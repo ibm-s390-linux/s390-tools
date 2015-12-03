@@ -3,7 +3,7 @@
  *
  * Common ECKD dump I/O functions
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -442,6 +442,34 @@ void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count)
 	int cmd = track_io ? ECKD_CCW_READ_TRACK_DATA : ECKD_CCW_READ_KD_MT;
 
 	io_block(cmd, blk, addr, blk_count, 0, 1);
+}
+
+/*
+ * Write dump segment with the header to DASD and return the next free
+ * block number
+ */
+unsigned long write_dump_segment(unsigned long blk,
+				 struct df_s390_dump_segm_hdr *segm,
+				 unsigned long zero_page)
+{
+	unsigned long addr, start_blk, blk_count;
+
+	/* Write the dump segment header itself (1 page) */
+	writeblock(blk, (unsigned long)segm, m2b(PAGE_SIZE), zero_page);
+	blk += m2b(PAGE_SIZE);
+	/* Write the dump segment */
+	addr = segm->start;
+	start_blk = blk;
+	while (addr < segm->start + segm->len) {
+		/* Remaining blocks to write */
+		blk_count = m2b(segm->len) - (blk - start_blk);
+		blk_count = MIN(blk_count, eckd_blk_max);
+		writeblock(blk, addr, blk_count, zero_page);
+		progress_print(addr);
+		blk += blk_count;
+		addr += b2m(blk_count);
+	}
+	return blk;
 }
 
 /*

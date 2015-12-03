@@ -3,7 +3,7 @@
  *
  * Common functions for stand-alone dump tools
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -45,6 +45,7 @@ struct stage2dump_parm_tail parm_tail
  * Globals
  */
 struct df_s390_hdr *dump_hdr;
+unsigned long total_dump_size;
 
 /*
  * Init dumper: Allocate standard pages, set timers
@@ -87,6 +88,112 @@ void progress_print(unsigned long addr)
 }
 
 /*
+ * Check if one MB memory after addr is zero
+ */
+static int __is_zero_mb(unsigned long addr)
+{
+	register unsigned long _addr1 asm("2") = (unsigned long) addr;
+	register unsigned long _len1  asm("3") = (unsigned long) MIB;
+	register unsigned long _addr2 asm("4") = (unsigned long) addr;
+	register unsigned long _len2  asm("5") = (unsigned long) 0;
+	unsigned int ipm;
+
+	asm volatile(
+		"0:     clcle   %1,%3,0(0)\n"
+		"       jo      0b\n"
+		"       ipm     %0\n"
+		"       srl     %0,28\n"
+		: "=d" (ipm), "+d" (_addr1), "+d" (_len1), "+d" (_addr2), "+d" (_len2)
+		:
+		: "cc");
+	return !ipm;
+}
+
+/*
+ * Check if the megabyte contains all zeroes.
+ */
+int is_zero_mb(unsigned long addr)
+{
+	if (!page_is_valid(addr))
+		return 1;
+	if (__is_zero_mb(addr))
+		return 1;
+	return 0;
+}
+
+/*
+ * Find next non-zero megabyte in the address range
+ */
+static unsigned long find_next_non_zero(unsigned long start, unsigned long end)
+{
+	while (start < end) {
+		if (!is_zero_mb(start))
+			break;
+		start += MIB;
+	}
+	if (start > end)
+		start = end;
+	return start;
+}
+
+/*
+ * Find next zero megabyte in the address range
+ */
+static unsigned long find_next_zero(unsigned long start, unsigned long end)
+{
+	while (start < end) {
+		if (is_zero_mb(start))
+			break;
+		start += MIB;
+	}
+	if (start > end)
+		start = end;
+	return start;
+}
+
+/*
+ * Find first continuous set of non-zero megabytes in the specified
+ * address range and update *dump_segm structure accordingly. The segment's
+ * length is truncated to max_len if required. Afterwards, look for the next
+ * non-zero megabyte. Return the address of the next non-zero megabyte or zero
+ * if no more follow.
+ */
+unsigned long find_dump_segment(unsigned long start, unsigned long end,
+				unsigned long max_len,
+				struct df_s390_dump_segm_hdr *dump_segm)
+{
+	unsigned long addr, limit;
+
+	memset(dump_segm, 0, sizeof(*dump_segm));
+	/* Check the input values for MB alingment */
+	if (!IS_ALIGNED(start, MIB) || !IS_ALIGNED(max_len, MIB))
+		panic(EINTERNAL, "start or max_len not MB aligned");
+	/* Search for dump segment start */
+	addr = find_next_non_zero(start, end);
+	if (addr == end)
+		goto out;
+	dump_segm->start = addr;
+	/* Search for dump segment end */
+	limit = end;
+	if (max_len)
+		limit = MIN(addr + max_len, end);
+	addr = find_next_zero(dump_segm->start, limit);
+	dump_segm->len = addr - dump_segm->start;
+	/* Search for next dump segment start */
+	addr = find_next_non_zero(addr, end);
+	/* Return the start address of the next segment */
+	if (addr < end)
+		return addr;
+out:
+	/*
+	 * Set the stop-marker indicating no more non-zero
+	 * segments in the address range
+	 */
+	dump_segm->stop_marker = -1UL;
+	return 0;
+}
+
+/*
  * Create IDA list starting at "addr" with "len" bytes
  */
 void create_ida_list(unsigned long *list, int len, unsigned long addr,
@@ -113,11 +220,11 @@ static void df_s390_dump_init(void)
 {
 	struct df_s390_hdr *dh = dump_hdr;
 
-	dh->magic = DF_S390_MAGIC;
+	dh->magic = DF_S390_MAGIC_EXT;
 	dh->hdr_size = DF_S390_HDR_SIZE;
 	dh->page_size = PAGE_SIZE;
 	dh->dump_level = 4;
-	dh->version = 5;
+	dh->version = 1;
 	dh->mem_start = 0;
 	dh->arch = DF_S390_ARCH_64;
 	dh->build_arch = DF_S390_ARCH_64;

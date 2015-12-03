@@ -3,7 +3,7 @@
  *
  * Common dump functions
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -16,6 +16,8 @@
 #include "s390.h"
 
 #define IPL_SC	*((struct subchannel_id *) &S390_lowcore.subchannel_id)
+#define ROUND_DOWN(x, a)		((x) & ~((typeof(x))(a) - 1))
+#define IS_ALIGNED(x, a)		~((x) & ((typeof(x))(a) - 1))
 
 /*
  * zipl parameters passed at tail of dump tools
@@ -33,6 +35,7 @@ extern struct stage2dump_parm_tail parm_tail
  * S390 dump format defines
  */
 #define DF_S390_MAGIC		0xa8190173618f23fdULL
+#define DF_S390_MAGIC_EXT	0xa8190173618f23feULL
 #define DF_S390_HDR_SIZE	0x1000
 #define DF_S390_EM_SIZE		16
 #define DF_S390_EM_MAGIC	0x44554d505f454e44ULL
@@ -86,6 +89,15 @@ struct df_s390_em {
 } __packed __aligned(16);
 
 /*
+ * Dump segment header
+ */
+struct df_s390_dump_segm_hdr {
+	uint64_t start;
+	uint64_t len;
+	uint64_t stop_marker;
+};
+
+/*
  * Linker script defined symbols
  */
 extern char __eckd2mvdump_parm_start[];
@@ -95,6 +107,7 @@ extern char __stage2_desc[];
  * Dump common globals
  */
 extern struct df_s390_hdr *dump_hdr;
+extern unsigned long total_dump_size;
 
 /*
  * Common functions
@@ -105,6 +118,10 @@ void init_progress_print(void);
 void progress_print(unsigned long addr);
 void df_s390_em_page_init(unsigned long page);
 void pgm_check_handler(void);
+int is_zero_mb(unsigned long addr);
+unsigned long find_dump_segment(unsigned long start, unsigned long end,
+				unsigned long max_len,
+				struct df_s390_dump_segm_hdr *dump_segm);
 
 /*
  * Dump tool backend functions

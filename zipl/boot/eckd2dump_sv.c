@@ -3,7 +3,7 @@
  *
  * Single-volume ECKD DASD dump tool
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -17,7 +17,7 @@
  * Magic number at start of dump record
  */
 uint64_t magic __attribute__((section(".stage2.head"))) =
-	0x5a45434b44363404ULL; /* "ZECKD64", version 4 */
+	0x5845434b44363401ULL; /* "XECKD64", version 1 */
 
 /*
  * ECKD parameter block passed by zipl
@@ -61,20 +61,29 @@ void dt_device_enable(void)
  */
 void dt_dump_mem(void)
 {
-	unsigned long blk, addr, page;
+	unsigned long blk, addr, end, page;
+	struct df_s390_dump_segm_hdr *dump_segm;
 
 	blk = device.blk_start;
 	page = get_zeroed_page();
+	dump_segm = (void *)get_zeroed_page();
 
 	/* Write dump header */
 	writeblock(blk, __pa(dump_hdr), m2b(DF_S390_HDR_SIZE), 0);
 	blk += m2b(DF_S390_HDR_SIZE);
 
 	/* Write memory */
-	for (addr = 0; addr < dump_hdr->mem_size; addr += b2m(eckd_blk_max)) {
-		writeblock(blk, addr, eckd_blk_max, page);
-		progress_print(addr);
-		blk += eckd_blk_max;
+	addr = 0;
+	total_dump_size = 0;
+	end = dump_hdr->mem_size;
+	while (addr < end) {
+		addr = find_dump_segment(addr, end, 0, dump_segm);
+		blk = write_dump_segment(blk, dump_segm, page);
+		total_dump_size += dump_segm->len;
+		if (dump_segm->stop_marker) {
+			addr = end;
+			break;
+		}
 	}
 	progress_print(addr);
 
@@ -82,4 +91,5 @@ void dt_dump_mem(void)
 	df_s390_em_page_init(page);
 	writeblock(blk, page, 1, 0);
 	free_page(page);
+	free_page(__pa(dump_segm));
 }

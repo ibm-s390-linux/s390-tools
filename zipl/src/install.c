@@ -3,7 +3,7 @@
  *
  * Functions handling the installation of the boot loader code onto disk
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -636,7 +636,7 @@ overwrite_partition_start(int fd, struct disk_info* info, int mv_dump_magic)
 	unsigned int bytes = 65536;
 	char* buffer;
 	const char dump_magic[] = {0xa8, 0x19, 0x01, 0x73,
-		0x61, 0x8f, 0x23, 0xfd};
+		0x61, 0x8f, 0x23, 0xfe};
 
 	if (misc_seek(fd, info->geo.start * info->phy_block_size))
 		return -1;

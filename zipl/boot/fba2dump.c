@@ -3,7 +3,7 @@
  *
  * Single-volume FBA DASD dump tool
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -13,14 +13,15 @@
 #include "fba.h"
 #include "stage2dump.h"
 
-#define BLK_PWRT	64	/* Blocks per write */
-#define BLK_SIZE	0x200	/* FBA block size */
+#define BLK_PWRT	64			/* Blocks per write */
+#define BLK_SIZE	0x200			/* FBA block size */
+#define BLK_PER_PAGE	(PAGE_SIZE / BLK_SIZE)	/* FBA blocks per page */
 
 /*
  * Magic number at start of dump record
  */
 uint64_t magic __attribute__((section(".stage2.head")))
-	= 0x5a44464241363404ULL; /* ZDFBA64, version 4 */
+	= 0x5844464241363401ULL; /* XDFBA64, version 1 */
 
 /*
  * FBA dump device partition specification
@@ -120,8 +121,8 @@ void dt_device_enable(void)
 /*
  * Write memory with number of blocks to start block
  */
-static void writeblock(unsigned long blk, unsigned long addr, unsigned long blk_count,
-		       unsigned long zero_page)
+static void writeblock_fba(unsigned long blk, unsigned long addr,
+			   unsigned long blk_count, unsigned long zero_page)
 {
 	unsigned long blk_end;
 
@@ -134,6 +135,35 @@ static void writeblock(unsigned long blk, unsigned long addr, unsigned long blk_
 	create_ida_list(ccw_program.ida_list, b2m(blk_count), addr, zero_page);
 	start_io(IPL_SC, &irb, &orb, 1);
 }
+
+/*
+ * Write dump segment with the header to FBA and return the next free
+ * block number
+ */
+unsigned long write_dump_segment_fba(unsigned long blk,
+				     struct df_s390_dump_segm_hdr *dump_segm,
+				     unsigned long zero_page)
+{
+	unsigned long addr, start_blk, blk_count;
+
+	/* Write the dump segment header itself (1 page) */
+	writeblock_fba(blk, __pa(dump_segm), BLK_PER_PAGE, zero_page);
+	blk += BLK_PER_PAGE;
+	/* Write the dump segment */
+	addr = dump_segm->start;
+	start_blk = blk;
+	while (addr < dump_segm->start + dump_segm->len) {
+		/* Remaining blocks to write */
+		blk_count = m2b(dump_segm->len) - (blk - start_blk);
+		blk_count = MIN(blk_count, BLK_PWRT);
+		writeblock_fba(blk, addr, blk_count, zero_page);
+		progress_print(addr);
+		blk += blk_count;
+		addr += b2m(blk_count);
+	}
+	return blk;
+}
+
 
 /*
  * Initialize the CCW program
@@ -163,26 +193,36 @@ static void ccw_program_init(void)
  */
 void dt_dump_mem(void)
 {
-	unsigned long blk, addr, page;
+	struct df_s390_dump_segm_hdr *dump_segm;
+	unsigned long blk, addr, end, page;
 
 	ccw_program_init();
 	blk = device.blk_start;
 	page = get_zeroed_page();
+	dump_segm = (void *)get_zeroed_page();
 
 	/* Write dump header */
-	writeblock(blk, __pa(dump_hdr), m2b(DF_S390_HDR_SIZE), 0);
-	blk += DF_S390_HDR_SIZE / BLK_SIZE;
+	writeblock_fba(blk, __pa(dump_hdr), m2b(DF_S390_HDR_SIZE), 0);
+	blk += m2b(DF_S390_HDR_SIZE);
 
 	/* Write memory */
-	for (addr = 0; addr < dump_hdr->mem_size; addr += b2m(BLK_PWRT)) {
-		writeblock(blk, addr, BLK_PWRT, page);
-		progress_print(addr);
-		blk += BLK_PWRT;
+	addr = 0;
+	total_dump_size = 0;
+	end = dump_hdr->mem_size;
+	while (addr < end) {
+		addr = find_dump_segment(addr, end, 0, dump_segm);
+		blk = write_dump_segment_fba(blk, dump_segm, page);
+		total_dump_size += dump_segm->len;
+		if (dump_segm->stop_marker) {
+			addr = end;
+			break;
+		}
 	}
 	progress_print(addr);
 
 	/* Write end marker */
 	df_s390_em_page_init(page);
-	writeblock(blk, page, 1, 0);
+	writeblock_fba(blk, page, 1, 0);
 	free_page(page);
+	free_page(__pa(dump_segm));
 }

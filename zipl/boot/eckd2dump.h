@@ -3,7 +3,7 @@
  *
  * Common ECKD dump I/O functions
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -12,6 +12,7 @@
 #define ECKD2DUMP_H
 
 #include "cio.h"
+#include "stage2dump.h"
 
 struct eckd_device {
 	uint32_t blk_start;
@@ -46,5 +47,8 @@ void stage2dump_eckd_init();
 void writeblock(unsigned long blk, unsigned long addr, unsigned long blk_count,
 		unsigned long zero_page);
 void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count);
+unsigned long write_dump_segment(unsigned long blk,
+				 struct df_s390_dump_segm_hdr *segm,
+				 unsigned long zero_page);
 
 #endif /* ECKD2DUMP_H */
