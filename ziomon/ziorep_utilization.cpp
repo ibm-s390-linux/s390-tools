@@ -126,7 +126,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 
 	if (argc < 2) {
 		print_help();
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
 	assert(sizeof(long long int) == sizeof(__u64));
@@ -138,10 +138,10 @@ static int parse_params(int argc, char **argv, struct options *opts)
 			break;
 		case 'h':
 			print_help();
-			return 1;
+			exit(EXIT_SUCCESS);
 		case 'v':
 			print_version();
-			return 1;
+			exit(EXIT_SUCCESS);
 		case 'b':
 			if (get_datetime_val(optarg, &opts->begin))
 				return -1;
