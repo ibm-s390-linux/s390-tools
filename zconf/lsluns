@@ -219,7 +219,6 @@ sub get_env_list
 
     @res = </sys/bus/ccw/drivers/zfcp/*.*.*/0x*>;
     return () if (!@res);
-reload:
     foreach my $entry (@res) {
         my $a = ${[split('/', $entry)]}[-2];
         my $p = ${[split('/', $entry)]}[-1];
@@ -243,12 +242,7 @@ reload:
     }
 
     if (!%res_hash) {
-        print "\nNo valid parameters left, ",
-        "using all available resources in system.\n\n";
-        @$a_ref_list = ();
-        @$p_ref_list = ();
-        @t_arr = ();
-        goto reload;
+        print "$PROGRAM_NAME: Adapter and/or port filter(s) did not match anything\n";
     }
     return %res_hash;
 }
