@@ -215,7 +215,6 @@ sub get_env_list
     my $p_ref_list = shift();
     my @res ;
     my %res_hash;
-    my @t_arr;
 
     @res = </sys/bus/ccw/drivers/zfcp/*.*.*/0x*>;
     return () if (!@res);
@@ -225,20 +224,6 @@ sub get_env_list
         next if (@$a_ref_list && "@$a_ref_list" !~ /$a/);
         next if (@$p_ref_list && "@$p_ref_list" !~ /$p/);
         push @{ $res_hash{$a} }, $p;
-    }
-    foreach my $a (sort @$a_ref_list) {
-        if ("@{[keys %res_hash]}" !~ /$a/) {
-            print "\tNo valid combination found for adapter '$a'. ",
-            "Removing from resource list.\n";
-        }
-    }
-
-    push @t_arr, map { @{$res_hash{$_}} } keys %res_hash;
-    foreach my $p (@$p_ref_list) {
-        if ("@t_arr" !~ /$p/) {
-            print "\tNo valid combination found for port '$p'. ",
-            "Removing from resource list.\n";
-        }
     }
 
     if (!%res_hash) {
