@@ -8,12 +8,12 @@ lsluns \- list available LUNs
 
 .SH SYNOPSIS
 .B lsluns
-.RB [ \-h]
-.RB [ \-v]
-.RB [ \-c
-.IR adapter id:0.0.XXXX ]
+.RB [\| \-h \|]
+.RB [\| \-v \|]
+.RB [\| \-c
+.IR adapter\ id:0.0.XXXX \|]\ .\|.\|.
 .RB [ \-p
-.IR port number:0xXXXXXXXXXXXXXXXX ]
+.IR port\ number:0xXXXXXXXXXXXXXXXX \|]\ .\|.\|.
 
 .SH DESCRIPTION
 .PP
@@ -25,36 +25,40 @@ limited by specifying an adapter or a port.
 
 .SH OPTIONS
 .TP
-.B -h, --help
+.BR \-h ", " \-\-help
 Print help message and exit.
 .TP
-.B -v, --version
+.BR \-v ", " \-\-version
 Display version info and exit.
 .TP
-.B -c, --ccw
+.BI \-c\  adapter \fR,\ \fB\-\-ccw= adapter
 Shows LUNs for a specific adapter.
 .TP
-.B -p, --port
+.BI \-p\  port \fR,\ \fB\-\-port= port
 Shows LUNs for a specific port.
 .TP
-.B -a, --active
+.BR \-a ", " \-\-active
 Shows all activated LUNs. In addition information is provided
 whether the LUN is encrypted or not. This is indicated with a bracketed X 
 right after the LUN number.
 
 .SH EXAMPLES
-.PP
-.IP "lsluns"
+.TP
+.B "lsluns"
 .RS
 Shows all available LUNs.
 .RE
-.IP "lsluns -c 0.0.3922"
-Shows all LUNs found on adapter 0.0.3922.
-.IP "lsluns -p 0x5005123456789000"
-Shows all LUNs for port 0x5005123456789000.
-.IP "lsluns -c 0.0.3922 -p 0x5005123456789000"
-Shows all LUNs for adapter 0.0.3922 and port 0x5005123456789000.
-.IP "lsluns -a "
+.TP
+.BI "lsluns \-c " 0.0.3922
+Shows all LUNs found on adapter \fI0.0.3922\fR.
+.TP
+.BI "lsluns \-p " 0x5005123456789000
+Shows all LUNs for port \fI0x5005123456789000\fR.
+.TP
+.BI "lsluns \-c " 0.0.3922 " \-p " 0x5005123456789000
+Shows all LUNs for adapter \fI0.0.3922\fR and port \fI0x5005123456789000\fR.
+.TP
+.B "lsluns -a"
 adapter = 0.0.3c02
         port = 0x500507630300c562
                 lun = 0x401040a200000000(X)     /dev/sg0        Disk    IBM:2107900
