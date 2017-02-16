@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# lsluns - Tool to list all available LUNs
+# lsluns - list LUNs discovered in the FC SAN, or show encryption state of attached LUNs
 #
 # Copyright IBM Corp. 2008, 2017
 #
@@ -169,32 +169,39 @@ sub get_lun_hash
 
 sub lsluns_usage {
     print <<EOD;
-Usage: $PROGRAM_NAME [<options>]
+Usage:
+$PROGRAM_NAME [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
 
-    lsluns provides information for LUNs.
+    List LUNs discovered in the Fibre Channel (FC) Storage Area Network (SAN).
+    This causes extra SAN traffic for each target port WWPN.
 
-    The default is to list all LUNs that are available via the attached ports.
-    The display can be limited by specifying an adapter or a port.
+$PROGRAM_NAME -a [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
+
+    Show encryption state of the attached LUNs.
+    This causes extra SAN traffic for each attached LUN.
+
+For all other uses, such as listing attached LUNs or properties other than
+encryption, use other tools such as "lszfcp -D" or "lsscsi -tv".
+
+Limit the listing by specifying one or more adapters (FCP device
+bus-IDs) or target port WWPNs or both.
 
 Options:
-    -a, --active
-    Shows all activated LUNs.
-    In addition LUN encryption information is provided.
-    e.g. "lsluns -a"
+    -c <busid>, --ccw <busid>
+        Filter LUNs by adapter with the specified FCP device bus-ID. Can be
+        specified multiple times.
+        For example: "$PROGRAM_NAME -c 0.0.3922"
 
-    -c, --ccw
-    Shows LUNs for a specific ccw device.
-    e.g. "lsluns -c 0.0.3922"
-
-    -p, --port
-    Shows LUNs for a specific port.
-    e.g. "lsluns -p 0x5005123456789000"
+    -p <wwpn>, --port <wwpn>
+        Filter LUNs by target port with the specified WWPN. Can be specified
+        multiple times.
+        For example: "$PROGRAM_NAME -p 0x5005123456789000"
 
     -h, --help
-    Print help message and exit.
+        Print help message and exit.
 
     -v, --version
-    Display version info and exit.
+        Display version information and exit.
 EOD
     exit 0;
 }

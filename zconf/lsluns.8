@@ -2,61 +2,93 @@
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH LSLUNS 8 "June 2008" "s390-tools"
+.TH LSLUNS 8 "2017-02-17" "s390-tools"
 .SH NAME
-lsluns \- list available LUNs
+lsluns \- list LUNs discovered in the FC SAN, or show encryption state of
+attached LUNs
 
 .SH SYNOPSIS
 .B lsluns
+.RB [\| \-c
+.IR busid \|]\ .\|.\|.
+.RB [\| \-p
+.IR wwpn \|]\ .\|.\|.
+.\" --active
+.br
+.B lsluns \-a
+.RB [\| \-c
+.IR busid \|]\ .\|.\|.
+.RB [\| \-p
+.IR wwpn \|]\ .\|.\|.
+.\" --help and --version
+.br
+.B lsluns
 .RB [\| \-h \|]
 .RB [\| \-v \|]
-.RB [\| \-c
-.IR adapter\ id:0.0.XXXX \|]\ .\|.\|.
-.RB [ \-p
-.IR port\ number:0xXXXXXXXXXXXXXXXX \|]\ .\|.\|.
 
 .SH DESCRIPTION
 .PP
 .B lsluns
-does a listing of all available LUNs.
+lists all logical unit numbers (LUNs) discovered in the
+Fibre Channel (FC) Storage Area Network (SAN).
+This causes extra SAN traffic for each target port WWPN.
 
-The default is to list all LUNs that are found. The listing can be
-limited by specifying an adapter or a port.
+.B lsluns -a
+shows the encryption state of the attached LUNs.
+This causes extra SAN traffic for each attached LUN.
+
+Limit the listing by specifying one or more adapters (FCP device
+bus-IDs) or target port WWPNs or both.
+
+For all other uses, such as listing attached LUNs or properties other than
+encryption, use other tools such as
+.B lszfcp \-D
+or
+.BR "lsscsi \-tv" .
 
 .SH OPTIONS
+.TP
+.BR \-a ", " \-\-active
+Show the encryption state of the attached LUNs. Encrypted devices are indicated
+with a bracketed X immediately following the LUN number.
+.TP
+.BI \-c\  busid \fR,\ \fB\-\-ccw= busid
+Filter LUNs by adapter with the specified FCP device bus-ID. This option can be
+specified multiple times. When used in conjunction with \fB\-p\fR, only those
+LUNs are listed that also satisfy at least one of the \fB\-p\fR constraints.
+.TP
+.BI \-p\  wwpn \fR,\ \fB\-\-port= wwpn
+Filter LUNs by target port with the specified WWPN. This option can be
+specified multiple times. When used in conjunction with \fB\-c\fR, only those
+LUNs are listed that also satisfy at least one of the \fB\-c\fR constraints.
 .TP
 .BR \-h ", " \-\-help
 Print help message and exit.
 .TP
 .BR \-v ", " \-\-version
-Display version info and exit.
-.TP
-.BI \-c\  adapter \fR,\ \fB\-\-ccw= adapter
-Shows LUNs for a specific adapter.
-.TP
-.BI \-p\  port \fR,\ \fB\-\-port= port
-Shows LUNs for a specific port.
-.TP
-.BR \-a ", " \-\-active
-Shows all activated LUNs. In addition information is provided
-whether the LUN is encrypted or not. This is indicated with a bracketed X 
-right after the LUN number.
+Display version information and exit.
 
 .SH EXAMPLES
 .TP
 .B "lsluns"
 .RS
-Shows all available LUNs.
+Lists all LUNs discovered in the FC SAN.
 .RE
 .TP
 .BI "lsluns \-c " 0.0.3922
-Shows all LUNs found on adapter \fI0.0.3922\fR.
+Lists all LUNs discovered in the FC SAN on adapter \fI0.0.3922\fR.
 .TP
 .BI "lsluns \-p " 0x5005123456789000
-Shows all LUNs for port \fI0x5005123456789000\fR.
+Lists all LUNs discovered in the FC SAN on target port
+\fI0x5005123456789000\fR.
 .TP
-.BI "lsluns \-c " 0.0.3922 " \-p " 0x5005123456789000
-Shows all LUNs for adapter \fI0.0.3922\fR and port \fI0x5005123456789000\fR.
+.BI "lsluns \-c " 0.0.3922 " \-c " 0.0.fc00 \
+" \-p " 0x5005123456789000 " \-p " 0x5005abcdefabc000
+Lists all LUNs discovered in the FC SAN on:
+adpater \fI0.0.3922\fR and port \fI0x5005123456789000\fR,
+adapter \fI0.0.3922\fR and port \fI0x5005abcdefabc000\fR,
+adapter \fI0.0.fc00\fR and port \fI0x5005123456789000\fR, or
+adapter \fI0.0.fc00\fR and port \fI0x5005abcdefabc000\fR.
 .TP
 .B "lsluns -a"
 adapter = 0.0.3c02
@@ -64,4 +96,9 @@ adapter = 0.0.3c02
                 lun = 0x401040a200000000(X)     /dev/sg0        Disk    IBM:2107900
                 lun = 0x401040a300000000        /dev/sg1        Disk    IBM:2107900
 
-Shows all active LUNs including the information whether the device is encrypted or not.
+Shows the encryption status of attached LUNs. A bracketed X suffixed to a LUN
+indicates that the device is encrypted.
+
+.SH "SEE ALSO"
+.BR lszfcp (8),
+.BR lsscsi (8)
