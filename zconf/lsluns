@@ -192,7 +192,8 @@ $PROGRAM_NAME -a [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
     This causes extra SAN traffic for each attached LUN.
 
 For all other uses, such as listing attached LUNs or properties other than
-encryption, use other tools such as "lszfcp -D" or "lsscsi -tv".
+encryption, use other tools such as "lszfcp -D" or "lsscsi -tv"
+or "lszdev zfcp-lun -ii".
 
 Limit the listing by specifying one or more adapters (FCP device
 bus-IDs) or target port WWPNs or both.

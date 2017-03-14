@@ -48,7 +48,9 @@ For all other uses, such as listing attached LUNs or properties other than
 encryption, use other tools such as
 .B lszfcp \-D
 or
-.BR "lsscsi \-tv" .
+.BR "lsscsi \-tv"
+or
+.BR "lszdev zfcp-lun \-ii" .
 
 .SS Details on lsluns without -a option
 
@@ -135,4 +137,5 @@ indicates that the device is encrypted.
 
 .SH "SEE ALSO"
 .BR lszfcp (8),
-.BR lsscsi (8)
+.BR lsscsi (8),
+.BR lszdev (8)
