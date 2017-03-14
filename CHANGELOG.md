@@ -3,6 +3,10 @@ Release history for s390-tools (MIT version)
 
 * __v2.1.1 (2017-mm-dd)__
 
+  Bug Fixes:
+  - lsluns: Do not scan (all) if filters match nothing
+  - lsluns: Enhance usage statement and man page
+
 * __v2.1.0 (2017-09-25)__
 
   Added new tools:
