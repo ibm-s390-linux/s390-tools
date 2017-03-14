@@ -177,6 +177,10 @@ $PROGRAM_NAME [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
       Discovering LUNs only makes sense for NPIV-enabled FCP devices
     without zfcp automatic LUN scan. zfcp automatic LUN scan is available
     as of kernel version 2.6.37, if not disabled with zfcp.allow_lun_scan=0.
+      For storage products that do not support a REPORT LUNS
+    well-known logical unit (such as IBM Storwize products),
+    ensure that LUN 0 represents a valid peripheral device type.
+    See the man page for more information.
 
 $PROGRAM_NAME -a [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
 

@@ -64,6 +64,18 @@ If not attached already, lsluns temporarily attaches LUN 0
 Do not terminate lsluns with a signal. Signals interfere
 with the removal of temporarily attached LUNs.
 
+.TP
+Storage Products
+Some storage products return a peripheral device type of 31==0x1f
+with peripheral qualifier 0 in a SCSI standard INQUIRY command
+for an unmapped FCP LUN 0. Examples are: IBM Storwize products,
+including IBM V7000, IBM V840, IBM V9000, and IBM SAN Volume Controller.
+For lsluns to work with such storage products,
+you must have a host mapping on the storage, which maps some volume
+to exported FCP LUN 0x0000000000000000 (Storwize host map property "SCSI ID" 0)
+for each used FCP-device initiator WWPN. The volume can be
+a minimum-sized thin-provisioned shared stand-in volume.
+
 .SH OPTIONS
 .TP
 .BR \-a ", " \-\-active
