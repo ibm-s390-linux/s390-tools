@@ -46,6 +46,24 @@ encryption, use other tools such as
 or
 .BR "lsscsi \-tv" .
 
+.SS Details on lsluns without -a option
+
+.TP
+Prerequisite
+Discovering LUNs only makes sense for NPIV-enabled FCP devices
+without zfcp automatic LUN scan. zfcp automatic LUN scan is available
+as of kernel version 2.6.37, if not disabled with zfcp.allow_lun_scan=0.
+
+With available and enabled zfcp automatic LUN scan,
+the kernel already performs LUN discovery.
+
+.TP
+Temporary LUN Attachment
+If not attached already, lsluns temporarily attaches LUN 0
+(or if this fails the WLUN 0xc101000000000000) during runtime.
+Do not terminate lsluns with a signal. Signals interfere
+with the removal of temporarily attached LUNs.
+
 .SH OPTIONS
 .TP
 .BR \-a ", " \-\-active

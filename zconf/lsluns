@@ -174,6 +174,9 @@ $PROGRAM_NAME [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
 
     List LUNs discovered in the Fibre Channel (FC) Storage Area Network (SAN).
     This causes extra SAN traffic for each target port WWPN.
+      Discovering LUNs only makes sense for NPIV-enabled FCP devices
+    without zfcp automatic LUN scan. zfcp automatic LUN scan is available
+    as of kernel version 2.6.37, if not disabled with zfcp.allow_lun_scan=0.
 
 $PROGRAM_NAME -a [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
 
