@@ -291,6 +291,13 @@ sub get_payload_records
 		my $area = str_from_hex(substr($record[2], 2, 14));
 		my $counter = hex(substr($record[2], 0, 2));
 		my $fsf_req_id = substr($record[2], 16, 16);
+		# ($counter == 0) is just a simple heuristic which can fail if
+		# there are missing payload record junks due to PAY area wrap!
+		if ($counter == 0 &&
+		    defined($PAYLOAD_RECORDS{$fsf_req_id}{$area})) {
+			print "Warning: Ambiguous PAYload records. reqid:" .
+			      $fsf_req_id . " area:" . $area . "\n";
+		}
 		$PAYLOAD_RECORDS{$fsf_req_id}{$area}[$counter] = [@record];
 		if ($def_error && ($area =~ /def_err/)) {
 			$def_error{$fsf_req_id}[$counter] = [@record];
@@ -515,11 +522,16 @@ sub print_payload
 	my $field_name = shift();
 	my $tmp_str;
 
+	if ($payload) {
+		# workaround to let user determine ambiguous PAYload records
+		printf "%-14s : %s\n", "Payload time", $payload->[0]->[0];
+	}
 	printf "%-14s : ", $field_name;
 	if (!$payload) {
 		print "record not available anymore.\n";
 		return;
 	}
+	# TODO: iterate with $counter loop and notify user about missing junks
 	foreach my $cc (@$payload) {
 		$tmp_str .= substr($cc->[2], 32);
 	}

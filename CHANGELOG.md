@@ -21,6 +21,7 @@ Release history for s390-tools (MIT version)
   - lszfcp: Fix to show non-good target ports again
   - lszfcp: Fix missing block & sg device output without CONFIG_SYSFS_DEPRECATED
   - lszfcp: New command line option for extended output format
+  - zfcpdbf: Warn about ambiguous payload records with dup reqid & payarea
 
  * __v2.8.0 (2019-02-15)__
 
