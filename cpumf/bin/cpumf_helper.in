@@ -1,0 +1,483 @@
+#!/usr/bin/perl -W
+#
+# cpumf_helper - Helper module for managing CPU-measurement facilities (CPU-MF)
+#
+# Copyright IBM Corp. 2014, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+use strict;
+use warnings;
+use Carp qw/croak/;
+use Data::Dumper;
+use Getopt::Long qw/:config no_ignore_case/;
+use Pod::Usage;
+
+
+# Global constants
+my $SERVICE_LEVELS = '/proc/service_levels';
+my $CPUMF_DATA_DIR = '@cpumfdata_path@';
+my $CPUM_SFB_SIZE = '/sys/module/kernel/parameters/cpum_sfb_size';
+my $CPUM_SF_DBF='/sys/kernel/debug/s390dbf/cpum_sf';
+
+# Counter set bits (according to QUERY COUNTER INFORMATION)
+my $BASIC_SET = 0x0002;
+my $PROBLEM_STATE_SET = 0x0004;
+my $CRYPTO_SET = 0x0008;
+my $EXTENTED_SET = 0x0001;
+my $MT_DIAG_SET = 0x0020;
+my $COPROC_GRP_SET = 0x8000;
+
+
+# Public prototypes
+sub cpumf_collect_data();
+sub cpumf_get_sfb_size();
+sub cpumf_set_sfb_size($);
+sub cpumf_parse_ctrdef($;$);
+sub cpumf_load_ctrdef($;$);
+sub cpumf_get_counter_set($);
+sub cpumf_counter_set_names();
+sub cpumf_counter_set_ids();
+sub cpumf_hardware_counter_map();
+
+# Internal prototypes
+sub cpumf_parse_cf($$);
+sub cpumf_parse_sf($$);
+
+
+sub cpumf_get_sfb_size()
+{
+	my $val = "0,0";
+	my $SFBSIZE;
+
+	return $val unless open($SFBSIZE, '<', $CPUM_SFB_SIZE);
+	$val = <$SFBSIZE>;
+	chomp($val);
+	close($SFBSIZE);
+
+	return [split /,/, $val];
+}
+
+sub cpumf_set_sfb_size($)
+{
+	my @size = @{shift()};
+	my $val = join ',', @size[0,1];
+	my ($SFBSIZE, $rc);
+
+	return undef unless open($SFBSIZE, '>', $CPUM_SFB_SIZE);
+	# Check the return code of print and close to detect error conditions
+	# reported by the device driver.  Because perl might buffer data, print
+	# might be successful, but close might then report the error condition.
+	# So check the return code of both functions and always close the file
+	# handle.
+	$rc = print { $SFBSIZE } "$val\n";
+	unless ($rc) {
+		close($SFBSIZE);
+		return $rc;
+	}
+	return close($SFBSIZE);
+}
+
+
+sub cpumf_parse_cf($$)
+{
+	my ($ent, $data) = @_;
+
+	if ($ent =~ /version=([0-9.]+) authorization=([[:xdigit:]]+)/) {
+		$data->{cf} = { version => $1, auth => hex($2) };
+	}
+}
+
+sub cpumf_parse_sf($$)
+{
+	my ($ent, $data) = @_;
+
+	# Parse common sampling facility entry
+	if ($ent =~ /min_rate=(\d+) max_rate=(\d+) cpu_speed=(\d+)/) {
+		$data->{sf} = {
+			min_sampl_interval => $1,
+			max_sampl_interval => $2,
+			cpu_speed	   => $3,
+			# This contains a list of authorized sampling modes, for
+			# example, basic
+			modes		    => {},
+		};
+	}
+
+	# Parse sampling facility mode entries
+	if ($ent =~ /mode=(\w+) sample_size=(\d+)/) {
+		$data->{sf}->{modes}->{$1}->{sample_size} = $2;
+	}
+}
+
+sub cpumf_collect_data()
+{
+	my $SL;
+
+	# Collect CPU-MF information from /proc/service_levels
+	return undef unless open($SL, '<', $SERVICE_LEVELS);
+	my @sl = <$SL>;
+	chomp(@sl);
+	close($SL);
+
+	# Process CPU-MF information and build data hash
+	my $data = {};
+	foreach my $ent (@sl) {
+		$ent =~ s/^CPU-MF: // or next;
+		cpumf_parse_cf($ent, $data) if $ent =~ s/Counter facility: //;
+		cpumf_parse_sf($ent, $data) if $ent =~ s/Sampling facility: //;
+	}
+
+	# Collect perf support for available facilities
+	if (-e '/sys/bus/event_source/devices/cpum_cf') {
+		$data->{cf}->{perf} = "cpum_cf" if exists $data->{cf};
+	}
+	if (-e '/sys/bus/event_source/devices/cpum_sf') {
+		$data->{sf}->{perf} = "cpum_sf" if exists $data->{sf};
+	}
+
+	return $data;
+}
+
+# Parse the specified counter definition file and returns a hash containing
+# the parsed counter definition.  The optional argument specifies a hash
+# reference to which the new definitions are added.  This reference is returned.
+sub cpumf_parse_ctrdef($;$)
+{
+	my $ctrdef = shift();
+	my $h = @_ ? shift() : {};
+	my $CTRDEF;
+
+	return undef unless open($CTRDEF, '<', "$CPUMF_DATA_DIR/$ctrdef");
+	my ($ctr, $name);
+	while (my $line = <$CTRDEF>) {
+		next if $line =~ /^#/;
+		chomp($line);
+
+		# Parse start of counter definition entry
+		if ($line =~ m/^Counter:\s*(0x[[:xdigit:]]+|\d+)
+			        \s+Name:\s*([[:alnum:]_]+)$/x) {
+			($ctr, $name) = ($1, $2);
+			$ctr = hex($ctr) if $ctr =~ /^0x/;
+			unless (length($ctr)) {
+				print STDERR "Found invalid entry in counter " .
+				      "definition: line $.\n";
+			}
+			$h->{$ctr} = { name => $name || "" };
+		}
+
+		# At this point, a counter must be defined
+		next unless defined($ctr);
+
+		# Parse short description (optional)
+		if ($line =~ m/^Short-Description:\s*(\S.*)?$/) {
+			$h->{ctr}->{shortdesc} = $1 || "";
+
+		# Parse start of counter description
+		} elsif ($line =~ m/^Description:\s*(\S.*)?$/) {
+			$h->{$ctr}->{desc} = $1 || "";
+
+		# Parse end of counter description
+		} elsif ($line =~ m/^\.$/) {
+			# Complete the counter definition
+			$h->{$ctr}->{set} = cpumf_get_counter_set($ctr);
+			# Trim whitespaces
+			$h->{$ctr}->{shortdesc} =~ s/^\s+|\s+$//g if $h->{$ctr}->{shortdesc};
+			$h->{$ctr}->{desc} =~ s/^\s+|\s+$//g if $h->{$ctr}->{desc};
+			# Finally, reset counter for next entry
+			$ctr = undef;
+
+		# Line is part of counter description (if $ctr_num is set)
+		} else {
+			$h->{$ctr}->{desc} .= " $line";
+		}
+	}
+	close($CTRDEF);
+
+	return $h;
+}
+
+# IBM System z hardware with CPU-M counter facility support
+my $system_z_hwtype_map = {
+	# Machine type	   Description
+	''		=> 'Unknown hardware model',
+	2097		=> 'IBM System z10 EC',
+	2098		=> 'IBM System z10 BC',
+	2817		=> 'IBM zEnterprise 196',
+	2818		=> 'IBM zEnterprise 114',
+	2827		=> 'IBM zEnterprise EC12',
+	2828		=> 'IBM zEnterprise BC12',
+	2964		=> 'IBM z13',
+	2965		=> 'IBM z13s',
+};
+
+sub get_hardware_type()
+{
+	my $type = "";
+	my $SYSINFO;
+
+	return undef unless open($SYSINFO, '<', '/proc/sysinfo');
+	while (my $line = <$SYSINFO>) {
+		if ($line =~ m/^Type:\s*(\d+)\s*$/) {
+			$type = $1;
+			last;
+		}
+	}
+	close($SYSINFO);
+	return $type;
+}
+
+sub cpumf_load_ctrdef($;$)
+{
+	my $hw_type = shift();
+	my $authorized = @_ ? shift() : 0xffff;   # Counter Set authorization
+
+	my $ctrmap = cpumf_hardware_counter_map();
+	return unless $ctrmap;
+
+	my $h = {};
+	# Load generic counter sets
+	cpumf_parse_ctrdef($ctrmap->{0}, $h) or
+		croak "Failed to read generic counter definition: $!\n";
+	# Load hardware model specific counter set(s)
+	if ($hw_type && $ctrmap->{$hw_type}) {
+		# Hardware-model specific counter sets are:
+		#   - Extended Counter Set
+		#   - MT-diagnostic Counter Set
+		cpumf_parse_ctrdef($ctrmap->{$hw_type}, $h) or
+			croak "Failed to read hardware-model counter definition: $!\n";
+	}
+
+	# Remove counter sets that miss authorizations
+	my @no_auth_list = ();
+	foreach my $ctr (sort keys %$h) {
+		push @no_auth_list, $ctr unless $h->{$ctr}->{set} & $authorized;
+	}
+	delete $h->{$_} foreach (@no_auth_list);
+
+	return $h;
+}
+
+
+sub cpumf_get_counter_set($)
+{
+	my $ctr = shift();
+
+	return $BASIC_SET if $ctr < 32;
+	return $PROBLEM_STATE_SET if $ctr < 64;
+	return $CRYPTO_SET if $ctr < 128;
+	#
+	# The extended counter set ranges from
+	# 128 to
+	#   159	for csvn == 1
+	#   175 for csvn == 2
+	#   255 for csvn >  2
+	# Tolerate any future counters up to
+	# the MT-diagnostic counter set.
+	return $EXTENTED_SET if $ctr < 448;
+	#
+	# The MT-diagnostic counter set ranges from
+	# 448 to
+	#   495 for cvsn > 3
+	return $MT_DIAG_SET if $ctr <= 495;
+	return 0;
+}
+
+sub cpumf_counter_set_names()
+{
+	return {
+		# Identifier	       Name
+		$BASIC_SET	    => 'Basic Counter Set',
+		$PROBLEM_STATE_SET  => 'Problem-State Counter Set',
+		$CRYPTO_SET	    => 'Crypto-Activity Counter Set',
+		$EXTENTED_SET	    => 'Extended Counter Set',
+		$MT_DIAG_SET	    => 'MT-diagnostic Counter Set',
+		$COPROC_GRP_SET	    => 'Coprocessor Group Counter Set',
+	};
+}
+
+sub cpumf_counter_set_ids()
+{
+	return [$BASIC_SET, $PROBLEM_STATE_SET, $CRYPTO_SET, $EXTENTED_SET,
+		$MT_DIAG_SET, $COPROC_GRP_SET];
+}
+
+sub cpumf_hardware_counter_map()
+{
+	my $map = do "$CPUMF_DATA_DIR/cpum-cf-hw-counter.map";
+	croak "Failed to parse mapfile: $@" if $@;
+	croak "Failed to read mapfile: $!" unless defined $map;
+	return $map;
+}
+
+
+sub cpumf_helper_main()
+{
+	# Configuration settings and options
+	my $conf = {
+	};
+
+	# Parse command line option
+	GetOptions(
+		"i|info"	=> \$conf->{opt_info},
+		"c|counter=i"	=> \$conf->{opt_ctr},
+		"ctr-def=i"	=> \$conf->{opt_ctrdef},
+		"hardware-type"	=> \$conf->{opt_hwtype},
+		"ctr-set-names"	=> \$conf->{opt_ctrset_names},
+		"ctr-set-ids"	=> \$conf->{opt_ctrset_ids},
+		"sfb-size"	=> \$conf->{opt_sfb_size},
+		"ctr-sf"	=> \$conf->{opt_sf_ctr},
+	) or pod2usage(-message =>"One or more options are not valid",
+		       -exitval => 1);
+
+	# Setting up Data::Dumper to create parseable Perl output
+	local $Data::Dumper::Purity = 1;
+	local $Data::Dumper::Sortkeys = 1;
+	local $Data::Dumper::Terse = 1;
+
+	###print STDERR "CONF: " . Dumper($conf) . "\n";
+
+	# Process command line options
+	my $exitval = 0;
+	my $result;
+	if (defined($conf->{opt_info})) {
+		$result = cpumf_collect_data();
+
+	# Display System z hardware type
+	} elsif (defined($conf->{opt_hwtype})) {
+		my $type = get_hardware_type();
+		$result = [$type, $system_z_hwtype_map->{$type} || ""];
+
+	# Display counters for current System z hardware
+	} elsif (defined($conf->{opt_ctr})) {
+		my $type = get_hardware_type();
+		$type = 0 unless $type;
+		$result = cpumf_load_ctrdef($type, $conf->{opt_ctr});
+
+	# Display counters for a particular System z hardware type
+	} elsif (defined($conf->{opt_ctrdef})) {
+		my $m = cpumf_hardware_counter_map();
+		if (exists $m->{$conf->{opt_ctrdef}}) {
+			$result = cpumf_parse_ctrdef($m->{$conf->{opt_ctrdef}});
+		} else {
+			printf STDERR "Invalid counter definition\n";
+			$exitval = 2;
+		}
+	# Display the size of the sampling facility buffer (sfb)
+	} elsif (defined($conf->{opt_sfb_size})) {
+		$result = cpumf_get_sfb_size();
+
+	# Display counter definitions for the sampling facility support (perf)
+	} elsif (defined($conf->{opt_sf_ctr})) {
+		$result = cpumf_parse_ctrdef('cpum-sf-modes.ctr');
+
+	# Display mapping of counter set IDs to counter set names
+	} elsif (defined($conf->{opt_ctrset_names})) {
+		$result = cpumf_counter_set_names();
+
+	# Display counter set IDs
+	} elsif (defined($conf->{opt_ctrset_ids})) {
+		$result = cpumf_counter_set_ids();
+
+	} else {
+		pod2usage(-message => "No option specified",
+			  -exitval => 1);
+	}
+
+	# Display result
+	print Dumper($result) if $result;
+	exit $exitval;
+}
+
+&cpumf_helper_main();
+__DATA__
+__END__
+=head1 NAME
+
+B<cpumf_helper> - Helper module for managing CPU-Measurement Facilities (CPU-MF)
+
+=head1 SYNOPSIS
+
+=head1 DESCRIPTION
+
+The B<cpumf_helper> program is not intended for ordinary use.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-i>, B<--info>
+
+Displays detailed information about installed and available CPU-measurement
+facilities and the related Linux support.
+
+=item B<-c>, B<--counter> I<authorization_value>
+
+Displays counter information for the current System z hardware.  The
+authorization value provides information about the authorized counter sets.  The
+value must be specified in decimal format.
+
+To display all supported counters, specify C<65535> (FFFF hex).
+
+To display supported counters for a particular System z hardware, use the
+B<--ctr-def> option and specify the System z hardware type.
+
+=item B<--hardware-type>
+
+Displays the System z hardware type.
+
+=item B<--ctr-def> I<hardware_type>
+
+Displays detailed information about a particular counter set for the specified
+System z hardware type, I<hardware_type>.  If you specify zero for
+I<hardware_type>, type-independent counter sets are displayed.
+
+=item B<--ctr-set-names>
+
+Displays the mapping of counter set IDs to counter set names.  The counter set
+IDs are numbers that are used in counter definitions.
+
+=item B<--ctr-set-ids>
+
+Displays the counter set IDs.  The counter set IDs are numbers that match the
+authorization bits (see QUERY COUNTER INFORMATION).  The output format is a
+list.  To get the ID for a particular counter set, use an index number as
+follows:
+
+=over 16
+
+=item 0: Basic Counter Set
+
+=item 1: Problem-State Counter Set
+
+=item 2: Crypto-Activity Counter Set
+
+=item 3: Extended Counter Set
+
+=item 4: MT-diagnostic Counter Set
+
+=item 5: Coprocessor Group Counter Set
+
+=back
+
+=item B<--ctr-sf>
+
+Displays the counter definitions for the sampling facility support.  These
+counter definitions are specific to Linux perf infrastructure.
+
+=item B<--sfb-size>
+
+Displays the size of the sampling facility buffer (SFB).  The minimum and
+maximum numbers are measured in units of sample-data-blocks.  A
+sample-data-block uses about 4 kilobytes.
+
+=back
+
+=head1 FILES
+
+=head1 SEE ALSO
+
+L<lscpumf(1)>, L<chcpumf(1)>
+
+=cut

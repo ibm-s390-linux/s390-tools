@@ -1,0 +1,738 @@
+#!/bin/bash
+#
+# qethconf - Tool to configure IPA, VIPA, and Proxy ARP for OSA-Express cards
+#
+# This shell script simplifies the usage of the OSA-Express functions
+#
+#  - IP address takeover (IPA)
+#  - Proxy ARP
+#  - Virtual IP address (VIPA)
+#
+# IP addresses in IPv4 or IPv6 format must be no longer specified in
+# hexadecimal format. The script compounds the commands for the functions
+# according to the given parameters and sends it to the appropriate
+# OSA-Express device driver /proc file.
+#
+# Copyright 2017 IBM Corp.
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+script_name=${0##*/}                     # name of this script
+vipa_ext="_vipa"                         # command extension for VIPA
+parp_ext="_rxip"                         # command extension for Proxy ARP
+proc_file="/proc/qeth_ipa_takeover"      # kernel 2.4 qeth proc file for these features
+sys_file="/sys/devices/qeth" 		 # kernel 2.6 sys fs file for these features
+sys_ifnames="/sys/class/net"		 # include all available if_names 
+echo_cmd=""                              # echo command to be build 
+
+
+#
+# exit script on error and print usage hint
+#
+function __exit_on_error
+{
+   echo "Try '$script_name --help' for more information."
+   exit 1
+}
+
+#
+# error message if layer2 is enabled
+#
+function __layer2_enabled
+{
+
+    	#
+    	# check interface name if specified 
+    	#
+    	if [ -z "$1" ]; then
+       		echo $script_name": interface name required for function $cmd_type"
+       		__exit_on_error
+	elif [ ! -e $sys_ifnames/$1 ]; then
+       		echo $script_name": interface does not exist"
+       		__exit_on_error
+    	fi
+
+	#
+	# check if layer 2 is enables
+	#
+	if [ -e /sys/class/net/$1/device/layer2 ]; then
+		if [ "`cat /sys/class/net/$1/device/layer2`" != 0 ]; then
+			if [ "$2" != 'list' ]; then
+					echo "$script_name: OSA layer 2 enabled for device $1 !"
+					echo "          IPA, VIPA, PARP not supported."
+					exit 1
+			else
+				return 1
+			fi
+		fi
+	fi
+}
+
+
+#
+# function for printing the usage message
+#
+function __usage
+{
+    printf '\n%s %s %s\n\n' "Usage:" $script_name "TYPE CMD [IPADDR] [INTERFACE]"
+    printf '  %s\n'   "Description:"
+    printf '  %s\n'   "Shell script to configure IPA, VIPA and Proxy ARP for OSA-Express"
+    printf '  %s\n\n' "cards in layer 3 mode."
+    printf '  %s\n\n' "Parameter:"
+    printf '  %s\t\t%s\n' "TYPE" "<ipa/vipa/parp|rxip/list_all/list_msg>"
+    printf '\t\t%s\n' "choose one of these keywords for feature"
+    printf '\t\t%s\n' "ipa - IP address takeover"
+    printf '\t\t%s\n' "vipa - Virtual IP address"
+    printf '\t\t%s\n' "parp|rxip - Proxy ARP"
+    printf '\t\t%s\n' "list_all - list all available entries"
+    printf '\t\t%s\n' "list_msg - list messages and explanation"
+    printf '\n  %s\t\t%s\n' "CMD" "<add/del/inv4/inv6/list>"
+    printf '\t\t%s\n' "where"
+    printf '\t\t%s\n' "add  - add an IP address or address range"
+    printf '\t\t%s\n' "del  - delete an IP address or address range"
+    printf '\t\t%s\n' "inv4 - inverts the selection of address ranges for IPv4"
+    printf '\t\t%s\n' "       (only IPA)"
+    printf '\t\t%s\n' "inv6 - inverts the selection of address ranges for IPv6"
+    printf '\t\t%s\n' "       (only IPA)"
+    printf '\t\t%s\n' "list - list defined entries per feature"
+    printf '\n  %s\t%s\n' "IPADDR" "[-x]<addr>[/<mask_bits>]"
+    printf '\t\t%s\n' "required for commands add and del"
+    printf '\t\t%s\n' "addr      - IP address in IPv4 or IPv6 format"
+    printf '\t\t%s\n' "            e.g. 192.168.10.38 or FE80::800:5A12:3459"
+    printf '\t\t%s\n' "            use option -x for hexadecimal format"
+    printf '\t\t%s\n' "            e.g. c0a80a26"
+    printf '\t\t%s\n' "mask_bits - number of bits which are set in the"
+    printf '\t\t%s\n' "            network mask (required for IPA)"
+    printf '\n  %s\t%s\n' "INTERFACE" "interface name to which the address or address range"
+    printf '\t\t%s\n' "is bound, e.g eth0"
+    exit 0
+}
+
+function PrintVersion
+{
+        echo "$script_name: version %S390_TOOLS_VERSION%"
+        echo "Copyright IBM Corp. 2003, 2017"
+}
+
+
+
+#
+# prints a row from /proc/qeth_ipa_takeover
+#
+function __print_line
+{
+   local ip_num=
+
+   if [ -n "$(echo $raw_cmd | grep '4')" ]; then  # IPv4
+      
+      # convert hex IPv4 address to human format
+      for i in 0 2 4 6; do
+        # convert hex digits to uppercase (bc needs this)
+        # use bc for hex to dec conversion
+        ip_num=`echo ${ipinfo:i:2} | tr '[a-f]' '[A-F]'`  
+        ip_num=`echo "ibase=16; $ip_num" | bc`
+
+        fmt_line="$fmt_line$ip_num"        
+
+        if [ "$i" -ne 6 ]; then
+           fmt_line="$fmt_line."
+        fi
+      done 
+
+   else # IPv6
+     
+      # convert IPv6 address to human readable format
+      for i in 0 4 8 12 16 20 24 28; do
+        
+        ip_num=${ipinfo:i:4} 
+
+        fmt_line="$fmt_line$(echo $ip_num | sed -e 's/0000/0/')"
+
+        if [ "$i" -ne 28 ]; then
+           fmt_line="$fmt_line:"
+        fi
+      done
+   fi
+
+   # add mask bits and interface, if existent
+   if [ -n "$(echo $ipinfo| grep '/')" ]; then
+      fmt_line="$fmt_line/$(echo ${ipinfo##*/} | sed -e 's/:/ /')"
+   elif [ -n "$(echo $ipinfo| grep ':')" ]; then
+      fmt_line="$fmt_line ${ipinfo##*:}"
+   fi
+
+   # finally echo line to stdout
+   echo $fmt_line
+}
+
+
+#
+# list defined entries per IPA/VIPA/PARP function
+#
+function __list_entries
+{
+  local cmd_type=$1
+  local fmt_line=
+  local device_list=
+  local number_of_devices=
+
+  declare -i count=0
+
+#
+# list all available entries for all devices
+#
+  if [ "$1" = list_all ];then
+  	cmd_type="ipa vipa rxip"
+  fi
+  for j in ${cmd_type}
+	do
+	  device_list="`cat $sys_file/*.*.*/if_name`"
+	  for i in ${device_list} 
+		  do
+			__layer2_enabled "$i" "list"
+			if [ "$?" -ne 0 ]; then
+				continue
+			fi
+			case "$j" in
+				ipa )	cmd_type_temp=ipa_takeover;;
+				parp )	cmd_type_temp=rxip
+					j=rxip;;
+				* )	cmd_type_temp=$j;;
+			esac
+			fmt_line=/sys/class/net/$i/device/$cmd_type_temp/
+			for k in 4 6 
+				do
+# 
+# here we get the data from the sysfs
+#
+					if [ -f /sys/class/net/$i/device/$cmd_type_temp/add$k ]; then	
+						cat_output="`cat /sys/class/net/$i/device/$cmd_type_temp/add$k`"
+						for l in ${cat_output}
+							do
+								if [ -n "$cat_output" ]; then
+									if [ "$j" = rxip ]; then
+										j=parp
+									fi
+									echo "$j add $l $i"
+									count=count+1
+								fi
+							done
+					fi
+				done
+		  done
+ done
+	
+
+  if [ "$count" -eq 0 ]; then 
+     echo $script_name": currently no $cmd_type entries defined"
+  fi
+
+  exit 0
+}
+
+
+#
+# list messages and explanation
+#
+function __list_msgs
+{
+    local cmd_type=$1
+    printf '\n\t\t%s\n' "Operation not permitted."
+    printf '\t\t%s\n' "OSA layer2 mode is enabled for the device. IPA, VIPA,"
+    printf '\t\t%s\n' "and PARP are not supported with layer 2."
+    printf '\n\t\t%s\n' "Out of memory."
+    printf '\t\t%s\n' "There is not enough free memory to allocate an entry in sysfs."
+    printf '\n\t\t%s\n' "File exists."
+    printf '\t\t%s\n' "The entry to be added (e.g. IP address) does already exist"
+    printf '\n\t\t%s\n' "Invalid argument."
+    printf '\t\t%s\n' "At least one of the following specifications was not valid:"
+    printf '\t\t%s\n' "- The IP address format"
+    printf '\t\t%s\n' "- The mask bits for the IP address"
+    printf '\t\t%s\n' "- The value in the field for IP address inversion"
+    exit 0
+}
+
+
+#
+# IP address conversion - converts IP address to hexadecimal format
+#
+function __ip_conv
+{
+	
+    declare -i count=0
+    declare -i zeropad=8
+    ip_temp=
+    ip_shortened="false"
+    strt_end_col="false"
+
+    ipv4_rule='^[[:digit:]]\{1,3\}\.[[:digit:]]\{1,3\}\.[[:digit:]]\{1,3\}\.[[:digit:]]\{1,3\}$'
+    ipv6_rule='^[[:xdigit:]:.]\+$'
+
+    # if IP address is given as hex input; option -x 
+    # convert it to decimal 
+
+    if [ -n "$(echo $ip_addr | grep '\-x')" ]; then
+       #
+       # hex input given 
+       #
+       ip_addr=${ip_addr##-x}
+       if [ -n "$(echo $ip_addr | grep '^[[:xdigit:]]\{8\}$')" ]; then 
+          ip_ver=4
+       elif [ -n "$(echo $ip_addr | grep '^[[:xdigit:]]\{32\}$')" ]; then
+          ip_ver=6
+       else
+          echo $script_name": bad IP address"
+          __exit_on_error
+       fi
+       ip_hex=$ip_addr
+       #
+       # convert hex given IPv4 address to decimal for kernel 2.6
+       #
+       ip_addr_length=${#ip_addr}
+       if [ $ip_addr_length = 8 ]; then
+		ip_hex=""
+  		while [ $ip_addr_length -gt 0 ]; do
+			ip_addr_length=$(($ip_addr_length-2))
+    			ip_temp='0x'`expr substr $ip_addr 1 2`
+			ip_addr=`expr substr $ip_addr 3 $ip_addr_length`
+			#
+			# conversion from hex to decimal
+			#
+       			ip_hex_temp="$(printf '%02d' $ip_temp)"
+			if [ `expr substr $ip_hex_temp 1 1` = 0 ]; then
+				ip_hex_temp=`expr substr $ip_hex_temp 2 1`
+			fi
+			if [ $ip_addr_length -ge 2 ]; then
+				ip_hex_temp="$ip_hex_temp."
+			fi
+			ip_hex=$ip_hex$ip_hex_temp
+  		done
+			
+       else
+		#
+		# add ':' signs to hex given IPv6 address
+		#
+		ip_hex=""
+       		ip_addr_length=${#ip_addr}
+		while [ $ip_addr_length -gt 0 ]; do
+    			ip_temp=`expr substr $ip_addr 1 4`
+			if [ $ip_addr_length -gt 4 ]; then
+				ip_temp="$ip_temp:"
+			fi
+			ip_addr_length=$(($ip_addr_length-4))
+			ip_addr=`expr substr $ip_addr 5 $ip_addr_length`
+			ip_hex=$ip_hex$ip_temp	
+		done
+       fi		
+				   
+    else
+       #
+       # IPv4 format
+       #
+       ip_addr_orig=$ip_addr
+       if [ -n "$(echo $ip_addr | grep "$ipv4_rule")" ]; then
+		ip_ver=4
+		until [ -z "$(echo $ip_addr | grep '\.')" ]; do
+			ip_temp="${ip_addr%%.*}" 
+			ip_temp=$(echo $ip_temp | sed -e 's/0*//') 
+			if [ -z "$ip_temp" ]; then
+				ip_hex=$ip_hex"00"
+			else
+				ip_hex="$ip_hex$(printf '%02x' $ip_temp)"
+			fi
+			ip_addr=${ip_addr#*.}
+		done
+		ip_temp=$(echo $ip_addr | sed -e 's/0*//')
+		if [ -z "$ip_temp" ]; then
+			ip_hex=$ip_hex"00"
+		else
+			ip_hex="$ip_hex$(printf '%02x' $ip_temp)"
+		fi
+		if [ "${#ip_hex}" -gt 8 ]; then
+			echo $script_name": bad IPv4 address" 
+			__exit_on_error
+		fi
+		ip_hex=$ip_addr_orig
+#
+# IPv6 format
+#
+       elif [ -n "$(echo $ip_addr | grep "$ipv6_rule")" ]; then
+    
+      	# check for IPv4-compatible address or IPv4-mapped address
+      	if [ -n "$(echo $ip_addr | grep '\.')" ]; then
+        	 ipv4_part=${ip_addr##*:}
+         	ipv6_part=`echo ${ip_addr%:*} | tr '[a-f]' '[A-F]'`":"
+         	if [ -z "$(echo $ipv4_part | grep "$ipv4_rule")" ]; then
+    			echo $script_name": bad IP address"
+    			__exit_on_error
+         	fi
+         	ip_temp="$(printf '%02x' ${ipv4_part%%.*})"
+         	ipv4_part=${ipv4_part#*.}
+         	ip_temp=$ip_temp"$(printf '%02x' ${ipv4_part%%.*})"
+         	ipv4_part=${ipv4_part#*.}
+         	ip_temp=$ip_temp":""$(printf '%02x' ${ipv4_part%%.*})"
+         	ipv4_part=${ipv4_part#*.}
+         	ip_temp=$ip_temp"$(printf '%02x' $ipv4_part)"
+        	if [ "${#ip_temp}" -gt 9 ]; then
+    			echo $script_name": bad IPv6 address"
+    			__exit_on_error
+        	fi
+        	ip_addr=$ipv6_part$ip_temp
+        fi
+      	# count number of colons within IP address 
+      	ip_temp=$ip_addr
+      	until [ -z "$(echo $ip_temp | grep ':')" ]; do
+         	ip_temp=${ip_temp#*:}
+         	count=count+1
+      	done
+    		  
+      	# test number of allowed colons                               
+      	if [ "$count" -gt 7 ] || [ "$count" -lt 2 ]; then
+         	echo $script_name": bad IP address"
+         	__exit_on_error
+      	fi 
+    
+      	# 
+      	# have to increase count for zero padding for starting/ending colon
+      	#
+      	if [ -z "${ip_addr%::*}" ]; then
+         	zeropad=zeropad+1
+         	strt_end_col="true"
+      	fi
+      	if [ -z "${ip_addr#*::}" ]; then
+         	zeropad=zeropad+1
+         	strt_end_col="true"
+      	fi 
+    
+      	#
+      	# loop through IPv6 address and convert it to 16 byte hex input
+      	#
+      	ip_ver=6
+      	ip_addr=$ip_addr":"          # use colon as end marker here
+    
+      	while [ -n "$(echo $ip_addr | grep ':')" ]; do
+         	ip_temp=${ip_addr%%:*}
+         	if [ -z "$ip_temp" ]; then
+    			# found IPv6 double colon shortcut - add missing 0s
+    			if [ "$ip_shortened" = false ]; then
+    	   			zeropad=zeropad-$count                     
+    	   			while [ $zeropad -ne 0 ]; do
+    	      				ip_hex=$ip_hex"0000":
+    	      				zeropad=zeropad-1
+    	   			done
+    	   			ip_shortened="true"
+    	   			if [ $strt_end_col = "true" ]; then
+    	      				ip_addr=${ip_addr#:}
+    	   			fi
+    			elif [ ! $ip_addr = ":" ]; then
+    	   			echo $script_name": IPv6 double colon shortcut can be used only once"
+    	   			__exit_on_error
+    			fi
+         	fi
+		sign=":"
+         	case "${#ip_temp}" in 
+    	 		1 )  ip_hex=$ip_hex"000"$ip_temp$sign;;
+    	 		2 )  ip_hex=$ip_hex"00"$ip_temp$sign ;;
+    	 		3 )  ip_hex=$ip_hex"0"$ip_temp$sign ;;
+    	 		4 )  ip_hex="$ip_hex$ip_temp$sign" ;; 
+    	 		0 )  ;;
+    	 		* )  echo $script_name": bad IPv6 address"
+    	      		__exit_on_error ;;
+         	esac
+    
+         	ip_addr=${ip_addr#*:}
+      	done
+	ip_hex=${ip_hex%*:}
+    
+      	#
+      	# test if given IPv6 address was too short
+      	#
+      	if [ "$count" -lt 7 -a "$ip_shortened" = false ]; then
+        	echo $script_name": given IPv6 is too short"
+        	__exit_on_error  
+      	fi
+    
+    	else 
+      		echo $script_name": IP address wrong or missing"
+      		__exit_on_error
+    	fi   
+   fi	
+}
+
+
+#
+# builds echo command according to the given parameters 
+# 
+function __build_cmd
+{
+    # input parameters
+    local cmd_type=$1 
+    local cmd_parm=$2 
+    local ip_addr=$3
+    local interface=$4
+
+    local mask_bits=
+    ip_ver=
+    local ip_hex=
+
+
+    #
+    # allow also shortcut rxip for Proxy ARP
+    #
+    if [ $cmd_type = rxip ]; then
+       cmd_type=parp
+    fi
+
+    #
+    # check if mask bits are given for parameter IPADDR 
+    #
+    if [ -z "$ip_addr" ]; then
+        echo $script_name": IP address parameter missing"
+        __exit_on_error
+    elif [ -n "$(echo $ip_addr | grep '/')" ]; then
+       if [ $cmd_type = ipa ]; then 
+         mask_bits=${ip_addr##*/}
+         ip_addr=${ip_addr%%/*}
+         if [ -z "$(echo $mask_bits | grep '^[[:digit:]]\{1,3\}$')" ]; then
+         	echo $script_name": invalid mask bits specified"
+             	__exit_on_error
+          	
+	 fi	
+       else
+          echo $script_name": mask bits not allowed for $cmd_type"
+          __exit_on_error
+       fi
+    elif [ $cmd_type = ipa ]; then
+       echo $script_name": mask bits required for function $cmd_type"
+       __exit_on_error
+    fi
+
+    
+    __layer2_enabled $interface
+    __ip_conv 
+
+    #
+    # assemble command
+    #
+    echo_cmd="$echo_cmd$ip_ver $ip_hex"
+
+    if [ -n "$mask_bits" ]; then
+       if [ "$ip_ver" = 4 ]; then
+	      if [ "$mask_bits" -gt 32 ]; then
+		     echo $script_name": invalid mask bits specified"
+		     __exit_on_error
+	      fi
+       else
+	      if [ "$mask_bits" -gt 128 ]; then
+		     echo $script_name": invalid mask bits specified"
+		     __exit_on_error
+	      fi
+       fi
+       echo_cmd="${echo_cmd}/$mask_bits"
+    fi
+}
+
+
+#---------------------------------------
+# --           main                   --
+#---------------------------------------
+
+
+
+#
+# parse options (currently none avail)  
+#
+while [ -n "$(echo $1 | grep '-')" ]; do
+    case "$1" in
+       -v | --version  ) PrintVersion
+       	     exit 0 ;;
+       *  ) __usage ;;               
+    esac
+    shift
+done
+
+#
+# check if target proc or sysfs file exists - 
+# otherwise the OSA-E device driver is not loaded
+#
+
+if [ ! -e "$sys_file" ]; then
+	echo $script_name": No QDIO device found" 
+	echo "Try 'man $script_name' for more information."
+	exit 1
+fi
+
+
+#
+# parse arguments TYPE and CMD
+#
+if [ "$#" -lt 1 -o "$#" -gt 4 ]; then
+    echo $script_name": invalid number of parameters specified"
+    __exit_on_error
+else
+   case "$1" in
+       ipa  ) case "$2" in
+                  add | del       ) echo_cmd="$2"
+                                    __build_cmd "$@";;
+                  inv4 | inv6     ) if [ "$#" -gt 3 ]; then
+				       echo $script_name": too many parameters for $2 command"           
+				       __exit_on_error
+				    else
+				        if [ -z "$3" ]; then
+       						echo $script_name": interface name required for function $cmd_type"
+       						__exit_on_error
+					else
+						__layer2_enabled $3
+						if [ $2 = inv4 ]; then
+							echo_cmd="invert4 toggle"
+						else
+							echo_cmd="invert6 toggle"
+						fi
+    					fi
+				    fi;;	
+                  list 		) if [ "$#" -gt 2 ]; then
+                                       echo $script_name": too many parameters for $2 command"
+                                       __exit_on_error
+                                    else
+                                       __list_entries "$@"
+                                    fi;; 
+                  *               ) echo $script_name": invalid CMD parameter specified"
+                                    __exit_on_error ;; 
+              esac ;;
+       vipa ) case "$2" in
+                  add | del ) echo_cmd="$2"
+                              __build_cmd "$@";;
+                  list      ) if [ "$#" -gt 2 ]; then
+                                 echo $script_name": too many parameters for $2 command"
+                                 __exit_on_error
+                              else
+                                 __list_entries "$@"
+                              fi;;
+                  *         ) echo $script_name": invalid CMD parameter specified"
+                              __exit_on_error ;;
+              esac;;
+       parp | rxip ) case "$2" in
+                  add | del ) echo_cmd="$2"
+                              __build_cmd "$@";;
+                  list      ) if [ "$#" -gt 2 ]; then
+                                 echo $script_name": too many parameters for $2 command"
+                                 __exit_on_error
+                              else
+                                  __list_entries "$@"
+                              fi;;
+                  *         ) echo $script_name": invalid CMD parameter specified" 
+                              __exit_on_error ;;
+              esac;;
+	list_all ) if [ "$#" -gt 1 ]; then
+                           echo $script_name": too many parameters for $2 command"
+                            __exit_on_error
+                   else
+	       	   	    __list_entries "$@"
+		   fi;;
+	list_msg ) if [ "$#" -gt 1 ]; then
+                           echo $script_name": too many parameters for $2 command"
+                            __exit_on_error
+                   else
+	       	   	    __list_msgs "$@"
+		   fi;;
+       * ) echo $script_name": invalid TYPE parameter specified" 
+           __exit_on_error ;;
+   esac
+fi
+
+#
+# finally echo cmd to appropriate OSA-Express proc or sysfs file
+# and check if command was successful
+#
+
+if [ "$2" = inv4 ] || [ "$2" = inv6 ]; then
+	sys_fs_dir="/sys/class/net/$3/device"
+else	
+	sys_fs_dir="/sys/class/net/$4/device"
+fi
+echo_cmd_temp=($echo_cmd)
+#
+# build sysfs path
+#
+case "$1" in
+	ipa ) proc_file=$sys_fs_dir/ipa_takeover/${echo_cmd_temp[0]}
+	      echo_cmd=${echo_cmd_temp[1]}	;;
+	vipa ) proc_file=$sys_fs_dir/vipa/${echo_cmd_temp[0]}
+	      echo_cmd=${echo_cmd_temp[1]}	;;
+	parp | rxip ) proc_file=$sys_fs_dir/rxip/${echo_cmd_temp[0]}
+	      echo_cmd=${echo_cmd_temp[1]}	;;
+esac 	
+ 
+# 
+# check if entry to delete exists
+# 
+
+if [ "$2" = del ]; then
+	    case "$1" in
+		ipa ) if ! grep -sqi "${echo_cmd_temp[1]}" $sys_fs_dir/ipa_takeover/add$ip_ver; then
+				echo $script_name": no such $1 entry found."
+				exit 0
+		      fi;;		
+		vipa ) if ! grep -sqi "${echo_cmd_temp[1]}" $sys_fs_dir/$1/add$ip_ver; then
+				echo $script_name": no such $1 entry found."
+				exit 0
+		      fi;;		
+		parp | rxip ) if ! grep -sqi "${echo_cmd_temp[1]}" $sys_fs_dir/rxip/add$ip_ver; then
+				echo $script_name": no such $1 entry found."
+				exit 0
+		      fi;;		
+	    esac	
+fi
+	     
+
+# 
+# does proc or sysfs entry exsist ?
+# 
+
+
+if [ -f $proc_file ]; then
+	echo $echo_cmd > $proc_file
+	if [ "$?" -ne 0 ]; then
+		echo $script_name": The qethconf command failed."
+		echo "Enter 'qethconf list_msg' for details."
+		exit 1
+	fi
+else
+	echo $script_name": device does not exist or is not capable of $1."
+        __exit_on_error 
+fi
+
+if [ "$1" = rxip ]; then
+	message_cmd=parp
+else
+	message_cmd=$1
+fi
+
+
+
+case "$2" in
+    add )  echo "$script_name: Added $echo_cmd to sysfs entry $proc_file."
+           echo "$script_name: For verification please use \"qethconf $message_cmd list\" "
+           ;;
+    del )  echo "$script_name: Deleted $echo_cmd from sysfs entry $proc_file."
+           echo "$script_name: For verification please use \"qethconf $message_cmd list\" "
+	   ;;
+
+    inv4 | inv6 ) if [ "`cat $proc_file`" != 0 ]; then
+    		echo "$script_name: Negating the following IP address takeover settings:"
+		if [ "$2" = inv4 ]; then
+			echo  "`cat ${proc_file/invert4/add4}`"
+		else
+			echo  "`cat ${proc_file/invert6/add6}`"
+		fi
+	   else
+    		echo "$script_name: The following IP address takeover settings are valid again:"
+		if [ "$2" = inv4 ]; then
+			echo  "`cat ${proc_file/invert4/add4}`"
+		else
+			echo  "`cat ${proc_file/invert6/add6}`"
+		fi
+	   fi;;
+esac

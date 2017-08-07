@@ -1,0 +1,98 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSCHP 8 "Mar 2007" s390\-tools
+
+.SH NAME
+lschp \- list information about available channel\-paths.
+
+.SH SYNOPSIS
+.B lschp
+.RB [ \-h|\-\-help ]
+.RB [ \-v|\-\-version ]
+
+.SH DESCRIPTION
+The lschp command lists status and type information about available
+channel\-paths.
+
+.B Column description:
+
+CHPID
+.RS
+Channel\-path identifier.
+.RE
+
+Vary
+.RS
+Logical channel\-path state:
+.br
+0 = channel\-path is not used for I/O
+.br
+1 = channel\-path is used for I/O
+.RE
+
+Cfg.
+.RS
+Channel\-path configure state:
+.br
+0 = stand\-by
+.br
+1 = configured
+.br
+2 = reserved
+.br
+3 = not recognized
+.RE
+
+Type
+.RS
+Channel\-path type identifier.
+.RE
+
+Cmg
+.RS
+Channel measurement group identifier.
+.RE
+
+Shared
+.RS
+Indicates whether a channel\-path is shared between LPARs:
+.br
+0 = channel\-path is not shared
+.br
+1 = channel\-path is shared
+.RE
+
+PCHID
+.RS
+Physical channel-ID unless the 4-digit hexadecimal value is enclosed in
+parenthesis.
+
+If the value is enclosed in parenthesis, no physical channel-ID is
+associated with the CHPID, and the value is an internal channel-ID.
+
+For example, 0501 specifies a PCHID whereas (0502) specifies an internal
+channel-ID.
+.RE
+
+A column value of '\-' indicates that a facility associated with the respective
+channel\-path attribute is not available.
+
+.SH OPTIONS
+.B \-h
+.br
+.B \-\-help
+.RS
+Print a short help text, then exit.
+.RE
+
+.B \-v
+.br
+.B \-\-version
+.RS
+Print version number, then exit.
+.RE
+
+.SH SEE ALSO
+.BR chchp (8)

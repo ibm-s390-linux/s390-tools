@@ -1,0 +1,205 @@
+.\" iucvtty.1
+.\"
+.\"
+.\" Copyright IBM Corp. 2008, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.TH iucvtty "1" "March 2009" "s390-tools" "IUCV terminal applications"
+.
+.ds t \fBiucvtty\fP
+.ds i \fBiucvconn\fP
+.
+.
+.
+.SH NAME
+iucvtty \- allow remote logins over z/VM IUCV
+.
+.
+.
+.SH SYNOPSIS
+.B iucvtty
+.RB [ \-h | \-\-help ]
+.br
+.B iucvtty
+.RB [ \-v | \-\-version ]
+.br
+.B iucvtty
+.RB [ \-a | \-\-allow-from
+.IR regex ]
+.IR terminal_id
+.RB [\-\-
+.IR login_program " [" login_options ]]
+.
+.
+.
+.SH DESCRIPTION
+The \*t application provides full-screen terminal access to a Linux instance
+running as a z/VM guest operating system.
+The \*i application is used to connect to a running \*t instance.
+
+The terminal connection is based on the z/VM Inter-User Communication Vehicle
+(IUCV). z/VM IUCV establishes a communication path between two z/VM guest
+virtual machines on the same z/VM instance.
+Because z/VM IUCV is independent from TCP/IP, Linux instances with no external
+network can be accessed.
+
+\fIterminal_id\fP identifies the z/VM IUCV connection and is similar to a port
+number in TCP/IP communications.  \fIterminal_id\fP is case-sensitive and
+consists of up to 8 alphanumeric characters.
+It must be specified as a parameter in connection requests against
+a \*t instance.
+
+When a connection is established, \*t starts a login program.
+When the login program ends, \*t also exits. Consider an
+.BR inittab (5)
+entry
+.\"or an upstart job file
+to ensure that \*t is restarted and ready for the next terminal session.
+.
+.
+.
+.SH OPTIONS
+.TP
+.BR \-\^h ", " \-\^\-help
+Display a short help text and exit.
+.
+.TP
+.BR \-\^v ", " \-\^\-version
+Display the version number of \*t, then exit.
+.
+.TP
+.BR \-\^a ", " \-\^\-allow-from " " \fIregex\fP
+Limit permissions for incoming connections to z/VM user IDs that match
+the regular expression \fIregex\fP. The connection is refused if the ID
+does not match. If this parameter is omitted, connections are permitted
+from any z/VM user ID.
+.
+.TP
+.I login_program
+\fIlogin_program\fP specifies the absolute path to the login program to be
+started when a connection is established.
+The default is
+.BR /bin/login (1).
+.br
+The \fIlogin_program\fP must be separated by two dashes (--).
+.
+.TP
+.I login_options
+Depending on the particular login program used, \fIlogin_options\fP specifies
+additional options.
+.
+.
+.
+.SH EXAMPLES
+To allow remote logins using the terminal identifier "lnxterm":
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvtty lnxterm
+.fi
+.in -0.25in
+.ft
+
+To only allow users from LNXSYS01 to connect to terminal "lnxterm":
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvtty -a LNXSYS01 lnxterm
+.fi
+.in -0.25in
+.ft
+
+To only allow users from LNXSYS10 through LNXSYS19 to connect to terminal
+"lnxterm":
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvtty -a "LNXSYS1[0-9]" lnxterm
+.fi
+.in -0.25in
+.ft
+
+To use \fB/sbin/sulogin\fP instead of \fB/bin/login\fP for terminal "suterm":
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvtty suterm -- /sbin/sulogin
+.fi
+.in -0.25in
+.ft
+
+An entry in \fB/etc/inittab\fP to facilitate user logins on terminal "lnxterm"
+with \fB/bin/login\fP could be:
+.PP
+.ft CW
+.in +0.25in
+.nf
+t1:2345:respawn:/usr/bin/iucvtty lnxterm
+.fi
+.in -0.25in
+.ft
+
+An entry in \fB/etc/inittab\fP to facilitate user logins on terminal "suterm"
+with \fB/sbin/sulogin\fP in single user mode could be:
+.PP
+.ft CW
+.in +0.25in
+.nf
+s1:S:respawn:/usr/bin/iucvtty suterm -- /sbin/sulogin
+.fi
+.in -0.25in
+.ft
+.
+.
+.
+.SH DIAGNOSTICS
+If the Linux kernel does not include kernel support for the AF_IUCV network
+addressing family, \*t exits and displays the message
+.I 'AF_IUCV address family is not available: Address family not supported by
+.IR protocol' "."
+.
+.
+.
+.SH SECURITY
+.SS Linux
+The \*t program can be used by regular users.
+Depending on the particular login program, \*t must be started with superuser
+privileges for user authentication and authorization. For instance,
+\fB/bin/login\fP requires superuser privileges and, thus, regular users
+must use a different login program.
+
+Each connection attempt is logged to the \fBauthpriv\fP syslog facility.
+
+\*t uses pseudo-terminal (pts) devices to communicate with the
+login program. For security reasons, some login programs, like
+\fB/bin/login\fP, do not permit root logins on pseudo-terminal devices (see also
+.BR /etc/securetty "(5))."
+
+To permit root logins, consider using HVC terminal devices that are provided by
+the z/VM IUCV hypervisor console (HVC) device driver.
+.\"Enabling root logins on pseudo-terminal devices can compromise system security.
+.\"To avoid this potential security exposure, consider using HVC terminal devices
+.\"that are provided by the z/VM IUCV hypervisor console (HVC) device driver.
+.
+.
+.
+.SS z/VM guest virtual machine
+See the
+.BR af_iucv (7)
+manual page for details about IUCV authorizations.
+.
+.
+.
+.SH "SEE ALSO"
+.BR iucvconn (1),
+.BR login (1),
+.BR pts (4),
+.BR regex (7),
+.BR securetty (5),
+.BR af_iucv (7),
+.BR hvc_iucv (9)

@@ -1,0 +1,13 @@
+# Perf raw event counter definitions for the
+#   CPU-measurment sampling facility
+#
+# Basic-sampling mode
+Counter: 0xB0000  Name:SF_CYCLES_BASIC
+Description:
+Sample CPU cycles using basic-sampling mode
+.
+# Diagnostic-sampling mode (includes basic-sampling)
+Counter: 0xBD000  Name:SF_CYCLES_BASIC_DIAG
+Description:
+Sample CPU cycle using diagnostic-sampling mode (not for ordinary use)
+.

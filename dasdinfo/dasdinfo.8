@@ -1,0 +1,97 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH DASDINFO 8 "Febr 2007" "s390-tools" "Linux Administrator's Manual"
+.SH NAME
+.B "dasdinfo "
+\- tool to read unique id from s390 DASD device
+.SH SYNOPSIS
+.BI "dasdinfo [-a] [-l] [-u] [-x] [-e] {-i " <busid>
+.BI "| -b " <blockdev>
+.BI " | -d " <devnode>
+.BI "}"
+.sp
+.BI "dasdinfo [-h] [-v]"
+
+.SH DESCRIPTION
+.B dasdinfo 
+displays specific information about a specified DASD device.
+It is normally called from a udev rule, to provide udev with a unique id string and
+additional information (type, serial) for an S390 DASD drive. Udev can use this
+information to create symlinks in /dev/disk/by-id and /dev/disk/by-label
+to the real device node.
+
+.SH OPTIONS
+
+.TP
+.BI "-a|--all"
+Same as -u -x -l
+.TP
+.BI "-x|--extended-uid"
+Print DASD uid
+
+This option prints the full uid of the DASD. When z/VM provides two
+virtual devices that are actually located on the same real device, the
+first four tokens of the uid will be identical for both devices.  z/VM
+may provide an additional token that allows to distinguish between
+different minidisks. You need both support in the Linux kernel and
+z/VM to receive such an additional token.
+
+For z/VM: VM support for the hypervisor injected Special Node Element
+Qualifier (SNEQ) (or hypervisor injected self-description data) is
+available by applying the PTFs for VM APAR VM64273 on z/VM 5.2.0 and higher.
+.TP
+.BI "-u|--uid"
+Print DASD uid without z/VM minidisk token
+
+z/VM may provide an additional token that allows to distinguish
+between different minidisks (see --extended-uid option).  To remain
+compatibile with systems that were installed on older Linux or z/VM
+levels, the -u option will print the uid excluding any z/VM-provided
+minidisk token.
+
+For example, if the extended uid is
+IBM.75000000092461.e900.10.00000000000037400000000000000000 then the
+uid is IBM.75000000092461.e900.10. If the extended uid contains no
+minidisk token, e.g. in an LPAR environment, then both uids are the
+same.
+.TP
+.BI "-l|--label"
+Print DASD volume label (volser).
+.TP
+.BI "-i|--busid " <busid>
+Use the bus ID as input parameter, e.g. 0.0.e910.
+.TP
+.BI "-b|--block " <blockdev>
+Use the block device name as input parameter, e.g. dasdb.
+.TP
+.BI "-d|--devnode " <devnode>
+Use a device node as input parameter, e.g. /dev/dasdb.
+.TP
+.BI "-e|--export"
+Print all values (ID_BUS, ID_TYPE, ID_SERIAL).
+.TP
+.BI "-h|--help"
+Print usage text.
+.TP
+.BI "-v|--version"
+Print version number.
+
+.SH EXAMPLES
+dasdinfo -u -i 0.0.e910
+
+dasdinfo -u -b dasdb
+
+dasdinfo -u -d /dev/dasdb
+
+All three examples should return the same unique ID for 
+the same DASD device, e.g. IBM.75000000092461.e900.10.
+
+In case this uid is not available, dasdinfo will return
+the volume label instead, e.g. 0XE910.
+.SH SEE ALSO
+.BR udev (7)
+.SH AUTHORS
+Volker Sameske <sameske@de.ibm.com>
+

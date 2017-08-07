@@ -1,0 +1,46 @@
+# Service unit to apply control program identification (CPI) settings
+#
+# Copyright IBM Corp. 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=Apply Control Program Identification (CPI)
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=local-fs.target
+ConditionPathIsReadWrite=/sys/firmware/cpi
+
+[Service]
+Type=oneshot
+#
+# Specify a file with the environment variables using the EnvironmentFile=
+# service property.
+#
+EnvironmentFile=/etc/sysconfig/cpi
+#
+# Alternatively, you can specify the environment variables directly,
+# using the Environment= service properties, which can be overridden by
+# "systemctl edit --full cpi".
+# In this case, the EnvironmentFile= needs to be commented out, otherwise
+# it would override the directly specified variables.
+#
+# The sysplex name, system name, and system type consist of up to eight
+# characters of the following set: A-Z, 0-9, $, @, #, and blank.
+#
+# Environment=CPI_SYSTEM_NAME=
+# Environment=CPI_SYSPLEX_NAME=
+# Environment=CPI_SYSTEM_LEVEL=
+# Environment=CPI_SYSTEM_TYPE=LINUX
+
+#
+# Apply settings
+ExecStartPre=/bin/sh -c 'if test -n "$CPI_SYSTEM_TYPE"; then echo $CPI_SYSTEM_TYPE |tr a-z A-Z > /sys/firmware/cpi/system_type; fi'
+ExecStartPre=/bin/sh -c 'if test -n "$CPI_SYSTEM_NAME"; then echo $CPI_SYSTEM_NAME |tr a-z A-Z > /sys/firmware/cpi/system_name; fi'
+ExecStartPre=/bin/sh -c 'if test -n "$CPI_SYSPLEX_NAME"; then echo $CPI_SYSPLEX_NAME |tr a-z A-Z > /sys/firmware/cpi/sysplex_name; fi'
+ExecStartPre=/bin/sh -c 'test -n "$CPI_SYSTEM_LEVEL" || CPI_SYSTEM_LEVEL="$(uname -r)" ; echo $CPI_SYSTEM_LEVEL |cut -d- -f1 | tr . " " |xargs printf "0x0000000000%02x%02x%02x\n" > /sys/firmware/cpi/system_level'
+#
+# Sending data to the HMC/SE
+ExecStart=/bin/sh -c 'echo 1 > /sys/firmware/cpi/set'

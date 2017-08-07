@@ -1,0 +1,204 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH TUNEDASD 8 "Apr 2006" "s390-tools"
+.SH NAME
+tunedasd \- A tool to adjust tunable parameters on DASD devices
+
+.SH SYNOPSIS
+.B tunedasd
+[OPTION] COMMAND device
+
+.SH DESCRIPTION
+.B tunedasd
+is a tool to adjust tunable parameters on DASD devices.
+It can be used to modify the status of the device and to adjust
+some performance relevant settings.
+The DEVICE is the node of the device (e.g. '/dev/dasda') or a list of 
+devices separated by a space character.
+Following functions are supported:
+.IP "     -"
+Get and reset the performance statistics profile per device. 
+.IP "     -"
+Get and set the caching mode of the storage server.
+This is only available for ECKD devices, because it is implemented using 
+ECKD Channel Program commands.
+.IP "     -"
+Reserve/Release/Unconditional Reserve a device.
+This is only available for ECKD devices, because it is based on 
+the Control Unit functions.
+.P
+If 
+.B tunedasd
+is called without parameter, it prints a short usage information and exits.
+.SH OPTIONS
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+.TP   
+.SH COMMANDS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+.TP
+.BR "\-g" " or " "\-\-get_cache"
+Get current storage server caching behavior.
+.TP   
+.BR "\-c" " or " "\-\-cache" " <behavior> "
+Define caching behavior on storage server.
+The following caching behaviors are currently supported by modern 
+Enterprise Storage Servers (ESS):
+.br
+.IP "          \(bu" 12 
+.I normal 
+('Normal Cache replacement'),
+.IP "          \(bu" 12 
+.I bypass 
+(Bypass Cache),
+.IP "          \(bu" 12 
+.I inhibit
+(Inhibit Cache Loading),
+.IP "          \(bu" 12 
+.I sequential
+(Sequential Access),
+.IP "          \(bu" 12 
+.I prestage 
+(Sequential Prestage),
+.IP "          \(bu" 12 
+.I record
+(Record Access)
+.IP "" 7
+More details about caching can be found in the 'Storage Control Reference' of the attached storage server.
+.TP   
+.BR "\-n" " or " "\-\-no_cyl" " <n> "
+Number of cylinders to be cached (only valid together with --cache).
+.TP   
+.BR "\-S" " or " "\-\-reserve"
+Reserve device.
+.TP   
+.BR "\-L" " or " "\-\-release"
+Release device.
+.TP   
+.BR "\-O" " or " "\-\-slock"
+Unconditional reserve device.   
+.br
+.B Note: 
+Use with care, this breaks an existing reserve.
+.TP   
+.BR "\-\-enable-stats"
+Enable performance statistics globally.
+.br
+\fBNote:\fR Same as "echo 'set on' > /proc/dasd/statistics"
+.TP
+.BR "\-\-disable-stats"
+Disable performance statistics globally.
+.br
+\fBNote:\fR Same as "echo 'set off' > /proc/dasd/statistics"
+.TP
+.BR "\-P" " or " "\-\-profile"
+Print profile info of device.
+.br
+.B Note: 
+Profile info must be available and enabled in the kernel to get valid results
+out of the profile commands. Enable statistics via \fB--enable-stats\fR.
+.TP   
+.BR "\-Q" " or " "\-\-query_reserve"
+Query the current reserve status of the device.
+The following states are defined:
+.br
+.IP "          \(bu" 12
+.I none:
+The device is not reserved.
+.IP "          \(bu" 12
+.I implicit:
+The device is not reserved, but there is a contingent or implicit
+allegiance to this Linux instance.
+.IP "          \(bu" 12
+.I other:
+The device is reserved to another operating system instance.
+.IP "          \(bu" 12
+.I reserved:
+The device is reserved to this Linux instance.
+.IP "" 7
+More details about reserve/release can be found in the 'Storage Control Reference' of the attached storage server.
+
+.TP
+.BR "\-I" " or " "\-\-prof_item <row> "
+Print single profile item data row (without header).
+.br
+Following rows are supported:
+.br
+.IP "          \(bu" 12 
+.I reqs 
+(# of dasd I/O requests),
+.IP "          \(bu" 12 
+.I sects 
+(# of 512Byte sectors),
+.IP "          \(bu" 12 
+.I sizes 
+(Histogram of sizes),
+.IP "          \(bu" 12 
+.I total 
+(Histogram of I/O times),
+.IP "          \(bu" 12 
+.I totsect 
+(Histogram of I/O times per sector),
+.IP "          \(bu" 12 
+.I start 
+(Histogram of I/O time till ssch),
+.IP "          \(bu" 12 
+.I irq 
+(istogram of I/O time between ssch and irq),
+.IP "          \(bu" 12 
+.I irqsect 
+(istogram of I/O time between ssch and irq per sector),
+.IP "          \(bu" 12 
+.I end 
+(Histogram of I/O time between irq and end),
+.IP "          \(bu" 12 
+.I queue 
+(# of req in chanq at enqueuing)
+.TP   
+.BR "\-R" " or " "\-\-reset_prof"
+Reset profile info of device.
+.TP
+.BR "\-p" " or " "\-\-path_reset <chpid>"
+Reset a channel path <chpid> of a selected device. A channel path
+might be suspended due to high IFCC error rates or a High Performance
+FICON failure. Use this option to resume considering the channel path
+for I/O.
+.TP
+.BR "\-\-path_reset_all"
+Reset all channel paths of the selected device. The channel paths
+might be suspended due to high IFCC error rates or a High Performance
+FICON failure. Use this option to resume considering all defined
+channel paths for I/O.
+.\"
+.\".TP
+.\".BR "\-o" " or " "\-\-online"
+.\"Set the device online using the sysfs interface. 
+
+.SH EXAMPLE
+1. Scenario: Get profile info for a device.  
+.br
+
+       tunedasd -P /dev/dasdc
+       tunedasd -PI irq /dev/dasdc
+
+.br	
+2. Scenario: Set device caching mode to 1 cylinder 'prestage'.
+.br
+
+       tunedasd -c prestage -n 1 /dev/dasdc
+
+.br
+3. Scenario: Reset failed channel path with CHPID 45
+.br
+
+       tunedasd -p 45 /dev/dasdc
+.br
+.SH "SEE ALSO"
+.BR dasdview (8), 
+.BR dasdfmt (8), 
+.BR fdasd (8)

@@ -1,0 +1,351 @@
+.\" hvc_iucv.9
+.\"
+.\" z/VM IUCV hypervisor console (HVC) device driver
+.\"
+.\" Copyright IBM Corp. 2008, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" -------------------------------------------------------------------------
+.TH "hvc_iucv" "9" "March 2015" "s390-tools" "z/VM IUCV HVC device driver"
+.
+.
+.
+.SH NAME
+hvc_iucv \- Introduction to the z/VM IUCV hypervisor console (HVC) device driver
+.
+.
+.
+.SH SYNOPSIS
+.BR hvc_iucv "=" \fInumber\fP
+
+.BR hvc_iucv_allow "=" "\fIcomma-separated list of z/VM user IDs"
+.
+.
+.
+.SH DESCRIPTION
+The Hypervisor Console (HVC) device driver is a generic TTY device driver
+providing terminal devices with pluggable transport device drivers.
+
+The z/VM IUCV hypervisor console (HVC) device driver is a transport plug-in
+that uses z/VM IUCV communication to establish terminal connections and to
+transfer terminal data.
+
+The kernel parameter \fBhvc_iucv\fP controls the number of HVC terminals managed
+by the z/VM IUCV HVC device driver.  \fInumber\fP is an integer in the range
+0 to 8.  If \fInumber\fP is zero, the z/VM IUCV HVC device driver is
+switched off; otherwise up to \fInumber\fP z/VM IUCV HVC terminal devices are
+created.
+.\"(The maximum of 8 is a hypervisor console layer constant and might change
+.\"in future kernel versions.)
+
+The \fBhvc_iucv_allow\fP kernel parameter optionally specifies a comma separated
+list of z/VM user IDs. If the kernel parameter has been specified, the z/VM IUCV
+HVC device driver accepts IUCV connections from listed z/VM user IDs only.
+
+The first z/VM IUCV HVC terminal device is registered automatically for use as
+the Linux console.
+
+The
+.BR iucvconn (1)
+program establishes connections to z/VM IUCV HVC terminal devices. If a terminal
+is disconnected, output written by Linux is not displayed or saved.
+Therefore, a newly opened connection to a terminal is always blank. For most
+applications, like login or shell prompts, it is sufficient to press "Return" to
+obtain a new prompt.
+
+.
+.
+.
+.SH USAGE
+.SS "Connecting to z/VM IUCV HVC terminal devices"
+Connections to z/VM IUCV HVC terminal devices are established with the IUCV
+terminal application
+.BR iucvconn (1).
+.PP
+To connect to the first z/VM IUCV HVC terminal device on the z/VM guest virtual
+machine "LNX1234", run:
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvconn LNX1234 lnxhvc0
+.fi
+.in -0.25in
+.ft
+.PP
+The \fBlnxhvc\fP\fIn\fP identifier refers to the IUCV name of z/VM IUCV
+HVC terminal devices; where \fIn\fP corresponds to the terminal device number.
+.PP
+For z/VM IUCV HVC terminal devices,
+.BR iucvconn (1)
+does not set the terminal environment. See section "Setting up the terminal
+environment" below for further instructions.
+.PP
+The terminal connection is disconnected if the terminal session ends by logging
+off (for example, by typing exit).
+Alternatively,
+.BR iucvconn (1)
+provides an escape function for disconnecting from the terminal at any time.
+See also the manual page of
+.BR iucvconn (1).
+.
+.TP
+.B Note:
+If the first z/VM HVC terminal device is configured as the preferred Linux
+console, a logoff might be followed by a new login prompt.
+End the terminal session by using the disconnect escape function. Reconnecting
+always resumes the existing terminal session. Explicitly logging off before
+using the disconnect escape function assures that users must log in again.
+.
+.
+.SS "Using the magic sysrequest function on the first z/VM IUCV HVC terminal"
+The first z/VM IUCV HVC terminal, which can be used as Linux console, supports
+the "magic sysrequest" function if the Linux kernel has been built with
+\f(CWCONFIG_MAGIC_SYSRQ\fP.
+.PP
+To invoke the "magic sysrequest" function, press "Ctrl\^+\^o" followed by a second
+character that designates the debugging or emergency function.
+.PP
+The most important magic sysrequest functions are:
+.RS 4
+.IP "0 .. 9" 8
+Set the Linux console log level and control which kernel message are written to
+Linux console devices.
+.
+.IP "b" 8
+Re-IPL immediately (without syncing or unmounting file systems).
+The re-IPL configuration is used for the re-IPL of the Linux system.
+.
+.IP "s" 8
+Emergency sync all file file systems.
+.
+.IP "u" 8
+Emergency remount all mounted file systems read-only.
+.
+.IP "t" 8
+Show task info.
+.
+.IP "m" 8
+Show memory.
+.
+.IP "e" 8
+Send the TERM signal to end all tasks except
+.BR init (8).
+.
+.IP "i" 8
+Send the KILL signal to end all tasks except
+.BR init (8).
+.
+.RE
+.PP
+See \fBsysrq.txt\fP of the Linux kernel documentation for a more complete
+list of functions.
+.PP
+This feature can be switched on or off during runtime by echoing "1" (on) or
+"0" (off) to \fB/proc/sys/kernel/sysrq\fP.
+.
+.
+.
+.SH CONFIGURATION
+.SS "Using the z/VM IUCV HVC terminal device as Linux console"
+The first z/VM IUCV HVC terminal device can display kernel messages
+and it can also be used as the preferred Linux console (i.e. become
+\fB/dev/console\fP).
+The preferred console is used as the initial input and output device,
+beginning at the stage of the boot process when the
+.BR init (8)
+program is called. Messages issued by programs that run at this stage are
+only displayed on the preferred console.
+
+.TP
+.B Note:
+Console messages are not displayed if the z/VM IUCV HVC terminal
+is not connected.
+If console messages flood the terminal, the z/VM HVC terminal device driver
+might discard console messages if they come in too fast.
+.PP
+To use the z/VM IUCV hypervisor console as the preferred console, append the
+\fBconsole=hvc0\fP parameter to the kernel command line.
+
+To display console messages only and use another device as preferred console,
+append \fBconsole=hvc0\fP, followed by an additional \fBconsole=\fP
+parameter that explicitly defines the preferred console,
+e.g. \fBconsole=ttyS0\fP.
+
+.TP
+.B Note:
+The last \fBconsole=\fP parameter designates the device for use as the
+preferred console. For Linux on System z, the default preferred console device
+is \fBttyS0\fP.
+.
+.
+.SS "Restricting terminal connections using a z/VM user ID filter"
+The z/VM IUCV HVC device driver can filter incoming connection requests based
+on the user ID of the originating z/VM guest virtual machine.
+
+The z/VM user ID filter is specified as a comma separated list of user IDs for
+the \fBhvc_iucv_allow\fP kernel parameter.  If an user ID ends with an asterisk
+(*), only the characters up to the asterisk must match.  You can use the
+asterisk to match multiple z/VM user IDs.
+The kernel parameter can be set initially on the kernel command line or through
+a sysfs attribute at runtime.
+
+For changing the parameter value at runtime, see the
+.BR chiucvallow (8)
+command.
+
+If the z/VM user ID filter is changed at runtime, the new filter applies only
+to new incoming connection requests. Existing terminal connections remain active
+until they get closed.
+Any re-connection attempt is subject to the new z/VM user ID filter.
+
+.TP
+.B Note:
+If z/VM user ID filtering is active, connection attempts from the z/VM
+guest virtual machine to itself are also subject to filtering. If the local
+z/VM user ID is not listed, local connection requests are refused.
+.
+.
+.SS "Configuring HVC terminals for user logins"
+Typically, \fBgetty\fP programs initialize terminals and prepare terminals for
+user logins.
+
+For each HVC terminal device, a \fBgetty\fP program must be started.
+To configure and start \fBgetty\fP on a HVC terminal, open
+.BR /etc/inittab (5),
+and add a new entry similar to this one:
+.ft CW
+.in +0.25in
+.nf
+
+h0:2345:respawn:/sbin/mingetty hvc0
+
+.fi
+.in -0.25in
+.ft
+Add new entries for each HVC terminal device that is designated for user logins.
+You can use
+.BR ttyrun (8)
+to start a getty program on each HVC terminal device and to prevent respawns
+through  the
+.BR init (8)
+program when a HVC terminal is not available.  You can then change the number
+of HVC terminal devices without adding or removing entries every time.
+
+See
+.BR inittab (5)
+about the format of \fBinittab\fP entries; see
+.BR getty (8),
+or
+.BR mingetty (8)
+for options that are related to terminal setup and user login.
+.
+.
+.SS "Setting up HVC terminals for root logins"
+To allow root logins on HVC terminals, ensure that the respective terminal
+device names are listed in
+.BR /etc/securetty (5)\fR.\fP
+HVC terminal device names start with \fBhvc\fP followed by an integer in
+the range 0 to 7.
+.
+.
+.SS "Setting up the terminal environment"
+The terminal environment is changed by assigning the terminal name to the
+\fBTERM\fP environment variable. This can be done manually, or by a
+getty program.
+
+Complete the following steps for setting up the terminal environment for a z/VM
+IUCV HVC terminal:
+.RS 4
+.IP "1." 4
+To display the current terminal name, issue the command:
+
+.ft CW
+.in +0.25in
+.nf
+user@host:~$ echo $TERM
+xterm
+.fi
+.in -0.25in
+.ft
+
+.IP "2." 4
+To connect to a z/VM IUCV HVC terminal, run
+.BR iucvconn (1)
+and log in as usual:
+
+.ft CW
+.in +0.25in
+.nf
+user@host:~$ iucvconn MYLNX01 lnxhvc0
+     ...
+user@MYLNX01:~$
+.fi
+.in -0.25in
+.ft
+
+.IP "3." 4
+To assign the terminal name from step 1. to the terminal environment variable,
+issue the following command:
+
+.ft CW
+.in +0.25in
+.nf
+user@MYLNX01:~$ export TERM=xterm
+.fi
+.in -0.25in
+.ft
+.RE
+
+If unsure which terminal name to use, assign "\f(CWlinux\fP" to the terminal
+environment variable.
+
+.PP
+For getty programs, a sample terminal environment configuration might look like:
+
+.ft CW
+.in +0.25in
+.nf
+h0:2345:respawn:/sbin/agetty -L 9600 hvc0 linux
+.fi
+.in -0.25in
+.ft
+
+The terminal name typically follows the terminal device name. In the example,
+.BR agetty (8)
+sets the terminal environment variable to "linux" before
+.BR login (1)
+is started.
+
+Some getty programs do not support the terminal name parameter, see
+the manual page of the respective getty program for more information.
+.
+.
+.
+.SH "DIAGNOSTICS"
+The z/VM IUCV hypervisor console device driver uses the kernel message
+infrastructure for its messages. The message prefix is \fBhvc_iucv\fP.
+.
+.
+.
+.SH "SEE ALSO"
+.BR iucvconn (1),
+.BR chiucvallow (8),
+.BR af_iucv (7),
+.BR bootparam (7),
+.BR inittab (5),
+.BR getty (8),
+.BR agetty (8),
+.BR mingetty (8),
+.BR ttyrun (8),
+.BR login (1),
+.BR securetty (5)
+
+See
+.BR kernel-parameters.txt " and"
+.BR sysrq.txt
+of the Linux kernel documentation for more information about kernel boot
+parameters and the magic sysrequest function.
+
+.I "Linux on System z - Device Drivers, Features, and Commands"

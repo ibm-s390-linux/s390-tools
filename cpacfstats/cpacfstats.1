@@ -1,0 +1,127 @@
+.\" cpacfstats.1
+.\"
+.\" Copyright IBM Corp. 2015, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" use
+.\"   groff -man -Tutf8 cpacfstats.1
+.\" or
+.\"   nroff -man cpacfstats.1
+.\" to process this source
+.\"
+.TH cpacfstats "1" "January 2015" "s390-tools"
+.
+.ds c \fcpacfstats\fP
+.
+.SH NAME
+cpacfstats \- enable, disable and display CPACF statistical data
+.
+.SH SYNOPSIS
+.B cpacfstats
+.RB [ \-h | \-\-help ]
+.RB [ \-v | \-\-version ]
+.RB [ \-e | \-\-enable
+.I counter
+.RB ]
+.RB [ \-d | \-\-disable
+.I counter
+.RB ]
+.RB [ \-r | \-\-reset
+.I counter
+.RB ]
+.RB [ \-p | \-\-print
+.I counter
+.RB ]
+.
+.SH DESCRIPTION
+The cpacfstats client application interacts with the cpacfstatsd daemon and
+triggers actions. The application enables, disables, resets, and fetches
+one or all of the mainframe CPACF performance counters with the help of the
+daemon process.
+
+All counters are initially disabled and must be switched on to measure
+CPACF activities of the system. There is a slight performance penalty with
+CPACF counters enabled.
+
+Note: All cryptographic counters are bound to physical CPUs. If you use
+dedicated CPUs for your LPAR, you obtain only your CPACF activities. If
+your CPUs are shared with other LPARs, their cryptographic activities might
+distort the results. CPACF performance counters are available on LPARs
+only. For security reasons only members of the group \fIcpacfstats\fR are
+allowed to run the cpacfstats client application.
+
+Example usage scenario:
+.P
+1. Start the cpacfstatsd daemon with root privileges.
+.P
+2. Check for successful startup by using the ps and syslog commands.
+.P
+3. Enable the CPACF counters of interest. For example, enable all counters
+by issuing cpacfstats -e.
+.P
+4. Run your applications.
+.P
+5. Display counter values by using the cpacfstats command. Reset the
+cryptographic counters as required. To reset, use, for example, cpacfstats
+-r.
+.P
+6. Disable all the CPACF measurements, for example, by using cpacfstats
+-d.
+.P
+7. Shutdown the cpacfstatsd daemon by using killall cpacfstatsd.
+
+.SH OPTIONS
+.TP
+\fB\-h\fR or \fB\-\-help\fR
+Display help information for the command.
+.TP
+\fB\-v\fR or \fB\-\-version\fR
+Display version and copyright information for the command.
+.TP
+\fB\-e\fR or \fB\-\-enable\fR [counter]
+Enable one or all CPACF performance counters. The optional counter argument
+can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR or \fBall\fR. If
+the counter argument is omitted, all performance counters are
+enabled. Enabling a counter does not reset it. New events are added to the
+current counter value.
+.TP
+\fB\-d\fR or \fB\-\-disable\fR [counter]
+Disable one or all CPACF performance counters. The optional counter
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR or
+\fBall\fR. If the counter argument is omitted, all performance counters
+are disabled. Disabling a counter does not reset it. The counter value is
+preserved when a counter is disabled, and counting will resume using the
+preserved value when the counter is re-enabled.
+.TP
+\fB\-r\fR or \fB\-\-reset\fR [counter]
+Reset one or all CPACF performance counters. The optional counter
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR or
+\fBall\fR. If the counter argument is omitted, all performance counters are
+reset to 0.
+.TP
+\fB\-p\fR or \fB\-\-print\fR [counter]
+Display the value of one or all CPACF performance counters. The optional
+counter argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR
+or \fBall\fR. If the counter argument is omitted or if there is no
+argument, all performance counters are displayed.
+.TP
+The default command is --print all.
+.
+.SH FILES
+.nf
+/var/run/cpacfstatsd_socket
+.fi
+.
+.SH RETURN VALUE
+.IP 0
+Successful program execution.
+.IP 1
+An error occurred, reasons include: invalid argument, cpacfstatsd could not
+be reached (check that the daemon is running), insufficient access rights,
+version mismatch between client and daemon, or the application is out of
+memory. The application prints a message with the details of the error and
+the errno value.
+.
+.SH SEE ALSO
+cpacfstatsd (8)

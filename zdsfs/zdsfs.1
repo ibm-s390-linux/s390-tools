@@ -1,0 +1,276 @@
+.\" IBM Corporation Copyright 2013, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZDSFS 1 "2013" "s390-tools"
+
+.SH NAME
+zdsfs \- File system for z/OS data set access
+
+.SH SYNOPSIS
+.SS mounting:
+.TP
+\fBzdsfs\fP \fI<devices>\fR \fI<mountpoint>\fR [\fI<options>\fR]
+.SS unmounting:
+.TP
+\fBfusermount\fP -u \fI<mountpoint>\fR
+
+.SH DESCRIPTION
+
+Use the \fBzdsfs\fP command for read access to z/OS data sets
+stored on one or more DASDs.
+
+The zdsfs file system translates the record-based z/OS data sets to
+UNIX file system semantics.  After mounting the devices, you can use
+common Linux tools to access the files on the disk. Physical
+sequential data sets are represented as files. Partitioned data sets
+are represented as directories, with each member being represented as
+a file in that directory.
+
+.SH RESTRICTIONS
+Only read access is supported.
+
+Data sets on tape devices are not supported.
+
+To maintain data consistency, a DASD must not be modified while it is
+in use by zdsfs. This can be assured by varying the device offline
+in z/OS before setting it online in Linux.
+
+The access to the device by Linux is not subject to RACF or any other
+z/OS auditing mechanism. The safety of the data on the device must be
+established by the respective Linux mechanisms. The default behavior
+of zdsfs is to grant access to the files in the fuse file system only
+to the user who has started the tool. This behavior can be
+configured by using the options `allow_other', `default_permissions',
+`umask', `uid', and `gid'.
+
+Only physical sequential (PS) and partitioned data sets (PDS) are
+supported. Supported record formats are: V, F, U, B, S, A, and M.
+
+The file system is limited to basic operations (readdir, stat, open,
+read, seek). Because the actual size of the data in each track is not
+always known, zdsfs does not support mmap. Seek operations read the
+whole data set to the given offset. The performance of seek
+operations to previous offsets can be improved by buffering seek
+offsets, see option `-o seekbuffers'.
+
+A further consequence of the unknown exact data size is that zdsfs
+cannot provide exact file sizes. As a heuristic, the given file sizes
+are the maximum possible data sizes, based on the number and size of
+the extents that belong to each data set. When the actual end of the
+data is reached during read, the usual end of file (EOF) is returned.
+To make sure that the EOF is passed to the user correctly, the option
+`-o direct_io' is set by zdsfs implicitly.
+
+The detection of incomplete multi volume data sets does not work for
+data sets for which only the first volume (device) is present.
+
+.SH OPTIONS
+.SS "general options:"
+
+.TP
+\fB<devices>\fR One or more DASD device nodes, where node specifications are
+separated by blanks. The device nodes can be specified explicitly with
+the command or with the -l option and a file.
+.TP
+\fB<mountpoint>\fR The mount point for the specified DASD.
+.TP
+\fB\-o\fR \fI<opt>\fR,[\fI<opt>\fR...]  Fuse or mount command
+options. For fuse options see "Applicable FUSE options" below, for
+mount options see \fBmount(8)\fP.
+.TP
+\fB\-h\fR or \fB\-\-help\fR
+Print usage information, then exit.
+.TP
+\fB\-v\fR or \fB\-\-version\fR
+Print version information, then exit.
+.SS "zdsfs options:"
+.TP
+\fB\-l\fR \fI<device_list>\fR
+The specified file \fI<device_list>\fR contains a list of device
+nodes, separated by white space (space, tab or new line). All device
+nodes in this file are mounted as if given directly via the command
+line.
+.TP
+\fB\-o\fR rdw
+Keep record descriptor words in the byte stream. By default, data set
+files contain only the user data.
+
+Record boundaries might be important for applications to correctly
+interpret the user data. For data sets with variable records, the
+record descriptor words are required to find the record
+boundaries. With fixed blocks, record boundaries can be computed from
+the fixed record sizes.
+
+See `z/OS DFSMS Using Data Sets' for more information about record
+descriptor words.
+.TP
+\fB\-o\fR ignore_incomplete
+Continue processing even if parts of a multi-volume data set are
+missing.  By default, zdsfs ends with an error unless all data sets
+are complete.
+
+Incomplete data sets can be tolerated, for example, if all data of
+interest is on another data set that is complete.
+Incomplete data sets are not represented in the file system. Instead,
+for each incomplete data set, a warning message is written to the
+standard error stream.
+.TP
+\fB\-o\fR tracks=\fI<n>\fR
+Size of the track buffer in tracks. The default for \fI<n>\fR is 128.
+
+The data that is read from the DASD has to be stored in a buffer, because
+the minimum size for a read operation in raw access mode is one track,
+and the user data has to be extracted from the track images.  Reading
+more than one track at a time improves the overall performance, but
+requires larger buffers.
+
+The memory needed by zdsfs for buffering a single track is 64KB for the
+raw track data and 56KB for the extracted user data. Each time a file
+is opened a total of (\fI<n>\fR * 120KB) is allocated for the track buffer.
+
+.TP
+\fB\-o\fR seekbuffer=\fI<s>\fR
+Upper limit in bytes for the seek history buffer size. The default for
+\fIs\fR is 1048576.
+
+Because the block and record sizes in a data set may vary,
+the only way to find a data byte at a particular offset (`seek') is
+to read and interpret the whole data set from the beginning, until
+the offset is reached.
+
+To improve the performance of `seek' operations in areas that have
+already been read, zdsfs can buffer offsets in regular
+intervals. These intervals are multiples of \fI<n>\fR tracks, as specified
+with the `tracks' option.
+
+For small data sets and large values of \fI<n>\fR, only a few seek offsets
+need to be buffered. In this case, the amount of memory that is
+actually allocated can be much smaller than the upper limit \fI<s>\fR.
+
+If \fI<s>\fR is set to 0, no seek history buffer is allocated. In this
+case `seek' is still supported, but a `seek' operation might result in a
+read from the beginning of the data set.
+
+.TP
+\fB\-o\fR check_host_count
+Stop processing if the device is used by another operating system instance.
+
+.SS "Applicable FUSE options (version 2.8):"
+This is a selected subset of all FUSE options. Use the zdsfs
+\fB\--help\fR option to print a full list.
+
+.TP
+\fB\-d\fR or \fB\-o\fR debug
+Enable debug output (implies \fB\-f\fR)
+.TP
+\fB\-f\fR
+Foreground operation
+.TP
+\fB\-o\fR allow_other
+Allow access by other users
+.TP
+\fB\-o\fR allow_root
+Allow access by root
+.TP
+\fB\-o\fR nonempty
+Allow mounts over non\-empty file/dir
+.TP
+\fB\-o\fR default_permissions
+Enable permission checking by kernel
+.TP
+\fB\-o\fR max_read=\fI<n>\fR
+Set maximum size of read requests
+.TP
+\fB\-o\fR kernel_cache
+Cache files in kernel
+.TP
+\fB\-o\fR [no]auto_cache
+Enable caching based on modification times
+.TP
+\fB\-o\fR umask=\fI<m>\fR
+Set file permissions (octal)
+.TP
+\fB\-o\fR uid=\fI<m>\fR
+Set file owner
+.TP
+\fB\-o\fR gid=\fI<n>\fR
+Set file group
+.TP
+\fB\-o\fR max_readahead=\fI<n>\fR
+Set maximum readahead
+.TP
+\fB\-o\fR async_read
+Perform reads asynchronously (default)
+.TP
+\fB\-o\fR sync_read
+Perform reads synchronously
+
+
+.SH DATA SET CHARACTERISTICS
+
+Certain data set characteristics might be required for the correct
+interpretation of the data. The collected metadata of all data sets
+can be found in a file `metadata.txt' in the top directory of the
+mounted file system.
+
+This file contains one line per data set, with the syntax that is used
+by z/OS.
+
+dsn=<data set name>,recfm=<fmt>,lrecl=<size>,dsorg=<org>
+
+\fBdsn\fR: The data set name.
+For physical sequential data sets this is the
+same name as the file name in the mount directory. For partitioned
+data sets (PDS) this is the same as the directory name in the mount
+directory. For PDS members the member name is placed in parentheses
+after the PDS name.
+
+\fBrecfm\fR: The record format.
+
+\fBlrecl\fR: The logical record length.
+
+\fBdsorg\fR: The data set organization.
+For partitioned data sets the organization is `PO', but for
+partitioned data set members it is `PS'.
+
+In addition to the `metadata.txt' file, you can use the following
+extended attributes to read the data set characteristics of a file or
+directory:
+
+\fBuser.recfm\fR: The record format.
+
+\fBuser.lrecl\fR: The logical record length.
+
+\fBuser.dsorg\fR: The data set organization of a file.
+
+
+.SH EXAMPLES
+To mount the z/OS disk with the name dasde enter:
+.br
+
+  # zdsfs /dev/dasde /mnt
+
+.br
+
+To mount the z/OS disk with space for 4 tracks and keeping the record
+descriptor words in the byte stream, enter:
+.br
+
+  # zdsfs -o rdw -o tracks=4 /dev/dasde /mnt
+
+.br
+
+To unmount the z/OS disk mounted on /mnt enter:
+.br
+
+  # fusermount -u /mnt
+
+To list all extended attributes of file FOOBAR.TEST.TXT
+assuming the z/OS disk was mounted on /mnt:
+
+  # getfattr -d /mnt/FOOBAR.TEST.TXT
+
+.SH SEE ALSO
+getfattr(1), fuse(8), z/OS DFSMS Using Data Sets,
+and Linux on System z: Device Drivers, Features and Commands

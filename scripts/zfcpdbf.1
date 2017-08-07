@@ -1,0 +1,99 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZFCPDBF 1 "DEC 2010, JUL 2016" "s390-tools"
+
+.SH NAME
+zfcpdbf \- zfcp trace data sort/analyse tool.
+
+.SH SYNOPSIS
+.br
+\fBzfcpdbf\fR [OPTIONS] <adapter>
+.br
+\fBzfcpdbf\fR {-h|-v}
+
+.SH DESCRIPTION
+\fBzfcpdbf\fR Interprets the information from various logging and tracing sources,
+e.g. zfcp-, qdio- and cio-trace records and, if available, system messages.
+
+With offline debug data, such as collected by \fBdbginfo.sh\fR or
+extracted from a Linux system dump with \fBcrash\fR version 5.1.0 or
+later, zfcpdbf can run on any platform with a suitable Perl language
+environment.
+
+Any zfcpdbf since version 1.13.0 works with debug data from any Linux
+kernel since version 2.6.38. Recent zfcpdbf versions with older kernel
+versions show zeros or empty values for newer trace record fields the
+old kernel did not yet have. Older zfcpdbf versions with recent kernel
+versions simply show the old trace records fields zfcpdbf already
+knows about and ignores any newer trace record fields of the kernel.
+For full exploitation, it is recommended to always use the latest
+version of zfcpdbf no matter from which kernel version the debug data is.
+
+.SH OPTIONS
+.TP
+\fB-h\fR, \fB--help\fR
+Print usage information, then exit.
+
+.TP
+\fB-v\fR, \fB--version\fR
+Print version information, then exit.
+
+.TP
+\fB-x <AREA[,AREA]>\fR, \fB--exclude=<AREA[,AREA]>\fR
+list of trace areas to exclude (default none).
+
+.TP
+\fB-i <AREA[,AREA]>\fR, \fB--include=<AREA[,AREA]>\fR
+list of trace areas to include (default all).
+
+.TP
+\fB-z \fR, \fB--zfcp-only\fR
+zfcp trace areas only (short cut).
+
+.TP
+\fB-t <DIFF>\fR, \fB--timediff=<DIFF>\fR
+highlight requests with a round-trip processing time of <DIFF> or more.
+
+.TP
+\fB-e\fR, \fB--def-error\fR
+do NOT show deferred error messages.
+
+.TP
+\fB-f\fR, \fB--force\fR
+force execution on a detected version mismatch.
+
+.TP
+\fB-p <PATH>\fR, \fB--path=<PATH>\fR
+use directory <PATH> for the location of the trace records.
+
+.TP
+\fB-r <PATH>\fR, \fB--root=<PATH>\fR
+prepend <ROOT> to standard trace record location.
+
+.TP
+\fB-m <ZONE>\fR, \fB--timezone=<ZONE>\fR
+set time zone for system message timestamps.
+
+.SH PARAMETERS
+<AREA> may be REC, HBA, SAN, SCSI, QDIO, QDIO_SETUP, QDIO_ERROR,
+CIO_TRACE, CIO_MSG, CIO_CRW, KERNEL or MULTIPATH.
+
+<DIFF> is the value in seconds which has to be lapsed between sending the request
+and receiving its response.
+
+<PATH> is specifying the location(directory) of trace records which were pulled
+from another system, e.g. pulled from a dump.
+
+<ROOT> is specifying a directory which has to be prepended to the standard
+location of the trace records, e.g. typically used in conjunction with
+the result of the dbginfo script.
+
+<PATH> and <ROOT> are only useful if used on non-live systems and therefore
+typically used by service- or development-staff.
+
+<ZONE> is a time zone value in the [+-][h]h[:mm] format.
+
+<adapter> aka busid is specifying the host adapter of which the trace information should be processed. if a 4-digit value is provided it is automaitically extended to the correct format 0f 0.0.xxxx.
+

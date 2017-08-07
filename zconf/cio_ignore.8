@@ -1,0 +1,256 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CIO_IGNORE 8 "Apr 2009" s390\-tools
+
+.SH NAME
+cio_ignore \- query or modify the CIO device driver blacklist
+
+.SH SYNOPSIS
+.B cio_ignore
+.RB [ \-h | \-\-help ]
+.RB [ \-v | \-\-version ]
+.RS 11
+.br
+.RB [ \-a | \-\-add
+.IR DEVID ]
+.RB [ \-A | \-\-add\-all ]
+.br
+.RB [ \-r | \-\-remove
+.IR DEVID ]
+.RB [ \-R | \-\-remove\-all ]
+.br
+.RB [ \-l | \-\-list ]
+.RB [ \-L | \-\-list\-not\-blacklisted ]
+.br
+.RB [ \-i | \-\-is\-ignored
+.IR DEVID ]
+.br
+.RB [ \-k | \-\-kernel\-param ]
+.RB [ \-u | \-\-unused ]
+.RB [ \-p | \-\-purge ]
+
+
+.SH DESCRIPTION
+The cio_ignore command provides functions to query and modify the contents of
+the CIO device driver blacklist. This blacklist determines if Linux tries to
+make a device which is connected through the Channel-subsystem (CSS) available
+for use by Linux.
+
+Adding a device to the blacklist does not immediately result in a change
+of device availability. For devices which are already available in Linux,
+the blacklist only has an effect when attaching or re-attaching the device, or
+when using the
+.I purge
+function. Removing a device from the blacklist on the other hand
+will directly result in an attempt to make that device available.
+
+The
+blacklist is not persistent, that is it is cleared during initial program load.
+To create a persistent blacklist, add the output of the
+.I kernel-param
+option to the Linux kernel parameters.
+
+.B Advantages of using a blacklist
+
+The CIO device driver will not perform device discovery operations or allocate
+memory for devices which are on the blacklist. Therefore it is possible to
+significantly reduce time and memory consumption during the boot phase of Linux
+by specifying a blacklist as kernel parameter which contains all devices that
+are not required for normal operations.
+
+Using the
+.I purge
+function, it is also possible to make devices only temporarily available (for
+example DASD disks which are only used for backup) and remove them afterwards
+when they are no longer required.
+
+
+.B Device ID format
+
+To identify a device, specify its device ID in the format:
+"<CSSID>.<SSID>.<DEVNO>". For example: "0.0.0190".
+.br
+
+The meaning of each field is:
+
+CSSID
+.RS
+Channel-subsystem ID in hexadecimal notation with at most two digits.
+.RE
+
+SSID
+.RS
+Subchannel-set ID in hexadecimal notation with exactly one digit.
+.RE
+
+DEVNO
+.RS
+Device number in hexadecimal notation with exactly four digits.
+.RE
+
+Devices for which CSSID and SSID are 0 can alternatively be specified by
+using only the device number, either with or without leading "0x" and zeros.
+For example: "190", "0x190" or "0190".
+
+
+
+
+.SH OPTIONS
+.B \-h
+.br
+.B \-\-help
+.RS
+Print a short help text, then exit.
+.RE
+
+.B \-v
+.br
+.B \-\-version
+.RS
+Print version information, then exit.
+.RE
+
+.B \-a
+.br
+.B \-\-add
+.I DEVID
+.RS
+Add one or more device IDs to the blacklist.
+.br
+
+.I DEVID
+can be a single device ID as specified in section DESCRIPTION, or it can be a
+range of device IDs, or  a comma-separated list of device IDs or ranges. Ranges
+may not cross SSID boundaries. See also section EXAMPLES.
+.br
+
+Note that adding an existing device to the blacklist will not immediately
+change its availability in Linux.
+
+.RE
+
+.B \-A
+.br
+.B \-\-add\-all
+.RS
+Add the complete range of possible device IDs to the blacklist.
+.RE
+
+.B \-r
+.br
+.B \-\-remove
+.I DEVID
+.RS
+Remove one or more device IDs from the blacklist
+
+.I DEVID
+can be a single device ID as specified in section DESCRIPTION, or it can be a
+range of device IDs, or  a comma-separated list of device IDs or ranges. Ranges
+may not cross SSID boundaries. See also section EXAMPLES.
+.br
+
+When a device is removed from the blacklist, Linux will immediately attempt
+to make that device available.
+.RE
+
+.B \-R
+.br
+.B \-\-remove\-all
+.RS
+Remove all device IDs from the blacklist.
+.RE
+
+.B \-l
+.br
+.BI \-\-list
+.RS
+List device IDs on the blacklist.
+.RE
+
+.B \-L
+.br
+.B \-\-list\-not\-blacklisted
+.RS
+List device IDs not on the blacklist.
+.RE
+
+.B \-i
+.br
+.B \-\-is-ignored
+.I DEVID
+.RS
+Check if the device with the specified ID is on the blacklist. If it is
+on the blacklist, the exit code is 0. If it is not on the blacklist, the
+exit code is 2.
+.RE
+
+.B \-k
+.br
+.B \-\-kernel\-param
+.RS
+List the current blacklist in cio_ignore kernel param format.
+
+To make a blacklist persistent across IPL, use the output of this command
+and add it to the Linux kernel parameter.
+.RE
+
+.B \-u
+.br
+.B \-\-unused
+.RS
+Create a blacklist which includes all unused (i.e. offline) devices.
+
+Note: The new blacklist replaces any previous one. Also in this
+context, an unused device is a device which is currently not online (see
+.BR chccwdev(8) ).
+.RE
+
+.B \-p
+.br
+.B \-\-purge
+.RS
+Remove all blacklisted unused (i.e. offline) devices from Linux.
+
+To make a device available again, use the
+.I remove
+or
+.I remove\-all
+function.
+.RE
+
+.SH EXAMPLES
+
+.B cio_ignore -a 0x190,0.0.1000-0.0.1002
+.RS
+Add devices 0.0.0190, 0.0.1000, 0.0.1001 and 0.0.1002 to the blacklist. If these
+devices are currently available in Linux, their availability will not
+immediately change.
+.RE
+
+.B cio_ignore  -A -r 0x190
+.RS
+Add all devices except device 0.0.0190 to the blacklist.
+.RE
+
+.B cio_ignore -r 0x190
+.RS
+Remove device 0.0.0190 from the blacklist. If this device is currently attached
+to the Linux system but not available, it will immediately become available.
+.RE
+
+.B cio_ignore -u -p
+.RS
+Remove all devices from Linux which are currently not online.
+.RE
+
+.B cio_ignore -u -k
+.RS
+Set the blacklist to contain all offline devices and print the corresponding
+kernel parameter.
+.RE
+
+.SH SEE ALSO
+.BR lscss (8),
+.BR chccwdev (8)

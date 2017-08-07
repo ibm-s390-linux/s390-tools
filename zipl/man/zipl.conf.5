@@ -1,0 +1,654 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIPL.CONF 5 "Nov 2009" "s390-tools"
+
+.SH NAME
+zipl.conf \- zipl configuration file
+
+.SH DESCRIPTION
+The
+.I zipl.conf
+file contains configuration information for the IBM S/390 and zSeries
+boot loader tool
+.B zipl
+(see
+.BR zipl (8)).
+.br
+
+By default this configuration file is located at /etc/zipl.conf. A different
+location may be specified either using the '\-\-config' option of
+.B zipl
+or by setting the ZIPLCONF shell environment variable.
+.br
+
+Using the
+.I zipl.conf
+configuration file, one can specify several different boot configurations. Each
+configuration represents one of the following tasks which are performed at boot
+time:
+.IP "     -"
+boot a Linux kernel using a specific kernel parameter line and optionally
+a ramdisk
+.IP "     -"
+load a data segment for initializing named saved segments
+.IP "     -"
+create a system dump on a DASD disk partition or tape device
+.IP "     -"
+create a system dump on a device mapper multipath partition device node of
+a SCSI disk
+.PP
+
+To be able to specify more than one boot configuration, the
+.I zipl.conf
+file is divided into sections. There are two types of sections: configuration
+sections and menu sections. Configuration sections specify a single task while
+menu sections represent a list of tasks which are grouped together as a 'menu'.
+
+Each section begins with a heading. In the case of configuration sections, the
+heading is a single line containing the section name in square brackets ([]).
+Such names may be made up of any printable character except for space and have
+to be unique among the configuration file.
+
+Menu headings are made up of a leading colon (':'), followed by a menu name
+which may consist of alphabetic characters and numbers.
+
+The heading is followed by a number of lines, called the section body. Inside
+this body, options are specified, one per line, using the form
+.IP
+.B key=value
+.PP
+where 'key' may be any of the options described below or a number in case
+of a menu section. The 'value' field may be enclosed in quotes (" or ') to
+preserve leading and trailing spaces. Lines beginning with a hash sign (#)
+are treated as comments and will be ignored.
+
+Note that it is not allowed to specify
+.B key=value
+pairs outside of a section (i.e. before the first section heading).
+
+As a special section name, 'defaultboot' is reserved for specifying a
+default boot configuration (see options
+.BR 'default' ", " 'defaultmenu' " and "'defaultauto'"
+below).
+
+.B Example configuration:
+.IP
+# An example for a zipl.conf file
+.br
+
+[defaultboot]
+.br
+defaultmenu = menu1
+.br
+
+[linux]
+.br
+target      = /boot
+.br
+image       = /boot/image
+.br
+parameters  = "root=/dev/dasda1 console=ttyS0"
+.br
+
+[test]
+.br
+target      = /boot
+.br
+image       = /boot/image-test
+.br
+parmfile    = /boot/parmfile-test
+.br
+
+:menu1
+.br
+target      = /boot
+.br
+1           = linux
+.br
+2           = test
+.br
+default     = 1
+.br
+prompt      = 1
+.br
+timeout     = 0
+.br
+.PP
+
+.B Boot menu
+
+The
+.B zipl
+tool provides a boot menu function which enables users to choose a boot
+configuration and to modify the kernel command line parameters at IPL time
+(only available for DASD disk devices).
+
+There are two alternatives for specifying a boot menu:
+.IP
+1. by explicitly defining a menu section (see example configuration)
+.PP
+.IP
+2. by having zipl automatically create a menu from all available IPL sections
+(see description of
+.B 'defaultauto'
+keyword below)
+.PP
+
+When defining a menu section, included configurations are subsequently
+identified by their assigned number.
+
+If the 
+.B 'prompt'
+setting of the menu section is set to 1, a menu text will be displayed
+during IPL and the boot program will wait for user input:
+
+.IP
+zIPL interactive boot menu
+.br
+
+ 0. default (linux)
+.br
+ 
+ 1. linux
+.br
+ 2. test
+.br
+ 
+Please choose:
+.PP
+
+The menu prompt expects the configuration number as input. Typing '0' will
+start the default configuration. Additional kernel parameters can be
+specified by supplying them after the configuration number, separated by a
+blank character. These kernel parameters will be converted to lower-case.
+Example input:
+
+.IP
+2 mem=128m maxcpus=1
+.PP
+
+This will start configuration 2 and append the string "mem=128m maxcpus=1" to
+the existing kernel command line. To replace the existing command line, prefix
+the the string with "=":
+
+.IP
+2 =dasd=0190 root=/dev/dasda1
+.PP
+
+This will start configuration 2 and use "dasd=0190 root=/dev/dasda1" as the
+kernel command line. Note that these menu-specified parameters are only
+temporary and won't be saved for the next IPL process. Note also that the
+selected configuration number will be available to the init process through
+the environment variable named
+.BR BOOT_IMAGE .
+
+If the
+.B 'timeout'
+option has been used, the boot menu will automatically start the default
+configuration after the specified number of seconds has passed without user
+input.
+
+VM users need to prefix all input with the VM VINPUT command,
+e.g. type '#cp vinput vmsg 0' to boot the default configuration.
+
+Another way of selecting a configuration without the interactive menu is by
+specifying its number using the IPL
+.B 'loadparm'
+function, e.g.:
+
+.IP
+#cp ipl 0192 loadparm 2
+.PP
+
+In case the specified number does not correspond to a valid configuration,
+the boot process will abort with a disabled wait state (address code 0x300).
+
+The loadparm function is available even if the menu has been deactivated by
+setting 'prompt' to zero or by installing only a single configuration. The menu
+can then be temporarily activated by passing the string 'prompt' via the
+loadparm function:
+
+.IP
+#cp ipl 0192 loadparm prompt
+.PP
+
+
+
+.SH OPTIONS
+.I number
+=
+.I section name
+(menu only)
+.IP
+.B Menu section:
+.br
+Specifies that section
+.I section name
+be included in the menu at position
+.IR number ,
+where
+.I number
+is limited to the interval from 1 to 62 (30 on SCSI devices). A
+choice of boot configurations will either be available through a respective
+hardware feature or using the interactive boot menu (DASD devices only - see
+description above).
+
+Only disk IPL sections (see option
+.BR image ) 
+and file system dump sections (option
+.BR dumpto )
+may be included in menus. 
+
+Note that position number 0 is reserved and will automatically be assigned to
+the default menu entry (see
+.BR default ).
+
+.PP
+.br
+.B default
+=
+.I default\-configuration
+(configuration and menu)
+.IP
+.B Configuration section:
+.br
+This option is valid only in a special section named
+.BR 'defaultboot' .
+It indicates the default action which zipl should perform when called
+without parameters.
+
+When specified alone, it indicates that zipl should install a single boot
+configuration. In that case,
+.I default-configuration
+indicates the configuration name.
+
+When specified together with
+.BR 'defaultauto' " or " 'target' " ,
+it indicates that zipl should install a boot menu including all IPL boot
+configurations found in the configuration file. In that case,
+.I default-configuration
+specifies the name of the boot configuration to be used as default by the
+menu.
+
+.B Menu section:
+.br
+This option specifies the position number of the menu entry to use as
+default, i.e. when no user selection is available at boot time. If no
+default entry is specified, the first entry to appear in the menu section
+will be used as default.
+
+The default entry will also be available as position number 0.
+.PP
+
+.br
+.B defaultauto
+(configuration only)
+.IP
+.B Configuration section:
+.br
+This option is valid only in a special section named
+.BR 'defaultboot' .
+It indicates the default action which zipl should perform when called
+without parameters.
+
+When specified, it indicates that zipl should install a boot menu including all
+IPL boot configurations found in the configuration file.
+
+When this option is specified, a
+.B 'target'
+option
+.I must
+also be present and other menu-specific options such as
+.BR 'default' ", " 'timeout' " or " 'prompt'
+.I may
+also be present in the same section.
+
+Note that IPL configurations included in the menu are numbered in the order
+in which they are found in the configuration file.
+.PP
+
+.br
+.B defaultmenu
+=
+.I default\-menu
+(configuration only)
+.IP
+.B Configuration section:
+.br
+This option is valid only in a special section named
+.BR 'defaultboot' .
+It indicates the default action which zipl should perform when called
+without parameters.
+
+When specified, it indicates that zipl should install a boot menu. In that case,
+.I default-menu
+indicates the menu name.
+.PP
+
+.br
+.B dumpto
+=
+.IR dump\-device [, size ]
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify a DASD partition, device mapper multipath partition device node of a
+SCSI disk or an IBM 3480/3490/3590 tape device on which to
+install a system dump record. Once a device prepared in such a way
+is booted, the current system status is written in a raw format to that device
+and can later be retrieved using the
+.B zgetdump
+utility (see
+.BR zgetdump (8)).
+
+An optional decimal SIZE parameter may be specified to determine the
+maximum dump size in bytes. SIZE can be suffixed by either of the letters
+K, M or G to signify that the decimal number be interpreted as kilobytes,
+megabytes or gigabytes respectively. SIZE will be rounded up to the next
+megabyte boundary. Note that when you specify a SIZE lower than the actual
+memory size used by linux (see kernel parameter mem=), the resulting dump
+will be incomplete. Also note that for SCSI dump the SIZE parameter is not
+supported.
+.PP
+
+.B dumptofs
+.IP
+.br
+This option has been removed, use dumpto instead.
+.PP
+
+.B mvdump
+=
+.IR dumplist [, size ]
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify a file containing a list of ECKD DASD partitions formatted with
+compatible disk layout.
+Each device associated with one of the listed partitions is prepared for
+multi-volume dump. A dump signature is written to each listed partition.
+Once a device prepared in such a way
+is booted, the current system status is written in a raw format to the
+specified set of partitions and can later be retrieved using the
+.B zgetdump
+utility (see
+.BR zgetdump (8)).
+
+An optional decimal SIZE parameter may be specified to determine the
+maximum dump size in bytes. SIZE can be suffixed by either of the letters
+K, M or G to signify that the decimal number be interpreted as kilobytes,
+megabytes or gigabytes respectively. SIZE will be rounded up to the next
+megabyte boundary. Note that when you specify a SIZE lower than the actual
+memory size used by linux (see kernel parameter mem=), the resulting dump
+will be incomplete.
+
+This option is useful if the actual memory size used by linux is larger than
+any single ECKD DASD partition could hold.
+.PP
+
+.B image
+=
+.IR image\-file [, address ]
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify an image file containing the Linux kernel which should be started when
+booting this configuration.
+An optional hexadecimal address may be provided to load the kernel to a
+non-default memory location.
+
+An initial ramdisk may be provided using
+.BR 'ramdisk' .
+To change the kernel parameters, use
+.BR 'parmfile' " or"
+.BR 'parameters' .
+
+This option cannot be used together with either
+.BR 'dump' , " or"
+.BR 'segment' .
+.PP
+
+.B parameters
+=
+.I kernel\-parameters
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Use this option to specify a parameter line which will be passed to the Linux
+kernel at boot time. Note that the parameter line may be enclosed in quotes
+(" or ') to preserve leading and trailing spaces.
+.PP
+
+.B parmfile
+=
+.IR kernel\-parmfile [, address ]
+(configuration only)
+.IP
+.B Configuration section:
+.br
+This option can be used to specify a file which contains the kernel parameter
+line.
+An optional hexadecimal address may be provided to load the kernel to a
+non-default memory location.
+.PP
+
+.B kdump
+=
+.IR auto
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify this option to install a kdump kernel that can be used as a
+stand-alone dump tool. You can IPL this kernel in an LPAR or guest virtual
+machine to create a dump of a previously running operating system instance
+that has been configured with a reserved memory area for kdump. For
+Linux, the memory is reserved with the "crashkernel" kernel parameter.
+.PP
+
+.B prompt
+=
+.IR 0 / 1
+(configuration and menu)
+.IP
+.B Configuration section:
+.br
+This option is valid only in a special section named
+.BR 'defaultboot' " and "
+when specified together with options
+.BR 'defaultauto' " or " 'target' ". "
+
+Setting this option to 1 activates the interactive boot menu which can be used
+to select a configuration at boot time (DASD disks only). See previous section
+for a detailed description of the boot menu.
+
+The default value for
+.B 'prompt'
+is 0.
+
+.B Menu section:
+.br
+Setting this option to 1 activates the interactive boot menu which can be used
+to select a configuration at boot time (DASD disks only). See previous section
+for a detailed description of the boot menu.
+
+The default value for
+.B 'prompt'
+is 0.
+.PP
+
+.B ramdisk
+=
+.IR ramdisk\-file [, address ]
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify an image file containing an initial ramdisk which will be used as
+root device when booting a Linux kernel with respective parameters.
+An optional hexadecimal address may be provided to load the kernel to a
+non-default memory location.
+.PP
+
+.B segment
+=
+.IR segment\-file , address
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify a file which will be used to initialize a named saved segment.
+.I address
+is mandatory as it specifies the hexadecimal load address for the segment
+file.
+.PP
+
+.B tape
+=
+.I tape\-device
+(configuration only)
+.IP
+.B Configuration section:
+.br
+Specify a IBM 3480/3490/3590 tape device on which to install a boot record.
+
+This option cannot be used together with
+.BR 'target' ", "
+.BR 'dump' ", " " or "
+.BR 'segment' .
+.PP
+
+.B target
+=
+.I target\-directory
+(configuration and menu)
+.IP
+.B Configuration and menu section:
+.br
+Specify a target directory for a configuration or menu section. This
+directory is used for the following purpose:
+.IP "         - " 12
+A special file named 'bootmap' will be written to this directory. It holds
+data which is required for the boot process. Note that any attempt of
+deleting or modifying it will result in undefined behavior.
+.IP "         - " 12
+The device on which the target directory is located will be used as 'target
+device', i.e. it will be prepared for booting (initial program load).
+.PP
+
+.B targetbase
+=
+.I base\-device
+(configuration and menu)
+.IP
+.B Configuration and menu section:
+.br
+Specify the device which will be prepared for booting.
+
+This parameter is required when working with logical devices (see zipl(8)).
+.PP
+
+.B targettype
+=
+.I type
+(configuration and menu)
+.IP
+.B Configuration and menu section:
+.br
+Specify the device type for the physical device.
+.IP "         - " 12
+CDL: DASD disk with ECKD/compatible disk layout
+.IP "         - " 12
+LDL: DASD disk with ECKD/linux disk layout
+.IP "         - " 12
+FBA: FBA disk DASD
+.IP "         - " 12
+SCSI disk
+.PP
+.IP " " 8
+This parameter is required when working with logical devices (see zipl(8)).
+.PP
+
+.B targetgeometry
+=
+.I cylinders,heads,sectors
+(configuration and menu)
+.IP
+.B Configuration and menu section:
+.br
+Specify the number of cylinders, heads and sectors for the physical device.
+
+This parameter is required when working with logical devices (see zipl(8)).
+.PP
+
+.B targetblocksize
+=
+.I size
+(configuration and menu)
+.IP
+.B Configuration and menu section:
+.br
+Specify the number of bytes per block for the physical device.
+
+This parameter is required when working with logical devices (see zipl(8)).
+.PP
+
+.B targetoffset
+=
+.I offset
+(configuration and menu)
+.IP
+.B Configuration and menu section:
+.br
+Specify the starting block number of the logical device on the physical device.
+
+This parameter is required when working with logical devices (see zipl(8)).
+.PP
+
+.B timeout
+=
+.I menu-timeout
+(configuration and menu)
+.IP
+.B Configuration section:
+.br
+This option is valid only in a special section named
+.BR 'defaultboot' " and "
+when specified together with options
+.BR 'defaultauto' " or " 'target' ". "
+
+Specify a timeout interval in seconds after which the interactive boot menu
+will automatically select the default boot configuration. Setting this value to
+0 or providing any user input at boot time will deactivate the timeout
+mechanism.
+
+The default value for
+.B 'timeout'
+is 0.
+
+.B Menu section:
+.br
+Specify a timeout interval in seconds after which the interactive boot menu
+will automatically select the default boot configuration. Setting this value to
+0 or providing any user input at boot time will deactivate the timeout
+mechanism.
+
+The default value for
+.B 'timeout'
+is 0.
+.PP
+
+.SH NOTES
+While it is not recommended for reasons of recovery and redundancy, FCP.
+attached SCSI disks can also be accessed directly without multipathing,.
+for example via the "/dev/disk/by-path/" device nodes.
+
+.SH SEE ALSO
+.BR zipl (8),
+.BR zgetdump (8)

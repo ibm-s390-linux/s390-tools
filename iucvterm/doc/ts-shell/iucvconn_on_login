@@ -1,0 +1,37 @@
+#! /bin/sh
+#
+# iucvconn_on_login - start terminal connection at login
+#
+# Shell script to connect to a Linux guest operation system
+# using the iucvconn(1) program.
+# The z/VM guest virtual machine to which iucvconn_on_login will connect
+# is the name of the Linux user that logs in.
+#
+# Copyright IBM Corp. 2008, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+prog_name=`basename $0`
+guest_name=${USER:-`whoami 2>/dev/null`}
+terminal=lnxhvc0
+iucvconn=`which iucvconn 2>/dev/null`
+
+__error() {
+	printf "$prog_name: $@\n" >&2
+	exit 1
+}
+
+# check if we have been called with -c <name> to specify an alternate
+# terminal identifier. This can be used by ssh: "ssh -t guest@ts my_term"
+case "$1" in
+  -c) test -n "$2" && terminal=$2 ;;
+esac
+
+test -t 1 || __error "The $prog_name program requires a terminal to run on"
+test "x$guest_name" = x && \
+	__error "Failed to determine the target z/VM guest virtual machine"
+test -x "$iucvconn" || __error "Failed to run the 'iucvconn' program"
+
+printf "$prog_name: Connecting to $guest_name (terminal ID: $terminal)\n\n"
+exec $iucvconn $guest_name $terminal

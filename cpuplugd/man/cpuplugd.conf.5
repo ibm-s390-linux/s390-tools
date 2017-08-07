@@ -1,0 +1,284 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CPUPLUGD.CONF 5 "May 2011" "s390-tools"
+.
+.SH NAME
+cpuplugd.conf \- Configuration file for the Linux on System z CPU and memory
+hotplug daemon
+.
+.SH DESCRIPTION
+The cpuplugd.conf configuration file contains the configuration information for
+the Linux for System z CPU and memory hotplug daemon.
+
+Use this file to specify rules for enabling or disabling CPUs and for adding
+or removing memory.
+.
+.SS "CPU hotplug"
+CPUs can be enabled and disabled through a sysfs interface.
+The status file for a CPU, here CPU number 16 (counting starts at 0),
+is /sys/devices/system/cpu/cpu15/online.
+
+Writing a 0 to this file disables the CPU. Writing a 1 enables the CPU.
+.
+.SS "Memory hotplug"
+The rules that add or remove memory use the cooperative memory management
+(CMM) feature.
+
+CMM is a mechanism to reduce the memory available to Linux instances that run
+as guests of z/VM.
+CMM allocates pages to a dynamic page pool not available to Linux.
+A diagnose code indicates to z/VM that the pages in the page pool are out of
+use. z/VM can then immediately reuse these pages for other guests.
+.
+.SS "Layout of the configuration file"
+The configuration file contains variables specifying static numbers or
+expressions. They are of the format \fB<variable>="<value>"\fP and they
+need to be specified within one line. Expressions can be specified
+to calculate algebraic values or to define boolean rules, which determine
+when a hotplug/hotunplug action should be taken. The maximum valid line
+length is 2048 characters.
+
+There are case-insensitive pre-defined and case-sensitive user-defined
+variables. The configuration file must include specifications for all
+pre-defined variables. If a variable is not set, the hotplug function it
+applies to, CPU or memory, is disabled.
+The only exception to this rule is CMM_DEC, which defaults to the setting
+for CMM_INC if omitted. If a pre-defined variable is set more than once, only
+the last occurrence is used. User-defined variables must not be set more than
+once.
+.
+.SS "Hotplug rules"
+Set these pre-defined variables to an expression that resolves to a boolean
+value (true or false). These variables trigger hotplug actions. Setting a
+variable to "0" disables the action.
+.
+.RS 2
+.IP "-" 2
+\fBHOTPLUG\fP - used to enable CPUs
+.IP "-" 2
+\fBHOTUNPLUG\fP - used to disable CPUs
+.IP "-" 2
+\fBMEMPLUG\fP - used to increase the available memory
+.IP "-" 2
+\fBMEMUNPLUG\fP - used to decrease the amount of memory
+.RE
+.PP
+The following operators can be used in a hotplug rule expression:
+.br
+.RS 2
+.B + * ( ) / - < >
+.RE
+.br
+Furthermore, the boolean operators \fB & \fP (and) \fB|\fP (or) and \fB!\fP
+(not) can be used.
+
+If both HOTPLUG and HOTUNPLUG evaluate to true, only the HOTPLUG action is
+triggered. If both MEMPLUG and MEMUNPLUG evaluate to true, only the MEMPLUG
+action is triggered.
+.
+.SS "Pre-defined static variables"
+The following pre-defined variables can be set only to a static, positive,
+numeric value:
+.
+.RS 2
+.IP "-" 2
+\fBCPU_MIN\fP - the minimum number of CPUs to keep online (> 0)
+.IP "-" 2
+\fBCPU_MAX\fP - the maximum number of CPUs to enable (>= 0)
+.IP "-" 2
+\fBUPDATE\fP - the interval at which cpuplugd evaluates the rules (in seconds,
+> 0)
+.IP "-" 2
+\fBCMM_MIN\fP - the minimum size of the CMM page pool (>= 0)
+.IP "-" 2
+\fBCMM_MAX\fP - the maximum size of the CMM page pool (>= 0)
+.RE
+.PP
+If the value of CPU_MAX is 0, the overall number of CPUs found in this system
+is used as the maximum.
+.
+.SS "Pre-defined dynamic variables"
+The following pre-defined variables can either be set to a static value or to an
+algebraic expression:
+.
+.RS 2
+.IP "-" 2
+\fBCMM_INC\fP - the amount of pages by which the CMM page pool is increased
+if the MEMUNPLUG rule is matched (available system memory is decreased).
+.IP "-" 2
+\fBCMM_DEC\fP - the amount of pages by which the CMM page pool is decreased
+if the MEMPLUG rule is matched (available system memory is increased).
+.RE
+.PP
+The following operators can be used in a dynamic variable expression:
+.br
+.RS 2
+.B + * ( ) / - < >
+.RE
+.br
+.
+.SS "User-defined variables"
+You can specify complex calculations as user-defined variables, which can then
+be used in expressions. User-defined variables are case-sensitive and must not
+match a pre-defined variable or keyword. In the configuration file, definitions
+for user-defined variables must precede their use in expressions.
+
+Variable names consist of alphanumeric characters (a-z,A-Z,0-9) and
+the "_" character, see section \fB"EXAMPLES"\fP for an example (pgscanrate). The
+maximum name
+length for a variable is 128 characters, and the maximum total size for all
+user-defined variables (names + values) is 4096 characters.
+.
+.SS "Keywords for CPU hotplug rules"
+The \fBHOTPLUG\fP and \fBHOTUNPLUG\fP rules can contain the following
+pre-defined keywords:
+.
+.RS 2
+.IP "-" 2
+\fBloadavg\fP - the current load average
+.IP "-" 2
+\fBonumcpus\fP - the current number of CPUs which are online
+.IP "-" 2
+\fBrunnable_proc\fP - the current amount of runnable processes
+.IP "-" 2
+\fBuser\fP - the current CPU user percentage
+.IP "-" 2
+\fBnice\fP - the current CPU nice percentage
+.IP "-" 2
+\fBsystem\fP - the current CPU system percentage
+.IP "-" 2
+\fBidle\fP - the current CPU idle percentage
+.IP "-" 2
+\fBiowait\fP - the current CPU iowait percentage
+.IP "-" 2
+\fBirq\fP - the current CPU irq percentage
+.IP "-" 2
+\fBsoftirq\fP - the current CPU softirq percentage
+.IP "-" 2
+\fBsteal\fP - the current CPU steal percentage
+.IP "-" 2
+\fBguest\fP - the current CPU guest percentage (depends on kernel version: if not reported in /proc/stat, this is set to 0)
+.IP "-" 2
+\fBguest_nice\fP - the current CPU guest_nice percentage (depends on kernel version: if not reported in /proc/stat, this is set to 0)
+.IP "-" 2
+\fBcpustat.<name>\fP - data from /proc/stat and /proc/loadavg
+.IP "-" 2
+\fBtime\fP - floating point timestamp in "seconds.microseconds" since the Unix
+Epoch (1970-01-01 00:00:00 +0000 (UTC))
+.RE
+.PP
+The percentage values are accumulated over all online CPUs, so they can vary
+between 0 and (100 * \fBonumcpus\fP).
+
+CPU usage data from /proc/stat and /proc/loadavg is accessible by
+specifying \fBcpustat.<name>\fP, where \fB<name>\fP can be any of the keywords
+described above, plus \fBtotal_ticks\fP. In this case, \fBloadavg\fP,
+\fBonumcpus\fP and \fBrunnable_proc\fP
+provide the same values as the pre-defined keywords, while the others refer
+to the raw timer ticks as reported by /proc/stat, not the percentage.
+For example, \fBcpustat.idle\fP reports the timer ticks spent in idle since
+system start, and \fBcpustat.total_ticks\fP indicates the sum of all reported
+timer ticks, which can be useful for user-defined percentage calculations.
+.
+.SS "Keywords for memory hotplug rules"
+The \fBMEMPLUG\fP and \fBMEMUNPLUG\fP rules can contain the following
+pre-defined keywords:
+.
+.RS 2
+.IP "-" 2
+\fBapcr\fP - the amount of page cache operations, i.e. pgpin + pgpout from
+/proc/vmstat (in 512 byte blocks / second)
+.IP "-" 2
+\fBfreemem\fP - the amount of free memory (in megabytes)
+.IP "-" 2
+\fBswaprate\fP - the number of swap operations, i.e. pswpin + pswpout from
+/proc/vmstat (in pages / second)
+.IP "-" 2
+\fBmeminfo.<name>\fP - any value from /proc/meminfo
+.IP "-" 2
+\fBvmstat.<name>\fP - any value from /proc/vmstat
+.IP "-" 2
+\fBtime\fP - floating point timestamp in "seconds.microseconds" since the Unix
+Epoch (1970-01-01 00:00:00 +0000 (UTC))
+.RE
+.PP
+All values from /proc/meminfo and /proc/vmstat can be used in an expression
+by specifying \fBmeminfo.<name>\fP or \fBvmstat.<name>\fP, where \fB<name>\fP
+matches a symbol name reported by /proc/meminfo or /proc/vmstat (case
+sensitive), e.g. \fBmeminfo.MemTotal\fP.
+.
+.SS "History function"
+There is a history function for the following keywords:
+.
+.RS 2
+.IP "-" 2
+\fBcpustat.<name>\fP - data from /proc/stat and /proc/loadavg
+.IP "-" 2
+\fBmeminfo.<name>\fP - any value from /proc/meminfo
+.IP "-" 2
+\fBvmstat.<name>\fP - any value from /proc/vmstat
+.IP "-" 2
+\fBtime\fP - floating point timestamp in "seconds.microseconds" since the Unix
+Epoch (1970-01-01 00:00:00 +0000 (UTC))
+.RE
+.PP
+The history levels can be accessed by appending \fB[<history level>]\fP to the
+name, where \fB<history level>\fP indicates the amount of past intervals where
+the value was gathered. [0] means the current interval (the [0] can be omitted
+in this case), [1] means the previous interval, [2] means two intervals ago,
+and so on. The history limit is 100. For example, \fBcpustat.system[1]\fP would
+indicate the system value from /proc/stat at the previous interval, while
+\fBvmstat.pgpgin\fP and \fBvmstat.pgpgin[0]\fP would both mean the current
+pgpgin value from /proc/vmstat.
+
+The \fBtime\fP keyword and its history values can be used to calculate values
+dependent on time intervals, see section \fB"EXAMPLES"\fP for an example
+(pgscanrate).
+.
+.SH EXAMPLES
+A complete configuration file could look like this:
+
+.nf
+------------------------------ config file start ------------------------------
+UPDATE="5"
+CPU_MIN="2"
+CPU_MAX="5"
+CMM_MIN="0"
+CMM_MAX="131072"	# 512 MB
+
+pgscan_k="vmstat.pgscan_kswapd_dma + vmstat.pgscan_kswapd_normal + vmstat.pgscan_kswapd_movable"
+pgscan_d="vmstat.pgscan_direct_dma + vmstat.pgscan_direct_normal + vmstat.pgscan_direct_movable"
+pgscan_k1="vmstat.pgscan_kswapd_dma[1] + vmstat.pgscan_kswapd_normal[1] + vmstat.pgscan_kswapd_movable[1]"
+pgscan_d1="vmstat.pgscan_direct_dma[1] + vmstat.pgscan_direct_normal[1] + vmstat.pgscan_direct_movable[1]"
+pgscanrate="(pgscan_k + pgscan_d - pgscan_k1 - pgscan_d1) / (time - time[1])"
+cache="meminfo.Cached + meminfo.Buffers"
+
+# CMM_INC: 10% of free memory + cache, in 4K pages
+CMM_INC="(meminfo.MemFree + cache) / 40"
+# CMM_DEC: 10% of total memory in 4K pages
+CMM_DEC="meminfo.MemTotal / 40"
+
+HOTPLUG = "(loadavg > onumcpus + 0.75) & (idle < 10.0)"
+HOTUNPLUG = "(loadavg < onumcpus - 0.25) | (idle > 50)"
+
+# Plug memory if page scan rate is above 20 pages / sec
+MEMPLUG = "pgscanrate > 20"
+# Unplug memory while free memory is above 10% of total memory, or cache uses
+# more than 50% of total memory
+MEMUNPLUG = "(meminfo.MemFree > meminfo.MemTotal / 10) | (cache > meminfo.MemTotal / 2)"
+------------------------------ config file end ------------------------------
+.fi
+
+The example includes multiple user-defined variables to calculate the page scan
+rate with values from /proc/vmstat, as well as the cache size.
+
+\fBAttention:\fP Do not use these example rules on production systems. The
+rules have been designed to illustrate the configuration file syntax and are
+not suitable for actually governing hotplug actions. Useful rules differ
+considerably depending on the workload, resources, and requirements of the
+system they are designed for.
+.
+.SH SEE ALSO
+.BR cpuplugd (8)

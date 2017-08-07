@@ -1,0 +1,63 @@
+.\"  Copyright IBM Corp. 2006, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSLUNS 8 "June 2008" "s390-tools"
+.SH NAME
+lsluns \- list available LUNs
+
+.SH SYNOPSIS
+.B lsluns
+.RB [ \-h]
+.RB [ \-v]
+.RB [ \-c
+.IR adapter id:0.0.XXXX ]
+.RB [ \-p
+.IR port number:0xXXXXXXXXXXXXXXXX ]
+
+.SH DESCRIPTION
+.PP
+.B lsluns
+does a listing of all available LUNs.
+
+The default is to list all LUNs that are found. The listing can be
+limited by specifying an adapter or a port.
+
+.SH OPTIONS
+.TP
+.B -h, --help
+Print help message and exit.
+.TP
+.B -v, --version
+Display version info and exit.
+.TP
+.B -c, --ccw
+Shows LUNs for a specific adapter.
+.TP
+.B -p, --port
+Shows LUNs for a specific port.
+.TP
+.B -a, --active
+Shows all activated LUNs. In addition information is provided
+whether the LUN is encrypted or not. This is indicated with a bracketed X 
+right after the LUN number.
+
+.SH EXAMPLES
+.PP
+.IP "lsluns"
+.RS
+Shows all available LUNs.
+.RE
+.IP "lsluns -c 0.0.3922"
+Shows all LUNs found on adapter 0.0.3922.
+.IP "lsluns -p 0x5005123456789000"
+Shows all LUNs for port 0x5005123456789000.
+.IP "lsluns -c 0.0.3922 -p 0x5005123456789000"
+Shows all LUNs for adapter 0.0.3922 and port 0x5005123456789000.
+.IP "lsluns -a "
+adapter = 0.0.3c02
+        port = 0x500507630300c562
+                lun = 0x401040a200000000(X)     /dev/sg0        Disk    IBM:2107900
+                lun = 0x401040a300000000        /dev/sg1        Disk    IBM:2107900
+
+Shows all active LUNs including the information whether the device is encrypted or not.

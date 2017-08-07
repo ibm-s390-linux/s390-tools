@@ -1,0 +1,338 @@
+#!/usr/bin/perl
+#
+# lsluns - Tool to list all available LUNs
+#
+# Copyright IBM Corp. 2008, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+use strict;
+use warnings;
+use English;
+use Getopt::Long;
+use File::Basename;
+use File::Glob;
+
+my %res_hash = ();
+my @adapter = ();
+my @port = ();
+my $active = "";
+
+my $wlun = "0xc101000000000000";
+my $lun0 = "0x0000000000000000";
+my $sg_dir = "/sys/class/scsi_generic";
+my $udevsettle_call;
+my $udevadm = "/sbin/udevadm";
+
+
+if (! -e $udevadm) {
+        $udevsettle_call = "/sbin/udevsettle";
+} else {
+        $udevsettle_call = "$udevadm settle";
+}
+
+# read the first line of a sysfs-entry and compare it to a given string
+# parameters:
+#   1 - $sysfs_attr_path:   path to the sysfs-entry
+#   2 - $compare_value:     compare-value (used as string)
+# return:
+#   true/false: depending on the comparison (true for equal)
+#   undef:      if I/O on the given path isn't possible
+sub sysfs_read_and_compare($$)
+{
+    my ($sysfs_attr_path, $compare_value) = @_;
+
+    open(my $sysfs_attr, "<", $sysfs_attr_path) or return undef;
+    my $sysfs_value = <$sysfs_attr>;
+    close($sysfs_attr);
+
+    # EOF?
+    if (!defined($sysfs_value)) {
+        return undef;
+    }
+
+    chomp($sysfs_value);
+    return $sysfs_value eq $compare_value;
+}
+
+sub list_luns
+{
+    my %lun_hash = get_lun_hash();
+    my $drv_dir = "/sys/bus/ccw/drivers/zfcp";
+    my $man_att;
+    my $cnt;
+
+    foreach my $a (sort keys %res_hash) {
+        # first check whether the adapter is online and good to use
+        if (!sysfs_read_and_compare($drv_dir.'/'.$a.'/online', "1") ||
+            !sysfs_read_and_compare($drv_dir.'/'.$a.'/availability', "good") ||
+            !sysfs_read_and_compare($drv_dir.'/'.$a.'/failed', "0") ||
+            !sysfs_read_and_compare($drv_dir.'/'.$a.'/in_recovery', "0"))
+        {
+            print "Adapter $a is not in a good state; skipping LUN scan.\n";
+            next;
+        }
+
+        print "Scanning for LUNs on adapter $a\n";
+        foreach my $p (@{$res_hash{$a}}) {
+            next if (! -e $drv_dir."/$a/$p");
+            my $status = `cat $drv_dir/$a/$p/access_denied`;
+            $status .= `cat $drv_dir/$a/$p/failed`;
+            $status .= `cat $drv_dir/$a/$p/in_recovery`;
+            if ($status =~ /1/) {
+                print "\tat port $p:\n";
+                print "\t\tPort not online. Cannot scan for LUNs.\n";
+                next;
+            }
+            if (!defined($lun_hash{$a}{$p})) {
+                `echo $lun0 >> $drv_dir/$a/$p/unit_add 2>/dev/null`;
+                for ($cnt = 0; $cnt < 4; $cnt++) {
+                    `$udevsettle_call`;
+                    %lun_hash = get_lun_hash();
+                    last if (defined($lun_hash{$a}{$p}));
+                    select(undef, undef, undef, 0.1);
+                }
+                if (!defined($lun_hash{$a}{$p})) {
+                    `echo $lun0 >> $drv_dir/$a/$p/unit_remove 2>/dev/null`;
+                    `echo $wlun >> $drv_dir/$a/$p/unit_add 2>/dev/null`;
+                    for ($cnt = 0; $cnt < 4; $cnt++) {
+                        `$udevsettle_call`;
+                        %lun_hash = get_lun_hash();
+                        last if (defined($lun_hash{$a}{$p}));
+                        select(undef, undef, undef, 0.1);
+                    }
+                    if (!defined($lun_hash{$a}{$p})) {
+                    	`echo $wlun >> $drv_dir/$a/$p/unit_remove 2>/dev/null`;
+                    	print"\tat port $p:\n";
+                    	print "\t\tCannot attach WLUN / LUN0 for scanning.\n";
+                    	next;
+		    }
+                }
+                $man_att = 1;
+            }
+
+	    my $retries = 0;
+            foreach my $lun (@{[keys %{$lun_hash{$a}{$p}}]}) {
+            	my $sg_dev = $lun_hash{$a}{$p}{$lun};
+            	select(undef, undef, undef, 0.1) while (! -e "/dev/$sg_dev");
+            	my @output = `sg_luns /dev/$sg_dev 2>/dev/null`;
+            	my $error = $?;
+            	if ($man_att) {
+                	`echo 1 >> $sg_dir/$sg_dev/device/delete 2>/dev/null`;
+                	select(undef, undef, undef, 0.1);
+                	`echo $lun >> $drv_dir/$a/$p/unit_remove 2>/dev/null`;
+                	$man_att = 0;
+            	}
+            	print "\tat port $p:\n" if (!$retries);
+            	if (!$error && @output) {
+                	splice(@output, 0, 2);
+                	map { s/\s*(\w{16})\s*/\t\t0x$1\n/ } @output;
+                	print @output;
+			last;
+            	}
+            	if ($error) {
+                	print "\t\tUnable to send the REPORT_LUNS command to LUN.\n";
+            	}
+		$retries++;
+		last if ($retries > 3);
+	    }
+        }
+        if (! -d $sg_dir) {
+        	print "$PROGRAM_NAME: Error: Please load/configure SCSI Generic (sg) to use $PROGRAM_NAME.\n";
+        }
+    }
+}
+
+# Look only for LUN0 and the REPORT LUNs WLUN. SAM specifies that the storage
+# only has to response on one of those to the REPORT LUNs command.
+sub get_lun_hash
+{
+    my %lun_hash;
+
+    foreach my $device (</$sg_dir/sg*>) {
+        my $l = `cat $device/device/fcp_lun`;
+        my $p = `cat $device/device/wwpn`;
+        my $a = `cat $device/device/hba_id`;
+
+        $l =~ s/(0x\w{16})*\n/$1/;
+        $p =~ s/(0x\w{16})*\n/$1/;
+        chomp($a);
+
+        if ($active or ($l eq $lun0 or $l eq $wlun)) {
+            $lun_hash{$a}{$p}{$l} = ${[split('/', $device)]}[-1];
+	}
+    }
+    return %lun_hash;
+}
+
+sub lsluns_usage {
+    print <<EOD;
+Usage: $PROGRAM_NAME [<options>]
+
+    lsluns provides information for LUNs.
+
+    The default is to list all LUNs that are available via the attached ports.
+    The display can be limited by specifying an adapter or a port.
+
+Options:
+    -a, --active
+    Shows all activated LUNs.
+    In addition LUN encryption information is provided.
+    e.g. "lsluns -a"
+
+    -c, --ccw
+    Shows LUNs for a specific ccw device.
+    e.g. "lsluns -c 0.0.3922"
+
+    -p, --port
+    Shows LUNs for a specific port.
+    e.g. "lsluns -p 0x5005123456789000"
+
+    -h, --help
+    Print help message and exit.
+
+    -v, --version
+    Display version info and exit.
+EOD
+    exit 0;
+}
+
+sub lsluns_version {
+    print "$PROGRAM_NAME: version %S390_TOOLS_VERSION%\n";
+    print "Copyright IBM Corp. 2008, 2017\n";
+}
+
+sub lsluns_invalid_usage {
+    print "$PROGRAM_NAME: invalid option\n";
+    print "Try '$PROGRAM_NAME --help' for more information.\n";
+}
+
+sub get_env_list
+{
+    my $a_ref_list = shift();
+    my $p_ref_list = shift();
+    my @res ;
+    my %res_hash;
+    my @t_arr;
+
+    @res = </sys/bus/ccw/drivers/zfcp/*.*.*/0x*>;
+    return () if (!@res);
+reload:
+    foreach my $entry (@res) {
+        my $a = ${[split('/', $entry)]}[-2];
+        my $p = ${[split('/', $entry)]}[-1];
+        next if (@$a_ref_list && "@$a_ref_list" !~ /$a/);
+        next if (@$p_ref_list && "@$p_ref_list" !~ /$p/);
+        push @{ $res_hash{$a} }, $p;
+    }
+    foreach my $a (sort @$a_ref_list) {
+        if ("@{[keys %res_hash]}" !~ /$a/) {
+            print "\tNo valid combination found for adapter '$a'. ",
+            "Removing from resource list.\n";
+        }
+    }
+
+    push @t_arr, map { @{$res_hash{$_}} } keys %res_hash;
+    foreach my $p (@$p_ref_list) {
+        if ("@t_arr" !~ /$p/) {
+            print "\tNo valid combination found for port '$p'. ",
+            "Removing from resource list.\n";
+        }
+    }
+
+    if (!%res_hash) {
+        print "\nNo valid parameters left, ",
+        "using all available resources in system.\n\n";
+        @$a_ref_list = ();
+        @$p_ref_list = ();
+        @t_arr = ();
+        goto reload;
+    }
+    return %res_hash;
+}
+
+sub show_attached_lun_info
+{
+        my %lun_hash = get_lun_hash();
+        my @txt = ("Disk", "Tape", "Printer", "Proc", "WRO",
+                   "CD/DVD", "Scanner", "OMD", "Changer","Comm","n/a",
+                   "n/a","RAID", "Encl");
+
+        if (glob("/sys/class/scsi_device/*") && (! -d $sg_dir)) {
+                print "$PROGRAM_NAME: Error: Please load/configure SCSI Generic (sg) to use $PROGRAM_NAME.\n";
+        }
+        foreach my $a (sort keys %lun_hash) {
+                next if ("@adapter" !~ /$a/);
+                print "adapter = $a\n";
+                foreach my $p (sort keys %{$lun_hash{$a}}) {
+                        next if ("@port" !~ /$p/);
+                        print "\tport = $p\n";
+                        foreach my $l (sort keys %{$lun_hash{$a}{$p}}) {
+                                my $sg_dev = "/dev/".$lun_hash{$a}{$p}{$l};
+                                my $inq = `sg_inq -r $sg_dev 2>/dev/null`;
+				if (!$inq) {
+					print("\t\tlun = $l [offline]\n");
+					next;
+				}
+                                (my $vend = substr($inq, 0x8, 0x8)) =~ s/\s*//g;
+                                (my $mod = substr($inq, 0x10, 0x10)) =~ s/\s*//g;
+                                my $type = ord(substr($inq, 0x0, 0x1));
+                                my $enc = ($mod =~ /2107/) ?
+                                        ord(substr($inq, 0xa2, 0x1)) : 0;
+                                $l .= "(X)" if ($enc & 0x80);
+                                $txt[$type] = $type if (!defined($txt[$type]));
+                                print("\t\tlun = $l\t$sg_dev\t$txt[$type]",
+                                      "\t$vend:$mod\n");
+                        }
+                }
+        }
+}
+
+
+
+########### main ################
+
+$PROGRAM_NAME = basename($PROGRAM_NAME);
+
+Getopt::Long::Configure(qw(bundling));
+GetOptions('c|ccw=s' => \@adapter,
+	   'p|port=s'    => \@port,
+	   'a|active'    => \$active,
+	   'v|version'   => sub { lsluns_version(); exit 0; },
+	   'h|help'      => sub { lsluns_usage(); exit 0; },
+           ) or do {
+               lsluns_invalid_usage();
+               exit 1;
+           };
+
+@adapter = split(',', join(',', @adapter));
+foreach (@adapter) {
+	$_ =~ tr/A-Z/a-z/;
+}
+
+@port = split(',', join(',', @port));
+foreach (@port) {
+	$_ =~ tr/A-Z/a-z/;
+}
+
+%res_hash = get_env_list(\@adapter, \@port);
+
+@adapter = keys %res_hash;
+push @port, map { @{$res_hash{$_}} } keys %res_hash;
+
+# checking for helper progs
+
+die "$PROGRAM_NAME: Unable to execute due to missing sg3_utils package. ".
+    "Processing stopped.\n" if system("sg_luns -V > /dev/null 2>&1");
+
+
+
+if ($active) {
+        show_attached_lun_info();
+} else {
+        list_luns();
+}
+
+

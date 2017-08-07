@@ -1,0 +1,91 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH QETHCONF 8 "Apr 2006" "s390-tools"
+.SH "NAME"
+qethconf \- Configure QETH functions IPA, VIPA and Proxy ARP.
+.SH "SYNOPSIS"
+\fBqethconf\fR \fITYPE\fR \fICMD\fR [[\-x]\fIIPADDR\fR[/\fIMASKBITS\fR]] [\fIINTERFACE\fR]                                  
+.SH "DESCRIPTION"
+\fBqethconf\fR simplifies usage of QETH IPA, VIPA and Proxy ARP functions for
+OSA-Express cards in layer 3 mode.
+
+.TP 
+\fITYPE\fR
+<ipa/vipa/parp|rxip/list_all/list_msg>                
+.br 
+Choose one of these keywords for function:
+.br 
+ipa \- IP address takeover (IPA)
+.br 
+vipa \- Virtual IP address (VIPA)
+.br 
+parp|rxip \- Proxy ARP
+.br 
+list_all \- List all available IPA, VIPA and Proxy ARP entries 
+from the sysfs
+.br 
+list_msg \- List messages and explanation of errors during 
+command execution
+.TP 
+\fICMD\fR 
+<add/del/inv4/inv6/list>           
+.br 
+where
+.br 
+add  \- Add an IP address or address range.
+.br 
+del  \- Delete an IP address or address range.
+.br 
+inv4 \- Invert the selection of address ranges for IPv4 (only IPA).
+.br 
+inv6 \- Invert the selection of address ranges for IPv6 (only IPA).
+.br 
+list \- List TYPE specific entries from the sysfs 
+
+.TP 
+\fIIPADDR\fR
+Required for commands add and del.
+.br 
+IP address in IPv4 or IPv6 format,
+.br 
+e.g. 192.168.10.38 or FE80::1:800:23e7:f5db
+.br 
+Use preceding option \-x for hexadecimal input format,
+e.g. \-xc0a80a26
+
+.TP 
+\fIMASKBITS\fR 
+Number of bits set in the network mask. 
+This allows to specify an address range, e.g. 192.168.10.0/24. 
+This subparameter is only valid for function IPA.
+.TP 
+\fIINTERFACE\fR
+Interface name to which the address or address range is 
+bound, e.g. eth0. This parameter is required for add, 
+del and the inv4 and inv6 command. 
+
+
+.SH "RESTRICTIONS"
+.nf 
+Needs at least bash version 2.0.
+
+.SH "EXAMPLES"
+.nf 
+qethconf ipa add 192.168.10.0/24 eth0
+qethconf ipa add \-xc0a80a00/24 eth1
+qethconf ipa inv4 eth0
+qethconf parp add 10.0.0.2 eth0 (or qethconf rxip add 10.0.0.2 eth0)
+qethconf vipa del 192.168.10.2 tr0 
+qethconf vipa add FE80::1:800:23e7:f5db eth1
+qethconf list_all
+
+.SH "AUTHOR"
+.nf 
+This man\-page was written by Thomas Weber.
+
+.SH "SEE ALSO"
+.PP 
+See the appropriate chapters for QETH IPA, VIPA and Proxy ARP in the
+"Device Drivers, Features, and Commands" manual for Linux on System z.

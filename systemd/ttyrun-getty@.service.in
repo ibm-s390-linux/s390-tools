@@ -1,0 +1,35 @@
+#
+# Systemd unit to start getty programs if a terminal is available using
+# the ttyrun program
+#
+# Copyright IBM Corp. 2014, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=TTYRun on %I
+Documentation=man:ttyrun(8) man:agetty(8)
+BindTo=dev-%i.device
+After=dev-%i.device systemd-user-sessions.service plymouth-quit-wait.service
+After=rc-local.service
+Before=getty.target
+IgnoreOnIsolate=yes
+
+
+[Service]
+Environment=TERM=linux
+ExecStart=-@bin_path@/ttyrun %I /sbin/agetty -L 115200,38400,9600 %I
+IgnoreSIGPIPE=no
+KillMode=process
+Restart=always
+RestartSec=0
+SendSIGHUP=yes
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+UtmpIdentifier=%I
+
+[Install]
+WantedBy=getty.target

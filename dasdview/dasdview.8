@@ -1,0 +1,218 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH DASDVIEW 8 "Apr 2006" "s390-tools"
+.SH NAME
+dasdview \- Display DASD and VTOC information and dump the content of a DASD
+to the console.
+.SH SYNOPSIS
+\fBdasdview\fR [-h] [-v] 
+.br
+         [-b \fIbegin\fR] [-s \fIsize\fR] [-1|-2]
+.br
+         [-i] [-x] [-j] [-c]
+.br
+         [-l] [-t {\fIinfo\fR|\fIf1\fR|\fIf3\fR|\fIf4\fR|\fIf5\fR|\fIf7\fR|\fIf8\fR|\fIf9\fR}]
+.br
+         \fIdevice\fR
+.SH DESCRIPTION
+\fBdasdview\fR prints you some useful information of your disks to the console.
+You can display a disk dump by specifying start point and offset and you can 
+print the volume label and VTOC entries.
+The \fIdevice\fR is the node of the device (e.g. '/dev/dasda').
+Any device node created by udev for kernel 2.6 can be used 
+(e.g. '/dev/dasd/0.0.b100/disc').
+
+DASD devices in raw_track_access mode are supported and detected
+automatically.  When in raw_track_access mode, the same basic
+functions are available as in the regular mode, but the output may
+have a slightly different layout:
+.IP \(bu 2
+The disk dump functions (\fB-b\fR and \fB-s\fR) print the count,
+key and data information for the whole track, and not just the
+contents of the data areas.
+.IP \(bu 2
+The VTOC listing (\fB-t\fR) print all specified DSCBs in the same
+format as in the regular mode, but in the sequence as they appear in
+the VTOC. The \fB-t info\fR overview contains more details for each
+data set than in the regular mode, to support the larger variety of
+data set layouts.
+
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print usage and exit.
+
+.TP
+\fB-v\fR or \fB--version\fR 
+Print version number and exit.
+
+.TP
+\fB-b\fR \fIbegin\fR or \fB--begin=\fR\fIbegin\fR 
+Print a disk dump to the console, starting with \fIbegin\fR. The content of 
+the disk will be displayed in hexadecimal numbers, ASCII text and EBCDIC text. 
+If no size is specified dasdview will take the default size. The variable 
+\fIbegin\fR can be specified in one of the following ways:
+.br
+
+    begin[k|m|b|t|c]
+
+.br
+The default for \fIbegin\fR is \fI0\fR.
+.br
+
+\fBNote 1:\fR dasdview will show you the content of your disk using the DASD
+driver. If this driver decides to hide or add some parts of the disk, you have 
+to live with it. This happens for example with the first two tracks of a 
+cdl-formatted disk. In this case the DASD driver fills up shorter blocks with 
+zeros to have a constant blocksize. And all applications, including dasdview, 
+believe it.
+.br
+\fBNote 2:\fR In raw_track_access mode \fIbegin\fR must be aligned to
+track boundaries. A simple way to do that is to specify a track or
+cylinder as starting point.
+.br
+
+examples:
+.br
+    -b 32  --> start printing at Byte 32
+.br
+    -b 32k --> start printing at kByte 32
+.br
+    -b 32m --> start printing at MByte 32
+.br
+    -b 32b --> start printing at block 32
+.br
+    -b 32t --> start printing at track 32
+.br
+    -b 32c --> start printing at cylinder 32
+
+.TP
+\fB-s\fR \fIsize\fR or \fB--size=\fR\fIsize\fR 
+Print a disk dump to the console, starting with \fIbegin\fR, specified with 
+the \fB-b\fR option and size \fIsize\fR. The content of the disk will be 
+displayed in hexadecimal numbers, ASCII text and EBCDIC text. If no start 
+value is specified dasdview will take the default start value. The variable 
+\fIsize\fR can be specified in one of the following ways:
+.br
+
+    size[k|m|b|t|c]
+
+.br
+\fBNote:\fR In raw_track_access mode \fIsize\fR must be a multiple of
+one track. A simple way to do that is to specify the size in tracks or
+cylinders.
+
+.br
+The default for \fIsize\fR is \fI128\fR in regular mode and \fI1t\fR
+in raw_track_access mode.
+.br
+
+examples:
+.br
+    -s 16  --> use a 16 Byte size
+.br
+    -s 16k --> use a 16 kByte size
+.br
+    -s 16m --> use a 16 MByte size
+.br
+    -s 16b --> use a 16 block size
+.br
+    -s 16t --> use a 16 track size
+.br
+    -s 16c --> use a 16 cylinder size
+
+.TP
+\fB-1\fR
+This option tells dasdview to print the disk dump using format 1. This means 
+you will get 16 Bytes per line in hex, ascii and ebcdic. There is no line 
+number.
+.br
+The \fB-1\fR option makes only sense with the \fB-b\fR and/or the \fB-s\fR 
+options. 
+.br
+This is the default.
+
+.TP
+\fB-2\fR
+This option tells dasdview to print the disk dump using format 2. This means 
+you will get 8 Bytes per line in hex, ascii and ebcdic. And in addition a line 
+number and a decimal and hexadecimal byte count will be printed.
+.br
+The \fB-2\fR option makes only sense with the \fB-b\fR and/or the \fB-s\fR 
+options. In raw_track_access mode this format is not supported and the
+option will be ignored.
+
+.TP
+\fB-i\fR or \fB--info\fR 
+Print some useful information (e.g. device node/number/type or geometry data).
+When running dasdview on a kernel 2.6 based distribution the busid 
+is printed instead of the device number.
+
+.TP
+\fB-x\fR or \fB--extended\fR 
+Print some more DASD information (e.g. open count, subchannel identifier).
+
+.TP
+\fB-j\fR or \fB--volser\fR 
+Print volume serial number (volume identifier).
+
+.TP
+\fB-l\fR or \fB--label\fR 
+Print the volume label.
+
+.TP
+\fB-c\fR or \fB--characteristic\fR
+Print some information about the device e.g. if it is encrypted.
+
+.TP
+\fB-t\fR \fIspec\fR or \fB--vtoc=\fR\fIspec\fR
+Print the VTOC (table of content) or single VTOC entries to the console.
+\fIspec\fR can be one of the following strings:
+.br
+
+\fIinfo\fR: 
+.br
+Gives you a VTOC overview. You will see what other S/390 or zSeries operating 
+systems would see (e.g. data set names and sizes).
+.br
+
+\fIf1\fR:
+.br
+Print the content of all format 1 DSCBs. 
+.br
+
+\fIf3\fR:
+.br
+Print the content of all format 3 DSCBs.
+.br
+
+\fIf4\fR: 
+.br
+Print the content of the format 4 DSCB.
+.br
+
+\fIf5\fR: 
+.br
+Print the content of the format 5 DSCB.
+.br
+
+\fIf7\fR: 
+.br
+Print the content of the format 7 DSCB.
+.br
+
+\fIf8\fR:
+.br
+Print the content of all format 8 DSCBs.
+.br
+
+\fIf9\fR:
+.br
+Print the content of all format 9 DSCBs.
+.br
+
+\fIall\fR: 
+.br
+Print the content of all DSCBs. 

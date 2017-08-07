@@ -1,0 +1,35 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIOMON_ZFCPCONF 8 "Jul 2008" "s390-tools"
+
+.SH NAME
+ziomon_fcpconf \- Collect configuration data for fcp adapters.
+
+.SH SYNOPSIS
+.B ziomon_fcpconf
+[-h] [-v] [-o <outfile>]
+
+.SH DESCRIPTION
+.B ziomon_fcpconf
+collects various fcp configuration-related data and writes to a file.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-o" " or " "\-\-output"
+Specify the outfile basename. The suffix .cfg will be appended. Defaults to 'config'.
+
+.SH "SEE ALSO"
+.BR ziomon (8)
+.BR ziomon_mgr (8),
+.BR ziomon_util (8),
+.BR ziomon_zfcpdd (8)

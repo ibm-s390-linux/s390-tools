@@ -1,0 +1,54 @@
+zfcpdump: S390 SCSI dump tool (Version 3)
+=========================================
+zfcpdump is used for creating System dumps for Linux on System z. It has two
+parts: a zfcpdump enabled Linux kernel and a user space application.
+
+This is the 3rd version of zfcpdump which uses the upstream kernel
+version 3.12 or above. This version writes the dump to a partition in
+contrast to the previous versions where the dump was written to
+a file system.
+
+The user space application of zfcpdump can reside either in an intitramfs or an
+initrd. It reads from /proc/vmcore, provided by the kernel part, and writes the
+system dump to a SCSI disk partition.
+
+To build a zfcpdump enabled kernel use the following settings in your kernel
+configuration:
+
+ * CONFIG_ZFCPDUMP=y
+ * CONFIG_BLK_DEV_INITRD=y
+ * CONFIG_EFI_PARTITION=y for using GPT disk layout
+ * CONFIG_MSDOS_PARTITION=y for using MSDOS disk layout
+ * BLK_DEV_SD=y
+ * Enable ZFCP driver
+ * Enable SCSI driver
+ * Disable as many features as possible to keep the kernel small.
+   E.g. network and file system support is not needed at all.
+
+You can use "make zfcpdump_defconfig" as a starting point for your kernel
+configuration.
+
+ * Issue "make bzImage" to build the zfcpdump kernel image.
+
+In a Linux distribution the zfcpdump enabled kernel image must be copied to
+/lib/s390-tools/zfcpdump/zfcpdump_part.image, where the s390 zipl tool is
+looking for the dump kernel when preparing a SCSI dump disk.
+
+Create and install initrd
+=========================
+
+ * make
+
+Builds "cpioinit" and statically linked "zfcpdump" application. Then cpioinit
+is used to integrate the zfcpdump application into the cpio archive
+zfcpdump_part.rd.
+
+ * make install
+
+The initrd zfcpdump_part.rd is installed to "/lib/s390-tools/zfcpdump/".
+
+Additional information
+======================
+For more information on how to use zfcpdump and zipl refer to the s390
+'Using the Dump Tools' book, which is available from:
+http://www.ibm.com/developerworks/linux/linux390.

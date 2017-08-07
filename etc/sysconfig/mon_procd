@@ -1,0 +1,9 @@
+## Path:	System/Monitoring/s390-tools/mon_procd
+## Description:	Linux - z/VM Monitor Daemon for process and filesystem data.
+
+## Type:	integer(1:)
+## Default:	60
+#
+# Monitor interval in seconds for process monitoring.
+#
+PROC_INTERVAL=60

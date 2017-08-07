@@ -1,0 +1,97 @@
+.\" cpacfstatsd.8
+.\"
+.\" Copyright IBM Corp. 2015, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" use
+.\"   groff -man -Tutf8 cpacfstatsd.8
+.\" or
+.\"   nroff -man cpacfstatsd.8
+.\" to process this source
+.\"
+.TH cpacfstatsd "8" "January 2015" "s390-tools"
+.
+.ds c \fcpacfstatsd\fP
+.
+.SH NAME
+cpacfstatsd \- CPACF statistics collection daemon process
+.
+.SH SYNOPSIS
+.B cpacfstatsd
+.RB [ \-h | \-\-help ]
+.RB [ \-v | \-\-version ]
+.RB [ \-f | \-\-foreground ]
+.
+.SH DESCRIPTION
+The cpacfstatsd controlling daemon enables, disables, resets, and fetches
+the mainframe CPACF performance counter registers.
+The daemon receives commands from the user application cpacfstats through
+the UNIX Domain Socket, processes them and returns the requested
+information. For all available commands, see the cpacfstats man page.
+
+Prerequisites
+.P
+- The running Linux kernel must have the the CONFIG_PERF_EVENTS
+config option enabled.
+.P
+- Libpfm version 4 or higher is needed to successfully run the daemon.
+.P
+- Your LPAR must be configured to enable the "Counter Facility Security Options".
+.P
+- The daemon requires root privileges to interact with the performance
+ioctls of the kernel.
+
+CPU hotplug is not recognized by the daemon. When adding or removing a CPU,
+restart the daemon to ensure correct summing of the per-CPU performance
+counters.
+
+The starting daemon first checks for any stale pid file
+/var/run/cpacfstatsd.pid. If this file exists, and the process ID in the
+file belongs to an active process, an error message is printed to the
+console and the program terminates.
+
+The daemon and the client cpacfstats communicate through a Unix Domain
+Socket. This socket is created by the daemon at startup with the associated
+socket file /run/cpacfstatsd_socket. For security reasons only members of
+the group \fIcpacfstats\fR are allowed to communicate with the daemon. A
+system administrator should create this group and add all users which are
+allowed to run the cpacfstats client to the group.
+
+After startup, the daemon runs in the background and detaches from any
+terminal. Errors and warnings are posted to the syslog subsystem. Check the
+process list and the system syslog messages for confirmation of successful
+startup.
+
+On regular termination the pid file, the communication socket and the
+associated file is removed gracefully.
+
+.SH OPTIONS
+.TP
+\fB\-h\fR or \fB\-\-help\fR
+Display help information for the command.
+.TP
+\fB\-v\fR or \fB\-\-version\fR
+Display version and copyright information for the command.
+.TP
+\fB\-f\fR or \fB\-\-foreground\fR
+Run the daemon in foreground mode, thus printing errors to stderr instead
+of posting them through syslog. This option might be useful when debugging
+daemon startup and initialization failures.
+
+.SH FILES
+.nf
+/var/run/cpacfstatsd_socket
+/var/run/cpacfstatsd.pid
+.fi
+
+.SH RETURN VALUE
+.IP 0
+The daemon was successfully set to run in the background. This does not
+imply that the daemon startup was successful, as the main initialization is
+done in the re-spawned process. Check the syslog for success or failure.
+.IP 1
+The daemon could not be set to run in the background.
+
+.SH SEE ALSO
+cpacfstats (1)

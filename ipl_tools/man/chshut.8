@@ -1,0 +1,68 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CHSHUT 8 "Sept 2011" "s390-tools"
+
+.SH NAME
+chshut \- change the shutdown actions for Linux on System z
+
+.SH SYNOPSIS
+\fBchshut\fR TRIGGER ACTION [VM Command]
+
+.SH DESCRIPTION
+Use \fBchshut\fR to configure the Linux on System z shutdown actions.
+
+The tool handles up to three parameters. The first parameter specifies
+the shutdown trigger. A shutdown trigger is an event that will stop Linux.
+The following shutdown triggers are supported: "halt", "poff", and "reboot".
+There are two other shutdown triggers "panic" and "restart" that are
+controlled by the
+.BR dumpconf (8)
+service script.
+
+The second parameter specifies the shutdown action that you want to run
+if the specified trigger occurs. Valid action arguments are "ipl", "reipl",
+"stop", and "vmcmd".
+
+If you have chosen "vmcmd" as action, a third parameter is required for the
+CP command you want to execute under z/VM.
+
+.B Note:
+VM CP commands, device addresses, and guest names must be uppercase.
+
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print help information, then exit.
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print version information, then exit.
+
+.SH EXAMPLES
+Log off the z/VM guest if the Linux
+.BR poweroff (8)
+command was executed successfully:
+
+\fB# chshut poff vmcmd LOGOFF\fR
+
+If the system is halted it should start again:
+
+\fB# chshut halt ipl\fR
+
+If the Linux
+.BR poweroff (8)
+command is executed, send a message to guest MASTER and automatically log off
+the guest:
+
+\fB# chshut poff vmcmd "MSG MASTER Going down" vmcmd "LOGOFF"\fR
+
+.SH NOTES
+
+For most Linux distributions, "halt" is mapped by default to "power off".
+In this case you have to use the shutdown trigger "poff" instead of "halt".
+
+.SH SEE ALSO
+.BR dumpconf (8)
+.BR lsshut (8)

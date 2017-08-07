@@ -1,0 +1,1 @@
+SUBSYSTEM=="ccwgroup", ACTION=="change", RUN+="/usr/bin/killall -SIGUSR1 osasnmpd"

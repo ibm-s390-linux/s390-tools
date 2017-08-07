@@ -1,0 +1,185 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH FDASD 8 "Apr 2006" "s390-tools"
+.SH NAME
+fdasd \- partitioning tool.
+.SH SYNOPSIS
+interactive mode:
+.br
+     \fBfdasd\fR [-s] [-r] [-C] \fIdevice\fR
+.br
+command line mode:
+.br
+     \fBfdasd\fR [-s] [-r] [-C] {-a[-k|-l \fIvolser\fR]|-i|-p|-c \fIconf_file\fR}
+[-f \fI[type,blocksize]\fR] \fIdevice\fR
+.br
+help:
+.br
+     \fBfdasd\fR {-h|-v}
+.SH DESCRIPTION
+\fBfdasd\fR writes a partition table to a cdl (compatible disk layout) 
+formatted DASD, in the form of
+a VTOC (volume table of contents) for usage with Linux for S/390
+or zSeries. If fdasd detects a valid \fBVOL1\fR volume label, it 
+will use it, otherwise it asks to write a new one.
+.br
+
+\fBAttention\fR: Careless use of
+\fBfdasd\fR can result in loss of data.
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print usage information, then exit.
+
+.TP
+\fB-v\fR or \fB--version\fR 
+Print version information, then exit.
+
+.TP
+\fB-s\fR or \fB--silent\fR  
+Suppress messages in non-interactive mode.
+
+.TP
+\fB-r\fR or \fB--verbose\fR  
+Provide more verbose output.
+
+.TP
+\fB-a\fR or \fB--auto\fR  
+Automatically create a partition using the entire disk in non-interactive 
+mode.
+
+.TP
+\fB-k\fR or \fB--keep_volser\fR
+Keeps the volume serial when writing the volume label. 
+.br
+This is useful, if the volume serial has been written before and should not
+be overwritten. This option is only applicable in non-interactive mode.
+
+.TP
+\fB-l\fR \fIvolser\fR or \fB--label\fR \fIvolser\fR
+Specify the volume serial.
+.br
+\fIvolser\fR is interpreted as ASCII string and is automatically converted to 
+uppercase, padded with blanks and finally converted to EBCDIC to be written
+to disk. This option is only applicable in non-interactive mode.
+.br
+
+Do not use the following reserved volume serial: SCRTCH, PRIVAT, MIGRAT, 
+or Lnnnnn (L with five digit number); These are used as keywords by 
+other operating systems (OS/390).
+.br
+
+A volume serial is 1 through 6 alphanumeric characters or one of the 
+following special characters: $, #, @, %. All other characters are simply 
+ignored. 
+.br
+Try to avoid using special characters in the volume serial. 
+This may cause problems accessing a disk by volser. 
+In case you really have to use special characters, make sure you are using 
+quotes. In addition there is a special handling for the '$' sign. 
+Please specify it using '\\$' if necessary.
+.br
+
+e.g. -l 'a@b\\$c#' to get A@B$C#
+.br
+
+Omitting this parameter causes fdasd to ask for it in case it is needed.
+.br
+
+.TP
+\fB-c\fR \fIconf_file\fR or \fB--config\fR \fIconf_file\fR
+Use this option to create multiple partitions according to
+specifications in a configuration file, \fIconf_file\fR.
+.br
+The configuration file contains one line for each partition. The lines
+have this format:
+.sp
+[<first>,<last>,<type>]
+.br
+
+where:
+
+.br
+<first> and <last> are numbers that specify the first and the last
+track of the partition. Instead of a numerical value, you can
+specify 'first' for the first possible track on the disk and 'last'
+for the last possible track on disk.
+.br
+
+<type> is optional and specifies the partition type. <type> can be one
+of: native, swap, raid, lvm, or gpfs.
+If omitted, 'native' is used.
+.br
+
+The configuration file of the following example specifies three
+partitions that use the entire disk:
+.sp
+[first,1000]
+.br
+[1001,2000,swap]
+.br
+[2001,last,lvm]
+.br
+
+.TP
+\fB-i\fR or \fB--volser\fR 
+Print the volume serial, then exit.
+
+.TP
+\fB-p\fR or \fB--table\fR 
+Print partition table, then exit. 
+.br
+In combination with the -s option fdasd will display a short version of the 
+partition table.
+
+.TP
+\fB-C\fR or \fB--check_host_count\fR
+Force fdasd to check the host access open count to ensure the device
+is not online on another operating system instance
+
+.TP
+\fB-f\fR \fI[type,blocksize]\fR or \fB--force\fR \fI[type,blocksize]\fR
+Force fdasd to work on non DASD devices.
+.br
+If fdasd is to be used on a block device that is neither a native DASD
+nor exposes the proper disk geometry of a DASD of type 3390,
+then the --force option can be used to assume the geometry of a
+given device type. The default device type is 3390 and the default
+block size is 4096. An optional argument of <device type>,<blocksize>
+can be used to specify type and blocksize explicitly. For example:
+
+-f
+
+has the same effect as
+
+-f3390,4096 or --force=3390,4096
+
+Valid device types are: 3390, 3380, 9345
+.br
+Valid block sizes are: 4096, 2048, 1024, 512
+
+You can use the verbose option to get information about the disk
+geometry that fdasd has computed from device type and block size.
+
+.TP
+\fIdevice\fR
+This parameter specifies the device to be partitioned:
+.sp
+	\fB/dev/dasd/\fR\fIxxxx\fR\fB/device\fR
+.br
+
+where \fIxxxx\fR is the four-letter devno (device number).
+.br
+
+In case your are not using the device file system, please specify:
+.sp
+	\fB/dev/dasd\fR\fIx\fR
+.br
+
+where \fIx\fR is one or more lowercase letter(s) or any other device
+node specification configured by udev for kernel 2.6 or higher. 
+
+.SH SEE ALSO
+.BR dasdfmt (8)

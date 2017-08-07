@@ -1,0 +1,106 @@
+.\" Copyright IBM Corp. 2015, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSHMC 8 "Mar 2015" "s390-tools"
+.\" disable hyphenation for words below
+.hw hmcdrv lshmc
+
+.\" save horizontal spacing to registers
+.nr default-word-spacing \n[.ss]
+.nr default-sentence-spacing \n[.sss]
+
+.\" define a macro for default horizontal spacing
+.de ssd
+.ss \n[default-word-spacing] \n[default-sentence-spacing]
+..
+
+.SH NAME
+lshmc \- list
+.SM HMC
+drive
+.SM DVD
+contents
+
+.SH SYNOPSIS
+.TP
+\fBlshmc\fP [OPTIONS] [FILE]
+
+.SH DESCRIPTION
+List files on a
+.SM DVD
+in the
+.SM DVD
+drive of the Hardware Management Console
+.ss 0
+(
+.SM HMC
+)
+.ssd
+\&.
+By default, the command lists all files in the root directory of the
+.SM DVD\c
+\&.
+Use FILE to list a different set of files.  FILE can specify the path, relative
+to the
+.SM DVD
+root directory, for a directory and file and can contain the * and ? wildcard
+characters.
+
+.SH OPTIONS
+.TP
+.B "-h, --help"
+Print help text, then exit.
+.TP
+.B "-v, --version"
+Print version information, then exit.
+.TP
+.B "-s, --short"
+Print only regular files (no directories, symbolic links and special files),
+in a short listing format.
+
+.SH EXAMPLES
+
+To list the files in a
+.SM HMC
+drive
+.SM DVD
+root directory use:
+.PP
+.nf
+.RS
+.B # lshmc
+.RE
+.fi
+.PP
+In case the kernel module \fIhmcdrv\fP was not loaded in advance use:
+.PP
+.nf
+.RS
+.B # modprobe hmcdrv
+.B # lshmc
+.RE
+.fi
+.PP
+To list all HTML files in subdirectory \fIwww\fP use:
+.PP
+.nf
+.RS
+.B # lshmc /www/*.html
+.RE
+.fi
+.PP
+
+.SH DIAGNOSTICS
+The \fBlshmc\fP command needs access to device node \fI/dev/\:hmcdrv\fP.  This
+node is created automatically when the \fIhmcdrv\fP kernel module is loaded
+(see Linux kernel configuration option
+.SM CONFIG_HMC_DRV\c
+).  The user process that runs the \fBlshmc\fP command must have sufficient
+privileges to read from and write to node \fI/dev/\:hmcdrv\fP.  Use the commands
+\fBchown(1)\fP, \fBchgrp(1)\fP and/or \fBchmod(1)\fP on node
+\fI/dev/\:hmcdrv\fP to ensure this condition.
+
+.SH SEE ALSO
+.B ls(1), chown(1), chgrp(1), chmod(1)
+and Linux on System z: Device Drivers, Features and Commands

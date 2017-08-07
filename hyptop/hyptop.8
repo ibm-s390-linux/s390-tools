@@ -1,0 +1,254 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH HYPTOP 8 "Nov 2009" "s390-tools"
+.SH NAME
+hyptop \- Show hypervisor performance data on System z
+
+.SH SYNOPSIS
+.B hyptop
+[OPTIONS]
+
+.SH DESCRIPTION
+.B hyptop
+provides a dynamic real-time view of a hypervisor environment on System z.
+It works with either the z/VM or the LPAR hypervisor. Depending on the available
+data it shows for example CPU and memory information about running LPARs or
+z/VM guests.
+
+hyptop provides two windows:
+.IP "     -"
+sys_list: Shows a list of systems that the hypervisor is currently running
+.IP "     -"
+sys: Shows one system in more detail.
+.PP
+System names in hyptop are either LPAR names as shown on the SE or
+HMC, or z/VM guest IDs that identify z/VM guest virtual machines.
+.PP
+You can run hyptop in interactive mode (default) or in batch mode with
+the "\-b" option. For how to use the interactive mode, see the online help
+(enter "?" after hyptop is started).
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-w <WINDOW NAME>" " or " "\-\-window=<WINDOW NAME>"
+Select current window. Use the options "--sys", "--fields", and "--sort" to
+modify the current window. The last window specified with the "--window" option
+will be used as start window. The default window is "sys_list".
+.TP
+.BR "\-s <SYSTEM>,..." " or " "\-\-sys=<SYSTEM>,..."
+Select systems for current window. If this option is specified, only the
+selected systems are shown for the window. For window "sys" only one
+system can be specified.
+.TP
+.BR "\-f <F_LETTER>[:<UNIT>],..." " or " "\-\-fields=<F_LETTER>[:<UNIT>],..."
+Select fields and units in the current window. "F_LETTER" is the field
+letter that identifies uniquely a field (for example "c" for CPU time).
+"UNIT" is the used entity for displaying data for the field (for example "us"
+for microseconds). See FIELDS and UNITS below for definitions.
+If the "--fields" option is specified, only the selected fields are
+shown.
+.TP
+.BR "\-S <F_LETTER>" " or " "\-\-sort=<F_LETTER>"
+Select sort field for current window. To reverse the sort order, specify the
+option twice. See FIELDS below for definitions.
+.TP
+.BR "\-t <TYPE>,..." " or " "\-\-cpu_types=<TYPE>,..."
+Select CPU types that are used for CPU time calculations. See CPU TYPES
+below for definitions.
+.TP
+.BR "\-b" " or " "\-\-batch_mode"
+Use batch mode (no curses). This can be useful for sending output from hyptop
+to another program, a file, or a line mode terminal.
+In this mode no user input is accepted.
+.TP
+.BR "\-d <SECONDS>" " or " "\-\-delay=<SECONDS>"
+Specifies the delay between screen updates.
+.TP
+.BR "\-n <ITERATIONS>" " or " "\-\-iterations=<ITERATIONS>"
+Specifies the maximum number of iterations before ending.
+
+.SH PREREQUISITES
+The following things are required to run hyptop:
+
+.IP "     -"
+The Linux kernel must have the required support to  provide  the
+performance data.
+.IP "     -"
+debugfs has to be mounted.
+.IP "     -"
+The hyptop user must have read permission for the required debugfs files.
+.IP "     -"
+You can always monitor the guest operating system where hyptop is running.
+
+To monitor any other operating system instances running on the same hypervisor
+as hyptop, you will need additional permissions.
+
+For z/VM, the guest virtual machine must have privilege class B. For LPAR,
+on the HMC or SE security menu of the LPAR activation profile, select the
+Global performance data control checkbox.
+
+.PP
+To mount debugfs, you can use this command:
+
+# mount none -t debugfs /sys/kernel/debug
+
+To make this persistent, add the following to "/etc/fstab":
+
+none     /sys/kernel/debug       debugfs defaults        0 0
+
+
+.SH FIELDS
+The supported fields depend on the available data  on  the  hypervisor.
+This  is  different  between LPAR and z/VM. It might also depend on
+machine type, z/VM version and kernel version. Each field has a  unique
+field  letter  that can be used to select the field in interactive mode
+or through the "--fields" command line option.
+
+The following fields are available under LPAR:
+
+  In "sys_list" and "sys" window:
+  'c' - Core dispatch time per second
+  'e' - Thread time per second
+  'm' - Management time per second
+  'C' - Total core dispatch time
+  'E' - Total thread time
+  'M' - Total management time
+  'o' - Online time
+
+  In "sys_list" window:
+  '#' - Number of cores (sum of initial and reserved)
+  'T' - Number of threads (sum of initial and reserved)
+
+  In "sys" window:
+  'p' - CPU type
+  'v' - Visualization of core dispatch time per second
+
+The following fields are available under z/VM:
+
+  In "sys_list" and "sys" window:
+  'c' - CPU time per second
+  'm' - Management time per second (*)
+  'C' - Total CPU time
+  'M' - Total management time (*)
+  'o' - Online time
+
+  In "sys_list" window:
+  '#' - Number of CPUs
+  'O' - Number of operating CPUs
+  'u' - Used memory
+  'a' - Maximum memory
+  'r' - Current weight
+  'x' - Maximum weight
+
+  In "sys" window:
+  'v' - Visualization of CPU time per second
+
+  (*) Only available for the local guest virtual machine
+      Only available if the system has the required support
+
+.SH UNITS
+Depending on the field type the values can be displayed in different units.
+The following units are supported:
+
+  Time:
+  'us'  - Microseconds (10^-6 seconds)
+  'ms'  - Millisconds (10^-3 seconds)
+  '%'   - Hundreds of a second (10^-2 seconds) or percent
+  's'   - Seconds
+  'm'   - Minutes
+  'hm'  - Hours & Minutes
+  'dhm' - Days & Hours & Minutes
+
+  Memory:
+  'kib' - Kibibytes (1.024 bytes)
+  'mib' - Mebibytes (1.048.576 bytes)
+  'gib' - Gibibytes (1.073.741.824 bytes)
+
+  Miscellaneous:
+  'str' - String
+  '#'   - Count/Number
+  'vis' - Visualization
+
+.SH CPU TYPES
+Depending on the hypervisor different CPU types are supported. These CPU
+types can be selected either interactively or with the "--cpu_types"
+command line option. The calculation of the CPU data only uses CPUs of
+the specified types.
+
+On LPAR the following CPU types are supported:
+   'IFL' - Integrated Facility for Linux
+   'CP'  - CP processor type
+   'UN'  - Unspecified processor type (other than CP or IFL)
+
+NOTE: It is possible that on older machines also IFLs are shown as CPs.
+On z/VM currently only the processor type 'UN' is available.
+
+.SH CPU DATA
+For Linux on z/VM, no performance data is available for individual CPUs
+on remote guests.
+Therefore, the hyptop "sys" window shows identical values for each of
+the operating CPUs. For the CPU time fields, these values represent the
+total across all operating CPUs divided by the number of operating CPUs.
+For the online time field, the value is the time during which at least
+one CPU has been operational.
+Operating CPUs are shown with CPU identifier "0" and stopped CPUs with "1".
+
+.SH EXAMPLES
+To start hyptop with the "sys_list" window in interactive mode, enter:
+.br
+
+  # hyptop
+
+.br
+To start hyptop with the "sys_list" window in batch mode, enter:
+.br
+
+  # hyptop -b
+
+.br
+To start hyptop with the "sys_list" window in interactive mode with the fields
+CPU time (in milliseconds) and online time (unit default) and sort the
+output according to online time, enter:
+.br
+
+  # hyptop -f c:ms,o -S o
+
+.br
+To start hyptop with the "sys" window with system "MYLPAR" with the fields CPU
+time (unit milliseconds) and online time  (unit  default)  and  sort  the
+output reverse according the online time, enter:
+.br
+
+  # hyptop -w sys -s MYLPAR -f c:ms,o -S o -S o
+
+.br
+To start hyptop with the "sys_list" window in batch mode with update delay 5
+seconds and 10 iterations, enter:
+.br
+
+  # hyptop -b -d 5 -n 10
+
+.br
+To start  hyptop with the "sys_list" window and use only CPU types IFL and CP
+for CPU time calculation, enter:
+.br
+
+  # hyptop -t ifl,cp
+
+.SH ENVIRONMENT
+.TP
+.B TERM
+The TERM environment variable specifies your terminal type. To run
+\fBhyptop\fP in interactive mode the TERM environment variable has
+to be set. The interactive mode is not available for terminals that
+have TERM=dumb (e.g. line mode terminals).

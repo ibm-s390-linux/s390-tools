@@ -1,0 +1,58 @@
+Usage: chzdev TYPE DEVICE [SELECTION] [SETTINGS] [ACTION] [OPTIONS]
+
+Use chzdev to manage the configuration of z Systems specific devices in either:
+ - active configuration (running system), or
+ - persistent configuration (configuration files)
+
+Actions apply to both configurations unless specified otherwise.
+
+TYPE
+  Device type to which this command applies. Use --list-types to display
+  supported types.
+
+DEVICE
+  ID                     Select single device by ID, e.g. 0.0.1234
+  FROM-TO                Select range of devices between FROM and TO
+  DEV1,DEV2,...          Select list of devices or device ranges
+
+SELECTION
+  --all                  Select all existing and configured devices
+  --configured           Select devices with a persistent configuration
+  --existing             Select devices found in the active configuration
+  --online/--offline     Select devices that are online/offline
+  --failed               Select devices that are not functioning correctly
+  --by-path PATH         Select device providing file system path, e.g. /usr
+  --by-node NODE         Select device providing device node, e.g. /dev/sda
+  --by-interface NAME    Select device providing network interface, e.g. eth0
+  --by-attrib KEY=VALUE  Select devices with specified attribute value
+
+SETTINGS
+  Specifications in the form ATTRIB=VALUE used to modify device or device type
+  settings.  Use --list-attributes (also with --type) to list available
+  attributes.
+
+ACTIONS
+  -e, --enable           Enable device
+  -d, --disable          Disable device
+  -l, --list-attributes  List attributes
+  -L, --list-types       List supported device types
+  -H, --help-attribute   Show detailed help on specified attribute
+      --export FILENAME  Export configuration data to file
+      --import FILENAME  Import configuration data from file
+      --apply            Apply persistent settings to active configuration
+  -h, --help             Print usage information, then exit
+  -v, --version          Print version information, then exit
+
+OPTIONS
+  -a, --active           Apply changes to active configuration only
+  -p, --persistent       Apply changes to persistent configuration only
+  -t, --type             Apply changes to device type
+  -r, --remove ATTRIB    Remove setting for specified attribute
+  -R, --remove-all       Remove settings for all attributes
+  -f, --force            Override safety checks
+  -y, --yes              Answer all confirmation questions with 'yes'
+      --no-root-update   Skip root device update
+      --dry-run          Display changes without applying
+      --base PATH        Use PATH as base for accessing files
+  -V, --verbose          Print additional run-time information
+  -q, --quiet            Print only minimal run-time information

@@ -1,0 +1,132 @@
+Counter:   0	Name:CPU_CYCLES
+Description:
+Cycle Count
+.
+Counter:   1	Name:INSTRUCTIONS
+Description:
+Instruction Count
+.
+Counter:   2	Name:L1I_DIR_WRITES
+Description:
+Level-1 I-Cache Directory Write Count
+.
+Counter:   3	Name:L1I_PENALTY_CYCLES
+Description:
+Level-1 I-Cache Penalty Cycle Count
+.
+Counter:   4	Name:L1D_DIR_WRITES
+Description:
+Level-1 D-Cache Directory Write Count
+.
+Counter:   5	Name:L1D_PENALTY_CYCLES
+Description:
+Level-1 D-Cache Penalty Cycle Count
+.
+Counter:  32	Name:PROBLEM_STATE_CPU_CYCLES
+Description:
+Problem-State Cycle Count
+.
+Counter:  33	Name:PROBLEM_STATE_INSTRUCTIONS
+Description:
+Problem-State Instruction Count
+.
+Counter:  34	Name:PROBLEM_STATE_L1I_DIR_WRITES
+Description:
+Problem-State Level-1 I-Cache Directory Write Count
+.
+Counter:  35	Name:PROBLEM_STATE_L1I_PENALTY_CYCLES
+Description:
+Problem-State Level-1 I-Cache Penalty Cycle Count
+.
+Counter:  36	Name:PROBLEM_STATE_L1D_DIR_WRITES
+Description:
+Problem-State Level-1 D-Cache Directory Write Count
+.
+Counter:  37	Name:PROBLEM_STATE_L1D_PENALTY_CYCLES
+Description:
+Problem-State Level-1 D-Cache Penalty Cycle Count
+.
+Counter:  64	Name:PRNG_FUNCTIONS
+Description:
+Total number of the PRNG functions issued by the CPU
+.
+Counter:  65	Name:PRNG_CYCLES
+Description:
+Total number of CPU cycles when the DEA/AES coprocessor is busy
+performing PRNG functions issued by the CPU
+.
+Counter:  66	Name:PRNG_BLOCKED_FUNCTIONS
+Description:
+Total number of the PRNG functions that are issued by the CPU and are
+blocked because the DEA/AES coprocessor is busy performing a function
+issued by another CPU
+.
+Counter:  67	Name:PRNG_BLOCKED_CYCLES
+Description:
+Total number of CPU cycles blocked for the PRNG functions issued by
+the CPU because the DEA/AES coprocessor is busy performing a function
+issued by another CPU
+.
+Counter:  68	Name:SHA_FUNCTIONS
+Description:
+Total number of SHA functions issued by the CPU
+.
+Counter:  69	Name:SHA_CYCLES
+Description:
+Total number of CPU cycles when the SHA coprocessor is busy performing
+the SHA functions issued by the CPU
+.
+Counter:  70	Name:SHA_BLOCKED_FUNCTIONS
+Description:
+Total number of the SHA functions that are issued by the CPU and are
+blocked because the SHA coprocessor is busy performing a function issued
+by another CPU
+.
+Counter:  71	Name:SHA_BLOCKED_CYCLES
+Description:
+Total number of CPU cycles blocked for the SHA functions issued by the
+CPU because the SHA coprocessor is busy performing a function issued
+by another CPU
+.
+Counter:  72	Name:DEA_FUNCTIONS
+Description:
+Total number of the DEA functions issued by the CPU
+.
+Counter:  73	Name:DEA_CYCLES
+Description:
+Total number of CPU cycles when the DEA/AES coprocessor is busy
+performing the DEA functions issued by the CPU
+.
+Counter:  74	Name:DEA_BLOCKED_FUNCTIONS
+Description:
+Total number of the DEA functions that are issued by the CPU and are
+blocked because the DEA/AES coprocessor is busy performing a function
+issued by another CPU
+.
+Counter:  75	Name:DEA_BLOCKED_CYCLES
+Description:
+Total number of CPU cycles blocked for the DEA functions issued by the
+CPU because the DEA/AES coprocessor is busy performing a function issued
+by another CPU
+.
+Counter:  76	Name:AES_FUNCTIONS
+Description:
+Total number of AES functions issued by the CPU
+.
+Counter:  77	Name:AES_CYCLES
+Description:
+Total number of CPU cycles when the DEA/AES coprocessor is busy
+performing the AES functions issued by the CPU
+.
+Counter:  78	Name:AES_BLOCKED_FUNCTIONS
+Description:
+Total number of AES functions that are issued by the CPU and are blocked
+because the DEA/AES coprocessor is busy performing a function issued
+by another CPU
+.
+Counter:  79	Name:AES_BLOCKED_CYCLES
+Description:
+Total number of CPU cycles blocked for the AES functions issued by the
+CPU because the DEA/AES coprocessor is busy performing a function issued
+by another CPU
+.

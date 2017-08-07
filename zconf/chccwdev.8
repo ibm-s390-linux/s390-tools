@@ -1,0 +1,135 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CHCCWDEV 8 "Apr 2006" "s390-tools"
+
+.SH NAME
+chccwdev \- modify generic attributes of channel attached devices.
+
+.SH SYNOPSIS
+.TP 9
+.B chccwdev
+.B -h
+.TP
+.B chccwdev
+.RB "[ (" -a
+.IB <name> = <value>
+.RB "| " -e " | " -d " | " -s " | " -f  ") [...]]"
+.br
+.I  <range>
+.RI "[, " "<range>" " [...]]"
+.TP
+.B chccwdev
+.B -v
+
+.SH DESCRIPTION
+The chccwdev command is used to set generic attributes for devices that
+are controlled by the common I/O subsystem. Attributes are set in the order
+they are specified on the commandline except the online attribute which is
+special.
+.P
+If the same attribute is given more than one time the value that was set
+last will be used. This is also true (while not that obvious) when mixing
+the generic
+.BR -a " and the " -e ", " -d ", "-s" and " -f " arguments."
+.P
+All attributes will be set in the following order:
+.RS
+.TP 4
+1.
+All attributes except online. If the device is offline there will be no
+error if the attribute doesn't exist.
+.TP
+2.
+Set the online attribute to the desired value ((forced) online or
+(safe) offline).
+.TP
+3.
+Set all the attributes that havn't been set, yet. At this point invalid
+attribute names will always cause an error.
+.RE
+.P
+If any error occurs the execution is terminated. So if using ranges only
+devices before the current one have been modified. There is no automatic
+rollback. All attributes that already have been changed will stay that way.
+
+.SH OPTIONS
+.TP 8
+.BR -h | --help
+Print help text.
+
+.TP 8
+.BR -v | --version
+Print the version of the s390-tools package and the command.
+
+.TP
+.BR -a | --attribute " \fI<name>\fR=\fI<value>\fR"
+Try to set the attribute named \fIname\fR to the given value. After writing
+the attribute it will be read to check whether the setting was accepted.
+
+.TP
+.BR -e | --online
+Try to set the specified devices online.
+
+.TP
+.BR -f | --forceonline
+Same as online but for devices that support this (DASD devices), it can
+be used to bring it online regardless of any reserved states.
+
+.TP
+.BR -d | --offline
+Try to set the specified devices offline. The --online, --forceonline,
+--offline, and --safeoffline options are mutually exclusive.
+
+.TP
+.BR -s |--safeoffline
+DASD only: For each specified device, wait until all outstanding I/O
+requests have completed, and then try to set the device offline. The
+--online, --forceonline, --offline, and --safeoffline options are
+mutually exclusive.
+
+.TP
+\fB<range>\fR = <bus ID>\fB[-\fR<bus ID>\fB]\fR
+.TP
+\fB<bus ID>\fR = ([0-9]+\\.[0-9]+\\.)?[0-9a-f]{1,4}
+Note that bus IDs specified in short form (i.e. without leading "0.<n>.")
+will be interpreted as "0.0.<bus ID>".
+
+Example: "0192" becomes "0.0.0192".
+
+.SH EXAMPLES
+\fBchccwdev --online 0.0.0192,0.0.0195-0.0.0198\fR
+.RS
+After completing all outstanding I/O requests for the devices with bus
+ID 0.0.0192, 0.0.0195, 0.0.0196, 0.0.0197 and 0.0.0198, tries to set
+the  device offline.
+.RE
+.P
+.B chccwdev --attribute readonly=1 --attribute online=1 0.0.0192
+.RS
+This will try to set the device with bus ID 0.0.192 online with readonly
+attribute set to one (read-only mode).
+.RE
+.P
+.B chccwdev --attribute cmb_enable=1 0.0.0195-0.0.0198
+.RS
+Set the cmb_enable attribute of the devices 0.0.0195, 0.0.0196, 0.0.0197 and
+0.0.0198 to one. This would for example activate the usage of the channel
+measurement block facility.
+.RE
+.P
+.B chccwdev --safeoffline 0.0.0192,0.0.0195-0.0.0198
+.RS
+Will  try  to  set  the  devices with bus ID 0.0.0192, 0.0.0195,
+0.0.0196, 0.0.0197 and 0.0.0198 offline and finish all outstanding I/O
+requests before.
+.RE
+
+.SH AUTHOR
+.nf
+This man-page was written by Stefan Bader <shbader@de.ibm.com>.
+.SH "SEE ALSO"
+.BR lscss (8)
+.fi
+

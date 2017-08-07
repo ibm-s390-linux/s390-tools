@@ -1,0 +1,417 @@
+.\" Copyright IBM Corp. 2015, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH HMCDRVFS 1 "Mar 2015" "s390-tools"
+.\" disable hyphenation for words below
+.hw hmcdrv hmcdrvfs fuse DIAGNOSTICS
+
+.SH NAME
+hmcdrvfs \- mount a
+.SM FUSE
+file system for remote access to a
+.SM DVD
+in a
+.SM HMC DVD
+drive
+
+.SH SYNOPSIS
+mounting:
+.nf
+.RS
+\fBhmcdrvfs\fP MOUNTPOINT [OPTIONS]
+.RE
+.fi
+.PP
+unmounting:
+.nf
+.RS
+\fBfusermount\fP -u MOUNTPOINT
+.RE
+.fi
+
+.SH DESCRIPTION
+Use the \fBhmcdrvfs\fP command for read-only access to files
+on a
+.SM DVD
+in the
+.SM DVD
+drive of an
+.SM HMC\c
+\&.
+On the
+.SM HMC\c
+, the
+.SM DVD
+must be assigned to the
+.SM LPAR
+within which your Linux instance runs.  For
+.SM z/VM
+guests, the
+.SM DVD
+must be
+assigned to the
+.SM LPAR
+where the
+.SM z/VM
+hypervisor runs.
+With the
+.SM DVD
+assigned to your Linux instance, this command creates a
+.SM FUSE.HMCDRVFS
+file system with the content of the
+.SM DVD
+at the specified mountpoint.
+
+.SH OPTIONS
+.SS "General mount options"
+.TP
+\fB-o\fP opt[,opt...]
+.SM FUSE
+or mount command options;
+for the
+.SM FUSE
+options see below, for mount options
+see \fBmount(8)\fP
+.TP
+\fB-h\fP, \fB--help\fP
+print usage information, then exit (see also DIAGNOSTICS)
+.TP
+\fB-v\fP, \fB--version\fP
+print version information, then exit
+
+.SS "Specific FUSE.HMCDRVFS options"
+.TP
+.BI "-o hmclang=" LANG
+specify the language setting on the
+.SM HMC\c
+; for valid values, see \fBlocale(1)\fP;
+for more information, see DIAGNOSTICS and EXAMPLES
+.TP
+.BI "-o hmctz=" TZ
+specify the time zone setting on the
+.SM HMC\c
+; for valid values, see \fBtzset(3)\fP;
+for more information, see DIAGNOSTICS and EXAMPLES
+
+.SS "Applicable FUSE options (version 2.6)"
+.TP
+\fB-d\fP, \fB-o debug\fP
+enable debug output (implies \fB-f\fP)
+.TP
+.B -f
+foreground operation
+.TP
+.B -s
+disable multi-threaded operation
+.TP
+.B -o allow_other
+allow access by other users
+.TP
+.B -o allow_root
+allow access by root
+.TP
+.B -o nonempty
+allow mounts over non-empty file/dir
+.TP
+.B -o default_permissions
+enable permission checking by kernel
+.TP
+.BI "-o fsname=" NAME
+set file system name
+.TP
+.BI "-o subtype=" TYPE
+set file system type
+.TP
+.BI "-o max_read=" N
+set maximum size of read requests
+.TP
+.B -o direct_io
+use direct I/O
+.TP
+.B -o kernel_cache
+cache files in kernel
+.TP
+\fB-o \fP[\fBno\fP]\fBauto_cache\fP
+enable caching based on modification times
+.TP
+.BI "-o umask=" M
+set file permissions (octal)
+.TP
+.BI "-o uid=" N
+set file owner
+.TP
+.BI "-o gid=" N
+set file group
+.TP
+.BI "-o entry_timeout=" T
+cache timeout for names (default: 1.0 second)
+.TP
+.BI "-o attr_timeout=" T
+cache timeout for attributes (default: 1.0 second)
+.TP
+.BI "-o ac_attr_timeout=" T
+auto cache timeout for attributes (default: \fBattr_timeout\fP)
+.TP
+.BI "-o max_readahead=" N
+set maximum readahead
+.TP
+.B -o async_read
+perform reads asynchronously (default)
+.TP
+.B -o sync_read
+perform reads synchronously
+.TP
+.B -o no_remote_lock
+disable remote file locking
+.TP
+.B -o intr
+allow requests to be interrupted
+.TP
+.BI "-o intr_signal=" NUM
+signal to send on interrupt
+
+
+.SH EXAMPLES
+To mount the
+.SM HMC
+drive
+.SM DVD
+at \fI/mnt/hmc\fP without any special options use:
+.PP
+.nf
+.RS
+.B $ hmcdrvfs /mnt/hmc
+.RE
+.fi
+.PP
+In case the kernel module \fIhmcdrv\fP was not loaded in advance use:
+.PP
+.nf
+.RS
+.B # modprobe hmcdrv
+.B # hmcdrvfs /mnt/hmc
+.RE
+.fi
+.PP
+To translate the UID and GID of files on the
+.SM HMC
+drive
+.SM DVD
+to your system users and groups along with overriding the permissions use for
+example:
+.PP
+.nf
+.RS
+.B $ hmcdrvfs /mnt/hmc -o uid=500 -o gid=1000 -o umask=0337
+.RE
+.fi
+.PP
+To speed up transfer rates to frequently accessed directories use
+the cache timeout option:
+.PP
+.nf
+.RS
+.B $ hmcdrvfs /mnt/hmc -o entry_timeout=60
+.RE
+.PP
+.fi
+If the
+.SM HMC
+is in a different timezone and is configured for a
+different language use, for example:
+.PP
+.nf
+.RS
+.B $ hmcdrvfs /mnt/hmc -o hmclang=de_DE -o hmctz=Europe/Berlin
+.RE
+.fi
+.PP
+or disregarding any daylight saving time, specifying hours west of
+Prime Meridian (UTC):
+.PP
+.nf
+.RS
+.B $ hmcdrvfs /mnt/hmc -o hmclang=de_DE -o hmctz="GMT-1"
+.RE
+.fi
+.PP
+To unmount the
+.SM HMC
+drive
+.SM DVD
+mounted on \fI/mnt/hmc\fP use:
+.PP
+.nf
+.RS
+.B $ fusermount -u /mnt/hmc
+.RE
+.fi
+.PP
+It is also possible to mount by using \fBfstab(5)\fP.  Specify
+the mount point and associated mount options in \fI/etc/fstab\fP,
+for example:
+.PP
+.nf
+.RS
+hmcdrvfs /mnt/hmc fuse ro,noatime,allow_other,uid=500,gid=1000
+.RE
+.fi
+.PP
+You can then mount the file system with this command:
+.PP
+.nf
+.RS
+.B # mount /mnt/hmc
+.RE
+.fi
+
+.SH FILES
+Some general options about mount policy can be set in the
+\fI/etc/\:fuse.conf\fP file.  These options are:
+.TP
+.BI "mount_max=" NNN
+Set the maximum number of
+.SM FUSE
+mounts allowed to non-root users.
+The default is 1000.
+.TP
+.B user_allow_other
+Allow non-root users to specify the \fBallow_other\fP or \fBallow_root\fP
+mount options.
+
+.SH DIAGNOSTICS
+.IP 1. 3
+The
+.SM FUSE.HMCDRVFS
+file system needs access to device node \fI/dev/\:hmcdrv\fP.  This node is
+created automatically when the \fIhmcdrv\fP kernel module is loaded (see Linux
+kernel configuration option
+.SM CONFIG_HMC_DRV\c
+).  The user process that runs the \fBhmcdrvfs\fP command must have
+sufficient privileges to read from and write to node \fI/dev/\:hmcdrv\fP.
+Use the commands \fBchown(1)\fP, \fBchgrp(1)\fP and/or \fBchmod(1)\fP on
+node \fI/dev/\:hmcdrv\fP to ensure this condition.
+
+.IP 2. 3
+In addition to the required permissions, there are some environmental
+requirements:
+.RS
+.IP - 2
+In a
+.SM z/VM
+environment, the
+.SM z/VM
+guest virtual machine must have at least privilege class B.
+.IP - 2
+For Linux in
+.SM LPAR
+mode, the
+.SM LPAR
+activation profile must allow issuing
+.SM SCLP
+requests.
+.IP - 2
+On the
+.SM HMC\c
+, the
+.SM DVD
+must be assigned to the associated system image (use menu \fIAccess Removable
+Media\fP).
+.RE
+
+.IP 3. 3
+The
+.SM FUSE.HMCDRVFS
+file system maintains a file attributes cache, with an aging timeout.  This
+timeout is related to the \fBentry_timeout\fP and \fBattr_timeout\fP
+.SM FUSE
+options.  Its value exceeds the greater of the two, \fBentry_timeout\fP and
+\fBattr_timeout\fP, by 30 - 60 seconds.  This timeout affects the performance
+of the
+.SM FUSE.HMCDRVFS
+file system.
+.RE
+
+.IP 4. 3
+Different language and time zone settings on the
+.SM HMC
+and your Linux instance can result in incorrect file modification information.
+.RS
+.IP - 2
+Use the \fBhmclang\fP specific
+.SM FUSE.HMCDRVFS
+option if the language settings
+of the
+.SM HMC
+and your Linux instance do not match.  Correctly setting this option prevents
+incorrect file modification dates in the file details.  Omitting the
+\fBhmclang\fP option can result in incorrect dates of the form 01-01-YYYY,
+with misleading values for the day and month.
+.IP - 2
+Use the \fBhmctz\fP specific
+.SM FUSE.HMCDRVFS
+option if the time zone settings
+of the
+.SM HMC
+and your Linux instance do not match.  Correctly setting this option prevents
+incorrect file modification times in the file details.  Omitting \fBhmctz\fP,
+an incorrect specification, or a missing time zone description file can result
+in modification times that differ up to 25 hours from the correct times.
+Specifications that cannot be interpreted result in GMT/UTC being set.  If the
+.SM HMC
+is set to GMT/UTC, specify \fBhmctz=""\fP.
+.RE
+
+.IP 5. 3
+The following generic mount options from \fBmount(8)\fP are ignored:
+.RS 3
+.TP
+\fB-w\fP, \fB--rw\fP, \fB-o rw\fP
+mount the file system read/write
+.TP
+.B -o atime
+update inode access times on this file system
+.RE
+
+.IP 6. 3
+The following
+.SM FUSE
+mount options from \fBmount.fuse(8)\fP are
+ignored:
+.RS 3
+.TP
+.B -o hard_remove
+immediate removal
+.TP
+.B -o negative_timeout
+cache timeout for deleted names
+.TP
+.BI "-o max_write=" N
+set maximum size of write requests
+.TP
+.B -o atomic_o_trunc
+enable atomic open+truncate support
+.TP
+.B -o big_writes
+enable larger than 4kB writes
+.TP
+.BI "-o subdir=" DIR
+prepend this directory to all paths
+.TP
+.B -o use_ino
+let file system set inode numbers
+.TP
+.B -o readdir_ino
+try to fill in d_ino in readdir
+.RE
+
+.SH SEE ALSO
+.BR tzset(3),
+.BR locale(1),
+.BR fusermount(1),
+.BR fstab(5),
+.BR mount(8),
+.B mount.fuse(8)
+.BR lshmc(8),
+and Linux on System z: Device Drivers, Features and Commands

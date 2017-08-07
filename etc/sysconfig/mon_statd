@@ -1,0 +1,28 @@
+## Path:	System/Monitoring/s390-tools/mon_statd
+## Description:	Linux - z/VM Monitor Daemon for process and filesystem data.
+
+## Type:	integer(1:)
+## Default:	60
+#
+# Monitor interval in seconds for filesystem monitoring.
+#
+FSSTAT_INTERVAL=60
+
+## Type:	integer(1:)
+## Default:	60
+#
+# Monitor interval in seconds for process monitoring.
+#
+PROC_INTERVAL=60
+
+## Type:	yesno
+## Default:	no
+#
+# Set this to "yes" if you want to enable filesystem monitoring.
+FSSTAT="no"
+
+## Type:	yesno
+## Default:	no
+#
+# Set this to "yes" if you want to enable process monitoring.
+PROC="no"

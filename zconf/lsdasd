@@ -1,0 +1,801 @@
+#!/bin/bash
+#
+# lsdasd - Tool to list information about DASDs
+#
+# Copyright IBM Corp. 2003, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+CMD=$(basename $0)
+SYSFSDIR="/sys"
+
+#------------------------------------------------------------------------------
+# Print usage
+#------------------------------------------------------------------------------
+function PrintUsage() {
+	cat <<-EOD
+		Usage: $(basename $0) <options> [<device>]
+
+		<options> ::=
+		 	-a|--offline
+		 		Include devices that are currently offline.
+		 	-b|--base
+		 		Include only base devices.
+		 	-h|--help
+		 		Print this text and exit.
+		 	-s|--short
+		 		Strip leading 0.0. from bus IDs.
+		 	-u|--uid
+		 		Print and sort by uid.
+		 	-c|--compat
+		 		Print old version of lsdasd output.
+		 	-l|--long
+		 		Print extended information about DASDs.
+		 	-H|--host-access-list
+		 		Print information about hosts accessing DASDs.
+		 	-v|--verbose
+		 		For compatibility/future use. Currently ignored.
+		 	--version
+		 		Show tools and command version.
+
+		<device> ::= <bus ID>
+		 	Limit output to one or more devices which are given as a bus ID.
+	EOD
+}
+
+function PrintVersion()
+{
+	cat <<-EOD
+	$CMD: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp. 2003, 2017
+	EOD
+}
+
+#------------------------------------------------------------------------------
+# Helper function to check a device string.
+#------------------------------------------------------------------------------
+function CheckDeviceString() {
+	local X
+
+	X=$(
+		echo "$1" |
+		awk --posix -F. '
+			function PrintBusID(css, grp, devno) {
+				while(length(devno) < 4)
+					devno = "0" devno
+				print css "\\." grp "\\." devno "$"
+			}
+			NF == 1 && $1 ~ /^[0-9a-fA-F]{1,4}$/ {
+				PrintBusID("0","0", $1)
+				next
+			}
+			NF != 3 || $1 !~ /^[0-9a-fA-F]{1,2}$/ {
+				next
+			}
+			$2 !~ /^[0-9a-fA-F]{1,2}$/ {
+				next
+			}
+			$3 !~ /^[0-9a-fA-F]{1,4}$/ {
+				next
+			}
+			{
+				PrintBusID($1, $2, $3)
+			}
+		'
+		)
+
+	if [ "$X" != "" ]; then
+		echo $X
+		return 0
+	fi
+
+	return 1
+}
+
+#------------------------------------------------------------------------------
+# Generate list of DASDs
+#------------------------------------------------------------------------------
+function listDASDDeviceDirectories() {
+    DRIVERECKD="$SYSFSDIR/bus/ccw/drivers/dasd-eckd/"
+    DRIVERFBA="$SYSFSDIR/bus/ccw/drivers/dasd-fba/"
+    SEARCHDIRS=
+
+    if [[ -d "$DRIVERECKD" ]]; then
+	SEARCHDIRS="$DRIVERECKD"
+    fi
+    if [[ -d "$DRIVERFBA" ]]; then
+	SEARCHDIRS="$SEARCHDIRS $DRIVERFBA"
+    fi
+    if [[ -n "$SEARCHDIRS" ]]; then
+        find $SEARCHDIRS -type l -printf "%h/%l\n" 2> /dev/null
+    else
+        # The above paths may become invalid in the future, so we keep the
+        # following query as backup:
+        find "$SYSFSDIR/devices" -type l -name "driver" -lname "*/dasd*" \
+		    -printf "%h\n" 2> /dev/null
+    fi
+    return 0
+}
+
+#------------------------------------------------------------------------------
+# find dasd directory in debugfs
+#------------------------------------------------------------------------------
+function findDASDDebugfsDirectorie() {
+    local mntentries
+
+    while read -a mntentries
+    do
+	if [[ "${mntentries[2]}" == "debugfs" ]]
+	then
+	    DASD_DBF_DIR="${mntentries[1]}"
+	    break;
+	fi
+    done < /etc/mtab
+    if [[ "$DASD_DBF_DIR" == "" ]]
+    then
+	echo "$CMD: No debugfs mount point found" >&2
+	exit 1
+    fi
+    DASD_DBF_DIR="$DASD_DBF_DIR/dasd"
+    if [[ ! -d "$DASD_DBF_DIR" ]]
+    then
+	echo "$CMD: Default DASD debugfs directory $DASD_DBF_DIR does not exist" >&2
+	exit 1
+    fi
+}
+
+#------------------------------------------------------------------------------
+# gather device data and call appropriate output function
+#------------------------------------------------------------------------------
+function gatherDeviceData() {
+	while read DEVPATH
+	do
+		#-------------------------------------------#
+		# gather information from device attributes #
+		#-------------------------------------------#
+		read ONLINE 2> /dev/null < $DEVPATH/online || continue
+		if [[ "$ONLINE" == 0 ]] &&
+			[[ "$PRINTOFFLINE" == "false" ]]; then
+			continue
+		fi
+		read ALIAS 2> /dev/null < $DEVPATH/alias || continue
+		read DEV_UID 2> /dev/null < $DEVPATH/uid || continue
+		read READONLY 2> /dev/null < $DEVPATH/readonly || continue
+		read DISCIPLINE 2> /dev/null < $DEVPATH/discipline || continue
+
+		# Block device specific information is only available for
+		# devices that are online and not a PAV alias
+		if [[ ! "$ONLINE" == 0 ]] && [[ ! "$ALIAS" == 1 ]]; then
+			#find device Path to the block device
+			if [[ -d "$DEVPATH/block" ]]; then
+				set - "$DEVPATH"/block/dasd*
+			else
+				set - "$DEVPATH"/block:dasd*
+			fi
+			MAJMIN=
+			MAJOR=
+			MINOR=
+			SIZE=
+			SSIZE=
+			if [[ -d "$1" ]]; then
+				cd -P "$1"
+				BLOCKPATH=$PWD
+				BLOCKNAME=${BLOCKPATH##*/}
+				read MAJMIN 2> /dev/null < $BLOCKPATH/dev || continue
+				MAJOR=${MAJMIN%%:*}
+				MINOR=${MAJMIN##*:}
+				read SIZE 2> /dev/null < $BLOCKPATH/size || continue
+				read SSIZE 2> /dev/null < $BLOCKPATH/queue/hw_sector_size
+				if [[ -z $SSIZE ]] && [[ -b "/dev/$BLOCKNAME" ]]; then
+					SSIZE=$(blockdev --getss /dev/$BLOCKNAME 2>/dev/null)
+				fi
+			fi
+		else
+			# BLOCKNAME for offline and alias devices will not be
+			# printed, it's just a key for sorting
+			if [[ "$ONLINE" == 0 ]]; then
+				BLOCKNAME=""
+			else
+				BLOCKNAME="a"
+			fi
+			MAJMIN=
+			MAJOR=
+			MINOR=
+			SIZE=
+		fi
+
+		# busid is the base name of the device path
+		if [[ "$SHORTID" == "true" ]]; then
+			BUSID=${DEVPATH##*.}
+		else
+			BUSID=${DEVPATH##*/}
+		fi
+
+		if [[ "$PRINTUID" == "true" ]]; then
+			SORTKEYLEN=${#DEV_UID}
+			SORTKEY=$DEV_UID
+			FORMATTED_UID="$DEV_UID"
+		else
+			SORTKEYLEN=${#BLOCKNAME}
+			SORTKEY=$BLOCKNAME
+			FORMATTED_UID=""
+		fi
+
+		if [[ "$OUTPUT" == "old" ]]; then
+			oldoutput
+		elif [[ "$OUTPUT" == "extended" ]]; then
+			extended
+		elif [[ "$PRINTUID" == "true" ]]; then
+			uid
+		elif [[ "$OUTPUT" == "host" ]]; then
+			host
+		else
+			newoutput
+		fi
+    done
+}
+
+function newoutput()
+{
+	#-------------------------------------------#
+	# format data for output                    #
+	#-------------------------------------------#
+
+	if [[ "$ONLINE" == 0 ]]; then
+		printf "%s:%s:%-8s   offline\n" \
+			"$SORTKEYLEN" "$SORTKEY" \
+			"$BUSID" ;
+		return
+	fi
+
+	if [[ "$ALIAS" == 1 ]]; then
+		if [[ "$BASEONLY" == "false" ]]; then
+			printf "%s:%s:%-8s   alias %28s\n" \
+				"$SORTKEYLEN" "$SORTKEY" \
+				"$BUSID" \
+				"$DISCIPLINE"
+		fi
+		return
+	fi
+
+	if [[ "$READONLY" == 0 ]]; then
+		ROSTRING=""
+	else
+		ROSTRING="(ro)"
+	fi
+
+	if [[ -z "$BLOCKNAME" ]] || [[ -z "$SIZE" ]]; then
+		ACTIVE="active"
+		BLOCKCOUNT=""
+		MBSIZE=""
+	elif [[ "$SIZE" == 0 ]]; then
+		ACTIVE="n/f"
+		BLOCKCOUNT=""
+		MBSIZE=""
+		SSIZE=""
+	else
+		if [[ -n "$SSIZE" ]] && [[ "$SSIZE" > 0 ]]; then
+				BLOCKCOUNT=$(( SIZE / (SSIZE / 512) ))
+		else
+			SSIZE="???"
+			BLOCKCOUNT="???"
+		fi
+		MBSIZE=$(( SIZE / 2048 ))MB
+		ACTIVE="active"
+	fi
+
+	printf "%s:%s:%-8s   %-6s%-4s  %-8s  %-2s:%-2s   %-4s  %-4s   %-8s  %s\n" \
+		"$SORTKEYLEN" "$SORTKEY" \
+		"$BUSID" \
+		"$ACTIVE" \
+		"$ROSTRING" \
+		"$BLOCKNAME" \
+		"$MAJOR" \
+		"$MINOR" \
+		"$DISCIPLINE" \
+		"$SSIZE" \
+		"$MBSIZE" \
+		"$BLOCKCOUNT" ;
+}
+
+function oldoutput()
+{
+	#-------------------------------------------#
+	# format data for output                    #
+	#-------------------------------------------#
+
+	if [[ "$ONLINE" == 0 ]]; then
+		printf "%s:%s:%s(%s)%s : offline\n" \
+			"$SORTKEYLEN" "$SORTKEY" \
+			"$BUSID" \
+			"$DISCIPLINE" \
+			"$FORMATTED_UID"
+		return
+	fi
+
+	if [[ "$ALIAS" == 1 ]]; then
+		if [[ "$BASEONLY" == "false" ]]; then
+			printf "%s:%s:%s(%s)%s : alias\n" \
+				"$SORTKEYLEN" "$SORTKEY" \
+				"$BUSID" \
+				"$DISCIPLINE" \
+				"$FORMATTED_UID"
+		fi
+		return
+	fi
+
+	if [[ "$READONLY" == 0 ]]; then
+		ROSTRING=""
+	else
+		ROSTRING="(ro)"
+	fi
+
+	printf "%s:%s:%s(%-4s)%s at (%3i:%3i) is %-7s%4s: " \
+		"$SORTKEYLEN" "$SORTKEY" \
+		"$BUSID" \
+		"$DISCIPLINE" \
+		"$FORMATTED_UID" \
+		"$MAJOR" \
+		"$MINOR" \
+		"$BLOCKNAME" \
+		"$ROSTRING" ;
+
+	if [[ -z "$BLOCKNAME" ]] || [[ -z "$SIZE" ]]; then
+		printf "active\n"
+	elif [[ "$SIZE" == 0 ]]; then
+		printf "n/f\n"
+	else
+		if [[ -n "$SSIZE" ]] && [[ "$SSIZE" > 0 ]]; then
+				BLOCKCOUNT=$(( SIZE / (SSIZE / 512) ))
+		else
+			SSIZE="???"
+			BLOCKCOUNT="???"
+		fi
+		MBSIZE=$(( SIZE / 2048 ))
+		printf "active at blocksize %s, %s blocks, %i MB\n" \
+			"$SSIZE" "$BLOCKCOUNT" "$MBSIZE"
+	fi
+}
+
+function extended()
+{
+	PIM=0
+	OPM=0
+	NPPM=0
+	CABLEPM=0
+	CUIRPM=0
+	HPFPM=0
+	IFCCPM=0
+
+	# additional information
+	read DIAG 2> /dev/null < $DEVPATH/use_diag
+	read EER 2> /dev/null < $DEVPATH/eer_enabled
+	read ERP 2> /dev/null < $DEVPATH/erplog
+	read HPF 2> /dev/null < $DEVPATH/hpf
+        # in case the path_masks do not exist simply ignore it
+	read OPM NPPM CABLEPM CUIRPM HPFPM IFCCPM 2> /dev/null < $DEVPATH/path_masks
+	read -a C 2> /dev/null < $DEVPATH/../chpids
+	read PIM PAM POM 2> /dev/null < $DEVPATH/../pimpampom
+
+	# convert to hexadecimal values
+	PIM=0x$PIM
+	OPM=0x$OPM
+	NPPM=0x$NPPM
+	CABLEPM=0x$CABLEPM
+	CUIRPM=0x$CUIRPM
+	HPFPM=0x$HPFPM
+	IFCCPM=0x$IFCCPM
+
+       	#-----------------------------------------------------------#
+       	# aggregate chpids and path mask to useful information      #
+       	#-----------------------------------------------------------#
+
+        # initialise chpid lists
+        INSTALLED_PATHS=(" " " " " " " " " " " " " " " ")
+	USED_PATHS=(" " " " " " " " " " " " " " " ")
+	NP_PATHS=(" " " " " " " " " " " " " " " ")
+        CUIR_PATHS=(" " " " " " " " " " " " " " " ")
+        CABLE_PATHS=(" " " " " " " " " " " " " " " ")
+        HPF_PATHS=(" " " " " " " " " " " " " " " ")
+        IFCC_PATHS=(" " " " " " " " " " " " " " " ")
+
+	# installed paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($PIM&$mask))
+	    if [ $PM -gt 0 ] ;then
+		INSTALLED_PATHS[$j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+	# used paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($OPM&$mask))
+	    if [ $PM -gt 0 ] ;then
+		USED_PATHS[$j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+	# non preffered paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($NPPM&$mask))
+	    if [ $PM -gt 0 ] ;then
+		NP_PATHS[j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+	# cuir quiesced paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($CUIRPM&$mask))
+	    if [ $PM -gt 0 ] ;then
+		CUIR_PATHS[j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+	# mis cabled paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($CABLEPM&$mask))
+	    if [ $PM -gt 0 ] ;then
+		CABLE_PATHS[j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+	# HPF unusable paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($HPFPM&$mask))
+	    if [ $PM  -gt 0 ] ;then
+		HPF_PATHS[j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+	# IFCC unusable paths
+	j=0
+	mask=0x80
+	for (( i=0; i<8; i++ )) ;do
+	    PM=$(($IFCCPM&$mask))
+	    if [ $PM  -gt 0 ] ;then
+		IFCC_PATHS[j]=${C[$i]} ;
+		((j++)) ;
+	    fi
+	    (( mask>>=1 ))
+	done
+
+       	#-------------------------------------------#
+       	# format data for output                    #
+       	#-------------------------------------------#
+
+	if [[ "$ONLINE" == 0 ]]; then
+		ACTIVE="offline"
+		printf "%s:%s:%s#  status:\t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+			"$SORTKEYLEN" "$SORTKEY" \
+			"$BUSID" \
+			"$ACTIVE" \
+			"$DIAG" \
+			"$READONLY" \
+			"$EER" \
+			"$ERP" \
+			"$HPF" \
+			"$DEV_UID" \
+		        "${INSTALLED_PATHS[@]}" \
+		        "${USED_PATHS[@]}" \
+		        "${NP_PATHS[@]}" \
+		        "${CABLE_PATHS[@]}" \
+		        "${CUIR_PATHS[@]}" \
+		        "${HPF_PATHS[@]}" \
+		        "${IFCC_PATHS[@]}" ;
+		return
+	elif [[ "$ALIAS" == 1 ]]; then
+		if [[ "$BASEONLY" == "false" ]]; then
+			ACTIVE="alias"
+			printf "%s:%s:%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s #  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+				"$SORTKEYLEN" "$SORTKEY" \
+				"$BUSID" \
+				"$ACTIVE" \
+				"$DISCIPLINE" \
+				"$DIAG" \
+				"$READONLY" \
+				"$EER" \
+				"$ERP" \
+				"$HPF" \
+				"$DEV_UID" \
+			        "${INSTALLED_PATHS[@]}" \
+			        "${USED_PATHS[@]}" \
+			        "${NP_PATHS[@]}" \
+			        "${CABLE_PATHS[@]}" \
+			        "${CUIR_PATHS[@]}" \
+			        "${HPF_PATHS[@]}" \
+		                "${IFCC_PATHS[@]}" ;
+		fi
+		return
+	elif [[ -z "$BLOCKNAME" ]] || [[ -z "$SIZE" ]]; then
+		ACTIVE="active"
+		COLON=""
+	elif [[ "$SIZE" == 0 ]]; then
+		ACTIVE="n/f"
+		COLON=""
+	else
+		if [[ -n "$SSIZE" ]] && [[ "$SSIZE" > 0 ]]; then
+			BLOCKCOUNT=$(( SIZE / (SSIZE / 512) ))
+		else
+			SSIZE="???"
+			BLOCKCOUNT="???"
+		fi
+		MBSIZE=$(( SIZE / 2048 ))MB
+		ACTIVE="active"
+		COLON=":"
+	fi
+
+	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+		"$SORTKEYLEN" "$SORTKEY" \
+		"$BUSID" \
+		"$BLOCKNAME" \
+		"$MAJOR" \
+		"$COLON" \
+		"$MINOR" \
+		"$ACTIVE" \
+		"$DISCIPLINE" \
+		"$SSIZE" \
+		"$MBSIZE" \
+		"$BLOCKCOUNT" \
+		"$DIAG" \
+		"$READONLY" \
+		"$EER" \
+		"$ERP" \
+		"$HPF" \
+		"$DEV_UID" \
+	        "${INSTALLED_PATHS[@]}" \
+	        "${USED_PATHS[@]}" \
+	        "${NP_PATHS[@]}" \
+	        "${CABLE_PATHS[@]}" \
+	        "${CUIR_PATHS[@]}" \
+	        "${HPF_PATHS[@]}"  \
+	        "${IFCC_PATHS[@]}" ;
+}
+
+function host()
+{
+findDASDDebugfsDirectorie
+
+if [[ ! -f "$DASD_DBF_DIR/$BUSID/host_access_list" ]]
+then
+    printf "\n%s: hosts access information not available\n" "$BUSID"
+    return
+fi
+
+local temp=`mktemp /tmp/lsdasd.XXXXXX`
+if test -w $temp ; then :; else
+	printf "\nCreating temporary file failed\n"
+	return
+fi
+
+cat $DASD_DBF_DIR/$BUSID/host_access_list > $temp 2> /dev/null
+ret=$?
+if [[ $ret -ne 0 ]]
+then
+    printf "%s: hosts access information not available\n" "$BUSID"
+    rm -f $temp
+    return $ret
+fi
+
+unset index
+unset array
+declare -a array
+
+index=(pgid status_flags sysplex_name supported_cylinder timestamp)
+
+for element in ${index[@]}
+do
+	count=0
+
+	declare -a $element
+	OLDIFS=$IFS
+	IFS=$'\n'
+	for value in `grep $element $temp`
+	do
+		(( ++count ))
+		value=$(echo -e $value | cut -d ' ' -f2)
+		eval $element[$count]=$value
+	done
+	IFS=$OLDIFS
+done
+
+printf "Host information for %s\n" "$BUSID";
+printf "Path-Group-ID          LPAR  CPU   FL  Status  Sysplex      Max_Cyls        Time\n";
+printf "================================================================================\n";
+
+# mask bits for online and reserved state
+online_reserved_mask=0xE0
+
+# print name value lists
+for i in `seq 1 $count`;
+do
+    # get flags field
+    value=${status_flags[$i]}
+    # mark as hex value
+    value=0x$value
+    # mask online and reserved bits
+    value=$(($value & $online_reserved_mask))
+
+    case $value in
+	0 ) # 0x00
+	    STATE="OFF"
+	    ;;
+	32 ) # 0x20
+	    STATE="OFF-RSV"
+	    ;;
+	64 ) # 0x40
+	    STATE="ON"
+	    ;;
+	96 ) # 0x60
+	    STATE="ON-RSV"
+	    ;;
+	* )
+	    STATE="-"
+	    ;;
+    esac
+
+    printf "%22s %02s %07s  %02s  %-6s  %-8s  %11u  %10lu\n" \
+	"${pgid[$i]}" \
+	"${pgid[$i]:4:2}" \
+	"${pgid[$i]:6:4}" \
+	"${status_flags[$i]}" \
+	"$STATE" \
+	"${sysplex_name[$i]}" \
+	"${supported_cylinder[$i]}" \
+	"${timestamp[$i]}" \
+	;
+done
+printf "\n";
+
+rm -f $temp
+}
+
+function uid()
+{
+	#-------------------------------------------#
+	# format data for output                    #
+	#-------------------------------------------#
+
+	if [[ "$ONLINE" == 0 ]]; then
+		BLOCKNAME="offline"
+	elif [[ "$ALIAS" == 1 ]]; then
+		if [[ "$BASEONLY" == "true" ]]; then
+			return
+		else
+			BLOCKNAME="alias"
+		fi
+	fi
+
+	printf "%s:%s:%-8s  %-8s  %s\n" \
+		"$SORTKEYLEN" "$SORTKEY" \
+		"$BUSID" \
+		"$BLOCKNAME" \
+		"$FORMATTED_UID" ;
+}
+
+SHORTID=false
+PRINTOFFLINE=false
+VERBOSE=false
+PRINTUID=false
+BASEONLY=false
+OUTPUT="new"
+#------------------------------------------------------------------------------
+# Evaluating command line options
+#------------------------------------------------------------------------------
+while [ $# -gt 0 ]; do
+	case $1 in
+	--help|-h)
+		PrintUsage
+		exit 0
+		;;
+	--verbose|-v)
+		VERBOSE=true
+		;;
+	--offline|-a)
+		PRINTOFFLINE=true
+		;;
+	--short|-s)
+		SHORTID=true
+		;;
+	--uid|-u)
+		PRINTUID=true
+		;;
+	--base|-b)
+		BASEONLY=true
+		;;
+	--compat|-c)
+		OUTPUT="old"
+		;;
+	--long|-l)
+		OUTPUT="extended"
+		;;
+	--host-access-list|-H)
+		OUTPUT="host"
+		;;
+	--version)
+		PrintVersion
+		exit 0
+		;;
+	-*)
+		echo "$CMD: Invalid option $1"
+		echo "Try 'lsdasd --help' for more information."
+		exit 1
+		;;
+	*)
+		DEV="$(CheckDeviceString $1)"
+		if [ "$DEV" = "" ]; then
+			echo "$CMD: ERROR: $1 no device format"
+			exit 1
+		fi
+		if [ "$DEVLIST" == "" ]; then
+			DEVLIST="$DEV"
+		else
+			DEVLIST="$DEVLIST\|$DEV"
+		fi
+		;;
+	esac
+	shift
+	if [[ $OUTPUT == "extended" ]]; then
+		if [[ $PRINTUID == true ]]; then
+			echo "$CMD: ERROR: invalid options specified"
+			exit 1
+		fi
+	fi
+done
+
+
+PROCESSING="listDASDDeviceDirectories "
+# if there is a DEVLIST remove all elements not in the DEVLIST
+if [ "$DEVLIST" != "" ]; then
+	PROCESSING=" $PROCESSING | grep \"$DEVLIST\" "
+fi
+
+# gather information on devices in list
+PROCESSING=" $PROCESSING | gatherDeviceData "
+
+# sort resulting list
+if [[ "$OUTPUT" == "host" ]]; then
+    PROCESSING=" $PROCESSING"
+else
+    PROCESSING=" $PROCESSING | sort -t: -k1n -k2 | cut -d: -f3- "
+fi
+
+if  [[ "$PRINTUID" == "true" ]] && [[ "$OUTPUT" != "old" ]]; then
+	printf "Bus-ID    Name      UID\n"
+	printf "==============================================================================\n"
+elif [[ "$OUTPUT" == "new" ]]; then
+	printf "Bus-ID     Status      Name      Device  Type  BlkSz  Size      Blocks\n"
+	printf "==============================================================================\n"
+elif [[ "$OUTPUT" == "extended" ]]; then
+	PROCESSING=" $PROCESSING | sed 's/#/\n/g' "
+fi
+
+#execute all steps
+eval "$PROCESSING"
+
+exit 0

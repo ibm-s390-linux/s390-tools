@@ -1,0 +1,15 @@
+#
+# Apply control program identification (CPI) settings
+#
+# The system and sysplex names consist of up to eight characters of
+# the following set: A-Z, 0-9, $, @, #, and blank.
+
+#
+# CPI system name
+#
+CPI_SYSTEM_NAME=""
+
+#
+# CPI sysplex name
+#
+CPI_SYSPLEX_NAME=""

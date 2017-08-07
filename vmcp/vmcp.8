@@ -1,0 +1,126 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH vmcp "8" "Apr 2006" "s390-tools"
+.SH NAME
+vmcp \- send commands to the z/VM control program
+.SH SYNOPSIS
+.BI vmcp
+[\fI-k\fR] [\fI-b <size>\fR] command
+
+.BI vmcp
+[\fI-h|-v\fR]
+
+
+.SH DESCRIPTION
+vmcp allows Linux users to send commands to the control program of z/VM.
+The normal usage is to invoke vmcp with the command you want to
+execute. If the 
+.BI -k
+option is not specified, the whole command line is automatically translated 
+into uppercase. The response of z/VM is written to the standard output. 
+ 
+.BI vmcp
+needs a kernel feature represented by the device node /dev/vmcp.
+The kernel module defines a buffer size, which limits the length of the 
+response. Every output larger than the compiled buffer size is 
+silently dropped.
+Depending on you shell, please remember to escape special characters 
+like * using \\* instead.
+.SH RETURN CODES
+vmcp writes the response to stdout and any error message to stderr.
+Depending on the success one of the following return codes is returned:
+.TP
+.BR "0"
+No problem in vmcp or CP.
+
+.TP
+.BR "1"
+CP returned a non-zero response code.
+
+The message
+
+.B Error: non-zero CP response for command '<command>': #<num>"
+
+is written to stderr.
+.I <num>
+contains the numerical value of the response
+code and
+.I <command>
+contains the commands as send to CP.
+
+.TP
+.BR "2"
+The specified buffer was not large enough to hold CP's response. The command
+was executed, nevertheless, and the response was truncated. You can use the 
+--buffer option to increase the response buffer. The message
+
+.B Error: output (<num> bytes) was truncated, try --buffer to increase size
+
+is written to stderr.
+.I <num>
+contains the necessary buffer size in bytes.
+
+.TP
+.BR "3"
+Linux reported an error to vmcp. See the error message for details.
+
+.TP
+.BR "4"
+The options passed to vmcp were erroneous. See the error messages for details.
+
+
+
+
+.SH EXAMPLES
+To get your user id
+.IP
+.nf
+vmcp query userid
+.fi
+.P
+
+To attach the device 1234 to your guest 
+.IP
+.nf
+vmcp attach 1234 \\*
+.fi
+.P
+
+If add the following line to /etc/sudoers
+
+.BI "ALL ALL=NOPASSWD: /sbin/vmcp indicate"
+
+every user on the system can run the indicate command
+.IP
+.nf
+sudo vmcp indicate
+.fi
+.P
+
+
+.SH CREDITS
+The basic idea of vmcp is based on cpint of Neale Fergusson.
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "--help"
+Print usage information, then exit
+
+.TP
+.BR "\-v" " or " "--version"
+Print version information, then exit
+
+.TP
+.BR "\-k" " or " "--keepcase"
+Using this option, vmcp does not convert the command to uppercase. 
+(The default is to translate the command string to uppercase) 
+
+.TP
+.BR "\-b <size>" " or " "--buffer=<size>"
+Specify a buffer size for the response. The buffer size can be specified
+from 4096 bytes (4k) to 1048576 Bytes (1M). The default size is 2 pages 
+(8192 Bytes). You can also use k/K/m/M for kilobytes and Megabytes
+
+.SH "SEE ALSO"
+sudo(8)

@@ -1,0 +1,96 @@
+Counter: 128	Name:L1I_L2_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from the Level-2 (L1.5) cache
+.
+Counter: 129	Name:L1D_L2_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the installed
+cache line was sourced from the Level-2 (L1.5) cache
+.
+Counter: 130	Name:L1I_L3_LOCAL_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the installed
+cache line was sourced from the Level-3 cache that is on the same book
+as the Instruction cache (Local L2 cache)
+.
+Counter: 131	Name:L1D_L3_LOCAL_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the installtion
+cache line was source from the Level-3 cache that is on the same book
+as the Data cache (Local L2 cache)
+.
+Counter: 132	Name:L1I_L3_REMOTE_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the installed
+cache line was sourced from a Level-3 cache that is not on the same
+book as the Instruction cache (Remote L2 cache)
+.
+Counter: 133	Name:L1D_L3_REMOTE_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the installed
+cache line was sourced from a Level-3 cache that is not on the same
+book as the Data cache (Remote L2 cache)
+.
+Counter: 134	Name:L1D_LMEM_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the installed
+cache line was sourced from memory that is attached to the same book
+as the Data cache (Local Memory)
+.
+Counter: 135	Name:L1I_LMEM_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache where the installed cache
+line was sourced from memory that is attached to the s ame book as the
+Instruction cahe (local Memory)
+.
+Counter: 136	Name:L1D_RO_EXCL_WRITES
+Description:
+A directory write to the Level-1 D-Cache where the line was originally
+in a Read-Only state in the cache but has been updated to be in the
+Exclusive state that allows stores to the cache line
+.
+Counter: 137	Name:L1I_CACHELINE_INVALIDATES
+Description:
+A cache line in the Level-1 I-Cache has been invalidated by a store on
+the same CPU as the Level-1 I-Cache
+.
+Counter: 138	Name:ITLB1_WRITES
+Description:
+A translation entry has been written into the Level-1 Instruction
+Translation Lookaside Buffer
+.
+Counter: 139	Name:DTLB1_WRITES
+Description:
+A translation entry has been written to the Level-1 Data Translation
+Lookaside Buffer
+.
+Counter: 140	Name:TLB2_PTE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Page Table
+Entry arrays
+.
+Counter: 141	Name:TLB2_CRSTE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Common Region
+Segment Table Entry arrays
+.
+Counter: 142	Name:TLB2_CRSTE_HPAGE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Common Region
+Segment Table Entry arrays for a one-megabyte large page translation
+.
+Counter: 145	Name:ITLB1_MISSES
+Description:
+Level-1 Instruction TLB miss in progress. Incremented by one for every
+cycle an ITLB1 miss is in progress
+.
+Counter: 146	Name:DTLB1_MISSES
+Description:
+Level-1 Data TLB miss in progress. Incremented by one for every cycle
+an DTLB1 miss is in progress
+.
+Counter: 147	Name:L2C_STORES_SENT
+Description:
+Incremented by one for every store sent to Level-2 (L1.5) cache
+.

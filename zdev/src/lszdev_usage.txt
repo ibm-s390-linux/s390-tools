@@ -1,0 +1,45 @@
+Usage: lszdev [TYPE] [DEVICE] [SELECTION] [ACTION] [OPTIONS]
+
+Use lszdev to view the configuration of z Systems specific devices in either:
+ - active configuration (running system), or
+ - persistent configuration (configuration files)
+
+Actions apply to both configurations unless specified otherwise.
+
+TYPE
+  Device type to which this command applies. Use --list-types to display
+  supported types.
+
+DEVICE
+  ID                     Select single device by ID, e.g. 0.0.1234
+  FROM-TO                Select range of devices between FROM and TO
+  DEV1,DEV2,...          Select list of devices or device ranges
+
+SELECTION
+  --all                  Select all existing and configured devices (default)
+  --configured           Select devices with a persistent configuration
+  --existing             Select devices found in the active configuration
+  --online/--offline     Select devices that are online/offline
+  --failed               Select devices that are not functioning correctly
+  --by-path PATH         Select device providing file system path, e.g. /usr
+  --by-node NODE         Select device providing device node, e.g. /dev/sda
+  --by-interface NAME    Select device providing network interface, e.g. eth0
+  --by-attrib KEY=VALUE  Select devices with specified attribute value
+
+ACTIONS
+  -i, --info             Display detailed information
+  -l, --list-columns     List available output columns
+  -L, --list-types       List supported device types
+  -h, --help             Print usage information, then exit
+  -v, --version          Print version information, then exit
+
+OPTIONS
+  -a, --active           Only show data from the active configuration
+  -p, --persistent       Only show data from the persistent configuration
+  -t, --type             List information about device type
+  -c, --columns COLUMNS  Specify comma-separated list of columns to display
+  -n, --no-headings      Do not print column headings
+      --base PATH        Use PATH as base for accessing files
+      --pairs            Produce output in KEY="VALUE" format
+  -V, --verbose          Print additional run-time information
+  -q, --quiet            Print only minimal run-time information

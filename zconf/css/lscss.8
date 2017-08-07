@@ -1,0 +1,120 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSCSS 8 "Mar 2009" "s390-tools"
+
+.SH NAME
+lscss \- list channel subsystem devices.
+
+.SH SYNOPSIS
+.TP 16
+.B lscss \fI<options>\fR \fI[RANGE]\fR
+
+.SH DESCRIPTION
+The lscss command is used to list all or a subset of devices that are managed
+by the common I/O subsystem.
+
+.SH [RANGE]
+Limit output to a range of subchannels by specifying
+multiple identifiers as a comma-separated list or a
+range or a combination of both, e.g.
+
+	0.0.1234-0.0.1235,4711
+
+
+Note that ranges may also be separated by spaces.
+
+.SH OPTIONS
+.TP 8
+.BR -s | --short
+Shorten IDs by removing leading "0.0.". Note: only IDs beginning with "0.0."
+will be displayed in this case.
+
+.TP 8
+.BR -t | --devtype " " \fI<devtype>[/<model>][,...]\fR
+For IO subchannels, limit output to devices of the given device type
+(e.g. 3390).
+
+.TP 8
+.BR -d | --devrange
+Indicate that RANGE refers to device identifiers.
+
+.TP 8
+.BR --avail
+Show availability attribute of IO devices.
+
+.TP 8
+.BR --vpm
+Show verified path mask.
+VPM is an internal path mask used by Linux. A channel path can be used by Linux device drivers
+to do IO if the corresponding bit is set in the VPM. Events that can lead to a channel path
+not being available include:
+.RS
+.IP \[bu] 4
+The corresponding bit is not set in at least one of the PIM, PAM, or POM masks.
+.IP \[bu]
+The channel path is varied offline.
+.IP \[bu]
+Linux received no interrupt to IO using this channel path.
+.RE
+
+.TP 8
+.BR -v | --version
+Print the version of the s390-tools package and the command.
+
+.TP 8
+.BR -h | --help
+Print help text.
+
+.TP 8
+.BR -u | --uppercase
+Print values using uppercase.
+
+.TP 8
+.BR --io
+Show IO subchannels. (default)
+
+.TP 8
+.BR --chsc
+Show CHSC subchannels.
+
+.TP 8
+.BR --eadm
+Show EADM subchannels.
+
+.TP 8
+.BR --vfio
+Show additional information for I/O subchannels used for VFIO.
+An MDEV is a mediated device that is required to be created by the VFIO channel
+I/O device driver for the VFIO driver framework as the pass-through target
+device when doing channel I/O pass-through.
+
+.TP 8
+.BR -a | --all
+Show subchannels of all types.
+
+
+.SH EXAMPLES
+\fBlscss\fR
+.RS
+List all devices that are managed by the common I/O subsystem.
+.RE
+
+\fBlscss -t 3390\fR
+.RS
+Same as above but shows only 3390 devices.
+.RE
+
+.SH NOTES
+In rare situations a device might temporarily not be accessible to
+the subchannel. Then "none" is displayed as the device identifier and the
+other device attributes are empty.
+
+.SH AUTHOR
+.nf
+This man-page was written by Stefan Bader <shbader@de.ibm.com>.
+New options added by Sebastian Ott <sebott@linux.vnet.ibm.com>.
+.SH "SEE ALSO"
+.BR chccwdev (8)
+.fi

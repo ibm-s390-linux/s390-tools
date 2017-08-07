@@ -1,0 +1,161 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides: mon_statd
+# Required-Start: $local_fs $remote_fs
+# Required-Stop: $local_fs $remote_fs
+# Should-Start: 
+# Should-Stop: 
+# Default-Start: 2 3 5
+# Default-Stop: 0 1 6
+# Short-Description: Configure the mon_fsstatd and mon_procd daemons.
+# Description: Configures the mon_fsstatd and mon_procd daemons. It uses the
+#              configuration file /etc/sysconfig/mon_statd.
+### END INIT INFO
+
+# chkconfig: 235 01 99
+
+DAEMON=mon_statd
+FSSTATD=mon_fsstatd
+PROCD=mon_procd
+FSSTATD_PATH=/usr/sbin/$FSSTATD
+PROCD_PATH=/usr/sbin/$PROCD
+CONFIG_FILE=/etc/sysconfig/$DAEMON
+FSSTATD_PID_FILE=/var/run/$FSSTATD.pid
+PROCD_PID_FILE=/var/run/$PROCD.pid
+
+# source function library
+. /lib/lsb/init-functions
+
+# Source config file
+if [ -f $CONFIG_FILE ]; then
+	. $CONFIG_FILE
+fi
+
+UDEVSETTLE=/sbin/udevadm
+if [ ! -e $UDEVSETTLE ]
+then
+	UDEVSETTLE=/sbin/udevsettle
+	UDEVSETTLE_CALL="$UDEVSETTLE --timeout=10"
+else
+	UDEVSETTLE_CALL="$UDEVSETTLE settle --timeout=10"
+fi
+
+load_kernel_module()
+{
+	if [ ! -e /dev/monwriter ]; then
+		echo "Loading monwriter module..."
+		modprobe monwriter 2>&1
+		if [ $? -ne 0 ]; then
+			exit 1
+		fi
+		if [ -e $UDEVSETTLE ]
+		then
+			$UDEVSETTLE_CALL
+		fi
+	fi
+}
+
+start_daemon()
+{
+	local daemon_name=$1
+	local daemon_interval=$2
+	local daemon_pid_file=$3
+	local daemon_path=$4
+
+	if [ ! -f $daemon_pid_file ]; then
+		load_kernel_module
+		echo -n "Starting $daemon_name:"
+		$daemon_path -i $daemon_interval
+		if [ $? -eq 0 ]; then
+			log_success_msg
+		else
+			log_failure_msg
+		fi
+	else
+		echo "$daemon_name (pid $(cat $daemon_pid_file)) is already running..."
+	fi
+}
+	
+start()
+{
+	if [ "$FSSTAT" = "yes" ]; then
+		start_daemon $FSSTATD $FSSTAT_INTERVAL $FSSTATD_PID_FILE \
+			$FSSTATD_PATH
+	fi
+
+	if [ "$PROC" = "yes" ]; then
+		start_daemon $PROCD $PROC_INTERVAL $PROCD_PID_FILE \
+			$PROCD_PATH
+	fi
+}
+
+stop_daemon()
+{
+	local daemon_name=$1
+	local daemon_pid_file=$2
+	local daemon_path=$3
+
+	echo -n "Stopping $daemon_name:"
+	if [ -f $daemon_pid_file ]; then
+		killproc $daemon_path -TERM
+		log_success_msg
+		rm -f $daemon_pid_file
+	else
+		log_failure_msg
+	fi
+}
+
+stop()
+{
+	if [ "$FSSTAT" = "yes" ]; then
+		stop_daemon $FSSTATD $FSSTATD_PID_FILE $FSSTATD_PATH
+	fi
+	if [ "$PROC" = "yes" ]; then
+		stop_daemon $PROCD $PROCD_PID_FILE $PROCD_PATH
+	fi
+}
+
+restart() {
+	stop
+	start
+}
+
+status_daemon()
+{
+	local daemon_name=$1
+	local daemon_pid_file=$2
+	local daemon_interval=$3
+
+	if [ ! -f $daemon_pid_file ]; then
+		echo "$daemon_name is not running."
+	else
+		echo "$daemon_name (pid $(cat $daemon_pid_file), interval: $daemon_interval) is running."
+	fi
+}
+
+status()
+{
+	status_daemon $FSSTATD $FSSTATD_PID_FILE $FSSTAT_INTERVAL
+	status_daemon $PROCD $PROCD_PID_FILE $PROC_INTERVAL
+}
+
+# How are we called?
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	status)
+		status
+		;;
+	restart|reload|force-reload)
+		restart
+		;;
+	*)
+		echo "Usage: $DAEMON {start|stop|status|restart|reload}"
+		exit 1
+esac
+
+exit 0

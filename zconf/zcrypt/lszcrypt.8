@@ -1,0 +1,146 @@
+.\" lszcrypt.8
+.\"
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" use
+.\"   groff -man -Tutf8 lszcrypt.8
+.\" or
+.\"   nroff -man lszcrypt.8
+.\" to process this source
+.\"
+.TH LSZCRYPT 8 "AUG 2008" "s390-tools"
+.SH NAME
+lszcrypt \- display zcrypt device and configuration information
+.SH SYNOPSIS
+.TP 9
+.B lszcrypt
+.RB "[ " -V " ] "
+[
+.I <device id>
+[...]]
+.TP
+.B lszcrypt
+.B -c
+<device id>
+.TP
+.B lszcrypt -b
+.TP
+.B lszcrypt -d
+.TP
+.B lszcrypt -h
+.TP
+.B lszcrypt -v
+.SH DESCRIPTION
+The
+.B lszcrypt
+command is used to display information about cryptographic devices managed by
+zcrypt and the AP bus attributes of zcrypt. Displayed information depends on the
+kernel version.
+.B lszcrypt
+requires that sysfs is mounted.
+.P
+The following information can be displayed for each cryptographic
+device: card ID, domain ID, card type (symbolic), mode, online status,
+hardware card type (numeric), installed function facilities, card capability,
+hardware queue depth, request count, number of requests in hardware queue, and
+the number of outstanding requests.
+The following AP bus attributes can be displayed: AP domain, Max AP domain,
+configuration timer, poll thread status, poll timeout, and AP interrupt
+status.
+.SH OPTIONS
+.TP 8
+.B -V, --verbose
+The verbose level for cryptographic device information.
+With this verbose level additional information like hardware card type,
+hardware queue depth, pending request queue count, outstanding
+request queue count, and installed function facilities are displayed.
+.TP 8
+.B <device id>
+Specifies a cryptographic device to display. A cryptographic device can be
+either a card device or a queue device. If no devices are specified information
+about all available devices is displayed.
+
+Please note that the card device representation and the queue device are both
+in hexadecimal notation.
+.TP 8
+.B -b, --bus
+Displays the AP bus attributes and exits.
+.TP 8
+.B -c, --capability <card device id>
+Shows the capabilities of a cryptographic card device of hardware type 6 or
+higher. The card device id value may be given as decimal or hex value (with
+a leading 0x). The capabilities of a cryptographic card device depend on
+the card type and the installed function facilities.  A cryptographic card
+device can provide one or more of the following capabilities:
+.RS
+.IP "o" 3
+RSA 2K Clear Key
+.IP "o"
+RSA 4K Clear Key
+.IP "o"
+CCA Secure Key
+.IP "o"
+EP11 Secure Key
+.IP "o"
+Long RNG
+.RE
+.TP 8
+.B -d, --domains
+Shows the usage and control domains of the cryptographic devices.
+The displayed domains of the cryptographic device depends on the initial
+cryptographic configuration.
+.RS
+.IP "o" 2
+ 'C' indicate a control domain
+.IP "o"
+ 'U' indicate a usage domain
+.IP "o"
+ 'B' indicate both (control and usage domain)
+.RE
+.TP 8
+.B -h, --help
+Displays help text and exits.
+.TP 8
+.B -v, --version
+Displays version information and exits.
+.SH EXAMPLES
+.TP
+.B lszcrypt
+Displays the card/domain ID, card type (short name), mode (long name), online
+status and request count of all available cryptographic devices.
+.TP
+.B lszcrypt  1 3 5
+Displays the card/domain ID, card type, mode, online status and request count
+for cryptographic devices 1, 3, and 5.
+.TP
+.B lszcrypt -V 3 7 11
+Displays the card/domain ID, card type, mode, online status, request count,
+number of requests in the hardware queue, number of outstanding requests and
+installed function facilities for cryptographic devices 3, 7 and 17 (0x11).
+.TP
+.B lszcrypt  10.0038
+Displays information of the cryptographic device '10.0038' respectively card
+id 16 (0x10) with domain 56 (0x38).
+.TP
+.B lszcrypt  .0038
+Displays information of all available queue devices (potentially multiple
+adapters) with domain 56 (0x38).
+.TP
+.B lszcrypt -b
+Displays AP bus information.
+.TP
+.B lszcrypt -c 7
+.RS
+.br
+Coprocessor card07 provides capability for:
+.br
+CCA Secure Key
+.br
+RSA 4K Clear Key
+.br
+Long RNG
+.RE
+.SH SEE ALSO
+\fBchzcrypt\fR(8)

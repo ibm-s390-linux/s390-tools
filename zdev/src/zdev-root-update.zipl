@@ -1,0 +1,207 @@
+#!/bin/bash
+#
+# zdev-root-update
+#   Ensure that the persistent root device configuration is put into effect.
+#   On typical distributions this requires a rebuild of the initial ram disk
+#   and the re-installation of the IPL record referencing the ram disk.
+#
+#   Parameters:
+#     zdev-root-update <devtype> <devid> [<devtype2> <devid2>...]
+#
+#     Where <devtype> is the device type as used by chzdev and <devid> is the
+#     ID of the root device.
+#
+
+TOOLNAME=$(basename $0)
+ZIPLCONF=/etc/zipl.conf
+
+# die MESSAGE
+# Print MESSAGE on standard error and exit with exit code 1
+die()
+{
+	echo "$TOOLNAME: Error: $*" >&2
+	exit 1
+}
+
+# add LIST NEW DELIM
+# Add NEW to DELIM-separated LIST.
+add()
+{
+	local LIST="$1"
+	local NEW="$2"
+	local DELIM="$3"
+
+	if [ -z "$LIST" ] ; then
+		echo "$NEW"
+	else
+		echo "$LIST$DELIM$NEW"
+	fi
+}
+
+# add LIST NEW DELIM
+# Add NEW to DELIM-separated LIST unless it is already in list.
+add_unique()
+{
+	local LIST="$1"
+	local NEW="$2"
+	local DELIM="$3"
+	local ENTRY
+	local FOUND
+	local IFS="$DELIM"
+
+	FOUND=0
+	for ENTRY in $LIST ; do
+		if [ "$ENTRY" == "$NEW" ] ; then
+			FOUND=1
+			break
+		fi
+	done
+	if [ "$FOUND" -eq 0 ] ; then
+		LIST=$(add "$LIST" "$NEW" "$DELIM")
+	fi
+
+	echo "$LIST"
+}
+
+# process CMDLINE
+# Apply root device settings from globals DASD ZFCP and CIOIGNORE to CMDLINE
+process_cmdline()
+{
+	local CMDLINE="$1"
+	local ENTRY
+	local NEW
+	local FOUND_DASD=0
+	local FOUND_ZFCP=0
+	local V
+	local X
+
+	for ENTRY in $CMDLINE ; do
+		K=${ENTRY%%=*}
+		case "$K" in
+		dasd)
+			if [ ! -z "$DASD" ] ; then
+				NEW=$(add "$NEW" "dasd=$DASD" " ")
+				FOUND_DASD=1
+			fi
+			;;
+		zfcp.device)
+			if [ ! -z "$ZFCP" ] ; then
+				NEW=$(add "$NEW" "zfcp.device=$ZFCP" " ")
+				FOUND_ZFCP=1
+			fi
+			;;
+		cio_ignore)
+			V=${ENTRY#*=}
+			for X in $CIOIGNORE ; do
+				V=$(add_unique "$V" "$X" ",")
+			done
+			NEW=$(add "$NEW" "cio_ignore=$V" " ")
+			;;
+		*)
+			NEW=$(add "$NEW" "$ENTRY" " ")
+			;;
+		esac
+	done
+
+	if [ "$FOUND_DASD" -eq 0 -a ! -z "$DASD" ] ; then
+		NEW=$(add "$NEW" "dasd=$DASD" " ")
+	fi
+	if [ "$FOUND_ZFCP" -eq 0 -a ! -z "$ZFCP" ] ; then
+		NEW=$(add "$NEW" "zfcp.device=$ZFCP" " ")
+	fi
+
+	echo "$NEW"
+}
+
+# process_file FILENAME
+# Apply root device settings from globals DASD ZFCP and CIOIGNORE to kernel
+# command line found in file FILENAME
+process_file()
+{
+	local FILENAME=$1
+	local CMDLINE
+
+	CMDLINE=$(cat $FILENAME)
+	CMDLINE=$(process_cmdline "$CMDLINE")
+	if ! echo $CMDLINE > "$FILENAME" ; then
+		die "Could not write to $FILENAME"
+	fi
+}
+
+# Build dasd= zfcp.device= and cio_ignore= parameter values
+DASD=
+ZFCP=
+CIOIGNORE=
+while [ $# -gt 0 ] ; do
+	TYPE=$1
+	ID=$2
+	if [ -z "$TYPE" -o -z "$ID" ] ; then
+		die "Incomplete parameters: $*"
+	fi
+	case $TYPE in
+	dasd-*)
+		DASD=$(add "$DASD" "$ID" ",")
+		CIOIGNORE=$(add "$CIOIGNORE" "!$ID" " ")
+		;;
+	zfcp-lun)
+		if [ ! -z "$ZFCP" ] ; then
+			die "Too many zFCP SCSI devices used for root device"
+		fi
+		ZFCP=$(echo $ID | sed -e 's/:/,/g')
+		FCPDEV=$(echo $ID | cut -d: -f1)
+		CIOIGNORE=$(add "$CIOIGNORE" "!$FCPDEV" " ")
+		;;
+	*)
+		die "Unsupported root device type: $TYPE"
+		;;
+	esac
+	shift 2
+done
+
+if [ -z "$DASD" -a -z "$ZFCP" ] ; then
+	die "No root device specified"
+fi
+
+if [ ! -r "$ZIPLCONF" ] ; then
+	die "Could not read $ZIPLCONF"
+fi
+
+# Create new zipl.conf file
+echo "Updating $ZIPLCONF"
+TMPFILE=$(mktemp zdev-zipl.conf.XXX)
+[ $? -ne 0 ] && die "Could not create temporary file"
+while read LINE ; do
+	OKEY=${LINE%%=*}
+	KEY=$(echo $OKEY)
+	case "$KEY" in
+	parameters)
+		V=$(echo ${LINE#*=} | sed -e 's/^"//' -e 's/"$//')
+		V=$(process_cmdline "$V")
+		echo "$OKEY=\"$V\""
+		;;
+	parmfile)
+		V=$(echo ${LINE#*=} | sed -e 's/^"//' -e 's/"$//')
+		process_file "$V"
+		echo "$LINE"
+	;;
+	*)
+		echo "$LINE"
+		;;
+	esac
+done < "$ZIPLCONF" >"$TMPFILE"
+
+
+# Swap new and old zipl.conf file
+if ! mv "$ZIPLCONF" "${ZIPLCONF}.old" ; then
+	die "Could not rename $ZIPLCONF to ${ZIPLCONF}.old"
+fi
+if ! mv $TMPFILE $ZIPLCONF ; then
+	die "Could not rename $TMPFILE to $ZIPCONF"
+fi
+rm -f "${ZIPLCONF}.old"
+
+# Install IPL loader
+echo "Installing IPL record"
+if ! zipl --noninteractive ; then
+	die "Could not install IPL record"
+fi

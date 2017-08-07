@@ -1,0 +1,21 @@
+#
+# Systemd unit for configuring dump on panic for System z
+#
+# Copyright IBM Corp. 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=Configure dump on panic for System z
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=@toolslib_path@/dumpconf start
+ExecStop=@toolslib_path@/dumpconf stop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

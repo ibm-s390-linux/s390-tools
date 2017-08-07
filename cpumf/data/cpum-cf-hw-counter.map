@@ -1,0 +1,17 @@
+# CPU-measurement facilities
+#
+# Mapping of IBM System z hardware types to extended counter set defintions
+#
+#
+{
+	# Definition	   # File name
+	   0		=> 'cpum-cf-generic.ctr',
+	2097		=> 'cpum-cf-extended-z10.ctr',
+	2098		=> 'cpum-cf-extended-z10.ctr',
+	2817		=> 'cpum-cf-extended-z196.ctr',
+	2818		=> 'cpum-cf-extended-z196.ctr',
+	2827		=> 'cpum-cf-extended-zEC12.ctr',
+	2828		=> 'cpum-cf-extended-zEC12.ctr',
+	2964		=> 'cpum-cf-extended-z13.ctr',
+	2965		=> 'cpum-cf-extended-z13.ctr',
+};

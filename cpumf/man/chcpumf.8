@@ -1,0 +1,66 @@
+.\" chcpumf.8
+.\"
+.\"
+.\" Copyright IBM Corp. 2014, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.TH chcpumf "8" "February 2014" "s390-tools" "CPU-MF management programs"
+.
+.ds c \fBchcpumf\fP
+.
+.
+.SH NAME
+chcpumf \- manage the CPU-measurement facilities support
+.
+.
+.SH SYNOPSIS
+.B chcpumf
+.RB [ \-m | \-\-min
+.IR num_sdb ]
+.RB [ \-x | \-\-max
+.IR num_sdb ]
+.br
+.B chcpumf
+.BR \-h | \-\-help
+.br
+.B chcpumf
+.BR \-v | \-\-version
+.
+.
+.SH DESCRIPTION
+The chcpumf program helps you to manage settings for the CPU-measurement
+facilities for Linux on System z.
+.
+.
+.SH OPTIONS
+.TP
+.BR \-m ", " \-\-min " \fInum_sdb\fP"
+Specifies the minimum sampling facility buffer size in sample-data-blocks
+(SDB).  A sample-data-block consumes about 4 kilobytes.
+
+This is the initial buffer size when you start the sampling facility.
+.
+.TP
+.BR \-x ", " \-\-max " \fInum_sdb\fP"
+Specifies the maximum sampling facility buffer size in sample-data-blocks
+(SDB).  A sample-data-block consumes about 4 kilobytes.
+
+This is the maximum size to which the buffer is dynamically adjusted during
+sampling.
+.
+.TP
+.BR \-V ", " \-\-verbose
+Displays verbose messages.
+.
+.TP
+.BR \-h ", " \-\-help
+Displays help information, then exits.
+.
+.TP
+.BR \-v ", " \-\-version
+Displays version information, then exits.
+.
+.
+.SH "SEE ALSO"
+.BR lscpumf (1)

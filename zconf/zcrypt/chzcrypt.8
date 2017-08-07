@@ -1,0 +1,112 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CHZCRYPT 8 "AUG 2008" "s390-tools"
+.SH NAME
+chzcrypt \- modify zcrypt configuration
+.SH SYNOPSIS
+.TP 9
+.B chzcrypt
+.B -e
+.RB "|"
+.B -d
+.RB "( " -a " | "
+.I <device id>
+[...] )
+.TP
+.B chzcrypt
+.RB "[ " -p " | " -n " ] [ " -t
+.I <timeout>
+]
+.TP
+.B chzcrypt
+.RB "[ " -c
+.I <timeout>
+]
+.TP
+.B chzcrypt
+.RB "[ " -q
+.I <domain>
+]
+.TP
+.B chzcrypt -h
+.TP
+.B chzcrypt -v
+.SH DESCRIPTION
+The
+.B chzcrypt
+command is used to configure cryptographic devices managed by zcrypt and
+modify zcrypt's AP bus attributes.
+
+Attributes may vary depending on the kernel
+version.
+.B chzcrypt
+requires that the sysfs filesystem is mounted.
+.SH OPTIONS
+.TP 8
+.B -e, --enable
+Set the given cryptographic device(s) online.
+.TP 8
+.B -d, --disable
+Set the given cryptographic device(s) offline.
+.TP 8
+.B -a, --all
+Set all available cryptographic device(s) online or offline.
+.TP 8
+.B <device id>
+Specifies a cryptographic device which will be set either online or offline.
+The device can either be a card device or a queue device.
+
+Please note that the card device and queue device representation are both
+in hexadecimal notation.
+.TP 8
+.B -p, --poll-thread-enable
+Enable zcrypt's poll thread.
+.TP 8
+.B -n, --poll-thread-disable
+Disable zcrypt's poll thread.
+.TP 8
+.BI "-c, --config-time" " <timeout>"
+Set configuration timer for re-scanning the AP bus to
+.I <timeout>
+seconds.
+.TP 8
+.BI "-t, --poll-timeout" " <poll_timeout>"
+Set poll timer to run poll tasklet all
+.I <poll_timeout>
+nanoseconds.
+.TP 8
+.BI "-q, --default-domain" " <domain>"
+Set the new default domain of the AP bus to <domain>.
+The number of available domains can be retrieved with the lszcrypt
+command ('-d' option).
+.TP 8
+.B -V, --verbose
+Print verbose messages.
+.TP 8
+.B -h, --help
+Print help text and exit.
+.TP 8
+.B -v, --version
+Print version information and exit.
+.SH EXAMPLES
+.TP
+.B chzcrypt -e 0 1 12
+Will set the cryptographic card devices 0, 1 and 12 online.
+.TP
+.B chzcrypt -e 01.0038
+Will set the cryptographic device '10.0038' respectively card id 16
+(0x10) with domain 56 (0x38) online.
+.TP
+.B chzcrypt -d -a
+Will set all available cryptographic devices offline.
+.TP
+.B chzcrypt -c 60 -n
+Will set configuration timer for re-scanning the AP bus to 60 seconds and
+disable zcrypt's poll thread.
+.TP
+.B chzcrypt -q 67
+Will set the default domain to 67.
+.SH SEE ALSO
+\fBlszcrypt\fR(8)

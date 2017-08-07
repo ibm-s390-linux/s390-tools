@@ -1,0 +1,116 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides: cpuplugd
+# Required-Start: $local_fs $remote_fs
+# Required-Stop: $local_fs $remote_fs
+# Should-Start: 
+# Should-Stop: 
+# Default-Start: 2 3 5
+# Default-Stop: 0 1 6
+# Short-Description: Start the cpu hotplug daemon for Linux on System z
+# Description: Starts the cpuplugd. It uses the configuration
+#              file /etc/cpuplugd.conf
+### END INIT INFO
+
+# chkconfig: 235 01 99
+
+DAEMON=cpuplugd
+DAEMON_PATH=/usr/sbin/cpuplugd
+CONFIG_FILE=/etc/cpuplugd.conf
+RUN_PID_FILE=/var/run/cpuplugd.pid
+RETVAL=0
+OPTIONS="-c $CONFIG_FILE"
+
+# source function library
+. /lib/lsb/init-functions
+
+start()
+{
+	if [ ! -f $RUN_PID_FILE ]; then
+		echo -n $"Starting $DAEMON:"
+		$DAEMON_PATH $OPTIONS
+		if [ $? == "0" ]; then
+			log_success_msg
+		else
+			log_failure_msg
+		fi
+		echo
+	else
+		echo "$DAEMON (pid $(cat $RUN_PID_FILE)) is already running..."
+		echo
+	fi
+}
+
+stop()
+{
+	echo -n $"Stopping $DAEMON:"
+	if [ -f $RUN_PID_FILE ]; then
+		killproc $DAEMON_PATH -TERM
+		log_success_msg
+		rm -f $RUN_PID_FILE
+	else
+		log_failure_msg
+	fi
+	echo
+}
+
+restart() {
+	stop
+  	#
+        # We have to wait 2-3 seconds here. When the daemon is stopped it takes
+        # the time we sleep to reactivate cpus. If we restart to fast and
+        # cpuplugd wasn't able to restore some settings we may get a undesired
+        # online cpu count after cpuplugd shutdown
+        #
+	sleep 4
+	start
+}
+
+status()
+{
+	if [ ! -f $RUN_PID_FILE ]; then
+		echo "$DAEMON is not running."
+		echo
+	else
+		echo "$DAEMON (pid $(cat $RUN_PID_FILE), options: $OPTIONS) is running."
+		echo
+	fi
+}
+
+reload()                                                                        
+{
+        echo -n $"Reloading $DAEMON: "
+	if [ -f $RUN_PID_FILE ]; then
+		killproc $DAEMON_PATH -HUP
+	    log_success_msg
+        else
+            log_failure_msg
+        fi
+        RETVAL=$?
+        echo
+}
+
+
+# How are we called?
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	status)
+		status
+		;;
+	restart)
+		restart
+		;;
+	reload|force-reload)
+		reload
+		;;
+	*)
+		echo "Usage: $DAEMON {start|stop|status|restart|reload}"
+		RETVAL=1
+esac
+
+exit $RETVAL

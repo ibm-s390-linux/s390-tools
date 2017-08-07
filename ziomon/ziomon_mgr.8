@@ -1,0 +1,111 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIOMON_MGR 8 "Jul 2008" "s390-tools"
+
+.SH NAME
+ziomon_mgr \- Message queue server for the ziomon framework.
+
+.SH SYNOPSIS
+.B ziomon_mgr
+[-h] [-v] [-V] [-e] [-f] [-l <size>] [-x <version>] -o <filename> -i <length> -Q <msgq_path> -q <msgq_id> -u <util_id> -r <ioerr_id> -b <blkiomon_id> -z <zfcpdd_id>
+
+.SH DESCRIPTION
+.B ziomon_mgr
+starts a message queue where the clients of the ziomon framework can
+send their data to. Any data received will be we written to a specified
+file. Optionally, an upper limit for the file can be specified. If the
+limit is exceeded, the oldest data will be aggregated into a separate
+file to make room for the latest.
+
+For consistent data, all clients should schedule their interval
+lengths to the same duration. In general, clients should send their
+data at the same time.
+
+This command is not intended to be run on its own - rather use the ziomon command.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-V" " or " "\-\-verbose"
+Be verbose.
+
+.TP
+.BR "\-e" " or " "\-\-binary-offsets"
+Lengthes of the raw data structures.
+
+.TP
+.BR "\-f" " or " "\-\-force"
+Force message queue creation in case one already exists.
+
+.TP
+.BR "\-o" " or " "\-\-output"
+Basename of the file to write data to. Respective suffixes will be appended
+for aggregated and regular data file names.
+
+.TP
+.BR "\-l" " or " "\-\-size-limit"
+Upper limit of the output file in MB. This does not include the space for
+the aggregated data file. However, the size of the aggregated data file
+is usually negligible.
+
+.TP
+.BR "\-x" " or " "\-\-enforce-version"
+Enforce specific file format for .log and .agg files. Currently supports
+versions 2 (blkiomon version 0.2) and 3 (blkiomon version 0.3 or higher).
+
+.TP
+.BR "\-i" " or " "\-\-interval-length"
+Expected elapsed time between messages sent by the clients in seconds.
+The samples will be aggregated over this period. Defaults to the duration.
+This should be a multiple of the sample length.
+
+.TP
+.BR "\-Q" " or " "\-\-msg-queue-name"
+Name for the message queue to start.
+
+.TP
+.BR "\-q" " or " "\-\-msg-queue-id"
+Id for the message queue to start. Must be an integer >0.
+
+.TP
+.BR "\-u" " or " "\-\-util-id"
+Id of the utilization messages that ziomon_util will send.
+Must be an integer >0.
+
+.TP
+.BR "\-r" " or " "\-\-ioerr-id"
+Id of the ioerr messages that ziomon_util will send.
+Must be an integer >0.
+
+.TP
+.BR "\-b" " or " "\-\-blkiomon-id"
+Id of the messages that ziomon_util will send.
+Must be an integer >0.
+
+.TP
+.BR "\-z" " or " "\-\-ziomon_zfcpdd-id"
+Id of the messages that ziomon_zfcpdd will send.
+Must be an integer >0.
+
+.SH EXAMPLES
+Start a message queue named /tmp/ziomon.23943 with id 95.
+Utilization messages from ziomon_util will carry the id 17, ioerr messages 18,
+messages from ziomon_zfcpdd
+47 and messages from blkiomon 59. The interval between each set of messages will
+be 20 seconds. The output files should base their names on 'trace_data':
+
+ziomon_mgr -i 20 -Q /tmp/ziomon.23943 -q 95 -u 17 -r 18 -b 47 -z 59 -o trace_data
+
+.SH "SEE ALSO"
+.BR ziomon (8),
+.BR ziomon_util (8),
+.BR ziomon_zfcpdd (8)

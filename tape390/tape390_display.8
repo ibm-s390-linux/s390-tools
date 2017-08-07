@@ -1,0 +1,150 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH TAPE390_DISPLAY 8 "Apr 2006" "s390-tools"
+
+.SH NAME
+tape390_display \- display messages on the display unit of a zSeries tape
+device.
+
+.SH SYNOPSIS
+.TP 16
+.B tape390_display
+.RB [ -b | --blink ]
+.br
+.RB [ -h | --help ]
+.br
+.RB [ -l | --load ]
+.br
+.RB [ -t <type>| --type <type>]
+.br
+.RB [ -q | --quiet ]
+.br
+.RB [ -v | --version ]
+.br
+.IR message1
+.RB [
+.I message2
+.RB ]
+.I device
+
+.SH DESCRIPTION
+\fBtape390_display\fR displays one or two 8-byte messages on the display
+unit of a zSeries tape device.  Characters to be displayed include capital
+letters A-Z, numerics 0-9 and special characters.
+However some special characters may not display on all device types. The
+characters that should display on model 3490 are:
+.br
+	'@$#,./()*&+-=%|:_<>?;' and the <cent> character.
+.br
+Spaces and shell-sensitive characters have to be quoted.
+
+.SH OPTIONS
+.TP 8
+\fB-h\fR or \fB--help\fR
+Print help text.
+
+.TP
+\fB-b\fR or \fB--blink\fR
+Display \fImessage1\fR repeatedly for 2 seconds at half-second intervals.
+This option is ignored if two messages are specified on command line.
+
+.TP
+\fB-l\fR or \fB--load\fR
+If this option is given the display request will cause a load request to be
+sent to the automatic tape loader (if installed). The next indexed tape will
+then be loaded if the loader is in 'system' mode. Otherwise the request is
+ignored.
+
+.TP
+\fB-q\fR or \fB--quiet\fR
+This option causes the command to run in quiet mode which will suppress
+all warning messages.
+
+.TP
+\fB-t\fR \fItype\fR or \fB--type\fR \fItype\fR
+Set the type of the message to be displayed. This influences how long
+the message(s) stay on the display. Available types are:
+
+.RS
+.TP 16
+.B standard
+The message(s) stay displayed until the drive executes the next tape
+movement command. This is the default.
+.TP
+.B load
+Displays the message(s) until a tape is loaded. If there already is
+a tape loaded to the device, nothing is displayed at all.
+.TP
+.B unload
+This will display the message(s) until currently loaded tape is unloaded.
+Again, if the drive \fIis\fR currently unloaded there is no output at all.
+.TP
+.B noop
+For testing purposes only, this will access the drive but won't do anything
+at all (no operation). This doesn't seem to work with 3590 tape devices.
+.TP
+.B reload
+This display type \fBrequires\fR two messages. The first message is
+displayed as long as there is a tape loaded up to the time the unload
+operation is completed (or, if there isn't a tape loaded, it will be
+ignored). The second message is displayed as soon as a tape gets loaded
+into the drive.
+.RE
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print the S/390 tools package version, the utility version and exit.
+
+.TP 8
+\fBmessage1\fR [ \fBmessage2\fR ]
+The message(s) to be displayed. They stay displayed until either the
+ending condition for the message type takes place or the display is
+updated with another message.
+.br
+If two messages are specified, they are alternated on the display.
+Each message is then displayed repeatedly for 2 seconds
+at half-second intervals. 
+
+.TP
+\fBdevice\fR
+The tape device on which the message(s) will be displayed, e.g.:
+.sp
+	\fB/dev/ntibm\fR\fI0\fR
+.br
+
+.SH EXAMPLES
+\fBtape390_display --blink --type unload "TESTING" /dev/ntibm\fR\fI0\fR
+.RS
+Let the message TESTING blink on the display of the tape unit until the
+tape is removed (or another message is given). If there is no tape in the
+drive, nothing happens.
+.RE
+\fBtape390_display "BACKUP" "COMPLETE" /dev/ntibm\fR\fI0\fR
+.RS
+This will display the messages BACKUP and COMPLETE each for 2 seconds
+until the tape is moved, ejected or (if there isn't a tape in the
+device) inserted.
+.RE
+\fBtape390_display --type reload "UNLOAD" "LOAD" /dev/ntibm\fR\fI0\fR
+.RS
+The UNLOAD message will be displayed if there is a tape inserted and as
+long as the tape isn't removed. After that the LOAD message is displayed
+until a tape is inserted. If there is no tape inserted when the command
+.RE
+\fBtape390_display --load --type load "LOADING" /dev/ntibm\fR\fI0\fR
+.RS
+Causes the device to display the message LOADING until a tape is inserted
+and to instruct the automatic stacker to load the next tape (if the mode
+of operation is \fIsystem\fR). If there already is a tape loaded, nothing
+will happen at all.
+.RE
+
+.SH AUTHOR
+.nf
+This man-page was written by Despina Papadopoulou<despina_p@de.ibm.com>
+.nf
+Updates by Stefan Bader<shbader@de.ibm.com>
+.fi
+

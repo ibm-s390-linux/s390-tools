@@ -1,0 +1,73 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSMEM 8 "Apr 2010" s390\-tools
+.
+.
+.SH NAME
+lsmem \- list the ranges of available memory with their online status.
+.
+.
+.SH SYNOPSIS
+.B lsmem
+.RB [OPTIONS]
+.
+.
+.SH DESCRIPTION
+The lsmem command lists the ranges of available memory with their online
+status. The listed memory blocks correspond to the memory block representation
+in sysfs. The command also shows the memory block size, the device size, and
+the amount of memory in online and offline state.
+.
+.SS "Column description"
+.
+.TP 4
+Address Range
+Start and end address of the memory range.
+.
+.TP 4
+Size
+Size of the memory range in MB (1024 x 1024 bytes).
+.
+.TP 4
+State
+Indication of the online status of the memory range. State on->off means
+that the address range is in transition from online to offline.
+.
+.TP 4
+Removable
+"yes" if the memory range can be set offline, "no" if it cannot be set offline.
+A dash ("\-") means that the range is already offline.
+.
+.TP 4
+Device
+Device number or numbers that correspond to the memory range.
+
+Each device represents a memory unit for the hypervisor in control of the
+memory. The hypervisor cannot reuse a memory unit unless the corresponding
+memory range is completely offline. For best memory utilization, each device
+should either be completely online or completely offline.
+
+The chmem command with the size parameter automatically chooses the best suited
+device or devices when setting memory online or offline. The device size depends
+on the hypervisor and on the amount of total online and offline memory.
+.
+.
+.SH OPTIONS
+.TP
+.BR \-a ", " \-\-all
+List each individual memory block, instead of combining memory blocks with
+similar attributes.
+.
+.TP
+.BR \-h ", " \-\-help
+Print a short help text, then exit.
+.
+.TP
+.BR \-v ", " \-\-version
+Print the version number, then exit.
+.
+.
+.SH SEE ALSO
+.BR chmem (8)

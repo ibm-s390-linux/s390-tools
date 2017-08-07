@@ -1,0 +1,114 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH QETHARP 8 "Nov 2011" "s390-tools"
+.SH NAME
+qetharp \- querying and modifying ARP data.
+
+.SH SYNOPSIS
+.TP 8
+.B qetharp
+.RB [ -hv]
+.br
+.RB [ -[c|n][6]q
+.IR interface ]
+.br
+.RB [ -p
+.IR interface ]
+.br
+.RB [ -a
+.IR interface
+.RB -i
+.IR IP_address
+.RB -m
+.IR MAC_address ]
+.br
+.RB [ -d
+.IR interface
+.RB -i
+.IR IP_address ]
+
+.SH DESCRIPTION
+\fBqetharp\fR queries ARP data, such as MAC and IP addresses, from an OSA hardware ARP cache or a HiperSockets ARP cache. For OSA hardware, qetharp can also modify the cache.
+
+The command applies only to devices in layer3 mode. It supports IPv6 for HiperSockets only.
+.SH OPTIONS
+.TP
+\fB-q\fR or \fB--query \fIinterface\fR
+shows the ARP information about the specified network interface. Depending on the device that the interface has been assigned to, this information is obtained from an OSA feature's ARP cache or a HiperSockets ARP cache.
+
+The default command output shows symbolic host names and only includes numerical address for host names that cannot be resolved. Use the \fB-n\fR option to show numerical addresses instead of host names.
+
+By default, qetharp omits IPv6 related information. Use the \fB-6\fR option to include IPv6 information for HiperSockets.
+.TP
+\fB-n\fR or \fB--numeric\fR
+shows numerical addresses instead of trying to resolve the addresses to the symbolic host names. This option can only be used with the \fB-q\fR option.
+.TP
+\fB-c\fR or \fB--compact\fR
+limits the output to numerical addresses only. This option can only be used with the \fB-q\fR option.
+.TP
+\fB-6\fR or \fB--ipv6\fR
+includes IPv6 information for HiperSockets. For real HiperSockets, shows the IPv6 addresses. For guest LAN HiperSockets, shows the IPv6 to MAC address mappings. This option can only be used with the \fB-q\fR option.
+.TP
+
+\fB-p\fR or \fB--purge \fIinterface\fR
+flushes the ARP cache of the OSA. The cache contains dynamic ARP entries, which the OSA adapter creates through ARP queries. After flushing the cache, the OSA adapter creates new dynamic entries. This option only works with OSA devices.
+.TP
+\fB-a\fR or \fB--add \fIinterface\fR
+adds a static ARP entry to the OSA adapter card. This option requires an IP address and a MAC address (\fB-i\fR and \fB-m\fR options).
+.TP
+\fB-d\fR or \fB--delete \fIinterface\fR
+deletes a static ARP entry from the OSA adapter card. This command requires an
+IP address (\fB-i\fR option).
+.TP
+\fB-i\fR or \fB--ip \fIIP_address\fR
+specifies an IP address to be added to or removed from the OSA adapter card.
+\fB-m\fR or \fB--mac \fIMAC_address\fR
+specifies a MAC address to be added to the OSA adapter card.
+.TP
+
+\fB-v\fR or \fB--version\fR
+shows version information.
+.TP
+\fB-h\fR or \fB--help\fR
+shows usage information for qetharp.
+
+.SH RETURN CODES
+qetharp writes the response to stdout and any error message to stderr.
+The command completes with one of the following return codes:
+.TP
+.BR "0"
+The qetharp command ran successfully.
+
+.TP
+.BR "1"
+An error occurred.
+
+.SH EXAMPLE
+.TP
+\fBqetharp -q eth0\fR  
+shows all ARP entries of OSA.
+.TP
+\fBqetharp -nq eth0\fR 
+shows all ARP entries of OSA without resolving host names.
+.TP
+\fBqetharp -6q hsi0\fR
+shows all ARP entries of the HiperSockets interface including IPv6 entries.
+.TP
+\fBqetharp -n6q hsi0\fR
+shows all ARP entries of the HiperSockets interface including IPv6 entries without resolving host names.
+.TP
+\fBqetharp -p eth0\fR  
+flushes the OSA ARP cache for eth0.
+.TP
+\fBqetharp -a eth0 -i 1.2.3.4 -m aa:bb:cc:dd:ee:ff\fR  
+adds a static ARP entry for the IP address 1.2.3.4 to the OSA ARP cache, using
+a MAC address of aa:bb:cc:dd:ee:ff
+.TP
+\fBqetharp -d eth0 -i 1.2.3.4\fR  
+deletes the static ARP entry for the IP address 1.2.3.4 from the OSA ARP cache.
+
+.SH AUTHOR
+.nf
+This man-page was written by Frank Pavlic <pavlic@de.ibm.com>

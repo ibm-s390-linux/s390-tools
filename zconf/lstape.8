@@ -1,0 +1,94 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSTAPE 8 "Jul 2007" "s390-tools"
+
+.SH NAME
+lstape \- list tape devices.
+
+.SH SYNOPSIS
+.TP 16
+.B lstape
+.RB [ -h | --help]
+.RB [ --scsi-only | --ccw-only ]
+.RB [ -v | --version ]
+.RB [ -V | --verbose ]
+.br
+.RB [ --online | --offline ]
+.RB [ -s ]
+.br
+.RB [ -t
+.IR <device-type> [, <device-type> ] "" ...]
+
+.SH DESCRIPTION
+The lstape command lists all available tape devices on the current host. For
+channel attached tape devices this output is the same as the contents of
+/proc/tapedevices (which is obsolete) but also includes offline devices. By
+default all tape devices are displayed.
+
+Since SCSI tape devices are accessed differently to channel attached tape
+devices they are only visible if they are known to the SCSI layer. There
+are at least two possible drivers that can claim a SCSI tape device and the
+lstape command tries to find out which one this is. For the generic tape
+and changer driver the device names start with "st" or "sch", while for the
+IBM tape driver this would be "IBMtape" or "IBMchanger". If "N/A" is shown,
+the correct driver could not be obtained.
+This happens for example if there is no sg_inq command installed which is
+required to read the drive's serial number which in turn is used to find out
+the device number of the IBM tape driver.
+
+The serial number of a SCSI tape can be displayed with the --verbose option. If
+there is no sg_inq command available "NO/INQ" is shown as the tape's serial.
+
+.SH OPTIONS
+.TP 8
+\fB-h\fR or \fB--help\fR
+Print help text.
+
+.TP 8
+\fB-v\fR or \fB--version\fR
+Print the version of the s390-tools package and the command.
+
+.TP
+\fB-V\fB or \fB--verbose\fR
+Adds additional information that does not fit into a single line of output.
+This is currently only used for SCSI devices.
+
+.TP
+.BR --scsi-only | --ccw-only
+Limit output to either SCSI or channel attached tape devices. The output without
+SCSI devices is the same as it was with previous versions of this command.
+
+.TP
+.BR -s | --shortid
+Using this option will list only tape devices that are in channel subsystem 0,
+with subchannel set 0. All other devices will be suppressed and the leading
+"0.0." for bus IDs of the remaining devices will be removed.
+Since this is specific to CCW devices this option has no effect on the output
+of SCSI tape devices.
+
+.TP
+.BR --online | --offline
+Limit output to either online or offline devices. This filter has no effect
+on the output of SCSI devices.
+
+.TP
+.BR -t | --type " \fI<device-type>\fR"
+Limit output to given device types (currently only applies to channel attached
+tape devices).
+
+.TP
+\fB<device-type>\fR =
+Device type of devices that should be displayed (e.g. 3490).
+
+.SH EXAMPLES
+\fBlstape\fR
+.RS
+List all tape devices that are available 
+.RE
+
+\fBlstape --ccw-only -t 3490 --online\fR
+.RS
+Show all 3490 CCW devices that are online.
+.RE

@@ -1,0 +1,122 @@
+Counter: 128	Name:L1D_L2_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the returned
+cache line was sourced from the Level-2 cache
+.
+Counter: 129	Name:L1I_L2_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from the Level-2 cache
+.
+Counter: 130	Name:DTLB1_MISSES
+Description:
+Level-1 Data TLB miss in progress. Incremented by one for every cycle
+a DTLB1 miss is in progress.
+.
+Counter: 131	Name:ITLB1_MISSES
+Description:
+Level-1 Instruction TLB miss in progress. Incremented by one for every
+cycle a ITLB1 miss is in progress.
+.
+Counter: 133	Name:L2C_STORES_SENT
+Description:
+Incremented by one for every store sent to Level-2 cache
+.
+Counter: 134	Name:L1D_OFFBOOK_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the returned
+cache line was sourced from an Off Book Level-3 cache
+.
+Counter: 135	Name:L1D_ONBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the returned
+cache line was sourced from an On Book Level-4 cache
+.
+Counter: 136	Name:L1I_ONBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from an On Book Level-4 cache
+.
+Counter: 137	Name:L1D_RO_EXCL_WRITES
+Description:
+A directory write to the Level-1 D-Cache where the line was originally
+in a Read-Only state in the cache but has been updated to be in the
+Exclusive state that allows stores to the cache line
+.
+Counter: 138	Name:L1D_OFFBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the returned
+cache line was sourced from an Off Book Level-4 cache
+.
+Counter: 139	Name:L1I_OFFBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from an Off Book Level-4 cache
+.
+Counter: 140	Name:DTLB1_HPAGE_WRITES
+Description:
+A translation entry has been written to the Level-1 Data Translation
+Lookaside Buffer for a one-megabyte page
+.
+Counter: 141	Name:L1D_LMEM_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache where the installed cache line
+was sourced from memory that is attached to the same book as the Data
+cache (Local Memory)
+.
+Counter: 142	Name:L1I_LMEM_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache where the installed cache
+line was sourced from memory that is attached to the same book as the
+Instruction cache (Local Memory)
+.
+Counter: 143	Name:L1I_OFFBOOK_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from an Off Book Level-3 cache
+.
+Counter: 144	Name:DTLB1_WRITES
+Description:
+A translation entry has been written to the Level-1 Data Translation
+Lookaside Buffer
+.
+Counter: 145	Name:ITLB1_WRITES
+Description:
+A translation entry has been written to the Level-1 Instruction
+Translation Lookaside Buffer
+.
+Counter: 146	Name:TLB2_PTE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Page Table
+Entry arrays
+.
+Counter: 147	Name:TLB2_CRSTE_HPAGE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Common Region
+Segment Table Entry arrays for a one-megabyte large page translation
+.
+Counter: 148	Name:TLB2_CRSTE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Common Region
+Segment Table Entry arrays
+.
+Counter: 150	Name:L1D_ONCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the returned
+cache line was sourced from an On Chip Level-3 cache
+.
+Counter: 152	Name:L1D_OFFCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 D-Cache directory where the returned
+cache line was sourced from an Off Chip/On Book Level-3 cache
+.
+Counter: 153	Name:L1I_ONCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from an On Chip Level-3 cache
+.
+Counter: 155	Name:L1I_OFFCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 I-Cache directory where the returned
+cache line was sourced from an Off Chip/On Book Level-3 cache
+.

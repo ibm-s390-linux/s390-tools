@@ -1,0 +1,495 @@
+#!/usr/bin/perl
+
+#
+# FCP report generators
+#
+# Script to list the FCP, SCSI and multipath configuration
+#
+# Copyright IBM Corp. 2008, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+use strict;
+use warnings;
+use English;
+use Getopt::Long;
+use File::Spec::Functions;
+use File::Temp qw/ tempdir /;
+use Data::Dumper;
+
+use constant S_DIR1 => "/sys/class/fc_host";
+use constant S_DIR2 => "/sys/devices/css0"; #/<sub_ch>/<device>
+use constant S_DIR3 => "/sys/class/scsi_device";
+use constant S_DIR4 => "/sys/class/fc_remote_ports";
+
+our $base_dir = "/";
+our %sub_ch;
+our %devices;
+our %mapper_dev;
+our %rports;
+our $c_src;
+
+sub get_line
+{
+	return "n/a" unless open(FH, (catfile($c_src, @_))[0]);
+	my $line = readline(FH);
+	$line =~ s/\s*\Z// unless !$line;
+	close(FH);
+	return $line;
+}
+
+sub dir_content
+{
+	my @temp_dir;
+	opendir(DH, shift()) or return 0;
+	@temp_dir = readdir(DH);
+	closedir(DH);
+	return @temp_dir;
+}
+
+sub glob_last
+{
+	return (glob(catfile($c_src, @_)))[-1];
+}
+
+sub mm_to_32
+{
+	return "0" unless ($_[0] and $_[0] =~ /\d+:\d+/);
+	my @t_arr = split(':',shift);
+	return ($t_arr[0] << 20) + $t_arr[1];
+}
+
+sub get_sub_ch_data
+{
+	my @entries = grep { /^host\d+\Z/ }
+			dir_content(catdir($base_dir, S_DIR1));
+
+	foreach my $host (@entries) {
+		$c_src = catdir($base_dir, S_DIR1, $host);
+		my $sub_ch;
+		my $adapter;
+		if (-l $c_src) {
+			$sub_ch = (split("/", readlink($c_src)))[-5];
+			$adapter = (split("/", readlink($c_src)))[-4];
+		} else {
+			$sub_ch = (split("/", readlink($c_src."/device")))[-3];
+			$adapter = (split("/", readlink($c_src."/device")))[-2];
+		}
+		$sub_ch{$adapter}{sub_ch} = $sub_ch;
+		$sub_ch{$adapter}{host}  = $host;
+		$sub_ch{$adapter}{speed} = get_line("speed");
+		$sub_ch{$adapter}{name}  = get_line("port_name");
+		$sub_ch{$adapter}{pname} = get_line("permanent_port_name");
+		$sub_ch{$adapter}{type}  = get_line("port_type");
+		$c_src = catdir($base_dir, S_DIR2, $sub_ch, $adapter);
+		$sub_ch{$adapter}{lic}   = get_line("lic_version");
+		$sub_ch{$adapter}{gen}   = get_line("card_version");
+		$sub_ch{$adapter}{state} = get_line("online") == 1 ? "Online" :
+								     "Offline";
+		$c_src = catdir($base_dir, S_DIR2, $sub_ch);
+		$sub_ch{$adapter}{chpid} = substr(get_line("chpids"), 0, 2);
+	}
+}
+
+sub get_device_data
+{
+	my @entries = grep { /^\d+:\d+:\d+:\d+\Z/ }
+			dir_content(catdir($base_dir, S_DIR3));
+
+	foreach my $hctl (@entries) {
+		$c_src = catdir($base_dir, S_DIR3, $hctl, "device");
+		my $type =  get_line("type");
+		$devices{$hctl}{hba_id} = get_line("hba_id");
+		$devices{$hctl}{model}  = get_line("model");
+		$devices{$hctl}{vendor} = get_line("vendor");
+		$devices{$hctl}{lun}    = get_line("fcp_lun");
+		$devices{$hctl}{wwpn}   = get_line("wwpn");
+		$devices{$hctl}{sg} = (-d catdir($c_src, "scsi_generic")) ?
+					glob_last(catdir("scsi_generic/*")) :
+					glob_last("scsi_generic\:*");
+
+		$devices{$hctl}{sg}     =~ s/.*(sg\d+)\Z/$1/
+					unless(!$devices{$hctl}{sg});
+		$devices{$hctl}{type}   = "type_".$type; #preset only
+		$devices{$hctl}{mm}     = "0:0"; #preset only
+		$devices{$hctl}{sg_mm}  = "0:0"; #preset only
+		$devices{$hctl}{dev}    = undef; #preset only
+		if ($type == "0") {
+			$devices{$hctl}{type} = "Disk";
+			if (-d catdir($c_src, "block")) {
+				$devices{$hctl}{dev}  = glob_last("block/sd*");
+			} else {
+				$devices{$hctl}{dev}  = glob_last("block\:sd*");
+			}
+			$c_src = $devices{$hctl}{dev};
+			$devices{$hctl}{dev}  =~ s/.*(sd[a-z0-9]+)\Z/$1/
+						unless(!$devices{$hctl}{dev});
+			$devices{$hctl}{mm}   = get_line("dev");
+			$devices{$hctl}{sg_mm}   = get_line("generic", "dev");
+			$devices{$hctl}{mp_dev} = glob_last("holders", "dm*");
+			$devices{$hctl}{mp_dev} =~ s/.*\/(.+)\Z/$1/
+						unless (!$devices{$hctl}{mp_dev});
+			$c_src = catdir($base_dir, "sys", "block",
+					$devices{$hctl}{mp_dev});
+			$devices{$hctl}{mp_dev_mm} = get_line("dev");
+		} elsif ($type == "1") {
+			$devices{$hctl}{type} = "Tape";
+			$devices{$hctl}{mm} = get_line("tape", "dev");
+			$devices{$hctl}{sg_mm} = get_line("generic", "dev");
+			$devices{$hctl}{dev} = (-d catdir($c_src, "scsi_tape")) ?
+						(grep { /st\d+\Z/ }
+                                                glob(catdir($c_src, "scsi_tape/st*")))[0] :
+						(grep { /\:st\d+\Z/ }
+						glob(catdir($c_src, "scsi_tape:st*")))[0];
+			$devices{$hctl}{dev} =~ s/.*(st\d+)\Z/$1/
+						unless(!$devices{$hctl}{dev});
+		}
+	}
+}
+
+sub get_mapper_devices
+{
+	$c_src = catdir($base_dir, "dev", "mapper");
+	my @entries = grep { ! /^\./ } dir_content($c_src);
+
+	foreach my $dev (@entries) {
+		next if ("control" =~ /$dev/);
+		if ($base_dir !~ /^\/\Z/) {
+			$mapper_dev{get_line("$dev")} = $dev;
+			next;
+		}
+		my $tf = catfile($c_src, "$dev");
+		my $mm = `stat -L -c%t:%T $tf`;
+		chomp($mm);
+		$mm = join(":", map { hex($_) } split(":", $mm));
+		$mapper_dev{$mm} = $dev;
+	}
+}
+
+sub get_rport_data
+{
+	my @entries = grep { ! /^\./ } dir_content(catdir($base_dir, S_DIR4));
+
+	foreach my $rport (@entries) {
+		$c_src = catdir($base_dir, S_DIR4, "$rport");
+		$rports{$rport}{wwpn} = get_line("port_name");
+		$rports{$rport}{did} = get_line("port_id");
+		$rports{$rport}{sup_class} = get_line("supported_classes");
+		$rports{$rport}{scsi_target} = get_line("scsi_target_id");
+		$rports{$rport}{dl_tmo} = get_line("dev_loss_tmo");
+		$rports{$rport}{state} = get_line("port_state");
+		$rports{$rport}{hba_id} = (split('/', get_line("uevent")))[-1];
+	}
+}
+
+sub mapping_table
+{
+	foreach my $line (sort keys %devices) {
+		my @out_str;
+		my $mp_dev_mm = $devices{$line}{mp_dev_mm};
+
+		push @out_str, $sub_ch{$devices{$line}{hba_id}}{chpid};
+		push @out_str, $line;
+		push @out_str, "$sub_ch{$devices{$line}{hba_id}}{sub_ch}:".
+			       "$devices{$line}{hba_id}:$devices{$line}{wwpn}:".
+				$devices{$line}{lun};
+		if ($mp_dev_mm && defined $mapper_dev{$mp_dev_mm}) {
+			push @out_str, "/dev/mapper/$mapper_dev{$mp_dev_mm}";
+			push @out_str, mm_to_32($devices{$line}{mp_dev_mm});
+			push @out_str, "$devices{$line}{mp_dev_mm}";
+		} else {
+			push @out_str, "n/a";
+			push @out_str, "0";
+			push @out_str, "0:0";
+		}
+		if ($devices{$line}{type} eq "Tape") {
+			push @out_str, $devices{$line}{dev} ? "/dev/$devices{$line}{sg}" : "n/a" ;
+			push @out_str, mm_to_32($devices{$line}{sg_mm});
+			push @out_str, $devices{$line}{sg_mm};
+		} else {
+			push @out_str, $devices{$line}{dev} ? "/dev/$devices{$line}{dev}" : "n/a" ;
+			push @out_str, mm_to_32($devices{$line}{mm});
+			push @out_str, $devices{$line}{mm};
+		}
+		push @out_str, $devices{$line}{type};
+		print "@out_str\n";
+	}
+}
+
+sub adapter_report
+{
+	my @adapters = @_;
+
+	foreach my $a (sort keys %sub_ch) {
+		next if (@adapters && "@adapters" !~ /\b$a\b/);
+		my @out_str;
+		push @out_str, "Host:    $sub_ch{$a}{host}\n";
+		push @out_str, "CHPID:   $sub_ch{$a}{chpid}\n";
+		push @out_str, "Adapter: $a\n";
+		push @out_str, "Sub-Ch.: $sub_ch{$a}{sub_ch}\n";
+		push @out_str, "Name:    $sub_ch{$a}{name}\n";
+		push @out_str, "P-Name:  $sub_ch{$a}{pname}\n";
+		push @out_str, "Version: $sub_ch{$a}{gen}\n";
+		push @out_str, "LIC:     $sub_ch{$a}{lic}\n";
+		push @out_str, "Type:    $sub_ch{$a}{type}\n";
+		push @out_str, "Speed:   $sub_ch{$a}{speed}\n";
+		push @out_str, "State:   $sub_ch{$a}{state}\n";
+		print @out_str, "\n";
+	}
+}
+
+sub device_report
+{
+	my $adapters = shift;
+	my $ports = shift;
+	my $luns = shift;
+	my $s_devs = shift;
+	my $hosts = shift;
+
+	if ($_[0]) {
+		print "adapter  remote_port        LUN                SCSI  ",
+		      "gen_dev  scsi_dev MM  type model vendor H:C:T:L\n",
+		      "======================================================",
+		      "===============================================\n";
+	}
+	foreach my $hctl (sort keys %devices) {
+		next if (@$adapters && "@$adapters" !~ /\b$devices{$hctl}{hba_id}\b/);
+		next if (@$ports && "@$ports" !~ /\b$devices{$hctl}{wwpn}\b/);
+		next if (@$luns && "@$luns" !~ /\b$devices{$hctl}{lun}\b/);
+		next if (@$s_devs && "@$s_devs" !~ /\b$devices{$hctl}{dev}\b/);
+		next if (@$hosts && "@$hosts" !~ /\b$sub_ch{$devices{$hctl}{hba_id}}{host}\b/);
+		my @out_str;
+		push @out_str, $devices{$hctl}{hba_id};
+		push @out_str, $devices{$hctl}{wwpn};
+		push @out_str, $devices{$hctl}{lun};
+		push @out_str, $sub_ch{$devices{$hctl}{hba_id}}{host};
+		push @out_str, $devices{$hctl}{sg} ?
+					"/dev/".$devices{$hctl}{sg}: "NO_SG";
+		push @out_str, $devices{$hctl}{dev} ?
+					"/dev/".$devices{$hctl}{dev}: "NO_SCSI";
+		push @out_str, $devices{$hctl}{mm};
+		push @out_str, $devices{$hctl}{type};
+		push @out_str, $devices{$hctl}{model};
+		push @out_str, $devices{$hctl}{vendor};
+		push @out_str, $hctl;
+
+		print "@out_str\n";
+	}
+}
+
+sub mapper_report
+{
+	my $adapters = shift;
+	my $ports = shift;
+	my $s_devs = shift;
+	my $m_devs = shift;
+	my @out_str;
+
+	if (! (keys %mapper_dev)) {
+		print "No device mapper devices configured.\n";
+		return;
+	}
+	if ($_[0]) {
+		print "adapter  remote_port        scsi_dev multipath_device\n",
+		      "=====================================================\n";
+	}
+	foreach my $hctl (sort keys %devices) {
+		next if (! $devices{$hctl}{mp_dev});
+		next if (@$adapters && "@$adapters" !~ /\b$devices{$hctl}{hba_id}\b/);
+		next if (@$ports && "@$ports" !~ /\b$devices{$hctl}{wwpn}\b/);
+		next if (@$s_devs && "@$s_devs" !~ /\b$devices{$hctl}{dev}\b/);
+		next if (@$m_devs && "@$m_devs" !~ /\b$mapper_dev{$devices{$hctl}{mp_dev_mm}}\b/);
+		my @line_str;
+		push @line_str, $devices{$hctl}{hba_id};
+		push @line_str, $devices{$hctl}{wwpn};
+		push @line_str, "/dev/".$devices{$hctl}{dev};
+		push @line_str, "/dev/mapper/".$mapper_dev{$devices{$hctl}{mp_dev_mm}};
+		push @out_str, "@line_str\n";
+	}
+	@out_str = sort {
+			my @a_fields = split('\s+', $a);
+			my @b_fields = split('\s+', $b);
+
+			$a_fields[3] cmp $b_fields[3]
+				||
+			$a_fields[1] cmp $b_fields[1]
+				||
+			$a_fields[0] cmp $b_fields[0]
+		} @out_str;
+	print @out_str;
+}
+
+sub usage
+{
+    print <<MSG
+Usage: $PROGRAM_NAME [-h] [-v] [-t] [-i <source>] [-a <adapter>]
+                     [-p <port>] [-l <lun>] [-s <host>] [-d <dev>] [-m <dev>]
+                     [-A] [-D] [-M] [-I]
+
+$PROGRAM_NAME provides information of the multipath, SCSI and FCP configuration
+
+The default is to print the adapter configuration report.
+
+Options:
+
+        -h, --help
+            print this help text.
+
+        -v, --version
+            print version information.
+
+        -t, --topline
+            print a header for column description
+            the default is to print no header which is useful if the results
+            are imported by another application.
+            e.g. $PROGRAM_NAME -D -t
+
+        -i, --input <source>
+            specify a directory or configuration file as source
+            instead of working on the current live-system.
+
+        -a, --adapter <adapter>
+            limit the output to the list of adapters specified
+            e.g. $PROGRAM_NAME -a 0.0.3c07,0.0.3d07
+
+        -p, --port <port>
+            limit the output to the list of remote-ports specified
+            e.g. $PROGRAM_NAME -D -p 0x5005123456789000,0x5005123456789001
+
+        -l, --lun <lun>
+            limit the output to the list of LUNs specified
+            e.g. $PROGRAM_NAME -D -l 0x401040a600000000 -l 0x401040a700000000
+
+        -s, --scsi <host>
+            limit the output to the list SCSI hosts specified
+            e.g. $PROGRAM_NAME -D --scsi host0,host1 -s host5
+
+        -d, --device <dev>
+            limit the output to the list of SCSI devices specified
+            e.g. $PROGRAM_NAME -D --device sda,sdb -d sde
+
+        -m, --mdev <dev>
+            limit the output to the list of multipath devices specified
+            e.g. $PROGRAM_NAME -M -m 36005076303ffc56200000000000010a6
+
+        -A, --Adapter
+            print the adapter report, this is the default.
+
+        -D, --Device
+            print the device report
+
+        -M, --Map
+            print the multipath, mapper report
+
+        -I, --Internal
+            prints an assembly of data used as input for a variety of reports
+MSG
+}
+
+sub version {
+	print "$PROGRAM_NAME: version %S390_TOOLS_VERSION%\n";
+	print "Copyright IBM Corp. 2008, 2017\n";
+}
+
+sub unpack_config
+{
+	my $td = tempdir( CLEANUP => 1 );
+
+	print STDERR "Unpacking configuration ...";
+	system("tar xzf $base_dir -C $td 2>/dev/null");
+	print STDERR "Done.\n";
+
+	$base_dir = $td;
+}
+
+sub verify_and_init
+{
+	# only brief checks if there's something at all #
+	return -1 if (! (-e catdir($base_dir, S_DIR1) &&
+			 -e catdir($base_dir, S_DIR2) &&
+			 -e catdir($base_dir, S_DIR3) &&
+			 -e catdir($base_dir, S_DIR4)));
+
+	get_sub_ch_data($base_dir);
+	get_device_data($base_dir);
+	get_mapper_devices($base_dir);
+	#get_rport_data($base_dir);
+
+	return 0;
+}
+
+##################### main #######################
+my @adapter;
+my @port;
+my @lun;
+my @host;
+my @s_dev;
+my @m_dev;
+my $int_map_list;
+my $adapter_rep;
+my $device_rep;
+my $map_rep;
+my $header = 0;
+
+Getopt::Long::Configure(qw/bundling no_ignore_case/);
+GetOptions('i|input=s' => \$base_dir,
+           'a|adapter=s' => \@adapter,
+           't|topline' => \$header,
+           'h|help' => sub { usage(); exit 0; },
+           'v|version' => sub { version(); exit 0; },
+           'p|port=s' => \@port,
+           'l|lun=s' => \@lun,
+           's|scsi=s' => \@host,
+           'd|device=s' => \@s_dev,
+           'm|mdev=s' => \@m_dev,
+           'I|Internal' => \$int_map_list,
+           'A|Adapter' => \$adapter_rep,
+           'D|Device' => \$device_rep,
+           'M|Map' => \$map_rep,
+          ) or do {
+	print "Invalid usage !\n";
+	usage();
+	exit 1;
+};
+
+if (scalar(@ARGV)) {
+	print "$PROGRAM_NAME: extra operand '@ARGV'\n";
+	print "Try '$PROGRAM_NAME --help' for more information.\n";
+	exit 2;
+}
+
+if (-f $base_dir) {
+	unpack_config();
+}
+
+if (verify_and_init() != 0) {
+	print "No valid configuration found.\nTerminating\n\n";
+	exit 4;
+}
+
+@adapter = split(',', join(',', @adapter));
+@port = split(',', join(',', @port));
+@lun = split(',', join(',', @lun));
+@host = split(',', join(',', @host));
+@s_dev = split(',', join(',', @s_dev));
+@m_dev = split(',', join(',', @m_dev));
+
+if ($int_map_list) {
+	mapping_table();
+	exit 0;
+}
+
+if ($adapter_rep || !($device_rep || $map_rep)) {
+	adapter_report(@adapter);
+}
+
+if ($device_rep) {
+	device_report(\@adapter, \@port, \@lun, \@s_dev, \@host, $header);
+}
+
+if ($map_rep) {
+	mapper_report(\@adapter, \@port, \@s_dev, \@m_dev, $header);
+}
+

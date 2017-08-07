@@ -1,0 +1,36 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH VMCONVERT 1 "Apr 2006" "s390-tools"
+.SH NAME
+vmconvert \- convert VMDUMPs into lkcd dumps
+
+.SH SYNOPSIS
+.B vmconvert
+-f \fIVMDUMPFILE\fR [-o \fIOUTPUTFILE\fR] [-h] [-v]
+
+.B vmconvert
+\fIVMDUMPFILE\fR [\fIOUTPUTFILE\fR]
+.SH DESCRIPTION
+.B vmconvert
+is a tool to convert VMDUMPs into lkcd dumps, which can be analyzed by Linux
+dumpanalysis tools (e.g. lcrash or crash).
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-f VMDUMPFILE" " or " "\-\-file=VMDUMPFILE"
+Use the specified VMDUMPFILE as input file.
+
+.TP
+.BR "\-o OUTPUTFILE" " or " "\-\-output=OUTPUTFILE"
+Use the specified OUTPUTFILE as filename for the lkcd dump. The default
+filename is 'dump.lkcd'

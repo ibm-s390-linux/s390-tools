@@ -1,0 +1,1278 @@
+#!/usr/bin/perl
+#
+# zfcpdbf - Tool to interpret the information from logging/tracing sources
+#
+# Copyright IBM Corp. 2010, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# zfcpdbf is a tool retrieving the information from logging/tracing sources
+# and printing it in a human readable manner. The script extracts data from
+# the following sources (or from the copy thereof):
+#
+# * /sys/kernel/debug/s390dbf subdirectory hex_ascii and sprintf files;
+# * /var/log/messages file.
+#
+# zfcpdbf reads and prints data for the following trace record areas: REC,
+# HBA, SAN, SCSI, QDIO, QDIO_SETUP, QDIO_ERROR, CIO_TRACE, CIO_MSG, CIO_CRW,
+# and uses the following log message types: KERNEL and MULTIPATH. Also, the
+# script reads the payload records from an appropriate subdirectory. The output
+# of some trace records contains as a part the payload record data provided by
+# the kernel trace feature.
+#
+# After reading and parsing the records the script places them into a global
+# array, sorts the array items in ascending order by the record timestamp
+# value and prints the human readable record representations to the standard
+# output stream.
+#
+# Because it is necessary to provide different output view for the different
+# record types, the areas are split in the script into the two area classes:
+# Area and Foreign Area.
+#
+# The REC, HBA, SAN, and SCSI areas belong the Area class areas. The first
+# instances of the def_error type payload records zfcpdbf considers as a
+# special case and prints them like an Area class records.
+#
+# The QDIO, QDIO_SETUP, QDIO_ERROR, CIO_TRACE, CIO_MSG, CIO_CRW trace areas
+# belong to the Foreign Area area class. The log message KERNEL and MULTIPATH
+# records also belong to the Foreign Area area class.
+#
+# zfcpdbf script reads the ASCII hexadecimal representation of the trace
+# records and creates internal data structures for them. Each area class
+# record have its own internal representation and the record data is
+# represented as a numbered array.
+#
+# An array for the Area type record data structure is defined as follows:
+#	[0] - area name (REC, HBA, SAN or SCSI);
+#	[1] - timestamp;
+#	[2] - CPU ID;
+#	[3] - ASCII hexadecimal data representation string;
+#	[4] - subarea;
+#	[5] - level;
+#	[6] - exception;
+#	[7] - caller;
+#	[8] - oldest/newest record mark value:
+#		0 - an ordinary record;
+#		1 - the oldest record;
+#		2 - the newest record;
+#		3 - a single record in an area.
+#
+# An array for the Foreign Area trace type record data structure is defined as
+# follows:
+#	[0] - area name (QDIO, QDIO_SETUP, QDIO_ERROR, CIO_TRACE, CIO_MSG,
+#	      CIO_CRW).
+#	[1] - timestamp;
+#	[2] - CPU ID;
+#	[3] - ASCII hexadecimal data representation string or emtpy string;
+#	[4] - ASCII string data representation;
+#	[5] - subarea;
+#	[6] - level;
+#	[7] - exception;
+#	[8] - caller;
+#	[9] - oldest/newest record mark value:
+#		0 - an ordinary record;
+#		1 - the oldest record;
+#		2 - the newest record;
+#		3 - a single record in an area.
+#
+# The source KERNEL and MULTIPATH Foreign Area records do not have the data
+# for the CPU ID and ASCII hexadecimal representation string fields and for
+# those array fields zfcpdbf uses placeholders.
+#
+# An array for the Foreign Area log message type record data structure is
+# defined as follows:
+#	[0] - area name (KERNEL or MULTIPATH);
+#	[1] - timestamp;
+#	[2] - CPU ID field placeholder (the "n/a" string);
+#	[3] - Payload hex output field placeholder (empty string);
+#	[4] - message text string.
+#	[5] - oldest/newest record mark value:
+#		0 - an ordinary record;
+#		1 - the oldest record;
+#		2 - the newest record;
+#		3 - a single record in an area.
+#
+# The area inclusion into the zfcpdbf output is controlled by the script
+# command line arguments.
+#
+
+use v5.8.0;
+use POSIX qw(strftime floor difftime mktime);
+use File::Spec::Functions qw/catfile catdir rel2abs/;
+use File::Basename;
+use Getopt::Long;
+
+use constant TOD_UNIX_EPOCH => 0x7d91048bca000000;
+use constant STD_DEBUG_DIR => "/sys/kernel/debug/s390dbf/";
+use constant STD_MSG_DIR => "/var/log/";
+use constant VERSION => '%S390_TOOLS_VERSION%';
+use constant PROGNAME => (fileparse($0))[0];
+use constant PAGE_SIZE => 4096;
+use constant HEADER_SIZE => 16;
+use constant TZ_LIMIT => 12 * 3600;
+use constant ZFCP_DBF_SAN_MAX_PAYLOAD => 48;
+use constant FCP_RESP_WITH_EXT => 24;
+
+our @TRACE_RECORDS;
+our %PAYLOAD_RECORDS;
+our %def_error;
+our @print_hba_id = ();
+our @print_rec_id = ();
+our @print_san_id = ();
+our $root = "";
+our $timediff;
+our $def_error = 1;
+our $force = 0;
+our $log_low_res_timestamps = 0;
+our %AREA_STATES;
+our %RECORD_LENGTHS;
+our $time_zone = 0;
+
+sub stck_to_timeval
+{
+	my $todval = hex(shift()) - TOD_UNIX_EPOCH;
+	my $sec;
+	my $nsec;
+	my $usec;
+
+	$sec = floor(($todval >> 12) / 1000000);
+	$todval -= ($sec * 1000000) << 12;
+	$nsec = ($todval * 1000) >> 12;
+	$usec = floor($nsec / 1000);
+
+	return $sec.":".sprintf("%06lu", $usec);
+}
+
+sub str_from_hex
+{
+	my $val = shift();
+	my $s;
+	my $i = 0;
+
+	while (my $c = substr($val, $i, 2)) {
+		$s .= chr(hex($c));
+		$i += 2;
+	}
+	return $s;
+}
+
+sub str_timestamp
+{
+	my @arg = split(/:/, shift());
+	my $tz = shift();
+
+	$arg[0] += $tz if (defined $tz);
+
+	return strftime("%F-%T",localtime($arg[0])).":$arg[1]";
+}
+
+sub payload_format
+{
+	my $val = shift();
+
+	$val =~ s/(\w{32})(?=\w+)/$1\n\t\t /g;
+	$val =~ s/(\w{8})(?=\w+)/$1 /g;
+
+	return $val."\n";
+}
+
+#
+# Sometimes, depending on kernel configuration, the s390dbf feature prints
+# symbolic caller kernel module name enclosed in square brackets after the
+# caller function item. To allow the script to do the further trace records
+# parsing correctly the symbolic module name should be joined with the caller
+# function array item value.
+#
+use constant CALLER => 5;
+use constant MODULE => 6;
+
+sub canonic_caller_fields($)
+{
+	my $row = shift();
+
+	#
+	# If the row contains a symbolic caller module name enclosed in square
+	# brackets, append that name with brackets to the caller function item
+	# value and remove the module name item from the row.
+	#
+	if ($row->[MODULE] =~ /^\[.+\]$/) {
+		$row->[CALLER] = join(' ', @$row[CALLER..MODULE]);
+		splice(@$row, MODULE, 1);
+	}
+}
+
+sub get_common
+{
+	my $line = readline(shift());
+	my $area = shift();
+	my @common;
+	my $ascii_dump;
+
+	return if (!$line);
+	return "1" unless ($line =~ /^[[:xdigit:]]{2}/);
+
+	$ascii_dump = substr($line, index($line, '|') + 2);
+	$line = substr($line, 0, index($line, '|'));
+
+	chomp($ascii_dump);
+	$AREA_STATES{$area}{'length'} = length($ascii_dump) + HEADER_SIZE;
+
+	#
+	# Each source file line contains one symbolic caller function name or
+	# hexadecimal caller address and offset value which can be enclosed in
+	# angle brackets and there can be spaces between the openning bracket
+	# and the function name or hexadecimal caller address. Remove the
+	# whitespace characters between the openning angle bracket and the
+	# function name or hexadecimal caller address.
+	#
+	$line =~ s/<\s+/</;
+	@common = split(/\s+/, $line);
+	#
+	# Process symbolic kernel module name, if necessary.
+	#
+	canonic_caller_fields(\@common);
+	return (str_timestamp($common[1]),
+		$common[4], join('', @common[6 .. $#common]),
+		$common[0], $common[2], $common[3], $common[5], 0);
+}
+
+sub mark_oldest_and_newest
+{
+	my $recs = shift();
+	my $mark = shift();
+	my $oldest;
+	my $newest;
+	my $comparison;
+
+	$oldest = 0;
+	$newest = 0;
+	for (my $i = 1; $i <= $#$recs; $i++) {
+		$comparison = $recs->[$i]->[1] cmp $recs->[$oldest]->[1];
+		if ($comparison < 0) {
+			$oldest = $i;
+		}
+		$comparison = $recs->[$i]->[1] cmp $recs->[$newest]->[1];
+		if ($comparison >= 0) {
+			$newest = $i;
+		}
+	}
+
+	$recs->[$oldest]->[$mark] = 0x01;
+	$recs->[$newest]->[$mark] |= 0x02;
+}
+
+sub get_payload_records
+{
+	my $dir = shift() || STD_DEBUG_DIR;
+	my $adapter = shift();
+	my $tf;
+	local *HANDLE;
+	my @area_records;
+
+	$tf = catfile($root, $dir, "zfcp_".$adapter."_pay", "hex_ascii");
+
+	open(*HANDLE, $tf) or do {
+		if (!$force) {
+			print "Warning: possible version mismatch detected.\n";
+			print "Consider updating the utility ", PROGNAME,"\n";
+			print "or force execution with -f|--force .\n";
+			return 1;
+		} else {
+			print "Warning: Cannot open '$tf' for reading.\n";
+			return 0;
+		}
+	};
+
+	$AREA_STATES{'PAY'}{'count'} = 0;
+	$AREA_STATES{'PAY'}{'length'} = 0;
+	while (my @record = get_common(*HANDLE, 'PAY')) {
+		next if (!$record[2]);
+		my $area = str_from_hex(substr($record[2], 2, 14));
+		my $counter = hex(substr($record[2], 0, 2));
+		my $fsf_req_id = substr($record[2], 16, 16);
+		$PAYLOAD_RECORDS{$fsf_req_id}{$area}[$counter] = [@record];
+		if ($def_error && ($area =~ /def_err/)) {
+			$def_error{$fsf_req_id}[$counter] = [@record];
+			if ($counter == 0) {
+			    # pseudo area record for first def_err part
+			    push @area_records, [$area, @record];
+			}
+		}
+		$AREA_STATES{'PAY'}{'count'}++;
+	}
+	close(*HANDLE);
+
+	if (scalar(@area_records) > 0) {
+		mark_oldest_and_newest(\@area_records, 8);
+		push @TRACE_RECORDS, @area_records;
+	}
+	return 0;
+}
+
+sub get_area_records
+{
+	my $dir = shift() || STD_DEBUG_DIR;
+	my $adapter = shift();
+	my $tf;
+	local *HANDLE;
+
+	foreach my $area (qw/REC SAN HBA SCSI/) {
+		my @area_records;
+
+		$tf = catfile($root, $dir,
+				"zfcp_".$adapter."_". lc $area, "hex_ascii");
+
+		open(*HANDLE, $tf) or do {
+			print "Warning: Cannot open '$tf' for reading.\n";
+			next;
+		};
+		$AREA_STATES{$area}{'count'} = 0;
+		$AREA_STATES{$area}{'length'} = 0;
+		while (my @record = get_common(*HANDLE, $area)) {
+			next if (!$record[2]);
+			unshift @record, $area;
+			push @area_records, [@record];
+			$AREA_STATES{$area}{'count'}++;
+		}
+		close(*HANDLE);
+
+		if (scalar(@area_records) > 0) {
+			mark_oldest_and_newest(\@area_records, 8);
+			push @TRACE_RECORDS, @area_records;
+		}
+	}
+}
+
+sub get_foreign_records
+{
+	my $dir = shift() || STD_DEBUG_DIR;
+	my $adapter = shift();
+	my $tf;
+	my @static_areas = qw/QDIO_SETUP QDIO_ERROR CIO_TRACE CIO_MSG CIO_CRW/;
+	local *HANDLE;
+
+	foreach my $area ("QDIO_".uc($adapter), @static_areas) {
+		my @area_records;
+
+		$AREA_STATES{$area}{'length'} = 0;
+		$AREA_STATES{$area}{'count'} = 0;
+
+		$tf = ("CIO_MSG CIO_CRW" =~ /$area/) ?
+			catfile($root, $dir, lc $area, "sprintf"):
+			catfile($root, $dir, lc $area, "hex_ascii");
+
+		open(*HANDLE, $tf) or do {
+			print "Warning: Cannot open '$tf' for reading.\n";
+			next;
+		};
+		while (my $line = readline(*HANDLE)) {
+			next unless ($line =~ /^[[:xdigit:]]{2}/);
+
+			chomp($line);
+			#
+			# Each source file line contains one symbolic caller
+			# function name or hexadecimal caller address and
+			# offset value which can be enclosed in angle brackets
+			# and there can be spaces between the openning bracket
+			# and the function name or hexadecimal caller address.
+			# Remove the whitespace characters between the openning
+			# angle bracket and the function name or hexadecimal
+			# caller address.
+			#
+			$line =~ s/<\s+/</;
+			my @raw_rec = split(/\s+/,($line =~ /[|]/) ?
+					substr($line, 0, index($line, '|')):
+					$line);
+			#
+			# Process symbolic kernel module name, if necessary.
+			#
+			canonic_caller_fields(\@raw_rec);
+
+			my @rec = ();
+			push @rec, $area =~ /QDIO_[[:xdigit:].]{8,}/i ? "QDIO" : $area;
+			push @rec, str_timestamp($raw_rec[1]);
+			push @rec, $raw_rec[4];
+			if ($raw_rec[6] =~ /^[[:xdigit:]]{2}$/) {
+				push @rec, join('', @raw_rec[6 .. $#raw_rec]);
+				push @rec, substr($line, index($line, '|') + 2);
+			} else {
+				push @rec, ""; #dummy to preserve format
+				push @rec, join(' ', @raw_rec[6 .. $#raw_rec]);
+			}
+			#
+			# It is impossible to calculate the trace record length
+			# for the sprintf type debug views using the view data
+			# strings. Because of that the trace record lengths for
+			# the CIO_MSG and CIO_CRW foreign areas are hardcoded
+			# and assigned in the main.
+			#
+			$AREA_STATES{$area}{'length'} = HEADER_SIZE;
+			if (defined($RECORD_LENGTHS{$area})) {
+				$AREA_STATES{$area}{'length'} +=
+					$RECORD_LENGTHS{$area};
+			} else {
+				$AREA_STATES{$area}{'length'} +=
+					length($rec[$#rec]);
+			}
+
+			push @rec, ($raw_rec[0], $raw_rec[2], $raw_rec[3],
+				$raw_rec[5], 0);
+			push @area_records, [@rec];
+			$AREA_STATES{$area}{'count'}++;
+		}
+		close(*HANDLE);
+
+		if (scalar(@area_records) > 0) {
+			mark_oldest_and_newest(\@area_records, 9);
+			push @TRACE_RECORDS, @area_records;
+		}
+	}
+}
+
+sub sep_msg_ts
+{
+	my @tmp_array = split(/\s+/, shift());
+	my @m_array = qw/Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec/;
+	my ($c_mon, $c_year) = (localtime(time))[4,5];
+	my $counter = 0;
+
+	if ($tmp_array[0] =~ /^[A-Za-z]/) { #Low res timestamp format
+		my $mon = shift(@tmp_array);
+		my @time = split(/:/, $tmp_array[1]);
+
+		$log_low_res_timestamps = 1;
+
+		$counter++ while($m_array[$counter] !~ /$mon/);
+		$c_year-- if ($counter > $c_mon);
+		return mktime($time[2], $time[1], $time[0],
+			      $tmp_array[0], $counter, $c_year),
+		       @tmp_array[3 .. $#tmp_array];
+	} else { # ISO 8601 format
+		my @t_a = split(/[-:A-Za-z]+/, $tmp_array[0]);
+		push @t_a, split(/[:]+/, $tmp_array[1]) if ($#t_a <= 3);
+		$counter++ while($tmp_array[$counter] !~ /\S+[:]$/);
+		my ($sec, $secfraction, $rest) = split(/[.,+-]/, $t_a[5]);
+		#
+		# Format secfraction to 6 decimal places and only use those.
+		#
+		my ($zero, $usec) = split(/[.]/,
+					  sprintf("%.6f", "0.".$secfraction));
+		return mktime($sec, $t_a[4], $t_a[3],
+			      $t_a[2], $t_a[1] - 1, $t_a[0] - 1900).":".$usec,
+		       @tmp_array[$counter .. $#tmp_array];
+	}
+}
+
+sub get_log_messages
+{
+	my $dir = shift() || STD_MSG_DIR;
+	local *HANDLE;
+	my @kernel_records;
+	my @mpath_records;
+
+	$tf = catfile($root, $dir, "messages");
+
+	open(*HANDLE, $tf) or do {
+		print "Warning: Cannot open '$tf' for reading.\n";
+		return;
+	};
+
+	while (my $line = readline(*HANDLE)) {
+		# pre-check for succeeding long running function
+		next if ($line !~ /kernel|multipath/);
+		my ($ts, @rec) = sep_msg_ts($line);
+		next if (!$ts || $rec[0] !~ /kernel|multipath/);
+		chop($rec[0]) if ($rec[0] eq 'multipathd:');
+		chop($rec[0]);
+
+		splice(@rec, 0, 1, uc $rec[0]);
+		splice(@rec, 1, $#rec, join(' ', @rec[1 .. $#rec]));
+		splice(@rec, 1, 0, str_timestamp($ts, $time_zone), "n/a", "");
+		push @rec, 0;
+		if ($rec[0] eq 'KERNEL') {
+			push @kernel_records, [@rec];
+		} else {
+			push @mpath_records, [@rec];
+		}
+	}
+	close(*HANDLE);
+
+	if (scalar(@kernel_records) > 0) {
+		mark_oldest_and_newest(\@kernel_records, 5);
+		push @TRACE_RECORDS, @kernel_records;
+	}
+	if (scalar(@mpath_records) > 0) {
+		mark_oldest_and_newest(\@mpath_records, 5);
+		push @TRACE_RECORDS, @mpath_records;
+	}
+}
+
+sub print_payload
+{
+	my $payload_length = shift();
+	my $payload = shift();
+	my $field_name = shift();
+	my $tmp_str;
+
+	printf "%-14s : ", $field_name;
+	if (!$payload) {
+		print "record not available anymore.\n";
+		return;
+	}
+	foreach my $cc (@$payload) {
+		$tmp_str .= substr($cc->[2], 32);
+	}
+	print payload_format(substr($tmp_str, 0, $payload_length * 2));
+}
+
+sub print_hba_common
+{
+	my $rec = shift();
+	my $record_id = substr($rec->[2], 0, 2);
+	my $fsf_req_id = substr($rec->[2], 16, 16);
+	my $payload_length = hex(substr($rec->[2], 56, 4));
+
+	print "Tag            : ", str_from_hex(substr($rec->[2], 2, 14)), "\n";
+	if ($record_id == 4) {
+		# ZFCP_DBF_HBA_BASIC only has Tag
+		print "\n";
+		return;
+	}
+	print "Request ID     : 0x", $fsf_req_id, "\n";
+	print "Request status : 0x", substr($rec->[2], 32, 8), "\n";
+	print "FSF cmnd       : 0x", substr($rec->[2], 40, 8), "\n";
+	print "FSF sequence no: 0x", substr($rec->[2], 48, 8), "\n";
+
+	if (!defined $print_hba_id[hex($record_id)]) {
+		printf("HBA record id=%d not defined.\n",
+			hex($record_id));
+		return;
+	}
+	$print_hba_id[hex($record_id)]($fsf_req_id, substr($rec->[2], 60),
+				       $payload_length, $rec->[0]);
+	print "\n";
+}
+
+sub _print_hba_id1
+{
+	my $fsf_req_id = shift();
+	my $rec = shift();
+	my $payload_length = shift();
+	my $rec_received = shift();
+	my $rec_issued;
+	my $pay_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"fsf_res"};
+
+	$rec_issued  = stck_to_timeval(substr($rec, 0, 16));
+
+	if (defined $timediff) { # do we want to see delayed responses ?
+		my @t_arr = split(/[-:]/, $rec_received);
+
+		my $ts1 = mktime($t_arr[5], $t_arr[4], $t_arr[3],
+				 $t_arr[2], $t_arr[1] - 1, $t_arr[0] - 1900);
+
+		my ($ts2, $us2) = split(/:/, $rec_issued);
+
+		my $ts_received = $ts1 . "." . $t_arr[6];
+		my $ts_issued = $ts2 . "." . $us2;
+
+		if (($ts_received - $ts_issued) >= $timediff) {
+			print "WARNING: delayed response above ",
+			      "skip level of $timediff seconds.\n";
+		}
+	}
+
+	print "FSF issued     : ",str_timestamp($rec_issued),"\n";
+	print "FSF stat       : 0x", substr($rec, 56, 8), "\n";
+	print "FSF stat qual  : ", payload_format(substr($rec, 64, 32));
+	print "Prot stat      : 0x", substr($rec, 16, 8), "\n";
+	print "Prot stat qual : ", payload_format(substr($rec, 24, 32));
+
+	print "Port handle    : 0x", substr($rec,  96, 8), "\n";
+	print "LUN handle     : 0x", substr($rec, 104, 8), "\n";
+
+	print "QTCB log length: ", $payload_length, "\n" if ($payload_length);
+	print_payload($payload_length, $pay_rec, "QTCB log info")
+	    if ($payload_length);
+}
+
+sub _print_hba_id2
+{
+	my $fsf_req_id = shift();
+	my $rec = shift();
+	my $payload_length = shift();
+	my $pay_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"fsf_uss"};
+
+	print "SRB stat type  : 0x", substr($rec, 0, 8), "\n";
+	print "SRB stat sub   : 0x", substr($rec, 8, 8), "\n";
+	print "SRB D_ID       : 0x", substr($rec, 16, 8), "\n";
+	print "SRB LUN        : 0x", substr($rec, 24, 16), "\n";
+	print "SRB q-design.  : 0x", substr($rec, 40, 16), "\n";
+
+	print "SRB length     : ", $payload_length, "\n" if ($payload_length);
+	print_payload($payload_length, $pay_rec, "SRB info")
+	    if ($payload_length);
+}
+
+sub _print_hba_id3
+{
+	my $fsf_req_id = shift();
+	my $rec = shift();
+	my $payload_length = shift();
+
+	print "Link fail cnt  : ", substr($rec, 8, 8), "\n";
+	print "Sync loss cnt  : ", substr($rec, 16, 8), "\n";
+	print "Sign loss cnt  : ", substr($rec, 24, 8), "\n";
+	print "Seq error cnt  : ", substr($rec, 32, 8), "\n";
+	print "Inv trans cnt  : ", substr($rec, 40, 8), "\n";
+	print "CRC error cnt  : ", substr($rec, 48, 8), "\n";
+	print "Seq timeo cnt  : ", substr($rec, 56, 8), "\n";
+	print "Buff over cnt  : ", substr($rec, 64, 8), "\n";
+	print "Fca timeo cnt  : ", substr($rec, 72, 8), "\n";
+	print "Adv B2B r-cred : ", substr($rec, 80, 8), "\n";
+	print "Cur B2B r-cred : ", substr($rec, 88, 8), "\n";
+	print "Adv B2B t-cred : ", substr($rec, 96, 8), "\n";
+	print "Cur B2B t-cred : ", substr($rec, 104, 8), "\n";
+	print "SRB length     : ", $payload_length, "\n" if ($payload_length);
+	if ($payload_length &&
+	    $payload_length != 64 + 56) {
+	    print "WARNING: Check if struct fsf_bit_error_payload still matches SRB bit error payload.\n";
+	}
+}
+
+sub print_deferr_common
+{
+	my $rec = shift();
+	my $fsf_req_id = substr($rec->[2], 16, 16);
+
+	print_deferred_error($def_error{$fsf_req_id});
+	print "\n";
+}
+
+sub print_deferred_error
+{
+	my $rec = shift();
+
+	foreach my $t_rec (@$rec) {
+		my $sbal = hex(substr($t_rec->[2], 0, 2));
+		if ($sbal == 0) {
+			print "Tag            : def_err\n";
+			print "Request ID     : 0x",
+				substr($t_rec->[2], 16, 16), "\n";
+			print "Reason         : 0x",
+				substr($t_rec->[2], 0x20 + 0xf3 * 2, 2), "\n";
+			print "SBALE in err   : ", # u32 & 0xFFFF
+				hex(substr($t_rec->[2], 0x20 + 0x16 * 2, 4)),
+				"\n";
+			print "Scount         : ",
+				hex(substr($t_rec->[2], 0x20 + 4, 2)), "\n";
+			printf "Signaling SBAL : %s",
+				payload_format(substr($t_rec->[2], 0x20));
+			next;
+		} else {
+			printf "Req. SBAL(%02d)  : %s", $sbal - 1 ,
+				payload_format(substr($t_rec->[2], 0x20));
+		}
+	}
+}
+
+sub print_rec_common
+{
+	my $rec = shift();
+	my $record_id = substr($rec->[2], 0, 2);
+
+	print "Tag            : ", str_from_hex(substr($rec->[2], 2, 14)), "\n";
+	print "LUN            : 0x", substr($rec->[2], 16, 16), "\n";
+	print "WWPN           : 0x", substr($rec->[2], 32, 16), "\n";
+	print "D_ID           : 0x", substr($rec->[2], 48, 8), "\n";
+	print "Adapter status : 0x", substr($rec->[2], 56, 8), "\n";
+	print "Port status    : 0x", substr($rec->[2], 64, 8), "\n";
+	print "LUN status     : 0x", substr($rec->[2], 72, 8), "\n";
+
+	if (!defined $print_rec_id[hex($record_id)]) {
+		printf("Recovery record id=%d not defined.\n",
+			hex($record_id));
+		return;
+	}
+	$print_rec_id[hex($record_id)](substr($rec->[2], 80));
+	print "\n";
+}
+
+sub _print_rec_id1
+{
+	my $rec = shift();
+
+	print "Ready count    : 0x", substr($rec, 0, 8), "\n";
+	print "Running count  : 0x", substr($rec, 8, 8), "\n";
+	print "ERP want       : 0x", substr($rec, 16, 2), "\n";
+	print "ERP need       : 0x", substr($rec, 18, 2), "\n";
+}
+
+sub _print_rec_id2
+{
+	my $rec = shift();
+
+	print "Request ID     : 0x", substr($rec, 0, 16), "\n";
+	print "ERP status     : 0x", substr($rec, 16, 8), "\n";
+	print "ERP step       : 0x", substr($rec, 24, 4), "\n";
+	print "ERP action     : 0x", substr($rec, 28, 2), "\n";
+	print "ERP count      : 0x", substr($rec, 30, 2), "\n";
+}
+
+sub print_san_common
+{
+	my $rec = shift();
+	my $record_id = substr($rec->[2], 0, 2);
+	my $fsf_req_id = substr($rec->[2], 16, 16);
+	my $payload_length = hex(substr($rec->[2], 136, 4));
+
+	print "Tag            : ", str_from_hex(substr($rec->[2], 2, 14)), "\n";
+	print "Request ID     : 0x", $fsf_req_id, "\n";
+	print "Destination ID : 0x", substr($rec->[2], 32, 8), "\n";
+
+	if (!defined $print_san_id[hex($record_id)]) {
+		printf("SAN record id=%d not defined.\n",
+			hex($record_id));
+		return;
+	}
+	$print_san_id[hex($record_id)]($fsf_req_id, $payload_length,
+				       substr($rec->[2], 40, 96));
+	print "\n";
+}
+
+sub _print_san_id1
+{
+	my $fsf_req_id = shift();
+	my $payload_length = shift();
+	my $payload_short = shift();
+
+	my $pay_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"san_req"};
+
+	$payload_short = substr($payload_short, 0, $payload_length * 2)
+	    if ($payload_length != 0);
+	print "SAN req short  : ", payload_format($payload_short);
+	print "SAN req length : ", $payload_length, "\n" if ($payload_length);
+
+	print_payload($payload_length, $pay_rec, "San req info")
+	    if ($payload_length > ZFCP_DBF_SAN_MAX_PAYLOAD);
+}
+
+sub _print_san_id2
+{
+	my $fsf_req_id = shift();
+	my $payload_length = shift();
+	my $payload_short = shift();
+
+	my $pay_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"san_res"};
+
+	$payload_short = substr($payload_short, 0, $payload_length * 2)
+	    if ($payload_length != 0);
+	print "SAN resp short : ", payload_format($payload_short);
+	print "SAN resp length: ", $payload_length, "\n" if ($payload_length);
+
+	print_payload($payload_length, $pay_rec, "San resp info")
+	    if ($payload_length > ZFCP_DBF_SAN_MAX_PAYLOAD);
+}
+
+sub _print_san_id3
+{
+	my $fsf_req_id = shift();
+	my $payload_length = shift();
+	my $payload_short = shift();
+
+	my $pay_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"san_els"};
+
+	$payload_short = substr($payload_short, 0, $payload_length * 2)
+	    if ($payload_length != 0);
+	print "iELS short     : ", payload_format($payload_short);
+	print "iELS length    : ", $payload_length, "\n" if ($payload_length);
+
+	print_payload($payload_length, $pay_rec, "iELS info")
+	    if ($payload_length > ZFCP_DBF_SAN_MAX_PAYLOAD);
+}
+
+sub print_scsi_common
+{
+	my $rec = shift();
+	my $record_id = substr($rec->[2], 0, 2);
+	my $fsf_req_id = substr($rec->[2], 78, 16);
+	my $payload_length = hex(substr($rec->[2], 110, 4));
+	my $pay_sns = $PAYLOAD_RECORDS{$fsf_req_id}{"fcp_sns"};
+	my $pay_riu = $PAYLOAD_RECORDS{$fsf_req_id}{"fcp_riu"};
+
+	print "Tag            : ", str_from_hex(substr($rec->[2], 2, 14)), "\n";
+	print "Request ID     : 0x", $fsf_req_id, "\n";
+	print "SCSI ID        : 0x", substr($rec->[2], 16, 8), "\n";
+	print "SCSI LUN       : 0x", substr($rec->[2], 24, 8), "\n";
+	print "SCSI LUN high  : 0x", substr($rec->[2],162, 8), "\n";
+	print "SCSI result    : 0x", substr($rec->[2], 32, 8), "\n";
+	print "SCSI retries   : 0x", substr($rec->[2], 40, 2), "\n";
+	print "SCSI allowed   : 0x", substr($rec->[2], 42, 2), "\n";
+	print "SCSI scribble  : 0x", substr($rec->[2], 94, 16), "\n";
+	print "SCSI opcode    : ", payload_format(substr($rec->[2], 46, 32));
+	print "FCP rsp inf cod: 0x", substr($rec->[2], 44, 2), "\n";
+	print "FCP rsp IU     : ", payload_format(substr($rec->[2], 114, 48));
+
+	if (defined($pay_sns)) {
+		print "Sense len      : ", $payload_length, "\n"
+			if ($payload_length);
+		print_payload($payload_length, $pay_sns, "Sense info")
+	}
+	if (defined($pay_riu) && ($payload_length > FCP_RESP_WITH_EXT)) {
+		print "FCP rsp IU len : ", $payload_length, "\n";
+		print_payload($payload_length, $pay_riu, "FCP rsp IU all");
+	}
+	print "\n";
+}
+
+sub print_foreign_rec
+{
+	my $area = shift();
+	my $rec = shift();
+
+	if ($area !~ /KERNEL|MULTIPATH/) {
+		print "Payload hex    : ", payload_format($rec->[2]);
+	}
+	print "Payload string : ", $rec->[3], "\n";
+	print "\n";
+}
+
+sub assign_callback_subs
+{
+	$print_hba_id[1] = \&_print_hba_id1;
+	$print_hba_id[2] = \&_print_hba_id2;
+	$print_hba_id[3] = \&_print_hba_id3;
+
+	$print_rec_id[1] = \&_print_rec_id1;
+	$print_rec_id[2] = \&_print_rec_id2;
+
+	$print_san_id[1] = \&_print_san_id1;
+	$print_san_id[2] = \&_print_san_id2;
+	$print_san_id[3] = \&_print_san_id3;
+}
+
+sub load_records
+{
+	my $dir = shift();
+	my $adapter = shift();
+
+	print "Loading trace records ...(this might take a while)\n";
+	get_area_records($dir, $adapter);
+	exit(1) if (get_payload_records($dir, $adapter));
+
+	# load foreign records
+	get_foreign_records($dir, $adapter);
+
+	#load messages
+	get_log_messages($dir);
+}
+
+sub get_marker
+{
+	my $rec = shift();
+	my $mark = shift();
+	my $marker;
+
+	SWITCH: {
+		$rec->[$mark] == 1 && do {
+			$marker = " <== the first record";
+			last SWITCH;
+		};
+		$rec->[$mark] == 2 && do {
+			$marker = " <== the last record";
+			last SWITCH;
+		};
+		$rec->[$mark] == 3 && do {
+			$marker = " <== the first and the last record";
+			last SWITCH;
+		};
+		$marker = "";
+	}
+	return $marker;
+}
+
+sub print_header
+{
+	my $area = shift();
+	my $rec = shift();
+	my $common_trace_header = 0;
+	my $header_pos;
+	my $marker;
+	my $caller;
+
+	$common_trace_header = 1 if ($area !~ /KERNEL|MULTIPATH/);
+
+	if ($area =~ /def_err|HBA|REC|SAN|SCSI/) {
+		$marker = get_marker($rec, 7);
+	} else {
+		if ($common_trace_header) {
+			$marker = get_marker($rec, 8);
+		} else {
+			$marker = get_marker($rec, 4);
+		}
+	}
+
+	print "Timestamp      : ", $rec->[0], $marker, "\n";
+	if ($area =~ /def_err|HBA|REC|SAN|SCSI/) {
+		print "Area           : ", $area, "\n";
+		$header_pos = 3;
+	} else {
+		print "Foreign area   : ", $area, "\n";
+		$header_pos = 4;
+	}
+	if ($common_trace_header) {
+		print "Subarea        : ", $rec->[$header_pos], "\n";
+		print "Level          : ", $rec->[$header_pos + 1], "\n";
+		print "Exception      : ", $rec->[$header_pos + 2], "\n";
+		print "CPU ID         : ", $rec->[1], "\n";
+		#
+		# Print the Caller field. This field data can contain symbolic
+		# caller function name or hexadecimal caller address and offset
+		# enclosed in angle brackets.
+		# Remove the brackets before printing the function name or
+		# caller address, and add the 0x prefix instead of the angle
+		# brackets for hexadecimal field values.
+		#
+		print "Caller         : ";
+		$caller = $rec->[$header_pos + 3];
+		$caller =~ s/<(.*)>/\1/;
+		if ($caller =~ /^[[:xdigit:]+]+\z/) {
+			print "0x";
+		}
+		print $caller, "\n";
+		#
+		# Print the Record id field for Area area class records.
+		#
+		if ($area =~ /def_err|HBA|REC|SAN|SCSI/) {
+			print "Record ID      : ",
+				hex(substr($rec->[2], 0, 2)), "\n";
+		}
+	}
+}
+
+sub show_all_records_ordered
+{
+	my @excl_areas = @{shift()};
+	my @incl_areas = @{shift()};
+	my @all_rec = ();
+	my @all_rec_sorted;
+
+
+	@all_rec_sorted = sort { $a->[1] cmp $b->[1]
+					 ||
+				 $a->[2] cmp $b->[2]} @TRACE_RECORDS;
+
+	if ($log_low_res_timestamps) {
+		print "\n";
+		print "WARNING: Low resolution timestamps were found in the ";
+		print "message log. The message log records can be sorted ";
+		print "incorrectly in the script output.\n";
+		print "\n";
+	}
+
+	foreach my $entry (@all_rec_sorted) {
+		my $area = shift @$entry;
+		if ($area !~ /def_err/) {
+		    next if (@excl_areas && map { $area =~ /^$_$/ } @excl_areas);
+		    next if (@incl_areas && !map { $area =~ /^$_$/ } @incl_areas);
+		}
+
+		print_header($area, $entry);
+
+		SWITCH: {
+			$area =~ /REC/ && do {
+				print_rec_common($entry); last SWITCH; };
+			$area =~ /SAN/ && do {
+				print_san_common($entry); last SWITCH; };
+			$area =~ /HBA/ && do {
+				print_hba_common($entry); last SWITCH; };
+			$area =~ /SCSI/ && do {
+				print_scsi_common($entry); last SWITCH; };
+			$area =~ /def_err/ && do {
+				print_deferr_common($entry); last SWITCH; };
+			print_foreign_rec($area, $entry);
+		}
+	}
+}
+
+sub get_sysfs_attr
+{
+	my $dir = shift();
+	my $adapter = shift();
+	my $area = shift();
+	my $attr = shift();
+	my $tf;
+	local *HANDLE;
+	my $value;
+
+	$area = lc $area;
+	SWITCH: {
+		$area =~ /hba|rec|pay|san|scsi/ && do {
+			$tf = catfile($root, $dir,
+				      "zfcp_".$adapter."_".$area,
+				      $attr);
+			last SWITCH;
+		};
+		$area =~ /cio_crw|cio_msg|cio_trace|qdio_error|qdio_setup/
+			&& do {
+			$tf = catfile($root, $dir, $area, $attr);
+			last SWITCH;
+		};
+		$area =~ /qdio/ && do {
+			$tf = catfile($root,
+				      $dir,
+				      $area."_".$adapter,
+				      $attr);
+			last SWITCH;
+		};
+	}
+
+	open(*HANDLE, $tf) or do {
+		print "Warning: Cannot open '$tf' for reading.\n";
+		return -1;
+	};
+
+	$value = readline(*HANDLE);
+
+	close(*HANDLE);
+
+	return $value;
+}
+
+sub decorate_percents
+{
+	my $val = shift();
+
+	if ($val < 0.1 and $val > 0) {
+		$val = '>0.0';
+	} else {
+		$val = sprintf("%5.1f", $val);
+	}
+	return $val;
+}
+
+sub show_trace_area_states
+{
+	my $dir = shift() || STD_DEBUG_DIR;
+	my $adapter = shift();
+	my @excl_areas = @{shift()};
+	my @incl_areas = @{shift()};
+	my @trace_areas;
+	my $print_note;
+
+	push @trace_areas, qw/HBA REC SAN SCSI PAY/;
+	push @trace_areas, qw/QDIO QDIO_ERROR QDIO_SETUP/;
+	push @trace_areas, qw/CIO_CRW CIO_MSG CIO_TRACE/;
+
+	print "\n";
+	print "Trace Area Statistics for FCP Device ", $adapter, "\n";
+	print "============================================================\n";
+	print "                 Allocated     % Record Record   Maybe     %\n";
+	print "Area       Level     Pages Waste Length  Count Wrapped  Used\n";
+	print "---------- ----- --------- ----- ------ ------ ------- -----\n";
+
+	$print_note = 0;
+	foreach my $area (@trace_areas) {
+		next if (@excl_areas && map {$area =~ /^$_$/} @excl_areas);
+		next if (@incl_areas && !map {$area =~ /^$_$/} @incl_areas);
+		next if ($area =~ /KERNEL|MULTIPATH/);
+
+		my $pages;
+		my $level;
+		my $rec_len;
+		my $rec_count;
+		my $records_per_page;
+		my $wrapped;
+		my $pct_used;
+		my $pct_waste;
+		my $area_name;
+		my $used_memory;
+		my $trace_buffer_size;
+		my $remaining_space;
+
+		$pages = get_sysfs_attr($dir, $adapter, $area, "pages");
+		$level = get_sysfs_attr($dir, $adapter, $area, "level");
+
+		$area_name = $area;
+		$area_name = "QDIO_".uc $adapter if ($area eq 'QDIO');
+		$rec_len = $AREA_STATES{$area_name}{'length'};
+		$rec_count = $AREA_STATES{$area_name}{'count'};
+
+		if ($pages > 0 and $rec_len > 0) {
+			$records_per_page = floor(PAGE_SIZE / $rec_len);
+			$trace_buffer_size = $records_per_page * $rec_len *
+				$pages;
+			$used_memory = $rec_len * $rec_count;
+			$remaining_memory = $trace_buffer_size - $used_memory;
+			$wrapped = 'N';
+			$wrapped = 'Y' if ($remaining_memory < $rec_len);
+
+			$pct_waste = 100.0 - (100.0 * $records_per_page *
+					     $rec_len / PAGE_SIZE);
+			$pct_waste = decorate_percents($pct_waste);
+
+			$pct_used = $used_memory / $trace_buffer_size * 100;
+			$pct_used = decorate_percents($pct_used);
+
+			if (defined($RECORD_LENGTHS{$area})) {
+				$rec_len = '=' . $rec_len;
+				$print_note = 1;
+			}
+		} else {
+			$wrapped = 'N';
+			$rec_len = 'N/A';
+			$pct_used = '0.0';
+			$pct_waste = '0.0';
+		}
+
+		printf("%-10s %5d %9d %5s %6s %6s %7s %5s\n",
+		       $area,
+		       $level,
+		       $pages,
+		       $pct_waste,
+		       $rec_len,
+		       $rec_count,
+		       $wrapped,
+		       $pct_used);
+	}
+	print "============================================================\n";
+	if ($print_note) {
+		print "Note:\n";
+		print "  = this record length was hardcoded in the script ";
+		print "and\n    potentially can be wrong.\n";
+	}
+	print "\n";
+}
+
+sub check_timezone($$)
+{
+	my ($opt_name, $opt_value) = @_;
+	my $sign;
+	my $hours;
+	my $minutes;
+
+	if ($opt_value !~ /^([+-])?(1[0-2]|0?[0-9])(?::([0-5][0-9]))?$/) {
+		print "Invalid time zone format, must be [+-][h]h[:mm].\n";
+		exit(2);
+	}
+
+	$sign = (defined $1 && $1 eq '-') ? -1 : 1;
+	$hours = $2;
+	$minutes = (defined $3) ? $3 : 0;
+
+	$time_zone = $sign * ($hours * 3600 + $minutes * 60);
+
+	if ($time_zone < - TZ_LIMIT || $time_zone > TZ_LIMIT) {
+		print "Invalid time zone value " . $opt_value . ", " .
+		      "must be between and including -12:00 and +12:00.\n";
+		exit(2);
+	}
+}
+
+sub usage
+{
+	my $pn = PROGNAME;
+
+	print <<END;
+Usage: $pn [OPTION]... <adapter>
+Interprets the information from various logging and tracing sources,
+e.g. zfcp-, qdio- and cio-trace records and, if available, system messages.
+
+    -x, --exclude <AREA[,AREA]>	list of trace areas to exclude (default none).
+    -i, --include <AREA[,AREA]>	list of trace areas to include (default all).
+    -z, --zfcp-only		zfcp trace areas only (short cut).
+    -t, --timediff <DIFF>	highlight requests with a round-trip processing
+				time of <DIFF> or more.
+    -e, --def-error		do NOT show deferred error messages.
+    -f, --force			force execution on a detected version mismatch.
+    -p, --path <PATH>		use directory <PATH> for the location of the
+				trace records.
+    -r, --root <ROOT>		prepend <ROOT> to standard trace record location.
+    -m, --timezone <ZONE>	set time zone value for system message
+                                timestamps.
+    -h, --help			show this help text.
+    -v, --version               print version information, then exit.
+
+AREA may be REC, HBA, SAN, SCSI, QDIO, QDIO_SETUP, QDIO_ERROR,
+CIO_TRACE, CIO_MSG, CIO_CRW, KERNEL or MULTIPATH.
+
+The area name PAY can be used to control the row with the payload trace area
+usage statistics appearance in the Trace Area Statistics table. $pn
+includes the PAY area statistics by default with the option -z|--zfcp-only.
+
+DIFF is the value in seconds which has to be lapsed between sending the request
+and receiving its response.
+
+PATH is specifying the location(directory) of trace records which were pulled
+from another system, e.g. pulled from a dump.
+
+ROOT is specifying a directory which has to be prepended to the standard
+location of the trace records, e.g. typically used in conjunction with
+the result of the dbginfo script.
+
+PATH and ROOT are only useful if used on non-live systems and therefore
+typically used by service- or development-staff.
+
+ZONE is a zone value in [+-][h]h[:mm] format.
+
+END
+}
+
+sub print_version
+{
+	print PROGNAME," version ", VERSION, "\n";
+	print "Copyright IBM Corp. 2010, 2017\n\n";
+}
+
+#
+# End of subroutine section.
+#
+
+my @excl_areas;
+my @incl_areas;
+my $path;
+
+Getopt::Long::Configure("bundling");
+GetOptions(
+	"x|exclude=s" => \@excl_areas,
+	"i|include=s" => \@incl_areas,
+	"z|zfcp-only" => sub {@incl_areas = qw/REC HBA SAN SCSI PAY/;},
+	"t|timediff=i" => \$timediff,
+	"e|def-error" => sub {$def_error = 0;},
+	"f|force" => \$force,
+	"p|path=s" => \$path,
+	"r|root=s" => \$root,
+	"m|timezone=s" => \&check_timezone,
+	"h|help" => sub {print_version(); usage(); exit(0);},
+	"v|version" => sub {print_version(); exit(0);},
+);
+
+my $adapter = shift(@ARGV);
+if (!$adapter) {
+	print "ERROR: missing adapter value.\n";
+	usage();
+	exit(1);
+}
+$adapter = "0.0.".$adapter if ($adapter =~ /^[[:xdigit:]]{4}$/);
+
+@excl_areas = split(/,/, join(',', @excl_areas));
+@incl_areas = split(/,/, join(',', @incl_areas));
+
+$path = rel2abs($path) if ($path);
+$root = rel2abs($root) if ($root);
+
+#
+# Hardcode the lengths of the sprintf type foreign trace area records because
+# the record length cannot be calculated using the trace view data strings.
+#
+$RECORD_LENGTHS{'CIO_CRW'} = 64;
+$RECORD_LENGTHS{'CIO_MSG'} = 88;
+
+assign_callback_subs();
+load_records($path, $adapter);
+
+@excl_areas = map { uc } @excl_areas;
+@incl_areas = map { uc } @incl_areas;
+
+show_trace_area_states($path, $adapter, \@excl_areas, \@incl_areas);
+show_all_records_ordered(\@excl_areas, \@incl_areas);

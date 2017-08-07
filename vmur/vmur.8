@@ -1,0 +1,610 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH VMUR 8 "January 2015" "s390-tools"
+.
+.ds v \fBvmur\fP
+.
+.
+.SH NAME
+vmur \- Work with z/VM spool file queues
+.
+.
+.SH SYNOPSIS
+.B vmur
+.RI [ OPTIONS ]
+.br
+.B vmur
+.IR vmur_command " [" command_options "] [" command_args ]
+.
+.
+.
+.SH DESCRIPTION
+The \*v program allows to read, create, list, purge, or order files
+on the z/VM spool files queues (RDR, PUN, and PRT).
+
+\*v supports the following commands:
+.RS 3
+.TP 12
+.RB "- " receive :
+Read a file from the reader queue
+.TP
+.RB "- " punch :
+Create a file on the punch queue
+.TP
+.RB "- " print :
+Create a file on the print queue
+.TP
+.RB "- " list :
+List one or all files on a spool file queue
+.TP
+.RB "- " purge :
+Purge one or all files on a spool file queue
+.TP
+.RB "- " order :
+Position a file at the top of a spool file queue
+.
+.RE
+.PP
+The \*v program requires the vmcp kernel module as prerequisite.
+For the receive, punch, and print commands the vmur kernel module is also
+required, and the corresponding z/VM virtual unit record devices
+(in most cases 000c as reader, 000d as punch, and 000e as printer) 
+must be set online.
+See
+.BR chccwdev (8)
+for setting devices online or offline.
+.
+.
+.
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+.PP
+All other options are command specific and will be discussed below in the
+respective command context.
+.
+.
+.
+.\" .SH USAGE
+.SH receive
+.SS Read file from reader queue
+.IP "" 0
+Synopsis:
+.IP "" 2
+receive [-fH] [-d dev_node] [-C class] [-t | -b sep.pad | -c]
+spoolid
+[-O | outfile]
+.PP
+Minimum abbreviation: re
+.PP
+Use \fBreceive\fR when you want to read a file
+from the z/VM reader queue.
+The file to be read is identified by its spoolid,
+a 4-digit decimal number.
+Use the 'vmur list' command to display information
+about files in the z/VM reader queue.
+.SP
+.SH receive options
+.SP
+The following command options are supported by \fBreceive\fR:
+.SP
+.IP "" 0
+\fB-f or --force\fR
+.IP "" 2
+Specifies that outfile is to be overwritten without displaying any
+confirmation message.
+.SP
+.IP "" 0
+\fB-H or --hold\fR
+.IP "" 2
+Specifies that the reader file to be received shall remain in the reader queue
+after processing. If omitted, the reader file is purged.
+.SP
+.IP "" 0
+\fB-C or --class\fR
+.IP "" 2
+Specifies the spool file class to match particular reader files.  The class
+value is a 1-character alphanumeric field whose values can be A through Z, 0
+through 9, or asterisk (*).
+
+If you omit this option, the asterisk (*) is used to receive files of any class.
+.SP
+.IP "" 0
+\fB-d or --device\fR
+.IP "" 2
+Specifies the device node of the virtual reader device.
+If omitted, /dev/vmrdr-0.0.000c is assumed.
+.SP
+.IP "" 0
+\fB-t or --text\fR
+.IP "" 2
+Specifies that a text file requiring EBCDIC-to-ASCII conversion is to be 
+received. Character sets IBM037 and ISO-8859-1 are used for the conversion.
+An ASCII line feed character (0x0a) is inserted for each 80-byte input
+record read from the z/VM reader. Trailing EBCDIC blanks (0x40) in the
+input records are stripped.
+.SP
+.IP "" 0
+\fB-b or --blocked\fR
+.IP "" 2
+Specifies that the file is to be received using blocked mode.
+As parameter for the -b option, the
+hex codes of a separator byte and a padding byte have to be specified.
+The parameter has the following format: 0xSS,0xPP
+.br
+All trailing padding bytes are
+removed from the end of each record read from the virtual reader and
+the separator byte is inserted afterwards.
+The receive function's output can be piped to
+.BR iconv (1)
+using the appropriate character sets, for example:
+.IP "" 2
+# vmur re 7 -b 0x25,0x40 -O | iconv -f EBCDIC-US -t ISO-8859-1 > file
+.SP
+.IP "" 0
+\fB-c or --convert\fR
+.IP "" 2
+Specifies to convert the VMDUMP spool file into a
+format appropriate for further analysis with crash or lcrash.
+.SP
+.IP "" 0
+\fB-O or --stdout\fR
+.IP "" 2
+Specifies that the reader file's contents are written to
+standard output.
+.SP
+.SH receive arguments
+.SP
+The following command arguments are supported by \fBreceive\fR:
+.SP
+.IP "" 0
+\fBspoolid\fR
+.IP "" 2
+Denotes the spoolid, which identifies a z/VM spool file.
+.br
+spoolid is mandatory and must be a decimal number in the range 0-9999.
+.SP
+.IP "" 0
+\fBoutfile\fR
+.IP "" 2
+specifies the name of the output file to receive the
+reader file's data.
+.br
+If both outfile and --stdout are omitted, name and type of the spool file
+to be received
+(see NAME and TYPE columns in 'vmur list' output)
+are taken to build output file name name.type.
+If the spool file to be received is an unnamed file, an error message
+is issued.
+.SP
+.SH receive example
+.SP
+Receive the z/VM console of your Linux guest machine. In the 'vmur list' output
+this is an unnamed file with identifier
+CON in the right part of the CLASS column.
+Assume its spoolid is 1234.
+.IP "" 2
+# vmur re -t 1234 linux_console
+.PD
+.IP "" 0
+.SP
+.SH punch or print
+.SS Write file to punch or printer queue
+.IP "" 0
+Synopsis:
+.IP "" 2
+punch|print [-fr] [-d dev_node]
+[-C class] [--form form] [--dest dest] [--dist distcode]
+[-t | -b sep.pad] [-u user] [-n node]
+.br
+      [-N name.type] [file]
+.PP
+Minimum abbreviation: pun/pr
+.PP
+Use \fBpunch/print\fR when you want to write a file to the z/VM punch or
+printer queue.
+Specify the --rdr option if you want the file to be transferred to the z/VM
+reader queue.
+.SP
+.SH punch/print options
+.SP
+The following command options are supported by \fBpunch/print\fR:
+.SP
+.IP "" 0
+\fB-f or --force\fR
+.IP "" 2
+Specifies to automatically convert Linux input file name (or
+<name>.<type> as specified with --name) to a valid spool
+file name and type without any error message.
+Invalid characters are replaced by _(underscore) and both <name> and <type>
+are truncated to a length of maximal 8 characters.
+.SP
+.IP "" 0
+\fB-r or --rdr\fR
+.IP "" 2
+Specifies that the punch or printer file
+is to be transferred to a reader.
+.SP
+.IP "" 0
+\fB-d or --device\fR
+.IP "" 2
+Specifies the device node of the virtual punch or printer device.
+If omitted, /dev/vmpun-0.0.000d is assumed for punch,
+and /dev/vmprt-0.0.000e for printer.
+.SP
+.IP "" 0
+\fB-C or --class\fR
+.IP "" 2
+Specifies the spool file class assigned to the spool files created on this punch
+or print.  The class value is a 1-character alphanumeric field whose values can be
+A through Z and 0 through 9.
+.SP
+.IP "" 0
+\fB--form\fR
+.IP "" 2
+Specifies the form to be assigned to the spool files on this punch or print.
+The value is a 1- to 8-character value.
+.SP
+.IP "" 0
+\fB--dest\fR
+.IP "" 2
+Specifies the destination value to be assigned to the spool files on this punch
+or print.  The value is a 1- to 8-character value.
+
+If the destination value has not been changed otherwise, for example, by a CP
+SPOOL command, the default is OFF.  OFF is the initial setting of the
+destination value for virtual devices.   Specify ANY to indicate that the
+resulting spool file can be processed on any CP output device that meets other
+selection criteria, regardless of the device's DEST setting.
+.SP
+.IP "" 0
+\fB--dist\fR
+.IP "" 2
+Specifies the distribution code to be assigned to the spool files on this punch
+or print.  The distribution code, distcode, is a 1- to 8-character value and
+appears on the separator page.
+
+If OFF or an asterisk (*) is specified, the distribution code of the spool file
+is reset to the distribution code in the system directory.
+.SP
+.IP "" 0
+\fB-t or --text\fR
+.IP "" 2
+specifies to
+punch or print the input file as text file, that is perform ASCII-to-EBCDIC
+conversion (using character sets ISO-8859-1 and IBM037)
+and pad each input line with trailing blanks to fill up the unit
+device record. The unit device record length is 80 for a punch and 132
+for a printer. If an input line length exceeds 80 or 132 for punch
+or print, respectively, an error message is issued.
+.SP
+.IP "" 0
+\fB-b or --blocked\fR
+.IP "" 2
+Specifies that the file is to be written using blocked mode.
+As parameter for the -b option, the
+hex codes of a separator byte and a padding byte have to be specified.
+The parameter has the following format: 0xSS,0xPP
+.br
+The separator byte identifies
+the line end character of the file to punch or print. If a line has less
+characters than the record length of the used unit record device, the
+residual of the record is filled up with the specified padding byte.
+If a line exceeds the record length, an error is printed.
+.br
+.BR iconv (1)
+output can be piped to punch or print, for example: 
+.IP "" 2
+# iconv xyz -f ISO-8859-1 -t EBCDIC-US | vmur pun -b 0x25,0x40 -N abc
+.SP
+.IP "" 0
+\fB-u or --user\fR
+.IP "" 2
+Specifies the z/VM user ID to whose reader the data is to be
+transferred. The --user operand must adhere to z/VM user naming conventions.
+If a local user is specified (that is the --node option is omitted), the
+user name is validated against the CP directory.
+.br
+The user option
+is only valid, if the -r option has been specified.
+If user is omitted, the data is transferred
+to your own machine's reader.
+.SP
+.IP "" 0
+\fB-n or --node\fR
+.IP "" 2
+Specifies the z/VM node ID of a remote z/VM system to which
+the data is to be transferred. RSCS (Remote Spooling Communications
+Subsystem) must be installed on the z/VM systems and
+the specified node ID must be defined in the RSCS machine's configuration file.
+The node option
+is only valid, if the -u option has been specified.
+If node is omitted, the data is transferred to the specified user
+at your local z/VM system.
+.SP
+.IP "" 0
+\fB-N or --name\fR
+.IP "" 2
+Specifies a name and, optionally, a type for the z/VM spool file to be created by
+the punch or print function (see NAME and TYPE columns in 'vmur list' output).
+.br
+In the following situations the spool file type is ignored
+and only a spool file name is set:
+.IP "" 4
+- if the string specified in --name does not contain any period delimiter.
+.IP "" 4
+- if the only period appears at the very first beginning of string.
+.IP "" 4
+- if a period appears at the very end of string and is not preceded by
+another period.
+.IP "" 2
+If --name is omitted:
+.IP "" 4
+- The Linux input file name (if any) is taken instead
+and an error message is issued, if it does not comply to z/VM file
+name rules (e.g. longer than 8 chars).
+.IP "" 4
+- If the Linux input file name is also omitted (that is data is read
+from standard input), then an error message is issued.
+.SP
+.SH punch/print arguments
+.SP
+The following command arguments are supported by \fBpunch/print\fR:
+.SP
+.IP "" 0
+\fBfile\fR
+.IP "" 2
+Specifies the Linux file data to be punched or printed.
+If file is omitted, the data is read from standard input.
+.SP
+.SH punch/print example
+.SP
+Punch parmfile and transfer it to the reader queue.
+.IP "" 2
+$ vmur pun -r /boot/parmfile
+.PD
+.IP "" 0
+.SP
+.SH list
+.SS List file(s) on spool file queue
+.IP "" 0
+Synopsis:
+.IP "" 2
+list [-q queue] [spoolid]
+.PP
+Minimum abbreviation: li
+.PP
+Use \fBlist\fR when you want to display information about files on a
+z/VM spool file queue.
+.SP
+.SH list options
+.SP
+The following command option is supported by \fBlist\fR:
+.SP
+.IP "" 0
+\fB-q or --queue\fR
+.IP "" 2
+Specifies the z/VM spool file queue to be listed. Possible values are rdr
+(reader file queue), pun (punch file queue), and prt (printer file queue).
+.br
+If omitted, the reader file queue is assumed.
+.SP
+.SH list arguments
+.SP
+The following command argument is supported by \fBlist\fR:
+.SP
+.IP "" 0
+\fBspoolid\fR
+.IP "" 2
+Identifies the z/VM spool file to be listed.
+If omitted, all spool files on the specified queue are listed 
+.PD
+.IP "" 0
+.SP
+.SH purge
+.SS Purge file(s) on spool file queue
+.IP "" 0
+Synopsis:
+.IP "" 2
+purge [-f] [-q queue] [-C class] [--form form] [--dest dest] [spoolid]
+.PP
+Minimum abbreviation: pur
+.PP
+Use \fBpurge\fR to remove files on a z/VM spool file queue.  Select the
+spool files to remove with the class, form, or dest options and the
+spoolid argument.  If these are omitted, all spool files on the specified
+queue are purged.
+\fB
+.SP
+.SH purge options
+.SP
+The following command options are supported by \fBpurge\fR:
+.SP
+.IP "" 0
+\fB-f or --force\fR
+.IP "" 2
+Specifies to purge the specified spool file(s) without displaying any
+confirmation message.
+.SP
+.IP "" 0
+\fB-q or --queue\fR
+.IP "" 2
+Specifies which spool file queue contains the file(s) that you want to purge.
+Possible values are rdr
+(reader file queue), pun (punch file queue), and prt (printer file queue).
+.br
+If omitted, the reader file queue is assumed.
+.SP
+.IP "" 0
+\fB-C or --class\fR
+.IP "" 2
+Specifies a spool file class.  All the files of the specified class are purged.
+The class value is a 1-character alphanumeric field whose values ca be A through
+Z, 0 through 9.
+.SP
+.IP "" 0
+\fB--form\fR
+.IP "" 2
+Specifies a form name.  All the files with the specified form name are purged.
+The form name is a 1- to 8-character value.
+.SP
+.IP "" 0
+\fB--dest\fR
+.IP "" 2
+Specifies a destination value.  All the files with the specified destination
+value are purged.  The destination is a 1- to 8-character value.
+.SP
+.SH purge arguments
+.SP
+The following command argument is supported by \fBpurge\fR:
+.SP
+.IP "" 0
+\fBspoolid\fR
+.IP "" 2
+Identifies the z/VM spool file to be purged.
+.PD
+.IP "" 0
+.SP
+.SH order
+.SS Order file on spool file queue
+.IP "" 0
+Synopsis:
+.IP "" 2
+list [-q queue] spoolid
+.PP
+Minimum abbreviation: or
+.PP
+Use \fBorder\fR when you want to place a spool file on top of a
+z/VM spool file queue.
+.SP
+.SH order options
+.SP
+The following command option is supported by \fBorder\fR:
+.SP
+.IP "" 0
+\fB-q or --queue\fR
+.IP "" 2
+Specifies the z/VM spool file queue you want to order. Possible values are rdr
+(reader file queue), pun (punch file queue), and prt (printer file queue).
+.br
+If omitted, the reader file queue is assumed.
+.SP
+.SH order arguments
+.SP
+The following command argument is supported by \fBorder\fR:
+.SP
+.IP "" 0
+\fBspoolid\fR
+.IP "" 2
+Identifies the z/VM spool file to be ordered.
+.
+.
+.
+.SH "EXAMPLES"
+.SS "Log and read the z/VM console from Linux"
+.IP "1." 3
+Start z/VM console spooling by issuing:
+
+.ft CW
+.in +0.25in
+.nf
+# vmcp sp cons start
+.fi
+.in -0.25in
+.ft
+.
+.IP "2."
+Produce output to the z/VM console (for example, with \fBCP TRACE\fP)
+.IP "3."
+Close the console file and transfer it to the reader queue, find the spool ID
+behind the \f(CWFILE\fP keyword in the corresponding CP message.
+In the example below, the spool ID is 398:
+
+.ft CW
+.in +0.25in
+.nf
+# vmcp sp cons clo \(rs* rdr
+RDR FILE 0398 SENT FROM LINUX025 CON WAS 0398 RECS 1872 
+.fi
+.in -0.25in
+.ft
+.
+.IP "4."
+Read and save the spool file on the Linux file system in the
+current working directory:
+
+.ft CW
+.in +0.25in
+.nf
+# vmur re -t 398 linux_cons
+.fi
+.in -0.25in
+.ft
+.
+.SS Prepare z/VM reader to IPL Linux
+.IP "1." 3
+Send parmfile to the z/VM punch queue and transfer it to the reader queue:
+
+.ft CW
+.in +0.25in
+.nf
+# vmur pun -r /boot/parmfile
+Reader file with spoolid 0465 created.
+.fi
+.in -0.25in
+.ft
+.
+.IP "2."
+Send the Linux kernel image to the z/VM punch queue and
+transfer it to reader queue:
+
+.ft CW
+.in +0.25in
+.nf
+# vmur pun -r /boot/vmlinuz -N image
+Reader file with spoolid 0466 created.
+.fi
+.in -0.25in
+.ft
+.
+.IP "3."
+Move the Linux kernel image to the first and parmfile to
+the second position in the reader queue:
+
+.ft CW
+.in +0.25in
+.nf
+# vmur or 465
+# vmur or 466
+.fi
+.in -0.25in
+.ft
+.
+.IP "4."
+Prepare re-IPL from the z/VM reader and reboot:
+
+.ft CW
+.in +0.25in
+.nf
+# chreipl ccw 0.0.000c
+# reboot
+.fi
+.in -0.25in
+.ft
+.
+.\" ---
+.
+.
+.
+.SH "SEE ALSO"
+.BR chccwdev (8),
+.BR vmcp (8),
+.BR iconv (1)
+
+.I "Linux on System z - Device Drivers, Features, and Commands"

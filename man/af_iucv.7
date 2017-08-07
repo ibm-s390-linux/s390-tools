@@ -1,0 +1,576 @@
+.\" af_iucv.7
+.\"
+.\"
+.\" Copyright IBM Corp. 2008, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.TH AF_IUCV 7 "August 2011"  "s390-tools" "Linux Programmer's Manual"
+.SH NAME
+AF_IUCV \- Sockets for z/VM IUCV and HiperSockets communication
+.
+.
+.
+.SH SYNOPSIS
+.B #include <sys/socket.h>
+.br
+.B #include <netiucv/iucv.h>
+.PP
+.IB iucv_stream_socket " = socket(AF_IUCV, SOCK_STREAM, 0);"
+.br
+.IB iucv_packet_socket " = socket(AF_IUCV, SOCK_SEQPACKET, 0);"
+.
+.
+.
+.SH DESCRIPTION
+The AF_IUCV address family provides an addressing mode for communications
+between applications that run on System z mainframes.  This addressing mode can be
+used for connections through real HiperSockets and through the z/VM Inter-User
+Communication Vehicle (IUCV).
+.PP
+HiperSockets facilitate connections between applications across LPARs within a
+System z mainframe.  In particular, an application running on an instance of Linux
+on System z can communicate with:
+.RS 2
+.IP "\(bu" 2
+Itself
+.IP "\(bu" 2
+Other applications running on the same Linux instance
+.IP "\(bu" 2
+An application on an instance of Linux on System z in another LPAR
+.RE
+.PP
+IUCV facilitates connections between applications across z/VM guest virtual
+machines within a z/VM system.  In particular, an application running on Linux on
+z/VM can communicate with:
+.RS 2
+.IP "\(bu" 2
+Itself
+.IP "\(bu" 2
+Other applications running on the same Linux instance
+.IP "\(bu" 2
+Applications running on other instances of Linux on z/VM within the same z/VM system
+.IP "\(bu" 2
+Applications running on a z/VM guest other than Linux within the same z/VM system
+.IP "\(bu" 2
+The z/VM control program (CP)
+.RE
+.PP
+The AF_IUCV address family supports stream-oriented sockets
+(\f(CWSOCK_STREAM\fP) and connection-oriented datagram sockets
+(\f(CWSOCK_SEQPACKET\fP).  Stream-oriented sockets can fragment data over
+several packets.  Sockets of type SOCK_SEQPACKET always map a particular
+socket write or read operation to a single packet.
+.
+.
+.SS Features
+For all instances of Linux on System z, the AF_IUCV address family provides:
+.RS 2
+.IP "\(bu" 2
+Multiple outgoing socket connections for real HiperSockets in layer3 mode
+.IP "\(bu" 2
+Multiple incoming socket connections for real HiperSockets in layer3 mode
+.RE
+.PP
+For instances of Linux on z/VM, the AF_IUCV address family also provides:
+.RS 2
+.IP "\(bu" 2
+Multiple outgoing socket connections for IUCV
+.IP "\(bu" 2
+Multiple incoming socket connections for IUCV
+.IP "\(bu" 2
+Socket communication with applications utilizing CMS AF_IUCV support
+.RE
+.
+.
+.
+.
+.SH "ADDRESS FORMAT"
+An AF_IUCV socket is represented by the following format:
+.PP
+.RS 8
+.ft CW
+.nf
+#define AF_IUCV    32
+
+struct sockaddr_iucv {
+    sa_family_t    siucv_family;     /* AF_IUCV */
+    unsigned short siucv_port;       /* reserved */
+    unsigned int   siucv_addr;       /* reserved */
+    char           siucv_nodeid[8];  /* reserved */
+    char           siucv_user_id[8]; /* user id */
+    char           siucv_name[8];    /* application name */
+};
+.fi
+.ft
+.RE
+.PP
+.TP
+.B siucv_family
+is set to
+.BR AF_IUCV
+(= 32)
+.
+.TP
+.B siucv_port, siucv_addr, siucv_nodeid
+are reserved for future use. The
+.B siucv_port
+and
+.B siucv_addr
+fields must be zero. The
+.B siucv_nodeid
+field must be set to exactly eight blanks.
+.
+.TP
+.B siucv_user_id
+specifies a HiperSockets device or a z/VM guest virtual machine.
+This specification implicitly sets the connection type for the socket to a
+HiperSockets connection or to a z/VM IUCV connection.
+
+This field must be eight characters long and, if necessary, padded with
+blanks on the right.
+
+For HiperSockets connections, the
+.B siucv_user_id
+field specifies the identifier that is set with the \fBhsuid\fP sysfs
+attribute of the HiperSockets device.  For
+.BR bind (2)
+this is the identifier of a local device, and for
+.BR connect (2)
+this is the identifier of the HiperSockets device of the communication
+peer.
+
+For IUCV connections, the
+.B siucv_user_id
+field specifies a z/VM user ID.  For
+.BR bind (2)
+this is the identifier of the local z/VM guest virtual machine, and
+for
+.BR connect (2)
+this is the identifier of the z/VM guest virtual machine for the
+communication peer.
+
+.RS
+.TP
+.B Tip:
+For
+.BR bind (2)
+you can also specify eight blanks.  The AF_IUCV address family support
+then automatically substitutes the local z/VM user ID for you.
+.RE
+.
+.TP
+.B siucv_name
+is set to the application name by which the socket is known. Servers advertise
+application names and clients use these application names to connect to servers.
+This field must be eight characters long, and if necessary, padded with blanks on
+the right.
+
+Similar to TCP or UDP ports, application names distinguish distinct
+applications on the same operating system instance.  Do not call
+.BR bind (2)
+for names beginning with \fBlnxhvc\fP.  These names are reserved for the
+z/VM IUCV HVC device driver (see also
+.BR hvc_iucv (9)).
+.
+.
+.
+.SH "SOCKET OPTIONS"
+Socket options can be set with
+.BR setsockopt (2)
+and read with
+.BR getsockopt (2)
+by specifying \f(CWSOL_IUCV\fP as the socket level.
+
+.TP
+.B SO_IPRMDATA_MSG
+Enables the application to send up to seven bytes of socket data in the
+parameter list of an IUCV message.  Use this option for IUCV connections
+to increase performance when transferring small amounts of data.
+For HiperSockets connections, this option has no effect.
+
+To send data in the parameter list, specify a non-zero integer value.
+
+.RS
+.TP
+.B Note:
+Use this option with care, older AF_IUCV versions do not support receiving
+socket data in the parameter list and shut down the socket on which
+a parameter list message has been received.
+.RE
+.
+.TP
+.B SO_MSGLIMIT
+Modifies the message limit for communication paths. The message limit
+specifies the maximum number of outstanding messages that are allowed
+for established connections.  For IUCV connections this setting can be
+lowered by z/VM when a connection is established.
+
+The message limit is an integer value in range 1 to 65535.
+The default value is 65535 for IUCV connections and 128 for HiperSockets
+connections.
+
+The message limit must be set before
+.BR connect "(2) or " listen (2)
+is called for sockets.
+.br
+For sockets that are already connected or listening for connections,
+the message limit cannot be changed.
+.br
+New sockets created by
+.BR accept (2)
+inherit the message limit that has been set for the listening socket.
+
+.BR getsockopt (2)
+returns the default message limit or the limit that has been set.
+For connected sockets, the current message limit is returned.
+For IUCV connections, there are two parameters that specify the message limit:
+.BR getsockopt (2)
+and the z/VM IUCV MSGLIMIT parameter.  If the two parameters specify different
+values for the message limit, the lower value is used.
+
+See the "SETUP FOR IUCV CONNECTIONS" section for setting IUCV MSGLIMIT
+authorizations.
+.
+.TP
+.B SO_MSGSIZE
+.BR getsockopt (2)
+returns the maximum message size a bound AF_IUCV socket can handle.
+The maximum message size for connections through HiperSockets depends on
+the MTU size of the underlying HiperSockets connection.
+.br
+For sockets that are not yet bound the maximum message size cannot be
+determined.
+.
+.
+.SH "ANCILLARY DATA"
+Ancillary data is sent and received using
+.BR sendmsg (2)
+and
+.BR recvmsg (2)\fR.\fP
+To send ancillary data, set the \fBcmsg_level\fP field of struct \fBcmsghdr\fP
+to \f(CWSOL_IUCV\fP and the \fBcmsg_type\fP field to a type of ancillary data
+that is supported by the AF_IUCV address family.
+.br
+For more information see
+.BR cmsg (3).
+
+Currently, the only supported type is:
+.TP
+.B SCM_IUCV_TRGCLS
+Send or receive IUCV target class information. The IUCV target class can be used
+to classify and identify an IUCV message at the IUCV protocol level.
+If the target class is not specified as ancillary data, it is set to zero.
+
+The target class is a number of type \fBuint32_t\fP.
+.
+.
+.
+.SH "SETUP FOR HIPERSOCKETS CONNECTIONS"
+This section applies to HiperSockets connections and explains the
+configuration of a HiperSockets device used for AF_IUCV address family
+support.
+.PP
+To run an AF_IUCV socket application using HiperSockets connections, the
+socket must be bound to a particular HiperSockets device configured with
+layer3 mode.
+Use the \f(CWhsuid\fP attribute of a HiperSockets device to identify it
+to the AF_IUCV address family support.
+.PP
+The identifier must adhere to these rules:
+.RS 2
+.IP \(bu 2
+It must be 1 to 8 characters.
+.IP \(bu 2
+It must be unique across your environment.
+.IP \(bu 2
+It must not match any z/VM user ID in your environment.
+.RE
+.PP
+To set an identifier, issue a command like this:
+.PP
+.RS 8
+.ft CW
+echo \fIidentifier\fP > /sys/devices/qeth/\fI<bus-ID>\fP/hsuid
+.ft
+.RE
+.PP
+You can then address this device by specifying the hsuid as the
+value for the \fBsiucv_user_id\fP field in the \fBsockaddr_iucv\fP
+addressing structure.
+.PP
+For example, to use "MYHOST01" to bind AF_IUCV sockets to the
+HiperSockets device with bus-ID 0.0.8000, run:
+.PP
+.RS 8
+.ft CW
+.nf
+echo "MYHOST01" > /sys/devices/qeth/0.0.8000/hsuid
+.fi
+.ft
+.RE
+.
+.
+.
+.SH "SETUP FOR IUCV CONNECTIONS"
+This section applies to z/VM IUCV connections and provides an overview of the
+required IUCV statements for your z/VM guest virtual machines.  For details
+and for general IUCV setup information for z/VM guest virtual machines see
+.I z/VM CP Programming Services
+and
+.IR "z/VM CP Planning and Administration" .
+.
+.
+.SS "Granting IUCV authorizations"
+Use the
+.B IUCV
+directory control statement to grant the necessary authorizations.
+.
+.TP
+.B IUCV ALLOW
+allows any other z/VM guest virtual machine to establish a communication path
+with this z/VM guest virtual machine.  With this statement, no further
+authorization is required for the z/VM guest virtual machine that initiates
+the communication.
+.
+.TP
+.B IUCV ANY
+allows this z/VM guest virtual machine to establish a communication path with
+any other z/VM guest virtual machine.
+.
+.TP
+.B IUCV \fIuser_ID\fP
+allows this z/VM guest virtual machine to establish a communication path to the
+z/VM guest virtual machine with the z/VM user ID \fIuser_ID\fP.
+.PP
+You can specify multiple IUCV statements. To any of these IUCV statements you
+can append the
+.B MSGLIMIT \fIlimit\fP
+parameter.
+\fIlimit\fP specifies the maximum number of outstanding messages that are
+allowed for each connection authorized by this statement.
+If no value is specified for \fBMSGLIMIT\fP, the maximum, 65535, is used.
+.
+.
+.SS "Setting a connection limit"
+Use the \fBOPTION\fP statement to limit the number of concurrent connections.
+.TP
+.B OPTION MAXCONN \fImaxno\fP
+\fImaxno\fP specifies the maximum number of IUCV connections allowed for this
+virtual machine. The default is 64. The maximum is 65535.
+.
+.
+.SS "Example"
+These sample statements allow any z/VM guest virtual machine to connect to your
+z/VM guest virtual machine with a maximum of 10\^000 outstanding messages for each
+incoming connection. Your z/VM guest virtual machine is permitted to connect to
+all other z/VM guest virtual machines. The total number of connections for your
+z/VM guest virtual machine cannot exceed 100.
+.ft CW
+.in +0.25i
+.nf
+
+IUCV ALLOW MSGLIMIT 10000
+IUCV ANY
+OPTION MAXCONN 100
+
+.fi
+.in -0.25i
+.ft
+.
+.
+.
+.
+.SH ERRORS
+Several socket operations return error conditions that have a special meaning in
+the context of AF_IUCV. Those error conditions, and the respective descriptions
+are listed below.
+
+See the manual page of the respective socket operation for a complete list
+of errors.
+
+.TP
+.B ECONNREFUSED
+.BR connect (2)
+called but the target system is not listening on the
+application name.
+.
+.TP
+.B ENETUNREACH
+.BR connect (2)
+called but the target z/VM guest virtual machine is not logged on.
+Ensure that the z/VM guest virtual machine to which your application wants to
+connect is logged on.
+.
+.TP
+.B EAGAIN
+.BR connect (2)
+called but the maximum number of IUCV connections is exceeded for the calling
+or for the target z/VM guest virtual machine.
+This error can be temporary and the application might try again after some
+time.  If the error occurs repeatedly, increase the maximum number of
+connections (for one or both z/VM guest virtual machines).
+See the "SETUP FOR IUCV CONNECTIONS" section about the required authorization
+statement.
+
+.B sendmsg (2)
+called but the maximum number of outstanding messages for the socket
+connection is reached, for example, if data is available that has not
+yet been received by the communication peer.
+
+If necessary, increase the message limit using the
+.BR setsockopt (2)
+function for HiperSockets and IUCV connections.  In addition, increase the
+IUCV message limit as as explained in section "Granting IUCV authorizations".
+.
+.TP
+.B EACCES
+.BR connect (2)
+called but the calling z/VM guest virtual machine is missing IUCV authorization.
+See the "SETUP FOR IUCV CONNECTIONS" section about required IUCV authorizations.
+.
+.TP
+.B ENODEV
+.BR connect (2)
+or
+.BR sendmsg (2)
+called but the HiperSockets device bound to the AF_IUCV socket does not exist.
+.
+.TP
+.B ENETDOWN
+.BR connect (2)
+or
+.BR sendmsg (2)
+called but the HiperSockets device bound to the AF_IUCV socket is not activated.
+.
+.TP
+.B EBADFD
+.BR connect (2)
+called but for HiperSockets connections the AF_IUCV socket is not
+bound or, for IUCV connections, the socket is neither in open nor in bound
+state.
+
+.BR bind (2)
+called but the AF_IUCV socket is no longer in open state.
+
+.BR accept (2)
+called but the AF_IUCV socket is not listening.
+
+.BR getsockopt (2)
+called but the AF_IUCV socket is not bound.
+
+.TP
+.B EINVAL
+.BR connect (2)
+or
+.BR bind (2)
+called but the \fBsiucv_family\fP field of the specified \fBsockaddr_iucv\fP
+structure is not set to \fBAF_IUCV\fP.
+
+.BR listen (2)
+called but the AF_IUCV socket has not yet been bound to an address.
+Always call
+.BR bind (2)
+before
+.BR listen (2).
+
+.BR setsockopt (2)
+called with option \fBSO_MSGLIMIT\fP for sockets that are already connected.
+.
+.TP
+.B ENOPROTOOPT
+.BR setsockopt (2)
+or
+.BR getsockopt (2)
+called but the socket level has not been set to \f(CWSOL_IUCV\fP, or the
+specified socket option is not supported.
+.
+.TP
+.B EOPNOTSUPP
+.BR sendmsg (2)
+or
+.BR recvmsg (2)
+might have been called with the
+.I MSG_OOB
+flag set.
+AF_IUCV does not support sending or receiving \fIout-of-band\fP data on its
+sockets.
+
+For \f(CWSOCK_SEQPACKET\fP sockets,
+.BR sendmsg (2)
+called without the
+.I MSG_EOR
+flag set.
+AF_IUCV does not support segmentation, and thus, the "end-of-record"
+(\fIMSG_EOR\fP) flag must always be set.
+.
+.TP
+.B EPROTONOSUPPORT
+.BR socket (2)
+called with a protocol that is not supported. The socket protocol parameter
+must be either zero or \f(CWPF_IUCV\fP.
+.
+.TP
+.B EAFNOSUPPORT
+.BR socket (2)
+called with \f(CWAF_IUCV\fP but the AF_IUCV address family is not
+supported by the current Linux kernel.  Ensure that your Linux kernel has been
+compiled with support for the latest version of the AF_IUCV address family.
+.
+.TP
+.B EADDRINUSE
+.BR bind (2)
+called with an \fBsiucv_name\fP already used for another AF_IUCV socket.
+.
+.PP
+Other errors can be generated by the generic socket layer. See the respective
+manual pages for more information.
+.
+.
+.
+.SH "SEE ALSO"
+.BR connect (2),
+.BR recvmsg (2),
+.BR sendmsg (2),
+.BR socket (2),
+.BR setsockopt (2),
+.BR getsockopt (2),
+.BR cmsg (3),
+.BR socket (7)
+
+.I "Linux on System z - Device Drivers, Features, and Commands"
+.br
+.I "z/VM CP Planning and Administration"
+.br
+.I "z/VM CP Programming Services"
+.
+.
+.
+.SH "HISTORY"
+.TP
+.B AF_IUCV, version 1.0
+.RS 4
+.IP "\(bu" 2
+Initial version.
+.RE
+.
+.TP
+.B AF_IUCV, version 1.1
+.RS 4
+.IP "\(bu" 2
+Support for sending socket data in the parameter list of an IUCV message
+(\f(CWSO_IPRMDATA_MSG\fP).
+.IP "\(bu" 2
+Access the target class of an IUCV message as ancillary data using
+.BR sendmsg "(2) and " recvmsg (2).
+.IP "\(bu" 2
+Support for \f(CWSOCK_SEQPACKET\fP sockets to facilitate development of native
+IUCV applications that interact with AF_IUCV.
+.RE
+.
+.TP
+.B AF_IUCV, version 1.2
+.RS 4
+.IP "\(bu" 2
+Support for HiperSockets connections.
+.RE

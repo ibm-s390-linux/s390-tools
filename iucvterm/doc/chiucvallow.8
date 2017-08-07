@@ -1,0 +1,146 @@
+.\" chiucvallow.8
+.\"
+.\"
+.\" Copyright IBM Corp. 2009, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.TH chiucvallow "8" "March 2015" "s390-tools" "z/VM IUCV HVC device driver"
+.
+.
+.ds f \fBchiucvallow\fP
+
+.
+.
+.SH NAME
+lsiucvallow, chiucvallow \- List, change, and verify z/VM user ID filter settings
+.
+.
+.
+.SH SYNOPSIS
+.B lsiucvallow
+.br
+.B \*f
+.BR \-l | \-\-list
+
+.B \*f
+.BR \-e | \-\-edit
+.RI " [" filter ]
+.br
+.B \*f
+.BR \-s | \-\-set
+.I filter
+.br
+.B \*f
+.BR \-c | \-\-clear
+
+.B \*f
+.BR \-V | \-\-verify
+.I filter
+.
+.
+.
+.SH DESCRIPTION
+The \*f program lists, verifies, and changes the z/VM user ID filter of the
+z/VM IUCV hypervisor console (HVC) device driver.
+
+The z/VM user ID filter lists the z/VM guest virtual machines (user IDs) that
+are permitted to establish IUCV communication paths with the z/VM IUCV HVC
+device driver.
+
+The filter list is a comma-separated list of z/VM user IDs as specified by the
+\fBhvc_iucv_allow\fP kernel parameter.  A filter entry might end with an
+asterisk (*) to match multiple z/VM user IDs.  Use \*f to change the filter
+list at runtime.
+
+\*f works with the currently active filter or with filter files that list each
+z/VM user ID on a separate line. Filter files might also contain comment lines
+starting with '#'.
+.br
+You can edit and verify existing filter files and replace the current
+z/VM user ID filter.
+.
+.
+.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display a short help text, then exit.
+.
+.TP
+.BR \-v ", " \-\-version
+Display the version of \*f, then exit.
+.
+.TP
+.BR \-l ", " \-\-list
+Display the z/VM user IDs contained in the current filter.
+
+Using this parameter requires root authority.
+.
+.TP
+.BR \-e ", " \-\-edit " [" \fIfilter\fP ]
+Edit the current z/VM user ID filter.
+
+\fIfilter\fP specifies a filter file listing z/VM user IDs.
+If \fIfilter\fP is not specified, the entries of the current z/VM user ID
+filter are used.
+
+The filter is opened temporarily in an editor program.  When the editor is
+closed, the changed filter is verified and, if verification succeeds, the
+current filter is replaced.  Otherwise a backup copy is saved for correcting
+errors.
+
+Using this parameter requires root authority.
+.
+.TP
+.BR \-c ", " \-\-clear
+Clear the current z/VM user ID filter by deleting all user ID entries.
+
+Using this parameter requires root authority.
+.
+.TP
+.BR \-s ", " \-\-set " " "\fIfilter\fP"
+Replace the current filter with the filter entries specified by \fIfilter\fP.
+The current filter can be replaced only after the new filter has been
+successfully verified.
+
+Using this parameter requires root authority.
+.
+.TP
+.BR \-V ", " \-\-verify " " "\fIfilter\fP"
+Verify the z/VM user ID filter specified by \fIfilter\fP.
+
+The verification process checks the following rules:
+.RS 10
+.IP "\(bu" 2
+z/VM user IDs consist of up to eight alphanumeric characters or underscores (_)
+.IP "\(bu" 2
+The total number of z/VM user IDs in the filter must not exceed 500
+.IP "\(bu" 2
+The filter size in bytes must not exceed 4095 bytes
+.RE
+.
+.
+.
+.SH "FILES"
+.TP
+.B /sys/module/kernel/parameters/hvc_iucv_allow
+sysfs attribute for accessing the \fBhvc_iucv_allow\fP kernel parameter.
+Use \*f to modify and access this sysfs attribute.
+.
+.
+.
+.SH "ENVIRONMENT"
+.TP
+.B EDITOR
+Specifies an editor program that is used for editing z/VM user ID filters.
+If \fBEDITOR\fP is not set or empty,
+.BR vi (1)
+is used.
+.
+.
+.
+.SH "SEE ALSO"
+.BR hvc_iucv (9)
+
+.I "Linux on System z - Device Drivers, Features, and Commands"

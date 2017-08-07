@@ -1,0 +1,32 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSSHUT 8 "Sept 2011" "s390-tools"
+
+.SH NAME
+lsshut \- print the shutdown action configuration for Linux on System z
+
+.SH SYNOPSIS
+\fBlsshut\fR [OPTIONS]
+
+.SH DESCRIPTION
+The \fBlsshut\fR command lists the Linux on System z shutdown action
+configuration. This configuration handles what the system should do for
+the following shutdown triggers: "halt", "poff", "reboot", "restart",
+and "panic".
+
+If kdump is enabled on your system, "restart" and "panic" also show the
+"kdump" action together with the action that is run in case of a "kdump"
+failure.
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print help information, then exit.
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print version information, then exit.
+
+.SH SEE ALSO
+.BR chshut (8)

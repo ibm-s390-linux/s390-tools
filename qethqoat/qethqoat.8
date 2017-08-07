@@ -1,0 +1,66 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH QETHQOAT 8 "April 2012" "s390-tools"
+.SH NAME
+qethqoat \- query the OSA address table
+
+.SH SYNOPSIS
+.B qethqoat
+.RB [ \-hv ]
+.br
+.B qethqoat
+.RB [ \-r "] [" \-s
+.IR scope ]
+.I interface
+.br
+.B qethqoat
+.RB \-f
+.I file
+
+.SH DESCRIPTION
+Use \fBqethqoat\fP to query the OSA address table and display physical and logical
+device information.
+
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-version
+Prints the version number of qethqoat and exits.
+.TP
+.BR \-h ", " \-\-help
+Displays the help information for the command.
+.TP
+.BR \-r ", " \-\-raw
+Writes raw data to stdout.
+.TP
+.BR \-f ", " \-\-file
+Reads input from file.
+.TP
+.BR \-s ", " \-\-scope
+Defines the scope of the query. Following scopes are supported.
+
+\fB0\fP  Query the level of the OSA address table
+
+\fB1\fP  Interface (default)
+
+.SH RETURN CODES
+qethqoat writes the response to stdout and any error message to stderr.
+The command completes with one of the following return codes:
+.TP
+.BR "0"
+The qethqoat command ran successfully.
+
+.TP
+.BR "1"
+An error occurred.
+
+.SH EXAMPLE
+.TP
+To display physical and logical device information for interface eth0 issue:
+\fBqethqoat eth0\fP
+
+.SH AUTHOR
+.nf
+Written by Frank Blaschka <frank.blaschka@de.ibm.com>
+.fi

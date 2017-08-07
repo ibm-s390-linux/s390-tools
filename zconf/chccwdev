@@ -1,0 +1,469 @@
+#!/bin/bash
+#
+# chccwdev - Tool to change attributes of a ccw device
+#
+# Copyright IBM Corp. 2003, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+CMD=$(basename $0)
+MAX_RETRIES=5
+CIO_SETTLE="/proc/cio_settle"
+ONLINEATTR="online"
+SYSPATH=NULL
+
+if [ "$(cat /proc/filesystems|grep sysfs)" = "" ]; then
+	echo "ERROR: $CMD requires sysfs support!" >&2
+	exit 1
+fi
+SYSFSDIR=$(cat /proc/mounts|awk '$3=="sysfs"{print $2; exit}')
+if [ "$SYSFSDIR" = "" ]; then
+	echo "ERROR: $CMD requires sysfs filesystem mounted!" >&2
+fi
+
+function PrintUsage() {
+	cat <<-EOD
+		Usage: $(basename $0) [<options>] <devices>
+
+		<options>
+		 	-a|--attribute <name>=<value>
+		 	-e|--online
+		 		Tries to set the given device online.
+		 	-f|--forceonline
+		 		Tries to force a device online if the device
+		 		driver supports this.
+		  	-d|--offline
+		  		Tries to set the given device offline.
+		  	-s|--safeoffline
+		  		Tries to set the given device offline waiting for all outstanding I/O. May block forever.
+		 	-v|--version
+		 		Show tools and command version.
+
+		<devices>
+		 	<bus ID>[-<busid>][,<busid>[-<busid>]] ...
+	EOD
+}
+
+function PrintVersion()
+{
+	cat <<-EOD
+	$CMD: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp. 2003, 2017
+	EOD
+}
+
+function CheckOnlineArg()
+{
+    if [ "$ONLINE" = $1 ] ;then
+	echo "$CMD: Incompatible argument list." >&2
+	echo "Try '$CMD --help' for more information." >&2
+	exit 1
+    fi
+}
+
+function SetAttribute()
+{
+	local NAME="$1"
+	local VAL="$2"
+	local CNT=0
+
+	if [ "$VAL" = "" ]; then
+		echo "WARNING: Attribute[$NAME] has no value and will" \
+			"be ignored!" >&2
+		return
+	fi
+	if [ "$NAME" = "online" ]; then
+		if [ "$VAL" = "force" ]; then
+			CheckOnlineArg 0
+			ONLINE=1
+			FORCE="force"
+		elif [ "$VAL" = "1" ]; then
+			CheckOnlineArg 0
+			ONLINE=1
+		else
+			CheckOnlineArg 1
+			ONLINE=0
+		fi
+		ACTIONSET=true
+		return
+	elif [ "$NAME" = "safe_offline" ]; then
+		CheckOnlineArg 1
+		ONLINE=0
+		ACTIONSET=true
+		ONLINEATTR="safe_offline"
+		return
+	fi
+
+	while [ $CNT -lt $NUMATTR ]; do
+		if [ "${ATTRNAME[$CNT]}" = "$NAME" ]; then
+			break
+		fi
+		let "CNT++"
+	done
+
+	ATTRNAME[$CNT]="$NAME"
+	ATTRVAL[$CNT]="$VAL"
+
+	if [ $CNT = $NUMATTR ]; then
+		let "NUMATTR++"
+		ACTIONSET=true
+	fi
+}
+
+FORCE=""
+ONLINE=""
+NUMATTR=0
+ACTIONSET=false
+while [ $# -gt 0 ]; do
+	case $1 in
+		-a|--attribute)
+				SetAttribute "$(echo $2|cut -d= -f1)" \
+					"$(echo $2|cut -d= -f2)"
+				shift
+				;;
+		-a*)
+				SetAttribute "$(echo $1|cut -c3-|cut -d= -f1)" \
+					"$(echo $1|cut -c3-|cut -d= -f2)"
+				;;
+		-h|--help)
+				PrintUsage
+				exit 0
+				;;
+		-e|--online)
+				SetAttribute "online" 1
+				;;
+		-f|--forceonline)
+				SetAttribute "online" "force"
+				;;
+		-d|--offline)
+				SetAttribute "online" 0
+				;;
+		-s|--safeoffline)
+				SetAttribute "safe_offline" 0
+				;;
+		-v|--version)
+				PrintVersion
+				exit 0
+				;;
+		-*)
+				echo "$CMD: Invalid option $1" >&2
+				echo "Try '$CMD --help' for more" \
+				    "information." >&2
+				exit 1
+				;;
+		*)
+				if [ "$BUSIDLIST" = "" ]; then
+					BUSIDLIST="$1"
+				else
+					BUSIDLIST="$BUSIDLIST,$1"
+				fi
+				;;
+	esac
+	shift
+done
+
+if [ -w $CIO_SETTLE ] ; then
+	echo 1 > $CIO_SETTLE
+fi
+
+#
+# Parse the BUSIDLIST and expand the ranges and short IDs.
+#
+BUSIDLIST=$(
+	echo "$BUSIDLIST" | awk '
+	function hex2dec(hex,	d, h, i) {
+		d = 0
+		for (i = 1; i <= length(hex); i++) {
+			h = index("0123456789abcdef", tolower(substr(hex,i,1)))
+			d = (d * 16) + (h - 1)
+		}
+		return d
+	}
+	function dec2hex(dec,	d, h) {
+		h = ""
+		for(d = dec; d > 0; d = int(d / 16)) {
+			h = substr("0123456789abcdef", (d % 16) + 1, 1) h
+		}
+		while (length(h) < 4)
+			h = "0" h
+
+		return h
+	}
+	function BusIDValid(id,		css, dsn) {
+		split(id, part, ".")
+		css = int(part[1])
+		if (css < 0 || css > 255)
+			return 0
+		dsn = int(part[2])
+		if (dsn < 0 || dsn > 255)
+			return 0
+		if (length(part[3]) > 4)
+			return 0
+		if (match(part[3], /^[a-f0-9]+$/) == 0)
+			return 0
+		return 1
+	}
+	function ExpandBusID(id) {
+		if (length(id) < 1) {
+			print "\"\" is not a valid bus ID." >err
+			return ""
+		}
+		split(id, part, ".")
+		if (3 in part) {
+			css = part[1]
+			dsn = part[2]
+			did = part[3]
+		} else if (2 in part) {
+			css = 0
+			dsn = part[1]
+			did = part[2]
+		} else {
+			css = 0
+			dsn = 0
+			did = part[1]
+		}
+		while (length(did) < 4)
+			did = "0" did
+
+		busid = css "." dsn "." did
+		if (! BusIDValid(busid)) {
+			print busid " is not a valid bus ID." >err
+			return ""
+		}
+		return busid
+	}
+	function ExpandRange(range,	i) {
+		split(range, id, "-")
+		from = ExpandBusID(id[1])
+		if (from == "")
+			return -1
+
+		to = ExpandBusID(id[2])
+		if (to == "")
+			return -1
+
+		split(from, parts1, ".")
+		split(to, parts2, ".")
+
+		if (parts1[1] != parts2[1] || parts1[2] != parts2[2]) {
+			print "Invalid range (" from "-" to ")" >err
+			return -1
+		}
+		from = hex2dec(parts1[3])
+		to   = hex2dec(parts2[3])
+		if (from > to) {
+			print "Invalid range order" >err
+			return -1
+		}
+		found = 0
+		for (i = from; i <= to; i++) {
+			# Expand ranges only to valid entries.
+			busid = parts1[1] "." parts1[2] "." dec2hex(i)
+			filen = SYSFSBASE busid "/devtype"
+			if ((getline x <filen) > 0) {
+				found = 1
+				print busid
+			}
+			close(filen)
+		}
+		if (!found) {
+			print "No Device in range (" parts1[1] "." parts1[2] \
+				"." parts1[3] "-" parts2[1] "." parts2[2]    \
+				"." parts2[3] ") found" >err
+			return -1
+		}
+	}
+	BEGIN{
+		SYSFSBASE = "'$SYSFSDIR'/bus/ccw/devices/"
+		err = "/dev/stderr"
+	}
+	{
+		line = tolower($0)
+		gsub(/[ \t]+/, "", line)
+
+		split(line, range, ",")
+		for (i=1; i in range; i++) {
+			if (match(range[i], /-/)) {
+				if (ExpandRange(range[i]) < 0)
+					exit 1
+			} else {
+				busid = ExpandBusID(range[i])
+				if (busid == "")
+					exit 1
+				print busid
+			}
+		}
+	}'
+)
+
+if [ $? -ne 0 ]; then
+	echo "ERROR: Evaluation of bus IDs failed!" >&2
+	echo ""
+	exit 1
+fi
+
+if [ "$BUSIDLIST" = "" ]; then
+	PrintUsage
+	echo ""
+	echo "No bus ID given!" >&2
+	exit 1
+fi
+if ! $ACTIONSET; then
+	PrintUsage
+	echo ""
+	echo "No action specified. Please use a valid action switch." >&2
+	exit 1
+fi
+
+function IsOnline() {
+	local ONLINE=$(cat $1/online 2>/dev/null)
+	if [ -z $ONLINE ]; then
+		if [ $2 -eq 0 ]; then
+			return 0
+		fi
+		return 1
+	fi
+	if [ $ONLINE -eq $2 ]; then
+		return 0
+	fi
+	return 1
+}
+
+function StoreAttribute()
+{
+	local SYSPATH="$1"
+	local BUSID="$(basename "$1")"
+	local NAME="${ATTRNAME[$2]}"
+	local VALUE="${ATTRVAL[$2]}"
+	local CHECK="$3"
+
+	if [ ! -f "$SYSPATH/$NAME" ]; then
+		return 1
+	fi
+	if [ "$VALUE" = "" ]; then
+		return 0
+	fi
+	if [ "$(cat $SYSPATH/$NAME)" = "$VALUE" ]; then
+		echo "The $NAME attribute of $BUSID already is $VALUE"
+		ATTRVAL[$2]=""
+		return 0
+	fi
+
+	echo "Setting $NAME attribute of $BUSID to $VALUE"
+	echo "$VALUE" >"$SYSPATH/$NAME" 2>/dev/null
+	if [ $? -eq 0 ]; then
+		ATTRVAL[$2]=""
+		return 0
+	fi
+
+	if [ $CHECK ]; then
+		echo "ERROR: Failed to set $NAME attribute of $BUSID!" >&2
+		exit 1
+	fi
+
+	return 0
+}
+
+function PrintError()
+{
+	read ERROR
+	if [ -n "$ERROR" ] ;then
+		echo "Failed (${ERROR##*: })" >&2
+		if [ ! -e $SYSPATH/driver ]; then
+			read CUTYPE 2>/dev/null < $SYSPATH/cutype
+			read DEVTYPE 2>/dev/null < $SYSPATH/devtype
+			if [ $? -ne 0 ] ;then
+				exit 1
+			fi
+			if [[ $DEVTYPE == "n/a" ]] ;then
+				DEVTYPE="0000/00"
+			fi
+			echo "Note: No driver is attached to this device" \
+				"(DevType:$DEVTYPE CU Type:$CUTYPE)." >&2
+		fi
+		exit 1
+	fi
+}
+
+SAVEDATTRS=("${ATTRVAL[@]}")
+for BUSID in $BUSIDLIST; do
+	SYSPATH=$SYSFSDIR/bus/ccw/devices/$BUSID
+	if [ ! -r $SYSPATH ]; then
+		echo "Device $BUSID not found"
+		exit 1
+	fi
+
+	if [ "$ONLINE" != "" ]; then
+
+		CNT=0
+		while [ $CNT -lt $NUMATTR ]; do
+			StoreAttribute "$SYSPATH" $CNT
+			if [ $? -ne 0 ]; then
+				if IsOnline $SYSPATH 1; then
+					echo "ERROR: Device[$BUSID] has no attribute" \
+						"${ATTRNAME[$CNT]}!" >&2
+					exit 1
+				fi
+			fi
+			let "CNT++"
+		done
+
+		if IsOnline $SYSPATH $ONLINE; then
+			if [ "$ONLINE" -eq 1 ]; then
+				echo "WARNING: Device[$BUSID] is already " \
+					"online" >&2
+			else
+				echo "Device is already offline" >&2
+			fi
+		else
+			if [ "$ONLINE" -eq 1 ]; then
+				echo "Setting device $BUSID online"
+			else
+				echo "Setting device $BUSID offline"
+			fi
+			if [ ! -e $SYSPATH/$ONLINEATTR ]; then
+				echo "$ONLINEATTR attribute not available for" \
+				    " device[$BUSID]" >&2
+				exit 1
+			fi
+			if [ "$FORCE" != "" ]; then
+				echo $FORCE 2>&1 >$SYSPATH/$ONLINEATTR | PrintError
+			else
+				echo $ONLINE 2>&1 > $SYSPATH/$ONLINEATTR | PrintError
+			fi
+
+			#
+			# Workaround for bad drivers which report success but
+			# silently fail or have an asynchronous online processing.
+			#
+			RETRIES=0
+			while ! IsOnline $SYSPATH $ONLINE; do
+				if [ $RETRIES -eq $MAX_RETRIES ]; then
+					echo "Failed" >&2
+					exit 1
+				fi
+				sleep 0.5
+				let "RETRIES++"
+			done
+		fi
+	fi
+
+	CNT=0
+	while [ $CNT -lt $NUMATTR ]; do
+		StoreAttribute "$SYSPATH" $CNT "CHECK"
+		if [ $? -ne 0 ]; then
+			echo "ERROR: Device[$BUSID] has no attribute" \
+				"${ATTRNAME[$CNT]}!" >&2
+			exit 1
+		fi
+		let "CNT++"
+	done
+	echo "Done"
+
+	unset ATTRVAL
+	ATTRVAL=("${SAVEDATTRS[@]}")
+done
+
+exit 0

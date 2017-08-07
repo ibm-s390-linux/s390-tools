@@ -1,0 +1,65 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIOMON_ZFCPDD 8 "July 28, 2008" "s390-tools" ""
+
+
+.SH NAME
+ziomon_zfcpdd \- monitor zfcp through blktrace drv\_data traces
+
+
+.SH SYNOPSIS
+.B ziomon_zfcpdd
+[ \-v ] [ \-V ] [ \-h ] [ \-i \fIinterval\fR ] [ \-b \fIfile\fR ]
+[ \-Q \fImsgq_path\fR \-q \fImsgq_id\fR \-m \fImsg_id\fR ]
+
+
+.SH DESCRIPTION
+ziomon_zfcpdd monitors performance relevant data provided by the
+zfcp device driver: channel und fabric latency, QDIO outbound queue
+utilisation.
+
+ziomon_zfcpdd periodically writes statistics every time a user-sepcified
+interval elapses.
+
+ziomon_zfcpdd consumes zfcp drv\_data traces provided by the binary output
+of blktrace.
+
+
+.SH OPTIONS
+
+.TP
+\fB-h\fR or \fB--help\fR
+Print usage information, then exit.
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print version information, then exit.
+
+.TP
+\fB-V\fR or \fB--verbose\fR
+Be verbose.
+
+.TP
+\fB-i\fR \fIinterval\fR or \fB--interval\fR \fIinterval\fR
+Specify interval length in seconds.
+
+.TP
+\fB-b\fR \fIfile\fR or \fB--binary\fR \fIfile\fR
+Specify the filename for binary output.
+
+.TP
+\fB-Q\fR \fImsgq_path\fR or \fB--msg-queue\fR \fImsgq_path\fR
+Specify the message queue path name.
+
+.TP
+\fB-q\fR \fImsgq_id\fR or \fB--msg-queue-id\fR \fImsgq_id\fR
+Specify the message queue id.
+
+.TP
+\fB-m\fR \fImsg_id\fR or \fB--msg-id\fR \fImsg_id\fR
+Specify the message id to use.
+
+.SH "SEE ALSO"
+blktrace (8)

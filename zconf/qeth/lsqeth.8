@@ -1,0 +1,66 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSQETH 8 "Sep 2013" "s390-tools"
+
+.SH NAME
+lsqeth \- list all qeth-based network devices with their corresponding
+settings.
+
+.SH SYNOPSIS
+.TP 16
+.B lsqeth \f [ -p ]\fB \f [ -h ]\fB \f [ -v ]\fB \f <device>\f
+
+.SH DESCRIPTION
+The lsqeth command lists all available qeth-based network devices with
+their attributes and the current status of these attributes. By default all devices
+are listed. It is also possible to list the attributes for a given device by
+specifying it as the last parameter.
+There are 3 different output schemas available. By default the output is printed in
+a 2 column table where the attributes are displayed on the left side with
+their current settings on the right side. The two other options are described
+below.
+
+
+
+.SH OPTIONS
+
+
+.TP
+.BR -p | --proc
+List the qeth based network devices in the former /proc/qeth format.
+
+.TP 8
+\fB-h\fR or \fB--help\fR
+Print help text.
+
+.TP 8
+\fB-v\fR or \fB--version\fR
+Print the version of the s390-tools package and the command.
+
+.TP
+\fB<device>\fR
+By specifying a device only the attributes for this device are displayed.
+
+.SH EXAMPLES
+\fBlsqeth\fR
+.RS
+List all qeth based network devices in a 2 column table layout.
+.RE
+
+\fBlsqeth -p\fR
+.RS
+List all qeth based network devices in the former /proc/qeth format.
+.RE
+
+\fBlsqeth -p hsi2\fR
+.RS
+List all device attributes with their current settings for HiperSockets
+device hsi2 in the former /proc/qeth format.
+.RE
+
+.SH AUTHOR
+.nf
+This man-page was written by Steffen Thoss <thoss@de.ibm.com>.
+.fi

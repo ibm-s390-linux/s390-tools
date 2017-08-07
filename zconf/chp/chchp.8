@@ -1,0 +1,142 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CHCHP 8 "Mar 2007" s390\-tools
+
+.SH NAME
+chchp \- modify channel\-path state.
+
+.SH SYNOPSIS
+.B chchp
+.RB [ \-v|\-\-vary
+.IR value ]
+.RB [ \-c|\-\-configure
+.IR value ]
+.RS 6
+.br
+.RB [ \-a|\-\-attribute
+.IR key = value ]
+.I chpid
+.br
+.RB [ \-h|\-\-help ]
+.RB [ \-\-version ]
+
+.SH DESCRIPTION
+The chchp command modifies the state of one or more channel\-paths.
+Channel\-path identifiers are specified in hexadecimal notation either simply
+as the CHPID\-number (e.g. e0) or in the form
+
+.RS
+<cssid>.<id>
+.RE
+
+where <cssid> is the channel\-subsystem identifier and <id> is the CHPID\-number (e.g. 0.7e).
+
+An operation can be performed on more than one channel\-path by specifying
+multiple identifiers as a blank or comma\-separated list or a range or a
+combination of both (see EXAMPLES section).
+
+Note that modifying the state of channel\-paths can affect the availability
+of I/O devices as well as trigger associated functions (e.g. channel\-path
+verification or device scanning) which in turn can result in a temporary
+increase in processor, memory and I/O load.
+.SH OPTIONS
+.BI "\-v " value
+.br
+.BI "\-\-vary " value
+.RS
+Change the logical channel\-path state to
+.IR value .
+The logical channel\-path state determines whether Linux will be actively
+using a channel\-path for I/O.
+.br
+
+.RI "A " value
+of "0" specifies the logical offline state. A value of "1" specifies the logical
+online state.
+.br
+
+Note that setting the logical state to offline may cause a currently running
+I/O operation to be aborted.
+.RE
+
+.BI "\-c " value
+.br
+.BI "\-\-configure " value
+.RS
+Change the channel\-path configuration state to
+.IR value .
+.br
+
+.RI "A " value
+of "0" specifies standby state. A value of "1" specifies configured state.
+.br
+
+Note that setting the configured state to standby may cause a currently running
+I/O operation to be aborted.
+.RE
+
+.B "\-a "
+.IR key = value
+.br
+.B \-\-attribute
+.IR key = value
+.RS
+Change the channel\-path sysfs attribute
+.IR key " to " value .
+.br
+
+.I key
+can be the name of any available channel-path sysfs attribute (e.g. "configure"
+or "status"), while
+.I value
+can take any valid value that may be written to the attribute (e.g. "0"
+or "offline").
+.br
+
+This is a more generic way of modifying the state of a channel-path via
+the sysfs interface. It is intended for cases where sysfs attributes
+or attribute values are available in the kernel but not in chchp.
+.RE
+
+
+.B \-h
+.br
+.B \-\-help
+.RS
+Print a short help text, then exit.
+.RE
+
+.B \-V
+.br
+.B \-\-version
+.RS
+Print version number, then exit.
+.RE
+
+.SH EXAMPLES
+
+.B chchp \-c 0 19
+.RS
+Put channel\-path 0.19 into standby state.
+.RE
+
+.B chchp \-a configure=0 19
+.RS
+Write value "0" into sysfs attribute "configure" of channel-path 0.19. The
+result is the same as when using the command chchp \-c 0 19
+.RE
+
+.B chchp \-c 1 0.65\-0.6f
+.RS
+Put channel\-paths 0.65 to 0.6f into configured state.
+.RE
+
+.B chchp \-v 0 0.12,0.7f,0.17\-0.20
+.RS
+Put channel\-paths 0.12, 0.7f and 0.17 to 0.20 into logical offline state.
+.RE
+
+.SH SEE ALSO
+.BR lschp (8)

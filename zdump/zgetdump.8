@@ -1,0 +1,447 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZGETDUMP 8 "April 2012" "s390-tools"
+.SH NAME
+zgetdump \- Tool for copying and converting System z dumps
+.SH SYNOPSIS
+
+\fBzgetdump\fR    DUMP [-s SYS] [-f FMT] > DUMP_FILE
+.br
+         -m DUMP [-s SYS] [-f FMT] DIR
+.br
+         -i DUMP [-s SYS]
+.br
+         -d DUMPDEV
+.br
+         -u DIR
+.br
+         -h|-v
+.SH DESCRIPTION
+The \fBzgetdump\fR tool copies a source dump into a target dump with a
+configurable dump format. The source dump can be located either on a dump
+device or on a file system. By default the source dump content is
+written to standard output, which you can redirect to a specific file. You
+can also mount the dump content, print dump information, check
+whether a dump device contains a valid dump tool, or create a
+non-disruptive dump on a live system.
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-m <DUMP> <DIR>" " or " "\-\-mount <DUMP> <DIR>"
+Mount the source dump DUMP to mount point DIR and generate a virtual target
+dump file instead of writing the content to standard output. The virtual dump
+file gets the name "dump.FMT", where FMT is the name of the specified
+dump format (see "--fmt" option).
+
+.TP
+.BR "\-u <DIR>" " or " "\-\-umount <DIR>"
+Unmount the dump that is mounted at mount point DIR. This option is a wrapper
+for "fusermount -u". Instead of DIR also the DUMP (for example /dev/dasdd1)
+can be specified.
+
+.TP
+.BR "\-d <DUMPDEV>" " or " "\-\-device <DUMPDEV>"
+Check the dump disk DUMPDEV for a valid dump tool and print information
+about it. See chapters DUMPDEV and DUMPDEV INFORMATION below for
+more information.
+
+.TP
+.BR "\-i <DUMP>" " or " "\-\-info <DUMP>"
+Print the dump header information reading from the DUMP and check if
+the dump is valid. See chapters DUMP and DUMP INFORMATION below for more
+information.
+.TP
+.BR "\-f <FMT>" " or " "\-\-fmt <FMT>"
+Use the specified target dump format FMT when writing or mounting the dump.
+The following target dump formats are supported:
+
+.BR "- elf:"
+Executable and Linking Format core dump (default)
+
+.BR "- s390:"
+s390 dump
+
+.TP
+.BR "\-s <SYS>" " or " "\-\-select <SYS>"
+If kdump fails and a stand-alone dump is created, the resulting dump captures
+two systems: The crashed kdump system and the previously crashed Linux
+instance. With the "--select" option you can choose which system data
+to use:
+
+.BR "- prod:"
+Data for the initial crashed Linux instance
+
+.BR "- kdump:"
+Data for the crashed kdump system
+
+.BR "- all:"
+Data for the initial crashed Linux and kdump system
+
+The "-s" option returns an error for dumps that capture only a single crashed system.
+
+.TP
+\fBDUMP\fR
+This parameter specifies the file, partition or tape device node where the
+source dump is located:
+.IP "         -" 12
+Regular dump file (e.g. /dumps/dump.0)
+.IP "         -" 12
+DASD partition device node (e.g. /dev/dasdc1)
+.IP "         -" 12
+DASD device node for multi-volume dump (e.g. /dev/dasdc)
+.IP "         -" 12
+Device mapper multipath partition device node of a FCP attached SCSI disk (e.g.
+/dev/mapper/3600..20c0-part1)
+.IP "         -" 12
+Tape device node (e.g. /dev/ntibm0)
+.IP "         -" 12
+Device node for live system (/dev/mem or /dev/crash)
+.PP
+.IP  " " 8
+Note: For DASD multi-volume dump it is sufficient to specify only one of the
+multi-volume DASD partitions as DUMP.
+
+.TP
+\fBDUMPDEV\fR
+When using the "--device" option, DUMPDEV must be the device node of
+the dump disk that should be verified. This can be either a DASD device
+node or a device mapper multipath device node of a FCP attached SCSI disk.
+
+.SH COPY DUMP
+The default action of zgetdump is to copy the source dump to standard output in
+the target format specified by the \-\-fmt option. Read
+the examples section below for more information.
+
+.SH MOUNT DUMP
+Use the "--mount" option to make a source dump accessible to tools that cannot
+directly read the original dump format. Rather than creating a converted
+copy of the dump, zgetdump creates a virtual dump file with the requested
+target format. This is fast and does not consume any additional disk space.
+Also multi-volume dumps can be assimilated into a single virtual dump file,
+which can then be accessed directly with dump-processing tools like
+makedumpfile or crash.
+
+Specify a command of this form to mount and convert a dump:
+
+.br
+# zgetdump --mount <DUMP> <DIR>  --fmt <FMT>
+.br
+
+Where:
+.TP
+.BR DUMP
+is the source dump or dump device
+.TP
+.BR DIR
+is the mount point where the virtual dump file is created
+.TP
+.BR FMT
+is the target dump format to which the virtual dump file is converted.
+The resulting virtual dump file is <DIR>/dump.<FMT>
+.P
+The virtual dump file exists until the directory is unmounted.
+Use zgetdump -u <DIR> to unmount a dump.
+
+The zgetdump tool uses the file system in user space (fuse) to mount the source
+dump. Therefore, the fuse kernel module must to be loaded before using
+the "--mount" option.
+
+Read the examples section below for more information.
+.SH DUMP FORMATS
+The default target format of zgetdump is "elf". Use the "--fmt" option to
+change the target format. The following dump formats are supported for
+target and source dump:
+.TP
+.BR "elf"
+Executable and Linking Format core dump. This dump format is also used for
+Linux user space core dumps.
+.TP
+.BR "s390"
+This dump format is System z specific and is used for DASD and tape dumps.
+.TP
+The following dump formats are supported for the source dump only:
+.TP
+.BR "lkcd"
+This dump format is used by the Linux Kernel Crash Dumps (LKCD) project
+and also on System z for the "vmconvert" dump tool.
+.TP
+.BR "devmem"
+On live systems the /dev/mem or /dev/crash device nodes can be used as source
+dumps for creating live dumps.
+.TP
+.BR "kdump" / "kdump_flat"
+Dump formats created by the "makedumpfile" tool. For these formats only the
+"--info" option can be used.
+
+.SH DUMP INFORMATION
+Depending on the dump format, the following dump attributes are available
+when calling zgetdump with the "--info" option:
+.TP
+.BR "Dump format"
+Name of the dump format.
+.TP
+.BR Version
+Version number of the dump format.
+.TP
+.BR "Dump method"
+Dump method that has been used to create the dump. Currently the only
+supported value for this attribute is "live" which indicates that the
+dump has been created from a live system and therefore is not consistent.
+.TP
+.BR "Dump created/ended"
+Time when the dump process was started or ended. The dump time information is
+printed in your local time zone. E.g. "Wed, 03 Feb 2010 10:47:37 +0100" shows
+the time at your location. The meaning of "+0100" is that your time zone is one
+hour behind GMT. You can use the "TZ" environment
+variable or use the "tzselect" tool to change the time zone. For example, if you
+know that the dump has been created in Hawaii, you can get the correct
+time information with:
+.br
+
+# TZ='Pacific/Honolulu' zgetdump -i DUMP
+.TP
+.BR "Dump CPU ID"
+Identifier of the CPU that ran the dump tool.
+.TP
+.BR "UTS node name"
+The network node hostname of the Linux system.
+.TP
+.BR "UTS kernel release"
+The kernel release of the Linux system.
+.TP
+.BR "UTS kernel version"
+The kernel version of the Linux system.
+.TP
+.BR "Build arch"
+Architecture (s390 or s390x) on which the dump tool was built.
+.TP
+.BR "System arch"
+Architecture (s390 or s390x) of the Linux system.
+.TP
+.BR "CPU count (online)"
+Number of online CPUs.
+.TP
+.BR "CPU count (real)"
+Number of total CPUs (online and offline).
+.TP
+.BR "Dump memory range"
+Memory range that was dumped. This value is the difference between the last
+dumped and the first dumped memory address.
+.TP
+.BR "Real memory range"
+Memory range that was available on the system. This value is the difference
+between the last and the first memory address of the system on which the
+dump was created.
+The "real memory range" can differ from the "dump memory range" when
+the SIZE parameter was used when preparing the dump device with the zipl
+tool (see man zipl).
+.TP
+.BR "Memory map"
+Available memory chunks in the dump. Some dump tools create multiple memory
+chunks when creating a dump on a system with memory gaps
+
+.SH DUMPDEV INFORMATION
+Depending on the dump tool, the following attributes are available
+when calling zgetdump with the "--device" option:
+.TP
+.BR "Dump tool"
+Name of the dump tool.
+.TP
+.BR "Version"
+Version of the dump tool.
+.TP
+.BR "Architecture"
+Architecture (s390 or s390x) of the dump tool.
+.TP
+.BR "DASD type"
+Type of the DASD where the dump tool is installed (ECKD or FBA).
+.TP
+.BR "Dump size limit"
+If this attribute is set, the dump tool will dump memory only up to that
+limit even if there is more memory available.
+.TP
+.BR "Force specified"
+If this attribute is set to "yes", the multi-volume DASD dump tool will not
+verify the dump signature on dump partitions. This can be useful, if the dump
+partition is also used for swap.
+.TP
+.BR "Partition info"
+For SCSI partition dump, the partition number and the maximum dump size is
+printed. The partition number corresponds to the output of
+"parted /dev/sdx print" or "fdisk -l /dev/sdx".
+
+.SH EXAMPLES
+.TP
+.B Copy single-volume DASD dump
+
+The DASD partition /dev/dasdx1 was prepared for dump with:
+.br
+
+  # zipl -d /dev/dasdx1
+
+.br
+An IPL was performed on the corresponding single-volume dump tool and a dump
+has been created. To copy the dump from the DASD partition to file dump.elf
+issue:
+.br
+
+  # zgetdump /dev/dasdx1 > dump.elf
+
+.TP
+.B Copy multi-volume DASD dump
+
+DASD partitions /dev/dasdx1 and /dev/dasdy1 contained in file dev_list.conf
+were prepared for multi-volume dump with:
+.br
+
+  # zipl -M dev_list.conf
+
+.br
+An IPL was performed on the corresponding multi-volume dump tool and a dump
+has been created. To copy the dump from the DASD partitions to file dump.elf
+issue:
+.br
+
+  # zgetdump /dev/dasdx > dump.elf
+
+.br
+.TP
+.B Copy SCSI dump
+
+The device mapper multipath partition on a SCSI disk
+/dev/mapper/3600..20c0-part1 was prepared for dump with:
+.br
+
+  # zipl -d /dev/mapper/3600..20c0-part1
+
+.br
+An IPL was performed on the corresponding dump tool and a dump
+has been created. To copy the dump from the device mapper partition to file
+dump.elf issue:
+.br
+
+  # zgetdump /dev/mapper/3600..20c0-part1 > dump.elf
+
+.TP
+.B Copy tape dump
+
+Tape device /dev/ntibm0 was prepared with:
+.br
+
+  # zipl -d /dev/ntibm0
+
+.br
+An IPL was performed on the corresponding tape dump tool and a dump
+has been created. To copy the dump from the tape to file dump.elf
+issue:
+.br
+
+  # zgetdump /dev/ntibm0 > dump.elf
+
+.br
+.TP
+.B Create live dump
+
+To store an ELF-format dump from a live system in a file called dump.elf
+issue:
+.br
+
+  # nice -n -20 zgetdump /dev/mem > dump.elf
+
+.br
+.TP
+.B Using pipes for network transfer
+
+You can redirect standard output to tools like ftp or ssh in order to
+transfer the dump over the network without copying it into the file system
+first.
+
+Copy DASD dump using ssh:
+.br
+
+   # zgetdump /dev/dasdd1  | ssh user@host "cat > dump.elf"
+
+.br
+Copy and compress DASD dump using ftp and gzip (note that not all ftp clients
+can do this):
+.br
+
+   # ftp host
+   ftp> put |"zgetdump /dev/dasdd1 | gzip" dump.elf.gz
+
+.br
+The same effect can also be achieved by using the "--mount" option and run
+scp or ftp directly on the mounted virtual dump file.
+
+.TP
+.B Using the "--mount" option
+
+Mount a single-volume DASD dump as virtual ELF dump file, compress
+it with the makedumpfile tool, and unmount it with zgetdump:
+.br
+
+  # zgetdump -m /dev/dasdc1 /dumps
+  # makedumpfile -c -d 31 -x vmlinux.debug \\
+       /dumps/dump.elf dump.kdump
+  # zgetdump -u /dumps
+
+.br
+Mount a multi-volume DASD dump, process it with the "crash" tool, and
+unmount it with fusermount:
+.br
+
+  # zgetdump -m /dev/dasdx /dumps
+  # crash vmlinux /dumps/dump.elf
+  # fusermount -u /dumps
+
+.br
+.TP
+.B Print dump information (--info)
+
+Print information about a DASD dump on /dev/dasdd1:
+.br
+
+  # zgetdump -i /dev/dasdd1
+
+.br
+Print information about a dump on a device mapper multipath partition device
+node of a SCSI disk:
+.br
+
+  # zgetdump -i /dev/mapper/3600..20c0-part1
+
+.br
+.TP
+.B Print dump tool information (--device)
+
+Print information about a DASD dump tool on /dev/dasdd:
+.br
+
+  # zgetdump -d /dev/dasdd
+
+.br
+Print information about a dump tool on a SCSI multipath device:
+.br
+
+  # zgetdump -d /dev/mapper/3600..02c0
+
+.br
+.SH NOTES
+The ELF dump format is not supported by the zgetdump tool under 31 bit.
+
+While it is not recommended for reasons of recovery and redundancy, FCP
+attached SCSI disks can also be accessed directly without multipathing,
+for example via the "/dev/disk/by-path/" device nodes.
+
+.SH SEE ALSO
+.BR zipl (8), crash (8), makedumpfile (8), dumpconf (8), vmconvert (1), vmur (8)
+.BR fdisk (8), parted (8)

@@ -1,0 +1,6 @@
+#
+# Rule for z90crypt character device node permissions
+# This file should be installed in /etc/udev/rules.d
+#
+
+KERNEL=="z90crypt",		MODE="0666"

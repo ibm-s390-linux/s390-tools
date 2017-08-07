@@ -1,0 +1,458 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" Macro for inserting an option description prologue.
+.\" .OD <long> [<short>] [args]
+.de OD
+.  ds args "
+.  if !'\\$3'' .as args \fI\\$3\fP
+.  if !'\\$4'' .as args \\$4
+.  if !'\\$5'' .as args \fI\\$5\fP
+.  if !'\\$6'' .as args \\$6
+.  if !'\\$7'' .as args \fI\\$7\fP
+.  PD 0
+.  if !'\\$2'' .IP "\fB\-\\$2\fP \\*[args]" 4
+.  if !'\\$1'' .IP "\fB\-\-\\$1\fP \\*[args]" 4
+.  PD
+..
+.\" Macro for inserting code line.
+.\" .CL <text>
+.de CL
+.  ds pfont \\n[.f]
+.  nh
+.  na
+.  ft CW
+\\$*
+.  ft \\*[pfont]
+.  ad
+.  hy
+.  br
+..
+.\" Macro for inserting a man page reference.
+.\" .MP man-page section [suffix]
+.de MP
+.  nh
+.  na
+.  BR \\$1 (\\$2)\\$3
+.  ad
+.  hy
+..
+.
+.TH "dump2tar" "1" "2016\-09\-02" "" ""
+.
+.SH "NAME"
+dump2tar - Gather file contents and command output into a tar archive
+.
+.
+.SH "SYNOPSIS"
+.B "dump2tar "
+.RI "[" "OPTIONS" "] " "SPECS"
+.
+.
+.SH "DESCRIPTION"
+.B dump2tar
+creates a tar archive from the contents of any files, including files of
+unknown size.
+
+Examples for files of unknown size are:
+.IP \(bu 3
+Named pipes (FIFOs)
+.PP
+.IP \(bu 3
+Particular Linux kernel debugfs or sysfs files
+.PP
+.IP \(bu 3
+Character or block devices
+.PP
+
+When adding such a file,
+.B dump2tar
+first reads all available data until an end-of-file indication is found. From
+this data, it then creates a regular file entry in the resulting tar archive.
+By default, symbolic links and directories are preserved in the archive in
+their original form.
+
+.B dump2tar
+can also:
+.IP \(bu 3
+Add files under a different name
+.PP
+.IP \(bu 3
+Run arbitrary commands and add the resulting command output as a
+regular file
+.PP
+.
+.
+.SH "FILE SPECIFICATIONS"
+.
+This section describes the format of the
+.I SPECS
+argument mentioned in the command synopsis.
+Use the following command line syntax to identify data sources and
+to specify file names within the archive:
+.PP
+
+.TP
+.I "PATH"
+Adds the contents of the file system subtree at file system location
+.I PATH
+(with possible exceptions described by options) in the archive under the same
+file name as on the file system.
+.PP
+.
+.
+.TP
+.IR "FILENAME" ":=" "PATH"
+Adds the contents of the file at file system location
+.I PATH
+in the archive under the name specified by
+.IR FILENAME .
+.PP
+.
+.
+.TP
+.IR "FILENAME" "|=" "CMDLINE"
+Runs the command
+.IR CMDLINE
+and captures both the resulting standard output and standard error streams.
+Adds the collected output as a regular file named
+.I FILENAME
+in the resulting archive. You can also include the resulting program exit code
+by using option \-\-add\-cmd\-status.
+.PP
+.
+You can also specify "\-\-". All specifications that follow are interpreted as
+simple file names. This is useful for archiving files that contain ":=" or "|=".
+.PP
+.
+.
+.SH "OUTPUT OPTIONS"
+.
+.OD "output\-file" "o" "TARFILE"
+Writes the resulting tar archive to
+.IR TARFILE .
+An existing file at the specified file system location is overwritten.
+
+If this option is omitted or if "\-" is specified for
+.IR TARFILE ,
+the archive is written to the standard output stream.
+.PP
+.
+.
+.OD "gzip" "z" ""
+Compresses the resulting tar archive using gzip.
+.PP
+.
+.
+.OD "max\-size" "m" "VALUE"
+Sets an upper size limit, in bytes, for the resulting archive. If this limit
+is exceeded after adding a file, no further files are added.
+.PP
+.
+.
+.OD "timeout" "t" "VALUE"
+Sets an upper time limit, in seconds, for the archiving process. If this limit
+is exceeded while adding a file, that file is truncated and no
+further files are added.
+.PP
+.
+.
+.OD "no-eof" "" ""
+Does not write an end-of-file marker.
+
+Use this option if you want to create an archive that can be extended by
+appending additional tar archive data.
+
+Note: Do not use this option for the final data to be added.
+A valid tar archive requires a trailing end-of-file marker.
+.PP
+.
+.
+.OD "append" "" ""
+Appends data to the end of the archive.
+
+Use this option to incrementally build a tar file by repeatedly calling
+.BR dump2tar .
+You must specify the \-\-no\-eof option for each but the final call of
+.BR dump2tar .
+.PP
+.
+.
+.OD "add-cmd-status" "" ""
+Adds a separate file named
+.RI \(dq FILENAME .cmdstatus\(dq
+for each command output added through the
+.RI \(dq FILENAME |= CMDLINE \(dq
+notation (see FILE SPECIFICATIONS).
+This file contains information about the exit status of the
+process that executed the command:
+.
+.RS 8
+.TP
+.RI EXITSTATUS= VALUE
+Unless
+.I VALUE
+is -1, the process ended normally with the specified exit value.
+.PP
+.
+.TP
+.RI TERMSIG= VALUE
+Unless
+.I VALUE
+is -1, the process was stopped by a signal of the specified number.
+.PP
+.
+.TP
+.RI WAITPID_ERRNO= VALUE
+Unless
+.I VALUE
+is -1, an attempt to obtain the status of the process failed with the
+specified error.
+.PP
+.RE
+.
+.
+.
+.SH "INPUT OPTIONS"
+.
+.OD "files\-from" "F" "FILENAME"
+Reads input data specifications (see FILE SPECIFICATIONS) from
+.IR FILENAME ,
+one specification per line. Each line contains either a file name or a
+.IR FILENAME := PATH
+or
+.IR FILENAME |= CMDLINE
+specification. Empty lines are ignored.
+
+A line can also consist of only "\-\-". All lines following this specification
+are interpreted as simple file names. This is useful for archiving files that
+contain ":=" or "|=".
+.PP
+.
+.
+.OD "ignore\-failed\-read" "i" ""
+Continues after read errors.
+
+By default,
+.B dump2tar
+stops processing after encountering errors while reading an input file.
+With this option,
+.B dump2tar
+prints a warning message and adds an empty entry for the erroneous file in
+the archive.
+.PP
+.
+.
+.OD "buffer\-size" "b" "VALUE"
+Reads data from input files in chunks of
+.I VALUE
+bytes. Large values can accelerate the archiving process for large files
+at the cost of increased memory usage. The default value is 1048576.
+.PP
+.
+.
+.OD "file\-timeout" "T" "VALUE"
+Sets an upper time limit, in seconds, for reading an input file.
+
+.B dump2tar
+stops processing a file when the time limit is exceeded. Archive entries for
+such files are truncated to the amount of data that is collected by the time
+the limit is reached.
+.PP
+.
+.
+.OD "file\-max\-size" "M" "N"
+Sets an upper size limit, in bytes, for an input file.
+
+.B dump2tar
+stops processing a file when the size limit is exceeded. Archive entries for
+such files are truncated to the specified size.
+.PP
+.
+.
+.OD "jobs" "j" "N"
+By default,
+.B dump2tar
+processes one file at a time. With this option,
+.B dump2tar
+processes
+.I N
+files in parallel.
+
+Parallel processing can accelerate the archiving process,
+especially if input files are located on slow devices, or when output from
+multiple commands is added to the archive.
+
+Note: Use
+.B tar
+option \-\-delay\-directory\-restore when extracting files from an archive
+created with \-\-jobs to prevent conflicts with directory permissions and
+modification times.
+.PP
+.
+.
+.OD "jobs\-per\-cpu" "J" "N"
+Processes
+.I N
+files for each online CPU in parallel.
+
+Parallel processing can accelerate the
+archiving process, especially if input files are located on slow devices, or
+when output from multiple commands is added to the archive.
+
+Note: Use
+.B tar
+option \-\-delay\-directory\-restore when extracting files from an archive
+created with \-\-jobs\-per\-cpu to prevent conflicts with directory permissions
+and modification times.
+.PP
+.
+.
+.OD "exclude" "x" "PATTERN"
+Does not add files to the archive if their file names match
+.IR PATTERN .
+.I PATTERN
+is an expression that uses the shell wildcards.
+.PP
+.
+.
+.OD "exclude\-from" "X" "FILENAME"
+Does not add files to the archive if their names match at least one of the
+patterns listed in the pattern file with name
+.IR FILENAME .
+In the pattern file, each line specifies an expression that uses the
+shell wildcards.
+.PP
+.
+.
+.OD "exclude\-type" "" "TYPE"
+Does not add files to the archive if they match at least one of the file types
+specified with
+.IR TYPE .
+.I TYPE
+uses one or more of the characters "fdcbpls", where:
+
+.RS 8
+.IP f 3
+regular files
+.PP
+.IP d 3
+directories
+.PP
+.IP c 3
+character devices
+.PP
+.IP b 3
+block devices
+.PP
+.IP p 3
+named pipes (FIFOs)
+.PP
+.IP l 3
+symbolic links
+.PP
+.IP s 3
+sockets
+.PP
+.RE
+.
+.PP
+.
+.
+.OD "dereference" "" ""
+Adds the content of link targets instead of symbolic links.
+.PP
+.
+.
+.OD "no\-recursion" "" ""
+Does not add files from sub\-directories.
+
+By default,
+.B dump2tar
+adds archive entries for specified directories, and for the files within these
+directories. With this option, a specified directory results in a single entry
+for the directory. Any contained files to be included must be specified
+explicitly.
+.PP
+.
+.
+.SH "MISC OPTIONS"
+.
+.OD "help" "h" ""
+Prints an overview of available options, then exits.
+.PP
+.
+.
+.OD "verbose" "V" ""
+Prints additional informational output.
+.PP
+.
+.
+.OD "quiet" "q" ""
+Suppresses printing of informational output.
+.PP
+.
+.
+.
+.SH "EXAMPLES"
+.
+.\fB
+.CL # dump2tar a b \-o archive.tar
+.\fR
+
+.RS 4
+Creates a tar archive named archive.tar containing files a and b.
+.RE
+.PP
+.
+.\fB
+.CL # dump2tar /proc \-o procdump.tar.gz \-z \-i \-T 1 \-M 1048576
+.\fR
+
+.RS 4
+Creates a gzip compressed tar archive named procdump.tar.gz that contains
+all procfs files. Unreadable files are ignored. Files are truncated when the
+first of the two limiting conditions is reached, either 1048576 bytes of
+content or the reading time of 1 second.
+.RE
+.PP
+.
+.\fB
+.CL # dump2tar '|=dmesg' '|=lspci' \-o data.tar
+.\fR
+
+.RS 4
+Creates a tar archive named data.tar containing the output of the 'dmesg'
+and 'lspci' commands.
+.RE
+.PP
+.
+.\fB
+.CL # dump2tar /sys/kernel/debug/ -x '*/tracing/*' -o debug.tar -i
+.\fR
+
+.RS 4
+Creates a tar archive named debug.tar containing the contents of directory
+/sys/kernel/debug/ while excluding any file that is located in a sub-directory
+named 'tracing'.
+.RE
+.PP
+.
+.
+.SH "EXIT CODES"
+.TP
+.B 0
+The program finished successfully
+.TP
+.B 1
+A run-time error occurred
+.TP
+.B 2
+The specified command was not valid
+.PP
+.
+.
+.SH "SEE ALSO"
+.MP dump2tar 1 ,
+.MP tar 1

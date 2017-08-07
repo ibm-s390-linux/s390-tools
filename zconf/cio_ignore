@@ -1,0 +1,793 @@
+#!/bin/bash
+#
+# cio_ignore - Tool to query and modify the cio blacklist
+#
+# Copyright IBM Corp. 2009, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+VERSION="%S390_TOOLS_VERSION%"
+BLACKLIST="/proc/cio_ignore"
+CIO_SETTLE="/proc/cio_settle"
+WAIT_FOR_CIO=0
+SYSINFO="/proc/sysinfo"
+CONSDRV="/sys/bus/ccw/drivers/3215"
+MAXCSSID=0
+MAXSSID=3
+MAXDEVNO=65535
+LSCSS="lscss"
+TOOLNAME="${0##*/}"
+
+# print_help()
+# Print help text.
+function print_help()
+{
+	cat << EOF
+Usage: ${TOOLNAME} COMMANDS
+
+Query or modify the CIO device driver blacklist. This blacklist determines if
+the CIO device driver ignores a newly discovered device. Ignored devices are
+not accessible and do not use resources.
+
+COMMANDS:
+ -h, --help                  Print this help text
+ -v, --version               Print version information
+ -a, --add DEVID             Add a device ID to the blacklist
+ -A, --add-all               Add all device IDs to the blacklist
+ -r, --remove DEVID          Remove a device ID from the blacklist
+ -R, --remove-all            Remove all device IDs from the blacklist
+ -l, --list                  List device IDs on the blacklist
+ -L, --list-not-blacklisted  List device IDs not on the blacklist
+ -i, --is-ignored DEVID      Check if specified device ID is on the blacklist
+ -k, --kernel-param          List blacklist in cio_ignore kernel param format
+ -u, --unused                Create blacklist including all unused devices
+ -p, --purge                 Unregister all unused devices on the blacklist
+EOF
+}
+
+# print_version()
+# Print version information.
+function print_version()
+{
+	echo "${TOOLNAME}: version ${VERSION}"
+	echo "Copyright IBM Corp. 2009, 2017"
+}
+
+# print_usage_tip()
+# Print usage tip text.
+function print_usage_tip()
+{
+	echo "Use '${TOOLNAME} --help' to get usage information." >&2
+}
+
+# warn(msg)
+# Print msg to stderr in warning text format.
+function warn()
+{
+	local MSG=$1
+
+	echo "${TOOLNAME}: $MSG" >&2
+}
+
+# error(msg)
+# Print msg to stderr in error text format and exit with non-zero exit code.
+function error()
+{
+	local MSG=$1
+
+	warn "$MSG"
+	exit 1
+}
+
+# blacklist_write(msg)
+# Check for write access and write msg to blacklist
+function blacklist_write()
+{
+	local MSG="$*"
+
+	if [ ! -w "$BLACKLIST" ] ; then
+		error "Error: missing write permission for $BLACKLIST"
+	fi
+
+	echo "$MSG" > "$BLACKLIST" 2>/dev/null || return 1
+
+	return 0
+}
+
+# split_range(range, &bus_id1, &bus_id2)
+# Set bus_id1 and bus_id2 to the bus IDs as specified in range.
+function split_range()
+{
+	local RANGE=$1
+	local LOCAL_BUSID1="${RANGE%%-*}"
+	local LOCAL_BUSID2="${RANGE##*-}"
+
+	eval "$2=$LOCAL_BUSID1"
+	eval "$3=$LOCAL_BUSID2"
+}
+
+# split_bus_id(bus_id, &cssid, &ssid, &devno)
+# Set cssid, ssid and devno to the respective values as specified in bus_id.
+function split_bus_id()
+{
+	local BUSID=$1
+	local DEVNO="${BUSID##*.}"
+	local BUS="${BUSID%.*}"
+	local CSSID="${BUS%%.*}"
+	local SSID="${BUS##*.}"
+
+	# Set cssid and ssid to zero if not specified
+	if [ "${BUSID#*.}" == "$BUSID" ] ; then
+		CSSID=0
+		SSID=0
+	fi
+	eval "let $2=0x$CSSID"
+	eval "let $3=0x$SSID"
+	eval "let $4=0x$DEVNO"
+}
+
+# count_char(string, char, &count)
+# Count the number of times that char occurs in string.
+function count_char()
+{
+	local STRING=$1
+	local CHAR=$2
+	local COUNT=$3
+	local I
+
+	I=0
+	while [ "${STRING#*$CHAR}" != "$STRING" ] ; do
+		let I=$I+1
+		STRING="${STRING#*$CHAR}"
+	done
+	eval "$COUNT=$I"
+}
+
+# check_hex_number(number, mindigits, maxdigits, max, &errmsg)
+# Check hex number for validity. Return 0 when valid, 1 otherwise.
+function check_hex_number()
+{
+	local NUMBER=$1
+	local MINDIGITS=$2
+	local MAXDIGITS=$3
+	local MAX=$4
+	local ERRHEX=$5
+	local VAL
+
+	if [ -z "$NUMBER" ] ; then
+		eval "$ERRHEX='is empty'"
+		return 1
+	fi
+	let VAL="0x$NUMBER" 2>/dev/null
+	if [ -z "$VAL" ] ; then
+		eval "$ERRHEX='is not valid'"
+		return 1
+	fi
+	if [ $VAL -gt $MAX ] ; then
+		eval "$ERRHEX='is too large'"
+		return 1
+	fi
+	if [ ${#NUMBER} -lt $MINDIGITS ] ; then
+		eval "$ERRHEX='is too short'"
+		return 1
+	fi
+	if [ ${#NUMBER} -gt $MAXDIGITS ] ; then
+		eval "$ERRHEX='is too long'"
+		return 1
+	fi
+	return 0
+}
+
+# check_dev_id(devid, &errmsg)
+# Check device ID for validity. Return 0 when ID is valid, 1 otherwise.
+function check_dev_id()
+{
+	local DEVID=$1
+	local ERRDEV=$2
+	local ERRTXT
+	local CSSID
+	local SSID
+	local DEVNO
+	local DOTCOUNT
+	local IFS
+
+	# Check for empty device ID
+	if [ -z "$DEVID" ] ; then
+		eval "$ERRDEV='device ID is empty'"
+		return 1
+	fi
+	# Check for spaces in device id
+	IFS=' '
+	set - $DEVID
+	if [ $# -ne 1 -o "$DEVID" != "$1" ] ; then
+		eval "$ERRDEV='device ID contains spaces'"
+		return 1
+	fi
+	# Convert bus id to positional parameters
+	count_char "$DEVID" '.' DOTCOUNT
+	IFS='.'
+	set - $DEVID
+	unset IFS
+	# Check number of components
+	if [ $DOTCOUNT -eq 0 ] ; then
+		# Old style device number
+		DEVNO="${1#0x}"
+		if [ -z "$DEVNO" ] ; then
+			eval "$ERRDEV='device number is incomplete'"
+			return 1
+		fi
+		# Check for valid device number
+		if ! check_hex_number "$DEVNO" 1 65535 $MAXDEVNO ERRTXT; then
+			eval "$ERRDEV='device number $ERRTXT'"
+			return 1
+		fi
+		return 0
+	fi
+	# Check for bus id format
+	if [ $DOTCOUNT -ne 2 ] ; then
+		eval "$ERRDEV='unrecognized format'"
+		return 1
+	fi
+	CSSID=$1
+	SSID=$2
+	DEVNO=$3
+	# Check cssid
+	if ! check_hex_number "$CSSID" 1 2 $MAXCSSID ERRTXT; then
+		eval "$ERRDEV='CSSID $ERRTXT'"
+		return 1
+	fi
+	# Check ssid
+	if ! check_hex_number "$SSID" 1 1 $MAXSSID ERRTXT; then
+		eval "$ERRDEV='SSID $ERRTXT'"
+		return 1
+	fi
+	# Check devno
+	if ! check_hex_number "$DEVNO" 4 4 $MAXDEVNO ERRTXT; then
+		eval "$ERRDEV='device number $ERRTXT'"
+		return 1
+	fi
+
+	return 0
+}
+
+# check_range(range, &errmsg)
+# Check a device ID range for validity. Return 0 if valid, 1 otherwise.
+function check_range()
+{
+	local RANGE=$1
+	local ERRRNG=$2
+	local ERRTXTRNG
+	local MINUSCOUNT
+	local BUSID1
+	local BUSID2
+	local CSSID1
+	local CSSID2
+	local SSID1
+	local SSID2
+	local DEVNO1
+	local DEVNO2
+	local IFS
+
+	count_char "$RANGE" '-' MINUSCOUNT
+	IFS='-'
+	set - $RANGE
+	unset IFS
+	# Check number of device IDs
+	if [ $MINUSCOUNT -gt 1 ] ; then
+		eval "$ERRRNG='unrecognized format'"
+		return 1
+	fi
+	# Check first device ID
+	if ! check_dev_id "$1" ERRTXTRNG ; then
+		eval "$ERRRNG='$ERRTXTRNG'"
+		return 1
+	fi
+	if [ $MINUSCOUNT -eq 0 ] ; then
+		return 0
+	fi
+	# Check second device ID
+	if ! check_dev_id "$2" ERRTXTRNG ; then
+		eval "$ERRRNG='$ERRTXTRNG'"
+		return 1
+	fi
+	# Check actual ID
+	split_range "$RANGE" BUSID1 BUSID2
+	split_bus_id "$BUSID1" CSSID1 SSID1 DEVNO1
+	split_bus_id "$BUSID2" CSSID2 SSID2 DEVNO2
+	if [ "$CSSID1" -ne "$CSSID2" ] ; then
+		eval "$ERRRNG='CSSIDs do not match'"
+		return 1
+	fi
+	if [ "$SSID1" -ne "$SSID2" ] ; then
+		eval "$ERRRNG='SSIDs do not match'"
+		return 1
+	fi
+	if [ "$DEVNO1" -gt "$DEVNO2" ] ; then
+		eval "$ERRRNG='reversed device ID order'"
+		return 1
+	fi
+	return 0
+}
+
+# add_device(list)
+# Add a list of devices to blacklist
+function add_device()
+{
+	local DEVID_LIST=$1
+	local RANGE
+	local ERRMSG
+	local MINUSCOUNT
+	local IFS=','
+
+	if [ -z "$DEVID_LIST" ] ; then
+		error "--add requires an argument"
+	fi
+	for RANGE in $DEVID_LIST ; do
+		if blacklist_write "add $RANGE" ; then
+			continue
+		fi
+		# Try to determine why blacklist operation failed
+		if ! check_range "$RANGE" ERRMSG ; then
+			count_char "$RANGE" '-' MINUSCOUNT
+			if [ "$MINUSCOUNT" -eq 0 ] ; then
+				error "Error: device ID '$RANGE': $ERRMSG"
+			else
+				error "Error: device ID range '$RANGE': $ERRMSG"
+			fi
+		else
+			error "Error: could not add '$RANGE' to blacklist"
+		fi
+	done
+}
+
+# add_all_devices()
+# Add all devices to the blacklist.
+function add_all_devices()
+{
+	blacklist_write 'add all' || \
+		error "Error: add-all function not accepted by kernel"
+}
+
+# remove_device(list)
+# Remove a list of devices from blacklist.
+function remove_device()
+{
+	local DEVID_LIST=$1
+	local RANGE
+	local IFS=','
+
+	if [ -z "$DEVID_LIST" ] ; then
+		error "--remove requires an argument"
+	fi
+	for RANGE in $DEVID_LIST ; do
+		if blacklist_write "free $RANGE" ; then
+			continue
+		fi
+		# Try to determine why blacklist operation failed
+		if ! check_range "$RANGE" ERRMSG ; then
+			count_char "$RANGE" '-' MINUSCOUNT
+			if [ "$MINUSCOUNT" -eq 0 ] ; then
+				error "Error: device ID '$RANGE': $ERRMSG"
+			else
+				error "Error: device ID range '$RANGE': $ERRMSG"
+			fi
+		else
+			error "Error: could not remove '$RANGE' from blacklist"
+		fi
+	done
+}
+
+# remove_all_devices()
+# Remove all devices from blacklist.
+function remove_all_devices()
+{
+	blacklist_write 'free all' || \
+		error "Error: remove-all function not accepted by kernel"
+}
+
+# list_blacklisted(showheader)
+# Print list of devices on blacklist. Precede output by header text
+# if showheader is 1
+function list_blacklisted()
+{
+	local SHOWHEADER=$1
+	local LIST
+	local ENTRY
+
+	if [ $SHOWHEADER -eq 1 ] ; then
+		echo 'Ignored devices:'
+		echo '================='
+	fi
+	LIST=$(cat "$BLACKLIST" 2>/dev/null) || \
+		error "Error: could not read $BLACKLIST"
+	# Parse each blacklist entry
+	for ENTRY in $LIST ; do
+		echo "$ENTRY"
+	done
+}
+
+# advance_ssid(cssid, ssid, &newcssid, &newssid)
+# Set newcssid and newssid to the next ssid after cssid and ssid. Return
+# 0 if there was another ssid, 1 if all ssids have been processed.
+function advance_ssid()
+{
+	local LOCAL_CSSID=$1
+	local LOCAL_SSID=$2
+	let LOCAL_SSID=$LOCAL_SSID+1
+
+	if [ $LOCAL_SSID -gt $MAXSSID ] ; then
+		LOCAL_SSID=0
+		let LOCAL_CSSID=$LOCAL_CSSID+1
+		if [ $LOCAL_CSSID -gt $MAXCSSID ] ; then
+			return 1
+		fi
+	fi
+	eval "$3=$LOCAL_CSSID"
+	eval "$4=$LOCAL_SSID"
+	return 0
+}
+
+# print_range(cssid1, ssid1, devno1, cssid2, ssid2, devno2)
+# Print range for given device ID.
+function print_range()
+{
+	local CSSID1
+	local SSID1
+	local DEVNO1
+	local CSSID2
+	local SSID2
+	local DEVNO2
+
+	let CSSID1=$1
+	let SSID1=$2
+	let DEVNO1=$3
+	let CSSID2=$4
+	let SSID2=$5
+	let DEVNO2=$6
+
+	if [ $CSSID1 -eq $CSSID2 -a $SSID1 -eq $SSID2 -a \
+	     $DEVNO1 -eq $DEVNO2 ] ; then
+		printf '%x.%x.%04x\n' $CSSID1 $SSID1 $DEVNO1
+	else
+		printf '%x.%x.%04x-%x.%x.%04x\n' $CSSID1 $SSID1 $DEVNO1 \
+						 $CSSID2 $SSID2 $DEVNO2
+
+	fi
+}
+
+# list_not_blacklisted(showheader)
+# Print list of devices not on blacklist. Precede output by header text
+# if showheader is 1.
+function list_not_blacklisted()
+{
+	local SHOWHEADER=$1
+	local CSSID=0
+	local SSID=0
+	local DEVNO=0
+	local ENTRY
+	local LIST
+
+	if [ $SHOWHEADER -eq 1 ] ; then
+		echo 'Devices that are not ignored:'
+		echo '============================='
+	fi
+	LIST=$(cat "$BLACKLIST" 2>/dev/null) || \
+		error "Error: could not read $BLACKLIST"
+	# Parse each blacklist entry
+	for ENTRY in $LIST ; do
+		local BLBUSID1
+		local BLBUSID2
+		local BLCSSID
+		local BLSSID
+		local BLDEVNO1
+		local BLDEVNO2
+
+		# Prepare variables containing bus id information
+		split_range $ENTRY BLBUSID1 BLBUSID2
+		split_bus_id $BLBUSID1 BLCSSID BLSSID BLDEVNO1
+		split_bus_id $BLBUSID2 BLCSSID BLSSID BLDEVNO2
+
+		# Print ranges in ssids before this entry
+		while [ $CSSID -ne $BLCSSID -o $SSID -ne $BLSSID ] ; do
+			print_range $CSSID $SSID $DEVNO $CSSID $SSID $MAXDEVNO
+			DEVNO=0
+			if ! advance_ssid $CSSID $SSID CSSID SSID ; then
+				return
+			fi
+		done
+		# Print range before this entry in the same ssid
+		if [ $BLDEVNO1 -gt 0 ] ; then
+			print_range $CSSID $SSID $DEVNO \
+				    $CSSID $SSID $BLDEVNO1-1
+		fi
+		# Advance current id pointer to after the end of this entry
+		let DEVNO=$BLDEVNO2+1
+		if [ $DEVNO -gt $MAXDEVNO ] ; then
+			DEVNO=0
+			if ! advance_ssid $CSSID $SSID CSSID SSID ; then
+				return
+			fi
+		fi
+	done
+
+	# Print ranges in ssids after the final entry
+	while [ $CSSID -le $MAXCSSID -o $SSID -le $MAXSSID ] ; do
+		print_range $CSSID $SSID $DEVNO $CSSID $SSID $MAXDEVNO
+		DEVNO=0
+		if ! advance_ssid $CSSID $SSID CSSID SSID ; then
+			return
+		fi
+	done
+}
+
+# simplify_range(range, &dest_range)
+# Remove 0.0. from bus ids in range.
+function simplify_range()
+{
+	local LOCAL_RANGE=$1
+	local BUSID1
+	local BUSID2
+
+	split_range $LOCAL_RANGE BUSID1 BUSID2
+	BUSID1=${BUSID1##0.0.}
+	BUSID2=${BUSID2##0.0.}
+	if [ $BUSID1 == $BUSID2 ] ; then
+		eval "$2=$BUSID1"
+	else
+		eval "$2=$BUSID1-$BUSID2"
+	fi
+}
+
+
+# to_param(invert, list)
+# Print list in comma-separated format, preceding each range with ! if
+# invert is 1.
+function to_param()
+{
+	local INVERT=$1
+	local LIST=$2
+	local RANGE
+	local SEP
+	local PREFIX
+
+	if [ $INVERT -eq 1 ] ; then
+		echo -n 'all'
+		PREFIX='!'
+		SEP=','
+	fi
+
+	for RANGE in $LIST ; do
+		simplify_range $RANGE RANGE
+		echo -n "$SEP$PREFIX$RANGE"
+		SEP=','
+	done
+}
+
+# is_blacklisted(bus_id)
+# Check if device is on the blacklist. Return 0 when on blacklist, 1 otherwise.
+function is_blacklisted()
+{
+	local ISBUSID=$1
+	local ISCSSID
+	local ISSSID
+	local ISDEVNO
+	local BUSID1
+	local BUSID2
+	local CSSID1
+	local CSSID2
+	local SSID1
+	local SSID2
+	local DEVNO1
+	local DEVNO2
+	local LIST
+	local RANGE
+
+	split_bus_id $ISBUSID ISCSSID ISSSID ISDEVNO
+	LIST=$(cat "$BLACKLIST" 2>/dev/null) || \
+		error "Error: could not read $BLACKLIST"
+	# Parse each blacklist entry
+	for RANGE in $LIST ; do
+		split_range "$RANGE" BUSID1 BUSID2
+		split_bus_id "$BUSID1" CSSID1 SSID1 DEVNO1
+		split_bus_id "$BUSID2" CSSID2 SSID2 DEVNO2
+
+		if [ $ISCSSID -ne $CSSID1 -o $ISSSID -ne $SSID1 ] ; then
+			continue
+		fi
+		if [ $ISDEVNO -ge $DEVNO1 -a $ISDEVNO -le $DEVNO2 ] ; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+# is_blacklisted_opt(bus_id)
+# Check if specified busid is on blacklist. Print result and exit with code 0
+# if on blacklist, 2 otherwise.
+function is_blacklisted_opt()
+{
+	local BUSID=$1
+	local ERRBLO
+	local COMMACOUNT
+	local MINUSCOUNT
+
+	if [ -z "$BUSID" ] ; then
+		error "--is-ignored requires an argument"
+	fi
+	count_char "$BUSID" ',' COMMACOUNT
+	count_char "$BUSID" '-' MINUSCOUNT
+	if [ $COMMACOUNT -gt 0 -o $MINUSCOUNT -gt 0 ] ; then
+		error "Error: --is-ignored accepts only a single device ID"
+	fi
+	if ! check_dev_id "$BUSID" ERRBLO ; then
+		error "Error: device ID '$BUSID': $ERRBLO"
+	fi
+	if is_blacklisted $BUSID ; then
+		echo "Device $BUSID is ignored"
+		exit 0
+	else
+		echo "Device $BUSID is not ignored"
+		exit 2
+	fi
+}
+
+# is_vm()
+# Check if Linux is running on z/VM. Return 0 when on VM, 1 otherwise.
+function is_vm()
+{
+	if grep 'z/VM' < "$SYSINFO" -q ; then
+		return 0
+	fi
+	return 1
+}
+
+# get_console_busid(&busid)
+# Return busid for VM console.
+function get_console_busid()
+{
+	local DEVID
+
+	if [ ! -d "$CONSDRV" ] ; then
+		return
+	fi
+	DEVID=$(echo $CONSDRV/*.*.*)
+	DEVID="${DEVID##*/}"
+	if [ "$DEVID" != "*.*.*" ] ; then
+		eval "$1=$DEVID"
+	fi
+}
+
+# check_vm_console()
+# Print a warning if VM console is on blacklist.
+function check_vm_console()
+{
+	local CONSBUSID
+
+	if ! is_vm ; then
+		return
+	fi
+	get_console_busid CONSBUSID
+	if [ -z "$CONSBUSID" ] ; then
+		return
+	fi
+	if is_blacklisted $CONSBUSID ; then
+		warn "Warning: reboot might fail due to blacklisted console $CONSBUSID"
+	fi
+}
+
+# kernel_param()
+# Print blacklist in kernel parameter format.
+function kernel_param()
+{
+	local BLACKLISTED=$(list_blacklisted 0)
+	local NOTBLACKLISTED=$(list_not_blacklisted 0)
+
+	echo -n 'cio_ignore='
+	# Determine shorter list
+	if [ ${#BLACKLISTED} -le ${#NOTBLACKLISTED} ] ; then
+		# Use blacklist
+		to_param 0 "$BLACKLISTED"
+	else
+		# Use negative blacklist
+		to_param 1 "$NOTBLACKLISTED"
+	fi
+	echo
+	check_vm_console
+}
+
+# create_from_unused()
+# Create blacklist from unused devices as determined by lscss.
+function create_from_unused()
+{
+	local DEVID
+	local UNUSED
+
+	add_all_devices
+	$LSCSS 2>/dev/null | grep yes | while read DEVID UNUSED ; do
+		remove_device $DEVID
+	done
+}
+
+# purge()
+# Perform blacklist purge function.
+function purge()
+{
+	blacklist_write 'purge' || \
+		error "Error: purge function not accepted by kernel"
+}
+
+# Check for blacklist
+if [ ! -f "$BLACKLIST" ] ; then
+	error "Error: file $BLACKLIST not found"
+fi
+
+# Check for zero options
+if [ $# -eq 0 ] ; then
+	warn 'Need one of options -a, -A, -r, -R, -l, -L, -i, -k, -u or -p'
+	print_usage_tip
+	exit 1
+fi
+
+# Parse command line options
+while [ $# -gt 0 ] ; do
+	case $1 in
+	-h|--help)
+		print_help
+		exit 0
+		;;
+	-v|--version)
+		print_version
+		exit 0
+		;;
+	-a|--add)
+		shift
+		add_device $1
+		;;
+	-A|--add-all)
+		add_all_devices
+		;;
+	-r|--remove)
+		shift
+		remove_device $1
+		WAIT_FOR_CIO=1
+		;;
+	-R|--remove-all)
+		remove_all_devices
+		WAIT_FOR_CIO=1
+		;;
+	-l|--list)
+		list_blacklisted 1
+		;;
+	-L|--list-not-blacklisted)
+		list_not_blacklisted 1
+		;;
+	-i|--is-ignored)
+		shift
+		is_blacklisted_opt $1
+		;;
+	-k|--kernel-param)
+		kernel_param
+		;;
+	-u|--unused)
+		create_from_unused
+		;;
+	-p|--purge)
+		purge
+		WAIT_FOR_CIO=1
+		;;
+	*)
+		warn "invalid option '$1'"
+		print_usage_tip
+		exit 1
+		;;
+	esac
+	shift
+done
+
+if [ \( -w $CIO_SETTLE \) -a $WAIT_FOR_CIO = 1 ] ; then
+	echo 1 > $CIO_SETTLE
+fi
+
+exit 0

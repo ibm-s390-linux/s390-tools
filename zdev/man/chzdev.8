@@ -1,0 +1,791 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" Macro for inserting an option description prologue.
+.\" .OD <long> [<short>] [args]
+.de OD
+.  ds args "
+.  if !'\\$3'' .as args \fI\\$3\fP
+.  if !'\\$4'' .as args \\$4
+.  if !'\\$5'' .as args \fI\\$5\fP
+.  if !'\\$6'' .as args \\$6
+.  if !'\\$7'' .as args \fI\\$7\fP
+.  PD 0
+.  if !'\\$2'' .IP "\fB\-\\$2\fP \\*[args]" 4
+.  if !'\\$1'' .IP "\fB\-\-\\$1\fP \\*[args]" 4
+.  PD
+..
+.\" Macro for inserting code line.
+.\" .CL <text>
+.de CL
+.  ds pfont \fP
+.  nh
+.  na
+.  ft CW
+\\$*
+.  ft \\*[pfont]
+.  ad
+.  hy
+.  br
+..
+.\" Macro for inserting a man page reference.
+.\" .MP man-page section [suffix]
+.de MP
+.  nh
+.  na
+.  BR \\$1 (\\$2)\\$3
+.  ad
+.  hy
+..
+.
+.TH chzdev 8 "Jan 2016" s390-tools chzdev
+.
+.SH NAME
+chzdev - Configure z Systems specific devices
+.
+.
+.SH SYNOPSIS
+.B "chzdev "
+.I "TYPE "
+.I "DEVICE "
+[
+.I "SELECTION "
+.I "SETTINGS "
+.I "ACTIONS "
+.I "OPTIONS "
+]
+.
+.
+.SH DESCRIPTION
+.B chzdev
+is a tool for configuring devices and device drivers which are specific to the
+IBM z Systems platform. Supported device types include storage devices (DASD
+and zFCP) and networking devices (QETH, CTC and LCS).
+.PP
+.
+.SS "Configurations"
+You can apply configuration changes to the active configuration of the
+currently running system, or to the persistent configuration stored in
+configuration files:
+.IP \(bu 3
+Changes to the
+.B "active configuration"
+are effective immediately. They are lost on reboot, or when a device becomes
+unavailable, or when a device driver is unloaded.
+.PP
+.IP \(bu 3
+Changes to the
+.B "persistent configuration"
+are applied when the system boots, or when a device becomes available, or
+when a device driver is loaded.
+.PP
+By default chzdev applies changes to both the active and the persistent
+configuration.
+.PP
+.
+.SS "Tool actions"
+chzdev supports multiple
+.B tool actions
+such as
+.IP \(bu 3
+Enable a device.
+.PP
+.IP \(bu 3
+Disable a device.
+.PP
+.IP \(bu 3
+Export and import configuration data to and from a file.
+.PP
+.IP \(bu 3
+Display a list of available device types and attributes.
+.PP
+You can trigger these actions by specifying one of the command line options
+listed in the ACTIONS section.
+.PP
+.
+.
+.SH TYPE
+chzdev uses
+.B "device type"
+names to distinguish devices by their respective type.
+A device type typically corresponds to a device driver, though there are cases
+where multiple device types are provided for the same driver (for example both
+device types "dasd-eckd" and "dasd-fba" are related to the DASD device driver).
+.PP
+You can use the
+.B TYPE
+positional argument of the chzdev tool to restrict the scope of a tool action
+to the specified device type:
+.IP \(bu 3
+Specify a device type and optionally a device ID to only work on
+devices with matching type and ID
+.PP
+.IP \(bu 3
+Specify a device type together with option
+.nh
+\-\-type
+.hy
+to manage the configuration of the device type itself
+.PP
+.B Note:
+Specify the full device type when configuring a device by
+ID. Otherwise the same device ID might accidentally match other devices of a
+different type.
+.PP
+To get a list of supported device types, use the
+.nh
+\-\-list\-types
+.hy
+action.
+.PP
+.
+.
+.SH DEVICE
+Use the
+.B DEVICE
+positional argument of chzdev to select a single device or a range of devices
+by device ID as target for a tool action. To select a range of devices, specify
+the ID of the first and the last device in the range separated by a hyphen (-).
+Separate multiple IDs or ranges with a comma (,).
+.PP
+.B Example:
+.CL chzdev dasd 1000,2000-2010 -e
+.PP
+.
+.
+.SH SELECTION
+In addition to specifying devices by their ID you can also select devices by
+their state or by the Linux functions they provide.
+.PP
+chzdev supports the following device states:
+.PP
+.TP 12
+.B online
+The device is enabled in the active configuation and set up to provide a Linux
+function such as a block device like /dev/dasda, or a networking interface like
+eth0.
+.PP
+.TP 12
+.B offline
+The device is not enabled in the active configuration.
+.PP
+.TP 12
+.B existing
+The device is present in the active configuration.
+.PP
+.TP 12
+.B configured
+There is a persistent configuration for this device.
+.PP
+.TP 12
+.B failed
+The driver of a device detected errors that may cause the device to not function
+properly.
+.PP
+.
+Selection works in two stages:
+.PP
+.IP 1. 3
+All devices specified by ID or by options
+.nh
+\-\-all, \-\-by\-interface, \-\-by\-node or \-\-by\-path
+.hy
+are considered for selection.
+.PP
+.IP 2. 3
+Of the considered devices, only those matching the specified state options
+.nh
+\-\-online, \-\-offline, \-\-existing, \-\-configured and \-\-failed
+.hy
+are selected.
+.PP
+.
+.
+.SS "Selection options"
+.OD all "" ""
+Select all existing and configured devices.
+.PP
+.
+.OD by-attrib "" "KEY" "=" "VALUE"
+.OD by-attrib "" "KEY" "!=" "VALUE"
+
+Select devices with specified attribute value.
+
+When specified as
+.IR KEY = VALUE ,
+selects all devices that provide an attribute named
+.I KEY
+with a value of
+.IR VALUE .
+When specified as
+.IR KEY != VALUE ,
+selects all devices that
+.B don't
+provide an attribute named
+.I KEY
+with a value of
+.IR VALUE .
+.PP
+.
+.OD by-interface "" "NAME"
+Select device providing network interface, e.g. eth0.
+
+The
+.I NAME
+parameter must be the name of an existing networking interface.
+.PP
+.
+.OD by-node "" "NODE"
+Select device providing device node, e.g. /dev/sda.
+
+The
+.I NODE
+parameter must be the path to a block device or character device special file.
+
+.B Note:
+If
+.I NODE
+is the device node for a logical device (such as a device mapper device),
+chzdev will try to resolve the corresponding physical device nodes. The
+.MP lsblk 8
+tool must be available for this resolution to work.
+.PP
+.
+.OD by-path "" "PATH"
+Select device providing file system path, e.g. /usr.
+
+The
+.I PATH
+parameter can be the mount point of a mounted file system, or a path
+on that file system.
+
+.B Note:
+If the file system that provides
+.I PATH
+is stored on multiple physical devices or on a subvolume (such as supported by
+btrfs) chzdev will try to resolve the corresponding physical device nodes. The
+.MP lsblk 8
+and
+.MP findmnt 8
+tools must be available and in the case of multiple physical devices the file
+system must provide a valid UUID for this resolution to work.
+.PP
+.
+.OD configured "" ""
+Select all devices for which a persistent configuration exists.
+.PP
+.
+.OD existing "" ""
+Select all devices that are present in the active configuration.
+.PP
+.
+.OD online "" ""
+Select devices that are online.
+
+An online device is a device in the active configuration that is set up
+to provide its associated Linux function (such as a block device or networking
+interface).
+.PP
+.
+.OD offline "" ""
+Select devices that are offline.
+
+
+An offline device is a device in the active configuration that is
+.B not
+set up to provide its associated Linux function.
+.PP
+.
+.OD failed "" ""
+Select devices for which errors were detected.
+
+A failed device is a device for which its driver detected an error condition
+that may cause the device to not correctly perform its function. You can use
+the \-\-info option of the lszdev tool to get more details on the detected
+errors.
+
+.B Example:
+.CL lszdev \-\-failed \-\-info
+.PP
+.
+.
+.SH SETTINGS
+A
+.B setting
+is a positional argument of chzdev in the form KEY=VALUE. It can be used to
+configure a specific named attribute (KEY) of a device or device type with
+the provided VALUE.
+.PP
+.B Example:
+.CL chzdev dasd 1000 use_diag=1
+.PP
+You can use the
+.nh
+\-\-list\-attributes
+.hy
+option to display a list of available
+attributes and
+.nh
+\-\-help\-attribute
+.hy
+to get more detailed information about
+a specific attribute.
+.PP
+.
+.
+.SH ACTIONS
+You can use one of the action options listed below to specify the
+.B main tool action
+that chzdev should perform. Alternatively you can specify a setting
+or one of \-\-remove or \-\-remove\-all to modify device and device type
+settings.
+.PP
+.
+.
+.SS "Action options"
+.OD apply "" ""
+Apply persistent settings to active configuration.
+
+Applies the persistent configuration of all selected devices and
+device types to the active configuration.
+.PP
+.
+.OD disable "d" ""
+Disable device.
+
+.B Active configuration:
+Disables the selected devices by reverting the configuration steps necessary
+to enable a device.
+
+.B Persistent configuration:
+Removes configuration files and settings associated with the
+selected device.
+.PP
+.
+.OD enable "e" ""
+Enable device.
+
+The enable action instructs chzdev to perform any steps necessary for the
+selected devices to provide their corresponding Linux function (such as a block
+device or networking interface). Examples for such steps include setting a CCW
+device online, removing a CCW device from the CIO blacklist, and creating a CCW
+group device.
+
+.B Active configuration:
+Performs all initial setup steps required for a device to provide its Linux
+function.
+
+.B Persistent configuration:
+Creates configuration files and settings associated with the selected devices.
+.PP
+.
+.OD export "" "FILENAME" "|-"
+Export configuration data to a text file.
+
+Writes configuration data for all selected devices and device types to
+.IR FILENAME .
+If a single hyphen ("-") is specified instead of an actual file name, data is
+written to the standard output stream.
+
+The output format of this action is suitable for use with the
+.nh
+\-\-import
+.hy
+action of chzdev.
+.PP
+.
+.OD help "h" ""
+Print usage information, then exit.
+.PP
+.
+.OD help-attribute "H" ""
+Show detailed help on specified attribute.
+
+Displays detailed information about the attributes specified as positional
+command line arguments. Information displayed includes a description of
+the attribute function and optionally a list of accepted values and the
+default value.
+.PP
+.
+.OD import "" "FILENAME" "|-"
+Import configuration data from a text file.
+
+Reads configuration data from FILENAME and applies it. If a single hyphen ("-")
+is specified as FILENAME data is read from the standard input stream. The
+input format of the data read must be the same format as produced by the
+chzdev \-\-export action.
+
+By default all configuration data that is read is also applied. To reduce the
+scope of imported configuration data, you can select specific devices, a device
+type, or define whether only data for the active or persistent configuration
+should be imported.
+.PP
+.
+.OD list-attributes "l" ""
+List attributes.
+
+Lists all supported device or device type attributes, including a short
+description. You can use the
+.nh
+\-\-help\-attribute
+.hy
+action to get more detailed information about an attribute.
+.PP
+.
+.OD list-types "L" ""
+List supported device types.
+
+Lists the name and a short description for all device types supported by
+chzdev.
+.PP
+.
+.OD version "v" ""
+Print version information, then exit.
+.PP
+.
+.
+.SH OPTIONS
+.OD active "a" ""
+Apply changes to the active configuration only.
+
+Restricts configuration changes to the active configuration. As a result, the
+persistent configuration is not changed unless
+.nh
+\-\-persistent
+.hy
+was also specified.
+
+.B Note:
+Changes to the active configuration are effective immediately. They are lost
+on reboot, or when a device becomes unavailable, or when a device driver is
+unloaded.
+.PP
+.
+.OD base "" "PATH" | "KEY" = "VALUE"
+Change file system paths used to access files.
+
+If
+.I PATH
+is specified without an equal sign (=), it is used as base path for accessing
+files in the active and persistent configuration.
+
+If the specified parameter is in KEY=VALUE format, only those paths
+that begin with
+.I KEY
+are modified.
+For these paths, the initial
+.I KEY
+portion is replaced with
+.IR VALUE .
+
+.B Example:
+.CL chzdev -dasd-eckd 1000 -e -p --base /etc=/mnt/etc
+.PP
+.
+.OD dry-run "" ""
+Print output without performing configuration actions.
+
+Performs action processing and displays tool output without changing the
+configuration of any devices or device types. When combined with
+.nh
+\-\-verbose,
+.hy
+details about skipped configuration steps are displayed.
+.PP
+.
+.OD force "f" ""
+Override safety checks.
+
+Overrides safety checks and confirmation questions. These checks include:
+.RS 8
+.IP \(bu 3
+Selection of more than 256 devices
+.PP
+.IP \(bu 3
+Configuring unknown attributes
+.PP
+.IP \(bu 3
+Combining apparently inconsistent settings
+.PP
+.RE
+.
+.OD no-root-update "" ""
+Skip root device update.
+
+Skips any additional steps that are required to make changes to the root
+device configuration persistent. Typically such steps include rebuilding the
+initial RAM disk, or modifying the kernel command line.
+.PP
+.
+.OD persistent "p" ""
+Apply changes to persistent configuration only.
+
+The persistent configuration is put into effect when the system boots, or
+when a device becomes available, or when a device driver is loaded.
+.PP
+.
+.OD quiet "q" ""
+Print only minimal run-time information.
+.PP
+.
+.OD remove "r" "ATTRIB"
+Remove setting for attribute
+.IR ATTRIB .
+
+.B Persistent configuration:
+Removes any setting for the specified attribute. As a result, the attribute will
+keep its initial value when the device or device type is configured.
+
+.B Active configuration:
+For attributes that maintain a list of values written to them, clears all values
+for that list.
+
+.B Note:
+Some attributes are mandatory and cannot be removed.
+.PP
+.
+.OD remove-all "R" ""
+Remove settings for all attributes.
+
+.B Persistent configuration:
+Removes all non-mandatory attribute settings. As a result, these attributes will
+keep their initial value when the device or device type is configured.
+
+.B Active configuration:
+For all attributes that maintain a list of values written to them, clears all
+values for that list.
+
+.B Note:
+Some attributes are mandatory and cannot be removed.
+.PP
+.
+.OD type "t" ""
+Select device type as target for actions.
+
+Selects a device type as target for a configuration or query action.
+.PP
+.
+.OD verbose "V" ""
+Print additional run-time information.
+.PP
+.
+.OD yes "y" ""
+Answer all confirmation questions with 'yes'.
+.PP
+.
+.
+.SH "EXAMPLES"
+.B Enable DASD 0.0.8000 and create persistent configuration:
+.RS 4
+.CL chzdev \-e dasd 8000
+.RE
+.PP
+.
+.B Enable zFCP LUN and create persistent configuration:
+.RS 4
+.CL chzdev \-e zfcp-lun 0.0.1724:0x50050763070ba5e2:0x4006404e00000000
+.RE
+.PP
+.
+.B Enable QETH device without creating a persistent configuration:
+.RS 4
+.CL chzdev \-e \-a qeth 0.0.a000:0.0.a001:0.0.a002
+.RE
+.PP
+.
+.B Get help on QETH device attribute:
+.RS 4
+.CL chzdev qeth \-\-help\-attribute layer2
+.RE
+.PP
+.
+.B Change dasd device type parameter:
+.RS 4
+.CL chzdev dasd \-\-type eer_pages=14
+.RE
+.PP
+.
+.B Remove persistent use_diag setting of dasd 0.0.8000:
+.RS 4
+.CL chzdev dasd 8000 \-\-remove use_diag --persistent
+.RE
+.PP
+.
+.B Export configuration data for all zFCP LUNs to file.
+.RS 4
+.CL chzdev zfcp\-lun \-\-all \-\-export config.txt
+.RE
+.PP
+.
+.B Persistently configure root device:
+.RS 4
+.CL chzdev \-\-by\-path / \-\-persistent
+.RE
+.PP
+.
+.B Disable device that provides networking interface eth0:
+.RS 4
+.CL chzdev \-\-by\-interface eth0 \-\-active
+.RE
+.PP
+.
+.
+.SH "EXIT CODES"
+.TP
+.B 0
+Program finished successfully
+.PP
+.TP
+.B 1
+Usage error
+.PP
+.TP
+.B 2
+Unknown device type specified
+.PP
+.TP
+.B 3
+Device not found
+.PP
+.TP
+.B 4
+Unknown attribute specified
+.PP
+.TP
+.B 5
+Invalid device type specified
+.PP
+.TP
+.B 6
+Invalid attribute value specified
+.PP
+.TP
+.B 7
+Setting not found
+.PP
+.TP
+.B 8
+Empty selection
+.PP
+.TP
+.B 9
+Invalid configuration
+.PP
+.TP
+.B 10
+Invalid device ID specified
+.PP
+.TP
+.B 11
+Incomplete device ID specified
+.PP
+.TP
+.B 12
+Configuration data not found
+.PP
+.TP
+.B 13
+Unknown column specified
+.PP
+.TP
+.B 14
+None or incomplete type specified
+.PP
+.TP
+.B 15
+A run-time error occurred
+.PP
+.TP
+.B 16
+Operation aborted on user request
+.PP
+.TP
+.B 17
+Error while applying setting
+.PP
+.TP
+.B 18
+File format error
+.PP
+.TP
+.B 19
+Kernel module is in use
+.PP
+.TP
+.B 20
+Kernel module could not be unloaded
+.PP
+.TP
+.B 21
+Kernel module could not be loaded
+.PP
+.TP
+.B 22
+Not enough available memory
+.PP
+.TP
+.B 23
+FCP device not found
+.PP
+.TP
+.B 24
+Invalid WWPN specified
+.PP
+.TP
+.B 25
+WWPN not found
+.PP
+.TP
+.B 26
+Invalid LUN specified
+.PP
+.TP
+.B 27
+SCSI device not found
+.PP
+.TP
+.B 28
+CCW group device: CCW device not found
+.PP
+.TP
+.B 29
+CCW group device: CCW devices are not a valid group
+.PP
+.TP
+.B 30
+CCW group device: CCW device already grouped
+.PP
+.TP
+.B 31
+CCW group device: Grouping failed
+.PP
+.TP
+.B 32
+CCW group device: Ungrouping failed
+.PP
+.TP
+.B 99
+An internal error occurred
+.PP
+.
+.
+.SH FILES
+.TP
+/etc/udev/rules.d/
+chzdev creates udev rules to store the persistent configuration of devices
+in this directory. File names start with "41-".
+.TP
+/etc/modprobe.d/
+chzdev creates modprobe configuration files to store the persistent
+configuration of certain device types in this directory. File names start
+with "s390x-".
+.
+.
+.SH "SEE ALSO"
+.MP lszdev 8 ,
+.MP lscss 8 ,
+.MP lsdasd 8 ,
+.MP lszfcp 8 ,
+.MP lsqeth 8 ,
+.MP lsblk 8 .

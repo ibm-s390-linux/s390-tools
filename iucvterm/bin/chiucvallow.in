@@ -1,0 +1,277 @@
+#!/bin/sh
+#
+# z/VM IUCV HVC device driver -- Edit z/VM user ID filter
+#
+# Copyright IBM Corp. 2009, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+PRG=`basename $0`
+
+# sysfs file that contains the z/VM user ID filter for the
+# z/VM IUCV HVC device driver
+sysfs_hvc_iucv_allow="/sys/module/kernel/parameters/hvc_iucv_allow"
+# older kernel versions do not have the "kernel" directory
+test -f $sysfs_hvc_iucv_allow || \
+	sysfs_hvc_iucv_allow="/sys/module/hvc_iucv/parameters/hvc_iucv_allow"
+
+
+show_help(){
+	cat <<"EoHelp"
+Usage:
+  chiucvallow [-h|--help] [-v|--version]
+
+  chiucvallow -l|--list
+  chiucvallow -c|--clear
+  chiucvallow -e|--edit  [<filter file>]
+  chiucvallow -s|--set    <filter file>
+  chiucvallow -V|--verify <filter file>
+
+
+Options:
+  -h|--help                     Print help information, then exit.
+  -v|--version                  Print version information, then exit.
+
+  -l|--list                     List current z/VM user ID filter.
+  -c|--clear                    Clear the z/VM user ID filter.
+  -e|--edit  [<filter file>]    Edit the z/VM user ID filter.
+  -s|--set    <filter file>     Set the z/VM user ID filter from a filter file.
+  -V|--verify <filter file>     Verify the z/VM user ID filter file.
+
+  The list, edit, set and clear options require root authority.
+EoHelp
+}
+
+show_version(){
+	cat <<EoVersion
+chiucvallow: List and change the z/VM user ID filter, version @S390_TOOLS_RELEASE@
+Copyright IBM Corp. 2009, 2017
+EoVersion
+}
+
+error(){
+	echo "$PRG: $1" >&2
+	exit ${2:-1}
+}
+
+hvciucv_available(){
+	test -r "$sysfs_hvc_iucv_allow" \
+		&& cat "$sysfs_hvc_iucv_allow" >/dev/null 2>&1
+	if test $? -gt 0; then
+		cat >&2 <<EoM
+$PRG: Failed to read z/VM user ID filter: $sysfs_hvc_iucv_allow
+Ensure that your Linux kernel supports the z/VM IUCV HVC device driver.
+EoM
+		exit 1
+	fi
+	return 0
+}
+
+
+#
+# List z/VM user ID filter information
+list_filter(){
+	cat $sysfs_hvc_iucv_allow |tr ',' '\n'
+}
+
+#
+# Verify z/VM user ID filter file
+verify_filter(){
+	local filename=$1
+	local failed=0
+	local count=0
+	local fsize=0
+	local userid
+	local regex='^([_$[:alnum:]]{1,8}|[_$[:alnum:]]{1,7}\*)$'
+
+	test -r "$filename" \
+		|| error "Failed to read z/VM user ID filter: $filename"
+
+	# check size... sysfs uses PAGE_SIZE and the filter should be below that
+	fsize=`grep -vE '^(\s*$|#)' $filename 2>/dev/null |wc -c`
+	if test "$fsize" -gt 4095; then
+		printf "$PRG: The z/VM user ID filter exceeds the maximum size (%d of %d bytes)\n" \
+			$fsize 4095 >&2
+		return 1
+	fi
+
+	while read userid; do
+		# skip empty lines and lines starting with '#'
+		echo "$userid" |grep -q -E '^(\s*$|#)' && continue
+
+		printf "Verify z/VM user ID: %-8s : " "$userid"
+		if echo -n "$userid" |grep -q -E -i "$regex"; then
+			printf "OK\n"
+		else
+			printf "FAILED\n"
+			failed=$((failed + 1))
+		fi
+
+		count=$((count + 1))
+	done <$filename
+
+	test $count -gt 500 && \
+		error "The z/VM user ID filter exceeds the maximum of 500 user IDs"
+
+	printf "\n$PRG: Verification summary: verified=%d failed=%d size=%d bytes\n" \
+		$count $failed $fsize
+
+	test $failed -eq 0 || return 2
+}
+
+#
+# Edit the z/VM user ID filter
+edit_filter(){
+	local fromfile="$1"
+	local context=$2
+	local tmpfile=`mktemp /tmp/hvc_iucv_allow.XXXXXX`
+	local md5file=`mktemp /tmp/hvc_iucv_allow.md5.XXXXXX`
+
+	if test -w $tmpfile && test -w $md5file; then :; else
+		error "Creating temporary files failed"
+	fi
+
+	# save list in temp file
+	if test -r "$fromfile"; then cat $fromfile; else list_filter; fi > $tmpfile
+
+	# check whether to open editor
+	if test "x$context" != xnoeditor; then
+		md5sum $tmpfile > $md5file	# save checksum to track changes
+		${EDITOR:-vi} $tmpfile		# open editor
+		if md5sum --status -c $md5file; then
+			cat <<EoM
+$PRG: The filter is not updated because it has not been changed
+EoM
+			rm -f $tmpfile $md5file
+			exit 0
+		fi
+		rm -f $md5file
+	fi
+
+	# verify temp file content and, if successful, write back
+	if verify_filter $tmpfile >/dev/null; then :; else
+		cat >&2 <<EoM
+$PRG: Verifying the z/VM user ID filter failed.
+A backup copy has been saved as '$tmpfile'.
+Consider verifying the file using:
+    $0 --verify $tmpfile
+Correct the problem by editing the filter:
+    $0 --edit $tmpfile
+EoM
+	exit 2
+	fi
+
+	# Post-process and write z/VM user ID filter to sysfs file
+	#	1. skip empty and comment lines,
+	#	2. convert lower to upper case,
+	#	3. sort and remove duplicates,
+	#	4. replace '\n' with ',' and
+	#	5. and remove the last ','.
+	grep -Ev '^(\s*$|#)' $tmpfile \
+		|tr '[:lower:]' '[:upper:]' \
+		|sort -u \
+		|tr '\n' ',' \
+		|sed -e 's#,$##' > $sysfs_hvc_iucv_allow
+
+	if test x$? != x0; then
+		cat >&2 <<EoM
+$PRG: Writing the filter failed. Check for previous error messages.
+A backup copy has been saved as '$tmpfile'.
+Consider re-editing the file using \`$0 --edit $tmpfile'.
+EoM
+		exit 3
+	else
+		test "x$context" != xnoeditor && \
+			printf "$PRG: The filter has been updated successfully\n"
+	fi
+
+	# finally remove temporary files
+	rm -f $tmpfile $md5file 2>/dev/null
+	exit 0
+}
+
+#
+# Clear z/VM user ID filter
+clear_filter(){
+	echo > $sysfs_hvc_iucv_allow
+}
+
+#
+# Check whether we run as root, otherwise complain and exit
+for_root_only(){
+	local euid=`id -u 2>/dev/null`
+
+	test "x$euid" = x0 && return
+	error "You need root authority to use option '$1'"
+}
+
+lock_operation(){
+	( flock -nx 9 \
+		|| error "The filter is currently being changed. Try again later."
+		$@
+	) 9>/var/lock/hvc_iucv_allow
+}
+
+
+# Common options
+case $1 in
+	-h|--help)
+		show_help
+		exit 0
+	;;
+	-v|--version)
+		show_version
+		exit 0
+	;;
+esac
+
+# check the name under which we have been called
+case `basename $0` in
+	lsiucvallow) exec chiucvallow --list ;;
+esac
+
+# chiucvallow program options
+case $1 in
+	-l|--list)
+		for_root_only "$1"
+		hvciucv_available
+		list_filter
+	;;
+	-e|--edit)
+		for_root_only "$1"
+		hvciucv_available
+		lock_operation edit_filter "$2"
+	;;
+	-c|--clear)
+		for_root_only "$1"
+		hvciucv_available
+		lock_operation clear_filter
+	;;
+	-s|--set)
+		for_root_only "$1"
+		test -n "$2" \
+			|| error "This option requires a file as argument"
+		test -r "$2" \
+			|| error "The specified file must be readable"
+		hvciucv_available
+		lock_operation edit_filter "$2" noeditor
+	;;
+	-V|--verify)
+		test -n "$2" \
+			|| error "This option requires a file as argument"
+		verify_filter "$2"
+		exit $?
+	;;
+	'')
+		echo "$PRG: One or more arguments are missing" >&2
+		echo "Try '$0 --help' for more information." >&2
+		exit 201
+	;;
+	*)
+		echo "$PRG: Invalid option -- '$1'" >&2
+		echo "Try '$0 --help' for more information." >&2
+		exit 201
+	;;
+esac
+exit 0

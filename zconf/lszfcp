@@ -1,0 +1,348 @@
+#!/bin/bash
+#
+# lszfcp - Tool to display information about zfcp devices (adapters/ports/units)
+#
+# Copyright IBM Corp. 2006, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+SCRIPTNAME='lszfcp'
+SYSFS=`cat /proc/mounts | grep -m1 sysfs | awk '{ print $2 }'`
+FC_CLASS=false
+
+# Command line parameters
+VERBOSITY=0
+SHOW_HOSTS=0
+SHOW_PORTS=0
+SHOW_DEVICES=0
+SHOW_ATTRIBUTES=false
+unset PAR_BUSID PAR_WWPN PAR_LUN
+
+
+##############################################################################
+
+check_sysfs()
+{
+	if [ -z $SYSFS -o ! -d $SYSFS -o ! -r $SYSFS ]; then
+        	echo "Error: sysfs not available."
+                exit 1
+	fi
+}
+
+check_zfcp_support()
+{
+	if [ ! -e $SYSFS/bus/ccw/drivers/zfcp ]; then
+		echo "Error: No zfcp support available."
+		echo "Load the zfcp module or compile"
+		echo "the kernel with zfcp support."
+		exit 1
+	fi
+}
+
+check_fcp_devs()
+{
+	if $FC_CLASS; then
+		ignore=`ls $SYSFS/class/fc_host/host* 2>&1`
+	else
+		ignore=`ls $SYSFS/devices/css0/[0-9]*/[0-9]*/host[0-9]* 2>&1`
+	fi
+
+	if [ $? -ne 0 ]; then
+		echo "Error: No fcp devices found."
+		exit 1
+	fi
+}
+
+check_fc_class()
+{
+	if [ -d "$SYSFS/class/fc_host" ]; then 
+		FC_CLASS=true
+	fi
+}
+
+print_version()
+{
+	cat <<EOF
+$SCRIPTNAME: version %S390_TOOLS_VERSION%
+Copyright IBM Corp. 2006, 2017
+EOF
+}
+
+print_help()
+{
+	cat <<EOF
+Usage: $SCRIPTNAME [OPTIONS]
+
+Provide information contained in sysfs about zfcp adapters, ports and
+units that are online.
+
+Mandatory arguments to long options are mandatory for short options too.
+
+OPTIONS:
+    -H, --hosts		show host information (default)
+    -P, --ports		show remote port information
+    -D, --devices	show SCSI device information
+    -b, --busid=BUSID	select specific busid
+    -p, --wwpn=WWPN	select specific port name
+    -l, --lun=LUN	select specific LUN
+    -a, --attributes	show all attributes
+    -V, --verbose	show sysfs paths of associated class
+			and bus devices
+    -s, --sysfs=PATH	use path as sysfs (for dbginfo archives)
+    -h, --help		print this help
+    -v, --version	print version information
+
+EXAMPLE: 
+    List for all zfcp adapters, ports and units the names of their 
+    associated SCSI hosts, FC remote ports and SCSI devices.
+
+    #> lszfcp -P -H -D
+    0.0.3d0c host0
+    0.0.3d0c/0x500507630300c562 rport-0:0-0
+    0.0.3d0c/0x500507630300c562/0x4010403300000000 0:0:0:0
+
+The default is to list bus_ids of all zfcp adapters and corresponding
+SCSI host names (equals "lszfcp -H").
+EOF
+}
+
+
+show_attributes()
+{
+	if [ -z $1 -o ! -d $1 -o ! -r $1 ]; then
+		return 1
+	fi
+
+	for FILE in `ls $1`; do
+		read 2>/dev/null CONTENT < $1/$FILE
+
+		# Read fails for directories and
+		# files with permissions 0200.
+		if [ $? -ne 0 ]; then
+			continue
+		fi
+
+		printf "    %-19s = \"%s\"\n" "$FILE" "$CONTENT"
+	done
+}
+
+
+show_hosts()
+{
+	HOST_LIST=`ls -dX $SYSFS/devices/css0/[0-9]*/[0-9]*/host[0-9]*`
+
+	for HOST_PATH in $HOST_LIST; do
+		SCSI_HOST=`basename $HOST_PATH`
+		ADAPTER_PATH=`dirname $HOST_PATH`
+		ADAPTER=`basename $ADAPTER_PATH`
+		
+		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
+
+		if [ $VERBOSITY -eq 0 ]; then
+			echo $ADAPTER $SCSI_HOST
+		else
+			echo $ADAPTER_PATH
+			$FC_CLASS && echo "$SYSFS/class/fc_host/$SCSI_HOST"
+			echo "$SYSFS/class/scsi_host/$SCSI_HOST"
+		fi
+
+		if $SHOW_ATTRIBUTES; then
+			echo 'Bus = "ccw"'
+			show_attributes $ADAPTER_PATH
+
+			if $FC_CLASS; then
+				echo 'Class = "fc_host"'
+				show_attributes \
+					"$SYSFS/class/fc_host/$SCSI_HOST"
+			fi
+
+			echo 'Class = "scsi_host"'
+			show_attributes "$SYSFS/class/scsi_host/$SCSI_HOST"
+			echo
+		fi
+	done
+}
+
+
+show_ports()
+{
+	# Without fc_remote_class there is far less information to display.
+	if ! $FC_CLASS; then
+		PORT_LIST=`ls -d $SYSFS/devices/css0/*/*/0x*`
+
+		for PORT_PATH in $PORT_LIST; do
+			WWPN=`basename $PORT_PATH`
+			ADAPTER=`basename \`dirname $PORT_PATH\``
+			
+			[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
+			[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
+
+			if [ $VERBOSITY -eq 0 ]; then
+				echo "$ADAPTER/$WWPN"
+			else
+				echo $PORT_PATH
+			fi
+		done
+		return
+	fi
+
+
+	if [ -e $SYSFS/class/fc_remote_ports/ ]; then
+		PORT_LIST=`ls -d $SYSFS/class/fc_remote_ports/* 2>/dev/null`
+	fi;
+
+	for FC_PORT_PATH in $PORT_LIST; do
+		PORT=`basename $FC_PORT_PATH`
+		read PORT_STATE < $FC_PORT_PATH/port_state
+		if [ "$PORT_STATE" == "Online" ];
+		then
+			read WWPN < $FC_PORT_PATH/port_name
+		else
+			continue
+		fi
+
+		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
+
+		ADAPTER_PORT_PATH=`ls -d \
+			$SYSFS/devices/css0/*/*/$WWPN/../host[0-9]*/$PORT |\
+			awk -F "/../host" '{ print $1 }'`
+		ADAPTER=`basename \`dirname $ADAPTER_PORT_PATH\``
+
+		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
+
+		if [ $VERBOSITY -eq 0 ]; then
+			echo "$ADAPTER/$WWPN $PORT"
+		else
+			echo $ADAPTER_PORT_PATH
+			echo $FC_PORT_PATH
+		fi
+
+		if $SHOW_ATTRIBUTES; then
+			echo 'Class = "fc_remote_ports"'
+			show_attributes "$FC_PORT_PATH"
+			echo
+		fi
+	done
+}
+
+
+show_devices()
+{
+	# Differentiate old and new sysfs layout
+	if $FC_CLASS; then
+		SCSI_DEVICE_LIST=`ls -d \
+			$SYSFS/bus/ccw/drivers/zfcp/*/host*/rport*/target*/*/ \
+		       	2>/dev/null |grep -P '\d+:\d+:\d+:\d+'`
+	else
+		SCSI_DEVICE_LIST=`ls -d $SYSFS/devices/css0/*/*/host[0-9]*/*/`
+	fi
+
+	if [ -z "$SCSI_DEVICE_LIST" ]; then
+		echo "Error: No fcp devices found."
+	fi
+
+	for SCSI_DEVICE_PATH in $SCSI_DEVICE_LIST; do
+		read ADAPTER < $SCSI_DEVICE_PATH/hba_id
+		read WWPN < $SCSI_DEVICE_PATH/wwpn
+		read LUN < $SCSI_DEVICE_PATH/fcp_lun
+		
+		[ $LUN != ${PAR_LUN:-$LUN} ] && continue
+		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
+		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
+
+		if [ $VERBOSITY -eq 0 ]; then
+			echo "$ADAPTER/$WWPN/$LUN `basename $SCSI_DEVICE_PATH`"
+		else
+			echo "`ls -d $SYSFS/devices/css0/*/$ADAPTER`/$WWPN/$LUN"
+			echo ${SCSI_DEVICE_PATH%*/} # without trailing slash
+
+			# On live systems, there are links to the block and
+			# generic devices. In a dbginfo archive, these links
+			# are not present.  Therefore, fall back to reading 
+			# the runtime.out log file.
+			if [ `ls $SCSI_DEVICE_PATH | grep -c block:` -eq 1 ] 
+			then
+				BLOCK_DEV=`ls $SCSI_DEVICE_PATH | grep block:`
+				GEN_DEV=`ls $SCSI_DEVICE_PATH |\
+			       		grep scsi_generic:`
+				echo -n "$SYSFS/block/${BLOCK_DEV#*:} "
+				echo "$SYSFS/class/scsi_generic/${GEN_DEV#*:}"
+
+			# FIXME Find a way to assign the generic devices.
+			elif [ -r $SYSFS/../runtime.out ]; then 
+				SCSI_DEV=`basename $SCSI_DEVICE_PATH`
+				echo "$SYSFS/block/"`grep -r "\[$SCSI_DEV\]"\
+			       		$SYSFS/../runtime.out |\
+					awk -F "/dev/" '{print $2}'`
+			fi
+		fi
+
+		if $SHOW_ATTRIBUTES; then
+			echo 'Class = "scsi_device"'
+			show_attributes "$SCSI_DEVICE_PATH"
+			echo
+		fi
+	done
+}
+
+
+##############################################################################
+
+ARGS=`getopt --options ahvHPDVb:p:l:s: --longoptions \
+attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs: \
+-n "$SCRIPTNAME" -- "$@"`
+
+if [ $? -ne 0 ]; then
+	echo
+	print_help
+	exit
+fi
+
+eval set -- "$ARGS"
+
+for ARG; do
+	case "$ARG" in
+		-a|--attributes) SHOW_ATTRIBUTES=true; 	shift 1;;
+		-b|--busid) 	 PAR_BUSID=$2;		shift 2;;
+		-h|--help) 	 print_help;		exit 0;;
+		-l|--lun) 	 PAR_LUN=$2;		shift 2;;
+		-p|--wwpn) 	 PAR_WWPN=$2;		shift 2;;
+		-v|--version) 	 print_version;		exit 0;;
+		-H|--hosts) 	 SHOW_HOSTS=1;		shift 1;;
+		-D|--devices) 	 SHOW_DEVICES=1;	shift 1;;
+		-P|--ports) 	 SHOW_PORTS=1;		shift 1;;
+		-V|--verbose) 	 VERBOSITY=1;		shift 1;;
+		-s|--sysfs)	 SYSFS=$2;		shift 2;;
+		--) shift; break;;
+	esac
+done
+
+check_sysfs
+check_zfcp_support
+check_fc_class
+check_fcp_devs
+
+default=1
+if [ $SHOW_HOSTS -eq 1 ]; then
+	default=0; show_hosts
+elif [ $SHOW_PORTS -eq 0 -a $SHOW_DEVICES -eq 0 -a -n "$PAR_BUSID" ]; then
+	default=0; show_hosts
+fi
+
+if [ $SHOW_PORTS -eq 1 ]; then
+	default=0; show_ports
+elif [ $SHOW_HOSTS -eq 0 -a $SHOW_DEVICES -eq 0 -a -n "$PAR_WWPN" ]; then
+	default=0; show_ports
+fi
+
+if [ $SHOW_DEVICES -eq 1 ]; then
+	default=0; show_devices
+elif [ $SHOW_HOSTS -eq 0 -a $SHOW_PORTS -eq 0 -a -n "$PAR_LUN" ]; then
+	default=0; show_devices
+fi
+
+if [ $default == 1 ]; then
+	show_hosts
+fi

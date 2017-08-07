@@ -1,0 +1,37 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH MON_FSSTATD 8 "Dec 2006" "s390-tools"
+
+.SH NAME
+mon_fsstatd \- Filesystem statistics monitor.
+
+.SH SYNOPSIS
+\fBmon_fsstatd\fR [-h] [-v] [-a] [-i \fI<interval>\fR]
+
+.SH DESCRIPTION
+\fBmon_fsstatd\fR is a daemon that writes filesystem utilization data to the z/VM monitor
+stream.
+
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print usage message and exit.
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print Version information and exit.
+
+.TP
+\fB-a\fR or \fB--attach\fR
+Run in foreground.
+
+.TP
+\fB-i\fR \fI<interval>\fR or \fB--interval\fR=\fI<interval>\fR
+Set polling interval in seconds.
+
+.SH AUTHOR
+.nf
+This man-page was written by Melissa Howland <melissa.howland@us.ibm.com>.
+.fi

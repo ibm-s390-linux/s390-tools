@@ -1,0 +1,772 @@
+#!/bin/bash
+
+#
+# FCP adapter trace utility
+#
+# Wrapper script to start all processes
+#
+# Copyright IBM Corp. 2008, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+WRP_TOOLNAME="ziomon"
+WRP_MSG_Q_PATH="/tmp/.zfcpstats$RANDOM";
+WRP_DEBUGFS_PATH="";
+WRP_MSG_Q_ID=1;
+WRP_MSG_Q_UTIL_ID=1;
+WRP_MSG_Q_IOERR_ID=2;
+WRP_MSG_Q_BLKIOMON_ID=3;
+WRP_MSG_Q_ZIOMON_ZFCPDD_ID=4;
+WRP_DURATION="";
+WRP_INTERVAL="";
+WRP_INTERVAL_DEFAULT="60";
+WRP_DEBUG=0;
+WRP_ZIOMON_MGR_PID="";
+WRP_ZIOMON_UTIL_PID="";
+WRP_BLKTRACE_PID="";
+WRP_BLKIOMON_PID="";
+WRP_ZIOMON_ZFCPDD_PID="";
+WRP_SIZE="";
+WRP_HOST_ADAPTERS="";
+WRP_DEVICES=();
+WRP_LUNS=();
+WRP_LOGFILE="";
+WRP_BLKIOMON_VERSION="";
+# limit of actual data in percent that need space on disk
+WRP_SIZE_THRESHOLD="10";
+WRP_FORCE=0;
+
+function debug() {
+   if [ $WRP_DEBUG -ne 0 ]; then
+      echo "    === $@";
+   fi
+}
+
+function ddebug() {
+   if [ $WRP_DEBUG -gt 1 ]; then
+      echo "    ====== $@";
+   fi
+}
+
+function print_usage() {
+   echo "Usage: $WRP_TOOLNAME [-h] [-V] [-v] [-f] [-l <sz_limit>] [-i n] -d n";
+   echo "              -o <logfile> <device>...";
+   echo;
+   echo "Collect performance data for the specified zfcp devices or multipath devices.";
+   echo "Example: $WRP_TOOLNAME -d 5 -o log /dev/sda";
+   echo;
+   echo "-h, --help            Print usage information and exit.";
+   echo "-v, --version         Print version information and exit.";
+   echo "-V, --verbose         Be verbose.";
+   echo "-i, --interval-length Elapsed time between recording data in seconds.";
+   echo "                      All samples in this timeframe will be aggregated.";
+   echo "                      Must be an even number.";
+   echo "                      Defaults to $WRP_INTERVAL_DEFAULT seconds.";
+   echo "-d, --duration        Total duration to sample data in minutes.";
+   echo "-f, --force           Force run even with insufficient disk space.";
+   echo "-o, --outfile         Specify logfile name.";
+   echo "-l, --size-limit      Specify an upper limit for the data output.";
+   echo "                      Use suffixes M (megabytes), G (Gigabytes)";
+   echo "                      or T (Terabytes) to specify a unit measure.";
+   echo "                      Unit measure defaults to megabytes.";
+}
+
+
+function check_for_int() {
+   [ $1 -gt 0 ] >/dev/null 2>&1;
+   if [ $? -ne 0 ]; then
+      echo "$WRP_TOOLNAME: $1 is not a valid argument to $2 - must be positive integer";
+      exit 3;
+   fi
+}
+
+
+function print_version() {
+   echo "$WRP_TOOLNAME: I/O data collection utility, version %S390_TOOLS_VERSION%";
+   echo "Copyright IBM Corp. 2008, 2017";
+}
+
+
+function parse_size() {
+   local arg=$1;
+   local pos;
+   local size;
+   local unit;
+
+   let pos=${#arg}-1;
+   unit=${arg:$pos};
+   size=${arg:0:$pos};
+
+   # default to megabytes
+   if [ "`echo $unit | tr -d [0-9]`" == "" ]; then
+      size=$arg;
+      unit="M";
+   fi
+
+   check_for_int $size -l;
+
+   case $unit in
+      G) (( WRP_SIZE=1000*$size ));;
+      M) WRP_SIZE=$size;;
+      T) (( WRP_SIZE=1000000*$size ));;
+      *) echo "$WRP_TOOLNAME: Unknown size suffix $unit";
+         return 1;;
+   esac;
+
+   return 0;
+}
+
+
+function parse_params() {
+   local tmp;
+   local i;
+   local error=0;
+   local args;
+
+   if [ $# -eq 0 ]; then
+      print_usage;
+      exit 1;
+   fi
+
+   args=`getopt -u -o hVd:fi:o:l:v -l help,verbose,duration:,force,interval-length:,outfile:,size-limit:,version -- $@`;
+   set -- $args;
+
+   let i=0;
+   while [ $# -gt 0 ]; do
+        case $1 in
+            --help|-h)
+                print_usage;
+                exit 0;;
+            --verbose|-V)
+                (( WRP_DEBUG++ ));;
+            --duration|-d)
+                shift;
+                (( WRP_DURATION = $1 * 60 ));;
+            --force|-f)
+                WRP_FORCE=1;;
+            --interval-length|-i)
+                shift;
+                WRP_INTERVAL=$1;;
+            --outfile|-o)
+                shift;
+                WRP_LOGFILE=$1;;
+            --size-limit|-l)
+                shift;
+                parse_size $1;
+                [ $? -ne 0 ] && ((error++));;
+            --version|-v)
+                print_version;
+                exit 0;;
+            --) ;;
+            -*)
+                echo "$WRP_TOOLNAME: Invalid option -- $1";
+                echo "Try '$WRP_TOOLNAME --help' for more information.";
+                exit 1;;
+            *)
+                echo ${WRP_DEVICES[@]} | grep -w $1 >/dev/null 2>&1
+                if [ $? -ne 0 ]; then
+                   WRP_DEVICES[$i]=$1;
+                   (( i++ ));
+                else
+                   debug "Skipping duplicate: $1";
+                fi;;
+        esac
+        shift;
+   done
+   if [ ${#WRP_DEVICES[@]} -eq 0 ]; then
+      echo "$WRP_TOOLNAME: No devices specified";
+      error=1;
+   fi
+   if [ "$WRP_LOGFILE" == "" ]; then
+      echo "$WRP_TOOLNAME: No logfile specified";
+      error=1;
+   fi
+   if [ $error -eq 0 ] && [ `dirname $WRP_LOGFILE` == "" ]; then
+      WRP_LOGFILE=$WRP_LOGFILE;
+   fi
+   if [ $error -eq 0 ] && [ ! -d `dirname $WRP_LOGFILE` ]; then
+      echo "$WRP_TOOLNAME: Directory `dirname $WRP_LOGFILE` does not exist";
+      error=1;
+   fi
+   if [ "$WRP_DURATION" == "" ]; then
+      echo "$WRP_TOOLNAME: No duration specified - see option '-d'";
+      error=1;
+   fi
+   [ $error -eq 0 ] && check_for_int $WRP_DURATION -d;
+   if [ $error -eq 0 ] && [ "$WRP_INTERVAL" != "" ]; then
+      check_for_int $WRP_INTERVAL -i;
+   else
+      WRP_INTERVAL=$WRP_INTERVAL_DEFAULT;
+   fi
+   [ $error -eq 0 ] && [ "$WRP_SIZE" != "" ] && check_for_int $WRP_SIZE -l;
+
+   if [ $error -eq 0 ]; then
+      tmp=`expr $WRP_INTERVAL % 2`;
+      if [ $tmp -ne 0 ]; then
+         echo "$WRP_TOOLNAME: The interval length must be an even number";
+         error=1;
+      fi
+   fi
+
+   if [ $error -eq 0 ]; then
+      tmp=`expr $WRP_DURATION % $WRP_INTERVAL`;
+      if [ $tmp -ne 0 ]; then
+         echo "$WRP_TOOLNAME: The duration must be a multiple of the interval length";
+         error=1;
+      fi
+   fi
+   if [ $error -ne 0 ]; then
+      exit 1;
+   fi
+
+   debug "WRP_INTERVAL     : $WRP_INTERVAL seconds";
+   debug "WRP_DURATION     : $WRP_DURATION seconds";
+   debug "WRP_MSG_Q_ID     : $WRP_MSG_Q_ID";
+   debug "WRP_FORCE        : $WRP_FORCE";
+   debug "WRP_SIZE         : $WRP_SIZE MB";
+   debug "WRP_LOGFILE      : $WRP_LOGFILE";
+}
+
+
+function check_for_process() {
+   if [ $# -eq 0 ] || [ ! -d /proc/$1 ]; then
+      echo "failed";
+      return 1;
+   fi
+
+   return 0;
+}
+
+
+function start_trace() {
+   local verbose="";
+   local verbose_blk="";
+   local command="";
+   local blktrace_command="";
+   local blkiomon_command="";
+   local zfcpdd_command="";
+   local size_limit="";
+   local hosts_param;
+   local luns_param;
+   local i;
+   local len;
+   local end;
+
+   while [ -e $WRP_MSG_Q_PATH ]; do
+      WRP_MSG_Q_PATH="$WRP_MSG_Q_PATH$RANDOM";
+   done
+   mkdir $WRP_MSG_Q_PATH;
+   debug "WRP_MSG_Q_PATH   : $WRP_MSG_Q_PATH";
+
+
+   if [ $WRP_DEBUG -ne 0 ]; then
+      verbose="-V";
+      verbose_blk="-D $WRP_MSG_Q_PATH/blkiomon.log";
+   fi
+
+   # collect system data
+   # we do this synchronously, as some of the volumes affected by this action
+   # might be the ones to monitor
+   echo -n "Collecting configuration data...";
+   command="ziomon_fcpconf -o $WRP_LOGFILE";
+   debug "collect system data: $command";
+   $command > $WRP_MSG_Q_PATH/ziomon_fcpconf.log;
+   echo "done";
+
+   # start data manager
+   echo -n "Start data collection processes...";
+   if [ "$WRP_SIZE" != "" ]; then
+      size_limit="-l $WRP_SIZE";
+   fi
+   command="ziomon_mgr $verbose $WRP_BLKIOMON_VERSION -f -i $WRP_INTERVAL -Q $WRP_MSG_Q_PATH -q $WRP_MSG_Q_ID -u $WRP_MSG_Q_UTIL_ID -r $WRP_MSG_Q_IOERR_ID -b $WRP_MSG_Q_BLKIOMON_ID -z $WRP_MSG_Q_ZIOMON_ZFCPDD_ID -o $WRP_LOGFILE $size_limit";
+   debug "starting data manager: $command";
+   $command > $WRP_MSG_Q_PATH/ziomon_mgr.log &
+   WRP_ZIOMON_MGR_PID=$!;
+
+   # start utilization
+   for (( i=0; i<${#WRP_HOST_ADAPTERS[@]}; ++i )); do
+      hosts_param="$hosts_param -a `echo ${WRP_HOST_ADAPTERS[$i]} | sed s/host//`";
+   done
+   for (( i=0; i<${#WRP_LUNS[@]}; ++i )); do
+      luns_param="$luns_param -l ${WRP_LUNS[$i]}";
+   done
+   command="ziomon_util $verbose $hosts_param $luns_param -Q $WRP_MSG_Q_PATH -q $WRP_MSG_Q_ID -m $WRP_MSG_Q_UTIL_ID -L $WRP_MSG_Q_IOERR_ID -d $WRP_DURATION -i $WRP_INTERVAL";
+   debug "starting ziomon_util: $command";
+   $command > $WRP_MSG_Q_PATH/ziomon_util.log &
+   WRP_ZIOMON_UTIL_PID=$!;
+
+   # start blkiomon & ziomon_zfcpdd
+   blktrace_command="blktrace -a issue -a drv_data -a complete -w $WRP_DURATION -o - ${WRP_DEVICES[@]}";
+   blkiomon_command="blkiomon --interval=$WRP_INTERVAL -Q  $WRP_MSG_Q_PATH -q $WRP_MSG_Q_ID -m $WRP_MSG_Q_BLKIOMON_ID $verbose_blk -d -";
+   zfcpdd_command="ziomon_zfcpdd -Q  $WRP_MSG_Q_PATH -q $WRP_MSG_Q_ID -m $WRP_MSG_Q_ZIOMON_ZFCPDD_ID -i $WRP_INTERVAL";
+   debug "starting blktrace: $blktrace_command | $blkiomon_command | $zfcpdd_command";
+   $blktrace_command 2>$WRP_MSG_Q_PATH/blktrace.err | $blkiomon_command | $zfcpdd_command > $WRP_MSG_Q_PATH/blktrace.log &
+   i=0;
+   # might take a moment to start all processes in the pipe if system under load
+   while [ $i -lt 60 ]; do
+      WRP_BLKTRACE_PID=`ps -o pid,args --ppid $$ | grep blktrace | awk '{ print $1 }'`;
+      WRP_BLKIOMON_PID=`ps -o pid,args --ppid $$ | grep blkiomon | awk '{ print $1 }'`;
+      WRP_ZIOMON_ZFCPDD_PID=`ps -o pid,args --ppid $$ | grep ziomon_zfcpdd | awk '{ print $1 }'`;
+      if [ "$WRP_BLKTRACE_PID" != "" ] && [ "$WRP_BLKIOMON_PID" != "" ] && [ "$WRP_ZIOMON_ZFCPDD_PID" != "" ]; then
+         break;
+      fi
+      sleep 1;
+      (( i++ ));
+   done
+   check_for_process $WRP_ZIOMON_MGR_PID;
+   [ $? -ne 0 ] && echo "$WRP_TOOLNAME: Failed to determine ziomon_mgr pid" && return 1;
+   check_for_process $WRP_ZIOMON_UTIL_PID;
+   [ $? -ne 0 ] && echo "$WRP_TOOLNAME: Failed to determine ziomon_util pid" && return 1;
+   check_for_process $WRP_BLKTRACE_PID;
+   [ $? -ne 0 ] && echo "$WRP_TOOLNAME: Failed to determine blktrace pid" && return 1;
+   check_for_process $WRP_BLKIOMON_PID;
+   [ $? -ne 0 ] && echo "$WRP_TOOLNAME: Failed to determine blkiomon pid" && return 1;
+   check_for_process $WRP_ZIOMON_ZFCPDD_PID;
+   [ $? -ne 0 ] && echo "$WRP_TOOLNAME: Failed to determine ziomon_zfcpdd pid" && return 1;
+
+   echo "done";
+   echo -n "Collecting data...";
+
+   # pay extra attention to blktrace - but check every 15 seconds only since
+   # otherwise checking might become too expensive
+   end=`date +%s`;
+   let end=$end+$WRP_DURATION;
+   debug "start data collection at `date`";
+   while [ `date +%s` -lt $end ]; do
+      len=`cat $WRP_MSG_Q_PATH/blktrace.err 2>/dev/null | wc -l`;
+      if [ $len -ne 0 ]; then
+         cat $WRP_MSG_Q_PATH/blktrace.err;
+         echo "Error: blktrace has errors, aborting";
+         return;
+      fi
+
+      check_for_process $WRP_BLKTRACE_PID;
+      if [ $? -ne 0 ]; then
+         echo "Error: blktrace died unexpected";
+         return;
+      fi
+                                          
+      sleep 15;
+   done
+   debug "end data collection at `date`";
+
+   echo "done";
+}
+
+
+function shutdown() {
+   echo "Shutting down";
+   # one more second to write final result
+   sleep 2;
+   if [ "$WRP_ZIOMON_UTIL_PID" != "" ]; then
+      [ -d /proc/$WRP_ZIOMON_UTIL_PID ] && echo "Shutting down utilization process" && kill -s SIGTERM $WRP_ZIOMON_UTIL_PID;
+   fi
+   if [ "$WRP_BLKTRACE_PID" != "" ]; then
+      [ -d /proc/$WRP_BLKTRACE_PID ] && echo "Shutting down blktrace process" && kill -s SIGINT $WRP_BLKTRACE_PID;
+   fi
+   if [ "$WRP_BLKIOMON_PID" != "" ]; then
+      [ -d /proc/$WRP_BLKIOMON_PID ] && echo "Shutting down blkiomon process" && kill -s SIGTERM $WRP_BLKIOMON_PID;
+   fi
+   if [ "$WRP_ZIOMON_ZFCPDD_PID" != "" ]; then
+      [ -d /proc/$WRP_ZIOMON_ZFCPDD_PID ] && echo "Shutting down ziomon_zfcpdd process" && kill -s SIGTERM $WRP_ZIOMON_ZFCPDD_PID;
+   fi
+   if [ "$WRP_ZIOMON_MGR_PID" != "" ]; then
+      if [ -d /proc/$WRP_ZIOMON_MGR_PID ]; then
+         # don't be too fast
+         sleep 1;
+         echo "Shutting down data manager";
+         kill -s SIGTERM $WRP_ZIOMON_MGR_PID;
+      fi
+   fi
+   # synchronize with all children to avoid zombies
+   # and to prepare for a clean subsequent re-run of ziomon
+   wait
+
+   if [ -e $WRP_MSG_Q_PATH ]; then
+      if [ $WRP_DEBUG -gt 1 ]; then
+         debug "Logfiles available at $WRP_MSG_Q_PATH";
+      else
+         rm -rf $WRP_MSG_Q_PATH;
+      fi
+   fi
+}
+
+
+function emergency_shutdown() {
+   debug "signal received, aborting!";
+   shutdown;
+   exit 1;
+}
+
+
+function check_cpuplugd {
+   # check if cpuplugd is running
+   # If so, the whole per-cpu mechanism of blktrace gets corrupted, which
+   # results in the infamous 'bad trace magic' message
+   if [ -e /var/run/cpuplugd.pid ]; then
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+      echo "$WRP_TOOLNAME: Warning: cpuplugd is running which can corrupt the traces.";
+      echo "        It is recommended to stop cpuplugd for the duration of the";
+      echo "        trace using 'service cpuplugd stop'.";
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+   fi
+}
+
+
+# we need 2MB per device and CPU
+function check_vmalloc_space() {
+   local total;
+   local used;
+   local free;
+   local num_cpus;
+   local required;
+   local result;
+   
+   num_cpus=`cat /proc/cpuinfo | grep processors | awk '{print $4}'`;
+   total=`cat /proc/meminfo | grep VmallocTotal | awk '{print $2}'`;
+   used=`cat /proc/meminfo | grep VmallocUsed | awk '{print $2}'`;
+
+   (( free=$total-$used ));
+   (( required=$num_cpus*${#WRP_DEVICES[@]}*2048 ));
+   (( result=$free-$required ));
+   debug "Required Vmalloc space: $required KBytes";
+   if [ $result -lt 0 ]; then
+      echo "$WRP_TOOLNAME: Not enough free Vmalloc space:";
+      echo "        Required: $required KBytes";
+      echo "        Free: $free KBytes";
+      exit 1;
+   fi
+   
+   return 0;
+}
+
+
+function check_blkiomon() {
+   # check blkiomon version
+   ver=`blkiomon -V | awk '{print $3}'`;
+   if [ "$ver" == "0.2" ]; then
+      WRP_BLKIOMON_VERSION="-x 2";
+      debug "detected backlevel blkiomon, use binary format option $WRP_BLKIOMON_VERSION";
+   else
+      if [ "$ver" != "0.3" ]; then
+         echo "$WRP_TOOLNAME: Unsupported blkiomon version $ver detected, aborting";
+         exit 1;
+      fi
+   fi
+}
+
+
+function check_debugfs() {
+   # check if debugfs is mounted (required for blktrace)
+   WRP_DEBUGFS_PATH=$(awk '{ if ($3 == "debugfs" && $2 == \
+                          "/sys/kernel/debug") print $2 }' /proc/mounts);
+   if [ -z "$WRP_DEBUGFS_PATH" ]; then
+      echo "$WRP_TOOLNAME: Error: Debugfs not mounted on /sys/kernel/debug.";
+      exit 1;
+   fi
+}
+
+
+function clean_devices() {
+   local tmp;
+
+   # remove empty entries from array
+   tmp=( ${WRP_DEVICES[@]} );
+   WRP_DEVICES=();
+   WRP_DEVICES=( ${tmp[@]} );
+}
+
+
+function check_for_multipath_devices() {
+   local i;
+   local j;
+   local mp_arr=();
+   local line;
+   local devices_basenames;
+   local tmp;
+
+   [ ${#WRP_DEVICES[@]} -eq 0 ] && return;
+
+   # maybe multipath is not even installed?!?
+   if [ -e /sbin/multipath ]; then
+      while read line
+      do
+         mp_arr[${#mp_arr[@]}]=$line;
+      done < <(/sbin/multipath -l);
+   fi
+
+   for (( j=0; j<${#WRP_DEVICES[@]}; ++j )); do
+      devices_basenames[$j]=`basename ${WRP_DEVICES[$j]}`;
+   done
+
+   ddebug "check for multipath devices...";
+   for (( i=0; i<${#mp_arr[@]}; ++i )); do
+      if [ "${mp_arr[$i]:0:1}" != "[" ] && [ "${mp_arr[$i]:0:1}" != " " ] && [ "${mp_arr[$i]:0:1}" != "_" ]; then
+         tmp=`echo ${mp_arr[$i]} | awk '{print $1}'`;
+         for (( j=0; j<${#WRP_DEVICES[@]}; ++j )); do
+            if [ "$tmp" == "`basename ${WRP_DEVICES[$j]}`" ]; then
+               ddebug "   multipath device found: $tmp";
+               WRP_DEVICES[$j]="";
+               devices_basenames[$j]="";
+               clean_devices;
+               (( i+=2 ));
+               while [[ `echo "${mp_arr[$i]:0:1}" | grep -ve "[0-9a-zA-Z]"` ]] && [ $i -lt ${#mp_arr[@]} ]; do
+                  if [ `echo ${mp_arr[$i]} | grep -e "[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}" | wc -l` -ne 0 ]; then
+	             line="`echo ${mp_arr[$i]} | sed 's/.*\([0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}\)/\1/'`";
+                     checked_devs[${#checked_devs[@]}]=`echo $line | awk '{print "/dev/"$2}'`;
+                     ddebug "      adding ${checked_devs[${#checked_devs[@]}-1]}";
+                     WRP_HOST_ADAPTERS[${#WRP_HOST_ADAPTERS[@]}]="host${line%%:*}";
+                     WRP_LUNS[${#WRP_LUNS[@]}]=`echo $line | awk '{print $1}'`;
+                  fi
+                  (( i++ ));
+               done;
+               (( --i ));
+               break;
+            fi
+         done
+      fi
+   done
+   ddebug "done";
+}
+
+
+function check_for_regular_devices() {
+   local i;
+   local j;
+   local line;
+   local lsscsi_arr=();
+   local dev;
+   local dev_gen;
+
+   [ ${#WRP_DEVICES[@]} -eq 0 ] && return;
+
+   while read line
+   do
+      lsscsi_arr[${#lsscsi_arr[@]}]=$line;
+   done < <(lsscsi -g);
+
+   ddebug "check for regular devices...";
+   if [ ${#WRP_DEVICES[@]} -gt 0 ]; then
+      for (( i=0; i<${#lsscsi_arr[@]}; ++i )); do
+         dev=`echo ${lsscsi_arr[$i]} | awk '{print $(NF-1)}'`;
+         dev_gen=`echo ${lsscsi_arr[$i]} | awk '{print $NF}'`;
+         for (( j=0; j<${#WRP_DEVICES[@]}; ++j )); do
+            if [ "$dev" == "${WRP_DEVICES[$j]}" ] || [ "$dev_gen" == "${WRP_DEVICES[$j]}" ]; then
+               checked_devs[${#checked_devs[@]}]=${WRP_DEVICES[$j]};
+               WRP_DEVICES[$j]="";
+               clean_devices;
+               ddebug "   add ${checked_devs[${#checked_devs[@]}-1]}";
+               line=`echo ${lsscsi_arr[$i]} | awk '{print $1}'`;
+               line=${line#[*};
+               WRP_HOST_ADAPTERS[${#WRP_HOST_ADAPTERS[@]}]="host${line%%:*}";
+               WRP_LUNS[${#WRP_LUNS[@]}]=${line%%]*};
+               break;
+            fi
+         done
+      done
+   fi
+   ddebug "done";
+}
+
+
+function determine_host_adapters() {
+   local error=0;
+   local found;
+   local num_s_devs;
+   local s_dev_ratio;
+
+   echo -n "Check devices...";
+
+   # Estimate fraction of /dev/s* devices - if >50%, start with check for regular devices
+   num_s_devs=`echo ${WRP_DEVICES[@]} | sed "s/ /\n/g" | grep /dev/s | wc -l`;
+   (( s_dev_ratio=$num_s_devs*100/${#WRP_DEVICES[@]} ))
+   if [ $s_dev_ratio -ge 50 ]; then
+      check_for_regular_devices;
+      check_for_multipath_devices;
+   else
+      check_for_multipath_devices;
+      check_for_regular_devices;
+   fi
+
+   # anything left?
+   found=0;
+   for (( i=0; i<${#WRP_DEVICES[@]}; ++i )); do
+      if [ "${WRP_DEVICES[$i]}" != "" ]; then
+         if [ $found -eq 0 ]; then
+           echo "$WRP_TOOLNAME: The following devices do not seem to exist:";
+           found=1;
+         fi
+         echo "   ${WRP_DEVICES[$i]}";
+      fi
+   done
+   [ $found -ne 0 ] && exit 1;
+
+   # filter duplicates
+   WRP_HOST_ADAPTERS=( `echo ${WRP_HOST_ADAPTERS[@]} | sed "s/ /\n/g" | sort | uniq` );
+   WRP_DEVICES=( `echo ${checked_devs[@]} | sed "s/ /\n/g" | sort | uniq` );
+   WRP_LUNS=( `echo ${WRP_LUNS[@]} | sed "s/ /\n/g" | sort | uniq` );
+
+   echo "done";
+
+   debug "#Devices total   : ${#WRP_DEVICES[@]}"
+   debug "WRP_DEVICES      : ${WRP_DEVICES[@]}";
+   debug "WRP_LUNS         : ${WRP_LUNS[@]}";
+   debug "WRP_HOST_ADAPTERS: ${WRP_HOST_ADAPTERS[@]}";
+
+   if [ ${#WRP_DEVICES[@]} -ne ${#WRP_LUNS[@]} ]; then
+      echo "$WRP_TOOLNAME: Number of LUNs does not match number of devices: ${#WRP_DEVICES[@]} devices and ${#WRP_LUNS[@]} LUNs";
+      exit 2;
+   fi
+}
+
+
+
+# required args:
+# $1 estimated size
+# $2 limit
+function check_free_space_mileage() {
+   local history_percent;
+   local estimated_size=$1;
+   local limit=$2;
+
+   if [ $estimated_size -gt $limit ]; then
+      (( history_percent = $limit * 100 / $estimated_size ));
+      if [ $WRP_FORCE -eq 0 ] && [ $history_percent -lt $WRP_SIZE_THRESHOLD ]; then
+         if [ "$WRP_SIZE" != "" ]; then
+            echo "$WRP_TOOLNAME: User-specified limit for log data too low";
+            echo "Estimated maximum size of log data: $estimated_size MBytes.";
+            echo "User-specified limit: $limit MBytes.";
+            echo "This would equal $history_percent percent of the total data, while at least $WRP_SIZE_THRESHOLD percent is required.";
+            echo "Either lower the duration, reduce the interval length, raise the limit or override using option '-f'."
+         else
+            echo "Error: Not enough free disk space available for log data";
+            echo "Estimated maximum size of log data: $estimated_size MBytes.";
+            echo "Free disk space available: $limit MBytes.";
+            echo "This would equal $history_percent percent of the total data, while at least $WRP_SIZE_THRESHOLD percent is required.";
+            echo "Either lower the duration, reduce the interval length or override using option '-f'."
+         fi
+         return 1;
+      else
+         echo -n "Warning: Only approx. $history_percent percent of the total log data can be recorded due to ";
+         if [ "$WRP_SIZE" != "" ]; then
+            echo -n "a user-specified limit. ";
+         else
+            echo -n "disk space limitations. ";
+         fi
+            echo "All data exceeding this limit must be aggregated, which means a loss of granularity.";
+      fi
+   else
+      [ $estimated_size -eq 0 ] && estimated_size="<1";
+      echo "Estimated maximum disk space required for log data: approx. $estimated_size MBytes";
+   fi
+
+   return 0;
+}
+
+
+function check_blktrace() {
+   which blktrace >/dev/null 2>&1;
+   if [ $? -ne 0 ]; then
+      echo "$WRP_TOOLNAME: Could not find blktrace. Please make sure that the blktrace package is installed and matches the level in the documentation.";
+      exit 1;
+   fi
+}
+
+
+function check_for_existing_output() {
+    # avoid config mismatch. Accidental deletion doesn't harm - can be recreated from .cfg anyway
+    if [ -e "$WRP_LOGFILE.config" ]; then
+        debug "$WRP_LOGFILE.config exists, removing";
+        rm -rf $WRP_LOGFILE.config;
+    fi
+    if [ -e "$WRP_LOGFILE.agg" ]; then
+        debug "$WRP_LOGFILE.agg exists, removing";
+        rm -rf $WRP_LOGFILE.agg;
+    fi
+}
+
+
+function check_size_requirements() {
+   local util_base_sz;
+   local util_variable_sz;
+   local ioerr_base_sz;
+   local ioerr_variable_sz;
+   local blkiotrace_sz;
+   local zfcpiotrace_sz;
+   local size_per_record;
+   local total_num_records;
+   local estimated_size;
+   local free_space;
+   local logpath=`dirname $WRP_LOGFILE`;
+
+   set `ziomon_mgr -e`;
+   util_base_sz=$1;
+   util_variable_sz=$2;
+   ioerr_base_sz=$3;
+   ioerr_variable_sz=$4;
+   zfcpiotrace_sz=$5;
+   blkiotrace_sz=$6;
+
+   # NOTE: Since blktrace and ziomon_zfcpdd write messages only when there is
+   # traffic, the estimate is an upper boundary only
+   debug "disk space requirements:";
+   (( size_per_record = $util_base_sz + ${#WRP_HOST_ADAPTERS[@]} * $util_variable_sz + $ioerr_base_sz
+                        + ${#WRP_DEVICES[@]} * ( $ioerr_variable_sz + $blkiotrace_sz + $zfcpiotrace_sz )
+                        + ( 2 + ${#WRP_DEVICES[@]}) * 8 ));
+   debug "    size per interval: $size_per_record Bytes";
+   (( total_num_records = $WRP_DURATION / $WRP_INTERVAL ));
+   debug "    total number of intervals: $total_num_records";
+   (( estimated_size=$total_num_records * $size_per_record ));
+   debug "    estimated size: $estimated_size Bytes";
+   (( estimated_size=$estimated_size / 1000000 ));
+   free_space=`df -P -B 1M $logpath | tail -n 1 | awk '{print $4}'`;
+   debug "    free space on '$logpath': $free_space MBytes";
+   if [ "$WRP_SIZE" == "" ]; then
+      echo "NOTE: No size limit specified, run without a limit.";
+   else
+      if [ $WRP_FORCE -eq 0 ] && [ $WRP_SIZE -gt $free_space ]; then
+         echo "$WRP_TOOLNAME: The user-specified limit of $WRP_SIZE MBytes for the log data exceeds the actual free space of $free_space MBytes.";
+         echo "Either lower the limit, get more free space or use option '-f' to override.";
+         return -1;
+      fi
+   fi
+   if [ "$WRP_SIZE" == "" ]; then
+      check_free_space_mileage $estimated_size $free_space;
+   else
+      check_free_space_mileage $estimated_size $WRP_SIZE;
+   fi
+   [ $? -ne 0 ] && return 1;
+
+   return 0;
+}
+
+
+trap emergency_shutdown SIGHUP SIGTERM SIGINT SIGQUIT;
+
+check_blktrace;
+
+parse_params $@;
+
+determine_host_adapters;
+
+check_cpuplugd;
+
+check_blkiomon;
+
+check_for_existing_output;
+
+check_debugfs;
+
+check_vmalloc_space;
+
+check_size_requirements;
+
+[ $? -eq 0 ] && start_trace;
+
+shutdown;
+
+exit 0;
+
+

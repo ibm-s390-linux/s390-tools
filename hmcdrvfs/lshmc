@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# lshmc - Print files from a HMC drive DVD
+#
+# Copyright IBM Corp. 2015, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+TOOL=$(basename $0)
+FTPDEV="/dev/hmcdrv"
+FTPCMD="dir"
+
+#------------------------------------------------------------------------------
+# Print usage
+#------------------------------------------------------------------------------
+function PrintUsage() {
+	cat <<-EOD
+		Usage: $(basename $0) [OPTIONS] [FILE]
+
+		List information about the FILE(s) residing on a HMC drive DVD.
+		Use OPTIONS described below or present simple wildcards on
+		behalf of FILE.
+
+		-h, --help	Print this help, then exit.
+		-v, --version	Print version information, then exit.
+		-s, --short	Print only files, in a short listing format.
+	EOD
+}
+
+#------------------------------------------------------------------------------
+# Print version
+#------------------------------------------------------------------------------
+function PrintVersion()
+{
+	cat <<-EOD
+	$TOOL: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp. 2015, 2017
+	EOD
+}
+
+
+FILES=""
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	--help|-h)
+		PrintUsage
+		exit 0
+		;;
+	--version|-v)
+		PrintVersion
+		exit 0
+		;;
+	--short|-s)
+		FTPCMD="nls"
+		;;
+	-*)
+		echo "$TOOL: Invalid option $1"
+		echo "Try '$TOOL --help' for more information."
+		exit 1
+		;;
+	*)
+		FILES="$FILES $1"
+		;;
+	esac
+
+	shift
+done
+
+
+if [ ! -c "$FTPDEV" ]; then
+	echo "$TOOL: Device \"$FTPDEV\" does not exist (modprobe hmcdrv ?)"
+	exit 1
+fi
+
+if [ ${#FILES} -eq 0 ]; then
+	FILES="/"
+fi
+
+# open device $FTPDEV and assign the file descriptor to variable fd
+exec {fd}<>${FTPDEV}
+# echo the FTP command into device file
+echo "$FTPCMD $FILES" >&${fd}
+# and output the response
+cat <&${fd}
+STATUS="$?"
+# close file descriptor $fd
+exec {fd}>&-
+exit $STATUS

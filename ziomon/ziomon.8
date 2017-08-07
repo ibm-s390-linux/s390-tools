@@ -1,0 +1,76 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIOMON 8 "Jul 2008" "s390-tools"
+
+.SH NAME
+ziomon \- Collect data for performance analysis of fcp adapters.
+
+.SH SYNOPSIS
+.B ziomon
+[-h] [-V] [-v] [-f] [-l <sz_limit>] [-i n] -d n -o <logfile> <device>...
+
+.SH DESCRIPTION
+.B ziomon
+starts and controls various utilities to collect data for performance analysis
+for a specified duration. Note that it is possible to specify multipath
+devices also. If multipath devices are specified, the respective
+regular devices used by the multipath devices will be monitored.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-V" " or " "\-\-verbose"
+Be verbose.
+
+.TP
+.BR "\-f" " or " "\-\-force"
+Force start of data collection even though there is insufficient free disk space.
+
+.TP
+.BR "\-l" " or " "\-\-size-limit"
+Upper limit of the output files. May include one of the suffixes
+M (megabytes), G (gigabytes) or T (terabytes) to specify a unit measure.
+Unit measure defaults to megabytes.
+Note that this is only a tentative value which might be slightly exceeded.
+
+.TP
+.BR "\-i" " or " "\-\-interval-length"
+Specify the time to elapse between recording data in seconds. Must be an even number.
+Defaults to 60 seconds.
+
+.TP
+.BR "\-d" " or " "\-\-duration"
+Overall monitoring duration in minutes. Must be a multiple of the
+interval length.
+
+.TP
+.BR "\-o" " or " "\-\-outfile"
+Basename for output files.
+
+.TP
+.BR device
+specifies a device to collect respective data for.
+
+.SH EXAMPLES
+Collect data for devices /dev/sda, /dev/sdg, /dev/sdp and the multipath device
+/dev/mapper/36005076303ffc104000000000000212b for 5 minutes.
+Data should be sampled every 20 seconds.
+The collected data size should not exceed 50 MB.
+The output files should base their names on 'trace_data':
+
+ziomon -i 20 -d 5 -l 50M -o trace_data /dev/mapper/36005076303ffc104000000000000212b /dev/sda /dev/sdg /dev/sdp
+
+.SH "SEE ALSO"
+.BR ziomon_mgr (8),
+.BR ziomon_util (8),
+.BR ziomon_zfcpdd (8)
+.BR ziomon_fcpconf (8)

@@ -1,0 +1,64 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CPUPLUGD 8 "May 2011" "s390-tools"
+.
+.SH NAME
+cpuplugd \- Linux on System z CPU and memory hotplug daemon
+.
+.SH SYNOPSIS
+.B cpuplugd
+.RI [ OPTIONS ]
+.
+.SH DESCRIPTION
+The cpuplugd daemon dynamically enables and disables CPUs and increases or
+decreases the cooperative memory management (CMM) page pool based on a set of
+rules.
+
+When the daemon is stopped, the size of the CMM page pool and the number
+of active CPUs are reset to the values they had before the cpuplugd was started.
+
+This program can be used to control the number of CPUs for Linux on z/VM
+and for Linux in LPAR mode. The memory hotplug feature (CMM page pool) applies
+to Linux on z/VM only.
+.
+.SH OPTIONS
+.TP
+\fB\-c\fP or \fB\-\-config\fP \fI<configuration file>\fP
+Specify the absolute path to the configuration file. This option is mandatory.
+The default configuration file can be found in /etc/cpuplugd.conf.
+.
+.TP
+\fB\-f\fP or \fB\-\-foreground\fP
+Run in the foreground and not as daemon. If this option is
+omitted, the program runs in the background.
+.
+.TP
+\fB\-h\fP or \fB\-\-help\fP
+Print usage message and exit.
+.
+.TP
+\fB\-v\fP or \fB\-\-version\fP
+Print Version information and exit.
+.
+.TP
+\fB\-V\fP or \fB\-\-verbose\fP
+Print verbose messages to stdout (when running in foreground)
+or to syslog otherwise.
+This options is mainly used for debugging purposes.
+.
+.SH EXAMPLES
+To test a setup start cpuplugd in foreground mode using verbose output:
+.br
+.RS 4
+cpuplugd \-V \-f \-c /etc/cpuplugd.conf
+.RE
+
+For daemon mode, start cpuplugd from an init script as follows:
+.br
+.RS 4
+cpuplugd \-c /etc/cpuplugd.conf
+.RE
+.SH SEE ALSO
+.BR cpuplugd.conf (5)

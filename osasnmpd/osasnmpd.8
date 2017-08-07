@@ -1,0 +1,71 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH OSASNMPD 8 "Apr 2006" "s390-tools"
+.SH NAME
+osasnmpd \- IBM OSA-Express network card SNMP subagent.
+.SH SYNOPSIS
+\fBosasnmpd\fR [-h] [-v] [-f] [-l \fIlogfile\fR | -L]  [-A] [-P \fIpidfile\fR]
+[-x \fIagentx-socket\fR]
+.SH DESCRIPTION
+\fBosasnmpd\fR is an SNMP subagent for the net-snmp 5.1.x package.
+It supports the MIBs provided by an IBM OSA-Express network card.
+The subagent communicates via the AgentX protocol with the snmpd daemon.
+Hence the snmpd daemon must be already started on the same system before
+osasnmpd can start successfully.
+
+.SH OPTIONS
+.TP
+\fB-h\fR
+Print usage message and exit.
+
+.TP
+\fB-v\fR 
+Print Version information and exit.
+
+.TP
+\fB-f\fR
+Don't fork() from the calling shell.
+
+.TP
+\fB-l\fR \fIlogfile\fR 
+Logs all  output  from  the subagent (including stdout/stderr) to 
+\fIlogfile\fR.
+.br
+(By default logfile=/var/log/osasnmpd.log)   
+
+.TP
+\fB-A\fR
+Append to the logfile rather than truncating it.
+
+.TP
+\fB-L\fR
+Print warnings/messages to stdout/stderr.
+
+.TP
+\fB-P\fR \fIpidfile\fR
+Save the process ID of the subagent in \fIpidfile\fR.
+
+.TP
+\fB-x\fR \fIagentx-socket\fR
+Uses the specified socket as AgentX connection rather than the 
+default '/var/agentx/master'. The socket can either be a Unix 
+domain socket path, or the address of a network interface.
+If a network address of the form inet-addr:port is given, then
+the subagent will use the port specified. If a network address 
+of the form inet-addr is given, then the subagent will use the
+default AgentX port, 705.
+The agentx sockets of the snmpd daemon and osasnmpd must match.
+
+.SH AUTHOR
+.nf
+This man-page was written by Thomas Weber <tweber@de.ibm.com>
+and is maintained by Ursula Braun <ursula.braun@de.ibm.com>
+.fi
+
+.SH SEE ALSO
+.PP
+snmpd(1),
+snmp.conf(5),
+snmpd.conf(5)

@@ -1,0 +1,195 @@
+Counter: 128	Name:DTLB1_MISSES
+Description:
+Level-1 Data TLB miss in progress. Incremented by one for every cycle
+a DTLB1 miss is in progress.
+.
+Counter:129	Name:ITLB1_MISSES
+Description:
+Level-1 Instruction TLB miss in progress. Incremented by one for every
+cycle a ITLB1 miss is in progress.
+.
+Counter:130	Name:L1D_L2I_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from the Level-2 Instruction cache
+.
+Counter:131	Name:L1I_L2I_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from the Level-2 Instruction cache
+.
+Counter:132	Name:L1D_L2D_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from the Level-2 Data cache
+.
+Counter:133	Name:DTLB1_WRITES
+Description:
+A translation entry has been written to the Level-1 Data Translation
+Lookaside Buffer
+.
+Counter:135	Name:L1D_LMEM_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache where the installed cache line
+was sourced from memory that is attached to the same book as the Data
+cache (Local Memory)
+.
+Counter:137	Name:L1I_LMEM_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache where the installed cache
+line was sourced from memory that is attached to the same book as the
+Instruction cache (Local Memory)
+.
+Counter:138	Name:L1D_RO_EXCL_WRITES
+Description:
+A directory write to the Level-1 D-Cache where the line was originally
+in a Read-Only state in the cache but has been updated to be in the
+Exclusive state that allows stores to the cache line
+.
+Counter:139	Name:DTLB1_HPAGE_WRITES
+Description:
+A translation entry has been written to the Level-1 Data Translation
+Lookaside Buffer for a one-megabyte page
+.
+Counter:140	Name:ITLB1_WRITES
+Description:
+A translation entry has been written to the Level-1 Instruction
+Translation Lookaside Buffer
+.
+Counter:141	Name:TLB2_PTE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Page Table
+Entry arrays
+.
+Counter:142	Name:TLB2_CRSTE_HPAGE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Common Region
+Segment Table Entry arrays for a one-megabyte large page translation
+.
+Counter:143	Name:TLB2_CRSTE_WRITES
+Description:
+A translation entry has been written to the Level-2 TLB Common Region
+Segment Table Entry arrays
+.
+Counter:144	Name:L1D_ONCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an On Chip Level-3 cache without intervention
+.
+Counter:145	Name:L1D_OFFCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an Off Chip/On Book Level-3 cache without
+intervention
+.
+Counter:146	Name:L1D_OFFBOOK_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an Off Book Level-3 cache without intervention
+.
+Counter:147	Name:L1D_ONBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an On Book Level-4 cache
+.
+Counter:148	Name:L1D_OFFBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an Off Book Level-4 cache
+.
+#
+# Notes for the transactional-execution mode notations:
+#   TX .. transactional-execution mode
+#   NC .. nonconstrained
+#    C .. constrained
+#
+Counter:149	Name:TX_NC_TEND
+Description:
+A TEND instruction has completed in a nonconstrained
+transactional-execution mode
+.
+Counter:150	Name:L1D_ONCHIP_L3_SOURCED_WRITES_IV
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from a On Chip Level-3 cache with intervention
+.
+Counter:151	Name:L1D_OFFCHIP_L3_SOURCED_WRITES_IV
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an Off Chip/On Book Level-3 cache with
+intervention
+.
+# XXX Remove SOURCED from L1D_OFFBOOK_L3_SOURCED_WRITES...
+Counter:152	Name:L1D_OFFBOOK_L3_SOURCED_WRITES_IV
+Description:
+A directory write to the Level-1 Data cache directory where the returned
+cache line was sourced from an Off Book Level-3 cache with intervention
+.
+Counter:153	Name:L1I_ONCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an On Chip Level-3 cache without
+intervention
+.
+Counter:154	Name:L1I_OFFCHIP_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an Off Chip/On Book Level-3 cache
+without intervention
+.
+Counter:155	Name:L1I_OFFBOOK_L3_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an Off Book Level-3 cache without
+intervention
+.
+Counter:156	Name:L1I_ONBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an On Book Level-4 cache
+.
+Counter:157	Name:L1I_OFFBOOK_L4_SOURCED_WRITES
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an Off Book Level-4 cache
+.
+Counter:158	Name:TX_C_TEND
+Description:
+A TEND instruction has completed in a constrained transactional-execution
+mode
+.
+Counter:159	Name:L1I_ONCHIP_L3_SOURCED_WRITES_IV
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an On Chip Level-3 cache with
+intervention
+.
+Counter:160	Name:L1I_OFFCHIP_L3_SOURCED_WRITES_IV
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an Off Chip/On Book Level-3 cache
+with intervention
+.
+Counter:161	Name:L1I_OFFBOOK_L3_SOURCED_WRITES_IV
+Description:
+A directory write to the Level-1 Instruction cache directory where the
+returned cache line was sourced from an Off Book Level-3 cache with
+intervention
+.
+Counter:177	Name:TX_NC_TABORT
+Description:
+A transaction abort has occurred in a nonconstrained
+transactional-execution mode
+.
+Counter:178	Name:TX_C_TABORT_NO_SPECIAL
+Description:
+A transaction abort has occurred in a constrained transactional-execution
+mode and the CPU is not using any special logic to allow the transaction
+to complete
+.
+Counter:179	Name:TX_C_TABORT_SPECIAL
+Description:
+A transaction abort has occurred in a constrained transactional-execution
+mode and the CPU is using special logic to allow the transaction to
+complete
+.

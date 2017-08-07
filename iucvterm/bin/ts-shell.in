@@ -1,0 +1,671 @@
+#! /usr/bin/perl -W
+#
+# ts-shell - Simple terminal server shell to access systems over IUCV
+#
+# This script can be used as login shell for users to restrict
+# IUCV-based terminal access to other systems.
+#
+# Copyright IBM Corp. 2008, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long qw(:config no_ignore_case);
+use Term::ReadLine;
+use POSIX;
+
+
+$ENV{'PERL_RL'} = " o=0";   # use best avail. readline
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+$ENV{'LESSSECURE'} = 1;     # let less run in "secure" mode
+$ENV{'PAGER'} = $ENV{'PAGER'} || "/usr/bin/less";
+my $ts_shell = fileparse($0, qr/\.[^.]+/);
+$SIG{__WARN__} = sub { print STDERR "$ts_shell: $_[0]"; };
+$SIG{__DIE__}  = sub { print STDERR "$ts_shell: $_[0]"; exit 255; };
+
+# Terminal server configuration settings
+my %config = (
+	# general options
+	'conffile'	=>	"@sysconf_path@/ts-shell.conf",
+	'authfile'	=>	"@sysconf_path@/ts-authorization.conf",
+	'sysfile'	=>	"@sysconf_path@/ts-systems.conf",
+	'auditfile'	=>	"@sysconf_path@/ts-logsys.conf",
+	'auditdir'	=>	"@var_path@/log/ts-shell",
+	'iucvconn'	=>	"@iucvconn_path@/iucvconn",
+	'prompt'	=>	getpwuid($>) . '@'."$ts_shell> ",
+	# runtime options
+	'rl'		=>	undef,		# terminal readline (rl)
+	'user'		=>	getpwuid($>),	# user name
+	'groups'	=>	[],		# user groups (list ref)
+	'service'	=>	"lnxhvc0",	# default service
+	'auth_func'	=>	sub { return -1; },	# no authorization
+	'regex'		=>	[],		# re to match systems (list ref)
+	'systems'	=>	[],		# system list (list reference)
+	'services'      =>      [qw/lnxhvc0/],	# services list (completion)
+	'termsys'	=>	{},		# global ts sys list (hash ref)
+	'auditsys'	=>	{},		# audit ts sys list (hash ref)
+);
+
+
+sub main();
+sub help();
+sub usage();
+sub version();
+sub intro();
+sub auth_global($$);
+sub auth_regex($$);
+sub auth_list($$);
+sub get_auditlog_file($$$);
+sub cmd_connect($\%);
+sub cmd_service($\%);
+sub cmd_list(\%);
+sub rl_cmd_completion($$$);
+sub list_regex_match($);
+sub updateConfiguration(\%$);
+sub loadAuthorization(\%);
+sub readFile($$);
+sub log_debug($);
+sub log_error($);
+sub log_info($);
+sub pager($);
+
+
+# main() - Terminal server program
+#
+# The program loads the system authorizations for the effective user id,
+# and then initializes the term readline environment and starts the shell.
+#
+sub main()
+{
+	unless (GetOptions("v|version" => sub { version(); exit 0; },
+	 		   "h|help"    => sub { usage();   exit 0; })) {
+		log_error "Enter '$ts_shell --help' for more information";
+		exit 1;
+	}
+
+	unless (-t STDIN) {
+		log_error "The $ts_shell requires a terminal to run on";
+		exit 1;
+	}
+
+	unless ($config{user}) {
+		log_error "Resolving the name of user ID $> failed";
+		exit 2;
+	}
+
+	# update ts-shell configuration
+	unless (readFile($config{conffile},
+			sub { updateConfiguration(%config, $_); })) {
+		log_error "Reading the ts-shell configuration file " .
+			  "$config{conffile} failed: $!";
+		exit 3;
+	}
+
+	# load list of systems the ts-shell is allowed to use; and
+	# hash the systems names in uppercase
+	unless (readFile($config{sysfile},
+			 sub { $config{termsys}->{uc $_} = 1; })) {
+		log_error "Reading $config{sysfile} failed: $!";
+		exit 4;
+	}
+
+	# load list of systems for for that auditing should be enabled
+	# hash the system names in uppercase
+	unless (readFile($config{auditfile},
+			 sub { $config{auditsys}->{uc $_} = 1; })) {
+		log_error "Reading $config{auditsys} failed: $!";
+		exit 5;
+	}
+
+	# retrieve user group membership and load authorizations
+	my %uniq_groups = ();
+	# $) returns egid twice, so we hash group names to avoid dups
+	foreach(map {$_ = getgrgid($_)} split / /, $)) {
+		$uniq_groups{$_} = 1;
+	}
+	push @{$config{groups}}, keys %uniq_groups;
+
+	# finally, load user specific authorization data from file
+	unless (loadAuthorization(%config)) {
+		log_error "Reading $config{authfile} failed: $!";
+		exit 5;
+	}
+
+	# set up terminal readline
+	$config{rl} = new Term::ReadLine 'Terminal Server Shell';
+	$config{rl}->Attribs->{'completion_function'} = \&rl_cmd_completion;
+	select ($config{rl}->OUT || \*STDOUT);
+
+	# setup signal handler to ignore SIGINT
+	my $sigint = POSIX::SigAction->new(sub { return 1; },
+					   POSIX::SigSet->new(),
+					   &POSIX::SA_NODEFER);
+	POSIX::sigaction(&POSIX::SIGINT, $sigint);
+
+	log_debug "User: $config{user} / Groups: $) [@{$config{groups}}]";
+	log_debug("Using Term::ReadLine backend: " . $config{rl}->ReadLine);
+
+	intro();
+	SHELL: while (defined($_ = $config{rl}->readline($config{prompt}))) {
+		chomp;
+		s/^\s+|\s+$//;
+		next if /^$/;
+		SWITCH: {
+			/^(?:q|quit|exit)/  and last SHELL;
+			/^help/		    and help(), last SWITCH;
+			/^version/	    and version(), last SWITCH;
+			/^(?:list|ls)/	    and cmd_list(%config), last SWITCH;
+			/^terminal\s*(\w*)/ and cmd_service($1, %config), last SWITCH;
+
+			if (/^connect\s*(\w*$|\w+\s+\w+)/) {
+				cmd_connect($1, %config);
+				last SWITCH;
+			}
+
+			log_error "$_ is not a known command";
+		}
+		$config{rl}->addhistory($_)
+			if (/\S/ && !$config{rl}->Features->{autohistory});
+	}
+	exit 0;
+}
+
+# updateConfiguration() - Load ts-shell configuration from ts-shell.conf
+#
+# %cfg:		Hash reference to terminal server configuration
+# $line:	Configuration line (key = value pair)
+#
+# The routine updates the ts-shell configuration based on configuration lines
+# from the ts-shell.conf file.
+#
+sub updateConfiguration(\%$)
+{
+	my ($cfg, $line) = @_;
+	my ($option, $value) = split /\s*=\s*/, $line;
+	
+	$cfg->{sysfile}   = $value if $option =~ /^ts-systems$/;
+	$cfg->{authfile}  = $value if $option =~ /^ts-authorization$/;
+	$cfg->{auditdir}  = $value if $option =~ /^transcript-directory$/;
+	$cfg->{auditfile} = $value if $option =~ /^transcript-systems$/;
+}
+
+# loadAuthorization() - Load system authorizations from file
+#
+# $cfg:		Hash reference to terminal server configuration
+#
+# The routine parses the authorization data for the effective user
+# and stores the information in the configuration hash. Further, it
+# sets the auth_func reference to either auth_list() or auth_regex()
+# to abstract authorization checks.
+#
+sub loadAuthorization(\%)
+{
+	my $cfg = shift();
+
+	return 0 unless open(AUTH, "<$cfg->{authfile}");
+
+	AUTH_ENT: while (<AUTH>) {
+		chomp;
+		next if /^#/;		# ignore comments
+		next if /^\s*$/;	# skip empty lines
+		s/^\s+|\s+$//g;		# trim
+
+		my $authorized = 0;
+		my ($key, $val) = split /\s*=\s*/;
+
+		# read authorization configuration for user and its groups
+		if ($key =~ /^$cfg->{user}$/) {
+			$authorized = 1;
+			log_debug "Found user: $key";
+
+		} elsif ($key =~ /^@(\S+)$/) {
+			my $group = $1;
+			$authorized = 1 if grep {/^${group}$/} @{$cfg->{groups}};
+			log_debug "Found group: $key" if $authorized;
+		}
+
+		# skip line if there was no auth data for current user
+		next unless $authorized;
+
+		# build authorization policy and set auth_func
+		if ($val =~ /^list:\s*(.+)$/) {
+			if (@{$cfg->{regex}}) {
+				log_error "Authorization by list is ignored because "
+					  ."$cfg->{user} uses regular expressions "
+					  ."($cfg->{authfile}:$.)";
+				next AUTH_ENT;
+			}
+
+			$cfg->{auth_func} = \&auth_list;
+			push @{$cfg->{systems}}, split /\s*[;,]\s*/, $1;
+
+		} elsif ($val =~ /^file:(.+)$/) {
+			if (@{$cfg->{regex}}) {
+				log_error "Authorization by list is ignored because "
+					. "$cfg->{user} uses regular expressions "
+					. "($cfg->{authfile}:$.)";
+				next AUTH_ENT;
+			}
+
+			$cfg->{auth_func} = \&auth_list;
+			unless(readFile($1, sub { push @{$cfg->{systems}}, $_; })) {
+				log_error "Reading $1 failed: $! "
+					. "($cfg->{authfile}:$.)";
+			}
+		} elsif ($val =~ /^regex:(.+)$/) {
+			if (@{$cfg->{systems}}) {
+				log_error "Authorization by regular expression "
+					. "is ignored because $cfg->{user} "
+					. "uses lists ($cfg->{authfile}:$.)";
+				next AUTH_ENT;
+			}
+
+			# check regex syntax and complain if it is not correct
+			my $re = eval "qr/$1/io";
+			if ($@) {
+				log_error "An authorization entry is not a valid"
+					. " regular expression "
+					. "($cfg->{authfile}:$.):\n$@";
+				next AUTH_ENT;
+			}
+
+			$cfg->{auth_func} = \&auth_regex;
+			push @{$cfg->{regex}}, $re;
+
+		} else {
+			log_error "An authorization entry is not valid "
+				. "($cfg->{authfile}:$.)";
+		}
+		log_debug "'$key' => '$val'";
+	}
+	close(AUTH);
+
+	return 1;
+}
+
+# readFile() - Helper routine to read data from file
+#
+# The routine reads the file content, line by line, skips
+# comments and empty lines. It calls a routine for each line
+# containing data. The routine can access the data either
+# using the first parameter or using the context variable $_.
+#
+# Error handling is up to the caller; the routine exits with
+# zero if the file could not be opened. open() should set $!.
+#
+# $file:	File name
+# $sub:		Reference to sub routine
+#
+sub readFile($$)
+{
+	my ($file, $sub) = @_;
+
+	return 0 unless open(CONF, "<$file");
+	while (<CONF>) {
+		chomp;
+		next if /^#/;		# ignore comments
+		next if /^\s*$/;	# skip empty lines
+		s/^\s+|\s+$//g;		# trim
+		&{$sub}($_);		# execute sub in current context
+	}
+	close(CONF);
+	return 1;
+}
+
+# auth_global() - Authorization check using global system list
+#
+# $guest:	Scalar reference to the guest name string
+# $cfg:         Hash reference to terminal server configuration
+#
+sub auth_global($$)
+{
+	my ($guest, $cfg) = @_;
+
+	return -1 unless $cfg->{termsys};
+
+	# unstricted
+	return  1 if exists $cfg->{termsys}->{'[*ALL*]'};
+	# if restricted, check if system has been hashed (in uppercase)
+	return  1 if exists $cfg->{termsys}->{uc $$guest};
+
+	# guest has not been defined, so deny authorization request
+	return -2;
+}
+
+# auth_regex() - Authorization check using a regex
+#
+# $guest:	Scalar reference to the guest name string
+# $cfg:		Hash reference to terminal server configuration
+#
+sub auth_regex($$)
+{
+	my ($guest, $cfg) = @_;
+
+	return -1 unless @{$cfg->{regex}};
+	foreach my $re (@{$cfg->{regex}}) {
+		return 1 if $$guest =~ /$re/; # $re has been compiled as //io
+	}
+	return  0;
+}
+
+# auth_list() - Authorization check using a list of systems
+#
+# $guest:	Scalar reference to the guest name string
+# $cfg:		Hash reference to terminal server configuration
+#
+sub auth_list($$)
+{
+	my ($guest, $cfg) = @_;
+
+	return -1 unless @{$cfg->{systems}};
+	return 1 if grep(/^\s*\Q$$guest\E\s*$/i, @{$cfg->{systems}});
+	return 0;
+}
+
+# get_auditlog_file() - Set file path for session transcript
+#
+# Return false if an error has occurred; otherwise true.
+#
+# $filepath:	Scalar reference to file path variable
+# $guest:	Name of the virtual guest machine
+# $cfg:		Hash reference to terminal server configuration
+sub get_auditlog_file($$$)
+{
+	my ($filepath, $guest, $cfg) = @_;
+
+	unless (exists $cfg->{auditsys}->{'[*ALL*]'} ||
+	     	exists $cfg->{auditsys}->{uc $guest}) {
+		$$filepath = "";
+		return 1;		# no transcript, return success
+	}
+
+	# check and create log directory for user
+	unless (-d "$cfg->{auditdir}/$cfg->{user}") {
+		unless (mkdir "$cfg->{auditdir}/$cfg->{user}") {
+			log_error "Creating the session transcript directory "
+				. "$cfg->{auditdir}/$cfg->{user} failed: $!";
+			$$filepath = "";
+			return 0;	# return error
+		}
+	}
+
+	$$filepath  = "$cfg->{auditdir}/$cfg->{user}/" . uc $guest . "_";
+	$$filepath .= strftime '%F-%H%M%S', localtime;
+
+	log_debug "Session transcript file: $$filepath";
+
+	return 1;			# return success
+}
+
+# cmd_connect() - Perform auth check; and on success, connect to system
+#
+# $guest:	Name of the virtual guest machine
+# $cfg:		Hash reference to terminal server configuration
+#
+sub cmd_connect($\%)
+{
+	my ($params, $cfg) = @_;
+	my $service        = $cfg->{service};
+
+	unless (length($params)) {
+		log_error "The z/VM guest name is missing";
+		return;
+	}
+
+	my ($guest, $srv) = split /\s+/, $params;
+	$service = $srv if $srv && $srv =~ /\w{1,8}/;
+
+	# check authorization:
+	# The auth_func contract is to return a code, that must be one of:
+	#	-2:	ts-shell is not permitted to connect to the guest
+	#	-1:	The user does not have any authorization policy
+	#	 0:	User does not have authorization to connect to guest
+	#	 1:	User is permitted to connect to guest (success)
+	# Other return codes are not allowed!
+	#
+	# call auth_func to check authorization
+	my  $rc = &{$cfg->{auth_func}}(\$guest, $cfg);
+
+	# if the user is authorized, finally check if the system is
+	# (globally) restricted to be used by the terminal server
+	$rc = auth_global(\$guest, $cfg) if $rc > 0;
+
+	if ($rc == -2) {
+		log_error "$ts_shell is not configured to connect to $guest";
+		return;
+	}
+	if ($rc == -1) {
+		log_error "You are not authorized to connect to "
+			. "any z/VM virtual machines";
+		return;
+	}
+	if ($rc == 0) {
+		log_error "You are not authorized to connect to $guest";
+		return;
+	}
+
+	# construct iucvconn command line
+	my @iucvconn = ("$cfg->{iucvconn}");
+
+	# check if the terminal session to $guest requires session logging
+	my $session_path = "";
+	# return if get_auditlog_file() failed
+	return unless get_auditlog_file(\$session_path, $guest, $cfg);
+	push @iucvconn, "-s", $session_path if $session_path;
+
+	# add $guest name and terminal identifier (service)
+	push @iucvconn, $guest, $service;
+
+	log_info "Connecting to $guest (terminal identifier: $service)...";
+	if (-x $cfg->{iucvconn}) {
+		system @iucvconn;
+		log_info "Connection ended";
+	} else {
+		log_error "Running $cfg->{iucvconn} failed: $!";
+	}
+}
+
+# cmd_service() - Show / set service/terminal name to identify remote terminal
+#
+# $new:		New terminal name; can be empty
+# %cfg:		Hash reference to terminal server configuration
+#
+sub cmd_service($\%)
+{
+	my ($new, $cfg) = @_;
+
+	unless ($new) {
+		print "$cfg->{service}\n";
+		return;
+	}
+
+	if ($new =~ /\w{1,8}/) {
+		$cfg->{service} = $new;
+		# push new service for cmd completion
+		unless (grep /$new/, @{$cfg->{services}}) {
+			push @{$cfg->{services}}, $new;
+		}
+	} else {
+		log_error("Terminal identifier $new is not valid");
+		log_error("Terminal identifiers consist of up to " .
+			  "eight alphanumerical characters");
+	}
+}
+
+# cmd_list() - List system authorization for effective user
+#
+# $cfg:		Hash reference to terminal server configuration
+#
+sub cmd_list(\%)
+{
+	my $cfg = shift();
+
+	if (@{$cfg->{regex}}) {
+		pager sub {
+			print "Regular expressions for your authorization:\n";
+			print "$_\n" foreach (@{$cfg->{regex}});
+			my $matches = list_regex_match($cfg);
+			if (@$matches) {
+				print "\nYou are authorized to connect to ".
+				      "these z/VM guest virtual machines:\n";
+				print "$_\n" foreach (@$matches);
+			}
+		};
+	} elsif (@{$cfg->{systems}}) {
+		pager sub {
+			foreach (@{$cfg->{systems}}) {
+				printf "$_\n" if auth_global(\$_, $cfg) > 0;
+			}
+		};
+	} else {
+		log_error "You are not authorized to connect to " .
+			  "any z/VM virtual machines";
+	}
+}
+
+sub log_debug($)
+{
+	print STDERR "[DEBUG] " . shift() . "\n" if $ENV{'TS_SHELL_DEBUG'};
+}
+
+sub log_error($)
+{
+	print STDERR "$ts_shell: " . shift() . "\n";
+}
+
+sub log_info($)
+{
+	print "$ts_shell: " . shift() . "\n";
+}
+
+sub pager($)
+{
+	my $eval = shift();
+
+	unless (open(PAGER, "|$ENV{'PAGER'}")) {
+		eval &$eval;
+		return;
+	}
+	my $old_out = select PAGER;
+	eval &$eval;
+	select $old_out;
+	close (PAGER);
+}
+
+sub intro()
+{
+  print <<EoIntro;
+Welcome to the Terminal Server shell.
+Type 'help' to get a list of available commands.
+
+
+EoIntro
+}
+
+sub version()
+{
+	print <<EoVersion
+Terminal Server Shell, version @S390_TOOLS_RELEASE@
+Copyright IBM Corp. 2008, 2017
+
+EoVersion
+}
+
+sub help()
+{
+	print STDERR <<EoHelp;
+Terminal Server shell help
+
+Available commands:
+	list			List authorizations.
+	connect <vm_guest>	Connect to specified z/VM guest virtual machine.
+	terminal [<identifier>]	Display or set the terminal identifier.
+	q | quit | exit		Exit the current shell session.
+	help			Display help information.
+	version			Display version information.
+
+EoHelp
+}
+
+sub usage()
+{
+	printf <<EoUsage;
+Usage: ts-shell [-h|--help] [-v|--version]
+
+Options:
+	-h, --help	Print help information, then exit.
+	-v, --version	Print version information, then exit.
+EoUsage
+}
+
+
+# list_regex_match() - Helper routine to get a list of systems that match regex
+#
+# $cfg:		Hash reference to terminal server configuration
+# $listref:	List reference to store result
+sub list_regex_match($)
+{
+	my $cfg      = shift();
+	my %uniq_sys = ();
+	my @result   = ();
+
+	return \@result if exists $cfg->{termsys}->{'[*ALL*]'};
+
+	# get a list of systems if ts shell runs unrestricted
+	foreach my $re (@{$cfg->{regex}}) {
+		foreach (grep (/$re/, keys %{$cfg->{termsys}})) {
+			$uniq_sys{$_} = 1;
+		}
+	}
+	push @result, (keys %uniq_sys);
+	return \@result;
+}
+
+# rl_cmd_completion() - Term::ReadLine completion for ts-shell commands
+#
+# $text:	Text to complete
+# $line:	Line buffer
+# $start:	offset
+#
+sub rl_cmd_completion($$$)
+{
+	my ($text, $line, $start) = @_;
+	my @cmds = qw/help version list connect terminal quit exit/;
+
+	# complete commands
+	return grep (/^$text/, @cmds) unless $start;
+
+	# complete terminal names for service and optionally for connect command
+	if ($line =~ /^(?:terminal|connect\s+\w+)\s+(?:\w+)?$/) {
+		return grep (/^$text/, @{$config{services}});
+	}
+
+	# complete systems for connect command
+	if ($line =~ /^connect\s+(\w+)?$/) {
+		my $systems = [];	# list ref for completion
+
+		# complete for simple lists
+		if (@{$config{systems}}) {
+			foreach my $sys (@{$config{systems}}) {
+				if (auth_global(\$sys, \%config) > 0) {
+					push @$systems, $sys;
+				}
+			}
+		# complete if ts shell uses regex's
+		} elsif (@{$config{regex}}) {
+			$systems = list_regex_match(\%config);
+		}
+		return grep {/^$text/} @$systems;
+	}
+	return ();
+}
+
+# start the terminal server shell
+&main();
+
+__DATA__
+__END__
+# vim: set ai noet ts=8 sw=8 tw=80:

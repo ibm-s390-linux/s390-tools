@@ -1,0 +1,221 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIOMON_MGR 8 "Jul 2008" "s390-tools"
+
+.SH NAME
+ziorep_traffic \- I/O traffic report for FCP adapters.
+
+.SH SYNOPSIS
+.B ziorep_traffic
+[-V] [-v] [-h] [-b <begin>] [-e <end>] [-i <time>] [-s] [-c <chpid>] [-u <id>] [-t <num>] [-p <port>] [-l <lun>] [-d <fdev> ] [-m <mdev> ] [-x] [-D] [-C a|u|p|m|A] <filename>
+
+
+
+.SH DESCRIPTION
+.B ziorep_traffic
+Prints a report from the specified data.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-V" " or " "\-\-verbose"
+Be verbose.
+
+.TP
+.BR "\-b" " or " "\-\-begin"
+Limit the timeframe to consider to data beginning with the specified date.
+.br
+Dates must be specified in the following format: YYYY-MM-DD HH:MM[:SS].
+.br
+E.g. 2008-03-21 09:08 is 9:08 on March 21, 2008.
+
+.TP
+.BR "\-e" " or " "\-\-end"
+Limit the timeframe to consider to data ending with the specified date.
+.br
+Dates must be specified in the following format: YYYY-MM-DD HH:MM[:SS].
+.br
+E.g. 2008-03-21 09:08 is 9:08 on March 21, 2008.
+
+.TP
+.BR "\-i" " or " "\-\-interval"
+Specify an aggregation interval. The interval is given in seconds, and must be a multiple
+of the interval as found in the source data.
+
+.TP
+.BR "\-s" " or " "\-\-summary"
+Print a summary of the data, then exit.
+
+.TP
+.BR "\-c" " or " "\-\-chpid"
+Consider the specified physical adapter. Adapters must be specified in hex.
+.br
+If multiple adapters should be specified, specify each one separately.
+.br
+E.g. '-c 7a'.
+
+.TP
+.BR "\-u" " or " "\-\-bus-id"
+Consider the specified bus-IDs. bus-IDs must be specified in hex.
+.br
+If multiple bus-IDs should be specified, specify each one separately.
+.br
+E.g. '-u 0.0.4c78'.
+
+.TP
+.BR "\-p" " or " "\-\-port"
+Consider the specified target port. Target ports must be specified in hex.
+.br
+If multiple ports should be specified, specify each one separately.
+.br
+E.g. '-p 0x500507630040710b'.
+
+.TP
+.BR "\-l" " or " "\-\-lun"
+Consider the specified lun. luns must be specified in hex.
+.br
+If multiple luns should be specified, specify each one separately.
+.br
+E.g. '-l 0x4021402d00000000'.
+
+.TP
+.BR "\-d" " or " "\-\-device"
+Consider the specified device.
+.br
+If multiple devices should be specified, specify each one separately.
+.br
+E.g. '-d sda'.
+
+.TP
+.BR "\-m" " or " "\-\-mdev"
+Consider the specified multipath device.
+.br
+If multiple devices should be specified, specify each one separately.
+.br
+E.g. '-m 36005076303ffc1040002120'.
+
+.TP
+.BR "\-x" " or " "\-\-export-csv"
+Write data to file(s) in CSV format. Output filenames will be based on the data filename.
+
+.TP
+.BR "\-t" " or " "\-\-topline"
+Repeat topline after specified number of frames.
+.br
+0 for no repeat (default).
+
+.TP
+.BR "\-D" " or " "\-\-detailed"
+Print histograms.
+
+.TP
+.BR "\-C" " or " "\-\-collapse"
+Collapse the data by the specified criterion:
+.br
+.BR "a"
+collapse by physical adapter.
+.br
+.BR "u"
+collapse by bus-ID.
+.br
+.BR "p"
+collapse by target port.
+.br
+.BR "m"
+collapse by multipath device.
+.br
+.BR "A"
+collapse all data into a single dataset.
+
+
+.SH OUTPUT
+Here is a list of the columns and their descriptions.
+Timestamps of the frames printed depict the ending of the respective timeframe.
+
+.TP
+.BR "I/O rt MB/s"
+I/O rate of the respective device in megabytes per second, considering individual requests and their total processing time, including channel latency, etc.
+.br
+.IR "min" " and " "max"
+give the minimum and maximum respectively.
+
+.TP
+.BR "thrp in MB/s"
+Throughput of the respective device in megabytes per second, considering times of activity only.
+.br
+.IR "avg" " and " "stdev"
+give the average utilization as well as its standard deviation respectively.
+
+.TP
+.BR "I/O requests"
+Statistics on the numbers and kinds of I/O requests seen.
+.br
+.IR "#reqs"
+is the total number of requests,
+.br
+.IR "rd"
+is the number of read requests,
+.br
+.IR "wrt"
+is the number of write requests and
+.br
+.IR "bidi"
+is the number of bi-directional requests.
+
+.TP
+.BR "I/O subs. lat. in us"
+Latency of the I/O subsystem in microseconds. This is the time needed to execute a request, from the I/O stack down to the hardware and back up again. It excludes channel and fabric latencies.
+.br
+.IR "min" ", " "max" ", " "avg" " and " "stdev"
+give the minimum, maximum and average latency as well as its standard deviation respectively.
+
+.TP
+.BR "channel lat. in us"
+Channel latency in microseconds. This is the time needed to execute a request on the FCP adapter. It excludes I/O subsystem and fabric latencies.
+.br
+.IR "min" ", " "max" ", " "avg" " and " "stdev"
+give the minimum, maximum and average latency as well as its standard deviation respectively.
+
+.TP
+.BR "fabric lat. in us"
+Fabric latency in microseconds. This is the time needed for the requests within the fabric, from the FCP adapter to the target device and back again. It excludes I/O subsystem and channel latencies.
+.br
+.IR "min" ", " "max" ", " "avg" " and " "stdev"
+give the minimum, maximum and average latency as well as its standard deviation respectively.
+
+
+.SH EXAMPLES
+.B Example
+.br
+Print a traffic report for all devices.
+Only data after 8:57 April 5, 2008 should be considered.
+Data should be aggregated to 60 second intervals.
+
+ziorep_traffic -i 60 -b "2008-04-05 08:57" sample.log
+
+.B Example
+.br
+Print a detailed traffic report for all devices connected to target port 0x500507630313c562.
+Data should be aggregated over the whole data range.
+
+ziorep_traffic -i 0 -p 0x500507630313c562 sample.log
+
+.B Example
+.br
+Print a detailed traffic report for all devices that are either connected to target port 0x500507630313c562 or part of multipath device 36005076303ffc5620000000000001314.
+The result should be collapsed on the bus-ID level.
+
+ziorep_traffic -C u -p 0x500507630313c562 -m 36005076303ffc5620000000000001314 sample.log
+
+.SH "SEE ALSO"
+.BR ziorep_config (8),
+.BR ziorep_utilization (8)

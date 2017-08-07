@@ -1,0 +1,211 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZKEY 1 "February 2017" "s390-tools"
+.SH NAME
+zkey \- Generates, re-enciphers, and validates secure AES keys
+.
+.
+.SH SYNOPSIS
+.B zkey
+.BR generate | gen
+.I secure\-key\-file
+.RB [ \-\-keybits | \-k
+.IB size ]
+.RB [ \-\-xts | \-x ]
+.RB [ \-\-clearkey | \-c
+.IB clear\-key\-file ]
+.RB [ \-\-verbose | \-V ]
+.
+.br
+.B zkey
+.BR validate  | val
+.I secure\-key\-file
+.RB [ \-\-verbose | \-V ]
+.
+.br
+.B zkey
+.BR reencipher | re
+.I secure\-key\-file
+.RB [ \-\-to\-new | \-n ]
+.RB [ \-\-from\-old | \-o ]
+.RB [ \-\-output | \-f
+.IB output\-file ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+.B zkey
+.BR \-\-help | \-h
+.br
+.B zkey
+.BR \-\-version | \-v
+.
+.
+.
+.SH DESCRIPTION
+Use the \fBzkey\fP command to generate secure AES keys that are enciphered
+with a master key of an IBM cryptographic adapter in CCA coprocessor mode.
+You can also use the \fBzkey\fP command to validate and re-encipher secure
+AES keys.
+.PP
+The generated secure key is saved in a file with a size of 64 or 128 bytes.
+The file contains an AES key of 128, 192, or 256 bits enciphered with the
+master key of the CCA cryptographic adapter.
+Secure keys that are used for the XTS cipher mode can be 128 or 256 bits
+in size, because XTS requires two concatenated secure keys.
+.
+.
+.
+.SH USAGE
+.SS "Generating secure AES keys"
+Use the
+.B generate
+command to generate a new secure AES key either randomly within the CCA
+cryptographic adapter, or from a clear AES key specified as input. When specifying
+a clear key as input, the clear key should be kept at a secure place, or be
+securely erased after creation of the secure key. The secure key itself does
+not need to be kept secure, because it can only be used together with a
+CCA cryptographic adapter that contains the master key with which the secure
+key was generated.
+.
+.SS "Validating secure AES keys"
+Use the
+.B validate
+command to validate an existing secure key.
+It checks if the specified file contains a valid secure key.
+It also displays the attributes of the secure key, such as key sizes, whether
+it is a secure key that can be used for the XTS cipher mode, and the master key
+register with which the secure key is enciphered.
+.
+.SS "Re-encipher existing AES secure keys"
+Use the
+.B reencipher
+command to re-encipher an existing secure key with a new master key.
+A secure key have to be re-enciphered, when the master key of the CCA
+cryptographic adapter is being changed.
+.PP
+The CCA cryptographic adapter has 3 different registers to store
+master keys:
+.RS 2
+.IP "\(bu" 2
+The \fPCURRENT\fP register contains the current master key.
+.
+.IP "\(bu" 2
+The \fBOLD\fP register contains the previously used master key.
+Secure keys enciphered with the master key contained in the \fBOLD\fP
+register canstill be used until the master key is changed again.
+.
+.IP "\(bu" 2
+The \fBNEW\fP register contains the new master key to be set.
+The master key in the \fBNEW\fP register cannot be used until it is made
+the current master key.  Note that a secure key can be proactively
+re-enciphered with the master key in the \fBNEW\fP register before
+the new master key is made the current one.
+.RE
+.PP
+Use the
+.B \-\-from\-old
+option to re-encipher a secure key that is currently enciphered with
+the master key in the \fBOLD\fP register with the master key in the
+\fBCURRENT\fP register.
+.PP
+Use the
+.B \-\-to\-new
+option to proactively re-encipher a secure key that is currently
+enciphered with the master key in the \fBCURRENT\fP register with
+the master key in the \fBNEW\fP register.
+.PP
+If both options are specified, a secure key that is currently enciphered
+with the master key in the \fBOLD\fP register is re-enciphered with the
+master key in the \fBNEW\fP register.
+.PP
+If both options are omitted, \fBzkey\fP automatically detects whether the
+secure key is currently enciphered with the master key in the \fBOLD\fP
+register or with the master key in the \fBCURRENT\fP register.
+If currently enciphered with the master key in the i\fBOLD\fP register,
+it is re-enciphered with the master key in the \fBCURRENT\fP register.
+If it is currently enciphered with the master key in the \fBCURRENT\fP
+register, it is re-enciphered with the master key in the \fBNEW\fP register.
+.PP
+.B Note:
+The \fBreencipher\fP command requires the IBM CCA Host Library (libcsulcca.so)
+to be installed.
+.
+.
+.
+.SH OPTIONS
+.SS "Options for the generate command"
+.TP
+.BR \-k ", " \-\-keybits \fIsize\fP
+Specifies the size of the AES key to be generated in bits.
+Valid sizes are 128, 192, and 256 bits. Secure keys for use with the
+XTS cipher mode can only use keys of 128 or 256 bits.
+The default is 256 bits.
+.TP
+.BR \-x ", " \-\-xts
+Generates a secure AES key for the XTS cipher mode. A secure AES key for
+the XTS cipher mode consist of two concatenated secure keys.
+.TP
+.BR \-c ", " \-\-clearkey \fIclear\-key\-file\fP
+Specifies a file path that contains the clear AES key in binary form.
+If option \fB\-\-keybits\fP is omitted, the size of the specified file
+determines the size of the AES key.  If option \fB\-\-keybits\fP
+is specified, the size of the specified file must match the specified
+key size.  Valid file sizes are of 16, 24, or 32 bytes, and of 32 or 64
+bytes for keys to be used with the XTS cipher mode.
+.
+.SS "Options for the reencipher command"
+.TP
+.BR \-n ", " \-\-to\-new
+Re-enciphers a secure AES key that is currently enciphered with the
+master key in the CURRENT register with the master key in the NEW register.
+.TP
+.BR \-o ", " \-\-from\-old
+Re-enciphers a secure AES key that is currently enciphered with the
+master key in the OLD register with the master key in the CURRENT register.
+.TP
+.BR \-f ", " \-\-output \fIoutput\-file\fP
+Specifies the name of the output file to which the re-enciphered secure key
+is written. If this option is omitted, the re-enciphered secure key
+is replaced in the file that currently contains the secure key.
+.
+.SS "General options"
+.TP
+.BR \-V ", " \-\-verbose
+Displays additional information messages during processing.
+.TP
+.BR \-h ", " \-\-help
+Displays help text and exits.
+.TP
+.BR \-v ", " \-\-version
+Displays version information and exits.
+.
+.
+.
+.SH EXAMPLES
+.TP
+.B zkey generate seckey.bin
+Generates a 256-bit secure AES key and stores it in file 'seckey.bin'.
+.TP
+.B zkey generate seckey.bin \-\-keybits 128 \-\-xts
+Generates a 128-bit secure AES key for the XTS cipher mode and stores it
+in file 'seckey.bin'.
+.TP
+.B zkey generate seckey.bin \-\-clearkey clearkey.bin
+Generates a secure AES key from the clear key in file 'clearkey.bin' and
+stores it in file 'seckey.bin'.
+.TP
+.B zkey reencipher seckey.bin \-\-from\-old
+Re-enciphers the secure key in file 'seckey.bin' which is currently enciphered
+with the master key in the OLD register with the master key in the CURRENT
+register, and replaces the secure key in file 'seckey.bin' with the
+re-enciphered key.
+.TP
+.B zkey reencipher seckey.bin \-\-to\-new \-\-output seckey2.bin
+Re-enciphers the secure key in file 'seckey.bin' which is currently enciphered
+with the master key in the CURRENT register with the master key in the NEW
+register, and saves the re-enciphered secure key to file 'seckey2.bin'.
+.TP
+.B zkey validate seckey.bin
+Validates the secure key in file 'seckey.bin' and displays its attributes.

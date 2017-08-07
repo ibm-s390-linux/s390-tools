@@ -1,0 +1,236 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CHREIPL 8 "July 2010" "s390-tools"
+
+.SH NAME
+chreipl \- change the re-IPL configuration for Linux on System z
+
+.SH SYNOPSIS
+\fBchreipl\fP [TARGET] [OPTIONS]
+
+.SH DESCRIPTION
+Use the \fBchreipl\fP tool to modify the re-IPL configuration for Linux on
+System z. You can configure a certain boot device and, for zipl boot
+menu configurations, the boot menu entry that will be used for the next
+reboot. Also kernel parameters for the next Linux kernel can be defined.
+
+Initial program load (IPL) is the mainframe synonym for what is called
+"boot" under Linux. Accordingly re-IPL can be translated to "reboot" in the
+non-mainframe context.
+
+Normally for reboot the last IPL device is used to restart the system. To reboot
+from another IPL device, you first have to change the re-IPL settings with
+\fBchreipl\fP and then run the
+.BR reboot (8)
+command.
+
+All settings made with
+\fBchreipl\fP are preserved over reboots until they are changed again.
+.SH TARGET
+
+The first argument specifies the re-IPL target:
+.RS 3
+.TP 8
+.RB "- " ccw :
+Specify a DASD CCW device for reboot
+.TP
+.RB "- " fcp :
+Specify a FCP device for reboot
+.TP
+.RB "- " nss :
+Specify a named saved system (NSS) for reboot
+.TP
+.RB "- " node :
+Specify a device for reboot using a device node or directory
+.RE
+.PP
+If the target specification is non-ambiguous it can be omitted. See section
+\fBAUTOTARGET\fP for more information. Ambiguous setups are very rare,
+e.g. the name of a device node theoretically could be the same as a bus-ID.
+.SH OPTIONS
+.TP
+.BR "\-f" " or " "\-\-force"
+With this option, you can force the re-IPL from a target device even
+if the target cannot be verified by the system. This is the case, for
+example, if the device is on the cio_ignore blacklist.
+
+.B Note:
+Use this option with great care. You can specify non-existing devices, which
+will cause the re-IPL to fail.
+
+.TP
+.BR "\-p" " or " "\-\-bootparms"
+Specifies boot parameters for the next reboot. The boot parameters which
+are typically kernel parameters are appended to the kernel parameter line.
+If you specify the boot parameters with a leading equal sign (=), the
+boot parameters replace all parameters on the kernel parameter line. To
+remove boot parameters, specify an empty string for this option.
+
+Depending on the chreipl target a different maximum number of characters
+is allowed for boot parameters. Under LPAR it is not possible to specify boot
+parameters for the ccw target.
+
+.B Note:
+When replacing all parameters, you might inadvertently omit parameters that
+the boot configuration requires. Read
+.B /proc/cmdline
+to find out with which parameters a running Linux instance has been started.
+
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.PP
+All other options are specific to the re-IPL target and are discussed below in
+the respective section. For a more detailed description of the Linux on
+System z IPL mechanisms see
+.BR zipl.conf (6).
+The mandatory options (e.g. device, wwpn, lun, etc.) can also be specified
+as positional parameters.
+.SH AUTOTARGET
+For the ccw, fcp, and node targets \fBchreipl\fP can find automatically
+the correct re-IPL target. To do this, omit the re-IPL target parameter and
+start specifying the required positional parameters.
+.PP
+\fBExamples:\fP
+.br
+
+1. Next time reboot from the DASD device /dev/dasda using the first boot
+configuration:
+.br
+
+\fB# chreipl /dev/dasda -L 1\fP
+.br
+
+2. Next time reboot from the CCW device with the bus-ID 0.0.7e78 and empty
+loadparm:
+
+\fB# chreipl 0.0.7e78 \fP
+
+3. Next time reboot from the SCSI disk with FCP bus-ID 0.0.1700,
+WWPN 0x500507630300c562, and LUN 0x401040b300000000. In addition to that
+append kernel parameter "mem=" to restrict memory to 512 MB:
+
+\fB# chreipl 0.0.1700 0x500507630300c562 0x401040b300000000 -p "mem=512M"\fP
+.SH ccw
+Use the ccw re-IPL target for DASD devices that are accessed by the hardware
+using channel command word (CCW) channels.
+.TP
+.BR "\-d" " or " "\-\-device"
+Specifies the CCW bus-ID. If the bus-ID starts with "0.0." this prefix
+can be omitted and the four digit short notation can be used (e.g. 5000 is
+the same as 0.0.5000).
+
+.TP
+.BR "\-L" " or " "\-\-loadparm"
+Specifies an entry in the
+.BR zipl (8)
+boot menu. If this option is omitted, the default menu entry is used.
+.PP
+\fBExamples:\fP
+.br
+
+1. Next time reboot from the CCW device with the bus-ID 0.0.7e78 and empty
+loadparm:
+
+\fB# chreipl ccw 0.0.7e78\fP
+
+2. Next time reboot from the CCW device with the bus-ID 0.0.7e78
+using the first entry of the zipl boot menu:
+
+\fB# chreipl ccw -d 0.0.7e78 -L 1\fP
+.SH fcp
+Use the fcp re-IPL target for SCSI disks that are accessed by the hardware
+using Fibre Channel Protocol (FCP) channels.
+.TP
+.BR "\-d" " or " "\-\-device"
+Specifies the bus-ID of the FCP adapter that should be used to access
+the SCSI re-IPL device. If the bus-ID starts with "0.0." this prefix
+can be omitted and the four digit short notation can be used (e.g. 5000 is
+the same as 0.0.5000).
+
+.TP
+.BR "\-w" " or " "\-\-wwpn"
+Specifies the world wide port name (WWPN) for the FCP attached SCSI disk.
+
+.TP
+.BR "\-l" " or " "\-\-lun"
+Specifies the logical unit number (LUN) for the FCP attached SCSI disk.
+
+.TP
+.BR "\-b" " or " "\-\-bootprog"
+Specifies an entry in the FCP boot configuration by defining the IPL boot
+program selector. If omitted, '0' will be used.
+
+.TP
+.BR "\-L" " or " "\-\-loadparm"
+The loadparm for the fcp re-IPL target is not used to control the FCP boot
+configuration that is defined by the
+.BR zipl (8)
+boot menu. Instead it can be used to control higher level boot loaders
+like GRUB. For more details refer to distribution specific documentation.
+
+.PP
+\fBExamples:\fP
+.br
+
+1. Next time reboot from the SCSI disk with FCP bus-ID 0.0.1700,
+WWPN 0x500507630300c562, LUN 0x401040b300000000, and boot program selector 0:
+.br
+
+\fB# chreipl fcp 0.0.1700 0x500507630300c562 0x401040b300000000\fP
+.br
+
+2. Use same configuration as (1) but choose boot program selector 2 and
+use options instead of positional parameters:
+.br
+
+\fB# chreipl fcp -d 0.0.1700 -w 0x5005076... -l 0x401040b3... -b 2\fP
+.SH nss
+Use the nss re-IPL target to specify z/VM named saved systems (NSS) for
+reboot.
+.TP
+.BR "\-n" " or " "\-\-name"
+Specifies the name of the NSS.
+.PP
+\fBExamples:\fP
+.br
+
+Use the NSS named LINUX1 for the next reboot:
+
+\fB# chreipl nss LINUX1\fP
+.SH node
+You can identify DASD or SCSI re-IPL devices indirectly through a device
+node or directory. The chreipl tool then determines the information
+that you would otherwise have to specify with the ccw or fcp target.
+.PP
+\fBExamples:\fP
+.br
+
+1. Next time reboot from the DASD device /dev/dasda:
+.br
+
+\fB# chreipl node /dev/dasda\fP
+.br
+
+2. Next time reboot from the SCSI disk /dev/sda:
+.br
+
+\fB# chreipl node /dev/sda\fP
+
+3. Next time reboot from the device where directory /mnt/boot is located:
+.br
+
+\fB# chreipl node /mnt/boot\fP
+
+.SH SEE ALSO
+.BR lsreipl (8),
+.BR zipl (8),
+.BR zipl.conf (5),
+.BR reboot (8)

@@ -1,0 +1,195 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH DASDFMT 8 "Apr 2006" "s390-tools"
+.SH NAME
+dasdfmt \- formatting of DASD (ECKD) disk drives.
+
+.SH SYNOPSIS
+\fBdasdfmt\fR [-h] [-t] [-v] [-y] [-p] [-P] [-m \fIstep\fR]
+.br
+        [-r \fIcylinder\fR] [-b \fIblksize\fR] [-l \fIvolser\fR] [-d \fIlayout\fR]
+.br
+        [-L] [-V] [-F] [-k] [-C] [-M \fImode\fR] \fIdevice\fR
+
+.SH DESCRIPTION
+\fBdasdfmt\fR formats a DASD (ECKD) disk drive to prepare it
+for usage with Linux for S/390. 
+The \fIdevice\fR is the node of the device (e.g. '/dev/dasda').
+Any device node created by udev for kernel 2.6 can be used 
+(e.g. '/dev/dasd/0.0.b100/disc').
+.br
+
+\fBWARNING\fR: Careless usage of \fBdasdfmt\fR can result in 
+\fBLOSS OF DATA\fR.
+
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print usage and exit.
+
+.TP
+\fB-t\fR or \fB--test\fR
+Disables any modification of the disk drive. 
+.br
+\fBdasdfmt\fR just prints
+out, what it \fBwould\fR do.
+
+.TP
+\fB-v\fR
+Increases verbosity.
+
+.TP
+\fB-y\fR 
+Start formatting without further user-confirmation.
+
+.TP
+\fB--norecordzero\fR
+Remove permission for subsystem to format write record zero.
+.br
+This is an expert option: Per default in recent dasd drivers, subsystems are
+granted the permission to format write record zero. This option is used
+to remove this permission.
+.br
+
+.TP
+\fB-L\fR or \fB--no_label\fR
+Omit the writing of a disk label after formatting.
+.br
+This makes only sense for the 'ldl' disk layout.
+.br
+The '-L' option has to be specified after the '-d ldl' option. 
+.br
+
+e.g. dasdfmt -d ldl -L /dev/...
+
+
+.TP
+\fB-V\fR or \fB--version\fR
+Print version number and exit.
+
+.TP
+\fB-F\fR or \fB--force\fR
+Formats the device without performing sanity checking.
+
+.TP
+\fB-C\fR or \fB--check_host_count\fR
+Force dasdfmt to check the host access open count to ensure the device
+is not online on another operating system instance
+
+.TP
+\fB-d\fR \fIlayout\fR or \fB--disk_layout\fR=\fIlayout\fR
+Formats the device with compatible disk layout or linux disk layout.
+\fIlayout\fR is either \fIcdl\fR for the compatible disk layout
+(default) or \fIldl\fR for the linux disk layout.
+.br
+Compatible disk layout means a special handling of the 
+first two tracks of the volume. This enables other S/390 or zSeries 
+operating systems to access this device (e.g. for backup purposes).
+
+.TP
+\fB-p\fR or \fB--progressbar\fR
+Print a progress bar while formatting. 
+Do not use this option if you are using a 3270 console,
+running in background or redirecting the output to a file.
+
+.TP
+\fB-P\fR or \fB--percentage\fR
+Print one line for each formatted cylinder showing the number of the
+cylinder and percentage of formatting process.
+Intended to be used by higher level interfaces.
+
+.TP
+\fB-m\fR \fIstep\fR or \fB--hashmarks\fR=\fIstep\fR
+Print a hashmark every \fIstep\fR cylinders. The value \fIstep\fR has to be within range [1,1000], otherwise it will be set to the default, which is 10.
+.br
+You can use this option to see the progress of formatting in case you
+are not able to use the progress bar option -p, e.g. with a 3270
+terminal.
+.br
+The value will be at least as big as the -r or --requestsize value.
+.br
+
+.TP
+\fB-M\fR \fImode\fR or \fB--mode\fR=\fImode\fR
+Specify the \fImode\fR to be used to format the device. Valid modes are:
+.RS
+.IP full
+Format the entire disk with the specified blocksize. (default)
+.IP quick
+Format the first two tracks and write label and partition information. Only use
+this option if you are sure that the target DASD already contains a regular
+format with the specified blocksize. A blocksize can optionally be specified
+using \fB-b\fR (\fB--blocksize\fR).
+.IP expand
+Format all unformatted tracks at the end of the target DASD. This mode assumes
+that tracks at the beginning of the DASD volume have already been correctly
+formatted, while a consecutive set of tracks at the end are unformatted. You can
+use this mode to make added space available for Linux use after dynamically
+increasing the size of a DASD volume. A blocksize can optionally be specified
+using \fB-b\fR (\fB--blocksize\fR).
+.RE
+
+.TP
+\fB--check\fR
+Perform a complete format check on a DASD volume. A blocksize can be specified
+with \fB-b\fR (\fB--blocksize\fR).
+
+.TP
+\fB-r\fR \fIcylindercount\fR or \fB--requestsize\fR=\fIcylindercount\fR
+Number of cylinders to be processed in one formatting step.
+The value must be an integer in the range 1 - 255.
+.br
+Use this parameter to exploit any available PAV devices.
+The number of cylinders optimally matches the number of associated
+devices, counting the base device and all alias devices.
+.br
+
+.TP
+\fB-b\fR \fIblksize\fR or \fB--blocksize\fR=\fIblksize\fR
+Specify blocksize to be used. \fIblksize\fR must be a positive integer
+and always be a power of two. The recommended blocksize is 4096 bytes.
+
+.TP
+\fB-l\fR \fIvolser\fR or \fB--label\fR=\fIvolser\fR
+Specify the volume serial number or volume identifier to be written 
+to disk after formatting. If no label is specified, a sensible default 
+is used. \fIvolser\fR is interpreted as ASCII string and is automatically 
+converted to uppercase and then to EBCDIC.
+.br
+
+e.g. -l LNX001 or --label=DASD01
+.br
+
+The \fIvolser\fR identifies by serial number the volume. A volume serial 
+number is 1 through 6 alphanumeric or one of the following special
+characters: $, #, @, %. Enclose a serial number that contains special 
+characters in apostrophes. If the number is shorter than six 
+characters, it is padded with trailing blanks.
+.br 
+
+Do not code a volume serial number as SCRTCH, PRIVAT, or Lnnnnn (L with 
+five numbers); these are used in OS/390 messages to ask the operator to 
+mount a volume. Do not code a volume serial number as MIGRAT, which is 
+used by the OS/390 Hierarchical Storage Manager DFSMShsm for migrated 
+data sets.
+.br
+
+NOTE: Try to avoid using special characters in the volume serial. This may cause problems accessing a disk by volser. 
+.br
+In case you really have to use special characters, make sure you are using quotes. In addition there is a special handling for the '$' sign. Please specify it using '\\$' if necessary.
+.br
+
+e.g. -l 'a@b\\$c#' to get A@B$C#
+.br
+
+.TP
+\fB-k\fR or \fB--keep_volser\fR
+Keeps the Volume Serial Number, when writing the Volume Label. This is
+useful, if the Serial Number has been written with a VM Tool and should not
+be overwritten.
+.br
+
+.SH SEE ALSO
+.BR fdasd (8)

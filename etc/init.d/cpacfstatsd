@@ -1,0 +1,89 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides: cpacfstatsd
+# Required-Start: $local_fs
+# Required-Stop: $local_fs
+# Should-Start:
+# Should-Stop:
+# Default-Start: 2 3 5
+# Default-Stop: 0 1 6
+# Short-Description: Start the cpacfstatsd daemon for Linux on System z
+# Description: CPACF statistics collection daemon process for Linux on System z
+### END INIT INFO
+
+DAEMON=cpacfstatsd
+DAEMON_PATH=/usr/sbin/cpacfstatsd
+RUN_PID_FILE=/var/run/cpacfstatsd.pid
+RETVAL=0
+OPTIONS=""
+
+# source function library
+. /lib/lsb/init-functions
+
+start()
+{
+	if [ ! -f $RUN_PID_FILE ]; then
+		echo -n $"Starting $DAEMON:"
+		$DAEMON_PATH $OPTIONS
+		if [ $? == "0" ]; then
+			log_success_msg
+		else
+			log_failure_msg
+		fi
+		echo
+	else
+		echo "$DAEMON (pid $(cat $RUN_PID_FILE)) is already running..."
+		echo
+	fi
+}
+
+stop()
+{
+	echo -n $"Stopping $DAEMON:"
+	if [ -f $RUN_PID_FILE ]; then
+		killproc $DAEMON_PATH -TERM
+		log_success_msg
+		rm -f $RUN_PID_FILE
+	else
+		log_failure_msg
+	fi
+	echo
+}
+
+restart() {
+	stop
+	sleep 1
+	start
+}
+
+status()
+{
+	if [ ! -f $RUN_PID_FILE ]; then
+		echo "$DAEMON is not running."
+		echo
+	else
+		echo "$DAEMON (pid $(cat $RUN_PID_FILE)) is running."
+		echo
+	fi
+}
+
+# How are we called?
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	status)
+		status
+		;;
+	restart)
+		restart
+		;;
+	*)
+		echo "Usage: $DAEMON {start|stop|status|restart}"
+		RETVAL=1
+esac
+
+exit $RETVAL

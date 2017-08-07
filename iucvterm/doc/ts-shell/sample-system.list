@@ -1,0 +1,11 @@
+# Terminal server shell -- system list
+#
+# This file lists z/VM guest virtual machines, each name on a separate line.
+# Empty lines or lines starting with '#' are ignored.
+# See ts-shell(1) for more information.
+#
+#------|<---------------------------------------------------
+LNXSYSA
+LNXSYSB
+LNXSYS01
+LNXSYS42

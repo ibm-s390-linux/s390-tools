@@ -1,0 +1,379 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIPL 8 "Feb 2012" "s390-tools"
+.SH NAME
+zipl \- boot loader for IBM S/390 and zSeries architectures
+
+.SH SYNOPSIS
+.B zipl
+[OPTION] [SECTION]
+
+.SH DESCRIPTION
+.B zipl
+is a boot loader tool for IBM S/390 and zSeries machines. It can be used to
+prepare devices for initial program load (IPL). The following functions are
+supported:
+.IP "     -"
+booting a Linux kernel with optional ramdisk and kernel command line
+.IP "     -"
+taking a snapshot of the current system status (system dump)
+.IP "     -"
+loading a data file to initialize named saved segments (NSS)
+.PP
+Each of these operations is characterized by a boot configuration, i.e. a
+set of required parameters.
+.B zipl
+supports two ways of specifying a boot configuration:
+.IP "     -"
+.B command line:
+all parameters are provided through the command line switches described below.
+Using this mode, only a single boot configuration can be specified.
+.IP "     -"
+.B configuration file:
+parameters are provided by sections defined in a configuration file (see
+.BR zipl.conf (5)).
+Using a configuration file, you can either specify a single boot configuration
+or a menu, i.e. a list of configurations from which users can choose at boot
+time.
+.PP
+
+To use a single boot configuration section, provide its name as parameter to
+.BR zipl .
+If 
+.B zipl
+is called without parameters, it searches the configuration file for a
+section specifying the default action.
+
+.B Boot menu
+
+The
+.B zipl
+tool implements a boot menu which includes the following features:
+.IP "     -"
+display a list of available configurations
+.IP "     -"
+allow to choose a configuration
+.IP "     -"
+allow to specify additional kernel command line parameters
+.PP
+
+See the
+.BR zipl.conf (5)
+man page for details on how to use the boot menu.
+
+.B Logical devices
+
+zipl can be used to prepare logical devices (e.g. a linear device mapper target)
+for booting when the following requirements are met by the logical device setup:
+.IP "     -"
+all boot relevant files (i.e. kernel, ramdisk and parameter files) must be
+located on a logical device which is mapped to a single physical disk of a type
+supported by zipl (i.e. DASD or SCSI disk)
+.IP "     -"
+adjacent data blocks on the logical device must correspond to adjacent blocks on
+the physical device
+.IP "     -"
+access to the first blocks (starting at block 0) of the physical device must be
+given
+.PP
+Examples for logical device setups that are supported are linear and mirror
+mapping.
+
+When working with logical devices, zipl requires that the user provides more
+information about the target device:
+.IP "     -"
+device characteristics of the underlying physical device: disk type and format
+(e.g. ECKD CDL or FCP SCSI), disk geometry in case of ECKD DASDs and block size
+.IP "     -"
+target device offset, i.e. the number of blocks between the physical device
+start and the start of the logical device containing the filesystem with all
+boot relevant files
+.IP "     -"
+a device node which provides access to the first blocks of the device
+.PP
+If the user does not provide this information explicitly by parameters
+zipl automatically runs a driver specific helper script to obtain these data,
+e.g. zipl_helper.device-mapper.
+
+Note that zipl uses /proc/devices to determine the driver name for a given
+device. If the driver name cannot be determined the preparation of a logical
+device for boot might fail.
+This can be the case in a chroot environment when /proc is not mounted
+explicitly.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-c <CONFIG FILE>" " or " "\-\-config=<CONFIG FILE>"
+Use the specified <CONFIG FILE>. If none is supplied, the environment
+variable ZIPLCONF is evaluated if set, otherwise /etc/zipl.conf is used.
+
+.TP
+.BR "\-t <TARGET DIRECTORY>" " or " "\-\-target=<TARGET DIRECTORY>"
+Use the specified <TARGET DIRECTORY>. 
+.B zipl
+uses this directory to store the bootmap, i.e. a file containing
+boot data. The actual boot loader is installed onto the device containing
+the target directory. Supported devices are DASD and SCSI disks.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-\-targetbase=<BASE DEVICE>"
+Install the actual boot loader on the device node specified by BASE DEVICE.
+
+This option is required when working with logical devices (see section
+"Logical devices" above).
+
+.TP
+.BR "\-\-targettype=<TARGET TYPE>"
+Assume that the physical device is of the specified type. Valid values are:
+.IP "         -" 12
+CDL: DASD disk with ECKD/compatible disk layout
+.IP "         -" 12
+LDL: DASD disk with ECKD/linux disk layout
+.IP "         -" 12
+FBA: FBA disk DASD
+.IP "         -" 12
+SCSI: SCSI disk
+.PP
+.IP " " 8
+This option is required when working with logical devices (see section
+"Logical devices" above).
+
+.TP
+.BR "\-\-targetgeometry=<CYLINDERS,HEADS,SECTORS>"
+Assume that the physical device has the specified number of cylinders, heads and
+sectors.
+
+This option is required when working with logical devices which are located on
+DASD ECKD disks (see section "Logical devices" above).
+
+.TP
+.BR "\-\-targetblocksize=<SIZE>"
+Assume that blocks on the physical device are SIZE bytes long.
+
+This option is required when working with logical devices (see section
+"Logical devices" above).
+
+.TP
+.BR "\-\-targetoffset=<OFFSET>"
+Assume that the logical device containing the directory specified by the
+--target option is located on the physical device starting at the block
+specified by OFFSET.
+
+This option is required when working with logical devices (see section
+"Logical devices" above).
+
+.TP
+.BR "\-T <TAPE DEVICE>" " or " "\-\-tape=<TAPE DEVICE>"
+Install bootloader on the specified <TAPE DEVICE>. Use this option instead
+of the 'target' option to prepare a tape device for IPL.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-i <IMAGE[,ADDRESS]>" " or " "\-\-image=<IMAGE[,ADDRESS]>"
+Use the Linux kernel image file <IMAGE>. An optional hexadecimal
+ADDRESS may be provided to specify a non-standard load address for the
+image file.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-r <RAMDISK[,ADDRESS]>" " or " "\-\-ramdisk=<RAMDISK[,ADDRESS]>"
+Use the ramdisk image <RAMDISK>. An optional hexadecimal
+ADDRESS may be provided to specify a non-standard load address for the
+ramdisk file.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-p <PARMFILE[,ADDRESS]>" " or " "\-\-parmfile=<PARMFILE[,ADDRESS]>"
+Use the kernel command line stored in file <PARMFILE>. An optional hexadecimal
+ADDRESS may be provided to specify a non-standard load address for the
+parameter file.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-P <PARMLINE>" " or " "\-\-parameters=<PARMLINE>"
+When installing a kernel, use the kernel command line <PARMLINE>.
+When --parmfile is specified as well, the contents of the parmfile
+and <PARMLINE> are appended to form the resulting command line.
+
+It is not possible to specify both this parameter and the name of a menu
+section on the command line at the same time.
+
+.TP
+.BR "\-k auto" " or " "\-\-kdump=auto"
+Install a kdump kernel that can be used as a stand-alone dump tool. You
+can IPL this kernel in an LPAR or guest virtual machine to create a dump of
+a previously running operating system instance that has been configured
+with a reserved memory area for kdump. For Linux, the memory is reserved
+with the "crashkernel" kernel parameter.
+
+.TP
+.BR "\-s <SEGMENT,ADDRESS>" " or " "\-\-segment=<SEGMENT,ADDRESS>"
+Use the segment image <SEGMENT>. The mandatory hexadecimal ADDRESS specifies
+the load address for the segment file.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-d <DEVNODE[,SIZE]>" " or " "--dumpto=<DEVNODE[,SIZE]>"
+Install a system dump record on the device identified by DEVNODE.
+Supported devices are DASD ECKD or FBA disk partitions,
+device mapper multipath partitions of FCP attached SCSI disks and IBM
+3480/3490/3590/3592 tape devices.
+
+With the exception of SCSI, an optional decimal SIZE parameter may be
+specified to determine the maximum dump size in bytes. SIZE can be suffixed
+by either of the letters K, M or G to signify that the decimal number be
+interpreted as kilobytes, megabytes or gigabytes respectively. SIZE will be
+rounded up to the next megabyte boundary. Note that when you specify a SIZE
+lower than the actual memory size used by linux (see kernel parameter mem=),
+the resulting dump will be incomplete.
+
+Note that on partitions formatted with the ECKD/linux disk layout, the dump
+record will be overwritten by system dump data so that it can be used for
+IPL only once before the system dump record has to be installed again.
+Partitions formatted with the ECKD/compatible disk layout allow for an
+arbitrary number of subsequent dumps.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-D" " or " "\-\-dumptofs"
+This option has been removed, use --dumpto instead.
+
+.TP
+.BR "\-M <DUMPLIST[,SIZE]>" " or " "--mvdump=<DUMPLIST[,SIZE]>"
+Install a multi-volume dump record on each device associated with one of the
+partitions listed in file DUMPLIST.
+Supported are DASD ECKD partitions formatted with the compatible
+disk layout.
+
+A dump signature is written to each partition contained in
+DUMPLIST. This signature is checked by the dump tool, when the dump is
+written. If a dump partition does not have the signature, the dump tool
+will refuse to write the dump. With the
+.BR \-\-force
+option this mechanism can be disabled. E.g. this can be used
+for installing swap space on dump partitions.
+
+An optional decimal SIZE parameter may be specified to determine the
+maximum dump size in bytes. SIZE can be suffixed by either of the letters
+K, M or G to signify that the decimal number be interpreted as kilobytes,
+megabytes or gigabytes respectively. SIZE will be rounded up to the next
+megabyte boundary. Note that when you specify a SIZE lower than the actual
+memory size used by linux (see kernel parameter mem=), the resulting dump
+will be incomplete.
+
+This option is useful if the actual memory size used by linux is
+larger than any single ECKD DASD partition could hold.
+
+It is not possible to specify both this parameter and the name of a menu
+or configuration section on the command line at the same time.
+
+.TP
+.BR "\-m <MENU>" " or " "--menu=<MENU>"
+Install the multi-boot configuration defined in menu section <MENU> of the
+configuration file.
+
+This option cannot be used together with either 
+.BR \-\-target ,
+.BR \-\-image ,
+.BR \-\-ramdisk ,
+.BR \-\-parmfile ,
+.BR \-\-parameters ,
+.BR \-\-segment ,
+.BR \-\-dumpto " or"
+.BR \-\-mvdump .
+
+.TP
+.BR "\-n" " or " "\-\-noninteractive"
+Answer all confirmation questions with 'yes'. This option may be useful when
+.B zipl
+is called from within a shell script or in other situations where no user
+interaction is possible.
+
+.TP
+.BR "\-V" " or " "\-\-verbose"
+Provide more verbose output.
+
+.TP
+.BR "\-a" " or " "\-\-add-files"
+Copy all specified files to the bootmap file instead of just referencing them.
+This option allows specifying files in a boot configuration which are not
+located on the target device.
+
+.TP
+.B "\-\-dry\-run"
+Print the results of performing the specified action without actually changing
+the IPL records. This option can be used to test a configuration since all
+error-checking is still done.
+
+Note that when working with tapes, the current device position will be changed
+even when specifying this option.
+
+.TP
+.BR "\-f" " or " "\-\-force"
+Omit validity checking while producing a multi-volume dump.
+Multi-volume dump partitions will be overwritten with dump data no matter
+whether they contain a dump signature or not.
+
+This option can only be used together with
+.BR \-\-mvdump .
+
+.SH EXAMPLE
+1. Scenario: prepare disk for booting a Linux kernel image using the
+following parameters:
+.br
+  - the directory /boot is located on the boot device
+.br
+  - /boot/image contains the Linux kernel image
+.br
+  - /boot/ramdisk.img contains a ramdisk image
+.br
+  - /boot/parmfile contains the kernel parameter line
+.br
+
+.RB "The respective " "zipl " "call reads:"
+.br
+
+  zipl -t /boot -i /boot/image -r /boot/ramdisk.img
+.br
+       -p /boot/parmfile
+.br
+
+2. Scenario: prepare DASD partition /dev/dasda1 for system dump:
+.br
+
+  zipl -d /dev/dasda1
+.br
+
+.SH NOTES
+While it is not recommended for reasons of recovery and redundancy, FCP.
+attached SCSI disks can also be accessed directly without multipathing,.
+for example via the "/dev/disk/by-path/" device nodes.
+
+.SH SEE ALSO
+.BR zipl.conf (5),
+.BR kexec (8)

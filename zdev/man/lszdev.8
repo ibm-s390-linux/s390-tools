@@ -1,0 +1,441 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" Macro for inserting an option description prologue.
+.\" .OD <long> [<short>] [args]
+.de OD
+.  ds args "
+.  if !'\\$3'' .as args \fI\\$3\fP
+.  if !'\\$4'' .as args \\$4
+.  if !'\\$5'' .as args \fI\\$5\fP
+.  if !'\\$6'' .as args \\$6
+.  if !'\\$7'' .as args \fI\\$7\fP
+.  PD 0
+.  if !'\\$2'' .IP "\fB\-\\$2\fP \\*[args]" 4
+.  if !'\\$1'' .IP "\fB\-\-\\$1\fP \\*[args]" 4
+.  PD
+..
+.\" Macro for inserting code line.
+.\" .CL <text>
+.de CL
+.  ds pfont \fP
+.  nh
+.  na
+.  ft CW
+\\$*
+.  ft \\*[pfont]
+.  ad
+.  hy
+.  br
+..
+.\" Macro for inserting a man page reference.
+.\" .MP man-page section [suffix]
+.de MP
+.  nh
+.  na
+.  BR \\$1 (\\$2)\\$3
+.  ad
+.  hy
+..
+.
+.TH lszdev 8 "Jan 2016" s390-tools lszdev
+.
+.SH NAME
+lszdev - Display configuration of z Systems specific devices
+.
+.
+.SH SYNOPSIS
+.B "lszdev "
+[
+.I "TYPE "
+.I "DEVICE "
+.I "SELECTION "
+.I "ACTIONS "
+.I "OPTIONS "
+]
+.
+.
+.SH DESCRIPTION
+.B lszdev
+displays the configuration of devices and device drivers that
+are specific to IBM z Systems. Supported device types include
+storage devices (DASD and zFCP) and networking devices (QETH, CTC and LCS).
+.PP
+.
+.PP
+lszdev can produce output in either list format or detailed format.
+With no further options specified, the output format defaults to list format.
+.
+.
+.SS "Configurations"
+There are two sources for configuration information: the active configuration
+of the currently running system, and the persistent configuration stored in
+configuration files.
+.PP
+By default lszdev displays information from both the active and the persistent
+configuration.
+.PP
+.
+.
+.SH TYPE
+lszdev uses
+.B "device type"
+names to distinguish devices by their respective type.
+A device type typically corresponds to a device driver, though there are cases
+where multiple device types are provided for the same driver (for example both
+device types "dasd-eckd" and "dasd-fba" are related to the DASD device driver).
+.PP
+You can use the
+.B TYPE
+positional argument to restrict output to the specified device type:
+.IP \(bu 3
+Specify a device type and optionally a device ID to only display data for
+devices with matching type and ID
+.PP
+.IP \(bu 3
+Specify a device type together with the
+.nh
+\-\-type
+.hy
+option to display the configuration of the device type itself
+.PP
+To get a list of supported device types, use the
+.nh
+\-\-list\-types
+.hy
+action.
+.PP
+.
+.
+.SH DEVICE
+You can use the
+.B DEVICE
+positional argument to select a single device or a range of devices by device
+ID. To select a range of devices, specify
+the ID of the first and the last device in the range separated by a hyphen (-).
+Multiple IDs or ranges can be specified by separating ID specifications with a
+comma (,).
+.PP
+.B Example:
+.CL lszdev dasd 1000,2000-2010
+.PP
+.
+.
+.SH SELECTION
+In addition to specifying devices by their ID, you can also select devices by
+their state or by the Linux functions they provide.
+.PP
+lszdev supports the following device states:
+.PP
+.TP 12
+.B online
+The device is enabled and set up to provide a Linux function such as a
+block device like /dev/dasda, or a networking interface like eth0.
+.PP
+.TP 12
+.B offline
+The device is not enabled.
+.PP
+.TP 12
+.B existing
+The device is present in the active configuration.
+.PP
+.TP 12
+.B configured
+There is a persistent configuration for this device.
+.PP
+.TP 12
+.B failed
+The driver of a device detected errors that may cause the device to not function
+properly.
+.PP
+.
+Selection works in two stages:
+.PP
+.IP 1. 3
+All devices specified by ID or by options
+.nh
+\-\-all, \-\-by\-interface, \-\-by\-node or \-\-by\-path
+.hy
+are considered for selection.
+.PP
+.IP 2. 3
+Of the considered devices, only those matching the specified state options
+.nh
+\-\-online, \-\-offline, \-\-existing, \-\-configured and \-\-failed
+.hy
+are selected.
+.PP
+.
+.
+.SS "Selection options"
+.OD all "" ""
+Select all existing and configured devices.
+
+This is the default when no other options are specified.
+.PP
+.
+.OD by-attrib "" "KEY" "=" "VALUE"
+.OD by-attrib "" "KEY" "!=" "VALUE"
+
+Select devices with specified attribute value.
+
+When specified as
+.IR KEY = VALUE ,
+selects all devices that provide an attribute named
+.I KEY
+with a value of
+.IR VALUE .
+When specified as
+.IR KEY != VALUE ,
+selects all devices that
+.B don't
+provide an attribute named
+.I KEY
+with a value of
+.IR VALUE .
+.PP
+.
+.OD by-interface "" "NAME"
+Select device providing network interface, e.g. eth0.
+
+The
+.I NAME
+parameter must be the name of an existing networking interface.
+.PP
+.
+.OD by-node "" "NODE"
+Select device providing device node, e.g. /dev/sda.
+
+The
+.I NODE
+parameter must be the path to a block device or character device special file.
+
+.B Note:
+If
+.I NODE
+is the device node for a logical device (such as a device mapper device),
+lszdev will try to resolve the corresponding physical device nodes. The
+.MP lsblk 8
+tool must be available for this resolution to work.
+.PP
+.
+.OD by-path "" "PATH"
+Select device providing file system path, e.g. /usr.
+
+The
+.I PATH
+parameter can be the mount point of a mounted file system, or a path
+on that file system.
+
+.B Note:
+If the file system that provides
+.I PATH
+is stored on multiple physical devices or on a subvolume (such as supported by
+btrfs) lszdev will try to resolve the corresponding physical device nodes. The
+.MP lsblk 8
+and
+.MP findmnt 8
+tools must be available and in the case of multiple physical devices the file
+system must provide a valid UUID for this resolution to work.
+.PP
+.
+.OD configured "" ""
+Select all devices for which a persistent configuration exists.
+.PP
+.
+.OD existing "" ""
+Select all devices that are present in the active configuration.
+.PP
+.
+.OD online "" ""
+Select devices that are online.
+
+An online device is a device in the active configuration that is set up
+to provide its associated Linux function (such as a block device or networking
+interface).
+.PP
+.
+.OD offline "" ""
+Select devices that are offline.
+
+
+An offline device is a device in the active configuration that is
+.B not
+set up to provide its associated Linux function.
+.PP
+.
+.OD failed "" ""
+Select devices for which errors were detected.
+
+A failed device is a device for which its driver detected an error condition
+that may cause the device to not correctly perform its function. You can use
+the \-\-info option of the lszdev tool to get more details on the detected
+errors.
+
+.B Example:
+.CL lszdev \-\-failed \-\-info
+.PP
+
+.
+.
+.SH ACTIONS
+.OD help "h" ""
+Print usage information, then exit.
+.PP
+.
+.OD info "i" ""
+Display detailed information.
+
+Displays detailed information about the configuration of the selected device
+or device type. Specifying \-\-info twice will display additional device
+information.
+.PP
+.
+.OD list-columns "l" ""
+List available output columns.
+
+Lists all available columns for use with option \-\-columns.
+.PP
+.
+.OD list-types "L" ""
+List supported device types.
+
+Lists the name and a short description for all device types supported by
+lszdev.
+.PP
+.
+.OD version "v" ""
+Print version information, then exit.
+.PP
+.
+.
+.SH OPTIONS
+.OD active "a" ""
+List information from the active configuration only.
+
+Restricts output to information obtained from the active configuration, that
+is information from the running system.
+.PP
+.
+.OD base "" "PATH" | "KEY" = "VALUE"
+Change file system paths used to access files.
+
+If
+.I PATH
+is specified without an equal sign (=), it is used as base path for accessing
+files in the active and persistent configuration.
+
+If the specified parameter is in KEY=VALUE format, only those paths
+that begin with
+.I KEY
+are modified.
+For these paths, the initial
+.I KEY
+portion is replaced with
+.IR VALUE .
+
+.B Example:
+.CL lszdev --persistent --base /etc=/mnt/etc
+.PP
+.
+.OD columns "c" "COLUMNS"
+Specify comma-separated list of columns to display.
+
+You can change the columns shown in list output format by specifying column
+names as comma-separated list via the \-\-columns option. Note that \-\-columns
+cannot be specified together with \-\-info.
+
+.B Example:
+.CL lszdev \-\-columns TYPE,ID
+
+To get a list of supported column names, use the
+.nh
+\-\-list\-columns
+.hy
+action.
+.PP
+.
+.OD no-headings "n" ""
+Do not print column headings.
+
+When displaying output in list format, this option can be specified to
+suppress the output of a heading row.
+.PP
+.
+.OD pairs "" ""
+Produce output in KEY="VALUE" format.
+
+You can use this option to generate output in a format more suitable for
+processing by other programs. In this format, column values are prefixed
+with the name of the corresponding column. Values are enclosed in double
+quotation marks. Any quotation marks or slashes in the value string are
+escaped by placing a slash in front of it.
+.PP
+.
+.OD persistent "p" ""
+List information from the persistent configuration only.
+
+Restricts output to information obtained from configuration files.
+.PP
+.
+.OD quiet "q" ""
+Print only minimal run-time information.
+.PP
+.
+.OD type "t" ""
+List information about device type.
+
+Use this option to display configuration information of a device type instead
+of a device.
+.PP
+.
+.OD verbose "V" ""
+Print additional run-time information.
+.PP
+.
+.
+.SH EXAMPLES
+.B Display a list of all devices:
+.RS 4
+.CL lszdev
+.RE
+.PP
+.
+.B Return type and ID of root device in machine-readable format:
+.RS 4
+.CL lszdev \-\-columns TYPE,ID \-\-by\-path /
+.RE
+.PP
+.
+.B Display DASD driver settings:
+.RS 4
+.CL lszdev \-\-type dasd
+.RE
+.PP
+.
+.SH "EXIT CODES"
+lszdev returns a subset of the exit codes returned by the chzdev tool. See
+.MP chzdev 8
+for the detailed list.
+.
+.
+.SH FILES
+.TP
+/etc/udev/rules.d/
+lszdev reads udev rules representing the persistent configuration of devices
+from this directory. File names start with "41-".
+.TP
+/etc/modprobe.d/
+chzdev reads modprobe configuration files representing the persistent
+configuration of certain device types from this directory. File names start
+with "s390x-".
+.
+.
+.SH "SEE ALSO"
+.MP chzdev 8 ,
+.MP lsdasd 8 ,
+.MP lszfcp 8 ,
+.MP lsqeth 8 ,
+.MP lsblk 8 .

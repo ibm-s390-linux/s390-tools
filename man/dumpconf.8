@@ -1,0 +1,187 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH DUMPCONF 8 "Sept 2011" "s390-tools"
+
+.SH NAME
+dumpconf \- Configure panic and PSW restart actions for Linux on System z
+
+.SH SYNOPSIS
+.br
+\fBdumpconf\fR [start|stop|status]
+.br
+\fBdumpconf\fR [-h|-v]
+
+.SH DESCRIPTION
+\fBdumpconf\fR reads the /etc/sysconfig/dumpconf file
+and establishes the action to be taken if a kernel panic occurs
+or PSW restart is triggered.
+
+The following keywords can be used in the dumpconf file:
+
+.TP
+\fB  - ON_PANIC:\fR
+Shutdown action in case of a kernel panic or a PSW restart. Possible values
+are 'dump', 'reipl', 'dump_reipl', 'stop' and 'vmcmd':
+.br
+
+dump: Trigger dump according to the configuration in /etc/sysconfig/dumpconf.
+.br
+
+reipl: Trigger re-IPL according to the configuration under /sys/firmware/reipl.
+.br
+
+dump_reipl: First trigger dump according to the configuration in
+/etc/sysconfig/dumpconf, then trigger re-IPL according to the configuration
+under /sys/firmware/reipl.
+.br
+
+stop: Stop Linux and enter disabled wait (default).
+.br
+
+vmcmd: Trigger CP command according to the 'VMCMD_X' configuration in
+/etc/sysconfig/dumpconf.
+
+.TP
+\fB  - DUMP_TYPE:\fR
+Type of dump device. Possible values are 'ccw' and 'fcp'.
+
+.TP
+\fB  - DEVICE:\fR
+Device number of dump device.
+
+.TP
+\fB  - WWPN\fR
+WWPN for SCSI dump device.
+
+.TP
+\fB  - LUN\fR
+LUN for SCSI dump device.
+
+.TP
+\fB  - BOOTPROG:\fR
+Boot program selector.
+
+.TP
+\fB  - BR_LBA:\fR
+Boot record logical block address.
+
+.TP
+\fB  - VMCMD_1, VMCMD_2 ... VMCMD_8:\fR
+Up to eight CP commands, which are executed in case of a kernel panic
+or PSW restart.
+
+.TP
+\fB - DELAY_MINUTES:\fR
+Number of minutes the activation of dumpconf is to be delayed. If this keyword
+is omitted, the default is zero, which means that
+dumpconf activates immediately during system startup.
+Specify a non-zero delay time only if you specified
+shutdown action "reipl" or "dump_reipl".
+These actions might cause a reboot loop
+if the Linux kernel crashes persistently during (or shortly after) each reboot.
+
+A non-zero delay time causes dumpconf to sleep in the background until the
+delay time has expired. In this case messages are written to /var/log/messages.
+By default (DELAY_MINUTES is omitted or zero) dumpconf runs in the foreground
+and informational messages are written to sysout, while
+error messages are written to syserr.
+
+Example: If you specified DELAY_MINUTES=10 and
+your Linux system crashes within 10 minutes after the reboot,
+then dumpconf is not yet active and the default action (stop) is triggered.
+
+.SH COMMANDS
+.TP
+\fBstart\fR
+Enable configuration defined in /etc/sysconfig/dumpconf.
+
+.TP
+\fBstop\fR
+Disable dump configuration.
+
+.TP
+\fBstatus\fR
+Show current configuration.
+
+.SH OPTIONS
+.TP
+\fB-h\fR or \fB--help\fR
+Print usage information, then exit.
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print version information, then exit.
+
+.SH PSW Restart
+PSW Restart can be triggered by the operator under z/VM with the CP
+command "#cp system restart" and under LPAR on the HMC with
+"Recovery/PSW Restart".
+
+.SH EXAMPLES:
+The following are examples of the /etc/sysconfig/dumpconf file:
+.br
+
+#
+.br
+# Example configuration for a CCW dump device (DASD)
+.br
+#
+.br
+ON_PANIC=dump_reipl
+.br
+DUMP_TYPE=ccw
+.br
+DEVICE=0.0.1234
+.br
+DELAY_MINUTES=5
+.br
+
+#
+.br
+# Example configuration for an FCP dump device (SCSI Disk)
+.br
+#
+.br
+ON_PANIC=dump
+.br
+DUMP_TYPE=fcp
+.br
+DEVICE=0.0.2345
+.br
+WWPN=0x5005076303004712
+.br
+LUN=0x4713000000000000
+.br
+BOOTPROG=0
+.br
+BR_LBA=0
+.br
+
+#
+.br
+# Example configuration for CP commands
+.br
+#
+.br
+ON_PANIC=vmcmd
+.br
+VMCMD_1="MESSAGE * Starting VMDUMP"
+.br
+VMCMD_2="VMDUMP"
+.br
+VMCMD_3="IPL 3456"
+
+#
+.br
+# Example config for re-IPL
+.br
+#
+.br
+ON_PANIC=reipl
+.br
+DELAY_MINUTES=5
+
+.SH SEE ALSO
+Linux on System z: Using the Dump Tools

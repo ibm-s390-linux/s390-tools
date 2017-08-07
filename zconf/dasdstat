@@ -1,0 +1,466 @@
+#!/bin/bash
+#
+# dasdstat - Tool to print DASD statistics data as formatted table
+#
+# Copyright IBM Corp. 2011, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+function print_usage() {
+	cat <<-EOD
+Usage: $CMD <options> [<statistic>]
+
+<options> ::=
+        -e|--enable
+                Enable the statistics.
+        -d|--disable
+                Disable the statistics.
+        -r|--reset
+                Reset the statistics.
+        -i|--directory <directory>
+                Specify the directory in which the statistics can be found.
+        -h|--help
+                Print this text and exit.
+        -l|--long
+                Print more detailed information, e.g differentiate between
+                read and write requests.
+        -c|--columns <number>
+                Format the output in a table with the given number of columns.
+        -w|--column-width <width>
+                Set the minimum width of the columns in the output table.
+        -V|--verbose
+                Print more verbose information.
+        -v|--version
+                Show tools and command version.
+
+<statistic>
+        Limit operation to one or more statistic.
+	EOD
+}
+
+function print_version()
+{
+	echo "$CMD: version %S390_TOOLS_VERSION%"
+	echo "Copyright IBM Corp. 2011, 2017"
+}
+
+function unset_known_variables() {
+	unset start_time
+	unset total_requests
+	unset total_sectors
+	unset total_pav
+	unset total_hpf
+	unset histogram_sectors
+	unset histogram_io_times
+	unset histogram_io_times_weighted
+	unset histogram_time_build_to_ssch
+	unset histogram_time_ssch_to_irq
+	unset histogram_time_ssch_to_irq_weighted
+	unset histogram_time_irq_to_end
+	unset histogram_ccw_queue_length
+	unset total_read_requests
+	unset total_read_sectors
+	unset total_read_pav
+	unset total_read_hpf
+	unset histogram_read_sectors
+	unset histogram_read_times
+	unset histogram_read_time_build_to_ssch
+	unset histogram_read_time_ssch_to_irq
+	unset histogram_read_time_irq_to_end
+	unset histogram_read_ccw_queue_length
+}
+
+function print_array()
+{
+	local width=$1
+	shift
+	local linebreak=$1
+	shift
+	local i=1
+	for element in $*
+	do
+		printf "%${width}s" $element
+		(( 0 == i++ % linebreak )) && printf "\n"
+	done
+	# add an extra line break if we do not already have one
+	(( 0 != (i - 1) % linebreak )) && printf "\n"
+}
+
+function subtract_array()
+{
+	local -a a=( $1 )
+	local -a b=( $2 )
+	local -a c
+	local i
+	local cnt=${#a[@]}
+	for (( i = 0 ; i < cnt ; i++ ))
+	do
+		(( c[i] = a[i] - b[i] ))
+	done
+	echo -n ${c[*]}
+}
+
+function print_line()
+{
+	local i
+	for (( i = 0 ; i < $1 ; i++ ))
+	do
+		echo -n '-'
+	done
+	echo
+}
+
+HEADERSEXP=" __<4    ___8    __16    __32    __64    _128    _256    _512 \
+             __1k    __2k    __4k    __8k    _16k    _32k    _64k    128k \
+             _256    _512    __1M    __2M    __4M    __8M    _16M    _32M \
+             _64M    128M    256M    512M    __1G    __2G    __4G    _>4G"
+
+HEADERSLIN=" ___0    ___1    ___2    ___3    ___4    ___5    ___6    ___7 \
+             ___8    ___9    __10    __11    __12    __13    __14    __15 \
+             __16    __17    __18    __19    __20    __21    __22    __23 \
+             __24    __25    __26    __27    __28    __29    __30    __31"
+
+
+function print_format_standard()
+{
+	local converted_time=$(date -d @$start_time)
+	# all numbers in the histograms below are smaller or equal to the
+	# total_requests. So we use that number to determine the column width.
+	local width=${#total_requests}
+	(( width++ ))
+	(( width < 5 )) && width=5
+
+	if [[ -n $COLUMN_WIDTH ]] && [[ $width -lt $COLUMN_WIDTH ]]
+	then
+		width=$COLUMN_WIDTH
+	fi
+
+	local linebreak=$NUMBER_COLUMNS
+	local statname="$1"
+	local tablewidth
+	(( tablewidth = width * linebreak ))
+
+	# Note: This function does not print the histogram_io_times_weighted
+	#       and histogram_time_ssch_to_irq_weighted because the interpretation
+	#       of these histograms is not intuitive and may lead to confusion.
+	print_line $tablewidth
+	printf "statistics data for statistic: %s\n" "$statname"
+	printf "start time of data collection: %s\n\n" "$converted_time"
+
+	printf "%d dasd I/O requests\n" ${total_requests[*]}
+	printf "with %u sectors(512B each)\n" ${total_sectors[*]}
+	printf "%d requests used a PAV alias device\n" ${total_pav[*]}
+	printf "%d requests used HPF\n" ${total_hpf[*]}
+	print_array $width $linebreak $HEADERSEXP
+	printf "Histogram of sizes (512B secs)\n"
+	print_array $width $linebreak ${histogram_sectors[*]}
+	printf "Histogram of I/O times (microseconds)\n"
+	print_array $width $linebreak ${histogram_io_times[*]}
+	printf "Histogram of I/O time till ssch\n"
+	print_array $width $linebreak ${histogram_time_build_to_ssch[*]}
+	printf "Histogram of I/O time between ssch and irq\n"
+	print_array $width $linebreak ${histogram_time_ssch_to_irq[*]}
+	printf "Histogram of I/O time between irq and end\n"
+	print_array $width $linebreak ${histogram_time_irq_to_end[*]}
+	printf "# of req in chanq at enqueuing (0..31) \n"
+	print_array $width $linebreak $HEADERSLIN
+	print_array $width $linebreak ${histogram_ccw_queue_length[*]}
+
+	if [[ $OUTPUT == "short" ]]
+	then
+		print_line $tablewidth
+		return
+	fi
+
+	printf "\n%d dasd I/O read requests\n" ${total_read_requests[*]}
+	printf "with %u sectors(512B each)\n" ${total_read_sectors[*]}
+	printf "%d requests used a PAV alias device\n" ${total_read_pav[*]}
+	printf "%d requests used HPF\n" ${total_read_hpf[*]}
+	print_array $width $linebreak $HEADERSEXP
+	printf "Histogram of sizes (512B secs)\n"
+	print_array $width $linebreak ${histogram_read_sectors[*]}
+	printf "Histogram of I/O times (microseconds)\n"
+	print_array $width $linebreak ${histogram_read_times[*]}
+	printf "Histogram of I/O time till ssch\n"
+	print_array $width $linebreak ${histogram_read_time_build_to_ssch[*]}
+	printf "Histogram of I/O time between ssch and irq\n"
+	print_array $width $linebreak ${histogram_read_time_ssch_to_irq[*]}
+	printf "Histogram of I/O time between irq and end\n"
+	print_array $width $linebreak ${histogram_read_time_irq_to_end[*]}
+	printf "# of req in chanq at enqueuing (0..31) \n"
+	print_array $width $linebreak $HEADERSLIN
+	print_array $width $linebreak ${histogram_read_ccw_queue_length[*]}
+
+	printf "\n%d dasd I/O write requests\n" $(( total_requests[0] - total_read_requests[0] ))
+	printf "with %u sectors(512B each)\n" $(( total_sectors[0] - total_read_sectors[0] ))
+	printf "%d requests used a PAV alias device\n" $(( total_pav[0] - total_read_pav[0] ))
+	printf "%d requests used HPF\n" $(( total_hpf[0] - total_read_hpf[0] ))
+	print_array $width $linebreak $HEADERSEXP
+	printf "Histogram of sizes (512B secs)\n"
+	print_array $width $linebreak $(subtract_array "${histogram_sectors[*]}" "${histogram_read_sectors[*]}")
+	printf "Histogram of I/O times (microseconds)\n"
+	print_array $width $linebreak $(subtract_array "${histogram_io_times[*]}" "${histogram_read_times[*]}")
+	printf "Histogram of I/O time till ssch\n"
+	print_array $width $linebreak $(subtract_array "${histogram_time_build_to_ssch[*]}" "${histogram_read_time_build_to_ssch[*]}")
+	printf "Histogram of I/O time between ssch and irq\n"
+	print_array $width $linebreak $(subtract_array "${histogram_time_ssch_to_irq[*]}" "${histogram_read_time_ssch_to_irq[*]}")
+	printf "Histogram of I/O time between irq and end\n"
+	print_array $width $linebreak $(subtract_array "${histogram_time_irq_to_end[*]}" "${histogram_read_time_irq_to_end[*]}")
+	printf "# of req in chanq at enqueuing (0..31) \n"
+	print_array $width $linebreak $HEADERSLIN
+	print_array $width $linebreak $(subtract_array "${histogram_ccw_queue_length[*]}" "${histogram_read_ccw_queue_length[*]}")
+
+	print_line $tablewidth
+}
+
+function read_stat_data() {
+	local file="$1"
+
+	while read -d ' ' token
+	do
+		read -a $token
+	done < <(cat $file) #avoid inconsistent data due to multiple reads/seeks
+
+	# differentiate I/O error from disabled statistic
+	if [[ -n $total_requests ]] || [[ "$token" == "disabled" ]]
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+function print_stat() {
+	myfile="$1"
+	if [[ ! -f "$myfile" ]]
+	then
+		print_line 80
+		echo "$CMD: Statistic \"$myfile\" does not exist" >&2
+		print_line 80
+		echo
+		return
+	fi
+	unset_known_variables
+	if read_stat_data "$myfile"
+	then
+		if [[ -z "$total_requests" ]]
+		then
+			if [[ "$VERBOSE" == "true" ]]
+			then
+				print_line 80
+				echo "statistics \"$f\" are disabled"
+				print_line 80
+				echo
+			fi
+		else
+			print_format_standard $f
+			echo
+		fi
+	else
+		print_line 80
+		echo "$CMD: Could not read statistic \"$myfile\" " >&2
+		print_line 80
+		echo
+	fi
+}
+
+function enable_stat() {
+	myfile="$1"
+	if [[ ! -f "$myfile" ]]
+	then
+		echo "$CMD: Statistic \"$myfile\" does not exist" >&2
+		return
+	fi
+	if echo on > "$myfile"
+	then
+		echo "enable statistic \"$myfile\""
+	else
+		echo "$CMD: Failed to enable statistic \"$myfile\"" >&2
+	fi
+}
+
+function disable_stat() {
+	myfile="$1"
+	if [[ ! -f "$myfile" ]]
+	then
+		echo "$CMD: Statistic \"$myfile\" does not exist" >&2
+		return
+	fi
+	if echo off > "$myfile"
+	then
+		echo "disable statistic \"$myfile\""
+	else
+		echo "$CMD: Failed to disable statistic \"$myfile\""
+	fi
+}
+
+function reset_stat() {
+	myfile="$1"
+	if [[ ! -f "$myfile" ]]
+	then
+		echo "$CMD: Statistic \"$myfile\" does not exist" >&2
+		return
+	fi
+	if echo reset > "$myfile"
+	then
+		echo "reset statistic \"$myfile\""
+	else
+		echo "$CMD: Failed to reset statistic \"$myfile\"" >&2
+	fi
+}
+
+function verbose_msg() {
+	if [[ "$VERBOSE" == "true" ]]
+	then
+		echo "$*"
+	fi
+}
+
+
+# Evaluating command line options
+CMD=$(basename $0)
+DASD_STATISTICS_DIR=""
+ALLFILES=""
+VERBOSE=false
+OUTPUT="short"
+NUMBER_COLUMNS=16
+COLUMN_WIDTH=
+ACTION="print"
+while [ $# -gt 0 ]; do
+	case $1 in
+	--help|-h)
+		print_usage
+		exit 0
+		;;
+	--enable|-e)
+		ACTION="enable"
+		;;
+	--disable|-d)
+		ACTION="disable"
+		;;
+	--reset|-r)
+		ACTION="reset"
+		;;
+	--directory|-i)
+		DASD_STATISTICS_DIR="$2"
+		shift
+		if [[ ! -d $DASD_STATISTICS_DIR ]]
+		then
+			echo "$CMD: $DASD_STATISTICS_DIR is not a directory" >&2
+			exit 1
+		fi
+		;;
+	--long|-l)
+		OUTPUT="extended"
+		;;
+	--columns|-c)
+		NUMBER_COLUMNS="$2"
+		if [[ ! "$NUMBER_COLUMNS" -gt 0 ]]
+		then
+			echo "$CMD: $NUMBER_COLUMNS is not a positive integer number" >&2
+			exit 1
+		fi
+		shift
+		;;
+	--column-width|-w)
+		COLUMN_WIDTH="$2"
+		if [[ ! "$COLUMN_WIDTH" -gt 0 ]]
+		then
+			echo "$CMD: $COLUMN_WIDTH is not a positive integer number" >&2
+			exit 1
+		fi
+		shift
+		;;
+	--verbose|-V)
+		VERBOSE=true
+		;;
+	--version|-v)
+		print_version
+		exit 0
+		;;
+	-*)
+		echo "$CMD: Invalid option $1" >&2
+		echo "Try '$CMD --help' for more information." >&2
+		exit 1
+		;;
+	*)
+		ALLFILES="$ALLFILES $1"
+		;;
+	esac
+	shift
+done
+
+# if no directory is given on command line, find dasd directory in debugfs
+if [[ "$DASD_STATISTICS_DIR" == "" ]]
+then
+	while read -a mntentries
+	do
+		if [[ "${mntentries[2]}" == "debugfs" ]]
+		then
+			DASD_STATISTICS_DIR="${mntentries[1]}"
+			verbose_msg "found debugfs mount point $DASD_STATISTICS_DIR"
+			break;
+		fi
+	done < /etc/mtab
+	if [[ "$DASD_STATISTICS_DIR" == "" ]]
+	then
+		echo "$CMD: No debugfs mount point found" >&2
+		exit 1
+	fi
+	DASD_STATISTICS_DIR="$DASD_STATISTICS_DIR/dasd"
+	if [[ ! -d "$DASD_STATISTICS_DIR" ]]
+	then
+		echo "$CMD: Default DASD debugfs directory $DASD_STATISTICS_DIR does not exist" >&2
+		exit 1
+	fi
+fi
+
+# look for directories that contain statistics
+if [[ "$ALLFILES" == "" ]]
+then
+	ALLFILES=$(ls -x $DASD_STATISTICS_DIR)
+	explicitstats="false"
+else
+	explicitstats="true"
+fi
+ALLSTATS=""
+for f in $ALLFILES
+do
+	if [[ -f "$DASD_STATISTICS_DIR/$f/statistics" ]]
+	then
+		ALLSTATS="$ALLSTATS $f"
+	elif [[ $explicitstats == "true" ]]
+	then
+		echo "$CMD: No statistics found for $f" >&2
+	fi
+done
+
+verbose_msg "found the following statistics in directory $DASD_STATISTICS_DIR:"
+verbose_msg "$ALLSTATS"
+
+# execute the required operation
+for f in $ALLSTATS
+do
+	case $ACTION in
+	"enable")
+		enable_stat "$DASD_STATISTICS_DIR/$f/statistics"
+		;;
+	"disable")
+		disable_stat "$DASD_STATISTICS_DIR/$f/statistics"
+		;;
+	"reset")
+		reset_stat "$DASD_STATISTICS_DIR/$f/statistics"
+		;;
+	"print")
+		print_stat "$DASD_STATISTICS_DIR/$f/statistics"
+		;;
+	*)
+		echo "error"
+		exit 1
+		;;
+	esac
+done
+
+

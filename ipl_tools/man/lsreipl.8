@@ -1,0 +1,39 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSREIPL 8 "July 2010" "s390-tools"
+
+.SH NAME
+lsreipl \- list the re-IPL configuration for Linux on System z
+
+.SH SYNOPSIS
+\fBlsreipl\fR [OPTION]
+
+.SH DESCRIPTION
+\fBlsreipl\fR lists the re-IPL (and IPL) configuration for Linux on System z.
+
+Using this tool you can see from which device your system will boot after you
+issue the reboot command. Furthermore you can query the system for information
+about the current boot device.
+
+IPL (initial program load) is the mainframe synonym for what is called
+"boot" in Linux. Accordingly re-IPL can be translated to "reboot" in the non mainframe context.
+
+.SH OPTIONS
+
+.TP
+\fB-i\fR or \fB--ipl\fR
+Print the IPL instead of the re-IPL configuration. This lists the configuration
+of the device from which your present Linux installation was booted.
+
+.TP
+\fB-h\fR or \fB--help\fR
+Print help information, then exit.
+
+.TP
+\fB-v\fR or \fB--version\fR
+Print version information, then exit.
+
+.SH SEE ALSO
+.BR chreipl (8)

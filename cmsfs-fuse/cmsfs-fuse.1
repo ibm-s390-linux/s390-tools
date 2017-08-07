@@ -1,0 +1,208 @@
+.\" Copyright IBM Corp. 2010, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH CMSFS-FUSE 1 "February 2010" "s390-tools"
+
+.SH NAME
+cmsfs-fuse \- File system for z/VM CMS disks
+
+.SH SYNOPSIS
+.SS mounting:
+.TP
+\fBcmsfs-fuse\fP DEVICE MOUNTPOINT [OPTIONS]
+.SS unmounting:
+.TP
+\fBfusermount\fP -u MOUNTPOINT
+
+.SH DESCRIPTION
+Use the \fBcmsfs-fuse\fP command to provide read and write access
+to files stored on a z/VM CMS disk.
+The cmsfs-fuse file system translates the record-based EDF file system on
+the CMS disk to UNIX semantics.
+After mounting the CMS disk, you can use common Linux tools to access
+the files on the disk. You can enable automatic conversions of text files from
+EBCDIC to ASCII.
+
+Attention: You can inadvertently damage files and lose data when directly
+writing to files within the cmsfs-fuse file system. To avoid problems when writing,
+multiple restrictions must be observed, especially with regard to linefeeds (see
+section RESTRICTIONS).
+
+If you are unsure about how to safely write to a file on the cmsfs-fuse file
+system, copy the file to a location outside the cmsfs-fuse file system, edit the file,
+and then copy it back to its original location.
+
+.SH OPTIONS
+.SS "general options:"
+.TP
+\fB\-o\fR opt,[opt...]
+Fuse or mount command options. For fuse options see below, for mount options
+see \fBmount(8)\fP.
+.TP
+\fB\-h\fR or \fB\-\-help\fR
+Print usage information, then exit.
+.TP
+\fB\-v\fR or \fB\-\-version\fR
+Print version information, then exit.
+.SS "cmsfs-fuse options:"
+.TP
+\fB\-a\fR or \fB\-\-ascii\fR
+Interpret all files on the CMS disk as text files and convert them from
+EBCDIC to ASCII.
+.TP
+\fB--from\fR
+The codepage of the files on the CMS disk. If this option is not
+specified the default codepage CP1047 is used. For a list of all available
+codepages see iconv --list.
+.TP
+\fB--to\fR
+The codepage to which CMS files should be converted to. If this option is not
+specified the default codepage ISO-8859-1 is used. For a list of all available
+codepages see iconv --list.
+.TP
+\fB\-t\fR or \fB\-\-filetype\fR
+Interpret files on the CMS disk as text files based on the file type
+and convert them from EBCDIC to ASCII. The file types that are treated
+as text files are taken from a configuration file (see section CONFIGURATION FILES).
+
+.SS "Applicable FUSE options (version 2.8):"
+.TP
+\fB\-d\fR or \fB\-o\fR debug
+Enable debug output (implies \fB\-f\fR)
+.TP
+\fB\-f\fR
+Foreground operation
+.TP
+\fB\-o\fR allow_other
+Allow access by other users
+.TP
+\fB\-o\fR allow_root
+Allow access by root
+.TP
+\fB\-o\fR nonempty
+Allow mounts over non\-empty file/dir
+.TP
+\fB\-o\fR default_permissions 
+Enable permission checking by kernel
+.TP
+.TP
+\fB\-o\fR max_read=N
+Set maximum size of read requests
+.TP
+\fB\-o\fR kernel_cache
+Cache files in kernel
+.TP
+\fB\-o\fR [no]auto_cache
+Enable caching based on modification times
+.TP
+\fB\-o\fR umask=M
+Set file permissions (octal)
+.TP
+\fB\-o\fR uid=N
+Set file owner
+.TP
+\fB\-o\fR gid=N
+Set file group
+.TP
+\fB\-o\fR max_write=N
+Set maximum size of write requests
+.TP
+\fB\-o\fR max_readahead=N
+Set maximum readahead
+.TP
+\fB\-o\fR async_read
+Perform reads asynchronously (default)
+.TP
+\fB\-o\fR sync_read
+Perform reads synchronously
+.TP
+\fB\-o big_writes\fR
+Enable write operations with more than 4 KB
+
+.SH EXTENDED ATTRIBUTES
+Use the following extended attributes to handle the CMS characteristics of a file:
+
+\fBuser.record_format\fR: The format of a file. Allowed values are F for fixed record length files
+and V for variable record length files. This attribute can be set only if the file is empty.
+
+\fBuser.record_lrecl\fR: The record length of a file. This attribute can be set only for a fixed
+record length file and if the file is empty. A valid record length is an integer in the range 1-65535.
+
+\fBuser.file_mode\fR: The file mode of a file which is interpreted by CMS. The file mode consists
+of a mode letter from A-Z and mode number from 0-6.
+
+New files are created by default as variable files with file mode A1.
+
+.SH RESTRICTIONS
+\fBrename\fR and \fBcreat\fR:
+Uppercase file names are enforced.
+
+\fBtruncate\fR:
+Only shrinking of a file is supported. For fixed length record files, the new file size must
+be a multiple of the record length.
+
+\fBunlink\fR:
+Creating a file with the name of a previously unlinked file which is still in use is not supported
+and will fail with -ENOENT.
+
+\fBwrite\fR:
+Writes are supported only at the end of the file.
+A write on a fixed length record file always writes a multiple
+of the record length. If additional bytes are added, the
+bytes are filled with zero in binary mode or with spaces in ASCII mode. Sparse files are not supported.
+If the cp tool is used to write files to a CMS disk the option "--sparse=never" must be specified.
+
+If ASCII translation is enabled for a file a linefeed character determines the end of a record.
+The following restrictions must be observed for writing files in ASCII mode:
+For fixed record length files a linefeed must occur exactly after a record of the length specified in the fixed record length.
+For variable record length files a linefeed must occur after the maximum record length is reached or earlier.
+If a record of a variable record length file consists only of a linefeed character cmsfs-fuse adds a space to this record since
+empty records are not supported by the CMS file system. 
+
+.SH CONFIGURATION FILES
+cmsfs-fuse uses a configuration file for automatic translation based on the file type.
+Upon startup, cmsfs-fuse evaluates the file .cmsfs-fuse/filetypes.conf in the user's home directory. If the file does not
+exist cmsfs-fuse evaluates the file /etc/cmsfs-fuse/filetypes.conf.
+
+The filetypes.conf file contains the CMS file types that are automaticaly translated to ASCII if cmsfs-fuse is started
+with the -t option. The syntax of the configuration file is one file type per line. Lines that start with a # followed by a space are treated as
+comments and are ignored. The file type is 8 characters long and must consist of valid CMS file name characters only.
+
+The default file types in the configuration file were taken from the z/VM TCPIP.DATA file
+(z/VM version 5.4.0).
+
+.SH EXAMPLES
+To mount the CMS disk with the name dasde enter:
+.br
+
+  # cmsfs-fuse /dev/dasde /mnt
+  
+.br
+To mount the CMS disk with the name dasde and enable automatic translation
+of known text files enter:
+.br
+
+  # cmsfs-fuse -t /dev/dasde /mnt
+
+To mount the CMS disk with the name dasde and enable automatic translation
+of all files to UTF-8 enter:
+.br
+
+  # cmsfs-fuse --to=UTF-8 -a /dev/dasde /mnt
+
+To unmount the CMS disk mounted on /mnt enter:
+.br
+
+  # fusermount -u /mnt
+
+To show the record format of file PROFILE.EXEC assuming the CMS disk was mounted on /mnt:
+
+  # getfattr -n user.record_format /mnt/PROFILE.EXEC
+
+The following example assumes that an empty, fixed record format file, PROFILE.EXEC, can be accessed on a CMS disk that has been mounted on /mnt. To set the record length of PROFILE.EXEC to 80 bytes:
+
+  # setfattr -n user.record_lrecl -v 80 /mnt/PROFILE.EXEC
+
+.SH SEE ALSO
+attr (5), getfattr (1), setfattr(1), iconv(1) and Linux on System z: Device Drivers, Features and Commands

@@ -1,0 +1,61 @@
+#
+# s390 dump config
+#
+# Configures the actions which should be performed after a kernel panic
+# and on PSW restart.
+#
+# The following actions are supported:
+#
+# * stop:       Stop Linux (default)
+# * dump:       Dump Linux with stand-alone dump tool
+# * vmcmd:      Issue z/VM CP commands
+# * reipl:      Re-IPL Linux using setting under /sys/firmware/reipl
+# * dump_reipl: First dump Linux with stand-alone dump tool, then re-IPL Linux
+#               using setting under /sys/firmware/reipl
+#
+
+# For the actions "reipl" and "dump_reipl" the DELAY_MINUTES keyword may
+# be used to delay the activation of dumpconf.
+# Thus potential reipl loops caused by kernel panics
+# which persistently occur early in the boot process can be prevented.
+
+# Dump on CCW device (DASD) and re-IPL after dump is complete.
+# The re-IPL device, as specified under "/sys/firmware/reipl", is used.
+# The activation of dumpconf is delayed by 5 minutes.
+#
+# ON_PANIC=dump_reipl
+# DUMP_TYPE=ccw
+# DEVICE=0.0.4e13
+# DELAY_MINUTES=5
+
+#
+# Dump on fcp device (SCSI Disk)
+#
+# ON_PANIC=dump
+# DUMP_TYPE=fcp
+# DEVICE=0.0.4711
+# WWPN=0x5005076303004711
+# LUN=0x4711000000000000
+# BOOTPROG=0
+# BR_LBA=0
+
+#
+# Use VMDUMP
+#
+# ON_PANIC=vmcmd
+# VMCMD_1="MESSAGE * Starting VMDUMP"
+# VMCMD_2="VMDUMP"
+# VMCMD_3="IPL 4711"
+
+#
+# Stop Linux (default)
+#
+# ON_PANIC=stop
+
+#
+# Re-IPL Linux
+# The re-IPL device, as specified under "/sys/firmware/reipl", is used.
+# Since the DELAY_MINUTES keyword is omitted, there is no delay and
+# dumpconf becomes active immediately during system startup.
+#
+# ON_PANIC=reipl

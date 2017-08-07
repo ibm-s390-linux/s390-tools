@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# zdev-root-update
+#   Ensure that the persistent root device configuration is put into effect.
+#   On typical distributions this requires a rebuild of the initial ram disk
+#   and the re-installation of the IPL record referencing the ram disk.
+#
+#   Parameters:
+#     zdev-root-update <devtype> <devid> [<devtype2> <devid2>...]
+#
+#     Where <devtype> is the device type as used by chzdev and <devid> is the
+#     ID of the root device.
+#
+
+TOOLNAME=$(basename $0)
+
+echo "Building initial RAM-disk"
+dracut -f || {
+	echo "${TOOLNAME}: Error: Could not build initial RAM-disk" >&2
+	exit 1
+}
+
+echo "Installing IPL record"
+zipl --noninteractive || {
+	echo "${TOOLNAME}: Error: Could not install IPL record" >&2
+	exit 1
+}
+
+exit 0

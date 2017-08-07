@@ -1,0 +1,27 @@
+# Terminal server shell (ts-shell) configuration file
+#
+# See ts-shell(1) manual page for file format syntax.
+
+
+# System and authorization settings
+# ---------------------------------
+
+# ts-system
+#	file path to the ts-systems.conf configuration file
+ts-systems = @sysconf_path@/unrestricted.conf
+
+# ts-authorization
+#	file path to the ts-authorization.conf configuration file
+ts-authorization = @sysconf_path@/ts-authorization.conf
+
+
+# Session transcript settings
+# ---------------------------
+
+# transcript-systems
+#	file path to a list of systems for which session transcript are created
+transcript-systems = @sysconf_path@/ts-audit-systems.conf
+
+# transcript-directory
+#	directory path for saving transcripts
+transcript-directory = /var/log/ts-shell

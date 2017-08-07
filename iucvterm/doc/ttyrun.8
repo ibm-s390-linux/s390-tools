@@ -1,0 +1,151 @@
+.\" ttyrun.8
+.\"
+.\"
+.\" Copyright IBM Corp. 2010, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" -------------------------------------------------------------------------
+.TH "ttyrun" "8" "December 2011" "s390-tools" "System Management Commands"
+.
+.ds s ttyrun
+.
+.
+.SH NAME
+ttyrun \- Start a program if a specified terminal device is available
+.
+.
+.
+.SH SYNOPSIS
+.B \*s
+.RB [ \-V | \-\-verbose ]
+.RB [ \-e | \-\-exitstatus
+.IR status ]
+.I term
+.I program
+.RI [ "program_options" ]
+.br
+.B \*s
+.RB [ \-h | \-\-help ]
+.br
+.B \*s
+.RB [ \-v | \-\-version ]
+.
+.
+.
+.SH DESCRIPTION
+\fB\*s\fP is typically started during system initialization and is used
+to prevent a respawn through the
+.BR init (8)
+program when a terminal is not available.
+
+\fIterm\fP is the name of the terminal device and is a path relative to
+the \f(CW/dev\fP directory, for example, specify \f(CWhvc0\fP for
+\f(CW/dev/hvc0\fP.
+.br
+If the specified terminal device can be opened, \fB\*s\fP starts the
+specified program.
+
+If the terminal device cannot be opened, the behavior of \fB\*s\fP
+depends on the \fB\-e\fP option:
+.
+.RS 2
+.IP "\(bu" 2
+If the \fB\-e\fP option has been specified, \fB\*s\fP exits with the
+specified return value, or
+.IP "\(bu" 2
+If the \fB\-e\fP option has not been specified,  \fB\*s\fP sleeps until
+it receives a signal that causes an exit.
+.RE
+.PP
+\fIprogram\fP is an absolute path to the program to be started by
+\fB\*s\fP and \fIprogram_options\fP specify additional arguments.
+Depending on the program, arguments might be required.  The variable
+\f(CW%t\fP in the \fIprogram_options\fP is resolved to the terminal
+device specified with \fIterm\fP.
+.
+.
+.
+.SH OPTIONS
+.TP
+.BR \-e ", " \-\-exitstatus\~\fIstatus\fP
+Specifies an exit status that is returned when the terminal device
+is not available.  \fIstatus\fP must be an integer in the range 1 to 255.
+
+You can use this status value in an upstart job file to prevent
+respawning.
+.
+.TP
+.BR \-V ", " \-\-verbose
+Displays syslog messages.
+.
+.TP
+.BR \-h ", " \-\-help
+Displays a short help text, then exits.
+.
+.TP
+.BR \-v ", " \-\-version
+Displays the version number of \fB\*s\fP, then exits.
+.
+.
+.
+.SH "RETURN VALUES"
+\fB\*s\fP exits with one of the following return values to report an
+error condition:
+.TP
+.B 1
+\fB\*s\fP has been started with an argument that is not valid or
+required but missing.
+.TP
+.B 2
+\fB\*s\fP could open the file specified for \fIterm\fP but the
+file is not a terminal device.
+.TP
+.B 3
+\fB\*s\fP could not start the specified program.
+.PP
+The return values 1 to 3 might also be returned when the \fB\-e\fP
+option is used and the terminal device is not available.
+.TP
+.B 4 \- 255
+The terminal device is not available and the \fB\-e\fP option
+specifies an exit status in this range.
+.
+.
+.
+.SH "EXAMPLES"
+.SS inittab
+To start \fB/sbin/agetty\fP on terminal device "hvc1", specify:
+.PP
+.ft CW
+.in +0.25in
+.nf
+h1:2345:respawn:/sbin/\*s hvc1 /sbin/agetty -L 9600 %t linux
+.fi
+.in -0.25in
+.ft
+.
+.SS upstart job/event files
+To start \fB/sbin/agetty\fP on terminal device "hvc1", add the following
+settings to the job file:
+.PP
+.ft CW
+.in +0.25in
+.nf
+respawn
+normal exit 42
+exec /sbin/\*s -e 42 hvc1 /sbin/agetty -L 9600 %t linux
+.fi
+.in -0.25in
+.ft
+.PP
+With the normal exit statement, you specify an exit status that will
+prevent upstart from respawning the program.  To prevent respawning with
+\fB\*s\fP, you must specify the same value for the \fB\-e\fP option.
+.
+.
+.
+.SH "SEE ALSO"
+.BR agetty (8),
+.BR mingetty (8),
+.BR inittab (5),
+.BR events (5)

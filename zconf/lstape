@@ -1,0 +1,429 @@
+#!/bin/bash
+#
+# lstape - Tool to show information about tape devices
+#
+# Copyright IBM Corp. 2003, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+CMD=$(basename $0)
+SG_INQ=$(type -p sg_inq)
+
+function RequireArgument() {
+	if [ $2 -eq 1 ]; then
+		echo "The $1 option requires an argument" >&2
+	else
+		echo "The $1 option requires $2 arguments" >&2
+	fi
+}
+
+function PrintUsage() {
+	cat <<-EOD | cut -c2-
+	:Usage: $(basename $0) [<options>]
+	:
+	:	<options>
+	:		-h|--help
+	:			Print this help text.
+	:		--ccw-only|--scsi-only
+	:			Limit output to CCW or SCSI devices only.
+	:		-t|--type <list of device types>
+	:			Limit output of CCW tape devices to the given
+	:			devices. The list consists of device types
+	:			separated by ','. (e.g. -t 3480,3490)
+	:		--online|--offline
+	:			Show only devices that are either online or
+	:			offline (only one option is allowed). This
+	:			option only affects CCW devices.
+	:		-s|--shortid
+	:			Show only devices on channel subsytem 0 with
+	:			subchannel set 0 and remove the leading '0.0.'
+	:			from the displayed bus id (only affects the
+	:			output of CCW devices).
+	:		-V|--verbose
+	:			Print additional information that does not fit
+	:			into a single line (only affects the output for
+	:			SCSI devices).
+	:		-v|--version
+	:			Display the version of the tools package and
+	:			the lstape command.
+	EOD
+}
+
+function PrintVersion()
+{
+	cat <<-EOD
+	$CMD: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp. 2003, 2017
+	EOD
+}
+
+FLSEP=""
+DEVLIST="3480,3490,3590"
+SHORTID=false
+SHOWCCW=true
+VERBOSE=false
+SHOWSCSI=true
+FILTERONLINE=false
+FILTEROFFLINE=false
+
+while [ $# -ne 0 ]; do
+	case $1 in
+		-h|--help)
+			PrintUsage
+			exit 0
+			;;
+		-t|--type)
+			if [ $# -lt 2 ]; then
+				RequireArgument $1 1
+				exit 1
+			fi
+			shift
+			DEVLIST="$1"
+			;;
+		--online)
+			if $FILTEROFFLINE; then
+				echo -n "Option --online and --offline " >&2
+				echo "are exclusive" >&2
+				exit 1
+			fi
+			FILTERONLINE=true
+			;;
+		--offline)
+			if $FILTERONLINE; then
+				echo -n "Option --online and --offline " >&2
+				echo "are exclusive" >&2
+				exit 1
+			fi
+			FILTEROFFLINE=true
+			;;
+		-s|--shortid)
+			SHORTID=true
+			;;
+		-v|--version)
+			PrintVersion
+			exit 0
+			;;
+		-V|--verbose)
+			VERBOSE=true;
+			;;
+		--ccw-only)
+			if ! $SHOWCCW; then
+				echo "ERROR: --ccw-only after --scsi-only!" >&2
+				exit 1
+			fi
+			SHOWSCSI=false;
+			;;
+		--scsi-only)
+			if ! $SHOWSCSI; then
+				echo "ERROR: --scsi-only after --ccw-only!" >&2
+				exit 1
+			fi
+			SHOWCCW=false
+			;;
+		-*|--*)
+			echo "$CMD: Invalid option $1" >&2
+			echo "Try 'lstape --help' for more information." >&2
+			exit 1
+			;;
+		*)
+			FILTERLIST="$FILTERLIST$FLSEP$1"
+			FLSEP=","
+			;;
+	esac
+	shift
+done
+
+function SysfsCreateListCCW() {
+	(
+		find $1/bus/ccw/drivers/tape_34xx -type l \
+			-printf '%f\n' 2>/dev/null
+		find $1/bus/ccw/drivers/tape_3590 -type l \
+			-printf '%f\n' 2>/dev/null
+	) | awk -v format="$CCWFORMAT" '
+		BEGIN{
+			medium_state_str[0] = "UNKNOWN "
+			medium_state_str[1] = "LOADED  "
+			medium_state_str[2] = "UNLOADED"
+
+			split("'$DEVLIST'", A, ",")
+			for(i = 1; i in A; i++) {
+				devlist[A[i]] = 1
+			}
+			shortid = "'$SHORTID'"=="true" ? 1 : 0
+			filteronline = "'$FILTERONLINE'"=="true" ? 1 : 0
+			filteroffline = "'$FILTEROFFLINE'"=="true" ? 1 : 0
+		}
+		function Read(file) {
+			value = ""
+			getline value <file
+			close(file)
+			return value
+		}
+		{
+			bus_id = tolower($1)
+			devdir = "'$1'/bus/ccw/devices/" bus_id
+
+			devtype      = Read(devdir "/devtype")
+			split(devtype, A, "/")
+			if (!(A[1] in devlist))
+				next
+
+			online = Read(devdir "/online")
+			if (filteronline && !online)
+				next
+			if (filteroffline && online)
+				next
+
+			cutype       = Read(devdir "/cutype")
+			majmin = Read(devdir "/non-rewinding/dev")
+			if (majmin != "") {
+				split(majmin, A, ":")
+				first_minor = A[2]
+			} else {
+				first_minor = Read(devdir "/first_minor")
+			}
+			if(first_minor == "")
+				next
+
+			if (online) {
+				medium_state = Read(devdir "/medium_state")
+				state        = Read(devdir "/state")
+				operation    = Read(devdir "/operation")
+				blocksize    = Read(devdir "/blocksize")
+				if (blocksize == 0)
+					blocksize = "auto"
+			} else {
+				state     = "OFFLINE"
+				operation = "---"
+				blocksize = "N/A"
+			}
+
+			if (shortid) {
+				if (substr(bus_id, 1, 4) != "0.0.")
+					next
+				bus_id = substr(bus_id, 5)
+			}
+
+			printf(format,
+				(online==0) ? "N/A" : first_minor / 2,
+				bus_id,
+				tolower(cutype),
+				tolower(devtype),
+				blocksize,
+				state,
+				operation,
+				(online==0) ? "N/A" : \
+					medium_state_str[medium_state])
+		}
+	' | sort 
+}
+
+function SysfsCreateListSCSI()
+{
+	for SCSI_DEV in $1/bus/scsi/devices/*:*:*:*; do
+		if [ ! -e $SCSI_DEV ]; then
+			continue
+		fi
+		TYPE=$(cat $SCSI_DEV/type)
+		case $TYPE in
+			1)
+				DEV_TYPE=tapedrv
+				DEV_NAME=IBMtape
+				;;
+			8)
+				DEV_TYPE=changer
+				DEV_NAME=IBMchanger
+				;;
+			*)
+				continue
+		esac
+		SCSI_LIST=$(ls -1d $SCSI_DEV/*)
+		SCSI_ID=$(basename $SCSI_DEV)
+		VENDOR=$(cat $SCSI_DEV/vendor)
+		MODEL=$(cat $SCSI_DEV/model)
+		STATE=$(cat $SCSI_DEV/state)
+		SG_DEV=$(echo $SCSI_DEV/scsi_generic*)
+
+		if [ -h $SG_DEV ]; then
+			# deprecated sysfs layout
+			SG_DEV=$(echo $SG_DEV | awk -F: '{print $NF}')
+		else
+			SG_DEV=$(basename $SG_DEV/*)
+		fi
+
+		if [ "$SG_INQ" != "" ]; then
+			TAPE_SERIAL=$(
+				sg_inq /dev/$SG_DEV |
+				awk '/serial/{print $NF}'
+			)
+		else
+			TAPE_SERIAL="NO/INQ"
+		fi
+
+		TAPE_DEV="N/A"
+		if [ "$(echo "$SCSI_LIST"|grep scsi_tape)" != "" ]; then
+			if [ -d $SCSI_DEV/scsi_tape ]; then
+				TAPE_IDX=$(echo $SCSI_DEV/scsi_tape/st*[0-9] |
+					   sed -e 's/.*scsi_tape\///')
+			else
+				# deprecated sysfs layout
+				TAPE_IDX=$(
+					echo "$SCSI_LIST" |
+					awk -F: '/scsi_tape\:st[0-9]+$/{print $NF}'
+				)
+			fi
+			if [ "$TAPE_IDX" != "" ]; then
+				TAPE_DEV=$TAPE_IDX
+			fi
+		elif [ "$(echo "$SCSI_LIST"|grep scsi_changer)" != "" ]; then
+			if [ -d $SCSI_DEV/scsi_changer ]; then
+				CHG_IDX=$(echo $SCSI_DEV/scsi_changer/sch*[0-9] |
+					  sed -e 's/.*scsi_changer\///')
+			else
+				# deprecated sysfs layout
+				CHG_IDX=$(
+					echo "$SCSI_LIST" |
+					awk -F: '/scsi_changer\:sch[0-9]+$/{print $NF}'
+				)
+			fi
+			if [ "$CHG_IDX" != "" ]; then
+				TAPE_DEV=$CHG_IDX
+			fi
+		elif [ -r /proc/scsi/$DEV_NAME ]; then
+			if [ "$TAPE_SERIAL" != "NO/INQ" ]; then
+				IBM_IDX=$(
+					awk '$3 == "'$TAPE_SERIAL'"{
+						print $1
+					}' /proc/scsi/$DEV_NAME
+				)
+				if [ "$IBM_IDX" != "" ]; then
+					TAPE_DEV=$DEV_NAME$IBM_IDX
+				fi
+			fi
+		fi
+
+		printf "$SCSIFORMAT" \
+			$SG_DEV \
+			$TAPE_DEV \
+			$SCSI_ID \
+			$VENDOR $MODEL \
+			$DEV_TYPE \
+			$STATE
+
+		if $VERBOSE; then
+			printf "$SCSIVFORMAT" \
+				$(cat $SCSI_DEV/hba_id) \
+				$(cat $SCSI_DEV/wwpn) \
+				$TAPE_SERIAL
+		fi
+	done
+}
+
+case $(uname -r|cut -d. -f1-2) in
+	1.*|2.[012])
+		echo "Not supported!" >&2
+		exit 1
+		;;
+	2.3|2.4)
+		SYSFS=false
+		;;
+	*)
+		SYSFS=true
+		if [ "$(cat /proc/filesystems|grep sysfs)" = "" ]; then
+			echo "WARNING: no sysfs support." >&2
+			SYSFS=false
+		fi
+		SYSFSDIR=$(cat /proc/mounts|awk '$3=="sysfs"{print $2; exit}')
+		if [ "SYSFS" = "true" -a "$SYSFSDIR" = "" ]; then
+			echo "WARNING: sysfs not mounted." >&2
+			SYSFS=false
+		fi
+		if [ "$SYSFS" = "false" -a "$SHOWCCW" = "true" ]; then
+			echo -n "WARNING: proc interface will not find offline"
+			echo " devices on kernel $(uname -r|cut -d. -f1-2)."
+			echo
+		fi
+		;;
+esac
+
+function ShowTapesCCW()
+{
+	if $SYSFS; then
+		SysfsCreateListCCW $SYSFSDIR
+	else
+		if [ ! -r /proc/tapedevices ]; then
+			echo "ERROR: neither proc nor sysfs found!" >&2
+			return 1
+		fi
+		cat /proc/tapedevices
+	fi | awk -v LIST="$FILTERLIST" '
+		BEGIN{
+			if(LIST != "")
+				split(LIST, A, ",")
+		}
+		LIST != ""{
+			for(i in A) {
+				if(index($2, A[i]) > 0) {
+					print $0
+					next
+				}
+			}
+			next
+		}
+		{
+			print $0
+		}
+	'
+}
+
+if $SHOWCCW; then
+	CCWFORMAT="%-7s %-10s %-12s %-15s %-7s %-7s %-7s %-8s\n"
+	LIST=$(ShowTapesCCW)
+
+	if [ "$LIST" = "" ]; then
+		NUMCCW=0
+	else
+		NUMCCW=$(echo "$LIST"|wc -l)
+	fi
+
+	if $SHOWSCSI; then
+		echo "FICON/ESCON tapes (found $NUMCCW):"
+	fi
+	printf "$CCWFORMAT" "TapeNo" "BusID" "CuType/Model" "DevType/Model" \
+		"BlkSize" "State" "Op" "MedState"
+	if [ $NUMCCW -gt 0 ]; then
+		echo "$LIST"
+	fi
+fi
+if $SHOWSCSI; then
+	SCSIFORMAT="%-7s %-13s %-12s %-8s %-16s %-8s %s\n"
+	SCSIVFORMAT="        %-8s      %-18s    %s\n"
+	LIST=$(SysfsCreateListSCSI $SYSFSDIR)
+
+	if [ "$LIST" = "" ]; then
+		NUMSCSI=0
+	else
+		NUMSCSI=$(echo "$LIST"|wc -l)
+		if $VERBOSE; then
+			let "NUMSCSI/=2"
+		fi
+	fi
+
+	if $SHOWCCW; then
+		echo
+		echo "SCSI tape devices (found $NUMSCSI):"
+	fi
+	printf "$SCSIFORMAT" "Generic" "Device" "Target" "Vendor" "Model" \
+		"Type" "State"
+	if $VERBOSE; then
+		printf "$SCSIVFORMAT" "HBA" "WWPN" "Serial"
+	fi
+	if [ $NUMSCSI -gt 0 ]; then
+		echo "$LIST"
+	fi
+fi
+
+exit 0
+

@@ -1,0 +1,95 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIOMON_UTIL 8 "Jul 2008" "s390-tools"
+
+.SH NAME
+ziomon_util \- monitoring tool for fcp host adapters.
+
+.SH SYNOPSIS
+.B ziomon_util
+[-h] [-v] [-V] [-Q <msgq_path> -q <msgq_id> -m <msg_id>] [-s n] [-i n] -d n -a <n> -l <lun>
+
+.SH DESCRIPTION
+.B ziomon_util
+monitors various sysfs attributes for a configurable duration.
+Output can be written to stdout or alternatively sent to a message
+queue in binary format.
+
+This command is not intended to be run on its own - rather use the ziomon command.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print help information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-V" " or " "\-\-verbose"
+Be verbose.
+
+.TP
+.BR "\-a" " or " "\-\-adapter"
+Number of the adapter to monitor. That is,
+.IR /sys/class/scsi_host/host<n>
+must exist.
+
+.TP
+.BR "\-l" " or " "\-\-lun"
+watch I/O error count of specified LUN. Specify each LUN separately in h:b:t:l format.
+That is,
+.IR /sys/bus/scsi/devices/h:b:t:l/ioerr_cnt
+must exist.
+
+.TP
+.BR "\-s" " or " "\-\-sample-length"
+Time to elapse between samples in seconds.
+
+.TP
+.BR "\-i" " or " "\-\-interval-length"
+Time to elapse between sending data in seconds. The samples will be aggregated
+over this period. Defaults to the duration.
+The interval lengh must be a multiple of the sample length.
+
+.TP
+.BR "\-d" " or " "\-\-duration"
+Overall monitoring duration in seconds.
+The duration must be a multiple of the interval length.
+
+.TP
+.BR "\-Q" " or " "\-\-msg-queue-name"
+Name for the message queue to use.
+Note that the usage of a message queue for the output requires that
+all of parameters -Q, -q and -m are specified.
+
+.TP
+.BR "\-q" " or " "\-\-msg-queue-id"
+Id for the message queue to use. Must be an integer >0.
+Note that the usage of a message queue for the output requires that
+all of parameters -Q, -q and -m are specified.
+
+.TP
+.BR "\-m" " or " "\-\-msg-id"
+Id for the messages to use when sending to a message queue.
+Must be an integer >0.
+Note that the usage of a message queue for the output requires that
+all of parameters -Q, -q and -m are specified.
+
+
+.SH EXAMPLES
+Monitor adapter 1 and the LUN at 0:0:1:2057 for 5 minutes,
+sample every 4 seconds and send the data
+every 20 seconds to a message queue. The message queue is named /tmp/ziomon.23943,
+the id is 95 and the the messages should carry the id 17:
+.br
+
+ziomon_util -s 4 -i 20 -d 300 -Q /tmp/ziomon.23943 -q 95 -m 17 -a 1 -l 0:0:1:2057 -L 18
+
+.SH "SEE ALSO"
+.BR ziomon (8),
+.BR ziomon_mgr (8),
+.BR ziomon_zfcpdd (8)

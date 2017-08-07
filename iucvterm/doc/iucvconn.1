@@ -1,0 +1,223 @@
+.\" iucvconn.1
+.\"
+.\"
+.\" Copyright IBM Corp. 2008, 2017
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.TH iucvconn "1" "March 2009" "s390-tools" "IUCV terminal applications"
+.
+.ds i \fBiucvconn\fP
+.
+.
+.
+.SH NAME
+iucvconn \- start terminal connection over z/VM IUCV
+.
+.
+.
+.SH SYNOPSIS
+.B iucvconn
+.RB [ \-h | \-\-help ]
+.br
+.B iucvconn
+.RB [ \-v | \-\-version ]
+.br
+.B iucvconn
+.RB [ \-e | \-\-escape-char
+.IR escape_char ]
+.RB [ \-s | \-\-sessionlog
+.IR log_file ]
+.I vm_guest
+.I terminal_id
+.
+.
+.
+.SH DESCRIPTION
+The \*i application establishes a terminal connection to another
+Linux instance. The Linux instance where \*i runs and the target Linux instance
+must be z/VM guest operating systems of the same z/VM instance.
+The communication path between both virtual machines is based on the z/VM
+Inter-User Communication Vehicle (IUCV).
+Because z/VM IUCV is independent from TCP/IP, Linux instances with no external
+network can be accessed.
+.PP
+\*i accesses the terminal specified by \fIterminal_id\fP on the z/VM guest
+virtual machine \fIvm_guest\fP.
+The \fIterminal_id\fP is similar to a port number in TCP/IP communications.
+.
+\fIterminal_id\fP is case-sensitive and consists of up to 8 alphanumeric
+characters. \fIterminal_id\fP must either identify a running \fBiucvtty\fP
+instance, or a terminal device provided by the z/VM IUCV hypervisor console
+(HVC) device driver.
+.
+.
+.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display a short help text, then exit.
+.
+.TP
+.BR \-v ", " \-\-version
+Display the version number of \*i, then exit.
+.
+.TP
+.BR \-e ", " \-\-escape-char\~\fIescape_char\fP
+Set an escape character for this terminal session. You need an escape character
+to access special \*i functions. The default escape character is underscore (_).
+If \fIescape_char\fP is set to "none", escaping is not possible.
+The escape character can be the closing bracket (]), the caret (^), the
+underscore (_), or any alphabetical character except C, D, Q, S and Z.
+The \fIescape_char\fP character is not case-sensitive.
+
+To invoke a \*i function, press Ctrl\^+\^\fIescape_char\fP, followed
+by the function character. For example, press "Ctrl\^+\^_ d" to disconnect the
+terminal session and exit \*i.
+
+For details, see section "ESCAPE CHARACTERS" below.
+.
+.TP
+.BR \-s ", " \-\-sessionlog\~\fIlogfile\fP
+Create a transcript of the terminal session and write session data to three
+different files.
+
+\fIlog_file\fP contains the raw terminal data stream. The
+.I log_file\fB.timing\fP
+file contains timing data that can be used for replaying the raw terminal data
+stream using realistic output delays.
+Additional terminal session information is logged to
+.IR log_file\fB.info\fP "."
+
+If any of these files already exist, \*i exits with an error. To proceed
+either delete the files or choose another file name for \fIlog_file\fP.
+.
+.
+.
+.SH "ESCAPE CHARACTERS"
+\*i supports functions through the use of an escape character.
+The default escape character (\fIescape_char\fP) is underscore (_).
+
+To enter the "escape mode" of \*i, press the Control and the \fIescape_char\fP
+key together ("Ctrl\^+\^_") In the "escape mode", \*i expects a single character
+designating the special function.
+
+The special functions are (assuming \fIescape_char\fP is set to underscore (_)):
+.RS 4
+.IP "\fBCtrl\^+\^_\fP" 8
+Send the escape character to the connected terminal.
+.IP "\fB.\fP or \fBd\fP" 8
+Disconnect and exit \*i.
+.IP "\fBr\fP" 8
+Force resizing of the connected terminal.
+.RE
+.PP
+Any other single character is ignored and is not send to the terminal. If
+multiple characters are entered together, \*i leaves the "escape mode" and sends
+the characters to the connected terminal.
+.
+.\" FIXME: change "connected terminal" to terminal
+.
+.
+.SH "EXAMPLES"
+To access the "lnxterm" terminal on the Linux instance in
+z/VM guest virtual machine LNXSYS01:
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvconn LNXSYS01 lnxterm
+.fi
+.in -0.25in
+.ft
+.PP
+To access the first z/VM IUCV HVC terminal on the Linux instance in
+z/VM guest virtual machine LNXSYS02:
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvconn LNXSYS02 lnxhvc0
+.fi
+.in -0.25in
+.ft
+.PP
+To create a transcript of the terminal session to the Linux instance in
+z/VM guest virtual machine LNXSYS99:
+.PP
+.ft CW
+.in +0.25in
+.nf
+iucvconn -s ~/transcripts/lnxsys99 LNXSYS99 lnxhvc0
+.fi
+.in -0.25in
+.ft
+.
+.
+.
+.SH ENVIRONMENT
+.TP
+.B TERM
+The terminal environment variable contains the name of the terminal
+(e.g. linux, xterm, ...) and also specifies the terminal capabilities.
+
+\*i transfers the value of the \fBTERM\fP environment variable at connection
+startup to the target system. The \fBiucvtty\fP application sets the
+\fBTERM\fP environment variable on the target system before the login program
+is started.
+Setting the \fBTERM\fP environment variable ensures that the terminal
+capabilities are the same on both sides of the connection.
+
+The z/VM IUCV hypervisor console (HVC) device driver ignores the content of
+the \fBTERM\fP environment variable transferred by \*i. See the
+.BR hvc_iucv (9)
+manual page for instructions to configure the terminal environment.
+.
+.
+.
+.SH DIAGNOSTICS
+If the Linux kernel does not include kernel support for the AF_IUCV network
+addressing family, \*i exits and displays the message
+.I 'AF_IUCV address family is not available: Address family not supported by
+.IR protocol' "."
+.
+.
+.
+.SH SECURITY
+.SS Linux
+The \*i program does not require superuser privileges and can be used by
+regular users.  Each connection attempt and failure is logged to the
+.BR authpriv
+syslog facility.
+.\".PP
+.\"Depending on the login program started by the \fBiucvtty\fP program,
+.\"the user must authenticate to the remote system.
+.PP
+Terminal session transcripts facilitate logging and auditing of terminal
+activity on remote systems or recording and playing back terminal sessions,
+for example for education and presentations.
+.
+.
+.SS z/VM guest virtual machine
+The z/VM guest virtual machine must have authorization to establish IUCV
+communication paths to other z/VM guest virtual machines.
+
+See the
+.BR af_iucv (7)
+manual page for details about IUCV authorizations.
+.
+.
+.
+.SH NOTES
+The Linux instance where \*i runs and the target Linux instances
+must be z/VM guest operating systems of the same z/VM instance.
+.
+.
+.
+.SH "SEE ALSO"
+.BR iucvtty (1),
+.BR hvc_iucv (9),
+.BR af_iucv (7),
+.BR scriptreplay (1)
+
+.I "Linux on System z - Device Drivers, Features, and Commands"

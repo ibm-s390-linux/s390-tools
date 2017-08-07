@@ -1,0 +1,97 @@
+.TH DBGINFO.SH  1 "February 2017" "s390-tools"
+
+.SH NAME
+dbginfo.sh \- collect runtime, configuration and trace information
+for debugging Linux on System z
+
+.SH SYNOPSIS
+.br
+\fBdbginfo.sh\fP [OPTIONS]
+.br
+\fBdbginfo.sh\fP {\-h|\-v}
+
+.SH DESCRIPTION
+This script collects runtime, configuration and trace information that can
+be used to debug a Linux on System z instance.
+For Linux on z/VM, the script also traces information about the z/VM system.
+The debug information is written to a file
+/tmp/DBGINFO\-<date>\-<time>\-<hostname>\-<processorid>.tgz
+where [date] and [time] are the date and time when the debug data was
+collected. [hostname] indicates the hostname of the system the data was
+collected from. The [processorid] is taken from the processor 0 and indicates
+the processor identification.
+
+.SH OPTIONS
+.TP
+\fB\-h\fP, \fB\-\-help\fP
+Print usage information, then exit.
+
+.TP
+\fB\-v\fP, \fB\-\-version\fP
+Print version information, then exit.
+
+.TP
+\fB\-d <DIRECTORY>\fP, \fB\-\-directory <DIRECTORY>\fP
+Specify the DIRECTORY where the data collection stores the temporary data and the final archive. The specified directory must already exist. If this parameter is not specified, /tmp is used by default.
+
+.SH FILES
+A .tgz file of the form
+.PP
+.nf
+.fam C
+    DBGINFO\-<year>\-<month>\-<day>\-<hours>\-<minutes>\-<seconds>\-<hostname>\-<processorid>.tgz
+
+.fam T
+.fi
+is generated and placed in the /tmp directory or in the directory specified by the -d option.
+
+.SH EXAMPLE
+Sample invocation:
+.P
+[root@host]# dbginfo.sh \-d /data\-collection
+.br
+dbginfo.sh: Debug information script version %S390_TOOLS_VERSION%
+.br
+Copyright IBM Corp. 2002, 2017
+.PP
+Hardware platform     = s390x
+.br
+Kernel version        = <kernel\-version>
+.br
+Runtime environment   = z/VM
+.PP
+1 of 11: Collecting command output
+.PP
+2 of 11: Collecting z/VM command output
+.PP
+3 of 11: Collecting procfs
+.PP
+4 of 11: Collecting sysfs
+.PP
+5 of 11: Collecting log files
+.PP
+6 of 11: Collecting config files
+.PP
+7 of 11: Collecting osa oat output skipped \- not available
+.PP
+8 of 11: Collecting OpenVSwitch output
+.PP
+9 of 11: Collecting domain xml files
+.PP
+10a of 11: Collecting docker container output
+10b of 11: Collecting docker network output
+.PP
+11 of 11: Postprocessing
+.PP
+Finalizing: Creating archive with collected data
+.PP
+Collected data was saved to:
+.br
+ >>  /data\-collection/DBGINFO\-2015\-02\-26\-21\-39\-16\-host\-012345.tgz  <<
+.SH HINTS
+Run the script with root authority.
+.br
+For Linux on z/VM, only z/VM guest virtual machines with class B privileges
+yield the complete debug information.
+.SH AUTHOR
+Linux on System z development <linux390@de.ibm.com>

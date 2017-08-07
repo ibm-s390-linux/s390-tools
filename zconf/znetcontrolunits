@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# znetcontrolunits - define some common control unit mappings
+#
+# This definitions are not intended to be used as standalone tool, but should be
+# used from other tools like a library. E.g. znetconf is one exploiter
+# of them.
+#
+# Copyright IBM Corp. 2008, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+# The arrays (among other things) should be adapted, if any of those device
+# drivers start supporting different CU types/models.
+
+readonly -a CU=(
+    1731/01
+    1731/05
+    3088/08
+    3088/1f
+    3088/1e
+    3088/60
+    1731/02
+    1731/02
+)
+#   1731/06 (OSN) is no longer supported
+
+readonly -a CU_DEVDRV=(
+    qeth
+    qeth
+    ctcm
+    ctcm
+    ctcm
+    lcs
+    qeth
+    qeth
+)
+
+# Searches for a match of argument 1 on the array $CU and sets $cu_idx
+# to the matched array index on success.
+# Returns 0 on success, 1 on failure.
+function search_cu() {
+    local scu=$1
+    local i
+    for ((i=0; i < ${#CU[@]}; i++)); do
+        if [ "$scu" == "${CU[i]}" ]; then
+            cu_idx=$i
+            return 0
+        fi
+    done
+    return 1
+}

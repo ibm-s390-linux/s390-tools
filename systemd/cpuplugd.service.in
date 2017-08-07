@@ -1,0 +1,22 @@
+#
+# Systemd unit for the CPU and memory hotplug daemon for Linux on z Systems
+#
+# Copyright IBM Corp. 2016, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=CPU hotplug daemon for Linux on System z
+Documentation=man:cpuplugd(8) man:cpuplugd.conf(5)
+After=remote-fs.target
+
+[Service]
+ExecStart=@usrsbin_path@/cpuplugd -f -c /etc/cpuplugd.conf
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

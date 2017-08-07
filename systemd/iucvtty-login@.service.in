@@ -1,0 +1,31 @@
+# Systemd unit for starting iucvtty instances.
+#
+# The instance ID corresponds to the terminal identifier for the iucvtty
+# instance.
+#
+# Copyright IBM Corp. 2014, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=iucvtty login for terminal ID %I
+Documentation=man:iucvtty(1) man:iucvconn(1) man:login(1)
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=rc-local.service
+Before=getty.target
+Conflicts=rescue.service
+IgnoreOnIsolate=yes
+
+
+[Service]
+ExecStart=-@usrbin_path@/iucvtty %I
+KillMode=process
+Restart=always
+RestartSec=0
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+[Install]
+WantedBy=getty.target

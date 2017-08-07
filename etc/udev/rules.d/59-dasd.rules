@@ -1,0 +1,35 @@
+#
+# Rules for unique DASD device nodes created in /dev/disk/
+# This file should be installed in /etc/udev/rules.d
+#
+
+SUBSYSTEM!="block", GOTO="dasd_symlinks_end"
+KERNEL!="dasd*", GOTO="dasd_symlinks_end"
+
+ACTION!="change", GOTO="dasd_block_end"
+# by-id (hardware serial number)
+KERNEL=="dasd*[!0-9]", ATTRS{status}=="online", IMPORT{program}="/sbin/dasdinfo -a -e -b $kernel"
+KERNEL=="dasd*[!0-9]", ENV{ID_SERIAL}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_SERIAL}"
+KERNEL=="dasd*[!0-9]", ENV{ID_UID}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_UID}"
+KERNEL=="dasd*[!0-9]", ENV{ID_XUID}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_XUID}"
+
+LABEL="dasd_block_end"
+
+ACTION!="change|add", GOTO="dasd_symlinks_end"
+
+# for partitions import parent information
+KERNEL=="dasd*[0-9]", IMPORT{parent}=="ID_*"
+
+KERNEL=="dasd*[0-9]", ENV{ID_SERIAL}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_SERIAL}-part%n"
+KERNEL=="dasd*[0-9]", ENV{ID_UID}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_UID}-part%n"
+KERNEL=="dasd*[0-9]", ENV{ID_XUID}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env{ID_XUID}-part%n"
+
+LABEL="dasd_symlinks_end"
+
+# on device add set request queue scheduler to deadline
+SUBSYSTEM!="block", GOTO="sched_end"
+
+ACTION!="change", GOTO="sched_end"
+KERNEL=="dasd*[!0-9]", TEST=="queue/scheduler", ATTR{queue/scheduler}="deadline"
+
+LABEL="sched_end"

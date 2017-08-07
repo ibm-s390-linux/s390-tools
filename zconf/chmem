@@ -1,0 +1,334 @@
+#!/usr/bin/perl
+#
+# chmem - Tool to change memory hotplug status
+#
+# Copyright IBM Corp. 2010, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+use strict;
+use warnings;
+use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
+use File::Basename;
+
+my $script_name = fileparse($0);
+my $online = 0;
+my $offline = 0;
+my $memdir = "/sys/devices/system/memory";
+my $block_size = 0;
+my $max_block_nr = 0;
+my $devices = {};
+my $dev_size;
+my $blocks_per_dev = 0;
+my $devs_per_block = 0;
+my $ret = 0;
+my @entries;
+
+sub chmem_usage()
+{
+	print <<HERE;
+Usage: $script_name [OPTIONS] SIZE|RANGE
+
+The $script_name command sets a particular size or range of memory online
+or offline.
+
+Specify SIZE as <size>[m|M|g|G]. With m or M, <size> specifies the memory
+size in MB (1024 x 1024 bytes). With g or G, <size> specifies the memory size
+in GB (1024 x 1024 x 1024 bytes). The default unit is MB.
+
+Specify RANGE in the form 0x<start>-0x<end> as shown in the output of the
+lsmem command. <start> is the hexadecimal address of the first byte and <end>
+is the hexadecimal address of the last byte in the memory range.
+
+SIZE and RANGE must be aligned to the Linux memory block size, as shown in
+the output of the lsmem command.
+
+OPTIONS
+    -e, --enable
+        Set the given RANGE or SIZE of memory online.
+
+    -d, --disable
+        Set the given RANGE or SIZE of memory offline.
+
+    -h, --help
+        Print a short help text, then exit.
+
+    -v, --version
+        Print the version number, then exit.
+HERE
+}
+
+sub chmem_version()
+{
+	print "$script_name: version %S390_TOOLS_VERSION%\n";
+	print "Copyright IBM Corp. 2010, 2017\n";
+}
+
+sub chmem_get_dev_size()
+{
+	my ($device, $old_device, $block, $old_block) = (0, 0, 0, 0);
+
+	foreach (@entries) {
+		$_ =~ /memory(\d+)/;
+		$block = $1;
+		$device = `cat $_/phys_device`;
+		chomp($device);
+		if ($device > $old_device) {
+			$dev_size = int((($block - $old_block) * $block_size) /
+				    ($device - $old_device));
+			last;
+		}
+		$dev_size += $block_size;
+		$old_block = $block;
+	}
+}
+
+sub chmem_online($)
+{
+	my $block = shift;
+
+	qx(echo online_movable > $memdir/memory$block/state 2>/dev/null);
+	if ($? >> 8 != 0) {
+		qx(echo online > $memdir/memory$block/state 2>/dev/null);
+	}
+	return $? >> 8;
+}
+
+sub chmem_offline($)
+{
+	my $block = shift;
+
+	qx(echo offline > $memdir/memory$block/state 2>/dev/null);
+	return $? >> 8;;
+}
+
+sub chmem_read_attr($$$)
+# parameters: state, device, block
+{
+	my @attributes = qw(state phys_device);
+	foreach (0..1) {
+		$_[$_] = `cat $memdir/memory$_[2]/$attributes[$_]`;
+		chomp($_[$_]);
+	}
+}
+
+sub chmem_read_devices()
+{
+	my $block = 0;
+	my $device = 0;
+	my $old_device = 0;
+	my $blocks = 0;
+	my $state;
+
+	foreach (@entries) {
+		$_ =~ /memory(\d+)/;
+		$block = $1;
+		chmem_read_attr($state, $device, $block);
+		if ($device != $old_device) {
+			$devices->{$old_device}->{'id'} = $old_device;
+			$devices->{$old_device}->{'blocks'} = $blocks;
+			$old_device = $device;
+			$blocks = 0;
+		}
+		if ($state eq "online") {
+			$blocks++;
+		}
+	}
+	$devices->{$old_device}->{'blocks'} = $blocks;
+	$devices->{$old_device}->{'id'} = $old_device;
+}
+
+sub chmem_dev_action($$)
+{
+	my ($dev_id, $blocks) = @_;
+	my ($start_block, $end_block, $tmp_block, $max_blocks);
+	my $state;
+	my $i = 0;
+	my $count = 0;
+
+	if ($blocks_per_dev > 0) {
+		$start_block = $dev_id * $blocks_per_dev;
+		$end_block = $start_block + $blocks_per_dev - 1;
+		$max_blocks = $blocks_per_dev;
+	} else {
+		$start_block = int($dev_id / $devs_per_block);
+		$end_block = $start_block;
+		$max_blocks = 1;
+	}
+	if ($blocks > $max_blocks) {
+		$blocks = $max_blocks;
+	}
+	while ($count < $blocks && $i < $max_blocks) {
+		$tmp_block = $online ? $start_block + $i : $end_block - $i;
+		$state = `cat $memdir/memory$tmp_block/state`;
+		chomp($state);
+		if ($offline && $state eq "online") {
+			$count++ unless chmem_offline($tmp_block);
+		}
+		if ($online && $state eq "offline") {
+			$count++ unless chmem_online($tmp_block);
+		}
+		$i++;
+	}
+	return $count;
+}
+
+sub chmem_size($)
+{
+	my $size = shift;
+	my ($blocks, $dev_blocks, $dev_id);
+
+	$blocks = int($size / $block_size);
+	if ($online) {
+		foreach my $device (sort {$b->{'blocks'} <=> $a->{'blocks'} ||
+					  $a->{'id'} <=> $b->{'id'}}
+				    values %{$devices}) {
+			$dev_blocks = $device->{'blocks'};
+			$dev_id = $device->{'id'};
+			if ($dev_blocks < $blocks_per_dev || $dev_blocks == 0) {
+				$blocks -= chmem_dev_action($dev_id, $blocks);
+				if ($blocks == 0) {
+					last;
+				}
+			}
+		}
+		if ($blocks > 0) {
+			printf(STDERR "chmem: Could only set %lu MB of memory ".
+			       "online.\n", $size - $blocks * $block_size);
+			$ret = 1;
+		}
+	} else {
+		foreach my $device (sort {$a->{'blocks'} <=> $b->{'blocks'} ||
+					  $b->{'id'} <=> $a->{'id'}}
+				    values %{$devices}) {
+			$dev_blocks = $device->{'blocks'};
+			$dev_id = $device->{'id'};
+			if ($dev_blocks > 0) {
+				$blocks -= chmem_dev_action($dev_id, $blocks);
+				if ($blocks == 0) {
+					last;
+				}
+			}
+		}
+		if ($blocks > 0) {
+			printf(STDERR "chmem: Could only set %lu MB of memory ".
+			       "offline.\n", $size - $blocks * $block_size);
+			$ret = 1;
+		}
+	}
+}
+
+sub chmem_range($$)
+{
+	my ($start, $end) = @_;
+	my $block = 0;
+	my $state;
+
+	while ($start < $end && $block < $max_block_nr) {
+		$block = int($start / ($block_size << 20));
+		$state = `cat $memdir/memory$block/state`;
+		chomp($state);
+		if ($online && $state eq "offline") {
+			if (chmem_online($block)) {
+				printf(STDERR "chmem: Could not set ".
+				       "0x%016x-0x%016x online\n", $start,
+				       $start + ($block_size << 20) - 1);
+				$ret = 1;
+			}
+		}
+		if ($offline && $state eq "online") {
+			if (chmem_offline($block)) {
+				printf(STDERR "chmem: Could not set ".
+				       "0x%016x-0x%016x offline\n", $start,
+				       $start + ($block_size << 20) - 1);
+				$ret = 1;
+			}
+		}
+		$start += $block_size << 20;
+	}
+}
+
+sub chmem_check()
+{
+	$block_size = `cat $memdir/block_size_bytes`;
+	chomp($block_size);
+	if ($block_size =~ /(?:0x)?([[:xdigit:]]+)/) {
+		$block_size = unpack("Q", pack("H16",
+				     substr("0" x 16 . $1, -16)));
+		$block_size = $block_size >> 20;
+	} else {
+		die "chmem: Unknown block size format in sysfs.\n";
+	}
+	if ($online == 0 && $offline == 0) {
+		die "chmem: Please specify one of the options -e or -d.\n";
+	}
+	if ($online == 1 && $offline == 1) {
+		die "chmem: You cannot specify both options -e and -d.\n";
+	}
+
+	chmem_get_dev_size();
+	if ($dev_size >= $block_size) {
+		$blocks_per_dev = int($dev_size / $block_size);
+	} else {
+		$devs_per_block = int($block_size / $dev_size);
+	}
+}
+
+sub chmem_action()
+{
+	my ($start, $end, $size, $unit);
+
+	if (!defined($ARGV[0])) {
+		die "chmem: Missing size or range.\n";
+	}
+	if ($ARGV[0] =~ /^0x([[:xdigit:]]+)-0x([[:xdigit:]]+)$/) {
+		$start = unpack("Q", pack("H16", substr("0" x 16 . $1, -16)));
+		$end = unpack("Q", pack("H16", substr("0" x 16 . $2, -16)));
+		if ($start % ($block_size << 20) ||
+		    ($end + 1) % ($block_size << 20)) {
+			die "chmem: Start address and (end address + 1) must ".
+			    "be aligned to memory block size ($block_size MB).\n";
+		}
+		chmem_range($start, $end);
+	} else {
+		if ($ARGV[0] =~ m/^(\d+)([mg]?)$/i) {
+			$size = $1;
+			$unit = $2 || "";
+			if ($unit =~ /g/i) {
+				$size = $size << 10;
+			}
+			if ($size % $block_size) {
+				die "chmem: Size must be aligned to memory ".
+				    "block size ($block_size MB).\n";
+			}
+			chmem_size($size);
+		} else {
+			printf(STDERR "chmem: Invalid size or range: %s\n",
+			       $ARGV[0]);
+			exit 1;
+		}
+	}
+}
+
+
+# Main
+unless (GetOptions('v|version' => sub {chmem_version(); exit 0;},
+		  'h|help'    => sub {chmem_usage(); exit 0;},
+		  'e|enable'  => \$online,
+		  'd|disable' => \$offline)) {
+	die "Try '$script_name --help' for more information.\n";
+};
+
+@entries = (sort {length($a) <=> length($b) || $a cmp $b} <$memdir/memory*>);
+if (@entries == 0) {
+	die "chmem: No memory hotplug interface in sysfs ($memdir).\n";
+}
+$entries[-1] =~ /memory(\d+)/;
+$max_block_nr = $1;
+
+chmem_read_devices();
+chmem_check();
+chmem_action();
+exit $ret;

@@ -1,0 +1,18 @@
+#
+# Rules to set an increased default max readahead size
+# This file should be installed in /etc/udev/rules.d
+#
+
+SUBSYSTEM!="block", GOTO="ra_end"
+
+ACTION!="add", GOTO="ra_change"
+# on device add set initial readahead to 512 (instead of in kernel 128)
+KERNEL=="sd*[!0-9]", WAIT_FOR="queue/read_ahead_kb", ATTR{queue/read_ahead_kb}="512"
+
+LABEL="ra_change"
+
+ACTION!="change", GOTO="ra_end"
+# on device change set initial readahead to 512 (instead of in kernel 128)
+KERNEL=="dasd*[!0-9]", TEST=="queue/read_ahead_kb", ATTR{queue/read_ahead_kb}="512"
+
+LABEL="ra_end"

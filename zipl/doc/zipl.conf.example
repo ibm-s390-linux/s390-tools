@@ -1,0 +1,29 @@
+# This is an example zipl.conf file.
+#
+# See the zipl.conf man page and the Device Drivers Book
+# available at IBM's Developerworks page for more details.
+#
+
+[defaultboot]
+default = linux
+
+[linux]
+target     = "/boot"
+image      = "/boot/image"
+parameters = "root=/dev/dasd/????/part1 ro noinitrd"
+
+[customized]
+target     = "/boot"
+image      = "/boot/image-customized"
+parmfile   = "/boot/parmfile-customized"
+
+[dump]
+target     = "/boot"
+dumpto     = "/dev/dasd/????/part1"
+
+:menu1
+target     = "/boot"
+1          = linux
+2          = customized
+default    = 1
+

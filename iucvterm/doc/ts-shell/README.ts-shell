@@ -1,0 +1,126 @@
+Terminal server setup
+=====================
+
+This README file provides additional information for configuring
+a terminal server.
+
+
+
+Installation overview
+---------------------
+The s390-tools package installs the ts-shell(1) program along with
+a set of configuration files in `/etc/iucvterm`.
+
+The ts-shell program is pre-configured to connect to any other z/VM
+guest virtual machines (if the z/VM guest virtual machine has the
+respective IUCV authorizations).
+The administrator can change the ts-shell configuration to restrict
+connections to particular z/VM guest virtual machines only.
+
+There are no user authorizations by default. The administrator must
+edit `/etc/iucvterm/ts-authorization.conf` to assign authorizations.
+See the manual page for ts-shell(1) and the `authorization-sample.conf`
+file in the documentation directory for configuration examples.
+
+In addition, the documentation directory also contains the
+iucvconn_on_login sample program that is an alternative to ts-shell.
+
+
+
+
+Setup considerations for the terminal server shell (ts-shell)
+-------------------------------------------------------------
+Adding new ts-shell users
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The ts-shell installation creates a system group ts-shell.
+If you intend to use ts-shell as a login shell for users, ensure that
+these users are all members of ts-shell.  To add existing users to
+group ts-shell, use +usermod -G ts-shell 'username'+.
+
+The ts-shell configuration files and `/var/log/ts-shell` are
+readable only by members of the *ts-shell* group.
+
+
+Enabling terminal session transcripts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ts-shell(1) can be configured to create transcripts of terminal sessions
+to particular z/VM guest virtual machines. The transcripts are written
+to log files in the `/var/log/ts-shell` directory.
+
+NOTE:	The `/var/log/ts-shell` directory permission has the
+	set-group-ID bit set. Sub-directories that are created by
+	different users will inherit the group ownership of the
+	`/var/log/ts-shell` directory.
+
+See the ts-shell(1) manual page for more information about terminal
+session transcripts.
+
+
+Setting up command completion (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*ts-shell* supports completion for commands and, if possible, for
+z/VM guest virtual machines. The completion is triggered using the
+'Tab' key. Command completion is an optional feature.
+
+To enable command completion, install one of the following Perl
+ReadLine libraries:
+
+- Term::ReadLine::Gnu
+- Term::ReadLine::Perl
+
+Check your Linux distribution for packages that provide these Perl
+ReadLine interfaces.
+
+
+
+
+Setup a terminal server using the iucvconn_on_login program
+-----------------------------------------------------------
+*iucvconn_on_login* is a sample script that uses the iucvconn(1)
+program to establish an IUCV terminal connection to a Linux
+instance that runs as z/VM guest operating system.
+
+It can be used as an alternative to set up a terminal server.
+The idea of iucvconn_on_login is to establish a terminal connection
+at login time.
+The z/VM guest virtual machine to which iucvconn_on_login will
+connect is the name of the Linux user that logs in.
+
+For example, if you log in as Linux user "lxguest1", iucvconn_on_login
+is started and establishes a terminal connection to the z/VM guest
+virtual machine lxguest1.
+
+
+Adding new users for z/VM guest virtual machines
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To set up a terminal server using the iucvconn_on_login program,
+create a new Linux user for each z/VM guest virtual machine using
+the z/VM user ID as name. Set the login shell of those users to
+*iucvconn_on_login*.
+
+NOTE:	User names are case-sensitive in Linux.	To ensure consistency,
+	always use either lower or upper case characters for your
+	user names.
+
+To create a new user for z/VM guest virtual machine LXGUEST1
+----
+useradd -s /usr/bin/iucvconn_on_login lxguest1
+----
+
+If you log in as user 'lxguest1' on the terminal server (for example
+using ssh(1)), *iucvconn_on_login* immediately establishes the terminal
+connection to the z/VM virtual guest virtual machine 'lxguest1'.
+
+To access the default terminal ('lnxhvc0') on the Linux instance in
+z/VM guest virtual machine LXGUEST1
+----
+ssh lxguest1@terminal.server
+----
+To access the terminal 'lnxterm' on the Linux instance in
+z/VM guest virtual machine LXGUEST1
+----
+ssh -t lxguest1@terminal.server lnxterm
+----
+For ssh(1), you must use the "-t" parameter if you want to specify an
+alternate terminal identifier. The "-t" parameter ensures that ssh
+starts iucvconn_on_login on a terminal.

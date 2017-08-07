@@ -1,0 +1,39 @@
+#
+# Systemd unit for mon_procd (monitor z/VM guest processes)
+#
+# Copyright IBM Corp. 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=Monitor Linux on z/VM processes
+Documentation=man:mon_procd(8)
+ConditionVirtualization=zvm
+After=remote-fs.target
+
+[Service]
+#
+# Specify a file with the environment variables using the EnvironmentFile=
+# service property.
+#
+EnvironmentFile=/etc/sysconfig/mon_procd
+#
+# Alternatively, you can specify the environment variables directly,
+# using the Environment= service property, which can be overridden by
+# "systemctl edit --full mon_procd".
+# In this case, the EnvironmentFile= needs to be commented out, otherwise
+# it would override the directly specified variables.
+#
+#Environment=PROC_INTERVAL=30
+
+ExecStartPre=-/sbin/modprobe monwriter
+ExecStartPre=/sbin/udevadm settle --timeout=10
+ExecStart=@usrsbin_path@/mon_procd -a -i $PROC_INTERVAL
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
