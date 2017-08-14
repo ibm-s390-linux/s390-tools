@@ -170,6 +170,10 @@ sub get_lun_hash
 sub lsluns_usage {
     print <<EOD;
 Usage:
+This tool is designed for environments where all SCSI devices are attached
+through the zfcp device driver. Expect error messages in mixed environments
+such as with iSCSI.
+
 $PROGRAM_NAME [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
 
     List LUNs discovered in the Fibre Channel (FC) Storage Area Network (SAN).

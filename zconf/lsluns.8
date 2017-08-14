@@ -4,8 +4,8 @@
 .\"
 .TH LSLUNS 8 "2017-02-17" "s390-tools"
 .SH NAME
-lsluns \- list LUNs discovered in the FC SAN, or show encryption state of
-attached LUNs
+lsluns \- list LUNs discovered in the FC SAN through zfcp, or show encryption state of
+zfcp-attached LUNs
 
 .SH SYNOPSIS
 .B lsluns
@@ -28,6 +28,10 @@ attached LUNs
 
 .SH DESCRIPTION
 .PP
+This tool is designed for environments where all SCSI devices are attached
+through the zfcp device driver. Expect error messages in mixed environments
+such as with iSCSI.
+
 .B lsluns
 lists all logical unit numbers (LUNs) discovered in the
 Fibre Channel (FC) Storage Area Network (SAN).
