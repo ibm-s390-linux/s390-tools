@@ -1,0 +1,46 @@
+# Sample Makefile to produce a pxe-style netboot image
+# matching the currently active kernel.
+# If the image is to be build for a different kernel version
+# the KERNEL_VERSION variable must be overridden
+# To use a local busybox installation, change BBINSTALL
+# to point to the local busybox install path
+
+ifeq ("$(KERNEL_VERSION)","")
+KERNEL_VERSION=$(shell uname -r)
+endif
+export KERNEL_VERSION
+
+filetype=$(shell file $1 | grep "Linux S390")
+s390_check=$(if $(call filetype,$1), $1)
+prefixes=image vmlinux vmlinuz
+kernel_images=$(foreach prefix, $(prefixes), \
+			$(call s390_check,/boot/$(prefix)-$(KERNEL_VERSION)))
+KERNEL_IMAGE=$(firstword $(kernel_images))
+
+ifeq ($(KERNEL_IMAGE),)
+$(error Could not find a kernel image under /boot)
+endif
+
+BUSYBOX=busybox-1.27.1
+BBINSTALL=$(BUSYBOX)/_install
+
+all: $(KERNEL_IMAGE) pxelinux.initramfs
+	/bin/bash mk-s390image $(KERNEL_IMAGE) pxelinux.0 -r pxelinux.initramfs
+
+pxelinux.initramfs: $(BBINSTALL)
+	/bin/bash mk-pxelinux-ramfs -b $< -k $(KERNEL_VERSION) $@
+
+$(BUSYBOX)/_install:
+	wget https://busybox.net/downloads/$(BUSYBOX).tar.bz2
+	tar xjf $(BUSYBOX).tar.bz2
+	make -C $(BUSYBOX) defconfig
+	make -C $(BUSYBOX) install
+
+install:
+
+clean:
+	$(RM) pxelinux.0 pxelinux.initramfs $(BUSYBOX).tar.bz2
+	$(RM) -r $(BUSYBOX)
+
+.PHONY: all install clean
+

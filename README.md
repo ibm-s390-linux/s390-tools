@@ -234,6 +234,10 @@ Package contents
    arbitrary files. It works even when the size of the actual file content
    is not known beforehand (e.g. FIFOs, sysfs files).
 
+ * netboot:
+   Provides simple tools to create a binary that can be used to implement
+   simple network boot setups following the PXELINUX conventions.
+
 For more information refer to the following publications:
 
   * "Device Drivers, Features, and Commands" chapter "Useful Linux commands"

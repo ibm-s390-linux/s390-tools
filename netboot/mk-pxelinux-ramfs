@@ -1,0 +1,402 @@
+#!/bin/bash
+#
+# netboot - PXE-style boot for KVM on s390
+#
+# Sample script to build an initramfs image suitable for performing a
+# PXELINUX-style boot for KVM guests from a DHCP/BOOTP Server.
+# Has to be executed on the KVM host where it will be deployed and needs
+# to be re-run after kernel updates on the host, unless the virtio
+# drivers are statically built into the host kernel.
+#
+# The script requires a busybox install tree, e.g. resulting from a build
+# from source, after make defconfig && make install
+#
+# To keep things simple, we don't include udev but use devtmpfs
+# which means the host kernel must have been built with CONFIG_DEVTMPFS=y
+#
+# Sample invocation:
+#
+# ./mk-pxelinux-ramfs -b /downloads/busyboxdir pxelinux.initramfs
+#
+# Copyright IBM Corp. 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+
+# Variables
+cmd=$(basename $0)
+busyboxdir=
+builddir=
+initramfs=
+success=no
+
+# Cleanup on exit
+cleanup()
+{
+	if [ -n $builddir ]
+	then
+		rm -rf $builddir
+	fi
+}
+trap cleanup EXIT
+
+# Usage
+usage()
+{
+cat <<-EOF
+Usage: $cmd -b BUSYBOX_DIR [-k KERNEL_VERSION] INITRAMFS_FILE
+
+Build a PXELINUX style boot initramfs INITRAMFS_FILE using a busybox installed
+in BUSYBOX_DIR and kernel modules from the currently running kernel or from
+the kernel version specified with the '-k KERNEL_VERSION' option.
+
+OPTIONS
+-b        Search installed busybox in directory BUSYBOX_DIR
+-k        Use KERNEL_VERSION instead of currently running kernel
+-h        Print this help, then exit
+EOF
+}
+
+# Get shared objects for binary
+sharedobjs()
+{
+	ldd $1 | sed -e 's?[^/]*??' -e 's/(.*)//'
+}
+
+# Check args
+args=$(getopt b:k:h $*)
+if [ $? = 0 ]
+then
+	set -- $args
+	while [ -n $1 ]
+	do
+		case $1 in
+			-b) busyboxdir=$2; shift 2;;
+			-k) kernelversion=$2; shift 2;;
+		        -h) usage; exit 0;;
+		        --) shift; break;;
+		        *) echo "$cmd: Unexpected argument $1, exiting..." >&2; exit 1;;
+		esac
+	done
+fi
+
+if [ $# != 1 -o "$busyboxdir" = "" ]
+then
+	usage >&2
+	exit 1
+fi
+
+# Full output file path
+initramfs=$(readlink -m $(dirname $1))/$(basename $1)
+
+# Exit on error
+set -e
+
+# Module locations
+if [ -n $kernelversion ]; then
+	moddir=/lib/modules/$kernelversion
+else
+	moddir=/lib/modules/$(uname -r)
+fi
+netdir=$moddir/kernel/drivers/net
+blkdir=$moddir/kernel/drivers/block
+
+# Setup build directory
+builddir=$(mktemp -d)
+echo "$cmd: Building in $builddir"
+
+ramfsdirs="/bin /dev /etc /lib64 /lib /mnt /proc /run /sbin /sys /tmp /usr /var"
+for d in $ramfsdirs
+do
+	mkdir -p $builddir/$d
+done
+
+# Kexec
+echo "$cmd: Copying kexec"
+
+# Install both binary and required shared libraries
+OLDPATH=$PATH
+PATH=$OLDPATH:/sbin:/usr/sbin
+kexec_bin=$(which kexec)
+kexec_sos=$(sharedobjs $kexec_bin)
+PATH=$OLDPATH
+
+cp $kexec_bin $builddir/sbin
+for so in $kexec_sos
+do
+	mkdir -p $builddir/$(dirname $so)
+	cp $so $builddir/$(dirname $so)
+done
+
+# virtio module(s), if present
+echo "$cmd: Copying virtio modules"
+
+mkdir -p $builddir/$netdir
+mkdir -p $builddir/$blkdir
+set +e
+cp $netdir/virtio_net.ko $builddir/$netdir 2> /dev/null
+cp $blkdir/virtio_blk.ko $builddir/$blkdir 2> /dev/null
+set -e
+
+# Busybox (+ dependencies)
+echo "$cmd: Copying busybox files"
+
+cp -a $busyboxdir/* $builddir
+busybox_sos=$(sharedobjs $busyboxdir/bin/busybox)
+for so in $busybox_sos
+do
+	mkdir -p $builddir/$(dirname $so)
+	cp $so $builddir/$(dirname $so)
+done
+
+# ad_packet module(s), if present
+echo "$cmd: Copying af_packet modules"
+
+packetdir=$moddir/kernel/net/packet
+mkdir -p $builddir/$packetdir
+set +e
+cp $packetdir/* $builddir/$packetdir 2> /dev/null
+set -e
+
+# Init script
+echo "$cmd: Making init script"
+
+# --- begin init script
+cat <<'EOF' > $builddir/init
+#!/bin/sh
+/bin/mount -t devtmpfs none /dev
+/bin/mount -t proc none /proc
+/bin/mount -t sysfs none /sys
+/bin/mount -t tmpfs none /run
+
+/sbin/modprobe virtio_net
+/sbin/udhcpc -O pxeconffile -O pxepathprefix &
+
+while true
+do
+	/sbin/pxeboot.script
+	/bin/sleep 1
+done
+EOF
+# --- end init script
+chmod +x $builddir/init
+
+# udhcpc script
+echo "$cmd: Making DHCP script"
+
+mkdir -p $builddir/usr/share/udhcpc
+# -- begin dhcp script
+cat <<'EOF' > $builddir/usr/share/udhcpc/default.script
+#!/bin/sh
+# Setup name resolution and PXE boot configuration
+# called by udhcpc
+
+RESOLVCONF="/etc/resolv.conf"
+PXECONF="/etc/pxe.conf"
+
+ccidr()
+{
+    # clumsy netmask to cidr transformation
+    # with minimal sanity checking
+    OLDIFS=$IFS
+    IFS=.
+    c=0
+    n=4
+    for i in $1
+    do
+	n=$(/usr/bin/expr $n - 1)
+	case $i in
+	    255) c=$(/usr/bin/expr $c + 8);;
+	    254) c=$(/usr/bin/expr $c + 7); break;;
+	    252) c=$(/usr/bin/expr $c + 6); break;;
+	    248) c=$(/usr/bin/expr $c + 5); break;;
+	    240) c=$(/usr/bin/expr $c + 4); break;;
+	    224) c=$(/usr/bin/expr $c + 3); break;;
+	    192) c=$(/usr/bin/expr $c + 2); break;;
+	    128) c=$(/usr/bin/expr $c + 1); break;;
+	    0) break;;
+	    *) c=0; break;;
+	esac
+	if [ $n = 0 ]
+	then
+	    break
+	fi
+    done
+    IFS=$OLDIFS
+    echo $c
+}
+
+echo "DHCP response $1: "
+case "$1" in
+    deconfig)
+	echo " interface: $interface"
+	/sbin/ip route flush table all
+	/sbin/ip addr flush $interface
+	/sbin/ip link set $interface up
+	/bin/rm -f $PXECONF $RESOLVCONF
+	;;
+
+    renew|bound)
+	echo " interface: $interface $ip $subnet"
+	echo " router: $router"
+	echo " domain: $domain $dns"
+	echo " tftp: $siaddr"
+	# flush routes
+	/sbin/ip route flush table all
+	# setup if link
+	/sbin/ip addr flush $interface
+	/sbin/ip link set $interface up
+	# setup if addr
+	if [ -n "$subnet" ]
+	then
+	    maskedip="$ip"/$(ccidr $subnet)
+	else
+	    maskedip="ip"
+	fi
+	/sbin/ip addr add $maskedip broadcast $broadcast dev $interface
+	# setup default routes
+	if [ -n "$router" ]
+	then
+		/sbin/ip route add default via $router
+	fi
+
+	# setup resolv.conf
+	if [ -n "$domain" ]
+	then
+	    echo "search $domain" > $RESOLVCONF
+	    for i in $dns
+	    do
+		echo " nameserver $i" >> $RESOLVCONF
+	    done
+	fi
+
+	# pxe control
+	if [ -n  "$siaddr" ]
+	then
+	    echo "siaddr=$siaddr" > $PXECONF
+	    echo "interface=$interface" >> $PXECONF
+	    echo "ip=$ip" >> $PXECONF
+	fi
+	;;
+
+    nak)
+	;;
+    *)
+	exit 1
+	;;
+esac
+
+exit 0
+
+EOF
+# -- end dhcp script
+chmod +x $builddir/usr/share/udhcpc/default.script
+
+# pxeboot script
+echo "$cmd: Making PXE boot script"
+
+# -- begin pxeboot script
+cat <<'EOF' > $builddir/sbin/pxeboot.script
+#!/bin/sh
+# Perform a PXE style boot using kexec
+# Supports only super-simple config files
+
+set -e
+
+# Source the DHCP-generated TFTP info
+# Currently we are just looking for siaddr
+PXE_CONF=/etc/pxe.conf
+if [ -f  $PXE_CONF ]
+then
+    . $PXE_CONF
+else
+    echo waiting for PXE configuration
+    exit
+fi
+
+# Retrieve the config (default only for now)
+CONFIGS=""
+if [ -n "$siaddr" ];
+then
+    # Enable UUID based config on s390
+    if [ $(/bin/uname -m) = "s390x" ]
+    then
+	set +e
+	uuid=$(/bin/grep UUID /proc/sysinfo | tail -1 | tr -d ' ' | cut -d ':' -f 2) 2> /dev/null
+	set -e
+    else
+	# not caring for other arches right now
+	uuid=""
+    fi
+    CONFIGS="$CONFIGS $uuid"
+
+    # Enable MAC based config
+    ifaddr=$(/bin/cat /sys/class/net/$interface/address | tr ':' '-')
+    CONFIGS="$CONFIGS 01-$ifaddr"
+
+    # Enable IP based config
+    iphex=$(printf %02X $(echo $ip | tr '.' ' '))
+    for i in 8 7 6 5 4 3 2 1
+    do
+	CONFIGS="$CONFIGS $(echo $iphex | cut -c 1-$i)"
+    done
+
+    # Finally enable default config
+    CONFIGS="$CONFIGS default"
+
+    set +e
+    for c in $CONFIGS
+    do
+	if /usr/bin/tftp -g -l /tmp/config -r pxelinux.cfg/$c $siaddr
+	then
+	    break
+	fi
+    done
+fi
+
+if [ ! -f /tmp/config ]
+then
+    echo no config found
+    exit
+fi
+
+# Simple config file parsing, only one entry allowed
+kernel=$(/bin/grep "^[[:space:]]*kernel" /tmp/config | sed "s/^[[:space:]]*kernel[[:space:]]*//")
+initrd=$(/bin/grep "^[[:space:]]*initrd" /tmp/config | sed "s/^[[:space:]]*initrd[[:space:]]*//")
+append=$(/bin/grep "^[[:space:]]*append" /tmp/config | sed "s/^[[:space:]]*append[[:space:]]*//")
+
+if [ -z "$kernel" ]
+then
+    echo no kernel statement found in config
+    exit
+else
+    /usr/bin/tftp -g -l /tmp/kernel -r $kernel $siaddr
+fi
+
+if [ -n "$initrd" ]
+then
+    /usr/bin/tftp -g -l /tmp/initrd -r $initrd $siaddr
+    INITRD="--initrd=/tmp/initrd"
+else
+    INITRD=""
+fi
+
+if [ -n "$append" ]
+then
+    APPEND="--append=$append"
+else
+    APPEND=""
+fi
+
+kexec -l /tmp/kernel $INITRD $APPEND
+kexec -e
+EOF
+# -- end pxeboot script
+chmod +x $builddir/sbin/pxeboot.script
+
+# The final initramfs
+echo Building initramfs
+
+cd $builddir
+find . | cpio -o -Hnewc | gzip - > $initramfs
+cd $OLDPWD

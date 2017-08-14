@@ -1,0 +1,171 @@
+#!/bin/bash
+#
+# netboot - PXE-style boot for KVM on s390
+#
+# Sample script to build a single s390 boot image consisting of
+# kernel, an initial ramdisk and kernel parameters from
+# individual components. Note that bash is required to run this script!
+#
+# Sample invocation:
+#
+# ./mk-s390image /boot/image -r /boot/initrd image
+#
+# The resulting image can be used to build a bootable
+# ISO or as firmware image for KVM.
+#
+# Copyright IBM Corp. 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+
+# Offsets
+OFFS_INITRD_START_BYTES=66568
+OFFS_INITRD_SIZE_BYTES=66576
+OFFS_COMMANDLINE_BYTES=66688
+MAX_PARMFILE_SIZE=896
+
+# Variables
+cmd=$(basename $0)
+kernel=
+ramdisk=
+parmfile=
+image=
+binval=
+success=no
+
+# Cleanup on exit
+cleanup()
+{
+	if [ -n "$binval" ]
+	then
+		rm -f $binval
+	fi
+	if [ -n "$image" -a $success = no ]
+	then
+		rm $image
+	fi
+}
+trap cleanup EXIT
+
+# Usage
+usage()
+{
+cat <<-EOF
+Usage: $cmd KERNEL BOOT_IMAGE [-r RAMDISK] [-p PARMFILE]
+
+Build an s390 image BOOT_IMAGE suitable for CD/tape/network boot or as a
+KVM firmware image using a stripped Linux kernel file KERNEL.
+
+OPTIONS
+-p        Use PARMFILE with kernel parameters in the image
+-r        Include RAMDISK in the image
+-h        Print this help, then exit
+EOF
+}
+
+# Convert decimal number to big endian doubleword
+dec2be64()
+{
+	local num=$1
+	local b
+	local i
+	for i in $(seq 1 8)
+	do
+		b="\\x$(printf '%x' $(expr $num % 256))$b"
+		num=$(expr $num / 256) || true
+	done
+	printf $b
+}
+
+# Do the image build
+dobuild()
+{
+	local i
+	local kernel_size
+	local ramdisk_size
+	local ramdisk_offset
+	local parmfile_size
+	# check whether all specified files exist
+	for i in $kernel $ramdisk $parmfile
+	do
+	if [ ! -f $i ]
+	then
+		echo "$cmd: File $i not found" >&2
+		return 1
+	fi
+	done
+	if ! file -b $(readlink -f $kernel) | grep "Linux S390" > /dev/null
+	then
+		echo "$cmd: Unrecognized file format for $kernel" >&2
+		return 1
+	fi
+
+	# from now on we SHOULD only fail on disk shortage
+	# or file permissions, let the shell handle that
+	set -e
+
+	# copy over kernel padded with zeroes to page boundary
+	dd if=$kernel of=$image bs=4096 conv=sync status=none
+
+	# append ramdisk if specified
+	if [ "$ramdisk" != "" ]
+	then
+		ramdisk_size=$(du -b $ramdisk | cut -f1)
+		kernel_size=$(du -b $kernel | cut -f1)
+		ramdisk_offset=$(du -b $image | cut -f1)
+		cat $ramdisk >> $image
+		binval=$(mktemp)
+		dec2be64 $ramdisk_offset > $binval
+		dd seek=$OFFS_INITRD_START_BYTES if=$binval of=$image bs=1 \
+			count=8 conv=notrunc status=none
+		dec2be64 $ramdisk_size > $binval
+		dd seek=$OFFS_INITRD_SIZE_BYTES if=$binval of=$image bs=1 \
+			count=8 conv=notrunc status=none
+	fi
+
+	# set cmdline
+	if [ "$parmfile" != "" ]
+	then
+		parmfile_size=$(du -b $parmfile | cut -f1)
+		if [ $parmfile_size -le $MAX_PARMFILE_SIZE ]
+		then
+			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 if=$parmfile \
+			    of=$image conv=notrunc status=none
+		else
+			echo "$cmd: Size $parmfile_size of $parmfile exceeds command line limit of $MAX_PARMFILE_SIZE" >&2
+			return 1
+		fi
+	fi
+
+	# we've done it
+	success=yes
+}
+
+# check args and build
+args=$(getopt "r:p:h" $*)
+if [ $? = 0 ]
+then
+	set -- $args
+	while [ $1 != "" ]
+	do
+		case $1 in
+			-r) ramdisk=$2; shift 2;;
+			-p) parmfile=$2; shift 2;;
+			-h) usage; exit 0;;
+			--) shift; break;;
+			*) echo "$cmd: Unexpected argument $1, exiting..." >&2; exit 1;;
+		esac
+	done
+fi
+
+if [ $# = 2 ]
+then
+	kernel=$1
+	image=$2
+	dobuild
+	exit 0
+fi
+
+# something wasn't right
+usage >&2
+exit 1
