@@ -1,7 +1,7 @@
 include ../common.mak
 
 CPPFLAGS += -I../include
-LDFLAGS += -ldl
+LDLIBS += -ldl
 
 all: zkey
 
