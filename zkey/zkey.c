@@ -1108,6 +1108,8 @@ int main(int argc, char *argv[])
 			goto out;
 	}
 
+	umask(S_IRWXG|S_IRWXO);
+
 	rc = command->function(keyfile);
 
 out:
