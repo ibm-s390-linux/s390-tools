@@ -718,7 +718,6 @@ static int key_token_change(u8 *secure_key, unsigned int secure_key_size,
 }
 
 static int validate_secure_xts_key(u8 *secure_key, size_t secure_key_size,
-				   u16 part1_cardnr, u16 part1_domain,
 				   u16 part1_keysize, u32 part1_attributes,
 				   size_t *clear_key_bitsize)
 {
@@ -762,18 +761,6 @@ static int validate_secure_xts_key(u8 *secure_key, size_t secure_key_size,
 
 	if ((verifykey.attributes & PKEY_VERIFY_ATTR_AES) == 0) {
 		pr_verbose("Secure key is not an AES key");
-		return EXIT_FAILURE;
-	}
-
-	if (verifykey.cardnr != part1_cardnr) {
-		pr_verbose("XTS secure key contains 2 keys using different "
-			   "cards");
-		return EXIT_FAILURE;
-	}
-
-	if (verifykey.domain != part1_domain) {
-		pr_verbose("XTS secure key contains 2 keys using different "
-			   "domains");
 		return EXIT_FAILURE;
 	}
 
@@ -827,8 +814,6 @@ static int validate_secure_key(u8 *secure_key, size_t secure_key_size,
 	/* XTS uses 2 secure key tokens concatenated to each other */
 	if (secure_key_size > SECURE_KEY_SIZE) {
 		rc = validate_secure_xts_key(secure_key, secure_key_size,
-					     verifykey.cardnr,
-					     verifykey.domain,
 					     verifykey.keysize,
 					     verifykey.attributes,
 					     clear_key_bitsize);
