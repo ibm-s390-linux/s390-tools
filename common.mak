@@ -4,8 +4,8 @@ COMMON_INCLUDED = true
 # Global definitions
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
-VERSION            = 1
-RELEASE            = 39
+VERSION            = 2
+RELEASE            = 0
 PATCHLEVEL         = 0
 DISTRELEASE        = build-$(shell date +%Y%m%d)
 S390_TOOLS_RELEASE = $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)

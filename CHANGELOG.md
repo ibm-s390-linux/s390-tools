@@ -1,7 +1,7 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.0.0 (2017-08-xx)__
+* __v2.0.0 (2017-08-21)__
 
   - Publish package under the MIT license with the same contents as
     the already available s390-tools-1.39.0
