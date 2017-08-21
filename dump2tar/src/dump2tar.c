@@ -47,7 +47,7 @@ static const struct util_prg dump2tar_prg = {
 		"in uncompressed tar format.",
 	.args = "SPECS",
 	.copyright_vec = {
-		{ "IBM Corp.", 2016, 2016 },
+		{ "IBM Corp.", 2016, 2017 },
 		UTIL_PRG_COPYRIGHT_END
 	},
 };

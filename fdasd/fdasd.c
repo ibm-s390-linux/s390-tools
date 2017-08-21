@@ -130,7 +130,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2001,
-			.pub_last = 2011,
+			.pub_last = 2017,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
