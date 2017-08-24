@@ -138,7 +138,7 @@ static struct util_opt opt_vec[] = {
  */
 struct zkey_command {
 	char *command;
-	unsigned int abrev_len;
+	unsigned int abbrev_len;
 	int (*function)(const char *keyfile);
 	int need_cca_library;
 	int need_pkey_device;
@@ -154,7 +154,7 @@ static int command_validate(const char *keyfile);
 static struct zkey_command zkey_commands[] = {
 	{
 		.command = COMMAND_GENERATE,
-		.abrev_len = 3,
+		.abbrev_len = 3,
 		.function = command_generate,
 		.need_pkey_device = 1,
 		.short_desc = "Generate a secure AES key",
@@ -164,7 +164,7 @@ static struct zkey_command zkey_commands[] = {
 	},
 	{
 		.command = COMMAND_REENCIPHER,
-		.abrev_len = 2,
+		.abbrev_len = 2,
 		.function = command_reencipher,
 		.need_cca_library = 1,
 		.need_pkey_device = 1,
@@ -175,7 +175,7 @@ static struct zkey_command zkey_commands[] = {
 	},
 	{
 		.command = COMMAND_VALIDATE,
-		.abrev_len = 3,
+		.abbrev_len = 3,
 		.function = command_validate,
 		.need_pkey_device = 1,
 		.short_desc = "Validate an existing secure AES key",
@@ -197,7 +197,7 @@ static void print_usage_command(const struct zkey_command *command)
 	unsigned int i;
 
 	strncpy(command_str, command->command, sizeof(command_str) - 1);
-	for (i = 0; i < command->abrev_len; i++)
+	for (i = 0; i < command->abbrev_len; i++)
 		command_str[i] = toupper(command_str[i]);
 
 	printf("Usage: %s %s SECURE-KEY-FILE",
@@ -223,7 +223,7 @@ static void print_usage_command_list(void)
 	printf("COMMANDS\n");
 	while (cmd->command) {
 		strcpy(command_str, cmd->command);
-		for (i = 0; i < cmd->abrev_len; i++)
+		for (i = 0; i < cmd->abbrev_len; i++)
 			command_str[i] = toupper(command_str[i]);
 		printf("  %s\t%s\n", command_str, cmd->short_desc);
 		cmd++;
@@ -959,7 +959,7 @@ static bool is_command(struct zkey_command *command, const char *str)
 
 	util_assert(sizeof(command_str) > strlen(command->command),
 		    "Buffer 'command_str' too small for %s", command->command);
-	if (str_len < command->abrev_len)
+	if (str_len < command->abbrev_len)
 		return false;
 	if (str_len > strlen(command->command))
 		return false;
