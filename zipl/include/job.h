@@ -13,6 +13,8 @@
 #ifndef JOB_H
 #define JOB_H
 
+#include <stdbool.h>
+
 #include "disk.h"
 #include "zipl.h"
 
@@ -47,6 +49,8 @@ struct job_ipl_data {
 	address_t parm_addr;
 	address_t ramdisk_addr;
 	int is_kdump;
+	bool optional;
+	bool ignore;
 };
 
 struct job_segment_data {

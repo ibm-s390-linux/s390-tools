@@ -447,6 +447,23 @@ This option cannot be used together with either
 .BR 'segment' .
 .PP
 
+.B optional
+=
+.IR 0 / 1
+(configuration only)
+.IP
+.B Configuration section:
+.br
+If this option is set to 1 the configuration section will only be included in
+the boot menu if the referenced image file exists, and running
+.B zipl
+will not fail if the image file is missing.
+
+The default value for
+.B 'optional'
+is 0.
+.PP
+
 .B parameters
 =
 .I kernel\-parameters

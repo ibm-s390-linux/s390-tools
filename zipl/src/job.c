@@ -825,14 +825,20 @@ out_free:
 
 
 static int
-check_job_ipl_data(struct job_ipl_data *ipl, char* name)
+check_job_ipl_data(struct job_ipl_data *ipl, char* name, bool may_ignore)
 {
 	int rc;
 
 	if (ipl->image != NULL) {
 		rc = misc_check_readable_file(ipl->image);
 		if (rc) {
-			if (name == NULL) {
+			if (may_ignore && ipl->optional) {
+				printf("Optional section '%s': Missing image file '%s'\n",
+				       name, ipl->image);
+				error_clear_reason();
+				ipl->ignore = true;
+				rc = 0;
+			} else if (name == NULL) {
 				error_text("Image file '%s'", ipl->image);
 			} else {
 				error_text("Image file '%s' in section '%s'",
@@ -844,7 +850,13 @@ check_job_ipl_data(struct job_ipl_data *ipl, char* name)
 	if (ipl->ramdisk != NULL) {
 		rc = misc_check_readable_file(ipl->ramdisk);
 		if (rc) {
-			if (name == NULL) {
+			if (ipl->optional) {
+				printf("Optional section '%s': Missing ramdisk file '%s'\n",
+				       name, ipl->ramdisk);
+				error_clear_reason();
+				ipl->ignore = true;
+				rc = 0;
+			} else if (name == NULL) {
 				error_text("Ramdisk file '%s'", ipl->ramdisk);
 			} else {
 				error_text("Ramdisk file '%s' in section '%s'",
@@ -941,9 +953,15 @@ check_job_menu_data(struct job_menu_data* menu)
 		switch (menu->entry[i].id) {
 		case job_ipl:
 			rc = check_job_ipl_data(&menu->entry[i].data.ipl,
-						menu->entry[i].name);
+						menu->entry[i].name, true);
 			if (rc)
 				return rc;
+			/* default_pos is 1-indexed */
+			if (menu->default_pos == i + 1 &&
+			    menu->entry[i].data.ipl.ignore) {
+				error_text("Cannot ignore default entry");
+				return -1;
+			}
 			break;
 		case job_print_usage:
 		case job_print_version:
@@ -1107,7 +1125,7 @@ check_job_data(struct job_data* job)
 		rc = 0;
 		break;
 	case job_ipl:
-		rc = check_job_ipl_data(&job->data.ipl, job->name);
+		rc = check_job_ipl_data(&job->data.ipl, job->name, false);
 		break;
 	case job_menu:
 		rc = check_job_menu_data(&job->data.menu);
@@ -1399,6 +1417,10 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 			if (rc)
 				return rc;
 		}
+		job->data.ipl.optional =
+			data[(int) scan_keyword_optional] != NULL ?
+			true : false;
+		job->data.ipl.ignore = false;
 		break;
 	case section_ipl_tape:
 		/* Tape IPL job */

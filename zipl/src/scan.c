@@ -47,45 +47,45 @@ enum scan_key_state scan_key_table[SCAN_SECTION_NUM][SCAN_KEYWORD_NUM] = {
  *	 ult  to   tofs e    mete file isk  ent  et   pt   out  ultm      dump
  *			     rs                                 enu
  *
- *       targ targ targ targ targ defa kdum secu
- *       etba etty etge etbl etof ulta p    re
+ *       targ targ targ targ targ defa kdum secu opti
+ *       etba etty etge etbl etof ulta p    re   onal
  *       se   pe   omet ocks fset uto
  *                 ry   ize
  */
 /* default auto */
 	{opt, inv, inv, inv, inv, inv, inv, inv, req, opt, opt, inv, inv, inv,
-	 opt, opt, opt, opt, opt, opt, inv, opt},
+	 opt, opt, opt, opt, opt, opt, inv, opt, inv},
 /* default menu */
 	{inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv, opt},
+	 inv, inv, inv, inv, inv, inv, inv, opt, inv},
 /* default section */
 	{req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv, opt},
+	 inv, inv, inv, inv, inv, inv, inv, opt, inv},
 /* ipl		*/
 	{inv, inv, inv, req, opt, opt, opt, inv, req, inv, inv, inv, inv, inv,
-	 opt, opt, opt, opt, opt, inv, opt, opt},
+	 opt, opt, opt, opt, opt, inv, opt, opt, opt},
 /* segment load */
 	{inv, inv, inv, inv, inv, inv, inv, req, req, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv, inv},
 /* part dump	*/
 	{inv, req, inv, inv, inv, inv, inv, inv, opt, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv, inv},
 /* fs dump	*/
 	{inv, inv, req, inv, opt, opt, inv, inv, req, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv, inv},
 /* ipl tape	*/
 	{inv, inv, inv, req, opt, opt, opt, inv, inv, inv, inv, inv, req, inv,
-	 inv, inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv, inv},
 /* multi volume dump	*/
 	{inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req,
-	 inv, inv, inv, inv, inv, inv, inv, inv}
+	 inv, inv, inv, inv, inv, inv, inv, inv, inv}
 };
 
 /* Determines which keyword may be present in a menu section */
 enum scan_key_state scan_menu_key_table[SCAN_KEYWORD_NUM] = {
 /* menu section */
 	 opt, inv, inv, inv, inv, inv, inv, inv, req, opt, opt, inv, inv, inv,
-	 opt, opt, opt, opt, opt, inv, inv, opt
+	 opt, opt, opt, opt, opt, inv, inv, opt, inv
 };
 
 /* Mapping of keyword IDs to strings */
@@ -114,6 +114,7 @@ static const struct {
 	{ "tape", scan_keyword_tape},
 	{ "kdump", scan_keyword_kdump},
 	{ "secure", scan_keyword_secure},
+	{ "optional", scan_keyword_optional},
 };
 
 /* List of keywords that are used without an assignment */
