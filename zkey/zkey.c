@@ -964,7 +964,7 @@ static bool is_command(struct zkey_command *command, const char *str)
 	if (str_len > strlen(command->command))
 		return false;
 	strncpy(command_str, command->command, str_len);
-	if (strcasecmp(str, command_str) != 0)
+	if (strncasecmp(str, command_str, str_len) != 0)
 		return false;
 
 	return true;
