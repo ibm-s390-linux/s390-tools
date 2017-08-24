@@ -1089,6 +1089,12 @@ build_program_table(int fd, char *filename, struct job_data *job,
 		for (i=0; i < job->data.menu.num; i++) {
 			switch (job->data.menu.entry[i].id) {
 			case job_ipl:
+				if (job->data.menu.entry[i].data.ipl.common.ignore) {
+					printf("Skipping #%d: IPL section '%s' (missing files)\n",
+					       job->data.menu.entry[i].pos,
+					       job->data.menu.entry[i].name);
+					break;
+				}
 				printf("Adding #%d: IPL section '%s'%s",
 				       job->data.menu.entry[i].pos,
 				       job->data.menu.entry[i].name,

@@ -758,7 +758,8 @@ static void error_text_section(const char *text, const char *section, const char
 
 
 static int
-check_common_ipl_data(struct job_common_ipl_data *common, const char *section)
+check_common_ipl_data(struct job_common_ipl_data *common, const char *section,
+		      bool may_ignore)
 {
 	uint64_t max_parm_size, len;
 	char *buffer = NULL;
@@ -768,10 +769,16 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section)
 	if (common->image != NULL) {
 		rc = misc_read_file(common->image, &buffer, &size, 0);
 		if (rc) {
-			error_text_section("Image file", section, common->image);
+			if (may_ignore && common->optional) {
+				printf("Optional section '%s': Missing image file '%s'\n",
+				       section, common->image);
+				error_clear_reason();
+				common->ignore = true;
+				rc = 0;
+				goto skip_image;
+			}
 			return rc;
 		}
-
 		if (size < MAX_COMMAND_LINE_SIZE + sizeof(uint64_t)) {
 			error_text_section("Image file", section, common->image);
 			return -1;
@@ -789,12 +796,19 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section)
 			return -1;
 		}
 	}
-
+skip_image:
 	if (common->ramdisk != NULL) {
 		rc = misc_check_readable_file(common->ramdisk);
 		if (rc) {
-			error_text_section("Ramdisk file", section, common->ramdisk);
-			return rc;
+			if (common->optional) {
+				printf("Optional section '%s': Missing ramdisk file '%s'\n",
+				       section, common->ramdisk);
+				error_clear_reason();
+				common->ignore = true;
+				rc = 0;
+			} else {
+				return rc;
+			}
 		}
 	}
 	return 0;
@@ -802,13 +816,17 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section)
 
 static int
 check_job_ipl_data(struct job_ipl_data *ipl, char *name,
-		   struct job_envblk_data *envblk)
+		   struct job_envblk_data *envblk, bool may_ignore)
 {
 	int rc;
 
-	rc = check_common_ipl_data(&ipl->common, name);
+	rc = check_common_ipl_data(&ipl->common, name, may_ignore);
 	if (rc)
 		return rc;
+
+	if (ipl->common.ignore)
+		return 0;
+
 	return finalize_ipl_address_data(ipl, name, envblk);
 }
 
@@ -887,9 +905,15 @@ check_job_menu_data(struct job_menu_data *menu, struct job_envblk_data *envblk)
 		case job_ipl:
 			rc = check_job_ipl_data(&menu->entry[i].data.ipl,
 						menu->entry[i].name,
-						envblk);
+						envblk, true);
 			if (rc)
 				return rc;
+			/* default_pos is 1-indexed */
+			if (menu->default_pos == i + 1 &&
+			    menu->entry[i].data.ipl.common.ignore) {
+				error_text("Cannot ignore default entry");
+				return -1;
+			}
 			break;
 		case job_print_usage:
 		case job_print_version:
@@ -917,7 +941,7 @@ check_job_ipl_tape_data(struct job_ipl_tape_data *ipl, char* name)
 			return rc;
 		}
 	}
-	rc = check_common_ipl_data(&ipl->common, name);
+	rc = check_common_ipl_data(&ipl->common, name, false);
 	if (rc)
 		return rc;
 	return finalize_common_address_data(&ipl->common, name);
@@ -1016,7 +1040,7 @@ check_job_data(struct job_data* job)
 		break;
 	case job_ipl:
 		rc = check_job_ipl_data(&job->data.ipl, job->name,
-					&job->envblk);
+					&job->envblk, false);
 		break;
 	case job_menu:
 		rc = check_job_menu_data(&job->data.menu, &job->envblk);
@@ -1295,6 +1319,12 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 			if (rc)
 				return rc;
 		}
+		job->data.ipl.common.optional = false;
+		if (data[(int) scan_keyword_optional] != NULL) {
+			job->data.ipl.common.optional =
+				atoi(data[(int) scan_keyword_optional]) == 1;
+		}
+		job->data.ipl.common.ignore = false;
 		break;
 	case section_ipl_tape:
 		/* Tape IPL job */
