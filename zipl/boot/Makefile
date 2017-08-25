@@ -1,7 +1,7 @@
 # Common definitions
 include ../../common.mak
 
-CFLAGS_BOOT = -Os -g -I../include -D__ASSEMBLY__ \
+CFLAGS_BOOT = $(NO_PIE_CFLAGS) -Os -g -I../include -D__ASSEMBLY__ \
 	  -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 	  -fno-builtin -ffreestanding -fno-asynchronous-unwind-tables \
 	  -fno-delete-null-pointer-checks \
@@ -54,11 +54,11 @@ stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
 			}' \
 	); \
 	case $$STAGE in \
-		0) SFLAGS="-nostdlib -Wl,-Ttext,0";; \
-		1) SFLAGS="-nostdlib -Wl,-Ttext,0x18";; \
-		1b) SFLAGS="-nostdlib -Wl,-Ttext,0xE000";; \
-		2) SFLAGS="-nostdlib -Wl,-T,stage2.lds";; \
-		3) SFLAGS="-nostdlib -Wl,-T,stage3.lds";; \
+		0) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-Ttext,0";; \
+		1) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-Ttext,0x18";; \
+		1b) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-Ttext,0xE000";; \
+		2) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-T,stage2.lds";; \
+		3) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-T,stage3.lds";; \
 	esac; \
 	$(LINK) $$SFLAGS -m64 $^ -o $@
 
@@ -77,7 +77,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
 		$< $@
 
 data.o: $(FILES)
-	$(LD) -r -b binary -o data.o $(FILES)
+	$(LD) $(NO_PIE_LDFLAGS) -r -b binary -o data.o $(FILES)
 
 data.h: data.o
 	rm -f data.h

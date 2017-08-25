@@ -7,8 +7,8 @@ ALL_CPPFLAGS += -I../include -I../boot \
 	    -DZFCPDUMP_FS_RD=$(ZFCPDUMP_FS_RD) \
 	    -DZFCPDUMP_PART_IMAGE=$(ZFCPDUMP_PART_IMAGE) \
 	    -DZFCPDUMP_PART_RD=$(ZFCPDUMP_PART_RD) \
-	    -D_FILE_OFFSET_BITS=64
-ALL_LDFLAGS += -Wl,-z,noexecstack
+	    -D_FILE_OFFSET_BITS=64 $(NO_PIE_CFLAGS)
+ALL_LDFLAGS += -Wl,-z,noexecstack $(NO_PIE_LDFLAGS)
 
 libs =	$(rootdir)/libutil/libutil.a \
 	$(rootdir)/libu2s/libu2s.a
