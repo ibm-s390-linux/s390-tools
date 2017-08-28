@@ -35,7 +35,7 @@ installkernel() {
 }
 
 install() {
-    local _tempfile=$(mktemp dracut-zdev.XXXX)
+    local _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
 
     if chzdev --export - --persistent --by-path / >/dev/null 2>&1 ; then
         # Use persistent configuration
