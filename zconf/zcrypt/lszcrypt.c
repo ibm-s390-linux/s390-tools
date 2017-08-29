@@ -168,7 +168,7 @@ static void show_domains_util_rec(char *domain_array[])
  */
 static void show_domains(void)
 {
-	char ctrl_domain_mask[67], usag_domain_mask[67], byte_str[3] = {};
+	char ctrl_domain_mask[80], usag_domain_mask[80], byte_str[3] = {};
 	int ctrl_chunk, usag_chunk;
 	char *ap, *domain_array[32 * 8 + 4];
 	int i, x, n;
@@ -181,8 +181,12 @@ static void show_domains(void)
 
 	util_file_read_line(ctrl_domain_mask, sizeof(ctrl_domain_mask),
 			    "%s/ap_control_domain_mask", ap);
+	if (strstr(ctrl_domain_mask, "not"))
+		errx(EXIT_FAILURE, "Control domain mask not available.");
 	util_file_read_line(usag_domain_mask, sizeof(usag_domain_mask),
 			    "%s/ap_usage_domain_mask", ap);
+	if (strstr(usag_domain_mask, "not"))
+		errx(EXIT_FAILURE, "Usage domain mask not available.");
 	/* remove leading '0x' from domain mask string */
 	memmove(&ctrl_domain_mask[0], &ctrl_domain_mask[2],
 		sizeof(ctrl_domain_mask) - 2);
