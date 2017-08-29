@@ -406,12 +406,14 @@ int main(int argc, char *argv[])
 		if (!util_path_is_dir(dev_path))
 			errx(EXIT_FAILURE, "Error - cryptographic device %s does not exist.", device);
 		if (!util_path_is_writable("%s/online", dev_path))
-			continue;
+			errx(EXIT_FAILURE, "Error - can't write to %s/online.\n Wrong permissions"
+			     " or wrong tools version.", dev_path);
 		verbose("Setting cryptographic device %s %s\n", device, online_text);
 		util_file_write_s(online, "%s/online", dev_path);
 		util_file_read_line(online_read, sizeof(online_read), "%s/online", dev_path);
 		if (strcmp(online, online_read) != 0)
-			errx(EXIT_FAILURE, "Error - unable to set cryptographic device %s %s.", device, online_text);
+			errx(EXIT_FAILURE, "Error - unable to set cryptographic device %s %s.",
+			     device, online_text);
 		free(dev_path);
 	}
 	free(dev_list);
