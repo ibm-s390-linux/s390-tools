@@ -18,12 +18,12 @@ lszcrypt \- display zcrypt device and configuration information
 .B lszcrypt
 .RB "[ " -V " ] "
 [
-.I <device id>
+.I <device-id>
 [...]]
 .TP
 .B lszcrypt
 .B -c
-<device id>
+<card-id>
 .TP
 .B lszcrypt -b
 .TP
@@ -57,18 +57,17 @@ With this verbose level additional information like hardware card type,
 hardware queue depth, pending request queue count, outstanding
 request queue count, and installed function facilities are displayed.
 .TP 8
-.B <device id>
+.B <device-id>
 Specifies a cryptographic device to display. A cryptographic device can be
 either a card device or a queue device. If no devices are specified information
 about all available devices is displayed.
-
-Please note that the card device representation and the queue device are both
-in hexadecimal notation.
+Please note that the card device representation and the queue device
+are both in hexadecimal notation.
 .TP 8
 .B -b, --bus
 Displays the AP bus attributes and exits.
 .TP 8
-.B -c, --capability <card device id>
+.B -c, --capability <card-id>
 Shows the capabilities of a cryptographic card device of hardware type 6 or
 higher. The card device id value may be given as decimal or hex value (with
 a leading 0x). The capabilities of a cryptographic card device depend on
@@ -92,12 +91,12 @@ Shows the usage and control domains of the cryptographic devices.
 The displayed domains of the cryptographic device depends on the initial
 cryptographic configuration.
 .RS
-.IP "o" 2
- 'C' indicate a control domain
+.IP "o" 3
+C - indicate a control domain
 .IP "o"
- 'U' indicate a usage domain
+U - indicate a usage domain
 .IP "o"
- 'B' indicate both (control and usage domain)
+B - indicate both (control and usage domain)
 .RE
 .TP 8
 .B -h, --help
