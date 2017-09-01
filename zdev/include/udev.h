@@ -14,6 +14,7 @@
 #include "exit_code.h"
 
 extern int udev_need_settle;
+extern int udev_no_settle;
 
 /* Single key-operator-value entry in a udev rule line.*/
 struct udev_entry_node {

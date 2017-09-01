@@ -54,5 +54,6 @@ OPTIONS
       --no-root-update   Skip root device update
       --dry-run          Display changes without applying
       --base PATH        Use PATH as base for accessing files
+      --no-settle        Do not wait for udev to settle
   -V, --verbose          Print additional run-time information
   -q, --quiet            Print only minimal run-time information

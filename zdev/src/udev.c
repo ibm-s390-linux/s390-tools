@@ -24,6 +24,7 @@
 #include "udev.h"
 
 int udev_need_settle = 0;
+int udev_no_settle;
 
 /* Create a newly allocated udev entry. */
 static struct udev_entry_node *udev_entry_node_new(const char *key,
@@ -403,5 +404,7 @@ exit_code_t udev_remove_rule(const char *type, const char *id)
 /* Wait for all current udev events to finish. */
 void udev_settle(void)
 {
+	if (udev_no_settle)
+		return;
 	misc_system(err_ignore, "%s settle", PATH_UDEVADM);
 }

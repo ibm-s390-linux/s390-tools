@@ -95,6 +95,7 @@ struct options {
 	struct util_list *base;		/* List of struct strlist_node */
 	unsigned int verbose:1;
 	unsigned int quiet:1;
+	unsigned int no_settle:1;
 };
 
 /* Makefile converts chzdev_usage.txt into C file which we include here. */
@@ -136,6 +137,7 @@ enum {
 	OPT_VERSION		= 'v',
 	OPT_VERBOSE		= 'V',
 	OPT_QUIET		= 'q',
+	OPT_NO_SETTLE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 };
 
 static struct opts_conflict conflict_list[] = {
@@ -217,6 +219,7 @@ static const struct option opt_list[] = {
 	{ "base",		required_argument, NULL, OPT_BASE },
 	{ "verbose",		no_argument,	NULL, OPT_VERBOSE },
 	{ "quiet",		no_argument,	NULL, OPT_QUIET },
+	{ "no-settle",		no_argument,	NULL, OPT_NO_SETTLE },
 	{ NULL,			no_argument,	NULL, 0 },
 };
 
@@ -935,6 +938,11 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		case OPT_QUIET:
 			/* --quiet */
 			opts->quiet = 1;
+			break;
+
+		case OPT_NO_SETTLE:
+			/* --no-settle */
+			opts->no_settle = 1;
 			break;
 
 		case ':':
@@ -2904,6 +2912,7 @@ int main(int argc, char *argv[])
 	force	= opts.force;
 	yes	= opts.yes;
 	dryrun	= opts.dryrun;
+	udev_no_settle = opts.no_settle;
 	path_set_base(opts.base);
 
 	if (dryrun)

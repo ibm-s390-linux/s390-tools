@@ -528,6 +528,15 @@ device configuration persistent. Typically such steps include rebuilding the
 initial RAM disk, or modifying the kernel command line.
 .PP
 .
+.OD no-settle "" ""
+Do not wait for udev processing to complete.
+
+Skips all calls to the udevadm tool that are intended to wait for udev to
+finish processing before continuing. There is typically no need to use this
+option unless chzdev is run in an environment where udev is not fully
+functional (such as in the early phase of an initial RAM disk).
+.PP
+.
 .OD persistent "p" ""
 Apply changes to persistent configuration only.
 
