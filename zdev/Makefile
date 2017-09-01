@@ -8,6 +8,7 @@ install: all
 	$(MAKE) -C src install
 	$(MAKE) -C man install
 	$(MAKE) -C dracut install
+	$(MAKE) -C initramfs install
 
 clean:
 	$(MAKE) -C src clean

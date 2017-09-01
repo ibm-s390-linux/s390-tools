@@ -271,6 +271,7 @@ This table lists additional build or install options:
 | __COMPONENT__  | __OPTION__       | __TOOLS__                       |
 |----------------|:----------------:|:-------------------------------:|
 | dracut         | `HAVE_DRACUT`    | zdev                            |
+| initramfs-tools| `HAVE_INITRAMFS` | zdev                            |
 
 The s390-tools build process uses "pkg-config" if available and hard-coded
 compiler and linker options otherwise.

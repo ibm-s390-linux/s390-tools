@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Copyright IBM Corp. 2016, 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# hooks/zdev
+#   This hook script adds files required to apply firmware-provided I/O
+#   configuration data during boot.
+#
+
+PREREQ=""
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+	prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# Add modules for all device types supported by chzdev (required for
+# auto-configuration)
+zdev_modules="lcs qeth qeth_l2 qeth_l3 dasd_mod dasd_eckd_mod dasd_fba_mod dasd_diag_mod zfcp"
+
+for x in $zdev_modules ; do
+	manual_add_modules ${x}
+done
+
+copy_exec /sbin/chzdev
+copy_exec /sbin/lszdev
+copy_exec /sbin/vmcp

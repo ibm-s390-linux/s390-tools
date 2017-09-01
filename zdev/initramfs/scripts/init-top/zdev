@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Copyright IBM Corp. 2017
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# scripts/init-top/zdev
+#   Parse the kernel command line for rd.zdev kernel parameters. These
+#   parameters are evaluated and used to configure z Systems specific devices.
+#
+# Format:
+#   rd.zdev=no-auto
+#
+#     where
+#
+#   no-auto:       Indicates that firmware-provided I/O configuration data
+#                  should not be applied.
+#
+
+PREREQ="udev"
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /scripts/functions
+
+zdev_fw_file="/sys/firmware/sclp_sd/config/data"
+zdev_base_args="--force --yes --no-root-update --no-settle --auto-conf --quiet"
+
+if [ -e "$zdev_fw_file" ] ; then
+	zdev_auto=1
+else
+	zdev_auto=0
+fi
+
+for x in $(cat /proc/cmdline); do
+        case ${x} in
+	rd.zdev=*)
+		zdev_arg=${x#*=}
+		if [ "$zdev_arg" = "no-auto" ] ; then
+			zdev_auto=0
+		fi
+		;;
+	esac
+done
+
+if [ $zdev_auto -eq 1 ] ; then
+	log_begin_msg "Starting firmware auto-configuration"
+	chzdev --import "$zdev_fw_file" $zdev_base_args
+	log_end_msg
+
+	# Repeat cold-plug after creating udev rules
+	udevadm control --reload
+	udevadm trigger --type=subsystems --action=add
+	udevadm trigger --action=add
+	udevadm settle || true
+fi
