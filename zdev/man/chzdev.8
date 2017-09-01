@@ -334,6 +334,35 @@ a specific attribute.
 .PP
 .
 .
+.SS "Special settings"
+The following special settings affect how devices are handled by chzdev:
+.PP
+.
+.BR zdev:early =0|1
+.RS 4
+Control in which stage of the boot process a device is activated:
+.TP 4
+.B 0
+Device is activated normally during boot (default).
+.PP
+.TP 4
+.B 1
+Device is activated early in the boot process, by the initial RAM-disk.
+.PP
+Specify a value of 1 for this attribute in any of the following situations:
+.TP 4
+\(bu
+To ensure that your settings override auto-configuration settings.
+.PP
+.TP 4
+\(bu
+To ensure that a device required to access the root file system is correctly
+enabled during boot. An example would be a networking device, or a device that
+is intended to extend a logical volume that provides the root file system.
+.PP
+.RE
+.
+.
 .SH ACTIONS
 You can use one of the action options listed below to specify the
 .B main tool action

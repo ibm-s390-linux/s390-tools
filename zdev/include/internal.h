@@ -12,7 +12,12 @@
 
 #include <stdbool.h>
 
+#include "attrib.h"
+
 #define INTERNAL_ATTR_PREFIX	"zdev:"
+#define	INTERNAL_ATTR_EARLY	INTERNAL_ATTR_PREFIX "early"
+
+extern struct attrib internal_attr_early;
 
 const char *internal_get_name(const char *name);
 bool internal_by_name(const char *name);

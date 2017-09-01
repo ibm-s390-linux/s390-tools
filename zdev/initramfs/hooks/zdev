@@ -10,7 +10,8 @@
 #   configuration data during boot.
 #
 
-PREREQ=""
+# Needs to run after udev or resulting udev rules could be overwritten
+PREREQ="udev"
 
 prereqs()
 {
@@ -37,3 +38,19 @@ done
 copy_exec /sbin/chzdev
 copy_exec /sbin/lszdev
 copy_exec /sbin/vmcp
+
+_tempfile=$(mktemp --tmpdir initramfs-zdev.XXXXXX)
+
+# Obtain early + root device configuration
+chzdev --export "$_tempfile" --persistent --by-path / \
+       --by-attrib "zdev:early=1" --quiet --type 2>/dev/null
+
+# Apply via --import to prevent other devices from being configured.
+# Rename the resulting cio-ignore rule to ensure that it does not override
+# the one copied by the initramfs udev hook to /lib/udev.
+chzdev --import "$_tempfile" --persistent \
+       --base "/etc/udev/rules.d/41-cio-ignore.rules=$DESTDIR/etc/udev/rules.d/41-cio-ignore-root.rules" \
+       --base "/etc=$DESTDIR/etc" --yes --quiet --no-root-update --force \
+       >/dev/null
+
+rm -f "$_tempfile"

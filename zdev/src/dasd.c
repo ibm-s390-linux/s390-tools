@@ -16,6 +16,7 @@
 #include "dasd.h"
 #include "device.h"
 #include "devtype.h"
+#include "internal.h"
 #include "misc.h"
 #include "modprobe.h"
 #include "module.h"
@@ -616,6 +617,7 @@ struct subtype dasd_subtype_eckd = {
 		&dasd_attr_reservation_policy,
 		&dasd_attr_last_known_reservation_state,
 		&dasd_attr_safe_offline,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 
@@ -651,6 +653,7 @@ struct subtype dasd_subtype_fba = {
 		&dasd_attr_reservation_policy,
 		&dasd_attr_last_known_reservation_state,
 		&dasd_attr_safe_offline,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 

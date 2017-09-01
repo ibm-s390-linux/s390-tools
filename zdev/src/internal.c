@@ -9,8 +9,21 @@
 
 #include <stdbool.h>
 
+#include "attrib.h"
 #include "internal.h"
 #include "misc.h"
+
+struct attrib internal_attr_early = {
+	.name = INTERNAL_ATTR_EARLY,
+	.title = "Activate device early during boot",
+	.desc = "Control the time of activation of a device:\n"
+		"  0: Device is activated normally during boot\n"
+		"  1: Device is activated early in the boot process, by the\n"
+		"     initial RAM-disk\n",
+	.defval = "0",
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.internal = 1,
+};
 
 /* Return identifier of internal attribute with specified @name. */
 const char *internal_get_name(const char *name)

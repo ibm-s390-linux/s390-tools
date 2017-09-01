@@ -17,6 +17,7 @@
 #include "devnode.h"
 #include "devtype.h"
 #include "generic_ccw.h"
+#include "internal.h"
 #include "namespace.h"
 #include "path.h"
 #include "subtype.h"
@@ -182,6 +183,7 @@ static struct subtype generic_ccw_subtype = {
 	.dev_attribs = ATTRIB_ARRAY(
 		&ccw_attr_online,
 		&ccw_attr_cmb_enable,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 	.generic		= 1,

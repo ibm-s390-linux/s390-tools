@@ -21,6 +21,7 @@
 #include "devnode.h"
 #include "devtype.h"
 #include "misc.h"
+#include "internal.h"
 #include "namespace.h"
 #include "path.h"
 #include "scsi.h"
@@ -1097,6 +1098,7 @@ struct subtype zfcp_lun_subtype = {
 		&zfcp_lun_attr_scsi_timeout,
 		&zfcp_lun_attr_scsi_state,
 		&zfcp_lun_attr_scsi_delete,
+		&internal_attr_early,
 	),
 	.prefixes = STRING_ARRAY(SCSI_ATTR_PREFIX),
 	.unknown_dev_attribs	= 1,

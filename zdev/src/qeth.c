@@ -15,6 +15,7 @@
 #include "ccwgroup.h"
 #include "device.h"
 #include "devtype.h"
+#include "internal.h"
 #include "misc.h"
 #include "namespace.h"
 #include "nic.h"
@@ -1445,6 +1446,7 @@ struct subtype qeth_subtype_qeth = {
 		&qeth_attr_vnicc_takeover_learning,
 		&qeth_attr_vnicc_bridge_invisible,
 		&qeth_attr_vnicc_rx_bcast,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 	.support_definable	= 1,

@@ -17,6 +17,7 @@
 #include "ccw.h"
 #include "device.h"
 #include "devtype.h"
+#include "internal.h"
 #include "misc.h"
 #include "path.h"
 #include "setting.h"
@@ -247,6 +248,7 @@ struct subtype zfcp_host_subtype = {
 		&zfcp_host_attr_failed,
 		&zfcp_host_attr_port_remove,
 		&zfcp_host_attr_port_rescan,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 

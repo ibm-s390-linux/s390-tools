@@ -17,6 +17,7 @@
 #include "ctc_auto.h"
 #include "device.h"
 #include "devtype.h"
+#include "internal.h"
 #include "misc.h"
 #include "namespace.h"
 #include "path.h"
@@ -425,6 +426,7 @@ static struct subtype ctc_subtype = {
 		&ccw_attr_online,
 		&ctc_attr_buffer,
 		&ctc_attr_protocol,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 	.support_definable	= 1,

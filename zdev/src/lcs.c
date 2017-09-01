@@ -15,6 +15,7 @@
 #include "ccwgroup.h"
 #include "device.h"
 #include "devtype.h"
+#include "internal.h"
 #include "lcs.h"
 #include "lcs_auto.h"
 #include "misc.h"
@@ -362,6 +363,7 @@ static struct subtype lcs_subtype = {
 		&ccw_attr_online,
 		&lcs_attr_lancmd_timeout,
 		&lcs_attr_recover,
+		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 	.support_definable	= 1,

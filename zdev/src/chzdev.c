@@ -3025,8 +3025,8 @@ int main(int argc, char *argv[])
 
 	if ((pers_mod_devs || pers_mod_devtypes) && !opts.no_root_check &&
 	    !dryrun) {
-		/* If the root device/device type has been modified, additional
-		 * work might be necessary. */
+		/* If the root device/device type or early devices have been
+		 * modified, additional work might be necessary. */
 		rc = root_check();
 		if (rc && !drc)
 			drc = rc;

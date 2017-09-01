@@ -45,23 +45,12 @@ install() {
     # Hook to parse zdev kernel parameter
     inst_hook cmdline 95 "$moddir/parse-zdev.sh"
 
-    # Obtain root device configuration
-
-    # Exit early if root device type is unknown
-    if ! lszdev --by-path / >/dev/null 2>&1 ; then
-        return 0
-    fi
-
+    # Obtain early + root device configuration
     _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
-
-    if chzdev --export - --persistent --by-path / >/dev/null 2>&1 ; then
-        # Use persistent configuration
-        chzdev --export "$_tempfile" --persistent --by-path / --quiet --type
-    else
-        # Use active configuration
-        chzdev --export "$_tempfile" --active --by-path / --quiet --type
-        sed -i -e 's/active/persistent/g' "$_tempfile"
-    fi
+    chzdev --export "$_tempfile" --persistent --by-path / --quiet \
+	   --type 2>/dev/null
+    chzdev --export - --persistent --by-attrib "zdev:early=1" --quiet \
+	   --type 2>/dev/null >> "$_tempfile"
 
     # Apply via --import to prevent other devices from being configured
     chzdev --import "$_tempfile" --persistent --base "/etc=$initdir/etc" \
