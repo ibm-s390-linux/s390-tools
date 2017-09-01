@@ -94,5 +94,7 @@ void device_list_add(struct device_list *, struct device *);
 struct device *device_list_find(struct device_list *, const char *,
 				struct device *);
 void device_list_print(struct device_list *, int);
+struct setting_list *device_get_setting_list(struct device *dev,
+					     config_t config);
 
 #endif /* DEVICE_H */

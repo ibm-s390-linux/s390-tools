@@ -17,9 +17,11 @@
 #define	QETH_NUM_DEVS		3
 
 struct devtype;
+struct subtype;
 struct namespace;
 
 extern struct devtype qeth_devtype;
+extern struct subtype qeth_subtype_qeth;
 extern struct namespace qeth_namespace;
 
 #endif /* QETH_H */

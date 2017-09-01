@@ -282,19 +282,6 @@ static bool parse_setting(const char *line, char **key_ptr, char **val_ptr)
 	return true;
 }
 
-static struct setting_list *dev_get_setting_list(struct device *dev,
-						 config_t config)
-{
-	struct setting_list *settings = NULL;
-
-	if (config == config_active)
-		settings = dev->active.settings;
-	else
-		settings = dev->persistent.settings;
-
-	return settings;
-}
-
 static struct setting_list *dt_get_setting_list(struct devtype *dt,
 						config_t config)
 {
@@ -426,7 +413,7 @@ static exit_code_t handle_setting(const char *filename, int lineno,
 	} else if (dev) {
 		/* We're inside a device section. */
 		attribs = dev->subtype->dev_attribs;
-		list = dev_get_setting_list(dev, config);
+		list = device_get_setting_list(dev, config);
 	} else
 		return EXIT_OK;
 
@@ -444,7 +431,7 @@ static exit_code_t handle_setting(const char *filename, int lineno,
 	return EXIT_OK;
 }
 
-static struct export_object *object_new(export_t type, void *ptr)
+struct export_object *object_new(export_t type, void *ptr)
 {
 	struct export_object *obj;
 

@@ -11,7 +11,10 @@
 #define DASD_H
 
 struct devtype;
+struct subtype;
 
 extern struct devtype dasd_devtype;
+extern struct subtype dasd_subtype_eckd;
+extern struct subtype dasd_subtype_fba;
 
 #endif /* DASD_H */

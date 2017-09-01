@@ -589,7 +589,7 @@ static struct ccw_subtype_data dasd_eckd_data = {
 	.mod		= "dasd_eckd_mod",
 };
 
-static struct subtype dasd_subtype_eckd = {
+struct subtype dasd_subtype_eckd = {
 	.super		= &ccw_subtype,
 	.devtype	= &dasd_devtype,
 	.name		= "dasd-eckd",
@@ -626,7 +626,7 @@ static struct ccw_subtype_data dasd_fba_data = {
 	.mod		= "dasd_fba_mod",
 };
 
-static struct subtype dasd_subtype_fba = {
+struct subtype dasd_subtype_fba = {
 	.super		= &ccw_subtype,
 	.devtype	= &dasd_devtype,
 	.name		= "dasd-fba",

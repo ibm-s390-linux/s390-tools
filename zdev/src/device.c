@@ -570,3 +570,16 @@ exit_code_t device_check_settings(struct device *dev, config_t config,
 
 	return EXIT_OK;
 }
+
+struct setting_list *device_get_setting_list(struct device *dev,
+					     config_t config)
+{
+	struct setting_list *settings = NULL;
+
+	if (config == config_active)
+		settings = dev->active.settings;
+	else
+		settings = dev->persistent.settings;
+
+	return settings;
+}

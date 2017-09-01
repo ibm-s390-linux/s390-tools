@@ -1369,7 +1369,7 @@ static struct ccwgroup_subtype_data qeth_data = {
 	.num_devs	= QETH_NUM_DEVS,
 };
 
-static struct subtype qeth_subtype_qeth = {
+struct subtype qeth_subtype_qeth = {
 	.super		= &ccwgroup_subtype,
 	.devtype	= &qeth_devtype,
 	.name		= "qeth",

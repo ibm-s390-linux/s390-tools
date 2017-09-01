@@ -98,25 +98,46 @@ static void dryrun_end_data(void)
 
 #define READ_CHUNK_SIZE		4096
 
-/* Read text from @fd and return resulting NULL-terminated text buffer.
- * If @chomp is non-zero, remove trailing newline character. Return %NULL
- * on error or when unprintable characters are read. */
-static char *read_fd(FILE *fd, int chomp)
+/* Read all data from @fd and return address of resulting buffer in
+ * @buffer_ptr. If @size_ptr is non-zero, use it to store the size of the
+ * resulting buffer. Return %EXIT_OK on success. */
+exit_code_t misc_read_fd(FILE *fd, void **buffer_ptr, size_t *size_ptr)
 {
 	char *buffer = NULL;
-	size_t done, i;
+	size_t done = 0;
 
-	done = 0;
 	while (!feof(fd)) {
-		buffer = realloc(buffer, done + READ_CHUNK_SIZE + 1);
+		buffer = realloc(buffer, done + READ_CHUNK_SIZE);
 		if (!buffer)
 			oom();
 		done += fread(&buffer[done], 1, READ_CHUNK_SIZE, fd);
 		if (ferror(fd)) {
 			free(buffer);
-			return NULL;
+			return EXIT_RUNTIME_ERROR;
 		}
 	}
+
+	buffer = realloc(buffer, done);
+	if (!buffer && done > 0)
+		oom();
+
+	*buffer_ptr = buffer;
+	if (size_ptr)
+		*size_ptr = done;
+
+	return EXIT_OK;
+}
+
+/* Read text from @fd and return resulting NULL-terminated text buffer.
+ * If @chomp is non-zero, remove trailing newline character. Return %NULL
+ * on error or when unprintable characters are read. */
+static char *read_fd(FILE *fd, int chomp)
+{
+	char *buffer;
+	size_t done, i;
+
+	if (misc_read_fd(fd, (void **) &buffer, &done))
+		return NULL;
 
 	/* Check if this is a text file at all (required to filter out
 	 * binary sysfs attributes). */
@@ -131,12 +152,13 @@ static char *read_fd(FILE *fd, int chomp)
 	if (chomp && done > 0 && buffer[done - 1] == '\n')
 		done--;
 
-	if (buffer) {
-		/* NULL-terminate. */
-		buffer[done++] = 0;
-	}
+	/* NULL-terminate. */
+	buffer = realloc(buffer, done + 1);
+	if (!buffer)
+		oom();
+	buffer[done] = 0;
 
-	return realloc(buffer, done);
+	return buffer;
 }
 
 static int count_newline(const char *str)

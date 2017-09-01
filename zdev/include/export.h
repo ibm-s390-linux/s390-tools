@@ -31,6 +31,7 @@ struct export_object {
 	} ptr;
 };
 
+struct export_object *object_new(export_t type, void *ptr);
 exit_code_t export_write_device(FILE *, struct device *, config_t, int *);
 exit_code_t export_write_devtype(FILE *, struct devtype *, config_t, int *);
 exit_code_t export_read(FILE *, const char *, struct util_list *);
