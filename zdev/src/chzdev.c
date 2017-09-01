@@ -27,6 +27,7 @@
 #include "devnode.h"
 #include "devtype.h"
 #include "export.h"
+#include "firmware.h"
 #include "inuse.h"
 #include "misc.h"
 #include "module.h"
@@ -2500,9 +2501,9 @@ static exit_code_t do_export(struct options *opts)
 	/* Open output stream. */
 	if (strcmp(opts->export, "-") == 0) {
 		fd = stdout;
-		info("Exporting configuration data to standard output\n");
+		info("Exporting data to standard output\n");
 	} else {
-		info("Exporting configuration data to %s\n", opts->export);
+		info("Exporting data to %s\n", opts->export);
 		if (!util_path_exists(opts->export)) {
 			rc = path_create(opts->export);
 			if (rc)
@@ -2735,6 +2736,7 @@ static exit_code_t do_import(struct options *opts)
 	exit_code_t drc = EXIT_OK;
 	const char *filename;
 	int found;
+	bool is_firmware;
 
 	/* Open input stream. */
 	if (strcmp(opts->import, "-") == 0) {
@@ -2744,16 +2746,23 @@ static exit_code_t do_import(struct options *opts)
 		fd = fopen(opts->import, "r");
 		filename = opts->import;
 	}
-	info("Importing configuration data from %s\n", filename);
+
 	if (!fd) {
 		error("Could not open file %s: %s\n", opts->import,
 		      strerror(errno));
 		return EXIT_RUNTIME_ERROR;
 	}
 
+	is_firmware = firmware_detect(fd);
+	info("Importing data from %s%s\n", filename,
+	     is_firmware ? " (firmware format)" : "");
+
 	/* Read data. */
 	objects = ptrlist_new();
-	rc = export_read(fd, filename, objects);
+	if (is_firmware)
+		rc = firmware_read(fd, filename, -1, opts->config, objects);
+	else
+		rc = export_read(fd, filename, objects);
 	if (rc)
 		goto out;
 
@@ -2766,8 +2775,8 @@ static exit_code_t do_import(struct options *opts)
 			      "selection\n", filename);
 			rc = EXIT_EMPTY_SELECTION;
 		} else {
-			error("%s: No settings found to import\n", filename);
-			rc = EXIT_NO_DATA;
+			info("%s: No settings found to import\n", filename);
+			rc = EXIT_OK;
 		}
 		goto out;
 	}

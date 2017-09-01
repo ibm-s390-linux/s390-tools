@@ -409,13 +409,23 @@ default value.
 .PP
 .
 .OD import "" "FILENAME" "|-"
-Import configuration data from a text file.
+Import configuration data from a text or machine-provided file.
 
 Reads configuration data from FILENAME and applies it. If a single hyphen ("-")
 is specified as FILENAME data is read from the standard input stream. The
-input format of the data read must be the same format as produced by the
-chzdev \-\-export action.
+input format must be either in the format as produced by the chzdev \-\-export
+action, or in the format of a machine-provided I/O configuration data file.
 
+.B Machine-provided data:
+Some machine models provide I/O configuration data which is made available
+by the Linux kernel via a sysfs interface. While this data is intended for
+automatic consumption during the boot phase, you can also apply it manually
+using the \-\-import action like in the following example
+
+.B Example:
+.CL chzdev --import /sys/firmware/sclp_sd/config/data
+
+.B Note:
 By default all configuration data that is read is also applied. To reduce the
 scope of imported configuration data, you can select specific devices, a device
 type, or define whether only data for the active or persistent configuration
