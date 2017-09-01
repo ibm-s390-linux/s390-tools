@@ -1333,7 +1333,7 @@ static exit_code_t cfg_write(struct device *dev, int prereq, config_t config,
 	struct subtype *st = dev->subtype;
 	exit_code_t rc = EXIT_OK;
 
-	if (!device_needs_writing(dev, config))
+	if (!device_needs_writing(dev, config) && !force)
 		goto out;
 
 	if (check_active && config == config_persistent &&
@@ -1623,6 +1623,10 @@ static exit_code_t print_config_result(struct selected_dev_node *sel,
 		if (dev)
 			already = device_needs_writing(dev, config) ? 0 : 1;
 	}
+
+	/* Re-do actions if run with --force */
+	if (force)
+		already = 0;
 
 	if (dev) {
 		devname = dev->subtype->devname;

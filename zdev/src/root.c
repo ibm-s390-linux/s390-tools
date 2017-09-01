@@ -60,7 +60,7 @@ exit_code_t root_check(void)
 		/* Check devices. */
 		dev = device_list_find(sel->st->devices, sel->id, NULL);
 		if (dev && dev->persistent.exists &&
-		    device_needs_writing(dev, config_persistent)) {
+		    (device_needs_writing(dev, config_persistent) || force)) {
 			strlist_add(mod, "%s %s", dev->subtype->devname,
 				    dev->id);
 		}

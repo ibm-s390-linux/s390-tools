@@ -385,6 +385,8 @@ void udev_zfcp_lun_add_device_ids(struct util_list *list)
 	free(cb_data.prefix);
 }
 
+/* Return path to zfcp lun udev rule file containing configuration data for
+ * all LUNs of a zfcp device. */
 static char *get_zfcp_lun_path(const char *id)
 {
 	char *copy, *e, *path;
@@ -397,6 +399,13 @@ static char *get_zfcp_lun_path(const char *id)
 	free(copy);
 
 	return path;
+}
+
+/* Return path to zfcp lun udev rule file containing configuration data for
+ * a single LUN. */
+static char *get_single_zfcp_lun_path(const char *id)
+{
+	return path_get_udev_rule(ZFCP_LUN_NAME, id);
 }
 
 /* Apply the settings found in NODE to STATE. */
@@ -437,7 +446,12 @@ exit_code_t udev_zfcp_lun_read_device(struct device *dev)
 	exit_code_t rc = EXIT_OK;
 	char *path;
 
-	path = get_zfcp_lun_path(dev->id);
+	/* Check for single lun file first then try multi lun file. */
+	path = get_single_zfcp_lun_path(dev->id);
+	if (!util_path_exists(path)) {
+		free(path);
+		path = get_zfcp_lun_path(dev->id);
+	}
 
 	/* Get previous rule data. */
 	luns = zfcp_lun_node_list_new();
@@ -599,8 +613,10 @@ out:
 
 /* Update the udev rule file that configures the zfcp lun with the specified
  * ID. If @state is %NULL, remove the rule, otherwise create a rule that
- * applies the corresponding parameters. */
-static exit_code_t update_lun_rule(const char *id, struct device_state *state)
+ * applies the corresponding parameters. If @single is set, update a single
+ * lun rule file, otherwise update a multi lun rule file. */
+static exit_code_t update_lun_rule(const char *id, struct device_state *state,
+				   bool single)
 {
 	struct zfcp_lun_devid devid;
 	struct util_list *luns;
@@ -612,7 +628,7 @@ static exit_code_t update_lun_rule(const char *id, struct device_state *state)
 	rc = zfcp_lun_parse_devid(&devid, id, err_delayed_print);
 	if (rc)
 		return rc;
-	path = get_zfcp_lun_path(id);
+	path = single ? get_single_zfcp_lun_path(id) : get_zfcp_lun_path(id);
 
 	/* Get previous rule data. */
 	luns = zfcp_lun_node_list_new();
@@ -650,24 +666,50 @@ static exit_code_t update_lun_rule(const char *id, struct device_state *state)
  * device state. */
 exit_code_t udev_zfcp_lun_write_device(struct device *dev)
 {
-	return update_lun_rule(dev->id, &dev->persistent);
+	exit_code_t rc;
+
+	rc = update_lun_rule(dev->id, &dev->persistent, true);
+
+	/* We only want single lun rule files so remove any remaining
+	 * references in multi lun rule files. */
+	update_lun_rule(dev->id, NULL, false);
+
+	return rc;
 }
 
 /* Remove the UDEV rule used to configure the zfcp lun with the specified ID. */
 exit_code_t udev_zfcp_lun_remove_rule(const char *id)
 {
-	return update_lun_rule(id, NULL);
+	exit_code_t rc, rc2;
+
+	rc = update_lun_rule(id, NULL, true);
+	rc2 = update_lun_rule(id, NULL, false);
+
+	if (rc)
+		return rc;
+
+	return rc2;
 }
 
 /* Determine if a udev rule exists for configuring the specified zfcp lun. */
 bool udev_zfcp_lun_exists(const char *id)
 {
 	struct zfcp_lun_devid devid;
-	char *path, *rule, *pattern = NULL;
+	char *path, *rule = NULL, *pattern = NULL;
 	bool rc = false;
 
 	if (zfcp_lun_parse_devid(&devid, id, err_ignore) != EXIT_OK)
 		return false;
+
+	/* Check for single lun rule file first. */
+	path = get_single_zfcp_lun_path(id);
+	if (util_path_exists(path)) {
+		rc = true;
+		goto out;
+	}
+	free(path);
+
+	/* Check multi lun rule file next. */
 	path = get_zfcp_lun_path(id);
 	rule = misc_read_text_file(path, 1, err_ignore);
 	if (!rule)
