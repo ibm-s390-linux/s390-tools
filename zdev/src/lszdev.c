@@ -59,6 +59,7 @@ struct options {
 	config_t config;
 	unsigned int active:1;
 	unsigned int persistent:1;
+	unsigned int auto_conf:1;
 	struct util_list *columns;	/* List of struct strlist_node */
 	unsigned int no_headings:1;
 	struct util_list *base;		/* List of struct strlist_node */
@@ -98,6 +99,7 @@ enum {
 	OPT_VERBOSE		= 'V',
 	OPT_QUIET		= 'q',
 	OPT_PAIRS		= 'P',
+	OPT_AUTO_CONF		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 };
 
 static struct opts_conflict conflict_list[] = {
@@ -150,6 +152,7 @@ static const struct option opt_list[] = {
 	/* Options. */
 	{ "active",		no_argument,	NULL, OPT_ACTIVE },
 	{ "persistent",		no_argument,	NULL, OPT_PERSISTENT },
+	{ "auto-conf",		no_argument,	NULL, OPT_AUTO_CONF },
 	{ "columns",		required_argument, NULL, OPT_COLUMNS },
 	{ "no-headings",	no_argument,	NULL, OPT_NO_HEADINGS },
 	{ "base",		required_argument, NULL, OPT_BASE },
@@ -623,6 +626,11 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 			opts->persistent = 1;
 			break;
 
+		case OPT_AUTO_CONF:
+			/* --auto-conf */
+			opts->auto_conf = 1;
+			break;
+
 		case OPT_COLUMNS:
 			/* --columns COLUMN */
 			strlist_add_multi(opts->columns, optarg, ",", 0);
@@ -685,7 +693,15 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		goto out;
 
 	/* Determine configuration set. */
-	opts->config = get_config(opts->active, opts->persistent);
+	if (!opts->active && !opts->persistent && !opts->auto_conf) {
+		/* Default display targets are active + persistent - note that
+		 * autoconf data is still shown when available to make users
+		 * aware of this type of data. */
+		opts->config = config_active | config_persistent;
+	} else {
+		opts->config = get_config(opts->active, opts->persistent,
+					  opts->auto_conf);
+	}
 
 	/* Handle positional parameters. */
 	rc = parse_positional(opts, argc, argv, optind);
@@ -725,6 +741,7 @@ enum dev_table_id {
 	dev_netdevs,
 	dev_exists,
 	dev_pers,
+	dev_auto,
 	dev_online,
 	dev_failed,
 	dev_modules,
@@ -744,6 +761,8 @@ static struct column *dev_table = COLUMN_ARRAY(
 	       "Device exists in the active configuration"),
 	COLUMN("PERS",		align_left, dev_pers, 1,
 	       "Device is configured persistently"),
+	COLUMN("AUTO",		align_left, dev_auto, 0,
+	       "Auto-configuration exists for device"),
 	COLUMN("FAILED",	align_left, dev_failed, 0,
 	       "Device is in error"),
 	COLUMN("NAMES",		align_left, dev_names, 1,
@@ -762,21 +781,34 @@ static struct column *dev_table = COLUMN_ARRAY(
 	       "Path to specific attribute in active configuration")
 );
 
-static char *merge_str(const char *act, const char *pers)
+static char *merge_str(const char *act, const char *pers, const char *ac,
+		       config_t config)
 {
 	char *str;
+	size_t len;
 
-	if (act && pers) {
-		if (strcmp(act, pers) == 0)
-			str = misc_strdup(act);
-		else
-			str = misc_asprintf("%s/%s", act, pers);
-	} else if (act)
-		str = misc_strdup(act);
-	else if (pers)
-		str = misc_strdup(pers);
-	else
-		str = misc_strdup("-");
+	act	= act  ? act  : "-";
+	pers	= pers ? pers : "-";
+	ac	= ac   ? ac   : "-";
+
+	if (strcmp(act, pers) == 0 && strcmp(act, ac) == 0)
+		return misc_strdup(act);
+
+	len = strlen(act) + strlen(pers) + strlen(ac) + /* 3 * / + NUL */ 4;
+	str = misc_malloc(len);
+
+	if (SCOPE_ACTIVE(config))
+		strcat(str, act);
+	if (SCOPE_PERSISTENT(config)) {
+		if (*str)
+			strcat(str, "/");
+		strcat(str, pers);
+	}
+	if (SCOPE_AUTOCONF(config)) {
+		if (*str)
+			strcat(str, "/");
+		strcat(str, ac);
+	}
 
 	return str;
 }
@@ -821,10 +853,9 @@ static char *get_attr(struct device *dev, const char *name, config_t config)
 	struct setting_list *list;
 	struct setting *s;
 
-	if (config == config_active)
-		list = dev->active.settings;
-	else
-		list = dev->persistent.settings;
+	list = device_get_setting_list(dev, config);
+	if (!list)
+		return NULL;
 	s = setting_list_find(list, name);
 	if (!s) {
 		if (config == config_active) {
@@ -841,7 +872,7 @@ static char *get_attr(struct device *dev, const char *name, config_t config)
 static char *dev_table_get_attr(struct device *dev, const char *attr,
 				config_t config)
 {
-	char *act = NULL, *pers = NULL, *str;
+	char *act = NULL, *pers = NULL, *ac = NULL, *str;
 	const char *name;
 
 	name = strchr(attr, ':');
@@ -853,10 +884,13 @@ static char *dev_table_get_attr(struct device *dev, const char *attr,
 		act = get_attr(dev, name, config_active);
 	if (SCOPE_PERSISTENT(config))
 		pers = get_attr(dev, name, config_persistent);
+	if (SCOPE_AUTOCONF(config))
+		ac = get_attr(dev, name, config_autoconf);
 
-	str = merge_str(act, pers);
+	str = merge_str(act, pers, ac, config);
 	free(act);
 	free(pers);
+	free(ac);
 
 	return str;
 }
@@ -904,7 +938,11 @@ static char *dev_table_get_value(void *item, int id, const char *heading,
 		return misc_strdup(YESNO(dev->active.exists ||
 					 dev->active.definable));
 	case dev_pers:
+		if (!dev->persistent.exists && dev->autoconf.exists)
+			return misc_strdup("auto");
 		return misc_strdup(YESNO(dev->persistent.exists));
+	case dev_auto:
+		return misc_strdup(YESNO(dev->autoconf.exists));
 	case dev_online:
 		return dev_table_get_online(dev, config_active);
 	case dev_failed:
@@ -942,6 +980,7 @@ static read_scope_t get_scope(struct options *opts)
 		case dev_netdevs:
 		case dev_exists:
 		case dev_pers:
+		case dev_auto:
 		case dev_online:
 		case dev_modules:
 			continue;
@@ -960,14 +999,21 @@ static struct util_list *dev_table_build(struct options *opts,
 	struct util_list *selected, *devices = NULL;
 	struct selected_dev_node *sel;
 	struct device *dev;
-	int active, persistent;
+	int active, persistent, autoconf;
 	read_scope_t scope;
 	exit_code_t rc;
+	config_t config = opts->config;
 
 	scope = get_scope(opts);
 	selected = selected_dev_list_new();
+
+	/* Read auto-config data when no configuration set was specified to
+	 * make user aware of auto-config data. */
+	if (!opts->active && !opts->persistent && !opts->auto_conf)
+		config |= config_autoconf;
+
 	rc = select_devices(opts->select, selected, 1, 0, opts->pairs,
-			    opts->config, scope, err_print);
+			    config, scope, err_print);
 	if (rc)
 		goto out;
 	devices = ptrlist_new();
@@ -987,7 +1033,8 @@ static struct util_list *dev_table_build(struct options *opts,
 		/* Only process existing devices. */
 		active = dev->active.exists || dev->active.definable;
 		persistent = dev->persistent.exists;
-		if (!active && !persistent)
+		autoconf = dev->autoconf.exists;
+		if (!active && !persistent && !autoconf)
 			continue;
 
 		ptrlist_add(devices, dev);
@@ -1025,9 +1072,11 @@ static exit_code_t do_list_devices(struct options *opts)
 	if (!items)
 		return EXIT_EMPTY_SELECTION;
 
-	/* Adjust columns visible depending on --active and --persistent. */
+	/* Adjust columns visible depending on selected config set. */
 	table_set_default(dev_table, dev_online, SCOPE_ACTIVE(opts->config));
 	table_set_default(dev_table, dev_pers, SCOPE_PERSISTENT(opts->config));
+	table_set_default(dev_table, dev_auto, SCOPE_AUTOCONF(opts->config) &&
+					       !SCOPE_PERSISTENT(opts->config));
 	table_set_default(dev_table, dev_names, SCOPE_ACTIVE(opts->config));
 
 	/* Display table. */
@@ -1057,17 +1106,20 @@ enum settings_table_id {
 	settings_readonly,
 	settings_active,
 	settings_persistent,
+	settings_autoconf,
 };
 
 static struct column *settings_table = COLUMN_ARRAY(
 	COLUMN("ATTRIBUTE", align_left, settings_attribute, 1, ""),
 	COLUMN("READONLY", align_left, settings_readonly, 1, ""),
 	COLUMN("ACTIVE", align_left, settings_active, 1, ""),
-	COLUMN("PERSISTENT", align_left, settings_persistent, 1, "")
+	COLUMN("PERSISTENT", align_left, settings_persistent, 1, ""),
+	COLUMN("AUTOCONF", align_left, settings_autoconf, 0, "")
 );
 
 static struct util_list *settings_table_build(struct setting_list *active,
 					      struct setting_list *persistent,
+					      struct setting_list *autoconf,
 					      bool readonly)
 {
 	struct util_list *names, *items;
@@ -1088,6 +1140,10 @@ static struct util_list *settings_table_build(struct setting_list *active,
 		util_list_iterate(&persistent->list, s)
 			strlist_add(names, s->name);
 	}
+	if (autoconf && !readonly) {
+		util_list_iterate(&autoconf->list, s)
+			strlist_add(names, s->name);
+	}
 	strlist_sort_unique(names, str_cmp);
 
 	/* Convert strlist to ptrlist. */
@@ -1102,6 +1158,7 @@ static struct util_list *settings_table_build(struct setting_list *active,
 struct settings_table_data {
 	struct setting_list *active;
 	struct setting_list *persistent;
+	struct setting_list *autoconf;
 	int pairs;
 	bool readonly;
 };
@@ -1124,12 +1181,17 @@ static char *settings_table_get_value(void *item, int id, const char *heading,
 	case settings_persistent:
 		list = stdata->persistent;
 		break;
+	case settings_autoconf:
+		list = stdata->autoconf;
+		break;
 	default:
 		break;
 	}
 	if (list) {
 		s = setting_list_find(list, name);
-		if (s && !(id == settings_persistent && s->derived)) {
+		if (s &&
+		    !((id == settings_persistent || id == settings_autoconf) &&
+		      s->derived)) {
 			if (stdata->pairs)
 				return misc_strdup(s->value);
 			else
@@ -1145,6 +1207,7 @@ static char *settings_table_get_value(void *item, int id, const char *heading,
 
 static void settings_table_print(struct setting_list *active,
 				 struct setting_list *persistent,
+				 struct setting_list *autoconf,
 				 struct options *opts, int ind, bool readonly,
 				 bool neednl)
 {
@@ -1154,7 +1217,7 @@ static void settings_table_print(struct setting_list *active,
 	items = settings_table_build(
 			SCOPE_ACTIVE(opts->config) ? active : NULL,
 			SCOPE_PERSISTENT(opts->config) ? persistent : NULL,
-			readonly);
+			autoconf, readonly);
 	if (util_list_is_empty(items)) {
 		if (!opts->pairs && !readonly)
 			indent(ind, "%sNo settings found\n",
@@ -1170,8 +1233,12 @@ static void settings_table_print(struct setting_list *active,
 			  SCOPE_ACTIVE(opts->config));
 	table_set_default(settings_table, settings_persistent,
 			  SCOPE_PERSISTENT(opts->config) && !readonly ? 1 : 0);
+	table_set_default(settings_table, settings_autoconf,
+			  (SCOPE_AUTOCONF(opts->config) || autoconf) &&
+				!readonly ? 1 : 0);
 	data.active = active;
 	data.persistent = persistent;
+	data.autoconf = autoconf;
 	data.pairs = opts->pairs;
 	table_print(settings_table, settings_table_get_value, &data, items,
 		    NULL, 1, opts->pairs, ind, 0);
@@ -1253,7 +1320,7 @@ static exit_code_t do_info_type(struct options *opts)
 		}
 	} else {
 		settings_table_print(dt->active_settings,
-				     dt->persistent_settings, opts,
+				     dt->persistent_settings, NULL, opts,
 				     INFO_INDENT, false, false);
 	}
 
@@ -1280,7 +1347,7 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 {
 	struct subtype *st = dev->subtype;
 	char *names, *bdevs, *cdevs, *ndevs, *modules, *online, *path, *key;
-	const char *id, *type, *exists, *persist, *prefix;
+	const char *id, *type, *exists, *persist, *ac, *prefix;
 	struct util_list *resources, *errors;
 	struct strlist_node *s;
 	bool first;
@@ -1299,6 +1366,7 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 	errors	= subtype_get_errors(dev->subtype, dev->id);
 	exists	= YESNO(dev->active.exists || dev->active.definable);
 	persist	= YESNO(dev->persistent.exists);
+	ac	= YESNO(dev->autoconf.exists);
 
 	/* Print information. */
 	if (opts->pairs) {
@@ -1316,6 +1384,8 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 		print_pair("ONLINE", online);
 		print_pair("EXISTS", exists);
 		print_pair("PERSISTENT", persist);
+		if (SCOPE_AUTOCONF(opts->config) || dev->autoconf.exists)
+			print_pair("AUTOCONF", ac);
 		if (errors) {
 			util_list_iterate(errors, s)
 				print_pair("ERROR", s->str);
@@ -1341,6 +1411,8 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 		print_info("Online", online);
 		print_info("Exists", exists);
 		print_info("Persistent", persist);
+		if (SCOPE_AUTOCONF(opts->config) || dev->autoconf.exists)
+			print_info("Auto-configured", ac);
 		if (errors) {
 			first = true;
 			util_list_iterate(errors, s) {
@@ -1382,11 +1454,17 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 
 	settings_table_print(dev->active.exists ? dev->active.settings : NULL,
 			     dev->persistent.exists ? dev->persistent.settings :
-			     NULL, opts, INFO_INDENT, false, !opts->pairs);
+			     NULL,
+			     dev->autoconf.exists ? dev->autoconf.settings :
+			     NULL,
+			     opts, INFO_INDENT, false, !opts->pairs);
 
 	settings_table_print(dev->active.exists ? dev->active.settings : NULL,
 			     dev->persistent.exists ? dev->persistent.settings :
-			     NULL, opts, INFO_INDENT, true, !opts->pairs);
+			     NULL,
+			     dev->autoconf.exists ? dev->autoconf.settings :
+			     NULL,
+			     opts, INFO_INDENT, true, !opts->pairs);
 
 	strlist_free(errors);
 	free(online);
@@ -1404,9 +1482,10 @@ static exit_code_t do_info_devices(struct options *opts)
 	struct util_list *selected;
 	struct selected_dev_node *sel;
 	struct device *dev;
-	int found, active, persistent;
+	int found, active, persistent, autoconf;
 	exit_code_t rc, drc = EXIT_OK;
 	read_scope_t scope;
+	config_t config = opts->config;
 
 	if (opts->info > 1)
 		scope = scope_all;
@@ -1415,7 +1494,13 @@ static exit_code_t do_info_devices(struct options *opts)
 
 	/* Get list of selected devices. */
 	selected = selected_dev_list_new();
-	select_devices(opts->select, selected, 1, 0, opts->pairs, opts->config,
+
+	/* Read auto-config data when no configuration set was specified to
+	 * make user aware of auto-config data. */
+	if (!opts->active && !opts->persistent && !opts->auto_conf)
+		config |= config_autoconf;
+
+	select_devices(opts->select, selected, 1, 0, opts->pairs, config,
 		       scope, err_print);
 
 	/* Process selected devices. */
@@ -1434,9 +1519,8 @@ static exit_code_t do_info_devices(struct options *opts)
 		/* Only process existing devices. */
 		active = dev->active.exists || dev->active.definable;
 		persistent = dev->persistent.exists;
-		if ((opts->config == config_active && !active) ||
-		    (opts->config == config_persistent && !persistent) ||
-		    (opts->config == config_all && !active && !persistent))
+		autoconf = dev->autoconf.exists;
+		if (!active && !persistent && !autoconf)
 			continue;
 		if (found > 0)
 			printf("\n");

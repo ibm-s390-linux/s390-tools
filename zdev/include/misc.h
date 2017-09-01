@@ -19,9 +19,14 @@
 #include "exit_code.h"
 
 #define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
-#define	SCOPE_ACTIVE(x)		(((x) == config_active) || ((x) == config_all))
-#define	SCOPE_PERSISTENT(x)	(((x) == config_persistent) || \
-				 ((x) == config_all))
+#define SCOPE_ACTIVE(x)		((x) & config_active ? 1 : 0)
+#define SCOPE_PERSISTENT(x)	((x) & config_persistent ? 1 : 0)
+#define SCOPE_AUTOCONF(x)	((x) & config_autoconf ? 1 : 0)
+#define SCOPE_ALL(x)		((x) == (config_active | config_persistent |\
+					 config_autoconf))
+#define SCOPE_SINGLE(x)		((x) == config_active || \
+				 (x) == config_persistent || \
+				 (x) == config_autoconf)
 
 #define DELAY_INDENT	4
 
@@ -34,12 +39,15 @@
 
 #define EVEN(x)		(((x) & 1) == 0)
 
-/* Enumeration of configuration sets. */
-typedef enum {
-	config_active,
-	config_persistent,
-	config_all,
-} config_t;
+/* Enumeration of configuration sets. Multiple configuration sets can be
+ * combined using bit-wise or. */
+enum {
+	config_active = 1,
+	config_persistent = 2,
+	config_autoconf = 4,
+	config_all = 7,
+};
+typedef int config_t;
 
 typedef enum {
 	err_ignore,
@@ -167,7 +175,7 @@ exit_code_t misc_write_text_file(const char *, const char *, err_t);
 exit_code_t misc_write_text_file_retry(const char *, const char *, err_t);
 exit_code_t misc_mktemp(char **, int *);
 char *misc_readlink(const char *path);
-config_t get_config(int, int);
+config_t get_config(int act, int pers, int ac);
 bool is_zvm(void);
 bool is_terminal(void);
 const char *config_to_str(config_t);

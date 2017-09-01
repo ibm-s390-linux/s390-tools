@@ -426,6 +426,8 @@ static void ccwgroup_st_online_set(struct subtype *st, struct device *dev,
 	}
 	if (SCOPE_PERSISTENT(config))
 		setting_list_apply(dev->persistent.settings, a, name, value);
+	if (SCOPE_AUTOCONF(config))
+		setting_list_apply(dev->autoconf.settings, a, name, value);
 }
 
 static int get_online(struct setting_list *list)
@@ -446,18 +448,20 @@ static int get_online(struct setting_list *list)
 }
 
 /* Return -1 if online state is not configured, 0 for offline and 1 for online.
- * If multiple configurations are specified, return the minimum of both. */
+ * If multiple configurations are specified, return the minimum of all. */
 static int ccwgroup_st_online_get(struct subtype *st, struct device *dev,
 				  config_t config)
 {
-	int act_online = 1, pers_online = 1;
+	int act_online = 1, pers_online = 1, auto_online = 1;
 
 	if (SCOPE_ACTIVE(config))
 		act_online = get_online(dev->active.settings);
 	if (SCOPE_PERSISTENT(config))
 		pers_online = get_online(dev->persistent.settings);
+	if (SCOPE_AUTOCONF(config))
+		auto_online = get_online(dev->autoconf.settings);
 
-	return MIN(act_online, pers_online);
+	return MIN(MIN(act_online, pers_online), auto_online);
 }
 
 /* Determine if the online state of the specified device was modified. */
@@ -473,6 +477,11 @@ static bool ccwgroup_st_online_specified(struct subtype *st,
 	}
 	if (SCOPE_PERSISTENT(config) && dev->persistent.settings) {
 		s = setting_list_find(dev->persistent.settings, "online");
+		if (s && s->specified)
+			return true;
+	}
+	if (SCOPE_AUTOCONF(config) && dev->autoconf.settings) {
+		s = setting_list_find(dev->autoconf.settings, "online");
 		if (s && s->specified)
 			return true;
 	}
@@ -682,7 +691,18 @@ static exit_code_t ccwgroup_st_read_persistent(struct subtype *st,
 
 	expand_id(data->ccwgroupdrv, dev);
 
-	return udev_ccwgroup_read_device(dev);
+	return udev_ccwgroup_read_device(dev, false);
+}
+
+static exit_code_t ccwgroup_st_read_autoconf(struct subtype *st,
+					     struct device *dev,
+					     read_scope_t scope)
+{
+	struct ccwgroup_subtype_data *data = st->data;
+
+	expand_id(data->ccwgroupdrv, dev);
+
+	return udev_ccwgroup_read_device(dev, true);
 }
 
 static exit_code_t ccwgroup_st_configure_active(struct subtype *st,
@@ -693,8 +713,9 @@ static exit_code_t ccwgroup_st_configure_active(struct subtype *st,
 	return device_write_active_settings(dev);
 }
 
-static exit_code_t ccwgroup_st_configure_persistent(struct subtype *st,
-						    struct device *dev)
+static exit_code_t _ccwgroup_st_configure_persistent(struct subtype *st,
+						     struct device *dev,
+						     bool autoconf)
 {
 	struct ccwgroup_subtype_data *data = st->data;
 	struct ccwgroup_devid *devid = dev->devid;
@@ -703,8 +724,21 @@ static exit_code_t ccwgroup_st_configure_persistent(struct subtype *st,
 		delayed_err("Incomplete device ID specified\n");
 		return EXIT_INCOMPLETE_ID;
 	}
-	return udev_ccwgroup_write_device(dev);
+	return udev_ccwgroup_write_device(dev, autoconf);
 }
+
+static exit_code_t ccwgroup_st_configure_persistent(struct subtype *st,
+						    struct device *dev)
+{
+	return _ccwgroup_st_configure_persistent(st, dev, false);
+}
+
+static exit_code_t ccwgroup_st_configure_autoconf(struct subtype *st,
+						    struct device *dev)
+{
+	return _ccwgroup_st_configure_persistent(st, dev, true);
+}
+
 
 static char *ccwgroup_st_get_active_attrib_path(struct subtype *,
 						struct device *, const char *);
@@ -733,7 +767,13 @@ static exit_code_t ccwgroup_st_deconfigure_active(struct subtype *st,
 static exit_code_t ccwgroup_st_deconfigure_persistent(struct subtype *st,
 						      struct device *dev)
 {
-	return udev_ccwgroup_remove_rule(st->name, dev->id);
+	return udev_ccwgroup_remove_rule(st->name, dev->id, false);
+}
+
+static exit_code_t ccwgroup_st_deconfigure_autoconf(struct subtype *st,
+						    struct device *dev)
+{
+	return udev_ccwgroup_remove_rule(st->name, dev->id, true);
 }
 
 /* Check if a CCWGROUP device with the specified ID exists. */
@@ -774,7 +814,12 @@ static bool ccwgroup_st_exists_active(struct subtype *st, const char *id)
 
 static bool ccwgroup_st_exists_persistent(struct subtype *st, const char *id)
 {
-	return udev_ccwgroup_exists(st->name, id);
+	return udev_ccwgroup_exists(st->name, id, false);
+}
+
+static bool ccwgroup_st_exists_autoconf(struct subtype *st, const char *id)
+{
+	return udev_ccwgroup_exists(st->name, id, true);
 }
 
 int ccwgroup_qsort_cmp(const void *a_ptr, const void *b_ptr)
@@ -796,7 +841,13 @@ static void ccwgroup_st_add_active_ids(struct subtype *st,
 static void ccwgroup_st_add_persistent_ids(struct subtype *st,
 					   struct util_list *ids)
 {
-	udev_ccwgroup_add_device_ids(st->name, ids);
+	udev_ccwgroup_add_device_ids(st->name, ids, false);
+}
+
+static void ccwgroup_st_add_autoconf_ids(struct subtype *st,
+					 struct util_list *ids)
+{
+	udev_ccwgroup_add_device_ids(st->name, ids, true);
 }
 
 /* Check if CCW device ID @b is part of CCW group device ID @a. */
@@ -1185,18 +1236,23 @@ struct subtype ccwgroup_subtype = {
 
 	.exists_active		= &ccwgroup_st_exists_active,
 	.exists_persistent	= &ccwgroup_st_exists_persistent,
+	.exists_autoconf	= &ccwgroup_st_exists_autoconf,
 
 	.add_active_ids		= &ccwgroup_st_add_active_ids,
 	.add_persistent_ids	= &ccwgroup_st_add_persistent_ids,
+	.add_autoconf_ids	= &ccwgroup_st_add_autoconf_ids,
 
 	.read_active		= &ccwgroup_st_read_active,
 	.read_persistent	= &ccwgroup_st_read_persistent,
+	.read_autoconf		= &ccwgroup_st_read_autoconf,
 
 	.configure_active	= &ccwgroup_st_configure_active,
 	.configure_persistent	= &ccwgroup_st_configure_persistent,
+	.configure_autoconf	= &ccwgroup_st_configure_autoconf,
 
 	.deconfigure_active	= &ccwgroup_st_deconfigure_active,
 	.deconfigure_persistent	= &ccwgroup_st_deconfigure_persistent,
+	.deconfigure_autoconf	= &ccwgroup_st_deconfigure_autoconf,
 
 	.online_set		= &ccwgroup_st_online_set,
 	.online_get		= &ccwgroup_st_online_get,

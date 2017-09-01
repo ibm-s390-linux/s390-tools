@@ -360,6 +360,8 @@ static void add_setting(const char *filename, struct device *dev,
 		_add_setting(filename, dev, config_active, key, value);
 	if (SCOPE_PERSISTENT(config))
 		_add_setting(filename, dev, config_persistent, key, value);
+	if (SCOPE_AUTOCONF(config))
+		_add_setting(filename, dev, config_autoconf, key, value);
 }
 
 /* Parse a single device setting in firmware format and apply it to the
@@ -476,6 +478,10 @@ static struct device *add_device(struct fw_file *f, struct subtype *st,
 	if (SCOPE_PERSISTENT(config)) {
 		setting_list_clear(dev->persistent.settings);
 		dev->persistent.exists = 1;
+	}
+	if (SCOPE_AUTOCONF(config)) {
+		setting_list_clear(dev->autoconf.settings);
+		dev->autoconf.exists = 1;
 	}
 
 	return dev;

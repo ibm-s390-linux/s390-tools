@@ -24,6 +24,7 @@
 #define PATH_CCW_BUS		"/sys/bus/ccw"
 #define PATH_CCWGROUP_BUS	"/sys/bus/ccwgroup"
 #define PATH_UDEV_RULES		"/etc/udev/rules.d"
+#define PATH_UDEV_RULES_VOLATILE "/run/udev/rules.d"
 #define	PATH_PROC		"/proc"
 
 #define PATH_UDEVADM		"udevadm"
@@ -55,8 +56,8 @@ char *path_get_ccw_device(const char *, const char *);
 char *path_get_ccw_devices(const char *);
 char *path_get_ccwgroup_device(const char *, const char *);
 char *path_get_ccwgroup_devices(const char *);
-char *path_get_udev_rule(const char *, const char *);
-char *path_get_udev_rules(void);
+char *path_get_udev_rule(const char *type, const char *id, bool vol);
+char *path_get_udev_rules(bool vol);
 char *path_get_proc(const char *);
 char *path_get_sys_bus_dev(const char *, const char *);
 char *path_get_sys_bus_drv(const char *, const char *);

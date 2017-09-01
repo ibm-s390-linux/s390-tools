@@ -1107,14 +1107,18 @@ char *misc_readlink(const char *path)
 }
 
 /* Determine configuration set. */
-config_t get_config(int active, int persistent)
+config_t get_config(int active, int persistent, int autoconf)
 {
-	if ((!active && !persistent) || (active && persistent))
-		return config_all;
-	else if (active)
-		return config_active;
-	else
-		return config_persistent;
+	config_t config = 0;
+
+	if (active)
+		config |= config_active;
+	if (persistent)
+		config |= config_persistent;
+	if (autoconf)
+		config |= config_autoconf;
+
+	return config;
 }
 
 /* Determine if program is running under z/VM. */
@@ -1248,11 +1252,12 @@ const char *config_to_str(config_t config)
 		return "active";
 	case config_persistent:
 		return "persistent";
+	case config_autoconf:
+		return "autoconf";
 	case config_all:
 		return "all";
 	}
-	/* Should not happen. */
-	return "";
+	return "multiple";
 }
 
 /* Convert textual config representation to config_t. */
@@ -1262,6 +1267,8 @@ bool str_to_config(const char *str, config_t *config_ptr)
 		*config_ptr = config_active;
 	else if (strcasecmp(str, "persistent") == 0)
 		*config_ptr = config_persistent;
+	else if (strcasecmp(str, "autoconf") == 0)
+		*config_ptr = config_autoconf;
 	else if (strcasecmp(str, "all") == 0)
 		*config_ptr = config_all;
 	else

@@ -40,8 +40,9 @@ exit_code_t udev_read_file(const char *, struct udev_file **);
 void udev_free_file(struct udev_file *);
 void udev_file_print(struct udev_file *);
 
-void udev_get_device_ids(const char *, struct util_list *);
-exit_code_t udev_remove_rule(const char *, const char *);
+void udev_get_device_ids(const char *type, struct util_list *list,
+			 bool autoconf);
+exit_code_t udev_remove_rule(const char *type, const char *id, bool autoconf);
 
 void udev_settle(void);
 

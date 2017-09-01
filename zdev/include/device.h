@@ -45,6 +45,7 @@ struct device_state {
  * @node: Node for adding this device to a list
  * @active: Device state in the active configuration
  * @persistent: Device state in the persistent configuration
+ * @autoconf: Auto-configured device state
  * @errors: A strlist of error and warning messages issued for the device
  * @processed: Device has been processed
  */
@@ -59,6 +60,7 @@ struct device {
 
 	struct device_state active;
 	struct device_state persistent;
+	struct device_state autoconf;
 
 	unsigned int processed:1;
 };
@@ -96,5 +98,7 @@ struct device *device_list_find(struct device_list *, const char *,
 void device_list_print(struct device_list *, int);
 struct setting_list *device_get_setting_list(struct device *dev,
 					     config_t config);
+
+config_t device_get_config(struct device *dev);
 
 #endif /* DEVICE_H */

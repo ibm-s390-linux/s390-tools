@@ -297,21 +297,25 @@ char *path_get_ccwgroup_devices(const char *drv)
 }
 
 /* Return path to udev rule. */
-char *path_get_udev_rule(const char *type, const char *id)
+char *path_get_udev_rule(const char *type, const char *id, bool vol)
 {
+	const char *path = vol ? PATH_UDEV_RULES_VOLATILE : PATH_UDEV_RULES;
+
 	if (id) {
-		return path_get("%s/%s-%s-%s%s", PATH_UDEV_RULES,
+		return path_get("%s/%s-%s-%s%s", path,
 				UDEV_PREFIX, type, id, UDEV_SUFFIX);
 	}
 
-	return path_get("%s/%s-%s%s", PATH_UDEV_RULES,
+	return path_get("%s/%s-%s%s", path,
 			UDEV_PREFIX, type, UDEV_SUFFIX);
 }
 
 /* Return path to directory containing all udev rules. */
-char *path_get_udev_rules(void)
+char *path_get_udev_rules(bool vol)
 {
-	return path_get("%s", PATH_UDEV_RULES);
+	const char *path = vol ? PATH_UDEV_RULES_VOLATILE : PATH_UDEV_RULES;
+
+	return path_get("%s", path);
 }
 
 /* Return path to the specified file in the proc file system. */

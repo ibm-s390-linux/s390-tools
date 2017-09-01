@@ -41,5 +41,6 @@ OPTIONS
   -n, --no-headings      Do not print column headings
       --base PATH        Use PATH as base for accessing files
       --pairs            Produce output in KEY="VALUE" format
+      --auto-conf        Only show auto-configuration data
   -V, --verbose          Print additional run-time information
   -q, --quiet            Print only minimal run-time information

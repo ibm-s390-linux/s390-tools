@@ -360,7 +360,8 @@ static bool get_ids_cb(const char *filename, void *data)
 
 /* Add the IDs for all devices of the specified subtype name for which a
  * udev rule exists to strlist LIST. */
-void udev_get_device_ids(const char *type, struct util_list *list)
+void udev_get_device_ids(const char *type, struct util_list *list,
+			 bool autoconf)
 {
 	char *path, *prefix;
 	struct util_list *files;
@@ -369,7 +370,7 @@ void udev_get_device_ids(const char *type, struct util_list *list)
 
 	prefix = misc_asprintf("%s-%s-", UDEV_PREFIX, type);
 	plen = strlen(prefix);
-	path = path_get_udev_rules();
+	path = path_get_udev_rules(autoconf);
 	files = strlist_new();
 	if (!misc_read_dir(path, files, get_ids_cb, prefix))
 		goto out;
@@ -388,12 +389,12 @@ out:
 }
 
 /* Remove UDEV rule for device. */
-exit_code_t udev_remove_rule(const char *type, const char *id)
+exit_code_t udev_remove_rule(const char *type, const char *id, bool autoconf)
 {
 	char *path;
 	exit_code_t rc = EXIT_OK;
 
-	path = path_get_udev_rule(type, id);
+	path = path_get_udev_rule(type, id, autoconf);
 	if (util_path_is_reg_file(path))
 		rc = remove_file(path);
 	free(path);

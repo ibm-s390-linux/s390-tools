@@ -69,12 +69,13 @@ With no further options specified, the output format defaults to list format.
 .
 .
 .SS "Configurations"
-There are two sources for configuration information: the active configuration
-of the currently running system, and the persistent configuration stored in
-configuration files.
+There are three sources for configuration information: the active configuration
+of the currently running system, the persistent configuration stored in
+configuration files, and the auto-configuration that is provided by some
+machine types to automatically enable I/O devices.
 .PP
 By default lszdev displays information from both the active and the persistent
-configuration.
+configuration, and, if available, from the auto-configuration.
 .PP
 .
 .
@@ -317,6 +318,19 @@ List information from the active configuration only.
 
 Restricts output to information obtained from the active configuration, that
 is information from the running system.
+.PP
+.
+.OD auto-conf "" ""
+List information from the auto-configuration only.
+
+Restricts output to information obtained from the auto-configuration.
+The auto-configuration is the collection of configuration data obtained
+automatically on some machine models during boot.
+
+.B Note:
+This data is refreshed during each boot. Also configuration directives in
+the auto-configuration only take effect if there is no directive for the
+same device in the persistent configuration.
 .PP
 .
 .OD base "" "PATH" | "KEY" = "VALUE"

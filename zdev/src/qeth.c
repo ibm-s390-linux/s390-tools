@@ -1207,7 +1207,7 @@ static exit_code_t check_layer2(struct device *dev, config_t config)
 {
 	struct setting *l;
 	int layer2_detected, layer2_active = -1, layer2_persistent = -1,
-	    layer2_modified = 0;
+	    layer2_autoconf = -1, layer2_modified = 0;
 	exit_code_t rc = EXIT_OK;
 
 	layer2_detected = detect_layer2(dev);
@@ -1231,13 +1231,25 @@ static exit_code_t check_layer2(struct device *dev, config_t config)
 		if (rc)
 			goto out;
 	}
+	l = setting_list_find(dev->autoconf.settings, qeth_attr_layer2.name);
+	if (l) {
+		layer2_autoconf = atoi(l->value);
+		layer2_modified |= l->modified;
+	} else if (SCOPE_AUTOCONF(config)) {
+		rc = generate_layer2("autoconf", dev->autoconf.settings,
+				     &layer2_autoconf, &layer2_modified);
+		if (rc)
+			goto out;
+	}
 
 	/* Check correct layer2 setting. */
 	if (layer2_detected != -1) {
 		if ((SCOPE_ACTIVE(config) && layer2_active != -1 &&
 		     layer2_active != layer2_detected) ||
 		    (SCOPE_PERSISTENT(config) && layer2_persistent != -1 &&
-		     layer2_persistent != layer2_detected)) {
+		     layer2_persistent != layer2_detected) ||
+		    (SCOPE_AUTOCONF(config) && layer2_autoconf != -1 &&
+		     layer2_autoconf != layer2_detected)) {
 			rc = layer2_mismatch(layer2_detected, layer2_modified);
 			if (rc)
 				goto out;
@@ -1256,14 +1268,25 @@ static exit_code_t check_layer2(struct device *dev, config_t config)
 		if (rc)
 			goto out;
 	}
+	if (SCOPE_AUTOCONF(config)) {
+		rc = check_ineffective_settings(dev->autoconf.settings,
+						layer2_autoconf);
+		if (rc)
+			goto out;
+	}
 	/* check for conflicting layer2 attribute groups */
 	if (SCOPE_ACTIVE(config)) {
 		rc = check_conflicting_settings(dev->active.settings);
 		if (rc)
 			goto out;
 	}
-	if (SCOPE_PERSISTENT(config))
+	if (SCOPE_PERSISTENT(config)) {
 		rc = check_conflicting_settings(dev->persistent.settings);
+		if (rc)
+			goto out;
+	}
+	if (SCOPE_AUTOCONF(config))
+		rc = check_conflicting_settings(dev->autoconf.settings);
 
 out:
 	return rc;
@@ -1277,7 +1300,8 @@ static exit_code_t qeth_st_check_pre_configure(struct subtype *st,
 
 	/* No need to check if device is deconfigured. */
 	if ((SCOPE_ACTIVE(config) && dev->active.deconfigured) ||
-	    (SCOPE_PERSISTENT(config) && dev->persistent.deconfigured))
+	    (SCOPE_PERSISTENT(config) && dev->persistent.deconfigured) ||
+	    (SCOPE_AUTOCONF(config) && dev->autoconf.deconfigured))
 		return EXIT_OK;
 
 	rc = check_layer2(dev, config);

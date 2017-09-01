@@ -428,8 +428,8 @@ using the \-\-import action like in the following example
 .B Note:
 By default all configuration data that is read is also applied. To reduce the
 scope of imported configuration data, you can select specific devices, a device
-type, or define whether only data for the active or persistent configuration
-should be imported.
+type, or define whether only data for the active, persistent or
+auto-configuration should be imported.
 .PP
 .
 .OD list-attributes "l" ""
@@ -470,6 +470,18 @@ was also specified.
 Changes to the active configuration are effective immediately. They are lost
 on reboot, or when a device becomes unavailable, or when a device driver is
 unloaded.
+.PP
+.
+.OD auto-conf "" ""
+Apply changes to the auto-configuration only.
+
+This option is used internally to apply machine-provided I/O configuration data
+to a Linux system.
+
+.B Note:
+There is typically no need for users to specify this option directly.
+In particular, user-initiated changes to this configuration will be lost
+the next time that machine-provided data is obtained (i.e. during boot).
 .PP
 .
 .OD base "" "PATH" | "KEY" = "VALUE"

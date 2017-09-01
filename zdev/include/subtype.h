@@ -67,17 +67,22 @@ typedef exit_code_t (*subtype_cb_t)(struct subtype *st, const char *id,
  *
  * @exists_active: Check if device exists in active configuration
  * @exists_persistent: Check if device exists in persistent configuration
+ * @exists_autoconf: Check if device exists in autoconf configuration
  *
  * @add_active_ids: Add IDs of all devices existing in active configuration to
  *                  specified strlist
  * @add_persistent_ids: Add IDs of all devices existing in persistent
  *                      configuration to specified strlist
+ * @add_autoconf_ids: Add IDs of all devices existing in autoconf
+ *                    configuration to specified strlist
  *
  * @read_active: Read device configuration from active configuration
  * @read_persistent: Read device configuration from persistent configuration
+ * @read_autoconf: Read device configuration from autoconf configuration
  *
  * @configure_active: Apply configuration to active configuration
  * @configure_persistent: Apply configuration to persistent configuration
+ * @configure_autoconf: Apply configuration to autoconf configuration
  *
  * @check_pre_write: Optional: Determine if the given configuration is valid
  *                   for the specified device. If not, emit warning messages
@@ -150,24 +155,33 @@ struct subtype {
 
 	bool		(*exists_active)(struct subtype *, const char *);
 	bool		(*exists_persistent)(struct subtype *, const char *);
+	bool		(*exists_autoconf)(struct subtype *, const char *);
 
 	void		(*add_active_ids)(struct subtype *, struct util_list *);
 	void		(*add_persistent_ids)(struct subtype *,
 					      struct util_list *);
+	void		(*add_autoconf_ids)(struct subtype *,
+					    struct util_list *);
 
 	exit_code_t	(*read_active)(struct subtype *, struct device *,
 				       read_scope_t);
 	exit_code_t	(*read_persistent)(struct subtype *, struct device *,
 					   read_scope_t);
+	exit_code_t	(*read_autoconf)(struct subtype *, struct device *,
+					 read_scope_t);
 
 	exit_code_t	(*configure_active)(struct subtype *, struct device *);
 	exit_code_t	(*configure_persistent)(struct subtype *,
 						struct device *);
+	exit_code_t	(*configure_autoconf)(struct subtype *,
+					      struct device *);
 
 	exit_code_t	(*deconfigure_active)(struct subtype *,
 					      struct device *);
 	exit_code_t	(*deconfigure_persistent)(struct subtype *,
 						  struct device *);
+	exit_code_t	(*deconfigure_autoconf)(struct subtype *,
+						struct device *);
 
 	exit_code_t	(*check_pre_configure)(struct subtype *,
 					       struct device *, int, config_t);
@@ -217,23 +231,31 @@ void subtype_exit(struct subtype *);
 
 bool subtype_device_exists_active(struct subtype *, const char *);
 bool subtype_device_exists_persistent(struct subtype *, const char *);
+bool subtype_device_exists_autoconf(struct subtype *st, const char *id);
 
 void subtype_add_active_ids(struct subtype *, struct util_list *);
 void subtype_add_persistent_ids(struct subtype *, struct util_list *);
+void subtype_add_autoconf_ids(struct subtype *st, struct util_list *ids);
 
 exit_code_t subtype_device_read_active(struct subtype *, struct device *,
 				       read_scope_t);
 exit_code_t subtype_device_read_persistent(struct subtype *, struct device *,
 					   read_scope_t);
+exit_code_t subtype_device_read_autoconf(struct subtype *st, struct device *dev,
+					 read_scope_t scope);
 
 exit_code_t subtype_device_configure_active(struct subtype *, struct device *);
 exit_code_t subtype_device_configure_persistent(struct subtype *,
 						struct device *);
+exit_code_t subtype_device_configure_autoconf(struct subtype *st,
+					      struct device *dev);
 
 exit_code_t subtype_device_deconfigure_active(struct subtype *,
 					      struct device *);
 exit_code_t subtype_device_deconfigure_persistent(struct subtype *st,
 						  struct device *);
+exit_code_t subtype_device_deconfigure_autoconf(struct subtype *st,
+						struct device *dev);
 
 exit_code_t subtype_check_pre_configure(struct subtype *, struct device *, int,
 					config_t);

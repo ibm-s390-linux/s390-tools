@@ -15,9 +15,9 @@
 
 struct device;
 
-bool udev_ccw_exists(const char *, const char *);
-exit_code_t udev_ccw_read_device(struct device *);
-exit_code_t udev_ccw_write_device(struct device *);
-exit_code_t udev_ccw_write_cio_ignore(const char *);
+bool udev_ccw_exists(const char *type, const char *id, bool autoconf);
+exit_code_t udev_ccw_read_device(struct device *dev, bool autoconf);
+exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf);
+exit_code_t udev_ccw_write_cio_ignore(const char *id_list, bool autoconf);
 
 #endif /* UDEV_CCW_H */

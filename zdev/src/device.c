@@ -40,6 +40,7 @@ struct device *device_new(struct subtype *st, const char *id)
 
 	dev->active.settings = setting_list_new();
 	dev->persistent.settings = setting_list_new();
+	dev->autoconf.settings = setting_list_new();
 
 	return dev;
 }
@@ -53,6 +54,7 @@ void device_free(struct device *dev)
 	free(dev->devid);
 	setting_list_free(dev->active.settings);
 	setting_list_free(dev->persistent.settings);
+	setting_list_free(dev->autoconf.settings);
 	free(dev);
 }
 
@@ -81,6 +83,15 @@ void device_print(struct device *dev, int level)
 	       dev->persistent.deconfigured);
 	if (dev->persistent.settings)
 		setting_list_print(dev->persistent.settings, level + 8);
+	else
+		printf("%*s<none>\n", level + 8, "");
+
+	printf("%*sautoconf:\n", level + 4, "");
+	printf("%*sexists=%d mod=%d deconf=%d\n",
+	       level + 8, "", dev->autoconf.exists, dev->autoconf.modified,
+	       dev->autoconf.deconfigured);
+	if (dev->autoconf.settings)
+		setting_list_print(dev->autoconf.settings, level + 8);
 	else
 		printf("%*s<none>\n", level + 8, "");
 }
@@ -182,6 +193,10 @@ bool device_needs_writing(struct device *dev, config_t config)
 	    (dev->persistent.modified || dev->persistent.deconfigured ||
 	     setting_list_modified(dev->persistent.settings)))
 		return true;
+	if (SCOPE_AUTOCONF(config) &&
+	    (dev->autoconf.modified || dev->autoconf.deconfigured ||
+	     setting_list_modified(dev->autoconf.settings)))
+		return true;
 
 	return false;
 }
@@ -203,6 +218,8 @@ static exit_code_t apply_setting(struct device *dev, config_t config,
 			goto err_invalid_forceable;
 		/* Check for activeonly. */
 		if (!force && SCOPE_PERSISTENT(config) && a->activeonly)
+			goto err_activeonly_forceable;
+		if (!force && SCOPE_AUTOCONF(config) && a->activeonly)
 			goto err_activeonly_forceable;
 		/* Check for multiple values. */
 		if (!force && !a->multi && strlist_find(processed, key))
@@ -231,8 +248,15 @@ static exit_code_t apply_setting(struct device *dev, config_t config,
 					     a, key, value);
 	}
 
+	/* Apply to autoconf config. */
+	if (SCOPE_AUTOCONF(config)) {
+		setting_list_apply_specified(dev->autoconf.settings,
+					     a, key, value);
+	}
+
 	/* Additional warning when trying to persist read-only setting. */
-	if (config == config_persistent) {
+	if (!SCOPE_ACTIVE(config) && (SCOPE_PERSISTENT(config) ||
+				      SCOPE_AUTOCONF(config))) {
 		s = setting_list_find(dev->active.settings, key);
 		if (s && s->readonly)
 			warn_readonly = true;
@@ -341,6 +365,8 @@ void device_reset(struct device *dev, config_t config)
 		reset_device_state(&dev->active);
 	if (SCOPE_PERSISTENT(config))
 		reset_device_state(&dev->persistent);
+	if (SCOPE_AUTOCONF(config))
+		reset_device_state(&dev->autoconf);
 	dev->processed = 0;
 }
 
@@ -567,6 +593,12 @@ exit_code_t device_check_settings(struct device *dev, config_t config,
 						 err))
 			return EXIT_INVALID_CONFIG;
 	}
+	if (SCOPE_AUTOCONF(config)) {
+		if (!setting_list_check_conflict(dev->autoconf.settings,
+						 config_autoconf,
+						 err))
+			return EXIT_INVALID_CONFIG;
+	}
 
 	return EXIT_OK;
 }
@@ -578,8 +610,27 @@ struct setting_list *device_get_setting_list(struct device *dev,
 
 	if (config == config_active)
 		settings = dev->active.settings;
-	else
+	else if (config == config_persistent)
 		settings = dev->persistent.settings;
+	else if (config == config_autoconf)
+		settings = dev->autoconf.settings;
 
 	return settings;
+}
+
+/* Return configuration set in which device exists. */
+config_t device_get_config(struct device *dev)
+{
+	config_t config = 0;
+
+	if (dev->active.exists || dev->active.definable)
+		config |= config_active;
+
+	if (dev->persistent.exists)
+		config |= config_persistent;
+
+	if (dev->autoconf.exists)
+		config |= config_autoconf;
+
+	return config;
 }

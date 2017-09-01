@@ -316,34 +316,34 @@ static struct attrib dasd_attr_safe_offline = {
  * DASD subtype methods.
  */
 
+static bool _check_use_diag(struct setting_list *list)
+{
+	struct setting *u;
+
+	u = setting_list_find(list, dasd_attr_use_diag.name);
+	if (u && u->modified) {
+		if (u->value && atoi(u->value) == 1) {
+			delayed_warn("Cannot set 'use_diag=1' on non-z/VM system\n");
+			return false;
+		}
+	}
+	return true;
+}
+
 /* Check if use_diag setting can be correctly applied. */
 static exit_code_t check_use_diag(struct device *dev, config_t config)
 {
-	struct setting *u;
-	int zvm = is_zvm();
+	if (is_zvm())
+		return EXIT_OK;
 
-	if (SCOPE_ACTIVE(config)) {
-		u = setting_list_find(dev->active.settings,
-				      dasd_attr_use_diag.name);
-		if (u && u->modified) {
-			if (u->value && atoi(u->value) == 1 && !zvm) {
-				delayed_warn("Cannot set 'use_diag=1' on "
-					     "non-z/VM system\n");
-				return EXIT_INVALID_CONFIG;
-			}
-		}
-	}
-	if (SCOPE_PERSISTENT(config)) {
-		u = setting_list_find(dev->persistent.settings,
-				      dasd_attr_use_diag.name);
-		if (u && u->modified) {
-			if (u->value && atoi(u->value) == 1 && !zvm) {
-				delayed_warn("Cannot set 'use_diag=1' on "
-					     "non-z/VM system\n");
-				return EXIT_INVALID_CONFIG;
-			}
-		}
-	}
+	if (SCOPE_ACTIVE(config) && !_check_use_diag(dev->active.settings))
+		return EXIT_INVALID_CONFIG;
+	if (SCOPE_PERSISTENT(config) &&
+	    !_check_use_diag(dev->persistent.settings))
+		return EXIT_INVALID_CONFIG;
+	if (SCOPE_AUTOCONF(config) &&
+	    !_check_use_diag(dev->autoconf.settings))
+		return EXIT_INVALID_CONFIG;
 
 	return EXIT_OK;
 }
@@ -375,6 +375,8 @@ static void dasd_st_add_modules(struct subtype *st, struct device *dev,
 	setting_list_get_bool_state(dev->active.settings,
 				    dasd_attr_use_diag.name, &changed, &aset);
 	setting_list_get_bool_state(dev->persistent.settings,
+				    dasd_attr_use_diag.name, &changed, &pset);
+	setting_list_get_bool_state(dev->autoconf.settings,
 				    dasd_attr_use_diag.name, &changed, &pset);
 
 	if (aset || pset)

@@ -25,7 +25,7 @@
 #include "udev_ccw.h"
 
 /* Check if a udev rule for the specified ccw device exists. */
-bool udev_ccw_exists(const char *type, const char *id)
+bool udev_ccw_exists(const char *type, const char *id, bool autoconf)
 {
 	char *path, *normid;
 	bool rc;
@@ -34,7 +34,7 @@ bool udev_ccw_exists(const char *type, const char *id)
 	if (!normid)
 		return false;
 
-	path = path_get_udev_rule(type, normid);
+	path = path_get_udev_rule(type, normid, autoconf);
 	rc = util_path_is_reg_file(path);
 	free(path);
 	free(normid);
@@ -88,15 +88,16 @@ static void udev_file_get_settings(struct udev_file *file,
 }
 
 /* Read the persistent configuration of a CCW device from a udev rule. */
-exit_code_t udev_ccw_read_device(struct device *dev)
+exit_code_t udev_ccw_read_device(struct device *dev, bool autoconf)
 {
 	struct subtype *st = dev->subtype;
-	struct device_state *state = &dev->persistent;
+	struct device_state *state = autoconf ? &dev->autoconf :
+						&dev->persistent;
 	struct udev_file *file = NULL;
 	exit_code_t rc;
 	char *path;
 
-	path = path_get_udev_rule(st->name, dev->id);
+	path = path_get_udev_rule(st->name, dev->id, autoconf);
 	rc = udev_read_file(path, &file);
 	if (rc)
 		goto out;
@@ -128,12 +129,13 @@ static char *get_label_id(const char *prefix, const char *type,
 }
 
 /* Write the persistent configuration of a CCW device to a udev rule. */
-exit_code_t udev_ccw_write_device(struct device *dev)
+exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
 {
 	struct subtype *st = dev->subtype;
 	struct ccw_subtype_data *data = st->data;
 	const char *type = st->name, *drv = data->ccwdrv, *id = dev->id;
-	struct device_state *state = &dev->persistent;
+	struct device_state *state = autoconf ? &dev->autoconf :
+						&dev->persistent;
 	char *path, *cfg_label = NULL, *end_label = NULL;
 	struct util_list *list;
 	struct ptrlist_node *p;
@@ -142,7 +144,7 @@ exit_code_t udev_ccw_write_device(struct device *dev)
 	FILE *fd;
 
 	if (!state->exists)
-		return udev_remove_rule(type, id);
+		return udev_remove_rule(type, id, autoconf);
 
 	cfg_label = get_label_id("cfg", type, id);
 	end_label = get_label_id("end", type, id);
@@ -150,7 +152,7 @@ exit_code_t udev_ccw_write_device(struct device *dev)
 	/* Apply attributes in correct order. */
 	list = setting_list_get_sorted(state->settings);
 
-	path = path_get_udev_rule(type, id);
+	path = path_get_udev_rule(type, id, autoconf);
 	debug("Writing %s udev rule file %s\n", type, path);
 	if (!util_path_exists(path)) {
 		rc = path_create(path);
@@ -234,14 +236,18 @@ out:
 }
 
 /* Write a udev rule to free devices from the cio-ignore blacklist. */
-exit_code_t udev_ccw_write_cio_ignore(const char *id_list)
+exit_code_t udev_ccw_write_cio_ignore(const char *id_list, bool autoconf)
 {
-	char *path, *curr = NULL;
+	char *path, *prefix, *curr = NULL;
 	FILE *fd;
 	exit_code_t rc = EXIT_OK;
 
+	/* Ensure that autoconf version of cio-ignore is not masked
+	 * by normal one. */
+	prefix = autoconf ? "cio-ignore-autoconf" : "cio-ignore";
+
 	/* Create file. */
-	path = path_get_udev_rule("cio-ignore", NULL);
+	path = path_get_udev_rule(prefix, NULL, autoconf);
 
 	if (!*id_list) {
 		/* Empty id_list string - remove file. */

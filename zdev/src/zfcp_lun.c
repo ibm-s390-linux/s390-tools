@@ -467,7 +467,14 @@ static exit_code_t zfcp_lun_st_read_persistent(struct subtype *st,
 					       struct device *dev,
 					       read_scope_t scope)
 {
-	return udev_zfcp_lun_read_device(dev);
+	return udev_zfcp_lun_read_device(dev, false);
+}
+
+static exit_code_t zfcp_lun_st_read_autoconf(struct subtype *st,
+					     struct device *dev,
+					     read_scope_t scope)
+{
+	return udev_zfcp_lun_read_device(dev, true);
 }
 
 static exit_code_t zfcp_lun_add(struct device *dev)
@@ -564,7 +571,13 @@ static exit_code_t zfcp_lun_st_configure_active(struct subtype *st,
 static exit_code_t zfcp_lun_st_configure_persistent(struct subtype *st,
 						    struct device *dev)
 {
-	return udev_zfcp_lun_write_device(dev);
+	return udev_zfcp_lun_write_device(dev, false);
+}
+
+static exit_code_t zfcp_lun_st_configure_autoconf(struct subtype *st,
+						  struct device *dev)
+{
+	return udev_zfcp_lun_write_device(dev, true);
 }
 
 static exit_code_t zfcp_lun_st_deconfigure_active(struct subtype *st,
@@ -578,7 +591,13 @@ static exit_code_t zfcp_lun_st_deconfigure_active(struct subtype *st,
 static exit_code_t zfcp_lun_st_deconfigure_persistent(struct subtype *st,
 						      struct device *dev)
 {
-	return udev_zfcp_lun_remove_rule(dev->id);
+	return udev_zfcp_lun_remove_rule(dev->id, false);
+}
+
+static exit_code_t zfcp_lun_st_deconfigure_autoconf(struct subtype *st,
+						    struct device *dev)
+{
+	return udev_zfcp_lun_remove_rule(dev->id, true);
 }
 
 static exit_code_t check_npiv(struct subtype *st, struct device *dev,
@@ -606,7 +625,8 @@ static exit_code_t check_npiv(struct subtype *st, struct device *dev,
 	if (!allow_lun_scan)
 		goto out;
 
-	if (!(dev->active.deconfigured || dev->persistent.deconfigured)) {
+	if (!(dev->active.deconfigured || dev->persistent.deconfigured ||
+	      dev->autoconf.deconfigured)) {
 		delayed_info("Note: Auto LUN scan enabled - manual LUN "
 			     "configuration is redundant for %s %s\n",
 			     zfcp_host_subtype.devname, fcp_dev_id);
@@ -643,7 +663,8 @@ static exit_code_t zfcp_lun_st_check_post_configure(struct subtype *st,
 
 	/* Don't show note when an attribute was modified. */
 	if (setting_list_modified(dev->active.settings) ||
-	    setting_list_modified(dev->persistent.settings))
+	    setting_list_modified(dev->persistent.settings) ||
+	    setting_list_modified(dev->autoconf.settings))
 		return EXIT_OK;
 
 	/* Check for NPIV but don't route exit code to caller - we only
@@ -795,7 +816,12 @@ static bool zfcp_lun_st_exists_active(struct subtype *st, const char *id)
 
 static bool zfcp_lun_st_exists_persistent(struct subtype *st, const char *id)
 {
-	return udev_zfcp_lun_exists(id);
+	return udev_zfcp_lun_exists(id, false);
+}
+
+static bool zfcp_lun_st_exists_autoconf(struct subtype *st, const char *id)
+{
+	return udev_zfcp_lun_exists(id, true);
 }
 
 static exit_code_t zfcp_lun_st_is_definable(struct subtype *st, const char *id,
@@ -889,7 +915,13 @@ static void zfcp_lun_st_add_active_ids(struct subtype *st,
 static void zfcp_lun_st_add_persistent_ids(struct subtype *st,
 					   struct util_list *ids)
 {
-	udev_zfcp_lun_add_device_ids(ids);
+	udev_zfcp_lun_add_device_ids(ids, false);
+}
+
+static void zfcp_lun_st_add_autoconf_ids(struct subtype *st,
+					 struct util_list *ids)
+{
+	udev_zfcp_lun_add_device_ids(ids, true);
 }
 
 static exit_code_t add_sg_cb(const char *path, const char *filename, void *data)
@@ -1072,18 +1104,23 @@ struct subtype zfcp_lun_subtype = {
 
 	.exists_active		= &zfcp_lun_st_exists_active,
 	.exists_persistent	= &zfcp_lun_st_exists_persistent,
+	.exists_autoconf	= &zfcp_lun_st_exists_autoconf,
 
 	.add_active_ids		= &zfcp_lun_st_add_active_ids,
 	.add_persistent_ids	= &zfcp_lun_st_add_persistent_ids,
+	.add_autoconf_ids	= &zfcp_lun_st_add_autoconf_ids,
 
 	.read_active		= &zfcp_lun_st_read_active,
 	.read_persistent	= &zfcp_lun_st_read_persistent,
+	.read_autoconf		= &zfcp_lun_st_read_autoconf,
 
 	.configure_active	= &zfcp_lun_st_configure_active,
 	.configure_persistent	= &zfcp_lun_st_configure_persistent,
+	.configure_autoconf	= &zfcp_lun_st_configure_autoconf,
 
 	.deconfigure_active	= &zfcp_lun_st_deconfigure_active,
 	.deconfigure_persistent	= &zfcp_lun_st_deconfigure_persistent,
+	.deconfigure_autoconf	= &zfcp_lun_st_deconfigure_autoconf,
 
 	.check_pre_configure	= &zfcp_lun_st_check_pre_configure,
 	.check_post_configure	= &zfcp_lun_st_check_post_configure,

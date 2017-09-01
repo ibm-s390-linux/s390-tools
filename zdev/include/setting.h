@@ -94,7 +94,8 @@ void setting_list_map_values(struct setting_list *);
 void setting_list_mark_default_derived(struct setting_list *);
 int setting_list_count_set(struct setting_list *);
 void setting_list_remove_derived(struct setting_list *);
-char *setting_get_changes(struct setting_list *, struct setting_list *);
+char *setting_get_changes(struct setting_list *act, struct setting_list *pers,
+			  struct setting_list *ac);
 bool setting_match_value(struct setting *, const char *);
 
 #endif /* SETTING_H */

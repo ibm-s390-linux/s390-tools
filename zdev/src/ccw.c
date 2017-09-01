@@ -892,12 +892,13 @@ static exit_code_t collect_group_cb(struct subtype *st, const char *id,
 }
 
 /* Set bits for all persistently configured CCW devices. */
-static char ***id_bitmap_collect(void)
+static char ***id_bitmap_collect(bool autoconf)
 {
 	char ***id_bitmap;
 	int i, j;
 	struct devtype *dt;
 	struct subtype *st;
+	config_t config = autoconf ? config_autoconf : config_persistent;
 
 	id_bitmap = id_bitmap_new();
 
@@ -906,14 +907,14 @@ static char ***id_bitmap_collect(void)
 		for (j = 0; (st = dt->subtypes[j]); j++) {
 			/* Collect CCW device IDs. */
 			if (st->namespace == &ccw_namespace) {
-				subtype_for_each_id(st, config_persistent,
+				subtype_for_each_id(st, config,
 						    collect_cb, id_bitmap);
 			}
 			/* Collect CCWGROUP device IDs. Since there may be
 			 * multiple namespaces, we need to make use of this
 			 * hack. */
 			if (ccwgroup_compatible_namespace(st->namespace)) {
-				subtype_for_each_id(st, config_persistent,
+				subtype_for_each_id(st, config,
 						    collect_group_cb,
 						    id_bitmap);
 			}
@@ -952,7 +953,7 @@ static void range_add(struct util_list *list, struct ccw_devid *from,
 	free(f_str);
 }
 
-static struct util_list *cio_ignore_get_ranges(void)
+static struct util_list *cio_ignore_get_ranges(bool autoconf)
 {
 	char ***id_bitmap;
 	unsigned int cssid, ssid, devno;
@@ -962,7 +963,7 @@ static struct util_list *cio_ignore_get_ranges(void)
 
 	ranges = strlist_new();
 
-	id_bitmap = id_bitmap_collect();
+	id_bitmap = id_bitmap_collect(autoconf);
 	for (cssid = 0; cssid < CSSID_MAX; cssid++) {
 		if (!id_bitmap[cssid])
 			continue;
@@ -1003,22 +1004,32 @@ static struct util_list *cio_ignore_get_ranges(void)
 }
 
 /* Persistently configure cio_ignore. */
-exit_code_t ccw_blacklist_persist(void)
+static exit_code_t _ccw_blacklist_persist(bool autoconf)
 {
 	struct util_list *ranges;
 	char *id_list;
 	exit_code_t rc;
 
 	/* Get string to write to /proc/cio_ignore. */
-	ranges = cio_ignore_get_ranges();
+	ranges = cio_ignore_get_ranges(autoconf);
 	id_list = strlist_flatten(ranges, ",");
 	strlist_free(ranges);
 
 	/* Write udev rule to automatically write cio_ignore. */
-	rc = udev_ccw_write_cio_ignore(id_list);
+	rc = udev_ccw_write_cio_ignore(id_list, autoconf);
 	free(id_list);
 
 	return rc;
+}
+
+exit_code_t ccw_blacklist_persist(void)
+{
+	exit_code_t rc1, rc2;
+
+	rc1 = _ccw_blacklist_persist(false);
+	rc2 = _ccw_blacklist_persist(true);
+
+	return rc1 ? rc1 : rc2;
 }
 
 /*
@@ -1368,7 +1379,13 @@ static bool ccw_st_exists_active(struct subtype *st, const char *id)
 /* Check if a configuration exists for a CCW device with the specified @id. */
 static bool ccw_st_exists_persistent(struct subtype *st, const char *id)
 {
-	return udev_ccw_exists(st->name, id);
+	return udev_ccw_exists(st->name, id, false);
+}
+
+/* Check if a configuration exists for a CCW device with the specified @id. */
+static bool ccw_st_exists_autoconf(struct subtype *st, const char *id)
+{
+	return udev_ccw_exists(st->name, id, true);
 }
 
 static bool get_ids_cb(const char *file, void *data)
@@ -1404,7 +1421,14 @@ static void ccw_st_add_active_ids(struct subtype *st, struct util_list *ids)
  * to strlist @ids. */
 static void ccw_st_add_persistent_ids(struct subtype *st, struct util_list *ids)
 {
-	udev_get_device_ids(st->name, ids);
+	udev_get_device_ids(st->name, ids, false);
+}
+
+/* Add the IDs of all CCW devices for which a autoconf configuration exists
+ * to strlist @ids. */
+static void ccw_st_add_autoconf_ids(struct subtype *st, struct util_list *ids)
+{
+	udev_get_device_ids(st->name, ids, true);
 }
 
 /* Read the configuration of the CCW device with the specified @id from the
@@ -1440,7 +1464,16 @@ static exit_code_t ccw_st_read_persistent(struct subtype *st,
 					  struct device *dev,
 					  read_scope_t scope)
 {
-	return udev_ccw_read_device(dev);
+	return udev_ccw_read_device(dev, false);
+}
+
+/* Read the configuration of the CCW device with the specified @id from the
+ * autoconf configuration and add the resulting data to @dev. */
+static exit_code_t ccw_st_read_autoconf(struct subtype *st,
+					  struct device *dev,
+					  read_scope_t scope)
+{
+	return udev_ccw_read_device(dev, true);
 }
 
 static int get_online(struct setting_list *list)
@@ -1505,7 +1538,14 @@ static exit_code_t ccw_st_configure_active(struct subtype *st,
 static exit_code_t ccw_st_configure_persistent(struct subtype *st,
 					       struct device *dev)
 {
-	return udev_ccw_write_device(dev);
+	return udev_ccw_write_device(dev, false);
+}
+
+/* Create a autoconf configuration for the specified device @dev. */
+static exit_code_t ccw_st_configure_autoconf(struct subtype *st,
+					       struct device *dev)
+{
+	return udev_ccw_write_device(dev, true);
 }
 
 
@@ -1552,7 +1592,22 @@ static exit_code_t ccw_st_deconfigure_active(struct subtype *st,
 static exit_code_t ccw_st_deconfigure_persistent(struct subtype *st,
 						 struct device *dev)
 {
-	return udev_remove_rule(st->name, dev->id);
+	return udev_remove_rule(st->name, dev->id, false);
+}
+
+/**
+ * ccw_st_deconfigure_autoconf - Deconfigure device in autoconf
+ *                               configuration set
+ * @st: Subtype of target device
+ * @dev: Target device
+ *
+ * Deconfigure device @dev in the autoconf configuration set. Return %EXIT_OK
+ * on success, an error code otherwise.
+ */
+static exit_code_t ccw_st_deconfigure_autoconf(struct subtype *st,
+						 struct device *dev)
+{
+	return udev_remove_rule(st->name, dev->id, true);
 }
 
 /* Perform basic sanity checks. */
@@ -1589,6 +1644,8 @@ static void ccw_st_online_set(struct subtype *st, struct device *dev,
 		setting_list_apply(dev->active.settings, a, name, value);
 	if (SCOPE_PERSISTENT(config))
 		setting_list_apply(dev->persistent.settings, a, name, value);
+	if (SCOPE_AUTOCONF(config))
+		setting_list_apply(dev->autoconf.settings, a, name, value);
 }
 
 /* Determine the online state of the specified CCW device (0=offline, 1=online,
@@ -1596,14 +1653,16 @@ static void ccw_st_online_set(struct subtype *st, struct device *dev,
 static int ccw_st_online_get(struct subtype *st, struct device *dev,
 			     config_t config)
 {
-	int act_online = 1, pers_online = 1;
+	int act_online = 1, pers_online = 1, auto_online = 1;
 
 	if (SCOPE_ACTIVE(config))
 		act_online = get_online(dev->active.settings);
 	if (SCOPE_PERSISTENT(config))
 		pers_online = get_online(dev->persistent.settings);
+	if (SCOPE_AUTOCONF(config))
+		auto_online = get_online(dev->autoconf.settings);
 
-	return MIN(act_online, pers_online);
+	return MIN(MIN(act_online, pers_online), auto_online);
 }
 
 /* Determine if the online state of the specified CCW device was specified */
@@ -1619,6 +1678,11 @@ static bool ccw_st_online_specified(struct subtype *st, struct device *dev,
 	}
 	if (SCOPE_PERSISTENT(config) && dev->persistent.settings) {
 		s = setting_list_find(dev->persistent.settings, "online");
+		if (s && s->specified)
+			return true;
+	}
+	if (SCOPE_AUTOCONF(config) && dev->autoconf.settings) {
+		s = setting_list_find(dev->autoconf.settings, "online");
 		if (s && s->specified)
 			return true;
 	}
@@ -1769,18 +1833,23 @@ struct subtype ccw_subtype = {
 
 	.exists_active		= &ccw_st_exists_active,
 	.exists_persistent	= &ccw_st_exists_persistent,
+	.exists_autoconf	= &ccw_st_exists_autoconf,
 
 	.add_active_ids		= &ccw_st_add_active_ids,
 	.add_persistent_ids	= &ccw_st_add_persistent_ids,
+	.add_autoconf_ids	= &ccw_st_add_autoconf_ids,
 
 	.read_active		= &ccw_st_read_active,
 	.read_persistent	= &ccw_st_read_persistent,
+	.read_autoconf		= &ccw_st_read_autoconf,
 
 	.configure_active	= &ccw_st_configure_active,
 	.configure_persistent	= &ccw_st_configure_persistent,
+	.configure_autoconf	= &ccw_st_configure_autoconf,
 
 	.deconfigure_active	= &ccw_st_deconfigure_active,
 	.deconfigure_persistent	= &ccw_st_deconfigure_persistent,
+	.deconfigure_autoconf	= &ccw_st_deconfigure_autoconf,
 
 	.check_pre_configure	= &ccw_st_check_pre_configure,
 

@@ -83,7 +83,7 @@ static bool is_exportable(struct setting *s, config_t config)
 			return true;
 		}
 	}
-	if (SCOPE_PERSISTENT(config)) {
+	if (SCOPE_PERSISTENT(config) || SCOPE_AUTOCONF(config)) {
 		if (setting_is_set(s))
 			return true;
 	}
@@ -148,10 +148,9 @@ static int count_exportable(struct device *dev, config_t config)
 	struct setting *s;
 	int count;
 
-	if (config == config_active)
-		list = dev->active.settings;
-	else
-		list = dev->persistent.settings;
+	list = device_get_setting_list(dev, config);
+	if (!list)
+		return 0;
 	count = 0;
 
 	util_list_iterate(&list->list, s) {
@@ -169,12 +168,26 @@ exit_code_t export_write_device(FILE *fd, struct device *dev, config_t config,
 	exit_code_t rc;
 	struct setting_list *settings;
 
-	if (config == config_all) {
-		rc = export_write_device(fd, dev, config_active, first_ptr);
-		if (rc)
-			return rc;
-		return export_write_device(fd, dev, config_persistent,
-					   first_ptr);
+	if (!SCOPE_SINGLE(config)) {
+		if (SCOPE_ACTIVE(config)) {
+			rc = export_write_device(fd, dev, config_active,
+						 first_ptr);
+			if (rc)
+				return rc;
+		}
+		if (SCOPE_PERSISTENT(config)) {
+			rc = export_write_device(fd, dev, config_persistent,
+						 first_ptr);
+			if (rc)
+				return rc;
+		}
+		if (SCOPE_AUTOCONF(config)) {
+			rc = export_write_device(fd, dev, config_autoconf,
+						 first_ptr);
+			if (rc)
+				return rc;
+		}
+		return EXIT_OK;
 	}
 
 	if (config == config_active) {
@@ -185,10 +198,14 @@ exit_code_t export_write_device(FILE *fd, struct device *dev, config_t config,
 		    !dev->subtype->support_definable)
 			return EXIT_OK;
 		settings = dev->active.settings;
-	} else {
+	} else if (config == config_persistent) {
 		if (!dev->persistent.exists)
 			return EXIT_OK;
 		settings = dev->persistent.settings;
+	} else {
+		if (!dev->autoconf.exists)
+			return EXIT_OK;
+		settings = dev->autoconf.settings;
 	}
 
 	write_header(fd, config, dev->subtype->name, dev->id, first_ptr);
@@ -204,12 +221,21 @@ exit_code_t export_write_devtype(FILE *fd, struct devtype *dt, config_t config,
 	exit_code_t rc;
 	struct setting_list *settings;
 
-	if (config == config_all) {
-		rc = export_write_devtype(fd, dt, config_active, first_ptr);
-		if (rc)
-			return rc;
-		return export_write_devtype(fd, dt, config_persistent,
-					    first_ptr);
+	if (!SCOPE_SINGLE(config)) {
+		if (SCOPE_ACTIVE(config)) {
+			rc = export_write_devtype(fd, dt, config_active,
+						  first_ptr);
+			if (rc)
+				return rc;
+		}
+		if (SCOPE_PERSISTENT(config)) {
+			rc = export_write_devtype(fd, dt, config_persistent,
+						  first_ptr);
+			if (rc)
+				return rc;
+		}
+		/* Scope autoconf not supported for devtype */
+		return EXIT_OK;
 	}
 
 	if (config == config_active)
@@ -379,6 +405,10 @@ static exit_code_t handle_header(const char *filename, int lineno,
 			setting_list_clear(dev->persistent.settings);
 			dev->persistent.exists = 1;
 		}
+		if (SCOPE_AUTOCONF(hdr->config)) {
+			setting_list_clear(dev->autoconf.settings);
+			dev->autoconf.exists = 1;
+		}
 	}
 
 out:
@@ -397,13 +427,26 @@ static exit_code_t handle_setting(const char *filename, int lineno,
 	struct attrib **attribs, *a;
 	struct setting_list *list;
 
-	if (config == config_all) {
-		rc = handle_setting(filename, lineno, key, value, dt, dev,
-				    config_active);
-		if (rc)
-			return rc;
-		return handle_setting(filename, lineno, key, value, dt, dev,
-				      config_persistent);
+	if (!SCOPE_SINGLE(config)) {
+		if (SCOPE_ACTIVE(config)) {
+			rc = handle_setting(filename, lineno, key, value, dt,
+					    dev, config_active);
+			if (rc)
+				return rc;
+		}
+		if (SCOPE_PERSISTENT(config)) {
+			rc = handle_setting(filename, lineno, key, value, dt,
+					    dev, config_persistent);
+			if (rc)
+				return rc;
+		}
+		if (SCOPE_AUTOCONF(config)) {
+			rc = handle_setting(filename, lineno, key, value, dt,
+					    dev, config_autoconf);
+			if (rc)
+				return rc;
+		}
+		return EXIT_OK;
 	}
 
 	if (dt) {
@@ -452,7 +495,8 @@ static bool empty_device(struct device *dev)
 	if (dev->subtype->support_definable)
 		return false;
 	if (util_list_is_empty(&dev->active.settings->list) &&
-	    util_list_is_empty(&dev->persistent.settings->list))
+	    util_list_is_empty(&dev->persistent.settings->list) &&
+	    util_list_is_empty(&dev->autoconf.settings->list))
 		return true;
 	return false;
 }

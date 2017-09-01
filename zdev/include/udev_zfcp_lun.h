@@ -15,10 +15,10 @@
 
 struct device;
 
-void udev_zfcp_lun_add_device_ids(struct util_list *);
-bool udev_zfcp_lun_exists(const char *);
-exit_code_t udev_zfcp_lun_read_device(struct device *);
-exit_code_t udev_zfcp_lun_write_device(struct device *);
-exit_code_t udev_zfcp_lun_remove_rule(const char *);
+void udev_zfcp_lun_add_device_ids(struct util_list *list, bool autoconf);
+bool udev_zfcp_lun_exists(const char *id, bool autoconf);
+exit_code_t udev_zfcp_lun_read_device(struct device *dev, bool autoconf);
+exit_code_t udev_zfcp_lun_write_device(struct device *dev, bool autoconf);
+exit_code_t udev_zfcp_lun_remove_rule(const char *id, bool autoconf);
 
 #endif /* UDEV_ZFCP_LUN_H */

@@ -195,6 +195,13 @@ bool subtype_device_exists_persistent(struct subtype *st, const char *id)
 	return super->exists_persistent(st, id);
 }
 
+bool subtype_device_exists_autoconf(struct subtype *st, const char *id)
+{
+	struct subtype *super = super_get(st, exists_autoconf, 1);
+
+	return super->exists_autoconf(st, id);
+}
+
 void subtype_add_active_ids(struct subtype *st, struct util_list *ids)
 {
 	struct subtype *super = super_get(st, add_active_ids, 1);
@@ -207,6 +214,13 @@ void subtype_add_persistent_ids(struct subtype *st, struct util_list *ids)
 	struct subtype *super = super_get(st, add_persistent_ids, 1);
 
 	super->add_persistent_ids(st, ids);
+}
+
+void subtype_add_autoconf_ids(struct subtype *st, struct util_list *ids)
+{
+	struct subtype *super = super_get(st, add_autoconf_ids, 1);
+
+	super->add_autoconf_ids(st, ids);
 }
 
 exit_code_t subtype_device_read_active(struct subtype *st, struct device *dev,
@@ -226,6 +240,15 @@ exit_code_t subtype_device_read_persistent(struct subtype *st,
 	return super->read_persistent(st, dev, scope);
 }
 
+exit_code_t subtype_device_read_autoconf(struct subtype *st,
+					   struct device *dev,
+					   read_scope_t scope)
+{
+	struct subtype *super = super_get(st, read_autoconf, 1);
+
+	return super->read_autoconf(st, dev, scope);
+}
+
 exit_code_t subtype_device_configure_active(struct subtype *st,
 					    struct device *dev)
 {
@@ -242,6 +265,14 @@ exit_code_t subtype_device_configure_persistent(struct subtype *st,
 	return super->configure_persistent(st, dev);
 }
 
+exit_code_t subtype_device_configure_autoconf(struct subtype *st,
+					      struct device *dev)
+{
+	struct subtype *super = super_get(st, configure_autoconf, 1);
+
+	return super->configure_autoconf(st, dev);
+}
+
 exit_code_t subtype_device_deconfigure_active(struct subtype *st,
 					      struct device *dev)
 {
@@ -256,6 +287,14 @@ exit_code_t subtype_device_deconfigure_persistent(struct subtype *st,
 	struct subtype *super = super_get(st, deconfigure_persistent, 1);
 
 	return super->deconfigure_persistent(st, dev);
+}
+
+exit_code_t subtype_device_deconfigure_autoconf(struct subtype *st,
+						struct device *dev)
+{
+	struct subtype *super = super_get(st, deconfigure_autoconf, 1);
+
+	return super->deconfigure_autoconf(st, dev);
 }
 
 exit_code_t subtype_check_pre_configure(struct subtype *st, struct device *dev,
@@ -299,7 +338,7 @@ void subtype_online_set(struct subtype *st, struct device *dev, int online,
 int subtype_online_get(struct subtype *st, struct device *dev, config_t config)
 {
 	struct subtype *super = super_get(st, online_get, 0);
-	int act_online = 1, pers_online = 1;
+	int act_online = 1, pers_online = 1, auto_online = 1;
 
 	if (super)
 		return super->online_get(st, dev, config);
@@ -310,8 +349,10 @@ int subtype_online_get(struct subtype *st, struct device *dev, config_t config)
 		act_online = dev->active.exists;
 	if (SCOPE_PERSISTENT(config))
 		pers_online = dev->persistent.exists;
+	if (SCOPE_AUTOCONF(config))
+		auto_online = dev->autoconf.exists;
 
-	return MIN(act_online, pers_online);
+	return MIN(MIN(act_online, pers_online), auto_online);
 }
 
 bool subtype_online_specified(struct subtype *st, struct device *dev,
@@ -495,6 +536,10 @@ bool subtype_device_exists(struct subtype *st, const char *id, config_t config)
 		if (!subtype_device_exists_persistent(st, id))
 			return false;
 	}
+	if (SCOPE_AUTOCONF(config)) {
+		if (!subtype_device_exists_autoconf(st, id))
+			return false;
+	}
 
 	return true;
 }
@@ -512,6 +557,8 @@ static struct util_list *get_ids(struct subtype *st, config_t config)
 	}
 	if (SCOPE_PERSISTENT(config))
 		subtype_add_persistent_ids(st, ids);
+	if (SCOPE_AUTOCONF(config))
+		subtype_add_autoconf_ids(st, ids);
 
 	/* Provide a sorted view. */
 	strlist_sort_unique(ids, st->namespace->qsort_cmp);
@@ -683,6 +730,19 @@ static exit_code_t read_device(struct subtype *st, const char *id,
 			goto out;
 	}
 
+	if (SCOPE_AUTOCONF(config)) {
+		if (subtype_device_exists_autoconf(st, id))
+			rc = subtype_device_read_autoconf(st, dev, scope);
+		else if (defined) {
+			/* Need to copy detected settings to autoconf
+			 * config. */
+			setting_list_merge(dev->autoconf.settings,
+					   dev->active.settings, false, false);
+		}
+		if (rc)
+			goto out;
+	}
+
 	if (add)
 		device_list_add(st->devices, dev);
 
@@ -756,6 +816,25 @@ exit_code_t subtype_write_device(struct subtype *st, struct device *dev,
 		if (!rc)
 			namespace_set_modified(dev->subtype->namespace);
 	}
+	if (SCOPE_AUTOCONF(config)) {
+		if (dev->autoconf.deconfigured) {
+			/* Deconfigure device. */
+			if (dev->autoconf.exists) {
+				rc = subtype_device_deconfigure_autoconf(st,
+									 dev);
+				if (rc)
+					return rc;
+			}
+		} else if (dev->autoconf.exists) {
+			/* Configure device. */
+			rc = subtype_device_configure_autoconf(st, dev);
+			if (rc)
+				return rc;
+		}
+		if (!rc)
+			namespace_set_modified(dev->subtype->namespace);
+	}
+
 
 	return EXIT_OK;
 }

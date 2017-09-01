@@ -646,7 +646,8 @@ static void add_changes(struct util_list *list, struct setting *s)
 
 /* Return a newly allocated string containing the setting changes found
  * in PERS and ACT or NULL if no change was found. */
-char *setting_get_changes(struct setting_list *act, struct setting_list *pers)
+char *setting_get_changes(struct setting_list *act, struct setting_list *pers,
+			  struct setting_list *ac)
 {
 	struct util_list *out;
 	struct util_list *processed;
@@ -659,6 +660,17 @@ char *setting_get_changes(struct setting_list *act, struct setting_list *pers)
 	/* Collect modified settings. */
 	if (pers) {
 		util_list_iterate(&pers->list, s) {
+			if (s->removed)
+				strlist_add(out, "-%s", s->name);
+			else if (s->modified)
+				add_changes(out, s);
+			else
+				continue;
+			strlist_add(processed, s->name);
+		}
+	}
+	if (ac) {
+		util_list_iterate(&ac->list, s) {
 			if (s->removed)
 				strlist_add(out, "-%s", s->name);
 			else if (s->modified)

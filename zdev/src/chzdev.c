@@ -86,6 +86,7 @@ struct options {
 	config_t config;
 	unsigned int active:1;
 	unsigned int persistent:1;
+	unsigned int auto_conf:1;
 	struct util_list *remove;	/* List of struct strlist_node */
 	unsigned int remove_all:1;
 	unsigned int force:1;
@@ -138,6 +139,7 @@ enum {
 	OPT_VERBOSE		= 'V',
 	OPT_QUIET		= 'q',
 	OPT_NO_SETTLE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
+	OPT_AUTO_CONF		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 };
 
 static struct opts_conflict conflict_list[] = {
@@ -172,11 +174,13 @@ static struct opts_conflict conflict_list[] = {
 	OPTS_CONFLICT(OPT_APPLY,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_LIST_TYPES, OPT_EXPORT, OPT_IMPORT, OPT_REMOVE,
-		      OPT_REMOVE_ALL, OPT_ACTIVE, OPT_PERSISTENT, 0),
+		      OPT_REMOVE_ALL, OPT_ACTIVE, 0),
 	OPTS_CONFLICT(OPT_ONLINE,
 		      OPT_OFFLINE),
 	OPTS_CONFLICT(OPT_QUIET,
 		      OPT_VERBOSE),
+	OPTS_CONFLICT(OPT_AUTO_CONF,
+		      OPT_TYPE, OPT_LIST_ATTRIBS, OPT_LIST_TYPES),
 	OPTS_CONFLICT(0, 0),
 };
 
@@ -210,6 +214,7 @@ static const struct option opt_list[] = {
 	/* Options. */
 	{ "active",		no_argument,	NULL, OPT_ACTIVE },
 	{ "persistent",		no_argument,	NULL, OPT_PERSISTENT },
+	{ "auto-conf",		no_argument,	NULL, OPT_AUTO_CONF },
 	{ "remove",		required_argument, NULL, OPT_REMOVE },
 	{ "remove-all",		no_argument,	NULL, OPT_REMOVE_ALL },
 	{ "force",		no_argument,	NULL, OPT_FORCE },
@@ -883,6 +888,11 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 			opts->persistent = 1;
 			break;
 
+		case OPT_AUTO_CONF:
+			/* --auto-conf */
+			opts->auto_conf = 1;
+			break;
+
 		case OPT_REMOVE:
 			/* --remove ATTRIB */
 			strlist_add(opts->remove, "%s", optarg);
@@ -977,7 +987,13 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		goto out;
 
 	/* Determine configuration set. */
-	opts->config = get_config(opts->active, opts->persistent);
+	if (!opts->active && !opts->persistent && !opts->auto_conf) {
+		/* Default configuration targets are active + persistent */
+		opts->config = config_active | config_persistent;
+	} else {
+		opts->config = get_config(opts->active, opts->persistent,
+					  opts->auto_conf);
+	}
 
 	/* Handle positional parameters. */
 	rc = parse_positional(opts, argc, argv, optind);
@@ -1049,13 +1065,15 @@ static void remove_all_settings(struct setting_list *settings, int active)
 /* Perform --remove-all operation for specified config on device. */
 static exit_code_t device_remove_all(struct device *dev, config_t config)
 {
-	int active, persistent;
+	int active, persistent, autoconf;
 
 	active = SCOPE_ACTIVE(config) ?
 			count_removable(dev->active.settings, 1) : 0;
 	persistent = SCOPE_PERSISTENT(config) ?
 			count_removable(dev->persistent.settings, 0) : 0;
-	if (active == 0 && persistent == 0) {
+	autoconf = SCOPE_AUTOCONF(config) ?
+			count_removable(dev->autoconf.settings, 0) : 0;
+	if (active == 0 && persistent == 0 && autoconf == 0) {
 		delayed_err("No removable settings found\n");
 		return EXIT_SETTING_NOT_FOUND;
 	}
@@ -1063,6 +1081,8 @@ static exit_code_t device_remove_all(struct device *dev, config_t config)
 		remove_all_settings(dev->active.settings, 1);
 	if (persistent)
 		remove_all_settings(dev->persistent.settings, 0);
+	if (autoconf)
+		remove_all_settings(dev->autoconf.settings, 0);
 
 	return EXIT_OK;
 }
@@ -1127,6 +1147,13 @@ static exit_code_t device_remove_settings(struct device *dev,
 
 	if (SCOPE_PERSISTENT(config)) {
 		rc = remove_settings(dev->persistent.settings, names, found,
+				     notfound, 0);
+		if (rc)
+			goto out;
+	}
+
+	if (SCOPE_AUTOCONF(config)) {
+		rc = remove_settings(dev->autoconf.settings, names, found,
 				     notfound, 0);
 		if (rc)
 			goto out;
@@ -1199,7 +1226,8 @@ static void print_dev_config_info(struct device *dev, config_t config)
 
 	changes = setting_get_changes(
 		  SCOPE_ACTIVE(config) ? dev->active.settings : NULL,
-		  SCOPE_PERSISTENT(config) ? dev->persistent.settings : NULL);
+		  SCOPE_PERSISTENT(config) ? dev->persistent.settings : NULL,
+		  SCOPE_AUTOCONF(config) ? dev->autoconf.settings : NULL);
 	if (changes)
 		info("    Changes: %s\n", changes);
 	free(changes);
@@ -1257,6 +1285,12 @@ static exit_code_t cfg_mod_existence(struct device *dev, config_t config)
 		dev->persistent.modified = 1;
 	}
 
+	/* Create autoconf config if necessary. */
+	if (SCOPE_AUTOCONF(config) && !dev->autoconf.exists) {
+		dev->autoconf.exists = 1;
+		dev->autoconf.modified = 1;
+	}
+
 	return EXIT_OK;
 }
 
@@ -1296,10 +1330,13 @@ online:
 	/* Make sure there's an online attribute. */
 	ensure_online(dev, config_active);
 	ensure_online(dev, config_persistent);
+	ensure_online(dev, config_autoconf);
 
 mand:
 	/* Ensure default values for mandatory attributes. */
 	setting_list_apply_defaults(dev->persistent.settings,
+				    dev->subtype->dev_attribs, true);
+	setting_list_apply_defaults(dev->autoconf.settings,
 				    dev->subtype->dev_attribs, true);
 
 	return EXIT_OK;
@@ -1336,7 +1373,8 @@ static exit_code_t cfg_write(struct device *dev, int prereq, config_t config,
 	if (!device_needs_writing(dev, config) && !force)
 		goto out;
 
-	if (check_active && config == config_persistent &&
+	if (check_active && !SCOPE_ACTIVE(config) &&
+	    (SCOPE_PERSISTENT(config) || SCOPE_AUTOCONF(config)) &&
 	    (!dev->active.exists && !dev->active.definable)) {
 		rc = handle_nonexistent(dev);
 		if (rc)
@@ -1377,7 +1415,7 @@ static exit_code_t cfg_configure(struct subtype *st, const char *id,
 	if (proc_ptr)
 		*proc_ptr = 0;
 
-	/* Read current device data. Note that we read data from both
+	/* Read current device data. Note that we read data from all
 	 * configurations to enable QETH autodetection and subtype
 	 * detection (e.g. dasd -> dasd_fba).*/
 	dev = NULL;
@@ -1398,22 +1436,16 @@ static exit_code_t cfg_configure(struct subtype *st, const char *id,
 
 	/* Exit here if we're only trying and device cannot be configured. */
 	if (try && !(dev->active.exists || dev->active.definable ||
-		     dev->persistent.exists)) {
+		     dev->persistent.exists || dev->autoconf.exists)) {
 		return EXIT_DEVICE_NOT_FOUND;
 	}
 
-	if (config == config_persistent) {
-		/* Abort if a modification action is triggered for a
-		 * non-existing persistent device. */
-		if (!dev->persistent.exists &&
-		    (!util_list_is_empty(opts->remove) || opts->remove_all))
-			return EXIT_DEVICE_NOT_FOUND;
+	/* Create device if needed by action. */
+	if (opts->enable || !util_list_is_empty(opts->settings)) {
+		rc = cfg_mod_existence(dev, config);
+		if (rc)
+			return rc;
 	}
-
-	/* Apply changes to device existence. */
-	rc = cfg_mod_existence(dev, config);
-	if (rc)
-		return rc;
 
 	/* Apply changes to device settings. */
 	rc = cfg_mod_settings(dev, opts, prereq);
@@ -1426,10 +1458,12 @@ static exit_code_t cfg_configure(struct subtype *st, const char *id,
 
 /* Apply persistent configuration to active configuration. */
 static exit_code_t cfg_apply(struct subtype *st, const char *id, int prereq,
-			     struct device **dev_ptr, int *proc_ptr)
+			     struct device **dev_ptr, int *proc_ptr,
+			     bool autoconf)
 {
 	exit_code_t rc;
 	struct device *dev;
+	struct device_state *state;
 
 	/* Reset processed flag. */
 	if (proc_ptr)
@@ -1452,8 +1486,9 @@ static exit_code_t cfg_apply(struct subtype *st, const char *id, int prereq,
 		*proc_ptr = 1;
 	dev->processed = 1;
 
+	state = autoconf ? &dev->autoconf : &dev->persistent;
 	/* Exit here if there is no persistent configuration. */
-	if (!dev->persistent.exists)
+	if (!state->exists)
 		return EXIT_NO_DATA;
 
 	/* Apply changes to device existence. */
@@ -1462,8 +1497,7 @@ static exit_code_t cfg_apply(struct subtype *st, const char *id, int prereq,
 		return rc;
 
 	/* Copy persistent settings to active configuration. */
-	rc = device_apply_settings(dev, config_active,
-				   &dev->persistent.settings->list);
+	rc = device_apply_settings(dev, config_active, &state->settings->list);
 	if (rc)
 		return rc;
 
@@ -1477,7 +1511,8 @@ static exit_code_t cfg_import(struct subtype *st, const char *id,
 			      struct device **dev_ptr, int *proc_ptr)
 {
 	exit_code_t rc;
-	struct setting_list *active = NULL, *persistent = NULL;
+	struct setting_list *active = NULL, *persistent = NULL,
+			    *autoconf = NULL;
 	struct device *dev;
 
 	/* Reset processed flag. */
@@ -1495,6 +1530,7 @@ static exit_code_t cfg_import(struct subtype *st, const char *id,
 			return EXIT_OK;
 		active = setting_list_copy(dev->active.settings);
 		persistent = setting_list_copy(dev->persistent.settings);
+		autoconf = setting_list_copy(dev->autoconf.settings);
 	} else if (!prereq) {
 		/* Should not happen. */
 		return EXIT_OK;
@@ -1524,14 +1560,20 @@ static exit_code_t cfg_import(struct subtype *st, const char *id,
 					   &persistent->list);
 		if (rc)
 			goto out;
+		rc = device_apply_settings(dev, config_autoconf,
+					   &autoconf->list);
+		if (rc)
+			goto out;
 	}
 	ensure_online(dev, config_active);
 	ensure_online(dev, config_persistent);
+	ensure_online(dev, config_autoconf);
 
 	/* Write resulting device data. */
 	rc = cfg_write(dev, prereq, config, 0);
 
 out:
+	setting_list_free(autoconf);
 	setting_list_free(persistent);
 	setting_list_free(active);
 
@@ -1609,11 +1651,13 @@ static exit_code_t print_config_result(struct selected_dev_node *sel,
 	if (opts->deconfigure) {
 		op = "deconfigure";
 		verb = "deconfigured";
-		if (dev)
+		if (dev) {
 			already = !dev->active.modified &&
-				  !dev->persistent.modified;
-		else if (rc == EXIT_DEVICE_NOT_FOUND &&
-			 config == config_persistent) {
+				  !dev->persistent.modified &&
+				  !dev->autoconf.modified;
+		} else if (rc == EXIT_DEVICE_NOT_FOUND &&
+			 (!SCOPE_ACTIVE(config) && (SCOPE_PERSISTENT(config) ||
+			  SCOPE_AUTOCONF(config)))) {
 			rc = EXIT_OK;
 			already = 1;
 		}
@@ -1685,9 +1729,10 @@ static exit_code_t cfg_prereqs(struct subtype *st, const char *id,
 	prereqs = selected_dev_list_new();
 	subtype_add_prereqs(st, id, prereqs);
 	util_list_iterate(prereqs, sel) {
-		if (opts->apply)
-			rc = cfg_apply(sel->st, sel->id, 1, &dev, &proc);
-		else if (opts->import) {
+		if (opts->apply) {
+			rc = cfg_apply(sel->st, sel->id, 1, &dev, &proc,
+				       opts->auto_conf);
+		} else if (opts->import) {
 			rc = cfg_import(sel->st, sel->id, config, 1, &dev,
 					&proc);
 		} else {
@@ -1760,9 +1805,11 @@ static exit_code_t configure_devices(struct options *opts, int specified,
 	struct namespace *ns;
 	const char *param;
 	struct device *dev;
+	config_t config = opts->config;
 
 	/* Determine list of selected devices. */
-	if (opts->config == config_persistent ||
+	if ((!SCOPE_ACTIVE(config) &&
+	    (SCOPE_PERSISTENT(config) || SCOPE_AUTOCONF(config))) ||
 	    (opts->select->subtype && opts->select->subtype->support_definable))
 		existing = 0;
 	else
@@ -1808,9 +1855,10 @@ static exit_code_t configure_devices(struct options *opts, int specified,
 			goto next;
 
 		/* Configure actual target device. */
-		if (opts->apply)
-			rc = cfg_apply(sel->st, sel->id, 0, &dev, &proc);
-		else {
+		if (opts->apply) {
+			rc = cfg_apply(sel->st, sel->id, 0, &dev, &proc,
+				       opts->auto_conf);
+		} else {
 			rc = cfg_configure(sel->st, sel->id, opts, 0,
 					   0, &dev, &proc);
 		}
@@ -1906,7 +1954,7 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 	dev->processed = 1;
 
 	if (try && !(dev->active.exists || dev->active.definable ||
-		     dev->persistent.exists)) {
+		     dev->persistent.exists || dev->autoconf.exists)) {
 		/* Attempt to deconfigure this device will fail. */
 		return EXIT_DEVICE_NOT_FOUND;
 	}
@@ -1916,7 +1964,8 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 	 * dev. */
 	if (SCOPE_ACTIVE(config) &&
 	    !(dev->active.exists || dev->active.definable)) {
-		if (!SCOPE_PERSISTENT(config) || !dev->persistent.exists)
+		if (!((SCOPE_PERSISTENT(config) && dev->persistent.exists) ||
+		      (SCOPE_AUTOCONF(config) && dev->autoconf.exists)))
 			return EXIT_DEVICE_NOT_FOUND;
 	}
 
@@ -1940,7 +1989,12 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 		dev->persistent.deconfigured = 1;
 		dev->persistent.modified = 1;
 	}
-	if (!dev->active.modified && !dev->persistent.modified)
+	if (SCOPE_AUTOCONF(config) && dev->autoconf.exists) {
+		dev->autoconf.deconfigured = 1;
+		dev->autoconf.modified = 1;
+	}
+	if (!dev->active.modified && !dev->persistent.modified &&
+	    !dev->autoconf.modified)
 		return EXIT_OK;
 
 	/* Pre-write check. */
@@ -2084,7 +2138,8 @@ static void print_type_config_info(struct devtype *dt, const char *title,
 
 	changes = setting_get_changes(
 		  SCOPE_ACTIVE(config) ? dt->active_settings : NULL,
-		  SCOPE_PERSISTENT(config) ? dt->persistent_settings : NULL);
+		  SCOPE_PERSISTENT(config) ? dt->persistent_settings : NULL,
+		  NULL);
 	if (changes)
 		info("    %s: %s\n", title, changes);
 	free(changes);
@@ -2498,6 +2553,8 @@ static void action_note(const char *msg, config_t config)
 		info("%s the active configuration only\n", msg);
 	else if (config == config_persistent)
 		info("%s the persistent configuration only\n", msg);
+	else if (config == config_autoconf)
+		info("%s the auto-configuration only\n", msg);
 }
 
 /* Export configuration of selected devices and/or device type to file. */
@@ -2619,7 +2676,7 @@ static exit_code_t import_device(struct device *dev, struct options *opts)
 	struct subtype *st = dev->subtype;
 	exit_code_t rc;
 	config_t config;
-	int proc = 0, active, persistent;
+	int proc = 0, active, persistent, autoconf;
 
 	if (SCOPE_ACTIVE(opts->config))
 		active = (dev->active.exists || dev->active.definable);
@@ -2629,7 +2686,16 @@ static exit_code_t import_device(struct device *dev, struct options *opts)
 		persistent = dev->persistent.exists;
 	else
 		persistent = 0;
-	config = get_config(active, persistent);
+	if (SCOPE_AUTOCONF(opts->config))
+		autoconf = dev->autoconf.exists;
+	else
+		autoconf = 0;
+
+	if (!active && !persistent && !autoconf) {
+		/* Nothing to import */
+		return EXIT_OK;
+	}
+	config = get_config(active, persistent, autoconf);
 
 	/* First check for prerequisite devices that need to be configured. */
 	rc = cfg_prereqs(st, dev->id, opts, config, 0);
@@ -2656,17 +2722,9 @@ static bool import_device_selected(struct device *dev, struct options *opts)
 	if (!select_opts_dev_specified(select))
 		return false;
 
-	/* --active */
-	if (opts->config == config_active) {
-		if (!dev->active.exists && !dev->active.definable)
-			return false;
-	}
-
-	/* --persistent */
-	if (opts->config == config_persistent) {
-		if (!dev->persistent.exists)
-			return false;
-	}
+	/* Target configuration */
+	if ((device_get_config(dev) & opts->config) == 0)
+		return false;
 
 	/* Devtype */
 	if (select->devtype && dt != select->devtype)

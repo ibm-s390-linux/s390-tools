@@ -248,12 +248,13 @@ static void unblacklist_devices(struct select_opts *select)
 bool select_match_state(struct device *dev, struct select_opts *select)
 {
 	struct subtype *st = dev->subtype;
-	int exists, configured, online;
+	int exists, configured, autoconf, online;
 	struct util_list *errors;
 
 	exists = dev->active.exists || dev->active.definable;
 	configured = dev->persistent.exists;
-	if (select->all && !(exists || configured))
+	autoconf = dev->autoconf.exists;
+	if (select->all && !(exists || configured || autoconf))
 		return false;
 	if (select->existing && !exists)
 		return false;
@@ -862,7 +863,8 @@ static exit_code_t select_nocreate(struct select_opts *select,
 			       select->offline || select->online ||
 			       SCOPE_ACTIVE(config),
 			       select->configured || select->all ||
-			       SCOPE_PERSISTENT(config));
+			       SCOPE_PERSISTENT(config),
+			       select->all || SCOPE_AUTOCONF(config));
 
 	longrun_total = 0;
 	if (quiet)
@@ -870,7 +872,7 @@ static exit_code_t select_nocreate(struct select_opts *select,
 
 	/* Count devices. */
 	verb("Scanning for devices in %s configuration%s:\n",
-	     config_to_str(id_config), id_config == config_all ? "s" : "");
+	     config_to_str(id_config), !SCOPE_SINGLE(id_config) ? "s" : "");
 	for (i = 0; (dt = devtypes[i]); i++) {
 		if (select->devtype && dt != select->devtype)
 			continue;
@@ -1128,6 +1130,13 @@ static exit_code_t by_attr_cb(struct subtype *st, const char *id,
 
 	/* Check for attribute value in persistent configuration. */
 	s = setting_list_find(dev->persistent.settings, cb_data->key);
+	if (s) {
+		match = setting_match_value(s, cb_data->value);
+		if (match)
+			goto out;
+	}
+	/* Check for attribute value in autoconf configuration. */
+	s = setting_list_find(dev->autoconf.settings, cb_data->key);
 	if (s)
 		match = setting_match_value(s, cb_data->value);
 

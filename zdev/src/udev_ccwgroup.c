@@ -25,34 +25,34 @@
 #include "udev_ccwgroup.h"
 
 static char *get_rule_path_by_devid(const char *type,
-				    struct ccwgroup_devid *devid)
+				    struct ccwgroup_devid *devid, bool autoconf)
 {
 	char *ccw_id, *path;
 
 	ccw_id = ccw_devid_to_str(&devid->devid[0]);
-	path = path_get_udev_rule(type, ccw_id);
+	path = path_get_udev_rule(type, ccw_id, autoconf);
 	free(ccw_id);
 
 	return path;
 }
 
-static char *get_rule_path(const char *type, const char *id)
+static char *get_rule_path(const char *type, const char *id, bool autoconf)
 {
 	struct ccwgroup_devid devid;
 
 	if (ccwgroup_parse_devid(&devid, id, err_ignore) != EXIT_OK)
 		return NULL;
 
-	return get_rule_path_by_devid(type, &devid);
+	return get_rule_path_by_devid(type, &devid, autoconf);
 }
 
 /* Check if a udev rule for the specified CCWGROUP device exists. */
-bool udev_ccwgroup_exists(const char *type, const char *id)
+bool udev_ccwgroup_exists(const char *type, const char *id, bool autoconf)
 {
 	char *path;
 	bool rc;
 
-	path = get_rule_path(type, id);
+	path = get_rule_path(type, id, autoconf);
 	if (!path)
 		return false;
 	rc = util_path_is_reg_file(path);
@@ -143,15 +143,16 @@ static void expand_id(struct device *dev, struct udev_file *file)
 }
 
 /* Read the persistent configuration of a CCWGROUP device from a udev rule. */
-exit_code_t udev_ccwgroup_read_device(struct device *dev)
+exit_code_t udev_ccwgroup_read_device(struct device *dev, bool autoconf)
 {
 	struct subtype *st = dev->subtype;
-	struct device_state *state = &dev->persistent;
+	struct device_state *state = autoconf ? &dev->autoconf :
+						&dev->persistent;
 	struct udev_file *file = NULL;
 	exit_code_t rc;
 	char *path;
 
-	path = get_rule_path_by_devid(st->name, dev->devid);
+	path = get_rule_path_by_devid(st->name, dev->devid, autoconf);
 	rc = udev_read_file(path, &file);
 	if (rc)
 		goto out;
@@ -184,9 +185,11 @@ static char *get_label_id(const char *prefix, const char *type,
 }
 
 /* Write the persistent configuration of a CCWGROUP device to a udev rule. */
-exit_code_t udev_ccwgroup_write_device(struct device *dev)
+exit_code_t udev_ccwgroup_write_device(struct device *dev, bool autoconf)
 {
 	struct subtype *st = dev->subtype;
+	struct device_state *state = autoconf ? &dev->autoconf :
+						&dev->persistent;
 	struct ccwgroup_subtype_data *data = st->data;
 	const char *type = st->name, *drv = data->ccwgroupdrv, *id = dev->id;
 	struct ccwgroup_devid devid;
@@ -200,21 +203,21 @@ exit_code_t udev_ccwgroup_write_device(struct device *dev)
 	FILE *fd;
 	unsigned int i;
 
-	if (!dev->persistent.exists)
-		return udev_ccwgroup_remove_rule(type, id);
+	if (!state->exists)
+		return udev_ccwgroup_remove_rule(type, id, autoconf);
 
 	if (ccwgroup_parse_devid(&devid, id, err_ignore) != EXIT_OK)
 		return EXIT_INVALID_ID;
 
 	ccw_id = ccw_devid_to_str(&devid.devid[0]);
-	path = get_rule_path(type, ccw_id);
+	path = get_rule_path(type, ccw_id, autoconf);
 
 	group_label = get_label_id("group", type, ccw_id);
 	cfg_label = get_label_id("cfg", type, ccw_id);
 	end_label = get_label_id("end", type, ccw_id);
 
 	/* Apply attributes in correct order. */
-	list = setting_list_get_sorted(dev->persistent.settings);
+	list = setting_list_get_sorted(state->settings);
 
 	debug("Writing %s udev rule file %s\n", type, path);
 	if (!util_path_exists(path)) {
@@ -357,12 +360,13 @@ static exit_code_t get_ids_cb(const char *path, const char *filename,
 
 /* Add the IDs for all devices of the specified subtype name for which a
  * udev rule exists to strlist LIST. */
-void udev_ccwgroup_add_device_ids(const char *type, struct util_list *list)
+void udev_ccwgroup_add_device_ids(const char *type, struct util_list *list,
+				  bool autoconf)
 {
 	struct get_ids_cb_data cb_data;
 	char *path;
 
-	path = path_get_udev_rules();
+	path = path_get_udev_rules(autoconf);
 	cb_data.prefix = misc_asprintf("%s-%s-", UDEV_PREFIX, type);
 	cb_data.ids = list;
 
@@ -374,7 +378,8 @@ void udev_ccwgroup_add_device_ids(const char *type, struct util_list *list)
 }
 
 /* Remove UDEV rule for CCWGROUP device. */
-exit_code_t udev_ccwgroup_remove_rule(const char *type, const char *id)
+exit_code_t udev_ccwgroup_remove_rule(const char *type, const char *id,
+				      bool autoconf)
 {
 	char *partial_id, *path;
 	exit_code_t rc = EXIT_OK;
@@ -383,7 +388,7 @@ exit_code_t udev_ccwgroup_remove_rule(const char *type, const char *id)
 	if (!partial_id)
 		return EXIT_INVALID_ID;
 
-	path = path_get_udev_rule(type, partial_id);
+	path = path_get_udev_rule(type, partial_id, autoconf);
 	if (util_path_is_reg_file(path))
 		rc = remove_file(path);
 	free(path);

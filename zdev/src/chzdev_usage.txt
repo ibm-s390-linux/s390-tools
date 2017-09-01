@@ -55,5 +55,6 @@ OPTIONS
       --dry-run          Display changes without applying
       --base PATH        Use PATH as base for accessing files
       --no-settle        Do not wait for udev to settle
+      --auto-conf        Apply changes to auto-configuration only
   -V, --verbose          Print additional run-time information
   -q, --quiet            Print only minimal run-time information
