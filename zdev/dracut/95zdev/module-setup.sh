@@ -9,7 +9,8 @@
 # 95zdev/module_setup.sh
 #   This module installs configuration files (udev rules and modprobe.conf
 #   files) required to enable the root device on s390. It will only work when
-#   the root device was configured using the chzdev tool.
+#   the root device was configured using the chzdev tool. In addition,
+#   a hook is installed to parse rd.zdev= kernel parameters.
 #
 
 check() {
@@ -29,14 +30,22 @@ depends() {
 }
 
 installkernel() {
-    local _modules=$(lszdev --by-path / --columns MODULES --no-headings 2>/dev/null)
-
-    [ -z "$_modules" ] && return 0
-    [ ! -z "$_modules" ] && instmods $_modules
+    # Add modules for all device types supported by chzdev (required for
+    # auto-configuration)
+    instmods lcs qeth qeth_l2 qeth_l3 dasd_mod dasd_eckd_mod dasd_fba_mod \
+	     dasd_diag_mod zfcp
 }
 
 install() {
     local _tempfile
+
+    # Ensure that required tools are available
+    inst_multiple chzdev lszdev vmcp
+
+    # Hook to parse zdev kernel parameter
+    inst_hook cmdline 95 "$moddir/parse-zdev.sh"
+
+    # Obtain root device configuration
 
     # Exit early if root device type is unknown
     if ! lszdev --by-path / >/dev/null 2>&1 ; then

@@ -11,11 +11,14 @@ ZDEVDIR := 95zdev
 # performs the following functions when dracut is run:
 #
 #  - copy the persistent root device configuration to the initial ram disk
+#  - install a boot-time hook to apply firmware-provided configuration data
+#    to the system
 #
 ifeq ($(HAVE_DRACUT),1)
 install:
 	$(INSTALL) -m 755 -d $(DESTDIR)$(MODDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(MODDIR)/$(ZDEVDIR)
 	$(INSTALL) -m 755 $(ZDEVDIR)/module-setup.sh \
+		$(ZDEVDIR)/parse-zdev.sh \
 		$(DESTDIR)$(MODDIR)/$(ZDEVDIR)/
 endif
