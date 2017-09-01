@@ -183,6 +183,7 @@ bool str_to_config(const char *, config_t *);
 char *quote_str(const char *, int);
 char *unquote_str(const char *);
 char *shrink_str(const char *);
+char *misc_strrstr(const char *haystack, const char *needle);
 
 struct util_list *strlist_new(void);
 void strlist_free(struct util_list *);

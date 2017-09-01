@@ -18,6 +18,7 @@
 #include "attrib.h"
 #include "ccwgroup.h"
 #include "device.h"
+#include "internal.h"
 #include "misc.h"
 #include "path.h"
 #include "setting.h"
@@ -68,6 +69,12 @@ static void add_setting_from_entry(struct setting_list *list,
 	char *copy, *name, *end;
 	struct attrib *a;
 
+	/* ENV{zdev_var}="1" */
+	if (starts_with(entry->key, "ENV{zdev_") &&
+	    strcmp(entry->op, "=") == 0) {
+		udev_add_internal_from_entry(list, entry, attribs);
+		return;
+	}
 	/* ATTR{[ccwgroup/0.0.f5f0]online}=1 */
 	if (strncmp(entry->key, "ATTR{[ccwgroup/", 10) != 0 ||
 	    strcmp(entry->op, "=") != 0)
@@ -282,6 +289,10 @@ exit_code_t udev_ccwgroup_write_device(struct device *dev, bool autoconf)
 				fprintf(fd, "ATTR{[ccwgroup/%s]%s}=\"%s\"\n",
 					ccw_id, s->name, str->str);
 			}
+		} else if ((s->attrib && s->attrib->internal) ||
+			   internal_by_name(s->name)) {
+			fprintf(fd, "ENV{zdev_%s}=\"%s\"\n",
+				internal_get_name(s->name), s->value);
 		} else {
 			fprintf(fd, "ATTR{[ccwgroup/%s]%s}=\"%s\"\n", ccw_id,
 				s->name, s->value);

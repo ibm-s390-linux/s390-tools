@@ -1717,3 +1717,18 @@ void debug_init(int argc, char *argv[])
 		fprintf(stderr, "%s\"%s\"", i > 0 ? ", " : "", argv[i]);
 	fprintf(stderr, "\n");
 }
+
+/* Return the last occurrence of @needle in @haystack, or %NULL if @needle
+ * was not found. */
+char *misc_strrstr(const char *haystack, const char *needle)
+{
+	char *result, *next;
+
+	result = strstr(haystack, needle);
+	if (result) {
+		while ((next = strstr(result + 1, needle)))
+			result = next;
+	}
+
+	return result;
+}

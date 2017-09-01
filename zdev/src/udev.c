@@ -409,3 +409,35 @@ void udev_settle(void)
 		return;
 	misc_system(err_ignore, "%s settle", PATH_UDEVADM);
 }
+
+/* Extract internal attribute settings from @entry and add to @list.
+ * Associate corresponding attribute if found in @attribs. */
+void udev_add_internal_from_entry(struct setting_list *list,
+				  struct udev_entry_node *entry,
+				  struct attrib **attribs)
+{
+	char *copy, *name, *end, *u;
+	struct attrib *a;
+
+	/* ENV{zdev_var}="1" */
+	copy = misc_strdup(entry->key);
+
+	/* Find attribute name start. */
+	name = strchr(copy, '{');
+	end = strrchr(copy, '}');
+	if (!name || !end)
+		goto out;
+	*end = 0;
+	name++;
+
+	/* zdev_ => zdev: */
+	u = strchr(name, '_');
+	if (u)
+		*u = ':';
+
+	a = attrib_find(attribs, name);
+	setting_list_apply_actual(list, a, name, entry->value);
+
+out:
+	free(copy);
+}

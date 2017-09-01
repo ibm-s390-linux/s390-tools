@@ -13,6 +13,9 @@
 #include "lib/util_list.h"
 #include "exit_code.h"
 
+struct attrib;
+struct setting_list;
+
 extern int udev_need_settle;
 extern int udev_no_settle;
 
@@ -45,5 +48,9 @@ void udev_get_device_ids(const char *type, struct util_list *list,
 exit_code_t udev_remove_rule(const char *type, const char *id, bool autoconf);
 
 void udev_settle(void);
+
+void udev_add_internal_from_entry(struct setting_list *list,
+				  struct udev_entry_node *entry,
+				  struct attrib **attribs);
 
 #endif /* UDEV_H */

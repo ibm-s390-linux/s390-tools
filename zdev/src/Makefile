@@ -8,7 +8,7 @@ ALL_CPPFLAGS += -I ../include -std=gnu99 -Wno-unused-parameter \
 chzdev_objects += attrib.o chzdev.o device.o devnode.o devtype.o exit_code.o \
 		  export.o hash.o inuse.o misc.o namespace.o opts.o path.o \
 		  root.o select.o setting.o subtype.o table.o table_attribs.o \
-		  table_types.o net.o firmware.o
+		  table_types.o net.o firmware.o internal.o
 
 # Devtype Helpers
 chzdev_objects += blkinfo.o ccw.o ccwgroup.o findmnt.o modprobe.o module.o \
@@ -38,7 +38,7 @@ chzdev_objects += generic_ccw.o
 lszdev_objects += attrib.o lszdev.o device.o devnode.o devtype.o exit_code.o \
 		  export.o hash.o inuse.o misc.o namespace.o opts.o path.o \
 		  root.o select.o setting.o subtype.o table.o table_types.o \
-		  net.o
+		  net.o internal.o
 
 # Devtype Helpers
 lszdev_objects += blkinfo.o ccw.o ccwgroup.o findmnt.o modprobe.o module.o \

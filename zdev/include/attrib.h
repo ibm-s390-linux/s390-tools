@@ -189,6 +189,7 @@ struct value_map {
  *              in the persistent configuration
  * @nounload:   (Device type attributes only) This attribute can be set while
  *              the corresponding kernel module remains loaded.
+ * @internal:   This attribute only affects internal handling
  * @order:	A number indicating the order in which to apply attribute
  * @order_cmp:  A function determining if a setting for this attribute should
  *              be applied before (-1) or after (1) another setting, or
@@ -216,6 +217,7 @@ struct attrib {
 	unsigned int activerem	:1;
 	unsigned int defunset	:1;
 	unsigned int nounload	:1;
+	unsigned int internal	:1;
 
 	/* Optional */
 	int order;

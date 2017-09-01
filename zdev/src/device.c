@@ -16,6 +16,7 @@
 #include "attrib.h"
 #include "device.h"
 #include "devtype.h"
+#include "internal.h"
 #include "misc.h"
 #include "namespace.h"
 #include "setting.h"
@@ -221,6 +222,9 @@ static exit_code_t apply_setting(struct device *dev, config_t config,
 			goto err_activeonly_forceable;
 		if (!force && SCOPE_AUTOCONF(config) && a->activeonly)
 			goto err_activeonly_forceable;
+		/* Check for internal. */
+		if (config == config_active && a->internal)
+			goto err_int_noactive;
 		/* Check for multiple values. */
 		if (!force && !a->multi && strlist_find(processed, key))
 			goto err_multi_forceable;
@@ -230,6 +234,9 @@ static exit_code_t apply_setting(struct device *dev, config_t config,
 			goto err_unknown;
 		if (!force)
 			goto err_unknown_forceable;
+		/* Check for internal. */
+		if (config == config_active && internal_by_name(key))
+			goto err_int_noactive;
 	}
 
 	strlist_add(processed, "%s", key);
@@ -293,6 +300,11 @@ err_unknown_forceable:
 err_activeonly_forceable:
 	delayed_forceable("Attribute '%s' should only be changed in the active "
 			  "config\n", a->name);
+	return EXIT_INVALID_SETTING;
+
+err_int_noactive:
+	delayed_err("Internal attribute '%s' cannot be set in the active config\n",
+		    key);
 	return EXIT_INVALID_SETTING;
 }
 
@@ -541,6 +553,9 @@ exit_code_t device_write_active_settings(struct device *dev)
 	util_list_iterate(list, p) {
 		s = p->ptr;
 		if (!s->modified || s->removed)
+			continue;
+		if ((s->attrib && s->attrib->internal) ||
+		    internal_by_name(s->name))
 			continue;
 
 		path = subtype_get_active_attrib_path(st, dev, s->name);

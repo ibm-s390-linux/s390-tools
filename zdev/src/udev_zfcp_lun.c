@@ -18,6 +18,7 @@
 
 #include "attrib.h"
 #include "device.h"
+#include "internal.h"
 #include "misc.h"
 #include "path.h"
 #include "scsi.h"
@@ -128,7 +129,7 @@ static bool zfcp_lun_devid_from_entry(struct zfcp_lun_devid *id_ptr,
 				      struct udev_entry_node *entry)
 {
 	struct zfcp_lun_devid id;
-	char *copy = NULL, *s;
+	char *copy = NULL, *s, *e, *u;
 	int i;
 	bool rc = false;
 
@@ -182,6 +183,28 @@ static bool zfcp_lun_devid_from_entry(struct zfcp_lun_devid *id_ptr,
 		goto out;
 	}
 
+	/*ENV{zdev_var__0_0_1941_0x500507630510c1ae_0x402340d400000000}="1"*/
+	if (starts_with(entry->key, "ENV{zdev_")) {
+		copy = misc_strdup(entry->key);
+
+		/* Find ID start (last __) and end (last }). */
+		s = misc_strrstr(copy, "__");
+		e = strrchr(copy, '}');
+		if (!s || !e)
+			goto out;
+		*e = 0;
+		s += 2;
+		/* Convert variable name to ID format. */
+		for (i = 0, u = s; (u = strchr(u, '_')); i++, u++) {
+			if (i < 2)
+				*u = '.';
+			else
+				*u = ':';
+		}
+		rc = zfcp_lun_parse_devid(&id, s, err_ignore) == EXIT_OK ?
+			true : false;
+	}
+
 out:
 	free(copy);
 	if (rc)
@@ -211,11 +234,46 @@ static struct zfcp_lun_node *zfcp_lun_node_from_entry(
 	return node;
 }
 
+static void add_internal_setting_from_entry(struct udev_entry_node *entry,
+					    struct zfcp_lun_node *node)
+{
+	char *copy, *name, *end, *u;
+	struct attrib *a;
+
+	/*ENV{zdev_var__0_0_1941_0x500507630510c1ae_0x402340d400000000}="1"*/
+	copy = misc_strdup(entry->key);
+
+	/* Find attribute name start and end. */
+	name = strchr(copy, '{');
+	end = misc_strrstr(copy, "__");
+	if (!name || !end)
+		goto out;
+	*end = 0;
+	name++;
+
+	/* zdev_ => zdev: */
+	u = strchr(name, '_');
+	if (u)
+		*u = ':';
+
+	a = attrib_find(zfcp_lun_subtype.dev_attribs, name);
+	setting_list_apply_actual(node->fc_settings, a, name, entry->value);
+
+out:
+	free(copy);
+}
+
 static void add_fc_setting_from_entry(struct udev_entry_node *entry,
 				      struct zfcp_lun_node *node)
 {
 	char *copy, *s, *e;
 
+	/*ENV{zdev_var__0_0_1941_0x500507630510c1ae_0x402340d400000000}="1"*/
+	if (starts_with(entry->key, "ENV{zdev_") &&
+	    strcmp(entry->op, "=") == 0) {
+		add_internal_setting_from_entry(entry, node);
+		return;
+	}
 	/*ATTR{[ccw/0.0.1941]0x500507630510c1ae/0x402340d400000000/failed}="0"*/
 	if (!starts_with(entry->key, "ATTR{[ccw/"))
 		return;
@@ -490,7 +548,7 @@ static struct zfcp_lun_node *state_to_zfcp_lun_node(struct zfcp_lun_devid *id,
 					s->value);
 			setting_list_add(node->scsi_settings, n);
 		} else {
-			n = setting_new(NULL, s->name, s->value);
+			n = setting_new(s->attrib, s->name, s->value);
 			setting_list_add(node->fc_settings, n);
 		}
 	}
@@ -580,9 +638,21 @@ static exit_code_t write_luns_rule(const char *path, struct util_list *list)
 			node->id.lun);
 
 		util_list_iterate(&node->fc_settings->list, s) {
-			fprintf(fd, "ATTR{[ccw/%s]0x%016" PRIx64 "/0x%016"
-				PRIx64 "/%s}=\"%s\"\n", hba_id, node->id.wwpn,
-				node->id.lun, s->name, s->value);
+			if ((s->attrib && s->attrib->internal) ||
+			    internal_by_name(s->name)) {
+				fprintf(fd, "ENV{zdev_%s__%x_%x_%04x_0x%016"
+					PRIx64 "_0x%016" PRIx64 "}=\"%s\"\n",
+					internal_get_name(s->name),
+					node->id.fcp_dev.cssid,
+					node->id.fcp_dev.ssid,
+					node->id.fcp_dev.devno, node->id.wwpn,
+					node->id.lun, s->value);
+			} else {
+				fprintf(fd, "ATTR{[ccw/%s]0x%016" PRIx64
+					"/0x%016" PRIx64 "/%s}=\"%s\"\n",
+					hba_id, node->id.wwpn, node->id.lun,
+					s->name, s->value);
+			}
 		}
 		last_node = node;
 	}
