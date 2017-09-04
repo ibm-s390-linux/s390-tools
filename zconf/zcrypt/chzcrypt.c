@@ -286,7 +286,7 @@ int main(int argc, char *argv[])
 {
 	const char *online, *online_text = NULL, *poll_thread, *config_time;
 	const char *poll_timeout, *default_domain;
-	char *path, *dev_path, *dev, *dev_list, device[256], online_read[2];
+	char *path, *dev_path, *dev, *dev_list, device[256], online_read[32];
 	bool all = false, actionset = false;
 	size_t len;
 	int id, dom, c, i, j;

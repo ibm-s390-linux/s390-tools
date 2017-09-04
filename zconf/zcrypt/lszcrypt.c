@@ -226,7 +226,7 @@ static void show_capability(const char *id_str)
 {
 	unsigned long func_val;
 	long hwtype, id;
-	char *p, *ap, *dev, card[7];
+	char *p, *ap, *dev, card[16];
 
 	/* check if ap driver is available */
 	ap = util_path_sysfs("bus/ap");
@@ -454,7 +454,7 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
  */
 static void show_device(struct util_rec *rec, const char *device)
 {
-	char *grp_dev, card[3];
+	char *grp_dev, card[16];
 
 	util_rec_set(rec, "card", card);
 
@@ -544,7 +544,7 @@ static void show_devices_argv(char *argv[])
 {
 	struct util_rec *rec = util_rec_new_wide("-");
 	struct dirent **dev_vec, **subdev_vec;
-	char *ap, *grp_dev, *path, card[7], sub_dev[7];
+	char *ap, *grp_dev, *path, card[16], sub_dev[16];
 	int id, dom, i, n, dev_cnt, sub_cnt;
 
 	/* check if ap driver is available */
