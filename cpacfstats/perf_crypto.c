@@ -97,6 +97,7 @@ int perf_init(void)
 			memset(&pfm_event, 0, sizeof(pfm_event));
 			pfm_arg.attr = &pfm_event;
 			pfm_arg.size = sizeof(pfm_arg);
+			pfm_event.size = sizeof(pfm_event);
 
 			/* search for the counter's corresponding pfm name */
 			for (i = ALL_COUNTER-1; i >= 0; i--)
