@@ -634,10 +634,10 @@ static struct attrib qeth_attr_rxip_add4 = {
 
 static struct attrib qeth_attr_rxip_add6 = {
 	.name = "rxip/add6",
-	.title = "Add IPv6 address to ARP proxy list",
+	.title = "Add IPv6 address to NDP proxy list",
 	.desc =
 	"Write an IPv6 address to this attribute to add it to the list of\n"
-	"addresses for which this QETH device should act as ARP proxy.\n",
+	"addresses for which this QETH device should act as NDP proxy.\n",
 	.defval = "",
 	.multi = 1,
 	.activerem = 1,
@@ -659,10 +659,10 @@ static struct attrib qeth_attr_rxip_del4 = {
 
 static struct attrib qeth_attr_rxip_del6 = {
 	.name = "rxip/del6",
-	.title = "Remove IPv6 address from ARP proxy list",
+	.title = "Remove IPv6 address from NDP proxy list",
 	.desc =
 	"Write an IPv6 address to this attribute to remove it from the list\n"
-	"of addresses for which this QETH device acts as an ARP proxy.\n",
+	"of addresses for which this QETH device acts as an NDP proxy.\n",
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
