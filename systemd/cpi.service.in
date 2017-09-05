@@ -36,11 +36,5 @@ EnvironmentFile=/etc/sysconfig/cpi
 # Environment=CPI_SYSTEM_TYPE=LINUX
 
 #
-# Apply settings
-ExecStartPre=/bin/sh -c 'if test -n "$CPI_SYSTEM_TYPE"; then echo $CPI_SYSTEM_TYPE |tr a-z A-Z > /sys/firmware/cpi/system_type; fi'
-ExecStartPre=/bin/sh -c 'if test -n "$CPI_SYSTEM_NAME"; then echo $CPI_SYSTEM_NAME |tr a-z A-Z > /sys/firmware/cpi/system_name; fi'
-ExecStartPre=/bin/sh -c 'if test -n "$CPI_SYSPLEX_NAME"; then echo $CPI_SYSPLEX_NAME |tr a-z A-Z > /sys/firmware/cpi/sysplex_name; fi'
-ExecStartPre=/bin/sh -c 'test -n "$CPI_SYSTEM_LEVEL" || CPI_SYSTEM_LEVEL="$(uname -r)" ; echo $CPI_SYSTEM_LEVEL |cut -d- -f1 | tr . " " |xargs printf "0x0000000000%02x%02x%02x\n" > /sys/firmware/cpi/system_level'
-#
 # Sending data to the HMC/SE
-ExecStart=/bin/sh -c 'echo 1 > /sys/firmware/cpi/set'
+ExecStart=@toolslib_path@/cpictl -e

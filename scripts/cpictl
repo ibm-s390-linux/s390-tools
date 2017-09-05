@@ -1,0 +1,274 @@
+#!/bin/bash
+#
+# cpictl - Configure the Control-Program-Information (CPI) settings
+#
+# This is an internal helper script that is used by the "cpi.service"
+# systemd unit and the "90-cpi.rules" udev rule.
+#
+# The bash shell is really needed. Other shells have different ideas of how
+# bitwise operators work.
+#
+# Copyright 2017 IBM Corp.
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+readonly CPI_LOCK="/var/lock/cpictl.lock"
+
+readonly PRG="${0##*/}"
+
+readonly SYSTEM_LEVEL_PATH="/sys/firmware/cpi/system_level"
+readonly SYSTEM_TYPE_PATH="/sys/firmware/cpi/system_type"
+readonly SYSTEM_NAME_PATH="/sys/firmware/cpi/system_name"
+readonly SYSPLEX_NAME_PATH="/sys/firmware/cpi/sysplex_name"
+readonly CPI_SET="/sys/firmware/cpi/set"
+
+declare LEVEL
+declare TYPE
+declare NAME
+declare SYSPLEX
+
+declare -i DRYRUN=0
+
+# Exit codes
+readonly EXIT_SUCCESS=0
+readonly EXIT_FAILURE=1
+readonly EXIT_ARG_TOO_LONG=3
+readonly EXIT_INVALID_CHARS=4
+
+print_help_and_exit()
+{
+	cat <<EndHelp
+Usage: $PRG [OPTIONS]
+
+Configure the Control-Program-Information (CPI) settings.
+
+  -b, --set-bit BIT      Set and commit the bit BIT in the flags
+  -e, --environment      Set and commit the system type, level, name and
+                         sysplex name with values taken from environment
+                         variables
+  -h, --help             Ignore all other options and print this help
+  -L, --level LEVEL      Set and commit OS level to LEVEL (format xx.yy.zzABCD)
+  -N, --name SYSTEM      Set and commit the system name to SYSTEM
+  -S, --sysplex SYSPLEX  Set and commit the sysplex name to SYSPLEX
+  -T, --type TYPE        Set and commit OS type to TYPE
+  --commit               Ignore all other options and commit any uncommitted
+                         values
+  --dry-run              Do not actually set or commit anything, but show what
+                         would be done
+  --show                 Ignore all other options and show current (possibly
+                         uncommitted) values
+
+Environment variables used for the --defaults option:
+  CPI_SYSTEM_TYPE, CPI_SYSTEM_LEVEL, CPI_SYSTEM_NAME, CPI_SYSPLEX_NAME
+
+Available bits for the --set-bit option:
+  kvm: Indicate that system is a KVM host
+
+The maximum length for system type, system name, and sysplex name is 8
+characters. The allowed characters are: [A-Z0-9 @#$]
+
+This tool should be called as root.
+EndHelp
+	exit $EXIT_SUCCESS
+}
+
+print_version_and_exit()
+{
+	cat <<EndVersion
+$PRG: Configure the CPI settings version %S390_TOOLS_VERSION%
+Copyright IBM Corp. 2017
+EndVersion
+	exit $EXIT_SUCCESS
+}
+
+cpi_show()
+{
+	cat <<-EndShow
+	System type:  $(cat "$SYSTEM_TYPE_PATH")
+	System level: $(cat "$SYSTEM_LEVEL_PATH")
+	System name:  $(cat "$SYSTEM_NAME_PATH")
+	Sysplex name: $(cat "$SYSPLEX_NAME_PATH")
+	EndShow
+}
+
+print_parse_error_and_exit()
+{
+	echo "Try '$PRG --help' for more information." >&2
+	exit $EXIT_FAILURE
+}
+
+fail_with()
+{
+	echo "$1" >&2
+	echo "Try '$PRG --help' for more information." >&2
+	exit ${2:-$EXIT_FAILURE}
+}
+
+cpi_commit()
+{
+	echo 1 > "$CPI_SET"
+}
+
+do_length_check()
+{
+	[ ${#1} -gt 8 ] &&
+		fail_with "$PRG: Specified $2 too long. The maximum length is 8 characters." $EXIT_ARG_TOO_LONG
+}
+
+do_character_check()
+{
+	echo "$1" | grep -q -E '^[a-zA-Z0-9@#$ ]*$' ||
+		fail_with "$PRG: Invalid characters in $2. Valid characters are: A-Z0-9 @#$" $EXIT_INVALID_CHARS
+}
+
+cpi_set_bit()
+{
+	LEVEL=$(printf '0x%x' $((LEVEL | (1 << (63 - $1)) )) )
+}
+
+cpi_set_oslevel()
+{
+	local kver=$(echo "${1:-$(uname -r)}" | grep -E -o '^[0-9]+[.][0-9]+[.][0-9]+')
+	local maj=$((${kver%%.*} % 256))
+	local min=${kver#*.}
+	min=$((${min%.*} % 256))
+	local rev=$((${kver##*.} % 256))
+	local hexlevel=$(printf '0x%02x%02x%02x' $maj $min $rev)
+	LEVEL=$(printf '0x%016x' $(((LEVEL & 0xFFFFFFFFFF000000) | hexlevel)))
+}
+
+cpi_set_type()
+{
+	TYPE="$1"
+	do_length_check "$TYPE" "system type"
+	do_character_check "$TYPE" "system type"
+}
+
+cpi_set_sysplex()
+{
+	SYSPLEX="$1"
+	do_length_check "$SYSPLEX" "sysplex name"
+	do_character_check "$SYSPLEX" "sysplex name"
+}
+
+cpi_set_name()
+{
+	NAME="$1"
+	do_length_check "$NAME" "system name"
+	do_character_check "$NAME" "system name"
+}
+
+# cpictl starts here
+
+if [ $# -le 0 ]; then
+	echo "$PRG: No parameters specified"
+	print_parse_error_and_exit
+fi
+
+opts=$(getopt -o b:ehL:N:S:T:v -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,show,version -n $PRG -- "$@")
+if [ $? -ne 0 ]; then
+	print_parse_error_and_exit
+fi
+
+# This guarantees that only one instance will be running, and will serialize
+# the execution of multiple instances
+[ -e "$CPI_LOCK" -a ! -w "$CPI_LOCK" ] &&
+	fail_with "$PRG: Cannot access lock file: $CPI_LOCK"
+[ ! -w "${CPI_LOCK%/*}" ] &&
+	fail_with "$PRG: Cannot access lock file: $CPI_LOCK"
+
+exec 9<> "$CPI_LOCK"
+flock -x 9
+
+# Get current values from sys/firmware
+read LEVEL < "$SYSTEM_LEVEL_PATH"
+read TYPE < "$SYSTEM_TYPE_PATH"
+read NAME < "$SYSTEM_NAME_PATH"
+read SYSPLEX < "$SYSPLEX_NAME_PATH"
+
+# Parse command line options: Use eval to remove getopt quotes
+eval set -- $opts
+while [ -n $1 ]; do
+	case "$1" in
+	--help|-h)
+		print_help_and_exit
+		;;
+	--version|-v)
+		print_version_and_exit
+		;;
+	-b|--set-bit)
+		case "$2" in
+		kvm)
+			cpi_set_bit 0
+			;;
+		*)
+			fail_with "$PRG: Unknown bit \"$2\" for the $1 option"
+			;;
+		esac
+		shift 2
+		;;
+	-L|--level)
+		cpi_set_oslevel "$2"
+		shift 2
+		;;
+	-e|--environment)
+		cpi_set_type "$CPI_SYSTEM_TYPE"
+		cpi_set_name "$CPI_SYSTEM_NAME"
+		cpi_set_oslevel "$CPI_SYSTEM_LEVEL"
+		cpi_set_sysplex "$CPI_SYSPLEX_NAME"
+		shift
+		;;
+	-T|--type)
+		cpi_set_type "$2"
+		shift 2
+		;;
+	-S|--sysplex)
+		cpi_set_sysplex "$2"
+		shift 2
+		;;
+	-N|--name)
+		cpi_set_name "$2"
+		shift 2
+		;;
+	--show)
+		cpi_show
+		exit $EXIT_SUCCESS
+		;;
+	--commit)
+		cpi_commit
+		exit $EXIT_SUCCESS
+		;;
+	--dry-run)
+		DRYRUN=1
+		shift
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		break;
+		;;
+	esac
+done
+
+# Print settings for --dry-run or commit them to sysfs otherwise
+
+if [ $DRYRUN -eq 1 ]; then
+	cat <<-EndDryrun
+	System type:  $TYPE
+	System level: $LEVEL
+	System name:  $NAME
+	Sysplex name: $SYSPLEX
+	EndDryrun
+else
+	echo "$LEVEL" > "$SYSTEM_LEVEL_PATH"
+	echo "$TYPE" > "$SYSTEM_TYPE_PATH"
+	echo "$NAME" > "$SYSTEM_NAME_PATH"
+	echo "$SYSPLEX" > "$SYSPLEX_NAME_PATH"
+	cpi_commit
+fi
+
+exit $EXIT_SUCCESS

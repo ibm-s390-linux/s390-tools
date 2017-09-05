@@ -15,7 +15,12 @@ install:
 		chown $(OWNER):$(GROUP) $(DESTDIR)$(BINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(BINDIR)/$$i; \
 	done
-	
+
+	sed -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' cpictl > \
+		$(DESTDIR)$(TOOLS_LIBDIR)/cpictl
+	chown $(OWNER):$(GROUP) $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
+	chmod 775 $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
+
 	@for i in $(MAN_PAGES); \
 	do \
 		$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $$i \

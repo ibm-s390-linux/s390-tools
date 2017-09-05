@@ -35,6 +35,8 @@ Package contents
    - 57-osasnmpd.rules: udev rules for osasnmpd.
    - 60-readahead.rules: udev rules to set increased "default max readahead".
    - 40-z90crypt.rules: udev rules for z90crypt driver
+   - 90-cpi.rules: udev rule to update Control-Program-Information when KVM is
+                   used.
 
  * systemd units:
    - cpi.service: Unit to apply CPI settings

@@ -1,0 +1,6 @@
+#
+# Rules to trigger cpictl when KVM is used
+# This file should be installed in /etc/udev/rules.d
+#
+
+SUBSYSTEM=="misc", KERNEL=="kvm", ENV{CREATED}=="1", ENV{EVENT}=="create", RUN+="/lib/s390-tools/cpictl -b kvm"

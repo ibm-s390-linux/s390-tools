@@ -5,6 +5,11 @@
 # the following set: A-Z, 0-9, $, @, #, and blank.
 
 #
+# CPI system type
+#
+CPI_SYSTEM_TYPE="LINUX"
+
+#
 # CPI system name
 #
 CPI_SYSTEM_NAME=""
