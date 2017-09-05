@@ -727,9 +727,9 @@ static int fdasd_parse_conffile(fdasd_anchor_t *anc,
 
 	memset(buffer, 0, sizeof(buffer));
 	rc = read(fd, buffer, sizeof(buffer) - 1);
+	close(fd);
 	if (rc < 0)
 		return -1;
-	close(fd);
 
 	for (i = 0; i < rc; i++)
 		buffer[i] = toupper(buffer[i]);
