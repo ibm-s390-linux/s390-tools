@@ -258,7 +258,7 @@ static void fdasd_check_volser(char *volser, int devno)
 {
 	int from, to;
 
-	for (from = 0, to = 0; volser[from] && from < VOLSER_LENGTH; from++)
+	for (from = 0, to = 0; from < VOLSER_LENGTH && volser[from]; from++)
 		if ((volser[from] >= 0x23 &&
 		     volser[from] <= 0x25) || /* # $ % */
 		    (volser[from] >= 0x30 &&
