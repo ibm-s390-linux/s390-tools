@@ -81,7 +81,7 @@ struct vol {
 	u64			part_size;
 	u64			mem_start;
 	u64			mem_end;
-	char			bus_id[9];
+	char			bus_id[10];
 	u32			nr;
 	u16			blk_size;
 	struct df_s390_dumper	dumper;
