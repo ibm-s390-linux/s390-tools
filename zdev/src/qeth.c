@@ -258,11 +258,17 @@ struct qeth_attrib_data {
 		layer_2,
 		layer_3
 	} layer_type;
+	enum qeth_attr_group_type {
+		group_none,
+		group_bridge,
+		group_vnicc
+	} attr_group;
 };
 
-#define QETH_DATA(layer)			\
+#define QETH_DATA(layer, group)			\
 	((struct qeth_attrib_data []) { {	\
 		.layer_type = layer,		\
+		.attr_group = group,		\
 		} })
 
 /*
@@ -304,7 +310,7 @@ static struct attrib qeth_attr_portname = {
 	.order_cmp = ccw_offline_only_order_cmp,
 	.check = ccw_offline_only_check,
 	.map = VALUE_MAP_ARRAY(VALUE_MAP("no portname required", "")),
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_priority_queueing = {
@@ -335,7 +341,7 @@ static struct attrib qeth_attr_priority_queueing = {
 		ACCEPT_STR("no_prio_queueing:3")
 	),
 	.unstable = 1,
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_buffer_count = {
@@ -348,7 +354,7 @@ static struct attrib qeth_attr_buffer_count = {
 	.order_cmp = ccw_offline_only_order_cmp,
 	.check = ccw_offline_only_check,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(8, 128)),
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_portno = {
@@ -360,7 +366,7 @@ static struct attrib qeth_attr_portno = {
 	.order_cmp = ccw_offline_only_order_cmp,
 	.check = ccw_offline_only_check,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_hsuid = {
@@ -370,7 +376,7 @@ static struct attrib qeth_attr_hsuid = {
 	"Specify a 1-8 character identifier used to identify a HiperSockets\n"
 	"QETH device in the AF_IUCV addressing family support.\n",
 	.defval = "",
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_recover = {
@@ -386,7 +392,7 @@ static struct attrib qeth_attr_recover = {
 	.accept = ACCEPT_ARRAY(ACCEPT_NUM(1)),
 	.writeonly = 1,
 	.activeonly = 1,
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_isolation = {
@@ -401,7 +407,7 @@ static struct attrib qeth_attr_isolation = {
 	.defval = "none",
 	.accept = ACCEPT_ARRAY(ACCEPT_STR("none"), ACCEPT_STR("drop"),
 			       ACCEPT_STR("forward")),
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_performance_stats = {
@@ -413,7 +419,7 @@ static struct attrib qeth_attr_performance_stats = {
 	"  1: Performance statistics data is collected\n",
 	.defval = "0",
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_hw_trap = {
@@ -428,7 +434,7 @@ static struct attrib qeth_attr_hw_trap = {
 	.defval = "disarm",
 	.accept = ACCEPT_ARRAY(ACCEPT_STR("disarm"), ACCEPT_STR("arm"),
 			       ACCEPT_STR("trap")),
-	.st_data = QETH_DATA(layer_any),
+	.st_data = QETH_DATA(layer_any, group_none),
 };
 
 static struct attrib qeth_attr_route4 = {
@@ -464,7 +470,7 @@ static struct attrib qeth_attr_route4 = {
 				  "secondary_connector"),
 			VALUE_MAP("secondary connector",
 				   "secondary_connector")),
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_route6 = {
@@ -501,7 +507,7 @@ static struct attrib qeth_attr_route6 = {
 			VALUE_MAP("secondary connector",
 				   "secondary_connector")),
 	.unstable = 1,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_fake_broadcast = {
@@ -515,7 +521,7 @@ static struct attrib qeth_attr_fake_broadcast = {
 	.defval = "0",
 	.order_cmp = after_layer2_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_enable = {
@@ -529,7 +535,7 @@ static struct attrib qeth_attr_ipa_takeover_enable = {
 	.defval = "0",
 	.order_cmp = after_layer2_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_add4 = {
@@ -544,7 +550,7 @@ static struct attrib qeth_attr_ipa_takeover_add4 = {
 	.multi = 1,
 	.activerem = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_add6 = {
@@ -559,7 +565,7 @@ static struct attrib qeth_attr_ipa_takeover_add6 = {
 	.multi = 1,
 	.activerem = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_del4 = {
@@ -573,7 +579,7 @@ static struct attrib qeth_attr_ipa_takeover_del4 = {
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_del6 = {
@@ -586,7 +592,7 @@ static struct attrib qeth_attr_ipa_takeover_del6 = {
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_invert4 = {
@@ -601,7 +607,7 @@ static struct attrib qeth_attr_ipa_takeover_invert4 = {
 	.defval = "0",
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_ipa_takeover_invert6 = {
@@ -616,7 +622,7 @@ static struct attrib qeth_attr_ipa_takeover_invert6 = {
 	.defval = "0",
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_rxip_add4 = {
@@ -629,7 +635,7 @@ static struct attrib qeth_attr_rxip_add4 = {
 	.multi = 1,
 	.activerem = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_rxip_add6 = {
@@ -642,7 +648,7 @@ static struct attrib qeth_attr_rxip_add6 = {
 	.multi = 1,
 	.activerem = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_rxip_del4 = {
@@ -654,7 +660,7 @@ static struct attrib qeth_attr_rxip_del4 = {
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_rxip_del6 = {
@@ -666,7 +672,7 @@ static struct attrib qeth_attr_rxip_del6 = {
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_sniffer = {
@@ -679,7 +685,7 @@ static struct attrib qeth_attr_sniffer = {
 	.defval = "0",
 	.order_cmp = after_layer2_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_vipa_add4 = {
@@ -692,7 +698,7 @@ static struct attrib qeth_attr_vipa_add4 = {
 	.multi = 1,
 	.activerem = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_vipa_add6 = {
@@ -705,7 +711,7 @@ static struct attrib qeth_attr_vipa_add6 = {
 	.multi = 1,
 	.activerem = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_vipa_del4 = {
@@ -717,7 +723,7 @@ static struct attrib qeth_attr_vipa_del4 = {
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_vipa_del6 = {
@@ -729,7 +735,7 @@ static struct attrib qeth_attr_vipa_del6 = {
 	.writeonly = 1,
 	.activeonly = 1,
 	.order_cmp = after_layer2_order_cmp,
-	.st_data = QETH_DATA(layer_3),
+	.st_data = QETH_DATA(layer_3, group_none),
 };
 
 static struct attrib qeth_attr_bridge_role = {
@@ -739,13 +745,16 @@ static struct attrib qeth_attr_bridge_role = {
 	"Configure a QETH device as a bridge port:\n"
 	"  primary:   The device acts as the primary bridge port\n"
 	"  secondary: The device acts as a secondary bridge port\n"
-	"  none:      The device has no bridge port role\n",
+	"  none:      The device has no bridge port role\n"
+	"  n/a (VNIC characteristics):\n"
+	"             The device is configured with VNIC characteristics\n"
+	"             and cannot have a bridge role (read-only)\n",
 	.defval = "none",
 	.order_cmp = after_layer2_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_STR("primary"),
 			       ACCEPT_STR("secondary"),
 			       ACCEPT_STR("none")),
-	.st_data = QETH_DATA(layer_2),
+	.st_data = QETH_DATA(layer_2, group_bridge),
 };
 
 static struct attrib qeth_attr_bridge_hostnotify = {
@@ -755,11 +764,14 @@ static struct attrib qeth_attr_bridge_hostnotify = {
 	"Control whether host connection and disconnection events are\n"
 	"reported through kernel uevents:\n"
 	"  0: Notifications are disabled\n"
-	"  1: Notifications are enabled\n",
+	"  1: Notifications are enabled\n"
+	"  n/a (VNIC characteristics):\n"
+	"     The device is configured with VNIC characteristics\n"
+	"     and cannot have a bridge role (read-only)\n",
 	.defval = "0",
 	.order_cmp = after_layer2_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_2),
+	.st_data = QETH_DATA(layer_2, group_bridge),
 };
 
 static struct attrib qeth_attr_bridge_reflect_promisc = {
@@ -773,13 +785,159 @@ static struct attrib qeth_attr_bridge_reflect_promisc = {
 	"  primary:   Attempt to configure the device as the primary bridge\n"
 	"             port\n"
 	"  secondary: Attempt to configure the device as a secondary bridge\n"
-	"             port\n",
+	"             port\n"
+	"  n/a (VNIC characteristics):\n"
+	"             The device is configured with VNIC characteristics\n"
+	"             and cannot have a bridge role (read-only)\n",
 	.defval = "none",
 	.order_cmp = after_layer2_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_STR("primary"),
 			       ACCEPT_STR("secondary"),
 			       ACCEPT_STR("none")),
-	.st_data = QETH_DATA(layer_2),
+	.st_data = QETH_DATA(layer_2, group_bridge),
+};
+
+static struct attrib qeth_attr_vnicc_flooding = {
+	.name = "vnicc/flooding",
+	.title = "Control setting of VNICC flooding",
+	.desc =
+	"Control and show the VNIC characteristic flooding\n"
+	"on the networking device:\n"
+	"  0:   Flooding disabled\n"
+	"  1:   Flooding enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "0",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_mcast_flooding = {
+	.name = "vnicc/mcast_flooding",
+	.title = "Control setting of VNICC multicast flooding",
+	.desc =
+	"Control and show the VNIC characteristic multicast flooding\n"
+	"on the networking device:\n"
+	"  0:   Multicast flooding disabled\n"
+	"  1:   Multicast flooding enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "0",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_learning = {
+	.name = "vnicc/learning",
+	.title = "Control setting of VNICC learning",
+	.desc =
+	"Control and show the VNIC characteristic learning\n"
+	"on the networking device:\n"
+	"  0:   Learning disabled\n"
+	"  1:   Learning enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "0",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_learning_timeout = {
+	.name = "vnicc/learning_timeout",
+	.title = "Control setting of the VNICC learning timeout",
+	.desc =
+	"Control and show the timeout of the VNIC characteristic learning\n"
+	"on the networking device:\n"
+	"  <N>: Timeout in seconds\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "600",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(60, 86400)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_takeover_setvmac = {
+	.name = "vnicc/takeover_setvmac",
+	.title = "Control setting of VNICC takeover SETVMAC",
+	.desc =
+	"Control and show the VNIC characteristic takeover SETVMAC\n"
+	"on the networking device:\n"
+	"  0:   Takeover SETVMAC disabled\n"
+	"  1:   Takeover SETVMAC enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "0",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_takeover_learning = {
+	.name = "vnicc/takeover_learning",
+	.title = "Control setting of VNICC takeover learning",
+	.desc =
+	"Control and show the VNIC characteristic takeover learning\n"
+	"on the networking device:\n"
+	"  0:   Takeover learning disabled\n"
+	"  1:   Takeover learning enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "0",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_bridge_invisible = {
+	.name = "vnicc/bridge_invisible",
+	.title = "Control setting of VNICC bridge invisible",
+	.desc =
+	"Control and show the VNIC characteristic bridge invisible\n"
+	"on the networking device:\n"
+	"  0:   Bridge invisible disabled\n"
+	"  1:   Bridge invisible enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "0",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
+};
+
+static struct attrib qeth_attr_vnicc_rx_bcast = {
+	.name = "vnicc/rx_bcast",
+	.title = "Control setting of VNICC receive broadcast",
+	.desc =
+	"Control and show the VNIC characteristic receive broadcast\n"
+	"on the networking device:\n"
+	"  0:   Receive broadcast disabled\n"
+	"  1:   Receive broadcast enabled\n"
+	"  n/a: Information unavailable (read-only)\n"
+	"  n/a (BridgePort):\n"
+	"       The device is part of a Linux bridge and cannot be\n"
+	"       configured with VNIC characteristics (read-only)\n",
+	.defval = "1",
+	.order_cmp = after_layer2_order_cmp,
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.st_data = QETH_DATA(layer_2, group_vnicc),
 };
 
 /*
@@ -921,6 +1079,20 @@ static enum qeth_layer_type get_layer_type(struct setting *s)
 		return data->layer_type;
 }
 
+static enum qeth_attr_group_type get_attr_group_type(struct setting *s)
+{
+	struct qeth_attrib_data *data;
+
+	if (!s->attrib)
+		return group_none;
+	data = s->attrib->st_data;
+
+	if (!data)
+		return group_none;
+	else
+		return data->attr_group;
+}
+
 static void add_layer2_setting(struct setting_list *list, int layer2)
 {
 	setting_list_apply(list, &qeth_attr_layer2,
@@ -994,6 +1166,38 @@ static exit_code_t check_ineffective_settings(struct setting_list *list,
 	return rc;
 }
 
+/* Check if there are conflicting attribute settings */
+static exit_code_t check_conflicting_settings(struct setting_list *list)
+{
+	const char *text = "Settings %s and %s are in conflict\n";
+	struct setting *bridge = NULL, *vnicc = NULL;
+	enum qeth_attr_group_type t;
+	struct setting *s;
+
+	util_list_iterate(&list->list, s) {
+		if (s->removed)
+			continue;
+		t = get_attr_group_type(s);
+		if (t == group_bridge && (!bridge || !bridge->specified))
+			bridge = s;
+		if (t == group_vnicc && (!vnicc || !vnicc->specified))
+			vnicc = s;
+	}
+
+	/* BridgePort and VNICC cannot both be configured at the same time */
+	if (bridge && vnicc && (bridge->specified || vnicc->specified)) {
+		if (force) {
+			delayed_warn(text, bridge->attrib->name,
+				     vnicc->attrib->name);
+			return EXIT_OK;
+		}
+		delayed_forceable(text, bridge->attrib->name,
+				  vnicc->attrib->name);
+		return EXIT_INVALID_CONFIG;
+	}
+	return EXIT_OK;
+}
+
 /* Check if layer2 setting can be correctly applied. */
 static exit_code_t check_layer2(struct device *dev, config_t config)
 {
@@ -1045,7 +1249,17 @@ static exit_code_t check_layer2(struct device *dev, config_t config)
 	if (SCOPE_PERSISTENT(config)) {
 		rc = check_ineffective_settings(dev->persistent.settings,
 						layer2_persistent);
+		if (rc)
+			goto out;
 	}
+	/* check for conflicting layer2 attribute groups */
+	if (SCOPE_ACTIVE(config)) {
+		rc = check_conflicting_settings(dev->active.settings);
+		if (rc)
+			goto out;
+	}
+	if (SCOPE_PERSISTENT(config))
+		rc = check_conflicting_settings(dev->persistent.settings);
 
 out:
 	return rc;
@@ -1195,6 +1409,14 @@ static struct subtype qeth_subtype_qeth = {
 		&qeth_attr_bridge_role,
 		&qeth_attr_bridge_hostnotify,
 		&qeth_attr_bridge_reflect_promisc,
+		&qeth_attr_vnicc_flooding,
+		&qeth_attr_vnicc_mcast_flooding,
+		&qeth_attr_vnicc_learning,
+		&qeth_attr_vnicc_learning_timeout,
+		&qeth_attr_vnicc_takeover_setvmac,
+		&qeth_attr_vnicc_takeover_learning,
+		&qeth_attr_vnicc_bridge_invisible,
+		&qeth_attr_vnicc_rx_bcast,
 	),
 	.unknown_dev_attribs	= 1,
 	.support_definable	= 1,
