@@ -62,13 +62,13 @@ static const char usage[] =
 "-h, --help           Displays this help, then exits.\n"
 "-v, --version        Displays version information, then exits.\n";
 
-static void help_exit(const char *prg)
+static void __noreturn help_exit(const char *prg)
 {
 	printf(usage, prg, prg);
 	exit(EXIT_SUCCESS);
 }
 
-static void version_exit(const char *prg)
+static void __noreturn version_exit(const char *prg)
 {
 	printf("%s: Start a program if a terminal device is available, "
 	       "version %s\n", prg, RELEASE_STRING);

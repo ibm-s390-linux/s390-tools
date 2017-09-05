@@ -348,7 +348,7 @@ void hyptop_text_mode(void)
 /*
  * Exit hyptop
  */
-void hyptop_exit(int rc)
+void __noreturn hyptop_exit(int rc)
 {
 	hyptop_text_mode();
 	exit(rc);

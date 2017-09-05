@@ -20,7 +20,7 @@ static const char *const usage_lsshut =
 "  -h, --help           Print this help, then exit\n"
 "  -v, --version        Print version information, then exit\n";
 
-static void print_usage_lsshut_exit(void)
+static __noreturn void print_usage_lsshut_exit(void)
 {
 	printf(usage_lsshut, g.prog_name);
 	exit(0);

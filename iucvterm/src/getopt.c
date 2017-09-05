@@ -71,8 +71,8 @@ static const struct tool_info iucv_tool[2] = {
 };
 
 
-static void usage_exit(const struct tool_info *prg, int is_error,
-			const char *msg)
+static void __noreturn usage_exit(const struct tool_info *prg, int is_error,
+				  const char *msg)
 {
 	if (msg != NULL)
 		fprintf(stderr, _("%s: %s\n"), prg->name, msg);
@@ -80,7 +80,7 @@ static void usage_exit(const struct tool_info *prg, int is_error,
 	exit(is_error ? 1 : 0);	/* rc=1 .. invalid args */
 }
 
-static void version_exit(const struct tool_info *prg)
+static void __noreturn version_exit(const struct tool_info *prg)
 {
 	printf(_("%s: IUCV Terminal Applications, version %s\n"),
 		prg->name, RELEASE_STRING);

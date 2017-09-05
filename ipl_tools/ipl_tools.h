@@ -24,6 +24,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <lib/zt_common.h>
+
 #define IPL_TYPE_LEN_MAX	100
 #define NSS_NAME_LEN_MAX	8
 
@@ -57,8 +59,8 @@ extern void read_str(char *string, const char *file, size_t len);
 extern void read_fw_str(char *string, const char *file, size_t len);
 extern void print_fw_str(const char *fmt, const char *dir, const char *file);
 
-extern void print_version_exit(void);
-extern void print_help_hint_exit(void);
+extern void __noreturn print_version_exit(void);
+extern void __noreturn print_help_hint_exit(void);
 
 /*
  * FCP

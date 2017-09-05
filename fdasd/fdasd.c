@@ -308,7 +308,7 @@ static void fdasd_cleanup(fdasd_anchor_t *anchor)
 /*
  * Exit fdasd.
  */
-static void fdasd_exit(fdasd_anchor_t *anchor, int rc)
+static void __noreturn fdasd_exit(fdasd_anchor_t *anchor, int rc)
 {
 	fdasd_cleanup(anchor);
 	exit(rc);

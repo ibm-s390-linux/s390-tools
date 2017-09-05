@@ -216,7 +216,7 @@ extern void win_cpu_types_init(void);
  * Misc functions
  */
 extern void hyptop_update_term(void);
-extern void hyptop_exit(int rc);
+extern void __noreturn hyptop_exit(int rc);
 extern void hyptop_text_mode(void);
 
 #endif /* HYPTOP_H */

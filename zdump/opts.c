@@ -75,7 +75,7 @@ static void init_defaults(void)
 /*
  * Print "help" hint
  */
-static void print_usage_exit(void)
+static void __noreturn print_usage_exit(void)
 {
 	STDERR("Try '%s --help' for more information.\n", g.prog_name);
 	zg_exit(1);
@@ -84,7 +84,7 @@ static void print_usage_exit(void)
 /*
  * Print help text
  */
-static void print_help_exit(void)
+static void __noreturn print_help_exit(void)
 {
 	STDOUT("%s", help_text);
 	zg_exit(0);
@@ -93,7 +93,7 @@ static void print_help_exit(void)
 /*
  * Print version information
  */
-static void print_version_exit(void)
+static void __noreturn print_version_exit(void)
 {
 	STDOUT("%s: Tool for copying and converting dumps version %s\n",
 	       g.prog_name, RELEASE_STRING);

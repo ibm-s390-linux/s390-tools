@@ -34,7 +34,7 @@ static const char *const usage_chshut =
 "  -h, --help        Print this help, then exit\n"
 "  -v, --version     Print version information, then exit\n";
 
-static void print_usage_chshut_exit(void)
+static void __noreturn print_usage_chshut_exit(void)
 {
 	printf(usage_chshut, g.prog_name);
 	exit(0);

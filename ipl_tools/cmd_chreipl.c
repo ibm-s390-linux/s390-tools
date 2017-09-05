@@ -97,7 +97,7 @@ static struct locals {
 	enum reipl_type		reipl_type;	/* CCW, FCP, NSS */
 } l;
 
-static void print_usage_chreipl_exit(void)
+static void __noreturn print_usage_chreipl_exit(void)
 {
 	printf(usage_chreipl, g.prog_name);
 	exit(0);
