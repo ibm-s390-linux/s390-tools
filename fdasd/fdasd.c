@@ -1,7 +1,7 @@
 /*
  * fdasd - Create or modify partitions on ECKD DASDs
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -1257,7 +1257,7 @@ static void fdasd_write_vtoc_labels(fdasd_anchor_t *anc)
 		printf("DSCBs: ");
 
 	blk = (cchhb2blk(&anc->vlabel->vtoc, &geo) - 1) * anc->blksize;
-	if (blk <= 0)
+	if (cchhb2blk(&anc->vlabel->vtoc, &geo) == 0 || blk == 0)
 		fdasd_error(anc, vlabel_corrupted, "");
 	maxblk = blk + anc->blksize * 9; /* f4+f5+f7+3*f8+3*f9 */
 
@@ -1994,7 +1994,7 @@ static int fdasd_check_volume(fdasd_anchor_t *anc)
 			printf(" VOL1\n");
 
 		blk = (cchhb2blk(&vlabel->vtoc, &geo) - 1) * anc->blksize;
-		if (blk > 0) {
+		if (cchhb2blk(&vlabel->vtoc, &geo) > 0 && blk > 0) {
 			rc = fdasd_valid_vtoc_pointer(anc, blk);
 
 			if (anc->print_table && (rc < 0))
