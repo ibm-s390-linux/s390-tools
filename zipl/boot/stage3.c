@@ -3,7 +3,7 @@
  *
  * Main program for stage3 bootloader
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -257,7 +257,7 @@ void start(void)
 		length++;
 
 	/* find end of original parm line */
-	while (command_line[end] != 0 && command_line[end] != 0)
+	while (command_line[end] != 0)
 		end++;
 
 	/*
