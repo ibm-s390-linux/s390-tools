@@ -3741,7 +3741,7 @@ static int extend_block_variable(struct file *f, const char *buf, int len,
 		}
 
 		DEBUG("%s: wrote %d record bytes\n", __func__, rlen);
-		if (size <= 0)
+		if (size == 0)
 			return copied;
 	}
 
