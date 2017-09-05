@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -550,7 +550,7 @@ void setting_list_merge(struct setting_list *to, struct setting_list *from,
 		if (specified)
 			n->specified = s->specified;
 		if (modified)
-			n->modified = n->modified;
+			n->modified = s->modified;
 	}
 }
 
