@@ -3,7 +3,7 @@
  *
  * Config file parsing
  *
- * Copyright IBM Corp. 2007, 2017
+ * Copyright IBM Corp. 2007, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -201,6 +201,7 @@ void parse_configfile(char *file)
 				      linebuffer);
 		parse_configline(linebuffer);
 	}
+	fclose(filp);
 }
 
 /*
