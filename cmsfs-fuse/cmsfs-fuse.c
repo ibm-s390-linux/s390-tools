@@ -3,7 +3,7 @@
  *
  * Main function
  *
- * Copyright IBM Corp. 2010, 2017
+ * Copyright IBM Corp. 2010, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -2841,6 +2841,7 @@ static int cmsfs_rename(const char *path, const char *new_path)
 	str_toupper(uc_new_name);
 
 	rc = encode_edf_name(uc_new_name, fname, ftype);
+	free(uc_new_name);
 	if (rc)
 		return rc;
 
