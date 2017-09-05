@@ -3,7 +3,7 @@
  *
  * Bootmenu Subroutines
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -123,7 +123,7 @@ static int menu_param(unsigned long *value)
 	/* no number, check for keyword */
 	i = 0;
 	/* skip leading whitespaces */
-	while (ebc_isspace(loadparm[i]) && (i < PARAM_SIZE))
+	while ((i < PARAM_SIZE) && ebc_isspace(loadparm[i]))
 		i++;
 
 	if (!strncmp(&loadparm[i], "PROMPT", 6)) {
