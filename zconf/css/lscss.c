@@ -41,8 +41,7 @@
 #define UUID_FORMAT	"^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$"
 
 /* Misc constants */
-#define MAX_BUFFER_SIZE_FOR_SUBCHANNEL_ATTRIBUTES	37
-#define MAX_BUFFER_SIZE_FOR_DEVICE_ATTRIBUTES		16
+#define MAX_BUF_SIZE		256
 #define PREFIX_ID_LENGTH	4
 #define SHORT_ID_LENGTH		4
 #define CHPIDS_SEGMENT_LENGTH	8
@@ -310,8 +309,8 @@ static bool in_devtypes_list(char *dtype)
  */
 static int fill_device_info(struct util_rec *rec, char *path, char *device)
 {
-	char buf[MAX_BUFFER_SIZE_FOR_DEVICE_ATTRIBUTES];
 	unsigned long int val_ul;
+	char buf[MAX_BUF_SIZE];
 
 	if (!path || !device) {
 		if (cmd.opt_devtype && cmd.dev_count > 0)
@@ -403,7 +402,7 @@ static bool is_sch_vfio(char *path)
  */
 static int fill_vfio_devid(struct util_rec *rec, char *path)
 {
-	char *device, buf[MAX_BUFFER_SIZE_FOR_SUBCHANNEL_ATTRIBUTES];
+	char *device, buf[MAX_BUF_SIZE];
 	struct dirent **de_vec;
 	int count;
 
@@ -433,7 +432,7 @@ static int fill_vfio_devid(struct util_rec *rec, char *path)
  */
 static int fill_io_devid(struct util_rec *rec, char *path)
 {
-	char *device, buf[MAX_BUFFER_SIZE_FOR_SUBCHANNEL_ATTRIBUTES];
+	char *device, buf[MAX_BUF_SIZE];
 	struct dirent **de_vec;
 	int count;
 
@@ -479,8 +478,8 @@ static int fill_io_devid(struct util_rec *rec, char *path)
  */
 static void print_sch_io(struct util_rec *rec, char *path, char *sch_dir)
 {
-	char buf[MAX_BUFFER_SIZE_FOR_SUBCHANNEL_ATTRIBUTES];
 	unsigned int pim, pam, pom;
+	char buf[MAX_BUF_SIZE];
 
 	/* Fill in subchannel ID */
 	if (cmd.opt_short) {
@@ -560,7 +559,7 @@ static void print_sch_io(struct util_rec *rec, char *path, char *sch_dir)
  */
 static void print_sch_chsc(struct util_rec *rec, char *sch_dir)
 {
-	char buf[MAX_BUFFER_SIZE_FOR_DEVICE_ATTRIBUTES];
+	char buf[MAX_BUF_SIZE];
 
 	/* Skip entry if devrange or devtype option is active */
 	if (cmd.opt_devrange && cmd.rng_count > 0)
@@ -596,7 +595,7 @@ static void print_sch_chsc(struct util_rec *rec, char *sch_dir)
  */
 static void print_sch_eadm(struct util_rec *rec, char *sch_dir)
 {
-	char buf[MAX_BUFFER_SIZE_FOR_DEVICE_ATTRIBUTES];
+	char buf[MAX_BUF_SIZE];
 
 	/* Skip entry if devrange or devtype option is active */
 	if (cmd.opt_devrange && cmd.rng_count > 0)
@@ -632,7 +631,7 @@ static void print_sch_eadm(struct util_rec *rec, char *sch_dir)
  */
 static void print_defunct_devices(struct util_rec *rec, char *path)
 {
-	char *device, buf[MAX_BUFFER_SIZE_FOR_DEVICE_ATTRIBUTES];
+	char *device, buf[MAX_BUF_SIZE];
 	struct dirent **de_vec;
 	int i, count;
 
