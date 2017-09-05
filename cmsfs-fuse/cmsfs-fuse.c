@@ -923,7 +923,6 @@ static void set_record(struct file *f, int *record, off_t addr, int len,
 static void add_record_ext(struct record *rec, struct record_ext *ext)
 {
 	struct record_ext *tmp;
-	int i = 0;
 
 	if (rec->ext == NULL) {
 		rec->ext = ext;
@@ -931,9 +930,7 @@ static void add_record_ext(struct record *rec, struct record_ext *ext)
 		ext->next = NULL;
 	} else {
 		tmp = rec->ext;
-		i++;
 		while (tmp->next != NULL) {
-			i++;
 			tmp = tmp->next;
 		}
 		tmp->next = ext;
