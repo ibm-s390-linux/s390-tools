@@ -547,6 +547,22 @@ static void setup_rec_long(struct util_rec *rec)
 	util_rec_def(rec, "ipa", UTIL_REC_ALIGN_LEFT, 0, "ipa");
 	util_rec_def(rec, "vipa", UTIL_REC_ALIGN_LEFT, 0, "vipa");
 	util_rec_def(rec, "parp", UTIL_REC_ALIGN_LEFT, 0, "parp");
+	util_rec_def(rec, "vnicc/bridge_invisible", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/bridge_invisible");
+	util_rec_def(rec, "vnicc/flooding", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/flooding");
+	util_rec_def(rec, "vnicc/learning", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/learning");
+	util_rec_def(rec, "vnicc/learning_timeout", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/learning_timeout");
+	util_rec_def(rec, "vnicc/mcast_flooding", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/mcast_flooding");
+	util_rec_def(rec, "vnicc/rx_bcast", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/rx_bcast");
+	util_rec_def(rec, "vnicc/takeover_learning", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/takeover_learning");
+	util_rec_def(rec, "vnicc/takeover_setvmac", UTIL_REC_ALIGN_LEFT, 0,
+		     "vnicc/takeover_setvmac");
 }
 
 /*
@@ -560,7 +576,7 @@ static struct util_rec *setup_rec()
 		rec = util_rec_new_wide("-");
 		setup_rec_wide(rec);
 	} else {
-		rec = util_rec_new_long("-", ":", "if_name", 30, 42);
+		rec = util_rec_new_long("-", ":", "if_name", 32, 40);
 		setup_rec_long(rec);
 	}
 	return rec;
