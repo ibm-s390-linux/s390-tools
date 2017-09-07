@@ -23,11 +23,12 @@
 #include <unistd.h>
 
 #include "lib/util_base.h"
+#include "lib/util_file.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
 #include "lib/zt_common.h"
 
-#define READCHUNK 80
+#define RD_BUFFER_SIZE 80
 #define BLKSSZGET    _IO(0x12,104)
 #define DASD_IOCTL_LETTER 'D'
 #define BIODASDINFO  _IOR(DASD_IOCTL_LETTER,1,struct dasd_information)
@@ -236,29 +237,9 @@ static char *dinfo_ebcdic_dec (char *source, char *target, int l)
 	return target;
 }
 
-static int dinfo_read_dasd_uid (char *uidfile, char *readbuf, int readbuflen)
+static int dinfo_read_dasd_uid(char *uidfile, char *readbuf)
 {
-	FILE *dasduid;
-	int offset = 0;
-
-	if ((dasduid = fopen(uidfile,"r")) == NULL)
-		return -1;
-
-	while (fgets(readbuf + offset, READCHUNK, dasduid)  &&
-	       readbuf[strlen(readbuf)-1] != '\n' ) {
-		offset += READCHUNK-1;
-		if ( offset+READCHUNK-1 >= readbuflen ) {
-			readbuf = realloc(readbuf,
-					  readbuflen + READCHUNK-1);
-			readbuflen += READCHUNK-1;
-		}
-	}
-	fclose(dasduid);
-
-	if (strlen(readbuf) <= 1)
-		return -1;
-
-	return 0;
+	return util_file_read_line(readbuf, RD_BUFFER_SIZE, uidfile);
 }
 
 static int dinfo_read_dasd_vlabel (char *device, struct volume_label *vlabel,
@@ -411,14 +392,14 @@ static void dinfo_free_devnode(char *device)
 	}
 }
 
-static int dinfo_extract_dev(dev_t *dev, char *str, int readbuflen)
+static int dinfo_extract_dev(dev_t *dev, char *str)
 {
-	char tmp[readbuflen];
+	char tmp[RD_BUFFER_SIZE];
 	char *p = NULL;
 	int ma, mi;
 
-	bzero(tmp, readbuflen);
-	strncpy(tmp, str, readbuflen);
+	bzero(tmp, RD_BUFFER_SIZE);
+	strncpy(tmp, str, RD_BUFFER_SIZE);
 	if ((p = strchr(tmp, ':')) == NULL) {
 		printf("Error: unable to extract major/minor\n");
 		return -1;
@@ -435,37 +416,17 @@ static int dinfo_extract_dev(dev_t *dev, char *str, int readbuflen)
 
 static int dinfo_get_dev_from_blockdev(char *blockdev, dev_t *dev)
 {
-	FILE *dasddev;
-	int offset = 0;
-	char *devfile = NULL;
 	char *readbuf = NULL;
-	int readbuflen = READCHUNK;
 
-	if ((devfile = dinfo_malloc(readbuflen)) == NULL)
-		return -1;
-
-	sprintf(devfile,"/sys/block/%s/dev", blockdev);
-
-	if ((readbuf = dinfo_malloc(readbuflen)) == NULL) {
+	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
+	if (!readbuf) {
 		printf("Error: Not enough memory to allocate readbuffer\n");
 		return -1;
 	}
-
-	if ((dasddev = fopen(devfile,"r")) == NULL)
+	if (util_file_read_line(readbuf, RD_BUFFER_SIZE,
+				"/sys/block/%s/dev", blockdev) < 0)
 		return -1;
-
-	while (fgets(readbuf + offset, READCHUNK, dasddev)  &&
-	       readbuf[strlen(readbuf)-1] != '\n' ) {
-		offset += READCHUNK-1;
-		if (offset+READCHUNK-1 >= readbuflen) {
-			readbuf = realloc(readbuf,
-					  readbuflen + READCHUNK-1);
-			readbuflen += READCHUNK-1;
-		}
-	}
-	fclose(dasddev);
-
-	if (dinfo_extract_dev(dev, readbuf, readbuflen) != 0)
+	if (dinfo_extract_dev(dev, readbuf) != 0)
 		return -1;
 
 	return 0;
@@ -580,14 +541,10 @@ out2:
 static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 {
 	struct stat stat_buffer;
-	char stat_dev[READCHUNK];
-	char sys_dev_path[READCHUNK];
+	char stat_dev[RD_BUFFER_SIZE];
 	char *readbuf;
 	DIR *directory = NULL;
 	struct dirent *dir_entry = NULL;
-	FILE *block_dev;
-	int readbuflen = READCHUNK;
-	int offset;
 
 	if (stat(devnode, &stat_buffer) != 0) {
 		printf("Error: could not stat %s\n", devnode);
@@ -602,28 +559,17 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 		return -1;
 	}
 
-	if ((readbuf = dinfo_malloc(readbuflen)) == NULL) {
+	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
+	if (!readbuf) {
 		printf("Error: Not enough memory to allocate readbuffer\n");
 		return -1;
 	}
 
 	while ((dir_entry = readdir(directory)) != NULL) {
-		sprintf(sys_dev_path, "/sys/block/%s/dev", dir_entry->d_name);
-
-		if ((block_dev = fopen(sys_dev_path,"r")) == NULL)
+		if (util_file_read_line(readbuf, RD_BUFFER_SIZE,
+					"/sys/block/%s/dev",
+					dir_entry->d_name) < 0)
 			continue;
-
-		offset = 0;
-		while (fgets(readbuf + offset, READCHUNK, block_dev)  &&
-		       readbuf[strlen(readbuf)-1] != '\n' ) {
-			offset += READCHUNK-1;
-			if ( offset+READCHUNK-1 >= readbuflen ) {
-				readbuf = realloc(readbuf,
-						  readbuflen + READCHUNK-1);
-				readbuflen += READCHUNK-1;
-			}
-		}
-		fclose(block_dev);
 
 		if (strncmp(stat_dev, readbuf,
 			    MAX(strlen(stat_dev), strlen(readbuf)-1)) == 0) {
@@ -644,7 +590,6 @@ int main(int argc, char * argv[])
 	char *uidfile = NULL;
 	char *device = NULL;
 	char *readbuf = NULL;
-	int readbuflen = READCHUNK;
 	dev_t dev;
 	int export = 0;
 	int c;
@@ -733,8 +678,9 @@ int main(int argc, char * argv[])
 		exit(1);
 	}
 
-	if (((readbuf = dinfo_malloc(readbuflen)) == NULL) ||
-	    ((uidfile = dinfo_malloc(readbuflen)) == NULL))
+	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
+	uidfile = dinfo_malloc(RD_BUFFER_SIZE);
+	if (!(readbuf && uidfile))
 		exit(1);
 
 	/* try to read the uid attribute */
@@ -753,7 +699,7 @@ int main(int argc, char * argv[])
 	}
 
 	if (print_uid) {
-		if (dinfo_read_dasd_uid(uidfile, readbuf, readbuflen) == 0) {
+		if (dinfo_read_dasd_uid(uidfile, readbuf) == 0) {
 			/* look for the 4th '.' and cut there */
 			srchuid = readbuf - 1;
 			for (i = 0; i < 4; ++i) {
@@ -766,20 +712,20 @@ int main(int argc, char * argv[])
 				srchuid[1] = 0;
 			}
 			if (export) {
-				printf("ID_UID=%s",readbuf);
+				printf("ID_UID=%s\n", readbuf);
 			} else
-				printf("%s",readbuf);
+				printf("%s\n", readbuf);
 			if (!print_vlabel && !print_extended_uid)
 				goto out;
 		}
 	}
 
 	if (print_extended_uid) {
-		if (dinfo_read_dasd_uid(uidfile, readbuf, readbuflen) == 0) {
+		if (dinfo_read_dasd_uid(uidfile, readbuf) == 0) {
 			if (export) {
-				printf("ID_XUID=%s",readbuf);
+				printf("ID_XUID=%s\n", readbuf);
 			} else
-				printf("%s",readbuf);
+				printf("%s\n", readbuf);
 			if (!print_vlabel)
 				goto out;
 		}
@@ -808,7 +754,8 @@ int main(int argc, char * argv[])
 			goto error;
 
 	} else if (devnode) {
-		if ((device = dinfo_malloc(readbuflen)) == NULL)
+		device = dinfo_malloc(RD_BUFFER_SIZE);
+		if (!device)
 			exit(1);
 		strcpy(device, devnode);
 	}
