@@ -921,7 +921,7 @@ static void fdasd_verify_device(fdasd_anchor_t *anc, char *name)
 		fdasd_error(anc, device_verification_failed, err_str);
 	}
 
-	if (minor(dst.st_rdev) & PARTN_MASK) {
+	if (!anc->force_virtual && minor(dst.st_rdev) & PARTN_MASK) {
 		snprintf(err_str, ERROR_STRING_SIZE,
 			 "Partition '%s' (%d/%d) detected where device is "
 			 "required\n", name,
