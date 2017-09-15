@@ -1071,7 +1071,11 @@ static exit_code_t setting_ineffective(struct setting *s, int layer2)
 
 static enum qeth_layer_type get_layer_type(struct setting *s)
 {
-	struct qeth_attrib_data *data = s->attrib->st_data;
+	struct qeth_attrib_data *data;
+
+	if (!s->attrib)
+		return layer_any;
+	data = s->attrib->st_data;
 
 	if (!data)
 		return layer_any;
