@@ -6,6 +6,7 @@ Release history for s390-tools (MIT version)
   - Changes of existing tools:
 
   - Bug Fixes:
+    znetconf: Add missing line in lsznet.raw
 
 * __v2.0.0 (2017-08-21)__
 

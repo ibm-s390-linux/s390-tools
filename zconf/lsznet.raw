@@ -105,6 +105,7 @@ function debug() {
 function search_cu_tcpip() {
     local scu=$1
     local i
+    for ((i=0; i < ${#CU_TCPIP[@]}; i++)); do
         if [ "$scu" == "${CU_TCPIP[i]}" ]; then
             return 0
         fi
