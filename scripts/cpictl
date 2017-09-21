@@ -53,6 +53,7 @@ Configure the Control-Program-Information (CPI) settings.
   -N, --name SYSTEM      Set and commit the system name to SYSTEM
   -S, --sysplex SYSPLEX  Set and commit the sysplex name to SYSPLEX
   -T, --type TYPE        Set and commit OS type to TYPE
+  -v, --version          Show version information
   --commit               Ignore all other options and commit any uncommitted
                          values
   --dry-run              Do not actually set or commit anything, but show what
