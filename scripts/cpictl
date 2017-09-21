@@ -48,12 +48,12 @@ Configure the Control-Program-Information (CPI) settings.
   -e, --environment      Set and commit the system type, level, name and
                          sysplex name with values taken from environment
                          variables
-  -h, --help             Ignore all other options and print this help
+  -h, --help             Print this help, then exit
   -L, --level LEVEL      Set and commit OS level to LEVEL (format xx.yy.zzABCD)
   -N, --name SYSTEM      Set and commit the system name to SYSTEM
   -S, --sysplex SYSPLEX  Set and commit the sysplex name to SYSPLEX
   -T, --type TYPE        Set and commit OS type to TYPE
-  -v, --version          Show version information
+  -v, --version          Print version information, then exit
   --commit               Ignore all other options and commit any uncommitted
                          values
   --dry-run              Do not actually set or commit anything, but show what
