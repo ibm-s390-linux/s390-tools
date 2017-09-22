@@ -1,12 +1,32 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.0.1 (2017-xx-xx)__
+* __v2.1.0 (2017-09-22)__
 
-  - Changes of existing tools:
+  Added new tools:
+  - netboot: Scripts for building a PXE-style netboot image for KVM
+  - 90-cpi.rules/cpictl: Introduce new udev rule for KVM hosts
 
-  - Bug Fixes:
-    znetconf: Add missing line in lsznet.raw
+  Changes of existing tools:
+  - lsqeth/zdev: Add VNIC Characteristics support
+
+  Bug Fixes:
+  - chzcrypt: Corrected handling of insufficient permissions
+  - cpacfstats: Add size setting to perf event
+  - fdasd: Skip partition check with the force option
+  - ttyrun: Fix deprecated BindTo usage in ttyrun-getty@.service.in
+  - lszcrypt: Fix core dump caused by stack overwrite
+  - lszcrypt: Fix random domain printout when no config available
+  - zdev: Fix segfault with unknown qeth attribute
+  - zdev: Fix IPv6 NDP proxy description
+  - zdev: Fix zdev dracut module temp file location
+  - zkey: Correctly detect abbreviated commands
+  - zkey: Validate XTS key: ignore domain and card
+  - zkey: Use octal values instead of S_IRWX* constants
+  - zkey: Properly set umask to prohibit permissions to group and others
+  - zkey: Add -ldl to LDLIBS (not LDFLAGS)
+  - znetconf: Re-add missing line in lsznet.raw
+  - Fix several gcc 7 warnings
 
 * __v2.0.0 (2017-08-21)__
 
