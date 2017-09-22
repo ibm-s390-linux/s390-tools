@@ -5,7 +5,7 @@ Release history for s390-tools (MIT version)
 
   Added new tools:
   - netboot: Scripts for building a PXE-style netboot image for KVM
-  - 90-cpi.rules/cpictl: Introduce new udev rule for KVM hosts
+  - 90-cpi.rules/cpictl: New udev rule to update CPI when KVM is used
 
   Changes of existing tools:
   - lsqeth/zdev: Add VNIC Characteristics support
