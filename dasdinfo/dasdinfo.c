@@ -573,8 +573,8 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 
 		if (strncmp(stat_dev, readbuf,
 			    MAX(strlen(stat_dev), strlen(readbuf)-1)) == 0) {
-			sprintf(*uidfile,"/sys/block/%s/device/uid",
-				dir_entry->d_name);
+			snprintf(*uidfile, RD_BUFFER_SIZE,
+				 "/sys/block/%s/device/uid", dir_entry->d_name);
 			break;
 		}
 	}
