@@ -7,7 +7,7 @@ CPUMF_DATADIR = $(TOOLS_DATADIR)/cpumf
 DATA_FILES = cpum-cf-hw-counter.map cpum-cf-generic.ctr \
              cpum-cf-extended-z10.ctr cpum-cf-extended-z196.ctr \
 	     cpum-cf-extended-zEC12.ctr cpum-sf-modes.ctr \
-	     cpum-cf-extended-z13.ctr
+	     cpum-cf-extended-z13.ctr cpum-cf-extended-z14.ctr
 LIB_FILES = bin/cpumf_helper
 USRBIN_SCRIPTS = bin/lscpumf
 USRSBIN_SCRIPTS = bin/chcpumf
