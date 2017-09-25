@@ -1,7 +1,7 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.1.0 (2017-09-22)__
+* __v2.1.0 (2017-09-25)__
 
   Added new tools:
   - netboot: Scripts for building a PXE-style netboot image for KVM

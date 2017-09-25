@@ -2,8 +2,8 @@ List of all individuals having contributed content to s390-tools
 ----------------------------------------------------------------
 
 - Alexey Ishchuk
-- Andreas Herrmann
 - Andre Wild
+- Andreas Herrmann
 - Antoinette Kaschner
 - Arnd Bergmann
 - Axel Wirbser
@@ -11,13 +11,14 @@ List of all individuals having contributed content to s390-tools
 - Carsten Otte
 - Christian Borntraeger
 - Christof Schmitt
+- Claudio Imbrenda
 - Clemens von Mann
 - Despina Papadopoulou
 - Eberhard Pasch
 - Einar Lueck
 - Erwin Vicari
-- Eugene Dvurechenski
 - Eugene Crosser
+- Eugene Dvurechenski
 - Farhan Ali
 - Felix Beck
 - Frank Blaschka
@@ -62,6 +63,7 @@ List of all individuals having contributed content to s390-tools
 - Mikhail Zaslonko
 - Peter Oberparleiter
 - Peter Tiedemann
+- Philipp Kern
 - Raimund Schroeder
 - Ralph Wuerthner
 - Rene Trumpp
