@@ -18,12 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/**
- * Copyright IBM Corp. 2016, 2017
- *
- * s390-tools is free software; you can redistribute it and/or modify
- * it under the terms of the MIT license. See LICENSE for details.
- */
 struct util_prg_copyright {
 	/** Name of the copyright owner, e.g. IBM */
 	const char *owner;
