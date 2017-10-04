@@ -167,7 +167,7 @@ MANDIR          = $(INSTALLDIR)/usr/share/man
 VARDIR          = $(INSTALLDIR)/var
 TOOLS_DATADIR   = $(INSTALLDIR)/usr/share/s390-tools
 TOOLS_LIBDIR    = $(INSTALLDIR)/lib/s390-tools
-ZFCPDUMP_DIR    = $(INSTALLDIR)/lib/s390-tools/zfcpdump
+ZFCPDUMP_DIR    = $(TOOLS_LIBDIR)/zfcpdump
 # Systemd support files are installed only if a directory is specified
 # for SYSTEMDSYSTEMUNITDIR (e.g. /lib/systemd/system)
 SYSTEMDSYSTEMUNITDIR =
