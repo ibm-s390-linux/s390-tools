@@ -291,7 +291,6 @@ typedef struct bootstrap2 {
 
 typedef struct dasdfmt_info {
 	dasd_information2_t dasd_info;
-        char  devname[PATH_MAX];
         int   verbosity;
         int   testmode;
         int   withoutprompt;
