@@ -456,24 +456,24 @@ static void program_interrupt_signal(int sig)
 /*
  * check given device name for blanks and some special characters
  */
-static void get_device_name(dasdfmt_info_t *info, char *devname, int argc,
-			    char *argv[])
+static void get_device_name(char *devname,
+			    int optind, int argc, char *argv[])
 {
 	struct util_proc_dev_entry dev_entry;
 	struct stat dev_stat;
 
-	if (info->device_id + 1 < argc)
+	if (optind + 1 < argc)
 		ERRMSG_EXIT(EXIT_MISUSE,
 			    "%s: More than one device specified!\n", prog_name);
 
-	if (info->device_id >= argc)
+	if (optind >= argc)
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: No device specified!\n",
 			    prog_name);
 
-	if (strlen(argv[info->device_id]) >= PATH_MAX)
+	if (strlen(argv[optind]) >= PATH_MAX)
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: device name too long!\n",
 			    prog_name);
-	strcpy(devname, argv[info->device_id]);
+	strcpy(devname, argv[optind]);
 
 	if (stat(devname, &dev_stat) != 0)
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: Could not get information for "
@@ -1604,7 +1604,6 @@ int main(int argc, char *argv[])
 			break;
 		case -1:
 			/* End of options string - start of devices list */
-			info.device_id = optind;
 			break;
 		default:
 			ERRMSG_EXIT(EXIT_MISUSE, "Try '%s --help' for more"
@@ -1635,7 +1634,7 @@ int main(int argc, char *argv[])
 	if (info.print_hashmarks)
 		PARSE_PARAM_INTO(info.hashstep, hashstep_str, 10, "hashstep");
 
-	get_device_name(&info, dev_filename, argc, argv);
+	get_device_name(dev_filename, optind, argc, argv);
 
 	filedes = open(dev_filename, O_RDWR);
 	if (filedes == -1)
