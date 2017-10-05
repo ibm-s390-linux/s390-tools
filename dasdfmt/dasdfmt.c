@@ -970,28 +970,19 @@ static void dasdfmt_print_info(dasdfmt_info_t *info, volume_label_t *vlabel,
 /*
  * get volser
  */
-static int dasdfmt_get_volser(dasdfmt_info_t *info, char *volser)
+static int dasdfmt_get_volser(char *devname, dasd_information2_t *dasd_info,
+			      char *volser)
 {
 	unsigned int blksize;
-	int f;
 	volume_label_t vlabel;
-
-	f = open(info->devname, O_RDONLY);
-	if (f == -1)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: Unable to open device %s: %s\n",
-			    prog_name, info->devname, strerror(errno));
 
 	get_blocksize(&blksize);
 
-	if (close(f) != 0)
-		ERRMSG("%s: error during close: %s\ncontinuing...\n",
-		       prog_name, strerror(errno));
-
-	if ((strncmp(info->dasd_info.type, "ECKD", 4) == 0) &&
-	    (!info->dasd_info.FBA_layout)) {
+	if ((strncmp(dasd_info->type, "ECKD", 4) == 0) &&
+	    !dasd_info->FBA_layout) {
 		/* OS/390 and zOS compatible disk layout */
-		vtoc_read_volume_label(info->devname,
-				       info->dasd_info.label_block * blksize,
+		vtoc_read_volume_label(devname,
+				       dasd_info->label_block * blksize,
 				       &vlabel);
 		vtoc_volume_label_get_volser(&vlabel, volser);
 		return 0;
@@ -1684,7 +1675,8 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		if (dasdfmt_get_volser(&info, old_volser) == 0)
+		if (dasdfmt_get_volser(info.devname,
+				       &info.dasd_info, old_volser) == 0)
 			vtoc_volume_label_set_volser(&vlabel, old_volser);
 		else
 			ERRMSG_EXIT(EXIT_FAILURE,
