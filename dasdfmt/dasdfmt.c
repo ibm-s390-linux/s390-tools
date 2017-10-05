@@ -527,9 +527,9 @@ static void get_device_info(dasdfmt_info_t *info)
 /*
  * Retrieve blocksize of device
  */
-static void get_blocksize(unsigned int *blksize)
+static void get_blocksize(int fd, unsigned int *blksize)
 {
-	if (ioctl(filedes, BLKSSZGET, blksize) != 0)
+	if (ioctl(fd, BLKSSZGET, blksize) != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl to get the blocksize "
 			    "of the device failed (%s).\n", prog_name,
 			    strerror(errno));
@@ -546,7 +546,7 @@ static void check_blocksize(dasdfmt_info_t *info, unsigned int blksize)
 	    info->dasd_info.format == DASD_FORMAT_NONE)
 		return;
 
-	get_blocksize(&dev_blksize);
+	get_blocksize(filedes, &dev_blksize);
 	if (dev_blksize != blksize) {
 		ERRMSG_EXIT(EXIT_FAILURE, "WARNING: Device is formatted with a "
 			    "different blocksize (%d).\nUse --mode=full to "
@@ -970,28 +970,19 @@ static void dasdfmt_print_info(dasdfmt_info_t *info, volume_label_t *vlabel,
 /*
  * get volser
  */
-static int dasdfmt_get_volser(dasdfmt_info_t *info, char *volser)
+static int dasdfmt_get_volser(int fd, char *devname,
+			      dasd_information2_t *dasd_info, char *volser)
 {
 	unsigned int blksize;
-	int f;
 	volume_label_t vlabel;
 
-	f = open(info->devname, O_RDONLY);
-	if (f == -1)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: Unable to open device %s: %s\n",
-			    prog_name, info->devname, strerror(errno));
+	get_blocksize(fd, &blksize);
 
-	get_blocksize(&blksize);
-
-	if (close(f) != 0)
-		ERRMSG("%s: error during close: %s\ncontinuing...\n",
-		       prog_name, strerror(errno));
-
-	if ((strncmp(info->dasd_info.type, "ECKD", 4) == 0) &&
-	    (!info->dasd_info.FBA_layout)) {
+	if ((strncmp(dasd_info->type, "ECKD", 4) == 0) &&
+	    (!dasd_info->FBA_layout)) {
 		/* OS/390 and zOS compatible disk layout */
-		vtoc_read_volume_label(info->devname,
-				       info->dasd_info.label_block * blksize,
+		vtoc_read_volume_label(devname,
+				       dasd_info->label_block * blksize,
 				       &vlabel);
 		vtoc_volume_label_get_volser(&vlabel, volser);
 		return 0;
@@ -1020,7 +1011,7 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 	if (info->verbosity > 0)
 		printf("Retrieving dasd information... ");
 
-	get_blocksize(&blksize);
+	get_blocksize(filedes, &blksize);
 
 	/*
 	 * Don't rely on the cylinders returned by HDIO_GETGEO, they might be
@@ -1668,7 +1659,7 @@ int main(int argc, char *argv[])
 	if (!info.blksize_specified) {
 		if (!(mode == FULL ||
 		      info.dasd_info.format == DASD_FORMAT_NONE) || info.check)
-			get_blocksize(&format_params.blksize);
+			get_blocksize(filedes, &format_params.blksize);
 		else
 			format_params = ask_user_for_blksize(format_params);
 	}
@@ -1684,7 +1675,8 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		if (dasdfmt_get_volser(&info, old_volser) == 0)
+		if (dasdfmt_get_volser(filedes, info.devname,
+				       &info.dasd_info, old_volser) == 0)
 			vtoc_volume_label_set_volser(&vlabel, old_volser);
 		else
 			ERRMSG_EXIT(EXIT_FAILURE,
