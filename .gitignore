@@ -3,7 +3,7 @@
 #
 *.o
 *.a
-*.d
+*.o.d
 
 #
 # Ignore generated executables and other generated files
