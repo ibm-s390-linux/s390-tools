@@ -229,6 +229,28 @@ sub get_hardware_type()
 	return $type;
 }
 
+sub get_cpum_cf_version()
+{
+	my $SL;
+
+	my $v = {
+		cfvn  => 0,
+		csvn  => 0,
+	};
+
+	return $v unless open($SL, '<', $SERVICE_LEVELS);
+	while (my $line = <$SL>) {
+		# CPU-MF: Counter facility: version=3.5
+		if ($line =~ m/^CPU-MF: Counter facility: version=(\d+)\.(\d+)/) {
+			$v->{cfvn} = $1;  # Counter First Version Number
+			$v->{csvn} = $2;  # Counter Second Version Number
+			last;
+		}
+	}
+	close($SL);
+	return $v
+}
+
 sub cpumf_load_ctrdef($;$)
 {
 	my $hw_type = shift();
@@ -237,10 +259,20 @@ sub cpumf_load_ctrdef($;$)
 	my $ctrmap = cpumf_hardware_counter_map();
 	return unless $ctrmap;
 
+	# Obtain CPU-MF counter facility versions
+	my $version = get_cpum_cf_version();
+
+	# List of "generic" counter sets
+	my @def = ();
+	push @def, "cfvn-" . $version->{cfvn};
+	push @def, "csvn-generic";
+
 	my $h = {};
-	# Load generic counter sets
-	cpumf_parse_ctrdef($ctrmap->{0}, $h) or
-		croak "Failed to read generic counter definition: $!\n";
+	# Load counter set definition
+	foreach my $ent (@def) {
+		cpumf_parse_ctrdef($ctrmap->{$ent}, $h) or
+			croak "Failed to read counter definition for $ent: $!\n";
+	}
 	# Load hardware model specific counter set(s)
 	if ($hw_type && $ctrmap->{$hw_type}) {
 		# Hardware-model specific counter sets are:
@@ -323,7 +355,7 @@ sub cpumf_helper_main()
 	GetOptions(
 		"i|info"	=> \$conf->{opt_info},
 		"c|counter=i"	=> \$conf->{opt_ctr},
-		"ctr-def=i"	=> \$conf->{opt_ctrdef},
+		"ctr-def=s"	=> \$conf->{opt_ctrdef},
 		"hardware-type"	=> \$conf->{opt_hwtype},
 		"ctr-set-names"	=> \$conf->{opt_ctrset_names},
 		"ctr-set-ids"	=> \$conf->{opt_ctrset_ids},
@@ -428,11 +460,13 @@ B<--ctr-def> option and specify the System z hardware type.
 
 Displays the System z hardware type.
 
-=item B<--ctr-def> I<hardware_type>
+=item B<--ctr-def> I<ctr-definition>
 
-Displays detailed information about a particular counter set for the specified
-System z hardware type, I<hardware_type>.  If you specify zero for
-I<hardware_type>, type-independent counter sets are displayed.
+Displays detailed information about the specified counter definition.
+Valid counter definitions start with C<cfvn-> or <csvn-> followed by
+the counter first/second version number of the CPU-Measurement Counter
+Facility.  To display counter information of model-specific counter
+sets, specify the System z hardware type for I<ctr-definition>.
 
 =item B<--ctr-set-names>
 
