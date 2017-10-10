@@ -1,11 +1,22 @@
 # CPU-measurement facilities
 #
-# Mapping of IBM System z hardware types to extended counter set defintions
+# Mapping of:
+#   1. CPU-MF counter first/second version numbers to "generic" counter
+#      definitions
+#   2. IBM z Systems hardware to respective extended counter set definitions
 #
 #
 {
 	# Definition	   # File name
-	   0		=> 'cpum-cf-generic.ctr',
+
+	# CFVN
+	'cfvn-1'      	=> 'cpum-cf-cfvn-1.ctr',
+	'cfvn-3'	=> 'cpum-cf-cfvn-3.ctr',
+
+	# CSVN
+	'csvn-generic'	=> 'cpum-cf-csvn-generic.ctr',
+
+	# Extended counters
 	2097		=> 'cpum-cf-extended-z10.ctr',
 	2098		=> 'cpum-cf-extended-z10.ctr',
 	2817		=> 'cpum-cf-extended-z196.ctr',

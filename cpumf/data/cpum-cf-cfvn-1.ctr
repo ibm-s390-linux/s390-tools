@@ -1,0 +1,48 @@
+Counter:   0	Name:CPU_CYCLES
+Description:
+Cycle Count
+.
+Counter:   1	Name:INSTRUCTIONS
+Description:
+Instruction Count
+.
+Counter:   2	Name:L1I_DIR_WRITES
+Description:
+Level-1 I-Cache Directory Write Count
+.
+Counter:   3	Name:L1I_PENALTY_CYCLES
+Description:
+Level-1 I-Cache Penalty Cycle Count
+.
+Counter:   4	Name:L1D_DIR_WRITES
+Description:
+Level-1 D-Cache Directory Write Count
+.
+Counter:   5	Name:L1D_PENALTY_CYCLES
+Description:
+Level-1 D-Cache Penalty Cycle Count
+.
+Counter:  32	Name:PROBLEM_STATE_CPU_CYCLES
+Description:
+Problem-State Cycle Count
+.
+Counter:  33	Name:PROBLEM_STATE_INSTRUCTIONS
+Description:
+Problem-State Instruction Count
+.
+Counter:  34	Name:PROBLEM_STATE_L1I_DIR_WRITES
+Description:
+Problem-State Level-1 I-Cache Directory Write Count
+.
+Counter:  35	Name:PROBLEM_STATE_L1I_PENALTY_CYCLES
+Description:
+Problem-State Level-1 I-Cache Penalty Cycle Count
+.
+Counter:  36	Name:PROBLEM_STATE_L1D_DIR_WRITES
+Description:
+Problem-State Level-1 D-Cache Directory Write Count
+.
+Counter:  37	Name:PROBLEM_STATE_L1D_PENALTY_CYCLES
+Description:
+Problem-State Level-1 D-Cache Penalty Cycle Count
+.
