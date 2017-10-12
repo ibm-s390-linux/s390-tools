@@ -623,7 +623,7 @@ sub get_dasd_info($)
 	my $type;
 	local *HANDLE;
 
-	open(HANDLE, "$dasdview -x -f  $dev 2>/dev/null|") or
+	open(HANDLE, "$dasdview -x $dev 2>/dev/null|") or
 		# dasdview returned with an error
 		return undef;
 	while (<HANDLE>) {
