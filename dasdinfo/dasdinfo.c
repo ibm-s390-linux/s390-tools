@@ -545,6 +545,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	char *readbuf;
 	DIR *directory = NULL;
 	struct dirent *dir_entry = NULL;
+	int rc = 0;
 
 	if (stat(devnode, &stat_buffer) != 0) {
 		printf("Error: could not stat %s\n", devnode);
@@ -573,8 +574,15 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 
 		if (strncmp(stat_dev, readbuf,
 			    MAX(strlen(stat_dev), strlen(readbuf)-1)) == 0) {
-			snprintf(*uidfile, RD_BUFFER_SIZE,
-				 "/sys/block/%s/device/uid", dir_entry->d_name);
+			rc = snprintf(*uidfile, RD_BUFFER_SIZE,
+				      "/sys/block/%s/device/uid",
+				      dir_entry->d_name);
+			if (rc >= RD_BUFFER_SIZE) {
+				fprintf(stderr,
+					"Error: Device name was truncated\n");
+				return -1;
+			}
+
 			break;
 		}
 	}
