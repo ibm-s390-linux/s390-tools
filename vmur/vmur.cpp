@@ -212,8 +212,8 @@ static char HELP_TEXT[] =
 "-w, --wait               Wait for the specified to be free rather than getting\n"
 "                         vmur in use error.\n"
 "-T, --tag                Up to 136 characters of information to associate with the\n"
-"                         specified spool file. The contents and format of this data are\n"
-"                         flexible; they ar ethe responsibility of the file originator\n"
+"                         spool file. The contents and format of this data are\n"
+"                         flexible; they are the responsibility of the file originator\n"
 "                         and the end user.\n"
 "\n"
 "Options for 'purge' command:\n"
@@ -1077,7 +1077,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
                         info->lock_attributes &= ~LOCK_NB;
 			break;	
 		case 'T':
-			strncpy_graph(info->tag_data,optarg,sizeof info->tag_data);			
+			strncpy_graph(info->tag_data,optarg,(sizeof info->tag_data) - sizeof char);			
                         break;
 		default:
 			std_usage_exit();
