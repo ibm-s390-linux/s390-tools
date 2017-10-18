@@ -209,7 +209,7 @@ static char HELP_TEXT[] =
 "    --form               Form to be assigned to the created spool file.\n"
 "    --dest               Destination to be assigned to the created spool file.\n"
 "    --dist               Distribution code for the resulting spool file.\n"
-"-w, --wait               Wait for the specified to be free rather than getting\n"
+"-w, --wait               Wait for the specified device to be free rather than getting\n"
 "                         vmur in use error.\n"
 "-T, --tag                Up to 136 characters of information to associate with the\n"
 "                         spool file. The contents and format of this data are\n"
@@ -985,6 +985,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "text",        no_argument,       NULL, 't'},
 		{ "rdr",         no_argument,       NULL, 'r'},
 		{ "force",       no_argument,       NULL, 'f'},
+		{ "wait",	 no_argument,	    NULL, 'w'},
 		{ "user",        required_argument, NULL, 'u'},
 		{ "node",        required_argument, NULL, 'n'},
 		{ "device",      required_argument, NULL, 's'},
@@ -994,7 +995,6 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "dest",        required_argument, NULL, 'D'},
 		{ "form",        required_argument, NULL, 'F'},
 		{ "dist",	 required_argument, NULL, 'I'},
-		{ "wait",	 no_argument,	    NULL, 'w'},
 		{ "tag",         required_argument, NULL, "T"},
 		{ 0,             0,                 0,    0  }
 	};
@@ -1077,7 +1077,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
                         info->lock_attributes &= ~LOCK_NB;
 			break;	
 		case 'T':
-			strncpy_graph(info->tag_data,optarg,(sizeof info->tag_data) - sizeof char);			
+			strncpy_graph(info->tag_data,optarg,sizeof info->tag_data);			
                         break;
 		default:
 			std_usage_exit();
@@ -2000,7 +2000,11 @@ static void rscs_punch_setup(struct vmur *info)
 
 	sprintf(cmd, "SPOOL %X CONT", info->devno);
 	cpcmd(cmd, NULL, NULL, 0);
-	sprintf(cmd, "TAG DEV %X %s %s", info->devno, info->node, info->user);
+	if ('\0' != info->node[0]) {
+	        sprintf(cmd, "TAG DEV %X %s %s", info->devno, info->node, info->user);
+	} else {
+		sprintf(cmd,"TAG DEV %X %s", info->devno, info->tag_data);
+	}
 	cpcmd(cmd, NULL, NULL, 0);
 	return;
 }
