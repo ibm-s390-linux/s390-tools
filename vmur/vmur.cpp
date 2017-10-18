@@ -93,6 +93,8 @@ struct vmur {
 	int   spool_form_specified;
 	char  spool_dist[9];
 	int   spool_dist_specified;
+	char  tag_data[137];
+	int   lock_attributes;		
 } vmur_info;
 
 /*
@@ -207,6 +209,12 @@ static char HELP_TEXT[] =
 "    --form               Form to be assigned to the created spool file.\n"
 "    --dest               Destination to be assigned to the created spool file.\n"
 "    --dist               Distribution code for the resulting spool file.\n"
+"-w, --wait               Wait for the specified to be free rather than getting\n"
+"                         vmur in use error.\n"
+"-T, --tag                Up to 136 characters of information to associate with the\n"
+"                         specified spool file. The contents and format of this data are\n"
+"                         flexible; they ar ethe responsibility of the file originator\n"
+"                         and the end user.\n"
 "\n"
 "Options for 'purge' command:\n"
 "\n"
@@ -653,6 +661,7 @@ static void init_info(struct vmur *info)
 	memset(info, 0, sizeof(struct vmur));
 	strcpy(info->queue, "rdr");
 	info->lock_fd = -1;
+	info->lock_attributes = LOCK_EX | LOCK_NB;
 }
 
 /*
@@ -985,9 +994,11 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "dest",        required_argument, NULL, 'D'},
 		{ "form",        required_argument, NULL, 'F'},
 		{ "dist",	 required_argument, NULL, 'I'},
+		{ "wait",	 no_argument,	    NULL, 'w'},
+		{ "tag",         required_argument, NULL, "T"},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vhtrfu:n:d:b:N:C:";
+	static const char option_string[] = "vhtrfwu:n:d:b:N:C:T:";
 
 	if (info->action == PUNCH) {
 		strcpy(info->devnode, VMPUN_DEVICE_NODE);
@@ -1062,6 +1073,12 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			else
 				strcpy(info->spool_dist, optarg);
 			break;
+		case 'w':
+                        info->lock_attributes &= ~LOCK_NB;
+			break;	
+		case 'T':
+			strncpy_graph(info->tag_data,optarg,sizeof info->tag_data);			
+                        break;
 		default:
 			std_usage_exit();
 		}
@@ -1459,14 +1476,16 @@ static int get_filename_from_reader(struct vmur *info)
 static void acquire_lock(struct vmur *info)
 {
 	char failed_action[10] = {};
-
-	info->lock_fd = open(LOCK_FILE, O_RDONLY | O_CREAT, S_IRUSR);
+	char lock_file[PATH_MAX];
+	
+        snprintf(lockfile,sizeof lock_file, "%s-%04x",LOCK_FILE,info->devno);
+	info->lock_fd = open(lock_file, O_RDONLY | O_CREAT, S_IRUSR);
 	if (info->lock_fd == -1) {
 		ERR("WARNING: Unable to open lock file %s, continuing "
 		    "without any serialization.\n", LOCK_FILE);
 		return;
 	}
-	if (flock(info->lock_fd, LOCK_EX | LOCK_NB) == -1) {
+	if (flock(info->lock_fd, info->lock_attributes) == -1) {
 		switch (info->action) {
 		case RECEIVE:
 			strcpy(failed_action, "received");
