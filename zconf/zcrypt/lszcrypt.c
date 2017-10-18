@@ -42,11 +42,19 @@ struct lszcrypt_l *lszcrypt_l = &l;
 /*
  * Card types
  */
-#define MASK_APSC	0x80000000
-#define MASK_RSA4K	0x60000000
-#define MASK_COPRO	0x10000000
-#define MASK_ACCEL	0x08000000
-#define MASK_EP11	0x04000000
+#define MASK_APSC	    0x80000000
+#define MASK_RSA4K	    0x60000000
+#define MASK_COPRO	    0x10000000
+#define MASK_ACCEL	    0x08000000
+#define MASK_EP11	    0x04000000
+
+/*
+ * Classification
+ */
+#define MASK_CLASS_FULL	      0x00800000
+#define CLASS_FULL            "full function set"
+#define MASK_CLASS_STATELESS  0x00400000
+#define CLASS_STATELESS       "restricted function set"
 
 /*
  * Program configuration
@@ -226,7 +234,7 @@ static void show_capability(const char *id_str)
 {
 	unsigned long func_val;
 	long hwtype, id;
-	char *p, *ap, *dev, card[16];
+	char *p, *ap, *dev, card[16], cbuf[256];
 
 	/* check if ap driver is available */
 	ap = util_path_sysfs("bus/ap");
@@ -250,6 +258,11 @@ static void show_capability(const char *id_str)
 		printf("Detailed capability information for %s (hardware type %ld) is not available.\n", card, hwtype);
 		return;
 	}
+	cbuf[0] = '\0';
+	if (func_val & MASK_CLASS_FULL)
+		snprintf(cbuf, sizeof(cbuf), "%s", CLASS_FULL);
+	else if (func_val & MASK_CLASS_STATELESS)
+		snprintf(cbuf, sizeof(cbuf), "%s", CLASS_STATELESS);
 	printf("%s provides capability for:\n", card);
 	switch (hwtype) {
 	case 6:
@@ -262,11 +275,15 @@ static void show_capability(const char *id_str)
 	case 7:
 	case 9:
 		printf("%s\n", CAP_RSA4K);
-		printf("%s\n", CAP_CCA);
+		if (cbuf[0])
+			printf("%s (%s)\n", CAP_CCA, cbuf);
+		else
+			printf("%s\n", CAP_CCA);
 		printf("%s", CAP_RNG);
 		break;
 	case 10:
 	case 11:
+	case 12:
 		if (func_val & MASK_ACCEL) {
 			if (func_val & MASK_RSA4K)
 				printf("%s", CAP_RSA4K);
@@ -274,12 +291,14 @@ static void show_capability(const char *id_str)
 				printf("%s", CAP_RSA2K);
 		} else if (func_val & MASK_COPRO) {
 			printf("%s\n", CAP_RSA4K);
-			printf("%s\n", CAP_CCA);
+			if (cbuf[0])
+				printf("%s (%s)\n", CAP_CCA, cbuf);
+			else
+				printf("%s\n", CAP_CCA);
 			printf("%s", CAP_RNG);
 		} else if (func_val & MASK_EP11) {
 			printf("%s", CAP_EP11);
 		} else {
-
 			printf("Detailed capability information for %s (hardware type %ld) is not available.", card, hwtype);
 		}
 		break;
