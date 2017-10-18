@@ -988,14 +988,14 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "wait",	 no_argument,	    NULL, 'w'},
 		{ "user",        required_argument, NULL, 'u'},
 		{ "node",        required_argument, NULL, 'n'},
-		{ "device",      required_argument, NULL, 's'},
+		{ "device",      required_argument, NULL, 'd'},
 		{ "blocked",     required_argument, NULL, 'b'},
 		{ "name",        required_argument, NULL, 'N'},
 		{ "class",       required_argument, NULL, 'C'},
 		{ "dest",        required_argument, NULL, 'D'},
 		{ "form",        required_argument, NULL, 'F'},
 		{ "dist",	 required_argument, NULL, 'I'},
-		{ "tag",         required_argument, NULL, "T"},
+		{ "tag",         required_argument, NULL, 'T'},
 		{ 0,             0,                 0,    0  }
 	};
 	static const char option_string[] = "vhtrfwu:n:d:b:N:C:T:";
