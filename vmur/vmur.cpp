@@ -1478,7 +1478,7 @@ static void acquire_lock(struct vmur *info)
 	char failed_action[10] = {};
 	char lock_file[PATH_MAX];
 	
-        snprintf(lockfile,sizeof lock_file, "%s-%04x",LOCK_FILE,info->devno);
+        snprintf(lock_file,sizeof lock_file, "%s-%04x",LOCK_FILE,info->devno);
 	info->lock_fd = open(lock_file, O_RDONLY | O_CREAT, S_IRUSR);
 	if (info->lock_fd == -1) {
 		ERR("WARNING: Unable to open lock file %s, continuing "
