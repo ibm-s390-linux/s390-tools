@@ -2198,7 +2198,7 @@ static void ur_write(struct vmur *info)
 		fhi = STDIN_FILENO;
 	}
 
-	if (info->node_specified)
+	if (info->node_specified || '\0' != info->tag_data[0])
 		rscs_punch_setup(info);
 
 	/* Open UR device */
