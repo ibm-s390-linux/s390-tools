@@ -201,7 +201,7 @@ Synopsis:
 .IP "" 2
 punch|print [-fr] [-d dev_node]
 [-C class] [--form form] [--dest dest] [--dist distcode]
-[-t | -b sep.pad] [-u user] [-n node]
+[-t | -b sep.pad] [-u user] [-n node] [--tag data] [--wait]
 .br
       [-N name.type] [file]
 .PP
@@ -352,6 +352,21 @@ name rules (e.g. longer than 8 chars).
 .IP "" 4
 - If the Linux input file name is also omitted (that is data is read
 from standard input), then an error message is issued.
+.SP
+.IP "" 0
+\fB-w or --wait\fR
+.IP "" 2
+Access to ur devices is serilaized. Use the wait option to wait for
+the device to be available. Without this option, if the device is in use
+an error message is displayed and the process exits.
+.SP
+.IP "" 0
+\fB-T or --tag\fR
+.IP "" 2
+Up to 136 characters of information you want to associate with the specified
+spool file. The contents and format of this data are flexible; they are 
+the responsibility of the file originator and the end user.
+Do not use the --tag option with the --node option.
 .SP
 .SH punch/print arguments
 .SP
