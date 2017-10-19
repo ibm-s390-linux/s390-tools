@@ -82,6 +82,7 @@ struct vmur {
 	struct sigaction sigact;
 	iconv_t iconv;
 	int   lock_fd;
+	int   lock_attributes;
 	/* ur device spool state */
 	char  spool_restore_cmd[MAXCMDLEN];
 	int   spool_restore_needed;
@@ -94,7 +95,7 @@ struct vmur {
 	char  spool_dist[9];
 	int   spool_dist_specified;
 	char  tag_data[137];
-	int   lock_attributes;		
+	int   tag_specified;
 } vmur_info;
 
 /*
@@ -529,7 +530,7 @@ static void save_spool_options(struct vmur *info)
 	cpcmd(cmd, &resp, NULL, 0);
 
 	/* Prepare CP spool restore command */
-	n = sprintf(info->spool_restore_cmd, "SPOOL %X", info->devno);
+	n = sprintf(info->spool_restore_cmd, "SPOOL %X NOCONT", info->devno);
 
 	/* Save the CLASS value if required */
 	if (info->spool_class_specified) {
@@ -592,7 +593,8 @@ static int require_spool_setup(struct vmur *info)
 	return !!(info->spool_class_specified ||
 		  info->spool_form_specified ||
 		  info->spool_dest_specified ||
-		  info->spool_dist_specified);
+		  info->spool_dist_specified ||
+		  info->spool_tag_specified);
 }
 
 /*
@@ -614,7 +616,7 @@ static void setup_spool_options(struct vmur *info)
 	save_spool_options(info);
 
 	/* Change spool options */
-	n = sprintf(cmd, "SPOOL %X", info->devno);
+	n = sprintf(cmd, "SPOOL %X NOCONT", info->devno);
 	if (info->spool_class_specified)
 		n += sprintf(cmd + n, " CLASS %c", info->spool_class);
 	if (info->spool_form_specified)
@@ -1077,6 +1079,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
                         info->lock_attributes &= ~LOCK_NB;
 			break;	
 		case 'T':
+			++info->spool_tag_specified;
 			strncpy_graph(info->tag_data,optarg,sizeof(info->tag_data));			
                         break;
 		default:
@@ -1096,6 +1099,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 	CHECK_SPEC_MAX(info->spool_form_specified, 1, "form");
 	CHECK_SPEC_MAX(info->spool_dest_specified, 1, "dest");
 	CHECK_SPEC_MAX(info->spool_dist_specified, 1, "dist");
+	CHECK_SPEC_MAX(info->tag_specified, 1, "tag");
 
 	if (info->user_specified && !info->rdr_specified)
 		ERR_EXIT("--user without --rdr specified\n");
@@ -1109,6 +1113,8 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 	if (info->blocked_specified && info->text_specified)
 		ERR_EXIT("Conflicting options: -b together with -t "
 			 "specified\n");
+	if (info->tag_specified && info->node_specified)
+		ERR_EXIT("Conflicting options: --tag with --node specified\n");
 
 	set_file(info, argv, argc, optind + 1);
 
