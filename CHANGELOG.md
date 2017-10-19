@@ -3,6 +3,9 @@ Release history for s390-tools (MIT version)
 
 * __v2.1.1 (2017-mm-dd)__
 
+  Changes of existing tools:
+  - lszcrypt: Add CEX6S exploitation
+
   Bug Fixes:
   - lsluns: Do not scan (all) if filters match nothing
   - lsluns: Enhance usage statement and man page
