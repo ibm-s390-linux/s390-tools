@@ -2185,7 +2185,7 @@ static void ur_write(struct vmur *info)
 
 	sfdata = (char *) malloc(info->ur_reclen * VMUR_REC_COUNT);
 	if (!sfdata)
-		ERR_EXIT("Could allocate memory for buffer (%i)\n",
+		ERR_EXIT("Could not allocate memory for buffer (%i)\n",
 			    info->ur_reclen);
 
 	/* Open Linux file */
