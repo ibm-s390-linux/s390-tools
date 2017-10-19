@@ -1903,7 +1903,7 @@ static void close_ur_device(struct vmur *info)
 	char cmd[MAXCMDLEN], spoolid[5] = {}, *response;
 	int cprc;
 
-	if (info->node_specified) {
+	if (info->node_specified || info->tag_specified) {
 		sprintf(cmd, "SPOOL %X NOCONT", info->devno);
 		cpcmd(cmd, NULL, NULL, 0);
 	}
@@ -2204,7 +2204,7 @@ static void ur_write(struct vmur *info)
 		fhi = STDIN_FILENO;
 	}
 
-	if (info->node_specified || '\0' != info->tag_data[0])
+	if (info->node_specified || info->tag_specified)
 		rscs_punch_setup(info);
 
 	/* Open UR device */
