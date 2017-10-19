@@ -2370,12 +2370,12 @@ int main(int argc, char **argv)
 	if (atexit(cleanup_atexit_fn))
 		ERR_EXIT("Could not set up vmur session cleanup\n");
 
-	/* Acquire a lock to serialize concurrent vmur invocations */
-	acquire_lock(&vmur_info);
-
 	/* Retrieve ur device number */
 	setup_ur_device(&vmur_info);
 
+	/* Acquire a lock to serialize concurrent vmur invocations */
+	acquire_lock(&vmur_info);
+	
 	switch (vmur_info.action) {
 	case RECEIVE:
 		/* Setup spool options */
