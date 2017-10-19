@@ -594,7 +594,7 @@ static int require_spool_setup(struct vmur *info)
 		  info->spool_form_specified ||
 		  info->spool_dest_specified ||
 		  info->spool_dist_specified ||
-		  info->spool_tag_specified);
+		  info->tag_specified);
 }
 
 /*
@@ -1000,7 +1000,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "tag",         required_argument, NULL, 'T'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vhtrfwu:n:d:b:N:C:T:";
+	static const char option_string[] = "vhtrfwu:n:d:b:N:C:D:F:I:T:";
 
 	if (info->action == PUNCH) {
 		strcpy(info->devnode, VMPUN_DEVICE_NODE);
@@ -1079,7 +1079,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
                         info->lock_attributes &= ~LOCK_NB;
 			break;	
 		case 'T':
-			++info->spool_tag_specified;
+			++info->tag_specified;
 			strncpy_graph(info->tag_data,optarg,sizeof(info->tag_data));			
                         break;
 		default:
