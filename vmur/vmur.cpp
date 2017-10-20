@@ -1087,7 +1087,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			break;	
 		case 'T':
 			++info->tag_specified;
-			strncpy_graph(info->tag_data,optarg,sizeof(info->tag_data));			
+			strncpy(info->tag_data,optarg,sizeof(info->tag_data));			
                         break;
 		default:
 			std_usage_exit();
