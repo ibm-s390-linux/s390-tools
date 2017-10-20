@@ -10,7 +10,8 @@ Release history for s390-tools (MIT version)
   Changes to existing tools:
   - vmur: Serialize based on device number used
   - vmur: Add --wait option to prevent "vmur in use" error
-  - vmur: Add --tag option
+  - vmur: Add --tag option for print/punch
+  - vmur: Add --rscs option for print/punch
   - vmur: Prevent cp command injection
   - vmur: Update usage and man page
        
