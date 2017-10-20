@@ -230,9 +230,9 @@ static char HELP_TEXT[] =
 "Options for 'order', 'list', and 'purge' commands:\n"
 "\n"
 "-q, --queue              Target queue for command. Possible queues are:\n"
-"                         'rdr' (default), 'pun' and 'prt'.\n";
+"                         'rdr' (default), 'pun' and 'prt'.\n"
 "-w, --wait               Wait for the specified device to be free rather than getting\n"
-"                         vmur in use error.\n"
+"                         vmur in use error.\n";
 
 
 static void usage(void)
