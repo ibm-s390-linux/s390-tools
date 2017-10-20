@@ -597,7 +597,7 @@ static void restore_spool_options(struct vmur *info)
 
 	cpcmd(info->spool_restore_cmd, NULL, NULL, 0);
 	if (info->tag_specified)
-		cpcmd(info->tag_restore_cmd, NULL, NULL, 0);
+		cpcmd_cs(info->tag_restore_cmd, NULL, NULL, 0);
 	--info->spool_restore_needed;
 }
 
