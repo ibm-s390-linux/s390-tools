@@ -8,11 +8,11 @@ Release history for s390-tools (MIT version)
   - vmur: correct "punch E spooled cont" for print verb
      
   Changes to existing tools:
-  -vmur: serialize based on device number used
-  -vmur: add --wait option to prevent "vmur in use" error
-  -vmur: add --tag option
-  -vmur: prevent cp command injection
-  -vmur: Update usage and man page
+  - vmur: serialize based on device number used
+  - vmur: add --wait option to prevent "vmur in use" error
+  - vmur: add --tag option
+  - vmur: prevent cp command injection
+  - vmur: Update usage and man page
        
 * __v2.1.1 (2017-mm-dd)__
 
