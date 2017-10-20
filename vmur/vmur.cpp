@@ -308,7 +308,7 @@ static void _cpcmd(char *cpcmd, char **resp, int *rc, int retry, int upper)
 
 	len = strlen(cpcmd);
 	for (i = 0; i < len; i++) {
-		if (!isprint(cpcmd[i]))
+		if (iscntrl(cpcmd[i]))
 			break;
 		cmd[i] = cpcmd[i];
 	}
