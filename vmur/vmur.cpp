@@ -97,6 +97,7 @@ struct vmur {
 	int   spool_dist_specified;
 	char  tag_data[137];
 	int   tag_specified;
+	char  rscs_userid[9];
 } vmur_info;
 
 /*
@@ -633,7 +634,7 @@ static void setup_spool_options(struct vmur *info)
 	save_spool_options(info);
 
 	/* Change spool options */
-	n = sprintf(cmd, "SPOOL %X NOCONT", info->devno);
+	n = sprintf(cmd, "SPOOL %X", info->devno);
 	if (info->spool_class_specified)
 		n += sprintf(cmd + n, " CLASS %c", info->spool_class);
 	if (info->spool_form_specified)
@@ -643,9 +644,18 @@ static void setup_spool_options(struct vmur *info)
 	if (info->spool_dist_specified)
 		n += sprintf(cmd + n, " DIST %s", info->spool_dist);
 
-	cpcmd(cmd, NULL, &rc, 0);
-	if (rc)
-		ERR_EXIT("Could not set spooling options (rc=%i)\n", rc);
+	if (n > 10) {
+		cpcmd(cmd, NULL, &rc, 0);
+		if (rc)
+			ERR_EXIT("Could not set spooling options (rc=%i)\n", rc);
+	}
+	
+	if (info->tag_specified) {
+                sprintf(cmd,"TAG DEV %X %s", info->devno, info->tag_data);
+                cpcmd_cs(cmd, NULL, &rc, 0);
+                if (rc)
+                        ERR_EXIT("Could not set tag (rc=%i)\n", rc);
+        }
 }
 
 /*
@@ -681,6 +691,7 @@ static void init_info(struct vmur *info)
 	strcpy(info->queue, "rdr");
 	info->lock_fd = -1;
 	info->lock_attributes = LOCK_EX | LOCK_NB;
+	strcpy(info->rscs_userid, RSCS_USERID);
 }
 
 /*
@@ -1015,6 +1026,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "form",        required_argument, NULL, 'F'},
 		{ "dist",	 required_argument, NULL, 'I'},
 		{ "tag",         required_argument, NULL, 'T'},
+		{ "rscs",        required_argument, NULL, 'R'},
 		{ 0,             0,                 0,    0  }
 	};
 	static const char option_string[] = "vhtrfwu:n:d:b:N:C:D:F:I:T:";
@@ -1097,8 +1109,13 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			break;	
 		case 'T':
 			++info->tag_specified;
-			strncpy(info->tag_data,optarg,sizeof(info->tag_data));			
+			strncpy(info->tag_data, optarg, sizeof(info->tag_data));			
                         break;
+		case 'R':
+			if (check_local_user(optarg))
+				ERR_EXIT("Invalid RSCS userid: %s\n", optarg);
+			strcpy(info->rscs_userid, optarg);
+			break;
 		default:
 			std_usage_exit();
 		}
@@ -1125,8 +1142,8 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 	if ((info->user_specified && !info->node_specified)
 	    && check_local_user(info->user))
 		ERR_EXIT("Invalid userid: %s\n", info->user);
-	if (info->node_specified && check_local_user(RSCS_USERID))
-		ERR_EXIT("Invalid RSCS userid: %s\n", info->node);
+	if (info->node_specified && check_local_user(info->rscs_userid))
+		ERR_EXIT("Invalid RSCS userid: %s\n", info->rscs_userid);
 	if (info->blocked_specified && info->text_specified)
 		ERR_EXIT("Conflicting options: -b together with -t "
 			 "specified\n");
@@ -1141,6 +1158,12 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		set_spoolfile_name(info, basename(info->file_name));
 	else
 		ERR_EXIT("No name for spool file specified!\n");
+	
+        if (info->node_specified) {
+                sprintf(info->tag_data, "%s %s", info->node, info->user);
+                info->tag_specified = 1;
+        }
+
 }
 
 /*
@@ -1927,7 +1950,7 @@ static void close_ur_device(struct vmur *info)
 	if (info->rdr_specified) {
 		sprintf(cmd, "CLOSE %X TO ", info->devno);
 		if (info->node_specified)
-			strcat(cmd, RSCS_USERID);
+			strcat(cmd, info->rscs_userid);
 		else if (info->user_specified)
 			strcat(cmd, to_upper(info->user));
 		else
@@ -1957,7 +1980,7 @@ static void close_ur_device(struct vmur *info)
 	if (info->rdr_specified) {
 		if (info->node_specified)
 			printf("Reader file with spoolid %s created and "
-			       "transferred to %s.\n", spoolid, RSCS_USERID);
+			       "transferred to %s.\n", spoolid, info->rscs_userid);
 		else if (info->user_specified)
 			printf("Reader file with spoolid %s created and "
 			       "transferred to %s.\n", spoolid, info->user);
@@ -2198,9 +2221,6 @@ static void ur_write(struct vmur *info)
 	char *sfdata;
 	ssize_t count;
 
-	/* close punch preventively */
-	close_ur_device_simple(info);
-
 	sfdata = (char *) malloc(info->ur_reclen * VMUR_REC_COUNT);
 	if (!sfdata)
 		ERR_EXIT("Could not allocate memory for buffer (%i)\n",
@@ -2409,7 +2429,10 @@ int main(int argc, char **argv)
 		if (is_punch_cont(&vmur_info))
 			ERR_EXIT("Virtual %s device %04X is spooled CONT.\n",
 				ur_action_str[vmur_info.action], vmur_info.devno);
-
+			
+		/* close punch preventively */
+		close_ur_device_simple(&vmur_info);
+			
 		/* Setup spool options */
 		setup_spool_options(&vmur_info);
 		if (vmur_info.text_specified)
