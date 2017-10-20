@@ -302,10 +302,9 @@ static void cperr_exit(char *cpcmd, int cprc, char *buf)
 
 static void _cpcmd(char *cpcmd, char **resp, int *rc, int retry, int upper)
 {
-	int fd, len, cprc, bufsize = VMCP_BUFSIZE;
+	int fd, len, cprc, bufsize = VMCP_BUFSIZE, n;
 	char *buf;
 	char cmd[MAXCMDLEN];
-	size_t n;
 
 	len = strlen(cpcmd);
 	for (n = 0; n < len; n++) {
