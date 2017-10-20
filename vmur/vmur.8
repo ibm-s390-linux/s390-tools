@@ -159,6 +159,13 @@ format appropriate for further analysis with crash or lcrash.
 Specifies that the reader file's contents are written to
 standard output.
 .SP
+.IP "" 0
+\fB-w\fR or \fB--wait\fR
+.IP "" 2
+Access to ur devices is serilaized. Use the wait option to wait for
+the device to be available. Without this option, if the device is in use
+an error message is displayed and the process exits.
+.SP
 .SH receive arguments
 .SP
 The following command arguments are supported by \fBreceive\fR:
@@ -201,9 +208,9 @@ Synopsis:
 .IP "" 2
 punch|print [-fr] [-d dev_node]
 [-C class] [--form form] [--dest dest] [--dist distcode]
-[-t | -b sep.pad] [-u user] [-n node]
+[-t | -b sep.pad] [-u user] [-n node] 
 .br
-      [-N name.type] [--wait] [--tag data] [file]
+      [-N name.type] [--wait] [--tag data] [--rscs rscsuserid] [file]
 .PP
 Minimum abbreviation: pun/pr
 .PP
@@ -368,6 +375,11 @@ spool file. The contents and format of this data are flexible; they are
 the responsibility of the file originator and the end user.
 Do not use the --tag option with the --node option.
 .SP
+.IP "" 0
+\fB-R\fR or \fB--rscs\fR
+.IP "" 2
+The local user id of the RSCS machine. If omitted RSCS is used.
+.SP
 .SH punch/print arguments
 .SP
 The following command arguments are supported by \fBpunch/print\fR:
@@ -404,6 +416,13 @@ The following command option is supported by \fBlist\fR:
 .SP
 .IP "" 0
 \fB-q or --queue\fR
+.IP "" 0
+\fB-w\fR or \fB--wait\fR
+.IP "" 2
+Access to ur devices is serilaized. Use the wait option to wait for
+the device to be available. Without this option, if the device is in use
+an error message is displayed and the process exits.
+.SP
 .IP "" 2
 Specifies the z/VM spool file queue to be listed. Possible values are rdr
 (reader file queue), pun (punch file queue), and prt (printer file queue).
@@ -475,6 +494,13 @@ The form name is a 1- to 8-character value.
 Specifies a destination value.  All the files with the specified destination
 value are purged.  The destination is a 1- to 8-character value.
 .SP
+.IP "" 0
+\fB-w\fR or \fB--wait\fR
+.IP "" 2
+Access to ur devices is serilaized. Use the wait option to wait for
+the device to be available. Without this option, if the device is in use
+an error message is displayed and the process exits.
+.SP
 .SH purge arguments
 .SP
 The following command argument is supported by \fBpurge\fR:
@@ -509,6 +535,13 @@ Specifies the z/VM spool file queue you want to order. Possible values are rdr
 (reader file queue), pun (punch file queue), and prt (printer file queue).
 .br
 If omitted, the reader file queue is assumed.
+.SP
+.IP "" 0
+\fB-w\fR or \fB--wait\fR
+.IP "" 2
+Access to ur devices is serilaized. Use the wait option to wait for
+the device to be available. Without this option, if the device is in use
+an error message is displayed and the process exits.
 .SP
 .SH order arguments
 .SP
