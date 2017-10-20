@@ -305,8 +305,16 @@ static void _cpcmd(char *cpcmd, char **resp, int *rc, int retry, int upper)
 	int fd, len, cprc, bufsize = VMCP_BUFSIZE;
 	char *buf;
 	char cmd[MAXCMDLEN];
+	size_t n;
 
-	strcpy(cmd, cpcmd);
+	len = strlen(cpcmd);
+	for (n = 0; n < len; n++) {
+		if (!isprint(cpcmd[n]))
+			break;
+		cmd[n] = cpcmd[n];
+	}
+	cmd[n] = '\0';
+
 	if (upper)
 		to_upper(cmd);
 
