@@ -14,6 +14,7 @@ List of all individuals having contributed content to s390-tools
 - Claudio Imbrenda
 - Clemens von Mann
 - Despina Papadopoulou
+- Donald Russell
 - Eberhard Pasch
 - Einar Lueck
 - Erwin Vicari
