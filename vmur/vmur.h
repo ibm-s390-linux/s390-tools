@@ -49,7 +49,7 @@ do { \
 #define VMUR_REC_COUNT 511
 
 #define PAGE_SIZE 4096
-#define MAXCMDLEN 80
+#define MAXCMDLEN 150
 
 #define NOP               0x3
 #define CCW_IMMED_FLAG    0x10
