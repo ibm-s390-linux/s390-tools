@@ -218,6 +218,7 @@ static char HELP_TEXT[] =
 "                         spool file. The contents and format of this data are\n"
 "                         flexible; they are the responsibility of the file originator\n"
 "                         and the end user.\n"
+"-R, --rscs               Specify the local user id of the RSCS machine. If omitted: RSCS.\n"
 "\n"
 "Options for 'purge' command:\n"
 "\n"
