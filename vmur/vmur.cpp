@@ -84,6 +84,7 @@ struct vmur {
 	int   lock_fd;
 	int   lock_attributes;
 	/* ur device spool state */
+	char  tag_restore_cmd[MAXCMDLEN];
 	char  spool_restore_cmd[MAXCMDLEN];
 	int   spool_restore_needed;
 	char  spool_class;
@@ -532,10 +533,17 @@ static void save_spool_options(struct vmur *info)
 	char cl, value[9], *tmp;
 	int n;
 
+	/* Prepare CP TAG restore command */
+	if (info->tag_specified) {
+		sprintf(info->tag_restore_cmd, "TAG DEV %X ", info->devno);
+		sprintf(cmd, "TAG QUERY DEV %X", info->devno);
+		cpcmd(cmd, &resp, NULL, 0);
+		if (':' == resp[13])
+			strcat(info->tag_restore_cmd, resp+15);
+	}
 	/* Retrieve spooling options for ur device */
 	sprintf(cmd, "QUERY VIRTUAL %X", info->devno);
 	cpcmd(cmd, &resp, NULL, 0);
-
 	/* Prepare CP spool restore command */
 	n = sprintf(info->spool_restore_cmd, "SPOOL %X NOCONT", info->devno);
 
@@ -588,6 +596,8 @@ static void restore_spool_options(struct vmur *info)
 		return;
 
 	cpcmd(info->spool_restore_cmd, NULL, NULL, 0);
+	if (info->tag_specified)
+		cpcmd(info->tag_restore_cmd, NULL, NULL, 0);
 	--info->spool_restore_needed;
 }
 
