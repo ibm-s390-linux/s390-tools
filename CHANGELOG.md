@@ -1,6 +1,19 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
+* __v2.1.2 (2017-mm-dd)__
+
+  vmur:
+     Bug fixes:
+       - correct short option for print/punch device
+       
+     Enhancements:
+       - serialize based on device number used
+       - add --wait option to prevent "vmur in use" error
+       - add --tag option
+       - prevent cp cmd injection
+       - Enhance usage and man page
+       
 * __v2.1.1 (2017-mm-dd)__
 
   Bug Fixes:
