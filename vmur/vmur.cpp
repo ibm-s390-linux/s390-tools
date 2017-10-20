@@ -2023,7 +2023,7 @@ static void rscs_punch_setup(struct vmur *info)
 
 	sprintf(cmd, "SPOOL %X CONT", info->devno);
 	cpcmd(cmd, NULL, NULL, 0);
-	if ('\0' != info->node[0]) {
+	if (info->node_specified) {
 	        sprintf(cmd, "TAG DEV %X %s %s", info->devno, info->node, info->user);
 	} else {
 		sprintf(cmd,"TAG DEV %X %s", info->devno, info->tag_data);
@@ -2200,11 +2200,6 @@ static void ur_write(struct vmur *info)
 
 	/* close punch preventively */
 	close_ur_device_simple(info);
-
-	/* Check punch. If punch is spooled CONT, exit */
-	if (is_punch_cont(info))
-		ERR_EXIT("Virtual punch device %X is spooled CONT.\n",
-			 info->devno);
 
 	sfdata = (char *) malloc(info->ur_reclen * VMUR_REC_COUNT);
 	if (!sfdata)
@@ -2410,6 +2405,11 @@ int main(int argc, char **argv)
 		break;
 	case PUNCH:
 	case PRINT:
+		/* Check device. If spooled CONT, exit */
+		if (is_punch_cont(&vmur_info))
+			ERR_EXIT("Virtual %s device %04X is spooled CONT.\n",
+				ur_action_str[vmur_info.action], vmur_info.devno);
+
 		/* Setup spool options */
 		setup_spool_options(&vmur_info);
 		if (vmur_info.text_specified)
