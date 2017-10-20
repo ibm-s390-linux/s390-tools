@@ -190,6 +190,9 @@ static char HELP_TEXT[] =
 "-f, --force              Overwrite files without prompt.\n"
 "-H, --hold               Hold spool file in reader after receive.\n"
 "-C, --class              Specify the spool class to match a reader file.\n"
+"-w, --wait               Wait for the specified device to be free rather than getting\n"
+"                         vmur in use error.\n"
+
 "\n"
 "Options for 'punch' and 'print' command:\n"
 "\n"
@@ -228,6 +231,9 @@ static char HELP_TEXT[] =
 "\n"
 "-q, --queue              Target queue for command. Possible queues are:\n"
 "                         'rdr' (default), 'pun' and 'prt'.\n";
+"-w, --wait               Wait for the specified device to be free rather than getting\n"
+"                         vmur in use error.\n"
+
 
 static void usage(void)
 {
@@ -833,12 +839,13 @@ static void parse_opts_receive(struct vmur *info, int argc, char *argv[])
 		{ "force",       no_argument,       NULL, 'f'},
 		{ "hold",        no_argument,       NULL, 'H'},
 		{ "convert",     no_argument,       NULL, 'c'},
+		{ "wait",        no_argument,       NULL, 'w'},
 		{ "device",      required_argument, NULL, 'd'},
 		{ "blocked",     required_argument, NULL, 'b'},
 		{ "class",       required_argument, NULL, 'C'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vhtOfHcd:b:C:";
+	static const char option_string[] = "vhtOfHcwd:b:C:";
 
 	strcpy(info->devnode, VMRDR_DEVICE_NODE);
 	while (1) {
@@ -870,6 +877,9 @@ static void parse_opts_receive(struct vmur *info, int argc, char *argv[])
 			break;
 		case 'c':
 			++info->convert_specified;
+			break;
+		case 'w':
+			info->lock_attributes &= ~LOCK_NB;
 			break;
 		case 'C':
 			set_spool_class(info, optarg, 1);
@@ -1178,12 +1188,13 @@ static void parse_opts_purge(struct vmur *info, int argc, char *argv[])
 		{ "help",        no_argument,       NULL, 'h'},
 		{ "force",       no_argument,       NULL, 'f'},
 		{ "queue",       no_argument,       NULL, 'q'},
+		{ "wait",        no_argument,       NULL, 'w'},
 		{ "class",       required_argument, NULL, 'C'},
 		{ "dest",        required_argument, NULL, 'D'},
 		{ "form",        required_argument, NULL, 'F'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "fvhq:C:";
+	static const char option_string[] = "fvhqw:C:";
 
 	while (1) {
 		opt = getopt_long(argc, argv, option_string,
@@ -1198,6 +1209,9 @@ static void parse_opts_purge(struct vmur *info, int argc, char *argv[])
 		case 'q':
 			++info->queue_specified;
 			set_queue(info, optarg);
+			break;
+		case 'w':
+			info->lock_attributes &= ~LOCK_NB;
 			break;
 		case 'C':
 			set_spool_class(info, optarg, 0);
@@ -1237,10 +1251,11 @@ static void parse_opts_order(struct vmur *info, int argc, char *argv[])
 	static struct option long_options[] = {
 		{ "version",     no_argument,       NULL, 'v'},
 		{ "help",        no_argument,       NULL, 'h'},
+		{ "wait",        no_argument,       NULL, 'w'},
 		{ "queue",       required_argument, NULL, 'q'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vhq:";
+	static const char option_string[] = "vhwq:";
 
 	while (1) {
 		opt = getopt_long(argc, argv, option_string,
@@ -1249,6 +1264,9 @@ static void parse_opts_order(struct vmur *info, int argc, char *argv[])
 			break;
 		check_std_opts(opt);
 		switch (opt) {
+		case 'w':
+			info->lock_attributes &= ~LOCK_NB;
+			break;
 		case 'q':
 			++info->queue_specified;
 			set_queue(info, optarg);
@@ -1270,10 +1288,11 @@ static void parse_opts_list(struct vmur *info, int argc, char *argv[])
 	static struct option long_options[] = {
 		{ "version",     no_argument,       NULL, 'v'},
 		{ "help",        no_argument,       NULL, 'h'},
+		{ "wait",        no_argument,       NULL, 'w'},
 		{ "queue",       required_argument, NULL, 'q'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vhq:";
+	static const char option_string[] = "vhwq:";
 
 	while (1) {
 		opt = getopt_long(argc, argv, option_string,
@@ -1282,6 +1301,9 @@ static void parse_opts_list(struct vmur *info, int argc, char *argv[])
 			break;
 		check_std_opts(opt);
 		switch (opt) {
+		case 'w':
+			info->lock_attributes &= ~LOCK_NB;
+			break;
 		case 'q':
 			++info->queue_specified;
 			set_queue(info, optarg);
@@ -1305,7 +1327,7 @@ static void parse_opts_default(int argc, char *argv[])
 		{ "help",        no_argument,       NULL, 'h'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vh";
+	static const char option_string[] = "vhw";
 
 	while (1) {
 		opt = getopt_long(argc, argv, option_string,
