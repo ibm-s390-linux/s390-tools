@@ -82,6 +82,7 @@ struct vmur {
 	struct sigaction sigact;
 	iconv_t iconv;
 	int   lock_fd;
+	int   lock_attributes;
 	/* ur device spool state */
 	char  spool_restore_cmd[MAXCMDLEN];
 	int   spool_restore_needed;
@@ -93,6 +94,8 @@ struct vmur {
 	int   spool_form_specified;
 	char  spool_dist[9];
 	int   spool_dist_specified;
+	char  tag_data[137];
+	int   tag_specified;
 } vmur_info;
 
 /*
@@ -207,6 +210,12 @@ static char HELP_TEXT[] =
 "    --form               Form to be assigned to the created spool file.\n"
 "    --dest               Destination to be assigned to the created spool file.\n"
 "    --dist               Distribution code for the resulting spool file.\n"
+"-w, --wait               Wait for the specified device to be free rather than getting\n"
+"                         vmur in use error.\n"
+"-T, --tag                Up to 136 characters of information to associate with the\n"
+"                         spool file. The contents and format of this data are\n"
+"                         flexible; they are the responsibility of the file originator\n"
+"                         and the end user.\n"
 "\n"
 "Options for 'purge' command:\n"
 "\n"
@@ -293,11 +302,18 @@ static void cperr_exit(char *cpcmd, int cprc, char *buf)
 
 static void _cpcmd(char *cpcmd, char **resp, int *rc, int retry, int upper)
 {
-	int fd, len, cprc, bufsize = VMCP_BUFSIZE;
+	int fd, len, cprc, bufsize = VMCP_BUFSIZE, i;
 	char *buf;
 	char cmd[MAXCMDLEN];
 
-	strcpy(cmd, cpcmd);
+	len = strlen(cpcmd);
+	for (i = 0; i < len; i++) {
+		if (!isprint(cpcmd[i]))
+			break;
+		cmd[i] = cpcmd[i];
+	}
+	cmd[i] = '\0';
+
 	if (upper)
 		to_upper(cmd);
 
@@ -521,7 +537,7 @@ static void save_spool_options(struct vmur *info)
 	cpcmd(cmd, &resp, NULL, 0);
 
 	/* Prepare CP spool restore command */
-	n = sprintf(info->spool_restore_cmd, "SPOOL %X", info->devno);
+	n = sprintf(info->spool_restore_cmd, "SPOOL %X NOCONT", info->devno);
 
 	/* Save the CLASS value if required */
 	if (info->spool_class_specified) {
@@ -584,7 +600,8 @@ static int require_spool_setup(struct vmur *info)
 	return !!(info->spool_class_specified ||
 		  info->spool_form_specified ||
 		  info->spool_dest_specified ||
-		  info->spool_dist_specified);
+		  info->spool_dist_specified ||
+		  info->tag_specified);
 }
 
 /*
@@ -606,7 +623,7 @@ static void setup_spool_options(struct vmur *info)
 	save_spool_options(info);
 
 	/* Change spool options */
-	n = sprintf(cmd, "SPOOL %X", info->devno);
+	n = sprintf(cmd, "SPOOL %X NOCONT", info->devno);
 	if (info->spool_class_specified)
 		n += sprintf(cmd + n, " CLASS %c", info->spool_class);
 	if (info->spool_form_specified)
@@ -653,6 +670,7 @@ static void init_info(struct vmur *info)
 	memset(info, 0, sizeof(struct vmur));
 	strcpy(info->queue, "rdr");
 	info->lock_fd = -1;
+	info->lock_attributes = LOCK_EX | LOCK_NB;
 }
 
 /*
@@ -976,18 +994,20 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 		{ "text",        no_argument,       NULL, 't'},
 		{ "rdr",         no_argument,       NULL, 'r'},
 		{ "force",       no_argument,       NULL, 'f'},
+		{ "wait",	 no_argument,	    NULL, 'w'},
 		{ "user",        required_argument, NULL, 'u'},
 		{ "node",        required_argument, NULL, 'n'},
-		{ "device",      required_argument, NULL, 's'},
+		{ "device",      required_argument, NULL, 'd'},
 		{ "blocked",     required_argument, NULL, 'b'},
 		{ "name",        required_argument, NULL, 'N'},
 		{ "class",       required_argument, NULL, 'C'},
 		{ "dest",        required_argument, NULL, 'D'},
 		{ "form",        required_argument, NULL, 'F'},
 		{ "dist",	 required_argument, NULL, 'I'},
+		{ "tag",         required_argument, NULL, 'T'},
 		{ 0,             0,                 0,    0  }
 	};
-	static const char option_string[] = "vhtrfu:n:d:b:N:C:";
+	static const char option_string[] = "vhtrfwu:n:d:b:N:C:D:F:I:T:";
 
 	if (info->action == PUNCH) {
 		strcpy(info->devnode, VMPUN_DEVICE_NODE);
@@ -1062,6 +1082,13 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			else
 				strcpy(info->spool_dist, optarg);
 			break;
+		case 'w':
+                        info->lock_attributes &= ~LOCK_NB;
+			break;	
+		case 'T':
+			++info->tag_specified;
+			strncpy_graph(info->tag_data,optarg,sizeof(info->tag_data));			
+                        break;
 		default:
 			std_usage_exit();
 		}
@@ -1079,6 +1106,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 	CHECK_SPEC_MAX(info->spool_form_specified, 1, "form");
 	CHECK_SPEC_MAX(info->spool_dest_specified, 1, "dest");
 	CHECK_SPEC_MAX(info->spool_dist_specified, 1, "dist");
+	CHECK_SPEC_MAX(info->tag_specified, 1, "tag");
 
 	if (info->user_specified && !info->rdr_specified)
 		ERR_EXIT("--user without --rdr specified\n");
@@ -1092,6 +1120,8 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 	if (info->blocked_specified && info->text_specified)
 		ERR_EXIT("Conflicting options: -b together with -t "
 			 "specified\n");
+	if (info->tag_specified && info->node_specified)
+		ERR_EXIT("Conflicting options: --tag with --node specified\n");
 
 	set_file(info, argv, argc, optind + 1);
 
@@ -1459,14 +1489,16 @@ static int get_filename_from_reader(struct vmur *info)
 static void acquire_lock(struct vmur *info)
 {
 	char failed_action[10] = {};
-
-	info->lock_fd = open(LOCK_FILE, O_RDONLY | O_CREAT, S_IRUSR);
+	char lock_file[PATH_MAX];
+	
+        snprintf(lock_file,sizeof(lock_file), "%s-%04x",LOCK_FILE,info->devno);
+	info->lock_fd = open(lock_file, O_RDONLY | O_CREAT, S_IRUSR);
 	if (info->lock_fd == -1) {
 		ERR("WARNING: Unable to open lock file %s, continuing "
 		    "without any serialization.\n", LOCK_FILE);
 		return;
 	}
-	if (flock(info->lock_fd, LOCK_EX | LOCK_NB) == -1) {
+	if (flock(info->lock_fd, info->lock_attributes) == -1) {
 		switch (info->action) {
 		case RECEIVE:
 			strcpy(failed_action, "received");
@@ -1878,7 +1910,7 @@ static void close_ur_device(struct vmur *info)
 	char cmd[MAXCMDLEN], spoolid[5] = {}, *response;
 	int cprc;
 
-	if (info->node_specified) {
+	if (info->node_specified || info->tag_specified) {
 		sprintf(cmd, "SPOOL %X NOCONT", info->devno);
 		cpcmd(cmd, NULL, NULL, 0);
 	}
@@ -1981,7 +2013,11 @@ static void rscs_punch_setup(struct vmur *info)
 
 	sprintf(cmd, "SPOOL %X CONT", info->devno);
 	cpcmd(cmd, NULL, NULL, 0);
-	sprintf(cmd, "TAG DEV %X %s %s", info->devno, info->node, info->user);
+	if ('\0' != info->node[0]) {
+	        sprintf(cmd, "TAG DEV %X %s %s", info->devno, info->node, info->user);
+	} else {
+		sprintf(cmd,"TAG DEV %X %s", info->devno, info->tag_data);
+	}
 	cpcmd(cmd, NULL, NULL, 0);
 	return;
 }
@@ -2162,7 +2198,7 @@ static void ur_write(struct vmur *info)
 
 	sfdata = (char *) malloc(info->ur_reclen * VMUR_REC_COUNT);
 	if (!sfdata)
-		ERR_EXIT("Could allocate memory for buffer (%i)\n",
+		ERR_EXIT("Could not allocate memory for buffer (%i)\n",
 			    info->ur_reclen);
 
 	/* Open Linux file */
@@ -2175,7 +2211,7 @@ static void ur_write(struct vmur *info)
 		fhi = STDIN_FILENO;
 	}
 
-	if (info->node_specified)
+	if (info->node_specified || info->tag_specified)
 		rscs_punch_setup(info);
 
 	/* Open UR device */
@@ -2347,12 +2383,12 @@ int main(int argc, char **argv)
 	if (atexit(cleanup_atexit_fn))
 		ERR_EXIT("Could not set up vmur session cleanup\n");
 
-	/* Acquire a lock to serialize concurrent vmur invocations */
-	acquire_lock(&vmur_info);
-
 	/* Retrieve ur device number */
 	setup_ur_device(&vmur_info);
 
+	/* Acquire a lock to serialize concurrent vmur invocations */
+	acquire_lock(&vmur_info);
+	
 	switch (vmur_info.action) {
 	case RECEIVE:
 		/* Setup spool options */

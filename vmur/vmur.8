@@ -203,7 +203,7 @@ punch|print [-fr] [-d dev_node]
 [-C class] [--form form] [--dest dest] [--dist distcode]
 [-t | -b sep.pad] [-u user] [-n node]
 .br
-      [-N name.type] [file]
+      [-N name.type] [--wait] [--tag data] [file]
 .PP
 Minimum abbreviation: pun/pr
 .PP
@@ -217,7 +217,7 @@ reader queue.
 The following command options are supported by \fBpunch/print\fR:
 .SP
 .IP "" 0
-\fB-f or --force\fR
+\fB-f\fR or \fB--force\fR
 .IP "" 2
 Specifies to automatically convert Linux input file name (or
 <name>.<type> as specified with --name) to a valid spool
@@ -226,20 +226,20 @@ Invalid characters are replaced by _(underscore) and both <name> and <type>
 are truncated to a length of maximal 8 characters.
 .SP
 .IP "" 0
-\fB-r or --rdr\fR
+\fB-r\fR or \fB--rdr\fR
 .IP "" 2
 Specifies that the punch or printer file
 is to be transferred to a reader.
 .SP
 .IP "" 0
-\fB-d or --device\fR
+\fB-d\fR or \fB--device\fR
 .IP "" 2
 Specifies the device node of the virtual punch or printer device.
 If omitted, /dev/vmpun-0.0.000d is assumed for punch,
 and /dev/vmprt-0.0.000e for printer.
 .SP
 .IP "" 0
-\fB-C or --class\fR
+\fB-C\fR or \fB--class\fR
 .IP "" 2
 Specifies the spool file class assigned to the spool files created on this punch
 or print.  The class value is a 1-character alphanumeric field whose values can be
@@ -274,7 +274,7 @@ If OFF or an asterisk (*) is specified, the distribution code of the spool file
 is reset to the distribution code in the system directory.
 .SP
 .IP "" 0
-\fB-t or --text\fR
+\fB-t\fR or \fB--text\fR
 .IP "" 2
 specifies to
 punch or print the input file as text file, that is perform ASCII-to-EBCDIC
@@ -285,7 +285,7 @@ for a printer. If an input line length exceeds 80 or 132 for punch
 or print, respectively, an error message is issued.
 .SP
 .IP "" 0
-\fB-b or --blocked\fR
+\fB-b\fR or \fB--blocked\fR
 .IP "" 2
 Specifies that the file is to be written using blocked mode.
 As parameter for the -b option, the
@@ -304,7 +304,7 @@ output can be piped to punch or print, for example:
 # iconv xyz -f ISO-8859-1 -t EBCDIC-US | vmur pun -b 0x25,0x40 -N abc
 .SP
 .IP "" 0
-\fB-u or --user\fR
+\fB-u\fR or \fB--user\fR
 .IP "" 2
 Specifies the z/VM user ID to whose reader the data is to be
 transferred. The --user operand must adhere to z/VM user naming conventions.
@@ -317,7 +317,7 @@ If user is omitted, the data is transferred
 to your own machine's reader.
 .SP
 .IP "" 0
-\fB-n or --node\fR
+\fB-n\fR or \fB--node\fR
 .IP "" 2
 Specifies the z/VM node ID of a remote z/VM system to which
 the data is to be transferred. RSCS (Remote Spooling Communications
@@ -352,6 +352,21 @@ name rules (e.g. longer than 8 chars).
 .IP "" 4
 - If the Linux input file name is also omitted (that is data is read
 from standard input), then an error message is issued.
+.SP
+.IP "" 0
+\fB-w\fR or \fB--wait\fR
+.IP "" 2
+Access to ur devices is serilaized. Use the wait option to wait for
+the device to be available. Without this option, if the device is in use
+an error message is displayed and the process exits.
+.SP
+.IP "" 0
+\fB-T\fR or \fB--tag\fR
+.IP "" 2
+Up to 136 characters of information you want to associate with the specified
+spool file. The contents and format of this data are flexible; they are 
+the responsibility of the file originator and the end user.
+Do not use the --tag option with the --node option.
 .SP
 .SH punch/print arguments
 .SP
