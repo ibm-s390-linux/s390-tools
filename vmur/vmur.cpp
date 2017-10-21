@@ -1078,8 +1078,8 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			++info->user_specified;
 			if (invalid_userid(optarg))
 				ERR_EXIT("Invalid userid: %s\n", optarg);
-			else
-				strcpy(info->user, optarg);
+			strcpy(info->user, optarg);
+			to_upper(info->user);
 			break;
 		case 'b':
 			set_blocked(info, optarg);
@@ -1088,8 +1088,8 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			++info->node_specified;
 			if (invalid_operand(optarg))
 				ERR_EXIT("Invalid node specified.\n");
-			else
-				strcpy(info->node, optarg);
+			strcpy(info->node, optarg);
+			to_upper(info->node);
 			break;
 		case 'C':
 			set_spool_class(info, optarg, 0);
@@ -1126,6 +1126,7 @@ static void parse_opts_punch_print(struct vmur *info, int argc, char *argv[])
 			if (check_local_user(optarg))
 				ERR_EXIT("Invalid RSCS userid: %s\n", optarg);
 			strcpy(info->rscs_userid, optarg);
+			to_upper(info->rscs_userid);
 			break;
 		default:
 			std_usage_exit();
@@ -1547,7 +1548,7 @@ static void acquire_lock(struct vmur *info)
 	char failed_action[10] = {};
 	char lock_file[PATH_MAX];
 	
-        snprintf(lock_file,sizeof(lock_file), "%s-%04x",LOCK_FILE,info->devno);
+        snprintf(lock_file,sizeof(lock_file), "%s_%04x",LOCK_FILE,info->devno);
 	info->lock_fd = open(lock_file, O_RDONLY | O_CREAT, S_IRUSR);
 	if (info->lock_fd == -1) {
 		ERR("WARNING: Unable to open lock file %s, continuing "
@@ -1966,16 +1967,12 @@ static void close_ur_device(struct vmur *info)
 	char cmd[MAXCMDLEN], spoolid[5] = {}, *response;
 	int cprc;
 
-	if (info->node_specified || info->tag_specified) {
-		sprintf(cmd, "SPOOL %X NOCONT", info->devno);
-		cpcmd(cmd, NULL, NULL, 0);
-	}
 	if (info->rdr_specified) {
 		sprintf(cmd, "CLOSE %X TO ", info->devno);
 		if (info->node_specified)
 			strcat(cmd, info->rscs_userid);
 		else if (info->user_specified)
-			strcat(cmd, to_upper(info->user));
+			strcat(cmd, info->user);
 		else
 			strcat(cmd, "*");
 		strcat(cmd, " RDR");
@@ -2058,24 +2055,6 @@ static int is_punch_cont(struct vmur *info)
 		rc = 1;
 	free(buf);
 	return rc;
-}
-
-/*
- * Provide tag information for RSCS
- */
-static void rscs_punch_setup(struct vmur *info)
-{
-	char cmd[MAXCMDLEN];
-
-	sprintf(cmd, "SPOOL %X CONT", info->devno);
-	cpcmd(cmd, NULL, NULL, 0);
-	if (info->node_specified) {
-	        sprintf(cmd, "TAG DEV %X %s %s", info->devno, info->node, info->user);
-	} else {
-		sprintf(cmd,"TAG DEV %X %s", info->devno, info->tag_data);
-	}
-	cpcmd(cmd, NULL, NULL, 0);
-	return;
 }
 
 /*
@@ -2258,9 +2237,6 @@ static void ur_write(struct vmur *info)
 	} else {
 		fhi = STDIN_FILENO;
 	}
-
-	if (info->node_specified || info->tag_specified)
-		rscs_punch_setup(info);
 
 	/* Open UR device */
 	fho = open(info->devnode, O_WRONLY | O_NONBLOCK);
