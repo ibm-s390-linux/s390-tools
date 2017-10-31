@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env python3
 #
 # zipl_helper.device-mapper: print zipl parameters for a device-mapper device
 #
@@ -34,829 +34,530 @@
 # error message and a non-zero return code.
 #
 
-use strict;
-use File::Basename;
-use POSIX qw/locale_h/;
+import re
+import os
+import sys
+import stat
+import locale
+import logging
+import subprocess
+from itertools import islice
+from collections import namedtuple
 
-# Required tools
-our $dmsetup = "dmsetup";
-our $mknod = "mknod";
-our $dasdview = "dasdview";
-our $blockdev = "blockdev";
+logger = logging.getLogger(__name__)
 
-# Constants
-our $SECTOR_SIZE = 512;
-our $DASD_PARTN_MASK = 0x03;
-our $SCSI_PARTN_MASK = 0x0f;
+SECTOR_SIZE = 512
+DASD_PARTN_MASK = 0x03
+SCSI_PARTN_MASK = 0x0f
 
-# Internal constants
-our $DEV_TYPE_CDL = 0;
-our $DEV_TYPE_LDL = 1;
-our $DEV_TYPE_FBA = 2;
-our $DEV_TYPE_SCSI = 3;
+TOOLS = ['dmsetup', 'dasdview', 'blockdev']
 
-our $TARGET_START = 0;
-our $TARGET_LENGTH = 1;
-our $TARGET_TYPE = 2;
-our $TARGET_DATA = 3;
+TARGET_TYPES = ["linear", "mirror", "multipath"]
 
-our $TARGET_TYPE_LINEAR = 0;
-our $TARGET_TYPE_MIRROR = 1;
-our $TARGET_TYPE_MULTIPATH = 2;
+Target = namedtuple('Target', ['start', 'length', 'type', 'data'])
+TargetData = namedtuple('TargetData', ['major', 'minor', 'start'])
 
-our $LINEAR_MAJOR = 0;
-our $LINEAR_MINOR = 1;
-our $LINEAR_START_SECTOR = 2;
+UNRECOG_TABLE_MSG = "Unrecognized device-mapper table format for device '%s'"
+UNSUPPORTED_BLOCK_MSG = "Unsupported setup: Block 0 is not mirrored in device '%s'"
 
-our $MIRROR_MAJOR = 0;
-our $MIRROR_MINOR = 1;
-our $MIRROR_START_SECTOR = 2;
+def die(msg, *args, **kwargs):
+    logger.critical(msg, *args, **kwargs)
+    sys.exit(1)
 
-our $MULTIPATH_MAJOR = 0;
-our $MULTIPATH_MINOR = 1;
 
-sub get_physical_device_dir($);
-sub get_physical_device($$);
-sub get_major_minor($);
-sub get_table($$);
-sub get_linear_data($$);
-sub get_mirror_data($$);
-sub get_multipath_status($);
-sub get_multipath_data($$);
-sub filter_table($$$);
-sub get_target_start($);
-sub get_target_major_minor($);
-sub create_temp_device_node($$$);
-sub get_blocksize($);
-sub get_dasd_info($);
-sub get_partition_start($$);
-sub is_dasd($);
-sub get_partition_base($$$);
-sub get_device_characteristics($$);
-sub get_type_name($);
-sub check_for_mirror($@);
-sub get_target_base($$$$@);
-sub get_device_name($$);
-sub check_tools();
+def run_proc(args):
+    return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            check=True, universal_newlines=True)
 
-my $phy_geometry;	# Disk geometry of physical device
-my $phy_blocksize;	# Blocksize of physical device
-my $phy_offset;		# Offset in 512-byte sectors between start of physical
-			# device and start of filesystem
-my $phy_type;		# Type of physical device
-my $phy_bootsectors;	# Size of boot record in 512-byte sectors
-my $phy_partstart;	# Partition offset of physical device
-my $phy_major;		# Major device number of physical device
-my $phy_minor;		# Minor device number of physical device
-my @target_list;	# List of dm-targets between filesystem and physical
-			# device.
-my $base_major;		# Major device number of base device.
-my $base_minor;		# Minor device number of base device
-my $directory;		# Command line parameter
-my $toolname;		# Name of tool
 
-# Start
-$toolname = basename($0);
+def get_device_name(major, minor):
+    partitions_match = re.compile(r'^\s*(\d+)\s+(\d+)\s+\d+\s+(\S+)\s*$')
+    with open('/proc/partitions', 'r') as f:
+        for line in f:
+            res = re.match(partitions_match, line)
+            if not res:
+                continue
+            if int(res.group(1)) == major and int(res.group(2)) == minor:
+                return res.group(3)
+    return "{}:{}".format(major, minor)
 
-# Setup and use a standard locale to
-# avoid localized scripting output
-$ENV{LC_ALL} = "C"; # for child processes
-setlocale(LC_ALL, "C"); # for current process
 
-# Use alternate code path if called as chreipl helper
-if ($toolname eq "chreipl_helper.device-mapper") {
-	if (!defined($ARGV[0]) || !($ARGV[0] =~ /^\s*(\d+)\s*:\s*(\d+)\s*$/)) {
-		die("Usage: $toolname <major:minor of target devies>\n");
-	}
-	($phy_major, $phy_minor, $phy_offset, @target_list) =
-		get_physical_device($1, $2);
-	print("$phy_major:$phy_minor\n");
-	exit(0);
-}
+# args: <major>:<minor> <start_sector>
+# Returns [major, minor, start_sector]
+def get_linear_data(dev_name, args):
+    res = re.match(r'^(\d+):(\d+)\s+(\d+)$', args)
+    if not res:
+        die(UNRECOG_TABLE_MSG, dev_name)
+    return TargetData(*map(int, res.groups()))
 
-$directory = $ARGV[0];
-if (!defined($directory)) {
-	die("Usage: $toolname <target directory> or <major:minor of target devies>\n");
-}
 
-# check if needed tools are available
-check_tools();
+# args: <log_type> <#log_args> <log_arg1>...<log_argN> \
+#       <#devs> <device_name_1> <offset_1>...<device name N> <offset N> \
+#       <#features> <feature_1>...<feature_N>
+# Returns [TargetData1 ... TargetDataN]
+def get_mirror_data(dev_name, args):
+    try:
+        it = iter(args.split())
+        next(it) # <log_type>
+        nlogs = int(next(it)) # <#log_args>
+        it = islice(it, nlogs, None) # log_args*
+        ndevs = int(next(it)) # <#devs>
 
-if (($ARGV[0] =~ /^\s*(\d+)\s*:\s*(\d+)\s*$/)) {
-    	# Determine physical (non-dm) device on which partition is located
-	($phy_major, $phy_minor, $phy_offset, @target_list) =
-		get_physical_device($1,$2);
-}
-else
-{
-	# Determine physical (non-dm) device on which directory is located
-	($phy_major, $phy_minor, $phy_offset, @target_list) =
-		get_physical_device_dir($directory);
-}
+        data = []
+        offset = None
+        major_minor_match = re.compile(r'^(\d+):(\d+)$')
+        for _ in range(ndevs):
+            name, doffset = next(it), int(next(it)) # <dev_name_i> <offset_i>
+            res = re.match(major_minor_match, name)
+            if not res:
+                die(UNRECOG_TABLE_MSG, dev_name)
+            data.append(TargetData(*map(int, res.groups()), doffset))
+            offset = doffset if offset is None else offset
+            if doffset != offset:
+                die("Unsupported setup: Mirror target on device '%s' "
+                    "contains entries with varying sector offsets", dev_name)
 
-# Determine type and characteristics of physical device
-($phy_type, $phy_blocksize, $phy_geometry, $phy_bootsectors, $phy_partstart) =
-	get_device_characteristics($phy_major, $phy_minor);
+        nfeatures = int(next(it)) # <#features>
+        if sum(1 for _ in it) != nfeatures:
+            die(UNRECOG_TABLE_MSG, dev_name)
 
-# Handle partitions
-if ($phy_partstart > 0) {
-	# Only the partition of the physical device is mapped so only the
-	# physical device can provide access to the boot record.
-	($base_major, $base_minor) =
-		get_partition_base($phy_type, $phy_major, $phy_minor);
-	# Check for mirror
-	check_for_mirror(scalar(@target_list) - 1, @target_list);
-	# Adjust filesystem offset
-	$phy_offset += $phy_partstart * ($phy_blocksize / $SECTOR_SIZE);
-	$phy_partstart = 0;
-	# Update device geometry
-	(undef, undef, $phy_geometry, undef, undef) =
-		get_device_characteristics($base_major, $base_minor);
-} else {
-	# All of the device is mapped, so the base device is the top most
-	# dm device which provides access to boot sectors
-	($base_major, $base_minor) =
-		get_target_base($phy_major, $phy_minor, 0, $phy_bootsectors,
-				@target_list);
-}
+        return data
+    except (StopIteration, ValueError):
+        die(UNRECOG_TABLE_MSG, dev_name)
 
-# Check for valid offset of file system
-if (($phy_offset % ($phy_blocksize / $SECTOR_SIZE)) != 0) {
-	die("Error: File system not aligned on physical block size\n");
-}
 
-# Print resulting information
-print("targetbase=$base_major:$base_minor\n");
-print("targettype=".get_type_name($phy_type)."\n");
-if (defined($phy_geometry)) {
-	print("targetgeometry=$phy_geometry\n");
-}
-print("targetblocksize=$phy_blocksize\n");
-print("targetoffset=".($phy_offset / ($phy_blocksize / $SECTOR_SIZE))."\n");
+# args: <start> <length> <type>
+#       <#feature_args> <feature_arg1> ... <feature_argN>
+#       <#handler_status_args> <handler_status_arg1> ... <handler_status_argN>
+#       <#path_groups> <init_group_number>
+#         <group_state1> <#ps_status_args> <ps_args1> ... <ps_argsN>
+#         <#paths> <#selector_arg>
+#           <node1> <active1> <fail_cnt1> <selector_arg1> ... <selector_argN>
+def get_multipath_status(device):
+    dev = '/dev/{}'.format(device)
+    try:
+        res = run_proc(['dmsetup', 'status', dev])
+    except subprocess.CalledProcessError as e:
+        die("No paths found for '%s': 'dmsetup status' failed", device)
 
-exit(0);
+    failed = 0
+    states = {}
+    for line in res.stdout.splitlines():
+        # sample output (single line):
+        # 0 67108864 multipath \
+        #   2 0 0 \
+        #   0 \
+        #   2 2 \
+        #       E 0 \
+        #       2 2 \
+        #           8:16 F 1 \
+        #               0 1 \
+        #           8:0 F 1 \
+        #               0 1 \
+        #       A 0 \
+        #       2 2 \
+        #           8:32 A 0 \
+        #               0 1 \
+        #           8:48 A 0 \
+        #               0 1
+        it = iter(line.split())
+        try:
+            start = int(next(it))
+            length = int(next(it))
+            dtype = next(it)
 
-# get_physical_device_from_dir(dir)
-# Returns (phy_major, phy_minor, phy_offset, @target_list).
-# target_list: [target_data1, target_data2, ..., target_datan]
-# target_data: [major, minor, target]
-sub get_physical_device_dir($)
-{
-	my ($directory) = @_;
-	my ($major, $minor) = get_major_minor($directory);
+            if dtype != "multipath":
+                continue
 
-	return get_physical_device($major, $minor);
-}
+            cnt = int(next(it)) # <#multipath_feature_args>
+            it = islice(it, cnt, None) # multipath_feature_args*
+            cnt = int(next(it)) # <#handler_status_args>
+            it = islice(it, cnt, None) # handler_status_args*
 
-# get_physical_device(major, minor)
-# Returns (phy_major, phy_minor, phy_offset, @target_list).
-# target_list: [target_data1, target_data2, ..., target_datan]
-# target_data: [major, minor, target]
-sub get_physical_device($$)
-{
-	my ($major, $minor) = @_;
-	my $table;
-	my $target;
-	my $start;
-	my $length;
-	my @target_list;
+            ngr = int(next(it))
+            ign = int(next(it))
+            for _ in range(ngr):
+                # group_state: D(isabled), A(ctive), or E(nabled)
+                state = next(it)
+                cnt = int(next(it)) # <#ps_status_args>
+                it = islice(it, cnt, None) # ps_status_args*
+                npaths = int(next(it)) # <#paths>
+                nsa = int(next(it)) # <#selector_args>
+                for _ in range(npaths):
+                    node = next(it)
+                    active = next(it)
+                    fail_cnt = int(next(it))
+                    states[node] = active
+                    failed += 1 if active != 'A' else 0
+                    it = islice(it, nsa, None) # selector_args*
+        except StopIteration:
+            continue
 
-	$table = get_table($major, $minor);
-	if (scalar(@$table) == 0) {
-		die("Error: Could not retrieve device-mapper information for ".
-		    "device '".get_device_name($major, $minor)."'\n");
-	}
-	# Filesystem must be on a single dm target
-	if (scalar(@$table) != 1) {
-		die("Error: Unsupported setup: Directory '$directory' is ".
-		    "located on a multi-target device-mapper device\n");
-	}
+    if len(states) == 0:
+        die("No paths found for '%s'", device)
 
-	$target = $table->[0];
-	push(@target_list, [$major, $minor, $target]);
-	$start = $target->[$TARGET_START];
-	$length = $target->[$TARGET_LENGTH];
-	while (1) {
-		# Convert fs_start to offset on parent dm device
-		$start += get_target_start($target);
-		($major, $minor) = get_target_major_minor($target);
-		$table = get_table($major, $minor);
-		if (scalar(@$table) == 0) {
-			# Found non-dm device
-			return ($major, $minor, $start, @target_list);
-		}
-		# Get target in parent table which contains filesystem
-		$table = filter_table($table, $start, $length);
-		if (scalar(@$table) != 1) {
-			die("Error: Unsupported setup: Could not map ".
-			    "directory '$directory' to a single physical ".
-			    "device\n");
-		}
-		$target = $table->[0];
-		push(@target_list, [$major, $minor, $target]);
-		# Convert fs_start to offset on parent target
-		$start -= $target->[$TARGET_START];
-	}
-}
+    if failed == len(states):
+        die("All paths for '%s' failed", device)
+    elif failed > 0:
+        logger.warning("There are one or more failed paths for device '%s'",
+                device)
 
-# get_major_minor(filename)
-# Returns: (device major, device minor) of the device containing the
-# specified file.
-sub get_major_minor($)
-{
-	my ($filename) = @_;
-	my @stat;
-	my $dev;
-	my $major;
-	my $minor;
+    return states
 
-	@stat = stat($filename);
-	if (!@stat) {
-		die("Error: Could not stat '$filename'\n");
-	}
-	$dev = $stat[0];
-	$major = ($dev & 0xfff00) >> 8;
-	$minor = ($dev & 0xff) | (($dev >> 12) & 0xfff00);
 
-	return ($major, $minor);
-}
+# args: <#features> <feat1> ... <featN>
+#       <#handlers> <handler1> ... <handlerN>
+#       <#path_groups> <path_group> <path_selector>
+#       <#selector_args> <selector_arg1> ... <selector_argN>
+#       <#paths> <#path_args>
+#       <path1> <path1_arg1> ... <path1_argN>
+#       ...
+#       <pathN> <pathN_arg1> ... <pathN_argN>
+# Returns: [TargetData1, ..., TargetDataN]
+def get_multipath_data(dev_name, args):
+    status = get_multipath_status(dev_name)
+    major_minor_match = re.compile(r'(\d+):(\d+)')
 
-# get_table(major, minor)
-# Returns: [target1, target2, ..., targetn]
+    data = []
+    it = iter(args.split())
+    try:
+        nfeatures = int(next(it)) # <#features>
+        it = islice(it, nfeatures, None) # features*
+        nhandlers = int(next(it)) # <#handlers>
+        it = islice(it, nhandlers, None) # handlers*
+        pgroups = int(next(it)) # <#pathgroups>
+        next(it) # pathgroup
+        for _ in range(pgroups):
+            next(it) # pathselector
+            cnt = int(next(it)) # <#selectorargs>
+            it = islice(it, cnt, None) # selectorargs*
+            npaths = int(next(it))
+            np_args = int(next(it))
+            for _ in range(npaths):
+                p = next(it)
+                res = re.match(major_minor_match, p)
+                if not res:
+                    die(UNRECOG_TABLE_MSG, dev_name)
+                major, minor = map(int, res.groups())
+                # FIXME: is it possible for 'p' to not be in 'status'?
+                if status[p] == 'A':
+                    data.append(TargetData(major, minor, 0))
+                # Remove deviceargs
+                it = islice(it, np_args, None)
+    except (StopIteration, ValueError):
+        die(UNRECOG_TABLE_MSG, dev_name)
+
+    if len(data) == 0:
+        die(UNRECOG_TABLE_MSG, dev_name)
+
+    return data
+
+
+# Returns: [target1, ..., targetN]
 # target: [start, length, type, data]
 # data: linear_data|mirror_data|multipath_data
-sub get_table($$)
-{
-	my ($major, $minor) = @_;
-	my @table;
-	my $dev_name = get_device_name($major, $minor);
-	local *HANDLE;
+def get_table(major, minor):
+    dev_name = get_device_name(major, minor)
 
-	open(HANDLE, "$dmsetup table -j $major -m $minor 2>/dev/null|") or
-		return undef;
-	while (<HANDLE>) {
-		if (!(/^(\d+)\s+(\d+)\s+(\S+)\s+(\S.*)$/)) {
-			die("Error: Unrecognized device-mapper table format ".
-			    "for device '$dev_name'\n");
-		}
-		my ($start, $length, $target_type, $args) = ($1, $2, $3, $4);
-		my $data;
-		my $type;
+    try:
+        res = run_proc(["dmsetup", "table", "-j", str(major), "-m", str(minor)])
+    except subprocess.CalledProcessError as e:
+        return []
 
-		if ($target_type eq "linear") {
-			$type = $TARGET_TYPE_LINEAR;
-			$data = get_linear_data($dev_name, $args);
-		} elsif ($target_type eq "mirror") {
-			$type = $TARGET_TYPE_MIRROR;
-			$data = get_mirror_data($dev_name, $args);
-		} elsif ($target_type eq "multipath") {
-			$type = $TARGET_TYPE_MULTIPATH;
-			$data = get_multipath_data($dev_name, $args);
-		} else {
-			die("Error: Unsupported setup: Unsupported ".
-			    "device-mapper target type '$target_type' for ".
-			    "device '$dev_name'\n");
-		}
-		push(@table, [$start, $length, $type, $data]);
-	}
-	close(HANDLE);
-	return \@table;
-}
+    table = []
+    handle_data = dict(zip(TARGET_TYPES, [get_linear_data, get_mirror_data,
+                                            get_multipath_data]))
+    target_match = re.compile(r'^(\d+)\s+(\d+)\s+(\S+)\s+(\S.*)$')
+    for line in res.stdout.splitlines():
+        r = re.match(target_match, line)
+        if not r:
+            die(UNRECOG_TABLE_MSG, dev_name)
+        start, length, target_type, args = r.groups()
 
-# get_linear_data(dev_name, args)
-# Returns: [major, minor, start_sector]
-sub get_linear_data($$)
-{
-	my ($dev_name, $args) = @_;
+        if target_type not in TARGET_TYPES:
+            die("Unrecognized setup: Unsupported device-mapper target "
+                "type '%s' for device '%s'", target_type, dev_name)
 
-	if (!($args =~ /^(\d+):(\d+)\s+(\d+)$/)) {
-		die("Error: Unrecognized device-mapper table format for ".
-		    "device '$dev_name'\n");
-	}
-	return [$1, $2, $3];
-}
+        data = handle_data[target_type](dev_name, args)
+        table.append(Target(int(start), int(length), target_type, data))
 
-# get_mirror_data(dev_name, args)
-# Returns [[major1, minor1, start_sector1], [major2, minor2, start_sector2], ..]
-sub get_mirror_data($$)
-{
-	my ($dev_name, $args) = @_;
-	my @argv = split(/\s+/, $args);
-	my @data;
-	my $offset;
-	my $num;
+    return table
 
-	# Remove log_type + #logargs + logargs
-	splice(@argv, 0, $argv[1] + 2);
-	if (!@argv) {
-		goto out_error;
-	}
-	$num = shift(@argv);
-	while ($num-- > 0) {
-		if (!($argv[0] =~ /^(\d+):(\d+)$/)) {
-			goto out_error;
-		}
-		push(@data, [$1, $2, $argv[1]]);
-		if (!defined($offset)) {
-			$offset = $argv[1];
-		} elsif ($argv[1] != $offset) {
-			die("Error: Unsupported setup: Mirror target on ".
-			    "device '$dev_name' contains entries with varying ".
-			    "sector offsets\n");
-		}
-		splice(@argv, 0, 2);
-	}
-	if (!scalar(@data)) {
-		goto out_error;
-	}
-	return \@data;
 
-out_error:
-	die("Error: Unrecognized device-mapper table format for device ".
-	    "'$dev_name'\n");
-}
+def get_target_major_minor(target):
+    data = target.data if target.type == "linear" else target.data[0]
+    return data.major, data.minor
 
-# get_multipath_status(device)
-# Return map of nodes to F/A flags (i.e. $map{$node} is either "A" or "F").
-# See linux/drivers/md/dm-mpath.c:multipath_status for details.
-sub get_multipath_status($)
-{
-	my $dev = shift();
-	my %map;
-	my $str;
-	my $failed = 0;
 
-	open(my $fh, "$dmsetup status /dev/$dev 2>/dev/null|") or return undef;
-	while ($str = <$fh>) {
-		# sample output (single line):
-		# 0 67108864 multipath \
-		# 	2 0 0 \
-		#	0 \
-		#	2 2 \
-		#		E 0 \
-		#		2 2 \
-		#			8:16 F 1 \
-		#				0 1 \
-		#			8:0 F 1 \
-		#				0 1 \
-		#		A 0 \
-		#		2 2 \
-		#			8:32 A 0 \
-		#				0 1 \
-		#			8:48 A 0 \
-		#				0 1
-		my @line = split(/\s+/, $str);
-		next if !@line;
+def get_target_start(target):
+    return target.data.start if target.type == "linear" else \
+            target.data[0].start
 
-		my ($start, $length, $type) = splice(@line, 0, 3);
-		next if $type ne "multipath";
 
-		my $cnt = shift(@line); # Remove #multipath_feature_args +
-		splice(@line, 0, $cnt) if $cnt > 0; # multipath_feature_args
+# Returns (phy_major, phy_minor, phy_offset, target_list)
+# target_list: [TargetData1, ..., TargetDataN]
+def get_physical_device(major, minor, directory=None):
+    table = get_table(major, minor)
+    if len(table) == 0:
+        die("Could not retrieve device-mapper information for "
+            "device '%s'", get_device_name(major, minor))
 
-		$cnt = shift(@line); # Remove #handler_status_args +
-		splice(@line, 0, $cnt) if $cnt > 0; # handler_status_args
+    # Filesystem must be on a single dm target
+    if len(table) != 1:
+        die("Unsupported setup: Directory '%s' is located on a "
+            "multi-target device-mapper device", directory)
 
-		# num_groups init_group_number ...
-		my ($ngr, $ign) = splice(@line, 0, 2);
-		for (my $g = 0; $g < $ngr; $g++) {
-			# Remove group_state + #ps_status_args
-			# group_state: D(isabled), A(ctive), or E(nabled)
-			my ($state, $cnt) = splice(@line, 0, 2);
-			# Remove ps_status_args*
-			splice(@line, 0, $cnt) if $cnt > 0;
-			# Remove #paths + #selector_args
-			my ($paths, $nsa) = splice(@line, 0, 2);
-			for (my $p = 0; $p < $paths; $p++) {
-				# Fetch single path description
-				my ($node, $active, $fail_cnt)
-					= splice(@line, 0, 3);
-				# active: A(ctive) or F(ailed)
-				$map{$node} = $active;
-				$failed++ if $active ne "A";
-				# Remove selector_args*
-				splice(@line, 0, $nsa) if $nsa > 0;
-			}
-		}
-	}
-	close($fh);
+    target = table[0]
+    target_list = [(major, minor, target)]
+    start = target.start
+    length = target.length
+    while True:
+        # Convert fs_start to offset on parent dm device
+        start += get_target_start(target)
+        mmaj, mmin = get_target_major_minor(target)
+        table = get_table(mmaj, mmin)
+        if len(table) == 0: # found non-dm device
+            return (mmaj, mmin, start, target_list)
 
-	die ("Error: No paths found for '$dev'\n") if scalar(keys %map) == 0;
-	if ($failed) {
-		die ("Error: All paths for '$dev' failed\n")
-			if $failed == scalar(keys %map);
+        def in_range(target, start, length):
+            return ((target.start + target.length - 1) >= start) and \
+                    (target.start <= (start + length - 1))
 
-		print(STDERR "Warning: There are one or more failed paths for"
-			." device '$dev'\n");
-	}
-	return \%map;
-}
+        # Get target in parent table which contains filesystem
+        # We are interested only in targets between start and start+length-1
+        table = list(filter(lambda t: in_range(t, start, length), table))
+        if len(table) != 1:
+            die("Unsupported setup: Could not map directory '%s' to a "
+                "single physical device", directory)
+        target = table[0]
+        target_list.append((mmaj, mmin, target))
+        # Convert fs_start to offset on parent target
+        start -= target.start
 
-# get_multipath_data(dev_name, args)
-# Returns [[major1, minor1], [major2, minor2], ..]
-sub get_multipath_data($$)
-{
-	my ($dev_name, $args) = @_;
-	my $status = get_multipath_status($dev_name);
-	my @argv = split(/\s+/, $args);
-	my @data;
 
-	# Remove #features + features
-	splice(@argv, 0, $argv[0] + 1);
-	if (!@argv) {
-		goto out_error;
-	}
-	# Remove #handlerargs + handlerargs
-	splice(@argv, 0, $argv[0] + 1);
-	if (!@argv) {
-		goto out_error;
-	}
-	# Remove #pathgroups + pathgroup
-	splice(@argv, 0, 2);
-	while (@argv) {
-		# Remove pathselector + #selectorargs + selectorargs
-		splice(@argv, 0, 2 + $argv[1]);
-		if (!@argv) {
-			goto out_error;
-		}
-		my $num_paths = $argv[0];
-		my $num_path_args = $argv[1];
-		# Remove #paths + #pathargs
-		splice(@argv, 0, 2);
-		while ($num_paths-- > 0) {
-			if (!@argv) {
-				goto out_error;
-			}
-			if (!($argv[0] =~ /(\d+):(\d+)/)) {
-				goto out_error;
-			}
-			push(@data, [$1, $2]) if $status->{$argv[0]} eq "A";
-			# Remove device + deviceargs
-			splice(@argv, 0, 1 + $num_path_args);
-		}
-	}
-	if (!@data) {
-		goto out_error;
-	}
-	return \@data;
+def get_major_minor(filename):
+    try:
+        dev = os.stat(filename).st_dev
+        return os.major(dev), os.minor(dev)
+    except:
+        die("Could not stat '%s'", filename)
 
-out_error:
-	die("Error: Unrecognized device-mapper table format for device ".
-	    "'$dev_name'\n");
-}
 
-# filter_table(table, start, length)
-# Returns table containing only targets between start and start + length - 1.
-sub filter_table($$$)
-{
-	my ($table, $start, $length) = @_;
-	my $end = $start + $length - 1;
-	my @result;
-	my $target;
+def get_physical_device_dir(directory):
+    major, minor = get_major_minor(directory)
+    return get_physical_device(major, minor, directory=directory)
 
-	foreach $target (@$table) {
-		my $target_start = $target->[$TARGET_START];
-		my $target_end = $target_start + $target->[$TARGET_LENGTH] - 1;
 
-		if (!(($target_end < $start) || ($target_start > $end))) {
-			push(@result, $target);
-		}
-	}
-	return \@result;
-}
-
-# get_target_start(target)
-# Returns the start sector of target.
-sub get_target_start($)
-{
-	my ($target) = @_;
-	my $type = $target->[$TARGET_TYPE];
-	my $data = $target->[$TARGET_DATA];
-
-	if ($type == $TARGET_TYPE_LINEAR) {
-		return $data->[$LINEAR_START_SECTOR];
-	} elsif ($type == $TARGET_TYPE_MIRROR) {
-		my $mirror_data = $data->[0];
-		return $mirror_data->[$MIRROR_START_SECTOR];
-	} else {
-		return 0;
-	}
-}
-
-# get_target_major_minor(target)
-# Returns (major, minor) of target of target.
-sub get_target_major_minor($)
-{
-	my ($target) = @_;
-	my $type = $target->[$TARGET_TYPE];
-	my $data = $target->[$TARGET_DATA];
-	my $major;
-	my $minor;
-
-	if ($type == $TARGET_TYPE_LINEAR) {
-		$major = $data->[$LINEAR_MAJOR];
-		$minor = $data->[$LINEAR_MINOR];
-	} elsif ($type == $TARGET_TYPE_MIRROR) {
-		# Use data of first device in list
-		my $mirror_data = $data->[0];
-		$major = $mirror_data->[$MIRROR_MAJOR];
-		$minor = $mirror_data->[$MIRROR_MINOR];
-	} elsif ($type == $TARGET_TYPE_MULTIPATH) {
-		# Use data of first device in list
-		my $multipath_data = $data->[0];
-		$major = $multipath_data->[$MULTIPATH_MAJOR];
-		$minor = $multipath_data->[$MULTIPATH_MINOR];
-	}
-	return ($major, $minor);
-}
-
-# create_temp_device_node(type, major, minor)
-# Returns the name of a temporary device node.
-sub create_temp_device_node($$$)
-{
-	my ($type, $major, $minor) = @_;
-	my $path = "/dev";
-	my $name;
-	my $num;
-
-	for ($num = 0; $num < 100; $num++) {
-		$name = sprintf("$path/zipl-dm-temp-%02d", $num);
-		if (-e $name) {
-			next;
-		}
-		if (system("$mknod $name $type $major $minor --mode 0600 ".
-			   "2>/dev/null")) {
-			next;
-		}
-		return $name;
-	}
-	die("Error: Could not create temporary device node in '$path'\n");
-}
-
-# get_blocksize(device)
-# # Return blocksize in bytes for device.
-sub get_blocksize($)
-{
-	my ($dev) = @_;
-	my $blocksize;
-	local *HANDLE;
-
-	open(HANDLE, "$blockdev --getss $dev 2>/dev/null|") or
-		return undef;
-	$blocksize = <HANDLE>;
-	chomp($blocksize);
-	close(HANDLE);
-
-	return $blocksize;
-}
-
-# get_dasd_info(device)
 # Returns (type, cylinders, heads, sectors)
-sub get_dasd_info($)
-{
-	my ($dev) = @_;
-	my $disk_type;
-	my $format;
-	my $cyl;
-	my $heads;
-	my $sectors;
-	my $type;
-	local *HANDLE;
+def get_dasd_info(device):
+    cylinder_match = re.compile(r'^number of cylinders.*\s(\d+)\s*$')
+    heads_match = re.compile(r'^tracks per cylinder.*\s(\d+)\s*$')
+    sectors_match = re.compile(r'^blocks per track.*\s(\d+)\s*$')
+    type_match = re.compile(r'^type\s+:\s+(\S+)\s*$')
+    format_match = re.compile(r'^format.*\s+dec\s(\d+)\s')
 
-	open(HANDLE, "$dasdview -x -f  $dev 2>/dev/null|") or
-		# dasdview returned with an error
-		return undef;
-	while (<HANDLE>) {
-		if (/^number of cylinders.*\s(\d+)\s*$/) {
-			$cyl = $1;
-		} elsif (/^tracks per cylinder.*\s(\d+)\s*$/) {
-			$heads = $1;
-		} elsif (/^blocks per track.*\s(\d+)\s*$/) {
-			$sectors = $1;
-		} elsif (/^type\s+:\s+(\S+)\s*$/) {
-			$disk_type = $1;
-		} elsif (/^format.*\s+dec\s(\d+)\s/) {
-			$format = $1;
-		}
-	}
-	close(HANDLE);
-	if (!defined($cyl) || !defined($heads) || !defined($sectors) ||
-	    !defined($disk_type) || !defined($format)) {
-		# Unrecognized dadsview output format
-		return undef;
-	}
-	if ($disk_type eq "FBA") {
-		$type = $DEV_TYPE_FBA;
-	} elsif ($disk_type eq "ECKD") {
-		if ($format == 1) {
-			$type = $DEV_TYPE_LDL;
-		} elsif ($format == 2) {
-			$type = $DEV_TYPE_CDL;
-		}
-	}
+    cyl, heads, sectors, disk_type, dformat = None, None, None, None, None
+    try:
+        res = run_proc(['dasdview', '-x', device])
+        for line in res.stdout.splitlines():
+            r = re.match(cylinder_match, line)
+            if r:
+                cyl = int(r.group(1))
+                continue
+            r = re.match(heads_match, line)
+            if r:
+                heads = int(r.group(1))
+                continue
+            r = re.match(sectors_match, line)
+            if r:
+                sectors = int(r.group(1))
+                continue
+            r = re.match(type_match, line)
+            if r:
+                disk_type = r.group(1)
+                continue
+            r = re.match(format_match, line)
+            if r:
+                dformat = int(r.group(1))
+                continue
+    except subprocess.CalledProcessError as e:
+        return None
 
-	return ($type, $cyl, $heads, $sectors);
-}
+    if None in [cyl, heads, sectors, disk_type, dformat]:
+        return None
 
-# get_partition_start(major, minor)
-# Return the partition offset of device.
-sub get_partition_start($$)
-{
-	my ($major, $minor) = @_;
-	my $dir = "/sys/dev/block/$major:$minor";
-	my $offset;
-	local *HANDLE;
+    if disk_type == "ECKD":
+        disk_type = "LDL" if dformat == 1 else "CDL"
 
-	return undef if (!-d $dir);
-
-	open(HANDLE, "<", "$dir/start") or return 0;
-	$offset = <HANDLE>;
-	close(HANDLE);
-
-	chomp($offset);
-
-	return $offset;
-}
-
-# is_dasd(type)
-# Return whether disk with type is a DASD.
-sub is_dasd($)
-{
-	my ($type) = @_;
-
-	return ($type == $DEV_TYPE_CDL) || ($type == $DEV_TYPE_LDL) ||
-	       ($type == $DEV_TYPE_FBA);
-}
-
-# get_partition_base(type, major, minor)
-# Return (major, minor) of the base device on which the partition is located.
-sub get_partition_base($$$)
-{
-	my ($type, $major, $minor) = @_;
-
-	if (is_dasd($type)) {
-		return ($major, $minor & ~$DASD_PARTN_MASK);
-	} else {
-		return ($major, $minor & ~$SCSI_PARTN_MASK);
-	}
-}
-
-# get_device_characteristics(major, minor)
-# Returns (type, blocksize, geometry, bootsectors, partstart) for device.
-sub get_device_characteristics($$)
-{
-	my ($major, $minor) = @_;
-	my $dev;
-	my $blocksize;
-	my $type;
-	my $cyl;
-	my $heads;
-	my $sectors;
-	my $geometry;
-	my $bootsectors;
-	my $partstart;
-
-	$dev = create_temp_device_node("b", $major, $minor);
-	$blocksize = get_blocksize($dev);
-	if (!defined($blocksize)) {
-		unlink($dev);
-		die("Error: Could not get block size for ".
-		    get_device_name($major, $minor)."\n");
-	}
-	($type, $cyl, $heads, $sectors) = get_dasd_info($dev);
-	if (defined($type)) {
-		$geometry = "$cyl,$heads,$sectors";
-		if ($type == $DEV_TYPE_CDL) {
-			# First track contains IPL records
-			$bootsectors = $blocksize * $sectors / $SECTOR_SIZE;
-		} elsif ($type == $DEV_TYPE_LDL) {
-			# First two blocks contain IPL records
-			$bootsectors = $blocksize * 2 / $SECTOR_SIZE;
-		} elsif ($type == $DEV_TYPE_FBA) {
-			# First block contains IPL records
-			$bootsectors = $blocksize / $SECTOR_SIZE;
-		}
-	} else {
-		# Assume SCSI if get_dasd_info failed
-		$type = $DEV_TYPE_SCSI;
-		# First block contains IPL records
-		$bootsectors = $blocksize / $SECTOR_SIZE;
-	}
-	$partstart = get_partition_start($major, $minor);
-	unlink($dev);
-	if (!defined($partstart)) {
-		die("Error: Could not determine partition start for ".
-		    get_device_name($major, $minor)."\n");
-	}
-	# Convert partition start in sectors to blocks
-	$partstart = $partstart / ($blocksize / $SECTOR_SIZE);
-	return ($type, $blocksize, $geometry, $bootsectors, $partstart);
-}
-
-# get_type_name(type)
-# Return textual representation of device type.
-sub get_type_name($)
-{
-	my ($type) = @_;
-
-	if ($type == $DEV_TYPE_CDL) {
-		return "CDL";
-	} elsif ($type == $DEV_TYPE_LDL) {
-		return "LDL";
-	} elsif ($type == $DEV_TYPE_FBA) {
-		return "FBA";
-	} elsif ($type == $DEV_TYPE_SCSI) {
-		return "SCSI";
-	}
-	return undef;
-}
+    return (disk_type, cyl, heads, sectors)
 
 
-# check_for_mirror(index, target_list)
-# Die if there is a mirror target between index and 0.
-sub check_for_mirror($@)
-{
-	my ($i, @target_list) = @_;
+def get_partition_start(major, minor):
+    ddir = '/sys/dev/block/{}:{}'.format(major, minor)
+    if not os.path.isdir(ddir):
+        die("Could not determine partition start for '%s'",
+            get_device_name(major, minor))
 
-	for (;$i >= 0; $i--) {
-		my $entry = $target_list[$i];
-		my ($major, $minor, $target) = @$entry;
+    try:
+        with open('{}/start'.format(ddir), 'r') as f:
+            return int(f.read())
+    except FileNotFoundError:
+        return 0
 
-		if ($target->[$TARGET_TYPE] == $TARGET_TYPE_MIRROR) {
-			# IPL records are not mirrored.
-			die("Error: Unsupported setup: Block 0 is not ".
-			    "mirrored in device '".
-			    get_device_name($major, $minor)."'\n");
-		}
-	}
-}
 
-# get_target_base(bottom_major, bottom_minor, start, length, target_list)
-# Return (major, minor) for the top most target in the target list that maps
-# the region on (bottom_major, bottom_minor) defined by start and length at
-# offset 0.
-sub get_target_base($$$$@)
-{
-	my ($bot_major, $bot_minor, $start, $length, @target_list) = @_;
-	my $entry;
-	my $top_major;
-	my $top_minor;
-	my $i;
+def is_dasd(ttype):
+    return ttype in ["CDL", "LDL", "FBA"]
 
-	# Pre-initialize with bottom major-minor
-	$top_major = $bot_major;
-	$top_minor = $bot_minor;
-	# Process all entries starting with the last one
-	for ($i = scalar(@target_list) - 1; $i >= 0; $i--) {
-		my $entry = $target_list[$i];
-		my ($major, $minor, $target) = @$entry;
 
-		if (($target->[$TARGET_START] != 0) ||
-		    (get_target_start($target) != 0) ||
-		    ($target->[$TARGET_LENGTH] < $length)) {
-			last;
-		}
-		$top_major = $major;
-		$top_minor = $minor;
-	}
-	# Check for mirrorring between base device and fs device.
-	check_for_mirror($i, @target_list);
-	return ($top_major, $top_minor);
-}
+# Return (major, minor) of the base device on which the partition is located
+def get_partition_base(dtype, major, minor):
+    return (major, minor & (~DASD_PARTN_MASK if is_dasd(dtype) else ~SCSI_PARTN_MASK))
 
-# get_device_name(major, minor)
-# Return the name of the device specified by major and minor.
-sub get_device_name($$)
-{
-	my ($major, $minor) = @_;
-	my $name;
-	local *HANDLE;
 
-	$name = "$major:$minor";
-	open(HANDLE, "</proc/partitions") or goto out;
-	while (<HANDLE>) {
-		if (/^\s*(\d+)\s+(\d+)\s+\d+\s+(\S+)\s*$/) {
-			if (($major == $1) && ($minor == $2)) {
-				$name = $3;
-				last;
-			}
-		}
-	}
-	close(HANDLE);
-out:
-	return $name;
-}
+def get_blocksize(device):
+    try:
+        # FIXME: replace this by proper system call
+        r = run_proc(['blockdev', '--getss', device])
+        return int(r.stdout)
+    except subprocess.CalledProcessError as e:
+        return None
 
-sub check_tools()
-{
-system("$dmsetup --version &> /dev/null") >> 8 != 127
-    or die("Error: dmsetup not found\n");
-system("$mknod --version &> /dev/null") >> 8 != 127
-    or die("Error: mknod not found\n");
-system("$dasdview --version &> /dev/null") >> 8 != 127
-    or die("Error: dasdview not found\n");
-system("$blockdev --version &> /dev/null") >> 8 != 127
-    or die("Error: blockdev not found\n");
 
-return 0;
-}
+def create_temp_device_node(dtype, major, minor):
+    for num in range(100):
+        name = '/dev/zipl-dm-temp-{:02d}'.format(num)
+        if os.path.exists(name):
+            continue
+        os.mknod(name, dtype|0o600, os.makedev(major, minor))
+        return name
+    die("Could not create temporary device node in '/dev'")
+
+
+# Return (type, blocksize, geometry, bootsectors, partstart) for device
+def get_device_characteristics(major, minor):
+    name = get_device_name(major, minor)
+    dev = create_temp_device_node(stat.S_IFBLK, major, minor)
+    try:
+        blocksize = get_blocksize(dev)
+        if blocksize is None:
+            die("Could not get block size for %s", name)
+        info = get_dasd_info(dev)
+        geometry = None
+        if info is not None:
+            dtype, cyl, heads, sectors = info
+            geometry = "{},{},{}".format(cyl,heads,sectors)
+            if dtype == "CDL":
+                bootsectors = blocksize * sectors / SECTOR_SIZE
+            elif dtype == "LDL":
+                bootsectors = blocksize * 2 / SECTOR_SIZE
+            elif dtype == "FBA":
+                # first block contains IPL records
+                bootsectors = blocksize / SECTOR_SIZE
+        else: # assume SCSI if get_dasd_info failed
+            dtype = "SCSI"
+            # first block contains IPL records
+            bootsectors = blocksize / SECTOR_SIZE
+    except:
+        raise
+    finally:
+        os.remove(dev)
+
+    partstart = get_partition_start(major, minor)
+    # Convert partition start in sectors to blocks
+    partstart = partstart / (blocksize / SECTOR_SIZE)
+    return (dtype, blocksize, geometry, bootsectors, partstart)
+
+
+def check_tools():
+    try:
+        return sum(map(attrgetter('returncode'),
+                    map(subprocess.run, ([c, '--version'] for c in tools)))) == 0
+    except:
+        return False
+
+
+# Return (major, minor) for the topmost target in the target list that maps the
+# region on (bottom_major, bottom_minor) defined by start and length at offset 0
+def get_target_base(bot_major, bot_minor, start, length, target_list):
+    top_major, top_minor = bot_major, bot_minor
+    for idx, tgt in zip(range(len(target_list)-1, -1, -1), reversed(target_list)):
+        major, minor, target = tgt
+        if (target.start != 0) or (get_target_start(target) != 0) or \
+            (target.length < length):
+            # Check for mirrorring between base device and fs device
+            mirror = [t for t in target_list[:idx] if t[2].type == "mirror"]
+            if len(mirror) > 0:
+                major, minor, _ = mirror[0]
+                die(UNSUPPORTED_BLOCK_MSG, get_device_name(major, minor))
+            return top_major, top_minor
+        top_major, top_minor = major, minor
+    return top_major, top_minor
+
+
+if __name__ == '__main__':
+    # Setup and use a standard locale to avoid localized scripting output
+    locale.setlocale(locale.LC_ALL, 'C')
+
+    toolname=sys.argv[0]
+
+    if toolname == "chreipl_helper.device-mapper":
+        if len(sys.argv) <= 1:
+            die("Usage: %s <major:minor of target device>", toolname)
+        r = re.match(r'^\s*(\d+)\s*:\s*(\d+)\s*$', sys.argv[1])
+        if not r:
+            die("Usage: %s <major:minor of target device>", toolname)
+        major, minor = int(r.group(1)), int(r.group(2))
+        phy_maj, phy_min, _, _ = get_physical_device(major, minor)
+        print("{}:{}".format(phy_maj, phy_min))
+        sys.exit(0)
+
+    if len(sys.argv) <= 1:
+        die("Usage: %s <target dir> or <maj:min of target device>", toolname)
+
+    check_tools()
+
+    r = re.match(r'^\s*(\d+)\s*:\s*(\d+)\s*$', sys.argv[1])
+    if r:
+        major, minor = int(r.group(1)), int(r.group(2))
+        phy_maj, phy_min, phy_offset, target_list = \
+                get_physical_device(major, minor)
+    else:
+        phy_maj, phy_min, phy_offset, target_list = \
+                get_physical_device_dir(sys.argv[1])
+
+    phy_type, phy_blksize, phy_geometry, phy_bootsectors, phy_partstart = \
+            get_device_characteristics(phy_maj, phy_min)
+
+    if phy_partstart > 0:
+        # Only the partition of the physical device is mapped so only the
+        # physical device can provide access to the boot record
+        base_major, base_minor = \
+                get_partition_base(phy_type, phy_maj, phy_min)
+        # Check for mirror
+        mirror = [t for t in target_list if t[2].type == "mirror"]
+        if len(mirror) > 0:
+            major, minor, _ = mirror[0]
+            die(UNSUPPORTED_BLOCK_MSG, get_device_name(major, minor))
+        # Adjust filesystem offset
+        phy_offset += phy_partstart * (phy_blksize / SECTOR_SIZE)
+        phy_partstart = 0
+        # Update device geometry
+        _, _, phy_geometry, _, _ = \
+                get_device_characteristics(base_major, base_minor)
+    else:
+        # All of the device is mapped, so the base device is the top most dm
+        # device which provides access to boot sectors
+        base_major, base_minor = \
+                get_target_base(phy_maj, phy_min, 0, phy_bootsectors, target_list)
+
+    # Check for valid offset of filesystem
+    if ((phy_offset % (phy_blksize / SECTOR_SIZE)) != 0):
+        die("Filesystem not aligned on physical block size")
+
+    # Print resulting information
+    print("targetbase={}:{}".format(base_major, base_minor))
+    print("targettype={}".format(phy_type))
+    if phy_geometry:
+        print("targetgeometry={}".format(phy_geometry))
+    print("targetblocksize={}".format(phy_blksize))
+    print("targetoffset={}".format(int(phy_offset / (phy_blksize / SECTOR_SIZE))))
