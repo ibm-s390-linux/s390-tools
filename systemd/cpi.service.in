@@ -38,3 +38,6 @@ EnvironmentFile=/etc/sysconfig/cpi
 #
 # Sending data to the HMC/SE
 ExecStart=@toolslib_path@/cpictl -e
+
+[Install]
+WantedBy=multi-user.target
