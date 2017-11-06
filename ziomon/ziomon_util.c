@@ -1009,7 +1009,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 
 	if (argc <= 1) {
 		print_help();
-		return 1;
+		return -1;
 	}
 
 	/* this is too much, but argc/2 is a reliable upper boundary
@@ -1296,6 +1296,7 @@ int main(int argc, char **argv)
 	struct timeval	       		first_interval;
 	struct ioerr_wrp	       *ioerr = NULL;
 	int				rc = 0;
+	int				parse_params_rc;
 
 	verbose = 0;
 	keep_running = 1;
@@ -1304,8 +1305,12 @@ int main(int argc, char **argv)
 
 	init_opts(&opts);
 
-	if (parse_params(argc, argv, &opts)) {
+	parse_params_rc = parse_params(argc, argv, &opts);
+	if (parse_params_rc < 0) {
 		rc = -1;
+		goto out2;
+	} else if (parse_params_rc > 0) {
+		rc = 0;
 		goto out2;
 	}
 
