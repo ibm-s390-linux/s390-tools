@@ -15,7 +15,7 @@ SYSTOOLS = ttyrun
 
 all: $(PROGRAMS) $(SYSTOOLS)
 check:
-install:
+install: all
 	for prg in $(PROGRAMS); do \
 	  $(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 $$prg $(DESTDIR)$(USRBINDIR) ; \
 	done
