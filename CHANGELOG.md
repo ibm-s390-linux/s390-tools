@@ -1,11 +1,11 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.1.2 (2017-10-20)__
+* __v2.1.2 (2017-11-06)__
 
   Bug fixes:
   - vmur: Correct short option for print/punch device
-  - vmur: Correct "punch E spooled cont" for print verb
+  - vmur: Correct "punch E spooled cont" error message for print verb
      
   Changes to existing tools:
   - vmur: Serialize based on device number used
