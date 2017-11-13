@@ -3,6 +3,9 @@ Release history for s390-tools (MIT version)
 
 * __v2.1.1 (2017-mm-dd)__
 
+  Removed tools:
+  - lsmem/chmem: Moved to util-linux >= 2.30
+
   Changes of existing tools:
   - lszcrypt: Add CEX6S exploitation
 

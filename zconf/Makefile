@@ -4,9 +4,9 @@
 include ../common.mak
 
 SCRIPTS	= lsdasd lstape chccwdev lszfcp cio_ignore znetconf dasdstat
-USRSBIN_SCRIPTS = lsmem chmem lsluns
+USRSBIN_SCRIPTS = lsluns
 MANPAGES= lsdasd.8 lstape.8 chccwdev.8 lszfcp.8 lsluns.8 \
-	  cio_ignore.8 znetconf.8 chmem.8 lsmem.8 dasdstat.8
+	  cio_ignore.8 znetconf.8 dasdstat.8
 
 SUB_DIRS = zcrypt scm chp css qeth
 

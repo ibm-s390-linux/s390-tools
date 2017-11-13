@@ -131,8 +131,6 @@ Package contents
    - znetconf:   List and configure network devices for s390 network adapters.
    - cio_ignore: Query and modify the contents of the CIO device driver
                  blacklist.
-   - lsmem:      Display the online status of the available memory.
-   - chmem:      Set hotplug memory online or offline.
    - dasdstat:   Configure and format the debugfs based DASD statistics data.
 
  * zkey:
