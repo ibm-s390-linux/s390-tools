@@ -375,7 +375,8 @@ CMDS="uname -a\
   :runlevel\
   :iptables -L\
   :ulimit -a\
-  :ps -eo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
+  :ps -emo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
+  :ps -eHo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
   :ps axX\
   :dmesg -s 1048576\
   :last\
