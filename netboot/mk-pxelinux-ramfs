@@ -364,9 +364,9 @@ then
 fi
 
 # Simple config file parsing, only one entry allowed
-kernel=$(/bin/grep "^[[:space:]]*kernel" /tmp/config | sed "s/^[[:space:]]*kernel[[:space:]]*//")
-initrd=$(/bin/grep "^[[:space:]]*initrd" /tmp/config | sed "s/^[[:space:]]*initrd[[:space:]]*//")
-append=$(/bin/grep "^[[:space:]]*append" /tmp/config | sed "s/^[[:space:]]*append[[:space:]]*//")
+kernel=$(/bin/grep -i "^[[:space:]]*kernel" /tmp/config | sed "s/^[[:space:]]*kernel[[:space:]]*//I")
+initrd=$(/bin/grep -i "^[[:space:]]*initrd" /tmp/config | sed "s/^[[:space:]]*initrd[[:space:]]*//I")
+append=$(/bin/grep -i "^[[:space:]]*append" /tmp/config | sed "s/^[[:space:]]*append[[:space:]]*//I")
 
 if [ -z "$kernel" ]
 then
