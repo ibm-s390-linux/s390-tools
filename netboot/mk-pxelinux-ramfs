@@ -386,15 +386,13 @@ else
     INITRD=""
 fi
 
-if [ -n "$append" ]
-then
-    APPEND="--append=$append"
+if [ -z "$append" ]; then
+    echo "Kexec load: kexec -l /tmp/kernel $INITRD"
+    kexec -l /tmp/kernel $INITRD
 else
-    APPEND=""
+    echo "Kexec load: kexec -l /tmp/kernel $INITRD --append=\"$append\""
+    kexec -l /tmp/kernel $INITRD --append="$append"
 fi
-
-echo "Kexec load: kexec -l /tmp/kernel $INITRD $APPEND"
-kexec -l /tmp/kernel $INITRD $APPEND
 kexec -e
 EOF
 # -- end pxeboot script
