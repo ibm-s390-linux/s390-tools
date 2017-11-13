@@ -164,7 +164,6 @@ echo "$cmd: Making init script"
 # --- begin init script
 cat <<'EOF' > $builddir/init
 #!/bin/sh
-script="/sbin/pxeboot.script"
 /bin/mount -t devtmpfs none /dev
 /bin/mount -t proc none /proc
 /bin/mount -t sysfs none /sys
@@ -173,12 +172,7 @@ script="/sbin/pxeboot.script"
 /sbin/modprobe virtio_net
 /sbin/udhcpc -O pxeconffile -O pxepathprefix &
 
-while true
-do
-	${script}
-	/bin/sleep 1
-	echo "retry ${script}"
-done
+/sbin/pxeboot.script
 EOF
 # --- end init script
 chmod +x $builddir/init
@@ -305,16 +299,26 @@ cat <<'EOF' > $builddir/sbin/pxeboot.script
 
 set -e
 
+# Check if a valid pxe conf is available
+# so far a non configurable 600 sec timeout
+PXE_CONF=/etc/pxe.conf
+TIMEOUT=600
+WAITED=0
+echo "waiting for pxe config from DHCP (max $TIMEOUT sec)"
+while [ ! -f $PXE_CONF ]
+do
+    sleep 1
+    WAITED=$(($WAITED + 1))
+    if [ $WAITED -gt $TIMEOUT ]
+    then
+        echo Error waiting for PXE configuration from DHCP
+        exit
+    fi
+done
+
 # Source the DHCP-generated TFTP info
 # Currently we are just looking for siaddr
-PXE_CONF=/etc/pxe.conf
-if [ -f  $PXE_CONF ]
-then
-    . $PXE_CONF
-else
-    echo waiting for PXE configuration from DHCP
-    exit
-fi
+. $PXE_CONF
 
 # Retrieve the config (default only for now)
 CONFIGS=""
