@@ -27,7 +27,7 @@
 #define	PATH_PROC		"/proc"
 
 #define PATH_UDEVADM		"udevadm"
-#define PATH_VMCP		"/usr/sbin/vmcp"
+#define PATH_VMCP		TOOLS_BINDIR "/vmcp"
 #define PATH_IP			"ip"
 
 #define PATH_ROOT		"/"
