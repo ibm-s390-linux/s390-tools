@@ -164,6 +164,7 @@ echo "$cmd: Making init script"
 # --- begin init script
 cat <<'EOF' > $builddir/init
 #!/bin/sh
+script="/sbin/pxeboot.script"
 /bin/mount -t devtmpfs none /dev
 /bin/mount -t proc none /proc
 /bin/mount -t sysfs none /sys
@@ -174,8 +175,9 @@ cat <<'EOF' > $builddir/init
 
 while true
 do
-	/sbin/pxeboot.script
+	${script}
 	/bin/sleep 1
+	echo "retry ${script}"
 done
 EOF
 # --- end init script
@@ -310,7 +312,7 @@ if [ -f  $PXE_CONF ]
 then
     . $PXE_CONF
 else
-    echo waiting for PXE configuration
+    echo waiting for PXE configuration from DHCP
     exit
 fi
 
@@ -347,6 +349,7 @@ then
     set +e
     for c in $CONFIGS
     do
+	echo "fetching config pxelinux.cfg/$c from $siaddr"
 	if /usr/bin/tftp -g -l /tmp/config -r pxelinux.cfg/$c $siaddr
 	then
 	    break
@@ -370,11 +373,13 @@ then
     echo no kernel statement found in config
     exit
 else
+    echo fetch kernel $kernel from $siaddr
     /usr/bin/tftp -g -l /tmp/kernel -r $kernel $siaddr
 fi
 
 if [ -n "$initrd" ]
 then
+    echo fetch initrd $initrd from $siaddr
     /usr/bin/tftp -g -l /tmp/initrd -r $initrd $siaddr
     INITRD="--initrd=/tmp/initrd"
 else
@@ -388,6 +393,7 @@ else
     APPEND=""
 fi
 
+echo "Kexec load: kexec -l /tmp/kernel $INITRD $APPEND"
 kexec -l /tmp/kernel $INITRD $APPEND
 kexec -e
 EOF
