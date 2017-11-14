@@ -172,11 +172,7 @@ cat <<'EOF' > $builddir/init
 /sbin/modprobe virtio_net
 /sbin/udhcpc -O pxeconffile -O pxepathprefix &
 
-while true
-do
-	/sbin/pxeboot.script
-	/bin/sleep 1
-done
+/sbin/pxeboot.script
 EOF
 # --- end init script
 chmod +x $builddir/init
@@ -303,16 +299,26 @@ cat <<'EOF' > $builddir/sbin/pxeboot.script
 
 set -e
 
+# Check if a valid pxe conf is available
+# so far a non configurable 600 sec timeout
+PXE_CONF=/etc/pxe.conf
+TIMEOUT=600
+WAITED=0
+echo "waiting for pxe config from DHCP (max $TIMEOUT sec)"
+while [ ! -f $PXE_CONF ]
+do
+    sleep 1
+    WAITED=$(($WAITED + 1))
+    if [ $WAITED -gt $TIMEOUT ]
+    then
+        echo Error waiting for PXE configuration from DHCP
+        exit
+    fi
+done
+
 # Source the DHCP-generated TFTP info
 # Currently we are just looking for siaddr
-PXE_CONF=/etc/pxe.conf
-if [ -f  $PXE_CONF ]
-then
-    . $PXE_CONF
-else
-    echo waiting for PXE configuration
-    exit
-fi
+. $PXE_CONF
 
 # Retrieve the config (default only for now)
 CONFIGS=""
@@ -347,6 +353,7 @@ then
     set +e
     for c in $CONFIGS
     do
+	echo "fetching config pxelinux.cfg/$c from $siaddr"
 	if /usr/bin/tftp -g -l /tmp/config -r pxelinux.cfg/$c $siaddr
 	then
 	    break
@@ -361,34 +368,35 @@ then
 fi
 
 # Simple config file parsing, only one entry allowed
-kernel=$(/bin/grep "^[[:space:]]*kernel" /tmp/config | sed "s/^[[:space:]]*kernel[[:space:]]*//")
-initrd=$(/bin/grep "^[[:space:]]*initrd" /tmp/config | sed "s/^[[:space:]]*initrd[[:space:]]*//")
-append=$(/bin/grep "^[[:space:]]*append" /tmp/config | sed "s/^[[:space:]]*append[[:space:]]*//")
+kernel=$(/bin/grep -i "^[[:space:]]*kernel" /tmp/config | sed "s/^[[:space:]]*kernel[[:space:]]*//I")
+initrd=$(/bin/grep -i "^[[:space:]]*initrd" /tmp/config | sed "s/^[[:space:]]*initrd[[:space:]]*//I")
+append=$(/bin/grep -i "^[[:space:]]*append" /tmp/config | sed "s/^[[:space:]]*append[[:space:]]*//I")
 
 if [ -z "$kernel" ]
 then
     echo no kernel statement found in config
     exit
 else
+    echo fetch kernel $kernel from $siaddr
     /usr/bin/tftp -g -l /tmp/kernel -r $kernel $siaddr
 fi
 
 if [ -n "$initrd" ]
 then
+    echo fetch initrd $initrd from $siaddr
     /usr/bin/tftp -g -l /tmp/initrd -r $initrd $siaddr
     INITRD="--initrd=/tmp/initrd"
 else
     INITRD=""
 fi
 
-if [ -n "$append" ]
-then
-    APPEND="--append=$append"
+if [ -z "$append" ]; then
+    echo "Kexec load: kexec -l /tmp/kernel $INITRD"
+    kexec -l /tmp/kernel $INITRD
 else
-    APPEND=""
+    echo "Kexec load: kexec -l /tmp/kernel $INITRD --append=\"$append\""
+    kexec -l /tmp/kernel $INITRD --append="$append"
 fi
-
-kexec -l /tmp/kernel $INITRD $APPEND
 kexec -e
 EOF
 # -- end pxeboot script
