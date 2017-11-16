@@ -12,6 +12,7 @@ Release history for s390-tools (MIT version)
   Bug Fixes:
   - lsluns: Do not scan (all) if filters match nothing
   - lsluns: Enhance usage statement and man page
+  - ziomon: Re-add missing line in ziomon_fcpconf
 
 * __v2.1.0 (2017-09-25)__
 

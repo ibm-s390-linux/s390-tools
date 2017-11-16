@@ -58,6 +58,7 @@ sub store_mapper_devices
 	my $src_dir = shift();
 	my @entries = grep { ! /^\./ } dir_content($src_dir);
 
+	foreach my $map_dev (@entries) {
 		my $tf = catfile($src_dir, "$map_dev");
 		my $mm = `stat -L -c%t:%T $tf`;
 		chomp($mm);
