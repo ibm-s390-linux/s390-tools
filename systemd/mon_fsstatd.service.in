@@ -18,7 +18,7 @@ After=remote-fs.target
 # Specify a file with the environment variables using the EnvironmentFile=
 # service property.
 #
-EnvironmentFile=/etc/sysconfig/mon_fsstatd
+EnvironmentFile=@sysconf_path@/sysconfig/mon_fsstatd
 #
 # Alternatively, you can specify the environment variables directly,
 # using the Environment= service property, which can be overridden by

@@ -19,7 +19,7 @@ Type=oneshot
 # Specify a file with the environment variables using the EnvironmentFile=
 # service property.
 #
-EnvironmentFile=/etc/sysconfig/cpi
+EnvironmentFile=@sysconf_path@/sysconfig/cpi
 #
 # Alternatively, you can specify the environment variables directly,
 # using the Environment= service properties, which can be overridden by

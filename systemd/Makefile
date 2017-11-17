@@ -35,10 +35,12 @@ clean:
 	real_usrbin_dir=$(USRBINDIR); \
 	real_usrsbin_dir=$(USRSBINDIR); \
 	real_toolslib_dir=$(TOOLS_LIBDIR); \
+	real_sysconf_dir=$(SYSCONFDIR); \
 	$(SED) -e "s#@bin_path@#$$real_bin_dir#g" \
 	       -e "s#@usrbin_path@#$$real_usrbin_dir#g" \
 	       -e "s#@usrsbin_path@#$$real_usrsbin_dir#g" \
 	       -e "s#@toolslib_path@#$$real_toolslib_dir#g" \
+	       -e "s#@sysconf_path@#$$real_sysconf_dir#g" \
 	       -e 's#@S390_TOOLS_RELEASE@#$(S390_TOOLS_RELEASE)#g' \
 	< $< > $@
 
