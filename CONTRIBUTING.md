@@ -54,12 +54,5 @@ Submitting code
 ---------------
 The preferred way is to create a github pull request for your code.
 
-Coding guidelines
------------------
-For s390-tools the preferred language is C. We provide libraries, e.g. libutil
-that should be used by all tools if possible.
-
-The coding style is based on the Linux kernel guidelines. Therefore, use
-the checkpatch tool [1] for verification before you submit a patch.
-
-[1] https://github.com/torvalds/linux/blob/master/scripts/checkpatch.pl
+Before you submit your code please consider our recommendations in the
+[CODINGSTYLE](CODINGSTYLE.md) document.

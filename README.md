@@ -11,6 +11,7 @@ The package also contains the following files:
  * [LICENSE](LICENSE): The MIT license that applies to this package
  * [CHANGELOG](CHANGELOG.md): The history of s390-tools versions
  * [AUTHORS](AUTHORS.md): A list of all authors of the s390-tools package
+ * [CODINGSTYLE](CODINGSTYLE.md): Recommendations for writing s390-tools code
 
 Package contents
 ----------------
