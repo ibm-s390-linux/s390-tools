@@ -90,17 +90,18 @@ static void fsstatd_open_monwriter(void)
 /*
  * Store daemon's pid so it can be stopped
  */
-static void store_pid(void)
+static int store_pid(void)
 {
 	FILE *f = fopen(pid_file, "w");
 
 	if (!f) {
 		syslog(LOG_ERR, "cannot open pid file %s: %s", pid_file,
 		       strerror(errno));
-		exit(1);
+		return -1;
 	}
 	fprintf(f, "%d\n", getpid());
 	fclose(f);
+	return 0;
 }
 
 /*
@@ -244,7 +245,13 @@ static void fsstatd_write_ent(struct mntent *ent, time_t curr_time,
  */
 static void fsstatd_daemonize(void)
 {
+	int pipe_fds[2], startup_rc = 1;
 	pid_t pid;
+
+	if (pipe(pipe_fds) == -1) {
+		syslog(LOG_ERR, "pipe error: %s\n", strerror(errno));
+		exit(1);
+	}
 
 	/* Fork off the parent process */
 	pid = fork();
@@ -252,33 +259,50 @@ static void fsstatd_daemonize(void)
 		syslog(LOG_ERR, "fork error: %s\n", strerror(errno));
 		exit(1);
 	}
-	if (pid > 0)
-		exit(0);
+	if (pid > 0) {
+		/* Wait for startup return code from daemon */
+		if (read(pipe_fds[0], &startup_rc, sizeof(startup_rc)) == -1)
+			syslog(LOG_ERR, "pipe read error: %s\n", strerror(errno));
+		/* With startup_rc == 0, pid file was written at this point */
+		exit(startup_rc);
+	}
 
 	/* Change the file mode mask */
 	umask(0);
 
-	/* Store daemon pid */
-	store_pid();
 	/* Catch SIGINT and SIGTERM to clean up pid file on exit */
 	fsstatd_handle_signals();
 
 	/* Create a new SID for the child process */
 	if (setsid() < 0) {
 		syslog(LOG_ERR, "setsid error: %s\n",  strerror(errno));
-		exit(1);
+		goto notify_parent;
 	}
 
 	/* Change the current working directory */
 	if (chdir("/") < 0) {
 		syslog(LOG_ERR, "chdir error: %s\n",  strerror(errno));
-		exit(1);
+		goto notify_parent;
 	}
 
 	/* Close out the standard file descriptors */
 	close(STDIN_FILENO);
 	close(STDOUT_FILENO);
 	close(STDERR_FILENO);
+
+	/* Store daemon pid */
+	if (store_pid() < 0)
+		goto notify_parent;
+	startup_rc = 0;
+
+notify_parent:
+	/* Inform waiting parent about startup return code */
+	if (write(pipe_fds[1], &startup_rc, sizeof(startup_rc)) == -1) {
+		syslog(LOG_ERR, "pipe write error: %s\n", strerror(errno));
+		exit(1);
+	}
+	if (startup_rc != 0)
+		exit(startup_rc);
 }
 
 static int fsstatd_do_work(void)

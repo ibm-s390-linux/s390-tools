@@ -30,10 +30,11 @@ EnvironmentFile=@sysconf_path@/sysconfig/mon_fsstatd
 
 ExecStartPre=-/sbin/modprobe monwriter
 ExecStartPre=/sbin/udevadm settle --timeout=10
-ExecStart=@usrsbin_path@/mon_fsstatd -a -i $FSSTAT_INTERVAL
+ExecStart=@usrsbin_path@/mon_fsstatd -i $FSSTAT_INTERVAL
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
-Type=simple
+Type=forking
+PIDFile=/var/run/mon_fsstatd.pid
 
 [Install]
 WantedBy=multi-user.target
