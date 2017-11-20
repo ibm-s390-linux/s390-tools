@@ -13,10 +13,11 @@ Documentation=man:cpuplugd(8) man:cpuplugd.conf(5)
 After=remote-fs.target
 
 [Service]
-ExecStart=@usrsbin_path@/cpuplugd -f -c @sysconf_path@/cpuplugd.conf
+ExecStart=@usrsbin_path@/cpuplugd -c @sysconf_path@/cpuplugd.conf
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
-Type=simple
+Type=forking
+PIDFile=/var/run/cpuplugd.pid
 
 [Install]
 WantedBy=multi-user.target

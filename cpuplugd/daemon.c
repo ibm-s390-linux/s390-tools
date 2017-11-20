@@ -9,6 +9,10 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "cpuplugd.h"
 
 const char *name = NAME;
@@ -49,7 +53,7 @@ void print_version()
 /*
  * Store daemon's pid so it can be stopped
  */
-void store_pid(void)
+static int store_pid(void)
 {
 	FILE *filp;
 
@@ -57,10 +61,62 @@ void store_pid(void)
 	if (!filp) {
 		cpuplugd_error("cannot open pid file %s: %s\n", pid_file,
 			       strerror(errno));
-		exit(1);
+		return -1;
 	}
 	fprintf(filp, "%d\n", getpid());
 	fclose(filp);
+	return 0;
+}
+
+/*
+ * Run daemon in background and write pid file
+ */
+int daemonize(void)
+{
+	int fd, pipe_fds[2], startup_rc = 1;
+	pid_t pid;
+
+	if (pipe(pipe_fds) == -1) {
+		cpuplugd_error("cannot create pipe\n");
+		return -1;
+	}
+	pid = fork();
+	if (pid < 0)
+		goto close_pipe;
+	if (pid != 0) {
+		/* Wait for startup return code from daemon */
+		if (read(pipe_fds[0], &startup_rc, sizeof(startup_rc)) == -1)
+			cpuplugd_error("cannot read from pipe\n");
+		/* On success daemon has written pid file at this point */
+		exit(startup_rc);
+	}
+	/* Create new session */
+	if (setsid() < 0)
+		goto notify_parent;
+	/* Redirect stdin/out/err to /dev/null */
+	fd = open("/dev/null", O_RDWR, 0);
+	if (fd == -1)
+		goto notify_parent;
+	if (dup2(fd, STDIN_FILENO) < 0)
+		goto notify_parent;
+	if (dup2(fd, STDOUT_FILENO) < 0)
+		goto notify_parent;
+	if (dup2(fd, STDERR_FILENO) < 0)
+		goto notify_parent;
+	/* Create pid file */
+	if (store_pid() < 0)
+		goto notify_parent;
+	startup_rc = 0;
+notify_parent:
+	/* Inform waiting parent about startup return code */
+	if (write(pipe_fds[1], &startup_rc, sizeof(startup_rc)) == -1) {
+		cpuplugd_error("cannot write to pipe\n");
+		startup_rc = 1;
+	}
+close_pipe:
+	close(pipe_fds[0]);
+	close(pipe_fds[1]);
+	return startup_rc ? -1 : 0;
 }
 
 /*

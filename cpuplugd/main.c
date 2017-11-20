@@ -418,13 +418,11 @@ int main(int argc, char *argv[])
 	check_config();
 
 	if (!foreground) {
-		rc = daemon(1, 0);
+		rc = daemonize();
 		if (rc < 0)
 			cpuplugd_exit("Detach from terminal failed: %s\n",
 				      strerror(errno));
 	}
-	/* Store daemon pid */
-	store_pid();
 	/* Unlock lock file */
 	flock(fd, LOCK_UN);
 	close(fd);
