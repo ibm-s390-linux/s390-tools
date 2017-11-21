@@ -52,7 +52,7 @@ Please use your real name (no pseudonyms or anonymous contributions).
 
 Submitting code
 ---------------
-The preferred way is to create a github pull request for your code.
+The preferred way is to create a GitHub pull request for your code.
 
 Before you submit your code please consider our recommendations in the
 [CODINGSTYLE](CODINGSTYLE.md) document.
