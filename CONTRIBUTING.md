@@ -42,13 +42,15 @@ Developer's Certificate of Origin 1.1
            this project or the open source license(s) involved.
 ```
 
-If you can certify the above, just add a line saying:
+If you can certify the above, just add a line stating the following at the
+bottom of each of your commit messages:
 
 ```
 Signed-off-by: Random Developer <random@developer.example.org>
 ```
 
-Please use your real name (no pseudonyms or anonymous contributions).
+Please use your real name and a valid e-mail address (no pseudonyms or anonymous
+contributions).
 
 Submitting code
 ---------------
