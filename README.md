@@ -256,14 +256,14 @@ HAVE_FUSE=0`".
 The following table provides an overview of the used libraries and
 build options:
 
-| __LIBRARY__    |__BUILD OPTION__| __TOOLS__                             |
-|----------------|:--------------:|:-------------------------------------:|
-| fuse           | `HAVE_FUSE`    | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump |
-| zlib           | `HAVE_ZLIB`    | zgetdump, dump2tar                    |
-| ncurses        | `HAVE_NCURSES` | hyptop                                |
-| pfm            | `HAVE_PFM`     | cpacfstats                            |
-| net-snmp       | `HAVE_SNMP`    | osasnmpd                              |
-| glibc-static   | `n/a`          | zfcpdump                              |
+| __LIBRARY__    | __BUILD OPTION__   | __TOOLS__                             |
+|----------------|:------------------:|:-------------------------------------:|
+| fuse           | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump |
+| zlib           | `HAVE_ZLIB`        | zgetdump, dump2tar                    |
+| ncurses        | `HAVE_NCURSES`     | hyptop                                |
+| pfm            | `HAVE_PFM`         | cpacfstats                            |
+| net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
+| glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 
 This table lists additional build or install options:
 

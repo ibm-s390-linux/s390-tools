@@ -2,7 +2,25 @@ include ../common.mak
 
 CPIOINIT  = $(call echocmd,"  CPIOINI ",/$@)./cpioinit
 
-all: $(ZFCPDUMP_PART_RD)
+ifeq (${HAVE_LIBC_STATIC},0)
+
+all:
+	$(SKIP) HAVE_LIBC_STATIC=0
+
+install:
+	$(SKIP) HAVE_LIBC_STATIC=0
+
+else
+
+check_dep:
+	$(call check_dep, \
+		"zfcpdump", \
+		"stdio.h", \
+		"glibc-static or libc-dev", \
+		"HAVE_LIBC_STATIC=0", \
+		"-static")
+
+all: check_dep $(ZFCPDUMP_PART_RD)
 
 cpioinit: cpioinit.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
@@ -19,7 +37,9 @@ $(ZFCPDUMP_PART_RD): cpioinit zfcpdump_part
 install: all
 	$(INSTALL) -m 611 $(ZFCPDUMP_PART_RD) $(DESTDIR)$(ZFCPDUMP_DIR)
 
+endif
+
 clean:
 	rm -f *.o *.gz *.tmp *~ zfcpdump_part cpioinit $(ZFCPDUMP_PART_RD)
 
-.PHONY: all clean install
+.PHONY: all clean install check_dep
