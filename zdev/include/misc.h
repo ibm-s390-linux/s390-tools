@@ -157,10 +157,6 @@ char *misc_asprintf(const char *, ...);
 int misc_system(err_t, const char *, ...);
 bool misc_read_dir(const char *, struct util_list *,
 		       bool (*)(const char *, void *), void *);
-bool path_exists(const char *);
-bool file_exists(const char *);
-bool file_writable(const char *);
-bool dir_exists(const char *);
 bool file_is_devnode(const char *);
 exit_code_t remove_file(const char *);
 char *misc_read_text_file(const char *, int, err_t);

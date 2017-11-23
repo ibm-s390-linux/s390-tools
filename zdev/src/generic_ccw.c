@@ -9,6 +9,8 @@
 
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "ccw.h"
 #include "ccwgroup.h"
@@ -162,7 +164,7 @@ static void generic_ccw_st_add_devnodes(struct subtype *st, const char *id,
 	cb_data.devnodes = devnodes;
 	cb_data.id = id;
 	path = path_get_sys_dev_char_devices();
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, add_cb, &cb_data);
 	free(path);
 }

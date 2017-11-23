@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "misc.h"
 #include "path.h"
 #include "scsi.h"
@@ -253,7 +255,7 @@ static struct util_list *read_scsi_zfcp_list(void)
 
 	list = ptrlist_new();
 	path = path_get_sys_bus_dev("scsi", NULL);
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, add_ids_cb, list);
 	free(path);
 

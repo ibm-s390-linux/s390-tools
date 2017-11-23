@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "ccw.h"
 #include "device.h"
@@ -430,7 +432,7 @@ static exit_code_t zfcp_lun_st_read_active(struct subtype *st,
 
 	/* Check for FC unit. */
 	fc_path = path_get_zfcp_lun_dev(dev->devid);
-	fc_exists = path_exists(fc_path);
+	fc_exists = util_path_exists(fc_path);
 	free(fc_path);
 
 	/* Check for SCSI device. */
@@ -478,7 +480,7 @@ static exit_code_t zfcp_lun_add(struct device *dev)
 	/* Check if LUN already exists. */
 	fcp_dev_id = ccw_devid_to_str(&devid->fcp_dev);
 	lunpath = path_get_zfcp_lun_dev(devid);
-	if (dir_exists(lunpath)) {
+	if (util_path_is_dir(lunpath)) {
 		hctl = scsi_hctl_from_zfcp_lun_devid(devid);
 		if (!hctl)
 			goto check_failed;
@@ -486,7 +488,7 @@ static exit_code_t zfcp_lun_add(struct device *dev)
 	}
 
 	portpath = path_get_zfcp_port_dev(devid);
-	if (!dir_exists(portpath)) {
+	if (!util_path_is_dir(portpath)) {
 		delayed_err("Target port not found\n");
 		rc = EXIT_ZFCP_WWPN_NOT_FOUND;
 		goto out;
@@ -681,14 +683,14 @@ static exit_code_t zfcp_lun_st_device_undefine(struct subtype *st,
 
 remove_lun:
 	path = path_get_zfcp_lun_dev(devid);
-	if (!path_exists(path))
+	if (!util_path_exists(path))
 		goto out;
 	free(path);
 	path = NULL;
 
 	/* Remove FCP LUN. */
 	devpath = path_get_zfcp_port_dev(devid);
-	if (!dir_exists(devpath)) {
+	if (!util_path_is_dir(devpath)) {
 		rc = EXIT_ZFCP_WWPN_NOT_FOUND;
 		goto out;
 	}
@@ -779,7 +781,7 @@ static bool zfcp_lun_fc_lun_exists(const char *id)
 	if (zfcp_lun_parse_devid(&devid, id, err_ignore) != EXIT_OK)
 		return false;
 	path = path_get_zfcp_lun_dev(&devid);
-	result = path_exists(path);
+	result = util_path_exists(path);
 	free(path);
 
 	return result;
@@ -910,7 +912,7 @@ static void add_sg_from_sysfs(struct util_list *list, const char *path)
 	char *sgpath;
 
 	sgpath = misc_asprintf("%s/scsi_generic", path);
-	if (dir_exists(sgpath))
+	if (util_path_is_dir(sgpath))
 		path_for_each(sgpath, add_sg_cb, list);
 	free(sgpath);
 }

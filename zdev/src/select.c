@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "blkinfo.h"
 #include "ccw.h"
 #include "device.h"
@@ -622,7 +624,7 @@ exit_code_t select_by_path(struct select_opts *select,
 	struct ptrlist_node *p;
 	exit_code_t rc;
 
-	if (!path_exists(path)) {
+	if (!util_path_exists(path)) {
 		err_t_print(err, "Path not found: %s\n", path);
 		return EXIT_DEVICE_NOT_FOUND;
 	}

@@ -12,6 +12,8 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "misc.h"
 #include "module.h"
@@ -34,7 +36,7 @@ bool module_loaded(const char *mod)
 	char *path = path_get_sys_module(mod);
 	bool rc;
 
-	rc = dir_exists(path);
+	rc = util_path_is_dir(path);
 	free(path);
 
 	return rc;
@@ -229,7 +231,7 @@ void module_try_load_once(const char *mod, const char *path)
 	} else
 		tried_loading = strlist_new();
 	strlist_add(tried_loading, mod);
-	if (path && path_exists(path))
+	if (path && util_path_exists(path))
 		return;
 	if (module_loaded(mod))
 		return;
@@ -275,7 +277,7 @@ bool module_set_params(const char *mod, struct setting_list *settings)
 			return false;
 		}
 		path = path_get_sys_module_param(mod, s->name);
-		result = file_writable(path);
+		result = util_path_is_writable(path);
 		free(path);
 		if (!result) {
 			/* Sysfs file is not writable. */
