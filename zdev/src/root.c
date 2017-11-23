@@ -9,6 +9,8 @@
 
 #include <stdlib.h>
 
+#include "lib/util_path.h"
+
 #include "device.h"
 #include "devtype.h"
 #include "misc.h"
@@ -69,7 +71,7 @@ exit_code_t root_check(void)
 	     "required.\n");
 
 	/* Check if script is available. */
-	if (!file_exists(PATH_ROOT_SCRIPT))
+	if (!util_path_is_reg_file(PATH_ROOT_SCRIPT))
 		goto out;
 
 	/* Ask for confirmation. */

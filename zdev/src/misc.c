@@ -889,69 +889,6 @@ void ptrlist_move(struct util_list *to, struct util_list *from,
 	util_list_add_tail(to, node);
 }
 
-/* Check if a path exists. */
-bool path_exists(const char *path)
-{
-	struct stat s;
-
-	debug("Checking if file exists: %s\n", path);
-	if (stat(path, &s) != 0)
-		return false;
-
-	return true;
-}
-
-/* Check if a file exists. */
-bool file_exists(const char *path)
-{
-	struct stat s;
-
-	debug("Checking if regular file exists: %s\n", path);
-	if (stat(path, &s) != 0)
-		return false;
-
-	if (!S_ISREG(s.st_mode))
-		return false;
-
-	return true;
-}
-
-/* Check if a file is writable. */
-bool file_writable(const char *path)
-{
-	struct stat s;
-
-	debug("Checking if regular file is writable: %s\n", path);
-	if (stat(path, &s) != 0)
-		return false;
-
-	if (!S_ISREG(s.st_mode))
-		return false;
-
-	if (!(s.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
-		return false;
-
-	return true;
-}
-
-/* Check if a directory exists. */
-bool dir_exists(const char *path)
-{
-	bool result = false;
-	struct stat s;
-
-	debug("Checking if directory exists: %s\n", path);
-	if (stat(path, &s) != 0)
-		goto out;
-	if (!S_ISDIR(s.st_mode))
-		goto out;
-	result = true;
-out:
-	debug("Result: %d\n", result);
-
-	return result;
-}
-
 /* Check if file is a block or character special file. */
 bool file_is_devnode(const char *path)
 {

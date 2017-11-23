@@ -15,6 +15,8 @@
 #include <sys/sysmacros.h>
 #include <unistd.h>
 
+#include "lib/util_path.h"
+
 #include "devnode.h"
 #include "misc.h"
 #include "path.h"
@@ -230,7 +232,7 @@ static exit_code_t add_block_cb(const char *path, const char *filename,
 
 	/* Add additional nodes. */
 	cb_data->prefix = filename;
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, add_part_cb, cb_data);
 
 	return EXIT_OK;
@@ -249,7 +251,7 @@ int devnode_add_block_from_sysfs(struct util_list *list, const char *path)
 	cb_data.prefix = NULL;
 
 	blkpath = misc_asprintf("%s/block", path);
-	if (dir_exists(blkpath))
+	if (util_path_is_dir(blkpath))
 		path_for_each(blkpath, add_block_cb, &cb_data);
 	free(blkpath);
 
@@ -283,7 +285,7 @@ int devnode_add_net_from_sysfs(struct util_list *list, const char *path)
 	cb_data.prefix = NULL;
 
 	netpath = misc_asprintf("%s/net", path);
-	if (dir_exists(netpath))
+	if (util_path_is_dir(netpath))
 		path_for_each(netpath, add_net_cb, &cb_data);
 	free(netpath);
 

@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "misc.h"
 #include "modprobe.h"
@@ -376,7 +378,7 @@ exit_code_t modprobe_read_settings(const char *path, const char *mod,
 	struct modprobe_file *mf;
 	exit_code_t rc;
 
-	if (!file_exists(path)) {
+	if (!util_path_is_reg_file(path)) {
 		*settings = NULL;
 		return EXIT_OK;
 	}
@@ -398,7 +400,7 @@ exit_code_t modprobe_write_settings(const char *path, const char *mod,
 	exit_code_t rc;
 	unsigned long lines;
 
-	if (file_exists(path)) {
+	if (util_path_is_reg_file(path)) {
 		rc = modprobe_read(path, &mf);
 		if (rc)
 			return rc;
@@ -414,7 +416,7 @@ exit_code_t modprobe_write_settings(const char *path, const char *mod,
 	lines = util_list_len(&mf->lines);
 	if (lines == 0 || (lines == 1 && find_chzdev_comment(mf))) {
 		/* Do not write empty files. */
-		if (file_exists(path))
+		if (util_path_is_reg_file(path))
 			rc = remove_file(path);
 	} else
 		rc = modprobe_write(mf);

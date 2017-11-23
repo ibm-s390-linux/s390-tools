@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "ccw.h"
 #include "device.h"
@@ -33,7 +35,7 @@ bool udev_ccw_exists(const char *type, const char *id)
 		return false;
 
 	path = path_get_udev_rule(type, normid);
-	rc = file_exists(path);
+	rc = util_path_is_reg_file(path);
 	free(path);
 	free(normid);
 
@@ -150,7 +152,7 @@ exit_code_t udev_ccw_write_device(struct device *dev)
 
 	path = path_get_udev_rule(type, id);
 	debug("Writing %s udev rule file %s\n", type, path);
-	if (!path_exists(path)) {
+	if (!util_path_exists(path)) {
 		rc = path_create(path);
 		if (rc)
 			goto out;
@@ -243,7 +245,7 @@ exit_code_t udev_ccw_write_cio_ignore(const char *id_list)
 
 	if (!*id_list) {
 		/* Empty id_list string - remove file. */
-		if (!file_exists(path)) {
+		if (!util_path_is_reg_file(path)) {
 			/* Already removed. */
 			goto out;
 		}
@@ -256,7 +258,7 @@ exit_code_t udev_ccw_write_cio_ignore(const char *id_list)
 		goto out;
 
 	debug("Writing cio-ignore udev rule file %s\n", path);
-	if (!path_exists(path)) {
+	if (!util_path_exists(path)) {
 		rc = path_create(path);
 		if (rc)
 			goto out;

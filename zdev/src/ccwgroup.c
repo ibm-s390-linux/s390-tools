@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "lib/util_base.h"
+#include "lib/util_path.h"
 
 #include "attrib.h"
 #include "ccw.h"
@@ -557,7 +558,7 @@ static bool read_full_id(struct ccwgroup_devid *devid_ptr, const char *drv,
 	bool result = false;
 
 	path = path_get_ccwgroup_device(drv, id);
-	if (!dir_exists(path))
+	if (!util_path_is_dir(path))
 		goto out;
 
 	memset(&devid, 0, sizeof(struct ccwgroup_devid));
@@ -625,7 +626,7 @@ static void ccwgroup_add_ids(const char *drv, const char *mod,
 	path = path_get_ccwgroup_devices(drv);
 	if (mod)
 		module_try_load_once(mod, path);
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, get_ids_cb, &cb_data);
 	free(path);
 }
@@ -663,7 +664,7 @@ static exit_code_t ccwgroup_st_read_active(struct subtype *st,
 	state->definable = 0;
 
 	path = ccwgroup_get_dev_path_by_devid(drv, devid);
-	if (path_exists(path)) {
+	if (util_path_exists(path)) {
 		state->exists = 1;
 		device_read_active_settings(dev, scope);
 	} else

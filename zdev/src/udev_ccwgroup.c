@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "ccwgroup.h"
 #include "device.h"
@@ -53,7 +55,7 @@ bool udev_ccwgroup_exists(const char *type, const char *id)
 	path = get_rule_path(type, id);
 	if (!path)
 		return false;
-	rc = file_exists(path);
+	rc = util_path_is_reg_file(path);
 	free(path);
 
 	return rc;
@@ -215,7 +217,7 @@ exit_code_t udev_ccwgroup_write_device(struct device *dev)
 	list = setting_list_get_sorted(dev->persistent.settings);
 
 	debug("Writing %s udev rule file %s\n", type, path);
-	if (!path_exists(path)) {
+	if (!util_path_exists(path)) {
 		rc = path_create(path);
 		if (rc)
 			goto out;
@@ -364,7 +366,7 @@ void udev_ccwgroup_add_device_ids(const char *type, struct util_list *list)
 	cb_data.prefix = misc_asprintf("%s-%s-", UDEV_PREFIX, type);
 	cb_data.ids = list;
 
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, get_ids_cb, &cb_data);
 
 	free(cb_data.prefix);
@@ -382,7 +384,7 @@ exit_code_t udev_ccwgroup_remove_rule(const char *type, const char *id)
 		return EXIT_INVALID_ID;
 
 	path = path_get_udev_rule(type, partial_id);
-	if (file_exists(path))
+	if (util_path_is_reg_file(path))
 		rc = remove_file(path);
 	free(path);
 	free(partial_id);
