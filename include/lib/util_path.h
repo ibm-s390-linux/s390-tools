@@ -20,5 +20,6 @@ bool util_path_is_readable(const char *fmt, ...);
 bool util_path_is_writable(const char *fmt, ...);
 bool util_path_is_dir(const char *fmt, ...);
 bool util_path_is_reg_file(const char *fmt, ...);
+bool util_path_exists(const char *fmt, ...);
 
 #endif /** LIB_UTIL_PATH_H @} */

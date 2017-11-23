@@ -194,3 +194,15 @@ free_str:
 	free(path);
 	return rc;
 }
+
+bool util_path_exists(const char *fmt, ...)
+{
+	va_list ap;
+	char *path;
+	bool rc;
+
+	UTIL_VASPRINTF(&path, fmt, ap);
+	rc = access(path, F_OK) == 0;
+	free(path);
+	return rc;
+}
