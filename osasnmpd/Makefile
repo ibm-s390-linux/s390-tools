@@ -1,5 +1,8 @@
 include ../common.mak
 LDLIBS = `net-snmp-config --agent-libs`
+# On some Linux systems `net-snmp-config --agent-libs` introduces -pie,
+# therefore add -fPIC to prevent link failures.
+CFLAGS += -fPIC
 CFLAGS += `net-snmp-config --cflags`
 
 OBJS = ibmOSAMib.o ibmOSAMibUtil.o osasnmpd.o
