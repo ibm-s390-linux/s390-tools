@@ -662,7 +662,7 @@ static int init_adapters(struct adapters *all_adapters, struct options *opts)
 				malloc(sizeof(char)*MAX_HOST_PATH_LEN);
 			sprintf(adapter->q_full_path, "%s/queue_full",
 				opts->host_path[i]);
-			if (stat(adapter->path, &buf)) {
+			if (stat(adapter->q_full_path, &buf)) {
 				fprintf(stderr, "%s: Path does not exist: %s - correct kernel version?\n",
 					toolname, adapter->q_full_path);
 				rc++;
@@ -806,7 +806,7 @@ static int check_host_param(long *host_nr, char *host_path)
 	}
 	tmp = malloc(strlen(host_path) + strlen("/queue_full") + 1);
 	sprintf(tmp, "%s/queue_full", host_path);
-	if (stat(host_path, &buf)) {
+	if (stat(tmp, &buf)) {
 		fprintf(stderr, "%s: Cannot access %s."
 			" Your installed kernel is probably too old. Please"
 			" check that your kernel matches the level in the"
