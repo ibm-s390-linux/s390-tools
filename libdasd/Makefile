@@ -4,7 +4,7 @@ lib = libdasd.a
 
 all: $(lib)
 
-objects = dasd_sys.o
+objects = dasd_sys.o dasd_ioctl.o
 
 $(lib): $(objects) Makefile
 
