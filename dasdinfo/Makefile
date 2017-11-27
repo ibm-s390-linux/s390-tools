@@ -1,7 +1,8 @@
 include ../common.mak
 
 libs = $(rootdir)/libu2s/libu2s.a \
-       $(rootdir)/libutil/libutil.a
+       $(rootdir)/libutil/libutil.a \
+       $(rootdir)/libdasd/libdasd.a
 
 all: dasdinfo
 

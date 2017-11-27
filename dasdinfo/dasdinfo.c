@@ -22,6 +22,7 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include "lib/dasd_base.h"
 #include "lib/util_base.h"
 #include "lib/util_file.h"
 #include "lib/util_opt.h"
@@ -29,10 +30,6 @@
 #include "lib/zt_common.h"
 
 #define RD_BUFFER_SIZE 80
-#define BLKSSZGET    _IO(0x12,104)
-#define DASD_IOCTL_LETTER 'D'
-#define BIODASDINFO  _IOR(DASD_IOCTL_LETTER,1,struct dasd_information)
-#define BIODASDINFO2 _IOR(DASD_IOCTL_LETTER,3,struct dasd_information2)
 #define TEMP_DEV_MAX_RETRIES    1000
 
 static const struct util_prg prg = {
@@ -99,65 +96,6 @@ struct volume_label {
 	char vollbl[4];
 	char volid[6];
 } __attribute__ ((packed));
-
-struct dasd_information2 {
-	unsigned int devno;
-	unsigned int real_devno;
-	unsigned int schid;
-	unsigned int cu_type  : 16;
-	unsigned int cu_model :  8;
-	unsigned int dev_type : 16;
-	unsigned int dev_model : 8;
-	unsigned int open_count;
-	unsigned int req_queue_len;
-	unsigned int chanq_len;
-	char type[4];
-	unsigned int status;
-	unsigned int label_block;
-	unsigned int FBA_layout;
-	unsigned int characteristics_size;
-	unsigned int confdata_size;
-	char characteristics[64];
-	char configuration_data[256];
-	unsigned int format;
-	unsigned int features;
-	unsigned int reserved0;
-	unsigned int reserved1;
-	unsigned int reserved2;
-	unsigned int reserved3;
-	unsigned int reserved4;
-	unsigned int reserved5;
-	unsigned int reserved6;
-	unsigned int reserved7;
-};
-
-struct dasd_information {
-	unsigned int devno;
-	unsigned int real_devno;
-	unsigned int schid;
-	unsigned int cu_type  : 16;
-	unsigned int cu_model :  8;
-	unsigned int dev_type : 16;
-	unsigned int dev_model : 8;
-	unsigned int open_count;
-	unsigned int req_queue_len;
-	unsigned int chanq_len;
-	char type[4];
-	unsigned int status;
-	unsigned int label_block;
-	unsigned int FBA_layout;
-	unsigned int characteristics_size;
-	unsigned int confdata_size;
-	char characteristics[64];
-	char configuration_data[256];
-};
-
-struct dasd_data
-{
-	struct dasd_information2 dasd_info;
-	int dasd_info_version;
-	int blksize;
-};
 
 static char EBCtoASC[256] = {
 /* 0x00  NUL   SOH   STX   ETX  *SEL    HT  *RNL   DEL */
@@ -244,13 +182,24 @@ static int dinfo_read_dasd_uid(char *uidfile, char *readbuf)
 static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 				  char *readbuf)
 {
-	struct dasd_data data;
 	struct volume_label tmp;
 	int vlsize = sizeof(struct volume_label);
+	dasd_information2_t dasd_info;
 	unsigned long vlabel_start;
+	unsigned int blksize;
 	char vollbl[5];
 	int f;
 	char *space;
+
+	if (dasd_get_blocksize(device, &blksize) != 0) {
+		printf("Unable to figure out block size.\n");
+		goto error;
+	}
+
+	if (dasd_get_info(device, &dasd_info) != 0) {
+		printf("Unable to figure out DASD informations.\n");
+		goto error;
+	}
 
 	f = open(device, O_RDONLY);
 	if (f < 0) {
@@ -258,32 +207,18 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 		goto error;
 	}
 
-	if (ioctl(f, BLKSSZGET, &data.blksize) != 0) {
-		printf("Unable to figure out block size.\n");
-		goto error;
-	}
-
-	if (ioctl(f, BIODASDINFO2, &data.dasd_info) == 0)
-		data.dasd_info_version = 2;
-	else {
-		if (ioctl(f, BIODASDINFO, &data.dasd_info) != 0) {
-			printf("Unable to figure out DASD informations.\n");
-			goto error;
-		}
-	}
-
-	vlabel_start = data.dasd_info.label_block * data.blksize;
+	vlabel_start = dasd_info.label_block * blksize;
 	if (lseek(f, vlabel_start, SEEK_SET) < 0)
-		goto error;
+		goto error_close;
 
 	bzero(vlabel, vlsize);
 
 	if (read(f, vlabel, vlsize) != vlsize) {
 		printf("Could not read volume label.\n");
-		goto error;
+		goto error_close;
 	}
 
-	if (data.dasd_info.FBA_layout) {
+	if (dasd_info.FBA_layout) {
 		bzero(&tmp, vlsize);
 		memcpy(&tmp, vlabel, vlsize);
 		memcpy(vlabel->vollbl, &tmp, vlsize - 4);
@@ -309,8 +244,9 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 	}
 
 	return 0;
-error:
+error_close:
 	close(f);
+error:
 	return -1;
 }
 
