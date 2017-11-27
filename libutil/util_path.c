@@ -213,7 +213,7 @@ bool util_path_exists(const char *fmt, ...)
 	bool rc;
 
 	UTIL_VASPRINTF(&path, fmt, ap);
-	rc = access(path, F_OK) == 0;
+	rc = access(path, F_OK) == 0 ? true : false;
 	free(path);
 	return rc;
 }
