@@ -56,21 +56,21 @@ static void  test_path(const char *path)
 {
 	printf("%-20s: ", path);
 	if (util_path_exists(path))
-		printf("exists=yes, ");
+		printf("exists=yes ");
 	else
-		printf("exists=no , ");
+		printf("exists=no  ");
 	if (util_path_is_readable(path))
-		printf("read=yes, ");
+		printf("read=yes ");
 	else
-		printf("read=no , ");
+		printf("read=no  ");
 	if (util_path_is_writable(path))
-		printf("write=yes, ");
+		printf("write=yes ");
 	else
-		printf("write=no , ");
+		printf("write=no  ");
 	if (util_path_is_reg_file(path))
-		printf("reg_file=yes");
+		printf("reg_file=yes ");
 	else
-		printf("reg_file=no ");
+		printf("reg_file=no  ");
 	if (util_path_is_dir(path))
 		printf("dir=yes");
 	else
