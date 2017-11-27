@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "ccw.h"
 #include "ccwgroup.h"
 #include "device.h"
@@ -277,7 +279,7 @@ static struct util_list *read_sorted_qeth_devinfos(void)
 	/* Get CHPID information for all devices bound to the QETH driver. */
 	infos = ptrlist_new();
 	path = path_get_sys_bus_drv(CCW_BUS_NAME, QETH_CCWDRV_NAME);
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, add_cb, infos);
 	free(path);
 

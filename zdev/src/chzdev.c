@@ -16,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "lib/util_path.h"
 #include "lib/zt_common.h"
 
 #include "attrib.h"
@@ -2502,7 +2503,7 @@ static exit_code_t do_export(struct options *opts)
 		info("Exporting configuration data to standard output\n");
 	} else {
 		info("Exporting configuration data to %s\n", opts->export);
-		if (!path_exists(opts->export)) {
+		if (!util_path_exists(opts->export)) {
 			rc = path_create(opts->export);
 			if (rc)
 				return rc;

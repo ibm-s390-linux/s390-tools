@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "device.h"
 #include "devtype.h"
@@ -480,7 +482,8 @@ void device_read_active_settings(struct device *dev, read_scope_t scope)
 		a = attrib_find(st->dev_attribs, name);
 		s = setting_list_apply_actual(dev->active.settings, a, name,
 					      value);
-		if (link || (scope == scope_all && !file_writable(path)))
+		if (link || (scope == scope_all &&
+			     !util_path_is_writable(path)))
 			s->readonly = 1;
 		if (link)
 			free(link);

@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "device.h"
 #include "misc.h"
@@ -376,7 +378,7 @@ void udev_zfcp_lun_add_device_ids(struct util_list *list)
 	cb_data.list = list;
 	path = path_get_udev_rules();
 
-	if (dir_exists(path))
+	if (util_path_is_dir(path))
 		path_for_each(path, lun_cb, &cb_data);
 
 	free(path);
@@ -497,7 +499,7 @@ static exit_code_t write_luns_rule(const char *path, struct util_list *list)
 		return EXIT_INTERNAL_ERROR;
 	hba_id = ccw_devid_to_str(&node->id.fcp_dev);
 	debug("Writing FCP LUN udev rule file %s\n", path);
-	if (!path_exists(path)) {
+	if (!util_path_exists(path)) {
 		rc = path_create(path);
 		if (rc)
 			goto out;
@@ -614,7 +616,7 @@ static exit_code_t update_lun_rule(const char *id, struct device_state *state)
 
 	/* Get previous rule data. */
 	luns = zfcp_lun_node_list_new();
-	exists = file_exists(path);
+	exists = util_path_is_reg_file(path);
 	if (exists)
 		udev_read_zfcp_lun_rule(path, luns);
 

@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "lib/util_base.h"
+#include "lib/util_path.h"
 
 #include "attrib.h"
 #include "ccw.h"
@@ -1165,15 +1166,10 @@ out:
 
 static void read_grouped(struct ccw_devinfo *info, const char *path)
 {
-	char *file_path;
-
-	file_path = misc_asprintf("%s/group_device", path);
-	if (path_exists(file_path))
+	if (util_path_exists("%s/group_device", path))
 		info->grouped = 1;
 	else
 		info->grouped = 0;
-
-	free(file_path);
 }
 
 static void read_cutype(struct ccw_devinfo *info, const char *path)
@@ -1229,7 +1225,7 @@ static struct ccw_devinfo *ccw_devinfo_read(struct ccw_devid *devid)
 
 	id = ccw_devid_to_str(devid);
 	path = path_get_ccw_device(NULL, id);
-	if (!dir_exists(path))
+	if (!util_path_is_dir(path))
 		goto out;
 
 	info->exists = 1;
@@ -1354,7 +1350,7 @@ bool ccw_exists(const char *drv, const char *mod, const char *id)
 	if (!path)
 		return false;
 
-	rc = dir_exists(path);
+	rc = util_path_is_dir(path);
 	free(path);
 
 	return rc;
@@ -1428,7 +1424,7 @@ static exit_code_t ccw_st_read_active(struct subtype *st, struct device *dev,
 	state->definable = 0;
 
 	path = path_get_ccw_device(drv, id);
-	if (path_exists(path)) {
+	if (util_path_exists(path)) {
 		state->exists = 1;
 		device_read_active_settings(dev, scope);
 	} else
@@ -1641,7 +1637,7 @@ static void ccw_st_add_errors(struct subtype *st, const char *id,
 	if (!path)
 		return;
 
-	if (!path_exists(path)) {
+	if (!util_path_exists(path)) {
 		strlist_add(errors, "CCW device %s does not exist", id);
 		goto out;
 	}
@@ -1662,9 +1658,7 @@ static void ccw_st_add_errors(struct subtype *st, const char *id,
 			    "paths", id);
 		goto out;
 	}
-	free(apath);
-	apath = misc_asprintf("%s/driver", path);
-	if (!path_exists(apath)) {
+	if (!util_path_exists("%s/driver", path)) {
 		strlist_add(errors, "CCW device %s is not bound to a driver",
 			    id);
 		goto out;

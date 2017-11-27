@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "attrib.h"
 #include "ccw.h"
 #include "device.h"
@@ -391,7 +393,7 @@ exit_code_t udev_remove_rule(const char *type, const char *id)
 	exit_code_t rc = EXIT_OK;
 
 	path = path_get_udev_rule(type, id);
-	if (file_exists(path))
+	if (util_path_is_reg_file(path))
 		rc = remove_file(path);
 	free(path);
 
