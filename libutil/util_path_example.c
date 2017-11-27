@@ -55,6 +55,10 @@ static void test_util_path_sysfs(void)
 static void  test_path(const char *path)
 {
 	printf("%-20s: ", path);
+	if (util_path_exists(path))
+		printf("exists=yes, ");
+	else
+		printf("exists=no , ");
 	if (util_path_is_readable(path))
 		printf("read=yes, ");
 	else
