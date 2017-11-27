@@ -195,6 +195,17 @@ free_str:
 	return rc;
 }
 
+/**
+ * Test if path to directory or file exists
+ *
+ * This function has the same semantics as "-e path" in bash.
+ *
+ * @param[in] fmt   Format string for path to test
+ * @param[in] ...   Variable arguments for format string
+ *
+ * @returns   true  Path exists
+ *            false Otherwise
+ */
 bool util_path_exists(const char *fmt, ...)
 {
 	va_list ap;
