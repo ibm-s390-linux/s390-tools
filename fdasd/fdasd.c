@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <sys/sysmacros.h>
 
+#include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 #include "lib/util_base.h"
 #include "lib/util_opt.h"
@@ -1228,26 +1229,13 @@ static int fdasd_get_volser(fdasd_anchor_t *anc, char *volser)
  */
 static void fdasd_reread_partition_table(fdasd_anchor_t *anc)
 {
-	char err_str[ERROR_STRING_SIZE];
-	int fd;
-
 	if (!anc->silent)
 		printf("rereading partition table...\n");
 
-	fd = open(options.device, O_RDONLY);
-	if (fd < 0) {
-		snprintf(err_str, ERROR_STRING_SIZE,
-			 "Could not open device '%s' "
-			 "in read-only mode!\n", options.device);
-		fdasd_error(anc, unable_to_open_disk, err_str);
-	}
-
-	if (ioctl(fd, BLKRRPART, NULL) != 0) {
-		close(fd);
+	if (dasd_reread_partition_table(options.device, 1) != 0) {
 		fdasd_error(anc, unable_to_ioctl, "Error while rereading "
 			    "partition table.\nPlease reboot!");
 	}
-	close(fd);
 }
 
 /*
@@ -2092,7 +2080,8 @@ static void fdasd_check_disk_access(fdasd_anchor_t *anc)
 {
 	char err_str[ERROR_STRING_SIZE];
 	format1_label_t f1;
-	int fd, pos, ro;
+	int fd, pos;
+	bool ro;
 
 	fd = open(options.device, O_RDONLY);
 	if (fd == -1) {
@@ -2125,7 +2114,9 @@ static void fdasd_check_disk_access(fdasd_anchor_t *anc)
 		fdasd_error(anc, unable_to_seek_disk, err_str);
 	}
 
-	if (ioctl(fd, BLKROGET, &ro) != 0) {
+	close(fd);
+
+	if (dasd_is_ro(options.device, &ro) != 0) {
 		snprintf(err_str, ERROR_STRING_SIZE,
 			 "Could not get read-only status for device '%s'.",
 			 options.device);
@@ -2136,8 +2127,6 @@ static void fdasd_check_disk_access(fdasd_anchor_t *anc)
 		       "You will not be able to save any changes.\n\n",
 		       options.device);
 	}
-
-	close(fd);
 }
 
 /*
@@ -2214,21 +2203,12 @@ static void fdasd_get_geometry(fdasd_anchor_t *anc)
 	struct dasd_eckd_characteristics *characteristics;
 	unsigned long long size_in_bytes;
 	char err_str[ERROR_STRING_SIZE];
-	dasd_information_t dasd_info;
-	int fd, blksize = 0;
+	dasd_information2_t dasd_info;
+	unsigned int blksize = 0;
 
-	fd = open(options.device, O_RDONLY);
-	if (fd < 0) {
-		snprintf(err_str, ERROR_STRING_SIZE,
-			 "Could not open device '%s' "
-			 "in read-only mode!\n", options.device);
-		fdasd_error(anc, unable_to_open_disk, err_str);
-	}
-	if (ioctl(fd, BLKGETSIZE64, &size_in_bytes) != 0) {
-		close(fd);
+	if (dasd_get_blocksize_in_bytes(options.device, &size_in_bytes) != 0)
 		fdasd_error(anc, unable_to_ioctl,
 			    "Could not retrieve disk size.");
-	}
 	/*
 	 * If anc->force_virtual is set, we do no real geometry detection.
 	 * anc->dev_type and anc->blksize have already been set via command
@@ -2247,7 +2227,6 @@ static void fdasd_get_geometry(fdasd_anchor_t *anc)
 		geo.start = 0;
 		anc->label_pos = 2 * anc->blksize;
 		anc->devno = 0;
-		close(fd);
 		if (anc->verbose) {
 			printf("The force option is active. "
 			       "The following geometry will be used:\n"
@@ -2259,24 +2238,21 @@ static void fdasd_get_geometry(fdasd_anchor_t *anc)
 		return;
 	}
 
-	if (ioctl(fd, HDIO_GETGEO, &geo) != 0) {
-		close(fd);
+	if (dasd_get_geo(options.device, &geo) != 0) {
 		fdasd_error(anc, unable_to_ioctl,
 			    "Could not retrieve disk geometry information.");
 	}
-	if (ioctl(fd, BLKSSZGET, &blksize) != 0) {
-		close(fd);
+	if (dasd_get_blocksize(options.device, &blksize) != 0) {
 		fdasd_error(anc, unable_to_ioctl,
 			    "Could not retrieve blocksize information.");
 	}
 	/* get disk type */
-	if (ioctl(fd, BIODASDINFO, &dasd_info) != 0) {
+	if (dasd_get_info(options.device, &dasd_info) != 0) {
 		if (anc->verbose)
 			printf("BIODASDINFO ioctl failed,"
 			       " use disk geometry only.\n");
 		/* verify that the geometry matches a 3390 DASD */
 		if (!fdasd_verify_geometry(DASD_3390_TYPE, blksize, &geo)) {
-			close(fd);
 			fdasd_error(anc, wrong_disk_type,
 				    "Disk geometry does not match a DASD device"
 				    " of type 3390.");
@@ -2356,8 +2332,6 @@ static void fdasd_get_geometry(fdasd_anchor_t *anc)
 		anc->label_pos	= dasd_info.label_block * blksize;
 		anc->devno	= dasd_info.devno;
 	}
-
-	close(fd);
 }
 
 /*
