@@ -25,6 +25,8 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include "lib/dasd_base.h"
+#include "lib/dasd_sys.h"
 #include "lib/libzds.h"
 #include "lib/u2s.h"
 #include "lib/util_base.h"
@@ -144,75 +146,33 @@ static void dot(char label[])
 	}
 }
 
-/*
- * Attempts to find the sysfs entry for the given busid and reads
- * the contents of a specified attribute to the buffer
- */
-static int dasdview_read_attribute(char *busid, char *attribute, char *buffer,
-				   size_t count)
-{
-	char path[100];
-	int rc, fd;
-	ssize_t rcount;
-
-	rc = 0;
-	snprintf(path, sizeof(path), "/sys/bus/ccw/devices/%s/%s",
-		 busid, attribute);
-	fd = open(path, O_RDONLY);
-	if (fd < 0)
-		return errno;
-	rcount = read(fd, buffer, count);
-	if (rcount < 0)
-		rc = errno;
-	close(fd);
-	return rc;
-}
-
 static void
 dasdview_get_info(dasdview_info_t *info)
 {
-	int fd;
 	struct dasd_eckd_characteristics *characteristics;
-	char buffer[10];
-	int rc;
+	int err;
 
-	fd = open(info->device, O_RDONLY);
-	if (fd == -1) {
-		zt_error_print("dasdview: open error\n"
-			       "Could not open device '%s'.\n"
-			       "Maybe you have specified an unknown device or \n"
-			       "you are not authorized to do that.\n",
-			info->device);
+	err = dasd_get_geo(info->device, &info->geo);
+	if (err != 0) {
+		/* Test for unknown device in the first call to libdasd to avoid
+		 * spitting out two different error messages to the user
+		 */
+		if (err != EBADF)
+			zt_error_print("dasdview: "
+				       "Could not retrieve geo information!\n");
 		exit(-1);
 	}
 
-	/* get disk geometry */
-	if (ioctl(fd, HDIO_GETGEO, &info->geo) != 0) {
-		close(fd);
-		zt_error_print("dasdview: ioctl error\n"
-			       "Could not retrieve disk geometry "
-			       "information.");
-		exit(-1);
-	}
-
-	if (ioctl(fd, BLKSSZGET, &info->blksize) != 0) {
-		close(fd);
-		zt_error_print("dasdview: ioctl error\n"
+	if (dasd_get_blocksize(info->device, &info->blksize) != 0) {
+		zt_error_print("dasdview: "
 			       "Could not retrieve blocksize information!\n");
 		exit(-1);
 	}
 
-	/* get disk information */
-	if (ioctl(fd, BIODASDINFO2, &info->dasd_info) == 0) {
-		info->dasd_info_version = 2;
-	} else {
-		/* INFO2 failed - try INFO using the same (larger) buffer */
-		if (ioctl(fd, BIODASDINFO, &info->dasd_info) != 0) {
-			close(fd);
-			zt_error_print("dasdview: ioctl error\n"
-				       "Could not retrieve disk information.");
-			exit(-1);
-		}
+	if (dasd_get_info(info->device, &info->dasd_info) != 0) {
+		zt_error_print("dasdview: "
+			       "Could not retrieve disk information!\n");
+		exit(-1);
 	}
 
 	characteristics = (struct dasd_eckd_characteristics *)
@@ -222,22 +182,13 @@ dasdview_get_info(dasdview_info_t *info)
 		info->hw_cylinders = characteristics->long_no_cyl;
 	else
 		info->hw_cylinders = characteristics->no_cyl;
-	close(fd);
 
 	if (u2s_getbusid(info->device, info->busid) == -1)
 		info->busid_valid = 0;
 	else
 		info->busid_valid = 1;
 
-	rc = dasdview_read_attribute(info->busid, "raw_track_access", buffer,
-				     sizeof(buffer));
-	if (rc) {
-		zt_error_print("dasdview: Could not retrieve raw_track_access"
-			       " mode information.");
-		return;
-	}
-	if ('1' == buffer[0])
-		info->raw_track_access = 1;
+	info->raw_track_access = dasd_sys_raw_track_access(info->device);
 }
 
 static void
@@ -439,26 +390,24 @@ dasdview_print_extended_info(dasdview_info_t *info)
 	printf("confdata_size          : hex %x  \tdec %d\n",
 	       dasd_info->confdata_size, dasd_info->confdata_size);
 
-	if (info->dasd_info_version >= 2) {
-		printf("format                 : hex %x  \tdec %d      \t%s\n",
-		       dasd_info->format, dasd_info->format,
-		       dasd_info->format == DASD_FORMAT_NONE ?
-		       "NOT formatted" :
-		       dasd_info->format == DASD_FORMAT_LDL  ?
-		       "LDL formatted" :
-		       dasd_info->format == DASD_FORMAT_CDL  ?
-		       "CDL formatted" : "unknown format");
+	printf("format                 : hex %x  \tdec %d      \t%s\n",
+	       dasd_info->format, dasd_info->format,
+	       dasd_info->format == DASD_FORMAT_NONE ?
+	       "NOT formatted" :
+	       dasd_info->format == DASD_FORMAT_LDL  ?
+	       "LDL formatted" :
+	       dasd_info->format == DASD_FORMAT_CDL  ?
+	       "CDL formatted" : "unknown format");
 
-		printf("features               : hex %x  \tdec %d      \t",
-		       dasd_info->features, dasd_info->features);
-		if (dasd_info->features == DASD_FEATURE_DEFAULT) {
-			printf("default\n");
-		} else {
-			for (i = 0; i < UTIL_ARRAY_SIZE(flist); i++)
-				if (dasd_info->features & flist[i].mask)
-					printf("%s ", flist[i].name);
-			printf("\n");
-		}
+	printf("features               : hex %x  \tdec %d      \t",
+	       dasd_info->features, dasd_info->features);
+	if (dasd_info->features == DASD_FEATURE_DEFAULT) {
+		printf("default\n");
+	} else {
+		for (i = 0; i < UTIL_ARRAY_SIZE(flist); i++)
+			if (dasd_info->features & flist[i].mask)
+				printf("%s ", flist[i].name);
+		printf("\n");
 	}
 	printf("\n");
 	dasdview_dump_array("characteristics",
@@ -2347,6 +2296,7 @@ int main(int argc, char *argv[])
 		strcpy(info.device, argv[info.device_id]);
 
 	dasdview_get_info(&info);
+
 	if (info.raw_track_access) {
 		rc = lzds_zdsroot_alloc(&info.zdsroot);
 		if (rc) {
