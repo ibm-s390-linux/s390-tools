@@ -17,139 +17,6 @@
  * SECTION: Definitions needed for DASD-API (see dasd.h)
  *******************************************************************************/
 
-#define DASD_IOCTL_LETTER 'D'
-
-/*
- * struct dasd_information_t
- * represents any data about the device, which is visible to userspace.
- *  including foramt and features.
- */
-typedef struct dasd_information_t {
-        unsigned int devno;         /* S/390 devno */
-        unsigned int real_devno;    /* for aliases */
-        unsigned int schid;         /* S/390 subchannel identifier */
-        unsigned int cu_type  : 16; /* from SenseID */
-        unsigned int cu_model :  8; /* from SenseID */
-        unsigned int dev_type : 16; /* from SenseID */
-        unsigned int dev_model : 8; /* from SenseID */
-        unsigned int open_count;
-        unsigned int req_queue_len;
-        unsigned int chanq_len;     /* length of chanq */
-        char type[4];               /* from discipline.name, 'none' for unknown */
-        unsigned int status;        /* current device level */
-        unsigned int label_block;   /* where to find the VOLSER */
-        unsigned int FBA_layout;    /* fixed block size (like AIXVOL) */
-        unsigned int characteristics_size;
-        unsigned int confdata_size;
-        char characteristics[64];   /* from read_device_characteristics */
-        char configuration_data[256]; /* from read_configuration_data */
-} dasd_information_t;
-
-typedef struct dasd_information2_t {
-        unsigned int devno;         /* S/390 devno */
-        unsigned int real_devno;    /* for aliases */
-        unsigned int schid;         /* S/390 subchannel identifier */
-        unsigned int cu_type  : 16; /* from SenseID */
-        unsigned int cu_model :  8; /* from SenseID */
-        unsigned int dev_type : 16; /* from SenseID */
-        unsigned int dev_model : 8; /* from SenseID */
-        unsigned int open_count;
-        unsigned int req_queue_len;
-        unsigned int chanq_len;     /* length of chanq */
-        char type[4];               /* from discipline.name, 'none' for unknown */
-        unsigned int status;        /* current device level */
-        unsigned int label_block;   /* where to find the VOLSER */
-        unsigned int FBA_layout;    /* fixed block size (like AIXVOL) */
-        unsigned int characteristics_size;
-        unsigned int confdata_size;
-	unsigned char characteristics[64];/*from read_device_characteristics */
-	unsigned char configuration_data[256];/*from read_configuration_data */
-        unsigned int format;          /* format info like formatted/cdl/ldl/... */
-        unsigned int features;        /* dasd features like 'ro',...            */
-        unsigned int reserved0;       /* reserved for further use ,...          */
-        unsigned int reserved1;       /* reserved for further use ,...          */
-        unsigned int reserved2;       /* reserved for further use ,...          */
-        unsigned int reserved3;       /* reserved for further use ,...          */
-        unsigned int reserved4;       /* reserved for further use ,...          */
-        unsigned int reserved5;       /* reserved for further use ,...          */
-        unsigned int reserved6;       /* reserved for further use ,...          */
-        unsigned int reserved7;       /* reserved for further use ,...          */
-} dasd_information2_t;
-
-struct dasd_eckd_characteristics {
-	unsigned short cu_type;
-	struct {
-		unsigned char support:2;
-		unsigned char async:1;
-		unsigned char reserved:1;
-		unsigned char cache_info:1;
-		unsigned char model:3;
-	} __attribute__ ((packed)) cu_model;
-	unsigned short dev_type;
-	unsigned char dev_model;
-	struct {
-		unsigned char mult_burst:1;
-		unsigned char RT_in_LR:1;
-		unsigned char reserved1:1;
-		unsigned char RD_IN_LR:1;
-		unsigned char reserved2:4;
-		unsigned char reserved3:8;
-		unsigned char defect_wr:1;
-		unsigned char XRC_supported:1;
-		unsigned char reserved4:1;
-		unsigned char striping:1;
-		unsigned char reserved5:4;
-		unsigned char cfw:1;
-		unsigned char reserved6:2;
-		unsigned char cache:1;
-		unsigned char dual_copy:1;
-		unsigned char dfw:1;
-		unsigned char reset_alleg:1;
-		unsigned char sense_down:1;
-	} __attribute__ ((packed)) facilities;
-	unsigned char dev_class;
-	unsigned char unit_type;
-	unsigned short no_cyl;
-	unsigned short trk_per_cyl;
-	unsigned char sec_per_trk;
-	unsigned char byte_per_track[3];
-	unsigned short home_bytes;
-	unsigned char formula;
-	union {
-		struct {
-			unsigned char f1;
-			unsigned short f2;
-			unsigned short f3;
-		} __attribute__ ((packed)) f_0x01;
-		struct {
-			unsigned char f1;
-			unsigned char f2;
-			unsigned char f3;
-			unsigned char f4;
-			unsigned char f5;
-		} __attribute__ ((packed)) f_0x02;
-	} __attribute__ ((packed)) factors;
-	unsigned short first_alt_trk;
-	unsigned short no_alt_trk;
-	unsigned short first_dia_trk;
-	unsigned short no_dia_trk;
-	unsigned short first_sup_trk;
-	unsigned short no_sup_trk;
-	unsigned char MDR_ID;
-	unsigned char OBR_ID;
-	unsigned char director;
-	unsigned char rd_trk_set;
-	unsigned short max_rec_zero;
-	unsigned char reserved1;
-	unsigned char RWANY_in_LR;
-	unsigned char factor6;
-	unsigned char factor7;
-	unsigned char factor8;
-	unsigned char reserved2[3];
-	unsigned char reserved3[6];
-	unsigned int long_no_cyl;
-} __attribute__ ((packed));
-
 /*
  * values to be used for dasd_information2_t.format
  * 0x00: NOT formatted
@@ -169,21 +36,6 @@ struct dasd_eckd_characteristics {
 #define DASD_FEATURE_DEFAULT  0
 #define DASD_FEATURE_READONLY 1
 #define DASD_FEATURE_USEDIAG  2
-
-/* Get information on a dasd device (enhanced) */
-#define BIODASDINFO    _IOR(DASD_IOCTL_LETTER,1,dasd_information_t)
-#define BIODASDINFO2   _IOR(DASD_IOCTL_LETTER,3,dasd_information2_t)
-
-/********************************************************************************
- * SECTION: Further IOCTL Definitions  (see fs.h and hdreq.h)
- *******************************************************************************/
-/* get block device sector size */
-#define BLKSSZGET  _IO(0x12,104)
-/* return device size in bytes (u64 *arg) */
-#define BLKGETSIZE64 _IOR(0x12,114,size_t)
-
-/* get device geometry */
-#define HDIO_GETGEO		0x0301
 
 /********************************************************************************
  * SECTION: DASDVIEW internal types
@@ -215,7 +67,7 @@ typedef struct dasdview_info
 	char device[PATH_MAX];
 	dasd_information2_t dasd_info;
 	int dasd_info_version;
-	int blksize;
+	unsigned int blksize;
 	struct hd_geometry geo;
 	u_int32_t hw_cylinders;
 
