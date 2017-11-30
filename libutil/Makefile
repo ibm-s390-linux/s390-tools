@@ -28,17 +28,17 @@ objects =	util_base.o \
 		util_proc.o \
 		util_rec.o
 
-util_base_example: util_base_example.o $(rootdir)/libutil/libutil.a
-util_panic_example: util_panic_example.o $(rootdir)/libutil/libutil.a
-util_path_example: util_path_example.o $(rootdir)/libutil/libutil.a
-util_scandir_example: util_scandir_example.o $(rootdir)/libutil/libutil.a
-util_file_example: util_file_example.o $(rootdir)/libutil/libutil.a
-util_libc_example: util_libc_example.o $(rootdir)/libutil/libutil.a
-util_opt_example: util_opt_example.o $(rootdir)/libutil/libutil.a
-util_opt_command_example: util_opt_command_example.o $(rootdir)/libutil/libutil.a
-util_panic_example: util_panic_example.o $(rootdir)/libutil/libutil.a
-util_prg_example: util_prg_example.o $(rootdir)/libutil/libutil.a
-util_rec_example: util_rec_example.o $(rootdir)/libutil/libutil.a
+util_base_example: util_base_example.o $(lib)
+util_panic_example: util_panic_example.o $(lib)
+util_path_example: util_path_example.o $(lib)
+util_scandir_example: util_scandir_example.o $(lib)
+util_file_example: util_file_example.o $(lib)
+util_libc_example: util_libc_example.o $(lib)
+util_opt_example: util_opt_example.o $(lib)
+util_opt_command_example: util_opt_command_example.o $(lib)
+util_panic_example: util_panic_example.o $(lib)
+util_prg_example: util_prg_example.o $(lib)
+util_rec_example: util_rec_example.o $(lib)
 
 $(lib): $(objects)
 
