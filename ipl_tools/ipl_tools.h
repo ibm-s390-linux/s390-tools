@@ -24,7 +24,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <lib/zt_common.h>
+#include "lib/zt_common.h"
 
 #define IPL_TYPE_LEN_MAX	100
 #define NSS_NAME_LEN_MAX	8
