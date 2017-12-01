@@ -3,22 +3,32 @@
 #==============================================================================
 include ../common.mak
 
+ALL_CPPFLAGS += -I../include
+ALL_LDFLAGS += -Wl,-z,noexecstack
+
+libs = $(rootdir)/libutil/libutil.a
+
+objects = lsluns.o
+
 SCRIPTS	= lsdasd lstape chccwdev lszfcp cio_ignore znetconf dasdstat
-USRSBIN_SCRIPTS = lsluns
 MANPAGES= lsdasd.8 lstape.8 chccwdev.8 lszfcp.8 lsluns.8 \
 	  cio_ignore.8 znetconf.8 dasdstat.8
 
 SUB_DIRS = zcrypt scm chp css qeth
 
-all: $(SUB_DIRS)
+all: $(SUB_DIRS) lsluns
+
+lsluns: $(objects) $(libs)
 
 clean: $(SUB_DIRS)
+	rm -f *.o *~ lsluns
 
-install:	install-scripts install-manpages install-usrsbin-scripts $(SUB_DIRS)
+install:	install-scripts install-manpages all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 lsznet.raw \
 		$(DESTDIR)$(TOOLS_LIBDIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 znetcontrolunits \
 		$(DESTDIR)$(TOOLS_LIBDIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 lsluns $(DESTDIR)$(TOOLS_LIBDIR)
 
 install-scripts:	$(SCRIPTS)
 	@for i in $^; do \
@@ -27,15 +37,6 @@ install-scripts:	$(SCRIPTS)
 		>$(DESTDIR)$(BINDIR)/$$i; \
 		chown $(OWNER).$(GROUP) $(DESTDIR)$(BINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(BINDIR)/$$i; \
-	done
-
-install-usrsbin-scripts:	$(USRSBIN_SCRIPTS)
-	@for i in $^; do \
-		cat $$i | \
-		sed -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' \
-		>$(DESTDIR)$(USRSBINDIR)/$$i; \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/$$i; \
-		chmod 755 $(DESTDIR)$(USRSBINDIR)/$$i; \
 	done
 
 install-manpages:	$(MANPAGES)
@@ -62,4 +63,4 @@ $(SUB_DIRS):
 		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
 .PHONY: $(SUB_DIRS)
 
-.PHONY: all install clean install-scripts install-manpages install-usrsbin-scripts
+.PHONY: all install clean install-scripts install-manpages
