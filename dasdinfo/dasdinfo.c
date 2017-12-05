@@ -716,8 +716,7 @@ int main(int argc, char * argv[])
 					break;
 			}
 			if (srchuid) {
-				srchuid[0] = '\n';
-				srchuid[1] = 0;
+				srchuid[0] = '\0';
 			}
 			if (export) {
 				printf("ID_UID=%s\n", readbuf);
