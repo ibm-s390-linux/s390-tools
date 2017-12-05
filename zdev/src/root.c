@@ -37,9 +37,14 @@ exit_code_t root_check(void)
 	/* Get list of devices that provide the root device. */
 	selected = selected_dev_list_new();
 	rc = select_by_path(NULL, selected, config_active, scope_mandatory,
-			    NULL, NULL, PATH_ROOT, err_print);
-	if (rc)
+			    NULL, NULL, PATH_ROOT, err_ignore);
+	if (rc) {
+		/* Running from an unknown root device is not an error. */
+		verb("Note: Could not determine if root device configuration "
+		     "needs to be updated\n");
+		rc = 0;
 		goto out;
+	}
 
 	/* Determine if any of the devices or device types has been modified. */
 	mod = strlist_new();
