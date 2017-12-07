@@ -29,13 +29,21 @@ depends() {
 }
 
 installkernel() {
-    local _modules=$(lszdev --by-path / --columns MODULES --no-headings)
+    local _modules=$(lszdev --by-path / --columns MODULES --no-headings 2>/dev/null)
 
+    [ -z "$_modules" ] && return 0
     [ ! -z "$_modules" ] && instmods $_modules
 }
 
 install() {
-    local _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
+    local _tempfile
+
+    # Exit early if root device type is unknown
+    if ! lszdev --by-path / >/dev/null 2>&1 ; then
+        return 0
+    fi
+
+    _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
 
     if chzdev --export - --persistent --by-path / >/dev/null 2>&1 ; then
         # Use persistent configuration
