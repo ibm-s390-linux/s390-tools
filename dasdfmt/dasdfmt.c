@@ -33,7 +33,6 @@ static char *prog_name;
 static volatile sig_atomic_t program_interrupt_in_progress;
 static int reqsize;
 
-
 static const struct util_prg prg = {
 	.desc = "Use dasdfmt to format a DASD ECKD device for use by Linux.\n"
 		"DEVICE is the node of the device (e.g. '/dev/dasda').",
@@ -271,8 +270,8 @@ static int reread_partition_table(void)
 	int rc = -1;
 
 	/* If the BLKRRPART ioctl fails, it is most likely due to
-	   the device just beeing in use by udev. So it is worthwhile
-	   to retry the ioctl after a second as it is likely to succeed.
+	 * the device just being in use by udev. So it is worthwhile
+	 * to retry the ioctl after a second as it is likely to succeed.
 	 */
 	while (rc && (i < 5)) {
 		++i;
@@ -312,16 +311,18 @@ static unsigned int recs_per_track(struct dasd_eckd_characteristics *rdc,
 			kn = ceil_quot(kl + 6, 232) + 1;
 			return 1729 / (10 + 9 + ceil_quot(kl + 6 * kn, 34) +
 				       9 + ceil_quot(dl + 6 * dn, 34));
-		} else
+		} else {
 			return 1729 / (10 + 9 + ceil_quot(dl + 6 * dn, 34));
+		}
 	case 0x9345:
 		dn = ceil_quot(dl + 6, 232) + 1;
 		if (kl) {
 			kn = ceil_quot(kl + 6, 232) + 1;
 			return 1420 / (18 + 7 + ceil_quot(kl + 6 * kn, 34) +
 				       ceil_quot(dl + 6 * dn, 34));
-		} else
+		} else {
 			return 1420 / (18 + 7 + ceil_quot(dl + 6 * dn, 34));
+		}
 	}
 	return 0;
 }
@@ -404,7 +405,7 @@ static void evaluate_format_error(dasdfmt_info_t *info, format_check_t *cdata,
 		break;
 	case DASD_FMT_ERR_RECORD_ID:
 		ERRMSG("Invalid record ID at cyl: %d trk: %d rec: %d.\n",
-			cyl, head, cdata->rec);
+		       cyl, head, cdata->rec);
 		break;
 	case DASD_FMT_ERR_KEY_LENGTH:
 		ERRMSG("Invalid key length (found %d, expected %d) "
@@ -996,7 +997,6 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 	void *ipl1_record, *ipl2_record;
 	int ipl1_record_len, ipl2_record_len;
 
-
 	if (info->verbosity > 0)
 		printf("Retrieving dasd information... ");
 
@@ -1094,7 +1094,7 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 	if (((rc != sizeof(*vlabel) - sizeof(vlabel->formatted_blocks)) &&
 	     info->cdl_format) ||
 	    ((rc != (sizeof(*vlabel) - sizeof(vlabel->volkey))) &&
-	     (!info->cdl_format)))
+	     !info->cdl_format))
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Error writing volume label "
 			    "(%d).\n", prog_name, rc);
 
@@ -1226,7 +1226,7 @@ static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 			      | DASD_FMT_INT_INVAL)
 	};
 
-	if (!((info->withoutprompt) && (info->verbosity < 1)))
+	if (!(info->withoutprompt && (info->verbosity < 1)))
 		printf("Formatting the device. This may take a while "
 		       "(get yourself a coffee).\n");
 
@@ -1281,7 +1281,7 @@ static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 static void dasdfmt_expand_format(dasdfmt_info_t *info, unsigned int cylinders,
 				  unsigned int heads, format_data_t *p)
 {
-	if (!((info->withoutprompt) && (info->verbosity < 1)))
+	if (!(info->withoutprompt && (info->verbosity < 1)))
 		printf("Formatting the device. This may take a while "
 		       "(get yourself a coffee).\n");
 
@@ -1344,7 +1344,7 @@ static void dasdfmt_quick_format(dasdfmt_info_t *info, unsigned int cylinders,
 		}
 	}
 
-	if (!((info->withoutprompt) && (info->verbosity < 1)))
+	if (!(info->withoutprompt && (info->verbosity < 1)))
 		printf("Formatting the first two tracks of the device.\n");
 
 	/* Disable the device before we do anything */
