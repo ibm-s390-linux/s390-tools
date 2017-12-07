@@ -1,20 +1,31 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.1.1 (2017-mm-dd)__
+* __v2.2.0 (2017-12-07)__
+
+  For Linux kernel version: 4.14
 
   Removed tools:
   - lsmem/chmem: Moved to util-linux >= 2.30
 
   Changes of existing tools:
-  - lszcrypt: Add CEX6S exploitation
+  - lszcrypt: Add CEX6S support
+  - cpuplugd/mon_tools: Improve systemctl start error handling
+  - systemd: Install also the unit configuration files
 
   Bug Fixes:
+  - build process: Fix parallel build for libutil
+  - cpi: Add missing Install section to service unit
   - lsluns: Do not scan (all) if filters match nothing
   - lsluns: Enhance usage statement and man page
+  - zdev: Use correct path to vmcp binary
   - ziomon: Re-add missing line in ziomon_fcpconf
+  - ziomon: Fix non-zero return code in ziomon_util
+  - zipl: Remove invalid dasdview command line option
 
 * __v2.1.0 (2017-09-25)__
+
+  For Linux kernel version: 4.13
 
   Added new tools:
   - netboot: Scripts for building a PXE-style netboot image for KVM
