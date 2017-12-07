@@ -220,8 +220,7 @@ static u_int32_t get_usable_cylinders(fdasd_anchor_t *anc)
 		return anc->f4->DS4DCYL;
 	/* normal volume */
 	if (anc->f4->DS4DEVCT.DS4DEVFG & ALTERNATE_CYLINDERS_USED)
-		cyl = anc->f4->DS4DEVCT.DS4DSCYL -
-			(u_int16_t) anc->f4->DS4DEVAC;
+		cyl = anc->f4->DS4DEVCT.DS4DSCYL - (u_int16_t)anc->f4->DS4DEVAC;
 	else
 		cyl = anc->f4->DS4DEVCT.DS4DSCYL;
 
@@ -230,9 +229,8 @@ static u_int32_t get_usable_cylinders(fdasd_anchor_t *anc)
 
 static void get_addr_of_highest_f1_f8_label(fdasd_anchor_t *anc, cchhb_t *addr)
 {
-
 	u_int8_t record;
-	/* We have to count the follwing labels:
+	/* We have to count the following labels:
 	 * one format 4
 	 * one format 5
 	 * format 7 only if we have moren then BIG_DISK_SIZE tracks
@@ -769,7 +767,7 @@ static int fdasd_parse_conffile(fdasd_anchor_t *anc,
 		} else {
 			errno = 0;
 			anc->confdata[i].start = strtol(token[0],
-							(char **) NULL, 10);
+							(char **)NULL, 10);
 			if (errno != 0 || anc->confdata[i].start == 0) {
 				snprintf(err_str, ERROR_STRING_SIZE,
 					 "invalid partition start in config "
@@ -784,7 +782,7 @@ static int fdasd_parse_conffile(fdasd_anchor_t *anc,
 		} else {
 			errno = 0;
 			anc->confdata[i].stop = strtol(token[1],
-						       (char **) NULL, 10);
+						       (char **)NULL, 10);
 			if (errno != 0 || anc->confdata[i].stop == 0) {
 				snprintf(err_str, ERROR_STRING_SIZE,
 					 "invalid partition end in config "
@@ -884,9 +882,9 @@ static void fdasd_check_conffile_input(fdasd_anchor_t *anc,
 			anc->fspace_trk = start - FIRST_USABLE_TRK;
 
 		if (i < USABLE_PARTITIONS - 1) {
-			if (anc->confdata[i+1].start != 0)
+			if (anc->confdata[i + 1].start != 0)
 				part_info->fspace_trk =
-					anc->confdata[i+1].start-stop-1;
+					anc->confdata[i + 1].start - stop - 1;
 			else
 				part_info->fspace_trk = last_trk - stop;
 		} else if (i == USABLE_PARTITIONS - 1) {
@@ -916,8 +914,8 @@ static void fdasd_verify_device(fdasd_anchor_t *anc, char *name)
 	if (!S_ISBLK(dst.st_mode)) {
 		snprintf(err_str, ERROR_STRING_SIZE,
 			 "Device '%s' (%d/%d) is not a block device\n", name,
-			 (unsigned short) major(dst.st_rdev),
-			 (unsigned short) minor(dst.st_rdev));
+			 (unsigned short)major(dst.st_rdev),
+			 (unsigned short)minor(dst.st_rdev));
 		fdasd_error(anc, device_verification_failed, err_str);
 	}
 
@@ -925,8 +923,8 @@ static void fdasd_verify_device(fdasd_anchor_t *anc, char *name)
 		snprintf(err_str, ERROR_STRING_SIZE,
 			 "Partition '%s' (%d/%d) detected where device is "
 			 "required\n", name,
-			 (unsigned short) major(dst.st_rdev),
-			 (unsigned short) minor(dst.st_rdev));
+			 (unsigned short)major(dst.st_rdev),
+			 (unsigned short)minor(dst.st_rdev));
 		fdasd_error(anc, device_verification_failed, err_str);
 	}
 
@@ -962,8 +960,8 @@ static void fdasd_verify_device(fdasd_anchor_t *anc, char *name)
 
 	if (anc->verbose) {
 		printf("Verification successful for '%s' (%d/%d)\n", name,
-		       (unsigned short) major(dst.st_rdev),
-		       (unsigned short) minor(dst.st_rdev));
+		       (unsigned short)major(dst.st_rdev),
+		       (unsigned short)minor(dst.st_rdev));
 	}
 }
 
@@ -1028,15 +1026,13 @@ static void fdasd_verify_options(fdasd_anchor_t *anc)
 		}
 	}
 
-	if (anc->auto_partition &&
-	    (options.conffile || anc->print_table)) {
+	if (anc->auto_partition && (options.conffile || anc->print_table)) {
 		fdasd_error(anc, parser_failed,
 			    "Option 'auto' cannot be used with "
 			    "'config' and 'table'.\n");
 	}
 
-	if (options.conffile  &&
-	    (anc->print_table)) {
+	if (options.conffile && anc->print_table) {
 		fdasd_error(anc, parser_failed,
 			    "Option 'config' cannot be used with"
 			    " 'table'.\n");
@@ -1335,7 +1331,7 @@ static void fdasd_write_vtoc_labels(fdasd_anchor_t *anc)
 			while (getpos(anc, k) > -1)
 				k++;
 
-			setpos(anc, k, i-1);
+			setpos(anc, k, i - 1);
 
 			strncpy(ch, "LINUX.V               "
 				"                      ", 44);
@@ -1414,7 +1410,7 @@ static void fdasd_write_labels(fdasd_anchor_t *anc)
 	if (anc->vtoc_changed)
 		fdasd_write_vtoc_labels(anc);
 
-	if ((anc->vtoc_changed) || (anc->vlabel_changed))
+	if (anc->vtoc_changed || anc->vlabel_changed)
 		fdasd_reread_partition_table(anc);
 }
 
@@ -1500,9 +1496,9 @@ static void fdasd_reuse_vtoc(fdasd_anchor_t *anc)
 
 	if (!anc->silent) {
 		snprintf(str, INPUT_BUF_SIZE,
-			"WARNING: this will re-create your VTOC "
-			"entries using the partition\n           "
-			"information of your existing VTOC. Continue?");
+			 "WARNING: this will re-create your VTOC "
+			 "entries using the partition\n           "
+			 "information of your existing VTOC. Continue?");
 
 		if (yes_no(str) != 0)
 			return;
@@ -1637,9 +1633,11 @@ static void fdasd_change_part_type(fdasd_anchor_t *anc)
 	printf("\n");
 
 	part_type = 0;
-	while (part_type < 1 || part_type > UTIL_ARRAY_SIZE(partition_types) - 1) {
-		while (!isdigit(part_type =
-				read_char("new partition type: ")));
+	while (part_type < 1 ||
+	       part_type > UTIL_ARRAY_SIZE(partition_types) - 1) {
+		do {
+			part_type = read_char("new partition type: ");
+		} while (!isdigit(part_type));
 		part_type -= 48;
 	}
 
@@ -2171,16 +2169,18 @@ static unsigned int recs_per_track(unsigned short dev_type, unsigned int kl,
 			kn = ceil_quot(kl + 6, 232) + 1;
 			return 1729 / (10 + 9 + ceil_quot(kl + 6 * kn, 34) +
 				       9 + ceil_quot(dl + 6 * dn, 34));
-		} else
+		} else {
 			return 1729 / (10 + 9 + ceil_quot(dl + 6 * dn, 34));
+		}
 	case DASD_9345_TYPE:
 		dn = ceil_quot(dl + 6, 232) + 1;
 		if (kl) {
 			kn = ceil_quot(kl + 6, 232) + 1;
 			return 1420 / (18 + 7 + ceil_quot(kl + 6 * kn, 34) +
 				       ceil_quot(dl + 6 * dn, 34));
-		} else
+		} else {
 			return 1420 / (18 + 7 + ceil_quot(dl + 6 * dn, 34));
+		}
 	}
 	return 0;
 }
@@ -2384,10 +2384,8 @@ fdasd_read_int(unsigned long low, unsigned long dflt, unsigned long high,
 	}
 
 	while (1) {
-		while (!isdigit(read_char(msg_txt))
-		       && (*line_ptr != '-' &&
-			   *line_ptr != '+' &&
-			   *line_ptr != '\0'))
+		while (!isdigit(read_char(msg_txt)) &&
+		       (*line_ptr != '-' && *line_ptr != '+' && *line_ptr != '\0'))
 			continue;
 		if ((*line_ptr == '+' || *line_ptr == '-') && base != lower) {
 			if (*line_ptr == '+')
@@ -2411,13 +2409,13 @@ fdasd_read_int(unsigned long low, unsigned long dflt, unsigned long high,
 				break;
 			case 'm':
 			case 'M':
-				trk *= (1024*1024);
+				trk *= (1024 * 1024);
 				trk /= anc->blksize;
 				trk /= geo.sectors;
 				break;
 			case 'g':
 			case 'G':
-				trk *= (1024*1024*1024);
+				trk *= (1024 * 1024 * 1024);
 				trk /= anc->blksize;
 				trk /= geo.sectors;
 				break;
@@ -2546,7 +2544,6 @@ static int fdasd_get_partition_data(fdasd_anchor_t *anc, extent_t *part_extent,
 			limit = part_tmp->start_trk - 1;
 			break;
 		}
-
 	}
 
 	if (start == limit) {
@@ -2642,7 +2639,7 @@ static void fdasd_enqueue_new_partition(fdasd_anchor_t *anc)
 				FIRST_USABLE_TRK;
 		}
 	} else {
-		/* there are partitons in front of the new one */
+		/* there are partitions in front of the new one */
 		if (part_info->start_trk == part_info->prev->end_trk + 1) {
 			/* new partition is right behind the previous one */
 			part_info->fspace_trk = part_info->prev->fspace_trk -
@@ -2797,7 +2794,7 @@ static void fdasd_remove_partition(fdasd_anchor_t *anc)
 /*
  * writes a standard volume label and a standard VTOC with
  * only one partition to disc. With this function is it
- * possible to create one partiton in non-interactive mode,
+ * possible to create one partition in non-interactive mode,
  * which can be used within shell scripts
  */
 static void fdasd_auto_partition(fdasd_anchor_t *anc)
@@ -3067,7 +3064,6 @@ int main(int argc, char *argv[])
 			fdasd_recreate_vtoc(&anchor);
 			anchor.option_recreate = 0;
 		}
-
 	}
 
 	return -1;
