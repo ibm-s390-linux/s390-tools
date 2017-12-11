@@ -19,6 +19,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/dasd_base.h"
 
 #define LINE_LENGTH 80
 #define VTOC_START_CC 0x0
@@ -39,14 +40,6 @@
 #define LV_COMPAT_CYL 0xFFFE
 
 #define VTOC_ERROR "VTOC error:"
-
-/* definition from hdreq.h */
-struct hd_geometry {
-      unsigned char heads;
-      unsigned char sectors;
-      unsigned short cylinders;
-      unsigned long start;
-};
 
 typedef struct ttr 
 {

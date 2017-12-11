@@ -25,6 +25,8 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include "lib/dasd_base.h"
+#include "lib/dasd_sys.h"
 #include "lib/libzds.h"
 #include "lib/u2s.h"
 #include "lib/util_base.h"
@@ -116,9 +118,9 @@ static void zt_error_print(const char *fmt, ...)
 {
 	va_list args;
 
-	va_start (args, fmt);
+	va_start(args, fmt);
 	vsnprintf(error_str, ERROR_STRING_SIZE, fmt, args);
-	va_end (args);
+	va_end(args);
 
 	fprintf(stderr, "Error: %s\n", error_str);
 }
@@ -126,95 +128,51 @@ static void zt_error_print(const char *fmt, ...)
 /*
  * replace special characters with dots and question marks
  */
-static void
-dot (char label[]) {
-
-        int i;
+static void dot(char label[])
+{
+	int i;
 	char c;
 
-  	for (i = 0; i < 16; i++) {
-
-	        c = label[i];
-		if (c <= 0x20) label[i] = '?';
-		if (c == 0x00) label[i] = '.';
-		if (c == 0x60) label[i] = '?';
-		if (c >= 0x7f) label[i] = '?';
+	for (i = 0; i < 16; i++) {
+		c = label[i];
+		if (c <= 0x20)
+			label[i] = '?';
+		if (c == 0x00)
+			label[i] = '.';
+		if (c == 0x60)
+			label[i] = '?';
+		if (c >= 0x7f)
+			label[i] = '?';
 	}
-}
-
-
-/*
- * Attempts to find the sysfs entry for the given busid and reads
- * the contents of a specified attribute to the buffer
- */
-static int dasdview_read_attribute(char *busid, char *attribute, char *buffer,
-				   size_t count)
-{
-	char path[100];
-	int rc, fd;
-	ssize_t rcount;
-
-	rc = 0;
-	snprintf(path, sizeof(path), "/sys/bus/ccw/devices/%s/%s",
-		 busid, attribute);
-	fd = open(path, O_RDONLY);
-	if (fd < 0)
-		return errno;
-	rcount = read(fd, buffer, count);
-	if (rcount < 0)
-		rc = errno;
-	close(fd);
-	return rc;
 }
 
 static void
 dasdview_get_info(dasdview_info_t *info)
 {
-	int fd;
 	struct dasd_eckd_characteristics *characteristics;
-	char buffer[10];
-	int rc;
+	int err;
 
-	fd = open(info->device, O_RDONLY);
-	if (fd == -1)
-	{
-		zt_error_print("dasdview: open error\n" \
-			"Could not open device '%s'.\n"
-			"Maybe you have specified an unknown device or \n"
-			"you are not authorized to do that.\n",
-			info->device);
+	err = dasd_get_geo(info->device, &info->geo);
+	if (err != 0) {
+		/* Test for unknown device in the first call to libdasd to avoid
+		 * spitting out two different error messages to the user
+		 */
+		if (err != EBADF)
+			zt_error_print("dasdview: "
+				       "Could not retrieve geo information!\n");
 		exit(-1);
 	}
 
-	/* get disk geometry */
-	if (ioctl(fd, HDIO_GETGEO, &info->geo) != 0)
-	{
-	        close(fd);
-		zt_error_print("dasdview: ioctl error\n" \
-			"Could not retrieve disk geometry " \
-			"information.");
+	if (dasd_get_blocksize(info->device, &info->blksize) != 0) {
+		zt_error_print("dasdview: "
+			       "Could not retrieve blocksize information!\n");
 		exit(-1);
 	}
 
-	if (ioctl(fd, BLKSSZGET, &info->blksize) != 0)
-	{
-	        close(fd);
-		zt_error_print("dasdview: ioctl error\n" \
-			"Could not retrieve blocksize information!\n");
+	if (dasd_get_info(info->device, &info->dasd_info) != 0) {
+		zt_error_print("dasdview: "
+			       "Could not retrieve disk information!\n");
 		exit(-1);
-	}
-
-	/* get disk information */
-	if (ioctl(fd, BIODASDINFO2, &info->dasd_info) == 0) {
-		info->dasd_info_version = 2;
-	} else {
-		/* INFO2 failed - try INFO using the same (larger) buffer */
-		if (ioctl(fd, BIODASDINFO, &info->dasd_info) != 0) {
-			close(fd);
-			zt_error_print("dasdview: ioctl error\n"	\
-				       "Could not retrieve disk information.");
-			exit(-1);
-		}
 	}
 
 	characteristics = (struct dasd_eckd_characteristics *)
@@ -224,25 +182,14 @@ dasdview_get_info(dasdview_info_t *info)
 		info->hw_cylinders = characteristics->long_no_cyl;
 	else
 		info->hw_cylinders = characteristics->no_cyl;
-	close(fd);
 
-
-	if(u2s_getbusid(info->device, info->busid) == -1)
+	if (u2s_getbusid(info->device, info->busid) == -1)
 		info->busid_valid = 0;
 	else
 		info->busid_valid = 1;
 
-	rc = dasdview_read_attribute(info->busid, "raw_track_access", buffer,
-				sizeof(buffer));
-	if (rc) {
-		zt_error_print("dasdview: Could not retrieve raw_track_access"
-			       " mode information.");
-		return;
-	}
-	if ('1' == buffer[0])
-		info->raw_track_access = 1;
+	info->raw_track_access = dasd_sys_raw_track_access(info->device);
 }
-
 
 static void
 dasdview_parse_input(unsigned long long *p, dasdview_info_t *info, char *s)
@@ -252,30 +199,29 @@ dasdview_parse_input(unsigned long long *p, dasdview_info_t *info, char *s)
 	char suffix;
 
 	l = strtoull(s, &endp, 0);
-	if ((endp == s) || ((l+1) == 0))
+	if ((endp == s) || ((l + 1) == 0))
 		goto error;
 
 	if (*endp) {
-		if (!strchr("kmtbcKMTBC", *endp) || *(endp+1))
+		if (!strchr("kmtbcKMTBC", *endp) || *(endp + 1))
 			goto error;
 		suffix = tolower(*endp);
-	} else
+	} else {
 		suffix = 0;
+	}
 	if (info->raw_track_access) {
 		switch (suffix) {
 		case 't':
 			l *= RAWTRACKSIZE;
 			break;
 		case 'c':
-			l *= (unsigned long long) info->geo.heads *
-				RAWTRACKSIZE;
+			l *= (unsigned long long)info->geo.heads * RAWTRACKSIZE;
 			break;
 		case 0:
 			if (l % RAWTRACKSIZE) {
 				zt_error_print("dasdview: only full tracks can"
-					     " be accessd on devices with "
-					     " raw_track_access enabled.\n", s);
-
+					       " be accessd on devices with "
+					       " raw_track_access enabled.\n", s);
 				goto error;
 			}
 			break;
@@ -294,16 +240,16 @@ dasdview_parse_input(unsigned long long *p, dasdview_info_t *info, char *s)
 			l *= 1024LL * 1024LL;
 			break;
 		case 't':
-			l *= (unsigned long long) info->blksize *
-				(unsigned long long) info->geo.sectors;
+			l *= (unsigned long long)info->blksize *
+				(unsigned long long)info->geo.sectors;
 			break;
 		case 'b':
-			l *= (unsigned long long) info->blksize;
+			l *= (unsigned long long)info->blksize;
 			break;
 		case 'c':
-			l *= (unsigned long long) info->blksize *
-				(unsigned long long) info->geo.sectors *
-				(unsigned long long) info->geo.heads;
+			l *= (unsigned long long)info->blksize *
+				(unsigned long long)info->geo.sectors *
+				(unsigned long long)info->geo.heads;
 			break;
 		default:
 			break;
@@ -324,20 +270,19 @@ error:
 static void
 dasdview_print_general_info(dasdview_info_t *info)
 {
-	printf("\n--- general DASD information -----------------" \
+	printf("\n--- general DASD information -----------------"
 	       "---------------------------------\n");
-	printf("device node            : %s\n",info->device);
+	printf("device node            : %s\n", info->device);
 #ifdef SYSFS
 	struct utsname buf;
-	unsigned char a,b,c;
+	unsigned char a, b, c;
 	char suffix[sizeof(buf.release)];
 	int rc;
 
 	rc = uname(&buf);
-	if(!rc)
-	{
+	if (!rc) {
 		sscanf(buf.release, "%c.%c.%c-%s", &a, &b, &c, suffix);
-		if(KERNEL_VERSION(2,5,0) <= KERNEL_VERSION(a, b, c)) {
+		if (KERNEL_VERSION(2, 5, 0) <= KERNEL_VERSION(a, b, c)) {
 			if (info->busid_valid)
 				printf("busid                  : %s\n",
 				       info->busid);
@@ -357,7 +302,7 @@ dasdview_print_general_info(dasdview_info_t *info)
 	printf("device type            : hex %x  \tdec %d\n",
 	       info->dasd_info.dev_type,
 	       info->dasd_info.dev_type);
-	printf("\n--- DASD geometry ----------------------------" \
+	printf("\n--- DASD geometry ----------------------------"
 	       "---------------------------------\n");
 	printf("number of cylinders    : hex %x  \tdec %d\n",
 	       info->hw_cylinders,
@@ -388,8 +333,10 @@ dasdview_dump_array(char *name, int size, unsigned char *addr)
 			else
 				printf("\n%25s", "");
 		} else {
-			if (i % 8 == 0) printf(" ");
-			if (i % 4 == 0) printf(" ");
+			if (i % 8 == 0)
+				printf(" ");
+			if (i % 4 == 0)
+				printf(" ");
 		}
 		printf("%02x", addr[i]);
 	}
@@ -407,13 +354,13 @@ dasdview_print_extended_info(dasdview_info_t *info)
 	struct {
 		unsigned int mask;
 		char *name;
-	} flist[2] = {{DASD_FEATURE_READONLY, "ro"  },
-		      {DASD_FEATURE_USEDIAG,  "diag"}};
+	} flist[2] = { {DASD_FEATURE_READONLY, "ro"  },
+		       {DASD_FEATURE_USEDIAG,  "diag"} };
 
 	dasd_info = &info->dasd_info;
-	printf("\n--- extended DASD information ----------------" \
+	printf("\n--- extended DASD information ----------------"
 	       "---------------------------------\n");
-        printf("real device number     : hex %x  \tdec %d\n",
+	printf("real device number     : hex %x  \tdec %d\n",
 	       dasd_info->real_devno, dasd_info->real_devno);
 	printf("subchannel identifier  : hex %x  \tdec %d\n",
 	       dasd_info->schid, dasd_info->schid);
@@ -427,7 +374,7 @@ dasdview_print_extended_info(dasdview_info_t *info)
 	       dasd_info->dev_model, dasd_info->dev_model);
 	printf("open count             : hex %x  \tdec %d\n",
 	       dasd_info->open_count, dasd_info->open_count);
-        printf("req_queue_len          : hex %x  \tdec %d\n",
+	printf("req_queue_len          : hex %x  \tdec %d\n",
 	       dasd_info->req_queue_len, dasd_info->req_queue_len);
 	printf("chanq_len              : hex %x  \tdec %d\n",
 	       dasd_info->chanq_len, dasd_info->chanq_len);
@@ -437,32 +384,30 @@ dasdview_print_extended_info(dasdview_info_t *info)
 	       dasd_info->label_block, dasd_info->label_block);
 	printf("FBA_layout             : hex %x  \tdec %d\n",
 	       dasd_info->FBA_layout, dasd_info->FBA_layout);
-        printf("characteristics_size   : hex %x  \tdec %d\n",
+	printf("characteristics_size   : hex %x  \tdec %d\n",
 	       dasd_info->characteristics_size,
 	       dasd_info->characteristics_size);
-        printf("confdata_size          : hex %x  \tdec %d\n",
+	printf("confdata_size          : hex %x  \tdec %d\n",
 	       dasd_info->confdata_size, dasd_info->confdata_size);
 
-	if (info->dasd_info_version >= 2) {
-		printf("format                 : hex %x  \tdec %d      \t%s\n",
-		       dasd_info->format, dasd_info->format,
-		       dasd_info->format == DASD_FORMAT_NONE ?
-		       "NOT formatted" :
-		       dasd_info->format == DASD_FORMAT_LDL  ?
-		       "LDL formatted" :
-		       dasd_info->format == DASD_FORMAT_CDL  ?
-		       "CDL formatted" : "unknown format");
+	printf("format                 : hex %x  \tdec %d      \t%s\n",
+	       dasd_info->format, dasd_info->format,
+	       dasd_info->format == DASD_FORMAT_NONE ?
+	       "NOT formatted" :
+	       dasd_info->format == DASD_FORMAT_LDL  ?
+	       "LDL formatted" :
+	       dasd_info->format == DASD_FORMAT_CDL  ?
+	       "CDL formatted" : "unknown format");
 
-		printf("features               : hex %x  \tdec %d      \t",
-		       dasd_info->features, dasd_info->features);
-		if (dasd_info->features == DASD_FEATURE_DEFAULT)
-			printf("default\n");
-		else {
-			for (i = 0; i < (sizeof(flist)/sizeof(flist[0])); i++)
-				if (dasd_info->features & flist[i].mask)
-					printf("%s ",flist[i].name);
-			printf("\n");
-		}
+	printf("features               : hex %x  \tdec %d      \t",
+	       dasd_info->features, dasd_info->features);
+	if (dasd_info->features == DASD_FEATURE_DEFAULT) {
+		printf("default\n");
+	} else {
+		for (i = 0; i < UTIL_ARRAY_SIZE(flist); i++)
+			if (dasd_info->features & flist[i].mask)
+				printf("%s ", flist[i].name);
+		printf("\n");
 	}
 	printf("\n");
 	dasdview_dump_array("characteristics",
@@ -474,7 +419,6 @@ dasdview_print_extended_info(dasdview_info_t *info)
 			    dasd_info->configuration_data);
 }
 
-
 static void
 dasdview_read_vlabel(dasdview_info_t *info, volume_label_t *vlabel)
 {
@@ -485,17 +429,15 @@ dasdview_read_vlabel(dasdview_info_t *info, volume_label_t *vlabel)
 
 	bzero(vlabel, sizeof(volume_label_t));
 	if ((strncmp(info->dasd_info.type, "ECKD", 4) == 0) &&
-	    (!info->dasd_info.FBA_layout)) {
+	    !info->dasd_info.FBA_layout) {
 		/* OS/390 and zOS compatible disk layout */
 		vtoc_read_volume_label(info->device, pos, vlabel);
-	}
-	else {
+	} else {
 		/* standard LINUX disk layout */
 		vtoc_read_volume_label(info->device, pos, &tmp);
-		memcpy(vlabel->vollbl, &tmp, sizeof(tmp)-4);
+		memcpy(vlabel->vollbl, &tmp, sizeof(tmp) - 4);
 	}
 }
-
 
 static void
 dasdview_print_vlabel(dasdview_info_t *info)
@@ -516,10 +458,11 @@ dasdview_print_vlabel(dasdview_info_t *info)
 		}
 		lzds_dasd_get_vlabel(info->dasd, &tmpvlabel);
 		memcpy(&vlabel, tmpvlabel, sizeof(vlabel));
-	} else
+	} else {
 		dasdview_read_vlabel(info, &vlabel);
+	}
 
-	printf("\n--- volume label -----------------------------" \
+	printf("\n--- volume label -----------------------------"
 	       "---------------------------------\n");
 
 	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.volkey, 4);
@@ -527,21 +470,24 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
 	printf("                        : hex    ");
-	for (i=0; i<4; i++) printf("%02x", s4[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", s4[i]);
 
 	bzero(s4, 5); bzero(s4, 5); strncpy((char *)s4, vlabel.vollbl, 4);
 	printf("\n\nvolume label identifier : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
 	printf("                        : hex    ");
-	for (i=0; i<4; i++) printf("%02x", s4[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", s4[i]);
 
 	bzero(s6, 7); bzero(t6, 7); strncpy((char *)s6, vlabel.volid, 6);
 	printf("\n\nvolume identifier       : ascii  '%6s'\n", s6);
 	vtoc_ebcdic_dec((char *)s6, (char *)t6, 6);
 	printf("                        : ebcdic '%6s'\n", t6);
 	printf("                        : hex    ");
-	for (i=0; i<6; i++) printf("%02x", s6[i]);
+	for (i = 0; i < 6; i++)
+		printf("%02x", s6[i]);
 
 	printf("\n\nsecurity byte           : hex    %02x\n", vlabel.security);
 
@@ -551,7 +497,7 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	    (vlabel.vtoc.b == 0x40))
 		printf("\n");
 	else
-		printf("\n                                 " \
+		printf("\n                                 "
 		       "(cyl %d, trk %d, blk %d)\n\n",
 		       vtoc_get_cyl_from_cchhb(&vlabel.vtoc),
 		       vtoc_get_head_from_cchhb(&vlabel.vtoc), vlabel.vtoc.b);
@@ -561,46 +507,52 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	vtoc_ebcdic_dec((char *)s5, (char *)t5, 5);
 	printf("                        : ebcdic '%5s'\n", t5);
 	printf("                        : hex    ");
-	for (i=0; i<5; i++) printf("%02x", s5[i]);
+	for (i = 0; i < 5; i++)
+		printf("%02x", s5[i]);
 
 	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.cisize, 4);
 	printf("\n\nCI size for FBA         : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
 	printf("                        : hex    ");
-	for (i=0; i<4; i++) printf("%02x", s4[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", s4[i]);
 
 	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.blkperci, 4);
 	printf("\n\nblocks per CI (FBA)     : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
 	printf("                        : hex    ");
-	for (i=0; i<4; i++) printf("%02x", s4[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", s4[i]);
 
 	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.labperci, 4);
 	printf("\n\nlabels per CI (FBA)     : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
 	printf("                        : hex    ");
-	for (i=0; i<4; i++) printf("%02x", s4[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", s4[i]);
 
 	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.res2, 4);
 	printf("\n\nreserved                : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
 	printf("                        : hex    ");
-	for (i=0; i<4; i++) printf("%02x", s4[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", s4[i]);
 
 	bzero(s14, 15); bzero(t14, 15); strncpy(s14, vlabel.lvtoc, 14);
 	printf("\n\nowner code for VTOC     : ascii  '%14s'\n", s14);
 	vtoc_ebcdic_dec(s14, t14, 14);
 	printf("                          ebcdic '%14s'\n", t14);
 	printf("                          hex    ");
-	for (i=0; i<14; i++)
-	{
+	for (i = 0; i < 14; i++) {
 		printf("%02x", s14[i]);
-		if ((i+1)%4 == 0) printf(" ");
-		if ((i+1)%8 == 0) printf(" ");
+		if ((i + 1) % 4 == 0)
+			printf(" ");
+		if ((i + 1) % 8 == 0)
+			printf(" ");
 	}
 
 	bzero(s29, 30); strncpy(s29, vlabel.res3, 28);
@@ -609,13 +561,15 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	vtoc_ebcdic_dec(s29, t29, 28);
 	printf("                          ebcdic '%28s'\n", t29);
 	printf("                          hex    ");
-	for (i=0; i<28; i++)
-	{
+	for (i = 0; i < 28; i++) {
 		printf("%02x", s29[i]);
-		if ((i+1)%4 == 0) printf(" ");
-		if ((i+1)%8 == 0) printf(" ");
-		if ((i+1)%16 == 0) printf("\n                " \
-					  "                 ");
+		if ((i + 1) % 4 == 0)
+			printf(" ");
+		if ((i + 1) % 8 == 0)
+			printf(" ");
+		if ((i + 1) % 16 == 0)
+			printf("\n                "
+			       "                 ");
 	}
 
 	bzero(s4, 5); bzero(t4, 5); s4[0] = vlabel.ldl_version;
@@ -631,7 +585,6 @@ dasdview_print_vlabel(dasdview_info_t *info)
 
 	printf("\n");
 }
-
 
 static void
 dasdview_print_volser(dasdview_info_t *info)
@@ -651,28 +604,30 @@ dasdview_print_volser(dasdview_info_t *info)
 		}
 		lzds_dasd_get_vlabel(info->dasd, &tmpvlabel);
 		memcpy(&vlabel, tmpvlabel, sizeof(vlabel));
-	} else
+	} else {
 		dasdview_read_vlabel(info, &vlabel);
+	}
 
 	bzero(vollbl, 5);
 	bzero(volser, 7);
 	strncpy(vollbl, vlabel.vollbl, 4);
 	vtoc_ebcdic_dec(vollbl, vollbl, 4);
 
-	if ((strncmp(vollbl, "VOL1", 4) == 0)||(strncmp(vollbl, "LNX1", 4) == 0)) {
-	        strncpy(volser, vlabel.volid, 6);
+	if ((strncmp(vollbl, "VOL1", 4) == 0) ||
+	    (strncmp(vollbl, "LNX1", 4) == 0)) {
+		strncpy(volser, vlabel.volid, 6);
 		vtoc_ebcdic_dec(volser, volser, 6);
-	} else
-	        strncpy(volser, "      ", 6);
+	} else {
+		strncpy(volser, "      ", 6);
+	}
 
 	printf("%6.6s\n", volser);
 }
 
-
 static void
 dasdview_read_vtoc(dasdview_info_t *info)
 {
-        volume_label_t vlabel;
+	volume_label_t vlabel;
 	format1_label_t tmp;
 	unsigned long maxblk, pos;
 	u_int64_t vtocblk;
@@ -682,20 +637,17 @@ dasdview_read_vtoc(dasdview_info_t *info)
 
 	bzero(&vlabel, sizeof(vlabel));
 	if ((strncmp(info->dasd_info.type, "ECKD", 4) == 0) &&
-	    (!info->dasd_info.FBA_layout))
-	{
+	    !info->dasd_info.FBA_layout) {
 		/* OS/390 and zOS compatible disk layout */
 		vtoc_read_volume_label(info->device, pos, &vlabel);
-	}
-	else
-	{
-		zt_error_print("dasdview: disk layout error\n" \
-			"%s is not formatted with the z/OS " \
-			"compatible disk layout!\n", info->device);
+	} else {
+		zt_error_print("dasdview: disk layout error\n"
+			       "%s is not formatted with the z/OS "
+			       "compatible disk layout!\n", info->device);
 		exit(-1);
 	}
 
-	vtocblk = (u_int64_t) vtoc_get_cyl_from_cchhb(&vlabel.vtoc) *
+	vtocblk = (u_int64_t)vtoc_get_cyl_from_cchhb(&vlabel.vtoc) *
 		info->geo.heads * info->geo.sectors +
 		vtoc_get_head_from_cchhb(&vlabel.vtoc) * info->geo.sectors +
 		vlabel.vtoc.b;
@@ -709,10 +661,9 @@ dasdview_read_vtoc(dasdview_info_t *info)
 	 */
 	maxblk = info->geo.cylinders * info->geo.heads * info->geo.sectors;
 
-	if ((vtocblk <= 0) || (vtocblk > maxblk))
-	{
-		zt_error_print("dasdview: VTOC error\n" \
-			"Volume label VTOC pointer is not valid!\n");
+	if ((vtocblk <= 0) || (vtocblk > maxblk)) {
+		zt_error_print("dasdview: VTOC error\n"
+			       "Volume label VTOC pointer is not valid!\n");
 		exit(-1);
 	}
 
@@ -721,21 +672,19 @@ dasdview_read_vtoc(dasdview_info_t *info)
 
 	if ((info->f4.DS4KEYCD[0] != 0x04) ||
 	    (info->f4.DS4KEYCD[43] != 0x04) ||
-	    (info->f4.DS4IDFMT != 0xf4))
-	{
+	    (info->f4.DS4IDFMT != 0xf4)) {
 		/* format4 DSCB is invalid */
-		zt_error_print("dasdview: VTOC error\n" \
-			"Format 4 DSCB is invalid!\n");
+		zt_error_print("dasdview: VTOC error\n"
+			       "Format 4 DSCB is invalid!\n");
 		exit(-1);
 	}
 
 	info->f4c++;
 	pos = (vtocblk - 1) * info->blksize;
 
-	for (i=1; i<info->geo.sectors; i++)
-	{
-	        pos += info->blksize;
-	        vtoc_read_label(info->device, pos, &tmp, NULL, NULL, NULL);
+	for (i = 1; i < info->geo.sectors; i++) {
+		pos += info->blksize;
+		vtoc_read_label(info->device, pos, &tmp, NULL, NULL, NULL);
 
 		switch (tmp.DS1FMTID) {
 		case 0xf1:
@@ -768,28 +717,25 @@ dasdview_read_vtoc(dasdview_info_t *info)
 			break;
 		default:
 			printf("Unknown label in VTOC detected (id=%x)\n",
-				 tmp.DS1FMTID);
+			       tmp.DS1FMTID);
 		}
 	}
 
-	if (info->f4c > 1)
-        {
-		zt_error_print("dasdview: VTOC error\n" \
-			"More than one FMT4 DSCB!\n");
+	if (info->f4c > 1) {
+		zt_error_print("dasdview: VTOC error\n"
+			       "More than one FMT4 DSCB!\n");
 		exit(-1);
 	}
 
-	if (info->f5c > 1)
-        {
-		zt_error_print("dasdview: VTOC error\n" \
-			"More than one FMT5 DSCB!\n");
+	if (info->f5c > 1) {
+		zt_error_print("dasdview: VTOC error\n"
+			       "More than one FMT5 DSCB!\n");
 		exit(-1);
 	}
 
-	if (info->f7c > 1)
-        {
-		zt_error_print("dasdview: VTOC error\n" \
-			"More than one FMT7 DSCB!\n");
+	if (info->f7c > 1) {
+		zt_error_print("dasdview: VTOC error\n"
+			       "More than one FMT7 DSCB!\n");
 		exit(-1);
 	}
 }
@@ -798,7 +744,7 @@ static void dasdview_print_format1_8_short_info(format1_label_t *f1,
 						struct hd_geometry *geo)
 {
 	char s6[7], s13[14], s44[45];
-	unsigned long track_low , track_up;
+	unsigned long track_low, track_up;
 
 	bzero(s44, 45);
 	strncpy(s44, f1->DS1DSNAM, 44);
@@ -815,14 +761,14 @@ static void dasdview_print_format1_8_short_info(format1_label_t *f1,
 
 	printf(" | %44s |          trk |          trk |\n",
 	       s44);
-	printf(" | data set serial number :"	     \
-	       " '%6s'            |"					\
+	printf(" | data set serial number :"
+	       " '%6s'            |"
 	       " %12ld | %12ld |\n", s6, track_low, track_up);
-	printf(" | system code            :"   \
-	       " '%13s'     |"						\
+	printf(" | system code            :"
+	       " '%13s'     |"
 	       "      cyl/trk |      cyl/trk |\n", s13);
-	printf(" | creation date          :"	       \
-	       "  year %4d, day %3d |"				\
+	printf(" | creation date          :"
+	       "  year %4d, day %3d |"
 	       " %8d/%3d | %8d/%3d |\n",
 	       f1->DS1CREDT.year + 1900,
 	       f1->DS1CREDT.day,
@@ -830,15 +776,15 @@ static void dasdview_print_format1_8_short_info(format1_label_t *f1,
 	       vtoc_get_head_from_cchh(&f1->DS1EXT1.llimit),
 	       vtoc_get_cyl_from_cchh(&f1->DS1EXT1.ulimit),
 	       vtoc_get_head_from_cchh(&f1->DS1EXT1.ulimit));
-	printf(" +-----------------------------------------"		\
+	printf(" +-----------------------------------------"
 	       "-----+--------------+--------------+\n");
 }
 
 static void dasdview_print_vtoc_info(dasdview_info_t *info)
 {
-        int i;
+	int i;
 
-	printf("--- VTOC info --------------------------------" \
+	printf("--- VTOC info --------------------------------"
 	       "---------------------------------\n");
 	printf("The VTOC contains:\n");
 	printf("  %d format 1 label(s)\n", info->f1c);
@@ -848,22 +794,22 @@ static void dasdview_print_vtoc_info(dasdview_info_t *info)
 	printf("  %d format 8 label(s)\n", info->f8c);
 	printf("  %d format 9 label(s)\n", info->f9c);
 
-	if ((info->f1c < 1) && (info->f8c < 1))	{
-	        printf("There are no partitions defined.\n");
+	if ((info->f1c < 1) && (info->f8c < 1)) {
+		printf("There are no partitions defined.\n");
 	} else {
-	        printf("Other mainframe operating systems would see " \
+		printf("Other mainframe operating systems would see "
 		       "the following data sets:\n");
-		printf(" +----------------------------------------------+" \
+		printf(" +----------------------------------------------+"
 		       "--------------+--------------+\n");
-		printf(" | data set                                     |" \
+		printf(" | data set                                     |"
 		       " start        | end          |\n");
-		printf(" +----------------------------------------------+" \
+		printf(" +----------------------------------------------+"
 		       "--------------+--------------+\n");
 
-		for (i=0; i<info->f1c; i++)
+		for (i = 0; i < info->f1c; i++)
 			dasdview_print_format1_8_short_info(&info->f1[i],
 							    &info->geo);
-		for (i=0; i<info->f8c; i++)
+		for (i = 0; i < info->f8c; i++)
 			dasdview_print_format1_8_short_info(&info->f8[i],
 							    &info->geo);
 	}
@@ -1020,16 +966,15 @@ static void dasdview_print_format1_8_short_info_raw(format1_label_t *f1,
 	 */
 	rc = lzds_raw_vtoc_get_dscb_from_cchhb(info->rawvtoc, &f1->DS1PTRDS,
 					       &dscb);
-	/* The first f9 label contains extra data that we may want
-	 * to print here */
+	/* The first f9 label contains extra data that we may want to print here
+	 */
 	while (!rc && dscb && dscb->fmtid == 0xf9) {
 		f9 = (format9_label_t *)dscb;
 		rc = lzds_raw_vtoc_get_dscb_from_cchhb(info->rawvtoc,
 						       &f9->DS9PTRDS, &dscb);
 	}
 	if (rc) {
-		zt_error_print("dasdview: Broken format 3 DSCB"
-			       " chain \n");
+		zt_error_print("dasdview: Broken format 3 DSCB chain \n");
 		exit(-1);
 	}
 	f3 = (dscb && dscb->fmtid == 0xf3) ? (format3_label_t *)dscb : NULL;
@@ -1099,7 +1044,7 @@ static void dasdview_print_vtoc_info_raw(dasdview_info_t *info)
 			++f9c;
 	}
 	lzds_dscbiterator_free(it);
-	printf("--- VTOC info --------------------------------" \
+	printf("--- VTOC info --------------------------------"
 	       "---------------------------------\n");
 	printf("The VTOC contains:\n");
 	printf("  %d format 1 label(s)\n", f1c);
@@ -1123,7 +1068,6 @@ static void dasdview_print_vtoc_info_raw(dasdview_info_t *info)
 	lzds_dscbiterator_free(it);
 }
 
-
 /*
  * Note: the explicit cylinder/head conversion for large volume
  * adresses should not be necessary for entries that point to
@@ -1146,19 +1090,20 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	printf("DS1FMTID    : dec %d, hex %02x\n",
 	       f1->DS1FMTID, f1->DS1FMTID);
 	printf("DS1DSSN     : hex    ");
-	for (i=0; i<6; i++) printf("%02x", f1->DS1DSSN[i]);
+	for (i = 0; i < 6; i++)
+		printf("%02x", f1->DS1DSSN[i]);
 	strncpy(s6, (char *)f1->DS1DSSN, 6);
 	printf("\n              ascii  '%6s'\n", s6);
 	vtoc_ebcdic_dec(s6, s6, 6);
 	printf("              ebcdic '%6s'\n", s6);
 	printf("DS1VOLSQ    : dec %d, hex %04x\n",
 	       f1->DS1VOLSQ, f1->DS1VOLSQ);
-	printf("DS1CREDT    : hex %02x%04x "	\
+	printf("DS1CREDT    : hex %02x%04x "
 	       "(year %d, day %d)\n",
 	       f1->DS1CREDT.year, f1->DS1CREDT.day,
 	       f1->DS1CREDT.year + 1900,
 	       f1->DS1CREDT.day);
-	printf("DS1EXPDT    : hex %02x%04x "	\
+	printf("DS1EXPDT    : hex %02x%04x "
 	       "(year %d, day %d)\n",
 	       f1->DS1EXPDT.year, f1->DS1EXPDT.day,
 	       f1->DS1EXPDT.year + 1900,
@@ -1170,12 +1115,13 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	printf("DS1FLAG1    : dec %d, hex %02x\n",
 	       f1->DS1FLAG1, f1->DS1FLAG1);
 	printf("DS1SYSCD    : hex    ");
-	for (i=0; i<13; i++) printf("%02x", f1->DS1SYSCD[i]);
+	for (i = 0; i < 13; i++)
+		printf("%02x", f1->DS1SYSCD[i]);
 	strncpy(s13, (char *)f1->DS1SYSCD, 13);
 	printf("\n              ascii  '%13s'\n", s13);
 	vtoc_ebcdic_dec(s13, s13, 13);
 	printf("              ebcdic '%13s'\n", s13);
-	printf("DS1REFD     : hex %02x%04x "	\
+	printf("DS1REFD     : hex %02x%04x "
 	       "(year %d, day %d)\n",
 	       f1->DS1REFD.year, f1->DS1REFD.day,
 	       f1->DS1REFD.year + 1900,
@@ -1207,8 +1153,9 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	printf("DS1SCAL1    : dec %d, hex %02x\n",
 	       f1->DS1SCAL1, f1->DS1SCAL1);
 	printf("DS1SCAL3    : hex ");
-	for (i=0; i<3; i++) printf("%02x", f1->DS1SCAL3[i]);
-	printf("\nDS1LSTAR    : hex %04x%02x "	\
+	for (i = 0; i < 3; i++)
+		printf("%02x", f1->DS1SCAL3[i]);
+	printf("\nDS1LSTAR    : hex %04x%02x "
 	       "(trk %d, blk %d)\n",
 	       f1->DS1LSTAR.tt, f1->DS1LSTAR.r,
 	       f1->DS1LSTAR.tt, f1->DS1LSTAR.r);
@@ -1228,13 +1175,13 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	       f1->DS1EXT1.typeind);
 	printf("              seqno      : dec %d, hex %02x\n",
 	       f1->DS1EXT1.seqno, f1->DS1EXT1.seqno);
-	printf("              llimit     : hex %04x%04x "	\
+	printf("              llimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       f1->DS1EXT1.llimit.cc,
 	       f1->DS1EXT1.llimit.hh,
 	       vtoc_get_cyl_from_cchh(&f1->DS1EXT1.llimit),
 	       vtoc_get_head_from_cchh(&f1->DS1EXT1.llimit));
-	printf("              ulimit     : hex %04x%04x "	\
+	printf("              ulimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       f1->DS1EXT1.ulimit.cc,
 	       f1->DS1EXT1.ulimit.hh,
@@ -1252,13 +1199,13 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	       f1->DS1EXT2.typeind);
 	printf("              seqno      : dec %d, hex %02x\n",
 	       f1->DS1EXT2.seqno, f1->DS1EXT2.seqno);
-	printf("              llimit     : hex %04x%04x "	\
+	printf("              llimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       f1->DS1EXT2.llimit.cc,
 	       f1->DS1EXT2.llimit.hh,
 	       vtoc_get_cyl_from_cchh(&f1->DS1EXT2.llimit),
 	       vtoc_get_head_from_cchh(&f1->DS1EXT2.llimit));
-	printf("              ulimit     : hex %04x%04x "	\
+	printf("              ulimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       f1->DS1EXT2.ulimit.cc,
 	       f1->DS1EXT2.ulimit.hh,
@@ -1276,19 +1223,19 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	       f1->DS1EXT3.typeind);
 	printf("              seqno      : dec %d, hex %02x\n",
 	       f1->DS1EXT3.seqno, f1->DS1EXT3.seqno);
-	printf("              llimit     : hex %04x%04x "	\
+	printf("              llimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       f1->DS1EXT3.llimit.cc,
 	       f1->DS1EXT3.llimit.hh,
 	       vtoc_get_cyl_from_cchh(&f1->DS1EXT3.llimit),
 	       vtoc_get_head_from_cchh(&f1->DS1EXT3.llimit));
-	printf("              ulimit     : hex %04x%04x "	\
+	printf("              ulimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       f1->DS1EXT3.ulimit.cc,
 	       f1->DS1EXT3.ulimit.hh,
 	       vtoc_get_cyl_from_cchh(&f1->DS1EXT3.ulimit),
 	       vtoc_get_head_from_cchh(&f1->DS1EXT3.ulimit));
-	printf("DS1PTRDS    : %04x%04x%02x "		\
+	printf("DS1PTRDS    : %04x%04x%02x "
 	       "(cyl %d, trk %d, blk %d)\n",
 	       f1->DS1PTRDS.cc, f1->DS1PTRDS.hh,
 	       f1->DS1PTRDS.b,
@@ -1328,13 +1275,13 @@ static void dasdview_print_extent(extent_t *ext, char *name, int index)
 	       ext->typeind);
 	printf("              seqno      : dec %d, hex %02x\n",
 	       ext->seqno, ext->seqno);
-	printf("              llimit     : hex %04x%04x "	\
+	printf("              llimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       ext->llimit.cc,
 	       ext->llimit.hh,
 	       vtoc_get_cyl_from_cchh(&ext->llimit),
 	       vtoc_get_head_from_cchh(&ext->llimit));
-	printf("              ulimit     : hex %04x%04x "	\
+	printf("              ulimit     : hex %04x%04x "
 	       "(cyl %d, trk %d)\n",
 	       ext->ulimit.cc,
 	       ext->ulimit.hh,
@@ -1350,7 +1297,7 @@ static void dasdview_print_vtoc_f3_raw(format3_label_t *f3)
 	       "---------------------------------\n");
 
 	printf("DS3KEYID    : ");
-	for (i=0; i<4; i++)
+	for (i = 0; i < 4; i++)
 		printf("%02x", f3->DS3KEYID[i]);
 	printf("\n");
 
@@ -1363,28 +1310,28 @@ static void dasdview_print_vtoc_f3_raw(format3_label_t *f3)
 	for (i = 0; i < 9; ++i)
 		dasdview_print_extent(&f3->DS3ADEXT[i], "DS3ADEXT", i);
 
-	printf("DS3PTRDS    : %04x%04x%02x "		\
+	printf("DS3PTRDS    : %04x%04x%02x "
 	       "(cyl %d, trk %d, blk %d)\n",
 	       f3->DS3PTRDS.cc, f3->DS3PTRDS.hh,
 	       f3->DS3PTRDS.b,
 	       vtoc_get_cyl_from_cchhb(&f3->DS3PTRDS),
 	       vtoc_get_head_from_cchhb(&f3->DS3PTRDS),
 	       f3->DS3PTRDS.b);
-
 }
 
 static void dasdview_print_vtoc_f4_raw(format4_label_t *f4)
 {
-        int i;
+	int i;
 
 	printf("\n--- VTOC format 4 label ----------------------"
 	       "---------------------------------\n");
 
 	printf("DS4KEYCD    : ");
-	for (i=0; i<44; i++) printf("%02x", f4->DS4KEYCD[i]);
+	for (i = 0; i < 44; i++)
+		printf("%02x", f4->DS4KEYCD[i]);
 	printf("\nDS4IDFMT    : dec %d, hex %02x\n",
 	       f4->DS4IDFMT, f4->DS4IDFMT);
-	printf("DS4HPCHR    : %04x%04x%02x " \
+	printf("DS4HPCHR    : %04x%04x%02x "
 	       "(cyl %d, trk %d, blk %d)\n",
 	       f4->DS4HPCHR.cc, f4->DS4HPCHR.hh,
 	       f4->DS4HPCHR.b,
@@ -1428,15 +1375,20 @@ static void dasdview_print_vtoc_f4_raw(format4_label_t *f4)
 	printf("DS4DEVDB    : dec %d, hex %02x\n",
 	       f4->DS4DEVCT.DS4DEVDB, f4->DS4DEVCT.DS4DEVDB);
 	printf("DS4AMTIM    : hex ");
-	for (i=0; i<8; i++) printf("%02x", f4->DS4AMTIM[i]);
+	for (i = 0; i < 8; i++)
+		printf("%02x", f4->DS4AMTIM[i]);
 	printf("\nDS4AMCAT    : hex ");
-	for (i=0; i<3; i++) printf("%02x", f4->DS4AMCAT[i]);
+	for (i = 0; i < 3; i++)
+		printf("%02x", f4->DS4AMCAT[i]);
 	printf("\nDS4R2TIM    : hex ");
-	for (i=0; i<8; i++) printf("%02x", f4->DS4R2TIM[i]);
+	for (i = 0; i < 8; i++)
+		printf("%02x", f4->DS4R2TIM[i]);
 	printf("\nres1        : hex ");
-	for (i=0; i<5; i++) printf("%02x", f4->res1[i]);
+	for (i = 0; i < 5; i++)
+		printf("%02x", f4->res1[i]);
 	printf("\nDS4F6PTR    : hex ");
-	for (i=0; i<5; i++) printf("%02x", f4->DS4F6PTR[i]);
+	for (i = 0; i < 5; i++)
+		printf("%02x", f4->DS4F6PTR[i]);
 	printf("\nDS4VTOCE    : hex %02x%02x%04x%04x%04x%04x\n",
 	       f4->DS4VTOCE.typeind, f4->DS4VTOCE.seqno,
 	       f4->DS4VTOCE.llimit.cc, f4->DS4VTOCE.llimit.hh,
@@ -1454,10 +1406,11 @@ static void dasdview_print_vtoc_f4_raw(format4_label_t *f4)
 	       vtoc_get_cyl_from_cchh(&f4->DS4VTOCE.ulimit),
 	       vtoc_get_head_from_cchh(&f4->DS4VTOCE.ulimit));
 	printf("res2        : hex ");
-	for (i=0; i<10; i++) printf("%02x", f4->res2[i]);
+	for (i = 0; i < 10; i++)
+		printf("%02x", f4->res2[i]);
 	printf("\nDS4EFLVL    : dec %d, hex %02x\n",
 	       f4->DS4EFLVL, f4->DS4EFLVL);
-	printf("DS4EFPTR    : hex %04x%04x%02x " \
+	printf("DS4EFPTR    : hex %04x%04x%02x "
 	       "(cyl %d, trk %d, blk %d)\n",
 	       f4->DS4EFPTR.cc, f4->DS4EFPTR.hh,
 	       f4->DS4EFPTR.b,
@@ -1468,7 +1421,8 @@ static void dasdview_print_vtoc_f4_raw(format4_label_t *f4)
 	printf("DS4DCYL     : dec %d, hex %08x\n",
 	       f4->DS4DCYL, f4->DS4DCYL);
 	printf("res4        : hex ");
-	for (i=0; i<2; i++) printf("%02x", f4->res4[i]);
+	for (i = 0; i < 2; i++)
+		printf("%02x", f4->res4[i]);
 	printf("\nDS4DEVF2    : dec %d, hex %02x\n",
 	       f4->DS4DEVF2, f4->DS4DEVF2);
 	printf("res5        : hex %02x\n", f4->res5);
@@ -1476,42 +1430,41 @@ static void dasdview_print_vtoc_f4_raw(format4_label_t *f4)
 
 static void dasdview_print_vtoc_f5_raw(format5_label_t *f5)
 {
-        int i;
+	int i;
 
-	printf("\n--- VTOC format 5 label ----------------------" \
+	printf("\n--- VTOC format 5 label ----------------------"
 	       "---------------------------------\n");
 
 	printf("key identifier\n        DS5KEYID    : ");
-	for (i=0; i<4; i++) printf("%02x", f5->DS5KEYID[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", f5->DS5KEYID[i]);
 	printf("\nfirst extent description\n");
-	printf("        DS5AVEXT    : %04x%04x%02x " \
+	printf("        DS5AVEXT    : %04x%04x%02x "
 	       "(start trk: %d, length: %d cyl, %d trk)\n",
 	       f5->DS5AVEXT.t,  f5->DS5AVEXT.fc,
 	       f5->DS5AVEXT.ft, f5->DS5AVEXT.t,
 	       f5->DS5AVEXT.fc, f5->DS5AVEXT.ft);
 	printf("next 7 extent descriptions\n");
-	for (i=0; i<7; i++)
-        {
-	        printf("        DS5EXTAV[%d] : %04x%04x%02x " \
-		       "(start trk: %d, length: %d cyl, %d trk)\n", i+2,
+	for (i = 0; i < 7; i++) {
+		printf("        DS5EXTAV[%d] : %04x%04x%02x "
+		       "(start trk: %d, length: %d cyl, %d trk)\n", i + 2,
 		       f5->DS5EXTAV[i].t,  f5->DS5EXTAV[i].fc,
 		       f5->DS5EXTAV[i].ft, f5->DS5EXTAV[i].t,
 		       f5->DS5EXTAV[i].fc, f5->DS5EXTAV[i].ft);
 	}
-	printf("format identifier\n" \
+	printf("format identifier\n"
 	       "        DS5FMTID    : dec %d, hex %02x\n",
 	       f5->DS5FMTID, f5->DS5FMTID);
 	printf("next 18 extent descriptions\n");
-	for (i=0; i<18; i++)
-        {
-	        printf("        DS5MAVET[%d] : %04x%04x%02x " \
-		       "(start trk: %d, length: %d cyl, %d trk)\n", i+9,
+	for (i = 0; i < 18; i++) {
+		printf("        DS5MAVET[%d] : %04x%04x%02x "
+		       "(start trk: %d, length: %d cyl, %d trk)\n", i + 9,
 		       f5->DS5MAVET[i].t,  f5->DS5MAVET[i].fc,
 		       f5->DS5MAVET[i].ft, f5->DS5MAVET[i].t,
 		       f5->DS5MAVET[i].fc, f5->DS5MAVET[i].ft);
 	}
-	printf("pointer to next format 5 label\n" \
-	       "        DS5PTRDS    : %04x%04x%02x " \
+	printf("pointer to next format 5 label\n"
+	       "        DS5PTRDS    : %04x%04x%02x "
 	       "(cyl %d, trk %d, blk %d)\n",
 	       f5->DS5PTRDS.cc, f5->DS5PTRDS.hh,
 	       f5->DS5PTRDS.b,
@@ -1522,36 +1475,36 @@ static void dasdview_print_vtoc_f5_raw(format5_label_t *f5)
 
 static void dasdview_print_vtoc_f7_raw(format7_label_t *f7)
 {
-        int i;
+	int i;
 
-	printf("\n--- VTOC format 7 label ----------------------" \
+	printf("\n--- VTOC format 7 label ----------------------"
 	       "---------------------------------\n");
 
 	printf("key identifier\n        DS7KEYID    : ");
-	for (i=0; i<4; i++) printf("%02x", f7->DS7KEYID[i]);
+	for (i = 0; i < 4; i++)
+		printf("%02x", f7->DS7KEYID[i]);
 	printf("\nfirst 5 extent descriptions\n");
-	for (i=0; i<5; i++)
-	{
-	        printf("        DS7EXTNT[%d] : %08x %08x " \
-		       "(start trk %d, end trk %d)\n", i+1,
+	for (i = 0; i < 5; i++) {
+		printf("        DS7EXTNT[%d] : %08x %08x "
+		       "(start trk %d, end trk %d)\n", i + 1,
 		       f7->DS7EXTNT[i].a, f7->DS7EXTNT[i].b,
 		       f7->DS7EXTNT[i].a, f7->DS7EXTNT[i].b);
 	}
-	printf("format identifier\n" \
+	printf("format identifier\n"
 	       "        DS7FMTID    : dec %d, hex %02x\n",
 	       f7->DS7FMTID, f7->DS7FMTID);
 	printf("next 11 extent descriptions\n");
-	for (i=0; i<11; i++)
-	{
-	        printf("        DS7ADEXT[%d] : %08x %08x " \
-		       "(start trk %d, end trk %d)\n", i+6,
+	for (i = 0; i < 11; i++) {
+		printf("        DS7ADEXT[%d] : %08x %08x "
+		       "(start trk %d, end trk %d)\n", i + 6,
 		       f7->DS7ADEXT[i].a, f7->DS7ADEXT[i].b,
 		       f7->DS7ADEXT[i].a, f7->DS7ADEXT[i].b);
 	}
 	printf("reserved field\n        res1        : ");
-	for (i=0; i<2; i++) printf("%02x", f7->res1[i]);
-	printf("\npointer to next format 7 label\n" \
-	       "        DS7PTRDS    : %04x%04x%02x " \
+	for (i = 0; i < 2; i++)
+		printf("%02x", f7->res1[i]);
+	printf("\npointer to next format 7 label\n"
+	       "        DS7PTRDS    : %04x%04x%02x "
 	       "(cyl %d, trk %d, blk %d)\n",
 	       f7->DS7PTRDS.cc, f7->DS7PTRDS.hh,
 	       f7->DS7PTRDS.b,
@@ -1572,11 +1525,11 @@ static void dasdview_print_vtoc_f9_nohead(format9_label_t *f9)
 	       f9->DS9NUMF9, f9->DS9NUMF9);
 
 	printf("res1        : hex ");
-	for (i=0; i < sizeof(f9->res1); i++) {
+	for (i = 0; i < sizeof(f9->res1); i++) {
 		if ((i > 0) && (i % 16 == 0))
 			printf("\n                  ");
 		printf("%02x", f9->res1[i]);
-		if ((i+9) % 16 == 0)
+		if ((i + 9) % 16 == 0)
 			printf(" ");
 	}
 	printf("\n");
@@ -1585,11 +1538,11 @@ static void dasdview_print_vtoc_f9_nohead(format9_label_t *f9)
 	       f9->DS9FMTID, f9->DS9FMTID);
 
 	printf("res2        : hex ");
-	for (i=0; i < sizeof(f9->res2); i++) {
+	for (i = 0; i < sizeof(f9->res2); i++) {
 		if ((i > 0) && (i % 16 == 0))
 			printf("\n                  ");
 		printf("%02x", f9->res2[i]);
-		if ((i+9) % 16 == 0)
+		if ((i + 9) % 16 == 0)
 			printf(" ");
 	}
 	printf("\n");
@@ -1605,7 +1558,7 @@ static void dasdview_print_vtoc_f9_nohead(format9_label_t *f9)
 
 static void dasdview_print_vtoc_f9_raw(format9_label_t *f9)
 {
-	printf("\n--- VTOC format 9 label ----------------------" \
+	printf("\n--- VTOC format 9 label ----------------------"
 	       "---------------------------------\n");
 	dasdview_print_vtoc_f9_nohead(f9);
 }
@@ -1615,40 +1568,40 @@ static void dasdview_print_vtoc_dscb(dasdview_info_t *info, void *dscb)
 	format1_label_t *tmp = dscb;
 
 	switch (tmp->DS1FMTID) {
-        case 0x00:
+	case 0x00:
 		break;
-        case 0xf1:
+	case 0xf1:
 		if (info->vtoc_f1 || info->vtoc_all)
 			dasdview_print_vtoc_f1_raw(dscb);
 		break;
-        case 0xf3:
+	case 0xf3:
 		if (info->vtoc_f3 || info->vtoc_all)
 			dasdview_print_vtoc_f3_raw(dscb);
 		break;
-        case 0xf4:
+	case 0xf4:
 		if (info->vtoc_f4 || info->vtoc_all)
 			dasdview_print_vtoc_f4_raw(dscb);
 		break;
-        case 0xf5:
+	case 0xf5:
 		if (info->vtoc_f5 || info->vtoc_all)
 			dasdview_print_vtoc_f5_raw(dscb);
 		break;
-        case 0xf7:
+	case 0xf7:
 		if (info->vtoc_f7 || info->vtoc_all)
 			dasdview_print_vtoc_f7_raw(dscb);
 		break;
-        case 0xf8:
+	case 0xf8:
 		if (info->vtoc_f8 || info->vtoc_all)
 			dasdview_print_vtoc_f8_raw(dscb);
 		break;
-        case 0xf9:
+	case 0xf9:
 		if (info->vtoc_f9 || info->vtoc_all)
 			dasdview_print_vtoc_f9_raw(dscb);
 		break;
-        default:
+	default:
 		printf("unrecognized DSCB of type: %x \n\n", tmp->DS1FMTID);
-                break;
-        }
+		break;
+	}
 }
 
 static void dasdview_print_vtoc_f1(dasdview_info_t *info)
@@ -1658,14 +1611,13 @@ static void dasdview_print_vtoc_f1(dasdview_info_t *info)
 	printf("--- VTOC format 1 labels ----------------------"
 	       "---------------------------------\n");
 
-	if (info->f1c < 1)
-	{
-	        printf("This VTOC doesn't contain a format 1 label.\n");
+	if (info->f1c < 1) {
+		printf("This VTOC doesn't contain a format 1 label.\n");
 		return;
 	}
 
-	for (j=0; j<info->f1c; j++) {
-		printf("\n--- format 1 DSCB number %d ---\n", j+1);
+	for (j = 0; j < info->f1c; j++) {
+		printf("\n--- format 1 DSCB number %d ---\n", j + 1);
 		dasdview_print_format1_8_no_head(&info->f1[j]);
 	}
 }
@@ -1677,14 +1629,13 @@ static void dasdview_print_vtoc_f8(dasdview_info_t *info)
 	printf("--- VTOC format 8 labels ----------------------"
 	       "---------------------------------\n");
 
-	if (info->f8c < 1)
-	{
+	if (info->f8c < 1) {
 		printf("This VTOC doesn't contain a format 8 label.\n");
 		return;
 	}
 
-	for (j=0; j<info->f8c; j++) {
-		printf("\n--- format 8 DSCB number %d ---\n", j+1);
+	for (j = 0; j < info->f8c; j++) {
+		printf("\n--- format 8 DSCB number %d ---\n", j + 1);
 		dasdview_print_format1_8_no_head(&info->f8[j]);
 	}
 }
@@ -1692,9 +1643,9 @@ static void dasdview_print_vtoc_f8(dasdview_info_t *info)
 static void dasdview_print_vtoc_f4(dasdview_info_t *info)
 {
 	if (info->f4c < 1) {
-		printf("\n--- VTOC format 4 label ----------------------" \
+		printf("\n--- VTOC format 4 label ----------------------"
 		       "---------------------------------\n");
-	        printf("This VTOC doesn't contain a format 4 label.\n");
+		printf("This VTOC doesn't contain a format 4 label.\n");
 		return;
 	}
 	dasdview_print_vtoc_f4_raw(&info->f4);
@@ -1702,11 +1653,10 @@ static void dasdview_print_vtoc_f4(dasdview_info_t *info)
 
 static void dasdview_print_vtoc_f5(dasdview_info_t *info)
 {
-	if (info->f5c < 1)
-	{
-		printf("\n--- VTOC format 5 label ----------------------" \
+	if (info->f5c < 1) {
+		printf("\n--- VTOC format 5 label ----------------------"
 		       "---------------------------------\n");
-	        printf("This VTOC doesn't contain a format 5 label.\n");
+		printf("This VTOC doesn't contain a format 5 label.\n");
 		return;
 	}
 	dasdview_print_vtoc_f5_raw(&info->f5);
@@ -1714,11 +1664,10 @@ static void dasdview_print_vtoc_f5(dasdview_info_t *info)
 
 static void dasdview_print_vtoc_f7(dasdview_info_t *info)
 {
-	if (info->f7c < 1)
-	{
+	if (info->f7c < 1) {
 		printf("\n--- VTOC format 7 label ----------------------"
 		       "---------------------------------\n");
-	        printf("This VTOC doesn't contain a format 7 label.\n");
+		printf("This VTOC doesn't contain a format 7 label.\n");
 		return;
 	}
 	dasdview_print_vtoc_f7_raw(&info->f7);
@@ -1731,11 +1680,11 @@ static void dasdview_print_vtoc_f9(dasdview_info_t *info)
 	printf("\n--- VTOC format 9 label ----------------------"
 	       "---------------------------------\n");
 	if (info->f9c < 1) {
-	        printf("This VTOC doesn't contain a format 9 label.\n");
+		printf("This VTOC doesn't contain a format 9 label.\n");
 		return;
 	}
 	for (j = 0; j < info->f9c; j++) {
-		printf("\n--- format 9 DSCB number %d ---\n", j+1);
+		printf("\n--- format 9 DSCB number %d ---\n", j + 1);
 		dasdview_print_vtoc_f9_nohead(&info->f9[j]);
 	}
 }
@@ -1745,10 +1694,9 @@ static void dasdview_print_vtoc_f3(void)
 	/* dasdfmt formatted DASD devices have no format3 labels, but since the
 	 *  option exists for raw DASDs, we need to have some sensible message
 	 */
-	printf("\n--- VTOC format 3 label ----------------------"	\
+	printf("\n--- VTOC format 3 label ----------------------"
 	       "---------------------------------\n");
 	printf("This VTOC doesn't contain a format 3 label.\n");
-	return;
 }
 
 static void dasdview_print_vtoc_standard(dasdview_info_t *info)
@@ -1759,16 +1707,16 @@ static void dasdview_print_vtoc_standard(dasdview_info_t *info)
 		dasdview_print_vtoc_info(info);
 
 	if (info->vtoc_f4 || info->vtoc_all)
-	        dasdview_print_vtoc_f4(info);
+		dasdview_print_vtoc_f4(info);
 
 	if (info->vtoc_f5 || info->vtoc_all)
-	        dasdview_print_vtoc_f5(info);
+		dasdview_print_vtoc_f5(info);
 
 	if (info->vtoc_f7 || info->vtoc_all)
-	        dasdview_print_vtoc_f7(info);
+		dasdview_print_vtoc_f7(info);
 
 	if (info->vtoc_f1 || info->vtoc_all)
-	        dasdview_print_vtoc_f1(info);
+		dasdview_print_vtoc_f1(info);
 
 	if (info->vtoc_f8 || info->vtoc_all)
 		dasdview_print_vtoc_f8(info);
@@ -1837,8 +1785,7 @@ dasdview_print_format1(unsigned int size, unsigned char *dumpstr)
 	unsigned int i;
 	char asc[17], ebc[17];
 
-	for (i = 0; i < size; i++)
-	{
+	for (i = 0; i < size; i++) {
 		if ((i / 16) * 16 == i) {
 			printf("\n|  ");
 			strncpy(asc, (char *)dumpstr + i, 16);
@@ -1847,8 +1794,10 @@ dasdview_print_format1(unsigned int size, unsigned char *dumpstr)
 			ebc[16] = '\0';
 		}
 		printf("%02X", dumpstr[i]);
-		if (((i + 1) / 4)  * 4  == i + 1) printf(" ");
-		if (((i + 1) / 8)  * 8  == i + 1) printf(" ");
+		if (((i + 1) / 4)  * 4  == i + 1)
+			printf(" ");
+		if (((i + 1) / 8)  * 8  == i + 1)
+			printf(" ");
 		if (((i + 1) / 16) * 16 == i + 1) {
 			vtoc_ebcdic_dec(asc, asc, 16);
 			dot(asc);
@@ -1867,18 +1816,18 @@ dasdview_print_format2(unsigned int size, unsigned char *dumpstr,
 	unsigned int i;
 	char asc[17], ebc[17];
 
-	for (i = 0; i < size; i++)
-	{
+	for (i = 0; i < size; i++) {
 		if ((i / 8) * 8 == i) {
 			printf("\n | %13llu | %13llX |  ",
-			       begin + (unsigned long long) i,
-			       begin + (unsigned long long) i);
+			       begin + (unsigned long long)i,
+			       begin + (unsigned long long)i);
 
 			strncpy(asc, (char *)dumpstr + i, 8);
 			strncpy(ebc, (char *)dumpstr + i, 8);
 		}
 		printf("%02X", dumpstr[i]);
-		if (((i + 1) / 4) * 4 == i + 1) printf("  ");
+		if (((i + 1) / 4) * 4 == i + 1)
+			printf("  ");
 		if (((i + 1) / 8) * 8 == i + 1) {
 			vtoc_ebcdic_dec(asc, asc, 8);
 			dot(asc);
@@ -1893,61 +1842,54 @@ dasdview_print_format2(unsigned int size, unsigned char *dumpstr,
 static void dasdview_view_standard(dasdview_info_t *info)
 {
 	unsigned char  dumpstr[DUMP_STRING_SIZE];
-	unsigned long long i=0, j=0, k=0, count=0;
+	unsigned long long i = 0, j = 0, k = 0, count = 0;
 	int   fd, rc;
 
-	unsigned long long a=0;
-	int b=0;
+	unsigned long long a = 0;
+	int b = 0;
 
 	k = ((info->size) % 16LL);
 
 	if (k != 0)
-	{
 		info->size += (16LL - k);
-	}
 
 	fd = open(info->device, O_RDONLY);
-	if (fd == -1)
-	{
-		zt_error_print("dasdview: open error\n" \
-			"Unable to open device %s in read-only" \
-			"mode!\n", info->device);
+	if (fd == -1) {
+		zt_error_print("dasdview: open error\n"
+			       "Unable to open device %s in read-only mode!\n",
+			       info->device);
 		exit(-1);
 	}
 
 	j = (info->begin / SEEK_STEP);
 	k = (info->begin % SEEK_STEP);
 
-        /* seek in SEEK_STEP steps */
-	for (i=1; i <= j; i++)
-	{
+	/* seek in SEEK_STEP steps */
+	for (i = 1; i <= j; i++) {
 		rc = lseek64(fd, SEEK_STEP, SEEK_CUR);
-		if (rc == -1)
-		{
+		if (rc == -1) {
 			printf("*** rc: %d (%d) ***\n", rc, errno);
 			printf("*** j: %llu ***\n", j);
 			printf("*** k: %llu ***\n", k);
 			printf("*** a: %llu ***\n", a);
 			printf("*** b: %d ***\n", b);
 			close(fd);
-			zt_error_print("dasdview: seek error\n" \
-				"Unable to seek in device %s!\n",
-				info->device);
+			zt_error_print("dasdview: seek error\n"
+				       "Unable to seek in device %s!\n",
+				       info->device);
 			exit(-1);
 		}
 		b++;
 		a += SEEK_STEP;
 	}
 
-	if (k > 0)
-	{
+	if (k > 0) {
 		rc = lseek(fd, k, SEEK_CUR);
-		if (rc == -1)
-		{
+		if (rc == -1) {
 			close(fd);
-			zt_error_print("dasdview: seek error\n" \
-				"Unable to seek in device %s!\n",
-				info->device);
+			zt_error_print("dasdview: seek error\n"
+				       "Unable to seek in device %s!\n",
+				       info->device);
 			exit(-1);
 		}
 	}
@@ -1955,41 +1897,35 @@ static void dasdview_view_standard(dasdview_info_t *info)
 	j = info->size / DUMP_STRING_SIZE;
 	k = info->size % DUMP_STRING_SIZE;
 
-
-	if (info->format1)
-	{
-		printf("+----------------------------------------+" \
+	if (info->format1) {
+		printf("+----------------------------------------+"
 		       "------------------+------------------+\n");
-		printf("| HEXADECIMAL                            |" \
+		printf("| HEXADECIMAL                            |"
 		       " EBCDIC           | ASCII            |\n");
-		printf("|  01....04 05....08  09....12 13....16  |" \
+		printf("|  01....04 05....08  09....12 13....16  |"
 		       " 1.............16 | 1.............16 |\n");
-		printf("+----------------------------------------+" \
+		printf("+----------------------------------------+"
 		       "------------------+------------------+");
-	}
-	else if (info->format2)
-	{
-		printf(" +---------------+---------------+----------------" \
+	} else if (info->format2) {
+		printf(" +---------------+---------------+----------------"
 		       "------+----------+----------+\n");
-		printf(" |     BYTE      |     BYTE      |     HEXADECIMAL" \
+		printf(" |     BYTE      |     BYTE      |     HEXADECIMAL"
 		       "      |  EBCDIC  |  ASCII   |\n");
-		printf(" |    DECIMAL    |  HEXADECIMAL  |  1 2 3 4   5 6 " \
+		printf(" |    DECIMAL    |  HEXADECIMAL  |  1 2 3 4   5 6 "
 		       "7 8   | 12345678 | 12345678 |\n");
-		printf(" +---------------+---------------+----------------" \
+		printf(" +---------------+---------------+----------------"
 		       "------+----------+----------+");
 	}
 
 	count = info->begin;
-	for (i=1; i <= j; i++)
-	{
+	for (i = 1; i <= j; i++) {
 		bzero(dumpstr, DUMP_STRING_SIZE);
 		rc = read(fd, &dumpstr, DUMP_STRING_SIZE);
-		if (rc != DUMP_STRING_SIZE)
-		{
+		if (rc != DUMP_STRING_SIZE) {
 			close(fd);
-			zt_error_print("dasdview: read error\n" \
-				"Unable to read from device %s!\n",
-				info->device);
+			zt_error_print("dasdview: read error\n"
+				       "Unable to read from device %s!\n",
+				       info->device);
 			exit(-1);
 		}
 
@@ -2001,39 +1937,32 @@ static void dasdview_view_standard(dasdview_info_t *info)
 		count += DUMP_STRING_SIZE;
 	}
 
-	if (k > 0)
-	{
+	if (k > 0) {
 		bzero(dumpstr, DUMP_STRING_SIZE);
 		rc = read(fd, &dumpstr, k);
-		if (rc != (int) k)
-		{
+		if (rc != (int)k) {
 			close(fd);
-			zt_error_print("dasdview: read error\n" \
-				"Unable to read from device %s!\n",
-				info->device);
+			zt_error_print("dasdview: read error\n"
+				       "Unable to read from device %s!\n",
+				       info->device);
 			exit(-1);
 		}
 
 		if (info->format1)
-			dasdview_print_format1((unsigned int) k, dumpstr);
+			dasdview_print_format1((unsigned int)k, dumpstr);
 		else if (info->format2)
-			dasdview_print_format2((unsigned int) k, dumpstr,
+			dasdview_print_format2((unsigned int)k, dumpstr,
 					       count);
 	}
 
 	close(fd);
 
 	if (info->format1)
-	{
-		printf("\n+----------------------------------------+" \
+		printf("\n+----------------------------------------+"
 		       "------------------+------------------+\n\n");
-	}
 	else if (info->format2)
-	{
-		printf("\n +---------------+---------------+----------------" \
+		printf("\n +---------------+---------------+----------------"
 		       "------+----------+----------+\n\n");
-	}
-
 }
 
 static void dasdview_print_format_raw(unsigned int size, char *dumpstr)
@@ -2078,7 +2007,6 @@ static void dasdview_print_format_raw(unsigned int size, char *dumpstr)
  */
 static void dasdview_print_raw_record(char *rec)
 {
-
 	struct eckd_count *ecount;
 	unsigned int cyl, head;
 
@@ -2154,13 +2082,11 @@ static void dasdview_print_raw_track(char *trackdata,
 		data += sizeof(*ecount) + ecount->kl + ecount->dl;
 		++record;
 
-		if ((*(unsigned long long *)data) == ENDTOKEN) {
+		if ((*(unsigned long long *)data) == ENDTOKEN)
 			break;
-		}
 		if ((unsigned long)data >=
-		    (unsigned long)trackdata + RAWTRACKSIZE) {
+		    (unsigned long)trackdata + RAWTRACKSIZE)
 			break;
-		}
 	} while (1);
 }
 
@@ -2214,7 +2140,7 @@ static void dasdview_view_raw(dasdview_info_t *info)
 		data = trackdata;
 		for (i = 0; i < trckcount; ++i) {
 			dasdview_print_raw_track(data, track / info->geo.heads,
-						track % info->geo.heads);
+						 track % info->geo.heads);
 			data += RAWTRACKSIZE;
 			++track;
 		}
@@ -2242,19 +2168,19 @@ static void dasdview_view(dasdview_info_t *info)
 static void
 dasdview_print_characteristic(dasdview_info_t *info)
 {
-	dasd_information2_t dasd_info;
-	dasd_info = info->dasd_info;
+	dasd_information2_t dasd_info = info->dasd_info;
+
 	printf("encrypted disk         : %s\n",
-	       (dasd_info.characteristics[46]&0x80)?"yes":"no");
+	       (dasd_info.characteristics[46] & 0x80) ? "yes" : "no");
 	printf("solid state device     : %s\n",
-	       (dasd_info.characteristics[46]&0x40)?"yes":"no");
+	       (dasd_info.characteristics[46] & 0x40) ? "yes" : "no");
 }
 
-int main(int argc, char * argv[]) {
-
+int main(int argc, char *argv[])
+{
 	dasdview_info_t info;
 	int oc;
-	unsigned long long max=0LL;
+	unsigned long long max = 0LL;
 	char *begin_param_str = NULL;
 	char *size_param_str  = NULL;
 	int rc;
@@ -2262,13 +2188,11 @@ int main(int argc, char * argv[]) {
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
-	bzero (&info, sizeof(info));
-	while (1)
-	{
+	bzero(&info, sizeof(info));
+	while (1) {
 		oc = util_opt_getopt_long(argc, argv);
 
-		switch (oc)
-		{
+		switch (oc) {
 		case 'h':
 			util_prg_print_help();
 			util_opt_print_help();
@@ -2307,31 +2231,31 @@ int main(int argc, char * argv[]) {
 			info.volser = 1;
 			break;
 		case 't':
-		        if (strcmp(optarg, "info")==0)
-		                info.vtoc_info = 1;
-		        else if (strcmp(optarg, "f1")==0)
-		                info.vtoc_f1 = 1;
-		        else if (strcmp(optarg, "f3")==0)
-		                info.vtoc_f3 = 1;
-		        else if (strcmp(optarg, "f4")==0)
-		                info.vtoc_f4 = 1;
-		        else if (strcmp(optarg, "f5")==0)
-		                info.vtoc_f5 = 1;
-		        else if (strcmp(optarg, "f7")==0)
-		                info.vtoc_f7 = 1;
-		        else if (strcmp(optarg, "f8")==0)
+			if (strcmp(optarg, "info") == 0) {
+				info.vtoc_info = 1;
+			} else if (strcmp(optarg, "f1") == 0) {
+				info.vtoc_f1 = 1;
+			} else if (strcmp(optarg, "f3") == 0) {
+				info.vtoc_f3 = 1;
+			} else if (strcmp(optarg, "f4") == 0) {
+				info.vtoc_f4 = 1;
+			} else if (strcmp(optarg, "f5") == 0) {
+				info.vtoc_f5 = 1;
+			} else if (strcmp(optarg, "f7") == 0) {
+				info.vtoc_f7 = 1;
+			} else if (strcmp(optarg, "f8") == 0) {
 				info.vtoc_f8 = 1;
-			else if (strcmp(optarg, "f9")==0)
+			} else if (strcmp(optarg, "f9") == 0) {
 				info.vtoc_f9 = 1;
-			else if (strcmp(optarg, "all")==0)
-		                info.vtoc_all = 1;
-		        else {
+			} else if (strcmp(optarg, "all") == 0) {
+				info.vtoc_all = 1;
+			} else {
 				zt_error_print("dasdview: usage error\n"
 					       "%s is no valid argument for"
 					       " option -t/--vtoc\n", optarg);
 				exit(-1);
 			}
-		        info.vtoc = 1;
+			info.vtoc = 1;
 			info.action_specified = 1;
 			break;
 		case 'l':
@@ -2348,21 +2272,22 @@ int main(int argc, char * argv[]) {
 			break;
 		default:
 			fprintf(stderr, "Try 'dasdview --help' for more"
-					" information.\n");
+				" information.\n");
 			exit(1);
 		}
-        	if (oc==-1) break;
+		if (oc == -1)
+			break;
 	}
 
 	/* do some tests */
 	if (info.device_id >= argc) {
-		zt_error_print("dasdview: usage error\n"	\
+		zt_error_print("dasdview: usage error\n"
 			       "No device specified!");
 		exit(EXIT_FAILURE);
 	}
 
 	if (info.device_id + 1 < argc) {
-		zt_error_print("dasdview: usage error\n"	\
+		zt_error_print("dasdview: usage error\n"
 			       "More than one device specified!");
 		exit(EXIT_FAILURE);
 	}
@@ -2371,6 +2296,7 @@ int main(int argc, char * argv[]) {
 		strcpy(info.device, argv[info.device_id]);
 
 	dasdview_get_info(&info);
+
 	if (info.raw_track_access) {
 		rc = lzds_zdsroot_alloc(&info.zdsroot);
 		if (rc) {
@@ -2390,18 +2316,17 @@ int main(int argc, char * argv[]) {
 	else
 		info.begin = DEFAULT_BEGIN;
 
-	if (info.raw_track_access) {
-		max = (unsigned long long) info.hw_cylinders *
-			(unsigned long long) info.geo.heads * RAWTRACKSIZE;
-	} else
-		max = (unsigned long long) info.hw_cylinders *
-			(unsigned long long) info.geo.heads *
-			(unsigned long long) info.geo.sectors *
-			(unsigned long long) info.blksize;
+	if (info.raw_track_access)
+		max = (unsigned long long)info.hw_cylinders *
+			(unsigned long long)info.geo.heads * RAWTRACKSIZE;
+	else
+		max = (unsigned long long)info.hw_cylinders *
+			(unsigned long long)info.geo.heads *
+			(unsigned long long)info.geo.sectors *
+			(unsigned long long)info.blksize;
 
-	if (info.begin > max)
-	{
-		zt_error_print("dasdview: usage error\n" \
+	if (info.begin > max) {
+		zt_error_print("dasdview: usage error\n"
 			"'begin' value is not within disk range!");
 		exit(-1);
 	}
@@ -2414,25 +2339,21 @@ int main(int argc, char * argv[]) {
 		info.size = DEFAULT_SIZE;
 
 	if ((info.begin_specified || info.size_specified) &&
-	    ((info.begin + info.size) > max             )   )
-	{
-		zt_error_print("dasdview: usage error\n" \
-			"'begin' + 'size' is not within " \
+	    ((info.begin + info.size) > max)) {
+		zt_error_print("dasdview: usage error\n"
+			"'begin' + 'size' is not within "
 			"disk range!");
 		exit(-1);
 	}
 
 	if ((info.begin_specified || info.size_specified) &&
 	    (!info.format1 && !info.format2))
-	{
 		info.format1 = 1;
-	}
 
 	if ((info.format1 || info.format2) &&
-	    (!info.size_specified && !info.begin_specified))
-	{
-		zt_error_print("dasdview: usage error\n" \
-			"Options -1 or -2 make only sense with " \
+	    (!info.size_specified && !info.begin_specified)) {
+		zt_error_print("dasdview: usage error\n"
+			"Options -1 or -2 make only sense with "
 			"options -b or -s!");
 		exit(-1);
 	}
@@ -2457,11 +2378,8 @@ int main(int argc, char * argv[]) {
 	if (info.vtoc)
 		dasdview_print_vtoc(&info);
 
-
 	if (!info.action_specified)
-	{
 		printf("No action specified.\n");
-	}
 
 	if (info.characteristic_specified)
 		dasdview_print_characteristic(&info);

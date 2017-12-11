@@ -22,6 +22,7 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include "lib/dasd_base.h"
 #include "lib/util_base.h"
 #include "lib/util_file.h"
 #include "lib/util_opt.h"
@@ -29,10 +30,6 @@
 #include "lib/zt_common.h"
 
 #define RD_BUFFER_SIZE 80
-#define BLKSSZGET    _IO(0x12,104)
-#define DASD_IOCTL_LETTER 'D'
-#define BIODASDINFO  _IOR(DASD_IOCTL_LETTER,1,struct dasd_information)
-#define BIODASDINFO2 _IOR(DASD_IOCTL_LETTER,3,struct dasd_information2)
 #define TEMP_DEV_MAX_RETRIES    1000
 
 static const struct util_prg prg = {
@@ -100,67 +97,7 @@ struct volume_label {
 	char volid[6];
 } __attribute__ ((packed));
 
-struct dasd_information2 {
-	unsigned int devno;
-	unsigned int real_devno;
-	unsigned int schid;
-	unsigned int cu_type  : 16;
-	unsigned int cu_model :  8;
-	unsigned int dev_type : 16;
-	unsigned int dev_model : 8;
-	unsigned int open_count;
-	unsigned int req_queue_len;
-	unsigned int chanq_len;
-	char type[4];
-	unsigned int status;
-	unsigned int label_block;
-	unsigned int FBA_layout;
-	unsigned int characteristics_size;
-	unsigned int confdata_size;
-	char characteristics[64];
-	char configuration_data[256];
-	unsigned int format;
-	unsigned int features;
-	unsigned int reserved0;
-	unsigned int reserved1;
-	unsigned int reserved2;
-	unsigned int reserved3;
-	unsigned int reserved4;
-	unsigned int reserved5;
-	unsigned int reserved6;
-	unsigned int reserved7;
-};
-
-struct dasd_information {
-	unsigned int devno;
-	unsigned int real_devno;
-	unsigned int schid;
-	unsigned int cu_type  : 16;
-	unsigned int cu_model :  8;
-	unsigned int dev_type : 16;
-	unsigned int dev_model : 8;
-	unsigned int open_count;
-	unsigned int req_queue_len;
-	unsigned int chanq_len;
-	char type[4];
-	unsigned int status;
-	unsigned int label_block;
-	unsigned int FBA_layout;
-	unsigned int characteristics_size;
-	unsigned int confdata_size;
-	char characteristics[64];
-	char configuration_data[256];
-};
-
-struct dasd_data
-{
-	struct dasd_information2 dasd_info;
-	int dasd_info_version;
-	int blksize;
-};
-
-static char EBCtoASC[256] =
-{
+static char EBCtoASC[256] = {
 /* 0x00  NUL   SOH   STX   ETX  *SEL    HT  *RNL   DEL */
 	0x00, 0x01, 0x02, 0x03, 0x07, 0x09, 0x07, 0x7F,
 /* 0x08  -GE  -SPS  -RPT    VT    FF    CR    SO    SI */
@@ -227,12 +164,12 @@ static char EBCtoASC[256] =
 	0x38, 0x39, 0x07, 0x07, 0x9A, 0x07, 0x07, 0x07
 };
 
-static char *dinfo_ebcdic_dec (char *source, char *target, int l)
+static char *dinfo_ebcdic_dec(char *source, char *target, int l)
 {
 	int i;
 
 	for (i = 0; i < l; i++)
-		target[i]=EBCtoASC[(unsigned char)(source[i])];
+		target[i] = EBCtoASC[(unsigned char)(source[i])];
 
 	return target;
 }
@@ -242,51 +179,49 @@ static int dinfo_read_dasd_uid(char *uidfile, char *readbuf)
 	return util_file_read_line(readbuf, RD_BUFFER_SIZE, uidfile);
 }
 
-static int dinfo_read_dasd_vlabel (char *device, struct volume_label *vlabel,
-				   char *readbuf)
+static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
+				  char *readbuf)
 {
-	struct dasd_data data;
 	struct volume_label tmp;
 	int vlsize = sizeof(struct volume_label);
+	dasd_information2_t dasd_info;
 	unsigned long vlabel_start;
+	unsigned int blksize;
 	char vollbl[5];
 	int f;
 	char *space;
 
-	if ((f = open(device, O_RDONLY)) < 0) {
-		printf("Could not open device node.\n");
-		goto error;
-	}
-
-	if (ioctl(f, BLKSSZGET, &data.blksize) != 0) {
+	if (dasd_get_blocksize(device, &blksize) != 0) {
 		printf("Unable to figure out block size.\n");
 		goto error;
 	}
 
-	if (ioctl(f, BIODASDINFO2, &data.dasd_info) == 0)
-		data.dasd_info_version = 2;
-	else {
-		if (ioctl(f, BIODASDINFO, &data.dasd_info) != 0) {
-			printf("Unable to figure out DASD informations.\n");
-			goto error;
-		}
+	if (dasd_get_info(device, &dasd_info) != 0) {
+		printf("Unable to figure out DASD informations.\n");
+		goto error;
 	}
 
-	vlabel_start = data.dasd_info.label_block * data.blksize;
-	if (lseek(f, vlabel_start, SEEK_SET) < 0)
+	f = open(device, O_RDONLY);
+	if (f < 0) {
+		printf("Could not open device node.\n");
 		goto error;
+	}
+
+	vlabel_start = dasd_info.label_block * blksize;
+	if (lseek(f, vlabel_start, SEEK_SET) < 0)
+		goto error_close;
 
 	bzero(vlabel, vlsize);
 
 	if (read(f, vlabel, vlsize) != vlsize) {
 		printf("Could not read volume label.\n");
-		goto error;
+		goto error_close;
 	}
 
-	if (data.dasd_info.FBA_layout) {
+	if (dasd_info.FBA_layout) {
 		bzero(&tmp, vlsize);
 		memcpy(&tmp, vlabel, vlsize);
-		memcpy(vlabel->vollbl, &tmp, vlsize-4);
+		memcpy(vlabel->vollbl, &tmp, vlsize - 4);
 	}
 
 	close(f);
@@ -301,16 +236,17 @@ static int dinfo_read_dasd_vlabel (char *device, struct volume_label *vlabel,
 	    (strncmp(vollbl, "CMS1", 4) == 0)) {
 		strncpy(readbuf, vlabel->volid, 6);
 		dinfo_ebcdic_dec(readbuf, readbuf, 6);
-		space = strchr(readbuf,' ');
+		space = strchr(readbuf, ' ');
 		if (space)
 			*space = 0;
-	} else
+	} else {
 		strcpy(readbuf, "");
-
+	}
 
 	return 0;
-error:
+error_close:
 	close(f);
+error:
 	return -1;
 }
 
@@ -321,7 +257,7 @@ static void *dinfo_malloc(size_t size)
 	result = malloc(size);
 	if (result == NULL) {
 		printf("Could not allocate %lld bytes of memory",
-			(unsigned long long) size);
+		       (unsigned long long)size);
 	}
 	return result;
 }
@@ -332,7 +268,7 @@ static char *dinfo_make_path(char *dirname, char *filename)
 	size_t len;
 
 	len = strlen(dirname) + strlen(filename) + 2;
-	result = (char *) dinfo_malloc(len);
+	result = (char *)dinfo_malloc(len);
 	if (result == NULL)
 		return NULL;
 	sprintf(result, "%s/%s", dirname, filename);
@@ -342,8 +278,8 @@ static char *dinfo_make_path(char *dirname, char *filename)
 static int dinfo_create_devnode(dev_t dev, char **devno)
 {
 	char *result;
-	char * pathname[] = { "/dev", getenv("TMPDIR"), "/tmp",
-				getenv("HOME"), "." , "/"};
+	char *pathname[] = { "/dev", getenv("TMPDIR"), "/tmp",
+		getenv("HOME"), ".", "/"};
 	char filename[] = "dasdinfo0000";
 	mode_t mode;
 	unsigned int path;
@@ -354,10 +290,10 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 	mode = S_IFBLK | S_IRWXU;
 
 	/* Try several locations for the temporary device node. */
-	for (path=0; path < sizeof(pathname) / sizeof(pathname[0]); path++) {
+	for (path = 0; path < UTIL_ARRAY_SIZE(pathname); path++) {
 		if (pathname[path] == NULL)
 			continue;
-		for (retry=0; retry < TEMP_DEV_MAX_RETRIES; retry++) {
+		for (retry = 0; retry < TEMP_DEV_MAX_RETRIES; retry++) {
 			sprintf(filename, "dasdinfo%04d", retry);
 			result = dinfo_make_path(pathname[path], filename);
 			if (result == NULL)
@@ -366,7 +302,8 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 			if (rc == 0) {
 				/* Need this test to cover
 				 * 'nodev'-mounted
-				 * filesystems. */
+				 * filesystems.
+				 */
 				fd = open(result, O_RDONLY);
 				if (fd != -1) {
 					close(fd);
@@ -375,8 +312,9 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 				}
 				remove(result);
 				retry = TEMP_DEV_MAX_RETRIES;
-			} else if (errno != EEXIST)
+			} else if (errno != EEXIST) {
 				retry = TEMP_DEV_MAX_RETRIES;
+			}
 			free(result);
 		}
 	}
@@ -400,7 +338,8 @@ static int dinfo_extract_dev(dev_t *dev, char *str)
 
 	bzero(tmp, RD_BUFFER_SIZE);
 	strncpy(tmp, str, RD_BUFFER_SIZE);
-	if ((p = strchr(tmp, ':')) == NULL) {
+	p = strchr(tmp, ':');
+	if (p == NULL) {
 		printf("Error: unable to extract major/minor\n");
 		return -1;
 	}
@@ -439,6 +378,7 @@ dinfo_is_busiddir(const char *fpath, const struct stat *UNUSED(sb),
 	char *tempdir;
 	char linkdir[128];
 	ssize_t i;
+
 	if (tflag != FTW_D || (strncmp((fpath + ftwbuf->base), searchbusid,
 				       strlen(searchbusid)) != 0))
 		return FTW_CONTINUE;
@@ -454,7 +394,7 @@ dinfo_is_busiddir(const char *fpath, const struct stat *UNUSED(sb),
 	if ((i < 0) || (i >= 128))
 		return -1;
 	/* append '\0' because readlink returns non zero terminated string */
-	tempdir[i+1] = '\0';
+	tempdir[i + 1] = '\0';
 	if (strstr(linkdir, "dasd") == NULL)
 		return FTW_CONTINUE;
 	free(busiddir);
@@ -470,15 +410,17 @@ dinfo_find_entry(const char *dir, const char *searchstring,
 {
 	DIR *directory = NULL;
 	struct dirent *dir_entry = NULL;
+
 	directory = opendir(dir);
 	if (directory == NULL)
 		return -1;
 	while ((dir_entry = readdir(directory)) != NULL) {
-		/* compare if the found entry has exactly the same name
-		   and type as searched */
+		/* compare if the found entry has exactly the same name and type
+		 * as searched
+		 */
 		if ((strncmp(dir_entry->d_name, searchstring,
-			     strlen(searchstring)) == 0)
-		    && (dir_entry->d_type & type)) {
+			     strlen(searchstring)) == 0) &&
+		    (dir_entry->d_type & type)) {
 			*result = strdup(dir_entry->d_name);
 			if (*result == NULL)
 				goto out;
@@ -555,7 +497,8 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	sprintf(stat_dev, "%d:%d", major(stat_buffer.st_rdev),
 		minor(stat_buffer.st_rdev));
 
-	if ((directory = opendir("/sys/block/")) == NULL) {
+	directory = opendir("/sys/block/");
+	if (directory == NULL) {
 		printf("Error: could not open directory /sys/block\n");
 		return -1;
 	}
@@ -573,7 +516,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 			continue;
 
 		if (strncmp(stat_dev, readbuf,
-			    MAX(strlen(stat_dev), strlen(readbuf)-1)) == 0) {
+			    MAX(strlen(stat_dev), strlen(readbuf) - 1)) == 0) {
 			rc = snprintf(*uidfile, RD_BUFFER_SIZE,
 				      "/sys/block/%s/device/uid",
 				      dir_entry->d_name);
@@ -591,7 +534,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	return 0;
 }
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
 	struct utsname uname_buf;
 	int version, release;
@@ -635,13 +578,13 @@ int main(int argc, char * argv[])
 			print_vlabel = 1;
 			break;
 		case 'i':
-			busid=strdup(optarg);
+			busid = strdup(optarg);
 			break;
 		case 'b':
-			blockdev=strdup(optarg);
+			blockdev = strdup(optarg);
 			break;
 		case 'd':
-			devnode=strdup(optarg);
+			devnode = strdup(optarg);
 			break;
 		case 'e':
 			export = 1;
@@ -661,11 +604,11 @@ int main(int argc, char * argv[])
 	}
 
 	uname(&uname_buf);
-	sscanf(uname_buf.release, "%d.%d", &version,&release);
-	if (strcmp(uname_buf.sysname,"Linux") ||
+	sscanf(uname_buf.release, "%d.%d", &version, &release);
+	if (strcmp(uname_buf.sysname, "Linux") ||
 	    version < 2 || (version == 2 && release < 6)) {
 		printf("%s %d.%d is not supported\n", uname_buf.sysname,
-			version,release);
+		       version, release);
 		exit(1);
 	}
 
@@ -693,9 +636,9 @@ int main(int argc, char * argv[])
 
 	/* try to read the uid attribute */
 	if (busid) {
-		sprintf(uidfile,"/sys/bus/ccw/devices/%s/uid", busid);
+		sprintf(uidfile, "/sys/bus/ccw/devices/%s/uid", busid);
 	} else if (blockdev) {
-		sprintf(uidfile,"/sys/block/%s/device/uid", blockdev);
+		sprintf(uidfile, "/sys/block/%s/device/uid", blockdev);
 	} else if (devnode) {
 		if (dinfo_get_uid_from_devnode(&uidfile, devnode) != 0)
 			goto error;
@@ -715,12 +658,11 @@ int main(int argc, char * argv[])
 				if (!srchuid)
 					break;
 			}
-			if (srchuid) {
+			if (srchuid)
 				srchuid[0] = '\0';
-			}
-			if (export) {
+			if (export)
 				printf("ID_UID=%s\n", readbuf);
-			} else
+			else
 				printf("%s\n", readbuf);
 			if (!print_vlabel && !print_extended_uid)
 				goto out;
@@ -729,9 +671,9 @@ int main(int argc, char * argv[])
 
 	if (print_extended_uid) {
 		if (dinfo_read_dasd_uid(uidfile, readbuf) == 0) {
-			if (export) {
+			if (export)
 				printf("ID_XUID=%s\n", readbuf);
-			} else
+			else
 				printf("%s\n", readbuf);
 			if (!print_vlabel)
 				goto out;
@@ -768,9 +710,9 @@ int main(int argc, char * argv[])
 	}
 
 	if (dinfo_read_dasd_vlabel(device, &vlabel, readbuf) == 0) {
-		if (export) {
-			printf("ID_SERIAL=%s\n",readbuf);
-		} else
+		if (export)
+			printf("ID_SERIAL=%s\n", readbuf);
+		else
 			printf("%s\n", readbuf);
 		goto out;
 	}

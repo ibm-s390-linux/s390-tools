@@ -2,6 +2,7 @@
  * dasdfmt - Format DASD ECKD devices for use by Linux
  *
  * Copyright IBM Corp. 1999, 2017
+ * Copyright Red Hat Inc. 2017
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -12,6 +13,7 @@
 #include <sys/time.h>
 #include <sys/utsname.h>
 
+#include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
@@ -26,13 +28,13 @@
 #define SEC_PER_HOUR (60 * 60)
 
 static int filedes;
+static char dev_filename[PATH_MAX];
 static int disk_disabled;
 static format_data_t format_params;
 static format_mode_t mode;
 static char *prog_name;
 static volatile sig_atomic_t program_interrupt_in_progress;
 static int reqsize;
-
 
 static const struct util_prg prg = {
 	.desc = "Use dasdfmt to format a DASD ECKD device for use by Linux.\n"
@@ -265,24 +267,6 @@ static void draw_progress(dasdfmt_info_t *info, int cyl, unsigned int cylinders,
 	}
 }
 
-static int reread_partition_table(void)
-{
-	int i = 0;
-	int rc = -1;
-
-	/* If the BLKRRPART ioctl fails, it is most likely due to
-	   the device just beeing in use by udev. So it is worthwhile
-	   to retry the ioctl after a second as it is likely to succeed.
-	 */
-	while (rc && (i < 5)) {
-		++i;
-		rc = ioctl(filedes, BLKRRPART, NULL);
-		if (rc)
-			sleep(1);
-	}
-	return rc;
-}
-
 /*
  * Helper function for recs_per_track.
  */
@@ -312,16 +296,18 @@ static unsigned int recs_per_track(struct dasd_eckd_characteristics *rdc,
 			kn = ceil_quot(kl + 6, 232) + 1;
 			return 1729 / (10 + 9 + ceil_quot(kl + 6 * kn, 34) +
 				       9 + ceil_quot(dl + 6 * dn, 34));
-		} else
+		} else {
 			return 1729 / (10 + 9 + ceil_quot(dl + 6 * dn, 34));
+		}
 	case 0x9345:
 		dn = ceil_quot(dl + 6, 232) + 1;
 		if (kl) {
 			kn = ceil_quot(kl + 6, 232) + 1;
 			return 1420 / (18 + 7 + ceil_quot(kl + 6 * kn, 34) +
 				       ceil_quot(dl + 6 * dn, 34));
-		} else
+		} else {
 			return 1420 / (18 + 7 + ceil_quot(dl + 6 * dn, 34));
+		}
 	}
 	return 0;
 }
@@ -404,7 +390,7 @@ static void evaluate_format_error(dasdfmt_info_t *info, format_check_t *cdata,
 		break;
 	case DASD_FMT_ERR_RECORD_ID:
 		ERRMSG("Invalid record ID at cyl: %d trk: %d rec: %d.\n",
-			cyl, head, cdata->rec);
+		       cyl, head, cdata->rec);
 		break;
 	case DASD_FMT_ERR_KEY_LENGTH:
 		ERRMSG("Invalid key length (found %d, expected %d) "
@@ -412,6 +398,30 @@ static void evaluate_format_error(dasdfmt_info_t *info, format_check_t *cdata,
 		       cdata->key_length, kl, cyl, head, cdata->rec);
 		break;
 	}
+}
+
+static void disk_enable(void)
+{
+	int err;
+
+	err = dasd_disk_enable(filedes);
+	if (err != 0)
+		ERRMSG_EXIT(EXIT_FAILURE, "%s: (prepare device) IOCTL "
+			    "BIODASDENABLE failed (%s)\n", prog_name,
+			    strerror(err));
+	disk_disabled = 0;
+}
+
+static void disk_disable(const char *device)
+{
+	int err;
+
+	err = dasd_disk_disable(device, &filedes);
+	if (err != 0)
+		ERRMSG_EXIT(EXIT_FAILURE, "%s: (prepare device) IOCTL "
+			    "BIODASDDISABLE failed. (%s)\n", prog_name,
+			    strerror(err));
+	disk_disabled = 1;
 }
 
 /*
@@ -428,26 +438,17 @@ static void program_interrupt_signal(int sig)
 
 	if (disk_disabled) {
 		printf("Re-accessing the device...\n");
-		rc = ioctl(filedes, BIODASDENABLE, &format_params);
-		if (rc)
-			ERRMSG_EXIT(EXIT_FAILURE, "%s: (signal handler) IOCTL "
-				    "BIODASDENABLE failed (%s)\n", prog_name,
-				    strerror(errno));
+		disk_enable();
 	}
 
 	printf("Rereading the partition table...\n");
-	rc = reread_partition_table();
+	rc = dasd_reread_partition_table(dev_filename, 5);
 	if (rc) {
 		ERRMSG("%s: (signal handler) Re-reading partition table "
-		       "failed. (%s)\n", prog_name, strerror(errno));
+		       "failed. (%s)\n", prog_name, strerror(rc));
 	} else {
 		printf("Exiting...\n");
 	}
-
-	rc = close(filedes);
-	if (rc)
-		ERRMSG("%s: (signal handler) Unable to close device (%s)\n",
-		       prog_name, strerror(errno));
 
 	signal(sig, SIG_DFL);
 	raise(sig);
@@ -497,30 +498,15 @@ static void get_device_name(char *devname,
 	}
 }
 
-/*
- * Retrieve DASD information
- */
-static void get_device_info(dasdfmt_info_t *info)
+static void get_blocksize(const char *device, unsigned int *blksize)
 {
-	dasd_information2_t dasd_info;
+	int err;
 
-	if (ioctl(filedes, BIODASDINFO2, &dasd_info))
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl call to retrieve "
-			    "device information failed (%s).\n",
-			    prog_name, strerror(errno));
-
-	info->dasd_info = dasd_info;
-}
-
-/*
- * Retrieve blocksize of device
- */
-static void get_blocksize(unsigned int *blksize)
-{
-	if (ioctl(filedes, BLKSSZGET, blksize) != 0)
+	err = dasd_get_blocksize(device, blksize);
+	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl to get the blocksize "
 			    "of the device failed (%s).\n", prog_name,
-			    strerror(errno));
+			    strerror(err));
 }
 
 /*
@@ -534,7 +520,7 @@ static void check_blocksize(dasdfmt_info_t *info, unsigned int blksize)
 	    info->dasd_info.format == DASD_FORMAT_NONE)
 		return;
 
-	get_blocksize(&dev_blksize);
+	get_blocksize(dev_filename, &dev_blksize);
 	if (dev_blksize != blksize) {
 		ERRMSG_EXIT(EXIT_FAILURE, "WARNING: Device is formatted with a "
 			    "different blocksize (%d).\nUse --mode=full to "
@@ -576,16 +562,15 @@ static void check_layout(dasdfmt_info_t *info, unsigned int intensity)
  */
 static void check_disk(dasdfmt_info_t *info, char *devname)
 {
-	int ro, errno_save;
+	int err;
+	bool ro;
 
-	if (ioctl(filedes, BLKROGET, &ro) != 0) {
-		errno_save = errno;
-		close(filedes);
+	err = dasd_is_ro(devname, &ro);
+	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE,
 			    "%s: the ioctl call to retrieve read/write "
 			    "status information failed (%s)\n",
-			    prog_name, strerror(errno_save));
-	}
+			    prog_name, strerror(err));
 
 	if (ro)
 		ERRMSG_EXIT(EXIT_FAILURE, "Disk is read only!\n");
@@ -775,9 +760,11 @@ static format_check_t check_track_format(dasdfmt_info_t *info, format_data_t *p)
 			.stop_unit = p->stop_unit
 		}, 0
 	};
+	int err;
 
-	if (ioctl(filedes, BIODASDCHECKFMT, &cdata)) {
-		if (errno == ENOTTY) {
+	err = dasd_check_format(dev_filename, &cdata);
+	if (err != 0) {
+		if (err == ENOTTY) {
 			ERRMSG("%s: Missing kernel support for format checking",
 			       prog_name);
 			if (mode == EXPAND) {
@@ -788,7 +775,7 @@ static format_check_t check_track_format(dasdfmt_info_t *info, format_data_t *p)
 			ERRMSG_EXIT(EXIT_FAILURE, ".\n");
 		}
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Could no check format: %s\n",
-			    prog_name, strerror(errno));
+			    prog_name, strerror(err));
 	}
 
 	return cdata;
@@ -804,7 +791,7 @@ static int process_tracks(dasdfmt_info_t *info, unsigned int cylinders,
 	format_data_t step = *format_params;
 	unsigned long step_value;
 	unsigned long cur_trk;
-	int cyl = 0;
+	int cyl = 0, err;
 
 	check_hashmarks(info);
 
@@ -827,10 +814,11 @@ static int process_tracks(dasdfmt_info_t *info, unsigned int cylinders,
 				break;
 			}
 		} else {
-			if (ioctl(filedes, BIODASDFMT, &step) != 0)
+			err = dasd_format_disk(filedes, &step);
+			if (err != 0)
 				ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl call "
 					    "to format tracks failed. (%s)\n",
-					    prog_name, strerror(errno));
+					    prog_name, strerror(err));
 		}
 
 		cyl = cur_trk / heads + 1;
@@ -965,7 +953,7 @@ static int dasdfmt_get_volser(char *devname, dasd_information2_t *dasd_info,
 	unsigned int blksize;
 	volume_label_t vlabel;
 
-	get_blocksize(&blksize);
+	get_blocksize(devname, &blksize);
 
 	if ((strncmp(dasd_info->type, "ECKD", 4) == 0) &&
 	    !dasd_info->FBA_layout) {
@@ -992,25 +980,25 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 	format5_label_t f5;
 	format7_label_t f7;
 	unsigned int blksize;
-	int rc;
+	int rc, fd;
 	void *ipl1_record, *ipl2_record;
 	int ipl1_record_len, ipl2_record_len;
-
 
 	if (info->verbosity > 0)
 		printf("Retrieving dasd information... ");
 
-	get_blocksize(&blksize);
+	get_blocksize(dev_filename, &blksize);
 
 	/*
 	 * Don't rely on the cylinders returned by HDIO_GETGEO, they might be
 	 * to small. geo is only used to get the number of sectors, which may
 	 * vary depending on the format.
 	 */
-	if (ioctl(filedes, HDIO_GETGEO, &geo) != 0)
+	rc = dasd_get_geo(dev_filename, &geo);
+	if (rc != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: (write labels) IOCTL "
 			    "HDIO_GETGEO failed (%s).\n",
-			    prog_name, strerror(errno));
+			    prog_name, strerror(rc));
 
 	if (info->verbosity > 0)
 		printf("ok\n");
@@ -1036,26 +1024,40 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 		ipl2_record_len	= sizeof(ipl2.data);
 	}
 
-	if (lseek(filedes, 0, SEEK_SET) != 0)
+	fd = open(dev_filename, O_RDWR);
+	if (fd < 0)
+		ERRMSG_EXIT(EXIT_FAILURE, "%s: Unable to open device "
+			    "'%s' (%s)\n", prog_name, dev_filename,
+			    strerror(errno));
+
+	if (lseek(fd, 0, SEEK_SET) != 0) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: lseek command 0 failed "
 			    "(%s)\n", prog_name, strerror(errno));
+	}
 
-	rc = write(filedes, ipl1_record, ipl1_record_len);
-	if (rc != ipl1_record_len)
+	rc = write(fd, ipl1_record, ipl1_record_len);
+	if (rc != ipl1_record_len) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Writing the bootstrap IPL1 "
 			    "failed, only wrote %d bytes.\n", prog_name, rc);
+	}
 
 	label_position = blksize;
-	rc = lseek(filedes, label_position, SEEK_SET);
-	if (rc != label_position)
+	rc = lseek(fd, label_position, SEEK_SET);
+	if (rc != label_position) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: lseek command to %i failed "
 			    "(%s).\n", prog_name, label_position,
 			    strerror(errno));
+	}
 
-	rc = write(filedes, ipl2_record, ipl2_record_len);
-	if (rc != ipl2_record_len)
+	rc = write(fd, ipl2_record, ipl2_record_len);
+	if (rc != ipl2_record_len) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Writing the bootstrap IPL2 "
 			    "failed, only wrote %d bytes.\n", prog_name, rc);
+	}
 
 	/* write VTOC */
 	vtoc_init_format4_label(&f4, geo.cylinders, cylinders, heads,
@@ -1071,32 +1073,36 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 	if (info->verbosity > 0)
 		printf("Writing label...\n");
 
-	rc = lseek(filedes, label_position, SEEK_SET);
-	if (rc != label_position)
+	rc = lseek(fd, label_position, SEEK_SET);
+	if (rc != label_position) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: lseek command to %i failed "
 			    "(%s).\n", prog_name, label_position,
 			    strerror(errno));
+	}
 
 	/*
 	 * Note: cdl volume labels do not contain the 'formatted_blocks' part
 	 * and ldl labels do not contain the key field
 	 */
 	if (info->cdl_format) {
-		rc = write(filedes, vlabel, (sizeof(*vlabel) -
-					     sizeof(vlabel->formatted_blocks)));
+		rc = write(fd, vlabel, (sizeof(*vlabel) -
+					sizeof(vlabel->formatted_blocks)));
 	} else {
 		vlabel->ldl_version = 0xf2; /* EBCDIC '2' */
 		vlabel->formatted_blocks = cylinders * heads * geo.sectors;
-		rc = write(filedes, &vlabel->vollbl, (sizeof(*vlabel)
-						     - sizeof(vlabel->volkey)));
+		rc = write(fd, &vlabel->vollbl, (sizeof(*vlabel)
+						 - sizeof(vlabel->volkey)));
 	}
 
 	if (((rc != sizeof(*vlabel) - sizeof(vlabel->formatted_blocks)) &&
 	     info->cdl_format) ||
 	    ((rc != (sizeof(*vlabel) - sizeof(vlabel->volkey))) &&
-	     (!info->cdl_format)))
+	     !info->cdl_format)) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Error writing volume label "
 			    "(%d).\n", prog_name, rc);
+	}
 
 	if (info->verbosity > 0)
 		printf("Writing VTOC... ");
@@ -1104,48 +1110,62 @@ static void dasdfmt_write_labels(dasdfmt_info_t *info, volume_label_t *vlabel,
 	label_position = (VTOC_START_CC * heads + VTOC_START_HH) *
 		geo.sectors * blksize;
 
-	rc = lseek(filedes, label_position, SEEK_SET);
-	if (rc != label_position)
+	rc = lseek(fd, label_position, SEEK_SET);
+	if (rc != label_position) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: lseek command to %i failed "
 			    "(%s).\n", prog_name, label_position,
 			    strerror(errno));
+	}
 
 	/* write VTOC FMT4 DSCB */
-	rc = write(filedes, &f4, sizeof(format4_label_t));
-	if (rc != sizeof(format4_label_t))
+	rc = write(fd, &f4, sizeof(format4_label_t));
+	if (rc != sizeof(format4_label_t)) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Error writing FMT4 label "
 			    "(%d).\n", prog_name, rc);
+	}
 
 	label_position += blksize;
 
-	rc = lseek(filedes, label_position, SEEK_SET);
-	if (rc != label_position)
+	rc = lseek(fd, label_position, SEEK_SET);
+	if (rc != label_position) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: lseek to %i failed (%s).\n",
 			    prog_name, label_position, strerror(errno));
+	}
 
 	/* write VTOC FMT5 DSCB */
-	rc = write(filedes, &f5, sizeof(format5_label_t));
-	if (rc != sizeof(format5_label_t))
+	rc = write(fd, &f5, sizeof(format5_label_t));
+	if (rc != sizeof(format5_label_t)) {
+		close(fd);
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Error writing FMT5 label "
 			    "(%d).\n", prog_name, rc);
+	}
 
 	if ((cylinders * heads) > BIG_DISK_SIZE) {
 		label_position += blksize;
 
-		rc = lseek(filedes, label_position, SEEK_SET);
-		if (rc != label_position)
+		rc = lseek(fd, label_position, SEEK_SET);
+		if (rc != label_position) {
+			close(fd);
 			ERRMSG_EXIT(EXIT_FAILURE, "%s: lseek to %i failed "
 				    "(%s).\n", prog_name, label_position,
 				    strerror(errno));
+		}
 
 		/* write VTOC FMT 7 DSCB (only on big disks) */
-		rc = write(filedes, &f7, sizeof(format7_label_t));
-		if (rc != sizeof(format7_label_t))
+		rc = write(fd, &f7, sizeof(format7_label_t));
+		if (rc != sizeof(format7_label_t)) {
+			close(fd);
 			ERRMSG_EXIT(EXIT_FAILURE, "%s: Error writing FMT7 "
 				    "label (rc=%d).\n", prog_name, rc);
+		}
 	}
 
-	fsync(filedes);
+	fsync(fd);
+
+	close(fd);
 
 	if (info->verbosity > 0)
 		printf("ok\n");
@@ -1225,27 +1245,25 @@ static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 		.intensity = ((p->intensity & ~DASD_FMT_INT_FMT_NOR0)
 			      | DASD_FMT_INT_INVAL)
 	};
+	int err;
 
-	if (!((info->withoutprompt) && (info->verbosity < 1)))
+	if (!(info->withoutprompt && (info->verbosity < 1)))
 		printf("Formatting the device. This may take a while "
 		       "(get yourself a coffee).\n");
 
 	if (info->verbosity > 0)
 		printf("Detaching the device...\n");
 
-	if (ioctl(filedes, BIODASDDISABLE, p) != 0)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: (prepare device) IOCTL "
-			    "BIODASDDISABLE failed. (%s)\n", prog_name,
-			    strerror(errno));
-	disk_disabled = 1;
+	disk_disable(dev_filename);
 
 	if (info->verbosity > 0)
 		printf("Invalidate first track...\n");
 
-	if (ioctl(filedes, BIODASDFMT, &temp) != 0)
+	err = dasd_format_disk(filedes, &temp);
+	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: (invalidate first track) IOCTL "
 			    "BIODASDFMT failed. (%s)\n", prog_name,
-			    strerror(errno));
+			    strerror(err));
 
 	/* except track 0 from standard formatting procss */
 	p->start_unit = 1;
@@ -1260,19 +1278,16 @@ static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 	if (info->verbosity > 0)
 		printf("Revalidate first track...\n");
 
-	if (ioctl(filedes, BIODASDFMT, &temp) != 0)
+	err = dasd_format_disk(filedes, &temp);
+	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: (re-validate first track) IOCTL"
 			    " BIODASDFMT failed (%s)\n", prog_name,
-			    strerror(errno));
+			    strerror(err));
 
 	if (info->verbosity > 0)
 		printf("Re-accessing the device...\n");
 
-	if (ioctl(filedes, BIODASDENABLE, p) != 0)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: (prepare device) IOCTL "
-			    "BIODASDENABLE failed. (%s)\n", prog_name,
-			    strerror(errno));
-	disk_disabled = 0;
+	disk_enable();
 }
 
 /*
@@ -1281,18 +1296,14 @@ static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 static void dasdfmt_expand_format(dasdfmt_info_t *info, unsigned int cylinders,
 				  unsigned int heads, format_data_t *p)
 {
-	if (!((info->withoutprompt) && (info->verbosity < 1)))
+	if (!(info->withoutprompt && (info->verbosity < 1)))
 		printf("Formatting the device. This may take a while "
 		       "(get yourself a coffee).\n");
 
 	if (info->verbosity > 0)
 		printf("Detaching the device...\n");
 
-	if (ioctl(filedes, BIODASDDISABLE, p) != 0)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: (prepare device) IOCTL "
-			    "BIODASDDISABLE failed. (%s)\n", prog_name,
-			    strerror(errno));
-	disk_disabled = 1;
+	disk_disable(dev_filename);
 
 	dasdfmt_format(info, cylinders, heads, p);
 
@@ -1302,11 +1313,7 @@ static void dasdfmt_expand_format(dasdfmt_info_t *info, unsigned int cylinders,
 	if (info->verbosity > 0)
 		printf("Re-accessing the device...\n");
 
-	if (ioctl(filedes, BIODASDENABLE, p) != 0)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: (prepare device) IOCTL "
-			    "BIODASDENABLE failed. (%s)\n", prog_name,
-			    strerror(errno));
-	disk_disabled = 0;
+	disk_enable();
 }
 
 /*
@@ -1318,6 +1325,7 @@ static void dasdfmt_quick_format(dasdfmt_info_t *info, unsigned int cylinders,
 {
 	format_check_t cdata = { .expect = {0}, 0 };
 	format_data_t tmp = *p;
+	int err;
 
 	if (info->force) {
 		printf("Skipping format check due to --force.\n");
@@ -1344,25 +1352,20 @@ static void dasdfmt_quick_format(dasdfmt_info_t *info, unsigned int cylinders,
 		}
 	}
 
-	if (!((info->withoutprompt) && (info->verbosity < 1)))
+	if (!(info->withoutprompt && (info->verbosity < 1)))
 		printf("Formatting the first two tracks of the device.\n");
 
 	/* Disable the device before we do anything */
-	if (ioctl(filedes, BIODASDDISABLE, p))
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl to disable the device "
-			    "failed. (%s)\n", prog_name, strerror(errno));
-	disk_disabled = 1;
+	disk_disable(dev_filename);
 
 	/* Now do the actual formatting of our first two tracks */
-	if (ioctl(filedes, BIODASDFMT, p))
+	err = dasd_format_disk(filedes, p);
+	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl to format the device "
-			    "failed. (%s)\n", prog_name, strerror(errno));
+			    "failed. (%s)\n", prog_name, strerror(err));
 
 	/* Re-Enable the device so that we can continue working with it */
-	if (ioctl(filedes, BIODASDENABLE, p))
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl to enable the device "
-			    "failed. (%s)\n", prog_name, strerror(errno));
-	disk_disabled = 0;
+	disk_enable();
 }
 
 static void do_format_dasd(dasdfmt_info_t *info, char *devname,
@@ -1371,7 +1374,7 @@ static void do_format_dasd(dasdfmt_info_t *info, char *devname,
 			   unsigned int heads)
 {
 	char inp_buffer[5];
-	int count;
+	int count, err;
 
 	p->start_unit = 0;
 
@@ -1448,9 +1451,10 @@ static void do_format_dasd(dasdfmt_info_t *info, char *devname,
 			dasdfmt_write_labels(info, vlabel, cylinders, heads);
 
 		printf("Rereading the partition table... ");
-		if (reread_partition_table()) {
+		err = dasd_reread_partition_table(dev_filename, 5);
+		if (err != 0) {
 			ERRMSG("%s: error during rereading the partition "
-			       "table: %s.\n", prog_name, strerror(errno));
+			       "table: %s.\n", prog_name, strerror(err));
 		} else {
 			printf("ok\n");
 		}
@@ -1465,7 +1469,6 @@ int main(int argc, char *argv[])
 	volume_label_t vlabel;
 	char old_volser[7];
 
-	char dev_filename[PATH_MAX];
 	char str[ERR_LENGTH];
 	char buf[7];
 
@@ -1636,18 +1639,17 @@ int main(int argc, char *argv[])
 
 	get_device_name(dev_filename, optind, argc, argv);
 
-	filedes = open(dev_filename, O_RDWR);
-	if (filedes == -1)
-		ERRMSG_EXIT(EXIT_FAILURE, "%s: Unable to open device %s: %s\n",
-			    prog_name, dev_filename, strerror(errno));
-
-	get_device_info(&info);
+	rc = dasd_get_info(dev_filename, &info.dasd_info);
+	if (rc != 0)
+		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl call to retrieve "
+			    "device information failed (%s).\n",
+			    prog_name, strerror(rc));
 
 	/* Either let the user specify the blksize or get it from the kernel */
 	if (!info.blksize_specified) {
 		if (!(mode == FULL ||
 		      info.dasd_info.format == DASD_FORMAT_NONE) || info.check)
-			get_blocksize(&format_params.blksize);
+			get_blocksize(dev_filename, &format_params.blksize);
 		else
 			format_params = ask_user_for_blksize(format_params);
 	}
@@ -1685,10 +1687,6 @@ int main(int argc, char *argv[])
 	else
 		do_format_dasd(&info, dev_filename, &vlabel,
 			       &format_params, cylinders, heads);
-
-	if (close(filedes) != 0)
-		ERRMSG("%s: error during close: %s\ncontinuing...\n",
-		       prog_name, strerror(errno));
 
 	return 0;
 }

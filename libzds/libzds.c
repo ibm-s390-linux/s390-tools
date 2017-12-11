@@ -13,16 +13,13 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
 #include <linux/types.h>
 #include <malloc.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
+#include "lib/dasd_base.h"
 #include "lib/libzds.h"
 #include "lib/u2s.h"
 #include "lib/util_base.h"
@@ -30,13 +27,6 @@
 #include "lib/vtoc.h"
 
 /** @cond PRIVATE */
-
-/******************************************************************************/
-/*     ioctl related definitions					      */
-/******************************************************************************/
-
-/* device size in bytes (u64 *arg) */
-#define BLKGETSIZE64 _IOR(0x12, 114, size_t)
 
 
 /******************************************************************************/
@@ -480,18 +470,11 @@ void lzds_zdsroot_free(struct zdsroot *root)
  */
 static int dasd_read_geometry(struct dasd *dasd)
 {
-	int fd;
 	unsigned long long size_in_bytes;
 
 	errorlog_clear(dasd->log);
-	fd = open(dasd->device, O_RDONLY);
-	if (fd < 0)
-		return errorlog_add_message(
-			&dasd->log, NULL, EIO,
-			"read geometry: could not open device %s\n",
-			dasd->device);
 
-	if (ioctl(fd, BLKGETSIZE64, &size_in_bytes) != 0)
+	if (dasd_get_blocksize_in_bytes(dasd->device, &size_in_bytes) != 0)
 		return errorlog_add_message(
 			&dasd->log, NULL, EIO,
 			"read geometry: could not get size from device %s\n",
@@ -505,7 +488,6 @@ static int dasd_read_geometry(struct dasd *dasd)
 	dasd->label_block = 2;
 	dasd->heads = 15;
 	dasd->cylinders = (size_in_bytes / (dasd->heads * RAWTRACKSIZE));
-	close(fd);
 	return 0;
 }
 
