@@ -509,6 +509,7 @@ VM_CMDS="q userid\
   :q cache\
   :q nic\
   :q pav\
+  :q proc\
   :q proc topology\
   :q mt\
   :q qioass\
