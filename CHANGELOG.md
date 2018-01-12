@@ -3,6 +3,11 @@ Release history for s390-tools (MIT version)
 
 * __v2.2.1 (xxxx-xx-xx)__
 
+  For Linux kernel version: 4.15
+
+  Bug Fixes:
+  - zgetdump: Fix handling of DASD multi-volume dump for partitions above 4 GB
+
 * __v2.2.0 (2017-12-07)__
 
   For Linux kernel version: 4.14

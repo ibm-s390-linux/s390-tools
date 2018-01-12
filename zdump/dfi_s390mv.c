@@ -242,7 +242,7 @@ static void vol_init(struct vol *vol, struct vol_parm *vol_parm, int ssid,
 
 	sprintf(vol->bus_id, "0.%x.%04x", ssid, vol_parm->devno);
 	vol->blk_size = vol_parm->blk_size << 8;
-	vol->part_off = vol_parm->start_blk * vol->blk_size;
+	vol->part_off = (u64)vol_parm->start_blk * vol->blk_size;
 	vol->part_size = blk_cnt * vol->blk_size;
 	vol->status = dev_from_busid(vol->bus_id, &vol->dev);
 	vol->sign = SIGN_VALID;
