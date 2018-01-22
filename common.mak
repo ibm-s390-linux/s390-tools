@@ -220,10 +220,10 @@ export AS LD CC CPP AR NM STRIP OBJCOPY OBJDUMP INSTALL CFLAGS CXXFLAGS \
 
 # Overwrite implicite makefile rules for having nice compile output
 %.o: %.c
-	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
 ifeq ("${C}","1")
 	$(CHECKTOOL) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
 endif
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
 
 %.o: %.cpp
 	$(CXX) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) -c $< -o $@
