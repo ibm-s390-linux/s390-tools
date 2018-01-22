@@ -8,7 +8,7 @@ clean:
 	rm -f *.o core xcec-bridge
 
 install: ip_watcher.pl xcec-bridge start_hsnc.sh
-	$(SED) -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' \
+	$(SED) -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 	< start_hsnc.sh >$(DESTDIR)$(USRSBINDIR)/start_hsnc.sh; \
 	chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/start_hsnc.sh; \
 	chmod 755 $(DESTDIR)$(USRSBINDIR)/start_hsnc.sh; \

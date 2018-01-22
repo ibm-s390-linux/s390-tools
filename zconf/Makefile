@@ -23,7 +23,7 @@ install:	install-scripts install-manpages install-usrsbin-scripts $(SUB_DIRS)
 install-scripts:	$(SCRIPTS)
 	@for i in $^; do \
 		cat $$i | \
-		sed -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' \
+		sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		>$(DESTDIR)$(BINDIR)/$$i; \
 		chown $(OWNER).$(GROUP) $(DESTDIR)$(BINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(BINDIR)/$$i; \
@@ -32,7 +32,7 @@ install-scripts:	$(SCRIPTS)
 install-usrsbin-scripts:	$(USRSBIN_SCRIPTS)
 	@for i in $^; do \
 		cat $$i | \
-		sed -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' \
+		sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		>$(DESTDIR)$(USRSBINDIR)/$$i; \
 		chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(USRSBINDIR)/$$i; \

@@ -10,13 +10,13 @@ install:
 	@for i in $(SCRIPTS); \
 	do \
 		cat $$i | \
-		sed -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' \
+		sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		>$(DESTDIR)$(BINDIR)/$$i; \
 		chown $(OWNER):$(GROUP) $(DESTDIR)$(BINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(BINDIR)/$$i; \
 	done
 
-	sed -e 's+%S390_TOOLS_VERSION%+$(S390_TOOLS_RELEASE)+' cpictl > \
+	sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' cpictl > \
 		$(DESTDIR)$(TOOLS_LIBDIR)/cpictl
 	chown $(OWNER):$(GROUP) $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
 	chmod 775 $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
