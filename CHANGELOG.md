@@ -5,6 +5,9 @@ Release history for s390-tools (MIT version)
 
   For Linux kernel version: 4.15
 
+  Changes of existing tools:
+  - lscpumf: add support for IBM z14 hardware counters
+
   Bug Fixes:
   - zgetdump: Fix handling of DASD multi-volume dump for partitions above 4 GB
 
