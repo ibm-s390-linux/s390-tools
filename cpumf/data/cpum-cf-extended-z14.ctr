@@ -269,7 +269,7 @@ Description:
 Decimal instructions dispatched. Instructions: CVB, CVD, AP, CP, DP, ED,
 EDMK, MP, SRP, SP, ZAP
 .
-Counter:233	Name:LAST_HOST_TRANSLATIONS
+Counter:232	Name:LAST_HOST_TRANSLATIONS
 Description:
 Last Host Translation done
 .
