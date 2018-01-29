@@ -405,17 +405,7 @@ int lzds_zdsroot_alloc(struct zdsroot **root)
 	memset(tmproot, 0, sizeof(*tmproot));
 
 	tmproot->dasdlist = util_list_new(struct dasd, list);
-	if (!tmproot->dasdlist) {
-		free(tmproot);
-		return ENOMEM;
-	}
-
 	tmproot->datasetlist = util_list_new(struct dataset, list);
-	if (!tmproot->dasdlist) {
-		util_list_free(tmproot->dasdlist);
-		free(tmproot);
-		return ENOMEM;
-	}
 
 	*root = tmproot;
 
@@ -804,10 +794,6 @@ static int errorlog_alloc(struct errorlog **log)
 		return ENOMEM;
 	memset(tmplog, 0, sizeof(*tmplog));
 	tmplog->entries = util_list_new(struct errormsg, list);
-	if (!tmplog->entries) {
-		free(tmplog);
-		return ENOMEM;
-	}
 	*log = tmplog;
 	return 0;
 }
@@ -2185,8 +2171,6 @@ static int dataset_member_analysis(struct dataset *ds)
 
 	dataset_free_memberlist(ds);
 	ds->memberlist = util_list_new(struct pdsmember, list);
-	if (!ds->memberlist)
-		return ENOMEM;
 
 	/* track buffer must be page aligned for O_DIRECT */
 	trackdata = memalign(4096, RAWTRACKSIZE);

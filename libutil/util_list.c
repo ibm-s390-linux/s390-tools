@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_list.h"
 
 /*
@@ -45,10 +46,8 @@ void util_list_init_offset(struct util_list *list, unsigned long offset)
  */
 struct util_list *util_list_new_offset(unsigned long offset)
 {
-	struct util_list *list = malloc(sizeof(*list));
+	struct util_list *list = util_malloc(sizeof(*list));
 
-	if (!list)
-		return NULL;
 	util_list_init_offset(list, offset);
 	return list;
 }
