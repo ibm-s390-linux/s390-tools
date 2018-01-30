@@ -14,6 +14,7 @@ List of all individuals having contributed content to s390-tools
 - Christof Schmitt
 - Claudio Imbrenda
 - Clemens von Mann
+- cvs2git
 - Dan Horak
 - Despina Papadopoulou
 - Eberhard Pasch
@@ -21,6 +22,7 @@ List of all individuals having contributed content to s390-tools
 - Erwin Vicari
 - Eugene Crosser
 - Eugene Dvurechenski
+- Eugene (jno) Dvurechenski
 - Farhan Ali
 - Fedor Loshakov
 - Felix Beck
@@ -60,6 +62,7 @@ List of all individuals having contributed content to s390-tools
 - Martin Schwidefsky
 - Maxim Shchetynin
 - Melissa Howland
+- Michael
 - Michael Ernst
 - Michael Holzheu
 - Michael Mueller
@@ -74,9 +77,11 @@ List of all individuals having contributed content to s390-tools
 - Ralph Wuerthner
 - Rene Trumpp
 - Rolf Schaefer
+- root
 - Sa Liu
 - Sascha Silbe
 - Sebastian Ott
+- Seshagiri N Ippili
 - Seshagiri N. Ippili
 - Simon Sturm
 - Stefan Bader

@@ -1,15 +1,18 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.2.1 (xxxx-xx-xx)__
+* __v2.3.0 (2018-01-30)__
 
   For Linux kernel version: 4.15
 
   Changes of existing tools:
-  - lscpumf: add support for IBM z14 hardware counters
+  - lscpumf: Add support for IBM z14 hardware counters
+  - libdasd: Introduce libdasd and use for dasd tools
+  - zipl: Always build and link without PIE
 
   Bug Fixes:
   - zgetdump: Fix handling of DASD multi-volume dump for partitions above 4 GB
+  - zdev: Fix zdev dracut module aborting on unknown root device
 
 * __v2.2.0 (2017-12-07)__
 
