@@ -1,9 +1,26 @@
 include ../common.mak
 
+ifeq (${HAVE_OPENSSL},0)
+
+all:
+	$(SKIP) HAVE_OPENSSL=0
+
+install:
+	$(SKIP) HAVE_OPENSSL=0
+
+else
+
+check_dep:
+	$(call check_dep, \
+		"zkey", \
+		"openssl/evp.h", \
+		"openssl-devel", \
+		"HAVE_OPENSSL=0")
+
 CPPFLAGS += -I../include
 LDLIBS += -ldl -lcrypto
 
-all: zkey
+all: check_dep zkey
 
 libs = $(rootdir)/libutil/libutil.a
 
@@ -17,6 +34,8 @@ install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -m 644 -c zkey.1 $(DESTDIR)$(MANDIR)/man1
+
+endif
 
 clean:
 	rm -f *.o zkey

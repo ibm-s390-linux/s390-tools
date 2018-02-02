@@ -264,6 +264,7 @@ build options:
 | pfm            | `HAVE_PFM`         | cpacfstats                            |
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
+| openssl        | `HAVE_OPENSSL`     | zkey                                  |
 
 This table lists additional build or install options:
 
@@ -366,3 +367,8 @@ the different tools are provided:
   For running znetconf these programs are required:
   - modprobe (kmod)
   - vmcp (s390-tools)
+
+* zkey:
+  For building the zkey tools you need openssl version 0.9.7 or newer installed
+  (openssl-devel.rpm). Tip: you may skip the zkey build by adding
+  `HAVE_OPENSSL=0` to the make invocation.
