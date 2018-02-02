@@ -38,6 +38,8 @@ struct property {
 #define RESTRICTED_PROPERTY_NAME_CHARS   "=\n"
 #define RESTRICTED_PROPERTY_VALUE_CHARS  "\n"
 
+#define RESTRICTED_STR_LIST_CHARS        ",\n"
+
 static int openssl_initialized;
 
 /**
@@ -406,4 +408,216 @@ out:
 		free(digest_read);
 	fclose(fp);
 	return rc;
+}
+
+/**
+ * Combines a list of strings into one comma separated string
+ *
+ * @param[in] strings    zero terminated array of pointers to C-strings
+ *
+ * @returns a new string. This must be freed by the caller when no longer used.
+ *          returns NULL if a string contains an invalid character.
+ */
+char *str_list_combine(const char **strings)
+{
+	unsigned int i, size;
+	char *str;
+
+	util_assert(strings != NULL, "Internal error: strings is NULL");
+
+	for (i = 0, size = 0; strings[i] != NULL; i++) {
+		if (strpbrk(strings[i], RESTRICTED_STR_LIST_CHARS) != NULL)
+			return NULL;
+
+		if (i > 0)
+			size += 1;
+		size += strlen(strings[i]);
+	}
+
+	str = util_zalloc(size + 1);
+	for (i = 0, size = 0; strings[i] != NULL; i++) {
+		if (i > 0)
+			strcat(str, ",");
+		strcat(str, strings[i]);
+	}
+
+	return str;
+}
+
+/**
+ * Splits a comma separated string into its parts
+ *
+ * @param[in] str_list   the comma separated string
+ *
+ * @returns a zero terminated array of pointers to C-strings. This array
+ *          and all individual C-Strings need to be freed bay the caller when
+ *          no longer used. This can be done using str_list_free_string_array().
+ */
+char **str_list_split(const char *str_list)
+{
+	unsigned int i, count;
+	char **list;
+	char *copy;
+	char *tok;
+
+	util_assert(str_list != NULL, "Internal error: str_list is NULL");
+
+	count = str_list_count(str_list);
+	list = util_zalloc((count + 1) * sizeof(char *));
+
+	copy = util_strdup(str_list);
+	tok = strtok(copy, ",");
+	i = 0;
+	while (tok != NULL) {
+		list[i] = util_strdup(tok);
+		i++;
+		tok = strtok(NULL, ",");
+	}
+
+	free(copy);
+	return list;
+}
+
+/**
+ * Count the number of parts a comma separated string contains
+ *
+ * param[in] str_list   the comma separated string
+ *
+ * @returns the number of parts
+ */
+unsigned int str_list_count(const char *str_list)
+{
+	unsigned int i, count;
+
+	util_assert(str_list != NULL, "Internal error: str_list is NULL");
+
+	if (strlen(str_list) == 0)
+		return 0;
+
+	for (i = 0, count = 1; str_list[i] != '\0'; i++)
+		if (str_list[i] == ',')
+			count++;
+	return count;
+}
+
+/**
+ * Find a string in a comma separated string
+ *
+ * @param str_list     the comma separated string.
+ * @param str          the string to find
+ *
+ * @returns a pointer to the string within the comma separated string,
+ *          or NULL if the string was not found
+ *
+ */
+static char *str_list_find(const char *str_list, const char *str)
+{
+	char *before;
+	char *after;
+	char *ch;
+
+	ch = strstr(str_list, str);
+	if (ch == NULL)
+		return NULL;
+
+	if (ch != str_list) {
+		before = ch - 1;
+		if (*before != ',')
+			return NULL;
+	}
+
+	after = ch + strlen(str);
+	if (*after != ',' && *after != '\0')
+		return NULL;
+
+	return ch;
+}
+
+/**
+ * Appends a string to a comma separated string
+ *
+ * @param str_list     the comma separated string.
+ * @param str          the string to add
+ *
+ * @returns a new comma separated string. This must be freed by the caller when
+ *          no longer used. If the string to add is already contained in the
+ *          comma separated list, it is not added and NULL is returned.
+ *          If the string to be added contains a comma, NULL is returned.
+ */
+char *str_list_add(const char *str_list, const char *str)
+{
+	char *ret;
+
+	util_assert(str_list != NULL, "Internal error: str_list is NULL");
+	util_assert(str != NULL, "Internal error: str is NULL");
+
+	if (strpbrk(str, RESTRICTED_STR_LIST_CHARS) != NULL)
+		return NULL;
+
+	if (str_list_find(str_list, str))
+		return NULL;
+
+	ret = util_zalloc(strlen(str_list) + 1 + strlen(str) + 1);
+	strcpy(ret, str_list);
+	if (strlen(str_list) > 0)
+		strcat(ret, ",");
+	strcat(ret, str);
+
+	return ret;
+}
+
+/**
+ * Removes a string from a comma separated string
+ *
+ * @param str_list     the comma separated string.
+ * @param str          the string to remove
+ *
+ * @returns a new comma separated string. This must be freed by the caller when
+ *          no longer used. If the string to remove is not found in the
+ *          comma separated string, NULL is returned
+ */
+char *str_list_remove(const char *str_list, const char *str)
+{
+	char *after;
+	char *ret;
+	char *ch;
+
+	util_assert(str_list != NULL, "Internal error: str_list is NULL");
+	util_assert(str != NULL, "Internal error: str is NULL");
+
+	ch = str_list_find(str_list, str);
+	if (ch == NULL)
+		return NULL;
+
+	after = ch + strlen(str);
+	if (*after == ',') {
+		/* there are more parts after the one to remove */
+		ret = util_zalloc(strlen(str_list) - strlen(str) - 1 + 1);
+		strncpy(ret, str_list, ch - str_list);
+		strcat(ret, after + 1);
+	} else if (ch == str_list) {
+		/* removing the one and only part -> empty string */
+		ret = util_zalloc(1);
+	} else {
+		/* there are no more parts after the one to remove */
+		ret = util_zalloc(strlen(str_list) - strlen(str) - 1 + 1);
+		strncpy(ret, str_list, ch - 1 - str_list);
+	}
+
+	return ret;
+}
+
+/**
+ * Frees a string array (as produced by str_list_split())
+ *
+ * @param strings a NULL terminated array of pointers to C-Strings.
+ */
+void str_list_free_string_array(char **strings)
+{
+	util_assert(strings != NULL, "Internal error: strings is NULL");
+
+	while (*strings != NULL) {
+		free((void *)*strings);
+		strings++;
+	}
 }

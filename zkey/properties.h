@@ -33,4 +33,16 @@ int properties_save(struct properties *properties, const char *filename,
 int properties_load(struct properties *properties, const char *filename,
 		    bool check_integrity);
 
+char *str_list_combine(const char **strings);
+
+char **str_list_split(const char *str_list);
+
+unsigned int str_list_count(const char *str_list);
+
+char *str_list_add(const char *str_list, const char *str);
+
+char *str_list_remove(const char *str_list, const char *str);
+
+void str_list_free_string_array(char **strings);
+
 #endif
