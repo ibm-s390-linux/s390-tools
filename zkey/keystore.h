@@ -1,0 +1,77 @@
+/*
+ * zkey - Generate, re-encipher, and validate secure keys
+ *
+ * Keystore handling functions
+ *
+ * Copyright IBM Corp. 2018
+ *
+ * s390-tools is free software; you can redistribute it and/or modify
+ * it under the terms of the MIT license. See LICENSE for details.
+ */
+
+#ifndef KEYSTORE_H
+#define KEYSTORE_H
+
+#include <stdbool.h>
+
+#include "pkey.h"
+
+struct keystore {
+	bool verbose;
+	char *directory;
+	int lock_fd;
+	mode_t mode;
+	gid_t owner;
+};
+
+struct keystore *keystore_new(const char *directory, bool verbose);
+
+int keystore_generate_key(struct keystore *keystore, const char *name,
+			  const char *description, const char *volumes,
+			  const char *apqns, size_t sector_size,
+			  size_t keybits, bool xts, const char *clear_key_file,
+			  int pkey_fd);
+
+int keystore_import_key(struct keystore *keystore, const char *name,
+			const char *description, const char *volumes,
+			const char *apqns, size_t sector_size,
+			const char *import_file);
+
+int keystore_change_key(struct keystore *keystore, const char *name,
+			const char *description, const char *volumes,
+			const char *apqns, long int sector_size);
+
+int keystore_rename_key(struct keystore *keystore, const char *name,
+			const char *newname);
+
+int keystore_validate_key(struct keystore *keystore, const char *name_filter,
+			  const char *apqn_filter, int pkey_fd);
+
+int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
+			    const char *apqn_filter,
+			    bool from_old, bool to_new, bool inplace,
+			    bool staged, bool complete, int pkey_fd,
+			    t_CSNBKTC dll_CSNBKTC);
+
+int keystore_copy_key(struct keystore *keystore, const char *name,
+		      const char *newname, const char *volumes);
+
+int keystore_export_key(struct keystore *keystore, const char *name,
+			const char *export_file);
+
+int keystore_remove_key(struct keystore *keystore, const char *name,
+			bool quiet);
+
+int keystore_list_keys(struct keystore *keystore, const char *name_filter,
+		       const char *volume_filter, const char *apqn_filter);
+
+int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
+			bool execute);
+
+int keystore_crypttab(struct keystore *keystore, const char *volume_filter);
+
+void keystore_free(struct keystore *keystore);
+
+
+
+#endif

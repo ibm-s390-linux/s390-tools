@@ -27,8 +27,9 @@ libs = $(rootdir)/libutil/libutil.a
 zkey.o: zkey.c pkey.h misc.h
 pkey.o: pkey.c pkey.h
 properties.o: properties.c properties.h
+keystore.o: keystore.c keystore.h properties.h
 
-zkey: zkey.o pkey.o properties.o $(libs)
+zkey: zkey.o pkey.o properties.o keystore.o $(libs)
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
