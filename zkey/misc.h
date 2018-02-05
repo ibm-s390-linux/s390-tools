@@ -3,7 +3,7 @@
  *
  * Local helper functions
  *
- * Copyright 2017 IBM Corp.
+ * Copyright IBM Corp. 2017, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -37,11 +37,24 @@ void misc_print_invalid_command(const char *command)
 /**
  * An required parameter has not been specified
  *
- * @param[in] option  Parameter string
+ * @param[in] parm_name  Parameter string
  */
 void misc_print_required_parm(const char *parm_name)
 {
 	warnx("Parameter '%s' is required", parm_name);
+	util_prg_print_parse_error();
+}
+
+/**
+ * An required parameter has not been specified
+ *
+ * @param[in] parm_name1  Parameter string 1
+ * @param[in] parm_name2  Parameter string 2
+ */
+static void misc_print_required_parms(const char *parm_name1,
+				      const char *parm_name2)
+{
+	warnx("Parameter '%s' or '%s' is required", parm_name1, parm_name2);
 	util_prg_print_parse_error();
 }
 
