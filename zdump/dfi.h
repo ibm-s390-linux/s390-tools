@@ -125,7 +125,7 @@ enum dfi_cpu_content {
 };
 
 #define DFI_CPU_CONTENT_FAC_VX	0x00000001
-extern int dfi_cpu_content_fac_check(int falgs);
+extern int dfi_cpu_content_fac_check(int flags);
 extern void dfi_cpu_content_fac_add(int flags);
 
 #define dfi_cpu_iterate(cpu) \
