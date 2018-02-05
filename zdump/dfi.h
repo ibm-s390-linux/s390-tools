@@ -158,8 +158,6 @@ struct dfi_mem_chunk {
 	u64			start;		/* Start address in memory */
 	u64			end;		/* End address in memory */
 	u64			size;		/* Size of chunk in dump file */
-	u64			out_start;	/* Start offset in dump file */
-	u64			out_end;	/* End offset in dump file */
 	dfi_mem_chunk_read_fn	read_fn;	/* Chunk read callback */
 	dfi_mem_chunk_free_fn	free_fn;	/* Free data callback */
 	void			*data;		/* Data for callback */
