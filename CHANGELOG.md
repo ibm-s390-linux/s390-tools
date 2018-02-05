@@ -6,6 +6,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 4.16
 
   Changes of existing tools:
+  - dbginfo: Gather nvme related data
 
   Bug Fixes:
 

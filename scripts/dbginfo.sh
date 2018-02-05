@@ -182,11 +182,14 @@ readonly OUTPUT_FILE_XML="${WORKPATH}domain_xml"
 # File that includes the docker inspect output
 readonly OUTPUT_FILE_DOCKER="${WORKPATH}docker_inspect.out"
 
+# File that includes nvme related information
+readonly OUTPUT_FILE_NVME="${WORKPATH}nvme.out"
+
 # Mount point of the debug file system
 readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
 
 # The amount of steps running the whole collections
-readonly COLLECTION_COUNT=11
+readonly COLLECTION_COUNT=12
 
 # The kernel version (e.g. '2' from 2.6.32 or '3' from 3.2.1)
 readonly KERNEL_VERSION=$(uname -r 2>/dev/null | cut -d'.' -f1)
@@ -827,13 +830,32 @@ collect_docker() {
 }
 
 ########################################
+collect_nvme() {
+    local NVME
+
+    pr_syslog_stdout "11 of ${COLLECTION_COUNT}: Collecting nvme output"
+    call_run_command "nvme list" "${OUTPUT_FILE_NVME}"
+
+    for NVME in /dev/nvme[0-9]*; do
+	if [ -c $NVME ]; then
+	    call_run_command "smartctl -x $NVME" "${OUTPUT_FILE_NVME}"
+	    call_run_command "nvme fw-log $NVME" "${OUTPUT_FILE_NVME}"
+	    call_run_command "nvme smart-log $NVME" "${OUTPUT_FILE_NVME}"
+	    call_run_command "nvme error-log $NVME" "${OUTPUT_FILE_NVME}"
+	fi
+    done
+
+    pr_log_stdout " "
+}
+
+########################################
 post_processing() {
     local file_mtime
     local file_mtime_epoche
     local tmp_file
     local file_name
 
-    pr_syslog_stdout "11 of ${COLLECTION_COUNT}: Postprocessing"
+    pr_syslog_stdout "${COLLECTION_COUNT} of ${COLLECTION_COUNT}: Postprocessing"
 
     find "${WORKPATH}etc/libvirt/qemu/" -maxdepth 1 -name "*.xml" 2>/dev/null | while IFS= read -r file_name; do
 	file_mtime_epoche=$(stat --format=%Y "${file_name}")
@@ -1117,6 +1139,8 @@ collect_ovs
 collect_domain_xml
 
 collect_docker
+
+collect_nvme
 
 post_processing
 
