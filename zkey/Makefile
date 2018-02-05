@@ -25,9 +25,10 @@ all: check_dep zkey
 libs = $(rootdir)/libutil/libutil.a
 
 zkey.o: zkey.c pkey.h misc.h
+pkey.o: pkey.c pkey.h
 properties.o: properties.c properties.h
 
-zkey: zkey.o properties.o $(libs)
+zkey: zkey.o pkey.o properties.o $(libs)
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)

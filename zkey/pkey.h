@@ -4,7 +4,7 @@
  * This header file defines the interface to the pkey kernel module.
  * It defines a set of IOCTL commands with its associated structures.
  *
- * Copyright 2017 IBM Corp.
+ * Copyright IBM Corp. 2017, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -81,5 +81,45 @@ struct pkey_verifykey {
 #define PKEY_VERIFY_ATTR_OLD_MKVP  0x0100 /* key has old MKVP value */
 
 #define PKEY_VERIFYKEY _IOWR(PKEY_IOCTL_MAGIC, 0x07, struct pkey_verifykey)
+
+#define METHOD_OLD_TO_CURRENT	"RTCMK   "
+#define METHOD_CURRENT_TO_NEW	"RTNMK   "
+
+typedef void (*t_CSNBKTC)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  unsigned char *key_identifier);
+
+int load_cca_library(void **lib_csulcca, t_CSNBKTC *dll_CSNBKTC, bool verbose);
+
+int open_pkey_device(bool verbose);
+
+int generate_secure_key_random(int pkey_fd, const char *keyfile,
+			       size_t keybits, bool xts, u16 card, u16 domain,
+			       bool verbose);
+
+int generate_secure_key_clear(int pkey_fd, const char *keyfile,
+			      size_t keybits, bool xts,
+			      const char *clearkeyfile,
+			      u16 card, u16 domain,
+			      bool verbose);
+
+u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
+		    bool verbose);
+
+int write_secure_key(const char *keyfile, const u8 *secure_key,
+		     size_t secure_key_size, bool verbose);
+
+int validate_secure_key(int pkey_fd,
+			u8 *secure_key, size_t secure_key_size,
+			size_t *clear_key_bitsize, int *is_old_mk,
+			bool verbose);
+
+int key_token_change(t_CSNBKTC dll_CSNBKTC,
+		     u8 *secure_key, unsigned int secure_key_size,
+		     char *method, bool verbose);
 
 #endif

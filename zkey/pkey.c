@@ -1,0 +1,748 @@
+/*
+ * zkey - Generate, re-encipher, and validate secure keys
+ *
+ * Copyright IBM Corp. 2018
+ *
+ * s390-tools is free software; you can redistribute it and/or modify
+ * it under the terms of the MIT license. See LICENSE for details.
+ */
+
+#include <dlfcn.h>
+#include <err.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <string.h>
+#include <stdint.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include "lib/util_base.h"
+#include "lib/util_libc.h"
+#include "lib/util_panic.h"
+
+#include "pkey.h"
+
+
+#define pr_verbose(verbose, fmt...)	do {				\
+						if (verbose)		\
+							warnx(fmt);	\
+					} while (0)
+
+#define DOUBLE_KEYSIZE_FOR_XTS(keysize, xts) ((xts) ? 2 * (keysize) : (keysize))
+#define HALF_KEYSIZE_FOR_XTS(keysize, xts)   ((xts) ? (keysize) / 2 : (keysize))
+
+/*
+ * Definitions for the CCA library
+ */
+#define CCA_LIBRARY_NAME	"libcsulcca.so"
+
+#define DEFAULT_KEYBITS 256
+
+/**
+ * Loads the CCA library and provides the entry point of the CSNBKTC function.
+ *
+ * @param[out] lib_csulcca   on return this contains the address of the CCA
+ *                           library. dlclose() should be used to free this
+ *                           when no longer needed.
+ * @param[out] dll_CSNBKTC   on return this contains the address of the
+ *                           CSNBKTC function.
+ * @param verbose            if true, verbose messages are printed
+ *
+ * @returns 0 on success, -ELIBACC in case of library load errors
+ */
+int load_cca_library(void **lib_csulcca, t_CSNBKTC *dll_CSNBKTC, bool verbose)
+{
+	util_assert(lib_csulcca != NULL, "Internal error: lib_csulcca is NULL");
+	util_assert(dll_CSNBKTC != NULL, "Internal error: dll_CSNBKTC is NULL");
+
+	/* Load the CCA library */
+	*lib_csulcca = dlopen(CCA_LIBRARY_NAME, RTLD_GLOBAL | RTLD_NOW);
+	if (*lib_csulcca == NULL) {
+		warnx("%s\nEnsure that the IBM CCA Host Libraries and "
+		      "Tools are installed properly", dlerror());
+		return  -ELIBACC;
+	}
+
+	/* Get the Key Token Change function */
+	*dll_CSNBKTC = (t_CSNBKTC)dlsym(*lib_csulcca, "CSNBKTC");
+	if (*dll_CSNBKTC == NULL) {
+		warnx("%s\nEnsure that the IBM CCA Host Libraries and "
+		      "Tools are installed properly", dlerror());
+		dlclose(*lib_csulcca);
+		*lib_csulcca = NULL;
+		return -ELIBACC;
+	}
+
+	pr_verbose(verbose, "CCA library '%s' has been loaded successfully",
+		   CCA_LIBRARY_NAME);
+	return 0;
+}
+
+/**
+ * Opens the pkey device and returns its file descriptor.
+ *
+ * @param verbose            if true, verbose messages are printed
+ *
+ * @returns the file descriptor or -1 to indicate an error
+ */
+int open_pkey_device(bool verbose)
+{
+	int pkey_fd;
+
+	pkey_fd = open(PKEYDEVICE, O_RDWR);
+	if (pkey_fd < 0) {
+		warnx("File '%s:' %s\nEnsure that the 'pkey' kernel module "
+		      "is loaded", PKEYDEVICE, strerror(errno));
+		return -1;
+	}
+
+	pr_verbose(verbose, "Device '%s' has been opened successfully",
+		   PKEYDEVICE);
+	return pkey_fd;
+}
+
+/**
+ * Read a secure key file and return the allocated buffer and size.
+ *
+ * @param[in]  keyfile     the name of the file to read
+ * @param[out] secure_key_size  on return, the size of the secure key read
+ * @param[in]  verbose     if true, verbose messages are printed
+ *
+ * @return a buffer containing the secure key, or NULL in case of an error.
+ *         The returned buffer must be freed by the caller.
+ */
+u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
+		    bool verbose)
+{
+	size_t count, size;
+	struct stat sb;
+	char *msg;
+	FILE *fp;
+	u8 *buf;
+
+	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(secure_key_size != NULL,
+		    "Internal error: secure_key_size is NULL");
+
+	if (stat(keyfile, &sb)) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		return NULL;
+	}
+	size = sb.st_size;
+
+	if (size != SECURE_KEY_SIZE && size != 2*SECURE_KEY_SIZE) {
+		warnx("File '%s' has an invalid size, %lu or %lu bytes "
+		      "expected", keyfile, SECURE_KEY_SIZE,
+		      2 * SECURE_KEY_SIZE);
+		return NULL;
+	}
+
+	fp = fopen(keyfile, "r");
+	if (fp == NULL) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		return NULL;
+	}
+
+	buf = util_malloc(size);
+	count = fread(buf, 1, size, fp);
+	if (count <= 0) {
+		msg = feof(fp) ? "File is too small" : strerror(errno);
+		warnx("File '%s': %s", keyfile, msg);
+		free(buf);
+		buf = NULL;
+		goto out;
+	}
+
+	*secure_key_size = size;
+
+	if (verbose) {
+		pr_verbose(verbose, "%lu bytes read from file '%s'", size,
+			   keyfile);
+		util_hexdump_grp(stderr, NULL, buf, 4, size, 0);
+	}
+out:
+	fclose(fp);
+	return buf;
+}
+
+/**
+ * Write a secure key file
+ *
+ * @param[in] keyfile     the name of the file to write
+ * @param[in] secure_key  a buffer containing the secure key
+ * @param[in] secure_key_size the size of the secure key
+ * @param[in]  verbose     if true, verbose messages are printed
+ *
+ * @returns 0 in case of success, -EIO in case of an error
+ */
+int write_secure_key(const char *keyfile, const u8 *secure_key,
+		     size_t secure_key_size, bool verbose)
+{
+	size_t count;
+	FILE *fp;
+
+	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+	util_assert(secure_key_size > 0,
+		    "Internal error: secure_key_size is zero");
+
+	fp = fopen(keyfile, "w");
+	if (fp == NULL) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		return -EIO;
+	}
+
+	count = fwrite(secure_key, 1, secure_key_size, fp);
+	if (count <= 0) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		fclose(fp);
+		return -EIO;
+	}
+
+	if (verbose) {
+		pr_verbose(verbose, "%lu bytes written to file '%s'",
+			   secure_key_size, keyfile);
+		util_hexdump_grp(stderr, NULL, secure_key, 4,
+				 secure_key_size, 0);
+	}
+	fclose(fp);
+	return 0;
+}
+
+/**
+ * Read a clear key file and return the allocated buffer and size
+ *
+ * @param[in]  keyfile     the name of the file to read
+ * @param[in]  keybits     the clear key size in bits. When keybits is 0, then
+ *                         the file size determines the keybits.
+ * @param[in]  xts         if true an XTS key is to be read
+ * @param[out] clear_key_size  on return, the size of the clear key read
+ * @param[in]  verbose     if true, verbose messages are printed
+ *
+ * @return a buffer containing the clear key, or NULL in case of an error.
+ *         The returned buffer must be freed by the caller.
+ */
+static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
+			  size_t *clear_key_size, bool verbose)
+{
+	size_t count, size, expected_size;
+	struct stat sb;
+	char *msg;
+	FILE *fp;
+	u8 *buf;
+
+	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(clear_key_size != NULL,
+		    "Internal error: clear_key_size is NULL");
+
+	if (stat(keyfile, &sb)) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		return NULL;
+	}
+	size = sb.st_size;
+
+	if (keybits != 0) {
+		expected_size = DOUBLE_KEYSIZE_FOR_XTS(keybits / 8, xts);
+		if (size != expected_size) {
+			warnx("File '%s' has an invalid size, "
+			      "%lu bytes expected", keyfile, expected_size);
+			return NULL;
+		}
+	} else {
+		keybits = DOUBLE_KEYSIZE_FOR_XTS(size * 8, xts);
+	}
+
+	switch (keybits) {
+	case 128:
+		break;
+	case 192:
+		if (xts) {
+			warnx("File '%s' has an invalid size, "
+			      "192 bit keys are not supported with XTS",
+			      keyfile);
+			return NULL;
+		}
+		break;
+	case 256:
+		break;
+	default:
+		if (xts)
+			warnx("File '%s' has an invalid size, "
+			      "32 or 64 bytes expected", keyfile);
+		else
+			warnx("File '%s' has an invalid size, 16, 24 "
+			      "or 32 bytes expected", keyfile);
+		return NULL;
+	}
+
+	fp = fopen(keyfile, "r");
+	if (fp == NULL) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		return NULL;
+	}
+
+	buf = util_malloc(size);
+	count = fread(buf, 1, size, fp);
+	if (count <= 0) {
+		msg = feof(fp) ? "File is too small" : strerror(errno);
+		warnx("File '%s': %s", keyfile, msg);
+		free(buf);
+		buf = NULL;
+		goto out;
+	}
+
+	*clear_key_size = size;
+
+	if (verbose) {
+		pr_verbose(verbose, "%lu bytes read from file '%s'", size,
+			   keyfile);
+		util_hexdump_grp(stderr, NULL, buf, 4, size, 0);
+	}
+out:
+	fclose(fp);
+	return buf;
+}
+
+/**
+ * Generate a secure key by random
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] keyfile       the file name of the secure key to generate
+ * @param[in] keybits       the cryptographic size of the key in bits
+ * @param[in] xts           if true an XTS key is generated
+ * @param[in] card          the card number to use (or AUTOSELECT)
+ * @param[in] domain        the domain number to use (or AUTOSELECT)
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int generate_secure_key_random(int pkey_fd, const char *keyfile,
+			       size_t keybits, bool xts, u16 card, u16 domain,
+			       bool verbose)
+{
+	struct pkey_genseck gensec;
+	size_t secure_key_size;
+	u8 *secure_key;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+
+	if (keybits == 0)
+		keybits = DEFAULT_KEYBITS;
+
+	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(SECURE_KEY_SIZE, xts);
+	secure_key = util_malloc(secure_key_size);
+
+	pr_verbose(verbose, "Generate key on card %02x.%04x", card, domain);
+
+	gensec.cardnr = card;
+	gensec.domain = domain;
+	switch (keybits) {
+	case 128:
+		gensec.keytype = PKEY_KEYTYPE_AES_128;
+		break;
+	case 192:
+		if (xts) {
+			warnx("Invalid value for '--keybits'|'-c' "
+			      "for XTS: '%lu'", keybits);
+			rc = -EINVAL;
+			goto out;
+		}
+		gensec.keytype = PKEY_KEYTYPE_AES_192;
+		break;
+	case 256:
+		gensec.keytype = PKEY_KEYTYPE_AES_256;
+		break;
+	default:
+		warnx("Invalid value for '--keybits'/'-c': '%lu'", keybits);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = ioctl(pkey_fd, PKEY_GENSECK, &gensec);
+	if (rc < 0) {
+		rc = -errno;
+		warnx("Failed to generate a secure key: %s", strerror(errno));
+		goto out;
+	}
+
+	memcpy(secure_key, &gensec.seckey, SECURE_KEY_SIZE);
+
+	if (xts) {
+		rc = ioctl(pkey_fd, PKEY_GENSECK, &gensec);
+		if (rc < 0) {
+			rc = -errno;
+			warnx("Failed to generate a secure key: %s",
+			      strerror(errno));
+			goto out;
+		}
+
+		memcpy(secure_key + SECURE_KEY_SIZE, &gensec.seckey,
+		       SECURE_KEY_SIZE);
+	}
+
+	pr_verbose(verbose, "Successfully generated a secure key");
+
+	rc = write_secure_key(keyfile, secure_key, secure_key_size, verbose);
+
+out:
+	free(secure_key);
+	return rc;
+}
+
+
+/*
+ * Generate a secure key from a clear key file
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] keyfile       the file name of the secure key to generate
+ * @param[in] keybits       the cryptographic size of the key in bits. When
+ *                          keybits is 0, then the clear key file size
+ *                          determines the keybits.
+ * @param[in] xts           if true an XTS key is generated
+ * @param[in] clearkeyfile  the file name of the clear key to read
+ * @param[in] card          the card number to use (or AUTOSELECT)
+ * @param[in] domain        the domain number to use (or AUTOSELECT)
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int generate_secure_key_clear(int pkey_fd, const char *keyfile,
+			      size_t keybits, bool xts,
+			      const char *clearkeyfile,
+			      u16 card, u16 domain,
+			      bool verbose)
+{
+	struct pkey_clr2seck clr2sec;
+	size_t secure_key_size;
+	size_t clear_key_size;
+	u8 *secure_key;
+	u8 *clear_key;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(clearkeyfile != NULL,
+		    "Internal error: clearkeyfile is NULL");
+
+	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(SECURE_KEY_SIZE, xts);
+	secure_key = util_malloc(secure_key_size);
+
+	clear_key = read_clear_key(clearkeyfile, keybits, xts, &clear_key_size,
+				   verbose);
+	if (clear_key == NULL)
+		return -EINVAL;
+
+	pr_verbose(verbose, "Generate key on card %02x.%04x", card, domain);
+
+	clr2sec.cardnr = card;
+	clr2sec.domain = domain;
+	switch (HALF_KEYSIZE_FOR_XTS(clear_key_size * 8, xts)) {
+	case 128:
+		clr2sec.keytype = PKEY_KEYTYPE_AES_128;
+		break;
+	case 192:
+		clr2sec.keytype = PKEY_KEYTYPE_AES_192;
+		break;
+	case 256:
+		clr2sec.keytype = PKEY_KEYTYPE_AES_256;
+		break;
+	default:
+		warnx("Invalid clear key size: '%lu' bytes", clear_key_size);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	memcpy(&clr2sec.clrkey, clear_key,
+	       HALF_KEYSIZE_FOR_XTS(clear_key_size, xts));
+
+	rc = ioctl(pkey_fd, PKEY_CLR2SECK, &clr2sec);
+	if (rc < 0) {
+		rc = -errno;
+		warnx("Failed to generate a secure key from a "
+		      "clear key: %s", strerror(errno));
+		goto out;
+	}
+
+	memcpy(secure_key, &clr2sec.seckey, SECURE_KEY_SIZE);
+
+	if (xts) {
+		memcpy(&clr2sec.clrkey, clear_key + clear_key_size / 2,
+		       clear_key_size / 2);
+
+		rc = ioctl(pkey_fd, PKEY_CLR2SECK, &clr2sec);
+		if (rc < 0) {
+			rc = -errno;
+			warnx("Failed to generate a secure key from "
+			      "a clear key: %s", strerror(errno));
+			goto out;
+		}
+
+		memcpy(secure_key+SECURE_KEY_SIZE, &clr2sec.seckey,
+		       SECURE_KEY_SIZE);
+	}
+
+	pr_verbose(verbose,
+		   "Successfully generated a secure key from a clear key");
+
+	rc = write_secure_key(keyfile, secure_key, secure_key_size, verbose);
+
+out:
+	memset(&clr2sec, 0, sizeof(clr2sec));
+	memset(clear_key, 0, clear_key_size);
+	free(clear_key);
+	free(secure_key);
+	return rc;
+}
+
+/**
+ * Prints CCA return and reason code information for certain known CCA
+ * error situations.
+ *
+ * @param return_code  the CCA return code
+ * @param reason_code  the CCA reason code
+ */
+static void print_CCA_error(int return_code, int reason_code)
+{
+	switch (return_code) {
+	case 8:
+		switch (reason_code) {
+		case 48:
+			warnx("The secure key has a CCA master key "
+			      "verification pattern that is not valid");
+			break;
+		}
+		break;
+	case 12:
+		switch (reason_code) {
+		case 764:
+			warnx("The CCA master key is not loaded and "
+			      "therefore a secure key cannot be enciphered");
+			break;
+		}
+		break;
+	}
+}
+
+/**
+ * Re-enciphers a secure key.
+ *
+ * @param[in] dll_CSNBKTC      the address of the CCA CSNBKTC function
+ * @param[in] secure_key       a buffer containing the secure key
+ * @param[in] secure_key_size  the size of the secure key
+ * @param[in] method           the re-enciphering method. METHOD_OLD_TO_CURRENT
+ *                             or METHOD_CURRENT_TO_NEW.
+ * @param[in] verbose          if true, verbose messages are printed
+ *
+ * @returns 0 on success, -EIO in case of an error
+ */
+int key_token_change(t_CSNBKTC dll_CSNBKTC,
+		     u8 *secure_key, unsigned int secure_key_size,
+		     char *method, bool verbose)
+{
+	long exit_data_len = 0, rule_array_count;
+	unsigned char rule_array[2 * 80] = { 0, };
+	unsigned char exit_data[4] = { 0, };
+	long return_code, reason_code;
+
+	util_assert(dll_CSNBKTC != NULL, "Internal error: dll_CSNBKTC is NULL");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+	util_assert(secure_key_size > 0,
+		    "Internal error: secure_key_size is 0");
+	util_assert(method != NULL, "Internal error: method is NULL");
+
+	memcpy(rule_array, method, 8);
+	memcpy(rule_array + 8, "AES     ", 8);
+	rule_array_count = 2;
+
+	dll_CSNBKTC(&return_code, &reason_code,
+		      &exit_data_len, exit_data,
+		      &rule_array_count, rule_array,
+		      secure_key);
+
+	pr_verbose(verbose, "CSNBKTC (Key Token Change) with '%s' returned: "
+		   "return_code: %ld, reason_code: %ld", method, return_code,
+		   reason_code);
+	if (return_code != 0) {
+		print_CCA_error(return_code, reason_code);
+		return -EIO;
+	}
+
+	if (secure_key_size == 2 * SECURE_KEY_SIZE) {
+		dll_CSNBKTC(&return_code, &reason_code,
+			      &exit_data_len, exit_data,
+			      &rule_array_count, rule_array,
+			      secure_key + SECURE_KEY_SIZE);
+
+		pr_verbose(verbose, "CSNBKTC (Key Token Change) with '%s' "
+			   "returned: return_code: %ld, reason_code: %ld",
+			   method, return_code, reason_code);
+		if (return_code != 0) {
+			print_CCA_error(return_code, reason_code);
+			return -EIO;
+		}
+	}
+	return 0;
+}
+
+/**
+ * Validates an XTS secure key (the second part)
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] secure_key    a buffer containing the secure key
+ * @param[in] secure_key_size the secure key size
+ * @param[in] part1_keysize the key size of the first key part
+ * @param[in] part1_attributes the attributes of the first key part
+ * @param[out] clear_key_bitsize on return , the cryptographic size of the
+ *                          clear key
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int validate_secure_xts_key(int pkey_fd,
+				   u8 *secure_key, size_t secure_key_size,
+				   u16 part1_keysize, u32 part1_attributes,
+				   size_t *clear_key_bitsize, bool verbose)
+{
+	struct secaeskeytoken *token = (struct secaeskeytoken *)secure_key;
+	struct pkey_verifykey verifykey;
+	struct secaeskeytoken *token2;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+
+	/* XTS uses 2 secure key tokens concatenated to each other */
+	token2 = (struct secaeskeytoken *)(secure_key + SECURE_KEY_SIZE);
+
+	if (secure_key_size != 2 * SECURE_KEY_SIZE) {
+		pr_verbose(verbose, "Size of secure key is too small: "
+			   "%lu expected %lu", secure_key_size,
+			   2 * SECURE_KEY_SIZE);
+		return -EINVAL;
+	}
+
+	if (token->bitsize != token2->bitsize) {
+		pr_verbose(verbose, "XTS secure key contains 2 clear keys of "
+			   "different sizes");
+		return -EINVAL;
+	}
+	if (token->keysize != token2->keysize) {
+		pr_verbose(verbose, "XTS secure key contains 2 keys of "
+			   "different sizes");
+		return -EINVAL;
+	}
+	if (memcmp(&token->mkvp, &token2->mkvp, sizeof(token->mkvp)) != 0) {
+		pr_verbose(verbose, "XTS secure key contains 2 keys using "
+			   "different CCA master keys");
+		return -EINVAL;
+	}
+
+	memcpy(&verifykey.seckey, token2, sizeof(verifykey.seckey));
+
+	rc = ioctl(pkey_fd, PKEY_VERIFYKEY, &verifykey);
+	if (rc < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to validate a secure key: %s",
+			   strerror(-rc));
+		return rc;
+	}
+
+	if ((verifykey.attributes & PKEY_VERIFY_ATTR_AES) == 0) {
+		pr_verbose(verbose, "Secure key is not an AES key");
+		return -EINVAL;
+	}
+
+	if (verifykey.keysize != part1_keysize) {
+		pr_verbose(verbose, "XTS secure key contains 2 keys using "
+			   "different key sizes");
+		return -EINVAL;
+	}
+
+	if (verifykey.attributes != part1_attributes) {
+		pr_verbose(verbose, "XTS secure key contains 2 keys using "
+			   "different attributes");
+		return -EINVAL;
+	}
+
+	if (clear_key_bitsize)
+		*clear_key_bitsize += verifykey.keysize;
+
+	return 0;
+}
+
+/**
+ * Validates a secure key
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] secure_key    a buffer containing the secure key
+ * @param[in] secure_key_size the secure key size
+ * @param[out] clear_key_bitsize on return , the cryptographic size of the
+ *                          clear key
+ * @param[out] is_old_mk    in return set to 1 to indicate if the secure key
+ *                          is currently enciphered by the OLD CCA master key
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int validate_secure_key(int pkey_fd,
+			u8 *secure_key, size_t secure_key_size,
+			size_t *clear_key_bitsize, int *is_old_mk,
+			bool verbose)
+{
+	struct secaeskeytoken *token = (struct secaeskeytoken *)secure_key;
+	struct pkey_verifykey verifykey;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+
+	if (secure_key_size < SECURE_KEY_SIZE) {
+		pr_verbose(verbose, "Size of secure key is too small: "
+			   "%lu expected %lu", secure_key_size,
+			   SECURE_KEY_SIZE);
+		return -EINVAL;
+	}
+
+	memcpy(&verifykey.seckey, token, sizeof(verifykey.seckey));
+
+	rc = ioctl(pkey_fd, PKEY_VERIFYKEY, &verifykey);
+	if (rc < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to validate a secure key: %s",
+			   strerror(-rc));
+		return rc;
+	}
+
+	if ((verifykey.attributes & PKEY_VERIFY_ATTR_AES) == 0) {
+		pr_verbose(verbose, "Secure key is not an AES key");
+		return -EINVAL;
+	}
+
+	if (clear_key_bitsize)
+		*clear_key_bitsize = verifykey.keysize;
+
+	/* XTS uses 2 secure key tokens concatenated to each other */
+	if (secure_key_size > SECURE_KEY_SIZE) {
+		rc = validate_secure_xts_key(pkey_fd,
+					     secure_key, secure_key_size,
+					     verifykey.keysize,
+					     verifykey.attributes,
+					     clear_key_bitsize,
+					     verbose);
+		if (rc != 0)
+			return rc;
+	}
+
+	if (is_old_mk)
+		*is_old_mk = (verifykey.attributes &
+			      PKEY_VERIFY_ATTR_OLD_MKVP) != 0;
+
+	pr_verbose(verbose, "Secure key validation completed successfully");
+
+	return 0;
+}
