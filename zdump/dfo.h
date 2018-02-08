@@ -24,7 +24,6 @@ struct dfo_chunk {
 	struct util_list_node	list;
 	u64			start;
 	u64			end;
-	u64			size;
 	dfo_chunk_read_fn	read_fn;
 	void			*data;
 };

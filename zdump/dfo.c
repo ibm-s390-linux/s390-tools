@@ -52,7 +52,6 @@ void dfo_chunk_add(u64 start, u64 size, void *data, dfo_chunk_read_fn read_fn)
 	dfo_chunk = zg_alloc(sizeof(*dfo_chunk));
 	dfo_chunk->start = start;
 	dfo_chunk->end = start + size - 1;
-	dfo_chunk->size = size;
 	dfo_chunk->data = data;
 	dfo_chunk->read_fn = read_fn;
 	util_list_add_head(&l.dump.chunk_list, dfo_chunk);
