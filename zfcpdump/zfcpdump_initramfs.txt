@@ -28,5 +28,4 @@ dir /mnt 755 0 0
 dir /sbin 755 0 0
 dir /etc 755 0 0
 file /init arch/s390/boot/zfcpdump 755 0 0
-file /sbin/e2fsck arch/s390/boot/e2fsck 755 0 0
 slink /etc/mtab /proc/mounts 755 0 0
