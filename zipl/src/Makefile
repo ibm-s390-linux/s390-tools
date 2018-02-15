@@ -16,15 +16,19 @@ libs =	$(rootdir)/libutil/libutil.a \
 objects = misc.o error.o scan.o job.o boot.o bootmap.o disk.o \
 	  install.o zipl.o $(rootdir)/zipl/boot/data.o
 
-zipl_helpers = $(wildcard zipl_helper.*)
+zipl_helpers = $(basename $(wildcard zipl_helper.*.c))
 chreipl_helpers = $(subst zipl_,chreipl_, $(zipl_helpers))
 
 all: zipl $(chreipl_helpers)
 
 zipl: $(objects) $(libs)
 
+zipl_helper.device-mapper: $(rootdir)/libdasd/libdasd.a \
+	$(rootdir)/libvtoc/libvtoc.a \
+	$(libs) zipl_helper.device-mapper.o
+
 chreipl_helper.%: zipl_helper.%
-	ln -s $< $@
+	ln -f -s $< $@
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)
@@ -34,7 +38,7 @@ install: all
 	$(CP) --no-dereference $(chreipl_helpers) $(DESTDIR)$(TOOLS_LIBDIR)
 
 clean:
-	rm -f *.o $(chreipl_helpers) zipl
+	rm -f *.o $(zipl_helpers) $(chreipl_helpers) zipl
 
 .PHONY: all install clean
 
