@@ -31,6 +31,7 @@
 
 #include "lib/vmdump.h"
 #include "lib/zt_common.h"
+#include "lib/util_str.h"
 
 #include "vmur.h"
 
@@ -1370,30 +1371,6 @@ static void close_reader(struct vmur *info, const char *hold)
 }
 
 /*
- * strip leading and trailing blanks
- */
-static char *strstrip(char *s)
-{
-	size_t size;
-	char *end;
-
-	size = strlen(s);
-
-	if (!size)
-		return s;
-
-	end = s + size - 1;
-	while (end >= s && isspace(*end))
-		end--;
-	*(end + 1) = '\0';
-
-	while (*s && isspace(*s))
-		s++;
-
-	return s;
-}
-
-/*
  *  Check whether reader can handle class of reader spool file
  */
 static int check_class(struct vmur *info)
@@ -1431,9 +1408,9 @@ static int get_filename_from_reader(struct vmur *info)
 	sprintf(cmd, "QUERY RDR * %s ALL SHORTDATE", info->spoolid);
 	cpcmd(cmd, &buf, NULL, 0);
 	memcpy(name, &buf[130], 8);
-	strstrip(name);
+	util_strstrip(name);
 	memcpy(type, &buf[140], 8);
-	strstrip(type);
+	util_strstrip(type);
 	free(buf);
 	if (strlen(name) == 0) {
 		ERR("Please specify name to receive "
