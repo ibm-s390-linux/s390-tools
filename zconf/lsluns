@@ -235,8 +235,15 @@ sub get_env_list
     my @res ;
     my %res_hash;
 
+    if (!</sys/bus/ccw/drivers/zfcp/*.*.*/>) {
+        print "$PROGRAM_NAME: No adapter exists\n";
+        return;
+    }
     @res = </sys/bus/ccw/drivers/zfcp/*.*.*/0x*>;
-    return () if (!@res);
+    if (!@res) {
+        print "$PROGRAM_NAME: No port on any adapter exists\n";
+        return;
+    }
     foreach my $entry (@res) {
         my $a = ${[split('/', $entry)]}[-2];
         my $p = ${[split('/', $entry)]}[-1];

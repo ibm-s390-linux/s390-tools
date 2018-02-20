@@ -7,6 +7,7 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
 
   Bug Fixes:
+  - lsluns: Print a message if no adapter or port exists
 
  * __v2.4.0 (2018-05-07)__
 
