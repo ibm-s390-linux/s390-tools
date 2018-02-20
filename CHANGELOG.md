@@ -9,6 +9,7 @@ Release history for s390-tools (MIT version)
   - dbginfo: Gather nvme related data
 
   Bug Fixes:
+  - hmcdrvfs: fix parsing of link count >= 1000
 
 * __v2.3.0 (2018-01-30)__
 

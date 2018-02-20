@@ -821,10 +821,13 @@ static char *hmcdrv_parse_line(char *line, char *namebuf,
 		if ((*line != '\0') && (*line != '\n')) {
 			field = hmcdrv_parse_ntoken(field, line, &attr);
 
-			while ((*line != '\0') &&
-			       (*line != '\n') &&
-			       !isspace(*line))
+			while ((*line != '\0') && (*line != '\n')) {
+				if (isspace(*line))
+					break;
+				if (field == 1 && isdigit(*line))
+					break;
 				++line; /* search end of field */
+			}
 		}
 	} /* while */
 
