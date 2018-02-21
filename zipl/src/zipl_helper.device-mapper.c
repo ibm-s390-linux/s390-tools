@@ -108,11 +108,11 @@ struct device_characteristics {
 #define BDEVNAME_SIZE 32
 
 /* Constants */
-const unsigned int SECTOR_SIZE = 512;
-const unsigned int DASD_PARTN_MASK = 0x03;
-const unsigned int SCSI_PARTN_MASK = 0x0f;
+#define SECTOR_SIZE 512
+#define DASD_PARTN_MASK 0x03
+#define SCSI_PARTN_MASK 0x0f
 
-const char CHREIPL_HELPER[] = "chreipl_helper.device-mapper";
+#define CHREIPL_HELPER "chreipl_helper.device-mapper"
 
 /* Internal constants */
 enum dev_type {
@@ -951,7 +951,7 @@ static bool toolname_is_chreipl_helper(const char *toolname)
 	return strcmp(toolname + tlen - clen, CHREIPL_HELPER) == 0;
 }
 
-void print_usage(const char *toolname)
+static void print_usage(const char *toolname)
 {
 	fprintf(stderr, "%s <major:minor of target device>", toolname);
 	if (!toolname_is_chreipl_helper(toolname))
