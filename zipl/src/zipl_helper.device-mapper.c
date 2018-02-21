@@ -38,7 +38,6 @@
 
 #include <errno.h>
 #include <limits.h>
-#include <linux/hdreg.h>
 #include <linux/limits.h>
 #include <locale.h>
 #include <stdarg.h>
