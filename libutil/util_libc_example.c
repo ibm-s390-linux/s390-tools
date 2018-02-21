@@ -10,9 +10,12 @@
 //! [code]
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
+
+#define	EXAMPLE_WORD	"   /sys/devices/system/cpu    "
 
 /*
  * Demonstrate that out of memory is automatically handled via panic()
@@ -22,6 +25,12 @@ int main(void)
 	unsigned long ulong_max = (unsigned long)-1;
 	void *ptr;
 	char *zeroes, *str;
+	char buffer[sizeof(EXAMPLE_WORD)];
+
+	strcat(buffer, EXAMPLE_WORD);
+	fprintf(stderr, "Try to remove leading and trailing spaces from "
+			"\"%s\"\nresult = \"%s\"\n", EXAMPLE_WORD,
+			util_strstrip(buffer));
 
 	/* Use util_strcat_realloc() for string concatenation */
 	fprintf(stderr, "Try to concatenate \"Hello\",  \", \" and \"world!\": ");

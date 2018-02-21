@@ -31,7 +31,7 @@
 
 #include "lib/vmdump.h"
 #include "lib/zt_common.h"
-#include "lib/util_str.h"
+#include "lib/util_libc.h"
 
 #include "vmur.h"
 

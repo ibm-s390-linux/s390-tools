@@ -198,3 +198,33 @@ int __util_vsprintf(const char *func, const char *file, int line,
 			      rc != -1, "Could not format string\n");
 	return rc;
 }
+
+/**
+ * Strip leading and trailing spaces from string
+ *
+ * Remove string \a s leading and trailing spaces
+ *
+ * @param[in,out] s String to manipulate
+ *
+ * @returns Pointer to first non-space character in string \a s
+ */
+char *util_strstrip(char *s)
+{
+	size_t size;
+	char *end;
+
+	size = strlen(s);
+
+	if (!size)
+		return s;
+
+	end = s + size - 1;
+	while (end >= s && isspace(*end))
+		end--;
+	*(end + 1) = '\0';
+
+	while (*s && isspace(*s))
+		s++;
+
+	return s;
+}

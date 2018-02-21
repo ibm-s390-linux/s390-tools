@@ -14,6 +14,10 @@
 
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Allocate memory or panic in case of failure
  *
@@ -124,5 +128,11 @@ int __util_vsprintf(const char *func, const char *file, int line,
 		    char *str, const char *fmt, va_list ap);
 char *util_strcat_realloc(char *str1, const char *str2);
 void util_str_toupper(char *str);
+
+char *util_strstrip(char *s);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /** LIB_UTIL_LIBC_H @} */
