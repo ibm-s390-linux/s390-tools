@@ -2,7 +2,9 @@ include ../common.mak
 
 all: vmcp
 
-vmcp: vmcp.o
+libs =	$(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a
+
+vmcp: vmcp.o $(libs)
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man8
