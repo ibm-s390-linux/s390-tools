@@ -31,14 +31,6 @@ do { \
 		ERR_EXIT(str " can only be specified once.\n"); \
 } while (0)
 
-#define VMCP_DEVICE_NODE "/dev/vmcp"
-#define VMCP_BUFSIZE 0x4000
-#define VMCP_GETSIZE _IOR(0x10, 3, int)
-#define VMCP_SETBUF  _IOW(0x10, 2, int)
-#define VMCP_GETCODE _IOR(0x10, 1, int)
-
-#define CP_PREFIX_LEN 11
-
 #define VMRDR_DEVICE_NODE "/dev/vmrdr-0.0.000c"
 #define VMPUN_DEVICE_NODE "/dev/vmpun-0.0.000d"
 #define VMPRT_DEVICE_NODE "/dev/vmprt-0.0.000e"

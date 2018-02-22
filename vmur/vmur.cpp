@@ -32,8 +32,11 @@
 #include "lib/vmdump.h"
 #include "lib/zt_common.h"
 #include "lib/util_libc.h"
+#include "lib/vmcp.h"
 
 #include "vmur.h"
+
+#define	CP_PREFIX_LEN	11
 
 /* Program name */
 static char *prog_name;
@@ -245,24 +248,6 @@ fail:
 }
 
 /*
- * Read at most COUNT bytes from FD into memory at location BUF.
- * Return number of bytes read on success, -1 on error.
- */
-static ssize_t read_buf(int fd, char *buf, ssize_t count)
-{
-	ssize_t rc, len;
-
-	for (len = 0; len < count; len += rc) {
-		rc = read(fd, &buf[len], count - len);
-		if (rc == -1)
-			return -1;
-		if (rc == 0)
-			break;
-	}
-	return len;
-}
-
-/*
  * Strip leading CP header from error message
  */
 static void strip_cperr(char *buf)
@@ -294,64 +279,63 @@ static void cperr_exit(char *cpcmd, int cprc, char *buf)
 
 static void _cpcmd(char *cpcmd, char **resp, int *rc, int retry, int upper)
 {
-	int fd, len, cprc, bufsize = VMCP_BUFSIZE;
-	char *buf;
+	struct vmcp_parm cp;
 	char cmd[MAXCMDLEN];
+	int ret;
 
 	strcpy(cmd, cpcmd);
-	if (upper)
-		to_upper(cmd);
+	cp.cpcmd = cmd;
+	cp.do_upper = upper;
+	cp.buffer_size = VMCP_DEFAULT_BUFSZ;
 
-	fd = open(VMCP_DEVICE_NODE, O_RDWR);
-	if (fd == -1)
+retry:
+	ret = vmcp(&cp);
+
+	switch (ret) {
+	case VMCP_ERR_OPEN:
 		ERR_EXIT("Could not issue CP command: \"%s\"\n"
 			 "Ensure that vmcp kernel module is loaded!\n", cmd);
 
-	do {
-		if (ioctl(fd, VMCP_SETBUF, &bufsize) == -1)
-			goto fail;
-
-		if (write(fd, cmd, strlen(cmd)) == -1)
-			goto fail;
-
-		if (ioctl(fd, VMCP_GETCODE, &cprc) == -1)
-			goto fail;
-
-		if (ioctl(fd, VMCP_GETSIZE, &len) == -1)
-			goto fail;
-
-		if (len <= bufsize)
-			break;
-		else if (retry)
-			bufsize = len;
-		else
-			ERR_EXIT("Not enough buffer space (%i/%i) for CP "
-				 "command '%s'.\nSorry, please issue command "
-				 "on your 3270 console!\n", len, bufsize, cmd);
-	} while (1);
-
-	buf = (char *) malloc(len + 1);
-	if (!buf)
-		ERR_EXIT("Out of memory for CP command '%s'\n", cmd);
-
-	memset(buf, 0, len + 1);
-	if (read_buf(fd, buf, len) == -1)
+	case VMCP_ERR_SETBUF:
 		goto fail;
 
+	case VMCP_ERR_WRITE:
+		goto fail;
+
+	case VMCP_ERR_GETCODE:
+		goto fail;
+
+	case VMCP_ERR_GETSIZE:
+		goto fail;
+
+	case VMCP_ERR_READ:
+		goto fail;
+
+	case VMCP_ERR_TOOSMALL:
+		if (retry) {
+			cp.buffer_size = cp.response_size;
+			free(cp.response);
+			goto retry;
+		}
+		ERR_EXIT("Not enough buffer space (%u/%u) for CP "
+			 "command '%s'.\nSorry, please issue command "
+			 " on your 3270 console!\n", cp.response_size,
+			 cp.buffer_size, cmd);
+	}
+
 	if (rc == NULL) {
-		if (cprc != 0) {
+		if (cp.cprc != 0) {
 			/* caller wants us to handle the error */
-			cperr_exit(cmd, cprc, buf);
+			cperr_exit(cmd, cp.cprc, cp.response);
 		}
 	} else {
-		*rc = cprc;
+		*rc = cp.cprc;
 	}
 
 	if (resp)
-		*resp = buf;
+		*resp = cp.response;
 	else
-		free(buf);
-	close(fd);
+		free(cp.response);
 	return;
 
 fail:

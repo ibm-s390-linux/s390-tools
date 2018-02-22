@@ -6,7 +6,7 @@ LDLIBS += -lz
 all: vmur
 
 libs =  $(rootdir)/libvmdump/libvmdump.a \
-	$(rootdir)/libutil/libutil.a
+	$(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a
 
 objects = vmur.o
 
