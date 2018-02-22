@@ -37,21 +37,13 @@
 #include "lib/util_rec.h"
 #include "lib/util_scandir.h"
 #include "lib/zt_common.h"
+#include "lib/vmcp.h"
 
 #include "misc.h"
 
 #define ID_FORMAT		"^[[:xdigit:]]{1,2}[.][[:xdigit:]][.][[:xdigit:]]{4}$"
 #define MAX_ID_LENGTH		10
 #define PAGE_SIZE		4096
-
-/*
- * Constants for CP call (taken from vmcp.h)
- */
-#define VMCP_DEVICE_NODE "/dev/vmcp"
-#define VMCP_GETCODE _IOR(0x10, 1, int)
-#define VMCP_SETBUF _IOW(0x10, 2, int)
-#define VMCP_GETSIZE _IOR(0x10, 3, int)
-#define CP_BUF_SIZE	8192
 
 /*
  * Private data
@@ -197,32 +189,38 @@ static void ethtool_checksumming(char *buf, const char *if_name)
  */
 static void exec_cp(char **argz, size_t *argz_len, const char *fmt, ...)
 {
-	int fd, response_code, response_size, rc;
-	static const int buf_size = CP_BUF_SIZE;
-	char *buf, *command;
+	struct vmcp_parm cp;
+	char *command;
 	va_list ap;
+	int rc;
 
-	fd = open(VMCP_DEVICE_NODE, O_RDWR);
-	if (fd == -1)
-		errx(EXIT_FAILURE, "Could not open device %s", VMCP_DEVICE_NODE);
-	if (ioctl(fd, VMCP_SETBUF, &buf_size) == -1)
-		errx(EXIT_FAILURE, "Could not set buffer size");
 	UTIL_VASPRINTF(&command, fmt, ap);
-	if (write(fd, command, strlen(command)) == -1)
-		errx(EXIT_FAILURE, "Could not issue CP command");
+	cp.cpcmd = command;
+	cp.do_upper = false;
+	cp.buffer_size = VMCP_DEFAULT_BUFSZ;
+	rc = vmcp(&cp);
 	free(command);
-	if (ioctl(fd, VMCP_GETCODE, &response_code) == -1)
+
+	switch (rc) {
+	case VMCP_ERR_OPEN:
+		errx(EXIT_FAILURE, "Could not open device %s", VMCP_DEVICE_NODE);
+	case VMCP_ERR_SETBUF:
+		errx(EXIT_FAILURE, "Could not set buffer size");
+	case VMCP_ERR_GETCODE:
 		errx(EXIT_FAILURE, "Could not query return code");
-	if (ioctl(fd, VMCP_GETSIZE, &response_size) == -1)
+	case VMCP_ERR_GETSIZE:
 		errx(EXIT_FAILURE, "Could not query response size");
-	buf = util_malloc(buf_size);
-	rc = misc_read_buf(fd, buf, buf_size);
-	if (rc == -1)
+	case VMCP_ERR_WRITE:
+		errx(EXIT_FAILURE, "Could not issue CP command");
+	case VMCP_ERR_READ:
 		errx(EXIT_FAILURE, "Could not read CP response");
-	rc = argz_create_sep(buf, '\n', argz, argz_len);
+	case VMCP_ERR_TOOSMALL:
+		break;		/* Truncated CP response treated as good */
+	}
+	rc = argz_create_sep(cp.response, '\n', argz, argz_len);
 	if (rc)
 		errx(EXIT_FAILURE, "Memory allocation error for CP response processing");
-	free(buf);
+	free(cp.response);
 }
 
 /*

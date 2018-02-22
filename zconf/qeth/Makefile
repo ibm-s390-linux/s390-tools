@@ -2,7 +2,7 @@ include ../../common.mak
 
 all: lsqeth
 
-libs = $(rootdir)/libutil/libutil.a
+libs = $(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a
 
 lsqeth: lsqeth.o misc.o $(libs)
 
