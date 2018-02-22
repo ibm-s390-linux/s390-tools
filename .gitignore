@@ -46,6 +46,7 @@ libutil/util_prg_example
 libutil/util_rec_example
 libutil/util_scandir_example
 libzds/libzds.a
+libvmcp/vmcp_example
 mon_tools/mon_fsstatd
 mon_tools/mon_procd
 osasnmpd/osasnmpd
