@@ -57,6 +57,7 @@ Set all available cryptographic device(s) online or offline.
 .B <device id>
 Specifies a cryptographic device which will be set either online or offline.
 The device can either be a card device or a queue device.
+A queue device can only get switched online when the providing card is online.
 
 Please note that the card device and queue device representation are both
 in hexadecimal notation.
@@ -95,7 +96,7 @@ Print version information and exit.
 .B chzcrypt -e 0 1 12
 Will set the cryptographic card devices 0, 1 and 12 online.
 .TP
-.B chzcrypt -e 01.0038
+.B chzcrypt -e 10.0038
 Will set the cryptographic device '10.0038' respectively card id 16
 (0x10) with domain 56 (0x38) online.
 .TP
