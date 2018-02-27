@@ -30,19 +30,6 @@ extern struct stage2dump_parm_tail parm_tail
 	__attribute__ ((section(".stage2dump.tail")));
 
 /*
- * Load 4 bytes from addr
- */
-static inline unsigned int load(unsigned long addr)
-{
-	unsigned int val;
-
-	asm volatile(
-		"	l	%0,0(%1)\n"
-		: "=d" (val) : "d" (addr) : "cc");
-	return val;
-}
-
-/*
  * S390 dump format defines
  */
 #define DF_S390_MAGIC		0xa8190173618f23fdULL
