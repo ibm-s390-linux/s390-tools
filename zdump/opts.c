@@ -3,7 +3,7 @@
  *
  * Option parsing
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -46,9 +46,10 @@ static char help_text[] =
 "-s, --select   Select system data SYS (\"kdump\", \"prod\", or \"all\")\n"
 "-d, --device   Print DUMPDEV (dump device) information\n"
 "-v, --version  Print version information, then exit\n"
+"-V, --verbose  Show detailed layout of memory map on printing DUMP information\n"
 "-h, --help     Print this help, then exit\n";
 
-static const char copyright_str[] = "Copyright IBM Corp. 2001, 2017";
+static const char copyright_str[] = "Copyright IBM Corp. 2001, 2018";
 
 /*
  * Select option strings
@@ -251,9 +252,10 @@ void opts_parse(int argc, char *argv[])
 		{"fmt",     required_argument, NULL, 'f'},
 		{"select",  required_argument, NULL, 's'},
 		{"debug",   no_argument,       NULL, 'X'},
+		{"verbose", no_argument,       NULL, 'V'},
 		{NULL,      0,                 NULL,  0 }
 	};
-	static const char optstr[] = "hvidmus:f:X";
+	static const char optstr[] = "hvVidmus:f:X";
 
 	init_defaults();
 	while ((opt = getopt_long(argc, argv, optstr, long_opts, &idx)) != -1) {
@@ -262,6 +264,9 @@ void opts_parse(int argc, char *argv[])
 			print_help_exit();
 		case 'v':
 			print_version_exit();
+		case 'V':
+			g.opts.verbose_specified = 1;
+			break;
 		case 'i':
 			action_set(ZG_ACTION_DUMP_INFO);
 			break;

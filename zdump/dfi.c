@@ -152,9 +152,24 @@ static void mem_map_print(void)
 {
 	struct dfi_mem_chunk *mem_chunk;
 	u64 print_start = 0, print_end = 0;
+	const char *zero_str;
 	u32 volnr = 0;
 
 	STDERR("\nMemory map:\n");
+	/*
+	 * Print each memory chunk if verbose specified
+	 */
+	if (g.opts.verbose_specified) {
+		dfi_mem_chunk_iterate(mem_chunk) {
+			zero_str = "";
+			if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
+				zero_str = " zeroes";
+			STDERR("  %016llx - %016llx (%llu MB%s)\n",
+			       mem_chunk->start, mem_chunk->end,
+			       TO_MIB(mem_chunk->size), zero_str);
+		}
+		return;
+	}
 	/*
 	 * Merge adjacent memory chunks from the same volume
 	 */
