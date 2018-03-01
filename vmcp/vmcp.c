@@ -4,7 +4,7 @@
  * Tool for accessing the control program of z/VM using the
  * kernel module vmcp
  * return codes:
- *	0: everything was fine                      (VMCP_OK)
+ *	0: everything was fine                      (EXIT_SUCCESS)
  *	1: CP returned a nn zero response code      (VMCP_CP)
  *	2: the response buffer was not large enough (VMCP_BUF)
  *	3: an internal Linux error occurred         (VMCP_LIN)
@@ -33,6 +33,8 @@
 
 #include "lib/zt_common.h"
 #include "lib/vmcp.h"
+#include "lib/util_opt.h"
+#include "lib/util_prg.h"
 
 #define MAXBUFFER 1048576
 #define MINBUFFER 4096
@@ -44,45 +46,40 @@
 #define VMCP_LIN 3
 #define VMCP_OPT 4
 
-static struct option options[] = {
-	{"help", no_argument, NULL, 'h'},
-	{"version", no_argument, NULL, 'v'},
-	{"keepcase", no_argument, NULL, 'k'},
-	{"buffer", required_argument, NULL, 'b'},
-	{NULL, 0, NULL, 0}
-};
-
-static const char opt_string[] = "+hvkb:";
-
-static const char help_text[] =
-    "Usage:\n"
-    "vmcp [-k] [-b <size>] command\n"
-    "vmcp [-h|-v]\n\n"
-    "Options:\n"
-    "-h or --help     :Print usage information, then exit\n"
-    "-v or --version  :Print version information, then exit\n"
-    "-k or --keepcase :Using this option, vmcp does not convert the command\n"
-    "                  to uppercase. The default is to translate the command\n"
-    "                  string.\n"
-    "-b <size> or     :defines the buffer size for the response\n"
-    "--buffer=<size>   valid values are from 4096 to 1048576 bytes\n"
-    "                  the k and M suffixes are also supported\n";
-
 static int keep_case = 0;
 static int buffersize = VMCP_DEFAULT_BUFSZ;
 static char command[MAXCMDLEN + 1];
 
-static void print_help(const char *name)
-{
-	printf("%s: z/VM CP command interface.\n%s", name, help_text);
-}
+static struct util_opt opt_vec[] = {
+	UTIL_OPT_SECTION("OPTIONS"),
+	{
+		.option = { "keepcase", no_argument, NULL, 'k' },
+		.desc = "Do not convert CP-command string to uppercase",
+	},
+	{
+		.option = { "buffer", required_argument, NULL, 'b' },
+		.argument = "SIZE",
+		.desc = "Specify buffer size in bytes, kilobytes (k) "
+			"or megabytes (M). SIZE range from 4096 to 1048576 "
+			"bytes"
+	},
+	UTIL_OPT_HELP,
+	UTIL_OPT_VERSION,
+	UTIL_OPT_END
+};
 
-static void print_version(const char *name)
-{
-	printf("%s: z/VM CP command interface version %s\n"
-	       "Copyright IBM Corp. 2005, 2017\n",
-	       name, RELEASE_STRING);
-}
+static const struct util_prg prg = {
+	.desc = "z/VM CP command interface",
+	.args = "CP-command",
+	.copyright_vec = {
+		{
+			.owner = "IBM Corp.",
+			.pub_first = 2005,
+			.pub_last = 2018,
+		},
+		UTIL_PRG_COPYRIGHT_END
+	}
+};
 
 /* Parse STRING for buffer size in bytes, allowing size modifier suffix 'k' and
  * 'm'. Return buffer size in bytes on success, -1 on error. */
@@ -123,17 +120,18 @@ static int parse_args(int argc, char **argv)
 	int index;
 
 	do {
-		opt = getopt_long(argc, argv, opt_string, options, NULL);
+		opt = util_opt_getopt_long(argc, argv);
 		switch (opt) {
 		case -1:
 			/* Reached end of parameter list. */
 			break;
 		case 'h':
-			print_help(argv[0]);
-			exit(VMCP_OK);
+			util_prg_print_help();
+			util_opt_print_help();
+			exit(EXIT_SUCCESS);
 		case 'v':
-			print_version(argv[0]);
-			exit(VMCP_OK);
+			util_prg_print_version();
+			exit(EXIT_SUCCESS);
 		case 'k':
 			keep_case = 1;
 			break;
@@ -165,7 +163,8 @@ static int parse_args(int argc, char **argv)
 		strcat(command, argv[index]);
 	}
 	if (strlen(command) == 0) {
-		print_help(argv[0]);
+		util_prg_print_help();
+		util_opt_print_help();
 		return VMCP_OPT;
 	}
 	return VMCP_OK;
@@ -199,6 +198,9 @@ int main(int argc, char **argv)
 {
 	struct vmcp_parm cp;
 	int ret;
+
+	util_prg_init(&prg);
+	util_opt_init(opt_vec, NULL);
 
 	ret = parse_args(argc, argv);
 	if (ret != VMCP_OK)
@@ -243,5 +245,5 @@ int main(int argc, char **argv)
 			"#%d\n", command, cp.cprc);
 		return VMCP_CP;
 	}
-	return VMCP_OK;
+	return EXIT_SUCCESS;
 }
