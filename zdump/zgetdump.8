@@ -1,4 +1,4 @@
-.\" Copyright 2017 IBM Corp.
+.\" Copyright 2018 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -59,6 +59,12 @@ more information.
 Print the dump header information reading from the DUMP and check if
 the dump is valid. See chapters DUMP and DUMP INFORMATION below for more
 information.
+
+.TP
+.BR "\-V" " or " "\-\-verbose"
+Show the detailed memory map layout when printing the dump header
+information (relevant for s390_ext and ELF dump formats).
+
 .TP
 .BR "\-f <FMT>" " or " "\-\-fmt <FMT>"
 Use the specified target dump format FMT when writing or mounting the dump.
@@ -170,6 +176,9 @@ This dump format is System z specific and is used for DASD and tape dumps.
 .TP
 The following dump formats are supported for the source dump only:
 .TP
+.BR "s390_ext"
+This dump format is System z specific and is used for DASD dumps only.
+.TP
 .BR "lkcd"
 This dump format is used by the Linux Kernel Crash Dumps (LKCD) project
 and also on System z for the "vmconvert" dump tool.
@@ -244,6 +253,10 @@ dump was created.
 The "real memory range" can differ from the "dump memory range" when
 the SIZE parameter was used when preparing the dump device with the zipl
 tool (see man zipl).
+.TP
+.BR "Dump file size"
+Actual size of dump file on disk in megabytes. "Dump file size" may differ from
+the "dump memory range" because of zero memory chunks.
 .TP
 .BR "Memory map"
 Available memory chunks in the dump. Some dump tools create multiple memory
