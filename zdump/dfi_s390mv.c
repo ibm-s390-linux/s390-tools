@@ -318,7 +318,7 @@ static void mem_chunks_add(void)
  */
 static int mem_chunks_add_ext(void)
 {
-	u64 off, rc, part_end, old = 0;
+	u64 off, rc, part_end, old = 0, dump_size = 0;
 	struct df_s390_dump_segm_hdr dump_segm;
 	struct vol_mem_chunk *vol_mem_chunk;
 	unsigned int i;
@@ -357,6 +357,7 @@ static int mem_chunks_add_ext(void)
 					      dfi_s390mv_ext_mem_read, NULL,
 					      vol->nr);
 			old = dump_segm.start + dump_segm.len;
+			dump_size += dump_segm.len;
 			off = zg_seek_cur(vol->fh, dump_segm.len,
 					  ZG_CHECK_NONE);
 			if (dump_segm.stop_marker)
@@ -367,6 +368,8 @@ static int mem_chunks_add_ext(void)
 			dfi_mem_chunk_add_vol(old, l.hdr.mem_size - old, NULL,
 					      dfi_mem_chunk_read_zero, NULL,
 					      vol->nr);
+			/* Set the actual size of the dump file */
+			dfi_attr_file_size_set(dump_size);
 			/* Read and verify the end marker */
 			rc = zg_read(vol->fh, &l.em, sizeof(l.em), ZG_CHECK);
 			if (rc != sizeof(l.em) ||

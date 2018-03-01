@@ -72,6 +72,7 @@ struct attr {
 	u32			*real_cpu_cnt;
 	struct new_utsname	*utsname;
 	char			*dump_method;
+	u64			*file_size;
 };
 
 /*
@@ -262,6 +263,9 @@ void dfi_info_print(void)
 	if (l.attr.mem_size_real)
 		STDERR("  Real memory range..: %lld MB\n",
 		      TO_MIB(*l.attr.mem_size_real));
+	if (l.attr.file_size)
+		STDERR("  Dump file size.....: %lld MB\n",
+		      TO_MIB(*l.attr.file_size));
 	if (dfi_mem_range())
 		mem_map_print();
 	if (l.dfi->info_dump) {
@@ -775,6 +779,21 @@ u64 *dfi_attr_mem_size_real(void)
 {
 	return l.attr.mem_size_real;
 }
+
+/*
+ * Attribute: Dump file size
+ */
+void dfi_attr_file_size_set(u64 file_size)
+{
+	l.attr.file_size = zg_alloc(sizeof(*l.attr.file_size));
+	*l.attr.file_size = file_size;
+}
+
+u64 *dfi_attr_file_size(void)
+{
+	return l.attr.file_size;
+}
+
 
 /*
  * Attribute: Build architecture

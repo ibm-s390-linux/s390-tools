@@ -209,7 +209,10 @@ extern void dfi_attr_dump_method_set(char *dump_method);
 extern char *dfi_attr_dump_method(void);
 
 extern void dfi_attr_mem_size_real_set(u64 mem_size_real);
-extern u64 *dfi_attr_mem_size_real();
+extern u64 *dfi_attr_mem_size_real(void);
+
+extern void dfi_attr_file_size_set(u64 dump_size);
+extern u64 *dfi_attr_file_size(void);
 
 extern void dfi_attr_vol_nr_set(unsigned int vol_nr);
 extern unsigned int *dfi_attr_vol_nr(void);
