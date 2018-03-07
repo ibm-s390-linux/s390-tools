@@ -73,6 +73,7 @@ struct attrib ccw_attr_cmb_enable = {
 	"  1: Data collection is enabled (rewrite 1 to reset data)\n",
 	.rewrite = 1,
 	.defval = "0",
+	.order_cmp = ccw_offline_only_order_cmp,
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
 };
 
