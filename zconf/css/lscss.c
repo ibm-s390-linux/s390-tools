@@ -717,7 +717,7 @@ static void print_subchannels_of_type(enum sch_type type_requested,
 	if (!cmd.opt_devrange && cmd.rng_count > 0)
 		return;
 	path = util_path_sysfs("devices");
-	count = util_scandir(&de_vec, alphasort, path, "css.*/");
+	count = util_scandir(&de_vec, alphasort, path, "css.*");
 	free(path);
 	for (i = 0; i < count; i++) {
 		path = util_path_sysfs("devices/%s/defunct", de_vec[i]->d_name);
