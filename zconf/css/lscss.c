@@ -649,14 +649,12 @@ static void print_defunct_devices(struct util_rec *rec, char *path)
 			snprintf(buf, sizeof(buf), "%s", device);
 		}
 		if (cmd.opt_devrange && cmd.rng_count > 0 &&
-		   !id_in_ranges_list(device)) {
-			util_scandir_free(de_vec, count);
+		   !id_in_ranges_list(device))
 			continue;
-		}
-		if (fill_device_info(rec, path, device) != 0) {
-			util_scandir_free(de_vec, count);
+
+		if (fill_device_info(rec, path, device) != 0)
 			continue;
-		}
+
 		if (cmd.opt_uppercase)
 			util_str_toupper(buf);
 		util_rec_set(rec, "device", "%s", buf);
