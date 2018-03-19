@@ -172,7 +172,7 @@ sub cpumf_parse_ctrdef($;$)
 
 		# Parse short description (optional)
 		if ($line =~ m/^Short-Description:\s*(\S.*)?$/) {
-			$h->{ctr}->{shortdesc} = $1 || "";
+			$h->{$ctr}->{shortdesc} = $1 || "";
 
 		# Parse start of counter description
 		} elsif ($line =~ m/^Description:\s*(\S.*)?$/) {
