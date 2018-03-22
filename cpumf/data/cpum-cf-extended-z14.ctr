@@ -47,13 +47,13 @@ Table Entry array in the Level-2 TLB for a one-megabyte page or a
 Last Host Translation was done
 .
 Counter:132	Name:DTLB2_GPAGE_WRITES
-Short-Description:DTLB2 Two-Gigabye Page Writes
+Short-Description:DTLB2 Two-Gigabyte Page Writes
 Description:
 A translation entry for a two-gigabyte page was written into the
 Level-2 TLB
 .
 Counter:133	Name:L1D_L2D_SOURCED_WRITES
-Short-Description:L1D L2D SOURCED Writes
+Short-Description:L1D L2D Sourced Writes
 Description:
 A directory write to the Level-1 Data cache directory where the
 returned cache line was sourced from the Level-2 Data cache
@@ -101,7 +101,7 @@ A TEND instruction has completed in a constrained transactional-execution
 mode
 .
 Counter:141	Name:TX_NC_TEND
-Short-Description:Completed TEND instructions in non constrained TX mode
+Short-Description:Completed TEND instructions in non-constrained TX mode
 Description:
 A TEND instruction has completed in a non-constrained
 transactional-execution mode
@@ -125,7 +125,7 @@ A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from On-Chip memory
 .
 Counter:146	Name:L1D_ONCHIP_L3_SOURCED_WRITES_IV
-Short-Description:L1D On-Chip L3 Sourced Writes with intervention
+Short-Description:L1D On-Chip L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an On-Chip Level-3 cache with intervention
@@ -143,7 +143,7 @@ A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an On-Cluster memory
 .
 Counter:149	Name:L1D_ONCLUSTER_L3_SOURCED_WRITES_IV
-Short-Description:L1D On-Cluster L3 Sourced Writes with intervention
+Short-Description:L1D On-Cluster L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an On-Cluster Level-3 cache with intervention
@@ -162,7 +162,7 @@ A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from Off-Cluster memory
 .
 Counter:152	Name:L1D_OFFCLUSTER_L3_SOURCED_WRITES_IV
-Short-Description:L1D Off-Cluster L3 Sourced Writes with intervention
+Short-Description:L1D Off-Cluster L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an Off-Cluster Level-3 cache with intervention
@@ -181,7 +181,7 @@ A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from Off-Drawer memory
 .
 Counter:155	Name:L1D_OFFDRAWER_L3_SOURCED_WRITES_IV
-Short-Description:L1D Off-Drawer L3 Sourced Writes with intervention
+Short-Description:L1D Off-Drawer L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an Off-Drawer Level-3 cache with intervention
@@ -199,7 +199,7 @@ A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from Off-Drawer Level-4 cache
 .
 Counter:158	Name:L1D_ONCHIP_L3_SOURCED_WRITES_RO
-Short-Description:L1D On-Chip L3 Sourced Writes RO
+Short-Description:L1D On-Chip L3 Sourced Writes read-only
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from On-Chip L3 but a read-only invalidate was
@@ -219,7 +219,7 @@ A directory write to the Level-1 Instruction cache directory where the
 returned cache ine was sourced from On-Chip memory
 .
 Counter:164	Name:L1I_ONCHIP_L3_SOURCED_WRITES_IV
-Short-Description:L1I On-Chip L3 Sourced Writes with intervention
+Short-Description:L1I On-Chip L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache ine was sourced from an On-Chip Level-3 cache with
@@ -239,7 +239,7 @@ A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from an On-Cluster memory
 .
 Counter:167	Name:L1I_ONCLUSTER_L3_SOURCED_WRITES_IV
-Short-Description:L1I On-Cluster L3 Sourced Writes with intervention
+Short-Description:L1I On-Cluster L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from On-Cluster Level-3 cache with
@@ -259,7 +259,7 @@ A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from Off-Cluster memory
 .
 Counter:170	Name:L1I_OFFCLUSTER_L3_SOURCED_WRITES_IV
-Short-Description:L1I Off-Cluster L3 Sourced Writes with intervention
+Short-Description:L1I Off-Cluster L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from an Off-Cluster Level-3 cache with
@@ -279,7 +279,7 @@ A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from Off-Drawer memory
 .
 Counter:173	Name:L1I_OFFDRAWER_L3_SOURCED_WRITES_IV
-Short-Description:L1I Off-Drawer L3 Sourced Writes with intervention
+Short-Description:L1I Off-Drawer L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from an Off-Drawer Level-3 cache with
@@ -323,7 +323,7 @@ Description:
 Last Host Translation done
 .
 Counter:243	Name:TX_NC_TABORT
-Short-Description:Aborted transaction in non constrained TX mode
+Short-Description:Aborted transactions in non-constrained TX mode
 Description:
 A transaction abort has occurred in a non-constrained
 transactional-execution mode

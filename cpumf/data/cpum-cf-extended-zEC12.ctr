@@ -49,7 +49,7 @@ line was sourced from memory that is attached to the same book as the
 Instruction cache (Local Memory)
 .
 Counter:138	Name:L1D_RO_EXCL_WRITES
-Short-Description:L1D RO Excl Writes
+Short-Description:L1D Read-only Exclusive Writes
 Description:
 A directory write to the Level-1 D-Cache where the line was originally
 in a Read-Only state in the cache but has been updated to be in the
@@ -106,7 +106,7 @@ cache line was sourced from an Off Book Level-3 cache without intervention
 .
 Counter:147	Name:L1D_ONBOOK_L4_SOURCED_WRITES
 Short-Description:L1D On-Book L4 Sourced Writes
-CDescription:
+Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an On Book Level-4 cache
 .
@@ -123,19 +123,19 @@ cache line was sourced from an Off Book Level-4 cache
 #    C .. constrained
 #
 Counter:149	Name:TX_NC_TEND
-Short-Description:Completed TEND instructions in non constrained TX mode
+Short-Description:Completed TEND instructions in non-constrained TX mode
 Description:
 A TEND instruction has completed in a nonconstrained
 transactional-execution mode
 .
 Counter:150	Name:L1D_ONCHIP_L3_SOURCED_WRITES_IV
-Short-Description:L1D On-Chip L3 Sourced Writes with intervention
+Short-Description:L1D On-Chip L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from a On Chip Level-3 cache with intervention
 .
 Counter:151	Name:L1D_OFFCHIP_L3_SOURCED_WRITES_IV
-Short-Description:L1D Off-Chip L3 Sourced Writes with intervention
+Short-Description:L1D Off-Chip L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an Off Chip/On Book Level-3 cache with
@@ -143,7 +143,7 @@ intervention
 .
 # XXX Remove SOURCED from L1D_OFFBOOK_L3_SOURCED_WRITES...
 Counter:152	Name:L1D_OFFBOOK_L3_SOURCED_WRITES_IV
-Short-Description:L1D Off-Book L3 Sourced Writes with intervention
+Short-Description:L1D Off-Book L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Data cache directory where the returned
 cache line was sourced from an Off Book Level-3 cache with intervention
@@ -188,28 +188,28 @@ A TEND instruction has completed in a constrained transactional-execution
 mode
 .
 Counter:159	Name:L1I_ONCHIP_L3_SOURCED_WRITES_IV
-Short-Description:L1I On-Chip L3 Sourced Writes with intervention
+Short-Description:L1I On-Chip L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from an On Chip Level-3 cache with
 intervention
 .
 Counter:160	Name:L1I_OFFCHIP_L3_SOURCED_WRITES_IV
-Short-Description:L1I Off-Chip L3 Sourced Writes with intervention
+Short-Description:L1I Off-Chip L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from an Off Chip/On Book Level-3 cache
 with intervention
 .
 Counter:161	Name:L1I_OFFBOOK_L3_SOURCED_WRITES_IV
-Short-Description:L1I Off-Book L3 Sourced Writes with intervention
+Short-Description:L1I Off-Book L3 Sourced Writes with Intervention
 Description:
 A directory write to the Level-1 Instruction cache directory where the
 returned cache line was sourced from an Off Book Level-3 cache with
 intervention
 .
 Counter:177	Name:TX_NC_TABORT
-Short-Description:Aborted transaction in non constrained TX mode
+Short-Description:Aborted transactions in non-constrained TX mode
 Description:
 A transaction abort has occurred in a nonconstrained
 transactional-execution mode

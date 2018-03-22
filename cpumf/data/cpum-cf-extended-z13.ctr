@@ -17,7 +17,7 @@
 # Extended Counter Set
 # ---------------------------------------------------------------------
 Counter:128	Name:L1D_RO_EXCL_WRITES
-Short-Description:L1D RO Exclusive Writes
+Short-Description:L1D Read-only Exclusive Writes
 Description:
 A directory write to the Level-1 Data cache where the line was
 originally in a Read-Only state in the cache but has been updated
@@ -77,7 +77,7 @@ A translation entry has been written to the Level-2 TLB Page Table
 Entry arrays
 .
 Counter:138	Name:TLB2_CRSTE_HPAGE_WRITES
-Short-Description:TLB2 CRSTE One-Megabate Page Writes
+Short-Description:TLB2 CRSTE One-Megabyte Page Writes
 Description:
 A translation entry has been written to the Level-2 TLB Combined Region
 Segment Table Entry arrays for a one-megabyte large page translation
@@ -95,7 +95,7 @@ A TEND instruction has completed in a constrained transactional-execution
 mode
 .
 Counter:141	Name:TX_NC_TEND
-Short-Description:Completed TEND instructions in non constrained TX mode
+Short-Description:Completed TEND instructions in non-constrained TX mode
 Description:
 A TEND instruction has completed in a non-constrained
 transactional-execution mode
@@ -339,7 +339,7 @@ A directory write to the Level-1 Instruction cache directory where
 the returned cache line was sourced from On-Chip memory
 .
 Counter:218	Name:TX_NC_TABORT
-Short-Description:Aborted transaction in non constrained TX mode
+Short-Description:Aborted transactions in non-constrained TX mode
 Description:
 A transaction abort has occurred in a non-constrained
 transactional-execution mode
@@ -367,7 +367,7 @@ Description:
 Cycle count with one thread active
 .
 Counter:449	Name:MT_DIAG_CYCLES_TWO_THR_ACTIVE
-Short-Description:cycle count with two threads active
+Short-Description:Cycle count with two threads active
 Description:
 Cycle count with two threads active
 .

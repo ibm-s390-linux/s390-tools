@@ -46,7 +46,7 @@ A directory write to the Level-1 I-Cache directory where the returned
 cache line was sourced from an On Book Level-4 cache
 .
 Counter: 137	Name:L1D_RO_EXCL_WRITES
-Short-Description:L1D RO Excl Writes
+Short-Description:L1D Read-only Exclusive Writes
 Description:
 A directory write to the Level-1 D-Cache where the line was originally
 in a Read-Only state in the cache but has been updated to be in the
@@ -65,20 +65,20 @@ A directory write to the Level-1 I-Cache directory where the returned
 cache line was sourced from an Off Book Level-4 cache
 .
 Counter: 140	Name:DTLB1_HPAGE_WRITES
-Short-Description:DTLB1 HPAGE Writes
+Short-Description:DTLB1 One-Megabyte Page Writes
 Description:
 A translation entry has been written to the Level-1 Data Translation
 Lookaside Buffer for a one-megabyte page
 .
 Counter: 141	Name:L1D_LMEM_SOURCED_WRITES
-Short-Description:L1D LMEM Sourced Writes
+Short-Description:L1D Local Memory Sourced Writes
 Description:
 A directory write to the Level-1 D-Cache where the installed cache line
 was sourced from memory that is attached to the same book as the Data
 cache (Local Memory)
 .
 Counter: 142	Name:L1I_LMEM_SOURCED_WRITES
-Short-Description:L1I LMEM Sourced Writes
+Short-Description:L1I Local Memory Sourced Writes
 Description:
 A directory write to the Level-1 I-Cache where the installed cache
 line was sourced from memory that is attached to the same book as the
@@ -109,7 +109,7 @@ A translation entry has been written to the Level-2 TLB Page Table
 Entry arrays
 .
 Counter: 147	Name:TLB2_CRSTE_HPAGE_WRITES
-Short-Description:TLB2 CRSTE HPAGE Writes
+Short-Description:TLB2 CRSTE One-Megabyte Page Writes
 Description:
 A translation entry has been written to the Level-2 TLB Common Region
 Segment Table Entry arrays for a one-megabyte large page translation
@@ -121,25 +121,25 @@ A translation entry has been written to the Level-2 TLB Common Region
 Segment Table Entry arrays
 .
 Counter: 150	Name:L1D_ONCHIP_L3_SOURCED_WRITES
-Short-Description:L1D Onchip L3 Sourced Writes
+Short-Description:L1D On-Chip L3 Sourced Writes
 Description:
 A directory write to the Level-1 D-Cache directory where the returned
 cache line was sourced from an On Chip Level-3 cache
 .
 Counter: 152	Name:L1D_OFFCHIP_L3_SOURCED_WRITES
-Short-Description:L1D Offchip L3 Sourced Writes
+Short-Description:L1D Off-Chip L3 Sourced Writes
 Description:
 A directory write to the Level-1 D-Cache directory where the returned
 cache line was sourced from an Off Chip/On Book Level-3 cache
 .
 Counter: 153	Name:L1I_ONCHIP_L3_SOURCED_WRITES
-Short-Description:L1I Onchip L3 Sourced Writes
+Short-Description:L1I On-Chip L3 Sourced Writes
 Description:
 A directory write to the Level-1 I-Cache directory where the returned
 cache line was sourced from an On Chip Level-3 cache
 .
 Counter: 155	Name:L1I_OFFCHIP_L3_SOURCED_WRITES
-Short-Description:L1I Offchip L3 Sourced Writes
+Short-Description:L1I Off-Chip L3 Sourced Writes
 Description:
 A directory write to the Level-1 I-Cache directory where the returned
 cache line was sourced from an Off Chip/On Book Level-3 cache
