@@ -42,7 +42,7 @@ Counter: 135	Name:L1I_LMEM_SOURCED_WRITES
 Description:
 A directory write to the Level-1 I-Cache where the installed cache
 line was sourced from memory that is attached to the s ame book as the
-Instruction cahe (local Memory)
+Instruction cache (Local Memory)
 .
 Counter: 136	Name:L1D_RO_EXCL_WRITES
 Description:
