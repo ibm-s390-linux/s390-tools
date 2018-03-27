@@ -74,6 +74,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
 		--only-section=.rodata \
 		--only-section=.stage2dump.tail \
 		--only-section=.eckd2dump_mv.tail \
+		--only-section=.fixup \
 		$< $@
 
 data.o: $(FILES)

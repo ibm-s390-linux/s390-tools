@@ -18,6 +18,7 @@
 #define __pa(x) ((unsigned long)(x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define barrier() __asm__ __volatile__("": : :"memory")
+#define inline		inline __attribute__((always_inline))
 
 /*
  * Helper macro for exception table entries
@@ -207,29 +208,24 @@ do { \
 	libc_stop(reason); \
 } while (0)
 
-#define CHUNK_READ_WRITE	0
-#define CHUNK_READ_ONLY		1
-
-static inline int tprot(unsigned long addr)
-{
-	int rc = -EFAULT;
-
-	asm volatile(
-		"       tprot   0(%1),0\n"
-		"0:     ipm     %0\n"
-		"       srl     %0,28\n"
-		"1:\n"
-		EX_TABLE(0b, 1b)
-		: "+d" (rc) : "a" (addr) : "cc");
-	return rc;
-}
-
 static inline int page_is_valid(unsigned long addr)
 {
+	unsigned long tmp;
 	int rc;
 
-	rc = tprot(addr);
-	return (rc == CHUNK_READ_WRITE) || (rc == CHUNK_READ_ONLY);
+	asm volatile(
+		"0:     ic      %1,%2\n"
+		"1:     lhi     %0,1\n"
+		"2:\n"
+		".pushsection .fixup, \"ax\"\n"
+		"3:     xr      %0,%0\n"
+		"       jg      2b\n"
+		".popsection\n"
+		EX_TABLE(0b, 3b) EX_TABLE(1b, 3b)
+		: "=d" (rc), "=d" (tmp)
+		: "Q" (*(unsigned long *) addr)
+		: "cc");
+	return rc;
 }
 
 static inline uint32_t csum_partial(const void *buf, int len, uint32_t sum)
