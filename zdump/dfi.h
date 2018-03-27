@@ -97,6 +97,7 @@ struct dfi_cpu {
 	u32		todpreg;
 	u64		vxrs_low[16];
 	struct dfi_vxrs	vxrs_high[16];
+	u16		cpu_id;
 };
 
 struct dfi_cpu_32 {

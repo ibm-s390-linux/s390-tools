@@ -795,7 +795,10 @@ static void lc2cpu_64(struct dfi_cpu *cpu, struct dfi_lowcore_64 *lc)
 	/* Add VX registers if available */
 	if (!dfi_cpu_lc_has_vx_sa(lc))
 		return;
-	dfi_mem_read(lc->vector_save_area_addr, &vx_sa, sizeof(vx_sa));
+	if (dfi_mem_read_rc(lc->vector_save_area_addr, &vx_sa, sizeof(vx_sa))) {
+		STDERR("zgetdump: Vector registers save area is beyond dump memory limit for CPU %d\n", cpu->cpu_id);
+		return;
+	}
 	memcpy(cpu->vxrs_high, &vx_sa[16 * 16], sizeof(cpu->vxrs_high));
 	for (i = 0; i < 16; i++)
 		memcpy(&cpu->vxrs_low[i], &vx_sa[16 * i + 8], sizeof(u64));
@@ -827,6 +830,7 @@ void dfi_cpu_add_from_lc(u32 lc_addr)
 {
 	struct dfi_cpu *cpu = dfi_cpu_alloc();
 
+	cpu->cpu_id = l.cpus.cnt;
 	switch (l.cpus.content) {
 	case DFI_CPU_CONTENT_LC:
 		cpu->prefix = lc_addr;
