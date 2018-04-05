@@ -474,6 +474,8 @@ VM_CMDS="q userid\
   :q privclass\
   :q cplevel\
   :q cpservice\
+  :q cpprot user\
+  :q specex\
   :q ssi\
   :q cpus\
   :q srm\
