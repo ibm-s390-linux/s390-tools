@@ -129,7 +129,7 @@ int write_str_errno(char *string, char *file)
 	snprintf(path, sizeof(path), "/sys/firmware/%s", file);
 	fh = open(path, O_WRONLY);
 	if (fh < 0)
-		ERR_EXIT_ERRNO("Could not open \"%s\"", file);
+		return errno;
 	if (write(fh, value, strlen(value)) < 0)
 		return errno;
 	close(fh);
