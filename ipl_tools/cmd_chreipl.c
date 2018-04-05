@@ -636,7 +636,6 @@ static void chreipl_fcp(void)
 	write_str(l.busid, "reipl/fcp/device");
 	write_str(l.wwpn, "reipl/fcp/wwpn");
 	write_str(l.lun, "reipl/fcp/lun");
-	write_str("fcp", "reipl/reipl_type");
 	/*
 	 * set the boot record logical block address. Master boot
 	 * record. It is always 0 for Linux
@@ -645,6 +644,7 @@ static void chreipl_fcp(void)
 	if (!l.bootprog_set)
 		sprintf(l.bootprog, "0");
 	write_str(l.bootprog,  "reipl/fcp/bootprog");
+	write_str("fcp", "reipl/reipl_type");
 
 	print_fcp(0, 0);
 }
