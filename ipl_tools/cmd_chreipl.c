@@ -445,7 +445,7 @@ static void set_target_type_auto(const char *arg)
 {
 	char busid[10];
 
-	if (access(arg, R_OK) == 0) {
+	if (access(arg, F_OK) == 0) {
 		set_target_type(TT_NODE, 1);
 		return;
 	}
@@ -539,12 +539,19 @@ static void parse_chreipl_options(int argc, char *argv[])
 		parse_pos_args(&argv[optind], argc - optind);
 }
 
-static void verify_write_access(const char *path, const char *attr)
+static void check_exists(const char *path, const char *attr)
 {
 	char fpath[PATH_MAX];
 
 	snprintf(fpath, sizeof(fpath), "/sys/firmware/%s", path);
-	if (access(fpath, W_OK) != 0)
+	if (access(fpath, F_OK) != 0)
+		ERR_EXIT("System does not allow to set %s", attr);
+}
+
+static void write_str_optional(char *string, char *file, int exit_on_fail,
+			       const char *attr)
+{
+	if (write_str_errno(string, file) && exit_on_fail)
 		ERR_EXIT("System does not allow to set %s", attr);
 }
 
@@ -585,22 +592,18 @@ static void chreipl_ccw(void)
 		ERR_EXIT("Could not find DASD CCW device \"%s\"", l.busid);
 	}
 
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_CCW_MAX) {
+		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
+			 strlen(l.bootparms), BOOTPARMS_CCW_MAX);
+	}
+
 	/*
 	 * On old systems that use CCW reipl loadparm cannot be set
 	 */
-	if (l.loadparm_set)
-		verify_write_access("reipl/ccw/loadparm", "loadparm");
-	if (l.bootparms_set) {
-		verify_write_access("reipl/ccw/parm", "boot parameters");
-		if (strlen(l.bootparms) > BOOTPARMS_CCW_MAX)
-			ERR_EXIT("Maximum boot parameter length exceeded "
-				 "(%zu/%u)", strlen(l.bootparms),
-				 BOOTPARMS_CCW_MAX);
-	}
-	if (access("/sys/firmware/reipl/ccw/parm", W_OK) == 0)
-		write_str(l.bootparms, "reipl/ccw/parm");
-	if (access("/sys/firmware/reipl/ccw/loadparm", W_OK) == 0)
-		write_str(l.loadparm, "reipl/ccw/loadparm");
+	write_str_optional(l.loadparm, "reipl/ccw/loadparm", l.loadparm_set,
+			   "loadparm");
+	write_str_optional(l.bootparms, "reipl/ccw/parm", l.bootparms_set,
+			   "boot parameters");
 	write_str(l.busid, "reipl/ccw/device");
 	write_str("ccw", "reipl/reipl_type");
 
@@ -616,23 +619,18 @@ static void chreipl_fcp(void)
 			ERR_EXIT("Device is on cio_ignore list, try \"cio_ignore -r %s\"?", l.busid);
 		ERR_EXIT("Could not find FCP device \"%s\"", l.busid);
 	}
-	verify_write_access("reipl/fcp/device", "\"fcp\" re-IPL target");
+	check_exists("reipl/fcp/device", "\"fcp\" re-IPL target");
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
+		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
+			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+	}
 	/*
 	 * On old systems the FCP reipl loadparm cannot be set
 	 */
-	if (l.loadparm_set)
-		verify_write_access("reipl/fcp/loadparm", "loadparm");
-	if (l.bootparms_set) {
-		verify_write_access("reipl/fcp/scp_data", "boot parameters");
-		if (strlen(l.bootparms) > BOOTPARMS_FCP_MAX)
-			ERR_EXIT("Maximum boot parameter length exceeded "
-				 "(%zu/%u)", strlen(l.bootparms),
-				 BOOTPARMS_FCP_MAX);
-	}
-	if (access("/sys/firmware/reipl/fcp/scp_data", W_OK) == 0)
-		write_str(l.bootparms, "reipl/fcp/scp_data");
-	if (access("/sys/firmware/reipl/fcp/loadparm", W_OK) == 0)
-		write_str(l.loadparm, "reipl/fcp/loadparm");
+	write_str_optional(l.loadparm, "reipl/fcp/loadparm", l.loadparm_set,
+			   "loadparm");
+	write_str_optional(l.bootparms, "reipl/fcp/scp_data", l.bootparms_set,
+			   "boot parameters");
 	write_str(l.busid, "reipl/fcp/device");
 	write_str(l.wwpn, "reipl/fcp/wwpn");
 	write_str(l.lun, "reipl/fcp/lun");
@@ -652,17 +650,14 @@ static void chreipl_fcp(void)
 static void chreipl_nss(void)
 {
 	check_nss_opts();
-	verify_write_access("reipl/nss/name", "\"nss\" re-IPL target");
-	if (l.bootparms_set) {
-		verify_write_access("reipl/nss/parm", "boot parameters");
-		if (strlen(l.bootparms) > BOOTPARMS_NSS_MAX)
-			ERR_EXIT("Maximum boot parameter length exceeded "
-				 "(%zu/%u)", strlen(l.bootparms),
-				 BOOTPARMS_NSS_MAX);
+	check_exists("reipl/nss/name", "\"nss\" re-IPL target");
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_NSS_MAX) {
+		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
+			 strlen(l.bootparms), BOOTPARMS_NSS_MAX);
 	}
+	write_str_optional(l.bootparms, "reipl/nss/parm", l.bootparms_set,
+			   "boot parameters");
 	write_str(l.nss_name, "reipl/nss/name");
-	if (access("/sys/firmware/reipl/nss/parm", W_OK) == 0)
-		write_str(l.bootparms, "reipl/nss/parm");
 	write_str("nss", "reipl/reipl_type");
 	print_nss(0);
 }
