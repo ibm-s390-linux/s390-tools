@@ -25,8 +25,8 @@
 #define EX_TABLE(_fault, _target)	\
 	".section .ex_table,\"a\"\n"	\
 	".align	4\n"			\
-	".long	(" #_fault ") - .\n"	\
-	".long	(" #_target ") - .\n"	\
+	".long	(" #_fault ")\n"	\
+	".long	(" #_target ")\n"	\
 	".previous\n"
 
 struct psw_t {

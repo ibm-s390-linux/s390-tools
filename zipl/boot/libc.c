@@ -23,8 +23,8 @@ extern char __ex_table_start[];
 extern char __ex_table_stop[];
 
 struct ex_table_entry {
-	int fault;
-	int target;
+	unsigned int fault;
+	unsigned int target;
 };
 
 #define MEM_ALLOC_START	((unsigned long) __heap_start)
@@ -310,16 +310,13 @@ void pgm_check_handler_fn(void)
 	struct ex_table_entry *ex_table = (void *) __ex_table_start;
 	struct psw_t *psw_old = &S390_lowcore.program_old_psw;
 	int i, ex_table_cnt;
-	unsigned long fault, target;
 
 	ex_table_cnt = (__ex_table_stop - __ex_table_start)
 		/ sizeof(struct ex_table_entry);
 
 	for (i = 0; i < ex_table_cnt; i++) {
-		fault = __pa(&ex_table[i]) + ex_table[i].fault;
-		if (fault == psw_old->addr) {
-			target = __pa(&ex_table[i]) + ex_table[i].target;
-			psw_old->addr = target;
+		if (ex_table[i].fault == psw_old->addr) {
+			psw_old->addr = ex_table[i].target;
 			return;
 		}
 	}
