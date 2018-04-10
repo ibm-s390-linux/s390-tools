@@ -22,8 +22,6 @@
  * Static globals
  */
 static uint8_t machine_has_vx;
-static unsigned long progress_next_addr;
-static unsigned long progress_inc = 0x20000000; /* Issue message each 512M */
 
 /*
  * IPL info in lowcore
@@ -63,28 +61,25 @@ static void init_early(void)
 }
 
 /*
-
- * Init dump progress messages to sclp console
- *
- * 8 messages if the memory is 4G or less, otherwise one message for each
- * 512M chunk of dumped memory
- */
-static void progress_init(void)
-{
-	if (dump_hdr->mem_size <= (4 * 1024 * 1024 * 1024ULL))
-		progress_inc = dump_hdr->mem_size >> 3;
-	progress_next_addr = progress_inc;
-}
-
-/*
  * Print progress message
  */
 void progress_print(unsigned long addr)
 {
-	if (addr < progress_next_addr && addr != dump_hdr->mem_size)
+	/* Print a message approximately every 5 sec */
+	static unsigned long delta = 5 * (1UL << 32);
+	static unsigned long next;
+	unsigned long time = get_tod_clock();
+
+	if (next == 0) {
+		next = time + delta;
 		return;
-	printf("%08lu / %08lu MB", addr >> 20, dump_hdr->mem_size >> 20);
-	progress_next_addr += progress_inc;
+	}
+	if (time < next && addr != dump_hdr->mem_size)
+		return;
+
+	printf("%08lu / %08lu MB (Dump file size %08lu MB)", addr >> 20,
+	       dump_hdr->mem_size >> 20, total_dump_size >> 20);
+	next = time + delta;
 }
 
 /*
@@ -434,7 +429,6 @@ void start(void)
 	printf("Dumping 64 bit OS");
 	mem_and_cpu_init();
 	store_status();
-	progress_init();
 	dt_dump_mem();
 	printf("Dump successful");
 	dump_exit(0);
