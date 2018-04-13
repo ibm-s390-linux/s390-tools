@@ -21,7 +21,7 @@
 #include "error.h"
 #include "misc.h"
 
-#define DATA_SIZE(x)	((size_t) (&_binary_##x##_bin_size))
+#define DATA_SIZE(x)	((size_t) (&_binary_##x##_bin_end - &_binary_##x##_bin_start))
 #define DATA_ADDR(x)	(&_binary_##x##_bin_start)
 
 #define STAGE2_MAX_SIZE		0x3000
