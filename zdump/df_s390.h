@@ -3,7 +3,7 @@
  *
  * S390 dump format common functions
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -16,6 +16,7 @@
 #include "zg.h"
 
 #define DF_S390_MAGIC		0xa8190173618f23fdULL
+#define DF_S390_MAGIC_EXT	0xa8190173618f23feULL
 #define DF_S390_HDR_SIZE	0x1000
 #define DF_S390_EM_SIZE		16
 #define DF_S390_EM_STR		"DUMP_END"
@@ -69,6 +70,16 @@ struct df_s390_em {
 } __attribute__((packed));
 
 /*
+ * Segment header for s390 extended dump format
+ */
+struct df_s390_dump_segm_hdr {
+	u64	start;
+	u64	len;
+	u64	stop_marker;
+	u8	reserved[0x1000 - 24];
+} __attribute__((packed));
+
+/*
  * Convert DFI arch to s390 arch
  */
 static inline enum df_s390_arch df_s390_from_dfi_arch(enum dfi_arch dfi_arch)
@@ -84,95 +95,30 @@ static inline enum dfi_arch df_s390_to_dfi_arch(enum df_s390_arch df_s390_arch)
 	return df_s390_arch == DF_S390_ARCH_64 ? DFI_ARCH_64 : DFI_ARCH_32;
 }
 
-/*
- * Dump tool structure (version 1)
- */
-struct df_s390_dumper_v1 {
-	char	code[0xff7 - 0x8];
-	u8	force;
-	u64	mem;
-} __attribute__ ((packed));
-
-#define DF_S390_DUMPER_SIZE_V1	0x1000
-
-/*
- * Dump tool structure (version 2)
- */
-struct df_s390_dumper_v2 {
-	char	code[0x1ff7 - 0x8];
-	u8	force;
-	u64	mem;
-} __attribute__ ((packed));
-
-#define DF_S390_DUMPER_SIZE_V2	0x2000
-
-/*
- * Dump tool structure (version 3 and 4)
- */
-struct df_s390_dumper_v3 {
-	char	code[0x2ff7 - 0x8];
-	u8	force;
-	u64	mem;
-} __attribute__ ((packed));
-
-#define DF_S390_DUMPER_SIZE_V3	0x3000
+#define DF_S390_DUMPER_SIZE_V1		0x1000
+#define DF_S390_DUMPER_SIZE_V2		0x2000
+#define DF_S390_DUMPER_SIZE_V3		0x3000
+#define DF_S390_DUMPER_MAGIC32		"ZECKD31"
+#define DF_S390_DUMPER_MAGIC64		"ZECKD64"
+#define DF_S390_DUMPER_MAGIC_EXT	"XECKD64"
+#define DF_S390_DUMPER_MAGIC32_FBA	"ZDFBA31"
+#define DF_S390_DUMPER_MAGIC64_FBA	"ZDFBA64"
+#define DF_S390_DUMPER_MAGIC_FBA_EXT	"XDFBA64"
+#define DF_S390_DUMPER_MAGIC_MV		"ZMULT64"
+#define DF_S390_DUMPER_MAGIC_MV_EXT	"XMULT64"
+#define OLD_DUMPER_HEX_INSTR1 "\x0d\x10\x47\xf0" /* BASR + 1st halfword of BC */
+#define OLD_DUMPER_HEX_INSTR2 "\x0d\xd0" /* BASR 13,0 */
 
 /*
  * Dump tool structure
  */
 struct df_s390_dumper {
-	char		magic[7];
-	u8		version;
-	union {
-		struct df_s390_dumper_v1	v1;
-		struct df_s390_dumper_v2	v2;
-		struct df_s390_dumper_v3	v3;
-	} d;
+	char	magic[7];
+	u8	version;
+	u32	size;
+	u8	force;
+	u64	mem;
 } __attribute__ ((packed));
-
-/*
- * Dumper member access helpers
- */
-#define df_s390_dumper_magic(dumper) ((dumper).magic)
-#define df_s390_dumper_version(dumper) ((dumper).version)
-static inline u64 df_s390_dumper_mem(struct df_s390_dumper *dumper)
-{
-	switch (dumper->version) {
-	case 1:
-		return dumper->d.v1.mem;
-	case 2:
-		return dumper->d.v2.mem;
-	case 3:
-	default:
-		return dumper->d.v3.mem;
-	}
-}
-
-static inline u8 df_s390_dumper_force(struct df_s390_dumper *dumper)
-{
-	switch (dumper->version) {
-	case 1:
-		return dumper->d.v1.force;
-	case 2:
-		return dumper->d.v2.force;
-	case 3:
-	default:
-		return dumper->d.v3.force;
-	}
-}
-
-static inline unsigned long df_s390_dumper_size(struct df_s390_dumper *dumper)
-{
-	switch (dumper->version) {
-	case 1:
-		return 0x1000;
-	case 2:
-		return 0x2000;
-	case 3:
-	default:
-		return 0x3000;
-	}
-}
 
 /*
  * s390 dump helpers

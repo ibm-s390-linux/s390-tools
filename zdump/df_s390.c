@@ -3,7 +3,7 @@
  *
  * S390 dump format common functions
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -41,7 +41,7 @@ void df_s390_cpu_info_add(struct df_s390_hdr *hdr, u64 addr_max)
 {
 	unsigned int i;
 
-	if (hdr->version < 5) {
+	if (hdr->version < 5 && hdr->magic == DF_S390_MAGIC) {
 		/* No Prefix registers in header */
 		hdr->cpu_cnt = 0;
 		dfi_cpu_info_init(DFI_CPU_CONTENT_NONE);
@@ -85,11 +85,14 @@ void df_s390_hdr_add(struct df_s390_hdr *hdr)
 	dfi_arch_set(df_s390_to_dfi_arch(hdr->arch));
 	if (hdr->cpu_id)
 		dfi_attr_cpu_id_set(hdr->cpu_id);
-	if (hdr->version >= 3 && hdr->mem_size_real)
-		dfi_attr_mem_size_real_set(hdr->mem_size_real);
-	if (hdr->version >= 2 && hdr->build_arch)
+	if ((hdr->version >= 2 || hdr->magic == DF_S390_MAGIC_EXT) &&
+	    hdr->build_arch)
 		dfi_attr_build_arch_set(df_s390_to_dfi_arch(hdr->build_arch));
-	if (hdr->version >= 5 && hdr->real_cpu_cnt)
+	if ((hdr->version >= 3 || hdr->magic == DF_S390_MAGIC_EXT) &&
+	    hdr->mem_size_real)
+		dfi_attr_mem_size_real_set(hdr->mem_size_real);
+	if ((hdr->version >= 5 || hdr->magic == DF_S390_MAGIC_EXT) &&
+	    hdr->real_cpu_cnt)
 		dfi_attr_real_cpu_cnt_set(hdr->real_cpu_cnt);
 }
 
@@ -124,8 +127,38 @@ int df_s390_em_verify(struct df_s390_em *em, struct df_s390_hdr *hdr)
 void df_s390_dumper_read(struct zg_fh *fh, int blk_size,
 			 struct df_s390_dumper *dumper)
 {
-	int offset = DF_S390_MAGIC_BLK_ECKD * blk_size;
+	int bytes_to_read, offset = DF_S390_MAGIC_BLK_ECKD * blk_size;
 
+	/*
+	 * First read 3 fields at the start of the dumper. The magic number,
+	 * version and one extra field for the old dumper case (no magic
+	 * number, checking for specific assembler instructions).
+	 */
+	bytes_to_read = offsetof(struct df_s390_dumper, force);
 	zg_seek(fh, offset, ZG_CHECK);
-	zg_read(fh, dumper, sizeof(*dumper), ZG_CHECK);
+	zg_read(fh, dumper, bytes_to_read, ZG_CHECK);
+	if (memcmp(dumper->magic, OLD_DUMPER_HEX_INSTR1, 4) == 0 &&
+	    memcmp(&dumper->size, OLD_DUMPER_HEX_INSTR2, 2) == 0)
+		/* We found basr r13,0 (old dumper) */
+		dumper->version = 0;
+	switch (dumper->version) {
+	case 1:
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT, 7) == 0 ||
+		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7) == 0)
+			dumper->size = DF_S390_DUMPER_SIZE_V3;
+		else
+			dumper->size = DF_S390_DUMPER_SIZE_V1;
+		break;
+	case 2:
+		dumper->size = DF_S390_DUMPER_SIZE_V2;
+		break;
+	case 3:
+	default:
+		dumper->size = DF_S390_DUMPER_SIZE_V3;
+	}
+	/* Read force and mem fields in the end of the dumper */
+	bytes_to_read = sizeof(dumper->force) + sizeof(dumper->mem);
+	offset += dumper->size - bytes_to_read;
+	zg_seek(fh, offset, ZG_CHECK);
+	zg_read(fh, &dumper->force, bytes_to_read, ZG_CHECK);
 }

@@ -3,7 +3,7 @@
  *
  * S390 multi-volume dump input format
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -109,8 +109,7 @@ static void table_read(struct zg_fh *fh, u16 blk_size,
 {
 	int off;
 
-	off = DF_S390_MAGIC_BLK_ECKD * blk_size +
-		df_s390_dumper_size(&l.dumper);
+	off = DF_S390_MAGIC_BLK_ECKD * blk_size + l.dumper.size;
 	zg_seek(fh, off, ZG_CHECK);
 	zg_read(fh, table, sizeof(*table), ZG_CHECK);
 }
@@ -263,7 +262,7 @@ static void vol_init(struct vol *vol, struct vol_parm *vol_parm, int ssid,
 		l.dump_incomplete = 1;
 	}
 
-	if (strncmp(df_s390_dumper_magic(vol->dumper), "ZMULT64", 7) != 0) {
+	if (strncmp(vol->dumper.magic, DF_S390_DUMPER_MAGIC_MV, 7) != 0) {
 		vol->sign = SIGN_INVALID;
 		l.dump_incomplete = 1;
 	}
@@ -445,7 +444,7 @@ static int mv_dumper_read(void)
 		     ZG_CHECK_NONE) == -1)
 		return -ENODEV;
 	df_s390_dumper_read(g.fh, l.blk_size, &l.dumper);
-	if (memcmp(df_s390_dumper_magic(l.dumper), "ZMULT64", 7) != 0)
+	if (memcmp(l.dumper.magic, DF_S390_DUMPER_MAGIC_MV, 7) != 0)
 		return -ENODEV;
 	table_read(g.fh, l.blk_size, &l.table);
 	return 0;
@@ -529,9 +528,9 @@ int dt_s390mv_init(void)
 		return -ENODEV;
 	volumes_init();
 	dt_arch_set(DFI_ARCH_64);
-	dt_version_set(df_s390_dumper_version(l.dumper));
-	dt_attr_mem_limit_set(df_s390_dumper_mem(&l.dumper));
-	dt_attr_force_set(df_s390_dumper_force(&l.dumper));
+	dt_version_set(l.dumper.version);
+	dt_attr_mem_limit_set(l.dumper.mem);
+	dt_attr_force_set(l.dumper.force);
 	return 0;
 }
 
