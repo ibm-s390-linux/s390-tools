@@ -3,7 +3,7 @@
  *
  * ELF core dump output format
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -71,8 +71,12 @@ static u64 loads_init(Elf64_Phdr *phdr, u64 loads_offset)
 		phdr->p_offset = loads_offset;
 		phdr->p_vaddr = mem_chunk->start;
 		phdr->p_paddr = mem_chunk->start;
-		phdr->p_filesz = mem_chunk->end - mem_chunk->start + 1;
-		phdr->p_memsz = phdr->p_filesz;
+		phdr->p_memsz = mem_chunk->end - mem_chunk->start + 1;
+		if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
+			/* Zero memory chunk */
+			phdr->p_filesz = 0;
+		else
+			phdr->p_filesz = phdr->p_memsz;
 		phdr->p_flags = PF_R | PF_W | PF_X;
 		phdr->p_align = PAGE_SIZE;
 		loads_offset += phdr->p_filesz;
@@ -277,6 +281,9 @@ static void dump_chunks_init(void)
 	dfo_chunk_add(0, l.hdr_size, l.hdr, dfo_chunk_buf_fn);
 	off = l.hdr_size;
 	dfi_mem_chunk_iterate(mem_chunk) {
+		if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
+			/* Zero memory chunk */
+			continue;
 		dfo_chunk_add(off, mem_chunk->size, mem_chunk,
 				   dfo_chunk_mem_fn);
 		off += mem_chunk->size;

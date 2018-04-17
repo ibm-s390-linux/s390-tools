@@ -3,7 +3,7 @@
  *
  * ELF core dump input format
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -42,12 +42,16 @@ static int pt_load_add(Elf64_Phdr *phdr)
 		STDERR("Dump file \"%s\" is a user space core dump\n",
 		      g.opts.device);
 	}
-	if (phdr->p_filesz == 0) /* Skip null pt loads */
-		return 0;
-	off_ptr = zg_alloc(sizeof(*off_ptr));
-	*off_ptr = phdr->p_offset;
-	dfi_mem_chunk_add(phdr->p_paddr, phdr->p_filesz, off_ptr,
-			  dfi_elf_mem_chunk_read_fn, zg_free);
+	if (phdr->p_filesz == 0) {
+		/* Add zero memory chunk */
+		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, NULL,
+				  dfi_mem_chunk_read_zero, NULL);
+	} else {
+		off_ptr = zg_alloc(sizeof(*off_ptr));
+		*off_ptr = phdr->p_offset;
+		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, off_ptr,
+				  dfi_elf_mem_chunk_read_fn, zg_free);
+	}
 	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
 		return -EINVAL;
 	return 0;
