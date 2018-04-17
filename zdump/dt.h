@@ -13,6 +13,10 @@
 #define DT_H
 
 #include "dfi.h"
+#include <stdbool.h>
+
+#define DUMP_EXTENDED		true
+#define DUMP_NON_EXTENDED	false
 
 struct dt {
 	const char	*desc;

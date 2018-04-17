@@ -3,7 +3,7 @@
  *
  * Dump tool info generic functions
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -15,7 +15,9 @@
  * Supported dump tools
  */
 static struct dt *dt_vec[] = {
+	&dt_s390mv_ext,
 	&dt_s390mv,
+	&dt_s390sv_ext,
 	&dt_s390sv,
 	&dt_scsi,
 	NULL,

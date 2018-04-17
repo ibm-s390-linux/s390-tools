@@ -18,6 +18,7 @@
 static struct {
 	struct df_s390_dumper	dumper;
 	enum dfi_arch		dumper_arch;
+	bool extended;		/* Extended dump-tool */
 } l;
 
 /*
@@ -27,6 +28,12 @@ static int dumper_read_eckd(int blk_size)
 {
 	df_s390_dumper_read(g.fh, blk_size, &l.dumper);
 
+	if (l.extended) {
+		if (strncmp(l.dumper.magic, DF_S390_DUMPER_MAGIC_EXT, 7) != 0)
+			return -ENODEV;
+		l.dumper_arch = DFI_ARCH_64;
+		return 0;
+	}
 	if (strncmp(l.dumper.magic, DF_S390_DUMPER_MAGIC64, 7) == 0) {
 		l.dumper_arch = DFI_ARCH_64;
 	} else if (strncmp(l.dumper.magic, DF_S390_DUMPER_MAGIC32, 7) == 0) {
@@ -46,6 +53,13 @@ static int dumper_read_eckd(int blk_size)
  */
 static int dumper_check_fba(struct df_s390_dumper *dumper)
 {
+	if (l.extended) {
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_FBA_EXT, 7)
+		    != 0)
+			return -ENODEV;
+		l.dumper_arch = DFI_ARCH_64;
+		return 0;
+	}
 	if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC64_FBA, 7) == 0) {
 		l.dumper_arch = DFI_ARCH_64;
 	} else if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC32_FBA, 7) == 0) {
@@ -123,8 +137,9 @@ static int sv_dumper_read(void)
 /*
  * Initialize s390 single-volume dump tool (for -d option)
  */
-static int dt_s390sv_init(void)
+int dt_s390sv_init_gen(bool extended)
 {
+	l.extended = extended;
 	if (sv_dumper_read() != 0)
 		return -ENODEV;
 	dt_arch_set(l.dumper_arch);
@@ -133,8 +148,12 @@ static int dt_s390sv_init(void)
 	return 0;
 }
 
+static int dt_s390sv_init(void)
+{
+	return dt_s390sv_init_gen(DUMP_NON_EXTENDED);
+}
 /*
- * s390 single-volume DT operations
+ * s390 single-volume DT (non-extended) operations
  */
 struct dt dt_s390sv = {
 	.desc	= "Single-volume DASD dump tool",

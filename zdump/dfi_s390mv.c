@@ -21,52 +21,7 @@
 #include <unistd.h>
 
 #include "zgetdump.h"
-
-#define SYSFS_BUSDIR	"/sys/bus/ccw/devices"
-#define MAX_VOLUMES	32
-
-/*
- * Parameter for DASD multi-volume dump
- */
-struct vol_parm {
-	u16	devno;
-	u32	start_blk;
-	u32	end_blk;
-	u8	blk_size;
-	u8	end_sec;
-	u8	num_heads;
-} __attribute__ ((packed));
-
-struct vol_parm_table {
-	u64		timestamp;
-	u16		vol_cnt;
-	struct vol_parm	vol_parm[MAX_VOLUMES];
-	u8		ssid[MAX_VOLUMES];
-} __attribute__ ((packed));
-
-/*
- * Device signature
- */
-enum dev_sign {
-	SIGN_INVALID	= 0,	/* No dumper installed */
-	SIGN_VALID	= 1,	/* dumper installed, but volume not used */
-	SIGN_ACTIVE	= 2,	/* dumper installed and volume userd */
-};
-
-static char *dev_sign_str[] = {"invalid", "valid", "active"};
-#define dev_sign_str(x) (dev_sign_str[x])
-
-/*
- * Device status
- */
-enum dev_status {
-	DEV_ONLINE	= 0,
-	DEV_OFFLINE	= 1,
-	DEV_UNDEFINED	= 2,
-};
-
-static char *dev_status_str[] = {"online", "offline", "undefined"};
-#define dev_status_str(x) (dev_status_str[x])
+#include "dfi_s390mv.h"
 
 /*
  * Volume information
@@ -99,6 +54,8 @@ static struct {
 	int			blk_size;
 	struct df_s390_dumper	dumper;
 	int			dump_incomplete;
+	bool extended;
+	char dumper_magic[7];	/* Reference value to compare with */
 } l;
 
 /*
@@ -262,13 +219,16 @@ static void vol_init(struct vol *vol, struct vol_parm *vol_parm, int ssid,
 		l.dump_incomplete = 1;
 	}
 
-	if (strncmp(vol->dumper.magic, DF_S390_DUMPER_MAGIC_MV, 7) != 0) {
+	if (strncmp(vol->dumper.magic, l.dumper_magic, 7) != 0) {
 		vol->sign = SIGN_INVALID;
 		l.dump_incomplete = 1;
 	}
 
 	if (vol->nr == 0)
 		l.hdr = vol->hdr;
+
+	if (l.extended)
+		return;
 
 	if (*mem_off == l.hdr.mem_size) {
 		/* Unused volume */
@@ -444,7 +404,7 @@ static int mv_dumper_read(void)
 		     ZG_CHECK_NONE) == -1)
 		return -ENODEV;
 	df_s390_dumper_read(g.fh, l.blk_size, &l.dumper);
-	if (memcmp(l.dumper.magic, DF_S390_DUMPER_MAGIC_MV, 7) != 0)
+	if (strncmp(l.dumper.magic, l.dumper_magic, 7) != 0)
 		return -ENODEV;
 	table_read(g.fh, l.blk_size, &l.table);
 	return 0;
@@ -465,6 +425,8 @@ static void volumes_init(void)
 		vol_init(&l.vol_vec[i], &l.table.vol_parm[i], l.table.ssid[i],
 			 &mem_off);
 	}
+	if (l.extended)
+		return;
 	if (mem_off != l.hdr.mem_size)
 		l.dump_incomplete = 1;
 }
@@ -475,7 +437,7 @@ static void volumes_init(void)
 static int open_dump(void)
 {
 	const struct stat *stat = zg_stat(g.fh);
-	unsigned dev_minor;
+	unsigned int dev_minor;
 	enum zg_type type;
 	char *path;
 
@@ -520,10 +482,16 @@ static int dfi_s390mv_init(void)
 }
 
 /*
- * Initialize s390 multi-volume dump tool (for -d option)
+ * Initialize s390 multi-volume dump tool generic function
  */
-int dt_s390mv_init(void)
+int dt_s390mv_init_gen(bool extended)
 {
+	l.extended = extended;
+	/* Specify dumper magic value for further validation */
+	if (extended)
+		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7);
+	else
+		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV, 7);
 	if (open_dump() != 0)
 		return -ENODEV;
 	volumes_init();

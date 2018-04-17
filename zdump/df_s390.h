@@ -131,9 +131,10 @@ extern void df_s390_dumper_read(struct zg_fh *fh, int32_t blk_size,
 				struct df_s390_dumper *dumper);
 
 /*
- * DASD multi-volume dumper functions
+ * DASD dt and dfi functions
  */
-extern int dt_s390mv_init(void);
+extern int dt_s390sv_init_gen(bool extended);
+extern int dt_s390mv_init_gen(bool extended);
 extern void dt_s390mv_info(void);
 
 #endif /* DF_S390_H */

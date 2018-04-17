@@ -12,7 +12,15 @@
 #include "zgetdump.h"
 
 /*
- * DT operations
+ * Initialize s390 multi-volume dump tool (for -d option)
+ */
+static int dt_s390mv_init(void)
+{
+	return dt_s390mv_init_gen(DUMP_NON_EXTENDED);
+}
+
+/*
+ * Dump Tool operations
  */
 struct dt dt_s390mv = {
 	.desc	= "Multi-volume DASD dump tool",

@@ -3,7 +3,7 @@
  *
  * Main include file - Should be included by all source files
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -92,7 +92,9 @@ extern struct dfo dfo_elf;
  * Supported s390 dumpers
  */
 extern struct dt dt_s390mv;
+extern struct dt dt_s390mv_ext;
 extern struct dt dt_s390sv;
+extern struct dt dt_s390sv_ext;
 extern struct dt dt_scsi;
 
 #endif /* ZGETDUMP_H */
