@@ -26,10 +26,11 @@
 static struct {
 	struct df_s390_hdr	hdr;	/* s390 dump header */
 	struct df_s390_em	em;	/* s390 end marker */
+	bool extended;			/* Extended input dump format */
 } l;
 
 /*
- * S390 mem chunk read callback
+ * s390 mem chunk read callback
  */
 static void dfi_s390_mem_chunk_read(struct dfi_mem_chunk *mem_chunk, u64 off,
 				    void *buf, u64 cnt)
@@ -41,15 +42,31 @@ static void dfi_s390_mem_chunk_read(struct dfi_mem_chunk *mem_chunk, u64 off,
 }
 
 /*
+ * s390_ext mem chunk read callback
+ */
+static void dfi_s390_ext_mem_chunk_read(struct dfi_mem_chunk *mem_chunk,
+					u64 off, void *buf, u64 cnt)
+{
+	u64 *mem_chunk_off = mem_chunk->data;
+
+	zg_seek(g.fh, *mem_chunk_off + off, ZG_CHECK);
+	zg_read(g.fh, buf, cnt, ZG_CHECK);
+}
+
+
+/*
  * Read s390 dump header
  */
 static int read_s390_hdr(void)
 {
+	u64 magic_number;
+
+	magic_number = l.extended ? DF_S390_MAGIC_EXT : DF_S390_MAGIC;
 	if ((zg_type(g.fh) == ZG_TYPE_FILE) && (zg_size(g.fh) < sizeof(l.hdr)))
 		return -ENODEV;
 	if (zg_read(g.fh, &l.hdr, sizeof(l.hdr), ZG_CHECK_ERR) != sizeof(l.hdr))
 		return -ENODEV;
-	if (l.hdr.magic != DF_S390_MAGIC)
+	if (l.hdr.magic != magic_number)
 		return -ENODEV;
 	df_s390_hdr_add(&l.hdr);
 	return 0;
@@ -62,9 +79,6 @@ static int read_s390_em(void)
 {
 	u64 rc;
 
-	rc = zg_seek(g.fh, l.hdr.mem_size + DF_S390_HDR_SIZE, ZG_CHECK_NONE);
-	if (rc != l.hdr.mem_size + DF_S390_HDR_SIZE)
-		return -EINVAL;
 	rc = zg_read(g.fh, &l.em, sizeof(l.em), ZG_CHECK_ERR);
 	if (rc != sizeof(l.em))
 		return -EINVAL;
@@ -75,23 +89,94 @@ static int read_s390_em(void)
 }
 
 /*
- * Initialize s390 DFI
+ * Register memory chunks and verify the end marker
  */
-static int dfi_s390_init(void)
+static int mem_chunks_add(void)
 {
+	u64 rc;
+
+	/* Single memory chunk for non-extended dump format */
+	dfi_mem_chunk_add(0, l.hdr.mem_size, NULL,
+			  dfi_s390_mem_chunk_read,
+			  NULL);
+	rc = zg_seek(g.fh, DF_S390_HDR_SIZE + l.hdr.mem_size,
+		     ZG_CHECK_NONE);
+	if (rc != DF_S390_HDR_SIZE + l.hdr.mem_size)
+		return -EINVAL;
+	/* Read and verify the end marker */
+	return read_s390_em();
+}
+
+/*
+ * Register memory chunks (extended dump format) and verify the end marker
+ */
+static int mem_chunks_add_ext(void)
+{
+	struct df_s390_dump_segm_hdr dump_segm;
+	u64 rc, *off_ptr, old = 0;
+
+	off_ptr = zg_alloc(sizeof(*off_ptr));
+	*off_ptr = zg_seek(g.fh, DF_S390_HDR_SIZE, ZG_CHECK_NONE);
+	if (*off_ptr != DF_S390_HDR_SIZE)
+		return -EINVAL;
+	while (*off_ptr < DF_S390_HDR_SIZE + l.hdr.mem_size - PAGE_SIZE) {
+		rc = zg_read(g.fh, &dump_segm, PAGE_SIZE, ZG_CHECK_ERR);
+		if (rc != PAGE_SIZE)
+			return -EINVAL;
+		*off_ptr += PAGE_SIZE;
+		/* Add zero memory chunk */
+		dfi_mem_chunk_add(old, dump_segm.start - old, NULL,
+				  dfi_mem_chunk_read_zero, NULL);
+		/* Add memory chunk for a dump segment */
+		dfi_mem_chunk_add(dump_segm.start, dump_segm.len, off_ptr,
+				  dfi_s390_ext_mem_chunk_read, zg_free);
+		old = dump_segm.start + dump_segm.len;
+		off_ptr = zg_alloc(sizeof(*off_ptr));
+		*off_ptr = zg_seek_cur(g.fh, dump_segm.len, ZG_CHECK_NONE);
+		if (dump_segm.stop_marker)
+			break;
+	}
+	/* Add zero memory chunk at the end */
+	dfi_mem_chunk_add(old, l.hdr.mem_size - old, NULL,
+			  dfi_mem_chunk_read_zero, NULL);
+	/* Check if the last dump segment found */
+	if (!dump_segm.stop_marker)
+		return -EINVAL;
+	/* Read and verify the end marker */
+	return read_s390_em();
+}
+
+/*
+ * Initialize s390 single-volume DFI general function
+ */
+int dfi_s390_init_gen(bool extended)
+{
+	int rc;
+
+	l.extended = extended;
 	if (read_s390_hdr() != 0)
 		return -ENODEV;
-	dfi_mem_chunk_add(0, l.hdr.mem_size, NULL, dfi_s390_mem_chunk_read,
-			  NULL);
-	if (read_s390_em() != 0)
-		return -EINVAL;
+	if (!extended)
+		rc = mem_chunks_add();
+	else
+		rc = mem_chunks_add_ext();
+	if (rc)
+		return rc;
 	df_s390_cpu_info_add(&l.hdr, l.hdr.mem_size);
 	zg_seek(g.fh, sizeof(l.hdr), ZG_CHECK);
 	return 0;
 }
 
 /*
- * S390 DFI operations
+ * Initialize s390 single-volume DFI (non-extended)
+ */
+static int dfi_s390_init(void)
+{
+	return dfi_s390_init_gen(DUMP_NON_EXTENDED);
+}
+
+/*
+ * s390 single-volume DFI (non-extended) operations
  */
 struct dfi dfi_s390 = {
 	.name		= "s390",

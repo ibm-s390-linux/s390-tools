@@ -44,6 +44,14 @@ struct vol {
 };
 
 /*
+ * Mem chunk helper structure for extended dump format
+ */
+struct vol_mem_chunk {
+	struct vol	*vol;
+	u64		off; /* Offset to the memory chunk from the start of the volume */
+};
+
+/*
  * File local static data
  */
 static struct {
@@ -55,6 +63,7 @@ static struct {
 	struct df_s390_dumper	dumper;
 	int			dump_incomplete;
 	bool extended;
+	u64 magic_number;	/* Reference value to compare with */
 	char dumper_magic[7];	/* Reference value to compare with */
 } l;
 
@@ -85,6 +94,7 @@ static void em_init(struct vol *vol)
 	if (df_s390_em_verify(&l.em, &l.hdr) != 0)
 		l.dump_incomplete = 1;
 }
+
 
 /*
  * Check sysfs, whether a device specified by its bus ID is defined and online.
@@ -177,14 +187,27 @@ static void vol_read(struct vol *vol)
 }
 
 /*
- * Read memory
+ * Read memory chunk
  */
-static void df_s390mv_mem_read(struct dfi_mem_chunk *mem_chunk, u64 off,
+static void dfi_s390mv_mem_read(struct dfi_mem_chunk *mem_chunk, u64 off,
 			       void *buf, u64 cnt)
 {
 	struct vol *vol = mem_chunk->data;
 
 	zg_seek(vol->fh, vol->part_off + off + DF_S390_HDR_SIZE, ZG_CHECK);
+	zg_read(vol->fh, buf, cnt, ZG_CHECK);
+}
+
+/*
+ * Read memory chunk (extended)
+ */
+static void dfi_s390mv_ext_mem_read(struct dfi_mem_chunk *mem_chunk, u64 off,
+				    void *buf, u64 cnt)
+{
+	struct vol_mem_chunk *vol_mem_chunk = mem_chunk->data;
+	struct vol *vol = vol_mem_chunk->vol;
+
+	zg_seek(vol->fh, vol_mem_chunk->off + off, ZG_CHECK);
 	zg_read(vol->fh, buf, cnt, ZG_CHECK);
 }
 
@@ -214,7 +237,7 @@ static void vol_init(struct vol *vol, struct vol_parm *vol_parm, int ssid,
 	if ((vol->hdr.volnr == vol->nr) && (vol->hdr.mem_size != 0))
 		vol->sign = SIGN_ACTIVE;
 
-	if (vol->hdr.mvdump_sign != DF_S390_MAGIC) {
+	if (vol->hdr.mvdump_sign != l.magic_number) {
 		vol->sign = SIGN_INVALID;
 		l.dump_incomplete = 1;
 	}
@@ -277,16 +300,83 @@ static void vol_print_all(void)
  */
 static void mem_chunks_add(void)
 {
+	struct vol *vol;
+	unsigned int i;
+
+	for (i = 0; i < l.table.vol_cnt; i++) {
+		vol = &l.vol_vec[i];
+		if (vol->sign != SIGN_ACTIVE)
+			continue;
+		dfi_mem_chunk_add_vol(vol->mem_start,
+				      vol->mem_end - vol->mem_start + 1,
+				      vol, dfi_s390mv_mem_read, NULL, vol->nr);
+	}
+}
+
+/*
+ * Add memory chunks (extended dump format) and verify the end marker
+ */
+static int mem_chunks_add_ext(void)
+{
+	u64 off, rc, part_end, old = 0;
+	struct df_s390_dump_segm_hdr dump_segm;
+	struct vol_mem_chunk *vol_mem_chunk;
 	unsigned int i;
 
 	for (i = 0; i < l.table.vol_cnt; i++) {
 		struct vol *vol = &l.vol_vec[i];
 		if (vol->sign != SIGN_ACTIVE)
 			continue;
-		dfi_mem_chunk_add(vol->mem_start,
-				  vol->mem_end - vol->mem_start + 1,
-				  vol, df_s390mv_mem_read, NULL);
+		off = vol->part_off + DF_S390_HDR_SIZE;
+		part_end = vol->part_off + vol->part_size;
+		rc = zg_seek(vol->fh, off, ZG_CHECK_NONE);
+		if (rc != off)
+			return -EINVAL;
+		/*
+		 * Reading dump segments from the start of partition (skipping
+		 * the dump header) till the end of partition (considering that
+		 * minimum dump segment size is one megabyte + one page and one
+		 * more page is reserved for the end marker)
+		 */
+		while (off < part_end - MIB - PAGE_SIZE) {
+			rc = zg_read(vol->fh, &dump_segm, sizeof(dump_segm),
+				     ZG_CHECK_ERR);
+			if (rc != PAGE_SIZE)
+				return -EINVAL;
+			off += PAGE_SIZE;
+			vol_mem_chunk = zg_alloc(sizeof(*vol_mem_chunk));
+			vol_mem_chunk->vol = vol;
+			vol_mem_chunk->off = off;
+			/* Add zero memory chunk */
+			dfi_mem_chunk_add_vol(old, dump_segm.start - old, NULL,
+					      dfi_mem_chunk_read_zero, NULL,
+					      vol->nr);
+			/* Add memory chunk for a dump segment */
+			dfi_mem_chunk_add_vol(dump_segm.start, dump_segm.len,
+					      vol_mem_chunk,
+					      dfi_s390mv_ext_mem_read, NULL,
+					      vol->nr);
+			old = dump_segm.start + dump_segm.len;
+			off = zg_seek_cur(vol->fh, dump_segm.len,
+					  ZG_CHECK_NONE);
+			if (dump_segm.stop_marker)
+				break;
+		}
+		if (dump_segm.stop_marker) {
+			/* Add zero memory chunk at the end*/
+			dfi_mem_chunk_add_vol(old, l.hdr.mem_size - old, NULL,
+					      dfi_mem_chunk_read_zero, NULL,
+					      vol->nr);
+			/* Read and verify the end marker */
+			rc = zg_read(vol->fh, &l.em, sizeof(l.em), ZG_CHECK);
+			if (rc != sizeof(l.em) ||
+			    df_s390_em_verify(&l.em, &l.hdr) != 0)
+				return -EINVAL;
+			return 0;
+		}
 	}
+	/* No dump segment with the stop marker found */
+	return -EINVAL;
 }
 
 /*
@@ -364,9 +454,9 @@ static int mvdump_hdr_check(const char *file)
 	fh = zg_open(file, O_RDONLY, ZG_CHECK);
 	if (zg_read(fh, &hdr, sizeof(hdr), ZG_CHECK_ERR) != sizeof(hdr))
 		goto fail;
-	if (hdr.magic != DF_S390_MAGIC)
+	if (hdr.magic != l.magic_number)
 		goto fail;
-	if (hdr.mvdump_sign != DF_S390_MAGIC)
+	if (hdr.mvdump_sign != l.magic_number)
 		goto fail;
 	rc = 0;
 fail:
@@ -385,14 +475,6 @@ static void check_sysfs(void)
 	if (!fh_dir)
 		ERR_EXIT_ERRNO("Could not open %s\n", SYSFS_BUSDIR);
 	closedir(fh_dir);
-}
-
-/*
- * Print dump information (dfi operation)
- */
-static void dfi_s390mvfo_dump(void)
-{
-	vol_print_all();
 }
 
 /*
@@ -461,10 +543,26 @@ static int open_dump(void)
 }
 
 /*
- * Initialize s390 multi-volume input dump format
+ * Specify reference values for dumper magic and dump magic numbers
  */
-static int dfi_s390mv_init(void)
+static void set_magic_numbers(void)
 {
+	if (l.extended) {
+		l.magic_number = DF_S390_MAGIC_EXT;
+		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7);
+	} else {
+		l.magic_number = DF_S390_MAGIC;
+		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV, 7);
+	}
+}
+
+/*
+ * Initialize s390 multi-volume input dump format generic function
+ */
+int dfi_s390mv_init_gen(bool extended)
+{
+	l.extended = extended;
+	set_magic_numbers();
 	if (open_dump() != 0)
 		return -ENODEV;
 	volumes_init();
@@ -473,7 +571,10 @@ static int dfi_s390mv_init(void)
 	if (l.hdr.mem_size == 0)
 		return -ENODEV;
 	df_s390_hdr_add(&l.hdr);
-	mem_chunks_add();
+	if (!extended)
+		mem_chunks_add();
+	else if (mem_chunks_add_ext() != 0)
+		return -EINVAL;
 	if (l.dump_incomplete)
 		return -EINVAL;
 	df_s390_cpu_info_add(&l.hdr, l.hdr.mem_end);
@@ -482,16 +583,28 @@ static int dfi_s390mv_init(void)
 }
 
 /*
+ * Initializt s390 multi-volume input dump
+ */
+static int dfi_s390mv_init(void)
+{
+	return dfi_s390mv_init_gen(DUMP_NON_EXTENDED);
+}
+
+/*
+ * Print dump information (dfi operation)
+ */
+void dfi_s390mv_info(void)
+{
+	vol_print_all();
+}
+
+/*
  * Initialize s390 multi-volume dump tool generic function
  */
 int dt_s390mv_init_gen(bool extended)
 {
 	l.extended = extended;
-	/* Specify dumper magic value for further validation */
-	if (extended)
-		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7);
-	else
-		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV, 7);
+	set_magic_numbers();
 	if (open_dump() != 0)
 		return -ENODEV;
 	volumes_init();
@@ -516,6 +629,6 @@ void dt_s390mv_info(void)
 struct dfi dfi_s390mv = {
 	.name		= "s390mv",
 	.init		= dfi_s390mv_init,
-	.info_dump	= dfi_s390mvfo_dump,
+	.info_dump	= dfi_s390mv_info,
 	.feat_bits	= DFI_FEAT_COPY | DFI_FEAT_SEEK,
 };

@@ -3,7 +3,7 @@
  *
  * Generic input dump format functions (DFI - Dump Format Input)
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -162,8 +162,15 @@ struct dfi_mem_chunk {
 	dfi_mem_chunk_read_fn	read_fn;	/* Chunk read callback */
 	dfi_mem_chunk_free_fn	free_fn;	/* Free data callback */
 	void			*data;		/* Data for callback */
+	u32			volnr;		/* Volume id where chunk resides */
 };
 
+extern void dfi_mem_chunk_read_zero(struct dfi_mem_chunk *UNUSED(mem_chunk),
+				    u64 UNUSED(off), void *buf, u64 cnt);
+extern void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
+				  dfi_mem_chunk_read_fn read_fn,
+				  dfi_mem_chunk_free_fn free_fn,
+				  u32 volnr);
 extern void dfi_mem_chunk_add(u64 start, u64 size, void *data,
 			      dfi_mem_chunk_read_fn read_fn,
 			      dfi_mem_chunk_free_fn free_fn);
@@ -174,6 +181,7 @@ extern u64 dfi_mem_range(void);
 extern int dfi_mem_range_valid(u64 addr, u64 len);
 extern unsigned int dfi_mem_chunk_cnt(void);
 extern struct dfi_mem_chunk *dfi_mem_chunk_first(void);
+extern struct dfi_mem_chunk *dfi_mem_chunk_last(void);
 extern struct dfi_mem_chunk *dfi_mem_chunk_next(struct dfi_mem_chunk *chunk);
 extern struct dfi_mem_chunk *dfi_mem_chunk_prev(struct dfi_mem_chunk *chunk);
 extern struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr);

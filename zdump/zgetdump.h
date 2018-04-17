@@ -75,7 +75,9 @@ void zfuse_umount(void);
  */
 extern struct dfi dfi_s390tape;
 extern struct dfi dfi_s390mv;
+extern struct dfi dfi_s390mv_ext;
 extern struct dfi dfi_s390;
+extern struct dfi dfi_s390_ext;
 extern struct dfi dfi_lkcd;
 extern struct dfi dfi_elf;
 extern struct dfi dfi_kdump;

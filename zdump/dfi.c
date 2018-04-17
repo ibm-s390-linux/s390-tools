@@ -3,7 +3,7 @@
  *
  * Generic input dump format functions (DFI - Dump Format Input)
  *
- * Copyright IBM Corp. 2001, 2017
+ * Copyright IBM Corp. 2001, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -21,7 +21,9 @@
 static struct dfi *dfi_vec[] = {
 	&dfi_s390tape,
 	&dfi_devmem,
+	&dfi_s390mv_ext,
 	&dfi_s390mv,
+	&dfi_s390_ext,
 	&dfi_s390,
 	&dfi_lkcd,
 	&dfi_elf,
@@ -149,12 +151,31 @@ static void mem_update(struct mem *mem)
 static void mem_map_print(void)
 {
 	struct dfi_mem_chunk *mem_chunk;
+	u64 print_start = 0, print_end = 0;
+	u32 volnr = 0;
 
 	STDERR("\nMemory map:\n");
+	/*
+	 * Merge adjacent memory chunks from the same volume
+	 */
 	dfi_mem_chunk_iterate(mem_chunk) {
-		STDERR("  %016llx - %016llx (%llu MB)\n", mem_chunk->start,
-		       mem_chunk->end, TO_MIB(mem_chunk->size));
+		if (print_end == 0) {
+			print_start = mem_chunk->start;
+			print_end = mem_chunk->end;
+			volnr = mem_chunk->volnr;
+			continue;
+		}
+		if (mem_chunk->start != print_end + 1 ||
+		    mem_chunk->volnr != volnr) {
+			STDERR("  %016llx - %016llx (%llu MB)\n", print_start,
+			       print_end, TO_MIB(print_end - print_start + 1));
+			print_start = mem_chunk->start;
+			volnr = mem_chunk->volnr;
+		}
+		print_end = mem_chunk->end;
 	}
+	STDERR("  %016llx - %016llx (%llu MB)\n", print_start,
+	       print_end, TO_MIB(print_end - print_start + 1));
 }
 
 /*
@@ -351,7 +372,25 @@ void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
 			    dfi_mem_chunk_read_fn read_fn,
 			    dfi_mem_chunk_free_fn free_fn)
 {
+	if (size == 0)
+		return;
 	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, free_fn);
+}
+
+/*
+ * Add memory chunk with volume index
+ */
+void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
+			   dfi_mem_chunk_read_fn read_fn,
+			   dfi_mem_chunk_free_fn free_fn,
+			   u32 volnr)
+{
+	if (size == 0)
+		return;
+	mem_chunk_create(&l.mem_phys, start, size, data, read_fn, free_fn);
+	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, free_fn);
+	l.mem_virt.chunk_cache->volnr = volnr;
+
 }
 
 /*
@@ -361,8 +400,16 @@ void dfi_mem_chunk_add(u64 start, u64 size, void *data,
 		       dfi_mem_chunk_read_fn read_fn,
 		       dfi_mem_chunk_free_fn free_fn)
 {
-	mem_chunk_create(&l.mem_phys, start, size, data, read_fn, free_fn);
-	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, free_fn);
+	dfi_mem_chunk_add_vol(start, size, data, read_fn, free_fn, 0);
+}
+
+/*
+ * Read zero pages
+ */
+void dfi_mem_chunk_read_zero(struct dfi_mem_chunk *UNUSED(mem_chunk),
+			     u64 UNUSED(off), void *buf, u64 cnt)
+{
+	memset(buf, 0, cnt);
 }
 
 /*
@@ -399,6 +446,16 @@ struct dfi_mem_chunk *dfi_mem_chunk_first(void)
 	if (util_list_is_empty(&l.mem_virt.chunk_list))
 		return NULL;
 	return util_list_start(&l.mem_virt.chunk_list);
+}
+
+/*
+ * Return last memory chunk
+ */
+struct dfi_mem_chunk *dfi_mem_chunk_last(void)
+{
+	if (util_list_is_empty(&l.mem_virt.chunk_list))
+		return NULL;
+	return util_list_end(&l.mem_virt.chunk_list);
 }
 
 /*
@@ -678,7 +735,7 @@ struct new_utsname *dfi_attr_utsname(void)
 }
 
 /*
- * Attribute: dump method
+ * Attribute: Dump method
  */
 void dfi_attr_dump_method_set(char *dump_method)
 {
