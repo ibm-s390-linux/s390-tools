@@ -1,0 +1,45 @@
+.TH ZIPL-SWITCH-TO-BLSCFG  1 "April 2018" "s390-tools"
+
+.SH NAME
+zipl-switch-to-blscfg \- Switch zipl to use BootLoaderSpec configuration
+
+.SH SYNOPSIS
+.br
+\fBzipl-switch-to-blscfg\fP [OPTIONS]
+.br
+\fBzipl-switch-to-blscfg\fP {\-h|\-v}
+
+.SH DESCRIPTION
+This script switches the zipl boot-loader configuration to use BootLoaderSpec files
+to define IPL sections. For each Linux kernel defined in the zipl.conf config file,
+a BLS fragment is generated in the BLS directory specified. Also, the zipl.conf is
+modified it only contains global configurations, all IPL sections comes from BLS.
+
+.SH OPTIONS
+.TP
+\fB\-h\fP, \fB\-\-help\fP
+Print this help and exit
+
+.TP
+\fB\-v\fP, \fB\-\-version\fP
+Print version information and exit
+
+.TP
+\fB\-\-backup-suffix <SUFFIX>\fP
+The suffix used for backup files, defaults to .bak.
+
+.TP
+\fB\-\-bls-directory <DIRECTORY>\fP
+The DIRECTORY where the BLS fragments will be generated. The directory is created if it doesn't exists, by default /boot/loader/entries is used.
+
+.TP
+\fB\-\-config-file <FILE>\fP
+The FILE used for zipl configuration file, defaults to /etc/zipl.conf.
+
+.TP
+\fB\-\-ignore-default\fP
+Ignore the default option from the zipl configuration file
+
+.TP
+\fB\-\-use-version-name\fP
+Use the section kernel version as the BLS file name
