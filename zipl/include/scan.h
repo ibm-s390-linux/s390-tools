@@ -119,6 +119,7 @@ extern enum scan_key_state scan_key_table[SCAN_SECTION_NUM][SCAN_KEYWORD_NUM];
 
 
 int scan_file(const char* filename, struct scan_token** array);
+int scan_bls(const char* blsdir, struct scan_token** token, int scan_size);
 void scan_free(struct scan_token* array);
 char* scan_keyword_name(enum scan_keyword_id id);
 int scan_check_defaultboot(struct scan_token* scan);

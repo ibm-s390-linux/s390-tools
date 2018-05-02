@@ -117,6 +117,27 @@ timeout     = 0
 .br
 .PP
 
+.B BootLoaderSpec configuration files
+
+Another way to specify IPL sections is to use BLS config files. These are
+configuration files located by default at /boot/loader/entries, but another
+location can be specified using the '\-\-blsdir' option of zipl.
+
+.IP
+# An example for a BLS configuration file
+.br
+
+version 4.15.9
+.br
+linux /vmlinuz-4.15.9
+.br
+initrd /initramfs-4.15.9
+.br
+options root=/dev/dasda1 console=ttyS0
+.PP
+
+The location of the linux and initrd has to be specified relative to the boot partition. The BLS config files are only used to specify the IPL sections, a zipl.conf configuration files is still needed for global parameters.
+
 .B Boot menu
 
 The
