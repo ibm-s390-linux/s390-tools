@@ -538,9 +538,9 @@ scan_free(struct scan_token* array)
 
 #define INITIAL_ARRAY_LENGTH 40
 
-/* Scan file FILENAME for tokens. Upon success, return zero and set TOKEN
- * to point to a NULL-terminated array of scan_tokens, i.e. the token id
- * of the last token is 0. Return non-zero otherwise. */
+/* Scan file FILENAME for tokens. Upon success, return the number allocated
+ * tokens and set TOKEN to point to a NULL-terminated array of scan_tokens,
+ * i.e. the token id of the last token is 0. Return non-zero otherwise. */
 int
 scan_file(const char* filename, struct scan_token** token)
 {
@@ -623,11 +623,13 @@ scan_file(const char* filename, struct scan_token** token)
 		}
 	}
 	misc_free_file_buffer(&file);
-	if (rc)
+	if (rc) {
 		scan_free(array);
-	else
-		*token = array;
-	return rc;
+		return rc;
+	}
+
+	*token = array;
+	return size;
 }
 
 

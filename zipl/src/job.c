@@ -1732,7 +1732,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	struct scan_token* new_scan;
 	char* filename;
 	char* source;
-	int rc;
+	int rc, scan_size;
 
 	/* Read configuration file */
 	if (cmdline->config != NULL) {
@@ -1750,10 +1750,10 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 		source = "";
 	}
 	printf("Using config file '%s'%s\n", filename, source);
-	rc = scan_file(filename, &scan);
-	if (rc) {
+	scan_size = scan_file(filename, &scan);
+	if (scan_size <= 0) {
 		error_text("Config file '%s'", filename);
-		return rc;
+		return scan_size;
 	}
 	if ((cmdline->menu == NULL) && (cmdline->section == NULL)) {
 		rc = scan_check_defaultboot(scan);
