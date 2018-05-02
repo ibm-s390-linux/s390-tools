@@ -1,0 +1,213 @@
+#!/bin/bash
+#
+# zipl-switch-to-blscfg - Switch zipl to use BootLoaderSpec configuration
+#
+# Copyright 2018 Red Hat, Inc.
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+readonly SCRIPTNAME="${0##*/}"
+
+declare -A zipl_to_bls
+zipl_to_bls["image"]="linux"
+zipl_to_bls["ramdisk"]="initrd"
+zipl_to_bls["parameters"]="options"
+
+print_error() {
+    echo "$1" >&2
+    exit 1
+}
+
+function on_exit() {
+    if ! rm -rf $TMP; then
+        echo "Delete temporary files failed!" >&2
+        exit 1
+    fi
+}
+
+if ! TMP="$(mktemp -d)"; then
+    print_error "Creating a temporary dir for config files failed!"
+fi
+
+trap 'on_exit' EXIT
+
+print_version() {
+    cat <<EOF
+${SCRIPTNAME}: version %S390_TOOLS_VERSION%
+Copyright Red Hat, Inc. 2018
+EOF
+}
+
+print_usage()
+{
+    print_version
+
+    cat <<EOF
+
+Usage: ${SCRIPTNAME} [OPTIONS]
+
+Switches the zipl boot-loader configuration to use BootLoaderSpec files.
+
+Options:
+
+	-h, --help		print this help and exit
+	-v, --version      	print version information and exit
+	--backup-suffix=SUFFIX  suffix used for backup files, defaults to .bak
+	--bls-directory=DIR     path to generate BLS files, defaults to /boot/loader/entries
+	--config-file=FILE      path to zipl configuration file, defaults to /etc/zipl.conf
+	--ignore-default	ignore the default option from the zipl configuration file
+	--use-version-name	use the section kernel version as the BLS file name
+
+EOF
+}
+
+OPTS="$(getopt -o hv --long help,version,backup-suffix:,bls-directory:,config-file:,\
+ignore-default,use-version-name -n \'$SCRIPTNAME\' -- "$@")"
+eval set -- "$OPTS"
+
+BACKUP_SUFFIX=.bak
+BLS_DIR="/boot/loader/entries"
+CMDLINE_LINUX_DEBUG=" systemd.log_level=debug systemd.log_target=kmsg"
+LINUX_DEBUG_VERSION_POSTFIX="_with_debugging"
+LINUX_DEBUG_TITLE_POSTFIX=" with debugging"
+CONFIG="/etc/zipl.conf"
+
+while [ ${#} -gt 0 ]; do
+    case "$1" in
+	--help|-h)
+	    print_usage
+	    exit 0
+	    ;;
+	--version|-v)
+	    print_version
+	    exit 0
+	    ;;
+	--backup-suffix)
+	    BACKUP_SUFFIX=${2}
+	    shift
+	    ;;
+	--bls-directory)
+	    BLS_DIR=${2}
+	    shift
+	    ;;
+	--config-file)
+	    CONFIG=${2}
+	    shift
+	    ;;
+	--ignore-default)
+	    ignore_default=true
+	    ;;
+	--use-version-name)
+	    version_name=true
+	    ;;
+	--)
+	    shift
+	    break
+	    ;;
+	*)
+	    echo >&2
+	    echo "${SCRIPTNAME}: invalid option \"${1}\"" >&2
+	    echo "Try '${SCRIPTNAME} --help' for more information" >&2
+	    echo >&2
+	    exit 1
+	    ;;
+    esac
+    shift
+done
+
+TMP_CONFIG="${TMP}/${CONFIG##*/}"
+
+[[ -d "$BLS_DIR" ]] || mkdir -m 0700 -p "$BLS_DIR"
+
+if [ -f /etc/machine-id ]; then
+    read MACHINE_ID < /etc/machine-id
+    MACHINE_ID=${MACHINE_ID}-
+fi
+
+count=0
+OUTPUT=""
+TARGET=""
+while IFS='= ' read key val; do
+    # for BLS the default kernel is always the latest one
+    if [[ $key == \#* ]] || [[ $key == "default" && $ignore_default == true ]]; then
+        continue
+    fi
+
+    # remove spaces
+    key="$(echo $key | sed -e 's/^[ \t"]*//;s/[ \t"]*$//')"
+
+    if [[ $key = \[*] ]]; then
+        if [[ $key == "[defaultboot]" ]]; then
+            OUTPUT=${TMP_CONFIG}
+            echo $key >> ${OUTPUT}
+        else
+            key="${key%\]}"
+            key="${key#\[}"
+            section=$key
+            OUTPUT=${BLS_DIR}/${MACHINE_ID}${section}.conf
+            if [ -f "${OUTPUT}" ]; then
+                print_error "BLS file ${OUTPUT} already exists"
+            fi
+        fi
+    elif [[ $val ]]; then
+        val="$(echo $val | sed -e 's/^[ \t"]*//;s/[ \t"]*$//')"
+        if [[ $key == "target" ]]; then
+            if [ -z ${TARGET} ]; then
+                echo $key=$val >> ${TMP_CONFIG}
+                TARGET=$val
+            else if [ "${TARGET}" != "${val}" ]; then
+                     print_error "BLS is only supported if all sections have the same target"
+                 fi
+            fi
+        else
+            if [ -n "${zipl_to_bls[$key]}" ]; then
+		if [[ $key = "image" && $version_name == true ]]; then
+                    if [[ $val = *"vmlinuz-"* ]]; then
+                        version="${val##*/vmlinuz-}"
+                    else
+                        version="${val##*/}"
+                    fi
+                    echo "version $version" >> ${OUTPUT}
+                    if [[ $version = *"rescue"* ]]; then
+                        FILENAME=${BLS_DIR}/${MACHINE_ID}0-rescue.conf
+                    else
+                        FILENAME=${BLS_DIR}/${MACHINE_ID}${version}.conf
+                    fi
+
+                    if [[ ${OUTPUT} != ${FILENAME} ]]; then
+			if [ -f "${FILENAME}" ]; then
+			    print_error "BLS file ${FILENAME} already exists"
+			fi
+                        mv ${OUTPUT} ${FILENAME}
+                        if [ ! $? -eq 0 ]; then
+                            print_error "Creating BLS file ${FILENAME} failed"
+                        fi
+                        OUTPUT=${FILENAME}
+                    fi
+		elif [[ $key = "image" ]]; then
+                    echo "version $section" >> ${OUTPUT}
+		fi
+
+                echo "${zipl_to_bls[$key]} ${val}" >> ${OUTPUT}
+            else
+                echo $key=$val >> ${TMP_CONFIG}
+            fi
+        fi
+    fi
+done < "${CONFIG}"
+
+if [ -f "${CONFIG}${BACKUP_SUFFIX}" ]; then
+    print_error "Backup file ${CONFIG}${BACKUP_SUFFIX} already exists"
+fi
+
+cp -af "${CONFIG}" "${CONFIG}${BACKUP_SUFFIX}"
+mv "${TMP_CONFIG}" "${CONFIG}"
+
+zipl > /dev/null
+if [ ! $? -eq 0 ]; then
+    mv "${CONFIG}${BACKUP_SUFFIX}" "${CONFIG}"
+fi
+
+exit 0
