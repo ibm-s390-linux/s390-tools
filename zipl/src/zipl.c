@@ -54,6 +54,7 @@ static const char* usage_text[] = {
 "-h, --help                      Print this help, then exit",
 "-v, --version                   Print version information, then exit",
 "-c, --config CONFIGFILE         Read configuration from CONFIGFILE",
+"-b, --blsdir BLSDIR             Parse BootLoaderSpec files from BLSDIR",
 "-t, --target TARGETDIR          Write bootmap file to TARGETDIR and install",
 "                                bootloader on device containing TARGETDIR",
 "    --targetbase BASEDEVICE     Install bootloader on BASEDEVICE",

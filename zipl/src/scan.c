@@ -16,12 +16,20 @@
 #define __USE_ISOC99
 #endif
 
+/* Need GNU function strverscmp() in dirent.h */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sys/stat.h>
 
 #include "lib/util_base.h"
 
@@ -630,6 +638,177 @@ scan_file(const char* filename, struct scan_token** token)
 
 	*token = array;
 	return size;
+}
+
+
+static int
+bls_filter(const struct dirent *ent)
+{
+	int offset = strlen(ent->d_name) - strlen(".conf");
+
+	if (offset < 0)
+		return 0;
+
+	return strncmp(ent->d_name + offset, ".conf", strlen(".conf")) == 0;
+}
+
+
+static int
+bls_sort(const struct dirent **ent_a, const struct dirent **ent_b)
+{
+	return strverscmp((*ent_a)->d_name, (*ent_b)->d_name);
+}
+
+
+static int
+scan_append_section_heading(struct scan_token* scan, int* index, char* name);
+static int
+scan_append_keyword_assignment(struct scan_token* scan, int* index,
+			       enum scan_keyword_id id, char* value);
+
+
+static int
+scan_bls_field(struct misc_file_buffer *file, struct scan_token* scan,
+	       int* index)
+{
+	int current;
+	int key_start, key_end;
+	int val_start, val_end;
+	char *val;
+
+	for (key_start = file->pos; ; file->pos++) {
+		current = misc_get_char(file, 0);
+
+		if (isblank(current)) {
+			key_end = file->pos;
+			skip_blanks(file);
+			val_start = file->pos;
+			break;
+		}
+
+		if (!isalnum(current) && current != '_' && current != '-')
+			return -1;
+	}
+
+	for (; ; file->pos++) {
+		current = misc_get_char(file, 0);
+
+		if (current == '\n' || current == EOF)
+			break;
+	}
+
+	val_end = file->pos;
+	file->buffer[key_end] = '\0';
+	file->buffer[val_end] = '\0';
+
+	if (strncmp("version", &file->buffer[key_start], key_end - key_start) == 0) {
+		scan_append_section_heading(scan, index, &file->buffer[val_start]);
+	}
+
+	if (strncmp("linux", &file->buffer[key_start], key_end - key_start) == 0) {
+		misc_asprintf(&val, "%s", &file->buffer[val_start]);
+		scan_append_keyword_assignment(scan, index, scan_keyword_image, val);
+		free(val);
+	}
+
+	if (strncmp("options", &file->buffer[key_start], key_end - key_start) == 0) {
+		scan_append_keyword_assignment(scan, index, scan_keyword_parameters,
+					       &file->buffer[val_start]);
+	}
+
+	if (strncmp("initrd", &file->buffer[key_start], key_end - key_start) == 0) {
+		misc_asprintf(&val, "%s", &file->buffer[val_start]);
+		scan_append_keyword_assignment(scan, index, scan_keyword_ramdisk, val);
+		free(val);
+	}
+
+	return 0;
+}
+
+
+int
+scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
+{
+	int count = 0;
+	int size, remaining = 0, n, current, rc = -1;
+	struct scan_token* buffer;
+	struct scan_token* array = *token;
+	struct dirent** bls_entries;
+	struct misc_file_buffer file;
+	struct stat sb;
+	char filename[PATH_MAX];
+
+	if (!(stat(blsdir, &sb) == 0 && S_ISDIR(sb.st_mode)))
+		return 0;
+
+	n = scandir(blsdir, &bls_entries, bls_filter, bls_sort);
+	if (n <= 0)
+		return n;
+
+	while (array[count].id != 0)
+		count++;
+
+	remaining = scan_size - count;
+
+	if (remaining < n) {
+		size = scan_size - remaining + n;
+		buffer = (struct scan_token *)misc_malloc(size * sizeof(struct scan_token));
+		if (!buffer)
+			goto err;
+		memset(buffer, 0, size * sizeof(struct scan_token));
+		memcpy(buffer, array, count * sizeof(struct scan_token));
+	} else {
+		buffer = array;
+	}
+
+	while (n--) {
+		sprintf(filename, "%s/%s", blsdir, bls_entries[n]->d_name);
+		printf("Using BLS config file '%s'\n", filename);
+
+		rc = misc_get_file_buffer(filename, &file);
+		if (rc)
+			goto err;
+
+		while ((size_t)file.pos < file.length) {
+			current = misc_get_char(&file, 0);
+			switch (current) {
+			case '#':
+				file.pos++;
+				skip_line(&file);
+				break;
+			case EOF:
+				break;
+			case '\t':
+			case '\0':
+			case ' ':
+				file.pos++;
+				break;
+			default:
+				rc = scan_bls_field(&file, buffer, &count);
+				if (rc) {
+					error_reason("Incorrect BLS field in "
+						"config file %s\n", filename);
+					goto err;
+				}
+				break;
+			}
+		}
+
+		misc_free_file_buffer(&file);
+		free(bls_entries[n]);
+	}
+
+	*token = buffer;
+	rc = 0;
+err:
+	if (n > 0) {
+		do {
+			free(bls_entries[n]);
+		} while (n-- > 0);
+	}
+
+	free(bls_entries);
+	return rc;
 }
 
 

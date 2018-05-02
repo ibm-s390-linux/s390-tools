@@ -27,6 +27,7 @@
 /* Command line options */
 static struct option options[] = {
 	{ "config",		required_argument,	NULL, 'c'},
+	{ "blsdir",		required_argument,	NULL, 'b'},
 	{ "target",		required_argument,	NULL, 't'},
 	{ "targetbase",         required_argument,      NULL, 0xaa},
 	{ "targettype",         required_argument,      NULL, 0xab},
@@ -55,11 +56,12 @@ static struct option options[] = {
 };
 
 /* Command line option abbreviations */
-static const char option_string[] = "-c:t:i:r:p:P:d:D:M:s:m:hHnVvaT:fk:";
+static const char option_string[] = "-c:b:t:i:r:p:P:d:D:M:s:m:hHnVvaT:fk:";
 
 struct command_line {
 	char* data[SCAN_KEYWORD_NUM];
 	char* config;
+	char *blsdir;
 	char* menu;
 	char* section;
 	int help;
@@ -196,6 +198,14 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 				rc = -1;
 			} else
 				cmdline.config = optarg;
+			break;
+		case 'b':
+			if (cmdline.blsdir != NULL) {
+				error_reason("Option 'blsdir' specified more "
+					     "than once");
+				rc = -1;
+			} else
+				cmdline.blsdir = optarg;
 			break;
 		case 'm':
 			if (cmdline.menu != NULL) {
@@ -1731,6 +1741,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	struct scan_token* scan;
 	struct scan_token* new_scan;
 	char* filename;
+	char *blsdir;
 	char* source;
 	int rc, scan_size;
 
@@ -1754,6 +1765,17 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	if (scan_size <= 0) {
 		error_text("Config file '%s'", filename);
 		return scan_size;
+	}
+	/* Check if a BLS directory was provided on command line */
+	if (cmdline->blsdir != NULL) {
+		blsdir = cmdline->blsdir;
+	} else {
+		blsdir = ZIPL_DEFAULT_BLSDIR;
+	}
+	rc = scan_bls(blsdir, &scan, scan_size);
+	if (rc) {
+		error_text("BLS parsing '%s'", blsdir);
+		return rc;
 	}
 	if ((cmdline->menu == NULL) && (cmdline->section == NULL)) {
 		rc = scan_check_defaultboot(scan);
