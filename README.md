@@ -265,6 +265,8 @@ build options:
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 | openssl        | `HAVE_OPENSSL`     | zkey                                  |
+| cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
+| json-c         | `HAVE_JSONC`       | zkey-cryptsetup                       |
 
 This table lists additional build or install options:
 
@@ -371,9 +373,12 @@ the different tools are provided:
 
 * zkey:
   For building the zkey tools you need openssl version 0.9.7 or newer installed
-  (openssl-devel.rpm). Tip: you may skip the zkey build by adding
-  `HAVE_OPENSSL=0` to the make invocation.
+  (openssl-devel.rpm). Also required are cryptsetup version 2.0.3 or newer
+  (cryptsetup-devel.rpm), and json-c version 0.12 or newer (json-c-devel.rpm).
+  Tip: you may skip the zkey build by adding `HAVE_OPENSSL=0`, and you may
+  may skip the zkey-cryptsetup build by adding `HAVE_CRYPTSETUP2=0`, or
+  `HAVE_JSONC=0` to the make invocation.
   A new group 'zkeyadm' needs to be created and all users intending to use the
-  tool must be added to this group. The owner of the default key repository 
+  tool must be added to this group. The owner of the default key repository
   '/etc/zkey/repository' must be set to group 'zkeyadm' with write permission
-  for this group. 
+  for this group.

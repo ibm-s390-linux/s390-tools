@@ -1,54 +1,96 @@
 include ../common.mak
 
-ifeq (${HAVE_OPENSSL},0)
-
-all:
-	$(SKIP) HAVE_OPENSSL=0
-
-install:
-	$(SKIP) HAVE_OPENSSL=0
-
+ifneq (${HAVE_OPENSSL},0)
+	BUILD_TARGETS += zkey
+	INSTALL_TARGETS += install-zkey
 else
+	BUILD_TARGETS += zkey-skip
+	INSTALL_TARGETS += zkey-skip
+endif
 
-check_dep:
+ifneq (${HAVE_CRYPTSETUP2},0)
+	ifneq (${HAVE_JSONC},0)
+		BUILD_TARGETS += zkey-cryptsetup
+		INSTALL_TARGETS += install-zkey-cryptsetup
+	else
+		BUILD_TARGETS += zkey-cryptsetup-skip-jsonc
+		INSTALL_TARGETS += zkey-cryptsetup-skip-jsonc
+	endif
+else
+	BUILD_TARGETS += zkey-cryptsetup-skip-cryptsetup2
+	INSTALL_TARGETS += zkey-cryptsetup-skip-cryptsetup2
+endif
+
+CPPFLAGS += -I../include
+LIBS = $(rootdir)/libutil/libutil.a
+
+detect-libcryptsetup.h:
+	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.h
+	echo "#ifndef CRYPT_LUKS2" >> detect-libcryptsetup.h
+	echo "  #error libcryptsetup version 2.0.3 is required" >> detect-libcryptsetup.h
+	echo "#endif" >> detect-libcryptsetup.h
+	echo "int i = CRYPT_SLOT_UNBOUND;" >> detect-libcryptsetup.h
+
+check-dep-zkey:
 	$(call check_dep, \
 		"zkey", \
 		"openssl/evp.h", \
 		"openssl-devel", \
 		"HAVE_OPENSSL=0")
 
-CPPFLAGS += -I../include
+check-dep-zkey-cryptsetup: detect-libcryptsetup.h
+	$(call check_dep, \
+		"zkey-cryptsetup", \
+		"detect-libcryptsetup.h", \
+		"cryptsetup-devel version 2.0.3", \
+		"HAVE_CRYPTSETUP2=0", \
+		"-I.")
+	$(call check_dep, \
+		"zkey-cryptsetup", \
+		"json-c/json.h", \
+		"json-c-devel", \
+		"HAVE_JSONC=0")
 
-all: check_dep zkey zkey-cryptsetup
+zkey-skip:
+	echo "  SKIP    zkey due to HAVE_OPENSSL=0"
 
-libs = $(rootdir)/libutil/libutil.a
+zkey-cryptsetup-skip-cryptsetup2:
+	echo "  SKIP    zkey-cryptsetup due to HAVE_CRYPTSETUP2=0"
+
+zkey-cryptsetup-skip-jsonc:
+	echo "  SKIP    zkey-cryptsetup due to HAVE_JSONC=0"
+
+all: $(BUILD_TARGETS)
 
 zkey.o: zkey.c pkey.h misc.h
 pkey.o: pkey.c pkey.h
-properties.o: properties.c properties.h
+properties.o: check-dep-zkey properties.c properties.h
 keystore.o: keystore.c keystore.h properties.h
-zkey-cryptsetup.o: zkey-cryptsetup.c pkey.h misc.h
+zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h misc.h
 
 zkey: LDLIBS = -ldl -lcrypto
-zkey: zkey.o pkey.o properties.o keystore.o $(libs)
+zkey: zkey.o pkey.o properties.o keystore.o $(LIBS)
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c
-zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(libs)
+zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(LIBS)
 
-
-install: all
+install-common:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey $(DESTDIR)$(USRBINDIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey-cryptsetup $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
+
+install-zkey:
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -m 644 -c zkey.1 $(DESTDIR)$(MANDIR)/man1
-	$(INSTALL) -m 644 -c zkey-cryptsetup.1 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey/repository
 
-endif
+install-zkey-cryptsetup:
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey-cryptsetup $(DESTDIR)$(USRBINDIR)
+	$(INSTALL) -m 644 -c zkey-cryptsetup.1 $(DESTDIR)$(MANDIR)/man1
+
+install: all install-common $(INSTALL_TARGETS)
 
 clean:
-	rm -f *.o zkey zkey-cryptsetup
+	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.h
 
 .PHONY: all install clean
