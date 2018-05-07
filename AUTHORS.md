@@ -96,6 +96,7 @@ List of all individuals having contributed content to s390-tools
 - Thomas Weber
 - Ursula Braun
 - Utz Bacher
+- Vasily Gorbik
 - Viktor Mihajlovski
 - Volker Sameske
 - Wolfgang Taphorn

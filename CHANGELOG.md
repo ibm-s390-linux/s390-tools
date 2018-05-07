@@ -1,15 +1,28 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
- * __v2.3.1 (XXX-XX-XX)__
+ * __v2.4.0 (2018-05-07)__
 
   For Linux kernel version: 4.16
 
   Changes of existing tools:
   - dbginfo: Gather nvme related data
+  - zipl: Rewrite helper script in C
+  - libutil: Add function util_strstrip
+  - libvmcp: Introduce libvmcp
+  - zipl: Extend DASD stand-alone dumpers to drop zero pages
+  - zgetdump: Add verbose option
+  - zgetdump: Add 'Dump file size' field for zgetdump -i output
+  - cpumf: Add IBM z14 ZR1 to the CPU Measurement Facility model list
+  - zkey: Add build dependency to OpenSSL (libcrypto)
+  - zkey: Add keystore implementation
+
 
   Bug Fixes:
   - hmcdrvfs: fix parsing of link count >= 1000
+  - zgetdump: Avoid Segfault on processing dumps with memory limit
+  - chreipl: correct fcp reipl sysfs write sequence
+  - udev: Replace WAIT_FOR with TEST keyword
 
 * __v2.3.0 (2018-01-30)__
 
