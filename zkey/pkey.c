@@ -11,11 +11,13 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/if_alg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -25,6 +27,12 @@
 
 #include "pkey.h"
 
+#ifndef AF_ALG
+#define AF_ALG 38
+#endif
+#ifndef SOL_ALG
+#define SOL_ALG 279
+#endif
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -33,6 +41,8 @@
 
 #define DOUBLE_KEYSIZE_FOR_XTS(keysize, xts) ((xts) ? 2 * (keysize) : (keysize))
 #define HALF_KEYSIZE_FOR_XTS(keysize, xts)   ((xts) ? (keysize) / 2 : (keysize))
+
+#define MAX_CIPHER_LEN		32
 
 /*
  * Definitions for the CCA library
@@ -367,6 +377,8 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 	if (rc < 0) {
 		rc = -errno;
 		warnx("Failed to generate a secure key: %s", strerror(errno));
+		warnx("Make sure that all available CCA crypto adapters are "
+		      "setup with the same master key");
 		goto out;
 	}
 
@@ -378,6 +390,8 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			rc = -errno;
 			warnx("Failed to generate a secure key: %s",
 			      strerror(errno));
+			warnx("Make sure that all available CCA crypto "
+			      "adapters are setup with the same master key");
 			goto out;
 		}
 
@@ -465,6 +479,8 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 		rc = -errno;
 		warnx("Failed to generate a secure key from a "
 		      "clear key: %s", strerror(errno));
+		warnx("Make sure that all available CCA crypto adapters are "
+		      "setup with the same master key");
 		goto out;
 	}
 
@@ -479,6 +495,8 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			rc = -errno;
 			warnx("Failed to generate a secure key from "
 			      "a clear key: %s", strerror(errno));
+			warnx("Make sure that all available CCA crypto "
+			      "adapters are setup with the same master key");
 			goto out;
 		}
 
@@ -745,4 +763,144 @@ int validate_secure_key(int pkey_fd,
 	pr_verbose(verbose, "Secure key validation completed successfully");
 
 	return 0;
+}
+
+/**
+ * Generate a key verification pattern of a secure key by encrypting the all
+ * zero message with the secure key using the AF_ALG interface
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ * @param[in] vp            buffer where the verification pattern is returned
+ * @param[in] vp_len        the size of the buffer
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int generate_key_verification_pattern(const char *key, size_t key_size,
+				      char *vp, size_t vp_len, bool verbose)
+{
+	int tfmfd = -1, opfd = -1, rc = 0;
+	char null_msg[ENC_ZERO_LEN];
+	char enc_zero[ENC_ZERO_LEN];
+	struct af_alg_iv *alg_iv;
+	struct cmsghdr *header;
+	uint32_t *type;
+	ssize_t len;
+	size_t i;
+
+	struct sockaddr_alg sa = {
+		.salg_family = AF_ALG,
+		.salg_type = "skcipher",
+	};
+	struct iovec iov = {
+		.iov_base = (void *)null_msg,
+		.iov_len = sizeof(null_msg),
+	};
+	int iv_msg_size = CMSG_SPACE(sizeof(*alg_iv) + PAES_BLOCK_SIZE);
+	char buffer[CMSG_SPACE(sizeof(*type)) + iv_msg_size];
+	struct msghdr msg = {
+		.msg_control = buffer,
+		.msg_controllen = sizeof(buffer),
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
+
+	if (vp_len < VERIFICATION_PATTERN_LEN) {
+		rc = -EMSGSIZE;
+		goto out;
+	}
+
+	snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "%s(paes)",
+		 key_size > SECURE_KEY_SIZE ? "xts" : "cbc");
+
+	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
+	if (tfmfd < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to open an AF_ALG socket");
+		goto out;
+	}
+
+	if (bind(tfmfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to bind the AF_ALG socket, "
+			   "salg_name='%s' ", sa.salg_name);
+		goto out;
+	}
+
+	if (setsockopt(tfmfd, SOL_ALG, ALG_SET_KEY, key,
+		       key_size) < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to set the key");
+		goto out;
+	}
+
+	opfd = accept(tfmfd, NULL, 0);
+	if (opfd < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to accept on the AF_ALG socket");
+		goto out;
+	}
+
+	memset(null_msg, 0, sizeof(null_msg));
+	memset(buffer, 0, sizeof(buffer));
+
+	header = CMSG_FIRSTHDR(&msg);
+	if (header == NULL) {
+		pr_verbose(verbose, "Failed to obtain control message header");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	header->cmsg_level = SOL_ALG;
+	header->cmsg_type = ALG_SET_OP;
+	header->cmsg_len = CMSG_LEN(sizeof(*type));
+	type = (void *)CMSG_DATA(header);
+	*type = ALG_OP_ENCRYPT;
+
+	header = CMSG_NXTHDR(&msg, header);
+	if (header == NULL) {
+		pr_verbose(verbose, "Failed to obtain control message "
+			   "header");
+		rc = -EINVAL;
+		goto out;
+	}
+	header->cmsg_level = SOL_ALG;
+	header->cmsg_type = ALG_SET_IV;
+	header->cmsg_len = iv_msg_size;
+	alg_iv = (void *)CMSG_DATA(header);
+	alg_iv->ivlen = PAES_BLOCK_SIZE;
+	memcpy(alg_iv->iv, null_msg, PAES_BLOCK_SIZE);
+
+	len = sendmsg(opfd, &msg, 0);
+	if (len != ENC_ZERO_LEN) {
+		pr_verbose(verbose, "Failed to send to the AF_ALG socket");
+		rc = -errno;
+		goto out;
+	}
+
+	len = read(opfd, enc_zero, sizeof(enc_zero));
+	if (len != ENC_ZERO_LEN) {
+		pr_verbose(verbose, "Failed to receive from the AF_ALG socket");
+		rc = -errno;
+		goto out;
+	}
+
+	memset(vp, 0, vp_len);
+	for (i = 0; i < sizeof(enc_zero); i++)
+		sprintf(&vp[i * 2], "%02x", enc_zero[i]);
+
+	pr_verbose(verbose, "Key verification pattern:  %s", vp);
+
+out:
+	if (opfd != -1)
+		close(opfd);
+	if (tfmfd != -1)
+		close(tfmfd);
+
+	if (rc != 0)
+		pr_verbose(verbose, "Failed to generate the key verification "
+			   "pattern: %s", strerror(-rc));
+
+	return rc;
 }
