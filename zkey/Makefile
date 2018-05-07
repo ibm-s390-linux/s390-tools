@@ -36,9 +36,8 @@ install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -m 644 -c zkey.1 $(DESTDIR)$(MANDIR)/man1
-	getent group zkeyadm >/dev/null || groupadd -r zkeyadm
-	$(INSTALL) -d -g zkeyadm -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey
-	$(INSTALL) -d -g zkeyadm -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey/repository
+	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey
+	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey/repository
 
 endif
 
