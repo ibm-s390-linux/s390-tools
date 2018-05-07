@@ -7,7 +7,7 @@ SUBSYSTEM!="block", GOTO="ra_end"
 
 ACTION!="add", GOTO="ra_change"
 # on device add set initial readahead to 512 (instead of in kernel 128)
-KERNEL=="sd*[!0-9]", WAIT_FOR="queue/read_ahead_kb", ATTR{queue/read_ahead_kb}="512"
+KERNEL=="sd*[!0-9]", TEST=="queue/read_ahead_kb", ATTR{queue/read_ahead_kb}="512"
 
 LABEL="ra_change"
 
