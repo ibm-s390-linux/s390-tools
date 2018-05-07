@@ -372,3 +372,7 @@ the different tools are provided:
   For building the zkey tools you need openssl version 0.9.7 or newer installed
   (openssl-devel.rpm). Tip: you may skip the zkey build by adding
   `HAVE_OPENSSL=0` to the make invocation.
+  A new group 'zkeyadm' needs to be created and all users intending to use the
+  tool must be added to this group. The owner of the default key repository 
+  '/etc/zkey/repository' must be set to group 'zkeyadm' with write permission
+  for this group. 
