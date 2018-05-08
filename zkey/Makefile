@@ -42,6 +42,7 @@ install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey-cryptsetup $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -m 644 -c zkey.1 $(DESTDIR)$(MANDIR)/man1
+	$(INSTALL) -m 644 -c zkey-cryptsetup.1 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey/repository
 

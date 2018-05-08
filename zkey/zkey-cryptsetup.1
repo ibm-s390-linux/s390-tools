@@ -1,0 +1,403 @@
+.\" Copyright IBM Corp. 2018
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZKEY\-CRYPTSETUP 1 "May 2018" "s390-tools"
+.SH NAME
+zkey\-cryptsetup \- Manage secure AES volume keys of volumes encrypted with
+\fBLUKS2\fP and the \fBpaes\fP cipher
+.
+.
+.SH SYNOPSIS
+.B zkey\-cryptsetup
+.I command
+.I device
+.RI [ OPTIONS ]
+.
+.PP
+.B zkey\-cryptsetup
+.RI [ command ]
+.BR \-\-help | \-h
+.br
+.B zkey\-cryptsetup
+.BR \-\-version | \-v
+.
+.
+.
+.SH DESCRIPTION
+Use \fBzkey\-cryptsetup\fP to validate and re-encipher secure AES
+volume keys of volumes encrypted with \fBLUKS2\fP and the \fBpaes\fP cipher.
+These secure AES volume keys are enciphered with a master key of an IBM
+cryptographic adapter in CCA coprocessor mode.
+.PP
+To encrypt a volume using \fBLUKS2\fP and the \fBpaes\fP cipher, generate a
+secure AES key using \fBzkey\fP: \fB'zkey generate luks.key --xts'\fP.
+Then format the device with \fBcryptsetup\fP using the just generated secure
+AES key from file luks.key: \fB'cryptsetup luksFormat <device> --type luks2
+--cipher paes-xts-plain64 --master-key-file luks.key --key-size 1024'\fP. For
+more details about \fBzkey\fP or \fBcryptsetup\fP see the
+corresponding man pages.
+.
+.
+.
+.SH COMMANDS
+.
+.
+.SS "Validate secure AES volume keys"
+.
+.B zkey\-cryptsetup
+.BR validate | val
+.I device
+.RB [ \-\-key\-file | \-d
+.IR file-name ]
+.RB [ \-\-keyfile\-offset | \-o
+.IR bytes ]
+.RB [ \-\-keyfile\-size | \-l
+.IR bytes ]
+.RB [ \-\-tries | \-T
+.IR number ]
+.RB [ \-\-verbose | \-V ]
+.RB [ \-\-debug | \-D ]
+.PP
+Use the
+.B validate
+command to validate a secure AES volume key of a volume encrypted with
+\fBLUKS2\fP and the \fBpaes\fP cipher.
+It checks if the LUKS2 header of the volume contains a valid secure key.
+It also displays the attributes of the secure key, such as key size, whether
+it is a secure key that can be used for the XTS cipher mode, and the master key
+register (CURRENT or OLD) with which the secure key is enciphered.
+For further information about master key registers, see the
+\fBreencipher\fP command.
+.PP
+To open a key slot contained in the LUKS2 header of the volume, a passphrase is
+required. You are prompted for the passphrase, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options
+behave in the same way as with \fBcryptsetup\fP.
+.
+.SS "Re-encipher secure AES volume keys"
+.
+.PP
+.B zkey\-cryptsetup
+.BR reencipher | re
+.I device
+.RB [ \-\-staged | \-s ]
+.RB [ \-\-in\-place | \-i ]
+.RB [ \-\-complete | \-c ]
+.RB [ \-\-key\-file | \-d
+.IR file-name ]
+.RB [ \-\-keyfile\-offset | \-o
+.IR bytes ]
+.RB [ \-\-keyfile\-size | \-l
+.IR bytes ]
+.RB [ \-\-tries | \-T
+.IR number ]
+.RB [ \-\-verbose | \-V ]
+.RB [ \-\-debug | \-D ]
+.PP
+Use the
+.B reencipher
+command to re-encipher a secure AES volume key of a volume encrypted with
+\fBLUKS2\fP and the \fBpaes\fP cipher. A secure AES volume key must be
+re-enciphered when the master key of the cryptographic adapter in CCA
+coprocessor mode changes.
+.PP
+The cryptographic adapter in CCA coprocessor mode has three different registers
+to store master keys:
+.RS 2
+.IP "\(bu" 2
+The \fBCURRENT\fP register contains the current master key.
+.
+.IP "\(bu" 2
+The \fBOLD\fP register contains the previously used master key.
+Secure keys enciphered with the master key contained in the \fBOLD\fP
+register can still be used until the master key is changed again.
+.
+.IP "\(bu" 2
+The \fBNEW\fP register contains the new master key to be set.
+The master key in the \fBNEW\fP register cannot be used until it is made
+the current master key. You can pro-actively re-encipher a secure key with the
+\fBNEW\fP master key before this key is made the \fBCURRENT\fP key.
+.RE
+.PP
+\fBzkey\-cryptsetup\fP automatically detects whether the secure volume key
+is currently enciphered with the master key in the \fBOLD\fP register or with
+the master key in the \fBCURRENT\fP register. If currently enciphered with the
+master key in the \fBOLD\fP register, it is re-enciphered with the master key
+in the \fBCURRENT\fP register. If it is currently enciphered with the master
+key in the \fBCURRENT\fP register, it is re-enciphered with the master key in
+the \fBNEW\fP register. If for this case the \fBNEW\fP register does not
+contain a valid master key, then the re-encipher operation fails.
+.PP
+Re-enciphering a secure volume key of a volume encrypted with
+\fBLUKS2\fP and the \fBpaes\fP cipher can be performed \fBin-place\fP, or in
+\fBstaged\fP mode.
+.PP
+\fB"In-place"\fP immediately replaces the secure volume key in the LUKS2
+header of the encrypted volume with the re-enciphered secure volume key.
+Re-enciphering from \fBOLD\fP to \fBCURRENT\fP is performed in-place per
+default. You can use option \fB--in-place\fP to force an in-place
+re-enciphering for the \fBCURRENT\fP to \fBNEW\fP case. Be aware that
+an encrypted volume with a secure volume key that was re-enciphered in-place
+from \fBCURRENT\fP to \fBNEW\fP is no longer usable, until the new CCA master
+key has been made the current one.
+.PP
+\fBStaged\fP mode means that the re-enciphered secure volume key is stored in a
+separate (unbound) key slot in the LUKS2 header of the encrypted volume. Thus
+all key slots containing the current secure volume key are still valid at this
+point. Once the new CCA master key has been set (made active), you must rerun
+the reencipher command with option \fB--complete\fP to complete the staged
+re-enciphering. When completing the staged re-enciphering, the (unbound) key
+slot containing the re-enciphered secure volume key becomes the active
+key slot and, optionally, all key slots containing the old secure volume key
+are removed.
+Re-enciphering from \fBCURRENT\fP to \fBNEW\fP is performed in staged mode per
+default. You can use option \fB--staged\fP to force a staged re-enciphering for
+the \fBOLD\fP to \fBCURRENT\fP case.
+.PP
+To open a key slot contained in the LUKS2 header of the volume, a passphrase is
+required. You are prompted for the passphrase, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options
+behave in the same way as with \fBcryptsetup\fP.
+.PP
+.B Note:
+The \fBreencipher\fP command requires the CCA host library (libcsulcca.so)
+to be installed.
+.
+.
+.
+.SS "Set a verification pattern of the secure AES volume key"
+.
+.B zkey\-cryptsetup
+.BR setvp | setv
+.I device
+.RB [ \-\-key\-file | \-d
+.IR file-name ]
+.RB [ \-\-keyfile\-offset | \-o
+.IR bytes ]
+.RB [ \-\-keyfile\-size | \-l
+.IR bytes ]
+.RB [ \-\-tries | \-T
+.IR number ]
+.RB [ \-\-verbose | \-V ]
+.RB [ \-\-debug | \-D ]
+.PP
+Use the
+.B setvp
+command to set a verification pattern of the secure AES volume key of a volume
+encrypted with \fBLUKS2\fP and the \fBpaes\fP cipher. The verification pattern
+identifies the effective key used to encrypt the volume's data.
+The verification pattern is stored in a token named
+\fBpaes-verification-pattern\fP in the LUKS2 header.
+.PP
+.B Note:
+Set the verification pattern right after formatting the volume using
+\fB'cryptsetup luksFormat'\fP.
+.PP
+To open a key slot contained in the LUKS2 header of the volume, a passphrase is
+required. You are prompted for the passphrase, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options
+behave in the same way as with \fBcryptsetup\fP.
+.
+.
+.
+.SS "Set a new secure AES volume key for a volume"
+.
+.B zkey\-cryptsetup
+.BR setkey | setk
+.I device
+.BR \-\-master\-key\-file | \-m
+.IR file-name
+.RB [ \-\-key\-file | \-d
+.IR file-name ]
+.RB [ \-\-keyfile\-offset | \-o
+.IR bytes ]
+.RB [ \-\-keyfile\-size | \-l
+.IR bytes ]
+.RB [ \-\-tries | \-T
+.IR number ]
+.RB [ \-\-verbose | \-V ]
+.RB [ \-\-debug | \-D ]
+.PP
+Use the
+.B setkey
+command to set a new secure AES volume key for a volume encrypted with
+\fBLUKS2\fP and the \fBpaes\fP cipher. Use this command to recover from an
+invalid secure AES volume key contained in the LUKS2 header.
+A secure AES volume key contained in the LUKS2 header can become invalid when
+the CCA master key is changed without re-enciphering the secure volume key.
+.PP
+You can recover the secure volume key only if you have a copy of the secure key
+in a file, and this copy was re-enciphered when the CCA master key has been
+changed. Thus, the copy of the secure key must be currently enciphered with the
+CCA master key in the CURRENT or OLD master key register.
+Specify the secure key file with option
+.B \-\-master\-key\-file
+to set this secure key as the new volume key.
+.PP
+In case the LUKS2 header of the volume contains a verification pattern token,
+it is used to ensure that the new volume key contains the same effective key.
+If no verification pattern token is available, then you are prompted to confirm
+that the specified secure key is the correct one.
+.B ATTENTION:
+If you set a wrong secure key you will loose all the data on the encrypted
+volume!
+.PP
+To open a key slot contained in the LUKS2 header of the volume, a passphrase is
+required. You are prompted for the passphrase, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options
+behave in the same way the same as with \fBcryptsetup\fP.
+.
+.
+.
+.
+.SH OPTIONS
+.
+.SS "Options for the reencipher command"
+.TP
+.BR \-i ", " \-\-in-place
+Forces an in-place re-enciphering of a secure volume key in the LUKS2
+header. This option immediately replaces the secure volume key in the LUKS2
+header of the encrypted volume with the re-enciphered secure volume key.
+Re-enciphering from \fBOLD\fP to \fBCURRENT\fP is performed in-place per
+default.
+.TP
+.BR \-s ", " \-\-staged
+Forces that the re-enciphering of a secure volume key in the LUKS2
+header is performed in staged mode. Staged mode means that the re-enciphered
+secure volume key is stored in a separate (unbound) key slot in the LUKS2
+header of the encrypted volume. Thus all key slots containing the current
+secure volume key are still valid at this point. Once the new CCA master key
+has been set (made active), you must rerun the reencipher command with option
+\fB--complete\fP to complete the staged re-enciphering. Re-enciphering from
+\fBCURRENT\fP to \fBNEW\fP is performed in staged mode per default.
+.TP
+.BR \-p ", " \-\-complete
+Completes a staged re-enciphering. Use this option after the new CCA master key
+has been set (made active). When completing the staged re-enciphering, the
+(unbound) key slot containing the re-enciphered secure volume key becomes
+the active key slot and, optionally, all key slots containing the old secure
+volume key are removed.
+.
+.
+.
+.SS "Options for the setkey command"
+.TP
+.BR \-m ", " \-\-master\-key\-file\~\fIfile\-name\fP
+Specifies the name of a file containing the secure AES key that is set as the
+new volume key.
+.
+.
+.
+.SS "Options for supplying the passphrase"
+.TP
+.BR \-d ", " \-\-key\-file\~\fIfile\-name\fP
+Reads the passphrase from the specified file. If this option is omitted,
+or if the file\-name is \fI-\fP (a dash), then you are prompted to enter the
+passphrase interactively.
+.TP
+.BR \-o ", " \-\-keyfile\-offset\~\fIbytes\fP
+Specifies the number of bytes to skip before starting to read in the file
+specified with option \fB\-\-key\-file\fP. If omitted, the file is read
+from the beginning. When option \fB\-\-key\-file\fP is not specified, this
+option is ignored.
+.TP
+.BR \-l ", " \-\-keyfile\-size\~\fIbytes\fP
+Specifies the number of bytes to be read from the beginning of the file
+specified with option \fB\-\-key\-file\fP. If omitted, the file is read
+until the end. When \fB\-\-keyfile\-offset\fP is also specified, reading starts
+at the offset. When option \fB\-\-key\-file\fP is not specified, this option is
+ignored.
+.TP
+.BR \-T ", " \-\-tries\~\fInumber\fP
+Specifies how often the interactive input of the passphrase can be re-entered.
+The default is 3 times. When option \fB\-\-key\-file\fP is specified, this
+option is ignored, and the passphrase is read only once from the file.
+.
+.
+.
+.SS "General options"
+.TP
+.BR \-V ", " \-\-verbose
+Displays additional information messages during processing.
+.TP
+.BR \-D ", " \-\-debug
+Displays additional debugging messages during processing. This option also
+implies \fB\-\-verbose\fP.
+.TP
+.BR \-h ", " \-\-help
+Displays help text and exits.
+.TP
+.BR \-v ", " \-\-version
+Displays version information and exits.
+.
+.
+.
+.SH EXAMPLES
+.TP
+.B zkey-cryptsetup reencipher /dev/dasdd1
+Re-enciphers the secure volume key of the encrypted volume /dev/dasdd1.
+.TP
+.B zkey-cryptsetup reencipher /dev/dasdd1 \-\-staged
+Re-enciphers the secure volume key of the encrypted volume /dev/dasdd1 in
+staged mode.
+.TP
+.B zkey-cryptsetup reencipher /dev/dasdd1 \-\-complete
+Completes re-enciphers the secure volume key of the encrypted
+volume /dev/dasdd1.
+.TP
+.B zkey-cryptsetup reencipher /dev/dasdd1 \-\-in\-place
+Re-enciphers the secure volume key of the encrypted volume /dev/dasdd1 in
+in-place mode.
+.TP
+.B zkey-cryptsetup validate /dev/dasdd1
+Validates the secure volume key of the encrypted volume /dev/dasdd1 and
+displays its attributes.
+.TP
+.B zkey-cryptsetup setvp /dev/dasdd1
+Sets the verification pattern of the secure volume key of the encrypted
+volume /dev/dasdd1.
+.TP
+.B zkey-cryptsetup setkey /dev/dasdd1 --master-key-file seckey.key
+Sets the secure key contained in file seckey.key as the new volume key
+for the encrypted volume /dev/dasdd1.
