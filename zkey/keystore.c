@@ -2319,7 +2319,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 
 	if (params.complete) {
 		if (!_keystore_reencipher_key_exists(file_names)) {
-			warnx("Staged re-enciphering in not pending for key "
+			warnx("Staged re-enciphering is not pending for key "
 			      "'%s', skipping",
 			      name);
 			info->num_skipped++;
