@@ -43,6 +43,7 @@
 
 #define ZIPL_CONF_VAR			"ZIPLCONF"
 #define ZIPL_DEFAULT_CONF		"/etc/zipl.conf"
+#define ZIPL_DEFAULT_BLSDIR		"/boot/loader/entries"
 
 #define MENU_DEFAULT_PROMPT		0
 #define MENU_DEFAULT_TIMEOUT		0

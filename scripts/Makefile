@@ -1,7 +1,7 @@
 include ../common.mak
 
-SCRIPTS	= dbginfo.sh zfcpdbf scsi_logging_level
-MAN_PAGES = dbginfo.sh.1 zfcpdbf.1
+SCRIPTS	= dbginfo.sh zfcpdbf zipl-switch-to-blscfg scsi_logging_level
+MAN_PAGES = dbginfo.sh.1 zfcpdbf.1 zipl-switch-to-blscfg.1
 
 all:
 

@@ -25,7 +25,7 @@ loading a data file to initialize named saved segments (NSS)
 Each of these operations is characterized by a boot configuration, i.e. a
 set of required parameters.
 .B zipl
-supports two ways of specifying a boot configuration:
+supports three ways of specifying a boot configuration:
 .IP "     -"
 .B command line:
 all parameters are provided through the command line switches described below.
@@ -37,6 +37,11 @@ parameters are provided by sections defined in a configuration file (see
 Using a configuration file, you can either specify a single boot configuration
 or a menu, i.e. a list of configurations from which users can choose at boot
 time.
+.IP "     -"
+.B BLS config files:
+boot configurations are specified using BootLoaderSpec (BLS) configuration files. The
+.BR zipl.conf (5)
+configuration file is still used to specify parameters or aditional boot configurations.
 .PP
 
 To use a single boot configuration section, provide its name as parameter to
@@ -116,6 +121,11 @@ Print version information, then exit.
 .BR "\-c <CONFIG FILE>" " or " "\-\-config=<CONFIG FILE>"
 Use the specified <CONFIG FILE>. If none is supplied, the environment
 variable ZIPLCONF is evaluated if set, otherwise /etc/zipl.conf is used.
+
+.TP
+.BR "\-b <BLS DIRECTORY>" " or " "\-\-blsdir=<BLS DIRECTORY>"
+Use the specified <BLS DIRECTORY> to parse BootLoaderSpec config files.
+If none is supplied, the /boot/loader/entries directory is used.
 
 .TP
 .BR "\-t <TARGET DIRECTORY>" " or " "\-\-target=<TARGET DIRECTORY>"
