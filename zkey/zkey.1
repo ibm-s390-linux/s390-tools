@@ -75,30 +75,32 @@ key repository.
 .BR generate | gen
 .I secure\-key\-file
 .RB [ \-\-keybits | \-k
-.IB size ]
+.IR size ]
 .RB [ \-\-xts | \-x ]
 .RB [ \-\-clearkey | \-c
-.IB clear\-key\-file ]
+.IR clear\-key\-file ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
 .B zkey
 .BR generate | gen
 .B \-\-name | \-N
-.IB key-name
+.IR key-name
 .RB [ \-\-description | \-d
-.IB description ]
+.IR description ]
 .RB [ \-\-volumes | \-l
-.IB volume1:dmname1[,volume2:dmname2[,...]] ]
+.IR volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-apqns | \-a
-.IB card1.domain1[,card2.domain2[,...]] ]
+.IR card1.domain1[,card2.domain2[,...]] ]
 .RB [ \-\-sector-size | \-S
-.IB bytes ]
+.IR bytes ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
 .RB [ \-\-keybits | \-k
-.IB size ]
+.IR size ]
 .RB [ \-\-xts | \-x ]
 .RB [ \-\-clearkey | \-c
-.IB clear\-key\-file ]
+.IR clear\-key\-file ]
 .RB [ \-\-verbose | \-V ]
 .PP
 Use the
@@ -115,16 +117,16 @@ The generated secure key can either be stored in a file in the file system,
 or in the secure key repository. To store the generated secure key in a
 file, specify the file name with option \fIsecure\-key\-file\fP. To store the
 secure key in the secure key repository, specify the name of the key using the
-.B --name
+.B \-\-name
 option. When storing the secure key in a key repository,
 additional information can be associated with a secure key using the
-.B --description
+.B \-\-description
 ,
-.B --volumes
+.B \-\-volumes
 ,
-.B --apqns
+.B \-\-apqns
 , or the
-.B --sector-size
+.B \-\-sector-size
 options.
 .
 .SS "Validating secure AES keys"
@@ -138,7 +140,7 @@ options.
 .B zkey
 .BR validate | val
 .RB [ \-\-name | \-N
-.IB key-name ]
+.IR key-name ]
 .RB [ \-\-verbose | \-V ]
 .PP
 Use the
@@ -156,10 +158,10 @@ secure key repository. To validate a secure key contained in a file, specify
 the file name with option \fIsecure\-key\-file\fP. To validate secure keys
 contained in the secure key repository, specify the name of the key
 or a pattern containing wildcards using the
-.B --name
+.B \-\-name
 option. When wildcards are used you must quote the value.
 If neither option \fIsecure\-key\-file\fP nor option
-.B --name
+.B \-\-name
 are specified, then all secure keys contained in the key repository
 are validated.
 .
@@ -171,15 +173,15 @@ are validated.
 .RB [ \-\-to\-new | \-n ]
 .RB [ \-\-from\-old | \-o ]
 .RB [ \-\-output | \-f
-.IB output\-file ]
+.IR output\-file ]
 .RB [ \-\-verbose | \-V ]
 .PP
 .B zkey
 .BR reencipher | re
 .RB [ \-\-name | \-N
-.IB key-name ]
+.IR key-name ]
 .RB [ \-\-apqns | \-a
-.IB card1.domain1[,card2.domain2[,...]] ]
+.IR card1.domain1[,card2.domain2[,...]] ]
 .RB [ \-\-to\-new | \-n ]
 .RB [ \-\-from\-old | \-o ]
 .RB [ \-\-in-place | \-i ]
@@ -190,7 +192,7 @@ are validated.
 Use the
 .B reencipher
 command to re-encipher an existing secure key with a new master key.
-A secure key bust be re-enciphered when the master key of the CCA
+A secure key must be re-enciphered when the master key of the CCA
 cryptographic adapter changes.
 .PP
 The CCA cryptographic adapter has three different registers to store
@@ -243,18 +245,18 @@ secure key repository. To re-encipher a secure key contained in a file,
 specify the file name with option \fIsecure\-key\-file\fP. To re-encipher
 secure keys contained in the secure key repository, specify the name of the key
 or a pattern containing wildcards using the
-.B --name
+.B \-\-name
 option. When wildcards are used you must quote the value.
 You can also specify the
-.B --apqns
+.B \-\-apqns
 option to re-encipher those secure
 keys which are associated with the specified cryptographic adapters (APQNs).
 You can use wildcards for the APQN specification.
 When wildcards are used you must quote the value.
 If both option
-.B --name
+.B \-\-name
 and option
-.B --apqns
+.B \-\-apqns
 are specified then all secure keys
 contained in the key repository that match both patterns are re-enciphered.
 If all both options are omitted, then all secure keys contained in the key
@@ -265,7 +267,7 @@ performed \fBin-place\fP, or in \fBstaged\fP mode.
 .PP
 \fB"In-place"\fP immediately replaces the secure key in the repository with
 the re-enciphered secure key. Re-enciphering from \fBOLD\fP to \fBCURRENT\fP is
-performed in-place per default. You can use option \fB--in-place\fP to force an
+performed in-place per default. You can use option \fB\-\-in-place\fP to force an
 in-place re-enciphering for the \fBCURRENT\fP to \fBNEW\fP case. Be aware that
 a secure key that was re-enciphered in-place from \fBCURRENT\fP to \fBNEW\fP
 is no longer valid, until the new CCA master key has been made the current one.
@@ -273,9 +275,9 @@ is no longer valid, until the new CCA master key has been made the current one.
 \fBStaged\fP mode means that the re-enciphered secure key is stored in a
 separate file in the secure key repository. Thus the current secure key is still
 valid at this point. Once the new CCA master key has been set (made active), you
-must rerun the reencipher command with option \fB--complete\fP to complete the
+must rerun the reencipher command with option \fB\-\-complete\fP to complete the
 staged re-enciphering. Re-enciphering from \fBCURRENT\fP to \fBNEW\fP is
-performed in staged mode per default. You can use option \fB--staged\fP to force
+performed in staged mode per default. You can use option \fB\-\-staged\fP to force
 a staged re-enciphering for the \fBOLD\fP to \fBCURRENT\fP case.
 .PP
 .B Note:
@@ -288,15 +290,17 @@ to be installed.
 .BR import | im
 .I secure\-key\-file
 .B \-\-name | \-N
-.IB key-name
+.IR key-name
 .RB [ \-\-description | \-d
-.IB description ]
+.IR description ]
 .RB [ \-\-volumes | \-l
-.IB volume1:dmname1[,volume2:dmname2[,...]] ]
+.IR volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-apqns | \-a
-.IB card1.domain1[,card2.domain2[,...]] ]
+.IR card1.domain1[,card2.domain2[,...]] ]
 .RB [ \-\-sector-size | \-S
-.IB bytes ]
+.IR bytes ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -305,13 +309,13 @@ Use the
 command to import an existing secure key contained in a file into the the
 secure key repository. When importing a secure key in a key repository,
 additional information can be associated with a secure key using the
-.B --description
+.B \-\-description
 ,
-.B --volumes
+.B \-\-volumes
 ,
-.B --apqns
+.B \-\-apqns
 , or the
-.B --sector-size
+.B \-\-sector-size
 options.
 .
 .SS "Export AES secure keys from the secure key repository"
@@ -320,7 +324,7 @@ options.
 .BR export | ex
 .I secure\-key\-file
 .B \-\-name | \-N
-.IB key-name
+.IR key-name
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -329,7 +333,7 @@ Use the
 command to export an existing secure key contained in the secure key repository
 to a file in the file system. Specify the name of the key that is to be exported
 using the
-.B --name
+.B \-\-name
 option. You cannot use wildcards.
 When wildcards are used you must quote the value.
 The exported secure key also remains in the secure key repository.
@@ -339,20 +343,22 @@ The exported secure key also remains in the secure key repository.
 .B zkey
 .BR list | li
 .RB [ \-\-name | \-N
-.IB key-name ]
+.IR key-name ]
 .RB [ \-\-volumes | \-l
-.IB volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
 .RB [ \-\-apqns | \-a
-.IB card1.domain1[,card2.domain2[,...]] ]
+.IR card1.domain1[,card2.domain2[,...]] ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
 Use the
 .B list
 command to display a list of secure keys contained in the secure key repository.
-You can filter the displayed list by key name, associated volumes, and
-associated cryptographic adapters (APQNs). You can use wildcards for the key
-name, associated APQNs, and associated volumes. The device-mapper name of an
+You can filter the displayed list by key name, associated volumes, associated
+cryptographic adapters (APQNs), and volume type. You can use wildcards for the
+key name, associated APQNs, and associated volumes. The device-mapper name of an
 associated volume can be omitted; if it is specified then only those keys are
 listed that are associated with the specified volume and device-mapper name.
 .PP
@@ -369,7 +375,7 @@ modification and last re-encipherment.
 .B zkey
 .BR remove | rem
 .B \-\-name | \-N
-.IB key-name
+.IR key-name
 .RB [ \-\-force | \-F ]
 .RB [ \-\-verbose | \-V ]
 .
@@ -378,10 +384,10 @@ Use the
 .B remove
 command to remove an existing secure key from the secure key repository.
 Specify the name of the key that is to be removed using the
-.B --name
+.B \-\-name
 option. You cannot use wildcards. The remove command prompts for
 a confirmation, unless you specify the
-.B --force
+.B \-\-force
 option.
 .PP
 .B Note:
@@ -395,43 +401,45 @@ secure key.
 .B zkey
 .BR change | ch
 .B \-\-name | \-N
-.IB key-name
+.IR key-name
 .RB [ \-\-description | \-d
-.IB description ]
+.IR description ]
 .RB [ \-\-volumes | \-l
-.IB [+|-]volume1:dmname1[,volume2:dmname2[,...]] ]
+.IR [+|-]volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-apqns | \-a
-.IB [+|-]card1.domain1[,card2.domain2[,...]] ]
+.IR [+|-]card1.domain1[,card2.domain2[,...]] ]
 .RB [ \-\-sector-size | \-S
-.IB bytes ]
+.IR bytes ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
 Use the
 .B change
 command to change the description, the associated volumes, the associated
-cryptographic adapters (APQNs), and the sector size of a secure key contained
-in the secure key repository. Specify the name of the key that is to be changed
-using the
-.B --name
+cryptographic adapters (APQNs), the sector size, and the volume type of a secure
+key contained in the secure key repository. Specify the name of the key that is
+to be changed using the
+.B \-\-name
 option. You cannot use wildcards.
 .PP
 You can set (replace), add, or
 remove volume and cryptographic adapters (APQN) associations. To set
 (replace) an association, specify the association with the
-.B --volumes
+.B \-\-volumes
 or the
-.B --apqns
+.B \-\-apqns
 options. To add an association,
 specify the new association prefixed with a \fI+\fP with the
-.B --volumes
+.B \-\-volumes
 or the
-.B --apqns
+.B \-\-apqns
 options. To remove an association,
 specify the association to remove prefixed with a \fI-\fP with the
-.B --volumes
+.B \-\-volumes
 or the
-.B --apqns
+.B \-\-apqns
 options. You cannot mix \fI+\fP and
 \fI-\fP in one specification. You can either add or remove (or set) the
 associations with one command.
@@ -447,9 +455,9 @@ command.
 .B zkey
 .BR rename | ren
 .B \-\-name | \-N
-.IB key-name
+.IR key-name
 .B \-\-new-name | \-w
-.IB new-key-name
+.IR new-key-name
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -457,9 +465,9 @@ Use the
 .B rename
 command to rename an existing secure key in the secure key repository.
 Specify the name of the key that is to be renamed using the
-.B --name
+.B \-\-name
 option and the new name using the
-.B --new-name
+.B \-\-new-name
 option. You cannot use wildcards.
 .
 .SS "Copy (duplicate) existing AES secure keys in the secure key repository"
@@ -467,11 +475,11 @@ option. You cannot use wildcards.
 .B zkey
 .B copy | co
 .RB \-\-name | \-N
-.IB key-name
+.IR key-name
 .B \-\-new-key-name | \-w
-.IB new-name
+.IR new-name
 .RB [ \-\-volumes | \-l
-.IB volume1:dmname1[,volume2:dmname2[,...]] ]
+.IR volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -479,15 +487,15 @@ Use the
 .B copy
 command to copy (duplicate) an existing secure key in the secure key repository.
 Specify the name of the key that is to be copied using the
-.B --name
+.B \-\-name
 option and the name of the copied key using the
-.B --new-name
+.B \-\-new-name
 option. You cannot use wildcards.
 .PP
 .B Note:
 When copying a secure key, the volume associations are not copied, because
 a specific volume can only be associated with a single secure key. Specify the
-.B --volumes
+.B \-\-volumes
 option to associate different
 volumes with the copied secure key, or use the \fBchange\fP command to associate
 volumes afterwards.
@@ -497,45 +505,56 @@ volumes afterwards.
 .B zkey
 .BR crypttab | cryptt
 .RB [ \-\-volumes | \-l
-.IB volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
 Use the
 .B crypttab
-command to generate crypttab entries using the \fBplain\fP dm-crypt mode
-for volumes that are associated with secure keys contained in the secure key
-repository. Specify the
-.B --volumes
+command to generate crypttab entries using the \fBplain\fP or \fBLUKS2\fP
+dm-crypt mode for volumes that are associated with secure keys contained in the
+secure key repository. Specify the
+.B \-\-volumes
 option to limit the list
 of volumes where crypttab entries are generated for. You can use wildcards.
 When wildcards are used you must quote the value.
 The device-mapper name of an associated volume can be omitted; if it is
 specified then only those volumes with the specified volume and device-mapper
 name are selected.
+Specify the
+.B \-\-volume-type
+option to generate crypttab entries for the specified volume type only.
 .
 .SS "Generate cryptsetup commands for volumes associated with secure AES keys"
 .
 .B zkey
 .BR cryptsetup | crypts
 .RB [ \-\-volumes | \-l
-.IB volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
 .RB [ \-\-run | \-r ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
 Use the
 .B cryptsetup
-command to generate \fBcryptsetup plainOpen\fP commands for volumes that are
-associated with secure keys contained in the secure key repository. Specify the
-.B --volumes
+command to generate \fBcryptsetup plainOpen\fP or \fBcryptsetup luksFormat\fP
+commands for volumes that are associated with secure keys contained in the
+secure key repository. Specify the
+.B \-\-volumes
 option to limit the list
 of volumes where cryptsetup commands are generated for. You can use wildcards.
 When wildcards are used you must quote the value.
 The device-mapper name of an associated volume can be omitted; if it is
 specified then only those volumes with the specified volume and device-mapper
 name are selected. Specify the
-.B --run
+.B \-\-volume-type
+option to generate cryptsetup commands for the specified volume type only.
+Specify the
+.B \-\-run
 option to run the generated cryptsetup commands.
 .
 .
@@ -589,8 +608,17 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-S ", " \-\-sector-size\~\fIbytes\fP
 Specifies the sector size in bytes used with dm-crypt. It must be a power of two
-and in the range 512 - 4096 bytes. If omitted, the system default sector size
-is used.
+and in the range of 512 to 4096 bytes. If omitted, the system default sector
+size is used.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is used.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
+the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -650,7 +678,7 @@ repository is performed in staged mode. Staged mode means that the re-enciphered
 secure key is stored in a separate file in the secure key repository. Thus the
 current secure key is still valid at this point. Once the new CCA master key has
 been set (made active), you must rerun the reencipher command with option
-\fB--complete\fP to complete the staged re-enciphering.
+\fB\-\-complete\fP to complete the staged re-enciphering.
 Re-enciphering from CURRENT to NEW is performed in staged mode per default.
 This option is only used for secure keys contained in the secure key repository.
 .TP
@@ -690,8 +718,17 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-S ", " \-\-sector-size\~\fIbytes\fP
 Specifies the sector size in bytes used with dm-crypt. It must be a power of two
-and in the range 512 - 4096 bytes. If omitted, the system default sector size
-is used.
+and in the range of 512 to 4096 bytes. If omitted, the system default sector
+size is used.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is used.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
+the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -733,6 +770,15 @@ repository. Only those keys are listed, which are associated with the specified
 APQNs. Each APQN association specifies a card and domain number separated
 by a period (like lszcrypt displays it). You can use wildcards in the APQN
 specification.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. Only keys with the specified volume
+type are listed.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -791,9 +837,16 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-S ", " \-\-sector-size\~\fIbytes\fP
 Specifies the sector size in bytes used with dm-crypt. It must be a power of two
-and in the range 512 - 4096 bytes. If omitted, the system default sector size
-is used. Specify \fI0\fP to un-set the sector size so that the system default
-is used.
+and in the range of 512 to 4096 bytes. Specify \fI0\fP to set the sector size
+to the system default.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -845,6 +898,15 @@ specified volume and device-mapper name. You can use wildcards to specify
 the volumes and device-mapper names.
 When wildcards are used you must quote the value.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. Only keys with the specified volume
+type are selected to generate crypttab entries for.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+This option is only used for secure keys contained in the secure key repository.
 .
 .
 .
@@ -861,10 +923,18 @@ the volumes and device-mapper names.
 When wildcards are used you must quote the value.
 This option is only used for secure keys contained in the secure key repository.
 .TP
-.BR \-r ", " \-\-run\fP
-Runs the generated cryptsetup commands. When an execution of a cryptsetup
-command fails, no further cryptsetup commands are executed, and zkey ends
-with an error.
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. Only keys with the specified volume
+type are selected to generate cryptsetup commands for.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-r ", " \-\-run
+Runs the generated cryptsetup commands. When one of the cryptsetup command fail,
+no further cryptsetup commands are run, and zkey ends with an error.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -895,14 +965,19 @@ in file 'seckey.bin'.
 Generates a secure AES key from the clear key in file 'clearkey.bin' and
 stores it in file 'seckey.bin'.
 .TP
-.B zkey generate --name seckey
+.B zkey generate \-\-name seckey
 Generates a random 256-bit secure AES key and stores it in the secure key
-repository under the name 'seckey'.
+repository using the name 'seckey'.
 .TP
-.B zkey generate --name seckey --volumes /dev/dasdc1:encvol --apqns 03.004c
+.B zkey generate \-\-name seckey \-\-volumes /dev/dasdc1:encvol \-\-apqns 03.004c
 Generates a random 256-bit secure AES key and stores it in the secure key
-repository under the name 'seckey' and associates it with block
+repository using the name 'seckey' and associates it with block
 device '/dev/dasdc1' and device-mapper name 'encvol', and APQN '03.004c'.
+.TP
+.B zkey generate \-\-name seckey \-\-volumes /dev/dasdc1:encvol \-\-volume-type luks2
+Generates a random 256-bit secure AES key and stores it in the secure key
+repository using the name 'seckey' and associates it with block
+device '/dev/dasdc1' and device-mapper name 'encvol', and a volume type of luks2.
 .TP
 .B zkey reencipher seckey.bin \-\-from\-old
 Re-enciphers the secure key in file 'seckey.bin' which is currently enciphered
@@ -915,17 +990,17 @@ Re-enciphers the secure key in file 'seckey.bin' which is currently enciphered
 with the master key in the CURRENT register with the master key in the NEW
 register, and saves the re-enciphered secure key to file 'seckey2.bin'.
 .TP
-.B zkey reencipher --name seckey
+.B zkey reencipher \-\-name seckey
 Re-enciphers the secure key 'seckey' in the secure key repository.
 .TP
-.B zkey reencipher --apqns 03.004c
+.B zkey reencipher \-\-apqns 03.004c
 Re-enciphers all secure keys contained in the secure key repository that are
 associated with APQN '03.004c'.
 .TP
 .B zkey validate seckey.bin
 Validates the secure key in file 'seckey.bin' and displays its attributes.
 .TP
-.B zkey validate --name seckey
+.B zkey validate \-\-name seckey
 Validates the secure key 'seckey' in the secure key repository and displays its
 attributes.
 .TP
@@ -933,25 +1008,28 @@ attributes.
 Lists all secure keys in the secure key repository and displays its
 attributes.
 .TP
-.B zkey list --name '*key'
+.B zkey list \-\-name '*key'
 Lists all secure keys in the secure key repository with names ending with 'key'
 and displays its attributes.
 .TP
-.B zkey change --name seckey --volumes +/dev/dasdc2:encvol2
+.B zkey change \-\-name seckey \-\-volumes +/dev/dasdc2:encvol2
 Changes the secure key 'seckey' in the secure key repository and adds
 volume '/dev/dasdc2' with device-mapper name 'encvol2' to the list of associated
 volumes of this secure key.
 .TP
-.B zkey change --name seckey --apqns -03.004c
+.B zkey change \-\-name seckey \-\-apqns -03.004c
 Changes the secure key 'seckey' in the secure key repository and removes
 APQN '03.004c' from the list of associated APQNs of this secure key.
 .TP
-.B zkey crypttab --volumes '/dev/dasdc*'
+.B zkey crypttab \-\-volumes '/dev/dasdc*'
 Generates crypttab entries for all volumes that match the pattern '/dev/dasdc*'.
 .TP
-.B zkey cryptsetup --volumes '*:enc_dasd'
+.B zkey cryptsetup \-\-volumes '*:enc_dasd'
 Generates cryptsetup commands for the volumes that uses the device-mapper
 name 'enc_dasd'.
+.TP
+.B zkey cryptsetup \-\-volume-type luks2
+Generates cryptsetup commands for all volumes of type luks2.
 .
 .SH ENVIRONMENT
 .TP

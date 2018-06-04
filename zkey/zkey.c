@@ -68,6 +68,7 @@ static struct zkey_globals {
 	char *volumes;
 	char *apqns;
 	long int sector_size;
+	char *volume_type;
 	char *newname;
 	bool run;
 	bool force;
@@ -180,6 +181,16 @@ static struct util_opt opt_vec[] = {
 			"used",
 		.command = COMMAND_GENERATE,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. When this option is omitted, "
+			"the default is 'luks2'",
+		.command = COMMAND_GENERATE,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -211,19 +222,23 @@ static struct util_opt opt_vec[] = {
 	},
 	{
 		.option = {"complete", 0, NULL, 'p'},
-		.desc = "Completes a pending re-enciphering of a secure AES "
-			"key that was re-enciphered with the master key in the "
-			"NEW register",
+		.desc = "Completes a staged re-enciphering. Use this option "
+			"after the new CCA master key has been set (made "
+			"active)",
 		.command = COMMAND_REENCIPHER,
 	},
 	{
 		.option = {"in-place", 0, NULL, 'i'},
-		.desc = "Forces an in-place re-enchipering of a secure AES key",
+		.desc = "Forces an in-place re-enchipering of a secure AES "
+			"key. Re-enciphering from OLD to CURRENT is performed "
+			"in-place per default",
 		.command = COMMAND_REENCIPHER,
 	},
 	{
 		.option = {"staged", 0, NULL, 's'},
-		.desc = "Forces a staged re-enchipering of a secure AES key",
+		.desc = "Forces that the re-enciphering of a secure AES key is "
+			"performed in staged mode. Re-enciphering from CURRENT "
+			"to NEW is performed in staged mode per default",
 		.command = COMMAND_REENCIPHER,
 	},
 	{
@@ -310,6 +325,16 @@ static struct util_opt opt_vec[] = {
 			"used",
 		.command = COMMAND_IMPORT,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. When this option is omitted, "
+			"the default is 'luks2'",
+		.command = COMMAND_IMPORT,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -358,6 +383,16 @@ static struct util_opt opt_vec[] = {
 			"associated with specific crypto cards",
 		.command = COMMAND_LIST,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. Use this option to list all "
+			"keys with the specified volumes type.",
+		.command = COMMAND_LIST,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -422,11 +457,19 @@ static struct util_opt opt_vec[] = {
 		.option = { "sector-size", required_argument, NULL, 'S'},
 		.argument = "0|512|4096",
 		.desc = "The sector size used with dm-crypt. It must be power "
-			"of two and in range 512 - 4096 bytes. If this option "
-			"is omitted, the system default sector size (512) is "
-			"used",
+			"of two and in range 512 - 4096 bytes. Specify 0 to "
+			"use the system default sector size (512)",
 		.command = COMMAND_CHANGE,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'",
+		.command = COMMAND_CHANGE,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -494,6 +537,17 @@ static struct util_opt opt_vec[] = {
 			"volume and the device-mapper name matches",
 		.command = COMMAND_CRYPTTAB,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. Use this option to select "
+			"the keys by its volume type for which a crypttab "
+			"entry is to be generated",
+		.command = COMMAND_CRYPTTAB,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -512,6 +566,17 @@ static struct util_opt opt_vec[] = {
 			"both, the volume and the device-mapper name matches",
 		.command = COMMAND_CRYPTSETUP,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. Use this option to select "
+			"the keys by its volume type for which a crypttab "
+			"entry is to be generated",
+		.command = COMMAND_CRYPTSETUP,
+	},
+#endif
 	{
 		.option = {"run", 0, NULL, 'r'},
 		.desc = "Runs the generated cryptsetup command",
@@ -819,7 +884,7 @@ static int command_generate_repository(void)
 
 	rc = keystore_generate_key(g.keystore, g.name, g.description, g.volumes,
 				   g.apqns, g.sector_size, g.keybits, g.xts,
-				   g.clearkeyfile, g.pkey_fd);
+				   g.clearkeyfile,  g.volume_type, g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1167,7 +1232,8 @@ static int command_import(void)
 		g.sector_size = 0;
 
 	rc = keystore_import_key(g.keystore, g.name, g.description, g.volumes,
-				 g.apqns, g.sector_size, g.pos_arg);
+				 g.apqns, g.sector_size, g.pos_arg,
+				 g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1200,7 +1266,8 @@ static int command_list(void)
 {
 	int rc;
 
-	rc = keystore_list_keys(g.keystore, g.name, g.volumes, g.apqns);
+	rc = keystore_list_keys(g.keystore, g.name, g.volumes, g.apqns,
+				g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1239,7 +1306,7 @@ static int command_change(void)
 	}
 
 	rc = keystore_change_key(g.keystore, g.name, g.description, g.volumes,
-				 g.apqns, g.sector_size);
+				 g.apqns, g.sector_size, g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1299,7 +1366,7 @@ static int command_crypttab(void)
 {
 	int rc;
 
-	rc = keystore_crypttab(g.keystore, g.volumes);
+	rc = keystore_crypttab(g.keystore, g.volumes, g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1313,7 +1380,7 @@ static int command_cryptsetup(void)
 {
 	int rc;
 
-	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run);
+	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1490,6 +1557,11 @@ int main(int argc, char *argv[])
 				return EXIT_FAILURE;
 			}
 			break;
+#ifdef HAVE_LUKS2_SUPPORT
+		case 't':
+			g.volume_type = optarg;
+			break;
+#endif
 		case 'w':
 			g.newname = optarg;
 			break;

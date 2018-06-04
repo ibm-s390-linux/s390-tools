@@ -30,16 +30,17 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 			  const char *description, const char *volumes,
 			  const char *apqns, size_t sector_size,
 			  size_t keybits, bool xts, const char *clear_key_file,
-			  int pkey_fd);
+			  const char *volume_type, int pkey_fd);
 
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, size_t sector_size,
-			const char *import_file);
+			const char *import_file, const char *volume_type);
 
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
-			const char *apqns, long int sector_size);
+			const char *apqns, long int sector_size,
+			const char *volume_type);
 
 int keystore_rename_key(struct keystore *keystore, const char *name,
 			const char *newname);
@@ -63,12 +64,14 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 			bool quiet);
 
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
-		       const char *volume_filter, const char *apqn_filter);
+		       const char *volume_filter, const char *apqn_filter,
+		       const char *volume_type);
 
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
-			bool execute);
+			bool execute, const char *volume_type);
 
-int keystore_crypttab(struct keystore *keystore, const char *volume_filter);
+int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
+		      const char *volume_type);
 
 void keystore_free(struct keystore *keystore);
 

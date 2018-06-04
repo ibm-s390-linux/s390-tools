@@ -59,6 +59,15 @@ struct key_filenames {
 #define PROP_NAME_CHANGE_TIME	"update-time"
 #define PROP_NAME_REENC_TIME	"reencipher-time"
 #define PROP_NAME_KEY_VP	"verification-pattern"
+#define PROP_NAME_VOLUME_TYPE	"volume-type"
+
+#define VOLUME_TYPE_PLAIN	"plain"
+#define VOLUME_TYPE_LUKS2	"luks2"
+#ifdef HAVE_LUKS2_SUPPORT
+	#define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_LUKS2
+#else
+	#define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_PLAIN
+#endif
 
 #define IS_XTS(secure_key_size) (secure_key_size > SECURE_KEY_SIZE ? 1 : 0)
 
@@ -72,11 +81,12 @@ struct key_filenames {
 #define REC_KEY_FILE		"Key file name"
 #define REC_SECTOR_SIZE		"Sector size"
 #define REC_STATUS		"Status"
-#define REC_MASTERKEY		"Encrypted with"
+#define REC_MASTERKEY		"Enciphered with"
 #define REC_CREATION_TIME	"Created"
 #define REC_CHANGE_TIME		"Changed"
 #define REC_REENC_TIME		"Re-enciphered"
 #define REC_KEY_VP		"Verification pattern"
+#define REC_VOLUME_TYPE		"Volume type"
 
 #define pr_verbose(keystore, fmt...)	do {				\
 						if (keystore->verbose)	\
@@ -278,6 +288,85 @@ static int _keystore_valid_sector_size(size_t sector_size)
 	if (sector_size & (sector_size - 1))
 		return 0;
 	return 1;
+}
+
+/**
+ *  Checks if the volume type is supported.
+ *
+ * @param[in] volume_type   the volume type
+ *
+ * @returns 1 if the volume type is valid, 0 otherwise
+ */
+static int _keystore_valid_volume_type(const char *volume_type)
+{
+	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0)
+		return 1;
+#ifdef HAVE_LUKS2_SUPPORT
+	if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0)
+		return 1;
+#endif
+	return 0;
+}
+
+/**
+ * Returns the volume type contained in the properties. If no volume type
+ * property is contained, then 'plain' is assumed (for backward comatibility).
+ *
+ * @returns a string containing the volume type. Must be freed by the caller.
+ */
+static char *_keystore_get_volume_type(struct properties *properties)
+{
+	char *type;
+
+	type = properties_get(properties, PROP_NAME_VOLUME_TYPE);
+	if (type == NULL)
+		type = util_strdup(VOLUME_TYPE_PLAIN);
+
+	return type;
+}
+
+/**
+ * Prints a message followed by a list of associated volumes, if volumes are
+ * associated and the volume-type matches (if specified)
+ *
+ * @param[in] msg          the message to display
+ * @param[in] properties   the properties
+ * @param[in] volume_type  the volume type to display the message for (or NULL)
+ *
+ * @returns always zero
+ */
+static int _keystore_msg_for_volumes(const char *msg,
+				     struct properties *properties,
+				     const char *volume_type)
+{
+	char *volumes = NULL;
+	char **volume_list;
+	char *type = NULL;
+	int i;
+
+	if (volume_type != NULL) {
+		type = _keystore_get_volume_type(properties);
+		if (strcasecmp(type, volume_type) != 0)
+			goto out;
+	}
+
+	volumes = properties_get(properties, PROP_NAME_VOLUMES);
+	if (volumes != NULL && strlen(volumes) > 0) {
+		volume_list = str_list_split(volumes);
+
+		util_print_indented(msg, 0);
+		for (i = 0; volume_list[i] != NULL; i++)
+			printf("  %s\n", volume_list[i]);
+		str_list_free_string_array(volume_list);
+	}
+
+out:
+	if (volumes != NULL)
+		free(volumes);
+	if (type != NULL)
+		free(type);
+
+	return 0;
 }
 
 typedef int (*check_association_t)(const char *value, bool remove,
@@ -712,6 +801,35 @@ static int _keystore_match_filter_property(struct properties *properties,
 }
 
 /**
+ * Checks if the volume type property matches the specified volume type.
+ * If the properties do not contain a volume type property, then the default
+ * volume type is assumed.
+ *
+ * @param[in] properties   a properties object
+ * @param[in] volume_type  the volume type to match. Can be NULL. In this case
+ *                         it always matches.
+ *
+ * @returns 1 for a match, 0 for not matched
+ */
+static int _keystore_match_volume_type_property(struct properties *properties,
+						const char *volume_type)
+{
+	char *type;
+	int rc = 0;
+
+	if (volume_type == NULL)
+		return 1;
+
+	type = _keystore_get_volume_type(properties);
+	if (strcasecmp(type, volume_type) == 0)
+		rc = 1;
+
+	free(type);
+	return rc;
+}
+
+
+/**
  * Checks if a key name matches a name filter
  *
  * @param[in] name         the name to check
@@ -774,6 +892,7 @@ typedef int (*process_key_t)(struct keystore *keystore,
  * @param[in] apqn_filter    the APQN filter. Can contain wild cards, and
  *                           mutliple APQN filters separated by commas.
  *                           NULL means no APQN filter.
+ * @param[in] volume_type    If not NULL, specifies the volume type.
  * @param[in] process_func   the callback function called for a matching key
  * @param[in/out] process_private private data passed to the process_func
  *
@@ -785,6 +904,7 @@ static int _keystore_process_filtered(struct keystore *keystore,
 				      const char *name_filter,
 				      const char *volume_filter,
 				      const char *apqn_filter,
+				      const char *volume_type,
 				      process_key_t process_func,
 				      void *process_private)
 {
@@ -863,6 +983,15 @@ static int _keystore_process_filtered(struct keystore *keystore,
 		if (rc == 0) {
 			pr_verbose(keystore,
 				   "Key '%s' filtered out due to APQN filter",
+				   name);
+			goto free_prop;
+		}
+
+		rc = _keystore_match_volume_type_property(key_props,
+							  volume_type);
+		if (rc == 0) {
+			pr_verbose(keystore,
+				   "Key '%s' filtered out due to volume type",
 				   name);
 			goto free_prop;
 		}
@@ -1122,8 +1251,8 @@ static int _keystore_volume_check(const char *volume, bool remove,
 	}
 
 	rc = _keystore_process_filtered(info->keystore, NULL, info->volume,
-					NULL, _keystore_volume_check_process,
-					info);
+					NULL, NULL,
+					_keystore_volume_check_process, info);
 out:
 	free((void *)info->volume);
 	info->volume = NULL;
@@ -1418,13 +1547,15 @@ static int _keystore_set_default_properties(struct properties *key_props)
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
  *                        default is used.
+ * @param[in] volume_type the type of volume
  */
 static int _keystore_create_info_file(struct keystore *keystore,
 				      const char *name,
 				      const struct key_filenames *filenames,
 				      const char *description,
 				      const char *volumes, const char *apqns,
-				      size_t sector_size)
+				      size_t sector_size,
+				      const char *volume_type)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name };
 	struct properties *key_props;
@@ -1466,6 +1597,19 @@ static int _keystore_create_info_file(struct keystore *keystore,
 			    temp);
 	if (rc != 0) {
 		warnx("Invalid characters in sector-size");
+		goto out;
+	}
+
+	if (volume_type == NULL)
+		volume_type = DEFAULT_VOLUME_TYPE;
+	if (!_keystore_valid_volume_type(volume_type)) {
+		warnx("Invalid volume-type specified");
+		rc = -EINVAL;
+		goto out;
+	}
+	rc = properties_set(key_props, PROP_NAME_VOLUME_TYPE, volume_type);
+	if (rc != 0) {
+		warnx("Invalid characters in volume-type");
 		goto out;
 	}
 
@@ -1553,6 +1697,7 @@ out:
  * @param[in] clear_key_file if not NULL the secure key is generated from the
  *                        clear key contained in the file denoted here.
  *                        if NULL, the secure key is generated by random.
+ * @param[in] volume_type the type of volume
  * @param[in] pkey_fd     the file descriptor of /dev/pkey
  *
  * @returns 0 for success or a negative errno in case of an error
@@ -1561,7 +1706,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 			  const char *description, const char *volumes,
 			  const char *apqns, size_t sector_size,
 			  size_t keybits, bool xts, const char *clear_key_file,
-			  int pkey_fd)
+			  const char *volume_type, int pkey_fd)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
@@ -1603,7 +1748,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
-					sector_size);
+					sector_size, volume_type);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -1640,14 +1785,15 @@ out_free_key_filenames:
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
  *                        default is used.
- * @param[in] import_file The name of a secure key containing the kley to import
+ * @param[in] import_file The name of a secure key containing the key to import
+ * @param[in] volume_type the type of volume
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, size_t sector_size,
-			const char *import_file)
+			const char *import_file, const char *volume_type)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
@@ -1686,7 +1832,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
-					sector_size);
+					sector_size, volume_type);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -1722,25 +1868,28 @@ out_free_key_filenames:
  *                        volumes are not changed.
  * @param[in] apqns       a comma separated list of APQNs associated with this
  *                        key, or an APQN prefixed with '+' or '-' to add or
- *                        remove that APQN respectively. IfNULL then the APQNs
+ *                        remove that APQN respectively. If NULL then the APQNs
  *                        are not changed.
  * @param[in] sector_size the sector size to use with dm-crypt. It must be power
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
  *                        default is used. Specify -1 if this property should
  *                        not be changed.
- *
+ * @param[in] volume_type the type of volume. If NULL then the volume type is
+ *                        not changed.
+ * *
  * @returns 0 for success or a negative errno in case of an error
  *
  */
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
-			const char *apqns, long int sector_size)
+			const char *apqns, long int sector_size,
+			const char *volume_type)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
-	char temp[10];
+	char temp[30];
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -1803,6 +1952,21 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		}
 	}
 
+	if (volume_type != NULL) {
+		if (!_keystore_valid_volume_type(volume_type)) {
+			warnx("Invalid volume-type specified");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		rc = properties_set(key_props, PROP_NAME_VOLUME_TYPE,
+				    volume_type);
+		if (rc != 0) {
+			warnx("Invalid characters in volume-type");
+			goto out;
+		}
+	}
+
 	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props);
 	/* ignore return code, vp generation might fail if key is not valid */
 
@@ -1849,6 +2013,8 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct key_filenames new_names = { NULL, NULL, NULL };
+	struct properties *key_props = NULL;
+	char *msg;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -1896,12 +2062,28 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 		}
 	}
 
+	key_props = properties_new();
+	rc = properties_load(key_props, new_names.info_filename, 1);
+	if (rc != 0) {
+		warnx("Key '%s' does not exist or is invalid", newname);
+		goto out;
+	}
+
+	util_asprintf(&msg, "The following volumes are associated with the "
+		      "renamed key '%s'. You should adjust the corresponding "
+		      "crypttab entries and 'cryptsetup plainOpen' commands to "
+		      "use the new name.", newname);
+	_keystore_msg_for_volumes(msg, key_props, VOLUME_TYPE_PLAIN);
+	free(msg);
+
 	pr_verbose(keystore, "Successfully renamed key '%s' to '%s'", name,
 		   newname);
 
 out:
 	_keystore_free_key_filenames(&file_names);
 	_keystore_free_key_filenames(&new_names);
+	if (key_props != NULL)
+		properties_free(key_props);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to rename key '%s'to '%s': %s",
@@ -1941,6 +2123,8 @@ static struct util_rec *_keystore_setup_record(bool validation)
 	util_rec_def(rec, REC_KEY_FILE, UTIL_REC_ALIGN_LEFT, 54, REC_KEY_FILE);
 	util_rec_def(rec, REC_SECTOR_SIZE, UTIL_REC_ALIGN_LEFT, 54,
 		     REC_SECTOR_SIZE);
+	util_rec_def(rec, REC_VOLUME_TYPE, UTIL_REC_ALIGN_LEFT, 54,
+		     REC_VOLUME_TYPE);
 	util_rec_def(rec, REC_KEY_VP, UTIL_REC_ALIGN_LEFT, 54, REC_KEY_VP);
 	util_rec_def(rec, REC_CREATION_TIME, UTIL_REC_ALIGN_LEFT, 54,
 		     REC_CREATION_TIME);
@@ -1967,6 +2151,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	size_t sector_size = 0;
 	size_t apqns_argz_len;
 	char *description;
+	char *volume_type;
 	char *reencipher;
 	char *creation;
 	char *volumes;
@@ -2001,6 +2186,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	change = properties_get(properties, PROP_NAME_CHANGE_TIME);
 	reencipher = properties_get(properties, PROP_NAME_REENC_TIME);
 	vp = properties_get(properties, PROP_NAME_KEY_VP);
+	volume_type = _keystore_get_volume_type(properties);
 
 	util_rec_set(rec, REC_KEY, name);
 	if (validation)
@@ -2039,6 +2225,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	else
 		util_rec_set(rec, REC_SECTOR_SIZE, "%lu bytes",
 			     sector_size);
+	util_rec_set(rec, REC_VOLUME_TYPE, volume_type);
 	if (vp != NULL) {
 		len = sprintf(temp_vp, "%.*s%c%.*s",
 			      VERIFICATION_PATTERN_LEN / 2, vp,
@@ -2075,6 +2262,8 @@ static void _keystore_print_record(struct util_rec *rec,
 		free(reencipher);
 	if (vp != NULL)
 		free(vp);
+	if (volume_type != NULL)
+		free(volume_type);
 }
 
 struct validate_info {
@@ -2227,10 +2416,10 @@ static int _keystore_process_validate(struct keystore *keystore,
 
 	if (valid && is_old_mk) {
 		util_print_indented("WARNING: The secure key is currently "
-				    "enciphered with the OLD CCA master key "
-				    "and should be re-enciphered with the "
-				    "CURRENT CCA master key as soon as "
-				    "possible to avoid data loss\n", 0);
+				    "enciphered with the OLD CCA master key. "
+				    "To mitigate the danger of data loss "
+				    "re-encipher it with the CURRENT CCA "
+				    "master key\n", 0);
 		info->num_warnings++;
 	}
 	if (_keystore_display_apqn_status(properties, name) != 0)
@@ -2271,7 +2460,7 @@ int keystore_validate_key(struct keystore *keystore, const char *name_filter,
 	info.num_warnings = 0;
 
 	rc = _keystore_process_filtered(keystore, name_filter, NULL,
-					apqn_filter,
+					apqn_filter, NULL,
 					_keystore_process_validate, &info);
 
 	util_rec_free(rec);
@@ -2458,7 +2647,8 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 		if (params.complete) {
 			warnx("Key '%s' is not valid, re-enciphering is not "
 			      "completed", name);
-			warnx("Possibly the CCA master key not yet been set?");
+			warnx("The new CCA master key might yet have to be set "
+			      "as the CURRENT master key.");
 		} else {
 			warnx("Key '%s' is not valid, it is not re-enciphered",
 			      name);
@@ -2526,6 +2716,14 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 						   file_names->info_filename);
 		if (rc != 0)
 			goto out;
+
+		util_asprintf(&temp, "The following LUKS2 volumes are "
+			      "encrypted with key '%s'. You should also "
+			      "re-encipher the volume key of those volumes "
+			      "using command 'zkey-cryptsetup reencipher "
+			      "<device>':", name);
+		_keystore_msg_for_volumes(temp, properties, VOLUME_TYPE_LUKS2);
+		free(temp);
 	}
 
 	if (params.complete ||
@@ -2539,12 +2737,11 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	}
 
 	if (params.inplace != 1) {
-		util_asprintf(&temp, "Staged re-enciphering has completed for "
-			      "key '%s'. Run 'zkey reencipher' with option "
-			      "'--complete' when the NEW CCA master key has "
-			      "been set (moved to the CURRENT master key "
-			      "register) to complete the re-enciphering "
-			      "process", name);
+		util_asprintf(&temp, "Staged re-enciphering is initiated for "
+			      "key '%s'. After the NEW CCA master key has been "
+			      "set to become the CURRENT master key run "
+			      "'zkey reencipher' with option '--complete' to "
+			      "complete the re-enciphering process", name);
 		util_print_indented(temp, 0);
 		free(temp);
 	}
@@ -2613,7 +2810,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 	info.num_skipped = 0;
 
 	rc = _keystore_process_filtered(keystore, name_filter, NULL,
-					apqn_filter,
+					apqn_filter, NULL,
 					_keystore_process_reencipher, &info);
 
 	if (rc != 0) {
@@ -2833,10 +3030,9 @@ static int _keystore_propmp_for_remove(struct keystore *keystore,
 				       struct key_filenames *file_names)
 {
 	struct properties *key_prop;
-	char *volumes = NULL;
-	char **volume_list = NULL;
 	char str[20];
-	int rc, i;
+	char *msg;
+	int rc;
 
 	key_prop = properties_new();
 	rc = properties_load(key_prop, file_names->info_filename, 1);
@@ -2845,15 +3041,10 @@ static int _keystore_propmp_for_remove(struct keystore *keystore,
 		goto out;
 	}
 
-	volumes = properties_get(key_prop, PROP_NAME_VOLUMES);
-	if (volumes != NULL && strlen(volumes) > 0) {
-		volume_list = str_list_split(volumes);
-
-		warnx("When you remove key '%s' the following volumes will "
-		      "no longer be usable:", name);
-		for (i = 0; volume_list[i] != NULL; i++)
-			fprintf(stderr, "%s\n", volume_list[i]);
-	}
+	util_asprintf(&msg, "When you remove key '%s' the following volumes "
+		      "will no longer be usable:", name);
+	_keystore_msg_for_volumes(msg, key_prop, VOLUME_TYPE_PLAIN);
+	free(msg);
 
 	printf("%s: Remove key '%s'? ", program_invocation_short_name, name);
 	if (fgets(str, sizeof(str), stdin) == NULL) {
@@ -2870,9 +3061,6 @@ static int _keystore_propmp_for_remove(struct keystore *keystore,
 
 out:
 	properties_free(key_prop);
-	if (volume_list != NULL)
-		str_list_free_string_array(volume_list);
-
 	return rc;
 }
 
@@ -3000,22 +3188,30 @@ out:
  * @param[in] apqn_filter    the APQN filter. Can contain wild cards, and
  *                           mutliple APQN filters separated by commas.
  *                           NULL means no APQN filter.
+ * @param[in] volume_type    The volume type. NULL means no volume type filter.
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
-		       const char *volume_filter, const char *apqn_filter)
+		       const char *volume_filter, const char *apqn_filter,
+		       const char *volume_type)
 {
 	struct util_rec *rec;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 
+	if (volume_type != NULL &&
+	    !_keystore_valid_volume_type(volume_type)) {
+		warnx("Invalid volume-type specified");
+		return -EINVAL;
+	}
+
 	rec = _keystore_setup_record(0);
 
 	rc = _keystore_process_filtered(keystore, name_filter, volume_filter,
-					apqn_filter, _keystore_display_key,
-					rec);
+					apqn_filter, volume_type,
+					_keystore_display_key, rec);
 	util_rec_free(rec);
 
 	if (rc != 0)
@@ -3067,6 +3263,7 @@ struct crypt_info {
 			    const char *key_file_name,
 			    size_t key_file_size,
 			    size_t sector_size,
+			    const char *volume_type,
 			    struct crypt_info *info);
 };
 
@@ -3080,7 +3277,8 @@ struct crypt_info {
  * @param[in] cipher_spec the cipher specification
  * @param[in] key_file_name the key file name
  * @param[in] key_file_size the size of the key file in bytes
- * @param sector_size    the sector size in bytes or 0 if not specified
+ * @param[in] sector_size    the sector size in bytes or 0 if not specified
+ * @param[in] volume_type the volume type
  * @param[in] info       processing info
  *
  * @returns 0 if successful, a negative errno value otherwise
@@ -3092,6 +3290,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 					const char *key_file_name,
 					size_t key_file_size,
 					size_t sector_size,
+					const char *volume_type,
 					struct crypt_info *info)
 {
 	char temp[100];
@@ -3099,18 +3298,53 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 	char *cmd;
 
 	sprintf(temp, "--sector-size %lu ", sector_size);
-	util_asprintf(&cmd,
-		      "cryptsetup plainOpen %s--key-file '%s' --key-size %lu "
-		      "--cipher %s %s%s %s",
-		      keystore->verbose ? "-v " : "", key_file_name,
-		      key_file_size * 8, cipher_spec,
-		      sector_size > 0 ? temp : "", volume, dmname);
 
-	if (info->execute) {
-		printf("Executing: %s\n", cmd);
-		rc = _keystore_execute_cmd(cmd, "cryptsetup");
+	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
+		util_asprintf(&cmd,
+			      "cryptsetup plainOpen %s--key-file '%s' "
+			      "--key-size %lu --cipher %s %s%s %s",
+			      keystore->verbose ? "-v " : "", key_file_name,
+			      key_file_size * 8, cipher_spec,
+			      sector_size > 0 ? temp : "", volume, dmname);
+
+		if (info->execute) {
+			printf("Executing: %s\n", cmd);
+			rc = _keystore_execute_cmd(cmd, "cryptsetup");
+		} else {
+			printf("%s\n", cmd);
+		}
+	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
+		util_asprintf(&cmd,
+			      "cryptsetup luksFormat %s--type luks2 "
+			      "--master-key-file '%s' --key-size %lu "
+			      "--cipher %s %s%s",
+			      keystore->verbose ? "-v " : "", key_file_name,
+			      key_file_size * 8, cipher_spec,
+			      sector_size > 0 ? temp : "", volume);
+
+		if (info->execute) {
+			printf("Executing: %s\n", cmd);
+			rc = _keystore_execute_cmd(cmd, "cryptsetup");
+		} else {
+			printf("%s\n", cmd);
+		}
+
+		free(cmd);
+		if (rc != 0)
+			return rc;
+
+		util_asprintf(&cmd,
+			      "zkey-cryptsetup setvp %s%s", volume,
+			      keystore->verbose ? " -V " : "");
+
+		if (info->execute) {
+			printf("Executing: %s\n", cmd);
+			rc = _keystore_execute_cmd(cmd, "zkey-cryptsetup");
+		} else {
+			printf("%s\n", cmd);
+		}
 	} else {
-		printf("%s\n", cmd);
+		return -EINVAL;
 	}
 
 	free(cmd);
@@ -3127,7 +3361,8 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
  * @param[in] cipher_spec the cipher specification
  * @param[in] key_file_name the key file name
  * @param[in] key_file_size the size of the key file in bytes
- * @param sector_size    the sector size in bytes or 0 if not specified
+ * @param[in] sector_size the sector size in bytes or 0 if not specified
+ * @param[in] volume_type the volume type
  * @param[in] info       processing info (not used here)
  *
  * @returns 0 if successful, a negative errno value otherwise
@@ -3140,25 +3375,34 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 				      const char *key_file_name,
 				      size_t key_file_size,
 				      size_t sector_size,
+				      const char *volume_type,
 				      struct crypt_info *UNUSED(info))
 {
 	char temp[1000];
 
-	if (sector_size > 0) {
-		sprintf(temp,
-			"WARNING: volume '%s' is using a sector size of %lu. "
-			"At the time this utility was developed, systemd's "
-			"support of crypttab did not support to specify a "
-			"sector size with plain dm-crypt devices. The generated "
-			"crypttab entry might or might not work, and might need "
-			"manual adoptions.", volume, sector_size);
-		util_print_indented(temp, 0);
-	}
+	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
+		if (sector_size > 0) {
+			sprintf(temp,
+				"WARNING: volume '%s' is using a sector size "
+				"of %lu. At the time this utility was "
+				"developed, systemd's support of crypttab did "
+				"not support to specify a sector size with "
+				"plain dm-crypt devices. The generated "
+				"crypttab entry might or might not work, and "
+				"might need manual adoptions.", volume,
+				sector_size);
+			util_print_indented(temp, 0);
+		}
 
-	sprintf(temp, ",sector-size=%lu", sector_size);
-	printf("%s\t%s\t%s\tplain,cipher=%s,size=%lu,hash=plain%s\n",
-	       dmname, volume, key_file_name, cipher_spec, key_file_size * 8,
-	       sector_size > 0 ? temp : "");
+		sprintf(temp, ",sector-size=%lu", sector_size);
+		printf("%s\t%s\t%s\tplain,cipher=%s,size=%lu,hash=plain%s\n",
+		       dmname, volume, key_file_name, cipher_spec,
+		       key_file_size * 8, sector_size > 0 ? temp : "");
+	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
+		printf("%s\t%s\n", dmname, volume);
+	} else {
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -3251,6 +3495,7 @@ static int _keystore_process_crypt(struct keystore *keystore,
 	struct crypt_info *info = (struct crypt_info *)private;
 	char **volume_list = NULL;
 	char *cipher_spec = NULL;
+	char *volume_type = NULL;
 	size_t secure_key_size;
 	size_t sector_size = 0;
 	char *volumes = NULL;
@@ -3290,6 +3535,8 @@ static int _keystore_process_crypt(struct keystore *keystore,
 		free(temp);
 	}
 
+	volume_type = _keystore_get_volume_type(properties);
+
 	for (i = 0; volume_list[i] != NULL && rc == 0; i++) {
 		vol = volume_list[i];
 		if (_keystore_match_filter(vol, info->volume_filter,
@@ -3306,7 +3553,8 @@ static int _keystore_process_crypt(struct keystore *keystore,
 
 			rc = info->process_func(keystore, vol, dmname,
 					cipher_spec, file_names->skey_filename,
-					secure_key_size, sector_size, info);
+					secure_key_size, sector_size,
+					volume_type, info);
 			if (rc != 0)
 				break;
 		}
@@ -3319,6 +3567,8 @@ out:
 		str_list_free_string_array(volume_list);
 	if (cipher_spec != NULL)
 		free(cipher_spec);
+	if (volume_type != NULL)
+		free(volume_type);
 	return rc;
 }
 
@@ -3333,11 +3583,12 @@ out:
  *                           checks the volume part only.
  * @param[in] execute        If TRUE the cryptsetup command is executed,
  *                           otherwise it is printed to stdout
- *
+ * @param[in] volume_type the type of volume to generate cryptsetup cmds for
+ * *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
-			bool execute)
+			bool execute, const char *volume_type)
 {
 	struct crypt_info info = { 0 };
 	int rc;
@@ -3346,12 +3597,20 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 
 	if (volume_filter == NULL)
 		volume_filter = "*";
+
+	if (volume_type != NULL &&
+	    !_keystore_valid_volume_type(volume_type)) {
+		warnx("Invalid volume-type specified");
+		return -EINVAL;
+	}
+
 	info.execute = execute;
 	info.volume_filter = str_list_split(volume_filter);
 	info.process_func = _keystore_process_cryptsetup;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					_keystore_process_crypt, &info);
+					volume_type, _keystore_process_crypt,
+					&info);
 
 	str_list_free_string_array(info.volume_filter);
 
@@ -3376,10 +3635,12 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
  *                           The ':dm-name' part of the volume is optional
  *                           for the volume filter. If not specified, the filter
  *                           checks the volume part only.
+ * @param[in] volume_type    the type of volume to generate crypttab entries for
  *
  * @returns 0 for success or a negative errno in case of an error
  */
-int keystore_crypttab(struct keystore *keystore, const char *volume_filter)
+int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
+		      const char *volume_type)
 {
 	struct crypt_info info = { 0 };
 	int rc;
@@ -3388,11 +3649,19 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter)
 
 	if (volume_filter == NULL)
 		volume_filter = "*";
+
+	if (volume_type != NULL &&
+	    !_keystore_valid_volume_type(volume_type)) {
+		warnx("Invalid volume-type specified");
+		return -EINVAL;
+	}
+
 	info.volume_filter = str_list_split(volume_filter);
 	info.process_func = _keystore_process_crypttab;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					_keystore_process_crypt, &info);
+					volume_type, _keystore_process_crypt,
+					&info);
 
 	str_list_free_string_array(info.volume_filter);
 

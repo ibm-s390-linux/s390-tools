@@ -12,6 +12,7 @@ ifneq (${HAVE_CRYPTSETUP2},0)
 	ifneq (${HAVE_JSONC},0)
 		BUILD_TARGETS += zkey-cryptsetup
 		INSTALL_TARGETS += install-zkey-cryptsetup
+		CPPFLAGS += -DHAVE_LUKS2_SUPPORT
 	else
 		BUILD_TARGETS += zkey-cryptsetup-skip-jsonc
 		INSTALL_TARGETS += zkey-cryptsetup-skip-jsonc
