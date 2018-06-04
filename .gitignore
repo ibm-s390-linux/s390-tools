@@ -77,6 +77,7 @@ zdump/zgetdump
 zfcpdump/cpioinit
 zfcpdump/zfcpdump_part
 zfcpdump/zfcpdump-initrd
+zfcpdump/10-zfcpdump.install
 ziomon/ziomon_mgr
 ziomon/ziomon_util
 ziomon/ziomon_zfcpdd

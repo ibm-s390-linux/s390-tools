@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# 10-zfcpdump.install - Installation script to handle zfcpdump kernels
+#
+# Copyright IBM Corp. 2018
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+#
+# This script supports two modes:
+#
+#  1) Installing the images to /boot/<machine-id>/<kernel-version>
+#     subdirectories, i.e. BOOT_DIR_ABS, as recommended by the BLS.
+#     In this case file names are taken over from the original files.
+#
+#  2) Installing the images directly to /boot. In this case the files are
+#     renamed to <original-name>-<kernel-version>.
+#
+# The existence of BOOT_DIR_ABS is taken as trigger to switch between both
+# modes.
+#
+# The KERNEL_VERSION is assumed to contain '@flavor@' to identify the image
+# as a zfcpdump kernel.
+
+COMMAND="$1"
+KERNEL_VERSION="$2"
+BOOT_DIR_ABS="$3"
+KERNEL_IMAGE="$4"
+
+# Location zipl looks for the zfcpdump kernel
+ZFCPDUMP_IMAGE='@zfcpdump_image@'
+
+# Only handle zfcpdump kernels
+echo "$KERNEL_VERSION" | grep -q '@flavor@' || exit 0
+
+case "$COMMAND" in
+	add)
+		KERNEL_DIR="$(dirname $KERNEL_IMAGE)"
+		KERNEL_NAME="$(basename $KERNEL_IMAGE)"
+
+		for f in \
+			"$KERNEL_IMAGE" \
+			"$KERNEL_DIR"/System.map \
+			"$KERNEL_DIR"/config \
+			"$KERNEL_DIR"/zImage.stub
+		do
+			test -e "$f" || continue
+			test -d "$BOOT_DIR_ABS" \
+				&& DEST="$BOOT_DIR_ABS/$(basename $f)" \
+				|| DEST="/boot/$(basename $f)-$KERNEL_VERSION"
+
+			cp -aT "$f" "$DEST"
+			test $(command -v restorecon) && restorecon -R "$DEST"
+		done
+
+		# hmac file need special treatment
+		f="$KERNEL_DIR/.$KERNEL_NAME.hmac"
+		if [ -e "$f" ]; then
+			test -d "$BOOT_DIR_ABS" \
+				&& DEST="$BOOT_DIR_ABS/$(basename $f)" \
+				|| DEST="/boot/.$KERNEL_NAME-$KERNEL_VERSION.hmac"
+
+			cp -aT "$f" "$DEST"
+			test $(command -v restorecon) && restorecon -R "$DEST"
+		fi
+
+		# Set link so zipl finds the kernel
+		test -d "$BOOT_DIR_ABS" \
+			&& TARGET="$BOOT_DIR_ABS/$KERNEL_NAME" \
+			|| TARGET="/boot/$KERNEL_NAME-$KERNEL_VERSION"
+		ln -sf "$TARGET" "$ZFCPDUMP_IMAGE"
+		;;
+
+	remove)
+		# On removal
+		# $KERNEL_IMAGE is empty -> $KERNEL_NAME is empty -> rebuild it
+		KERNEL_NAME="$(basename $(readlink $ZFCPDUMP_IMAGE))"
+		if [ -d "$BOOT_DIR_ABS" ]; then
+			INSTALL_DIR="$(dirname $BOOT_DIR_ABS)"
+		else
+			INSTALL_DIR="/boot/"
+			KERNEL_NAME="$(echo $KERNEL_NAME \
+				| sed -e "s#\(.*\)-$KERNEL_VERSION#\1#")"
+		fi
+
+		for f in $(find "$INSTALL_DIR" -name "*$KERNEL_VERSION*"); do
+			rm -rf "$f"
+		done
+
+		# Update link to latest remaining zfcpdump kernel.
+		if [ $(readlink "$ZFCPDUMP_IMAGE" | grep "$KERNEL_VERSION") ]
+		then
+			NEXT_IMAGE=$( \
+				find "$INSTALL_DIR" -type f \
+				| grep '@flavor@' \
+				| grep "$KERNEL_NAME" \
+				| grep -v "hmac" \
+				| sort -V \
+				| tail -n1 )
+
+			test $NEXT_IMAGE \
+				&& ln -sf "$NEXT_IMAGE" "$ZFCPDUMP_IMAGE" \
+				|| rm -f "$ZFCPDUMP_IMAGE"
+		fi
+		;;
+	*)
+		;;
+esac
+
+# Prevent execution of all other scripts.
+# The zfcpdump kernel is stripped down to the bare minimum needed for
+# dumping. It is not supposed to be used for any other purpose.
+exit 77

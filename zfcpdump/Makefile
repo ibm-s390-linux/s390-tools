@@ -1,6 +1,7 @@
 include ../common.mak
 
 CPIOINIT  = $(call echocmd,"  CPIOINI ",/$@)./cpioinit
+INSTALL_SCRIPTS = 10-zfcpdump.install
 
 ifeq (${HAVE_LIBC_STATIC},0)
 
@@ -20,7 +21,7 @@ check_dep:
 		"HAVE_LIBC_STATIC=0", \
 		"-static")
 
-all: check_dep $(ZFCPDUMP_INITRD)
+all: check_dep $(ZFCPDUMP_INITRD) scripts
 
 cpioinit: cpioinit.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
@@ -34,12 +35,21 @@ $(ZFCPDUMP_INITRD): cpioinit zfcpdump_part
 	$(GZIP) -f $@.tmp
 	$(MV) $@.tmp.gz $(ZFCPDUMP_INITRD)
 
+scripts: $(INSTALL_SCRIPTS)
+	chmod +x $(INSTALL_SCRIPTS)
+
 install: all
 	$(INSTALL) -m 611 $(ZFCPDUMP_INITRD) $(DESTDIR)$(ZFCPDUMP_DIR)
 
+%: %.in
+	zfcpdump_image=$(ZFCPDUMP_DIR)/$(ZFCPDUMP_IMAGE);	\
+	$(SED)	-e "s#@zfcpdump_image@#$$zfcpdump_image#g"	\
+		-e "s#@flavor@#$(ZFCPDUMP_FLAVOR)#g"		\
+	< $< > $@
 endif
 
 clean:
-	rm -f *.o *.gz *.tmp *~ zfcpdump_part cpioinit $(ZFCPDUMP_INITRD)
+	rm -f *.o *.gz *.tmp *~ zfcpdump_part cpioinit $(ZFCPDUMP_INITRD) \
+		$(INSTALL_SCRIPTS)
 
-.PHONY: all clean install check_dep
+.PHONY: all clean install check_dep scripts
