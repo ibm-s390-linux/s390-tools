@@ -1057,6 +1057,7 @@ static int command_reencipher(void)
  */
 static int command_validate_file(void)
 {
+	char vp[VERIFICATION_PATTERN_LEN];
 	size_t secure_key_size;
 	size_t clear_key_size;
 	u8 *secure_key;
@@ -1089,14 +1090,30 @@ static int command_validate_file(void)
 		goto out;
 	}
 
+	rc = generate_key_verification_pattern((char *)secure_key,
+					       secure_key_size, vp, sizeof(vp),
+					       g.verbose);
+	if (rc != 0) {
+		warnx("Failed to generate the verification pattern: %s",
+		      strerror(-rc));
+		warnx("Make sure that kernel module 'paes_s390' is loaded and "
+		      "that the 'paes' cipher is available");
+		rc = EXIT_FAILURE;
+		goto out;
+	}
+
 	printf("Validation of secure key in file '%s':\n", g.pos_arg);
-	printf("  Status:          Valid\n");
-	printf("  Secure key size: %lu bytes\n", secure_key_size);
-	printf("  Clear key size:  %lu bits\n", clear_key_size);
-	printf("  XTS type key:    %s\n",
+	printf("  Status:                Valid\n");
+	printf("  Secure key size:       %lu bytes\n", secure_key_size);
+	printf("  Clear key size:        %lu bits\n", clear_key_size);
+	printf("  XTS type key:          %s\n",
 	       secure_key_size > SECURE_KEY_SIZE ? "Yes" : "No");
-	printf("  Encrypted with:  %s CCA master key\n",
+	printf("  Enciphered with:       %s CCA master key\n",
 	       is_old_mk ? "OLD" : "CURRENT");
+	printf("  Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,
+	       vp);
+	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
+	       &vp[VERIFICATION_PATTERN_LEN / 2]);
 
 out:
 	free(secure_key);

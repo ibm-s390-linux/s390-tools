@@ -58,6 +58,7 @@ struct key_filenames {
 #define PROP_NAME_CREATION_TIME	"creation-time"
 #define PROP_NAME_CHANGE_TIME	"update-time"
 #define PROP_NAME_REENC_TIME	"reencipher-time"
+#define PROP_NAME_KEY_VP	"verification-pattern"
 
 #define IS_XTS(secure_key_size) (secure_key_size > SECURE_KEY_SIZE ? 1 : 0)
 
@@ -75,6 +76,7 @@ struct key_filenames {
 #define REC_CREATION_TIME	"Created"
 #define REC_CHANGE_TIME		"Changed"
 #define REC_REENC_TIME		"Re-enciphered"
+#define REC_KEY_VP		"Verification pattern"
 
 #define pr_verbose(keystore, fmt...)	do {				\
 						if (keystore->verbose)	\
@@ -1270,6 +1272,77 @@ struct keystore *keystore_new(const char *directory, bool verbose)
 }
 
 /**
+ * Generate the key verification pattern from the specified secure key file
+ *
+ * @param[in] keystore    the key store
+ * @param[in} keyfile     the key file
+ * @param[in] vp          buffer filled with the verification pattern
+ * @param[in] vp_len      length of the buffer. Must be at
+ *                        least VERIFICATION_PATTERN_LEN bytes in size.
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+static int _keystore_generate_verification_pattern(struct keystore *keystore,
+						  const char *keyfile,
+						  char *vp, size_t vp_len)
+{
+	size_t key_size;
+	u8 *key;
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(vp != NULL, "Internal error: vp is NULL");
+
+	key = read_secure_key(keyfile, &key_size, keystore->verbose);
+	if (key == NULL)
+		return -EIO;
+
+	rc = generate_key_verification_pattern((const char *)key, key_size,
+					       vp, vp_len, keystore->verbose);
+
+	free(key);
+	return rc;
+}
+
+/**
+ * Checks if the key verification pattern property exists. If not, then it is
+ * created from the secure key.
+ *
+ * @param[in] keystore    the key store
+ * @param[in] file_names  the file names of the key
+ * @param[in] key_props   the properties of the key
+ *
+ *  @returns 0 for success or a negative errno in case of an error
+ */
+static int _keystore_ensure_vp_exists(struct keystore *keystore,
+				      const struct key_filenames *file_names,
+				      struct properties *key_props)
+{
+	char vp[VERIFICATION_PATTERN_LEN];
+	char *temp;
+	int rc;
+
+	temp = properties_get(key_props, PROP_NAME_KEY_VP);
+	if (temp != NULL) {
+		free(temp);
+		return 0;
+	}
+
+	rc = _keystore_generate_verification_pattern(keystore,
+						     file_names->skey_filename,
+						     vp, sizeof(vp));
+	if (rc != 0)
+		return rc;
+
+	rc = properties_set(key_props, PROP_NAME_KEY_VP, vp);
+	if (rc != 0)
+		return rc;
+
+	return 0;
+}
+
+/**
  * Sets a timestamp to be used as creation/update/reencipher time into
  * the specified property
  *
@@ -1348,7 +1421,7 @@ static int _keystore_set_default_properties(struct properties *key_props)
  */
 static int _keystore_create_info_file(struct keystore *keystore,
 				      const char *name,
-				      const char *info_filename,
+				      const struct key_filenames *filenames,
 				      const char *description,
 				      const char *volumes, const char *apqns,
 				      size_t sector_size)
@@ -1396,17 +1469,26 @@ static int _keystore_create_info_file(struct keystore *keystore,
 		goto out;
 	}
 
-	rc = properties_save(key_props, info_filename, 1);
+	rc = _keystore_ensure_vp_exists(keystore, filenames, key_props);
+	if (rc != 0) {
+		warnx("Failed to generate the key verification pattern: %s",
+		      strerror(-rc));
+		warnx("Make sure that kernel module 'paes_s390' is loaded and "
+		      "that the 'paes' cipher is available");
+		return rc;
+	}
+
+	rc = properties_save(key_props, filenames->info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
 			   "Key info file '%s' could not be written: %s",
-			   info_filename, strerror(-rc));
+			   filenames->info_filename, strerror(-rc));
 		goto out;
 	}
 
-	rc = _keystore_set_file_permission(keystore, info_filename);
+	rc = _keystore_set_file_permission(keystore, filenames->info_filename);
 	if (rc != 0) {
-		remove(info_filename);
+		remove(filenames->info_filename);
 		goto out;
 	}
 
@@ -1519,8 +1601,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_props;
 
-	rc = _keystore_create_info_file(keystore, name,
-					file_names.info_filename,
+	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
 					sector_size);
 	if (rc != 0)
@@ -1603,8 +1684,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_props;
 
-	rc = _keystore_create_info_file(keystore, name,
-					file_names.info_filename,
+	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
 					sector_size);
 	if (rc != 0)
@@ -1723,6 +1803,9 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		}
 	}
 
+	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props);
+	/* ignore return code, vp generation might fail if key is not valid */
+
 	rc = _keystore_set_timestamp_property(key_props, PROP_NAME_CHANGE_TIME);
 	if (rc != 0)
 		goto out;
@@ -1838,7 +1921,7 @@ static struct util_rec *_keystore_setup_record(bool validation)
 {
 	struct util_rec *rec;
 
-	rec = util_rec_new_long("-", ":", REC_KEY, 23, 54);
+	rec = util_rec_new_long("-", ":", REC_KEY, 28, 54);
 	util_rec_def(rec, REC_KEY, UTIL_REC_ALIGN_LEFT, 54, REC_KEY);
 	if (validation)
 		util_rec_def(rec, REC_STATUS, UTIL_REC_ALIGN_LEFT, 54,
@@ -1858,6 +1941,7 @@ static struct util_rec *_keystore_setup_record(bool validation)
 	util_rec_def(rec, REC_KEY_FILE, UTIL_REC_ALIGN_LEFT, 54, REC_KEY_FILE);
 	util_rec_def(rec, REC_SECTOR_SIZE, UTIL_REC_ALIGN_LEFT, 54,
 		     REC_SECTOR_SIZE);
+	util_rec_def(rec, REC_KEY_VP, UTIL_REC_ALIGN_LEFT, 54, REC_KEY_VP);
 	util_rec_def(rec, REC_CREATION_TIME, UTIL_REC_ALIGN_LEFT, 54,
 		     REC_CREATION_TIME);
 	util_rec_def(rec, REC_CHANGE_TIME, UTIL_REC_ALIGN_LEFT, 54,
@@ -1876,6 +1960,7 @@ static void _keystore_print_record(struct util_rec *rec,
 				   size_t clear_key_bitsize, bool valid,
 				   bool is_old_mk, bool reenc_pending)
 {
+	char temp_vp[VERIFICATION_PATTERN_LEN + 2];
 	char *volumes_argz = NULL;
 	size_t volumes_argz_len;
 	char *apqns_argz = NULL;
@@ -1888,6 +1973,8 @@ static void _keystore_print_record(struct util_rec *rec,
 	char *change;
 	char *apqns;
 	char *temp;
+	char *vp;
+	int len;
 
 	description = properties_get(properties, PROP_NAME_DESCRIPTION);
 	volumes = properties_get(properties, PROP_NAME_VOLUMES);
@@ -1913,6 +2000,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	creation = properties_get(properties, PROP_NAME_CREATION_TIME);
 	change = properties_get(properties, PROP_NAME_CHANGE_TIME);
 	reencipher = properties_get(properties, PROP_NAME_REENC_TIME);
+	vp = properties_get(properties, PROP_NAME_KEY_VP);
 
 	util_rec_set(rec, REC_KEY, name);
 	if (validation)
@@ -1951,6 +2039,15 @@ static void _keystore_print_record(struct util_rec *rec,
 	else
 		util_rec_set(rec, REC_SECTOR_SIZE, "%lu bytes",
 			     sector_size);
+	if (vp != NULL) {
+		len = sprintf(temp_vp, "%.*s%c%.*s",
+			      VERIFICATION_PATTERN_LEN / 2, vp,
+			      '\0', VERIFICATION_PATTERN_LEN / 2,
+			      &vp[VERIFICATION_PATTERN_LEN / 2]);
+		util_rec_set_argz(rec, REC_KEY_VP, temp_vp, len + 1);
+	} else {
+		util_rec_set(rec, REC_KEY_VP, "(not available)");
+		}
 	util_rec_set(rec, REC_CREATION_TIME, creation);
 	util_rec_set(rec, REC_CHANGE_TIME,
 		     change != NULL ? change : "(never)");
@@ -1976,6 +2073,8 @@ static void _keystore_print_record(struct util_rec *rec,
 		free(change);
 	if (reencipher != NULL)
 		free(reencipher);
+	if (vp != NULL)
+		free(vp);
 }
 
 struct validate_info {
@@ -2403,6 +2502,17 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 						      PROP_NAME_REENC_TIME);
 		if (rc != 0)
 			goto out;
+
+		rc = _keystore_ensure_vp_exists(keystore, file_names,
+						properties);
+		if (rc != 0) {
+			warnx("Failed to generate the key verification pattern "
+			      "for key '%s': %s", file_names->skey_filename,
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'paes_s390' is loaded and "
+			      "that the 'paes' cipher is available");
+			goto out;
+		}
 
 		rc = properties_save(properties, file_names->info_filename, 1);
 		if (rc != 0) {
@@ -3040,7 +3150,7 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 			"At the time this utility was developed, systemd's "
 			"support of crypttab did not support to specify a "
 			"sector size with plain dm-crypt devices. The generated "
-			"crypttab entry may or may not work, and may need "
+			"crypttab entry might or might not work, and might need "
 			"manual adoptions.", volume, sector_size);
 		util_print_indented(temp, 0);
 	}
