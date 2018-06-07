@@ -981,25 +981,33 @@ static int _keystore_apqn_check(const char *apqn, bool remove,
 	rc = regexec(&reg_buf, apqn, (size_t) 1, pmatch, 0);
 	if (rc != 0) {
 		warnx("the APQN '%s' is not valid", apqn);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto out;
 	}
 
-	if (sscanf(apqn, "%x.%x", &card, &domain) != 2)
-		return -EINVAL;
+	if (sscanf(apqn, "%x.%x", &card, &domain) != 2) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	util_asprintf(normalized, "%02x.%04x", card, domain);
 
-	if (remove)
-		return 0;
+	if (remove) {
+		rc = 0;
+		goto out;
+	}
 
 	rc = _keystore_is_apqn_online(card, domain);
 	if (rc != 1) {
 		warnx("The APQN %02x.%04x is %s", card, domain,
 		      rc == -1 ? "not a CCA card" : "not online");
-		return -EIO;
+		rc = -EIO;
+		goto out;
 	}
 
-	return 0;
+out:
+	regfree(&reg_buf);
+	return rc;
 }
 
 

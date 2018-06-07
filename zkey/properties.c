@@ -149,6 +149,7 @@ void properties_free(struct properties *properties)
 		free(property->name);
 		free(property->value);
 		util_list_remove(&properties->list, property);
+		free(property);
 	}
 
 	free(properties);
@@ -259,6 +260,7 @@ int properties_remove(struct properties *properties, const char *name)
 	free(property->name);
 	free(property->value);
 	util_list_remove(&properties->list, property);
+	free(property);
 	return 0;
 }
 
@@ -614,10 +616,13 @@ char *str_list_remove(const char *str_list, const char *str)
  */
 void str_list_free_string_array(char **strings)
 {
+	char **list = strings;
+
 	util_assert(strings != NULL, "Internal error: strings is NULL");
 
 	while (*strings != NULL) {
 		free((void *)*strings);
 		strings++;
 	}
+	free(list);
 }
