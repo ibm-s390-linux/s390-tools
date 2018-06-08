@@ -1,10 +1,13 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.4.1 (XXXX-XX-XX)__
+ * __v2.5.0 (2018-06-08)__
 
   For Linux kernel version: 4.17
 
   Changes of existing tools:
+  - zdev: Add support for reading firmware configuration files
+  - zipl: Add BootLoaderSpec support
+  - scripts: Add script to switch zipl config to a BootLoaderSpec setup
 
   Bug Fixes:
   - lsluns: Print a message if no adapter or port exists

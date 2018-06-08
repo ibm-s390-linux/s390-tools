@@ -45,6 +45,7 @@ List of all individuals having contributed content to s390-tools
 - Jan Glauber
 - Jan Hoeppner
 - Jan Willeke
+- Javier Martinez Canillas
 - Jean-Baptiste Joret
 - Jens Remus
 - Jochen Roehrig
