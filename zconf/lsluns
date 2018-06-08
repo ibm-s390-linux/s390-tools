@@ -2,7 +2,7 @@
 #
 # lsluns - list LUNs discovered in the FC SAN, or show encryption state of attached LUNs
 #
-# Copyright IBM Corp. 2008, 2017
+# Copyright IBM Corp. 2008, 2018
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -152,6 +152,11 @@ sub get_lun_hash
     my %lun_hash;
 
     foreach my $device (</$sg_dir/sg*>) {
+	# skip non-zfcp SCSI devices and avoid file access error messages
+	next unless -r "$device/device/fcp_lun";
+	next unless -r "$device/device/wwpn";
+	next unless -r "$device/device/hba_id";
+
         my $l = `cat $device/device/fcp_lun`;
         my $p = `cat $device/device/wwpn`;
         my $a = `cat $device/device/hba_id`;
@@ -170,9 +175,8 @@ sub get_lun_hash
 sub lsluns_usage {
     print <<EOD;
 Usage:
-This tool is designed for environments where all SCSI devices are attached
-through the zfcp device driver. Expect error messages in mixed environments
-such as with iSCSI.
+This tool is designed for environments with SCSI devices attached
+through the zfcp device driver.
 
 $PROGRAM_NAME [-c <busid>] ... [-p <wwpn>] ... [-h] [-v]
 
@@ -220,7 +224,7 @@ EOD
 
 sub lsluns_version {
     print "$PROGRAM_NAME: version %S390_TOOLS_VERSION%\n";
-    print "Copyright IBM Corp. 2008, 2017\n";
+    print "Copyright IBM Corp. 2008, 2018\n";
 }
 
 sub lsluns_invalid_usage {
