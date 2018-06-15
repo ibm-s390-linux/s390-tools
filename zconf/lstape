@@ -335,9 +335,13 @@ function SysfsCreateListSCSI()
 			$STATE
 
 		if $VERBOSE; then
+			HBA_ID="N/A"
+			[ -r $SCSI_DEV/hba_id ] && HBA_ID=$(cat $SCSI_DEV/hba_id)
+			WWPN="N/A"
+			[ -r $SCSI_DEV/wwpn ] && WWPN=$(cat $SCSI_DEV/wwpn)
 			printf "$SCSIVFORMAT" \
-				$(cat $SCSI_DEV/hba_id) \
-				$(cat $SCSI_DEV/wwpn) \
+				"$HBA_ID" \
+				"$WWPN" \
 				$TAPE_SERIAL
 		fi
 	done
