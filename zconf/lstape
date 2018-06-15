@@ -2,7 +2,7 @@
 #
 # lstape - Tool to show information about tape devices
 #
-# Copyright IBM Corp. 2003, 2017
+# Copyright IBM Corp. 2003, 2018
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -55,7 +55,7 @@ function PrintVersion()
 {
 	cat <<-EOD
 	$CMD: version %S390_TOOLS_VERSION%
-	Copyright IBM Corp. 2003, 2017
+	Copyright IBM Corp. 2003, 2018
 	EOD
 }
 
@@ -292,16 +292,13 @@ function SysfsCreateListSCSI()
 				TAPE_DEV=$CHG_IDX
 			fi
 		elif [ -r /proc/scsi/$DEV_NAME ]; then
-			if [ "$TAPE_SERIAL" != "NO/INQ" ]; then
 				IBM_IDX=$(
-					awk '$3 == "'$TAPE_SERIAL'"{
-						print $1
-					}' /proc/scsi/$DEV_NAME
+					grep -wF "$SCSI_ID" /proc/scsi/$DEV_NAME |
+					cut -d ' ' -f 1
 				)
 				if [ "$IBM_IDX" != "" ]; then
 					TAPE_DEV=$DEV_NAME$IBM_IDX
 				fi
-			fi
 		fi
 
 		printf "$SCSIFORMAT" \

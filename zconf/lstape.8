@@ -1,8 +1,8 @@
-.\" Copyright 2017 IBM Corp.
+.\" Copyright 2017, 2018 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH LSTAPE 8 "Jul 2007" "s390-tools"
+.TH LSTAPE 8 "Jun 2018" "s390-tools"
 
 .SH NAME
 lstape \- list tape devices.
@@ -34,9 +34,6 @@ lstape command tries to find out which one this is. For the generic tape
 and changer driver the device names start with "st" or "sch", while for the
 IBM tape driver this would be "IBMtape" or "IBMchanger". If "N/A" is shown,
 the correct driver could not be obtained.
-This happens for example if there is no sg_inq command installed which is
-required to read the drive's serial number which in turn is used to find out
-the device number of the IBM tape driver.
 
 The serial number of a SCSI tape can be displayed with the --verbose option. If
 there is no sg_inq command available "NO/INQ" is shown as the tape's serial.
