@@ -986,6 +986,7 @@ static int _keystore_apqn_check(const char *apqn, bool remove,
 	}
 
 	if (sscanf(apqn, "%x.%x", &card, &domain) != 2) {
+		warnx("the APQN '%s' is not valid", apqn);
 		rc = -EINVAL;
 		goto out;
 	}
@@ -1003,6 +1004,8 @@ static int _keystore_apqn_check(const char *apqn, bool remove,
 		      rc == -1 ? "not a CCA card" : "not online");
 		rc = -EIO;
 		goto out;
+	} else {
+		rc = 0;
 	}
 
 out:
