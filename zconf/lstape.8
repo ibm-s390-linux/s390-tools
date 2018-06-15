@@ -36,7 +36,13 @@ IBM tape driver this would be "IBMtape" or "IBMchanger". If "N/A" is shown,
 the correct driver could not be obtained.
 
 The serial number of a SCSI tape can be displayed with the --verbose option. If
-there is no sg_inq command available "NO/INQ" is shown as the tape's serial.
+there is no sg_inq command available "NO/INQ" is shown as the serial number
+of the tape.
+If no SCSI generic (sg) kernel support is available, "NO/SG" is shown
+as the serial number of the tape and "N/A" for the "Generic" column.
+
+The lstape command without the --ccw-only option causes extra SAN traffic
+for each SCSI tape or changer device by invoking the sg_inq command.
 
 .SH OPTIONS
 .TP 8

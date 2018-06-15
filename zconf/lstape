@@ -48,6 +48,9 @@ function PrintUsage() {
 	:		-v|--version
 	:			Display the version of the tools package and
 	:			the lstape command.
+	:
+	:$(basename $0) without the --ccw-only option causes extra SAN traffic
+	:for each SCSI tape or changer device by invoking the sg_inq command.
 	EOD
 }
 
@@ -249,11 +252,16 @@ function SysfsCreateListSCSI()
 		if [ -h $SG_DEV ]; then
 			# deprecated sysfs layout
 			SG_DEV=$(echo $SG_DEV | awk -F: '{print $NF}')
-		else
+		elif [ -d $SCSI_DEV/scsi_generic ]; then
 			SG_DEV=$(basename $SG_DEV/*)
+		else
+			SG_DEV=""
 		fi
 
-		if [ "$SG_INQ" != "" ]; then
+		if [ -z "$SG_DEV" ]; then
+			SG_DEV="N/A"
+			TAPE_SERIAL="NO/SG"
+		elif [ "$SG_INQ" != "" ]; then
 			TAPE_SERIAL=$(
 				sg_inq /dev/$SG_DEV |
 				awk '/serial/{print $NF}'
