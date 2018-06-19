@@ -1534,7 +1534,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
-	if (rc != 0 && rc != -EEXIST)
+	if (rc != 0)
 		remove(file_names.skey_filename);
 out_free_key_filenames:
 	_keystore_free_key_filenames(&file_names);
@@ -1617,7 +1617,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
-	if (rc != 0 && rc != -EEXIST)
+	if (rc != 0)
 		remove(file_names.skey_filename);
 out_free_key_filenames:
 	_keystore_free_key_filenames(&file_names);
