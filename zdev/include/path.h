@@ -20,7 +20,7 @@
 #define	UDEV_SUFFIX		".rules"
 
 #define	PATH_MODPROBE_CONF	"/etc/modprobe.d"
-#define PATH_MODPROBE		"/usr/sbin/modprobe"
+#define PATH_MODPROBE		"/sbin/modprobe"
 #define PATH_CCW_BUS		"/sys/bus/ccw"
 #define PATH_CCWGROUP_BUS	"/sys/bus/ccwgroup"
 #define PATH_UDEV_RULES		"/etc/udev/rules.d"
