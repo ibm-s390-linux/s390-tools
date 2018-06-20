@@ -223,6 +223,24 @@ function SysfsCreateListCCW() {
 	' | sort 
 }
 
+# handle SCSI device not necessarily zfcp-attached, e.g. virtio-scsi-ccw
+function SCSISearchCCWBusid()
+{
+	local SCSI_DEV=$1
+	local SDEVCAN=$(readlink -e $SCSI_DEV)
+	while [ -n "$SDEVCAN" ]; do
+		# ascend to parent: strip last path part
+		SDEVCAN=${SDEVCAN%/*}
+		[ -h $SDEVCAN/subsystem ] || continue
+		local SUBSYSTEM=$(readlink -e $SDEVCAN/subsystem)
+		if [ "${SUBSYSTEM##*/}" = "ccw" ]; then
+			echo ${SDEVCAN##*/}
+			return
+		fi
+	done
+	echo "N/A"
+}
+
 function SysfsCreateListSCSI()
 {
 	for SCSI_DEV in $1/bus/scsi/devices/*:*:*:*; do
@@ -335,8 +353,11 @@ function SysfsCreateListSCSI()
 			$STATE
 
 		if $VERBOSE; then
-			HBA_ID="N/A"
-			[ -r $SCSI_DEV/hba_id ] && HBA_ID=$(cat $SCSI_DEV/hba_id)
+			if [ -r $SCSI_DEV/hba_id ]; then
+				HBA_ID=$(cat $SCSI_DEV/hba_id)
+			else
+				HBA_ID=$(SCSISearchCCWBusid $SCSI_DEV)
+			fi
 			WWPN="N/A"
 			[ -r $SCSI_DEV/wwpn ] && WWPN=$(cat $SCSI_DEV/wwpn)
 			printf "$SCSIVFORMAT" \

@@ -112,8 +112,9 @@ For SCSI devices, the --verbose option additionally displays:
 .TP
 .B HBA
 The device bus-ID of the FCP device
+or of the virtio-scsi-ccw virtual HBA
 through which the tape drive is attached.
-"N/A" if device is not attached through zfcp.
+"N/A" if the device does not have a sysfs ancestor with subsystem ccw.
 .TP
 .B WWPN
 The WWPN (worldwide port name) of the tape drive in the SAN.
