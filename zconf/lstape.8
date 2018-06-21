@@ -20,6 +20,8 @@ lstape \- list tape devices.
 .br
 .RB [ -t
 .IR <device-type> [, <device-type> ] "" ...]
+.br
+.RI [ <device-bus-ID> ...]
 
 .SH DESCRIPTION
 The lstape command lists all available tape devices on the current host. For
@@ -78,12 +80,14 @@ on the output of SCSI devices.
 
 .TP
 .BR -t | --type " \fI<device-type>\fR"
-Limit output to given device types (currently only applies to channel attached
+Limit output to given device types, for example 3490
+(currently only applies to channel-attached
 tape devices).
 
 .TP
-\fB<device-type>\fR =
-Device type of devices that should be displayed (e.g. 3490).
+.I <device-bus-ID>
+Limits the output to information about the specified tape device or
+devices only. For CCW-attached devices only.
 
 .SH EXAMPLES
 \fBlstape\fR
