@@ -29,20 +29,6 @@ channel attached tape devices this output is the same as the contents of
 /proc/tapedevices (which is obsolete) but also includes offline devices. By
 default all tape devices are displayed.
 
-Since SCSI tape devices are accessed differently to channel attached tape
-devices they are only visible if they are known to the SCSI layer. There
-are at least two possible drivers that can claim a SCSI tape device and the
-lstape command tries to find out which one this is. For the generic tape
-and changer driver the device names start with "st" or "sch", while for the
-IBM tape driver this would be "IBMtape" or "IBMchanger". If "N/A" is shown,
-the correct driver could not be obtained.
-
-The serial number of a SCSI tape can be displayed with the --verbose option. If
-there is no sg_inq command available "NO/INQ" is shown as the serial number
-of the tape.
-If no SCSI generic (sg) kernel support is available, "NO/SG" is shown
-as the serial number of the tape and "N/A" for the "Generic" column.
-
 The lstape command without the --ccw-only option causes extra SAN traffic
 for each SCSI tape or changer device by invoking the sg_inq command.
 
@@ -89,6 +75,55 @@ tape devices).
 Limits the output to information about the specified tape device or
 devices only. For CCW-attached devices only.
 
+.SH OUTPUT FIELDS FOR SCSI TAPE/CHANGER DEVICES
+.TP
+.B Generic
+SCSI generic device file for the tape drive, for example /dev/sg0.
+"N/A" if the SCSI generic (sg) kernel functionality is not available.
+.TP
+.B Device
+Main character device node file for accessing the tape drive or medium changer.
+SCSI tape devices are only visible if they are known to the SCSI layer. There
+are at least two possible drivers that can claim a SCSI tape device. The
+lstape command tries to determine the device driver. For the generic tape
+and changer driver the device names start with "st" or "sch", while for the
+IBM tape driver this would be "IBMtape" or "IBMchanger". If "N/A" is shown,
+the device driver could not be determined.
+.TP
+.B Target
+Linux SCSI device name in H:C:T:L format.
+.TP
+.B Vendor
+The vendor field from the SCSI device.
+.TP
+.B Model
+The model field from the SCSI device.
+.TP
+.B Type
+"tapedrv" for a tape drive or "changer" for a medium changer.
+.TP
+.B State
+The state of the SCSI device object in the kernel.
+Any state other than "running" can indicate problems.
+
+.PP
+
+For SCSI devices, the --verbose option additionally displays:
+.TP
+.B HBA
+The device bus-ID of the FCP device
+through which the tape drive is attached.
+"N/A" if device is not attached through zfcp.
+.TP
+.B WWPN
+The WWPN (worldwide port name) of the tape drive in the SAN.
+"N/A" if device is not attached through zfcp.
+.TP
+.B Serial
+The serial number.
+"NO/INQ" if there is no sg_inq command available.
+"NO/SG" if no SCSI generic (sg) kernel support is available.
+
 .SH EXAMPLES
 \fBlstape\fR
 .RS
@@ -98,4 +133,9 @@ List all tape devices that are available
 \fBlstape --ccw-only -t 3490 --online\fR
 .RS
 Show all 3490 CCW devices that are online.
+.RE
+
+\fBlstape --scsi-only --verbose\fR
+.RS
+Show all SCSI tape or changer devices with maximum information.
 .RE
