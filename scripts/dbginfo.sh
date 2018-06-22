@@ -2,7 +2,7 @@
 #
 # dbginfo.sh - Tool to collect runtime, configuration, and trace information
 #
-# Copyright IBM Corp. 2002, 2017
+# Copyright IBM Corp. 2002, 2018
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -21,7 +21,7 @@ readonly SCRIPTNAME="${0##*/}"
 print_version() {
     cat <<EOF
 ${SCRIPTNAME}: Debug information script version %S390_TOOLS_VERSION%
-Copyright IBM Corp. 2002, 2017
+Copyright IBM Corp. 2002, 2018
 EOF
 }
 
@@ -480,6 +480,7 @@ VM_CMDS="q userid\
   :q cpus\
   :q srm\
   :q vtod\
+  :q time full\
   :q timezone\
   :q loaddev\
   :q v osa\
@@ -1016,25 +1017,31 @@ environment_setup()
 # create gzip-ped tar file
 create_package()
 {
+    local rc_tar
     pr_stdout "Finalizing: Creating archive with collected data"
     cd "${WORKDIR_BASE}"
 
-    if ! tar -czf "${WORKARCHIVE}" "${WORKDIR_CURRENT}"; then
-	pr_stdout " "
-	pr_stdout "${SCRIPTNAME}: Error: Collection of data failed!"
-	pr_stdout "       The creation of \"${WORKARCHIVE}\" was not successful."
-	pr_stdout "       Please check the directory \"${WORKDIR_BASE}\""
-	pr_stdout "       to provide enough free available space."
+    tar -czf "${WORKARCHIVE}" "${WORKDIR_CURRENT}"
+    rc_tar=$?
+    if [ $rc_tar -eq 0 ]; then
+        chmod 0600 "${WORKARCHIVE}"
+        pr_stdout " "
+        pr_stdout "Collected data was saved to:"
+        pr_stdout " >>  ${WORKARCHIVE}  <<"
+        pr_stdout " "
+        pr_stdout "Review the collected data before sending to your service organization. "
+        pr_stdout " "
+    elif [ $rc_tar -eq 127 ]; then
+        pr_stdout " "
+        pr_stdout "${SCRIPTNAME}: Error: tar command is not available!"
+        pr_stdout "     Please install the corresponding package!"
     else
-	chmod 0600 "${WORKARCHIVE}"
-	pr_stdout " "
-	pr_stdout "Collected data was saved to:"
-	pr_stdout " >>  ${WORKARCHIVE}  <<"
+        pr_stdout " "
+        pr_stdout "${SCRIPTNAME}: Error: Collection of data failed!"
+        pr_stdout "       The creation of \"${WORKARCHIVE}\" was not successful."
+        pr_stdout "       Please check the directory \"${WORKDIR_BASE}\""
+        pr_stdout "       to provide enough free available space."
     fi
-
-    pr_stdout " "
-    pr_stdout "Review the collected data before sending to your service organization. "
-    pr_stdout " "
 }
 
 
