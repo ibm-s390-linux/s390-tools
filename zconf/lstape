@@ -291,6 +291,23 @@ function SysfsCreateListSCSI()
 			if [ "$CHG_IDX" != "" ]; then
 				TAPE_DEV=$CHG_IDX
 			fi
+		elif [ "$(echo "$SCSI_LIST"|grep lin_tape)" != "" ]; then
+			# bash glob sorts so IBMtape0 comes before IBMtape0n
+			local IBM_PATH=$(
+				ls -1d $SCSI_DEV/lin_tape/$DEV_NAME[0-9]* |
+				head -n 1)
+			if [ -d "$IBM_PATH" ]; then
+				IBM_IDX=${IBM_PATH##*/}
+			else
+				# deprecated sysfs layout
+				IBM_IDX=$(
+					echo "$SCSI_LIST" |
+					awk -F: '/lin_tape\:'"$DEV_NAME"'[0-9]+$/{print $NF}'
+				)
+			fi
+			if [ "$IBM_IDX" != "" ]; then
+				TAPE_DEV=$IBM_IDX
+			fi
 		elif [ -r /proc/scsi/$DEV_NAME ]; then
 				IBM_IDX=$(
 					grep -wF "$SCSI_ID" /proc/scsi/$DEV_NAME |
