@@ -134,8 +134,8 @@ echo "$cmd: Copying virtio modules"
 mkdir -p $builddir/$netdir
 mkdir -p $builddir/$blkdir
 set +e
-cp $netdir/virtio_net.ko $builddir/$netdir 2> /dev/null
-cp $blkdir/virtio_blk.ko $builddir/$blkdir 2> /dev/null
+cp $netdir/virtio_net.ko* $builddir/$netdir 2> /dev/null
+cp $blkdir/virtio_blk.ko* $builddir/$blkdir 2> /dev/null
 set -e
 
 # Busybox (+ dependencies)
