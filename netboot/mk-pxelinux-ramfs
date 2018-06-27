@@ -170,7 +170,7 @@ cat <<'EOF' > $builddir/init
 /bin/mount -t tmpfs none /run
 
 /sbin/modprobe virtio_net
-/sbin/udhcpc -O pxeconffile -O pxepathprefix &
+/sbin/udhcpc -O pxeconffile -O pxepathprefix -x 93:001F &
 
 /sbin/pxeboot.script
 EOF
@@ -237,6 +237,7 @@ case "$1" in
 	echo " router: $router"
 	echo " domain: $domain $dns"
 	echo " tftp: $siaddr"
+	echo " pxepathprefix: $pxepathprefix"
 	# flush routes
 	/sbin/ip route flush table all
 	# setup if link
@@ -272,6 +273,7 @@ case "$1" in
 	    echo "siaddr=$siaddr" > $PXECONF
 	    echo "interface=$interface" >> $PXECONF
 	    echo "ip=$ip" >> $PXECONF
+	    echo "pxepathprefix=$pxepathprefix" >> $PXECONF
 	fi
 	;;
 
@@ -354,7 +356,7 @@ then
     for c in $CONFIGS
     do
 	echo "fetching config pxelinux.cfg/$c from $siaddr"
-	if /usr/bin/tftp -g -l /tmp/config -r pxelinux.cfg/$c $siaddr
+	if /usr/bin/tftp -g -l /tmp/config -r ${pxepathprefix}pxelinux.cfg/$c $siaddr
 	then
 	    break
 	fi
@@ -378,13 +380,13 @@ then
     exit
 else
     echo fetch kernel $kernel from $siaddr
-    /usr/bin/tftp -g -l /tmp/kernel -r $kernel $siaddr
+    /usr/bin/tftp -g -l /tmp/kernel -r $pxepathprefix$kernel $siaddr
 fi
 
 if [ -n "$initrd" ]
 then
     echo fetch initrd $initrd from $siaddr
-    /usr/bin/tftp -g -l /tmp/initrd -r $initrd $siaddr
+    /usr/bin/tftp -g -l /tmp/initrd -r $pxepathprefix$initrd $siaddr
     INITRD="--initrd=/tmp/initrd"
 else
     INITRD=""

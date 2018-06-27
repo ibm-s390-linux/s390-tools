@@ -9,6 +9,7 @@ Release history for s390-tools (MIT version)
   Bug Fixes:
   - mon_procd: fix parsing of /proc/<pid>/stat
   - netboot: Include compressed kernel modules in initramfs
+  - netboot: Send client architecture and handle path prefix
 
  * __v2.5.0 (2018-06-08)__
 
