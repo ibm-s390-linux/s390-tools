@@ -594,17 +594,18 @@ static void cal_task_pcpu(struct task_t *task, const unsigned long long tics)
 */
 static int read_stat(struct task_t *task)
 {
-	int ppid, tty, proc;
-	unsigned long flags, pri, nice;
-	unsigned long long maj_flt, utime, stime, cutime, cstime;
+	unsigned long long maj_flt = 0, utime = 0, stime = 0, cutime = 0,
+			   cstime = 0;
+	unsigned long flags = 0, pri = 0, nice = 0;
 	char *cmd_start, *cmd_end, *cmdlenp, *cmdp;
+	int ppid = 0, tty = 0, proc = 0, rc;
 
 	snprintf(fname, sizeof(fname), "/proc/%u/stat", task->pid);
 	if (read_file(fname, buf, sizeof(buf) - 1) == -1)
 		return 0;
 
 	cmd_start = strchr(buf, '(') + 1;
-	cmd_end = strchr(cmd_start, ')');
+	cmd_end = strrchr(cmd_start, ')');
 	name_lens.cmd_len = cmd_end - cmd_start;
 	cmdlenp = mon_record + sizeof(struct monwrite_hdr);
 	cmdlenp += sizeof(struct procd_hdr);
@@ -625,7 +626,7 @@ static int read_stat(struct task_t *task)
 	memcpy(cmdlenp, &name_lens.cmd_len, sizeof(__u16));
 
 	cmd_end += 2;
-	sscanf(cmd_end,
+	rc = sscanf(cmd_end,
 		"%c %d %*d %*d %d %*d "
 		"%lu %*s %*s %Lu %*s "
 		"%Lu %Lu %Lu %Lu "
@@ -642,6 +643,8 @@ static int read_stat(struct task_t *task)
 		&utime, &stime, &cutime, &cstime,
 		&pri, &nice,
 		&proc);
+	if (rc != 12)
+		syslog(LOG_ERR, "bad data in %s \n", fname);
 	task->ppid = (__u32)ppid;
 	task->tty = (__u16)tty;
 	task->flags = (__u32)flags;
