@@ -373,6 +373,7 @@ fi
 kernel=$(/bin/grep -i "^[[:space:]]*kernel" /tmp/config | sed "s/^[[:space:]]*kernel[[:space:]]*//I")
 initrd=$(/bin/grep -i "^[[:space:]]*initrd" /tmp/config | sed "s/^[[:space:]]*initrd[[:space:]]*//I")
 append=$(/bin/grep -i "^[[:space:]]*append" /tmp/config | sed "s/^[[:space:]]*append[[:space:]]*//I")
+ipappend=$(/bin/grep -i "^[[:space:]]*ipappend" /tmp/config | sed "s/^[[:space:]]*ipappend[[:space:]]*//I")
 
 if [ -z "$kernel" ]
 then
@@ -396,6 +397,9 @@ if [ -z "$append" ]; then
     echo "Kexec load: kexec -l /tmp/kernel $INITRD"
     kexec -l /tmp/kernel $INITRD
 else
+    if [ "$ipappend" = "2" ]; then
+       $append="$append BOOTIF=01-$ifaddr"
+    fi
     echo "Kexec load: kexec -l /tmp/kernel $INITRD --append=\"$append\""
     kexec -l /tmp/kernel $INITRD --append="$append"
 fi

@@ -5,6 +5,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 4.18
 
   Changes of existing tools:
+  - netboot: add BOOTIF support
 
   Bug Fixes:
   - mon_procd: fix parsing of /proc/<pid>/stat
