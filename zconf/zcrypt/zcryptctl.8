@@ -1,0 +1,147 @@
+.\" zcryptctl.8
+.\"
+.\" Copyright 2018 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" use
+.\"   groff -man -Tutf8 zcryptctl.8
+.\" or
+.\"   nroff -man zcryptctl.8
+.\" to process this source
+.\"
+.TH ZCRYPTCTL 8 "AUG 2018" "s390-tools"
+.SH NAME
+zcryptctl \- display information and administrate zcrypt multiple device nodes
+.SH SYNOPSIS
+.TP 8
+.B zcryptctl list
+.TP
+.B zcryptctl create
+.R [
+.I node-name
+.R ]
+.TP
+.B zcryptctl destroy
+.I node-name
+.TP
+.B zcryptctl addap
+.R |
+.B delap
+.I node-name adapter-nr
+.TP
+.B zcryptctl adddom
+.R |
+.B deldom
+.I node-name domain-nr
+.TP
+.B zcryptctl addioctl
+.R |
+.B delioctl
+.I node-name ioctl-term
+.TP
+.B zcryptctl config
+.I config-file
+.TP
+.B zcryptctl listconfig
+.SH DESCRIPTION
+The
+.B zcryptctl
+command displays information and maintains the multi device node
+extension for the zcrypt device driver.
+.P
+With the multi device node extension you can create and configure
+additional zcrypt device nodes which can be used as alternate device
+nodes to access the crypto hardware provided by the zcrypt device
+driver. Each zcrypt device node can be restricted in terms of crypto
+cards, domains, and available ioctls. Such a device node can be used
+as a base for container solutions like Docker to control and restrict
+the access to crypto resources.
+.SH COMMANDS
+.TP 8
+.B zcryptctl list
+Show all the additional device nodes that are currently active.
+.TP
+.B zcryptctl create
+.R [
+.I node-name
+.R ]
+Create a new zcrypt device node. The \fInode-name\fP might be given
+and needs to be unique and not in use. If there is no node name
+provided, the zcrypt device driver will create a new one with pattern
+zcrypt_\fIx\fP, with \fIx\fP being the next free number. Up to 256
+additional device nodes can be created. The newly created additional
+device node appears in /dev and has read and write permissions enabled
+only for root. By default all adapters, domains and ioctls are
+initially disabled on this new device node.
+.TP
+.B zcryptctl destroy
+.I node-name
+Destroy an additional zcrypt device node. The device node is only
+marked for disposal and destroyed when it is no longer used.
+.TP
+.B zcryptctl addap
+.R |
+.B delap
+.I node-name adapter-nr
+Update the filter for the specified zcrypt device node and add or
+delete a crypto adapter to be accessible via this node. The symbol
+\fBALL\fP can be used to enable or disable all adapters.
+.TP
+.B zcryptctl adddom
+.R |
+.B deldom
+.I node-name domain-nr
+Update the filter for the specified zcrypt device node and add or
+delete a domain to be accessible through this node. The symbol
+\fBALL\fP can be used to enable or disable all domains.
+.TP
+.B zcryptctl addioctl
+.R |
+.B delioctl
+.I node-name ioctl-term
+Update the filter for the specified zcrypt device node and add or
+delete an ioctl. The ioctl might be specified as symbolic string (one
+of \fBICARSAMODEXPO\fP, \fBICARSACRT\fP, \fBZSECSENDCPRB\fP,
+\fBZSENDEP11CPRB\fP, \fBZCRYPT_DEVICE_STATUS\fP,
+\fBZCRYPT_STATUS_MASK\fP, \fBZCRYPT_QDEPTH_MASK\fP,
+\fBZCRYPT_PERDEV_REQCNT\fP) or numeric value in the range 0-255 and
+the symbol \fBALL\fP can be used to include all ioctls.
+.TP
+.B zcryptctl config
+.I config-file
+Process a config file. The given configuration file is read line by
+line and the settings are applied. Syntax is simple:
+.RS
+.IP "node=<node-name>"
+.IP "aps=<list of ap numbers separated by space, tab or ','>"
+.IP "doms=<list of domain numbers separated by space, tab or ','>"
+.IP "ioctls=<list of ioctl as numeric or symbolic number separated by space, tab or ','>"
+.LP
+Empty lines are ignored and the '#' marks the rest of the
+line as comment.
+.LP
+The \fBnode=\fP line creates a new zcrypt device node, the \fBaps=\fP,
+\fBdoms=\fP and \fBioctls=\fP lines customize the previously created
+node. The symbol \fBALL\fP is also recognized for aps, doms, and
+ioctls.
+.LP
+Each action must fit into one line, spreading over multiple lines is
+not supported. But you can use more than one \fBaps=\fP, \fBdoms=\fP
+and \fBioctls=\fP lines to customize the very same node.
+.LP
+Processing stops when a line cannot be parsed or the current action
+fails. In this case the exit status is non zero but the successful
+actions until the failure occurs are not rolled back.
+.RE
+.TP
+.B zcryptctl listconfig
+List the current configuration in a form suitable for input to the
+\fBzcryptctl config\fP command.
+.LP
+.SH EXIT STATUS
+On successful completion of the command the exit status is 0. A non
+zero return code (and some kind of failure message) is emitted if the
+processing could not complete successful.
+.SH SEE ALSO
+\fBlszcrypt\fR(8)
