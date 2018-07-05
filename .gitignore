@@ -76,7 +76,7 @@ zdsfs/zdsfs
 zdump/zgetdump
 zfcpdump/cpioinit
 zfcpdump/zfcpdump_part
-zfcpdump/zfcpdump_part.rd
+zfcpdump/zfcpdump-initrd
 ziomon/ziomon_mgr
 ziomon/ziomon_util
 ziomon/ziomon_zfcpdd
