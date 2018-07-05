@@ -874,22 +874,22 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 {
 	int rc;
 	/* Add data needed to convert fs dump job to IPL job */
-	rc = misc_check_readable_file(FSDUMP_PART_IMAGE);
+	rc = misc_check_readable_file(ZFCPDUMP_IMAGE);
 	if (rc) {
 		error_text("Need external file '%s' for partition dump",
-			   FSDUMP_PART_IMAGE);
+			   ZFCPDUMP_IMAGE);
 		return rc;
 	}
-	dump->image = misc_strdup(FSDUMP_PART_IMAGE);
+	dump->image = misc_strdup(ZFCPDUMP_IMAGE);
 	if (dump->image == NULL)
 		return -1;
 	dump->image_addr = DEFAULT_IMAGE_ADDRESS;
 
 	/* Ramdisk is no longer required with new initramfs dump system */
-	if (misc_check_readable_file(FSDUMP_PART_RAMDISK))
+	if (misc_check_readable_file(ZFCPDUMP_INITRD))
 		dump->ramdisk = NULL;
 	else {
-		dump->ramdisk = misc_strdup(FSDUMP_PART_RAMDISK);
+		dump->ramdisk = misc_strdup(ZFCPDUMP_INITRD);
 		if (dump->ramdisk == NULL)
 			return -1;
 		dump->ramdisk_addr = UNSPECIFIED_ADDRESS;
