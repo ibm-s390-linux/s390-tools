@@ -288,12 +288,10 @@ no_reipl:
 /*
  * Signal handler for zfcp_dumper
  */
-static __sighandler_t dump_sig_handler(int sig, siginfo_t *UNUSED(sip),
-				       void *UNUSED(p))
+static void dump_sig_handler(int sig, siginfo_t *UNUSED(sip), void *UNUSED(p))
 {
 	PRINT_ERR("Got signal: %i\n", sig);
 	terminate(1);
-	return NULL;
 }
 
 /*
@@ -304,7 +302,7 @@ static __sighandler_t dump_sig_handler(int sig, siginfo_t *UNUSED(sip),
 static int init_sig(void)
 {
 	g.sigact.sa_flags = (SA_NODEFER | SA_SIGINFO | SA_RESETHAND);
-	g.sigact.sa_handler = (__sighandler_t)dump_sig_handler;
+	g.sigact.sa_sigaction = dump_sig_handler;
 	if (sigemptyset(&g.sigact.sa_mask) < 0)
 		return -1;
 	if (sigaction(SIGINT, &g.sigact, NULL) < 0)
