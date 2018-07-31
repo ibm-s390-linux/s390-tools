@@ -360,40 +360,9 @@ void show_progress(unsigned long done)
 }
 
 /*
- * Load a kernel module
- */
-static void modprobe(const char *module)
-{
-	pid_t pid;
-
-	pid = fork();
-	if (pid < 0) {
-		PRINT_PERR("fork failed\n");
-		return;
-	} else if (pid == 0) {
-		execl("/bin/modprobe", "modprobe", module, "-q", NULL);
-		execl("/sbin/modprobe", "modprobe", module, "-q", NULL);
-		exit(1);
-	} else {
-		waitpid(pid, NULL, 0);
-	}
-}
-
-/*
- * Load all required kernel modules
- */
-static void load_modules(const char *module_list[])
-{
-	int i;
-
-	for (i = 0; module_list[i]; i++)
-		modprobe(module_list[i]);
-}
-
-/*
  * Initialize zfcpdump
  */
-int zfcpdump_init(const char *module_list[])
+int zfcpdump_init(void)
 {
 	char start_time_str[128], linux_version[256];
 
@@ -436,7 +405,6 @@ int zfcpdump_init(const char *module_list[])
 		PRINT_ERR("Could not parse parmline\n");
 		return -1;
 	}
-	load_modules(module_list);
 	if (enable_zfcp_device()) {
 		PRINT_ERR("Could not enable dump device\n");
 		return -1;

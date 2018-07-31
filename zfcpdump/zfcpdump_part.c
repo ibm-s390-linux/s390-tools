@@ -103,7 +103,6 @@ struct scsi_mbr {
 /*
  * Globals
  */
-static const char *module_list[] = {"zfcp", "sd_mod", "zcore_mod", NULL};
 static struct scsi_dump_sb dump_sb;
 static struct scsi_mbr mbr;
 
@@ -440,7 +439,7 @@ int main(int UNUSED(argc), char *UNUSED(argv[]))
 {
 	int rc;
 
-	if (zfcpdump_init(module_list))
+	if (zfcpdump_init())
 		return terminate(1);
 	PRINT("Dump parameters:\n");
 	PRINT(" devno....: %s\n", g.dump_devno);

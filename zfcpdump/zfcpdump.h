@@ -103,7 +103,7 @@ struct mem_chunk {
  */
 void release_hsa(void);
 __u64 get_hsa_size(void);
-int zfcpdump_init(const char *module_list[]);
+int zfcpdump_init(void);
 void print_newline(void);
 void show_progress(unsigned long done);
 int terminate(int rc);
