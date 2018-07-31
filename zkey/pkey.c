@@ -158,8 +158,8 @@ u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 
 	buf = util_malloc(size);
 	count = fread(buf, 1, size, fp);
-	if (count <= 0) {
-		msg = feof(fp) ? "File is too small" : strerror(errno);
+	if (count != size) {
+		msg = ferror(fp) ? strerror(errno) : "File is too small";
 		warnx("File '%s': %s", keyfile, msg);
 		free(buf);
 		buf = NULL;
@@ -206,7 +206,7 @@ int write_secure_key(const char *keyfile, const u8 *secure_key,
 	}
 
 	count = fwrite(secure_key, 1, secure_key_size, fp);
-	if (count <= 0) {
+	if (count != secure_key_size) {
 		warnx("File '%s': %s", keyfile, strerror(errno));
 		fclose(fp);
 		return -EIO;
@@ -296,8 +296,8 @@ static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
 
 	buf = util_malloc(size);
 	count = fread(buf, 1, size, fp);
-	if (count <= 0) {
-		msg = feof(fp) ? "File is too small" : strerror(errno);
+	if (count != size) {
+		msg = ferror(fp) ? strerror(errno) : "File is too small";
 		warnx("File '%s': %s", keyfile, msg);
 		free(buf);
 		buf = NULL;
