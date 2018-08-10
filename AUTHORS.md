@@ -16,6 +16,7 @@ List of all individuals having contributed content to s390-tools
 - Clemens von Mann
 - Dan Horak
 - Despina Papadopoulou
+- Dimitri John Ledkov
 - Eberhard Pasch
 - Einar Lueck
 - Erwin Vicari

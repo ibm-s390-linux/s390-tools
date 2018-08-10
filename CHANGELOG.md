@@ -1,9 +1,11 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.5.1 (XXXX-XX-XX)__
+ * __v2.6.0 (2018-08-10)__
 
   For Linux kernel version: 4.18
 
+  Add new tool:
+  - zkey: Add zkey-cryptsetup tool
   Changes of existing tools:
   - netboot: add BOOTIF support
 
