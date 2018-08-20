@@ -5,6 +5,13 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
 
   Bug Fixes:
+  - lstape: fix output with SCSI lin_tape and multiple paths to same unit
+  - lstape: fix output without SCSI generic (sg)
+  - lsluns: fix to prevent error messages if there are non-zfcp SCSI devices
+  - lstape: fix to prevent error messages if there are non-zfcp SCSI devices
+  - lstape: fix description of --type and <devbusid> filter for channel tapes
+  - lstape: fix SCSI output description in man page
+  - lstape: fix SCSI HBA CCW device bus-ID e.g. for virtio-scsi-ccw
 
 
  * __v2.6.0 (2018-08-10)__
