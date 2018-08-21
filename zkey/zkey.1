@@ -335,7 +335,6 @@ to a file in the file system. Specify the name of the key that is to be exported
 using the
 .B \-\-name
 option. You cannot use wildcards.
-When wildcards are used you must quote the value.
 The exported secure key also remains in the secure key repository.
 .
 .SS "List AES secure keys contained in the secure key repository"
@@ -392,9 +391,11 @@ option.
 .PP
 .B Note:
 When removing a secure key that is associated with one or multiple volumes,
+and the key's volume type is \fBplain\fP,
 a message informs you about the associated volumes. When the secure key is
 removed, these volumes can no longer be used, unless you have a backup of the
-secure key.
+secure key. For keys with volume type \fBluks2\fP no such message is issued,
+because the secure key is contained in the LUKS2 header.
 .
 .SS "Change existing AES secure keys contained the secure key repository"
 .
@@ -469,6 +470,15 @@ Specify the name of the key that is to be renamed using the
 option and the new name using the
 .B \-\-new-name
 option. You cannot use wildcards.
+.
+.B Note:
+When renaming a secure key that is associated with one or multiple volumes and
+the key's volume type is \fBplain\fP, a message informs you about the
+associated volumes. When the secure key is renamed, these volumes can no
+longer be used, unless you change the name of the secure key in the 'cryptsetup
+plainOpen' commands and in the '/etc/crypttab' entries.
+For keys with volume type \fBluks2\fP no such message is issued, because the
+secure key is contained in the LUKS2 header.
 .
 .SS "Copy (duplicate) existing AES secure keys in the secure key repository"
 .
