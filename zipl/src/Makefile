@@ -41,6 +41,8 @@ clean:
 
 # Additional manual dependencies
 
+.boot.o.d boot.o: ../boot/data.h
+
 ../boot/data.h:
 	make -C ../boot data.h
 
