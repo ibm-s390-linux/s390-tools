@@ -1,7 +1,7 @@
 /**
  * lszcrypt - Display zcrypt devices and configuration settings
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -57,6 +57,25 @@ struct lszcrypt_l *lszcrypt_l = &l;
 #define CLASS_STATELESS       "restricted function set"
 
 /*
+ * facility bits
+ */
+#define MAX_FAC_BITS 9
+static struct fac_bits_s {
+	int mask;
+	char c;
+} fac_bits[MAX_FAC_BITS] = {
+	{ 0x80000000, 'S' },
+	{ 0x40000000, 'M' },
+	{ 0x20000000, 'C' },
+	{ 0x10000000, 'D' },
+	{ 0x08000000, 'A' },
+	{ 0x04000000, 'X' },
+	{ 0x02000000, 'N' },
+	{ 0x00800000, 'F' },
+	{ 0x00400000, 'R' },
+};
+
+/*
  * Program configuration
  */
 const struct util_prg prg = {
@@ -66,7 +85,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2017,
+			.pub_last = 2018,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -255,7 +274,8 @@ static void show_capability(const char *id_str)
 	/* Skip devices, which are not supported by zcrypt layer */
 	if (!util_path_is_readable("%s/type", dev) ||
 	    !util_path_is_readable("%s/online", dev)) {
-		printf("Detailed capability information for %s (hardware type %ld) is not available.\n", card, hwtype);
+		printf("Detailed capability information for %s (hardware type %ld) is not available.\n",
+		       card, hwtype);
 		return;
 	}
 	cbuf[0] = '\0';
@@ -299,11 +319,13 @@ static void show_capability(const char *id_str)
 		} else if (func_val & MASK_EP11) {
 			printf("%s", CAP_EP11);
 		} else {
-			printf("Detailed capability information for %s (hardware type %ld) is not available.", card, hwtype);
+			printf("Detailed capability information for %s (hardware type %ld) is not available.",
+			       card, hwtype);
 		}
 		break;
 	default:
-			printf("Detailed capability information for %s (hardware type %ld) is not available.", card, hwtype);
+			printf("Detailed capability information for %s (hardware type %ld) is not available.",
+			       card, hwtype);
 		break;
 	}
 	printf("\n");
@@ -315,17 +337,22 @@ static void show_capability(const char *id_str)
 static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 				    const char *sub_dev)
 {
-	unsigned long facility;
 	char buf[256];
+	unsigned long facility;
 
-	util_file_read_line(buf, sizeof(buf), "%s/type", grp_dev);
-	util_rec_set(rec, "type", buf);
-
-	util_file_read_line(buf, sizeof(buf), "%s/%s/online", grp_dev, sub_dev);
-	if (strcmp(buf, "0") == 0)
-		util_rec_set(rec, "online", "offline");
+	if (util_file_read_line(buf, sizeof(buf), "%s/type", grp_dev))
+		util_rec_set(rec, "type", "-");
 	else
-		util_rec_set(rec, "online", "online");
+		util_rec_set(rec, "type", buf);
+
+	if (util_file_read_line(buf, sizeof(buf), "%s/%s/online",
+				grp_dev, sub_dev))
+		util_rec_set(rec, "online", "-");
+	else
+		if (strcmp(buf, "0") == 0)
+			util_rec_set(rec, "online", "offline");
+		else
+			util_rec_set(rec, "online", "online");
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
 	if (facility & MASK_COPRO)
@@ -339,7 +366,7 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 
 	util_file_read_line(buf, sizeof(buf), "%s/%s/request_count",
 			    grp_dev, sub_dev);
-	util_rec_set(rec, "request_count", buf);
+	util_rec_set(rec, "requests", buf);
 }
 
 /*
@@ -348,20 +375,19 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 				    const char *sub_dev)
 {
+	int i;
 	unsigned long facility;
-	char buf[256];
-	long depth;
+	char buf[256], afile[PATH_MAX];
+	long depth, pending1, pending2;
 
 	if (l.verbose == 0)
 		return;
 
-	util_file_read_line(buf, sizeof(buf), "%s/%s/pendingq_count",
-		       grp_dev, sub_dev);
-	util_rec_set(rec, "pendingq_count", buf);
-
-	util_file_read_line(buf, sizeof(buf), "%s/%s/requestq_count",
-		       grp_dev, sub_dev);
-	util_rec_set(rec, "requestq_count", buf);
+	util_file_read_l(&pending1, 10, "%s/%s/pendingq_count",
+			 grp_dev, sub_dev);
+	util_file_read_l(&pending2, 10, "%s/%s/requestq_count",
+			 grp_dev, sub_dev);
+	util_rec_set(rec, "pending", "%ld", pending1 + pending2);
 
 	util_file_read_line(buf, sizeof(buf), "%s/hwtype", grp_dev);
 	util_rec_set(rec, "hwtype", buf);
@@ -370,7 +396,18 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 	util_rec_set(rec, "depth", "%02d", depth + 1);
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
-	util_rec_set(rec, "facility", "0x%08x", facility);
+	for (i = 0; i < MAX_FAC_BITS; i++)
+		buf[i] = facility & fac_bits[i].mask ? fac_bits[i].c : '-';
+	buf[i] = '\0';
+	util_rec_set(rec, "facility", buf);
+
+	snprintf(afile, sizeof(afile), "%s/%s/driver", grp_dev, sub_dev);
+	afile[sizeof(afile) - 1] = '\0';
+	memset(buf, 0, sizeof(buf));
+	if (readlink(afile, buf, sizeof(buf)) > 0)
+		util_rec_set(rec, "driver", strrchr(buf, '/') + 1);
+	else
+		util_rec_set(rec, "driver", "-no-driver-");
 }
 
 /*
@@ -382,9 +419,13 @@ static void show_subdevice(struct util_rec *rec, const char *grp_dev,
 	if (!util_path_is_dir("%s/%s", grp_dev, sub_dev))
 		errx(EXIT_FAILURE, "Error - cryptographic device %s/%s does not exist.", grp_dev, sub_dev);
 
-	/* Skip devices, which are not supported by zcrypt layer */
-	if (!util_path_is_readable("%s/type", grp_dev) ||
-	    !util_path_is_readable("%s/%s/online", grp_dev, sub_dev))
+	/*
+	 * If not verbose mode, skip devices which are not supported
+	 * by the zcrypt layer.
+	 */
+	if (l.verbose == 0 &&
+	    (!util_path_is_readable("%s/type", grp_dev) ||
+	     !util_path_is_readable("%s/%s/online", grp_dev, sub_dev)))
 		return;
 
 	util_rec_set(rec, "card", sub_dev);
@@ -414,11 +455,13 @@ static void show_subdevices(struct util_rec *rec, const char *grp_dev)
  */
 static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 {
-	unsigned long facility;
 	char buf[256];
+	unsigned long facility;
 
-	util_file_read_line(buf, sizeof(buf), "%s/type", grp_dev);
-	util_rec_set(rec, "type", buf);
+	if (util_file_read_line(buf, sizeof(buf), "%s/type", grp_dev))
+		util_rec_set(rec, "type", "-");
+	else
+		util_rec_set(rec, "type", buf);
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
 	if (facility & MASK_COPRO)
@@ -430,14 +473,16 @@ static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 	else
 		util_rec_set(rec, "mode", "Unknown");
 
-	util_file_read_line(buf, sizeof(buf), "%s/online", grp_dev);
-	if (strcmp(buf, "0") == 0)
-		util_rec_set(rec, "online", "offline");
+	if (util_file_read_line(buf, sizeof(buf), "%s/online", grp_dev))
+		util_rec_set(rec, "online", "-");
 	else
-		util_rec_set(rec, "online", "online");
+		if (strcmp(buf, "0") == 0)
+			util_rec_set(rec, "online", "offline");
+		else
+			util_rec_set(rec, "online", "online");
 
 	util_file_read_line(buf, sizeof(buf), "%s/request_count", grp_dev);
-	util_rec_set(rec, "request_count", buf);
+	util_rec_set(rec, "requests", buf);
 }
 
 /*
@@ -445,18 +490,17 @@ static void read_rec_default(struct util_rec *rec, const char *grp_dev)
  */
 static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 {
+	int i;
 	unsigned long facility;
-	char buf[256];
-	long depth;
+	char buf[256], afile[PATH_MAX];
+	long depth, pending1, pending2;
 
 	if (l.verbose == 0)
 		return;
 
-	util_file_read_line(buf, sizeof(buf), "%s/pendingq_count", grp_dev);
-	util_rec_set(rec, "pendingq_count", buf);
-
-	util_file_read_line(buf, sizeof(buf), "%s/requestq_count", grp_dev);
-	util_rec_set(rec, "requestq_count", buf);
+	util_file_read_l(&pending1, 10, "%s/pendingq_count", grp_dev);
+	util_file_read_l(&pending2, 10, "%s/requestq_count", grp_dev);
+	util_rec_set(rec, "pending", "%ld", pending1 + pending2);
 
 	util_file_read_line(buf, sizeof(buf), "%s/hwtype", grp_dev);
 	util_rec_set(rec, "hwtype", buf);
@@ -465,7 +509,18 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 	util_rec_set(rec, "depth", "%02d", depth + 1);
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
-	util_rec_set(rec, "facility", "0x%08x", facility);
+	for (i = 0; i < MAX_FAC_BITS; i++)
+		buf[i] = facility & fac_bits[i].mask ? fac_bits[i].c : '-';
+	buf[i] = '\0';
+	util_rec_set(rec, "facility", buf);
+
+	snprintf(afile, sizeof(afile), "%s/driver", grp_dev);
+	afile[sizeof(afile) - 1] = '\0';
+	memset(buf, 0, sizeof(buf));
+	if (readlink(afile, buf, sizeof(buf)) > 0)
+		util_rec_set(rec, "driver", strrchr(buf, '/') + 1);
+	else
+		util_rec_set(rec, "driver", "-no-driver-");
 }
 
 /*
@@ -481,9 +536,14 @@ static void show_device(struct util_rec *rec, const char *device)
 	grp_dev = util_path_sysfs("devices/ap/%s", device);
 	if (!util_path_is_dir(grp_dev))
 		errx(EXIT_FAILURE, "Error - cryptographic device %s does not exist.", device);
-	/* Skip devices, which are not supported by zcrypt layer */
-	if (!util_path_is_readable("%s/type", grp_dev) ||
-	    !util_path_is_readable("%s/online", grp_dev)) {
+
+	/*
+	 * If not verbose mode, skip devices which are not supported
+	 * by the zcrypt layer.
+	 */
+	if (l.verbose == 0 &&
+	    (!util_path_is_readable("%s/type", grp_dev) ||
+	     !util_path_is_readable("%s/online", grp_dev))) {
 		goto out_free;
 	}
 	util_rec_set(rec, "card", card);
@@ -506,8 +566,7 @@ static void define_rec_default(struct util_rec *rec)
 	util_rec_def(rec, "type", UTIL_REC_ALIGN_LEFT, 5, "TYPE");
 	util_rec_def(rec, "mode", UTIL_REC_ALIGN_LEFT, 11, "MODE");
 	util_rec_def(rec, "online", UTIL_REC_ALIGN_LEFT, 7, "STATUS");
-	util_rec_def(rec, "request_count", UTIL_REC_ALIGN_RIGHT, 11,
-		     "REQUEST_CNT");
+	util_rec_def(rec, "requests", UTIL_REC_ALIGN_RIGHT, 8, "REQUESTS");
 }
 
 /*
@@ -517,13 +576,11 @@ static void define_rec_verbose(struct util_rec *rec)
 {
 	if (l.verbose == 0)
 		return;
-	util_rec_def(rec, "pendingq_count", UTIL_REC_ALIGN_RIGHT, 12,
-		     "PENDINGQ_CNT");
-	util_rec_def(rec, "requestq_count", UTIL_REC_ALIGN_RIGHT, 12,
-		     "REQUESTQ_CNT");
-	util_rec_def(rec, "hwtype", UTIL_REC_ALIGN_RIGHT, 7, "HW_TYPE");
-	util_rec_def(rec, "depth", UTIL_REC_ALIGN_RIGHT, 7, "Q_DEPTH");
+	util_rec_def(rec, "pending", UTIL_REC_ALIGN_RIGHT, 8, "PENDING");
+	util_rec_def(rec, "hwtype", UTIL_REC_ALIGN_RIGHT, 6, "HWTYPE");
+	util_rec_def(rec, "depth", UTIL_REC_ALIGN_RIGHT, 6, "QDEPTH");
 	util_rec_def(rec, "facility", UTIL_REC_ALIGN_LEFT, 10, "FUNCTIONS");
+	util_rec_def(rec, "driver", UTIL_REC_ALIGN_LEFT, 11, "DRIVER");
 }
 
 /*
