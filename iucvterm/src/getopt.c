@@ -75,9 +75,11 @@ static const struct tool_info iucv_tool[2] = {
 static void __noreturn usage_exit(const struct tool_info *prg, int is_error,
 				  const char *msg)
 {
+	FILE *file = is_error ? stderr : stdout;
+
 	if (msg != NULL)
-		fprintf(stderr, _("%s: %s\n"), prg->name, msg);
-	fprintf(stderr, _(prg->usage), prg->name, prg->name);
+		fprintf(file, _("%s: %s\n"), prg->name, msg);
+	fprintf(file, _(prg->usage), prg->name, prg->name);
 	exit(is_error ? 1 : 0);	/* rc=1 .. invalid args */
 }
 
