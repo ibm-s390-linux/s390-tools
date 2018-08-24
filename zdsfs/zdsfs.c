@@ -774,7 +774,7 @@ static const struct fuse_opt zdsfs_opts[] = {
 
 static void usage(const char *progname)
 {
-	fprintf(stderr,
+	fprintf(stdout,
 "Usage: %s <devices> <mountpoint> [<options>]\n"
 "\n"
 "Use the zdsfs command to provide read access to data sets stored on one or\n"
@@ -976,14 +976,24 @@ static int zdsfs_process_args(void *UNUSED(data), const char *arg, int key,
 		return 0;
 	case KEY_HELP:
 		usage(outargs->argv[0]);
+
+		/*
+		 * Usage output needs to go to stdout to be consistent with
+		 * coding guidelines. FUSE versions before 3.0.0 print help
+		 * output to stderr. Redirect stderr to stdout here to enforce
+		 * consistent behavior.
+		 */
+		fflush(stderr);
+		dup2(STDOUT_FILENO, STDERR_FILENO);
+
 		fuse_opt_add_arg(outargs, "-ho");
 		/* call fuse_main to let library print fuse options */
 		fuse_main(outargs->argc, outargs->argv, &rdf_oper, NULL);
 		exit(0);
 	case KEY_VERSION:
-		fprintf(stderr, COMP "FUSE file system for z/OS data set access"
+		fprintf(stdout, COMP "FUSE file system for z/OS data set access"
 			", program version %s\n", RELEASE_STRING);
-		fprintf(stderr, "Copyright IBM Corp. 2013, 2017\n");
+		fprintf(stdout, "Copyright IBM Corp. 2013, 2017\n");
 		exit(0);
 	default:
 		fprintf(stderr, "Unknown argument key %x\n", key);
