@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
 	) {
 		switch(c) {
 			case 'h':
-				fprintf(stderr, "%s", help_text);
+				fprintf(stdout, "%s", help_text);
 				exit(0);
 			case 'b':
 				ds.cntrl.blink = 1;
