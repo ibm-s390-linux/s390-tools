@@ -1338,7 +1338,7 @@ static int hmcdrv_fuse_main(struct fuse_args *args)
  */
 static void hmcdrv_fuse_usage(const char *progname)
 {
-	fprintf(stderr,
+	fprintf(stdout,
 		"Usage: %s MOUNTPOINT [OPTIONS]\n\n"
 		"Use the %s command to read files from a HMC drive DVD.\n"
 		"\n"
@@ -1450,7 +1450,7 @@ static int hmcdrv_fuse_optproc(void *data, const char *arg,
 		return 1;
 
 	case HMCDRV_FUSE_OPTKEY_VERSION:
-		fprintf(stderr, HMCDRV_FUSE_LOGHEAD
+		fprintf(stdout, HMCDRV_FUSE_LOGHEAD
 			"HMC drive DVD file system, version %s\n"
 			"Copyright IBM Corp. 2015, 2017\n",
 			HMCDRV_FUSE_RELEASE);
@@ -1458,6 +1458,16 @@ static int hmcdrv_fuse_optproc(void *data, const char *arg,
 
 	case HMCDRV_FUSE_OPTKEY_HELP:
 		hmcdrv_fuse_usage(outargs->argv[0]);
+
+		/*
+		 * Usage output needs to go to stdout to be consistent with
+		 * coding guidelines. FUSE versions before 3.0.0 print help
+		 * output to stderr. Redirect stderr to stdout here to enforce
+		 * consistent behavior.
+		 */
+		fflush(stderr);
+		dup2(STDOUT_FILENO, STDERR_FILENO);
+
 		fuse_opt_add_arg(outargs, "-ho");
 		hmcdrv_fuse_main(outargs);
 		exit(EXIT_SUCCESS);
