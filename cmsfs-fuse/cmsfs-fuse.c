@@ -76,7 +76,7 @@ static const struct fuse_opt cmsfs_opts[] = {
 
 static void usage(const char *progname)
 {
-	fprintf(stderr,
+	fprintf(stdout,
 "Usage: %s DEVICE MOUNTPOINT [OPTIONS]\n"
 "\n"
 "Use the cmsfs-fuse command to read and write files stored on a z/VM CMS disk.\n"
@@ -4498,14 +4498,23 @@ static int cmsfs_process_args(void *data, const char *arg, int key,
 		return 1;
 	case KEY_HELP:
 		usage(outargs->argv[0]);
+
+		/*
+		 * Usage output needs to go to stdout to be consistent with
+		 * coding guidelines. FUSE versions before 3.0.0 print help
+		 * output to stderr. Redirect stderr to stdout here to enforce
+		 * consistent behavior.
+		 */
+		fflush(stderr);
+		dup2(STDOUT_FILENO, STDERR_FILENO);
+
 		fuse_opt_add_arg(outargs, "-ho");
 		cmsfs_fuse_main(outargs, &cmsfs_oper);
 		exit(0);
 	case KEY_VERSION:
-		fprintf(stderr, COMP "FUSE file system for CMS disks "
+		fprintf(stdout, COMP "FUSE file system for CMS disks "
 			"program version %s\n", RELEASE_STRING);
-		fprintf(stderr, "Copyright IBM Corp. 2010, 2017\n");
-		fuse_opt_add_arg(outargs, "--version");
+		fprintf(stdout, "Copyright IBM Corp. 2010, 2017\n");
 		exit(0);
 
 	default:
