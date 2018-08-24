@@ -34,6 +34,12 @@ const struct util_prg prg = {
 	}
 };
 
+static const struct option opt_list[] = {
+	{ "help",	no_argument,	NULL, 'h' },
+	{ "version",	no_argument,	NULL, 'v' },
+	{ NULL,		no_argument,	NULL, 0 },
+};
+
 /*
  * Demonstrate the util_prg_print() functions
  */
@@ -49,7 +55,7 @@ int main(int argc, char *argv[])
 
 	util_prg_init(&prg);
 
-	while ((opt = getopt(argc, argv, "vhe")) != -1) {
+	while ((opt = getopt_long(argc, argv, "vhe", opt_list, NULL)) != -1) {
 		switch (opt) {
 		case 'v':
 			util_prg_print_version();
