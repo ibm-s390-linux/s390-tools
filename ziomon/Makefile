@@ -12,33 +12,33 @@ ziomon_mgr_main.o: ziomon_mgr.c
 ziomon_mgr: LDLIBS += -lm
 ziomon_mgr: ziomon_dacc.o ziomon_util.o ziomon_mgr_main.o ziomon_tools.o \
 	    ziomon_zfcpdd.o ziomon_msg_tools.o
-	$(LINK) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 ziomon_util_main.o: ziomon_util.c ziomon_util.h
 	$(CC) -DWITH_MAIN $(ALL_CFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 ziomon_util: LDLIBS += -lm
 ziomon_util: ziomon_util_main.o ziomon_tools.o
-	$(LINK) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 ziomon_zfcpdd_main.o: ziomon_zfcpdd.c ziomon_zfcpdd.h
 	$(CC) -DWITH_MAIN $(ALL_CFLAGS) $(ALL_CPPFLAGS) -c $< -o $@
 ziomon_zfcpdd: LDLIBS += -lm -lrt -lpthread
 ziomon_zfcpdd: ziomon_zfcpdd_main.o ziomon_tools.o
-	$(LINK) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 ziorep_traffic: ziorep_traffic.o ziorep_framer.o ziorep_frameset.o \
 		ziorep_printers.o ziomon_dacc.o ziomon_util.o \
 		ziomon_msg_tools.o ziomon_tools.o ziomon_zfcpdd.o \
 		ziorep_cfgreader.o ziorep_collapser.o ziorep_utils.o \
 		ziorep_filters.o
-	$(LINKXX) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINKXX) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 ziorep_utilization: ziorep_utilization.o ziorep_framer.o ziorep_frameset.o \
 		    ziorep_printers.o ziomon_dacc.o ziomon_util.o \
 		    ziomon_msg_tools.o ziomon_tools.o ziomon_zfcpdd.o \
 		    ziorep_cfgreader.o ziorep_collapser.o ziorep_utils.o \
 		    ziorep_filters.o
-	$(LINKXX) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINKXX) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install: all
 	$(SED) -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
