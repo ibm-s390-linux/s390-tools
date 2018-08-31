@@ -22,7 +22,6 @@ else
 	INSTALL_TARGETS += zkey-cryptsetup-skip-cryptsetup2
 endif
 
-CPPFLAGS += -I../include
 LIBS = $(rootdir)/libutil/libutil.a
 
 detect-libcryptsetup.h:
