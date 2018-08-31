@@ -22,7 +22,7 @@ else
 	INSTALL_TARGETS += zkey-cryptsetup-skip-cryptsetup2
 endif
 
-LIBS = $(rootdir)/libutil/libutil.a
+libs = $(rootdir)/libutil/libutil.a
 
 detect-libcryptsetup.h:
 	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.h
@@ -69,10 +69,10 @@ keystore.o: keystore.c keystore.h properties.h
 zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h misc.h
 
 zkey: LDLIBS = -ldl -lcrypto
-zkey: zkey.o pkey.o properties.o keystore.o $(LIBS)
+zkey: zkey.o pkey.o properties.o keystore.o $(libs)
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c
-zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(LIBS)
+zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(libs)
 
 install-common:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
