@@ -9,7 +9,7 @@ libs =  $(rootdir)/libvmdump/libvmdump.a
 objects = vmconvert.o
 
 vmconvert: $(objects) $(libs)
-	$(LINKXX) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINKXX) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR) $(DESTDIR)$(MANDIR)/man1

@@ -240,7 +240,7 @@ endif
 	$(CXX) $(ALL_CPPFLAGS) $(ALL_CXXFLAGS) -c $< -o $@
 
 %: %.o
-	$(LINK) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 %.a:
 	$(AR) rcs $@ $^
