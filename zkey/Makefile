@@ -70,9 +70,11 @@ zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h misc.h
 
 zkey: LDLIBS = -ldl -lcrypto
 zkey: zkey.o pkey.o properties.o keystore.o $(libs)
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c
 zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(libs)
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-common:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
