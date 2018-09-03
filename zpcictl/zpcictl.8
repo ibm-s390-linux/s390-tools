@@ -1,0 +1,80 @@
+.\" Copyright 2017 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" Macro for inserting an option description prologue.
+.\" .OD <long> [<short>] [args]
+.de OD
+.  ds args "
+.  if !'\\$3'' .as args \fI\\$3\fP
+.  if !'\\$4'' .as args \\$4
+.  if !'\\$5'' .as args \fI\\$5\fP
+.  if !'\\$6'' .as args \\$6
+.  if !'\\$7'' .as args \fI\\$7\fP
+.  PD 0
+.  if !'\\$2'' .IP "\fB\-\\$2\fP \\*[args]" 4
+.  if !'\\$1'' .IP "\fB\-\-\\$1\fP \\*[args]" 4
+.  PD
+..
+.
+.TH zpcictl 8 "Oct 2018" s390-tools zpcictl
+.
+.SH NAME
+zpcictl - Manage PCI devices on z Systems
+.
+.
+.SH SYNOPSIS
+.B "zpcictl"
+.I "OPTIONS"
+.I "DEVICE"
+.
+.
+.SH DESCRIPTION
+.B zpcictl
+is a tool for managing PCI devices on the IBM z Systems platform. It is
+especially used for reporting errorneous PCI devices to the service element.
+
+.B Note:
+For NVMe devices additional data (such as S.M.A.R.T. data) is collected and sent
+with any error handling action. The smartmontools are required to be installed
+for this to work.
+.PP
+.
+.
+.SH DEVICE
+.B DEVICE
+can be either the PCI slot address (e.g. 0000:00:00.0) or the main device node
+of an NVMe device (e.g. /dev/nvme0).
+.
+.
+.SH OPTIONS
+.SS Error Handling
+.OD reset "" "DEVICE"
+Reset
+.I DEVICE
+and initiate a re-initialisation of the adapter.
+.PP
+.
+.OD deconfigure "" "DEVICE"
+De-configure
+.I DEVICE
+and prepare for any repair action. This action will move the
+PCI device from a configured to a reserved state.
+.PP
+.
+.OD report-error "" "DEVICE"
+Report any device error for
+.IR DEVICE .
+The
+.I DEVICE
+is marked as erroneous and no further action is initiated on it.
+.PP
+.
+.SS Misc
+.OD help "h" ""
+Print usage information, then exit.
+.PP
+.
+.OD version "v" ""
+Print version information, then exit.
+.PP

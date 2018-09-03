@@ -90,3 +90,4 @@ zipl/src/chreipl_helper.device-mapper
 zipl/src/zipl
 zipl/src/zipl_helper.device-mapper
 zkey/zkey
+zpcictl/zpcictl
