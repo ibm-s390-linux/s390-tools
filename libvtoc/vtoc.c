@@ -398,7 +398,7 @@ void vtoc_volume_label_set_volser (volume_label_t *vlabel, char *volser)
 
 	strcpy(s, "      ");
 	vtoc_ebcdic_enc(s, s, VOLSER_LENGTH);
-	strncpy(vlabel->volid, s, VOLSER_LENGTH);
+	memcpy(vlabel->volid, s, VOLSER_LENGTH);
 
 	if (i > VOLSER_LENGTH) i = VOLSER_LENGTH;
 
@@ -743,8 +743,8 @@ static void vtoc_init_format_1_8_label (
 	bzero(f1->DS1DSNAM, sizeof(f1->DS1DSNAM));
 	sprintf(str, "PART    .NEW                                ");
 	vtoc_ebcdic_enc(str, str, 44);
-	strncpy(f1->DS1DSNAM, str, 44);
-	strncpy((char *) f1->DS1DSSN, "      ", 6);
+	memcpy(f1->DS1DSNAM, str, 44);
+	memcpy((char *) f1->DS1DSSN, "      ", 6);
 	f1->DS1VOLSQ = 0x0001;
 
 	vtoc_set_date(&f1->DS1CREDT,
@@ -758,7 +758,7 @@ static void vtoc_init_format_1_8_label (
 	f1->DS1NOBDB = 0x00;
 	f1->DS1FLAG1 = 0x00;
 	vtoc_ebcdic_enc("IBM LINUX    ", str, 13);
-	strncpy((char *)f1->DS1SYSCD, str, 13);
+	memcpy((char *)f1->DS1SYSCD, str, 13);
 	vtoc_set_date(&f1->DS1REFD,
 		      (u_int8_t) creatime->tm_year,
 		      (u_int16_t) creatime->tm_yday);
