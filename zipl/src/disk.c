@@ -21,6 +21,8 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <unistd.h>
+#include <linux/fs.h>
+#include <linux/fiemap.h>
 
 #include "lib/util_proc.h"
 
@@ -550,8 +552,12 @@ disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 {
 	struct statfs buf;
 	blocknum_t phy_per_fs;
-	int mapped;
+	blocknum_t mapped;
+	int block;
 	int subblock;
+	int fiemap_size;
+	int map_offset;
+	struct fiemap *fiemap;
 
 	/* No file system: partition or raw disk */
 	if (info->fs_block_size == -1) {
@@ -576,12 +582,55 @@ disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 	}
 	/* Get mapping in file system blocks */
 	phy_per_fs = info->fs_block_size / info->phy_block_size;
-	mapped = logical / phy_per_fs;
 	subblock = logical % phy_per_fs;
-	if (ioctl(fd, FIBMAP, &mapped)) {
-		error_reason("Could not get file mapping");
+
+	/* First try FIEMAP, more complicated to set up */
+	fiemap_size = sizeof(struct fiemap) + sizeof(struct fiemap_extent);
+
+	fiemap = misc_malloc(fiemap_size);
+	if (!fiemap)
 		return -1;
+	memset(fiemap, 0, fiemap_size);
+
+	fiemap->fm_extent_count = 1;
+	fiemap->fm_flags = FIEMAP_FLAG_SYNC;
+	/* fm_start, fm_length in bytes; logical is in physical block units */
+	fiemap->fm_start = logical * info->phy_block_size;
+	fiemap->fm_length = info->phy_block_size;
+
+	if (ioctl(fd, FS_IOC_FIEMAP, (unsigned long)fiemap)) {
+		/* FIEMAP failed, fall back to FIBMAP */
+		block = logical / phy_per_fs;
+		if (ioctl(fd, FIBMAP, &block)) {
+			error_reason("Could not get file mapping");
+			free(fiemap);
+			return -1;
+		}
+		mapped = block;
+	} else {
+		if (fiemap->fm_mapped_extents) {
+			if (fiemap->fm_extents[0].fe_flags &
+			    FIEMAP_EXTENT_ENCODED) {
+				error_reason("File mapping is encoded");
+				free(fiemap);
+				return -1;
+			}
+			/*
+			 * returned extent may start prior to our request
+			 */
+			map_offset = fiemap->fm_start -
+				     fiemap->fm_extents[0].fe_logical;
+			mapped = fiemap->fm_extents[0].fe_physical +
+				 map_offset;
+			/* set mapped to fs block units */
+			mapped = mapped / info->fs_block_size;
+		} else {
+			mapped = 0;
+		}
 	}
+
+	free(fiemap);
+
 	if (mapped == 0) {
 		/* This is a hole in the file */
 		*physical = 0;
