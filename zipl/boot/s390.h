@@ -190,7 +190,7 @@ struct _lowcore {
 
 	/* align to the top of the prefix area */
 	uint8_t	pad_0x1900[0x2000-0x1900];	/* 0x1900 */
-} __packed;
+} __packed __aligned(8192);
 
 #define S390_lowcore (*((struct _lowcore *) 0))
 
