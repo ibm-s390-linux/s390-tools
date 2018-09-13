@@ -35,7 +35,7 @@ public:
 	const char *what(void) const { return msg; }
 	int code(void) const { return errorCode; }
 protected:
-	char msg[200];
+	char msg[2048];
 	int  errorCode;
 };
 
