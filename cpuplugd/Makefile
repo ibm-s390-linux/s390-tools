@@ -7,7 +7,7 @@ LDLIBS += -lm
 OBJECTS = daemon.o cpu.o info.o terms.o config.o main.o getopt.o mem.o
 
 cpuplugd: $(OBJECTS)
-	$(LINK) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 clean:
 	rm -f cpuplugd $(OBJECTS)

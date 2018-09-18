@@ -6,7 +6,7 @@ objects = main.o ccw.o fcp.o system.o shutdown.o \
 	  cmd_lsshut.o cmd_chshut.o cmd_lsreipl.o cmd_chreipl.o proc.o
 
 chreipl: $(objects)
-	$(LINK) $(ALL_LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 lsreipl:
 	ln -sf chreipl lsreipl
