@@ -198,8 +198,8 @@ disk_get_info(const char* device, struct job_target_data* target,
 	long devsize;
 	FILE *fh;
 	char *script_pre = TOOLS_LIBDIR "/zipl_helper.";
-	char script_file[80];
-	char ppn_cmd[80];
+	char *script_file;
+	char *ppn_cmd;
 	char buffer[80];
 	char value[40];
 	int majnum, minnum;
@@ -235,23 +235,22 @@ disk_get_info(const char* device, struct job_target_data* target,
 	}
 	data->source = source_user;
 	/* Check if targetbase script is available */
-	strcpy(script_file, script_pre);
-	if (data->drv_name) {
-		strcat(script_file, data->drv_name);
-	}
+	if (data->drv_name)
+		misc_asprintf(&script_file, "%s%s", script_pre, data->drv_name);
+	else
+		misc_asprintf(&script_file, "%s", script_pre);
 	if ((target->targetbase == NULL) &&
 	    (!stat(script_file, &script_stats))) {
 		data->source = source_script;
 		/* Run targetbase script */
-		strcpy(ppn_cmd, script_file);
 		if (target->bootmap_dir == NULL) {
 			/* happens in case of partition dump */
-			snprintf(ppn_cmd, sizeof(ppn_cmd), "%s %d:%d",
-				 script_file, major(stats.st_rdev),
-				 minor(stats.st_rdev));
+			misc_asprintf(&ppn_cmd, "%s %d:%d",
+				      script_file, major(stats.st_rdev),
+				      minor(stats.st_rdev));
 		} else {
-			strcat(ppn_cmd, " ");
-			strcat(ppn_cmd, target->bootmap_dir);
+			misc_asprintf(&ppn_cmd, "%s %s",
+				      script_file, target->bootmap_dir);
 		}
 		printf("Run %s\n", ppn_cmd);
 		fh = popen(ppn_cmd, "r");
@@ -447,6 +446,7 @@ type_determined:
 	return 0;
 out_close:
 	close(fd);
+	free(ppn_cmd);
 	free(data);
 	return -1;
 
