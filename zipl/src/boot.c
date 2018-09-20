@@ -117,7 +117,7 @@ boot_init_fba_stage0(struct boot_fba_stage0 *stage0,
 	blocknum_t i;
 
 	/* Initialize stage 0 data */
-	memcpy(stage0, DATA_ADDR(fba0), sizeof(*stage0));
+	memcpy(stage0, DATA_ADDR(fba0), DATA_SIZE(fba0));
 	/* Fill in blocklist for stage 2 loader */
 	if (stage1b_count > STAGE1B_BLK_CNT_MAX) {
 		error_reason("Not enough room for FBA stage 1b loader");
@@ -137,7 +137,7 @@ boot_init_fba_stage0(struct boot_fba_stage0 *stage0,
 void
 boot_init_eckd_ldl_stage0(struct boot_eckd_ldl_stage0 *stage0)
 {
-	memcpy(stage0, DATA_ADDR(eckd0_ldl), sizeof(*stage0));
+	memcpy(stage0, DATA_ADDR(eckd0_ldl), DATA_SIZE(eckd0_ldl));
 	/* Fill in size of stage 1 plus stage 0 loader */
 	stage0->read_r1.count = sizeof(struct boot_eckd_stage1) +
 		sizeof(struct boot_eckd_ldl_stage0);
@@ -146,7 +146,7 @@ boot_init_eckd_ldl_stage0(struct boot_eckd_ldl_stage0 *stage0)
 void
 boot_init_eckd_cdl_stage0(struct boot_eckd_cdl_stage0 *stage0)
 {
-	memcpy(stage0, DATA_ADDR(eckd0_cdl), sizeof(*stage0));
+	memcpy(stage0, DATA_ADDR(eckd0_cdl), DATA_SIZE(eckd0_cdl));
 	/* Fill in size of stage 1 loader */
 	stage0->read.count = sizeof(struct boot_eckd_stage1);
 }
@@ -157,7 +157,7 @@ boot_init_eckd_stage1(struct boot_eckd_stage1 *stage1,
 {
 	blocknum_t i;
 
-	memcpy(stage1, DATA_ADDR(eckd1), sizeof(*stage1));
+	memcpy(stage1, DATA_ADDR(eckd1), DATA_SIZE(eckd1));
 	/* Fill in blocklist for stage 1b  loader */
 	if (stage1b_count > STAGE1B_BLK_CNT_MAX) {
 		error_reason("Not enough room for ECKD stage 1b loader "
@@ -185,7 +185,7 @@ boot_init_fba_stage1b(struct boot_fba_stage1b *stage1b,
 {
 	blocknum_t i;
 
-	memcpy(stage1b, DATA_ADDR(fba1b), sizeof(*stage1b));
+	memcpy(stage1b, DATA_ADDR(fba1b), DATA_SIZE(fba1b));
 	if (stage2_count > STAGE2_BLK_CNT_MAX) {
 		error_reason("Not enough room for FBA stage 2 loader");
 		return -1;
@@ -207,7 +207,7 @@ boot_init_eckd_stage1b(struct boot_eckd_stage1b *stage1b,
 {
 	blocknum_t i;
 
-	memcpy(stage1b, DATA_ADDR(eckd1b), sizeof(*stage1b));
+	memcpy(stage1b, DATA_ADDR(eckd1b), DATA_SIZE(eckd1b));
 	if (stage2_count > STAGE2_BLK_CNT_MAX) {
 		error_reason("Not enough room for ECKD stage 2 loader "
 			     "(try larger block size)");
