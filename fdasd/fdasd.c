@@ -1310,7 +1310,7 @@ static void fdasd_write_vtoc_labels(fdasd_anchor_t *anc)
 			volser[VOLSER_LENGTH] = ' ';
 			strncpy(c1, volser, VOLSER_LENGTH + 1);
 			c1 = strchr(ch, ' ');
-			strncpy(c1, s2, 31);
+			memcpy(c1, s2, 31);
 		} else {
 			if (get_part_type_by_dsname(ch, &part_info->type))
 				part_info->type = PARTITION_NATIVE;
@@ -1321,23 +1321,23 @@ static void fdasd_write_vtoc_labels(fdasd_anchor_t *anc)
 
 			setpos(anc, k, i - 1);
 
-			strncpy(ch, "LINUX.V               "
+			memcpy(ch, "LINUX.V               "
 				"                      ", 44);
 
 			strncpy(volser, anc->vlabel->volid, VOLSER_LENGTH);
 			vtoc_ebcdic_dec(volser, volser, VOLSER_LENGTH);
-			strncpy(c1, volser, VOLSER_LENGTH);
+			memcpy(c1, volser, VOLSER_LENGTH);
 
 			c1 = strchr(ch, ' ');
-			strncpy(c1, ".PART", 5);
+			memcpy(c1, ".PART", 5);
 			c1 += 5;
 
 			sprintf(dsno, "%04d.", k + 1);
-			strncpy(c1, dsno, 5);
+			memcpy(c1, dsno, 5);
 			c1 += 5;
 
 			get_part_dsname_by_type(part_info->type, &dsname);
-			strncpy(c1, dsname, strlen(dsname)); /* We don't want \0 */
+			memcpy(c1, dsname, strlen(dsname)); /* We don't want \0 */
 		}
 		vtoc_ebcdic_enc(ch, ch, 44);
 		if (anc->verbose)
@@ -1636,7 +1636,7 @@ static void fdasd_change_part_type(fdasd_anchor_t *anc)
 
 	ch = strstr(part_info->f1->DS1DSNAM, "PART") + 9;
 	if (ch != NULL)
-		strncpy(ch, str, 6);
+		memcpy(ch, str, 6);
 	vtoc_ebcdic_enc(part_info->f1->DS1DSNAM, part_info->f1->DS1DSNAM, 44);
 	anc->vtoc_changed++;
 }
