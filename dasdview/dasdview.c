@@ -618,7 +618,7 @@ dasdview_print_volser(dasdview_info_t *info)
 		strncpy(volser, vlabel.volid, 6);
 		vtoc_ebcdic_dec(volser, volser, 6);
 	} else {
-		strncpy(volser, "      ", 6);
+		memcpy(volser, "      ", 6);
 	}
 
 	printf("%6.6s\n", volser);
