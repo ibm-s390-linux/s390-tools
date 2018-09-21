@@ -1171,6 +1171,37 @@ static exit_code_t check_ineffective_settings(struct setting_list *list,
 	return rc;
 }
 
+/* Check if a possibly conflicting setting is active in the configuration */
+static bool conflict_setting_active(struct setting *s)
+{
+	enum qeth_attr_group_type t;
+
+	t = get_attr_group_type(s);
+	if (t != group_bridge && t != group_vnicc) {
+		/* Check BridgePort and VNICC attributes only */
+		return false;
+	}
+	if (s->specified) {
+		/* Specified on the command line: We are strict here and do not
+		 * allow to specify VNICC and BridgePort attributes in the same
+		 * command to avoid issues when attributes are enabled/disabled
+		 * in the wrong order. Example: disable VNICC and enable
+		 * BridgePort in the same command would	result in an error
+		 * because BridgePort attributes are set first.
+		 */
+		return true;
+	}
+	if (attrib_match_default(s->attrib, s->value)) {
+		/* Not active if set to default value */
+		return false;
+	}
+	if (s->actual_value && strncmp(s->actual_value, "n/a", 3) == 0) {
+		/* Not active if in n/a state (conflicting attribute set) */
+		return false;
+	}
+	return true;
+}
+
 /* Check if there are conflicting attribute settings */
 static exit_code_t check_conflicting_settings(struct setting_list *list)
 {
@@ -1181,6 +1212,8 @@ static exit_code_t check_conflicting_settings(struct setting_list *list)
 
 	util_list_iterate(&list->list, s) {
 		if (s->removed)
+			continue;
+		if (!conflict_setting_active(s))
 			continue;
 		t = get_attr_group_type(s);
 		if (t == group_bridge && (!bridge || !bridge->specified))
