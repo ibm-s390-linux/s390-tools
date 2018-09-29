@@ -68,6 +68,7 @@ zconf/qeth/lsqeth
 zconf/scm/lsscm
 zconf/zcrypt/chzcrypt
 zconf/zcrypt/lszcrypt
+zconf/zcrypt/zcryptctl
 zdev/src/chzdev
 zdev/src/chzdev_usage.c
 zdev/src/lszdev
