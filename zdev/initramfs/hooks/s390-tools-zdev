@@ -5,7 +5,7 @@
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
 #
-# hooks/zdev
+# hooks/s390-tools-zdev
 #   This hook script adds files required to apply firmware-provided I/O
 #   configuration data during boot.
 #
