@@ -79,6 +79,7 @@ zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(libs)
 install-common:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
+	$(MAKE) -C initramfs install
 
 install-zkey:
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey $(DESTDIR)$(USRBINDIR)

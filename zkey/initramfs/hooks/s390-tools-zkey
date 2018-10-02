@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# Copyright IBM Corp. 2016, 2017
+# Copyright Canonical Ltd 2018
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# hooks/s390-tools-zkey
+#   This hook script adds zkey related utilities and zkey repository
+#   in the initramfs
+#
+
+# Needs to run after udev or resulting udev rules could be overwritten
+PREREQ="udev"
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+	prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# Add zcrypt modules
+zdev_modules="pkey paes_s390 zcrypt zcrypt_cex2a zcrypt_cex4 zcrypt_pcixcc"
+
+for x in $zdev_modules ; do
+	manual_add_modules ${x}
+done
+
+# copy utils
+copy_exec /sbin/chzcrypt
+copy_exec /sbin/lszcrypt
+copy_exec /usr/bin/zkey
+copy_exec /usr/bin/zkey-cryptsetup
+
+mkdir -p "${DESTDIR}/etc"
+cp -a /etc/zkey "${DESTDIR}/etc/"
