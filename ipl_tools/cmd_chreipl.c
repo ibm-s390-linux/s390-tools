@@ -545,7 +545,7 @@ static void check_exists(const char *path, const char *attr)
 
 	snprintf(fpath, sizeof(fpath), "/sys/firmware/%s", path);
 	if (access(fpath, F_OK) != 0)
-		ERR_EXIT("System does not allow to set %s", attr);
+		ERR_EXIT("System does not allow one to set %s", attr);
 }
 
 static void write_str_optional(char *string, char *file, int exit_on_fail,

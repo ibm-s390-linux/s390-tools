@@ -197,7 +197,7 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 	}
 
 	if (dasd_get_info(device, &dasd_info) != 0) {
-		printf("Unable to figure out DASD informations.\n");
+		printf("Unable to figure out DASD information.\n");
 		goto error;
 	}
 
