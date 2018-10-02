@@ -5,7 +5,7 @@
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
 #
-# scripts/init-top/zdev
+# scripts/init-top/s390-tools-zdev
 #   Parse the kernel command line for rd.zdev kernel parameters. These
 #   parameters are evaluated and used to configure z Systems specific devices.
 #

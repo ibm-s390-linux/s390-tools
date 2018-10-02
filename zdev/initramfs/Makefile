@@ -17,6 +17,6 @@ INITTOP := $(INITRAMFSDIR)/scripts/init-top
 ifeq ($(HAVE_INITRAMFS),1)
 install:
 	$(INSTALL) -m 755 -d $(DESTDIR)/$(HOOKDIR) $(DESTDIR)/$(INITTOP)
-	$(INSTALL) -m 755 hooks/zdev $(DESTDIR)/$(HOOKDIR)
-	$(INSTALL) -m 755 scripts/init-top/zdev $(DESTDIR)/$(INITTOP)
+	$(INSTALL) -m 755 hooks/s390-tools-zdev $(DESTDIR)/$(HOOKDIR)
+	$(INSTALL) -m 755 scripts/init-top/s390-tools-zdev $(DESTDIR)/$(INITTOP)
 endif
