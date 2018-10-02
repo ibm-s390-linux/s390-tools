@@ -10,6 +10,7 @@
 [Unit]
 Description=CPACF statistics collection daemon process for Linux on System z
 Documentation=man:cpacfstatsd(8)
+ConditionVirtualization=no
 
 [Service]
 Type=forking
