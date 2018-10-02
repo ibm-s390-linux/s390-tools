@@ -304,7 +304,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 
 	if (argc <= 1) {
 		print_help();
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
 	while ((c = getopt_long(argc, argv, "r:Q:q:u:b:z:i:l:o:x:Vhfev",
@@ -359,7 +359,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 			break;
 		case 'h':
 			print_help();
-			return 1;
+			exit(EXIT_SUCCESS);
 		case 'e':
 			print_bin_struct_sizes();
 			return 1;
@@ -443,7 +443,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 			break;
 		case 'v':
 			print_version();
-			return 1;
+			exit(EXIT_SUCCESS);
 		default:
 			fprintf(stderr, "Try '%s --help' for"
 				" more information.\n", toolname);

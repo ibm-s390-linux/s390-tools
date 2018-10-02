@@ -1009,7 +1009,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 
 	if (argc <= 1) {
 		print_help();
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 
 	/* this is too much, but argc/2 is a reliable upper boundary
@@ -1080,10 +1080,10 @@ static int parse_params(int argc, char **argv, struct options *opts)
 			break;
 		case 'v':
 			print_version();
-			return 1;
+			exit(EXIT_SUCCESS);
 		case 'h':
 			print_help();
-			return 1;
+			exit(EXIT_SUCCESS);
 		default:
 			fprintf(stderr, "%s: Try '%s --help' for more"
 				" information.\n", toolname, toolname);
