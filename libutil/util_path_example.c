@@ -90,7 +90,7 @@ static void test_util_path_is_xxx(void)
 }
 
 /*
- * Usage: util_path_example [sysfs mount point] | "is_xxx"
+ * Usage: util_path_example sysfs [MOUNT_POINT] | is_xxx
  */
 int main(int argc, char *argv[])
 {
@@ -111,6 +111,6 @@ int main(int argc, char *argv[])
 	}
 	return EXIT_SUCCESS;
 out_fail:
-	errx(EXIT_FAILURE, "Usage: %s sysfs <path> | is_xxx", argv[0]);
+	errx(EXIT_FAILURE, "Usage: %s sysfs [MOUNT_POINT] | is_xxx", argv[0]);
 }
 //! [code]
