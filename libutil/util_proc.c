@@ -442,9 +442,9 @@ util_proc_dev_get_entry(dev_t device, int blockdev,
 
 
 /*
- * Provide one record form a /proc/mounts like file
+ * Provide one record from a /proc/mounts like file
  *
- * The parameter file_name distinguishes the file form procfs which
+ * The parameter file_name distinguishes the file from procfs which
  * is read, the parameter spec is the selector for the record.
  */
 int util_proc_mnt_get_entry(const char *file_name, const char *spec,
