@@ -456,7 +456,6 @@ int util_proc_mnt_get_entry(const char *file_name, const char *spec,
 	rc = get_file_buffer(&file, file_name);
 	if (rc)
 		return rc;
-	rc = -1;
 	while (!eof(&file)) {
 		rc = scan_mnt_entry(&file, entry);
 		if (rc)
@@ -467,6 +466,7 @@ int util_proc_mnt_get_entry(const char *file_name, const char *spec,
 		}
 		util_proc_mnt_free_entry(entry);
 	}
+	rc = -1;
 out_free:
 	free_file_buffer(&file);
 	return rc;
