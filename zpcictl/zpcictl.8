@@ -1,4 +1,4 @@
-.\" Copyright 2017 IBM Corp.
+.\" Copyright IBM Corp. 2018
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -30,9 +30,10 @@ zpcictl - Manage PCI devices on z Systems
 .
 .
 .SH DESCRIPTION
+With
 .B zpcictl
-is a tool for managing PCI devices on the IBM z Systems platform. It is
-especially used for reporting errorneous PCI devices to the service element.
+, you can manage PCI devices on the IBM z Systems platform. It is especially
+used for reporting erroneous PCI devices to the service element.
 
 .B Note:
 For NVMe devices additional data (such as S.M.A.R.T. data) is collected and sent
@@ -44,7 +45,9 @@ for this to work.
 .SH DEVICE
 .B DEVICE
 can be either the PCI slot address (e.g. 0000:00:00.0) or the main device node
-of an NVMe device (e.g. /dev/nvme0).
+of an NVMe device (e.g.
+.I /dev/nvme0
+).
 .
 .
 .SH OPTIONS
@@ -52,7 +55,7 @@ of an NVMe device (e.g. /dev/nvme0).
 .OD reset "" "DEVICE"
 Reset
 .I DEVICE
-and initiate a re-initialisation of the adapter.
+and initiate a re-initialization of the PCI device.
 .PP
 .
 .OD deconfigure "" "DEVICE"

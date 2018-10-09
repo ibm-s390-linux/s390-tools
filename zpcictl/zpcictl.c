@@ -240,7 +240,7 @@ static int device_exists(char *dev)
 static void get_device_info(struct zpci_device *pdev, char *dev)
 {
 	if (!device_exists(dev))
-		errx(EXIT_FAILURE, "Device %s not found", dev);
+		errx(EXIT_FAILURE, "Could not find device %s", dev);
 	if (is_blk_dev(dev))
 		errx(EXIT_FAILURE, "Unsupported device type %s", dev);
 	if (is_char_dev(dev)) {
@@ -254,9 +254,10 @@ static void get_device_info(struct zpci_device *pdev, char *dev)
 	pdev->fid = sysfs_read_value(pdev, "function_id");
 	pdev->pchid = sysfs_read_value(pdev, "pchid");
 
-	/* In case a slot address was specified, we still need to figure out
-	 * the device node for NVMe devices. Otherwise we won't be able to
-	 * collect S.M.A.R.T. data at a later point.
+	/*
+	 * In case a slot address was specified, the device node for NVMe
+	 * devices is still needed. Otherwise it won't be possible to collect
+	 * S.M.A.R.T. data at a later point.
 	 */
 	if (!pdev->device && pdev->class == PCI_CLASS_NVME)
 		get_device_node(pdev);
