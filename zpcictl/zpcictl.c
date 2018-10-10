@@ -155,17 +155,19 @@ static unsigned int sysfs_read_value(struct zpci_device *pdev, const char *attr)
 
 static void sysfs_write_data(struct zpci_report_error *report, char *slot)
 {
+	size_t r_size;
 	char *path;
-	int fd, rc;
+	FILE *fp;
+
+	r_size = sizeof(*report);
 
 	path = util_path_sysfs("bus/pci/devices/%s/report_error", slot);
-	fd = open(path, O_WRONLY);
-	if (!fd)
+	fp = fopen(path, "w");
+	if (!fp)
 		fopen_err(path);
-	rc = write(fd, report, sizeof(*report));
-	if (rc == -1)
+	if (fwrite(report, 1, r_size, fp) != r_size)
 		warnx("Could not write to file: %s: %s", path, strerror(errno));
-	if (close(fd))
+	if (fclose(fp))
 		warnx("Could not close file: %s: %s", path, strerror(errno));
 	free(path);
 }
