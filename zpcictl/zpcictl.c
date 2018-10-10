@@ -172,13 +172,16 @@ static void sysfs_write_data(struct zpci_report_error *report, char *slot)
 	free(path);
 }
 
+/* lstat() doesn't work for sysfs files, so we have to work with a fixed size */
+#define READLINK_SIZE	256
+
 static void sysfs_get_slot_addr(const char *dev, char *slot)
 {
+	char device[READLINK_SIZE], *result;
 	unsigned int major, minor;
 	struct stat dev_stat;
-	char addr[13];
+	ssize_t len;
 	char *path;
-	FILE *fp;
 
 	if (stat(dev, &dev_stat) != 0) {
 		errx(EXIT_FAILURE, "Could not get stat information for %s: %s",
@@ -187,15 +190,21 @@ static void sysfs_get_slot_addr(const char *dev, char *slot)
 	major = major(dev_stat.st_rdev);
 	minor = minor(dev_stat.st_rdev);
 
-	path = util_path_sysfs("dev/char/%u:%u/address", major, minor);
-	fp = fopen(path, "r");
-	if (!fp)
-		fopen_err(path);
-	fscanf(fp, "%s", addr);
-	fclose(fp);
+	path = util_path_sysfs("dev/char/%u:%u/device", major, minor);
+	len = readlink(path, device, READLINK_SIZE - 1);
 	free(path);
+	if (len != -1)
+		device[len] = '\0';
+	else
+		errx(EXIT_FAILURE, "Could not read device link for %s", dev);
 
-	strcpy(slot, addr);
+	result = strrchr(device, '/');
+	if (result)
+		result++;
+	else
+		result = device;
+
+	strcpy(slot, result);
 }
 
 static void get_device_node(struct zpci_device *pdev)
