@@ -104,6 +104,9 @@ static char *collect_smart_data(struct zpci_device *pdev)
 	char *cmd;
 	FILE *fd;
 
+	if (!pdev->device)
+		return NULL;
+
 	util_asprintf(&cmd, SMARTCTL_CMDLINE, pdev->device);
 	fd = popen(cmd, "r");
 	if (!fd)
@@ -175,7 +178,7 @@ static void sysfs_write_data(struct zpci_report_error *report, char *slot)
 /* lstat() doesn't work for sysfs files, so we have to work with a fixed size */
 #define READLINK_SIZE	256
 
-static void sysfs_get_slot_addr(const char *dev, char *slot)
+static int sysfs_get_slot_addr(const char *dev, char *slot)
 {
 	char device[READLINK_SIZE], *result;
 	unsigned int major, minor;
@@ -184,8 +187,9 @@ static void sysfs_get_slot_addr(const char *dev, char *slot)
 	char *path;
 
 	if (stat(dev, &dev_stat) != 0) {
-		errx(EXIT_FAILURE, "Could not get stat information for %s: %s",
-		     dev, strerror(errno));
+		warnx("Could not get stat information for %s: %s",
+		      dev, strerror(errno));
+		return 0;
 	}
 	major = major(dev_stat.st_rdev);
 	minor = minor(dev_stat.st_rdev);
@@ -193,18 +197,21 @@ static void sysfs_get_slot_addr(const char *dev, char *slot)
 	path = util_path_sysfs("dev/char/%u:%u/device", major, minor);
 	len = readlink(path, device, READLINK_SIZE - 1);
 	free(path);
-	if (len != -1)
+	if (len != -1) {
 		device[len] = '\0';
-	else
-		errx(EXIT_FAILURE, "Could not read device link for %s", dev);
+	} else {
+		warnx("Could not read device link for %s", dev);
+		return 0;
+	}
 
 	result = strrchr(device, '/');
 	if (result)
 		result++;
 	else
 		result = device;
-
 	strcpy(slot, result);
+
+	return 1;
 }
 
 static void get_device_node(struct zpci_device *pdev)
@@ -219,12 +226,13 @@ static void get_device_node(struct zpci_device *pdev)
 	if (count == -1) {
 		warnx("Could not read directory %s: %s", path, strerror(errno));
 		free(path);
-		exit(EXIT_FAILURE);
+		return;
 	}
 
 	for (i = 0; i < count; i++) {
 		util_asprintf(&dev, "/dev/%s", de_vec[i]->d_name);
-		sysfs_get_slot_addr(dev, slot);
+		if (!sysfs_get_slot_addr(dev, slot))
+			continue;
 		if (strcmp(slot, pdev->slot) == 0) {
 			pdev->device = dev;
 			break;
@@ -255,7 +263,9 @@ static void get_device_info(struct zpci_device *pdev, char *dev)
 	if (is_blk_dev(dev))
 		errx(EXIT_FAILURE, "Unsupported device type %s", dev);
 	if (is_char_dev(dev)) {
-		sysfs_get_slot_addr(dev, pdev->slot);
+		if (!sysfs_get_slot_addr(dev, pdev->slot))
+			errx(EXIT_FAILURE,
+			     "Could not determine slot address for %s", dev);
 		pdev->device = dev;
 	} else {
 		strcpy(pdev->slot, dev);
