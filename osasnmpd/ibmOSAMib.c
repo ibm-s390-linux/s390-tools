@@ -95,10 +95,10 @@ void init_ibmOSAMib(void) {
     }
   else if ( osaexp_num == 0 )
     {
-      fprintf( stderr, "init_ibmOSAMib(): bad or no OSA-E devices reported\n"
-		       "check agent log file for more details\n"
-		       "Cannot start subagent...exiting...\n");
-      exit(1);
+      get_time( time_buf );
+      snmp_log( LOG_ERR, "%s init_ibmOSAMib(): none of the %d interfaces is a real "
+			 "OSA-E device - starting subagent anyway\n", time_buf, ifNumber);
+      return;
     } 
   /* end if */
   
