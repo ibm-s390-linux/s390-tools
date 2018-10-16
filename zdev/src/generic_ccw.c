@@ -29,6 +29,7 @@
 static struct ccw_subtype_data generic_ccw_data = {
 	.ccwdrv		= NULL,
 	.mod		= NULL,
+	.any_driver     = true,
 };
 
 /* Check if there is a non-generic subtype in the CCW namespace that uses the

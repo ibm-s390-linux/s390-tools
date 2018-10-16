@@ -140,7 +140,7 @@ exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
 {
 	struct subtype *st = dev->subtype;
 	struct ccw_subtype_data *data = st->data;
-	const char *type = st->name, *drv = data->ccwdrv, *id = dev->id;
+	const char *type = st->name, *drv = data->any_driver ? "*" : data->ccwdrv, *id = dev->id;
 	struct device_state *state = autoconf ? &dev->autoconf :
 						&dev->persistent;
 	char *path, *cfg_label = NULL, *end_label = NULL;

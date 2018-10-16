@@ -62,10 +62,12 @@ struct ccw_devinfo {
  * ccw_subtype_data - CCW subtype specific information
  * @ccwdrv: The name of the CCW device driver for this subtype
  * @mod: The name of the main kernel module for this subtype
+ * @any_driver: If set, the exact driver for this subtype are not known
  */
 struct ccw_subtype_data {
 	const char *ccwdrv;
 	const char *mod;
+	bool any_driver;
 };
 
 extern struct attrib ccw_attr_online;
