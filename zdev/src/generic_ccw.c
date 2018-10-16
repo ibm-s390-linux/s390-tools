@@ -27,7 +27,7 @@
  */
 
 static struct ccw_subtype_data generic_ccw_data = {
-	.ccwdrv		= NULL,
+	.ccwdrv		= "*",
 	.mod		= NULL,
 };
 
