@@ -37,6 +37,7 @@ check-dep-zkey:
 		"openssl/evp.h", \
 		"openssl-devel", \
 		"HAVE_OPENSSL=0")
+	touch check-dep-zkey
 
 check-dep-zkey-cryptsetup: detect-libcryptsetup.h
 	$(call check_dep, \
@@ -50,6 +51,7 @@ check-dep-zkey-cryptsetup: detect-libcryptsetup.h
 		"json-c/json.h", \
 		"json-c-devel", \
 		"HAVE_JSONC=0")
+	touch check-dep-zkey-cryptsetup
 
 zkey-skip:
 	echo "  SKIP    zkey due to HAVE_OPENSSL=0"
@@ -93,6 +95,9 @@ install-zkey-cryptsetup:
 install: all install-common $(INSTALL_TARGETS)
 
 clean:
-	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.h
+	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.h \
+		check-dep-zkey check-dep-zkey-cryptsetup
 
-.PHONY: all install clean
+.PHONY: all install clean zkey-skip zkey-cryptsetup-skip-cryptsetup2 \
+	zkey-cryptsetup-skip-jsonc install-common install-zkey \
+	install-zkey-cryptsetup
