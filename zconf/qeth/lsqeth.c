@@ -168,7 +168,7 @@ static void ethtool_checksumming(char *buf, const char *if_name)
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0)
 		errx(EXIT_FAILURE, "Internal error: cannot get SOCK_DGRAM socket");
-	strncpy(ifr.ifr_name, if_name, IFNAMSIZ);
+	util_strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
 	val.cmd = ETHTOOL_GRXCSUM;
 	ifr.ifr_data = (void *)&val;
 	rc = ioctl(fd, SIOCETHTOOL, &ifr);
