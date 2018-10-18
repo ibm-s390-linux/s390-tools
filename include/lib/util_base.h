@@ -42,6 +42,9 @@ static inline void util_ptr_vec_free(void **ptr_vec, int count)
 {
 	int i;
 
+	if (!ptr_vec || count < 0)
+		return;
+
 	for (i = 0; i < count; i++)
 		free(ptr_vec[i]);
 	free(ptr_vec);

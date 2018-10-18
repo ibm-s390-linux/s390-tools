@@ -59,6 +59,7 @@ static int __scandir(struct dirent ***de_vec, const char *path,
 	int count = 0;
 	DIR *dirp;
 
+	*de_vec = NULL;
 	dirp = opendir(path);
 	if (!dirp)
 		return -1;
@@ -134,13 +135,13 @@ int util_scandir_hexsort(const struct dirent **de1, const struct dirent **de2)
  * directory entries. The entries as well as the pointer array itself are
  * allocated by the function and has to be released by the user via free.
  *
- * @param[out] de_vec         Vector of matched directory entries
+ * @param[out] de_vec         Vector of matched directory entries, or NULL
  * @param[in]  compar_fn      Callback function for sorting the entry list
  * @param[in]  path           Path to the directory to scan
  * @param[in]  fmt            Format string, describes the search pattern as POSIX regex
  * @param[in]  ...            Values for format string
  *
- * @returns    Number of returned directory entries
+ * @returns    Number of returned directory entries, or -1 on error
  */
 int util_scandir(struct dirent ***de_vec,
 		 int compar_fn(const struct dirent **first,
