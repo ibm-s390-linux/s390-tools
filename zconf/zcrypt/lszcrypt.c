@@ -12,6 +12,7 @@
 
 #include "lib/util_base.h"
 #include "lib/util_file.h"
+#include "lib/util_libc.h"
 #include "lib/util_opt.h"
 #include "lib/util_panic.h"
 #include "lib/util_path.h"
@@ -620,7 +621,7 @@ static void show_devices_argv(char *argv[])
 {
 	struct util_rec *rec = util_rec_new_wide("-");
 	struct dirent **dev_vec, **subdev_vec;
-	char *ap, *grp_dev, *path, card[16], sub_dev[16];
+	char *ap, *grp_dev, *path, *card, *sub_dev;
 	int id, dom, i, n, dev_cnt, sub_cnt;
 
 	/* check if ap driver is available */
@@ -639,14 +640,16 @@ static void show_devices_argv(char *argv[])
 		if (sscanf(argv[i], "%x.%x", &id, &dom) >= 1) {
 			/* at least the id field was valid */
 			if (id >= 0 && dom >= 0) {	/* single subdevice */
-				sprintf(sub_dev, "%02x.%04x", id, dom);
+				util_asprintf(&sub_dev, "%02x.%04x", id, dom);
 				grp_dev = util_path_sysfs("devices/ap/card%02x",
 							  id);
 				show_subdevice(rec, grp_dev, sub_dev);
 				free(grp_dev);
+				free(sub_dev);
 			} else {			/* group device */
-				sprintf(card, "card%02x", id);
+				util_asprintf(&card, "card%02x", id);
 				show_device(rec, card);
+				free(card);
 			}
 			return;
 		}
