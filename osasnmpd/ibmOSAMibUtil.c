@@ -1204,18 +1204,7 @@ void update_mib_info ()
 	 * and mark them in IF-MIB interface list 
 	 * */
 	osaexp_num = query_OSA_EXP( &tmp_list, if_num );
-	if ( osaexp_num < 0 )
-	{
-		get_time( time_buf );
-		fprintf( stderr, "%s update_mib_info(): "
-			 "OSA-E device driver query interface ioctl() "
-			 "failed\nupdate_mib_info(): going to stop osasnmpd daemon\n"
-			 "update_mib_info(): check subagent logfile for more details\n"
-			 "update_mib_info(): sending termination signal to osasnmpd...\n",
-			 time_buf );
-		exit(-1);
-	}
-	else if ( osaexp_num == 0 )
+	if ( osaexp_num == 0 )
 	{
 		get_time( time_buf );      
 		snmp_log( LOG_ERR, "%s update_mib_info(): "
@@ -1698,9 +1687,8 @@ int query_IF_MIB ( IF_LIST** ifList )
  *  IN    int       if_Number: number of network interfaces
  *  returns: int num - number of OSA Express devices found on this 
  *                          system  (>=0)
- *                          -1 -an error occurred , no valid info avail
  *********************************************************************/
-int query_OSA_EXP ( IF_LIST** ifList, int if_Number )
+unsigned int query_OSA_EXP ( IF_LIST** ifList, int if_Number )
 {
   int j, num = 0;  
   char            time_buf[TIME_BUF_SIZE];  /* date/time buffer */

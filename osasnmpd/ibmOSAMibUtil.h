@@ -91,7 +91,7 @@ void update_mib_info ( );
 int query_IF_MIB( IF_LIST** );
 
 /* retrieves OSA Express interface information from kernel */
-int query_OSA_EXP ( IF_LIST** ,int );
+unsigned int query_OSA_EXP ( IF_LIST** ,int );
 
 /* get time of day */
 int get_time( char* );

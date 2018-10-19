@@ -85,15 +85,7 @@ void init_ibmOSAMib(void) {
 
   /* query OSA-E device driver for OSA-E devices and mark them in IF-MIB interface list */
   osaexp_num = query_OSA_EXP ( &if_list, ifNumber );
-  if ( osaexp_num < 0 )
-    {
-      fprintf( stderr, "init_ibmOSAMib(): "
-	       "OSA-E device driver query interface ioctl() failed\n"
-  	       "check agent log file for more details\n"
-               "Cannot start subagent...exiting...\n");
-      exit(1); 
-    }
-  else if ( osaexp_num == 0 )
+  if ( osaexp_num == 0 )
     {
       get_time( time_buf );
       snmp_log( LOG_ERR, "%s init_ibmOSAMib(): none of the %d interfaces is a real "
