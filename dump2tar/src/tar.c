@@ -78,7 +78,7 @@ static void set_time(char *dest, size_t len, time_t value)
 #define SET_TIME_FIELD(obj, name, value) \
 	set_time((obj)->name, sizeof((obj)->name), (time_t) (value))
 #define SET_STR_FIELD(obj, name, value) \
-	strncpy((obj)->name, (value), sizeof((obj)->name))
+	util_strlcpy((obj)->name, (value), sizeof((obj)->name))
 
 /* Initialize the tar file @header with the provided data */
 static void init_header(struct tar_header *header, const char *filename,
