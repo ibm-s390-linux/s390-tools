@@ -3,6 +3,7 @@ Release history for s390-tools (MIT version)
  * __v2.6.1 (XXXX-XX-XX)__
 
   Changes of existing tools:
+  - qethqoat: add OSA-Express7S support
 
   Bug Fixes:
   - lstape: fix output with SCSI lin_tape and multiple paths to same unit

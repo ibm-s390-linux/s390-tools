@@ -58,6 +58,7 @@ struct qeth_qoat_physical {
 #define OAT_OSA_GEN_OSAE4S 0x02
 #define OAT_OSA_GEN_OSAE5S 0x03
 #define OAT_OSA_GEN_OSAE6S 0x04
+#define OAT_OSA_GEN_OSAE7S 0x05
 	__u8 osa_gen;
 #define OAT_PORT_SPEED_UNKNOWN      0x00
 #define OAT_PORT_SPEED_10mbs_half   0x01
@@ -68,6 +69,7 @@ struct qeth_qoat_physical {
 #define OAT_PORT_SPEED_1000mbs_full 0x06
 #define OAT_PORT_SPEED_NA           0x07
 #define OAT_PORT_SPEED_10gbs_full   0x08
+#define OAT_PORT_SPEED_25gbs_full   0x0A
 	__u8 port_speed;
 #define OAT_PORT_MEDIA_COPPER      0x01
 #define OAT_PORT_MEDIA_MULTI_MODE  0x02

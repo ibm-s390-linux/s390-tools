@@ -208,6 +208,9 @@ static void print_physical(struct qeth_qoat_physical *phdr)
 	case OAT_OSA_GEN_OSAE6S:
 		osagen = "OSA-Express6S";
 		break;
+	case OAT_OSA_GEN_OSAE7S:
+		osagen = "OSA-Express7S";
+		break;
 	default:
 		sprintf(tmp, "unknown (0x%x)", phdr->osa_gen);
 		osagen = tmp;
@@ -238,6 +241,9 @@ static void print_physical(struct qeth_qoat_physical *phdr)
 		break;
 	case OAT_PORT_SPEED_10gbs_full:
 		speed = "10 Gb/s / full duplex";
+		break;
+	case OAT_PORT_SPEED_25gbs_full:
+		speed = "25 Gb/s / full duplex";
 		break;
 	case OAT_PORT_SPEED_UNKNOWN:
 		speed = "unknown / unknown";
