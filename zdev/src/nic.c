@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
+
 #include "misc.h"
 #include "nic.h"
 #include "path.h"
@@ -55,8 +57,8 @@ bool nic_data_get(const char *id, struct nic_data *data_ptr)
 	else
 		goto out;
 
-	strncpy(data.owner, argv[11], sizeof(data.owner));
-	strncpy(data.name, argv[12], sizeof(data.name));
+	util_strlcpy(data.owner, argv[11], NIC_OWNER_SIZE);
+	util_strlcpy(data.name, argv[12], NIC_NAME_SIZE);
 
 	result = true;
 	*data_ptr = data;

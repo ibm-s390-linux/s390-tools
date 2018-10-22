@@ -24,14 +24,14 @@ enum nic_target {
 	nic_lan,
 };
 
-#define NIC_OWNER_LEN	9
-#define NIC_NAME_LEN	9
+#define NIC_OWNER_SIZE	9
+#define NIC_NAME_SIZE	9
 
 struct nic_data {
 	enum nic_type type;
 	enum nic_target target;
-	char owner[NIC_OWNER_LEN];
-	char name[NIC_NAME_LEN];
+	char owner[NIC_OWNER_SIZE];
+	char name[NIC_NAME_SIZE];
 };
 
 bool nic_data_get(const char *, struct nic_data *);
