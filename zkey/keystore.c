@@ -1359,7 +1359,7 @@ struct keystore *keystore_new(const char *directory, bool verbose)
 	util_assert(directory != NULL, "Internal error: directory is NULL");
 
 	if (stat(directory, &sb) != 0) {
-		warnx("'%s' does not exist", directory);
+		warnx("Can not access '%s': %s", directory, strerror(errno));
 		return NULL;
 	}
 	if (!(sb.st_mode & S_IFDIR)) {
