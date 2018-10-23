@@ -29,9 +29,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#ifdef GZIP_SUPPORT
-#include <zlib.h>
-#endif
 
 #include "lib/zt_common.h"
 #include "zfcpdump.h"
