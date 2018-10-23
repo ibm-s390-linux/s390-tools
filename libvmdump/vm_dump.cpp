@@ -98,19 +98,20 @@ VMDump::VMDump(const char *fileName) : Dump(fileName, "rb")
 	dump_read(&adsrRecord,sizeof(adsrRecord),1,fh);
 
 	if(debug) {
+		char buf_asc[1024];
 		char buf[1024];
 		int i;
 
 		fprintf(stderr, "off=%d\n", adsrRecord.sec5_offset);
 		dump_seek(fh, adsrRecord.sec5_offset, SEEK_SET);
 		dump_read(buf, adsrRecord.sec5_len, 1, fh);
-		ebcAsc(buf, adsrRecord.sec5_len);
+		ebcAsc(buf, buf_asc, adsrRecord.sec5_len);
 		for (i=0; i < adsrRecord.sec5_len; i++) {
-			if ((buf[i]==0) || iscntrl(buf[i]))
-				buf[i]=' ';
+			if ((buf_asc[i]==0) || iscntrl(buf_asc[i]))
+				buf_asc[i]=' ';
 		}
-		buf[adsrRecord.sec5_len] = 0;
-		printf("symptom string1: %s\n",buf);
+		buf_asc[adsrRecord.sec5_len] = 0;
+		printf("symptom string1: %s\n",buf_asc);
 	}
 
 	/* Record 2: fmbk */
@@ -142,7 +143,8 @@ struct timeval VMDump::getDumpTime(void) const
 void VMDump::printDebug(void)
 {
 	struct timeval time;
-	char buf[1024];
+	char fmbk_id[8];
+	char albk_id[8];
 
 	s390TodToTimeval(adsrRecord.tod, &time);
 
@@ -165,9 +167,9 @@ void VMDump::printDebug(void)
 
 	/* fmbk */
 
-	ebcAsc(fmbkRecord.id, sizeof(fmbkRecord.id));
-	fmbkRecord.id[7] = 0;
-	printf("id           : %s\n", fmbkRecord.id);
+	ebcAsc(fmbkRecord.id, fmbk_id, sizeof(fmbkRecord.id));
+	fmbk_id[7] = 0;
+	printf("id           : %s\n", fmbk_id);
 	printf("fir    rec nr: %i\n", fmbkRecord.rec_nr_fir);
 	printf("vec    rec nr: %i\n", fmbkRecord.rec_nr_vector);
 	printf("access rec nr: %i\n", fmbkRecord.rec_nr_access);
@@ -175,21 +177,9 @@ void VMDump::printDebug(void)
 
 	/* albk */
 
-	memcpy(buf, albkRecord.id, sizeof(albkRecord.id));
-	ebcAsc(buf, sizeof(albkRecord.id));
-	buf[8]=0;
-	printf("ALBK id      : %s\n",buf);
-
-	/* asibk */
-/*
-  XXX
-	memcpy(buf,asibkRecord.id,sizeof(asibkRecord.id));
-	ebcAsc(buf,sizeof(asibkRecord.id));
-	asibkRecord.id[8]=0;
-	printf("ASIBK id     : %s\n",buf);
-	printf("storage      : %x\n",asibkRecord.storage_size_2GB);
-	printf("bitmapsrecs  : %i\n",asibkRecord.nr_of_recs_of_first_bit_map);
-*/
+	ebcAsc(albkRecord.id, albk_id, sizeof(albkRecord.id));
+	albk_id[7]=0;
+	printf("ALBK id      : %s\n",albk_id);
 }
 
 void VMDump::printInfo(void)

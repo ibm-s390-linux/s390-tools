@@ -140,9 +140,15 @@ protected:
 	} __packed;
 
 	/* Methods */
-	inline void ebcAsc(char *inout, size_t len) const
+	inline void ebcAsc(char *in, char *out, size_t size) const
 	{
-		iconv(ebcdicAsciiConv, &inout, &len, &inout, &len);
+		size_t size_out = size;
+		size_t size_in = size;
+		size_t rc;
+
+		rc = iconv(ebcdicAsciiConv, &in, &size_in, &out, &size_out);
+		if (rc == (size_t) -1)
+			throw(DumpException("Code page translation EBCDIC-ASCII failed"));
 	}
 
 	/* Members */
