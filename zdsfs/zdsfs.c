@@ -27,6 +27,7 @@
 #endif
 
 #include "lib/libzds.h"
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 #define COMP "zdsfs: "
@@ -75,11 +76,10 @@ static void path_to_ds_name(const char *path, char *normds, size_t size)
 
 	if (*path == '/')
 		++path;
-	strncpy(normds, path, size);
-	normds[size - 1] = 0;
+	util_strlcpy(normds, path, size);
 	end = strchr(normds, '/');
 	if (end)
-		*end = 0;
+		*end = '\0';
 }
 
 static void path_to_member_name(const char *path, char *normds, size_t size)
@@ -88,11 +88,10 @@ static void path_to_member_name(const char *path, char *normds, size_t size)
 		++path;
 	path = strchr(path, '/');
 	if (!path)
-		normds[0] = 0;
+		normds[0] = '\0';
 	else {
 		++path;
-		strncpy(normds, path, size);
-		normds[size - 1] = 0;
+		util_strlcpy(normds, path, size);
 	}
 }
 
