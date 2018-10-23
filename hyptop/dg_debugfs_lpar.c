@@ -176,7 +176,6 @@ static void l_sd_cpu_phys_fill(struct sd_sys *sys,
 		sd_cpu_state_set(cpu, SD_CPU_STATE_UNKNOWN);
 	}
 	sd_cpu_mgm_time_us_set(cpu, cpu_info->mgm_time);
-	sd_cpu_real_type_set(cpu, cpu_type);
 	sd_cpu_commit(cpu);
 }
 

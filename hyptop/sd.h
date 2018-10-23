@@ -195,7 +195,6 @@ struct sd_cpu {
 	struct sd_info		i;
 	char			id[9];
 	struct sd_cpu_type	*type;
-	char			real_type[CPU_TYPE_ID_LEN];
 	struct sd_cpu_info	d1;
 	struct sd_cpu_info	d2;
 	struct sd_cpu_info	*d_cur;
@@ -226,11 +225,6 @@ struct sd_cpu *sd_cpu_new(struct sd_sys *parent, const char *id,
 static inline void sd_cpu_state_set(struct sd_cpu *cpu, enum sd_cpu_state state)
 {
 	cpu->state = state;
-}
-
-static inline void sd_cpu_real_type_set(struct sd_cpu *cpu, const char *type)
-{
-	strncpy(cpu->real_type, type, sizeof(cpu->real_type));
 }
 
 static inline void sd_cpu_cpu_time_us_set(struct sd_cpu *cpu, u64 value)
