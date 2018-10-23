@@ -20,7 +20,7 @@
 .TH zpcictl 8 "Oct 2018" s390-tools zpcictl
 .
 .SH NAME
-zpcictl - Manage PCI devices on z Systems
+zpcictl - Manage PCI devices on IBM Z
 .
 .
 .SH SYNOPSIS
@@ -30,50 +30,42 @@ zpcictl - Manage PCI devices on z Systems
 .
 .
 .SH DESCRIPTION
-With
+Use
 .B zpcictl
-, you can manage PCI devices on the IBM z Systems platform. It is especially
-used for reporting erroneous PCI devices to the service element.
+to manage PCI devices on the IBM Z platform. In particular,
+use this command to report defective PCI devices to the service element.
 
 .B Note:
 For NVMe devices additional data (such as S.M.A.R.T. data) is collected and sent
-with any error handling action. The smartmontools are required to be installed
-for this to work.
+with any error handling action. For this extendend data collection, the
+smartmontools must be installed.
 .PP
 .
 .
 .SH DEVICE
-.B DEVICE
-can be either the PCI slot address (e.g. 0000:00:00.0) or the main device node
-of an NVMe device (e.g.
+A PCI slot address (e.g. 0000:00:00.0) or the main device node of an NVMe
+device (e.g.
 .I /dev/nvme0
 ).
 .
 .
 .SH OPTIONS
-.SS Error Handling
+.SS Error Handling Options
 .OD reset "" "DEVICE"
-Reset
-.I DEVICE
-and initiate a re-initialization of the PCI device.
+Reset and re-initialize the PCI device.
 .PP
 .
 .OD deconfigure "" "DEVICE"
-De-configure
-.I DEVICE
-and prepare for any repair action. This action will move the
-PCI device from a configured to a reserved state.
+Deconfigure the PCI device and prepare for any repair action. This action
+changes the status of the PCI device from configured to reserved.
 .PP
 .
 .OD report-error "" "DEVICE"
-Report any device error for
-.IR DEVICE .
-The
-.I DEVICE
-is marked as erroneous and no further action is initiated on it.
+Report any device error for the PCI device.
+The device is marked as defective but no further action is taken.
 .PP
 .
-.SS Misc
+.SS General Options
 .OD help "h" ""
 Print usage information, then exit.
 .PP

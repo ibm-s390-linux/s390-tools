@@ -27,8 +27,9 @@
 #define SMARTCTL_CMDLINE "smartctl -x %s 2>/dev/null"
 
 static const struct util_prg prg = {
-	.desc = "Use zpcictl to manage PCI devices on s390\n"
-		"DEVICE is the slot id or node of the device (e.g. /dev/nvme0)",
+	.desc = "Use zpcictl to manage PCI devices on IBM Z\n"
+		"DEVICE is the slot ID or node of the device "
+		"(e.g. 0000:00:00.0 or /dev/nvme0)",
 	.args = "DEVICE",
 	.copyright_vec = {
 		{
@@ -46,23 +47,23 @@ static const struct util_prg prg = {
 #define OPT_REPORT_ERR	130
 
 static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("ERROR HANDLING"),
+	UTIL_OPT_SECTION("ERROR HANDLING OPTIONS"),
 	{
 		.option = { "reset", no_argument, NULL, OPT_RESET },
-		.desc = "Reset device",
+		.desc = "Reset the device",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "deconfigure", no_argument, NULL, OPT_DECONF },
-		.desc = "De-configure device and prepare for any repair action",
+		.desc = "Deconfigure the device to prepare for any repair action",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "report-error", no_argument, NULL, OPT_REPORT_ERR },
-		.desc = "Report device error to service element (SE)",
+		.desc = "Report a device error to the service element (SE)",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
-	UTIL_OPT_SECTION("MISC"),
+	UTIL_OPT_SECTION("GENERAL OPTIONS"),
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
