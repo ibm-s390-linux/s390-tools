@@ -24,12 +24,12 @@ endif
 
 libs = $(rootdir)/libutil/libutil.a
 
-detect-libcryptsetup.h:
-	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.h
-	echo "#ifndef CRYPT_LUKS2" >> detect-libcryptsetup.h
-	echo "  #error libcryptsetup version 2.0.3 is required" >> detect-libcryptsetup.h
-	echo "#endif" >> detect-libcryptsetup.h
-	echo "int i = CRYPT_SLOT_UNBOUND;" >> detect-libcryptsetup.h
+detect-libcryptsetup.dep:
+	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.dep
+	echo "#ifndef CRYPT_LUKS2" >> detect-libcryptsetup.dep
+	echo "  #error libcryptsetup version 2.0.3 is required" >> detect-libcryptsetup.dep
+	echo "#endif" >> detect-libcryptsetup.dep
+	echo "int i = CRYPT_SLOT_UNBOUND;" >> detect-libcryptsetup.dep
 
 check-dep-zkey:
 	$(call check_dep, \
@@ -39,10 +39,10 @@ check-dep-zkey:
 		"HAVE_OPENSSL=0")
 	touch check-dep-zkey
 
-check-dep-zkey-cryptsetup: detect-libcryptsetup.h
+check-dep-zkey-cryptsetup: detect-libcryptsetup.dep
 	$(call check_dep, \
 		"zkey-cryptsetup", \
-		"detect-libcryptsetup.h", \
+		"detect-libcryptsetup.dep", \
 		"cryptsetup-devel version 2.0.3", \
 		"HAVE_CRYPTSETUP2=0", \
 		"-I.")
@@ -95,7 +95,7 @@ install-zkey-cryptsetup:
 install: all install-common $(INSTALL_TARGETS)
 
 clean:
-	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.h \
+	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.dep \
 		check-dep-zkey check-dep-zkey-cryptsetup
 
 .PHONY: all install clean zkey-skip zkey-cryptsetup-skip-cryptsetup2 \
