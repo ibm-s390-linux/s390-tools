@@ -1,19 +1,29 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.6.1 (XXXX-XX-XX)__
+ * __v2.7.0 (2018-10-31)__
+
+  For Linux kernel version: 4.19
+
+  Add new tool:
+  - zcryptctl: Add zcryptctl for multiple zcrypt node management
+  - zpcictl: Add zpcictl for reporting defective PCI devices
 
   Changes of existing tools:
-  - qethqoat: add OSA-Express7S support
+  - qethqoat: Add OSA-Express7S support
+  - lszcrypt: Add support for alternative zcrypt device drivers
+  - zfcpdump: Add install script for zfcpdump
+  - zipl: Make zipl work with XFS by using the FIEMAP mapping ioctl
 
   Bug Fixes:
-  - lstape: fix output with SCSI lin_tape and multiple paths to same unit
-  - lstape: fix output without SCSI generic (sg)
-  - lsluns: fix to prevent error messages if there are non-zfcp SCSI devices
-  - lstape: fix to prevent error messages if there are non-zfcp SCSI devices
-  - lstape: fix description of --type and <devbusid> filter for channel tapes
-  - lstape: fix SCSI output description in man page
-  - lstape: fix SCSI HBA CCW device bus-ID e.g. for virtio-scsi-ccw
-
+  - lstape: Fix output with SCSI lin_tape and multiple paths to same unit
+  - lstape: Fix output without SCSI generic (sg)
+  - lsluns: Fix to prevent error messages if there are non-zfcp SCSI devices
+  - lstape: Fix to prevent error messages if there are non-zfcp SCSI devices
+  - lstape: Fix description of --type and <devbusid> filter for channel tapes
+  - lstape: Fix SCSI output description in man page
+  - lstape: Fix SCSI HBA CCW device bus-ID e.g. for virtio-scsi-ccw
+  - Direct --help and --version output to stdout for several tools
+  - osasnmpd: Start without real OSA devices
 
  * __v2.6.0 (2018-08-10)__
 

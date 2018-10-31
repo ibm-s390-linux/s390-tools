@@ -19,6 +19,7 @@ List of all individuals having contributed content to s390-tools
 - Dimitri John Ledkov
 - Eberhard Pasch
 - Einar Lueck
+- Eric Sandeen
 - Erwin Vicari
 - Eugene Crosser
 - Eugene Dvurechenski
