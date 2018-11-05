@@ -568,10 +568,10 @@ static void set_magic_numbers(void)
 {
 	if (l.extended) {
 		l.magic_number = DF_S390_MAGIC_EXT;
-		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7);
+		memcpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7);
 	} else {
 		l.magic_number = DF_S390_MAGIC;
-		strncpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV, 7);
+		memcpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV, 7);
 	}
 }
 
