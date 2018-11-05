@@ -10,6 +10,7 @@
  */
 
 #include <dirent.h>
+#include <err.h>
 #include <fcntl.h>
 #include <linux/fs.h>
 #include <stdio.h>
@@ -19,6 +20,8 @@
 #include <sys/sysmacros.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "lib/util_path.h"
 
 #include "zgetdump.h"
 #include "dfi_s390mv.h"
@@ -102,19 +105,25 @@ static void em_init(struct vol *vol)
  */
 static enum dev_status dev_from_busid(char *bus_id, dev_t *dev)
 {
-	char tmp_file[PATH_MAX], dev_file[PATH_MAX];
 	struct dirent *direntp;
 	int fh, minor, major;
 	char buf[10];
 	DIR *fh_dir;
+	char *sysfs;
 
-	snprintf(dev_file, PATH_MAX, "%s/%s", SYSFS_BUSDIR, bus_id);
-	fh_dir = opendir(dev_file);
+	sysfs = util_path_sysfs("%s/%s", SYSFS_BUSDIR, bus_id);
+	fh_dir = opendir(sysfs);
+	free(sysfs);
 	if (!fh_dir)
 		return DEV_UNDEFINED;
 
-	snprintf(tmp_file, PATH_MAX, "%s/online", dev_file);
-	fh = open(tmp_file, O_RDONLY);
+	sysfs = util_path_sysfs("%s/%s/online", SYSFS_BUSDIR, bus_id);
+	fh = open(sysfs, O_RDONLY);
+	if (fh == -1) {
+		warnx("Could not open \"%s\" (%s)", sysfs, strerror(errno));
+		goto err;
+	}
+	free(sysfs);
 	if (read(fh, buf, 1) == -1)
 		ERR_EXIT_ERRNO("Could not read online attribute");
 	close(fh);
@@ -128,27 +137,49 @@ static enum dev_status dev_from_busid(char *bus_id, dev_t *dev)
 	closedir(fh_dir);
 
 	if (direntp == NULL) {
-		snprintf(dev_file, PATH_MAX, "%s/%s/block", SYSFS_BUSDIR,
-			 bus_id);
-		fh_dir = opendir(dev_file);
-		if (!fh_dir)
-			ERR_EXIT_ERRNO("Could not open \"%s\"", dev_file);
+		sysfs = util_path_sysfs("%s/%s/block", SYSFS_BUSDIR, bus_id);
+		fh_dir = opendir(sysfs);
+		if (!fh_dir) {
+			warnx("Could not open \"%s\" (%s) ",
+			      sysfs, strerror(errno));
+			goto err;
+		}
 		while ((direntp = readdir(fh_dir)))
 			if (strncmp(direntp->d_name, "dasd", 4) == 0)
 				break;
 		closedir(fh_dir);
-		if (direntp == NULL)
-			ERR_EXIT("Problem with contents of \"%s\"", dev_file);
+		if (direntp == NULL) {
+			warnx("Problem with contents of \"%s\"", sysfs);
+			goto err;
+		}
+		free(sysfs);
 	}
-	snprintf(tmp_file, PATH_MAX, "%s/%s/dev", dev_file, direntp->d_name);
-	fh = open(tmp_file, O_RDONLY);
-	if (read(fh, buf, sizeof(buf)) == -1)
-		ERR_EXIT_ERRNO("Could not read dev file");
+
+	sysfs = util_path_sysfs("%s/%s/%s/dev",
+				SYSFS_BUSDIR, bus_id, direntp->d_name);
+	fh = open(sysfs, O_RDONLY);
+	if (fh == -1) {
+		warnx("Could not open \"%s\" (%s)", sysfs, strerror(errno));
+		goto err;
+	}
+	if (read(fh, buf, sizeof(buf)) == -1) {
+		warnx("Could not read dev file (%s)", strerror(errno));
+		goto err;
+	}
 	close(fh);
-	if (sscanf(buf, "%i:%i", &major, &minor) != 2)
-		ERR_EXIT("Malformed content of \"%s\": %s", tmp_file, buf);
+	if (sscanf(buf, "%i:%i", &major, &minor) != 2) {
+		warnx("Malformed content of \"%s\": %s", sysfs, buf);
+		goto err;
+	}
 	*dev = makedev(major, minor);
+
+	free(sysfs);
+
 	return DEV_ONLINE;
+
+err:
+	free(sysfs);
+	exit(EXIT_FAILURE);
 }
 
 /*
@@ -468,19 +499,6 @@ fail:
 }
 
 /*
- * Check if sysfs is available
- */
-static void check_sysfs(void)
-{
-	DIR *fh_dir;
-
-	fh_dir = opendir(SYSFS_BUSDIR);
-	if (!fh_dir)
-		ERR_EXIT_ERRNO("Could not open %s\n", SYSFS_BUSDIR);
-	closedir(fh_dir);
-}
-
-/*
  * Read dump tool from DASD and check if we have a multi-volume dump tool
  */
 static int mv_dumper_read(void)
@@ -502,8 +520,6 @@ static void volumes_init(void)
 {
 	u64 mem_off = 0;
 	unsigned int i;
-
-	check_sysfs();
 
 	for (i = 0; i < l.table.vol_cnt; i++) {
 		l.vol_vec[i].nr = i;

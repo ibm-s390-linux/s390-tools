@@ -13,7 +13,7 @@
 
 #include "lib/zt_common.h"
 
-#define SYSFS_BUSDIR	"/sys/bus/ccw/devices"
+#define SYSFS_BUSDIR	"bus/ccw/devices"
 #define MAX_VOLUMES	32
 
 /*
