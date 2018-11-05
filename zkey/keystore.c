@@ -3235,7 +3235,7 @@ static int _keystore_execute_cmd(const char *cmd,
 {
 	int rc;
 
-	rc = setenv("PATH", "/bin:/usr/bin:/usr/sbin", 1);
+	rc = setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin", 1);
 	if (rc < 0)
 		return rc;
 
