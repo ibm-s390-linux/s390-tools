@@ -343,6 +343,9 @@ $(rootdir)/libvmcp/libvmcp.a: $(rootdir)/libvmcp
 	$(MAKE) -C $(rootdir)/libvmcp/ libvmcp.a
 .PHONY: $(rootdir)/libvmcp
 
+# Dependencies between libraries
+$(rootdir)/libvmcp: $(rootdir)/libutil/libutil.a
+
 $(rootdir)/zipl/boot/data.o:
 	$(MAKE) -C $(rootdir)/zipl/boot/ data.o
 
