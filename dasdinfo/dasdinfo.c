@@ -192,18 +192,18 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 	char *space;
 
 	if (dasd_get_blocksize(device, &blksize) != 0) {
-		printf("Unable to figure out block size.\n");
+		warnx("Unable to figure out block size");
 		goto error;
 	}
 
 	if (dasd_get_info(device, &dasd_info) != 0) {
-		printf("Unable to figure out DASD informations.\n");
+		warnx("Unable to figure out DASD information");
 		goto error;
 	}
 
 	f = open(device, O_RDONLY);
 	if (f < 0) {
-		printf("Could not open device node.\n");
+		warnx("Could not open device node");
 		goto error;
 	}
 
@@ -214,7 +214,7 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 	bzero(vlabel, vlsize);
 
 	if (read(f, vlabel, vlsize) != vlsize) {
-		printf("Could not read volume label.\n");
+		warnx("Could not read volume label");
 		goto error_close;
 	}
 
@@ -255,10 +255,9 @@ static void *dinfo_malloc(size_t size)
 	void *result;
 
 	result = malloc(size);
-	if (result == NULL) {
-		printf("Could not allocate %lld bytes of memory",
-		       (unsigned long long)size);
-	}
+	if (result == NULL)
+		warnx("Could not allocate %lu bytes of memory", size);
+
 	return result;
 }
 
@@ -318,16 +317,14 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 			free(result);
 		}
 	}
-	printf("Error: Unable to create temporary device node");
+	warnx("Error: Unable to create temporary device node");
 	return -1;
 }
 
 static void dinfo_free_devnode(char *device)
 {
-	if (remove(device)) {
-		printf("Warning: Could not remove "
-			"temporary file %s", device);
-	}
+	if (remove(device))
+		warnx("Warning: Could not remove temporary file %s", device);
 }
 
 static int dinfo_extract_dev(dev_t *dev, char *str)
@@ -340,7 +337,7 @@ static int dinfo_extract_dev(dev_t *dev, char *str)
 	strncpy(tmp, str, RD_BUFFER_SIZE);
 	p = strchr(tmp, ':');
 	if (p == NULL) {
-		printf("Error: unable to extract major/minor\n");
+		warnx("Error: unable to extract major/minor");
 		return -1;
 	}
 
@@ -359,7 +356,7 @@ static int dinfo_get_dev_from_blockdev(char *blockdev, dev_t *dev)
 
 	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
 	if (!readbuf) {
-		printf("Error: Not enough memory to allocate readbuffer\n");
+		warnx("Error: Not enough memory to allocate readbuffer");
 		return -1;
 	}
 	if (util_file_read_line(readbuf, RD_BUFFER_SIZE,
@@ -490,7 +487,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	int rc = 0;
 
 	if (stat(devnode, &stat_buffer) != 0) {
-		printf("Error: could not stat %s\n", devnode);
+		warnx("Error: could not stat %s", devnode);
 		return -1;
 	}
 
@@ -499,13 +496,13 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 
 	directory = opendir("/sys/block/");
 	if (directory == NULL) {
-		printf("Error: could not open directory /sys/block\n");
+		warnx("Error: could not open directory /sys/block");
 		return -1;
 	}
 
 	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
 	if (!readbuf) {
-		printf("Error: Not enough memory to allocate readbuffer\n");
+		warnx("Error: Not enough memory to allocate readbuffer");
 		return -1;
 	}
 
@@ -607,25 +604,23 @@ int main(int argc, char *argv[])
 	sscanf(uname_buf.release, "%d.%d", &version, &release);
 	if (strcmp(uname_buf.sysname, "Linux") ||
 	    version < 2 || (version == 2 && release < 6)) {
-		printf("%s %d.%d is not supported\n", uname_buf.sysname,
-		       version, release);
+		warnx("%s %d.%d is not supported", uname_buf.sysname,
+		      version, release);
 		exit(1);
 	}
 
 	if (!busid && !blockdev && !devnode) {
-		printf("Error: please specify a device using either -b, -i "
-		       "or -d\n");
+		warnx("Error: please specify a device using either -b, -i or -d");
 		exit(1);
 	}
 
 	if ((busid && blockdev) || (busid && devnode) || (blockdev && devnode)) {
-		printf("Error: please specify device only once,  either -b, -i "
-		       "or -d\n");
+		warnx("Error: please specify device only once,  either -b, -i or -d");
 		exit(1);
 	}
 
 	if (!print_uid && !print_extended_uid && !print_vlabel) {
-		printf("Error: no action specified (e.g. -u)\n");
+		warnx("Error: no action specified (e.g. -u)");
 		exit(1);
 	}
 
@@ -718,7 +713,7 @@ int main(int argc, char *argv[])
 	}
 
 error:
-	printf("Error: could not read unique DASD ID\n");
+	warnx("Error: could not read unique DASD ID");
 	rc = 1;
 
 out:
