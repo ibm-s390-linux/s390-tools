@@ -25,6 +25,7 @@
 #include "lib/dasd_base.h"
 #include "lib/util_base.h"
 #include "lib/util_file.h"
+#include "lib/util_libc.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
 #include "lib/zt_common.h"
@@ -334,7 +335,7 @@ static int dinfo_extract_dev(dev_t *dev, char *str)
 	int ma, mi;
 
 	bzero(tmp, RD_BUFFER_SIZE);
-	strncpy(tmp, str, RD_BUFFER_SIZE);
+	util_strlcpy(tmp, str, RD_BUFFER_SIZE);
 	p = strchr(tmp, ':');
 	if (p == NULL) {
 		warnx("Error: unable to extract major/minor");
