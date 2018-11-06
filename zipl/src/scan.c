@@ -701,7 +701,7 @@ scan_bls_field(struct misc_file_buffer *file, struct scan_token* scan,
 	file->buffer[key_end] = '\0';
 	file->buffer[val_end] = '\0';
 
-	if (strncmp("version", &file->buffer[key_start], key_end - key_start) == 0) {
+	if (strncmp("title", &file->buffer[key_start], key_end - key_start) == 0) {
 		scan_append_section_heading(scan, index, &file->buffer[val_start]);
 	}
 

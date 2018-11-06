@@ -150,6 +150,7 @@ while IFS='= ' read key val; do
             if [ -f "${OUTPUT}" ]; then
                 print_error "BLS file ${OUTPUT} already exists"
             fi
+            echo "title $section" >> ${OUTPUT}
         fi
     elif [[ $val ]]; then
         val="$(echo $val | sed -e 's/^[ \t"]*//;s/[ \t"]*$//')"
