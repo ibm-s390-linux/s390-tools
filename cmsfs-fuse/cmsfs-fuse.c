@@ -17,6 +17,7 @@
 #include <fuse.h>
 #include <fuse_opt.h>
 #include <iconv.h>
+#include <limits.h>
 #include <linux/fs.h>
 #ifdef HAVE_SETXATTR
 #include <linux/xattr.h>
@@ -4187,21 +4188,12 @@ static ssize_t find_newline(const char *buf, int len)
 		return pos - buf;
 }
 
-static int cmsfs_write(const char *path, const char *buf, size_t size,
-		       off_t offset, struct fuse_file_info *fi)
+static int cmsfs_write_strings(struct file *f, const char *buf,
+			       size_t size, off_t offset)
 {
 	int scan_len = MIN(size, (size_t)MAX_RECORD_LEN + 1);
 	int rc, nl_byte = 1, null_record = 0, pad = 0;
-	struct file *f = get_fobj(fi);
 	ssize_t rsize;
-
-	(void) path;
-
-	if (cmsfs.readonly)
-		return -EROFS;
-
-	if (!f->linefeed)
-		return do_write(f, buf, size, offset);
 
 	/* remove already committed bytes */
 	offset -= f->wcache_commited;
@@ -4276,6 +4268,36 @@ static int cmsfs_write(const char *path, const char *buf, size_t size,
 	purge_wcache(f);
 	f->pad_bytes += pad;
 	return rc;
+}
+
+static int cmsfs_write(const char *path, const char *buf, size_t size,
+		       off_t offset, struct fuse_file_info *fi)
+{
+	struct file *f = get_fobj(fi);
+	int rc, written, nbytes;
+
+	(void) path;
+
+	if (cmsfs.readonly)
+		return -EROFS;
+
+	if (!f->linefeed)
+		return do_write(f, buf, size, offset);
+
+	/* Limit the size to what we can report back as written */
+	nbytes = MIN(size, (size_t) INT_MAX);
+
+	written = 0;
+	while (nbytes) {
+		rc = cmsfs_write_strings(f, buf, nbytes, offset);
+		if (rc < 0)
+			return written ? written : rc;
+		written += rc;
+		offset += rc;
+		buf += rc;
+		nbytes -= rc;
+	}
+	return written;
 }
 
 static int cmsfs_unlink(const char *path)
