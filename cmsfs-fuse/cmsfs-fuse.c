@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include "lib/util_base.h"
+#include "lib/util_libc.h"
 #include "lib/util_list.h"
 #include "lib/zt_common.h"
 
@@ -601,7 +602,7 @@ static struct file *file_open(const char *name)
 	char uc_name[MAX_FNAME];
 	struct file *f;
 
-	strncpy(uc_name, name, MAX_FNAME);
+	util_strlcpy(uc_name, name, MAX_FNAME);
 	str_toupper(uc_name);
 
 	util_list_iterate(&open_file_list, f)
@@ -1564,7 +1565,7 @@ static off_t lookup_file(const char *name, struct fst_entry *fst, int flag)
 	off_t faddr = 0;
 	int rc;
 
-	strncpy(uc_name, name, MAX_FNAME);
+	util_strlcpy(uc_name, name, MAX_FNAME);
 	str_toupper(uc_name);
 
 	if (flag == HIDE_UNLINKED && file_unlinked(uc_name))
@@ -1848,7 +1849,7 @@ static int cmsfs_open(const char *path, struct fuse_file_info *fi)
 		if (f->wcache == NULL)
 			return -ENOMEM;
 
-		strncpy(f->path, path, MAX_FNAME + 1);
+		util_strlcpy(f->path, path, MAX_FNAME + 1);
 		str_toupper(f->path);
 
 		f->use_count = 1;
@@ -2105,7 +2106,7 @@ static int cmsfs_create(const char *path, mode_t mode,
 		return rc;
 
 	/* force uppercase */
-	strncpy(uc_name, path + 1, MAX_FNAME);
+	util_strlcpy(uc_name, path + 1, MAX_FNAME);
 	str_toupper(uc_name);
 
 	rc = encode_edf_name(uc_name, fname, ftype);
@@ -2754,7 +2755,7 @@ static int delete_file(const char *path)
 		fst_last = find_last_fdir_entry(cmsfs.fdir, cmsfs.dir_levels);
 
 	/* remove unlinked file from fcache */
-	strncpy(file, path + 1, MAX_FNAME);
+	util_strlcpy(file, path + 1, MAX_FNAME);
 	str_toupper(file);
 	invalidate_htab_entry(file);
 
@@ -2845,14 +2846,14 @@ static int cmsfs_rename(const char *path, const char *new_path)
 	memcpy(&fst.name[0], fname, 8);
 	memcpy(&fst.type[0], ftype, 8);
 
-	strncpy(uc_old_name, path + 1, MAX_FNAME);
+	util_strlcpy(uc_old_name, path + 1, MAX_FNAME);
 	str_toupper(uc_old_name);
 	invalidate_htab_entry(uc_old_name);
 
 	/* update name in file object if the file is opened */
 	f = file_open(uc_old_name);
 	if (f != NULL) {
-		strncpy(f->path, new_path, MAX_FNAME + 1);
+		util_strlcpy(f->path, new_path, MAX_FNAME + 1);
 		str_toupper(f->path);
 		memcpy(f->fst->name, fname, 8);
 		memcpy(f->fst->type, ftype, 8);

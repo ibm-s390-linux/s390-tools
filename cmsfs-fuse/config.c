@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 #include "cmsfs-fuse.h"
@@ -65,7 +66,7 @@ static void add_filetype(char *name, struct util_list *list)
 	entry = malloc(sizeof(*entry));
 	if (entry == NULL)
 		DIE_PERROR("malloc failed");
-	strncpy(entry->name, name, MAX_TYPE_LEN);
+	util_strlcpy(entry->name, name, MAX_TYPE_LEN);
 	util_list_add_head(list, entry);
 }
 
