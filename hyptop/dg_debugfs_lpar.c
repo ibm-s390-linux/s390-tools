@@ -55,8 +55,7 @@ struct l_x_sys_hdr {
 
 static inline void l_sys_hdr__sys_name(struct l_x_sys_hdr *hdr, char *name)
 {
-	memcpy(name, hdr->sys_name, LPAR_NAME_LEN);
-	ht_ebcdic_to_ascii(name, LPAR_NAME_LEN);
+	ht_ebcdic_to_ascii(hdr->sys_name, name, LPAR_NAME_LEN);
 	name[LPAR_NAME_LEN] = 0;
 	ht_strstrip(name);
 }

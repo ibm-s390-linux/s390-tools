@@ -98,9 +98,15 @@ void *ht_realloc(void *old_ptr, size_t size)
 /*
  * Convert EBCDIC string to ASCII
  */
-void ht_ebcdic_to_ascii(char *inout, size_t len)
+void ht_ebcdic_to_ascii(char *in, char *out, size_t size)
 {
-	iconv(l_iconv_ebcdic_ascii, &inout, &len, &inout, &len);
+	size_t size_out = size;
+	size_t size_in = size;
+	size_t rc;
+
+	rc = iconv(l_iconv_ebcdic_ascii, &in, &size_in, &out, &size_out);
+	if (rc == (size_t) -1)
+		ERR_EXIT_ERRNO("Code page translation EBCDIC-ASCII failed");
 }
 
 /*

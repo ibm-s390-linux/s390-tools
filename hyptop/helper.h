@@ -30,7 +30,7 @@ extern char *ht_strstrip(char *str);
 extern char *ht_strdup(const char *str);
 extern void ht_print_head(const char *sys);
 extern void ht_print_help_icon(void);
-extern void ht_ebcdic_to_ascii(char *inout, size_t len);
+extern void ht_ebcdic_to_ascii(char *in, char *out, size_t len);
 extern char *ht_mount_point_get(const char *fs_type);
 extern u64 ht_ext_tod_2_us(void *tod_ext);
 extern void ht_print_time(void);

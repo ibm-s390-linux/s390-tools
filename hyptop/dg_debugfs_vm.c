@@ -245,8 +245,7 @@ static void l_sd_sys_root_fill(struct sd_sys *sys)
 		struct sd_sys *guest;
 
 		guest_name[NAME_LEN] = 0;
-		memcpy(guest_name, data->guest_name, NAME_LEN);
-		ht_ebcdic_to_ascii(guest_name, NAME_LEN);
+		ht_ebcdic_to_ascii(data->guest_name, guest_name, NAME_LEN);
 		ht_strstrip(guest_name);
 
 		guest = sd_sys_get(sys, guest_name);
