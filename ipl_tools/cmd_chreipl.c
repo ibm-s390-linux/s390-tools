@@ -303,19 +303,21 @@ static int set_reipl_type(const char *dev_name)
 
 static int get_chreipl_helper_cmd(dev_t dev, char cmd[PATH_MAX])
 {
-	char chreipl_helper[PATH_MAX];
+	char *chreipl_helper;
 	struct proc_dev_entry pde;
 
 	if (proc_dev_get_entry(dev, 1, &pde) != 0)
 		return -1;
-	snprintf(chreipl_helper, PATH_MAX,
-		 "%s/%s.%s", TOOLS_LIBDIR, "chreipl_helper", pde.name);
+	util_asprintf(&chreipl_helper,
+		      "%s/%s.%s", TOOLS_LIBDIR, "chreipl_helper", pde.name);
 	if (access(chreipl_helper, X_OK) != 0) {
 		proc_dev_free_entry(&pde);
+		free(chreipl_helper);
 		return -1;
 	}
 	sprintf(cmd, "%s %d:%d", chreipl_helper, major(dev), minor(dev));
 	proc_dev_free_entry(&pde);
+	free(chreipl_helper);
 	return 0;
 }
 

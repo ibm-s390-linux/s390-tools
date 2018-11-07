@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/util_libc.h"
 #include "ipl_tools.h"
 
 /*
@@ -81,10 +82,11 @@ void read_str(char *string, const char *path, size_t len)
  */
 void read_fw_str(char *string, const char *file, size_t len)
 {
-	char path[PATH_MAX];
+	char *path;
 
-	snprintf(path, sizeof(path), "/sys/firmware/%s", file);
-	return read_str(string, path, len);
+	util_asprintf(&path, "/sys/firmware/%s", file);
+	read_str(string, path, len);
+	free(path);
 }
 
 /*
