@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/util_libc.h"
 #include "ipl_tools.h"
 
 /*
@@ -30,7 +31,7 @@ int fcp_is_device(const char *devno)
  */
 void fcp_wwpn_get(const char *device, char *wwpn)
 {
-	char path[PATH_MAX], buf[4096];
+	char path[PATH_MAX], buf[20];
 	FILE *fh;
 	int rc;
 
@@ -41,7 +42,7 @@ void fcp_wwpn_get(const char *device, char *wwpn)
 	rc = fscanf(fh, "%s", buf);
 	if (rc <= 0)
 		ERR_EXIT("Could not lookup WWPN \"%s\"", path);
-	strncpy(wwpn, buf, 20);
+	util_strlcpy(wwpn, buf, 20);
 	fclose(fh);
 }
 
@@ -51,7 +52,7 @@ void fcp_wwpn_get(const char *device, char *wwpn)
  */
 void fcp_lun_get(const char *device, char *lun)
 {
-	char path[PATH_MAX], buf[4096];
+	char path[PATH_MAX], buf[20];
 	FILE *fh;
 	int rc;
 
@@ -62,7 +63,7 @@ void fcp_lun_get(const char *device, char *lun)
 	rc = fscanf(fh, "%s", buf);
 	if (rc <= 0)
 		ERR_EXIT("Could not lookup LUN \"%s\"", path);
-	strncpy(lun, buf, 20);
+	util_strlcpy(lun, buf, 20);
 	fclose(fh);
 }
 
