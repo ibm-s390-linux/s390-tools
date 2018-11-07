@@ -1,11 +1,13 @@
 include ../common.mak
 
+libs = $(rootdir)/libutil/libutil.a
+
 all: chreipl lsreipl chshut lsshut
 
 objects = main.o ccw.o fcp.o system.o shutdown.o \
 	  cmd_lsshut.o cmd_chshut.o cmd_lsreipl.o cmd_chreipl.o proc.o
 
-chreipl: $(objects)
+chreipl: $(objects) $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 lsreipl:

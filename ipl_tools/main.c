@@ -9,7 +9,9 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
+
 #include "ipl_tools.h"
 
 struct globals g;
@@ -31,7 +33,7 @@ void __noreturn print_version_exit(void)
 
 int main(int argc, char *argv[])
 {
-	strncpy(g.prog_name, argv[0], sizeof(g.prog_name));
+	util_strlcpy(g.prog_name, argv[0], sizeof(g.prog_name));
 	if (strstr(argv[0], "chreipl") != NULL) {
 		cmd_chreipl(argc, argv);
 		return 0;

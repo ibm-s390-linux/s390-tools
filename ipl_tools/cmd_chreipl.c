@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <sys/sysmacros.h>
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 #include "ipl_tools.h"
@@ -182,7 +183,7 @@ static void set_bootprog(const char *bootprog)
 		ERR_EXIT("Bootprog \"%s\" is not a decimal number", bootprog);
 	if (bootprog_int > UINT_MAX)
 		ERR_EXIT("Invalid bootprog specified");
-	strncpy(l.bootprog, bootprog, sizeof(l.bootprog));
+	util_strlcpy(l.bootprog, bootprog, sizeof(l.bootprog));
 	l.bootprog_set = 1;
 }
 
@@ -294,7 +295,7 @@ static int set_reipl_type(const char *dev_name)
 	else
 		return -1;
 
-	strncpy(l.dev, dev_name, sizeof(l.dev));
+	util_strlcpy(l.dev, dev_name, sizeof(l.dev));
 	dev_from_part(l.dev);
 	l.dev_set = 1;
 	return 0;
