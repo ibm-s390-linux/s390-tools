@@ -20,7 +20,7 @@
 #include <wait.h>
 
 #include "lib/u2s.h"
-#include "misc.h"
+#include "lib/util_libc.h"
 
 #define DEV_BUFFER_LENGTH 20
 #define PATH_BUFFER_LENGTH 256
@@ -113,7 +113,7 @@ static int extract_busid(char *name, char *busid) {
 	if (!start)
 		return -1;
 	start++;
-	len = misc_strlcpy(busid, start, BUSIDSIZE);
+	len = util_strlcpy(busid, start, BUSIDSIZE);
 	if (len >= BUSIDSIZE)
 		return -1;
 
@@ -246,7 +246,7 @@ static int find_busid_in_proc(int maja, int mina, char *busid)
 	while (fscanf(filp, "%[^(] %*[^)] ) at ( %d : %d %*[^\n]\n",
 		      bus, &majb, &minb) != EOF) {
 		if ((maja == majb) && (mina == minb)) {
-			len = misc_strlcpy(busid, bus, BUSIDSIZE);
+			len = util_strlcpy(busid, bus, BUSIDSIZE);
 			if (len < BUSIDSIZE)
 				rc = 0;
 			break;

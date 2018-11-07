@@ -130,6 +130,7 @@ char *util_strcat_realloc(char *str1, const char *str2);
 void util_str_toupper(char *str);
 
 char *util_strstrip(char *s);
+size_t util_strlcpy(char *dest, const char *src, size_t size);
 
 #ifdef __cplusplus
 }

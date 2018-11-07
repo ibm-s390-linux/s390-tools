@@ -228,3 +228,30 @@ char *util_strstrip(char *s)
 
 	return s;
 }
+
+/**
+ * Copy \a src to buffer \a dest of size \a size. At most size - 1
+ * chars will be copied. \a dest will always be NUL terminated.
+ *
+ * Note: If the return value is greater than or equal to size truncation
+ * occurred.
+ *
+ * @param[in] dest   Destination buffer
+ * @param[in] src    Source string
+ * @param[in] size   Size of destination buffer
+ *
+ * @returns   strlen Length of \a src string
+ */
+size_t util_strlcpy(char *dest, const char *src, size_t size)
+{
+	size_t str_len = strlen(src);
+	size_t len;
+
+	if (size) {
+		len = MIN(size - 1, str_len);
+		memcpy(dest, src, len);
+		dest[len] = '\0';
+	}
+
+	return str_len;
+}

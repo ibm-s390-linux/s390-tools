@@ -7,8 +7,8 @@ ALL_CPPFLAGS += -I../include -I../boot \
 	    -D_FILE_OFFSET_BITS=64 $(NO_PIE_CFLAGS)
 ALL_LDFLAGS += -Wl,-z,noexecstack $(NO_PIE_LDFLAGS)
 
-libs =	$(rootdir)/libutil/libutil.a \
-	$(rootdir)/libu2s/libu2s.a
+libs =	$(rootdir)/libu2s/libu2s.a \
+	$(rootdir)/libutil/libutil.a
 
 objects = misc.o error.o scan.o job.o boot.o bootmap.o disk.o \
 	  install.o zipl.o $(rootdir)/zipl/boot/data.o
