@@ -17,6 +17,7 @@
 #include <sys/types.h>
 
 #include "lib/util_base.h"
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 #define G0(x) MAX(0, (s64) (x))

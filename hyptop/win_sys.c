@@ -326,7 +326,7 @@ void win_sys_set(const char *sys_id)
 {
 	if (l_initialized)
 		table_reset(l_t);
-	strncpy(l_sys_id, sys_id, sizeof(l_sys_id));
+	util_strlcpy(l_sys_id, sys_id, sizeof(l_sys_id));
 }
 
 /*

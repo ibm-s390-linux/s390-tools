@@ -219,7 +219,7 @@ struct sd_cpu *sd_cpu_new(struct sd_sys *parent, const char *id,
 
 	cpu = ht_zalloc(sizeof(*cpu));
 	cpu->i.parent = parent;
-	strncpy(cpu->id, id, sizeof(cpu->id));
+	util_strlcpy(cpu->id, id, sizeof(cpu->id));
 	cpu->type = l_cpu_type_by_id(type);
 	cpu->d_cur = &cpu->d1;
 	cpu->cnt = cnt;
@@ -251,7 +251,7 @@ struct sd_sys *sd_sys_new(struct sd_sys *parent, const char *id)
 	struct sd_sys *sys_new;
 
 	sys_new = ht_zalloc(sizeof(*sys_new));
-	strncpy(sys_new->id, id, sizeof(sys_new->id));
+	util_strlcpy(sys_new->id, id, sizeof(sys_new->id));
 	util_list_init(&sys_new->child_list, struct sd_sys, list);
 	util_list_init(&sys_new->cpu_list, struct sd_cpu, list);
 

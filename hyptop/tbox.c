@@ -157,7 +157,7 @@ static void l_print_line(const char *line)
 	char line_cpy[TBOX_MAX_STR + 1];
 	char *ptr_old, *ptr;
 
-	strncpy(line_cpy, line, sizeof(line_cpy));
+	util_strlcpy(line_cpy, line, sizeof(line_cpy));
 	ptr_old = ptr = line_cpy;
 	do {
 		ptr = strchr(ptr, '\\');

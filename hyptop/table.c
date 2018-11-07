@@ -47,7 +47,7 @@ static void l_mark_key_add(struct table *t, char *str)
 	struct table_mark_key *key;
 
 	key = ht_zalloc(sizeof(*key));
-	strncpy(key->str, str, sizeof(key->str));
+	util_strlcpy(key->str, str, sizeof(key->str));
 	util_list_add_tail(&t->mark_key_list, key);
 }
 
@@ -617,7 +617,7 @@ void table_row_select_key_get(struct table *t, char str[TABLE_STR_MAX])
 	struct table_row *row;
 
 	row = l_selected_row(t);
-	strncpy(str, row->entries[0].str, TABLE_STR_MAX);
+	util_strlcpy(str, row->entries[0].str, TABLE_STR_MAX);
 }
 
 /*
