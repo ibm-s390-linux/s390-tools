@@ -47,9 +47,15 @@ static int mac_is_zero(__u8 *mac)
 	return !(mac[0] | mac[1] | mac[2] | mac[3] | mac[4] | mac[5]);
 }
 
-static void ebctoasc(char *inout, size_t len)
+static void ebctoasc(char *in, char *out, size_t size)
 {
-	iconv(l_iconv_ebcdic_ascii, &inout, &len, &inout, &len);
+	size_t size_out = size;
+	size_t size_in = size;
+	size_t rc;
+
+	rc = iconv(l_iconv_ebcdic_ascii, &in, &size_in, &out, &size_out);
+	if (rc == (size_t) -1)
+		fprintf(stderr, "Code page translation EBCDIC-ASCII failed\n");
 }
 
 static void print_version()
@@ -288,6 +294,7 @@ static void print_logical(struct qeth_qoat_logical *lhdr)
 	char prouter[] = "primary";
 	char srouter[] = "secondary";
 	char nrouter[] = "no";
+	char port_name[8];
 	char *router;
 
 	if (lhdr->ip4_primary_router)
@@ -341,8 +348,8 @@ static void print_logical(struct qeth_qoat_logical *lhdr)
 
 
 	if (lhdr->port_name_f) {
-		ebctoasc((char *)lhdr->port_name, 8);
-		printf("Port name: %.8s\n", lhdr->port_name);
+		ebctoasc((char *)lhdr->port_name, port_name, 8);
+		printf("Port name: %.8s\n", port_name);
 	}
 
 	printf("IPv4 assists enabled: 0x%08x\n", lhdr->ip4_ass_enabled);
