@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 #include "qethqoat.h"
 
@@ -541,6 +542,7 @@ int main(int argc, char **argv)
 	opts.raw = 0;
 	opts.scope = 1;
 	opts.file = NULL;
+	opts.ifname = NULL;
 
 	while ((c = getopt_long(argc, argv, qethqoat_opts_str, qethqoat_opts,
 		&index)) != -1) {
@@ -613,7 +615,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	strncpy(ifr.ifr_name, opts.ifname, IFNAMSIZ);
+	util_strlcpy(ifr.ifr_name, opts.ifname, IFNAMSIZ);
 	oat_data.command = opts.scope;
 	ifr.ifr_ifru.ifru_data = (void *)&oat_data;
 

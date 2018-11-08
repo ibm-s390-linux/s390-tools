@@ -2,7 +2,9 @@ include ../common.mak
 
 all: qethqoat
 
-qethqoat: qethqoat.o
+libs = $(rootdir)/libutil/libutil.a
+
+qethqoat: qethqoat.o $(libs)
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man8
