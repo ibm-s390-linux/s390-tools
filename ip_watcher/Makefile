@@ -2,7 +2,9 @@ include ../common.mak
 
 all: xcec-bridge
 
-xcec-bridge: xcec-bridge.o
+libs =	$(rootdir)/libutil/libutil.a
+
+xcec-bridge: xcec-bridge.o $(libs)
 
 clean:
 	rm -f *.o core xcec-bridge

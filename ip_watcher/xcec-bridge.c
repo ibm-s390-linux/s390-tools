@@ -31,6 +31,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 /* a signal causes the interfaces to be re-checked */
@@ -91,7 +92,7 @@ int open_incoming_socket(char *dev_name)
 		return -1;
 	}
 
-	strncpy(if_req.ifr_name,dev_name,DEV_NAME_SIZE);
+	util_strlcpy(if_req.ifr_name, dev_name, DEV_NAME_SIZE);
 	retval=ioctl(fd,SIOCGIFINDEX,&if_req);
 	if (retval==-1) {
 		syslog(LOG_ERR,"can't ioctl on raw packet socket, " \
@@ -281,7 +282,7 @@ int read_sys(struct int_sock **nlist)
 				do_broadcast_bridging=0;
 
 			is->mtu_warning=0;
-			strncpy(is->dev_name, if_name, DEV_NAME_SIZE);
+			util_strlcpy(is->dev_name, if_name, DEV_NAME_SIZE);
 			if (!strncmp(if_name,"hsi",3)) {
 				is->features=I_S_FEATURE_PASSTHROUGH;
 			}
@@ -360,7 +361,7 @@ void update_interfaces()
 				continue;
 			}
 
-			strncpy(new_int->dev_name,i->dev_name,DEV_NAME_SIZE);
+			util_strlcpy(new_int->dev_name, i->dev_name, DEV_NAME_SIZE);
 			new_int->i_fd=i_fd;
 			new_int->o_fd=o_fd;
 			new_int->features=i->features;
