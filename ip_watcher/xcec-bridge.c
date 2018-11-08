@@ -40,7 +40,7 @@
 
 #define UPDATE_SIGNAL SIGUSR1
 
-#define DEV_NAME_LEN IFNAMSIZ
+#define DEV_NAME_SIZE IFNAMSIZ
 
 #define BUFFER_LEN 65536
 
@@ -55,7 +55,7 @@ struct int_sock {
 	int features;
 	int i_fd;
 	int o_fd;
-	char dev_name[DEV_NAME_LEN];
+	char dev_name[DEV_NAME_SIZE];
 	int mtu_warning;
 
 	struct int_sock *next;
@@ -91,7 +91,7 @@ int open_incoming_socket(char *dev_name)
 		return -1;
 	}
 
-	strncpy(if_req.ifr_name,dev_name,DEV_NAME_LEN);
+	strncpy(if_req.ifr_name,dev_name,DEV_NAME_SIZE);
 	retval=ioctl(fd,SIOCGIFINDEX,&if_req);
 	if (retval==-1) {
 		syslog(LOG_ERR,"can't ioctl on raw packet socket, " \
@@ -192,7 +192,7 @@ int open_outgoing_socket(char *dev_name)
 int interface_in_list(struct int_sock *item,struct int_sock *list)
 {
 	for (;list;list=list->next) {
-		if (!strncmp(item->dev_name,list->dev_name,DEV_NAME_LEN)) {
+		if (!strncmp(item->dev_name,list->dev_name,DEV_NAME_SIZE)) {
 			return 1;
 		}
 	}
@@ -281,7 +281,7 @@ int read_sys(struct int_sock **nlist)
 				do_broadcast_bridging=0;
 
 			is->mtu_warning=0;
-			strncpy(is->dev_name, if_name, DEV_NAME_LEN);
+			strncpy(is->dev_name, if_name, DEV_NAME_SIZE);
 			if (!strncmp(if_name,"hsi",3)) {
 				is->features=I_S_FEATURE_PASSTHROUGH;
 			}
@@ -317,7 +317,7 @@ void update_interfaces()
 			prev=NULL;
 			while (j) {
 				if (!strncmp(j->dev_name,i->dev_name,
-					     DEV_NAME_LEN)) {
+					     DEV_NAME_SIZE)) {
 					if (!prev) {
 						select_set.i_s_list=j->next;
 					} else {
@@ -360,7 +360,7 @@ void update_interfaces()
 				continue;
 			}
 
-			strncpy(new_int->dev_name,i->dev_name,DEV_NAME_LEN);
+			strncpy(new_int->dev_name,i->dev_name,DEV_NAME_SIZE);
 			new_int->i_fd=i_fd;
 			new_int->o_fd=o_fd;
 			new_int->features=i->features;
