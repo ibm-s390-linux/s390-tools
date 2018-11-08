@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2018
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -1091,7 +1091,7 @@ exit_code_t misc_write_text_file_retry(const char *path, const char *text,
  * at the specified path or NULL on error. */
 char *misc_readlink(const char *path)
 {
-	char *name;
+	char *name, *name2;
 	ssize_t len;
 
 	debug("Reading link %s\n", path);
@@ -1103,7 +1103,8 @@ char *misc_readlink(const char *path)
 	}
 	name[len++] = 0;
 
-	return realloc(name, len);
+	name2 = realloc(name, len);
+	return (name2) ? name2 : name;
 }
 
 /* Determine configuration set. */
