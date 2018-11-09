@@ -31,12 +31,13 @@ LDLIBS += $(FUSE_LDLIBS) -lpthread -lrt -ldl -lm
 
 OBJECTS = hmcdrvfs.o
 
+libs = $(rootdir)/libutil/libutil.a
 
 all: check_dep hmcdrvfs
 
 $(OBJECTS): Makefile
 
-hmcdrvfs: $(OBJECTS)
+hmcdrvfs: $(OBJECTS) $(libs)
 
 install: all install-scripts
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 hmcdrvfs \

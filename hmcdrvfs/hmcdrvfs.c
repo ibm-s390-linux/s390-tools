@@ -27,6 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 #define HMCDRV_FUSE_LOGNAME	"hmcdrvfs" /* log prefix */
@@ -276,7 +277,7 @@ static void hmcdrv_cache_symlink(struct hmcdrv_fuse_file *fp,
 		fp->symlnk = malloc(HMCDRV_FUSE_MAXPATH);
 
 		if (fp->symlnk != NULL) {
-			strncpy(fp->symlnk, symlink, HMCDRV_FUSE_MAXPATH);
+			util_strlcpy(fp->symlnk, symlink, HMCDRV_FUSE_MAXPATH);
 			fp->symlnk[HMCDRV_FUSE_MAXPATH - 1] = '\0';
 		}
 	}
@@ -483,8 +484,7 @@ static ssize_t hmcdrv_ftp_transfer(struct hmcdrv_fuse_file *fp, char *buf,
 	}
 
 	current_offset += retlen;
-	strncpy(last_ftpcmd, fp->ftpcmd, HMCDRV_FUSE_MAXCMDLEN);
-	last_ftpcmd[HMCDRV_FUSE_MAXCMDLEN - 1] = '\0';
+	util_strlcpy(last_ftpcmd, fp->ftpcmd, HMCDRV_FUSE_MAXCMDLEN);
 	return retlen;
 }
 
@@ -853,13 +853,12 @@ static char *hmcdrv_parse_line(char *line, char *namebuf,
 				*arrow = '\0';
 		}
 
-		strncpy(namebuf, attr.fname, bufsize);
-		namebuf[bufsize - 1] = '\0'; /* safety */
+		util_strlcpy(namebuf, attr.fname, bufsize);
 
 		if (arrow == NULL) {
 			symlink[0] = '\0';
 		} else {
-			strncpy(symlink, arrow + 4, HMCDRV_FUSE_MAXPATH);
+			util_strlcpy(symlink, arrow + 4, HMCDRV_FUSE_MAXPATH);
 			*arrow = ' '; /* restore */
 		}
 
@@ -1148,8 +1147,7 @@ static int hmcdrv_fuse_readlink(const char *path, char *buf, size_t size)
 			if (!S_ISLNK(fp->st.st_mode)) {
 				rc = -EINVAL;
 			} else {
-				strncpy(buf, fp->symlnk, size);
-				buf[size - 1] = '\0';
+				util_strlcpy(buf, fp->symlnk, size);
 			}
 		}
 	}
