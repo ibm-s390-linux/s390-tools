@@ -309,7 +309,8 @@ static void sclp_issue_action(struct zpci_device *pdev, int action)
 	if (pdev->class == PCI_CLASS_NVME)
 		sdata = collect_smart_data(pdev);
 	if (sdata) {
-		strncpy(report.data.log_data, sdata, sizeof(report.data.log_data));
+		util_strlcpy(report.data.log_data, sdata,
+			     sizeof(report.data.log_data));
 		free(sdata);
 	}
 	sysfs_write_data(&report, pdev->slot);
