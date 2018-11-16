@@ -60,7 +60,7 @@ static struct util_opt opt_vec[] = {
 	},
 	{
 		.option = { "report-error", no_argument, NULL, OPT_REPORT_ERR },
-		.desc = "Report a device error to the service element (SE)",
+		.desc = "Report a device error to the Support Element (SE)",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	UTIL_OPT_SECTION("GENERAL OPTIONS"),
