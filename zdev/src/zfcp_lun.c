@@ -761,10 +761,8 @@ static char *zfcp_lun_st_get_active_attrib_path(struct subtype *st,
 	char *hctl, *devpath, *path;
 	size_t len = strlen(SCSI_ATTR_PREFIX);
 
-	if (!starts_with(name, SCSI_ATTR_PREFIX) ||
-	    !(name[len] == 0 || name[len] == '/' ))
-		devpath = path_get_zfcp_lun_dev(dev->devid);
-	else {
+	if (starts_with(name, SCSI_ATTR_PREFIX) &&
+	    (name[len] == 0 || name[len] == '/')) {
 		hctl = scsi_hctl_from_zfcp_lun_devid(dev->devid);
 		if (!hctl)
 			return NULL;
@@ -772,6 +770,8 @@ static char *zfcp_lun_st_get_active_attrib_path(struct subtype *st,
 		free(hctl);
 
 		name += strlen(SCSI_ATTR_PREFIX);
+	} else {
+		devpath = path_get_zfcp_lun_dev(dev->devid);
 	}
 
 	while (*name == '/')
