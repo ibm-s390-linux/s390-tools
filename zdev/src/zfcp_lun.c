@@ -246,6 +246,7 @@ static unsigned long zfcp_lun_num_ids_in_range(const char *range)
 
 static bool zfcp_lun_is_id_in_range(const char *id, const char *range)
 {
+	/* No ranges are supported on zfcp lun IDs. */
 	return false;
 }
 
