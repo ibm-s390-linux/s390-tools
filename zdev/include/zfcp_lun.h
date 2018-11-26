@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -12,6 +12,8 @@
 
 #include <stdint.h>
 #include "ccw.h"
+#include "exit_code.h"
+#include "misc.h"
 
 #define ZFCP_LUN_NAME		"zfcp-lun"
 #define SCSI_ATTR_PREFIX	"scsi_dev"
