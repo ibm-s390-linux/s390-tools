@@ -64,6 +64,7 @@ struct rec_fmt {
 			int argz_sep;
 		} csv_p;
 	} d;
+	int indent;
 };
 
 /*
@@ -122,7 +123,19 @@ struct util_rec *util_rec_new_wide(const char *hdr_sep)
 	rec->fmt.type = REC_FMT_WIDE;
 	rec->fmt.d.wide_p.hdr_sep = util_strdup(hdr_sep);
 	rec->fmt.d.wide_p.argz_sep = ',';
+	rec->fmt.indent = 0;
 	return rec;
+}
+
+/*
+ * Print the indentation characters
+ */
+static inline void rec_print_indention(int indent)
+{
+	if (indent <= 0)
+		return;
+
+	printf("%*s", indent, "");
 }
 
 /*
@@ -135,6 +148,7 @@ static void rec_print_wide_hdr(struct util_rec *rec)
 	struct util_rec_fld *fld;
 	char *buf;
 
+	rec_print_indention(rec->fmt.indent);
 	util_list_iterate(rec->list, fld) {
 		if (col_nr)
 			printf(" ");
@@ -156,6 +170,7 @@ static void rec_print_wide_hdr(struct util_rec *rec)
 		buf = util_malloc(size + 1);
 		memset(buf, (int)hdr_sep[0], size);
 		buf[size] = 0;
+		rec_print_indention(rec->fmt.indent);
 		printf("%s\n", buf);
 		free(buf);
 	}
@@ -172,6 +187,7 @@ void rec_print_wide(struct util_rec *rec)
 	int fld_count = 0;
 	char *entry;
 
+	rec_print_indention(rec->fmt.indent);
 	util_list_iterate(rec->list, fld) {
 		if (!fld->hdr)
 			continue;
@@ -225,6 +241,7 @@ struct util_rec *util_rec_new_long(const char *hdr_sep, const char *col_sep,
 	rec->fmt.d.long_p.key_size = key_size;
 	rec->fmt.d.long_p.val_size = val_size;
 	rec->fmt.d.long_p.argz_sep = ' ';
+	rec->fmt.indent = 0;
 	return rec;
 }
 
@@ -241,6 +258,7 @@ static void rec_print_long_hdr(struct util_rec *rec)
 	fld = rec_get_fld(rec, p->key);
 	util_assert(fld != NULL, "Record not found\n");
 	util_assert(fld->hdr != NULL, "Header for field not found\n");
+	rec_print_indention(rec->fmt.indent);
 	if (p->col_sep) {
 		printf("%-*s %s %-*s\n", p->key_size, fld->hdr,
 		       p->col_sep, fld->width, fld->val);
@@ -255,6 +273,7 @@ static void rec_print_long_hdr(struct util_rec *rec)
 	buf = util_malloc(len + 1);
 	memset(buf, p->hdr_sep[0], len);
 	buf[len] = 0;
+	rec_print_indention(rec->fmt.indent);
 	printf("%s\n", buf);
 	free(buf);
 }
@@ -277,19 +296,24 @@ static void rec_print_long(struct util_rec *rec)
 			continue;
 		if (!fld->val)
 			continue;
+		rec_print_indention(rec->fmt.indent);
 		item = argz_next(fld->val, fld->len, item);
 		if (p->col_sep) {
 			printf("        %-*s %s %s\n",
 			       p->key_size - 8, fld->hdr, p->col_sep, item);
-			while ((item = argz_next(fld->val, fld->len, item)))
+			while ((item = argz_next(fld->val, fld->len, item))) {
+				rec_print_indention(rec->fmt.indent);
 				printf("        %-*s %c %s\n",
 				       p->key_size - 8, "", p->argz_sep, item);
+			}
 		} else {
 			printf("        %-*s %s\n",
 			       p->key_size - 8, fld->hdr, fld->val);
-			while ((item = argz_next(fld->val, fld->len, item)))
+			while ((item = argz_next(fld->val, fld->len, item))) {
+				rec_print_indention(rec->fmt.indent);
 				printf("        %-*s %s\n",
 				       p->key_size - 8, "", item);
+			}
 		}
 	}
 	printf("\n");
@@ -320,6 +344,7 @@ struct util_rec *util_rec_new_csv(const char *col_sep)
 	rec->fmt.type = REC_FMT_CSV;
 	rec->fmt.d.csv_p.col_sep = util_strdup(col_sep);
 	rec->fmt.d.csv_p.argz_sep = ' ';
+	rec->fmt.indent = 0;
 	return rec;
 }
 
@@ -332,6 +357,7 @@ void rec_print_csv_hdr(struct util_rec *rec)
 	struct util_rec_fld *fld;
 	int fld_count = 0;
 
+	rec_print_indention(rec->fmt.indent);
 	util_list_iterate(rec->list, fld) {
 		if (fld_count)
 			printf("%c", *col_sep);
@@ -354,6 +380,7 @@ void rec_print_csv(struct util_rec *rec)
 	int fld_count = 0;
 	char *item = NULL;
 
+	rec_print_indention(rec->fmt.indent);
 	util_list_iterate(rec->list, fld) {
 		item = argz_next(fld->val, fld->len, item);
 		if (fld_count)
@@ -536,4 +563,15 @@ const char *util_rec_get(struct util_rec *rec, const char *key)
 	struct util_rec_fld *fld = rec_get_fld(rec, key);
 
 	return (fld != NULL) ? fld->val : NULL;
+}
+
+/**
+ * Sets the indentation of the record
+ *
+ * @param[in] rec    Record pointer
+ * @param[in] indent Number of characters to indent
+ */
+void util_rec_set_indent(struct util_rec *rec, int indent)
+{
+	rec->fmt.indent = indent;
 }
