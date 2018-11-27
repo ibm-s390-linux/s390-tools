@@ -139,6 +139,35 @@ static inline void rec_print_indention(int indent)
 }
 
 /*
+ * Print record separator in "wide" output format
+ */
+static void rec_print_wide_separator(struct util_rec *rec)
+{
+	const char *hdr_sep = rec->fmt.d.wide_p.hdr_sep;
+	int size = 0, field_count = 0;
+	struct util_rec_fld *fld;
+	char *buf;
+
+	if (!hdr_sep)
+		return;
+
+	util_list_iterate(rec->list, fld) {
+		if (fld->hdr) {
+			size += fld->width;
+			field_count++;
+		}
+	}
+
+	size += field_count - 1;
+	buf = util_malloc(size + 1);
+	memset(buf, (int)hdr_sep[0], size);
+	buf[size] = 0;
+	rec_print_indention(rec->fmt.indent);
+	printf("%s\n", buf);
+	free(buf);
+}
+
+/*
  * Print record header in "wide" output format
  */
 static void rec_print_wide_hdr(struct util_rec *rec)
@@ -493,6 +522,24 @@ void util_rec_print_hdr(struct util_rec *rec)
 		break;
 	case REC_FMT_CSV:
 		rec_print_csv_hdr(rec);
+		break;
+	}
+}
+
+/**
+ * Print record separator according to output format
+ *
+ * @param[in] rec  Record pointer
+ */
+void util_rec_print_separator(struct util_rec *rec)
+{
+	switch (rec->fmt.type) {
+	case REC_FMT_WIDE:
+		rec_print_wide_separator(rec);
+		break;
+	case REC_FMT_LONG:
+		break;
+	case REC_FMT_CSV:
 		break;
 	}
 }

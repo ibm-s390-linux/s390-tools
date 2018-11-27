@@ -68,6 +68,7 @@ const char *util_rec_get(struct util_rec *rec, const char *key);
 
 void util_rec_print_hdr(struct util_rec *rec);
 void util_rec_print(struct util_rec *rec);
+void util_rec_print_separator(struct util_rec *rec);
 
 void util_rec_set_indent(struct util_rec *rec, int indent);
 
