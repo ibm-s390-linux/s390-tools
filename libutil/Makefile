@@ -13,7 +13,8 @@ examples =	util_base_example \
 		util_prg_example \
 		util_rec_example
 
-all: $(lib) $(examples)
+all: $(lib)
+examples: $(lib) $(examples)
 
 objects =	util_base.o \
 		util_path.o \

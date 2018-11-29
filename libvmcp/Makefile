@@ -4,7 +4,8 @@ lib = libvmcp.a
 
 examples = vmcp_example
 
-all: $(lib) $(examples)
+all: $(lib)
+examples: $(lib) $(examples)
 
 objects = vmcp.o
 
