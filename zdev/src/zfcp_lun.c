@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -317,6 +317,7 @@ struct namespace zfcp_lun_namespace = {
 /*
  * zfcp lun device attributes.
  */
+
 static struct attrib zfcp_lun_attr_failed = {
 	.name = "failed",
 	.title = "Check and restart FCP SCSI device recovery",
@@ -1080,6 +1081,7 @@ static exit_code_t zfcp_lun_st_detect_definable(struct subtype *st,
 /*
  * zfcp lun subtype.
  */
+
 struct subtype zfcp_lun_subtype = {
 	.super		= &subtype_base,
 

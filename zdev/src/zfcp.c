@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -67,7 +67,7 @@ static struct attrib zfcp_tattr_allow_lun_scan = {
 	"Control the use of the automatic LUN scanning feature for FCP\n"
 	"devices that are configured in N_PORT ID Virtualization mode.\n"
 	"  0: Automatic LUN scanning is disabled\n"
-	"  1: Automatic LUN scanning is enabled\n\n",
+	"  1: Automatic LUN scanning is enabled\n",
 	.nounload = 1,
 	.defval = "1",
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),

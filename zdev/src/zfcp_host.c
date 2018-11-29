@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -64,7 +64,7 @@ static struct attrib zfcp_host_attr_port_rescan = {
 	.title = "Trigger a port rescan for the FCP device",
 	.desc =
 	"Rescan FCP device for available remote ports by writing the value 1\n"
-	"to this attribute\n",
+	"to this attribute.\n",
 	.activeonly = 1,
 	.writeonly = 1,
 	.accept = ACCEPT_ARRAY(ACCEPT_NUM(1)),
