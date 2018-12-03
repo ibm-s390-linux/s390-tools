@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "lib/util_path.h"
@@ -259,7 +260,7 @@ bool module_set_params(const char *mod, struct setting_list *settings)
 	struct setting *s;
 	char *path;
 	const char *value;
-	bool result;
+	bool readonly;
 	exit_code_t rc;
 
 	/* First check if all modified settings can be applied this way. */
@@ -277,9 +278,9 @@ bool module_set_params(const char *mod, struct setting_list *settings)
 			return false;
 		}
 		path = path_get_sys_module_param(mod, s->name);
-		result = util_path_is_writable(path);
+		readonly = util_path_is_readonly_file("%s", path);
 		free(path);
-		if (!result) {
+		if (readonly) {
 			/* Sysfs file is not writable. */
 			return false;
 		}

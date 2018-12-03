@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "lib/util_path.h"
 
@@ -521,7 +522,7 @@ void device_read_active_settings(struct device *dev, read_scope_t scope)
 		s = setting_list_apply_actual(dev->active.settings, a, name,
 					      value);
 		if (link || (scope == scope_all &&
-			     !util_path_is_writable(path)))
+			     util_path_is_readonly_file("%s", path)))
 			s->readonly = 1;
 		if (link)
 			free(link);
