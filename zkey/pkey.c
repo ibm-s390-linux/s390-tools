@@ -48,6 +48,7 @@
  * Definitions for the CCA library
  */
 #define CCA_LIBRARY_NAME	"libcsulcca.so"
+#define CCA_WEB_PAGE		"http://www.ibm.com/security/cryptocards"
 
 #define DEFAULT_KEYBITS 256
 
@@ -71,16 +72,20 @@ int load_cca_library(void **lib_csulcca, t_CSNBKTC *dll_CSNBKTC, bool verbose)
 	/* Load the CCA library */
 	*lib_csulcca = dlopen(CCA_LIBRARY_NAME, RTLD_GLOBAL | RTLD_NOW);
 	if (*lib_csulcca == NULL) {
-		warnx("%s\nEnsure that the IBM CCA Host Libraries and "
-		      "Tools are installed properly", dlerror());
+		pr_verbose(verbose, "%s", dlerror());
+		warnx("The command requires the IBM CCA Host Libraries and "
+		      "Tools.\nFor the supported environments and downloads, "
+		      "see:\n%s", CCA_WEB_PAGE);
 		return  -ELIBACC;
 	}
 
 	/* Get the Key Token Change function */
 	*dll_CSNBKTC = (t_CSNBKTC)dlsym(*lib_csulcca, "CSNBKTC");
 	if (*dll_CSNBKTC == NULL) {
-		warnx("%s\nEnsure that the IBM CCA Host Libraries and "
-		      "Tools are installed properly", dlerror());
+		pr_verbose(verbose, "%s", dlerror());
+		warnx("The command requires the IBM CCA Host Libraries and "
+		      "Tools.\nFor the supported environments and downloads, "
+		      "see:\n%s", CCA_WEB_PAGE);
 		dlclose(*lib_csulcca);
 		*lib_csulcca = NULL;
 		return -ELIBACC;
