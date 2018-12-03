@@ -19,6 +19,7 @@ install: all
 	$(INSTALL) -m 644 -c chzcrypt.8 $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -m 644 -c lszcrypt.8 $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -m 644 -c zcryptctl.8 $(DESTDIR)$(MANDIR)/man8
+	$(INSTALL) -m 644 -c zcryptstats.8 $(DESTDIR)$(MANDIR)/man8
 
 clean:
 	rm -f *.o chzcrypt lszcrypt zcryptctl zcryptstats

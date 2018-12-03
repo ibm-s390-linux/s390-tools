@@ -1,0 +1,247 @@
+.\" Copyright IBM Corp. 2019
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZCRYPTSTATS 1 "January 2019" "s390-tools"
+.SH NAME
+zcryptstats \- Display usage statistics of IBM Crypto Express adapters
+.
+.
+.SH SYNOPSIS
+.B zcryptstats
+.RI [ OPTIONS ]
+.RI [ DEVICE_ID
+[...] ]
+.
+.PP
+.B zcryptstats
+.BR \-\-help | \-h
+.br
+.B zcryptstats
+.BR \-\-version | \-v
+.
+.
+.
+.SH DESCRIPTION
+.
+Use \fBzcryptstats\fP to display usage statistics of IBM Crypto Express
+adapters.
+.PP
+\fBzcryptstats\fP obtains cryptographic performance measurement data
+periodically and displays the data for each cryptographic device for each
+interval.
+A cryptographic device can be either a card device or a queue device (APQN).
+\fBzcryptstats\fP runs forever unless you limit the number of intervals with
+the \fB\-\-count\fP option. The default interval time is 10 seconds.
+Use the \fB\-\-interval\fP option to specify a different interval time.
+.PP
+By default, all available cryptographic devices are monitored.
+You can optionally specify the device IDs of the devices to be monitored.
+The card device representation and the queue device are both in hexadecimal
+notation.
+.PP
+Use the \fB\-\-no-apqn\fP option to omit the performance measurement data of
+the queues. If the system does not support obtaining cryptographic
+performance measurement data on the queue devices, only the card devices
+are monitored.
+.PP
+For each device, a set of counters is displayed. The amount and meaning of the
+counters are dependent on the device type and mode, see the COUNTERS section.
+For each counter and interval, the following values are displayed:
+.RS 2
+.IP "\(bu" 2
+Number of measured operations.
+.IP "\(bu" 2
+Rate of the measured operation in operations per second.
+.IP "\(bu" 2
+Utilization of the device in percent.
+.IP "\(bu" 2
+Average duration of the operations.
+.RE
+.PP
+The sum of all operations is displayed in a separate \fBtotals\fP line.
+Use the \fB\-\-only-totals\fP option to omit the individual counters and
+display the totals only. Use the \fB\-\-no\-totals\fP option to omit the
+totals.
+.PP
+
+.B Note:
+The utilization value of a counter can exceed 100%. This value is caused by
+the parallel execution of cryptographic operations.
+.PP
+Cryptographic performance measurement data might not be available when Linux
+is running as guest under z/VM or under KVM. \fBzcryptstats\fP then displays an
+error message and exits.
+.
+.
+.
+.SH OPTIONS
+.
+.TP
+.BR DEVICE_ID
+Specifies a cryptographic device for which statistics are displayed.
+A device ID can either be a card device ID
+(\fI<card-id>\fP) or a queue device (APQN) ID (\fI<card-id>.<domain-id>\fP).
+To filter all devices by domain,  provide \fI.<domain-id>\fP.
+If no IDs are given, statistics are displayed for all available devices.
+.
+.TP
+.BR \-i ", " \-\-interval\~\fIINTERVAL\fP
+Specifies the interval time in seconds. If this option is omitted, then the
+default interval time of 10 seconds is used.
+.
+.TP
+.BR \-c ", " \-\-count\~\fICOUNT\fP
+Specifies the number of reports that are generated at \fIINTERVAL\fP seconds
+apart. If this option is omitted, the \fBzcryptstats\fP command generates
+reports continuously, until it is stopped with control-C.
+.
+.TP
+.BR \-o ", " \-\-output\~\fIJSON\fP|\fITABLE\fP|\fICSV\fP
+Displays the statistics in the specified format. If this option is omitted, a
+comprehensive report is displayed. Supported output formats are:
+.RS 8
+.IP "\(bu" 2
+\fBJSON:\fP Displays the statistics in Javascript Object Notation (JSON) format.
+JSON output field order is undefined, and new fields might be added in the
+future.
+.IP "\(bu" 2
+\fBTABLE:\fP Displays the statistics in a human readable simple table format.
+The individual counters are omitted, and only the totals are displayed.
+This output format implies option \fB\-\-only-totals\fP.
+.IP "\(bu" 2
+\fBCSV:\fP Displays the statistics in comma-separated values format. The values
+are separated with a semicolon. The individual counters are omitted, and only
+the totals are displayed. This output format implies option
+\fB\-\-only-totals\fP.
+.RE
+.
+.TP
+.BR \-t ", " \-\-no\-totals
+Excludes the totals of all counters of a card device or queue device
+(APQN). This option cannot be specified together with option
+\fB\-\-only\-totals\fP or option \fB\-\-output\fP \fITABLE\fP|\fICSV\fP.
+.
+.TP
+.BR \-T ", " \-\-only\-totals
+Displays only the totals of all counters of a card device or a queue device
+(APQN), but not the individual counters. This option is implied with
+option \fB\-\-output\fP \fITABLE\fP|\fICSV\fP.
+.
+.TP
+.BR \-a ", " \-\-no\-apqn
+Displays only the counters of the card device, but omits the counters of the
+queue device (APQN). If the system does not support obtaining cryptographic
+performance measurement data on the queue devices, this option is implied.
+.
+.TP
+.BR \-M ", " \-\-map\-type\~\fIMAPPING\fP
+Maps unknown cryptographic device types and modes to known types and modes.
+This option should only be used when new, so far unknown cryptographic devices
+are found. You can then map them to known devices and modes, provided that the
+new cryptographic devices report the same counters as the known cryptographic
+device to which it is mapped.
+The mapping specification consists of a comma-separated list of
+\fIFROM\-TYPE\fP:\fIFROM\-MODE\fP=\fITO\-TYPE\fP:\fITO\-MODE\fP specifications.
+The type and mode values must be specified in decimal notation.
+.
+.TP
+.BR \-A ", " \-\-all
+Displays all cards devices and queue devices (APQNs), not only those that are
+available to the Linux instance. Using this option additional cryptographic
+devices that are available in the CEC, but not available to the Linux system
+are also monitored.
+This option cannot be specified together with option \fB\-\-only-online\fP.
+.
+.TP
+.BR \-O ", " \-\-only\-online
+Displays only online cards devices and queue devices (APQNs). This option
+cannot be specified together with option \fB\-\-all\fP.
+.
+.TP
+.BR \-V ", " \-\-verbose
+Displays additional information messages during processing.
+.TP
+.BR \-h ", " \-\-help
+Displays help text and exits.
+.TP
+.BR \-v ", " \-\-version
+Displays version information and exits.
+.
+.
+.
+.SH COUNTERS
+.
+.PP
+.B IBM Crypto Express adapter in accelerator mode:
+.RS 4
+.TP
+.B All
+All operations on the adapter
+.TP
+.B RSA Key-gen
+RSA-key-generation operations (also included in \fBAll\fP).
+.RE
+.PP
+.B IBM Crypto Express adapter in CCA co-processor mode:
+.RS 4
+.TP
+.B RSA 1024 ME
+1024-bit ME-format RSA operations.
+.TP
+.B RSA 2048 ME
+2048-bit ME-format RSA operations.
+.TP
+.B RSA 1024 CRT
+1024-bit CRT-format RSA operations.
+.TP
+.B RSA 2048 CRT
+2048-bit CRT-format RSA operations.
+.TP
+.B RSA 4096 ME
+4096-bit ME-format RSA operations.
+.TP
+.B RSA 4096 CTR
+4096-bit CRT-format RSA operations.
+.RE
+.PP
+.B IBM Crypto Express adapter in EP11 co-processor mode:
+.RS 4
+.TP
+.B Asym. Slow
+Slow asymmetric-key functions.
+.TP
+.B Asym. Fast
+Fast asymmetric-key functions.
+.TP
+.B Symm. Partial
+Symmetric-key functions that return partial or incremental results.
+.TP
+.B Symm. Complete
+Symmetric-key functions that return a complete or final result.
+.TP
+.B  Asym. Key-gen
+asymmetric-key generation function.
+.RE
+.PP
+.
+.
+.
+.SH EXAMPLES
+.TP
+.B  zcryptstats 02
+Display statistics for all cryptographic devices with card ID \fB02\fP.
+.TP
+.B zcryptstats 02.0005 --interval 5
+Display statistics for cryptographic devices with card ID \fB02\fP and domain
+ID \fB0005\fP in a 5 second interval.
+.TP
+.B zcryptstats .0005 --count 10
+Display statistics for cryptographic devices with domain ID \fB0005\fP with the
+default interval time of 10 seconds, for 10 intervals.
+.TP
+.B  zcryptstats 02 --output JSON
+Display statistics for all cryptographic devices with card ID \fB02\fP in
+\fBJSON\fP output format.
+.TP
+
