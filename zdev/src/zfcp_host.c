@@ -70,6 +70,27 @@ static struct attrib zfcp_host_attr_port_rescan = {
 	.accept = ACCEPT_ARRAY(ACCEPT_NUM(1)),
 };
 
+static struct attrib zfcp_host_attr_fc_security = {
+	.name = "fc_security",
+	.title = "Show FC Endpoint Security capability of FCP device",
+	.desc =
+	"This read-only attribute shows the Fibre Channel Endpoint Security\n"
+	"capabilities of the FCP device.\n"
+	"\n"
+	"Possible values are either one of the following:\n"
+	"  unknown       : The Fibre Channel Endpoint Security capabilities\n"
+	"                  of the FCP device are not known\n"
+	"  unsupported   : The FCP device does not support Fibre Channel\n"
+	"                  Endpoint Security\n"
+	"  none          : The FCP device does not report any Fibre Channel\n"
+	"                  Endpoint Security capabilities\n"
+	"\n"
+	"Or one or more comma-separated values:\n"
+	"  Authentication: The FCP device supports authentication\n"
+	"  Encryption    : The FCP device supports encryption\n",
+	.readonly = 1,
+};
+
 /*
  * zfcp host methods.
  */
@@ -248,6 +269,7 @@ struct subtype zfcp_host_subtype = {
 		&zfcp_host_attr_failed,
 		&zfcp_host_attr_port_remove,
 		&zfcp_host_attr_port_rescan,
+		&zfcp_host_attr_fc_security,
 		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,

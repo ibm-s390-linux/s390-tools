@@ -33,6 +33,7 @@
 #include "zfcp_lun.h"
 
 #define DEVNAME			"zFCP LUN"
+#define FC_SECURITY_VATTR	"fc_security"
 
 /*
  * zfcp lun namespace.
@@ -415,6 +416,24 @@ static struct attrib zfcp_lun_attr_scsi_delete = {
 	.accept = ACCEPT_ARRAY(ACCEPT_NUM(1)),
 };
 
+static struct attrib zfcp_lun_attr_fc_security = {
+	.name = FC_SECURITY_VATTR,
+	.title = "Show FC Endpoint Security state of connection",
+	.desc =
+	"This read-only attribute shows the current state of Fibre Channel\n"
+	"Endpoint Security of the connection between the FCP device and the\n"
+	"FC remote port used to access the LUN:\n"
+	"  unknown       : The Fibre Channel Endpoint Security state of the\n"
+	"                  connection is not known\n"
+	"  unsupported   : The FCP device does not support Fibre Channel\n"
+	"                  Endpoint Security\n"
+	"  none          : The connection has no Fibre Channel Endpoint\n"
+	"                  Security\n"
+	"  Authentication: The connection has been authenticated\n"
+	"  Encryption    : The connection is encrypted\n",
+	.readonly = 1,
+};
+
 /*
  * zfcp lun device methods.
  */
@@ -770,6 +789,12 @@ static char *zfcp_lun_st_get_active_attrib_path(struct subtype *st,
 		free(hctl);
 
 		name += strlen(SCSI_ATTR_PREFIX);
+	} else if (strcmp(name, FC_SECURITY_VATTR) == 0) {
+		devpath = path_get_zfcp_port_dev(dev->devid);
+		if (!util_path_exists(devpath)) {
+			free(devpath);
+			return NULL;
+		}
 	} else {
 		devpath = path_get_zfcp_lun_dev(dev->devid);
 	}
@@ -1101,6 +1126,7 @@ struct subtype zfcp_lun_subtype = {
 		&zfcp_lun_attr_scsi_timeout,
 		&zfcp_lun_attr_scsi_state,
 		&zfcp_lun_attr_scsi_delete,
+		&zfcp_lun_attr_fc_security,
 		&internal_attr_early,
 	),
 	.prefixes = STRING_ARRAY(SCSI_ATTR_PREFIX),
