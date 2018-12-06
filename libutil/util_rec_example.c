@@ -42,6 +42,8 @@ static void print_records(const char *format, struct util_rec *rec)
 		/* Print the record */
 		util_rec_print(rec);
 	}
+	/* Print a separator line (is a nop for long and csv format) */
+	util_rec_print_separator(rec);
 	printf("\n");
 }
 
@@ -70,6 +72,11 @@ int main(void)
 
 	rec = util_rec_new_wide("-");
 	print_records("Wide format", rec);
+	util_rec_free(rec);
+
+	rec = util_rec_new_wide("-");
+	util_rec_set_indent(rec, 4);
+	print_records("Wide format with indentation", rec);
 	util_rec_free(rec);
 
 	rec = util_rec_new_long("-", ":", "number", 30, 20);
