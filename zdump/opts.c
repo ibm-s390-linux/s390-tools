@@ -167,7 +167,7 @@ static void argv_fuse_set(char **argv, int argc)
 static void action_set(enum zg_action action)
 {
 	if (g.opts.action_specified)
-		ERR_EXIT("Please specifiy only one of the \"-i\", \"-d\", "
+		ERR_EXIT("Please specify only one of the \"-i\", \"-d\", "
 			 "\"-m\" or \"-u\" option");
 	g.opts.action = action;
 	g.opts.action_specified = 1;
@@ -183,7 +183,7 @@ static void verify_opts(void)
 		    g.opts.action != ZG_ACTION_STDOUT &&
 		    g.opts.action != ZG_ACTION_DUMP_INFO)
 			ERR_EXIT("The \"--select\" option can only be "
-				 "specifed for info, mount, or copy");
+				 "specified for info, mount, or copy");
 	}
 	if (!g.opts.fmt_specified)
 		return;

@@ -34,7 +34,7 @@ Print DASD uid
 This option prints the full uid of the DASD. When z/VM provides two
 virtual devices that are actually located on the same real device, the
 first four tokens of the uid will be identical for both devices.  z/VM
-may provide an additional token that allows to distinguish between
+may provide an additional token that can be used to distinguish between
 different minidisks. You need both support in the Linux kernel and
 z/VM to receive such an additional token.
 
@@ -45,7 +45,7 @@ available by applying the PTFs for VM APAR VM64273 on z/VM 5.2.0 and higher.
 .BI "-u|--uid"
 Print DASD uid without z/VM minidisk token
 
-z/VM may provide an additional token that allows to distinguish
+z/VM may provide an additional token that can be used to distinguish
 between different minidisks (see --extended-uid option).  To remain
 compatibile with systems that were installed on older Linux or z/VM
 levels, the -u option will print the uid excluding any z/VM-provided
