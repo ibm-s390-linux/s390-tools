@@ -171,8 +171,12 @@ static void sysfs_write_data(struct zpci_report_error *report, char *slot)
 		fopen_err(path);
 	if (fwrite(report, 1, r_size, fp) != r_size)
 		warnx("Could not write to file: %s: %s", path, strerror(errno));
-	if (fclose(fp))
-		warnx("Could not close file: %s: %s", path, strerror(errno));
+	if (fclose(fp)) {
+		if (errno == EIO || errno == EOPNOTSUPP)
+			warnx("Unsupported operation: %s: %s", path, strerror(errno));
+		else
+			warnx("Could not close file: %s: %s", path, strerror(errno));
+	}
 	free(path);
 }
 
