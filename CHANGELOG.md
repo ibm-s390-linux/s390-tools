@@ -1,5 +1,12 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
+ * __v2.x.x (xxxx-xx-xx)__
+
+  For Linux kernel version: 4.xx
+
+  Bug Fixes:
+  - cmfs-fuse: Fix iconv buffer aliasing
+
  * __v2.7.0 (2018-10-31)__
 
   For Linux kernel version: 4.19

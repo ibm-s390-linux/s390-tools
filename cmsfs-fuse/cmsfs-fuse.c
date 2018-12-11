@@ -233,6 +233,8 @@ struct file {
 	int		null_records;
 	/* write cache for text mode */
 	char		*wcache;
+	/* buffer for iconv */
+	char		*iconv_buf;
 	/* used bytes in write cache */
 	int		wcache_used;
 	/* committed written bytes to FUSE */
@@ -1849,6 +1851,25 @@ static int cmsfs_open(const char *path, struct fuse_file_info *fi)
 		if (f->wcache == NULL)
 			return -ENOMEM;
 
+		/*
+		 * For fixed-length records f->fst->record_len contains
+		 * the fixed record length, which will not change. For
+		 * variable-length records it contains the (current) maximum
+		 * record length, which could be increased later by appending
+		 * new records, so use MAX_RECORD_LEN for the iconv buffer.
+		 * The MAX_RECORD_LEN is not valid for fixed-length records,
+		 * only for variable-length records, so use the actual record
+		 * length (f->fst->record_len) for fixed-length records.
+		 */
+		if (f->fst->record_format == RECORD_LEN_FIXED)
+			f->iconv_buf = malloc(f->fst->record_len + 1);
+		else
+			f->iconv_buf = malloc(MAX_RECORD_LEN + 1);
+		if (f->iconv_buf == NULL) {
+			destroy_file_object(f);
+			return -ENOMEM;
+		}
+
 		util_strlcpy(f->path, path, MAX_FNAME + 1);
 		str_toupper(f->path);
 
@@ -2548,14 +2569,13 @@ static void get_block_data_from_record(struct record *rec, off_t offset,
 	}
 }
 
-static int convert_text(iconv_t conv, char *buf, int size)
+static int convert_text(iconv_t conv, char *in_buf, char *out_buf, int size)
 {
 	size_t out_count = size;
 	size_t in_count = size;
-	char *data_ptr = buf;
 	int rc;
 
-	rc = iconv(conv, &data_ptr, &in_count, &data_ptr, &out_count);
+	rc = iconv(conv, &in_buf, &in_count, &out_buf, &out_count);
 	if ((rc == -1) || (in_count != 0)) {
 		DEBUG("Code page translation EBCDIC-ASCII failed\n");
 		return -EIO;
@@ -2616,14 +2636,15 @@ static int cmsfs_read(const char *path, char *buf, size_t size, off_t offset,
 		/* read one record */
 		if (addr == NULL_BLOCK)
 			memset(buf, 0, chunk);
-		else {
-			rc = _read(buf, chunk, addr);
+		else if (f->translate) {
+			rc = _read(f->iconv_buf, chunk, addr);
 			if (rc < 0)
 				return rc;
-		}
-
-		if (f->translate) {
-			rc = convert_text(cmsfs.iconv_from, buf, chunk);
+			rc = convert_text(cmsfs.iconv_from, f->iconv_buf, buf, chunk);
+			if (rc < 0)
+				return rc;
+		} else {
+			rc = _read(buf, chunk, addr);
 			if (rc < 0)
 				return rc;
 		}
@@ -4221,7 +4242,7 @@ static int cmsfs_write(const char *path, const char *buf, size_t size,
 	}
 
 	/* translate */
-	rc = convert_text(cmsfs.iconv_to, f->wcache, f->wcache_used);
+	rc = convert_text(cmsfs.iconv_to, f->wcache, f->iconv_buf, f->wcache_used);
 	if (rc < 0)
 		return rc;
 
@@ -4231,6 +4252,7 @@ static int cmsfs_write(const char *path, const char *buf, size_t size,
 	 */
 	if (!f->wcache_used) {
 		*f->wcache = FILLER_EBCDIC;
+		*f->iconv_buf = FILLER_EBCDIC;
 		f->wcache_used = 1;
 		nl_byte = 0;
 		null_record = 1;
@@ -4241,7 +4263,7 @@ static int cmsfs_write(const char *path, const char *buf, size_t size,
 	offset += f->pad_bytes;
 	BUG(offset < 0);
 
-	rc = do_write(f, f->wcache, f->wcache_used, offset);
+	rc = do_write(f, f->iconv_buf, f->wcache_used, offset);
 	if (rc < 0)
 		return rc;
 
@@ -4283,7 +4305,7 @@ static int flush_wcache(struct file *f)
 	int rc;
 
 	/* translate */
-	rc = convert_text(cmsfs.iconv_to, f->wcache, f->wcache_used);
+	rc = convert_text(cmsfs.iconv_to, f->wcache, f->iconv_buf, f->wcache_used);
 	if (rc < 0)
 		return rc;
 
@@ -4291,7 +4313,7 @@ static int flush_wcache(struct file *f)
 	offset -= (f->fst->nr_records - f->null_records);
 	BUG(offset < 0);
 
-	rc = do_write(f, f->wcache, f->wcache_used, offset);
+	rc = do_write(f, f->iconv_buf, f->wcache_used, offset);
 	purge_wcache(f);
 	f->null_records = 0;
 	if (rc < 0)
@@ -4414,6 +4436,7 @@ static void destroy_file_object(struct file *f)
 	struct record *rec;
 	int i;
 
+	free(f->iconv_buf);
 	free(f->wcache);
 	free(f->wstate);
 
