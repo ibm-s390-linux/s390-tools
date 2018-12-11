@@ -261,3 +261,42 @@ int dasd_reread_partition_table(const char *device, int ntries)
 
 	return err;
 }
+
+/*
+ * Reserve DASD disk.
+ *
+ * @param[in] device node   device node's name
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ *
+ */
+int dasd_disk_reserve(const char *device)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDRSRV, NULL);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
+ * Release DASD disk
+ *
+ * @param[in] device node   device node's name
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_disk_release(const char *device)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDRLSE, NULL);
+	dasd_close_device(fd);
+
+	return 0;
+}

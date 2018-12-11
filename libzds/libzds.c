@@ -22,8 +22,6 @@
 #include "lib/dasd_base.h"
 #include "lib/libzds.h"
 #include "lib/u2s.h"
-#include "lib/util_base.h"
-#include "lib/util_list.h"
 #include "lib/vtoc.h"
 
 /** @cond PRIVATE */
@@ -70,72 +68,11 @@ struct errormsg {
 	char text[ERRORMSG];
 };
 
-/**
- * As the VTOC is the data area on the DASD that describes all data sets,
- * this library will often have to refer to the various records in the VTOC.
- * To make this more efficiant, we will read the whole VTOC once and identify
- * all elements (DSCBs). The raw data of the VTOC tracks and the index to the
- * DSCBs is stored.
- */
-struct raw_vtoc {
-	/** @brief The raw track data  */
-	char *rawdata;
-	/** @brief This size of the raw track data in bytes */
-	unsigned long long rawdatasize;
-	/** @brief An array with pointers to the various DSCBs in the rawdata */
-	char **vtocindex;
-	/** @brief Number of entries in the index */
-	unsigned int vtocindexcount;
-	/** @brief Number of records per VTOC track
-	 *
-	 *  @note While the DS4DEVDT field in the format 4 DSCB names the number
-	 *  if DSCBs per VTOC track, we count the records, which is DS4DEVDT + 1
-	 *  for record 0.
-	 */
-	unsigned int vtoc_rec_per_track;
-	/** @brief The track number in which the vtoc begins on the DASD */
-	unsigned int vtoctrackoffset;
-	/** @brief Start record of VTOC.
-	 *
-	 *  The rawdata contains full tracks. This is the number of the first
-	 *  record that actually belongs to the VTOC */
-	unsigned int vtocrecno;
-	/** @brief The DASD this vtoc was read from */
-	struct dasd *dasd;
-	/** @brief Detailed error messages in case of a problem */
-	struct errorlog *log;
-};
-
 struct dscbiterator {
 	/** @brief The raw_vtoc this iterator refers to */
 	struct raw_vtoc *rawvtoc;
 	/** @brief Index to the vtocindex array in rawvtoc */
 	unsigned int i;
-};
-
-struct dasd {
-	/** @brief List head used to store a list of DASDs in struct zdsroot */
-	struct util_list_node list;
-	/** @brief Name of the block device, e.g. /dev/dasde */
-	char *device;
-	/** @brief File descriptor for the block device.
-	 *
-	 * The device is kept open for as along as the library uses it.
-	 * This lets the system know that the device is still in use.
-	 */
-	int inusefd;
-	/* @brief where to find the volume label */
-	unsigned int label_block;
-	/** @brief Device geometry. How many cylinders does the DASD have. */
-	unsigned int cylinders;
-	/** @brief Device geometry. How many heads does the DASD have. */
-	unsigned int heads;
-	/** @brief The VTOC data that has been read from this device */
-	struct raw_vtoc *rawvtoc;
-	/** @brief The volume label that has been read from this device */
-	volume_label_t *vlabel;
-	/** @brief Detailed error messages in case of a problem */
-	struct errorlog *log;
 };
 
 struct dasdhandle {
@@ -412,6 +349,29 @@ int lzds_zdsroot_alloc(struct zdsroot **root)
 	return 0;
 }
 
+
+/**
+ * It should be noted that this frees all structures that are owned by the
+ * root structure as well. For example, a pointer to a struct dasd that
+ * has been returned by lzds_zdsroot_add_device is not valid anymore.
+ *
+ * @param[in] root Reference to the zdsroot structure that is to be freed.
+ */
+void lzds_dslist_free(struct zdsroot *root)
+{
+	struct dataset *ds, *nextds;
+	int i;
+
+	util_list_iterate_safe(root->datasetlist, ds, nextds) {
+		util_list_remove(root->datasetlist, ds);
+		dataset_free_memberlist(ds);
+		for (i = 0; i < MAXVOLUMESPERDS; ++i)
+			free(ds->dsp[i]);
+		errorlog_free(ds->log);
+		free(ds);
+	}
+}
+
 /**
  * It should be noted that this frees all structures that are owned by the
  * root structure as well. For example, a pointer to a struct dasd that
@@ -422,8 +382,6 @@ int lzds_zdsroot_alloc(struct zdsroot **root)
 void lzds_zdsroot_free(struct zdsroot *root)
 {
 	struct dasd *dasd, *nextdasd;
-	struct dataset *ds, *nextds;
-	int i;
 
 	if (!root)
 		return;
@@ -433,15 +391,7 @@ void lzds_zdsroot_free(struct zdsroot *root)
 		dasd_free(dasd);
 	}
 	util_list_free(root->dasdlist);
-
-	util_list_iterate_safe(root->datasetlist, ds, nextds) {
-		util_list_remove(root->datasetlist, ds);
-		dataset_free_memberlist(ds);
-		for (i = 0; i < MAXVOLUMESPERDS; ++i)
-			free(ds->dsp[i]);
-		errorlog_free(ds->log);
-		free(ds);
-	}
+	lzds_dslist_free(root);
 	util_list_free(root->datasetlist);
 	errorlog_free(root->log);
 	free(root);
@@ -1443,7 +1393,7 @@ int lzds_raw_vtoc_get_dscb_from_cchhb(struct raw_vtoc *rv, cchhb_t *p,
  *   - EPROTO  The VTOC data is not in a valid format.
  *   - EIO     Other I/O error
  */
-int lzds_dasd_read_rawvtoc(struct dasd *dasd)
+int lzds_dasd_read_rawvtoc(struct dasd *dasd, struct raw_vtoc *rawvtoc)
 {
 	unsigned long long vtoctrckno, vtocrecno;
 	unsigned int vtoctrack_start, vtoctrack_end, vtocindexsize;
@@ -1455,26 +1405,11 @@ int lzds_dasd_read_rawvtoc(struct dasd *dasd)
 	format4_label_t *f4;
 	unsigned long long rawvtocsize;
 
-	struct raw_vtoc *rawvtoc = NULL;
 	volume_label_t *vlabel = NULL;
 	char *trackdata = NULL;
 	char vol1[] = {0xe5, 0xd6, 0xd3, 0xf1, 0x00}; /* "VOL1" in EBCDIC */
 
 	errorlog_clear(dasd->log);
-	/* cleanup the old rawvtoc structures before we read new ones */
-	rawvtoc = dasd->rawvtoc;
-	dasd->rawvtoc = NULL;
-	if (rawvtoc) {
-		free(rawvtoc->rawdata);
-		free(rawvtoc->vtocindex);
-		free(rawvtoc);
-	}
-
-	rawvtoc = malloc(sizeof(*rawvtoc));
-	if (!rawvtoc)
-		return ENOMEM;
-	memset(rawvtoc, 0, sizeof(*rawvtoc));
-	rawvtoc->dasd = dasd;
 
 	rc = lzds_dasd_get_vlabel(dasd, &vlabel);
 	if (rc) {
@@ -1611,13 +1546,49 @@ int lzds_dasd_read_rawvtoc(struct dasd *dasd)
 		++i;
 	}
 
-	dasd->rawvtoc = rawvtoc;
 	return 0;
 
 cleanup:
-	free(rawvtoc->vtocindex);
 	free(trackdata);
-	free(rawvtoc);
+	return rc;
+}
+
+/**
+ * @param[in]  dasd The struct dasd that represents the device we want to read
+ *                  the VTOC from.
+ * @return     0 on success, otherwise one of the following error codes:
+ *   - ENOMEM  Could not allocate internal structure due to lack of memory.
+ *   - EINVAL  The volume label has not yet been read or it is not valid.
+ *   - EPROTO  The VTOC data is not in a valid format.
+ *   - EIO     Other I/O error
+ */
+int lzds_dasd_alloc_rawvtoc(struct dasd *dasd)
+{
+	struct raw_vtoc *rawvtoc = NULL;
+	int rc;
+
+	/* cleanup the old rawvtoc structures before we read new ones */
+	rawvtoc = dasd->rawvtoc;
+	dasd->rawvtoc = NULL;
+	if (rawvtoc) {
+		free(rawvtoc->rawdata);
+		free(rawvtoc->vtocindex);
+		free(rawvtoc);
+	}
+
+	rawvtoc = malloc(sizeof(*rawvtoc));
+	if (!rawvtoc)
+		return ENOMEM;
+	memset(rawvtoc, 0, sizeof(*rawvtoc));
+	rawvtoc->dasd = dasd;
+
+	rc = lzds_dasd_read_rawvtoc(dasd, rawvtoc);
+	if (rc) {
+		free(rawvtoc->vtocindex);
+		free(rawvtoc);
+	} else {
+		dasd->rawvtoc = rawvtoc;
+	}
 	return rc;
 }
 
@@ -2261,6 +2232,7 @@ out1:
 static int dataset_merge_dataset(struct dataset *baseds, struct dataset *newds)
 {
 	int k, l, dspcount;
+
 	for (k = 0; k < MAXVOLUMESPERDS; ++k) {
 		/* if both datasets have a part in position k,
 		 * then something is wrong */
@@ -2280,18 +2252,20 @@ static int dataset_merge_dataset(struct dataset *baseds, struct dataset *newds)
 			 * Since dsp[0] may not be set yet, we loop over the
 			 * base dsp array until we find an entry.
 			 */
-			for (l = 0; l < MAXVOLUMESPERDS; ++l)
-				if (baseds->dsp[l]) {
-					if (memcmp(baseds->dsp[l]->f1->DS1DSSN,
-						   newds->dsp[k]->f1->DS1DSSN,
-						   MAXVOLSER))
-						return errorlog_add_message(
-						     &baseds->log, NULL, EPROTO,
-				       "merge dataset: part %d has incompatible"
-						    " base volume serial\n", k);
-					else
-						break;
-				}
+			for (l = 0; l < MAXVOLUMESPERDS; ++l) {
+				if (!baseds->dsp[l])
+					continue;
+				if (memcmp(baseds->dsp[l]->f1->DS1DSSN,
+					   newds->dsp[k]->f1->DS1DSSN,
+					   MAXVOLSER))
+					return errorlog_add_message(
+						&baseds->log, NULL, EPROTO,
+						"merge dataset: part %d has incompatible base volume serial\n",
+						k);
+				else
+					break;
+			}
+
 			baseds->dsp[k] = newds->dsp[k];
 			baseds->dspcount++;
 

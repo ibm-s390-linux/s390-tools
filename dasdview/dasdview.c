@@ -1741,7 +1741,7 @@ static void dasdview_print_vtoc_raw(dasdview_info_t *info)
 			       " rc=%d\n", rc);
 		exit(-1);
 	}
-	rc = lzds_dasd_read_rawvtoc(info->dasd);
+	rc = lzds_dasd_alloc_rawvtoc(info->dasd);
 	if (rc == EINVAL) {
 		zt_error_print("dasdview: Cannot read VTOC because disk does"
 			       " not contain valid VOL1 label.\n",

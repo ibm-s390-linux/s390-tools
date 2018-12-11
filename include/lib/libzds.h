@@ -112,6 +112,8 @@
  */
 #define LIB_LIBZDS_H
 
+#include "lib/util_base.h"
+#include "lib/util_list.h"
 #include "vtoc.h"
 
 
@@ -329,10 +331,73 @@ struct pds_member_entry {
 struct zdsroot;
 
 /**
+ * @struct raw_vtoc
+ * @brief The VTOC is a directory of data sets on one DASD
+ *
+ * As the VTOC is the data area on the DASD that describes all data sets,
+ * this library will often have to refer to the various records in the VTOC.
+ * To make this more efficient, we will read the whole VTOC once and identify
+ * all elements (DSCBs). The raw data of the VTOC tracks and the index to the
+ * DSCBs is stored.
+ */
+struct raw_vtoc {
+	/** @brief The raw track data  */
+	char *rawdata;
+	/** @brief This size of the raw track data in bytes */
+	unsigned long long rawdatasize;
+	/** @brief An array with pointers to the various DSCBs in the rawdata */
+	char **vtocindex;
+	/** @brief Number of entries in the index */
+	unsigned int vtocindexcount;
+	/** @brief Number of records per VTOC track
+	 *
+	 *  @note While the DS4DEVDT field in the format 4 DSCB names the number
+	 *  if DSCBs per VTOC track, we count the records, which is DS4DEVDT + 1
+	 *  for record 0.
+	 */
+	unsigned int vtoc_rec_per_track;
+	/** @brief The track number at which the vtoc begins on the DASD */
+	unsigned int vtoctrackoffset;
+	/** @brief Start record of VTOC.
+	 *
+	 *  The rawdata contains full tracks. This is the number of the first
+	 *  record that actually belongs to the VTOC
+	 */
+	unsigned int vtocrecno;
+	/** @brief The DASD this vtoc was read from */
+	struct dasd *dasd;
+	/** @brief Detailed error messages in case of a problem */
+	struct errorlog *log;
+};
+
+/**
  * @struct dasd
  * @brief Represents one physical device, may have a vtoc
  */
-struct dasd;
+struct dasd {
+	/** @brief List head used to store a list of DASDs in struct zdsroot */
+	struct util_list_node list;
+	/** @brief Name of the block device, e.g. /dev/dasde */
+	char *device;
+	/** @brief File descriptor for the block device.
+	 *
+	 * The device is kept open for as along as the library uses it.
+	 * This lets the system know that the device is still in use.
+	 */
+	int inusefd;
+	/* @brief where to find the volume label */
+	unsigned int label_block;
+	/** @brief Device geometry. How many cylinders does the DASD have. */
+	unsigned int cylinders;
+	/** @brief Device geometry. How many heads does the DASD have. */
+	unsigned int heads;
+	/** @brief The VTOC data that has been read from this device */
+	struct raw_vtoc *rawvtoc;
+	/** @brief The volume label that has been read from this device */
+	volume_label_t *vlabel;
+	/** @brief Detailed error messages in case of a problem */
+	struct errorlog *log;
+};
 
 /**
  * @struct dasditerator
@@ -349,12 +414,6 @@ struct dasditerator;
  * use, similar to a FILE pointer
  */
 struct dasdhandle;
-
-/**
- * @struct raw_vtoc
- * @brief The VTOC is a directory of data sets on one dasd
- */
-struct raw_vtoc;
 
 /**
  * @struct dscbiterator
@@ -572,7 +631,13 @@ int lzds_dasd_get_vlabel(struct dasd *dasd, struct volume_label **vlabel);
  * @brief Read the vtoc data from device. The data as stored as part
  *        of the struct dasd.
  */
-int lzds_dasd_read_rawvtoc(struct dasd *dasd);
+int lzds_dasd_read_rawvtoc(struct dasd *dasd, struct raw_vtoc *vtoc);
+
+/**
+ * @brief Read the vtoc data from device. The data as stored as part
+ *        of the struct dasd.
+ */
+int lzds_dasd_alloc_rawvtoc(struct dasd *dasd);
 
 /**
  * @brief Get the previously read raw_vtoc data.
@@ -786,6 +851,8 @@ void lzds_pdsmember_get_name(struct pdsmember *member, char **name);
 int lzds_zdsroot_extract_datasets_from_dasd(struct zdsroot *root,
 					    struct dasd *dasd);
 
+
+void lzds_dslist_free(struct zdsroot *root);
 
 
 /** @} */ /* end of group libzds_functions_high */

@@ -53,6 +53,8 @@ struct zdsfs_info {
 };
 
 static struct zdsfs_info zdsfsinfo;
+static int zdsfs_create_meta_data_buffer(struct zdsfs_info *);
+static int zdsfs_verify_datasets(void);
 
 struct zdsfs_file_info {
 	struct dshandle *dsh;
@@ -193,6 +195,48 @@ static int zdsfs_getattr(const char *path, struct stat *stbuf)
 	return 0;
 }
 
+static void zdsfs_read_device(struct dasd *newdasd, const char *device)
+{
+	struct errorlog *log;
+	int rc;
+
+	rc = dasd_disk_reserve(device);
+	if (rc) {
+		fprintf(stderr, "error when reserving device %s: %s\n",
+			device, strerror(rc));
+		lzds_dasd_get_errorlog(newdasd, &log);
+		lzds_errorlog_fprint(log, stderr);
+		exit(1);
+	}
+	rc = lzds_dasd_alloc_rawvtoc(newdasd);
+	if (rc) {
+		fprintf(stderr, "error when reading VTOC from device %s: %s\n",
+			device, strerror(rc));
+		lzds_dasd_get_errorlog(newdasd, &log);
+		lzds_errorlog_fprint(log, stderr);
+		exit(1);
+	}
+	rc = lzds_zdsroot_extract_datasets_from_dasd(zdsfsinfo.zdsroot,
+						     newdasd);
+	if (rc) {
+		fprintf(stderr,
+			"error when extracting data sets from dasd %s: %s\n",
+			device, strerror(rc));
+		lzds_zdsroot_get_errorlog(zdsfsinfo.zdsroot, &log);
+		lzds_errorlog_fprint(log, stderr);
+		exit(1);
+	}
+	rc = dasd_disk_release(device);
+	if (rc) {
+		fprintf(stderr, "error when releasing device %s: %s\n",
+			device, strerror(rc));
+		lzds_dasd_get_errorlog(newdasd, &log);
+		lzds_errorlog_fprint(log, stderr);
+		exit(1);
+	}
+}
+
+
 static int zdsfs_statfs(const char *UNUSED(path), struct statvfs *statvfs)
 {
 	struct dasditerator *dasdit;
@@ -239,6 +283,33 @@ static int zdsfs_statfs(const char *UNUSED(path), struct statvfs *statvfs)
 	return 0;
 }
 
+
+static int zdsfs_update_vtoc(void)
+{
+	struct dasditerator *dasdit;
+	struct dasd *dasd;
+	int rc;
+
+	lzds_dslist_free(zdsfsinfo.zdsroot);
+	rc = lzds_zdsroot_alloc_dasditerator(zdsfsinfo.zdsroot, &dasdit);
+	if (rc)
+		return -ENOMEM;
+
+	while (!lzds_dasditerator_get_next_dasd(dasdit, &dasd))
+		zdsfs_read_device(dasd, dasd->device);
+
+	lzds_dasditerator_free(dasdit);
+	rc = zdsfs_verify_datasets();
+	if (rc)
+		return rc;
+
+	rc = zdsfs_create_meta_data_buffer(&zdsfsinfo);
+	if (rc)
+		return rc;
+
+	return 0;
+}
+
 static int zdsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t UNUSED(offset), struct fuse_file_info *UNUSED(fi))
 {
@@ -251,6 +322,10 @@ static int zdsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	struct pdsmember *member;
 	int rc;
 	int ispds, issupported;
+
+	rc = zdsfs_update_vtoc();
+	if (rc)
+		return rc;
 
 	/* we have two type of directories
 	 * type one: the root directory contains all data sets
@@ -328,6 +403,9 @@ static int zdsfs_open(const char *path, struct fuse_file_info *fi)
 		goto error1;
 
 	if (strcmp(path, "/"METADATAFILE) == 0) {
+		rc = zdsfs_update_vtoc();
+		if (rc)
+			return rc;
 		zfi->dsh = NULL;
 		zfi->is_metadata_file = 1;
 		zfi->metaread = 0;
@@ -595,6 +673,7 @@ static int zdsfs_verify_datasets(void)
 	if (rc)
 		return ENOMEM;
 	while (!lzds_dsiterator_get_next_dataset(dsit, &ds)) {
+		lzds_dataset_get_name(ds, &dsname);
 		lzds_dataset_get_is_complete(ds, &iscomplete);
 		if (!iscomplete) {
 			lzds_dataset_get_name(ds, &dsname);
@@ -821,23 +900,7 @@ static void zdsfs_process_device(const char *device)
 		lzds_errorlog_fprint(log, stderr);
 		exit(1);
 	}
-	rc = lzds_dasd_read_rawvtoc(newdasd);
-	if (rc) {
-		fprintf(stderr, "error when reading VTOC from device %s:"
-			" %s\n", device, strerror(rc));
-		lzds_dasd_get_errorlog(newdasd, &log);
-		lzds_errorlog_fprint(log, stderr);
-		exit(1);
-	}
-	rc = lzds_zdsroot_extract_datasets_from_dasd(zdsfsinfo.zdsroot,
-						     newdasd);
-	if (rc) {
-		fprintf(stderr, "error when extracting data sets from dasd %s:"
-			" %s\n", device, strerror(rc));
-		lzds_zdsroot_get_errorlog(zdsfsinfo.zdsroot, &log);
-		lzds_errorlog_fprint(log, stderr);
-		exit(1);
-	}
+	zdsfs_read_device(newdasd, device);
 }
 
 static void zdsfs_process_device_file(const char *devfile)

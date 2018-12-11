@@ -170,6 +170,10 @@ struct hd_geometry {
 #define BIODASDDISABLE _IO(DASD_IOCTL_LETTER, 0)
 /* Enable the volume (for Linux) */
 #define BIODASDENABLE  _IO(DASD_IOCTL_LETTER, 1)
+/* Reserve the device for the current LPAR */
+#define BIODASDRSRV    _IO(DASD_IOCTL_LETTER, 2)
+/* Release the device for the current LPAR */
+#define BIODASDRLSE    _IO(DASD_IOCTL_LETTER, 3)
 /* Get information on a dasd device (enhanced) */
 #define BIODASDINFO2   _IOR(DASD_IOCTL_LETTER, 3, dasd_information2_t)
 /* #define BIODASDFORMAT  _IOW(IOCTL_LETTER,0,format_data_t) , deprecated */
@@ -203,5 +207,7 @@ int dasd_get_geo(const char *device, struct hd_geometry *geo);
 int dasd_get_info(const char *device, dasd_information2_t *info);
 int dasd_is_ro(const char *device, bool *ro);
 int dasd_reread_partition_table(const char *device, int ntries);
+int dasd_disk_reserve(const char *device);
+int dasd_disk_release(const char *device);
 
 #endif /* LIB_DASD_BASE_H */
