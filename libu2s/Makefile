@@ -6,7 +6,7 @@ all: $(lib)
 
 objects = u2s.o
 
-$(lib): $(objects) $(rootdir)/libutil/libutil.a
+$(lib): $(objects)
 
 install: all
 
