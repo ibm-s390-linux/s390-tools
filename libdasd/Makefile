@@ -6,7 +6,7 @@ all: $(lib)
 
 objects = dasd_sys.o dasd_ioctl.o
 
-$(lib): $(objects) Makefile
+$(lib): $(objects)
 
 install: all
 
