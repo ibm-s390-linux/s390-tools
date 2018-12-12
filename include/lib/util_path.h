@@ -3,7 +3,7 @@
  * @{
  * @brief Work with paths
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -21,5 +21,7 @@ bool util_path_is_writable(const char *fmt, ...);
 bool util_path_is_dir(const char *fmt, ...);
 bool util_path_is_reg_file(const char *fmt, ...);
 bool util_path_exists(const char *fmt, ...);
+bool util_path_is_readonly_file(const char *fmt, ...);
+bool util_path_is_writeonly_file(const char *fmt, ...);
 
 #endif /** LIB_UTIL_PATH_H @} */

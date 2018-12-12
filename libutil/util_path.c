@@ -3,7 +3,7 @@
  *
  * Work with paths
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -217,3 +217,58 @@ bool util_path_exists(const char *fmt, ...)
 	free(path);
 	return rc;
 }
+
+/**
+ * Test if path exists, is a regular file, and permission is read-only
+ *
+ * @param[in] fmt   Format string for path to test
+ * @param[in] ...   Variable arguments for format string
+ *
+ * @returns   true  Path exists, is a regular file, and permission does
+ *                  not allow any write but allows read
+ *            false Otherwise
+ */
+bool util_path_is_readonly_file(const char *fmt, ...)
+{
+	bool rc = false;
+	struct stat sb;
+	va_list ap;
+	char *path;
+
+	UTIL_VASPRINTF(&path, fmt, ap);
+	if (stat(path, &sb) == 0) {
+		rc = S_ISREG(sb.st_mode) &&
+		     (sb.st_mode & 0222) == 0 &&
+		     (sb.st_mode & 0444) != 0;
+	}
+	free(path);
+	return rc;
+}
+
+/**
+ * Test if path exists, is a regular file, and permission is write-only
+ *
+ * @param[in] fmt   Format string for path to test
+ * @param[in] ...   Variable arguments for format string
+ *
+ * @returns   true  Path exists, is a regular file, and permission does
+ *                  not allow any read but allows write
+ *            false Otherwise
+ */
+bool util_path_is_writeonly_file(const char *fmt, ...)
+{
+	bool rc = false;
+	struct stat sb;
+	va_list ap;
+	char *path;
+
+	UTIL_VASPRINTF(&path, fmt, ap);
+	if (stat(path, &sb) == 0) {
+		rc = S_ISREG(sb.st_mode) &&
+		     (sb.st_mode & 0222) != 0 &&
+		     (sb.st_mode & 0444) == 0;
+	}
+	free(path);
+	return rc;
+}
+
