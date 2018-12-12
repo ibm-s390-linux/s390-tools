@@ -1,7 +1,7 @@
 /**
  * util_path_example - Example program for util_path
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "lib/util_path.h"
 #include "lib/util_prg.h"
@@ -26,7 +27,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2001,
-			.pub_last = 2017,
+			.pub_last = 2019,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -72,9 +73,17 @@ static void  test_path(const char *path)
 	else
 		printf("reg_file=no  ");
 	if (util_path_is_dir(path))
-		printf("dir=yes");
+		printf("dir=yes ");
 	else
-		printf("dir=no ");
+		printf("dir=no  ");
+	if (util_path_is_readonly_file(path))
+		printf("read-only_file=yes ");
+	else
+		printf("read-only_file=no  ");
+	if (util_path_is_writeonly_file(path))
+		printf("write-only_file=yes");
+	else
+		printf("write-only_file=no ");
 	printf("\n");
 }
 
