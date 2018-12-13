@@ -1,11 +1,28 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.x.x (xxxx-xx-xx)__
+ * __v2.7.1 (2018-12-13)__
 
-  For Linux kernel version: 4.xx
+  For Linux kernel version: 4.19
+
+  Changes of existing tools:
+  - zkey: Enhance file read/write error handling
+  - cmsfs-fuse: Write more than a single line in linefeed mode
+  - zpcictl: Add warning for unsupported operations
+  - zipl: Use the BLS "title" field as the IPL section name
 
   Bug Fixes:
-  - cmfs-fuse: Fix iconv buffer aliasing
+  - cmsfs-fuse: Fix iconv buffer aliasing
+  - cmsfs-fuse: Fix memory leak in cmsfs_rename()
+  - fdasd: Fix possible integer overflow
+  - fdasd: Fix resource leak in fdasd_parse_conffile()
+  - zdev: Fix memory leak in misc_readlink()
+  - dasdinfo: Display error messages on stderr
+  - zkey: Include /sbin into PATH when executing commands
+  - Makefile: Fix parallel build
+  - GCC8 warning fixes across the board for:
+      cmsfs-fuse, dasdinfo, dasdview, dump2tar, fdasd, hmcdrvfs, hyptop,
+      ip_watcher, libvmdump, libvtoc, lsqeth, lszcrypt, qethqoat, zdev, zdsfs,
+      zgetdump, zipl, zpcictl
 
  * __v2.7.0 (2018-10-31)__
 
