@@ -133,14 +133,7 @@ static int _keystore_get_key_filenames(struct keystore *keystore,
  */
 static int _keystore_reencipher_key_exists(struct key_filenames *file_names)
 {
-	struct stat sb;
-	int rc;
-
-	rc = stat(file_names->renc_filename, &sb);
-	if (rc == 0 && !S_ISREG(sb.st_mode))
-		rc = 1;
-
-	return !rc;
+	return util_path_is_reg_file("%s", file_names->renc_filename);
 }
 
 /**
@@ -153,20 +146,14 @@ static int _keystore_reencipher_key_exists(struct key_filenames *file_names)
  */
 static int _keystore_exists_keyfiles(struct key_filenames *file_names)
 {
-	struct stat sb_skey, sb_info;
-	int rc_skey, rc_info;
+	bool rc_skey, rc_info;
 
-	rc_skey = stat(file_names->skey_filename, &sb_skey);
-	if (rc_skey == 0 && !S_ISREG(sb_skey.st_mode))
-		rc_skey = 1;
+	rc_skey = util_path_is_reg_file("%s", file_names->skey_filename);
+	rc_info = util_path_is_reg_file("%s", file_names->info_filename);
 
-	rc_info = stat(file_names->info_filename, &sb_info);
-	if (rc_info == 0 && !S_ISREG(sb_info.st_mode))
-		rc_info = 1;
-
-	if (rc_skey == 0 && rc_info == 0)
+	if (rc_skey && rc_info)
 		return 1;
-	if (rc_skey != 0 && rc_info != 0 &&
+	if (!rc_skey && !rc_info &&
 	    _keystore_reencipher_key_exists(file_names) == 0)
 		return 0;
 	return -1;
