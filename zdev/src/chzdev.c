@@ -3,7 +3,7 @@
  *
  * chzdev: Configure z Systems specific devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -2573,7 +2573,7 @@ static exit_code_t do_export(struct options *opts)
 		info("Exporting data to standard output\n");
 	} else {
 		info("Exporting data to %s\n", opts->export);
-		if (!util_path_exists(opts->export)) {
+		if (!util_path_exists("%s", opts->export)) {
 			rc = path_create(opts->export);
 			if (rc)
 				return rc;
