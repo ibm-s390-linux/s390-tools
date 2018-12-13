@@ -129,6 +129,7 @@ Package contents
                  or show encryption state of attached LUNs.
    - lszcrypt:   Show Information about zcrypt devices and configuration.
    - chzcrypt:   Modify the zcrypt configuration.
+   - zcryptstats: Display usage statistics of IBM Crypto Express adapters.
    - znetconf:   List and configure network devices for s390 network adapters.
    - cio_ignore: Query and modify the contents of the CIO device driver
                  blacklist.
