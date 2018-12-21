@@ -36,8 +36,16 @@ esac
 
 zdev_fw_file="/sys/firmware/sclp_sd/config/data"
 zdev_base_args="--force --yes --no-root-update --no-settle --auto-conf --quiet"
+eval $(grep machine /proc/cpuinfo | cut -f2- -d: | tr -d ' ' | tr ',' ';')
 
-if [ -e "$zdev_fw_file" ] ; then
+case "$machine" in
+# Z13 or Z13s
+2964|2965)
+	enable_all="true"
+	;;
+esac
+
+if [ -e "$zdev_fw_file" ] || [ -n "$enable_all" ]; then
 	zdev_auto=1
 else
 	zdev_auto=0
@@ -56,7 +64,11 @@ done
 
 if [ $zdev_auto -eq 1 ] ; then
 	log_begin_msg "Starting firmware auto-configuration"
-	chzdev --import "$zdev_fw_file" $zdev_base_args
+	if [ -n "$enable_all" ]; then
+		chzdev --all --enable
+	else
+		chzdev --import "$zdev_fw_file" $zdev_base_args
+	fi
 	log_end_msg
 
 	# Repeat cold-plug after creating udev rules
