@@ -20,8 +20,8 @@ PROCD=mon_procd
 FSSTATD_PATH=/usr/sbin/$FSSTATD
 PROCD_PATH=/usr/sbin/$PROCD
 CONFIG_FILE=/etc/sysconfig/$DAEMON
-FSSTATD_PID_FILE=/var/run/$FSSTATD.pid
-PROCD_PID_FILE=/var/run/$PROCD.pid
+FSSTATD_PID_FILE=/run/$FSSTATD.pid
+PROCD_PID_FILE=/run/$PROCD.pid
 
 # source function library
 . /lib/lsb/init-functions

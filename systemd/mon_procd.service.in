@@ -34,7 +34,7 @@ ExecStart=@usrsbin_path@/mon_procd -i $PROC_INTERVAL
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Type=forking
-PIDFile=/var/run/mon_procd.pid
+PIDFile=/run/mon_procd.pid
 
 [Install]
 WantedBy=multi-user.target

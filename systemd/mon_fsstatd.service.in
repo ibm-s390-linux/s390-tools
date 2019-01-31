@@ -34,7 +34,7 @@ ExecStart=@usrsbin_path@/mon_fsstatd -i $FSSTAT_INTERVAL
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Type=forking
-PIDFile=/var/run/mon_fsstatd.pid
+PIDFile=/run/mon_fsstatd.pid
 
 [Install]
 WantedBy=multi-user.target

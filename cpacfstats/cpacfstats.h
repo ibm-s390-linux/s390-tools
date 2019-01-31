@@ -78,8 +78,8 @@ struct msg_answer {
 
 #define BACKLOG 10
 
-#define SOCKET_FILE "/var/run/cpacfstatsd_socket"
-#define PID_FILE    "/var/run/cpacfstatsd.pid"
+#define SOCKET_FILE "/run/cpacfstatsd_socket"
+#define PID_FILE    "/run/cpacfstatsd.pid"
 
 #define CPACFSTATS_GROUP "cpacfstats"
 

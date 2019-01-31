@@ -312,7 +312,7 @@ LOGFILES="\
   /var/log/yum.log\
   /var/log/openvswitch/ovs-vswitchd.log\
   /var/log/openvswitch/ovsdb-server.log\
-  /var/run/docker/libcontainerd/containerd/events.log\
+  /run/docker/libcontainerd/containerd/events.log\
   /run/containerd/events.log\
   "
 

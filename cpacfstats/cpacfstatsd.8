@@ -47,7 +47,7 @@ restart the daemon to ensure correct summing of the per-CPU performance
 counters.
 
 The starting daemon first checks for any stale pid file
-/var/run/cpacfstatsd.pid. If this file exists, and the process ID in the
+/run/cpacfstatsd.pid. If this file exists, and the process ID in the
 file belongs to an active process, an error message is printed to the
 console and the program terminates.
 
@@ -81,8 +81,8 @@ daemon startup and initialization failures.
 
 .SH FILES
 .nf
-/var/run/cpacfstatsd_socket
-/var/run/cpacfstatsd.pid
+/run/cpacfstatsd_socket
+/run/cpacfstatsd.pid
 .fi
 
 .SH RETURN VALUE

@@ -17,7 +17,7 @@ ExecStart=@usrsbin_path@/cpuplugd -c @sysconf_path@/cpuplugd.conf
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Type=forking
-PIDFile=/var/run/cpuplugd.pid
+PIDFile=/run/cpuplugd.pid
 
 [Install]
 WantedBy=multi-user.target

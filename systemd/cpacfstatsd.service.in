@@ -15,7 +15,7 @@ ConditionVirtualization=no
 [Service]
 Type=forking
 ExecStart=@usrsbin_path@/cpacfstatsd
-PIDFile=/var/run/cpacfstatsd.pid
+PIDFile=/run/cpacfstatsd.pid
 KillMode=process
 Restart=no
 

@@ -27,7 +27,7 @@
 
 #define NAME		"cpuplugd"
 #define MAX_HISTORY	100
-#define PIDFILE		"/var/run/cpuplugd.pid"
+#define PIDFILE		"/run/cpuplugd.pid"
 #define LOCKFILE	"/var/lock/cpuplugd.lock"
 #define PROCINFO_LINE	512
 #define CPUSTAT_SIZE	1024

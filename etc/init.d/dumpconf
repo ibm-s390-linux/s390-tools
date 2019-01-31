@@ -22,7 +22,7 @@ DUMP_CONFIG_FILE=/etc/sysconfig/dumpconf
 CMDFULL=$0
 CMD="dumpconf"
 LOCKFILE=/var/lock/$CMD
-PIDFILE=/var/run/$CMD.pid
+PIDFILE=/run/$CMD.pid
 ERRMSG="Check $DUMP_CONFIG_FILE!"
 
 RETVAL=0

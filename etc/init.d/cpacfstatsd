@@ -13,7 +13,7 @@
 
 DAEMON=cpacfstatsd
 DAEMON_PATH=/usr/sbin/cpacfstatsd
-RUN_PID_FILE=/var/run/cpacfstatsd.pid
+RUN_PID_FILE=/run/cpacfstatsd.pid
 RETVAL=0
 OPTIONS=""
 
