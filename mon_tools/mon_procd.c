@@ -59,7 +59,7 @@ static char buf[BUF_SIZE];
 static char mon_record[MAX_REC_LEN];
 static long sample_interval = 60;
 
-static const char *pid_file = "/var/run/mon_procd.pid";
+static const char *pid_file = "/run/mon_procd.pid";
 
 /*
  * Clean up when SIGTERM or SIGINT received

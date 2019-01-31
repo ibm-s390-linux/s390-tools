@@ -32,7 +32,7 @@ static char small_mon_record[SMALL_MON_RECORD_LEN];
 static char large_mon_record[LARGE_MON_RECORD_LEN];
 static long sample_interval = 60;
 
-static const char *pid_file = "/var/run/mon_fsstatd.pid";
+static const char *pid_file = "/run/mon_fsstatd.pid";
 
 struct mw_name_lens {
 	__u16  mw_name_len;

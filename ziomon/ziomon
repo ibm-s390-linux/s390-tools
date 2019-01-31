@@ -405,7 +405,7 @@ function check_cpuplugd {
    # check if cpuplugd is running
    # If so, the whole per-cpu mechanism of blktrace gets corrupted, which
    # results in the infamous 'bad trace magic' message
-   if [ -e /var/run/cpuplugd.pid ]; then
+   if [ -e /run/cpuplugd.pid ]; then
       echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
       echo "$WRP_TOOLNAME: Warning: cpuplugd is running which can corrupt the traces.";
       echo "        It is recommended to stop cpuplugd for the duration of the";

@@ -17,7 +17,7 @@
 DAEMON=cpuplugd
 DAEMON_PATH=/usr/sbin/cpuplugd
 CONFIG_FILE=/etc/cpuplugd.conf
-RUN_PID_FILE=/var/run/cpuplugd.pid
+RUN_PID_FILE=/run/cpuplugd.pid
 RETVAL=0
 OPTIONS="-c $CONFIG_FILE"
 
