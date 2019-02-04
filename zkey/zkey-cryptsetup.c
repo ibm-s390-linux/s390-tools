@@ -1096,7 +1096,11 @@ static int put_vp_token(struct crypt_device *cd, int token,
  */
 static int open_device(const char *device, struct crypt_device **cd)
 {
-	const struct crypt_pbkdf_type *pbkdf;
+	const struct crypt_pbkdf_type pbkdf2 = {
+		.type = CRYPT_KDF_PBKDF2,
+		.hash = "sha256",
+		.time_ms = 2000,
+	};
 	struct crypt_device *cdev = NULL;
 	int rc;
 
@@ -1128,10 +1132,14 @@ static int open_device(const char *device, struct crypt_device **cd)
 		goto out;
 	}
 
-	pbkdf = crypt_get_pbkdf_type(cdev);
-	rc = crypt_set_pbkdf_type(cdev, pbkdf);
+	/*
+	 * Set PBKDF2 as default key derivation function. LUKS2 uses
+	 * Argon2i as default, but this might cause out-of-memory errors when
+	 * multiple LUKS2 volumes are opened automatically via /etc/crypttab
+	 */
+	rc = crypt_set_pbkdf_type(cdev, &pbkdf2);
 	if (rc != 0) {
-		warnx("Failed to set the PBKDF-type for device '%s': %s",
+		warnx("Failed to set the PBKDF for device '%s': %s",
 		      device, strerror(-rc));
 		goto out;
 	}

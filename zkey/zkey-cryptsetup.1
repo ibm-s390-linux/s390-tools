@@ -180,6 +180,20 @@ and
 to control which part of the key file is used as passphrase. These options
 behave in the same way as with \fBcryptsetup\fP.
 .PP
+The
+.B reencipher
+command creates a new key slot with the re-enciphered secure AES volume key.
+The new key slot uses
+.B PBKDF2
+as password based key derivation function. LUKS2 volumes typically default to
+.B Argon2i
+as password based key derivation function,
+but this might cause out-of-memory errors when multiple encrypted volumes are
+unlocked automatically at boot through /etc/crypttab. Because PAES
+uses secure AES keys as volume keys, the security of the key derivation
+function used to encrypt the volume key in the LUKS key slots is of less
+relevance. 
+.PP
 .B Note:
 The \fBreencipher\fP command requires the CCA host library (libcsulcca.so)
 to be installed. For the supported environments and downloads, see:
@@ -288,6 +302,20 @@ and
 .B \-\-keyfile\-size
 to control which part of the key file is used as passphrase. These options
 behave in the same way the same as with \fBcryptsetup\fP.
+.PP
+The
+.B setkey
+command creates a new key slot with the re-enciphered secure AES volume key.
+The new key slot uses
+.B PBKDF2
+as password based key derivation function. LUKS2 volumes typically default to
+.B Argon2i
+as password based key derivation function,
+but this might cause out-of-memory errors when multiple encrypted volumes are
+unlocked automatically at boot through /etc/crypttab. Because PAES
+uses secure AES keys as volume keys, the security of the key derivation
+function used to encrypt the volume key in the LUKS key slots is of less
+relevance. 
 .
 .
 .
