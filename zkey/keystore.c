@@ -3301,10 +3301,16 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			printf("%s\n", cmd);
 		}
 	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
+		/*
+		 * Use PBKDF2 as key derivation function for LUKS2 volumes.
+		 * LUKS2 uses Argon2i as default, but this might cause
+		 * out-of-memory errors when multiple LUKS2 volumes are opened
+		 * automatically via /etc/crypttab
+		 */
 		util_asprintf(&cmd,
 			      "cryptsetup luksFormat %s--type luks2 "
 			      "--master-key-file '%s' --key-size %lu "
-			      "--cipher %s %s%s",
+			      "--cipher %s --pbkdf pbkdf2 %s%s",
 			      keystore->verbose ? "-v " : "", key_file_name,
 			      key_file_size * 8, cipher_spec,
 			      sector_size > 0 ? temp : "", volume);

@@ -567,6 +567,15 @@ option to generate cryptsetup commands for the specified volume type only.
 Specify the
 .B \-\-run
 option to run the generated cryptsetup commands.
+.P
+For LUKS2 volumes, the generated \fBcryptsetup luksFormat\fP contains
+option \fB\-\-pbkdf pbkdf2\fP to set \fBPBKDF2\fP as password based key
+derivation function. LUKS2 volumes typically default to \fBArgon2i\fP as
+password based key derivation function, but this might cause out-of-memory
+errors when multiple encrypted volumes are unlocked automatically at boot
+through /etc/crypttab. Because PAES uses secure AES keys as volume keys, the
+security of the key derivation function used to encrypt the volume key in the
+LUKS key slots is of less relevance. 
 .
 .
 .
