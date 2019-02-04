@@ -259,13 +259,13 @@ static int _keystore_set_file_permission(struct keystore *keystore,
 
 	if (chmod(filename, keystore->mode) != 0) {
 		rc = -errno;
-		warnx("chmod faild on file '%s': %s", filename, strerror(-rc));
+		warnx("chmod failed on file '%s': %s", filename, strerror(-rc));
 		return rc;
 	}
 
 	if (chown(filename, geteuid(), keystore->owner) != 0) {
 		rc = -errno;
-		warnx("chown faild on file '%s': %s", filename, strerror(-rc));
+		warnx("chown failed on file '%s': %s", filename, strerror(-rc));
 		return rc;
 	}
 
@@ -1982,10 +1982,6 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
-	rc = _keystore_set_file_permission(keystore, file_names.info_filename);
-	if (rc != 0)
-		goto out;
-
 	pr_verbose(keystore, "Successfully changed key '%s'", name);
 
 out:
@@ -2683,10 +2679,6 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_set_file_permission(keystore, out_file);
-	if (rc != 0)
-		goto out;
-
 	if (params.complete || params.inplace == 1) {
 		rc = _keystore_set_timestamp_property(properties,
 						      PROP_NAME_REENC_TIME);
@@ -2711,11 +2703,6 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 				   file_names->info_filename, strerror(-rc));
 			goto out;
 		}
-
-		rc = _keystore_set_file_permission(keystore,
-						   file_names->info_filename);
-		if (rc != 0)
-			goto out;
 
 		util_asprintf(&temp, "The following LUKS2 volumes are "
 			      "encrypted with key '%s'. You should also "
