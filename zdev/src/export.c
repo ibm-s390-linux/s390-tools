@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -71,6 +71,8 @@ static bool is_exportable(struct setting *s, config_t config)
 
 	if (!a)
 		return true;
+	if (a->readonly)
+		return false;
 	if (a->mandatory)
 		return true;
 	if (SCOPE_ACTIVE(config)) {

@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -186,13 +186,15 @@ static void table_attribs_show_details_one(struct table_attrib *t,
 		indent(j, "The default value is '%s'.\n", a->defval);
 	}
 
-	printf("\n");
-	indent(i, "ACCEPTED VALUES\n");
-	attrib_print_acceptable(a, j);
+	if (!a->readonly) {
+		printf("\n");
+		indent(i, "ACCEPTED VALUES\n");
+		attrib_print_acceptable(a, j);
+	}
 
 	if (!(a->multi || a->activeonly || a->unstable || a->writeonly ||
 	      a->rewrite || a->mandatory || a->newline || a->activerem ||
-	      a->nounload || a->check))
+	      a->nounload || a->check || a->readonly))
 		return;
 
 	printf("\n");
@@ -211,6 +213,8 @@ static void table_attribs_show_details_one(struct table_attrib *t,
 	}
 	if (a->writeonly)
 		indent(j, "- You cannot read this attribute\n");
+	if (a->readonly)
+		indent(j, "- You cannot write to this attribute\n");
 	if (a->rewrite) {
 		indent(j, "- Setting the same value multiple times may have "
 		       "additional effects\n");

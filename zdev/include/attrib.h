@@ -1,7 +1,7 @@
 /*
  * zdev - Modify and display the persistent configuration of devices
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -181,6 +181,7 @@ struct value_map {
  * @activeonly: This attribute should only be changed in the active config
  * @unstable:   The value read is not the last value written
  * @writeonly:  This attribute cannot be read from
+ * @readonly:   This attribute cannot be written to
  * @rewrite:    Writing the same value multiple times has side-effects
  * @mandatory:	This attribute cannot be removed from a configured device
  * @newline:    There must be a newline when writing to this attribute
@@ -211,6 +212,7 @@ struct attrib {
 	unsigned int activeonly	:1;
 	unsigned int unstable	:1;
 	unsigned int writeonly	:1;
+	unsigned int readonly	:1;
 	unsigned int rewrite	:1;
 	unsigned int mandatory	:1;
 	unsigned int newline	:1;

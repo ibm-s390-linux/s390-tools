@@ -215,6 +215,9 @@ static exit_code_t apply_setting(struct device *dev, config_t config,
 	/* Check for known attribute. */
 	a = subtype_find_dev_attrib(st, key);
 	if (a) {
+		/* Check for read-only attribute. */
+		if (a->readonly)
+			goto err_readonly;
 		/* Check for acceptable value of known attribute. */
 		if (!force && !attrib_check_value(a, value))
 			goto err_invalid_forceable;
@@ -306,6 +309,10 @@ err_activeonly_forceable:
 err_int_noactive:
 	delayed_err("Internal attribute '%s' cannot be set in the active config\n",
 		    key);
+	return EXIT_INVALID_SETTING;
+
+err_readonly:
+	delayed_err("Cannot modify read-only attribute: %s\n", key);
 	return EXIT_INVALID_SETTING;
 }
 
@@ -521,7 +528,7 @@ void device_read_active_settings(struct device *dev, read_scope_t scope)
 		a = attrib_find(st->dev_attribs, name);
 		s = setting_list_apply_actual(dev->active.settings, a, name,
 					      value);
-		if (link || (scope == scope_all &&
+		if ((a && a->readonly) || link || (scope == scope_all &&
 			     util_path_is_readonly_file("%s", path)))
 			s->readonly = 1;
 		if (link)
