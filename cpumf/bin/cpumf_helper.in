@@ -51,10 +51,11 @@ sub cpumf_get_sfb_size()
 	my $val = "0,0";
 	my $SFBSIZE;
 
-	return $val unless open($SFBSIZE, '<', $CPUM_SFB_SIZE);
-	$val = <$SFBSIZE>;
-	chomp($val);
-	close($SFBSIZE);
+	if (open($SFBSIZE, '<', $CPUM_SFB_SIZE)) {
+		$val = <$SFBSIZE>;
+		chomp($val);
+		close($SFBSIZE);
+	}
 
 	return [split /,/, $val];
 }
