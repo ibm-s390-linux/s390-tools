@@ -307,6 +307,7 @@ LOGFILES="\
   /var/log/lin_tape.trace\
   /var/log/lin_tape.errorlog\
   /var/log/messages*\
+  /var/log/opencryptoki\
   /var/log/syslog*\
   /var/log/sa\
   /var/log/yum.log\
