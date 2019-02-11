@@ -167,6 +167,9 @@ readonly OUTPUT_FILE_VMCMD="${WORKPATH}zvm_runtime.out"
 # File that includes content of files from sysfs
 readonly OUTPUT_FILE_SYSFS="${WORKPATH}sysfsfiles.out"
 
+# File that includes the output of lsof
+readonly OUTPUT_FILE_LSOF="${WORKPATH}open_files.out"
+
 # File that includes content of OSA OAT
 readonly OUTPUT_FILE_OSAOAT="${WORKPATH}osa_oat"
 
@@ -442,7 +445,8 @@ CMDS="uname -a\
   :SPident\
   :rpm -qa | sort\
   :sysctl -a\
-  :lsof\
+  :lsof \
+   > '${OUTPUT_FILE_LSOF}'\
   :mount\
   :df -h\
   :df -i\
