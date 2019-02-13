@@ -35,6 +35,11 @@
 #include "misc.h"
 #include "pkey.h"
 
+/* Detect if cryptsetup 2.1 or later is available */
+#ifdef CRYPT_LOG_DEBUG_JSON
+#define HAVE_CRYPT_KEYSLOT_GET_PBKDF
+#endif
+
 #define MAX_KEY_SIZE                (8 * 1024 * 1024)
 #define MAX_PASSWORD_SIZE           512
 #define KEYFILE_BUFLEN              4096
@@ -1319,6 +1324,9 @@ static int open_keyslot(int keyslot, char **key, size_t *keysize,
 			    char **password, size_t *password_len,
 			    const char *prompt)
 {
+#ifdef HAVE_CRYPT_KEYSLOT_GET_PBKDF
+	struct crypt_pbkdf_type pbkdf;
+#endif
 	char *vkey = NULL;
 	char *pw = NULL;
 	long long tries;
@@ -1369,6 +1377,30 @@ static int open_keyslot(int keyslot, char **key, size_t *keysize,
 
 	keyslot = rc;
 	pr_verbose("Volume key obtained from key slot %d", keyslot);
+
+#ifdef HAVE_CRYPT_KEYSLOT_GET_PBKDF
+	/*
+	 * Get PBKDF of the key slot that was opened, and use its PBKDF for
+	 * new key slots.
+	 */
+	memset(&pbkdf, 0, sizeof(pbkdf));
+	rc = crypt_keyslot_get_pbkdf(g.cd, keyslot, &pbkdf);
+	if (rc != 0) {
+		warnx("Failed to get the PBKDF for key slot %d: %s",
+		      keyslot, strerror(-rc));
+		goto out;
+	}
+
+	/* Reuse already benchmarked number of iterations */
+	pbkdf.flags |= CRYPT_PBKDF_NO_BENCHMARK;
+
+	rc = crypt_set_pbkdf_type(g.cd, &pbkdf);
+	if (rc != 0) {
+		warnx("Failed to set the PBKDF for new key slots: %s",
+		      strerror(-rc));
+		goto out;
+	}
+#endif
 
 	if (key != NULL)
 		*key = vkey;
