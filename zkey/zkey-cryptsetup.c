@@ -419,7 +419,7 @@ static void cryptsetup_log(int level, const char *msg,
 		fprintf(stderr, "%s: %s", program_invocation_short_name, msg);
 		break;
 	case CRYPT_LOG_DEBUG:
-		fprintf(stderr, "%s: # %s", program_invocation_short_name, msg);
+		fprintf(stderr, "%s: # %s\n", program_invocation_short_name, msg);
 		break;
 	default:
 		warnx("Internal error on logging class for msg: %s", msg);
