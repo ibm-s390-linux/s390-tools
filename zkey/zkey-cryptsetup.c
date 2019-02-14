@@ -421,6 +421,11 @@ static void cryptsetup_log(int level, const char *msg,
 	case CRYPT_LOG_DEBUG:
 		fprintf(stderr, "%s: # %s\n", program_invocation_short_name, msg);
 		break;
+#ifdef CRYPT_DEBUG_JSON
+	case CRYPT_DEBUG_JSON:
+		fprintf(stderr, "%s\n", msg);
+		break;
+#endif
 	default:
 		warnx("Internal error on logging class for msg: %s", msg);
 		break;
@@ -2278,7 +2283,11 @@ int main(int argc, char *argv[])
 
 	crypt_set_log_callback(NULL, cryptsetup_log, NULL);
 	if (g.debug)
-		crypt_set_debug_level(-1);
+#ifdef CRYPT_DEBUG_JSON
+		crypt_set_debug_level(CRYPT_DEBUG_JSON);
+#else
+		crypt_set_debug_level(CRYPT_DEBUG_ALL);
+#endif
 
 	if (command->open_device) {
 		if (g.pos_arg == NULL) {
