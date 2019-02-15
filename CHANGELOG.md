@@ -1,13 +1,18 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.x.x (xxxx-xx-xx)__
+ * __v2.8.0 (2019-02-15)__
 
-  For Linux kernel version: 4.xx
+  For Linux kernel version: 4.20
 
   Changes of existing tools:
+  - Switch to using /run directory instead of the legacy /var/run
+  - zkey: Add --pbkdf pbkdf2 to generated cryptsetup luksFormat command
+  - zdsfs: Add online VTOC refresh
+  - pkey: Support autoloading kernel pkey module
 
   Bug Fixes:
-
+  - zkey: Avoid EPERM on key change if user is not owner of key file
+  - cpumf/cpumf_helper: Always return list reference for --sfb-size
 
  * __v2.7.1 (2018-12-13)__
 
