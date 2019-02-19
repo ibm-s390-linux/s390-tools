@@ -44,6 +44,13 @@ Option "-a" additionally shows all attributes of interest found in
 sysfs for the listed object.
 
 Option "-e" enables an extended output format.
+It enumerates all hosts/ports/luns independent of their state.
+The extended output format can help determining problems.
+Since a long time, without option "-e", lszfcp has
+.I
+not
+enumerated:
+ports with fc_rport port_state unequal to "Online" (such as fibres pulled).
 
 .SH OPTIONS
 .TP

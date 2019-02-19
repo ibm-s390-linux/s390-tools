@@ -198,8 +198,7 @@ show_ports()
 	for FC_PORT_PATH in $PORT_LIST; do
 		PORT=`basename $FC_PORT_PATH`
 		read PORT_STATE < $FC_PORT_PATH/port_state
-		if [ "$PORT_STATE" == "Online" ];
-		then
+		if [ "$PORT_STATE" == "Online" ] || $SHOW_EXTENDED; then
 			read WWPN < $FC_PORT_PATH/port_name
 		else
 			continue
@@ -207,17 +206,36 @@ show_ports()
 
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
 
-		ADAPTER_PORT_PATH=`ls -d \
-			$SYSFS/devices/css0/*/*/$WWPN/../host[0-9]*/$PORT |\
-			awk -F "/../host" '{ print $1 }'`
-		ADAPTER=`basename \`dirname $ADAPTER_PORT_PATH\``
+		local sysreal=$(readlink -e "$FC_PORT_PATH")
+		local ADAPTER=""
+		while [ -n "$sysreal" ]; do
+			# ascend to parent: strip last path part
+			sysreal=${sysreal%/*}
+			[ -h $sysreal/subsystem ] || continue
+			local subsystem=$(readlink -e $sysreal/subsystem)
+			if [ "${subsystem##*/}" = "ccw" ]; then
+				ADAPTER=${sysreal##*/}
+				break
+			fi
+		done
+		[ -z "$ADAPTER" ] && continue # skip not zfcp-attached ones
+		if [ -d $SYSFS/devices/css[0-9]*/[0-9d]*/[0-9]*/$WWPN/../host[0-9]*/$PORT ];
+		then
+			ADAPTER_PORT_PATH=$SYSFS/devices/css[0-9]*/[0-9d]*/$ADAPTER/$WWPN
+		else
+			ADAPTER_PORT_PATH="-"
+		fi
 
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
 		if [ $VERBOSITY -eq 0 ]; then
 			echo "$ADAPTER/$WWPN $PORT"
 		else
-			echo $ADAPTER_PORT_PATH
+			if [ "$ADAPTER_PORT_PATH" != "-" ]; then
+				echo $ADAPTER_PORT_PATH
+			else
+				echo "- (NoMoreZfcpPort:$ADAPTER/$WWPN)"
+			fi
 			echo $FC_PORT_PATH
 		fi
 
