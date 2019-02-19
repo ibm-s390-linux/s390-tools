@@ -2,7 +2,7 @@
 #
 # lszfcp - Tool to display information about zfcp devices (adapters/ports/units)
 #
-# Copyright IBM Corp. 2006, 2017
+# Copyright IBM Corp. 2006, 2019
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -67,7 +67,7 @@ print_version()
 {
 	cat <<EOF
 $SCRIPTNAME: version %S390_TOOLS_VERSION%
-Copyright IBM Corp. 2006, 2017
+Copyright IBM Corp. 2006, 2019
 EOF
 }
 
@@ -271,6 +271,21 @@ show_devices()
 					grep scsi_generic:`
 				echo -n "$SYSFS/block/${BLOCK_DEV#*:} "
 				echo "$SYSFS/class/scsi_generic/${GEN_DEV#*:}"
+
+			elif [ -d $SCSI_DEVICE_PATH/block ] && $SHOW_EXTENDED
+			then
+				# case without CONFIG_SYSFS_DEPRECATED
+				BLOCK_DEV=$(echo $SCSI_DEVICE_PATH/block/*)
+				BLOCK_DEV=${BLOCK_DEV##*/}
+				echo -n "$SYSFS/block/$BLOCK_DEV "
+				local SGPATH=$SCSI_DEVICE_PATH/scsi_generic
+				if [ -d $SGPATH ]; then
+					GEN_DEV=$(echo $SGPATH/*)
+					GEN_DEV=${GEN_DEV##*/}
+					echo "$SYSFS/class/scsi_generic/$GEN_DEV"
+				else
+					echo "-"
+				fi
 
 			# FIXME Find a way to assign the generic devices.
 			elif [ -r $SYSFS/../runtime.out ]; then

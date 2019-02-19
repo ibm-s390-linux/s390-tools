@@ -1,8 +1,8 @@
-.\" Copyright IBM Corp. 2006, 2017
+.\" Copyright IBM Corp. 2006, 2019
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH LSZFCP 8 "Mar 2008" "s390-tools"
+.TH LSZFCP 8 "Feb 2019" "s390-tools"
 .SH NAME
 lszfcp \- list information about zfcp adapters, ports, and units
 
@@ -37,6 +37,8 @@ device names are listed.
 
 Option "-V" additionally shows the sysfs paths of interest for the
 listed object.
+If a SCSI device has an associated block device (disk)
+and SCSI generic (sg) device, show their sysfs paths in a 3rd line.
 
 Option "-a" additionally shows all attributes of interest found in
 sysfs for the listed object.
@@ -77,6 +79,8 @@ Generate extended output.
 .B -V, --verbose
 Generate verbose output. Display sysfs path names of class and bus
 devices that are of interest for this object.
+If a SCSI device has an associated block device (disk)
+and SCSI generic (sg) device, show their sysfs paths in a 3rd line.
 .TP
 .B -s, --sysfs /path/to/sys
 Use path as sysfs (for dbginfo archives).
