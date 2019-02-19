@@ -59,6 +59,19 @@ check_fcp_devs()
 		ignore=$(ls -dX $SYSFS/devices/css[0-9]*/defunct/[0-9]*/host[0-9]* 2>&1)
 		[ $? -eq 0 ] && found=1
 	fi
+	if [ $found -eq 0 ] && $SHOW_EXTENDED; then
+		local mypath mylist=""
+		# nothing found yet so search for FCP devices never been online
+		for mypath in $SYSFS/bus/ccw/drivers/zfcp/*.*.*; do
+			if [ "$mypath" = "$SYSFS/bus/ccw/drivers/zfcp/*.*.*" ];
+			then
+				break # glob did not match anything
+			fi
+			[ -d $mypath/host[0-9]* ] && continue # is/was online
+			mylist="$mylist $(readlink -e $mypath)/-"
+		done
+		[ -n "$mylist" ] && found=1
+	fi
 
 	if [ $found -eq 0 ]; then
 		echo "Error: No fcp devices found."
@@ -150,6 +163,12 @@ show_hosts()
 		# add all "defunct" FCP devices
 		HOST_LIST="$HOST_LIST
 $(ls -dX $SYSFS/devices/css[0-9]*/defunct/[0-9]*/host[0-9]* 2>/dev/null)"
+		# add all FCP devices that have never been online
+		for HOST_PATH in $SYSFS/bus/ccw/drivers/zfcp/*.*.*; do
+			[ -d $HOST_PATH/host[0-9]* ] && continue # is/was online
+			HOST_LIST="$HOST_LIST
+$(readlink -e $HOST_PATH)/-"
+		done
 	fi
 
 	for HOST_PATH in $HOST_LIST; do
@@ -177,13 +196,24 @@ $(ls -dX $SYSFS/devices/css[0-9]*/defunct/[0-9]*/host[0-9]* 2>/dev/null)"
 			echo $ADAPTER $SCSI_HOST$HOSTMARKER
 		else
 			echo $ADAPTER_PATH$HOSTMARKER
-			$FC_CLASS && echo "$SYSFS/class/fc_host/$SCSI_HOST"
-			echo "$SYSFS/class/scsi_host/$SCSI_HOST"
+			if [ "$SCSI_HOST" != "-" ]; then
+				$FC_CLASS && echo "$SYSFS/class/fc_host/$SCSI_HOST"
+				echo "$SYSFS/class/scsi_host/$SCSI_HOST"
+			else
+				echo "-"
+				echo "-"
+			fi
 		fi
 
 		if $SHOW_ATTRIBUTES; then
 			echo 'Bus = "ccw"'
 			show_attributes $ADAPTER_PATH
+
+			if [ "$SCSI_HOST" = "-" ]; then
+				# skip output of non-existent fc_host & scsi_host
+				echo
+				continue
+			fi
 
 			if $FC_CLASS; then
 				echo 'Class = "fc_host"'

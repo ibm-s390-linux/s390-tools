@@ -51,6 +51,7 @@ Since a long time, without option "-e", lszfcp has
 .I
 not
 enumerated:
+hosts that have never been online (since last bind to zfcp device driver),
 hosts that are defunct (CHPID configured off, or z/VM detach),
 ports with fc_rport port_state unequal to "Online" (such as fibres pulled).
 
@@ -63,7 +64,8 @@ Show all attributes of the specified objects.
 List zfcp units and  SCSI devices.
 .TP
 .B -H, --hosts
-List zfcp adapters and fc-hosts (default). Information is given only
+List zfcp adapters, fc-hosts, and scsi-hosts (default).
+Without option "-e", information is given only
 for adapters that are online (registered at the SCSI stack).
 .TP
 .B -P, --ports
