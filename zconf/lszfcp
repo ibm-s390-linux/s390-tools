@@ -18,6 +18,7 @@ SHOW_HOSTS=0
 SHOW_PORTS=0
 SHOW_DEVICES=0
 SHOW_ATTRIBUTES=false
+SHOW_MORE_ATTRS=0
 SHOW_EXTENDED=false
 unset PAR_BUSID PAR_WWPN PAR_LUN
 
@@ -111,7 +112,9 @@ OPTIONS:
     -b, --busid=BUSID	select specific busid
     -p, --wwpn=WWPN	select specific port name
     -l, --lun=LUN	select specific LUN
-    -a, --attributes	show all attributes
+    -a, --attributes	show attributes
+    -m, --moreattrs	show more attributes
+			(host: css; port: zfcp_port; SCSI device: zfcp_unit)
     -V, --verbose	show sysfs paths of associated class
 			and bus devices
     -e, --extended	extended output format
@@ -206,6 +209,15 @@ $(readlink -e $HOST_PATH)/-"
 		fi
 
 		if $SHOW_ATTRIBUTES; then
+			if [ $SHOW_MORE_ATTRS -ge 1 ]; then
+				echo 'Bus = "css"'
+				if [ "$DEFUNCT" = "defunct" ]; then
+					printf "    %-19s\n" "defunct"
+				else
+					show_attributes ${ADAPTER_PATH%/*}
+				fi
+			fi
+
 			echo 'Bus = "ccw"'
 			show_attributes $ADAPTER_PATH
 
@@ -304,6 +316,15 @@ show_ports()
 		fi
 
 		if $SHOW_ATTRIBUTES; then
+			if [ $SHOW_MORE_ATTRS -ge 1 ] \
+				&& [ "$ADAPTER_PORT_PATH" != "-" ] \
+				&& [ -d $ADAPTER_PORT_PATH ];
+			then
+				# fc_rport can exist without zfcp_port
+				# (e.g. after port_remove)
+				echo 'Class = "zfcp_port"'
+				show_attributes "$ADAPTER_PORT_PATH"
+			fi
 			echo 'Class = "fc_remote_ports"'
 			show_attributes "$FC_PORT_PATH"
 			echo
@@ -392,6 +413,13 @@ show_devices()
 			fi
 		fi
 
+		if $SHOW_ATTRIBUTES && [ $SHOW_MORE_ATTRS -ge 1 ]; then
+			# auto scan LUNs not necessarily have a zfcp_unit
+			if [ -d $ZFCP_UNIT_PATH ]; then
+				echo 'Class = "zfcp_unit"'
+				show_attributes "$ZFCP_UNIT_PATH"
+			fi
+		fi
 		if $SHOW_ATTRIBUTES; then
 			echo 'Class = "scsi_device"'
 			show_attributes "$SCSI_DEVICE_PATH"
@@ -403,8 +431,8 @@ show_devices()
 
 ##############################################################################
 
-ARGS=`getopt --options ahvHPDVb:p:l:s:e --longoptions \
-attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs:,extended \
+ARGS=`getopt --options ahvHPDVb:p:l:s:em --longoptions \
+attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs:,extended,moreattrs \
 -n "$SCRIPTNAME" -- "$@"`
 
 if [ $? -ne 0 ]; then
@@ -418,6 +446,7 @@ eval set -- "$ARGS"
 for ARG; do
 	case "$ARG" in
 		-a|--attributes) SHOW_ATTRIBUTES=true; 	shift 1;;
+		-m|--moreattrs)	 ((SHOW_MORE_ATTRS++));	shift 1;;
 		-e|--extended)	 SHOW_EXTENDED=true;	shift 1;;
 		-b|--busid) 	 PAR_BUSID=$2;		shift 2;;
 		-h|--help) 	 print_help;		exit 0;;

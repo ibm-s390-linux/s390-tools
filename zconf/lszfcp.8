@@ -8,7 +8,7 @@ lszfcp \- list information about zfcp adapters, ports, and units
 
 .SH SYNOPSIS
 .B lszfcp
-.RB [ \-hvVaHDPe ]
+.RB [ \-hvVaHDPem ]
 .RB [ \-b
 .IR busid ]
 .RB [ \-l
@@ -40,8 +40,11 @@ listed object.
 If a SCSI device has an associated block device (disk)
 and SCSI generic (sg) device, show their sysfs paths in a 3rd line.
 
-Option "-a" additionally shows all attributes of interest found in
+Option "-a" additionally shows attributes of interest found in
 sysfs for the listed object.
+
+Option "-m"  together with option "-a" shows sysfs attributes if available for:
+host: css (subchannel); port: zfcp_port; lun: zfcp_unit.
 
 Option "-e" enables an extended output format.
 It enumerates all hosts/ports/luns independent of their state.
@@ -58,7 +61,11 @@ ports with fc_rport port_state unequal to "Online" (such as fibres pulled).
 .SH OPTIONS
 .TP
 .B -a, --attributes
-Show all attributes of the specified objects.
+Show the most interesting attributes of the specified objects.
+.TP
+.B -m, --moreattrs
+Show more attributes of the specified objects.
+Host: css (subchannel). Port: zfcp_port. Lun: zfcp_unit.
 .TP
 .B -D, --devices
 List zfcp units and  SCSI devices.
