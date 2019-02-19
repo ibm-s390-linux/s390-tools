@@ -115,6 +115,8 @@ OPTIONS:
     -a, --attributes	show attributes
     -m, --moreattrs	show more attributes
 			(host: css; port: zfcp_port; SCSI device: zfcp_unit)
+			specify twice to show more attributes for SCSI devices
+			(scsi_disk,block,integrity,queue,iosched)
     -V, --verbose	show sysfs paths of associated class
 			and bus devices
     -e, --extended	extended output format
@@ -445,6 +447,30 @@ show_devices()
 		if $SHOW_ATTRIBUTES; then
 			echo 'Class = "scsi_device"'
 			show_attributes "$SCSI_DEVICE_PATH"
+		fi
+		if $SHOW_ATTRIBUTES && [ $SHOW_MORE_ATTRS -ge 2 ]; then
+			if [ -d $SCSI_DEVICE_PATH/scsi_disk ]; then
+				echo 'Class = "scsi_disk"'
+				show_attributes "$SCSI_DEVICE_PATH/scsi_disk/$(basename $SCSI_DEVICE_PATH)"
+			fi
+			if [ -d $SCSI_DEVICE_PATH/block ]; then
+				echo 'Class = "block"'
+				show_attributes "$SCSI_DEVICE_PATH/block/*/"
+			fi
+			if [ -d $SCSI_DEVICE_PATH/block/*/integrity ]; then
+				echo 'Class = "block_integrity"'
+				show_attributes "$SCSI_DEVICE_PATH/block/*/integrity"
+			fi
+			if [ -d $SCSI_DEVICE_PATH/block/*/queue ]; then
+				echo 'Class = "block_queue"'
+				show_attributes "$SCSI_DEVICE_PATH/block/*/queue"
+			fi
+			if [ -d $SCSI_DEVICE_PATH/block/*/queue/iosched ]; then
+				echo 'Class = "block_queue_iosched"'
+				show_attributes "$SCSI_DEVICE_PATH/block/*/queue/iosched"
+			fi
+		fi
+		if $SHOW_ATTRIBUTES; then
 			echo
 		fi
 	done

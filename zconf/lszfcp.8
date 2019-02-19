@@ -45,6 +45,10 @@ sysfs for the listed object.
 
 Option "-m"  together with option "-a" shows sysfs attributes if available for:
 host: css (subchannel); port: zfcp_port; lun: zfcp_unit.
+Specifying option "-m" twice together with option "-a"
+additionally shows SCSI device sysfs attributes
+if available for:
+scsi_disk, block, block_integrity, block_queue, block_queue_iosched.
 
 Option "-e" enables an extended output format.
 It enumerates all hosts/ports/luns independent of their state.
@@ -67,6 +71,9 @@ Show the most interesting attributes of the specified objects.
 .B -m, --moreattrs
 Show more attributes of the specified objects.
 Host: css (subchannel). Port: zfcp_port. Lun: zfcp_unit.
+If specified twice,
+show additional attributes of the specified SCSI device objects:
+scsi_disk, block, block_integrity, block_queue, block_queue_iosched.
 .TP
 .B -D, --devices
 List zfcp units and  SCSI devices.
@@ -133,6 +140,8 @@ Show all adapters that match the given busid, all ports that match the given
 busid and wwpnn and show all units that match the given busid, wwpn and lun.
 .IP "lszfcp -b 0.0.0815 -p 0x5005123456789000 -l 0x0000000000000000 -H -P -D"
 Generates same output as previous example.
+.IP "lszfcp -HPDVeamm"
+Generates the fullest output in the extended format.
 .SH "SEE ALSO"
 .BR lscss (8)
 
