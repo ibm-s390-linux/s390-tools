@@ -26,8 +26,8 @@ unset PAR_BUSID PAR_WWPN PAR_LUN
 check_sysfs()
 {
 	if [ -z $SYSFS -o ! -d $SYSFS -o ! -r $SYSFS ]; then
-        	echo "Error: sysfs not available."
-                exit 1
+		echo "Error: sysfs not available."
+		exit 1
 	fi
 }
 
@@ -57,7 +57,7 @@ check_fcp_devs()
 
 check_fc_class()
 {
-	if [ -d "$SYSFS/class/fc_host" ]; then 
+	if [ -d "$SYSFS/class/fc_host" ]; then
 		FC_CLASS=true
 	fi
 }
@@ -94,8 +94,8 @@ OPTIONS:
     -h, --help		print this help
     -v, --version	print version information
 
-EXAMPLE: 
-    List for all zfcp adapters, ports and units the names of their 
+EXAMPLE:
+    List for all zfcp adapters, ports and units the names of their
     associated SCSI hosts, FC remote ports and SCSI devices.
 
     #> lszfcp -P -H -D
@@ -137,7 +137,7 @@ show_hosts()
 		SCSI_HOST=`basename $HOST_PATH`
 		ADAPTER_PATH=`dirname $HOST_PATH`
 		ADAPTER=`basename $ADAPTER_PATH`
-		
+
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
 		if [ $VERBOSITY -eq 0 ]; then
@@ -175,7 +175,7 @@ show_ports()
 		for PORT_PATH in $PORT_LIST; do
 			WWPN=`basename $PORT_PATH`
 			ADAPTER=`basename \`dirname $PORT_PATH\``
-			
+
 			[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
 			[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
@@ -234,7 +234,7 @@ show_devices()
 	if $FC_CLASS; then
 		SCSI_DEVICE_LIST=`ls -d \
 			$SYSFS/bus/ccw/drivers/zfcp/*/host*/rport*/target*/*/ \
-		       	2>/dev/null |grep -P '\d+:\d+:\d+:\d+'`
+			2>/dev/null |grep -P '\d+:\d+:\d+:\d+'`
 	else
 		SCSI_DEVICE_LIST=`ls -d $SYSFS/devices/css0/*/*/host[0-9]*/*/`
 	fi
@@ -247,7 +247,7 @@ show_devices()
 		read ADAPTER < $SCSI_DEVICE_PATH/hba_id
 		read WWPN < $SCSI_DEVICE_PATH/wwpn
 		read LUN < $SCSI_DEVICE_PATH/fcp_lun
-		
+
 		[ $LUN != ${PAR_LUN:-$LUN} ] && continue
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
@@ -260,21 +260,21 @@ show_devices()
 
 			# On live systems, there are links to the block and
 			# generic devices. In a dbginfo archive, these links
-			# are not present.  Therefore, fall back to reading 
+			# are not present.  Therefore, fall back to reading
 			# the runtime.out log file.
-			if [ `ls $SCSI_DEVICE_PATH | grep -c block:` -eq 1 ] 
+			if [ `ls $SCSI_DEVICE_PATH | grep -c block:` -eq 1 ]
 			then
 				BLOCK_DEV=`ls $SCSI_DEVICE_PATH | grep block:`
 				GEN_DEV=`ls $SCSI_DEVICE_PATH |\
-			       		grep scsi_generic:`
+					grep scsi_generic:`
 				echo -n "$SYSFS/block/${BLOCK_DEV#*:} "
 				echo "$SYSFS/class/scsi_generic/${GEN_DEV#*:}"
 
 			# FIXME Find a way to assign the generic devices.
-			elif [ -r $SYSFS/../runtime.out ]; then 
+			elif [ -r $SYSFS/../runtime.out ]; then
 				SCSI_DEV=`basename $SCSI_DEVICE_PATH`
 				echo "$SYSFS/block/"`grep -r "\[$SCSI_DEV\]"\
-			       		$SYSFS/../runtime.out |\
+					$SYSFS/../runtime.out |\
 					awk -F "/dev/" '{print $2}'`
 			fi
 		fi
