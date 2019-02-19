@@ -277,7 +277,11 @@ show_devices()
 	fi
 
 	if [ -z "$SCSI_DEVICE_LIST" ]; then
-		echo "Error: No fcp devices found."
+		if $SHOW_EXTENDED; then
+			echo "Error: No zfcp-attached SCSI devices found."
+		else
+			echo "Error: No fcp devices found."
+		fi
 	fi
 
 	for SCSI_DEVICE_PATH in $SCSI_DEVICE_LIST; do
