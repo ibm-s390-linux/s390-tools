@@ -202,6 +202,7 @@ $(readlink -e $HOST_PATH)/-"
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
 		read ONLINE < $ADAPTER_PATH/online
+		read AVAILABILITY < $ADAPTER_PATH/availability
 		[ -r $ADAPTER_PATH/failed ] && read FAILED < $ADAPTER_PATH/failed
 		DEFUNCT=${ADAPTER_PATH%/*} # strip devbusid
 		DEFUNCT=${DEFUNCT##*/}     # basename
@@ -213,6 +214,8 @@ $(readlink -e $HOST_PATH)/-"
 				HOSTMARKER=" offline"
 			elif [ "$FAILED" = "1" ]; then
 				HOSTMARKER=" failed"
+			elif [ "$AVAILABILITY" != "good" ]; then
+				HOSTMARKER=" NotAvailable"
 			fi
 		fi
 		if [ $VERBOSITY -eq 0 ]; then
