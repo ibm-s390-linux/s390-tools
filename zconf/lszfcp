@@ -340,11 +340,21 @@ show_devices()
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
+		ZFCP_UNIT_PATH=$SYSFS/devices/css[0-9]*/[0-9d]*/$ADAPTER/$WWPN/$LUN
+		SDEVMARKER=""
+		if $SHOW_EXTENDED; then
+			[ -d $ZFCP_UNIT_PATH ] || SDEVMARKER="$SDEVMARKER auto"
+			[ -r $SCSI_DEVICE_PATH/state ] \
+				&& read SDEVSTATE < $SCSI_DEVICE_PATH/state
+			[ "$SDEVSTATE" != "running" ] \
+				&& SDEVMARKER="$SDEVMARKER NotRunning"
+		fi
+
 		if [ $VERBOSITY -eq 0 ]; then
-			echo "$ADAPTER/$WWPN/$LUN `basename $SCSI_DEVICE_PATH`"
+			echo "$ADAPTER/$WWPN/$LUN `basename $SCSI_DEVICE_PATH`$SDEVMARKER"
 		else
-			echo "`ls -d $SYSFS/devices/css0/*/$ADAPTER`/$WWPN/$LUN"
-			echo ${SCSI_DEVICE_PATH%*/} # without trailing slash
+			echo "`ls -d $SYSFS/devices/css0/[0-9d]*/$ADAPTER`/$WWPN/$LUN"
+			echo ${SCSI_DEVICE_PATH%*/}$SDEVMARKER # without trailing slash
 
 			# On live systems, there are links to the block and
 			# generic devices. In a dbginfo archive, these links
