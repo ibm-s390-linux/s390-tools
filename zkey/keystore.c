@@ -3388,11 +3388,11 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 		}
 
 		sprintf(temp, ",sector-size=%lu", sector_size);
-		printf("%s\t%s\t%s\tplain,cipher=%s,size=%lu,hash=plain%s\n",
+		printf("%s\t%s\t%s\tplain,cipher=%s,size=%lu%s\n",
 		       dmname, volume, key_file_name, cipher_spec,
 		       key_file_size * 8, sector_size > 0 ? temp : "");
 	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
-		printf("%s\t%s\n", dmname, volume);
+		printf("%s\t%s\tnone\tluks\n", dmname, volume);
 	} else {
 		return -EINVAL;
 	}
