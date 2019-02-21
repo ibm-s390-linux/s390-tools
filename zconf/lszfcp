@@ -159,10 +159,24 @@ $(ls -dX $SYSFS/devices/css[0-9]*/defunct/[0-9]*/host[0-9]* 2>/dev/null)"
 
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
+		read ONLINE < $ADAPTER_PATH/online
+		[ -r $ADAPTER_PATH/failed ] && read FAILED < $ADAPTER_PATH/failed
+		DEFUNCT=${ADAPTER_PATH%/*} # strip devbusid
+		DEFUNCT=${DEFUNCT##*/}     # basename
+		HOSTMARKER=""
+		if $SHOW_EXTENDED; then
+			if [ "$DEFUNCT" = "defunct" ]; then
+				HOSTMARKER=" defunct"
+			elif [ "$ONLINE" = "0" ]; then
+				HOSTMARKER=" offline"
+			elif [ "$FAILED" = "1" ]; then
+				HOSTMARKER=" failed"
+			fi
+		fi
 		if [ $VERBOSITY -eq 0 ]; then
-			echo $ADAPTER $SCSI_HOST
+			echo $ADAPTER $SCSI_HOST$HOSTMARKER
 		else
-			echo $ADAPTER_PATH
+			echo $ADAPTER_PATH$HOSTMARKER
 			$FC_CLASS && echo "$SYSFS/class/fc_host/$SCSI_HOST"
 			echo "$SYSFS/class/scsi_host/$SCSI_HOST"
 		fi
