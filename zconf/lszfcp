@@ -220,6 +220,9 @@ show_ports()
 		else
 			continue
 		fi
+		PORTSTATEMARKER=""
+		$SHOW_EXTENDED && [ "$PORT_STATE" != "Online" ] \
+			&& PORTSTATEMARKER=" NotOnline"
 
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
 
@@ -246,14 +249,14 @@ show_ports()
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
 		if [ $VERBOSITY -eq 0 ]; then
-			echo "$ADAPTER/$WWPN $PORT"
+			echo "$ADAPTER/$WWPN $PORT$PORTSTATEMARKER"
 		else
 			if [ "$ADAPTER_PORT_PATH" != "-" ]; then
 				echo $ADAPTER_PORT_PATH
 			else
 				echo "- (NoMoreZfcpPort:$ADAPTER/$WWPN)"
 			fi
-			echo $FC_PORT_PATH
+			echo $FC_PORT_PATH$PORTSTATEMARKER
 		fi
 
 		if $SHOW_ATTRIBUTES; then
