@@ -344,7 +344,15 @@ show_devices()
 		SCSI_DEVICE_LIST=`ls -d $SYSFS/devices/css0/*/*/host[0-9]*/*/`
 	fi
 
-	if [ -z "$SCSI_DEVICE_LIST" ]; then
+	if $SHOW_EXTENDED; then
+		ZFCP_UNIT_LIST=$(ls -d \
+			$SYSFS/devices/css[0-9]*/[0-9d]*/[0-9]*/0x*/0x* \
+			2> /dev/null)
+	else
+		ZFCP_UNIT_LIST=""
+	fi
+
+	if [ -z "$SCSI_DEVICE_LIST" ] && [ -z "$ZFCP_UNIT_LIST" ]; then
 		if $SHOW_EXTENDED; then
 			echo "Error: No zfcp-attached SCSI devices found."
 		else
@@ -356,6 +364,20 @@ show_devices()
 		read ADAPTER < $SCSI_DEVICE_PATH/hba_id
 		read WWPN < $SCSI_DEVICE_PATH/wwpn
 		read LUN < $SCSI_DEVICE_PATH/fcp_lun
+
+		# remove from ZFCP_UNIT_LIST if SCSI device exists
+		REDUCED_LIST=""
+		for UNIT_PATH in $ZFCP_UNIT_LIST; do
+			STRIPPED_PATH=$UNIT_PATH
+			L=${UNIT_PATH##*/}
+			STRIPPED_PATH=${STRIPPED_PATH%/*}
+			W=${STRIPPED_PATH##*/}
+			STRIPPED_PATH=${STRIPPED_PATH%/*}
+			A=${STRIPPED_PATH##*/}
+			[ "$A/$W/$L" = "$ADAPTER/$WWPN/$LUN" ] && continue
+			REDUCED_LIST="$REDUCED_LIST $UNIT_PATH"
+		done
+		ZFCP_UNIT_LIST="$REDUCED_LIST"
 
 		[ $LUN != ${PAR_LUN:-$LUN} ] && continue
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
@@ -423,6 +445,36 @@ show_devices()
 		if $SHOW_ATTRIBUTES; then
 			echo 'Class = "scsi_device"'
 			show_attributes "$SCSI_DEVICE_PATH"
+			echo
+		fi
+	done
+
+	# what's left in ZFCP_UNIT_LIST are now units without SCSI device
+	for UNIT_PATH in $ZFCP_UNIT_LIST; do
+		STRIPPED_PATH=$UNIT_PATH
+		LUN=${UNIT_PATH##*/}
+		STRIPPED_PATH=${STRIPPED_PATH%/*}
+		WWPN=${STRIPPED_PATH##*/}
+		STRIPPED_PATH=${STRIPPED_PATH%/*}
+		ADAPTER=${STRIPPED_PATH##*/}
+
+		[ $LUN != ${PAR_LUN:-$LUN} ] && continue
+		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
+		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
+
+		if [ $VERBOSITY -eq 0 ]; then
+			echo "$ADAPTER/$WWPN/$LUN - failed"
+		else
+			echo "$UNIT_PATH failed"
+			echo "-"
+		fi
+
+		if $SHOW_ATTRIBUTES && [ $SHOW_MORE_ATTRS -ge 1 ]; then
+			echo 'Class = "zfcp_unit"'
+			show_attributes "$UNIT_PATH"
+		fi
+
+		if $SHOW_ATTRIBUTES; then
 			echo
 		fi
 	done

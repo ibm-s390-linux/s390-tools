@@ -56,7 +56,8 @@ not
 enumerated:
 hosts that have never been online (since last bind to zfcp device driver),
 hosts that are defunct (CHPID configured off, or z/VM detach),
-ports with fc_rport port_state unequal to "Online" (such as fibres pulled).
+ports with fc_rport port_state unequal to "Online" (such as fibres pulled),
+zfcp units without associated SCSI device (unit_add of non-existent LUN).
 
 .SH OPTIONS
 .TP
