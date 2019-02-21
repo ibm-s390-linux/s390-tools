@@ -18,6 +18,7 @@ SHOW_HOSTS=0
 SHOW_PORTS=0
 SHOW_DEVICES=0
 SHOW_ATTRIBUTES=false
+SHOW_EXTENDED=false
 unset PAR_BUSID PAR_WWPN PAR_LUN
 
 
@@ -90,6 +91,7 @@ OPTIONS:
     -a, --attributes	show all attributes
     -V, --verbose	show sysfs paths of associated class
 			and bus devices
+    -e, --extended	extended output format
     -s, --sysfs=PATH	use path as sysfs (for dbginfo archives)
     -h, --help		print this help
     -v, --version	print version information
@@ -290,8 +292,8 @@ show_devices()
 
 ##############################################################################
 
-ARGS=`getopt --options ahvHPDVb:p:l:s: --longoptions \
-attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs: \
+ARGS=`getopt --options ahvHPDVb:p:l:s:e --longoptions \
+attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs:,extended \
 -n "$SCRIPTNAME" -- "$@"`
 
 if [ $? -ne 0 ]; then
@@ -305,6 +307,7 @@ eval set -- "$ARGS"
 for ARG; do
 	case "$ARG" in
 		-a|--attributes) SHOW_ATTRIBUTES=true; 	shift 1;;
+		-e|--extended)	 SHOW_EXTENDED=true;	shift 1;;
 		-b|--busid) 	 PAR_BUSID=$2;		shift 2;;
 		-h|--help) 	 print_help;		exit 0;;
 		-l|--lun) 	 PAR_LUN=$2;		shift 2;;

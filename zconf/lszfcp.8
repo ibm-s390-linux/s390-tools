@@ -8,7 +8,7 @@ lszfcp \- list information about zfcp adapters, ports, and units
 
 .SH SYNOPSIS
 .B lszfcp
-.RB [ \-hvVaHDP ]
+.RB [ \-hvVaHDPe ]
 .RB [ \-b
 .IR busid ]
 .RB [ \-l
@@ -41,6 +41,8 @@ listed object.
 Option "-a" additionally shows all attributes of interest found in
 sysfs for the listed object.
 
+Option "-e" enables an extended output format.
+
 .SH OPTIONS
 .TP
 .B -a, --attributes
@@ -68,6 +70,9 @@ configured for different adapters or ports.)
 List zfcp port(s) and FC remote port(s) selected by wwpn. (Information
 for several ports might be shown if a remote port is configured for
 different adapters.)
+.TP
+.B -e, --extended
+Generate extended output.
 .TP
 .B -V, --verbose
 Generate verbose output. Display sysfs path names of class and bus
