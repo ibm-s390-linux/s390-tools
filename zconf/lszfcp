@@ -14,6 +14,7 @@ FC_CLASS=false
 
 # Command line parameters
 VERBOSITY=0
+SHOW_MODPARMS=0
 SHOW_HOSTS=0
 SHOW_PORTS=0
 SHOW_DEVICES=0
@@ -109,6 +110,7 @@ OPTIONS:
     -H, --hosts		show host information (default)
     -P, --ports		show remote port information
     -D, --devices	show SCSI device information
+    -Z, --modparms	show zfcp (module) parameters
     -b, --busid=BUSID	select specific busid
     -p, --wwpn=WWPN	select specific port name
     -l, --lun=LUN	select specific LUN
@@ -156,6 +158,22 @@ show_attributes()
 
 		printf "    %-19s = \"%s\"\n" "$FILE" "$CONTENT"
 	done
+}
+
+
+show_modparms()
+{
+	local modparmdir=$SYSFS/module/zfcp/parameters
+
+	[ -d "$modparmdir" ] || return
+
+	if [ $VERBOSITY -ne 0 ]; then
+		echo "$modparmdir"
+	fi
+
+	echo 'Module = "zfcp"'
+	show_attributes "$modparmdir"
+	echo
 }
 
 
@@ -509,8 +527,8 @@ show_devices()
 
 ##############################################################################
 
-ARGS=`getopt --options ahvHPDVb:p:l:s:em --longoptions \
-attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs:,extended,moreattrs \
+ARGS=`getopt --options ahvHPDVb:p:l:s:emZ --longoptions \
+attributes,help,version,hosts,ports,devices,verbose,busid:,wwpn:,lun:,sysfs:,extended,moreattrs,modparms \
 -n "$SCRIPTNAME" -- "$@"`
 
 if [ $? -ne 0 ]; then
@@ -535,6 +553,7 @@ for ARG; do
 		-D|--devices) 	 SHOW_DEVICES=1;	shift 1;;
 		-P|--ports) 	 SHOW_PORTS=1;		shift 1;;
 		-V|--verbose) 	 VERBOSITY=1;		shift 1;;
+		-Z|--modparms) 	 SHOW_MODPARMS=1;	shift 1;;
 		-s|--sysfs)	 SYSFS=$2;		shift 2;;
 		--) shift; break;;
 	esac
@@ -546,6 +565,10 @@ check_fc_class
 check_fcp_devs
 
 default=1
+if [ $SHOW_MODPARMS -eq 1 ]; then
+	default=0; show_modparms
+fi
+
 if [ $SHOW_HOSTS -eq 1 ]; then
 	default=0; show_hosts
 elif [ $SHOW_PORTS -eq 0 -a $SHOW_DEVICES -eq 0 -a -n "$PAR_BUSID" ]; then

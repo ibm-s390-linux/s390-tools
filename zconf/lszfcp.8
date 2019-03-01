@@ -8,7 +8,7 @@ lszfcp \- list information about zfcp adapters, ports, and units
 
 .SH SYNOPSIS
 .B lszfcp
-.RB [ \-hvVaHDPem ]
+.RB [ \-hvVaZHDPem ]
 .RB [ \-b
 .IR busid ]
 .RB [ \-l
@@ -28,8 +28,10 @@ scsi_devices.
 The default is to list busids of all zfcp adapters and their corresponding
 SCSI host names.
 
-There are three output variants. Default (without options "-a" or
-"-V") is one line for each object.  For adapters the busid and their
+There are four output variants. Default (without options "-a" or
+"-V" or "-Z") is one line for each object.
+For the zfcp device driver (module), its parameters are listed.
+For adapters the busid and their
 corresponding SCSI host names are listed.  For ports the pair
 "busid"/"wwpn" and their corresponding FC-remote-port names are listed.
 For units the triple "busid"/"wwpn"/"lun" and their corresponding SCSI
@@ -74,6 +76,9 @@ Host: css (subchannel). Port: zfcp_port. Lun: zfcp_unit.
 If specified twice,
 show additional attributes of the specified SCSI device objects:
 scsi_disk, block, block_integrity, block_queue, block_queue_iosched.
+.TP
+.B -Z, --modparms
+List zfcp (module) parameters with a scope of the device driver.
 .TP
 .B -D, --devices
 List zfcp units and  SCSI devices.
@@ -121,7 +126,7 @@ Display version info and exit.
 .PP
 Options "-b", "-p" or "-l" are of restricting nature. They limit the output
 to those adapters, ports or units that match the specified busid, wwpn and lun.
-If none of the options "-H", "-P" and "-D" are specified, "-b" implies "-H",
+If none of the options "-Z", "-H", "-P" and "-D" are specified, "-b" implies "-H",
 "-p" implies "-P" and "-l" implies "-D".
 
 .SH EXAMPLES
@@ -140,7 +145,7 @@ Show all adapters that match the given busid, all ports that match the given
 busid and wwpnn and show all units that match the given busid, wwpn and lun.
 .IP "lszfcp -b 0.0.0815 -p 0x5005123456789000 -l 0x0000000000000000 -H -P -D"
 Generates same output as previous example.
-.IP "lszfcp -HPDVeamm"
+.IP "lszfcp -ZHPDVeamm"
 Generates the fullest output in the extended format.
 .SH "SEE ALSO"
 .BR lscss (8)
