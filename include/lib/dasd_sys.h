@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 int dasd_sys_raw_track_access(char *);
+int dasd_sys_ese(char *);
 int dasd_reset_chpid(char *, char *);
 int dasd_get_host_access_count(char *device);
 

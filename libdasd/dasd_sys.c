@@ -57,6 +57,43 @@ int dasd_sys_raw_track_access(char *devnode)
 	return (rc == 1) ? 1 : 0;
 }
 
+/**
+ * Is volume extent space efficient a.k.a. thin-provisioned
+ *
+ * The "devnode" parameter can be any valid relative or absolute path to
+ * a DASD device node, for example:
+ *
+ * - /dev/dasda
+ * - /dev/disk/by-path/ccw-0.0.bf20
+ *
+ * @param[in]	devnode		Device node of interest
+ *
+ * @retval	1		Volume is extent space efficient
+ * @retval	0		Volume is not extent space efficient or
+ *				cannot be determined
+ */
+int dasd_sys_ese(char *devnode)
+{
+	char busid[DASD_BUS_ID_SIZE];
+	char *path;
+	FILE *fp;
+	int rc;
+
+	if (util_sys_get_dev_addr(devnode, busid) != 0)
+		return 0;
+
+	path = util_path_sysfs("bus/ccw/devices/%s/ese", busid);
+	fp = fopen(path, "r");
+	if (!fp) {
+		free(path);
+		return 0;
+	}
+
+	rc = fgetc(fp) - '0';
+	fclose(fp);
+
+	return (rc == 1) ? 1 : 0;
+}
 
 int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
 {
