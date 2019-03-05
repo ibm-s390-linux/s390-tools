@@ -92,6 +92,9 @@ typedef struct dasdfmt_info {
 	int   force_host;
 	int   layout_specified;
 	int   check;
+	int   mode_specified;
+	int   ese;
+	int   no_discard;
 } dasdfmt_info_t;
 
 

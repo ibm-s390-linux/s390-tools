@@ -53,6 +53,7 @@ static const struct util_prg prg = {
 /* Defines for options with no short command */
 #define OPT_CHECK	128
 #define OPT_NOZERO	129
+#define OPT_NODISCARD	130
 
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("FORMAT ACTIONS"),
@@ -103,6 +104,11 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "norecordzero", no_argument, NULL, OPT_NOZERO },
 		.desc = "Prevent storage server from modifying record 0",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = { "no-discard", no_argument, NULL, OPT_NODISCARD },
+		.desc = "Do not discard space before formatting",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
@@ -921,6 +927,8 @@ static void dasdfmt_print_info(dasdfmt_info_t *info, char *devname,
 	printf("Drive Geometry: %d Cylinders * %d Heads =  %d Tracks\n",
 	       cylinders, heads, (cylinders * heads));
 
+	printf("Device Type: %s Provisioned\n",
+	       info->ese ? "Thinly" : "Fully");
 	printf("\nI am going to format the device ");
 	printf("%s in the following way:\n", devname);
 	printf("   Device number of device : 0x%x\n", info->dasd_info.devno);
@@ -939,7 +947,10 @@ static void dasdfmt_print_info(dasdfmt_info_t *info, char *devname,
 	       (p->intensity & DASD_FMT_INT_COMPAT) ? "yes" : "no");
 	printf("   Blocksize               : %d\n", p->blksize);
 	printf("   Mode                    : %s\n", mode_str[mode]);
-
+	if (info->ese) {
+		printf("   Full Space Release      : %s\n",
+		       (info->no_discard || mode == FULL) ? "no" : "yes");
+	}
 	if (info->testmode)
 		printf("Test mode active, omitting ioctl.\n");
 }
@@ -1234,6 +1245,26 @@ static void dasdfmt_format(dasdfmt_info_t *info, unsigned int cylinders,
 	process_tracks(info, cylinders, heads, format_params);
 }
 
+static void dasdfmt_release_space(dasdfmt_info_t *info)
+{
+	format_data_t r = {
+		.start_unit = 0,
+		.stop_unit = 0,
+		.intensity = DASD_FMT_INT_ESE_FULL,
+	};
+	int err = 0;
+
+	if (!info->ese || info->no_discard)
+		return;
+
+	printf("Releasing space for the entire device...\n");
+	err = dasd_release_space(dev_filename, &r);
+	if (err) {
+		ERRMSG_EXIT(EXIT_FAILURE, "%s: Could not release space (%s)\n",
+			    prog_name, strerror(err));
+	}
+}
+
 static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 				       unsigned int cylinders,
 				       unsigned int heads, format_data_t *p)
@@ -1329,6 +1360,8 @@ static void dasdfmt_quick_format(dasdfmt_info_t *info, unsigned int cylinders,
 
 	if (info->force) {
 		printf("Skipping format check due to --force.\n");
+	} else if (info->ese) {
+		printf("Skipping format check due to thin-provisioned device.\n");
 	} else {
 		check_blocksize(info, p->blksize);
 
@@ -1438,6 +1471,7 @@ static void do_format_dasd(dasdfmt_info_t *info, char *devname,
 			dasdfmt_prepare_and_format(info, cylinders, heads, p);
 			break;
 		case QUICK:
+			dasdfmt_release_space(info);
 			dasdfmt_quick_format(info, cylinders, heads, p);
 			break;
 		case EXPAND:
@@ -1459,6 +1493,19 @@ static void do_format_dasd(dasdfmt_info_t *info, char *devname,
 			printf("ok\n");
 		}
 	}
+}
+
+static void eval_format_mode(dasdfmt_info_t *info)
+{
+	if (!info->force && info->mode_specified && info->ese && mode == EXPAND) {
+		ERRMSG_EXIT(EXIT_FAILURE,
+			    "WARNING: The specified device is thin-provisioned\n"
+			    "Format mode 'expand' is not feasible.\n"
+			    "Use --mode=full or --mode=quick to perform a clean format\n");
+	}
+
+	if (!info->mode_specified)
+		mode = info->ese ? QUICK : FULL;
 }
 
 int main(int argc, char *argv[])
@@ -1495,8 +1542,6 @@ int main(int argc, char *argv[])
 
 	format_params.blksize   = DEFAULT_BLOCKSIZE;
 	format_params.intensity = DASD_FMT_INT_COMPAT;
-
-	mode = FULL;
 
 	/*************** parse parameters **********************/
 
@@ -1601,6 +1646,10 @@ int main(int argc, char *argv[])
 					    "invalid. Consult the man page for "
 					    "more information.\n",
 					    prog_name, optarg);
+			info.mode_specified = 1;
+			break;
+		case OPT_NODISCARD:
+			info.no_discard = 1;
 			break;
 		case OPT_CHECK:
 			info.check = 1;
@@ -1644,6 +1693,9 @@ int main(int argc, char *argv[])
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl call to retrieve "
 			    "device information failed (%s).\n",
 			    prog_name, strerror(rc));
+
+	info.ese = dasd_sys_ese(dev_filename);
+	eval_format_mode(&info);
 
 	/* Either let the user specify the blksize or get it from the kernel */
 	if (!info.blksize_specified) {

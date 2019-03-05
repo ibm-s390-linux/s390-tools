@@ -122,6 +122,8 @@ Format the first two tracks and write label and partition information. Only use
 this option if you are sure that the target DASD already contains a regular
 format with the specified blocksize. A blocksize can optionally be specified
 using \fB-b\fR (\fB--blocksize\fR).
+.br
+For thin-provisioned DASD ESE volumes this is the default mode.
 .IP expand
 Format all unformatted tracks at the end of the target DASD. This mode assumes
 that tracks at the beginning of the DASD volume have already been correctly
@@ -135,6 +137,10 @@ using \fB-b\fR (\fB--blocksize\fR).
 \fB--check\fR
 Perform a complete format check on a DASD volume. A blocksize can be specified
 with \fB-b\fR (\fB--blocksize\fR).
+
+.TP
+\fB--no-discard\fR
+Omit a full space release when formatting a thin-provisioned DASD ESE volume.
 
 .TP
 \fB-r\fR \fIcylindercount\fR or \fB--requestsize\fR=\fIcylindercount\fR
