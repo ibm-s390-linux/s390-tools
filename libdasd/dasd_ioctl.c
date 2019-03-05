@@ -229,6 +229,26 @@ int dasd_check_format(const char *device, format_check_t *p)
 }
 
 /*
+ * Release Allocated Space
+ *
+ * @param[in] fd		device node's file descriptor
+ * @param[in] r			format options
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_release_space(const char *device, format_data_t *r)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDRAS, r);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
  * Reread partition table
  *
  * @param[in] device node	device node's name

@@ -157,6 +157,7 @@ typedef struct format_data_t {
 #define DASD_FMT_INT_INVAL	4	/* invalidate tracks */
 #define DASD_FMT_INT_COMPAT	8	/* use OS/390 compatible disk layout */
 #define DASD_FMT_INT_FMT_NOR0	16	/* remove permission to write record zero */
+#define DASD_FMT_INT_ESE_FULL	32	/* release space for entire volume */
 
 /*
  * struct format_check_t
@@ -210,6 +211,8 @@ struct hd_geometry {
 #define BIODASDINFO2   _IOR(DASD_IOCTL_LETTER, 3, dasd_information2_t)
 /* #define BIODASDFORMAT  _IOW(IOCTL_LETTER,0,format_data_t) , deprecated */
 #define BIODASDFMT     _IOW(DASD_IOCTL_LETTER, 1, format_data_t)
+/* Release Allocated Space */
+#define BIODASDRAS     _IOW(DASD_IOCTL_LETTER, 3, format_data_t)
 /* Check device format according to format_data_t */
 #define BIODASDCHECKFMT _IOWR(DASD_IOCTL_LETTER, 2, format_check_t)
 
@@ -233,6 +236,7 @@ int dasd_check_format(const char *device, format_check_t *p);
 int dasd_format_disk(int fd, format_data_t *p);
 int dasd_disk_disable(const char *device, int *fd);
 int dasd_disk_enable(int fd);
+int dasd_release_space(const char *device, format_data_t *r);
 int dasd_get_blocksize(const char *device, unsigned int *blksize);
 int dasd_get_blocksize_in_bytes(const char *device, unsigned long long *blksize);
 int dasd_get_geo(const char *device, struct hd_geometry *geo);
