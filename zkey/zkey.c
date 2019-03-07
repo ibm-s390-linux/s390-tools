@@ -71,6 +71,10 @@ static struct zkey_globals {
 	char *volume_type;
 	char *newname;
 	bool run;
+	char *keyfile;
+	long long keyfile_offset;
+	long long keyfile_size;
+	long long tries;
 	bool force;
 	void *lib_csulcca;
 	t_CSNBKTC dll_CSNBKTC;
@@ -101,6 +105,11 @@ static struct zkey_globals {
 
 #define ENVVAR_ZKEY_REPOSITORY	"ZKEY_REPOSITORY"
 #define DEFAULT_KEYSTORE	"/etc/zkey/repository"
+
+#define OPT_CRYPTSETUP_KEYFILE		256
+#define OPT_CRYPTSETUP_KEYFILE_OFFSET	257
+#define OPT_CRYPTSETUP_KEYFILE_SIZE	258
+#define OPT_CRYPTSETUP_TRIES		259
 
 /*
  * Configuration of command line options
@@ -582,6 +591,51 @@ static struct util_opt opt_vec[] = {
 		.desc = "Runs the generated cryptsetup command",
 		.command = COMMAND_CRYPTSETUP,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = {"key-file", required_argument, NULL,
+			   OPT_CRYPTSETUP_KEYFILE},
+		.argument = "FILE-NAME",
+		.desc = "Read the passphrase from the specified file. "
+			"This option is passed to the generated command(s) for "
+			"LUKS2 volumes",
+		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"keyfile-offset", required_argument, NULL,
+			   OPT_CRYPTSETUP_KEYFILE_OFFSET},
+		.argument = "BYTES",
+		.desc = "Specifies the number of bytes to skip in the file "
+			"specified with option '--key-file'. "
+			"This option is passed to the generated command(s) for "
+			"LUKS2 volumes",
+		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"keyfile-size", required_argument, NULL,
+			   OPT_CRYPTSETUP_KEYFILE_SIZE},
+		.argument = "BYTES",
+		.desc = "Specifies the number of bytes to read from the file "
+			"specified with option '--key-file'. "
+			"This option is passed to the generated command(s) for "
+			"LUKS2 volumes",
+		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"tries", required_argument, NULL,
+			   OPT_CRYPTSETUP_TRIES},
+		.argument = "NUMBER",
+		.desc = "Specifies how often the interactive input of the "
+			"passphrase can be retried. "
+			"This option is passed to the generated command(s) for "
+			"LUKS2 volumes",
+		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1380,7 +1434,9 @@ static int command_cryptsetup(void)
 {
 	int rc;
 
-	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type);
+	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type,
+				 g.keyfile, g.keyfile_offset, g.keyfile_size,
+				 g.tries);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1574,6 +1630,45 @@ int main(int argc, char *argv[])
 		case 'V':
 			g.verbose = 1;
 			break;
+#ifdef HAVE_LUKS2_SUPPORT
+		case OPT_CRYPTSETUP_KEYFILE:
+			g.keyfile = optarg;
+			break;
+		case OPT_CRYPTSETUP_KEYFILE_OFFSET:
+			g.keyfile_offset = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.keyfile_offset < 0 ||
+			    (g.keyfile_offset == LLONG_MAX &&
+			     errno == ERANGE)) {
+				warnx("Invalid value for '--keyfile-offset': "
+				      "'%s'", optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
+			break;
+		case OPT_CRYPTSETUP_KEYFILE_SIZE:
+			g.keyfile_size = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.keyfile_size <= 0 ||
+			    (g.keyfile_size == LLONG_MAX && errno == ERANGE)) {
+				warnx("Invalid value for '--keyfile-size': "
+				      "'%s'", optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
+			break;
+		case OPT_CRYPTSETUP_TRIES:
+			g.tries = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.tries <= 0 ||
+			    (g.tries == LLONG_MAX && errno == ERANGE)) {
+				warnx("Invalid value for '--tries': '%s'",
+				      optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
+			break;
+#endif
 		case 'h':
 			print_help(command);
 			return EXIT_SUCCESS;

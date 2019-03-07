@@ -547,6 +547,14 @@ option to generate crypttab entries for the specified volume type only.
 .RB [ \-\-volume-type | \-t
 .IR type ]
 .RB [ \-\-run | \-r ]
+.RB [ \-\-key\-file
+.IR file-name ]
+.RB [ \-\-keyfile\-offset
+.IR bytes ]
+.RB [ \-\-keyfile\-size
+.IR bytes ]
+.RB [ \-\-tries
+.IR number ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -576,6 +584,24 @@ errors when multiple encrypted volumes are unlocked automatically at boot
 through /etc/crypttab. Because PAES uses secure AES keys as volume keys, the
 security of the key derivation function used to encrypt the volume key in the
 LUKS key slots is of less relevance. 
+.P
+For LUKS2 volumes, a passphrase is required. You are prompted for the
+passphrase when running the generated commands, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options are
+only available if
+.B zkey
+has been compiled with LUKS2 support enabled. These options are passed to the
+generated command(s) and behave in the same way as with \fBcryptsetup\fP.
 .
 .
 .
@@ -956,6 +982,42 @@ This option is only used for secure keys contained in the secure key repository.
 Runs the generated cryptsetup commands. When one of the cryptsetup command fail,
 no further cryptsetup commands are run, and zkey ends with an error.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-key\-file\~\fIfile\-name\fP
+Reads the passphrase from the specified file. If this option is omitted,
+or if the file\-name is \fI-\fP (a dash), then you are prompted to enter the
+passphrase interactively. This option is passed to the generated command(s)
+for LUKS2 volumes, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-\-keyfile\-offset\~\fIbytes\fP
+Specifies the number of bytes to skip before starting to read in the file
+specified with option \fB\-\-key\-file\fP. If omitted, the file is read
+from the beginning. When option \fB\-\-key\-file\fP is not specified, this
+option is ignored. This option is passed to the generated command(s)
+for LUKS2 volumes, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-\-keyfile\-size\~\fIbytes\fP
+Specifies the number of bytes to be read from the beginning of the file
+specified with option \fB\-\-key\-file\fP. If omitted, the file is read
+until the end. When \fB\-\-keyfile\-offset\fP is also specified, reading starts
+at the offset. When option \fB\-\-key\-file\fP is not specified, this option is
+ignored. This option is passed to the generated command(s) for LUKS2 volumes,
+and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-\-tries\~\fInumber\fP
+Specifies how often the interactive input of the passphrase can be re-entered.
+The default is 3 times. When option \fB\-\-key\-file\fP is specified, this
+option is ignored, and the passphrase is read only once from the file.
+This option is passed to the generated command(s) for LUKS2 volumes, and is
+only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 .
 .
 .

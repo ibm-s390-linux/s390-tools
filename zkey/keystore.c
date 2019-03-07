@@ -3242,6 +3242,10 @@ static int _keystore_execute_cmd(const char *cmd,
 
 struct crypt_info {
 	bool execute;
+	const char *keyfile;
+	size_t keyfile_offset;
+	size_t keyfile_size;
+	size_t tries;
 	char **volume_filter;
 	int (*process_func)(struct keystore *keystore,
 			    const char *volume,
@@ -3280,11 +3284,37 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 					const char *volume_type,
 					struct crypt_info *info)
 {
+	char *keyfile_opt = NULL, *offset_opt = NULL;
+	char *size_opt = NULL, *tries_opt = NULL;
+	char *common_passphrase_options;
+	size_t common_len;
 	char temp[100];
 	int rc = 0;
 	char *cmd;
 
 	sprintf(temp, "--sector-size %lu ", sector_size);
+
+	if (info->keyfile) {
+		util_asprintf(&keyfile_opt, "--key-file '%s' ", info->keyfile);
+		if (info->keyfile_offset > 0)
+			util_asprintf(&offset_opt, "--keyfile-offset %lu ",
+				      info->keyfile_offset);
+		if (info->keyfile_size > 0)
+			util_asprintf(&size_opt, "--keyfile-size %lu ",
+				      info->keyfile_size);
+	}
+	if (info->tries > 0)
+		util_asprintf(&tries_opt, "--tries %lu ", info->tries);
+	util_asprintf(&common_passphrase_options, "%s%s%s%s",
+		      keyfile_opt != NULL ? keyfile_opt : "",
+		      offset_opt != NULL ? offset_opt : "",
+		      size_opt != NULL ? size_opt : "",
+		      tries_opt != NULL ? tries_opt : "");
+	common_len = strlen(common_passphrase_options);
+	free(keyfile_opt);
+	free(offset_opt);
+	free(size_opt);
+	free(tries_opt);
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
 		util_asprintf(&cmd,
@@ -3310,9 +3340,10 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 		util_asprintf(&cmd,
 			      "cryptsetup luksFormat %s--type luks2 "
 			      "--master-key-file '%s' --key-size %lu "
-			      "--cipher %s --pbkdf pbkdf2 %s%s",
+			      "--cipher %s --pbkdf pbkdf2 %s%s%s",
 			      keystore->verbose ? "-v " : "", key_file_name,
 			      key_file_size * 8, cipher_spec,
+			      common_len > 0 ? common_passphrase_options : "",
 			      sector_size > 0 ? temp : "", volume);
 
 		if (info->execute) {
@@ -3327,8 +3358,9 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			return rc;
 
 		util_asprintf(&cmd,
-			      "zkey-cryptsetup setvp %s%s", volume,
-			      keystore->verbose ? " -V " : "");
+			      "zkey-cryptsetup setvp %s %s%s", volume,
+			      common_len > 0 ? common_passphrase_options : "",
+			      keystore->verbose ? "-V" : "");
 
 		if (info->execute) {
 			printf("Executing: %s\n", cmd);
@@ -3340,6 +3372,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 		return -EINVAL;
 	}
 
+	free(common_passphrase_options);
 	free(cmd);
 	return rc;
 }
@@ -3577,11 +3610,17 @@ out:
  * @param[in] execute        If TRUE the cryptsetup command is executed,
  *                           otherwise it is printed to stdout
  * @param[in] volume_type the type of volume to generate cryptsetup cmds for
- * *
+ * @param[in] keyfile        If non-NULL, specifies the name of the file to
+ *                           read the passphrase from.
+ * @param[in] keyfile_offset the offset in bytes for reading from keyfile
+ * @param[in] keyfile_size   the size in bytes for reading from keyfile
+ * @param[in] tries          the number of tries for passphrase entry
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
-			bool execute, const char *volume_type)
+			bool execute, const char *volume_type,
+			const char *keyfile, size_t keyfile_offset,
+			size_t keyfile_size, size_t tries)
 {
 	struct crypt_info info = { 0 };
 	int rc;
@@ -3598,6 +3637,10 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 	}
 
 	info.execute = execute;
+	info.keyfile = keyfile;
+	info.keyfile_offset = keyfile_offset;
+	info.keyfile_size = keyfile_size;
+	info.tries = tries;
 	info.volume_filter = str_list_split(volume_filter);
 	info.process_func = _keystore_process_cryptsetup;
 
