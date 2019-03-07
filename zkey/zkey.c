@@ -71,6 +71,10 @@ static struct zkey_globals {
 	char *volume_type;
 	char *newname;
 	bool run;
+	char *keyfile;
+	long long keyfile_offset;
+	long long keyfile_size;
+	long long tries;
 	bool force;
 	void *lib_csulcca;
 	t_CSNBKTC dll_CSNBKTC;
@@ -580,6 +584,33 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = {"run", 0, NULL, 'r'},
 		.desc = "Runs the generated cryptsetup command",
+		.command = COMMAND_CRYPTSETUP,
+	},
+	{
+		.option = {"key-file", required_argument, NULL, 'd'},
+		.argument = "FILE-NAME",
+		.desc = "Read the passphrase from the specified file",
+		.command = COMMAND_CRYPTSETUP,
+	},
+	{
+		.option = {"keyfile-offset", required_argument, NULL, 'o'},
+		.argument = "BYTES",
+		.desc = "Specifies the number of bytes to skip in the file "
+			"specified with option '--key-file'|'-d'",
+		.command = COMMAND_CRYPTSETUP,
+	},
+	{
+		.option = {"keyfile-size", required_argument, NULL, 'L'},
+		.argument = "BYTES",
+		.desc = "Specifies the number of bytes to read from the file "
+			"specified with option '--key-file'|'-d'",
+		.command = COMMAND_CRYPTSETUP,
+	},
+	{
+		.option = {"tries", required_argument, NULL, 'T'},
+		.argument = "NUMBER",
+		.desc = "Specifies how often the interactive input of the "
+			"passphrase can be retried",
 		.command = COMMAND_CRYPTSETUP,
 	},
 	/***********************************************************/
@@ -1380,7 +1411,7 @@ static int command_cryptsetup(void)
 {
 	int rc;
 
-	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type);
+	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type, g.keyfile, g.keyfile_offset, g.keyfile_size, g.tries);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1523,7 +1554,19 @@ int main(int argc, char *argv[])
 			g.tonew = 1;
 			break;
 		case 'o':
-			g.fromold = 1;
+			if (command && !strcmp(command->command, COMMAND_CRYPTSETUP)) {
+				g.keyfile_offset = strtoll(optarg, &endp, 0);
+				if (*optarg == '\0' || *endp != '\0' ||
+				    g.keyfile_offset < 0 ||
+				    (g.keyfile_offset == LLONG_MAX &&
+				     errno == ERANGE)) {
+					warnx("Invalid value for '--keyfile-offset'|"
+					      "'-o': '%s'", optarg);
+					util_prg_print_parse_error();
+					return EXIT_FAILURE;
+				}
+			} else
+				g.fromold = 1;
 			break;
 		case 'p':
 			g.complete = 1;
@@ -1539,6 +1582,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			g.description = optarg;
+			g.keyfile = optarg;
 			break;
 		case 'l':
 			g.volumes = optarg;
@@ -1567,6 +1611,28 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			g.run = 1;
+			break;
+		case 'L':
+			g.keyfile_size = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.keyfile_size <= 0 ||
+			    (g.keyfile_size == LLONG_MAX && errno == ERANGE)) {
+				warnx("Invalid value for '--keyfile-size'|"
+				      "'-L': '%s'", optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
+			break;
+		case 'T':
+			g.tries = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.tries <= 0 ||
+			    (g.tries == LLONG_MAX && errno == ERANGE)) {
+				warnx("Invalid value for '--tries'|'-T': '%s'",
+				      optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
 			break;
 		case 'F':
 			g.force = 1;

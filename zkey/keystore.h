@@ -68,7 +68,8 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		       const char *volume_type);
 
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
-			bool execute, const char *volume_type);
+			bool execute, const char *volume_type, const char *keyfile,
+	                size_t keyfile_offset, size_t keyfile_size, size_t tries);
 
 int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 		      const char *volume_type);
