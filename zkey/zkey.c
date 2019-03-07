@@ -71,6 +71,7 @@ static struct zkey_globals {
 	char *volume_type;
 	char *newname;
 	bool run;
+	bool batch_mode;
 	char *keyfile;
 	long long keyfile_offset;
 	long long keyfile_size;
@@ -636,6 +637,13 @@ static struct util_opt opt_vec[] = {
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 #endif
+	{
+		.option = {"batch-mode", 0, NULL, 'q'},
+		.desc = "Suppresses cryptsetup confirmation questions. "
+			"This option is passed to the generated cryptsetup "
+			"command(s)",
+		.command = COMMAND_CRYPTSETUP,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1436,7 +1444,7 @@ static int command_cryptsetup(void)
 
 	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type,
 				 g.keyfile, g.keyfile_offset, g.keyfile_size,
-				 g.tries);
+				 g.tries, g.batch_mode);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1669,6 +1677,9 @@ int main(int argc, char *argv[])
 			}
 			break;
 #endif
+		case 'q':
+			g.batch_mode = 1;
+			break;
 		case 'h':
 			print_help(command);
 			return EXIT_SUCCESS;
