@@ -3242,6 +3242,7 @@ static int _keystore_execute_cmd(const char *cmd,
 
 struct crypt_info {
 	bool execute;
+	bool batch_mode;
 	const char *keyfile;
 	size_t keyfile_offset;
 	size_t keyfile_size;
@@ -3305,8 +3306,9 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
 		util_asprintf(&cmd,
-			      "cryptsetup plainOpen %s--key-file '%s' "
+			      "cryptsetup plainOpen %s%s--key-file '%s' "
 			      "--key-size %lu --cipher %s %s%s %s",
+			      info->batch_mode ? "-q " : "",
 			      keystore->verbose ? "-v " : "", key_file_name,
 			      key_file_size * 8, cipher_spec,
 			      sector_size > 0 ? temp : "", volume, dmname);
@@ -3325,9 +3327,10 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 		 * automatically via /etc/crypttab
 		 */
 		util_asprintf(&cmd,
-			      "cryptsetup luksFormat %s--type luks2 "
+			      "cryptsetup luksFormat %s%s--type luks2 "
 			      "--master-key-file '%s' --key-size %lu "
 			      "--cipher %s --pbkdf pbkdf2 %s%s%s",
+			      info->batch_mode ? "-q " : "",
 			      keystore->verbose ? "-v " : "", key_file_name,
 			      key_file_size * 8, cipher_spec,
 			      common_len > 0 ? common_passphrase_options : "",
@@ -3600,7 +3603,7 @@ out:
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
-			bool execute, const char *volume_type, const char *keyfile,
+			bool execute, bool batch_mode, const char *volume_type, const char *keyfile,
 	                size_t keyfile_offset, size_t keyfile_size, size_t tries)
 {
 	struct crypt_info info = { 0 };
@@ -3618,6 +3621,7 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 	}
 
 	info.execute = execute;
+	info.batch_mode = batch_mode;
 	info.keyfile = keyfile;
 	info.keyfile_offset = keyfile_offset;
 	info.keyfile_size = keyfile_size;
