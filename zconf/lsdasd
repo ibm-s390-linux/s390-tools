@@ -164,6 +164,7 @@ function gatherDeviceData() {
 		read DEV_UID 2> /dev/null < $DEVPATH/uid || continue
 		read READONLY 2> /dev/null < $DEVPATH/readonly || continue
 		read DISCIPLINE 2> /dev/null < $DEVPATH/discipline || continue
+		read ESE 2> /dev/null < $DEVPATH/ese
 
 		# Block device specific information is only available for
 		# devices that are online and not a PAV alias
@@ -244,7 +245,7 @@ function newoutput()
 	#-------------------------------------------#
 
 	if [[ "$ONLINE" == 0 ]]; then
-		printf "%s:%s:%-8s   offline\n" \
+		printf "%s:%s:%-8s  offline\n" \
 			"$SORTKEYLEN" "$SORTKEY" \
 			"$BUSID" ;
 		return
@@ -252,7 +253,7 @@ function newoutput()
 
 	if [[ "$ALIAS" == 1 ]]; then
 		if [[ "$BASEONLY" == "false" ]]; then
-			printf "%s:%s:%-8s   alias %28s\n" \
+			printf "%s:%s:%-8s  alias %26s\n" \
 				"$SORTKEYLEN" "$SORTKEY" \
 				"$BUSID" \
 				"$DISCIPLINE"
@@ -286,7 +287,11 @@ function newoutput()
 		ACTIVE="active"
 	fi
 
-	printf "%s:%s:%-8s   %-6s%-4s  %-8s  %-2s:%-2s   %-4s  %-4s   %-8s  %s\n" \
+	if [[ "$ESE" == 1 ]]; then
+		DISCIPLINE="${DISCIPLINE} (ESE)"
+	fi
+
+	printf "%s:%s:%-8s  %-6s%-2s  %-8s  %-2s:%-2s   %-11s  %-4s   %-8s  %s\n" \
 		"$SORTKEYLEN" "$SORTKEY" \
 		"$BUSID" \
 		"$ACTIVE" \
@@ -378,6 +383,10 @@ function extended()
 	read OPM NPPM CABLEPM CUIRPM HPFPM IFCCPM 2> /dev/null < $DEVPATH/path_masks
 	read -a C 2> /dev/null < $DEVPATH/../chpids
 	read PIM PAM POM 2> /dev/null < $DEVPATH/../pimpampom
+	read ESE 2> /dev/null < $DEVPATH/ese
+	read EXTSZ 2> /dev/null < $DEVPATH/extent_pool/extent_size
+	read CAPACITY 2> /dev/null < $DEVPATH/capacity/logical_capacity
+	read ALLOCATED 2> /dev/null < $DEVPATH/capacity/space_allocated
 
 	# convert to hexadecimal values
 	PIM=0x$PIM
@@ -550,7 +559,11 @@ function extended()
 		COLON=":"
 	fi
 
-	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+	if [[ "$ESE" == 1 ]]; then
+		DISCIPLINE="${DISCIPLINE} (ESE)"
+	fi
+
+	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  extent_size:\t\t\t\t%s#  logical_capacity:\t\t\t%s#  space_allocated:\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
 		"$SORTKEYLEN" "$SORTKEY" \
 		"$BUSID" \
 		"$BLOCKNAME" \
@@ -562,6 +575,9 @@ function extended()
 		"$SSIZE" \
 		"$MBSIZE" \
 		"$BLOCKCOUNT" \
+		"$EXTSZ" \
+		"$CAPACITY" \
+		"$ALLOCATED" \
 		"$DIAG" \
 		"$READONLY" \
 		"$EER" \
@@ -787,10 +803,10 @@ fi
 
 if  [[ "$PRINTUID" == "true" ]] && [[ "$OUTPUT" != "old" ]]; then
 	printf "Bus-ID    Name      UID\n"
-	printf "==============================================================================\n"
+	printf "================================================================================\n"
 elif [[ "$OUTPUT" == "new" ]]; then
-	printf "Bus-ID     Status      Name      Device  Type  BlkSz  Size      Blocks\n"
-	printf "==============================================================================\n"
+	printf "Bus-ID    Status    Name      Device  Type         BlkSz  Size      Blocks\n"
+	printf "================================================================================\n"
 elif [[ "$OUTPUT" == "extended" ]]; then
 	PROCESSING=" $PROCESSING | sed 's/#/\n/g' "
 fi
