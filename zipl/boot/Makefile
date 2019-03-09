@@ -71,6 +71,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
 		--only-section=.ex_table \
 		--only-section=.data \
 		--only-section=.rodata.str1.2 \
+		--only-section=.rodata.cst8 \
 		--only-section=.rodata \
 		--only-section=.stage2dump.tail \
 		--only-section=.eckd2dump_mv.tail \
