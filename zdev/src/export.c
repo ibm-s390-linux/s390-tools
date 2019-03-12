@@ -78,6 +78,10 @@ static bool is_exportable(struct setting *s, config_t config)
 			/* Skip values that cannot be determined. */
 			return false;
 		}
+		if (!attrib_check_value(a, s->value)) {
+			/* Skip values that are not acceptable input values. */
+			return false;
+		}
 		if (!attrib_match_default(s->attrib, s->value)) {
 			/* All non-default values should be exported. */
 			return true;
