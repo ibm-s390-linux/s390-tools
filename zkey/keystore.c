@@ -3247,6 +3247,8 @@ struct crypt_info {
 	size_t keyfile_offset;
 	size_t keyfile_size;
 	size_t tries;
+	bool open;
+	bool format;
 	char **volume_filter;
 	int (*process_func)(struct keystore *keystore,
 			    const char *volume,
@@ -3318,6 +3320,9 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 	free(tries_opt);
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
+		if (info->format)
+			return 0;
+
 		util_asprintf(&cmd,
 			      "cryptsetup plainOpen %s%s--key-file '%s' "
 			      "--key-size %lu --cipher %s %s%s %s",
@@ -3333,43 +3338,63 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			printf("%s\n", cmd);
 		}
 	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
-		/*
-		 * Use PBKDF2 as key derivation function for LUKS2 volumes.
-		 * LUKS2 uses Argon2i as default, but this might cause
-		 * out-of-memory errors when multiple LUKS2 volumes are opened
-		 * automatically via /etc/crypttab
-		 */
-		util_asprintf(&cmd,
-			      "cryptsetup luksFormat %s%s--type luks2 "
-			      "--master-key-file '%s' --key-size %lu "
-			      "--cipher %s --pbkdf pbkdf2 %s%s%s",
-			      info->batch_mode ? "-q " : "",
-			      keystore->verbose ? "-v " : "", key_file_name,
-			      key_file_size * 8, cipher_spec,
-			      common_len > 0 ? common_passphrase_options : "",
-			      sector_size > 0 ? temp : "", volume);
+		if (info->open) {
+			util_asprintf(&cmd,
+				      "cryptsetup luksOpen %s%s%s%s %s",
+				      info->batch_mode ? "-q " : "",
+				      keystore->verbose ? "-v " : "",
+				      common_len > 0 ?
+						common_passphrase_options : "",
+				      volume, dmname);
 
-		if (info->execute) {
-			printf("Executing: %s\n", cmd);
-			rc = _keystore_execute_cmd(cmd, "cryptsetup");
+			if (info->execute) {
+				printf("Executing: %s\n", cmd);
+				rc = _keystore_execute_cmd(cmd, "cryptsetup");
+			} else {
+				printf("%s\n", cmd);
+			}
 		} else {
-			printf("%s\n", cmd);
-		}
+			/*
+			 * Use PBKDF2 as key derivation function for LUKS2
+			 * volumes. LUKS2 uses Argon2i as default, but this
+			 * might cause out-of-memory errors when multiple LUKS2
+			 * volumes are opened automatically via /etc/crypttab
+			 */
+			util_asprintf(&cmd,
+				      "cryptsetup luksFormat %s%s--type luks2 "
+				      "--master-key-file '%s' --key-size %lu "
+				      "--cipher %s --pbkdf pbkdf2 %s%s%s",
+				      info->batch_mode ? "-q " : "",
+				      keystore->verbose ? "-v " : "",
+				      key_file_name, key_file_size * 8,
+				      cipher_spec, common_len > 0 ?
+						common_passphrase_options : "",
+				      sector_size > 0 ? temp : "", volume);
 
-		free(cmd);
-		if (rc != 0)
-			return rc;
+			if (info->execute) {
+				printf("Executing: %s\n", cmd);
+				rc = _keystore_execute_cmd(cmd, "cryptsetup");
+			} else {
+				printf("%s\n", cmd);
+			}
 
-		util_asprintf(&cmd,
-			      "zkey-cryptsetup setvp %s %s%s", volume,
-			      common_len > 0 ? common_passphrase_options : "",
-			      keystore->verbose ? "-V" : "");
+			free(cmd);
+			if (rc != 0)
+				return rc;
 
-		if (info->execute) {
-			printf("Executing: %s\n", cmd);
-			rc = _keystore_execute_cmd(cmd, "zkey-cryptsetup");
-		} else {
-			printf("%s\n", cmd);
+			util_asprintf(&cmd,
+				      "zkey-cryptsetup setvp %s %s%s", volume,
+				      common_len > 0 ?
+						common_passphrase_options : "",
+				      keystore->verbose ? "-V" : "");
+
+			if (info->execute) {
+				printf("Executing: %s\n", cmd);
+				rc = _keystore_execute_cmd(cmd,
+							   "zkey-cryptsetup");
+			} else {
+				printf("%s\n", cmd);
+			}
 		}
 	} else {
 		return -EINVAL;
@@ -3630,12 +3655,15 @@ out:
  * @param[in] keyfile_size   the size in bytes for reading from keyfile
  * @param[in] tries          the number of tries for passphrase entry
  * @param[in] batch_mode     If TRUE, suppress cryptsetup confirmation questions
+ * @param[in] open           If TRUE, generate luksOpen/plainOpen commands
+ * @param[in] format         If TRUE, generate luksFormat commands
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 			bool execute, const char *volume_type,
 			const char *keyfile, size_t keyfile_offset,
-			size_t keyfile_size, size_t tries, bool batch_mode)
+			size_t keyfile_size, size_t tries, bool batch_mode,
+			bool open, bool format)
 {
 	struct crypt_info info = { 0 };
 	int rc;
@@ -3652,6 +3680,8 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 	}
 
 	info.execute = execute;
+	info.open = open;
+	info.format = format;
 	info.batch_mode = batch_mode;
 	info.keyfile = keyfile;
 	info.keyfile_offset = keyfile_offset;

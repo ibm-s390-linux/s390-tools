@@ -572,6 +572,8 @@ has been compiled with LUKS2 support enabled.
 .RB [ \-\-volume-type | \-t
 .IR type ]
 .RB [ \-\-run | \-r ]
+.RB [ \-\-open ]
+.RB [ \-\-format ]
 .RB [ \-\-key\-file
 .IR file-name ]
 .RB [ \-\-keyfile\-offset
@@ -585,9 +587,9 @@ has been compiled with LUKS2 support enabled.
 .PP
 Use the
 .B cryptsetup
-command to generate \fBcryptsetup plainOpen\fP or \fBcryptsetup luksFormat\fP
-commands for volumes that are associated with secure keys contained in the
-secure key repository. Specify the
+command to generate \fBcryptsetup plainOpen\fP, \fBcryptsetup luksOpen\fP, or
+\fBcryptsetup luksFormat\fP commands for volumes that are associated with
+secure keys contained in the secure key repository. Specify the
 .B \-\-volumes
 option to limit the list
 of volumes where cryptsetup commands are generated for. You can use wildcards.
@@ -599,7 +601,14 @@ name are selected. Specify the
 option to generate cryptsetup commands for the specified volume type only.
 Specify the
 .B \-\-run
-option to run the generated cryptsetup commands.
+option to run the generated cryptsetup commands. Specify the
+.B \-\-open
+to generate \fBcryptsetup plainOpen\fP or \fBcryptsetup luksOpen\fP commands.
+For the plain volume type, this is the default. Specify the
+.B \-\-format
+option to generate \fBcryptsetup luksFormat\fP commands. For the LUKS2 volume
+type, this is the default. If specified for the plain volume type, then no
+command is generated.
 .P
 For LUKS2 volumes, the generated \fBcryptsetup luksFormat\fP contains
 option \fB\-\-pbkdf pbkdf2\fP to set \fBPBKDF2\fP as password based key
@@ -1050,6 +1059,24 @@ This option is only used for secure keys contained in the secure key repository.
 Runs the generated cryptsetup commands. When one of the cryptsetup command fail,
 no further cryptsetup commands are run, and zkey ends with an error.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-open
+Generates \fBcryptsetup luksOpen\fP or \fBcryptsetup plainOpen\fP commands.
+For a plain volume type, this is the default. This option can not be specified
+together with the
+.BR \-\-format
+option, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-\-format
+Generates \fBcryptsetup luksFormat\fP commands. For a LUKS2 volume type, this
+is the default. If specified for a plain volume type, then no command is
+generated. This option can not be specified together with the
+.BR \-\-open
+option, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 .TP
 .BR \-\-key\-file\~\fIfile\-name\fP
 Reads the passphrase from the specified file. If this option is omitted,

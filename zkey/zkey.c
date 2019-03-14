@@ -77,6 +77,8 @@ static struct zkey_globals {
 	long long keyfile_size;
 	long long tries;
 	bool force;
+	bool open;
+	bool format;
 	void *lib_csulcca;
 	t_CSNBKTC dll_CSNBKTC;
 	int pkey_fd;
@@ -111,6 +113,8 @@ static struct zkey_globals {
 #define OPT_CRYPTSETUP_KEYFILE_OFFSET	257
 #define OPT_CRYPTSETUP_KEYFILE_SIZE	258
 #define OPT_CRYPTSETUP_TRIES		259
+#define OPT_CRYPTSETUP_OPEN		260
+#define OPT_CRYPTSETUP_FORMAT		261
 
 /*
  * Configuration of command line options
@@ -691,6 +695,23 @@ static struct util_opt opt_vec[] = {
 			"command(s)",
 		.command = COMMAND_CRYPTSETUP,
 	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = {"open", 0, NULL, OPT_CRYPTSETUP_OPEN},
+		.desc = "Generates luksOpen or plainOpen commands. For the "
+			"plain volume type, this is the default",
+		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"format", 0, NULL, OPT_CRYPTSETUP_FORMAT},
+		.desc = "Generates luksFormat commands. For the LUKS2 volume "
+			"type, this is the default. If specified for the "
+			"plain volume type, then no command is generated",
+		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1490,9 +1511,16 @@ static int command_cryptsetup(void)
 {
 	int rc;
 
+	if (g.open && g.format) {
+		warnx("Either '--open' or '--format' can be specified, but "
+		      "not both");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+
 	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type,
 				 g.keyfile, g.keyfile_offset, g.keyfile_size,
-				 g.tries, g.batch_mode);
+				 g.tries, g.batch_mode, g.open, g.format);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1728,6 +1756,14 @@ int main(int argc, char *argv[])
 		case 'q':
 			g.batch_mode = 1;
 			break;
+#ifdef HAVE_LUKS2_SUPPORT
+		case OPT_CRYPTSETUP_OPEN:
+			g.open = 1;
+			break;
+		case OPT_CRYPTSETUP_FORMAT:
+			g.format = 1;
+			break;
+#endif
 		case 'h':
 			print_help(command);
 			return EXIT_SUCCESS;
