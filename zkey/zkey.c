@@ -557,6 +557,53 @@ static struct util_opt opt_vec[] = {
 			"entry is to be generated",
 		.command = COMMAND_CRYPTTAB,
 	},
+	{
+		.option = {"key-file", required_argument, NULL,
+			   OPT_CRYPTSETUP_KEYFILE},
+		.argument = "FILE-NAME",
+		.desc = "Read the passphrase from the specified file. "
+			"The specified file is passed to the generated "
+			"crypttab entry for LUKS2 volumes",
+		.command = COMMAND_CRYPTTAB,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"keyfile-offset", required_argument, NULL,
+			   OPT_CRYPTSETUP_KEYFILE_OFFSET},
+		.argument = "BYTES",
+		.desc = "Specifies the number of bytes to skip in the file "
+			"specified with option '--key-file'. "
+			"The specified offset is passed to the generated "
+			"crypttab entry for LUKS2 volumes. Not all "
+			"distributions support the 'keyfile-offset' option in "
+			"crypttab entries",
+		.command = COMMAND_CRYPTTAB,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"keyfile-size", required_argument, NULL,
+			   OPT_CRYPTSETUP_KEYFILE_SIZE},
+		.argument = "BYTES",
+		.desc = "Specifies the number of bytes to read from the file "
+			"specified with option '--key-file'. "
+			"The specified size is passed to the generated "
+			"crypttab entry for LUKS2 volumes. Not all "
+			"distributions support the 'keyfile-size' option in "
+			"crypttab entries",
+		.command = COMMAND_CRYPTTAB,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"tries", required_argument, NULL,
+			   OPT_CRYPTSETUP_TRIES},
+		.argument = "NUMBER",
+		.desc = "Specifies how often the interactive input of the "
+			"passphrase can be retried. "
+			"The specified number is passed to the generated "
+			"crypttab entry for LUKS2 volumes",
+		.command = COMMAND_CRYPTTAB,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
 #endif
 	/***********************************************************/
 	{
@@ -1428,7 +1475,8 @@ static int command_crypttab(void)
 {
 	int rc;
 
-	rc = keystore_crypttab(g.keystore, g.volumes, g.volume_type);
+	rc = keystore_crypttab(g.keystore, g.volumes, g.volume_type, g.keyfile,
+			       g.keyfile_offset, g.keyfile_size, g.tries);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

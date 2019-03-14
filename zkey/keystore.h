@@ -73,7 +73,8 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 			size_t keyfile_size, size_t tries, bool batch_mode);
 
 int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
-		      const char *volume_type);
+		      const char *volume_type, const char *keyfile,
+		      size_t keyfile_offset, size_t keyfile_size, size_t tries);
 
 void keystore_free(struct keystore *keystore);
 

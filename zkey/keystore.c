@@ -3405,7 +3405,7 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 				      size_t key_file_size,
 				      size_t sector_size,
 				      const char *volume_type,
-				      struct crypt_info *UNUSED(info))
+				      struct crypt_info *info)
 {
 	char temp[1000];
 
@@ -3428,7 +3428,18 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 		       dmname, volume, key_file_name, cipher_spec,
 		       key_file_size * 8, sector_size > 0 ? temp : "");
 	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
-		printf("%s\t%s\tnone\tluks\n", dmname, volume);
+		printf("%s\t%s\t%s\tluks", dmname, volume,
+		       info->keyfile != NULL ? info->keyfile : "none");
+		if (info->keyfile != NULL) {
+			if (info->keyfile_offset > 0)
+				printf(",keyfile-offset=%lu",
+				       info->keyfile_offset);
+			if (info->keyfile_size > 0)
+				printf(",keyfile-size=%lu", info->keyfile_size);
+		}
+		if (info->tries > 0)
+			printf(",tries=%lu", info->tries);
+		printf("\n");
 	} else {
 		return -EINVAL;
 	}
@@ -3677,11 +3688,17 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
  *                           for the volume filter. If not specified, the filter
  *                           checks the volume part only.
  * @param[in] volume_type    the type of volume to generate crypttab entries for
+ * @param[in] keyfile        If non-NULL, specifies the name of the file to
+ *                           read the passphrase from.
+ * @param[in] keyfile_offset the offset in bytes for reading from keyfile
+ * @param[in] keyfile_size   the size in bytes for reading from keyfile
+ * @param[in] tries          the number of tries for passphrase entry
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
-		      const char *volume_type)
+		      const char *volume_type, const char *keyfile,
+		      size_t keyfile_offset, size_t keyfile_size, size_t tries)
 {
 	struct crypt_info info = { 0 };
 	int rc;
@@ -3697,6 +3714,10 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 		return -EINVAL;
 	}
 
+	info.keyfile = keyfile;
+	info.keyfile_offset = keyfile_offset;
+	info.keyfile_size = keyfile_size;
+	info.tries = tries;
 	info.volume_filter = str_list_split(volume_filter);
 	info.process_func = _keystore_process_crypttab;
 

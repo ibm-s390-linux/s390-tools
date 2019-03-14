@@ -519,6 +519,14 @@ volumes afterwards.
 .IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
 .RB [ \-\-volume-type | \-t
 .IR type ]
+.RB [ \-\-key\-file
+.IR file-name ]
+.RB [ \-\-keyfile\-offset
+.IR bytes ]
+.RB [ \-\-keyfile\-size
+.IR bytes ]
+.RB [ \-\-tries
+.IR number ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -537,6 +545,23 @@ name are selected.
 Specify the
 .B \-\-volume-type
 option to generate crypttab entries for the specified volume type only.
+.P
+For LUKS2 volumes, a passphrase is required. You are prompted for the
+passphrase during system startup when crypttab is evaluated, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options are
+passed to the generated crypttab entries and are only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 .
 .SS "Generate cryptsetup commands for volumes associated with secure AES keys"
 .
@@ -956,6 +981,46 @@ This option is only available if
 .B zkey
 has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-key\-file\~\fIfile\-name\fP
+Reads the passphrase from the specified file. If this option is omitted, then
+you are prompted to enter the passphrase interactively during system startup.
+This option is passed to the generated crypttab entries for LUKS2 volumes, and
+is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-\-keyfile\-offset\~\fIbytes\fP
+Specifies the number of bytes to skip before starting to read in the file
+specified with option \fB\-\-key\-file\fP. If omitted, the file is read
+from the beginning. When option \fB\-\-key\-file\fP is not specified, this
+option is ignored. This option is passed to the generated crypttab entries
+for LUKS2 volumes, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled. Not all distributions support the
+.B keyfile-offset
+option in crypttab entries.
+.TP
+.BR \-\-keyfile\-size\~\fIbytes\fP
+Specifies the number of bytes to be read from the beginning of the file
+specified with option \fB\-\-key\-file\fP. If omitted, the file is read
+until the end. When \fB\-\-keyfile\-offset\fP is also specified, reading starts
+at the offset. When option \fB\-\-key\-file\fP is not specified, this option is
+ignored. This option is passed to the generated crypttab entries for LUKS2
+volumes, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled. Not all distributions support the
+.B keyfile-size
+option in crypttab entries.
+.TP
+.BR \-\-tries\~\fInumber\fP
+Specifies how often the interactive input of the passphrase can be re-entered
+during system startup. The default is 3 times. When option \fB\-\-key\-file\fP
+is specified, this option is ignored, and the passphrase is read only once from
+the file. This option is passed to the generated crypttab entries for LUKS2
+volumes, and is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 .
 .
 .
