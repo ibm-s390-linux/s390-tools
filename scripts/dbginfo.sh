@@ -470,6 +470,8 @@ CMDS="uname -a\
   :docker version\
   :docker stats --no-stream\
   :systemctl status docker.service\
+  :blockdev --report\
+  :lvdisplay\
   "
 
 ########################################
