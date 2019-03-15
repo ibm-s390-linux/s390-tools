@@ -547,15 +547,15 @@ option to generate crypttab entries for the specified volume type only.
 .RB [ \-\-volume-type | \-t
 .IR type ]
 .RB [ \-\-run | \-r ]
-.RB [ \-\-key\-file | \-d
+.RB [ \-\-key\-file
 .IR file-name ]
-.RB [ \-\-keyfile\-offset | \-o
+.RB [ \-\-keyfile\-offset
 .IR bytes ]
-.RB [ \-\-keyfile\-size | \-L
+.RB [ \-\-keyfile\-size
 .IR bytes ]
-.RB [ \-\-tries | \-T
+.RB [ \-\-tries
 .IR number ]
-.RB [ \-\-batch\-mode | \-q ]
+.RB [ \-\-batch\-mode]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -983,30 +983,30 @@ Runs the generated cryptsetup commands. When one of the cryptsetup command fail,
 no further cryptsetup commands are run, and zkey ends with an error.
 This option is only used for secure keys contained in the secure key repository.
 .TP
-.BR \-d ", " \-\-key\-file\~\fIfile\-name\fP
+.BR \-\-key\-file\~\fIfile\-name\fP
 Reads the passphrase from the specified file. If this option is omitted,
 or if the file\-name is \fI-\fP (a dash), then you are prompted to enter the
 passphrase interactively.
 .TP
-.BR \-o ", " \-\-keyfile\-offset\~\fIbytes\fP
+.BR \-\-keyfile\-offset\~\fIbytes\fP
 Specifies the number of bytes to skip before starting to read in the file
 specified with option \fB\-\-key\-file\fP. If omitted, the file is read
 from the beginning. When option \fB\-\-key\-file\fP is not specified, this
 option is ignored.
 .TP
-.BR \-L ", " \-\-keyfile\-size\~\fIbytes\fP
+.BR \-\-keyfile\-size\~\fIbytes\fP
 Specifies the number of bytes to be read from the beginning of the file
 specified with option \fB\-\-key\-file\fP. If omitted, the file is read
 until the end. When \fB\-\-keyfile\-offset\fP is also specified, reading starts
 at the offset. When option \fB\-\-key\-file\fP is not specified, this option is
 ignored.
 .TP
-.BR \-T ", " \-\-tries\~\fInumber\fP
+.BR \-\-tries\~\fInumber\fP
 Specifies how often the interactive input of the passphrase can be re-entered.
 The default is 3 times. When option \fB\-\-key\-file\fP is specified, this
 option is ignored, and the passphrase is read only once from the file.
 .TP
-.BR \-q ", " \-\-batch\-mode
+.BR \-\-batch\-mode
 Suppress cryptsetup confirmation questions.
 .
 .

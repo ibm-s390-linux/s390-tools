@@ -102,6 +102,12 @@ static struct zkey_globals {
 #define COMMAND_CRYPTTAB	"crypttab"
 #define COMMAND_CRYPTSETUP	"cryptsetup"
 
+#define OPT_BATCHMODE		300
+#define OPT_KEYFILE		301
+#define OPT_KEYFILE_OFFSET	302
+#define OPT_KEYFILE_SIZE	303
+#define OPT_TRIES		304
+
 #define ZKEY_COMMAND_MAX_LEN	10
 
 #define ENVVAR_ZKEY_REPOSITORY	"ZKEY_REPOSITORY"
@@ -588,36 +594,41 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_CRYPTSETUP,
 	},
 	{
-		.option = {"batch-mode", 0, NULL, 'q'},
+		.option = {"batch-mode", 0, NULL, OPT_BATCHMODE},
 		.desc = "Suppresses cryptsetup confirmation questions",
 		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
-		.option = {"key-file", required_argument, NULL, 'd'},
+		.option = {"key-file", required_argument, NULL, OPT_KEYFILE},
 		.argument = "FILE-NAME",
 		.desc = "Read the passphrase from the specified file",
 		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
-		.option = {"keyfile-offset", required_argument, NULL, 'o'},
+		.option = {"keyfile-offset", required_argument, NULL, OPT_KEYFILE_OFFSET},
 		.argument = "BYTES",
 		.desc = "Specifies the number of bytes to skip in the file "
-			"specified with option '--key-file'|'-d'",
+			"specified with option '--key-file'",
 		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
-		.option = {"keyfile-size", required_argument, NULL, 'L'},
+		.option = {"keyfile-size", required_argument, NULL, OPT_KEYFILE_SIZE},
 		.argument = "BYTES",
 		.desc = "Specifies the number of bytes to read from the file "
-			"specified with option '--key-file'|'-d'",
+			"specified with option '--key-file'",
 		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
-		.option = {"tries", required_argument, NULL, 'T'},
+		.option = {"tries", required_argument, NULL, OPT_TRIES},
 		.argument = "NUMBER",
 		.desc = "Specifies how often the interactive input of the "
 			"passphrase can be retried",
 		.command = COMMAND_CRYPTSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	/***********************************************************/
 	{
@@ -1560,19 +1571,7 @@ int main(int argc, char *argv[])
 			g.tonew = 1;
 			break;
 		case 'o':
-			if (command && !strcmp(command->command, COMMAND_CRYPTSETUP)) {
-				g.keyfile_offset = strtoll(optarg, &endp, 0);
-				if (*optarg == '\0' || *endp != '\0' ||
-				    g.keyfile_offset < 0 ||
-				    (g.keyfile_offset == LLONG_MAX &&
-				     errno == ERANGE)) {
-					warnx("Invalid value for '--keyfile-offset'|"
-					      "'-o': '%s'", optarg);
-					util_prg_print_parse_error();
-					return EXIT_FAILURE;
-				}
-			} else
-				g.fromold = 1;
+			g.fromold = 1;
 			break;
 		case 'p':
 			g.complete = 1;
@@ -1588,7 +1587,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			g.description = optarg;
-			g.keyfile = optarg;
 			break;
 		case 'l':
 			g.volumes = optarg;
@@ -1618,26 +1616,41 @@ int main(int argc, char *argv[])
 		case 'r':
 			g.run = 1;
 			break;
-		case 'q':
+		case OPT_BATCHMODE:
 			g.batch_mode = 1;
 			break;
-		case 'L':
-			g.keyfile_size = strtoll(optarg, &endp, 0);
+		case OPT_KEYFILE:
+			g.keyfile = optarg;
+			break;
+		case OPT_KEYFILE_OFFSET:
+			g.keyfile_offset = strtoll(optarg, &endp, 0);
 			if (*optarg == '\0' || *endp != '\0' ||
-			    g.keyfile_size <= 0 ||
-			    (g.keyfile_size == LLONG_MAX && errno == ERANGE)) {
-				warnx("Invalid value for '--keyfile-size'|"
-				      "'-L': '%s'", optarg);
+			    g.keyfile_offset < 0 ||
+			    (g.keyfile_offset == LLONG_MAX &&
+			     errno == ERANGE)) {
+				warnx("Invalid value for '--keyfile-offset'"
+				      ": '%s'", optarg);
 				util_prg_print_parse_error();
 				return EXIT_FAILURE;
 			}
 			break;
-		case 'T':
+		case OPT_KEYFILE_SIZE:
+			g.keyfile_size = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.keyfile_size <= 0 ||
+			    (g.keyfile_size == LLONG_MAX && errno == ERANGE)) {
+				warnx("Invalid value for '--keyfile-size'"
+				      ": '%s'", optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
+			break;
+		case OPT_TRIES:
 			g.tries = strtoll(optarg, &endp, 0);
 			if (*optarg == '\0' || *endp != '\0' ||
 			    g.tries <= 0 ||
 			    (g.tries == LLONG_MAX && errno == ERANGE)) {
-				warnx("Invalid value for '--tries'|'-T': '%s'",
+				warnx("Invalid value for '--tries': '%s'",
 				      optarg);
 				util_prg_print_parse_error();
 				return EXIT_FAILURE;
