@@ -98,6 +98,7 @@ static struct zkey_cryptsetup_globals {
 	bool inplace;
 	bool staged;
 	char *master_key_file;
+	bool batch_mode;
 	bool debug;
 	bool verbose;
 	void *lib_csulcca;
@@ -181,6 +182,11 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_REENCIPHER,
 	},
 	OPT_PASSPHRASE_ENTRY(COMMAND_REENCIPHER),
+	{
+		.option = {"batch-mode", 0, NULL, 'q'},
+		.desc = "Suppresses all confirmation questions. Use with care!",
+		.command = COMMAND_REENCIPHER,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -209,6 +215,11 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_SETKEY,
 	},
 	OPT_PASSPHRASE_ENTRY(COMMAND_SETKEY),
+	{
+		.option = {"batch-mode", 0, NULL, 'q'},
+		.desc = "Suppresses all confirmation questions. Use with care!",
+		.command = COMMAND_SETKEY,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1172,6 +1183,12 @@ out:
 static bool prompt_for_yes(void)
 {
 	char str[20];
+
+	if (g.batch_mode) {
+		printf("(yes implied because '--batch-mode' | '-q' option is "
+		       "specified)\n");
+		return true;
+	}
 
 	if (fgets(str, sizeof(str), stdin) == NULL)
 		return false;
@@ -2235,6 +2252,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'm':
 			g.master_key_file = optarg;
+			break;
+		case 'q':
+			g.batch_mode = true;
 			break;
 		case 'D':
 			g.debug = true;

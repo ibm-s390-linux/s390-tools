@@ -102,6 +102,7 @@ behave in the same way as with \fBcryptsetup\fP.
 .IR bytes ]
 .RB [ \-\-tries | \-T
 .IR number ]
+.RB [ \-\-batch\-mode | \-q ]
 .RB [ \-\-verbose | \-V ]
 .RB [ \-\-debug | \-D ]
 .PP
@@ -261,6 +262,7 @@ behave in the same way as with \fBcryptsetup\fP.
 .IR bytes ]
 .RB [ \-\-tries | \-T
 .IR number ]
+.RB [ \-\-batch\-mode | \-q ]
 .RB [ \-\-verbose | \-V ]
 .RB [ \-\-debug | \-D ]
 .PP
@@ -347,6 +349,9 @@ has been set (made active). When completing the staged re-enciphering, the
 (unbound) key slot containing the re-enciphered secure volume key becomes
 the active key slot and, optionally, all key slots containing the old secure
 volume key are removed.
+.TP
+.BR \-q ", " \-\-batch\-mode
+Suppresses all confirmation questions. Use with care!
 .
 .
 .
@@ -355,6 +360,9 @@ volume key are removed.
 .BR \-m ", " \-\-master\-key\-file\~\fIfile\-name\fP
 Specifies the name of a file containing the secure AES key that is set as the
 new volume key.
+.TP
+.BR \-q ", " \-\-batch\-mode
+Suppresses all confirmation questions. Use with care!
 .
 .
 .
