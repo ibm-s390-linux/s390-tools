@@ -18,6 +18,18 @@
 /*
  * Definitions for the /dev/pkey kernel module interface
  */
+struct tokenheader {
+	u8  type;
+	u8  res0[3];
+	u8  version;
+	u8  res1[3];
+} __packed;
+
+#define TOKEN_TYPE_NON_CCA	0x00
+#define TOKEN_TYPE_CCA_INTERNAL	0x01
+
+#define TOKEN_VERSION_AESDATA	0x04
+
 struct secaeskeytoken {
 	u8  type;     /* 0x01 for internal key token */
 	u8  res0[3];
@@ -82,6 +94,8 @@ struct pkey_verifykey {
 
 #define PKEY_VERIFYKEY _IOWR(PKEY_IOCTL_MAGIC, 0x07, struct pkey_verifykey)
 
+#define KEY_TYPE_CCA_AESDATA        "CCA-AESDATA"
+
 #define PAES_BLOCK_SIZE             16
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
 #define VERIFICATION_PATTERN_LEN    (2 * ENC_ZERO_LEN + 1)
@@ -115,5 +129,8 @@ int generate_key_verification_pattern(const char *key, size_t key_size,
 int get_master_key_verification_pattern(const u8 *secure_key,
 					size_t secure_key_size, u64 *mkvp,
 					bool verbose);
+
+bool is_cca_aes_data_key(const u8 *key, size_t key_size);
+const char *get_key_type(const u8 *key, size_t key_size);
 
 #endif

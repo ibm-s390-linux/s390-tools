@@ -1416,6 +1416,8 @@ static int command_validate_file(void)
 	printf("Validation of secure key in file '%s':\n", g.pos_arg);
 	printf("  Status:                Valid\n");
 	printf("  Secure key size:       %lu bytes\n", secure_key_size);
+	printf("  Key type:              %s\n",
+	       get_key_type(secure_key, secure_key_size));
 	printf("  Clear key size:        %lu bits\n", clear_key_size);
 	printf("  XTS type key:          %s\n",
 	       secure_key_size > SECURE_KEY_SIZE ? "Yes" : "No");

@@ -77,6 +77,7 @@ struct key_filenames {
 #define REC_SEC_KEY_SIZE	"Secure key size"
 #define REC_CLR_KEY_SIZE	"Clear key size"
 #define REC_XTS			"XTS type key"
+#define REC_KEY_TYPE		"Key type"
 #define REC_VOLUMES		"Volumes"
 #define REC_APQNS		"APQNs"
 #define REC_KEY_FILE		"Key file name"
@@ -2140,6 +2141,7 @@ static struct util_rec *_keystore_setup_record(bool validation)
 	util_rec_def(rec, REC_CLR_KEY_SIZE, UTIL_REC_ALIGN_LEFT, 20,
 		     REC_CLR_KEY_SIZE);
 	util_rec_def(rec, REC_XTS, UTIL_REC_ALIGN_LEFT, 3, REC_XTS);
+	util_rec_def(rec, REC_KEY_TYPE, UTIL_REC_ALIGN_LEFT, 54, REC_KEY_TYPE);
 	if (validation)
 		util_rec_def(rec, REC_MASTERKEY, UTIL_REC_ALIGN_LEFT, 54,
 			     REC_MASTERKEY);
@@ -2178,6 +2180,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	char *description;
 	char *volume_type;
 	char *reencipher;
+	char *key_type;
 	char *creation;
 	char *volumes;
 	char *change;
@@ -2212,6 +2215,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	reencipher = properties_get(properties, PROP_NAME_REENC_TIME);
 	vp = properties_get(properties, PROP_NAME_KEY_VP);
 	volume_type = _keystore_get_volume_type(properties);
+	key_type = properties_get(properties, PROP_NAME_KEY_TYPE);
 
 	util_rec_set(rec, REC_KEY, name);
 	if (validation)
@@ -2226,6 +2230,7 @@ static void _keystore_print_record(struct util_rec *rec,
 		util_rec_set(rec, REC_CLR_KEY_SIZE, "(unknown)");
 	util_rec_set(rec, REC_XTS,
 		     IS_XTS(secure_key_size) ? "Yes" : "No");
+	util_rec_set(rec, REC_KEY_TYPE, key_type);
 	if (validation) {
 		if (valid)
 			util_rec_set(rec, REC_MASTERKEY,
@@ -2290,6 +2295,8 @@ static void _keystore_print_record(struct util_rec *rec,
 		free(vp);
 	if (volume_type != NULL)
 		free(volume_type);
+	if (key_type != NULL)
+		free(key_type);
 }
 
 struct validate_info {

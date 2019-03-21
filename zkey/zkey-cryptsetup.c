@@ -1999,6 +1999,8 @@ static int command_validate(void)
 	printf("  Secure key size:       %lu bytes\n", keysize);
 	printf("  XTS type key:          %s\n",
 	       keysize > SECURE_KEY_SIZE ? "Yes" : "No");
+	printf("  Key type:              %s\n",
+	       get_key_type((u8 *)key, keysize));
 	if (is_valid) {
 		printf("  Clear key size:        %lu bits\n", clear_keysize);
 		printf("  Enciphered with:       %s CCA master key (MKVP: "

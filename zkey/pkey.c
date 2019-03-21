@@ -790,3 +790,42 @@ int get_master_key_verification_pattern(const u8 *secure_key,
 
 	return 0;
 }
+
+/**
+ * Check if the specified key is a CCA AESDATA key token.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is an CCA AESDATA token type
+ */
+bool is_cca_aes_data_key(const u8 *key, size_t key_size)
+{
+	struct tokenheader *hdr = (struct tokenheader *)key;
+
+	if (key == NULL || key_size < SECURE_KEY_SIZE)
+		return false;
+
+	if (hdr->type != TOKEN_TYPE_CCA_INTERNAL)
+		return false;
+	if (hdr->version != TOKEN_VERSION_AESDATA)
+		return false;
+
+	return true;
+}
+
+/**
+ * Returns the type of the key
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns a static string on success, NULL in case of an error
+ */
+const char *get_key_type(const u8 *key, size_t key_size)
+{
+	if (is_cca_aes_data_key(key, key_size))
+		return KEY_TYPE_CCA_AESDATA;
+
+	return NULL;
+}
