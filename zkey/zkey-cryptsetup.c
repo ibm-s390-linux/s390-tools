@@ -34,6 +34,7 @@
 
 #include "misc.h"
 #include "pkey.h"
+#include "cca.h"
 
 /* Detect if cryptsetup 2.1 or later is available */
 #ifdef CRYPT_LOG_DEBUG_JSON
@@ -101,8 +102,7 @@ static struct zkey_cryptsetup_globals {
 	bool batch_mode;
 	bool debug;
 	bool verbose;
-	void *lib_csulcca;
-	t_CSNBKTC dll_CSNBKTC;
+	struct cca_lib cca;
 	int pkey_fd;
 	struct crypt_device *cd;
 } g = {
@@ -1578,7 +1578,7 @@ static int reencipher_prepare(int token)
 	util_print_indented(msg, 0);
 	free(msg);
 
-	rc = key_token_change(g.dll_CSNBKTC, (u8 *)key, keysize,
+	rc = key_token_change(&g.cca, (u8 *)key, keysize,
 			      is_old_mk ? METHOD_OLD_TO_CURRENT :
 					  METHOD_CURRENT_TO_NEW,
 			      g.verbose);
@@ -1700,7 +1700,7 @@ static int reencipher_complete(int token)
 			goto out;
 		}
 
-		rc = key_token_change(g.dll_CSNBKTC, (u8 *)key, keysize,
+		rc = key_token_change(&g.cca, (u8 *)key, keysize,
 				      METHOD_OLD_TO_CURRENT, g.verbose);
 		if (rc != 0) {
 			warnx("Failed to re-encipher the secure volume key for "
@@ -2288,8 +2288,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (command->need_cca_library) {
-		rc = load_cca_library(&g.lib_csulcca, &g.dll_CSNBKTC,
-				      g.verbose);
+		rc = load_cca_library(&g.cca, g.verbose);
 		if (rc != 0) {
 			rc = EXIT_FAILURE;
 			goto out;
@@ -2331,8 +2330,8 @@ int main(int argc, char *argv[])
 	rc = command->function();
 
 out:
-	if (g.lib_csulcca)
-		dlclose(g.lib_csulcca);
+	if (g.cca.lib_csulcca)
+		dlclose(g.cca.lib_csulcca);
 	if (g.pkey_fd >= 0)
 		close(g.pkey_fd);
 	if (g.cd)

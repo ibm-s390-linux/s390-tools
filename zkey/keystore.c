@@ -33,6 +33,7 @@
 
 #include "keystore.h"
 #include "pkey.h"
+#include "cca.h"
 #include "properties.h"
 
 struct key_filenames {
@@ -2522,7 +2523,7 @@ struct reencipher_params {
 struct reencipher_info {
 	struct reencipher_params params;
 	int pkey_fd;
-	t_CSNBKTC dll_CSNBKTC;
+	struct cca_lib *cca;
 	unsigned long num_reenciphered;
 	unsigned long num_failed;
 	unsigned long num_skipped;
@@ -2533,7 +2534,7 @@ struct reencipher_info {
  *
  * @param[in] keystore   the keystore
  * @param[in] name       the name of the key
- * @param[in] dll_CSNBKTC the CCA key token change function
+ * @param[in] cca        the CCA library struct
  * @param[in] params     reenciphering parameters
  * @param[in] secure_key a buffer containing the secure key
  * @param[in] secure_key_size the size of the secure key
@@ -2544,7 +2545,7 @@ struct reencipher_info {
  */
 static int _keystore_perform_reencipher(struct keystore *keystore,
 					const char *name,
-					t_CSNBKTC dll_CSNBKTC,
+					struct cca_lib *cca,
 					struct reencipher_params *params,
 					u8 *secure_key, size_t secure_key_size,
 					bool is_old_mk)
@@ -2584,8 +2585,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 			   "Secure key '%s' will be re-enciphered from OLD "
 			   "to the CURRENT CCA master key", name);
 
-		rc = key_token_change(dll_CSNBKTC,
-				      secure_key, secure_key_size,
+		rc = key_token_change(cca, secure_key, secure_key_size,
 				      METHOD_OLD_TO_CURRENT,
 				      keystore->verbose);
 		if (rc != 0) {
@@ -2602,8 +2602,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 		if (params->inplace == -1)
 			params->inplace = 0;
 
-		rc = key_token_change(dll_CSNBKTC,
-				      secure_key, secure_key_size,
+		rc = key_token_change(cca, secure_key, secure_key_size,
 				      METHOD_CURRENT_TO_NEW,
 				      keystore->verbose);
 		if (rc != 0) {
@@ -2696,10 +2695,9 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	if (!params.complete) {
 		printf("Re-enciphering key '%s'\n", name);
 
-		rc = _keystore_perform_reencipher(keystore, name,
-						  info->dll_CSNBKTC, &params,
-						  secure_key, secure_key_size,
-						  is_old_mk);
+		rc = _keystore_perform_reencipher(keystore, name, info->cca,
+						  &params, secure_key,
+						  secure_key_size, is_old_mk);
 		if (rc < 0)
 			goto out;
 		if (rc > 0) {
@@ -2802,6 +2800,8 @@ out:
  * @param[in] inplace      if true, the key will be re-enciphere in-place
  * @param[in] staged       if true, the key will be re-enciphere not in-place
  * @param[in] complete     if true, a pending re-encipherment is completed
+ * @param[in] pkey_fd      the file descriptor of /dev/pkey
+ * @param[in] cca          the CCA library struct
  * Note: if both from Old and toNew are FALSE, then the reencipherement mode is
  *       detected automatically. If both are TRUE then the key is reenciphered
  *       from the OLD to the NEW CCA master key.
@@ -2814,7 +2814,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 			    const char *apqn_filter,
 			    bool from_old, bool to_new, bool inplace,
 			    bool staged, bool complete, int pkey_fd,
-			    t_CSNBKTC dll_CSNBKTC)
+			    struct cca_lib *cca)
 {
 	struct reencipher_info info;
 	int rc;
@@ -2830,7 +2830,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 		info.params.inplace = 0;
 	info.params.complete = complete;
 	info.pkey_fd = pkey_fd;
-	info.dll_CSNBKTC = dll_CSNBKTC;
+	info.cca = cca;
 	info.num_failed = 0;
 	info.num_reenciphered = 0;
 	info.num_skipped = 0;

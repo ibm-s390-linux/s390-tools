@@ -14,6 +14,7 @@
 
 #include <stdbool.h>
 
+#include "cca.h"
 #include "pkey.h"
 
 struct keystore {
@@ -54,7 +55,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 			    const char *apqn_filter,
 			    bool from_old, bool to_new, bool inplace,
 			    bool staged, bool complete, int pkey_fd,
-			    t_CSNBKTC dll_CSNBKTC);
+			    struct cca_lib *cca);
 
 int keystore_copy_key(struct keystore *keystore, const char *name,
 		      const char *newname, const char *volumes);

@@ -82,22 +82,9 @@ struct pkey_verifykey {
 
 #define PKEY_VERIFYKEY _IOWR(PKEY_IOCTL_MAGIC, 0x07, struct pkey_verifykey)
 
-#define METHOD_OLD_TO_CURRENT	"RTCMK   "
-#define METHOD_CURRENT_TO_NEW	"RTNMK   "
-
-typedef void (*t_CSNBKTC)(long *return_code,
-			  long *reason_code,
-			  long *exit_data_length,
-			  unsigned char *exit_data,
-			  long *rule_array_count,
-			  unsigned char *rule_array,
-			  unsigned char *key_identifier);
-
 #define PAES_BLOCK_SIZE             16
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
 #define VERIFICATION_PATTERN_LEN    (2 * ENC_ZERO_LEN + 1)
-
-int load_cca_library(void **lib_csulcca, t_CSNBKTC *dll_CSNBKTC, bool verbose);
 
 int open_pkey_device(bool verbose);
 
@@ -121,10 +108,6 @@ int validate_secure_key(int pkey_fd,
 			u8 *secure_key, size_t secure_key_size,
 			size_t *clear_key_bitsize, int *is_old_mk,
 			bool verbose);
-
-int key_token_change(t_CSNBKTC dll_CSNBKTC,
-		     u8 *secure_key, unsigned int secure_key_size,
-		     char *method, bool verbose);
 
 int generate_key_verification_pattern(const char *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);

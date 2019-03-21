@@ -64,18 +64,19 @@ zkey-cryptsetup-skip-jsonc:
 
 all: $(BUILD_TARGETS)
 
-zkey.o: zkey.c pkey.h misc.h
+zkey.o: zkey.c pkey.h cca.h misc.h
 pkey.o: pkey.c pkey.h
+cca.o: cca.c cca.h pkey.h
 properties.o: check-dep-zkey properties.c properties.h
-keystore.o: keystore.c keystore.h properties.h
-zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h misc.h
+keystore.o: keystore.c keystore.h properties.h pkey.h cca.h
+zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h misc.h
 
 zkey: LDLIBS = -ldl -lcrypto
-zkey: zkey.o pkey.o properties.o keystore.o $(libs)
+zkey: zkey.o pkey.o cca.o properties.o keystore.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c
-zkey-cryptsetup: zkey-cryptsetup.o pkey.o $(libs)
+zkey-cryptsetup: zkey-cryptsetup.o pkey.o cca.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-common:

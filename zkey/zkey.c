@@ -27,6 +27,7 @@
 #include "lib/util_prg.h"
 #include "lib/zt_common.h"
 
+#include "cca.h"
 #include "keystore.h"
 #include "misc.h"
 #include "pkey.h"
@@ -80,8 +81,7 @@ static struct zkey_globals {
 	bool force;
 	bool open;
 	bool format;
-	void *lib_csulcca;
-	t_CSNBKTC dll_CSNBKTC;
+	struct cca_lib cca;
 	int pkey_fd;
 	struct keystore *keystore;
 } g = {
@@ -1194,8 +1194,7 @@ static int command_reencipher_file(void)
 		pr_verbose("Secure key will be re-enciphered from OLD to the "
 			   "CURRENT CCA master key");
 
-		rc = key_token_change(g.dll_CSNBKTC,
-				      secure_key, secure_key_size,
+		rc = key_token_change(&g.cca, secure_key, secure_key_size,
 				      METHOD_OLD_TO_CURRENT,
 				      g.verbose);
 		if (rc != 0) {
@@ -1209,8 +1208,7 @@ static int command_reencipher_file(void)
 		pr_verbose("Secure key will be re-enciphered from CURRENT "
 			   "to the NEW CCA master key");
 
-		rc = key_token_change(g.dll_CSNBKTC,
-				      secure_key, secure_key_size,
+		rc = key_token_change(&g.cca, secure_key, secure_key_size,
 				      METHOD_CURRENT_TO_NEW, g.verbose);
 		if (rc != 0) {
 			warnx("Re-encipher from CURRENT to NEW CCA "
@@ -1270,7 +1268,7 @@ static int command_reencipher_repository(void)
 
 	rc = keystore_reencipher_key(g.keystore, g.name, g.apqns, g.fromold,
 				     g.tonew, g.inplace, g.staged, g.complete,
-				     g.pkey_fd, g.dll_CSNBKTC);
+				     g.pkey_fd, &g.cca);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1867,8 +1865,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (command->need_cca_library) {
-		rc = load_cca_library(&g.lib_csulcca, &g.dll_CSNBKTC,
-				      g.verbose);
+		rc = load_cca_library(&g.cca, g.verbose);
 		if (rc != 0) {
 			rc = EXIT_FAILURE;
 			goto out;
@@ -1887,8 +1884,8 @@ int main(int argc, char *argv[])
 	rc = command->function();
 
 out:
-	if (g.lib_csulcca)
-		dlclose(g.lib_csulcca);
+	if (g.cca.lib_csulcca)
+		dlclose(g.cca.lib_csulcca);
 	if (g.pkey_fd >= 0)
 		close(g.pkey_fd);
 	if (g.keystore)
