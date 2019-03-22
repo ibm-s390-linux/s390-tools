@@ -79,6 +79,8 @@ key repository.
 .RB [ \-\-xts | \-x ]
 .RB [ \-\-clearkey | \-c
 .IR clear\-key\-file ]
+.RB [ \-\-key-type | \-K
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -102,6 +104,8 @@ key repository.
 .RB [ \-\-xts | \-x ]
 .RB [ \-\-clearkey | \-c
 .IR clear\-key\-file ]
+.RB [ \-\-key-type | \-K
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .PP
 Use the
@@ -129,6 +133,11 @@ additional information can be associated with a secure key using the
 , or the
 .B \-\-sector-size
 options.
+.PP
+You can generate different types of secure keys: \fBCCA-AESDATA\fP keys.
+Specify the type of the secure key using the
+.B \-\-key\-type
+option. The default key type is CCA-AESDATA.
 .
 .SS "Validating secure AES keys"
 .
@@ -730,6 +739,11 @@ This option is only available if
 has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
 the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-K ", " \-\-key-type\~\fItype\fP
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP.
+If this option is omitted, then a secure key of type
+CCA-AESDATA is generated.
 .
 .
 .

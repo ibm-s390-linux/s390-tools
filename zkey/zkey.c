@@ -217,6 +217,15 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_GENERATE,
 	},
 #endif
+	{
+		.option = { "key-type", required_argument, NULL, 'K'},
+		.argument = "type",
+		.desc = "The type of the key. Possible values are '"
+			KEY_TYPE_CCA_AESDATA"'. "
+			"When this option is omitted, the default is '"
+			KEY_TYPE_CCA_AESDATA"'",
+		.command = COMMAND_GENERATE,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1019,7 +1028,7 @@ static int command_generate_clear(void)
 
 	rc = generate_secure_key_clear(g.pkey_fd, g.pos_arg,
 				       g.keybits, g.xts,
-				       g.clearkeyfile,
+				       g.clearkeyfile, g.key_type,
 				       AUTOSELECT, AUTOSELECT,
 				       g.verbose);
 
@@ -1036,7 +1045,7 @@ static int command_generate_random(void)
 	int rc;
 
 	rc = generate_secure_key_random(g.pkey_fd, g.pos_arg,
-					g.keybits, g.xts,
+					g.keybits, g.xts, g.key_type,
 					AUTOSELECT, AUTOSELECT,
 					g.verbose);
 
@@ -1058,7 +1067,7 @@ static int command_generate_repository(void)
 	rc = keystore_generate_key(g.keystore, g.name, g.description, g.volumes,
 				   g.apqns, g.noapqncheck, g.sector_size,
 				   g.keybits, g.xts, g.clearkeyfile,
-				   g.volume_type, g.pkey_fd);
+				   g.volume_type, g.key_type, g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1085,6 +1094,8 @@ static int command_generate(void)
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
 	}
+	if (g.key_type == NULL)
+		g.key_type = KEY_TYPE_CCA_AESDATA;
 	if (g.name != NULL)
 		return command_generate_repository();
 	if (g.pos_arg != NULL) {

@@ -32,7 +32,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 			  const char *apqns, bool noapqncheck,
 			  size_t sector_size, size_t keybits, bool xts,
 			  const char *clear_key_file, const char *volume_type,
-			  int pkey_fd);
+			  const char *key_type, int pkey_fd);
 
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,

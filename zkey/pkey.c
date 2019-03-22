@@ -278,6 +278,7 @@ out:
  * @param[in] keyfile       the file name of the secure key to generate
  * @param[in] keybits       the cryptographic size of the key in bits
  * @param[in] xts           if true an XTS key is generated
+ * @param[in] key_type      the type of the key
  * @param[in] card          the card number to use (or AUTOSELECT)
  * @param[in] domain        the domain number to use (or AUTOSELECT)
  * @param[in] verbose       if true, verbose messages are printed
@@ -285,8 +286,8 @@ out:
  * @returns 0 on success, a negative errno in case of an error
  */
 int generate_secure_key_random(int pkey_fd, const char *keyfile,
-			       size_t keybits, bool xts, u16 card, u16 domain,
-			       bool verbose)
+			       size_t keybits, bool xts, const char *key_type,
+			       u16 card, u16 domain, bool verbose)
 {
 	struct pkey_genseck gensec;
 	size_t secure_key_size;
@@ -295,6 +296,12 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(key_type != NULL, "Internal error: key_type is NULL");
+
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) != 0) {
+		warnx("Invalid key-type: %s", key_type);
+		return -EINVAL;
+	}
 
 	if (keybits == 0)
 		keybits = DEFAULT_KEYBITS;
@@ -374,6 +381,7 @@ out:
  *                          determines the keybits.
  * @param[in] xts           if true an XTS key is generated
  * @param[in] clearkeyfile  the file name of the clear key to read
+ * @param[in] key_type      the type of the key
  * @param[in] card          the card number to use (or AUTOSELECT)
  * @param[in] domain        the domain number to use (or AUTOSELECT)
  * @param[in] verbose       if true, verbose messages are printed
@@ -382,7 +390,7 @@ out:
  */
 int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      size_t keybits, bool xts,
-			      const char *clearkeyfile,
+			      const char *clearkeyfile, const char *key_type,
 			      u16 card, u16 domain,
 			      bool verbose)
 {
@@ -397,6 +405,12 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
 	util_assert(clearkeyfile != NULL,
 		    "Internal error: clearkeyfile is NULL");
+	util_assert(key_type != NULL, "Internal error: key_type is NULL");
+
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) != 0) {
+		warnx("Invalid key-type: %s", key_type);
+		return -EINVAL;
+	}
 
 	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(SECURE_KEY_SIZE, xts);
 	secure_key = util_malloc(secure_key_size);

@@ -103,12 +103,12 @@ struct pkey_verifykey {
 int open_pkey_device(bool verbose);
 
 int generate_secure_key_random(int pkey_fd, const char *keyfile,
-			       size_t keybits, bool xts, u16 card, u16 domain,
-			       bool verbose);
+			       size_t keybits, bool xts, const char *key_type,
+			       u16 card, u16 domain, bool verbose);
 
 int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      size_t keybits, bool xts,
-			      const char *clearkeyfile,
+			      const char *clearkeyfile, const char *key_type,
 			      u16 card, u16 domain,
 			      bool verbose);
 
