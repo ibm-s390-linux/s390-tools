@@ -23,6 +23,9 @@ void properties_free(struct properties *properties);
 int properties_set(struct properties *properties,
 		   const char *name, const char *value);
 
+int properties_set2(struct properties *properties,
+		    const char *name, const char *value, bool uppercase);
+
 char *properties_get(struct properties *properties, const char *name);
 
 int properties_remove(struct properties *properties, const char *name);

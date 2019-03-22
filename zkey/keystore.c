@@ -1617,7 +1617,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 		rc = -EINVAL;
 		goto out;
 	}
-	rc = properties_set(key_props, PROP_NAME_VOLUME_TYPE, volume_type);
+	rc = properties_set2(key_props, PROP_NAME_VOLUME_TYPE, volume_type,
+			     true);
 	if (rc != 0) {
 		warnx("Invalid characters in volume-type");
 		goto out;
@@ -1989,8 +1990,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 		}
 
-		rc = properties_set(key_props, PROP_NAME_VOLUME_TYPE,
-				    volume_type);
+		rc = properties_set2(key_props, PROP_NAME_VOLUME_TYPE,
+				     volume_type, true);
 		if (rc != 0) {
 			warnx("Invalid characters in volume-type");
 			goto out;

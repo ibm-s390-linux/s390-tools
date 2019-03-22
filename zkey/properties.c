@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -183,14 +184,16 @@ static struct property *properties_find(struct properties *properties,
  * @param[in]  properties    the properties object
  * @param[in]  name          the name of the property
  * @param[in]  value         the value of the property
+ * @param[in]  uppercase     if true the value is set all uppercase
  *
  * @returns 0 on success,
  *          -EINVAL if the name or value contains invalid characters
  */
-int properties_set(struct properties *properties,
-		   const char *name, const char *value)
+int properties_set2(struct properties *properties,
+		    const char *name, const char *value, bool uppercase)
 {
 	struct property *property;
+	int i;
 
 	util_assert(properties != NULL, "Internal error: properties is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
@@ -211,7 +214,28 @@ int properties_set(struct properties *properties,
 		property->value = util_strdup(value);
 		util_list_add_tail(&properties->list, property);
 	}
+	if (uppercase) {
+		for (i = 0; property->value[i] != '\0'; i++)
+			property->value[i] = toupper(property->value[i]);
+	}
+
 	return 0;
+}
+
+/**
+ * Adds or updates a property
+ *
+ * @param[in]  properties    the properties object
+ * @param[in]  name          the name of the property
+ * @param[in]  value         the value of the property
+ *
+ * @returns 0 on success,
+ *          -EINVAL if the name or value contains invalid characters
+ */
+int properties_set(struct properties *properties,
+		   const char *name, const char *value)
+{
+	return properties_set2(properties, name, value, false);
 }
 
 /**
