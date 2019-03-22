@@ -315,6 +315,39 @@ static char *_keystore_get_volume_type(struct properties *properties)
 }
 
 /**
+ * Returns the key type contained in the properties. If no key type
+ * property is contained, then 'CCA-AESDATA' is assumed (for backward
+ * compatibility).
+ *
+ * @returns a string containing the key type. Must be freed by the caller.
+ */
+static char *_keystore_get_key_type(struct properties *properties)
+{
+	char *type;
+
+	type = properties_get(properties, PROP_NAME_KEY_TYPE);
+	if (type == NULL)
+		type = util_strdup(KEY_TYPE_CCA_AESDATA);
+
+	return type;
+}
+
+/**
+ *  Checks if the key type is supported.
+ *
+ * @param[in] key_type   the key type
+ *
+ * @returns 1 if the key type is valid, 0 otherwise
+ */
+static int _keystore_valid_key_type(const char *key_type)
+{
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		return 1;
+
+	return 0;
+}
+
+/**
  * Prints a message followed by a list of associated volumes, if volumes are
  * associated and the volume-type matches (if specified)
  *
@@ -817,6 +850,33 @@ static int _keystore_match_volume_type_property(struct properties *properties,
 	return rc;
 }
 
+/**
+ * Checks if the key type property matches the specified key type.
+ * If the properties do not contain a key type property, then the default
+ * key type is assumed.
+ *
+ * @param[in] properties   a properties object
+ * @param[in] key_type     the key type to match. Can be NULL. In this case
+ *                         it always matches.
+ *
+ * @returns 1 for a match, 0 for not matched
+ */
+static int _keystore_match_key_type_property(struct properties *properties,
+					     const char *key_type)
+{
+	char *type;
+	int rc = 0;
+
+	if (key_type == NULL)
+		return 1;
+
+	type = _keystore_get_key_type(properties);
+	if (strcasecmp(type, key_type) == 0)
+		rc = 1;
+
+	free(type);
+	return rc;
+}
 
 /**
  * Checks if a key name matches a name filter
@@ -882,6 +942,7 @@ typedef int (*process_key_t)(struct keystore *keystore,
  *                           mutliple APQN filters separated by commas.
  *                           NULL means no APQN filter.
  * @param[in] volume_type    If not NULL, specifies the volume type.
+ * @param[in] key_type       The key type. NULL means no key type filter.
  * @param[in] process_func   the callback function called for a matching key
  * @param[in/out] process_private private data passed to the process_func
  *
@@ -894,6 +955,7 @@ static int _keystore_process_filtered(struct keystore *keystore,
 				      const char *volume_filter,
 				      const char *apqn_filter,
 				      const char *volume_type,
+				      const char *key_type,
 				      process_key_t process_func,
 				      void *process_private)
 {
@@ -981,6 +1043,15 @@ static int _keystore_process_filtered(struct keystore *keystore,
 		if (rc == 0) {
 			pr_verbose(keystore,
 				   "Key '%s' filtered out due to volume type",
+				   name);
+			goto free_prop;
+		}
+
+		rc = _keystore_match_key_type_property(key_props,
+						       key_type);
+		if (rc == 0) {
+			pr_verbose(keystore,
+				   "Key '%s' filtered out due to key type",
 				   name);
 			goto free_prop;
 		}
@@ -1193,7 +1264,7 @@ static int _keystore_volume_check(const char *volume, bool remove, bool set,
 
 	info->set = set;
 	rc = _keystore_process_filtered(info->keystore, NULL, info->volume,
-					NULL, NULL,
+					NULL, NULL, NULL,
 					_keystore_volume_check_process, info);
 out:
 	free((void *)info->volume);
@@ -1454,7 +1525,8 @@ static int _keystore_set_default_properties(struct properties *key_props)
 {
 	int rc;
 
-	rc = properties_set(key_props, PROP_NAME_KEY_TYPE, "CCA-AESDATA");
+	rc = properties_set(key_props, PROP_NAME_KEY_TYPE,
+			    KEY_TYPE_CCA_AESDATA);
 	if (rc != 0)
 		return rc;
 
@@ -2498,7 +2570,7 @@ int keystore_validate_key(struct keystore *keystore, const char *name_filter,
 	info.num_warnings = 0;
 
 	rc = _keystore_process_filtered(keystore, name_filter, NULL,
-					apqn_filter, NULL,
+					apqn_filter, NULL, NULL,
 					_keystore_process_validate, &info);
 
 	util_rec_free(rec);
@@ -2877,7 +2949,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 	info.num_skipped = 0;
 
 	rc = _keystore_process_filtered(keystore, name_filter, NULL,
-					apqn_filter, NULL,
+					apqn_filter, NULL, NULL,
 					_keystore_process_reencipher, &info);
 
 	if (rc != 0) {
@@ -3258,12 +3330,13 @@ out:
  *                           mutliple APQN filters separated by commas.
  *                           NULL means no APQN filter.
  * @param[in] volume_type    The volume type. NULL means no volume type filter.
+ * @param[in] key_type       The key type. NULL means no key type filter.
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		       const char *volume_filter, const char *apqn_filter,
-		       const char *volume_type)
+		       const char *volume_type, const char *key_type)
 {
 	struct util_rec *rec;
 	int rc;
@@ -3276,10 +3349,16 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		return -EINVAL;
 	}
 
+	if (key_type != NULL &&
+	    !_keystore_valid_key_type(key_type)) {
+		warnx("Invalid key-type specified");
+		return -EINVAL;
+	}
+
 	rec = _keystore_setup_record(0);
 
 	rc = _keystore_process_filtered(keystore, name_filter, volume_filter,
-					apqn_filter, volume_type,
+					apqn_filter, volume_type, key_type,
 					_keystore_display_key, rec);
 	util_rec_free(rec);
 
@@ -3773,8 +3852,8 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 	info.process_func = _keystore_process_cryptsetup;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					volume_type, _keystore_process_crypt,
-					&info);
+					volume_type, NULL,
+					_keystore_process_crypt, &info);
 
 	str_list_free_string_array(info.volume_filter);
 
@@ -3834,8 +3913,8 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 	info.process_func = _keystore_process_crypttab;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					volume_type, _keystore_process_crypt,
-					&info);
+					volume_type, NULL,
+					_keystore_process_crypt, &info);
 
 	str_list_free_string_array(info.volume_filter);
 

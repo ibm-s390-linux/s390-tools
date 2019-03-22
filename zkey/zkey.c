@@ -73,6 +73,7 @@ static struct zkey_globals {
 	long int sector_size;
 	char *volume_type;
 	char *newname;
+	char *key_type;
 	bool run;
 	bool batch_mode;
 	char *keyfile;
@@ -432,6 +433,15 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_LIST,
 	},
 #endif
+	{
+		.option = { "key-type", required_argument, NULL, 'K'},
+		.argument = "type",
+		.desc = "The type of the key. Possible values are '"
+			KEY_TYPE_CCA_AESDATA"'. "
+			"Use this option to list all keys with the specified "
+			"key type.",
+		.command = COMMAND_LIST,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1532,7 +1542,7 @@ static int command_list(void)
 	int rc;
 
 	rc = keystore_list_keys(g.keystore, g.name, g.volumes, g.apqns,
-				g.volume_type);
+				g.volume_type, g.key_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1852,6 +1862,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			g.run = 1;
+			break;
+		case 'K':
+			g.key_type = optarg;
 			break;
 		case 'F':
 			g.force = 1;

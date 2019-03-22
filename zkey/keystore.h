@@ -68,7 +68,7 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		       const char *volume_filter, const char *apqn_filter,
-		       const char *volume_type);
+		       const char *volume_type, const char *key_type);
 
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 			bool execute, const char *volume_type,

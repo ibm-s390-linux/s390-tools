@@ -368,6 +368,8 @@ The exported secure key also remains in the secure key repository.
 .IR card1.domain1[,card2.domain2[,...]] ]
 .RB [ \-\-volume-type | \-t
 .IR type ]
+.RB [ \-\-key-type | \-K
+.IR type ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -382,7 +384,7 @@ listed that are associated with the specified volume and device-mapper name.
 .PP
 The
 .B list
-command displays the attributes of the secure keys, such as key sizes,
+command displays the attributes of the secure keys, such as key sizes, key type,
 whether it is a secure key that can be used for the XTS cipher mode, the textual
 description, associated cryptographic adapters (APQNs) and volumes, the
 sector size, the key verification pattern, and timestamps for key creation, last
@@ -906,6 +908,11 @@ type are listed.
 This option is only available if
 .B zkey
 has been compiled with LUKS2 support enabled.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-K ", " \-\-key-type\~\fItype\fP
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP.
+Only keys with the specified key type are listed.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
