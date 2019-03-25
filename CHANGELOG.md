@@ -5,9 +5,21 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 5.xx
 
   Changes of existing tools:
+  - lszfcp: New command line option to show module parameters
+  - lszfcp: Sdev attributes for scsi_disk, block, integrity, queue, iosched
+  - lszfcp: Add new output marker for non-good SCSI devices (luns)
+  - lszfcp: Add new output marker for non-good fc_rports
+  - lszfcp: Clean up whitespace (mixed indentation, trailing)
 
   Bug Fixes:
-
+  - lszfcp: Allow to show zfcp_units without associated SCSI device
+  - lszfcp: Attribute details for: css, zfcp_port, zfcp_unit
+  - lszfcp: Allow to also enumerate FCP device that have never been online
+  - lszfcp: Fix error message if no zfcp-attached SCSI device found
+  - lszfcp: Fix to show defunct FCP devices again
+  - lszfcp: Fix to show non-good target ports again
+  - lszfcp: Fix missing block & sg device output without CONFIG_SYSFS_DEPRECATED
+  - lszfcp: New command line option for extended output format
 
  * __v2.8.0 (2019-02-15)__
 
