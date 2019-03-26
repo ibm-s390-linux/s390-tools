@@ -69,6 +69,7 @@ zconf/scm/lsscm
 zconf/zcrypt/chzcrypt
 zconf/zcrypt/lszcrypt
 zconf/zcrypt/zcryptctl
+zconf/zcrypt/zcryptstats
 zdev/src/chzdev
 zdev/src/chzdev_usage.c
 zdev/src/lszdev
