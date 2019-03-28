@@ -61,7 +61,8 @@ struct component_entry {
 
 typedef enum {
 	COMPONENT_EXECUTE = 0x01,
-	COMPONENT_LOAD = 0x02
+	COMPONENT_LOAD = 0x02,
+	COMPONENT_SIGNATURE = 0x03
 } component_type;
 
 struct stage2_descr {

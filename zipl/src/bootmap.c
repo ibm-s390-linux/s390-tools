@@ -199,24 +199,21 @@ add_program_table(int fd, disk_blockptr_t* table, int entries,
 	return rc;
 }
 
-
 struct component_entry {
 	uint8_t data[23];
 	uint8_t type;
-	union {
-		uint64_t load_address;
-		uint64_t load_psw;
-	} address;
+	component_data compdat;
 } __attribute((packed));
 
 typedef enum {
 	component_execute = 0x01,
-	component_load = 0x02
+	component_load = 0x02,
+	component_signature = 0x03
 } component_type;
 
 static void
 create_component_entry(void* buffer, disk_blockptr_t* pointer,
-		       component_type type, uint64_t address,
+		       component_type type, component_data data,
 		       struct disk_info* info)
 {
 	struct component_entry* entry;
@@ -228,10 +225,15 @@ create_component_entry(void* buffer, disk_blockptr_t* pointer,
 		case component_load:
 			bootmap_store_blockptr(&entry->data, pointer,
 					       info);
-			entry->address.load_address = address;
+			entry->compdat.load_address = data.load_address;
 			break;
 		case component_execute:
-			entry->address.load_psw = address;
+			entry->compdat.load_psw = data.load_psw;
+			break;
+		case component_signature:
+			bootmap_store_blockptr(&entry->data, pointer,
+					       info);
+			entry->compdat.sig_head = data.sig_head;
 			break;
 	}
 }
@@ -267,7 +269,7 @@ struct component_loc {
 
 static int
 add_component_file(int fd, const char* filename, address_t load_address,
-		   off_t offset, void* component, int add_files,
+		   size_t trailer, void *component, int add_files,
 		   struct disk_info* info, struct job_target_data* target,
 		   struct component_loc *location)
 {
@@ -279,8 +281,6 @@ add_component_file(int fd, const char* filename, address_t load_address,
 	size_t size;
 	blocknum_t count;
 	int rc;
-	int from;
-	unsigned int to;
 
 	if (add_files) {
 		/* Read file to buffer */
@@ -289,17 +289,10 @@ add_component_file(int fd, const char* filename, address_t load_address,
 			error_text("Could not read file '%s'", filename);
 			return rc;
 		}
-		/* Ensure minimum size */
-		if (size <= (size_t) offset) {
-			error_reason("File '%s' is too small (has to be "
-				     "greater than %ld bytes)", filename,
-				     (long) offset);
-			free(buffer);
-			return -1;
-		}
+		size -= trailer;
 		/* Write buffer */
-		count = disk_write_block_buffer(fd, 0, buffer + offset,
-					size - offset, &list, info);
+		count = disk_write_block_buffer(fd, 0, buffer,
+						size, &list, info);
 		free(buffer);
 		if (count == 0) {
 			error_text("Could not write to bootmap file");
@@ -321,20 +314,7 @@ add_component_file(int fd, const char* filename, address_t load_address,
 		disk_free_info(file_info);
 		if (count == 0)
 			return -1;
-		if (count * info->phy_block_size <= (size_t) offset) {
-			error_reason("File '%s' is too small (has to be "
-				     "greater than %ld bytes)", filename,
-				     (long) offset);
-			free(list);
-			return -1;
-		}
-		if (offset > 0) {
-			/* Shorten list by offset */
-			from = offset / info->phy_block_size;
-			count -= from;
-			for (to=0; to < count; to++, from++)
-				list[to] = list[from];
-		}
+		count -= DIV_ROUND_UP(trailer, info->phy_block_size);
 	}
 	/* Fill in component location */
 	loc.addr = load_address;
@@ -346,7 +326,7 @@ add_component_file(int fd, const char* filename, address_t load_address,
 	free(list);
 	if (rc == 0) {
 		create_component_entry(component, &segment, component_load,
-				       load_address, info);
+				       (component_data) load_address, info);
 		/* Return location if requested */
 		if (location != NULL)
 			*location = loc;
@@ -354,11 +334,10 @@ add_component_file(int fd, const char* filename, address_t load_address,
 	return rc;
 }
 
-
 static int
-add_component_buffer(int fd, void* buffer, size_t size, address_t load_address,
+add_component_buffer(int fd, void* buffer, size_t size, component_data data,
 		     void* component, struct disk_info* info,
-		     struct component_loc *location)
+		     struct component_loc *location, int type)
 {
 	struct component_loc loc;
 	disk_blockptr_t segment;
@@ -372,17 +351,21 @@ add_component_buffer(int fd, void* buffer, size_t size, address_t load_address,
 		error_text("Could not write to bootmap file");
 		return -1;
 	}
-	/* Fill in component location */
-	loc.addr = load_address;
-	loc.size = count * info->phy_block_size;
+	if (type == component_load) {
+		/* Fill in component location */
+		loc.addr = data.load_address;
+		loc.size = count * info->phy_block_size;
+	} else {
+		loc.addr = 0;
+		loc.size = 0;
+	}
 	/* Try to compact list */
 	count = disk_compact_blocklist(list, count, info);
 	/* Write segment table */
 	rc = add_segment_table(fd, list, count, &segment, info);
 	free(list);
 	if (rc == 0) {
-		create_component_entry(component, &segment, component_load,
-				       load_address, info);
+		create_component_entry(component, &segment, type, data, info);
 		/* Return location if requested */
 		if (location != NULL)
 			*location = loc;
@@ -410,6 +393,63 @@ print_components(const char *name[], struct component_loc *loc, int num)
 }
 
 static int
+extract_signature(char *filename, void **ret_signature,
+		  struct signature_header *sig_head)
+{
+	struct file_signature *file_sig;
+	void *signature;
+	size_t signature_size = 0;
+	size_t size;
+	char *buffer;
+
+	if (misc_read_file(filename, &buffer, &size, 0))
+		return 0;
+
+	file_sig = (void *) buffer + size - sizeof(*file_sig);
+	if (memcmp(file_sig->magic, SIGNATURE_MAGIC, sizeof(file_sig->magic))
+	    != 0)
+		goto out;
+
+	signature = misc_malloc(file_sig->sig_len);
+	if (signature == NULL)
+		goto out;
+	signature_size = file_sig->sig_len;
+
+	memcpy(signature, buffer + size - signature_size - sizeof(*file_sig),
+	       signature_size);
+
+	*ret_signature = signature;
+	sig_head->length = signature_size;
+
+	switch (file_sig->id_type) {
+	case PKEY_ID_PKCS7:
+		sig_head->format = PKCS7_FORMAT;
+		break;
+	default:
+		error_text("Unsupported signature type %02x",
+			   file_sig->id_type);
+		signature_size = 0;
+		goto out;
+	}
+	/* return size of signature and corresponding header */
+	signature_size += sizeof(*file_sig);
+out:
+	free(buffer);
+	return signature_size;
+}
+
+static void
+check_remaining_filesize(size_t filesize, size_t signature_size,
+			 struct disk_info *info, char *filename)
+{
+	if ((filesize - signature_size) % info->phy_block_size) {
+		fprintf(stderr,
+			"Warning: Size of signed file %s is not a multiple of the disk block size\n",
+			filename);
+	}
+}
+
+static int
 add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		int verbose, int add_files, component_header_type type,
 		struct disk_info* info, struct job_target_data* target)
@@ -418,14 +458,18 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	void* table;
 	void *stage3_params;
 	size_t stage3_params_size;
-	const char *comp_name[5];
-	struct component_loc comp_loc[5];
+	const char *comp_name[10];
+	struct component_loc comp_loc[10];
 	int rc;
 	int offset, flags = 0;
 	size_t ramdisk_size, image_size;
+	void *signature;
+	size_t signature_size;
+	struct signature_header sig_head;
 	int comp_nr = 0;
 
 	memset(comp_loc, 0, sizeof(comp_loc));
+	memset(&sig_head, 0, sizeof(sig_head));
 	table = misc_malloc(info->phy_block_size);
 	if (table == NULL)
 		return -1;
@@ -472,10 +516,32 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	}
 	image_size = stats.st_size;
 
+	signature_size = extract_signature(ZIPL_STAGE3_PATH, &signature,
+					   &sig_head);
+	if (signature_size) {
+		if (verbose)
+			printf("  signature for.....: %s\n", ZIPL_STAGE3_PATH);
+
+		rc = add_component_buffer(fd, signature, sig_head.length,
+					  (component_data)sig_head,
+					  VOID_ADD(table, offset), info,
+					  &comp_loc[comp_nr],
+					  component_signature);
+		if (rc) {
+			error_text("Could not add stage3 signature");
+			free(table);
+			return rc;
+		}
+		comp_name[comp_nr] = "loader signature";
+		offset += sizeof(struct component_entry);
+		comp_nr++;
+		free(signature);
+	}
+
 	/* Add stage 3 loader to bootmap */
-	rc = add_component_file(fd, ZIPL_STAGE3_PATH, DEFAULT_STAGE3_ADDRESS, 0,
-				VOID_ADD(table, offset), 1, info, target,
-				&comp_loc[comp_nr]);
+	rc = add_component_file(fd, ZIPL_STAGE3_PATH, DEFAULT_STAGE3_ADDRESS,
+				signature_size, VOID_ADD(table, offset), 1,
+				info, target, &comp_loc[comp_nr]);
 	if (rc) {
 		error_text("Could not add internal loader file '%s'",
 			   ZIPL_STAGE3_PATH);
@@ -499,9 +565,10 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		return rc;
 	}
 	rc = add_component_buffer(fd, stage3_params, stage3_params_size,
+				  (component_data) (uint64_t)
 				  DEFAULT_STAGE3_PARAMS_ADDRESS,
 				  VOID_ADD(table, offset), info,
-				  &comp_loc[comp_nr]);
+				  &comp_loc[comp_nr], component_load);
 	free(stage3_params);
 	if (rc) {
 		error_text("Could not add parameters");
@@ -511,12 +578,36 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	offset += sizeof(struct component_entry);
 	comp_name[comp_nr] = "parameters";
 	comp_nr++;
+
 	/* Add kernel image */
 	if (verbose) {
 		printf("  kernel image......: %s\n", ipl->image);
 	}
+	signature_size = extract_signature(ipl->image, &signature, &sig_head);
+	if (signature_size) {
+		if (verbose)
+			printf("  signature for.....: %s\n", ipl->image);
+
+		rc = add_component_buffer(fd, signature, sig_head.length,
+					  (component_data)sig_head,
+					  VOID_ADD(table, offset), info,
+					  &comp_loc[comp_nr],
+					  component_signature);
+		if (rc) {
+			error_text("Could not add image signature");
+			free(table);
+			return rc;
+		}
+		comp_name[comp_nr] = "image signature";
+		offset += sizeof(struct component_entry);
+		comp_nr++;
+		free(signature);
+		check_remaining_filesize(image_size, signature_size, info,
+					 ipl->image);
+	}
+
 	rc = add_component_file(fd, ipl->image, ipl->image_addr,
-				0, VOID_ADD(table, offset),
+				signature_size, VOID_ADD(table, offset),
 				add_files, info, target, &comp_loc[comp_nr]);
 	if (rc) {
 		error_text("Could not add image file '%s'", ipl->image);
@@ -526,16 +617,18 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	offset += sizeof(struct component_entry);
 	comp_name[comp_nr] = "kernel image";
 	comp_nr++;
+
+	/* Add kernel parmline */
 	if (ipl->parmline != NULL) {
-		/* Add kernel parmline */
 		if (verbose) {
 			printf("  kernel parmline...: '%s'\n", ipl->parmline);
 		}
 		rc = add_component_buffer(fd, ipl->parmline,
 					  strlen(ipl->parmline) + 1,
-					  ipl->parm_addr,
+					  (component_data) ipl->parm_addr,
 					  VOID_ADD(table, offset),
-					  info, &comp_loc[comp_nr]);
+					  info, &comp_loc[comp_nr],
+					  component_load);
 		if (rc) {
 			error_text("Could not add parmline '%s'",
 				   ipl->parmline);
@@ -549,8 +642,33 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 
 	/* finally add ramdisk */
 	if (ipl->ramdisk != NULL) {
+		signature_size = extract_signature(ipl->ramdisk, &signature,
+						   &sig_head);
+		if (signature_size) {
+			if (verbose) {
+				printf("  signature for.....: %s\n",
+				       ipl->ramdisk);
+			}
+			rc = add_component_buffer(fd, signature,
+						  sig_head.length,
+						  (component_data)sig_head,
+						  VOID_ADD(table, offset), info,
+						  &comp_loc[comp_nr],
+						  component_signature);
+			if (rc) {
+				error_text("Could not add ramdisk signature");
+				free(table);
+				return rc;
+			}
+			comp_name[comp_nr] = "ramdisk signature";
+			offset += sizeof(struct component_entry);
+			comp_nr++;
+			free(signature);
+			check_remaining_filesize(ramdisk_size, signature_size,
+						 info, ipl->ramdisk);
+		}
 		rc = add_component_file(fd, ipl->ramdisk,
-					ipl->ramdisk_addr, 0,
+					ipl->ramdisk_addr, signature_size,
 					VOID_ADD(table, offset),
 					add_files, info, target,
 					&comp_loc[comp_nr]);
@@ -569,7 +687,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       component_execute,
-			       ZIPL_STAGE3_ENTRY_ADDRESS | PSW_LOAD,
+			       (component_data) (uint64_t)
+			       (ZIPL_STAGE3_ENTRY_ADDRESS | PSW_LOAD),
 			       info);
 	/* Write component table */
 	rc = disk_write_block_aligned(fd, table, info->phy_block_size,
@@ -620,7 +739,8 @@ if (rc) {
 		print_components(comp_name, comp_loc, 1);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
-			       component_execute, PSW_DISABLED_WAIT, info);
+			       component_execute, (component_data) (uint64_t)
+			       PSW_DISABLED_WAIT, info);
 	/* Write component table */
 	rc = disk_write_block_aligned(fd, table, info->phy_block_size,
 				      program, info);

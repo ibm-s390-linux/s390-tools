@@ -115,8 +115,13 @@ void start(void)
 	/* skip header */
 	entry = (struct component_entry *)
 		(load_address + sizeof(struct component_header));
-
-	while (entry->type == COMPONENT_LOAD) {
+	while (entry->type == COMPONENT_LOAD ||
+	       entry->type == COMPONENT_SIGNATURE) {
+		if (entry->type == COMPONENT_SIGNATURE) {
+			/* Skip unhandled signature components */
+			entry++;
+			continue;
+		}
 		load_address = (void *)(unsigned long)
 			entry->address.load_address[1];
 		load_blocklist(entry, subchannel_id, load_address);
