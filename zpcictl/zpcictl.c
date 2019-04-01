@@ -253,8 +253,12 @@ static int device_exists(char *dev)
 	char *path;
 	int rc = 0;
 
+	/* In case a device node is specified, this will be sufficiant */
+	if (util_path_exists(dev) && !util_path_is_dir(dev))
+		return 1;
+
 	path = util_path_sysfs("bus/pci/devices/%s", dev);
-	if (util_path_exists(path) || util_path_exists(dev))
+	if (util_path_exists(path))
 		rc = 1;
 	free(path);
 
