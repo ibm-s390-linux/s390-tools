@@ -22,7 +22,6 @@
 #include "error.h"
 #include "misc.h"
 
-
 /* Allocate SIZE bytes of memory. Upon success, return pointer to memory.
  * Return NULL otherwise. */
 void *

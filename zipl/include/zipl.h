@@ -45,11 +45,16 @@
 #define ZIPL_DEFAULT_CONF		"/etc/zipl.conf"
 #define ZIPL_DEFAULT_BLSDIR		"/boot/loader/entries"
 #define ZIPL_STAGE3_PATH		TOOLS_LIBDIR "/stage3.bin"
+#define ZIPL_SIPL_PATH			"/sys/firmware/ipl/has_secure"
 
 #define MENU_DEFAULT_PROMPT		0
 #define MENU_DEFAULT_TIMEOUT		0
 
 #define MAX_DUMP_VOLUMES		32
+
+#define SECURE_BOOT_DISABLED		0
+#define SECURE_BOOT_ENABLED		1
+#define SECURE_BOOT_AUTO		2
 
 /* Internal component load address type */
 typedef uint64_t address_t;

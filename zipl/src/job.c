@@ -52,11 +52,12 @@ static struct option options[] = {
 	{ "dry-run",		no_argument,		NULL, '0'},
 	{ "force",		no_argument,		NULL, 'f'},
 	{ "kdump",		required_argument,	NULL, 'k'},
+	{ "secure",		required_argument,	NULL, 'S'},
 	{ NULL,			0,			NULL, 0 }
 };
 
 /* Command line option abbreviations */
-static const char option_string[] = "-c:b:t:i:r:p:P:d:D:M:s:m:hHnVvaT:fk:";
+static const char option_string[] = "-c:b:t:i:r:p:P:d:D:M:s:S:m:hHnVvaT:fk:";
 
 struct command_line {
 	char* data[SCAN_KEYWORD_NUM];
@@ -214,6 +215,11 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 				rc = -1;
 			} else
 				cmdline.menu = optarg;
+			break;
+		case 'S':
+			is_keyword = 1;
+			rc = store_option(&cmdline, scan_keyword_secure,
+					  optarg);
 			break;
 		case 'h':
 			cmdline.help = 1;
@@ -1263,6 +1269,26 @@ type_from_target(char *target, disk_type_t *type)
 	}
 }
 
+static int
+set_secure_ipl(char *keyword, struct job_data *job)
+{
+	if (strcmp(keyword, "auto") == 0) {
+		job->is_secure = SECURE_BOOT_AUTO;
+	} else if (strcmp(keyword, "0") == 0) {
+		job->is_secure = SECURE_BOOT_DISABLED;
+	} else if (strcmp(keyword, "1") == 0) {
+		if (job->target.targettype != disk_type_scsi) {
+			error_reason("Secure boot forced for non-SCSI disk type");
+			return -1;
+		}
+		job->is_secure = SECURE_BOOT_ENABLED;
+	} else {
+		error_reason("Invalid secure boot setting '%s'",
+			     keyword);
+		return -1;
+	}
+	return 0;
+}
 
 static int
 get_job_from_section_data(char* data[], struct job_data* job, char* section)
@@ -1344,6 +1370,13 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 					     data[(int) scan_keyword_kdump]);
 				return -1;
 			}
+		}
+		/* Fill in secure boot */
+		if (data[(int) scan_keyword_secure] != NULL) {
+			rc = set_secure_ipl(data[(int) scan_keyword_secure],
+					    job);
+			if (rc)
+				return rc;
 		}
 		break;
 	case section_ipl_tape:
@@ -1501,6 +1534,13 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 				case scan_keyword_timeout:
 					job->data.menu.timeout =
 					  atol(scan[i].content.keyword.value);
+					break;
+				case scan_keyword_secure:
+					rc = set_secure_ipl(
+						scan[i].content.keyword.value,
+						job);
+					if (rc)
+						return rc;
 					break;
 				case scan_keyword_target:
 					job->target.bootmap_dir = misc_strdup(

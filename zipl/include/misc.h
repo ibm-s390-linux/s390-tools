@@ -51,6 +51,7 @@ int misc_check_readable_file(const char* filename);
 int misc_check_writable_device(const char* devno, int blockdev, int chardev);
 void misc_ebcdic_to_ascii(unsigned char *from, unsigned char *to);
 void misc_ascii_to_ebcdic(unsigned char *from, unsigned char *to);
+unsigned int misc_check_secure_boot(void);
 
 #define ROUNDUP(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))

@@ -19,6 +19,7 @@
 #include <sys/types.h>
 
 #include "lib/util_part.h"
+#include "lib/util_path.h"
 
 #include "boot.h"
 #include "bootmap.h"
@@ -115,6 +116,22 @@ check_menu_positions(struct job_menu_data* menu, char* name,
 		}
 	}
 	return 0;
+}
+
+static bool
+check_secure_boot_support(void)
+{
+	unsigned int val;
+	FILE *fp;
+
+	fp = fopen(ZIPL_SIPL_PATH, "r");
+	if (!fp)
+		return false;
+
+	fscanf(fp, "%d", &val);
+	fclose(fp);
+
+	return val ? true : false;
 }
 
 
@@ -452,7 +469,8 @@ check_remaining_filesize(size_t filesize, size_t signature_size,
 static int
 add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		int verbose, int add_files, component_header_type type,
-		struct disk_info* info, struct job_target_data* target)
+		struct disk_info* info, struct job_target_data* target,
+		int is_secure)
 {
 	struct stat stats;
 	void* table;
@@ -467,6 +485,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	size_t signature_size;
 	struct signature_header sig_head;
 	int comp_nr = 0;
+	bool secure_boot_supported;
 
 	memset(comp_loc, 0, sizeof(comp_loc));
 	memset(&sig_head, 0, sizeof(sig_head));
@@ -515,10 +534,12 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		return -1;
 	}
 	image_size = stats.st_size;
-
+	secure_boot_supported = check_secure_boot_support();
 	signature_size = extract_signature(ZIPL_STAGE3_PATH, &signature,
 					   &sig_head);
-	if (signature_size) {
+	if (signature_size &&
+	    (is_secure == SECURE_BOOT_ENABLED ||
+	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
 		if (verbose)
 			printf("  signature for.....: %s\n", ZIPL_STAGE3_PATH);
 
@@ -536,6 +557,17 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		offset += sizeof(struct component_entry);
 		comp_nr++;
 		free(signature);
+	} else if (is_secure == SECURE_BOOT_ENABLED) {
+		/*
+		 * If secure boot is forced and we have failed to extract a
+		 * signature for the stage 3 loader zipl will abort with an
+		 * error message
+		 */
+		error_text("Could not install Secure Boot IPL records");
+		error_reason("Missing signature in internal loader file %s",
+			     ZIPL_STAGE3_PATH);
+		free(table);
+		return -1;
 	}
 
 	/* Add stage 3 loader to bootmap */
@@ -584,7 +616,9 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		printf("  kernel image......: %s\n", ipl->image);
 	}
 	signature_size = extract_signature(ipl->image, &signature, &sig_head);
-	if (signature_size) {
+	if (signature_size &&
+	    (is_secure == SECURE_BOOT_ENABLED ||
+	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
 		if (verbose)
 			printf("  signature for.....: %s\n", ipl->image);
 
@@ -604,6 +638,17 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		free(signature);
 		check_remaining_filesize(image_size, signature_size, info,
 					 ipl->image);
+	} else if (is_secure == SECURE_BOOT_ENABLED) {
+		/*
+		 * If secure boot is forced and we have failed to extract a
+		 * signature for the kernel image zipl will abort with an
+		 * error message
+		 */
+		error_text("Could not install Secure Boot IPL records");
+		error_reason("Missing signature in image file %s",
+			     ipl->image);
+		free(table);
+		return -1;
 	}
 
 	rc = add_component_file(fd, ipl->image, ipl->image_addr,
@@ -644,7 +689,10 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	if (ipl->ramdisk != NULL) {
 		signature_size = extract_signature(ipl->ramdisk, &signature,
 						   &sig_head);
-		if (signature_size) {
+		if (signature_size &&
+		    (is_secure == SECURE_BOOT_ENABLED ||
+		     (is_secure == SECURE_BOOT_AUTO &&
+		      secure_boot_supported))) {
 			if (verbose) {
 				printf("  signature for.....: %s\n",
 				       ipl->ramdisk);
@@ -830,7 +878,7 @@ add_dump_program(int fd, struct job_dump_data* dump,
 		return rc;
 	ipl.parm_addr = dump->parm_addr;
 	return add_ipl_program(fd, &ipl, program, verbose, 1,
-			       type, info, target);
+			       type, info, target, SECURE_BOOT_DISABLED);
 }
 
 
@@ -867,7 +915,7 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 		rc = add_ipl_program(fd, &job->data.ipl, &table[0],
 				     verbose || job->command_line,
 				     job->add_files, component_header,
-				     info, &job->target);
+				     info, &job->target, job->is_secure);
 		break;
 	case job_segment:
 		if (job->command_line)
@@ -918,7 +966,8 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 					&table[job->data.menu.entry[i].pos],
 					verbose || job->command_line,
 					job->add_files,	component_header,
-					info, &job->target);
+						     info, &job->target,
+						     job->is_secure);
 				break;
 			case job_print_usage:
 			case job_print_version:

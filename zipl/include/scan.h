@@ -16,7 +16,7 @@
 
 
 #define SCAN_SECTION_NUM		9
-#define SCAN_KEYWORD_NUM		21
+#define SCAN_KEYWORD_NUM		22
 #define SCAN_KEYWORD_ONLY_NUM		1
 #define SCAN_AUTOMENU_NAME		"zipl-automatic-menu"
 
@@ -51,6 +51,7 @@ enum scan_keyword_id {
 	scan_keyword_targetoffset = 18,
 	scan_keyword_defaultauto = 19,
 	scan_keyword_kdump = 20,
+	scan_keyword_secure = 21,
 };
 
 enum scan_section_type {

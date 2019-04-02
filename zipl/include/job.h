@@ -121,6 +121,7 @@ struct job_data {
 	int add_files;
 	int dry_run;
 	int command_line;
+	int is_secure;
 };
 
 

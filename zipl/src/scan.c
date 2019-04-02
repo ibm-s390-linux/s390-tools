@@ -45,45 +45,45 @@ enum scan_key_state scan_key_table[SCAN_SECTION_NUM][SCAN_KEYWORD_NUM] = {
  *	 ult  to   tofs e    mete file isk  ent  et   pt   out  ultm      dump
  *			     rs                                 enu
  *
- *       targ targ targ targ targ defa kdum
- *       etba etty etge etbl etof ulta p
+ *       targ targ targ targ targ defa kdum secu
+ *       etba etty etge etbl etof ulta p    re
  *       se   pe   omet ocks fset uto
  *                 ry   ize
  */
 /* default auto */
 	{opt, inv, inv, inv, inv, inv, inv, inv, req, opt, opt, inv, inv, inv,
-	 opt, opt, opt, opt, opt, opt, inv},
+	 opt, opt, opt, opt, opt, opt, inv, opt},
 /* default menu */
 	{inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, opt},
 /* default section */
 	{req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, opt},
 /* ipl		*/
 	{inv, inv, inv, req, opt, opt, opt, inv, req, inv, inv, inv, inv, inv,
-	 opt, opt, opt, opt, opt, inv, opt},
+	 opt, opt, opt, opt, opt, inv, opt, opt},
 /* segment load */
 	{inv, inv, inv, inv, inv, inv, inv, req, req, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv},
 /* part dump	*/
 	{inv, req, inv, inv, inv, inv, inv, inv, opt, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv},
 /* fs dump	*/
 	{inv, inv, req, inv, opt, opt, inv, inv, req, inv, inv, inv, inv, inv,
-	 inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv},
 /* ipl tape	*/
 	{inv, inv, inv, req, opt, opt, opt, inv, inv, inv, inv, inv, req, inv,
-	 inv, inv, inv, inv, inv, inv, inv},
+	 inv, inv, inv, inv, inv, inv, inv, inv},
 /* multi volume dump	*/
 	{inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req,
-	 inv, inv, inv, inv, inv, inv, inv}
+	 inv, inv, inv, inv, inv, inv, inv, inv}
 };
 
 /* Determines which keyword may be present in a menu section */
 enum scan_key_state scan_menu_key_table[SCAN_KEYWORD_NUM] = {
 /* menu section */
 	 opt, inv, inv, inv, inv, inv, inv, inv, req, opt, opt, inv, inv, inv,
-	 opt, opt, opt, opt, opt, inv, inv
+	 opt, opt, opt, opt, opt, inv, inv, opt
 };
 
 /* Mapping of keyword IDs to strings */
@@ -111,6 +111,7 @@ static const struct {
 	{ "timeout", scan_keyword_timeout},
 	{ "tape", scan_keyword_tape},
 	{ "kdump", scan_keyword_kdump},
+	{ "secure", scan_keyword_secure},
 };
 
 /* List of keywords that are used without an assignment */
@@ -1863,6 +1864,7 @@ scan_build_automenu(struct scan_token* scan)
 	       /* defaultmenu */                    1 +
 	       /* menu heading  */                  1 +
 	       /* keyword default,prompt,timeout */ 3 +
+	       /* keyword secure */                 1 +
 	       /* target keywords*/                 num_targets +
 	       /* missing target definitions */     num_sections * num_targets +
 	       /* number assigment  */              num_sections;
@@ -1978,6 +1980,14 @@ scan_build_automenu(struct scan_token* scan)
 						   db_keyword[i]))
 			goto err;
 	}
+	/* secure= */
+	i = (int) scan_keyword_secure;
+	if (db_keyword[i]) {
+		if (scan_append_keyword_assignment(new_scan, &i_new,
+						   scan_keyword_secure,
+						   db_keyword[i]))
+			goto err;
+			}
 	/* target= */
 	/* targetbase= */
 	/* targetgeometry= */
