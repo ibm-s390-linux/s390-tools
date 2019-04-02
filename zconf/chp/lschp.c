@@ -3,7 +3,7 @@
  *
  * Provide main function and command line parsing.
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -12,6 +12,7 @@
 #include <err.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "lib/util_base.h"
 #include "lib/util_file.h"
@@ -31,7 +32,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2016,
-			.pub_last = 2017,
+			.pub_last = 2019,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -55,9 +56,10 @@ static struct util_opt opt_vec[] = {
  * @param[in] dir     Path of the desired directory
  * @param[in] css_id  ID for device identification
  * @param[in] rec     The buffer structure, where results are written to
+ * @param[in] chp     If set: CHPID to filter by
  */
 static void print_chpid(const char *chp_dir, unsigned int css_id,
-			struct util_rec *rec)
+			struct util_rec *rec, char *chp)
 {
 	unsigned int css_id_tmp, chp_id;
 	bool chid_external;
@@ -123,7 +125,8 @@ static void print_chpid(const char *chp_dir, unsigned int css_id,
 	} else {
 		util_rec_set(rec, "pchid", "%s", "-");
 	}
-	util_rec_print(rec);
+	if (!strlen(chp) || strcmp(util_rec_get(rec, "chpid"), chp) == 0)
+		util_rec_print(rec);
 	free(path);
 }
 
@@ -153,8 +156,9 @@ static int chpsort(const struct dirent **de1, const struct dirent **de2)
  *
  * @param[in] css_dir The desired directory
  * @param[in] rec     The buffer structure, where results are written to
+ * @param[in] chp     If set: CHPID to filter by
  */
-static void print_css(const char *css_dir, struct util_rec *rec)
+static void print_css(const char *css_dir, struct util_rec *rec, char *chp)
 {
 	struct dirent **de_vec;
 	unsigned int css_id;
@@ -167,15 +171,17 @@ static void print_css(const char *css_dir, struct util_rec *rec)
 	path = util_path_sysfs("devices/css%d", css_id);
 	count = util_scandir(&de_vec, chpsort, path, "chp%x.*", css_id);
 	for (i = 0; i < count; i++)
-		print_chpid(de_vec[i]->d_name, css_id, rec);
+		print_chpid(de_vec[i]->d_name, css_id, rec, chp);
 	util_scandir_free(de_vec, count);
 	free(path);
 }
 
 /*
  * Print chpid table
+ *
+ * @param[in] chp              If set: CHPID to filter by
  */
-static void cmd_lschp(void)
+static void cmd_lschp(char *chp)
 {
 	struct dirent **de_vec;
 	struct util_rec *rec;
@@ -198,17 +204,19 @@ static void cmd_lschp(void)
 	path = util_path_sysfs("devices");
 	count = util_scandir(&de_vec, alphasort, path, "^css[[:xdigit:]]{1,2}$");
 	for (i = 0; i < count; i++)
-		print_css(de_vec[i]->d_name, rec);
+		print_css(de_vec[i]->d_name, rec, chp);
 	util_ptr_vec_free((void **) de_vec, count);
 	free(path);
 	util_rec_free(rec);
 }
 
+#define CHP_LEN		4
 /*
  * Parse options and execute the command
  */
 int main(int argc, char *argv[])
 {
+	char chp[CHP_LEN + 1] = "";
 	int c;
 
 	util_prg_init(&prg);
@@ -231,10 +239,30 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 	}
-	if (argc > optind) {
-		util_prg_print_arg_error(argv[optind]);
-		return EXIT_FAILURE;
+	if (argc > optind + 1)
+		errx(EXIT_FAILURE, "Too many arguments specified");
+	if (argc == optind + 1) {
+		/* we take a single argument only */
+		switch (strlen(argv[optind])) {
+		case 1:
+			sprintf(chp, "0.0%s", argv[optind]);
+			break;
+		case 2:
+			sprintf(chp, "0.%s", argv[optind]);
+			break;
+		case CHP_LEN:
+			strcpy(chp, argv[optind]);
+			break;
+		default:
+			errx(EXIT_FAILURE, "%s is not a valid channel-path ID",
+			     argv[optind]);
+		}
+		if (!isdigit(chp[0]) || chp[1] != '.' || !isxdigit(chp[2]) ||
+		    !isxdigit(chp[3]))
+			errx(EXIT_FAILURE, "%s is not a valid channel-path ID",
+			     chp);
 	}
-	cmd_lschp();
+	cmd_lschp(chp);
+
 	return EXIT_SUCCESS;
 }

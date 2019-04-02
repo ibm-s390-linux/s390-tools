@@ -10,6 +10,7 @@ Release history for s390-tools (MIT version)
   - lszfcp: Add new output marker for non-good SCSI devices (luns)
   - lszfcp: Add new output marker for non-good fc_rports
   - lszfcp: Clean up whitespace (mixed indentation, trailing)
+  - lschp: Add support for specifying a CHPID
 
   Bug Fixes:
   - lszfcp: Allow to show zfcp_units without associated SCSI device

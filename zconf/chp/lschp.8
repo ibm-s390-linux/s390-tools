@@ -11,10 +11,24 @@ lschp \- list information about available channel\-paths.
 .B lschp
 .RB [ \-h|\-\-help ]
 .RB [ \-v|\-\-version ]
+.RB [
+.I CHPID
+]
 
 .SH DESCRIPTION
 The lschp command lists status and type information about available
-channel\-paths.
+channel\-paths. A
+.I CHPID
+argument can be specified to return the information for the respective
+channel-path identifier only.
+Channel\-path identifiers are specified in hexadecimal notation either simply
+as the CHPID\-number (e.g. e0) or in the form
+
+.RS
+<cssid>.<id>
+.RE
+
+where <cssid> is the channel\-subsystem identifier and <id> is the CHPID\-number (e.g. 0.7e).
 
 .B Column description:
 
