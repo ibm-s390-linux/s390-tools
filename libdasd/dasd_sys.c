@@ -13,6 +13,7 @@
 #include <stdlib.h>
 
 #include "lib/dasd_sys.h"
+#include "lib/util_path.h"
 
 /**
  * Get raw-track access mode status
@@ -32,21 +33,23 @@
 int dasd_sys_raw_track_access(char *devnode)
 {
 	char busid[9];
-	char path[47];
+	char *path;
 	FILE *fp;
 	int rc;
 
 	if (u2s_getbusid(devnode, busid))
 		return 0;
 
-	sprintf(path, "/sys/bus/ccw/devices/%s/raw_track_access", busid);
-
+	path = util_path_sysfs("bus/ccw/devices/%s/raw_track_access", busid);
 	fp = fopen(path, "r");
-	if (!fp)
+	if (!fp) {
+		free(path);
 		return 0;
+	}
 
 	rc = fgetc(fp) - '0';
 	fclose(fp);
+	free(path);
 
 	return (rc == 1) ? 1 : 0;
 }
@@ -55,15 +58,17 @@ int dasd_sys_raw_track_access(char *devnode)
 int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
 {
 	unsigned int val;
-	char path[40];
 	int count, i;
+	char *path;
 	FILE *fp;
 
-	sprintf(path, "/sys/bus/ccw/devices/%s/../chpids", busid);
+	path = util_path_sysfs("bus/ccw/devices/%s/../chpids", busid);
 	*mask = 0;
 	fp = fopen(path, "r");
-	if (!fp)
+	if (!fp) {
+		free(path);
 		return ENODEV;
+	}
 
 	for (i = 0; i < 8; i++) {
 		count = fscanf(fp, " %x", &val);
@@ -75,6 +80,7 @@ int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
 			*mask = 0x80 >> i;
 	}
 	fclose(fp);
+	free(path);
 
 	return 0;
 }
@@ -102,22 +108,25 @@ int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
 int dasd_reset_chpid(char *devnode, char *chpid_char)
 {
 	unsigned int chpid;
-	char path[41];
 	char busid[9];
 	int  mask, rc;
 	char *endptr;
+	char *path;
 	FILE *fp;
 
 	if (u2s_getbusid(devnode, busid))
 		return ENODEV;
 
 	if (!chpid_char) {
-		sprintf(path, "/sys/bus/ccw/devices/%s/path_reset", busid);
+		path = util_path_sysfs("bus/ccw/devices/%s/path_reset", busid);
 		fp = fopen(path, "w");
-		if (!fp)
+		if (!fp) {
+			free(path);
 			return ENODEV;
+		}
 		fprintf(fp, "%s", "all\n");
 		fclose(fp);
+		free(path);
 		return 0;
 	}
 
@@ -132,12 +141,15 @@ int dasd_reset_chpid(char *devnode, char *chpid_char)
 	if (!mask)
 		return ENOENT;
 
-	sprintf(path, "/sys/bus/ccw/devices/%s/path_reset", busid);
+	path = util_path_sysfs("bus/ccw/devices/%s/path_reset", busid);
 	fp = fopen(path, "w");
-	if (!fp)
+	if (!fp) {
+		free(path);
 		return ENODEV;
+	}
 	fprintf(fp, "%02x", mask);
 	fclose(fp);
+	free(path);
 
 	return 0;
 }
