@@ -3,7 +3,6 @@ include ../common.mak
 libs =	$(rootdir)/libvtoc/libvtoc.a \
 	$(rootdir)/libzds/libzds.a \
 	$(rootdir)/libdasd/libdasd.a \
-	$(rootdir)/libu2s/libu2s.a \
 	$(rootdir)/libutil/libutil.a
 
 all: fdasd

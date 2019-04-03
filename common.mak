@@ -331,10 +331,6 @@ $(rootdir)/libzds/libzds.a: $(rootdir)/libzds
 	$(MAKE) -C $(rootdir)/libzds/ libzds.a
 .PHONY: $(rootdir)/libzds
 
-$(rootdir)/libu2s/libu2s.a: $(rootdir)/libu2s
-	$(MAKE) -C $(rootdir)/libu2s/ libu2s.a
-.PHONY: $(rootdir)/libu2s
-
 $(rootdir)/libvmdump/libvmdump.a: $(rootdir)/libvmdump
 	$(MAKE) -C $(rootdir)/libvmdump/ libvmdump.a
 .PHONY: $(rootdir)/libvmdump
