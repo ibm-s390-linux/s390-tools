@@ -32,6 +32,7 @@
 #include "lib/util_base.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
+#include "lib/util_sys.h"
 #include "lib/vtoc.h"
 #include "lib/zt_common.h"
 
@@ -183,7 +184,7 @@ dasdview_get_info(dasdview_info_t *info)
 	else
 		info->hw_cylinders = characteristics->no_cyl;
 
-	if (u2s_getbusid(info->device, info->busid) == -1)
+	if (util_sys_get_dev_addr(info->device, info->busid) != 0)
 		info->busid_valid = 0;
 	else
 		info->busid_valid = 1;

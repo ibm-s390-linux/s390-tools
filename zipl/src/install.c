@@ -23,7 +23,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "lib/u2s.h"
+#include "lib/util_sys.h"
 
 #include "boot.h"
 #include "bootmap.h"
@@ -1132,7 +1132,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		parm.param[i].num_heads = info[i]->geo.heads;
 		parm.param[i].blocksize = info[i]->phy_block_size >> 8;
 		parm.param[i].devno = info[i]->devno;
-		if (u2s_getbusid(device[i], busid)) {
+		if (util_sys_get_dev_addr(device[i], busid) != 0) {
 			error_text("Could not find bus-ID for '%s'", device[i]);
 			rc = -1;
 			goto out;

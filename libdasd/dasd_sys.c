@@ -15,6 +15,7 @@
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 #include "lib/util_path.h"
+#include "lib/util_sys.h"
 
 /**
  * Get raw-track access mode status
@@ -38,7 +39,7 @@ int dasd_sys_raw_track_access(char *devnode)
 	FILE *fp;
 	int rc;
 
-	if (u2s_getbusid(devnode, busid))
+	if (util_sys_get_dev_addr(devnode, busid) != 0)
 		return 0;
 
 	path = util_path_sysfs("bus/ccw/devices/%s/raw_track_access", busid);
@@ -115,7 +116,7 @@ int dasd_reset_chpid(char *devnode, char *chpid_char)
 	char *path;
 	FILE *fp;
 
-	if (u2s_getbusid(devnode, busid))
+	if (util_sys_get_dev_addr(devnode, busid) != 0)
 		return ENODEV;
 
 	if (!chpid_char) {
