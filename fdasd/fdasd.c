@@ -935,7 +935,7 @@ static void fdasd_verify_device(fdasd_anchor_t *anc, char *name)
 		fdasd_error(anc, device_verification_failed, err_str);
 	}
 
-	count = u2s_get_host_access_count(name);
+	count = dasd_get_host_access_count(name);
 	if (anc->force_host) {
 		if (count > 1) {
 			snprintf(err_str, ERROR_STRING_SIZE,

@@ -1394,7 +1394,7 @@ static void do_format_dasd(dasdfmt_info_t *info, char *devname,
 	if ((info->verbosity > 0) || !info->withoutprompt || info->testmode)
 		dasdfmt_print_info(info, devname, vlabel, cylinders, heads, p);
 
-	count = u2s_get_host_access_count(devname);
+	count = dasd_get_host_access_count(devname);
 	if (info->force_host) {
 		if (count > 1) {
 			ERRMSG_EXIT(EXIT_FAILURE,

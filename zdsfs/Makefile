@@ -2,9 +2,9 @@ include ../common.mak
 
 libs =	$(rootdir)/libzds/libzds.a \
 	$(rootdir)/libvtoc/libvtoc.a \
+	$(rootdir)/libdasd/libdasd.a \
 	$(rootdir)/libu2s/libu2s.a \
 	$(rootdir)/libutil/libutil.a \
-	$(rootdir)/libdasd/libdasd.a
 
 ifeq (${HAVE_FUSE},0)
 

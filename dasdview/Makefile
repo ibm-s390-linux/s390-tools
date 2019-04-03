@@ -7,7 +7,6 @@ all: dasdview
 libs =	$(rootdir)/libdasd/libdasd.a \
 	$(rootdir)/libzds/libzds.a \
 	$(rootdir)/libvtoc/libvtoc.a \
-	$(rootdir)/libu2s/libu2s.a \
 	$(rootdir)/libutil/libutil.a
 
 dasdview: dasdview.o $(libs)

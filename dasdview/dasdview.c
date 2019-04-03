@@ -28,7 +28,6 @@
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 #include "lib/libzds.h"
-#include "lib/u2s.h"
 #include "lib/util_base.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"

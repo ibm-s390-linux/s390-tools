@@ -20,8 +20,8 @@
 #include <stdlib.h>
 
 #include "lib/dasd_base.h"
+#include "lib/dasd_sys.h"
 #include "lib/libzds.h"
-#include "lib/u2s.h"
 #include "lib/vtoc.h"
 
 /** @cond PRIVATE */
@@ -3701,7 +3701,7 @@ int lzds_analyse_open_count(struct zdsroot *root, int warn)
 	int rc = 0;
 
 	util_list_iterate(root->dasdlist, dasd) {
-		value = u2s_get_host_access_count(dasd->device);
+		value = dasd_get_host_access_count(dasd->device);
 
 		if (value < 0) {
 			fprintf(stderr,

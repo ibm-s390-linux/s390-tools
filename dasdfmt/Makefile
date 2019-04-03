@@ -4,7 +4,6 @@ all: dasdfmt
 
 libs =	$(rootdir)/libdasd/libdasd.a \
 	$(rootdir)/libvtoc/libvtoc.a \
-	$(rootdir)/libu2s/libu2s.a \
 	$(rootdir)/libutil/libutil.a
 
 dasdfmt: dasdfmt.o $(libs)

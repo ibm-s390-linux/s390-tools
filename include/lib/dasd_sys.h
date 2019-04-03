@@ -13,9 +13,9 @@
 #define LIB_DASD_SYS_H
 
 #include <stdio.h>
-#include "u2s.h"
 
 int dasd_sys_raw_track_access(char *);
 int dasd_reset_chpid(char *, char *);
+int dasd_get_host_access_count(char *device);
 
 #endif /* LIB_DASD_SYS_H */

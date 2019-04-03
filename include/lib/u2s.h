@@ -15,7 +15,5 @@
 #define U2S_BUS_ID_SIZE    32
 
 int u2s_getbusid(char *, char *);
-int u2s_read_attribute(char *, char *, char *, size_t);
-int u2s_get_host_access_count(char *);
 
 #endif /* LIB_U2S_H */

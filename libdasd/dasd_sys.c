@@ -14,6 +14,7 @@
 
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
+#include "lib/util_file.h"
 #include "lib/util_path.h"
 #include "lib/util_sys.h"
 
@@ -154,4 +155,34 @@ int dasd_reset_chpid(char *devnode, char *chpid_char)
 	free(path);
 
 	return 0;
+}
+
+/**
+ * Read amount of host with access to \p device
+ *
+ * The \p device can be any valid relative or absolute path to a DASD device
+ * node, for example:
+ *
+ * - /dev/dasda
+ * - /dev/disk/by-path/ccw-0.0.bf20
+ *
+ * @param[in]	device	Device node of interest
+ *
+ * @retval	n	Number of hosts with access to \p device
+ * @retval	0	Value could not be determined
+ */
+int dasd_get_host_access_count(char *device)
+{
+	char busid[9];
+	char *path;
+	long value;
+
+	if (!util_sys_get_dev_addr(device, busid))
+		return 0;
+
+	path = util_path_sysfs("bus/ccw/devices/%s/host_access_count", busid);
+	util_file_read_l(&value, 10, path);
+	free(path);
+
+	return value;
 }
