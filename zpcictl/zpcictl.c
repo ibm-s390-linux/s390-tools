@@ -21,6 +21,7 @@
 #include "lib/util_proc.h"
 #include "lib/util_rec.h"
 #include "lib/util_scandir.h"
+#include "lib/util_sys.h"
 
 #include "zpcictl.h"
 
@@ -180,45 +181,6 @@ static void sysfs_write_data(struct zpci_report_error *report, char *slot)
 	free(path);
 }
 
-/* lstat() doesn't work for sysfs files, so we have to work with a fixed size */
-#define READLINK_SIZE	256
-
-static int sysfs_get_slot_addr(const char *dev, char *slot)
-{
-	char device[READLINK_SIZE], *result;
-	unsigned int major, minor;
-	struct stat dev_stat;
-	ssize_t len;
-	char *path;
-
-	if (stat(dev, &dev_stat) != 0) {
-		warnx("Could not get stat information for %s: %s",
-		      dev, strerror(errno));
-		return 0;
-	}
-	major = major(dev_stat.st_rdev);
-	minor = minor(dev_stat.st_rdev);
-
-	path = util_path_sysfs("dev/char/%u:%u/device", major, minor);
-	len = readlink(path, device, READLINK_SIZE - 1);
-	free(path);
-	if (len != -1) {
-		device[len] = '\0';
-	} else {
-		warnx("Could not read device link for %s", dev);
-		return 0;
-	}
-
-	result = strrchr(device, '/');
-	if (result)
-		result++;
-	else
-		result = device;
-	strcpy(slot, result);
-
-	return 1;
-}
-
 static void get_device_node(struct zpci_device *pdev)
 {
 	struct dirent **de_vec;
@@ -236,7 +198,7 @@ static void get_device_node(struct zpci_device *pdev)
 
 	for (i = 0; i < count; i++) {
 		util_asprintf(&dev, "/dev/%s", de_vec[i]->d_name);
-		if (!sysfs_get_slot_addr(dev, slot))
+		if (util_sys_get_dev_addr(dev, slot) != 0)
 			continue;
 		if (strcmp(slot, pdev->slot) == 0) {
 			pdev->device = dev;
@@ -272,7 +234,7 @@ static void get_device_info(struct zpci_device *pdev, char *dev)
 	if (is_blk_dev(dev))
 		errx(EXIT_FAILURE, "Unsupported device type %s", dev);
 	if (is_char_dev(dev)) {
-		if (!sysfs_get_slot_addr(dev, pdev->slot))
+		if (util_sys_get_dev_addr(dev, pdev->slot) != 0)
 			errx(EXIT_FAILURE,
 			     "Could not determine slot address for %s", dev);
 		pdev->device = dev;
