@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
+/* A bus id of a DASD is 8 characters long. E.g. 0.0.4711 */
+#define DASD_BUS_ID_SIZE	9
+
 typedef struct dasd_information2_t {
 	unsigned int devno;         /* S/390 devno */
 	unsigned int real_devno;    /* for aliases */

@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 #include "lib/util_path.h"
 
@@ -32,7 +33,7 @@
  */
 int dasd_sys_raw_track_access(char *devnode)
 {
-	char busid[9];
+	char busid[DASD_BUS_ID_SIZE];
 	char *path;
 	FILE *fp;
 	int rc;
@@ -108,7 +109,7 @@ int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
 int dasd_reset_chpid(char *devnode, char *chpid_char)
 {
 	unsigned int chpid;
-	char busid[9];
+	char busid[DASD_BUS_ID_SIZE];
 	int  mask, rc;
 	char *endptr;
 	char *path;

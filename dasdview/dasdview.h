@@ -11,7 +11,6 @@
 #define DASDVIEW_H
 
 #include <limits.h>
-#include "lib/u2s.h"
 
 /********************************************************************************
  * SECTION: Definitions needed for DASD-API (see dasd.h)
@@ -109,7 +108,7 @@ typedef struct dasdview_info
 	int f8c;
 	int f9c;
 
-	char busid[U2S_BUS_ID_SIZE];
+	char busid[DASD_BUS_ID_SIZE];
 	int busid_valid;
 	int raw_track_access;
 	struct zdsroot *zdsroot;
