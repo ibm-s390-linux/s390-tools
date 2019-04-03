@@ -27,7 +27,8 @@ objects =	util_base.o \
 		util_part.o \
 		util_prg.o \
 		util_proc.o \
-		util_rec.o
+		util_rec.o \
+		util_sys.o
 
 util_base_example: util_base_example.o $(lib)
 util_panic_example: util_panic_example.o $(lib)
