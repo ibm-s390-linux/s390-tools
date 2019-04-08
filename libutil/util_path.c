@@ -107,7 +107,7 @@ bool util_path_is_readable(const char *fmt, ...)
 	bool rc;
 
 	UTIL_VASPRINTF(&path, fmt, ap);
-	rc = access(path, R_OK) == 0 ? true : false;
+	rc = access(path, R_OK) == 0;
 	free(path);
 
 	return rc;
@@ -131,7 +131,7 @@ bool util_path_is_writable(const char *fmt, ...)
 	bool rc;
 
 	UTIL_VASPRINTF(&path, fmt, ap);
-	rc = access(path, W_OK) == 0 ? true : false;
+	rc = access(path, W_OK) == 0;
 	free(path);
 
 	return rc;
@@ -157,7 +157,7 @@ bool util_path_is_reg_file(const char *fmt, ...)
 
 	UTIL_VASPRINTF(&path, fmt, ap);
 	if (stat(path, &sb) == 0)
-		rc = S_ISREG(sb.st_mode) ? true : false;
+		rc = S_ISREG(sb.st_mode);
 	free(path);
 	return rc;
 }
@@ -182,7 +182,7 @@ bool util_path_is_dir(const char *fmt, ...)
 
 	UTIL_VASPRINTF(&path, fmt, ap);
 	if (stat(path, &sb) == 0)
-		rc = S_ISDIR(sb.st_mode) ? true : false;
+		rc = S_ISDIR(sb.st_mode);
 	free(path);
 	return rc;
 }
@@ -205,7 +205,7 @@ bool util_path_exists(const char *fmt, ...)
 	bool rc;
 
 	UTIL_VASPRINTF(&path, fmt, ap);
-	rc = access(path, F_OK) == 0 ? true : false;
+	rc = access(path, F_OK) == 0;
 	free(path);
 	return rc;
 }
