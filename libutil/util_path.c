@@ -150,18 +150,14 @@ bool util_path_is_writable(const char *fmt, ...)
  */
 bool util_path_is_reg_file(const char *fmt, ...)
 {
+	bool rc = false;
 	struct stat sb;
 	va_list ap;
 	char *path;
-	bool rc;
 
 	UTIL_VASPRINTF(&path, fmt, ap);
-	if (stat(path, &sb)) {
-		rc = false;
-		goto free_str;
-	}
-	rc = S_ISREG(sb.st_mode) ? true : false;
-free_str:
+	if (stat(path, &sb) == 0)
+		rc = S_ISREG(sb.st_mode) ? true : false;
 	free(path);
 	return rc;
 }
@@ -179,18 +175,14 @@ free_str:
  */
 bool util_path_is_dir(const char *fmt, ...)
 {
+	bool rc = false;
 	struct stat sb;
 	va_list ap;
 	char *path;
-	bool rc;
 
 	UTIL_VASPRINTF(&path, fmt, ap);
-	if (stat(path, &sb)) {
-		rc = false;
-		goto free_str;
-	}
-	rc = S_ISDIR(sb.st_mode) ? true : false;
-free_str:
+	if (stat(path, &sb) == 0)
+		rc = S_ISDIR(sb.st_mode) ? true : false;
 	free(path);
 	return rc;
 }
