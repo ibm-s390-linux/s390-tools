@@ -514,7 +514,7 @@ function check_for_multipath_devices() {
                (( i+=2 ));
                while [[ `echo "${mp_arr[$i]:0:1}" | grep -ve "[0-9a-zA-Z]"` ]] && [ $i -lt ${#mp_arr[@]} ]; do
                   if [ `echo ${mp_arr[$i]} | grep -e "[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}" | wc -l` -ne 0 ]; then
-	             line="`echo ${mp_arr[$i]} | sed 's/.*\([0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}\)/\1/'`";
+	             line="`echo ${mp_arr[$i]} | sed 's/[^0-9]*\([0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}\)/\1/'`";
                      checked_devs[${#checked_devs[@]}]=`echo $line | awk '{print "/dev/"$2}'`;
                      ddebug "      adding ${checked_devs[${#checked_devs[@]}-1]}";
                      WRP_HOST_ADAPTERS[${#WRP_HOST_ADAPTERS[@]}]="host${line%%:*}";
