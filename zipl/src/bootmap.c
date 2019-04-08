@@ -391,6 +391,30 @@ add_component_buffer(int fd, void* buffer, size_t size, component_data data,
 }
 
 
+static int
+add_dummy_buffer(int fd, size_t size, address_t addr, void *component,
+		 struct disk_info *info, struct component_loc *comp_loc)
+{
+	char *buffer;
+	int rc;
+
+	buffer = misc_malloc(size);
+	if (buffer == NULL)
+		return -1;
+
+	memset(buffer, 0, size);
+	rc = add_component_buffer(fd, buffer, size,
+				  (component_data) (uint64_t) addr,
+				  component, info, comp_loc, component_load);
+	if (rc) {
+		free(buffer);
+		return rc;
+	}
+	free(buffer);
+	return 0;
+}
+
+
 static void
 print_components(const char *name[], struct component_loc *loc, int num)
 {
@@ -520,8 +544,36 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		}
 	}
 	ramdisk_size = stats.st_size;
-	if (info->type == disk_type_scsi)
+	if (info->type == disk_type_scsi) {
 		flags |= STAGE3_FLAG_SCSI;
+		/*
+		 * Add dummy components for stage 3 heap and stack to block the
+		 * associated memory areas against firmware use.
+		 */
+		rc = add_dummy_buffer(fd, STAGE3_HEAP_SIZE, STAGE3_HEAP_ADDRESS,
+				      VOID_ADD(table, offset), info,
+				      &comp_loc[comp_nr]);
+		if (rc) {
+			error_text("Could not add stage3 HEAP dummy");
+			free(table);
+			return rc;
+		}
+		comp_name[comp_nr] = "heap area";
+		offset += sizeof(struct component_entry);
+		comp_nr++;
+		rc = add_dummy_buffer(fd, STAGE3_STACK_SIZE,
+				      STAGE3_STACK_ADDRESS,
+				      VOID_ADD(table, offset), info,
+				      &comp_loc[comp_nr]);
+		if (rc) {
+			error_text("Could not add stage3 STACK dummy");
+			free(table);
+			return rc;
+		}
+		comp_name[comp_nr] = "stack area";
+		offset += sizeof(struct component_entry);
+		comp_nr++;
+	}
 	if (ipl->is_kdump)
 		flags |= STAGE3_FLAG_KDUMP;
 
