@@ -369,7 +369,7 @@ out:
 	return 0;
 }
 
-typedef int (*check_association_t)(const char *value, bool remove,
+typedef int (*check_association_t)(const char *value, bool remove, bool set,
 				   char **normalized, void *private);
 
 /**
@@ -407,7 +407,7 @@ static int _keystore_set_association(struct properties *key_props,
 
 	for (i = 0; newvals[i] != NULL; i++) {
 		if (check_func != NULL) {
-			rc = check_func(newvals[i], 0, &normalized,
+			rc = check_func(newvals[i], 0, 1, &normalized,
 					check_private);
 			if (rc != 0)
 				goto out;
@@ -488,7 +488,7 @@ static int _keystore_add_association(struct properties *key_props,
 
 	for (i = 0; newvals[i] != NULL; i++) {
 		if (check_func != NULL) {
-			rc = check_func(newvals[i], 0, &normalized,
+			rc = check_func(newvals[i], 0, 0, &normalized,
 					check_private);
 			if (rc != 0)
 				goto out;
@@ -567,7 +567,7 @@ static int _keystore_remove_association(struct properties *key_props,
 
 	for (i = 0; delvals[i] != NULL; i++) {
 		if (check_func != NULL) {
-			rc = check_func(delvals[i], 1, &normalized,
+			rc = check_func(delvals[i], 1, 0, &normalized,
 					check_private);
 			if (rc != 0)
 				goto out;
@@ -1091,12 +1091,13 @@ out:
  *
  * @param[in] apqn     the APQN value to check
  * @param[in] remove   if true the apqn is removed
+ * @param[in] set      if true the apqn is set (not used here)
  * @param[out] normalized normalized value on return or NULL if no change
  * @param[in] private  private data (not used here)
  *
  * @returns 0 if successful, a negative errno value otherwise
  */
-static int _keystore_apqn_check(const char *apqn, bool remove,
+static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 				char **normalized, void *UNUSED(private))
 {
 	int rc, card, domain;
@@ -1149,6 +1150,7 @@ struct volume_check {
 	struct keystore *keystore;
 	const char *name;
 	const char *volume;
+	bool set;
 };
 
 /**
@@ -1172,6 +1174,11 @@ static int _keystore_volume_check_process(struct keystore *UNUSED(keystore),
 					  void *private)
 {
 	struct volume_check *info = (struct volume_check *)private;
+
+	if (info->set) {
+		if (strcmp(name, info->name) == 0)
+			return 0;
+	}
 
 	warnx("Key '%s' is already associated with volume '%s'", name,
 	      info->volume);
@@ -1204,12 +1211,13 @@ static int _keystore_is_block_device(const char *volume)
  *
  * @param[in] volume     the Volume value to check
  * @param[in] remove     if true the volume is removed
+ * @param[in] set        if true the volume is set
  * @param[out] normalized normalized value on return or NULL if no change
  * @param[in] private    private data: struct volume_check
  *
  * @returns 0 if successful, a negative errno value otherwise
  */
-static int _keystore_volume_check(const char *volume, bool remove,
+static int _keystore_volume_check(const char *volume, bool remove, bool set,
 				  char **normalized, void *private)
 {
 	struct volume_check *info = (struct volume_check *)private;
@@ -1250,6 +1258,7 @@ static int _keystore_volume_check(const char *volume, bool remove,
 		goto out;
 	}
 
+	info->set = set;
 	rc = _keystore_process_filtered(info->keystore, NULL, info->volume,
 					NULL, NULL,
 					_keystore_volume_check_process, info);
@@ -1557,7 +1566,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 				      size_t sector_size,
 				      const char *volume_type)
 {
-	struct volume_check vol_check = { .keystore = keystore, .name = name };
+	struct volume_check vol_check = { .keystore = keystore, .name = name,
+					  .set = 0 };
 	struct properties *key_props;
 	char temp[10];
 	int rc;
@@ -1662,7 +1672,7 @@ static int _keystore_get_card_domain(const char *apqns, unsigned int *card,
 	if (apqn_list[0] == NULL)
 		goto out;
 
-	rc = _keystore_apqn_check(apqn_list[0], 0, &normalized, NULL);
+	rc = _keystore_apqn_check(apqn_list[0], 0, 0, &normalized, NULL);
 	if (normalized != NULL)
 		free(normalized);
 	if (rc != 0)
@@ -1886,7 +1896,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *apqns, long int sector_size,
 			const char *volume_type)
 {
-	struct volume_check vol_check = { .keystore = keystore, .name = name };
+	struct volume_check vol_check = { .keystore = keystore, .name = name,
+					  .set = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
 	char temp[30];
@@ -2833,7 +2844,7 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 		      const char *newname, const char *volumes)
 {
 	struct volume_check vol_check = { .keystore = keystore,
-					  .name = newname };
+					  .name = newname, .set = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct key_filenames new_names = { NULL, NULL, NULL };
 	struct properties *key_prop = NULL;
