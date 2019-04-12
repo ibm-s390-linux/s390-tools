@@ -438,10 +438,10 @@ extract_signature(char *filename, void **ret_signature,
 		  struct signature_header *sig_head)
 {
 	struct file_signature *file_sig;
-	void *signature;
 	size_t signature_size = 0;
-	size_t size;
+	void *signature;
 	char *buffer;
+	size_t size;
 
 	if (misc_read_file(filename, &buffer, &size, 0))
 		return 0;
@@ -496,20 +496,20 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		struct disk_info* info, struct job_target_data* target,
 		int is_secure)
 {
-	struct stat stats;
-	void* table;
-	void *stage3_params;
+	struct component_loc comp_loc[10];
+	struct signature_header sig_head;
+	size_t ramdisk_size, image_size;
+	bool secure_boot_supported;
 	size_t stage3_params_size;
 	const char *comp_name[10];
-	struct component_loc comp_loc[10];
-	int rc;
-	int offset, flags = 0;
-	size_t ramdisk_size, image_size;
-	void *signature;
 	size_t signature_size;
-	struct signature_header sig_head;
+	int offset, flags = 0;
+	void *stage3_params;
+	struct stat stats;
+	void *signature;
 	int comp_nr = 0;
-	bool secure_boot_supported;
+	void *table;
+	int rc;
 
 	memset(comp_loc, 0, sizeof(comp_loc));
 	memset(&sig_head, 0, sizeof(sig_head));
