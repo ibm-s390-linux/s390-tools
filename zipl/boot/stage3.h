@@ -27,6 +27,8 @@
 #define STAGE3_FLAG_SCSI	 0x0001000000000000ULL
 #define STAGE3_FLAG_KDUMP	 0x0002000000000000ULL
 
+#define KERNEL_HEADER_SIZE	 65536
+
 #define UNSPECIFIED_ADDRESS		-1ULL
 
 extern unsigned long long _parm_addr;   /* address of parmline */
@@ -35,6 +37,8 @@ extern unsigned long long _initrd_len;  /* length of initrd */
 extern unsigned long long _load_psw;    /*  load psw of kernel */
 extern unsigned long long _extra_parm;  /* use extra parm line mechanism? */
 extern unsigned long long stage3_flags; /*  flags (e.g. STAGE3_FLAG_KDUMP) */
+extern unsigned long long _image_len;   /* length of kernel */
+extern unsigned long long _image_addr;  /* target address of kernel */
 extern void kdump_stage3();
 
 #endif /* STAGE3_H */

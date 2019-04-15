@@ -511,7 +511,7 @@ get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
 	/* Fill in component data */
 	num = 0;
 	rc = set_cl_element(&cl[num++], "kernel image", ipl->image,
-			    &ipl->image_addr, 0, 0x10000,
+			    &ipl->image_addr, 0, 0,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;

@@ -14,19 +14,25 @@
 #include "stage3.h"
 
 /*
- * 48 Byte dummy space for external symbols
+ * 64 Byte dummy space for external symbols
  * _parm_addr;    address of parmline
  * _initrd_addr;  address of initrd
  * _initrd_len;   length of initrd
  * _load_psw;     load psw of kernel
  * _extra_parm;   use extra parm line mechanism?
  * stage3_flags;  flags (e.g. STAGE3_FLAG_KDUMP)
+ * _image_len;    length of kernel
+ * _image_addr;   target address of kernel
  *
  * needed to blow up the binary and leave room
  */
 __attribute__ ((section(".text.dummy"))) void _dummy(void)
 {
 		asm volatile(
+		".long 0x00000000\n"
+		".long 0x00000000\n"
+		".long 0x00000000\n"
+		".long 0x00000000\n"
 		".long 0x00000000\n"
 		".long 0x00000000\n"
 		".long 0x00000000\n"
@@ -227,6 +233,14 @@ void start(void)
 	unsigned char *cextra = (unsigned char *)COMMAND_LINE_EXTRA;
 	unsigned char *command_line =  (unsigned char *)COMMAND_LINE;
 	unsigned int begin = 0, end = 0, length = 0;
+
+	/*
+	 * Relocate the kernel image to its actual load address while stripping
+	 * away the kernel IPL header to not overwrite the stage3 loader.
+	 */
+	memmove((void *)_image_addr,
+		(void *)_image_addr + KERNEL_HEADER_SIZE,
+		_image_len - KERNEL_HEADER_SIZE);
 
 	/* store subchannel ID into low core and into new kernel space */
 	subchannel_id = S390_lowcore.subchannel_id;

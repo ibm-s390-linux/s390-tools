@@ -35,7 +35,6 @@
 #define PSW_LOAD                        0x0008000080000000LL
 #define PSW_DISABLED_WAIT               0x000a000000000000LL
 
-#define KERNEL_HEADER_SIZE		65536
 #define BOOTMAP_FILENAME		"bootmap"
 #define BOOTMAP_TEMPLATE_FILENAME	"bootmap_temp.XXXXXX"
 

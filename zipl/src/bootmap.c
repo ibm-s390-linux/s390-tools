@@ -409,7 +409,6 @@ print_components(const char *name[], struct component_loc *loc, int num)
 	}
 }
 
-
 static int
 add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		int verbose, int add_files, component_header_type type,
@@ -424,6 +423,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	struct component_loc comp_loc[4];
 	int rc;
 	int offset, flags = 0;
+	size_t ramdisk_size, image_size;
 
 	memset(comp_loc, 0, sizeof(comp_loc));
 	table = misc_malloc(info->phy_block_size);
@@ -456,18 +456,29 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 			return -1;
 		}
 	}
+	ramdisk_size = stats.st_size;
 	if (info->type == disk_type_scsi)
 		flags |= STAGE3_FLAG_SCSI;
 	if (ipl->is_kdump)
 		flags |= STAGE3_FLAG_KDUMP;
 
+	/* Get kernel file size */
+	if (stat(ipl->image, &stats)) {
+		error_reason(strerror(errno));
+		error_text("Could not get information for file '%s'",
+			   ipl->image);
+		free(table);
+		return -1;
+	}
+	image_size = stats.st_size;
+
 	/* Add stage 3 loader to bootmap */
 	rc = boot_get_stage3(&stage3, &stage3_size, ipl->parm_addr,
-			     ipl->ramdisk_addr, (size_t) stats.st_size,
+			     ipl->ramdisk_addr, ramdisk_size,
 			     ipl->is_kdump ? ipl->image_addr + 0x10 :
 			     ipl->image_addr,
 			     (info->type == disk_type_scsi) ? 0 : 1,
-			     flags);
+			     flags, image_size);
 	if (rc) {
 		free(table);
 		return rc;
@@ -487,7 +498,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		printf("  kernel image......: %s\n", ipl->image);
 	}
 	rc = add_component_file(fd, ipl->image, ipl->image_addr,
-				KERNEL_HEADER_SIZE, VOID_ADD(table, offset),
+				0, VOID_ADD(table, offset),
 				add_files, info, target, &comp_loc[0]);
 	if (rc) {
 		error_text("Could not add image file '%s'", ipl->image);

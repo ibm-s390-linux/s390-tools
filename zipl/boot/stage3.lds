@@ -23,6 +23,11 @@ SECTIONS
   _extra_parm = .;
   . = 0xa028;
   stage3_flags =.;
+  . = 0xa030;
+  _image_len = .;
+  . = 0xa038;
+  _image_addr = .;
+
 
   . = 0xa000;
   .text.dummy : { *(.text.dummy) }

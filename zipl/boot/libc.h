@@ -49,6 +49,7 @@ typedef unsigned char uint8_t;
 void printf(const char *, ...);
 void sprintf(char *, const char *, ...);
 void *memcpy(void *, const void *, unsigned long);
+void *memmove(void *, const void *, unsigned long);
 void *memset(void *, int c, unsigned long);
 char *strcat(char *, const char *);
 int strncmp(const char *, const char *, unsigned long);

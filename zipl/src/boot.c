@@ -81,7 +81,7 @@ get_stage3_size()
 int
 boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
 		address_t initrd_addr, size_t initrd_len, address_t image_addr,
-		int extra_parm, uint16_t flags)
+		int extra_parm, uint16_t flags, size_t image_len)
 {
 	struct boot_stage3_params params;
 	void* data;
@@ -95,6 +95,7 @@ boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
 	data = misc_malloc(DATA_SIZE(stage3));
 	if (data == NULL)
 		return -1;
+	memset(data, 0, DATA_SIZE(stage3));
 	/* Prepare params section */
 	params.parm_addr = (uint64_t) parm_addr;
 	params.initrd_addr = (uint64_t) initrd_addr;
@@ -102,6 +103,8 @@ boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
 	params.load_psw = (uint64_t)(image_addr | PSW_LOAD);
 	params.extra_parm = (uint64_t) extra_parm;
 	params.flags = flags;
+	params.image_len = (uint64_t) image_len;
+	params.image_addr = (uint64_t) image_addr;
 	/* Initialize buffer */
 	memcpy(data, DATA_ADDR(stage3), DATA_SIZE(stage3));
 	memcpy(data, &params, sizeof(struct boot_stage3_params));

@@ -59,6 +59,26 @@ void *memcpy(void *dest, const void *src, unsigned long n)
 }
 
 /*
+ * Move @n bytes of memory from @src to @dest. The memory regions may overlap.
+ */
+void *memmove(void *dest, const void *src, unsigned long n)
+{
+	const char *s = src;
+	char *d = dest;
+
+	if (s < d) {
+		d += n;
+		s += n;
+		while (n--)
+			*--d = *--s;
+	} else {
+		while (n--)
+			*d++ = *s++;
+	}
+	return dest;
+}
+
+/*
  * Copy string
  */
 char *strcpy(char *dest, const char *src)
