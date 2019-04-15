@@ -12,6 +12,15 @@
 #include "libc.h"
 #include "s390.h"
 #include "stage3.h"
+#include "error.h"
+
+#define for_each_rb_entry(entry, rb) \
+	for (entry = rb->entries; \
+	     (void *) entry + sizeof(*entry) <= (void *) rb + rb->len; \
+	     entry++)
+
+static const char *msg_sipl_inval = "Secure boot failure: invalid load address";
+static const char *msg_sipl_unverified = "Secure boot failure: unverified load address";
 
 static unsigned char ebc_037[256] = {
 /* 0x00  NUL   SOH   STX   ETX  *SEL    HT  *RNL   DEL */
@@ -192,6 +201,64 @@ start_kernel(void)
 		: [psw] "a" (psw) );
 }
 
+unsigned int
+is_verified_address(unsigned long image_addr)
+{
+	struct ipl_rb_component_entry *comp;
+	struct ipl_rb_components *comps;
+	struct ipl_pl_hdr *pl_hdr;
+	struct ipl_rl_hdr *rl_hdr;
+	struct ipl_rb_hdr *rb_hdr;
+	unsigned long tmp;
+	void *rl_end;
+
+	/*
+	 * There is an IPL report, to find it load the pointer to the
+	 * IPL parameter information block from lowcore and skip past
+	 * the IPL parameter list, then align the address to a double
+	 * word boundary.
+	 */
+	tmp = (unsigned long) S390_lowcore.ipl_parmblock_ptr;
+	pl_hdr = (struct ipl_pl_hdr *) tmp;
+	tmp = (tmp + pl_hdr->len + 7) & -8UL;
+	rl_hdr = (struct ipl_rl_hdr *) tmp;
+	/* Walk through the IPL report blocks in the IPL Report list */
+	comps = NULL;
+	rl_end = (void *) rl_hdr + rl_hdr->len;
+	rb_hdr = (void *) rl_hdr + sizeof(*rl_hdr);
+	while ((void *) rb_hdr + sizeof(*rb_hdr) < rl_end &&
+	       (void *) rb_hdr + rb_hdr->len <= rl_end) {
+		switch (rb_hdr->rbt) {
+		case IPL_RBT_COMPONENTS:
+			comps = (struct ipl_rb_components *) rb_hdr;
+			break;
+		default:
+			break;
+		}
+
+		rb_hdr = (void *) rb_hdr + rb_hdr->len;
+	}
+	for_each_rb_entry(comp, comps) {
+		if (image_addr == comp->addr &&
+		    comp->flags & IPL_RB_COMPONENT_FLAG_SIGNED &&
+		    comp->flags & IPL_RB_COMPONENT_FLAG_VERIFIED)
+			return 1;
+	}
+	return 0;
+}
+
+unsigned int
+secure_boot_enabled()
+{
+	struct ipl_pl_hdr *pl_hdr;
+	unsigned long tmp;
+
+	tmp = (unsigned long) S390_lowcore.ipl_parmblock_ptr;
+	pl_hdr = (struct ipl_pl_hdr *) tmp;
+
+	return pl_hdr->flags & IPL_FLAG_SECURE;
+}
+
 void start(void)
 {
 	unsigned int subchannel_id;
@@ -200,8 +267,20 @@ void start(void)
 	unsigned int begin = 0, end = 0, length = 0;
 
 	/*
-	 * Relocate the kernel image to its actual load address while stripping
-	 * away the kernel IPL header to not overwrite the stage3 loader.
+	 * IPL process is secure we have to use default IPL values and
+	 * check if the psw jump address is within at the start of a
+	 * verified component. If it is not IPL is aborted.
+	 */
+	if (secure_boot_enabled()) {
+		if (_image_addr != DEFAULT_IMAGE_ADDR ||
+		    _load_psw != DEFAULT_PSW_LOAD)
+			panic(ESECUREBOOT, "%s", msg_sipl_inval);
+
+		if (!is_verified_address(_load_psw & PSW_ADDR_MASK))
+			panic(ESECUREBOOT, "%s", msg_sipl_unverified);
+	}
+	/*
+	 * cut the kernel header
 	 */
 	memmove((void *)_image_addr,
 		(void *)_image_addr + KERNEL_HEADER_SIZE,

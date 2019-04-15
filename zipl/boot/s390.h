@@ -35,6 +35,11 @@ struct psw_t {
 	uint64_t addr;
 } __aligned(8);
 
+struct psw32_t {
+	uint32_t mask;
+	uint32_t addr;
+} __aligned(8);
+
 void load_wait_psw(uint64_t, struct psw_t *);
 
 struct _lowcore {

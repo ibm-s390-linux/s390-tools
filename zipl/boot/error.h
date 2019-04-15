@@ -31,6 +31,9 @@
 /* Internal error */
 #define EINTERNAL		0x00004511
 
+/* Secure IPL error */
+#define ESECUREBOOT		0x00004512
+
 /* kdump: No operating system information was found */
 #define EOS_INFO_MISSING	0x00004520
 
