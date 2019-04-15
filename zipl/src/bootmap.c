@@ -416,11 +416,12 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 {
 	struct stat stats;
 	void* table;
-	void* stage3;
-	size_t stage3_size;
-	const char *comp_name[4] = {"kernel image", "parmline",
-				    "initial ramdisk", "internal loader"};
-	struct component_loc comp_loc[4];
+	void *stage3_params;
+	size_t stage3_params_size;
+	const char *comp_name[5] = {"kernel image", "parmline",
+				    "initial ramdisk", "internal loader",
+				    "parameters"};
+	struct component_loc comp_loc[5];
 	int rc;
 	int offset, flags = 0;
 	size_t ramdisk_size, image_size;
@@ -473,22 +474,35 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	image_size = stats.st_size;
 
 	/* Add stage 3 loader to bootmap */
-	rc = boot_get_stage3(&stage3, &stage3_size, ipl->parm_addr,
-			     ipl->ramdisk_addr, ramdisk_size,
-			     ipl->is_kdump ? ipl->image_addr + 0x10 :
-			     ipl->image_addr,
-			     (info->type == disk_type_scsi) ? 0 : 1,
-			     flags, image_size);
+	rc = add_component_file(fd, ZIPL_STAGE3_PATH, DEFAULT_STAGE3_ADDRESS, 0,
+				VOID_ADD(table, offset), 1, info, target,
+				&comp_loc[3]);
+	if (rc) {
+		error_text("Could not add internal loader file '%s'",
+			   ZIPL_STAGE3_PATH);
+		free(table);
+		return rc;
+	}
+	offset += sizeof(struct component_entry);
+
+	/* Add stage 3 parameter to bootmap */
+	rc = boot_get_stage3_parms(&stage3_params, &stage3_params_size,
+				   ipl->parm_addr, ipl->ramdisk_addr,
+				   ramdisk_size,
+				   ipl->is_kdump ? ipl->image_addr + 0x10 :
+				   ipl->image_addr,
+				   (info->type == disk_type_scsi) ? 0 : 1,
+				   flags, image_size);
 	if (rc) {
 		free(table);
 		return rc;
 	}
-	rc = add_component_buffer(fd, stage3, stage3_size,
-				  DEFAULT_STAGE3_ADDRESS,
-				  VOID_ADD(table, offset), info, &comp_loc[3]);
-	free(stage3);
+	rc = add_component_buffer(fd, stage3_params, stage3_params_size,
+				  DEFAULT_STAGE3_PARAMS_ADDRESS,
+				  VOID_ADD(table, offset), info, &comp_loc[4]);
+	free(stage3_params);
 	if (rc) {
-		error_text("Could not add stage 3 boot loader");
+		error_text("Could not add parameters");
 		free(table);
 		return -1;
 	}
@@ -540,7 +554,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		offset += sizeof(struct component_entry);
 	}
 	if (verbose)
-		print_components(comp_name, comp_loc, 4);
+		print_components(comp_name, comp_loc, ARRAY_SIZE(comp_name));
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       component_execute,
@@ -924,7 +938,9 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		ulong size;
 		ulong unused_size;
 
-		size = DIV_ROUND_UP(get_stage3_size(), info->phy_block_size);
+		/* Use approximated stage 3 size as starting point */
+		size = MINIMUM_ADDRESS;
+
 		/* Ramdisk */
 		if (job->data.dump.ramdisk != NULL) {
 			if (stat(job->data.dump.ramdisk, &st))

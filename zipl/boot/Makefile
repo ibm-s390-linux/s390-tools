@@ -13,10 +13,9 @@ FILES	= fba0.bin fba1b.bin fba2.bin \
 	  eckd0_ldl.bin eckd0_cdl.bin \
 	  eckd1.bin eckd1b.bin eckd2.bin \
 	  tape0.bin \
-	  eckd2dump_sv.bin tape2dump.bin fba2dump.bin eckd2dump_mv.bin \
-	  stage3.bin
+	  eckd2dump_sv.bin tape2dump.bin fba2dump.bin eckd2dump_mv.bin
 
-all: data.o data.h tape0.bin
+all: data.o data.h tape0.bin stage3.bin
 
 # Prevent make from using some default rules...
 %:	%.S
@@ -44,7 +43,7 @@ eckd2.exec: head.o stage2.o cio.o eckd2.o libc.o menu.o sclp.o \
 fba2.exec: head.o stage2.o cio.o fba2.o libc.o menu.o sclp.o \
 	   kdump2.o kdump.o entry.o
 stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
-	     kdump.o entry.o
+	     kdump.o entry.o stage3.lds
 
 %.exec:	%.o
 	@STAGE=$$( \
@@ -87,6 +86,7 @@ data.h: data.o
 				echo "extern char $$SYMBOL;" >>data.h; done
 
 clean:
-	rm -f *.o *.exec *.bin $(FILES) data.o data.h tape0.bin *.xxx *.yyy
+	rm -f *.o *.exec *.bin $(FILES) data.o data.h tape0.bin *.xxx *.yyy \
+	      stage3.bin
 
 .PHONY: all clean

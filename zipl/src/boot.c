@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "../boot/data.h"
 #include "boot.h"
@@ -68,20 +70,17 @@ boot_check_data(void)
 	return 0;
 }
 
-/* Export stage 3 size for partition dump with dump kernel */
-size_t
-get_stage3_size()
-{
-	return DATA_SIZE(stage3);
-}
-
-/* Create a stage 3 loader in memory.
+/*
+ * Create a stage 3 parameter block in memory.
  * Upon success, return 0 and set BUFFER to point to the data buffer and set
- * BYTECOUNT to contain the loader size in bytes. Return non-zero otherwise. */
+ * BYTECOUNT to contain the parameter block size in bytes.
+ * Return non-zero otherwise.
+ */
 int
-boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
-		address_t initrd_addr, size_t initrd_len, address_t image_addr,
-		int extra_parm, uint16_t flags, size_t image_len)
+boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
+		      address_t initrd_addr, size_t initrd_len,
+		      address_t image_addr, int extra_parm, uint16_t flags,
+		      size_t image_len)
 {
 	struct boot_stage3_params params;
 	void* data;
@@ -92,10 +91,10 @@ boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
 		return -1;
 	}
 	/* Get memory */
-	data = misc_malloc(DATA_SIZE(stage3));
+	data = misc_malloc(sizeof(params));
 	if (data == NULL)
 		return -1;
-	memset(data, 0, DATA_SIZE(stage3));
+	memset(data, 0, sizeof(params));
 	/* Prepare params section */
 	params.parm_addr = (uint64_t) parm_addr;
 	params.initrd_addr = (uint64_t) initrd_addr;
@@ -106,10 +105,9 @@ boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
 	params.image_len = (uint64_t) image_len;
 	params.image_addr = (uint64_t) image_addr;
 	/* Initialize buffer */
-	memcpy(data, DATA_ADDR(stage3), DATA_SIZE(stage3));
-	memcpy(data, &params, sizeof(struct boot_stage3_params));
+	memcpy(data, &params, sizeof(params));
 	*buffer = data;
-	*bytecount = DATA_SIZE(stage3);
+	*bytecount = sizeof(params);
 	return 0;
 }
 

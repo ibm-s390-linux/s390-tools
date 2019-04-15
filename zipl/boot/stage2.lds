@@ -9,7 +9,8 @@
  * 0x2000-0x4fff	Sections (load): head, text, data, rodata, rodata.str
  * 0x5000-0x51ff	eckd2dump_mv parameter block (426 bytes)
  * 0x5200-0x5fff	Sections: bss
- * 0x6000-0x9fff	Memory allocation (heap)
+ * 0x6000-0x8fff	Memory allocation (heap)
+ * 0x9000-0x9fff        Memory to load stage3 parameter to
  * 0xa000-0xdfff        Memory to load stage3 to
  * 0xe000-0xffff	Stack
  *
@@ -52,7 +53,7 @@ SECTIONS
 
   . = 0x6000;
   __heap_start = .;
-  . = 0xa000;
+  . = 0x9000;
   __heap_stop = .;
 
   . = 0xf000;

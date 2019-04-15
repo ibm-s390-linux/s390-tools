@@ -15,8 +15,9 @@ objects = misc.o error.o scan.o job.o boot.o bootmap.o disk.o \
 
 zipl_helpers = $(basename $(wildcard zipl_helper.*.c))
 chreipl_helpers = $(subst zipl_,chreipl_, $(zipl_helpers))
+zipl_stage3 = ../boot/stage3.bin
 
-all: zipl $(chreipl_helpers)
+all: zipl $(chreipl_helpers) $(zipl_stage3)
 
 zipl: $(objects) $(libs)
 
@@ -33,6 +34,7 @@ install: all
 	$(INSTALL) -m 755 $(zipl_helpers) $(chreipl_helpers) \
 		$(DESTDIR)$(TOOLS_LIBDIR)
 	$(CP) --no-dereference $(chreipl_helpers) $(DESTDIR)$(TOOLS_LIBDIR)
+	$(CP) --no-dereference $(zipl_stage3) $(DESTDIR)$(TOOLS_LIBDIR)
 
 clean:
 	rm -f *.o $(zipl_helpers) $(chreipl_helpers) zipl
@@ -48,3 +50,6 @@ clean:
 
 ../boot/data.o:
 	make -C ../boot data.o
+
+../boot/stage3.bin:
+	make -C ../boot stage3.bin

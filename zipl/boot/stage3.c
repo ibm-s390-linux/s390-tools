@@ -13,41 +13,6 @@
 #include "s390.h"
 #include "stage3.h"
 
-/*
- * 64 Byte dummy space for external symbols
- * _parm_addr;    address of parmline
- * _initrd_addr;  address of initrd
- * _initrd_len;   length of initrd
- * _load_psw;     load psw of kernel
- * _extra_parm;   use extra parm line mechanism?
- * stage3_flags;  flags (e.g. STAGE3_FLAG_KDUMP)
- * _image_len;    length of kernel
- * _image_addr;   target address of kernel
- *
- * needed to blow up the binary and leave room
- */
-__attribute__ ((section(".text.dummy"))) void _dummy(void)
-{
-		asm volatile(
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		".long 0x00000000\n"
-		);
-}
-
 static unsigned char ebc_037[256] = {
 /* 0x00  NUL   SOH   STX   ETX  *SEL    HT  *RNL   DEL */
 	0x00, 0x01, 0x02, 0x03, 0x07, 0x09, 0x07, 0x7F,

@@ -308,11 +308,10 @@ int boot_init_fba_stage1b(struct boot_fba_stage1b *stage1b,
 			  disk_blockptr_t *stage2_list,
 			  blocknum_t stage2_count);
 int boot_get_eckd_stage2(void** data, size_t* size, struct job_data* job);
-size_t get_stage3_size();
-int boot_get_stage3(void** buffer, size_t* bytecount, address_t parm_addr,
-		    address_t initrd_addr, size_t initrd_len,
-		    address_t image_addr, int extra_parm, uint16_t flags,
-		    size_t image_len);
+int boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
+			  address_t initrd_addr, size_t initrd_len,
+			  address_t load_addr, int extra_parm, uint16_t flags,
+			  size_t image_len);
 int boot_get_tape_ipl(void** data, size_t* size, address_t parm_addr,
 		      address_t initrd_addr, address_t image_addr);
 int boot_get_tape_dump(void** data, size_t* size, uint64_t mem);
