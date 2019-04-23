@@ -418,13 +418,12 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	void* table;
 	void *stage3_params;
 	size_t stage3_params_size;
-	const char *comp_name[5] = {"kernel image", "parmline",
-				    "initial ramdisk", "internal loader",
-				    "parameters"};
+	const char *comp_name[5];
 	struct component_loc comp_loc[5];
 	int rc;
 	int offset, flags = 0;
 	size_t ramdisk_size, image_size;
+	int comp_nr = 0;
 
 	memset(comp_loc, 0, sizeof(comp_loc));
 	table = misc_malloc(info->phy_block_size);
@@ -476,7 +475,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	/* Add stage 3 loader to bootmap */
 	rc = add_component_file(fd, ZIPL_STAGE3_PATH, DEFAULT_STAGE3_ADDRESS, 0,
 				VOID_ADD(table, offset), 1, info, target,
-				&comp_loc[3]);
+				&comp_loc[comp_nr]);
 	if (rc) {
 		error_text("Could not add internal loader file '%s'",
 			   ZIPL_STAGE3_PATH);
@@ -484,6 +483,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		return rc;
 	}
 	offset += sizeof(struct component_entry);
+	comp_name[comp_nr] = "internal loader";
+	comp_nr++;
 
 	/* Add stage 3 parameter to bootmap */
 	rc = boot_get_stage3_parms(&stage3_params, &stage3_params_size,
@@ -499,7 +500,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	}
 	rc = add_component_buffer(fd, stage3_params, stage3_params_size,
 				  DEFAULT_STAGE3_PARAMS_ADDRESS,
-				  VOID_ADD(table, offset), info, &comp_loc[4]);
+				  VOID_ADD(table, offset), info,
+				  &comp_loc[comp_nr]);
 	free(stage3_params);
 	if (rc) {
 		error_text("Could not add parameters");
@@ -507,19 +509,23 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		return -1;
 	}
 	offset += sizeof(struct component_entry);
+	comp_name[comp_nr] = "parameters";
+	comp_nr++;
 	/* Add kernel image */
 	if (verbose) {
 		printf("  kernel image......: %s\n", ipl->image);
 	}
 	rc = add_component_file(fd, ipl->image, ipl->image_addr,
 				0, VOID_ADD(table, offset),
-				add_files, info, target, &comp_loc[0]);
+				add_files, info, target, &comp_loc[comp_nr]);
 	if (rc) {
 		error_text("Could not add image file '%s'", ipl->image);
 		free(table);
 		return rc;
 	}
 	offset += sizeof(struct component_entry);
+	comp_name[comp_nr] = "kernel image";
+	comp_nr++;
 	if (ipl->parmline != NULL) {
 		/* Add kernel parmline */
 		if (verbose) {
@@ -529,7 +535,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 					  strlen(ipl->parmline) + 1,
 					  ipl->parm_addr,
 					  VOID_ADD(table, offset),
-					  info, &comp_loc[1]);
+					  info, &comp_loc[comp_nr]);
 		if (rc) {
 			error_text("Could not add parmline '%s'",
 				   ipl->parmline);
@@ -537,6 +543,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 			return -1;
 		}
 		offset += sizeof(struct component_entry);
+		comp_name[comp_nr] = "parmline";
+		comp_nr++;
 	}
 
 	/* finally add ramdisk */
@@ -544,7 +552,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		rc = add_component_file(fd, ipl->ramdisk,
 					ipl->ramdisk_addr, 0,
 					VOID_ADD(table, offset),
-					add_files, info, target, &comp_loc[2]);
+					add_files, info, target,
+					&comp_loc[comp_nr]);
 		if (rc) {
 			error_text("Could not add ramdisk '%s'",
 				   ipl->ramdisk);
@@ -552,9 +561,11 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 			return -1;
 		}
 		offset += sizeof(struct component_entry);
+		comp_name[comp_nr] = "initial ramdisk";
+		comp_nr++;
 	}
 	if (verbose)
-		print_components(comp_name, comp_loc, ARRAY_SIZE(comp_name));
+		print_components(comp_name, comp_loc, comp_nr);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       component_execute,
