@@ -352,6 +352,21 @@ whether they contain a dump signature or not.
 This option can only be used together with
 .BR \-\-mvdump .
 
+.TP
+.BR "\-S <SWITCH>" " or " "\-\-secure <SWITCH>"
+Control the zIPL secure boot support.
+<SWITCH> can take one of three values:
+
+  auto (default)
+    Write signatures if available and supported by the system.
+  1
+    Signatures are written independent of support indicated by the local
+    system. Also missing signatures for stage 3 and kernel IPL files
+    will result in an error.
+  0
+    No signatures will be written.
+
+
 .SH EXAMPLE
 1. Scenario: prepare disk for booting a Linux kernel image using the
 following parameters:
