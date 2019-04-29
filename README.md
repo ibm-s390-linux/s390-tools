@@ -285,6 +285,9 @@ Build and runtime requirements for specific tools
 In the following more details on the build an runtime requirements of
 the different tools are provided:
 
+* dbginfo.sh:
+  The tar package is required to archive collected data.
+
 * osasnmpd:
   You need at least the NET-SNMP 5.1.x package (net-snmp-devel.rpm)
   installed, before building the osasnmpd subagent.
