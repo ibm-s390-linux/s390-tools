@@ -86,6 +86,7 @@ stage3.bin:	stage3.exec
 		--only-section=.ex_table \
 		--only-section=.data \
 		--only-section=.rodata.str1.2 \
+		--only-section=.rodata.cst8 \
 		--only-section=.rodata \
 		--only-section=.stage2dump.tail \
 		--only-section=.eckd2dump_mv.tail \
