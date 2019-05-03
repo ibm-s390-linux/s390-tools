@@ -699,6 +699,10 @@ scan_bls_field(struct misc_file_buffer *file, struct scan_token* scan,
 	}
 
 	val_end = file->pos;
+
+	while (val_end > val_start && isblank(file->buffer[val_end - 1]))
+		val_end--;
+
 	file->buffer[key_end] = '\0';
 	file->buffer[val_end] = '\0';
 
@@ -780,6 +784,7 @@ scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
 			case EOF:
 				break;
 			case '\t':
+			case '\n':
 			case '\0':
 			case ' ':
 				file.pos++;
