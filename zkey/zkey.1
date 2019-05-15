@@ -92,6 +92,7 @@ key repository.
 .IR volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-apqns | \-a
 .IR card1.domain1[,card2.domain2[,...]] ]
+.RB [ \-\-no\-apqn\-check ]
 .RB [ \-\-sector-size | \-S
 .IR bytes ]
 .RB [ \-\-volume-type | \-t
@@ -141,6 +142,9 @@ options.
 .BR validate | val
 .RB [ \-\-name | \-N
 .IR key-name ]
+.RB [ \-\-apqns | \-a
+.IR card1.domain1[,card2.domain2[,...]] ]
+.RB [ \-\-no\-apqn\-check ]
 .RB [ \-\-verbose | \-V ]
 .PP
 Use the
@@ -160,8 +164,21 @@ contained in the secure key repository, specify the name of the key
 or a pattern containing wildcards using the
 .B \-\-name
 option. When wildcards are used you must quote the value.
-If neither option \fIsecure\-key\-file\fP nor option
+You can also specify the
+.B \-\-apqns
+option to validate those secure keys which are associated with the specified
+cryptographic adapters (APQNs). You can use wildcards for the APQN
+specification. When wildcards are used you must quote the value.
+If both option
 .B \-\-name
+and option
+.B \-\-apqns
+are specified then all secure keys contained in the key repository that match
+both patterns are validated.
+If neither option \fIsecure\-key\-file\fP nor options
+.B \-\-name
+or
+.B \-\-apqns
 are specified, then all secure keys contained in the key repository
 are validated.
 .
@@ -259,7 +276,7 @@ and option
 .B \-\-apqns
 are specified then all secure keys
 contained in the key repository that match both patterns are re-enciphered.
-If all both options are omitted, then all secure keys contained in the key
+If both options are omitted, then all secure keys contained in the key
 repository are re-enciphered.
 .PP
 Re-enciphering a secure key contained in the secure key repository can be
@@ -298,6 +315,7 @@ to be installed. For the supported environments and downloads, see:
 .IR volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-apqns | \-a
 .IR card1.domain1[,card2.domain2[,...]] ]
+.RB [ \-\-no\-apqn\-check ]
 .RB [ \-\-sector-size | \-S
 .IR bytes ]
 .RB [ \-\-volume-type | \-t
@@ -410,6 +428,7 @@ because the secure key is contained in the LUKS2 header.
 .IR [+|-]volume1:dmname1[,volume2:dmname2[,...]] ]
 .RB [ \-\-apqns | \-a
 .IR [+|-]card1.domain1[,card2.domain2[,...]] ]
+.RB [ \-\-no\-apqn\-check ]
 .RB [ \-\-sector-size | \-S
 .IR bytes ]
 .RB [ \-\-volume-type | \-t
@@ -685,8 +704,14 @@ Specifies a comma-separated list of cryptographic adapters in CCA
 coprocessor mode (APQN) which are associated with the secure AES key in the
 repository. Each APQN association specifies a card and domain number separated
 by a period (like lszcrypt displays it). When at least one APQN is specified,
-then the first one is used to generate the key. If no APQNs are specified,
-then an APQN is selected automatically. All specified APQNs must be online.
+then the first online APQN is used to generate the key. If no APQNs are
+specified, then an APQN is selected automatically. All specified APQNs must be
+online, unless the \fB\-\-no\-apqn\-check\fP option is specified.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-no\-apqn\-check
+Do not check if the specified APQNs are available. Use this option to
+associate APQNs with a secure AES key that are currently not available.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-S ", " \-\-sector-size\~\fIbytes\fP
@@ -712,6 +737,19 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the name of the secure key in the secure key repository. You can
 use wildcards to select multiple secure keys in the secure key repository.
 When wildcards are used you must quote the value.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
+Specifies a comma-separated list of cryptographic adapters in CCA
+coprocessor mode (APQNs). You can use wildcards in the APQN specification.
+All secure keys contained in the secure key repository
+which are associated with the specified APQNs are validated.
+Each APQN specifies a card and domain number separated by a period (like
+lszcrypt displays it).
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-no\-apqn\-check
+Do not check if the associated APQNs are available.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -796,7 +834,13 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies a comma-separated list of cryptographic adapters in CCA
 coprocessor mode (APQN) which are associated with the secure AES key in the
 repository. Each APQN association specifies a card and domain number separated
-by a period (like lszcrypt displays it). All specified APQNs must be online.
+by a period (like lszcrypt displays it). All specified APQNs must be online,
+unless option \fB\-\-no\-apqn\-check\fP is specified.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-no\-apqn\-check
+Do not check if the specified APQNs are available. Use this option to
+associate APQNs with a secure AES key that are currently not available.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-S ", " \-\-sector-size\~\fIbytes\fP
@@ -915,7 +959,13 @@ To remove an APQN from the associated APQNs, prefix the APQN with a \fI-\fP.
 To set (replace) the APQN association do not specify a prefix.
 You cannot mix \fI+\fP and \fI-\fP in one specification. You can either add or
 remove (or set) the associations with one command.
-All APQNs being added or set (replaced) must be online.
+All APQNs being added or set (replaced) must be online, unless option
+\fB\-\-no\-apqn\-check\fP is specified.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-no\-apqn\-check
+Do not check if the specified APQNs are available. Use this option to
+associate APQNs with a secure AES key that are currently not available.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-S ", " \-\-sector-size\~\fIbytes\fP

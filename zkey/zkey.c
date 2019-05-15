@@ -67,6 +67,7 @@ static struct zkey_globals {
 	char *description;
 	char *volumes;
 	char *apqns;
+	bool noapqncheck;
 	long int sector_size;
 	char *volume_type;
 	char *newname;
@@ -115,6 +116,7 @@ static struct zkey_globals {
 #define OPT_CRYPTSETUP_TRIES		259
 #define OPT_CRYPTSETUP_OPEN		260
 #define OPT_CRYPTSETUP_FORMAT		261
+#define OPT_NO_APQN_CHECK		262
 
 /*
  * Configuration of command line options
@@ -185,6 +187,14 @@ static struct util_opt opt_vec[] = {
 			"that are associated with the secure AES key in the "
 			"repository",
 		.command = COMMAND_GENERATE,
+	},
+	{
+		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
+		.desc = "Do not check if the specified APQN(s) are available. "
+			"Use this option to associate APQN(s) with a secure "
+			"AES key that are currently not available.",
+		.command = COMMAND_GENERATE,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
@@ -295,6 +305,12 @@ static struct util_opt opt_vec[] = {
 			"associated with specific crypto cards",
 		.command = COMMAND_VALIDATE,
 	},
+	{
+		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
+		.desc = "Do not check if the associated APQN(s) are available",
+		.command = COMMAND_VALIDATE,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -329,6 +345,14 @@ static struct util_opt opt_vec[] = {
 			"that are associated with the secure AES key in the "
 			"repository",
 		.command = COMMAND_IMPORT,
+	},
+	{
+		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
+		.desc = "Do not check if the specified APQN(s) are available. "
+			"Use this option to associate APQN(s) with a secure "
+			"AES key that are currently not available.",
+		.command = COMMAND_IMPORT,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
@@ -466,6 +490,14 @@ static struct util_opt opt_vec[] = {
 			"pairs of crypto cards and domains from the key "
 			"specify '-CARD.DOMAIN[,...]'",
 		.command = COMMAND_CHANGE,
+	},
+	{
+		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
+		.desc = "Do not check if the specified APQN(s) are available. "
+			"Use this option to associate APQN(s) with a secure "
+			"AES key that are currently not available.",
+		.command = COMMAND_CHANGE,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
@@ -1013,8 +1045,9 @@ static int command_generate_repository(void)
 		g.sector_size = 0;
 
 	rc = keystore_generate_key(g.keystore, g.name, g.description, g.volumes,
-				   g.apqns, g.sector_size, g.keybits, g.xts,
-				   g.clearkeyfile,  g.volume_type, g.pkey_fd);
+				   g.apqns, g.noapqncheck, g.sector_size,
+				   g.keybits, g.xts, g.clearkeyfile,
+				   g.volume_type, g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1033,6 +1066,12 @@ static int command_generate(void)
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
 	}
+	if (g.apqns == NULL && g.noapqncheck) {
+		warnx("Option '--noapqncheck' is only valid together with "
+		      "the '--apqns|-a' option");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
 	if (g.name != NULL)
 		return command_generate_repository();
 	if (g.pos_arg != NULL) {
@@ -1044,6 +1083,12 @@ static int command_generate(void)
 		}
 		if (g.apqns != NULL) {
 			warnx("Option '--apqns|-a' is not valid for "
+			      "generating a key outside of the repository");
+			util_prg_print_parse_error();
+			return EXIT_FAILURE;
+		}
+		if (g.noapqncheck) {
+			warnx("Option '--noapqncheck' is not valid for "
 			      "generating a key outside of the repository");
 			util_prg_print_parse_error();
 			return EXIT_FAILURE;
@@ -1271,6 +1316,12 @@ static int command_validate_file(void)
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
 	}
+	if (g.noapqncheck) {
+		warnx("Option '--noapqncheck' is not valid for "
+		      "validating a key outside of the repository");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
 
 	/* Read the secure key to be re-enciphered */
 	secure_key = read_secure_key(g.pos_arg, &secure_key_size, g.verbose);
@@ -1324,7 +1375,15 @@ static int command_validate_repository(void)
 {
 	int rc;
 
-	rc = keystore_validate_key(g.keystore, g.name, g.apqns, g.pkey_fd);
+	if (g.apqns == NULL && g.noapqncheck) {
+		warnx("Option '--noapqncheck' is only valid together with "
+		      "the '--apqns|-a' option");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+
+	rc = keystore_validate_key(g.keystore, g.name, g.apqns, g.noapqncheck,
+				   g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1361,9 +1420,16 @@ static int command_import(void)
 	if (g.sector_size < 0)
 		g.sector_size = 0;
 
+	if (g.apqns == NULL && g.noapqncheck) {
+		warnx("Option '--noapqncheck' is only valid together with "
+		      "the '--apqns|-a' option");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+
 	rc = keystore_import_key(g.keystore, g.name, g.description, g.volumes,
-				 g.apqns, g.sector_size, g.pos_arg,
-				 g.volume_type);
+				 g.apqns, g.noapqncheck, g.sector_size,
+				 g.pos_arg, g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1434,9 +1500,16 @@ static int command_change(void)
 		misc_print_required_parm("--name/-N");
 		return EXIT_FAILURE;
 	}
+	if (g.apqns == NULL && g.noapqncheck) {
+		warnx("Option '--noapqncheck' is only valid together with "
+		      "the '--apqns|-a' option");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
 
 	rc = keystore_change_key(g.keystore, g.name, g.description, g.volumes,
-				 g.apqns, g.sector_size, g.volume_type);
+				 g.apqns, g.noapqncheck, g.sector_size,
+				 g.volume_type);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1685,6 +1758,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'a':
 			g.apqns = optarg;
+			break;
+		case OPT_NO_APQN_CHECK:
+			g.noapqncheck = 1;
 			break;
 		case 'S':
 			g.sector_size = strtol(optarg, &endp, 0);

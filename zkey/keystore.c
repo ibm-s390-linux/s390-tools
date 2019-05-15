@@ -1085,6 +1085,11 @@ out:
 	return rc;
 }
 
+struct apqn_check {
+	bool noonlinecheck;
+	bool nomsg;
+};
+
 /**
  * Checks an APQN value for its syntax. This is a callback function for
  * function _keystore_change_association().
@@ -1093,13 +1098,14 @@ out:
  * @param[in] remove   if true the apqn is removed
  * @param[in] set      if true the apqn is set (not used here)
  * @param[out] normalized normalized value on return or NULL if no change
- * @param[in] private  private data (not used here)
+ * @param[in] private  private data (struct apqn_check)
  *
  * @returns 0 if successful, a negative errno value otherwise
  */
 static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
-				char **normalized, void *UNUSED(private))
+				char **normalized, void *private)
 {
+	struct apqn_check *info = (struct apqn_check *)private;
 	int rc, card, domain;
 	regmatch_t pmatch[1];
 	regex_t reg_buf;
@@ -1125,15 +1131,16 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 
 	util_asprintf(normalized, "%02x.%04x", card, domain);
 
-	if (remove) {
+	if (remove || info->noonlinecheck) {
 		rc = 0;
 		goto out;
 	}
 
 	rc = _keystore_is_apqn_online(card, domain);
 	if (rc != 1) {
-		warnx("The APQN %02x.%04x is %s", card, domain,
-		      rc == -1 ? "not a CCA card" : "not online");
+		if (info->nomsg == 0)
+			warnx("The APQN %02x.%04x is %s", card, domain,
+			      rc == -1 ? "not a CCA card" : "not online");
 		rc = -EIO;
 		goto out;
 	} else {
@@ -1552,6 +1559,8 @@ static int _keystore_set_default_properties(struct properties *key_props)
  *                        key (optional, can be NULL)
  * @param[in] apqns       a comma separated list of APQNs associated with this
  *                        key (optional, can be NULL)
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
  * @param[in] sector_size the sector size to use with dm-crypt. It must be power
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
@@ -1563,11 +1572,14 @@ static int _keystore_create_info_file(struct keystore *keystore,
 				      const struct key_filenames *filenames,
 				      const char *description,
 				      const char *volumes, const char *apqns,
+				      bool noapqncheck,
 				      size_t sector_size,
 				      const char *volume_type)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
 					  .set = 0 };
+	struct apqn_check apqn_check = { .noonlinecheck = noapqncheck,
+					 .nomsg = 0 };
 	struct properties *key_props;
 	char temp[10];
 	int rc;
@@ -1593,7 +1605,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 
 	rc = _keystore_change_association(key_props, PROP_NAME_APQNS,
 					  apqns != NULL ? apqns : "",
-					  "APQN", _keystore_apqn_check, NULL);
+					  "APQN", _keystore_apqn_check,
+					  &apqn_check);
 	if (rc != 0)
 		goto out;
 
@@ -1652,15 +1665,18 @@ out:
 }
 
 /**
- * Extracts a card/domain pair from the specified APQns, or uses AUTOSELECT
- * if no APQNs are specified.
+ * Extracts an online card/domain pair from the specified APQns. If none of the
+ * specified APQNs are online, then -ENODEV is returned.
+ * If no APQNs are specified at all, then it uses AUTOSELECT and returns zero.
  */
 static int _keystore_get_card_domain(const char *apqns, unsigned int *card,
 				     unsigned int *domain)
 {
+	struct apqn_check apqn_check = { .noonlinecheck = 0, .nomsg = 1 };
 	char **apqn_list;
 	char *normalized = NULL;
 	int rc = 0;
+	int i;
 
 	*card = AUTOSELECT;
 	*domain = AUTOSELECT;
@@ -1672,17 +1688,23 @@ static int _keystore_get_card_domain(const char *apqns, unsigned int *card,
 	if (apqn_list[0] == NULL)
 		goto out;
 
-	rc = _keystore_apqn_check(apqn_list[0], 0, 0, &normalized, NULL);
-	if (normalized != NULL)
-		free(normalized);
-	if (rc != 0)
-		goto out;
+	for (i = 0; apqn_list[i] != NULL; i++) {
+		rc = _keystore_apqn_check(apqn_list[i], 0, 0, &normalized,
+					  &apqn_check);
+		if (normalized != NULL)
+			free(normalized);
+		if (rc == -EINVAL)
+			goto out;
+		if (rc != 0)
+			continue;
 
-	if (sscanf(apqn_list[0], "%x.%x", card, domain) != 2) {
-		rc = -EINVAL;
-		goto out;
+		if (sscanf(apqn_list[i], "%x.%x", card, domain) == 2)
+			goto found;
 	}
 
+	warnx("None of the specified APQNs is online or of type CCA");
+	rc = -ENODEV;
+found:
 out:
 	str_list_free_string_array(apqn_list);
 	return rc;
@@ -1698,6 +1720,8 @@ out:
  *                        key (optional, can be NULL)
  * @param[in] apqns       a comma separated list of APQNs associated with this
  *                        key (optional, can be NULL)
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
  * @param[in] sector_size the sector size to use with dm-crypt. It must be power
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
@@ -1714,9 +1738,10 @@ out:
  */
 int keystore_generate_key(struct keystore *keystore, const char *name,
 			  const char *description, const char *volumes,
-			  const char *apqns, size_t sector_size,
-			  size_t keybits, bool xts, const char *clear_key_file,
-			  const char *volume_type, int pkey_fd)
+			  const char *apqns, bool noapqncheck,
+			  size_t sector_size, size_t keybits, bool xts,
+			  const char *clear_key_file, const char *volume_type,
+			  int pkey_fd)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
@@ -1758,7 +1783,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
-					sector_size, volume_type);
+					noapqncheck, sector_size, volume_type);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -1791,6 +1816,8 @@ out_free_key_filenames:
  *                        key (optional, can be NULL)
  * @param[in] apqns       a comma separated list of APQNs associated with this
  *                        key (optional, can be NULL)
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
  * @param[in] sector_size the sector size to use with dm-crypt. It must be power
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
@@ -1802,7 +1829,7 @@ out_free_key_filenames:
  */
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
-			const char *apqns, size_t sector_size,
+			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
@@ -1842,7 +1869,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
-					sector_size, volume_type);
+					noapqncheck, sector_size, volume_type);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -1880,6 +1907,8 @@ out_free_key_filenames:
  *                        key, or an APQN prefixed with '+' or '-' to add or
  *                        remove that APQN respectively. If NULL then the APQNs
  *                        are not changed.
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
  * @param[in] sector_size the sector size to use with dm-crypt. It must be power
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
@@ -1893,11 +1922,13 @@ out_free_key_filenames:
  */
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
-			const char *apqns, long int sector_size,
-			const char *volume_type)
+			const char *apqns, bool noapqncheck,
+			long int sector_size, const char *volume_type)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
 					  .set = 0 };
+	struct apqn_check apqn_check = { .noonlinecheck = noapqncheck,
+					 .nomsg = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
 	char temp[30];
@@ -1942,7 +1973,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	if (apqns != NULL) {
 		rc = _keystore_change_association(key_props, PROP_NAME_APQNS,
 						  apqns, "APQN",
-						  _keystore_apqn_check, NULL);
+						  _keystore_apqn_check,
+						  &apqn_check);
 		if (rc != 0)
 			goto out;
 	}
@@ -2276,6 +2308,7 @@ static void _keystore_print_record(struct util_rec *rec,
 struct validate_info {
 	struct util_rec *rec;
 	int pkey_fd;
+	bool noapqncheck;
 	unsigned long int num_valid;
 	unsigned long int num_invalid;
 	unsigned long int num_warnings;
@@ -2429,8 +2462,9 @@ static int _keystore_process_validate(struct keystore *keystore,
 				    "master key\n", 0);
 		info->num_warnings++;
 	}
-	if (_keystore_display_apqn_status(properties, name) != 0)
-		info->num_warnings++;
+	if (info->noapqncheck == 0)
+		if (_keystore_display_apqn_status(properties, name) != 0)
+			info->num_warnings++;
 	if (_keystore_display_volume_status(properties, name) != 0)
 		info->num_warnings++;
 
@@ -2446,11 +2480,16 @@ out:
  *
  * @param[in] keystore the key store
  * @param[in] name_filter  the name filter to select the key (can be NULL)
+ * @param[in] apqn_filter  the APQN filter to select the key (can be NULL)
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
+ * @param[in] pkey_fd     the file descriptor of /dev/pkey
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_validate_key(struct keystore *keystore, const char *name_filter,
-			  const char *apqn_filter, int pkey_fd)
+			  const char *apqn_filter, bool noapqncheck,
+			  int pkey_fd)
 {
 	struct validate_info info;
 	struct util_rec *rec;
@@ -2461,6 +2500,7 @@ int keystore_validate_key(struct keystore *keystore, const char *name_filter,
 	rec = _keystore_setup_record(1);
 
 	info.pkey_fd = pkey_fd;
+	info.noapqncheck = noapqncheck;
 	info.rec = rec;
 	info.num_valid = 0;
 	info.num_invalid = 0;
