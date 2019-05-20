@@ -151,7 +151,12 @@ static unsigned int sysfs_read_value(struct zpci_device *pdev, const char *attr)
 	fp = fopen(path, "r");
 	if (!fp)
 		fopen_err(path);
-	fscanf(fp, "%x", &val);
+	if (fscanf(fp, "%x", &val) != 1) {
+		fclose(fp);
+		warnx("Could not read file %s: %s", path, strerror(errno));
+		free(path);
+		exit(EXIT_FAILURE);
+	}
 	fclose(fp);
 	free(path);
 
