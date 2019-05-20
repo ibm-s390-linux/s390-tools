@@ -128,7 +128,10 @@ check_secure_boot_support(void)
 	if (!fp)
 		return false;
 
-	fscanf(fp, "%d", &val);
+	if (fscanf(fp, "%d", &val) != 1) {
+		fclose(fp);
+		return false;
+	}
 	fclose(fp);
 
 	return val ? true : false;
