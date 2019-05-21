@@ -161,8 +161,8 @@ int is_online(int cpuid)
 				retval = 1;
 			if (state == 0)
 				retval = 0;
-			fclose(filp);
 		}
+		fclose(filp);
 	}
 	return retval;
 }
@@ -220,8 +220,8 @@ int cpu_is_configured(int cpuid)
 				retval = 1;
 			if (state == 0)
 				retval = 0;
-			fclose(filp);
 		}
+		fclose(filp);
 	}
 	return retval;
 }
