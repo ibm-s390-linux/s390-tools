@@ -1,8 +1,12 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.8.1 (xxxx-xx-xx)__
+ * __v2.9.0 (2019-05-21)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.0 / 5.1
+
+  Add new tool:
+  - zcryptstats: Add zcryptstats to display usage statistics of
+      IBM Crypto Express adapters
 
   Changes of existing tools:
   - lszfcp: New command line option to show module parameters
@@ -11,6 +15,11 @@ Release history for s390-tools (MIT version)
   - lszfcp: Add new output marker for non-good fc_rports
   - lszfcp: Clean up whitespace (mixed indentation, trailing)
   - lschp: Add support for specifying a CHPID
+  - zipl: Add secure boot capabilities
+  - zkey: Add common passphrase options for cryptsetup and crypttab
+  - zkey: Add batch-mode option to cryptsetup and zkey-cryptsetup
+  - libu2s: Remove the entire library and provide more robust functionality
+      in libdasd and libutil instead
 
   Bug Fixes:
   - lszfcp: Allow to show zfcp_units without associated SCSI device
@@ -22,6 +31,7 @@ Release history for s390-tools (MIT version)
   - lszfcp: Fix missing block & sg device output without CONFIG_SYSFS_DEPRECATED
   - lszfcp: New command line option for extended output format
   - zfcpdbf: Warn about ambiguous payload records with dup reqid & payarea
+  - zpcictl: Check for regular directory to prevent possible buffer overflow
 
  * __v2.8.0 (2019-02-15)__
 
