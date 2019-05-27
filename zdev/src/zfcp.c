@@ -75,12 +75,24 @@ static struct attrib zfcp_tattr_allow_lun_scan = {
 
 static struct attrib zfcp_tattr_dif = {
 	.name = "dif",
-	.title = "Enable DIF/DIX data consistency checking",
+	.title = "Enable DIF data consistency checking",
 	.desc =
-	"Control the use of the end-to-end data consistency checking\n"
-	"mechanism (DIF/DIX):\n"
+	"Control the use of the DIF data consistency checking\n"
+	"mechanism:\n"
 	"  0: DIF is disabled\n"
 	"  1: DIF is enabled when supported by the FCP device hardware\n",
+	.defval = "0",
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+};
+
+static struct attrib zfcp_tattr_dix = {
+	.name = "dix",
+	.title = "Enable DIF&DIX data consistency checking",
+	.desc =
+	"Control the use of the end-to-end data consistency checking\n"
+	"mechanism (DIF&DIX):\n"
+	"  0: DIF&DIX is disabled\n"
+	"  1: DIF&DIX is enabled when supported by the FCP device hardware\n",
 	.defval = "0",
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
 };
@@ -160,6 +172,7 @@ static void all_bools_to_num(struct setting_list *list)
 	util_list_iterate(&list->list, s) {
 		if (s->attrib == &zfcp_tattr_allow_lun_scan ||
 		    s->attrib == &zfcp_tattr_dif ||
+		    s->attrib == &zfcp_tattr_dix ||
 		    s->attrib == &zfcp_tattr_datarouter ||
 		    s->attrib == &zfcp_tattr_no_auto_port_rescan) {
 			/* Convert Y to 1 and N to 0. */
@@ -295,6 +308,7 @@ struct devtype zfcp_devtype = {
 		&zfcp_tattr_queue_depth,
 		&zfcp_tattr_allow_lun_scan,
 		&zfcp_tattr_dif,
+		&zfcp_tattr_dix,
 		&zfcp_tattr_datarouter,
 		&zfcp_tattr_no_auto_port_rescan,
 		&zfcp_tattr_port_scan_ratelimit,
