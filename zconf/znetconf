@@ -1128,12 +1128,6 @@ then
 	exit 1
 fi
 
-# check existence of ccwgroup devices
-if ! [ -d $CCWGROUPBUS_DIR ]; then
-	print_error "There are no ccwgroup devices"
-	exit $RC_NO_CCWGROUP
-fi
-
 # determine environment
 check_vm_env
 
@@ -1296,6 +1290,12 @@ then
 	print_error "Too much arguments"
 	echo "Try '$CMD --help' for more information."
 	exit $RC_TOO_MUCH_ARGUMENTS
+fi
+
+# check existence of ccwgroup devices
+if ! [ -d $CCWGROUPBUS_DIR ]; then
+	print_error "There are no ccwgroup devices"
+	exit $RC_NO_CCWGROUP
 fi
 
 # react to parsed options
