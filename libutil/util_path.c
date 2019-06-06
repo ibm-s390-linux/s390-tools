@@ -160,7 +160,7 @@ bool util_path_is_reg_file(const char *fmt, ...)
 		rc = false;
 		goto free_str;
 	}
-	rc = (sb.st_mode & S_IFREG) ? true : false;
+	rc = S_ISREG(sb.st_mode) ? true : false;
 free_str:
 	free(path);
 	return rc;
@@ -189,7 +189,7 @@ bool util_path_is_dir(const char *fmt, ...)
 		rc = false;
 		goto free_str;
 	}
-	rc = (sb.st_mode & S_IFDIR) ? true : false;
+	rc = S_ISDIR(sb.st_mode) ? true : false;
 free_str:
 	free(path);
 	return rc;
