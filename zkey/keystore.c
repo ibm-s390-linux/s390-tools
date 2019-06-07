@@ -3,7 +3,7 @@
  *
  * Keystore handling functions
  *
- * Copyright IBM Corp. 2018
+ * Copyright IBM Corp. 2018, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -1378,7 +1378,7 @@ struct keystore *keystore_new(const char *directory, bool verbose)
 		warnx("Can not access '%s': %s", directory, strerror(errno));
 		return NULL;
 	}
-	if (!(sb.st_mode & S_IFDIR)) {
+	if (!S_ISDIR(sb.st_mode)) {
 		warnx("'%s' is not a directory", directory);
 		return NULL;
 	}
