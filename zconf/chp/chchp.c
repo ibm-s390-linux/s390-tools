@@ -3,7 +3,7 @@
  *
  * Provide main function and command line parsing.
  *
- * Copyright IBM Corp. 2016, 2017
+ * Copyright IBM Corp. 2016, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -236,7 +236,7 @@ static char *get_chp_dir(int css, int id)
 	char *path;
 
 	path = util_path_sysfs("devices/css%x/chp%x.%x", css, css, id);
-	if ((stat(path, &sb) == 0) && (sb.st_mode == S_IFDIR))
+	if ((stat(path, &sb) == 0) && S_ISDIR(sb.st_mode))
 		return path;
 	free(path);
 	return util_path_sysfs("devices/css%x/chp%x.%02x", css, css, id);
@@ -296,7 +296,7 @@ static void perform_command(int css, int id)
 	char *path;
 
 	path = get_chp_dir(css, id);
-	if ((stat(path, &sb) != 0) || ((sb.st_mode & S_IFMT) != S_IFDIR)) {
+	if ((stat(path, &sb) != 0) || !S_ISDIR(sb.st_mode)) {
 		printf("Skipping unknown channel-path %x.%02x\n", css, id);
 		goto out_free_path;
 	}
