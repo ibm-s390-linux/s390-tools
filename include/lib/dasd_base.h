@@ -54,6 +54,16 @@ typedef struct dasd_information2_t {
 	unsigned int reserved7;       /* reserved for further use ,...          */
 } dasd_information2_t;
 
+/*
+ * values to be used for dasd_information2_t.format
+ * 0x00: NOT formatted
+ * 0x01: Linux disc layout
+ * 0x02: Common disc layout
+ */
+#define DASD_FORMAT_NONE 0
+#define DASD_FORMAT_LDL  1
+#define DASD_FORMAT_CDL  2
+
 struct dasd_eckd_characteristics {
 	unsigned short cu_type;
 	struct {
@@ -140,6 +150,15 @@ typedef struct format_data_t {
 } format_data_t;
 
 /*
+ * values to be used for format_data_t.intensity
+ */
+#define DASD_FMT_INT_FMT_R0	1	/* write record zero */
+#define DASD_FMT_INT_FMT_HA	2	/* write home address, also set FMT_R0 ! */
+#define DASD_FMT_INT_INVAL	4	/* invalidate tracks */
+#define DASD_FMT_INT_COMPAT	8	/* use OS/390 compatible disk layout */
+#define DASD_FMT_INT_FMT_NOR0	16	/* remove permission to write record zero */
+
+/*
  * struct format_check_t
  * represents all data necessary to evaluate the format of
  * different tracks of a dasd
@@ -156,6 +175,16 @@ typedef struct format_check_t {
 	unsigned int blksize;           /* Block-size of first record in error */
 	unsigned int key_length;        /* Key length of first record in error */
 } format_check_t;
+
+/*
+ * values to be used in format_check_t for indicating
+ * possible format errors
+ */
+#define DASD_FMT_ERR_TOO_FEW_RECORDS	1
+#define DASD_FMT_ERR_TOO_MANY_RECORDS	2
+#define DASD_FMT_ERR_BLKSIZE		3
+#define DASD_FMT_ERR_RECORD_ID		4
+#define DASD_FMT_ERR_KEY_LENGTH		5
 
 #ifndef __linux__
 /* definition from hdreg.h */

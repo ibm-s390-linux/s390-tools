@@ -27,10 +27,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/****************************************************************************
- * SECTION: Definition needed for DASD-API (see dasd.h)                     *
- ****************************************************************************/
-
 /*
  * Represents possible format modes that can be specified when formatting
  * a DASD.
@@ -45,57 +41,16 @@ static const char mode_str[3][10] = {
 	"Full", "Quick", "Expand"
 };
 
-/*
- * values to be used for format_data_t.intensity
- * 0/8: normal format
- * 1/9: also write record zero
- * 3/11: also write home address
- * 4/12: invalidate track
- */
-#define DASD_FMT_INT_FMT_R0 1 /* write record zero */
-#define DASD_FMT_INT_FMT_HA 2 /* write home address, also set FMT_R0 ! */
-#define DASD_FMT_INT_INVAL  4 /* invalidate tracks */
-#define DASD_FMT_INT_COMPAT 8 /* use OS/390 compatible disk layout */
-#define DASD_FMT_INT_FMT_NOR0 16 /* remove permission to write record zero */
-
-/*
- * values to be used in format_check_t for indicating
- * possible format errors
- */
-#define DASD_FMT_ERR_TOO_FEW_RECORDS	1
-#define DASD_FMT_ERR_TOO_MANY_RECORDS	2
-#define DASD_FMT_ERR_BLKSIZE		3
-#define DASD_FMT_ERR_RECORD_ID		4
-#define DASD_FMT_ERR_KEY_LENGTH		5
-
-/*
- * values to be used for dasd_information2_t.format
- * 0x00: NOT formatted
- * 0x01: Linux disc layout
- * 0x02: Common disc layout
- */
-#define DASD_FORMAT_NONE 0
-#define DASD_FORMAT_LDL  1
-#define DASD_FORMAT_CDL  2
-
-/****************************************************************************
- * SECTION: DASDFMT internal types                                          *
- ****************************************************************************/
-
 #define DASD_PARTN_BITS 2
 #define PARTN_MASK ((1 << DASD_PARTN_BITS) - 1)
 
 #define EXIT_MISUSE 1
 #define EXIT_BUSY   2
-#define LABEL_LENGTH 14
-#define VLABEL_CHARS 84
-#define LINE_LENGTH  80
 #define ERR_LENGTH   90
 
 #define DEFAULT_BLOCKSIZE  4096
 /* requestsize - number of cylinders in one format step */
 #define DEFAULT_REQUESTSIZE 10
-#define USABLE_PARTITIONS  ((1 << DASD_PARTN_BITS) - 1)
 
 #define ERRMSG(x...) {fflush(stdout);fprintf(stderr,x);}
 #define ERRMSG_EXIT(ec,x...) {fflush(stdout);fprintf(stderr,x);exit(ec);}
