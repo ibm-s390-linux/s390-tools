@@ -48,4 +48,7 @@ int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
 
 int print_mk_info(const char *apqns, bool verbose);
 
+int cross_check_apqns(const char *apqns, u64 mkvp, bool print_mks,
+		      bool verbose);
+
 #endif

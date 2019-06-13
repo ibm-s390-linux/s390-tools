@@ -506,3 +506,220 @@ int print_mk_info(const char *apqns, bool verbose)
 	util_rec_free(info.rec);
 	return rc;
 }
+
+struct cross_check_info {
+	u64	mkvp;
+	u64	new_mkvp;
+	bool	key_mkvp;
+	u32	num_cur_match;
+	u32	num_old_match;
+	u32	num_new_match;
+	bool	mismatch;
+	bool	print_mks;
+	int	num_checked;
+	bool	verbose;
+};
+
+static int cross_check_mk_info(int card, int domain, void *handler_data)
+{
+	struct cross_check_info *info = (struct cross_check_info *)handler_data;
+	struct mk_info mk_info;
+	char temp[200];
+	int rc;
+
+	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
+	if (rc == -ENODEV) {
+		info->print_mks = 1;
+		printf("WARNING: APQN %02x.%04x: Not available or not of "
+		       "type CCA\n", card, domain);
+		return 0;
+	}
+	if (rc != 0)
+		return rc;
+
+	info->num_checked++;
+
+	if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL) {
+		info->print_mks = 1;
+		sprintf(temp, "INFO: APQN %02x.%04x: The NEW master key "
+			"register is only partially loaded.", card, domain);
+		util_print_indented(temp, 0);
+	}
+
+	if (info->new_mkvp == 0 &&
+	    mk_info.new_mk.mk_state == MK_STATE_FULL)
+		info->new_mkvp = mk_info.new_mk.mkvp;
+
+	if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+	    mk_info.new_mk.mkvp != info->new_mkvp) {
+		info->print_mks = 1;
+		sprintf(temp, "WARNING: APQN %02x.%04x: The NEW master key "
+			      "register contains a different master key than "
+			      "the NEW register of other APQNs.", card,
+			domain);
+		util_print_indented(temp, 0);
+	}
+
+	if (mk_info.cur_mk.mk_state != MK_STATE_VALID) {
+		info->print_mks = 1;
+		info->mismatch = 1;
+		printf("WARNING: APQN %02x.%04x: No master key is set.\n", card,
+		       domain);
+		return 0;
+	}
+
+	if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
+	    mk_info.old_mk.mkvp == mk_info.cur_mk.mkvp) {
+		info->print_mks = 1;
+		sprintf(temp, "INFO: APQN %02x.%04x: The OLD master key "
+			"register contains the same master key as the CURRENT "
+			"master key register.", card, domain);
+		util_print_indented(temp, 0);
+	}
+	if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+	    mk_info.new_mk.mkvp == mk_info.cur_mk.mkvp) {
+		info->print_mks = 1;
+		sprintf(temp, "INFO: APQN %02x.%04x: The NEW master key "
+			"register contains the same master key as the CURRENT "
+			"master key register.", card, domain);
+		util_print_indented(temp, 0);
+	}
+	if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+	    mk_info.old_mk.mk_state == MK_STATE_VALID &&
+	    mk_info.new_mk.mkvp == mk_info.old_mk.mkvp) {
+		info->print_mks = 1;
+		sprintf(temp, "INFO: APQN %02x.%04x: The NEW master key "
+			"register contains the same master key as the OLD "
+			"master key register.", card, domain);
+		util_print_indented(temp, 0);
+	}
+
+	if (info->mkvp == 0)
+		info->mkvp = mk_info.cur_mk.mkvp;
+
+	if (info->key_mkvp) {
+		if (mk_info.cur_mk.mk_state == MK_STATE_VALID &&
+		    mk_info.cur_mk.mkvp == info->mkvp)
+			info->num_cur_match++;
+
+		if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
+		    mk_info.old_mk.mkvp == info->mkvp)
+			info->num_old_match++;
+
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+		    mk_info.new_mk.mkvp == info->mkvp)
+			info->num_new_match++;
+	}
+
+	if (mk_info.cur_mk.mkvp != info->mkvp) {
+
+		if (info->key_mkvp) {
+			if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
+			    mk_info.old_mk.mkvp == info->mkvp) {
+				info->print_mks = 1;
+				sprintf(temp, "INFO: APQN %02x.%04x: The master"
+					" key has been changed to a new "
+					"master key, but the secure key has "
+					"not yet been re-enciphered.", card,
+					domain);
+				util_print_indented(temp, 0);
+			} else if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+				   mk_info.new_mk.mkvp == info->mkvp) {
+				info->print_mks = 1;
+				sprintf(temp, "INFO: APQN %02x.%04x: The master"
+					" key has been changed but is not "
+					"yet been set (made active).", card,
+					domain);
+				util_print_indented(temp, 0);
+			} else {
+				info->print_mks = 1;
+				info->mismatch = 1;
+				sprintf(temp, "WARNING: APQN %02x.%04x: The "
+					"CURRENT master key register contains "
+					"a master key that is different from "
+					"the one used by the secure key.", card,
+					domain);
+				util_print_indented(temp, 0);
+			}
+		} else {
+			info->print_mks = 1;
+			info->mismatch = 1;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Cross checks the master key information for all specified APQNs. It checks
+ * if all specified APQNs have the same current master key, and if it matches
+ * the master key specified by the mkvp parameter (optional). If not, it prints
+ * out an information message about the APQNs that have a different master key.
+ *
+ * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
+ *                      or an empty string, then all online CCA APQNs are
+ *                      checked.
+ * @param[in] mkvp      The master key verification pattern of a secure key.
+ *                      If this is all zero, then the master keys are not
+ *                      matched against it.
+ * @param[in] print_mks if true, then a the full master key info of all
+ *                      specified APQns is printed, in case of a mismatch.
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error. -ENODEV is
+ *          returned if at least one APQN has a mismatching master key.
+ *          -ENOTSUP is returned when the mkvps sysfs attribute is not
+ *          available, because the zcrypt kernel module is on an older level.
+ */
+int cross_check_apqns(const char *apqns, u64 mkvp, bool print_mks, bool verbose)
+{
+	struct cross_check_info info;
+	char temp[200];
+	int rc;
+
+	memset(&info, 0, sizeof(info));
+	info.key_mkvp = mkvp != 0;
+	info.mkvp = mkvp;
+	info.verbose = verbose;
+
+	pr_verbose(verbose, "Cross checking APQNs with mkvp 0x%016llx: %s",
+		   mkvp, apqns != NULL ? apqns : "ANY");
+
+	rc = handle_apqns(apqns, cross_check_mk_info, &info, verbose);
+	if (rc != 0)
+		return rc;
+
+	if (info.mismatch) {
+		if (info.key_mkvp)
+			printf("WARNING: Not all APQNs have the correct master "
+			       "key (%016llx).\n", mkvp);
+		else
+			printf("WARNING: Not all APQNs have the same master "
+			       "key.\n");
+
+		rc = -ENODEV;
+	}
+	if (info.num_checked == 0) {
+		printf("WARNING: None of the APQNs is available or of "
+		       "type CCA\n");
+		rc = -ENODEV;
+	}
+	if (info.num_old_match > 0 && info.num_new_match > 0) {
+		sprintf(temp, "WARNING: On %u APQNs the OLD master key "
+			"register contains the master key use by the secure "
+			"key, and on %u APQNs the NEW master key register "
+			"contains the master key use by the secure key.",
+			info.num_old_match, info.num_new_match);
+		util_print_indented(temp, 0);
+		info.print_mks = 1;
+		rc = -ENODEV;
+	}
+
+	if (print_mks && info.print_mks) {
+		printf("\n");
+		print_mk_info(apqns, verbose);
+		printf("\n");
+	}
+
+	return rc;
+}
