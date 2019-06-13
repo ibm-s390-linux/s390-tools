@@ -22,6 +22,11 @@
 
 #include "utils.h"
 
+#define pr_verbose(verbose, fmt...)	do {				\
+						if (verbose)		\
+							warnx(fmt);	\
+					} while (0)
+
 /**
  * Checks if the specified card is of type CCA and is online
  *
@@ -107,3 +112,50 @@ out:
 	return rc;
 }
 
+/**
+ * Gets the 8 character ASCII serial number string of an card from the sysfs.
+ *
+ * @param[in] card      card number
+ * @param[out] serialnr Result buffer
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 if the serial number was returned. -ENODEV if the APQN is not
+ *          available, or is not a CCA card. -ENOTSUP if the serialnr sysfs
+ *          attribute is not available, because the zcrypt kernel module is
+ *          on an older level.
+ */
+int sysfs_get_serialnr(int card, char serialnr[9], bool verbose)
+{
+	char *dev_path;
+	int rc = 0;
+
+	if (serialnr == NULL)
+		return -EINVAL;
+
+	if (sysfs_is_card_online(card) != 1)
+		return -ENODEV;
+
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x", card);
+	if (!util_path_is_dir(dev_path)) {
+		rc = -ENODEV;
+		goto out;
+	}
+	if (util_file_read_line(serialnr, 9, "%s/serialnr", dev_path) != 0) {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	if (strlen(serialnr) == 0) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+	pr_verbose(verbose, "Serial number of %02x: %s", card, serialnr);
+out:
+	if (rc != 0)
+		pr_verbose(verbose, "Failed to get serial number for "
+			   "%02x: %s", card, strerror(-rc));
+
+	free(dev_path);
+	return rc;
+}

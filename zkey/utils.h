@@ -18,4 +18,6 @@ int sysfs_is_card_online(int card);
 
 int sysfs_is_apqn_online(int card, int domain);
 
+int sysfs_get_serialnr(int card, char serialnr[9], bool verbose);
+
 #endif
