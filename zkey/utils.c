@@ -426,3 +426,83 @@ int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
 
 	return rc;
 }
+
+struct print_apqn_info {
+	struct util_rec *rec;
+	bool verbose;
+};
+
+static int print_apqn_mk_info(int card, int domain, void *handler_data)
+{
+	struct print_apqn_info *info = (struct print_apqn_info *)handler_data;
+	struct mk_info mk_info;
+	int rc;
+
+	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
+	if (rc == -ENOTSUP)
+		return rc;
+
+	util_rec_set(info->rec, "APQN", "%02x.%04x", card, domain);
+
+	if (rc == 0) {
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL)
+			util_rec_set(info->rec, "NEW", "%016llx",
+				     mk_info.new_mk.mkvp);
+		else if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL)
+			util_rec_set(info->rec, "NEW", "partially loaded");
+		else
+			util_rec_set(info->rec, "NEW", "-");
+
+		if (mk_info.cur_mk.mk_state ==  MK_STATE_VALID)
+			util_rec_set(info->rec, "CUR", "%016llx",
+				     mk_info.cur_mk.mkvp);
+		else
+			util_rec_set(info->rec, "CUR", "-");
+
+		if (mk_info.old_mk.mk_state ==  MK_STATE_VALID)
+			util_rec_set(info->rec, "OLD", "%016llx",
+				     mk_info.old_mk.mkvp);
+		else
+			util_rec_set(info->rec, "OLD", "-");
+	} else {
+		util_rec_set(info->rec, "NEW", "?");
+		util_rec_set(info->rec, "CUR", "?");
+		util_rec_set(info->rec, "OLD", "?");
+	}
+
+	util_rec_print(info->rec);
+
+	return 0;
+}
+
+/**
+ * Prints master key information for all specified APQNs
+ *
+ * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
+ *                      or an empty string, then all online CCA APQNs are
+ *                      printed.
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error. -ENOTSUP is
+ *          returned when the mkvps sysfs attribute is not available, because
+ *          the zcrypt kernel module is on an older level.
+ */
+int print_mk_info(const char *apqns, bool verbose)
+{
+	struct print_apqn_info info;
+	int rc;
+
+	info.verbose = verbose;
+	info.rec = util_rec_new_wide("-");
+
+	util_rec_def(info.rec, "APQN", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
+	util_rec_def(info.rec, "NEW", UTIL_REC_ALIGN_LEFT, 16, "NEW MK");
+	util_rec_def(info.rec, "CUR", UTIL_REC_ALIGN_LEFT, 16, "CURRENT MK");
+	util_rec_def(info.rec, "OLD", UTIL_REC_ALIGN_LEFT, 16, "OLD MK");
+	util_rec_print_hdr(info.rec);
+
+	rc = handle_apqns(apqns, print_apqn_mk_info, &info, verbose);
+
+	util_rec_free(info.rec);
+	return rc;
+}

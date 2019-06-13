@@ -46,4 +46,6 @@ typedef int(*apqn_handler_t) (int card, int domain, void *handler_data);
 int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
 		 bool verbose);
 
+int print_mk_info(const char *apqns, bool verbose);
+
 #endif
