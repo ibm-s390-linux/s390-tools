@@ -7,6 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <dirent.h>
 #include <err.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -19,8 +20,13 @@
 
 #include "lib/util_path.h"
 #include "lib/util_file.h"
+#include "lib/util_scandir.h"
+#include "lib/util_libc.h"
+#include "lib/util_rec.h"
+#include "lib/util_base.h"
 
 #include "utils.h"
+#include "properties.h"
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -297,5 +303,126 @@ out:
 			   card, domain, strerror(-rc));
 
 	free(dev_path);
+	return rc;
+}
+
+static int scan_for_domains(int card, apqn_handler_t handler,
+			    void *handler_data, bool verbose)
+{
+	struct dirent **namelist;
+	char fname[290];
+	int i, n, domain, rc = 0;
+
+	sprintf(fname, "/sys/devices/ap/card%02x/", card);
+	n = util_scandir(&namelist, alphasort, fname,
+			 "[0-9a-fA-F]+\\.[0-9a-fA-F]+");
+
+	if (n < 0)
+		return -EIO;
+
+	for (i = 0; i < n; i++) {
+		if (sscanf(namelist[i]->d_name, "%x.%x", &card, &domain) != 2)
+			continue;
+
+		pr_verbose(verbose, "Found %02x.%04x", card, domain);
+
+		if (sysfs_is_apqn_online(card, domain) != 1) {
+			pr_verbose(verbose, "APQN %02x.%04x is offline or not "
+				   "CCA", card, domain);
+			continue;
+		}
+
+		rc = handler(card, domain, handler_data);
+		if (rc != 0)
+			break;
+	}
+
+	util_scandir_free(namelist, n);
+	return rc;
+}
+
+
+static int scan_for_apqns(apqn_handler_t handler, void *handler_data,
+			  bool verbose)
+{
+	struct dirent **namelist;
+	int i, n, card, rc = 0;
+
+	if (handler == NULL)
+		return -EINVAL;
+
+	n = util_scandir(&namelist, alphasort, "/sys/devices/ap/",
+			 "card[0-9a-fA-F]+");
+	if (n < 0)
+		return -EIO;
+
+	for (i = 0; i < n; i++) {
+		if (sscanf(namelist[i]->d_name, "card%x", &card) != 1)
+			continue;
+
+		pr_verbose(verbose, "Found card %02x", card);
+
+		if (sysfs_is_card_online(card) != 1) {
+			pr_verbose(verbose, "Card %02x is offline or not CCA",
+				   card);
+			continue;
+		}
+
+		rc = scan_for_domains(card, handler, handler_data, verbose);
+		if (rc != 0)
+			break;
+	}
+
+	util_scandir_free(namelist, n);
+	return rc;
+}
+
+/**
+ * Calls the handler for all APQNs specified in the apqns parameter, or of this
+ * is NULL, for all online CCA APQNs found in sysfs. In case sysfs is inspected,
+ * the cards and domains are processed in alphabetical order.
+ *
+ * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
+ *                      or an empty string, then all online CCA APQNs are
+ *                      handled.
+ * @param[in] handler   a handler function that is called for each APQN
+ * @param[in] handler_data private data that is passed to the handler
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
+		 bool verbose)
+{
+	int card, domain;
+	char *copy, *tok;
+	char *save;
+	int rc = 0;
+
+	if (apqns == NULL || (apqns != NULL && strlen(apqns) == 0)) {
+		rc = scan_for_apqns(handler, handler_data, verbose);
+	} else {
+		copy = util_strdup(apqns);
+		tok = strtok_r(copy, ",", &save);
+		while (tok != NULL) {
+
+			if (sscanf(tok, "%x.%x", &card, &domain) != 2) {
+				warnx("the APQN '%s' is not valid",
+				      tok);
+				rc = -EINVAL;
+				break;
+			}
+
+			pr_verbose(verbose, "Specified: %02x.%04x", card,
+				   domain);
+			rc = handler(card, domain, handler_data);
+			if (rc != 0)
+				break;
+
+			tok = strtok_r(NULL, ",", &save);
+		}
+		free(copy);
+	}
+
 	return rc;
 }

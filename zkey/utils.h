@@ -41,4 +41,9 @@ struct mk_info {
 int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info,
 		    bool verbose);
 
+typedef int(*apqn_handler_t) (int card, int domain, void *handler_data);
+
+int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
+		 bool verbose);
+
 #endif
