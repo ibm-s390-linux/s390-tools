@@ -25,7 +25,6 @@
 #include <sys/types.h>
 
 #include "lib/util_base.h"
-#include "lib/util_file.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
 #include "lib/util_path.h"
@@ -35,6 +34,7 @@
 #include "pkey.h"
 #include "cca.h"
 #include "properties.h"
+#include "utils.h"
 
 struct key_filenames {
 	char *skey_filename;
@@ -1010,69 +1010,6 @@ free:
 	return rc;
 }
 
-/**
- * Checks if the specified APQN is of type CCA and is online
- *
- * @param[in] card      card number
- * @param[in] domain    the domain
- *
- * @returns 1 if its a CCA card and is online, 0 if offline and -1 if its
- *          not a CCA card.
- */
-static int _keystore_is_apqn_online(int card, int domain)
-{
-	long int online;
-	char *dev_path;
-	char type[20];
-	int rc = 1;
-
-	dev_path = util_path_sysfs("bus/ap/devices/card%02x", card);
-	if (!util_path_is_dir(dev_path)) {
-		rc = 0;
-		goto out;
-	}
-	if (util_file_read_l(&online, 10, "%s/online", dev_path) != 0) {
-		rc = 0;
-		goto out;
-	}
-	if (online == 0) {
-		rc = 0;
-		goto out;
-	}
-	if (util_file_read_line(type, sizeof(type), "%s/type", dev_path) != 0) {
-		rc = 0;
-		goto out;
-	}
-	if (strncmp(type, "CEX", 3) != 0 || strlen(type) < 5) {
-		rc = 0;
-		goto out;
-	}
-	if (type[4] != 'C') {
-		rc = -1;
-		goto out;
-	}
-	free(dev_path);
-
-	dev_path = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x", card,
-				   card, domain);
-	if (!util_path_is_dir(dev_path)) {
-		rc = 0;
-		goto out;
-	}
-	if (util_file_read_l(&online, 10, "%s/online", dev_path) != 0) {
-		rc = 0;
-		goto out;
-	}
-	if (online == 0) {
-		rc = 0;
-		goto out;
-	}
-
-out:
-	free(dev_path);
-	return rc;
-}
-
 struct apqn_check {
 	bool noonlinecheck;
 	bool nomsg;
@@ -1124,7 +1061,7 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 		goto out;
 	}
 
-	rc = _keystore_is_apqn_online(card, domain);
+	rc = sysfs_is_apqn_online(card, domain);
 	if (rc != 1) {
 		if (info->nomsg == 0)
 			warnx("The APQN %02x.%04x is %s", card, domain,
@@ -2329,7 +2266,7 @@ static int _keystore_display_apqn_status(struct properties *properties,
 		if (sscanf(apqn_list[i], "%x.%x", &card, &domain) != 2)
 			continue;
 
-		rc = _keystore_is_apqn_online(card, domain);
+		rc = sysfs_is_apqn_online(card, domain);
 		if (rc != 1) {
 			printf("WARNING: The APQN %02x.%04x associated with "
 			       "key '%s' is %s\n", card, domain, name,
