@@ -2252,43 +2252,32 @@ struct validate_info {
 /**
  * Displays the status of the associated APQNs.
  *
+ * @param[in] keystore the key store
  * @param[in] properties  the properties of the key
- * @param[in] name        the name of the key
+ * @param[in] mkvp        the master key verification pattern of the key
  *
  * @returns 0 in case of success, 1 if at least one of the APQNs is not
- *          available
+ *          available or has a master key mismatch
  */
-static int _keystore_display_apqn_status(struct properties *properties,
-					 const char *name)
+static int _keystore_display_apqn_status(struct keystore *keystore,
+					 struct properties *properties,
+					 u64 mkvp)
 {
-	int i, rc, card, domain, warning = 0;
-	char **apqn_list;
+	int rc, warning = 0;
 	char *apqns;
 
 	apqns = properties_get(properties, PROP_NAME_APQNS);
 	if (apqns == NULL)
 		return 0;
-	apqn_list = str_list_split(apqns);
 
-	for (i = 0; apqn_list[i] != NULL; i++) {
-
-		if (sscanf(apqn_list[i], "%x.%x", &card, &domain) != 2)
-			continue;
-
-		rc = sysfs_is_apqn_online(card, domain);
-		if (rc != 1) {
-			printf("WARNING: The APQN %02x.%04x associated with "
-			       "key '%s' is %s\n", card, domain, name,
-			       rc == -1 ? "not a CCA card" : "not online");
-			warning = 1;
-		}
-	}
+	rc = cross_check_apqns(apqns, mkvp, true, keystore->verbose);
+	if (rc != 0 && rc != -ENOTSUP)
+		warning = 1;
 
 	if (warning)
 		printf("\n");
 
 	free(apqns);
-	str_list_free_string_array(apqn_list);
 	return warning;
 }
 /**
@@ -2405,7 +2394,8 @@ static int _keystore_process_validate(struct keystore *keystore,
 		info->num_warnings++;
 	}
 	if (info->noapqncheck == 0)
-		if (_keystore_display_apqn_status(properties, name) != 0)
+		if (_keystore_display_apqn_status(keystore, properties,
+						  mkvp) != 0)
 			info->num_warnings++;
 	if (_keystore_display_volume_status(properties, name) != 0)
 		info->num_warnings++;

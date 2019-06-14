@@ -1380,6 +1380,15 @@ static int command_validate_file(void)
 	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       &vp[VERIFICATION_PATTERN_LEN / 2]);
 
+	rc = cross_check_apqns(NULL, mkvp, true, g.verbose);
+	if (rc == -EINVAL)
+		return EXIT_FAILURE;
+	if (rc != 0 && rc != -ENOTSUP) {
+		warnx("Your master key setup is improper");
+		rc = EXIT_FAILURE;
+		goto out;
+	}
+
 out:
 	free(secure_key);
 	return rc;
