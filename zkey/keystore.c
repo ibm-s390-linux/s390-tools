@@ -1685,6 +1685,14 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
+	rc = cross_check_apqns(apqns, 0, true, keystore->verbose);
+	if (rc == -EINVAL)
+		goto out_free_key_filenames;
+	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
+		warnx("Your master key setup is improper");
+		goto out_free_key_filenames;
+	}
+
 	rc = _keystore_get_card_domain(apqns, &card, &domain);
 	if (rc != 0)
 		goto out_free_key_filenames;

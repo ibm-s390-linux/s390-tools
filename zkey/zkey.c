@@ -31,6 +31,7 @@
 #include "keystore.h"
 #include "misc.h"
 #include "pkey.h"
+#include "utils.h"
 
 /*
  * Program configuration
@@ -1060,6 +1061,8 @@ static int command_generate_repository(void)
  */
 static int command_generate(void)
 {
+	int rc;
+
 	if (g.pos_arg != NULL && g.name != NULL) {
 		warnx(" Option '--name|-N' is not valid for generating a key "
 		      "outside of the repository");
@@ -1097,6 +1100,14 @@ static int command_generate(void)
 			warnx("Option '--description|-d' is not valid for "
 			      "generating a key outside of the repository");
 			util_prg_print_parse_error();
+			return EXIT_FAILURE;
+		}
+
+		rc = cross_check_apqns(NULL, 0, true, g.verbose);
+		if (rc == -EINVAL)
+			return EXIT_FAILURE;
+		if (rc != 0 && rc != -ENOTSUP) {
+			warnx("Your master key setup is improper");
 			return EXIT_FAILURE;
 		}
 
