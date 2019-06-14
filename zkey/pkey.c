@@ -769,3 +769,24 @@ out:
 
 	return rc;
 }
+
+int get_master_key_verification_pattern(const u8 *secure_key,
+					size_t secure_key_size, u64 *mkvp,
+					bool verbose)
+{
+	struct secaeskeytoken *token = (struct secaeskeytoken *)secure_key;
+
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
+
+	if (secure_key_size < SECURE_KEY_SIZE) {
+		pr_verbose(verbose, "Size of secure key is too small: "
+			   "%lu expected %lu", secure_key_size,
+			   SECURE_KEY_SIZE);
+		return -EINVAL;
+	}
+
+	*mkvp = token->mkvp;
+
+	return 0;
+}

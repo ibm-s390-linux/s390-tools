@@ -112,4 +112,8 @@ int validate_secure_key(int pkey_fd,
 int generate_key_verification_pattern(const char *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);
 
+int get_master_key_verification_pattern(const u8 *secure_key,
+					size_t secure_key_size, u64 *mkvp,
+					bool verbose);
+
 #endif
