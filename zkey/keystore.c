@@ -2107,7 +2107,7 @@ static void _keystore_print_record(struct util_rec *rec,
 				   bool validation, const char *skey_filename,
 				   size_t secure_key_size,
 				   size_t clear_key_bitsize, bool valid,
-				   bool is_old_mk, bool reenc_pending)
+				   bool is_old_mk, bool reenc_pending, u64 mkvp)
 {
 	char temp_vp[VERIFICATION_PATTERN_LEN + 2];
 	char *volumes_argz = NULL;
@@ -2169,10 +2169,11 @@ static void _keystore_print_record(struct util_rec *rec,
 	if (validation) {
 		if (valid)
 			util_rec_set(rec, REC_MASTERKEY,
-				     is_old_mk ? "OLD CCA master key" :
-						     "CURRENT CCA master key");
+				     "%s CCA master key (MKVP: %016llx)",
+				     is_old_mk ? "OLD" : "CURRENT", mkvp);
 		else
-			util_rec_set(rec, REC_MASTERKEY, "(unknown)");
+			util_rec_set(rec, REC_MASTERKEY,
+				     "(unknown, MKVP: %016llx)", mkvp);
 	}
 	if (volumes_argz != NULL)
 		util_rec_set_argz(rec, REC_VOLUMES, volumes_argz,
@@ -2350,6 +2351,7 @@ static int _keystore_process_validate(struct keystore *keystore,
 	u8 *secure_key;
 	int is_old_mk;
 	int rc, valid;
+	u64 mkvp;
 
 	rc = _keystore_ensure_keyfiles_exist(file_names, name);
 	if (rc != 0)
@@ -2373,12 +2375,18 @@ static int _keystore_process_validate(struct keystore *keystore,
 		info->num_valid++;
 		valid = 1;
 	}
+
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 &mkvp, keystore->verbose);
 	free(secure_key);
+	if (rc)
+		goto out;
 
 	_keystore_print_record(info->rec, name, properties, 1,
 			       file_names->skey_filename, secure_key_size,
 			       clear_key_bitsize, valid, is_old_mk,
-			       _keystore_reencipher_key_exists(file_names));
+			       _keystore_reencipher_key_exists(file_names),
+			       mkvp);
 
 	if (valid && is_old_mk) {
 		util_print_indented("WARNING: The secure key is currently "
@@ -3131,7 +3139,7 @@ static int _keystore_display_key(struct keystore *keystore,
 			       IS_XTS(secure_key_size) ? secure_key->bitsize * 2
 						       : secure_key->bitsize,
 			       0, 0,
-			       _keystore_reencipher_key_exists(file_names));
+			       _keystore_reencipher_key_exists(file_names), 0);
 
 out:
 	free(secure_key);

@@ -1834,6 +1834,7 @@ static int command_validate(void)
 	char *prompt;
 	char *msg;
 	int token;
+	u64 mkvp;
 	int rc;
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
@@ -1864,6 +1865,14 @@ static int command_validate(void)
 			vp_tok_avail = 1;
 	}
 
+	rc = get_master_key_verification_pattern((u8 *)key, keysize,
+						 &mkvp, g.verbose);
+	if (rc != 0) {
+		warnx("Failed to get the master key verification pattern: %s",
+		      strerror(-rc));
+		goto out;
+	}
+
 	printf("Validation of secure volume key of device '%s':\n", g.pos_arg);
 	printf("  Status:                %s\n", is_valid ? "Valid" : "Invalid");
 	printf("  Secure key size:       %lu bytes\n", keysize);
@@ -1871,11 +1880,12 @@ static int command_validate(void)
 	       keysize > SECURE_KEY_SIZE ? "Yes" : "No");
 	if (is_valid) {
 		printf("  Clear key size:        %lu bits\n", clear_keysize);
-		printf("  Enciphered with:       %s CCA master key\n",
-		       is_old_mk ? "OLD" : "CURRENT");
+		printf("  Enciphered with:       %s CCA master key (MKVP: "
+		       "%016llx)\n", is_old_mk ? "OLD" : "CURRENT", mkvp);
 	} else {
 		printf("  Clear key size:        (unknown)\n");
-		printf("  Enciphered with:       (unknown)\n");
+		printf("  Enciphered with:       (unknown, MKVP: %016llx)\n",
+		       mkvp);
 	}
 	if (vp_tok_avail)
 		print_verification_pattern(vp_tok.verification_pattern);

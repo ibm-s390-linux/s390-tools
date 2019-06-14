@@ -1300,6 +1300,7 @@ static int command_validate_file(void)
 	size_t clear_key_size;
 	u8 *secure_key;
 	int is_old_mk;
+	u64 mkvp;
 	int rc;
 
 	if (g.name != NULL) {
@@ -1346,14 +1347,23 @@ static int command_validate_file(void)
 		goto out;
 	}
 
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 &mkvp, g.verbose);
+	if (rc != 0) {
+		warnx("Failed to get the master key verification pattern: %s",
+		      strerror(-rc));
+		rc = EXIT_FAILURE;
+		goto out;
+	}
+
 	printf("Validation of secure key in file '%s':\n", g.pos_arg);
 	printf("  Status:                Valid\n");
 	printf("  Secure key size:       %lu bytes\n", secure_key_size);
 	printf("  Clear key size:        %lu bits\n", clear_key_size);
 	printf("  XTS type key:          %s\n",
 	       secure_key_size > SECURE_KEY_SIZE ? "Yes" : "No");
-	printf("  Enciphered with:       %s CCA master key\n",
-	       is_old_mk ? "OLD" : "CURRENT");
+	printf("  Enciphered with:       %s CCA master key (MKVP: %016llx)\n",
+	       is_old_mk ? "OLD" : "CURRENT", mkvp);
 	printf("  Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       vp);
 	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
