@@ -1770,6 +1770,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	struct properties *key_props = NULL;
 	size_t secure_key_size;
 	u8 *secure_key;
+	u64 mkvp;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -1791,9 +1792,26 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 		goto out_free_key_filenames;
 	}
 
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 &mkvp, keystore->verbose);
+	if (rc != 0) {
+		warnx("Failed to get the master key verification pattern: %s",
+		      strerror(-rc));
+		goto out_free_key;
+	}
+
+	rc = cross_check_apqns(apqns, mkvp, true, keystore->verbose);
+	if (rc == -EINVAL)
+		goto out_free_key;
+	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
+		warnx("Your master key setup is improper");
+		goto out_free_key;
+	}
+
 	rc = write_secure_key(file_names.skey_filename, secure_key,
 			      secure_key_size, keystore->verbose);
 	free(secure_key);
+	secure_key = NULL;
 	if (rc != 0)
 		goto out_free_props;
 
@@ -1811,6 +1829,9 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 		   "Successfully imported a secure key in '%s' and key info in '%s'",
 		   file_names.skey_filename, file_names.info_filename);
 
+out_free_key:
+	if (secure_key != NULL)
+		free(secure_key);
 out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
