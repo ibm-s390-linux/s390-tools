@@ -1886,7 +1886,11 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 					 .nomsg = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
+	size_t secure_key_size;
+	char *apqns_prop;
+	u8 *secure_key;
 	char temp[30];
+	u64 mkvp;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -1932,6 +1936,33 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 						  &apqn_check);
 		if (rc != 0)
 			goto out;
+
+		secure_key = read_secure_key(file_names.skey_filename,
+					     &secure_key_size,
+					     keystore->verbose);
+		if (secure_key == NULL) {
+			rc = -ENOENT;
+			goto out;
+		}
+
+		rc = get_master_key_verification_pattern(secure_key,
+							 secure_key_size,
+							 &mkvp,
+							 keystore->verbose);
+		free(secure_key);
+		if (rc)
+			goto out;
+
+		apqns_prop = properties_get(key_props, PROP_NAME_APQNS);
+		rc = cross_check_apqns(apqns_prop, mkvp, true,
+				       keystore->verbose);
+		free(apqns_prop);
+		if (rc == -ENOTSUP)
+			rc = 0;
+		if (rc != 0 && noapqncheck == 0) {
+			warnx("Your master key setup is improper");
+			goto out;
+		}
 	}
 
 	if (sector_size >= 0) {
