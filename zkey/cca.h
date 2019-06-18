@@ -32,6 +32,33 @@ typedef void (*t_CSUACFV)(long *return_code,
 			  long *version_data_length,
 			  unsigned char *version_data);
 
+typedef void (*t_CSUACFQ)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *verb_data_length,
+			  unsigned char *verb_data);
+
+typedef void (*t_CSUACRA)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *ressource_name_length,
+			  unsigned char *ressource_name);
+
+typedef void (*t_CSUACRD)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *ressource_name_length,
+			  unsigned char *ressource_name);
+
 struct cca_version {
 	unsigned int ver;
 	unsigned int rel;
@@ -42,6 +69,9 @@ struct cca_lib {
 	void *lib_csulcca;
 	t_CSNBKTC dll_CSNBKTC;
 	t_CSUACFV dll_CSUACFV;
+	t_CSUACFQ dll_CSUACFQ;
+	t_CSUACRA dll_CSUACRA;
+	t_CSUACRD dll_CSUACRD;
 	struct cca_version version;
 };
 
@@ -50,5 +80,7 @@ int load_cca_library(struct cca_lib *cca, bool verbose);
 int key_token_change(struct cca_lib *cca,
 		     u8 *secure_key, unsigned int secure_key_size,
 		     char *method, bool verbose);
+
+int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose);
 
 #endif
