@@ -1128,7 +1128,9 @@ static int command_reencipher_file(void)
 {
 	size_t secure_key_size;
 	int rc, is_old_mk;
+	int selected = 1;
 	u8 *secure_key;
+	u64 mkvp;
 
 	if (g.name != NULL) {
 		warnx("Option '--name|-N' is not valid for "
@@ -1174,6 +1176,15 @@ static int command_reencipher_file(void)
 		goto out;
 	}
 
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 &mkvp, g.verbose);
+	if (rc != 0) {
+		warnx("Failed to get the master key verification pattern: %s",
+		      strerror(-rc));
+		rc = EXIT_FAILURE;
+		goto out;
+	}
+
 	if (!g.fromold && !g.tonew) {
 		/* Autodetect reencipher option */
 		if (is_old_mk) {
@@ -1205,12 +1216,28 @@ static int command_reencipher_file(void)
 		pr_verbose("Secure key will be re-enciphered from OLD to the "
 			   "CURRENT CCA master key");
 
+		rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
+						FLAG_SEL_CCA_MATCH_OLD_MKVP,
+						g.verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			warnx("No APQN found that is suitable for "
+			      "re-enciphering the secure AES volume key");
+			rc = EXIT_FAILURE;
+			goto out;
+		}
+
 		rc = key_token_change(&g.cca, secure_key, secure_key_size,
 				      METHOD_OLD_TO_CURRENT,
 				      g.verbose);
 		if (rc != 0) {
 			warnx("Re-encipher from OLD to CURRENT CCA "
-			      "master key has failed");
+			      "master key has failed\n");
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
 			rc = EXIT_FAILURE;
 			goto out;
 		}
@@ -1219,11 +1246,30 @@ static int command_reencipher_file(void)
 		pr_verbose("Secure key will be re-enciphered from CURRENT "
 			   "to the NEW CCA master key");
 
+		rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
+						FLAG_SEL_CCA_MATCH_CUR_MKVP |
+						FLAG_SEL_CCA_NEW_MUST_BE_SET,
+						g.verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			util_print_indented("No APQN found that is suitable "
+					    "for re-enciphering this secure "
+					    "AES key and has the NEW master "
+					    "key loaded", 0);
+			rc = EXIT_FAILURE;
+			goto out;
+		}
+
 		rc = key_token_change(&g.cca, secure_key, secure_key_size,
 				      METHOD_CURRENT_TO_NEW, g.verbose);
 		if (rc != 0) {
 			warnx("Re-encipher from CURRENT to NEW CCA "
-			      "master key has failed");
+			      "master key has failed\n");
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
 			rc = EXIT_FAILURE;
 			goto out;
 		}

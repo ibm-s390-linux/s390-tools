@@ -18,6 +18,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/util_base.h"
+#include "lib/util_libc.h"
 #include "lib/util_panic.h"
 
 #include "cca.h"
@@ -606,4 +608,21 @@ int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
 
 	rc = select_cca_adapter(cca, info.card, info.domain, verbose);
 	return rc;
+}
+
+void print_msg_for_cca_envvars(const char *key_name)
+{
+	char *msg;
+
+	util_asprintf(&msg, "WARNING: You must set environment variables "
+			    "%s and %s to the desired card and domain that is "
+			    "set up with the AES master key used by this %s. "
+			    "%s specifies the domain as decimal number. %s "
+			    "specifies the adapter number as 'CRPnn', where "
+			    "'nn' is the adapter number. See the CCA "
+			    "documentation for more details.\n",
+			    CCA_DOMAIN_ENVAR, CCA_ADAPTER_ENVAR, key_name,
+			    CCA_DOMAIN_ENVAR, CCA_ADAPTER_ENVAR);
+	util_print_indented(msg, 0);
+	free(msg);
 }

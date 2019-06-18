@@ -90,4 +90,6 @@ int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose);
 int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
 			       unsigned int flags, bool verbose);
 
+void print_msg_for_cca_envvars(const char *key_name);
+
 #endif

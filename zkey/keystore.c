@@ -2535,6 +2535,7 @@ struct reencipher_info {
  * @param[in] secure_key_size the size of the secure key
  * @param[in] is_old_mk  if true the key is currently re-enciphered with the
  *            OLD master key
+ * @param[in] apqns      the associated APQNs (or NULL if none)
  * @returns 0 if the re-enciphering is successful, a negative errno value
  *          otherwise, 1 if it was skipped
  */
@@ -2543,9 +2544,18 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 					struct cca_lib *cca,
 					struct reencipher_params *params,
 					u8 *secure_key, size_t secure_key_size,
-					bool is_old_mk)
+					bool is_old_mk, const char *apqns)
 {
-	int rc;
+	int rc, selected = 1;
+	u64 mkvp;
+
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 &mkvp, keystore->verbose);
+	if (rc != 0) {
+		warnx("Failed to get the master key verification pattern: %s",
+		      strerror(-rc));
+		return rc;
+	}
 
 	if (!params->from_old && !params->to_new) {
 		/* Autodetect reencipher mode */
@@ -2567,12 +2577,6 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 	}
 
 	if (params->from_old) {
-		if (!is_old_mk) {
-			printf("The secure key '%s' is already enciphered "
-			       "with the CURRENT CCA master key\n", name);
-			return 1;
-		}
-
 		if (params->inplace == -1)
 			params->inplace = 1;
 
@@ -2580,12 +2584,27 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 			   "Secure key '%s' will be re-enciphered from OLD "
 			   "to the CURRENT CCA master key", name);
 
+		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+						FLAG_SEL_CCA_MATCH_OLD_MKVP,
+						keystore->verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			warnx("No APQN found that is suitable for "
+			      "re-enciphering this secure AES key");
+			return rc;
+		}
+
 		rc = key_token_change(cca, secure_key, secure_key_size,
 				      METHOD_OLD_TO_CURRENT,
 				      keystore->verbose);
 		if (rc != 0) {
 			warnx("Failed to re-encipher '%s' from OLD to "
 			      "CURRENT CCA master key", name);
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
 			return rc;
 		}
 	}
@@ -2597,12 +2616,30 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 		if (params->inplace == -1)
 			params->inplace = 0;
 
+		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+						FLAG_SEL_CCA_MATCH_CUR_MKVP |
+						FLAG_SEL_CCA_NEW_MUST_BE_SET,
+						keystore->verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			util_print_indented("No APQN found that is suitable "
+					    "for re-enciphering this secure "
+					    "AES key and has the NEW master "
+					    "key loaded", 0);
+			return rc;
+		}
+
 		rc = key_token_change(cca, secure_key, secure_key_size,
 				      METHOD_CURRENT_TO_NEW,
 				      keystore->verbose);
 		if (rc != 0) {
 			warnx("Failed to re-encipher '%s' from CURRENT to "
 			      "NEW CCA master key", name);
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
 			return rc;
 		}
 	}
@@ -2692,7 +2729,9 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 
 		rc = _keystore_perform_reencipher(keystore, name, info->cca,
 						  &params, secure_key,
-						  secure_key_size, is_old_mk);
+						  secure_key_size, is_old_mk,
+						  properties_get(properties,
+							PROP_NAME_APQNS));
 		if (rc < 0)
 			goto out;
 		if (rc > 0) {
