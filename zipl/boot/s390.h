@@ -452,7 +452,7 @@ static inline int test_facility(unsigned long nr)
 	return __test_facility(nr, &S390_lowcore.stfle_fac_list);
 }
 
-static unsigned long __stfle_asm(u64 *stfle_fac_list, int size)
+static inline unsigned long __stfle_asm(u64 *stfle_fac_list, int size)
 {
 	register unsigned long reg0 asm("0") = size - 1;
 
