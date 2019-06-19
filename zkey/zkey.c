@@ -1067,7 +1067,7 @@ static int command_generate(void)
 		return EXIT_FAILURE;
 	}
 	if (g.apqns == NULL && g.noapqncheck) {
-		warnx("Option '--noapqncheck' is only valid together with "
+		warnx("Option '--no-apqn-check' is only valid together with "
 		      "the '--apqns|-a' option");
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
@@ -1088,7 +1088,7 @@ static int command_generate(void)
 			return EXIT_FAILURE;
 		}
 		if (g.noapqncheck) {
-			warnx("Option '--noapqncheck' is not valid for "
+			warnx("Option '--no-apqn-check' is not valid for "
 			      "generating a key outside of the repository");
 			util_prg_print_parse_error();
 			return EXIT_FAILURE;
@@ -1317,7 +1317,7 @@ static int command_validate_file(void)
 		return EXIT_FAILURE;
 	}
 	if (g.noapqncheck) {
-		warnx("Option '--noapqncheck' is not valid for "
+		warnx("Option '--no-apqn-check' is not valid for "
 		      "validating a key outside of the repository");
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
@@ -1376,7 +1376,7 @@ static int command_validate_repository(void)
 	int rc;
 
 	if (g.apqns == NULL && g.noapqncheck) {
-		warnx("Option '--noapqncheck' is only valid together with "
+		warnx("Option '--no-apqn-check' is only valid together with "
 		      "the '--apqns|-a' option");
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
@@ -1421,7 +1421,7 @@ static int command_import(void)
 		g.sector_size = 0;
 
 	if (g.apqns == NULL && g.noapqncheck) {
-		warnx("Option '--noapqncheck' is only valid together with "
+		warnx("Option '--no-apqn-check' is only valid together with "
 		      "the '--apqns|-a' option");
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
@@ -1501,7 +1501,7 @@ static int command_change(void)
 		return EXIT_FAILURE;
 	}
 	if (g.apqns == NULL && g.noapqncheck) {
-		warnx("Option '--noapqncheck' is only valid together with "
+		warnx("Option '--no-apqn-check' is only valid together with "
 		      "the '--apqns|-a' option");
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
