@@ -3050,7 +3050,7 @@ out:
  * @returnd 0 if the user confirmed the deletion, a negative errno value
  *          otherwise
  */
-static int _keystore_propmp_for_remove(struct keystore *keystore,
+static int _keystore_prompt_for_remove(struct keystore *keystore,
 				       const char *name,
 				       struct key_filenames *file_names)
 {
@@ -3116,7 +3116,7 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 		goto out;
 
 	if (!quiet) {
-		if (_keystore_propmp_for_remove(keystore, name,
+		if (_keystore_prompt_for_remove(keystore, name,
 						&file_names) != 0)
 			goto out;
 	}
