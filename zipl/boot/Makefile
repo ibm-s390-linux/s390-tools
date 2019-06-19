@@ -46,7 +46,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
 	     kdump.o entry.o stage3.lds
 
 %.exec:	%.o
-	@STAGE=$$( \
+	STAGE=$$( \
 		echo $@ | awk ' \
 			match($$0,/[0-9]+b*/){ \
 				print substr($$0,RSTART,RLENGTH) \
