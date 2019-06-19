@@ -507,3 +507,103 @@ int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose)
 	pr_verbose(verbose, "Selected adapter %u (CRP%02d)", adapter, adapter);
 	return 0;
 }
+
+struct find_mkvp_info {
+	u64		mkvp;
+	unsigned int	flags;
+	bool		found;
+	int		card;
+	int		domain;
+	bool		verbose;
+};
+
+static int find_mkvp(int card, int domain, void *handler_data)
+{
+	struct find_mkvp_info *info = (struct find_mkvp_info *)handler_data;
+	struct mk_info mk_info;
+	bool found = false;
+	int rc;
+
+	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
+	if (rc == -ENODEV)
+		return 0;
+	if (rc != 0)
+		return rc;
+
+	if (info->flags & FLAG_SEL_CCA_MATCH_CUR_MKVP)
+		if (mk_info.cur_mk.mk_state == MK_STATE_VALID &&
+		    mk_info.cur_mk.mkvp == info->mkvp)
+			found = true;
+
+	if (info->flags & FLAG_SEL_CCA_MATCH_OLD_MKVP)
+		if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
+		    mk_info.old_mk.mkvp == info->mkvp)
+			found = true;
+
+	if (info->flags & FLAG_SEL_CCA_NEW_MUST_BE_SET)
+		if (mk_info.new_mk.mk_state != MK_STATE_FULL)
+			found = false;
+
+
+	if (found) {
+		info->card = card;
+		info->domain = domain;
+		info->found = true;
+
+		pr_verbose(info->verbose, "%02x.%04x has the desired mkvp%s",
+			   card, domain,
+			   info->flags & FLAG_SEL_CCA_NEW_MUST_BE_SET ?
+			   " and NEW MK set" : "");
+
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Selects an APQN to be used for the CCA host library that has the specified
+ * master key verification pattern
+ *
+ * @param[in] cca       the CCA library structure
+ * @param[in] mkvp      the master key verification pattern to search for
+ * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
+ *                      or an empty string, then all online CCA APQNs are
+ *                      checked.
+ * @param[in] flags     Flags that control the MKVM matching and NEW register
+ *                      checking. Multiple flags can be combined.
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error. -ENOTSUP is
+ *          returned when the serialnr sysfs attribute is not available,
+ *          because the zcrypt kernel module is on an older level. -ENODEV is
+ *          returned if no APQN is available with the desired mkvp.
+ */
+int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
+		 unsigned int flags, bool verbose)
+{
+	struct find_mkvp_info info;
+	int rc;
+
+	util_assert(cca != NULL, "Internal error: cca is NULL");
+
+	pr_verbose(verbose, "Select mkvp %016llx in APQNs %s for the CCA host "
+		   "library", mkvp, apqns == 0 ? "ANY" : apqns);
+
+	info.mkvp = mkvp;
+	info.flags = flags;
+	info.found = false;
+	info.card = 0;
+	info.domain = 0;
+	info.verbose = verbose;
+
+	rc = handle_apqns(apqns, find_mkvp, &info, verbose);
+	if (rc < 0)
+		return rc;
+
+	if (!info.found)
+		return -ENODEV;
+
+	rc = select_cca_adapter(cca, info.card, info.domain, verbose);
+	return rc;
+}
