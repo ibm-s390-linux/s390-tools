@@ -1375,13 +1375,6 @@ static int command_validate_repository(void)
 {
 	int rc;
 
-	if (g.apqns == NULL && g.noapqncheck) {
-		warnx("Option '--no-apqn-check' is only valid together with "
-		      "the '--apqns|-a' option");
-		util_prg_print_parse_error();
-		return EXIT_FAILURE;
-	}
-
 	rc = keystore_validate_key(g.keystore, g.name, g.apqns, g.noapqncheck,
 				   g.pkey_fd);
 
