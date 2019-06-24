@@ -527,17 +527,17 @@ non-default memory location.
 .B Configuration section:
 .br
 Control the zIPL secure boot support.
-Set this option to one of the following:
+Set this option to one of the following values:
 .IP "         - " 12
 .BR auto:
 Write signatures if available and supported by the system.
 .IP "         - " 12
 .BR 1:
-Signatures are written independent of support indicated by the local system. 
-Also missing signatures for stage 3 and kernel IPL files will result in an error.
+Write signatures regardless of support indicated by the local system.
+Missing signatures for stage 3 and kernel IPL files will result in an error.
 .IP "         - " 12
 .BR 0:
-No signatures will be written.
+Do not write signatures.
 
 The default value for
 .B 'secure'
