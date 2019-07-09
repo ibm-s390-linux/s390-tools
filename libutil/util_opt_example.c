@@ -112,6 +112,12 @@ int main(int argc, char *argv[])
 		case OPT_NOSHORT:
 			printf("Specified: --noshort\n");
 			break;
+		case 'l':
+			printf("Specified: -l\n");
+			break;
+		case 'm':
+			printf("Specified: --manual\n");
+			break;
 		default:
 			util_opt_print_parse_error(c, argv);
 			return EXIT_FAILURE;
