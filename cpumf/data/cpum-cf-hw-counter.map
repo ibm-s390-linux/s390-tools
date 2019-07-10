@@ -14,7 +14,8 @@
 	'cfvn-3'	=> 'cpum-cf-cfvn-3.ctr',
 
 	# CSVN
-	'csvn-generic'	=> 'cpum-cf-csvn-generic.ctr',
+	'csvn-12345'	=> 'cpum-cf-csvn-12345.ctr',
+	'csvn-6'	=> 'cpum-cf-csvn-6.ctr',
 
 	# Extended counters
 	2097		=> 'cpum-cf-extended-z10.ctr',
@@ -27,4 +28,7 @@
 	2965		=> 'cpum-cf-extended-z13.ctr',
 	3906		=> 'cpum-cf-extended-z14.ctr',
 	3907		=> 'cpum-cf-extended-z14.ctr',
+	# Identical with z14
+	8561		=> 'cpum-cf-extended-z14.ctr',
+	8562		=> 'cpum-cf-extended-z14.ctr',
 };

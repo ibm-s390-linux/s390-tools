@@ -6,7 +6,7 @@ include ../common.mak
 CPUMF_DATADIR = $(TOOLS_DATADIR)/cpumf
 DATA_FILES = cpum-cf-hw-counter.map \
 	     cpum-cf-cfvn-1.ctr cpum-cf-cfvn-3.ctr \
-	     cpum-cf-csvn-generic.ctr \
+	     cpum-cf-csvn-12345.ctr cpum-cf-csvn-6.ctr \
              cpum-cf-extended-z10.ctr cpum-cf-extended-z196.ctr \
 	     cpum-cf-extended-zEC12.ctr cpum-sf-modes.ctr \
 	     cpum-cf-extended-z13.ctr cpum-cf-extended-z14.ctr

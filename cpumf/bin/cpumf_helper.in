@@ -267,7 +267,12 @@ sub cpumf_load_ctrdef($;$)
 	# List of "generic" counter sets
 	my @def = ();
 	push @def, "cfvn-" . $version->{cfvn};
-	push @def, "csvn-generic";
+	if ($version->{csvn} >= 1 && $version->{csvn} <= 6) {
+		push @def, "csvn-12345";
+	}
+	if ($version->{csvn} == 6) {
+		push @def, "csvn-6";
+	}
 
 	my $h = {};
 	# Load counter set definition
