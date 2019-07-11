@@ -43,7 +43,7 @@ eckd2.exec: head.o stage2.o cio.o eckd2.o libc.o menu.o sclp.o \
 fba2.exec: head.o stage2.o cio.o fba2.o libc.o menu.o sclp.o \
 	   kdump2.o kdump.o entry.o
 stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
-	     kdump.o entry.o stage3.lds
+	     kdump.o entry.o
 
 %.exec:	%.o
 	@STAGE=$$( \
