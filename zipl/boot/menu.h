@@ -15,7 +15,7 @@
 #include "stage2.h"
 
 /* address of extra command line */
-#define COMMAND_LINE_EXTRA	        (0xA000-0x400)
+#define COMMAND_LINE_EXTRA	        0xE000
 
 /* max command line length */
 #define COMMAND_LINE_SIZE	        896

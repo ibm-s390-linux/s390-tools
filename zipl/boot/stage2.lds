@@ -12,7 +12,8 @@
  * 0x6000-0x8fff	Memory allocation (heap)
  * 0x9000-0x9fff        Memory to load stage3 parameter to
  * 0xa000-0xdfff        Memory to load stage3 to
- * 0xe000-0xffff	Stack
+ * 0xe000-0xe3ff	command line extra
+ * 0xe400-0xffff	Stack
  *
  * Special memory locations
  * ------------------------

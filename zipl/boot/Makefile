@@ -6,7 +6,7 @@ CFLAGS_BOOT = $(NO_PIE_CFLAGS) -Os -g -I../include -D__ASSEMBLY__ \
 	  -fno-builtin -ffreestanding -fno-asynchronous-unwind-tables \
 	  -fno-delete-null-pointer-checks \
 	  -fexec-charset=IBM1047 -m64 -mpacked-stack \
-	  -mstack-size=8192 -mstack-guard=128 -msoft-float \
+	  -mstack-size=4096 -mstack-guard=128 -msoft-float \
 	  -W -Wall -Wformat-security
 
 FILES	= fba0.bin fba1b.bin fba2.bin \
@@ -91,7 +91,7 @@ stage3.bin:	stage3.exec
 		--only-section=.stage2dump.tail \
 		--only-section=.eckd2dump_mv.tail \
 		--only-section=.fixup \
-		--pad-to=0xf000 \
+		--pad-to=0xe000 \
 		$< $@
 
 data.o: $(FILES)
