@@ -2393,7 +2393,11 @@ int main(int argc, char *argv[])
 
 	g.chsc_fd = open(CHSC_DEVICE, O_RDWR);
 	if (g.chsc_fd < 0) {
+		rc = errno;
 		warnx("File '%s:' %s", CHSC_DEVICE, strerror(errno));
+		if (rc == ENOENT)
+			warnx("You might have to load kernel module 'chsc_sch' "
+			      "using 'modprobe chsc_sch'");
 		return EXIT_FAILURE;
 	}
 	pr_verbose("Device '%s' has been opened successfully", CHSC_DEVICE);

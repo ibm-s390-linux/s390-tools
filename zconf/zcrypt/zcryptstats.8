@@ -72,6 +72,11 @@ the parallel execution of cryptographic operations.
 Cryptographic performance measurement data might not be available when Linux
 is running as guest under z/VM or under KVM. \fBzcryptstats\fP then displays an
 error message and exits.
+.PP
+.B Note:
+\fBzcryptstats\fP utilizes the device node \fB/dev/chsc\fP. When this device
+node is not available, you might have to load kernel module \fBchsc_sch\fP using
+\fBmodprobe chsc_sch\fP to make it available. 
 .
 .
 .
