@@ -95,6 +95,8 @@ static struct zkey_cryptsetup_globals {
 	long long keyfile_offset;
 	long long keyfile_size;
 	long long tries;
+	bool tonew;
+	bool fromold;
 	bool complete;
 	bool inplace;
 	bool staged;
@@ -160,6 +162,22 @@ static struct util_opt opt_vec[] = {
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "OPTIONS",
+		.command = COMMAND_REENCIPHER,
+	},
+	{
+		.option = {"to-new", 0, NULL, 'N'},
+		.desc = "Re-enciphers a secure volume key in the LUKS2 header "
+			"that is currently enciphered with the master key in "
+			"the CURRENT register with the master key in the NEW "
+			"register",
+		.command = COMMAND_REENCIPHER,
+	},
+	{
+		.option = {"from-old", 0, NULL, 'O'},
+		.desc = "Re-enciphers a secure volume key in the LUKS2 header "
+			"that is currently enciphered with the master key in "
+			"the OLD register with the master key in the CURRENT "
+			"register",
 		.command = COMMAND_REENCIPHER,
 	},
 	{
@@ -1572,13 +1590,28 @@ static int reencipher_prepare(int token)
 	if (rc < 0)
 		goto out;
 
-	util_asprintf(&msg, "The secure volume key of device '%s' is "
-		      "enciphered with the %s CCA master key and is being "
-		      "re-enciphered with the %s CCA master key.",
-		      g.pos_arg, is_old_mk ? "OLD" : "CURRENT",
-		      is_old_mk ? "CURRENT" : "NEW");
-	util_print_indented(msg, 0);
-	free(msg);
+	if (!g.fromold && !g.tonew) {
+		/* Autodetect reencipher mode */
+		if (is_old_mk) {
+			g.fromold = 1;
+			util_asprintf(&msg, "The secure volume key of device "
+				      "'%s' is enciphered with the OLD CCA "
+				      "master key and is being re-enciphered "
+				      "with the CURRENT CCA master key.",
+				      g.pos_arg);
+			util_print_indented(msg, 0);
+			free(msg);
+		} else {
+			g.tonew = 1;
+			util_asprintf(&msg, "The secure volume key of device "
+				      "'%s' is enciphered with the CURRENT CCA "
+				      "master key and is being re-enciphered "
+				      "with the NEW CCA master key.",
+				      g.pos_arg);
+			util_print_indented(msg, 0);
+			free(msg);
+		}
+	}
 
 	rc = get_master_key_verification_pattern((u8 *)key, keysize, &mkvp,
 						 g.verbose);
@@ -1588,36 +1621,64 @@ static int reencipher_prepare(int token)
 		goto out;
 	}
 
-	rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
-					is_old_mk ? FLAG_SEL_CCA_MATCH_OLD_MKVP
-						: FLAG_SEL_CCA_MATCH_CUR_MKVP |
-						  FLAG_SEL_CCA_NEW_MUST_BE_SET,
-					g.verbose);
-	if (rc == -ENOTSUP) {
-		rc = 0;
-		selected = 0;
-	}
-	if (rc != 0) {
-		util_asprintf(&msg, "No APQN found that is suitable for "
-			      "re-enciphering the secure AES volume key%s",
-			      !is_old_mk ? " and has the NEW master key loaded"
-					 : "");
-		util_print_indented(msg, 0);
-		free(msg);
-		goto out;
+	if (g.fromold) {
+		rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
+						FLAG_SEL_CCA_MATCH_OLD_MKVP,
+						g.verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			util_print_indented("No APQN found that is suitable "
+					    "for re-enciphering the secure AES "
+					    "volume key from the OLD to the "
+					    "CURRENT CCA master key.", 0);
+			goto out;
+		}
+
+		rc = key_token_change(&g.cca, (u8 *)key, keysize,
+				      METHOD_OLD_TO_CURRENT, g.verbose);
+		if (rc != 0) {
+			warnx("Failed to re-encipher the secure volume key of "
+			      "device '%s'\n", g.pos_arg);
+			if (!selected)
+				print_msg_for_cca_envvars(
+						"secure AES volume key");
+			rc = -EINVAL;
+			goto out;
+		}
 	}
 
-	rc = key_token_change(&g.cca, (u8 *)key, keysize,
-			      is_old_mk ? METHOD_OLD_TO_CURRENT :
-					  METHOD_CURRENT_TO_NEW,
-			      g.verbose);
-	if (rc != 0) {
-		warnx("Failed to re-encipher the secure volume key of device "
-		      "'%s'\n", g.pos_arg);
-		if (!selected)
-			print_msg_for_cca_envvars("secure AES volume key");
-		rc = -EINVAL;
-		goto out;
+	if (g.tonew) {
+		rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
+						FLAG_SEL_CCA_MATCH_CUR_MKVP |
+						FLAG_SEL_CCA_NEW_MUST_BE_SET,
+						g.verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			util_print_indented("No APQN found that is suitable "
+					    "for re-enciphering the secure AES "
+					    "volume key from the CURRENT to "
+					    "the NEW CCA master key.", 0);
+			goto out;
+		}
+
+		rc = key_token_change(&g.cca, (u8 *)key, keysize,
+				      METHOD_CURRENT_TO_NEW,
+				      g.verbose);
+		if (rc != 0) {
+			warnx("Failed to re-encipher the secure volume key of "
+			      "device '%s'\n", g.pos_arg);
+			if (!selected)
+				print_msg_for_cca_envvars(
+						"secure AES volume key");
+			rc = -EINVAL;
+			goto out;
+		}
 	}
 
 	rc = crypt_keyslot_add_by_key(g.cd, CRYPT_ANY_SLOT, key, keysize,
@@ -2276,6 +2337,12 @@ int main(int argc, char *argv[])
 		if (c == -1)
 			break;
 		switch (c) {
+		case 'N':
+			g.tonew = 1;
+			break;
+		case 'O':
+			g.fromold = 1;
+			break;
 		case 'c':
 			g.complete = 1;
 			break;

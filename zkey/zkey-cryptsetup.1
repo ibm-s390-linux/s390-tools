@@ -91,6 +91,8 @@ behave in the same way as with \fBcryptsetup\fP.
 .B zkey\-cryptsetup
 .BR reencipher | re
 .I device
+.RB [ \-\-to\-new | \-N ]
+.RB [ \-\-from\-old | \-O ]
 .RB [ \-\-staged | \-s ]
 .RB [ \-\-in\-place | \-i ]
 .RB [ \-\-complete | \-c ]
@@ -128,17 +130,36 @@ register can still be used until the master key is changed again.
 The \fBNEW\fP register contains the new master key to be set.
 The master key in the \fBNEW\fP register cannot be used until it is made
 the current master key. You can pro-actively re-encipher a secure key with the
-\fBNEW\fP master key before this key is made the \fBCURRENT\fP key.
+\fBNEW\fP master key before this key is made the \fBCURRENT\fP key. Use the
+.B \-\-to-new
+option to do this.
 .RE
 .PP
-\fBzkey\-cryptsetup\fP automatically detects whether the secure volume key
-is currently enciphered with the master key in the \fBOLD\fP register or with
-the master key in the \fBCURRENT\fP register. If currently enciphered with the
-master key in the \fBOLD\fP register, it is re-enciphered with the master key
-in the \fBCURRENT\fP register. If it is currently enciphered with the master
-key in the \fBCURRENT\fP register, it is re-enciphered with the master key in
-the \fBNEW\fP register. If for this case the \fBNEW\fP register does not
-contain a valid master key, then the re-encipher operation fails.
+Use the
+.B \-\-from\-old
+option to re-encipher a secure volume key that is currently enciphered with
+the master key in the \fBOLD\fP register with the master key in the
+\fBCURRENT\fP register.
+.PP
+.PP
+If both the
+.B \-\-from-old
+and
+.B \-\-to-new
+options are specified, a secure volume key that is currently enciphered
+with the master key in the \fBOLD\fP register is re-enciphered with the
+master key in the \fBNEW\fP register.
+.RE
+.PP
+If both options are omitted, \fBzkey-cryptsetup\fP automatically detects whether
+the secure volume key is currently enciphered with the master key in the
+\fBOLD\fP register or with the master key in the \fBCURRENT\fP register.
+If currently enciphered with the master key in the \fBOLD\fP register,
+it is re-enciphered with the master key in the \fBCURRENT\fP register.
+If it is currently enciphered with the master key in the \fBCURRENT\fP
+register, it is re-enciphered with the master key in the \fBNEW\fP register.
+If for this case the \fBNEW\fP register does not contain a valid master key,
+then the re-encipher operation fails.
 .PP
 Re-enciphering a secure volume key of a volume encrypted with
 \fBLUKS2\fP and the \fBpaes\fP cipher can be performed \fBin-place\fP, or in
@@ -325,6 +346,16 @@ relevance.
 .SH OPTIONS
 .
 .SS "Options for the reencipher command"
+.TP
+.BR \-N ", " \-\-to\-new
+Re-enciphers a secure volume key in the LUKS2 header that is currently
+enciphered with the master key in the CURRENT register with the master key in
+the NEW register.
+.TP
+.BR \-O ", " \-\-from\-old
+Re-enciphers a secure volume key in the LUKS2 header that is currently
+enciphered with the master key in the OLD register with the master key in the
+CURRENT register.
 .TP
 .BR \-i ", " \-\-in-place
 Forces an in-place re-enciphering of a secure volume key in the LUKS2
