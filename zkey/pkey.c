@@ -98,10 +98,8 @@ u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 	}
 	size = sb.st_size;
 
-	if (size != SECURE_KEY_SIZE && size != 2*SECURE_KEY_SIZE) {
-		warnx("File '%s' has an invalid size, %lu or %lu bytes "
-		      "expected", keyfile, SECURE_KEY_SIZE,
-		      2 * SECURE_KEY_SIZE);
+	if (size < MIN_SECURE_KEY_SIZE || size > 2 * MAX_SECURE_KEY_SIZE) {
+		warnx("File '%s' has an invalid size: %lu", keyfile, size);
 		return NULL;
 	}
 
@@ -306,7 +304,7 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 	if (keybits == 0)
 		keybits = DEFAULT_KEYBITS;
 
-	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(SECURE_KEY_SIZE, xts);
+	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(AESDATA_KEY_SIZE, xts);
 	secure_key = util_malloc(secure_key_size);
 
 	pr_verbose(verbose, "Generate key on card %02x.%04x", card, domain);
@@ -344,7 +342,7 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 		goto out;
 	}
 
-	memcpy(secure_key, &gensec.seckey, SECURE_KEY_SIZE);
+	memcpy(secure_key, &gensec.seckey, AESDATA_KEY_SIZE);
 
 	if (xts) {
 		rc = ioctl(pkey_fd, PKEY_GENSECK, &gensec);
@@ -357,8 +355,8 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			goto out;
 		}
 
-		memcpy(secure_key + SECURE_KEY_SIZE, &gensec.seckey,
-		       SECURE_KEY_SIZE);
+		memcpy(secure_key + AESDATA_KEY_SIZE, &gensec.seckey,
+		       AESDATA_KEY_SIZE);
 	}
 
 	pr_verbose(verbose, "Successfully generated a secure key");
@@ -412,7 +410,7 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 		return -EINVAL;
 	}
 
-	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(SECURE_KEY_SIZE, xts);
+	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(AESDATA_KEY_SIZE, xts);
 	secure_key = util_malloc(secure_key_size);
 
 	clear_key = read_clear_key(clearkeyfile, keybits, xts, &clear_key_size,
@@ -453,7 +451,7 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 		goto out;
 	}
 
-	memcpy(secure_key, &clr2sec.seckey, SECURE_KEY_SIZE);
+	memcpy(secure_key, &clr2sec.seckey, AESDATA_KEY_SIZE);
 
 	if (xts) {
 		memcpy(&clr2sec.clrkey, clear_key + clear_key_size / 2,
@@ -469,8 +467,8 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			goto out;
 		}
 
-		memcpy(secure_key+SECURE_KEY_SIZE, &clr2sec.seckey,
-		       SECURE_KEY_SIZE);
+		memcpy(secure_key + AESDATA_KEY_SIZE, &clr2sec.seckey,
+		       AESDATA_KEY_SIZE);
 	}
 
 	pr_verbose(verbose,
@@ -505,21 +503,21 @@ static int validate_secure_xts_key(int pkey_fd,
 				   u16 part1_keysize, u32 part1_attributes,
 				   size_t *clear_key_bitsize, bool verbose)
 {
-	struct secaeskeytoken *token = (struct secaeskeytoken *)secure_key;
+	struct aesdatakeytoken *token = (struct aesdatakeytoken *)secure_key;
 	struct pkey_verifykey verifykey;
-	struct secaeskeytoken *token2;
+	struct aesdatakeytoken *token2;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 
 	/* XTS uses 2 secure key tokens concatenated to each other */
-	token2 = (struct secaeskeytoken *)(secure_key + SECURE_KEY_SIZE);
+	token2 = (struct aesdatakeytoken *)(secure_key + AESDATA_KEY_SIZE);
 
-	if (secure_key_size != 2 * SECURE_KEY_SIZE) {
+	if (secure_key_size != 2 * AESDATA_KEY_SIZE) {
 		pr_verbose(verbose, "Size of secure key is too small: "
 			   "%lu expected %lu", secure_key_size,
-			   2 * SECURE_KEY_SIZE);
+			   2 * AESDATA_KEY_SIZE);
 		return -EINVAL;
 	}
 
@@ -591,17 +589,17 @@ int validate_secure_key(int pkey_fd,
 			size_t *clear_key_bitsize, int *is_old_mk,
 			bool verbose)
 {
-	struct secaeskeytoken *token = (struct secaeskeytoken *)secure_key;
+	struct aesdatakeytoken *token = (struct aesdatakeytoken *)secure_key;
 	struct pkey_verifykey verifykey;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 
-	if (secure_key_size < SECURE_KEY_SIZE) {
+	if (secure_key_size < AESDATA_KEY_SIZE) {
 		pr_verbose(verbose, "Size of secure key is too small: "
 			   "%lu expected %lu", secure_key_size,
-			   SECURE_KEY_SIZE);
+			   AESDATA_KEY_SIZE);
 		return -EINVAL;
 	}
 
@@ -624,7 +622,7 @@ int validate_secure_key(int pkey_fd,
 		*clear_key_bitsize = verifykey.keysize;
 
 	/* XTS uses 2 secure key tokens concatenated to each other */
-	if (secure_key_size > SECURE_KEY_SIZE) {
+	if (secure_key_size > AESDATA_KEY_SIZE) {
 		rc = validate_secure_xts_key(pkey_fd,
 					     secure_key, secure_key_size,
 					     verifykey.keysize,
@@ -656,7 +654,7 @@ int validate_secure_key(int pkey_fd,
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-int generate_key_verification_pattern(const char *key, size_t key_size,
+int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose)
 {
 	int tfmfd = -1, opfd = -1, rc = 0;
@@ -691,7 +689,7 @@ int generate_key_verification_pattern(const char *key, size_t key_size,
 	}
 
 	snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "%s(paes)",
-		 key_size > SECURE_KEY_SIZE ? "xts" : "cbc");
+		 is_xts_key(key, key_size) ? "xts" : "cbc");
 
 	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
 	if (tfmfd < 0) {
@@ -788,15 +786,15 @@ int get_master_key_verification_pattern(const u8 *secure_key,
 					size_t secure_key_size, u64 *mkvp,
 					bool verbose)
 {
-	struct secaeskeytoken *token = (struct secaeskeytoken *)secure_key;
+	struct aesdatakeytoken *token = (struct aesdatakeytoken *)secure_key;
 
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
 
-	if (secure_key_size < SECURE_KEY_SIZE) {
+	if (secure_key_size < AESDATA_KEY_SIZE) {
 		pr_verbose(verbose, "Size of secure key is too small: "
 			   "%lu expected %lu", secure_key_size,
-			   SECURE_KEY_SIZE);
+			   AESDATA_KEY_SIZE);
 		return -EINVAL;
 	}
 
@@ -817,7 +815,7 @@ bool is_cca_aes_data_key(const u8 *key, size_t key_size)
 {
 	struct tokenheader *hdr = (struct tokenheader *)key;
 
-	if (key == NULL || key_size < SECURE_KEY_SIZE)
+	if (key == NULL || key_size < AESDATA_KEY_SIZE)
 		return false;
 
 	if (hdr->type != TOKEN_TYPE_CCA_INTERNAL)
@@ -826,6 +824,57 @@ bool is_cca_aes_data_key(const u8 *key, size_t key_size)
 		return false;
 
 	return true;
+}
+
+/**
+ * Check if the specified key is an XTS type key
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is an XTS key type
+ */
+bool is_xts_key(const u8 *key, size_t key_size)
+{
+	if (is_cca_aes_data_key(key, key_size)) {
+		if (key_size == 2 * AESDATA_KEY_SIZE &&
+		    is_cca_aes_data_key(key + AESDATA_KEY_SIZE,
+					key_size - AESDATA_KEY_SIZE))
+			return true;
+	}
+
+	return false;
+}
+
+/**
+ * Gets the size in bits of the effective key of the specified secure key
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ * @param[out] bitsize      On return, contains the size in bits of the key.
+ *                          If the key size can not be determined, then 0 is
+ *                          passed back as bitsize.
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
+{
+	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
+
+	util_assert(bitsize != NULL, "Internal error: bitsize is NULL");
+
+	if (is_cca_aes_data_key(key, key_size)) {
+		*bitsize = datakey->bitsize;
+		if (key_size == 2 * AESDATA_KEY_SIZE) {
+			datakey = (struct aesdatakeytoken *)key +
+					AESDATA_KEY_SIZE;
+			*bitsize += datakey->bitsize;
+		}
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 /**

@@ -30,10 +30,10 @@ struct tokenheader {
 
 #define TOKEN_VERSION_AESDATA	0x04
 
-struct secaeskeytoken {
-	u8  type;     /* 0x01 for internal key token */
+struct aesdatakeytoken {
+	u8  type;     /* TOKEN_TYPE_INTERNAL (0x01) for internal key token */
 	u8  res0[3];
-	u8  version;  /* should be 0x04 */
+	u8  version;  /* should be TOKEN_VERSION_AESDATA (0x04) */
 	u8  res1[1];
 	u8  flag;     /* key flags */
 	u8  res2[1];
@@ -45,10 +45,13 @@ struct secaeskeytoken {
 	u8  tvv[4];   /* token validation value */
 } __packed;
 
-#define SECURE_KEY_SIZE sizeof(struct secaeskeytoken)
+#define AESDATA_KEY_SIZE	sizeof(struct aesdatakeytoken)
+
+#define MAX_SECURE_KEY_SIZE	AESDATA_KEY_SIZE
+#define MIN_SECURE_KEY_SIZE	AESDATA_KEY_SIZE
 
 struct pkey_seckey {
-	u8  seckey[SECURE_KEY_SIZE];  /* the secure key blob */
+	u8  seckey[AESDATA_KEY_SIZE];  /* the secure key blob */
 };
 
 struct pkey_clrkey {
@@ -123,7 +126,7 @@ int validate_secure_key(int pkey_fd,
 			size_t *clear_key_bitsize, int *is_old_mk,
 			bool verbose);
 
-int generate_key_verification_pattern(const char *key, size_t key_size,
+int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);
 
 int get_master_key_verification_pattern(const u8 *secure_key,
@@ -131,6 +134,8 @@ int get_master_key_verification_pattern(const u8 *secure_key,
 					bool verbose);
 
 bool is_cca_aes_data_key(const u8 *key, size_t key_size);
+bool is_xts_key(const u8 *key, size_t key_size);
+int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize);
 const char *get_key_type(const u8 *key, size_t key_size);
 
 #endif

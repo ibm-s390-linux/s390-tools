@@ -215,11 +215,11 @@ int key_token_change(struct cca_lib *cca,
 		return -EIO;
 	}
 
-	if (secure_key_size == 2 * SECURE_KEY_SIZE) {
+	if (secure_key_size == 2 * AESDATA_KEY_SIZE) {
 		cca->dll_CSNBKTC(&return_code, &reason_code,
 				 &exit_data_len, exit_data,
 				 &rule_array_count, rule_array,
-				 secure_key + SECURE_KEY_SIZE);
+				 secure_key + AESDATA_KEY_SIZE);
 
 		pr_verbose(verbose, "CSNBKTC (Key Token Change) with '%s' "
 			   "returned: return_code: %ld, reason_code: %ld",

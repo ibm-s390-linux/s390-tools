@@ -70,8 +70,6 @@ struct key_filenames {
 	#define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_PLAIN
 #endif
 
-#define IS_XTS(secure_key_size) (secure_key_size > SECURE_KEY_SIZE ? 1 : 0)
-
 #define REC_KEY			"Key"
 #define REC_DESCRIPTION		"Description"
 #define REC_SEC_KEY_SIZE	"Secure key size"
@@ -1440,7 +1438,7 @@ static int _keystore_generate_verification_pattern(struct keystore *keystore,
 	if (key == NULL)
 		return -EIO;
 
-	rc = generate_key_verification_pattern((const char *)key, key_size,
+	rc = generate_key_verification_pattern(key, key_size,
 					       vp, vp_len, keystore->verbose);
 
 	free(key);
@@ -1854,6 +1852,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
 	size_t secure_key_size;
+	const char *key_type;
 	u8 *secure_key;
 	u64 mkvp;
 	int rc;
@@ -1874,6 +1873,14 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 				     keystore->verbose);
 	if (secure_key == NULL) {
 		rc = -ENOENT;
+		goto out_free_key_filenames;
+	}
+
+	key_type = get_key_type(secure_key, secure_key_size);
+	if (key_type == NULL) {
+		warnx("Key '%s' is not a valid secure key", name);
+		free(secure_key);
+		rc = -EINVAL;
 		goto out_free_key_filenames;
 	}
 
@@ -1907,7 +1914,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
 					noapqncheck, sector_size, volume_type,
-					KEY_TYPE_CCA_AESDATA);
+					key_type);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2252,7 +2259,7 @@ static void _keystore_print_record(struct util_rec *rec,
 				   const char *name,
 				   struct properties *properties,
 				   bool validation, const char *skey_filename,
-				   size_t secure_key_size,
+				   size_t secure_key_size, bool is_xts,
 				   size_t clear_key_bitsize, bool valid,
 				   bool is_old_mk, bool reenc_pending, u64 mkvp)
 {
@@ -2308,13 +2315,12 @@ static void _keystore_print_record(struct util_rec *rec,
 	util_rec_set(rec, REC_DESCRIPTION,
 		     description != NULL ? description : "");
 	util_rec_set(rec, REC_SEC_KEY_SIZE, "%lu bytes", secure_key_size);
-	if (!validation || valid)
+	if ((!validation || valid) && clear_key_bitsize != 0)
 		util_rec_set(rec, REC_CLR_KEY_SIZE, "%lu bits",
 			     clear_key_bitsize);
 	else
 		util_rec_set(rec, REC_CLR_KEY_SIZE, "(unknown)");
-	util_rec_set(rec, REC_XTS,
-		     IS_XTS(secure_key_size) ? "Yes" : "No");
+	util_rec_set(rec, REC_XTS, is_xts ? "Yes" : "No");
 	util_rec_set(rec, REC_KEY_TYPE, key_type);
 	if (validation) {
 		if (valid)
@@ -2525,6 +2531,7 @@ static int _keystore_process_validate(struct keystore *keystore,
 
 	_keystore_print_record(info->rec, name, properties, 1,
 			       file_names->skey_filename, secure_key_size,
+			       is_xts_key(secure_key, secure_key_size),
 			       clear_key_bitsize, valid, is_old_mk,
 			       _keystore_reencipher_key_exists(file_names),
 			       mkvp);
@@ -3297,29 +3304,29 @@ static int _keystore_display_key(struct keystore *keystore,
 				 void *private)
 {
 	struct util_rec *rec = (struct util_rec *)private;
-	struct secaeskeytoken *secure_key;
-	size_t secure_key_size;
+	u8 *secure_key;
+	size_t secure_key_size, clear_key_bitsize = 0;
 	int rc = 0;
 
-	secure_key = (struct secaeskeytoken *)
-		     read_secure_key(file_names->skey_filename,
+	secure_key = read_secure_key(file_names->skey_filename,
 				     &secure_key_size, keystore->verbose);
 	if (secure_key == NULL)
 		return -EIO;
 
-	if (secure_key_size < SECURE_KEY_SIZE) {
+	if (secure_key_size < MIN_SECURE_KEY_SIZE) {
 		pr_verbose(keystore,
 			   "Size of secure key is too small: %lu expected %lu",
-			   secure_key_size, SECURE_KEY_SIZE);
+			   secure_key_size, MIN_SECURE_KEY_SIZE);
 		rc = -EIO;
 		goto out;
 	}
 
+	get_key_bit_size(secure_key, secure_key_size, &clear_key_bitsize);
+
 	_keystore_print_record(rec, name, properties, 0,
 			       file_names->skey_filename, secure_key_size,
-			       IS_XTS(secure_key_size) ? secure_key->bitsize * 2
-						       : secure_key->bitsize,
-			       0, 0,
+			       is_xts_key(secure_key, secure_key_size),
+			       clear_key_bitsize, 0, 0,
 			       _keystore_reencipher_key_exists(file_names), 0);
 
 out:
@@ -3682,37 +3689,6 @@ out:
 }
 
 /**
- * Returns the size of the secure key file
- *
- * @param[in] keystore   the keystore
- * @param[in] skey_filename the file name of the secure key
- *
- * @returns the size of the secure key, or -1 in case of an error
- */
-static size_t _keystore_get_key_file_size(struct keystore *keystore,
-					  const char *skey_filename)
-{
-	size_t secure_key_size;
-	struct stat sb;
-
-	if (stat(skey_filename, &sb)) {
-		pr_verbose(keystore, "Key file '%s': %s",
-			   skey_filename, strerror(errno));
-		return -1;
-	}
-
-	secure_key_size = sb.st_size;
-	if (secure_key_size < SECURE_KEY_SIZE) {
-		pr_verbose(keystore,
-			   "Size of secure key is too small: %lu expected %lu",
-			   secure_key_size, SECURE_KEY_SIZE);
-		return -1;
-	}
-
-	return secure_key_size;
-}
-
-/**
  * Processing function for the cryptsetup and crypttab functions.
  * Extracts the required information and calls the secondary processing function
  * contained in struct crypt_info.
@@ -3738,6 +3714,7 @@ static int _keystore_process_crypt(struct keystore *keystore,
 	size_t secure_key_size;
 	size_t sector_size = 0;
 	char *volumes = NULL;
+	u8 *secure_key = NULL;
 	char *dmname;
 	char *temp;
 	int rc = 0;
@@ -3745,18 +3722,14 @@ static int _keystore_process_crypt(struct keystore *keystore,
 	char *ch;
 	int i;
 
-	secure_key_size = _keystore_get_key_file_size(keystore,
-						file_names->skey_filename);
-	if (secure_key_size < SECURE_KEY_SIZE) {
-		pr_verbose(keystore,
-			   "Size of secure key is too small: %lu expected %lu",
-			   secure_key_size, SECURE_KEY_SIZE);
-		rc = -EIO;
-		goto out;
-	}
+	secure_key = read_secure_key(file_names->skey_filename,
+				     &secure_key_size, keystore->verbose);
+	if (secure_key == NULL)
+		return -EIO;
 
 	cipher_spec = _keystore_build_cipher_spec(properties,
-						  IS_XTS(secure_key_size));
+						  is_xts_key(secure_key,
+							     secure_key_size));
 	if (cipher_spec == NULL) {
 		rc = -EINVAL;
 		goto out;
@@ -3808,6 +3781,8 @@ out:
 		free(cipher_spec);
 	if (volume_type != NULL)
 		free(volume_type);
+	if (secure_key != NULL)
+		free(secure_key);
 	return rc;
 }
 

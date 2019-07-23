@@ -1413,7 +1413,7 @@ static int command_validate_file(void)
 		goto out;
 	}
 
-	rc = generate_key_verification_pattern((char *)secure_key,
+	rc = generate_key_verification_pattern(secure_key,
 					       secure_key_size, vp, sizeof(vp),
 					       g.verbose);
 	if (rc != 0) {
@@ -1441,7 +1441,7 @@ static int command_validate_file(void)
 	       get_key_type(secure_key, secure_key_size));
 	printf("  Clear key size:        %lu bits\n", clear_key_size);
 	printf("  XTS type key:          %s\n",
-	       secure_key_size > SECURE_KEY_SIZE ? "Yes" : "No");
+	       is_xts_key(secure_key, secure_key_size) ? "Yes" : "No");
 	printf("  Enciphered with:       %s CCA master key (MKVP: %016llx)\n",
 	       is_old_mk ? "OLD" : "CURRENT", mkvp);
 	printf("  Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,

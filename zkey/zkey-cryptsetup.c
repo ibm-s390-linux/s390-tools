@@ -1329,22 +1329,25 @@ static int activate_unbound_keyslot(int token, int keyslot, const char *key,
 	return rc;
 }
 
-static int check_keysize_and_cipher_mode(size_t keysize)
+static int check_keysize_and_cipher_mode(const u8 *key, size_t keysize)
 {
-	if (keysize == 0) {
+	if (keysize < MIN_SECURE_KEY_SIZE ||
+	    keysize > 2 * MAX_SECURE_KEY_SIZE) {
 		warnx("Invalid volume key size");
 		return -EINVAL;
 	}
 
 	if (strncmp(crypt_get_cipher_mode(g.cd), "xts", 3) == 0) {
-		if (keysize != 2 * SECURE_KEY_SIZE) {
+		if (keysize < 2 * MIN_SECURE_KEY_SIZE ||
+		    (key != NULL && !is_xts_key(key, keysize))) {
 			warnx("The volume key size %lu is not valid for the "
 			      "cipher mode '%s'", keysize,
 			      crypt_get_cipher_mode(g.cd));
 			return -EINVAL;
 		}
 	} else {
-		if (keysize != SECURE_KEY_SIZE) {
+		if (keysize > MAX_SECURE_KEY_SIZE ||
+		    (key != NULL && is_xts_key(key, keysize))) {
 			warnx("The volume key size %lu is not valid for the "
 			      "cipher mode '%s'", keysize,
 			      crypt_get_cipher_mode(g.cd));
@@ -1377,7 +1380,7 @@ static int open_keyslot(int keyslot, char **key, size_t *keysize,
 	vkeysize = crypt_get_volume_key_size(g.cd);
 	pr_verbose("Volume key size: %lu", vkeysize);
 
-	rc = check_keysize_and_cipher_mode(vkeysize);
+	rc = check_keysize_and_cipher_mode(NULL, vkeysize);
 	if (rc != 0)
 		return rc;
 
@@ -1571,7 +1574,7 @@ static int reencipher_prepare(int token)
 	if (rc != 0)
 		goto out;
 
-	rc = generate_key_verification_pattern(key, keysize,
+	rc = generate_key_verification_pattern((u8 *)key, keysize,
 					       reenc_tok.verification_pattern,
 					 sizeof(reenc_tok.verification_pattern),
 					       g.verbose);
@@ -1851,8 +1854,8 @@ static int reencipher_complete(int token)
 
 	}
 
-	rc = generate_key_verification_pattern(key, keysize, vp, sizeof(vp),
-					       g.verbose);
+	rc = generate_key_verification_pattern((u8 *)key, keysize, vp,
+					       sizeof(vp), g.verbose);
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
@@ -1998,7 +2001,7 @@ static int command_validate(void)
 	printf("  Status:                %s\n", is_valid ? "Valid" : "Invalid");
 	printf("  Secure key size:       %lu bytes\n", keysize);
 	printf("  XTS type key:          %s\n",
-	       keysize > SECURE_KEY_SIZE ? "Yes" : "No");
+	       is_xts_key((u8 *)key, keysize) ? "Yes" : "No");
 	printf("  Key type:              %s\n",
 	       get_key_type((u8 *)key, keysize));
 	if (is_valid) {
@@ -2076,7 +2079,7 @@ static int command_setvp(void)
 
 	token = find_token(g.cd, PAES_VP_TOKEN_NAME);
 
-	rc = generate_key_verification_pattern(key, keysize,
+	rc = generate_key_verification_pattern((const u8 *)key, keysize,
 					       vp_tok.verification_pattern,
 					    sizeof(vp_tok.verification_pattern),
 					       g.verbose);
@@ -2131,7 +2134,7 @@ static int command_setkey(void)
 	if (newkey == NULL)
 		return EXIT_FAILURE;
 
-	rc = check_keysize_and_cipher_mode(newkey_size);
+	rc = check_keysize_and_cipher_mode(newkey, newkey_size);
 	if (rc != 0)
 		goto out;
 
@@ -2180,7 +2183,7 @@ static int command_setkey(void)
 		goto out;
 	}
 
-	rc = generate_key_verification_pattern((char *)newkey, newkey_size, vp,
+	rc = generate_key_verification_pattern(newkey, newkey_size, vp,
 					       sizeof(vp), g.verbose);
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
