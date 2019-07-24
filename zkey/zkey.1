@@ -134,10 +134,14 @@ additional information can be associated with a secure key using the
 .B \-\-sector-size
 options.
 .PP
-You can generate different types of secure keys: \fBCCA-AESDATA\fP keys.
-Specify the type of the secure key using the
+You can generate different types of secure keys: \fBCCA-AESDATA\fP keys, and
+\fBCCA-AESCIPHER\fP keys. Specify the type of the secure key using the
 .B \-\-key\-type
 option. The default key type is CCA-AESDATA.
+.PP
+.B Note:
+Secure keys of type \fBCCA-AESCIPHER\fP require an IBM cryptographic
+adapter in CCA coprocessor mode of version 6 or later, e.g. a CEX6C.
 .
 .SS "Validating secure AES keys"
 .
@@ -741,9 +745,11 @@ the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key-type\~\fItype\fP
-Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP.
-If this option is omitted, then a secure key of type
-CCA-AESDATA is generated.
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP
+and \fBCCA-AESCIPHER\fP. If this option is omitted, then a secure key of type
+CCA-AESDATA is generated. Secure keys of type \fBCCA-AESCIPHER\fP require an
+IBM cryptographic adapter in CCA coprocessor mode of version 6 or later, e.g.
+a CEX6C.
 .
 .
 .
@@ -925,8 +931,8 @@ has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key-type\~\fItype\fP
-Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP.
-Only keys with the specified key type are listed.
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP
+and \fBCCA-AESCIPHER\fP. Only keys with the specified key type are listed.
 This option is only used for secure keys contained in the secure key repository.
 .
 .

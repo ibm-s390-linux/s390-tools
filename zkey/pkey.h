@@ -29,6 +29,7 @@ struct tokenheader {
 #define TOKEN_TYPE_CCA_INTERNAL	0x01
 
 #define TOKEN_VERSION_AESDATA	0x04
+#define TOKEN_VERSION_AESCIPHER	0x05
 
 struct aesdatakeytoken {
 	u8  type;     /* TOKEN_TYPE_INTERNAL (0x01) for internal key token */
@@ -45,10 +46,45 @@ struct aesdatakeytoken {
 	u8  tvv[4];   /* token validation value */
 } __packed;
 
-#define AESDATA_KEY_SIZE	sizeof(struct aesdatakeytoken)
+struct aescipherkeytoken {
+	u8  type;     /* TOKEN_TYPE_INTERNAL (0x01) for internal key token */
+	u8  res0;
+	u16 length;   /* length of token */
+	u8  version;  /* should be TOKEN_VERSION_CIPHER (0x05) */
+	u8  res1[3];
+	u8  kms;      /* key material state, should be 0x03 */
+	u8  kvptype;  /* key verification pattern type */
+	u8  kvp[16];  /* key verification pattern */
+	u8  kwm;      /* key wrapping method, should be 0x02 */
+	u8  kwh;      /* key wrapping hash algorithm */
+	u8  pfv;      /* payload format version, should be 0x00*/
+	u8  res2;
+	u8  adv;      /* associated data section version */
+	u8  res3;
+	u16 adl;      /* associated data length */
+	u8  kll;      /* length of optional key label */
+	u8  eadl;     /* extended associated data length */
+	u8  uadl;     /* user associated data length */
+	u8  res4;
+	u16 pl;       /* payload bit length */
+	u8  res5;
+	u8  at;       /* algorithm type, should be 0x02 (AES) */
+	u16 kt;       /* key type, should be 0x001 (CIPHER) */
+	u8  kufc;     /* key usage field count */
+	u16 kuf1;     /* key usage field 1 */
+	u16 kuf2;     /* key usage field 2 */
+	u8  kmfc;     /* key management field count */
+	u16 kmf1;     /* key management field 1 */
+	u16 kmf2;     /* key management field 2 */
+	u16 kmf3;     /* key management field 3 */
+	u8  varpart[80]; /* variable part */
+} __packed;
 
-#define MAX_SECURE_KEY_SIZE	AESDATA_KEY_SIZE
-#define MIN_SECURE_KEY_SIZE	AESDATA_KEY_SIZE
+#define AESDATA_KEY_SIZE	sizeof(struct aesdatakeytoken)
+#define AESCIPHER_KEY_SIZE	sizeof(struct aescipherkeytoken)
+
+#define MAX_SECURE_KEY_SIZE	MAX(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE)
+#define MIN_SECURE_KEY_SIZE	MIN(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE)
 
 struct pkey_seckey {
 	u8  seckey[AESDATA_KEY_SIZE];  /* the secure key blob */
@@ -58,12 +94,12 @@ struct pkey_clrkey {
 	u8  clrkey[32]; /* 16, 24, or 32 byte clear key value */
 };
 
-#define PKEY_IOCTL_MAGIC 'p'
-#define AUTOSELECT 0xFFFF
-#define PKEYDEVICE "/dev/pkey"
-#define PKEY_KEYTYPE_AES_128  1
-#define PKEY_KEYTYPE_AES_192  2
-#define PKEY_KEYTYPE_AES_256  3
+#define PKEY_IOCTL_MAGIC	'p'
+#define AUTOSELECT		0xFFFF
+#define PKEYDEVICE		"/dev/pkey"
+#define PKEY_KEYTYPE_AES_128	1
+#define PKEY_KEYTYPE_AES_192	2
+#define PKEY_KEYTYPE_AES_256	3
 
 struct pkey_genseck {
 	u16 cardnr;			/* in: card to use or FFFF for any */
@@ -97,7 +133,99 @@ struct pkey_verifykey {
 
 #define PKEY_VERIFYKEY _IOWR(PKEY_IOCTL_MAGIC, 0x07, struct pkey_verifykey)
 
+enum pkey_key_type {
+	PKEY_TYPE_CCA_DATA   = (u32) 1,
+	PKEY_TYPE_CCA_CIPHER = (u32) 2,
+};
+
+enum pkey_key_size {
+	PKEY_SIZE_AES_128 = (u32) 128,
+	PKEY_SIZE_AES_192 = (u32) 192,
+	PKEY_SIZE_AES_256 = (u32) 256,
+	PKEY_SIZE_UNKNOWN = (u32) 0xFFFFFFFF,
+};
+
+#define PKEY_FLAGS_MATCH_CUR_MKVP  0x00000002
+#define PKEY_FLAGS_MATCH_ALT_MKVP  0x00000004
+
+#define PKEY_KEYGEN_XPRT_SYM	0x00008000
+#define PKEY_KEYGEN_XPRT_UASY	0x00004000
+#define PKEY_KEYGEN_XPRT_AASY	0x00002000
+#define PKEY_KEYGEN_XPRT_RAW	0x00001000
+#define PKEY_KEYGEN_XPRT_CPAC	0x00000800
+#define PKEY_KEYGEN_XPRT_DES	0x00000080
+#define PKEY_KEYGEN_XPRT_AES	0x00000040
+#define PKEY_KEYGEN_XPRT_RSA	0x00000008
+
+struct pkey_apqn {
+	u16 card;
+	u16 domain;
+};
+
+struct pkey_genseck2 {
+	struct pkey_apqn *apqns;	/* in: ptr to list of apqn targets */
+	u32 apqn_entries;		/* in: # of apqn target list entries */
+	enum pkey_key_type type;	/* in: key type to generate */
+	enum pkey_key_size size;	/* in: key size to generate */
+	u32 keygenflags;		/* in: key generation flags */
+	u8 *key;			/* in: pointer to key blob buffer */
+	u32 keylen;			/* in: available key blob buffer size */
+					/* out: actual key blob size */
+};
+
+#define PKEY_GENSECK2 _IOWR(PKEY_IOCTL_MAGIC, 0x11, struct pkey_genseck2)
+
+struct pkey_clr2seck2 {
+	struct pkey_apqn *apqns;	/* in: ptr to list of apqn targets */
+	u32 apqn_entries;		/* in: # of apqn target list entries */
+	enum pkey_key_type type;	/* in: key type to generate */
+	enum pkey_key_size size;	/* in: key size to generate */
+	u32 keygenflags;		/* in: key generation flags */
+	struct pkey_clrkey clrkey;	/* in: the clear key value */
+	u8 *key;			/* in: pointer to key blob buffer */
+	u32 keylen;			/* in: available key blob buffer size */
+					/* out: actual key blob size */
+};
+
+#define PKEY_CLR2SECK2 _IOWR(PKEY_IOCTL_MAGIC, 0x12, struct pkey_clr2seck2)
+
+struct pkey_verifykey2 {
+	u8 *key;			/* in: pointer to key blob */
+	u32 keylen;			/* in: key blob size */
+	u16 cardnr;			/* in/out: card number */
+	u16 domain;			/* in/out: domain number */
+	enum pkey_key_type type;	/* out: the key type */
+	enum pkey_key_size size;	/* out: the key size */
+	u32 flags;			/* out: additional key info flags */
+};
+
+#define PKEY_VERIFYKEY2 _IOWR(PKEY_IOCTL_MAGIC, 0x17, struct pkey_verifykey2)
+
+struct pkey_apqns4key {
+	u8 *key;			/* in: pointer to key blob */
+	u32 keylen;			/* in: key blob size */
+	u32 flags;			/* in: match controlling flags */
+	struct pkey_apqn *apqns;	/* in/out: ptr to list of apqn targets*/
+	u32 apqn_entries;		/* in: max # of apqn entries in list */
+					/* out: # apqns stored into the list */
+};
+
+#define PKEY_APQNS4K _IOWR(PKEY_IOCTL_MAGIC, 0x1B, struct pkey_apqns4key)
+
+struct pkey_apqns4keytype {
+	enum pkey_key_type type;	/* in: key type */
+	u8  cur_mkvp[32];		/* in: current mkvp */
+	u8  alt_mkvp[32];		/* in: alternate mkvp */
+	u32 flags;			/* in: match controlling flags */
+	struct pkey_apqn *apqns;	/* in/out: ptr to list of apqn targets*/
+	u32 apqn_entries;		/* in: max # of apqn entries in list */
+					/* out: # apqns stored into the list */
+};
+
+#define PKEY_APQNS4KT _IOWR(PKEY_IOCTL_MAGIC, 0x1C, struct pkey_apqns4keytype)
+
 #define KEY_TYPE_CCA_AESDATA        "CCA-AESDATA"
+#define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"
 
 #define PAES_BLOCK_SIZE             16
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
@@ -129,11 +257,11 @@ int validate_secure_key(int pkey_fd,
 int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);
 
-int get_master_key_verification_pattern(const u8 *secure_key,
-					size_t secure_key_size, u64 *mkvp,
-					bool verbose);
+int get_master_key_verification_pattern(const u8 *key, size_t key_size,
+					u64 *mkvp, bool verbose);
 
 bool is_cca_aes_data_key(const u8 *key, size_t key_size);
+bool is_cca_aes_cipher_key(const u8 *key, size_t key_size);
 bool is_xts_key(const u8 *key, size_t key_size);
 int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize);
 const char *get_key_type(const u8 *key, size_t key_size);

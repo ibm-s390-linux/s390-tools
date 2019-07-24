@@ -221,7 +221,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "key-type", required_argument, NULL, 'K'},
 		.argument = "type",
 		.desc = "The type of the key. Possible values are '"
-			KEY_TYPE_CCA_AESDATA"'. "
+			KEY_TYPE_CCA_AESDATA"' and '"KEY_TYPE_CCA_AESCIPHER"'. "
 			"When this option is omitted, the default is '"
 			KEY_TYPE_CCA_AESDATA"'",
 		.command = COMMAND_GENERATE,
@@ -446,7 +446,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "key-type", required_argument, NULL, 'K'},
 		.argument = "type",
 		.desc = "The type of the key. Possible values are '"
-			KEY_TYPE_CCA_AESDATA"'. "
+			KEY_TYPE_CCA_AESDATA"' and '"KEY_TYPE_CCA_AESCIPHER"'. "
 			"Use this option to list all keys with the specified "
 			"key type.",
 		.command = COMMAND_LIST,

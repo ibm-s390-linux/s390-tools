@@ -782,23 +782,21 @@ out:
 	return rc;
 }
 
-int get_master_key_verification_pattern(const u8 *secure_key,
-					size_t secure_key_size, u64 *mkvp,
-					bool verbose)
+int get_master_key_verification_pattern(const u8 *key, size_t key_size,
+					u64 *mkvp, bool UNUSED(verbose))
 {
-	struct aesdatakeytoken *token = (struct aesdatakeytoken *)secure_key;
+	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
+	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
 
-	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+	util_assert(key != NULL, "Internal error: secure_key is NULL");
 	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
 
-	if (secure_key_size < AESDATA_KEY_SIZE) {
-		pr_verbose(verbose, "Size of secure key is too small: "
-			   "%lu expected %lu", secure_key_size,
-			   AESDATA_KEY_SIZE);
+	if (is_cca_aes_data_key(key, key_size))
+		*mkvp = datakey->mkvp;
+	else if (is_cca_aes_cipher_key(key, key_size))
+		memcpy(mkvp, cipherkey->kvp, sizeof(*mkvp));
+	else
 		return -EINVAL;
-	}
-
-	*mkvp = token->mkvp;
 
 	return 0;
 }
@@ -827,6 +825,56 @@ bool is_cca_aes_data_key(const u8 *key, size_t key_size)
 }
 
 /**
+ * Check if the specified key is a CCA AESCIPHER key token.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is an CCA AESCIPHER token type
+ */
+bool is_cca_aes_cipher_key(const u8 *key, size_t key_size)
+{
+	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
+
+	if (key == NULL || key_size < AESCIPHER_KEY_SIZE)
+		return false;
+
+	if (cipherkey->type != TOKEN_TYPE_CCA_INTERNAL)
+		return false;
+	if (cipherkey->version != TOKEN_VERSION_AESCIPHER)
+		return false;
+	if (cipherkey->length > key_size)
+		return false;
+
+	if (cipherkey->kms != 0x03) /* key wrapped by master key */
+		return false;
+	if (cipherkey->kwm != 0x02) /* key wrapped using AESKW */
+		return false;
+	if (cipherkey->pfv != 0x00 && cipherkey->pfv != 0x01) /* V0 or V1 */
+		return false;
+	if (cipherkey->adv != 0x01) /* Should have ass. data sect. version 1 */
+		return false;
+	if (cipherkey->at != 0x02) /* Algorithm: AES */
+		return false;
+	if (cipherkey->kt != 0x0001) /* Key type: CIPHER */
+		return false;
+	if (cipherkey->adl != 26) /* Ass. data section length should be 26 */
+		return false;
+	if (cipherkey->kll != 0) /* Should have no key label */
+		return false;
+	if (cipherkey->eadl != 0) /* Should have no ext associated data */
+		return false;
+	if (cipherkey->uadl != 0) /* Should have no user associated data */
+		return false;
+	if (cipherkey->kufc != 2) /* Should have 2 KUFs */
+		return false;
+	if (cipherkey->kmfc != 3) /* Should have 3 KMFs */
+		return false;
+
+	return true;
+}
+
+/**
  * Check if the specified key is an XTS type key
  *
  * @param[in] key           the secure key token
@@ -840,6 +888,11 @@ bool is_xts_key(const u8 *key, size_t key_size)
 		if (key_size == 2 * AESDATA_KEY_SIZE &&
 		    is_cca_aes_data_key(key + AESDATA_KEY_SIZE,
 					key_size - AESDATA_KEY_SIZE))
+			return true;
+	} else if (is_cca_aes_cipher_key(key, key_size)) {
+		if (key_size == 2 * AESCIPHER_KEY_SIZE &&
+		    is_cca_aes_cipher_key(key + AESCIPHER_KEY_SIZE,
+					  key_size - AESCIPHER_KEY_SIZE))
 			return true;
 	}
 
@@ -860,6 +913,7 @@ bool is_xts_key(const u8 *key, size_t key_size)
 int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 {
 	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
+	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
 
 	util_assert(bitsize != NULL, "Internal error: bitsize is NULL");
 
@@ -869,6 +923,17 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 			datakey = (struct aesdatakeytoken *)key +
 					AESDATA_KEY_SIZE;
 			*bitsize += datakey->bitsize;
+		}
+	} else if (is_cca_aes_cipher_key(key, key_size)) {
+		if (cipherkey->pfv == 0x00) /* V0 payload */
+			*bitsize = cipherkey->pl - 384;
+		else
+			*bitsize = 0; /* Unknown */
+		if (key_size > cipherkey->length) {
+			cipherkey = (struct aescipherkeytoken *)key +
+					cipherkey->length;
+			if (cipherkey->pfv == 0x00) /* V0 payload */
+				*bitsize += cipherkey->pl - 384;
 		}
 	} else {
 		return -EINVAL;
@@ -889,6 +954,8 @@ const char *get_key_type(const u8 *key, size_t key_size)
 {
 	if (is_cca_aes_data_key(key, key_size))
 		return KEY_TYPE_CCA_AESDATA;
+	if (is_cca_aes_cipher_key(key, key_size))
+		return KEY_TYPE_CCA_AESCIPHER;
 
 	return NULL;
 }
