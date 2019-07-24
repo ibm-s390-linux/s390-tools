@@ -46,6 +46,8 @@
 
 #define DEFAULT_KEYBITS		256
 
+#define INITIAL_APQN_ENTRIES	16
+
 /**
  * Opens the pkey device and returns its file descriptor.
  *
@@ -495,6 +497,387 @@ static int pkey_verifyseck2(int pkey_fd, struct pkey_verifykey2 *verifykey2,
 		verifykey2->flags = PKEY_FLAGS_MATCH_CUR_MKVP;
 
 	return 0;
+}
+
+/**
+ * Print a list of APQNs if verbose is set
+ */
+static void pr_verbose_apqn_list(bool verbose, struct pkey_apqn *list, u32 num)
+{
+	u32 i;
+
+	if (!verbose)
+		return;
+
+	for (i = 0; i < num ; i++)
+		warnx("  APQN: %02x.%04x", list[i].card, list[i].domain);
+}
+
+/**
+ * Filter a n array list of APQNs (struct pkey_apqn) by a list of APQN strings.
+ *
+ * @param[in] apqn_list     a zero terminated array of pointers to C-strings
+ * @param[in/out] apqns     A list of APQNs as array of struct pkey_apqn to
+ *                          filter. The list is modified during filtering.
+ * @param[in/out] apqn_entries Number of entries in the list of APQNs. The
+ *                          number is modified during filtering.
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int filter_apqn_list(const char **apqn_list, struct pkey_apqn **apqns,
+			    u32 *apqn_entries)
+{
+	unsigned int count, i, k, card, domain;
+	struct pkey_apqn *list = *apqns;
+	bool found;
+
+	if (apqn_list == NULL)
+		return 0;
+
+	for (count = 0; apqn_list[count] != NULL; count++)
+		;
+	if (count == 0)
+		return 0;
+
+	for (i = 0; i < *apqn_entries; i++) {
+		found = false;
+		for (k = 0; apqn_list[k] != NULL; k++) {
+			if (sscanf(apqn_list[k], "%x.%x", &card, &domain) != 2)
+				return -EINVAL;
+
+			if (list[i].card == card && list[i].domain == domain) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			if (i < *apqn_entries - 1)
+				memmove(&list[i], &list[i+1],
+					(*apqn_entries - i - 1) *
+						sizeof(struct pkey_apqn));
+			(*apqn_entries)--;
+			i--;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Build a list of APQNs in the form accepted by the pkey IOCTLs from the
+ * List of APQNs as zero terminated array of pointers to C-strings that
+ * are usable for the CCA-AESDATA key type.
+ *
+ * @param[in] apqn_list     a zero terminated array of pointers to C-strings
+ * @param[out] apqns        A list of APQNs as array of struct pkey_apqn. The
+ *                          list must be freed by the caller using free().
+ * @param[out] apqn_entries Number of entries in the list of APQNs
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int build_apqn_list_for_aes_data(const char **apqn_list,
+					struct pkey_apqn **apqns,
+					u32 *apqn_entries, bool verbose)
+{
+	unsigned int card, domain, count = 0;
+	struct pkey_apqn *list = NULL;
+	u32 list_entries = 0;
+	int i;
+
+	pr_verbose(verbose, "Build a list of APQNs for CCA-AESDATA");
+
+	if (apqn_list != NULL)
+		for (count = 0; apqn_list[count] != NULL; count++)
+			;
+
+	if (count > 0) {
+		list = util_malloc(count * sizeof(struct pkey_apqn));
+		list_entries = count;
+
+		for (i = 0; apqn_list[i] != NULL; i++) {
+			if (sscanf(apqn_list[i], "%x.%x", &card, &domain) != 2)
+				return -EINVAL;
+
+			list[i].card = card;
+			list[i].domain = domain;
+		}
+
+	} else {
+		/*
+		 * Although the new pkey IOCTLs do not support APQN entries
+		 * with ANY indication, build an ANY-list here. If we get here,
+		 * then the new IOCTLs are not available, and it will fall back
+		 * to the old IOCTL which do support ANY specifications.
+		 */
+		list = util_malloc(sizeof(struct pkey_apqn));
+		list_entries = 1;
+
+		list[0].card = AUTOSELECT;
+		list[0].domain = AUTOSELECT;
+	}
+
+	*apqns = list;
+	*apqn_entries = list_entries;
+
+	pr_verbose(verbose, "%u APQNs found", list_entries);
+	pr_verbose_apqn_list(verbose, list, list_entries);
+	return 0;
+}
+
+/**
+ * Build a list of APQNs in the form accepted by the pkey IOCTLs from the
+ * List of APQNs as zero terminated array of pointers to C-strings that
+ * are usable for the specified key type.
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] type          the key type
+ * @param[in] apqn_list     a zero terminated array of pointers to C-strings
+ * @param[out] apqns        A list of APQNs as array of struct pkey_apqn. The
+ *                          list must be freed by the caller using free().
+ * @param[out] apqn_entries Number of entries in the list of APQNs
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int build_apqn_list_for_key_type(int pkey_fd, enum pkey_key_type type,
+					const char **apqn_list,
+					struct pkey_apqn **apqns,
+					u32 *apqn_entries, bool verbose)
+{
+	struct pkey_apqns4keytype apqns4keytype;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(apqns != NULL, "Internal error: apqns is NULL");
+	util_assert(apqn_entries != NULL,
+		    "Internal error: apqn_entries is NULL");
+
+	pr_verbose(verbose, "Build a list of APQNs for key type %d", type);
+
+	memset(&apqns4keytype, 0, sizeof(apqns4keytype));
+	apqns4keytype.type = type;
+	apqns4keytype.apqn_entries = INITIAL_APQN_ENTRIES;
+	apqns4keytype.apqns = (struct pkey_apqn *)util_malloc(
+			apqns4keytype.apqn_entries * sizeof(struct pkey_apqn));
+
+	do {
+		rc = ioctl(pkey_fd, PKEY_APQNS4KT, &apqns4keytype);
+		if (rc == 0)
+			break;
+		rc = -errno;
+		pr_verbose(verbose, "ioctl PKEY_APQNS4KT rc: %s",
+			   strerror(-rc));
+
+		switch (rc) {
+		case -ENOSPC:
+			free(apqns4keytype.apqns);
+			apqns4keytype.apqns = (struct pkey_apqn *)
+				util_malloc(apqns4keytype.apqn_entries *
+						sizeof(struct pkey_apqn));
+			continue;
+		case -ENOTTY:
+			/*
+			 * New IOCTL is not available: build the list
+			 * manually (Key type CCA-AESDATA only)
+			 */
+			free(apqns4keytype.apqns);
+
+			if (type != PKEY_TYPE_CCA_DATA)
+				return -ENOTSUP;
+
+			rc = build_apqn_list_for_aes_data(apqn_list, apqns,
+							  apqn_entries,
+							  verbose);
+			return rc;
+		default:
+			goto out;
+		}
+	} while (rc != 0);
+
+	if (apqns4keytype.apqn_entries == 0) {
+		pr_verbose(verbose, "No APQN available for key type %d", type);
+		rc = -ENODEV;
+		goto out;
+	}
+
+	rc = filter_apqn_list(apqn_list, &apqns4keytype.apqns,
+			      &apqns4keytype.apqn_entries);
+	if (rc != 0)
+		goto out;
+
+	if (apqns4keytype.apqn_entries == 0) {
+		pr_verbose(verbose, "No APQN available for key type %d", type);
+		rc = -ENODEV;
+		goto out;
+	}
+
+	pr_verbose(verbose, "%u APQNs found", apqns4keytype.apqn_entries);
+	pr_verbose_apqn_list(verbose, apqns4keytype.apqns,
+			     apqns4keytype.apqn_entries);
+
+out:
+	if (rc == 0) {
+		*apqns = apqns4keytype.apqns;
+		*apqn_entries = apqns4keytype.apqn_entries;
+	} else {
+		*apqns = NULL;
+		*apqn_entries = 0;
+		free(apqns4keytype.apqns);
+	}
+
+	return rc;
+}
+
+/**
+ * Build a list of APQNs in the form accepted by the pkey IOCTLs from the
+ * List of APQNs as zero terminated array of pointers to C-strings that are
+ * usable for the specufied key.
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] key           the key
+ * @param[in] keylen        the length of the key
+ * @param[in] flags         PKEY_FLAGS_MATCH_xxx flags
+ * @param[in] apqn_list     a zero terminated array of pointers to C-strings
+ * @param[out] apqns        A list of APQNs as array of struct pkey_apqn. The
+ *                          list must be freed by the caller using free().
+ * @param[out] apqn_entries Number of  entries in the list of APQNs
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int build_apqn_list_for_key(int pkey_fd, u8 *key, u32 keylen, u32 flags,
+				   const char **apqn_list,
+				   struct pkey_apqn **apqns,
+				   u32 *apqn_entries, bool verbose)
+{
+	struct pkey_apqns4key apqns4key;
+	u64 mkvp;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(key != NULL, "Internal error: key is NULL");
+	util_assert(apqns != NULL, "Internal error: apqns is NULL");
+	util_assert(apqn_entries != NULL,
+		    "Internal error: apqn_entries is NULL");
+
+	pr_verbose(verbose, "Build a list of APQNs for the key");
+
+	memset(&apqns4key, 0, sizeof(apqns4key));
+	apqns4key.key = key;
+	apqns4key.keylen = keylen;
+	apqns4key.flags = flags;
+	apqns4key.apqn_entries = INITIAL_APQN_ENTRIES;
+	apqns4key.apqns = (struct pkey_apqn *)util_malloc(
+			apqns4key.apqn_entries * sizeof(struct pkey_apqn));
+
+	do {
+		rc = ioctl(pkey_fd, PKEY_APQNS4K, &apqns4key);
+		if (rc == 0)
+			break;
+		rc = -errno;
+		pr_verbose(verbose, "ioctl PKEY_APQNS4K rc: %s", strerror(-rc));
+
+		switch (rc) {
+		case -ENOSPC:
+			free(apqns4key.apqns);
+			apqns4key.apqns = (struct pkey_apqn *)
+				util_malloc(apqns4key.apqn_entries *
+					sizeof(struct pkey_apqn));
+			continue;
+		case -ENOTTY:
+			/*
+			 * New IOCTL is not available: build the list manually
+			 * (Key type CCA-AESDATA only)
+			 */
+			free(apqns4key.apqns);
+
+			if (!is_cca_aes_data_key(key, keylen))
+				return -ENOTSUP;
+
+			rc = get_master_key_verification_pattern(key, keylen,
+								 &mkvp,
+								 verbose);
+			if (rc != 0)
+				return rc;
+
+			rc = build_apqn_list_for_aes_data(apqn_list, apqns,
+							  apqn_entries,
+							  verbose);
+			return rc;
+		default:
+			goto out;
+		}
+	} while (rc != 0);
+
+	if (apqns4key.apqn_entries == 0) {
+		pr_verbose(verbose, "No APQN available for the key");
+		rc = -ENODEV;
+		goto out;
+	}
+
+	rc = filter_apqn_list(apqn_list, &apqns4key.apqns,
+			      &apqns4key.apqn_entries);
+	if (rc != 0)
+		goto out;
+
+	if (apqns4key.apqn_entries == 0) {
+		pr_verbose(verbose, "No APQN available for the key");
+		rc = -ENODEV;
+		goto out;
+	}
+
+	pr_verbose(verbose, "%u APQNs found", apqns4key.apqn_entries);
+	pr_verbose_apqn_list(verbose, apqns4key.apqns, apqns4key.apqn_entries);
+
+out:
+	if (rc == 0) {
+		*apqns = apqns4key.apqns;
+		*apqn_entries = apqns4key.apqn_entries;
+	} else {
+		*apqns = NULL;
+		*apqn_entries = 0;
+		free(apqns4key.apqns);
+	}
+
+	return rc;
+}
+
+/**
+ * Convert the key type string into the pkey enumeration
+ *
+ * @param[in] key_type      the type of the key
+ *
+ * @returns the pkey key type or 0 for an u known key type
+ */
+static enum pkey_key_type key_type_to_pkey_type(const char *key_type)
+{
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		return PKEY_TYPE_CCA_DATA;
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+		return PKEY_TYPE_CCA_CIPHER;
+
+	return 0;
+}
+
+/**
+ * Return the size of a key blob for a specific type
+ *
+ * @param[in] type          the type of the key
+ *
+ * @returns the size of the key or 0 for an invalid key type
+ */
+static size_t key_size_for_type(enum pkey_key_type type)
+{
+	switch (type) {
+	case PKEY_TYPE_CCA_DATA:
+		return AESDATA_KEY_SIZE;
+	case PKEY_TYPE_CCA_CIPHER:
+		return AESCIPHER_KEY_SIZE;
+	default:
+		return 0;
+	}
 }
 
 /**
