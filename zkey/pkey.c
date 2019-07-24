@@ -270,6 +270,234 @@ out:
 }
 
 /**
+ * Returns the PKEY_KEYTYPE_xxx value for the specified key size.
+ *
+ * @param[in] keysize      the key size in bits
+ *
+ * @returns the PKEY_KEYTYPE_xxx value or 0 for an unknown key size
+ */
+static u32 keysize_to_keytype(enum pkey_key_size keysize)
+{
+	switch (keysize) {
+	case PKEY_SIZE_AES_128:
+		return PKEY_KEYTYPE_AES_128;
+	case PKEY_SIZE_AES_192:
+		return PKEY_KEYTYPE_AES_192;
+	case PKEY_SIZE_AES_256:
+		return PKEY_KEYTYPE_AES_256;
+	default:
+		return 0;
+	}
+}
+
+/**
+ * Returns the PKEY_SIZE_xxx value for the specified keybits.
+ *
+ * @param[in] keybits      the key size in bits
+ *
+ * @returns thePKEY_SIZE_xxx value or 0 for an unknown key size
+ */
+static enum pkey_key_size keybits_to_keysize(u32 keybits)
+{
+	switch (keybits) {
+	case 128:
+		return PKEY_SIZE_AES_128;
+	case 192:
+		return PKEY_SIZE_AES_192;
+	case 256:
+		return PKEY_SIZE_AES_256;
+	default:
+		return PKEY_SIZE_UNKNOWN;
+	}
+}
+
+/*
+ * Wrapper for the PKEY_GENSECK/PKEY_GENSECK2 IOCTL to generate a secure
+ * key of any type by random. If the newer PKEY_GENSECK2 IOCTL is not supported
+ * by the pkey device, then it falls back to the older PKEY_GENSECK IOCTL
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in/out] genseck   info about key to generate
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int pkey_genseck2(int pkey_fd, struct pkey_genseck2 *genseck2,
+			 bool verbose)
+{
+	struct pkey_genseck genseck;
+	int rc;
+	u32 i;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(genseck2 != NULL, "Internal error: genseck2 is NULL");
+
+	rc = ioctl(pkey_fd, PKEY_GENSECK2, genseck2);
+	if (rc != 0 && errno != ENOTTY)
+		return -errno;
+	if (rc == 0)
+		return 0;
+
+	/* New IOCTL is not available, fall back to old one */
+	pr_verbose(verbose, "ioctl PKEY_GENSECK2 not supported, fall back to "
+		   "PKEY_GENSECK");
+
+	if (genseck2->type != PKEY_TYPE_CCA_DATA) {
+		warnx("Key-type is not supported");
+		return -ENOTSUP;
+	}
+
+	if (genseck2->keylen < AESDATA_KEY_SIZE)
+		return -EINVAL;
+
+	memset(&genseck, 0, sizeof(genseck));
+
+	genseck.keytype = keysize_to_keytype(genseck2->size);
+	if (genseck.keytype == 0)
+		return -EINVAL;
+
+	for (i = 0; i < genseck2->apqn_entries; i++) {
+		genseck.cardnr = genseck2->apqns[i].card;
+		genseck.domain = genseck2->apqns[i].domain;
+
+		rc = ioctl(pkey_fd, PKEY_GENSECK, &genseck);
+		if (rc != 0)
+			continue;
+
+		memcpy(genseck2->key, &genseck.seckey.seckey, AESDATA_KEY_SIZE);
+		genseck2->keylen = AESDATA_KEY_SIZE;
+		return 0;
+	}
+
+	return -errno;
+}
+
+/*
+ * Wrapper for the PKEY_CLR2SECK/PKEY_CLR2SECK2 IOCTL to generate a secure
+ * key of any type from a clear key. If the newer PKEY_CLR2SECK2 IOCTL is not
+ * supported by the pkey device, then it falls back to the older PKEY_CLR2SECK
+ * IOCTL
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in/out] clr2seck2 info about key to generate
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int pkey_clr2seck2(int pkey_fd, struct pkey_clr2seck2 *clr2seck2,
+			  bool verbose)
+{
+	struct pkey_clr2seck clr2seck;
+	int rc;
+	u32 i;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(clr2seck2 != NULL, "Internal error: clr2seck2 is NULL");
+
+	rc = ioctl(pkey_fd, PKEY_CLR2SECK2, clr2seck2);
+	if (rc != 0 && errno != ENOTTY)
+		return -errno;
+	if (rc == 0)
+		return 0;
+
+	/* New IOCTL is not available, fall back to old one */
+	pr_verbose(verbose, "ioctl PKEY_CLR2SECK2 not supported, fall back to "
+			   "PKEY_CLR2SECK");
+
+	if (clr2seck2->type != PKEY_TYPE_CCA_DATA) {
+		warnx("Key-type is not supported");
+		return -ENOTSUP;
+	}
+
+	if (clr2seck2->keylen < AESDATA_KEY_SIZE)
+		return -EINVAL;
+
+	memset(&clr2seck, 0, sizeof(clr2seck));
+	clr2seck.clrkey = clr2seck2->clrkey;
+
+	clr2seck.keytype = keysize_to_keytype(clr2seck2->size);
+	if (clr2seck.keytype == 0)
+		return -EINVAL;
+
+	for (i = 0; i < clr2seck2->apqn_entries; i++) {
+		clr2seck.cardnr = clr2seck2->apqns[i].card;
+		clr2seck.domain = clr2seck2->apqns[i].domain;
+
+		rc = ioctl(pkey_fd, PKEY_CLR2SECK, &clr2seck);
+		if (rc != 0)
+			continue;
+
+		memcpy(clr2seck2->key, &clr2seck.seckey.seckey,
+		       AESDATA_KEY_SIZE);
+		clr2seck2->keylen = AESDATA_KEY_SIZE;
+		return 0;
+	}
+
+	return -errno;
+}
+
+/*
+ * Wrapper for the PKEY_VERIFYKEY/PKEY_VERIFYKEY2 IOCTL to verify a secure
+ * key of any type. If the newer PKEY_VERIFYKEY2 IOCTL is not supported
+ * by the pkey device, then it falls back to the older PKEY_VERIFYKEY IOCTL
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in/out] verifykey2   info about key to verify
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int pkey_verifyseck2(int pkey_fd, struct pkey_verifykey2 *verifykey2,
+			    bool verbose)
+{
+	struct pkey_verifykey verifykey;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(verifykey2 != NULL, "Internal error: verifyseck2 is NULL");
+
+	rc = ioctl(pkey_fd, PKEY_VERIFYKEY2, verifykey2);
+	if (rc != 0 && errno != ENOTTY)
+		return -errno;
+	if (rc == 0)
+		return 0;
+
+	/* New IOCTL is not available, fall back to old one */
+	pr_verbose(verbose, "ioctl PKEY_VERIFYKEY2 not supported, fall back to "
+			   "PKEY_VERIFYKEY");
+
+	if (!is_cca_aes_data_key(verifykey2->key, verifykey2->keylen))
+		return -ENODEV;
+
+	memset(&verifykey, 0, sizeof(verifykey));
+	memcpy(&verifykey.seckey, verifykey2->key, sizeof(verifykey.seckey));
+
+	/*
+	 * Note: the old IOCTL does not support to check a specific card and
+	 * domain. If falling back to the old IOCTL, this input is silently
+	 * ignored, and all APQNs currently available in the system are used.
+	 */
+	rc = ioctl(pkey_fd, PKEY_VERIFYKEY, &verifykey);
+	if (rc != 0)
+		return -errno;
+
+	if ((verifykey.attributes & PKEY_VERIFY_ATTR_AES) == 0)
+		return -ENODEV;
+
+	verifykey2->type = PKEY_TYPE_CCA_DATA;
+	verifykey2->cardnr = verifykey.cardnr;
+	verifykey2->domain = verifykey.domain;
+	verifykey2->size = keybits_to_keysize(verifykey.keysize);
+
+	if (verifykey.attributes & PKEY_VERIFY_ATTR_OLD_MKVP)
+		verifykey2->flags = PKEY_FLAGS_MATCH_ALT_MKVP;
+	else
+		verifykey2->flags = PKEY_FLAGS_MATCH_CUR_MKVP;
+
+	return 0;
+}
+
+/**
  * Generate a secure key by random
  *
  * @param[in] pkey_fd       the pkey file descriptor
