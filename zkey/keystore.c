@@ -1667,52 +1667,6 @@ out:
 }
 
 /**
- * Extracts an online card/domain pair from the specified APQns. If none of the
- * specified APQNs are online, then -ENODEV is returned.
- * If no APQNs are specified at all, then it uses AUTOSELECT and returns zero.
- */
-static int _keystore_get_card_domain(const char *apqns, unsigned int *card,
-				     unsigned int *domain)
-{
-	struct apqn_check apqn_check = { .noonlinecheck = 0, .nomsg = 1 };
-	char **apqn_list;
-	char *normalized = NULL;
-	int rc = 0;
-	int i;
-
-	*card = AUTOSELECT;
-	*domain = AUTOSELECT;
-
-	if (apqns == NULL)
-		return 0;
-
-	apqn_list = str_list_split(apqns);
-	if (apqn_list[0] == NULL)
-		goto out;
-
-	for (i = 0; apqn_list[i] != NULL; i++) {
-		rc = _keystore_apqn_check(apqn_list[i], 0, 0, &normalized,
-					  &apqn_check);
-		if (normalized != NULL)
-			free(normalized);
-		if (rc == -EINVAL)
-			goto out;
-		if (rc != 0)
-			continue;
-
-		if (sscanf(apqn_list[i], "%x.%x", card, domain) == 2)
-			goto found;
-	}
-
-	warnx("None of the specified APQNs is online or of type CCA");
-	rc = -ENODEV;
-found:
-out:
-	str_list_free_string_array(apqn_list);
-	return rc;
-}
-
-/**
  * Generates a secure key by random and adds it to the key store
  *
  * @param[in] keystore    the key store
@@ -1748,7 +1702,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
-	unsigned int card, domain;
+	char **apqn_list = NULL;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -1776,21 +1730,21 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 		goto out_free_key_filenames;
 	}
 
-	rc = _keystore_get_card_domain(apqns, &card, &domain);
-	if (rc != 0)
-		goto out_free_key_filenames;
+	if (apqns != NULL)
+		apqn_list = str_list_split(apqns);
 
 	if (clear_key_file == NULL)
 		rc = generate_secure_key_random(pkey_fd,
 						file_names.skey_filename,
 						keybits, xts, key_type,
-						card, domain,
+						(const char **)apqn_list,
 						keystore->verbose);
 	else
 		rc = generate_secure_key_clear(pkey_fd,
 					       file_names.skey_filename,
 					       keybits, xts, clear_key_file,
-					       key_type, card, domain,
+					       key_type,
+					       (const char **)apqn_list,
 					       keystore->verbose);
 	if (rc != 0)
 		goto out_free_props;
@@ -1812,6 +1766,8 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 		   file_names.info_filename);
 
 out_free_props:
+	if (apqn_list != NULL)
+		str_list_free_string_array(apqn_list);
 	if (key_props != NULL)
 		properties_free(key_props);
 	if (rc != 0)

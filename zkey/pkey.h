@@ -235,13 +235,12 @@ int open_pkey_device(bool verbose);
 
 int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			       size_t keybits, bool xts, const char *key_type,
-			       u16 card, u16 domain, bool verbose);
+			       const char **apqns, bool verbose);
 
 int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      size_t keybits, bool xts,
 			      const char *clearkeyfile, const char *key_type,
-			      u16 card, u16 domain,
-			      bool verbose);
+			      const char **apqns, bool verbose);
 
 u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 		    bool verbose);

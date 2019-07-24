@@ -1029,8 +1029,7 @@ static int command_generate_clear(void)
 	rc = generate_secure_key_clear(g.pkey_fd, g.pos_arg,
 				       g.keybits, g.xts,
 				       g.clearkeyfile, g.key_type,
-				       AUTOSELECT, AUTOSELECT,
-				       g.verbose);
+				       NULL, g.verbose);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1046,8 +1045,7 @@ static int command_generate_random(void)
 
 	rc = generate_secure_key_random(g.pkey_fd, g.pos_arg,
 					g.keybits, g.xts, g.key_type,
-					AUTOSELECT, AUTOSELECT,
-					g.verbose);
+					NULL, g.verbose);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

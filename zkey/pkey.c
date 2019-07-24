@@ -888,86 +888,109 @@ static size_t key_size_for_type(enum pkey_key_type type)
  * @param[in] keybits       the cryptographic size of the key in bits
  * @param[in] xts           if true an XTS key is generated
  * @param[in] key_type      the type of the key
- * @param[in] card          the card number to use (or AUTOSELECT)
- * @param[in] domain        the domain number to use (or AUTOSELECT)
+ * @param[in] apqns         a zero terminated array of pointers to APQN-strings,
+ *                          or NULL for AUTOSELECT
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
  */
 int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			       size_t keybits, bool xts, const char *key_type,
-			       u16 card, u16 domain, bool verbose)
+			       const char **apqns, bool verbose)
 {
-	struct pkey_genseck gensec;
-	size_t secure_key_size;
-	u8 *secure_key;
+	struct pkey_genseck2 genseck2;
+	size_t secure_key_size, size;
+	u8 *secure_key = NULL;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
 	util_assert(key_type != NULL, "Internal error: key_type is NULL");
 
-	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) != 0) {
-		warnx("Invalid key-type: %s", key_type);
-		return -EINVAL;
-	}
-
 	if (keybits == 0)
 		keybits = DEFAULT_KEYBITS;
 
-	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(AESDATA_KEY_SIZE, xts);
-	secure_key = util_malloc(secure_key_size);
+	pr_verbose(verbose, "Generate secure key by random");
 
-	pr_verbose(verbose, "Generate key on card %02x.%04x", card, domain);
+	memset(&genseck2, 0, sizeof(genseck2));
 
-	gensec.cardnr = card;
-	gensec.domain = domain;
-	switch (keybits) {
-	case 128:
-		gensec.keytype = PKEY_KEYTYPE_AES_128;
-		break;
-	case 192:
-		if (xts) {
-			warnx("Invalid value for '--keybits'|'-c' "
-			      "for XTS: '%lu'", keybits);
-			rc = -EINVAL;
-			goto out;
-		}
-		gensec.keytype = PKEY_KEYTYPE_AES_192;
-		break;
-	case 256:
-		gensec.keytype = PKEY_KEYTYPE_AES_256;
-		break;
-	default:
+	genseck2.type = key_type_to_pkey_type(key_type);
+	if (genseck2.type == 0) {
+		warnx("Key-type not supported; %s", key_type);
+		return -ENOTSUP;
+	}
+
+	genseck2.size = keybits_to_keysize(keybits);
+	if (genseck2.size == 0) {
 		warnx("Invalid value for '--keybits'/'-c': '%lu'", keybits);
-		rc = -EINVAL;
-		goto out;
+		return -EINVAL;
+	}
+	if (keybits == 192 && xts) {
+		warnx("Invalid value for '--keybits'|'-c' "
+		      "for XTS: '%lu'", keybits);
+		return -EINVAL;
 	}
 
-	rc = ioctl(pkey_fd, PKEY_GENSECK, &gensec);
-	if (rc < 0) {
-		rc = -errno;
-		warnx("Failed to generate a secure key: %s", strerror(errno));
-		warnx("Make sure that all available CCA crypto adapters are "
-		      "setup with the same master key");
-		goto out;
+	rc = build_apqn_list_for_key_type(pkey_fd, genseck2.type, apqns,
+					  &genseck2.apqns,
+					  &genseck2.apqn_entries, verbose);
+	if (rc != 0) {
+		if (rc == -ENODEV || rc == -ENOTSUP)
+			warnx("No APQN is available that can generate a secure "
+			      "key of type %s", key_type);
+		else
+			warnx("Failed to build a list of APQNs that can "
+			      "generate a secure key of type %s: %s", key_type,
+			      strerror(-rc));
+		return rc;
 	}
 
-	memcpy(secure_key, &gensec.seckey, AESDATA_KEY_SIZE);
+	size = key_size_for_type(genseck2.type);
+	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(size, xts);
+	secure_key = util_zalloc(secure_key_size);
+
+	genseck2.key = secure_key;
+	genseck2.keylen = size;
+
+	rc = pkey_genseck2(pkey_fd, &genseck2, verbose);
+	if (rc != 0) {
+		warnx("Failed to generate a secure key: %s", strerror(-rc));
+		goto out;
+	}
 
 	if (xts) {
-		rc = ioctl(pkey_fd, PKEY_GENSECK, &gensec);
-		if (rc < 0) {
-			rc = -errno;
-			warnx("Failed to generate a secure key: %s",
-			      strerror(errno));
-			warnx("Make sure that all available CCA crypto "
-			      "adapters are setup with the same master key");
+		free(genseck2.apqns);
+		genseck2.apqns = NULL;
+		genseck2.apqn_entries = 0;
+
+		/*
+		 * Ensure to generate 2nd key with an APQN that has the same
+		 * master key that is used by the 1st key.
+		 */
+		rc = build_apqn_list_for_key(pkey_fd, secure_key, size,
+					     PKEY_FLAGS_MATCH_CUR_MKVP, apqns,
+					     &genseck2.apqns,
+					     &genseck2.apqn_entries, verbose);
+		if (rc != 0) {
+			if (rc == -ENODEV || rc == -ENOTSUP)
+				warnx("No APQN is available that can generate "
+				      "a secure key of type %s", key_type);
+			else
+				warnx("Failed to build a list of APQNs that "
+				      "can generate a secure key of type %s: "
+				      "%s", key_type, strerror(-rc));
 			goto out;
 		}
 
-		memcpy(secure_key + AESDATA_KEY_SIZE, &gensec.seckey,
-		       AESDATA_KEY_SIZE);
+		genseck2.key = secure_key + size;
+		genseck2.keylen = size;
+
+		rc = pkey_genseck2(pkey_fd, &genseck2, verbose);
+		if (rc != 0) {
+			warnx("Failed to generate a secure key: %s",
+			      strerror(-rc));
+			goto out;
+		}
 	}
 
 	pr_verbose(verbose, "Successfully generated a secure key");
@@ -975,6 +998,7 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 	rc = write_secure_key(keyfile, secure_key, secure_key_size, verbose);
 
 out:
+	free(genseck2.apqns);
 	free(secure_key);
 	return rc;
 }
@@ -991,8 +1015,8 @@ out:
  * @param[in] xts           if true an XTS key is generated
  * @param[in] clearkeyfile  the file name of the clear key to read
  * @param[in] key_type      the type of the key
- * @param[in] card          the card number to use (or AUTOSELECT)
- * @param[in] domain        the domain number to use (or AUTOSELECT)
+ * @param[in] apqns         a zero terminated array of pointers to APQN-strings,
+ *                          or NULL for AUTOSELECT
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
@@ -1000,14 +1024,14 @@ out:
 int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      size_t keybits, bool xts,
 			      const char *clearkeyfile, const char *key_type,
-			      u16 card, u16 domain,
-			      bool verbose)
+			      const char **apqns, bool verbose)
 {
-	struct pkey_clr2seck clr2sec;
+	struct pkey_clr2seck2 clr2seck2;
 	size_t secure_key_size;
 	size_t clear_key_size;
 	u8 *secure_key;
 	u8 *clear_key;
+	size_t size;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
@@ -1016,70 +1040,99 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 		    "Internal error: clearkeyfile is NULL");
 	util_assert(key_type != NULL, "Internal error: key_type is NULL");
 
-	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) != 0) {
-		warnx("Invalid key-type: %s", key_type);
-		return -EINVAL;
-	}
-
-	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(AESDATA_KEY_SIZE, xts);
-	secure_key = util_malloc(secure_key_size);
+	pr_verbose(verbose, "Generate secure key from a clear key");
 
 	clear_key = read_clear_key(clearkeyfile, keybits, xts, &clear_key_size,
 				   verbose);
 	if (clear_key == NULL)
 		return -EINVAL;
 
-	pr_verbose(verbose, "Generate key on card %02x.%04x", card, domain);
+	memset(&clr2seck2, 0, sizeof(clr2seck2));
 
-	clr2sec.cardnr = card;
-	clr2sec.domain = domain;
-	switch (HALF_KEYSIZE_FOR_XTS(clear_key_size * 8, xts)) {
-	case 128:
-		clr2sec.keytype = PKEY_KEYTYPE_AES_128;
-		break;
-	case 192:
-		clr2sec.keytype = PKEY_KEYTYPE_AES_192;
-		break;
-	case 256:
-		clr2sec.keytype = PKEY_KEYTYPE_AES_256;
-		break;
-	default:
-		warnx("Invalid clear key size: '%lu' bytes", clear_key_size);
-		rc = -EINVAL;
-		goto out;
-	}
-
-	memcpy(&clr2sec.clrkey, clear_key,
+	memcpy(&clr2seck2.clrkey, clear_key,
 	       HALF_KEYSIZE_FOR_XTS(clear_key_size, xts));
 
-	rc = ioctl(pkey_fd, PKEY_CLR2SECK, &clr2sec);
-	if (rc < 0) {
-		rc = -errno;
-		warnx("Failed to generate a secure key from a "
-		      "clear key: %s", strerror(errno));
-		warnx("Make sure that all available CCA crypto adapters are "
-		      "setup with the same master key");
+	clr2seck2.type = key_type_to_pkey_type(key_type);
+	if (clr2seck2.type == 0) {
+		warnx("Key-type not supported; %s", key_type);
+		return -ENOTSUP;
+	}
+
+	clr2seck2.size = keybits_to_keysize(HALF_KEYSIZE_FOR_XTS(
+						clear_key_size * 8, xts));
+	if (clr2seck2.size == 0) {
+		warnx("Invalid clear key size: '%lu' bytes", clear_key_size);
+		return -EINVAL;
+	}
+	if (keybits == 192 && xts) {
+		warnx("Invalid clear key size for XTS: '%lu' bytes",
+		      clear_key_size);
+		return -EINVAL;
+	}
+
+	rc = build_apqn_list_for_key_type(pkey_fd, clr2seck2.type, apqns,
+					  &clr2seck2.apqns,
+					  &clr2seck2.apqn_entries, verbose);
+	if (rc != 0) {
+		if (rc == -ENODEV || rc == -ENOTSUP)
+			warnx("No APQN is available that can generate a secure "
+			      "key of type %s", key_type);
+		else
+			warnx("Failed to build a list of APQNs that can "
+			      "generate a secure key of type %s: %s", key_type,
+			      strerror(-rc));
+		return rc;
+	}
+
+	size = key_size_for_type(clr2seck2.type);
+	secure_key_size = DOUBLE_KEYSIZE_FOR_XTS(size, xts);
+	secure_key = util_zalloc(secure_key_size);
+
+	clr2seck2.key = secure_key;
+	clr2seck2.keylen = size;
+
+	rc = pkey_clr2seck2(pkey_fd, &clr2seck2, verbose);
+	if (rc != 0) {
+		warnx("Failed to generate a secure key: %s", strerror(-rc));
 		goto out;
 	}
 
-	memcpy(secure_key, &clr2sec.seckey, AESDATA_KEY_SIZE);
-
 	if (xts) {
-		memcpy(&clr2sec.clrkey, clear_key + clear_key_size / 2,
+		free(clr2seck2.apqns);
+		clr2seck2.apqns = NULL;
+		clr2seck2.apqn_entries = 0;
+
+		memcpy(&clr2seck2.clrkey, clear_key + clear_key_size / 2,
 		       clear_key_size / 2);
 
-		rc = ioctl(pkey_fd, PKEY_CLR2SECK, &clr2sec);
-		if (rc < 0) {
-			rc = -errno;
-			warnx("Failed to generate a secure key from "
-			      "a clear key: %s", strerror(errno));
-			warnx("Make sure that all available CCA crypto "
-			      "adapters are setup with the same master key");
+		/*
+		 * Ensure to generate 2nd key with an APQN that has the same
+		 * master key that is used by the 1st key.
+		 */
+		rc = build_apqn_list_for_key(pkey_fd, secure_key, size,
+					     PKEY_FLAGS_MATCH_CUR_MKVP, apqns,
+					     &clr2seck2.apqns,
+					     &clr2seck2.apqn_entries, verbose);
+		if (rc != 0) {
+			if (rc == -ENODEV || rc == -ENOTSUP)
+				warnx("No APQN is available that can generate "
+				      "a secure key of type %s", key_type);
+			else
+				warnx("Failed to build a list of APQNs that "
+				      "can generate a secure key of type %s: "
+				      "%s", key_type, strerror(-rc));
 			goto out;
 		}
 
-		memcpy(secure_key + AESDATA_KEY_SIZE, &clr2sec.seckey,
-		       AESDATA_KEY_SIZE);
+		clr2seck2.key = secure_key + size;
+		clr2seck2.keylen = size;
+
+		rc = pkey_clr2seck2(pkey_fd, &clr2seck2, verbose);
+		if (rc != 0) {
+			warnx("Failed to generate a secure key: %s",
+			      strerror(-rc));
+			goto out;
+		}
 	}
 
 	pr_verbose(verbose,
@@ -1088,10 +1141,11 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 	rc = write_secure_key(keyfile, secure_key, secure_key_size, verbose);
 
 out:
-	memset(&clr2sec, 0, sizeof(clr2sec));
+	memset(&clr2seck2, 0, sizeof(clr2seck2));
 	memset(clear_key, 0, clear_key_size);
 	free(clear_key);
 	free(secure_key);
+	free(clr2seck2.apqns);
 	return rc;
 }
 
