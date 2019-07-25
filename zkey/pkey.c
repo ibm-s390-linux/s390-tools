@@ -267,7 +267,7 @@ static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
 			return NULL;
 		}
 	} else {
-		keybits = DOUBLE_KEYSIZE_FOR_XTS(size * 8, xts);
+		keybits = HALF_KEYSIZE_FOR_XTS(size * 8, xts);
 	}
 
 	switch (keybits) {
