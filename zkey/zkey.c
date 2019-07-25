@@ -1188,7 +1188,7 @@ static int command_reencipher_file(void)
 		return EXIT_FAILURE;
 
 	rc = validate_secure_key(g.pkey_fd, secure_key, secure_key_size, NULL,
-				 &is_old_mk, g.verbose);
+				 &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {
 		warnx("The secure key in file '%s' is not valid", g.pos_arg);
 		rc = EXIT_FAILURE;
@@ -1404,7 +1404,7 @@ static int command_validate_file(void)
 		return EXIT_FAILURE;
 
 	rc = validate_secure_key(g.pkey_fd, secure_key, secure_key_size,
-				 &clear_key_size, &is_old_mk, g.verbose);
+				 &clear_key_size, &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {
 		warnx("The secure key in file '%s' is not valid", g.pos_arg);
 		rc = EXIT_FAILURE;

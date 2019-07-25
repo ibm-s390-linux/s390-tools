@@ -1492,7 +1492,7 @@ static int validate_keyslot(int keyslot, char **key, size_t *keysize,
 	keyslot = rc;
 
 	rc = validate_secure_key(g.pkey_fd, (u8 *)vkey, vkeysize, clear_keysize,
-				 &is_old, g.verbose);
+				 &is_old, NULL, g.verbose);
 	if (rc != 0) {
 		if (invalid_msg != NULL)
 			warnx("%s", invalid_msg);
@@ -1972,7 +1972,7 @@ static int command_validate(void)
 		goto out;
 
 	rc = validate_secure_key(g.pkey_fd, (u8 *)key, keysize, &clear_keysize,
-				 &is_old_mk, g.verbose);
+				 &is_old_mk, NULL, g.verbose);
 	is_valid = (rc == 0);
 
 	token = find_token(g.cd, PAES_REENC_TOKEN_NAME);
@@ -2139,7 +2139,7 @@ static int command_setkey(void)
 		goto out;
 
 	rc = validate_secure_key(g.pkey_fd, newkey, newkey_size, NULL,
-				 &is_old_mk, g.verbose);
+				 &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {
 		warnx("The secure key in file '%s' is not valid",
 		      g.master_key_file);

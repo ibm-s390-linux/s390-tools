@@ -1153,84 +1153,58 @@ out:
  * Validates an XTS secure key (the second part)
  *
  * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] apqn          the APQN to verify the key with
  * @param[in] secure_key    a buffer containing the secure key
  * @param[in] secure_key_size the secure key size
  * @param[in] part1_keysize the key size of the first key part
- * @param[in] part1_attributes the attributes of the first key part
+ * @param[in] part1_flags   the flags of the first key part
  * @param[out] clear_key_bitsize on return , the cryptographic size of the
  *                          clear key
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-static int validate_secure_xts_key(int pkey_fd,
+static int validate_secure_xts_key(int pkey_fd, struct pkey_apqn *apqn,
 				   u8 *secure_key, size_t secure_key_size,
-				   u16 part1_keysize, u32 part1_attributes,
-				   size_t *clear_key_bitsize, bool verbose)
+				   enum pkey_key_size part1_keysize,
+				   u32 part1_flags, size_t *clear_key_bitsize,
+				   bool verbose)
 {
-	struct aesdatakeytoken *token = (struct aesdatakeytoken *)secure_key;
-	struct pkey_verifykey verifykey;
-	struct aesdatakeytoken *token2;
+	struct pkey_verifykey2 verifykey2;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+	util_assert(apqn != NULL, "Internal error: apqn is NULL");
 
-	/* XTS uses 2 secure key tokens concatenated to each other */
-	token2 = (struct aesdatakeytoken *)(secure_key + AESDATA_KEY_SIZE);
+	memset(&verifykey2, 0, sizeof(verifykey2));
+	verifykey2.key = secure_key + (secure_key_size / 2);
+	verifykey2.keylen = secure_key_size / 2;
+	verifykey2.cardnr = apqn->card;
+	verifykey2.domain = apqn->domain;
 
-	if (secure_key_size != 2 * AESDATA_KEY_SIZE) {
-		pr_verbose(verbose, "Size of secure key is too small: "
-			   "%lu expected %lu", secure_key_size,
-			   2 * AESDATA_KEY_SIZE);
-		return -EINVAL;
-	}
-
-	if (token->bitsize != token2->bitsize) {
-		pr_verbose(verbose, "XTS secure key contains 2 clear keys of "
-			   "different sizes");
-		return -EINVAL;
-	}
-	if (token->keysize != token2->keysize) {
-		pr_verbose(verbose, "XTS secure key contains 2 keys of "
-			   "different sizes");
-		return -EINVAL;
-	}
-	if (memcmp(&token->mkvp, &token2->mkvp, sizeof(token->mkvp)) != 0) {
-		pr_verbose(verbose, "XTS secure key contains 2 keys using "
-			   "different CCA master keys");
-		return -EINVAL;
-	}
-
-	memcpy(&verifykey.seckey, token2, sizeof(verifykey.seckey));
-
-	rc = ioctl(pkey_fd, PKEY_VERIFYKEY, &verifykey);
+	rc = pkey_verifyseck2(pkey_fd, &verifykey2, verbose);
 	if (rc < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to validate a secure key: %s",
-			   strerror(-rc));
+		pr_verbose(verbose, "Failed to validate the 2nd part of the "
+			   "XTS secure key on APQN %02x.%04x: %s", apqn->card,
+			   apqn->domain, strerror(-rc));
 		return rc;
 	}
 
-	if ((verifykey.attributes & PKEY_VERIFY_ATTR_AES) == 0) {
-		pr_verbose(verbose, "Secure key is not an AES key");
-		return -EINVAL;
-	}
-
-	if (verifykey.keysize != part1_keysize) {
+	if (verifykey2.size != part1_keysize) {
 		pr_verbose(verbose, "XTS secure key contains 2 keys using "
 			   "different key sizes");
 		return -EINVAL;
 	}
 
-	if (verifykey.attributes != part1_attributes) {
+	if (verifykey2.flags != part1_flags) {
 		pr_verbose(verbose, "XTS secure key contains 2 keys using "
-			   "different attributes");
+			   "different master keys");
 		return -EINVAL;
 	}
 
-	if (clear_key_bitsize)
-		*clear_key_bitsize += verifykey.keysize;
+	if (clear_key_bitsize && verifykey2.size != PKEY_SIZE_UNKNOWN)
+		*clear_key_bitsize += verifykey2.size;
 
 	return 0;
 }
@@ -1245,6 +1219,8 @@ static int validate_secure_xts_key(int pkey_fd,
  *                          clear key
  * @param[out] is_old_mk    in return set to 1 to indicate if the secure key
  *                          is currently enciphered by the OLD CCA master key
+ * @param[in] apqns         a zero terminated array of pointers to APQN-strings,
+ *                          or NULL for AUTOSELECT
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
@@ -1252,59 +1228,89 @@ static int validate_secure_xts_key(int pkey_fd,
 int validate_secure_key(int pkey_fd,
 			u8 *secure_key, size_t secure_key_size,
 			size_t *clear_key_bitsize, int *is_old_mk,
-			bool verbose)
+			const char **apqns, bool verbose)
 {
-	struct aesdatakeytoken *token = (struct aesdatakeytoken *)secure_key;
-	struct pkey_verifykey verifykey;
+	struct pkey_verifykey2 verifykey2;
+	struct pkey_apqn *list = NULL;
+	u32 i, list_entries = 0;
+	bool xts, valid;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 
-	if (secure_key_size < AESDATA_KEY_SIZE) {
-		pr_verbose(verbose, "Size of secure key is too small: "
-			   "%lu expected %lu", secure_key_size,
-			   AESDATA_KEY_SIZE);
-		return -EINVAL;
-	}
+	xts = is_xts_key(secure_key, secure_key_size);
 
-	memcpy(&verifykey.seckey, token, sizeof(verifykey.seckey));
-
-	rc = ioctl(pkey_fd, PKEY_VERIFYKEY, &verifykey);
-	if (rc < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to validate a secure key: %s",
-			   strerror(-rc));
+	rc = build_apqn_list_for_key(pkey_fd, secure_key,
+				     HALF_KEYSIZE_FOR_XTS(secure_key_size, xts),
+				     PKEY_FLAGS_MATCH_CUR_MKVP |
+						PKEY_FLAGS_MATCH_ALT_MKVP,
+				     apqns, &list, &list_entries, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build a list of APQNs that can "
+			   "validate this secure key: %s", strerror(-rc));
 		return rc;
 	}
 
-	if ((verifykey.attributes & PKEY_VERIFY_ATTR_AES) == 0) {
-		pr_verbose(verbose, "Secure key is not an AES key");
-		return -EINVAL;
+	if (is_old_mk != NULL)
+		*is_old_mk = true;
+	if (clear_key_bitsize != NULL)
+		*clear_key_bitsize = 0;
+
+	valid = false;
+	for (i = 0; i < list_entries; i++) {
+		memset(&verifykey2, 0, sizeof(verifykey2));
+		verifykey2.key = secure_key;
+		verifykey2.keylen = HALF_KEYSIZE_FOR_XTS(secure_key_size, xts);
+		verifykey2.cardnr = list[i].card;
+		verifykey2.domain = list[i].domain;
+
+		rc = pkey_verifyseck2(pkey_fd, &verifykey2, verbose);
+		if (rc < 0) {
+			pr_verbose(verbose, "Failed to validate the secure key "
+				   "on APQN %02x.%04x: %s", list[i].card,
+				   list[i].domain, strerror(-rc));
+			continue;
+		}
+
+		if (is_xts_key(secure_key, secure_key_size)) {
+			rc = validate_secure_xts_key(pkey_fd, &list[i],
+						     secure_key,
+						     secure_key_size,
+						     verifykey2.size,
+						     verifykey2.flags,
+						     clear_key_bitsize,
+						     verbose);
+			if (rc != 0)
+				continue;
+
+		}
+
+		valid = true;
+
+		if (clear_key_bitsize) {
+			if (verifykey2.size != PKEY_SIZE_UNKNOWN)
+				*clear_key_bitsize += verifykey2.size;
+			clear_key_bitsize = NULL; /* Set it only once */
+		}
+
+		/*
+		 * If at least one of the APQNs have a matching current MK,
+		 * then don't report OLD, even if some match the old MK.
+		 */
+		if (is_old_mk &&
+		    (verifykey2.flags & PKEY_FLAGS_MATCH_CUR_MKVP))
+			*is_old_mk = false;
 	}
 
-	if (clear_key_bitsize)
-		*clear_key_bitsize = verifykey.keysize;
-
-	/* XTS uses 2 secure key tokens concatenated to each other */
-	if (secure_key_size > AESDATA_KEY_SIZE) {
-		rc = validate_secure_xts_key(pkey_fd,
-					     secure_key, secure_key_size,
-					     verifykey.keysize,
-					     verifykey.attributes,
-					     clear_key_bitsize,
-					     verbose);
-		if (rc != 0)
-			return rc;
-	}
-
-	if (is_old_mk)
-		*is_old_mk = (verifykey.attributes &
-			      PKEY_VERIFY_ATTR_OLD_MKVP) != 0;
+	if (!valid)
+		return -ENODEV;
 
 	pr_verbose(verbose, "Secure key validation completed successfully");
 
-	return 0;
+	if (list != NULL)
+		free(list);
+	return rc;
 }
 
 /**

@@ -251,7 +251,7 @@ int write_secure_key(const char *keyfile, const u8 *secure_key,
 int validate_secure_key(int pkey_fd,
 			u8 *secure_key, size_t secure_key_size,
 			size_t *clear_key_bitsize, int *is_old_mk,
-			bool verbose);
+			const char **apqns, bool verbose);
 
 int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);

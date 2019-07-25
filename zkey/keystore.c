@@ -2451,8 +2451,10 @@ static int _keystore_process_validate(struct keystore *keystore,
 				      void *private)
 {
 	struct validate_info *info = (struct validate_info *)private;
+	char **apqn_list = NULL;
 	size_t clear_key_bitsize;
 	size_t secure_key_size;
+	char *apqns = NULL;
 	u8 *secure_key;
 	int is_old_mk;
 	int rc, valid;
@@ -2469,9 +2471,13 @@ static int _keystore_process_validate(struct keystore *keystore,
 		goto out;
 	}
 
+	apqns = properties_get(properties, PROP_NAME_APQNS);
+	if (apqns != NULL)
+		apqn_list = str_list_split(apqns);
+
 	rc = validate_secure_key(info->pkey_fd, secure_key, secure_key_size,
 				 &clear_key_bitsize, &is_old_mk,
-				 keystore->verbose);
+				 (const char **)apqn_list, keystore->verbose);
 	if (rc != 0) {
 		valid = 0;
 		info->num_invalid++;
@@ -2510,6 +2516,10 @@ static int _keystore_process_validate(struct keystore *keystore,
 		info->num_warnings++;
 
 out:
+	if (apqns != NULL)
+		free(apqns);
+	if (apqn_list != NULL)
+		str_list_free_string_array(apqn_list);
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to validate key '%s': %s",
 			   name, strerror(-rc));
@@ -2726,7 +2736,9 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	struct reencipher_params params = info->params;
 	size_t clear_key_bitsize;
 	size_t secure_key_size;
+	char **apqn_list = NULL;
 	u8 *secure_key = NULL;
+	char *apqns = NULL;
 	char *out_file;
 	int is_old_mk;
 	char *temp;
@@ -2763,9 +2775,13 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 		goto out;
 	}
 
+	apqns = properties_get(properties, PROP_NAME_APQNS);
+	if (apqns != NULL)
+		apqn_list = str_list_split(apqns);
+
 	rc = validate_secure_key(info->pkey_fd, secure_key, secure_key_size,
 				 &clear_key_bitsize, &is_old_mk,
-				 keystore->verbose);
+				 (const char **)apqn_list, keystore->verbose);
 	if (rc != 0) {
 		if (params.complete) {
 			warnx("Key '%s' is not valid, re-enciphering is not "
@@ -2864,6 +2880,10 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	info->num_reenciphered++;
 
 out:
+	if (apqns != NULL)
+		free(apqns);
+	if (apqn_list != NULL)
+		str_list_free_string_array(apqn_list);
 	if (secure_key != NULL)
 		free(secure_key);
 
