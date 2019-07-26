@@ -25,6 +25,15 @@ typedef void (*t_CSNBKTC)(long *return_code,
 			  unsigned char *rule_array,
 			  unsigned char *key_identifier);
 
+typedef void (*t_CSNBKTC2)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *key_identifier_length,
+			  unsigned char *key_identifier);
+
 typedef void (*t_CSUACFV)(long *return_code,
 			  long *reason_code,
 			  long *exit_data_length,
@@ -68,6 +77,7 @@ struct cca_version {
 struct cca_lib {
 	void *lib_csulcca;
 	t_CSNBKTC dll_CSNBKTC;
+	t_CSNBKTC2 dll_CSNBKTC2;
 	t_CSUACFV dll_CSUACFV;
 	t_CSUACFQ dll_CSUACFQ;
 	t_CSUACRA dll_CSUACRA;

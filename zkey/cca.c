@@ -142,6 +142,9 @@ int load_cca_library(struct cca_lib *cca, bool verbose)
 	/* Get the Key Token Change function */
 	cca->dll_CSNBKTC = (t_CSNBKTC)dlsym(cca->lib_csulcca, "CSNBKTC");
 
+	/* Get the Key Token Change 2 function */
+	cca->dll_CSNBKTC2 = (t_CSNBKTC2)dlsym(cca->lib_csulcca, "CSNBKTC2");
+
 	/* Get the Cryptographic Facility Query function */
 	cca->dll_CSUACFQ = (t_CSUACFQ)dlsym(cca->lib_csulcca, "CSUACFQ");
 
@@ -153,6 +156,7 @@ int load_cca_library(struct cca_lib *cca, bool verbose)
 
 	if (cca->dll_CSUACFV == NULL ||
 	    cca->dll_CSNBKTC == NULL ||
+	    cca->dll_CSNBKTC2 == NULL ||
 	    cca->dll_CSUACFQ == NULL ||
 	    cca->dll_CSUACRA == NULL ||
 	    cca->dll_CSUACRD == NULL) {
@@ -187,10 +191,13 @@ int key_token_change(struct cca_lib *cca,
 		     u8 *secure_key, unsigned int secure_key_size,
 		     char *method, bool verbose)
 {
+	struct aescipherkeytoken *cipherkey =
+				(struct aescipherkeytoken *)secure_key;
 	long exit_data_len = 0, rule_array_count;
 	unsigned char rule_array[2 * 8] = { 0, };
 	unsigned char exit_data[4] = { 0, };
 	long return_code, reason_code;
+	long key_token_length;
 
 	util_assert(cca != NULL, "Internal error: cca is NULL");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
@@ -202,33 +209,77 @@ int key_token_change(struct cca_lib *cca,
 	memcpy(rule_array + 8, "AES     ", 8);
 	rule_array_count = 2;
 
-	cca->dll_CSNBKTC(&return_code, &reason_code,
-			 &exit_data_len, exit_data,
-			 &rule_array_count, rule_array,
-			 secure_key);
+	if (is_cca_aes_data_key(secure_key, secure_key_size)) {
+		cca->dll_CSNBKTC(&return_code, &reason_code,
+				 &exit_data_len, exit_data,
+				 &rule_array_count, rule_array,
+				 secure_key);
 
-	pr_verbose(verbose, "CSNBKTC (Key Token Change) with '%s' returned: "
-		   "return_code: %ld, reason_code: %ld", method, return_code,
-		   reason_code);
+		pr_verbose(verbose, "CSNBKTC (Key Token Change) with '%s' "
+			   "returned: return_code: %ld, reason_code: %ld",
+			   method, return_code, reason_code);
+	} else if (is_cca_aes_cipher_key(secure_key, secure_key_size)) {
+		key_token_length = cipherkey->length;
+		cca->dll_CSNBKTC2(&return_code, &reason_code,
+				  &exit_data_len, exit_data,
+				  &rule_array_count, rule_array,
+				  &key_token_length,
+				  (unsigned char *)cipherkey);
+
+		pr_verbose(verbose, "CSNBKTC2 (Key Token Change2) with '%s' "
+			   "returned: return_code: %ld, reason_code: %ld",
+			   method, return_code, reason_code);
+
+		pr_verbose(verbose, "key_token_length: %lu", key_token_length);
+	} else {
+		warnx("Invalid key type specified");
+		return -EINVAL;
+	}
+
 	if (return_code != 0) {
 		print_CCA_error(return_code, reason_code);
 		return -EIO;
 	}
 
-	if (secure_key_size == 2 * AESDATA_KEY_SIZE) {
-		cca->dll_CSNBKTC(&return_code, &reason_code,
-				 &exit_data_len, exit_data,
-				 &rule_array_count, rule_array,
-				 secure_key + AESDATA_KEY_SIZE);
+	if (is_xts_key(secure_key, secure_key_size)) {
+		if (is_cca_aes_data_key(secure_key, secure_key_size)) {
+			cca->dll_CSNBKTC(&return_code, &reason_code,
+					 &exit_data_len, exit_data,
+					 &rule_array_count, rule_array,
+					 secure_key + AESDATA_KEY_SIZE);
 
-		pr_verbose(verbose, "CSNBKTC (Key Token Change) with '%s' "
-			   "returned: return_code: %ld, reason_code: %ld",
-			   method, return_code, reason_code);
+			pr_verbose(verbose, "CSNBKTC (Key Token Change) with "
+				   "'%s' returned: return_code: %ld, "
+				   "reason_code: %ld", method, return_code,
+				   reason_code);
+		} else if (is_cca_aes_cipher_key(secure_key, secure_key_size)) {
+			cipherkey = (struct aescipherkeytoken *)(secure_key +
+							AESCIPHER_KEY_SIZE);
+			key_token_length = cipherkey->length;
+			cca->dll_CSNBKTC2(&return_code, &reason_code,
+					 &exit_data_len, exit_data,
+					 &rule_array_count, rule_array,
+					 &key_token_length,
+					 (unsigned char *)cipherkey);
+
+			pr_verbose(verbose, "CSNBKTC2 (Key Token Change2) with "
+				  "'%s' returned: return_code: %ld, "
+				  "reason_code: %ld", method, return_code,
+				  reason_code);
+
+			pr_verbose(verbose, "key_token_length: %lu",
+				   key_token_length);
+		} else {
+			warnx("Invalid key type specified");
+			return -EINVAL;
+		}
+
 		if (return_code != 0) {
 			print_CCA_error(return_code, reason_code);
 			return -EIO;
 		}
 	}
+
 	return 0;
 }
 
