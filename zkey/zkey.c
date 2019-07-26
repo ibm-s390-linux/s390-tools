@@ -1122,7 +1122,9 @@ static int command_generate(void)
 			return EXIT_FAILURE;
 		}
 
-		rc = cross_check_apqns(NULL, 0, true, g.verbose);
+		rc = cross_check_apqns(NULL, 0,
+				get_min_card_level_for_keytype(g.key_type),
+				true, g.verbose);
 		if (rc == -EINVAL)
 			return EXIT_FAILURE;
 		if (rc != 0 && rc != -ENOTSUP) {
@@ -1447,7 +1449,10 @@ static int command_validate_file(void)
 	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       &vp[VERIFICATION_PATTERN_LEN / 2]);
 
-	rc = cross_check_apqns(NULL, mkvp, true, g.verbose);
+	rc = cross_check_apqns(NULL, mkvp,
+			       get_min_card_level_for_keytype(
+				     get_key_type(secure_key, secure_key_size)),
+			       true, g.verbose);
 	if (rc == -EINVAL)
 		return EXIT_FAILURE;
 	if (rc != 0 && rc != -ENOTSUP) {

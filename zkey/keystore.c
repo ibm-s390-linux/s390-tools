@@ -1722,7 +1722,9 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
-	rc = cross_check_apqns(apqns, 0, true, keystore->verbose);
+	rc = cross_check_apqns(apqns, 0,
+			       get_min_card_level_for_keytype(key_type), true,
+			       keystore->verbose);
 	if (rc == -EINVAL)
 		goto out_free_key_filenames;
 	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
@@ -1850,7 +1852,9 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 		goto out_free_key;
 	}
 
-	rc = cross_check_apqns(apqns, mkvp, true, keystore->verbose);
+	rc = cross_check_apqns(apqns, mkvp,
+			       get_min_card_level_for_keytype(key_type), true,
+			       keystore->verbose);
 	if (rc == -EINVAL)
 		goto out_free_key;
 	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
@@ -1937,8 +1941,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 					 .nomsg = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
+	char *apqns_prop, *key_type;
 	size_t secure_key_size;
-	char *apqns_prop;
 	u8 *secure_key;
 	char temp[30];
 	u64 mkvp;
@@ -2005,9 +2009,12 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 
 		apqns_prop = properties_get(key_props, PROP_NAME_APQNS);
-		rc = cross_check_apqns(apqns_prop, mkvp, true,
-				       keystore->verbose);
+		key_type = properties_get(key_props, PROP_NAME_KEY_TYPE);
+		rc = cross_check_apqns(apqns_prop, mkvp,
+				       get_min_card_level_for_keytype(key_type),
+				       true, keystore->verbose);
 		free(apqns_prop);
+		free(key_type);
 		if (rc == -ENOTSUP)
 			rc = 0;
 		if (rc != 0 && noapqncheck == 0) {
@@ -2373,12 +2380,17 @@ static int _keystore_display_apqn_status(struct keystore *keystore,
 {
 	int rc, warning = 0;
 	char *apqns;
+	char *key_type;
 
 	apqns = properties_get(properties, PROP_NAME_APQNS);
 	if (apqns == NULL)
 		return 0;
 
-	rc = cross_check_apqns(apqns, mkvp, true, keystore->verbose);
+	apqns = properties_get(properties, PROP_NAME_APQNS);
+	key_type = properties_get(properties, PROP_NAME_KEY_TYPE);
+	rc = cross_check_apqns(apqns, mkvp,
+			       get_min_card_level_for_keytype(key_type), true,
+			       keystore->verbose);
 	if (rc != 0 && rc != -ENOTSUP)
 		warning = 1;
 
@@ -2386,6 +2398,7 @@ static int _keystore_display_apqn_status(struct keystore *keystore,
 		printf("\n");
 
 	free(apqns);
+	free(key_type);
 	return warning;
 }
 /**

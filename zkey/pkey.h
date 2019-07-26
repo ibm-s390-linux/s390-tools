@@ -264,5 +264,6 @@ bool is_cca_aes_cipher_key(const u8 *key, size_t key_size);
 bool is_xts_key(const u8 *key, size_t key_size);
 int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize);
 const char *get_key_type(const u8 *key, size_t key_size);
+int get_min_card_level_for_keytype(const char *key_type);
 
 #endif

@@ -18,6 +18,8 @@ int sysfs_is_card_online(int card);
 
 int sysfs_is_apqn_online(int card, int domain);
 
+int sysfs_get_card_level(int card);
+
 int sysfs_get_serialnr(int card, char serialnr[9], bool verbose);
 
 #define MK_STATE_EMPTY		0
@@ -48,7 +50,7 @@ int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
 
 int print_mk_info(const char *apqns, bool verbose);
 
-int cross_check_apqns(const char *apqns, u64 mkvp, bool print_mks,
-		      bool verbose);
+int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
+		      bool print_mks, bool verbose);
 
 #endif

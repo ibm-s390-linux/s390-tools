@@ -119,6 +119,49 @@ out:
 }
 
 /**
+ * Returns the level of the card. For a CEX3C 3 is returned, for a CEX4C 4,
+ * and so on.
+ *
+ * @param[in] card      card number
+ *
+ * @returns The card level, or -1 of the level can not be determined.
+ */
+int sysfs_get_card_level(int card)
+{
+	char *dev_path;
+	char type[20];
+	int rc;
+
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x", card);
+	if (!util_path_is_dir(dev_path)) {
+		rc = -1;
+		goto out;
+	}
+	if (util_file_read_line(type, sizeof(type), "%s/type", dev_path) != 0) {
+		rc = -1;
+		goto out;
+	}
+	if (strncmp(type, "CEX", 3) != 0 || strlen(type) < 5) {
+		rc = -1;
+		goto out;
+	}
+	if (type[4] != 'C') {
+		rc = -1;
+		goto out;
+	}
+	if (type[3] < '1' || type[3] > '9') {
+		rc = -1;
+		goto out;
+	}
+
+	rc = type[3] - '0';
+
+out:
+	free(dev_path);
+	return rc;
+}
+
+/**
  * Gets the 8 character ASCII serial number string of an card from the sysfs.
  *
  * @param[in] card      card number
@@ -436,11 +479,13 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
 {
 	struct print_apqn_info *info = (struct print_apqn_info *)handler_data;
 	struct mk_info mk_info;
-	int rc;
+	int rc, level;
 
 	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
 	if (rc == -ENOTSUP)
 		return rc;
+
+	level = sysfs_get_card_level(card);
 
 	util_rec_set(info->rec, "APQN", "%02x.%04x", card, domain);
 
@@ -469,6 +514,11 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
 		util_rec_set(info->rec, "CUR", "?");
 		util_rec_set(info->rec, "OLD", "?");
 	}
+
+	if (level > 0)
+		util_rec_set(info->rec, "TYPE", "CEX%dC", level);
+	else
+		util_rec_set(info->rec, "TYPE", "?");
 
 	util_rec_print(info->rec);
 
@@ -499,6 +549,7 @@ int print_mk_info(const char *apqns, bool verbose)
 	util_rec_def(info.rec, "NEW", UTIL_REC_ALIGN_LEFT, 16, "NEW MK");
 	util_rec_def(info.rec, "CUR", UTIL_REC_ALIGN_LEFT, 16, "CURRENT MK");
 	util_rec_def(info.rec, "OLD", UTIL_REC_ALIGN_LEFT, 16, "OLD MK");
+	util_rec_def(info.rec, "TYPE", UTIL_REC_ALIGN_LEFT, 6, "TYPE");
 	util_rec_print_hdr(info.rec);
 
 	rc = handle_apqns(apqns, print_apqn_mk_info, &info, verbose);
@@ -511,6 +562,7 @@ struct cross_check_info {
 	u64	mkvp;
 	u64	new_mkvp;
 	bool	key_mkvp;
+	int	min_level;
 	u32	num_cur_match;
 	u32	num_old_match;
 	u32	num_new_match;
@@ -525,7 +577,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 	struct cross_check_info *info = (struct cross_check_info *)handler_data;
 	struct mk_info mk_info;
 	char temp[200];
-	int rc;
+	int rc, level;
 
 	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
 	if (rc == -ENODEV) {
@@ -538,6 +590,19 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 		return rc;
 
 	info->num_checked++;
+
+	if (info->min_level >= 0) {
+		level = sysfs_get_card_level(card);
+
+		if (level < info->min_level) {
+			info->print_mks = 1;
+			info->mismatch = 1;
+			sprintf(temp, "WARNING: APQN %02x.%04x: The card level "
+				"is less than CEX%dC.", card, domain,
+				info->min_level);
+			util_print_indented(temp, 0);
+		}
+	}
 
 	if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL) {
 		info->print_mks = 1;
@@ -662,6 +727,8 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  * @param[in] mkvp      The master key verification pattern of a secure key.
  *                      If this is all zero, then the master keys are not
  *                      matched against it.
+ * @param[in] min_level The minimum card level required. If min_level is -1 then
+ *                      the card level is not checked.
  * @param[in] print_mks if true, then a the full master key info of all
  *                      specified APQns is printed, in case of a mismatch.
  * @param[in] verbose   if true, verbose messages are printed
@@ -671,7 +738,8 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  *          -ENOTSUP is returned when the mkvps sysfs attribute is not
  *          available, because the zcrypt kernel module is on an older level.
  */
-int cross_check_apqns(const char *apqns, u64 mkvp, bool print_mks, bool verbose)
+int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
+		      bool print_mks, bool verbose)
 {
 	struct cross_check_info info;
 	char temp[200];
@@ -680,10 +748,12 @@ int cross_check_apqns(const char *apqns, u64 mkvp, bool print_mks, bool verbose)
 	memset(&info, 0, sizeof(info));
 	info.key_mkvp = mkvp != 0;
 	info.mkvp = mkvp;
+	info.min_level = min_level;
 	info.verbose = verbose;
 
-	pr_verbose(verbose, "Cross checking APQNs with mkvp 0x%016llx: %s",
-		   mkvp, apqns != NULL ? apqns : "ANY");
+	pr_verbose(verbose, "Cross checking APQNs with mkvp 0x%016llx and "
+		   "min-level %d: %s", mkvp, min_level,
+		   apqns != NULL ? apqns : "ANY");
 
 	rc = handle_apqns(apqns, cross_check_mk_info, &info, verbose);
 	if (rc != 0)

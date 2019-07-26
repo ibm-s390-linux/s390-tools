@@ -1630,3 +1630,23 @@ const char *get_key_type(const u8 *key, size_t key_size)
 
 	return NULL;
 }
+
+/**
+ * Returns the minimum card level for a specific key type
+ *
+ * @param[in] key_type       the type of the key
+ *
+ * @returns the minimum card level, or -1 for unknown key types
+ */
+int get_min_card_level_for_keytype(const char *key_type)
+{
+	if (key_type == NULL)
+		return -1;
+
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		return 3;
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+		return 6;
+
+	return -1;
+}
