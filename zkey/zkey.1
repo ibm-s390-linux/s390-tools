@@ -62,7 +62,8 @@ in size.
 The \fBzkey\fP tool can operate in two modes. When argument
 .I secure\-key\-file
 is specified then it operates on the secure key contained in the specified file.
-This applies to commands \fBgenerate\fP, \fBvalidate\fP, and \fBreencipher\fP.
+This applies to commands \fBgenerate\fP, \fBvalidate\fP, \fBreencipher\fP, and
+\fBconvert\fP.
 When the
 .B \-\-name
 option is specified then it operates on a secure key contained in the secure
@@ -680,6 +681,72 @@ questions, you can specify the
 option. These options are passed to the generated command(s) and behave in the
 same way as with \fBcryptsetup\fP.
 .
+.SS "Convert existing AES secure keys from one key type to another type"
+.
+.B zkey
+.BR convert | con
+.I secure\-key\-file
+.RB \-\-key-type | \-K
+.IR type
+.RB [ \-\-no\-apqn\-check ]
+.RB [ \-\-force | \-F ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+.B zkey
+.BR convert | con
+.B \-\-name | \-N
+.IR key-name
+.RB \-\-key-type | \-K
+.IR type
+.RB [ \-\-no\-apqn\-check ]
+.RB [ \-\-force | \-F ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B convert
+command to convert an existing secure key from one key type to another type.
+You can convert secure keys of type CCA-AESDATA to type CCA-AESCIPHER only.
+
+.B Note:
+Secure keys converted to type \fBCCA-AESCIPHER\fP require an IBM cryptographic
+adapter in CCA coprocessor mode of version 6 or later, e.g. a CEX6C.
+
+The secure key can either be contained in a file in the file system, or in a
+secure key repository. To convert a secure key contained in a file, specify
+the file name with option \fIsecure\-key\-file\fP. To convert a secure key
+contained in the secure key repository, specify the name of the key
+that is to be converted using the
+.B \-\-name
+option. You cannot use wildcards. The convert command prompts for
+a confirmation, unless you specify the
+.B \-\-force
+option.
+.PP
+.B Note:
+Converting a secure key is irreversible!
+When converting a secure key that is associated with one or multiple volumes,
+a message informs you about the associated volumes. When the secure key is
+converted, this might have an effect on these volumes.
+.P
+For volumes with volume type \fBplain\fP, you must adapt the crypttab entries
+and change the key size parameter to \fBsize=<new-key-size-in-bits>\fP or run
+command \fBzkey crypttab --volumes <device>\fP for each associated volume to
+re-generate the crypttab entries.
+.P
+Associated volumes of type \fLUKS2\fP still contain the secure AES volume key of
+the original type. To change the secure AES volume key in the LUKS2 header,
+run command \fBzkey-cryptsetup setkey <device> --master-key-file
+<converted-key>\fP for each associated volume.
+.
+.P
+.B Note:
+The \fBconvert\fP command requires the CCA host library (libcsulcca.so)
+to be installed. The required CCA IBM cryptographic adapter firmware version
+is 6.3.27 or later. For the supported environments and downloads, see:
+\fIhttp://www.ibm.com/security/cryptocards\fP
+.
 .
 .
 .
@@ -1200,6 +1267,30 @@ has been compiled with LUKS2 support enabled.
 .BR \-q ", " \-\-batch\-mode
 Suppress cryptsetup confirmation questions. This option is passed to the generated
 cryptsetup command(s).
+.
+.
+.
+.SS "Options for the convert command"
+.TP
+.BR \-N ", " \-\-name\~\fIkey-name\fP
+Specifies the name of the secure key in the secure key repository. You cannot
+use wildcards.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-K ", " \-\-key-type\~\fItype\fP
+Specifies the key type to which the secure key shall be converted to.
+Possible values are \fBCCA-AESCIPHER\fP. Secure keys of type \fBCCA-AESCIPHER\fP
+require an IBM cryptographic adapter in CCA coprocessor mode of version 6 or
+later, e.g. a CEX6C.
+.TP
+.BR \-\-no\-apqn\-check
+Do not check if the associated APQNs are available and capable of converting
+the secure key to type CCA-AESCIPHER.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-F ", " \-\-force\fP
+The user is prompted to confirm the convertion of a secure key. Use this option
+to convert a secure key without prompting for a confirmation.
 .
 .
 .

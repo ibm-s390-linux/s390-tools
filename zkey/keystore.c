@@ -3947,6 +3947,218 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 }
 
 /**
+ * Converts a secure keys in the keystore
+ *
+ * @param[in] keystore the key store
+ * @param[in] name         the name of the key to convert
+ * @param[in] key_type     the type of the key to convert it to
+ * @param[in] noapqncheck  if true, the specified APQN(s) are not checked for
+ *                         existence and type.
+ * @param[in] pkey_fd      the file descriptor of /dev/pkey
+ * @param[in] cca          the CCA library struct
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_convert_key(struct keystore *keystore, const char *name,
+			 const char *key_type, bool noapqncheck, bool quiet,
+			 int pkey_fd, struct cca_lib *cca)
+{
+	struct key_filenames file_names = { NULL, NULL, NULL };
+	u8 output_key[2 * MAX_SECURE_KEY_SIZE];
+	struct properties *properties = NULL;
+	int rc, min_level, selected = 1;
+	unsigned int output_key_size;
+	char *cur_key_type = NULL;
+	char **apqn_list = NULL;
+	size_t secure_key_size;
+	u8 *secure_key = NULL;
+	char *apqns = NULL;
+	char *temp;
+	u64 mkvp;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(name != NULL, "Internal error: name is NULL");
+
+	rc = _keystore_get_key_filenames(keystore, name, &file_names);
+	if (rc != 0)
+		goto out;
+
+	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	if (rc != 0)
+		goto out;
+
+	properties = properties_new();
+	rc = properties_load(properties, file_names.info_filename, 1);
+	if (rc != 0) {
+		warnx("Key '%s' does not exist or is invalid", name);
+		goto out;
+	}
+
+	cur_key_type = _keystore_get_key_type(properties);
+	if (strcasecmp(cur_key_type, key_type) == 0) {
+		warnx("The secure key '%s' is already of type %s", name,
+		      cur_key_type);
+		rc = 0;
+		goto out;
+	}
+	if (strcasecmp(cur_key_type, KEY_TYPE_CCA_AESDATA) != 0) {
+		warnx("Only secure keys of type %s can "
+		      "be converted. The secure key '%s' is of type %s",
+		      KEY_TYPE_CCA_AESDATA, name, cur_key_type);
+		rc = 0;
+		goto out;
+	}
+
+	secure_key = read_secure_key(file_names.skey_filename,
+				     &secure_key_size, keystore->verbose);
+	if (secure_key == NULL) {
+		rc = -ENOENT;
+		goto out;
+	}
+
+	min_level = get_min_card_level_for_keytype(key_type);
+	if (min_level < 0) {
+		warnx("Invalid key-type specified: %s", key_type);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	apqns = properties_get(properties, PROP_NAME_APQNS);
+	if (apqns != NULL)
+		apqn_list = str_list_split(apqns);
+
+	rc = cross_check_apqns(apqns, 0, min_level, true, keystore->verbose);
+	if (rc == -EINVAL)
+		goto out;
+	if (rc != 0 && rc != -ENOTSUP && !noapqncheck) {
+		warnx("Your master key setup is improper for converting key "
+		      "'%s'", name);
+		goto out;
+	}
+
+	rc = validate_secure_key(pkey_fd, secure_key, secure_key_size,
+				 NULL, NULL, (const char **)apqn_list,
+				 keystore->verbose);
+	if (rc != 0)
+		goto out;
+
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 &mkvp, keystore->verbose);
+	if (rc)
+		goto out;
+
+	rc = select_cca_adapter_by_mkvp(cca, mkvp, NULL,
+					FLAG_SEL_CCA_MATCH_CUR_MKVP,
+					keystore->verbose);
+	if (rc == -ENOTSUP) {
+		rc = 0;
+		selected = 0;
+	}
+	if (rc != 0) {
+		warnx("No APQN found that is suitable for "
+		      "converting the secure AES key '%s'", name);
+		goto out;
+	}
+
+	if (!quiet) {
+		util_print_indented("ATTENTION: Converting a secure key is "
+				    "irreversible, and might have an effect "
+				    "on the volumes encrypted with it!", 0);
+		_keystore_msg_for_volumes("The following volumes are encrypted "
+					  "with this key:", properties, NULL);
+		printf("%s: Convert key '%s [y/N]'? ",
+		       program_invocation_short_name, name);
+		if (!prompt_for_yes(keystore->verbose)) {
+			warnx("Operation aborted");
+			rc = -ECANCELED;
+			goto out;
+		}
+	}
+
+	memset(output_key, 0, sizeof(output_key));
+	output_key_size = sizeof(output_key);
+	rc = convert_aes_data_to_cipher_key(cca, secure_key,
+					    secure_key_size, output_key,
+					    &output_key_size,
+					    keystore->verbose);
+	if (rc != 0) {
+		warnx("Converting the secure key '%s' from %s to %s has failed",
+		      name, KEY_TYPE_CCA_AESDATA, key_type);
+		if (!selected)
+			print_msg_for_cca_envvars("secure AES key");
+		goto out;
+	}
+
+	rc = restrict_key_export(cca, output_key, output_key_size,
+				 keystore->verbose);
+	if (rc != 0) {
+		warnx("Export restricting the converted secure key '%s' has "
+		      "failed", name);
+		if (!selected)
+			print_msg_for_cca_envvars("secure AES key");
+		goto out;
+	}
+
+	rc = properties_set2(properties, PROP_NAME_KEY_TYPE, key_type, true);
+	if (rc != 0) {
+		warnx("Invalid characters in key-type");
+		goto out;
+	}
+
+	rc = properties_save(properties, file_names.info_filename, 1);
+	if (rc != 0) {
+		pr_verbose(keystore,
+			   "Failed to write key info file '%s': %s",
+			   file_names.info_filename, strerror(-rc));
+		goto out;
+	}
+
+	rc = write_secure_key(file_names.skey_filename, output_key,
+			      output_key_size, keystore->verbose);
+	if (rc != 0)
+		goto out;
+
+	pr_verbose(keystore, "Secure key '%s' was converted successfully",
+		   name);
+
+	util_asprintf(&temp, "The following LUKS2 volumes are "
+		      "encrypted with key '%s'. These volumes still contain "
+		      "the secure AES volume key of type CCA-AESDATA. To "
+		      "change the secure AES volume key in the LUKS2 header, "
+		      "run command 'zkey-cryptsetup setkey <device> "
+		      "--master-key-file %s':", name,
+		      file_names.skey_filename);
+	_keystore_msg_for_volumes(temp, properties, VOLUME_TYPE_LUKS2);
+	free(temp);
+	util_asprintf(&temp, "The following plain mode volumes are "
+		      "encrypted with key '%s'. You must adapt the crypttab "
+		      "entries for this volumes and change the key size "
+		      "parameter to 'size=%u' or run command 'zkey crypttab "
+		      "--volumes <device>' for each volume to re-generate the "
+		      "crypttab entries:", name, output_key_size * 8, name);
+	_keystore_msg_for_volumes(temp, properties, VOLUME_TYPE_PLAIN);
+	free(temp);
+
+out:
+	_keystore_free_key_filenames(&file_names);
+	if (properties != NULL)
+		properties_free(properties);
+	if (secure_key != NULL)
+		free(secure_key);
+	if (apqns != NULL)
+		free(apqns);
+	if (apqn_list != NULL)
+		str_list_free_string_array(apqn_list);
+	if (cur_key_type != NULL)
+		free(cur_key_type);
+
+	if (rc != 0)
+		pr_verbose(keystore, "Failed to convert key '%s': %s",
+			   name, strerror(-rc));
+	return rc;
+}
+
+/**
  * Frees a keystore object
  *
  * @param[in] keystore the key store

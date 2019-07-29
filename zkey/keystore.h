@@ -81,6 +81,10 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 		      const char *volume_type, const char *keyfile,
 		      size_t keyfile_offset, size_t keyfile_size, size_t tries);
 
+int keystore_convert_key(struct keystore *keystore, const char *name,
+			 const char *key_type, bool noapqncheck, bool quiet,
+			 int pkey_fd, struct cca_lib *cca);
+
 void keystore_free(struct keystore *keystore);
 
 
