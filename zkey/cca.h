@@ -83,6 +83,21 @@ typedef void (*t_CSNBKTR2)(long *return_code,
 			   long *output_key_token_length,
 			   unsigned char *output_key_token);
 
+typedef void (*t_CSNBRKA)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *key_identifier_length,
+			  unsigned char *key_identifier,
+			  long *ey_encrypting_key_identifier_length,
+			  unsigned char *ey_encrypting_key_identifier,
+			  long *opt_parameter1_length,
+			  unsigned char *opt_parameter1,
+			  long *opt_parameter2_length,
+			  unsigned char *opt_parameter2);
+
 struct cca_version {
 	unsigned int ver;
 	unsigned int rel;
@@ -98,6 +113,7 @@ struct cca_lib {
 	t_CSUACRA dll_CSUACRA;
 	t_CSUACRD dll_CSUACRD;
 	t_CSNBKTR2 dll_CSNBKTR2;
+	t_CSNBRKA dll_CSNBRKA;
 	struct cca_version version;
 };
 
@@ -123,5 +139,8 @@ int convert_aes_data_to_cipher_key(struct cca_lib *cca,
 				   u8 *output_key,
 				   unsigned int *output_key_size,
 				   bool verbose);
+
+int restrict_key_export(struct cca_lib *cca, u8 *secure_key,
+			unsigned int secure_key_size, bool verbose);
 
 #endif

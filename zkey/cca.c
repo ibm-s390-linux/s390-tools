@@ -165,13 +165,17 @@ int load_cca_library(struct cca_lib *cca, bool verbose)
 	/* Get the Key Translate 2 function */
 	cca->dll_CSNBKTR2 = (t_CSNBKTR2)dlsym(cca->lib_csulcca, "CSNBKTR2");
 
+	/* Get the Restrict Key Attribute function */
+	cca->dll_CSNBRKA = (t_CSNBRKA)dlsym(cca->lib_csulcca, "CSNBRKA");
+
 	if (cca->dll_CSUACFV == NULL ||
 	    cca->dll_CSNBKTC == NULL ||
 	    cca->dll_CSNBKTC2 == NULL ||
 	    cca->dll_CSUACFQ == NULL ||
 	    cca->dll_CSUACRA == NULL ||
 	    cca->dll_CSUACRD == NULL ||
-	    cca->dll_CSNBKTR2 == NULL) {
+	    cca->dll_CSNBKTR2 == NULL ||
+	    cca->dll_CSNBRKA == NULL) {
 		pr_verbose(verbose, "%s", dlerror());
 		warnx("The command requires the IBM CCA Host Libraries and "
 		      "Tools.\nFor the supported environments and downloads, "
@@ -898,3 +902,80 @@ int convert_aes_data_to_cipher_key(struct cca_lib *cca,
 	return 0;
 }
 
+/*
+ * Restrict the exportability of an AES CIPHER key. It restricts export by means
+ * of NOEX-AES, NOEX-DES, NOEX-RSA, NOEX-SYM, NOEXUASY, NOEXAASY, NOEX-RAW
+ * keywords.
+ * When this function is called with an AES DATA key, it does nothing and
+ * returns 0. AES DATA keys can not be export restricted.
+ *
+ * @param[in] cca       the CCA library structure
+ * @param[in] secure_key the secure key to restrict
+ * @param[in] secure_key_size the size of the secure key to restrict
+ * @param[in] verbose          if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+int restrict_key_export(struct cca_lib *cca, u8 *secure_key,
+			unsigned int secure_key_size, bool verbose)
+{
+	struct aescipherkeytoken *cipherkey =
+					(struct aescipherkeytoken *)secure_key;
+	long exit_data_len = 0, rule_array_count = 0;
+	unsigned char rule_array[8 * 8] = { 0, };
+	unsigned char exit_data[4] = { 0, };
+	long return_code, reason_code;
+	long token_length, zero = 0;
+
+	util_assert(cca != NULL, "Internal error: cca is NULL");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+
+	if (!is_cca_aes_cipher_key(secure_key, secure_key_size))
+		return 0;
+
+	memcpy(rule_array, "AES     ", 8);
+	memcpy(rule_array + 8, "NOEX-AES", 8);
+	memcpy(rule_array + 16, "NOEX-DES", 8);
+	memcpy(rule_array + 24, "NOEX-RSA", 8);
+	memcpy(rule_array + 32, "NOEX-SYM", 8);
+	memcpy(rule_array + 40, "NOEXUASY", 8);
+	memcpy(rule_array + 48, "NOEXAASY", 8);
+	memcpy(rule_array + 56, "NOEX-RAW", 8);
+	rule_array_count = 8;
+
+	token_length = cipherkey->length;
+	cca->dll_CSNBRKA(&return_code, &reason_code,
+			 &exit_data_len, exit_data,
+			 &rule_array_count, rule_array,
+			 &token_length, (unsigned char *)secure_key,
+			 &zero, NULL, &zero, NULL, &zero, NULL);
+
+	pr_verbose(verbose, "CSNBRKA (Restrict Key Attribute) "
+		   "returned: return_code: %ld, reason_code: %ld", return_code,
+		   reason_code);
+	if (return_code != 0) {
+		print_CCA_error(return_code, reason_code);
+		return -EIO;
+	}
+
+	if (is_xts_key(secure_key, secure_key_size)) {
+		cipherkey = (struct aescipherkeytoken *)(secure_key +
+							 AESCIPHER_KEY_SIZE);
+		token_length = cipherkey->length;
+		cca->dll_CSNBRKA(&return_code, &reason_code,
+				 &exit_data_len, exit_data,
+				 &rule_array_count, rule_array,
+				 &token_length, (unsigned char *)cipherkey,
+				 &zero, NULL, &zero, NULL, &zero, NULL);
+
+		pr_verbose(verbose, "CSNBRKA (Restrict Key Attribute) "
+			   "returned: return_code: %ld, reason_code: %ld",
+			   return_code, reason_code);
+		if (return_code != 0) {
+			print_CCA_error(return_code, reason_code);
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
