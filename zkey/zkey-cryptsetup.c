@@ -2169,14 +2169,7 @@ static int command_setkey(void)
 	if (rc < 0)
 		goto out;
 
-	if (keysize != newkey_size) {
-		warnx("The secure key in file '%s' has an invalid size",
-		      g.master_key_file);
-		rc = -EINVAL;
-		goto out;
-	}
-
-	if (memcmp(newkey, key, keysize) == 0) {
+	if (keysize == newkey_size && memcmp(newkey, key, keysize) == 0) {
 		warnx("The secure key in file '%s' is equal to the current "
 		      "volume key, setkey is ignored", g.master_key_file);
 		rc = 0;
