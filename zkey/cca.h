@@ -68,6 +68,21 @@ typedef void (*t_CSUACRD)(long *return_code,
 			  long *ressource_name_length,
 			  unsigned char *ressource_name);
 
+typedef void (*t_CSNBKTR2)(long *return_code,
+			   long *reason_code,
+			   long *exit_data_length,
+			   unsigned char *exit_data,
+			   long *rule_array_count,
+			   unsigned char *rule_array,
+			   long *input_key_token_length,
+			   unsigned char *input_key_token,
+			   long *input_KEK_key_identifier_length,
+			   unsigned char *input_KEK_key_identifier,
+			   long *output_KEK_key_identifier_length,
+			   unsigned char *output_KEK_key_identifier,
+			   long *output_key_token_length,
+			   unsigned char *output_key_token);
+
 struct cca_version {
 	unsigned int ver;
 	unsigned int rel;
@@ -82,6 +97,7 @@ struct cca_lib {
 	t_CSUACFQ dll_CSUACFQ;
 	t_CSUACRA dll_CSUACRA;
 	t_CSUACRD dll_CSUACRD;
+	t_CSNBKTR2 dll_CSNBKTR2;
 	struct cca_version version;
 };
 
@@ -101,5 +117,11 @@ int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
 			       unsigned int flags, bool verbose);
 
 void print_msg_for_cca_envvars(const char *key_name);
+
+int convert_aes_data_to_cipher_key(struct cca_lib *cca,
+				   u8 *input_key, unsigned int input_key_size,
+				   u8 *output_key,
+				   unsigned int *output_key_size,
+				   bool verbose);
 
 #endif

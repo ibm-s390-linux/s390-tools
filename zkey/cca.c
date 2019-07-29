@@ -55,6 +55,14 @@ static void print_CCA_error(int return_code, int reason_code)
 			warnx("The secure key has a CCA master key "
 			      "verification pattern that is not valid");
 			break;
+		case 90:
+			warnx("The operation has been rejected due to access "
+			      "control checking");
+			break;
+		case 2143:
+			warnx("The operation has been rejected due to key "
+			      "export restrictions of the secure key");
+			break;
 		}
 		break;
 	case 12:
@@ -154,12 +162,16 @@ int load_cca_library(struct cca_lib *cca, bool verbose)
 	/* Cryptographic Resource Deallocate function */
 	cca->dll_CSUACRD = (t_CSUACRD)dlsym(cca->lib_csulcca, "CSUACRD");
 
+	/* Get the Key Translate 2 function */
+	cca->dll_CSNBKTR2 = (t_CSNBKTR2)dlsym(cca->lib_csulcca, "CSNBKTR2");
+
 	if (cca->dll_CSUACFV == NULL ||
 	    cca->dll_CSNBKTC == NULL ||
 	    cca->dll_CSNBKTC2 == NULL ||
 	    cca->dll_CSUACFQ == NULL ||
 	    cca->dll_CSUACRA == NULL ||
-	    cca->dll_CSUACRD == NULL) {
+	    cca->dll_CSUACRD == NULL ||
+	    cca->dll_CSNBKTR2 == NULL) {
 		pr_verbose(verbose, "%s", dlerror());
 		warnx("The command requires the IBM CCA Host Libraries and "
 		      "Tools.\nFor the supported environments and downloads, "
@@ -729,3 +741,160 @@ void print_msg_for_cca_envvars(const char *key_name)
 	util_print_indented(msg, 0);
 	free(msg);
 }
+
+/*
+ * Convert a secure key of type CCA-AESDATA into a secure key of type
+ * CCA-AESCIPHER.
+ *
+ * @param[in] cca       the CCA library structure
+ * @param[in] input_key the secure key to convert
+ * @param[in] input_key_size the size of the secure key to convert
+ * @param[in] output_key buffer for the converted secure key
+ * @param[in/out] output_key_size on input: size of the output buffer.
+ *                                on exit: size of the converted secure key
+ * @param[in] verbose          if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+int convert_aes_data_to_cipher_key(struct cca_lib *cca,
+				   u8 *input_key, unsigned int input_key_size,
+				   u8 *output_key,
+				   unsigned int *output_key_size,
+				   bool verbose)
+{
+	long input_token_size, output_token_size, zero = 0;
+	long exit_data_len = 0, rule_array_count = 0;
+	unsigned char *input_token, *output_token;
+	unsigned char rule_array[8 * 2] = { 0, };
+	unsigned char null_token[64] = { 0, };
+	long null_token_len = sizeof(null_token);
+	unsigned char exit_data[4] = { 0, };
+	struct aescipherkeytoken *cipherkey;
+	long return_code, reason_code;
+	struct cca_version version;
+	unsigned char buffer[800];
+	int rc;
+
+	util_assert(cca != NULL, "Internal error: cca is NULL");
+	util_assert(input_key != NULL, "Internal error: input_key is NULL");
+	util_assert(output_key != NULL, "Internal error: output_key is NULL");
+	util_assert(output_key_size != NULL,
+		    "Internal error: output_key_size is NULL");
+
+	if (is_cca_aes_cipher_key(input_key, input_key_size)) {
+		warnx("Invalid key-type specified");
+		return -EINVAL;
+	}
+
+	if (*output_key_size < (is_xts_key(input_key, input_key_size) ?
+				2 * AESCIPHER_KEY_SIZE : AESCIPHER_KEY_SIZE))
+		return -EINVAL;
+
+	/*
+	 * We need a CCA firmware version 6.3.27 or later to support
+	 * conversion of secure keys that are exportable to CPACF protected keys
+	 */
+	rc = get_cca_adapter_version(cca, &version, verbose);
+	if (rc != 0)
+		return rc;
+	if (version.ver < 6 ||
+	    (version.ver == 6 && version.rel < 3) ||
+	    (version.ver == 6 && version.rel < 3 && version.mod < 27)) {
+		util_print_indented("The used CCA firmware version does not "
+				    "support converting a secure key that can "
+				    "be used with the PAES cipher. The "
+				    "required CCA firmware version is 6.3.27 "
+				    "or later. For the supported environments "
+				    "and updates, see: " CCA_WEB_PAGE, 0);
+		return -ENOTSUP;
+	}
+
+	input_token = input_key;
+	input_token_size = AESDATA_KEY_SIZE;
+	output_token = buffer;
+	output_token_size = sizeof(buffer);
+	memset(buffer, 0, sizeof(buffer));
+
+	memcpy(rule_array, "AES     ", 8);
+	memcpy(rule_array + 8, "REFORMAT", 8);
+	rule_array_count = 2;
+
+	cca->dll_CSNBKTR2(&return_code, &reason_code,
+			  &exit_data_len, exit_data,
+			  &rule_array_count, rule_array,
+			  &input_token_size, input_token,
+			  &null_token_len, null_token,
+			  &zero, NULL,
+			  &output_token_size, output_token);
+
+	pr_verbose(verbose, "CSNBKTR2 (Key Translate2) "
+		   "returned: return_code: %ld, reason_code: %ld", return_code,
+		   reason_code);
+	if (return_code != 0) {
+		print_CCA_error(return_code, reason_code);
+		return -EIO;
+	}
+
+	pr_verbose(verbose, "output_token_size: %lu", output_token_size);
+	if (output_token_size > (long)AESCIPHER_KEY_SIZE) {
+		pr_verbose(verbose, "Output key token too large");
+		return -EINVAL;
+	}
+
+	/*
+	 * Check if the converted key allows export to CPACF protected key.
+	 * If not, then the CCA host library or firmware code level is too low.
+	 */
+	cipherkey = (struct aescipherkeytoken *)buffer;
+	if ((cipherkey->kmf1 & 0x0800) == 0) {
+		util_print_indented("The used CCA firmware version does not "
+				    "support converting a secure key that can "
+				    "be used with the PAES cipher. The "
+				    "required CCA firmware version is 6.3.27 "
+				    "or later. For the supported environments "
+				    "and updates, see: " CCA_WEB_PAGE, 0);
+		return -ENOTSUP;
+	}
+
+	memset(output_key, 0, *output_key_size);
+	memcpy(output_key, buffer, output_token_size);
+	*output_key_size = AESCIPHER_KEY_SIZE;
+
+	if (is_xts_key(input_key, input_key_size)) {
+		input_token = input_key + AESDATA_KEY_SIZE;
+		input_token_size = AESDATA_KEY_SIZE;
+		output_token = buffer;
+		output_token_size = sizeof(buffer);
+		memset(buffer, 0, sizeof(buffer));
+
+		cca->dll_CSNBKTR2(&return_code, &reason_code,
+				  &exit_data_len, exit_data,
+				  &rule_array_count, rule_array,
+				  &input_token_size, input_token,
+				  &null_token_len, null_token,
+				  &zero, NULL,
+				  &output_token_size, output_token);
+
+		pr_verbose(verbose, "CSNBKTR2 (Key Translate2) "
+			   "returned: return_code: %ld, reason_code: %ld",
+			   return_code, reason_code);
+		if (return_code != 0) {
+			print_CCA_error(return_code, reason_code);
+			return -EIO;
+		}
+
+		pr_verbose(verbose, "output_token_size: %lu",
+			   output_token_size);
+		if (output_token_size > (long)AESCIPHER_KEY_SIZE) {
+			pr_verbose(verbose, "Output key token too large");
+			return -EINVAL;
+		}
+
+		memcpy(output_key + AESCIPHER_KEY_SIZE, buffer,
+		       output_token_size);
+		*output_key_size += AESCIPHER_KEY_SIZE;
+	}
+
+	return 0;
+}
+
