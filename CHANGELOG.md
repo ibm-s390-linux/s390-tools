@@ -1,5 +1,13 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
+ * __v2.10.x (2019-xx-xx)__
+
+  For Linux kernel version: 5.x
+
+  Changes of existing tools:
+
+  Bug Fixes:
+
  * __v2.10.0 (2019-07-31)__
 
   For Linux kernel version: 5.2
