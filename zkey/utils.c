@@ -793,3 +793,27 @@ int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 
 	return rc;
 }
+
+/*
+ * Prompts for yes or no. Returns true if 'y' or 'yes' was entered.
+ *
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns true if 'y' or 'yes' was entered (case insensitive). Returns false
+ * otherwise.
+ */
+bool prompt_for_yes(bool verbose)
+{
+	char str[20];
+
+	if (fgets(str, sizeof(str), stdin) == NULL)
+		return false;
+
+	if (str[strlen(str) - 1] == '\n')
+		str[strlen(str) - 1] = '\0';
+	pr_verbose(verbose, "Prompt reply: '%s'", str);
+	if (strcasecmp(str, "y") == 0 || strcasecmp(str, "yes") == 0)
+		return true;
+
+	return false;
+}

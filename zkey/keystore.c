@@ -1801,18 +1801,21 @@ out_free_key_filenames:
  *                        default is used.
  * @param[in] import_file The name of a secure key containing the key to import
  * @param[in] volume_type the type of volume
+ * @param[in] cca        the CCA library struct
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,
-			const char *import_file, const char *volume_type)
+			const char *import_file, const char *volume_type,
+			struct cca_lib *cca)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
 	size_t secure_key_size;
 	const char *key_type;
+	int selected = 1;
 	u8 *secure_key;
 	u64 mkvp;
 	int rc;
@@ -1860,6 +1863,51 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
 		warnx("Your master key setup is improper");
 		goto out_free_key;
+	}
+
+	if (is_cca_aes_cipher_key(secure_key, secure_key_size)) {
+		if (cca->lib_csulcca == NULL) {
+			rc = load_cca_library(cca, keystore->verbose);
+			if (rc != 0)
+				goto out_free_key;
+		}
+
+		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+						FLAG_SEL_CCA_MATCH_CUR_MKVP |
+						FLAG_SEL_CCA_MATCH_OLD_MKVP,
+						keystore->verbose);
+		if (rc == -ENOTSUP) {
+			rc = 0;
+			selected = 0;
+		}
+		if (rc != 0) {
+			warnx("No APQN found that is suitable for "
+			      "working with the secure AES key '%s'", name);
+			rc = 0;
+			goto out_free_key;
+		}
+
+		rc = restrict_key_export(cca, secure_key, secure_key_size,
+					 keystore->verbose);
+		if (rc != 0) {
+			warnx("Failed to export-restrict the imported secure "
+			      "key: %s", strerror(-rc));
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
+			goto out_free_key;
+		}
+
+		rc = check_aes_cipher_key(secure_key, secure_key_size);
+		if (rc != 0) {
+			warnx("The secure key to import might not be secure");
+			printf("%s: Do you want to import it anyway [y/N]? ",
+			       program_invocation_short_name);
+			if (!prompt_for_yes(keystore->verbose)) {
+				warnx("Operation aborted");
+				rc = -ECANCELED;
+				goto out_free_key;
+			}
+		}
 	}
 
 	rc = write_secure_key(file_names.skey_filename, secure_key,
@@ -3180,7 +3228,6 @@ static int _keystore_prompt_for_remove(struct keystore *keystore,
 				       struct key_filenames *file_names)
 {
 	struct properties *key_prop;
-	char str[20];
 	char *msg;
 	int rc;
 
@@ -3198,14 +3245,7 @@ static int _keystore_prompt_for_remove(struct keystore *keystore,
 
 	printf("%s: Remove key '%s' [y/N]? ", program_invocation_short_name,
 	       name);
-	if (fgets(str, sizeof(str), stdin) == NULL) {
-		rc = -EIO;
-		goto out;
-	}
-	if (str[strlen(str) - 1] == '\n')
-		str[strlen(str) - 1] = '\0';
-	pr_verbose(keystore, "Prompt reply: '%s'", str);
-	if (strcasecmp(str, "y") != 0 && strcasecmp(str, "yes") != 0) {
+	if (!prompt_for_yes(keystore->verbose)) {
 		warnx("Operation aborted");
 		rc = -ECANCELED;
 		goto out;

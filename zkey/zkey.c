@@ -1522,7 +1522,7 @@ static int command_import(void)
 
 	rc = keystore_import_key(g.keystore, g.name, g.description, g.volumes,
 				 g.apqns, g.noapqncheck, g.sector_size,
-				 g.pos_arg, g.volume_type);
+				 g.pos_arg, g.volume_type, &g.cca);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

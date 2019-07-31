@@ -53,4 +53,6 @@ int print_mk_info(const char *apqns, bool verbose);
 int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 		      bool print_mks, bool verbose);
 
+bool prompt_for_yes(bool verbose);
+
 #endif

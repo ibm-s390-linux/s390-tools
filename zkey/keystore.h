@@ -37,7 +37,8 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,
-			const char *import_file, const char *volume_type);
+			const char *import_file, const char *volume_type,
+			struct cca_lib *cca);
 
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
