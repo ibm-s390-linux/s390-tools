@@ -397,7 +397,7 @@ static void fdasd_error(fdasd_anchor_t *anc, enum fdasd_failure why, char *str)
 	fputc('\n', stderr);
 	fputs(err_str, stderr);
 
-	fdasd_exit(anc, -1);
+	fdasd_exit(anc, EXIT_FAILURE);
 }
 
 /*
@@ -3040,5 +3040,5 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	return -1;
+	return EXIT_FAILURE;
 }
