@@ -1,13 +1,22 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.9.x (2019-xx-xx)__
+ * __v2.10.0 (2019-07-31)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.2
 
   Changes of existing tools:
+  - zdev: Add zfcp dix parameter handling
+  - cpumf: Add support for CPU-Measurement Facility counters SVN 6
 
   Bug Fixes:
-
+  - libutil: Add functions to test path is read/write-only
+  - zdev: Fix reporting of read-only sysfs attributes
+  - zdev: Improve handling of invalid udev rules
+  - zipl: Fix stfle zero padding
+  - zipl: Fix build issues
+  - zipl: Remove trailing spaces from the fields defined in BLS files
+  - zipl: Do not overwrite BOOT_IMAGE entry
+  - zkey: Fix auto-detection of clear key bitsize for XTS keys
 
  * __v2.9.0 (2019-05-21)__
 
