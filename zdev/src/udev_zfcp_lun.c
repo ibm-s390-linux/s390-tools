@@ -393,6 +393,9 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 out:
 	udev_free_file(file);
 
+	if (!node)
+		warn_once("Warning: Invalid udev rule: %s\n", filename);
+
 	return rc;
 }
 
@@ -475,10 +478,16 @@ static void zfcp_lun_node_to_state(struct zfcp_lun_node *node,
 	struct attrib *a;
 	char *name;
 
-	state->exists = 1;
 	state->modified = 0;
 	state->deconfigured = 0;
 	state->definable = 0;
+
+	if (!node) {
+		state->exists = 0;
+		return;
+	}
+
+	state->exists = 1;
 
 	util_list_iterate(&node->fc_settings->list, s) {
 		a = attrib_find(attribs, s->name);
@@ -519,10 +528,7 @@ exit_code_t udev_zfcp_lun_read_device(struct device *dev, bool autoconf)
 		goto out;
 
 	node = zfcp_lun_node_find(luns, dev->devid);
-	if (node)
-		zfcp_lun_node_to_state(node, st->dev_attribs, state);
-	else
-		rc = EXIT_DEVICE_NOT_FOUND;
+	zfcp_lun_node_to_state(node, st->dev_attribs, state);
 
 out:
 	zfcp_lun_node_list_free(luns);

@@ -40,6 +40,7 @@ struct udev_file {
 };
 
 exit_code_t udev_read_file(const char *, struct udev_file **);
+bool udev_file_is_empty(struct udev_file *file);
 void udev_free_file(struct udev_file *);
 void udev_file_print(struct udev_file *);
 

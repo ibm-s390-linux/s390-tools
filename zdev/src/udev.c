@@ -346,6 +346,21 @@ exit_code_t udev_read_file(const char *path, struct udev_file **file_ptr)
 	return EXIT_OK;
 }
 
+/* Check if a udev file does not contain any statements. */
+bool udev_file_is_empty(struct udev_file *file)
+{
+	struct udev_line_node *l;
+
+	if (!file)
+		return true;
+	util_list_iterate(&file->lines, l) {
+		if (l->line[0])
+			return false;
+	}
+
+	return true;
+}
+
 static bool get_ids_cb(const char *filename, void *data)
 {
 	char *prefix = data;

@@ -163,9 +163,14 @@ exit_code_t udev_ccwgroup_read_device(struct device *dev, bool autoconf)
 	rc = udev_read_file(path, &file);
 	if (rc)
 		goto out;
-	udev_file_get_settings(file, st->dev_attribs, state->settings);
-	expand_id(dev, file);
-	state->exists = 1;
+	if (udev_file_is_empty(file)) {
+		warn_once("Warning: Invalid udev rule: %s\n", path);
+		state->exists = 0;
+	} else {
+		udev_file_get_settings(file, st->dev_attribs, state->settings);
+		expand_id(dev, file);
+		state->exists = 1;
+	}
 	udev_free_file(file);
 
 out:
@@ -343,6 +348,9 @@ static char *read_full_id(const char *path)
 
 out:
 	free(text);
+
+	if (!id)
+		warn_once("Warning: Invalid udev rule: %s\n", path);
 
 	return id;
 }

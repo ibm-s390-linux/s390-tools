@@ -108,8 +108,13 @@ exit_code_t udev_ccw_read_device(struct device *dev, bool autoconf)
 	rc = udev_read_file(path, &file);
 	if (rc)
 		goto out;
-	udev_file_get_settings(file, st->dev_attribs, state->settings);
-	state->exists = 1;
+	if (udev_file_is_empty(file)) {
+		warn_once("Warning: Invalid udev rule: %s\n", path);
+		state->exists = 0;
+	} else {
+		udev_file_get_settings(file, st->dev_attribs, state->settings);
+		state->exists = 1;
+	}
 	udev_free_file(file);
 
 out:
