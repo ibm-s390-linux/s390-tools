@@ -1650,3 +1650,140 @@ int get_min_card_level_for_keytype(const char *key_type)
 
 	return -1;
 }
+
+/**
+ * Performs extended checks on an AES CIPHER key. It checks the key usage
+ * fields (KUFs) and key management fields (KMFs) of the key. The function
+ * returns -EINVAL and issues warning messages if a mismatch is detected.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int check_aes_cipher_key(const u8 *key, size_t key_size)
+{
+	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
+	bool mismatch = false;
+
+	if (!is_cca_aes_cipher_key(key, key_size)) {
+		warnx("The key is not of type '"KEY_TYPE_CCA_AESCIPHER"'");
+		return -EINVAL;
+	}
+
+	if ((cipherkey->kuf1 & 0x8000) == 0) {
+		printf("WARNING: The secure key can not be used for "
+		       "encryption\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kuf1 & 0x4000) == 0) {
+		printf("WARNING: The secure key can not be used for "
+		       "decryption\n");
+		mismatch = true;
+	}
+	if (cipherkey->kuf1 & 0x2000) {
+		printf("INFO: The secure key can be used for data translate\n");
+		mismatch = true;
+	}
+	if (cipherkey->kuf1 & 0x1000) {
+		printf("WARNING: The secure key can only be used in UDXs\n");
+		mismatch = true;
+	}
+
+	if (cipherkey->kmf1 & 0x8000) {
+		printf("WARNING: The secure key can be exported using a "
+		       "symmetric key\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf1 & 0x4000) {
+		printf("WARNING: The secure key can be exported using an "
+		       "unauthenticated asymmetric key\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf1 & 0x2000) {
+		printf("WARNING: The secure key can be exported using an "
+		       "authenticated asymmetric key\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf1 & 0x1000) {
+		printf("WARNING: The secure key can be exported using a RAW "
+		       "key\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf1 & 0x0800) == 0) {
+		printf("WARNING: The secure key can not be transformed into a "
+		       "CPACF protected key\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf1 & 0x0080) == 0) {
+		printf("WARNING: The secure key can be exported using a DES "
+		       "key\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf1 & 0x0040) == 0) {
+		printf("WARNING: The secure key can be exported using an AES "
+		       "key\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf1 & 0x0008) == 0) {
+		printf("WARNING: The secure key can be exported using an RSA "
+		       "key\n");
+		mismatch = true;
+	}
+
+	if (cipherkey->kmf2 & 0xC000) {
+		printf("WARNING: The secure key is incomplete\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf2 & 0x0010) {
+		printf("WARNING: The secure key was previously encrypted with "
+		       "an untrusted KEK\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf2 & 0x0008) {
+		printf("WARNING: The secure key was previously in a format "
+		       "without type or usage attributes\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf2 & 0x0004) {
+		printf("WARNING: The secure key was previously encrypted with "
+		       "a key weaker than itself\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf2 & 0x0002) {
+		printf("WARNING: The secure key was previously in a non-CCA "
+		       "format\n");
+		mismatch = true;
+	}
+	if (cipherkey->kmf2 & 0x0001) {
+		printf("WARNING: The secure key was previously encrypted in "
+		       "ECB mode\n");
+		mismatch = true;
+	}
+
+	if ((cipherkey->kmf3 & 0xFF00) == 0x0000 ||
+	    (cipherkey->kmf3 & 0x00FF) == 0x0000)	{
+		printf("WARNING: The secure key was created by an unknown "
+		       "method\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf3 & 0xFF00) == 0x0400 ||
+	    (cipherkey->kmf3 & 0x00FF) == 0x0004)	{
+		printf("WARNING: The secure key was created from cleartext key "
+		       "components\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf3 & 0xFF00) == 0x0500 ||
+	    (cipherkey->kmf3 & 0x00FF) == 0x0005)	{
+		printf("WARNING: The secure key was entered as a cleartext key "
+		       "value\n");
+		mismatch = true;
+	}
+	if ((cipherkey->kmf3 & 0x00FF) == 0x0012)	{
+		printf("WARNING: The secure key was converted from a CCA "
+		       "key-token that had no export control attributes\n");
+		mismatch = true;
+	}
+
+	return mismatch ? -EINVAL : 0;
+}
