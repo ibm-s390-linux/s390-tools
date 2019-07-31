@@ -57,6 +57,7 @@ unsigned long longrun_total;
 unsigned long longrun_current;
 
 static struct util_list *delayed_messages;
+static struct util_list *warn_once_messages;
 static FILE *dryrun_file;
 
 static FILE *dryrun_get_file(void)
@@ -245,6 +246,7 @@ static void dryrun_print(void)
 void misc_exit(void)
 {
 	strlist_free(delayed_messages);
+	strlist_free(warn_once_messages);
 	if (dryrun_file) {
 		if (verbose)
 			dryrun_print();
@@ -360,6 +362,29 @@ void _warn(const char *format, ...)
 	va_start(args, format);
 	vfprintf(stderr, format, args);
 	va_end(args);
+}
+
+/* Report a warning: print an error message to standard error. Only print each
+ * warning once. */
+void _warn_once(const char *format, ...)
+{
+	va_list args;
+	char *str;
+
+	va_start(args, format);
+	if (vasprintf(&str, format, args) == -1)
+		oom();
+	va_end(args);
+
+	/* Check if message was printed before. */
+	if (!warn_once_messages)
+		warn_once_messages = strlist_new();
+	if (!strlist_find(warn_once_messages, str)) {
+		fprintf(stderr, "%s", str);
+		strlist_add(warn_once_messages, "%s", str);
+	}
+
+	free(str);
 }
 
 /* Print an error message indicating an out-of-memory situation and exit. */

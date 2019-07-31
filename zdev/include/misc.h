@@ -136,6 +136,12 @@ void _warn(const char *, ...);
 			fprintf(stderr, "%s:%d: ", __FILE__, __LINE__); \
 		_warn(__VA_ARGS__); \
 	} while (0)
+void _warn_once(const char *, ...);
+#define warn_once(...) do { \
+		if (debug_enabled) \
+			fprintf(stderr, "%s:%d: ", __FILE__, __LINE__); \
+		_warn_once(__VA_ARGS__); \
+	} while (0)
 #define info(...) do { if (!quiet) fprintf(stdout_data ? stderr : stdout, \
 					   __VA_ARGS__); } while (0)
 #define verb(...) do { if (verbose) fprintf(stdout_data ? stderr : stdout, \
