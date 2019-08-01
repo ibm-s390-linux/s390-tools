@@ -832,7 +832,7 @@ static struct zkey_command zkey_commands[] = {
 		.need_pkey_device = 1,
 		.short_desc = "Validate an existing secure AES key",
 		.long_desc = "Validate an existing secure AES key that is "
-			     "either contained in SECURE-KEY-FILE or is stored"
+			     "either contained in SECURE-KEY-FILE or is stored "
 			     "in the repository and print information about "
 			     "the key",
 		.has_options = 1,
