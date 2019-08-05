@@ -474,6 +474,58 @@ static int get_cca_adapter_serialnr(struct cca_lib *cca, char serialnr[9],
 }
 
 /**
+ * Queries the firmware version of the current CCA adapter
+ *
+ * @param[in] cca              the CCA library structure
+ * @param[out] version         the struct where the version is returned
+ * @param[in] verbose          if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int get_cca_adapter_version(struct cca_lib *cca,
+				   struct cca_version *version,
+				   bool verbose)
+{
+	long exit_data_len = 0, rule_array_count, verb_data_length = 0;
+	unsigned char rule_array[6 * 8] = { 0, };
+	unsigned char exit_data[4] = { 0, };
+	long return_code, reason_code;
+	char version_data[9];
+
+	util_assert(cca != NULL, "Internal error: cca is NULL");
+
+	memset(rule_array, 0, sizeof(rule_array));
+	memcpy(rule_array, "STATCCA ", 8);
+	rule_array_count = 1;
+
+	cca->dll_CSUACFQ(&return_code, &reason_code,
+			 &exit_data_len, exit_data,
+			 &rule_array_count, rule_array,
+			 &verb_data_length, NULL);
+
+	pr_verbose(verbose, "CSUACFQ (Cryptographic Facility Query) returned: "
+		   "return_code: %ld, reason_code: %ld", return_code,
+		   reason_code);
+	if (return_code != 0) {
+		print_CCA_error(return_code, reason_code);
+		return -EIO;
+	}
+
+	memcpy(version_data, rule_array+3*8, 8);
+	version_data[8] = '\0';
+
+	pr_verbose(verbose, "CCA firmware version string: %s", version_data);
+
+	if (sscanf((char *)version_data, "%u.%u.%uz", &version->ver,
+		   &version->rel, &version->mod) != 3) {
+		warnx("CCA formware version is invalid: %s", version_data);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * Selects the specified APQN to be used for the CCA host library.
  *
  * @param[in] cca              the CCA library structure
