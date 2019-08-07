@@ -559,7 +559,7 @@ get_dump_components(struct job_dump_data *dump,
 	/* Fill in component data */
 	num = 0;
 	rc = set_cl_element(&cl[num++], "kernel image", dump->image,
-			    &dump->image_addr, 0, 0x10000,
+			    &dump->image_addr, 0, 0x0,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;
