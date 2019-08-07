@@ -1275,7 +1275,7 @@ static int activate_unbound_keyslot(int token, int keyslot, const char *key,
 		util_print_indented(complete_msg, 0);
 	util_print_indented("All key slots containing the old volume key are "
 			    "now in unbound state. Do you want to remove "
-			    "these key slots?", 0);
+			    "these key slots [y/N]?", 0);
 
 	if (!prompt_for_yes())
 		return 0;
@@ -1524,7 +1524,7 @@ static int reencipher_prepare(int token)
 		util_asprintf(&msg, "Staged volume key re-enciphering is "
 			      "already initiated for device '%s'. Do you want to "
 			      "cancel the pending re-enciphering and start a "
-			      "new re-enciphering process?", g.pos_arg);
+			      "new re-enciphering process [y/N]?", g.pos_arg);
 		util_print_indented(msg, 0);
 		free(msg);
 
@@ -1690,7 +1690,7 @@ static int reencipher_complete(int token)
 			      "was completed.\n"
 			      "Do you want to re-encipher the secure key with "
 			      "the CCA master key in the CURRENT master key "
-			      "register?", g.pos_arg);
+			      "register [y/N]?", g.pos_arg);
 		util_print_indented(msg, 0);
 		free(msg);
 
@@ -2014,12 +2014,13 @@ static int command_setkey(void)
 		util_asprintf(&msg, "The secure key in file '%s' is "
 			      "enciphered with the CCA master key in the OLD "
 			      "master key register. Do you want to set this "
-			      "key as the new volume key anyway?",
+			      "key as the new volume key anyway [y/N]?",
 			      g.master_key_file);
 		util_print_indented(msg, 0);
 		free(msg);
 
 		if (!prompt_for_yes()) {
+			warnx("Device '%s' is left unchanged", g.pos_arg);
 			rc = -EINVAL;
 			goto out;
 		}
@@ -2078,12 +2079,13 @@ static int command_setkey(void)
 			      "be correct. You will lose all data on the "
 			      "volume if you set the wrong volume key!\n"
 			      "Are you sure that the key in file '%s' is the "
-			      "correct volume key for volume '%s'?",
+			      "correct volume key for volume '%s' [y/N]?",
 			      g.master_key_file, g.pos_arg);
 		util_print_indented(msg, 0);
 		free(msg);
 
 		if (!prompt_for_yes()) {
+			warnx("Device '%s' is left unchanged", g.pos_arg);
 			rc = -EINVAL;
 			goto out;
 		}

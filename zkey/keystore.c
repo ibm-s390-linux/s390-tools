@@ -3072,7 +3072,8 @@ static int _keystore_prompt_for_remove(struct keystore *keystore,
 	_keystore_msg_for_volumes(msg, key_prop, VOLUME_TYPE_PLAIN);
 	free(msg);
 
-	printf("%s: Remove key '%s'? ", program_invocation_short_name, name);
+	printf("%s: Remove key '%s' [y/N]? ", program_invocation_short_name,
+	       name);
 	if (fgets(str, sizeof(str), stdin) == NULL) {
 		rc = -EIO;
 		goto out;
@@ -3081,6 +3082,7 @@ static int _keystore_prompt_for_remove(struct keystore *keystore,
 		str[strlen(str) - 1] = '\0';
 	pr_verbose(keystore, "Prompt reply: '%s'", str);
 	if (strcasecmp(str, "y") != 0 && strcasecmp(str, "yes") != 0) {
+		warnx("Operation aborted");
 		rc = -ECANCELED;
 		goto out;
 	}
