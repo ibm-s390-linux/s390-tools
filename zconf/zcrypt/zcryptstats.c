@@ -147,8 +147,9 @@ struct chsc_cmb_area {
 #define CRYPTO_TYPE_CEX4S	10
 #define CRYPTO_TYPE_CEX5S	11
 #define CRYPTO_TYPE_CEX6S	12
+#define CRYPTO_TYPE_CEX7S	13
 
-#define CRYPTO_TYPE_TOLERATION	CRYPTO_TYPE_CEX6S
+#define CRYPTO_TYPE_TOLERATION	CRYPTO_TYPE_CEX7S
 
 struct crypto_counter {
 	const char *name;
@@ -235,8 +236,8 @@ const struct crypto_mode mode_pcica[1] = {
 		  .counters = counter_pcica },
 };
 
-#define NUM_CEX456_MODES	11
-const struct crypto_mode mode_cex456[NUM_CEX456_MODES] = {
+#define NUM_CEX4567_MODES	11
+const struct crypto_mode mode_cex4567[NUM_CEX4567_MODES] = {
 		{ 0 },
 		{ 0 },
 		{ 0 },
@@ -256,7 +257,7 @@ const struct crypto_mode mode_cex456[NUM_CEX456_MODES] = {
 		  .counters = counter_ep11 },
 };
 
-#define NUM_CRYPTO_TYPES	13
+#define NUM_CRYPTO_TYPES	14
 const struct crypto_type crypto_types[NUM_CRYPTO_TYPES] = {
 		{ 0 },
 		{ 0 },
@@ -275,12 +276,14 @@ const struct crypto_type crypto_types[NUM_CRYPTO_TYPES] = {
 		  .modes = mode_accel },
 		{ .name = "CEX3C", .num_modes = NUM_COPROC_MODES,
 		  .modes = mode_coproc },
-		{ .name = "CEX4", .num_modes = NUM_CEX456_MODES,
-		  .modes = mode_cex456 },
-		{ .name = "CEX5", .num_modes = NUM_CEX456_MODES,
-		  .modes = mode_cex456 },
-		{ .name = "CEX6", .num_modes = NUM_CEX456_MODES,
-		  .modes = mode_cex456 },
+		{ .name = "CEX4", .num_modes = NUM_CEX4567_MODES,
+		  .modes = mode_cex4567 },
+		{ .name = "CEX5", .num_modes = NUM_CEX4567_MODES,
+		  .modes = mode_cex4567 },
+		{ .name = "CEX6", .num_modes = NUM_CEX4567_MODES,
+		  .modes = mode_cex4567 },
+		{ .name = "CEX7", .num_modes = NUM_CEX4567_MODES,
+		  .modes = mode_cex4567 },
 };
 
 
