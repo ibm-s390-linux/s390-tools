@@ -1,7 +1,7 @@
 /**
  * lszcrypt - Display zcrypt devices and configuration settings
  *
- * Copyright IBM Corp. 2008, 2018
+ * Copyright IBM Corp. 2008, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -86,7 +86,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2018,
+			.pub_last = 2019,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -302,9 +302,10 @@ static void show_capability(const char *id_str)
 			printf("%s\n", CAP_CCA);
 		printf("%s", CAP_RNG);
 		break;
-	case 10:
-	case 11:
-	case 12:
+	case 10: /* CEX4S */
+	case 11: /* CEX5S */
+	case 12: /* CEX6S */
+	case 13: /* CEX7S */
 		if (func_val & MASK_ACCEL) {
 			if (func_val & MASK_RSA4K)
 				printf("%s", CAP_RSA4K);

@@ -1,7 +1,7 @@
 /*
  * chzcrypt - Tool to modify zcrypt configuration
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2019
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -47,7 +47,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2017,
+			.pub_last = 2019,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
