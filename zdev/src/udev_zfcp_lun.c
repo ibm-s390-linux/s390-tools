@@ -345,6 +345,7 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 		in_fc,
 		in_scsi,
 	} state = none;
+	bool empty_rule = true;
 
 	rc = udev_read_file(filename, &file);
 	if (rc)
@@ -374,16 +375,22 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 				state = in_scsi;
 				node = zfcp_lun_node_from_entry(entry, node,
 								list);
+				if (node)
+					empty_rule = false;
 			}
 			break;
 		case in_fc:
 			node = zfcp_lun_node_from_entry(entry, node, list);
-			if (node)
+			if (node) {
 				add_fc_setting_from_entry(entry, node);
+				empty_rule = false;
+			}
 			break;
 		case in_scsi:
-			if (node)
+			if (node) {
 				add_scsi_setting_from_entry(entry, node);
+				empty_rule = false;
+			}
 			break;
 		}
 	}
@@ -393,7 +400,7 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 out:
 	udev_free_file(file);
 
-	if (!node)
+	if (empty_rule)
 		warn_once("Warning: Invalid udev rule: %s\n", filename);
 
 	return rc;
