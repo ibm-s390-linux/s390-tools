@@ -199,7 +199,7 @@ disk_get_info(const char* device, struct job_target_data* target,
 	FILE *fh;
 	char *script_pre = TOOLS_LIBDIR "/zipl_helper.";
 	char *script_file;
-	char *ppn_cmd;
+	char *ppn_cmd = NULL;
 	char buffer[80];
 	char value[40];
 	int majnum, minnum;
