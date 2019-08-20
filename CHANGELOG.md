@@ -4,6 +4,10 @@ Release history for s390-tools (MIT version)
 
   For Linux kernel version: 5.x
 
+  Add new tool:
+  - lspci: Add support for pci devices
+  - smc_dbg: Add support for SMC sockets
+
   Changes of existing tools:
 
   Bug Fixes:

@@ -472,6 +472,8 @@ CMDS="uname -a\
   :systemctl status docker.service\
   :blockdev --report\
   :lvdisplay\
+  :lspci -vv\
+  :smc_dbg\
   "
 
 ########################################
