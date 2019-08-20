@@ -52,7 +52,7 @@ Sample invocation:
 .br
 dbginfo.sh: Debug information script version %S390_TOOLS_VERSION%
 .br
-Copyright IBM Corp. 2002, 2017
+Copyright IBM Corp. 2002, 2019
 .PP
 Hardware platform     = s390x
 .br
@@ -60,34 +60,40 @@ Kernel version        = <kernel\-version>
 .br
 Runtime environment   = z/VM
 .PP
-1 of 11: Collecting command output
+1 of 13: Collecting command output
 .PP
-2 of 11: Collecting z/VM command output
+2 of 13: Collecting z/VM command output
 .PP
-3 of 11: Collecting procfs
+3 of 13: Collecting procfs
 .PP
-4 of 11: Collecting sysfs
+4 of 13: Collecting sysfs
 .PP
-5 of 11: Collecting log files
+5 of 13: Collecting log files
 .PP
-6 of 11: Collecting config files
+6 of 13: Collecting config files
 .PP
-7 of 11: Collecting osa oat output skipped \- not available
+7 of 13: Collecting osa oat output skipped \- not available
 .PP
-8 of 11: Collecting OpenVSwitch output
+8 of 13: Collecting ethtool output
 .PP
-9 of 11: Collecting domain xml files
+9 of 13: Collecting OpenVSwitch output
 .PP
-10a of 11: Collecting docker container output
-10b of 11: Collecting docker network output
+10 of 13: Collecting domain xml files
 .PP
-11 of 11: Postprocessing
+11a of 13: Collecting docker container output
+11b of 13: Collecting docker network output
+.PP
+12 of 13: Collecting nvme output
+.PP
+13 of 13: Postprocessing
 .PP
 Finalizing: Creating archive with collected data
 .PP
 Collected data was saved to:
 .br
- >>  /data\-collection/DBGINFO\-2015\-02\-26\-21\-39\-16\-host\-012345.tgz  <<
+ >>  /data\-collection/DBGINFO\-2019\-08\-19\-21\-39\-16\-host\-012345.tgz  <<
+.br
+Review the collected data before sending to your service organization.
 .SH HINTS
 Run the script with root authority.
 .br

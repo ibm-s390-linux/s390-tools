@@ -9,6 +9,7 @@ Release history for s390-tools (MIT version)
   - smc_dbg: Add support for SMC sockets
 
   Changes of existing tools:
+  - dbginfo: Gather ethtool related data
 
   Bug Fixes:
 
