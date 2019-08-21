@@ -198,7 +198,7 @@ disk_get_info(const char* device, struct job_target_data* target,
 	long devsize;
 	FILE *fh;
 	char *script_pre = TOOLS_LIBDIR "/zipl_helper.";
-	char *script_file;
+	char *script_file = NULL;
 	char *ppn_cmd = NULL;
 	char buffer[80];
 	char value[40];
@@ -443,10 +443,12 @@ type_determined:
 	data->fs_block_size = -1;
 	close(fd);
 	*info = data;
+	free(script_file);
 	return 0;
 out_close:
 	close(fd);
 	free(ppn_cmd);
+	free(script_file);
 	free(data);
 	return -1;
 
