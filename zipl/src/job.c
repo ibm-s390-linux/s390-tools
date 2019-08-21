@@ -114,7 +114,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 			break;
 		case 'D':
 			error_reason("dumptofs has been deprecated, use "
-				     "--dump instead");
+				     "--dumpto instead");
 			rc = -1;
 			break;
 		case 'M':
