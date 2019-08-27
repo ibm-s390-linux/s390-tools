@@ -47,7 +47,7 @@
 #define DEFAULTBOOT_SECTION		"defaultboot"
 
 #define ZIPL_CONF_VAR			"ZIPLCONF"
-#define ZIPL_DEFAULT_CONF		"/etc/zipl.conf"
+#define ZIPL_DEFAULT_CONF		TOOLS_SYSCONFDIR "/zipl.conf"
 #define ZIPL_DEFAULT_BLSDIR		"/boot/loader/entries"
 #define ZIPL_STAGE3_PATH		TOOLS_LIBDIR "/stage3.bin"
 #define ZIPL_SIPL_PATH			"/sys/firmware/ipl/has_secure"
