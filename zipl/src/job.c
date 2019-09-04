@@ -1880,6 +1880,7 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->add_files = cmdline.add_files;
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
+	job->is_secure = SECURE_BOOT_AUTO;
 	/* Get job data from user input */
 	if (cmdline.help) {
 		job->command_line = 1;
