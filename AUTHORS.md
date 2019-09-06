@@ -56,6 +56,7 @@ List of all individuals having contributed content to s390-tools
 - Kittipon Meesompop
 - Klaus-Dieter Wacker
 - Lakhvich Dmitriy
+- Marc Hartmayer
 - Mark Dettinger
 - Martin Kammerer
 - Martin Peschke

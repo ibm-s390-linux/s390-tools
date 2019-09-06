@@ -1,17 +1,20 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.10.x (2019-xx-xx)__
+ * __v2.11.0 (2019-09-06)__
 
-  For Linux kernel version: 5.x
-
-  Add new tool:
-  - lspci: Add support for pci devices
-  - smc_dbg: Add support for SMC sockets
+  For Linux kernel version: 5.3
 
   Changes of existing tools:
+  - dasdfmt: Add support for thin-provisioned volumes
+  - lsdasd: Add support for thin-provisioned volumes
+  - libdasd: Provide function to utilise release space ioctl
+  - libdasd: Provide function to read ese sysfs attribute
+  - dbginfo: Add lspci (PCI devices) and smc_dbg (SMC sockets)
   - dbginfo: Gather ethtool related data
 
   Bug Fixes:
+  - zipl: Fix freeing of uninitialized pointer
+  - zipl: Set correct secure IPL default value
 
  * __v2.10.0 (2019-07-31)__
 
