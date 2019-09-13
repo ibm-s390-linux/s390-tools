@@ -1134,6 +1134,12 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 			     disk_get_type_name(info->type));
 		goto out_disk_free_info;
 	}
+	/* Check if secure boot was enabled only for SCSI */
+	if (job->is_secure == SECURE_BOOT_ENABLED &&
+	    info->type != disk_type_scsi) {
+		error_reason("Secure boot forced for non-SCSI disk type");
+		goto out_disk_free_info;
+	}
 	if (verbose) {
 		printf("Target device information\n");
 		disk_print_info(info);

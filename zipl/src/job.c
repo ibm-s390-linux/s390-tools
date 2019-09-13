@@ -81,6 +81,7 @@ struct command_line {
 	int add_files;
 	int dry_run;
 	int force;
+	int is_secure;
 	enum scan_section_type type;
 };
 
@@ -98,6 +99,22 @@ store_option(struct command_line* cmdline, enum scan_keyword_id keyword,
 	return 0;
 }
 
+static int
+set_secure_ipl(char *keyword, int *is_secure)
+{
+	if (strcmp(keyword, "auto") == 0) {
+		*is_secure = SECURE_BOOT_AUTO;
+	} else if (strcmp(keyword, "0") == 0) {
+		*is_secure = SECURE_BOOT_DISABLED;
+	} else if (strcmp(keyword, "1") == 0) {
+		*is_secure = SECURE_BOOT_ENABLED;
+	} else {
+		error_reason("Invalid secure boot setting '%s'",
+			     keyword);
+		return -1;
+	}
+	return 0;
+}
 
 static int
 get_command_line(int argc, char* argv[], struct command_line* line)
@@ -226,9 +243,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 				cmdline.menu = optarg;
 			break;
 		case 'S':
-			is_keyword = 1;
-			rc = store_option(&cmdline, scan_keyword_secure,
-					  optarg);
+			rc = set_secure_ipl(optarg, &cmdline.is_secure);
 			break;
 		case 'h':
 			cmdline.help = 1;
@@ -1279,27 +1294,6 @@ type_from_target(char *target, disk_type_t *type)
 }
 
 static int
-set_secure_ipl(char *keyword, struct job_data *job)
-{
-	if (strcmp(keyword, "auto") == 0) {
-		job->is_secure = SECURE_BOOT_AUTO;
-	} else if (strcmp(keyword, "0") == 0) {
-		job->is_secure = SECURE_BOOT_DISABLED;
-	} else if (strcmp(keyword, "1") == 0) {
-		if (job->target.targettype != disk_type_scsi) {
-			error_reason("Secure boot forced for non-SCSI disk type");
-			return -1;
-		}
-		job->is_secure = SECURE_BOOT_ENABLED;
-	} else {
-		error_reason("Invalid secure boot setting '%s'",
-			     keyword);
-		return -1;
-	}
-	return 0;
-}
-
-static int
 get_job_from_section_data(char* data[], struct job_data* job, char* section)
 {
 	int rc;
@@ -1383,7 +1377,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 		/* Fill in secure boot */
 		if (data[(int) scan_keyword_secure] != NULL) {
 			rc = set_secure_ipl(data[(int) scan_keyword_secure],
-					    job);
+					    &job->is_secure);
 			if (rc)
 				return rc;
 		}
@@ -1547,7 +1541,7 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 				case scan_keyword_secure:
 					rc = set_secure_ipl(
 						scan[i].content.keyword.value,
-						job);
+						&job->is_secure);
 					if (rc)
 						return rc;
 					break;
@@ -1904,7 +1898,6 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->add_files = cmdline.add_files;
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
-	job->is_secure = SECURE_BOOT_AUTO;
 	/* Get job data from user input */
 	if (cmdline.help) {
 		job->command_line = 1;
@@ -1923,6 +1916,11 @@ job_get(int argc, char* argv[], struct job_data** data)
 		job_free(job);
 		return rc;
 	}
+	if (cmdline.is_secure)
+		job->is_secure = cmdline.is_secure;
+	else
+		job->is_secure = job->is_secure ? : SECURE_BOOT_AUTO;
+
 	/* Check job data for validity */
 	rc = check_job_data(job);
 	if (rc) {
