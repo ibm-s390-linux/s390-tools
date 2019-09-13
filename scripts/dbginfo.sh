@@ -561,6 +561,11 @@ collect_cmdsout() {
     done
     IFS="${ifs_orig}"
 
+    if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
+        call_run_command "hyptop -b -d 1 -n 5 -f \#,c,m,C:s,M:s,o -S c" "${OUTPUT_FILE_CMD}"
+    else call_run_command "hyptop -b -d 1 -n 5 -f \#,T,c,e,m,C:s,E:s,M:s,o -S c" "${OUTPUT_FILE_CMD}"
+    fi
+
     pr_log_stdout " "
 }
 
