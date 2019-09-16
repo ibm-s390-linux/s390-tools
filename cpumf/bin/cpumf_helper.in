@@ -213,6 +213,7 @@ my $system_z_hwtype_map = {
 	2965		=> 'IBM z13s',
 	3906		=> 'IBM z14',
 	3907		=> 'IBM z14 ZR1',
+	8561		=> 'IBM z15',
 };
 
 sub get_hardware_type()
