@@ -104,7 +104,6 @@ int sclp_hsa_get_size(unsigned long *hsa_size)
 	sccb = (void *)get_zeroed_page();
 	sccb->header.length = sizeof(*sccb);
 
-	sccb->header.length = sizeof(*sccb);
 	sccb->evbuf.header.length = sizeof(struct sdias_evbuf);
 	sccb->evbuf.header.type = EVTYP_SDIAS;
 	sccb->evbuf.event_qual = EQ_SIZE;
