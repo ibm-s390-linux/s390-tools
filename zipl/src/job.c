@@ -128,6 +128,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 	memset((void *) &cmdline, 0, sizeof(struct command_line));
 	cmdline.type = section_invalid;
 	is_keyword = 0;
+	cmdline.is_secure = SECURE_BOOT_UNDEFINED;
 	/* Process options */
 	do {
 		opt = getopt_long(argc, argv, option_string, options, NULL);
@@ -1064,6 +1065,21 @@ check_job_mvdump_data(struct job_mvdump_data* dump, char* name)
 	return 0;
 }
 
+static int
+check_secure_boot(struct job_data *job)
+{
+	switch (job->is_secure) {
+	case SECURE_BOOT_UNDEFINED:
+	case SECURE_BOOT_DISABLED:
+	case SECURE_BOOT_ENABLED:
+	case SECURE_BOOT_AUTO:
+		return 0;
+	default:
+		error_reason("Invalid secure boot setting '%d'",
+			     job->is_secure);
+		return -1;
+	}
+}
 
 static int
 check_job_data(struct job_data* job)
@@ -1108,6 +1124,8 @@ check_job_data(struct job_data* job)
 	case job_mvdump:
 		rc = check_job_mvdump_data(&job->data.mvdump, job->name);
 	}
+	if (!rc)
+		rc = check_secure_boot(job);
 	return rc;
 }
 
@@ -1603,6 +1621,7 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 	       sizeof(struct job_menu_entry) * job->data.menu.num);
 	/* Fill in data */
 	current = 0;
+	job->data.menu.entry->is_secure = SECURE_BOOT_UNDEFINED;
 	for (i=index+1; (scan[i].id != scan_id_empty) &&
 			(scan[i].id != scan_id_section_heading) &&
 			(scan[i].id != scan_id_menu_heading); i++) {
@@ -1634,6 +1653,7 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 		if (temp_job == NULL)
 			return -1;
 		memset((void *) temp_job, 0, sizeof(struct job_data));
+		temp_job->is_secure = SECURE_BOOT_UNDEFINED;
 		rc = get_job_from_section_data(data, temp_job,
 					job->data.menu.entry[current].name);
 		if (rc) {
@@ -1646,6 +1666,8 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 				job->data.menu.entry[current].id = job_ipl;
 				job->data.menu.entry[current].data.ipl =
 					temp_job->data.ipl;
+				job->data.menu.entry[current].is_secure =
+					temp_job->is_secure;
 				memset((void *) &temp_job->data.ipl, 0,
 				       sizeof(struct job_ipl_data));
 				break;
@@ -1898,6 +1920,7 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->add_files = cmdline.add_files;
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
+	job->is_secure =  SECURE_BOOT_UNDEFINED;
 	/* Get job data from user input */
 	if (cmdline.help) {
 		job->command_line = 1;
@@ -1916,10 +1939,10 @@ job_get(int argc, char* argv[], struct job_data** data)
 		job_free(job);
 		return rc;
 	}
-	if (cmdline.is_secure)
+	if (cmdline.is_secure != SECURE_BOOT_UNDEFINED)
 		job->is_secure = cmdline.is_secure;
-	else
-		job->is_secure = job->is_secure ? : SECURE_BOOT_AUTO;
+	else if (job->id != job_menu && job->is_secure == SECURE_BOOT_UNDEFINED)
+		job->is_secure = SECURE_BOOT_AUTO;
 
 	/* Check job data for validity */
 	rc = check_job_data(job);

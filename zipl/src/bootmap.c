@@ -946,6 +946,7 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 {
 	disk_blockptr_t* table;
 	int entries, component_header;
+	int is_secure;
 	int i;
 	int rc;
 
@@ -1017,13 +1018,18 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 						component_header_ipl;
 					printf("\n");
 				}
+				if (job->is_secure != SECURE_BOOT_UNDEFINED)
+					is_secure = job->is_secure;
+				else
+					is_secure =
+					      job->data.menu.entry[i].is_secure;
 				rc = add_ipl_program(fd,
 					&job->data.menu.entry[i].data.ipl,
 					&table[job->data.menu.entry[i].pos],
 					verbose || job->command_line,
 					job->add_files,	component_header,
 						     info, &job->target,
-						     job->is_secure);
+						     is_secure);
 				break;
 			case job_print_usage:
 			case job_print_version:

@@ -94,6 +94,7 @@ struct job_menu_entry {
 	char* name;
 	enum job_id id;
 	union job_menu_entry_data data;
+	int is_secure;
 };
 
 struct job_menu_data {
