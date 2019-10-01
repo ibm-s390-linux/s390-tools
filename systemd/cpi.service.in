@@ -15,6 +15,7 @@ ConditionPathIsReadWrite=/sys/firmware/cpi
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 #
 # Specify a file with the environment variables using the EnvironmentFile=
 # service property.
