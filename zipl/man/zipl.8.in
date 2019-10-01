@@ -120,7 +120,7 @@ Print version information, then exit.
 .TP
 .BR "\-c <CONFIG FILE>" " or " "\-\-config=<CONFIG FILE>"
 Use the specified <CONFIG FILE>. If none is supplied, the environment
-variable ZIPLCONF is evaluated if set, otherwise /etc/zipl.conf is used.
+variable ZIPLCONF is evaluated if set, otherwise %SYSCONFDIR%/zipl.conf is used.
 
 .TP
 .BR "\-b <BLS DIRECTORY>" " or " "\-\-blsdir=<BLS DIRECTORY>"

@@ -8,6 +8,7 @@ all:
 install: all
 	$(MAKE) -C src install
 	$(MAKE) -C man install
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 doc/zipl.conf.minimal  $(DESTDIR)$(TOOLS_LIBDIR)/zipl.conf
 
 clean:
 	$(MAKE) -C src clean
