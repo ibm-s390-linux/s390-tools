@@ -755,8 +755,14 @@ scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
 
 	remaining = scan_size - count;
 
-	if (remaining < n) {
-		size = scan_size - remaining + n;
+	/* The array of scanned tokens is allocated when the zipl config file is
+	 * parsed. Its size is a multiple of INITIAL_ARRAY_LENGTH so it may have
+	 * enough space to scan all the tokens that are defined in the BLS files.
+	 * Calculate if is enough assuming that a BLS fragment can contain up to
+	 * 4 tokens: a section heading and 3 keywords (image, ramdisk, parameter).
+	 */
+	if (remaining < n * 4) {
+		size = scan_size - remaining + (n * 4);
 		buffer = (struct scan_token *)misc_malloc(size * sizeof(struct scan_token));
 		if (!buffer)
 			goto err;
