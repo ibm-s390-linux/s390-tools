@@ -1,0 +1,10 @@
+# This is an example of a minimal zipl.conf file that can be used when the
+# sections are defined in BootLoaderSpec fragments files.
+#
+# See the zipl and zipl.conf man page for more details.
+[defaultboot]
+defaultauto
+prompt=1
+timeout=5
+secure=auto
+target=/boot

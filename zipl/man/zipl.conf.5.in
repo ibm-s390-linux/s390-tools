@@ -17,8 +17,13 @@ boot loader tool
 .BR zipl (8)).
 .br
 
-By default this configuration file is located at /etc/zipl.conf. A different
-location may be specified either using the '\-\-config' option of
+By default
+.B zipl
+checks for
+.I zipl.conf
+at /run/zipl/zipl.conf, %SYSCONFDIR%/zipl.conf, %TOOLS_LIBDIR%/zipl.conf in that
+order - whichever is found first will be used. Users can specifically choose a
+location using the '\-\-config' option of
 .B zipl
 or by setting the ZIPLCONF shell environment variable.
 .br
@@ -138,7 +143,13 @@ initrd /initramfs-4.15.9
 options root=/dev/dasda1 console=ttyS0
 .PP
 
-The location of the linux and initrd has to be specified relative to the boot partition. The BLS config files are only used to specify the IPL sections, a zipl.conf configuration files is still needed for global parameters.
+The location of the linux and initrd has to be specified relative to the boot
+partition. The BLS config files are only used to specify the IPL sections, a
+zipl.conf configuration file is still needed for global parameters. For this
+purpose, a minimal zipl.conf configuration file is shipped at
+%TOOLS_LIBDIR%/zipl.conf which would help when used with BLS config files, by
+not requiring users to create the traditional configuration file at
+%SYSCONFDIR%/zipl.conf.
 
 .B Boot menu
 
