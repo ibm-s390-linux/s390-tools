@@ -59,6 +59,14 @@ static struct option options[] = {
 /* Command line option abbreviations */
 static const char option_string[] = "-c:b:t:i:r:p:P:d:D:M:s:S:m:hHnVvaT:fk:";
 
+/* Locations of zipl.conf configuration file */
+static const char *zipl_conf[] = {
+	ZIPL_RUNTIME_CONF,
+	ZIPL_DEFAULT_CONF,
+	ZIPL_MINIMAL_CONF,
+	NULL
+};
+
 struct command_line {
 	char* data[SCAN_KEYWORD_NUM];
 	char* config;
@@ -1783,7 +1791,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	char* filename;
 	char *blsdir;
 	char* source;
-	int rc, scan_size;
+	int i, rc, scan_size;
 
 	/* Read configuration file */
 	if (cmdline->config != NULL) {
@@ -1797,7 +1805,12 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 			 ZIPL_CONF_VAR ")";
 	} else {
 		/* Use default config file */
-		filename = ZIPL_DEFAULT_CONF;
+		for (i = 0; zipl_conf[i]; i++) {
+			if (misc_check_readable_file(zipl_conf[i]) == 0) {
+				filename = zipl_conf[i];
+				break;
+			}
+		}
 		source = "";
 	}
 	printf("Using config file '%s'%s\n", filename, source);
