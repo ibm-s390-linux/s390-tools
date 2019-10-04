@@ -1558,6 +1558,61 @@ scan_check(struct scan_token* scan)
 	return 0;
 }
 
+/* Check if kernel and initrd image paths provided by BLS files are readable.
+ * If not, add value of 'scan_keyword_target' into search path and silently
+ * update scan list.
+ * */
+int
+scan_check_bls(struct scan_token* scan)
+{
+	int i, rc;
+	char* target_value = NULL;
+	char* img_value = NULL;
+	char* buffer = NULL;
+	/*
+	 * In the BLS case, each BLS section heading inherits a keyword
+	 * assignment target= from zipl.conf, and they are all the same.
+	 * */
+	for (i = 0 ; scan[i].id != scan_id_empty; i++ ) {
+		if (scan[i].id == scan_id_keyword_assignment &&
+		    scan[i].content.keyword.keyword == scan_keyword_target) {
+			target_value = scan[i].content.keyword.value;
+			break;
+		}
+	}
+	if (!target_value)
+		return -1;
+	for (i = 0 ; scan[i].id != scan_id_empty; i++ ) {
+		if (scan[i].id != scan_id_keyword_assignment)
+			continue;
+		if (scan[i].content.keyword.keyword == scan_keyword_image ||
+		    scan[i].content.keyword.keyword == scan_keyword_ramdisk) {
+
+			rc = misc_check_readable_file(
+					scan[i].content.keyword.value);
+			if (rc) {
+			    misc_asprintf(&img_value, "%s%s",
+			                  target_value,
+			                  scan[i].content.keyword.value);
+			    rc = misc_check_readable_file(img_value);
+			    if (rc) {
+			        error_text(
+			            "Image file '%s' is not accessible",
+			            scan[i].content.keyword.value);
+			        return rc;
+			    }
+			    buffer = (char*)misc_malloc(strlen(img_value) + 1);
+			    if (buffer == NULL)
+			         return -1;
+			    memcpy(buffer, img_value, strlen(img_value));
+			    buffer[strlen(img_value)] = 0;
+			    free(scan[i].content.keyword.value);
+			    scan[i].content.keyword.value = buffer;
+			}
+		}
+	}
+	return 0;
+}
 
 static int
 scan_get_defaultboot_type(char* keyword[], int line[], int section_line,

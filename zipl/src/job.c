@@ -1840,6 +1840,12 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 		scan_free(scan);
 		return rc;
 	}
+	rc = scan_check_bls(scan);
+	if (rc) {
+		error_text("BLS parsing '%s'", blsdir);
+		scan_free(scan);
+		return rc;
+	}
 	/* Get job from config file data */
 	if (cmdline->menu != NULL)
 		rc = get_menu_job(scan, cmdline->menu, job);
