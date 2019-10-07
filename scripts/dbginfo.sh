@@ -401,6 +401,7 @@ CMDS="uname -a\
   :ip link show\
   :ip ntable\
   :ip a sh\
+  :ip -s -s link\
   :firewall-cmd --list-all\
   :ipcs -a\
   :netstat -pantu\
