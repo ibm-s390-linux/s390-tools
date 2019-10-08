@@ -9,6 +9,8 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/zt_common.h"
+
 #include "eckd2dump.h"
 #include "error.h"
 #include "stage2dump.h"
@@ -19,8 +21,7 @@
 /*
  * Magic number at start of dump record
  */
-uint64_t magic __attribute__((section(".stage2.head")))
-	= 0x584d554c54363401ULL; /* XMULT64, version 1 */
+uint64_t __section(.stage2.head) magic = 0x584d554c54363401ULL; /* XMULT64, version 1 */
 
 /*
  * Parameter format for ECKD MV dumper (13 bytes):
@@ -59,8 +60,7 @@ struct mvdump_parm_table {
 			(MAX_DUMP_VOLUMES * (sizeof(struct mvdump_param) + 1))];
 } __packed;
 
-static struct mvdump_parm_table mvdump_table
-	__attribute__((section(".eckd2dump_mv.tail")));
+static struct mvdump_parm_table __section(.eckd2dump_mv.tail) mvdump_table;
 
 static int volnr_current;
 

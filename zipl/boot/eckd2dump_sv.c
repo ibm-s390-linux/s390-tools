@@ -9,6 +9,8 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/zt_common.h"
+
 #include "eckd2dump.h"
 #include "error.h"
 #include "stage2dump.h"
@@ -16,8 +18,7 @@
 /*
  * Magic number at start of dump record
  */
-uint64_t magic __attribute__((section(".stage2.head"))) =
-	0x5845434b44363401ULL; /* "XECKD64", version 1 */
+uint64_t __section(.stage2.head) magic = 0x5845434b44363401ULL; /* "XECKD64", version 1 */
 
 /*
  * ECKD parameter block passed by zipl

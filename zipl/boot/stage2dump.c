@@ -11,6 +11,8 @@
 
 #include <stdarg.h>
 
+#include "lib/zt_common.h"
+
 #include "error.h"
 #include "sclp.h"
 #include "stage2dump.h"
@@ -34,8 +36,7 @@ struct ipib_info {
 /*
  * Tail parameters
  */
-struct stage2dump_parm_tail parm_tail
-	__attribute__ ((section(".stage2dump.tail"))) = {
+struct stage2dump_parm_tail parm_tail = {
 	.mem_upper_limit = 0xffffffffffffffffULL,
 };
 

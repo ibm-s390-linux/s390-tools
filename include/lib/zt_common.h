@@ -31,6 +31,7 @@
 #define __packed __attribute__((packed))
 #define __aligned(x) __attribute__((aligned(x)))
 #define __may_alias __attribute__((may_alias))
+#define __section(x) __attribute__((__section__(#x)))
 
 typedef unsigned long long	u64;
 typedef signed long long	s64;

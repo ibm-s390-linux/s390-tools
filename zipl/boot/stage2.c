@@ -9,6 +9,8 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/zt_common.h"
+
 #include "error.h"
 #include "libc.h"
 #include "menu.h"
@@ -141,4 +143,4 @@ void panic_notify(unsigned long UNUSED(reason))
 {
 }
 
-uint64_t stage2_head __attribute__((section(".stage2.head")));
+uint64_t __section(.stage2.head) stage2_head;

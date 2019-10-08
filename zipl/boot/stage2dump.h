@@ -28,8 +28,7 @@ struct stage2dump_parm_tail {
 	uint64_t	mem_upper_limit;
 } __packed;
 
-extern struct stage2dump_parm_tail parm_tail
-	__attribute__ ((section(".stage2dump.tail")));
+extern struct stage2dump_parm_tail __section(.stage2dump.tail) parm_tail;
 
 /*
  * S390 dump format defines
