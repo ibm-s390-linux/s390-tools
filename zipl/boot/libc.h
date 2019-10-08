@@ -60,7 +60,7 @@ char *strcpy(char *, const char *);
 unsigned long get_zeroed_page(void);
 void free_page(unsigned long);
 void initialize(void);
-void libc_stop(unsigned long) __attribute__((noreturn));
+void libc_stop(unsigned long);
 void start(void);
 void pgm_check_handler(void);
 void pgm_check_handler_fn(void);

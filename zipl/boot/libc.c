@@ -11,6 +11,8 @@
 
 #include <stdarg.h>
 
+#include "lib/zt_common.h"
+
 #include "error.h"
 #include "libc.h"
 #include "sclp.h"
@@ -383,7 +385,7 @@ void initialize(void)
 /*
  * Load disabled wait PSW with reason code in address field
  */
-void libc_stop(unsigned long reason)
+void __noreturn libc_stop(unsigned long reason)
 {
 	struct psw_t psw;
 
