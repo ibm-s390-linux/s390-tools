@@ -14,6 +14,8 @@
 
 #include <sys/types.h>
 
+#include "lib/zt_common.h"
+
 #include "disk.h"
 #include "job.h"
 #include "zipl.h"
@@ -51,7 +53,7 @@ struct scsi_dump_sb {
 	uint64_t        csum_offset;
 	uint64_t        csum_size;
 	uint64_t        csum;
-} __attribute((packed));
+} __packed;
 
 #define SCSI_DUMP_SB_MAGIC	0x5a46435044554d50ULL; /* ZFCPDUMP */
 /* To avoid a csum entry of 0 a seed is used */
@@ -63,7 +65,7 @@ struct scsi_dump_sb {
 struct scsi_dump_param {
 	uint64_t block;
 	uint64_t reserved;
-} __attribute((packed));
+} __packed;
 /* ECKD dump parameter */
 
 struct eckd_dump_param {
@@ -73,14 +75,14 @@ struct eckd_dump_param {
 	uint8_t		num_heads;
 	uint8_t		bpt;
 	char		reserved[4];
-} __attribute((packed, may_alias));
+} __packed __may_alias;
 
 /* FBA dump parameter */
 
 struct fba_dump_param {
 	uint64_t	start_blk;
 	uint64_t	blockct;
-} __attribute((packed));
+} __packed;
 
 struct boot_info_bp_dump {
 	union {
@@ -89,7 +91,7 @@ struct boot_info_bp_dump {
 		struct scsi_dump_param scsi;
 	} param;
 	uint8_t		unused[16];
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * Layout of block pointer for linear devices
@@ -101,7 +103,7 @@ struct linear_blockptr {
 	uint16_t size;
 	uint16_t blockct;
 	uint8_t reserved[4];
-} __attribute((packed));
+} __packed;
 
 /*
  * Layout of block pointer for cylinder/head/sector devices
@@ -115,7 +117,7 @@ struct eckd_blockptr {
 	uint16_t size;
 	uint8_t blockct;
 	uint8_t reserved[8];
-} __attribute((packed));
+} __packed;
 
 struct boot_info_bp_ipl {
 	union {
@@ -123,7 +125,7 @@ struct boot_info_bp_ipl {
 		struct linear_blockptr lin;
 	} bm_ptr;
 	uint8_t		unused[16];
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_info {
 	char		magic[4];
@@ -135,7 +137,7 @@ struct boot_info {
 		struct boot_info_bp_dump dump;
 		struct boot_info_bp_ipl ipl;
 	} bp;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_ccw0 {
 	uint8_t cmd;
@@ -144,21 +146,21 @@ struct boot_ccw0 {
 	uint8_t flags;
 	uint8_t pad;
 	uint16_t count;
-} __attribute__ ((packed));
+} __packed;
 
 /* Boot data structures for FBA disks */
 
 struct boot_fba_locread {
 	struct boot_ccw0 locate;
 	struct boot_ccw0 read;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_fba_locdata {
 	uint8_t command;
 	uint8_t dummy;
 	uint16_t blockct;
 	uint32_t blocknr;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_fba_stage0 {
 	uint64_t psw;
@@ -169,13 +171,13 @@ struct boot_fba_stage0 {
 	struct boot_fba_locdata locdata[2];
 	uint64_t reserved[4];
 	struct boot_info boot_info;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_fba_stage1b {
 	struct boot_fba_locread locread[STAGE2_BLK_CNT_MAX];
 	struct boot_fba_locdata locdata[STAGE2_BLK_CNT_MAX];
 	uint8_t unused[448];
-} __attribute__ ((packed));
+} __packed;
 
 /* Boot data structures for ECKD disks */
 
@@ -184,14 +186,14 @@ struct boot_eckd_ccw1 {
 	uint8_t flags;
 	uint16_t count;
 	uint32_t address;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_eckd_ssrt {
 	struct boot_ccw0 seek;
 	struct boot_ccw0 search;
 	struct boot_ccw0 tic;
 	struct boot_ccw0 read;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_eckd_seekarg {
 	uint16_t pad;
@@ -199,32 +201,32 @@ struct boot_eckd_seekarg {
 	uint16_t head;
 	uint8_t sec;
 	uint8_t pad2;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_eckd_cdl_stage0 {
 	uint64_t psw;
 	struct boot_ccw0 read;
 	struct boot_ccw0 tic;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_eckd_ldl_stage0 {
 	uint64_t psw;
 	struct boot_ccw0 read_r0;
 	struct boot_ccw0 read_r1;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_eckd_stage1 {
 	struct boot_eckd_ssrt ssrt[2];
 	struct boot_ccw0 tic1b;
 	struct boot_eckd_seekarg seek[2];
 	struct boot_info boot_info;
-} __attribute__ ((packed));
+} __packed;
 
 struct boot_eckd_stage1b {
 	struct boot_eckd_ssrt ssrt[STAGE2_BLK_CNT_MAX];
 	struct boot_eckd_seekarg seek[STAGE2_BLK_CNT_MAX];
 	uint8_t unused[64];
-} __attribute__ ((packed));
+} __packed;
 
 /* Stage 2 boot menu parameter structure */
 
@@ -236,7 +238,7 @@ struct boot_stage2_params {
 	uint16_t banner;
 	uint16_t config[BOOT_MENU_ENTRIES + 1];
 	uint64_t config_kdump;
-} __attribute__ ((packed));
+} __packed;
 
 
 /* Stage 3 bootloader parameter structure */
@@ -251,7 +253,7 @@ struct boot_stage3_params {
 	uint16_t reserved[3];
 	uint64_t image_len;
 	uint64_t image_addr;
-} __attribute__ ((packed));
+} __packed;
 
 #define STAGE3_FLAG_SCSI		0x0001
 #define STAGE3_FLAG_KDUMP		0x0002
@@ -275,7 +277,7 @@ struct mvdump_param {
 	uint8_t		blocksize;
 	uint8_t		bpt;
 	uint8_t		num_heads;
-} __attribute__ ((packed));
+} __packed;
 
 struct mvdump_parm_table {
 	uint64_t	timestamp;
@@ -284,7 +286,7 @@ struct mvdump_parm_table {
 	uint8_t		ssid[MAX_DUMP_VOLUMES];
 	unsigned char	reserved[512 - sizeof(uint64_t) - sizeof(uint16_t) -
 		(MAX_DUMP_VOLUMES * (sizeof(struct mvdump_param) + 1))];
-} __attribute__ ((packed));
+} __packed;
 
 void boot_get_dump_info(struct boot_info *boot_info, uint8_t dev_type,
 			void *param);

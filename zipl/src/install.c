@@ -23,6 +23,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "lib/zt_common.h"
 #include "lib/util_sys.h"
 
 #include "boot.h"
@@ -89,7 +90,7 @@ update_scsi_mbr(void* bootblock, disk_blockptr_t* table,
 		uint8_t		program_table_pointer[16];
 		uint8_t		reserved2[0x50];
 		struct boot_info boot_info;
-	}  __attribute__ ((packed))* mbr;
+	}  __packed* mbr;
 	struct scsi_dump_param param;
 	void* buffer;
 

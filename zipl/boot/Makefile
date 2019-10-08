@@ -2,7 +2,7 @@
 include ../../common.mak
 
 ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g -I $(rootdir)/zipl/include \
-	  -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
+	   -I $(rootdir)/include -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 	  -fno-builtin -ffreestanding -fno-asynchronous-unwind-tables \
 	  -fno-delete-null-pointer-checks \
 	  -fexec-charset=IBM1047 -m64 -mpacked-stack \

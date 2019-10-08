@@ -11,7 +11,7 @@
 #ifndef S390_H
 #define S390_H
 
-#include "../../include/lib/zt_common.h"
+#include "lib/zt_common.h"
 #include "libc.h"
 
 #define __pa32(x) ((uint32_t)(unsigned long)(x))

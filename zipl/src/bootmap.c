@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "lib/zt_common.h"
 #include "lib/util_part.h"
 #include "lib/util_path.h"
 
@@ -223,7 +224,7 @@ struct component_entry {
 	uint8_t data[23];
 	uint8_t type;
 	component_data compdat;
-} __attribute((packed));
+} __packed;
 
 typedef enum {
 	component_execute = 0x01,
@@ -263,7 +264,7 @@ struct component_header {
 	uint8_t magic[4];
 	uint8_t type;
 	uint8_t reserved[27];
-}  __attribute((packed));
+}  __packed;
 
 typedef enum {
 	component_header_ipl = 0x00,

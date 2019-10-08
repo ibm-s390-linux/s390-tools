@@ -12,6 +12,8 @@
 #ifndef BOOTMAP_H
 #define BOOTMAP_H
 
+#include "lib/zt_common.h"
+
 #include "disk.h"
 #include "job.h"
 #include "zipl.h"
@@ -23,7 +25,7 @@ struct signature_header {
 	uint8_t format;
 	uint8_t reserved[3];
 	uint32_t length;
-} __attribute((packed));
+} __packed;
 
 typedef union {
 	uint64_t load_address;
