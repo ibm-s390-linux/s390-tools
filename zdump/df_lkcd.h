@@ -12,6 +12,8 @@
 #ifndef DF_LKCD_H
 #define DF_LKCD_H
 
+#include "lib/zt_common.h"
+
 #define DF_LKCD_MAGIC		0xa8190173618f23edULL
 #define DF_LKCD_MAGIC_ASM	0x733339302d64756dULL
 #define DF_LKCD_VERSION		0x8	/* dump version number */
@@ -53,7 +55,7 @@ struct df_lkcd_hdr {
 	u32	dump_compress;
 	u32	dump_flags;
 	u32	dump_device;
-} __attribute__((packed));
+} __packed;
 
 /*
  * s390 LKCD asm header
@@ -65,7 +67,7 @@ struct df_lkcd_hdr_asm {
 	u16	cpu_cnt;
 	u16	real_cpu_cnt;
 	u32	lc_vec[512];
-} __attribute__((packed));
+} __packed;
 
 /*
  * Page header
@@ -74,6 +76,6 @@ struct df_lkcd_pg_hdr {
 	u64	addr;	/* Address of dump page */
 	u32	size;	/* Size of dump page */
 	u32	flags;	/* flags (DF_LKCD_COMPRESSED, DF_LKCD_RAW,...) */
-} __attribute__((packed));
+} __packed;
 
 #endif /* DF_LKCD_H */

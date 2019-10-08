@@ -13,7 +13,10 @@
 #define DFI_H
 
 #include <linux/utsname.h>
+
+#include "lib/zt_common.h"
 #include "lib/util_list.h"
+
 #include "zg.h"
 
 /*
@@ -68,7 +71,7 @@ struct dfi_lowcore_64 {
 	u32	access_regs_save_area[16];	/* 0x1340 */
 	u64	cregs_save_area[16];		/* 0x1380 */
 	u8	pad_0x1400[0x2000-0x1400];	/* 0x1400 */
-} __attribute__((packed));
+} __packed;
 
 static inline u64 dfi_lc_size(enum dfi_arch arch)
 {

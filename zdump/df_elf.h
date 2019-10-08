@@ -15,6 +15,8 @@
 #include <elf.h>
 #include <linux/types.h>
 
+#include "lib/zt_common.h"
+
 #include "dfo.h"
 #include "zg.h"
 
@@ -80,7 +82,7 @@ struct nt_prstatus_64 {
 	u64	orig_gpr2;
 	u32	pr_fpvalid;
 	u8	pad3[4];
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * fpregset ELF Note
@@ -89,7 +91,7 @@ struct nt_fpregset_64 {
 	u32	fpc;
 	u32	pad;
 	u64	fprs[16];
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * prpsinfo ELF Note

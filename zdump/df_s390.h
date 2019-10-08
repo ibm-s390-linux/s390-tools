@@ -12,6 +12,8 @@
 #ifndef DF_S390_H
 #define DF_S390_H
 
+#include "lib/zt_common.h"
+
 #include "dt.h"
 #include "zg.h"
 
@@ -59,7 +61,7 @@ struct df_s390_hdr {
 	u64	mvdump_zipl_time;		/* 0x208 */
 	u8	end_pad2[0x800-0x210];		/* 0x210 */
 	u32	lc_vec[DF_S390_CPU_MAX];	/* 0x800 */
-} __attribute__((packed));
+} __packed;
 
 /*
  *  End marker: Should be at the end of every valid s390 crash dump.
@@ -67,7 +69,7 @@ struct df_s390_hdr {
 struct df_s390_em {
 	char	str[8];
 	u64	tod;
-} __attribute__((packed));
+} __packed;
 
 /*
  * Segment header for s390 extended dump format
@@ -77,7 +79,7 @@ struct df_s390_dump_segm_hdr {
 	u64	len;
 	u64	stop_marker;
 	u8	reserved[0x1000 - 24];
-} __attribute__((packed));
+} __packed;
 
 /*
  * Convert DFI arch to s390 arch
@@ -118,7 +120,7 @@ struct df_s390_dumper {
 	u32	size;
 	u8	force;
 	u64	mem;
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * s390 dump helpers

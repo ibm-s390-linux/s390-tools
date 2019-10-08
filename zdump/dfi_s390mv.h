@@ -26,14 +26,14 @@ struct vol_parm {
 	u8	blk_size;
 	u8	end_sec;
 	u8	num_heads;
-} __attribute__ ((packed));
+} __packed;
 
 struct vol_parm_table {
 	u64		timestamp;
 	u16		vol_cnt;
 	struct vol_parm	vol_parm[MAX_VOLUMES];
 	u8		ssid[MAX_VOLUMES];
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * Device signature

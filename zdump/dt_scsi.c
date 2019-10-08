@@ -12,7 +12,9 @@
 #include <linux/fs.h>
 #include <stdio.h>
 
+#include "lib/zt_common.h"
 #include "lib/util_part.h"
+
 #include "zgetdump.h"
 
 /*
@@ -28,7 +30,7 @@ struct scsi_dump_sb {
 	uint64_t	csum_off;
 	uint64_t	csum_size;
 	uint64_t	csum;
-} __attribute((packed));
+} __packed;
 
 /*
  * File local static data
@@ -46,7 +48,7 @@ struct scsi_blockptr {
 	uint16_t	size;
 	uint16_t	blockct;
 	uint8_t		reserved[4];
-} __attribute__((__packed__));
+} __packed;
 
 enum component_entry_type {
 	component_execute	= 0x01,
@@ -61,7 +63,7 @@ struct component_entry {
 		uint64_t	load_address;
 		uint64_t	load_psw;
 	} address;
-} __attribute__((__packed__));
+} __packed;
 
 enum component_header_type {
 	component_header_ipl	= 0x00,
@@ -72,7 +74,7 @@ struct component_header {
 	uint8_t	magic[4];
 	uint8_t	type;
 	uint8_t	reserved[27];
-} __attribute__((__packed__));
+} __packed;
 
 struct boot_info {
 	char		magic[4];
@@ -81,7 +83,7 @@ struct boot_info {
 	uint8_t		dev_type;
 	uint8_t		flags;
 	uint64_t	sb_off;
-} __attribute__ ((packed));
+} __packed;
 
 struct scsi_mbr {
 	char			magic[4];
@@ -90,7 +92,7 @@ struct scsi_mbr {
 	struct scsi_blockptr	blockptr;
 	uint8_t			reserved2[0x50];
 	struct boot_info	boot_info;
-} __attribute__((__packed__));
+} __packed;
 
 #define BOOT_INFO_VERSION		1
 #define BOOT_INFO_MAGIC			"zIPL"

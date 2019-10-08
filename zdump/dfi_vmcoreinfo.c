@@ -10,6 +10,9 @@
  */
 
 #include <elf.h>
+
+#include "lib/zt_common.h"
+
 #include "zgetdump.h"
 
 #ifdef __s390x__
@@ -38,7 +41,7 @@ struct os_info {
 	u64	init_fn_size;
 	u32	init_fn_csum;
 	u8	reserved[4004];
-} __attribute__ ((packed));
+} __packed;
 
 /*
  * File local static data
