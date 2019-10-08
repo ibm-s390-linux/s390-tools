@@ -345,7 +345,7 @@ void pgm_check_handler_fn(void)
 	libc_stop(psw_old->addr);
 }
 
-__attribute__ ((noinline)) void load_wait_psw(uint64_t psw_mask, struct psw_t *psw)
+void __noinline load_wait_psw(uint64_t psw_mask, struct psw_t *psw)
 {
 	struct psw_t wait_psw = { .mask = psw_mask, .addr = 0 };
 	struct psw_t old_psw, *wait_psw_ptr = &wait_psw;

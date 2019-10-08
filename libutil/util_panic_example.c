@@ -15,10 +15,10 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 
+#include "lib/zt_common.h"
 #include "lib/util_panic.h"
 
 /* Make functions noinline to have a nice backtrace */
-#define __noinline __attribute__((noinline))
 
 /*
  * Test util_panic()

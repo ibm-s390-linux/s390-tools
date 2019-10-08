@@ -32,6 +32,7 @@
 #define __aligned(x) __attribute__((aligned(x)))
 #define __may_alias __attribute__((may_alias))
 #define __section(x) __attribute__((__section__(#x)))
+#define __noinline __attribute__((__noinline__))
 
 typedef unsigned long long	u64;
 typedef signed long long	s64;
