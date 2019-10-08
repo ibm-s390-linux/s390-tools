@@ -175,8 +175,7 @@ static void ebcdic_to_ascii(unsigned char *target, unsigned char *source,
 			target[i] = ebc[source[i]];
 }
 
-static void
-start_kernel(void)
+static inline void __noreturn start_kernel(void)
 {
 	struct psw_t *psw = &S390_lowcore.program_new_psw;
 	unsigned long addr, code;
@@ -199,6 +198,7 @@ start_kernel(void)
 		: [addr] "=&d" (addr),
 		  [code] "+&d" (code)
 		: [psw] "a" (psw) );
+	while (1);
 }
 
 unsigned int
