@@ -62,7 +62,7 @@ struct scsi_dump_sb {
 	uint64_t	csum_off;
 	uint64_t	csum_size;
 	uint64_t	csum;
-} __attribute((packed));
+} __packed;
 
 /*
  * Layout of SCSI disk block pointer
@@ -72,7 +72,7 @@ struct linear_blockptr {
 	uint16_t	size;
 	uint16_t	blockct;
 	uint8_t		reserved[4];
-} __attribute((packed));
+} __packed;
 
 /* From boot.h in zipl */
 struct boot_info {
@@ -82,7 +82,7 @@ struct boot_info {
 	uint8_t		dev_type;
 	uint8_t		flags;
 	uint64_t	sb_off;
-} __attribute__ ((packed));
+} __packed;
 
 /* From install.c in zipl */
 struct scsi_mbr {
@@ -92,7 +92,7 @@ struct scsi_mbr {
 	struct linear_blockptr	lin;
 	uint8_t			reserverd[0x50];
 	struct boot_info	boot_info;
-}  __attribute__ ((packed));
+}  __packed;
 
 /* From boot.h in zipl */
 #define BOOT_INFO_VERSION		1
