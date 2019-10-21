@@ -210,7 +210,7 @@ int dasd_reset_chpid(char *devnode, char *chpid_char)
  */
 int dasd_get_host_access_count(char *device)
 {
-	char busid[9];
+	char busid[DASD_BUS_ID_SIZE];
 	char *path;
 	long value;
 
