@@ -27,7 +27,6 @@ static void menu_prompt(int timeout)
 static int menu_read(void)
 {
 	char *temp_area =  (char *)get_zeroed_page();
-	uint16_t *configs = __stage2_params.config;
 	int timeout, rc, i, count = 0;
 	char *endptr;
 	int value;
@@ -60,7 +59,7 @@ static int menu_read(void)
 		value = ebcstrtoul((char *)temp_area, &endptr, 10);
 
 		if ((endptr != temp_area) && (value < BOOT_MENU_ENTRIES - 1) &&
-		    (configs[value] != 0)) {
+		    (__stage2_params.config[value] != 0)) {
 			/* valid config found - finish */
 			break;
 		} else {
@@ -80,14 +79,13 @@ out_free_page:
 
 static int menu_list(void)
 {
-	uint16_t *configs = __stage2_params.config;
 	char *name;
 	int i;
 
 	for (i = 0; i < BOOT_MENU_ENTRIES; i++) {
-		if (configs[i] == 0)
+		if (__stage2_params.config[i] == 0)
 			continue;
-		name = configs[i] + ((void *)&__stage2_params);
+		name = __stage2_params.config[i] + ((void *)&__stage2_params);
 		printf("%s\n", name);
 		if (i == 0)
 			printf("\n");
@@ -136,7 +134,6 @@ static int menu_param(unsigned long *value)
 
 int menu(void)
 {
-	uint16_t *configs = __stage2_params.config;
 	unsigned long value = 0;
 	char *cmd_line_extra;
 	char endstring[15];
@@ -178,11 +175,11 @@ int menu(void)
 
 boot:
 	/* sanity - config entry not valid */
-	if (configs[value] == 0)
+	if (__stage2_params.config[value] == 0)
 		panic(EINTERNAL, "%s", msg_econfig);
 
 	printf("Booting %s\n",
-	       (char *)(configs[value] +
+	       (char *)(__stage2_params.config[value] +
 			(void *)&__stage2_params + TEXT_OFFSET));
 
 	/* append 'BOOT_IMAGE=<num>' to parmline */
