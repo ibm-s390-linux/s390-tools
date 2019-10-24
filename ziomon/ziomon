@@ -745,9 +745,10 @@ function check_size_requirements() {
 
 trap emergency_shutdown SIGHUP SIGTERM SIGINT SIGQUIT;
 
-check_blktrace;
 
 parse_params $@;
+
+check_blktrace;
 
 determine_host_adapters;
 
