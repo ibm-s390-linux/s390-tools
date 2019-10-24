@@ -53,19 +53,21 @@ struct gds_subvector {
 	uint8_t      key;
 } __packed;
 
+/* Structure must not have any padding */
 struct sccb_header {
 	uint16_t     length;
 	uint8_t      function_code;
 	uint8_t      control_mask[3];
 	uint16_t     response_code;
-} __packed;
+};
 
+/* Structure must not have any padding */
 struct evbuf_header {
 	uint16_t     length;
 	uint8_t      type;
 	uint8_t      flags;
 	uint16_t     _reserved;
-} __packed;
+};
 
 struct mto {
 	uint16_t length;

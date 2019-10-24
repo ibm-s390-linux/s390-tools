@@ -124,11 +124,12 @@ struct ipl_rl_hdr {
 } __packed;
 
 /* IPL Report Block header */
+/* Structure must not have any padding */
 struct ipl_rb_hdr {
 	uint32_t len;
 	uint8_t  rbt;
 	uint8_t  reserved1[11];
-} __packed;
+};
 
 /* IPL Report Block types */
 enum ipl_rbt {
@@ -162,12 +163,13 @@ struct ipl_rb_component_entry {
 #define IPL_RB_COMPONENT_FLAG_SIGNED	0x80
 #define IPL_RB_COMPONENT_FLAG_VERIFIED	0x40
 
+/* Structure must not have any padding */
 struct ipl_rb_components {
 	uint32_t len;
 	uint8_t  rbt;
 	uint8_t  reserved1[11];
 	struct ipl_rb_component_entry entries[];
-} __packed;
+};
 
 extern unsigned long long _parm_addr;   /* address of parmline */
 extern unsigned long long _initrd_addr; /* address of initrd */

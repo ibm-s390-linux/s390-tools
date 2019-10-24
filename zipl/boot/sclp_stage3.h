@@ -40,10 +40,11 @@ struct sdias_evbuf {
 	uint16_t     dbs;
 } __packed;
 
+/* Structure must not have any padding */
 struct sdias_sccb {
 	struct sccb_header  header;
 	struct sdias_evbuf  evbuf;
-} __packed;
+};
 
 
 int sclp_hsa_copy(void *, unsigned long, unsigned long);
