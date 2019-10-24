@@ -1788,7 +1788,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 {
 	struct scan_token* scan;
 	struct scan_token* new_scan;
-	const char *filename;
+	const char *filename = NULL;
 	char *blsdir;
 	char* source;
 	int i, rc, scan_size;
@@ -1810,6 +1810,10 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 				filename = zipl_conf[i];
 				break;
 			}
+		}
+		if (filename == NULL) {
+			error_text("No zipl configuration was readable");
+			return -1;
 		}
 		source = "";
 	}
