@@ -17,9 +17,6 @@
 #define SDIAS_EVSTATE_ALL_STORED  0x00
 #define SDIAS_EVSTATE_PART_STORED 0x10
 
-#define SDIAS_EVSTATE_ALL_STORED  0x00
-#define SDIAS_EVSTATE_PART_STORED 0x10
-
 struct sdias_evbuf {
 	struct  evbuf_header header;
 	uint8_t      event_qual;
