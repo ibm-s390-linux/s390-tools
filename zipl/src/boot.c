@@ -79,14 +79,14 @@ boot_check_data(void)
 int
 boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 		      address_t initrd_addr, size_t initrd_len,
-		      address_t image_addr, int extra_parm, uint16_t flags,
-		      size_t image_len)
+		      address_t entry, int extra_parm, uint16_t flags,
+		      address_t image_addr, size_t image_len)
 {
 	struct boot_stage3_params params;
 	void* data;
 
-	if (image_addr != (image_addr & PSW_ADDRESS_MASK)) {
-		error_reason("Kernel image load address to high (31 bit "
+	if (entry != (entry & PSW_ADDRESS_MASK)) {
+		error_reason("Kernel image entry point to high (31 bit "
 			     "addressing mode)");
 		return -1;
 	}
@@ -99,7 +99,7 @@ boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 	params.parm_addr = (uint64_t) parm_addr;
 	params.initrd_addr = (uint64_t) initrd_addr;
 	params.initrd_len = (uint64_t) initrd_len;
-	params.load_psw = (uint64_t)(image_addr | PSW_LOAD);
+	params.load_psw = (uint64_t)(entry | PSW_LOAD);
 	params.extra_parm = (uint64_t) extra_parm;
 	params.flags = flags;
 	params.image_len = (uint64_t) image_len;

@@ -646,7 +646,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 				   ipl->is_kdump ? ipl->image_addr + 0x10 :
 				   ipl->image_addr,
 				   (info->type == disk_type_scsi) ? 0 : 1,
-				   flags, image_size);
+				   flags, ipl->image_addr, image_size);
 	if (rc) {
 		free(table);
 		return rc;
