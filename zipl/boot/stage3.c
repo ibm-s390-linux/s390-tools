@@ -13,6 +13,7 @@
 #include "s390.h"
 #include "stage3.h"
 #include "error.h"
+#include "zipl.h"
 
 #define for_each_rb_entry(entry, rb) \
 	for (entry = rb->entries; \
@@ -272,7 +273,7 @@ void start(void)
 	 * verified component. If it is not IPL is aborted.
 	 */
 	if (secure_boot_enabled()) {
-		if (_image_addr != DEFAULT_IMAGE_ADDR ||
+		if (_image_addr != IMAGE_LOAD_ADDRESS ||
 		    _load_psw != DEFAULT_PSW_LOAD)
 			panic(ESECUREBOOT, "%s", msg_sipl_inval);
 
@@ -283,8 +284,8 @@ void start(void)
 	 * cut the kernel header
 	 */
 	memmove((void *)_image_addr,
-		(void *)_image_addr + KERNEL_HEADER_SIZE,
-		_image_len - KERNEL_HEADER_SIZE);
+		(void *)_image_addr + IMAGE_LOAD_ADDRESS,
+		_image_len - IMAGE_LOAD_ADDRESS);
 
 	/* store subchannel ID into low core and into new kernel space */
 	subchannel_id = S390_lowcore.subchannel_id;

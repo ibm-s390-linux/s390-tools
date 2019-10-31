@@ -644,8 +644,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	rc = boot_get_stage3_parms(&stage3_params, &stage3_params_size,
 				   ipl->parm_addr, ipl->ramdisk_addr,
 				   ramdisk_size,
-				   ipl->is_kdump ? ipl->image_addr + 0x10 :
-				   ipl->image_addr,
+				   ipl->is_kdump ? IMAGE_ENTRY_KDUMP :
+				   IMAGE_ENTRY,
 				   (info->type == disk_type_scsi) ? 0 : 1,
 				   flags, ipl->image_addr, image_size);
 	if (rc) {
@@ -1175,7 +1175,7 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		ulong unused_size;
 
 		/* Use approximated stage 3 size as starting point */
-		size = MINIMUM_ADDRESS;
+		size = IMAGE_LOAD_ADDRESS;
 
 		/* Ramdisk */
 		if (job->data.dump.ramdisk != NULL) {
@@ -1187,7 +1187,7 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		/* Kernel */
 		if (stat(job->data.dump.image, &st))
 			goto out_misc_free_temp_dev;
-		size += DIV_ROUND_UP(st.st_size - 0x10000,
+		size += DIV_ROUND_UP(st.st_size - IMAGE_LOAD_ADDRESS,
 				     info->phy_block_size);
 		/* Parmfile */
 		size += DIV_ROUND_UP(DUMP_PARAM_MAX_LEN, info->phy_block_size);

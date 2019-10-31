@@ -23,6 +23,7 @@
 #include "job.h"
 #include "misc.h"
 #include "scan.h"
+#include "zipl.h"
 
 /* Command line options */
 static struct option options[] = {
@@ -655,12 +656,12 @@ check_component_address_data(struct component_loc *cl, int num, char *name,
 				     address_limit);
 			return -1;
 		}
-		if (*cl[i].addrp < MINIMUM_ADDRESS) {
+		if (*cl[i].addrp < IMAGE_LOAD_ADDRESS) {
 			if (name != NULL)
 				error_text("Section '%s'", name);
 			error_reason("Component '%s' falls below available "
 				     "address space (limit is 0x%08x)",
-				     cl[i].name, MINIMUM_ADDRESS);
+				     cl[i].name, IMAGE_LOAD_ADDRESS);
 			return -1;
 		}
 	}
@@ -698,12 +699,12 @@ finalize_component_address_data(struct component_loc *cl, int num,
 		for (j = -1; j < i; j++) {
 			if (j < 0) {
 				/* Try address before first component */
-				addr = MINIMUM_ADDRESS;
+				addr = IMAGE_LOAD_ADDRESS;
 			} else {
 				/* Try address after component j */
 				addr = *cl[j].addrp + cl[j].size;
-				if (addr < MINIMUM_ADDRESS)
-					addr = MINIMUM_ADDRESS;
+				if (addr < IMAGE_LOAD_ADDRESS)
+					addr = IMAGE_LOAD_ADDRESS;
 			}
 			addr = ALIGN(addr, cl[i].align);
 			if (addr + cl[i].size > address_limit) {
@@ -897,7 +898,7 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 	dump->image = misc_strdup(ZFCPDUMP_IMAGE);
 	if (dump->image == NULL)
 		return -1;
-	dump->image_addr = DEFAULT_IMAGE_ADDRESS;
+	dump->image_addr = IMAGE_LOAD_ADDRESS;
 
 	/* Ramdisk is no longer required with new initramfs dump system */
 	if (misc_check_readable_file(ZFCPDUMP_INITRD))
@@ -1347,7 +1348,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 			return -1;
 		if (extract_address(job->data.ipl.image,
 				    &job->data.ipl.image_addr)) {
-			job->data.ipl.image_addr = DEFAULT_IMAGE_ADDRESS;
+			job->data.ipl.image_addr = IMAGE_LOAD_ADDRESS;
 		}
 		/* Fill in parmline */
 		rc = get_parmline(data[(int) scan_keyword_parmfile],
@@ -1402,7 +1403,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 			return -1;
 		if (extract_address(job->data.ipl_tape.image,
 				    &job->data.ipl_tape.image_addr)) {
-			job->data.ipl_tape.image_addr = DEFAULT_IMAGE_ADDRESS;
+			job->data.ipl_tape.image_addr = IMAGE_LOAD_ADDRESS;
 		}
 		/* Fill in parmline */
 		rc = get_parmline(data[(int) scan_keyword_parmfile],
