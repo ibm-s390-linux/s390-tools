@@ -1,7 +1,7 @@
 # Common definitions
 include ../../common.mak
 
-CFLAGS_BOOT = $(NO_PIE_CFLAGS) -Os -g -I../include -D__ASSEMBLY__ \
+ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g -I $(rootdir)/zipl/include \
 	  -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 	  -fno-builtin -ffreestanding -fno-asynchronous-unwind-tables \
 	  -fno-delete-null-pointer-checks \
@@ -21,10 +21,10 @@ all: data.o data.h tape0.bin stage3.bin
 %:	%.S
 
 %.o:	%.S
-	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
+	$(CC) $(ALL_CFLAGS) -c -o $@ $<
 
 %.o:	%.c
-	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
+	$(CC) $(ALL_CFLAGS) -c -o $@ $<
 
 eckd2dump_sv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o \
