@@ -11,6 +11,8 @@
 #ifndef LIBC_H
 #define LIBC_H
 
+#include <stdint.h>
+
 #define NULL ((void *) 0)
 
 #define EPERM		 1	/* Operation not permitted */
@@ -40,11 +42,6 @@
 #define ENOTTY		25	/* Not a typewriter */
 
 #define MIB	(1024ULL * 1024)
-
-typedef unsigned long long uint64_t;
-typedef unsigned int uint32_t;
-typedef unsigned short uint16_t;
-typedef unsigned char uint8_t;
 
 void printf(const char *, ...);
 void sprintf(char *, const char *, ...);
