@@ -195,7 +195,7 @@ boot_init_fba_stage1b(struct boot_fba_stage1b *stage1b,
 		stage1b->locdata[i].blocknr =
 			(uint32_t) stage2_list[i].linear.block;
 		stage1b->locread[i].read.address_lo =
-			ZIPL_STAGE2_LOAD_ADDRESS + i * FBA_BLK_SIZE;
+			STAGE2_LOAD_ADDRESS + i * FBA_BLK_SIZE;
 	}
 	/* Terminate CCW chain */
 	stage1b->locread[i - 1].read.flags &= ~CCW_FLAG_CC;
@@ -220,7 +220,7 @@ boot_init_eckd_stage1b(struct boot_eckd_stage1b *stage1b,
 		stage1b->seek[i].head = stage2_list[i].chs.head |
 			((stage2_list[i].chs.cyl >> 12) & 0xfff0);
 		stage1b->seek[i].sec = stage2_list[i].chs.sec;
-		stage1b->ssrt[i].read.address_lo = ZIPL_STAGE2_LOAD_ADDRESS +
+		stage1b->ssrt[i].read.address_lo = STAGE2_LOAD_ADDRESS +
 			i * stage2_list[i].chs.size;
 		stage1b->ssrt[i].read.flags = CCW_FLAG_CC | CCW_FLAG_SLI;
 	}

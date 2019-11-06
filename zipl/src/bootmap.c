@@ -627,7 +627,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	}
 
 	/* Add stage 3 loader to bootmap */
-	rc = add_component_file(fd, ZIPL_STAGE3_PATH, DEFAULT_STAGE3_ADDRESS,
+	rc = add_component_file(fd, ZIPL_STAGE3_PATH, STAGE3_LOAD_ADDRESS,
 				signature_size, VOID_ADD(table, offset), 1,
 				info, target, &comp_loc[comp_nr]);
 	if (rc) {
@@ -654,7 +654,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	}
 	rc = add_component_buffer(fd, stage3_params, stage3_params_size,
 				  (component_data) (uint64_t)
-				  DEFAULT_STAGE3_PARAMS_ADDRESS,
+				  STAGE3_PARAMS_ADDRESS,
 				  VOID_ADD(table, offset), info,
 				  &comp_loc[comp_nr], component_load);
 	free(stage3_params);
@@ -792,7 +792,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       component_execute,
 			       (component_data) (uint64_t)
-			       (ZIPL_STAGE3_ENTRY_ADDRESS | PSW_LOAD),
+			       (STAGE3_ENTRY | PSW_LOAD),
 			       info);
 	/* Write component table */
 	rc = disk_write_block_aligned(fd, table, info->phy_block_size,
