@@ -1788,7 +1788,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 {
 	struct scan_token* scan;
 	struct scan_token* new_scan;
-	char* filename;
+	const char *filename;
 	char *blsdir;
 	char* source;
 	int i, rc, scan_size;
