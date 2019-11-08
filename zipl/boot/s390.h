@@ -452,7 +452,7 @@ static inline int test_facility(unsigned long nr)
 	return __test_facility(nr, &S390_lowcore.stfle_fac_list);
 }
 
-static inline unsigned long __stfle_asm(u64 *stfle_fac_list, int size)
+static inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, int size)
 {
 	register unsigned long reg0 asm("0") = size - 1;
 
@@ -469,7 +469,7 @@ static inline unsigned long __stfle_asm(u64 *stfle_fac_list, int size)
  * @stfle_fac_list: array where facility list can be stored
  * @size: size of passed in array in double words
  */
-static inline void stfle(u64 *stfle_fac_list, int size)
+static inline void stfle(uint64_t *stfle_fac_list, int size)
 {
 	unsigned long nr;
 
