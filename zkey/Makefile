@@ -67,7 +67,7 @@ all: $(BUILD_TARGETS)
 zkey.o: zkey.c pkey.h cca.h misc.h
 pkey.o: pkey.c pkey.h
 cca.o: cca.c cca.h pkey.h utils.h
-utils.o: utils.h
+utils.o: utils.h pkey.h
 properties.o: check-dep-zkey properties.c properties.h
 keystore.o: keystore.c keystore.h properties.h pkey.h cca.h utils.h
 zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h misc.h

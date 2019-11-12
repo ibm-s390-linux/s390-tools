@@ -14,11 +14,15 @@
 
 #include "lib/zt_common.h"
 
-int sysfs_is_card_online(int card);
+#include "pkey.h"
 
-int sysfs_is_apqn_online(int card, int domain);
+int sysfs_is_card_online(int card, enum card_type cardtype);
+
+int sysfs_is_apqn_online(int card, int domain, enum card_type cardtype);
 
 int sysfs_get_card_level(int card);
+
+enum card_type sysfs_get_card_type(int card);
 
 int sysfs_get_serialnr(int card, char serialnr[9], bool verbose);
 
@@ -45,13 +49,13 @@ int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info,
 
 typedef int(*apqn_handler_t) (int card, int domain, void *handler_data);
 
-int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
-		 bool verbose);
+int handle_apqns(const char *apqns, enum card_type cardtype,
+		 apqn_handler_t handler, void *handler_data, bool verbose);
 
-int print_mk_info(const char *apqns, bool verbose);
+int print_mk_info(const char *apqns, enum card_type cardtype, bool verbose);
 
 int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
-		      bool print_mks, bool verbose);
+		enum card_type cardtype, bool print_mks, bool verbose);
 
 bool prompt_for_yes(bool verbose);
 

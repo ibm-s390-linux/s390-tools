@@ -718,7 +718,7 @@ int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
 	info.domain = 0;
 	info.verbose = verbose;
 
-	rc = handle_apqns(apqns, find_mkvp, &info, verbose);
+	rc = handle_apqns(apqns, CARD_TYPE_CCA, find_mkvp, &info, verbose);
 	if (rc < 0)
 		return rc;
 

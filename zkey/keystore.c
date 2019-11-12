@@ -1085,6 +1085,7 @@ free:
 struct apqn_check {
 	bool noonlinecheck;
 	bool nomsg;
+	enum card_type cardtype;
 };
 
 /**
@@ -1136,11 +1137,11 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 		goto out;
 	}
 
-	rc = sysfs_is_apqn_online(card, domain);
+	rc = sysfs_is_apqn_online(card, domain, info->cardtype);
 	if (rc != 1) {
 		if (info->nomsg == 0)
 			warnx("The APQN %02x.%04x is %s", card, domain,
-			      rc == -1 ? "not a CCA card" : "not online");
+			      rc == -1 ? "not the correct type" : "not online");
 		rc = -EIO;
 		goto out;
 	} else {
@@ -1577,7 +1578,9 @@ static int _keystore_create_info_file(struct keystore *keystore,
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
 					  .set = 0 };
 	struct apqn_check apqn_check = { .noonlinecheck = noapqncheck,
-					 .nomsg = 0 };
+					 .nomsg = 0,
+					 .cardtype = get_card_type_for_keytype(
+								key_type), };
 	struct properties *key_props;
 	char temp[10];
 	int rc;
@@ -1726,7 +1729,8 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 		goto out_free_key_filenames;
 
 	rc = cross_check_apqns(apqns, 0,
-			       get_min_card_level_for_keytype(key_type), true,
+			       get_min_card_level_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type), true,
 			       keystore->verbose);
 	if (rc == -EINVAL)
 		goto out_free_key_filenames;
@@ -1859,7 +1863,8 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	}
 
 	rc = cross_check_apqns(apqns, mkvp,
-			       get_min_card_level_for_keytype(key_type), true,
+			       get_min_card_level_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type), true,
 			       keystore->verbose);
 	if (rc == -EINVAL)
 		goto out_free_key;
@@ -2063,6 +2068,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		key_type = properties_get(key_props, PROP_NAME_KEY_TYPE);
 		rc = cross_check_apqns(apqns_prop, mkvp,
 				       get_min_card_level_for_keytype(key_type),
+				       get_card_type_for_keytype(key_type),
 				       true, keystore->verbose);
 		free(apqns_prop);
 		free(key_type);
@@ -2440,7 +2446,8 @@ static int _keystore_display_apqn_status(struct keystore *keystore,
 	apqns = properties_get(properties, PROP_NAME_APQNS);
 	key_type = properties_get(properties, PROP_NAME_KEY_TYPE);
 	rc = cross_check_apqns(apqns, mkvp,
-			       get_min_card_level_for_keytype(key_type), true,
+			       get_min_card_level_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type), true,
 			       keystore->verbose);
 	if (rc != 0 && rc != -ENOTSUP)
 		warning = 1;
@@ -4030,7 +4037,9 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	if (apqns != NULL)
 		apqn_list = str_list_split(apqns);
 
-	rc = cross_check_apqns(apqns, 0, min_level, true, keystore->verbose);
+	rc = cross_check_apqns(apqns, 0, min_level,
+			       get_card_type_for_keytype(key_type), true,
+			       keystore->verbose);
 	if (rc == -EINVAL)
 		goto out;
 	if (rc != 0 && rc != -ENOTSUP && !noapqncheck) {

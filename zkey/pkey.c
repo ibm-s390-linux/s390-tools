@@ -1652,6 +1652,26 @@ int get_min_card_level_for_keytype(const char *key_type)
 }
 
 /**
+ * Returns the card type required for a specific key type
+ *
+ * @param[in] key_type       the type of the key
+ *
+ * @returns the card type, or CARD_TYPE_ANY for unknown key types
+ */
+enum card_type get_card_type_for_keytype(const char *key_type)
+{
+	if (key_type == NULL)
+		return CARD_TYPE_ANY;
+
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		return CARD_TYPE_CCA;
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+		return CARD_TYPE_CCA;
+
+	return CARD_TYPE_ANY;
+}
+
+/**
  * Performs extended checks on an AES CIPHER key. It checks the key usage
  * fields (KUFs) and key management fields (KMFs) of the key. The function
  * returns -EINVAL and issues warning messages if a mismatch is detected.

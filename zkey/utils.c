@@ -34,14 +34,16 @@
 					} while (0)
 
 /**
- * Checks if the specified card is of type CCA and is online
+ * Checks if the specified card is of the specified type and is online
  *
  * @param[in] card      card number
+ * @param[in] cardtype  card type (CCA, EP11 or ANY)
  *
- * @returns 1 if its a CCA card and is online, 0 if offline and -1 if its
- *          not a CCA card.
+ * @returns 1 if its card of the specified type and is online,
+ *          0 if offline,
+ *          -1 if its not the specified type.
  */
-int sysfs_is_card_online(int card)
+int sysfs_is_card_online(int card, enum card_type cardtype)
 {
 	long int online;
 	char *dev_path;
@@ -69,9 +71,21 @@ int sysfs_is_card_online(int card)
 		rc = 0;
 		goto out;
 	}
-	if (type[4] != 'C') {
-		rc = -1;
-		goto out;
+	switch (cardtype) {
+	case CARD_TYPE_CCA:
+		if (type[4] != 'C') {
+			rc = -1;
+			goto out;
+		}
+		break;
+	case CARD_TYPE_EP11:
+		if (type[4] != 'P') {
+			rc = -1;
+			goto out;
+		}
+		break;
+	default:
+		break;
 	}
 
 out:
@@ -80,21 +94,22 @@ out:
 }
 
 /**
- * Checks if the specified APQN is of type CCA and is online
+ * Checks if the specified APQN is of the specified type and is online
  *
  * @param[in] card      card number
  * @param[in] domain    the domain
  *
- * @returns 1 if its a CCA card and is online, 0 if offline and -1 if its
- *          not a CCA card.
+ * @returns 1 if its card of the specified type and is online,
+ *          0 if offline,
+ *          -1 if its not the specified type.
  */
-int sysfs_is_apqn_online(int card, int domain)
+int sysfs_is_apqn_online(int card, int domain, enum card_type cardtype)
 {
 	long int online;
 	char *dev_path;
 	int rc = 1;
 
-	rc = sysfs_is_card_online(card);
+	rc = sysfs_is_card_online(card, cardtype);
 	if (rc != 1)
 		return rc;
 
@@ -145,7 +160,7 @@ int sysfs_get_card_level(int card)
 		rc = -1;
 		goto out;
 	}
-	if (type[4] != 'C') {
+	if (type[4] != 'C' && type[4] != 'P') {
 		rc = -1;
 		goto out;
 	}
@@ -162,6 +177,50 @@ out:
 }
 
 /**
+ * Returns the type of the card. For a CEXnC CARD_TYPE_CCA is returned,
+ * for a CEXnP CARD_TYPE_EP11.
+ *
+ * @param[in] card      card number
+ *
+ * @returns The card type, or -1 of the type can not be determined.
+ */
+enum card_type sysfs_get_card_type(int card)
+{
+	char *dev_path;
+	char type[20];
+	enum card_type cardtype;
+
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x", card);
+	if (!util_path_is_dir(dev_path)) {
+		cardtype = -1;
+		goto out;
+	}
+	if (util_file_read_line(type, sizeof(type), "%s/type", dev_path) != 0) {
+		cardtype = -1;
+		goto out;
+	}
+	if (strncmp(type, "CEX", 3) != 0 || strlen(type) < 5) {
+		cardtype = -1;
+		goto out;
+	}
+	switch (type[4]) {
+	case 'C':
+		cardtype = CARD_TYPE_CCA;
+		break;
+	case 'P':
+		cardtype = CARD_TYPE_EP11;
+		break;
+	default:
+		cardtype = -1;
+		break;
+	}
+
+out:
+	free(dev_path);
+	return cardtype;
+}
+
+/**
  * Gets the 8 character ASCII serial number string of an card from the sysfs.
  *
  * @param[in] card      card number
@@ -169,9 +228,9 @@ out:
  * @param[in] verbose   if true, verbose messages are printed
  *
  * @returns 0 if the serial number was returned. -ENODEV if the APQN is not
- *          available, or is not a CCA card. -ENOTSUP if the serialnr sysfs
- *          attribute is not available, because the zcrypt kernel module is
- *          on an older level.
+ *          available, or is not a CCA or EP11 card.
+ *          -ENOTSUP if the serialnr sysfs attribute is not available, because
+ *          the zcrypt kernel module is on an older level.
  */
 int sysfs_get_serialnr(int card, char serialnr[9], bool verbose)
 {
@@ -181,7 +240,7 @@ int sysfs_get_serialnr(int card, char serialnr[9], bool verbose)
 	if (serialnr == NULL)
 		return -EINVAL;
 
-	if (sysfs_is_card_online(card) != 1)
+	if (sysfs_is_card_online(card, CARD_TYPE_ANY) != 1)
 		return -ENODEV;
 
 	dev_path = util_path_sysfs("bus/ap/devices/card%02x", card);
@@ -272,9 +331,9 @@ static int parse_mk_info(char *line, struct mk_info *mk_info)
  * @param[in] verbose   if true, verbose messages are printed
  *
  * @returns 0 if the master key info was returned. -ENODEV if the APQN is not
- *          available, or is not a CCA card. -ENOTSUP if the mkvps sysfs
- *          attribute is not available, because the zcrypt kernel module is
- *          on an older level.
+ *          available, or is not a CCA or EP11 card.
+ *          -ENOTSUP if the mkvps sysfs attribute is not available, because the
+ *          zcrypt kernel module is on an older level.
  */
 int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 {
@@ -292,7 +351,7 @@ int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 	mk_info->cur_mk.mk_state = MK_STATE_UNKNOWN;
 	mk_info->old_mk.mk_state = MK_STATE_UNKNOWN;
 
-	if (sysfs_is_apqn_online(card, domain) != 1)
+	if (sysfs_is_apqn_online(card, domain, CARD_TYPE_ANY) != 1)
 		return -ENODEV;
 
 	dev_path = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x/mkvps",
@@ -349,8 +408,9 @@ out:
 	return rc;
 }
 
-static int scan_for_domains(int card, apqn_handler_t handler,
-			    void *handler_data, bool verbose)
+static int scan_for_domains(int card, enum card_type cardtype,
+			    apqn_handler_t handler, void *handler_data,
+			    bool verbose)
 {
 	struct dirent **namelist;
 	char fname[290];
@@ -369,9 +429,9 @@ static int scan_for_domains(int card, apqn_handler_t handler,
 
 		pr_verbose(verbose, "Found %02x.%04x", card, domain);
 
-		if (sysfs_is_apqn_online(card, domain) != 1) {
+		if (sysfs_is_apqn_online(card, domain, cardtype) != 1) {
 			pr_verbose(verbose, "APQN %02x.%04x is offline or not "
-				   "CCA", card, domain);
+				   "the correct type", card, domain);
 			continue;
 		}
 
@@ -385,8 +445,8 @@ static int scan_for_domains(int card, apqn_handler_t handler,
 }
 
 
-static int scan_for_apqns(apqn_handler_t handler, void *handler_data,
-			  bool verbose)
+static int scan_for_apqns(enum card_type cardtype, apqn_handler_t handler,
+			  void *handler_data, bool verbose)
 {
 	struct dirent **namelist;
 	int i, n, card, rc = 0;
@@ -405,13 +465,14 @@ static int scan_for_apqns(apqn_handler_t handler, void *handler_data,
 
 		pr_verbose(verbose, "Found card %02x", card);
 
-		if (sysfs_is_card_online(card) != 1) {
-			pr_verbose(verbose, "Card %02x is offline or not CCA",
-				   card);
+		if (sysfs_is_card_online(card, cardtype) != 1) {
+			pr_verbose(verbose, "Card %02x is offline or not the "
+				   "correct type", card);
 			continue;
 		}
 
-		rc = scan_for_domains(card, handler, handler_data, verbose);
+		rc = scan_for_domains(card, cardtype, handler, handler_data,
+				      verbose);
 		if (rc != 0)
 			break;
 	}
@@ -421,21 +482,22 @@ static int scan_for_apqns(apqn_handler_t handler, void *handler_data,
 }
 
 /**
- * Calls the handler for all APQNs specified in the apqns parameter, or of this
- * is NULL, for all online CCA APQNs found in sysfs. In case sysfs is inspected,
- * the cards and domains are processed in alphabetical order.
+ * Calls the handler for all APQNs specified in the apqns parameter, or if this
+ * is NULL, for all online CCA or EP11 APQNs found in sysfs. In case sysfs is
+ * inspected, the cards and domains are processed in alphabetical order.
  *
  * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
- *                      or an empty string, then all online CCA APQNs are
- *                      handled.
+ *                      or an empty string, then all online CCA or EP11 APQNs
+ *                      are handled.
+ * @param[in] cardtype  card type (CCA, EP11 or ANY)
  * @param[in] handler   a handler function that is called for each APQN
  * @param[in] handler_data private data that is passed to the handler
  * @param[in] verbose   if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error
  */
-int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
-		 bool verbose)
+int handle_apqns(const char *apqns, enum card_type cardtype,
+		 apqn_handler_t handler, void *handler_data, bool verbose)
 {
 	int card, domain;
 	char *copy, *tok;
@@ -443,7 +505,7 @@ int handle_apqns(const char *apqns, apqn_handler_t handler, void *handler_data,
 	int rc = 0;
 
 	if (apqns == NULL || (apqns != NULL && strlen(apqns) == 0)) {
-		rc = scan_for_apqns(handler, handler_data, verbose);
+		rc = scan_for_apqns(cardtype, handler, handler_data, verbose);
 	} else {
 		copy = util_strdup(apqns);
 		tok = strtok_r(copy, ",", &save);
@@ -480,12 +542,14 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
 	struct print_apqn_info *info = (struct print_apqn_info *)handler_data;
 	struct mk_info mk_info;
 	int rc, level;
+	enum card_type type;
 
 	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
 	if (rc == -ENOTSUP)
 		return rc;
 
 	level = sysfs_get_card_level(card);
+	type = sysfs_get_card_type(card);
 
 	util_rec_set(info->rec, "APQN", "%02x.%04x", card, domain);
 
@@ -515,8 +579,9 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
 		util_rec_set(info->rec, "OLD", "?");
 	}
 
-	if (level > 0)
-		util_rec_set(info->rec, "TYPE", "CEX%dC", level);
+	if (level > 0 && type != CARD_TYPE_ANY)
+		util_rec_set(info->rec, "TYPE", "CEX%d%c", level,
+			     type == CARD_TYPE_CCA ? 'C' : 'P');
 	else
 		util_rec_set(info->rec, "TYPE", "?");
 
@@ -529,15 +594,16 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
  * Prints master key information for all specified APQNs
  *
  * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
- *                      or an empty string, then all online CCA APQNs are
- *                      printed.
+ *                      or an empty string, then all online CCA or EP11 APQNs
+ *                      are printed.
+ * @param[in] cardtype  card type (CCA, EP11 or ANY)
  * @param[in] verbose   if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error. -ENOTSUP is
  *          returned when the mkvps sysfs attribute is not available, because
  *          the zcrypt kernel module is on an older level.
  */
-int print_mk_info(const char *apqns, bool verbose)
+int print_mk_info(const char *apqns, enum card_type cardtype, bool verbose)
 {
 	struct print_apqn_info info;
 	int rc;
@@ -552,7 +618,7 @@ int print_mk_info(const char *apqns, bool verbose)
 	util_rec_def(info.rec, "TYPE", UTIL_REC_ALIGN_LEFT, 6, "TYPE");
 	util_rec_print_hdr(info.rec);
 
-	rc = handle_apqns(apqns, print_apqn_mk_info, &info, verbose);
+	rc = handle_apqns(apqns, cardtype, print_apqn_mk_info, &info, verbose);
 
 	util_rec_free(info.rec);
 	return rc;
@@ -583,7 +649,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 	if (rc == -ENODEV) {
 		info->print_mks = 1;
 		printf("WARNING: APQN %02x.%04x: Not available or not of "
-		       "type CCA\n", card, domain);
+		       "the correct type\n", card, domain);
 		return 0;
 	}
 	if (rc != 0)
@@ -729,6 +795,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  *                      matched against it.
  * @param[in] min_level The minimum card level required. If min_level is -1 then
  *                      the card level is not checked.
+ * @param[in] cardtype  card type (CCA, EP11 or ANY)
  * @param[in] print_mks if true, then a the full master key info of all
  *                      specified APQns is printed, in case of a mismatch.
  * @param[in] verbose   if true, verbose messages are printed
@@ -739,7 +806,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  *          available, because the zcrypt kernel module is on an older level.
  */
 int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
-		      bool print_mks, bool verbose)
+		      enum card_type cardtype, bool print_mks, bool verbose)
 {
 	struct cross_check_info info;
 	char temp[200];
@@ -755,7 +822,7 @@ int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 		   "min-level %d: %s", mkvp, min_level,
 		   apqns != NULL ? apqns : "ANY");
 
-	rc = handle_apqns(apqns, cross_check_mk_info, &info, verbose);
+	rc = handle_apqns(apqns, cardtype, cross_check_mk_info, &info, verbose);
 	if (rc != 0)
 		return rc;
 
@@ -771,7 +838,7 @@ int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 	}
 	if (info.num_checked == 0) {
 		printf("WARNING: None of the APQNs is available or of "
-		       "type CCA\n");
+		       "the correct type\n");
 		rc = -ENODEV;
 	}
 	if (info.num_old_match > 0 && info.num_new_match > 0) {
@@ -787,7 +854,7 @@ int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 
 	if (print_mks && info.print_mks) {
 		printf("\n");
-		print_mk_info(apqns, verbose);
+		print_mk_info(apqns, cardtype, verbose);
 		printf("\n");
 	}
 

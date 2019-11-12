@@ -1173,6 +1173,7 @@ static int command_generate(void)
 
 		rc = cross_check_apqns(NULL, 0,
 				get_min_card_level_for_keytype(g.key_type),
+				get_card_type_for_keytype(g.key_type),
 				true, g.verbose);
 		if (rc == -EINVAL)
 			return EXIT_FAILURE;
@@ -1425,6 +1426,7 @@ static int command_validate_file(void)
 	char vp[VERIFICATION_PATTERN_LEN];
 	size_t secure_key_size;
 	size_t clear_key_size;
+	const char *key_type;
 	u8 *secure_key;
 	int is_old_mk;
 	u64 mkvp;
@@ -1483,11 +1485,12 @@ static int command_validate_file(void)
 		goto out;
 	}
 
+	key_type = get_key_type(secure_key, secure_key_size);
+
 	printf("Validation of secure key in file '%s':\n", g.pos_arg);
 	printf("  Status:                Valid\n");
 	printf("  Secure key size:       %lu bytes\n", secure_key_size);
-	printf("  Key type:              %s\n",
-	       get_key_type(secure_key, secure_key_size));
+	printf("  Key type:              %s\n", key_type);
 	printf("  Clear key size:        %lu bits\n", clear_key_size);
 	printf("  XTS type key:          %s\n",
 	       is_xts_key(secure_key, secure_key_size) ? "Yes" : "No");
@@ -1499,8 +1502,8 @@ static int command_validate_file(void)
 	       &vp[VERIFICATION_PATTERN_LEN / 2]);
 
 	rc = cross_check_apqns(NULL, mkvp,
-			       get_min_card_level_for_keytype(
-				     get_key_type(secure_key, secure_key_size)),
+			       get_min_card_level_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type),
 			       true, g.verbose);
 	if (rc == -EINVAL)
 		return EXIT_FAILURE;
@@ -1775,7 +1778,9 @@ static int command_convert_file(void)
 		return EXIT_FAILURE;
 	}
 
-	rc = cross_check_apqns(NULL, 0, min_level, true, g.verbose);
+	rc = cross_check_apqns(NULL, 0, min_level,
+			       get_card_type_for_keytype(g.key_type), true,
+			       g.verbose);
 	if (rc == -EINVAL)
 		return EXIT_FAILURE;
 	if (rc != 0 && rc != -ENOTSUP) {
