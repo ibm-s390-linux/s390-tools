@@ -28,6 +28,7 @@
 #include "lib/zt_common.h"
 
 #include "cca.h"
+#include "ep11.h"
 #include "keystore.h"
 #include "misc.h"
 #include "pkey.h"
@@ -83,12 +84,16 @@ static struct zkey_globals {
 	bool force;
 	bool open;
 	bool format;
+	struct ext_lib lib;
 	struct cca_lib cca;
+	struct ep11_lib ep11;
 	int pkey_fd;
 	struct keystore *keystore;
 } g = {
 	.pkey_fd = -1,
 	.sector_size = -1,
+	.lib.cca = &g.cca,
+	.lib.ep11 = &g.ep11,
 };
 
 /*
@@ -822,6 +827,7 @@ struct zkey_command {
 	unsigned int abbrev_len;
 	int (*function)(void);
 	int need_cca_library;
+	int need_ep11_library;
 	int need_pkey_device;
 	char *short_desc;
 	char *long_desc;
@@ -1396,7 +1402,7 @@ static int command_reencipher_repository(void)
 
 	rc = keystore_reencipher_key(g.keystore, g.name, g.apqns, g.fromold,
 				     g.tonew, g.inplace, g.staged, g.complete,
-				     g.pkey_fd, &g.cca);
+				     g.pkey_fd, &g.lib);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1575,7 +1581,7 @@ static int command_import(void)
 
 	rc = keystore_import_key(g.keystore, g.name, g.description, g.volumes,
 				 g.apqns, g.noapqncheck, g.sector_size,
-				 g.pos_arg, g.volume_type, &g.cca);
+				 g.pos_arg, g.volume_type, &g.lib);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1916,7 +1922,7 @@ static int command_convert_repository(void)
 	}
 
 	rc = keystore_convert_key(g.keystore, g.name, g.key_type, g.noapqncheck,
-				  g.force, g.pkey_fd, &g.cca);
+				  g.force, g.pkey_fd, &g.lib);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -2231,6 +2237,13 @@ int main(int argc, char *argv[])
 			goto out;
 		}
 	}
+	if (command->need_ep11_library) {
+		rc = load_ep11_library(&g.ep11, g.verbose);
+		if (rc != 0) {
+			rc = EXIT_FAILURE;
+			goto out;
+		}
+	}
 	if (command->need_pkey_device) {
 		g.pkey_fd = open_pkey_device(g.verbose);
 		if (g.pkey_fd == -1) {
@@ -2246,6 +2259,8 @@ int main(int argc, char *argv[])
 out:
 	if (g.cca.lib_csulcca)
 		dlclose(g.cca.lib_csulcca);
+	if (g.ep11.lib_ep11)
+		dlclose(g.ep11.lib_ep11);
 	if (g.pkey_fd >= 0)
 		close(g.pkey_fd);
 	if (g.keystore)

@@ -1808,7 +1808,7 @@ out_free_key_filenames:
  *                        default is used.
  * @param[in] import_file The name of a secure key containing the key to import
  * @param[in] volume_type the type of volume
- * @param[in] cca        the CCA library struct
+ * @param[in] lib         the external library struct
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -1816,7 +1816,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type,
-			struct cca_lib *cca)
+			struct ext_lib *lib)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
@@ -1874,13 +1874,13 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	}
 
 	if (is_cca_aes_cipher_key(secure_key, secure_key_size)) {
-		if (cca->lib_csulcca == NULL) {
-			rc = load_cca_library(cca, keystore->verbose);
+		if (lib->cca->lib_csulcca == NULL) {
+			rc = load_cca_library(lib->cca, keystore->verbose);
 			if (rc != 0)
 				goto out_free_key;
 		}
 
-		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+		rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
 						FLAG_SEL_CCA_MATCH_CUR_MKVP |
 						FLAG_SEL_CCA_MATCH_OLD_MKVP,
 						keystore->verbose);
@@ -1895,7 +1895,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			goto out_free_key;
 		}
 
-		rc = restrict_key_export(cca, secure_key, secure_key_size,
+		rc = restrict_key_export(lib->cca, secure_key, secure_key_size,
 					 keystore->verbose);
 		if (rc != 0) {
 			warnx("Failed to export-restrict the imported secure "
@@ -2662,7 +2662,7 @@ struct reencipher_params {
 struct reencipher_info {
 	struct reencipher_params params;
 	int pkey_fd;
-	struct cca_lib *cca;
+	struct ext_lib *lib;
 	unsigned long num_reenciphered;
 	unsigned long num_failed;
 	unsigned long num_skipped;
@@ -2673,7 +2673,7 @@ struct reencipher_info {
  *
  * @param[in] keystore   the keystore
  * @param[in] name       the name of the key
- * @param[in] cca        the CCA library struct
+ * @param[in] lib        the external library struct
  * @param[in] params     reenciphering parameters
  * @param[in] secure_key a buffer containing the secure key
  * @param[in] secure_key_size the size of the secure key
@@ -2685,7 +2685,7 @@ struct reencipher_info {
  */
 static int _keystore_perform_reencipher(struct keystore *keystore,
 					const char *name,
-					struct cca_lib *cca,
+					struct ext_lib *lib,
 					struct reencipher_params *params,
 					u8 *secure_key, size_t secure_key_size,
 					bool is_old_mk, const char *apqns)
@@ -2728,7 +2728,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 			   "Secure key '%s' will be re-enciphered from OLD "
 			   "to the CURRENT master key", name);
 
-		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+		rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
 						FLAG_SEL_CCA_MATCH_OLD_MKVP,
 						keystore->verbose);
 		if (rc == -ENOTSUP) {
@@ -2741,7 +2741,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 			return rc;
 		}
 
-		rc = key_token_change(cca, secure_key, secure_key_size,
+		rc = key_token_change(lib->cca, secure_key, secure_key_size,
 				      METHOD_OLD_TO_CURRENT,
 				      keystore->verbose);
 		if (rc != 0) {
@@ -2760,7 +2760,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 		if (params->inplace == -1)
 			params->inplace = 0;
 
-		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+		rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
 						FLAG_SEL_CCA_MATCH_CUR_MKVP |
 						FLAG_SEL_CCA_NEW_MUST_BE_SET,
 						keystore->verbose);
@@ -2776,7 +2776,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 			return rc;
 		}
 
-		rc = key_token_change(cca, secure_key, secure_key_size,
+		rc = key_token_change(lib->cca, secure_key, secure_key_size,
 				      METHOD_CURRENT_TO_NEW,
 				      keystore->verbose);
 		if (rc != 0) {
@@ -2877,7 +2877,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	if (!params.complete) {
 		printf("Re-enciphering key '%s'\n", name);
 
-		rc = _keystore_perform_reencipher(keystore, name, info->cca,
+		rc = _keystore_perform_reencipher(keystore, name, info->lib,
 						  &params, secure_key,
 						  secure_key_size, is_old_mk,
 						  properties_get(properties,
@@ -2989,7 +2989,7 @@ out:
  * @param[in] staged       if true, the key will be re-enciphere not in-place
  * @param[in] complete     if true, a pending re-encipherment is completed
  * @param[in] pkey_fd      the file descriptor of /dev/pkey
- * @param[in] cca          the CCA library struct
+ * @param[in] lib          the external library struct
  * Note: if both fromOld and toNew are FALSE, then the reencipherement mode is
  *       detected automatically. If both are TRUE then the key is reenciphered
  *       from the OLD to the NEW master key.
@@ -3002,7 +3002,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 			    const char *apqn_filter,
 			    bool from_old, bool to_new, bool inplace,
 			    bool staged, bool complete, int pkey_fd,
-			    struct cca_lib *cca)
+			    struct ext_lib *lib)
 {
 	struct reencipher_info info;
 	int rc;
@@ -3018,7 +3018,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 		info.params.inplace = 0;
 	info.params.complete = complete;
 	info.pkey_fd = pkey_fd;
-	info.cca = cca;
+	info.lib = lib;
 	info.num_failed = 0;
 	info.num_reenciphered = 0;
 	info.num_skipped = 0;
@@ -3971,13 +3971,13 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
  * @param[in] noapqncheck  if true, the specified APQN(s) are not checked for
  *                         existence and type.
  * @param[in] pkey_fd      the file descriptor of /dev/pkey
- * @param[in] cca          the CCA library struct
+ * @param[in] lib          the external library struct
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_convert_key(struct keystore *keystore, const char *name,
 			 const char *key_type, bool noapqncheck, bool quiet,
-			 int pkey_fd, struct cca_lib *cca)
+			 int pkey_fd, struct ext_lib *lib)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	u8 output_key[2 * MAX_SECURE_KEY_SIZE];
@@ -4065,7 +4065,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	if (rc)
 		goto out;
 
-	rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
+	rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
 					FLAG_SEL_CCA_MATCH_CUR_MKVP,
 					keystore->verbose);
 	if (rc == -ENOTSUP) {
@@ -4095,7 +4095,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 
 	memset(output_key, 0, sizeof(output_key));
 	output_key_size = sizeof(output_key);
-	rc = convert_aes_data_to_cipher_key(cca, secure_key,
+	rc = convert_aes_data_to_cipher_key(lib->cca, secure_key,
 					    secure_key_size, output_key,
 					    &output_key_size,
 					    keystore->verbose);
@@ -4107,7 +4107,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
-	rc = restrict_key_export(cca, output_key, output_key_size,
+	rc = restrict_key_export(lib->cca, output_key, output_key_size,
 				 keystore->verbose);
 	if (rc != 0) {
 		warnx("Export restricting the converted secure key '%s' has "

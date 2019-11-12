@@ -35,6 +35,7 @@
 #include "misc.h"
 #include "pkey.h"
 #include "cca.h"
+#include "ep11.h"
 #include "utils.h"
 
 /* Detect if cryptsetup 2.1 or later is available */
@@ -105,12 +106,16 @@ static struct zkey_cryptsetup_globals {
 	bool batch_mode;
 	bool debug;
 	bool verbose;
+	struct ext_lib lib;
 	struct cca_lib cca;
+	struct ep11_lib ep11;
 	int pkey_fd;
 	struct crypt_device *cd;
 } g = {
 	.tries = 3,
 	.pkey_fd = -1,
+	.lib.cca = &g.cca,
+	.lib.ep11 = &g.ep11,
 };
 
 /*
@@ -269,6 +274,7 @@ struct zkey_cryptsetup_command {
 	unsigned int abbrev_len;
 	int (*function)(void);
 	int need_cca_library;
+	int need_ep11_library;
 	int need_pkey_device;
 	char *short_desc;
 	char *long_desc;
@@ -2430,6 +2436,13 @@ int main(int argc, char *argv[])
 
 	if (command->need_cca_library) {
 		rc = load_cca_library(&g.cca, g.verbose);
+		if (rc != 0) {
+			rc = EXIT_FAILURE;
+			goto out;
+		}
+	}
+	if (command->need_ep11_library) {
+		rc = load_ep11_library(&g.ep11, g.verbose);
 		if (rc != 0) {
 			rc = EXIT_FAILURE;
 			goto out;

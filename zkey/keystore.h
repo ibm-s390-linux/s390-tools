@@ -14,7 +14,6 @@
 
 #include <stdbool.h>
 
-#include "cca.h"
 #include "pkey.h"
 
 struct keystore {
@@ -38,7 +37,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type,
-			struct cca_lib *cca);
+			struct ext_lib *lib);
 
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
@@ -56,7 +55,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 			    const char *apqn_filter,
 			    bool from_old, bool to_new, bool inplace,
 			    bool staged, bool complete, int pkey_fd,
-			    struct cca_lib *cca);
+			    struct ext_lib *lib);
 
 int keystore_copy_key(struct keystore *keystore, const char *name,
 		      const char *newname, const char *volumes);
@@ -83,7 +82,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 
 int keystore_convert_key(struct keystore *keystore, const char *name,
 			 const char *key_type, bool noapqncheck, bool quiet,
-			 int pkey_fd, struct cca_lib *cca);
+			 int pkey_fd, struct ext_lib *lib);
 
 void keystore_free(struct keystore *keystore);
 

@@ -15,6 +15,9 @@
 
 #include "lib/zt_common.h"
 
+#include "cca.h"
+#include "ep11.h"
+
 /*
  * Definitions for the /dev/pkey kernel module interface
  */
@@ -242,6 +245,11 @@ enum card_type {
 	CARD_TYPE_ANY	= -1,
 	CARD_TYPE_CCA   = 1,
 	CARD_TYPE_EP11  = 2,
+};
+
+struct ext_lib {
+	struct cca_lib *cca;
+	struct ep11_lib *ep11;
 };
 
 int open_pkey_device(bool verbose);
