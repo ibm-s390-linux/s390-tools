@@ -28,11 +28,17 @@ struct tokenheader {
 	u8  res1[3];
 } __packed;
 
-#define TOKEN_TYPE_NON_CCA	0x00
-#define TOKEN_TYPE_CCA_INTERNAL	0x01
+#define TOKEN_TYPE_NON_CCA		0x00
+#define TOKEN_TYPE_CCA_INTERNAL		0x01
 
-#define TOKEN_VERSION_AESDATA	0x04
-#define TOKEN_VERSION_AESCIPHER	0x05
+/* CCA-Internal token versions */
+#define TOKEN_VERSION_AESDATA		0x04
+#define TOKEN_VERSION_AESCIPHER		0x05
+
+/* Non-CCA token versions */
+#define TOKEN_VERSION_PROTECTED_KEY	0x01
+#define TOKEN_VERSION_CLEAR_KEY		0x02
+#define TOKEN_VERSION_EP11_AES		0x03
 
 struct aesdatakeytoken {
 	u8  type;     /* TOKEN_TYPE_INTERNAL (0x01) for internal key token */
@@ -83,11 +89,36 @@ struct aescipherkeytoken {
 	u8  varpart[80]; /* variable part */
 } __packed;
 
+struct ep11keytoken {
+	union {
+		u8 session[32];
+		struct {
+			u8  type;      /* TOKEN_TYPE_NON_CCA (0x00) */
+			u8  res0;      /* unused */
+			u16 length;    /* length of token */
+			u8  version;   /* TOKEN_VERSION_EP11_AES (0x03) */
+			u8  res1;      /* unused */
+			u16 keybitlen; /* clear key bit len, 0 for unknown */
+		} head;
+	};
+	u8  wkvp[16]; /* wrapping key verification pattern */
+	u64 attr;     /* boolean key attributes */
+	u64 mode;     /* mode bits */
+	u16 version;  /* 0x1234, ep11 blob struct version */
+	u8  iv[14];
+	u8  encrypted_key_data[144];
+	u8  mac[32];
+	u8  padding[64];
+} __packed;
+
 #define AESDATA_KEY_SIZE	sizeof(struct aesdatakeytoken)
 #define AESCIPHER_KEY_SIZE	sizeof(struct aescipherkeytoken)
+#define EP11_KEY_SIZE		sizeof(struct ep11keytoken)
 
-#define MAX_SECURE_KEY_SIZE	MAX(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE)
-#define MIN_SECURE_KEY_SIZE	MIN(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE)
+#define MAX_SECURE_KEY_SIZE	MAX(EP11_KEY_SIZE, \
+				    MAX(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE))
+#define MIN_SECURE_KEY_SIZE	MIN(EP11_KEY_SIZE, \
+				    MIN(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE))
 
 struct pkey_seckey {
 	u8  seckey[AESDATA_KEY_SIZE];  /* the secure key blob */
@@ -139,6 +170,7 @@ struct pkey_verifykey {
 enum pkey_key_type {
 	PKEY_TYPE_CCA_DATA   = (u32) 1,
 	PKEY_TYPE_CCA_CIPHER = (u32) 2,
+	PKEY_TYPE_EP11       = (u32) 3,
 };
 
 enum pkey_key_size {
@@ -229,6 +261,7 @@ struct pkey_apqns4keytype {
 
 #define KEY_TYPE_CCA_AESDATA        "CCA-AESDATA"
 #define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"
+#define KEY_TYPE_EP11_AES           "EP11-AES"
 
 #define PAES_BLOCK_SIZE             16
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
@@ -282,6 +315,7 @@ int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 
 bool is_cca_aes_data_key(const u8 *key, size_t key_size);
 bool is_cca_aes_cipher_key(const u8 *key, size_t key_size);
+bool is_ep11_aes_key(const u8 *key, size_t key_size);
 bool is_xts_key(const u8 *key, size_t key_size);
 int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize);
 const char *get_key_type(const u8 *key, size_t key_size);

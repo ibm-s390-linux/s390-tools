@@ -343,6 +343,8 @@ static int _keystore_valid_key_type(const char *key_type)
 		return 1;
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return 1;
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return 1;
 
 	return 0;
 }

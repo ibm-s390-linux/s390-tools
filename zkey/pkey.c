@@ -691,6 +691,10 @@ static int build_apqn_list_for_key_type(int pkey_fd, enum pkey_key_type type,
 							  apqn_entries,
 							  verbose);
 			return rc;
+		case -EINVAL:
+			/* This is usually due to an unsupported key type */
+			rc = -ENOTSUP;
+			goto out;
 		default:
 			goto out;
 		}
@@ -799,6 +803,10 @@ static int build_apqn_list_for_key(int pkey_fd, u8 *key, u32 keylen, u32 flags,
 							  apqn_entries,
 							  verbose);
 			return rc;
+		case -EINVAL:
+			/* This is usually due to an unsupported key type */
+			rc = -ENOTSUP;
+			goto out;
 		default:
 			goto out;
 		}
@@ -850,6 +858,8 @@ static enum pkey_key_type key_type_to_pkey_type(const char *key_type)
 		return PKEY_TYPE_CCA_DATA;
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return PKEY_TYPE_CCA_CIPHER;
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return PKEY_TYPE_EP11;
 
 	return 0;
 }
@@ -868,6 +878,8 @@ static size_t key_size_for_type(enum pkey_key_type type)
 		return AESDATA_KEY_SIZE;
 	case PKEY_TYPE_CCA_CIPHER:
 		return AESCIPHER_KEY_SIZE;
+	case PKEY_TYPE_EP11:
+		return EP11_KEY_SIZE;
 	default:
 		return 0;
 	}
@@ -1227,6 +1239,7 @@ int validate_secure_key(int pkey_fd,
 	struct pkey_apqn *list = NULL;
 	u32 i, list_entries = 0;
 	bool xts, valid;
+	u32 flags;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
@@ -1234,11 +1247,15 @@ int validate_secure_key(int pkey_fd,
 
 	xts = is_xts_key(secure_key, secure_key_size);
 
+	flags = PKEY_FLAGS_MATCH_CUR_MKVP;
+	if (is_cca_aes_data_key(secure_key, secure_key_size) ||
+	    is_cca_aes_cipher_key(secure_key, secure_key_size))
+		flags |= PKEY_FLAGS_MATCH_ALT_MKVP;
+
 	rc = build_apqn_list_for_key(pkey_fd, secure_key,
 				     HALF_KEYSIZE_FOR_XTS(secure_key_size, xts),
-				     PKEY_FLAGS_MATCH_CUR_MKVP |
-						PKEY_FLAGS_MATCH_ALT_MKVP,
-				     apqns, &list, &list_entries, verbose);
+				     flags, apqns, &list, &list_entries,
+				     verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to build a list of APQNs that can "
 			   "validate this secure key: %s", strerror(-rc));
@@ -1451,6 +1468,7 @@ int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 {
 	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
+	struct ep11keytoken *ep11key = (struct ep11keytoken *)key;
 
 	util_assert(key != NULL, "Internal error: secure_key is NULL");
 	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
@@ -1460,6 +1478,8 @@ int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 		memcpy(mkvp, &datakey->mkvp, sizeof(datakey->mkvp));
 	else if (is_cca_aes_cipher_key(key, key_size))
 		memcpy(mkvp, &cipherkey->kvp, sizeof(cipherkey->kvp));
+	else if (is_ep11_aes_key(key, key_size))
+		memcpy(mkvp, &ep11key->wkvp, sizeof(ep11key->wkvp));
 	else
 		return -EINVAL;
 
@@ -1540,6 +1560,34 @@ bool is_cca_aes_cipher_key(const u8 *key, size_t key_size)
 }
 
 /**
+ * Check if the specified key is a EP11 AES key token.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is an EP11 AES token type
+ */
+bool is_ep11_aes_key(const u8 *key, size_t key_size)
+{
+	struct ep11keytoken *ep11key = (struct ep11keytoken *)key;
+
+	if (key == NULL || key_size < EP11_KEY_SIZE)
+		return false;
+
+	if (ep11key->head.type != TOKEN_TYPE_NON_CCA)
+		return false;
+	if (ep11key->head.version != TOKEN_VERSION_EP11_AES)
+		return false;
+	if (ep11key->head.length > key_size)
+		return false;
+
+	if (ep11key->version != 0x1234)
+		return false;
+
+	return true;
+}
+
+/**
  * Check if the specified key is an XTS type key
  *
  * @param[in] key           the secure key token
@@ -1558,6 +1606,11 @@ bool is_xts_key(const u8 *key, size_t key_size)
 		if (key_size == 2 * AESCIPHER_KEY_SIZE &&
 		    is_cca_aes_cipher_key(key + AESCIPHER_KEY_SIZE,
 					  key_size - AESCIPHER_KEY_SIZE))
+			return true;
+	} else if (is_ep11_aes_key(key, key_size)) {
+		if (key_size == 2 * EP11_KEY_SIZE &&
+		    is_ep11_aes_key(key + EP11_KEY_SIZE,
+					  key_size - EP11_KEY_SIZE))
 			return true;
 	}
 
@@ -1579,6 +1632,7 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 {
 	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
+	struct ep11keytoken *ep11key = (struct ep11keytoken *)key;
 
 	util_assert(bitsize != NULL, "Internal error: bitsize is NULL");
 
@@ -1599,6 +1653,12 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 					cipherkey->length);
 			if (cipherkey->pfv == 0x00) /* V0 payload */
 				*bitsize += cipherkey->pl - 384;
+		}
+	} else if (is_ep11_aes_key(key, key_size)) {
+		*bitsize = ep11key->head.keybitlen;
+		if (key_size == 2 * AESDATA_KEY_SIZE) {
+			ep11key = (struct ep11keytoken *)(key + EP11_KEY_SIZE);
+			*bitsize += ep11key->head.keybitlen;
 		}
 	} else {
 		return -EINVAL;
@@ -1621,7 +1681,8 @@ const char *get_key_type(const u8 *key, size_t key_size)
 		return KEY_TYPE_CCA_AESDATA;
 	if (is_cca_aes_cipher_key(key, key_size))
 		return KEY_TYPE_CCA_AESCIPHER;
-
+	if (is_ep11_aes_key(key, key_size))
+		return KEY_TYPE_EP11_AES;
 	return NULL;
 }
 
@@ -1641,6 +1702,8 @@ int get_min_card_level_for_keytype(const char *key_type)
 		return 3;
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return 6;
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return 7;
 
 	return -1;
 }
@@ -1661,6 +1724,8 @@ enum card_type get_card_type_for_keytype(const char *key_type)
 		return CARD_TYPE_CCA;
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return CARD_TYPE_CCA;
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return CARD_TYPE_EP11;
 
 	return CARD_TYPE_ANY;
 }
