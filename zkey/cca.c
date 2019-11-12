@@ -630,7 +630,7 @@ int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose)
 }
 
 struct find_mkvp_info {
-	u64		mkvp;
+	u8		mkvp[MKVP_LENGTH];
 	unsigned int	flags;
 	bool		found;
 	int		card;
@@ -653,12 +653,12 @@ static int find_mkvp(int card, int domain, void *handler_data)
 
 	if (info->flags & FLAG_SEL_CCA_MATCH_CUR_MKVP)
 		if (mk_info.cur_mk.mk_state == MK_STATE_VALID &&
-		    mk_info.cur_mk.mkvp == info->mkvp)
+		    MKVP_EQ(mk_info.cur_mk.mkvp, info->mkvp))
 			found = true;
 
 	if (info->flags & FLAG_SEL_CCA_MATCH_OLD_MKVP)
 		if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
-		    mk_info.old_mk.mkvp == info->mkvp)
+		    MKVP_EQ(mk_info.old_mk.mkvp, info->mkvp))
 			found = true;
 
 	if (info->flags & FLAG_SEL_CCA_NEW_MUST_BE_SET)
@@ -700,18 +700,20 @@ static int find_mkvp(int card, int domain, void *handler_data)
  *          because the zcrypt kernel module is on an older level. -ENODEV is
  *          returned if no APQN is available with the desired mkvp.
  */
-int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
+int select_cca_adapter_by_mkvp(struct cca_lib *cca, u8 *mkvp, const char *apqns,
 		 unsigned int flags, bool verbose)
 {
 	struct find_mkvp_info info;
 	int rc;
 
 	util_assert(cca != NULL, "Internal error: cca is NULL");
+	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
 
-	pr_verbose(verbose, "Select mkvp %016llx in APQNs %s for the CCA host "
-		   "library", mkvp, apqns == 0 ? "ANY" : apqns);
+	pr_verbose(verbose, "Select mkvp %s in APQNs %s for the CCA host "
+		   "library", printable_mkvp(CARD_TYPE_CCA, mkvp),
+		   apqns == 0 ? "ANY" : apqns);
 
-	info.mkvp = mkvp;
+	memcpy(info.mkvp, mkvp, sizeof(info.mkvp));
 	info.flags = flags;
 	info.found = false;
 	info.card = 0;

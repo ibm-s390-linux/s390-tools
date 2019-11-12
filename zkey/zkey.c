@@ -259,7 +259,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = {"complete", 0, NULL, 'p'},
 		.desc = "Completes a staged re-enciphering. Use this option "
-			"after the new CCA master key has been set (made "
+			"after the new master key has been set (made "
 			"active)",
 		.command = COMMAND_REENCIPHER,
 	},
@@ -874,7 +874,7 @@ static struct zkey_command zkey_commands[] = {
 		.long_desc = "Re-encipher an existing secure AES "
 			     "key that is either contained in SECURE-KEY-FILE "
 			     "or is stored in the repository with another "
-			     "CCA master key",
+			     "master key",
 		.has_options = 1,
 		.pos_arg = "[SECURE-KEY-FILE]",
 		.pos_arg_optional = 1,
@@ -1171,7 +1171,7 @@ static int command_generate(void)
 			return EXIT_FAILURE;
 		}
 
-		rc = cross_check_apqns(NULL, 0,
+		rc = cross_check_apqns(NULL, NULL,
 				get_min_card_level_for_keytype(g.key_type),
 				get_card_type_for_keytype(g.key_type),
 				true, g.verbose);
@@ -1198,10 +1198,10 @@ static int command_generate(void)
 static int command_reencipher_file(void)
 {
 	size_t secure_key_size;
+	u8 mkvp[MKVP_LENGTH];
 	int rc, is_old_mk;
 	int selected = 1;
 	u8 *secure_key;
-	u64 mkvp;
 
 	if (g.name != NULL) {
 		warnx("Option '--name|-N' is not valid for "
@@ -1248,7 +1248,7 @@ static int command_reencipher_file(void)
 	}
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, g.verbose);
+						 mkvp, g.verbose);
 	if (rc != 0) {
 		warnx("Failed to get the master key verification pattern: %s",
 		      strerror(-rc));
@@ -1261,16 +1261,16 @@ static int command_reencipher_file(void)
 		if (is_old_mk) {
 			g.fromold = 1;
 			util_print_indented("The secure key is currently "
-					    "enciphered with the OLD CCA "
+					    "enciphered with the OLD "
 					    "master key and is being "
 					    "re-enciphered with the CURRENT "
-					    "CCA master key\n", 0);
+					    "master key\n", 0);
 		} else {
 			g.tonew = 1;
 			util_print_indented("The secure key is currently "
-					    "enciphered with the CURRENT CCA "
+					    "enciphered with the CURRENT "
 					    "master key and is being "
-					    "re-enciphered with the NEW CCA "
+					    "re-enciphered with the NEW "
 					    "master key\n", 0);
 		}
 	}
@@ -1279,13 +1279,13 @@ static int command_reencipher_file(void)
 	if (g.fromold) {
 		if (!is_old_mk) {
 			warnx("The secure key is already enciphered "
-			      "with the CURRENT CCA master key");
+			      "with the CURRENT master key");
 			rc = EXIT_FAILURE;
 			goto out;
 		}
 
 		pr_verbose("Secure key will be re-enciphered from OLD to the "
-			   "CURRENT CCA master key");
+			   "CURRENT master key");
 
 		rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
 						FLAG_SEL_CCA_MATCH_OLD_MKVP,
@@ -1305,7 +1305,7 @@ static int command_reencipher_file(void)
 				      METHOD_OLD_TO_CURRENT,
 				      g.verbose);
 		if (rc != 0) {
-			warnx("Re-encipher from OLD to CURRENT CCA "
+			warnx("Re-encipher from OLD to CURRENT "
 			      "master key has failed\n");
 			if (!selected)
 				print_msg_for_cca_envvars("secure AES key");
@@ -1315,7 +1315,7 @@ static int command_reencipher_file(void)
 	}
 	if (g.tonew) {
 		pr_verbose("Secure key will be re-enciphered from CURRENT "
-			   "to the NEW CCA master key");
+			   "to the NEW master key");
 
 		rc = select_cca_adapter_by_mkvp(&g.cca, mkvp, NULL,
 						FLAG_SEL_CCA_MATCH_CUR_MKVP |
@@ -1337,7 +1337,7 @@ static int command_reencipher_file(void)
 		rc = key_token_change(&g.cca, secure_key, secure_key_size,
 				      METHOD_CURRENT_TO_NEW, g.verbose);
 		if (rc != 0) {
-			warnx("Re-encipher from CURRENT to NEW CCA "
+			warnx("Re-encipher from CURRENT to NEW "
 			      "master key has failed\n");
 			if (!selected)
 				print_msg_for_cca_envvars("secure AES key");
@@ -1361,7 +1361,7 @@ out:
 /*
  * Command handler for 'reencipher in repository'.
  *
- * Re-encipher the specified secure key with the NEW or CURRENT CCA master key.
+ * Re-encipher the specified secure key with the NEW or CURRENT master key.
  */
 static int command_reencipher_repository(void)
 {
@@ -1404,7 +1404,7 @@ static int command_reencipher_repository(void)
 /*
  * Command handler for 'reencipher'.
  *
- * Re-encipher the specified secure key with the NEW or CURRENT CCA master key.
+ * Re-encipher the specified secure key with the NEW or CURRENT master key.
  */
 static int command_reencipher(void)
 {
@@ -1427,9 +1427,9 @@ static int command_validate_file(void)
 	size_t secure_key_size;
 	size_t clear_key_size;
 	const char *key_type;
+	u8 mkvp[MKVP_LENGTH];
 	u8 *secure_key;
 	int is_old_mk;
-	u64 mkvp;
 	int rc;
 
 	if (g.name != NULL) {
@@ -1477,7 +1477,7 @@ static int command_validate_file(void)
 	}
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, g.verbose);
+						 mkvp, g.verbose);
 	if (rc != 0) {
 		warnx("Failed to get the master key verification pattern: %s",
 		      strerror(-rc));
@@ -1494,8 +1494,9 @@ static int command_validate_file(void)
 	printf("  Clear key size:        %lu bits\n", clear_key_size);
 	printf("  XTS type key:          %s\n",
 	       is_xts_key(secure_key, secure_key_size) ? "Yes" : "No");
-	printf("  Enciphered with:       %s CCA master key (MKVP: %016llx)\n",
-	       is_old_mk ? "OLD" : "CURRENT", mkvp);
+	printf("  Enciphered with:       %s master key (MKVP: %s)\n",
+	       is_old_mk ? "OLD" : "CURRENT",
+	       printable_mkvp(get_card_type_for_keytype(key_type), mkvp));
 	printf("  Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       vp);
 	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
@@ -1753,11 +1754,11 @@ static int command_convert_file(void)
 	u8 output_key[2 * MAX_SECURE_KEY_SIZE];
 	unsigned int output_key_size;
 	size_t secure_key_size;
+	u8 mkvp[MKVP_LENGTH];
 	int rc, is_old_mk;
 	int selected = 1;
 	u8 *secure_key;
 	int min_level;
-	u64 mkvp;
 
 	if (g.name != NULL) {
 		warnx("Option '--name|-N' is not valid for "
@@ -1778,7 +1779,7 @@ static int command_convert_file(void)
 		return EXIT_FAILURE;
 	}
 
-	rc = cross_check_apqns(NULL, 0, min_level,
+	rc = cross_check_apqns(NULL, NULL, min_level,
 			       get_card_type_for_keytype(g.key_type), true,
 			       g.verbose);
 	if (rc == -EINVAL)
@@ -1802,7 +1803,7 @@ static int command_convert_file(void)
 	}
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, g.verbose);
+						 mkvp, g.verbose);
 	if (rc != 0) {
 		warnx("Failed to get the master key verification pattern: %s",
 		      strerror(-rc));

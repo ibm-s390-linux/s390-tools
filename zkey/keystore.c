@@ -1728,7 +1728,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
-	rc = cross_check_apqns(apqns, 0,
+	rc = cross_check_apqns(apqns, NULL,
 			       get_min_card_level_for_keytype(key_type),
 			       get_card_type_for_keytype(key_type), true,
 			       keystore->verbose);
@@ -1822,9 +1822,9 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	struct properties *key_props = NULL;
 	size_t secure_key_size;
 	const char *key_type;
+	u8 mkvp[MKVP_LENGTH];
 	int selected = 1;
 	u8 *secure_key;
-	u64 mkvp;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -1855,7 +1855,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	}
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, keystore->verbose);
+						 mkvp, keystore->verbose);
 	if (rc != 0) {
 		warnx("Failed to get the master key verification pattern: %s",
 		      strerror(-rc));
@@ -1999,9 +1999,9 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	struct properties *key_props = NULL;
 	char *apqns_prop, *key_type;
 	size_t secure_key_size;
+	u8 mkvp[MKVP_LENGTH];
 	u8 *secure_key;
 	char temp[30];
-	u64 mkvp;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -2058,7 +2058,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 
 		rc = get_master_key_verification_pattern(secure_key,
 							 secure_key_size,
-							 &mkvp,
+							 mkvp,
 							 keystore->verbose);
 		free(secure_key);
 		if (rc)
@@ -2283,7 +2283,7 @@ static void _keystore_print_record(struct util_rec *rec,
 				   bool validation, const char *skey_filename,
 				   size_t secure_key_size, bool is_xts,
 				   size_t clear_key_bitsize, bool valid,
-				   bool is_old_mk, bool reenc_pending, u64 mkvp)
+				   bool is_old_mk, bool reenc_pending, u8 *mkvp)
 {
 	char temp_vp[VERIFICATION_PATTERN_LEN + 2];
 	char *volumes_argz = NULL;
@@ -2347,11 +2347,17 @@ static void _keystore_print_record(struct util_rec *rec,
 	if (validation) {
 		if (valid)
 			util_rec_set(rec, REC_MASTERKEY,
-				     "%s CCA master key (MKVP: %016llx)",
-				     is_old_mk ? "OLD" : "CURRENT", mkvp);
+				     "%s master key (MKVP: %s)",
+				     is_old_mk ? "OLD" : "CURRENT",
+				     printable_mkvp(
+					 get_card_type_for_keytype(key_type),
+					 mkvp));
 		else
 			util_rec_set(rec, REC_MASTERKEY,
-				     "(unknown, MKVP: %016llx)", mkvp);
+				     "(unknown, MKVP: %s)",
+				     printable_mkvp(
+					 get_card_type_for_keytype(key_type),
+					 mkvp));
 	}
 	if (volumes_argz != NULL)
 		util_rec_set_argz(rec, REC_VOLUMES, volumes_argz,
@@ -2433,7 +2439,7 @@ struct validate_info {
  */
 static int _keystore_display_apqn_status(struct keystore *keystore,
 					 struct properties *properties,
-					 u64 mkvp)
+					 u8 *mkvp)
 {
 	int rc, warning = 0;
 	char *apqns;
@@ -2525,11 +2531,11 @@ static int _keystore_process_validate(struct keystore *keystore,
 	char **apqn_list = NULL;
 	size_t clear_key_bitsize;
 	size_t secure_key_size;
+	u8 mkvp[MKVP_LENGTH];
 	char *apqns = NULL;
 	u8 *secure_key;
 	int is_old_mk;
 	int rc, valid;
-	u64 mkvp;
 
 	rc = _keystore_ensure_keyfiles_exist(file_names, name);
 	if (rc != 0)
@@ -2559,7 +2565,7 @@ static int _keystore_process_validate(struct keystore *keystore,
 	}
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, keystore->verbose);
+						 mkvp, keystore->verbose);
 	free(secure_key);
 	if (rc)
 		goto out;
@@ -2573,9 +2579,9 @@ static int _keystore_process_validate(struct keystore *keystore,
 
 	if (valid && is_old_mk) {
 		util_print_indented("WARNING: The secure key is currently "
-				    "enciphered with the OLD CCA master key. "
+				    "enciphered with the OLD master key. "
 				    "To mitigate the danger of data loss "
-				    "re-encipher it with the CURRENT CCA "
+				    "re-encipher it with the CURRENT "
 				    "master key\n", 0);
 		info->num_warnings++;
 	}
@@ -2685,10 +2691,10 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 					bool is_old_mk, const char *apqns)
 {
 	int rc, selected = 1;
-	u64 mkvp;
+	u8 mkvp[MKVP_LENGTH];
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, keystore->verbose);
+						 mkvp, keystore->verbose);
 	if (rc != 0) {
 		warnx("Failed to get the master key verification pattern: %s",
 		      strerror(-rc));
@@ -2700,16 +2706,16 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 		if (is_old_mk) {
 			params->from_old = 1;
 			util_print_indented("The secure key is currently "
-					    "enciphered with the OLD CCA "
+					    "enciphered with the OLD "
 					    "master key and is being "
 					    "re-enciphered with the CURRENT "
-					    "CCA master key\n", 0);
+					    "master key\n", 0);
 		} else {
 			params->to_new = 1;
 			util_print_indented("The secure key is currently "
-					    "enciphered with the CURRENT CCA "
+					    "enciphered with the CURRENT "
 					    "master key and is being "
-					    "re-enciphered with the NEW CCA "
+					    "re-enciphered with the NEW "
 					    "master key\n", 0);
 		}
 	}
@@ -2720,7 +2726,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 
 		pr_verbose(keystore,
 			   "Secure key '%s' will be re-enciphered from OLD "
-			   "to the CURRENT CCA master key", name);
+			   "to the CURRENT master key", name);
 
 		rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
 						FLAG_SEL_CCA_MATCH_OLD_MKVP,
@@ -2740,7 +2746,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 				      keystore->verbose);
 		if (rc != 0) {
 			warnx("Failed to re-encipher '%s' from OLD to "
-			      "CURRENT CCA master key", name);
+			      "CURRENT master key", name);
 			if (!selected)
 				print_msg_for_cca_envvars("secure AES key");
 			return rc;
@@ -2749,7 +2755,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 	if (params->to_new) {
 		pr_verbose(keystore,
 			   "Secure key '%s' will be re-enciphered from "
-			   "CURRENT to the NEW CCA master key", name);
+			   "CURRENT to the NEW master key", name);
 
 		if (params->inplace == -1)
 			params->inplace = 0;
@@ -2775,7 +2781,7 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 				      keystore->verbose);
 		if (rc != 0) {
 			warnx("Failed to re-encipher '%s' from CURRENT to "
-			      "NEW CCA master key", name);
+			      "NEW master key", name);
 			if (!selected)
 				print_msg_for_cca_envvars("secure AES key");
 			return rc;
@@ -2857,7 +2863,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 		if (params.complete) {
 			warnx("Key '%s' is not valid, re-enciphering is not "
 			      "completed", name);
-			warnx("The new CCA master key might yet have to be set "
+			warnx("The new master key might yet have to be set "
 			      "as the CURRENT master key.");
 		} else {
 			warnx("Key '%s' is not valid, it is not re-enciphered",
@@ -2940,7 +2946,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 
 	if (params.inplace != 1) {
 		util_asprintf(&temp, "Staged re-enciphering is initiated for "
-			      "key '%s'. After the NEW CCA master key has been "
+			      "key '%s'. After the NEW master key has been "
 			      "set to become the CURRENT master key run "
 			      "'zkey reencipher' with option '--complete' to "
 			      "complete the re-enciphering process", name);
@@ -2976,17 +2982,17 @@ out:
  * @param[in] name_filter  the name filter to select the key (can be NULL)
  * @param[in] apqn_filter  the APQN filter to seletc the key (can be NULL)
  * @param[in] from_old     If true the key is reenciphered from the OLD to the
- *                         CURRENT CCA master key.
+ *                         CURRENT master key.
  * @param[in] to_new       If true the key is reenciphered from the CURRENT to
- *                         the OLD CCA master key.
+ *                         the OLD master key.
  * @param[in] inplace      if true, the key will be re-enciphere in-place
  * @param[in] staged       if true, the key will be re-enciphere not in-place
  * @param[in] complete     if true, a pending re-encipherment is completed
  * @param[in] pkey_fd      the file descriptor of /dev/pkey
  * @param[in] cca          the CCA library struct
- * Note: if both from Old and toNew are FALSE, then the reencipherement mode is
+ * Note: if both fromOld and toNew are FALSE, then the reencipherement mode is
  *       detected automatically. If both are TRUE then the key is reenciphered
- *       from the OLD to the NEW CCA master key.
+ *       from the OLD to the NEW master key.
  * Note: if both inplace and staged are FLASE, then the key is re-enciphered
  *       inplace when for OLD-to-CURRENT, and is reenciphered staged for
  *       CURRENT-to-NEW.
@@ -3982,9 +3988,9 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	char **apqn_list = NULL;
 	size_t secure_key_size;
 	u8 *secure_key = NULL;
+	u8 mkvp[MKVP_LENGTH];
 	char *apqns = NULL;
 	char *temp;
-	u64 mkvp;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
@@ -4037,7 +4043,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	if (apqns != NULL)
 		apqn_list = str_list_split(apqns);
 
-	rc = cross_check_apqns(apqns, 0, min_level,
+	rc = cross_check_apqns(apqns, NULL, min_level,
 			       get_card_type_for_keytype(key_type), true,
 			       keystore->verbose);
 	if (rc == -EINVAL)
@@ -4055,7 +4061,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		goto out;
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 &mkvp, keystore->verbose);
+						 mkvp, keystore->verbose);
 	if (rc)
 		goto out;
 

@@ -231,6 +231,13 @@ struct pkey_apqns4keytype {
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
 #define VERIFICATION_PATTERN_LEN    (2 * ENC_ZERO_LEN + 1)
 
+#define MKVP_LENGTH		16
+
+static const u8 zero_mkvp[MKVP_LENGTH] = { 0x00 };
+
+#define MKVP_EQ(mkvp1, mkvp2)	(memcmp(mkvp1, mkvp2, MKVP_LENGTH) == 0)
+#define MKVP_ZERO(mkvp)		(mkvp == NULL || MKVP_EQ(mkvp, zero_mkvp))
+
 enum card_type {
 	CARD_TYPE_ANY	= -1,
 	CARD_TYPE_CCA   = 1,
@@ -263,7 +270,7 @@ int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);
 
 int get_master_key_verification_pattern(const u8 *key, size_t key_size,
-					u64 *mkvp, bool verbose);
+					u8 *mkvp, bool verbose);
 
 bool is_cca_aes_data_key(const u8 *key, size_t key_size);
 bool is_cca_aes_cipher_key(const u8 *key, size_t key_size);

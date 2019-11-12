@@ -36,21 +36,23 @@ int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
 			       bool verbose);
 
 #define MK_STATE_EMPTY		0
-#define MK_STATE_PARTIAL	1
-#define MK_STATE_FULL		2
+#define MK_STATE_PARTIAL	1 /* For CCA only */
+#define MK_STATE_FULL		2 /* For CCA only */
 #define MK_STATE_VALID		3
 #define MK_STATE_INVALID	4
+#define MK_STATE_UNCOMMITTED	5 /* For EP11 only */
+#define MK_STATE_COMMITTED	6 /* For EP11 only */
 #define MK_STATE_UNKNOWN	-1
 
 struct mk_info_reg {
 	int	mk_state;
-	u64	mkvp;
+	u8	mkvp[MKVP_LENGTH];
 };
 
 struct mk_info {
 	struct mk_info_reg	new_mk;
 	struct mk_info_reg	cur_mk;
-	struct mk_info_reg	old_mk;
+	struct mk_info_reg	old_mk; /* only available on CCA cards */
 };
 
 int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info,
@@ -63,9 +65,11 @@ int handle_apqns(const char *apqns, enum card_type cardtype,
 
 int print_mk_info(const char *apqns, enum card_type cardtype, bool verbose);
 
-int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
+int cross_check_apqns(const char *apqns, u8 *mkvp, int min_level,
 		enum card_type cardtype, bool print_mks, bool verbose);
 
 bool prompt_for_yes(bool verbose);
+
+char *printable_mkvp(enum card_type cardtype, u8 *mkvp);
 
 #endif

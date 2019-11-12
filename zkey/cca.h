@@ -129,7 +129,7 @@ int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose);
 #define FLAG_SEL_CCA_MATCH_OLD_MKVP	0x02
 #define FLAG_SEL_CCA_NEW_MUST_BE_SET	0x80
 
-int select_cca_adapter_by_mkvp(struct cca_lib *cca, u64 mkvp, const char *apqns,
+int select_cca_adapter_by_mkvp(struct cca_lib *cca, u8 *mkvp, const char *apqns,
 			       unsigned int flags, bool verbose);
 
 void print_msg_for_cca_envvars(const char *key_name);

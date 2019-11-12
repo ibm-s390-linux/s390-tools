@@ -753,7 +753,6 @@ static int build_apqn_list_for_key(int pkey_fd, u8 *key, u32 keylen, u32 flags,
 				   u32 *apqn_entries, bool verbose)
 {
 	struct pkey_apqns4key apqns4key;
-	u64 mkvp;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
@@ -795,12 +794,6 @@ static int build_apqn_list_for_key(int pkey_fd, u8 *key, u32 keylen, u32 flags,
 
 			if (!is_cca_aes_data_key(key, keylen))
 				return -ENOTSUP;
-
-			rc = get_master_key_verification_pattern(key, keylen,
-								 &mkvp,
-								 verbose);
-			if (rc != 0)
-				return rc;
 
 			rc = build_apqn_list_for_aes_data(apqn_list, apqns,
 							  apqn_entries,
@@ -1218,7 +1211,7 @@ static int validate_secure_xts_key(int pkey_fd, struct pkey_apqn *apqn,
  * @param[out] clear_key_bitsize on return , the cryptographic size of the
  *                          clear key
  * @param[out] is_old_mk    in return set to 1 to indicate if the secure key
- *                          is currently enciphered by the OLD CCA master key
+ *                          is currently enciphered by the OLD master key
  * @param[in] apqns         a zero terminated array of pointers to APQN-strings,
  *                          or NULL for AUTOSELECT
  * @param[in] verbose       if true, verbose messages are printed
@@ -1454,7 +1447,7 @@ out:
 }
 
 int get_master_key_verification_pattern(const u8 *key, size_t key_size,
-					u64 *mkvp, bool UNUSED(verbose))
+					u8 *mkvp, bool UNUSED(verbose))
 {
 	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
@@ -1462,10 +1455,11 @@ int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 	util_assert(key != NULL, "Internal error: secure_key is NULL");
 	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
 
+	memset(mkvp, 0, MKVP_LENGTH);
 	if (is_cca_aes_data_key(key, key_size))
-		*mkvp = datakey->mkvp;
+		memcpy(mkvp, &datakey->mkvp, sizeof(datakey->mkvp));
 	else if (is_cca_aes_cipher_key(key, key_size))
-		memcpy(mkvp, cipherkey->kvp, sizeof(*mkvp));
+		memcpy(mkvp, &cipherkey->kvp, sizeof(cipherkey->kvp));
 	else
 		return -EINVAL;
 

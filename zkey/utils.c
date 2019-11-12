@@ -25,6 +25,8 @@
 #include "lib/util_rec.h"
 #include "lib/util_base.h"
 
+ #include <openssl/crypto.h>
+
 #include "utils.h"
 #include "properties.h"
 
@@ -98,6 +100,7 @@ out:
  *
  * @param[in] card      card number
  * @param[in] domain    the domain
+ * @param[in] cardtype  card type (CCA, EP11 or ANY)
  *
  * @returns 1 if its card of the specified type and is online,
  *          0 if offline,
@@ -335,11 +338,12 @@ out:
 	return rc;
 }
 
-static int parse_mk_info(char *line, struct mk_info *mk_info)
+static int parse_cca_mk_info(char *line, struct mk_info *mk_info)
 {
 	struct mk_info_reg *mk_reg;
 	char *save;
 	char *tok;
+	u64 mkvp;
 
 	tok = strtok_r(line, " ", &save);
 	if (tok == NULL)
@@ -382,8 +386,78 @@ static int parse_mk_info(char *line, struct mk_info *mk_info)
 	if (tok == NULL)
 		return -EIO;
 
-	if (sscanf(tok, "%llx", &mk_reg->mkvp) != 1)
+	if (sscanf(tok, "%llx", &mkvp) != 1)
 		return -EIO;
+
+	memcpy(mk_reg->mkvp, &mkvp, sizeof(mkvp));
+
+	return 0;
+}
+
+static int parse_ep11_mk_info(char *line, struct mk_info *mk_info)
+{
+	struct mk_info_reg *mk_reg;
+	unsigned char *buf;
+	char *save;
+	char *tok;
+	long len;
+
+	tok = strtok_r(line, " ", &save);
+	if (tok == NULL)
+		return -EIO;
+
+	if (strcasecmp(tok, "WK") != 0)
+		return 0;
+
+	tok = strtok_r(NULL, " ", &save);
+	if (tok == NULL)
+		return -EIO;
+
+	if (strcasecmp(tok, "NEW:") == 0)
+		mk_reg = &mk_info->new_mk;
+	else if (strcasecmp(tok, "CUR:") == 0)
+		mk_reg = &mk_info->cur_mk;
+	else
+		return -EIO;
+
+	tok = strtok_r(NULL, " ", &save);
+	if (tok == NULL)
+		return -EIO;
+
+	if (strcasecmp(tok, "valid") == 0)
+		mk_reg->mk_state = MK_STATE_VALID;
+	else if (strcasecmp(tok, "invalid") == 0)
+		mk_reg->mk_state = MK_STATE_INVALID;
+	else if (strcasecmp(tok, "empty") == 0)
+		mk_reg->mk_state = MK_STATE_EMPTY;
+	else if (strcasecmp(tok, "uncommitted") == 0)
+		mk_reg->mk_state = MK_STATE_UNCOMMITTED;
+	else if (strcasecmp(tok, "committed") == 0)
+		mk_reg->mk_state = MK_STATE_COMMITTED;
+	else
+		mk_reg->mk_state = MK_STATE_UNKNOWN;
+
+	tok = strtok_r(NULL, " ", &save);
+	if (tok == NULL)
+		return -EIO;
+
+	/*
+	 * EP11 uses a 32 byte master key verification pattern.
+	 * Usually only the first 16 bytes are used, so we store only up to
+	 * 16 bytes.
+	 */
+	if (strlen(tok) >= MKVP_LENGTH * 2) {
+		if (strncmp(tok, "0x", 2) == 0)
+			tok += 2;
+
+		buf = OPENSSL_hexstr2buf(tok, &len);
+		if (buf == NULL)
+			return -EIO;
+		if (len > MKVP_LENGTH)
+			len = MKVP_LENGTH;
+		memcpy(mk_reg->mkvp, buf, len);
+		OPENSSL_free(buf);
+	}
 
 	return 0;
 }
@@ -404,6 +478,7 @@ static int parse_mk_info(char *line, struct mk_info *mk_info)
  */
 int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 {
+	enum card_type cardtype;
 	char *dev_path;
 	char *p, *end;
 	char buf[100];
@@ -421,6 +496,8 @@ int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 	if (sysfs_is_apqn_online(card, domain, CARD_TYPE_ANY) != 1)
 		return -ENODEV;
 
+	cardtype = sysfs_get_card_type(card);
+
 	dev_path = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x/mkvps",
 				   card, card, domain);
 	if (!util_path_is_reg_file(dev_path)) {
@@ -436,14 +513,22 @@ int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 
 	/*
 	 * Expected contents:
-	 *   AES NEW: <new_mk_state> <new_mk_mkvp>
-	 *   AES CUR: <cur_mk_state> <cur_mk_mkvp>
-	 *   AES OLD: <old_mk_state> <old_mk_mkvp>
-	 * with
-	 *   <new_mk_state>: 'empty' or 'partial' or 'full'
-	 *   <cur_mk_state>, <old_mk_state>: 'valid' or 'invalid'
-	 *   <new_mk_mkvp>, <cur_mk_mkvp>, <old_mk_mkvp:
-	 *        8 byte hex string with leading 0x
+	 * For CCA cards:
+	 *     AES NEW: <new_mk_state> <new_mk_mkvp>
+	 *     AES CUR: <cur_mk_state> <cur_mk_mkvp>
+	 *     AES OLD: <old_mk_state> <old_mk_mkvp>
+	 *   with
+	 *     <new_mk_state>: 'empty' or 'partial' or 'full'
+	 *     <cur_mk_state>, <old_mk_state>: 'valid' or 'invalid'
+	 *     <new_mk_mkvp>, <cur_mk_mkvp>, <old_mk_mkvp>:
+	 *          8 byte hex string with leading 0x
+	 * For EP11 cards:
+	 *     WK NEW: <new_wk_state> <new_wk_mkvp>
+	 *     WK CUR: <cur_wk_state> <cur_wk_mkvp>
+	 *   with
+	 *     <wk_cur_state>: 'invalid' or 'valid'
+	 *     <wk_new_state>: 'empty' or 'uncommitted' or 'committed'
+	 *     <wk_cur_vp> and <wk_new_vp>: '-' or a 32 byte hash pattern
 	 */
 	while ((p = fgets(buf, sizeof(buf), fp)) != NULL) {
 		end = memchr(buf, '\n', sizeof(buf));
@@ -455,7 +540,17 @@ int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 		pr_verbose(verbose, "mkvp for %02x.%04x: %s", card, domain,
 			   buf);
 
-		rc = parse_mk_info(buf, mk_info);
+		switch (cardtype) {
+		case CARD_TYPE_CCA:
+			rc = parse_cca_mk_info(buf, mk_info);
+			break;
+		case CARD_TYPE_EP11:
+			rc = parse_ep11_mk_info(buf, mk_info);
+			break;
+		default:
+			rc = -EINVAL;
+			break;
+		}
 		if (rc != 0)
 			break;
 	}
@@ -464,7 +559,8 @@ int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
 
 	if (mk_info->new_mk.mk_state == MK_STATE_UNKNOWN &&
 	    mk_info->cur_mk.mk_state == MK_STATE_UNKNOWN &&
-	    mk_info->old_mk.mk_state == MK_STATE_UNKNOWN)
+	    (cardtype == CARD_TYPE_CCA &&
+	     mk_info->old_mk.mk_state == MK_STATE_UNKNOWN))
 		rc = -EIO;
 out:
 	if (rc != 0)
@@ -601,6 +697,7 @@ int handle_apqns(const char *apqns, enum card_type cardtype,
 
 struct print_apqn_info {
 	struct util_rec *rec;
+	enum card_type cardtype;
 	bool verbose;
 };
 
@@ -620,24 +717,30 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
 
 	util_rec_set(info->rec, "APQN", "%02x.%04x", card, domain);
 
+	if (info->cardtype != CARD_TYPE_ANY && type != info->cardtype)
+		rc = -EINVAL;
+
 	if (rc == 0) {
-		if (mk_info.new_mk.mk_state == MK_STATE_FULL)
-			util_rec_set(info->rec, "NEW", "%016llx",
-				     mk_info.new_mk.mkvp);
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL ||
+		    mk_info.new_mk.mk_state == MK_STATE_COMMITTED)
+			util_rec_set(info->rec, "NEW", "%s",
+				     printable_mkvp(type, mk_info.new_mk.mkvp));
 		else if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL)
 			util_rec_set(info->rec, "NEW", "partially loaded");
+		else if (mk_info.new_mk.mk_state == MK_STATE_UNCOMMITTED)
+			util_rec_set(info->rec, "NEW", "uncommitted");
 		else
 			util_rec_set(info->rec, "NEW", "-");
 
 		if (mk_info.cur_mk.mk_state ==  MK_STATE_VALID)
-			util_rec_set(info->rec, "CUR", "%016llx",
-				     mk_info.cur_mk.mkvp);
+			util_rec_set(info->rec, "CUR", "%s",
+				     printable_mkvp(type, mk_info.cur_mk.mkvp));
 		else
 			util_rec_set(info->rec, "CUR", "-");
 
 		if (mk_info.old_mk.mk_state ==  MK_STATE_VALID)
-			util_rec_set(info->rec, "OLD", "%016llx",
-				     mk_info.old_mk.mkvp);
+			util_rec_set(info->rec, "OLD", "%s",
+				     printable_mkvp(type, mk_info.old_mk.mkvp));
 		else
 			util_rec_set(info->rec, "OLD", "-");
 	} else {
@@ -673,15 +776,23 @@ static int print_apqn_mk_info(int card, int domain, void *handler_data)
 int print_mk_info(const char *apqns, enum card_type cardtype, bool verbose)
 {
 	struct print_apqn_info info;
-	int rc;
+	int rc, mklen;
 
 	info.verbose = verbose;
+	info.cardtype = cardtype;
 	info.rec = util_rec_new_wide("-");
 
+	if (cardtype == CARD_TYPE_CCA)
+		mklen = 16;
+	else
+		mklen = 32;
+
 	util_rec_def(info.rec, "APQN", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
-	util_rec_def(info.rec, "NEW", UTIL_REC_ALIGN_LEFT, 16, "NEW MK");
-	util_rec_def(info.rec, "CUR", UTIL_REC_ALIGN_LEFT, 16, "CURRENT MK");
-	util_rec_def(info.rec, "OLD", UTIL_REC_ALIGN_LEFT, 16, "OLD MK");
+	util_rec_def(info.rec, "NEW", UTIL_REC_ALIGN_LEFT, mklen, "NEW MK");
+	util_rec_def(info.rec, "CUR", UTIL_REC_ALIGN_LEFT, mklen, "CURRENT MK");
+	if (cardtype != CARD_TYPE_EP11)
+		util_rec_def(info.rec, "OLD", UTIL_REC_ALIGN_LEFT, mklen,
+			     "OLD MK");
 	util_rec_def(info.rec, "TYPE", UTIL_REC_ALIGN_LEFT, 6, "TYPE");
 	util_rec_print_hdr(info.rec);
 
@@ -692,9 +803,10 @@ int print_mk_info(const char *apqns, enum card_type cardtype, bool verbose)
 }
 
 struct cross_check_info {
-	u64	mkvp;
-	u64	new_mkvp;
+	u8	mkvp[MKVP_LENGTH];
+	u8	new_mkvp[MKVP_LENGTH];
 	bool	key_mkvp;
+	enum card_type cardtype;
 	int	min_level;
 	u32	num_cur_match;
 	u32	num_old_match;
@@ -708,6 +820,7 @@ struct cross_check_info {
 static int cross_check_mk_info(int card, int domain, void *handler_data)
 {
 	struct cross_check_info *info = (struct cross_check_info *)handler_data;
+	enum card_type type;
 	struct mk_info mk_info;
 	char temp[200];
 	int rc, level;
@@ -724,6 +837,19 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 
 	info->num_checked++;
 
+	if (info->cardtype != CARD_TYPE_ANY) {
+		type = sysfs_get_card_type(card);
+		if (type != info->cardtype) {
+			info->print_mks = 1;
+			info->mismatch = 1;
+			sprintf(temp, "WARNING: APQN %02x.%04x: The card type "
+				"is not CEXn%c.", card, domain,
+				info->cardtype == CARD_TYPE_CCA ? 'C' : 'P');
+			util_print_indented(temp, 0);
+			return 0;
+		}
+	}
+
 	if (info->min_level >= 0) {
 		level = sysfs_get_card_level(card);
 
@@ -731,7 +857,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 			info->print_mks = 1;
 			info->mismatch = 1;
 			sprintf(temp, "WARNING: APQN %02x.%04x: The card level "
-				"is less than CEX%dC.", card, domain,
+				"is less than CEX%dn.", card, domain,
 				info->min_level);
 			util_print_indented(temp, 0);
 		}
@@ -743,13 +869,22 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 			"register is only partially loaded.", card, domain);
 		util_print_indented(temp, 0);
 	}
+	if (mk_info.new_mk.mk_state == MK_STATE_UNCOMMITTED) {
+		info->print_mks = 1;
+		sprintf(temp, "INFO: APQN %02x.%04x: The NEW master key "
+			"register is loaded but uncommitted.", card, domain);
+		util_print_indented(temp, 0);
+	}
 
-	if (info->new_mkvp == 0 &&
-	    mk_info.new_mk.mk_state == MK_STATE_FULL)
-		info->new_mkvp = mk_info.new_mk.mkvp;
+	if (MKVP_ZERO(info->new_mkvp) &&
+	    (mk_info.new_mk.mk_state == MK_STATE_FULL ||
+	     mk_info.new_mk.mk_state == MK_STATE_COMMITTED))
+		memcpy(info->new_mkvp, mk_info.new_mk.mkvp,
+		       sizeof(info->new_mkvp));
 
-	if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-	    mk_info.new_mk.mkvp != info->new_mkvp) {
+	if ((mk_info.new_mk.mk_state == MK_STATE_FULL ||
+	     mk_info.new_mk.mk_state == MK_STATE_COMMITTED) &&
+	    !MKVP_EQ(mk_info.new_mk.mkvp, info->new_mkvp)) {
 		info->print_mks = 1;
 		sprintf(temp, "WARNING: APQN %02x.%04x: The NEW master key "
 			      "register contains a different master key than "
@@ -767,15 +902,16 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 	}
 
 	if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
-	    mk_info.old_mk.mkvp == mk_info.cur_mk.mkvp) {
+	    MKVP_EQ(mk_info.old_mk.mkvp, mk_info.cur_mk.mkvp)) {
 		info->print_mks = 1;
 		sprintf(temp, "INFO: APQN %02x.%04x: The OLD master key "
 			"register contains the same master key as the CURRENT "
 			"master key register.", card, domain);
 		util_print_indented(temp, 0);
 	}
-	if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-	    mk_info.new_mk.mkvp == mk_info.cur_mk.mkvp) {
+	if ((mk_info.new_mk.mk_state == MK_STATE_FULL ||
+	     mk_info.new_mk.mk_state == MK_STATE_COMMITTED) &&
+	    MKVP_EQ(mk_info.new_mk.mkvp, mk_info.cur_mk.mkvp)) {
 		info->print_mks = 1;
 		sprintf(temp, "INFO: APQN %02x.%04x: The NEW master key "
 			"register contains the same master key as the CURRENT "
@@ -784,7 +920,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 	}
 	if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
 	    mk_info.old_mk.mk_state == MK_STATE_VALID &&
-	    mk_info.new_mk.mkvp == mk_info.old_mk.mkvp) {
+	    MKVP_EQ(mk_info.new_mk.mkvp, mk_info.old_mk.mkvp)) {
 		info->print_mks = 1;
 		sprintf(temp, "INFO: APQN %02x.%04x: The NEW master key "
 			"register contains the same master key as the OLD "
@@ -792,28 +928,29 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 		util_print_indented(temp, 0);
 	}
 
-	if (info->mkvp == 0)
-		info->mkvp = mk_info.cur_mk.mkvp;
+	if (MKVP_ZERO(info->mkvp))
+		memcpy(info->mkvp, mk_info.cur_mk.mkvp, sizeof(info->mkvp));
 
 	if (info->key_mkvp) {
 		if (mk_info.cur_mk.mk_state == MK_STATE_VALID &&
-		    mk_info.cur_mk.mkvp == info->mkvp)
+		    MKVP_EQ(mk_info.cur_mk.mkvp, info->mkvp))
 			info->num_cur_match++;
 
 		if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
-		    mk_info.old_mk.mkvp == info->mkvp)
+		    MKVP_EQ(mk_info.old_mk.mkvp, info->mkvp))
 			info->num_old_match++;
 
-		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-		    mk_info.new_mk.mkvp == info->mkvp)
+		if ((mk_info.new_mk.mk_state == MK_STATE_FULL ||
+		     mk_info.new_mk.mk_state == MK_STATE_COMMITTED) &&
+		    MKVP_EQ(mk_info.new_mk.mkvp, info->mkvp))
 			info->num_new_match++;
 	}
 
-	if (mk_info.cur_mk.mkvp != info->mkvp) {
+	if (!MKVP_EQ(mk_info.cur_mk.mkvp, info->mkvp)) {
 
 		if (info->key_mkvp) {
 			if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
-			    mk_info.old_mk.mkvp == info->mkvp) {
+			    MKVP_EQ(mk_info.old_mk.mkvp, info->mkvp)) {
 				info->print_mks = 1;
 				sprintf(temp, "INFO: APQN %02x.%04x: The master"
 					" key has been changed to a new "
@@ -821,8 +958,10 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 					"not yet been re-enciphered.", card,
 					domain);
 				util_print_indented(temp, 0);
-			} else if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-				   mk_info.new_mk.mkvp == info->mkvp) {
+			} else if ((mk_info.new_mk.mk_state == MK_STATE_FULL ||
+				    mk_info.new_mk.mk_state ==
+							MK_STATE_COMMITTED) &&
+				   MKVP_EQ(mk_info.new_mk.mkvp, info->mkvp)) {
 				info->print_mks = 1;
 				sprintf(temp, "INFO: APQN %02x.%04x: The master"
 					" key has been changed but is not "
@@ -855,11 +994,11 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  * out an information message about the APQNs that have a different master key.
  *
  * @param[in] apqns     a comma separated list of APQNs. If NULL is specified,
- *                      or an empty string, then all online CCA APQNs are
+ *                      or an empty string, then all online APQNs are
  *                      checked.
  * @param[in] mkvp      The master key verification pattern of a secure key.
- *                      If this is all zero, then the master keys are not
- *                      matched against it.
+ *                      If this is all zero or NULL, then the master keys are
+ *                      not matched against it.
  * @param[in] min_level The minimum card level required. If min_level is -1 then
  *                      the card level is not checked.
  * @param[in] cardtype  card type (CCA, EP11 or ANY)
@@ -872,7 +1011,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  *          -ENOTSUP is returned when the mkvps sysfs attribute is not
  *          available, because the zcrypt kernel module is on an older level.
  */
-int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
+int cross_check_apqns(const char *apqns, u8 *mkvp, int min_level,
 		      enum card_type cardtype, bool print_mks, bool verbose)
 {
 	struct cross_check_info info;
@@ -880,14 +1019,16 @@ int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 	int rc;
 
 	memset(&info, 0, sizeof(info));
-	info.key_mkvp = mkvp != 0;
-	info.mkvp = mkvp;
+	info.key_mkvp = !MKVP_ZERO(mkvp);
+	if (mkvp != NULL)
+		memcpy(info.mkvp, mkvp, sizeof(info.mkvp));
+	info.cardtype = cardtype;
 	info.min_level = min_level;
 	info.verbose = verbose;
 
-	pr_verbose(verbose, "Cross checking APQNs with mkvp 0x%016llx and "
-		   "min-level %d: %s", mkvp, min_level,
-		   apqns != NULL ? apqns : "ANY");
+	pr_verbose(verbose, "Cross checking APQNs with mkvp %s "
+		   "and min-level %d: %s", printable_mkvp(cardtype, info.mkvp),
+		   min_level, apqns != NULL ? apqns : "ANY");
 
 	rc = handle_apqns(apqns, cardtype, cross_check_mk_info, &info, verbose);
 	if (rc != 0)
@@ -896,11 +1037,11 @@ int cross_check_apqns(const char *apqns, u64 mkvp, int min_level,
 	if (info.mismatch) {
 		if (info.key_mkvp)
 			printf("WARNING: Not all APQNs have the correct master "
-			       "key (%016llx).\n", mkvp);
+			       "key (%s) or fulfill the requirements.\n",
+			       printable_mkvp(cardtype, info.mkvp));
 		else
 			printf("WARNING: Not all APQNs have the same master "
-			       "key.\n");
-
+			       "key or fulfill the requirements.\n");
 		rc = -ENODEV;
 	}
 	if (info.num_checked == 0) {
@@ -950,4 +1091,39 @@ bool prompt_for_yes(bool verbose)
 		return true;
 
 	return false;
+}
+
+/*
+ * Returns a printable version of the specified master key verification pattern
+ * (MKVP) for the specified card type. Different card types use different
+ * number of bytes for MKVP.
+ *
+ * @param[in] cardtype  card type (CCA, EP11 or ANY)
+ * @param[in] mkvp       the master key verification pattern to print
+ *
+ * @returns address of a static char array containing the printed MKVP, or NULL
+ *          in case of an error.
+ */
+char *printable_mkvp(enum card_type cardtype, u8 *mkvp)
+{
+	static char mkvp_print_buf[MKVP_LENGTH * 2 + 1];
+
+	if (mkvp == NULL)
+		return NULL;
+
+	switch (cardtype) {
+	case CARD_TYPE_CCA:
+		/* CCA uses an 8 byte MKVP */
+		sprintf(mkvp_print_buf, "%016llx", *((u64 *)mkvp));
+		break;
+	case CARD_TYPE_EP11:
+		/* EP11 uses an 32 byte MKVP, but truncated to 16 bytes*/
+		sprintf(mkvp_print_buf, "%016llx%016llx", *((u64 *)&mkvp[0]),
+			*((u64 *)&mkvp[8]));
+		break;
+	default:
+		return NULL;
+	}
+
+	return mkvp_print_buf;
 }
