@@ -377,7 +377,7 @@ CONFIGFILES="\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
   /etc/docker\
   /lib/systemd/system/docker.service\
-  /usr/lib/systemd/system/docker.service\
+  /usr/lib/systemd/system\
   /etc/apparmor.d\
   "
 
