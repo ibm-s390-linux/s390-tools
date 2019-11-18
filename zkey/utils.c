@@ -224,10 +224,10 @@ out:
 }
 
 /**
- * Gets the 8 character ASCII serial number string of an card from the sysfs.
+ * Gets the 8-16 character ASCII serial number string of an card from the sysfs.
  *
  * @param[in] card      card number
- * @param[out] serialnr Result buffer
+ * @param[out] serialnr Result buffer. Must be at least SERIALNR_LENGTH long.
  * @param[in] verbose   if true, verbose messages are printed
  *
  * @returns 0 if the serial number was returned. -ENODEV if the APQN is not
@@ -235,7 +235,7 @@ out:
  *          -ENOTSUP if the serialnr sysfs attribute is not available, because
  *          the zcrypt kernel module is on an older level.
  */
-int sysfs_get_serialnr(int card, char serialnr[9], bool verbose)
+int sysfs_get_serialnr(int card, char *serialnr, bool verbose)
 {
 	char *dev_path;
 	int rc = 0;
@@ -251,7 +251,8 @@ int sysfs_get_serialnr(int card, char serialnr[9], bool verbose)
 		rc = -ENODEV;
 		goto out;
 	}
-	if (util_file_read_line(serialnr, 9, "%s/serialnr", dev_path) != 0) {
+	if (util_file_read_line(serialnr, SERIALNR_LENGTH, "%s/serialnr",
+				dev_path) != 0) {
 		rc = -ENOTSUP;
 		goto out;
 	}

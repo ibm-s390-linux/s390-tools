@@ -558,7 +558,7 @@ int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose)
 {
 	unsigned int adapters, adapter;
 	char adapter_serialnr[9];
-	char apqn_serialnr[9];
+	char apqn_serialnr[SERIALNR_LENGTH];
 	char temp[10];
 	int rc, found = 0;
 

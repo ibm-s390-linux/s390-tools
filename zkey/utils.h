@@ -24,7 +24,9 @@ int sysfs_get_card_level(int card);
 
 enum card_type sysfs_get_card_type(int card);
 
-int sysfs_get_serialnr(int card, char serialnr[9], bool verbose);
+#define SERIALNR_LENGTH		17
+
+int sysfs_get_serialnr(int card, char *serialnr, bool verbose);
 
 struct fw_version {
 	unsigned int	major;
