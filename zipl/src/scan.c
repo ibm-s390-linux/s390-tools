@@ -1575,6 +1575,8 @@ scan_check_bls(struct scan_token *scan)
 	int i, rc;
 	char *target_value = NULL;
 	char *img_value = NULL;
+	char *file = NULL;
+	char *tmp, *value;
 	/*
 	 * In the BLS case, each BLS section heading inherits a keyword
 	 * assignment target= from zipl.conf, and they are all the same.
@@ -1595,18 +1597,36 @@ scan_check_bls(struct scan_token *scan)
 		if (scan[i].content.keyword.keyword == scan_keyword_image ||
 		    scan[i].content.keyword.keyword == scan_keyword_ramdisk) {
 
-			rc = misc_check_readable_file(
-				scan[i].content.keyword.value);
+			value = scan[i].content.keyword.value;
+			/*
+			 * put the filename only into the file var before
+			 * checking its presence
+			 */
+			if (contains_address(value)) {
+				tmp = strrchr(value, ',');
+				file = strndup(value, tmp - value);
+			} else {
+				file = value;
+			}
+			rc = misc_check_readable_file(file);
 			if (rc) {
 				misc_asprintf(&img_value, "%s%s",
-					      target_value,
-					      scan[i].content.keyword.value);
+					      target_value, file);
 				rc = misc_check_readable_file(img_value);
 				if (rc) {
 					error_reason(
-						"Image file '%s' is not accessible",
-						scan[i].content.keyword.value);
+						"File '%s' not accessible", file);
 					return rc;
+				}
+				/*
+				 * when file has stripped the load address part,
+				 * do generate a prefixed value
+				 */
+				if (file != value) {
+					free(file);
+					free(img_value);
+					misc_asprintf(&img_value, "%s%s",
+						      target_value, value);
 				}
 				free(scan[i].content.keyword.value);
 				scan[i].content.keyword.value = img_value;
