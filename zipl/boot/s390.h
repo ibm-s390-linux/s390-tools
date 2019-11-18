@@ -13,6 +13,7 @@
 
 #include "lib/zt_common.h"
 #include "libc.h"
+#include "boot/sigp.h"
 
 #define __pa32(x) ((uint32_t)(unsigned long)(x))
 #define __pa(x) ((unsigned long)(x))
@@ -292,43 +293,6 @@ static inline int diag308(unsigned long subcode, void *addr)
 		: "+d" (_addr), "+d" (_rc)
 		: "d" (subcode) : "cc", "memory");
 	return _rc;
-}
-
-/*
- * Signal Processor
- */
-#define SIGP_STOP_AND_STORE_STATUS	9
-#define SIGP_SET_MULTI_THREADING	22
-#define SIGP_STORE_ASTATUS_AT_ADDRESS	23
-
-#define SIGP_CC_ORDER_CODE_ACCEPTED	0
-#define SIGP_CC_BUSY			2
-
-static inline int sigp(uint16_t addr, uint8_t order, uint32_t parm,
-		       uint32_t *status)
-{
-	register unsigned int reg1 asm ("1") = parm;
-	int cc;
-
-	asm volatile(
-		"	sigp	%1,%2,0(%3)\n"
-		"	ipm	%0\n"
-		"	srl	%0,28\n"
-		: "=d" (cc), "+d" (reg1) : "d" (addr), "a" (order) : "cc");
-	if (status && cc == 1)
-		*status = reg1;
-	return cc;
-}
-
-static inline int sigp_busy(uint16_t addr, uint8_t order, uint32_t parm,
-			    uint32_t *status)
-{
-	int cc;
-
-	do {
-		cc = sigp(addr, order, parm, status);
-	} while (cc == SIGP_CC_BUSY);
-	return cc;
 }
 
 /*
