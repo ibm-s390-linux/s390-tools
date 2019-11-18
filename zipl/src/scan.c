@@ -1575,7 +1575,6 @@ scan_check_bls(struct scan_token *scan)
 	int i, rc;
 	char *target_value = NULL;
 	char *img_value = NULL;
-	char *buffer = NULL;
 	/*
 	 * In the BLS case, each BLS section heading inherits a keyword
 	 * assignment target= from zipl.conf, and they are all the same.
@@ -1609,14 +1608,8 @@ scan_check_bls(struct scan_token *scan)
 						scan[i].content.keyword.value);
 					return rc;
 				}
-				buffer = (char *)
-					misc_malloc(strlen(img_value) + 1);
-				if (buffer == NULL)
-					return -1;
-				memcpy(buffer, img_value, strlen(img_value));
-				buffer[strlen(img_value)] = 0;
 				free(scan[i].content.keyword.value);
-				scan[i].content.keyword.value = buffer;
+				scan[i].content.keyword.value = img_value;
 			}
 		}
 	}
