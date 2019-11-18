@@ -1603,7 +1603,7 @@ scan_check_bls(struct scan_token *scan)
 					      scan[i].content.keyword.value);
 				rc = misc_check_readable_file(img_value);
 				if (rc) {
-					error_text(
+					error_reason(
 						"Image file '%s' is not accessible",
 						scan[i].content.keyword.value);
 					return rc;
