@@ -10,6 +10,7 @@
  */
 
 #include "libc.h"
+#include "boot/sigp.h"
 #include "s390.h"
 #include "stage3.h"
 #include "error.h"
@@ -194,11 +195,12 @@ static inline void __noreturn start_kernel(void)
 		"       sam31\n"
 		"       sr      %r1,%r1\n"
 		"       sr      %r2,%r2\n"
-		"       sigp    %r1,%r2,0x12\n"
+		"       sigp    %r1,%r2,%[order]\n"
 		"       lpsw    0\n"
 		: [addr] "=&d" (addr),
 		  [code] "+&d" (code)
-		: [psw] "a" (psw) );
+		: [psw] "a" (psw),
+		  [order] "L" (SIGP_SET_ARCHITECTURE));
 	while (1);
 }
 

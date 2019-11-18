@@ -12,6 +12,7 @@
 
 /* Signal Processor Order Codes */
 #define SIGP_STOP_AND_STORE_STATUS	9
+#define SIGP_SET_ARCHITECTURE		18
 #define SIGP_SET_MULTI_THREADING	22
 #define SIGP_STORE_ASTATUS_AT_ADDRESS	23
 

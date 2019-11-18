@@ -9,16 +9,18 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "boot/sigp.h"
+
 .section .text.start
 .globl _start
 _start:
 	basr	%r13,0
 0:	la	%r7,2				/* First try code 2: */
 	la	%r6,0				/* 64 bit psws are restored */
-	sigp	%r7,%r6,0x12			/* Switch to 64 bit */
+	sigp	%r7,%r6,SIGP_SET_ARCHITECTURE	/* Switch to 64 bit */
 	bc	8,.Lswitched_64-0b(%r13)	/* Accepted ? */
 	la	%r7,1				/* Failed - try code 1 */
-	sigp	%r7,%r6,0x12			/* Switch to 64 bit */
+	sigp	%r7,%r6,SIGP_SET_ARCHITECTURE	/* Switch to 64 bit */
 .Lswitched_64:
 	sam64					/* Switch to 64 bit addr mode */
 	basr	%r13,0
