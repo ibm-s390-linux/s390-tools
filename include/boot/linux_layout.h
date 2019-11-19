@@ -17,6 +17,7 @@
 #define IMAGE_ENTRY_KDUMP	_AC(0x10010, UL)
 
 /* Parameter address offsets */
+#define PARMAREA		_AC(0x10400, UL)
 #define IPL_DEVICE		_AC(0x10400, UL)
 #define INITRD_START		_AC(0x10408, UL)
 #define INITRD_SIZE		_AC(0x10410, UL)

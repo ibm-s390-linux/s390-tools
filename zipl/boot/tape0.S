@@ -8,29 +8,21 @@
 #
 
 #include "boot/sigp.h"
+#include "boot/linux_layout.h"
 
 IPL_BS			= 1024			# block size for tape access
 IPL_OFF			= 0x4000		# temporary kernel load addr
-COMMAND_LINE_SIZE	= 896			# max command line length
-KERNEL_OFF		= 0x10000		# kernel start code offset
+KERNEL_OFF		= IMAGE_ENTRY		# kernel start code offset
 						# relative to image start
 __LC_IO_NEW_PSW         = 0x1f0			# IO New PSW addr
 
-
-# Parameter address offsets
-
-PARMAREA		= 0x10400		# Parameter area offset
-IPL_DEVICE		= 0x10400		# IPL device offset
-INITRD_START		= 0x10408		# ramdisk addr offset
-INITRD_SIZE		= 0x10410		# ramdisk size offset
-COMMAND_LINE		= 0x10480		# command line offset
 
 # Default IPL parameter - will be overwritten by zIPL
 
 RAMDISK_ORIGIN		= 0x800000		# default ramdisk load addr
 RAMDISK_SIZE		= 0x800000		# default ramdisk size
 PARMFILE_ADDR		= 0x1000		# default parmfile load addr
-KERNEL_ADDR		= 0x10000		# default kernel load addr
+KERNEL_ADDR		= IMAGE_ENTRY		# default kernel load addr
 
 
 	.org 0x0
