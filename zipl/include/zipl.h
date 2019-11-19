@@ -14,14 +14,13 @@
 
 #include <stdint.h>
 #include "lib/zt_common.h"
+#include "boot/linux_layout.h"
 
 #define ZIPL_MAGIC			"zIPL"
 #define ZIPL_MAGIC_SIZE			4
 #define DISK_LAYOUT_ID			0x00000001
 
 #define STAGE3_ENTRY			0xa000UL
-#define IMAGE_ENTRY			0x10000UL
-#define IMAGE_ENTRY_KDUMP		0x10010UL
 
 #define STAGE2_LOAD_ADDRESS		0x2000UL
 #define STAGE3_LOAD_ADDRESS		0xa000UL

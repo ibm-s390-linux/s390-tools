@@ -16,14 +16,9 @@
 #include "s390.h"
 
 #include "boot/ipl.h"
+#include "boot/linux_layout.h"
 
-#define IPL_DEVICE		 0x10400UL
-#define INITRD_START		 0x10408UL
-#define INITRD_SIZE		 0x10410UL
-#define OLDMEM_BASE		 0x10418UL
-#define OLDMEM_SIZE		 0x10420UL
-#define COMMAND_LINE		 0x10480UL
-#define COMMAND_LINE_SIZE	 896
+
 #define COMMAND_LINE_EXTRA       0xE000
 
 #define STAGE3_FLAG_SCSI	 0x0001000000000000ULL
