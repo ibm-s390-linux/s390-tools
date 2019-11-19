@@ -268,6 +268,73 @@ out:
 	return rc;
 }
 
+/**
+ * Gets the firmware version of an card from the sysfs.
+ * Currently only EP11 cards provide this information.
+ *
+ * @param[in] card      card number
+ * @param[out] fw_version On return: The firmware version numbers
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 if the firmware version was returned. -ENODEV if the APQN is not
+ *          available, or is not a CCA or EP11 card.
+ *          -ENOTSUP if the fw_version sysfs attribute is not available, because
+ *          the zcrypt kernel module is on an older level, or because the card
+ *          type does not provide this information.
+ */
+int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
+			       bool verbose)
+{
+	char *dev_path;
+	char buf[50];
+	int rc = 0;
+
+	if (fw_version == NULL)
+		return -EINVAL;
+
+	if (sysfs_is_card_online(card, CARD_TYPE_ANY) != 1)
+		return -ENODEV;
+
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x", card);
+	if (!util_path_is_dir(dev_path)) {
+		rc = -ENODEV;
+		goto out;
+	}
+	if (util_file_read_line(buf, sizeof(buf), "%s/FW_version",
+				dev_path) != 0) {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	if (sscanf(buf, "%d.%d", &fw_version->major, &fw_version->minor) != 2) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+	if (util_file_read_line(buf, sizeof(buf), "%s/API_ordinalnr",
+				dev_path) != 0) {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	if (sscanf(buf, "%d", &fw_version->api_ordinal) != 1) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+
+	pr_verbose(verbose, "Firmware version of %02x: %d.%d (API: %d)", card,
+		   fw_version->major, fw_version->minor,
+		   fw_version->api_ordinal);
+out:
+	if (rc != 0)
+		pr_verbose(verbose, "Failed to get firmware version for "
+			   "%02x: %s", card, strerror(-rc));
+
+	free(dev_path);
+	return rc;
+}
+
 static int parse_mk_info(char *line, struct mk_info *mk_info)
 {
 	struct mk_info_reg *mk_reg;

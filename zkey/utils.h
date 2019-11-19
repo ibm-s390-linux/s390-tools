@@ -26,6 +26,15 @@ enum card_type sysfs_get_card_type(int card);
 
 int sysfs_get_serialnr(int card, char serialnr[9], bool verbose);
 
+struct fw_version {
+	unsigned int	major;
+	unsigned int	minor;
+	unsigned int	api_ordinal;
+};
+
+int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
+			       bool verbose);
+
 #define MK_STATE_EMPTY		0
 #define MK_STATE_PARTIAL	1
 #define MK_STATE_FULL		2
