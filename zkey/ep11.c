@@ -126,9 +126,25 @@ int load_ep11_library(struct ep11_lib *ep11, bool verbose)
 	ep11->dll_m_get_xcp_info = (m_get_xcp_info_t)dlsym(ep11->lib_ep11,
 							   "m_get_xcp_info");
 
+	ep11->dll_m_admin = (m_admin_t)dlsym(ep11->lib_ep11, "m_admin");
+	ep11->dll_xcpa_cmdblock = (xcpa_cmdblock_t)dlsym(ep11->lib_ep11,
+							 "xcpa_cmdblock");
+	if (ep11->dll_xcpa_cmdblock == NULL)
+		ep11->dll_xcpa_cmdblock = (xcpa_cmdblock_t)dlsym(ep11->lib_ep11,
+							"ep11a_cmdblock");
+	ep11->dll_xcpa_internal_rv = (xcpa_internal_rv_t)dlsym(ep11->lib_ep11,
+							"xcpa_internal_rv");
+	if (ep11->dll_xcpa_internal_rv == NULL)
+		ep11->dll_xcpa_internal_rv =
+				(xcpa_internal_rv_t)dlsym(ep11->lib_ep11,
+							  "ep11a_internal_rv");
+
 	/* dll_m_add_module and dll_m_rm_module may be NULL for V1 EP11 lib */
 	if (ep11->dll_m_init == NULL ||
-	    ep11->dll_m_get_xcp_info == NULL) {
+	    ep11->dll_m_get_xcp_info == NULL ||
+	    ep11->dll_m_admin == NULL ||
+	    ep11->dll_xcpa_cmdblock == NULL ||
+	    ep11->dll_xcpa_internal_rv == NULL) {
 		pr_verbose(verbose, "%s", dlerror());
 		warnx("The command requires the IBM Z Enterprise PKCS #11 "
 		      "(EP11) Support Program (EP11 host library).\n"
@@ -337,3 +353,158 @@ int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
 
 	return 0;
 }
+
+/**
+ * Performs an EP11 administrative request to Re-encrypt a single EP11 secure
+ * key with a new EP11 master key (wrapping key).
+ *
+ * @param[in] ep11      the EP11 library structure
+ * @param[in] target    the target handle to use for the re-encipher operation
+ * @param[in] card      the card that corresponds to the target handle
+ * @param[in] domain    the domain that corresponds to the target handle
+ * @param[in/out] ep11key the EP11 key token to reencipher. The re-enciphered
+ *                      secure key will be returned in this buffer.
+ * @param[in] ep11key_size the size of the secure key
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of errors
+ */
+static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target, int card,
+			      int domain, struct ep11keytoken *ep11key,
+			      unsigned int ep11key_size, bool verbose)
+{
+	CK_BYTE resp[MAX_BLOBSIZE];
+	CK_BYTE req[MAX_BLOBSIZE];
+	char ep11_token_header[sizeof(ep11key->head)];
+	struct XCPadmresp lrb;
+	struct XCPadmresp rb;
+	size_t resp_len;
+	size_t blob_len;
+	long req_len;
+	CK_RV rv;
+	int rc;
+
+	blob_len = ep11key->head.length;
+	if (blob_len > ep11key_size) {
+		pr_verbose(verbose, "Blob length larger than secure key size");
+		return -EINVAL;
+	}
+
+	rb.domain = domain;
+	lrb.domain = domain;
+
+	/* The token header is an overlay over the (all zero) session field */
+	memcpy(ep11_token_header, ep11key, sizeof(ep11_token_header));
+	memset(ep11key->session, 0, sizeof(ep11key->session));
+
+	resp_len = sizeof(resp);
+	req_len = ep11->dll_xcpa_cmdblock(req, sizeof(req), XCP_ADM_REENCRYPT,
+					  &rb, NULL, (unsigned char *)ep11key,
+					  blob_len);
+	if (req_len < 0) {
+		pr_verbose(verbose, "Failed to build XCP command block");
+		return -EIO;
+	}
+
+	rv = ep11->dll_m_admin(resp, &resp_len, NULL, 0, req, req_len, NULL, 0,
+			       target);
+	if (rv != CKR_OK || resp_len == 0) {
+		pr_verbose(verbose, "Command XCP_ADM_REENCRYPT failed. "
+			   "rc = 0x%lx, resp_len = %ld", rv, resp_len);
+		return -EIO;
+	}
+
+	rc = ep11->dll_xcpa_internal_rv(resp, resp_len, &lrb, &rv);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to parse response. rc = %d", rc);
+		return -EIO;
+	}
+
+	if (rv != CKR_OK) {
+		pr_verbose(verbose, "Failed to re-encrypt the EP11 secure key. "
+			   "rc = 0x%lx", rv);
+		switch (rv) {
+		case CKR_IBM_WKID_MISMATCH:
+			warnx("The EP11 secure key is currently encrypted "
+			      "under a different master that does not match "
+			      "the master key in the CURRENT master key "
+			      "register of APQN %02X.%04X", card, domain);
+			break;
+		}
+		return -EIO;
+	}
+
+	if (blob_len != lrb.pllen) {
+		pr_verbose(verbose, "Re-encrypted EP11 secure key size has "
+			   "changed: org-len: %lu, new-len: %lu", blob_len,
+			   lrb.pllen);
+		return -EIO;
+	}
+
+	memcpy(ep11key, lrb.payload, blob_len);
+	memcpy(ep11key, ep11_token_header, sizeof(ep11_token_header));
+
+	return 0;
+}
+
+/**
+ * Re-encipher an EP11 secure key with a new EP11 master key (wrapping key).
+ *
+ * @param[in] ep11      the EP11 library structure
+ * @param[in] target    the target handle to use for the re-encipher operation
+ * @param[in] card      the card that corresponds to the target handle
+ * @param[in] domain    the domain that corresponds to the target handle
+ * @param[in/out] secure_key the EP11 key token to reencipher. The re-enciphered
+ *                      secure key will be returned in this buffer.
+ * @param[in] secure_key_size the size of the secure key
+ * @param[in] verbose   if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of errors
+ */
+int reencipher_ep11_key(struct ep11_lib *ep11, target_t target, int card,
+			int domain, u8 *secure_key,
+			unsigned int secure_key_size, bool verbose)
+{
+	struct ep11keytoken *ep11key = (struct ep11keytoken *)secure_key;
+	CK_IBM_DOMAIN_INFO dinf;
+	CK_ULONG dinf_len = sizeof(dinf);
+	CK_RV rv;
+	int rc;
+
+	util_assert(ep11 != NULL, "Internal error: ep11 is NULL");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+
+	rv = ep11->dll_m_get_xcp_info(&dinf, &dinf_len, CK_IBM_XCPQ_DOMAIN, 0,
+				      target);
+	if (rv != CKR_OK) {
+		pr_verbose(verbose, "Failed to query domain information for "
+			   "%02X.%04X: m_get_xcp_info rc: 0x%lx", card, domain,
+			   rv);
+		return -EIO;
+	}
+
+	if ((dinf.flags & CK_IBM_DOM_COMMITTED_NWK) == 0) {
+		warnx("The NEW master key register of APQN %02X.%04X is not "
+		      "in COMMITTED state", card, domain);
+		return -ENODEV;
+	}
+
+	rc = ep11_adm_reencrypt(ep11, target, card, domain, ep11key,
+				secure_key_size, verbose);
+	if (rc != 0)
+		return rc;
+
+	if (is_xts_key(secure_key, secure_key_size)) {
+		secure_key += EP11_KEY_SIZE;
+		secure_key_size -= EP11_KEY_SIZE;
+		ep11key = (struct ep11keytoken *)secure_key;
+
+		rc = ep11_adm_reencrypt(ep11, target, card, domain, ep11key,
+					secure_key_size, verbose);
+		if (rc != 0)
+			return rc;
+	}
+
+	return 0;
+}
+
