@@ -324,4 +324,14 @@ const struct fw_version *get_min_fw_version_for_keytype(const char *key_type);
 enum card_type get_card_type_for_keytype(const char *key_type);
 int check_aes_cipher_key(const u8 *key, size_t key_size);
 
+enum reencipher_method {
+	REENCIPHER_OLD_TO_CURRENT = 1,
+	REENCIPHER_CURRENT_TO_NEW = 2,
+};
+
+int reencipher_secure_key(struct ext_lib *lib, u8 *secure_key,
+			  size_t secure_key_size, const char *apqns,
+			  enum reencipher_method method, bool *apqn_selected,
+			  bool verbose);
+
 #endif

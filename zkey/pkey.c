@@ -1881,3 +1881,169 @@ int check_aes_cipher_key(const u8 *key, size_t key_size)
 
 	return mismatch ? -EINVAL : 0;
 }
+
+static int reencipher_cca_secure_key(struct cca_lib *cca, u8 *secure_key,
+				     size_t secure_key_size, const char *apqns,
+				     u8 *mkvp, enum reencipher_method method,
+				     bool *apqn_selected, bool verbose)
+{
+	unsigned int flags;
+	int rc;
+
+	if (method == REENCIPHER_OLD_TO_CURRENT)
+		flags = FLAG_SEL_CCA_MATCH_OLD_MKVP;
+	else
+		flags = FLAG_SEL_CCA_MATCH_CUR_MKVP |
+			FLAG_SEL_CCA_NEW_MUST_BE_SET;
+
+	*apqn_selected = true;
+
+	rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns, flags,
+					verbose);
+	if (rc == -ENOTSUP) {
+		rc = 0;
+		*apqn_selected = false;
+	}
+	if (rc != 0) {
+		pr_verbose(verbose, "No APQN found that is suitable "
+			   "for re-enciphering this secure key");
+		return rc;
+	}
+
+	rc = key_token_change(cca, secure_key, secure_key_size,
+			      method == REENCIPHER_OLD_TO_CURRENT ?
+					      METHOD_OLD_TO_CURRENT :
+					      METHOD_CURRENT_TO_NEW,
+			      verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to re-encipher secure key: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
+	return 0;
+}
+
+static int reencipher_ep11_secure_key(struct ep11_lib *ep11, u8 *secure_key,
+				      size_t secure_key_size, const char *apqns,
+				      u8 *mkvp, bool *apqn_selected,
+				      bool verbose)
+{
+	unsigned int flags;
+	int card, domain;
+	target_t target;
+	int rc;
+
+	flags = FLAG_SEL_EP11_MATCH_CUR_MKVP |
+		FLAG_SEL_EP11_NEW_MUST_BE_SET;
+
+	*apqn_selected = true;
+
+	rc = select_ep11_apqn_by_mkvp(ep11, mkvp, apqns, flags,
+				     &target, &card, &domain, verbose);
+	if (rc == -ENOTSUP) {
+		rc = 0;
+		*apqn_selected = false;
+	}
+	if (rc != 0) {
+		pr_verbose(verbose, "No APQN found that is suitable "
+			   "for re-enciphering this secure key");
+		return rc;
+	}
+
+	rc = reencipher_ep11_key(ep11, target, card, domain,
+				 secure_key, secure_key_size, verbose);
+	free_ep11_target_for_apqn(ep11, target);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to re-encipher secure key: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
+	return 0;
+}
+
+
+/**
+ * Re-enciphers a secure key
+ *
+ * @param[in] lib           the external library struct
+ * @param[in] secure_key    a buffer containing the secure key
+ * @param[in] secure_key_size the secure key size
+ * @param[in] apqns         a comma separated list of APQNs. If NULL is
+ *                          specified, or an empty string, then all online
+ *                          APQNs of the matching type are subject to be used.
+ * @param[in] method        the re-encipher method
+ * @param[out] apqn_selected On return: true if a specific APQN was selected.
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ * -ENODEV is returned if no APQN could be found with a matching master key.
+ * -EIO is returned if the re-enciphering has failed.
+ */
+int reencipher_secure_key(struct ext_lib *lib, u8 *secure_key,
+			  size_t secure_key_size, const char *apqns,
+			  enum reencipher_method method, bool *apqn_selected,
+			  bool verbose)
+{
+	u8 mkvp[MKVP_LENGTH];
+	int rc;
+
+	util_assert(lib != NULL, "Internal error: lib is NULL");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
+	util_assert(apqn_selected != NULL,
+		    "Internal error: apqn_selected is NULL");
+
+	*apqn_selected = true;
+
+	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
+						 mkvp, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the master key verification "
+			   "pattern: %s", strerror(-rc));
+		return rc;
+	}
+
+	if (is_ep11_aes_key(secure_key, secure_key_size)) {
+		/* EP11 secure key: need the EP11 host library */
+		if (lib->ep11->lib_ep11 == NULL) {
+			rc = load_ep11_library(lib->ep11, verbose);
+			if (rc != 0)
+				return rc;
+		}
+
+		if (method == REENCIPHER_OLD_TO_CURRENT) {
+			util_print_indented("ERROR: An APQN of a IBM "
+					    "cryptographic adapter in EP11 "
+					    "coprocessor mode does not have an "
+					    "OLD master key register. Thus, "
+					    "you can not re-encipher a secure "
+					    "key of type 'EP11-AES' from the "
+					    "OLD to the CURRENT master key "
+					    "register.\n", 0);
+			return -EINVAL;
+		}
+
+		rc = reencipher_ep11_secure_key(lib->ep11, secure_key,
+						secure_key_size, apqns, mkvp,
+						apqn_selected, verbose);
+	} else if (is_cca_aes_data_key(secure_key, secure_key_size) ||
+		   is_cca_aes_cipher_key(secure_key, secure_key_size)) {
+		/* CCA secure key: need the CCA host library */
+		if (lib->cca->lib_csulcca == NULL) {
+			rc = load_cca_library(lib->cca, verbose);
+			if (rc != 0)
+				return rc;
+		}
+
+		rc = reencipher_cca_secure_key(lib->cca, secure_key,
+					       secure_key_size, apqns, mkvp,
+					       method, apqn_selected, verbose);
+	} else {
+		pr_verbose(verbose, "Invalid key type");
+		rc = -EINVAL;
+	}
+
+	return rc;
+}
+

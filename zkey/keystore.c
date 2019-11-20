@@ -2696,16 +2696,8 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 					u8 *secure_key, size_t secure_key_size,
 					bool is_old_mk, const char *apqns)
 {
-	int rc, selected = 1;
-	u8 mkvp[MKVP_LENGTH];
-
-	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 mkvp, keystore->verbose);
-	if (rc != 0) {
-		warnx("Failed to get the master key verification pattern: %s",
-		      strerror(-rc));
-		return rc;
-	}
+	bool selected;
+	int rc;
 
 	if (!params->from_old && !params->to_new) {
 		/* Autodetect reencipher mode */
@@ -2734,27 +2726,22 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 			   "Secure key '%s' will be re-enciphered from OLD "
 			   "to the CURRENT master key", name);
 
-		rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
-						FLAG_SEL_CCA_MATCH_OLD_MKVP,
-						keystore->verbose);
-		if (rc == -ENOTSUP) {
-			rc = 0;
-			selected = 0;
-		}
+		rc = reencipher_secure_key(lib, secure_key, secure_key_size,
+					   apqns, REENCIPHER_OLD_TO_CURRENT,
+					   &selected, keystore->verbose);
 		if (rc != 0) {
-			warnx("No APQN found that is suitable for "
-			      "re-enciphering this secure AES key");
-			return rc;
-		}
-
-		rc = key_token_change(lib->cca, secure_key, secure_key_size,
-				      METHOD_OLD_TO_CURRENT,
-				      keystore->verbose);
-		if (rc != 0) {
-			warnx("Failed to re-encipher '%s' from OLD to "
-			      "CURRENT master key", name);
-			if (!selected)
-				print_msg_for_cca_envvars("secure AES key");
+			if (rc == -ENODEV) {
+				warnx("No APQN found that is suitable for "
+				      "re-enciphering this secure AES key");
+			} else {
+				warnx("Failed to re-encipher '%s' from OLD to "
+				      "CURRENT master key", name);
+				if (!selected &&
+				    !is_ep11_aes_key(secure_key,
+						     secure_key_size))
+					print_msg_for_cca_envvars(
+							"secure AES key");
+			}
 			return rc;
 		}
 	}
@@ -2766,30 +2753,23 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 		if (params->inplace == -1)
 			params->inplace = 0;
 
-		rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
-						FLAG_SEL_CCA_MATCH_CUR_MKVP |
-						FLAG_SEL_CCA_NEW_MUST_BE_SET,
-						keystore->verbose);
-		if (rc == -ENOTSUP) {
-			rc = 0;
-			selected = 0;
-		}
+		rc = reencipher_secure_key(lib, secure_key, secure_key_size,
+					   apqns, REENCIPHER_CURRENT_TO_NEW,
+					   &selected, keystore->verbose);
 		if (rc != 0) {
-			util_print_indented("No APQN found that is suitable "
-					    "for re-enciphering this secure "
-					    "AES key and has the NEW master "
-					    "key loaded", 0);
-			return rc;
-		}
-
-		rc = key_token_change(lib->cca, secure_key, secure_key_size,
-				      METHOD_CURRENT_TO_NEW,
-				      keystore->verbose);
-		if (rc != 0) {
-			warnx("Failed to re-encipher '%s' from CURRENT to "
-			      "NEW master key", name);
-			if (!selected)
-				print_msg_for_cca_envvars("secure AES key");
+			if (rc == -ENODEV) {
+				warnx("No APQN found that is suitable for "
+				      "re-enciphering this secure AES key and "
+				      "has the NEW master key loaded");
+			} else {
+				warnx("Failed to re-encipher '%s' from CURRENT "
+				      "to NEW master key", name);
+				if (!selected &&
+				    !is_ep11_aes_key(secure_key,
+						     secure_key_size))
+					print_msg_for_cca_envvars(
+							"secure AES key");
+			}
 			return rc;
 		}
 	}
