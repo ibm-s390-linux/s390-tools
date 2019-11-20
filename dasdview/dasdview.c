@@ -160,19 +160,19 @@ dasdview_get_info(dasdview_info_t *info)
 		if (err != EBADF)
 			zt_error_print("dasdview: "
 				       "Could not retrieve geo information!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (dasd_get_blocksize(info->device, &info->blksize) != 0) {
 		zt_error_print("dasdview: "
 			       "Could not retrieve blocksize information!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (dasd_get_info(info->device, &info->dasd_info) != 0) {
 		zt_error_print("dasdview: "
 			       "Could not retrieve disk information!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	characteristics = (struct dasd_eckd_characteristics *)
@@ -261,7 +261,7 @@ dasdview_parse_input(unsigned long long *p, dasdview_info_t *info, char *s)
 error:
 	zt_error_print("dasdview: usage error\n"
 		       "%s is not a valid begin/size value!", s);
-	exit(-1);
+	exit(EXIT_FAILURE);
 }
 
 /*
@@ -454,7 +454,7 @@ dasdview_print_vlabel(dasdview_info_t *info)
 		if (rc) {
 			zt_error_print("error when reading label from device:"
 				       " rc=%d\n", rc);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 		lzds_dasd_get_vlabel(info->dasd, &tmpvlabel);
 		memcpy(&vlabel, tmpvlabel, sizeof(vlabel));
@@ -600,7 +600,7 @@ dasdview_print_volser(dasdview_info_t *info)
 		if (rc) {
 			zt_error_print("error when reading label from device:"
 				       " rc=%d\n", rc);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 		lzds_dasd_get_vlabel(info->dasd, &tmpvlabel);
 		memcpy(&vlabel, tmpvlabel, sizeof(vlabel));
@@ -644,7 +644,7 @@ dasdview_read_vtoc(dasdview_info_t *info)
 		zt_error_print("dasdview: disk layout error\n"
 			       "%s is not formatted with the z/OS "
 			       "compatible disk layout!\n", info->device);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	vtocblk = (u_int64_t)vtoc_get_cyl_from_cchhb(&vlabel.vtoc) *
@@ -664,7 +664,7 @@ dasdview_read_vtoc(dasdview_info_t *info)
 	if ((vtocblk <= 0) || (vtocblk > maxblk)) {
 		zt_error_print("dasdview: VTOC error\n"
 			       "Volume label VTOC pointer is not valid!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	vtoc_read_label(info->device, (vtocblk - 1) * info->blksize,
@@ -676,7 +676,7 @@ dasdview_read_vtoc(dasdview_info_t *info)
 		/* format4 DSCB is invalid */
 		zt_error_print("dasdview: VTOC error\n"
 			       "Format 4 DSCB is invalid!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	info->f4c++;
@@ -724,19 +724,19 @@ dasdview_read_vtoc(dasdview_info_t *info)
 	if (info->f4c > 1) {
 		zt_error_print("dasdview: VTOC error\n"
 			       "More than one FMT4 DSCB!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (info->f5c > 1) {
 		zt_error_print("dasdview: VTOC error\n"
 			       "More than one FMT5 DSCB!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (info->f7c > 1) {
 		zt_error_print("dasdview: VTOC error\n"
 			       "More than one FMT7 DSCB!\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -975,7 +975,7 @@ static void dasdview_print_format1_8_short_info_raw(format1_label_t *f1,
 	}
 	if (rc) {
 		zt_error_print("dasdview: Broken format 3 DSCB chain \n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	f3 = (dscb && dscb->fmtid == 0xf3) ? (format3_label_t *)dscb : NULL;
 
@@ -990,7 +990,7 @@ static void dasdview_print_format1_8_short_info_raw(format1_label_t *f1,
 		if (f3->DS3FMTID != 0xf3) {
 			zt_error_print("dasdview: Broken format 3 DSCB"
 				       " chain \n");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 		for (j = 0; j < 4; ++j)
 			dasdview_print_short_info_extent_raw(&f3->DS3EXTNT[j]);
@@ -1002,7 +1002,7 @@ static void dasdview_print_format1_8_short_info_raw(format1_label_t *f1,
 		if (rc) {
 			zt_error_print("dasdview: Broken format 3 DSCB"
 				       " chain \n");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 	}
 	printf("\n");
@@ -1025,7 +1025,7 @@ static void dasdview_print_vtoc_info_raw(dasdview_info_t *info)
 	rc = lzds_raw_vtoc_alloc_dscbiterator(info->rawvtoc, &it);
 	if (rc) {
 		zt_error_print("dasdview: could not allocate DSCB iterator \n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	while (!lzds_dscbiterator_get_next_dscb(it, &dscb)) {
 		if (dscb->fmtid == 0xf1)
@@ -1058,7 +1058,7 @@ static void dasdview_print_vtoc_info_raw(dasdview_info_t *info)
 	rc = lzds_raw_vtoc_alloc_dscbiterator(info->rawvtoc, &it);
 	if (rc) {
 		zt_error_print("dasdview: could not allocate DSCB iterator \n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	while (!lzds_dscbiterator_get_next_dscb(it, &dscb)) {
 		if (dscb->fmtid == 0xf1 || dscb->fmtid == 0xf8)
@@ -1739,23 +1739,23 @@ static void dasdview_print_vtoc_raw(dasdview_info_t *info)
 	if (rc) {
 		zt_error_print("error when reading label from device:"
 			       " rc=%d\n", rc);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	rc = lzds_dasd_alloc_rawvtoc(info->dasd);
 	if (rc == EINVAL) {
 		zt_error_print("dasdview: Cannot read VTOC because disk does"
 			       " not contain valid VOL1 label.\n",
 			       info->device);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	} else if (rc) {
 		zt_error_print("error when reading vtoc from device:"
 			       " rc=%d\n", rc);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	rc = lzds_dasd_get_rawvtoc(info->dasd, &info->rawvtoc);
 	if (rc || !info->rawvtoc) {
 		zt_error_print("dasdview: libvtoc could not read vtoc\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (info->vtoc_info || info->vtoc_all)
@@ -1764,7 +1764,7 @@ static void dasdview_print_vtoc_raw(dasdview_info_t *info)
 	rc = lzds_raw_vtoc_alloc_dscbiterator(info->rawvtoc, &it);
 	if (rc) {
 		zt_error_print("dasdview: could not allocate DSCB iterator\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	while (!lzds_dscbiterator_get_next_dscb(it, &record))
 		dasdview_print_vtoc_dscb(info, record);
@@ -1858,7 +1858,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 		zt_error_print("dasdview: open error\n"
 			       "Unable to open device %s in read-only mode!\n",
 			       info->device);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	j = (info->begin / SEEK_STEP);
@@ -1877,7 +1877,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 			zt_error_print("dasdview: seek error\n"
 				       "Unable to seek in device %s!\n",
 				       info->device);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 		b++;
 		a += SEEK_STEP;
@@ -1890,7 +1890,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 			zt_error_print("dasdview: seek error\n"
 				       "Unable to seek in device %s!\n",
 				       info->device);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -1926,7 +1926,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 			zt_error_print("dasdview: read error\n"
 				       "Unable to read from device %s!\n",
 				       info->device);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		if (info->format1)
@@ -1945,7 +1945,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 			zt_error_print("dasdview: read error\n"
 				       "Unable to read from device %s!\n",
 				       info->device);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		if (info->format1)
@@ -2112,18 +2112,18 @@ static void dasdview_view_raw(dasdview_info_t *info)
 	trackdata = memalign(4096, trckbuffsize * RAWTRACKSIZE);
 	if (!trackdata) {
 		zt_error_print("failed to allocate memory\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	rc = lzds_dasd_alloc_dasdhandle(info->dasd, &dasdh);
 	if (rc) {
 		zt_error_print("failed to allocate memory\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	rc = lzds_dasdhandle_open(dasdh);
 	if (rc) {
 		lzds_dasdhandle_free(dasdh);
 		zt_error_print("failed to open device\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 	/* residual is the number of tracks we still have to read */
 	residual = tracks_to_read;
@@ -2135,7 +2135,7 @@ static void dasdview_view_raw(dasdview_info_t *info)
 							   trckend, trackdata);
 		if (rc) {
 			perror("Error on read");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 		data = trackdata;
 		for (i = 0; i < trckcount; ++i) {
@@ -2153,7 +2153,7 @@ static void dasdview_view_raw(dasdview_info_t *info)
 	lzds_dasdhandle_free(dasdh);
 	if (rc < 0) {
 		perror("Error on closing file");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -2253,7 +2253,7 @@ int main(int argc, char *argv[])
 				zt_error_print("dasdview: usage error\n"
 					       "%s is no valid argument for"
 					       " option -t/--vtoc\n", optarg);
-				exit(-1);
+				exit(EXIT_FAILURE);
 			}
 			info.vtoc = 1;
 			info.action_specified = 1;
@@ -2301,13 +2301,13 @@ int main(int argc, char *argv[])
 		rc = lzds_zdsroot_alloc(&info.zdsroot);
 		if (rc) {
 			zt_error_print("Could not allocate index\n");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 		rc = lzds_zdsroot_add_device(info.zdsroot, info.device,
 					     &info.dasd);
 		if (rc) {
 			zt_error_print("Could not add device to index\n");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -2328,7 +2328,7 @@ int main(int argc, char *argv[])
 	if (info.begin > max) {
 		zt_error_print("dasdview: usage error\n"
 			"'begin' value is not within disk range!");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (info.size_specified)
@@ -2343,7 +2343,7 @@ int main(int argc, char *argv[])
 		zt_error_print("dasdview: usage error\n"
 			"'begin' + 'size' is not within "
 			"disk range!");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	if ((info.begin_specified || info.size_specified) &&
@@ -2355,7 +2355,7 @@ int main(int argc, char *argv[])
 		zt_error_print("dasdview: usage error\n"
 			"Options -1 or -2 make only sense with "
 			"options -b or -s!");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	/* do the output */
