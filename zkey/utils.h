@@ -68,7 +68,8 @@ int handle_apqns(const char *apqns, enum card_type cardtype,
 int print_mk_info(const char *apqns, enum card_type cardtype, bool verbose);
 
 int cross_check_apqns(const char *apqns, u8 *mkvp, int min_level,
-		enum card_type cardtype, bool print_mks, bool verbose);
+		      const struct fw_version *min_fw_version,
+		      enum card_type cardtype, bool print_mks, bool verbose);
 
 bool prompt_for_yes(bool verbose);
 

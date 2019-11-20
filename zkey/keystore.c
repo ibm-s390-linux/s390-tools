@@ -1732,8 +1732,9 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 
 	rc = cross_check_apqns(apqns, NULL,
 			       get_min_card_level_for_keytype(key_type),
-			       get_card_type_for_keytype(key_type), true,
-			       keystore->verbose);
+			       get_min_fw_version_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type),
+			       true, keystore->verbose);
 	if (rc == -EINVAL)
 		goto out_free_key_filenames;
 	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
@@ -1866,8 +1867,9 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 
 	rc = cross_check_apqns(apqns, mkvp,
 			       get_min_card_level_for_keytype(key_type),
-			       get_card_type_for_keytype(key_type), true,
-			       keystore->verbose);
+			       get_min_fw_version_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type),
+			       true, keystore->verbose);
 	if (rc == -EINVAL)
 		goto out_free_key;
 	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
@@ -2070,6 +2072,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		key_type = properties_get(key_props, PROP_NAME_KEY_TYPE);
 		rc = cross_check_apqns(apqns_prop, mkvp,
 				       get_min_card_level_for_keytype(key_type),
+				       get_min_fw_version_for_keytype(key_type),
 				       get_card_type_for_keytype(key_type),
 				       true, keystore->verbose);
 		free(apqns_prop);
@@ -2455,6 +2458,7 @@ static int _keystore_display_apqn_status(struct keystore *keystore,
 	key_type = properties_get(properties, PROP_NAME_KEY_TYPE);
 	rc = cross_check_apqns(apqns, mkvp,
 			       get_min_card_level_for_keytype(key_type),
+			       get_min_fw_version_for_keytype(key_type),
 			       get_card_type_for_keytype(key_type), true,
 			       keystore->verbose);
 	if (rc != 0 && rc != -ENOTSUP)
@@ -4046,8 +4050,9 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		apqn_list = str_list_split(apqns);
 
 	rc = cross_check_apqns(apqns, NULL, min_level,
-			       get_card_type_for_keytype(key_type), true,
-			       keystore->verbose);
+			       get_min_fw_version_for_keytype(key_type),
+			       get_card_type_for_keytype(key_type),
+			       true, keystore->verbose);
 	if (rc == -EINVAL)
 		goto out;
 	if (rc != 0 && rc != -ENOTSUP && !noapqncheck) {

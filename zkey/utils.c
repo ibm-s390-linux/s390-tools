@@ -809,6 +809,7 @@ struct cross_check_info {
 	bool	key_mkvp;
 	enum card_type cardtype;
 	int	min_level;
+	const struct fw_version *min_fw_version;
 	u32	num_cur_match;
 	u32	num_old_match;
 	u32	num_new_match;
@@ -821,10 +822,11 @@ struct cross_check_info {
 static int cross_check_mk_info(int card, int domain, void *handler_data)
 {
 	struct cross_check_info *info = (struct cross_check_info *)handler_data;
+	struct fw_version fw_version;
 	enum card_type type;
 	struct mk_info mk_info;
 	char temp[200];
-	int rc, level;
+	int rc, level = 0;
 
 	rc = sysfs_get_mkvps(card, domain, &mk_info, info->verbose);
 	if (rc == -ENODEV) {
@@ -861,6 +863,35 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
 				"is less than CEX%dn.", card, domain,
 				info->min_level);
 			util_print_indented(temp, 0);
+		}
+	}
+
+	if (info->min_fw_version != NULL) {
+		rc = sysfs_get_firmware_version(card, &fw_version,
+					       info->verbose);
+		if (rc == 0) {
+			if (fw_version.api_ordinal <
+					info->min_fw_version->api_ordinal) {
+				info->print_mks = 1;
+				info->mismatch = 1;
+				sprintf(temp, "WARNING: APQN %02x.%04x: The "
+					"firmware version is too less to "
+					"support secure keys of that type",
+					card, domain);
+				util_print_indented(temp, 0);
+			}
+			if (info->min_level > 0 && info->min_level == level &&
+			    (fw_version.major < info->min_fw_version->major ||
+			     (fw_version.major == info->min_fw_version->major &&
+			      fw_version.minor < info->min_fw_version->minor))) {
+				info->print_mks = 1;
+				info->mismatch = 1;
+				sprintf(temp, "WARNING: APQN %02x.%04x: The "
+					"firmware version is too less to "
+					"support secure keys of that type",
+					card, domain);
+				util_print_indented(temp, 0);
+			}
 		}
 	}
 
@@ -1002,6 +1033,8 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  *                      not matched against it.
  * @param[in] min_level The minimum card level required. If min_level is -1 then
  *                      the card level is not checked.
+ * @param[in] min_fw_version The minimum firmware version required. If NULL tne
+ *                      the firmware version is not checked.
  * @param[in] cardtype  card type (CCA, EP11 or ANY)
  * @param[in] print_mks if true, then a the full master key info of all
  *                      specified APQns is printed, in case of a mismatch.
@@ -1013,6 +1046,7 @@ static int cross_check_mk_info(int card, int domain, void *handler_data)
  *          available, because the zcrypt kernel module is on an older level.
  */
 int cross_check_apqns(const char *apqns, u8 *mkvp, int min_level,
+		      const struct fw_version *min_fw_version,
 		      enum card_type cardtype, bool print_mks, bool verbose)
 {
 	struct cross_check_info info;
@@ -1025,11 +1059,17 @@ int cross_check_apqns(const char *apqns, u8 *mkvp, int min_level,
 		memcpy(info.mkvp, mkvp, sizeof(info.mkvp));
 	info.cardtype = cardtype;
 	info.min_level = min_level;
+	info.min_fw_version = min_fw_version;
 	info.verbose = verbose;
 
-	pr_verbose(verbose, "Cross checking APQNs with mkvp %s "
-		   "and min-level %d: %s", printable_mkvp(cardtype, info.mkvp),
-		   min_level, apqns != NULL ? apqns : "ANY");
+	pr_verbose(verbose, "Cross checking APQNs with mkvp %s, "
+		   "min-level %d, and min-fw-version %u.%u (api: %u): %s",
+		   printable_mkvp(cardtype, info.mkvp),
+		   min_level,
+		   min_fw_version != NULL ? min_fw_version->major : 0,
+		   min_fw_version != NULL ? min_fw_version->minor : 0,
+		   min_fw_version != NULL ? min_fw_version->api_ordinal : 0,
+		   apqns != NULL ? apqns : "ANY");
 
 	rc = handle_apqns(apqns, cardtype, cross_check_mk_info, &info, verbose);
 	if (rc != 0)

@@ -65,7 +65,7 @@ zkey-cryptsetup-skip-jsonc:
 all: $(BUILD_TARGETS)
 
 zkey.o: zkey.c pkey.h cca.h ep11.h misc.h
-pkey.o: pkey.c pkey.h cca.h ep11.h
+pkey.o: pkey.c pkey.h cca.h ep11.h utils.h
 cca.o: cca.c cca.h pkey.h ep11.h utils.h
 ep11.o: ep11.c ep11.h pkey.h cca.h utils.h
 utils.o: utils.h pkey.h cca.h ep11.h

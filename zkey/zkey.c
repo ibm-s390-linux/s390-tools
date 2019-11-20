@@ -1179,6 +1179,7 @@ static int command_generate(void)
 
 		rc = cross_check_apqns(NULL, NULL,
 				get_min_card_level_for_keytype(g.key_type),
+				get_min_fw_version_for_keytype(g.key_type),
 				get_card_type_for_keytype(g.key_type),
 				true, g.verbose);
 		if (rc == -EINVAL)
@@ -1510,6 +1511,7 @@ static int command_validate_file(void)
 
 	rc = cross_check_apqns(NULL, mkvp,
 			       get_min_card_level_for_keytype(key_type),
+			       get_min_fw_version_for_keytype(key_type),
 			       get_card_type_for_keytype(key_type),
 			       true, g.verbose);
 	if (rc == -EINVAL)
@@ -1786,8 +1788,9 @@ static int command_convert_file(void)
 	}
 
 	rc = cross_check_apqns(NULL, NULL, min_level,
-			       get_card_type_for_keytype(g.key_type), true,
-			       g.verbose);
+			       get_min_fw_version_for_keytype(g.key_type),
+			       get_card_type_for_keytype(g.key_type),
+			       true, g.verbose);
 	if (rc == -EINVAL)
 		return EXIT_FAILURE;
 	if (rc != 0 && rc != -ENOTSUP) {

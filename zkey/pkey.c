@@ -26,6 +26,7 @@
 #include "lib/util_panic.h"
 
 #include "pkey.h"
+#include "utils.h"
 
 #ifndef AF_ALG
 #define AF_ALG 38
@@ -1706,6 +1707,20 @@ int get_min_card_level_for_keytype(const char *key_type)
 		return 7;
 
 	return -1;
+}
+
+const struct fw_version *get_min_fw_version_for_keytype(const char *key_type)
+{
+	static const struct fw_version ep11_fw_version = {
+			.major = 0, .minor = 0, .api_ordinal = 4, };
+
+	if (key_type == NULL)
+		return NULL;
+
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return &ep11_fw_version;
+
+	return NULL;
 }
 
 /**
