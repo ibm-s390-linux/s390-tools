@@ -366,6 +366,16 @@ misc_free_temp_dev(char* device)
 	free(device);
 }
 
+/* Delete temporary bootmap file */
+void
+misc_free_temp_file(char *filename)
+{
+	if (remove(filename)) {
+		fprintf(stderr,
+			"Warning: Could not remove temporary file %s: %s",
+			filename, strerror(errno));
+	}
+}
 
 /* Write COUNT bytes from memory at location DATA to the file identified by
  * file descriptor FD. Return 0 when all bytes were successfully written,

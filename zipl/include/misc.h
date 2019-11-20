@@ -46,6 +46,7 @@ char* misc_make_path(char* dirname, char* filename);
 int misc_temp_dev(dev_t dev, int blockdev, char** devno);
 int misc_temp_dev_from_file(char* file, char** devno);
 void misc_free_temp_dev(char* device);
+void misc_free_temp_file(char *filename);
 int misc_check_writable_directory(const char* directory);
 int misc_check_readable_file(const char* filename);
 int misc_check_writable_device(const char* devno, int blockdev, int chardev);

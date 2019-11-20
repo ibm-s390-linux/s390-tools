@@ -1286,9 +1286,7 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		break;
 	}
 	if (dry_run) {
-		if (remove(filename) == -1)
-			fprintf(stderr, "Warning: could not remove temporary "
-				"file %s!\n", filename);
+		misc_free_temp_file(filename);
 	} else if (job->id != job_dump_partition) {
 		/* Rename to final bootmap name */
 		mapname = misc_make_path(job->target.bootmap_dir,
@@ -1315,6 +1313,8 @@ out_disk_free_info:
 	disk_free_info(info);
 out_close_fd:
 	close(fd);
+	if (job->id != job_dump_partition)
+		misc_free_temp_file(filename);
 out_free_filename:
 	free(filename);
 	return -1;
