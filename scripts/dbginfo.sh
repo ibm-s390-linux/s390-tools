@@ -463,7 +463,7 @@ CMDS="uname -a\
   :java -version\
   :cat /root/.bash_history\
   :env\
-  :journalctl --all --no-pager --since=$(date -d '5 day ago' +%Y-%m-%d) --until=now --lines=50000 \
+  :journalctl --all --no-pager --lines=100000 --output=short-precise\
    > '${OUTPUT_FILE_JOURNALCTL}'\
   :openssl engine\
   :systemd-delta\
