@@ -45,10 +45,10 @@ clean:
 .boot.o.d boot.o: ../boot/data.h
 
 ../boot/data.h:
-	make -C ../boot data.h
+	$(MAKE) -C ../boot data.h
 
 ../boot/data.o:
-	make -C ../boot data.o
+	$(MAKE) -C ../boot data.o
 
 ../boot/stage3.bin:
-	make -C ../boot stage3.bin
+	$(MAKE) -C ../boot stage3.bin

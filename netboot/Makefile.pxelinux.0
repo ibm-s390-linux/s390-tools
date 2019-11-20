@@ -33,8 +33,8 @@ pxelinux.initramfs: $(BBINSTALL)
 $(BUSYBOX)/_install:
 	wget https://busybox.net/downloads/$(BUSYBOX).tar.bz2
 	tar xjf $(BUSYBOX).tar.bz2
-	make -C $(BUSYBOX) defconfig
-	make -C $(BUSYBOX) install
+	$(MAKE) -C $(BUSYBOX) defconfig
+	$(MAKE) -C $(BUSYBOX) install
 
 install:
 
