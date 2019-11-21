@@ -1106,6 +1106,7 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 	int rc, card, domain;
 	regmatch_t pmatch[1];
 	regex_t reg_buf;
+	unsigned int num;
 
 	*normalized = NULL;
 
@@ -1120,7 +1121,9 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 		goto out;
 	}
 
-	if (sscanf(apqn, "%x.%x", &card, &domain) != 2) {
+	if (sscanf(apqn, "%x.%x%n", &card, &domain, &num) != 2 ||
+	    num != strlen(apqn) || card < 0 || card > 0xff ||
+	    domain < 0 || domain > 0xFFFF) {
 		warnx("the APQN '%s' is not valid", apqn);
 		rc = -EINVAL;
 		goto out;
