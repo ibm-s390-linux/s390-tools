@@ -24,9 +24,9 @@ zkey \- Manage secure AES keys
 .
 .SH DESCRIPTION
 Use the \fBzkey\fP tool to generate and manage secure AES keys that are
-enciphered with a master key of an IBM cryptographic adapter in CCA coprocessor
-mode. You can also use the \fBzkey\fP tool to validate and re-encipher secure
-AES keys.
+enciphered with a master key of an IBM cryptographic adapter in CCA or EP11
+coprocessor mode, dependent on the key type. You can also use the \fBzkey\fP
+tool to validate and re-encipher secure AES keys.
 .PP
 The secure keys can either be stored in a file in the file system, or
 in the secure key repository. The default location of the secure key repository
@@ -43,7 +43,7 @@ group \fBzkeyadm\fP.
 When storing the secure key in a key repository, additional information, such as
 a textual description of the key, can be associated with a secure key.
 You can associate a secure key with one or multiple cryptographic adapters
-(APQNs) that are set up with the same CCA master key.
+(APQNs) that are set up with the same CCA or EP11 master key.
 You can also associate a secure key with one or multiple volumes
 (block devices), which are encrypted using dm-crypt with the secure key. The
 volume association also contains the device-mapper name, separated by a colon,
@@ -52,7 +52,7 @@ key.
 .PP
 The generated secure key is saved in a file with a size of 64 or 128 bytes.
 The file contains an AES key with a length of 128, 192, or 256 bits. The key is
-enciphered with the master key of the CCA cryptographic adapter.
+enciphered with the master key of the CCA or EP11 cryptographic adapter.
 Secure keys that are used for the XTS cipher mode can be 128 or 256 bits
 in size.
 .
@@ -111,13 +111,13 @@ key repository.
 .PP
 Use the
 .B generate
-command to generate a new secure AES key either randomly within the CCA
+command to generate a new secure AES key either randomly within the CCA or EP11
 cryptographic adapter, or from a clear AES key specified as input. When specifying
 a clear key as input, the clear key should be kept in a secure place, or be
 securely erased after creation of the secure key. The secure key itself does
 not need to be kept secure, because it can only be used together with a
-CCA cryptographic adapter that contains the master key with which the secure
-key was generated.
+CCA or EP11 cryptographic adapter that contains the master key with which the
+secure key was generated.
 .PP
 The generated secure key can either be stored in a file in the file system,
 or in the secure key repository. To store the generated secure key in a
@@ -135,14 +135,17 @@ additional information can be associated with a secure key using the
 .B \-\-sector-size
 options.
 .PP
-You can generate different types of secure keys: \fBCCA-AESDATA\fP keys, and
-\fBCCA-AESCIPHER\fP keys. Specify the type of the secure key using the
+You can generate different types of secure keys: \fBCCA-AESDATA\fP keys,
+\fBCCA-AESCIPHER\fP, and \fBEP11-AES\fP keys.
+Specify the type of the secure key using the
 .B \-\-key\-type
 option. The default key type is CCA-AESDATA.
 .PP
 .B Note:
 Secure keys of type \fBCCA-AESCIPHER\fP require an IBM cryptographic
 adapter in CCA coprocessor mode of version 6 or later, e.g. a CEX6C.
+Secure keys of type \fBEP11-AES\fP require an IBM cryptographic
+adapter in EP11 coprocessor mode of version 7 or later, e.g. a CEX7P.
 .
 .SS "Validating secure AES keys"
 .
@@ -223,7 +226,7 @@ are validated.
 Use the
 .B reencipher
 command to re-encipher an existing secure key with a new master key.
-A secure key must be re-enciphered when the master key of the CCA
+A secure key must be re-enciphered when the master key of the CCA or EP11
 cryptographic adapter changes.
 .PP
 The CCA cryptographic adapter has three different registers to store
@@ -246,11 +249,15 @@ the current master key. You can pro-actively re-encipher a secure key with the
 option to do this.
 .RE
 .PP
+\fBNote:\fP An EP11 cryptographic adapter has only two registers to store master
+keys, \fBCURRENT\fP and \fBNEW\fP.
+.PP
 Use the
 .B \-\-from\-old
 option to re-encipher a secure key that is currently enciphered with
 the master key in the \fBOLD\fP register with the master key in the
-\fBCURRENT\fP register.
+\fBCURRENT\fP register. This option is only available for secure keys of type
+\fBCCA-AESDATA\fP or \fBCCA-AESCIPHER\fP.
 .PP
 .PP
 If both the
@@ -301,19 +308,23 @@ the re-enciphered secure key. Re-enciphering from \fBOLD\fP to \fBCURRENT\fP is
 performed in-place per default. You can use option \fB\-\-in-place\fP to force an
 in-place re-enciphering for the \fBCURRENT\fP to \fBNEW\fP case. Be aware that
 a secure key that was re-enciphered in-place from \fBCURRENT\fP to \fBNEW\fP
-is no longer valid, until the new CCA master key has been made the current one.
+is no longer valid, until the new CCA or EP11 master key has been made the
+current one.
 .PP
 \fBStaged\fP mode means that the re-enciphered secure key is stored in a
 separate file in the secure key repository. Thus the current secure key is still
-valid at this point. Once the new CCA master key has been set (made active), you
-must rerun the reencipher command with option \fB\-\-complete\fP to complete the
-staged re-enciphering. Re-enciphering from \fBCURRENT\fP to \fBNEW\fP is
-performed in staged mode per default. You can use option \fB\-\-staged\fP to force
-a staged re-enciphering for the \fBOLD\fP to \fBCURRENT\fP case.
+valid at this point. Once the new CCA or EP11 master key has been set (made
+active), you must rerun the reencipher command with option \fB\-\-complete\fP
+to complete the staged re-enciphering. Re-enciphering from \fBCURRENT\fP to
+\fBNEW\fP is performed in staged mode per default. You can use option
+\fB\-\-staged\fP to force a staged re-enciphering for the \fBOLD\fP to
+\fBCURRENT\fP case.
 .PP
 .B Note:
-The \fBreencipher\fP command requires the CCA host library (libcsulcca.so)
-to be installed. For the supported environments and downloads, see:
+The \fBreencipher\fP command requires the CCA host library (libcsulcca.so, for)
+for secure keys of type CCA-AESDATA or CCA-AESCIPHER, or the IBM Z Enterprise
+PKCS #11 (EP11) Support Program (EP11 host library) for secure keys of type
+EP11-AES to be installed. For the supported environments and downloads, see:
 \fIhttp://www.ibm.com/security/cryptocards\fP
 .
 .SS "Import existing AES secure keys into the secure key repository"
@@ -490,8 +501,8 @@ associations with one command.
 .B Note:
 The secure key itself cannot be changed, only information about the secure
 key is changed. To rename a secure key, use the \fBrename\fP command.
-To re-encipher a secure key with a new CCA master key, use the \fBreencipher\fP
-command.
+To re-encipher a secure key with a new CCA or EP11 master key, use the
+\fBreencipher\fP command.
 .
 .SS "Rename existing AES secure keys in the secure key repository"
 .
@@ -788,7 +799,7 @@ A specific volume can only be associated with a single secure key.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
-Specifies a comma-separated list of cryptographic adapters in CCA
+Specifies a comma-separated list of cryptographic adapters in CCA or EP11
 coprocessor mode (APQN) which are associated with the secure AES key in the
 repository. Each APQN association specifies a card and domain number separated
 by a period (like lszcrypt displays it). When at least one APQN is specified,
@@ -818,11 +829,13 @@ the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key-type\~\fItype\fP
-Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP
-and \fBCCA-AESCIPHER\fP. If this option is omitted, then a secure key of type
-CCA-AESDATA is generated. Secure keys of type \fBCCA-AESCIPHER\fP require an
-IBM cryptographic adapter in CCA coprocessor mode of version 6 or later, e.g.
-a CEX6C.
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP,
+\fBCCA-AESCIPHER\fP, and \fBEP11-AES\fP. If this option is omitted, then a
+secure key of type CCA-AESDATA is generated.
+Secure keys of type \fBCCA-AESCIPHER\fP require an IBM cryptographic adapter
+in CCA coprocessor mode of version 6 or later, e.g. a CEX6C.
+Secure keys of type \fBEP11-AES\fP require an IBM cryptographic adapter
+in EP11 coprocessor mode of version 7 or later, e.g. a CEX7P.
 .
 .
 .
@@ -835,7 +848,7 @@ When wildcards are used you must quote the value.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
-Specifies a comma-separated list of cryptographic adapters in CCA
+Specifies a comma-separated list of cryptographic adapters in CCA or EP11
 coprocessor mode (APQNs). You can use wildcards in the APQN specification.
 All secure keys contained in the secure key repository
 which are associated with the specified APQNs are validated.
@@ -858,6 +871,8 @@ master key in the CURRENT register with the master key in the NEW register.
 .BR \-o ", " \-\-from\-old
 Re-enciphers a secure AES key that is currently enciphered with the
 master key in the OLD register with the master key in the CURRENT register.
+This option is only available for secure keys of type CCA-AESDATA and
+CCA-AESCIPHER.
 .TP
 .BR \-f ", " \-\-output\~\fIoutput\-file\fP
 Specifies the name of the output file to which the re-enciphered secure key
@@ -873,7 +888,7 @@ When wildcards are used you must quote the value.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
-Specifies a comma-separated list of cryptographic adapters in CCA
+Specifies a comma-separated list of cryptographic adapters in CCA or EP11
 coprocessor mode (APQNs). You can use wildcards in the APQN specification.
 All secure keys contained in the secure key repository
 which are associated with the specified APQNs are re-enciphered.
@@ -892,16 +907,16 @@ This option is only used for secure keys contained in the secure key repository.
 Forces that the re-enciphering of a secure AES key contained in the secure key
 repository is performed in staged mode. Staged mode means that the re-enciphered
 secure key is stored in a separate file in the secure key repository. Thus the
-current secure key is still valid at this point. Once the new CCA master key has
-been set (made active), you must rerun the reencipher command with option
-\fB\-\-complete\fP to complete the staged re-enciphering.
+current secure key is still valid at this point. Once the new CCA or EP11 master
+key has been set (made active), you must rerun the reencipher command with
+option \fB\-\-complete\fP to complete the staged re-enciphering.
 Re-enciphering from CURRENT to NEW is performed in staged mode per default.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-p ", " \-\-complete
-Completes a staged re-enciphering. Use this option after the new CCA master key
-has been set (made active). This option replaces the secure key by its
-re-enciphered version in the secure key repository.
+Completes a staged re-enciphering. Use this option after the new CCA or EP11
+master key has been set (made active). This option replaces the secure key by
+its re-enciphered version in the secure key repository.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -926,7 +941,7 @@ A specific volume can only be associated with a single secure key.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
-Specifies a comma-separated list of cryptographic adapters in CCA
+Specifies a comma-separated list of cryptographic adapters in CCA or EP11
 coprocessor mode (APQN) which are associated with the secure AES key in the
 repository. Each APQN association specifies a card and domain number separated
 by a period (like lszcrypt displays it). All specified APQNs must be online,
@@ -986,7 +1001,7 @@ When wildcards are used you must quote the value.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
-Specifies a comma-separated list of cryptographic adapters in CCA
+Specifies a comma-separated list of cryptographic adapters in CCA or EP11
 coprocessor mode (APQN) which are associated with the secure AES key in the
 repository. Only those keys are listed, which are associated with the specified
 APQNs. Each APQN association specifies a card and domain number separated
@@ -1004,8 +1019,9 @@ has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key-type\~\fItype\fP
-Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP
-and \fBCCA-AESCIPHER\fP. Only keys with the specified key type are listed.
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP,
+\fBCCA-AESCIPHER\fP, and \fBEP11-AES\fP. Only keys with the specified key type
+are listed.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -1050,7 +1066,7 @@ A specific volume can only be associated with a single secure key.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fI[+|-]card1.domain1[,card2.domain2[,...]]\fP
-Specifies a comma-separated list of cryptographic adapters in CCA
+Specifies a comma-separated list of cryptographic adapters in CCA or EP11
 coprocessor mode (APQN) which are associated with the secure AES key in the
 repository. Each APQN association specifies a card and domain number separated
 by a period (like lszcrypt displays it).
