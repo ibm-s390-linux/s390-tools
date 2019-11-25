@@ -164,7 +164,7 @@ static struct util_opt opt_vec[] = {
 		.desc = "Name of the secure AES key in the repository. If "
 			"option --name/-N is specified, then the generated "
 			"secure AES key is stored in the repository. Parameter "
-			"SECURE-KEY-FILE is not used when option --name/-M is "
+			"SECURE-KEY-FILE is not used when option --name/-N is "
 			"specified",
 		.command = COMMAND_GENERATE,
 	},
