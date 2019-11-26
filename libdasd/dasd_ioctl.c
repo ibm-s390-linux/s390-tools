@@ -149,6 +149,7 @@ int dasd_is_ro(const char *device, bool *ro)
 	fd = dasd_open_device(device, O_RDWR);
 	RUN_IOCTL(fd, BLKROGET, &val);
 	*ro = (val != 0) ? true : false;
+	dasd_close_device(fd);
 
 	return 0;
 }
