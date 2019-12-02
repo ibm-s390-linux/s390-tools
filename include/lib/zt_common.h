@@ -15,6 +15,21 @@
 #define STRINGIFY_1(x)			#x
 #define STRINGIFY(x)			STRINGIFY_1(x)
 
+/* Use this macro to make constant macros usable in both assembler and
+ * C code.
+ *
+ * Usage example:
+ *  #define IMAGE_ENTRY _AC(0x10000, UL)
+ */
+#ifdef __ASSEMBLER__
+#define _AC(X, TYPE)	X
+#else
+#define _AC(X, TYPE)	X##TYPE
+#endif
+
+
+#ifndef __ASSEMBLER__
+
 #ifdef UNUSED
 #elif defined(__GNUC__)
 # define UNUSED(x) UNUSED_ ## x __attribute__((unused))
@@ -50,4 +65,5 @@ typedef signed short int	s16;
 typedef unsigned char		u8;
 typedef signed char		s8;
 
+#endif /* __ASSEMBLER__ */
 #endif /* LIB_ZT_COMMON_H */
