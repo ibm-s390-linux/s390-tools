@@ -13,37 +13,37 @@
  * 			actual data: IPIB and UV header)
  */
 
+#include "stage3a.h"
+#include "common_memory_layout.h"
+
 OUTPUT_FORMAT("elf64-s390", "elf64-s390", "elf64-s390")
 OUTPUT_ARCH(s390:64-bit)
 
 ENTRY(_init)
 
-__heap_size__ = 0x4000;
-__stack_size__ = 0x1000;
-
 SECTIONS
 {
 	. = 0x0;
 
-	. = 0x2000;
+	. = HEAP_ADDRESS;
 	__heap_start = .;
 	.heap : {
-		. = . + __heap_size__;
-		ASSERT(__heap_stop - __heap_start == __heap_size__,
+		. = . + HEAP_SIZE;
+		ASSERT(__heap_stop - __heap_start == HEAP_SIZE,
 		       "Heap section doesn't conform to the described memory layout");
 	}
 	__heap_stop = .;
 
-	. = 0xf000;
+	. = STACK_ADDRESS;
 	__stack_start = .;
 	.stack : {
-		. = . + __stack_size__;
-		ASSERT(__stack_end - __stack_start == __stack_size__,
+		. = . + STACK_SIZE;
+		ASSERT(__stack_end - __stack_start == STACK_SIZE,
 		       "Stack section doesn't conform to the described memory layout");
 	}
 	__stack_end = .;
 
-	. = 0x10000;
+	. = STAGE3A_INIT_ENTRY;
 	__text_init_start = .;
 	.text : {
 		stage3a_init.o(.text.init)
@@ -51,9 +51,11 @@ SECTIONS
 		/* Text size of text_init must be smaller than 'PARMAREA - IMAGE_ENTRY',
 		 * otherwise the text data could be overwritten by the original zipl stage3
 		 * boot loader */
-		ASSERT(__text_init_stop - __text_init_start < 0x400,
+		ASSERT(__text_init_stop - __text_init_start < PARMAREA - IMAGE_ENTRY,
 		       "Text size must be smaller than 'PARMAREA - IMAGE_ENTRY'");
 		. = 0x1000;
+		ASSERT(ABSOLUTE(.) == STAGE3A_ENTRY,
+		       "Text section doesn't conform to the described memory layout");
 		head.o(.text.start)
 		*(.text)
 	}

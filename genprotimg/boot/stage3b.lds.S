@@ -11,28 +11,28 @@
  * 0x0f000 - 0x0ffff	Stack
  */
 
+#include "stage3b.h"
+#include "common_memory_layout.h"
+
 OUTPUT_FORMAT("elf64-s390", "elf64-s390", "elf64-s390")
 OUTPUT_ARCH(s390:64-bit)
 
 ENTRY(_start)
 
-__heap_size__ = 0x4000;
-__stack_size__ = 0x1000;
-
 SECTIONS
 {
 	. = 0x0;
 
-	. = 0x2000;
+	. = HEAP_ADDRESS;
 	__heap_start = .;
 	.heap : {
-		. = . + __heap_size__;
-		ASSERT(__heap_stop - __heap_start == __heap_size__,
+		. = . + HEAP_SIZE;
+		ASSERT(__heap_stop - __heap_start == HEAP_SIZE,
 		       "Heap section doesn't conform to the described memory layout");
 	}
 	__heap_stop = .;
 
-	. = 0xa000;
+	. = STAGE3B_ENTRY;
 	.text : {
 		head.o(.text.start)
 		*(.text)
@@ -65,11 +65,11 @@ SECTIONS
 		       "Data size must be equal to 'sizeof(struct stage3b_args)'");
 	}
 
-	. = 0xf000;
+	. = STACK_ADDRESS;
 	__stack_start = .;
 	.stack : {
-		. = . + __stack_size__;
-		ASSERT(__stack_end - __stack_start == __stack_size__,
+		. = . + STACK_SIZE;
+		ASSERT(__stack_end - __stack_start == STACK_SIZE,
 		       "Stack section doesn't conform to the described memory layout");
 	}
 	__stack_end = .;

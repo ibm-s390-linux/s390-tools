@@ -11,6 +11,10 @@
 #define STAGE3B_H
 
 #include "lib/zt_common.h"
+#include "boot/loaders_layout.h"
+
+#define STAGE3B_ENTRY			STAGE3_ENTRY
+#define STAGE3B_LOAD_ADDRESS		STAGE3B_ENTRY
 
 
 #ifndef __ASSEMBLER__

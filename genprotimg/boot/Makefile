@@ -39,6 +39,17 @@ all: $(FILES)
 	$(CC) $(ALL_CFLAGS) -c -o $@ $<
 
 
+# Dependencies for the .lds generation
+sources_lds_S = $(wildcard *.lds.S)
+dependencies_lds_S = $(sources_lds_s:%.lds.S=.%.lds.d)
+# Include all ".lds.d" dependency files for all make targets except for "clean"
+ifneq ($(MAKECMDGOALS),clean)
+-include $(dependencies_lds_S)
+endif
+
+%.lds:	%.lds.S Makefile
+	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -P -C -o $@ $<
+
 # Special rules for zipl object files
 $(ZIPL_OBJS_C): %.o : $(ZIPL_BOOT_DIR)/%.c
 	$(CC) $(ALL_CFLAGS) -c -o $@ $<
@@ -78,6 +89,6 @@ stage3b.elf: head.o stage3b.o stage3b.lds $(ZIPL_OBJS)
 	@chmod a-x $@
 
 clean:
-	rm -f *.o *.elf *.bin *.map .*.d
+	rm -f *.o *.elf *.bin *.map .*.d *.lds
 
 .PHONY: all clean
