@@ -4050,7 +4050,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	if (rc)
 		goto out;
 
-	rc = select_cca_adapter_by_mkvp(cca, mkvp, NULL,
+	rc = select_cca_adapter_by_mkvp(cca, mkvp, apqns,
 					FLAG_SEL_CCA_MATCH_CUR_MKVP,
 					keystore->verbose);
 	if (rc == -ENOTSUP) {
