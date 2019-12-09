@@ -15,7 +15,6 @@
 #include "libc.h"
 #include "boot/sigp.h"
 
-#define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 /*
  * Helper macro for exception table entries

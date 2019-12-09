@@ -67,6 +67,23 @@
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
+#undef MIN
+#define MIN(x, y)				\
+	({					\
+		__typeof__(x) _x = (x);		\
+		__typeof__(y) _y = (y);		\
+						\
+		_x < _y ? _x : _y;		\
+	})
+
+#undef MAX
+#define MAX(x, y)				\
+	({					\
+		__typeof__(x) _x = (x);		\
+		__typeof__(y) _y = (y);		\
+						\
+		_x > _y ? _x : _y;		\
+	})
 
 typedef unsigned long long	u64;
 typedef signed long long	s64;
