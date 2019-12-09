@@ -17,7 +17,7 @@ ALL_CFLAGS := $(NO_PIE_CFLAGS) -Os -g \
 	-mstack-size=4096 -mstack-guard=128 -msoft-float \
 	-Wall -Wformat-security -Wextra -Werror
 
-FILES := stage3a.bin stage3b.bin
+FILES := stage3a.bin stage3b.bin stage3b_reloc.bin
 
 ZIPL_SRCS_C := libc.c ebcdic.c ebcdic_conv.c sclp.c
 ZIPL_SRCS_ASM := entry.S
@@ -66,14 +66,17 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(dependencies_zipl_c)
 endif
 
+stage3b_reloc.o: stage3b.bin
 
 stage3a.elf: head.o stage3a_init.o stage3a.o stage3a.lds $(ZIPL_OBJS)
 stage3b.elf: head.o stage3b.o stage3b.lds $(ZIPL_OBJS)
+stage3b_reloc.elf:
 
 %.elf:	%.o
 	case $* in \
 		stage3a) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-T,stage3a.lds";; \
 		stage3b) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-T,stage3b.lds";; \
+		stage3b_reloc) SFLAGS="$(NO_PIE_LINKFLAGS) -nostdlib -Wl,-estage3b_reloc_start,-Ttext,0";; \
 	esac; \
 	$(LINK) $$SFLAGS -m64 $(filter %.o, $^) -o $@
 	@chmod a-x $@
