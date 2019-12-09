@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "libc.h"
 #include "sclp.h"
 #include "sclp_stage3.h"
 

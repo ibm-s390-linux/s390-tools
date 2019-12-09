@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "libc.h"
 #include "error.h"
 #include "s390.h"
 #include "sclp.h"

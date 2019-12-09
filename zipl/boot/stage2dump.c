@@ -13,6 +13,7 @@
 
 #include "lib/zt_common.h"
 
+#include "libc.h"
 #include "error.h"
 #include "sclp.h"
 #include "stage2dump.h"

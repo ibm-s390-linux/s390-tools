@@ -12,7 +12,6 @@
 #define S390_H
 
 #include "lib/zt_common.h"
-#include "libc.h"
 #include "boot/sigp.h"
 
 
