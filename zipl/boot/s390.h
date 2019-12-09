@@ -19,7 +19,12 @@
 #define __pa(x) ((unsigned long)(x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define barrier() __asm__ __volatile__("": : :"memory")
-#define inline		inline __attribute__((always_inline))
+/* The Linux kernel (in stddef.h) and glibc (sys/cdefs.h) define
+ * __always_inline. Therefore undefine it first to allow the headers
+ * to be included first.
+ */
+#undef __always_inline
+#define __always_inline inline __attribute__((always_inline))
 
 /*
  * Helper macro for exception table entries
@@ -214,7 +219,7 @@ do { \
 	libc_stop(reason); \
 } while (0)
 
-static inline int page_is_valid(unsigned long addr)
+static __always_inline int page_is_valid(unsigned long addr)
 {
 	unsigned long tmp;
 	int rc;
@@ -234,7 +239,7 @@ static inline int page_is_valid(unsigned long addr)
 	return rc;
 }
 
-static inline uint32_t csum_partial(const void *buf, int len, uint32_t sum)
+static __always_inline uint32_t csum_partial(const void *buf, int len, uint32_t sum)
 {
 	register unsigned long reg2 asm("2") = (unsigned long) buf;
 	register unsigned long reg3 asm("3") = (unsigned long) len;
@@ -262,7 +267,7 @@ static inline uint32_t csum_partial(const void *buf, int len, uint32_t sum)
 		  "i" (low), "i" (high));			\
 })
 
-static inline void __ctl_set_bit(unsigned int cr, unsigned int bit)
+static __always_inline void __ctl_set_bit(unsigned int cr, unsigned int bit)
 {
 	unsigned long reg;
 
@@ -282,7 +287,7 @@ enum diag308_subcode {
 	DIAG308_STORE	= 6,
 };
 
-static inline int diag308(unsigned long subcode, void *addr)
+static __always_inline int diag308(unsigned long subcode, void *addr)
 {
 	register unsigned long _addr asm("0") = (unsigned long) addr;
 	register unsigned long _rc asm("1") = 0;
@@ -298,7 +303,7 @@ static inline int diag308(unsigned long subcode, void *addr)
 /*
  * Store CPU address
  */
-static inline unsigned short stap(void)
+static __always_inline unsigned short stap(void)
 {
 	unsigned short cpu_address;
 
@@ -309,7 +314,7 @@ static inline unsigned short stap(void)
 /*
  * Program the clock comparator
  */
-static inline void set_clock_comparator(uint64_t time)
+static __always_inline void set_clock_comparator(uint64_t time)
 {
 	asm volatile("sckc %0" : : "Q" (time));
 }
@@ -317,7 +322,7 @@ static inline void set_clock_comparator(uint64_t time)
 /*
  * Program the CPU timer
  */
-static inline void set_cpu_timer(uint64_t timer)
+static __always_inline void set_cpu_timer(uint64_t timer)
 {
 	asm volatile("spt %0" : : "Q" (timer));
 }
@@ -325,7 +330,7 @@ static inline void set_cpu_timer(uint64_t timer)
 /*
  * Get current time (store clock)
  */
-static inline unsigned long long get_tod_clock(void)
+static __always_inline unsigned long long get_tod_clock(void)
 {
 	unsigned long long clk;
 
@@ -343,7 +348,7 @@ struct cpuid {
 	unsigned int unused:16;
 } __packed __aligned(8);
 
-static inline void get_cpu_id(struct cpuid *ptr)
+static __always_inline void get_cpu_id(struct cpuid *ptr)
 {
 	asm volatile("stidp %0" : "=Q" (*ptr));
 }
@@ -351,7 +356,7 @@ static inline void get_cpu_id(struct cpuid *ptr)
 /*
  * Check if we run under z/VM
  */
-static inline int is_zvm(void)
+static __always_inline int is_zvm(void)
 {
 	struct cpuid cpuid;
 
@@ -369,7 +374,7 @@ typedef struct {
 /*
  * Save vector registers
  */
-static inline void save_vx_regs(__vector128 *vxrs)
+static __always_inline void save_vx_regs(__vector128 *vxrs)
 {
 	typedef struct { __vector128 _[32]; } addrtype;
 
@@ -383,7 +388,7 @@ static inline void save_vx_regs(__vector128 *vxrs)
 /*
  * Save vector registers safe
  */
-static inline void save_vx_regs_safe(__vector128 *vxrs)
+static __always_inline void save_vx_regs_safe(__vector128 *vxrs)
 {
 	unsigned long cr0;
 
@@ -396,7 +401,7 @@ static inline void save_vx_regs_safe(__vector128 *vxrs)
 
 #define MAX_FACILITY_BIT (256*8)	/* stfle_fac_list has 256 bytes */
 
-static inline int __test_facility(unsigned long nr, void *facilities)
+static __always_inline int __test_facility(unsigned long nr, void *facilities)
 {
 	unsigned char *ptr;
 
@@ -411,12 +416,12 @@ static inline int __test_facility(unsigned long nr, void *facilities)
  * That makes it easier to query facility bits with the bit number as
  * documented in the Principles of Operation.
  */
-static inline int test_facility(unsigned long nr)
+static __always_inline int test_facility(unsigned long nr)
 {
 	return __test_facility(nr, &S390_lowcore.stfle_fac_list);
 }
 
-static inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, int size)
+static __always_inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, int size)
 {
 	register unsigned long reg0 asm("0") = size - 1;
 
@@ -433,7 +438,7 @@ static inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, int size)
  * @stfle_fac_list: array where facility list can be stored
  * @size: size of passed in array in double words
  */
-static inline void stfle(uint64_t *stfle_fac_list, int size)
+static __always_inline void stfle(uint64_t *stfle_fac_list, int size)
 {
 	unsigned long nr;
 
