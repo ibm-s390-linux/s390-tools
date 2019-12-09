@@ -14,7 +14,7 @@
 #define KDUMP_H
 
 #include "libc.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 #define OS_INFO_VERSION_MAJOR_SUPPORTED	1
 #define OS_INFO_MAGIC			0x4f53494e464f535aULL /* OSINFOSZ */

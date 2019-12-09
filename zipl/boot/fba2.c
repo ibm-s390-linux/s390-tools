@@ -11,7 +11,7 @@
 
 #include "fba.h"
 #include "libc.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 int extract_length(void *data) {
 	struct linear_blockptr *blockptr = (struct linear_blockptr *)data;

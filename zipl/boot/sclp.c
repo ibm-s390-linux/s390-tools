@@ -11,7 +11,7 @@
 
 #include "libc.h"
 #include "error.h"
-#include "s390.h"
+#include "boot/s390.h"
 #include "sclp.h"
 
 /* Perform service call. Return 0 on success, non-zero otherwise. */

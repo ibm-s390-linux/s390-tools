@@ -12,7 +12,7 @@
 #define CIO_H
 
 #include "libc.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 /* Condition codes */
 #define CC_INITIATED		0

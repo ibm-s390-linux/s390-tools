@@ -10,7 +10,7 @@
  */
 
 #include "eckd.h"
-#include "s390.h"
+#include "boot/s390.h"
 #include "stage2.h"
 
 int extract_length(void *data)

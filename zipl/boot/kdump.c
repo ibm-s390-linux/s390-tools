@@ -13,7 +13,7 @@
 #include "kdump.h"
 #include "libc.h"
 #include "menu.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 void kdump_failed(unsigned long reason)
 {

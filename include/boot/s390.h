@@ -1,19 +1,25 @@
 /*
- * zipl - zSeries Initial Program Loader tool
+ * s390 related definitions and functions.
  *
- * System z specific functions
- *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
  */
+
 #ifndef S390_H
 #define S390_H
 
 #include "lib/zt_common.h"
 #include "boot/sigp.h"
 
+#define __LC_IPLDEV		0x0c6c
+#define __LC_OS_INFO		0x0e18
+
+#define PAGE_SIZE		_AC(4096, UL)
+
+
+#ifndef __ASSEMBLER__
 
 /*
  * Helper macro for exception table entries
@@ -194,10 +200,6 @@ struct _lowcore {
 
 #define S390_lowcore (*((struct _lowcore *) 0))
 
-#define __LC_IPLDEV		0x0c6c
-#define __LC_OS_INFO		0x0e18
-
-#define PAGE_SIZE		4096
 
 void panic_notify(unsigned long reason);
 
@@ -446,4 +448,5 @@ static __always_inline void stfle(uint64_t *stfle_fac_list, int size)
 	memset((char *) stfle_fac_list + nr, 0, size * 8 - nr);
 }
 
+#endif /* __ASSEMBLER__ */
 #endif /* S390_H */

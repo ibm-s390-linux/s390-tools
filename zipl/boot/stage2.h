@@ -15,7 +15,7 @@
 #include "cio.h"
 #include "error.h"
 #include "libc.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 #define DESCR_PER_BLOCK         16
 
@@ -76,4 +76,3 @@ void kdump_stage2(unsigned long);
 
 
 #endif /* COMMON_H */
-

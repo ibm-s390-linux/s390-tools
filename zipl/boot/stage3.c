@@ -11,7 +11,7 @@
 
 #include "libc.h"
 #include "boot/sigp.h"
-#include "s390.h"
+#include "boot/s390.h"
 #include "stage3.h"
 #include "error.h"
 #include "zipl.h"

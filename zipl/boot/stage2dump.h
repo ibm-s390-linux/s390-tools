@@ -13,7 +13,7 @@
 #define STAGE2DUMP_H
 
 #include "libc.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 #define IPL_SC	*((struct subchannel_id *) &S390_lowcore.subchannel_id)
 #define ROUND_DOWN(x, a)		((x) & ~((typeof(x))(a) - 1))

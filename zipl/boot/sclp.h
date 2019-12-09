@@ -13,7 +13,7 @@
 #define SCLP_H
 
 #include "libc.h"
-#include "s390.h"
+#include "boot/s390.h"
 
 /* vector keys and ids */
 #define GDS_ID_MDSMU		0x1310
