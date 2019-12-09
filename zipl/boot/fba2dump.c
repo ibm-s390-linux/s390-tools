@@ -14,7 +14,7 @@
 #include "fba.h"
 #include "stage2dump.h"
 
-#define BLK_PWRT	64			/* Blocks per write */
+#define BLK_PWRT	64U			/* Blocks per write */
 #define BLK_SIZE	0x200			/* FBA block size */
 #define BLK_PER_PAGE	(PAGE_SIZE / BLK_SIZE)	/* FBA blocks per page */
 
