@@ -15,16 +15,7 @@
 #include "libc.h"
 #include "boot/sigp.h"
 
-#define __pa32(x) ((uint32_t)(unsigned long)(x))
-#define __pa(x) ((unsigned long)(x))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
-#define barrier() __asm__ __volatile__("": : :"memory")
-/* The Linux kernel (in stddef.h) and glibc (sys/cdefs.h) define
- * __always_inline. Therefore undefine it first to allow the headers
- * to be included first.
- */
-#undef __always_inline
-#define __always_inline inline __attribute__((always_inline))
 
 /*
  * Helper macro for exception table entries

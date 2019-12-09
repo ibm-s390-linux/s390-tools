@@ -55,6 +55,18 @@
 #define __may_alias __attribute__((may_alias))
 #define __section(x) __attribute__((__section__(#x)))
 #define __noinline __attribute__((__noinline__))
+/* The Linux kernel (in stddef.h) and glibc (sys/cdefs.h) define
+ * __always_inline. Therefore undefine it first to allow the headers
+ * to be included first.
+ */
+#undef __always_inline
+#define __always_inline inline __attribute__((always_inline))
+
+#define __pa32(x) ((uint32_t)(unsigned long)(x))
+#define __pa(x) ((unsigned long)(x))
+
+#define barrier() __asm__ __volatile__("": : :"memory")
+
 
 typedef unsigned long long	u64;
 typedef signed long long	s64;
