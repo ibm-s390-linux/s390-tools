@@ -68,6 +68,8 @@ static const char* usage_text[] = {
 "-P, --parameters PARMLINE       Use specified kernel PARMLINE",
 "-T, --tape TAPEDEV              Install bootloader on tape device TAPEDEV",
 "-s, --segment SEGMENT,ADDR      Install a segment from file SEGMENT",
+"-k, --kdump=auto                Install a kdump kernel that can be used as a",
+"                                stand-alone dump tool",
 "-d, --dumpto DUMPDEV[,SIZE]     Install a system dump record on tape device",
 "                                or disk partition DUMPDEV",
 "-M, --mvdump DEVLIST[,SIZE]     Install a multi-volume dump record on each",
@@ -78,7 +80,12 @@ static const char* usage_text[] = {
 "-n, --noninteractive            Answer all confirmation questions with 'yes'",
 "-V, --verbose                   Provide more verbose output",
 "-a, --add-files                 Add all referenced files to bootmap file",
-"    --dry-run                   Simulate run but don't modify IPL records"
+"    --dry-run                   Simulate run but don't modify IPL records",
+"-S, --secure SWITCH             Control the zIPL secure boot support.",
+"                                 auto (default):",
+"                                  Write signatures if available and supported",
+"                                 1: Write signatures regardless of support",
+"                                 0: Do not write signatures"
 };
 
 
