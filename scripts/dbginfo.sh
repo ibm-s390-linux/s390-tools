@@ -179,6 +179,9 @@ readonly OUTPUT_FILE_ETHTOOL="${WORKPATH}ethtool.out"
 # File that includes content of tc commands
 readonly OUTPUT_FILE_TC="${WORKPATH}tc.out"
 
+# File that includes content of bridge commands
+readonly OUTPUT_FILE_BRIDGE="${WORKPATH}bridge.out"
+
 # File that includes the output of journalctl
 readonly OUTPUT_FILE_JOURNALCTL="${WORKPATH}journalctl.out"
 
@@ -198,7 +201,7 @@ readonly OUTPUT_FILE_NVME="${WORKPATH}nvme.out"
 readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
 
 # The amount of steps running the whole collections
-readonly COLLECTION_COUNT=14
+readonly COLLECTION_COUNT=15
 
 # The kernel version (e.g. '2' from 2.6.32 or '3' from 3.2.1)
 readonly KERNEL_VERSION=$(uname -r 2>/dev/null | cut -d'.' -f1)
@@ -818,6 +821,30 @@ collect_tc() {
 }
 
 ########################################
+collect_bridge() {
+    local network_devices
+    local network_device
+
+    network_devices=$(ls /sys/class/net 2>/dev/null)
+    if which bridge >/dev/null 2>&1; then
+	if test -n "${network_devices}"; then
+	    pr_syslog_stdout "10 of ${COLLECTION_COUNT}: Collecting bridge output"
+	    for network_device in ${network_devices}; do
+		call_run_command "bridge -d link show dev ${network_device}" "${OUTPUT_FILE_BRIDGE}"
+		call_run_command "bridge -s fdb show dev ${network_device}" "${OUTPUT_FILE_BRIDGE}"
+		call_run_command "bridge -d mdb show dev ${network_device}" "${OUTPUT_FILE_BRIDGE}"
+	    done
+	else
+	    pr_syslog_stdout "10 of ${COLLECTION_COUNT}: Collecting bridge output skipped - no devices"
+	fi
+    else
+	pr_syslog_stdout "10 of ${COLLECTION_COUNT}: Collecting bridge output skipped - not available"
+    fi
+
+    pr_log_stdout " "
+}
+
+########################################
 # OpenVSwitch
 collect_ovs() {
     local br_list
@@ -833,7 +860,7 @@ collect_ovs() {
             :ovsdb-client dump\
             "
     if test -n "${br_list}"; then
-        pr_syslog_stdout "10 of ${COLLECTION_COUNT}: Collecting OpenVSwitch output"
+        pr_syslog_stdout "11 of ${COLLECTION_COUNT}: Collecting OpenVSwitch output"
         IFS=:
           for ovscmd in ${ovscmds}; do
             IFS=${ifs_orig} call_run_command "${ovscmd}" "${OUTPUT_FILE_OVS}.out"
@@ -852,7 +879,7 @@ collect_ovs() {
          IFS="${ifs_orig}"
         done
     else
-        pr_syslog_stdout "10 of ${COLLECTION_COUNT}: Collecting OpenVSwitch output skipped"
+        pr_syslog_stdout "11 of ${COLLECTION_COUNT}: Collecting OpenVSwitch output skipped"
     fi
 
     pr_log_stdout " "
@@ -865,12 +892,12 @@ collect_domain_xml() {
 
     domain_list=$(virsh list --all --name)
     if test -n "${domain_list}"; then
-        pr_syslog_stdout "11 of ${COLLECTION_COUNT}: Collecting domain xml files"
+        pr_syslog_stdout "12 of ${COLLECTION_COUNT}: Collecting domain xml files"
 	  for domain in ${domain_list}; do
 	    call_run_command "virsh dumpxml ${domain}" "${OUTPUT_FILE_XML}_${domain}.xml"
           done
     else
-        pr_syslog_stdout "11 of ${COLLECTION_COUNT}: Collecting domain xml files skipped"
+        pr_syslog_stdout "12 of ${COLLECTION_COUNT}: Collecting domain xml files skipped"
     fi
 
     pr_log_stdout " "
@@ -884,23 +911,23 @@ collect_docker() {
     # call docker inspect for all containers
     item_list=$(docker ps -qa)
     if test -n "${item_list}"; then
-        pr_syslog_stdout "12a of ${COLLECTION_COUNT}: Collecting docker container output"
+        pr_syslog_stdout "13a of ${COLLECTION_COUNT}: Collecting docker container output"
         for item in ${item_list}; do
             call_run_command "docker inspect ${item}" "${OUTPUT_FILE_DOCKER}"
         done
     else
-        pr_syslog_stdout "12a of ${COLLECTION_COUNT}: Collecting docker container output skipped"
+        pr_syslog_stdout "13a of ${COLLECTION_COUNT}: Collecting docker container output skipped"
     fi
 
     # call docker inspect for all networks
     item_list=$(docker network ls -q)
     if test -n "${item_list}"; then
-        pr_syslog_stdout "12b of ${COLLECTION_COUNT}: Collecting docker network output"
+        pr_syslog_stdout "13b of ${COLLECTION_COUNT}: Collecting docker network output"
         for item in ${item_list}; do
             call_run_command "docker network inspect ${item}" "${OUTPUT_FILE_DOCKER}"
         done
     else
-        pr_syslog_stdout "12b of ${COLLECTION_COUNT}: Collecting docker network output skipped"
+        pr_syslog_stdout "13b of ${COLLECTION_COUNT}: Collecting docker network output skipped"
     fi
 
     pr_log_stdout " "
@@ -910,7 +937,7 @@ collect_docker() {
 collect_nvme() {
     local NVME
 
-    pr_syslog_stdout "13 of ${COLLECTION_COUNT}: Collecting nvme output"
+    pr_syslog_stdout "14 of ${COLLECTION_COUNT}: Collecting nvme output"
     call_run_command "nvme list" "${OUTPUT_FILE_NVME}"
 
     for NVME in /dev/nvme[0-9]*; do
@@ -1220,6 +1247,8 @@ collect_osaoat
 collect_ethtool
 
 collect_tc
+
+collect_bridge
 
 collect_ovs
 

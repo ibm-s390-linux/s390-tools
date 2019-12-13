@@ -5,6 +5,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 5.x
 
   Changes of existing tools:
+  - dbginfo: Gather bridge related data (using 'bridge')
 
   Bug Fixes:
 
