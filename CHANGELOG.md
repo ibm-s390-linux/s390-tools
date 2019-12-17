@@ -1,15 +1,32 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.11.x (2019-xx-xx)__
+ * __v2.12.0 (2019-12-17)__
 
-  For Linux kernel version: 5.x
+  For Linux kernel version: 5.4
 
   Changes of existing tools:
   - dbginfo: Gather qdisc related data (using 'tc')
   - dbginfo: Gather extended network statistics (using 'ip link')
+  - dbginfo: Collect all files under /usr/lib/systemd/system/
+  - cpumf/cpumf_helper: Add IBM z15 machine name
+  - zkey: Display MKVP when validating a secure key
+  - zkey: Cross check APQNs when generating, validating, or importing secure keys,
+      and when changing APQN associations
+  - zkey: Check crypto card level during APQN cross checking
+  - zkey: Add support for generating, validating, and re-enciphering AES CIPHER keys
+  - zkey-cryptsetup: Add --to-new and --from-old options
+  - zkey-cryptsetup: Allow setkey to set different key types
+  - lszcrypt/chzcrypt: CEX7S exploitation support
+  - zcryptstats: Add support for CEX7 crypto card
+  - zipl: Ship a minimal zipl.conf
+  - zipl: Add value of target= as search path for BLS case
 
   Bug Fixes:
-
+  - dasdview: Fix exit status in error cases
+  - zipl: Fix various compile warnings
+  - zipl: Fix dependency generation in zipl/boot
+  - zipl: Fix entry point for stand-alone kdump
+  - zipl: Add missing options to help output
 
  * __v2.11.0 (2019-09-06)__
 

@@ -98,6 +98,7 @@ List of all individuals having contributed content to s390-tools
 - Thomas Richter
 - Thomas Spatzier
 - Thomas Weber
+- Tuan Hoang
 - Ursula Braun
 - Utz Bacher
 - Vasily Gorbik
