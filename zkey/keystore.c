@@ -906,7 +906,7 @@ static int _keystore_info_file_filter(const struct dirent *dirent)
 {
 	size_t len;
 
-	if (dirent->d_type != DT_REG)
+	if (dirent->d_type != DT_REG && dirent->d_type != DT_UNKNOWN)
 		return 0;
 
 	len = strlen(dirent->d_name);
