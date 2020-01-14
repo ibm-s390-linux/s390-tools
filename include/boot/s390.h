@@ -358,12 +358,17 @@ static __always_inline int is_zvm(void)
 	return cpuid.version == 0xff;
 }
 
+/* To avoid conflicts add a macro guard since __vector128 is also
+ * defined in 'linux/asm/types.h'.
+ */
+#ifndef _S390_TYPES_H
 /*
  * Vector register definition
  */
 typedef struct {
 	uint32_t u[4];
 } __vector128;
+#endif
 
 /*
  * Save vector registers
