@@ -624,7 +624,7 @@ out_err:
 	if (rc != 0)
 		secure_free(pass, MAX_PASSWORD_SIZE + 1);
 	else
-		write(outfd, "\n", 1);
+		rc = write(outfd, "\n", 1) == 1 ? 0 : -EIO;
 
 	if (infd != STDIN_FILENO)
 		close(infd);
