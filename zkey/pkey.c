@@ -1591,8 +1591,8 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 	if (is_cca_aes_data_key(key, key_size)) {
 		*bitsize = datakey->bitsize;
 		if (key_size == 2 * AESDATA_KEY_SIZE) {
-			datakey = (struct aesdatakeytoken *)key +
-					AESDATA_KEY_SIZE;
+			datakey = (struct aesdatakeytoken *)(key +
+					AESDATA_KEY_SIZE);
 			*bitsize += datakey->bitsize;
 		}
 	} else if (is_cca_aes_cipher_key(key, key_size)) {
@@ -1601,8 +1601,8 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 		else
 			*bitsize = 0; /* Unknown */
 		if (key_size > cipherkey->length) {
-			cipherkey = (struct aescipherkeytoken *)key +
-					cipherkey->length;
+			cipherkey = (struct aescipherkeytoken *)(key +
+					cipherkey->length);
 			if (cipherkey->pfv == 0x00) /* V0 payload */
 				*bitsize += cipherkey->pl - 384;
 		}
