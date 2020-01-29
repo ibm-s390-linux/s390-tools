@@ -28,22 +28,22 @@ all: data.o data.h tape0.bin stage3.bin
 
 eckd2dump_sv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o \
-	libc.o sclp.o entry.o
+	libc.o ebcdic.o sclp.o entry.o
 eckd2dump_mv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_mv.o \
-	libc.o sclp.o entry.o
+	libc.o ebcdic.o sclp.o entry.o
 fba2dump.exec: \
 	head.o stage2dump.o cio.o fba2dump.o \
-	libc.o sclp.o entry.o
+	libc.o ebcdic.o sclp.o entry.o
 tape2dump.exec: \
 	head.o stage2dump.o cio.o tape2dump.o \
-	libc.o sclp.o entry.o
-eckd2.exec: head.o stage2.o cio.o eckd2.o libc.o menu.o sclp.o \
+	libc.o ebcdic.o sclp.o entry.o
+eckd2.exec: head.o stage2.o cio.o eckd2.o libc.o ebcdic.o menu.o sclp.o \
 	    kdump2.o kdump.o entry.o
-fba2.exec: head.o stage2.o cio.o fba2.o libc.o menu.o sclp.o \
+fba2.exec: head.o stage2.o cio.o fba2.o libc.o ebcdic.o menu.o sclp.o \
 	   kdump2.o kdump.o entry.o
-stage3.exec: head.o stage3.o kdump3.o libc.o sclp.o sclp_stage3.o \
-	     kdump.o entry.o stage3.lds
+stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
+	     sclp_stage3.o kdump.o entry.o stage3.lds
 
 %.exec:	%.o
 	STAGE=$$( \

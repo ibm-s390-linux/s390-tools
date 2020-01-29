@@ -18,6 +18,7 @@
 
 #include "error.h"
 #include "sclp.h"
+#include "ebcdic.h"
 
 extern char __heap_start[];
 extern char __heap_stop[];
@@ -127,24 +128,6 @@ int strncmp(const char *s1, const char *s2, unsigned long count)
 			return *(unsigned char *)(s1 - 1) -
 				*(unsigned char *)(s2 - 1);
 	return 0;
-}
-
-/*
- * Convert ebcdic string to number with given base
- */
-unsigned long ebcstrtoul(char *nptr, char **endptr, int base)
-{
-	unsigned long val = 0;
-
-	while (ebc_isdigit(*nptr)) {
-		if (val != 0)
-			val *= base;
-		val += *nptr - 0xf0;
-		nptr++;
-	}
-	if (endptr)
-		*endptr = (char *) nptr;
-	return val;
 }
 
 static int skip_atoi(const char **c)
