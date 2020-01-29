@@ -406,8 +406,11 @@ void printf(const char *fmt, ...)
 		buf[LINE_LENGTH - 2] = '.';
 		buf[LINE_LENGTH - 3] = '.';
 	}
-	sclp_print(buf);
 	va_end(va);
+	sclp_print(buf);
+#ifdef ENABLE_SCLP_ASCII
+	sclp_print_ascii(buf);
+#endif /* ENABLE_SCLP_ASCII */
 }
 
 /*
