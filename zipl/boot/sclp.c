@@ -126,20 +126,20 @@ int sclp_setup(int initialise)
 
 	switch (initialise) {
 	case SCLP_INIT:
-		sccb->receive_mask = 0x80000000;
-		sccb->send_mask = 0x40000000;
+		sccb->receive_mask = SCLP_EVENT_MASK_OPCMD;
+		sccb->send_mask = SCLP_EVENT_MASK_MSG;
 		break;
 	case SCLP_DISABLE:
-		sccb->receive_mask = 0x0;
-		sccb->send_mask = 0x0;
+		sccb->receive_mask = SCLP_EVENT_MASK_DISABLE;
+		sccb->send_mask = SCLP_EVENT_MASK_DISABLE;
 		break;
 	case SCLP_HSA_INIT:
-		sccb->receive_mask = 0x0;
-		sccb->send_mask = 0x40000010;
+		sccb->receive_mask = SCLP_EVENT_MASK_DISABLE;
+		sccb->send_mask = SCLP_EVENT_MASK_MSG | SCLP_EVENT_MASK_SDIAS;
 		break;
 	case SCLP_HSA_INIT_ASYNC:
-		sccb->receive_mask = 0x00000010;
-		sccb->send_mask = 0x40000010;
+		sccb->receive_mask = SCLP_EVENT_MASK_SDIAS;
+		sccb->send_mask = SCLP_EVENT_MASK_MSG | SCLP_EVENT_MASK_SDIAS;
 		break;
 	}
 
