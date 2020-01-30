@@ -2,7 +2,7 @@
 #
 # zfcpdbf - Tool to interpret the information from logging/tracing sources
 #
-# Copyright IBM Corp. 2010, 2017
+# Copyright IBM Corp. 2010, 2020
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -652,6 +652,47 @@ sub _print_hba_id3
 	}
 }
 
+sub _print_hba_id5
+{
+	my $fsf_req_id = shift();
+	my $rec = shift();
+	my $payload_length = shift();
+	my $rec_received = shift();
+	my $rec_issued;
+
+	$rec_issued  = stck_to_timeval(substr($rec, 0, 16));
+
+	if (defined $timediff) { # do we want to see delayed responses ?
+		my @t_arr = split(/[-:]/, $rec_received);
+
+		my $ts1 = mktime($t_arr[5], $t_arr[4], $t_arr[3],
+				 $t_arr[2], $t_arr[1] - 1, $t_arr[0] - 1900);
+
+		my ($ts2, $us2) = split(/:/, $rec_issued);
+
+		my $ts_received = $ts1 . "." . $t_arr[6];
+		my $ts_issued = $ts2 . "." . $us2;
+
+		if (($ts_received - $ts_issued) >= $timediff) {
+			print "WARNING: delayed response above ",
+			      "skip level of $timediff seconds.\n";
+		}
+	}
+
+	print "FSF issued     : ",str_timestamp($rec_issued),"\n";
+	print "FSF stat       : 0x", substr($rec, 16, 8), "\n";
+	print "FSF stat qual  : n/a\n";
+	print "Prot stat      : n/a\n";
+	print "Prot stat qual : n/a\n";
+
+	print "Port handle    : 0x", substr($rec, 24, 8), "\n";
+	print "LUN handle     : n/a\n";
+
+	print "WWPN           : 0x", substr($rec, 32, 16), "\n";
+	print "FCES old       : 0x", substr($rec, 48, 8), "\n";
+	print "FCES new       : 0x", substr($rec, 56, 8), "\n";
+}
+
 sub print_deferr_common
 {
 	my $rec = shift();
@@ -854,6 +895,7 @@ sub assign_callback_subs
 	$print_hba_id[1] = \&_print_hba_id1;
 	$print_hba_id[2] = \&_print_hba_id2;
 	$print_hba_id[3] = \&_print_hba_id3;
+	$print_hba_id[5] = \&_print_hba_id5;
 
 	$print_rec_id[1] = \&_print_rec_id1;
 	$print_rec_id[2] = \&_print_rec_id2;
