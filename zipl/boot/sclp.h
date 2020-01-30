@@ -28,9 +28,16 @@
 #define SCLP_CMD_READ_INFO2     0x00020001
 #define SCLP_CMD_READ_DATA      0x00770005
 
+/* SCLP function codes */
+#define SCLP_FC_NORMAL_WRITE	0
+
+/* SCLP event data types */
+#define SCLP_EVENT_DATA_ASCII	0x1a
+
 /* SCLP event masks */
 #define SCLP_EVENT_MASK_DISABLE	0x00000000
 #define SCLP_EVENT_MASK_SDIAS	0x00000010
+#define SCLP_EVENT_MASK_ASCII	0x00000040
 #define SCLP_EVENT_MASK_MSG	0x40000000
 #define SCLP_EVENT_MASK_OPCMD	0x80000000
 
@@ -46,6 +53,11 @@
 #define SCLP_DISABLE            0x1
 #define SCLP_HSA_INIT           0x2
 #define SCLP_HSA_INIT_ASYNC     0x3
+#define SCLP_LINE_ASCII_INIT    0x4
+
+#define SCCB_SIZE		PAGE_SIZE
+#define SCCB_MAX_DATA_LEN	(SCCB_SIZE - sizeof(struct sccb_header) \
+				 - sizeof(struct evbuf_header))
 
 typedef uint32_t sccb_mask_t;
 
@@ -114,7 +126,10 @@ struct mdb {
 
 struct msg_buf {
 	struct evbuf_header header;
-	struct mdb mdb;
+	union {
+		struct mdb mdb;
+		uint8_t data[0];
+	};
 } __packed;
 
 struct write_sccb {
@@ -164,6 +179,9 @@ struct read_sccb {
 int start_sclp(unsigned int, void *);
 int sclp_setup(int);
 int sclp_print(char *);
+# ifdef ENABLE_SCLP_ASCII
+int sclp_print_ascii(const char *);
+# endif /* ENABLE_SCLP_ASCII */
 int sclp_param(char *);
 int sclp_read(unsigned long, void *, int *);
 int sclp_read_info(struct read_info_sccb *sccb);

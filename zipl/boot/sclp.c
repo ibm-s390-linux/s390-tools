@@ -13,6 +13,10 @@
 #include "error.h"
 #include "boot/s390.h"
 #include "sclp.h"
+#include "ebcdic.h"
+#ifdef ENABLE_SCLP_ASCII
+# include "ebcdic_conv.h"
+#endif /* ENABLE_SCLP_ASCII */
 
 /* Perform service call. Return 0 on success, non-zero otherwise. */
 static int sclp_service_call(unsigned int command, void *sccb)
@@ -133,6 +137,10 @@ int sclp_setup(int initialise)
 		sccb->receive_mask = SCLP_EVENT_MASK_DISABLE;
 		sccb->send_mask = SCLP_EVENT_MASK_DISABLE;
 		break;
+	case SCLP_LINE_ASCII_INIT:
+		sccb->receive_mask = SCLP_EVENT_MASK_DISABLE;
+		sccb->send_mask = SCLP_EVENT_MASK_MSG | SCLP_EVENT_MASK_ASCII;
+		break;
 	case SCLP_HSA_INIT:
 		sccb->receive_mask = SCLP_EVENT_MASK_DISABLE;
 		sccb->send_mask = SCLP_EVENT_MASK_MSG | SCLP_EVENT_MASK_SDIAS;
@@ -160,6 +168,48 @@ out_free_page:
 	free_page((unsigned long) sccb);
 	return rc;
 }
+
+#ifdef ENABLE_SCLP_ASCII
+/* Content of @buffer must be EBCDIC encoded. The function used for
+ * the conversion `ebcdic_to_ascii` differentiates whether the code
+ * runs on z/VM or not and then selects the appropriate EBCDIC
+ * coding.
+ */
+int sclp_print_ascii(const char *buffer)
+{
+	struct write_sccb *sccb = NULL;
+	int rc, str_len = strlen(buffer);
+	unsigned long data_len = str_len + 1;
+
+	/* don't overflow the sccb buffer */
+	if (data_len > SCCB_MAX_DATA_LEN)
+		data_len = SCCB_MAX_DATA_LEN;
+
+	sccb = (void *)get_zeroed_page();
+	sccb->header.length = sizeof(struct write_sccb) - sizeof(struct mdb)
+		+ data_len;
+	sccb->header.function_code = SCLP_FC_NORMAL_WRITE;
+	sccb->msg_buf.header.length = sizeof(struct msg_buf) - sizeof(struct mdb)
+		+ data_len;
+	sccb->msg_buf.header.type = SCLP_EVENT_DATA_ASCII;
+	sccb->msg_buf.header.flags = 0;
+	ebcdic_to_ascii(sccb->msg_buf.data,
+			(const unsigned char *)buffer,
+			data_len - 1);
+	sccb->msg_buf.data[data_len - 1] = '\0';
+
+	/* SCLP command for write data */
+	rc = start_sclp(SCLP_CMD_WRITE_DATA, sccb);
+	if (rc || sccb->header.response_code != 0x20) {
+		rc = 1;
+		goto out_free_page;
+	}
+	rc = 0;
+out_free_page:
+	free_page((unsigned long) sccb);
+	return rc;
+}
+#endif /* ENABLE_SCLP_ASCII */
 
 int sclp_print(char *buffer)
 {
