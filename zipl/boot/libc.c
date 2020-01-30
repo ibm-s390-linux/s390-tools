@@ -9,12 +9,14 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "libc.h"
+
 #include <stdarg.h>
 
 #include "lib/zt_common.h"
+#include "boot/s390.h"
 
 #include "error.h"
-#include "libc.h"
 #include "sclp.h"
 
 extern char __heap_start[];
