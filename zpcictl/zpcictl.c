@@ -163,6 +163,26 @@ static unsigned int sysfs_read_value(struct zpci_device *pdev, const char *attr)
 	return val;
 }
 
+static void sysfs_write_value(struct zpci_device *pdev, const char *attr,
+				unsigned int val)
+{
+	char *path;
+	FILE *fp;
+
+	path = util_path_sysfs("bus/pci/devices/%s/%s", pdev->slot, attr);
+	fp = fopen(path, "w");
+	if (!fp)
+		fopen_err(path);
+	if (fprintf(fp, "%x", val) < 0) {
+		fclose(fp);
+		warnx("Could not write to file %s: %s", path, strerror(errno));
+		free(path);
+		exit(EXIT_FAILURE);
+	}
+	fclose(fp);
+	free(path);
+}
+
 static void sysfs_write_data(struct zpci_report_error *report, char *slot)
 {
 	size_t r_size;
@@ -297,6 +317,7 @@ static void sclp_issue_action(struct zpci_device *pdev, int action)
 static void sclp_reset_device(struct zpci_device *pdev)
 {
 	sclp_issue_action(pdev, SCLP_ERRNOTIFY_AQ_RESET);
+	sysfs_write_value(pdev, "recover", 1);
 }
 
 /*
