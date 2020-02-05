@@ -2539,7 +2539,7 @@ static int _keystore_process_validate(struct keystore *keystore,
 	size_t secure_key_size;
 	u8 mkvp[MKVP_LENGTH];
 	char *apqns = NULL;
-	u8 *secure_key;
+	u8 *secure_key = NULL;
 	int is_old_mk;
 	int rc, valid;
 
@@ -2572,8 +2572,7 @@ static int _keystore_process_validate(struct keystore *keystore,
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
 						 mkvp, keystore->verbose);
-	free(secure_key);
-	if (rc)
+	if (rc != 0)
 		goto out;
 
 	_keystore_print_record(info->rec, name, properties, 1,
@@ -2599,6 +2598,8 @@ static int _keystore_process_validate(struct keystore *keystore,
 		info->num_warnings++;
 
 out:
+	if (secure_key != NULL)
+		free(secure_key);
 	if (apqns != NULL)
 		free(apqns);
 	if (apqn_list != NULL)
