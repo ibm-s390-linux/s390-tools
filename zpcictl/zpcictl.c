@@ -183,7 +183,7 @@ static void sysfs_write_value(struct zpci_device *pdev, const char *attr,
 	free(path);
 }
 
-static void sysfs_write_data(struct zpci_report_error *report, char *slot)
+static void sysfs_report_error(struct zpci_report_error *report, char *slot)
 {
 	size_t r_size;
 	char *path;
@@ -308,7 +308,7 @@ static void sclp_issue_action(struct zpci_device *pdev, int action)
 			     sizeof(report.data.log_data));
 		free(sdata);
 	}
-	sysfs_write_data(&report, pdev->slot);
+	sysfs_report_error(&report, pdev->slot);
 }
 
 /*
