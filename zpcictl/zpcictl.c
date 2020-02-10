@@ -97,6 +97,35 @@ static void fopen_err(char *path)
 	exit(EXIT_FAILURE);
 }
 
+static void fclose_err(char *path)
+{
+	if (errno == EIO || errno == EOPNOTSUPP)
+		warnx("Unsupported operation: %s: %s", path, strerror(errno));
+	else
+		warnx("Could not close file: %s: %s", path, strerror(errno));
+	free(path);
+	exit(EXIT_FAILURE);
+
+}
+
+static void fread_err(FILE *fp, char *path)
+{
+	warnx("Could not read file: %s: %s", path, strerror(errno));
+	if (fclose(fp))
+		fclose_err(path);
+	free(path);
+	exit(EXIT_FAILURE);
+}
+
+static void fwrite_err(FILE *fp, char *path)
+{
+	warnx("Could not write to file: %s: %s", path, strerror(errno));
+	if (fclose(fp))
+		fclose_err(path);
+	free(path);
+	exit(EXIT_FAILURE);
+}
+
 #define READ_CHUNK_SIZE		512
 
 static char *collect_smart_data(struct zpci_device *pdev)
@@ -152,12 +181,10 @@ static unsigned int sysfs_read_value(struct zpci_device *pdev, const char *attr)
 	if (!fp)
 		fopen_err(path);
 	if (fscanf(fp, "%x", &val) != 1) {
-		fclose(fp);
-		warnx("Could not read file %s: %s", path, strerror(errno));
-		free(path);
-		exit(EXIT_FAILURE);
+		fread_err(fp, path);
 	}
-	fclose(fp);
+	if (fclose(fp))
+		fclose_err(path);
 	free(path);
 
 	return val;
@@ -174,12 +201,10 @@ static void sysfs_write_value(struct zpci_device *pdev, const char *attr,
 	if (!fp)
 		fopen_err(path);
 	if (fprintf(fp, "%x", val) < 0) {
-		fclose(fp);
-		warnx("Could not write to file %s: %s", path, strerror(errno));
-		free(path);
-		exit(EXIT_FAILURE);
+		fwrite_err(fp, path);
 	}
-	fclose(fp);
+	if (fclose(fp))
+		fclose_err(path);
 	free(path);
 }
 
@@ -196,13 +221,9 @@ static void sysfs_report_error(struct zpci_report_error *report, char *slot)
 	if (!fp)
 		fopen_err(path);
 	if (fwrite(report, 1, r_size, fp) != r_size)
-		warnx("Could not write to file: %s: %s", path, strerror(errno));
-	if (fclose(fp)) {
-		if (errno == EIO || errno == EOPNOTSUPP)
-			warnx("Unsupported operation: %s: %s", path, strerror(errno));
-		else
-			warnx("Could not close file: %s: %s", path, strerror(errno));
-	}
+		fwrite_err(fp, path);
+	if (fclose(fp))
+		fclose_err(path);
 	free(path);
 }
 
