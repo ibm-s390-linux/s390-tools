@@ -22,6 +22,13 @@
 # define UNUSED(x) x
 #endif
 
+#ifdef STATIC_ASSERT
+#elif defined(__GNUC__) && ((__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || __GNUC__ >= 5)
+# define STATIC_ASSERT(test) _Static_assert((test), "(" #test ") failed");
+#else
+# define STATIC_ASSERT(test)
+#endif
+
 #define RELEASE_STRING	STRINGIFY (S390_TOOLS_RELEASE)
 #define TOOLS_LIBDIR	STRINGIFY (S390_TOOLS_LIBDIR)
 #define TOOLS_SYSCONFDIR STRINGIFY (S390_TOOLS_SYSCONFDIR)
