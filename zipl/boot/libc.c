@@ -220,6 +220,254 @@ unsigned long ebcstrtoul(char *nptr, char **endptr, int base)
 	return val;
 }
 
+static int skip_atoi(const char **c)
+{
+	int i = 0;
+
+	do {
+		i = i*10 + *((*c)++) - '0';
+	} while (isdigit(**c));
+
+	return i;
+}
+
+enum format_type {
+	FORMAT_TYPE_NONE,
+	FORMAT_TYPE_STR,
+	FORMAT_TYPE_ULONG,
+};
+
+struct printf_spec {
+	unsigned int	type:8;		/* format_type enum */
+	signed int	field_width:24;	/* width of output field */
+	unsigned int	zeropad:1;	/* pad numbers with zero */
+	unsigned int	base:8;		/* number base, 8, 10 or 16 only */
+	signed int	precision:16;	/* # of digits/chars */
+};
+
+#define FIELD_WIDTH_MAX ((1 << 23) - 1)
+
+static int format_decode(const char *fmt, struct printf_spec *spec)
+{
+	const char *start = fmt;
+
+	spec->type = FORMAT_TYPE_NONE;
+	while (*fmt) {
+		if (*fmt == '%')
+			break;
+		fmt++;
+	}
+
+	/* return current non-format string */
+	if (fmt != start || !*fmt)
+		return fmt - start;
+
+	/* first char is '%', skip it */
+	fmt++;
+	if (*fmt == '0') {
+		spec->zeropad = 1;
+		fmt++;
+	}
+
+	spec->field_width = -1;
+	if (isdigit(*fmt))
+		spec->field_width = skip_atoi(&fmt);
+
+	spec->precision = -1;
+	if (*fmt == '.') {
+		fmt++;
+		if (isdigit(*fmt))
+			spec->precision = skip_atoi(&fmt);
+	}
+
+	/* always use long form, i.e. ignore long qualifier */
+	if (*fmt == 'l')
+		fmt++;
+
+	switch (*fmt) {
+	case 's':
+		spec->type = FORMAT_TYPE_STR;
+		break;
+
+	case 'o':
+		spec->base = 8;
+		spec->type = FORMAT_TYPE_ULONG;
+		break;
+
+	case 'u':
+		spec->base = 10;
+		spec->type = FORMAT_TYPE_ULONG;
+		break;
+
+	case 'x':
+		spec->base = 16;
+		spec->type = FORMAT_TYPE_ULONG;
+		break;
+
+	default:
+		libc_stop(EINTERNAL);
+	}
+
+	return ++fmt - start;
+}
+
+static char *string(char *buf, char *end, const char *s,
+		    struct printf_spec *spec)
+{
+	int limit = spec->precision;
+	int len = 0;
+	int spaces;
+
+	/* Copy string to buffer */
+	while (limit--) {
+		char c = *s++;
+		if (!c)
+			break;
+		if (buf < end)
+			*buf = c;
+		buf++;
+		len++;
+	}
+
+	/* right align if necessary */
+	if (len < spec->field_width && buf < end) {
+		spaces = spec->field_width - len;
+		if (spaces >= end - buf)
+			spaces = end - buf;
+		memmove(buf + spaces, buf, len);
+		memset(buf, ' ', spaces);
+		buf += spaces;
+	}
+
+	return buf;
+}
+
+static char *number(char *buf, char *end, unsigned long val,
+		    struct printf_spec *spec)
+{
+	/* temporary buffer to prepare the string.
+	 * Worst case: base = 8 -> 3 bits per char -> 2.67 chars per byte */
+	char tmp[3 * sizeof(val)];
+	static const char vec[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+				   '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+	int field_width = spec->field_width;
+	int precision = spec->precision;
+	int len;
+
+	/* prepare string in reverse order */
+	len = 0;
+	while (val) {
+		tmp[len++] = vec[val % spec->base];
+		val /= spec->base;
+	}
+
+	if (len > precision)
+		precision = len;
+
+	field_width -= precision;
+	while (field_width-- > 0) {
+		char c = spec->zeropad ? '0' : ' ';
+		if (buf < end)
+			*buf = c;
+		buf++;
+	}
+
+	/* needed if no field width but a precision is given */
+	while (len < precision--) {
+		if (buf < end)
+			*buf = '0';
+		buf++;
+	}
+
+	while (len-- > 0) {
+		if (buf < end)
+			*buf = tmp[len];
+		buf++;
+	}
+
+	return buf;
+}
+
+/*
+ * vsnprintf - Format string and place in a buffer
+ *
+ * This funcion only supports a subset of format options defined in the
+ * C standard, i.e.
+ * specifiers:
+ *	* %s (strings)
+ *	* %o (unsigned int octal)
+ *	* %u (unsigned int decimal)
+ *	* %x (unsigned int hexadecimal)
+ *
+ * length modifier:
+ *	* 'l' (ignored, see below)
+ *
+ * flag:
+ *	* '0' (zero padding for integers)
+ *
+ * precision and field width as integers, i.e. _not_ by asterix '*'.
+ *
+ * The integer specifiers (o, u and, x) always use the long form, i.e.
+ * assume the argument to be of type 'unsigned long int'.
+ *
+ * Returns the number of characters the function would have generated for
+ * the given input (excluding the trailing '\0'. If the return value is
+ * greater than or equal @size the resulting string is trunctuated.
+ */
+static int vsnprintf(char *buf, unsigned long size, const char *fmt,
+		     va_list args)
+{
+	struct printf_spec spec = {0};
+	char *str, *end;
+
+	str = buf;
+	end = buf + size;
+
+	/* use negative (large positive) buffer sizes as indication for
+	 * unknown/unlimited buffer sizes. */
+	if (end < buf) {
+		end = ((void *)-1);
+		size = end - buf;
+	}
+
+	while (*fmt) {
+		const char *old_fmt = fmt;
+		int read = format_decode(fmt, &spec);
+		int copy;
+
+		fmt += read;
+
+		switch (spec.type) {
+		case FORMAT_TYPE_NONE:
+			copy = read;
+			if (str < end) {
+				if (copy > end - str)
+					copy = end - str;
+				memcpy(str, old_fmt, copy);
+			}
+			str += read;
+			break;
+
+		case FORMAT_TYPE_STR:
+			str = string(str, end, va_arg(args, char *), &spec);
+			break;
+
+		case FORMAT_TYPE_ULONG:
+			str = number(str, end, va_arg(args, unsigned long),
+				     &spec);
+			break;
+		}
+	}
+
+	if (size) {
+		if (str < end)
+			*str = '\0';
+		else
+			end[-1] = '\0';
+	}
+	return str - buf;
+}
+
 /*
  * Convert string to number with given base
  */
