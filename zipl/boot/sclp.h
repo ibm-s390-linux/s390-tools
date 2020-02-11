@@ -60,6 +60,7 @@ struct sccb_header {
 	uint8_t      control_mask[3];
 	uint16_t     response_code;
 };
+STATIC_ASSERT(sizeof(struct sccb_header) == 2 + 1 + 3 + 2)
 
 /* Structure must not have any padding */
 struct evbuf_header {
@@ -68,6 +69,7 @@ struct evbuf_header {
 	uint8_t      flags;
 	uint16_t     _reserved;
 };
+STATIC_ASSERT(sizeof(struct evbuf_header) == 2 + 1 + 1 + 2)
 
 struct mto {
 	uint16_t length;

@@ -42,6 +42,8 @@ struct sdias_sccb {
 	struct sccb_header  header;
 	struct sdias_evbuf  evbuf;
 };
+STATIC_ASSERT(sizeof(struct sdias_sccb) ==
+	      sizeof(struct sccb_header) + sizeof(struct sdias_evbuf))
 
 
 int sclp_hsa_copy(void *, unsigned long, unsigned long);

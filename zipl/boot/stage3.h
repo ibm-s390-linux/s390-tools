@@ -15,6 +15,8 @@
 #include "libc.h"
 #include "s390.h"
 
+#include "lib/zt_common.h"
+
 #define IPL_DEVICE		 0x10404UL
 #define INITRD_START		 0x10408UL
 #define INITRD_SIZE		 0x10410UL
@@ -128,6 +130,7 @@ struct ipl_rb_hdr {
 	uint8_t  rbt;
 	uint8_t  reserved1[11];
 };
+STATIC_ASSERT(sizeof(struct ipl_rb_hdr) == 4 + 1 + 11)
 
 /* IPL Report Block types */
 enum ipl_rbt {
@@ -168,6 +171,7 @@ struct ipl_rb_components {
 	uint8_t  reserved1[11];
 	struct ipl_rb_component_entry entries[];
 };
+STATIC_ASSERT(sizeof(struct ipl_rb_components) == 4 + 1 + 11)
 
 extern unsigned long long _parm_addr;   /* address of parmline */
 extern unsigned long long _initrd_addr; /* address of initrd */
