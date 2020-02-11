@@ -532,7 +532,7 @@ void sprintf(char *str, const char *fmt, ...)
 }
 
 /*
- * Print formated string
+ * Print formatted string to console
  */
 void printf(const char *fmt, ...)
 {
@@ -540,7 +540,7 @@ void printf(const char *fmt, ...)
 	va_list va;
 
 	va_start(va, fmt);
-	vsprintf(buf, fmt, va);
+	vsnprintf(buf, sizeof(buf), fmt, va);
 	sclp_print(buf);
 	va_end(va);
 }
