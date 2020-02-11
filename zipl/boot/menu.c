@@ -183,7 +183,7 @@ boot:
 			(void *)&__stage2_params + TEXT_OFFSET));
 
 	/* append 'BOOT_IMAGE=<num>' to parmline */
-	sprintf(endstring, " BOOT_IMAGE=%u", value);
+	snprintf(endstring, sizeof(endstring), " BOOT_IMAGE=%u", value);
 	if ((strlen(cmd_line_extra) + strlen(endstring)) < COMMAND_LINE_SIZE)
 		strcat(cmd_line_extra, endstring);
 

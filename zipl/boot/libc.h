@@ -44,13 +44,12 @@
 #define MIB	(1024ULL * 1024)
 
 void printf(const char *, ...);
-void sprintf(char *, const char *, ...);
+void snprintf(char *buf, unsigned long size, const char *fmt, ...);
 void *memcpy(void *, const void *, unsigned long);
 void *memmove(void *, const void *, unsigned long);
 void *memset(void *, int c, unsigned long);
 char *strcat(char *, const char *);
 int strncmp(const char *, const char *, unsigned long);
-unsigned long strtoul(const char *, char **, int);
 unsigned long ebcstrtoul(char *, char **, int);
 int strlen(const char *);
 char *strcpy(char *, const char *);

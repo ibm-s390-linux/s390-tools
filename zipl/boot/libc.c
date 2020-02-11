@@ -128,81 +128,6 @@ int strncmp(const char *s1, const char *s2, unsigned long count)
 }
 
 /*
- * Convert number to string
- *
- * Parameters:
- *
- * - buf:   Output buffer
- * - base:  Base used for formatting (e.g. 10 or 16)
- * - val:   Number to format
- * - zero:  If > 0, fill with leading zeros, otherwise use blanks
- * - count: Minimum number of characters used for output string
- */
-static int num_to_str(char *buf, int base, unsigned long val, int zero,
-		      unsigned long count)
-{
-	static const char conv_vec[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-					'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-	unsigned long num = 0, val_work = val, in_number = 1;
-	int i;
-
-	/* Count number of characters needed for number */
-	do {
-		num++;
-		val_work /= base;
-	} while (val_work);
-	/* Real character number overwrites count */
-	if (count < num)
-		count = num;
-	/* Format number */
-	for (i = count - 1; i >= 0; i--) {
-		if (in_number) {
-			buf[i] = conv_vec[val % base];
-			val /= base;
-			in_number = val ? 1 : 0;
-		} else {
-			buf[i] = zero ? '0' : ' ';
-		}
-	}
-	buf[count] = 0;
-	return count;
-}
-
-/*
- * Convert string to string with indentation
- */
-static int str_to_str(char *buf, const char *str, unsigned long count)
-{
-	unsigned long size;
-
-	size = strlen(str);
-	if (count < size)
-		count = size;
-	else
-		memset(buf, ' ', count - size);
-	strcpy(buf + (count - size), str);
-	return count;
-}
-
-/*
- * Convert string to number with given base
- */
-unsigned long strtoul(const char *nptr, char **endptr, int base)
-{
-	unsigned long val = 0;
-
-	while (isdigit(*nptr)) {
-		if (val != 0)
-			val *= base;
-		val += *nptr - '0';
-		nptr++;
-	}
-	if (endptr)
-		*endptr = (char *) nptr;
-	return val;
-}
-
-/*
  * Convert ebcdic string to number with given base
  */
 unsigned long ebcstrtoul(char *nptr, char **endptr, int base)
@@ -469,65 +394,14 @@ static int vsnprintf(char *buf, unsigned long size, const char *fmt,
 }
 
 /*
- * Convert string to number with given base
+ * Write formatted string to buffer
  */
-static int sprintf_fmt(char type, char *buf, unsigned long val, int zero,
-		       int count)
-{
-	switch (type) {
-	case 's':
-		return str_to_str(buf, (const char *) val, count);
-	case 'x':
-		return num_to_str(buf, 16, val, zero, count);
-	case 'u':
-		return num_to_str(buf, 10, val, zero, count);
-	default:
-		libc_stop(EINTERNAL);
-	}
-	return 0;
-}
-
-/*
- * Print formated string (va version)
- */
-static void vsprintf(char *str, const char *fmt, va_list va)
-{
-	unsigned long val, zero, count;
-	char *fmt_next;
-
-	do {
-		if (*fmt == '%') {
-			fmt++;
-			if (*fmt == '0') {
-				zero = 1;
-				fmt++;
-			} else {
-				zero = 0;
-			}
-			/* No number found by strtoul: count=0 fmt_next=fmt */
-			count = strtoul(fmt, &fmt_next, 10);
-			fmt = fmt_next;
-			if (*fmt == 'l')
-				fmt++;
-			val = va_arg(va, unsigned long);
-			str += sprintf_fmt(*fmt, str, val, zero, count);
-			fmt++;
-		} else {
-			*str++ = *fmt++;
-		}
-	} while (*fmt);
-	*str = 0;
-}
-
-/*
- * Write formated string to string
- */
-void sprintf(char *str, const char *fmt, ...)
+void snprintf(char *buf, unsigned long size, const char *fmt, ...)
 {
 	va_list va;
 
 	va_start(va, fmt);
-	vsprintf(str, fmt, va);
+	vsnprintf(buf, size, fmt, va);
 	va_end(va);
 }
 

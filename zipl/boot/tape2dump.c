@@ -188,7 +188,7 @@ static void progress_print_disp(unsigned long addr)
 
 	if (addr % (1024 * 1024 * 16) != 0)
 		return;
-	sprintf(msg, "%08u", addr >> 20);
+	snprintf(msg, sizeof(msg), "%08u", addr >> 20);
 	ccw_load_display(msg);
 }
 
