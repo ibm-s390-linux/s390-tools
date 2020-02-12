@@ -1649,9 +1649,9 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 			*bitsize = cipherkey->pl - 384;
 		else
 			*bitsize = 0; /* Unknown */
-		if (key_size > cipherkey->length) {
+		if (key_size == 2 * AESCIPHER_KEY_SIZE) {
 			cipherkey = (struct aescipherkeytoken *)(key +
-					cipherkey->length);
+					AESCIPHER_KEY_SIZE);
 			if (cipherkey->pfv == 0x00) /* V0 payload */
 				*bitsize += cipherkey->pl - 384;
 		}
