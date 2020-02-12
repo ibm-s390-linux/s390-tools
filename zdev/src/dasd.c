@@ -313,6 +313,22 @@ static struct attrib dasd_attr_safe_offline = {
 	.writeonly = 1,
 };
 
+static struct attrib dasd_attr_fc_security = {
+	.name = "fc_security",
+	.title = "Show FC Endpoint Security state of DASD device",
+	.desc =
+	"This read-only attribute shows the Fibre Channel Endpoint Security\n"
+	"status of the connection to the DASD device:\n"
+	"  Unsupported   : The DASD device does not support Fibre Channel\n"
+	"                  Endpoint Security\n"
+	"  Inconsistent  : The operational channel paths of the DASD device\n"
+	"                  report inconsistent Fibre Channel Endpoint\n"
+	"                  Security status\n"
+	"  Authentication: The connection has been authenticated\n"
+	"  Encryption    : The connection is encrypted\n",
+	.readonly = 1,
+};
+
 /*
  * DASD subtype methods.
  */
@@ -617,6 +633,7 @@ struct subtype dasd_subtype_eckd = {
 		&dasd_attr_reservation_policy,
 		&dasd_attr_last_known_reservation_state,
 		&dasd_attr_safe_offline,
+		&dasd_attr_fc_security,
 		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
