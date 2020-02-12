@@ -42,6 +42,7 @@
 #define ENOTTY		25	/* Not a typewriter */
 
 #define MIB	(1024ULL * 1024)
+#define LINE_LENGTH 80 /* max line length printed by printf */
 
 void printf(const char *, ...);
 void snprintf(char *buf, unsigned long size, const char *fmt, ...);

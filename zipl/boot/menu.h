@@ -20,7 +20,6 @@
 /* max command line length */
 #define COMMAND_LINE_SIZE	        896
 #define BOOT_MENU_ENTRIES		63
-#define LINE_LENGTH                     80
 #define PARAM_SIZE                      8
 #define TEXT_OFFSET                     4
 

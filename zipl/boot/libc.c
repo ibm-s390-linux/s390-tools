@@ -410,11 +410,17 @@ void snprintf(char *buf, unsigned long size, const char *fmt, ...)
  */
 void printf(const char *fmt, ...)
 {
-	char buf[81];
+	char buf[LINE_LENGTH + 1];
+	int len;
 	va_list va;
 
 	va_start(va, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, va);
+	len = vsnprintf(buf, sizeof(buf), fmt, va);
+	if (len > LINE_LENGTH) {
+		buf[LINE_LENGTH - 1] = '.';
+		buf[LINE_LENGTH - 2] = '.';
+		buf[LINE_LENGTH - 3] = '.';
+	}
 	sclp_print(buf);
 	va_end(va);
 }
