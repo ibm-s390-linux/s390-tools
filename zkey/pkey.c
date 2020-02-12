@@ -1657,7 +1657,7 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 		}
 	} else if (is_ep11_aes_key(key, key_size)) {
 		*bitsize = ep11key->head.keybitlen;
-		if (key_size == 2 * AESDATA_KEY_SIZE) {
+		if (key_size == 2 * EP11_KEY_SIZE) {
 			ep11key = (struct ep11keytoken *)(key + EP11_KEY_SIZE);
 			*bitsize += ep11key->head.keybitlen;
 		}
