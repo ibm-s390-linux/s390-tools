@@ -10,7 +10,7 @@
  * 0x6000-0x8fff	free
  * 0x9000-0x9fff        Stage3 parameter
  * 0xa000-0xdfff        Stage3 code + data
- * 0xe000-0xffff        Stack
+ * 0xf000-0xffff        Stack
  */
 
 SECTIONS
