@@ -201,15 +201,6 @@ struct _lowcore {
 #define S390_lowcore (*((struct _lowcore *) 0))
 
 
-void panic_notify(unsigned long reason);
-
-#define panic(reason, x...) \
-do { \
-	printf(x); \
-	panic_notify(reason); \
-	libc_stop(reason); \
-} while (0)
-
 static __always_inline int page_is_valid(unsigned long addr)
 {
 	unsigned long tmp;

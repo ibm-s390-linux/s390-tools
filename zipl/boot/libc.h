@@ -61,6 +61,14 @@ void libc_stop(unsigned long);
 void start(void);
 void pgm_check_handler(void);
 void pgm_check_handler_fn(void);
+void panic_notify(unsigned long reason);
+
+#define panic(reason, ...)			\
+	do {					\
+		printf(__VA_ARGS__);		\
+		panic_notify(reason);		\
+		libc_stop(reason);		\
+	} while (0)
 
 static inline int isdigit(int c)
 {
