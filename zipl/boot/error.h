@@ -71,4 +71,10 @@
 #define ENOTIME		0x00004605  /* The zipl time stamps do not match */
 #define ENOMSS		0x00004606  /* Could not enable MSS */
 
+/*
+ * PV error codes
+ */
+#define ENOPV		0x00004607 /* No support for PV */
+#define EPV		0x00004608 /* PV error */
+
 #endif /* ERROR_H */

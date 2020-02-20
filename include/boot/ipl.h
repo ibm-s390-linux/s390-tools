@@ -89,6 +89,30 @@ struct ipl_pb0_ccw {
 	uint8_t  reserved5[8];
 } __packed;
 
+/* Structure must not have any padding */
+struct ipl_pb0_pv_comp {
+	uint64_t tweak_pref;
+	uint64_t addr;
+	uint64_t len;
+};
+STATIC_ASSERT(sizeof(struct ipl_pb0_pv_comp) == 3 * 8)
+
+/* IPL Parameter Block 0 for PV */
+struct ipl_pb0_pv {
+	uint32_t len;
+	uint8_t  pbt;
+	uint8_t  reserved1[3];
+	uint8_t  loadparm[8];
+	uint8_t  reserved2[84];
+	uint8_t  reserved3[3];
+	uint8_t  version;
+	uint8_t  reserved4[4];
+	uint32_t num_comp;
+	uint64_t pv_hdr_addr;
+	uint64_t pv_hdr_size;
+	struct ipl_pb0_pv_comp components[];
+} __packed;
+
 struct ipl_parameter_block {
 	struct ipl_pl_hdr hdr;
 	union {
@@ -96,6 +120,7 @@ struct ipl_parameter_block {
 		struct ipl_pb0_common common;
 		struct ipl_pb0_fcp fcp;
 		struct ipl_pb0_ccw ccw;
+		struct ipl_pb0_pv pv;
 		char raw[PAGE_SIZE - sizeof(struct ipl_pl_hdr)];
 	};
 } __packed __aligned(PAGE_SIZE);

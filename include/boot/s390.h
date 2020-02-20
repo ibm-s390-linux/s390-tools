@@ -18,6 +18,12 @@
 
 #define PAGE_SIZE		_AC(4096, UL)
 
+/* Minimum size of a stack frame in bytes */
+#define STACK_FRAME_OVERHEAD	_AC(160, U)
+
+/* Facilities */
+#define UNPACK_FACILITY		_AC(161, U)
+
 
 #ifndef __ASSEMBLER__
 
@@ -262,11 +268,17 @@ static __always_inline void __ctl_set_bit(unsigned int cr, unsigned int bit)
  * DIAG 308 support
  */
 enum diag308_subcode {
-	DIAG308_REL_HSA = 2,
-	DIAG308_IPL	= 3,
-	DIAG308_DUMP	= 4,
-	DIAG308_SET	= 5,
-	DIAG308_STORE	= 6,
+	DIAG308_REL_HSA	  = 2,
+	DIAG308_IPL	  = 3,
+	DIAG308_DUMP	  = 4,
+	DIAG308_SET	  = 5,
+	DIAG308_STORE	  = 6,
+	DIAG308_SET_PV	  = 8,
+	DIAG308_UNPACK_PV = 10,
+};
+
+enum diag308_rc {
+	DIAG308_RC_OK	      = 0x0001,
 };
 
 static __always_inline unsigned long diag308(unsigned long subcode, void *addr)
