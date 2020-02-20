@@ -2,7 +2,7 @@
 #
 # dbginfo.sh - Tool to collect runtime, configuration, and trace information
 #
-# Copyright IBM Corp. 2002, 2018
+# Copyright IBM Corp. 2002, 2020
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -21,7 +21,7 @@ readonly SCRIPTNAME="${0##*/}"
 print_version() {
     cat <<EOF
 ${SCRIPTNAME}: Debug information script version %S390_TOOLS_VERSION%
-Copyright IBM Corp. 2002, 2018
+Copyright IBM Corp. 2002, 2020
 EOF
 }
 
@@ -319,7 +319,6 @@ LOGFILES="\
   /var/log/lin_tape.trace\
   /var/log/lin_tape.errorlog\
   /var/log/messages*\
-  /var/log/opencryptoki\
   /var/log/syslog*\
   /var/log/sa\
   /var/log/yum.log\
