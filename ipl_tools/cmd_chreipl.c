@@ -60,6 +60,7 @@ static const char *const usage_chreipl =
 "Options for ccw target:\n"
 "  -d, --device <DEVICE>   Device number of the CCW IPL device\n"
 "  -L, --loadparm <PARM>   Loadparm specification\n"
+"  -c, --clear 0|1         Control if memory is cleared on re-IPL\n"
 "\n"
 "Options for fcp target:\n"
 "  -d, --device <DEVICE>   Device number of the adapter of the FCP IPL device\n"
@@ -67,6 +68,7 @@ static const char *const usage_chreipl =
 "  -w  --wwpn <WWPN>       World Wide Port Name of the FCP IPL device\n"
 "  -b, --bootprog <BPROG>  Bootprog specification\n"
 "  -L, --loadparm <PARM>   Loadparm specification\n"
+"  -c, --clear 0|1         Control if memory is cleared on re-IPL\n"
 "\n"
 "Options for nss target:\n"
 "  -n, --name <NAME>       Identifier of the NSS\n"
@@ -96,6 +98,7 @@ static struct locals {
 	int			target_type_set;
 	int			target_type_auto_mode;
 	enum reipl_type		reipl_type;	/* CCW, FCP, NSS */
+	int			reipl_clear;
 } l;
 
 static void __noreturn print_usage_chreipl_exit(void)
@@ -460,6 +463,16 @@ static void set_target_type_auto(const char *arg)
 	}
 }
 
+static void set_reipl_clear(const char *arg)
+{
+	if (arg[0] == '1')
+		l.reipl_clear = 1;
+	else if (arg[0] == '0')
+		l.reipl_clear = 0;
+	else
+		ERR_EXIT("re-IPL clear argument must be either 1 or 0");
+}
+
 static void parse_chreipl_options(int argc, char *argv[])
 {
 	int opt, idx;
@@ -474,9 +487,10 @@ static void parse_chreipl_options(int argc, char *argv[])
 		{ "bootparms",	 required_argument,	NULL, 'p' },
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "version",	 no_argument,		NULL, 'v' },
+		{ "clear",	 required_argument,	NULL, 'c' },
 		{ NULL,		 0,			NULL,  0  }
 	};
-	static const char optstr[] = "hcd:vw:l:fL:b:n:p:";
+	static const char optstr[] = "hd:vw:l:fL:b:n:p:c:";
 
 	/* dont run without any argument */
 	if (argc == 1)
@@ -492,6 +506,8 @@ static void parse_chreipl_options(int argc, char *argv[])
 		set_target_type(TT_NODE, 0);
 	else
 		set_target_type_auto(argv[1]);
+
+	l.reipl_clear = -1;
 
 	while ((opt = getopt_long(argc, argv, optstr, long_opts, &idx)) != -1) {
 		switch (opt) {
@@ -520,6 +536,9 @@ static void parse_chreipl_options(int argc, char *argv[])
 			break;
 		case 'f':
 			l.force_set = 1;
+			break;
+		case 'c':
+			set_reipl_clear(optarg);
 			break;
 		case 'v':
 			print_version_exit();
@@ -600,6 +619,11 @@ static void chreipl_ccw(void)
 			 strlen(l.bootparms), BOOTPARMS_CCW_MAX);
 	}
 
+	if (l.reipl_clear >= 0) {
+		check_exists("reipl/ccw/clear", "CCW re-IPL clear attribute");
+		write_str(l.reipl_clear ? "1" : "0", "reipl/ccw/clear");
+	}
+
 	/*
 	 * On old systems that use CCW reipl loadparm cannot be set
 	 */
@@ -627,6 +651,12 @@ static void chreipl_fcp(void)
 		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
 			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
 	}
+
+	if (l.reipl_clear >= 0) {
+		check_exists("reipl/fcp/clear", "FCP re-IPL clear attribute");
+		write_str(l.reipl_clear ? "1" : "0", "reipl/fcp/clear");
+	}
+
 	/*
 	 * On old systems the FCP reipl loadparm cannot be set
 	 */

@@ -59,6 +59,7 @@ void print_fcp(int show_ipl, int dump)
 	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
 		"/sys/firmware/reipl/fcp/loadparm";
 	char loadparm[9], loadparm_path[PATH_MAX];
+	char *path_reipl_clear = "/sys/firmware/reipl/fcp/clear";
 
 	if (dump)
 		printf("%-12s fcp_dump\n", get_ipl_banner(show_ipl));
@@ -79,6 +80,8 @@ void print_fcp(int show_ipl, int dump)
 	}
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
+	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
+		print_fw_str("clear:       %s\n", dir, "clear");
 }
 
 void print_ccw(int show_ipl)
@@ -89,6 +92,7 @@ void print_ccw(int show_ipl)
 		"/sys/firmware/reipl/ccw/loadparm";
 	char *path_bootparms = show_ipl ? "/sys/firmware/ipl/parm" :
 		"/sys/firmware/reipl/ccw/parm";
+	char *path_reipl_clear = "/sys/firmware/reipl/ccw/clear";
 
 	printf("%-12s ccw\n", get_ipl_banner(show_ipl));
 	print_fw_str("Device:      %s\n", dir, "device");
@@ -101,6 +105,8 @@ void print_ccw(int show_ipl)
 	}
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "parm");
+	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
+		print_fw_str("clear:       %s\n", dir, "clear");
 }
 
 static void parse_lsreipl_options(int argc, char *argv[])
