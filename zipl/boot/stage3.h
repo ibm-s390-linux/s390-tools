@@ -17,7 +17,7 @@
 
 #include "boot/ipl.h"
 
-#define IPL_DEVICE		 0x10404UL
+#define IPL_DEVICE		 0x10400UL
 #define INITRD_START		 0x10408UL
 #define INITRD_SIZE		 0x10410UL
 #define OLDMEM_BASE		 0x10418UL

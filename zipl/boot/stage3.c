@@ -292,7 +292,7 @@ void start(void)
 	/* store subchannel ID into low core and into new kernel space */
 	subchannel_id = S390_lowcore.subchannel_id;
 	*(unsigned int *)__LC_IPLDEV = subchannel_id;
-	*(unsigned int *)IPL_DEVICE = subchannel_id;
+	*(unsigned long long *)IPL_DEVICE = subchannel_id;
 
 	/* if valid command line is given, copy it into new kernel space */
 	if (_parm_addr != UNSPECIFIED_ADDRESS) {
