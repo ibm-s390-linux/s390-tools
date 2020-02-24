@@ -1,6 +1,6 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
- * __v2.12.x (20xx-xx-xx)__
+* __v2.12.x (20xx-xx-xx)__
 
   For Linux kernel version: 5.x
 
@@ -10,7 +10,7 @@ Release history for s390-tools (MIT version)
   Bug Fixes:
 
 
- * __v2.12.0 (2019-12-17)__
+* __v2.12.0 (2019-12-17)__
 
   For Linux kernel version: 5.4
 
@@ -38,7 +38,7 @@ Release history for s390-tools (MIT version)
   - zipl: Fix entry point for stand-alone kdump
   - zipl: Add missing options to help output
 
- * __v2.11.0 (2019-09-06)__
+* __v2.11.0 (2019-09-06)__
 
   For Linux kernel version: 5.3
 
@@ -54,7 +54,7 @@ Release history for s390-tools (MIT version)
   - zipl: Fix freeing of uninitialized pointer
   - zipl: Set correct secure IPL default value
 
- * __v2.10.0 (2019-07-31)__
+* __v2.10.0 (2019-07-31)__
 
   For Linux kernel version: 5.2
 
@@ -72,7 +72,7 @@ Release history for s390-tools (MIT version)
   - zipl: Do not overwrite BOOT_IMAGE entry
   - zkey: Fix auto-detection of clear key bitsize for XTS keys
 
- * __v2.9.0 (2019-05-21)__
+* __v2.9.0 (2019-05-21)__
 
   For Linux kernel version: 5.0 / 5.1
 
@@ -105,7 +105,7 @@ Release history for s390-tools (MIT version)
   - zfcpdbf: Warn about ambiguous payload records with dup reqid & payarea
   - zpcictl: Check for regular directory to prevent possible buffer overflow
 
- * __v2.8.0 (2019-02-15)__
+* __v2.8.0 (2019-02-15)__
 
   For Linux kernel version: 4.20
 
@@ -119,7 +119,7 @@ Release history for s390-tools (MIT version)
   - zkey: Avoid EPERM on key change if user is not owner of key file
   - cpumf/cpumf_helper: Always return list reference for --sfb-size
 
- * __v2.7.1 (2018-12-13)__
+* __v2.7.1 (2018-12-13)__
 
   For Linux kernel version: 4.19
 
@@ -143,7 +143,7 @@ Release history for s390-tools (MIT version)
       ip_watcher, libvmdump, libvtoc, lsqeth, lszcrypt, qethqoat, zdev, zdsfs,
       zgetdump, zipl, zpcictl
 
- * __v2.7.0 (2018-10-31)__
+* __v2.7.0 (2018-10-31)__
 
   For Linux kernel version: 4.19
 
@@ -168,7 +168,7 @@ Release history for s390-tools (MIT version)
   - Direct --help and --version output to stdout for several tools
   - osasnmpd: Start without real OSA devices
 
- * __v2.6.0 (2018-08-10)__
+* __v2.6.0 (2018-08-10)__
 
   For Linux kernel version: 4.18
 
@@ -182,7 +182,7 @@ Release history for s390-tools (MIT version)
   - netboot: Include compressed kernel modules in initramfs
   - netboot: Send client architecture and handle path prefix
 
- * __v2.5.0 (2018-06-08)__
+* __v2.5.0 (2018-06-08)__
 
   For Linux kernel version: 4.17
 
@@ -194,7 +194,7 @@ Release history for s390-tools (MIT version)
   Bug Fixes:
   - lsluns: Print a message if no adapter or port exists
 
- * __v2.4.0 (2018-05-07)__
+* __v2.4.0 (2018-05-07)__
 
   For Linux kernel version: 4.16
 
