@@ -387,6 +387,7 @@ function extended()
 	read EXTSZ 2> /dev/null < $DEVPATH/extent_pool/extent_size
 	read CAPACITY 2> /dev/null < $DEVPATH/capacity/logical_capacity
 	read ALLOCATED 2> /dev/null < $DEVPATH/capacity/space_allocated
+	read FC_SEC 2> /dev/null < $DEVPATH/fc_security
 
 	# convert to hexadecimal values
 	PIM=0x$PIM
@@ -521,7 +522,7 @@ function extended()
 	elif [[ "$ALIAS" == 1 ]]; then
 		if [[ "$BASEONLY" == "false" ]]; then
 			ACTIVE="alias"
-			printf "%s:%s:%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s #  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+			printf "%s:%s:%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s #  uid:  \t\t\t\t%s#  fc_security: \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
 				"$SORTKEYLEN" "$SORTKEY" \
 				"$BUSID" \
 				"$ACTIVE" \
@@ -532,6 +533,7 @@ function extended()
 				"$ERP" \
 				"$HPF" \
 				"$DEV_UID" \
+				"$FC_SEC" \
 			        "${INSTALLED_PATHS[@]}" \
 			        "${USED_PATHS[@]}" \
 			        "${NP_PATHS[@]}" \
@@ -563,7 +565,7 @@ function extended()
 		DISCIPLINE="${DISCIPLINE} (ESE)"
 	fi
 
-	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  extent_size:\t\t\t\t%s#  logical_capacity:\t\t\t%s#  space_allocated:\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  extent_size:\t\t\t\t%s#  logical_capacity:\t\t\t%s#  space_allocated:\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  fc_security: \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
 		"$SORTKEYLEN" "$SORTKEY" \
 		"$BUSID" \
 		"$BLOCKNAME" \
@@ -584,6 +586,7 @@ function extended()
 		"$ERP" \
 		"$HPF" \
 		"$DEV_UID" \
+		"$FC_SEC" \
 	        "${INSTALLED_PATHS[@]}" \
 	        "${USED_PATHS[@]}" \
 	        "${NP_PATHS[@]}" \
