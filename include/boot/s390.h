@@ -269,7 +269,7 @@ enum diag308_subcode {
 	DIAG308_STORE	= 6,
 };
 
-static __always_inline int diag308(unsigned long subcode, void *addr)
+static __always_inline unsigned long diag308(unsigned long subcode, void *addr)
 {
 	register unsigned long _addr asm("0") = (unsigned long) addr;
 	register unsigned long _rc asm("1") = 0;
@@ -403,7 +403,7 @@ static __always_inline int test_facility(unsigned long nr)
 	return __test_facility(nr, &S390_lowcore.stfle_fac_list);
 }
 
-static __always_inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, int size)
+static __always_inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, unsigned int size)
 {
 	register unsigned long reg0 asm("0") = size - 1;
 
@@ -420,7 +420,7 @@ static __always_inline unsigned long __stfle_asm(uint64_t *stfle_fac_list, int s
  * @stfle_fac_list: array where facility list can be stored
  * @size: size of passed in array in double words
  */
-static __always_inline void stfle(uint64_t *stfle_fac_list, int size)
+static __always_inline void stfle(uint64_t *stfle_fac_list, unsigned int size)
 {
 	unsigned long nr;
 
