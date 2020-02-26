@@ -87,8 +87,6 @@ below).
 .br
 defaultmenu = menu1
 .br
-secure = auto
-.br
 
 [linux]
 .br
@@ -121,6 +119,8 @@ default     = 1
 prompt      = 1
 .br
 timeout     = 0
+.br
+secure      = auto
 .br
 .PP
 
@@ -533,7 +533,7 @@ non-default memory location.
 .B secure
 =
 .IR auto / 1 / 0
-(configuration only)
+(configuration and menu)
 .IP
 .B Configuration section:
 .br
