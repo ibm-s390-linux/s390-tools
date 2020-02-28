@@ -260,6 +260,7 @@ PROCFILES="\
   /proc/mounts\
   /proc/net/vlan\
   /proc/net/bonding\
+  /proc/net/softnet_stat\
   /proc/partitions\
   /proc/qeth\
   /proc/qeth_perf\
