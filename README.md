@@ -30,6 +30,9 @@ Package contents
  * dasdinfo:
    Display unique DASD ID, either UID or volser.
 
+ * genprotimg:
+   Create a protected virtualization image.
+
  * udev rules:
    - 59-dasd.rules: rules for unique DASD device nodes created in /dev/disk/.
    - 57-osasnmpd.rules: udev rules for osasnmpd.
@@ -264,9 +267,10 @@ build options:
 | pfm            | `HAVE_PFM`         | cpacfstats                            |
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
-| openssl        | `HAVE_OPENSSL`     | zkey                                  |
+| openssl        | `HAVE_OPENSSL`     | genprotimg,zkey                       |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup                       |
+| glib2          | `HAVE_GLIB2`       | genprotimg                            |
 
 This table lists additional build or install options:
 

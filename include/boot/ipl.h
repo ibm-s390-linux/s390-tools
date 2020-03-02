@@ -18,6 +18,11 @@
 #define IPL_RB_COMPONENT_FLAG_SIGNED	0x80
 #define IPL_RB_COMPONENT_FLAG_VERIFIED	0x40
 
+#define IPL_PARM_BLOCK_VERSION		0x1
+
+/* IPL Types */
+#define IPL_TYPE_PV			0x5
+
 
 #ifndef __ASSEMBLER__
 

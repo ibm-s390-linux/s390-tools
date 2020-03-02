@@ -1,0 +1,97 @@
+.\" Copyright 2020 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH GENPROTIMG 8 "March 2020" "s390-tools"
+.SH NAME
+genprotimg \- Create a protected virtualization image
+
+.SH SYNOPSIS
+.SY
+.B genprotimg
+\fB\-k\fR \fIHOST_KEY_DOCUMENT\fR...
+\fB\-i\fR \fIVMLINUZ\fR
+[\fB\-r\fR \fIRAMDISK\fR]
+[\fB\-p\fR \fIPARMFILE\fR]
+\fB\-o\fR \fIOUTFILE\fR
+[\fIOPTION\fR]...
+.YS
+
+.SH DESCRIPTION
+.PP
+Use \fBgenprotimg\fR to generate a single bootable image file with
+encrypted and integrity-protected parts. The command requires a kernel
+image, a host-key document, and an output file name. Optionally,
+specify an initial RAM filesystem, and a file containing the kernel
+parameters. Should special circumstances require it, you can
+optionally specify your own keys for the encryption by using the
+experimental options. In the resulting image file, a plain text boot
+loader, the encrypted components for kernel, initial RAM disk, kernel
+parameters, and the encrypted and integrity-protected header are
+concatenated. The header contains metadata necessary for running the
+guest in protected mode.
+.PP
+Use this image file as a kernel image for zipl or for a direct kernel
+boot using QEMU.
+
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Prints usage information, then exits.
+.TP
+\fB\-\-help-experimental\fR
+Prints experimental usage information, then exits.
+.TP
+\fB\-\-help-all\fR
+Prints all usage information, then exits.
+.TP
+\fB\-V\fR, \fB\-\-verbose\fR
+Provides more detailed output.
+.TP
+\fB\-k\fR, \fB\-\-host-key-document\fR=\fI\,HOST_KEY_DOCUMENT\/\fR
+Specifies a host-key document. At least one is required. Specify this
+option multiple times to enable the image to run on more than one
+host.
+.TP
+\fB\-o\fR, \fB\-\-output\fR=\fI\,OUTPUT_FILE\/\fR
+Specifies the output file. Required.
+.TP
+\fB\-i\fR, \fB\-\-image\fR=\fI\,VMLINUZ\/\fR
+Specifies the Linux kernel image file. Required.
+.TP
+\fB\-r\fR, \fB\-\-ramdisk\fR=\fI\,RAMDISK\/\fR
+Specifies the RAM disk image. Optional.
+.TP
+\fB\-p\fR, \fB\-\-parmfile\fR=\fI\,PARMFILE\/\fR
+Specifies the kernel command line stored in \fI\,PARMFILE\/\fR. Optional.
+.TP
+\fB\-\-no-verify\fR
+Do not require the host-key documents to be valid. For testing
+purposes, do not use for a production image. Optional.
+.TP
+\fB\-v\fR, \fB\-\-version\fR
+Prints version information, then exits.
+
+.SH EXAMPLE
+.PP
+Generate a protected virtualization image in
+\fI\,/boot/vmlinuz.pv\/\fR, using the kernel file \fI\,vmlinuz\/\fR,
+the initrd in \fI\,initramfs\/\fR, the kernel parameters contained in
+\fI\,parmfile\/\fR, and the host-key document in \fI\,host_key.crt\/\fR:
+.PP
+.Vb 1
+.EX
+\&        genprotimg \-i \fI\,vmlinuz\/\fR \-r \fI\,initramfs\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-o \fI\,/boot/vmlinuz.pv\/\fR
+.EE
+.Ve
+.PP
+
+.SH NOTES
+.IP "1." 4
+An ELF file cannot be used as a Linux kernel image.
+.IP "2." 4
+Remember to re-run \fBzipl\fR after updating a protected
+virtualization image.
+
+.SH SEE ALSO
+\&\fBzipl\fR\|(5), \fBqemu\fR\|(1)

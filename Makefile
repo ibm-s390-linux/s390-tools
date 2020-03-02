@@ -8,7 +8,9 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   tape390 osasnmpd qetharp ip_watcher qethconf scripts zconf \
 	   vmconvert vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
 	   ziomon iucvterm hyptop cmsfs-fuse qethqoat zfcpdump zdsfs cpumf \
-	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl
+	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
+	   genprotimg
+
 SUB_DIRS = $(LIB_DIRS) $(TOOL_DIRS)
 
 all: $(TOOL_DIRS)
