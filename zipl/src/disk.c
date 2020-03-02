@@ -405,6 +405,12 @@ disk_get_info(const char* device, struct job_target_data* target,
 				     "determined.");
 			goto out_close;
 		}
+	/* NVMe path, driver name is 'blkext' */
+	} else if (strcmp(data->drv_name, "blkext") == 0) {
+		data->devno = -1;
+		data->type = disk_type_scsi;
+		data->partnum = stats.st_rdev & SCSI_PARTN_MASK;
+		data->device = stats.st_rdev & ~SCSI_PARTN_MASK;
 	} else {
 		/* Driver name is unknown */
 		error_reason("Unsupported device driver '%s'", data->drv_name);
