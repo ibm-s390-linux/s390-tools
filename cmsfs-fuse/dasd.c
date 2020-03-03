@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/zt_common.h"
 #include "cmsfs-fuse.h"
 #include "edf.h"
 #include "helper.h"

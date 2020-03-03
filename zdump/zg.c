@@ -432,7 +432,7 @@ char *zg_devnode_create(dev_t dev)
 	char *file_path;
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_ELEMENT_CNT(dir_vec); i++) {
+	for (i = 0; i < ARRAY_SIZE(dir_vec); i++) {
 		if (dir_vec[i] == NULL)
 			continue;
 		file_path = devnode_create_dir(dir_vec[i], dev);

@@ -64,10 +64,6 @@ typedef uint64_t address_t;
  * resulting return code or 0. */
 #define	DRY_RUN_FUNC(x)	(dry_run ? 0 : (x))
 
-#define ALIGN(x,a)              __ALIGN_MASK(x,(typeof(x))(a)-1)
-#define __ALIGN_MASK(x,mask)    (((x)+(mask))&~(mask))
-#define ARRAY_SIZE(x)		(sizeof(x) / sizeof(x[0]))
-
 extern int verbose;
 extern int interactive;
 extern int dry_run;

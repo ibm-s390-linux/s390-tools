@@ -15,10 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "lib/zt_common.h"
 #include "lib/util_list.h"
 #include "exit_code.h"
 
-#define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 #define SCOPE_ACTIVE(x)		((x) & config_active ? 1 : 0)
 #define SCOPE_PERSISTENT(x)	((x) & config_persistent ? 1 : 0)
 #define SCOPE_AUTOCONF(x)	((x) & config_autoconf ? 1 : 0)

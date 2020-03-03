@@ -12,8 +12,6 @@
 
 #include <stdbool.h>
 
-#define ARRAY_SIZE(x)	(sizeof(x) / sizeof(x[0]))
-
 char *misc_link_target(const char *fmt, ...);
 bool misc_str_in_list(const char *str, const char *strings[], int array_size);
 int misc_argz_add_from_file(char **argz, size_t *argz_len,

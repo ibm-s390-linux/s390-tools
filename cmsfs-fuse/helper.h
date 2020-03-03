@@ -49,6 +49,4 @@ extern FILE *logfile;
 		fprintf(stderr, COMP "Warning, " __VA_ARGS__);		\
 	} while (0)
 
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-
 #endif

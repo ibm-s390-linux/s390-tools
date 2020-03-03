@@ -122,10 +122,7 @@ do { \
  * Misc
  */
 #define PAGE_SIZE 4096UL
-#define ALIGN(x, a) __ALIGN_MASK(x, (typeof(x))(a)-1)
-#define __ALIGN_MASK(x, mask) (((x) + (mask)) & ~(mask))
 #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
-#define ARRAY_ELEMENT_CNT(x) (sizeof(x) / sizeof(x[0]))
 #define ROUNDUP(x, y)	((((x) + ((y) - 1)) / (y)) * (y))
 
 static inline u32 zg_csum_partial(const void *buf, int len, u32 sum)
