@@ -10,7 +10,7 @@
 Description=Apply Control Program Identification (CPI)
 DefaultDependencies=no
 Conflicts=shutdown.target
-After=local-fs.target
+After=sysinit.target
 ConditionPathIsReadWrite=/sys/firmware/cpi
 
 [Service]
