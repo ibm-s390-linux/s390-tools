@@ -781,6 +781,7 @@ collect_ethtool() {
 		call_run_command "ethtool -k ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
 		call_run_command "ethtool -a ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
 		call_run_command "ethtool -c ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
+		call_run_command "ethtool --per-queue ${network_device} --show-coalesce" "${OUTPUT_FILE_ETHTOOL}"
 		call_run_command "ethtool -g ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
 		call_run_command "ethtool -i ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
 		call_run_command "ethtool -l ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
