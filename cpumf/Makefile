@@ -9,7 +9,8 @@ DATA_FILES = cpum-cf-hw-counter.map \
 	     cpum-cf-csvn-12345.ctr cpum-cf-csvn-6.ctr \
              cpum-cf-extended-z10.ctr cpum-cf-extended-z196.ctr \
 	     cpum-cf-extended-zEC12.ctr cpum-sf-modes.ctr \
-	     cpum-cf-extended-z13.ctr cpum-cf-extended-z14.ctr
+	     cpum-cf-extended-z13.ctr cpum-cf-extended-z14.ctr \
+	     cpum-cf-extended-z15.ctr
 LIB_FILES = bin/cpumf_helper
 USRBIN_SCRIPTS = bin/lscpumf
 USRSBIN_SCRIPTS = bin/chcpumf
