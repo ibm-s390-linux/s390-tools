@@ -12,8 +12,6 @@ use warnings;
 use Carp qw/croak/;
 use Data::Dumper;
 use Getopt::Long qw/:config no_ignore_case/;
-use Pod::Usage;
-
 
 # Global constants
 my $SERVICE_LEVELS = '/proc/service_levels';
@@ -352,6 +350,62 @@ sub cpumf_hardware_counter_map()
 	return $map;
 }
 
+my $cpumf_helper_str = <<'END_MESSAGE';
+
+cpumf_helper - Helper module for managing CPU-Measurement Facilities (CPU-MF)
+
+Options:
+-i, --info:
+	Displays detailed information about installed and available
+	CPU-measurement facilities and the related Linux support.
+
+-c, --counter authorization_value
+	Displays counter information for the current System z hardware.
+	The authorization value provides information about the authorized
+	counter sets. The value must be specified in decimal format.
+
+	To display all supported counters, specify C<65535> (FFFF hex).
+
+	To display supported counters for a particular System z hardware,
+	use the --ctr-def option and specify the System z hardware type.
+
+--hardware-type
+	Displays the System z hardware type.
+
+--ctr-def ctr-definition
+	Displays detailed information about the specified counter definition.
+	Valid counter definitions start with C<cfvn-> or <csvn-> followed by
+	the counter first/second version number of the CPU-Measurement Counter
+	Facility.  To display counter information of model-specific counter
+	sets, specify the System z hardware type for I<ctr-definition>.
+
+--ctr-set-names
+	Displays the mapping of counter set IDs to counter set names.
+	The counter set IDs are numbers that are used in counter definitions.
+
+--ctr-set-ids
+	Displays the counter set IDs.  The counter set IDs are numbers that
+	match the authorization bits (see QUERY COUNTER INFORMATION).
+	The output format is a list. To get the ID for a particular counter
+	set, use an index number as follows:
+
+	0: Basic Counter Set
+	1: Problem-State Counter Set
+	2: Crypto-Activity Counter Set
+	3: Extended Counter Set
+	4: MT-diagnostic Counter Set
+	5: Coprocessor Group Counter Set
+
+--ctr-sf
+	Displays the counter definitions for the sampling facility support.
+	These counter definitions are specific to Linux perf infrastructure.
+
+--sfb-size
+	Displays the size of the sampling facility buffer (SFB). The minimum
+	and maximum numbers are measured in units of sample-data-blocks. A
+	sample-data-block uses about 4 kilobytes.
+
+END_MESSAGE
 
 sub cpumf_helper_main()
 {
@@ -369,8 +423,8 @@ sub cpumf_helper_main()
 		"ctr-set-ids"	=> \$conf->{opt_ctrset_ids},
 		"sfb-size"	=> \$conf->{opt_sfb_size},
 		"ctr-sf"	=> \$conf->{opt_sf_ctr},
-	) or pod2usage(-message =>"One or more options are not valid",
-		       -exitval => 1);
+	) or die("One or more options are not valid\n" . $cpumf_helper_str);
+
 
 	# Setting up Data::Dumper to create parseable Perl output
 	local $Data::Dumper::Purity = 1;
@@ -422,8 +476,7 @@ sub cpumf_helper_main()
 		$result = cpumf_counter_set_ids();
 
 	} else {
-		pod2usage(-message => "No option specified",
-			  -exitval => 1);
+		die("No option specified\n" . $cpumf_helper_str);
 	}
 
 	# Display result
@@ -434,93 +487,3 @@ sub cpumf_helper_main()
 &cpumf_helper_main();
 __DATA__
 __END__
-=head1 NAME
-
-B<cpumf_helper> - Helper module for managing CPU-Measurement Facilities (CPU-MF)
-
-=head1 SYNOPSIS
-
-=head1 DESCRIPTION
-
-The B<cpumf_helper> program is not intended for ordinary use.
-
-=head1 OPTIONS
-
-=over 8
-
-=item B<-i>, B<--info>
-
-Displays detailed information about installed and available CPU-measurement
-facilities and the related Linux support.
-
-=item B<-c>, B<--counter> I<authorization_value>
-
-Displays counter information for the current System z hardware.  The
-authorization value provides information about the authorized counter sets.  The
-value must be specified in decimal format.
-
-To display all supported counters, specify C<65535> (FFFF hex).
-
-To display supported counters for a particular System z hardware, use the
-B<--ctr-def> option and specify the System z hardware type.
-
-=item B<--hardware-type>
-
-Displays the System z hardware type.
-
-=item B<--ctr-def> I<ctr-definition>
-
-Displays detailed information about the specified counter definition.
-Valid counter definitions start with C<cfvn-> or <csvn-> followed by
-the counter first/second version number of the CPU-Measurement Counter
-Facility.  To display counter information of model-specific counter
-sets, specify the System z hardware type for I<ctr-definition>.
-
-=item B<--ctr-set-names>
-
-Displays the mapping of counter set IDs to counter set names.  The counter set
-IDs are numbers that are used in counter definitions.
-
-=item B<--ctr-set-ids>
-
-Displays the counter set IDs.  The counter set IDs are numbers that match the
-authorization bits (see QUERY COUNTER INFORMATION).  The output format is a
-list.  To get the ID for a particular counter set, use an index number as
-follows:
-
-=over 16
-
-=item 0: Basic Counter Set
-
-=item 1: Problem-State Counter Set
-
-=item 2: Crypto-Activity Counter Set
-
-=item 3: Extended Counter Set
-
-=item 4: MT-diagnostic Counter Set
-
-=item 5: Coprocessor Group Counter Set
-
-=back
-
-=item B<--ctr-sf>
-
-Displays the counter definitions for the sampling facility support.  These
-counter definitions are specific to Linux perf infrastructure.
-
-=item B<--sfb-size>
-
-Displays the size of the sampling facility buffer (SFB).  The minimum and
-maximum numbers are measured in units of sample-data-blocks.  A
-sample-data-block uses about 4 kilobytes.
-
-=back
-
-=head1 FILES
-
-=head1 SEE ALSO
-
-L<lscpumf(1)>, L<chcpumf(1)>
-
-=cut
