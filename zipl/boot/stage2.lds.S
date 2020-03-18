@@ -25,15 +25,19 @@
  * 0x5000-0x51ff	eckd2dump_mv parameter block (426 bytes)
  */
 
+#include "boot/loaders_layout.h"
+
 SECTIONS
 {
-  . = 0x78;
+  . = STAGE2_DESC;
   __stage2_desc = .;
 
-  . = 0x2000;
+  . = STAGE2_LOAD_ADDRESS;
   .stage2.head : { *(.stage2.head) }
-  . = 0x2018;
-  .text.start : { *(.text.start) }
+  . = STAGE2_ENTRY;
+  .text.start : {
+    *(.text.start)
+  }
   .text : { *(.text) }
   __ex_table_start = .;
   .ex_table : { *(.ex_table) }
@@ -52,12 +56,38 @@ SECTIONS
   .bss : { *(.bss) }
   __bss_stop = .;
 
-  . = 0x6000;
+  . = STAGE2_HEAP_ADDRESS;
   __heap_start = .;
-  . = 0x9000;
+  .heap : {
+    . += STAGE2_HEAP_SIZE;
+    ASSERT(__heap_stop - __heap_start == STAGE2_HEAP_SIZE,
+           "Heap section doesn't conform to the described memory layout");
+  }
   __heap_stop = .;
 
-  . = 0xf000;
+  /* Memory reserved for stage3. Use a dummy section to check if changes
+   * in stage3 memory layout work with stage2 and vice versa.
+   */
+  . = STAGE3_PARAMS_ADDRESS;
+  .stage3 : {
+    . += STAGE3_PARAMS_MAXIMUM_SIZE;
+
+    . = STAGE3_LOAD_ADDRESS - STAGE3_PARAMS_ADDRESS;
+    . += STAGE3_MAXIMUM_SIZE;
+
+    . = COMMAND_LINE_EXTRA - STAGE3_PARAMS_ADDRESS;
+    . += COMMAND_LINE_EXTRA_SIZE;
+  }
+
+  . = STAGE2_STACK_ADDRESS;
+  __stack_start = .;
+  .stack : {
+    . += STAGE2_STACK_SIZE;
+    ASSERT(__stack_end - __stack_start == STAGE2_STACK_SIZE,
+           "Stack section doesn't conform to the described memory layout");
+  }
+  __stack_end = .;
+
   .eh_frame : { *(.eh_frame) }
   .note.gnu.build-id : { *(.note.gnu.build-id) }
 }

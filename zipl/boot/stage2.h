@@ -16,9 +16,6 @@
 
 #define DESCR_PER_BLOCK         _AC(16, U)
 
-/* ADRESS */
-#define STAGE2_DESC		_AC(0x78, UL)
-
 
 #ifndef __ASSEMBLER__
 

@@ -13,21 +13,26 @@
  * 0xf000-0xffff        Stack
  */
 
+#include "boot/loaders_layout.h"
+
 SECTIONS
 {
   . = 0x0;
 
-  . = 0x2000;
+  . = STAGE3_HEAP_ADDRESS;
   __heap_start = .;
-  . = 0x6000;
+  .heap : {
+    . += STAGE3_HEAP_SIZE;
+    ASSERT(__heap_stop - __heap_start == STAGE3_HEAP_SIZE,
+           "Heap section doesn't conform to the described memory layout");
+  }
   __heap_stop = .;
 
-
   /* stage 3 parameter */
-  . = 0x9000;
+  . = STAGE3_PARAMS_ADDRESS;
   _stage3_parms = .;
 
-  . = 0xa000;
+  . = STAGE3_ENTRY;
   .text.start : { *(.text.start) }
   .text : { *(.text) }
   __ex_table_start = .;
@@ -40,4 +45,18 @@ SECTIONS
   __bss_stop = .;
   .rodata : {*(.rodata) }
   .data : { *(.data) }
+
+  . = COMMAND_LINE_EXTRA;
+  .cmdline_extra : {
+    . += COMMAND_LINE_EXTRA_SIZE;
+  }
+
+  . = STAGE3_STACK_ADDRESS;
+  __stack_start = .;
+  .stack : {
+    . += STAGE3_STACK_SIZE;
+    ASSERT(__stack_end - __stack_start == STAGE3_STACK_SIZE,
+           "Stack section doesn't conform to the described memory layout");
+  }
+  __stack_end = .;
 }

@@ -1,8 +1,11 @@
 # Common definitions
 include ../../common.mak
 
-ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g -I $(rootdir)/zipl/include \
-	   -I $(rootdir)/include -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
+INCLUDE_PATHS := $(rootdir)/zipl/include $(rootdir)/include
+INCLUDE_PARMS := $(addprefix -I,$(INCLUDE_PATHS))
+
+ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g $(INCLUDE_PARMS) \
+	  -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 	  -fno-builtin -ffreestanding -fno-asynchronous-unwind-tables \
 	  -fno-delete-null-pointer-checks \
 	  -fexec-charset=IBM1047 -m64 -mpacked-stack \
@@ -25,6 +28,17 @@ all: data.o data.h tape0.bin stage3.bin
 
 %.o:	%.c
 	$(CC) $(ALL_CFLAGS) -c -o $@ $<
+
+# Dependencies for the .lds generation
+sources_lds_S = $(wildcard *.lds.S)
+dependencies_lds_S = $(sources_lds_S:%.lds.S=.%.lds.d)
+# Include all ".lds.d" dependency files for all make targets except for "clean"
+ifneq ($(MAKECMDGOALS),clean)
+-include $(dependencies_lds_S)
+endif
+
+%.lds: %.lds.S
+	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -P -C -o $@ $<
 
 eckd2dump_sv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o \
@@ -104,6 +118,6 @@ data.h: data.o
 
 clean:
 	rm -f *.o *.exec *.bin $(FILES) data.o data.h tape0.bin *.xxx *.yyy \
-	      stage3.bin
+	      stage3.bin *.lds *.lds.d
 
 .PHONY: all clean
