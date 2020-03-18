@@ -13,9 +13,13 @@
 # The 1st CCW reads stage 1 IPL record.
 # The 2nd CCW tics to the loaded stage 1 IPL record.
 #
+
+#include "boot/loaders_layout.h"
+#include "boot/s390.h"
+
 	.org   0x0
 	.globl _start
 _start:
-	.long  0x00080000,0x80002018 # PSW :the first 24 byte are loaded by IPL
+	.quad  PSW_LOAD+STAGE2_ENTRY # PSW :the first 24 byte are loaded by IPL
 	.long  0x06000018,0x60000068 # read IPL record 2
 	.long  0x08000018,0x00000000 # TIC to stage 1

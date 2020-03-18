@@ -14,9 +14,13 @@
 # The 2nd CCW reads stage 1 IPL record (re-read record 1) and continues with
 # command chaining at address 0x18
 #
+
+#include "boot/loaders_layout.h"
+#include "boot/s390.h"
+
 	.org   0x0
 	.globl _start
 _start:
-	.long  0x00080000,0x80002018 # PSW :the first 24 byte are loaded by IPL
+	.quad  PSW_LOAD+STAGE2_ENTRY # PSW :the first 24 byte are loaded by IPL
 	.long  0x16002000,0x60000016 # Read record zero
 	.long  0x06000000,0x60000080 # Read IPL record 1 again

@@ -9,6 +9,7 @@
 
 #include "boot/sigp.h"
 #include "boot/linux_layout.h"
+#include "boot/s390.h"
 
 IPL_BS			= 1024			# block size for tape access
 IPL_OFF			= 0x4000		# temporary kernel load addr
@@ -31,7 +32,7 @@ _start:
 
 # Stage 0 loader - loads first block of this loader
 
-	.long 0x00080000,0x80000000+iplstart	# PSW to start execution
+	.quad PSW_LOAD+iplstart			# PSW to start execution
 	.long 0x27000000,0x60000001		# backward Space Block
 	.long 0x02000000,0x20000000+IPL_BS	# read IPL_BS bytes to addr 0
 
@@ -57,7 +58,7 @@ _parm_addr:
 _initrd_addr:
 	.quad RAMDISK_ORIGIN			# ramdisk load address
 _load_psw:
-	.quad 0x0008000080000000+KERNEL_ADDR	# kernel start PSW
+	.quad PSW_LOAD+KERNEL_ADDR		# kernel start PSW
 
 #
 # Subroutine to load from tape until tape mark

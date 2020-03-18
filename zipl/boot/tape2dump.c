@@ -9,11 +9,13 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "libc.h"
 #include "lib/zt_common.h"
+#include "boot/loaders_layout.h"
+#include "boot/s390.h"
 
 #include "cio.h"
 #include "error.h"
-#include "libc.h"
 #include "stage2dump.h"
 
 #define BLK_SIZE	0x8000 /* We write 32 KB at a time */
@@ -36,7 +38,7 @@ struct tape_head {
 } __packed;
 
 struct tape_head __section(.stage2.head) tape_head = {
-	.psw	= 0x0008000080002018ULL, /* Start code at 0x2018 */
+	.psw	= PSW_LOAD | STAGE2_ENTRY, /* Start code at 0x2018 */
 	.ccw1	= 0x0700000060000001ULL, /* Rewind ccw */
 	.ccw2	= 0x0200200020003000ULL, /* CCW to load dump tool to 0x2000 */
 };
