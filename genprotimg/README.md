@@ -71,31 +71,15 @@ talking about stage3b we refer to stage3b_reloc.bin.
 
 The memory layout of the bootable file looks like:
 
-+-----------------------+-----------+------------------------+
-|Start                  |End        |Use                     |
-+=======================+===========+========================+
-|0                      |0x7        |Short PSW, starting     |
-|                       |           |instruction at 0x11000  |
-+-----------------------+-----------+------------------------+
-|0x10000                |0x10012    |Branch to 0x11000       |
-+-----------------------+-----------+------------------------+
-|0x10013                |0x10fff    |Left intentionally      |
-|                       |           |unused                  |
-+-----------------------+-----------+------------------------+
-|0x11000                |0x12fff    |Stage3a                 |
-+-----------------------+-----------+------------------------+
-|0x13000                |0x13fff    |IPIB used as argument   |
-|                       |           |for the diag308 call    |
-+-----------------------+-----------+------------------------+
-|0x14000                |0x1[45]fff |UV header used for the  |
-|                       |           |diag308 call (size can  |
-|                       |           |be either 1 or 2 pages) |
-+-----------------------+-----------+------------------------+
-|NEXT_PAGE_ALIGNED_ADDR |           |Encrypted Kernel        |
-+-----------------------+-----------+------------------------+
-|NEXT_PAGE_ALIGNED_ADDR |           |Encrypted Cmdline       |
-+-----------------------+-----------+------------------------+
-|NEXT_PAGE_ALIGNED_ADDR |           |Encrypted Initrd        |
-+-----------------------+-----------+------------------------+
-|NEXT_PAGE_ALIGNED_ADDR |           |Encrypted Stage3b_reloc |
-+-----------------------+-----------+------------------------+
+| Start                  | End        | Use                                                                   |
+|------------------------|------------|-----------------------------------------------------------------------|
+| 0                      | 0x7        | Short PSW, starting instruction at 0x11000                            |
+| 0x10000                | 0x10012    | Branch to 0x11000                                                     |
+| 0x10013                | 0x10fff    | Left intentionally unused                                             |
+| 0x11000                | 0x12fff    | Stage3a                                                               |
+| 0x13000                | 0x13fff    | IPIB used as argument for the diag308 call                            |
+| 0x14000                | 0x1[45]fff | UV header used for the diag308 call (size can be either 1 or 2 pages) |
+| NEXT_PAGE_ALIGNED_ADDR |            | Encrypted kernel                                                      |
+| NEXT_PAGE_ALIGNED_ADDR |            | Encrypted kernel parameters                                           |
+| NEXT_PAGE_ALIGNED_ADDR |            | Encrypted initrd                                                      |
+| NEXT_PAGE_ALIGNED_ADDR |            | Encrypted stage3b_reloc                                               |
