@@ -511,20 +511,6 @@ static struct attrib qeth_attr_route6 = {
 	.st_data = QETH_DATA(layer_3, group_none),
 };
 
-static struct attrib qeth_attr_fake_broadcast = {
-	.name = "fake_broadcast",
-	.title = "Enable simulation of broadcast capability",
-	.desc =
-	"Control whether a QETH device that doesn't support broadcast should\n"
-	"fake the broadcast capability.\n"
-	"  0: Fake broadcasting depending on hardware capabilities\n"
-	"  1: No faked broadcasting\n",
-	.defval = "0",
-	.order_cmp = after_layer2_order_cmp,
-	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
-	.st_data = QETH_DATA(layer_3, group_none),
-};
-
 static struct attrib qeth_attr_ipa_takeover_enable = {
 	.name = "ipa_takeover/enable",
 	.title = "Control IP address takeover",
@@ -1451,7 +1437,6 @@ struct subtype qeth_subtype_qeth = {
 		&qeth_attr_hw_trap,
 		&qeth_attr_route4,
 		&qeth_attr_route6,
-		&qeth_attr_fake_broadcast,
 		&qeth_attr_ipa_takeover_enable,
 		&qeth_attr_ipa_takeover_add4,
 		&qeth_attr_ipa_takeover_add6,
