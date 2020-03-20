@@ -29,7 +29,7 @@ static void format_size(char *str, size_t size)
 		{"byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"};
 	unsigned int i;
 
-	for (i = 0; i < UTIL_ARRAY_SIZE(unit_vec); i++) {
+	for (i = 0; i < ARRAY_SIZE(unit_vec); i++) {
 		if (size / 1024 == 0) {
 			sprintf(str, "%zu %s", size, unit_vec[i]);
 			return;

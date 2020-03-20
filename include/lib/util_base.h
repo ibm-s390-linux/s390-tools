@@ -21,8 +21,6 @@ void util_hexdump_grp(FILE *fh, const char *tag, const void *data, int group,
 		      int cnt, int indent);
 void util_print_indented(const char *str, int indent);
 
-#define UTIL_ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
-
 static inline void util_ptr_vec_free(void **ptr_vec, int count)
 {
 	int i;

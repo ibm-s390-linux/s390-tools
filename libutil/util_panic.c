@@ -31,7 +31,7 @@ static void print_backtrace(void)
 	char **strings;
 
 	fprintf(stderr, "Backtrace:\n\n");
-	size = backtrace(array, UTIL_ARRAY_SIZE(array));
+	size = backtrace(array, ARRAY_SIZE(array));
 	strings = backtrace_symbols(array, size);
 	if (strings == NULL) {
 		fprintf(stderr, " Could not obtain backtrace (ENOMEM)\n");

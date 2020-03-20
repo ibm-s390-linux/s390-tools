@@ -404,7 +404,7 @@ dasdview_print_extended_info(dasdview_info_t *info)
 	if (dasd_info->features == DASD_FEATURE_DEFAULT) {
 		printf("default\n");
 	} else {
-		for (i = 0; i < UTIL_ARRAY_SIZE(flist); i++)
+		for (i = 0; i < ARRAY_SIZE(flist); i++)
 			if (dasd_info->features & flist[i].mask)
 				printf("%s ", flist[i].name);
 		printf("\n");

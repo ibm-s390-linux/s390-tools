@@ -75,7 +75,7 @@ static int get_part_name_by_dsname(char *dsname, char **name)
 		return 0;
 	}
 
-	for (i = 0; i < UTIL_ARRAY_SIZE(partition_types); i++) {
+	for (i = 0; i < ARRAY_SIZE(partition_types); i++) {
 		if (strstr(dsname, partition_types[i].dsname) != NULL) {
 			*name = partition_types[i].name;
 			return 0;
@@ -97,7 +97,7 @@ static int get_part_type_by_dsname(char *dsname, int *type)
 		return 0;
 	}
 
-	for (i = 0; i < UTIL_ARRAY_SIZE(partition_types); i++) {
+	for (i = 0; i < ARRAY_SIZE(partition_types); i++) {
 		if (strstr(dsname, partition_types[i].dsname) != NULL) {
 			*type = partition_types[i].type;
 			return 0;
@@ -112,7 +112,7 @@ static int get_part_type_by_dsname(char *dsname, int *type)
  */
 static int get_part_dsname_by_type(unsigned int type, char **dsname)
 {
-	if (type > UTIL_ARRAY_SIZE(partition_types))
+	if (type > ARRAY_SIZE(partition_types))
 		return 1;
 
 	if (type == 0)
@@ -1205,7 +1205,7 @@ static void fdasd_list_known_partitions(void)
 	unsigned int i;
 
 	for (i = VALID_PARTITION_OFFSET;
-	     i < UTIL_ARRAY_SIZE(partition_types); i++) {
+	     i < ARRAY_SIZE(partition_types); i++) {
 		printf("%3d %s\n",
 		       partition_types[i].type, partition_types[i].name);
 	}
@@ -1622,7 +1622,7 @@ static void fdasd_change_part_type(fdasd_anchor_t *anc)
 
 	part_type = 0;
 	while (part_type < 1 ||
-	       part_type > UTIL_ARRAY_SIZE(partition_types) - 1) {
+	       part_type > ARRAY_SIZE(partition_types) - 1) {
 		do {
 			part_type = read_char("new partition type: ");
 		} while (!isdigit(part_type));

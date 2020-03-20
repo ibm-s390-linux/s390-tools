@@ -290,7 +290,7 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 	mode = S_IFBLK | S_IRWXU;
 
 	/* Try several locations for the temporary device node. */
-	for (path = 0; path < UTIL_ARRAY_SIZE(pathname); path++) {
+	for (path = 0; path < ARRAY_SIZE(pathname); path++) {
 		if (pathname[path] == NULL)
 			continue;
 		for (retry = 0; retry < TEMP_DEV_MAX_RETRIES; retry++) {
