@@ -12,8 +12,7 @@
 #define LIBC_H
 
 #include <stdint.h>
-
-#define NULL ((void *) 0)
+#include <stddef.h>
 
 #define EPERM		 1	/* Operation not permitted */
 #define ENOENT		 2	/* No such file or directory */
