@@ -182,12 +182,12 @@ void start(void)
 	/* Handle extra kernel parameters specified in DASD boot menu. */
 	ebcdic_to_ascii(cextra, cextra, COMMAND_LINE_SIZE);
 
-	/* remove leading whitespace */
-	while (begin <= COMMAND_LINE_SIZE && cextra[begin] == 0x20)
+	/* remove leading whitespace of extra parameter */
+	while (begin < COMMAND_LINE_SIZE - 1 && cextra[begin] == 0x20)
 		begin++;
 
 	/* determine length of extra parameter */
-	while (length <= COMMAND_LINE_SIZE && cextra[length] != 0)
+	while (length < COMMAND_LINE_SIZE - 1 && cextra[length] != 0)
 		length++;
 
 	/* find end of original parm line */
