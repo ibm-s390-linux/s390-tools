@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -296,7 +297,7 @@ misc_temp_dev(dev_t dev, int blockdev, char** devno)
 	char filename[] = "zipl0000";
 	mode_t mode;
 	unsigned int path;
-	int retry;
+	unsigned int retry;
 	int rc;
 	int fd;
 
@@ -310,7 +311,8 @@ misc_temp_dev(dev_t dev, int blockdev, char** devno)
 		if (pathname[path] == NULL)
 			continue;
 		for (retry=0; retry < TEMP_DEV_MAX_RETRIES; retry++) {
-			sprintf(filename, "zipl%04d", retry);
+			assert(retry < 10000);
+			sprintf(filename, "zipl%04u", retry);
 			result = misc_make_path(pathname[path], filename);
 			if (result == NULL)
 				return -1;
