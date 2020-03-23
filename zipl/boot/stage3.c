@@ -138,8 +138,8 @@ void start(void)
 {
 	unsigned int subchannel_id;
 	unsigned char *cextra = (unsigned char *)COMMAND_LINE_EXTRA;
-	unsigned char *command_line =  (unsigned char *)COMMAND_LINE;
-	unsigned int begin = 0, end = 0, length = 0;
+	unsigned char *cmdline =  (unsigned char *)COMMAND_LINE;
+	unsigned int cmdline_len = 0, cextra_len = 0;
 
 	/*
 	 * IPL process is secure we have to use default IPL values and
@@ -168,11 +168,11 @@ void start(void)
 
 	/* if valid command line is given, copy it into new kernel space */
 	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
-		memcpy(command_line,
+		memcpy(cmdline,
 		       (void *)(unsigned long *)_stage3_parms.parm_addr,
 		       COMMAND_LINE_SIZE);
 		/* terminate \0 */
-		command_line[COMMAND_LINE_SIZE - 1] = 0;
+		cmdline[COMMAND_LINE_SIZE - 1] = 0;
 	}
 
 	/* convert extra parameter to ascii */
@@ -182,36 +182,36 @@ void start(void)
 	/* Handle extra kernel parameters specified in DASD boot menu. */
 	ebcdic_to_ascii(cextra, cextra, COMMAND_LINE_SIZE);
 
-	/* remove leading whitespace of extra parameter */
-	while (begin < COMMAND_LINE_SIZE - 1 && cextra[begin] == 0x20)
-		begin++;
-
 	/* determine length of extra parameter */
-	while (length < COMMAND_LINE_SIZE - 1 && cextra[length] != 0)
-		length++;
+	cextra_len = MIN(strlen((const char *)cextra), COMMAND_LINE_SIZE - 1);
 
-	/* find end of original parm line */
-	while (command_line[end] != 0)
-		end++;
+	/* remove leading whitespace of extra parameter */
+	while (cextra_len > 0 && *cextra == 0x20) {
+		cextra++;
+		cextra_len--;
+	}
+
+	/* determine length of original parm line */
+	cmdline_len = MIN(strlen((const char *)cmdline),
+			  COMMAND_LINE_SIZE - 1);
 
 	/*
 	 * if extra parm string starts with '=' replace original string,
 	 * else append
 	 */
-	if (cextra[begin] == 0x3d) {
-		memcpy(command_line, (void *)(cextra + begin), length);
+	if (*cextra == 0x3d) {
+		memcpy(cmdline, cextra, cextra_len);
 	} else {
 		/* check if length is within max value */
-		length = (end + 1 + length <= COMMAND_LINE_SIZE) ? length :
-			(COMMAND_LINE_SIZE - end - 1);
+		cextra_len = (cmdline_len + 1 + cextra_len <= COMMAND_LINE_SIZE) ?
+			cextra_len : (COMMAND_LINE_SIZE - cmdline_len - 1);
 		/* add blank */
-		command_line[end] = 0x20;
-		end++;
+		cmdline[cmdline_len] = 0x20;
+		cmdline_len++;
 		/* append string */
-		memcpy((void *)(command_line + end),
-		       (void *)(cextra + begin), length);
+		memcpy(cmdline + cmdline_len, cextra, cextra_len);
 		/* terminate 0 */
-		command_line[end + length] = 0;
+		cmdline[cmdline_len + cextra_len] = 0;
 	}
 
 noextra:
