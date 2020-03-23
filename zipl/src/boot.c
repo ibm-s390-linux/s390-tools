@@ -87,7 +87,7 @@ boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 	struct stage3_parms params;
 	void* data;
 
-	if (entry != (entry & PSW_ADDRESS_MASK)) {
+	if (entry != (entry & PSW32_ADDR_MASK)) {
 		error_reason("Kernel image entry point to high (31 bit "
 			     "addressing mode)");
 		return -1;
@@ -238,7 +238,7 @@ boot_get_tape_ipl(void** data, size_t* size, address_t parm_addr,
 	struct boot_tape_ipl_params params;
 	void* buffer;
 
-	if (image_addr != (image_addr & PSW_ADDRESS_MASK)) {
+	if (image_addr != (image_addr & PSW32_ADDR_MASK)) {
 		error_reason("Kernel image load address to high (31 bit "
 			     "addressing mode)");
 		return -1;

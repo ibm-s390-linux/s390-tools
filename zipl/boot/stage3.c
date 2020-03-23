@@ -18,7 +18,6 @@
 
 #include "stage3.h"
 #include "error.h"
-#include "zipl.h"
 #include "ebcdic.h"
 #include "ebcdic_conv.h"
 
@@ -152,7 +151,7 @@ void start(void)
 		    _stage3_parms.load_psw != DEFAULT_PSW_LOAD)
 			panic(ESECUREBOOT, "%s", msg_sipl_inval);
 
-		if (!is_verified_address(_stage3_parms.load_psw & PSW_ADDR_MASK))
+		if (!is_verified_address(_stage3_parms.load_psw & PSW32_ADDR_MASK))
 			panic(ESECUREBOOT, "%s", msg_sipl_unverified);
 	}
 	/*

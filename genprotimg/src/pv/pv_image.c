@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "boot/s390.h"
 #include "boot/stage3a.h"
 #include "common.h"
 #include "include/pv_crypto_def.h"
@@ -741,7 +742,7 @@ static gint convert_psw_to_short_psw(const struct psw_t *psw, uint64_t *dst,
 	uint64_t psw_mask = psw->mask;
 
 	/* test if PSW mask can be converted */
-	if (psw_mask & PSW_SHORT_ADDR_MASK) {
+	if (psw_mask & PSW32_ADDR_MASK) {
 		g_set_error(err, PV_ERROR, PV_ERROR_INTERNAL,
 			    _("Failed to convert PSW to short PSW"));
 		return -1;
@@ -755,7 +756,7 @@ static gint convert_psw_to_short_psw(const struct psw_t *psw, uint64_t *dst,
 	}
 
 	/* test if PSW addr can be converted  */
-	if (psw_addr & ~PSW_SHORT_ADDR_MASK) {
+	if (psw_addr & ~PSW32_ADDR_MASK) {
 		g_set_error(err, PV_ERROR, PV_ERROR_INTERNAL,
 			    _("Failed to convert PSW to short PSW"));
 		return -1;
