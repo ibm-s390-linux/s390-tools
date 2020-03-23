@@ -152,7 +152,6 @@ struct symbol_names {
 };
 
 extern int foreground;
-extern int debug;
 extern char *configfile;
 extern int debug;        /* is verbose specified? */
 extern int memory;
