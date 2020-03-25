@@ -291,6 +291,14 @@ the different tools are provided:
 * dbginfo.sh:
   The tar package is required to archive collected data.
 
+* genprotimg:
+  For building genprotimg you need OpenSSL version 1.1.0 or newer
+  installed (openssl-devel.rpm). Also required is glib2
+  (glib2-devel.rpm). Tip: you may skip the genprotimg build by adding
+  `HAVE_OPENSSL=0` or `HAVE_GLIB2=0`.
+
+  The runtime requirements are: openssl-libs (>= 1.1.0) and glib2.
+
 * osasnmpd:
   You need at least the NET-SNMP 5.1.x package (net-snmp-devel.rpm)
   installed, before building the osasnmpd subagent.
