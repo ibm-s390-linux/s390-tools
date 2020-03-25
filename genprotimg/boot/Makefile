@@ -41,7 +41,7 @@ all: $(FILES)
 
 # Dependencies for the .lds generation
 sources_lds_S = $(wildcard *.lds.S)
-dependencies_lds_S = $(sources_lds_s:%.lds.S=.%.lds.d)
+dependencies_lds_S = $(sources_lds_S:%.lds.S=.%.lds.d)
 # Include all ".lds.d" dependency files for all make targets except for "clean"
 ifneq ($(MAKECMDGOALS),clean)
 -include $(dependencies_lds_S)
