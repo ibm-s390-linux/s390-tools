@@ -26,6 +26,7 @@
 #define STAGE3_STACK_ADDRESS		_AC(0xF000, UL)
 #define STAGE3_PARAMS_ADDRESS		_AC(0x9000, UL)
 
+#define COMMAND_LINE_EXTRA		_AC(0xE000, UL)
 
 #ifndef __ASSEMBLER__
 #endif /* __ASSEMBLER__ */

@@ -13,6 +13,7 @@
 #include "boot/sigp.h"
 #include "boot/s390.h"
 #include "boot/sigp.h"
+#include "boot/linux_layout.h"
 #include "boot/loaders_layout.h"
 
 #include "stage3.h"

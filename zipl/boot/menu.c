@@ -13,6 +13,8 @@
 #include "menu.h"
 #include "sclp.h"
 #include "ebcdic.h"
+#include "boot/linux_layout.h"
+#include "boot/loaders_layout.h"
 
 static const char *msg_econfig = "Error: undefined configuration\n";
 

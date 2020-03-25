@@ -18,8 +18,6 @@
 #include "boot/linux_layout.h"
 
 
-#define COMMAND_LINE_EXTRA       0xE000
-
 #define STAGE3_FLAG_SCSI	 0x0001000000000000ULL
 #define STAGE3_FLAG_KDUMP	 0x0002000000000000ULL
 
