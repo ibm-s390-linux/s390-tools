@@ -12,8 +12,6 @@
 #ifndef STAGE3_H
 #define STAGE3_H
 
-#include "libc.h"
-
 #include "boot/s390.h"
 #include "boot/ipl.h"
 #include "boot/linux_layout.h"
