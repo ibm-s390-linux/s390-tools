@@ -21,6 +21,7 @@
 #include "lib/zt_common.h"
 #include "lib/util_part.h"
 #include "lib/util_path.h"
+#include "stage3.h"
 
 #include "boot.h"
 #include "bootmap.h"

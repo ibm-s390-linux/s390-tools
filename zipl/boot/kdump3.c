@@ -100,9 +100,9 @@ void kdump_stage3(void)
 {
 	unsigned long crash_base, crash_size;
 
-	if (!(stage3_flags & STAGE3_FLAG_KDUMP))
+	if (!(_stage3_parms.flags & STAGE3_FLAG_KDUMP))
 		return;
-	if (!(stage3_flags & STAGE3_FLAG_SCSI))
+	if (!(_stage3_parms.flags & STAGE3_FLAG_SCSI))
 		kdump_stage3_dasd(&crash_base, &crash_size);
 	else
 		kdump_stage3_scsi(&crash_base, &crash_size);

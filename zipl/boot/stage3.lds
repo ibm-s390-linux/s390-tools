@@ -25,21 +25,7 @@ SECTIONS
 
   /* stage 3 parameter */
   . = 0x9000;
-  _parm_addr = .;
-  . = 0x9008;
-  _initrd_addr = .;
-  . = 0x9010;
-  _initrd_len = .;
-  . = 0x9018;
-  _load_psw = .;
-  . = 0x9020;
-  _extra_parm = .;
-  . = 0x9028;
-  stage3_flags =.;
-  . = 0x9030;
-  _image_len = .;
-  . = 0x9038;
-  _image_addr = .;
+  _stage3_parms = .;
 
   . = 0xa000;
   .text.start : { *(.text.start) }

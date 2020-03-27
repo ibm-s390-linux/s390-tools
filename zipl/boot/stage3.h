@@ -12,6 +12,7 @@
 #ifndef STAGE3_H
 #define STAGE3_H
 
+#include "lib/zt_common.h"
 #include "boot/s390.h"
 #include "boot/ipl.h"
 #include "boot/linux_layout.h"
@@ -27,15 +28,21 @@
 
 #define UNSPECIFIED_ADDRESS		-1UL
 
+/* Stage 3 bootloader parameter structure */
+/* Structure must not have any padding */
+struct stage3_parms {
+	unsigned long long parm_addr;   /* address of parmline */
+	unsigned long long initrd_addr; /* address of initrd */
+	unsigned long long initrd_len;  /* length of initrd */
+	unsigned long long load_psw;    /*  load psw of kernel */
+	unsigned long long extra_parm;  /* use extra parm line mechanism? */
+	unsigned long long flags;       /* flags (e.g. STAGE3_FLAG_KDUMP) */
+	unsigned long long image_len;   /* length of kernel */
+	unsigned long long image_addr;  /* target address of kernel */
+};
+STATIC_ASSERT(sizeof(struct stage3_parms) == 8 * 8)
 
-extern unsigned long long _parm_addr;   /* address of parmline */
-extern unsigned long long _initrd_addr; /* address of initrd */
-extern unsigned long long _initrd_len;  /* length of initrd */
-extern unsigned long long _load_psw;    /*  load psw of kernel */
-extern unsigned long long _extra_parm;  /* use extra parm line mechanism? */
-extern unsigned long long stage3_flags; /*  flags (e.g. STAGE3_FLAG_KDUMP) */
-extern unsigned long long _image_len;   /* length of kernel */
-extern unsigned long long _image_addr;  /* target address of kernel */
+extern struct stage3_parms _stage3_parms;
 extern void kdump_stage3();
 
 #endif /* STAGE3_H */

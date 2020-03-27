@@ -147,19 +147,19 @@ void start(void)
 	 * verified component. If it is not IPL is aborted.
 	 */
 	if (secure_boot_enabled()) {
-		if (_image_addr != IMAGE_LOAD_ADDRESS ||
-		    _load_psw != DEFAULT_PSW_LOAD)
+		if (_stage3_parms.image_addr != IMAGE_LOAD_ADDRESS ||
+		    _stage3_parms.load_psw != DEFAULT_PSW_LOAD)
 			panic(ESECUREBOOT, "%s", msg_sipl_inval);
 
-		if (!is_verified_address(_load_psw & PSW_ADDR_MASK))
+		if (!is_verified_address(_stage3_parms.load_psw & PSW_ADDR_MASK))
 			panic(ESECUREBOOT, "%s", msg_sipl_unverified);
 	}
 	/*
 	 * cut the kernel header
 	 */
-	memmove((void *)_image_addr,
-		(void *)_image_addr + IMAGE_LOAD_ADDRESS,
-		_image_len - IMAGE_LOAD_ADDRESS);
+	memmove((void *)_stage3_parms.image_addr,
+		(void *)_stage3_parms.image_addr + IMAGE_LOAD_ADDRESS,
+		_stage3_parms.image_len - IMAGE_LOAD_ADDRESS);
 
 	/* store subchannel ID into low core and into new kernel space */
 	subchannel_id = S390_lowcore.subchannel_id;
@@ -167,15 +167,16 @@ void start(void)
 	*(unsigned long long *)IPL_DEVICE = subchannel_id;
 
 	/* if valid command line is given, copy it into new kernel space */
-	if (_parm_addr != UNSPECIFIED_ADDRESS) {
+	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
 		memcpy((void *)COMMAND_LINE,
-		       (void *)(unsigned long *)_parm_addr, COMMAND_LINE_SIZE);
+		       (void *)(unsigned long *)_stage3_parms.parm_addr,
+		       COMMAND_LINE_SIZE);
 		/* terminate \0 */
 		*(char *)(COMMAND_LINE + COMMAND_LINE_SIZE - 1) = 0;
 	}
 
 	/* convert extra parameter to ascii */
-	if (!_extra_parm || !*cextra)
+	if (!_stage3_parms.extra_parm || !*cextra)
 		goto noextra;
 
 	/* Handle extra kernel parameters specified in DASD boot menu. */
@@ -216,11 +217,11 @@ void start(void)
 
 noextra:
 	/* copy initrd start address and size intop new kernle space */
-	*(unsigned long long *)INITRD_START = _initrd_addr;
-	*(unsigned long long *)INITRD_SIZE = _initrd_len;
+	*(unsigned long long *)INITRD_START = _stage3_parms.initrd_addr;
+	*(unsigned long long *)INITRD_SIZE = _stage3_parms.initrd_len;
 
 	/* store address of new kernel to 0 to be able to start it */
-	*(unsigned long long *)0 = _load_psw;
+	*(unsigned long long *)0 = _stage3_parms.load_psw;
 
 	kdump_stage3();
 

@@ -17,6 +17,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include "stage3.h"
+
 #include "../boot/data.h"
 #include "boot.h"
 #include "bootmap.h"
@@ -79,10 +81,10 @@ boot_check_data(void)
 int
 boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 		      address_t initrd_addr, size_t initrd_len,
-		      address_t entry, int extra_parm, uint16_t flags,
+		      address_t entry, int extra_parm, uint64_t flags,
 		      address_t image_addr, size_t image_len)
 {
-	struct boot_stage3_params params;
+	struct stage3_parms params;
 	void* data;
 
 	if (entry != (entry & PSW_ADDRESS_MASK)) {

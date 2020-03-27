@@ -241,23 +241,6 @@ struct boot_stage2_params {
 } __packed;
 
 
-/* Stage 3 bootloader parameter structure */
-
-struct boot_stage3_params {
-	uint64_t parm_addr;
-	uint64_t initrd_addr;
-	uint64_t initrd_len;
-	uint64_t load_psw;
-	uint64_t extra_parm;
-	uint16_t flags;
-	uint16_t reserved[3];
-	uint64_t image_len;
-	uint64_t image_addr;
-} __packed;
-
-#define STAGE3_FLAG_SCSI		0x0001
-#define STAGE3_FLAG_KDUMP		0x0002
-
 /* Tape IPL bootloader parameter structure */
 
 #define BOOT_TAPE_IPL_PARAMS_OFFSET	0x200
@@ -312,7 +295,7 @@ int boot_init_fba_stage1b(struct boot_fba_stage1b *stage1b,
 int boot_get_eckd_stage2(void** data, size_t* size, struct job_data* job);
 int boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 			  address_t initrd_addr, size_t initrd_len,
-			  address_t entry, int extra_parm, uint16_t flags,
+			  address_t entry, int extra_parm, uint64_t flags,
 			  address_t image_addr, size_t image_len);
 int boot_get_tape_ipl(void** data, size_t* size, address_t parm_addr,
 		      address_t initrd_addr, address_t image_addr);
