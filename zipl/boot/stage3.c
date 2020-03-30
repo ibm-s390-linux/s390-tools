@@ -28,6 +28,7 @@
 
 static const char *msg_sipl_inval = "Secure boot failure: invalid load address";
 static const char *msg_sipl_unverified = "Secure boot failure: unverified load address";
+static const char *msg_sipl_noparm = "Secure boot failure: unable to load ipl parameter";
 
 static inline void __noreturn start_kernel(void)
 {
@@ -54,6 +55,18 @@ static inline void __noreturn start_kernel(void)
 		: [psw] "a" (psw),
 		  [order] "L" (SIGP_SET_ARCHITECTURE));
 	while (1);
+}
+
+unsigned int store_ipl_parmblock(struct ipl_pl_hdr *pl_hdr)
+{
+	int rc;
+
+	rc = diag308(DIAG308_STORE, pl_hdr);
+	if (rc == DIAG308_RC_OK &&
+		pl_hdr->version <= IPL_MAX_SUPPORTED_VERSION)
+		return 0;
+
+	return 1;
 }
 
 unsigned int
@@ -106,12 +119,15 @@ unsigned int
 secure_boot_enabled()
 {
 	struct ipl_pl_hdr *pl_hdr;
-	unsigned long tmp;
+	unsigned int rc;
 
-	tmp = (unsigned long) S390_lowcore.ipl_parmblock_ptr;
-	pl_hdr = (struct ipl_pl_hdr *) tmp;
+	pl_hdr = (void *)get_zeroed_page();
+	if (!pl_hdr || store_ipl_parmblock(pl_hdr))
+		panic(ESECUREBOOT, "%s", msg_sipl_noparm);
+	rc = !!(pl_hdr->flags & IPL_FLAG_SECURE);
+	free_page((unsigned long) pl_hdr);
 
-	return pl_hdr->flags & IPL_FLAG_SECURE;
+	return rc;
 }
 
 void start(void)
