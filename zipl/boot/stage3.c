@@ -201,13 +201,13 @@ void start(void)
 	 */
 	if (*cextra == 0x3d) {
 		memcpy(cmdline, cextra, cextra_len);
-	} else {
-		/* check if length is within max value */
-		cextra_len = (cmdline_len + 1 + cextra_len <= COMMAND_LINE_SIZE) ?
-			cextra_len : (COMMAND_LINE_SIZE - cmdline_len - 1);
+	} else if (cmdline_len + 1 <= COMMAND_LINE_SIZE - 1) {
 		/* add blank */
 		cmdline[cmdline_len] = 0x20;
 		cmdline_len++;
+		/* check if length is within max value */
+		cextra_len = (cmdline_len + cextra_len <= COMMAND_LINE_SIZE - 1) ?
+			cextra_len : (COMMAND_LINE_SIZE - 1 - cmdline_len);
 		/* append string */
 		memcpy(cmdline + cmdline_len, cextra, cextra_len);
 		/* terminate 0 */
