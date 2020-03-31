@@ -106,6 +106,10 @@ is_verified_address(unsigned long image_addr)
 
 		rb_hdr = (void *) rb_hdr + rb_hdr->len;
 	}
+
+	if (!comps)
+		return 0;
+
 	for_each_rb_entry(comp, comps) {
 		if (image_addr == comp->addr &&
 		    comp->flags & IPL_RB_COMPONENT_FLAG_SIGNED &&
