@@ -129,7 +129,7 @@ struct ipl_parameter_block {
 		struct ipl_pb0_pv pv;
 		char raw[PAGE_SIZE - sizeof(struct ipl_pl_hdr)];
 	};
-} __packed __aligned(PAGE_SIZE);
+} __packed;
 
 /* IPL Report List header */
 struct ipl_rl_hdr {
