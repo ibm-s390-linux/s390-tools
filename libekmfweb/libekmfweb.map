@@ -1,0 +1,6 @@
+LIBEKMFWEB_1.0 {
+    global:
+        ekmf_get_server_cert_chain;
+        ekmf_print_certificates;
+    local: *;
+};

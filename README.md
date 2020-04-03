@@ -243,6 +243,12 @@ Package contents
    Provides simple tools to create a binary that can be used to implement
    simple network boot setups following the PXELINUX conventions.
 
+ * libekmfweb:
+   A shared library that provides functions to communicate with an EKMF Web
+   server via REST calls over HTTPS. EKMF Web stands for IBM Enterprise Key
+   Management Foundation - Web Edition, and is used to manage keys in an
+   enterprise.
+
 For more information refer to the following publications:
 
   * "Device Drivers, Features, and Commands" chapter "Useful Linux commands"
@@ -267,10 +273,11 @@ build options:
 | pfm            | `HAVE_PFM`         | cpacfstats                            |
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
-| openssl        | `HAVE_OPENSSL`     | genprotimg,zkey                       |
+| openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb          |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
-| json-c         | `HAVE_JSONC`       | zkey-cryptsetup                       |
+| json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb           |
 | glib2          | `HAVE_GLIB2`       | genprotimg                            |
+| libcurl        | `HAVE_LIBCURL`     | libekmfweb                            |
 
 This table lists additional build or install options:
 
@@ -397,3 +404,11 @@ the different tools are provided:
   tool must be added to this group. The owner of the default key repository
   '/etc/zkey/repository' must be set to group 'zkeyadm' with write permission
   for this group.
+
+* libekmfweb:
+  For building the libekmfweb shared library you need openssl version 1.1.1 or
+  newer installed (openssl-devel.rpm). Also required are json-c version 0.13 or
+  newer (json-c-devel.rpm), and libcurl version 7.59 or newer
+  (libcurl-devel.rpm).
+  Tip: you may skip the libekmfweb build by adding `HAVE_OPENSSL=0`,
+  `HAVE_JSONC=0`, or `HAVE_LIBCURL=0` to the make invocation.

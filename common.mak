@@ -163,6 +163,7 @@ USRSBINDIR      = $(INSTALLDIR)/usr/sbin
 USRBINDIR       = $(INSTALLDIR)/usr/bin
 BINDIR          = $(INSTALLDIR)/sbin
 LIBDIR          = $(INSTALLDIR)/lib
+LIB64DIR        = $(INSTALLDIR)/lib64
 SYSCONFDIR      = $(INSTALLDIR)/etc
 MANDIR          = $(INSTALLDIR)/usr/share/man
 VARDIR          = $(INSTALLDIR)/var
@@ -172,14 +173,16 @@ ZFCPDUMP_DIR    = $(TOOLS_LIBDIR)/zfcpdump
 # Systemd support files are installed only if a directory is specified
 # for SYSTEMDSYSTEMUNITDIR (e.g. /lib/systemd/system)
 SYSTEMDSYSTEMUNITDIR =
+USRINCLUDEDIR   = $(INSTALLDIR)/usr/include
 
 INSTDIRS        = $(USRSBINDIR) $(USRBINDIR) $(BINDIR) $(LIBDIR) $(MANDIR) \
 			$(SYSCONFDIR) $(SYSCONFDIR)/sysconfig \
 			$(TOOLS_LIBDIR) $(TOOLS_DATADIR) \
-			$(ZFCPDUMP_DIR) $(SYSTEMDSYSTEMUNITDIR)
+			$(ZFCPDUMP_DIR) $(SYSTEMDSYSTEMUNITDIR) \
+			$(LIB64DIR) $(USRINCLUDEDIR)
 OWNER           = $(shell id -un)
 GROUP		= $(shell id -gn)
-export INSTALLDIR BINDIR LIBDIR MANDIR OWNER GROUP
+export INSTALLDIR BINDIR LIBDIR LIB64DIR MANDIR OWNER GROUP
 
 # Special defines for zfcpdump
 ZFCPDUMP_IMAGE	= zfcpdump-image
@@ -338,6 +341,10 @@ $(rootdir)/libvmdump/libvmdump.a: $(rootdir)/libvmdump
 $(rootdir)/libvmcp/libvmcp.a: $(rootdir)/libvmcp
 	$(MAKE) -C $(rootdir)/libvmcp/ libvmcp.a
 .PHONY: $(rootdir)/libvmcp
+
+$(rootdir)/libekmfweb/libekmfweb.so: $(rootdir)/libekmfweb
+	$(MAKE) -C $(rootdir)/libekmfweb/ libekmfweb.so
+.PHONY: $(rootdir)/libekmfweb
 
 $(rootdir)/zipl/boot/data.o:
 	$(MAKE) -C $(rootdir)/zipl/boot/ data.o
