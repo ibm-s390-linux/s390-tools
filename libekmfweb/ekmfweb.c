@@ -13,6 +13,7 @@
 #include <err.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include <curl/curl.h>
 
@@ -984,6 +985,149 @@ int ekmf_print_certificates(const char *cert_pem, bool verbose)
 	}
 
 	fclose(fp);
+	return rc;
+}
+
+/**
+ * Checks if the login token stored in the file denoted by field login_token
+ * of the config structure is valid or not. The file (if existent) contains a
+ * JSON Web Token (JWT, see RFC7519). It is valid if the current date and time
+ * is before its expiration time ("exp" claim), and after or equal its
+ * not-before time ("nbf" claim).
+ * Note: The signature (if any) of the JWT is not checked, nor any other JWT
+ * fields.
+ *
+ * @param config            the configuration structure
+ * @param valid             On return: true if the token is valid, false if not
+ * @param login_token       On return: If not NULL: the login token, if the
+ *                          token is still valid. The returned string must
+ *                          be freed by the caller when no longer needed.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ */
+int ekmf_check_login_token(const struct ekmf_config *config, bool *valid,
+			   char **login_token, bool verbose)
+{
+	json_object *jwt_payload = NULL;
+	json_object *exp_claim = NULL;
+	json_object *nbf_claim = NULL;
+	char *token = NULL;
+	size_t count, size;
+	int64_t exp, nbf;
+	FILE *fp = NULL;
+	struct stat sb;
+	int rc = 0;
+	time_t now;
+
+	if (config == NULL || valid == NULL)
+		return -EINVAL;
+
+	if (config->login_token == NULL) {
+		*valid = false;
+		return 0;
+	}
+
+	if (login_token != NULL)
+		*login_token = NULL;
+
+	pr_verbose(verbose, "Reading login token from file : '%s'",
+		   config->login_token);
+
+	if (stat(config->login_token, &sb)) {
+		rc = -errno;
+		pr_verbose(verbose, "stat on file %s failed: '%s'",
+			   config->login_token, strerror(-rc));
+		return rc;
+	}
+	size = sb.st_size;
+	if (size == 0) {
+		pr_verbose(verbose, "File %s is empty", config->login_token);
+		rc = -EIO;
+		goto out;
+	}
+
+	token = (char *)malloc(size + 1);
+	if (token == NULL) {
+		pr_verbose(verbose, "Failed to allocate a buffer");
+		return -ENOMEM;
+	}
+
+	fp = fopen(config->login_token, "r");
+	if (fp == NULL) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to open file %s: '%s'",
+			   config->login_token, strerror(-rc));
+		goto out;
+	}
+
+	count = fread(token, 1, size, fp);
+	if (count != size) {
+		pr_verbose(verbose, "Failed to read the token");
+		rc = -EIO;
+		goto out;
+	}
+	token[size] = '\0';
+	if (token[size - 1] == '\n')
+		token[size - 1] = '\0';
+
+	fclose(fp);
+	fp = NULL;
+
+	time(&now);
+	*valid = true;
+
+	rc = parse_json_web_token(token, NULL, &jwt_payload, NULL, NULL);
+	if (rc != 0) {
+		pr_verbose(verbose, "parse_json_web_token failed");
+		goto out;
+	}
+
+	if (json_object_object_get_ex(jwt_payload, "exp", &exp_claim) &&
+	    json_object_is_type(exp_claim, json_type_int)) {
+		exp = json_object_get_int64(exp_claim);
+		if (exp == 0) {
+			pr_verbose(verbose,
+				   "failed to get value from exp claim");
+			rc = -EIO;
+			goto out;
+		}
+
+		if (now > exp) {
+			pr_verbose(verbose, "JWT is expired");
+			*valid = false;
+		}
+	}
+
+	if (json_object_object_get_ex(jwt_payload, "nbf", &nbf_claim) &&
+	    json_object_is_type(nbf_claim, json_type_int)) {
+		nbf = json_object_get_int64(nbf_claim);
+		if (nbf == 0) {
+			pr_verbose(verbose,
+				   "failed to get value from nbf claim");
+			rc = -EIO;
+			goto out;
+		}
+
+		if (now <= nbf) {
+			pr_verbose(verbose, "JWT is not yet valid");
+			*valid = false;
+		}
+	}
+
+	if (login_token != NULL && *valid) {
+		*login_token = token;
+		token = NULL;
+	}
+
+out:
+	if (jwt_payload != NULL)
+		json_object_put(jwt_payload);
+	if (token != NULL)
+		free(token);
+	if (fp != NULL)
+		fclose(fp);
+
 	return rc;
 }
 

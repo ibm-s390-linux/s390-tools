@@ -45,6 +45,9 @@ struct ekmf_config {
 	/** Maximum number of redirects to follow. Zero means that redirects are
 	 *  not followed. -1 means to infinitely follow redirects. */
 	long max_redirs;
+	/** File name of the login token (JSON Web Token) used for the last
+	 *  login. */
+	const char *login_token;
 };
 
 /**
@@ -87,5 +90,26 @@ int ekmf_get_server_cert_chain(const struct ekmf_config *config,
  *          does not contain any certificates. 0 if success.
  */
 int ekmf_print_certificates(const char *cert_pem, bool verbose);
+
+/**
+ * Checks if the login token stored in the file denoted by field login_token
+ * of the config structure is valid or not. The file (if existent) contains a
+ * JSON Web Token (JWT, see RFC7519). It is valid if the current date and time
+ * is before its expiration time ("exp" claim), and after or equal its
+ * not-before time ("nbf" claim).
+ * Note: The signature (if any) of the JWT is not checked, nor any other JWT
+ * fields.
+ *
+ * @param config            the configuration structure
+ * @param valid             On return: true if the token is valid, false if not
+ * @param login_token       On return: If not NULL: the login token, if the
+ *                          token is still valid. The returned string must
+ *                          be freed by the caller when no longer needed.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ */
+int ekmf_check_login_token(const struct ekmf_config *config, bool *valid,
+			   char **login_token, bool verbose);
 
 #endif
