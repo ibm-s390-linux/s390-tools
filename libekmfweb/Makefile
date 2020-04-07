@@ -60,14 +60,15 @@ skip-libekmfweb-curl:
 
 all: $(BUILD_TARGETS)
 
-ekmfweb.o: check-dep-libekmfweb ekmfweb.c utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
+ekmfweb.o: check-dep-libekmfweb ekmfweb.c utilities.h cca.h $(rootdir)include/ekmfweb/ekmfweb.h
 utilities.o: check-dep-libekmfweb utilities.c utilities.h
+cca.o: check-dep-libekmfweb cca.c cca.h utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 
 libekmfweb.so: ALL_CFLAGS += -fPIC
-libekmfweb.so: LDLIBS = -ljson-c -lcrypto -lssl -lcurl -shared
+libekmfweb.so: LDLIBS = -ljson-c -lcrypto -lssl -lcurl -ldl -shared
 libekmfweb.so: LDFLAGS = -shared -Wl,--version-script=libekmfweb.map \
 	-Wl,-z,defs,-Bsymbolic
-libekmfweb.so: ekmfweb.o utilities.o
+libekmfweb.so: ekmfweb.o utilities.o cca.o
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-libekmfweb.so: libekmfweb.so

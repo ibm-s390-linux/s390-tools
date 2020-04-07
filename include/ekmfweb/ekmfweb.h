@@ -48,6 +48,25 @@ struct ekmf_config {
 	/** File name of the login token (JSON Web Token) used for the last
 	 *  login. */
 	const char *login_token;
+	/** File name of a file containing the client identity secure key blob.
+	 *  This key represents the client identity against EKMFWeb. Some
+	 *  requests sent to EKMFWeb are signed with this (secure) key */
+	const char *identity_secure_key;
+};
+
+struct ekmf_cca_lib {
+	void *cca_lib; /* Handle of CCA host library loaded via dlopen */
+};
+
+enum ekmf_ext_lib_type {
+	EKMF_EXT_LIB_CCA = 1,
+};
+
+struct ekmf_ext_lib {
+	enum ekmf_ext_lib_type type;
+	union {
+		struct ekmf_cca_lib *cca; /* Used if type = EKMF_EXT_LIB_CCA */
+	};
 };
 
 /**
@@ -111,5 +130,44 @@ int ekmf_print_certificates(const char *cert_pem, bool verbose);
  */
 int ekmf_check_login_token(const struct ekmf_config *config, bool *valid,
 			   char **login_token, bool verbose);
+
+enum ekmf_key_type {
+	EKMF_KEY_TYPE_ECC = 1,
+	EKMF_KEY_TYPE_RSA = 2,
+};
+
+struct ekmf_key_gen_info {
+	enum ekmf_key_type type;
+	union {
+		struct {
+			int curve_nid;
+		} ecc;
+		struct {
+			size_t modulus_bits;
+			unsigned int pub_exp;
+		} rsa;
+	} params;
+};
+
+/**
+ * Generate a secure identity key used to identify the client to EKMFWeb.
+ * The secure key blob is stored in a file specified in field
+ * identity_secure_key of the config structure. If an secure key already exists
+ * at that location, it is overwritten.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param info              key generation info, such as key type (ECC or RSA)
+ *                          and key parameters.
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ */
+int ekmf_generate_identity_key(const struct ekmf_config *config,
+			       const struct ekmf_key_gen_info *info,
+			       const struct ekmf_ext_lib *ext_lib,
+			       bool verbose);
 
 #endif

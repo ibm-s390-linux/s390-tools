@@ -31,6 +31,9 @@
 
 #include "ekmfweb/ekmfweb.h"
 #include "utilities.h"
+#include "cca.h"
+
+#define MAX_KEY_BLOB_SIZE		CCA_MAX_PKA_KEY_TOKEN_SIZE
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -1129,6 +1132,81 @@ out:
 		fclose(fp);
 
 	return rc;
+}
+
+/**
+ * Generate a secure identity key used to identify the client to EKMFWeb.
+ * The secure key blob is stored in a file specified in field
+ * identity_secure_key of the config structure. If an secure key already exists
+ * at that location, it is overwritten.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param info              key generation info, such as key type (ECC or RSA)
+ *                          and key parameters.
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ */
+int ekmf_generate_identity_key(const struct ekmf_config *config,
+			       const struct ekmf_key_gen_info *info,
+			       const struct ekmf_ext_lib *ext_lib, bool verbose)
+{
+	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
+	size_t key_blob_size = sizeof(key_blob);
+	int rc;
+
+	if (config == NULL || info == NULL || ext_lib == NULL)
+		return -EINVAL;
+	if (config->identity_secure_key == NULL)
+		return -EINVAL;
+
+	switch (ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		switch (info->type) {
+		case EKMF_KEY_TYPE_ECC:
+			rc = cca_generate_ecc_key_pair(ext_lib->cca,
+					info->params.ecc.curve_nid,
+					key_blob, &key_blob_size, verbose);
+			break;
+		case EKMF_KEY_TYPE_RSA:
+			rc = cca_generate_rsa_key_pair(ext_lib->cca,
+					info->params.rsa.modulus_bits,
+					info->params.rsa.pub_exp,
+					key_blob, &key_blob_size, verbose);
+			break;
+		default:
+			pr_verbose(verbose, "Invalid key type: %d", info->type);
+			return -EINVAL;
+		}
+		break;
+	default:
+		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
+		return -EINVAL;
+	}
+
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to generate a key: rc: %d - %s",
+			   rc, strerror(-rc));
+		return rc;
+	}
+
+	rc = write_key_blob(config->identity_secure_key, key_blob,
+			    key_blob_size);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to write the key to file '%s' "
+			   "rc: %d - %s", config->identity_secure_key, rc,
+			   strerror(-rc));
+		return rc;
+	}
+
+	pr_verbose(verbose, "Secure identity key generated (%lu bytes) "
+		   "and written to file '%s'", key_blob_size,
+		   config->identity_secure_key);
+
+	return 0;
 }
 
 /**

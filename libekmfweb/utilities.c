@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -356,6 +357,260 @@ out:
 		free(json);
 
 	return rc;
+}
+
+struct ecc_curve_info {
+	int curve_nid;
+	enum {
+		ECC_TYPE_PRIME = 0,
+		ECC_TYPE_BRAINPOOL = 1,
+	} type;
+	size_t prime_bits;
+	size_t prime_len;
+	const char *curve_id;
+};
+
+static const struct ecc_curve_info ecc_curve_list[] = {
+	{ .curve_nid = NID_X9_62_prime192v1, .type = ECC_TYPE_PRIME,
+	  .prime_bits = 192, .prime_len = 24, .curve_id = "P-192" },
+	{ .curve_nid = NID_secp224r1,        .type = ECC_TYPE_PRIME,
+	  .prime_bits = 224, .prime_len = 28, .curve_id = "P-224" },
+	{ .curve_nid = NID_X9_62_prime256v1, .type = ECC_TYPE_PRIME,
+	  .prime_bits = 256, .prime_len = 32, .curve_id = "P-256" },
+	{ .curve_nid = NID_secp384r1,        .type = ECC_TYPE_PRIME,
+	  .prime_bits = 384, .prime_len = 48, .curve_id = "P-384" },
+	{ .curve_nid = NID_secp521r1,        .type = ECC_TYPE_PRIME,
+	  .prime_bits = 521, .prime_len = 66, .curve_id = "P-521" },
+	{ .curve_nid = NID_brainpoolP160r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 160, .prime_len = 20, .curve_id = "brainpoolP160r1" },
+	{ .curve_nid = NID_brainpoolP192r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 192, .prime_len = 24, .curve_id = "brainpoolP192r1" },
+	{ .curve_nid = NID_brainpoolP224r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 224, .prime_len = 28, .curve_id = "brainpoolP224r1" },
+	{ .curve_nid = NID_brainpoolP256r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 256, .prime_len = 32, .curve_id = "brainpoolP256r1" },
+	{ .curve_nid = NID_brainpoolP320r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 320, .prime_len = 40, .curve_id = "brainpoolP320r1" },
+	{ .curve_nid = NID_brainpoolP384r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 384, .prime_len = 48, .curve_id = "brainpoolP384r1" },
+	{ .curve_nid = NID_brainpoolP512r1,  .type = ECC_TYPE_BRAINPOOL,
+	  .prime_bits = 512, .prime_len = 64, .curve_id = "brainpoolP512r1" },
+};
+
+static const int ecc_curve_num =
+		sizeof(ecc_curve_list) / sizeof(struct ecc_curve_info);
+
+/**
+ * Returns the prime bit length of the specified curve, or 0 if the curve
+ * is not known.
+ */
+size_t ecc_get_curve_prime_bits(int curve_nid)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].curve_nid == curve_nid)
+			return ecc_curve_list[i].prime_bits;
+	}
+	return 0;
+}
+
+/**
+ * Returns the prime length in bytes of the specified curve, or 0 if the curve
+ * is not known.
+ */
+size_t ecc_get_curve_prime_length(int curve_nid)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].curve_nid == curve_nid)
+			return ecc_curve_list[i].prime_len;
+	}
+	return 0;
+}
+
+/**
+ * Returns the textual curve ID of the specified curve, or NULL if the curve
+ * is not known.
+ */
+const char *ecc_get_curve_id(int curve_nid)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].curve_nid == curve_nid)
+			return ecc_curve_list[i].curve_id;
+	}
+	return NULL;
+}
+
+/**
+ * Returns true if the specified curve is a Prime curve, false if not, or if
+ * the curve is not known.
+ */
+bool ecc_is_prime_curve(int curve_nid)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].curve_nid == curve_nid)
+			return ecc_curve_list[i].type == ECC_TYPE_PRIME;
+	}
+	return false;
+}
+
+/**
+ * Returns true if the specified curve is a Brainpool curve, false if not, or if
+ * the curve is not known.
+ */
+bool ecc_is_brainpool_curve(int curve_nid)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].curve_nid == curve_nid)
+			return ecc_curve_list[i].type == ECC_TYPE_BRAINPOOL;
+	}
+	return false;
+}
+
+/**
+ * Returns the nid of the curve of the specified curve ID, or 0 if the curve
+ * is not known.
+ */
+int ecc_get_curve_by_id(const char *curve_id)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (strcmp(ecc_curve_list[i].curve_id, curve_id) == 0)
+			return ecc_curve_list[i].curve_nid;
+	}
+	return 0;
+}
+
+/**
+ * Returns the nid of the Prime curve by its specified prime bit size, or 0
+ * if the curve is not knwon.
+ */
+int ecc_get_prime_curve_by_prime_bits(size_t prime_bits)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].type == ECC_TYPE_PRIME &&
+		    ecc_curve_list[i].prime_bits == prime_bits)
+			return ecc_curve_list[i].curve_nid;
+	}
+	return 0;
+}
+
+/**
+ * Returns the nid of the Brainpool curve by its specified prime bit size, or 0
+ * if the curve is not knwon.
+ */
+int ecc_get_brainpool_curve_by_prime_bits(size_t prime_bits)
+{
+	int i;
+
+	for (i = 0; i < ecc_curve_num; i++) {
+		if (ecc_curve_list[i].type == ECC_TYPE_BRAINPOOL &&
+		    ecc_curve_list[i].prime_bits == prime_bits)
+			return ecc_curve_list[i].curve_nid;
+	}
+	return 0;
+}
+
+/**
+ * Write a secure key blob to the specified file.
+ *
+ * @param filename           the name of the file to write to
+ * @param key_blob           the key blob to write
+ * @param key_blob_len       the size of the key blob in bytes
+ *
+ * @returns zero for success, a negative errno in case of an error:
+ *          -EINVAL: invalid parameter
+ *          -EIO: error during writing out the key blob
+ *          any other errno as returned by fopen
+ */
+int write_key_blob(const char *filename, unsigned char *key_blob,
+		   size_t key_blob_len)
+{
+	size_t count;
+	FILE *fp;
+
+	if (filename == NULL || key_blob == NULL || key_blob_len == 0)
+		return -EINVAL;
+
+	fp = fopen(filename, "w");
+	if (fp == NULL)
+		return -errno;
+
+	count = fwrite(key_blob, 1, key_blob_len, fp);
+	if (count != key_blob_len) {
+		fclose(fp);
+		return -EIO;
+	}
+
+	fclose(fp);
+	return 0;
+}
+
+/**
+ * Read a secure key blob from the specified file.
+ *
+ * @param filename           the name of the file to write to
+ * @param key_blob           a buffer to read the key blob to. If NULL, then
+ *                           only the size of the key blob is returned in
+ *                           key_blob_len.
+ * @param key_blob_len       On entry: the size of the buffer in bytes
+ *                           On return: the size of the key blob read
+ *
+ * @returns zero for success, a negative errno in case of an error:
+ *          -EINVAL: invalid parameter
+ *          -ERANGE: The supplied buffer is too short. key_blob_len is set to
+ *                   the required size.
+ *          -EIO: error during reading in the key blob
+ *          any other errno as returned by stat or fopen
+ */
+int read_key_blob(const char *filename, unsigned char *key_blob,
+		  size_t *key_blob_len)
+{
+	size_t count, size;
+	struct stat sb;
+	FILE *fp;
+
+	if (filename == NULL || key_blob_len == NULL)
+		return -EINVAL;
+
+	if (stat(filename, &sb))
+		return -errno;
+	size = sb.st_size;
+
+	if (key_blob == NULL) {
+		*key_blob_len = size;
+		return 0;
+	}
+
+	if (size > *key_blob_len) {
+		*key_blob_len = size;
+		return -ERANGE;
+	}
+
+	fp = fopen(filename, "r");
+	if (fp == NULL)
+		return -errno;
+
+	count = fread(key_blob, 1, size, fp);
+	if (count != size) {
+		fclose(fp);
+		return -EIO;
+	}
+
+	*key_blob_len = size;
+	fclose(fp);
+	return 0;
 }
 
 /**
