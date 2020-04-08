@@ -168,11 +168,11 @@ void start(void)
 
 	/* if valid command line is given, copy it into new kernel space */
 	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
-		memcpy((void *)COMMAND_LINE,
+		memcpy(command_line,
 		       (void *)(unsigned long *)_stage3_parms.parm_addr,
 		       COMMAND_LINE_SIZE);
 		/* terminate \0 */
-		*(char *)(COMMAND_LINE + COMMAND_LINE_SIZE - 1) = 0;
+		command_line[COMMAND_LINE_SIZE - 1] = 0;
 	}
 
 	/* convert extra parameter to ascii */
@@ -199,8 +199,7 @@ void start(void)
 	 * else append
 	 */
 	if (cextra[begin] == 0x3d) {
-		memcpy((void *)COMMAND_LINE, (void *)(cextra + begin),
-		       length);
+		memcpy(command_line, (void *)(cextra + begin), length);
 	} else {
 		/* check if length is within max value */
 		length = (end + 1 + length <= COMMAND_LINE_SIZE) ? length :
