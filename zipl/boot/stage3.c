@@ -199,7 +199,10 @@ void start(void)
 	 * if extra parm string starts with '=' replace original string,
 	 * else append
 	 */
-	if (*cextra == 0x3d) {
+	if (*cextra == 0x3d && cextra_len >= 1) {
+		/* skip '=' */
+		cextra++;
+		cextra_len--;
 		memcpy(cmdline, cextra, cextra_len);
 	} else if (cmdline_len + 1 <= COMMAND_LINE_SIZE - 1) {
 		/* add blank */
