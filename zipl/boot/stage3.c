@@ -204,6 +204,7 @@ void start(void)
 		cextra++;
 		cextra_len--;
 		memcpy(cmdline, cextra, cextra_len);
+		cmdline[cextra_len] = 0;
 	} else if (cmdline_len + 1 <= COMMAND_LINE_SIZE - 1) {
 		/* add blank */
 		cmdline[cmdline_len] = 0x20;
