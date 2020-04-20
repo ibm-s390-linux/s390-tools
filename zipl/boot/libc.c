@@ -266,10 +266,10 @@ static char *number(char *buf, char *end, unsigned long val,
 
 	/* prepare string in reverse order */
 	len = 0;
-	while (val) {
+	do {
 		tmp[len++] = vec[val % spec->base];
 		val /= spec->base;
-	}
+	} while (val);
 
 	if (len > precision)
 		precision = len;
