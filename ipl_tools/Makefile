@@ -4,9 +4,7 @@ libs = $(rootdir)/libutil/libutil.a
 
 all: chreipl lsreipl chshut lsshut
 
-libs =	$(rootdir)/libutil/libutil.a
-
-objects = main.o ccw.o fcp.o system.o shutdown.o \
+objects = main.o ccw.o fcp.o nvme.o system.o shutdown.o \
 	  cmd_lsshut.o cmd_chshut.o cmd_lsreipl.o cmd_chreipl.o proc.o
 
 chreipl: $(objects) $(libs)

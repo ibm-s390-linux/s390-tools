@@ -84,6 +84,35 @@ void print_fcp(int show_ipl, int dump)
 		print_fw_str("clear:       %s\n", dir, "clear");
 }
 
+void print_nvme(int show_ipl, int dump)
+{
+	char *dir = show_ipl ? "ipl" : "reipl/nvme";
+	char *path_bootparms = show_ipl ? "/sys/firmware/ipl/scp_data" :
+		"/sys/firmware/reipl/nvme/scp_data";
+	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
+		"/sys/firmware/reipl/nvme/loadparm";
+	char loadparm[9], loadparm_path[PATH_MAX];
+
+	if (dump)
+		printf("%-12s nvme_dump\n", get_ipl_banner(show_ipl));
+	else
+		printf("%-12s nvme\n", get_ipl_banner(show_ipl));
+
+	print_fw_str("FID:         %s\n", dir, "fid");
+	print_fw_str("NSID:        %s\n", dir, "nsid");
+	print_fw_str("bootprog:    %s\n", dir, "bootprog");
+	print_fw_str("br_lba:      %s\n", dir, "br_lba");
+	if (access(path_loadparm, R_OK) == 0) {
+		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
+		read_fw_str(loadparm, loadparm_path, sizeof(loadparm));
+		if (strcmp(loadparm, "        ") == 0)
+			loadparm[0] = 0;
+		printf("Loadparm:    \"%s\"\n", loadparm);
+	}
+	if (access(path_bootparms, R_OK) == 0)
+		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
+}
+
 void print_ccw(int show_ipl)
 {
 	char loadparm[9], loadparm_path[PATH_MAX];
@@ -155,6 +184,10 @@ void cmd_lsreipl(int argc, char *argv[])
 		print_fcp(l.ipl_set, 0);
 	else if (strcmp(reipl_type_str, "fcp_dump") == 0)
 		print_fcp(l.ipl_set, 1);
+	else if (strcmp(reipl_type_str, "nvme") == 0)
+		print_nvme(l.ipl_set, 0);
+	else if (strcmp(reipl_type_str, "nvme_dump") == 0)
+		print_nvme(l.ipl_set, 1);
 	else if (strcmp(reipl_type_str, "ccw") == 0)
 		print_ccw(l.ipl_set);
 	else if (strcmp(reipl_type_str, "nss") == 0)

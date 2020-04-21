@@ -43,6 +43,7 @@ extern void cmd_chreipl(int argc, char *argv[]);
 
 extern void print_ccw(int show_ipl);
 extern void print_fcp(int show_ipl, int dump);
+extern void print_nvme(int show_ipl, int dump);
 extern void print_nss(int show_ipl);
 
 /*
@@ -69,6 +70,16 @@ extern int fcp_is_device(const char *devno);
 extern void fcp_lun_get(const char *device, char *lun);
 extern void fcp_wwpn_get(const char *device, char *wwpn);
 extern void fcp_busid_get(const char *device, char *devno);
+
+/*
+ * NVME
+ */
+#define FID_MAX_LEN	11	/* 8 characters + 0x + null */
+#define NVME_PATH_MAX	(PATH_MAX + NAME_MAX + 1)
+
+extern void nvme_fid_get(const char *device, char *fid);
+extern void nvme_nsid_get(const char *device, char *nsid);
+int nvme_is_device(char *fid_str, char *nsid_str);
 
 /*
  * CCW

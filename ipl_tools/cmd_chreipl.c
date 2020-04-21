@@ -28,12 +28,14 @@ enum target_type {
 	TT_FCP,
 	TT_NSS,
 	TT_NODE,
+	TT_NVME,
 };
 
 enum reipl_type {
 	REIPL_FCP,
 	REIPL_CCW,
-	REIPL_NSS
+	REIPL_NSS,
+	REIPL_NVME,
 };
 
 static const char *const usage_chreipl =
@@ -41,6 +43,7 @@ static const char *const usage_chreipl =
 "\n"
 " chreipl [ccw] [-d] <DEVICE> [OPTIONS]\n"
 " chreipl [fcp] [-d] <DEVICE> [-w] <WWPN> [-l] <LUN> [OPTIONS]\n"
+" chreipl nvme  [-i] <FID> [-s] <NSID> [OPTIONS]\n"
 " chreipl [node] <NODE|DIR> [OPTIONS]\n"
 " chreipl nss [-n] <NAME> [OPTIONS]\n"
 " chreipl [-h] [-v]\n"
@@ -48,6 +51,7 @@ static const char *const usage_chreipl =
 "The following re-IPL targets are supported:\n"
 "  ccw      IPL from CCW device\n"
 "  fcp      IPL from FCP device\n"
+"  nvme     IPL from NVME device\n"
 "  nss      IPL from NSS\n"
 "  node     IPL from device specified by device node or directory\n"
 "\n"
@@ -70,6 +74,12 @@ static const char *const usage_chreipl =
 "  -L, --loadparm <PARM>   Loadparm specification\n"
 "  -c, --clear 0|1         Control if memory is cleared on re-IPL\n"
 "\n"
+"Options for nvme target:\n"
+"  -i, --fid <FUNCTION_ID>   PCI Function ID of NVME IPL device (hex)\n"
+"  -s  --nsid <NAMESPACE_ID> Namespace ID of NVME IPL device (decimal, default 1)\n"
+"  -b, --bootprog <BPROG>    Bootprog specification\n"
+"  -L, --loadparm <PARM>     Loadparm specification\n"
+"\n"
 "Options for nss target:\n"
 "  -n, --name <NAME>       Identifier of the NSS\n"
 "\n"
@@ -86,6 +96,10 @@ static struct locals {
 	char			lun[20];	/* 18 character +0x" */
 	int			lun_set;
 	char			busid[10];	/* Bus ID e.g. 0.0.4711 */
+	int			fid_set;
+	char			fid[FID_MAX_LEN];
+	int			nsid_set;
+	char			nsid[11];	/* 10 decimal chars + null */
 	int			busid_set;
 	char			dev[15];	/* Device (e.g. dasda) */
 	int			dev_set;
@@ -94,10 +108,10 @@ static struct locals {
 	char			bootparms[4096];
 	int			bootparms_set;
 	int			force_set;
-	enum target_type	target_type;	/* CCW, FCP, NSS or NODE */
+	enum target_type	target_type;	/* CCW,FCP,NVME,NSS or NODE */
 	int			target_type_set;
 	int			target_type_auto_mode;
-	enum reipl_type		reipl_type;	/* CCW, FCP, NSS */
+	enum reipl_type		reipl_type;	/* CCW, FCP, NVME, NSS */
 	int			reipl_clear;
 } l;
 
@@ -229,6 +243,34 @@ static void set_wwpn(const char *wwpn)
 	l.wwpn_set = 1;
 }
 
+static void set_nvme_nsid(const char *nsid)
+{
+	unsigned long long nsid_tmp;
+	char *endptr;
+
+	nsid_tmp = strtoull(nsid, &endptr, 10);
+	if (*endptr)
+		ERR_EXIT("NSID \"%s\" is not a decimal number", nsid);
+	snprintf(l.nsid, sizeof(l.nsid), "%08llu", nsid_tmp);
+	l.nsid_set = 1;
+}
+
+static void set_nvme_fid(const char *fid)
+{
+	unsigned long long fid_tmp;
+	char *endptr;
+
+	fid_tmp = strtoull(fid, &endptr, 16);
+	if (*endptr)
+		ERR_EXIT("FID \"%s\" is not a hexadecimal number", fid);
+	snprintf(l.fid, sizeof(l.fid), "0x%08llx", fid_tmp);
+	l.fid_set = 1;
+
+	/* nsid defaults to 1, if not already set */
+	if (!l.nsid_set)
+		set_nvme_nsid("1");
+}
+
 static void parse_fcp_args(char *nargv[], int nargc)
 {
 	/*
@@ -246,6 +288,28 @@ static void parse_fcp_args(char *nargv[], int nargc)
 	set_device(nargv[0]);
 	set_wwpn(nargv[1]);
 	set_lun(nargv[2]);
+}
+
+static void parse_nvme_args(char *nargv[], int nargc)
+{
+	/*
+	 * we might be called like this:
+	 * chreipl nvme 0x13 1
+	 */
+	if (l.busid_set || l.fid_set || l.nsid_set || l.dev_set)
+		ERR_EXIT("Use either options or positional parameters");
+	if (nargc > 2)
+		ERR_EXIT("Too many arguments specified for \"nvme\" re-IPL "
+			 "type");
+	else if (nargc < 1)
+		ERR_EXIT("The \"nvme\" re-IPL type requires function id, and "
+			 "optional namespace id");
+	set_nvme_fid(nargv[0]);
+
+	if (nargc == 2)
+		set_nvme_nsid(nargv[1]);
+	else
+		set_nvme_nsid("1");
 }
 
 static void parse_ccw_args(char *nargv[], int nargc)
@@ -288,6 +352,13 @@ static void dev_from_part(char *dev_name)
 		dev_name[i] = 0;
 }
 
+static void dev_from_part_nvme(char *dev_name)
+{
+	char *delim = strrchr(dev_name, 'p');
+	if (delim)
+		*delim = 0;
+}
+
 static int set_reipl_type(const char *dev_name)
 {
 	if (strncmp(dev_name, "dasd", strlen("dasd")) == 0 ||
@@ -295,11 +366,18 @@ static int set_reipl_type(const char *dev_name)
 		l.reipl_type = REIPL_CCW;
 	else if (strncmp(dev_name, "sd", strlen("sd")) == 0)
 		l.reipl_type = REIPL_FCP;
+	else if (strncmp(dev_name, "nvme", strlen("nvme")) == 0)
+		l.reipl_type = REIPL_NVME;
 	else
 		return -1;
 
 	util_strlcpy(l.dev, dev_name, sizeof(l.dev));
-	dev_from_part(l.dev);
+
+	if (l.reipl_type == REIPL_NVME)
+		dev_from_part_nvme(l.dev);
+	else
+		dev_from_part(l.dev);
+
 	l.dev_set = 1;
 	return 0;
 }
@@ -402,6 +480,9 @@ static void parse_pos_args(char *nargv[], int nargc)
 	case TT_FCP:
 		parse_fcp_args(nargv, nargc);
 		break;
+	case TT_NVME:
+		parse_nvme_args(nargv, nargc);
+		break;
 	case TT_CCW:
 		parse_ccw_args(nargv, nargc);
 		break;
@@ -421,6 +502,14 @@ static void check_fcp_opts(void)
 	if (!(l.busid_set && l.wwpn_set && l.lun_set))
 		ERR_EXIT("The \"fcp\" target requires device, WWPN, "
 			 "and LUN");
+}
+
+static void check_nvme_opts(void)
+{
+	if (l.nss_name_set || l.wwpn_set || l.lun_set || l.busid_set)
+		ERR_EXIT("Invalid option for \"nvme\" target specified");
+	if (!(l.fid_set && l.nsid_set))
+		ERR_EXIT("The \"nvme\" target requires FID, and optional NSID");
 }
 
 static void check_ccw_opts(void)
@@ -482,6 +571,8 @@ static void parse_chreipl_options(int argc, char *argv[])
 		{ "device",	 required_argument,	NULL, 'd' },
 		{ "lun",	 required_argument,	NULL, 'l' },
 		{ "wwpn",	 required_argument,	NULL, 'w' },
+		{ "fid",	 required_argument,	NULL, 'i' },
+		{ "nsid",	 required_argument,	NULL, 's' },
 		{ "loadparm",	 required_argument,	NULL, 'L' },
 		{ "name",	 required_argument,	NULL, 'n' },
 		{ "bootparms",	 required_argument,	NULL, 'p' },
@@ -490,7 +581,7 @@ static void parse_chreipl_options(int argc, char *argv[])
 		{ "clear",	 required_argument,	NULL, 'c' },
 		{ NULL,		 0,			NULL,  0  }
 	};
-	static const char optstr[] = "hd:vw:l:fL:b:n:p:c:";
+	static const char optstr[] = "hd:vw:l:fL:b:n:p:c:i:s:";
 
 	/* dont run without any argument */
 	if (argc == 1)
@@ -502,6 +593,8 @@ static void parse_chreipl_options(int argc, char *argv[])
 		set_target_type(TT_CCW, 0);
 	else if (strcmp(argv[1], "nss") == 0)
 		set_target_type(TT_NSS, 0);
+	else if (strcmp(argv[1], "nvme") == 0)
+		set_target_type(TT_NVME, 0);
 	else if (strcmp(argv[1], "node") == 0)
 		set_target_type(TT_NODE, 0);
 	else
@@ -516,8 +609,14 @@ static void parse_chreipl_options(int argc, char *argv[])
 		case 'd':
 			set_device(optarg);
 			break;
+		case 'i':
+			set_nvme_fid(optarg);
+			break;
 		case 'l':
 			set_lun(optarg);
+			break;
+		case 's':
+			set_nvme_nsid(optarg);
 			break;
 		case 'w':
 			set_wwpn(optarg);
@@ -680,6 +779,40 @@ static void chreipl_fcp(void)
 	print_fcp(0, 0);
 }
 
+static void chreipl_nvme(void)
+{
+	check_nvme_opts();
+
+	if (!nvme_is_device(l.fid, l.nsid) && !l.force_set) {
+		ERR_EXIT("Could not find NVME device with fid %s and nsid %s",
+			l.fid, l.nsid);
+	}
+	check_exists("reipl/nvme/fid", "\"nvme\" re-IPL target");
+
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
+		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
+			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+	}
+
+	write_str_optional(l.loadparm, "reipl/nvme/loadparm", l.loadparm_set,
+			   "loadparm");
+	write_str_optional(l.bootparms, "reipl/nvme/scp_data", l.bootparms_set,
+			   "boot parameters");
+	write_str(l.fid, "reipl/nvme/fid");
+	write_str(l.nsid, "reipl/nvme/nsid");
+	/*
+	 * set the boot record logical block address. Master boot
+	 * record. It is always 0 for Linux
+	 */
+	write_str("0", "reipl/nvme/br_lba");
+	if (!l.bootprog_set)
+		sprintf(l.bootprog, "0");
+	write_str(l.bootprog,  "reipl/nvme/bootprog");
+	write_str("nvme", "reipl/reipl_type");
+
+	print_nvme(0, 0);
+}
+
 static void chreipl_nss(void)
 {
 	check_nss_opts();
@@ -720,6 +853,13 @@ static void chreipl_node(void)
 		l.busid_set = 1;
 		chreipl_fcp();
 		break;
+	case REIPL_NVME:
+		nvme_fid_get(l.dev, l.fid);
+		l.fid_set = 1;
+		nvme_nsid_get(l.dev, l.nsid);
+		l.nsid_set = 1;
+		chreipl_nvme();
+		break;
 	default:
 		ERR_EXIT("Internal error: chreipl_node");
 	}
@@ -734,6 +874,9 @@ void cmd_chreipl(int argc, char *argv[])
 		break;
 	case TT_FCP:
 		chreipl_fcp();
+		break;
+	case TT_NVME:
+		chreipl_nvme();
 		break;
 	case TT_NSS:
 		chreipl_nss();

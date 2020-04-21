@@ -39,6 +39,9 @@ Specify a DASD CCW device for reboot
 .RB "- " fcp :
 Specify a FCP device for reboot
 .TP
+.RB "- " nvme :
+Specify an NVMe device for reboot
+.TP
 .RB "- " nss :
 Specify a named saved system (NSS) for reboot
 .TP
@@ -118,6 +121,11 @@ WWPN 0x500507630300c562, and LUN 0x401040b300000000. In addition to that
 append kernel parameter "mem=" to restrict memory to 512 MB:
 
 \fB# chreipl 0.0.1700 0x500507630300c562 0x401040b300000000 -p "mem=512M"\fP
+
+4. Next time reboot from the NVMe device with function id 0x13, namespace 1:
+
+\fB# chreipl nvme 0x13 1
+
 .SH ccw
 Use the ccw re-IPL target for DASD devices that are accessed by the hardware
 using channel command word (CCW) channels.
@@ -207,6 +215,44 @@ use options instead of positional parameters:
 .br
 
 \fB# chreipl fcp -d 0.0.1700 -w 0x5005076... -l 0x401040b3... -b 2\fP
+.SH nvme
+Use the nvme re-IPL target for specifying an NVMe disk for reboot.
+.TP
+.BR "\-i" " or " "\-\-fid"
+PCI Function ID of NVME IPL device (hex).
+
+.TP
+.BR "\-s" " or " "\-\-nsid"
+Namespace ID of the NVME IPL device (decimal, default 1).
+
+.TP
+.BR "\-b" " or " "\-\-bootprog"
+Specifies an entry in the boot configuration by defining the IPL boot
+program selector. If omitted, '0' will be used.
+
+.TP
+.BR "\-L" " or " "\-\-loadparm"
+The loadparm for the nvme re-IPL target is not used to control the boot
+configuration that is defined by the
+.BR zipl (8)
+boot menu. Instead it can be used to control higher level boot loaders
+like GRUB. For more details refer to distribution specific documentation.
+
+.PP
+\fBExamples:\fP
+.br
+
+1. Next time reboot from the NVMe disk with function-id 0x13 and namespace 1:
+.br
+
+\fB# chreipl nvme 0x13 1\fP
+.br
+
+2. Use same configuration as (1) but choose boot program selector 2 and
+use options instead of positional parameters:
+.br
+
+\fB# chreipl nvme -i 0x13 -s 1 -b 2\fP
 .SH nss
 Use the nss re-IPL target to specify z/VM named saved systems (NSS) for
 reboot.
@@ -221,7 +267,7 @@ Use the NSS named LINUX1 for the next reboot:
 
 \fB# chreipl nss LINUX1\fP
 .SH node
-You can identify DASD or SCSI re-IPL devices indirectly through a device
+You can identify DASD, SCSI, or NVMe re-IPL devices indirectly through a device
 node or directory. The chreipl tool then determines the information
 that you would otherwise have to specify with the ccw or fcp target.
 .PP
@@ -243,6 +289,11 @@ that you would otherwise have to specify with the ccw or fcp target.
 .br
 
 \fB# chreipl node /mnt/boot\fP
+
+4. Next time reboot from the NVMe device represented by /dev/nvme0n1
+.br
+
+\fB# chreipl node /dev/nvme0n1\fP
 
 .SH SEE ALSO
 .BR lsreipl (8),
