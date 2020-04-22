@@ -61,7 +61,7 @@ skip-libekmfweb-curl:
 all: $(BUILD_TARGETS)
 
 ekmfweb.o: check-dep-libekmfweb ekmfweb.c utilities.h cca.h $(rootdir)include/ekmfweb/ekmfweb.h
-utilities.o: check-dep-libekmfweb utilities.c utilities.h
+utilities.o: check-dep-libekmfweb utilities.c utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 cca.o: check-dep-libekmfweb cca.c cca.h utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 
 libekmfweb.so: ALL_CFLAGS += -fPIC

@@ -65,10 +65,26 @@ typedef void (*CSNDKTC_t)(long *return_code,
 			  long *key_identifier_length,
 			  unsigned char *key_identifier);
 
+/* CCA Digital Signature Generate function */
+typedef void (*CSNDDSG_t)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *PKA_private_key_identifier_length,
+			  unsigned char *PKA_private_key_identifier,
+			  long *hash_length,
+			  unsigned char *hash,
+			  long *signature_field_length,
+			  long *signature_bit_length,
+			  unsigned char *signature_field);
+
 struct cca_lib {
 	CSNDPKB_t dll_CSNDPKB;
 	CSNDPKG_t dll_CSNDPKG;
 	CSNDKTC_t dll_CSNDKTC;
+	CSNDDSG_t dll_CSNDDSG;
 };
 
 #define CCA_MAX_PKA_KEY_TOKEN_SIZE	3500
@@ -88,5 +104,32 @@ int cca_get_key_type(const unsigned char *key_token, size_t key_token_length,
 int cca_reencipher_key(const struct ekmf_cca_lib *cca_lib,
 		       const unsigned char *key_token, size_t key_token_length,
 		       bool to_new, bool verbose);
+
+int cca_get_ecc_pub_key_as_pkey(const unsigned char *key_token,
+				size_t key_token_length,
+				EVP_PKEY **pkey, bool verbose);
+
+int cca_get_rsa_pub_key_as_pkey(const unsigned char *key_token,
+				size_t key_token_length,
+				int pkey_type, EVP_PKEY **pkey, bool verbose);
+
+int cca_rsa_sign(const struct ekmf_cca_lib *cca_lib,
+		 const unsigned char *key_token, size_t key_token_length,
+		 unsigned char *sig, size_t *siglen,
+		 const unsigned char *tbs, size_t tbslen,
+		 int padding_type, int digest_nid, bool verbose);
+
+int cca_rsa_pss_sign(const struct ekmf_cca_lib *cca_lib,
+		     const unsigned char *key_token, size_t key_token_length,
+		     unsigned char *sig, size_t *siglen,
+		     const unsigned char *tbs, size_t tbslen,
+		     int digest_nid, int mgf_digest_nid, int saltlen,
+		     bool verbose);
+
+int cca_ecdsa_sign(const struct ekmf_cca_lib *cca_lib,
+		   const unsigned char *key_token, size_t key_token_length,
+		   unsigned char *sig, size_t *siglen,
+		   const unsigned char *tbs, size_t tbslen, int digest_nid,
+		   bool verbose);
 
 #endif

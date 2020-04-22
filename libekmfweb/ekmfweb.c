@@ -21,6 +21,7 @@
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/ssl.h>
+#include <openssl/rsa.h>
 
 #include <json-c/json.h>
 #ifndef JSON_C_TO_STRING_NOSLASHESCAPE
@@ -32,6 +33,8 @@
 #include "ekmfweb/ekmfweb.h"
 #include "utilities.h"
 #include "cca.h"
+
+#define SERIAL_NUMBER_BIT_SIZE		159
 
 #define MAX_KEY_BLOB_SIZE		CCA_MAX_PKA_KEY_TOKEN_SIZE
 
@@ -1293,6 +1296,682 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 	}
 
 	return 0;
+}
+
+struct private_data {
+	const struct ekmf_ext_lib *ext_lib;
+	bool verbose;
+};
+
+/**
+ * Wrapper for the RSA sign callback to route the call to the selected
+ * secure key library.
+ */
+static int _ekmf_rsa_sign(const unsigned char *key_blob, size_t key_blob_length,
+			  unsigned char *sig, size_t *siglen,
+			  const unsigned char *tbs, size_t tbslen,
+			  int padding_type, int md_nid, void *private)
+{
+	struct private_data *prv = (struct private_data *)private;
+
+	if (prv == NULL || prv->ext_lib == NULL)
+		return 1;
+
+	switch (prv->ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		return cca_rsa_sign(prv->ext_lib->cca, key_blob,
+				    key_blob_length, sig, siglen, tbs, tbslen,
+				    padding_type, md_nid, prv->verbose);
+	default:
+		return 1;
+	}
+}
+
+/**
+ * Wrapper for the RSA-PSS sign callback to route the call to the selected
+ * secure key library.
+ */
+static int _ekmf_rsa_pss_sign(const unsigned char *key_blob,
+			      size_t key_blob_length, unsigned char *sig,
+			      size_t *siglen, const unsigned char *tbs,
+			      size_t tbslen, int md_nid, int mgfmd_nid,
+			      int saltlen, void *private)
+{
+	struct private_data *prv = (struct private_data *)private;
+
+	if (prv == NULL || prv->ext_lib == NULL)
+		return 1;
+
+	switch (prv->ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		return cca_rsa_pss_sign(prv->ext_lib->cca, key_blob,
+					key_blob_length, sig, siglen, tbs,
+					tbslen, md_nid, mgfmd_nid, saltlen,
+					prv->verbose);
+	default:
+		return 1;
+	}
+}
+
+/**
+ * Wrapper for the ECDSA sign callback to route the call to the selected
+ * secure key library.
+ */
+static int _ekmf_ecdsa_sign(const unsigned char *key_blob,
+			    size_t key_blob_length, unsigned char *sig,
+			    size_t *siglen, const unsigned char *tbs,
+			    size_t tbslen, int md_nid, void *private)
+{
+	struct private_data *prv = (struct private_data *)private;
+
+	if (prv == NULL || prv->ext_lib == NULL)
+		return 1;
+
+	switch (prv->ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		return cca_ecdsa_sign(prv->ext_lib->cca, key_blob,
+				      key_blob_length, sig, siglen, tbs, tbslen,
+				      md_nid, prv->verbose);
+	default:
+		return 1;
+	}
+}
+
+/**
+ * Gets the public key from the key blob as a PKEY object.
+ */
+static int _ekmf_get_pub_key_as_pkey(const unsigned char *key_blob,
+				     size_t key_blob_size, EVP_PKEY **pkey,
+				     bool rsa_pss,
+				     const struct ekmf_ext_lib *ext_lib,
+				     bool verbose)
+{
+	int rc, pkey_type;
+
+	switch (ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		rc = cca_get_key_type(key_blob, key_blob_size, &pkey_type);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to get the identity key "
+				   "type: %s", strerror(-rc));
+			return rc;
+		}
+
+		switch (pkey_type) {
+		case EVP_PKEY_EC:
+			rc = cca_get_ecc_pub_key_as_pkey(key_blob,
+					key_blob_size, pkey, verbose);
+			break;
+		case EVP_PKEY_RSA:
+		case EVP_PKEY_RSA_PSS:
+			rc = cca_get_rsa_pub_key_as_pkey(key_blob,
+					key_blob_size, rsa_pss ?
+						EVP_PKEY_RSA_PSS : pkey_type,
+					pkey, verbose);
+			break;
+		default:
+			pr_verbose(verbose, "Invalid identity key type: %d",
+				   pkey_type);
+			return -EIO;
+		}
+
+		if (rc != 0)
+			return rc;
+		break;
+	default:
+		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * Setup a signing context for the specified key, digest_nid, and RSA-PSS
+ * parameters.
+ */
+static int _ekmf_setup_sign_context(const unsigned char *key_blob,
+				    size_t key_blob_size, EVP_PKEY *pkey,
+				    int digest_nid,
+				    struct ekmf_rsa_pss_params *rsa_pss_params,
+				    EVP_MD_CTX **md_ctx,
+				    EVP_PKEY_CTX **pkey_ctx,
+				    struct private_data *private,
+				    bool verbose)
+{
+	struct sk_pkey_sign_func sign_func;
+	EVP_PKEY_CTX *pctx = NULL;
+	const EVP_MD *md = NULL;
+	int rc, default_nid;
+	EVP_MD_CTX *ctx;
+
+	rc = setup_secure_key_pkey_method(EVP_PKEY_id(pkey));
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to setup secure key PKEY method");
+		return rc;
+	}
+
+	ctx = EVP_MD_CTX_new();
+	if (ctx == NULL) {
+		pr_verbose(verbose, "Failed to allocate the digest context");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	if (digest_nid != 0) {
+		md = EVP_get_digestbynid(digest_nid);
+		if (md == NULL) {
+			pr_verbose(verbose, "Requested digest not supported");
+			rc = -ENOTSUP;
+			goto out;
+		}
+
+		if (EVP_PKEY_get_default_digest_nid(pkey, &default_nid) == 2 &&
+		    default_nid == 0) {
+			pr_verbose(verbose, "The signing algorithm requires "
+				   "there to be no digest");
+			md = NULL;
+		}
+	}
+
+	rc = EVP_DigestSignInit(ctx, &pctx, md, NULL, pkey);
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to initialize the signing "
+			   "operation");
+		rc = -EIO;
+		goto out;
+	}
+
+	sign_func.rsa_sign = _ekmf_rsa_sign;
+	sign_func.rsa_pss_sign = _ekmf_rsa_pss_sign;
+	sign_func.ecdsa_sign = _ekmf_ecdsa_sign;
+
+	rc = setup_secure_key_pkey_context(pctx, key_blob, key_blob_size,
+					   &sign_func, private);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to setup the secure key PKEY "
+			   "context: %s", strerror(-rc));
+		goto out;
+	}
+
+	if (EVP_PKEY_id(pkey) == EVP_PKEY_RSA_PSS && rsa_pss_params != NULL) {
+		rc = setup_rsa_pss_pkey_context(pctx, rsa_pss_params);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to setup RSA-PSS context");
+			goto out;
+		}
+	}
+
+	*md_ctx = ctx;
+	*pkey_ctx = pctx;
+
+out:
+	if (rc != 0) {
+		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
+		if (ctx != NULL)
+			EVP_MD_CTX_free(ctx);
+	}
+	return rc;
+}
+
+/**
+ * Generate a certificate signing request using the secure identity key (field
+ * identity_secure_key in config structure) with the specified subject name,
+ * certificate extensions (if any), and writes the CSR to the specified file
+ * in PEM format.
+ *
+ * To renew an existing certificate, specify renew_cert = true. In this case
+ * the existing certificate (field sign_certificate in config struct) is read,
+ * and the subject name is extracted from it. Any specified subject name RDNs
+ * are added to the CSR. Also, the extensions are taken from the existing
+ * certificate, and any specified extensions are added to the CSR.
+ *
+ * The CSR is signed using the secure identity key (field identity_secure_key in
+ * config structure) with an signing algorithm matching the identity key (ECDSA,
+ * RSA-PKCS, or RSA-PSS if rsa_pss is true), and the specified digest. If the
+ * digest nid is zero, then a default digest is used.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param subject_rdns      an array of strings, each string representing an
+ *                          RDN in the form '[+]type=value'. If the type is
+ *                          prepended with a '+', then this RDN is added to the
+ *                          previous one.
+ * @param num_subject_rdns  number of RDN elements in the array.
+ * @param subject_utf8      if true, RDNs of type MBSTRING_UTF8 are created,
+ *                          otherwise type is MBSTRING_ASC is used.
+ * @param renew_cert_filename if not NULL, specifies the file name of a PEM file
+ *                          containing an existing certificate that is renewed
+ * @param extensions        an array of strings, each string representing an
+ *                          certificate extension in the form 'type=value'.
+ * @param num_extensions    number of extension elements in the array.
+ * @param digest_nid        the OpenSSL digest nid to use with the signature
+ *                          algorithm, or 0 to use the default
+ * @param rsa_pss_params    if not NULL and the identity key is an RSA key, then
+ *                          the CSR is signed with RSA-PSS using the specified
+ *                          PSS parameters. Ignored if the identity key is an EC
+ *                          key
+ * @param csr_pem_filename  the name of the PEM file to which the CSR is written
+ * @param new_hdr           if true, output "NEW" in the PEM header lines
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success:
+ *          -EINVAL: invalid parameter
+ *          -ENOMEM: Failed to allocate memory
+ *          -EBADMSG: an RDN or extension is not formatted correctly
+ *          -EIO: OpenSSL failed to create the CSR
+ *          -EEXIST: if one of the RDN name entries or extensions to add is a
+ *                   duplicate
+ *          -ENOTSUP: the specified digest is not supported
+ *          any other errno from file I/O routines
+ */
+int ekmf_generate_csr(const struct ekmf_config *config,
+		      const char *subject_rdns[], size_t num_subject_rdns,
+		      bool subject_utf8, const char *renew_cert_filename,
+		      const char *extensions[], size_t num_extensions,
+		      int digest_nid,
+		      struct ekmf_rsa_pss_params *rsa_pss_params,
+		      const char *csr_pem_filename, bool new_hdr,
+		      const struct ekmf_ext_lib *ext_lib, bool verbose)
+{
+	const STACK_OF(X509_EXTENSION) *cert_exts = NULL;
+	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
+	size_t key_blob_size = sizeof(key_blob);
+	X509_NAME *subject_name = NULL;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+	struct private_data private;
+	EVP_MD_CTX *md_ctx = NULL;
+	bool pkey_meth = false;
+	EVP_PKEY *pkey = NULL;
+	X509_REQ *req = NULL;
+	X509 *cert = NULL;
+	int rc;
+
+	if (config == NULL || ext_lib == NULL || csr_pem_filename == NULL)
+		return -EINVAL;
+	if (config->identity_secure_key == NULL)
+		return -EINVAL;
+	if (renew_cert_filename == NULL &&
+	    (subject_rdns == NULL || num_subject_rdns == 0))
+		return -EINVAL;
+	if (num_extensions != 0 && extensions == NULL)
+		return -EINVAL;
+
+	rc = read_key_blob(config->identity_secure_key, key_blob,
+			   &key_blob_size);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to read identity key from file "
+			   "'%s': %s", config->identity_secure_key,
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = _ekmf_get_pub_key_as_pkey(key_blob, key_blob_size, &pkey,
+				       rsa_pss_params != NULL, ext_lib,
+				       verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get identity key as PKEY from "
+			   "file '%s': %s", config->identity_secure_key,
+			   strerror(-rc));
+		goto out;
+	}
+
+	req = X509_REQ_new();
+	if (req == NULL) {
+		pr_verbose(verbose, "X509_REQ_new failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = X509_REQ_set_version(req, 0L);
+	if (rc != 1) {
+		pr_verbose(verbose, "X509_REQ_set_version failed: rc: %d", rc);
+		rc = -EIO;
+		goto out;
+	}
+
+	if (renew_cert_filename != NULL) {
+		rc = read_x509_certificate(renew_cert_filename, &cert);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to open renew cert file "
+				   "'%s': %s", renew_cert_filename,
+				   strerror(-rc));
+			goto out;
+		}
+
+		subject_name = X509_NAME_dup(X509_get_subject_name(cert));
+		cert_exts = X509_get0_extensions(cert);
+	}
+
+	if (subject_rdns != NULL && num_subject_rdns > 0) {
+		rc = build_subject_name(&subject_name, subject_rdns,
+					num_subject_rdns, subject_utf8);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to parse the subject name "
+				   "RDSn: %s", strerror(-rc));
+			goto out;
+		}
+	}
+
+	if (subject_name == NULL) {
+		rc = -EINVAL;
+		pr_verbose(verbose, "Subject name can not be empty");
+		goto out;
+	}
+
+	rc = X509_REQ_set_subject_name(req, subject_name);
+	if (rc != 1) {
+		rc = -EIO;
+		pr_verbose(verbose, "Failed to set subject name into request");
+		goto out;
+	}
+
+	rc = build_certificate_extensions(NULL, req, extensions,
+					  num_extensions, cert_exts);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to parse the extensions: "
+			   "%s", strerror(-rc));
+		goto out;
+	}
+
+	rc = X509_REQ_set_pubkey(req, pkey);
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to set the public key");
+		rc = -EIO;
+		goto out;
+	}
+
+	private.ext_lib = ext_lib;
+	private.verbose = verbose;
+
+	rc = _ekmf_setup_sign_context(key_blob, key_blob_size, pkey, digest_nid,
+				      rsa_pss_params, &md_ctx, &pkey_ctx,
+				      &private, verbose);
+	if (rc != 0)
+		goto out;
+	pkey_meth = true;
+
+	rc = X509_REQ_sign_ctx(req, md_ctx);
+	if (rc <= 0) {
+		pr_verbose(verbose, "Failed to perform the signing operation");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = write_x509_request(csr_pem_filename, req, new_hdr);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to write CSR to file "
+			   "'%s': %s", csr_pem_filename, strerror(-rc));
+		goto out;
+	}
+
+	if (verbose) {
+		pr_verbose(verbose, "Certificate Signing Request created:");
+		X509_REQ_print_fp(stderr, req);
+	}
+
+out:
+	if (md_ctx != NULL)
+		EVP_MD_CTX_free(md_ctx);
+	if (pkey_meth)
+		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
+	if (subject_name != NULL)
+		X509_NAME_free(subject_name);
+	if (cert != NULL)
+		X509_free(cert);
+	if (req != NULL)
+		X509_REQ_free(req);
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+
+	return rc;
+}
+
+/**
+ * Generate a self signed certificate using the secure identity key (field
+ * identity_secure_key in config structure) with the specified subject name,
+ * certificate extensions (if any), and writes the certificate the specified
+ * file in PEM format.
+ *
+ * To renew an existing certificate, specify renew_cert = true. In this case
+ * the existing certificate (field sign_certificate in config struct) is read,
+ * and the subject name is extracted from it. Any specified subject name RDNs
+ * are added to the certificate. Also, the extensions are taken from the
+ * existing certificate, and any specified extensions are added to the new
+ * certificate.
+ *
+ * The certificate is signed using the secure identity key (field
+ * identity_secure_key in config structure) with an signing algorithm matching
+ * the identity key (ECDSA, RSA-PKCS, or RSA-PSS if rsa_pss is true), and the
+ * specified digest. If the digest nid is zero, then a default digest is used.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param subject_rdns      an array of strings, each string representing an
+ *                          RDN in the form '[+]type=value'. If the type is
+ *                          prepended with a '+', then this RDN is added to the
+ *                          previous one.
+ * @param num_subject_rdns  number of RDN elements in the array.
+ * @param subject_utf8      if true, RDNs of type MBSTRING_UTF8 are created,
+ *                          otherwise type is MBSTRING_ASC is used.
+ * @param renew_cert_filename if not NULL, specifies the file name of a PEM file
+ *                          containing an existing certificate that is renewed
+ * @param extensions        an array of strings, each string representing an
+ *                          certificate extension in the form 'type=value'.
+ * @param num_extensions    number of extension elements in the array.
+ * @param validity_days     number if day from the current date how long the
+ *                          certificate is valid.
+ * @param digest_nid        the OpenSSL digest nid to use with the signature
+ *                          algorithm, or 0 to use the default
+ * @param rsa_pss_params    if not NULL and the identity key is an RSA key, then
+ *                          the certificate is signed with RSA-PSS using the
+ *                          specified PSS parameters. Ignored if the identity
+ *                          key is an EC key
+ * @param cert_pem_filename the name of the PEM file to which the Certificate
+ *                          is written
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ *          -EINVAL: invalid parameter
+ *          -ENOMEM: Failed to allocate memory
+ *          -EBADMSG: an RDN or extension is not formatted correctly
+ *          -EIO: OpenSSL failed to create the certificate
+ *          -EEXIST: if one of the RDN name entries or extensions to add is a
+ *                   duplicate
+ *          -ENOTSUP: the specified digest is not supported
+ *          any other errno from file I/O routines
+ */
+int ekmf_generate_ss_cert(const struct ekmf_config *config,
+			  const char *subject_rdns[], size_t num_subject_rdns,
+			  bool subject_utf8, const char *renew_cert_filename,
+			  const char *extensions[], size_t num_extensions,
+			  int validity_days, int digest_nid,
+			  struct ekmf_rsa_pss_params *rsa_pss_params,
+			  const char *cert_pem_filename,
+			  const struct ekmf_ext_lib *ext_lib, bool verbose)
+{
+	const STACK_OF(X509_EXTENSION) *cert_exts = NULL;
+	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
+	size_t key_blob_size = sizeof(key_blob);
+	X509_NAME *subject_name = NULL;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+	struct private_data private;
+	EVP_MD_CTX *md_ctx = NULL;
+	bool pkey_meth = false;
+	EVP_PKEY *pkey = NULL;
+	X509 *rcert = NULL;
+	X509 *cert = NULL;
+	int rc;
+
+	if (config == NULL || ext_lib == NULL || cert_pem_filename == NULL)
+		return -EINVAL;
+	if (config->identity_secure_key == NULL)
+		return -EINVAL;
+	if (renew_cert_filename == NULL &&
+	    (subject_rdns == NULL || num_subject_rdns == 0))
+		return -EINVAL;
+	if (num_extensions != 0 && extensions == NULL)
+		return -EINVAL;
+
+	rc = read_key_blob(config->identity_secure_key, key_blob,
+			   &key_blob_size);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to read identity key from file "
+			   "'%s': %s", config->identity_secure_key,
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = _ekmf_get_pub_key_as_pkey(key_blob, key_blob_size, &pkey,
+				       rsa_pss_params != NULL, ext_lib,
+				       verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get identity key as PKEY from "
+			   "file '%s': %s", config->identity_secure_key,
+			   strerror(-rc));
+		goto out;
+	}
+
+	cert = X509_new();
+	if (cert == NULL) {
+		pr_verbose(verbose, "X509_new failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = X509_set_version(cert, 2L);
+	if (rc != 1) {
+		pr_verbose(verbose, "X509_set_version failed: rc: %d", rc);
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = generate_x509_serial_number(cert, SERIAL_NUMBER_BIT_SIZE);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to set the serial number: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	if (renew_cert_filename != NULL) {
+		rc = read_x509_certificate(renew_cert_filename, &rcert);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to open renew cert file "
+				   "'%s': %s", renew_cert_filename,
+				   strerror(-rc));
+			goto out;
+		}
+
+		subject_name = X509_NAME_dup(X509_get_subject_name(rcert));
+		cert_exts = X509_get0_extensions(rcert);
+	}
+
+	if (subject_rdns != NULL && num_subject_rdns > 0) {
+		rc = build_subject_name(&subject_name, subject_rdns,
+					num_subject_rdns, subject_utf8);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to parse the subject name "
+				   "RDSn: %s", strerror(-rc));
+			goto out;
+		}
+	}
+
+	if (subject_name == NULL) {
+		rc = -EINVAL;
+		pr_verbose(verbose, "Subject name can not be empty");
+		goto out;
+	}
+
+	rc = X509_set_subject_name(cert, subject_name);
+	if (rc != 1) {
+		rc = -EIO;
+		pr_verbose(verbose, "Failed to set subject name into cert");
+		goto out;
+	}
+
+	rc = X509_set_issuer_name(cert, subject_name);
+	if (rc != 1) {
+		rc = -EIO;
+		pr_verbose(verbose, "Failed to set issuer name into cert");
+		goto out;
+	}
+
+	rc = build_certificate_extensions(cert, NULL, extensions,
+					  num_extensions, cert_exts);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to parse the extensions: "
+			   "%s", strerror(-rc));
+		goto out;
+	}
+
+	if (X509_gmtime_adj(X509_getm_notBefore(cert), 0) == NULL) {
+		rc = -EIO;
+		pr_verbose(verbose, "Failed to set notBefore time inti cert");
+		goto out;
+	}
+
+	if (X509_time_adj_ex(X509_getm_notAfter(cert),
+			     validity_days, 0, NULL) == NULL) {
+		rc = -EIO;
+		pr_verbose(verbose, "Failed to set notAfter time into cert");
+		goto out;
+	}
+
+	rc = X509_set_pubkey(cert, pkey);
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to set the public key");
+		rc = -EIO;
+		goto out;
+	}
+
+	private.ext_lib = ext_lib;
+	private.verbose = verbose;
+
+	rc = _ekmf_setup_sign_context(key_blob, key_blob_size, pkey, digest_nid,
+				      rsa_pss_params, &md_ctx, &pkey_ctx,
+				      &private, verbose);
+	if (rc != 0)
+		goto out;
+	pkey_meth = true;
+
+	rc = X509_sign_ctx(cert, md_ctx);
+	if (rc <= 0) {
+		pr_verbose(verbose, "Failed to perform the signing operation");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = write_x509_certificate(cert_pem_filename, cert);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to write Certificate to file "
+			   "'%s': %s", cert_pem_filename, strerror(-rc));
+		goto out;
+	}
+
+	if (verbose) {
+		pr_verbose(verbose, "Self-signed Certificate created:");
+		X509_print_fp(stderr, cert);
+	}
+
+out:
+	if (md_ctx != NULL)
+		EVP_MD_CTX_free(md_ctx);
+	if (pkey_meth)
+		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
+	if (subject_name != NULL)
+		X509_NAME_free(subject_name);
+	if (cert != NULL)
+		X509_free(cert);
+	if (rcert != NULL)
+		X509_free(rcert);
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+
+	return rc;
 }
 
 /**

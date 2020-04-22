@@ -208,4 +208,140 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 				 const struct ekmf_ext_lib *ext_lib,
 				 bool verbose);
 
+struct ekmf_rsa_pss_params {
+	int salt_len;        /* salt length in bytes, or OpenSSL constants
+				RSA_PSS_SALTLEN_DIGEST (-1),
+				RSA_PSS_SALTLEN_AUTO (-2), or
+				RSA_PSS_SALTLEN_MAX(-3) */
+	int mgf_digest_nid;  /* OpenSSl digest nid, or zero to use the same
+				digest algorithm as the signature algorithm */
+};
+
+/**
+ * Generate a certificate signing request using the secure identity key (field
+ * identity_secure_key in config structure) with the specified subject name,
+ * certificate extensions (if any), and writes the CSR to the specified file
+ * in PEM format.
+ *
+ * To renew an existing certificate, specify renew_cert = true. In this case
+ * the existing certificate (field sign_certificate in config struct) is read,
+ * and the subject name is extracted from it. Any specified subject name RDNs
+ * are added to the CSR. Also, the extensions are taken from the existing
+ * certificate, and any specified extensions are added to the CSR.
+ *
+ * The CSR is signed using the secure identity key (field identity_secure_key in
+ * config structure) with an signing algorithm matching the identity key (ECDSA,
+ * RSA-PKCS, or RSA-PSS if rsa_pss is true), and the specified digest. If the
+ * digest nid is zero, then a default digest is used.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param subject_rdns      an array of strings, each string representing an
+ *                          RDN in the form '[+]type=value'. If the type is
+ *                          prepended with a '+', then this RDN is added to the
+ *                          previous one.
+ * @param num_subject_rdns  number of RDN elements in the array.
+ * @param subject_utf8      if true, RDNs of type MBSTRING_UTF8 are created,
+ *                          otherwise type is MBSTRING_ASC is used.
+ * @param renew_cert_filename if not NULL, specifies the file name of a PEM file
+ *                          containing an existing certificate that is renewed
+ * @param extensions        an array of strings, each string representing an
+ *                          certificate extension in the form 'type=value'.
+ * @param num_extensions    number of extension elements in the array.
+ * @param digest_nid        the OpenSSL digest nid to use with the signature
+ *                          algorithm, or 0 to use the default
+ * @param rsa_pss_params    if not NULL and the identity key is an RSA key, then
+ *                          the CSR is signed with RSA-PSS using the specified
+ *                          PSS parameters. Ignored if the identity key is an EC
+ *                          key
+ * @param csr_pem_filename  the name of the PEM file to which the CSR is written
+ * @param new_hdr           if true, output "NEW" in the PEM header lines
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success:
+ *          -EINVAL: invalid parameter
+ *          -ENOMEM: Failed to allocate memory
+ *          -EBADMSG: an RDN or extension is not formatted correctly
+ *          -EIO: OpenSSL failed to create the CSR
+ *          -EEXIST: if one of the RDN name entries or extensions to add is a
+ *                   duplicate
+ *          -ENOTSUP: the specified digest is not supported
+ *          any other errno from file I/O routines
+ */
+int ekmf_generate_csr(const struct ekmf_config *config,
+		      const char *subject_rdns[], size_t num_subject_rdns,
+		      bool subject_utf8, const char *renew_cert_filename,
+		      const char *extensions[], size_t num_extensions,
+		      int digest_nid,
+		      struct ekmf_rsa_pss_params *rsa_pss_params,
+		      const char *csr_pem_filename, bool new_hdr,
+		      const struct ekmf_ext_lib *ext_lib, bool verbose);
+
+/**
+ * Generate a self signed certificate using the secure identity key (field
+ * identity_secure_key in config structure) with the specified subject name,
+ * certificate extensions (if any), and writes the certificate the specified
+ * file in PEM format.
+ *
+ * To renew an existing certificate, specify renew_cert = true. In this case
+ * the existing certificate (field sign_certificate in config struct) is read,
+ * and the subject name is extracted from it. Any specified subject name RDNs
+ * are added to the certificate. Also, the extensions are taken from the
+ * existing certificate, and any specified extensions are added to the new
+ * certificate.
+ *
+ * The certificate is signed using the secure identity key (field
+ * identity_secure_key in config structure) with an signing algorithm matching
+ * the identity key (ECDSA, RSA-PKCS, or RSA-PSS if rsa_pss is true), and the
+ * specified digest. If the digest nid is zero, then a default digest is used.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param subject_rdns      an array of strings, each string representing an
+ *                          RDN in the form '[+]type=value'. If the type is
+ *                          prepended with a '+', then this RDN is added to the
+ *                          previous one.
+ * @param num_subject_rdns  number of RDN elements in the array.
+ * @param subject_utf8      if true, RDNs of type MBSTRING_UTF8 are created,
+ *                          otherwise type is MBSTRING_ASC is used.
+ * @param renew_cert_filename if not NULL, specifies the file name of a PEM file
+ *                          containing an existing certificate that is renewed
+ * @param extensions        an array of strings, each string representing an
+ *                          certificate extension in the form 'type=value'.
+ * @param num_extensions    number of extension elements in the array.
+ * @param validity_days     number if day from the current date how long the
+ *                          certificate is valid.
+ * @param digest_nid        the OpenSSL digest nid to use with the signature
+ *                          algorithm, or 0 to use the default
+ * @param rsa_pss_params    if not NULL and the identity key is an RSA key, then
+ *                          the certificate is signed with RSA-PSS using the
+ *                          specified PSS parameters. Ignored if the identity
+ *                          key is an EC key
+ * @param cert_pem_filename the name of the PEM file to which the Certificate
+ *                          is written
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ *          -EINVAL: invalid parameter
+ *          -ENOMEM: Failed to allocate memory
+ *          -EBADMSG: an RDN or extension is not formatted correctly
+ *          -EIO: OpenSSL failed to create the certificate
+ *          -EEXIST: if one of the RDN name entries or extensions to add is a
+ *                   duplicate
+ *          -ENOTSUP: the specified digest is not supported
+ *          any other errno from file I/O routines
+ */
+int ekmf_generate_ss_cert(const struct ekmf_config *config,
+			  const char *subject_rdns[], size_t num_subject_rdns,
+			  bool subject_utf8, const char *renew_cert_filename,
+			  const char *extensions[], size_t num_extensions,
+			  int validity_days, int digest_nid,
+			  struct ekmf_rsa_pss_params *rsa_pss_params,
+			  const char *cert_pem_filename,
+			  const struct ekmf_ext_lib *ext_lib, bool verbose);
+
 #endif
