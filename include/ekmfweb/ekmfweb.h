@@ -170,4 +170,42 @@ int ekmf_generate_identity_key(const struct ekmf_config *config,
 			       const struct ekmf_ext_lib *ext_lib,
 			       bool verbose);
 
+/**
+ * Re-encipher the secure identity key (form field identity_secure_key in
+ * config) used to identify the client to EKMFWeb.
+ * The secure key blob is encrypted using the HSM master key. Whenever the HSM
+ * master key is being changed, the secure identity key must be re-enciphered.
+ * You can either pro-actively re-encipher a secure key once the new master key
+ * has been prepared (but not yet made active): to_new = true; or you can
+ * re-encipher a secure key when the HSM master key has already been changed:
+ * to_new = false. This requires that the HSM still has the old master key.
+ * Not all HSMs support this.
+ *
+ * For pro-active re-encipherment it is suggested to store the re-enciphered
+ * secure key on a separate place, until the new HSM master key has been made
+ * active. Specify a file name in reenc_secure_key to do so. For an in-place
+ * re-encipherment, set reenc_secure_key = NULL.
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param to_new            If true: the identity key is re-enciphered from the
+ *                          current to the new master key.
+ *                          If false: the identity key is re-enciphered from the
+ *                          old to the current master key.
+ * @param reenc_secure_key  if not NULL, then the re-enciphered secure key is
+ *                          stored into the filename specified here. Otherwise
+ *                          the re-enciphered secure key replaces the original
+ *                          secure identity key.
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ * A -ENODEV indicates that the master keys are not loaded.
+ */
+int ekmf_reencipher_identity_key(const struct ekmf_config *config,
+				 bool to_new, const char *reenc_secure_key,
+				 const struct ekmf_ext_lib *ext_lib,
+				 bool verbose);
+
 #endif

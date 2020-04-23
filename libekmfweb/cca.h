@@ -13,6 +13,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include <openssl/evp.h>
+
 #include "ekmfweb/ekmfweb.h"
 
 /* CCA PKA Key Generate function */
@@ -53,9 +55,20 @@ typedef void (*CSNDPKB_t)(long *return_code,
 			  unsigned char *reserved_5,
 			  long *token_length, unsigned char *token);
 
+/* CCA PKA Key Token Change function */
+typedef void (*CSNDKTC_t)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *key_identifier_length,
+			  unsigned char *key_identifier);
+
 struct cca_lib {
 	CSNDPKB_t dll_CSNDPKB;
 	CSNDPKG_t dll_CSNDPKG;
+	CSNDKTC_t dll_CSNDKTC;
 };
 
 #define CCA_MAX_PKA_KEY_TOKEN_SIZE	3500
@@ -68,5 +81,12 @@ int cca_generate_rsa_key_pair(const struct ekmf_cca_lib *cca_lib,
 			      size_t modulus_bits, unsigned int pub_exp,
 			      unsigned char *key_token,
 			      size_t *key_token_length, bool verbose);
+
+int cca_get_key_type(const unsigned char *key_token, size_t key_token_length,
+		     int *pkey_type);
+
+int cca_reencipher_key(const struct ekmf_cca_lib *cca_lib,
+		       const unsigned char *key_token, size_t key_token_length,
+		       bool to_new, bool verbose);
 
 #endif

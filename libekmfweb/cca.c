@@ -51,6 +51,45 @@ struct cca_rsa_key_pair_value_struct {
 #define CCA_PRIME_CURVE			0x00
 #define CCA_BRAINPOOL_CURVE		0x01
 
+struct cca_token_header {
+	uint8_t		token_identifier;
+	uint8_t		token_version1; /* Used for PKA key tokens */
+	uint16_t	token_length;
+	uint8_t		token_version2; /* Used for symmetric key tokens */
+	uint8_t		reserved[3];
+} __packed;
+
+/* Key token identifiers */
+#define CCA_TOKEN_ID_NULL			0x00
+#define CCA_TOKEN_ID_INTERNAL_SYMMETRIC		0x01
+#define CCA_TOKEN_ID_EXTERNAL_SYMMETRIC		0x02
+#define CCA_TOKEN_ID_EXTERNAL_PKA		0x1e
+#define CCA_TOKEN_ID_INTERNAL_PKA		0x1f
+
+/* Key token versions */
+#define CCA_TOKEN_VERS1_V0			0x00
+#define CCA_TOKEN_VERS2_DES_V0			0x00
+#define CCA_TOKEN_VERS2_DES_V1			0x01
+#define CCA_TOKEN_VERS2_AES_DATA		0x04
+#define CCA_TOKEN_VERS2_AES_CIPHER		0x05
+
+struct cca_section_header {
+	uint8_t		section_identifier;
+	uint8_t		section_version;
+	uint16_t	section_length;
+} __packed;
+
+#define CCA_SECTION_ID_RSA_ME_1024_PRIV		0x02
+#define CCA_SECTION_ID_RSA_PUBL			0x04
+#define CCA_SECTION_ID_RSA_CRT_2048_PRIV	0x05
+#define CCA_SECTION_ID_RSA_ME_1024_OPK_PRIV	0x06
+#define CCA_SECTION_ID_RSA_CRT_4096_OPK_PRIV	0x08
+#define CCA_SECTION_ID_RSA_ME_4096_PRIV		0x09
+#define CCA_SECTION_ID_ECC_PRIV			0x20
+#define CCA_SECTION_ID_ECC_PUBL			0x21
+#define CCA_SECTION_ID_RSA_ME_1024_EOPK_PRIV	0x30
+#define CCA_SECTION_ID_RSA_CRT_4096_EOPK_PRIV	0x31
+
 /**
  * Gets the CCA library function entry points from the library handle
  */
@@ -62,8 +101,10 @@ static int _cca_get_library_functions(const struct ekmf_cca_lib *cca_lib,
 
 	cca->dll_CSNDPKB = (CSNDPKB_t)dlsym(cca_lib->cca_lib, "CSNDPKB");
 	cca->dll_CSNDPKG = (CSNDPKG_t)dlsym(cca_lib->cca_lib, "CSNDPKG");
+	cca->dll_CSNDKTC = (CSNDKTC_t)dlsym(cca_lib->cca_lib, "CSNDKTC");
 
-	if (cca->dll_CSNDPKB == NULL || cca->dll_CSNDPKG == NULL)
+	if (cca->dll_CSNDPKB == NULL || cca->dll_CSNDPKG == NULL ||
+	    cca->dll_CSNDKTC == NULL)
 		return -EIO;
 
 	return 0;
@@ -307,6 +348,174 @@ int cca_generate_rsa_key_pair(const struct ekmf_cca_lib *cca_lib,
 	}
 
 	*key_token_length = token_length;
+
+	return 0;
+}
+
+/**
+ * Finds a specific section of a CCA internal PKA key token.
+ */
+static const void *_cca_get_pka_section(const unsigned char *key_token,
+					size_t key_token_length,
+					unsigned int section_id, bool verbose)
+{
+	const struct cca_section_header *section_hdr;
+	const struct cca_token_header *token_hdr;
+	size_t ofs;
+
+	if (key_token == NULL)
+		return NULL;
+
+	if (key_token_length < sizeof(struct cca_token_header)) {
+		pr_verbose(verbose, "key token length too small");
+		return NULL;
+	}
+
+	token_hdr = (struct cca_token_header *)key_token;
+	if (token_hdr->token_length > key_token_length) {
+		pr_verbose(verbose, "key token length too small");
+		return NULL;
+	}
+	if (token_hdr->token_identifier != CCA_TOKEN_ID_INTERNAL_PKA) {
+		pr_verbose(verbose, "not an internal PKA token");
+		return NULL;
+	}
+	if (token_hdr->token_version1 != CCA_TOKEN_VERS1_V0) {
+		pr_verbose(verbose, "invalid token version");
+		return NULL;
+	}
+
+	ofs = sizeof(struct cca_token_header);
+	section_hdr = (struct cca_section_header *)&key_token[ofs];
+
+	while (section_hdr->section_identifier != section_id) {
+		ofs += section_hdr->section_length;
+		if (ofs >= token_hdr->token_length) {
+			pr_verbose(verbose, "section %u not found", section_id);
+			return NULL;
+		}
+		section_hdr = (struct cca_section_header *)&key_token[ofs];
+	}
+
+	if (ofs + section_hdr->section_length > token_hdr->token_length) {
+		pr_verbose(verbose, "section exceed the token length");
+		return NULL;
+	}
+
+	return section_hdr;
+}
+
+/**
+ * Queries the PKEY type of the key token.
+ *
+ * @param key_token         the key token containing an CCA ECC key
+ * @param key_token_length  the size of the key token
+ * @param pkey_type         On return: the PKEY type of the key token
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ */
+int cca_get_key_type(const unsigned char *key_token, size_t key_token_length,
+		     int *pkey_type)
+{
+	if (key_token == NULL || pkey_type == NULL)
+		return -EINVAL;
+
+	if (_cca_get_pka_section(key_token, key_token_length,
+				 CCA_SECTION_ID_ECC_PUBL, false) != NULL)
+		*pkey_type = EVP_PKEY_EC;
+	else if (_cca_get_pka_section(key_token, key_token_length,
+				      CCA_SECTION_ID_RSA_PUBL, false) != NULL)
+		*pkey_type = EVP_PKEY_RSA;
+	else
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * Re-enciphers a key token with a new CCA master key.
+ *
+ * @param cca_lib           the CCA library structure
+ * @param key_token         the key token containing an CCA ECC or RSA key.
+ *                          The re-enciphered key token is returned in the same
+ *                          buffer. The size of the re-enciphered key token
+ *                          remains the same.
+ * @param key_token_length  the size of the key token
+ * @param to_new            If true: the key token is re-enciphered from the
+ *                          current to the new master key.
+ *                          If false: the key token is re-enciphered from the
+ *                          old to the current master key.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ * -ENODEV is returned if the master keys are not loaded.
+ */
+int cca_reencipher_key(const struct ekmf_cca_lib *cca_lib,
+		       const unsigned char *key_token, size_t key_token_length,
+		       bool to_new, bool verbose)
+{
+	long return_code, reason_code, rule_array_count, exit_data_len = 0;
+	unsigned char rule_array[2 * CCA_KEYWORD_SIZE] = { 0, };
+	unsigned char *exit_data = NULL;
+	struct cca_lib cca;
+	long token_length;
+	int rc, type;
+
+	if (cca_lib == NULL || key_token == NULL)
+		return -EINVAL;
+
+	rc = _cca_get_library_functions(cca_lib, &cca);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CCA functions from library");
+		return rc;
+	}
+
+	rc = cca_get_key_type(key_token, key_token_length, &type);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to determine the key token type");
+		return rc;
+	}
+
+	rule_array_count = 2;
+	switch (type) {
+	case EVP_PKEY_EC:
+		memcpy(rule_array, "ECC     ", CCA_KEYWORD_SIZE);
+		break;
+	case EVP_PKEY_RSA:
+	case EVP_PKEY_RSA_PSS:
+		memcpy(rule_array, "RSA     ", CCA_KEYWORD_SIZE);
+		break;
+	default:
+		pr_verbose(verbose, "Invalid key token type: %d", type);
+		return -EINVAL;
+	}
+
+	if (to_new)
+		memcpy(rule_array + CCA_KEYWORD_SIZE, "RTNMK   ",
+		       CCA_KEYWORD_SIZE);
+	else
+		memcpy(rule_array + CCA_KEYWORD_SIZE, "RTCMK   ",
+		       CCA_KEYWORD_SIZE);
+
+	token_length = key_token_length;
+
+	cca.dll_CSNDKTC(&return_code, &reason_code,
+			&exit_data_len, exit_data,
+			&rule_array_count, rule_array,
+			&token_length, (unsigned char *)key_token);
+
+	if (return_code != 0) {
+		pr_verbose(verbose, "CCA CSNDKTC (PKA KEY TOKEN CHANGE) failed:"
+			  " return_code: %ld reason_code: %ld", return_code,
+			  reason_code);
+
+		if (return_code == 12 && reason_code == 764) {
+			pr_verbose(verbose, "The master keys are not loaded");
+			return -ENODEV;
+		}
+
+		return -EIO;
+	}
 
 	return 0;
 }

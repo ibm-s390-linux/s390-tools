@@ -4,5 +4,6 @@ LIBEKMFWEB_1.0 {
         ekmf_print_certificates;
         ekmf_check_login_token;
         ekmf_generate_identity_key;
+        ekmf_reencipher_identity_key;
     local: *;
 };
