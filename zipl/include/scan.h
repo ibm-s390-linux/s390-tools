@@ -126,7 +126,7 @@ char* scan_keyword_name(enum scan_keyword_id id);
 int scan_check_defaultboot(struct scan_token* scan);
 struct scan_token* scan_build_automenu(struct scan_token* scan);
 int scan_check(struct scan_token* scan);
-int scan_check_bls(struct scan_token *scan);
+void scan_update_bls_path(struct scan_token *scan);
 int scan_find_section(struct scan_token* scan, char* name, enum scan_id type,
 		      int offset);
 int scan_check_section_data(char* keyword[], int* line, char* name,

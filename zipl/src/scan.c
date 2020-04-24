@@ -1567,16 +1567,17 @@ scan_check(struct scan_token* scan)
 /*
  * Check if kernel and initrd image paths provided by BLS files are readable.
  * If not, add value of 'scan_keyword_target' into search path and silently
- * update scan list.
+ * update scan list if the file exists.
+ * In case neither path works the scan_check code will correctly handle missing
+ * files
  */
-int
-scan_check_bls(struct scan_token *scan)
+void scan_update_bls_path(struct scan_token *scan)
 {
-	int i, rc;
 	char *target_value = NULL;
 	char *img_value = NULL;
 	char *file = NULL;
 	char *tmp, *value;
+	int i;
 	/*
 	 * In the BLS case, each BLS section heading inherits a keyword
 	 * assignment target= from zipl.conf, and they are all the same.
@@ -1590,7 +1591,7 @@ scan_check_bls(struct scan_token *scan)
 		}
 	}
 	if (!target_value)
-		return -1;
+		return;
 	for (i = 0 ; scan[i].id != scan_id_empty; i++) {
 		if (scan[i].id != scan_id_keyword_assignment)
 			continue;
@@ -1608,16 +1609,12 @@ scan_check_bls(struct scan_token *scan)
 			} else {
 				file = value;
 			}
-			rc = misc_check_readable_file(file);
-			if (rc) {
+			if (misc_check_readable_file(file)) {
 				misc_asprintf(&img_value, "%s%s",
 					      target_value, file);
-				rc = misc_check_readable_file(img_value);
-				if (rc) {
-					error_reason(
-						"File '%s' not accessible", file);
-					return rc;
-				}
+				if (misc_check_readable_file(img_value))
+					continue;
+
 				/*
 				 * when file has stripped the load address part,
 				 * do generate a prefixed value
@@ -1633,7 +1630,7 @@ scan_check_bls(struct scan_token *scan)
 			}
 		}
 	}
-	return 0;
+	return;
 }
 
 static int
