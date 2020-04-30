@@ -234,6 +234,9 @@ and <PARMLINE> are appended to form the resulting command line.
 It is not possible to specify both this parameter and the name of a menu
 section on the command line at the same time.
 
+The command line can contain zIPL environment variables (see
+.BR zipl-editenv(8)).
+
 .TP
 .BR "\-k auto" " or " "\-\-kdump=auto"
 Install a kdump kernel that can be used as a stand-alone dump tool. You
@@ -406,4 +409,5 @@ for example via the "/dev/disk/by-path/" device nodes.
 
 .SH SEE ALSO
 .BR zipl.conf (5),
+.BR zipl-editenv (8),
 .BR kexec (8)

@@ -457,6 +457,8 @@ This option cannot be used together with either
 Use this option to specify a parameter line which will be passed to the Linux
 kernel at boot time. Note that the parameter line may be enclosed in quotes
 (" or ') to preserve leading and trailing spaces.
+The parameter line can contain zIPL environment variables (see
+.B zipl-editenv(8)).
 .PP
 
 .B parmfile
@@ -710,4 +712,5 @@ for example via the "/dev/disk/by-path/" device nodes.
 
 .SH SEE ALSO
 .BR zipl (8),
+.BR zipl-editenv (8),
 .BR zgetdump (8)

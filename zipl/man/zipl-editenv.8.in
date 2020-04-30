@@ -1,0 +1,156 @@
+.\" Copyright 2020 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZIPL-EDITENV 8 "Feb 2020" "s390-tools"
+.SH NAME
+zipl-editenv \- zIPL environment editor.
+
+.SH SYNOPSIS
+.B zipl-editenv
+[OPTION] [ARGUMENT]
+
+.SH DESCRIPTION
+.B zipl-editenv
+is a tool to manipulate with zIPL environment of partitions, prepared for
+initial program load (IPL) by
+.B zipl(8)
+utility. This tool performs atomic updates of boot data without modifying the
+boot record referencing that data. The following operations are supported:
+.IP "     -"
+Print environment
+.IP "     -"
+Assign a specified value to any environment variable
+.IP "     -"
+Remove a specified variable from the environment
+.IP "     -"
+Remove all variables from the environment
+.PP
+
+.B zIPL environment
+(don't confuse with shell environment!)
+is a set of variables with their values. All the variables are identified by
+their unique names. Names of zIPL environment variables have to satisfy POSIX
+requirements for shell environment variables (IEEE Std 1003.1-2001).
+That is, such names should consist solely of uppercase letters, digits, and
+the '_' (underscore) from the characters defined in Portable Character Set and
+should not begin with a digit.
+
+zIPL environment is defined per boot partition by a special boot component
+called
+.B zIPL environment block.
+This component is used for evaluation of variables in another boot component,
+kernel command line.
+zIPL environment variables can be used in kernel parameter string, where they
+should be specified by their names as ${NAME}. During boot, such variables
+are replaced with their current values, as defined by the installed environment.
+
+Maximum number of zIPL environment variables per boot partition is 512.
+
+zIPL environment is installed every time when preparing a device for initial
+program load (IPL) by
+.B zipl(8)
+utility. At installation time the environment by default is imported from
+user-editable file
+.B '/etc/ziplenv'.
+That default location can be overridden by respective
+.B zipl(8)
+option.
+
+Installed zIPL environment (AKA zIPL environment block) can be accessed
+(modified, printed) by this
+.B zipl-editenv(8)
+tool. All modifications made with this tool don't affect the file
+.B '/etc/ziplenv'.
+Hence, those modifications will be lost after the next boot record
+re-installation, unless
+.B '/etc/ziplenv'
+was updated respectively.
+
+.SH OPTIONS
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.TP
+.BR "\-t <TARGET DIRECTORY>" " or " "\-\-target <TARGET DIRECTORY>"
+Specify a directory, where the environment was installed. This directory should
+contain boot data (bootmap file). Default value is "/boot". A similar option
+with the same name exists also for
+.B zipl(8)
+utility.
+
+.TP
+.BR "\-l" " or " "\-\-list"
+Print zIPL environment, that is a list of all zIPL environment variables with
+their current values.
+
+.TP
+.BR "\-s <NAME=VALUE>" " or " "\-\-set <NAME=VALUE>"
+Assign value
+.B VALUE
+to the variable with name
+.B NAME.
+.B NAME
+has to satisfy the requirements above.
+.B VALUE
+may consist of any printable characters different from the new line symbol.
+If variable with such name didn't exist in the environment,
+then it will be added.
+
+.TP
+.BR "\-u <NAME>" " or " "\-\-unset <NAME>"
+Remove the variable with name
+.B NAME
+from zIPL environment.
+
+.TP
+.BR "\-r" " or " "\-\-reset"
+Remove all variables from zIPL environment.
+
+.SH FILES
+
+.B /etc/ziplenv
+- "initial environment" (or "environment file").
+
+A regular file containing zIPL environment to be installed every time when
+preparing a device for initial program load (IPL) by
+.B zipl(8)
+utility.
+Don't confuse environment file with environment block!
+In contrast with environment block, environment file is not a boot component
+and is not used at boot time by any boot processes.
+This file contains pairs
+.B NAME=VALUE
+delimited by new line symbols (i.e. each pair on a separate line).
+.B NAME
+is identified as a sequence of characters before the leftmost '=' in the line.
+.B NAME
+has to satisfy the requirements above. Lines beginning from "#" are ignored.
+Lines with not identified
+.B NAME
+are ignored. If lines contain identical names,
+then only the last one takes an effect. If the file defines more than 512
+variables, or if the environment defined by that file doesn't fit to the
+environment block, then
+.B zipl(8)
+will fail to import such file.
+
+This file can be modified, using any suitable text editor.
+
+.SH NOTES
+
+Any installed zIPL environment (environment block) should be accessed only
+by this
+.B zipl-editenv
+tool. Using other ways to access the environment block is not allowed.
+
+.TP
+
+.SH SEE ALSO
+.BR zipl (8),
+.BR zipl.conf (5)
