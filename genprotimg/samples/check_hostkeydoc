@@ -1,0 +1,276 @@
+#!/bin/sh
+#
+# check_hostkeydoc - Verify an IBM Secure Execution host key document
+#
+# Sample script to verify that a host key document is genuine by
+# verifying the issuer, the validity date and the signature.
+# Optionally verify the full trust chain using a CA certficate.
+#
+# Revocation list checking not yet implemented.
+#
+# Sample invocation:
+#
+# ./check_hostkeydoc HKD1234.crt signing-key.crt
+#
+# Copyright IBM Corp. 2020
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+
+
+# Allocate temporary files
+ISSUER_PUBKEY_FILE=$(mktemp)
+SIGNATURE_FILE=$(mktemp)
+BODY_FILE=$(mktemp)
+ISSUER_DN_FILE=$(mktemp)
+SUBJECT_DN_FILE=$(mktemp)
+DEF_ISSUER_DN_FILE=$(mktemp)
+CRL_SERIAL_FILE=$(mktemp)
+
+# Cleanup on exit
+cleanup()
+{
+    rm -f $ISSUER_PUBKEY_FILE $SIGNATURE_FILE $BODY_FILE \
+        $ISSUER_DN_FILE $SUBJECT_DN_FILE $DEF_ISSUER_DN_FILE \
+        $CRL_SERIAL_FILE
+}
+trap cleanup EXIT
+
+# Enhanced error checking for bash
+if echo $SHELL | grep /bin/bash > /dev/null
+then
+    set -o pipefail
+    set -o nounset
+fi
+set -e
+
+# Usage
+usage()
+{
+cat <<-EOF
+Usage: `basename $1` host-key-doc signing-key-cert [-c CA-cert] [-r CRL]
+
+Verify an IBM Secure Execution host key document against
+a signing key.
+
+Note that in order to have the full trust chain verified
+it is necessary to provide the issueing CA's certificate.
+
+EOF
+}
+
+check_verify_chain()
+{
+    # Verify certificate chain in case a CA certificate file/bundle
+    # was specified on the command line.
+    if [ $# = 1 ]
+    then
+        cat >&2 <<-EOF
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+No CA certificate specified! Skipping trust chain verification.
+Make sure that '$1' is a valid certificate.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+EOF
+    else
+        openssl verify -crl_download -crl_check $2 &&
+        openssl verify -crl_download -crl_check -untrusted $2 $1 ||
+        exit 1
+    fi
+}
+
+extract_pubkey()
+{
+    openssl x509 -in $1 -pubkey -noout > $2
+}
+
+extract_signature()
+{
+    # Assuming that the last field is the signature
+    SIGOFFSET=$(openssl asn1parse -in $1 | tail -1 | cut -d : -f 1)
+
+    openssl asn1parse -in $1 -out $2 -strparse $SIGOFFSET -noout
+}
+
+extract_body()
+{
+    # Assuming that the first field is the full cert body
+    SIGOFFSET=$(openssl asn1parse -in $1 | head -2 | tail -1 | cut -d : -f 1)
+
+    openssl asn1parse -in $1 -out $2 -strparse $SIGOFFSET -noout
+}
+
+verify_signature()
+{
+    # Assuming that the signature algorith is SHA512 with RSA
+    openssl sha512 -verify $1 -signature $2 $3
+}
+
+canonical_dn()
+{
+    OBJTYPE=$1
+    OBJ=$2
+    DNTYPE=$3
+    OUTPUT=$4
+
+    openssl $OBJTYPE -in $OBJ -$DNTYPE -noout -nameopt multiline \
+        | sort | grep -v $DNTYPE= > $OUTPUT
+}
+
+default_issuer()
+{
+    cat <<-EOF
+    commonName                = International Business Machines Corporation
+    countryName               = US
+    localityName              = Poughkeepsie
+    organizationalUnitName    = IBM Z Host Key Signing Service
+    organizationName          = International Business Machines Corporation
+    stateOrProvinceName       = New York
+EOF
+}
+
+verify_issuer_files()
+{
+    default_issuer > $DEF_ISSUER_DN_FILE
+
+    if ! diff $ISSUER_DN_FILE $DEF_ISSUER_DN_FILE
+    then
+        echo Incorrect default issuer >&2 && exit 1
+    fi
+
+    if diff $ISSUER_DN_FILE $SUBJECT_DN_FILE
+    then
+        echo Issuer verification OK
+    else
+        echo Issuer verification failed >&2 && exit 1
+    fi
+}
+
+cert_time()
+{
+    DATE=$(openssl x509 -in $1 -$2 -noout | sed "s/^.*=//")
+
+    date -d "$DATE" +%s
+}
+
+crl_time()
+{
+    DATE=$(openssl crl -in $1 -$2 -noout | sed "s/^.*=//")
+
+    date -d "$DATE" +%s
+}
+
+verify_dates()
+{
+    START="$1"
+    END="$2"
+    MSG="${3:-Certificate}"
+    NOW=$(date +%s)
+
+    if [ $START -le $NOW -a $NOW -le $END ]
+    then
+        echo "${MSG} dates are OK"
+    else
+        echo "${MSG} date verification failed" >&2 && exit 1
+    fi
+}
+
+crl_serials()
+{
+    openssl crl -in $1 -text -noout | \
+        grep "Serial Number" > $CRL_SERIAL_FILE
+}
+
+check_serial()
+{
+    CERT_SERIAL=$(openssl x509 -in $1 -noout -serial | cut -d = -f 2)
+
+    grep -q $CERT_SERIAL $CRL_SERIAL_FILE
+}
+
+check_file()
+{
+    [ $# = 0 ] ||
+    [ -e "$1" ] ||
+    (echo "File '$1' not found" >&2 && exit 1)
+}
+
+# check args
+CRL_FILE=
+CA_FILE=
+
+args=$(getopt -qu "r:c:h" $*)
+if [ $? = 0 ]
+then
+    set -- $args
+    while [ $1 != "" ]
+    do
+        case $1 in
+            -r) CRL_FILE=$2; shift 2;;
+            -c) CA_FILE=$2; shift 2;;
+            -h) usage $0; exit 0;;
+            --) shift; break;;
+        esac
+    done
+else
+    usage $0 >&2
+    exit 1
+fi
+
+if [ $# -ne 2  ]
+then
+    usage $0 >&2
+    exit 1
+fi
+
+HKD_FILE=$1
+HKSK_FILE=$2
+
+# Check whether all specified files exist
+check_file $HKD_FILE
+check_file $HKSK_FILE
+check_file $CA_FILE
+check_file $CRL_FILE
+
+# Check trust chain
+check_verify_chain $HKSK_FILE $CA_FILE
+
+# Verify host key document signature
+echo -n "Checking host key document signature: "
+extract_pubkey $HKSK_FILE $ISSUER_PUBKEY_FILE &&
+extract_signature $HKD_FILE $SIGNATURE_FILE &&
+extract_body $HKD_FILE $BODY_FILE &&
+verify_signature $ISSUER_PUBKEY_FILE $SIGNATURE_FILE $BODY_FILE ||
+exit 1
+
+# Verify the issuer
+canonical_dn x509 $HKD_FILE issuer $ISSUER_DN_FILE
+canonical_dn x509 $HKSK_FILE subject $SUBJECT_DN_FILE
+verify_issuer_files
+
+# Verify dates
+verify_dates $(cert_time $HKD_FILE startdate) $(cert_time $HKD_FILE enddate)
+
+# Check CRL if specified
+if [ -n "$CRL_FILE" ]
+then
+    echo -n "Checking CRL signature: "
+    extract_signature $CRL_FILE $SIGNATURE_FILE &&
+    extract_body $CRL_FILE $BODY_FILE &&
+    verify_signature $ISSUER_PUBKEY_FILE $SIGNATURE_FILE $BODY_FILE ||
+    exit 1
+
+    echo -n "CRL "
+    canonical_dn crl $CRL_FILE issuer $ISSUER_DN_FILE
+    canonical_dn x509 $HKSK_FILE subject $SUBJECT_DN_FILE
+    verify_issuer_files
+
+    verify_dates $(crl_time $CRL_FILE lastupdate) $(crl_time $CRL_FILE nextupdate) 'CRL'
+
+    crl_serials $CRL_FILE
+    check_serial $HKD_FILE &&
+    echo  "Certificate is revoked, do not use it anymore!" >&2 &&
+    exit 1
+fi
+
+# We made it
+echo All checks reqested for \'$HKD_FILE\' were successful
