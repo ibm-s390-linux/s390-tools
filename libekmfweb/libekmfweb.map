@@ -7,5 +7,8 @@ LIBEKMFWEB_1.0 {
         ekmf_reencipher_identity_key;
         ekmf_generate_csr;
         ekmf_generate_ss_cert;
+        ekmf_get_public_key;
+        ekmf_retrieve_key;
+        ekmf_curl_destroy;
     local: *;
 };

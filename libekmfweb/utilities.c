@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -20,7 +21,13 @@
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
 
+#include "lib/zt_common.h"
+
 #include "utilities.h"
+
+#ifndef JSON_C_TO_STRING_NOSLASHESCAPE
+#define JSON_C_TO_STRING_NOSLASHESCAPE (1 << 4)
+#endif
 
 /**
  * Decodes a Base64URL encoded string. Base64URL is like Base64, but using a
@@ -362,6 +369,547 @@ out:
 		free(json);
 
 	return rc;
+}
+
+/**
+ * Creates a JSON Web Signature object with the specified parts and returns a
+ * a character string containing the serialized JWS (see RFC 7515 for details)
+ *
+ * @param algorithm         the JWS algorithm (e.g. ES512) (in the JWS header)
+ * @param b64               the b64 property of the JWS header. If b64 is true,
+ *                          then the payload (if any) is base64url encoded,
+ *                          if false, the payload (if any) is used as-is.
+ * @param kid               the Key ID JWS header field (can be NULL)
+ * @param payload           the JWS payload.
+ * @param payload_len       the length of the payload in bytes
+ * @param detached_payload  if true a JWS with detached payload is created (see
+ *                          RFC 7515 Appendix F)
+ * @param md_ctx            An OpenSSL MD that has been set up with the desired
+ *                          digest and signing algorithm, options, and key
+ * @param jws               On return: a C-string allocated by this function
+ *                          containing the serialized JWS. The caller must
+ *                          free the memory used by the returned string.
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int create_json_web_signature(const char *algorithm, bool b64, const char *kid,
+			      const unsigned char *payload, size_t payload_len,
+			      bool detached_payload, EVP_MD_CTX *md_ctx,
+			      char **jws)
+{
+	unsigned char *signature = NULL;
+	json_object *header_obj = NULL;
+	json_object *crit_obj = NULL;
+	size_t signature_b64_len = 0;
+	size_t payload_b64_len = 0;
+	char *signature_b64 = NULL;
+	size_t header_b64_len = 0;
+	size_t signature_len = 0;
+	char *payload_b64 = NULL;
+	ECDSA_SIG *ec_sig = NULL;
+	char *header_b64 = NULL;
+	const unsigned char *p;
+	const char *header;
+	size_t prime_len;
+	EVP_PKEY *pkey;
+	int rc;
+
+	if (algorithm == NULL || payload == NULL || md_ctx == NULL ||
+	    jws == NULL)
+		return -EINVAL;
+
+	pkey = EVP_PKEY_CTX_get0_pkey(EVP_MD_CTX_pkey_ctx(md_ctx));
+	if (pkey == NULL) {
+		rc = -EIO;
+		goto out;
+	}
+
+	header_obj = json_object_new_object();
+	if (header_obj == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	/*
+	 * Note: The order of the fields is important, EKMFWeb expects it in
+	 * exactly this order!
+	 */
+	rc = json_object_object_add_ex(header_obj, "alg",
+				       json_object_new_string(algorithm), 0);
+	if (kid != NULL)
+		rc |= json_object_object_add_ex(header_obj, "kid",
+						json_object_new_string(kid), 0);
+	rc |= json_object_object_add_ex(header_obj, "b64",
+					json_object_new_boolean(b64), 0);
+	crit_obj = json_object_new_array();
+	rc |= (crit_obj == NULL ? -1 : 0);
+	rc |= json_object_array_add(crit_obj, json_object_new_string("b64"));
+	rc |= json_object_object_add_ex(header_obj, "crit", crit_obj, 0);
+	crit_obj = NULL;
+	if (rc != 0) {
+		rc = -EIO;
+		goto out;
+	}
+
+	header = json_object_to_json_string_ext(header_obj,
+						JSON_C_TO_STRING_PLAIN |
+						JSON_C_TO_STRING_NOSLASHESCAPE);
+	if (header == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = encode_base64url(NULL, &header_b64_len, (unsigned char *)header,
+			      strlen(header));
+	if (rc != 0)
+		goto out;
+
+	header_b64 = malloc(header_b64_len);
+	if (header_b64 == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = encode_base64url(header_b64, &header_b64_len,
+			      (unsigned char *)header, strlen(header));
+	if (rc != 0)
+		goto out;
+
+	if (b64) {
+		rc = encode_base64url(NULL, &payload_b64_len, payload,
+				      payload_len);
+		if (rc != 0)
+			goto out;
+
+		payload_b64 = malloc(payload_b64_len);
+		if (payload_b64 == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = encode_base64url(payload_b64, &payload_b64_len, payload,
+				      payload_len);
+		if (rc != 0)
+			goto out;
+	}
+
+	/* Sign: BASE64URL(UTF8(JWSHeader)) | '.' | [BASE64URL](JWS Payload) */
+	rc = EVP_DigestSignUpdate(md_ctx, header_b64, strlen(header_b64));
+	if (rc != 1) {
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = EVP_DigestSignUpdate(md_ctx, ".", 1);
+	if (rc != 1) {
+		rc = -EIO;
+		goto out;
+	}
+
+	if (b64)
+		rc = EVP_DigestSignUpdate(md_ctx, payload_b64,
+					  strlen(payload_b64));
+	else
+		rc = EVP_DigestSignUpdate(md_ctx, payload, payload_len);
+	if (rc != 1) {
+		rc = -EIO;
+		goto out;
+	}
+
+	signature_len = EVP_PKEY_size(pkey);
+	signature = malloc(signature_len);
+	if (signature == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = EVP_DigestSignFinal(md_ctx, signature, &signature_len);
+	if (rc != 1) {
+		rc = -EIO;
+		goto out;
+	}
+
+	switch (EVP_PKEY_id(pkey)) {
+	case EVP_PKEY_EC:
+		prime_len = ecc_get_curve_prime_length(EC_GROUP_get_curve_name(
+				EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pkey))));
+
+		p = signature;
+		if (d2i_ECDSA_SIG(&ec_sig, &p, signature_len) == NULL) {
+			rc = -EIO;
+			goto out;
+		}
+
+		if (signature_len < 2 * prime_len) {
+			rc = -EINVAL;
+			goto out;
+		}
+
+		memset(signature, 0, signature_len);
+		BN_bn2binpad(ECDSA_SIG_get0_r(ec_sig), signature, prime_len);
+		BN_bn2binpad(ECDSA_SIG_get0_s(ec_sig), signature + prime_len,
+			     prime_len);
+		signature_len = 2 * prime_len;
+		break;
+
+	case EVP_PKEY_RSA:
+	case EVP_PKEY_RSA_PSS:
+		/* No signature encoding for RSA */
+		break;
+
+	default:
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = encode_base64url(NULL, &signature_b64_len, signature,
+			      signature_len);
+	if (rc != 0)
+		goto out;
+
+	signature_b64 = malloc(signature_b64_len);
+	if (signature_b64 == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = encode_base64url(signature_b64, &signature_b64_len, signature,
+			      signature_len);
+	if (rc != 0)
+		goto out;
+
+	if (detached_payload) {
+		if (asprintf(jws, "%s..%s", header_b64, signature_b64) < 0) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	} else if (b64) {
+		if (asprintf(jws, "%s.%s.%s", header_b64, payload_b64,
+			     signature_b64) < 0) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	} else {
+		if (asprintf(jws, "%s.%.*s.%s", header_b64, (int)payload_len,
+			     payload, signature_b64) < 0) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	}
+
+	rc = 0;
+
+out:
+	if (header_obj != NULL)
+		json_object_put(header_obj);
+	if (header_b64 != NULL)
+		free(header_b64);
+	if (payload_b64 != NULL)
+		free(payload_b64);
+	if (signature != NULL)
+		free(signature);
+	if (signature_b64 != NULL)
+		free(signature_b64);
+	if (ec_sig != NULL)
+		ECDSA_SIG_free(ec_sig);
+
+	return rc;
+}
+
+/**
+ * Verifies a JSON Web Signature object (see RFC 7515 for details).
+ *
+ * @param jws               the JWS string
+ * @param payload           if not NULL: the detached JWS payload.
+ * @param payload_len       the length of the detached payload in bytes
+ * @param md_ctx            An OpenSSL MD that has been set up with the desired
+ *                          digest and signing algorithm, options, and key
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int verify_json_web_signature(const char *jws, const unsigned char *payload,
+			      size_t payload_len, EVP_PKEY *pkey)
+{
+	size_t header_len, hdr_pld_len, payload_b64_len, signature_len = 0;
+	unsigned char *signature = NULL, *der = NULL, *sig = NULL;
+	json_object *header_obj = NULL, *b64_obj = NULL;
+	int der_len, rc, curve_nid = 0, digest_nid = 0;
+	struct ekmf_rsa_pss_params rsa_pss_params;
+	bool b64 = true, rsa_pss = false;
+	EVP_MD_CTX *md_ctx = NULL;
+	EVP_PKEY_CTX *pctx = NULL;
+	ECDSA_SIG *ec_sig = NULL;
+	char *payload_b64 = NULL;
+	const EVP_MD *md = NULL;
+	BIGNUM *bn_r = NULL;
+	BIGNUM *bn_s = NULL;
+	const char *alg;
+	size_t sig_len;
+	char *ch;
+
+	if (jws == NULL || pkey == NULL)
+		return -EINVAL;
+
+	rc = parse_json_web_token(jws, &header_obj, NULL, &signature,
+				  &signature_len);
+	if (rc != 0)
+		goto out;
+
+	ch = strchr(jws, '.');
+	if (ch == NULL) {
+		rc = -EBADMSG;
+		goto out;
+	}
+	header_len = ch - jws;
+
+	ch = strchr(++ch, '.');
+	if (ch == NULL) {
+		rc = -EBADMSG;
+		goto out;
+	}
+	hdr_pld_len = ch - jws;
+
+	if (EVP_PKEY_id(pkey) == EVP_PKEY_EC) {
+		curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(
+						EVP_PKEY_get0_EC_KEY(pkey)));
+	}
+
+	alg = json_get_string(header_obj, "alg");
+	if (alg == NULL) {
+		rc = -EIO;
+		goto out;
+	}
+
+	/*
+	 * Only the following combinations are allowed per RFC7518 for JSON
+	 * Web Signatures (JWS) using ECC or RSA signing keys:
+	 *   alg=ES256: ECDSA using P-256 and SHA-256
+	 *   alg=ES384: ECDSA using P-384 and SHA-384
+	 *   alg=ES512: ECDSA using P-521 and SHA-512
+	 *   alg=RS256: RSA-PKCS1 using SHA-256
+	 *   alg=RS384: RSA-PKCS1 using SHA-384
+	 *   alg=RS512: RSA-PKCS1 using SHA-512
+	 *   alg=PS256: RSA-PSS using SHA-256, MGF1 with SHA-256, salt=digest
+	 *   alg=PS384: RSA-PSS using SHA-384, MGF1 with SHA-384, salt=digest
+	 *   alg=PS512: RSA-PSS using SHA-512, MGF1 with SHA-512, salt=digest
+	 */
+	if (strncmp(alg, "ES", 2) == 0) {
+		if (EVP_PKEY_id(pkey) != EVP_PKEY_EC) {
+			rc = EINVAL;
+			goto out;
+		}
+		if ((strncmp(alg + 2, "512", 3) == 0 &&
+					curve_nid != NID_secp521r1) ||
+		    (strncmp(alg + 2, "384", 3) == 0 &&
+					curve_nid != NID_secp384r1) ||
+		    (strncmp(alg + 2, "256", 3) == 0 &&
+					curve_nid != NID_X9_62_prime256v1)) {
+			rc = EINVAL;
+			goto out;
+		}
+	} else if (strncmp(alg, "RS", 2) == 0) {
+		if (EVP_PKEY_id(pkey) != EVP_PKEY_RSA) {
+			rc = EINVAL;
+			goto out;
+		}
+	} else if (strncmp(alg, "PS", 2) == 0) {
+		if (EVP_PKEY_id(pkey) != EVP_PKEY_RSA &&
+		    EVP_PKEY_id(pkey) != EVP_PKEY_RSA_PSS) {
+			rc = EINVAL;
+			goto out;
+		}
+		rsa_pss = true;
+	} else {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	if (strncmp(alg + 2, "512", 3) == 0)
+		digest_nid = NID_sha512;
+	else if (strncmp(alg + 2, "384", 3) == 0)
+		digest_nid = NID_sha384;
+	else if (strncmp(alg + 2, "256", 3) == 0)
+		digest_nid = NID_sha256;
+	if (digest_nid == 0) {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	md = EVP_get_digestbynid(digest_nid);
+	if (md == NULL) {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	md_ctx = EVP_MD_CTX_new();
+	if (md_ctx == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = EVP_DigestVerifyInit(md_ctx, &pctx, md, NULL, pkey);
+	if (rc != 1) {
+		rc = -EIO;
+		goto out;
+	}
+
+	if (rsa_pss) {
+		rsa_pss_params.mgf_digest_nid = digest_nid;
+		rsa_pss_params.salt_len = RSA_PSS_SALTLEN_DIGEST;
+		rc = setup_rsa_pss_pkey_context(pctx, &rsa_pss_params);
+		if (rc != 0)
+			goto out;
+	}
+
+	switch (EVP_PKEY_id(pkey)) {
+	case EVP_PKEY_EC:
+		ec_sig = ECDSA_SIG_new();
+		if (ec_sig == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		bn_r = BN_bin2bn(signature, signature_len / 2, NULL);
+		bn_s = BN_bin2bn(signature + signature_len / 2,
+				 signature_len / 2, NULL);
+		if (bn_r == NULL || bn_s == NULL) {
+			rc = -EIO;
+			goto out;
+		}
+
+		if (ECDSA_SIG_set0(ec_sig, bn_r, bn_s) != 1) {
+			rc = -EIO;
+			goto out;
+		}
+		bn_r = NULL;
+		bn_s = NULL;
+
+		der_len = i2d_ECDSA_SIG(ec_sig, &der);
+		if (der_len <= 0) {
+			rc = -EIO;
+			goto out;
+		}
+
+		sig = der;
+		sig_len = der_len;
+		break;
+
+	case EVP_PKEY_RSA:
+	case EVP_PKEY_RSA_PSS:
+		/* No signature encoding for RSA */
+		sig = signature;
+		sig_len = signature_len;
+		break;
+
+	default:
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (payload != NULL && payload_len > 0) {
+		/* Detached payload */
+		if (json_object_object_get_ex(header_obj, "b64", &b64_obj) &&
+		    json_object_is_type(b64_obj, json_type_boolean))
+			b64 = json_object_get_boolean(b64_obj);
+
+		if (b64) {
+			rc = encode_base64url(NULL, &payload_b64_len, payload,
+					      payload_len);
+			if (rc != 0)
+				goto out;
+
+			payload_b64 = malloc(payload_b64_len);
+			if (payload_b64 == NULL) {
+				rc = -ENOMEM;
+				goto out;
+			}
+
+			rc = encode_base64url(payload_b64, &payload_b64_len,
+					      payload, payload_len);
+			if (rc != 0)
+				goto out;
+		}
+
+		/* Take header plus '.' as is */
+		rc = EVP_DigestVerifyUpdate(md_ctx, jws, header_len + 1);
+		if (rc != 1) {
+			rc = -EIO;
+			goto out;
+		}
+
+		if (b64)
+			rc = EVP_DigestVerifyUpdate(md_ctx, payload_b64,
+						    payload_b64_len);
+		else
+			rc = EVP_DigestVerifyUpdate(md_ctx, payload,
+						    payload_len);
+		if (rc != 1) {
+			rc = -EIO;
+			goto out;
+		}
+	} else {
+		/* Take header plus '.' plus payload as is */
+		rc = EVP_DigestVerifyUpdate(md_ctx, jws, hdr_pld_len);
+		if (rc != 1) {
+			rc = -EIO;
+			goto out;
+		}
+	}
+
+	rc = EVP_DigestVerifyFinal(md_ctx, sig, sig_len);
+	if (rc != 1) {
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = 0;
+
+out:
+	if (header_obj != NULL)
+		json_object_put(header_obj);
+	if (signature != NULL)
+		free(signature);
+	if (payload_b64 != NULL)
+		free(payload_b64);
+	if (ec_sig != NULL)
+		ECDSA_SIG_free(ec_sig);
+	if (der != NULL)
+		OPENSSL_free(der);
+	if (bn_r != NULL)
+		BN_free(bn_r);
+	if (bn_s != NULL)
+		BN_free(bn_s);
+	if (md_ctx != NULL)
+		EVP_MD_CTX_free(md_ctx);
+
+	return rc;
+}
+
+/**
+ * Builds a JSON Object containing a timestamp value in ISO 8601 format, e.g.
+ * { "timestamp": "2020-04-27T10:02:18.123Z" }. The time is expressed in UTC,
+ * regardless of the local time zone.
+ *
+ * @returns a JSON object containing the timestamp, or NULL in case of an error.
+ */
+json_object *get_json_timestamp(void)
+{
+	char timestamp[100];
+	struct timeval tv;
+	struct tm *tm;
+	char temp[20];
+
+	if (gettimeofday(&tv, NULL) != 0)
+		return NULL;
+
+	tm = gmtime(&tv.tv_sec);
+	if (strftime(timestamp, sizeof(timestamp), "%FT%T", tm) == 0)
+		return NULL;
+
+	snprintf(temp, sizeof(temp), ".%06ldZ", tv.tv_usec);
+	strcat(timestamp, temp);
+
+	return json_object_new_string(timestamp);
 }
 
 struct ecc_curve_info {
@@ -790,6 +1338,125 @@ out:
 }
 
 /**
+ * Converts a JSON Web Key (ECC or RSA) into a OpenSSL PKEY
+ *
+ * @param jwk               The JSON Web Key to convert
+ * @param pkey_type         If the JWK contains an RSA key, then the pkey_type
+ *                          can be EVP_PKEY_RSA or EVP_PKEY_RSA_PSS
+ * @param pkey              On return: the OpenSSL PKEY
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int json_web_key_as_pkey(json_object *jwk, int pkey_type, EVP_PKEY **pkey)
+{
+	unsigned char *x = NULL, *y = NULL, *n = NULL, *e = NULL;
+	size_t prime_len, len, n_len, e_len;
+	const char *kty, *crv;
+	int nid, rc = 0;
+
+	if (jwk == NULL || pkey == NULL)
+		return -EINVAL;
+
+	*pkey = NULL;
+
+	kty = json_get_string(jwk, "kty");
+	if (kty == NULL) {
+		rc = -EIO;
+		goto out;
+	}
+
+	if (strcmp(kty, "EC") == 0) {
+		crv = json_get_string(jwk, "crv");
+		if (crv == NULL) {
+			rc = -EIO;
+			goto out;
+		}
+
+		nid = ecc_get_curve_by_id(crv);
+		if (nid == 0) {
+			rc = -EIO;
+			goto out;
+		}
+
+		prime_len = ecc_get_curve_prime_length(nid);
+		if (prime_len == 0) {
+			rc = -EIO;
+			goto out;
+		}
+
+		x = malloc(prime_len);
+		y = malloc(prime_len);
+		if (x == NULL || y == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		len = prime_len;
+		rc = json_object_get_base64url(jwk, "x", x, &len);
+		if (rc != 0)
+			goto out;
+
+		len = prime_len;
+		rc = json_object_get_base64url(jwk, "y", y, &len);
+		if (rc != 0)
+			goto out;
+
+		rc = ecc_pub_key_as_pkey(nid, prime_len, x, y, pkey);
+		if (rc != 0)
+			goto out;
+	} else if (strcmp(kty, "RSA") == 0) {
+		n_len = 0;
+		rc = json_object_get_base64url(jwk, "n", NULL, &n_len);
+		if (rc != 0)
+			goto out;
+
+		n = malloc(n_len);
+		if (n == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = json_object_get_base64url(jwk, "n", n, &n_len);
+		if (rc != 0)
+			goto out;
+
+		e_len = 0;
+		rc = json_object_get_base64url(jwk, "e", NULL, &e_len);
+		if (rc != 0)
+			goto out;
+
+		e = malloc(e_len);
+		if (e == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = json_object_get_base64url(jwk, "e", e, &e_len);
+		if (rc != 0)
+			goto out;
+
+		rc = rsa_pub_key_as_pkey(n, n_len, e, e_len, pkey_type, pkey);
+		if (rc != 0)
+			goto out;
+
+	} else {
+		return -EIO;
+	}
+
+out:
+	if (x != NULL)
+		free(x);
+	if (y != NULL)
+		free(y);
+	if (n != NULL)
+		free(n);
+	if (e != NULL)
+		free(e);
+	return rc;
+}
+
+
+/**
  * Write a secure key blob to the specified file.
  *
  * @param filename           the name of the file to write to
@@ -973,6 +1640,71 @@ int write_x509_request(const char *pem_filename, X509_REQ *req, bool new_hdr)
 		rc = PEM_write_X509_REQ_NEW(fp, req);
 	else
 		rc = PEM_write_X509_REQ(fp, req);
+
+	fclose(fp);
+
+	if (rc != 1)
+		return -EIO;
+
+	return 0;
+}
+
+/**
+ * Reads a public key from the specified PEM file.
+ *
+ * @param pem_filename       the name of the PEM file to read
+ * @param pkey               on Return: the PKEY object
+ *
+ * @returns zero for success, a negative errno in case of an error:
+ *          -EINVAL: invalid parameter
+ *          -EIO: error during reading in the certificate
+ *          any other errno as returned by fopen
+ */
+int read_public_key(const char *pem_filename, EVP_PKEY **pkey)
+{
+	FILE *fp;
+
+	if (pem_filename == NULL || pkey == NULL)
+		return -EINVAL;
+
+	fp = fopen(pem_filename, "r");
+	if (fp == NULL)
+		return -errno;
+
+	*pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
+
+	fclose(fp);
+
+	if (*pkey == NULL)
+		return -EIO;
+
+	return 0;
+}
+
+/**
+ * Writes apublic key to the specified PEM file.
+ *
+ * @param pem_filename       the name of the PEM file to write to
+ * @param pkey               the PKEY object to write
+ *
+ * @returns zero for success, a negative errno in case of an error:
+ *          -EINVAL: invalid parameter
+ *          -EIO: error during writing out the certificate
+ *          any other errno as returned by fopen
+ */
+int write_public_key(const char *pem_filename, EVP_PKEY *pkey)
+{
+	FILE *fp;
+	int rc;
+
+	if (pem_filename == NULL || pkey == NULL)
+		return -EINVAL;
+
+	fp = fopen(pem_filename, "w");
+	if (fp == NULL)
+		return -errno;
+
+	rc = PEM_write_PUBKEY(fp, pkey);
 
 	fclose(fp);
 
@@ -1835,3 +2567,103 @@ out:
 	return rc;
 }
 
+/**
+ * Gets a String field from a JSON object.
+ *
+ * @param obj                the JSON object
+ * @param name               the name of the String field to get
+ *
+ * @returns the contents of the String field or NULL.
+ * Note: The memory returned is owned by the JSON object, and must not be freed
+ *       by the caller. It is valid until the JSON object is freed, which also
+ *       frees the memory used for the string value.
+ */
+const char *json_get_string(json_object *obj, const char *name)
+{
+	json_object *field;
+
+	if (!json_object_object_get_ex(obj, name, &field) ||
+	    !json_object_is_type(field, json_type_string))
+		return NULL;
+
+	return json_object_get_string(field);
+}
+
+/**
+ * Gets a base64url field form a JSON object, decodes it and returns the
+ * decoded data.
+ *
+ * @param obj                the JSON object
+ * @param name               the name of the String field to get
+ * @param data               buffer to return the decoded data, or NULL to
+ *                           return only the required buffer size
+ * @param data_len           on entry: the size of tne buffer
+ *                           on exit: the size of the decoded data
+ * @returns zero for success, a negative errno in case of an error:
+ *          -EINVAL: a function parameter is invalid
+ *          -ENOMEM: failed to allocate memory
+ *          -EIO: OpenSSL failed to calculate the y coordinate
+ */
+int json_object_get_base64url(json_object *obj, const char *name,
+			      unsigned char *data, size_t *data_len)
+{
+	const char *b64;
+
+	b64 = json_get_string(obj, name);
+	if (b64 == NULL)
+		return -ENOENT;
+
+	return decode_base64url(data, data_len, b64, strlen(b64));
+}
+
+/**
+ * Base64URL encodes the data and creates a JSON string object of it
+ *
+ * @param data              the data to base64url encode
+ * @param len               the length of the data
+
+ * @returns a new JSON object, or NULL in case of an error
+ */
+json_object *json_object_new_base64url(const unsigned char *data, size_t len)
+{
+	json_object *ret = NULL;
+	char *b64 = NULL;
+	size_t b64len;
+	int rc;
+
+	rc = encode_base64url(NULL, &b64len, data, len);
+	if (rc != 0)
+		goto out;
+
+	b64 = malloc(b64len);
+	if (b64 == NULL)
+		goto out;
+
+	rc = encode_base64url(b64, &b64len, data, len);
+	if (rc != 0)
+		goto out;
+
+	ret = json_object_new_string(b64);
+
+out:
+	if (b64 != NULL)
+		free(b64);
+
+	return ret;
+}
+
+#ifdef IMPLEMENT_LOCAL_JSON_OBJECT_OBJECT_ADD
+
+/**
+ * JSON-C of version 0.12 does not have json_object_object_add_ex(), and
+ * json_object_object_add does not return a return code, so implement
+ * json_object_object_add_ex here instead.
+ */
+int json_object_object_add_ex(struct json_object *obj, const char *const key,
+			      struct json_object *const val,
+			      const unsigned int UNUSED(opts))
+{
+	json_object_object_add(obj, key, val);
+	return 0;
+}
+#endif

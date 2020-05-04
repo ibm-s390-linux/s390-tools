@@ -13,6 +13,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+typedef void CURL;
+
 struct ekmf_config {
 	/** The base URL of the server. Should use https:// ! */
 	const char *base_url;
@@ -52,6 +54,9 @@ struct ekmf_config {
 	 *  This key represents the client identity against EKMFWeb. Some
 	 *  requests sent to EKMFWeb are signed with this (secure) key */
 	const char *identity_secure_key;
+	/** File name of a PEM file containing the EKMFWeb servers public key
+	 *  used to sign key export responses. */
+	const char *ekmf_server_pubkey;
 };
 
 struct ekmf_cca_lib {
@@ -343,5 +348,84 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 			  struct ekmf_rsa_pss_params *rsa_pss_params,
 			  const char *cert_pem_filename,
 			  const struct ekmf_ext_lib *ext_lib, bool verbose);
+
+/**
+ * Request the EKMFWeb server's public signing key and store it into PEM file
+ * specified in field server_pubkey of the config structure.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ */
+int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
+			char **error_msg, bool verbose);
+
+/**
+ * Requests a key to be retrieved from EKMFweb and imported under the current
+ * HSM's master key.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to retrieve
+ * @param sess_ec_curve_nid The OpenSSL nid of the EC curve used for the session
+ *                          ECC key. If 0, then the default curve is used.
+ * @param sign_rsa_digest_nid The OpenSSL nid of a digest used to sign the
+ *                          request with if the identity key is an RSA-type key.
+ *                          If 0, then the default digest is used.
+ *                          Ignored for ECC-type identity keys.
+ * @param use_rsa_pss       If true, and the identity key is an RSA-type key,
+ *                          use RSA-PSS to sign the request.
+ * @param signature_kid     the Key ID for the signature of the request
+ * @param key_blob          a buffer to store the retrieved key blob to
+ * @param key_blob_length   On entry: the size ofthe buffer
+ *                          On return: the size of the key blob retrieved
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          retrieve the key
+ */
+int ekmf_retrieve_key(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *key_uuid, int sess_ec_curve_nid,
+		      int sign_rsa_digest_nid, bool use_rsa_pss,
+		      const char *signature_kid, unsigned char *key_blob,
+		      size_t *key_blob_length, char **error_msg,
+		      const struct ekmf_ext_lib *ext_lib, bool verbose);
+
+/**
+ * Close the connection to the EKMFWeb server by destroying the CURL handle.
+ *
+ * @param curl_handle       the CURL handle to destroy
+ */
+void ekmf_curl_destroy(CURL *curl_handle);
 
 #endif

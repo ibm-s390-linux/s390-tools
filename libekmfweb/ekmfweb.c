@@ -22,6 +22,7 @@
 #include <openssl/x509.h>
 #include <openssl/ssl.h>
 #include <openssl/rsa.h>
+#include <openssl/evp.h>
 
 #include <json-c/json.h>
 #ifndef JSON_C_TO_STRING_NOSLASHESCAPE
@@ -36,7 +37,13 @@
 
 #define SERIAL_NUMBER_BIT_SIZE		159
 
+#define DEFAULT_SESSION_EC_KEY_CURVE	NID_secp521r1
+
 #define MAX_KEY_BLOB_SIZE		CCA_MAX_PKA_KEY_TOKEN_SIZE
+#define MAX_SYM_KEY_BLOB_SIZE		CCA_MAX_SYM_KEY_TOKEN_SIZE
+
+#define EKMF_URI_SYSTEM_PUBKEY		"/api/v1/system/publicKey"
+#define EKMF_URI_KEYS_EXPORT		"/api/v1/keys/%s/export"
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -48,6 +55,27 @@
 			if (rc != CURLE_OK) {				\
 				pr_verbose(verbose, "%s: %s", text,	\
 					   curl_easy_strerror(rc));	\
+				goto label;				\
+			}						\
+		} while (0)
+
+#define JSON_CHECK_OBJ(obj, type, rc_var, rc, text, verbose, label)	\
+		do {							\
+			if (obj == NULL ||				\
+			    !json_object_is_type(obj, type)) {		\
+				rc_var = rc;				\
+				pr_verbose(verbose, "%s: %s", text,	\
+					   strerror(-rc_var));		\
+				goto label;				\
+			}						\
+		} while (0)
+
+#define JSON_CHECK_ERROR(cond, rc_var, rc, text, verbose, label)	\
+		do {							\
+			if (cond) {					\
+				rc_var = rc;				\
+				pr_verbose(verbose, "%s: %s", text,	\
+					   strerror(-rc_var));		\
 				goto label;				\
 			}						\
 		} while (0)
@@ -77,6 +105,20 @@ struct curl_sslctx_cb_data {
 const char *accepted_content_types[] = { "application/json",
 					 "text/x-json",
 					 NULL};
+
+struct private_data {
+	const struct ekmf_ext_lib *ext_lib;
+	bool verbose;
+};
+
+static int _ekmf_setup_sign_context(const unsigned char *key_blob,
+				    size_t key_blob_size, EVP_PKEY *pkey,
+				    int digest_nid,
+				    struct ekmf_rsa_pss_params *rsa_pss_params,
+				    EVP_MD_CTX **md_ctx,
+				    EVP_PKEY_CTX **pkey_ctx,
+				    struct private_data *private,
+				    bool verbose);
 
 /**
  * Extract the public key from a certificate in PEM format and store it into a
@@ -956,6 +998,44 @@ out:
 }
 
 /**
+ * Allocates or reuses a CURL handle. If curl_handle is not NULL, and
+ * points to a non-NULL CURL handle, it is used, otherwise a new CURL handle
+ * is allocated.
+ */
+static int _ekmf_get_curl_handle(CURL **curl_handle, CURL **curl)
+{
+	if (curl == NULL)
+		return -EINVAL;
+
+	if (curl_handle != NULL)
+		*curl = *curl_handle;
+
+	if (*curl == NULL)
+		*curl = curl_easy_init();
+
+	if (*curl == NULL)
+		return -EIO;
+
+	return 0;
+}
+
+/**
+ * Releases a CURL handle. If curl_handle is not NULL, then the used CURL
+ * handle is passed back via *curl_handle. If curl_handle is NULL, then the
+ * used CURL handle is destroyed.
+ */
+static void _ekmf_release_curl_handle(CURL **curl_handle, CURL *curl)
+{
+	if (curl == NULL)
+		return;
+
+	if (curl_handle != NULL)
+		*curl_handle = curl;
+	else
+		curl_easy_cleanup(curl);
+}
+
+/**
  * Print the certificate(s) contained in the specified PEM file.
  *
  * @param cert_pem          the file name of the PEM file to print
@@ -1138,6 +1218,907 @@ out:
 }
 
 /**
+ * Request the EKMFWeb server's public signing key and store it into PEM file
+ * specified in field server_pubkey of the config structure.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ */
+int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
+			char **error_msg, bool verbose)
+{
+	json_object *response_obj = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	EVP_PKEY *pkey = NULL;
+	CURL *curl = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL)
+		return -EINVAL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, EKMF_URI_SYSTEM_PUBKEY, "GET",
+				   NULL, NULL, login_token, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EIO,
+		       "No or invalid response content", verbose, out);
+
+	rc = json_web_key_as_pkey(response_obj, EVP_PKEY_RSA, &pkey);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed convert the JWK to PKEY");
+		goto out;
+	}
+
+	rc = write_public_key(config->ekmf_server_pubkey, pkey);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to write public key '%s': %s",
+			   config->ekmf_server_pubkey, strerror(-rc));
+		goto out;
+	}
+
+	pr_verbose(verbose, "EKMFWeb public key written to file '%s'",
+		   config->ekmf_server_pubkey);
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+
+	return rc;
+}
+
+/**
+ * Build the party info JSON object as base64(sha256(key_uuid|timestamp)).
+ * Digest_nid specifies the digest to use, ot 0 to use the default (SHA256).
+ * The function returns the party info JSON object, as well as the raw party
+ * info.
+ */
+static int _ekmf_build_party_info(const char *key_uuid, const char *timestamp,
+				  int digest_nid, unsigned char *party_info,
+				  size_t *party_info_length,
+				  json_object **party_info_obj, bool verbose)
+{
+	unsigned int digest_len;
+	EVP_MD_CTX *ctx = NULL;
+	const EVP_MD *md;
+	int rc;
+
+	md = EVP_get_digestbynid(digest_nid != 0 ? digest_nid : NID_sha256);
+	if (md == NULL) {
+		pr_verbose(verbose, "Failed to get specified digest");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (*party_info_length < (size_t)EVP_MD_size(md)) {
+		pr_verbose(verbose, "Party info buffer is too small");
+		return -ERANGE;
+		goto out;
+	}
+
+	ctx = EVP_MD_CTX_create();
+	if (ctx == NULL) {
+		pr_verbose(verbose, "Failed to allocate MD context");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = EVP_DigestInit_ex(ctx, md, NULL);
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to initialize MD context");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = EVP_DigestUpdate(ctx, key_uuid, strlen(key_uuid));
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to add data to the MD context");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = EVP_DigestUpdate(ctx, timestamp, strlen(timestamp));
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to add data to the MD context");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = EVP_DigestFinal_ex(ctx, party_info, &digest_len);
+	if (rc != 1) {
+		pr_verbose(verbose, "Failed to finalize the MD context");
+		rc = -EIO;
+		goto out;
+	}
+
+	*party_info_length = digest_len;
+	*party_info_obj = json_object_new_base64url(party_info, digest_len);
+	rc = 0;
+
+out:
+	if (ctx != NULL)
+		EVP_MD_CTX_destroy(ctx);
+
+	return rc;
+}
+
+/**
+ * Builds a (detached) JSON Web Signature using the secure identity key from
+ * the payload and returns a signature JSON object
+ */
+static int _ekmf_build_signature(unsigned char *key_blob,
+				 size_t key_blob_length,
+				 json_object *payload_obj,
+				 json_object **signature_obj,
+				 int digest_nid, bool use_rsa_pss,
+				 const char *jws_kid,
+				 const struct ekmf_ext_lib *ext_lib,
+				 bool verbose)
+{
+	struct ekmf_rsa_pss_params rsa_pss_params;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+	struct private_data private;
+	EVP_MD_CTX *md_ctx = NULL;
+	bool pkey_meth = false;
+	EVP_PKEY *pkey = NULL;
+	const char *payload;
+	const char *jws_alg;
+	int rc, curve_nid;
+	char *jws = NULL;
+	int pkey_type;
+	BIO *b;
+
+	switch (ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		rc = cca_get_key_type(key_blob, key_blob_length, &pkey_type);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to get the identity key "
+				   "type");
+			goto out;
+		}
+
+		switch (pkey_type) {
+		case EVP_PKEY_EC:
+			rc = cca_get_ecc_pub_key_as_pkey(key_blob,
+							 key_blob_length,
+							 &pkey, verbose);
+			break;
+		case EVP_PKEY_RSA:
+		case EVP_PKEY_RSA_PSS:
+			rc = cca_get_rsa_pub_key_as_pkey(key_blob,
+							 key_blob_length,
+							 use_rsa_pss ?
+							     EVP_PKEY_RSA_PSS :
+							     EVP_PKEY_RSA,
+							 &pkey, verbose);
+			break;
+		}
+
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to get the identity PKEY");
+			goto out;
+		}
+		break;
+	default:
+		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
+		return -EINVAL;
+	}
+
+	/*
+	 * Only the following combinations are allowed per RFC7518 for JSON
+	 * Web Signatures (JWS) using ECC or RSA identity keys:
+	 *   alg=ES256: ECDSA using P-256 and SHA-256
+	 *   alg=ES384: ECDSA using P-384 and SHA-384
+	 *   alg=ES512: ECDSA using P-521 and SHA-512
+	 *   alg=RS256: RSA-PKCS1 using SHA-256
+	 *   alg=RS384: RSA-PKCS1 using SHA-384
+	 *   alg=RS512: RSA-PKCS1 using SHA-512
+	 *   alg=PS256: RSA-PSS using SHA-256, MGF1 with SHA-256, salt=digest
+	 *   alg=PS384: RSA-PSS using SHA-384, MGF1 with SHA-384, salt=digest
+	 *   alg=PS512: RSA-PSS using SHA-512, MGF1 with SHA-512, salt=digest
+	 */
+	switch (EVP_PKEY_id(pkey)) {
+	case EVP_PKEY_EC:
+		curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(
+						EVP_PKEY_get0_EC_KEY(pkey)));
+		switch (curve_nid) {
+		case NID_secp521r1:
+			digest_nid = NID_sha512;
+			jws_alg = "ES512";
+			break;
+		case NID_secp384r1:
+			digest_nid = NID_sha384;
+			jws_alg = "ES384";
+			break;
+		case NID_X9_62_prime256v1:
+			digest_nid = NID_sha256;
+			jws_alg = "ES256";
+			break;
+		default:
+			pr_verbose(verbose, "Unsupported curve");
+			rc = -EINVAL;
+			goto out;
+		}
+		break;
+	case EVP_PKEY_RSA:
+		switch (digest_nid) {
+		case NID_sha256:
+			jws_alg = "RS256";
+			break;
+		case NID_sha384:
+			jws_alg = "RS384";
+			break;
+		case NID_sha512:
+		case 0:
+			jws_alg = "RS512";
+			digest_nid = NID_sha512;
+			break;
+		default:
+			pr_verbose(verbose, "Unsupported digest");
+			rc = -EINVAL;
+			goto out;
+		}
+		break;
+	case EVP_PKEY_RSA_PSS:
+		switch (digest_nid) {
+		case NID_sha256:
+			jws_alg = "PS256";
+			break;
+		case NID_sha384:
+			jws_alg = "PS384";
+			break;
+		case NID_sha512:
+		case 0:
+			jws_alg = "PS512";
+			digest_nid = NID_sha512;
+			break;
+		default:
+			pr_verbose(verbose, "Unsupported digest");
+			rc = -EINVAL;
+			goto out;
+		}
+		rsa_pss_params.mgf_digest_nid = digest_nid;
+		rsa_pss_params.salt_len = RSA_PSS_SALTLEN_DIGEST;
+		break;
+	default:
+		pr_verbose(verbose, "Unsupported key type");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	private.ext_lib = ext_lib;
+	private.verbose = verbose;
+
+	rc = _ekmf_setup_sign_context(key_blob, key_blob_length, pkey,
+				      digest_nid, &rsa_pss_params, &md_ctx,
+				      &pkey_ctx, &private, verbose);
+	if (rc != 0)
+		goto out;
+	pkey_meth = true;
+
+	payload = json_object_to_json_string_ext(payload_obj,
+					JSON_C_TO_STRING_PLAIN |
+					JSON_C_TO_STRING_NOSLASHESCAPE);
+	if (payload == NULL) {
+		pr_verbose(verbose, "Failed to get the payload string");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (verbose) {
+		pr_verbose(verbose, "JWS Payload: ->%s<-", payload);
+		pr_verbose(verbose, "JWS alg: %s", jws_alg);
+		pr_verbose(verbose, "Public signing key:");
+		b = BIO_new_fp(stderr, BIO_NOCLOSE);
+		PEM_write_bio_PUBKEY(b, pkey);
+		BIO_free(b);
+	}
+
+	rc = create_json_web_signature(jws_alg, false, jws_kid,
+				       (unsigned char *)payload,
+				       strlen(payload), true, md_ctx, &jws);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build the JWS");
+		goto out;
+	}
+
+	*signature_obj = json_object_new_string(jws);
+	rc = 0;
+
+out:
+	if (md_ctx != NULL)
+		EVP_MD_CTX_free(md_ctx);
+	if (pkey_meth)
+		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+	if (jws != NULL)
+		free(jws);
+
+	return rc;
+}
+
+/**
+ * Verifies the (detached) JSON Web Signature using the server's public signing
+ * key and the response payload.
+ * Note: This function removes the signature field from the response JSON
+ *       object!
+ */
+static int _ekmf_verify_signature(json_object *response_obj,
+				  EVP_PKEY *server_pubkey, bool verbose)
+{
+	json_object *signature_obj = NULL;
+	const char *sign_payload;
+	BIO *b;
+	int rc;
+
+	if (response_obj == NULL)
+		return -EINVAL;
+
+	json_object_object_get_ex(response_obj, "signature",
+				  &signature_obj);
+	JSON_CHECK_OBJ(signature_obj, json_type_string, rc, -EIO,
+		       "Failed to get the response signature", verbose, out);
+
+	json_object_get(signature_obj); /* Take ownership */
+	json_object_object_del(response_obj, "signature");
+
+	sign_payload = json_object_to_json_string_ext(response_obj,
+					JSON_C_TO_STRING_PLAIN |
+					JSON_C_TO_STRING_NOSLASHESCAPE);
+	if (sign_payload == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	if (verbose) {
+		pr_verbose(verbose, "JWS Payload: ->%s<-", sign_payload);
+		pr_verbose(verbose, "Public signing key:");
+		b = BIO_new_fp(stderr, BIO_NOCLOSE);
+		PEM_write_bio_PUBKEY(b, server_pubkey);
+		BIO_free(b);
+	}
+
+	rc = verify_json_web_signature(json_object_get_string(signature_obj),
+				       (const unsigned char *)sign_payload,
+				       strlen(sign_payload), server_pubkey);
+	if (rc != 0) {
+		pr_verbose(verbose, "Signature verify of response failed");
+		goto out;
+	}
+
+	pr_verbose(verbose, "Signature of response successfully verified");
+
+out:
+	if (signature_obj != NULL)
+		json_object_put(signature_obj);
+
+	return rc;
+}
+
+/**
+ * Import the key retrieved from EKMFWeb.
+ */
+static int _ekmf_import_key(unsigned char *req_sess_key,
+			    size_t req_sess_key_length,
+			    unsigned char *req_party_info,
+			    size_t req_party_info_length,
+			    unsigned char *resp_party_info,
+			    size_t resp_party_info_length,
+			    json_object *resp_sess_jwk_obj,
+			    json_object *resp_exp_jwk_obj,
+			    unsigned char *key_blob, size_t *key_blob_length,
+			    const struct ekmf_ext_lib *ext_lib, bool verbose)
+{
+	size_t resp_sess_ec_key_length, resp_exported_key_length;
+	unsigned char resp_exported_key[MAX_SYM_KEY_BLOB_SIZE];
+	unsigned char transport_key[MAX_SYM_KEY_BLOB_SIZE];
+	unsigned char resp_sess_key[MAX_KEY_BLOB_SIZE];
+	size_t party_info_length, transport_key_length;
+	unsigned char *party_info = NULL;
+	int rc;
+
+	party_info_length = req_party_info_length + resp_party_info_length;
+	party_info = malloc(party_info_length);
+	if (party_info == NULL) {
+		pr_verbose(verbose, "Failed to allocate memory");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	memcpy(party_info, req_party_info, req_party_info_length);
+	memcpy(party_info + req_party_info_length, resp_party_info,
+	       resp_party_info_length);
+
+	switch (ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		resp_sess_ec_key_length = sizeof(resp_sess_key);
+		rc = cca_import_key_from_json_web_key(ext_lib->cca,
+						      resp_sess_jwk_obj,
+						      resp_sess_key,
+						      &resp_sess_ec_key_length,
+						      verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to import the session EC "
+				   "key");
+			goto out;
+		}
+
+		transport_key_length = sizeof(transport_key);
+		rc = cca_ec_dh_derive_importer(ext_lib->cca,
+					       req_sess_key,
+					       req_sess_key_length,
+					       resp_sess_key,
+					       resp_sess_ec_key_length,
+					       party_info, party_info_length,
+					       CCA_KDF_ANS_X9_63_CCA,
+					       transport_key,
+					       &transport_key_length,
+					       verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to derive transport key");
+			goto out;
+		}
+
+		resp_exported_key_length = sizeof(resp_exported_key);
+		rc = cca_import_key_from_json_web_key(ext_lib->cca,
+						      resp_exp_jwk_obj,
+						      resp_exported_key,
+						      &resp_exported_key_length,
+						      verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to import the exported "
+				   "key");
+			goto out;
+		}
+
+		rc = cca_import_external_key(ext_lib->cca, resp_exported_key,
+					     resp_exported_key_length,
+					     transport_key,
+					     transport_key_length,
+					     key_blob, key_blob_length,
+					     verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to unwrap the exported "
+				   "key with the transport key");
+			goto out;
+		}
+
+		break;
+	default:
+		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
+		return -EINVAL;
+	}
+
+out:
+	if (party_info != NULL)
+		free(party_info);
+
+	return rc;
+}
+
+/**
+ * Requests a key to be retrieved from EKMFweb and imported under the current
+ * HSM's master key.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to retrieve
+ * @param sess_ec_curve_nid The OpenSSL nid of the EC curve used for the session
+ *                          ECC key. If 0, then the default curve is used.
+ * @param sign_rsa_digest_nid The OpenSSL nid of a digest used to sign the
+ *                          request with if the identity key is an RSA-type key.
+ *                          If 0, then the default digest is used.
+ *                          Ignored for ECC-type identity keys.
+ * @param use_rsa_pss       If true, and the identity key is an RSA-type key,
+ *                          use RSA-PSS to sign the request.
+ * @param signature_kid     the Key ID for the signature of the request
+ * @param key_blob          a buffer to store the retrieved key blob to
+ * @param key_blob_length   On entry: the size ofthe buffer
+ *                          On return: the size of the key blob retrieved
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          retrieve the key
+ */
+int ekmf_retrieve_key(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *key_uuid, int sess_ec_curve_nid,
+		      int sign_rsa_digest_nid, bool use_rsa_pss,
+		      const char *signature_kid, unsigned char *key_blob,
+		      size_t *key_blob_length, char **error_msg,
+		      const struct ekmf_ext_lib *ext_lib, bool verbose)
+{
+	size_t req_party_info_length, resp_party_info_length;
+	unsigned char req_party_info[SHA512_DIGEST_LENGTH];
+	size_t req_sess_ec_key_length, identity_key_length;
+	unsigned char req_sess_ec_key[MAX_KEY_BLOB_SIZE];
+	unsigned char identity_key[MAX_KEY_BLOB_SIZE];
+	json_object *resp_originator_obj = NULL;
+	json_object *resp_addl_info_obj = NULL;
+	json_object *req_party_info_obj = NULL;
+	json_object *req_originator_obj = NULL;
+	json_object *req_timestamp_obj = NULL;
+	json_object *req_addl_info_obj = NULL;
+	json_object *req_signature_obj = NULL;
+	unsigned char *resp_party_info = NULL;
+	json_object *resp_sess_jwk_obj = NULL;
+	json_object *req_sess_jwk_obj = NULL;
+	json_object *resp_exp_jwk_obj = NULL;
+	json_object *response_obj = NULL;
+	json_object *request_obj = NULL;
+	EVP_PKEY *server_pubkey = NULL;
+	char *escaped_uuid = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	long status_code;
+	char *uri = NULL;
+	int rc;
+
+	if (config == NULL || key_uuid == NULL || key_blob == NULL ||
+	    key_blob_length == NULL || ext_lib == NULL)
+		return -EINVAL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = read_public_key(config->ekmf_server_pubkey, &server_pubkey);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to read EKMFWeb server's public key"
+			   " '%s': %s", config->ekmf_server_pubkey,
+			   strerror(-rc));
+		goto out;
+	}
+
+	identity_key_length = sizeof(identity_key);
+	rc = read_key_blob(config->identity_secure_key, identity_key,
+			   &identity_key_length);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to read identity key from file "
+			   "'%s': %s", config->identity_secure_key,
+			   strerror(-rc));
+		goto out;
+	}
+
+	switch (ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		req_sess_ec_key_length = sizeof(req_sess_ec_key);
+		rc = cca_generate_ecc_key_pair(ext_lib->cca,
+					       sess_ec_curve_nid != 0 ?
+						  sess_ec_curve_nid :
+						  DEFAULT_SESSION_EC_KEY_CURVE,
+					       req_sess_ec_key,
+					       &req_sess_ec_key_length,
+					       verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to generate a session EC "
+				   "key");
+			goto out;
+		}
+
+		rc = cca_get_ecc_pub_key_as_json_web_key(req_sess_ec_key,
+							 req_sess_ec_key_length,
+							 &req_sess_jwk_obj,
+							 verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to generate session JWK");
+			goto out;
+		}
+		break;
+	default:
+		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
+		return -EINVAL;
+	}
+
+	req_timestamp_obj = get_json_timestamp();
+	JSON_CHECK_ERROR(req_timestamp_obj == NULL, rc, -EIO,
+			 "Failed to generate timestamp", verbose, out);
+
+	req_party_info_length = sizeof(req_party_info);
+	rc = _ekmf_build_party_info(key_uuid,
+				    json_object_get_string(req_timestamp_obj),
+				    NID_sha256, req_party_info,
+				    &req_party_info_length,
+				    &req_party_info_obj, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build the party info");
+		goto out;
+	}
+
+	/*
+	 * Note: The order of the fields is important, EKMFWeb expects it in
+	 * exactly this order!
+	 */
+	req_addl_info_obj = json_object_new_object();
+	JSON_CHECK_ERROR(req_addl_info_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+
+	rc = json_object_object_add_ex(req_addl_info_obj, "kdf",
+				       json_object_new_string("ANS-X9.63-CCA"),
+				       0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	rc = json_object_object_add_ex(req_addl_info_obj, "requestedKey",
+				       json_object_new_string(key_uuid), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	rc = json_object_object_add_ex(req_addl_info_obj, "timestamp",
+				       req_timestamp_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	req_timestamp_obj = NULL;
+
+	req_originator_obj = json_object_new_object();
+	JSON_CHECK_ERROR(req_originator_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+
+	rc = json_object_object_add_ex(req_originator_obj, "session",
+				       req_sess_jwk_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	req_sess_jwk_obj = NULL;
+	rc = json_object_object_add_ex(req_originator_obj, "partyInfo",
+				       req_party_info_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	req_party_info_obj = NULL;
+
+	request_obj = json_object_new_object();
+	JSON_CHECK_ERROR(request_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+
+	rc = json_object_object_add_ex(request_obj, "originator",
+				       req_originator_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	req_originator_obj = NULL;
+	rc = json_object_object_add_ex(request_obj, "additionalInfo",
+				       req_addl_info_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	req_addl_info_obj = NULL;
+
+	rc = _ekmf_build_signature(identity_key, identity_key_length,
+				   request_obj, &req_signature_obj,
+				   sign_rsa_digest_nid, use_rsa_pss,
+				   signature_kid, ext_lib, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build the signature");
+		goto out;
+	}
+
+	rc = json_object_object_add_ex(request_obj, "signature",
+				       req_signature_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	req_signature_obj = NULL;
+
+	escaped_uuid = curl_easy_escape(curl, key_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the key uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_KEYS_EXPORT, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, uri, "POST", request_obj, NULL,
+				   login_token, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	case 404:
+		pr_verbose(verbose, "Not found");
+		rc = -ENOENT;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EBADMSG,
+		       "No or invalid response", verbose, out);
+
+	rc = _ekmf_verify_signature(response_obj, server_pubkey, verbose);
+	if (rc != 0)
+		goto out;
+
+	json_object_object_get_ex(response_obj, "originator",
+				  &resp_originator_obj);
+	JSON_CHECK_OBJ(resp_originator_obj, json_type_object, rc, -EBADMSG,
+		       "Failed to get the response originator", verbose, out);
+
+	json_object_object_get_ex(resp_originator_obj, "session",
+				  &resp_sess_jwk_obj);
+	JSON_CHECK_OBJ(resp_sess_jwk_obj, json_type_object, rc, -EBADMSG,
+		       "Failed to get the response session key", verbose, out);
+
+	rc = json_object_get_base64url(resp_originator_obj, "partyInfo",
+				       NULL, &resp_party_info_length);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the response partyInfo");
+		goto out;
+	}
+
+	resp_party_info = malloc(resp_party_info_length);
+	if (resp_party_info == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = json_object_get_base64url(resp_originator_obj, "partyInfo",
+				       resp_party_info,
+				       &resp_party_info_length);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the response partyInfo");
+		goto out;
+	}
+
+	json_object_object_get_ex(response_obj, "additionalInfo",
+				  &resp_addl_info_obj);
+	JSON_CHECK_OBJ(resp_addl_info_obj, json_type_object, rc, -EBADMSG,
+		       "Failed to get the response addl.info", verbose, out);
+
+	json_object_object_get_ex(resp_addl_info_obj, "exportedKey",
+				  &resp_exp_jwk_obj);
+	JSON_CHECK_OBJ(resp_exp_jwk_obj, json_type_object, rc, -EBADMSG,
+		       "Failed to get the response exported key", verbose, out);
+
+	rc = _ekmf_import_key(req_sess_ec_key, req_sess_ec_key_length,
+			      req_party_info, req_party_info_length,
+			      resp_party_info, resp_party_info_length,
+			      resp_sess_jwk_obj, resp_exp_jwk_obj,
+			      key_blob, key_blob_length, ext_lib, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to import the retrieved key");
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (req_sess_jwk_obj != NULL)
+		json_object_put(req_sess_jwk_obj);
+	if (req_timestamp_obj != NULL)
+		json_object_put(req_timestamp_obj);
+	if (req_addl_info_obj != NULL)
+		json_object_put(req_addl_info_obj);
+	if (req_party_info_obj != NULL)
+		json_object_put(req_party_info_obj);
+	if (req_originator_obj != NULL)
+		json_object_put(req_originator_obj);
+	if (req_signature_obj != NULL)
+		json_object_put(req_signature_obj);
+	if (request_obj != NULL)
+		json_object_put(request_obj);
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (uri != NULL)
+		free(uri);
+	if (login_token != NULL)
+		free(login_token);
+	if (server_pubkey != NULL)
+		EVP_PKEY_free(server_pubkey);
+	if (resp_party_info != NULL)
+		free(resp_party_info);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+
+	return rc;
+}
+
+/**
  * Generate a secure identity key used to identify the client to EKMFWeb.
  * The secure key blob is stored in a file specified in field
  * identity_secure_key of the config structure. If an secure key already exists
@@ -1297,11 +2278,6 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 
 	return 0;
 }
-
-struct private_data {
-	const struct ekmf_ext_lib *ext_lib;
-	bool verbose;
-};
 
 /**
  * Wrapper for the RSA sign callback to route the call to the selected
@@ -1972,6 +2948,19 @@ out:
 		EVP_PKEY_free(pkey);
 
 	return rc;
+}
+
+/**
+ * Close the connection to the EKMFWeb server by destroying the CURL handle.
+ *
+ * @param curl_handle       the CURL handle to destroy
+ */
+void ekmf_curl_destroy(CURL *curl_handle)
+{
+	if (curl_handle == NULL)
+		return;
+
+	curl_easy_cleanup(curl_handle);
 }
 
 /**

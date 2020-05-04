@@ -31,6 +31,16 @@ int parse_json_web_token(const char *token, json_object **header_obj,
 			 json_object **payload_obj, unsigned char **signature,
 			 size_t *signature_len);
 
+int create_json_web_signature(const char *algorithm, bool b64, const char *kid,
+			      const unsigned char *payload, size_t payload_len,
+			      bool detached_payload, EVP_MD_CTX *md_ctx,
+			      char **jws);
+
+int verify_json_web_signature(const char *jws, const unsigned char *payload,
+			      size_t payload_len, EVP_PKEY *pkey);
+
+json_object *get_json_timestamp(void);
+
 size_t ecc_get_curve_prime_bits(int curve_nid);
 size_t ecc_get_curve_prime_length(int curve_nid);
 const char *ecc_get_curve_id(int curve_nid);
@@ -51,6 +61,8 @@ int rsa_pub_key_as_pkey(const unsigned char *modulus, size_t modulus_length,
 			const unsigned char *pub_exp, size_t pub_exp_length,
 			int pkey_type, EVP_PKEY **pkey);
 
+int json_web_key_as_pkey(json_object *jwk, int pkey_type, EVP_PKEY **pkey);
+
 int write_key_blob(const char *filename, unsigned char *key_blob,
 		   size_t key_blob_len);
 
@@ -62,6 +74,10 @@ int read_x509_certificate(const char *pem_filename, X509 **cert);
 int write_x509_certificate(const char *pem_filename, X509 *cert);
 
 int write_x509_request(const char *pem_filename, X509_REQ *req, bool new_hdr);
+
+int read_public_key(const char *pem_filename, EVP_PKEY **pkey);
+
+int write_public_key(const char *pem_filename, EVP_PKEY *pkey);
 
 typedef int (*rsa_sign_t)(const unsigned char *key_blob, size_t key_blob_length,
 			  unsigned char *sig, size_t *siglen,
@@ -103,5 +119,21 @@ int build_certificate_extensions(X509 *cert, X509_REQ *req,
 				 const STACK_OF(X509_EXTENSION) *addl_exts);
 
 int generate_x509_serial_number(X509 *cert, size_t sn_bit_size);
+
+const char *json_get_string(json_object *obj, const char *name);
+
+int json_object_get_base64url(json_object *obj, const char *name,
+			      unsigned char *data, size_t *data_len);
+
+json_object *json_object_new_base64url(const unsigned char *data, size_t len);
+
+#ifndef JSON_C_OBJECT_ADD_KEY_IS_NEW
+#define JSON_C_OBJECT_ADD_KEY_IS_NEW (1 << 1)
+#define IMPLEMENT_LOCAL_JSON_OBJECT_OBJECT_ADD
+
+int json_object_object_add_ex(struct json_object *obj, const char *const key,
+			      struct json_object *const val,
+			      const unsigned int opts);
+#endif
 
 #endif
