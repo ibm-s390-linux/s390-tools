@@ -47,6 +47,7 @@ List of all individuals having contributed content to s390-tools
 - Jan Glauber
 - Jan Hoeppner
 - Jan Willeke
+- Jason J. Herne
 - Javier Martinez Canillas
 - Jean-Baptiste Joret
 - Jens Remus
@@ -58,6 +59,7 @@ List of all individuals having contributed content to s390-tools
 - Lakhvich Dmitriy
 - Marc Hartmayer
 - Mark Dettinger
+- Mark Post
 - Martin Kammerer
 - Martin Peschke
 - Martin Petermann
@@ -69,6 +71,7 @@ List of all individuals having contributed content to s390-tools
 - Michael Mueller
 - Mijo Safradin
 - Mikhail Zaslonko
+- Niklas Schnelle
 - Peter Oberparleiter
 - Peter Tiedemann
 - Philipp Kern

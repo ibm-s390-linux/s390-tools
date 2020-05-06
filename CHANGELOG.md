@@ -1,13 +1,32 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.12.x (20xx-xx-xx)__
+* __v2.13.0 (2020-05-06)__
 
-  For Linux kernel version: 5.x
+  For Linux kernel version: 5.5 / 5.6
+
+  Add new tool:
+  - genprotimg: Add genprotimg to create protected virtualization images
+  - genprotimg: Add sample script to verify host keys
 
   Changes of existing tools:
   - dbginfo: Gather bridge related data (using 'bridge')
+  - dbginfo: Removed collection of /var/log/opencryptoki/
+  - dbginfo: collect softnet_stat
+  - dbginfo: gather ethtool output for per-queue coalescing
+  - ipl_tools: Support clear attribute for FCP and CCW re-IPL
+  - zdev: Report FC Endpoint Security of zfcp devices
+  - zdev/dracut/95zdev/module-setup.sh: Add ctcm kernel module
+  - cpumf/data: Add new deflate counters for IBM z15
+  - zkey: Add support for EP11 secure keys
+  - zpcictl: Initiate recover after reset
+  - zipl: Add support for NVMe devices
+  - zipl: A multitude of code and stability improvements
 
   Bug Fixes:
+  - zipl: Prevent endless loop during IPL
+  - zipl/libc: Fix potential buffer overflow in printf
+  - zkey: Fix listing of keys on file systems reporting DT_UNKNOWN
+  - zkey: Fix display of clear key size for XTS, CCA-AESCIPHER, and EP11-AES XTS keys
 
 
 * __v2.12.0 (2019-12-17)__
