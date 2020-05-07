@@ -41,6 +41,20 @@ int verify_json_web_signature(const char *jws, const unsigned char *payload,
 
 json_object *get_json_timestamp(void);
 
+int json_build_tag_def_list(json_object *array,
+			    struct ekmf_tag_def_list *tag_def_list,
+			    bool copy);
+int clone_tag_def_list(const struct ekmf_tag_def_list *src,
+		       struct ekmf_tag_def_list *dest);
+void free_tag_def_list(struct ekmf_tag_def_list *tag_def_list, bool free_tags);
+
+int json_build_template_info(json_object *obj,
+			     struct ekmf_template_info *template,
+			     bool copy);
+int clone_template_info(const struct ekmf_template_info *src,
+			struct ekmf_template_info *dest);
+void free_template_info(struct ekmf_template_info *template);
+
 size_t ecc_get_curve_prime_bits(int curve_nid);
 size_t ecc_get_curve_prime_length(int curve_nid);
 const char *ecc_get_curve_id(int curve_nid);

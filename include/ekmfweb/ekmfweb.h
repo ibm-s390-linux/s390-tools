@@ -421,6 +421,197 @@ int ekmf_retrieve_key(const struct ekmf_config *config, CURL **curl_handle,
 		      size_t *key_blob_length, char **error_msg,
 		      const struct ekmf_ext_lib *ext_lib, bool verbose);
 
+struct ekmf_tag_definition {
+	/** name of the tag */
+	const char *name;
+	/** Optional: description of the tag (can be NULL) */
+	const char *description;
+};
+
+struct ekmf_tag_def_list {
+	/** array of tag definitions */
+	struct ekmf_tag_definition *tag_defs;
+	/** number of tag definitions in array above */
+	size_t num_tag_defs;
+};
+
+struct ekmf_template_info {
+	/** name of the template */
+	const char *name;
+	/** UUID of the template */
+	const char *uuid;
+	/** type of the keys generated with this template , e.g. CIPHER */
+	const char *key_type;
+	/** algorithm of the keys generated with this template, e.g. AES */
+	const char *algorithm;
+	/** bit size of the keys generated with this template */
+	size_t key_size;
+	/** state of the template , e.g. ACTIVE */
+	const char *state;
+	/** state of the keys generated with this template , e.g. ACTIVE */
+	const char *key_state;
+	/** label template when generating keys with this template */
+	const char *label_template;
+	/** label tag definition list */
+	struct ekmf_tag_def_list label_tags;
+	/** true if keys generated with this template can be exported */
+	bool export_allowed;
+	/** the keystore type of the keys generated with this template */
+	const char *keystore_type;
+	/** Type of ECC curve, e.g. PRIME_CURVE (for algorithm = ECC) */
+	const char *curve;
+	/** timestamp when the template was created */
+	const char *created_on;
+	/** timestamp when the template was updated */
+	const char *updated_on;
+};
+
+/**
+ * Callback function used with the ekmf_list_templates function. This
+ * callback is called for each template found.
+ *
+ * @param curl_handle      a CURL handle that can be used to perform further
+ *                         EKMFWeb functions within the callback.
+ * @param template_info    a struct containing information about the template.
+ *                         If any of the information needs to be kept, then the
+ *                         callback function must make a copy of the
+ *                         information. The memory holding the information
+ *                         passed to the callback is no longer valid after the
+ *                         callback has returned.
+ * @param private          the private pointer that was specified with the
+ *                         ekmf_list_templates invocation.
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ * When a nonzero return code is returned, the template listing process stops,
+ * and ekmf_list_templates returns the return code from the callback.
+ */
+typedef int (*ekmf_template_cb_t)(CURL *curl_handle,
+				  struct ekmf_template_info *template_info,
+				  void *private);
+
+/**
+ * List available key templates. Only templates in state ACTIVE, with key
+ * algorithm AES and keystore type PERVASIVE_ENCRYPTION are listed. The
+ * templates are ordered by name in ascending order.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template_cb       a callback function that is called for each template
+ *                          found
+ * @param private           a pointer that is passed as-is to the callback
+ * @param name_pattern      a pattern to filter by name, or NULL to list all.
+ * @param state             the state of the templates to list. If NULL then
+ *                          templates in state 'ACTIVE' are listed
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          list the templates
+ */
+int ekmf_list_templates(const struct ekmf_config *config, CURL **curl_handle,
+			ekmf_template_cb_t template_cb, void *private,
+			const char *name_pattern, const char *state,
+			char **error_msg, bool verbose);
+
+/**
+ * Get a template by its UUID.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template_uuid     the UUID of the template to get
+ * @param template          an address of a template info pointer. On return
+ *                          the pointer is updated to point to a newly allocated
+ *                          template info struct. It must be freed by the caller
+ *                          using ekmf_free_template_info when no longer needed.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          get the template
+ */
+int ekmf_get_template(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *template_uuid,
+		      struct ekmf_template_info **template, char **error_msg,
+		      bool verbose);
+
+/**
+ * Get the last used sequence number of a template by its UUID.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template_uuid     the UUID of the template to get
+ * @param seqNumber         On return: the last used sequence number of this
+ *                          template.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          get the template
+ */
+int ekmf_get_last_seq_no(const struct ekmf_config *config, CURL **curl_handle,
+			 const char *template_uuid, unsigned int *seqNumber,
+			 char **error_msg, bool verbose);
+
+/**
+ * Clones a template info structure by making a deep copy of all strings and
+ * arrays.
+ * The copied template info must be freed using ekmf_free_template_info() by
+ * the caller.
+ *
+ * @param src               the source template info structure
+ * @param dest              the destination template info structure
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int ekmf_clone_template_info(const struct ekmf_template_info *src,
+			     struct ekmf_template_info **dest);
+
+/**
+ * Free a template info structure.
+ *
+ * @param template          the template to free
+ */
+void ekmf_free_template_info(struct ekmf_template_info *template);
+
 /**
  * Close the connection to the EKMFWeb server by destroying the CURL handle.
  *

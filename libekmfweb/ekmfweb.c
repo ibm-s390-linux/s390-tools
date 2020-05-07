@@ -44,6 +44,18 @@
 
 #define EKMF_URI_SYSTEM_PUBKEY		"/api/v1/system/publicKey"
 #define EKMF_URI_KEYS_EXPORT		"/api/v1/keys/%s/export"
+#define EKMF_URI_TEMPLATE_GET		"/api/v1/templates/%s"
+#define EKMF_URI_TEMPLATE_LIST		"/api/v1/templates"		\
+					"?templateStates=%s"		\
+					"&orderBy=%s"			\
+					"&namePattern=%s"
+#define EKMF_URI_TEMPLATE_SEQNO		"/api/v1/templates/%s/sequenceNumber"
+
+#define LIST_ELEMENTS_PER_PAGE		20
+#define TEMPLATE_STATE_ACTIVE		"ACTIVE"
+#define KEY_ALGORITHM_AES		"AES"
+#define KEYSTORE_TYPE_PERV_ENCR		"PERVASIVE_ENCRYPTION"
+#define ORDER_BY_NAME_ASC		"name%3Aasc"
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -2116,6 +2128,601 @@ out:
 		curl_free(escaped_uuid);
 
 	return rc;
+}
+
+/**
+ * Callback function for the _ekmf_list_request function. This callback
+ * is called for each result element. The curl handle can be used to perform
+ * further requests within the callback. However, the curl handle must not be
+ * closed/destroyed!
+ */
+typedef int (*ekmf_element_cb_t)(CURL *curl, json_object *element,
+				 void *private, bool verbose);
+
+/**
+ * Performs a list request (GET) on a base list_uri and iterates over
+ * multiple pages. The response of a list request is expected to be a
+ * JSON array of elements. For each element, the element callback is called
+ * with the element.
+ * The list_uri must contain anything required to list the desired objects,
+ * except the page and perPage UTL parameters. Those are added by this function.
+ */
+static int _ekmf_list_request(const struct ekmf_config *config,
+			      const char *list_uri, CURL *curl,
+			      ekmf_element_cb_t element_cb, void *private,
+			      const char *login_token, char **error_msg,
+			      bool verbose)
+{
+	json_object *response_obj = NULL;
+	json_object *element_obj;
+	int num, i, rc = 0;
+	unsigned int page;
+	char *uri = NULL;
+	long status_code;
+	bool has_query;
+
+	if (config == NULL || list_uri == NULL || element_cb == NULL ||
+	    curl == NULL)
+		return -EINVAL;
+
+	has_query = strchr(list_uri, '?') != NULL;
+
+	for (page = 1; ; page++) {
+		if (asprintf(&uri, "%s%sperPage=%u&page=%u", list_uri,
+			     has_query ? "&" : "?", LIST_ELEMENTS_PER_PAGE,
+			     page) < 0) {
+			pr_verbose(verbose, "asprintf failed");
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = _ekmf_perform_request(config, uri, "GET", NULL, NULL,
+					   login_token, &response_obj, NULL,
+					   &status_code, error_msg, curl,
+					   verbose);
+
+		free(uri);
+		uri = NULL;
+
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed perform the REST call");
+			if (rc > 0)
+				rc = -EIO;
+			goto out;
+		}
+
+		switch (status_code) {
+		case 200:
+			break;
+		case 400:
+			pr_verbose(verbose, "Bad request");
+			rc = -EBADMSG;
+			goto out;
+		case 401:
+			pr_verbose(verbose, "Not authorized");
+			rc = -EACCES;
+			goto out;
+		case 403:
+			pr_verbose(verbose, "Insufficient permissions");
+			rc = -EPERM;
+			goto out;
+		default:
+			pr_verbose(verbose, "REST Call failed with HTTP "
+				   "status code: %ld", status_code);
+			rc = -EIO;
+			goto out;
+		}
+
+		JSON_CHECK_OBJ(response_obj, json_type_array, rc, -EIO,
+			       "No or invalid response content", verbose, out);
+
+		num = json_object_array_length(response_obj);
+		if (num == 0)
+			break;
+
+		for (i = 0; i < num; i++) {
+			element_obj = json_object_array_get_idx(response_obj,
+								i);
+			if (element_obj == NULL) {
+				pr_verbose(verbose, "Failed to get array "
+					   "element for index %d", i);
+				rc = -EBADMSG;
+				goto out;
+			}
+
+			rc = element_cb(curl, element_obj, private, verbose);
+			if (rc != 0) {
+				pr_verbose(verbose, "Element-callback failed "
+					   "for index %d", i);
+				goto out;
+			}
+		}
+
+		if (response_obj != NULL)
+			json_object_put(response_obj);
+		response_obj = NULL;
+
+		if (num < LIST_ELEMENTS_PER_PAGE)
+			break;
+	}
+
+out:
+	if (uri != NULL)
+		free(uri);
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+
+	return rc;
+}
+
+struct ekmf_template_cb_data_t {
+	ekmf_template_cb_t template_cb;
+	void *cb_private;
+};
+
+/**
+ * Callback for template list function. Builds the template info structure
+ * and calls the application callback.
+ */
+static int _ekmf_template_cb(CURL *curl, json_object *element,
+			     void *private, bool verbose)
+{
+	struct ekmf_template_cb_data_t *cb_data = private;
+	struct ekmf_template_info template = { 0 };
+	int rc;
+
+	if (cb_data->template_cb == NULL) {
+		pr_verbose(verbose, "No template callback function");
+		return -EINVAL;
+	}
+
+	rc = json_build_template_info(element, &template, false);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build template info");
+		goto out;
+	}
+
+	rc = cb_data->template_cb(curl, &template, cb_data->cb_private);
+	if (rc != 0) {
+		pr_verbose(verbose, "Template callback rc: %d", rc);
+		goto out;
+	}
+
+out:
+	free_tag_def_list(&template.label_tags, false);
+
+	return rc;
+}
+
+/**
+ * List available key templates. Only templates in state ACTIVE, with key
+ * algorithm AES and keystore type PERVASIVE_ENCRYPTION are listed. The
+ * templates are ordered by name in ascending order.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template_cb       a callback function that is called for each template
+ *                          found
+ * @param private           a pointer that is passed as-is to the callback
+ * @param name_pattern      a pattern to filter by name, or NULL to list all.
+ * @param state             the state of the templates to list. If NULL then
+ *                          templates in state 'ACTIVE' are listed
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          list the templates
+ */
+int ekmf_list_templates(const struct ekmf_config *config, CURL **curl_handle,
+			ekmf_template_cb_t template_cb, void *private,
+			const char *name_pattern, const char *state,
+			char **error_msg, bool verbose)
+{
+	struct ekmf_template_cb_data_t cb_data;
+	char *escaped_name_pattern = NULL;
+	char *escaped_state = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	char *uri = NULL;
+	int rc;
+
+	if (config == NULL || template_cb == NULL)
+		return -EINVAL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	cb_data.template_cb = template_cb;
+	cb_data.cb_private = private;
+
+	escaped_name_pattern = curl_easy_escape(curl, name_pattern != NULL ?
+							name_pattern : "*", 0);
+	if (escaped_name_pattern == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the name pattern");
+		rc = -EIO;
+		goto out;
+	}
+
+	escaped_state = curl_easy_escape(curl, state != NULL ? state :
+						TEMPLATE_STATE_ACTIVE, 0);
+	if (escaped_state == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the state");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_TEMPLATE_LIST, escaped_state,
+		     ORDER_BY_NAME_ASC, escaped_name_pattern) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_list_request(config, uri, curl, _ekmf_template_cb,
+				&cb_data, login_token, error_msg, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to perform the list request");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (login_token != NULL)
+		free(login_token);
+	if (uri != NULL)
+		free(uri);
+	if (escaped_name_pattern != NULL)
+		curl_free(escaped_name_pattern);
+	if (escaped_state != NULL)
+		curl_free(escaped_state);
+
+	return rc;
+}
+
+/**
+ * Get a template by its UUID.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template_uuid     the UUID of the template to get
+ * @param template          an address of a template info pointer. On return
+ *                          the pointer is updated to point to a newly allocated
+ *                          template info struct. It must be freed by the caller
+ *                          using ekmf_free_template_info when no longer needed.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          get the template
+ */
+int ekmf_get_template(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *template_uuid,
+		      struct ekmf_template_info **template, char **error_msg,
+		      bool verbose)
+{
+	json_object *response_obj = NULL;
+	char *escaped_uuid = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	char *uri = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || template_uuid == NULL || template == NULL)
+		return -EINVAL;
+
+	*template = NULL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	escaped_uuid = curl_easy_escape(curl, template_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the template uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_TEMPLATE_GET, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, uri, "GET", NULL, NULL,
+				   login_token, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	case 404:
+		pr_verbose(verbose, "Not found");
+		rc = -ENOENT;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EBADMSG,
+		       "No or invalid response", verbose, out);
+
+	*template = calloc(1, sizeof(struct ekmf_template_info));
+	if (*template == NULL) {
+		pr_verbose(verbose, "calloc failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = json_build_template_info(response_obj, *template, true);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build template info");
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (uri != NULL)
+		free(uri);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+	if (rc != 0 && *template != NULL) {
+		free_template_info(*template);
+		free(*template);
+		*template = NULL;
+	}
+
+	return rc;
+}
+
+/**
+ * Get the last used sequence number of a template by its UUID.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template_uuid     the UUID of the template to get
+ * @param seqNumber         On return: the last used sequence number of this
+ *                          template.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          get the template
+ */
+int ekmf_get_last_seq_no(const struct ekmf_config *config, CURL **curl_handle,
+			 const char *template_uuid, unsigned int *seqNumber,
+			 char **error_msg, bool verbose)
+{
+	json_object *response_obj = NULL, *field = NULL;
+	char *escaped_uuid = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	char *uri = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || template_uuid == NULL || seqNumber == NULL)
+		return -EINVAL;
+
+	*seqNumber = 0;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	escaped_uuid = curl_easy_escape(curl, template_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the template uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_TEMPLATE_SEQNO, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, uri, "GET", NULL, NULL,
+				   login_token, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	case 404:
+		pr_verbose(verbose, "Not found");
+		rc = -ENOENT;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EBADMSG,
+		       "No or invalid response", verbose, out);
+
+	json_object_object_get_ex(response_obj, "lastSequenceNumber", &field);
+	JSON_CHECK_OBJ(field, json_type_int, rc, -EBADMSG,
+		       "Invalid response", verbose, out);
+
+	*seqNumber = json_object_get_int(field);
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (uri != NULL)
+		free(uri);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+
+	return rc;
+}
+
+/**
+ * Clones a template info structure by making a deep copy of all strings and
+ * arrays.
+ * The copied template info must be freed using ekmf_free_template_info() by
+ * the caller.
+ *
+ * @param src               the source template info structure
+ * @param dest              the destination template info structure
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int ekmf_clone_template_info(const struct ekmf_template_info *src,
+			     struct ekmf_template_info **dest)
+{
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	*dest = calloc(1, sizeof(struct ekmf_template_info));
+	if (*dest == NULL)
+		return -ENOMEM;
+
+	return clone_template_info(src, *dest);
+}
+
+/**
+ * Free a template info structure.
+ *
+ * @param template          the template to free
+ */
+void ekmf_free_template_info(struct ekmf_template_info *template)
+{
+	free_template_info(template);
+
+	free(template);
 }
 
 /**

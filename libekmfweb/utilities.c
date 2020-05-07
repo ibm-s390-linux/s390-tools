@@ -912,6 +912,298 @@ json_object *get_json_timestamp(void)
 	return json_object_new_string(timestamp);
 }
 
+/**
+ * If copy is true, returns a copy of str (via strdup), else returns str itself.
+ * If str is NULL, then NULL is returned.
+ */
+static char *cond_strdup(const char *str, bool copy)
+{
+	if (str == NULL)
+		return NULL;
+
+	if (copy)
+		return strdup(str);
+	else
+		return (char *)str;
+}
+
+/**
+ * Builds a list of tag definitions from a JSON array.
+ *
+ * @param array             a JSON array of tag definitions
+ * @param tag_def_list      the tag definition list to build
+ * @param copy              if true, the string values are copied (via strdup),
+ *                          if false, the string values re-use the JSON object's
+ *                          string buffer (see json_object_get_string).
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int json_build_tag_def_list(json_object *array,
+			    struct ekmf_tag_def_list *tag_def_list,
+			    bool copy)
+{
+	const char *descr;
+	json_object *obj;
+	int rc = 0;
+	size_t i;
+
+	if (array == NULL || tag_def_list == NULL ||
+	    !json_object_is_type(array, json_type_array))
+		return -EINVAL;
+
+	tag_def_list->num_tag_defs = json_object_array_length(array);
+	tag_def_list->tag_defs = calloc(tag_def_list->num_tag_defs,
+					sizeof(struct ekmf_tag_definition));
+	if (tag_def_list->tag_defs == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < tag_def_list->num_tag_defs; i++) {
+		obj =  json_object_array_get_idx(array, i);
+		if (obj == NULL) {
+			rc = -EBADMSG;
+			goto out;
+		}
+
+		tag_def_list->tag_defs[i].name = cond_strdup(
+				json_get_string(obj, "name"), copy);
+		if (tag_def_list->tag_defs[i].name == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		descr = json_get_string(obj, "description");
+		if (descr != NULL) {
+			tag_def_list->tag_defs[i].description =
+						cond_strdup(descr, copy);
+			if (tag_def_list->tag_defs[i].description == NULL) {
+				rc = -ENOMEM;
+				goto out;
+			}
+		}
+	}
+
+out:
+	if (rc != 0)
+		free_tag_def_list(tag_def_list, copy);
+
+	return rc;
+}
+
+/**
+ * Clones (copies) a tag definition list
+ *
+ * @param src               the source tag definition list
+ * @param dest              the destination tag definition list
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int clone_tag_def_list(const struct ekmf_tag_def_list *src,
+		       struct ekmf_tag_def_list *dest)
+{
+	int rc = 0;
+	size_t i;
+
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	dest->num_tag_defs = src->num_tag_defs;
+	dest->tag_defs = calloc(dest->num_tag_defs,
+					sizeof(struct ekmf_tag_definition));
+	if (dest->tag_defs == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < dest->num_tag_defs; i++) {
+		dest->tag_defs[i].name = cond_strdup(src->tag_defs[i].name,
+						     true);
+		if (dest->tag_defs[i].name == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+		if (src->tag_defs[i].description != NULL) {
+			dest->tag_defs[i].description =
+					strdup(src->tag_defs[i].description);
+			if (dest->tag_defs[i].description != NULL) {
+				rc = -ENOMEM;
+				goto out;
+			}
+		}
+	}
+
+out:
+	if (rc != 0)
+		free_tag_def_list(dest, true);
+	return rc;
+}
+
+/**
+ * Free a tag definition list
+ *
+ * @param tag_def_list      the tag definition list to free
+ * @param free_tags         if true, the tag name and description string s are
+ *                          freed, otherwise only the array is freed.
+ */
+void free_tag_def_list(struct ekmf_tag_def_list *tag_def_list, bool free_tags)
+{
+	size_t i;
+
+	if (tag_def_list == NULL || tag_def_list->tag_defs == NULL)
+		return;
+
+	for (i = 0; free_tags && i < tag_def_list->num_tag_defs; i++) {
+		free((char *)tag_def_list->tag_defs[i].name);
+		free((char *)tag_def_list->tag_defs[i].description);
+	}
+
+	free(tag_def_list->tag_defs);
+	tag_def_list->tag_defs = NULL;
+	tag_def_list->num_tag_defs = 0;
+}
+
+/**
+ * Builds a template info structure from a JSON object.
+ *
+ * @param obj               a JSON object containing the template info
+ * @param template          the template info struct build
+ * @param copy              if true, the string values are copied (via strdup),
+ *                          if false, the string values re-use the JSON object's
+ *                          string buffer (see json_object_get_string).
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int json_build_template_info(json_object *obj,
+			     struct ekmf_template_info *template,
+			     bool copy)
+{
+	json_object *field, *label_tags = NULL;
+	int rc;
+
+	if (obj == NULL || template == NULL ||
+	   !json_object_is_type(obj, json_type_object))
+		return -EINVAL;
+
+	template->name = cond_strdup(json_get_string(obj, "name"), copy);
+	template->uuid = cond_strdup(json_get_string(obj, "templateId"), copy);
+	template->key_type = cond_strdup(json_get_string(obj, "keyType"), copy);
+	template->algorithm = cond_strdup(json_get_string(obj, "algorithm"),
+					  copy);
+	if (json_object_object_get_ex(obj, "keyLength", &field) &&
+	    json_object_is_type(field, json_type_int))
+		template->key_size = json_object_get_int(field);
+	template->state = cond_strdup(json_get_string(obj, "templateState"),
+				      copy);
+	template->key_state = cond_strdup(json_get_string(obj, "keyState"),
+					  copy);
+	template->label_template = cond_strdup(json_get_string(obj,
+							"labelTemplate"), copy);
+	if (json_object_object_get_ex(obj, "exportAllowed", &field) &&
+	    json_object_is_type(field, json_type_boolean))
+		template->export_allowed = json_object_get_boolean(field);
+	template->keystore_type = cond_strdup(json_get_string(obj,
+							      "keystoreType"),
+					      copy);
+	template->curve = cond_strdup(json_get_string(obj, "curve"), copy);
+	template->created_on = cond_strdup(json_get_string(obj, "createdOn"),
+					   copy);
+	template->updated_on = cond_strdup(json_get_string(obj, "updatedOn"),
+					   copy);
+
+	if (template->name == NULL || template->uuid == NULL ||
+	    template->algorithm == NULL || template->label_template == NULL ||
+	    template->state == NULL || template->key_state == NULL ||
+	    template->keystore_type == NULL || template->created_on == NULL ||
+	    template->updated_on == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	json_object_object_get_ex(obj, "labelTags", &label_tags);
+	rc = json_build_tag_def_list(label_tags, &template->label_tags, copy);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (rc != 0) {
+		free_tag_def_list(&template->label_tags, copy);
+		if (copy)
+			free_template_info(template);
+	}
+
+	return rc;
+}
+
+/**
+ * Clones (copies) a template info structure
+ *
+ * @param src               the source template info structure
+ * @param dest              the destination template info structure
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int clone_template_info(const struct ekmf_template_info *src,
+			struct ekmf_template_info *dest)
+{
+	int rc;
+
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	dest->name = cond_strdup(src->name, true);
+	dest->uuid = cond_strdup(src->uuid, true);
+	dest->key_type = cond_strdup(src->key_type, true);
+	dest->algorithm = cond_strdup(src->algorithm, true);
+	dest->key_size = src->key_size;
+	dest->state = cond_strdup(src->state, true);
+	dest->key_state = cond_strdup(src->key_state, true);
+	dest->label_template = cond_strdup(src->label_template, true);
+	dest->export_allowed = src->export_allowed;
+	dest->keystore_type = cond_strdup(src->keystore_type, true);
+	dest->curve = cond_strdup(src->curve, true);
+	dest->created_on = cond_strdup(src->created_on, true);
+	dest->updated_on = cond_strdup(src->updated_on, true);
+	if (dest->name == NULL || dest->uuid == NULL ||
+	    dest->algorithm == NULL || dest->state == NULL ||
+	    dest->key_state == NULL || dest->label_template == NULL ||
+	    dest->keystore_type == NULL || dest->created_on == NULL ||
+	    dest->updated_on == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = clone_tag_def_list(&src->label_tags, &dest->label_tags);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (rc != 0)
+		free_template_info(dest);
+	return rc;
+}
+
+/**
+ * Free a template info structure
+ *
+ * @param template          the template to free
+ */
+void free_template_info(struct ekmf_template_info *template)
+{
+	if (template == NULL)
+		return;
+
+	free((char *)template->name);
+	free((char *)template->uuid);
+	free((char *)template->key_type);
+	free((char *)template->algorithm);
+	free((char *)template->state);
+	free((char *)template->key_state);
+	free((char *)template->label_template);
+	free((char *)template->keystore_type);
+	free((char *)template->curve);
+	free((char *)template->created_on);
+	free((char *)template->updated_on);
+
+	free_tag_def_list(&template->label_tags, true);
+}
+
 struct ecc_curve_info {
 	int curve_nid;
 	enum {
