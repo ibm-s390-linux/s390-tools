@@ -101,7 +101,7 @@ extract_body()
 
 verify_signature()
 {
-    # Assuming that the signature algorith is SHA512 with RSA
+    # Assuming that the signature algorithm is SHA512 with RSA
     openssl sha512 -verify $1 -signature $2 $3
 }
 
