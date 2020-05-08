@@ -1,11 +1,11 @@
 \" lscpumf.1
 .\"
 .\"
-.\" Copyright IBM Corp. 2014, 2017
+.\" Copyright IBM Corp. 2014, 2020
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\" ----------------------------------------------------------------------
-.TH lscpumf "1" "February 2014" "s390-tools" "CPU-MF management programs"
+.TH lscpumf "1" "May 2020" "s390-tools" "CPU-MF management programs"
 .
 .ds c \fBlscpumf\fP
 .
@@ -19,8 +19,8 @@ lscpumf \- display information about CPU-measurement facilities
 .RB [ \-i | \-\-info ]
 .br
 .B lscpumf
-.RB [ \-c | \-\-list\-counters ]
-.RB [ \-C | \-\-list\-all\-counters ]
+.RB [ \-c | \-\-list\-counters ] [ \-n ]
+.RB [ \-C | \-\-list\-all\-counters ] [ \-n ]
 .RB [ \-s | \-\-list\-sampling\-events ]
 .br
 .B lscpumf
@@ -46,12 +46,25 @@ facilities.
 Lists counters that are provided by the CPU-measurement facility, omitting
 counters for which the LPAR is not authorized. For counter measurements with
 the perf program, the raw event identifier is displayed.
+For linux version 5.5 and later the raw event identifier is
+displayed as <type>:<number>, where type is the number the CPU Measurement
+counter facility device driver was assigned to by the kernel.
+For earlier linux versions the raw event identifier is displayed as r<number>.
 .
 .TP
 .BR \-C ", " \-\-list\-all\-counters
 Lists all counters that are provided by the CPU-measurement counter facility,
 regardless of LPAR authorization. To list only those counters for which the
 LPAR is authorized, use the -c option.
+For linux version 5.5 and later the raw event identifier is
+displayed as <type>:<number>, where type is the number the CPU Measurement
+counter facility device driver was assigned to by the kernel.
+For earlier linux versions the raw event identifier is displayed as r<number>.
+.
+.TP
+.BR \-n ", " \-\-name
+.
+Display the counter name together with the raw event identifier.
 .
 .TP
 .BR \-s ", " \-\-list\-sampling\-events
