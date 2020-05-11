@@ -55,6 +55,27 @@ int clone_template_info(const struct ekmf_template_info *src,
 			struct ekmf_template_info *dest);
 void free_template_info(struct ekmf_template_info *template);
 
+int json_build_tag_list(json_object *array, struct ekmf_tag_list *tag_list,
+			bool copy);
+int clone_tag_list(const struct ekmf_tag_list *src,
+		   struct ekmf_tag_list *dest);
+void free_tag_list(struct ekmf_tag_list *tag_list, bool free_tags);
+
+int json_build_export_control(json_object *export_control,
+			      struct ekmf_export_control *export_info,
+			      bool copy);
+int clone_export_control(const struct ekmf_export_control *src,
+			 struct ekmf_export_control *dest);
+void free_export_control(struct ekmf_export_control *export_control,
+			 bool free_keys);
+
+int json_build_key_info(json_object *obj, json_object *custom_tags,
+			json_object *export_control,
+			struct ekmf_key_info *key, bool copy);
+int clone_key_info(const struct ekmf_key_info *src,
+		   struct ekmf_key_info *dest);
+void free_key_info(struct ekmf_key_info *key);
+
 size_t ecc_get_curve_prime_bits(int curve_nid);
 size_t ecc_get_curve_prime_length(int curve_nid);
 const char *ecc_get_curve_id(int curve_nid);

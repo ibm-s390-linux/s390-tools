@@ -466,6 +466,73 @@ struct ekmf_template_info {
 	const char *updated_on;
 };
 
+struct ekmf_tag {
+	/** name of the tag */
+	const char *name;
+	/** value of the tag */
+	const char *value;
+};
+
+struct ekmf_tag_list {
+	/** array of tags */
+	struct ekmf_tag *tags;
+	/** number of tags in array above */
+	size_t num_tags;
+};
+
+struct ekmf_exporting_key {
+	/** name of the exporting key */
+	const char *name;
+	/** uuid of the exporting key */
+	const char *uuid;
+};
+
+struct ekmf_export_control {
+	/** If true, export is allowed using the exporting keys below */
+	bool export_allowed;
+	/** array of erporting keys */
+	struct ekmf_exporting_key *exporting_keys;
+	/** number of keys in array above */
+	size_t num_exporting_keys;
+};
+
+struct ekmf_key_info {
+	/** label (name) of the key */
+	const char *label;
+	/** Optional: description of the key (can be NULL) */
+	const char *description;
+	/** UUID of the key */
+	const char *uuid;
+	/** type of the key, e.g. CIPHER */
+	const char *key_type;
+	/** algorithm of the key, e.g. AES */
+	const char *algorithm;
+	/** bit size of the key */
+	size_t key_size;
+	/** state of the key, e.g. ACTIVE */
+	const char *state;
+	/** type of the keystore, e.g. PERVASIVE_ENCRYPTION */
+	const char *keystore_type;
+	/** name of the template used to generate the key */
+	const char *template;
+	/** UUID of the template used to generate the key */
+	const char *template_uuid;
+	/** label tag list */
+	struct ekmf_tag_list label_tags;
+	/** custom tag list */
+	struct ekmf_tag_list custom_tags;
+	/** export control information */
+	struct ekmf_export_control export_control;
+	/** timestamp when the key was activated */
+	const char *activate_on;
+	/** timestamp when the key expires */
+	const char *expires_on;
+	/** timestamp when the key was created */
+	const char *created_on;
+	/** timestamp when the key was updated */
+	const char *updated_on;
+};
+
 /**
  * Callback function used with the ekmf_list_templates function. This
  * callback is called for each template found.
@@ -611,6 +678,121 @@ int ekmf_clone_template_info(const struct ekmf_template_info *src,
  * @param template          the template to free
  */
 void ekmf_free_template_info(struct ekmf_template_info *template);
+
+/**
+ * Callback function used with the ekmf_list_keys function. This
+ * callback is called for each ky found.
+ *
+ * @param curl_handle      a CURL handle that can be used to perform further
+ *                         EKMFWeb functions within the callback.
+ * @param template_info    a struct containing information about the key.
+ *                         If any of the information needs to be kept, then the
+ *                         callback function must make a copy of the
+ *                         information. The memory holding the information
+ *                         passed to the callback is no longer valid after the
+ *                         callback has returned.
+ * @param private          the private pointer that was specified with the
+ *                         ekmf_list_keys invocation.
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ * When a nonzero return code is returned, the key listing process stops,
+ * and ekmf_list_keys returns the return code from the callback.
+ */
+typedef int (*ekmf_key_cb_t)(CURL *curl_handle,
+			     struct ekmf_key_info *key_info,
+			     void *private);
+
+/**
+ * List available keys. The keys are ordered by name in ascending order.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_cb            a callback function that is called for each key
+ *                          found
+ * @param private           a pointer that is passed as-is to the callback
+ * @param name_pattern      a pattern to filter by name, or NULL to list all.
+ * @param states            the states of the keys to list, or NULL to list keys
+ *                          in ACTIVE state only. Multiple states can be
+ *                          specified separated by comma.*
+ * @param tags              a list of custom tags to use as filter, or NULL
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          list the keys
+ */
+int ekmf_list_keys(const struct ekmf_config *config, CURL **curl_handle,
+		   ekmf_key_cb_t key_cb, void *private,
+		   const char *name_pattern, const char *states,
+		   const struct ekmf_tag_list *tags,
+		   char **error_msg, bool verbose);
+
+/**
+ * Get information about a key by its UUID.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to get info for
+ * @param key               an address of a key info pointer. On return
+ *                          the pointer is updated to point to a newly allocated
+ *                          key info struct. It must be freed by the caller
+ *                          using ekmf_free_key_info when no longer needed.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          get the key info
+ */
+int ekmf_get_key_info(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *key_uuid, struct ekmf_key_info **key,
+		      char **error_msg, bool verbose);
+
+/**
+ * Clones a key info structure by making a deep copy of all strings and
+ * arrays.
+ * The copied key info must be freed using ekmf_free_key_info() by
+ * the caller.
+ *
+ * @param src               the source key info structure
+ * @param dest              the destination key info structure
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int ekmf_clone_key_info(const struct ekmf_key_info *src,
+			struct ekmf_key_info **dest);
+
+/**
+ * Free a key info structure.
+ *
+ * @param key               the key info to free
+ */
+void ekmf_free_key_info(struct ekmf_key_info *key);
 
 /**
  * Close the connection to the EKMFWeb server by destroying the CURL handle.

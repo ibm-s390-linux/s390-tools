@@ -44,6 +44,15 @@
 
 #define EKMF_URI_SYSTEM_PUBKEY		"/api/v1/system/publicKey"
 #define EKMF_URI_KEYS_EXPORT		"/api/v1/keys/%s/export"
+#define EKMF_URI_KEYS_TAGS		"/api/v1/keys/%s/tags"
+#define EKMF_URI_KEYS_EXPORT_CONTROL	"/api/v1/keys/%s/exportControl"
+#define EKMF_URI_KEYS_GET		"/api/v1/keys/%s"
+#define EKMF_URI_KEYS_LIST		"/api/v1/keys"			\
+					"?state=%s"			\
+					"&orderBy=%s"			\
+					"&namePattern=%s"		\
+					"&tags=%s"
+#define EKMF_URI_KEYS_LIST_STATE	"&state="
 #define EKMF_URI_TEMPLATE_GET		"/api/v1/templates/%s"
 #define EKMF_URI_TEMPLATE_LIST		"/api/v1/templates"		\
 					"?templateStates=%s"		\
@@ -53,9 +62,11 @@
 
 #define LIST_ELEMENTS_PER_PAGE		20
 #define TEMPLATE_STATE_ACTIVE		"ACTIVE"
+#define KEY_STATE_ACTIVE		"ACTIVE"
 #define KEY_ALGORITHM_AES		"AES"
 #define KEYSTORE_TYPE_PERV_ENCR		"PERVASIVE_ENCRYPTION"
 #define ORDER_BY_NAME_ASC		"name%3Aasc"
+#define ORDER_BY_LABEL_ASC		"label%3Aasc"
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -2723,6 +2734,655 @@ void ekmf_free_template_info(struct ekmf_template_info *template)
 	free_template_info(template);
 
 	free(template);
+}
+
+/**
+ * Gets the custom tags of a key by key-uuid. The custom tags are returned as
+ * JSON array. The returned JSON array must be freed by the caller using
+ * json_object_put().
+ */
+static int _ekmf_get_custom_tags(const struct ekmf_config *config,
+				 const char *key_uuid, CURL *curl,
+				 json_object **custom_tags,
+				 const char *login_token, char **error_msg,
+				 bool verbose)
+{
+	json_object *response_obj = NULL;
+	char *escaped_uuid = NULL;
+	char *uri = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || key_uuid == NULL || custom_tags == NULL ||
+	    curl == NULL)
+		return -EINVAL;
+
+	escaped_uuid = curl_easy_escape(curl, key_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the key uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_KEYS_TAGS, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, uri, "GET", NULL, NULL, login_token,
+				   &response_obj, NULL, &status_code, error_msg,
+				   curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_array, rc, -EIO,
+		       "No or invalid response content", verbose, out);
+
+	*custom_tags = response_obj;
+	rc = 0;
+
+out:
+	if (uri != NULL)
+		free(uri);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+	if (rc != 0 && response_obj != NULL)
+		json_object_put(response_obj);
+
+	return rc;
+}
+
+/**
+ * Gets the export control infos of a key by key-uuid. The export control info
+ * is returned as JSON object. The returned JSON object must be freed by the
+ * caller using  json_object_put().
+ */
+static int _ekmf_get_export_control(const struct ekmf_config *config,
+				   const char *key_uuid, CURL *curl,
+				   json_object **export_control,
+				   const char *login_token, char **error_msg,
+				   bool verbose)
+{
+	json_object *response_obj = NULL;
+	char *escaped_uuid = NULL;
+	char *uri = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || key_uuid == NULL || export_control == NULL ||
+	    curl == NULL)
+		return -EINVAL;
+
+	escaped_uuid = curl_easy_escape(curl, key_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the key uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_KEYS_EXPORT_CONTROL, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, uri, "GET", NULL, NULL, login_token,
+				   &response_obj, NULL, &status_code, error_msg,
+				   curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EIO,
+		       "No or invalid response content", verbose, out);
+
+	*export_control = response_obj;
+	rc = 0;
+
+out:
+	if (uri != NULL)
+		free(uri);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+	if (rc != 0 && response_obj != NULL)
+		json_object_put(response_obj);
+
+	return rc;
+}
+
+/**
+ * Get the custom tags for a key and build the key info structure
+ */
+static int _ekmf_build_key_info(const struct ekmf_config *config, CURL *curl,
+				const char *login_token, json_object *obj,
+				struct ekmf_key_info *key, bool copy,
+				char **error_msg, bool verbose)
+{
+	json_object *export_control = NULL;
+	json_object *custom_tags = NULL;
+	int rc;
+
+	rc = _ekmf_get_custom_tags(config, json_get_string(obj, "keyId"),
+				   curl, &custom_tags, login_token, error_msg,
+				   verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the custom tags for key %s",
+			   json_get_string(obj, "keyId"));
+		goto out;
+	}
+
+	rc = _ekmf_get_export_control(config, json_get_string(obj, "keyId"),
+				      curl, &export_control, login_token,
+				      error_msg, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the custom tags for key %s",
+			   json_get_string(obj, "keyId"));
+		goto out;
+	}
+
+	rc = json_build_key_info(obj, custom_tags, export_control, key, copy);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build key info");
+		goto out;
+	}
+
+out:
+	/*
+	 * Add custom tags and export control JSON objects to the key object,
+	 * so that these objects are also owned by the key object, and thus are
+	 * freed together with it, when the caller puts/frees the key object.
+	 */
+	if (custom_tags != NULL)
+		json_object_object_add_ex(obj, "_custom_tags_", custom_tags, 0);
+	if (export_control != NULL)
+		json_object_object_add_ex(obj, "_export_control_",
+					  export_control, 0);
+
+	return rc;
+}
+
+
+struct ekmf_key_cb_data_t {
+	const struct ekmf_config *config;
+	const char *login_token;
+	char **error_msg;
+	ekmf_key_cb_t key_cb;
+	void *cb_private;
+};
+
+/**
+ * Callback for key list function. Builds the key info structure
+ * and calls the application callback.
+ */
+static int _ekmf_key_cb(CURL *curl, json_object *element,
+			void *private, bool verbose)
+{
+	struct ekmf_key_cb_data_t *cb_data = private;
+	struct ekmf_key_info key = { 0 };
+	int rc;
+
+	if (cb_data->key_cb == NULL) {
+		pr_verbose(verbose, "No key callback function");
+		return -EINVAL;
+	}
+
+	rc = _ekmf_build_key_info(cb_data->config, curl, cb_data->login_token,
+				  element, &key, false, cb_data->error_msg,
+				  verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build key info");
+		goto out;
+	}
+
+	rc = cb_data->key_cb(curl, &key, cb_data->cb_private);
+	if (rc != 0) {
+		pr_verbose(verbose, "Key callback rc: %d", rc);
+		goto out;
+	}
+
+out:
+	free_tag_list(&key.label_tags, false);
+	free_tag_list(&key.custom_tags, false);
+	free_export_control(&key.export_control, false);
+
+	return rc;
+}
+
+/**
+ * Builds the state URL parameter(s) from a comma separated list of states
+ *
+ * @param curl              the curl handle
+ * @param states            a comma separaed list of states
+ *
+ * @returns an allocated URL parameter value, or NULL in case of an error
+ */
+static char *_ekmf_build_state_filter(CURL *curl, const char *states)
+{
+	char *list, *tok, *ret = NULL, *tmp;
+	char *escaped_state;
+
+	if (states == NULL)
+		goto error;
+
+	list = strdup(states);
+	if (list == NULL)
+		goto error;
+
+	tok = strtok(list, ",");
+	while (tok != NULL) {
+		escaped_state = curl_easy_escape(curl, tok, 0);
+		if (escaped_state == NULL)
+			goto error;
+
+		if (asprintf(&tmp, "%s%s%s", ret != NULL ? ret : "",
+			     ret == NULL ? "" : EKMF_URI_KEYS_LIST_STATE,
+			     escaped_state) < 0)
+			tmp = NULL;
+		curl_free(escaped_state);
+		if (tmp == NULL)
+			goto error;
+		if (ret != NULL)
+			free(ret);
+		ret = tmp;
+
+		tok = strtok(NULL, ",");
+	}
+
+	free(list);
+	return ret;
+
+error:
+	if (ret != NULL)
+		free(ret);
+	return NULL;
+}
+
+/**
+ * List available keys. The keys are ordered by name in ascending order.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_cb            a callback function that is called for each key
+ *                          found
+ * @param private           a pointer that is passed as-is to the callback
+ * @param name_pattern      a pattern to filter by name, or NULL to list all.
+ * @param states            the states of the keys to list, or NULL to list keys
+ *                          in ACTIVE state only. Multiple states can be
+ *                          specified separated by comma.
+ * @param tags              a list of custom tags to use as filter, or NULL
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          list the keys
+ */
+int ekmf_list_keys(const struct ekmf_config *config, CURL **curl_handle,
+		   ekmf_key_cb_t key_cb, void *private,
+		   const char *name_pattern, const char *states,
+		   const struct ekmf_tag_list *tags,
+		   char **error_msg, bool verbose)
+{
+	struct ekmf_key_cb_data_t cb_data;
+	char *escaped_name_pattern = NULL;
+	json_object *tags_obj = NULL;
+	char *state_filter = NULL;
+	char *escaped_tags = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	char *uri = NULL;
+	size_t i;
+	int rc;
+
+	if (config == NULL || key_cb == NULL)
+		return -EINVAL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	cb_data.config = config;
+	cb_data.login_token = login_token;
+	cb_data.error_msg = error_msg;
+	cb_data.key_cb = key_cb;
+	cb_data.cb_private = private;
+
+	escaped_name_pattern = curl_easy_escape(curl, name_pattern != NULL ?
+							name_pattern : "*", 0);
+	if (escaped_name_pattern == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the name pattern");
+		rc = -EIO;
+		goto out;
+	}
+
+	state_filter = _ekmf_build_state_filter(curl, states != NULL ? states :
+						KEY_STATE_ACTIVE);
+	if (state_filter == NULL) {
+		pr_verbose(verbose, "Failed to build the state filter");
+		rc = -EIO;
+		goto out;
+	}
+
+	tags_obj = json_object_new_object();
+	JSON_CHECK_ERROR(tags_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+	for (i = 0; tags != NULL && i < tags->num_tags; i++) {
+		if (tags->tags[i].name == NULL || tags->tags[i].value == NULL) {
+			rc = -EINVAL;
+			goto out;
+		}
+
+		rc = json_object_object_add_ex(tags_obj, tags->tags[i].name,
+					       json_object_new_string(
+							tags->tags[i].value),
+					       0);
+		JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+				 "JSON object", verbose, out);
+	}
+
+	escaped_tags = curl_easy_escape(curl, json_object_to_json_string_ext(
+				tags_obj, JSON_C_TO_STRING_PLAIN |
+					  JSON_C_TO_STRING_NOSLASHESCAPE), 0);
+	if (escaped_tags == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the tags");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_KEYS_LIST, state_filter,
+		     ORDER_BY_LABEL_ASC, escaped_name_pattern,
+		     escaped_tags) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_list_request(config, uri, curl, _ekmf_key_cb,
+				&cb_data, login_token, error_msg, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to perform the list request");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (login_token != NULL)
+		free(login_token);
+	if (uri != NULL)
+		free(uri);
+	if (state_filter != NULL)
+		free(state_filter);
+	if (escaped_name_pattern != NULL)
+		curl_free(escaped_name_pattern);
+	if (escaped_tags != NULL)
+		curl_free(escaped_tags);
+	if (tags_obj != NULL)
+		json_object_put(tags_obj);
+
+	return rc;
+}
+
+/**
+ * Get information about a key by its UUID.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to get info for
+ * @param key               an address of a key info pointer. On return
+ *                          the pointer is updated to point to a newly allocated
+ *                          key info struct. It must be freed by the caller
+ *                          using ekmf_free_key_info when no longer needed.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          get the key info
+ */
+int ekmf_get_key_info(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *key_uuid, struct ekmf_key_info **key,
+		      char **error_msg, bool verbose)
+{
+	json_object *response_obj = NULL;
+	char *escaped_uuid = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	char *uri = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || key_uuid == NULL || key == NULL)
+		return -EINVAL;
+
+	*key = NULL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	escaped_uuid = curl_easy_escape(curl, key_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the key uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_KEYS_GET, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, uri, "GET", NULL, NULL,
+				   login_token, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	case 404:
+		pr_verbose(verbose, "Not found");
+		rc = -ENOENT;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EBADMSG,
+		       "No or invalid response", verbose, out);
+
+	*key = calloc(1, sizeof(struct ekmf_key_info));
+	if (*key == NULL) {
+		pr_verbose(verbose, "calloc failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = _ekmf_build_key_info(config, curl, login_token, response_obj,
+				  *key, true, error_msg, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build template info");
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (uri != NULL)
+		free(uri);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+	if (rc != 0 && *key != NULL) {
+		free_key_info(*key);
+		free(*key);
+		*key = NULL;
+	}
+
+	return rc;
+}
+
+/**
+ * Clones a key info structure by making a deep copy of all strings and
+ * arrays.
+ * The copied key info must be freed using ekmf_free_key_info() by
+ * the caller.
+ *
+ * @param src               the source key info structure
+ * @param dest              the destination key info structure
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int ekmf_clone_key_info(const struct ekmf_key_info *src,
+			struct ekmf_key_info **dest)
+{
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	*dest = calloc(1, sizeof(struct ekmf_key_info));
+	if (*dest == NULL)
+		return -ENOMEM;
+
+	return clone_key_info(src, *dest);
+}
+
+/**
+ * Free a key info structure.
+ *
+ * @param key               the key info to free
+ */
+void ekmf_free_key_info(struct ekmf_key_info *key)
+{
+	free_key_info(key);
+
+	free(key);
 }
 
 /**

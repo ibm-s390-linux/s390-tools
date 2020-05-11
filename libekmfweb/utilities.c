@@ -928,6 +928,25 @@ static char *cond_strdup(const char *str, bool copy)
 }
 
 /**
+ * Returns the start of the UUId part of a href link.
+ * Returns NULL if href is NULL, or if the UUID is not found.
+ * The returned pointer (if not NULL) is within the specified href string!
+ */
+static const char *get_uuid_from_href(const char *href)
+{
+	const char *ch;
+
+	if (href == NULL)
+		return NULL;
+
+	ch = strrchr(href, '/');
+	if (ch == NULL)
+		return NULL;
+
+	return ch + 1;
+}
+
+/**
  * Builds a list of tag definitions from a JSON array.
  *
  * @param array             a JSON array of tag definitions
@@ -1202,6 +1221,441 @@ void free_template_info(struct ekmf_template_info *template)
 	free((char *)template->updated_on);
 
 	free_tag_def_list(&template->label_tags, true);
+}
+
+/**
+ * Builds a list of tags from a JSON array.
+ *
+ * @param array             a JSON array of tags
+ * @param tag_list          the tag list to build
+ * @param copy              if true, the string values are copied (via strdup),
+ *                          if false, the string values re-use the JSON object's
+ *                          string buffer (see json_object_get_string).
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int json_build_tag_list(json_object *array, struct ekmf_tag_list *tag_list,
+			bool copy)
+{
+	json_object *obj;
+	size_t i;
+	int rc = 0;
+
+	if (array == NULL || tag_list == NULL ||
+	    !json_object_is_type(array, json_type_array))
+		return -EINVAL;
+
+	tag_list->num_tags = json_object_array_length(array);
+	tag_list->tags = calloc(tag_list->num_tags, sizeof(struct ekmf_tag));
+	if (tag_list->tags == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < tag_list->num_tags; i++) {
+		obj =  json_object_array_get_idx(array, i);
+		if (obj == NULL)
+			return -EBADMSG;
+
+		tag_list->tags[i].name = cond_strdup(
+				json_get_string(obj, "name"), copy);
+		tag_list->tags[i].value = cond_strdup(
+				json_get_string(obj, "value"), copy);
+
+		if (tag_list->tags[i].name == NULL ||
+		    tag_list->tags[i].value == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	}
+
+out:
+	if (rc != 0)
+		free_tag_list(tag_list, copy);
+
+	return rc;
+}
+
+/**
+ * Clones (copies) a tag list
+ *
+ * @param src               the source tag list
+ * @param dest              the destination tag list
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int clone_tag_list(const struct ekmf_tag_list *src,
+		   struct ekmf_tag_list *dest)
+{
+	size_t i;
+	int rc = 0;
+
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	dest->num_tags = src->num_tags;
+	if (dest->num_tags == 0) {
+		dest->tags = NULL;
+		return 0;
+	}
+
+	dest->tags = calloc(dest->num_tags, sizeof(struct ekmf_tag));
+	if (dest->tags == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < dest->num_tags; i++) {
+		dest->tags[i].name = cond_strdup(src->tags[i].name, true);
+		if (dest->tags[i].name == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+		dest->tags[i].value = cond_strdup(src->tags[i].value, true);
+		if (dest->tags[i].value == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	}
+
+out:
+	if (rc != 0)
+		free_tag_list(dest, true);
+	return rc;
+}
+
+/**
+ * Free a tag list
+ *
+ * @param tag_list          the tag list to free
+ * @param free_tags         if true, the tag name and value string s are
+ *                          freed, otherwise only the array is freed.
+ */
+void free_tag_list(struct ekmf_tag_list *tag_list, bool free_tags)
+{
+	size_t i;
+
+	if (tag_list == NULL || tag_list->tags == NULL)
+		return;
+
+	for (i = 0; free_tags && i < tag_list->num_tags; i++) {
+		free((char *)tag_list->tags[i].name);
+		free((char *)tag_list->tags[i].value);
+	}
+
+	free(tag_list->tags);
+	tag_list->tags = NULL;
+	tag_list->num_tags = 0;
+}
+
+/**
+ * Builds the export control information from a JSON object.
+ *
+ * @param export_control    the JSON oibject
+ * @param tag_def_list      the tag list to build
+ * @param copy              if true, the string values are copied (via strdup),
+ *                          if false, the string values re-use the JSON object's
+ *                          string buffer (see json_object_get_string).
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int json_build_export_control(json_object *export_control,
+			      struct ekmf_export_control *export_info,
+			      bool copy)
+{
+	json_object *obj, *array;
+	size_t i;
+	int rc = 0;
+
+	if (export_control == NULL || export_info == NULL ||
+	    !json_object_is_type(export_control, json_type_object))
+		return -EINVAL;
+
+	if (!json_object_object_get_ex(export_control, "exportAllowed", &obj) ||
+	    !json_object_is_type(obj, json_type_boolean))
+		return -EINVAL;
+
+	export_info->export_allowed = json_object_get_boolean(obj);
+
+	if (!json_object_object_get_ex(export_control, "allowedKeys", &array) ||
+	    !json_object_is_type(array, json_type_array))
+		return -EINVAL;
+
+	export_info->num_exporting_keys = json_object_array_length(array);
+	export_info->exporting_keys = calloc(export_info->num_exporting_keys,
+					     sizeof(struct ekmf_exporting_key));
+	if (export_info->exporting_keys == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < export_info->num_exporting_keys; i++) {
+		obj =  json_object_array_get_idx(array, i);
+		if (obj == NULL)
+			return -EBADMSG;
+
+		export_info->exporting_keys[i].name = cond_strdup(
+				json_get_string(obj, "title"), copy);
+		export_info->exporting_keys[i].uuid = cond_strdup(
+				get_uuid_from_href(
+					json_get_string(obj, "href")), copy);
+
+		if (export_info->exporting_keys[i].name == NULL ||
+		    export_info->exporting_keys[i].uuid == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	}
+
+out:
+	if (rc != 0)
+		free_export_control(export_info, copy);
+
+	return rc;
+}
+
+/**
+ * Clones (copies) an export control info
+ *
+ * @param src               the source export control
+ * @param dest              the destination export control
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int clone_export_control(const struct ekmf_export_control *src,
+			 struct ekmf_export_control *dest)
+{
+	size_t i;
+	int rc = 0;
+
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	dest->export_allowed = src->export_allowed;
+
+	dest->num_exporting_keys = src->num_exporting_keys;
+	if (dest->num_exporting_keys == 0) {
+		dest->exporting_keys = NULL;
+		return 0;
+	}
+
+	dest->exporting_keys = calloc(dest->num_exporting_keys,
+				      sizeof(struct ekmf_exporting_key));
+	if (dest->exporting_keys == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < dest->num_exporting_keys; i++) {
+		dest->exporting_keys[i].name =
+				cond_strdup(src->exporting_keys[i].name, true);
+		if (dest->exporting_keys[i].name == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+		dest->exporting_keys[i].uuid =
+				cond_strdup(src->exporting_keys[i].uuid, true);
+		if (dest->exporting_keys[i].uuid == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+	}
+
+out:
+	if (rc != 0)
+		free_export_control(dest, true);
+	return rc;
+}
+
+/**
+ * Free export control infos
+ *
+ * @param export_control    the export control infos to free
+ * @param free_tags         if true, the exporting keys name and uuid strings
+ *                          are freed, otherwise only the array is freed.
+ */
+void free_export_control(struct ekmf_export_control *export_control,
+			 bool free_keys)
+{
+	size_t i;
+
+	if (export_control == NULL || export_control->exporting_keys == NULL)
+		return;
+
+	for (i = 0; free_keys && i < export_control->num_exporting_keys; i++) {
+		free((char *)export_control->exporting_keys[i].name);
+		free((char *)export_control->exporting_keys[i].uuid);
+	}
+
+	free(export_control->exporting_keys);
+	export_control->exporting_keys = NULL;
+	export_control->num_exporting_keys = 0;
+}
+
+/**
+ * Builds a key info structure from a JSON object.
+ *
+ * @param obj               a JSON object containing the key info
+ * @param custom_tags       a JSON array containing the custom tags
+ * @param export_control    a JSON object containing the export_control infos
+ * @param key               the key info struct to build
+ * @param copy              if true, the string values are copied (via strdup),
+ *                          if false, the string values re-use the JSON object's
+ *                          string buffer (see json_object_get_string).
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int json_build_key_info(json_object *obj, json_object *custom_tags,
+			json_object *export_control,
+			struct ekmf_key_info *key, bool copy)
+{
+	json_object *field, *label_tags = NULL;
+	int rc = 0;
+
+	if (obj == NULL || custom_tags == NULL || key == NULL ||
+	    !json_object_is_type(obj, json_type_object) ||
+	    !json_object_is_type(custom_tags, json_type_array))
+		return -EINVAL;
+
+	key->label = cond_strdup(json_get_string(obj, "label"), copy);
+	key->description = cond_strdup(json_get_string(obj, "description"),
+				       copy);
+	key->uuid = cond_strdup(json_get_string(obj, "keyId"), copy);
+	key->key_type = cond_strdup(json_get_string(obj, "type"), copy);
+	key->algorithm = cond_strdup(json_get_string(obj, "algorithm"), copy);
+	if (json_object_object_get_ex(obj, "length", &field) &&
+	    json_object_is_type(field, json_type_int))
+		key->key_size = json_object_get_int(field);
+	else
+		rc = -EBADMSG;
+
+	key->state = cond_strdup(json_get_string(obj, "state"), copy);
+	key->keystore_type = cond_strdup(json_get_string(obj, "keystoreType"),
+					 copy);
+	if (json_object_object_get_ex(obj, "template", &field) &&
+	    json_object_is_type(field, json_type_object)) {
+		key->template = cond_strdup(json_get_string(field, "title"),
+					    copy);
+		key->template_uuid = cond_strdup(get_uuid_from_href(
+					json_get_string(field, "href")), copy);
+	} else {
+		rc = -EBADMSG;
+	}
+	key->activate_on = cond_strdup(json_get_string(obj, "activationDate"),
+				       copy);
+	key->expires_on = cond_strdup(json_get_string(obj, "expirationDate"),
+				      copy);
+	key->created_on = cond_strdup(json_get_string(obj, "createdOn"), copy);
+	key->updated_on = cond_strdup(json_get_string(obj, "updatedOn"), copy);
+
+	if (rc != 0 || key->label == NULL || key->uuid == NULL ||
+	    key->algorithm == NULL || key->state == NULL ||
+	    key->keystore_type == NULL || key->template == NULL ||
+	    key->template_uuid == NULL || key->activate_on == NULL ||
+	    key->expires_on == NULL || key->created_on == NULL ||
+	    key->updated_on == NULL) {
+		rc = (rc != 0 ? rc : -ENOMEM);
+		goto out;
+	}
+
+	json_object_object_get_ex(obj, "labelTags", &label_tags);
+	rc = json_build_tag_list(label_tags, &key->label_tags, copy);
+	if (rc != 0)
+		goto out;
+
+	rc = json_build_tag_list(custom_tags, &key->custom_tags, copy);
+	if (rc != 0)
+		goto out;
+
+	rc = json_build_export_control(export_control, &key->export_control,
+				       copy);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (rc != 0) {
+		free_tag_list(&key->label_tags, copy);
+		free_tag_list(&key->custom_tags, copy);
+		free_export_control(&key->export_control, copy);
+		if (copy)
+			free_key_info(key);
+	}
+
+	return rc;
+}
+
+/**
+ * Clones (copies) a key info structure
+ *
+ * @param src               the source key info structure
+ * @param dest              the destination key info structure
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int clone_key_info(const struct ekmf_key_info *src,
+		   struct ekmf_key_info *dest)
+{
+	int rc;
+
+	if (src == NULL || dest == NULL)
+		return -EINVAL;
+
+	dest->label = cond_strdup(src->label, true);
+	dest->description = cond_strdup(src->description, true);
+	dest->uuid = cond_strdup(src->uuid, true);
+	dest->key_type = cond_strdup(src->key_type, true);
+	dest->algorithm = cond_strdup(src->algorithm, true);
+	dest->key_size = src->key_size;
+	dest->state = cond_strdup(src->state, true);
+	dest->keystore_type = cond_strdup(src->keystore_type, true);
+	dest->template = cond_strdup(src->template, true);
+	dest->template_uuid = cond_strdup(src->template_uuid, true);
+	dest->activate_on = cond_strdup(src->activate_on, true);
+	dest->expires_on = cond_strdup(src->expires_on, true);
+	dest->created_on = cond_strdup(src->created_on, true);
+	dest->updated_on = cond_strdup(src->updated_on, true);
+	if (dest->label == NULL || dest->uuid == NULL ||
+	    dest->algorithm == NULL || dest->state == NULL ||
+	    dest->keystore_type == NULL || dest->template == NULL ||
+	    dest->template_uuid == NULL || dest->activate_on == NULL ||
+	    dest->expires_on == NULL || dest->created_on == NULL ||
+	    dest->updated_on == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = clone_tag_list(&src->label_tags, &dest->label_tags);
+	if (rc != 0)
+		goto out;
+
+	rc = clone_tag_list(&src->custom_tags, &dest->custom_tags);
+	if (rc != 0)
+		goto out;
+out:
+	if (rc != 0)
+		free_key_info(dest);
+	return rc;
+}
+
+/**
+ * Free a key info structure
+ *
+ * @param key               the key info to free
+ */
+void free_key_info(struct ekmf_key_info *key)
+{
+	if (key == NULL)
+		return;
+
+	free((char *)key->label);
+	free((char *)key->description);
+	free((char *)key->uuid);
+	free((char *)key->key_type);
+	free((char *)key->algorithm);
+	free((char *)key->state);
+	free((char *)key->keystore_type);
+	free((char *)key->template);
+	free((char *)key->template_uuid);
+	free((char *)key->activate_on);
+	free((char *)key->expires_on);
+	free((char *)key->created_on);
+	free((char *)key->updated_on);
+
+	free_tag_list(&key->label_tags, true);
+	free_tag_list(&key->custom_tags, true);
+	free_export_control(&key->export_control, true);
 }
 
 struct ecc_curve_info {
