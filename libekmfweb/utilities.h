@@ -57,6 +57,8 @@ void free_template_info(struct ekmf_template_info *template);
 
 int json_build_tag_list(json_object *array, struct ekmf_tag_list *tag_list,
 			bool copy);
+int build_json_tag_list(const struct ekmf_tag_list *tag_list,
+			json_object **tags_obj);
 int clone_tag_list(const struct ekmf_tag_list *src,
 		   struct ekmf_tag_list *dest);
 void free_tag_list(struct ekmf_tag_list *tag_list, bool free_tags);

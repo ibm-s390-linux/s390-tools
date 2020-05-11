@@ -18,6 +18,7 @@ LIBEKMFWEB_1.0 {
         ekmf_get_key_info;
         ekmf_clone_key_info;
         ekmf_free_key_info;
+        ekmf_generate_key;
         ekmf_curl_destroy;
     local: *;
 };

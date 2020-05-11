@@ -43,6 +43,7 @@
 #define MAX_SYM_KEY_BLOB_SIZE		CCA_MAX_SYM_KEY_TOKEN_SIZE
 
 #define EKMF_URI_SYSTEM_PUBKEY		"/api/v1/system/publicKey"
+#define EKMF_URI_KEYS_GENERATE		"/api/v1/keys"
 #define EKMF_URI_KEYS_EXPORT		"/api/v1/keys/%s/export"
 #define EKMF_URI_KEYS_TAGS		"/api/v1/keys/%s/tags"
 #define EKMF_URI_KEYS_EXPORT_CONTROL	"/api/v1/keys/%s/exportControl"
@@ -3383,6 +3384,396 @@ void ekmf_free_key_info(struct ekmf_key_info *key)
 	free_key_info(key);
 
 	free(key);
+}
+
+/**
+ * Build the export control JSON object.
+ *
+ * @param exporting_key     the key to add as exporting key
+ * @param expctl_obj        on return: the export control JSON object
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ */
+static int _ekmf_build_export_control(const char *exporting_key,
+				      json_object **expctl_obj, bool verbose)
+{
+	json_object *exp_keys = NULL;
+	json_object *exp_ref = NULL;
+	char *href = NULL;
+	int rc = 0;
+
+	*expctl_obj = json_object_new_object();
+	JSON_CHECK_ERROR(*expctl_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object",
+			 verbose, out);
+
+	rc = json_object_object_add_ex(*expctl_obj, "exportAllowed",
+				       json_object_new_boolean(true), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+
+	exp_keys = json_object_new_array();
+	JSON_CHECK_ERROR(exp_keys == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object",
+			 verbose, out);
+
+	exp_ref = json_object_new_object();
+	JSON_CHECK_ERROR(exp_ref == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object",
+			 verbose, out);
+
+	rc = json_object_object_add_ex(exp_ref, "rel",
+			json_object_new_string("exportAllowedWithKey"), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+
+	JSON_CHECK_ERROR(asprintf(&href, "/keys/%s", exporting_key) < 0, rc,
+			 -ENOMEM, "Failed to allocate string", verbose, out);
+	rc = json_object_object_add_ex(exp_ref, "href",
+				       json_object_new_string(href), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+
+	rc = json_object_array_add(exp_keys, exp_ref);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+	exp_ref = NULL;
+
+	rc = json_object_object_add_ex(*expctl_obj, "allowedKeys", exp_keys, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+	exp_keys = NULL;
+
+out:
+	if (exp_keys != NULL)
+		json_object_put(exp_keys);
+	if (exp_ref != NULL)
+		json_object_put(exp_ref);
+	if (href != NULL)
+		free(href);
+	if (rc != 0 && *expctl_obj != NULL) {
+		json_object_put(*expctl_obj);
+		*expctl_obj = NULL;
+	}
+
+	return rc;
+}
+
+/**
+ * Base64-encodes the data
+ *
+ * @param data              the data to encode
+ * @param data_size         the size of the data in bytes
+ *
+ * @returns the encoded data or NULL in case of an error.
+ * The caller must free the string when no longer needed.
+ */
+static char *_ekmf_base64_encode(const unsigned char *data, size_t data_size)
+{
+	int outlen, len;
+	char *out;
+
+	outlen = (data_size / 3) * 4;
+	if (data_size % 3 > 0)
+		outlen += 4;
+
+	out = calloc(outlen + 1, 1);
+	if (out == NULL)
+		return NULL;
+
+	len = EVP_EncodeBlock((unsigned char *)out, data, data_size);
+	if (len != outlen) {
+		free(out);
+		return NULL;
+	}
+
+	out[outlen] = '\0';
+	return out;
+}
+
+/**
+ * Build the key material JSON object
+ *
+ * @param certificate       the certificate to generate an identity key from
+ * @param certificate_size  the size of the certificate
+ * @param keymat_obj        on return: the key material JSON object
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ */
+static int _ekmf_build_key_material(const unsigned char *certificate,
+				    size_t certificate_size,
+				    json_object **keymat_obj, bool verbose)
+{
+	char *payload = NULL;
+	int rc = 0;
+
+	*keymat_obj = json_object_new_object();
+	JSON_CHECK_ERROR(*keymat_obj == NULL, rc, -ENOMEM,
+				 "Failed to generate JSON object",
+				 verbose, out);
+
+	rc = json_object_object_add_ex(*keymat_obj, "type",
+			json_object_new_string("ENCODED-CERTIFICATE"), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+
+	payload = _ekmf_base64_encode(certificate, certificate_size);
+	JSON_CHECK_ERROR(*keymat_obj == NULL, rc, -EIO,
+			 "Failed to base64 encode the certificate",
+			 verbose, out);
+
+	rc = json_object_object_add_ex(*keymat_obj, "payload",
+				json_object_new_string(payload), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+			 "JSON object", verbose, out);
+
+out:
+	if (rc != 0 && *keymat_obj != NULL) {
+		json_object_put(*keymat_obj);
+		*keymat_obj = NULL;
+	}
+	if (payload != NULL)
+		free(payload);
+
+	return rc;
+}
+
+/**
+ * Generates a new key in EKMFWeb
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template          the name of the template to generate the key with
+ * @param description       Optional: a textual description of the key (can be
+ *                          NULL)
+ * @param label_tags        list of label tags. The label tags are required as
+ *                          defined in the template
+ * @param custom_tags       Optional: list of custom tags (can be NULL)
+ * @param exporting_key     Optional: The uuid of the key that is allowed to
+ *                          export the newly generated key (can be NULL).
+ * @param certificate       Optional: The certificate to generate an identity
+ *                          key from. Should be NULL for generating AES keys.
+ * @param certificate_size  Optional: the size of the certificate. Required if
+ *                          certificate is not NULL.
+ * @param key_info          Optional: On return: If not NULL, a key info struct
+ *                          is returned here containing key information. This
+ *                          must be freed by the caller with ekmf_free_key_info
+ *                          when no longer needed.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          generate keys
+ */
+int ekmf_generate_key(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *template, const char *description,
+		      const struct ekmf_tag_list *label_tags,
+		      const struct ekmf_tag_list *custom_tags,
+		      const char *exporting_key,
+		      const unsigned char *certificate, size_t certificate_size,
+		      struct ekmf_key_info **key_info,
+		      char **error_msg, bool verbose)
+{
+	json_object *response_obj = NULL;
+	json_object *request_obj = NULL;
+	json_object *expctl_obj = NULL;
+	json_object *keymat_obj = NULL;
+	json_object *tags_obj = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || template == NULL || label_tags == NULL ||
+	    label_tags->num_tags == 0 || label_tags->tags == NULL)
+		return -EINVAL;
+	if (custom_tags != NULL && custom_tags->num_tags > 0 &&
+	    custom_tags->tags == NULL)
+		return -EINVAL;
+	if (certificate != NULL && certificate_size == 0)
+		return -EINVAL;
+
+	if (key_info != NULL)
+		*key_info = NULL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	request_obj = json_object_new_object();
+	JSON_CHECK_ERROR(request_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+
+	rc = json_object_object_add_ex(request_obj, "templateName",
+				       json_object_new_string(template), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+
+	rc = build_json_tag_list(label_tags, &tags_obj);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to build label tag JSON object");
+		goto out;
+	}
+
+	rc = json_object_object_add_ex(request_obj, "labelTags", tags_obj, 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+	tags_obj = NULL;
+
+	if (description != NULL) {
+		rc = json_object_object_add_ex(request_obj, "description",
+					json_object_new_string(description), 0);
+		JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+				 "JSON object", verbose, out);
+	}
+
+	if (certificate != NULL) {
+		rc = _ekmf_build_key_material(certificate, certificate_size,
+					      &keymat_obj, verbose);
+		if (rc != 0)
+			goto out;
+
+		rc = json_object_object_add_ex(request_obj, "keyMaterial",
+					       keymat_obj, 0);
+		JSON_CHECK_ERROR(rc != 0, rc, -EIO,
+				 "Failed to add data to JSON object",
+				 verbose, out);
+		keymat_obj = NULL;
+	}
+
+	if (custom_tags != NULL && custom_tags->num_tags > 0) {
+		rc = build_json_tag_list(custom_tags, &tags_obj);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to build custom tag JSON "
+				   "object");
+			goto out;
+		}
+
+		rc = json_object_object_add_ex(request_obj, "customTags",
+					       tags_obj, 0);
+		JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to "
+				 "JSON object", verbose, out);
+		tags_obj = NULL;
+	}
+
+	if (exporting_key != NULL) {
+		rc = _ekmf_build_export_control(exporting_key, &expctl_obj,
+						verbose);
+		if (rc != 0)
+			goto out;
+
+		rc = json_object_object_add_ex(request_obj, "exportControl",
+					       expctl_obj, 0);
+		JSON_CHECK_ERROR(rc != 0, rc, -EIO,
+				 "Failed to add data to JSON object",
+				 verbose, out);
+		expctl_obj = NULL;
+	}
+
+	rc = _ekmf_perform_request(config, EKMF_URI_KEYS_GENERATE, "POST",
+				   request_obj, NULL, login_token,
+				   &response_obj, NULL, &status_code, error_msg,
+				   curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 201:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	case 409:
+		pr_verbose(verbose, "A key with this label exist already");
+		rc = -EEXIST;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EBADMSG,
+		       "No or invalid response", verbose, out);
+
+	if (key_info != NULL) {
+		*key_info = calloc(1, sizeof(struct ekmf_key_info));
+		if (*key_info == NULL) {
+			pr_verbose(verbose, "calloc failed");
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = _ekmf_build_key_info(config, curl, login_token,
+					  response_obj, *key_info, true,
+					  error_msg, verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to build the key info");
+			goto out;
+		}
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (request_obj != NULL)
+		json_object_put(request_obj);
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (tags_obj != NULL)
+		json_object_put(tags_obj);
+	if (expctl_obj != NULL)
+		json_object_put(expctl_obj);
+	if (keymat_obj != NULL)
+		json_object_put(keymat_obj);
+	if (rc != 0 && key_info != NULL && *key_info != NULL) {
+		free(*key_info);
+		*key_info = NULL;
+	}
+	return rc;
 }
 
 /**

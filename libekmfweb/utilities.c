@@ -1275,6 +1275,82 @@ out:
 }
 
 /**
+ * Builds an JSON array with tag objects from a list of tags.
+ * The returned JSON object must be freed using json_object_put by the caller.
+ */
+
+/**
+ * Builds an JSON array with tag objects from a list of tags.
+ * The returned JSON object must be freed using json_object_put by the caller.
+ *
+ * @param tag_list          the tag list
+ * @param tags_obj          On return: a JSOn array containig the tags
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int build_json_tag_list(const struct ekmf_tag_list *tag_list,
+			json_object **tags_obj)
+{
+	json_object *tag_obj = NULL;
+	int rc = 0;
+	size_t i;
+
+	if (tag_list == NULL || tags_obj == NULL)
+		return -EINVAL;
+
+	*tags_obj = json_object_new_array();
+	if (*tags_obj == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < tag_list->num_tags; i++) {
+		if (tag_list->tags[i].name == NULL ||
+		    tag_list->tags[i].value == NULL) {
+			rc = -EINVAL;
+			goto out;
+		}
+
+		tag_obj = json_object_new_object();
+		if (tag_obj == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = json_object_object_add_ex(tag_obj, "name",
+			json_object_new_string(tag_list->tags[i].name), 0);
+		if (rc != 0) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = json_object_object_add_ex(tag_obj, "value",
+			json_object_new_string(tag_list->tags[i].value), 0);
+		if (rc != 0) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = json_object_array_add(*tags_obj, tag_obj);
+		if (rc != 0) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		tag_obj = NULL;
+	}
+	rc = 0;
+
+out:
+	if (rc != 0) {
+		if (*tags_obj != NULL)
+			json_object_put(*tags_obj);
+		if (tag_obj != NULL)
+			json_object_put(tag_obj);
+	}
+
+	return rc;
+}
+
+/**
  * Clones (copies) a tag list
  *
  * @param src               the source tag list

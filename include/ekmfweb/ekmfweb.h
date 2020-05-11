@@ -795,6 +795,55 @@ int ekmf_clone_key_info(const struct ekmf_key_info *src,
 void ekmf_free_key_info(struct ekmf_key_info *key);
 
 /**
+ * Generates a new key in EKMFWeb
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param template          the name of the template to generate the key with
+ * @param description       Optional: a textual description of the key (can be
+ *                          NULL)
+ * @param label_tags        list of label tags. The label tags are required as
+ *                          defined in the template
+ * @param custom_tags       Optional: list of custom tags (can be NULL)
+ * @param exporting_key     Optional: The uuid of the key that is allowed to
+ *                          export the newly generated key (can be NULL).
+ * @param certificate       Optional: The certificate to generate an identity
+ *                          key from. Should be NULL for generating AES keys.
+ * @param certificate_size  Optional: the size of the certificate. Required if
+ *                          certificate is not NULL.
+ * @param key_info          Optional: On return: If not NULL, a key info struct
+ *                          is returned here containing key information. This
+ *                          must be freed by the caller with ekmf_free_key_info
+ *                          when no longer needed.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          generate keys
+ */
+int ekmf_generate_key(const struct ekmf_config *config, CURL **curl_handle,
+		      const char *template, const char *description,
+		      const struct ekmf_tag_list *label_tags,
+		      const struct ekmf_tag_list *custom_tags,
+		      const char *exporting_key,
+		      const unsigned char *certificate, size_t certificate_size,
+		      struct ekmf_key_info **key_info,
+		      char **error_msg, bool verbose);
+
+/**
  * Close the connection to the EKMFWeb server by destroying the CURL handle.
  *
  * @param curl_handle       the CURL handle to destroy
