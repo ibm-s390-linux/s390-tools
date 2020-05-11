@@ -46,10 +46,10 @@ facilities.
 Lists counters that are provided by the CPU-measurement facility, omitting
 counters for which the LPAR is not authorized. For counter measurements with
 the perf program, the raw event identifier is displayed.
-For linux version 5.5 and later the raw event identifier is
-displayed as <type>:<number>, where type is the number the CPU Measurement
-counter facility device driver was assigned to by the kernel.
-For earlier linux versions the raw event identifier is displayed as r<number>.
+For Linux version 5.5 and later, the raw event identifier is
+displayed as <type>:<number>, where type is an integer that the kernel
+assignes to the CPU Measurement counter facility device driver.
+For earlier Linux versions the raw event identifier is displayed as r<number>.
 .
 .TP
 .BR \-C ", " \-\-list\-all\-counters
