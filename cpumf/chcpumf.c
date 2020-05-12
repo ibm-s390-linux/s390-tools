@@ -129,7 +129,7 @@ static int write_sfb(unsigned long min, unsigned long max)
 		linux_error(PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
 	}
-	if (verbose)
+	if (verbose && rc != EXIT_FAILURE)
 		fprintf(stderr, "Sampling buffer sizes:\n"
 				"    Minimum:%7ld sample-data-blocks\n"
 				"    Maximum:%7ld sample-data-blocks\n",
