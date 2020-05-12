@@ -48,6 +48,7 @@
 #define EKMF_URI_KEYS_TAGS		"/api/v1/keys/%s/tags"
 #define EKMF_URI_KEYS_EXPORT_CONTROL	"/api/v1/keys/%s/exportControl"
 #define EKMF_URI_KEYS_GET		"/api/v1/keys/%s"
+#define EKMF_URI_KEYS_SET_STATE		"/api/v1/keys/%s"
 #define EKMF_URI_KEYS_LIST		"/api/v1/keys"			\
 					"?state=%s"			\
 					"&orderBy=%s"			\
@@ -3346,6 +3347,157 @@ out:
 		free(*key);
 		*key = NULL;
 	}
+
+	return rc;
+}
+
+/**
+ * Changes the state of a key identified by its UUID. To update a key,
+ * the timestamp from the last update is required. This can be found in
+ * the key info struct in field update_on.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to get info for
+ * @param new_state         the new state of the key
+ * @param updated_on        the timestamp of the last update (must match)
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          update the key.
+ *          -EAGAIN is returned if the timestamp does not match, indicating that
+ *          the key has been updated in the meantime.
+ */
+int ekmf_set_key_state(const struct ekmf_config *config, CURL **curl_handle,
+		       const char *key_uuid, const char *new_state,
+		       const char *updated_on, char **error_msg, bool verbose)
+{
+	char *request_headers[2] = { NULL, NULL };
+	json_object *request_obj = NULL;
+	char *escaped_uuid = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	char *if_match_hdr = NULL;
+	CURL *curl = NULL;
+	char *uri = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL || key_uuid == NULL || new_state == NULL ||
+	    updated_on == NULL)
+		return -EINVAL;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	request_obj = json_object_new_object();
+	JSON_CHECK_ERROR(request_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+
+	rc = json_object_object_add_ex(request_obj, "state",
+				       json_object_new_string(new_state), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+
+	escaped_uuid = curl_easy_escape(curl, key_uuid, 0);
+	if (escaped_uuid == NULL) {
+		pr_verbose(verbose, "Failed to url-escape the key uuid");
+		rc = -EIO;
+		goto out;
+	}
+
+	if (asprintf(&uri, EKMF_URI_KEYS_SET_STATE, escaped_uuid) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	if (asprintf(&if_match_hdr, "If-Match : %s", updated_on) < 0) {
+		pr_verbose(verbose, "asprintf failed");
+		rc = -ENOMEM;
+		goto out;
+	}
+	request_headers[0] = if_match_hdr;
+
+	rc = _ekmf_perform_request(config, uri, "PATCH", request_obj,
+				   request_headers, login_token, NULL, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 204:
+		break;
+	case 400:
+		pr_verbose(verbose, "Bad request");
+		rc = -EBADMSG;
+		goto out;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	case 403:
+		pr_verbose(verbose, "Insufficient permissions");
+		rc = -EPERM;
+		goto out;
+	case 404:
+		pr_verbose(verbose, "Not found");
+		rc = -ENOENT;
+		goto out;
+	case 409:
+		pr_verbose(verbose, "Key was updated in the meantime");
+		rc = -EAGAIN;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (request_obj != NULL)
+		json_object_put(request_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (uri != NULL)
+		free(uri);
+	if (escaped_uuid != NULL)
+		curl_free(escaped_uuid);
+	if (if_match_hdr != NULL)
+		free(if_match_hdr);
 
 	return rc;
 }
