@@ -24,13 +24,22 @@ my $wlun = "0xc101000000000000";
 my $lun0 = "0x0000000000000000";
 my $sg_dir = "/sys/class/scsi_generic";
 my $udevsettle_call;
-my $udevadm = "/sbin/udevadm";
 
 
-if (! -e $udevadm) {
-        $udevsettle_call = "/sbin/udevsettle";
+# See if we can find udevadm through $PATH:
+if (!system("udevadm --version > /dev/null 2>&1")) {
+	$udevsettle_call = "udevadm settle";
+# Search udevadm in well-known locations:
+} elsif (-e "/sbin/udevadm") {
+	$udevsettle_call = "/sbin/udevadm settle";
+} elsif (-e "/usr/bin/udevadm") {
+	$udevsettle_call = "/usr/bin/udevadm settle";
+# Fall back to udevsettle:
+} elsif (-e "/sbin/udevsettle") {
+	$udevsettle_call = "/sbin/udevsettle";
 } else {
-        $udevsettle_call = "$udevadm settle";
+	$udevsettle_call = "";
+	print "Failed to find any candidate for udevsettle.\n";
 }
 
 # read the first line of a sysfs-entry and compare it to a given string
