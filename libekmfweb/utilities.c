@@ -1734,6 +1734,43 @@ void free_key_info(struct ekmf_key_info *key)
 	free_export_control(&key->export_control, true);
 }
 
+/**
+ * Finds the specified HTTP header in the list of HTTP headers. Returns a newly
+ * allocated string containing the header value. The caller must free the string
+ * when no longer needed.
+ *
+ * @param headers           the list of HTTP headers
+ * @param name              the name of the header to look for.
+ *
+ * @returns a newly allocated string, or NULL if the header is not found
+ */
+char *get_http_header_value(const struct curl_slist *headers, const char *name)
+{
+	const struct curl_slist *hdr
+;
+	char *ch;
+
+	if (headers == NULL || name == NULL)
+		return NULL;
+
+	for (hdr = headers; hdr != NULL; hdr = hdr->next) {
+		if (hdr->data == NULL)
+			continue;
+
+		ch = strchr(hdr->data, ':');
+		if (ch == NULL)
+			continue;
+		if (strncasecmp(hdr->data, name, ch - hdr->data) != 0)
+			continue;
+
+		for (ch++; *ch == ' '; ch++)
+			;
+		return strdup(ch);
+	}
+
+	return NULL;
+}
+
 struct ecc_curve_info {
 	int curve_nid;
 	enum {

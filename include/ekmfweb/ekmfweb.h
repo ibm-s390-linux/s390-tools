@@ -816,6 +816,86 @@ int ekmf_set_key_state(const struct ekmf_config *config, CURL **curl_handle,
 		       const char *updated_on, char **error_msg, bool verbose);
 
 /**
+ * Sets (changed/adds) custom tags of a key identified by its UUID. To update a
+ * key, the timestamp from the last update is required. This can be found in
+ * the key info struct in field update_on.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to get info for
+ * @param tags              a list of tags to set
+ * @param updated_on        the timestamp of the last update (must match)
+ * @param new_updated_on    on return: if not NULL, the new timestamp of the
+ *                          current update. Can be used for subsequent updates
+ *                          on the key.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          update the key.
+ *          -EAGAIN is returned if the timestamp does not match, indicating that
+ *          the key has been updated in the meantime.
+ */
+int ekmf_set_key_tags(const struct ekmf_config *config, CURL **curl_handle,
+		       const char *key_uuid, const struct ekmf_tag_list *tags,
+		       const char *updated_on, char **new_updated_on,
+		       char **error_msg, bool verbose);
+
+/**
+ * Deletes custom tags of a key identified by its UUID. To update a
+ * key, the timestamp from the last update is required. This can be found in
+ * the key info struct in field update_on.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param key_uuid          the UUID of the key to get info for
+ * @param tags              a list of tags to delete. Only the name of the tags
+ *                          must be present in the tag structs of the list, the
+ *                          values are ignored.
+ * @param updated_on        the timestamp of the last update (must match)
+ * @param new_updated_on    on return: if not NULL, the new timestamp of the
+ *                          current update. Can be used for subsequent updates
+ *                          on the key.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ *          -EPERM is returned if the login token does not have permission to
+ *          update the key.
+ *          -EAGAIN is returned if the timestamp does not match, indicating that
+ *          the key has been updated in the meantime.
+ */
+int ekmf_delete_key_tags(const struct ekmf_config *config, CURL **curl_handle,
+			 const char *key_uuid, const struct ekmf_tag_list *tags,
+			 const char *updated_on, char **new_updated_on,
+			 char **error_msg, bool verbose);
+
+/**
  * Clones a key info structure by making a deep copy of all strings and
  * arrays.
  * The copied key info must be freed using ekmf_free_key_info() by

@@ -17,6 +17,8 @@ LIBEKMFWEB_1.0 {
         ekmf_list_keys;
         ekmf_get_key_info;
         ekmf_set_key_state;
+        ekmf_set_key_tags;
+        ekmf_delete_key_tags;
         ekmf_clone_key_info;
         ekmf_free_key_info;
         ekmf_generate_key;

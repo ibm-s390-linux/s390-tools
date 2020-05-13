@@ -18,6 +18,7 @@
 #include <openssl/evp.h>
 
 #include <json-c/json.h>
+#include <curl/curl.h>
 
 #include "ekmfweb/ekmfweb.h"
 
@@ -77,6 +78,8 @@ int json_build_key_info(json_object *obj, json_object *custom_tags,
 int clone_key_info(const struct ekmf_key_info *src,
 		   struct ekmf_key_info *dest);
 void free_key_info(struct ekmf_key_info *key);
+
+char *get_http_header_value(const struct curl_slist *headers, const char *name);
 
 size_t ecc_get_curve_prime_bits(int curve_nid);
 size_t ecc_get_curve_prime_length(int curve_nid);
