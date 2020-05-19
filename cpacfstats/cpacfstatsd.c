@@ -94,20 +94,24 @@ static int do_enable(int s, enum ctr_e ctr)
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (!ctr_state[i]) {
+			if (ctr_state[i] == DISABLED) {
 				rc = perf_enable_ctr(i);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
-				ctr_state[i] = 1;
+				ctr_state[i] = ENABLED;
 			}
-			rc = perf_read_ctr(i, &value);
-			if (rc != 0) {
-				send_answer(s, i, rc, 0);
-				break;
+			if (ctr_state[i] == UNSUPPORTED) {
+				send_answer(s, i, UNSUPPORTED, 0);
+			} else {
+				rc = perf_read_ctr(i, &value);
+				if (rc != 0) {
+					send_answer(s, i, rc, 0);
+					break;
+				}
+				send_answer(s, i, ENABLED, value);
 			}
-			send_answer(s, i, ENABLED, value);
 		}
 	}
 
@@ -121,7 +125,7 @@ static int do_disable(int s, enum ctr_e ctr)
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i]) {
+			if (ctr_state[i] == ENABLED) {
 				rc = perf_disable_ctr(i);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
@@ -129,7 +133,7 @@ static int do_disable(int s, enum ctr_e ctr)
 				}
 				ctr_state[i] = 0;
 			}
-			send_answer(s, i, DISABLED, 0);
+			send_answer(s, i, ctr_state[i], 0);
 		}
 	}
 
@@ -143,7 +147,7 @@ static int do_reset(int s, enum ctr_e ctr)
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i]) {
+			if (ctr_state[i] == ENABLED) {
 				rc = perf_reset_ctr(i);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
@@ -151,7 +155,7 @@ static int do_reset(int s, enum ctr_e ctr)
 				}
 				send_answer(s, i, ENABLED, 0);
 			} else {
-				send_answer(s, i, DISABLED, 0);
+				send_answer(s, i, ctr_state[i], 0);
 			}
 		}
 	}
@@ -166,7 +170,7 @@ static int do_print(int s, enum ctr_e ctr)
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i]) {
+			if (ctr_state[i] == ENABLED) {
 				rc = perf_read_ctr(i, &value);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
@@ -174,7 +178,7 @@ static int do_print(int s, enum ctr_e ctr)
 				}
 				send_answer(s, i, ENABLED, value);
 			} else {
-				send_answer(s, i, DISABLED, 0);
+				send_answer(s, i, ctr_state[i], 0);
 			}
 		}
 	}
@@ -411,6 +415,9 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	atexit(perf_close);
+
+	if (!perf_ecc_supported())
+		ctr_state[ECC_FUNCTIONS] = UNSUPPORTED;
 
 	sfd = open_socket(SERVER);
 	if (sfd < 0) {

@@ -3,7 +3,7 @@
  *
  * common function prototypes and definitions
  *
- * Copyright IBM Corp. 2015, 2017
+ * Copyright IBM Corp. 2015, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -14,7 +14,7 @@
 
 #include "lib/zt_common.h"
 
-#define COPYRIGHT "Copyright IBM Corp. 2015, 2017"
+#define COPYRIGHT "Copyright IBM Corp. 2015, 2020"
 
 int eprint(const char *format, ...);
 
@@ -27,6 +27,7 @@ enum ctr_e {
 	AES_FUNCTIONS,
 	SHA_FUNCTIONS,
 	PRNG_FUNCTIONS,
+	ECC_FUNCTIONS,
 	ALL_COUNTER
 };
 
@@ -44,7 +45,8 @@ enum cmd_e {
 
 enum state_e {
 	DISABLED = 0,
-	ENABLED
+	ENABLED,
+	UNSUPPORTED
 };
 
 /*
@@ -108,5 +110,6 @@ int  perf_enable_ctr(enum ctr_e ctr);
 int  perf_disable_ctr(enum ctr_e ctr);
 int  perf_reset_ctr(enum ctr_e ctr);
 int  perf_read_ctr(enum ctr_e ctr, uint64_t *value);
+int  perf_ecc_supported(void);
 
 #endif

@@ -3,7 +3,7 @@
  *
  * low level perf functions
  *
- * Copyright IBM Corp. 2015, 2017
+ * Copyright IBM Corp. 2015, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -24,6 +24,8 @@
 
 #include "cpacfstats.h"
 
+#define PERF_ECC_COUNTER_NAME "cpum_cf::ECC_FUNCTION_COUNT"
+
 /* correlation between counter and perf counter string */
 static const struct {
 	char pfm_name[80];
@@ -32,7 +34,8 @@ static const struct {
 	{"cpum_cf::DEA_FUNCTIONS", DES_FUNCTIONS},
 	{"cpum_cf::AES_FUNCTIONS", AES_FUNCTIONS},
 	{"cpum_cf::SHA_FUNCTIONS", SHA_FUNCTIONS},
-	{"cpum_cf::PRNG_FUNCTIONS", PRNG_FUNCTIONS}
+	{"cpum_cf::PRNG_FUNCTIONS", PRNG_FUNCTIONS},
+	{PERF_ECC_COUNTER_NAME, ECC_FUNCTIONS}
 };
 
 /*
@@ -53,6 +56,7 @@ static const struct {
  */
 static int *ctr_fds[ALL_COUNTER];
 
+static int ecc_supported;
 
 int perf_init(void)
 {
@@ -68,11 +72,19 @@ int perf_init(void)
 		return -1;
 	}
 
+	/* Check if ECC is supported on current hardware */
+	if (pfm_find_event(PERF_ECC_COUNTER_NAME) >= 0)
+		ecc_supported = 1;
+
 	/* get number of logical processors */
 	cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
 	/* for each counter */
 	for (ctr = 0; ctr < ALL_COUNTER; ctr++) {
+
+		/* Skip ECC counters completely if unsupported */
+		if (ctr == ECC_FUNCTIONS && !ecc_supported)
+			continue;
 
 		/*
 		 * allocate an array of ints to store for each CPU
@@ -88,6 +100,16 @@ int perf_init(void)
 
 		ctr_fds[ctr] = fds;
 
+		/* search for the counter's corresponding pfm name */
+		for (i = ALL_COUNTER-1; i >= 0; i--)
+			if ((int) pmf_counter_name[i].ctr == ctr)
+				break;
+		if (i < 0) {
+			eprint("Pfm ctr name not found for counter %d, please adjust pmf_counter_name[] in %s\n",
+			       ctr, __FILE__);
+			return -1;
+		}
+
 		for (cpu = 0; cpu < cpus; cpu++) {
 			pfm_perf_encode_arg_t pfm_arg;
 			struct perf_event_attr pfm_event;
@@ -98,16 +120,6 @@ int perf_init(void)
 			pfm_arg.attr = &pfm_event;
 			pfm_arg.size = sizeof(pfm_arg);
 			pfm_event.size = sizeof(pfm_event);
-
-			/* search for the counter's corresponding pfm name */
-			for (i = ALL_COUNTER-1; i >= 0; i--)
-				if ((int) pmf_counter_name[i].ctr == ctr)
-					break;
-			if (i < 0) {
-				eprint("Pfm ctr name not found for counter %d, please adjust pmf_counter_name[] in %s\n",
-				       ctr, __FILE__);
-				return -1;
-			}
 
 			/* encode the counters perf event into pfm_arg.attr */
 			ec = pfm_get_os_event_encoding(
@@ -256,4 +268,9 @@ int perf_read_ctr(enum ctr_e ctr, uint64_t *value)
 	}
 
 	return rc;
+}
+
+int  perf_ecc_supported(void)
+{
+	return ecc_supported;
 }

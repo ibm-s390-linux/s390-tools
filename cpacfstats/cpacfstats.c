@@ -3,7 +3,7 @@
  *
  * cpacfstats client implementation
  *
- * Copyright IBM Corp. 2015, 2017
+ * Copyright IBM Corp. 2015, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -39,13 +39,14 @@ static const char *const usage =
 	"\t-d, --disable [counter]   Disable one or all counters\n"
 	"\t-r, --reset   [counter]   Reset one or all counter values\n"
 	"\t-p, --print   [counter]   Print one or all counter values\n"
-	"\tcounter can be: 'aes' 'des' 'rng' 'sha' or 'all'\n";
+	"\tcounter can be: 'aes' 'des' 'rng' 'sha' 'ecc' or 'all'\n";
 
 static const char *const counter_str[] = {
 	[DES_FUNCTIONS]  = "des",
 	[AES_FUNCTIONS]  = "aes",
 	[SHA_FUNCTIONS]  = "sha",
 	[PRNG_FUNCTIONS] = "rng",
+	[ECC_FUNCTIONS] = "ecc",
 	[ALL_COUNTER]    = "all"
 };
 
@@ -98,6 +99,8 @@ static void print_answer(int ctr, int state, uint64_t value)
 		       counter_str[ctr], state);
 	else if (state == DISABLED)
 		printf(" %s counter: disabled\n", counter_str[ctr]);
+	else if (state == UNSUPPORTED)
+		printf(" %s counter: unsupported\n", counter_str[ctr]);
 	else
 		printf(" %s counter: %"PRIu64"\n", counter_str[ctr], value);
 }

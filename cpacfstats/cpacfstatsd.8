@@ -1,6 +1,6 @@
 .\" cpacfstatsd.8
 .\"
-.\" Copyright IBM Corp. 2015, 2017
+.\" Copyright IBM Corp. 2015, 2020
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -37,7 +37,10 @@ config option enabled.
 .P
 - Libpfm version 4 or higher is needed to successfully run the daemon.
 .P
-- Your LPAR must be configured to enable the "Counter Facility Security Options".
+- On the HMC or SE, authorize the LPAR for each counter set you want
+to use. Customize the LPAR activation profile and modify the Counter
+Facility Security Options. You need to activate the "Crypto activity
+counter set authorization control" checkbox.
 .P
 - The daemon requires root privileges to interact with the performance
 ioctls of the kernel.
@@ -47,7 +50,7 @@ restart the daemon to ensure correct summing of the per-CPU performance
 counters.
 
 The starting daemon first checks for any stale pid file
-/run/cpacfstatsd.pid. If this file exists, and the process ID in the
+\%/run/cpacfstatsd.pid. If this file exists, and the process ID in the
 file belongs to an active process, an error message is printed to the
 console and the program terminates.
 
@@ -94,4 +97,4 @@ done in the re-spawned process. Check the syslog for success or failure.
 The daemon could not be set to run in the background.
 
 .SH SEE ALSO
-cpacfstats (1)
+.BR cpacfstats (1)

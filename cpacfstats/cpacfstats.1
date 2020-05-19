@@ -1,6 +1,6 @@
 .\" cpacfstats.1
 .\"
-.\" Copyright IBM Corp. 2015, 2017
+.\" Copyright IBM Corp. 2015, 2020
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -80,31 +80,33 @@ Display help information for the command.
 Display version and copyright information for the command.
 .TP
 \fB\-e\fR or \fB\-\-enable\fR [counter]
-Enable one or all CPACF performance counters. The optional counter argument
-can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR or \fBall\fR. If
-the counter argument is omitted, all performance counters are
-enabled. Enabling a counter does not reset it. New events are added to the
-current counter value.
+Enable one or all CPACF performance counters. The optional counter
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
+\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
+performance counters are enabled. Enabling a counter does not reset
+it. New events are added to the current counter value.
 .TP
 \fB\-d\fR or \fB\-\-disable\fR [counter]
 Disable one or all CPACF performance counters. The optional counter
-argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR or
-\fBall\fR. If the counter argument is omitted, all performance counters
-are disabled. Disabling a counter does not reset it. The counter value is
-preserved when a counter is disabled, and counting will resume using the
-preserved value when the counter is re-enabled.
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
+\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
+performance counters are disabled. Disabling a counter does not reset
+it. The counter value is preserved when a counter is disabled, and
+counting will resume using the preserved value when the counter is
+re-enabled.
 .TP
 \fB\-r\fR or \fB\-\-reset\fR [counter]
 Reset one or all CPACF performance counters. The optional counter
-argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR or
-\fBall\fR. If the counter argument is omitted, all performance counters are
-reset to 0.
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
+\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
+performance counters are reset to 0.
 .TP
 \fB\-p\fR or \fB\-\-print\fR [counter]
-Display the value of one or all CPACF performance counters. The optional
-counter argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR
-or \fBall\fR. If the counter argument is omitted or if there is no
-argument, all performance counters are displayed.
+Display the value of one or all CPACF performance counters. The
+optional counter argument can be one of: \fBdes\fR, \fBaes\fR,
+\fBsha\fR, \fBprng\fR, \fBecc\fR, or \fBall\fR. If the counter
+argument is omitted or if there is no argument, all performance
+counters are displayed.
 .TP
 The default command is --print all.
 .
@@ -123,5 +125,10 @@ version mismatch between client and daemon, or the application is out of
 memory. The application prints a message with the details of the error and
 the errno value.
 .
+.SH NOTES
+ECC counters are only available since z15. cpacfstats will show the
+counters as \fIunsupported\fR if the hardware does not support ECC
+counters.
+.
 .SH SEE ALSO
-cpacfstatsd (8)
+.BR cpacfstatsd (8)
