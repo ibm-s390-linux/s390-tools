@@ -9,6 +9,7 @@
 
 [Unit]
 Description=Configure dump on panic for System z
+ConditionVirtualization=!lxc
 After=network.target
 
 [Service]
