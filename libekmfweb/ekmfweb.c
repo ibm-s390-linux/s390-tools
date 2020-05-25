@@ -43,6 +43,7 @@
 #define MAX_SYM_KEY_BLOB_SIZE		CCA_MAX_SYM_KEY_TOKEN_SIZE
 
 #define EKMF_URI_SYSTEM_PUBKEY		"/api/v1/system/publicKey"
+#define EKMF_URI_SYSTEM_LOGIN		"/api/v1/system/login"
 #define EKMF_URI_KEYS_GENERATE		"/api/v1/keys"
 #define EKMF_URI_KEYS_EXPORT		"/api/v1/keys/%s/export"
 #define EKMF_URI_KEYS_TAGS		"/api/v1/keys/%s/tags"
@@ -1241,6 +1242,142 @@ out:
 		fclose(fp);
 
 	return rc;
+}
+
+/**
+ * Performs a login of the specified user with a passcode. On success the
+ * returned login token is stored in the file denoted by field login_token
+ * of the config structure, so that it can be used by subsequent requests.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param user_id           the user-ID to log-in.
+ * @param passcode          the passcode to log-in the user.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if the passcode is no longer valid.
+ */
+int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
+	       const char *user_id, const char *passcode, char **error_msg,
+	       bool verbose)
+{
+	json_object *response_obj = NULL;
+	json_object *request_obj = NULL;
+	const char *login_token, *tok;
+	CURL *curl = NULL;
+	long status_code;
+	FILE *fp = NULL;
+	size_t count;
+	int rc;
+
+	if (config == NULL || user_id == NULL || passcode == NULL)
+		return -EINVAL;
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	request_obj = json_object_new_object();
+	JSON_CHECK_ERROR(request_obj == NULL, rc, -ENOMEM,
+			 "Failed to generate JSON object", verbose, out);
+
+	rc = json_object_object_add_ex(request_obj, "userId",
+				       json_object_new_string(user_id), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+
+	rc = json_object_object_add_ex(request_obj, "passcode",
+				       json_object_new_string(passcode), 0);
+	JSON_CHECK_ERROR(rc != 0, rc, -EIO, "Failed to add data to JSON object",
+			 verbose, out);
+
+	rc = _ekmf_perform_request(config, EKMF_URI_SYSTEM_LOGIN, "POST",
+				   request_obj, NULL, NULL, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 410:
+		pr_verbose(verbose, "The passcode is no longer valid");
+		rc = -EACCES;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_object, rc, -EIO,
+		       "No or invalid response content", verbose, out);
+
+	login_token = json_get_string(response_obj, "authorizationToken");
+	JSON_CHECK_ERROR(login_token == NULL, rc, -EBADMSG,
+			 "Invalid response content", verbose, out);
+
+	if (strncmp(login_token, "Bearer ", 7) != 0) {
+		rc = -EBADMSG;
+		pr_verbose(verbose, "Received token is not a Bearer token");
+		goto out;
+	}
+
+	tok = &login_token[7];
+	while (*tok == ' ')
+		tok++;
+
+	fp = fopen(config->login_token, "w");
+	if (fp == NULL) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to open file %s: '%s'",
+			   config->login_token, strerror(-rc));
+		goto out;
+	}
+
+	count = fwrite(tok, 1, strlen(tok), fp);
+	if (count != strlen(tok)) {
+		pr_verbose(verbose, "Failed to write the token");
+		rc = -EIO;
+		goto out;
+	}
+
+	pr_verbose(verbose, "Login token successfully updated in file '%s'",
+		   config->login_token);
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (request_obj != NULL)
+		json_object_put(request_obj);
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (fp != NULL)
+		fclose(fp);
+
+	return rc;
+
 }
 
 /**

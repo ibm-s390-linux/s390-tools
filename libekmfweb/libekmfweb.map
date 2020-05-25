@@ -3,6 +3,7 @@ LIBEKMFWEB_1.0 {
         ekmf_get_server_cert_chain;
         ekmf_print_certificates;
         ekmf_check_login_token;
+        ekmf_login;
         ekmf_generate_identity_key;
         ekmf_reencipher_identity_key;
         ekmf_generate_csr;

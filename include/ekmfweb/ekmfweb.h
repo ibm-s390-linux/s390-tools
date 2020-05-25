@@ -136,6 +136,36 @@ int ekmf_print_certificates(const char *cert_pem, bool verbose);
 int ekmf_check_login_token(const struct ekmf_config *config, bool *valid,
 			   char **login_token, bool verbose);
 
+/**
+ * Performs a login of the specified user with a passcode. On success the
+ * returned login token is stored in the file denoted by field login_token
+ * of the config structure, so that it can be used by subsequent requests.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param user_id           the user-ID to log-in.
+ * @param passcode          the passcode to log-in the user.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if the passcode is no longer valid.
+ */
+int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
+	       const char *user_id, const char *passcode, char **error_msg,
+	       bool verbose);
+
 enum ekmf_key_type {
 	EKMF_KEY_TYPE_ECC = 1,
 	EKMF_KEY_TYPE_RSA = 2,
