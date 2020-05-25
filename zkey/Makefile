@@ -73,9 +73,10 @@ properties.o: check-dep-zkey properties.c properties.h
 keystore.o: keystore.c keystore.h properties.h pkey.h cca.h ep11.h utils.h
 zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h \
 			ep11.h misc.h utils.h
+kms.o: kms.c kms.h kms-plugin.h
 
 zkey: LDLIBS = -ldl -lcrypto
-zkey: zkey.o pkey.o cca.o ep11.o properties.o keystore.o utils.o $(libs)
+zkey: zkey.o pkey.o cca.o ep11.o properties.o keystore.o utils.o kms.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c -lcrypto
@@ -86,13 +87,14 @@ install-common:
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 
-install-zkey:
+install-zkey: zkey
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -m 644 -c zkey.1 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey/repository
+	$(INSTALL) -m 644 -c kms-plugins.conf $(DESTDIR)$(SYSCONFDIR)/zkey
 
-install-zkey-cryptsetup:
+install-zkey-cryptsetup: zkey-cryptsetup
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey-cryptsetup $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -m 644 -c zkey-cryptsetup.1 $(DESTDIR)$(MANDIR)/man1
 
