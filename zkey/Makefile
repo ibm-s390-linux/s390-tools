@@ -1,5 +1,7 @@
 include ../common.mak
 
+SUB_DIRS = ekmfweb
+
 ifneq (${HAVE_OPENSSL},0)
 	BUILD_TARGETS += zkey
 	INSTALL_TARGETS += install-zkey
@@ -62,7 +64,7 @@ zkey-cryptsetup-skip-cryptsetup2:
 zkey-cryptsetup-skip-jsonc:
 	echo "  SKIP    zkey-cryptsetup due to HAVE_JSONC=0"
 
-all: $(BUILD_TARGETS)
+all: $(BUILD_TARGETS) $(SUB_DIRS)
 
 zkey.o: zkey.c pkey.h cca.h ep11.h misc.h
 pkey.o: pkey.c pkey.h cca.h ep11.h utils.h
@@ -98,11 +100,23 @@ install-zkey-cryptsetup: zkey-cryptsetup
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey-cryptsetup $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -m 644 -c zkey-cryptsetup.1 $(DESTDIR)$(MANDIR)/man1
 
-install: all install-common $(INSTALL_TARGETS)
+install: all install-common $(INSTALL_TARGETS) $(SUB_DIRS)
 
-clean:
+clean: $(SUB_DIRS)
 	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.dep \
 		check-dep-zkey check-dep-zkey-cryptsetup
+
+#
+# For simple "make" we explicitly set the MAKECMDGOALS to "all".
+#
+ifeq ($(MAKECMDGOALS),)
+MAKECMDGOALS = all
+endif
+
+$(SUB_DIRS):
+	$(foreach goal,$(MAKECMDGOALS), \
+		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
+.PHONY: $(SUB_DIRS)
 
 .PHONY: all install clean zkey-skip zkey-cryptsetup-skip-cryptsetup2 \
 	zkey-cryptsetup-skip-jsonc install-common install-zkey \

@@ -1,0 +1,5 @@
+ZKEY_EKMFWEB_1.0 {
+    global:
+        kms_get_functions;
+    local: *;
+};
