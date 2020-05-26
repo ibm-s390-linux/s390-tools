@@ -1,7 +1,7 @@
 /*
  * zkey - Generate, re-encipher, and validate secure keys
  *
- * Copyright IBM Corp. 2017, 2018
+ * Copyright IBM Corp. 2017, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -45,7 +45,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2017,
-			.pub_last = 2018,
+			.pub_last = 2020,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -837,6 +837,7 @@ struct zkey_command {
 	char *pos_arg_alternate;
 	char **arg_alternate_value;
 	int need_keystore;
+	struct zkey_command *sub_commands;
 };
 
 static int command_generate(void);
@@ -1007,28 +1008,68 @@ static struct zkey_command zkey_commands[] = {
 #define pr_verbose(fmt...)	if (g.verbose) \
 					warnx(fmt)
 
-static void print_usage_command(const struct zkey_command *command)
+static void print_usage_sub_command_list(const struct zkey_command *sub_command)
 {
+	struct zkey_command *sub_cmd = (struct zkey_command *)sub_command;
 	char command_str[ZKEY_COMMAND_STR_LEN];
+	unsigned int i;
+
+	printf("SUBCOMMANDS\n");
+	while (sub_cmd->command) {
+		strcpy(command_str, sub_cmd->command);
+		for (i = 0; i < sub_cmd->abbrev_len; i++)
+			command_str[i] =
+				toupper(command_str[i]);
+		printf("  %-*s    %s\n", ZKEY_COMMAND_MAX_LEN,
+		       command_str, sub_cmd->short_desc);
+		sub_cmd++;
+	}
+}
+
+static void print_usage_command(const struct zkey_command *command,
+				const struct zkey_command *sub_command)
+{
+	char sub_command_str[ZKEY_COMMAND_STR_LEN];
+	char command_str[ZKEY_COMMAND_STR_LEN];
+	const struct zkey_command *cmd;
 	unsigned int i;
 
 	strncpy(command_str, command->command, sizeof(command_str) - 1);
 	for (i = 0; i < command->abbrev_len; i++)
 		command_str[i] = toupper(command_str[i]);
 
-	printf("Usage: %s %s",
-	       program_invocation_short_name, command_str);
-	if (command->pos_arg != NULL)
-		printf(" %s", command->pos_arg);
-	if (command->has_options)
+	if (sub_command != NULL) {
+		strncpy(sub_command_str, sub_command->command,
+			sizeof(sub_command_str) - 1);
+		for (i = 0; i < sub_command->abbrev_len; i++)
+			sub_command_str[i] = toupper(sub_command_str[i]);
+
+		printf("Usage: %s %s %s", program_invocation_short_name,
+		       command_str, sub_command_str);
+	} else {
+		printf("Usage: %s %s", program_invocation_short_name,
+		       command_str);
+		if (command->sub_commands != NULL)
+			printf(" SUBCOMMAND");
+	}
+
+	cmd = sub_command != NULL ? sub_command : command;
+
+	if (cmd->pos_arg != NULL)
+		printf(" %s", cmd->pos_arg);
+	if (cmd->has_options)
 		printf(" [OPTIONS]");
+
 	if (prg.args)
 		printf(" %s", prg.args);
 	printf("\n\n");
-	util_print_indented(command->long_desc, 0);
+	util_print_indented(cmd->long_desc, 0);
 
-	if (command->has_options)
+	if (cmd->has_options)
 		printf("\n");
+
+	if (sub_command == NULL && command->sub_commands != NULL)
+		print_usage_sub_command_list(command->sub_commands);
 }
 
 static void print_usage_command_list(void)
@@ -1054,21 +1095,26 @@ static void print_usage_command_list(void)
 /*
  * --help printout
  */
-static void print_help(const struct zkey_command *command)
+static void print_help(const struct zkey_command *command,
+		       const struct zkey_command *sub_command)
 {
 	/* Print usage */
-	if (!command)
+	if (command == NULL)
 		print_usage_command_list();
 	else
-		print_usage_command(command);
+		print_usage_command(command, sub_command);
 
 	/* Print parameter help */
 	util_opt_print_help();
 
-	if (!command) {
+	if (command == NULL) {
 		printf("\n");
 		printf("For more information use '%s COMMAND --help'.\n",
 			program_invocation_short_name);
+	} else if (command->sub_commands != NULL && sub_command == NULL) {
+		printf("\n");
+		printf("For more information use '%s %s SUBCOMMAND --help'.\n",
+			program_invocation_short_name, command->command);
 	}
 }
 
@@ -1972,9 +2018,10 @@ static bool is_command(struct zkey_command *command, const char *str)
 /*
  * Find the command in the command table
  */
-struct zkey_command *find_command(const char *command)
+struct zkey_command *find_command(const struct zkey_command *commands,
+				  const char *command)
 {
-	struct zkey_command *cmd = zkey_commands;
+	struct zkey_command *cmd = (struct zkey_command *)commands;
 
 	while (cmd->command) {
 		if (is_command(cmd, command))
@@ -2012,7 +2059,10 @@ static int check_positional_arg(struct zkey_command *command)
  */
 int main(int argc, char *argv[])
 {
+	char command_str[2 * ZKEY_COMMAND_STR_LEN + 2];
+	struct zkey_command *sub_command = NULL;
 	struct zkey_command *command = NULL;
+	struct zkey_command *cmd = NULL;
 	int arg_count = argc;
 	char **args = argv;
 	char *endp;
@@ -2021,26 +2071,51 @@ int main(int argc, char *argv[])
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
-	/* Get command if one is specified */
-	if (argc >= 2 && strncmp(argv[1], "-", 1) != 0) {
-		command = find_command(argv[1]);
+	/* Get command and subcommand if one is specified */
+	if (arg_count >= 2 && strncmp(args[1], "-", 1) != 0) {
+		command = find_command(zkey_commands, args[1]);
 		if (command == NULL) {
-			misc_print_invalid_command(argv[1]);
+			misc_print_invalid_command(args[1]);
 			return EXIT_FAILURE;
 		}
 
-		arg_count = argc - 1;
-		args = &argv[1];
+		arg_count--;
+		args = &args[1];
 
-		if (argc >= 3 && strncmp(argv[2], "-", 1) != 0) {
-			g.pos_arg = argv[2];
-			arg_count = argc - 2;
-			args = &argv[2];
+		if (arg_count >= 2 && strncmp(args[1], "-", 1) != 0 &&
+		    command->sub_commands != NULL) {
+			sub_command = find_command(command->sub_commands,
+						   args[1]);
+			if (sub_command == NULL) {
+				misc_print_invalid_command(args[1]);
+				return EXIT_FAILURE;
+			}
+
+			arg_count--;
+			args = &args[1];
+		}
+
+		if (arg_count >= 2 && strncmp(args[1], "-", 1) != 0) {
+			g.pos_arg = args[1];
+			arg_count--;
+			args = &args[1];
 		}
 	}
 
-	util_opt_set_command(command ? command->command : NULL);
-	util_prg_set_command(command ? command->command : NULL);
+	if (sub_command != NULL) {
+		snprintf(command_str, sizeof(command_str), "%s %s",
+			 command->command, sub_command->command);
+		util_prg_set_command(command_str);
+		util_opt_set_command(command_str);
+	} else {
+		util_prg_set_command(command ? command->command : NULL);
+		util_opt_set_command(command ? command->command : NULL);
+	}
+
+	if (sub_command != NULL && command->sub_commands != NULL)
+		cmd = sub_command;
+	else
+		cmd = command;
 
 	while (1) {
 		c = util_opt_getopt_long(arg_count, args);
@@ -2179,7 +2254,7 @@ int main(int argc, char *argv[])
 			break;
 #endif
 		case 'h':
-			print_help(command);
+			print_help(command, sub_command);
 			return EXIT_SUCCESS;
 		case 'v':
 			util_prg_print_version();
@@ -2195,37 +2270,42 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if (command == NULL) {
+	if (cmd == NULL) {
 		misc_print_missing_command();
 		return EXIT_FAILURE;
 	}
 
-	if (command->pos_arg != NULL) {
-		if (check_positional_arg(command) != EXIT_SUCCESS)
+	if (cmd->sub_commands != NULL) {
+		misc_print_missing_sub_command();
+		return EXIT_FAILURE;
+	}
+
+	if (cmd->pos_arg != NULL) {
+		if (check_positional_arg(cmd) != EXIT_SUCCESS)
 			return EXIT_FAILURE;
 	}
 
-	if (command->need_keystore || g.pos_arg == NULL) {
+	if (cmd->need_keystore || g.pos_arg == NULL) {
 		rc = open_keystore();
 		if (rc != EXIT_SUCCESS)
 			goto out;
 	}
 
-	if (command->need_cca_library) {
+	if (cmd->need_cca_library) {
 		rc = load_cca_library(&g.cca, g.verbose);
 		if (rc != 0) {
 			rc = EXIT_FAILURE;
 			goto out;
 		}
 	}
-	if (command->need_ep11_library) {
+	if (cmd->need_ep11_library) {
 		rc = load_ep11_library(&g.ep11, g.verbose);
 		if (rc != 0) {
 			rc = EXIT_FAILURE;
 			goto out;
 		}
 	}
-	if (command->need_pkey_device) {
+	if (cmd->need_pkey_device) {
 		g.pkey_fd = open_pkey_device(g.verbose);
 		if (g.pkey_fd == -1) {
 			rc = EXIT_FAILURE;
@@ -2235,7 +2315,7 @@ int main(int argc, char *argv[])
 
 	umask(0077);
 
-	rc = command->function();
+	rc = cmd->function();
 
 out:
 	if (g.cca.lib_csulcca)
