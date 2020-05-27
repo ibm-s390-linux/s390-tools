@@ -39,6 +39,13 @@
 #define KMS_CONFIG_PROP_APQNS		"apqns"
 #define KMS_CONFIG_LOCAL		"local"
 
+static const char * const key_types[] = {
+		KEY_TYPE_CCA_AESDATA,
+		KEY_TYPE_CCA_AESCIPHER,
+		KEY_TYPE_EP11_AES,
+		NULL
+};
+
 typedef const struct kms_functions *(*kms_get_functions_t)(void);
 
 #define pr_verbose(verbose, fmt...)	do {				\
@@ -737,5 +744,71 @@ out:
 		free(config_dir);
 	if (filename != NULL)
 		free(filename);
+	return rc;
+}
+
+/**
+ * Displays information about the KMS plugin and its configuration
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int print_kms_info(struct kms_info *kms_info)
+{
+	bool first;
+	int rc = 0;
+	size_t i;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		goto out;
+	}
+
+	printf("KMS-Plugin:             %s\n", kms_info->plugin_name);
+
+	if (kms_info->funcs->kms_supports_key_type != NULL) {
+		for (i = 0, first = true; key_types[i] != NULL; i++) {
+			if (kms_info->funcs->kms_supports_key_type(
+					kms_info->handle, key_types[i])) {
+				printf("  %s  %s\n", first ?
+				       "Supported key types:" :
+				       "                    ", key_types[i]);
+				first = false;
+			}
+		}
+		if (first)
+			printf("  Supported key types:  (none)\n");
+	} else {
+		printf("  Supported key types:  (unknown)\n");
+	}
+
+	if (kms_info->apqns == NULL || kms_info->num_apqns == 0) {
+		printf("  APQNs:                (configuration required)\n");
+		goto kms_info;
+	}
+
+	for (i = 0; i < kms_info->num_apqns; i++)
+		printf("  %s                %02x.%04x\n",
+		       i == 0 ? "APQNs:" : "      ",
+		       kms_info->apqns[i].card,
+		       kms_info->apqns[i].domain);
+
+kms_info:
+	if (kms_info->funcs->kms_display_info == NULL)
+		goto out;
+
+	rc = kms_info->funcs->kms_display_info(kms_info->handle);
+	if (rc != 0) {
+		warnx("Failed to display information about the plugin: %s",
+		      strerror(-rc));
+		print_last_kms_error(kms_info);
+		goto out;
+	}
+
+out:
 	return rc;
 }

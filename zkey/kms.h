@@ -45,4 +45,6 @@ int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 int unbind_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 		      bool verbose);
 
+int print_kms_info(struct kms_info *kms_info);
+
 #endif

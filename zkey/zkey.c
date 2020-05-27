@@ -33,6 +33,7 @@
 #include "misc.h"
 #include "pkey.h"
 #include "utils.h"
+#include "kms.h"
 
 /*
  * Program configuration
@@ -115,6 +116,11 @@ static struct zkey_globals {
 #define COMMAND_CRYPTTAB	"crypttab"
 #define COMMAND_CRYPTSETUP	"cryptsetup"
 #define COMMAND_CONVERT		"convert"
+#define COMMAND_KMS		"kms"
+#define COMMAND_KMS_PLUGINS	"plugins"
+#define COMMAND_KMS_BIND	"bind"
+#define COMMAND_KMS_UNBIND	"unbind"
+#define COMMAND_KMS_INFO	"info"
 
 #define ZKEY_COMMAND_MAX_LEN	10
 
@@ -852,6 +858,7 @@ struct zkey_command {
 	char *pos_arg_alternate;
 	char **arg_alternate_value;
 	int need_keystore;
+	int use_kms_plugin;
 	struct zkey_command *sub_commands;
 };
 
@@ -868,6 +875,60 @@ static int command_copy(void);
 static int command_crypttab(void);
 static int command_cryptsetup(void);
 static int command_convert(void);
+static int command_kms_plugins(void);
+static int command_kms_bind(void);
+static int command_kms_unbind(void);
+static int command_kms_info(void);
+
+static struct zkey_command zkey_kms_commands[] = {
+	{
+		.command = COMMAND_KMS_PLUGINS,
+		.abbrev_len = 2,
+		.function = command_kms_plugins,
+		.short_desc = "Lists key management system plugins",
+		.long_desc = "Lists available key management system (KMS) "
+			     "plugins.",
+		.has_options = 1,
+	},
+	{
+		.command = COMMAND_KMS_BIND,
+		.abbrev_len = 2,
+		.function = command_kms_bind,
+		.short_desc = "Binds the repository to a key management system "
+			      "plugin",
+		.long_desc = "Binds the repository to the specified key "
+			     "management system (KMS) plugin.",
+		.need_keystore = 1,
+		.has_options = 1,
+		.pos_arg = "[KMS-PLUGIN]",
+	},
+	{
+		.command = COMMAND_KMS_UNBIND,
+		.abbrev_len = 3,
+		.function = command_kms_unbind,
+		.short_desc = "Unbinds the repository from a key management "
+			      "system plugin",
+		.long_desc = "Unbinds the repository from the current key "
+			     "management system (KMS) plugin, and turns all "
+			     "KMS-bound keys into local keys",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+	},
+	{
+		.command = COMMAND_KMS_INFO,
+		.abbrev_len = 2,
+		.function = command_kms_info,
+		.short_desc = "Displays information about a key management "
+			      "system plugin",
+		.long_desc = "Displays information about the current key "
+			     "management system (KMS) plugin",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+	},
+	{ .command = NULL }
+};
 
 static struct zkey_command zkey_commands[] = {
 	{
@@ -1016,6 +1077,15 @@ static struct zkey_command zkey_commands[] = {
 		.has_options = 1,
 		.pos_arg = "[SECURE-KEY-FILE]",
 		.pos_arg_optional = 1,
+	},
+	{
+		.command = COMMAND_KMS,
+		.abbrev_len = 2,
+		.short_desc = "key management system (KMS) support",
+		.long_desc = "Provides subcommands for key management system "
+			     "(KMS) support.",
+		.has_options = 1,
+		.sub_commands = zkey_kms_commands,
 	},
 	{ .command = NULL }
 };
@@ -2002,6 +2072,97 @@ static int command_convert(void)
 	return EXIT_SUCCESS;
 }
 
+/*
+ * Command handler for 'kms plugins'.
+ *
+ * List KMS plugins
+ */
+static int command_kms_plugins(void)
+{
+	int rc;
+
+	rc = list_kms_plugins(g.verbose);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'kms bind'.
+ *
+ * Bind repository to a KMS plugin
+ */
+static int command_kms_bind(void)
+{
+	int rc;
+
+	rc = bind_kms_plugin(g.keystore, g.pos_arg, g.verbose);
+
+	if (rc == 0)
+		util_print_indented("The KMS plugin requires configuration, "
+				    "run 'zkey kms configure [OPTIONS]' to "
+				    "complete the KMS binding process", 0);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'kms unbind'.
+ *
+ * Unbind repository from a KMS plugin
+ */
+static int command_kms_unbind(void)
+{
+	char *msg;
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	util_asprintf(&msg, "%s: Unbind this repository from KMS plugin '%s' "
+		     "and turn all KMS-bound keys into local keys [y/N]? ",
+		     program_invocation_short_name, g.kms_info.plugin_name);
+	util_print_indented(msg, 0);
+	free(msg);
+	if (!prompt_for_yes(g.verbose)) {
+		warnx("Operation aborted");
+		return EXIT_FAILURE;
+	}
+
+	rc = keystore_kms_keys_unbind(g.keystore);
+	if (rc != 0) {
+		warnx("Failed to turn KMS-bound keys into local keys: %s",
+		      strerror(-rc));
+		return EXIT_FAILURE;
+	}
+
+	rc = unbind_kms_plugin(&g.kms_info, g.keystore, g.verbose);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'kms info'.
+ *
+ * Prints information about a KMS plugin
+ */
+static int command_kms_info(void)
+{
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	rc = print_kms_info(&g.kms_info);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 /**
  * Opens the keystore. The keystore directory is either the
  * default directory or as specified in an environment variable
@@ -2139,6 +2300,12 @@ int main(int argc, char *argv[])
 		cmd = sub_command;
 	else
 		cmd = command;
+
+	if (cmd != NULL && cmd->use_kms_plugin) {
+		rc = check_for_kms_plugin(&g.kms_info, g.verbose);
+		if (rc != 0)
+			return EXIT_FAILURE;
+	}
 
 	while (1) {
 		c = util_opt_getopt_long(arg_count, args);
@@ -2314,7 +2481,8 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 	}
 
-	if (cmd->need_keystore || g.pos_arg == NULL) {
+	if (cmd->need_keystore ||
+	    (cmd->pos_arg_optional && g.pos_arg == NULL)) {
 		rc = open_keystore();
 		if (rc != EXIT_SUCCESS)
 			goto out;
@@ -2342,11 +2510,20 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (g.kms_info.plugin_lib != NULL) {
+		rc = init_kms_plugin(&g.kms_info, g.verbose);
+		if (rc != 0) {
+			rc = EXIT_FAILURE;
+			goto out;
+		}
+	}
+
 	umask(0077);
 
 	rc = cmd->function();
 
 out:
+	free_kms_plugin(&g.kms_info);
 	if (g.cca.lib_csulcca)
 		dlclose(g.cca.lib_csulcca);
 	if (g.ep11.lib_ep11)
