@@ -93,6 +93,9 @@ static struct zkey_globals {
 	int pkey_fd;
 	struct keystore *keystore;
 	struct kms_info kms_info;
+	int first_kms_option;
+	struct kms_option *kms_options;
+	size_t num_kms_options;
 } g = {
 	.pkey_fd = -1,
 	.sector_size = -1,
@@ -121,6 +124,15 @@ static struct zkey_globals {
 #define COMMAND_KMS_BIND	"bind"
 #define COMMAND_KMS_UNBIND	"unbind"
 #define COMMAND_KMS_INFO	"info"
+
+#define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
+
+#define OPT_PLACEHOLDER					\
+{							\
+	.option = { "", 0, NULL, ' ' },			\
+	.desc = OPT_COMMAND_PLACEHOLDER,		\
+	.command = OPT_COMMAND_PLACEHOLDER,		\
+}
 
 #define ZKEY_COMMAND_MAX_LEN	10
 
@@ -824,6 +836,47 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_CONVERT,
 	},
 	/***********************************************************/
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	OPT_PLACEHOLDER,
+	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "COMMON OPTIONS"
@@ -859,6 +912,7 @@ struct zkey_command {
 	char **arg_alternate_value;
 	int need_keystore;
 	int use_kms_plugin;
+	char *kms_plugin_opts_cmd;
 	struct zkey_command *sub_commands;
 };
 
@@ -2253,7 +2307,6 @@ int main(int argc, char *argv[])
 	int rc, c;
 
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
 
 	/* Get command and subcommand if one is specified */
 	if (arg_count >= 2 && strncmp(args[1], "-", 1) != 0) {
@@ -2305,12 +2358,44 @@ int main(int argc, char *argv[])
 		rc = check_for_kms_plugin(&g.kms_info, g.verbose);
 		if (rc != 0)
 			return EXIT_FAILURE;
+
+		if (cmd->kms_plugin_opts_cmd) {
+			rc = get_kms_options(&g.kms_info, opt_vec,
+					     OPT_COMMAND_PLACEHOLDER,
+					     cmd->kms_plugin_opts_cmd,
+					     sub_command != NULL ?
+						command_str : cmd->command,
+					     &g.first_kms_option,
+					     g.verbose);
+			if (rc != 0)
+				return EXIT_FAILURE;
+		}
 	}
+
+	util_opt_init(opt_vec, NULL);
 
 	while (1) {
 		c = util_opt_getopt_long(arg_count, args);
 		if (c == -1)
 			break;
+
+		if (cmd != NULL && cmd->kms_plugin_opts_cmd) {
+			rc = handle_kms_option(&g.kms_info, opt_vec,
+					       g.first_kms_option,
+					       sub_command != NULL ?
+						    command_str : cmd->command,
+					       c, optarg, &g.kms_options,
+					       &g.num_kms_options, g.verbose);
+			if (rc != 0 && rc != -ENOENT) {
+				warnx("Failed to process KMS plugin option: "
+				      "'%c': %s", c, strerror(-rc));
+				return EXIT_FAILURE;
+			}
+
+			if (rc == 0)
+				continue;
+		}
+
 		switch (c) {
 		case 'x':
 			g.xts = 1;
@@ -2532,5 +2617,7 @@ out:
 		close(g.pkey_fd);
 	if (g.keystore)
 		keystore_free(g.keystore);
+	if (g.kms_options != NULL)
+		free(g.kms_options);
 	return rc;
 }

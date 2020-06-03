@@ -47,4 +47,14 @@ int unbind_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 
 int print_kms_info(struct kms_info *kms_info);
 
+int get_kms_options(struct kms_info *kms_info, struct util_opt *opt_vec,
+		    const char *placeholder_cmd, const char *plugin_command,
+		    const char *opt_vec_command, int *first_plugin_opt,
+		    bool verbose);
+
+int handle_kms_option(struct kms_info *kms_info, struct util_opt *opt_vec,
+		      int first_kms_option, const char *command, int option,
+		      const char *optarg, struct kms_option **kms_options,
+		      size_t *num_kms_options, bool verbose);
+
 #endif

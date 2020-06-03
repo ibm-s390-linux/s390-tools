@@ -53,6 +53,30 @@ typedef const struct kms_functions *(*kms_get_functions_t)(void);
 							warnx(fmt);	\
 					} while (0)
 
+#define ARRAY_ADD(array, num_elemnts, element_size, new_element)	\
+	do {								\
+		(num_elemnts)++;					\
+		(array) = util_realloc((array),				\
+				(num_elemnts) * element_size);		\
+		memcpy(&(array)[(num_elemnts) - 1], new_element,	\
+		       element_size);					\
+	} while (0)
+
+#define ARRAY_REMOVE(array, num_elemnts, element_size, index)		\
+	do {								\
+		if ((index) < (num_elemnts) - 1)			\
+			memmove(&(array)[(index)],			\
+				&(array)[(index) + 1],			\
+				((num_elemnts) - (index) - 1) *		\
+							element_size);	\
+		(num_elemnts)--;					\
+		if ((num_elemnts) > 0) {				\
+			(array) = util_realloc((array),			\
+					(num_elemnts) * element_size);	\
+		}							\
+	} while (0)
+
+
 /**
  * Opens kms-plugins.conf. Looks for the file in /etc/zkey/, or if environment
  * variable ZKEY_KMS_PLUGINS is set then it uses the file name and path
@@ -811,4 +835,149 @@ kms_info:
 
 out:
 	return rc;
+}
+
+/**
+ * Gets the KMS plugin command specific option vector and puts them into the
+ * placeholder slots in opt_vec.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] opt_vec         the option vector to modify.
+ * @param[in] placeholder_cmd the command with which the placeholder option
+ *                            vector entries are marked
+ * @param[in] plugin_command  the plugin command to get the options for
+ * @param[in] opt_vec_command the command to use in the option vector entries
+ * @param[out] first_plugin_opt on return: the index of the first plugin option
+ *                            in opt_vec, or -1 if no plugin options are used.
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int get_kms_options(struct kms_info *kms_info, struct util_opt *opt_vec,
+		    const char *placeholder_cmd, const char *plugin_command,
+		    const char *opt_vec_command, int *first_plugin_opt,
+		    bool verbose)
+{
+	const struct util_opt *plugin_opts;
+	int i, k, first = 0, num_slots = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(opt_vec != NULL, "Internal error: opt_vec is NULL");
+	util_assert(placeholder_cmd != NULL,
+		    "Internal error: placeholder_cmd is NULL");
+	util_assert(plugin_command != NULL,
+		    "Internal error: plugin_command is NULL");
+	util_assert(first_plugin_opt != NULL,
+		    "Internal error: first_plugin_opt is NULL");
+
+	*first_plugin_opt = -1;
+
+	if (kms_info->plugin_lib == NULL) {
+		pr_verbose(verbose, "not bound to a KMS plugin");
+		return 0;
+	}
+
+	if (kms_info->funcs->kms_get_command_options == NULL) {
+		pr_verbose(verbose, "Plugin does not support command options");
+		return 0;
+	}
+
+	if (strcmp(plugin_command, KMS_COMMAND_CONFIGURE) != 0 &&
+	    strcmp(plugin_command, KMS_COMMAND_REENCIPHER) != 0 &&
+	    strcmp(plugin_command, KMS_COMMAND_GENERATE) != 0 &&
+	    strcmp(plugin_command, KMS_COMMAND_REMOVE) != 0 &&
+	    strcmp(plugin_command, KMS_COMMAND_LIST) != 0 &&
+	    strcmp(plugin_command, KMS_COMMAND_LIST_IMPORT) != 0) {
+		pr_verbose(verbose, "Command %s is not eligible for plugin "
+			   "options", plugin_command);
+		return 0;
+	}
+
+	for (i = 0; opt_vec[i].desc != NULL; i++) {
+		if (opt_vec[i].command != NULL &&
+		    strcmp(opt_vec[i].command, placeholder_cmd) == 0) {
+			if (first == 0)
+				first = i;
+			num_slots++;
+		}
+	}
+
+	pr_verbose(verbose, "%u placeholder slots found", num_slots);
+
+	plugin_opts = kms_info->funcs->kms_get_command_options(plugin_command,
+							       num_slots);
+	if (plugin_opts == NULL) {
+		pr_verbose(verbose, "No plugin options for command %s",
+			   plugin_command);
+		return 0;
+	}
+
+	for (k = 0, i = first; plugin_opts[k].desc != NULL &&
+			       i < first + num_slots; i++, k++) {
+		memcpy(&opt_vec[i], &plugin_opts[k], sizeof(struct util_opt));
+		opt_vec[i].command = (char *)opt_vec_command;
+	}
+
+	pr_verbose(verbose, "%u plugin options", k);
+
+	*first_plugin_opt = first;
+
+	return 0;
+}
+
+/**
+ * Checks if the option is a KMS plugin specific option and if so, adds it to
+ * list of KMS options. If the option is not handled by the plugin, then
+ * -ENOENT is returned.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] opt_vec         the option vector.
+ * @param[in] first_kms_option index of first KMS option in opt_vec
+ * @param[in] command         the plugin command to handle
+ * @param[in] option          the option character to handle
+ * @param[in] optarg          the option argument or NULL
+ * @param[out] kms_options    on return: an array of KMS options handled. The
+ *                            array is resized to add more options.
+ * @param[out] num_kms_options on return: The number of options in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ *
+ */
+int handle_kms_option(struct kms_info *kms_info, struct util_opt *opt_vec,
+		      int first_kms_option, const char *command, int option,
+		      const char *optarg, struct kms_option **kms_options,
+		      size_t *num_kms_options, bool verbose)
+{
+	struct kms_option opt = { .option = option, .argument = optarg };
+	int i;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(opt_vec != NULL, "Internal error: opt_vec is NULL");
+	util_assert(command != NULL, "Internal error: command is NULL");
+	util_assert(kms_options != NULL, "Internal error: kms_options is NULL");
+	util_assert(num_kms_options != NULL,
+		    "Internal error: num_kms_options is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		pr_verbose(verbose, "not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (first_kms_option < 0) {
+		pr_verbose(verbose, "No plugin specific options");
+		return -ENOENT;
+	}
+
+	for (i = first_kms_option; opt_vec[i].command != NULL &&
+		strcmp(opt_vec[i].command, command) == 0; i++) {
+		if ((opt_vec[i].flags & UTIL_OPT_FLAG_SECTION) == 0 &&
+		    opt_vec[i].option.val == option) {
+			ARRAY_ADD(*kms_options, *num_kms_options,
+				  sizeof(struct kms_option), &opt);
+			return 0;
+		}
+	}
+
+	return -ENOENT;
 }
