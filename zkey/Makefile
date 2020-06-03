@@ -73,7 +73,7 @@ properties.o: check-dep-zkey properties.c properties.h
 keystore.o: keystore.c keystore.h properties.h pkey.h cca.h ep11.h utils.h
 zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h \
 			ep11.h misc.h utils.h
-kms.o: kms.c kms.h kms-plugin.h
+kms.o: kms.c kms.h kms-plugin.h utils.h pkey.h
 
 zkey: LDLIBS = -ldl -lcrypto
 zkey: zkey.o pkey.o cca.o ep11.o properties.o keystore.o utils.o kms.o $(libs)

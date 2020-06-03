@@ -124,6 +124,8 @@ static struct zkey_globals {
 #define COMMAND_KMS_BIND	"bind"
 #define COMMAND_KMS_UNBIND	"unbind"
 #define COMMAND_KMS_INFO	"info"
+#define COMMAND_KMS_CONFIGURE	"configure"
+#define COMMAND_KMS_REENCIPHER	"reencipher"
 
 #define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
 
@@ -836,6 +838,67 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_CONVERT,
 	},
 	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_KMS " " COMMAND_KMS_CONFIGURE,
+	},
+	{
+		.option = { "apqns", required_argument, NULL, 'a'},
+		.argument = "[+|-]CARD.DOMAIN[,...]",
+		.desc = "Comma-separated pairs of crypto cards and domains "
+			"that are associated with the key management system "
+			"(KMS) plugin that the repository is bound to, and all "
+			"keys generated with the KMS. To add pairs of crypto "
+			"cards and domains to the key, specify "
+			"'+CARD.DOMAIN[,...]'. To remove pairs of crypto cards "
+			"and domains from the key specify '-CARD.DOMAIN[,...]'",
+		.command = COMMAND_KMS " " COMMAND_KMS_CONFIGURE,
+	},
+	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
+	},
+	{
+		.option = {"to-new", 0, NULL, 'n'},
+		.desc = "Re-enciphers KMS plugin internal secure keys that are "
+			"currently enciphered with the master key in the "
+			"CURRENT register with the master key in the NEW "
+			"register.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
+	},
+	{
+		.option = {"from-old", 0, NULL, 'o'},
+		.desc = "Re-enciphers KMS plugin internal secure keys that are "
+			"currently enciphered with the master key in the OLD "
+			"register with the master key in the CURRENT register.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
+	},
+	{
+		.option = {"complete", 0, NULL, 'p'},
+		.desc = "Completes a staged re-enciphering. Use this option "
+			"after the new master key has been set (made "
+			"active).",
+		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
+	},
+	{
+		.option = {"in-place", 0, NULL, 'i'},
+		.desc = "Forces an in-place re-enchipering of the KMS plugin "
+			"internal secure keys. Re-enciphering from OLD to "
+			"CURRENT is performed in-place per default.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
+	},
+	{
+		.option = {"staged", 0, NULL, 's'},
+		.desc = "Forces that the re-enciphering of the KMS plugin "
+			"internal secure keys is performed in staged mode. "
+			"Re-enciphering from CURRENT to NEW is performed in "
+			"staged mode per default.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
+	},
+	/***********************************************************/
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
@@ -933,6 +996,8 @@ static int command_kms_plugins(void);
 static int command_kms_bind(void);
 static int command_kms_unbind(void);
 static int command_kms_info(void);
+static int command_kms_configure(void);
+static int command_kms_reencipher(void);
 
 static struct zkey_command zkey_kms_commands[] = {
 	{
@@ -980,6 +1045,31 @@ static struct zkey_command zkey_kms_commands[] = {
 		.need_keystore = 1,
 		.has_options = 1,
 		.use_kms_plugin = 1,
+	},
+	{
+		.command = COMMAND_KMS_CONFIGURE,
+		.abbrev_len = 3,
+		.function = command_kms_configure,
+		.short_desc = "Configures a key management system plugin",
+		.long_desc = "Configures or re-configures the current key "
+			     "management system (KMS) plugin",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+		.kms_plugin_opts_cmd = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.command = COMMAND_KMS_REENCIPHER,
+		.abbrev_len = 2,
+		.function = command_kms_reencipher,
+		.short_desc = "Re-enciphers secure keys used by a key "
+			      "management system plugin",
+		.long_desc = "Re-enciphers secure keys internally used by a "
+			     "key management system (KMS) plugin",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+		.kms_plugin_opts_cmd = KMS_COMMAND_REENCIPHER,
 	},
 	{ .command = NULL }
 };
@@ -2213,6 +2303,82 @@ static int command_kms_info(void)
 	}
 
 	rc = print_kms_info(&g.kms_info);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'kms configure'.
+ *
+ * Configures or re-configures a KMS plugin
+ */
+static int command_kms_configure(void)
+{
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	rc = configure_kms_plugin(g.keystore, g.apqns, g.kms_options,
+				  g.num_kms_options, g.first_kms_option >= 0,
+				  g.verbose);
+	if (rc == -EAGAIN) {
+		util_print_indented("The KMS plugin has accepted the "
+				    "configuration so far, but requires further"
+				    " configuration. Run 'zkey kms info' to "
+				    "find out which KMS plugin settings still "
+				    "require configuration, and run 'zkey kms "
+				    "configure' again with the appropriate "
+				    "options to complete the KMS "
+				    "configuration process", 0);
+		rc = 0;
+	}
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'kms reencipher'.
+ *
+ * Reenciphers secure keys internally used by a KMS plugin
+ */
+static int command_kms_reencipher(void)
+{
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	if (g.inplace && g.staged) {
+		warnx("Either '--in-place|-i' or '--staged|-s' can be "
+		      "specified, but not both");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+	if (g.complete) {
+		if (g.inplace) {
+			warnx("Option '--in-place|-i' is not valid together "
+			      "with '--complete|-p'");
+			util_prg_print_parse_error();
+			return EXIT_FAILURE;
+		}
+		if (g.staged) {
+			warnx("Option '--staged|-s' is not valid together "
+			      "with '--complete|-p'");
+			util_prg_print_parse_error();
+			return EXIT_FAILURE;
+		}
+	}
+
+	rc = reencipher_kms(&g.kms_info, g.fromold, g.tonew, g.inplace,
+			   g.staged, g.complete, g.kms_options,
+			   g.num_kms_options, g.verbose);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

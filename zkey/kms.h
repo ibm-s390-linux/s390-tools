@@ -57,4 +57,13 @@ int handle_kms_option(struct kms_info *kms_info, struct util_opt *opt_vec,
 		      const char *optarg, struct kms_option **kms_options,
 		      size_t *num_kms_options, bool verbose);
 
+int configure_kms_plugin(struct keystore *keystore, const char *apqns,
+			 struct kms_option *kms_options, size_t num_kms_options,
+			 bool has_plugin_optins, bool verbose);
+
+int reencipher_kms(struct kms_info *kms_info, bool from_old, bool to_new,
+		   bool inplace, bool staged, bool complete,
+		   struct kms_option *kms_options, size_t num_kms_options,
+		   bool verbose);
+
 #endif

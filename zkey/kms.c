@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
+#include <regex.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,8 +25,11 @@
 #include "lib/util_libc.h"
 #include "lib/util_rec.h"
 #include "lib/util_panic.h"
+#include "lib/util_prg.h"
 
 #include "kms.h"
+#include "utils.h"
+#include "pkey.h"
 
 #define ENVVAR_ZKEY_REPOSITORY		"ZKEY_REPOSITORY"
 #define DEFAULT_KEYSTORE		"/etc/zkey/repository"
@@ -37,6 +41,8 @@
 #define KMS_CONFIG_PROP_KMS		"kms"
 #define KMS_CONFIG_PROP_KMS_CONFIG	"config"
 #define KMS_CONFIG_PROP_APQNS		"apqns"
+#define KMS_CONFIG_PROP_CCA_APQNS	"ep11_apqns"
+#define KMS_CONFIG_PROP_EP11_APQNS	"cca_apqns"
 #define KMS_CONFIG_LOCAL		"local"
 
 static const char * const key_types[] = {
@@ -980,4 +986,914 @@ int handle_kms_option(struct kms_info *kms_info, struct util_opt *opt_vec,
 	}
 
 	return -ENOENT;
+}
+
+struct card_info {
+	enum card_type type;
+	int min_level;
+	struct fw_version min_fw_version;
+	struct kms_apqn *apqns;
+	size_t num_apqns;
+};
+
+/**
+ * Parses an APQN and checks if it is online.
+ *
+ * @param[in] apqn            the APQN to parse
+ * @param[out] kms_apqn       the parse APQN is filled in
+ * @param{in] check           if true, the APQN is checked to be online
+ * @param[in] cards           An array of cards types with its requirements
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _parse_and_check_apqn(const char *apqn, struct kms_apqn *kms_apqn,
+				 bool check, struct card_info *cards,
+				 size_t num_cards)
+{
+	struct card_info *card_info = NULL;
+	struct fw_version fw_version;
+	int rc, card, domain, level;
+	enum card_type type;
+	regmatch_t pmatch[1];
+	regex_t reg_buf;
+	unsigned int num;
+	size_t i;
+
+	rc = regcomp(&reg_buf, "[[:xdigit:]]+\\.[[:xdigit:]]", REG_EXTENDED);
+	if (rc != 0)
+		return -EIO;
+
+	rc = regexec(&reg_buf, apqn, (size_t)1, pmatch, 0);
+	if (rc != 0) {
+		warnx("The APQN '%s' is not valid", apqn);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (sscanf(apqn, "%x.%x%n", &card, &domain, &num) != 2 ||
+	    num != strlen(apqn) || card < 0 || card > 0xff ||
+	    domain < 0 || domain > 0xFFFF) {
+		warnx("The APQN '%s' is not valid", apqn);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	kms_apqn->card = card;
+	kms_apqn->domain = domain;
+
+	if (!check) {
+		rc = 0;
+		goto out;
+	}
+
+	type = sysfs_get_card_type(card);
+	if (type == -1) {
+		warnx("The APQN %02x.%04x is not available or has an "
+		     "unsupported type", card, domain);
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = sysfs_is_apqn_online(card, domain, CARD_TYPE_ANY);
+	if (rc != 1) {
+		warnx("The APQN %02x.%04x is not available or not online",
+		      card, domain);
+		rc = -EIO;
+		goto out;
+	}
+
+	for (i = 0, card_info = NULL; i < num_cards; i++) {
+		if (cards[i].type == type) {
+			card_info = &cards[i];
+			break;
+		}
+	}
+	if (card_info == NULL) {
+		warnx("APQN %02x.%04x: The card type is not supported by the "
+		      "KMS plugin", card, domain);
+		rc = -EIO;
+		goto out;
+	}
+
+	level = sysfs_get_card_level(card);
+	if (level < card_info->min_level) {
+		warnx("APQN %02x.%04x: The card level is less than CEX%dn.",
+		      card, domain, card_info->min_level);
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = sysfs_get_firmware_version(card, &fw_version, false);
+	if (rc == 0) {
+		if (fw_version.api_ordinal <
+				card_info->min_fw_version.api_ordinal) {
+			warnx("APQN %02x.%04x: The firmware version is too "
+			      "less", card, domain);
+			rc = -EIO;
+			goto out;
+		}
+		if (card_info->min_level > 0 && card_info->min_level == level &&
+		    (fw_version.major < card_info->min_fw_version.major ||
+		     (fw_version.major == card_info->min_fw_version.major &&
+		      fw_version.minor < card_info->min_fw_version.minor))) {
+			warnx("APQN %02x.%04x: The firmware version is too "
+			      "less", card, domain);
+			rc = -EIO;
+			goto out;
+		}
+	}
+
+	rc = 0;
+
+out:
+	regfree(&reg_buf);
+	return rc;
+}
+
+/**
+ * Add APQNs to the current APQN association of the KMS plugin
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] apqns           the APQNs specification from --apqns option
+ * @param[in] cards           An array of card types with its requirements
+ * @param[in] num_cardsqs     The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _add_kms_apqns(struct kms_info *kms_info, const char *apqns,
+			  struct card_info *cards, size_t num_cards)
+{
+	struct kms_apqn kms_apqn;
+	char **new_apqns;
+	int i, rc = 0;
+	size_t k;
+
+	new_apqns = str_list_split(apqns);
+
+	for (i = 0; new_apqns[i] != NULL; i++) {
+		rc = _parse_and_check_apqn(new_apqns[i], &kms_apqn, true,
+					   cards, num_cards);
+		if (rc != 0)
+			goto out;
+
+		for (k = 0; k < kms_info->num_apqns; k++) {
+			if (kms_apqn.card == kms_info->apqns[k].card &&
+			    kms_apqn.domain == kms_info->apqns[k].domain) {
+				warnx("APQN %02x.%04x is already associated "
+				      "with the KMS plugin", kms_apqn.card,
+				      kms_apqn.domain);
+				rc = -EEXIST;
+				goto out;
+			}
+		}
+
+		ARRAY_ADD(kms_info->apqns, kms_info->num_apqns,
+			  sizeof(struct kms_apqn), &kms_apqn);
+	}
+
+out:
+	str_list_free_string_array(new_apqns);
+
+	return rc;
+}
+
+/**
+ * Remove APQNs from the current APQN association of the KMS plugin
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] apqns           the APQNs specification from --apqns option
+ * @param[in] cards           An array of card types with its requirements
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _remove_kms_apqns(struct kms_info *kms_info, const char *apqns,
+			     struct card_info *cards, size_t num_cards)
+{
+	struct kms_apqn kms_apqn;
+	char **rem_apqns;
+	int i, rc = 0;
+	size_t k;
+
+	rem_apqns = str_list_split(apqns);
+
+	for (i = 0; rem_apqns[i] != NULL; i++) {
+		rc = _parse_and_check_apqn(rem_apqns[i], &kms_apqn, false,
+					   cards, num_cards);
+		if (rc != 0)
+			goto out;
+
+		for (k = 0; k < kms_info->num_apqns; k++) {
+			if (kms_apqn.card == kms_info->apqns[k].card &&
+			    kms_apqn.domain == kms_info->apqns[k].domain) {
+				ARRAY_REMOVE(kms_info->apqns,
+					     kms_info->num_apqns,
+					     sizeof(struct kms_apqn), k);
+				rc = 0;
+				goto out;
+			}
+		}
+
+		warnx("APQN %02x.%04x is not associated with the KMS plugin",
+		      kms_apqn.card, kms_apqn.domain);
+		rc = -ENOENT;
+		goto out;
+	}
+
+out:
+	free(rem_apqns);
+
+	return rc;
+}
+
+/**
+ * Set the APQN association of the KMS plugin
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] apqns           the APQNs specification from --apqns option
+ * @param[in] cards           An array of card types with its requirements
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _set_kms_apqns(struct kms_info *kms_info, const char *apqns,
+			  struct card_info *cards, size_t num_cards)
+{
+	if (kms_info->apqns != NULL)
+		free(kms_info->apqns);
+	kms_info->apqns = NULL;
+	kms_info->num_apqns = 0;
+
+	if (strlen(apqns) == 0) {
+		/* Indicate empty list specified */
+		kms_info->apqns = util_malloc(sizeof(struct kms_apqn));
+		return 0;
+	}
+
+	return _add_kms_apqns(kms_info, apqns, cards, num_cards);
+}
+
+/**
+ * Change the APQN association of the KMS plugin
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] apqns           the APQNs specification from --apqns option
+ * @param[in] cards           An array of card types with its requirements
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _change_kms_apqns(struct kms_info *kms_info, const char *apqns,
+			     struct card_info *cards, size_t num_cards)
+{
+	switch (*apqns) {
+	case '+':
+		if (kms_info->apqns != NULL && kms_info->num_apqns > 0)
+			return _add_kms_apqns(kms_info, &apqns[1], cards,
+					      num_cards);
+		else
+			return _set_kms_apqns(kms_info, &apqns[1], cards,
+					      num_cards);
+	case '-':
+		if (kms_info->apqns != NULL && kms_info->num_apqns > 0)
+			return _remove_kms_apqns(kms_info, &apqns[1], cards,
+						 num_cards);
+
+		warnx("No APQNs are currently associated with the KMS plugin");
+		return -ENOENT;
+	default:
+		return _set_kms_apqns(kms_info, apqns, cards, num_cards);
+	}
+}
+
+/**
+ * Returns the crypto card requirements per card type base on the key types that
+ * the KMS plugin supports.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[out] cards          on return: An array of card types with its
+ *                            requirements. The caller must free this array if
+ *                            no longer used.
+ * @param[out] num_cards      on return: The number of elements in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns the card type
+ */
+static int _get_supported_card_types(struct kms_info *kms_info,
+				     struct card_info **cards,
+				     size_t *num_cards, bool verbose)
+{
+	struct card_info new_card = { 0 };
+	const struct fw_version *fw_ver;
+	struct card_info *req;
+	enum card_type type;
+	int i, level;
+	size_t k;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(cards != NULL, "Internal error: reqs is NULL");
+	util_assert(num_cards != NULL, "Internal error: num_reqs is NULL");
+
+	*cards = NULL;
+	*num_cards = 0;
+
+	if (kms_info->funcs->kms_supports_key_type == NULL)
+		return 0;
+
+	for (i = 0; key_types[i] != NULL; i++) {
+		if (kms_info->funcs->kms_supports_key_type(kms_info->handle,
+							   key_types[i])) {
+			pr_verbose(verbose, "KMS plugin supports key type %s",
+				   key_types[i]);
+
+			type = get_card_type_for_keytype(key_types[i]);
+			level = get_min_card_level_for_keytype(key_types[i]);
+			fw_ver = get_min_fw_version_for_keytype(key_types[i]);
+
+			for (req = NULL, k = 0; k < *num_cards; k++) {
+				if ((*cards)[k].type == type)
+					req = &(*cards)[k];
+			}
+
+			if (req == NULL) {
+				new_card.type = type;
+				new_card.min_level = level;
+				if (fw_ver != NULL)
+					new_card.min_fw_version = *fw_ver;
+
+				ARRAY_ADD(*cards, *num_cards,
+					  sizeof(struct card_info),
+					  &new_card);
+				req = &(*cards)[*num_cards - 1];
+			}
+
+			if (req->min_level < level) {
+				req->min_level = level;
+
+				if (fw_ver != NULL) {
+					if (req->min_fw_version.api_ordinal <
+							fw_ver->api_ordinal ||
+					    req->min_fw_version.major <
+							fw_ver->major ||
+					    (req->min_fw_version.major ==
+							fw_ver->major &&
+					     req->min_fw_version.minor <
+							fw_ver->minor))
+						req->min_fw_version = *fw_ver;
+				}
+			}
+
+			pr_verbose(verbose, "Card type: %d", req->type);
+			pr_verbose(verbose, "Card level: %d", req->min_level);
+			pr_verbose(verbose, "Fw version: %d.%d (API: %d)",
+				   req->min_fw_version.major,
+				   req->min_fw_version.minor,
+				   req->min_fw_version.api_ordinal);
+		}
+	}
+
+	pr_verbose(verbose, "%lu card type are supported", *num_cards);
+
+	return 0;
+}
+
+/**
+ * Builds an APQN list per card type.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] cards           An array of card types to build APQNs lists for
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _get_apqns_per_card_type(struct kms_info *kms_info,
+				    struct card_info *cards, size_t num_cards)
+{
+	enum card_type type;
+	size_t i, k;
+	bool found;
+
+	for (i = 0; i < kms_info->num_apqns; i++) {
+		if (!sysfs_is_apqn_online(kms_info->apqns[i].card,
+					  kms_info->apqns[i].domain, 0)) {
+			warnx("The APQN %02x.%04x is not online",
+			      kms_info->apqns[i].card,
+			      kms_info->apqns[i].domain);
+			return -EIO;
+		}
+
+		type = sysfs_get_card_type(kms_info->apqns[i].card);
+		for (k = 0, found = false; k < num_cards; k++) {
+			if (cards[k].type == type) {
+				ARRAY_ADD(cards[k].apqns, cards[k].num_apqns,
+					  sizeof(struct kms_apqn),
+					  &kms_info->apqns[i]);
+				found = true;
+			}
+		}
+
+		if (!found) {
+			warnx("The APQN %02x.%04x is not available of has an "
+			      "unsupported type", kms_info->apqns[i].card,
+			      kms_info->apqns[i].domain);
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Build an APQN string from an APQN array
+ *
+ * @param[in] apqns           An array of APQNs
+ * @param[in] num_apqns       The number of elements in above array
+ *
+ * @return an allocated string with the APQNs
+ */
+static char *_build_apqn_string(struct kms_apqn *apqns, size_t num_apqns)
+{
+	char *apqn_str, *str;
+	size_t size, i;
+
+	if (num_apqns == 0) {
+		apqn_str = util_malloc(1);
+		*apqn_str = '\0';
+		return apqn_str;
+	}
+
+	size = num_apqns * 8; /* 'cc.dddd' plus ',' or '\0' */
+	apqn_str = util_malloc(size);
+
+	str = apqn_str;
+	for (i = 0; i < num_apqns; i++) {
+		if (i != 0) {
+			*str = ',';
+			str++;
+		}
+
+		sprintf(str, "%02x.%04x", apqns[i].card, apqns[i].domain);
+		str += 7;
+	}
+
+	return apqn_str;
+}
+
+/**
+ * Update the APQNS properties in the KMS properties to reflect the list of
+ * APQNs contained in kms_info and supported card types.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] cards           An array of card types supported
+ * @param[in] num_cards       The number of elements in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _update_apqns_properties(struct kms_info *kms_info,
+				    struct card_info *cards, size_t num_cards,
+				    bool verbose)
+{
+	char *apqns = NULL;
+	char *prop;
+	size_t i;
+	int rc;
+
+	rc = properties_remove(kms_info->props,
+			       KMS_CONFIG_PROP_CCA_APQNS);
+	if (rc != 0 && rc != -ENOENT) {
+		pr_verbose(verbose, "Failed to remove the APQNS "
+			   "property: %s", strerror(-rc));
+		return rc;
+	}
+
+	rc = properties_remove(kms_info->props,
+			       KMS_CONFIG_PROP_EP11_APQNS);
+	if (rc != 0 && rc != -ENOENT) {
+		pr_verbose(verbose, "Failed to remove the APQNS "
+			   "property: %s", strerror(-rc));
+		return rc;
+	}
+
+	if (kms_info->num_apqns == 0) {
+		rc = properties_remove(kms_info->props, KMS_CONFIG_PROP_APQNS);
+		if (rc != 0 && rc != -ENOENT) {
+			pr_verbose(verbose, "Failed to remove the APQNS "
+				   "property: %s", strerror(-rc));
+			return rc;
+		}
+
+		pr_verbose(verbose, "APQNs: none");
+		return 0;
+	}
+
+	apqns = _build_apqn_string(kms_info->apqns, kms_info->num_apqns);
+	pr_verbose(verbose, "APQNs: '%s'", apqns);
+
+	rc = properties_set(kms_info->props, KMS_CONFIG_PROP_APQNS, apqns);
+	free(apqns);
+
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to set the APQNS property: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	for (i = 0; i < num_cards; i++) {
+		switch (cards[i].type) {
+		case CARD_TYPE_CCA:
+			prop = KMS_CONFIG_PROP_CCA_APQNS;
+			break;
+		case CARD_TYPE_EP11:
+			prop = KMS_CONFIG_PROP_EP11_APQNS;
+			break;
+		default:
+			continue;
+		}
+
+		apqns = _build_apqn_string(cards[i].apqns, cards[i].num_apqns);
+		pr_verbose(verbose, "%s: '%s'", prop, apqns);
+
+		rc = properties_set(kms_info->props, prop, apqns);
+		free(apqns);
+
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to set the %s property: %s",
+				   prop, strerror(-rc));
+			goto out;
+		}
+	}
+
+out:
+	return rc;
+}
+
+/**
+ * Cross checks the APQNs per card type
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] cards           An array of card types to build APQNs lists for
+ * @param[in] num_cards       The number of elements in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _cross_check_apqns(struct card_info *cards, size_t num_cards,
+			      bool verbose)
+{
+	char *apqns;
+	size_t i;
+	int rc;
+
+	for (i = 0; i < num_cards; i++) {
+		if (cards[i].num_apqns == 0)
+			continue;
+
+		apqns = _build_apqn_string(cards[i].apqns, cards[i].num_apqns);
+
+		rc = cross_check_apqns(apqns, NULL, cards[i].min_level,
+				       &cards[i].min_fw_version, cards[i].type,
+				       true, verbose);
+		free(apqns);
+
+		if (rc == -ENOTSUP)
+			continue;
+		if (rc != 0)
+			return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Checks existing KMS-bound keys in the keystore of the new set of APQNs
+ * would make them unusable. The user is prompted if so.
+ *
+ * @param[in] keystore        the keystore
+ * @param[in] cards           An array of card types
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _check_keystore_keys(struct keystore *keystore,
+				struct card_info *cards, size_t num_cards)
+{
+	struct kms_info *kms_info = keystore->kms_info;
+	struct card_info *card = NULL;
+	enum card_type type;
+	size_t i, k;
+	char *msg;
+	int rc;
+
+	for (i = 0; key_types[i] != NULL; i++) {
+		type = get_card_type_for_keytype(key_types[i]);
+		if (type <= 0)
+			continue;
+
+		for (k = 0; k < num_cards; k++) {
+			if (cards[k].type == type) {
+				card = &cards[k];
+				break;
+			}
+		}
+		if (card == NULL)
+			continue;
+
+		pr_verbose(keystore->verbose, "Checking repository for "
+			   "KMS-bound keys of type %s", key_types[i]);
+
+		if (card->num_apqns > 0) {
+			pr_verbose(keystore->verbose, "Set of APQNs for key "
+				   "type %s is not empty", key_types[i]);
+			continue;
+		}
+
+		util_asprintf(&msg, "The following keys of type '%s' are bound "
+			      "to KMS plugin '%s', and may become unusable "
+			      "with this set of APQNs:", key_types[i],
+			      kms_info->plugin_name);
+		rc = keystore_msg_for_kms_key(keystore, key_types[i], msg);
+		free(msg);
+
+		if (rc == -ENOENT) {
+			pr_verbose(keystore->verbose, "No keys of type %s "
+				   "found", key_types[i]);
+			continue;
+		}
+		if (rc != 0)
+			return rc;
+
+		printf("Do you want to continue [y/N]? ");
+		if (!prompt_for_yes(keystore->verbose)) {
+			warnx("Operation aborted");
+			return -ECANCELED;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Updates existing KMS-bound keys in the keystore with the set of APQNs that
+ * match the key type.
+ *
+ * @param[in] keystore        the keystore
+ * @param[in] cards           An array of card types
+ * @param[in] num_cards       The number of elements in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+static int _update_keystore_keys(struct keystore *keystore,
+				 struct card_info *cards, size_t num_cards)
+{
+	struct card_info *card = NULL;
+	enum card_type type;
+	size_t i, k;
+	char *apqns;
+	int rc;
+
+	for (i = 0; key_types[i] != NULL; i++) {
+		type = get_card_type_for_keytype(key_types[i]);
+		if (type <= 0)
+			continue;
+
+		for (k = 0; k < num_cards; k++) {
+			if (cards[k].type == type) {
+				card = &cards[k];
+				break;
+			}
+		}
+		if (card == NULL)
+			continue;
+
+		apqns = _build_apqn_string(card->apqns, card->num_apqns);
+
+		pr_verbose(keystore->verbose, "Changing KMS-bound keys of "
+			   "type %s to: '%s'", key_types[i], apqns);
+
+		rc = keystore_kms_keys_set_property(keystore, key_types[i],
+						    PROP_NAME_APQNS, apqns);
+		free(apqns);
+		if (rc != 0) {
+			warnx("Failed to update APQNs for KMS-bound keys of "
+			      "type %s: %s", key_types[i], strerror(-rc));
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Performs configuration of the KMS plugin.
+ *
+ * @param[in] keystore        the keystore
+ * @param[in] apqns           the APQNs specification from --apqns option, or
+ *                            NULL if the option was not specified
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] has_plugin_optins if true, then the KMS plugin uses KMS specific
+ *                            options, false of no options are supported
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ * -EAGAIN to indicate that the specified configuration was accepted so far, but
+ * the configuration is still incomplete, and needs to be completed.
+ */
+int configure_kms_plugin(struct keystore *keystore, const char *apqns,
+			 struct kms_option *kms_options, size_t num_kms_options,
+			 bool has_plugin_optins, bool verbose)
+{
+	struct card_info *cards = NULL;
+	struct kms_info *kms_info;
+	bool incomplete = false;
+	size_t i, num_cards = 0;
+	int rc = 0;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+
+	kms_info = keystore->kms_info;
+	if (kms_info->plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		goto out;
+	}
+
+	if (apqns == NULL) {
+		if (kms_info->apqns == NULL || kms_info->num_apqns == 0) {
+			warnx("Option '--apqns|-a' is required when no APQNS "
+			      "are associated with the KMS plugin");
+			util_prg_print_parse_error();
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (has_plugin_optins && num_kms_options == 0) {
+			warnx("At least one option is required");
+			util_prg_print_parse_error();
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (apqns != NULL) {
+		rc = _get_supported_card_types(kms_info, &cards, &num_cards,
+					       verbose);
+		if (rc != 0)
+			goto out;
+		if (num_cards == 0) {
+			warnx("The KMS plugin does not support any key type");
+			rc = -EIO;
+			goto out;
+		}
+
+		rc = _change_kms_apqns(kms_info, apqns, cards, num_cards);
+		if (rc != 0)
+			goto out;
+
+		rc = _get_apqns_per_card_type(kms_info, cards, num_cards);
+		if (rc != 0)
+			goto out;
+
+		rc = _cross_check_apqns(cards, num_cards, verbose);
+		if (rc != 0)
+			goto out;
+
+		rc = _check_keystore_keys(keystore, cards, num_cards);
+		if (rc != 0)
+			goto out;
+
+		rc = _update_apqns_properties(kms_info, cards, num_cards,
+					      verbose);
+		if (rc != 0) {
+			warnx("Failed to update the APQNs: %s", strerror(-rc));
+			goto out;
+		}
+	}
+
+	if (kms_info->funcs->kms_configure != NULL) {
+		rc = kms_info->funcs->kms_configure(kms_info->handle,
+						    apqns != NULL ?
+							kms_info->apqns : NULL,
+						    apqns != NULL ?
+							kms_info->num_apqns : 0,
+						    kms_options,
+						    num_kms_options);
+
+		if (rc == -EAGAIN) {
+			incomplete = true;
+			rc = 0;
+		}
+
+		if (rc != 0) {
+			warnx("Failed to configure the KMS plugin: '%s'",
+			      strerror(-rc));
+			print_last_kms_error(kms_info);
+			goto out;
+		}
+	}
+
+	if (apqns != NULL) {
+		rc = _save_kms_properties(keystore, kms_info->props, verbose);
+		if (rc != 0)
+			goto out;
+
+		rc = _update_keystore_keys(keystore, cards, num_cards);
+		if (rc != 0)
+			goto out;
+
+		if (kms_info->num_apqns == 0)
+			incomplete = true;
+	}
+
+out:
+	if (cards != NULL) {
+		for (i = 0; i < num_cards; i++)
+			if (cards[i].apqns != NULL)
+				free(cards[i].apqns);
+		free(cards);
+	}
+
+	if (rc == 0 && incomplete)
+		rc = -EAGAIN;
+	return rc;
+}
+
+/**
+ * Performs re-enciphering of secure keys internally used by the KMS plugin
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] from_old        If true the keys are reenciphered from the OLD to
+ *                            the CURRENT master key.
+ * @param[in] to_new          If true the keys are reenciphered from the CURRENT
+ *                            to the OLD master key.
+ * @param[in] inplace         if true, the key will be re-enciphere in-place
+ * @param[in] staged          if true, the key will be re-enciphere not in-place
+ * @param[in] complete        if true, a pending re-encipherment is completed
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been  specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ * -EAGAIN to indicate that the specified configuration was accepted so far, but
+ * the configuration is still incomplete, and needs to be completed.
+ */
+int reencipher_kms(struct kms_info *kms_info, bool from_old, bool to_new,
+		   bool inplace, bool staged, bool complete,
+		   struct kms_option *kms_options, size_t num_kms_options,
+		   bool verbose)
+{
+	enum kms_reencipher_mode mode = KMS_REENC_MODE_AUTO;
+	enum kms_reenc_mkreg mkreg = KMS_REENC_MKREG_AUTO;
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		goto out;
+	}
+
+	if (kms_info->funcs->kms_reenciper == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support "
+			   "reencipher");
+		goto out;
+	}
+
+	if (inplace)
+		mode = KMS_REENC_MODE_IN_PLACE;
+	else if (staged)
+		mode = KMS_REENC_MODE_STAGED;
+	else if (complete)
+		mode = KMS_REENC_MODE_STAGED_COMPLETE;
+
+	if (from_old && !to_new) {
+		mkreg = KMS_REENC_MKREG_FROM_OLD;
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_IN_PLACE;
+	} else if (to_new && !from_old) {
+		mkreg = KMS_REENC_MKREG_TO_NEW;
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_STAGED;
+	} else if (from_old && to_new) {
+		mkreg = KMS_REENC_MKREG_FROM_OLD_TO_NEW;
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_STAGED;
+	}
+
+	rc = kms_info->funcs->kms_reenciper(kms_info->handle, mode, mkreg,
+					    kms_options, num_kms_options);
+	if (rc != 0) {
+		warnx("Failed to reencipher KMS plugin internal keys: %s",
+		      strerror(-rc));
+		print_last_kms_error(kms_info);
+		goto out;
+	}
+
+out:
+	return rc;
 }
