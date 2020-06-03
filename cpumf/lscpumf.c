@@ -2572,6 +2572,7 @@ static const char *machine_name(void)
 	case 3906:	return "IBM z14";
 	case 3907:	return "IBM z14 ZR1";
 	case 8561:	return "IBM z15";
+	case 8562:	return "IBM z15 Model T02";
 	}
 	return "Unknown hardware model";
 }
