@@ -4265,6 +4265,292 @@ out:
 	return rc;
 }
 
+struct kms_process {
+	process_key_t process_func;
+	void *process_private;
+};
+
+struct kms_set_prop {
+	const char *prop_name;
+	const char *prop_value;
+	unsigned long num_keys;
+};
+
+/**
+ * Processing function for setting properties of KMS-bound keys
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] name       the name of the key
+ * @param[in] properties the properties object of the key (not used here)
+ * @param[in] file_names the file names used by this key
+ * @param[in] private    private data: struct reencipher_info
+ *
+ * @returns 0 for success, or a negative errno value in case of an error
+ */
+static int _keystore_process_kms_key_set_prop(struct keystore *keystore,
+					      const char *name,
+					      struct properties *properties,
+					      struct key_filenames *file_names,
+					      void *private)
+{
+	struct kms_set_prop *set_prop = private;
+	int rc;
+
+	pr_verbose(keystore, "Setting property for KMS-bound key '%s'", name);
+
+	if (set_prop->prop_value != NULL) {
+		rc = properties_set(properties, set_prop->prop_name,
+				    set_prop->prop_value);
+
+		if (rc != 0) {
+			pr_verbose(keystore, "Invalid characters in property: "
+				   "%s: %s", set_prop->prop_name,
+				   set_prop->prop_value);
+			goto out;
+		}
+
+	} else {
+		rc = properties_remove(properties, set_prop->prop_name);
+		if (rc != 0 && rc != -ENOENT) {
+			pr_verbose(keystore, "Failed to remove  property: "
+				   "%s: %s", set_prop->prop_name,
+				   strerror(-rc));
+			goto out;
+		}
+	}
+
+	rc = properties_save(properties, file_names->info_filename, 1);
+	if (rc != 0) {
+		pr_verbose(keystore,
+			   "Key info file '%s' could not be written: %s",
+			   file_names->info_filename, strerror(-rc));
+		goto out;
+	}
+
+	set_prop->num_keys++;
+
+out:
+	return rc;
+}
+
+/**
+ * Iterates over all keys stored in the keystore. For every key that is bound
+ * to a KMS plugin the specified property is set to the specified value.
+ * If value is NULL, then the property is removed from the key.
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] key_type   the key type. NULL means no key type filter.
+ * @param[in] prop_name  the name of the property to set
+ * @param[in] prop_value the value of the property to set or NULL if the proerty
+ *                       is to be removed.
+ *
+ * @returns 0 for success, or a negative errno value in case of an error
+ */
+int keystore_kms_keys_set_property(struct keystore *keystore,
+				   const char *key_type,
+				   const char *prop_name,
+				   const char *prop_value)
+{
+	struct kms_set_prop set_prop;
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(prop_name != NULL, "Internal error: prop_name is NULL");
+
+	set_prop.prop_name = prop_name;
+	set_prop.prop_value = prop_value;
+	set_prop.num_keys = 0;
+
+	rc = _keystore_process_filtered(keystore, NULL, NULL, NULL, NULL,
+					key_type, false, true,
+					_keystore_process_kms_key_set_prop,
+					&set_prop);
+	if (rc != 0)
+		pr_verbose(keystore, "Failed to set properties of kms keys: %s",
+			   strerror(-rc));
+	else
+		pr_verbose(keystore, "Successfully set properties of %lu kms "
+			   "keys", set_prop.num_keys);
+
+	return rc;
+}
+
+static const char * const kms_props[] = {
+	PROP_NAME_KMS,
+	PROP_NAME_KMS_KEY_ID,
+	PROP_NAME_KMS_KEY_LABEL,
+	PROP_NAME_KMS_XTS_KEY1_ID,
+	PROP_NAME_KMS_XTS_KEY1_LABEL,
+	PROP_NAME_KMS_XTS_KEY2_ID,
+	PROP_NAME_KMS_XTS_KEY2_LABEL,
+	NULL,
+};
+
+/**
+ * Unbinds the key by removing the KMS specific properties
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] properties the properties object of the key
+ *
+ * @returns 0 for success, or a negative errno value in case of an error
+ */
+static int _keystore_kms_key_unbind(struct keystore *keystore,
+				    struct properties *properties)
+{
+	int i, rc;
+
+	for (i = 0; kms_props[i] != NULL; i++) {
+		rc = properties_remove(properties, kms_props[i]);
+		if (rc != 0 && rc != -ENOENT) {
+			pr_verbose(keystore, "Failed to remove property: "
+				   "%s: %s", kms_props[i], strerror(-rc));
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Processing function for unbinding of KMS-bound keys
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] name       the name of the key
+ * @param[in] properties the properties object of the key
+ * @param[in] file_names the file names used by this key
+ * @param[in] private    private data: struct reencipher_info
+ *
+ * @returns 0 for success, or a negative errno value in case of an error
+ */
+static int _keystore_process_kms_key_unbind(struct keystore *keystore,
+					    const char *name,
+					    struct properties *properties,
+					    struct key_filenames *file_names,
+					    void *private)
+{
+	unsigned long *num_keys = private;
+	int rc;
+
+	pr_verbose(keystore, "Unbinding KMS-bound key '%s'", name);
+
+	rc = _keystore_kms_key_unbind(keystore, properties);
+	if (rc != 0)
+		goto out;
+
+	rc = properties_save(properties, file_names->info_filename, 1);
+	if (rc != 0) {
+		pr_verbose(keystore,
+			   "Key info file '%s' could not be written: %s",
+			   file_names->info_filename, strerror(-rc));
+		goto out;
+	}
+
+	(*num_keys)++;
+
+out:
+	return rc;
+}
+
+/**
+ * Iterates over all keys stored in the keystore. For every key that is bound
+ * to a KMS plugin the KMS specific properties are deleted, and thus these keys
+ * are unbound from the KMS plugin.
+ *
+ * @param[in] keystore   the keystore
+ *
+ * @returns 0 for success, or a negative errno value in case of an error
+ */
+int keystore_kms_keys_unbind(struct keystore *keystore)
+{
+	unsigned long num_keys = 0;
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+
+	rc = _keystore_process_filtered(keystore, NULL, NULL, NULL, NULL,
+					NULL, false, true,
+					_keystore_process_kms_key_unbind,
+					&num_keys);
+
+	if (rc != 0)
+		pr_verbose(keystore, "Failed to unbinds kms keys: %s",
+			   strerror(-rc));
+	else
+		pr_verbose(keystore, "Successfully unbound of %lu kms keys",
+			   num_keys);
+
+	return rc;
+}
+
+struct kms_msg_for_key {
+	const char *msg;
+	unsigned long num_keys;
+};
+
+/**
+ * Processing function for issuing a message for KMS-bound keys
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] name       the name of the key
+ * @param[in] properties the properties object of the key (not used here)
+ * @param[in] file_names the file names used by this key
+ * @param[in] private    private data: struct reencipher_info
+ *
+ * @returns 0 for success, or a negative errno value in case of an error
+ */
+static int _keystore_process_kms_msg_for_key(struct keystore *UNUSED(keystore),
+					     const char *name,
+					     struct properties *
+							UNUSED(properties),
+					     struct key_filenames *
+							UNUSED(file_names),
+					     void *private)
+{
+	struct kms_msg_for_key *msg_for_key = private;
+
+	if (msg_for_key->num_keys == 0)
+		util_print_indented(msg_for_key->msg, 0);
+
+	printf("  %s\n", name);
+	msg_for_key->num_keys++;
+
+	return 0;
+}
+
+/**
+ * Iterates over all keys stored in the keystore. Every key that is bound
+ * to a KMS plugin and has the specified key type is listed together with the
+ * message. If no KMS-bound keys with the specified key type exist in the
+ * keystore, then no message is printed, and -ENOENT is returned.
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] key_type   the key type. NULL means no key type filter.
+ * @param[in] msg        the message to print
+ *
+ * @returns 0 for success, or a negative errno value in case of an error.
+ * -ENOENT if no key macthed
+ */
+int keystore_msg_for_kms_key(struct keystore *keystore, const char *key_type,
+			     const char *msg)
+{
+	struct kms_msg_for_key msg_for_key;
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(msg != NULL, "Internal error: msg is NULL");
+
+	msg_for_key.msg = msg;
+	msg_for_key.num_keys = 0;
+
+	rc = _keystore_process_filtered(keystore, NULL, NULL, NULL, NULL,
+					key_type, false, true,
+					_keystore_process_kms_msg_for_key,
+					&msg_for_key);
+	if (rc != 0)
+		return rc;
+	return msg_for_key.num_keys == 0 ? -ENOENT : 0;
+}
+
 /**
  * Frees a keystore object
  *

@@ -108,6 +108,16 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 			 const char *key_type, bool noapqncheck, bool quiet,
 			 int pkey_fd, struct ext_lib *lib);
 
+int keystore_kms_keys_set_property(struct keystore *keystore,
+				   const char *key_type,
+				   const char *prop_name,
+				   const char *prop_value);
+
+int keystore_kms_keys_unbind(struct keystore *keystore);
+
+int keystore_msg_for_kms_key(struct keystore *keystore, const char *key_type,
+			     const char *msg);
+
 void keystore_free(struct keystore *keystore);
 
 
