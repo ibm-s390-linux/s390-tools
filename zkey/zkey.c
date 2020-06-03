@@ -75,6 +75,8 @@ static struct zkey_globals {
 	char *volume_type;
 	char *newname;
 	char *key_type;
+	bool local;
+	bool kms_bound;
 	bool run;
 	bool batch_mode;
 	char *keyfile;
@@ -89,6 +91,7 @@ static struct zkey_globals {
 	struct ep11_lib ep11;
 	int pkey_fd;
 	struct keystore *keystore;
+	struct kms_info kms_info;
 } g = {
 	.pkey_fd = -1,
 	.sector_size = -1,
@@ -455,6 +458,18 @@ static struct util_opt opt_vec[] = {
 			KEY_TYPE_CCA_AESDATA"', '"KEY_TYPE_CCA_AESCIPHER"' "
 			"and '"KEY_TYPE_EP11_AES"'. Use this option to list "
 			"all keys with the specified key type.",
+		.command = COMMAND_LIST,
+	},
+	{
+		.option = { "local", 0, NULL, 'L'},
+		.desc = "List local keys only. Local keys are not bound to a "
+			"KMS plugin.",
+		.command = COMMAND_LIST,
+	},
+	{
+		.option = { "kms-bound", 0, NULL, 'M'},
+		.desc = "List KMS-bound keys only. KMS-bound keys are bound to "
+			"a KMS plugin.",
 		.command = COMMAND_LIST,
 	},
 	/***********************************************************/
@@ -1640,8 +1655,16 @@ static int command_list(void)
 {
 	int rc;
 
+	if (g.local && g.kms_bound) {
+		warnx("Either '--local|-L' or '--kms-bound|-M' can be "
+		      "specified, but not both");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+
 	rc = keystore_list_keys(g.keystore, g.name, g.volumes, g.apqns,
-				g.volume_type, g.key_type);
+				g.volume_type, g.key_type, g.local,
+				g.kms_bound);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1991,7 +2014,7 @@ static int open_keystore(void)
 	if (directory == NULL)
 		directory = DEFAULT_KEYSTORE;
 
-	g.keystore = keystore_new(directory, g.verbose);
+	g.keystore = keystore_new(directory, &g.kms_info, g.verbose);
 
 	return g.keystore == NULL ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -2253,6 +2276,12 @@ int main(int argc, char *argv[])
 			g.format = 1;
 			break;
 #endif
+		case 'L':
+			g.local = 1;
+			break;
+		case 'M':
+			g.kms_bound = 1;
+			break;
 		case 'h':
 			print_help(command, sub_command);
 			return EXIT_SUCCESS;

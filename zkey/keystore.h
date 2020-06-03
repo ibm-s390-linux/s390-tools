@@ -3,7 +3,7 @@
  *
  * Keystore handling functions
  *
- * Copyright IBM Corp. 2018
+ * Copyright IBM Corp. 2018, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -15,6 +15,7 @@
 #include <stdbool.h>
 
 #include "pkey.h"
+#include "kms.h"
 
 struct keystore {
 	bool verbose;
@@ -22,9 +23,31 @@ struct keystore {
 	int lock_fd;
 	mode_t mode;
 	gid_t owner;
+	struct kms_info *kms_info;
 };
 
-struct keystore *keystore_new(const char *directory, bool verbose);
+#define PROP_NAME_KEY_TYPE		"key-type"
+#define PROP_NAME_CIPHER		"cipher"
+#define PROP_NAME_IV_MODE		"iv-mode"
+#define PROP_NAME_DESCRIPTION		"description"
+#define PROP_NAME_VOLUMES		"volumes"
+#define PROP_NAME_APQNS			"apqns"
+#define PROP_NAME_SECTOR_SIZE		"sector-size"
+#define PROP_NAME_CREATION_TIME		"creation-time"
+#define PROP_NAME_CHANGE_TIME		"update-time"
+#define PROP_NAME_REENC_TIME		"reencipher-time"
+#define PROP_NAME_KEY_VP		"verification-pattern"
+#define PROP_NAME_VOLUME_TYPE		"volume-type"
+#define PROP_NAME_KMS			"kms"
+#define PROP_NAME_KMS_KEY_ID		"kms-key-id"
+#define PROP_NAME_KMS_KEY_LABEL		"kms-key-label"
+#define PROP_NAME_KMS_XTS_KEY1_ID	"kms-xts-key1-id"
+#define PROP_NAME_KMS_XTS_KEY1_LABEL	"kms-xts-key1-label"
+#define PROP_NAME_KMS_XTS_KEY2_ID	"kms-xts-key2-id"
+#define PROP_NAME_KMS_XTS_KEY2_LABEL	"kms-xts-key2-label"
+
+struct keystore *keystore_new(const char *directory,
+			      struct kms_info *kms_info, bool verbose);
 
 int keystore_generate_key(struct keystore *keystore, const char *name,
 			  const char *description, const char *volumes,
@@ -68,7 +91,8 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		       const char *volume_filter, const char *apqn_filter,
-		       const char *volume_type, const char *key_type);
+		       const char *volume_type, const char *key_type,
+		       bool local, bool kms_bound);
 
 int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 			bool execute, const char *volume_type,

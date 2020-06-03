@@ -27,6 +27,8 @@ struct kms_info {
 	kms_handle_t handle;
 };
 
+struct keystore;
+
 int list_kms_plugins(bool verbose);
 
 int check_for_kms_plugin(struct kms_info *kms_info, bool verbose);

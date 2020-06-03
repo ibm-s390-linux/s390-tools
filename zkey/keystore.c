@@ -3,7 +3,7 @@
  *
  * Keystore handling functions
  *
- * Copyright IBM Corp. 2018, 2019
+ * Copyright IBM Corp. 2018, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -49,19 +49,6 @@ struct key_filenames {
 
 #define LOCK_FILE_NAME		".lock"
 
-#define PROP_NAME_KEY_TYPE	"key-type"
-#define PROP_NAME_CIPHER	"cipher"
-#define PROP_NAME_IV_MODE	"iv-mode"
-#define PROP_NAME_DESCRIPTION	"description"
-#define PROP_NAME_VOLUMES	"volumes"
-#define PROP_NAME_APQNS		"apqns"
-#define PROP_NAME_SECTOR_SIZE	"sector-size"
-#define PROP_NAME_CREATION_TIME	"creation-time"
-#define PROP_NAME_CHANGE_TIME	"update-time"
-#define PROP_NAME_REENC_TIME	"reencipher-time"
-#define PROP_NAME_KEY_VP	"verification-pattern"
-#define PROP_NAME_VOLUME_TYPE	"volume-type"
-
 #define VOLUME_TYPE_PLAIN	"plain"
 #define VOLUME_TYPE_LUKS2	"luks2"
 #ifdef HAVE_LUKS2_SUPPORT
@@ -87,6 +74,8 @@ struct key_filenames {
 #define REC_REENC_TIME		"Re-enciphered"
 #define REC_KEY_VP		"Verification pattern"
 #define REC_VOLUME_TYPE		"Volume type"
+#define REC_KMS			"KMS"
+#define REC_KMS_KEY_LABEL	"KMS key label"
 
 #define pr_verbose(keystore, fmt...)	do {				\
 						if (keystore->verbose)	\
@@ -347,6 +336,35 @@ static int _keystore_valid_key_type(const char *key_type)
 		return 1;
 
 	return 0;
+}
+
+/**
+ * Checks if the keys is KMS-bound
+ *
+ * @param[in] key_props     the key properties
+ * @param[out] kms_name     the name of the KMS plugin, if KMS-bound
+ *
+ * @return true if the key is KMS bound, false otherwise
+ */
+static bool _keystore_is_kms_bound_key(struct properties *key_props,
+				       char **kms_name)
+{
+	bool ret = false;
+	char *kms;
+
+	if (kms_name != NULL)
+		*kms_name = NULL;
+
+	kms = properties_get(key_props, PROP_NAME_KMS);
+	if (kms != NULL && strcasecmp(kms, "LOCAL") != 0)
+		ret = true;
+
+	if (kms_name != NULL && ret == true)
+		*kms_name = kms;
+	else if (kms != NULL)
+		free(kms);
+
+	return ret;
 }
 
 /**
@@ -945,6 +963,8 @@ typedef int (*process_key_t)(struct keystore *keystore,
  *                           NULL means no APQN filter.
  * @param[in] volume_type    If not NULL, specifies the volume type.
  * @param[in] key_type       The key type. NULL means no key type filter.
+ * @param[in] local          if true, only local keys are processed
+ * @param[in] kms_bound      if true, only KMS-bound keys are processed
  * @param[in] process_func   the callback function called for a matching key
  * @param[in/out] process_private private data passed to the process_func
  *
@@ -958,6 +978,7 @@ static int _keystore_process_filtered(struct keystore *keystore,
 				      const char *apqn_filter,
 				      const char *volume_type,
 				      const char *key_type,
+				      bool local, bool kms_bound,
 				      process_key_t process_func,
 				      void *process_private)
 {
@@ -1055,6 +1076,21 @@ static int _keystore_process_filtered(struct keystore *keystore,
 			pr_verbose(keystore,
 				   "Key '%s' filtered out due to key type",
 				   name);
+			goto free_prop;
+		}
+
+		if (local && _keystore_is_kms_bound_key(key_props, NULL)) {
+			pr_verbose(keystore,
+				   "Key '%s' filtered out because it is KMS "
+				   "bound", name);
+			rc = 0;
+			goto free_prop;
+		}
+		if (kms_bound && !_keystore_is_kms_bound_key(key_props, NULL)) {
+			pr_verbose(keystore,
+				   "Key '%s' filtered out because it is not "
+				   "KMS bound", name);
+			rc = 0;
 			goto free_prop;
 		}
 
@@ -1270,7 +1306,7 @@ static int _keystore_volume_check(const char *volume, bool remove, bool set,
 
 	info->set = set;
 	rc = _keystore_process_filtered(info->keystore, NULL, info->volume,
-					NULL, NULL, NULL,
+					NULL, NULL, NULL, false, false,
 					_keystore_volume_check_process, info);
 out:
 	free((void *)info->volume);
@@ -1365,11 +1401,13 @@ static int _keystore_unlock_repository(struct keystore *keystore)
  * Allocates new keystore object
  *
  * @param[in]    directory     the directory where the keystore resides
+ * @param[in]    kms_info      KMS plugin info
  * @param[in]    verbose       if true, verbose messages are printed
  *
  * @returns a new keystore object
  */
-struct keystore *keystore_new(const char *directory, bool verbose)
+struct keystore *keystore_new(const char *directory,
+			      struct kms_info *kms_info, bool verbose)
 {
 	struct keystore *keystore;
 	struct stat sb;
@@ -1407,6 +1445,8 @@ struct keystore *keystore_new(const char *directory, bool verbose)
 	keystore->directory = util_strdup(directory);
 	if (keystore->directory[strlen(keystore->directory)-1] == '/')
 		keystore->directory[strlen(keystore->directory)-1] = '\0';
+
+	keystore->kms_info = kms_info;
 
 	rc = _keystore_lock_repository(keystore);
 	if (rc != 0) {
@@ -1566,6 +1606,7 @@ static int _keystore_set_default_properties(struct properties *key_props)
  *                        default is used.
  * @param[in] volume_type the type of volume
  * @param[in] key_type    the type of the key
+ * @param[in] kms         the name of the KMS plugin, or NULL if no KMS is bound
  */
 static int _keystore_create_info_file(struct keystore *keystore,
 				      const char *name,
@@ -1575,7 +1616,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 				      bool noapqncheck,
 				      size_t sector_size,
 				      const char *volume_type,
-				      const char *key_type)
+				      const char *key_type,
+				      const char *kms)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
 					  .set = 0 };
@@ -1644,6 +1686,14 @@ static int _keystore_create_info_file(struct keystore *keystore,
 	if (rc != 0) {
 		warnx("Invalid characters in volume-type");
 		goto out;
+	}
+
+	if (kms != NULL) {
+		rc = properties_set(key_props, PROP_NAME_KMS, kms);
+		if (rc != 0) {
+			warnx("Invalid characters in KMS");
+			goto out;
+		}
 	}
 
 	rc = _keystore_ensure_vp_exists(keystore, filenames, key_props);
@@ -1768,7 +1818,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
 					noapqncheck, sector_size, volume_type,
-					key_type);
+					key_type, NULL);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -1936,7 +1986,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	rc = _keystore_create_info_file(keystore, name, &file_names,
 					description, volumes, apqns,
 					noapqncheck, sector_size, volume_type,
-					key_type);
+					key_type, NULL);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2272,6 +2322,9 @@ static struct util_rec *_keystore_setup_record(bool validation)
 	util_rec_def(rec, REC_VOLUME_TYPE, UTIL_REC_ALIGN_LEFT, 54,
 		     REC_VOLUME_TYPE);
 	util_rec_def(rec, REC_KEY_VP, UTIL_REC_ALIGN_LEFT, 54, REC_KEY_VP);
+	util_rec_def(rec, REC_KMS, UTIL_REC_ALIGN_LEFT, 54, REC_KMS);
+	util_rec_def(rec, REC_KMS_KEY_LABEL, UTIL_REC_ALIGN_LEFT, 54,
+		     REC_KMS_KEY_LABEL);
 	util_rec_def(rec, REC_CREATION_TIME, UTIL_REC_ALIGN_LEFT, 54,
 		     REC_CREATION_TIME);
 	util_rec_def(rec, REC_CHANGE_TIME, UTIL_REC_ALIGN_LEFT, 54,
@@ -2291,9 +2344,14 @@ static void _keystore_print_record(struct util_rec *rec,
 				   bool is_old_mk, bool reenc_pending, u8 *mkvp)
 {
 	char temp_vp[VERIFICATION_PATTERN_LEN + 2];
+	char *kms_xts_key1_label = NULL;
+	char *kms_xts_key2_label = NULL;
+	char *kms_key_label = NULL;
 	char *volumes_argz = NULL;
+	size_t label_argz_len = 0;
 	size_t volumes_argz_len;
 	char *apqns_argz = NULL;
+	char *label_argz = NULL;
 	size_t sector_size = 0;
 	size_t apqns_argz_len;
 	char *description;
@@ -2305,6 +2363,7 @@ static void _keystore_print_record(struct util_rec *rec,
 	char *change;
 	char *apqns;
 	char *temp;
+	char *kms;
 	char *vp;
 	int len;
 
@@ -2335,6 +2394,30 @@ static void _keystore_print_record(struct util_rec *rec,
 	vp = properties_get(properties, PROP_NAME_KEY_VP);
 	volume_type = _keystore_get_volume_type(properties);
 	key_type = properties_get(properties, PROP_NAME_KEY_TYPE);
+	if (_keystore_is_kms_bound_key(properties, &kms)) {
+		if (is_xts) {
+			kms_xts_key1_label = properties_get(properties,
+					PROP_NAME_KMS_XTS_KEY1_LABEL);
+			kms_xts_key2_label = properties_get(properties,
+					PROP_NAME_KMS_XTS_KEY2_LABEL);
+
+			if (kms_xts_key1_label != NULL &&
+			    kms_xts_key2_label != NULL) {
+				label_argz_len = util_asprintf(&label_argz,
+					 "%s%c%s", kms_xts_key1_label, '\0',
+					 kms_xts_key2_label) + 1;
+			}
+		} else {
+			kms_key_label = properties_get(properties,
+					PROP_NAME_KMS_KEY_LABEL);
+
+			if (kms_key_label != NULL) {
+				label_argz = kms_key_label;
+				label_argz_len = strlen(label_argz) + 1;
+				kms_key_label = NULL;
+			}
+		}
+	}
 
 	util_rec_set(rec, REC_KEY, name);
 	if (validation)
@@ -2389,7 +2472,13 @@ static void _keystore_print_record(struct util_rec *rec,
 		util_rec_set_argz(rec, REC_KEY_VP, temp_vp, len + 1);
 	} else {
 		util_rec_set(rec, REC_KEY_VP, "(not available)");
-		}
+	}
+	util_rec_set(rec, REC_KMS, kms != NULL ? kms : "(local)");
+	if (kms != NULL && label_argz != NULL)
+		util_rec_set_argz(rec, REC_KMS_KEY_LABEL, label_argz,
+				  label_argz_len);
+	else
+		util_rec_set(rec, REC_KMS_KEY_LABEL, "(local)");
 	util_rec_set(rec, REC_CREATION_TIME, creation);
 	util_rec_set(rec, REC_CHANGE_TIME,
 		     change != NULL ? change : "(never)");
@@ -2421,6 +2510,16 @@ static void _keystore_print_record(struct util_rec *rec,
 		free(volume_type);
 	if (key_type != NULL)
 		free(key_type);
+	if (kms != NULL)
+		free(kms);
+	if (kms_key_label != NULL)
+		free(kms_key_label);
+	if (kms_xts_key1_label != NULL)
+		free(kms_xts_key1_label);
+	if (kms_xts_key2_label != NULL)
+		free(kms_xts_key2_label);
+	if (label_argz != NULL)
+		free(label_argz);
 }
 
 struct validate_info {
@@ -2641,7 +2740,7 @@ int keystore_validate_key(struct keystore *keystore, const char *name_filter,
 	info.num_warnings = 0;
 
 	rc = _keystore_process_filtered(keystore, name_filter, NULL,
-					apqn_filter, NULL, NULL,
+					apqn_filter, NULL, NULL, false, false,
 					_keystore_process_validate, &info);
 
 	util_rec_free(rec);
@@ -3009,7 +3108,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 	info.num_skipped = 0;
 
 	rc = _keystore_process_filtered(keystore, name_filter, NULL,
-					apqn_filter, NULL, NULL,
+					apqn_filter, NULL, NULL, false, false,
 					_keystore_process_reencipher, &info);
 
 	if (rc != 0) {
@@ -3383,12 +3482,15 @@ out:
  *                           NULL means no APQN filter.
  * @param[in] volume_type    The volume type. NULL means no volume type filter.
  * @param[in] key_type       The key type. NULL means no key type filter.
+ * @param[in] local          if true, only local keys are listed
+ * @param[in] kms_bound      if true, only KMS-bound keys are listed
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		       const char *volume_filter, const char *apqn_filter,
-		       const char *volume_type, const char *key_type)
+		       const char *volume_type, const char *key_type,
+		       bool local, bool kms_bound)
 {
 	struct util_rec *rec;
 	int rc;
@@ -3411,6 +3513,7 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 
 	rc = _keystore_process_filtered(keystore, name_filter, volume_filter,
 					apqn_filter, volume_type, key_type,
+					local, kms_bound,
 					_keystore_display_key, rec);
 	util_rec_free(rec);
 
@@ -3872,7 +3975,7 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 	info.process_func = _keystore_process_cryptsetup;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					volume_type, NULL,
+					volume_type, NULL, false, false,
 					_keystore_process_crypt, &info);
 
 	str_list_free_string_array(info.volume_filter);
@@ -3933,7 +4036,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 	info.process_func = _keystore_process_crypttab;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					volume_type, NULL,
+					volume_type, NULL, false, false,
 					_keystore_process_crypt, &info);
 
 	str_list_free_string_array(info.volume_filter);
