@@ -235,15 +235,15 @@ int main(int argc, char **argv)
 	write_buffer(STDOUT_FILENO, cp.response,
 		     MIN(cp.response_size, cp.buffer_size));
 	free(cp.response);
-	if (ret == VMCP_ERR_TOOSMALL) {
-		fprintf(stderr, "Error: output (%d bytes) was truncated, try "
-			"--buffer to increase size\n", cp.response_size);
-		return VMCP_BUF;
-	}
 	if (cp.cprc > 0) {
 		fprintf(stderr, "Error: non-zero CP response for command '%s': "
 			"#%d\n", command, cp.cprc);
 		return VMCP_CP;
+	}
+	if (ret == VMCP_ERR_TOOSMALL) {
+		fprintf(stderr, "Error: output (%d bytes) was truncated, try "
+			"--buffer to increase size\n", cp.response_size);
+		return VMCP_BUF;
 	}
 	return EXIT_SUCCESS;
 }
