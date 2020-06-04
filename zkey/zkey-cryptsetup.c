@@ -650,10 +650,10 @@ static int get_password_file(char **pwd, size_t *pwd_size, const char *key_file,
 	size_t file_read_size;
 	int regular_file = 0;
 	int char_to_read = 0;
+	size_t buflen = 0, i;
 	int fd, rc, newline;
 	char *pass = NULL;
 	int char_read = 0;
-	size_t buflen, i;
 	struct stat sb;
 
 	fd = key_file ? open(key_file, O_RDONLY) : STDIN_FILENO;
@@ -712,6 +712,7 @@ static int get_password_file(char **pwd, size_t *pwd_size, const char *key_file,
 	if (keyfile_offset && keyfile_seek(fd, keyfile_offset) < 0) {
 		warnx("Cannot seek to requested key file offset %lu",
 		       keyfile_offset);
+		rc = -EIO;
 		goto out_err;
 	}
 
