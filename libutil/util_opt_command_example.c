@@ -43,6 +43,12 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_PULL,
 	},
 	{
+		.option = { "test", required_argument, NULL, 't'},
+		.argument = "TEST",
+		.desc = "Option 'test' with a required argument TEST for pull",
+		.command = COMMAND_PULL,
+	},
+	{
 		.desc = "OPTIONS",
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.command = COMMAND_PUSH,
@@ -57,7 +63,12 @@ static struct util_opt opt_vec[] = {
 		.option = { NULL, no_argument, NULL, 'l'},
 		.desc = "Option with only a short name",
 		.flags = UTIL_OPT_FLAG_NOLONG,
-		.command = "push",
+		.command = COMMAND_PUSH,
+	},
+	{
+		.option = { "test", no_argument, NULL, 't'},
+		.desc = "Option 'test' without an argument for push",
+		.command = COMMAND_PUSH,
 	},
 	UTIL_OPT_SECTION("COMMON OPTIONS"),
 	/* Standard option: -h,--help */
@@ -122,9 +133,6 @@ int main(int argc, char *argv[])
 	char **my_argv = argv;
 	char *command = NULL;
 
-	/* Install option vector */
-	util_opt_init(opt_vec, NULL);
-
 	/* The command name is the very first argument */
 	if (argc >= 2 && strncmp(argv[1], "-", 1) != 0) {
 		command = argv[1];
@@ -143,6 +151,9 @@ int main(int argc, char *argv[])
 	/* Set the current command (if any) */
 	util_opt_set_command(command);
 	util_prg_set_command(command);
+
+	/* Install option vector */
+	util_opt_init(opt_vec, NULL);
 
 	/* Parse all options specified in my_argv[] */
 	while (1) {
@@ -172,6 +183,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			printf("Specified: -l\n");
+			break;
+		case 't':
+			printf("Specified: --test %s\n", optarg ? optarg : "");
 			break;
 		default:
 			util_opt_print_parse_error(c, my_argv);

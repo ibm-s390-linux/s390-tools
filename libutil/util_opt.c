@@ -49,6 +49,7 @@ struct util_opt_l *util_opt_l = &l;
 #define MAX_OPTLEN	256
 
 static int opt_max_len(void);
+static bool opt_is_active(struct util_opt *opt);
 
 /**
  * Initialize the command line options
@@ -68,7 +69,9 @@ void util_opt_init(struct util_opt *opt_vec, const char *opt_prefix)
 
 	opterr = 0;
 	/* Get number of options */
-	for (count = 0; opt_vec[count].desc != NULL; count++);
+	for (i = 0, count = 0; opt_vec[i].desc != NULL; i++)
+		if (opt_is_active(&opt_vec[i]))
+			count++;
 	/*
 	 * Allocate short option string for worst case when all options have
 	 * optional parameters e.g "x::" and long option string.
@@ -85,7 +88,9 @@ void util_opt_init(struct util_opt *opt_vec, const char *opt_prefix)
 	/* Force getopt_long() to return ':' for missing required arguments */
 	*str++ = ':';
 	/* Construction of input structures for getopt_long() function.  */
-	for (i = 0, j = 0; i < count; i++) {
+	for (i = 0, j = 0; opt_vec[i].desc != NULL; i++) {
+		if (!opt_is_active(&opt_vec[i]))
+			continue;
 		if (opt_vec[i].flags & UTIL_OPT_FLAG_SECTION)
 			continue;
 		if (!(opt_vec[i].flags & UTIL_OPT_FLAG_NOLONG)) {
