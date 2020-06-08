@@ -1588,11 +1588,10 @@ static int _keystore_set_default_properties(struct properties *key_props)
 }
 
 /**
- * Creates an initial .info file for a key
+ * Creates the key properties for a key
  *
  * @param[in] keystore    the key store
  * @param[in] name        the name of the key
- * @param[in] info_filename  the file name of the key info file
  * @param[in] description textual description of the key (optional, can be NULL)
  * @param[in] volumes     a comma separated list of volumes associated with this
  *                        key (optional, can be NULL)
@@ -1607,17 +1606,18 @@ static int _keystore_set_default_properties(struct properties *key_props)
  * @param[in] volume_type the type of volume
  * @param[in] key_type    the type of the key
  * @param[in] kms         the name of the KMS plugin, or NULL if no KMS is bound
+ * @param[out] props      the properties object is allocated and returned
  */
-static int _keystore_create_info_file(struct keystore *keystore,
-				      const char *name,
-				      const struct key_filenames *filenames,
-				      const char *description,
-				      const char *volumes, const char *apqns,
-				      bool noapqncheck,
-				      size_t sector_size,
-				      const char *volume_type,
-				      const char *key_type,
-				      const char *kms)
+static int _keystore_create_info_props(struct keystore *keystore,
+				       const char *name,
+				       const char *description,
+				       const char *volumes, const char *apqns,
+				       bool noapqncheck,
+				       size_t sector_size,
+				       const char *volume_type,
+				       const char *key_type,
+				       const char *kms,
+				       struct properties **props)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
 					  .set = 0 };
@@ -1628,6 +1628,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 	struct properties *key_props;
 	char temp[10];
 	int rc;
+
+	*props = NULL;
 
 	key_props = properties_new();
 	rc = _keystore_set_default_properties(key_props);
@@ -1696,13 +1698,65 @@ static int _keystore_create_info_file(struct keystore *keystore,
 		}
 	}
 
+out:
+	if (rc == 0)
+		*props = key_props;
+	else
+		properties_free(key_props);
+
+	return rc;
+}
+
+
+/**
+ * Creates an initial .info file for a key
+ *
+ * @param[in] keystore    the key store
+ * @param[in] name        the name of the key
+ * @param[in] info_filename  the file name of the key info file
+ * @param[in] description textual description of the key (optional, can be NULL)
+ * @param[in] volumes     a comma separated list of volumes associated with this
+ *                        key (optional, can be NULL)
+ * @param[in] apqns       a comma separated list of APQNs associated with this
+ *                        key (optional, can be NULL)
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
+ * @param[in] sector_size the sector size to use with dm-crypt. It must be power
+ *                        of two and in range 512 - 4096 bytes. 0 means that
+ *                        the sector size is not specified and the system
+ *                        default is used.
+ * @param[in] volume_type the type of volume
+ * @param[in] key_type    the type of the key
+ * @param[in] kms         the name of the KMS plugin, or NULL if no KMS is bound
+ */
+static int _keystore_create_info_file(struct keystore *keystore,
+				      const char *name,
+				      const struct key_filenames *filenames,
+				      const char *description,
+				      const char *volumes, const char *apqns,
+				      bool noapqncheck,
+				      size_t sector_size,
+				      const char *volume_type,
+				      const char *key_type,
+				      const char *kms)
+{
+	struct properties *key_props = NULL;
+	int rc;
+
+	rc = _keystore_create_info_props(keystore, name, description, volumes,
+					 apqns, noapqncheck, sector_size,
+					 volume_type, key_type, kms,
+					 &key_props);
+	if (rc != 0)
+		return rc;
+
 	rc = _keystore_ensure_vp_exists(keystore, filenames, key_props);
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
 		warnx("Make sure that kernel module 'paes_s390' is loaded and "
 		      "that the 'paes' cipher is available");
-		return rc;
+		goto out;
 	}
 
 	rc = properties_save(key_props, filenames->info_filename, 1);
@@ -1841,6 +1895,164 @@ out_free_key_filenames:
 		pr_verbose(keystore, "Failed to generate key '%s': %s",
 			   name, strerror(-rc));
 	return rc;
+}
+
+/**
+ * Generates a secure key by using a KMS plugin and adds it to the key store
+ *
+ * @param[in] keystore    the key store
+ * @param[in] name        the name of the key
+ * @param[in] description textual description of the key (optional, can be NULL)
+ * @param[in] volumes     a comma separated list of volumes associated with this
+ *                        key (optional, can be NULL)
+ * @param[in] sector_size the sector size to use with dm-crypt. It must be power
+ *                        of two and in range 512 - 4096 bytes. 0 means that
+ *                        the sector size is not specified and the system
+ *                        default is used.
+ * @param[in] keybits     cryptographical size of the key in bits
+ * @param[in] xts         if true, an XTS key is generated
+ * @param[in] volume_type the type of volume
+ * @param[in] key_type    the type of the key (can be NULL)
+ * @param[in] kms_options an array of KMS options specified, or NULL if no
+ *                         KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_generate_key_kms(struct keystore *keystore, const char *name,
+			      const char *description, const char *volumes,
+			      size_t sector_size, size_t keybits, bool xts,
+			      const char *volume_type, const char *key_type,
+			      struct kms_option *kms_options,
+			      size_t num_kms_options)
+{
+	struct key_filenames file_names = { NULL, NULL, NULL };
+	struct properties *key_props = NULL;
+	struct kms_info *kms_info;
+	char *apqns = NULL;
+	int rc, i;
+
+	static const char * const key_types[] = {
+			KEY_TYPE_CCA_AESDATA,
+			KEY_TYPE_CCA_AESCIPHER,
+			KEY_TYPE_EP11_AES,
+			NULL
+	};
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(name != NULL, "Internal error: name is NULL");
+
+	kms_info = keystore->kms_info;
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (key_type == NULL) {
+		for (i = 0; kms_info->funcs->kms_supports_key_type != NULL &&
+			    key_types[i] != NULL; i++) {
+			if (kms_info->funcs->kms_supports_key_type(
+					kms_info->handle, key_types[i])) {
+				key_type = key_types[i];
+				break;
+			}
+		}
+		if (key_type == NULL)
+			key_type = KEY_TYPE_CCA_AESDATA;
+	}
+
+	if (!_keystore_valid_key_type(key_type)) {
+		warnx("Invalid key-type specified");
+		return -EINVAL;
+	}
+
+	rc = _keystore_get_key_filenames(keystore, name, &file_names);
+	if (rc != 0)
+		goto out_free_key_filenames;
+
+	rc = _keystore_ensure_keyfiles_not_exist(&file_names, name);
+	if (rc != 0)
+		goto out_free_key_filenames;
+
+	rc = get_kms_apqns_for_key_type(kms_info, key_type, true, &apqns,
+					keystore->verbose);
+	if (rc != 0) {
+		if (rc == -ENOTSUP)
+			warnx("Key-type not supported by the KMS plugin '%s'",
+			      kms_info->plugin_name);
+		goto out_free_key_filenames;
+	}
+
+	pr_verbose(keystore, "APQNs for keytype %s: '%s'", key_type, apqns);
+
+	rc = _keystore_create_info_props(keystore, name, description, volumes,
+					 apqns, false, sector_size, volume_type,
+					 key_type, kms_info->plugin_name,
+					 &key_props);
+	if (rc != 0)
+		goto out_free_key_filenames;
+
+	rc = generate_kms_key(kms_info, name, key_type, key_props, xts,
+			      keybits, file_names.skey_filename,
+			      kms_options, num_kms_options, keystore->verbose);
+	if (rc != 0) {
+		warnx("KMS plugin '%s' failed to generate key '%s': %s",
+		      kms_info->plugin_name, name, strerror(-rc));
+		print_last_kms_error(kms_info);
+		goto out_free_props;
+	}
+
+	rc = _keystore_set_file_permission(keystore, file_names.skey_filename);
+	if (rc != 0)
+		goto out_free_props;
+
+	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props);
+	if (rc != 0) {
+		warnx("Failed to generate the key verification pattern: %s",
+		      strerror(-rc));
+		warnx("Make sure that kernel module 'paes_s390' is loaded and "
+		      "that the 'paes' cipher is available");
+		goto out_free_props;
+	}
+
+	rc = properties_save(key_props, file_names.info_filename, 1);
+	if (rc != 0) {
+		pr_verbose(keystore,
+			   "Key info file '%s' could not be written: %s",
+			   file_names.info_filename, strerror(-rc));
+		goto out_del_info_file;
+	}
+
+	rc = _keystore_set_file_permission(keystore, file_names.info_filename);
+	if (rc != 0) {
+		remove(file_names.info_filename);
+		goto out_del_info_file;
+	}
+
+	pr_verbose(keystore,
+		   "Successfully generated a secure key with KMS plugin '%s' "
+		   "in '%s' and key info in '%s'", kms_info->plugin_name,
+		   file_names.skey_filename, file_names.info_filename);
+
+out_del_info_file:
+	if (rc != 0)
+		remove(file_names.info_filename);
+out_free_props:
+	if (key_props != NULL)
+		properties_free(key_props);
+	if (rc != 0)
+		remove(file_names.skey_filename);
+out_free_key_filenames:
+	_keystore_free_key_filenames(&file_names);
+	if (apqns != NULL)
+		free(apqns);
+
+	if (rc != 0)
+		pr_verbose(keystore, "Failed to generate key '%s' with KMS "
+			   "plugin '%s': %s", name, kms_info->plugin_name,
+			   strerror(-rc));
+	return rc;
+
 }
 
 /**

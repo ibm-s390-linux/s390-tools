@@ -263,6 +263,7 @@ struct pkey_apqns4keytype {
 #define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"
 #define KEY_TYPE_EP11_AES           "EP11-AES"
 
+#define DEFAULT_KEYBITS             256
 #define PAES_BLOCK_SIZE             16
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
 #define VERIFICATION_PATTERN_LEN    (2 * ENC_ZERO_LEN + 1)

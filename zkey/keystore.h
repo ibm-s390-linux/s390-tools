@@ -56,6 +56,13 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 			  const char *clear_key_file, const char *volume_type,
 			  const char *key_type, int pkey_fd);
 
+int keystore_generate_key_kms(struct keystore *keystore, const char *name,
+			      const char *description, const char *volumes,
+			      size_t sector_size, size_t keybits, bool xts,
+			      const char *volume_type, const char *key_type,
+			      struct kms_option *kms_options,
+			      size_t num_kms_options);
+
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,

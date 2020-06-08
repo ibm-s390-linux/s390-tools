@@ -66,4 +66,15 @@ int reencipher_kms(struct kms_info *kms_info, bool from_old, bool to_new,
 		   struct kms_option *kms_options, size_t num_kms_options,
 		   bool verbose);
 
+int perform_kms_login(struct kms_info *kms_info, bool verbose);
+
+int get_kms_apqns_for_key_type(struct kms_info *kms_info, const char *key_type,
+			       bool cross_check, char **apqns, bool verbose);
+
+int generate_kms_key(struct kms_info *kms_info, const char *name,
+		     const char *key_type, struct properties *key_props,
+		     bool xts, size_t keybits, const char *filename,
+		     struct kms_option *kms_options, size_t num_kms_options,
+		     bool verbose);
+
 #endif

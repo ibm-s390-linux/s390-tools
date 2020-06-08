@@ -45,8 +45,6 @@
 
 #define MAX_CIPHER_LEN		32
 
-#define DEFAULT_KEYBITS		256
-
 #define INITIAL_APQN_ENTRIES	16
 
 /**

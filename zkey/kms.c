@@ -7,6 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <ctype.h>
 #include <dlfcn.h>
 #include <dirent.h>
 #include <err.h>
@@ -19,6 +20,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include "lib/util_base.h"
@@ -44,6 +46,19 @@
 #define KMS_CONFIG_PROP_CCA_APQNS	"ep11_apqns"
 #define KMS_CONFIG_PROP_EP11_APQNS	"cca_apqns"
 #define KMS_CONFIG_LOCAL		"local"
+
+#define KMS_KEY_PROP_NAME		"zkey-name"
+#define KMS_KEY_PROP_CIPHER		"cipher"
+#define KMS_KEY_PROP_IV_MODE		"iv-mode"
+#define KMS_KEY_PROP_DESCRIPTION	"description"
+#define KMS_KEY_PROP_VOLUMES		"volumes"
+#define KMS_KEY_PROP_VOLUME_TYPE	"volume-type"
+#define KMS_KEY_PROP_SECTOR_SIZE	"sector-size"
+#define KMS_KEY_PROP_XTS_KEY		"xts-key"
+#define KMS_KEY_PROP_XTS_KEY1_ID	"xts-key1-id"
+#define KMS_KEY_PROP_XTS_KEY2_ID	"xts-key2-id"
+#define KMS_KEY_PROP_XTS_KEY1_LABEL	"xts-key1-label"
+#define KMS_KEY_PROP_XTS_KEY2_LABEL	"xts-key2-label"
 
 static const char * const key_types[] = {
 		KEY_TYPE_CCA_AESDATA,
@@ -1897,3 +1912,400 @@ int reencipher_kms(struct kms_info *kms_info, bool from_old, bool to_new,
 out:
 	return rc;
 }
+
+/**
+ * Performs a login with the KMS plugin, if one is configured
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int perform_kms_login(struct kms_info *kms_info, bool verbose)
+{
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		goto out;
+	}
+
+	if (kms_info->funcs->kms_login == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support login");
+		goto out;
+	}
+
+	rc = kms_info->funcs->kms_login(kms_info->handle);
+	if (rc != 0) {
+		warnx("Failed to login into the KMS: %s",
+		      strerror(-rc));
+		print_last_kms_error(kms_info);
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
+/**
+ * Gets the subset of the APQNs of a KMS plugin for a specific key type
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] key_type        the key type to get the APQNs for, or NULL to
+ *                            get all APQNs associated with the KMS
+ * @param[in] cross_check     if true, the APQNs are cross checked
+ * @param[out] apqns          On return the list of APQNs as comma separated
+ *                            string. Must be freed by the caller.
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ * If the KMS plugin does not support the key type, then -ENOTSUP is returned
+ */
+int get_kms_apqns_for_key_type(struct kms_info *kms_info, const char *key_type,
+			       bool cross_check, char **apqns, bool verbose)
+{
+	const struct fw_version *fw_version;
+	const char *prop_name;
+	int rc = 0, min_level;
+	enum card_type type;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(apqns != NULL, "Internal error: apqns is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (key_type != NULL) {
+		if (kms_info->funcs->kms_supports_key_type == NULL)
+			return -ENOTSUP;
+
+		if (!kms_info->funcs->kms_supports_key_type(kms_info->handle,
+							   key_type))
+			return -ENOTSUP;
+	}
+
+	type = get_card_type_for_keytype(key_type);
+	switch (type) {
+	case CARD_TYPE_CCA:
+		prop_name = KMS_CONFIG_PROP_CCA_APQNS;
+		break;
+	case CARD_TYPE_EP11:
+		prop_name = KMS_CONFIG_PROP_EP11_APQNS;
+		break;
+	default:
+		prop_name = KMS_CONFIG_PROP_APQNS;
+		break;
+	}
+
+	*apqns = properties_get(kms_info->props, prop_name);
+	if (*apqns == NULL)
+		return -ENOTSUP;
+
+	if (str_list_count(*apqns) == 0) {
+		rc = -ENOTSUP;
+		goto out;
+	}
+
+	if (cross_check) {
+		min_level = get_min_card_level_for_keytype(key_type);
+		fw_version = get_min_fw_version_for_keytype(key_type);
+
+		rc = cross_check_apqns(*apqns, NULL, min_level, fw_version,
+				       type, true, verbose);
+		if (rc == -ENOTSUP)
+			rc = 0;
+		if (rc != 0) {
+			warnx("Your master key setup is improper");
+			goto out;
+		}
+	}
+
+out:
+	if (rc != 0) {
+		free(*apqns);
+		*apqns = NULL;
+	}
+
+	return rc;
+}
+
+/**
+ * Returns a system specific version of the specified properties name.
+ * The properties name does not contain any special characters, except '-'
+ * and '_'. The returned string mst be freed by the caller.
+ *
+ * @param[in] prop_name      the base property name
+ *
+ * @returns an allocated string
+ */
+static char *_get_system_specific_prop_name(const char *prop_name)
+{
+	struct utsname utsname;
+	char *ret;
+	int i;
+
+	if (uname(&utsname)) {
+		warnx("uname failed: %s", strerror(errno));
+		return NULL;
+	}
+
+	for (i = 0; utsname.nodename[i] != '\0'; i++)
+		if (!isalnum(utsname.nodename[i]))
+			utsname.nodename[i] = '_';
+
+	util_asprintf(&ret, "%s-%s", prop_name, utsname.nodename);
+	return ret;
+}
+
+#define ADD_KMS_PROPS(props, num, pname, pvalue)			\
+	do {								\
+		util_assert((num) * sizeof(struct kms_property) <	\
+			    sizeof(props), " Internal error: kss "	\
+			    "property array is full");			\
+		(props)[num].name = (pname);				\
+		(props)[num].value = (pvalue);				\
+		(num)++;						\
+	} while (0)
+
+/**
+ * Requests the KMS plugin to generate  a key of the specified key type, size
+ * and mode, and stores the secure key blob into the specified file.
+ *
+ * For an XTS-mode key, 2 keys are generated and those are cross linked using
+ * its properties.
+ *
+ * The key ID(s) and label(s) of the generated keys (2 for XTS) are set into
+ * the properties object.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] name            the name of the key to generate
+ * @param[in] key_type        the key type o the key to generate
+ * @param[in] key_props       a properties object containing the key's initial
+ *                            properties. On return additional properties are
+ *                            added/set for the key ID(s) and label(s).
+ * @param[in] xts             if true, an XTS key (i.e 2 keys) is generated
+ * @param[in] keybits         the key bit size (e.g. 128, 196, 256, 0 to use the
+ *                            plugin's default)
+ * @param[in] filename        the file name to store the key in
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ * If the KMS plugin does not support the key type, then -ENOTSUP is returned
+ */
+int generate_kms_key(struct kms_info *kms_info, const char *name,
+		     const char *key_type, struct properties *key_props,
+		     bool xts, size_t keybits, const char *filename,
+		     struct kms_option *kms_options, size_t num_kms_options,
+		     bool verbose)
+{
+	char *cipher, *iv_mode, *description, *volumes, *vol_type, *sector_size;
+	unsigned char key_blob[MAX_SECURE_KEY_SIZE * 2];
+	char key1_label[KMS_KEY_LABEL_SIZE + 1] = { 0 };
+	char key2_label[KMS_KEY_LABEL_SIZE + 1] = { 0 };
+	char key1_id[KMS_KEY_ID_SIZE + 1] = { 0 };
+	char key2_id[KMS_KEY_ID_SIZE + 1] = { 0 };
+	struct kms_property kms_props[12];
+	int xts_mode_prop = -1, rc = 0;
+	size_t key_size, key_blob_size;
+	enum kms_key_mode key_mode;
+	size_t num_kms_props = 0;
+	char *sys_volumes = NULL;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(name != NULL, "Internal error: name is NULL");
+	util_assert(key_type != NULL, "Internal error: key_type is NULL");
+	util_assert(key_props != NULL, "Internal error: key_props is NULL");
+	util_assert(filename != NULL, "Internal error: filename is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (kms_info->funcs->kms_generate_key == NULL ||
+	    kms_info->funcs->kms_set_key_properties == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "generate keys or set properties");
+		return -ENOTSUP;
+	}
+
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		key_size = AESDATA_KEY_SIZE;
+	else if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+		key_size = AESCIPHER_KEY_SIZE;
+	else if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		key_size = EP11_KEY_SIZE;
+	else
+		return -ENOTSUP;
+
+	memset(key_blob, 0, sizeof(key_blob));
+
+	cipher = properties_get(key_props, PROP_NAME_CIPHER);
+	iv_mode = properties_get(key_props, PROP_NAME_IV_MODE);
+	description = properties_get(key_props, PROP_NAME_DESCRIPTION);
+	volumes = properties_get(key_props, PROP_NAME_VOLUMES);
+	vol_type = properties_get(key_props, PROP_NAME_VOLUME_TYPE);
+	sector_size = properties_get(key_props, PROP_NAME_SECTOR_SIZE);
+
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_NAME, name);
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_CIPHER,
+		      cipher != NULL ? cipher : "");
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_IV_MODE,
+		      iv_mode != NULL ? iv_mode : "");
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_DESCRIPTION,
+		      description != NULL ? description : "");
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_VOLUMES,
+		      volumes != NULL ? volumes : "");
+	sys_volumes = _get_system_specific_prop_name(KMS_KEY_PROP_VOLUMES);
+	if (sys_volumes == NULL)
+		return -ENOMEM;
+	ADD_KMS_PROPS(kms_props, num_kms_props, sys_volumes,
+		      volumes != NULL ? volumes : "");
+
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_VOLUME_TYPE,
+		      vol_type != NULL ? vol_type : "");
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_SECTOR_SIZE,
+		      sector_size != NULL ? sector_size : "");
+
+	if (xts) {
+		xts_mode_prop = num_kms_props;
+		ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_XTS_KEY,
+			      "XTS-KEY-1");
+	}
+
+	key_mode = xts ? KMS_KEY_MODE_XTS_1 : KMS_KEY_MODE_NON_XTS;
+
+	key_blob_size = key_size;
+	rc = kms_info->funcs->kms_generate_key(kms_info->handle, key_type,
+					       keybits, key_mode,
+					       kms_props, num_kms_props,
+					       kms_options, num_kms_options,
+					       key_blob, &key_blob_size,
+					       key1_id, sizeof(key1_id),
+					       key1_label, sizeof(key1_label));
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to generate key #1: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	pr_verbose(verbose, "Key1: ID: '%s' Label: '%s'", key1_id, key1_label);
+	pr_verbose(verbose, "Keyblob #1: %lu bytes:'", key_blob_size);
+	if (verbose)
+		util_hexdump_grp(stderr, NULL, key_blob, 4, key_blob_size, 0);
+
+	/* Save ID and label of 1st key */
+	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_ID :
+			    PROP_NAME_KMS_KEY_ID, key1_id);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to set key id of key #1: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_LABEL :
+			    PROP_NAME_KMS_KEY_LABEL, key1_label);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to set key label of key #1: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	if (!xts)
+		goto save_key;
+
+	/* Generate 2nd key of the XTS key */
+	kms_props[xts_mode_prop].value = "XTS-KEY-2";
+	key_mode = KMS_KEY_MODE_XTS_2;
+
+	/* Cross link key 1 with key 2 */
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_XTS_KEY1_ID,
+		      key1_id);
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_XTS_KEY1_LABEL,
+		      key1_label);
+
+	key_blob_size = key_size;
+	rc = kms_info->funcs->kms_generate_key(kms_info->handle, key_type,
+					       keybits, key_mode,
+					       kms_props, num_kms_props,
+					       kms_options, num_kms_options,
+					       &key_blob[key_size],
+					       &key_blob_size,
+					       key2_id, sizeof(key2_id),
+					       key2_label, sizeof(key2_label));
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to generate key #2: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	pr_verbose(verbose, "Key2: ID: '%s' Label: '%s'", key1_id, key1_label);
+	pr_verbose(verbose, "Keyblob #2: %lu bytes:'", key_blob_size);
+	if (verbose)
+		util_hexdump_grp(stderr, NULL, &key_blob[key_size], 4,
+				 key_blob_size, 0);
+
+	/* Save ID and label of 2nd key */
+	rc = properties_set(key_props, PROP_NAME_KMS_XTS_KEY2_ID, key2_id);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to set key id of key #2: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = properties_set(key_props, PROP_NAME_KMS_XTS_KEY2_LABEL,
+			    key2_label);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to set key label of key #2: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	/* Cross link key 2 with key 1 */
+	num_kms_props = 0;
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_XTS_KEY2_ID,
+		      key2_id);
+	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_XTS_KEY2_LABEL,
+		      key2_label);
+
+	rc = kms_info->funcs->kms_set_key_properties(kms_info->handle, key1_id,
+						     kms_props, num_kms_props);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to set properties of "
+			   "key #1: %s", strerror(-rc));
+		goto out;
+	}
+
+save_key:
+	rc = write_secure_key(filename, key_blob, xts ? key_size * 2 : key_size,
+			      verbose);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (cipher != NULL)
+		free(cipher);
+	if (iv_mode != NULL)
+		free(iv_mode);
+	if (description != NULL)
+		free(description);
+	if (volumes != NULL)
+		free(volumes);
+	if (vol_type != NULL)
+		free(vol_type);
+	if (sector_size != NULL)
+		free(sector_size);
+	if (sys_volumes != NULL)
+		free(sys_volumes);
+
+	return rc;
+}
+
