@@ -536,6 +536,12 @@ options. You cannot mix \fI+\fP and
 \fI-\fP in one specification. You can either add or remove (or set) the
 associations with one command.
 .PP
+For secure AES keys that are bound to a key management system (KMS) you can not
+change the APQN association. KMS-bound secure AES keys are always bound to the
+APQNs that are associated with the key management system plugin.
+Other associated information is also changed in the key management system when
+changed using the change command.
+.PP
 .B Note:
 The secure key itself cannot be changed, only information about the secure
 key is changed. To rename a secure key, use the \fBrename\fP command.

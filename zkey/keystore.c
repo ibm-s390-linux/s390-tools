@@ -2266,11 +2266,14 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 					 .nomsg = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
+	char *upd_volume_type = NULL;
 	char *apqns_prop, *key_type;
+	char *upd_volumes = NULL;
 	size_t secure_key_size;
 	u8 mkvp[MKVP_LENGTH];
+	char sect_size[30];
 	u8 *secure_key;
-	char temp[30];
+	bool kms_bound;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -2291,6 +2294,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
+	kms_bound = _keystore_is_kms_bound_key(key_props, NULL);
+
 	if (description != NULL) {
 		rc = properties_set(key_props, PROP_NAME_DESCRIPTION,
 				    description);
@@ -2307,9 +2312,18 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 						  &vol_check);
 		if (rc != 0)
 			goto out;
+
+		upd_volumes = properties_get(key_props, PROP_NAME_VOLUMES);
 	}
 
 	if (apqns != NULL) {
+		if (kms_bound) {
+			rc = -EINVAL;
+			warnx("The APQN association of a KMS-bound key can not "
+			      "be changed");
+			goto out;
+		}
+
 		rc = _keystore_change_association(key_props, PROP_NAME_APQNS,
 						  apqns, "APQN",
 						  _keystore_apqn_check,
@@ -2357,9 +2371,9 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 		}
 
-		sprintf(temp, "%lu", sector_size);
+		sprintf(sect_size, "%lu", sector_size);
 		rc = properties_set(key_props, PROP_NAME_SECTOR_SIZE,
-				    temp);
+				    sect_size);
 		if (rc != 0) {
 			warnx("Invalid characters in sector-size");
 			goto out;
@@ -2377,6 +2391,29 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 				     volume_type, true);
 		if (rc != 0) {
 			warnx("Invalid characters in volume-type");
+			goto out;
+		}
+
+		upd_volume_type = properties_get(key_props,
+						 PROP_NAME_VOLUME_TYPE);
+	}
+
+	if (kms_bound) {
+		rc = perform_kms_login(keystore->kms_info, keystore->verbose);
+		if (rc != 0)
+			goto out;
+
+		rc = set_kms_key_properties(keystore->kms_info, key_props, NULL,
+					    description, upd_volumes,
+					    upd_volume_type, sector_size >= 0 ?
+							sect_size : NULL,
+					    keystore->verbose);
+		if (rc != 0) {
+			warnx("KMS plugin '%s' failed to set key properties "
+			      "for key '%s': %s",
+			      keystore->kms_info->plugin_name, name,
+			      strerror(-rc));
+			print_last_kms_error(keystore->kms_info);
 			goto out;
 		}
 	}
@@ -2402,6 +2439,10 @@ out:
 	_keystore_free_key_filenames(&file_names);
 	if (key_props != NULL)
 		properties_free(key_props);
+	if (upd_volumes != NULL)
+		free(upd_volumes);
+	if (upd_volume_type != NULL)
+		free(upd_volume_type);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to change key '%s': %s",
@@ -2424,6 +2465,7 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct key_filenames new_names = { NULL, NULL, NULL };
 	struct properties *key_props = NULL;
+	bool reenc_exists = false;
 	char *msg;
 	int rc;
 
@@ -2457,18 +2499,16 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 		rc = -errno;
 		pr_verbose(keystore, "Failed to rename '%s': %s",
 			   file_names.info_filename, strerror(-rc));
-		rename(new_names.skey_filename, file_names.skey_filename);
+		goto out_rename_skey;
 	}
 	if (_keystore_reencipher_key_exists(&file_names)) {
+		reenc_exists = true;
 		if (rename(file_names.renc_filename,
 			   new_names.renc_filename) != 0) {
 			rc = -errno;
 			pr_verbose(keystore, "Failed to rename '%s': %s",
 				   file_names.renc_filename, strerror(-rc));
-			rename(new_names.skey_filename,
-			       file_names.skey_filename);
-			rename(new_names.info_filename,
-			       file_names.info_filename);
+			goto out_rename_info;
 		}
 	}
 
@@ -2476,7 +2516,25 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	rc = properties_load(key_props, new_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", newname);
-		goto out;
+		goto out_rename_info;
+	}
+
+	if (_keystore_is_kms_bound_key(key_props, NULL)) {
+		rc = perform_kms_login(keystore->kms_info, keystore->verbose);
+		if (rc != 0)
+			goto out_rename_info;
+
+		rc = set_kms_key_properties(keystore->kms_info, key_props,
+					    newname, NULL, NULL, NULL, NULL,
+					    keystore->verbose);
+		if (rc != 0) {
+			warnx("KMS plugin '%s' failed to set key properties "
+			      "for key '%s': %s",
+			      keystore->kms_info->plugin_name, name,
+			      strerror(-rc));
+			print_last_kms_error(keystore->kms_info);
+			goto out_rename_info;
+		}
 	}
 
 	util_asprintf(&msg, "The following volumes are associated with the "
@@ -2488,6 +2546,16 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 
 	pr_verbose(keystore, "Successfully renamed key '%s' to '%s'", name,
 		   newname);
+
+	goto out;
+
+out_rename_info:
+	if (reenc_exists)
+		rename(file_names.renc_filename, new_names.renc_filename);
+	rename(new_names.info_filename, file_names.info_filename);
+
+out_rename_skey:
+	rename(new_names.skey_filename, file_names.skey_filename);
 
 out:
 	_keystore_free_key_filenames(&file_names);

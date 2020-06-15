@@ -2309,3 +2309,120 @@ out:
 	return rc;
 }
 
+/**
+ * Sets (adds/replaces) properties of a key. Already existing properties
+ * with the same property name are replaced, non-existing properties are added.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] key_props       a properties object of the key
+ * @param[in] name            the name of the key in zkey (can be NULL)
+ * @param[in] description     the description of the key (can be NULL)
+ * @param[in] volumes         the volumes of the key (can be NULL)
+ * @param[in] vol_type        the volume type of the key (can be NULL)
+ * @param[in] sector_size     the sector_size of the key (can be NULL)
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+
+int set_kms_key_properties(struct kms_info *kms_info,
+			   struct properties *key_props,
+			   const char *name, const char *description,
+			   const char *volumes, const char *vol_type,
+			   const char *sector_size, bool verbose)
+{
+	char *key1_id = NULL, *key2_id = NULL;
+	struct kms_property kms_props[10];
+	size_t num_kms_props = 0;
+	char *sys_volumes = NULL;
+	char *sys_name = NULL;
+	bool xts = false;
+
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(key_props != NULL, "Internal error: key_props is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (kms_info->funcs->kms_set_key_properties == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "set properties");
+		return -ENOTSUP;
+	}
+
+	key1_id = properties_get(key_props, PROP_NAME_KMS_KEY_ID);
+	if (key1_id == NULL) {
+		key1_id = properties_get(key_props, PROP_NAME_KMS_XTS_KEY1_ID);
+		key2_id = properties_get(key_props, PROP_NAME_KMS_XTS_KEY2_ID);
+		if (key1_id == NULL || key2_id == NULL) {
+			pr_verbose(verbose, "Failed to get key-id(s)");
+			rc = -ENOENT;
+			goto out;
+		}
+		xts = true;
+	}
+
+	if (name != NULL) {
+		sys_name = _get_system_specific_prop_name(KMS_KEY_PROP_NAME);
+		if (sys_name == NULL)
+			return -ENOMEM;
+		ADD_KMS_PROPS(kms_props, num_kms_props, sys_name, name);
+	}
+	if (description != NULL)
+		ADD_KMS_PROPS(kms_props, num_kms_props,
+			      KMS_KEY_PROP_DESCRIPTION, description);
+	if (volumes != NULL) {
+		sys_volumes =
+			_get_system_specific_prop_name(KMS_KEY_PROP_VOLUMES);
+		if (sys_volumes == NULL)
+			return -ENOMEM;
+		ADD_KMS_PROPS(kms_props, num_kms_props, sys_volumes,
+			      volumes);
+	}
+	if (vol_type != NULL)
+		ADD_KMS_PROPS(kms_props, num_kms_props,
+			      KMS_KEY_PROP_VOLUME_TYPE, vol_type);
+	if (sector_size != NULL)
+		ADD_KMS_PROPS(kms_props, num_kms_props,
+			      KMS_KEY_PROP_SECTOR_SIZE, sector_size);
+
+	if (num_kms_props == 0)
+		goto out;
+
+	rc = kms_info->funcs->kms_set_key_properties(kms_info->handle, key1_id,
+						     kms_props, num_kms_props);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to set properties of "
+			   "key '%s': %s", key1_id, strerror(-rc));
+		goto out;
+	}
+
+	if (xts) {
+		rc = kms_info->funcs->kms_set_key_properties(kms_info->handle,
+							     key2_id,
+							     kms_props,
+							     num_kms_props);
+		if (rc != 0) {
+			pr_verbose(verbose, "KMS plugin failed to set "
+				   "properties of key '%s': %s", key2_id,
+				   strerror(-rc));
+			goto out;
+		}
+	}
+
+out:
+	if (sys_name != NULL)
+		free(sys_name);
+	if (sys_volumes != NULL)
+		free(sys_volumes);
+	if (key1_id != NULL)
+		free(key1_id);
+	if (key2_id != NULL)
+		free(key2_id);
+
+	return rc;
+}
+

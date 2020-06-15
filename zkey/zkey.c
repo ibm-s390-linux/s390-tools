@@ -1189,6 +1189,7 @@ static struct zkey_command zkey_commands[] = {
 			     "the repository",
 		.has_options = 1,
 		.need_keystore = 1,
+		.use_kms_plugin = 1,
 	},
 	{
 		.command = COMMAND_RENAME,
@@ -1198,6 +1199,7 @@ static struct zkey_command zkey_commands[] = {
 		.long_desc = "Rename a secure AES key in the repository",
 		.has_options = 1,
 		.need_keystore = 1,
+		.use_kms_plugin = 1,
 	},
 	{
 		.command = COMMAND_COPY,
