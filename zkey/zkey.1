@@ -581,6 +581,7 @@ secure key is contained in the LUKS2 header.
 .IR new-key-name
 .RB [ \-\-volumes | \-l
 .IR volume1:dmname1[,volume2:dmname2[,...]] ]
+.RB [ \-\-local | \-L ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -600,6 +601,10 @@ a specific volume can only be associated with a single secure key. Specify the
 option to associate different
 volumes with the copied secure key, or use the \fBchange\fP command to associate
 volumes afterwards.
+.PP
+You can not copy secure keys that are bound to a key management system (KMS),
+except when the \fB\-\-local\fP option is specified. The copied secure key is
+then created as a local key.
 .
 .SS "Generate crypttab entries for volumes associated with secure AES keys"
 .
@@ -757,6 +762,7 @@ Use the
 .B convert
 command to convert an existing secure key from one key type to another type.
 You can convert secure keys of type CCA-AESDATA to type CCA-AESCIPHER only.
+You can not convert keys that are bound to a key management system (KMS).
 
 .B Note:
 Secure keys converted to type \fBCCA-AESCIPHER\fP require an IBM cryptographic
@@ -1411,6 +1417,12 @@ These volumes are to be encrypted using dm-crypt with the secure AES key. The
 volume association also contains the device-mapper name, separated by a colon,
 used with dm-crypt.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-L ", "\-\-local
+Copy the secure key to a local key. This is the default when no key management
+system plugin (KMS plugin) is bound to the secure key repository. If the
+repository is bound to a key management system plugin, then the keys are bound
+to the KMS per default, and KMS-bound keys can only be copied to local keys.
 .
 .
 .

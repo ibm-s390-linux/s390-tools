@@ -82,6 +82,9 @@ struct key_filenames {
 							warnx(fmt);	\
 					} while (0)
 
+static int _keystore_kms_key_unbind(struct keystore *keystore,
+				    struct properties *properties);
+
 /**
  * Gets the file names of the .skey and .info and .renc files for a named
  * key in the key strore's directory
@@ -3349,11 +3352,12 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
  * @param[in] newname  the new name of the key
  * @param[in] volumes  a comma separated list of volumes associated with this
  *                     key (optional, can be NULL)
+ * @param[in] local    if true copy a KMS-bound key to a local one
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_copy_key(struct keystore *keystore, const char *name,
-		      const char *newname, const char *volumes)
+		      const char *newname, const char *volumes, bool local)
 {
 	struct volume_check vol_check = { .keystore = keystore,
 					  .name = newname, .set = 0 };
@@ -3361,6 +3365,7 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	struct key_filenames new_names = { NULL, NULL, NULL };
 	struct properties *key_prop = NULL;
 	size_t secure_key_size;
+	bool kms_bound = false;
 	u8 *secure_key;
 	int rc;
 
@@ -3384,6 +3389,21 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
+	key_prop = properties_new();
+	rc = properties_load(key_prop, file_names.info_filename, 1);
+	if (rc != 0) {
+		warnx("Key '%s' does not exist or is invalid", name);
+		goto out;
+	}
+
+	kms_bound = _keystore_is_kms_bound_key(key_prop, NULL);
+	if (kms_bound && !local) {
+		rc = -EINVAL;
+		warnx("Copying a KMS-bound key requires the "
+		      "'--local|-L' option");
+		goto out;
+	}
+
 	secure_key = read_secure_key(file_names.skey_filename,
 				     &secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
@@ -3400,14 +3420,6 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	rc = _keystore_set_file_permission(keystore, new_names.skey_filename);
 	if (rc != 0)
 		goto out;
-
-	key_prop = properties_new();
-	rc = properties_load(key_prop, file_names.info_filename, 1);
-	if (rc != 0) {
-		warnx("Key '%s' does not exist or is invalid", name);
-		remove(file_names.skey_filename);
-		goto out;
-	}
 
 	/*
 	 * Remove any volume association, since a volume can only be associated
@@ -3439,6 +3451,12 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 					      PROP_NAME_CREATION_TIME);
 	if (rc != 0)
 		goto out;
+
+	if (kms_bound) {
+		rc = _keystore_kms_key_unbind(keystore, key_prop);
+		if (rc != 0)
+			goto out;
+	}
 
 	rc = properties_save(key_prop, new_names.info_filename, 1);
 	if (rc != 0) {
@@ -4307,6 +4325,12 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	rc = properties_load(properties, file_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
+		goto out;
+	}
+
+	if (_keystore_is_kms_bound_key(properties, NULL)) {
+		rc = -EINVAL;
+		warnx("A KMS-bound key can not be converted");
 		goto out;
 	}
 

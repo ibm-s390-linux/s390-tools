@@ -634,6 +634,15 @@ static struct util_opt opt_vec[] = {
 			"specific volume.",
 		.command = COMMAND_COPY,
 	},
+	{
+		.option = { "local", 0, NULL, 'L'},
+		.desc = "Copy the key to a local key. This is the default when "
+			"no KMS plugin is bound to the repository. If the "
+			"repository is bound to a KMS plugin, then keys are "
+			"bound to the KMS per default, and KMS-bound key can "
+			"only be copied to local keys.",
+		.command = COMMAND_COPY,
+	},
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -2020,7 +2029,8 @@ static int command_copy(void)
 		return EXIT_FAILURE;
 	}
 
-	rc = keystore_copy_key(g.keystore, g.name, g.newname, g.volumes);
+	rc = keystore_copy_key(g.keystore, g.name, g.newname, g.volumes,
+			       g.local);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

@@ -88,7 +88,7 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 			    struct ext_lib *lib);
 
 int keystore_copy_key(struct keystore *keystore, const char *name,
-		      const char *newname, const char *volumes);
+		      const char *newname, const char *volumes, bool local);
 
 int keystore_export_key(struct keystore *keystore, const char *name,
 			const char *export_file);
