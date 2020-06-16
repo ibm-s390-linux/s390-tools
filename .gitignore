@@ -11,9 +11,8 @@
 cmsfs-fuse/cmsfs-fuse
 cpacfstats/cpacfstats
 cpacfstats/cpacfstatsd
-cpumf/bin/chcpumf
-cpumf/bin/cpumf_helper
-cpumf/bin/lscpumf
+cpumf/chcpumf
+cpumf/lscpumf
 cpuplugd/cpuplugd
 dasdfmt/dasdfmt
 dasdinfo/dasdinfo
