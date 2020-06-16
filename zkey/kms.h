@@ -83,4 +83,8 @@ int set_kms_key_properties(struct kms_info *kms_info,
 			   const char *volumes, const char *vol_type,
 			   const char *sector_size, bool verbose);
 
+int remove_kms_key(struct kms_info *kms_info, struct properties *key_props,
+		   struct kms_option *kms_options, size_t num_kms_options,
+		   bool verbose);
+
 #endif

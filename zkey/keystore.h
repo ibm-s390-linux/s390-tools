@@ -94,7 +94,8 @@ int keystore_export_key(struct keystore *keystore, const char *name,
 			const char *export_file);
 
 int keystore_remove_key(struct keystore *keystore, const char *name,
-			bool quiet);
+			bool quiet, struct kms_option *kms_options,
+			size_t num_kms_options);
 
 int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 		       const char *volume_filter, const char *apqn_filter,

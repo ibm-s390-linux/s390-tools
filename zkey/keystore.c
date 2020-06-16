@@ -3660,13 +3660,18 @@ out:
  * @param[in] keystore the key store
  * @param[in] name     the name of the key
  * @param[in] quiet    if true no confirmation prompt is shown
+ * @param[in] kms_options an array of KMS options specified, or NULL if no
+ *                     KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 int keystore_remove_key(struct keystore *keystore, const char *name,
-			bool quiet)
+			bool quiet, struct kms_option *kms_options,
+			size_t num_kms_options)
 {
 	struct key_filenames file_names = { NULL, NULL, NULL };
+	struct properties *key_props = NULL;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -3684,6 +3689,31 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 		if (_keystore_prompt_for_remove(keystore, name,
 						&file_names) != 0)
 			goto out;
+	}
+
+	key_props = properties_new();
+	rc = properties_load(key_props, file_names.info_filename, 1);
+	if (rc != 0) {
+		warnx("Key '%s' does not exist or is invalid", name);
+		goto out;
+	}
+
+	if (_keystore_is_kms_bound_key(key_props, NULL)) {
+		rc = perform_kms_login(keystore->kms_info, keystore->verbose);
+		if (rc != 0)
+			goto out;
+
+		rc = remove_kms_key(keystore->kms_info, key_props,
+				    kms_options, num_kms_options,
+				    keystore->verbose);
+
+		if (rc != 0) {
+			warnx("KMS plugin '%s' failed to remove key '%s': %s",
+			      keystore->kms_info->plugin_name, name,
+			      strerror(-rc));
+			print_last_kms_error(keystore->kms_info);
+			goto out;
+		}
 	}
 
 	if (remove(file_names.skey_filename) != 0) {
@@ -3708,6 +3738,8 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 
 out:
 	_keystore_free_key_filenames(&file_names);
+	if (key_props != NULL)
+		properties_free(key_props);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to remove key '%s': %s",

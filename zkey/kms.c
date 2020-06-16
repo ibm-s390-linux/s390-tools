@@ -2426,3 +2426,79 @@ out:
 	return rc;
 }
 
+/**
+ * Requests the KMS plugin to remove a KMS managed key. Removing a key mean
+ * to change its state, but not remove it.
+ * *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] key_props       a properties object
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int remove_kms_key(struct kms_info *kms_info, struct properties *key_props,
+		   struct kms_option *kms_options, size_t num_kms_options,
+		   bool verbose)
+{
+	char *key1_id = NULL, *key2_id = NULL;
+	bool xts = false;
+
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(key_props != NULL, "Internal error: key_props is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (kms_info->funcs->kms_remove_key == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "remove keys");
+		return -ENOTSUP;
+	}
+
+	key1_id = properties_get(key_props, PROP_NAME_KMS_KEY_ID);
+	if (key1_id == NULL) {
+		key1_id = properties_get(key_props, PROP_NAME_KMS_XTS_KEY1_ID);
+		key2_id = properties_get(key_props, PROP_NAME_KMS_XTS_KEY2_ID);
+		if (key1_id == NULL || key2_id == NULL) {
+			pr_verbose(verbose, "Failed to get key-id(s)");
+			rc = -ENOENT;
+			goto out;
+		}
+		xts = true;
+	}
+
+	rc = kms_info->funcs->kms_remove_key(kms_info->handle, key1_id,
+					     kms_options, num_kms_options);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to remove key '%s': %s",
+			   key1_id, strerror(-rc));
+		goto out;
+	}
+
+	if (xts) {
+		rc = kms_info->funcs->kms_remove_key(kms_info->handle,
+						     key2_id,
+						     kms_options,
+						     num_kms_options);
+		if (rc != 0) {
+			pr_verbose(verbose, "KMS plugin failed to remove key "
+				   "'%s': %s", key2_id, strerror(-rc));
+			goto out;
+		}
+	}
+
+out:
+	if (key1_id != NULL)
+		free(key1_id);
+	if (key2_id != NULL)
+		free(key2_id);
+
+	return rc;
+}

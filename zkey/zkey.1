@@ -466,6 +466,7 @@ bound to a key management systen (KMS).
 .B \-\-name | \-N
 .IR key-name
 .RB [ \-\-force | \-F ]
+.RB [ KMS\-plugin\ specific\ options ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -478,6 +479,16 @@ option. You cannot use wildcards. The remove command prompts for
 a confirmation, unless you specify the
 .B \-\-force
 option.
+.PP
+When the secure key that is to be removed is bound to a key management system,
+then the key management system plugin might also take an action in the key
+management system. It may for example change the state of the key in the key
+management system, instead of removing the key. Nevertheless, the secure key
+is removed from the local repository.
+.PP
+A key management system plugin may offer plugin specific options that can be
+specified with the \fBremove\fP command. Use \fBremove \-\-help\fP
+to display the plugin specific options and their meaning.
 .PP
 .B Note:
 When removing a secure key that is associated with one or multiple volumes,
@@ -1329,6 +1340,12 @@ The user is prompted to confirm the removal of a secure key from the secure
 key repository. Use this option to remove a secure key without prompting for
 a confirmation.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.B KMS-plugin specific options
+A key management system plugin may offer and even require plugin specific
+options that can be specified with the remove command when the secure key
+repository is bound to a key management system plugin. Use \fBremove
+\-\-help\fP to display the plugin specific options and their meaning.
 .
 .
 .

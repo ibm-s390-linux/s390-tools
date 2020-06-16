@@ -1179,6 +1179,8 @@ static struct zkey_command zkey_commands[] = {
 		.long_desc = "Remove a secure AES key from the repository",
 		.has_options = 1,
 		.need_keystore = 1,
+		.use_kms_plugin = 1,
+		.kms_plugin_opts_cmd = KMS_COMMAND_REMOVE,
 	},
 	{
 		.command = COMMAND_CHANGE,
@@ -1958,7 +1960,8 @@ static int command_remove(void)
 		return EXIT_FAILURE;
 	}
 
-	rc = keystore_remove_key(g.keystore, g.name, g.force);
+	rc = keystore_remove_key(g.keystore, g.name, g.force, g.kms_options,
+				 g.num_kms_options);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
