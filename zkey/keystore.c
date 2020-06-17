@@ -2454,7 +2454,6 @@ static int _keystore_display_apqn_status(struct keystore *keystore,
 	if (apqns == NULL)
 		return 0;
 
-	apqns = properties_get(properties, PROP_NAME_APQNS);
 	key_type = properties_get(properties, PROP_NAME_KEY_TYPE);
 	rc = cross_check_apqns(apqns, mkvp,
 			       get_min_card_level_for_keytype(key_type),
@@ -2867,8 +2866,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 		rc = _keystore_perform_reencipher(keystore, name, info->lib,
 						  &params, secure_key,
 						  secure_key_size, is_old_mk,
-						  properties_get(properties,
-							PROP_NAME_APQNS));
+						  apqns);
 		if (rc < 0)
 			goto out;
 		if (rc > 0) {
