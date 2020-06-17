@@ -7,11 +7,13 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <argz.h>
 #include <ctype.h>
 #include <dlfcn.h>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <regex.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -59,6 +61,17 @@
 #define KMS_KEY_PROP_XTS_KEY2_ID	"xts-key2-id"
 #define KMS_KEY_PROP_XTS_KEY1_LABEL	"xts-key1-label"
 #define KMS_KEY_PROP_XTS_KEY2_LABEL	"xts-key2-label"
+
+#define KMS_REC_LABEL			"Key label"
+#define KMS_REC_NAME			"Name"
+#define KMS_REC_KEY_TYPE		"Key type"
+#define KMS_REC_KEY_SIZE		"Key size"
+#define KMS_REC_DESCRIPTION		"Description"
+#define KMS_REC_XTS			"XTS type key"
+#define KMS_REC_VOLUMES			"Volumes"
+#define KMS_REC_VOLUME_TYPE		"Volume type"
+#define KMS_REC_SECTOR_SIZE		"Sector size"
+#define KMS_REC_ADDL_INFOS		"Addl. infos"
 
 static const char * const key_types[] = {
 		KEY_TYPE_CCA_AESDATA,
@@ -2499,6 +2512,478 @@ out:
 		free(key1_id);
 	if (key2_id != NULL)
 		free(key2_id);
+
+	return rc;
+}
+
+struct process_keys_data {
+	struct kms_info *kms_info;
+	bool verbose;
+	const char *label_filter;
+	const char *name_filter;
+	char **volume_filter;
+	char *volume_type;
+	char *zkey_name_system;
+	char *volume_system;
+	kms_process_callback callback;
+	void *private_data;
+};
+
+/**
+ * Finds a KMS property in the property array and returns its value or NULL if
+ * it has not been found.
+ *
+ * @param properties        a list of properties of the key
+ * @param num_properties    the number of properties in above array
+ * @param prop_name         the name of the property to get
+ *
+ * @returns the properties value, or NULL if not found.
+ * Note: The returned string is the value field from the array element.
+ */
+static const char *_find_property(const struct kms_property *properties,
+				  size_t num_properties, const char *prop_name)
+{
+	size_t i;
+
+	for (i = 0; i < num_properties; i++) {
+		if (strcmp(properties[i].name, prop_name) == 0)
+			return properties[i].value;
+	}
+	return NULL;
+}
+
+/*
+ * Checks if the value matches the filter list. The value is a comma
+ * separated string.
+ *
+ * If the filter values contain a second part separated by a colon (':'), then
+ * the filter matches only if both parts match. If the filter values do not
+ * contain a second part,then only the first part is checked, and the second
+ * parts of the values are ignored.
+ *
+ * @param[in] value     the value to check
+ * @param[in] filter_list a list of filter strings to match the value with
+ * @param[in] match_func the filter match function. If NULL fnmatch() is used.
+ *
+ * @returns 1 for a match, 0 for not matched
+ */
+static int _match_volumes_filter(const char *volumes, char **volumes_filter)
+{
+	char **value_list;
+	int i, k, rc = 0;
+	char *ch;
+
+	if (volumes_filter == NULL)
+		return 1;
+
+	value_list = str_list_split(volumes);
+	for (i = 0; volumes_filter[i] != NULL && rc == 0; i++) {
+		for (k = 0; value_list[k] != NULL; k++) {
+			/*
+			 * Ignore part after ':' of value if filter does
+			 * not also contain a ':' part.
+			 */
+			if (strchr(volumes_filter[i], ':') == NULL) {
+				ch = strchr(value_list[k], ':');
+				if (ch != NULL)
+					*ch = '\0';
+			}
+
+			if (fnmatch(volumes_filter[i], value_list[k], 0) == 0) {
+				rc = 1;
+				break;
+			}
+		}
+	}
+
+	str_list_free_string_array(value_list);
+	return rc;
+}
+
+/**
+ * Callback used with the process_kms_keys() function. Called for each key.
+ *
+ * @param key_id            the key-ID of the key
+ * @param key_label         the label of the key.
+ * @param key_type          the type of the key (CCA-AESDATA, etc)
+ * @param key_bits          the key size in bits
+ * @param properties        a list of properties of the key
+ * @param num_properties    the number of properties in above array
+ * @param addl_info_argz    an argz string containing additional KMS plugin
+ *                          specific infos to be displayed, or NULL if none.
+ * @param addl_info_len     length of the argz string in addl_info_argz
+ * @param private_data      the private data pointer
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _process_kms_keys_cb(const char *key_id, const char *key_label,
+				const char *key_type, size_t key_bits,
+				const struct kms_property *properties,
+				size_t num_properties,
+				const char *addl_info_argz,
+				size_t addl_info_len, void *private_data)
+{
+	struct process_keys_data *process_data = private_data;
+	const char *name, *volumes, *cipher, *iv_mode, *description;
+	const char *xts_key2_id = NULL, *xts_key2_label = NULL;
+	const char *xts_key, *volume_type, *temp;
+	size_t sector_size = 0;
+	bool xts = false;
+
+	pr_verbose(process_data->verbose, "processing key_id: %s", key_id);
+
+	xts_key = _find_property(properties, num_properties,
+				 KMS_KEY_PROP_XTS_KEY);
+	if (xts_key != NULL) {
+		if (strcasecmp(xts_key, "XTS-KEY-1") != 0) {
+			pr_verbose(process_data->verbose,
+				   "skipping '%s' due to %s=%s", key_id,
+				   KMS_KEY_PROP_XTS_KEY, xts_key);
+			return 0;
+		}
+		xts = true;
+
+		xts_key2_id = _find_property(properties, num_properties,
+					      KMS_KEY_PROP_XTS_KEY2_ID);
+		xts_key2_label = _find_property(properties, num_properties,
+						KMS_KEY_PROP_XTS_KEY2_LABEL);
+		if (xts_key2_id == NULL || xts_key2_label == NULL) {
+			pr_verbose(process_data->verbose, "skipping '%s' due "
+				   "to missing XTS cross refs", key_id);
+			return 0;
+		}
+	}
+
+	name = _find_property(properties, num_properties,
+				   process_data->zkey_name_system);
+	if (name == NULL)
+		name = _find_property(properties, num_properties,
+					   KMS_KEY_PROP_NAME);
+	if (name == NULL) {
+		pr_verbose(process_data->verbose, "skipping '%s' due "
+			   "to missing %s", key_id, KMS_KEY_PROP_NAME);
+		return 0;
+	}
+
+	cipher = _find_property(properties, num_properties,
+				KMS_KEY_PROP_CIPHER);
+	iv_mode = _find_property(properties, num_properties,
+				 KMS_KEY_PROP_IV_MODE);
+	description = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_DESCRIPTION);
+	volumes = _find_property(properties, num_properties,
+				 process_data->volume_system);
+	if (volumes == NULL)
+		volumes = _find_property(properties, num_properties,
+					 KMS_KEY_PROP_VOLUMES);
+	volume_type = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_VOLUME_TYPE);
+	temp = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_SECTOR_SIZE);
+	if (temp != NULL)
+		sscanf(temp, "%lu", &sector_size);
+
+	if (process_data->label_filter != NULL) {
+		if (fnmatch(process_data->label_filter, key_label,
+			    FNM_PATHNAME) != 0)
+			return 0;
+
+		if (xts && fnmatch(process_data->label_filter, xts_key2_label,
+				   FNM_PATHNAME) != 0)
+			return 0;
+	}
+
+	if (process_data->name_filter != NULL &&
+	    fnmatch(process_data->name_filter, name, FNM_PATHNAME) != 0)
+		return 0;
+
+	if (process_data->volume_filter != NULL) {
+		if (volumes == NULL)
+			return 0;
+
+		if (!_match_volumes_filter(volumes,
+					   process_data->volume_filter))
+			return 0;
+	}
+
+	if (process_data->volume_type != NULL &&
+	    strcasecmp(process_data->volume_type, volume_type) != 0)
+		return 0;
+
+	return process_data->callback(key_id, key_label, xts_key2_id,
+				      xts_key2_label, xts, name, key_type,
+				      xts ? key_bits * 2 : key_bits,
+				      description, cipher, iv_mode,
+				      volumes, volume_type, sector_size,
+				      addl_info_argz, addl_info_len,
+				      process_data->private_data);
+}
+
+/**
+ * Processes KMS managed keys. The keys can be filtered by label, name, volume,
+ * and volume type.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] label_filter    the KMS label filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] name_filter     the name filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] volume_filter   the volume filter. Can contain wild cards, and
+ *                            mutliple volume filters separated by commas.
+ *                            If the filter does not contain the ':dm-name'
+ *                            part, then the volumes are matched without the
+ *                            dm-name part. If the filter contains the
+ *                            ':dm-name' part, then the filter is matched
+ *                            including the dm-name part.
+ *                            NULL means no volume filter.
+ * @param[in] volume_type     If not NULL, specifies the volume type.
+ * @param[in] callback        the callback that is called for each matching key
+ * @param[in] private_data    the private data of the callback
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int process_kms_keys(struct kms_info *kms_info,
+		     const char *label_filter, const char *name_filter,
+		     const char *volume_filter, const char *volume_type,
+		     struct kms_option *kms_options,  size_t num_kms_options,
+		     kms_process_callback callback, void *private_data,
+		     bool verbose)
+{
+	struct process_keys_data process_data = { 0 };
+	struct kms_property kms_props;
+	size_t num_kms_props = 0;
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(callback != NULL, "Internal error: callback is NULL");
+
+	if (kms_info->funcs->kms_list_keys == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "list keys");
+		return -ENOTSUP;
+	}
+
+	process_data.kms_info = kms_info;
+	process_data.verbose = verbose;
+	process_data.label_filter = label_filter;
+	process_data.name_filter = name_filter;
+	if (volume_filter != NULL)
+		process_data.volume_filter = str_list_split(volume_filter);
+	if (volume_type != NULL) {
+		process_data.volume_type = util_strdup(volume_type);
+		util_str_toupper(process_data.volume_type);
+	}
+	process_data.callback = callback;
+	process_data.private_data = private_data;
+	process_data.zkey_name_system =
+			_get_system_specific_prop_name(KMS_KEY_PROP_NAME);
+	process_data.volume_system =
+			_get_system_specific_prop_name(KMS_KEY_PROP_VOLUMES);
+
+	if (process_data.volume_type != NULL) {
+		kms_props.name = KMS_KEY_PROP_VOLUME_TYPE;
+		kms_props.value = process_data.volume_type;
+		num_kms_props = 1;
+	}
+
+	rc = kms_info->funcs->kms_list_keys(kms_info->handle, label_filter,
+					    num_kms_props > 0 ?
+						&kms_props : NULL,
+					    num_kms_props, kms_options,
+					    num_kms_options,
+					    _process_kms_keys_cb,
+					    &process_data);
+
+	if (rc != 0) {
+		warnx("KMS plugin '%s' failed to list keys: %s",
+		      kms_info->plugin_name, strerror(-rc));
+		print_last_kms_error(kms_info);
+	}
+
+	free(process_data.zkey_name_system);
+	free(process_data.volume_system);
+	if (process_data.volume_filter != NULL)
+		str_list_free_string_array(process_data.volume_filter);
+	if (process_data.volume_type != NULL)
+		free(process_data.volume_type);
+
+	return rc;
+}
+
+struct list_keys_data {
+	struct util_rec *rec;
+};
+
+/**
+ * Callback used with the list_kms_keys() function. Called for each key.
+ *
+ * @param key1_id           the key-ID of the key (1st key of an XTS key)
+ * @param key1_label        the label of the key (1st key of an XTS key)
+ * @param key2_id           the key-ID of the 2nd XTS key, NULL if not XTS
+ * @param key2_label        the label of the 2nd XTS key, NULL if not XTS
+ * @param xts               if true, this is an XTS key pair
+ * @param name              the zkey name of the key
+ * @param key_type          the type of the key (CCA-AESDATA, etc)
+ * @param key_bits          the key size in bits
+ * @param description       the description of the key (can be NULL)
+ * @param cipher            the cipher of the key (can be NULL)
+ * @param iv_mode           the IV-mode of the key (can be NULL)
+ * @param volumes           the associated volumes of the key (can be NULL)
+ * @param volume_type       the volume type of the volume (can be NULL)
+ * @param sector_size       the sector size of the volume (0 means default)
+ * @param addl_info_argz    an argz string containing additional KMS plugin
+ *                          specific infos to be displayed, or NULL if none.
+ * @param addl_info_len     length of the argz string in addl_info_argz
+ * @param private_data      the private data pointer
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _list_kms_keys_cb(const char *UNUSED(key1_id),
+			     const char *key1_label,
+			     const char *UNUSED(key2_id),
+			     const char *key2_label,
+			     bool xts, const char *name,
+			     const char *key_type, size_t key_bits,
+			     const char *description,
+			     const char *UNUSED(cipher),
+			     const char *UNUSED(iv_mode), const char *volumes,
+			     const char *volume_type, size_t sector_size,
+			     const char *addl_info_argz, size_t addl_info_len,
+			     void *private_data)
+{
+	struct list_keys_data *list_data = private_data;
+	size_t volumes_argz_len, label_argz_len;
+	char *volumes_argz = NULL;
+	char *label_argz = NULL;
+
+	if (xts)
+		label_argz_len = util_asprintf(&label_argz, "%s%c%s",
+					       key1_label, '\0', key2_label);
+	else
+		label_argz_len = util_asprintf(&label_argz, "%s", key1_label);
+	label_argz_len += 1;
+
+	if (volumes != NULL)
+		util_assert(argz_create_sep(volumes, ',',
+					    &volumes_argz,
+					    &volumes_argz_len) == 0,
+			    "Internal error: argz_create_sep failed");
+
+	util_rec_set(list_data->rec, KMS_REC_NAME, name);
+	util_rec_set_argz(list_data->rec, KMS_REC_LABEL, label_argz,
+			  label_argz_len);
+	util_rec_set(list_data->rec, KMS_REC_DESCRIPTION,
+		     description != NULL ? description : "");
+	util_rec_set(list_data->rec, KMS_REC_XTS, xts ? "Yes" : "No");
+	util_rec_set(list_data->rec, KMS_REC_KEY_TYPE, key_type);
+	util_rec_set(list_data->rec, KMS_REC_KEY_SIZE, "%lu bits", key_bits);
+	if (volumes_argz != NULL)
+		util_rec_set_argz(list_data->rec, KMS_REC_VOLUMES, volumes_argz,
+				  volumes_argz_len);
+	else
+		util_rec_set(list_data->rec, KMS_REC_VOLUMES, "(none)");
+	util_rec_set(list_data->rec, KMS_REC_VOLUME_TYPE,
+		     volume_type != NULL ? volume_type : "");
+	if (sector_size == 0)
+		util_rec_set(list_data->rec, KMS_REC_SECTOR_SIZE,
+			     "(system default)");
+	else
+		util_rec_set(list_data->rec, KMS_REC_SECTOR_SIZE, "%lu bytes",
+			     sector_size);
+	if (addl_info_argz != NULL)
+		util_rec_set_argz(list_data->rec, KMS_REC_ADDL_INFOS,
+				  addl_info_argz, addl_info_len);
+	else
+		util_rec_set(list_data->rec, KMS_REC_ADDL_INFOS, "(none)");
+
+	util_rec_print(list_data->rec);
+
+	if (volumes_argz != NULL)
+		free(volumes_argz);
+	if (label_argz != NULL)
+		free(label_argz);
+
+	return 0;
+}
+
+/**
+ * Lists KMS managed keys. The list can be filtered by label, name, volume,
+ * and volume type.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] label_filter    the KMS label filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] name_filter     the name filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] volume_filter   the volume filter. Can contain wild cards, and
+ *                            mutliple volume filters separated by commas.
+ *                            If the filter does not contain the ':dm-name'
+ *                            part, then the volumes are matched without the
+ *                            dm-name part. If the filter contains the
+ *                            ':dm-name' part, then the filter is matched
+ *                            including the dm-name part.
+ *                            NULL means no volume filter.
+ * @param[in] volume_type     If not NULL, specifies the volume type.
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
+		  const char *name_filter, const char *volume_filter,
+		  const char *volume_type, struct kms_option *kms_options,
+		  size_t num_kms_options, bool verbose)
+{
+	struct list_keys_data list_data = { 0 };
+	int rc;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (kms_info->funcs->kms_list_keys == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "list keys");
+		return -ENOTSUP;
+	}
+
+	list_data.rec = util_rec_new_long("-", ":", KMS_REC_NAME, 28, 54);
+	util_rec_def(list_data.rec, KMS_REC_NAME, UTIL_REC_ALIGN_LEFT, 54,
+		     KMS_REC_NAME);
+	util_rec_def(list_data.rec, KMS_REC_LABEL, UTIL_REC_ALIGN_LEFT, 54,
+		     KMS_REC_LABEL);
+	util_rec_def(list_data.rec, KMS_REC_DESCRIPTION, UTIL_REC_ALIGN_LEFT,
+		     54, KMS_REC_DESCRIPTION);
+	util_rec_def(list_data.rec, KMS_REC_KEY_SIZE, UTIL_REC_ALIGN_LEFT, 20,
+		     KMS_REC_KEY_SIZE);
+	util_rec_def(list_data.rec, KMS_REC_XTS, UTIL_REC_ALIGN_LEFT, 20,
+		     KMS_REC_XTS);
+	util_rec_def(list_data.rec, KMS_REC_KEY_TYPE, UTIL_REC_ALIGN_LEFT, 54,
+		     KMS_REC_KEY_TYPE);
+	util_rec_def(list_data.rec, KMS_REC_VOLUMES, UTIL_REC_ALIGN_LEFT, 54,
+		     KMS_REC_VOLUMES);
+	util_rec_def(list_data.rec, KMS_REC_VOLUME_TYPE, UTIL_REC_ALIGN_LEFT,
+		     54, KMS_REC_VOLUME_TYPE);
+	util_rec_def(list_data.rec, KMS_REC_SECTOR_SIZE, UTIL_REC_ALIGN_LEFT,
+		     20, KMS_REC_SECTOR_SIZE);
+	util_rec_def(list_data.rec, KMS_REC_ADDL_INFOS, UTIL_REC_ALIGN_LEFT,
+		     54, KMS_REC_ADDL_INFOS);
+
+	rc = process_kms_keys(kms_info, label_filter, name_filter,
+			       volume_filter, volume_type, kms_options,
+			       num_kms_options, _list_kms_keys_cb,
+			       &list_data, verbose);
+
+	util_rec_free(list_data.rec);
 
 	return rc;
 }

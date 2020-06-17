@@ -76,6 +76,7 @@ static struct zkey_globals {
 	char *volume_type;
 	char *newname;
 	char *key_type;
+	char *label;
 	bool local;
 	bool kms_bound;
 	bool run;
@@ -126,6 +127,7 @@ static struct zkey_globals {
 #define COMMAND_KMS_INFO	"info"
 #define COMMAND_KMS_CONFIGURE	"configure"
 #define COMMAND_KMS_REENCIPHER	"reencipher"
+#define COMMAND_KMS_LIST	"list"
 
 #define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
 
@@ -916,6 +918,50 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_KMS " " COMMAND_KMS_REENCIPHER,
 	},
 	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
+	},
+	{
+		.option = { "label", required_argument, NULL, 'B'},
+		.argument = "LABEL",
+		.desc = "Label of the secure AES keys as known by the KMS that "
+			"are to be listed. You can use wildcards to select "
+			"the keys to be listed.",
+		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
+	},
+	{
+		.option = { "name", required_argument, NULL, 'N'},
+		.argument = "NAME",
+		.desc = "Name of the secure AES keys as known by zkey that "
+			"are to be listed. You can use wildcards to select "
+			"the keys to be listed.",
+		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
+	},
+	{
+		.option = { "volumes", required_argument, NULL, 'l'},
+		.argument = "VOLUME[:DMNAME][,...]",
+		.desc = "Comma-separated pairs of volume and device-mapper "
+			"names that are associated with the secure AES key in "
+			"the KMS. Use this option to list all keys "
+			"associated with specific volumes. The device-mapper "
+			"name (DMNAME) is optional. If specified, only those "
+			"keys are listed where both, the volume and the device-"
+			"mapper name matches.",
+		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
+	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. Use this option to list all "
+			"keys with the specified volumes type.",
+			.command = COMMAND_KMS " " COMMAND_KMS_LIST,
+	},
+#endif
+	/***********************************************************/
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
@@ -1016,6 +1062,7 @@ static int command_kms_unbind(void);
 static int command_kms_info(void);
 static int command_kms_configure(void);
 static int command_kms_reencipher(void);
+static int command_kms_list(void);
 
 static struct zkey_command zkey_kms_commands[] = {
 	{
@@ -1088,6 +1135,20 @@ static struct zkey_command zkey_kms_commands[] = {
 		.has_options = 1,
 		.use_kms_plugin = 1,
 		.kms_plugin_opts_cmd = KMS_COMMAND_REENCIPHER,
+	},
+	{
+		.command = COMMAND_KMS_LIST,
+		.abbrev_len = 2,
+		.function = command_kms_list,
+		.short_desc = "Lists secure keys managed by a key management "
+			      "system",
+		.long_desc = "Lists secure keys managed by a key management "
+			     "system (KMS)",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+		.need_kms_login = 1,
+		.kms_plugin_opts_cmd = KMS_COMMAND_LIST,
 	},
 	{ .command = NULL }
 };
@@ -2448,6 +2509,28 @@ static int command_kms_reencipher(void)
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+/*
+ * Command handler for 'kms list'.
+ *
+ * List secure keys managed by a KMS
+ */
+static int command_kms_list(void)
+{
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	rc = list_kms_keys(&g.kms_info, g.label, g.name, g.volumes,
+			   g.volume_type, g.kms_options, g.num_kms_options,
+			   g.verbose);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 /**
  * Opens the keystore. The keystore directory is either the
  * default directory or as specified in an environment variable
@@ -2764,6 +2847,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'M':
 			g.kms_bound = 1;
+			break;
+		case 'B':
+			g.label = optarg;
 			break;
 		case 'h':
 			print_help(command, sub_command);

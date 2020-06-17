@@ -87,4 +87,27 @@ int remove_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		   struct kms_option *kms_options, size_t num_kms_options,
 		   bool verbose);
 
+typedef int (*kms_process_callback)(const char *key1_id, const char *key1_label,
+				    const char *key2_id, const char *key2_label,
+				    bool xts, const char *name,
+				    const char *key_type, size_t key_bits,
+				    const char *description, const char *cipher,
+				    const char *iv_mode, const char *volumes,
+				    const char *volume_type, size_t sector_size,
+				    const char *addl_info_argz,
+				    size_t addl_info_len,
+				    void *private_data);
+
+int process_kms_keys(struct kms_info *kms_info,
+		     const char *label_filter, const char *name_filter,
+		     const char *volume_filter, const char *volume_type,
+		     struct kms_option *kms_options,  size_t num_kms_options,
+		     kms_process_callback callback, void *private_data,
+		     bool verbose);
+
+int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
+		  const char *name_filter, const char *volume_filter,
+		  const char *volume_type, struct kms_option *kms_options,
+		  size_t num_kms_options, bool verbose);
+
 #endif

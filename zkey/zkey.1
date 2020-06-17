@@ -1030,6 +1030,41 @@ re-enciphering. Re-enciphering from \fBCURRENT\fP to \fBNEW\fP is performed in
 staged mode per default. You can use option \fB\-\-staged\fP to force a staged
 re-enciphering for the \fBOLD\fP to \fBCURRENT\fP case.
 .
+.SS "List secure keys managed by a key management system"
+.
+.B zkey kms
+.BR list | li
+.RB [ \-\-label | \-B
+.IR key-label ]
+.RB [ \-\-name | \-N
+.IR key-name ]
+.RB [ \-\-volumes | \-l
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
+.RB [ KMS\-plugin\ specific\ options ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B kms list
+command to display secure keys managed by a key management system (KMS).
+You can filter the displayed list by key label, key name, associated volumes,
+and volume type. You can use wildcards for the key label, key name, and
+associated volumes. The device-mapper name of an associated volume can be
+omitted. If specified, then only those keys are listed that are associated
+with the specified volume and device-mapper name.
+.PP
+A key management system plugin may offer plugin specific options that can be
+specified with the \fBkms list\fP command. Use \fBkms list \-\-help\fP
+to display the plugin specific options and their meaning.
+.PP
+The
+.B kms list
+command displays the attributes of the secure keys, such as key label, key name,
+whether it is a secure key that can be used for the XTS cipher mode, the textual
+description, associated volumes, the volume type, and sector size.
+.
 .
 .
 .SH OPTIONS
@@ -1682,6 +1717,42 @@ their re-enciphered versions.
 A key management system plugin may offer plugin specific options that can be
 specified with the kms reencipher command. Use \fBkms reencipher \-\-help\fP to
 display the plugin specific options and their meaning.
+.
+.
+.
+.SS "Options for the kms list command"
+.TP
+.BR \-B ", " \-\-label\~\fIkey-label\fP
+Specifies the label of the secure key in the key management system (KMS).
+You can use wildcards to select multiple secure keys.
+When wildcards are used you must quote the value.
+Only keys with labels that match the pattern are listed.
+.TP
+.BR \-N ", " \-\-name\~\fIkey-name\fP
+Specifies the name of the secure key in the key management system (KMS).
+You can use wildcards to select multiple secure keys.
+When wildcards are used you must quote the value.
+Only keys with names that match the pattern are listed.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-l ", " \-\-volumes\~\fIvolume1[:dmname1][,volume2[:dmname2][,...]]\fP
+Specifies a comma-separated list of volumes (block devices) which are
+associated with the secure AES key in the key management system (KMS). Only
+those keys are listed, which are associated with the specified volumes.
+The volume association also contains the device-mapper name, separated by a
+colon, used with dm-crypt. You can omit the device-mapper name; if it is
+specified then only those keys are listed that are associated with the
+specified volume and device-mapper name. You can use wildcards to specify
+the volumes and device-mapper names.
+When wildcards are used you must quote the value.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. Only keys with the specified volume
+type are listed.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
 .
 .
 .
