@@ -69,8 +69,6 @@ struct globals {
 extern struct globals g;
 
 #define PROC_CMDLINE	"/proc/cmdline"
-#define DEV_ZCORE	"/sys/kernel/debug/zcore/mem"
-#define DEV_ZCORE_MAP	"/sys/kernel/debug/zcore/memmap"
 #define DEV_ZCORE_REIPL	"/sys/kernel/debug/zcore/reipl"
 #define DEV_ZCORE_HSA	"/sys/kernel/debug/zcore/hsa"
 #define REIPL		"1"
