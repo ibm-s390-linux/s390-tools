@@ -1065,6 +1065,50 @@ command displays the attributes of the secure keys, such as key label, key name,
 whether it is a secure key that can be used for the XTS cipher mode, the textual
 description, associated volumes, the volume type, and sector size.
 .
+.SS "Import secure keys managed by a key management system into the repository"
+.
+.B zkey kms
+.BR import | im
+.RB [ \-\-label | \-B
+.IR key-label ]
+.RB [ \-\-name | \-N
+.IR key-name ]
+.RB [ \-\-volumes | \-l
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
+.RB [ \-\-batch\-mode | \-q ]
+.RB [ \-\-no\-volume\-check ]
+.RB [ KMS\-plugin\ specific\ options ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B kms import
+command to import secure keys managed by a key management system (KMS) into the
+secure key repository.
+You can filter the list of keys to be imported by key label, key name,
+associated volumes, and volume type. You can use wildcards for the key label,
+key name, and associated volumes. The device-mapper name of an associated
+volume can be omitted. If it is specified, then only those keys are listed that
+are associated with the specified volume and device-mapper name.
+.PP
+A key management system plugin may offer plugin specific options that can be
+specified with the \fBkms import\fP command. Use \fBkms import \-\-help\fP
+to display the plugin specific options and their meaning.
+.PP
+If a secure key with the same name as a key to be imported already exists in
+the repository, then you are prompted to enter an alternate name. You can skip
+the import of that key, or enter an alternate name. If option
+\fB\-\-batch\-mode\fP is specified, then already existing keys are skipped.
+.PP
+If a key to be imported is associated with one or multiple volumes, it is
+verified that the volumes are available, and are not already associated with
+another secure key in the repository. If one of the volumes or all of them are
+not available, or are already associated with another secure key, the import
+fails. Use option \fB\-\-no\-volume\-check\fP to omit the volume check, and
+import the keys even if the associated volume(s) do not exist.
+.
 .
 .
 .SH OPTIONS
@@ -1756,7 +1800,52 @@ has been compiled with LUKS2 support enabled.
 .
 .
 .
-
+.SS "Options for the kms import command"
+.TP
+.BR \-B ", " \-\-label\~\fIkey-label\fP
+Specifies the label of the secure key in the key management system (KMS).
+You can use wildcards to select multiple secure keys.
+When wildcards are used you must quote the value.
+Only keys with labels that match the pattern are imported.
+.TP
+.BR \-N ", " \-\-name\~\fIkey-name\fP
+Specifies the name of the secure key in the key management system (KMS).
+You can use wildcards to select multiple secure keys.
+When wildcards are used you must quote the value.
+Only keys with names that match the pattern are imported.
+.TP
+.BR \-l ", " \-\-volumes\~\fIvolume1[:dmname1][,volume2[:dmname2][,...]]\fP
+Specifies a comma-separated list of volumes (block devices) which are
+associated with the secure AES key in the key management system (KMS). Only
+those keys are imported, which are associated with the specified volumes.
+The volume association also contains the device-mapper name, separated by a
+colon, used with dm-crypt. You can omit the device-mapper name; if it is
+specified then only those keys are listed that are associated with the
+specified volume and device-mapper name. You can use wildcards to specify
+the volumes and device-mapper names.
+When wildcards are used you must quote the value.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. Only keys with the specified volume
+type are imported.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-q ", " \-\-batch\-mode
+Suppress prompts to skip or to enter an anternate name, if a secure key with the
+same name as the secure key to be imported already exists in the repository.
+When this option is specified, then keys with an altready existing name are
+skipped.
+.TP
+.BR \-\-no\-volume\-check
+Do not check if the volume(s) associated with the to be imported secure key(s)
+are available, or are already associated with other secure keys in the
+repository.
+.
+.
+.
 .SS "General options"
 .TP
 .BR \-V ", " \-\-verbose

@@ -72,6 +72,7 @@ static struct zkey_globals {
 	char *volumes;
 	char *apqns;
 	bool noapqncheck;
+	bool novolcheck;
 	long int sector_size;
 	char *volume_type;
 	char *newname;
@@ -128,6 +129,7 @@ static struct zkey_globals {
 #define COMMAND_KMS_CONFIGURE	"configure"
 #define COMMAND_KMS_REENCIPHER	"reencipher"
 #define COMMAND_KMS_LIST	"list"
+#define COMMAND_KMS_IMPORT	"import"
 
 #define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
 
@@ -150,6 +152,7 @@ static struct zkey_globals {
 #define OPT_CRYPTSETUP_OPEN		260
 #define OPT_CRYPTSETUP_FORMAT		261
 #define OPT_NO_APQN_CHECK		262
+#define OPT_NO_VOLUME_CHECK		263
 
 /*
  * Configuration of command line options
@@ -962,6 +965,66 @@ static struct util_opt opt_vec[] = {
 	},
 #endif
 	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+	},
+	{
+		.option = { "label", required_argument, NULL, 'B'},
+		.argument = "LABEL",
+		.desc = "Label of the secure AES keys as known by the KMS that "
+			"are to be imported. You can use wildcards to select "
+			"the keys to be imported.",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+	},
+	{
+		.option = { "name", required_argument, NULL, 'N'},
+		.argument = "NAME",
+		.desc = "Name of the secure AES keys as known by zkey that "
+			"are to be imported. You can use wildcards to select "
+			"the keys to be imported.",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+	},
+	{
+		.option = { "volumes", required_argument, NULL, 'l'},
+		.argument = "VOLUME[:DMNAME][,...]",
+		.desc = "Comma-separated pairs of volume and device-mapper "
+			"names that are associated with the secure AES key in "
+			"the KMS. Use this option to import all keys "
+			"associated with specific volumes. The device-mapper "
+			"name (DMNAME) is optional. If specified, only those "
+			"keys are listed where both, the volume and the device-"
+			"mapper name matches.",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. Use this option to import "
+			"all keys with the specified volumes type.",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+	},
+#endif
+	{
+		.option = {"batch-mode", 0, NULL, 'q'},
+		.desc = "Suppresses alternate name questions. When importing a "
+			"key with a name that already exists in the "
+			"repository, do not prompt for an alternate name, but "
+			"skip the import of the duplicate key.",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+	},
+	{
+		.option = {"no-volume-check", 0, NULL, OPT_NO_VOLUME_CHECK},
+		.desc = "Do not check if the volume(s) associated with the "
+			"secure key(s) to be imported are available, or are "
+			"already associated with other secure keys.",
+		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	/***********************************************************/
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
@@ -1063,6 +1126,7 @@ static int command_kms_info(void);
 static int command_kms_configure(void);
 static int command_kms_reencipher(void);
 static int command_kms_list(void);
+static int command_kms_import(void);
 
 static struct zkey_command zkey_kms_commands[] = {
 	{
@@ -1149,6 +1213,20 @@ static struct zkey_command zkey_kms_commands[] = {
 		.use_kms_plugin = 1,
 		.need_kms_login = 1,
 		.kms_plugin_opts_cmd = KMS_COMMAND_LIST,
+	},
+	{
+		.command = COMMAND_KMS_IMPORT,
+		.abbrev_len = 2,
+		.function = command_kms_import,
+		.short_desc = "Imports secure keys managed by a key management "
+			      "system",
+		.long_desc = "Imports secure keys managed by a key management "
+			     "system (KMS) into the repository",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+		.need_kms_login = 1,
+		.kms_plugin_opts_cmd = KMS_COMMAND_LIST_IMPORT,
 	},
 	{ .command = NULL }
 };
@@ -2531,6 +2609,29 @@ static int command_kms_list(void)
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+/*
+ * Command handler for 'kms import'.
+ *
+ * Imports secure keys managed by a KMS
+ */
+static int command_kms_import(void)
+{
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	rc = keystore_import_kms_keys(g.keystore, g.label, g.name, g.volumes,
+				      g.volume_type, g.kms_options,
+				      g.num_kms_options, g.batch_mode,
+				      g.novolcheck);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 /**
  * Opens the keystore. The keystore directory is either the
  * default directory or as specified in an environment variable
@@ -2760,6 +2861,9 @@ int main(int argc, char *argv[])
 			break;
 		case OPT_NO_APQN_CHECK:
 			g.noapqncheck = 1;
+			break;
+		case OPT_NO_VOLUME_CHECK:
+			g.novolcheck = 1;
 			break;
 		case 'S':
 			g.sector_size = strtol(optarg, &endp, 0);

@@ -1200,6 +1200,7 @@ struct volume_check {
 	const char *name;
 	const char *volume;
 	bool set;
+	bool nocheck;
 };
 
 /**
@@ -1289,7 +1290,7 @@ static int _keystore_volume_check(const char *volume, bool remove, bool set,
 		goto out;
 	}
 
-	if (remove) {
+	if (remove || info->nocheck) {
 		rc = 0;
 		goto out;
 	}
@@ -1602,6 +1603,8 @@ static int _keystore_set_default_properties(struct properties *key_props)
  *                        key (optional, can be NULL)
  * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
  *                        existence and type.
+ * @param[i] novolscheck  if true, the specified Volume(s) are not checked for
+ *                        existence or duplicate use
  * @param[in] sector_size the sector size to use with dm-crypt. It must be power
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
@@ -1615,7 +1618,7 @@ static int _keystore_create_info_props(struct keystore *keystore,
 				       const char *name,
 				       const char *description,
 				       const char *volumes, const char *apqns,
-				       bool noapqncheck,
+				       bool noapqncheck, bool novolcheck,
 				       size_t sector_size,
 				       const char *volume_type,
 				       const char *key_type,
@@ -1623,7 +1626,7 @@ static int _keystore_create_info_props(struct keystore *keystore,
 				       struct properties **props)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
-					  .set = 0 };
+					  .set = 0, .nocheck = novolcheck };
 	struct apqn_check apqn_check = { .noonlinecheck = noapqncheck,
 					 .nomsg = 0,
 					 .cardtype = get_card_type_for_keytype(
@@ -1747,7 +1750,7 @@ static int _keystore_create_info_file(struct keystore *keystore,
 	int rc;
 
 	rc = _keystore_create_info_props(keystore, name, description, volumes,
-					 apqns, noapqncheck, sector_size,
+					 apqns, noapqncheck, false, sector_size,
 					 volume_type, key_type, kms,
 					 &key_props);
 	if (rc != 0)
@@ -1989,9 +1992,9 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 	pr_verbose(keystore, "APQNs for keytype %s: '%s'", key_type, apqns);
 
 	rc = _keystore_create_info_props(keystore, name, description, volumes,
-					 apqns, false, sector_size, volume_type,
-					 key_type, kms_info->plugin_name,
-					 &key_props);
+					 apqns, false, false, sector_size,
+					 volume_type, key_type,
+					 kms_info->plugin_name, &key_props);
 	if (rc != 0)
 		goto out_free_key_filenames;
 
@@ -2261,7 +2264,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			long int sector_size, const char *volume_type)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
-					  .set = 0 };
+					  .set = 0, .nocheck = 0 };
 	struct apqn_check apqn_check = { .noonlinecheck = noapqncheck,
 					 .nomsg = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
@@ -3427,8 +3430,8 @@ int keystore_reencipher_key(struct keystore *keystore, const char *name_filter,
 int keystore_copy_key(struct keystore *keystore, const char *name,
 		      const char *newname, const char *volumes, bool local)
 {
-	struct volume_check vol_check = { .keystore = keystore,
-					  .name = newname, .set = 0 };
+	struct volume_check vol_check = { .keystore = keystore, .name = newname,
+					  .set = 0, .nocheck = 0 };
 	struct key_filenames file_names = { NULL, NULL, NULL };
 	struct key_filenames new_names = { NULL, NULL, NULL };
 	struct properties *key_prop = NULL;
@@ -4885,6 +4888,341 @@ int keystore_msg_for_kms_key(struct keystore *keystore, const char *key_type,
 	if (rc != 0)
 		return rc;
 	return msg_for_key.num_keys == 0 ? -ENOENT : 0;
+}
+
+struct kms_import {
+	struct keystore *keystore;
+	bool batch_mode;
+	bool novolcheck;
+	unsigned long num_imported;
+	unsigned long num_skipped;
+	unsigned long num_failed;
+};
+
+/**
+ * Callback used with the keystore_import_kms_keys() function. Called for each
+ * key.
+ *
+ * @param[in] key1_id           the key-ID of the key (1st key of an XTS key)
+ * @param[in] key1_label        the label of the key (1st key of an XTS key)
+ * @param[in] key2_id           the key-ID of the 2nd XTS key, NULL if not XTS
+ * @param[in] key2_label        the label of the 2nd XTS key, NULL if not XTS
+ * @param[in] xts               if true, this is an XTS key pair
+ * @param[in] name              the zkey name of the key
+ * @param[in] key_type          the type of the key (CCA-AESDATA, etc)
+ * @param[in] key_bits          the key size in bits
+ * @param[in] description       the description of the key (can be NULL)
+ * @param[in] cipher            the cipher of the key (can be NULL)
+ * @param[in] iv_mode           the IV-mode of the key (can be NULL)
+ * @param[in] volumes           the associated volumes of the key (can be NULL)
+ * @param[in] volume_type       the volume type of the volume (can be NULL)
+ * @param[in] sector_size       the sector size of the volume (0 means default)
+ * @param[in] addl_info_argz    an argz string containing additional KMS plugin
+ *                              specific infos to be displayed, or NULL if none.
+ * @param[in] addl_info_len     length of the argz string in addl_info_argz
+ * @param[in] private_data      the private data pointer
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _keystore_process_kms_import(const char *key1_id,
+					const char *key1_label,
+					const char *key2_id,
+					const char *key2_label,
+					bool xts, const char *name,
+					const char *UNUSED(key_type),
+					size_t UNUSED(key_bits),
+					const char *description,
+					const char *UNUSED(cipher),
+					const char *UNUSED(iv_mode),
+					const char *volumes,
+					const char *volume_type,
+					size_t sector_size,
+					const char *UNUSED(addl_info_argz),
+					size_t UNUSED(addl_info_len),
+					void *private_data)
+{
+	struct key_filenames file_names = { NULL, NULL, NULL };
+	struct kms_import *import_data = private_data;
+	u8 secure_key[2 * MAX_SECURE_KEY_SIZE];
+	struct properties *key_props = NULL;
+	char vp[VERIFICATION_PATTERN_LEN];
+	const char *key_name = name;
+	struct keystore *keystore;
+	size_t alt_name_len = 0;
+	size_t secure_key_size;
+	bool fatal_err = false;
+	char *alt_name = NULL;
+	const char *key_type;
+	char *apqns = NULL;
+	int rc;
+
+	keystore = import_data->keystore;
+
+	rc = _keystore_get_key_filenames(keystore, key_name, &file_names);
+	if (rc != 0)
+		goto out;
+
+check_duplicate_key:
+	rc = _keystore_ensure_keyfiles_not_exist(&file_names, key_name);
+	if (rc == -EEXIST) {
+		if (import_data->batch_mode) {
+			rc = 1;
+			goto out;
+		}
+
+		printf("%s: Do you want to enter an alternate name [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(keystore->verbose)) {
+			rc = 1;
+			goto out;
+		}
+
+prompt_alt_name:
+		printf("%s: Alternate name: ", program_invocation_short_name);
+		rc = getline(&alt_name, &alt_name_len, stdin);
+		if (rc <= 1) {
+			rc = 1;
+			goto out;
+		}
+
+		if (alt_name[strlen(alt_name) - 1] == '\n')
+			alt_name[strlen(alt_name) - 1] = '\0';
+
+		key_name = alt_name;
+		_keystore_free_key_filenames(&file_names);
+		rc = _keystore_get_key_filenames(keystore, key_name,
+						 &file_names);
+		if (rc != 0)
+			goto prompt_alt_name;
+
+		goto check_duplicate_key;
+	} else if (rc != 0) {
+		goto out;
+	}
+
+	secure_key_size = sizeof(secure_key);
+	rc = import_kms_key(keystore->kms_info, key1_id, key2_id, xts, key_name,
+			    secure_key, &secure_key_size, keystore->verbose);
+	if (rc != 0) {
+		warnx("KMS plugin '%s' failed to import key '%s': %s",
+		      keystore->kms_info->plugin_name, key_name, strerror(-rc));
+		print_last_kms_error(keystore->kms_info);
+		if (rc == -ENOTSUP)
+			fatal_err = true;
+		goto out;
+	}
+
+	key_type = get_key_type(secure_key, secure_key_size);
+	if (key_type == NULL) {
+		warnx("Key '%s' is not a valid secure key", key_name);
+		free(secure_key);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = get_kms_apqns_for_key_type(keystore->kms_info, key_type, true,
+					&apqns, keystore->verbose);
+	if (rc != 0) {
+		if (rc == -ENOTSUP)
+			warnx("Key-type not supported by the KMS plugin '%s'",
+			      keystore->kms_info->plugin_name);
+		goto out;
+	}
+
+	pr_verbose(keystore, "APQNs for keytype %s: '%s'", key_type, apqns);
+
+	rc = _keystore_create_info_props(keystore, key_name, description,
+					 volumes, apqns, false,
+					 import_data->novolcheck,
+					 sector_size, volume_type, key_type,
+					 keystore->kms_info->plugin_name,
+					 &key_props);
+	if (rc != 0)
+		goto out;
+
+	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_ID :
+			    PROP_NAME_KMS_KEY_ID, key1_id);
+	if (rc != 0) {
+		pr_verbose(keystore, "Failed to set key id of key #1: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_LABEL :
+			    PROP_NAME_KMS_KEY_LABEL, key1_label);
+	if (rc != 0) {
+		pr_verbose(keystore, "Failed to set key label of key #1: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	if (xts) {
+		rc = properties_set(key_props, PROP_NAME_KMS_XTS_KEY2_ID,
+				    key2_id);
+		if (rc != 0) {
+			pr_verbose(keystore, "Failed to set key id of key #2: "
+				   "%s", strerror(-rc));
+			goto out;
+		}
+
+		rc = properties_set(key_props, PROP_NAME_KMS_XTS_KEY2_LABEL,
+				    key2_label);
+		if (rc != 0) {
+			pr_verbose(keystore, "Failed to set key label of key "
+				   "#2: %s", strerror(-rc));
+			goto out;
+		}
+	}
+
+	rc = write_secure_key(file_names.skey_filename, secure_key,
+			      secure_key_size, keystore->verbose);
+	if (rc != 0)
+		goto out;
+
+	rc = _keystore_set_file_permission(keystore, file_names.skey_filename);
+	if (rc != 0)
+		goto out_remove;
+
+	rc = generate_key_verification_pattern(secure_key, secure_key_size,
+					       vp, sizeof(vp),
+					       keystore->verbose);
+	if (rc != 0) {
+		warnx("Failed to generate the key verification pattern: %s",
+		      strerror(-rc));
+		warnx("Make sure that kernel module 'paes_s390' is loaded and "
+		      "that the 'paes' cipher is available");
+		fatal_err = true;
+		goto out_remove;
+	}
+
+	rc = properties_set(key_props, PROP_NAME_KEY_VP, vp);
+	if (rc != 0) {
+		pr_verbose(keystore, "Failed to set verification pattern of "
+			   "key: %s", strerror(-rc));
+
+		goto out_remove;
+	}
+
+	rc = properties_save(key_props, file_names.info_filename, 1);
+	if (rc != 0) {
+		pr_verbose(keystore,
+			   "Key info file '%s' could not be written: %s",
+			   file_names.info_filename, strerror(-rc));
+		goto out;
+	}
+
+	rc = _keystore_set_file_permission(keystore, file_names.info_filename);
+	if (rc != 0) {
+		remove(file_names.info_filename);
+		goto out_remove;
+	}
+
+out_remove:
+	if (rc != 0) {
+		remove(file_names.skey_filename);
+		remove(file_names.info_filename);
+	}
+
+out:
+	if (rc == 0) {
+		printf("Successfully imported key '%s'\n", key_name);
+		import_data->num_imported++;
+	} else if (rc < 0) {
+		warnx("Failed to import key '%s': %s", key_name, strerror(-rc));
+		import_data->num_failed++;
+	} else {
+		warnx("Skipping key '%s'", key_name);
+		import_data->num_skipped++;
+	}
+
+	_keystore_free_key_filenames(&file_names);
+	if (alt_name != NULL)
+		free(alt_name);
+	if (apqns != NULL)
+		free(apqns);
+	if (key_props != NULL)
+		properties_free(key_props);
+
+	return fatal_err ? rc : 0;
+}
+
+/**
+ * Imports secure keys from the KMS and adds it to the key store
+ *
+ * @param[in] keystore        the key store
+ * @param[in] label_filter    the KMS label filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] name_filter     the name filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] volume_filter   the volume filter. Can contain wild cards, and
+ *                            mutliple volume filters separated by commas.
+ *                            If the filter does not contain the ':dm-name'
+ *                            part, then the volumes are matched without the
+ *                            dm-name part. If the filter contains the
+ *                            ':dm-name' part, then the filter is matched
+ *                            including the dm-name part.
+ *                            NULL means no volume filter.
+ * @param[in] volume_type     If not NULL, specifies the volume type.
+ * @param[in] kms_options     an array of KMS options specified, or NULL if no
+ *                            KMS options have been specified
+ * @param[in] num_kms_options the number of options in above array
+ * @param[in] batch_mode      if true, suppress alternate name prompts if a key
+ *                            with an already existing name is to be imported.
+ * @param[in] novolcheck      if true, do not check the associated volumes for
+ *                            existence and duplicate use
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_import_kms_keys(struct keystore *keystore,
+			     const char *label_filter,
+			     const char *name_filter,
+			     const char *volume_filter,
+			     const char *volume_type,
+			     struct kms_option *kms_options,
+			     size_t num_kms_options,
+			     bool batch_mode, bool novolcheck)
+{
+	struct kms_import import_data = { 0 };
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+
+	if (keystore->kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (volume_type != NULL &&
+	    !_keystore_valid_volume_type(volume_type)) {
+		warnx("Invalid volume-type specified");
+		return -EINVAL;
+	}
+
+	import_data.keystore = keystore;
+	import_data.batch_mode = batch_mode;
+	import_data.novolcheck = novolcheck;
+	import_data.num_imported = 0;
+	import_data.num_skipped = 0;
+	import_data.num_failed = 0;
+
+	rc = process_kms_keys(keystore->kms_info, label_filter, name_filter,
+			       volume_filter, volume_type,
+			       kms_options, num_kms_options,
+			       _keystore_process_kms_import, &import_data,
+			       keystore->verbose);
+	if (rc != 0) {
+		pr_verbose(keystore, "Failed to import kms keys: %s",
+			   strerror(-rc));
+	} else {
+		printf("%lu keys imported, %lu keys skipped, %lu keys "
+		       "failed to import\n",
+		       import_data.num_imported, import_data.num_skipped,
+		       import_data.num_failed);
+		if (import_data.num_failed > 0)
+			rc = -EIO;
+	}
+
+	return rc;
 }
 
 /**

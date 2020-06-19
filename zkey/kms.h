@@ -110,4 +110,9 @@ int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
 		  const char *volume_type, struct kms_option *kms_options,
 		  size_t num_kms_options, bool verbose);
 
+int import_kms_key(struct kms_info *kms_info, const char *key1_id,
+		   const char *key2_id, bool xts, const char *name,
+		   unsigned char *key_blob, size_t *key_blob_length,
+		   bool verbose);
+
 #endif

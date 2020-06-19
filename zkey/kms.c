@@ -2987,3 +2987,129 @@ int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
 
 	return rc;
 }
+
+/**
+ * Imports a KMS managed key.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] key1_id         the id of the key to import (1st key for XTS)
+ * @param[in] key2_id         the id of the 2nd XTS key to import (NULL if not
+ *                            XTS)
+ * @param[in] xts             if true, an XTS key is to be imported
+ * @param[in] name            the zkey-name under which the key is imported
+ * @param[in] key_blob        a buffer to return the key blob. The size of the
+ *                            buffer is specified in key_blob_length
+ * @param[out] key_blob_length  on entry: the size of the key_blob buffer.
+ *                              on exit: the size of the key blob returned.
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int import_kms_key(struct kms_info *kms_info, const char *key1_id,
+		   const char *key2_id, bool xts, const char *name,
+		   unsigned char *key_blob, size_t *key_blob_length,
+		   bool verbose)
+{
+	size_t key_blob_size, key_blob_ofs, key_size = 0;
+	struct kms_property kms_prop;
+	char *sys_name = NULL;
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(key1_id != NULL, "Internal error: key1_id is NULL");
+	util_assert(xts == false ||  key2_id != NULL,
+		    "Internal error: key2_id is NULL");
+	util_assert(key_blob != NULL, "Internal error: key_blob is NULL");
+	util_assert(key_blob_length != NULL,
+		    "Internal error: key_blob_length is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (kms_info->funcs->kms_import_key == NULL ||
+	    kms_info->funcs->kms_set_key_properties == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "import keys");
+		return -ENOTSUP;
+	}
+
+	sys_name = _get_system_specific_prop_name(KMS_KEY_PROP_NAME);
+	if (sys_name == NULL)
+		return -ENOMEM;
+
+	key_blob_size = *key_blob_length;
+	memset(key_blob, 0, key_blob_size);
+
+	rc = kms_info->funcs->kms_import_key(kms_info->handle, key1_id,
+					     key_blob, &key_blob_size);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to import key '%s': %s",
+			   key1_id, strerror(-rc));
+		goto out;
+	}
+
+	if (is_cca_aes_data_key(key_blob, key_blob_size))
+		key_size =  AESDATA_KEY_SIZE;
+	else if (is_cca_aes_cipher_key(key_blob, key_blob_size))
+		key_size =  AESCIPHER_KEY_SIZE;
+	else if (is_ep11_aes_key(key_blob, key_blob_size))
+		key_size =  EP11_KEY_SIZE;
+
+	if (key_size == 0 || key_blob_size > key_size) {
+		pr_verbose(verbose, "Key '%s' has an unknown or unsupported "
+			   "key type", key1_id);
+		rc = -EIO;
+		goto out;
+	}
+
+	key_blob_ofs = key_size;
+
+	if (xts) {
+		key_blob_size = key_size;
+		rc = kms_info->funcs->kms_import_key(kms_info->handle, key2_id,
+						     key_blob + key_blob_ofs,
+						     &key_blob_size);
+		if (rc != 0) {
+			pr_verbose(verbose, "KMS plugin failed to import key #2"
+				   "'%s': %s", key2_id, strerror(-rc));
+			goto out;
+		}
+
+		key_blob_ofs += key_size;
+	}
+
+	*key_blob_length = key_blob_ofs;
+
+	kms_prop.name = sys_name;
+	kms_prop.value = name;
+
+	rc = kms_info->funcs->kms_set_key_properties(kms_info->handle, key1_id,
+						     &kms_prop, 1);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to set properties of "
+			   "key '%s': %s", key1_id, strerror(-rc));
+		goto out;
+	}
+
+	if (xts) {
+		rc = kms_info->funcs->kms_set_key_properties(kms_info->handle,
+							     key2_id,
+							     &kms_prop, 1);
+		if (rc != 0) {
+			pr_verbose(verbose, "KMS plugin failed to set "
+				   "properties of key #2 '%s': %s", key1_id,
+				   strerror(-rc));
+			goto out;
+		}
+	}
+
+out:
+	if (sys_name != NULL)
+		free(sys_name);
+	if (rc != 0)
+		*key_blob_length = 0;
+
+	return rc;
+}

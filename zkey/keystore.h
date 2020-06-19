@@ -126,6 +126,15 @@ int keystore_kms_keys_unbind(struct keystore *keystore);
 int keystore_msg_for_kms_key(struct keystore *keystore, const char *key_type,
 			     const char *msg);
 
+int keystore_import_kms_keys(struct keystore *keystore,
+			     const char *label_filter,
+			     const char *name_filter,
+			     const char *volume_filter,
+			     const char *volume_type,
+			     struct kms_option *kms_options,
+			     size_t num_kms_options,
+			     bool batch_mode, bool novolcheck);
+
 void keystore_free(struct keystore *keystore);
 
 
