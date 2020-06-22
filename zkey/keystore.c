@@ -5225,6 +5225,229 @@ int keystore_import_kms_keys(struct keystore *keystore,
 	return rc;
 }
 
+struct kms_refresh {
+	bool refresh_properties;
+	bool novolcheck;
+	unsigned long num_refreshed;
+	unsigned long num_failed;
+};
+
+/**
+ * Processing function for the key refresh function.
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] name       the name of the key
+ * @param[in] properties the properties object of the key
+ * @param[in] file_names the file names used by this key
+ * @param[in] private    private data: struct reencipher_info
+ *
+ * @returns 0 if the display is successful, a negative errno value otherwise
+ */
+static int _keystore_refresh_kms_key(struct keystore *keystore,
+				     const char *name,
+				     struct properties *properties,
+				     struct key_filenames *file_names,
+				     void *private)
+{
+	struct volume_check vol_check = { .keystore = keystore, .name = name,
+					  .set = 1, .nocheck = 0 };
+	char *description = NULL, *cipher = NULL, *iv_mode = NULL;
+	struct kms_refresh *refresh_data = private;
+	char *volumes = NULL, *volume_type = NULL;
+	ssize_t sector_size = -1;
+	bool fatal_err = false;
+	char sect_size[30];
+	char *msg;
+	int rc;
+
+	vol_check.nocheck = refresh_data->novolcheck;
+
+	rc = refresh_kms_key(keystore->kms_info, properties,
+			     &description, &cipher, &iv_mode, &volumes,
+			     &volume_type, &sector_size,
+			     file_names->skey_filename, keystore->verbose);
+	if (rc != 0) {
+		warnx("KMS plugin '%s' failed to refresh key '%s': %s",
+		      keystore->kms_info->plugin_name, name, strerror(-rc));
+		print_last_kms_error(keystore->kms_info);
+		if (rc == -ENOTSUP)
+			fatal_err = true;
+		goto out;
+	}
+
+	if (!refresh_data->refresh_properties)
+		goto save_props;
+
+	if (description != NULL) {
+		rc = properties_set(properties, PROP_NAME_DESCRIPTION,
+				    description);
+		if (rc != 0) {
+			warnx("Invalid characters in description");
+			goto out;
+		}
+	}
+
+	if (volumes != NULL) {
+		rc = _keystore_change_association(properties, PROP_NAME_VOLUMES,
+						  volumes, "volume",
+						  _keystore_volume_check,
+						  &vol_check);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (sector_size >= 0) {
+		if (!_keystore_valid_sector_size(sector_size)) {
+			warnx("Invalid sector-size specified");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		sprintf(sect_size, "%lu", sector_size);
+		rc = properties_set(properties, PROP_NAME_SECTOR_SIZE,
+				    sect_size);
+		if (rc != 0) {
+			warnx("Invalid characters in sector-size");
+			goto out;
+		}
+	}
+
+	if (volume_type != NULL) {
+		if (!_keystore_valid_volume_type(volume_type)) {
+			warnx("Invalid volume-type specified");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		rc = properties_set2(properties, PROP_NAME_VOLUME_TYPE,
+				     volume_type, true);
+		if (rc != 0) {
+			warnx("Invalid characters in volume-type");
+			goto out;
+		}
+	}
+
+save_props:
+	rc = _keystore_set_timestamp_property(properties,
+					      PROP_NAME_CHANGE_TIME);
+	if (rc != 0) {
+		warnx("Failed to set the update timestamp property");
+		goto out;
+	}
+
+	rc = properties_save(properties, file_names->info_filename, 1);
+	if (rc != 0) {
+		pr_verbose(keystore,
+			   "Key info file '%s' could not be written: %s",
+			   file_names->info_filename, strerror(-rc));
+		goto out;
+	}
+
+out:
+	if (rc == 0) {
+		printf("Successfully refreshed key '%s'\n", name);
+		refresh_data->num_refreshed++;
+
+		util_asprintf(&msg, "The following LUKS2 volumes are "
+			      "encrypted with key '%s'. To update the secure "
+			      "AES volume key in the LUKS2 header, run command "
+			      "'zkey-cryptsetup setkey <device> "
+			      "--master-key-file %s':", name,
+			      file_names->skey_filename);
+		_keystore_msg_for_volumes(msg, properties, VOLUME_TYPE_LUKS2);
+		free(msg);
+	} else {
+		warnx("Failed to refresh key '%s': %s", name, strerror(-rc));
+		refresh_data->num_failed++;
+	}
+
+	if (description != NULL)
+		free(description);
+	if (cipher != NULL)
+		free(cipher);
+	if (iv_mode != NULL)
+		free(iv_mode);
+	if (volumes != NULL)
+		free(volumes);
+	if (volume_type != NULL)
+		free(volume_type);
+
+	return fatal_err ? rc : 0;
+}
+
+/**
+ * Refreshes secure KMS-bound secure key and updates them from the KMS
+ *
+ * @param[in] keystore        the key store
+ * @param[in] name_filter     the name filter. Can contain wild cards.
+ *                            NULL means no name filter.
+ * @param[in] volume_filter   the volume filter. Can contain wild cards, and
+ *                            mutliple volume filters separated by commas.
+ *                            If the filter does not contain the ':dm-name'
+ *                            part, then the volumes are matched without the
+ *                            dm-name part. If the filter contains the
+ *                            ':dm-name' part, then the filter is matched
+ *                            including the dm-name part.
+ *                            NULL means no volume filter.
+ * @param[in] volume_type     If not NULL, specifies the volume type.
+ * @param[in] key_type       The key type. NULL means no key type filter.
+ * @param[in] refresh_properties   if true, also refresh the key's properties
+ * @param[in] novolcheck      if true, do not check the associated volumes for
+ *                            existence and duplicate use
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_refresh_kms_keys(struct keystore *keystore,
+			     const char *name_filter,
+			     const char *volume_filter,
+			     const char *volume_type, const char *key_type,
+			     bool refresh_properties, bool novolcheck)
+{
+	struct kms_refresh refresh_data = { 0 };
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+
+	if (keystore->kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (volume_type != NULL &&
+	    !_keystore_valid_volume_type(volume_type)) {
+		warnx("Invalid volume-type specified");
+		return -EINVAL;
+	}
+
+	if (key_type != NULL &&
+	    !_keystore_valid_key_type(key_type)) {
+		warnx("Invalid key-type specified");
+		return -EINVAL;
+	}
+
+	refresh_data.refresh_properties = refresh_properties;
+	refresh_data.novolcheck = novolcheck;
+	refresh_data.num_refreshed = 0;
+	refresh_data.num_failed = 0;
+
+	rc = _keystore_process_filtered(keystore, name_filter, volume_filter,
+					NULL, volume_type, key_type, false,
+					true, _keystore_refresh_kms_key,
+					&refresh_data);
+
+	if (rc != 0) {
+		pr_verbose(keystore, "Failed to refresh kms keys: %s",
+			   strerror(-rc));
+	} else {
+		printf("%lu keys refreshed, %lu keys failed to refresh\n",
+		       refresh_data.num_refreshed, refresh_data.num_failed);
+		if (refresh_data.num_failed > 0)
+			rc = -EIO;
+	}
+
+	return rc;
+}
+
 /**
  * Frees a keystore object
  *

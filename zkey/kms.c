@@ -3113,3 +3113,199 @@ out:
 
 	return rc;
 }
+
+/**
+ * Refreshes KMS managed keys.
+ *
+ * @param[in] kms_info        information of the currently bound plugin.
+ * @param[in] key_props       the key properties
+ * @param[out] description    on return: the description property
+ * @param[out] cipher         on return: the cipher property
+ * @param[out] iv_mode        on return: the iv_mode property
+ * @param[out] volumes        on return: the volumes property
+ * @param[out] volume_type    on return: the volume_type property
+ * @param[out] sector_size    on return: the sector_size property
+ * @param[in] filename        the file name to store the refreshed key blob in
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
+		    char **description, char **cipher, char **iv_mode,
+		    char **volumes, char **volume_type, ssize_t *sector_size,
+		    const char *filename, bool verbose)
+{
+	struct kms_property *properties = NULL;
+	u8 key_blob[2 * MAX_SECURE_KEY_SIZE];
+	char *key1_id = NULL, *key2_id = NULL;
+	size_t key_blob_size, key_size = 0;
+	char vp[VERIFICATION_PATTERN_LEN];
+	size_t i, num_properties = 0;
+	char *sys_volumes = NULL;
+	char *orig_vp = NULL;
+	bool xts = false;
+	const char *str;
+	int rc = 0;
+
+	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+
+	if (kms_info->plugin_lib == NULL) {
+		warnx("The repository is not bound to a KMS plugin");
+		return -ENOENT;
+	}
+
+	if (kms_info->funcs->kms_import_key == NULL ||
+	    kms_info->funcs->kms_get_key_properties == NULL) {
+		pr_verbose(verbose, "The KMS plugin does not support to "
+			   "import keys or get properties");
+		return -ENOTSUP;
+	}
+
+	key1_id = properties_get(key_props, PROP_NAME_KMS_KEY_ID);
+	if (key1_id == NULL) {
+		key1_id = properties_get(key_props, PROP_NAME_KMS_XTS_KEY1_ID);
+		key2_id = properties_get(key_props, PROP_NAME_KMS_XTS_KEY2_ID);
+		if (key1_id == NULL || key2_id == NULL) {
+			pr_verbose(verbose, "Failed to get key-id(s)");
+			rc = -ENOENT;
+			goto out;
+		}
+		xts = true;
+	}
+
+	rc = kms_info->funcs->kms_get_key_properties(kms_info->handle, key1_id,
+						     &properties,
+						     &num_properties);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to get attributes of "
+			   "key '%s': %s", key1_id, strerror(-rc));
+		goto out;
+	}
+
+	sys_volumes = _get_system_specific_prop_name(KMS_KEY_PROP_VOLUMES);
+	if (sys_volumes == NULL)
+		return -ENOMEM;
+
+	if (description != NULL) {
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_DESCRIPTION);
+		*description = (str != NULL) ? util_strdup(str) : NULL;
+	}
+
+	if (cipher != NULL) {
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_CIPHER);
+		*cipher = (str != NULL) ? util_strdup(str) : NULL;
+	}
+
+	if (iv_mode != NULL) {
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_IV_MODE);
+		*iv_mode = (str != NULL) ? util_strdup(str) : NULL;
+	}
+
+	if (volumes != NULL) {
+		str = _find_property(properties, num_properties,
+				     sys_volumes);
+		if (str == NULL)
+			str = _find_property(properties, num_properties,
+					     KMS_KEY_PROP_VOLUMES);
+		*volumes = (str != NULL) ? util_strdup(str) : NULL;
+	}
+
+	if (volume_type != NULL) {
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_VOLUME_TYPE);
+		*volume_type = (str != NULL) ? util_strdup(str) : NULL;
+	}
+
+	if (sector_size != NULL) {
+		*sector_size = -1;
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_SECTOR_SIZE);
+		if (str != NULL)
+			sscanf(str, "%lu", sector_size);
+	}
+
+	key_blob_size = sizeof(key_blob);
+	memset(key_blob, 0, key_blob_size);
+
+	rc = kms_info->funcs->kms_import_key(kms_info->handle, key1_id,
+					     key_blob, &key_blob_size);
+	if (rc != 0) {
+		pr_verbose(verbose, "KMS plugin failed to import key '%s': %s",
+			   key1_id, strerror(-rc));
+		goto out;
+	}
+
+	if (is_cca_aes_data_key(key_blob, key_blob_size))
+		key_size =  AESDATA_KEY_SIZE;
+	else if (is_cca_aes_cipher_key(key_blob, key_blob_size))
+		key_size =  AESCIPHER_KEY_SIZE;
+	else if (is_ep11_aes_key(key_blob, key_blob_size))
+		key_size =  EP11_KEY_SIZE;
+
+	if (key_size == 0 || key_blob_size > key_size) {
+		pr_verbose(verbose, "Key '%s' has an unknown or unsupported "
+			   "key type", key1_id);
+		rc = -EIO;
+		goto out;
+	}
+
+	if (xts) {
+		key_blob_size = key_size;
+		rc = kms_info->funcs->kms_import_key(kms_info->handle, key2_id,
+						     key_blob + key_size,
+						     &key_blob_size);
+		if (rc != 0) {
+			pr_verbose(verbose, "KMS plugin failed to import key #2"
+				   "'%s': %s", key2_id, strerror(-rc));
+			goto out;
+		}
+	}
+
+	key_blob_size = xts ? key_size * 2 : key_size;
+
+	orig_vp = properties_get(key_props, PROP_NAME_KEY_VP);
+	if (orig_vp != NULL) {
+		rc = generate_key_verification_pattern(key_blob, key_blob_size,
+						       vp, sizeof(vp), verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'paes_s390' is "
+			      "loaded and that the 'paes' cipher is available");
+			goto out;
+		}
+
+		if (strcmp(vp, orig_vp) != 0) {
+			warnx("The key verification pattern of the refreshed "
+			      "secure key does not match the current one.");
+			rc = -EIO;
+			goto out;
+		}
+	}
+
+	rc = write_secure_key(filename, key_blob, key_blob_size, verbose);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (key1_id != NULL)
+		free(key1_id);
+	if (key2_id != NULL)
+		free(key2_id);
+	if (sys_volumes != NULL)
+		free(sys_volumes);
+	if (orig_vp != NULL)
+		free(orig_vp);
+	if (properties != NULL) {
+		for (i = 0; i < num_properties; i++) {
+			free((void *)properties[i].name);
+			free((void *)properties[i].value);
+		}
+		free(properties);
+	}
+
+	return rc;
+}

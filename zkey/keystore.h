@@ -135,6 +135,12 @@ int keystore_import_kms_keys(struct keystore *keystore,
 			     size_t num_kms_options,
 			     bool batch_mode, bool novolcheck);
 
+int keystore_refresh_kms_keys(struct keystore *keystore,
+			      const char *name_filter,
+			      const char *volume_filter,
+			      const char *volume_type, const char *key_type,
+			      bool refres_properties, bool novolcheck);
+
 void keystore_free(struct keystore *keystore);
 
 

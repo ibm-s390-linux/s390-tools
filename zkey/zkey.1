@@ -1109,6 +1109,45 @@ not available, or are already associated with another secure key, the import
 fails. Use option \fB\-\-no\-volume\-check\fP to omit the volume check, and
 import the keys even if the associated volume(s) do not exist.
 .
+.SS "Refresh secure keys that are bound to a key management system"
+.
+.B zkey kms
+.BR refresh | ref
+.RB [ \-\-name | \-N
+.IR key-name ]
+.RB [ \-\-volumes | \-l
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-volume-type | \-t
+.IR type ]
+.RB [ \-\-key-type | \-K
+.IR type ]
+.RB [ \-\-refresh\-properties | \-P ]
+.RB [ \-\-no\-volume\-check ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B kms refresh
+command to refresh secure keys that are bound to a key management system (KMS).
+Refreshing a key updates the secure key by re-importing it from the key
+management system. Use option \fB\-\-refresh\-properties\fP to also update the
+associated information, such as the textual description, associated volumes,
+volume type, and sector size, with the information stored in the key management
+system.
+.PP
+You can filter the list of keys to be refreshed by key name, associated volumes,
+volume type, and key type. You can use wildcards for the key name, and
+associated volumes. The device-mapper name of an associated volume can be
+omitted; if it is specified then only those keys are listed that are associated
+with the specified volume and device-mapper name.
+.PP
+If a refreshed key is associated with one or multiple volumes, it is
+verified that the volumes are available, and are not already associated with
+another secure key in the repository. If one of the volumes or all of them are
+not available, or are already associated with another secure key, the refresh
+fails. Use option \fB\-\-no\-volume\-check\fP to omit the volume check, and
+refresh the keys even if the associated volume(s) do not exist.
+.
 .
 .
 .SH OPTIONS
@@ -1843,6 +1882,51 @@ skipped.
 Do not check if the volume(s) associated with the to be imported secure key(s)
 are available, or are already associated with other secure keys in the
 repository.
+.
+.
+.
+.SS "Options for the kms refresh command"
+.TP
+.BR \-N ", " \-\-name\~\fIkey-name\fP
+Specifies the name of the secure key in the secure key repository. You can
+use wildcards to select multiple secure keys in the secure key repository.
+When wildcards are used you must quote the value.
+Only keys with names that match the pattern are refreshed.
+.TP
+.BR \-l ", " \-\-volumes\~\fIvolume1[:dmname1][,volume2[:dmname2][,...]]\fP
+Specifies a comma-separated list of volumes (block devices) which are
+associated with the secure AES key in the repository. Only those keys are
+refreshed, which are associated with the specified volumes.
+The volume association also contains the device-mapper name, separated by a
+colon, used with dm-crypt. You can omit the device-mapper name; if it is
+specified then only those keys are listed that are associated with the
+specified volume and device-mapper name. You can use wildcards to specify
+the volumes and device-mapper names.
+When wildcards are used you must quote the value.
+.TP
+.BR \-t ", " \-\-volume-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with dm-crypt. Possible
+values are \fBplain\fP and \fBluks2\fP. Only keys with the specified volume
+type are refreshed.
+This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled.
+.TP
+.BR \-K ", " \-\-key-type\~\fItype\fP
+Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP,
+\fBCCA-AESCIPHER\fP, and \fBEP11-AES\fP. Only keys with the specified key type
+are refreshed.
+.TP
+.BR \-q ", " \-\-refresh\-properties
+Also update the associated information, such as the textual description,
+associated volumes, volume type, and sector size, with the information stored in
+the key management system.
+.TP
+.BR \-\-no\-volume\-check
+Do not check if the volume(s) associated with the secure key(s) to be refreshed
+are available, or are already associated with other secure keys in the
+repository. This option only has an effect when specified together with option
+\fB\-\-refresh\-properties\fP.
 .
 .
 .

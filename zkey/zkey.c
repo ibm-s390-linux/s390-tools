@@ -89,6 +89,7 @@ static struct zkey_globals {
 	bool force;
 	bool open;
 	bool format;
+	bool refresh_properties;
 	struct ext_lib lib;
 	struct cca_lib cca;
 	struct ep11_lib ep11;
@@ -130,6 +131,7 @@ static struct zkey_globals {
 #define COMMAND_KMS_REENCIPHER	"reencipher"
 #define COMMAND_KMS_LIST	"list"
 #define COMMAND_KMS_IMPORT	"import"
+#define COMMAND_KMS_REFRESH	"refresh"
 
 #define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
 
@@ -153,6 +155,7 @@ static struct zkey_globals {
 #define OPT_CRYPTSETUP_FORMAT		261
 #define OPT_NO_APQN_CHECK		262
 #define OPT_NO_VOLUME_CHECK		263
+#define OPT_REFRESH_PROPERTIES		264
 
 /*
  * Configuration of command line options
@@ -1025,6 +1028,65 @@ static struct util_opt opt_vec[] = {
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+	},
+	{
+		.option = { "name", required_argument, NULL, 'N'},
+		.argument = "NAME",
+		.desc = "Name of the secure AES keys in the repository that "
+			"are to be refreshed. You can use wildcards to select "
+			"the keys to be refreshed.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+	},
+	{
+		.option = { "volumes", required_argument, NULL, 'l'},
+		.argument = "VOLUME[:DMNAME][,...]",
+		.desc = "Comma-separated pairs of volume and device-mapper "
+			"names that are associated with the secure AES key in "
+			"the repository. Use this option to refresh all keys "
+			"associated with specific volumes. The device-mapper "
+			"name (DMNAME) is optional. If specified, only those "
+			"keys are refreshed where both, the volume and the "
+			"device-mapper name matches",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. Use this option to refresh "
+			"all keys with the specified volumes type.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+	},
+#endif
+	{
+		.option = { "key-type", required_argument, NULL, 'K'},
+		.argument = "type",
+		.desc = "The type of the key. Possible values are '"
+			KEY_TYPE_CCA_AESDATA"', '"KEY_TYPE_CCA_AESCIPHER"' "
+			"and '"KEY_TYPE_EP11_AES"'. Use this option to refresh "
+			"all keys with the specified key type.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+	},
+	{
+		.option = {"refresh-properties", 0, NULL, 'P'},
+		.desc = "Also refresh the properties of the secure AES key "
+			"and update them with the values from the KMS.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+	},
+	{
+		.option = {"no-volume-check", 0, NULL, OPT_NO_VOLUME_CHECK},
+		.desc = "Do not check if the volume(s) associated with the "
+			"secure key(s) to be refreshed are available, or are "
+			"already associated with other secure keys.",
+		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	/***********************************************************/
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
@@ -1127,6 +1189,7 @@ static int command_kms_configure(void);
 static int command_kms_reencipher(void);
 static int command_kms_list(void);
 static int command_kms_import(void);
+static int command_kms_refresh(void);
 
 static struct zkey_command zkey_kms_commands[] = {
 	{
@@ -1227,6 +1290,19 @@ static struct zkey_command zkey_kms_commands[] = {
 		.use_kms_plugin = 1,
 		.need_kms_login = 1,
 		.kms_plugin_opts_cmd = KMS_COMMAND_LIST_IMPORT,
+	},
+	{
+		.command = COMMAND_KMS_REFRESH,
+		.abbrev_len = 3,
+		.function = command_kms_refresh,
+		.short_desc = "Refreshes secure keys that are bound to a key "
+			      "management system",
+		.long_desc = "Refreshes secure keys that are bound to a key "
+			      "management system (KMS)",
+		.need_keystore = 1,
+		.has_options = 1,
+		.use_kms_plugin = 1,
+		.need_kms_login = 1,
 	},
 	{ .command = NULL }
 };
@@ -2632,6 +2708,28 @@ static int command_kms_import(void)
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+/*
+ * Command handler for 'kms refresh'.
+ *
+ * Refreshes secure keys managed by a KMS
+ */
+static int command_kms_refresh(void)
+{
+	int rc;
+
+	if (g.kms_info.plugin_lib == NULL) {
+		rc = -ENOENT;
+		warnx("The repository is not bound to a KMS plugin");
+		return EXIT_FAILURE;
+	}
+
+	rc = keystore_refresh_kms_keys(g.keystore, g.name, g.volumes,
+				       g.volume_type, g.key_type,
+				       g.refresh_properties, g.novolcheck);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 /**
  * Opens the keystore. The keystore directory is either the
  * default directory or as specified in an environment variable
@@ -2954,6 +3052,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'B':
 			g.label = optarg;
+			break;
+		case 'P':
+			g.refresh_properties = 1;
 			break;
 		case 'h':
 			print_help(command, sub_command);
