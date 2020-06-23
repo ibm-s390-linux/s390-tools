@@ -269,6 +269,7 @@ PROCFILES="\
   /proc/schedstat\
   /proc/service_levels\
   /proc/slabinfo\
+  /proc/softirqs\
   /proc/stat\
   /proc/swaps\
   /proc/sys/kernel\
