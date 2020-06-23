@@ -50,11 +50,12 @@ volume association also contains the device-mapper name, separated by a colon,
 used with dm-crypt. A specific volume can only be associated with one secure
 key.
 .PP
-The generated secure key is saved in a file with a size of 64 or 128 bytes.
-The file contains an AES key with a length of 128, 192, or 256 bits. The key is
-enciphered with the master key of the CCA or EP11 cryptographic adapter.
-Secure keys that are used for the XTS cipher mode can be 128 or 256 bits
-in size.
+The generated secure key is saved in a file, and contains an AES secure key with
+a length of 128, 192, or 256 bits, or two concatenated AES secure keys with a
+length of 128, or 256 bits each, for keys that are used for the XTS cipher mode.
+Note that the file size is not related to the key bit size, but is specific for
+the secure key type. The key is enciphered with the master key of the CCA or
+EP11 cryptographic adapter.
 .
 .
 .
