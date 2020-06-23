@@ -79,6 +79,7 @@ static const char *const usage_chreipl =
 "  -s  --nsid <NAMESPACE_ID> Namespace ID of NVME IPL device (decimal, default 1)\n"
 "  -b, --bootprog <BPROG>    Bootprog specification\n"
 "  -L, --loadparm <PARM>     Loadparm specification\n"
+"  -c, --clear 0|1         Control if memory is cleared on re-IPL\n"
 "\n"
 "Options for nss target:\n"
 "  -n, --name <NAME>       Identifier of the NSS\n"
@@ -792,6 +793,11 @@ static void chreipl_nvme(void)
 	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
 		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
 			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+	}
+
+	if (l.reipl_clear >= 0) {
+		check_exists("reipl/nvme/clear", "NVME re-IPL clear attribute");
+		write_str(l.reipl_clear ? "1" : "0", "reipl/nvme/clear");
 	}
 
 	write_str_optional(l.loadparm, "reipl/nvme/loadparm", l.loadparm_set,

@@ -92,6 +92,7 @@ void print_nvme(int show_ipl, int dump)
 	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
 		"/sys/firmware/reipl/nvme/loadparm";
 	char loadparm[9], loadparm_path[PATH_MAX];
+	char *path_reipl_clear = "/sys/firmware/reipl/nvme/clear";
 
 	if (dump)
 		printf("%-12s nvme_dump\n", get_ipl_banner(show_ipl));
@@ -111,6 +112,8 @@ void print_nvme(int show_ipl, int dump)
 	}
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
+	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
+		print_fw_str("clear:       %s\n", dir, "clear");
 }
 
 void print_ccw(int show_ipl)

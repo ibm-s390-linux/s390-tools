@@ -238,6 +238,13 @@ configuration that is defined by the
 boot menu. Instead it can be used to control higher level boot loaders
 like GRUB. For more details refer to distribution specific documentation.
 
+.TP
+.BR "\-c" " or " "\-\-clear"
+Specify whether memory should be cleared on re-IPL. Possible values are 0 to
+disable and 1 to enable memory clearing on re-IPL.
+Memory clearing is supported if the "clear" attribute is present in
+/sys/firmware/reipl/nvme/.
+
 .PP
 \fBExamples:\fP
 .br
