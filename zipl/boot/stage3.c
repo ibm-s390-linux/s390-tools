@@ -57,18 +57,6 @@ static inline void __noreturn start_kernel(void)
 	while (1);
 }
 
-unsigned int store_ipl_parmblock(struct ipl_pl_hdr *pl_hdr)
-{
-	int rc;
-
-	rc = diag308(DIAG308_STORE, pl_hdr);
-	if (rc == DIAG308_RC_OK &&
-		pl_hdr->version <= IPL_MAX_SUPPORTED_VERSION)
-		return 0;
-
-	return 1;
-}
-
 unsigned int
 is_verified_address(unsigned long image_addr)
 {
@@ -126,9 +114,18 @@ secure_boot_enabled()
 	unsigned int rc;
 
 	pl_hdr = (void *)get_zeroed_page();
-	if (!pl_hdr || store_ipl_parmblock(pl_hdr))
+	switch (diag308(DIAG308_STORE, pl_hdr)) {
+	case DIAG308_RC_OK:
+		rc = pl_hdr->version <= IPL_MAX_SUPPORTED_VERSION &&
+			!!(pl_hdr->flags & IPL_FLAG_SECURE);
+		break;
+	case DIAG308_RC_NO_CONF:
+		rc = 0;
+		break;
+	default:
 		panic(ESECUREBOOT, "%s", msg_sipl_noparm);
-	rc = !!(pl_hdr->flags & IPL_FLAG_SECURE);
+		break;
+	}
 	free_page((unsigned long) pl_hdr);
 
 	return rc;

@@ -286,6 +286,7 @@ enum diag308_subcode {
 
 enum diag308_rc {
 	DIAG308_RC_OK	      = 0x0001,
+	DIAG308_RC_NO_CONF    = 0x0102,
 };
 
 static __always_inline unsigned long diag308(unsigned long subcode, void *addr)
