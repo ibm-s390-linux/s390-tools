@@ -43,6 +43,7 @@ util_prg_example: util_prg_example.o $(lib)
 util_rec_example: util_rec_example.o $(lib)
 
 $(lib): $(objects)
+$(lib): ALL_CFLAGS += -fPIC
 
 install: all
 
