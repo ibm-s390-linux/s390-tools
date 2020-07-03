@@ -13,7 +13,6 @@
 
 #include <stdarg.h>
 
-#include "lib/zt_common.h"
 #include "boot/s390.h"
 
 #include "error.h"
@@ -501,7 +500,7 @@ void initialize(void)
 /*
  * Load disabled wait PSW with reason code in address field
  */
-void __noreturn libc_stop(unsigned long reason)
+void libc_stop(unsigned long reason)
 {
 	struct psw_t psw;
 

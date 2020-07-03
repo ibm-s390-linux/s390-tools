@@ -14,6 +14,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "lib/zt_common.h"
+
 #define EPERM		 1	/* Operation not permitted */
 #define ENOENT		 2	/* No such file or directory */
 #define ESRCH		 3	/* No such process */
@@ -55,7 +57,7 @@ char *strcpy(char *, const char *);
 unsigned long get_zeroed_page(void);
 void free_page(unsigned long);
 void initialize(void);
-void libc_stop(unsigned long);
+void libc_stop(unsigned long) __noreturn;
 void start(void);
 void pgm_check_handler(void);
 void pgm_check_handler_fn(void);
