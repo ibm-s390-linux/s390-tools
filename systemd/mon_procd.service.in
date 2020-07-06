@@ -29,7 +29,7 @@ EnvironmentFile=@sysconf_path@/sysconfig/mon_procd
 #Environment=PROC_INTERVAL=30
 
 ExecStartPre=-/sbin/modprobe monwriter
-ExecStartPre=/sbin/udevadm settle --timeout=10
+ExecStartPre=/usr/bin/udevadm settle --timeout=10
 ExecStart=@usrsbin_path@/mon_procd -i $PROC_INTERVAL
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process

@@ -31,7 +31,7 @@ if [ -f $CONFIG_FILE ]; then
 	. $CONFIG_FILE
 fi
 
-UDEVSETTLE=/sbin/udevadm
+UDEVSETTLE=/usr/bin/udevadm
 if [ ! -e $UDEVSETTLE ]
 then
 	UDEVSETTLE=/sbin/udevsettle
