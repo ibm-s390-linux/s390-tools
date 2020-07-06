@@ -20,10 +20,15 @@
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
 #include "lib/util_path.h"
+#include "lib/util_base.h"
+#include "lib/util_rec.h"
 
 #include "zkey-ekmfweb.h"
 #include "../kms-plugin.h"
+#include "../cca.h"
+#include "../utils.h"
 #include "../pkey.h"
+#include "../properties.h"
 
 #define pr_verbose(handle, fmt...)				\
 	do {							\
@@ -75,6 +80,133 @@ int kms_bind(const char *UNUSED(config_path))
 }
 
 /**
+ * Load the EKMFWeb plugin config file
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _load_config(struct plugin_handle *ph)
+{
+	char *file_name = NULL;
+	int rc;
+
+	util_asprintf(&file_name, "%s/%s", ph->config_path,
+		      EKMFWEB_CONFIG_FILE);
+
+	rc = properties_load(ph->properties, file_name, true);
+	if (rc != 0)
+		pr_verbose(ph, "Failed to load plugin config file '%s': %s",
+			   file_name, strerror(-rc));
+	else
+		pr_verbose(ph, "Config file '%s' loaded", file_name);
+
+	free(file_name);
+	return rc;
+}
+
+/**
+ * Sets the file permissions of the file to the permissions and the group
+ * of configuration directory
+ *
+ * @param ph                the plugin handle
+ * @param filename           the name of the file to set permissions for
+ *
+ * @returns 0 on success, or a negative errno value on failure
+ */
+static int _set_file_permission(struct plugin_handle *ph, const char *filename)
+{
+	int rc;
+
+	if (chmod(filename, ph->config_path_mode) != 0) {
+		rc = -errno;
+		_set_error(ph, "chmod failed on file '%s': %s", filename,
+			   strerror(-rc));
+		return rc;
+	}
+
+	if (chown(filename, geteuid(), ph->config_path_owner) != 0) {
+		rc = -errno;
+		_set_error(ph, "chown failed on file '%s': %s", filename,
+			   strerror(-rc));
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Save the EKMFWeb plugin config file
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _save_config(struct plugin_handle *ph)
+{
+	char *file_name = NULL;
+	int rc;
+
+	util_asprintf(&file_name, "%s/%s", ph->config_path,
+		      EKMFWEB_CONFIG_FILE);
+
+	pr_verbose(ph, "Saving '%s'", file_name);
+
+	rc = properties_save(ph->properties, file_name, true);
+	if (rc != 0) {
+		_set_error(ph, "Failed to save plugin config file '%s': %s",
+			   file_name, strerror(-rc));
+		goto out;
+	}
+
+	rc = _set_file_permission(ph, file_name);
+	if (rc != 0)
+		goto out;
+
+out:
+	free(file_name);
+	return rc;
+}
+
+/**
+ * Checks if a plugin config propertiy is set and not empty
+ *
+ * @param ph                the plugin handle
+ * @param name              the name of the property
+ *
+ * @returns true if the property is set and is not empty, false otherwise
+ */
+static bool _check_property(struct plugin_handle *ph, const char *name)
+{
+	bool ok = true;
+	char *value;
+
+	value = properties_get(ph->properties, name);
+	pr_verbose(ph, "Property '%s': %s", name,
+		   value != NULL ? value : "(missing)");
+
+	ok &= (value != NULL && strlen(value) > 0);
+
+	if (value != NULL)
+		free(value);
+
+	return ok;
+}
+
+/**
+ * Checks if the plugin configuration is complete. Sets the appropriate flags
+ * in the plugin handle
+ *
+ * @param ph                the plugin handle
+ */
+static void _check_config_complete(struct plugin_handle *ph)
+{
+	ph->apqns_configured = _check_property(ph, EKMFWEB_CONFIG_APQNS);
+
+	ph->config_complete = ph->apqns_configured;
+}
+
+/**
  * Initializes a KMS plugin for usage by zkey. When a repository is bound to a
  * KMS plugin, zkey calls this function when opening the repository.
  *
@@ -89,6 +221,7 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 {
 	struct plugin_handle *ph;
 	struct stat sb;
+	int rc;
 
 	util_assert(config_path != NULL, "Internal error: config_path is NULL");
 
@@ -124,6 +257,17 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 					     S_IRGRP  | S_IWGRP |
 					     S_IROTH);
 
+	ph->properties = properties_new();
+	rc = _load_config(ph);
+	if (rc != 0 && rc != -EIO) {
+		warnx("Failed to load plugin config file: %s", strerror(-rc));
+		goto error;
+	}
+
+	_check_config_complete(ph);
+	pr_verbose(ph, "Plugin configuration is %scomplete",
+		   ph->config_complete ? "" : "in");
+
 	return (kms_handle_t)ph;
 
 error:
@@ -151,6 +295,8 @@ int kms_terminate(const kms_handle_t handle)
 
 	if (ph->config_path != NULL)
 		free((void *)ph->config_path);
+	if (ph->properties != NULL)
+		properties_free(ph->properties);
 	free(ph);
 
 	return 0;
@@ -259,6 +405,398 @@ const struct util_opt *kms_get_command_options(const char *command,
 }
 
 /**
+ * Queries the APKA master key states and verification patterns of the current
+ * CCA adapter
+ *
+ * @param ph               the plugin handle
+ * @param cca              the CCA library structure
+ * @param apka_mk_info     the master key info of the APKA master key
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _get_cca_apka_mk_info(struct plugin_handle *ph, struct cca_lib *cca,
+				 struct mk_info *apka_mk_info)
+{
+	long exit_data_len = 0, rule_array_count, verb_data_length = 0;
+	unsigned char rule_array[16 * 8] = { 0, };
+	unsigned char exit_data[4] = { 0, };
+	long return_code, reason_code;
+	struct cca_staticsb {
+		u16	sym_old_mk_mdc4_len;
+		u16	sym_old_mk_mdc4_id;
+		u8	sym_old_mk_mdc4_hp[16];
+		u16	sym_cur_mk_mdc4_len;
+		u16	sym_cur_mk_mdc4_id;
+		u8	sym_cur_mk_mdc4_hp[16];
+		u16	sym_new_mk_mdc4_len;
+		u16	sym_new_mk_mdc4_id;
+		u8	sym_new_mk_mdc4_hp[16];
+		u16	asym_old_mk_mdc4_len;
+		u16	asym_old_mk_mdc4_id;
+		u8	asym_old_mk_mdc4_hp[16];
+		u16	asym_cur_mk_mdc4_len;
+		u16	asym_cur_mk_mdc4_id;
+		u8	asym_cur_mk_mdc4_hp[16];
+		u16	asym_new_mk_mdc4_len;
+		u16	asym_new_mk_mdc4_id;
+		u8	asym_new_mk_mdc4_hp[16];
+		u16	sym_old_mk_vp_len;
+		u16	sym_old_mk_vp_id;
+		u8	sym_old_mk_vp[8];
+		u16	sym_cur_mk_vp_len;
+		u16	sym_cur_mk_vp_id;
+		u8	sym_cur_mk_vp[8];
+		u16	sym_new_mk_vp_len;
+		u16	sym_new_mk_vp_id;
+		u8	sym_new_mk_vp[8];
+		u16	sym_new_mk_mkap_len;
+		u16	sym_new_mk_mkap_id;
+		u8	sym_new_mk_mkap[8];
+		u16	aes_old_mk_vp_len;
+		u16	aes_old_mk_vp_id;
+		u8	aes_old_mk_vp[8];
+		u16	aes_cur_mk_vp_len;
+		u16	aes_cur_mk_vp_id;
+		u8	aes_cur_mk_vp[8];
+		u16	aes_new_mk_vp_len;
+		u16	aes_new_mk_vp_id;
+		u8	aes_new_mk_vp[8];
+		u16	apka_old_mk_vp_len;
+		u16	apka_old_mk_vp_id;
+		u8	apka_old_mk_vp[8];
+		u16	apka_cur_mk_vp_len;
+		u16	apka_cur_mk_vp_id;
+		u8	apka_cur_mk_vp[8];
+		u16	apka_new_mk_vp_len;
+		u16	apka_new_mk_vp_id;
+		u8	apka_new_mk_vp[8];
+	} statis_csb = { 0 };
+
+	util_assert(cca != NULL, "Internal error: cca is NULL");
+	util_assert(apka_mk_info != NULL,
+		    "Internal error: apka_mk_info is NULL");
+
+	memset(apka_mk_info, 0, sizeof(struct mk_info));
+
+	memset(rule_array, 0, sizeof(rule_array));
+	memcpy(rule_array, "STATICSB", 8);
+	rule_array_count = 1;
+
+	verb_data_length = sizeof(statis_csb);
+
+	cca->dll_CSUACFQ(&return_code, &reason_code,
+			 &exit_data_len, exit_data,
+			 &rule_array_count, rule_array,
+			 &verb_data_length, (unsigned char *)&statis_csb);
+
+	pr_verbose(ph, "CSUACFQ (Cryptographic Facility Query) returned: "
+		   "return_code: %ld, reason_code: %ld", return_code,
+		   reason_code);
+	if (return_code != 0)
+		return -EIO;
+
+	switch (rule_array[10 * 8]) {
+	case '3':
+		apka_mk_info->new_mk.mk_state = MK_STATE_FULL;
+		break;
+	case '2':
+		apka_mk_info->new_mk.mk_state = MK_STATE_PARTIAL;
+		break;
+	case '1':
+	default:
+		apka_mk_info->new_mk.mk_state = MK_STATE_EMPTY;
+		break;
+	}
+	memcpy(apka_mk_info->new_mk.mkvp, statis_csb.apka_new_mk_vp,
+	       sizeof(statis_csb.apka_new_mk_vp));
+
+	switch (rule_array[11 * 8]) {
+	case '2':
+		apka_mk_info->cur_mk.mk_state = MK_STATE_VALID;
+		break;
+	case '1':
+	default:
+		apka_mk_info->cur_mk.mk_state = MK_STATE_INVALID;
+		break;
+	}
+	memcpy(apka_mk_info->cur_mk.mkvp, statis_csb.apka_cur_mk_vp,
+	       sizeof(statis_csb.apka_cur_mk_vp));
+
+	switch (rule_array[12 * 8]) {
+	case '2':
+		apka_mk_info->old_mk.mk_state = MK_STATE_VALID;
+		break;
+	case '1':
+	default:
+		apka_mk_info->old_mk.mk_state = MK_STATE_INVALID;
+		break;
+	}
+	memcpy(apka_mk_info->old_mk.mkvp, statis_csb.apka_old_mk_vp,
+	       sizeof(statis_csb.apka_old_mk_vp));
+
+	return 0;
+}
+
+/**
+ * Print the APKA master key infos of the selected APQNs
+ *
+ * @param ph                the plugin handle
+ * @param cca               CCA library structure
+ * @param apqns             a list of APQNs
+ * @param num_apqns         number of APQNs in above array
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+
+static int _print_apka_mks(struct plugin_handle *ph, struct cca_lib *cca,
+			   const struct kms_apqn *apqns, size_t num_apqns)
+{
+	struct mk_info mk_info;
+	struct util_rec *rec;
+	enum card_type type;
+	int rc = 0, level;
+	size_t i;
+
+	rec = util_rec_new_wide("-");
+	util_rec_def(rec, "APQN", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
+	util_rec_def(rec, "NEW", UTIL_REC_ALIGN_LEFT, 16, "NEW APKA MK");
+	util_rec_def(rec, "CUR", UTIL_REC_ALIGN_LEFT, 16, "CURRENT APKA MK");
+	util_rec_def(rec, "OLD", UTIL_REC_ALIGN_LEFT, 16, "OLD APKA MK");
+	util_rec_def(rec, "TYPE", UTIL_REC_ALIGN_LEFT, 6, "TYPE");
+	util_rec_print_hdr(rec);
+
+	for (i = 0; i < num_apqns; i++) {
+		rc = select_cca_adapter(cca, apqns[i].card, apqns[i].domain,
+					ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to select APQN %02x.%04x: %s",
+				   apqns[i].card, apqns[i].domain,
+				   strerror(-rc));
+			goto out;
+		}
+
+		rc = _get_cca_apka_mk_info(ph, cca, &mk_info);
+		if (rc != 0) {
+			_set_error(ph, "Failed to get the APKA master key "
+				   "infos for APQN %02x.%04x: %s",
+				   apqns[i].card, apqns[i].domain,
+				   strerror(-rc));
+			goto out;
+		}
+
+		level = sysfs_get_card_level(apqns[i].card);
+		type = sysfs_get_card_type(apqns[i].card);
+
+		util_rec_set(rec, "APQN", "%02x.%04x", apqns[i].card,
+			     apqns[i].domain);
+
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL ||
+		    mk_info.new_mk.mk_state == MK_STATE_COMMITTED)
+			util_rec_set(rec, "NEW", "%s",
+				     printable_mkvp(type, mk_info.new_mk.mkvp));
+		else if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL)
+			util_rec_set(rec, "NEW", "partially loaded");
+		else if (mk_info.new_mk.mk_state == MK_STATE_UNCOMMITTED)
+			util_rec_set(rec, "NEW", "uncommitted");
+		else
+			util_rec_set(rec, "NEW", "-");
+
+		if (mk_info.cur_mk.mk_state ==  MK_STATE_VALID)
+			util_rec_set(rec, "CUR", "%s",
+				     printable_mkvp(type, mk_info.cur_mk.mkvp));
+		else
+			util_rec_set(rec, "CUR", "-");
+
+		if (mk_info.old_mk.mk_state ==  MK_STATE_VALID)
+			util_rec_set(rec, "OLD", "%s",
+				     printable_mkvp(type, mk_info.old_mk.mkvp));
+		else
+			util_rec_set(rec, "OLD", "-");
+
+		if (level > 0 && type != CARD_TYPE_ANY)
+			util_rec_set(rec, "TYPE", "CEX%d%c", level,
+				     type == CARD_TYPE_CCA ? 'C' : 'P');
+		else
+			util_rec_set(rec, "TYPE", "?");
+
+		util_rec_print(rec);
+	}
+
+out:
+	util_rec_free(rec);
+
+	return rc;
+}
+
+/**
+ * Cross checks the APQNs associated with the plugin. Checks if the CCA master
+ * keys of all APQNs for the APKA master key are the same.
+ *
+ * @param ph                the plugin handle
+ * @param apqns             a list of APQNs
+ * @param num_apqns         number of APQNs in above array
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _cross_check_apqns(struct plugin_handle *ph,
+			      const struct kms_apqn *apqns, size_t num_apqns)
+{
+	u8 new_mkvp[MKVP_LENGTH] = { 0, };
+	u8 mkvp[MKVP_LENGTH] = { 0, };
+	struct cca_lib cca = { 0 };
+	struct mk_info mk_info;
+	bool mismatch = false;
+	bool print = false;
+	int rc = -ENODEV;
+	char temp[200];
+	size_t i;
+
+	for (i = 0; i < num_apqns; i++) {
+		rc = select_cca_adapter(&cca, apqns[i].card, apqns[i].domain,
+					ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to select APQN %02x.%04x: %s",
+				   apqns[i].card, apqns[i].domain,
+				   strerror(-rc));
+			goto out;
+		}
+
+		rc = _get_cca_apka_mk_info(ph, &cca, &mk_info);
+		if (rc != 0) {
+			_set_error(ph, "Failed to get the APKA master key "
+				   "infos for APQN %02x.%04x: %s",
+				   apqns[i].card, apqns[i].domain,
+				   strerror(-rc));
+			goto out;
+		}
+
+		if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL) {
+			print = true;
+			sprintf(temp, "INFO: APQN %02x.%04x: The NEW APKA "
+				"master key register is only partially loaded.",
+				apqns[i].card, apqns[i].domain);
+			util_print_indented(temp, 0);
+		}
+
+		if (MKVP_ZERO(new_mkvp) &&
+		    mk_info.new_mk.mk_state == MK_STATE_FULL)
+			memcpy(new_mkvp, mk_info.new_mk.mkvp, sizeof(new_mkvp));
+
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+		    !MKVP_EQ(mk_info.new_mk.mkvp, new_mkvp)) {
+			print = true;
+			sprintf(temp, "WARNING: APQN %02x.%04x: The NEW APKA "
+				"master key register contains a different "
+				"master key than the NEW APKA register of "
+				"other APQNs.", apqns[i].card, apqns[i].domain);
+			util_print_indented(temp, 0);
+		}
+
+		if (mk_info.cur_mk.mk_state != MK_STATE_VALID) {
+			mismatch = true;
+			print = true;
+			printf("WARNING: APQN %02x.%04x: No APKA master key is "
+			       "set.\n", apqns[i].card, apqns[i].domain);
+			continue;
+		}
+
+		if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
+		    MKVP_EQ(mk_info.old_mk.mkvp, mk_info.cur_mk.mkvp)) {
+			print = true;
+			sprintf(temp, "INFO: APQN %02x.%04x: The OLD APKA "
+				"master key register contains the same master "
+				"key as the CURRENT APKA master key register.",
+				apqns[i].card, apqns[i].domain);
+			util_print_indented(temp, 0);
+		}
+
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+		    MKVP_EQ(mk_info.new_mk.mkvp, mk_info.cur_mk.mkvp)) {
+			print = true;
+			sprintf(temp, "INFO: APQN %02x.%04x: The NEW APKA "
+				"master key register contains the same master "
+				"key as the CURRENT APKA master key register.",
+				apqns[i].card, apqns[i].domain);
+			util_print_indented(temp, 0);
+		}
+
+		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
+		    mk_info.old_mk.mk_state == MK_STATE_VALID &&
+		    MKVP_EQ(mk_info.new_mk.mkvp, mk_info.old_mk.mkvp)) {
+			print = true;
+			sprintf(temp, "INFO: APQN %02x.%04x: The NEW APKA "
+				"master key register contains the same master "
+				"key as the OLD APKA master key register.",
+				apqns[i].card, apqns[i].domain);
+			util_print_indented(temp, 0);
+		}
+
+		if (MKVP_ZERO(mkvp))
+			memcpy(mkvp, mk_info.cur_mk.mkvp, sizeof(mkvp));
+
+		if (!MKVP_EQ(mk_info.cur_mk.mkvp, mkvp)) {
+			mismatch = true;
+			print = true;
+			sprintf(temp, "WARNING: APQN %02x.%04x: The CURRENT "
+				"APKA master key register contains a different "
+				"master key than the CURRENT APKA register of "
+				"other APQNs.", apqns[i].card, apqns[i].domain);
+			util_print_indented(temp, 0);
+		}
+	}
+
+	if (mismatch) {
+		_set_error(ph, "Your APKA master key setup is improper");
+		rc = -ENODEV;
+	}
+
+	if (print)
+		_print_apka_mks(ph, &cca, apqns, num_apqns);
+
+out:
+	if (cca.lib_csulcca != NULL)
+		dlclose(cca.lib_csulcca);
+
+	return rc;
+}
+
+/**
+ * Build an APQN string from an APQN array
+ *
+ * @param apqns           An array of APQNs
+ * @param num_apqns       The number of elements in above array
+ *
+ * @return an allocated string with the APQNs
+ */
+static char *_build_apqn_string(const struct kms_apqn *apqns, size_t num_apqns)
+{
+	char *apqn_str, *str;
+	size_t size, i;
+
+	if (num_apqns == 0) {
+		apqn_str = util_malloc(1);
+		*apqn_str = '\0';
+		return apqn_str;
+	}
+
+	size = num_apqns * 8; /* 'cc.dddd' plus ',' or '\0' */
+	apqn_str = util_malloc(size);
+
+	str = apqn_str;
+	for (i = 0; i < num_apqns; i++) {
+		if (i != 0) {
+			*str = ',';
+			str++;
+		}
+
+		sprintf(str, "%02x.%04x", apqns[i].card, apqns[i].domain);
+		str += 7;
+	}
+
+	return apqn_str;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -290,6 +828,9 @@ int kms_configure(const kms_handle_t handle,
 		  const struct kms_option *options, size_t num_options)
 {
 	struct plugin_handle *ph = handle;
+	bool config_changed = false;
+	char *apqn_str = NULL;
+	int rc = 0;
 	size_t i;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
@@ -316,7 +857,46 @@ int kms_configure(const kms_handle_t handle,
 
 	_clear_error(ph);
 
-	return 0;
+	if (apqns != NULL) {
+		if (num_apqns > 0) {
+			rc = _cross_check_apqns(ph, apqns, num_apqns);
+			if (rc != 0)
+				goto out;
+		}
+
+		apqn_str = _build_apqn_string(apqns, num_apqns);
+		rc = properties_set(ph->properties, EKMFWEB_CONFIG_APQNS,
+				    apqn_str);
+		if (rc != 0) {
+			_set_error(ph, "Failed to set APQNs property: %s",
+				   strerror(-rc));
+			goto out;
+		}
+
+		config_changed = true;
+	}
+
+out:
+	if (apqn_str != NULL)
+		free(apqn_str);
+
+	if (rc == 0) {
+		if (config_changed) {
+			rc = _save_config(ph);
+			if (rc != 0)
+				goto ret;
+
+			_check_config_complete(ph);
+			pr_verbose(ph, "Plugin configuration is %scomplete",
+				   ph->config_complete ? "" : "in");
+		}
+
+		if (!ph->config_complete)
+			rc = -EAGAIN;
+	}
+
+ret:
+	return rc;
 }
 
 /**
@@ -371,6 +951,13 @@ int kms_login(const kms_handle_t handle)
 	pr_verbose(ph, "Login");
 
 	_clear_error(ph);
+
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -527,6 +1114,13 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 
 	_clear_error(ph);
 
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) != 0) {
 		_set_error(ph, "Key type '%s' is not supported by EKMF Web",
 			   key_type);
@@ -576,6 +1170,13 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 
 	_clear_error(ph);
 
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
 	_set_error(ph, "Not yet implemented");
 	return -ENOTSUP;
 }
@@ -611,6 +1212,13 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 	pr_verbose(ph, "Get key properties: key-ID: '%s'", key_id);
 
 	_clear_error(ph);
+
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
 
 	_set_error(ph, "Not yet implemented");
 	return -ENOTSUP;
@@ -657,6 +1265,13 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 	}
 
 	_clear_error(ph);
+
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
 
 	_set_error(ph, "Not yet implemented");
 	return -ENOTSUP;
@@ -724,6 +1339,13 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 
 	_clear_error(ph);
 
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
 	_set_error(ph, "Not yet implemented");
 	return -ENOTSUP;
 }
@@ -756,6 +1378,13 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 	pr_verbose(ph, "Import Key, key-ID: '%s'", key_id);
 
 	_clear_error(ph);
+
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
 
 	_set_error(ph, "Not yet implemented");
 	return -ENOTSUP;

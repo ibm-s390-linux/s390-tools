@@ -20,8 +20,15 @@ struct plugin_handle {
 	const char *config_path;
 	mode_t config_path_mode;
 	gid_t config_path_owner;
+	struct properties *properties;
+	bool apqns_configured;
+	bool config_complete;
 	char error_msg[1024];
 	bool verbose;
 };
+
+#define EKMFWEB_CONFIG_FILE			"ekmfweb.conf"
+
+#define EKMFWEB_CONFIG_APQNS			"apqns"
 
 #endif
