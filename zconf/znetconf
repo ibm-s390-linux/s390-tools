@@ -63,14 +63,8 @@ CMD=$(basename $0)
 LSZNET=/lib/s390-tools/lsznet.raw
 LSZNET_ARGS=-a
 LSZNET_CALL="$LSZNET $LSZNET_ARGS"
-UDEVSETTLE=/sbin/udevadm
-if [ ! -e $UDEVSETTLE ]
-then
-	UDEVSETTLE=/sbin/udevsettle
-	UDEVSETTLE_CALL="$UDEVSETTLE --timeout=10"
-else
-	UDEVSETTLE_CALL="$UDEVSETTLE settle --timeout=10"
-fi
+UDEVSETTLE=udevadm
+UDEVSETTLE_CALL="$UDEVSETTLE settle --timeout=10"
 SYSFSDIR=$(cat /proc/mounts|awk '$3=="sysfs"{print $2; exit}')
 CCWGROUPBUS_DIR=$SYSFSDIR/bus/ccwgroup
 CCWDEV_DIR=$SYSFSDIR/bus/ccw/devices
@@ -257,6 +251,35 @@ function lookup_lan_layer()
 		return $LAYER2
 	fi
 	return $ERRCODE_NO_LAYER_DETECTED
+}
+
+#==============================================================================
+
+function prepare_udevsettle_cmd()
+{
+	# is the command available in $PATH
+	if ! [ -x "$(command -v $UDEVSETTLE)" ]
+	then
+		# check the well known locations.
+		if [ -e "/sbin/udevadm" ]
+		then
+			UDEVSETTLE=/sbin/udevadm
+			UDEVSETTLE_CALL="$UDEVSETTLE settle --timeout=10"
+		elif [ -e "/usr/bin/udevadm" ]
+		then
+			UDEVSETTLE=/usr/bin/udevadm
+			UDEVSETTLE_CALL="$UDEVSETTLE settle --timeout=10"
+		elif [ -e "/sbin/udevsettle" ]
+		then
+			# Fallback to udevsettle
+			UDEVSETTLE=/sbin/udevsettle
+			UDEVSETTLE_CALL="$UDEVSETTLE --timeout=10"
+		else
+			UDEVSETTLE=""
+			UDEVSETTLE_CALL=""
+			echo "Failed to find any candidate for udevsettle"
+		fi
+	fi
 }
 
 #==============================================================================
@@ -506,8 +529,9 @@ function wait_for_net_device()
 	local CMD_FINDNETLINK="find $CCWGROUPBUS_DEVICEDIR/$CCWGROUPDEVNO/ -type l -name net*"
 	local LINKNAME=""
 
+	prepare_udevsettle_cmd
 	# polling loop to wait for net device to become available
-	if [ -e $UDEVSETTLE ]
+	if [ "$UDEVSETTLE" != "" ]
 	then
 		$UDEVSETTLE_CALL
 	fi
