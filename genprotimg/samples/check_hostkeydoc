@@ -37,7 +37,7 @@ cleanup()
 trap cleanup EXIT
 
 # Enhanced error checking for bash
-if echo $SHELL | grep /bin/bash > /dev/null
+if [ -n "${BASH}" ]
 then
     set -o pipefail
     set -o nounset
