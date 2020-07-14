@@ -1,0 +1,79 @@
+.\" Copyright 2020 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH LSSTP 8 "Jul 2020" "s390-tools" "Linux Administrator's Manual"
+.SH NAME
+.B "lsstp "
+\- tool to show STP system information
+.SH SYNOPSIS
+.BI "lsstp "
+
+.SH DESCRIPTION
+.B lsstp
+displays information about the currenta Server Time Protocol (STP) configuration
+like Coordianted Timing Network (CTN) ID, Timing state and Leap seconds.
+.SH OUTPUT
+.TP
+.B STP online
+Whether the STP subsystem is online
+.TP
+.B CTN ID
+The ID of the Coordinated Time Network. If it can be decoded as EBCDIC it will be shown as EBCDIC String, otherwise a hexadecimal representation is shown.
+.TP
+.B CTN Type
+The type of timing network.
+.IP
+.B No CTN
+STP is not configured for attachment to a CTN.
+.IP
+.B STP-only
+STP is configured and attached to a CTN with only STP nodes.
+.IP
+.B Mixed
+STP is configured and attached to a CTN which contains both STP and External Time Reference (ETR) nodes.
+.TP
+.B Stratum
+The Stratum level of the STP clock. This indicates the number of servers in the timing path between the local STP clock and the selected primary time server.
+.TP
+.B Timing mode
+.IP
+.B Local
+The Time-of-day (TOD) clock is stepped to the local hardware oscillator and is not steered by the STP facility.
+.IP
+.B ETR
+The TOD clock is synchronized with an attached 9037 Sysplex Timer.
+.IP
+.B STP
+The TOD clock is steered by the STP facility to maintain synchronization with a Coordinated Server Time (CST).
+.IP
+.B Uninitialized
+The TOD clock is not initialized. The STP facility is allowed to perform a step adjustment to the TOD clock for synchronization.
+.TP
+.B Timing state
+The synchronization state of the STP facilty. Can be unsynchronzied, synchronized and stopped.
+.TP
+.B DST offset
+The Daylight savings time offset relative to UTC in minutes.
+.TP
+.B Timezone offset
+The offset of the local time relative to UTC in minutes.
+.TP
+.B Time offset
+The total time offset at the server. This field is only valid in mixed CTN configurations.
+.TP
+.B Active Leap seconds
+The number of Leap seconds that are currently in effect at the STP facility.
+.TP
+.B Leap second <insertion|delation> at
+If a Leap second insertion or deletetion is scheduled in the STP facility, this field will show the Day and Time of the scheduled change.
+.SH OPTIONS
+.TP
+.BI "-v|--version"
+Print version number.
+.TP
+.BI "-h|--help"
+Print usage text.
+
+.SH AUTHORS
+Sven Schnelle <svens@linux.ibm.com>
