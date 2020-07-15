@@ -6,11 +6,9 @@
 # verifying the issuer, the validity date and the signature.
 # Optionally verify the full trust chain using a CA certficate.
 #
-# Revocation list checking not yet implemented.
-#
 # Sample invocation:
 #
-# ./check_hostkeydoc HKD1234.crt signing-key.crt
+# ./check_hostkeydoc HKD1234.crt ibm-z-host-key-signing.crt -c DigiCertCA.crt -r ibm-z-host-key.crl
 #
 # Copyright IBM Corp. 2020
 #
