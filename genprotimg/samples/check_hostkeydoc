@@ -39,6 +39,7 @@ trap cleanup EXIT
 # Enhanced error checking for bash
 if [ -n "${BASH}" ]
 then
+    set -o posix
     set -o pipefail
     set -o nounset
 fi
