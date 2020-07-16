@@ -4531,6 +4531,39 @@ static int _properties_to_ekmf_tags(struct plugin_handle *UNUSED(ph),
 }
 
 /**
+ * Converts an EKMF tag list into a list of KMS properties
+ *
+ * @param ph                the plugin handle
+ * @param ekmf_tag_list     The list of tags
+ * @param properties        On return: a list of properties
+ * @param num_properties    On return: the number of properties in above array
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _ekmf_tags_to_properties(struct plugin_handle *UNUSED(ph),
+				    const struct ekmf_tag_list *ekmf_tag_list,
+				    struct kms_property **properties,
+				    size_t *num_properties)
+{
+	struct kms_property *props;
+	size_t i;
+
+	props = util_malloc(sizeof(struct kms_property) *
+						ekmf_tag_list->num_tags);
+
+	for (i = 0; i < ekmf_tag_list->num_tags; i++) {
+		props[i].name = util_strdup(ekmf_tag_list->tags[i].name);
+		props[i].value = ekmf_tag_list->tags[i].value != NULL ?
+			util_strdup(ekmf_tag_list->tags[i].value) : NULL;
+	}
+
+	*properties = props;
+	*num_properties = ekmf_tag_list->num_tags;
+
+	return 0;
+}
+
+/**
  * Restricts an retrieved secure key from further export and checks the
  * required key attributes. If the secure key is not as expected, the user
  * is prompted to confirm the use of the key.
@@ -4872,8 +4905,14 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 			   const struct kms_property *properties,
 			   size_t num_properties)
 {
+	struct ekmf_tag_list delete_tag_list = { 0 };
+	struct ekmf_tag_list set_tag_list = { 0 };
+	struct ekmf_key_info *key_info = NULL;
 	struct plugin_handle *ph = handle;
+	char *updated_on = NULL;
+	char *error_msg = NULL;
 	size_t i;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(key_id != NULL, "Internal error: key_id is NULL");
@@ -4900,8 +4939,65 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 		return -EINVAL;
 	}
 
-	_set_error(ph, "Not yet implemented");
-	return -ENOTSUP;
+	rc = _properties_to_ekmf_tags(ph, properties, num_properties,
+				      &set_tag_list, false);
+	if (rc != 0)
+		goto out;
+
+	rc = _properties_to_ekmf_tags(ph, properties, num_properties,
+				      &delete_tag_list, true);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_get_key_info(&ph->ekmf_config, &ph->curl_handle,
+			       key_id, &key_info, &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get key '%s': %s", key_id,
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	if (set_tag_list.num_tags > 0) {
+		rc = ekmf_set_key_tags(&ph->ekmf_config, &ph->curl_handle,
+				       key_id, &set_tag_list,
+				       key_info->updated_on, &updated_on,
+				       &error_msg, ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to set custom tags for key "
+				   "'%s': %s", key_id, error_msg != NULL ?
+						   error_msg : strerror(-rc));
+			_remove_login_token_if_error(ph, rc);
+			goto out;
+		}
+	}
+
+	if (delete_tag_list.num_tags > 0) {
+		rc = ekmf_delete_key_tags(&ph->ekmf_config, &ph->curl_handle,
+				       key_id, &delete_tag_list,
+				       updated_on != NULL ? updated_on :
+						       key_info->updated_on,
+				       NULL, &error_msg, ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to delete custom tags for key "
+				   "'%s': %s", key_id, error_msg != NULL ?
+						   error_msg : strerror(-rc));
+			_remove_login_token_if_error(ph, rc);
+			goto out;
+		}
+	}
+
+out:
+	_free_ekmf_tags(&set_tag_list);
+	_free_ekmf_tags(&delete_tag_list);
+	if (key_info != NULL)
+		ekmf_free_key_info(key_info);
+	if (updated_on != NULL)
+		free(updated_on);
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return rc;
 }
 
 /**
@@ -4924,7 +5020,10 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 			   struct kms_property **properties,
 			   size_t *num_properties)
 {
+	struct ekmf_key_info *key_info = NULL;
 	struct plugin_handle *ph = handle;
+	char *error_msg = NULL;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(key_id != NULL, "Internal error: key_id is NULL");
@@ -4943,8 +5042,27 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 		return -EINVAL;
 	}
 
-	_set_error(ph, "Not yet implemented");
-	return -ENOTSUP;
+	rc = ekmf_get_key_info(&ph->ekmf_config, &ph->curl_handle,
+			       key_id, &key_info, &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get key '%s': %s", key_id,
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _ekmf_tags_to_properties(ph, &key_info->custom_tags, properties,
+				      num_properties);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (key_info != NULL)
+		ekmf_free_key_info(key_info);
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return rc;
 }
 
 /**
