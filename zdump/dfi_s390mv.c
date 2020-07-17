@@ -21,6 +21,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/util_file.h"
 #include "lib/util_path.h"
 
 #include "zgetdump.h"
@@ -98,6 +99,24 @@ static void em_init(struct vol *vol)
 		l.dump_incomplete = 1;
 }
 
+/*
+ * Check whether a device with a given busid is online
+ */
+static unsigned int dev_is_online(const char *busid)
+{
+	unsigned int online;
+	char *path;
+
+	path = util_path_sysfs("%s/%s/online", SYSFS_BUSDIR, busid);
+	if (util_file_read_ui(&online, 10, path) != 0) {
+		warnx("Could not open \"%s\" (%s)", path, strerror(errno));
+		free(path);
+		exit(EXIT_FAILURE);
+	}
+	free(path);
+
+	return online;
+}
 
 /*
  * Check sysfs, whether a device specified by its bus ID is defined and online.
@@ -106,67 +125,40 @@ static void em_init(struct vol *vol)
 static enum dev_status dev_from_busid(char *bus_id, dev_t *dev)
 {
 	struct dirent *direntp;
-	int fh, minor, major;
+	int minor, major;
 	char buf[10];
 	DIR *fh_dir;
 	char *sysfs;
 
 	sysfs = util_path_sysfs("%s/%s", SYSFS_BUSDIR, bus_id);
-	fh_dir = opendir(sysfs);
-	free(sysfs);
-	if (!fh_dir)
+	if (!util_path_is_dir(sysfs)) {
+		free(sysfs);
 		return DEV_UNDEFINED;
-
-	sysfs = util_path_sysfs("%s/%s/online", SYSFS_BUSDIR, bus_id);
-	fh = open(sysfs, O_RDONLY);
-	if (fh == -1) {
-		warnx("Could not open \"%s\" (%s)", sysfs, strerror(errno));
-		goto err;
 	}
 	free(sysfs);
-	if (read(fh, buf, 1) == -1)
-		ERR_EXIT_ERRNO("Could not read online attribute");
-	close(fh);
 
-	if (buf[0] != '1')
+	if (!dev_is_online(bus_id))
 		return DEV_OFFLINE;
 
-	while ((direntp = readdir(fh_dir)))
-		if (strncmp(direntp->d_name, "block:", 6) == 0)
-			break;
-	closedir(fh_dir);
-
-	if (direntp == NULL) {
-		sysfs = util_path_sysfs("%s/%s/block", SYSFS_BUSDIR, bus_id);
-		fh_dir = opendir(sysfs);
-		if (!fh_dir) {
-			warnx("Could not open \"%s\" (%s) ",
-			      sysfs, strerror(errno));
-			goto err;
-		}
-		while ((direntp = readdir(fh_dir)))
-			if (strncmp(direntp->d_name, "dasd", 4) == 0)
-				break;
-		closedir(fh_dir);
-		if (direntp == NULL) {
-			warnx("Problem with contents of \"%s\"", sysfs);
-			goto err;
-		}
-		free(sysfs);
-	}
-
-	sysfs = util_path_sysfs("%s/%s/%s/dev",
-				SYSFS_BUSDIR, bus_id, direntp->d_name);
-	fh = open(sysfs, O_RDONLY);
-	if (fh == -1) {
-		warnx("Could not open \"%s\" (%s)", sysfs, strerror(errno));
+	sysfs = util_path_sysfs("%s/%s/block", SYSFS_BUSDIR, bus_id);
+	fh_dir = opendir(sysfs);
+	if (!fh_dir) {
+		warnx("Could not open \"%s\" (%s) ", sysfs, strerror(errno));
 		goto err;
 	}
-	if (read(fh, buf, sizeof(buf)) == -1) {
+	while ((direntp = readdir(fh_dir)))
+		if (strncmp(direntp->d_name, "dasd", 4) == 0)
+			break;
+	if (direntp == NULL) {
+		warnx("Problem with contents of \"%s\"", sysfs);
+		goto err;
+	}
+	if (util_file_read_line(buf, sizeof(buf), "%s/%s/dev", sysfs, direntp->d_name)) {
 		warnx("Could not read dev file (%s)", strerror(errno));
 		goto err;
 	}
-	close(fh);
+	closedir(fh_dir);
+
 	if (sscanf(buf, "%i:%i", &major, &minor) != 2) {
 		warnx("Malformed content of \"%s\": %s", sysfs, buf);
 		goto err;
@@ -178,6 +170,8 @@ static enum dev_status dev_from_busid(char *bus_id, dev_t *dev)
 	return DEV_ONLINE;
 
 err:
+	if (fh_dir)
+		closedir(fh_dir);
 	free(sysfs);
 	exit(EXIT_FAILURE);
 }
