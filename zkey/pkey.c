@@ -1773,10 +1773,6 @@ int check_aes_cipher_key(const u8 *key, size_t key_size)
 		       "decryption\n");
 		mismatch = true;
 	}
-	if (cipherkey->kuf1 & 0x2000) {
-		printf("INFO: The secure key can be used for data translate\n");
-		mismatch = true;
-	}
 	if (cipherkey->kuf1 & 0x1000) {
 		printf("WARNING: The secure key can only be used in UDXs\n");
 		mismatch = true;
