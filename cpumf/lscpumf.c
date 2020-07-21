@@ -2539,7 +2539,7 @@ static struct counters cpumcf_z15_counters[] = {
 	{
 		.ctrnum = 265,
 		.ctrset = CPUMF_CTRSET_EXTENDED,
-		.name = "DFLT_CCERROR",
+		.name = NULL,
 		.desc = "Increments by one for every DEFLATE CONVERSION CALL"
 			"\n\t\tinstruction executed that ended in Condition Codes"
 			"\n\t\t0, 1 or 2",
@@ -2830,6 +2830,30 @@ static int read_sfb(struct cpumf_info *p)
 	return rc;
 }
 
+/* Set the counter name for z15 counter numbered 265. It is either named
+ * DFLT_CCERROR or DFLT_CCFINISH, depending on the linux version. The
+ * counter was renamed from CCERROR to CCFINISH in linux version 5.8.
+ * Check for existence of file /sys/devices/cpum_cf/events/DLFT_CCERROR.
+ */
+#define	CCERROR		"/sys/devices/cpum_cf/events/DFLT_CCERROR"
+static void read_ccerror(struct counters *cp, size_t cp_cnt)
+{
+	struct stat sbuf;
+	char *ctrname;
+	size_t i = 0;
+
+	if (stat(CCERROR, &sbuf) == 0)
+		ctrname = "DFLT_CCERROR";
+	else
+		ctrname = "DFLT_CCFINISH";
+	/* Find DFLT_CC{FINISH,ERROR} in table and set name */
+	for (struct counters *p = cp; i < cp_cnt; ++i, ++p)
+		if (p->ctrnum == 265) {
+			p->name = ctrname;
+			break;
+		}
+}
+
 /* Read allnecessary information from /sysfs file /proc/service_levels */
 static int read_info(void)
 {
@@ -3017,6 +3041,7 @@ static struct counters *get_counter(int ctrset, size_t *len)
 		case 8562:
 			cp = cpumcf_z15_counters;
 			*len = ARRAY_SIZE(cpumcf_z15_counters);
+			read_ccerror(cp, *len);
 			break;
 		}
 		break;
