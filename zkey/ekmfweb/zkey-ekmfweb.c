@@ -1116,6 +1116,92 @@ const struct util_opt configure_options[] = {
 			"zkey client with the EKMF Web server.",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS FOR CERTIFICATE GENERATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-csr", required_argument, NULL, 'c'},
+		.argument = "CSR-PEM-FILE",
+		.desc = "Generate a certificate signing request (CSR) with the "
+			"identity key and store it into the specified PEM "
+			"file. You pass this CSR to a certificate authority "
+			"(CA) to have it issue a CA signed certificate for the "
+			"EKMF Web plugin. You need to register the certificate "
+			"with EKMF Web before you can access EKMF Web.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-self-signed-cert", required_argument, NULL,
+			    'C'},
+		.argument = "CERT-PEM-FILE",
+		.desc = "Generate a self signed certificate with the "
+			"identity key and store it into the specified PEM "
+			"file. You need to register the certificate with EKMF "
+			"Web before you can access EKMF Web.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-subject", required_argument, NULL, 's'},
+		.argument = "SUBJECT-RDNS",
+		.desc = "The subject name for generating a certificate signing "
+			"request (CSR) or self signed certificate, in the form "
+			"'<type>=<value>(;<type>=<value>)*[;]' with types "
+			"recognized by OpenSSL.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-extensions", required_argument, NULL, 'e'},
+		.argument = "EXTENSIONS",
+		.desc = "The certificate extensions for generating a "
+			"certificate signing request (CSR) or self signed "
+			"certificate, in the form '<name>=[critical,]<value(s)>"
+			" (;<name>=[critical,]<value(s)>)*[;]' with extension "
+			"names and values recognized by OpenSSL.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "renew-cert", required_argument, NULL, 'N'},
+		.argument = "CERT-PEM-FILE",
+		.desc = "An existing PEM file containing the certificate to be "
+			"renewed. The certificate's subject name and extensions"
+			" are used to generate the certificate signing request "
+			"(CSR) or renewed self signed certificate.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "csr-new-header", 0, NULL, 'n'},
+		.desc = "Adds the word NEW to the PEM file header and footer "
+			"lines on the certificate signing request. Some "
+			"software and some CAs need this.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-validity-days", required_argument, NULL, 'd'},
+		.argument = "DAYS",
+		.desc = "The number of days to certify the self signed "
+			"certificate. The default is 30 days.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-digest", required_argument, NULL, 'D'},
+		.argument = "DIGEST",
+		.desc = "The digest algorithm to use when generating a "
+			"certificate signing request or self signed "
+			"certificate. The default is determined by OpenSSL.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+#ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
+	{
+		.option = { "cert-rsa-pss", 0, NULL, 'P'},
+		.desc = "Use the RSA-PSS algorithm to sign the certificate "
+			"signing request or the self signed certificate. This "
+			"option is only honored when the identity key type is "
+			"RSA, it is ignored otherwise.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+#endif
 	UTIL_OPT_END,
 };
 
@@ -2466,6 +2552,17 @@ struct config_options {
 	bool tls_verify_hostname;
 	bool refresh_settings;
 	bool generate_identity_key;
+	const char *sscert_pem_file;
+	const char *csr_pem_file;
+	const char *cert_subject;
+	const char *cert_extensions;
+	const char *renew_cert_pem_file;
+	bool csr_new_header;
+	const char *cert_validity_days;
+	const char *cert_digest;
+#ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
+	bool cert_rsa_pss;
+#endif
 };
 
 /**
@@ -2709,6 +2806,318 @@ out:
 }
 
 /**
+ * Parses an unsigned number from a string.
+ *
+ * @param str                the string to parse
+ *
+ * @returns the parsed number, or -1 in case of an error.
+ */
+static long _parse_unsigned(const char *str)
+{
+	long val;
+	char *endp;
+
+	val = strtol(str, &endp, 0);
+	if (*str == '\0' || *endp != '\0' ||
+	    (val == LONG_MAX && errno == ERANGE))
+		return -1;
+
+	return val;
+}
+
+/**
+ * Parse a semi-colon separated list and return an allocated array of the
+ * elements.
+ *
+ * @param list              the semi-colon separated list
+ * @param elements          on return, an allocated array of elements
+ * @param num_elements      on return, the number of elements in the array
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _parse_list(const char *list, char ***elements,
+		       size_t *num_elements)
+{
+	char *copy, *tok;
+	size_t count;
+	int i;
+
+	for (i = 0, count = 1; list[i] != '\0'; i++)
+		if (list[i] == ';')
+			count++;
+
+	*elements = util_zalloc(count * sizeof(char *));
+
+	copy = util_strdup(list);
+	tok = strtok(copy, ";");
+	i = 0;
+	while (tok != NULL) {
+		if (strlen(tok) > 0) {
+			(*elements)[i] = util_strdup(tok);
+			i++;
+		}
+		tok = strtok(NULL, ";");
+	}
+	*num_elements = i;
+
+	free(copy);
+
+	return 0;
+}
+
+/**
+ * Generates certificate signing request or self signed certificate using the
+ * identity key
+ *
+ * @param ph                the plugin handle
+ * @param csr_pem_file      name of the PEM file to store a CSR to. NULL if no
+ *                          CSR is to be generated.
+ * @param sscert_pem_file   name of the PEM file to store a self signed
+ *                          certificate to. NULL if no certificate is to be
+ *                          generated.
+ * @param subject           the subject RNDs separated by semicolon (;). Can be
+ *                          NULL if a renew certificate is specified.
+ * @param extensions        the extensions separated by semicolon (;). Can be
+ *                          NULL.
+ * @param renew_cert_pem_file name of a PEM file containing a certificate to
+ *                          renew. Can be NULL.
+ * @param csr_new_header    if true output NEW header and footer lines in CSR
+ * @param validity_days     the number of days the certificate is valid. Only
+ *                          valid when generating a self signed certificate.
+ *                          Can be NULL.
+ * @param digest            the digest to use with CSR and certificates. Can be
+ *                          NULL
+ * @param rsa_pss           if true, RSA-PSS is used with RSA-based identity
+ *                          keys
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _generate_csr_sscert(struct plugin_handle *ph,
+				const char *csr_pem_file,
+				const char *sscert_pem_file,
+				const char *subject, const char *extensions,
+				const char *renew_cert_pem_file,
+				bool csr_new_header, const char *validity_days,
+				const char *digest, bool rsa_pss)
+{
+	struct ekmf_rsa_pss_params rsa_pss_parms = {
+		.salt_len = RSA_PSS_SALTLEN_MAX, .mgf_digest_nid = 0 };
+	char **subject_rdn_list = NULL;
+	char **extension_list = NULL;
+	size_t num_subject_rdns = 0;
+	int digest_nid = NID_undef;
+	size_t num_extensions = 0;
+	int days = 30;
+	int rc = 0;
+	size_t i;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->identity_key_generated) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the EKMF Web server connection.");
+		return -EINVAL;
+	}
+
+	if (csr_pem_file != NULL && sscert_pem_file != NULL) {
+		_set_error(ph, "Either '--gen-csr' or option "
+			   "'--gen-self-signed-cert' can be specified.");
+		return -EINVAL;
+	}
+	if (csr_new_header && csr_pem_file == NULL) {
+		_set_error(ph, "Option '--csr-new-header' is only valid with "
+			   "option '--gen-csr'.");
+		return -EINVAL;
+	}
+	if (validity_days != NULL && sscert_pem_file == NULL) {
+		_set_error(ph, "Option '--cert-validity-days' is only valid "
+			   "with option '--gen-self-signed-cert'.");
+		return -EINVAL;
+	}
+	if (subject == NULL && renew_cert_pem_file == NULL) {
+		_set_error(ph, "Option '--cert-subject' is required, unless "
+			   " option '--renew-cert' is specified.");
+		return -EINVAL;
+	}
+
+	if (validity_days != NULL) {
+		days = _parse_unsigned(validity_days);
+		if (days <= 0) {
+			_set_error(ph, "Invalid validity days: '%s'",
+				   validity_days);
+			return -EINVAL;
+		}
+	}
+
+	if (digest != NULL) {
+		digest_nid = OBJ_txt2nid(digest);
+		if (digest_nid == NID_undef) {
+			_set_error(ph, "Invalid digest: '%s'", digest);
+			return -EINVAL;
+		}
+	}
+
+	if (subject != NULL) {
+		rc = _parse_list(subject, &subject_rdn_list,
+				 &num_subject_rdns);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (extensions != NULL) {
+		rc = _parse_list(extensions, &extension_list, &num_extensions);
+		if (rc != 0)
+			goto out;
+	}
+
+	rc = _select_cca_adapter(ph);
+	if (rc != 0)
+		goto out;
+
+	if (csr_pem_file != NULL) {
+		rc = ekmf_generate_csr(&ph->ekmf_config,
+				       (const char **)subject_rdn_list,
+				       num_subject_rdns, true,
+				       renew_cert_pem_file,
+				       (const char **)extension_list,
+				       num_extensions, digest_nid,
+				       rsa_pss ? &rsa_pss_parms : NULL,
+				       csr_pem_file, csr_new_header,
+				       &ph->ext_lib, ph->verbose);
+	} else {
+		rc = ekmf_generate_ss_cert(&ph->ekmf_config,
+				       (const char **)subject_rdn_list,
+				       num_subject_rdns, true,
+				       renew_cert_pem_file,
+				       (const char **)extension_list,
+				       num_extensions, days, digest_nid,
+				       rsa_pss ? &rsa_pss_parms : NULL,
+				       sscert_pem_file, &ph->ext_lib,
+				       ph->verbose);
+	}
+	switch (rc) {
+	case 0:
+		break;
+	case -EBADMSG:
+		_set_error(ph, "The subject or extensions could not be parsed "
+			   "or are not recognized by OpenSSL.");
+		rc = -EINVAL;
+		goto out;
+	case -EEXIST:
+		_set_error(ph, "One of the subject name entries or extensions "
+			   "is a duplicate.");
+		rc = -EINVAL;
+		goto out;
+	case -ENOTSUP:
+		_set_error(ph, "The specified digest is not supported.");
+		rc = -EINVAL;
+		goto out;
+	default:
+		_set_error(ph, "Failed to generate the %s: %s",
+			   csr_pem_file != NULL ? "certificate signing request"
+					   : "self signed certificate",
+			   strerror(-rc));
+		goto out;
+	}
+
+	if (csr_pem_file != NULL)
+		pr_verbose(ph, "Generated certificate signing request into "
+			   "'%s'", csr_pem_file);
+	else
+		pr_verbose(ph, "Generated self signed certificate into '%s'",
+			   sscert_pem_file);
+
+out:
+	if (subject_rdn_list != NULL) {
+		for (i = 0; i < num_subject_rdns; i++)
+			free(subject_rdn_list[i]);
+		free(subject_rdn_list);
+	}
+	if (extension_list != NULL) {
+		for (i = 0; i < num_extensions; i++)
+			free(extension_list[i]);
+		free(extension_list);
+	}
+
+	return rc;
+}
+
+/**
+ * Checks that none of the options for generating a CSR or self signed
+ * certificate is specified, and sets up the error message and return code if
+ * so.
+ *
+ * @param ph                the plugin handle
+ * @param opts              the config options structure
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _error_gen_csr_sscert_opts(struct plugin_handle *ph,
+				      struct config_options *opts)
+{
+	int rc = 0;
+
+	if (opts->cert_subject != NULL) {
+		_set_error(ph, "Option '--cert-subject' is only valid "
+			   "together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_extensions != NULL) {
+		_set_error(ph, "Option '--cert-extensions' is only "
+			   "valid together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->renew_cert_pem_file != NULL) {
+		_set_error(ph, "Option '--renew-cert' is only "
+			   "valid together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->csr_new_header == true) {
+		_set_error(ph, "Option '--csr-new-header' is only "
+			   "valid together with option '--gen-csr'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_validity_days != NULL) {
+		_set_error(ph, "Option '--cert-validity-days' is only "
+			   "valid together with option "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_digest != NULL) {
+		_set_error(ph, "Option '--cert-digest' is only "
+			   "valid together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+#ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
+	if (opts->cert_rsa_pss == true) {
+		_set_error(ph, "Option '--cert-rsa-pss' is only "
+			   "valid together with option '--gen-csr' or "
+			   "'--gen-self-signed-cert'");
+		rc = -EINVAL;
+		goto out;
+	}
+#endif
+
+out:
+	return rc;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -2824,6 +3233,35 @@ int kms_configure(const kms_handle_t handle,
 		case 'i':
 			opts.generate_identity_key = true;
 			break;
+		case 'c':
+			opts.csr_pem_file = options[i].argument;
+			break;
+		case 'C':
+			opts.sscert_pem_file = options[i].argument;
+			break;
+		case 's':
+			opts.cert_subject = options[i].argument;
+			break;
+		case 'e':
+			opts.cert_extensions = options[i].argument;
+			break;
+		case 'N':
+			opts.renew_cert_pem_file = options[i].argument;
+			break;
+		case 'n':
+			opts.csr_new_header = true;
+			break;
+		case 'd':
+			opts.cert_validity_days = options[i].argument;
+			break;
+		case 'D':
+			opts.cert_digest = options[i].argument;
+			break;
+#ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
+		case 'P':
+			opts.cert_rsa_pss = true;
+			break;
+#endif
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -2872,6 +3310,24 @@ int kms_configure(const kms_handle_t handle,
 
 		config_changed = true;
 	}
+
+	if (opts.csr_pem_file != NULL || opts.sscert_pem_file != NULL)
+		rc = _generate_csr_sscert(ph, opts.csr_pem_file,
+					  opts.sscert_pem_file,
+					  opts.cert_subject,
+					  opts.cert_extensions,
+					  opts.renew_cert_pem_file,
+					  opts.csr_new_header,
+					  opts.cert_validity_days,
+					  opts.cert_digest,
+#ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
+					  opts.cert_rsa_pss,
+#endif
+					  false);
+	else
+		rc = _error_gen_csr_sscert_opts(ph, &opts);
+	if (rc != 0)
+		goto out;
 
 out:
 	if (apqn_str != NULL)
