@@ -7,6 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <argz.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1355,6 +1356,36 @@ const struct util_opt remove_options[] = {
 	UTIL_OPT_END,
 };
 
+const struct util_opt list_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS",
+		.command = KMS_COMMAND_LIST,
+	},
+	{
+		.option = { "states", required_argument, NULL, 's'},
+		.argument = "STATES",
+		.desc = "The states of the keys that are to be listed. "
+			"Multiple states can be separated by comma. Possible "
+			"states are 'PRE-ACTIVATION', 'ACTIVE', 'DEACTIVATED', "
+			"'COMPROMISED', 'DESTROYED', and "
+			"'DESTROYED-COMPROMISED'. If this "
+			"option is not specified, only keys in state 'ACTIVE' "
+			"are listed.",
+		.command = KMS_COMMAND_LIST,
+	},
+	{
+		.option = { "all", 0, NULL, 'a'},
+		.desc = "List all keys that can be used for volume encryption. "
+			"If this option is not specified, then only volume "
+			"encryption keys that are allowed to be exported by "
+			"EKMF Web using the identity key of this zkey client "
+			"are listed.",
+		.command = KMS_COMMAND_LIST,
+	},
+	UTIL_OPT_END,
+};
+
 /**
  * Returns a list of KMS specific command line options that zkey should accept
  * and pass to the appropriate KMS plugin function. The option list must be
@@ -1387,6 +1418,8 @@ const struct util_opt *kms_get_command_options(const char *command,
 		return generate_options;
 	if (strcasecmp(command, KMS_COMMAND_REMOVE) == 0)
 		return remove_options;
+	if (strcasecmp(command, KMS_COMMAND_LIST) == 0)
+		return list_options;
 
 	return NULL;
 }
@@ -5296,6 +5329,139 @@ out:
 	return rc;
 }
 
+struct list_data {
+	struct plugin_handle *ph;
+	bool list_all;
+	const char *exporting_key;
+	kms_list_callback callback;
+	void *private;
+};
+
+/**
+ * Check if the key can be exported by the exporting key
+ *
+ * @param key_info          the key to check
+ * @param exporting_key     the exporting key
+ *
+ * @returns true if export is allowed, false otherwise
+ */
+static bool _check_exportability(struct ekmf_key_info *key_info,
+				 const char *exporting_key)
+{
+	bool found = false;
+	size_t i;
+
+	if (!key_info->export_control.export_allowed || exporting_key == NULL)
+		return false;
+
+	for (i = 0; i < key_info->export_control.num_exporting_keys; i++) {
+		if (strcmp(key_info->export_control.exporting_keys[i].uuid,
+			   exporting_key) == 0) {
+			found = true;
+			break;
+		}
+	}
+
+	return found;
+}
+
+/*
+ * Like argz_add, but formats the string first
+ */
+static error_t argz_add_fmt(char **argz, size_t *argz_len, const char *fmt, ...)
+{
+	va_list ap;
+	error_t rc;
+	char *str;
+
+	va_start(ap, fmt);
+	util_vasprintf(&str, fmt, ap);
+	va_end(ap);
+
+	rc = argz_add(argz, argz_len, str);
+
+	free(str);
+	return rc;
+}
+
+/**
+ * Callback function used with the ekmf_list_keys function. This
+ * callback is called for each key found.
+ *
+ * @param curl_handle      a CURL handle that can be used to perform further
+ *                         EKMFWeb functions within the callback.
+ * @param template_info    a struct containing information about the key.
+ *                         If any of the information needs to be kept, then the
+ *                         callback function must make a copy of the
+ *                         information. The memory holding the information
+ *                         passed to the callback is no longer valid after the
+ *                         callback has returned.
+ * @param private          the private pointer that was specified with the
+ *                         ekmf_list_keys invocation.
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ * When a nonzero return code is returned, the key listing process stops,
+ * and ekmf_list_keys returns the return code from the callback.
+ */
+static int _list_callback(CURL *curl_handle, struct ekmf_key_info *key_info,
+			  void *private)
+{
+	struct kms_property *properties = NULL;
+	struct list_data *data = private;
+	size_t i, num_properties = 0;
+	size_t addl_info_len = 0;
+	char *addl_info = NULL;
+	int rc = 0;
+
+	data->ph->curl_handle = curl_handle;
+
+	if (strcmp(key_info->keystore_type,
+		   EKMFWEB_KEYSTORE_TYPE_PERV_ENCR) != 0)
+		goto out;
+	if (strcmp(key_info->key_type, EKMFWEB_KEY_TYPE_CIPHER) != 0)
+		goto out;
+	if (strcmp(key_info->algorithm, EKMFWEB_KEY_ALGORITHM_AES) != 0)
+		goto out;
+	if (!data->list_all && !_check_exportability(key_info,
+						     data->exporting_key))
+		goto out;
+
+	rc = _ekmf_tags_to_properties(data->ph, &key_info->custom_tags,
+				      &properties, &num_properties);
+	if (rc != 0)
+		goto out;
+
+	rc = argz_add_fmt(&addl_info, &addl_info_len, "State: %s",
+			  key_info->state);
+	if (rc != 0)
+		goto out;
+	for (i = 0; i < key_info->export_control.num_exporting_keys; i++) {
+		rc = argz_add_fmt(&addl_info, &addl_info_len, "%s %s",
+			i == 0 ? "Exporting keys:" : "               ",
+			key_info->export_control.exporting_keys[i].name);
+		if (rc != 0)
+			goto out;
+	}
+
+	rc = data->callback(key_info->uuid, key_info->label,
+			    KEY_TYPE_CCA_AESCIPHER, key_info->key_size,
+			    properties, num_properties,
+			    addl_info, addl_info_len, data->private);
+
+out:
+	if (addl_info != NULL)
+		free(addl_info);
+	if (properties != NULL) {
+		for (i = 0;  i < num_properties; i++) {
+			free((char *)properties[i].name);
+			free((char *)properties[i].value);
+		}
+		free(properties);
+	}
+
+	return rc;
+}
+
 /**
  * List keys managed by the KMS. This list is independent of the zkey key
  * repository. It lists keys as known by the KMS.
@@ -5324,9 +5490,15 @@ out:
 int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 		  const struct kms_property *properties, size_t num_properties,
 		  const struct kms_option *options, size_t num_options,
-		  kms_list_callback callback, void *UNUSED(private_data))
+		  kms_list_callback callback, void *private_data)
 {
+	struct ekmf_tag_list tag_list = { 0 };
 	struct plugin_handle *ph = handle;
+	struct list_data data = { 0 };
+	char **state_list = NULL;
+	char *error_msg = NULL;
+	char *states = NULL;
+	int rc = 0;
 	size_t i;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
@@ -5365,8 +5537,75 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 		return -EINVAL;
 	}
 
-	_set_error(ph, "Not yet implemented");
-	return -ENOTSUP;
+	data.ph = ph;
+	data.list_all = false;
+	data.callback = callback;
+	data.private = private_data;
+
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 's':
+			states = util_strdup(options[i].argument);
+			util_str_toupper(states);
+			break;
+		case 'a':
+			data.list_all = true;
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	pr_verbose(ph, "State filter: '%s'", states != NULL ? states :
+		   "(none)");
+	pr_verbose(ph, "List all: %d", data.list_all);
+
+	if (states != NULL) {
+		state_list = str_list_split(states);
+		for (i = 0; state_list[i] != NULL; i++) {
+			rc = _check_state(ph, NULL, state_list[i], NULL);
+			if (rc != 0)
+				goto out;
+		}
+	}
+
+	data.exporting_key = properties_get(ph->properties,
+					    EKMFWEB_CONFIG_IDENTITY_KEY_ID);
+
+	rc = _properties_to_ekmf_tags(ph, properties, num_properties,
+				      &tag_list, false);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_list_keys(&ph->ekmf_config, &ph->curl_handle,
+			    _list_callback, &data, label_pattern, states,
+			    &tag_list, &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to list keys: %s",
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+out:
+	if (states != NULL)
+		free(states);
+	if (state_list != NULL)
+		str_list_free_string_array(state_list);
+	if (error_msg != NULL)
+		free(error_msg);
+	if (data.exporting_key != NULL)
+		free((char *)data.exporting_key);
+	_free_ekmf_tags(&tag_list);
+
+	return rc;
 }
 
 /**
