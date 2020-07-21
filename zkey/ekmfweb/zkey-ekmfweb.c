@@ -1333,6 +1333,28 @@ const struct util_opt generate_options[] = {
 	UTIL_OPT_END,
 };
 
+const struct util_opt remove_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS",
+		.command = KMS_COMMAND_REMOVE,
+	},
+	{
+		.option = { "state", required_argument, NULL, 's'},
+		.argument = "STATE",
+		.desc = "The state to which to change the key in EKMF Web, "
+			"after removing the secure key from the local secure "
+			"key repository. Possible states are 'DEACTIVATED', "
+			"'COMPROMISED', 'DESTROYED', and "
+			"'DESTROYED-COMPROMISED'. If this option is not "
+			"specified, the state of the key in EKMF Web is not "
+			"changed, but the key is removed from the local "
+			"secure key repository only.",
+		.command = KMS_COMMAND_REMOVE,
+	},
+	UTIL_OPT_END,
+};
+
 /**
  * Returns a list of KMS specific command line options that zkey should accept
  * and pass to the appropriate KMS plugin function. The option list must be
@@ -1363,6 +1385,8 @@ const struct util_opt *kms_get_command_options(const char *command,
 		return configure_options;
 	if (strcasecmp(command, KMS_COMMAND_GENERATE) == 0)
 		return generate_options;
+	if (strcasecmp(command, KMS_COMMAND_REMOVE) == 0)
+		return remove_options;
 
 	return NULL;
 }
@@ -5065,6 +5089,100 @@ out:
 	return rc;
 }
 
+struct key_state {
+	const char *state;
+	const char *new_states[7];
+};
+
+static const struct key_state states[] = {
+	{ .state = EKMFWEB_KEY_STATE_PRE_ACTIVATION,
+	  .new_states = {
+		EKMFWEB_KEY_STATE_ACTIVE,
+		EKMFWEB_KEY_STATE_COMPROMISED,
+		EKMFWEB_KEY_STATE_DESTROYED,
+		NULL },
+	},
+	{ .state = EKMFWEB_KEY_STATE_ACTIVE,
+	  .new_states = {
+		EKMFWEB_KEY_STATE_ACTIVE,
+		EKMFWEB_KEY_STATE_DEACTIVATED,
+		EKMFWEB_KEY_STATE_COMPROMISED,
+		EKMFWEB_KEY_STATE_DESTROYED,
+		NULL },
+	},
+	{ .state = EKMFWEB_KEY_STATE_DEACTIVATED,
+	  .new_states = {
+		EKMFWEB_KEY_STATE_COMPROMISED,
+		EKMFWEB_KEY_STATE_DESTROYED,
+		NULL },
+	},
+	{ .state = EKMFWEB_KEY_STATE_COMPROMISED,
+	  .new_states = {
+		EKMFWEB_KEY_STATE_DESTROYED_COMPROMISED,
+		NULL },
+	},
+	{ .state = EKMFWEB_KEY_STATE_DESTROYED,
+	  .new_states = { NULL },
+	},
+	{ .state = EKMFWEB_KEY_STATE_DESTROYED_COMPROMISED,
+	  .new_states = { NULL },
+	},
+	{ .state = NULL, .new_states = { NULL, }, },
+};
+
+/**
+ * Checks if the new state is a valid state. If the current state is also
+ * specified, then it checks also if the new state can be set from the current
+ * state
+ *
+ * @param ph                the plugin handle
+ * @param name              the key name
+ * @param new_state         the new state to set
+ * @param cur_state         the current state (can be NULL).
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _check_state(struct plugin_handle *ph, const char *name,
+			const char *new_state, const char *cur_state)
+{
+	bool ok = false;
+	int i, k;
+
+	for (i = 0; states[i].state != NULL; i++) {
+		if (strcasecmp(new_state, states[i].state) == 0) {
+			ok = true;
+			break;
+		}
+	}
+
+	if (!ok) {
+		_set_error(ph, "Invalid state specified: '%s'", new_state);
+		return -EINVAL;
+	}
+
+	if (cur_state == NULL)
+		return 0;
+
+	for (i = 0; states[i].state != NULL; i++) {
+		if (strcasecmp(cur_state, states[i].state) == 0) {
+			for (k = 0; states[i].new_states[k] != NULL; k++) {
+				if (strcasecmp(new_state,
+					       states[i].new_states[k]) == 0)
+					return 0;
+			}
+
+			_set_error(ph, "Key '%s' is in state '%s' and can not "
+				   "be changed to state '%s'", name,
+				   cur_state, new_state);
+			return -EINVAL;
+		}
+	}
+
+	_set_error(ph, "Key '%s' is in an invalid state: '%s'", name,
+		   cur_state);
+	return -EINVAL;
+}
+
 /**
  * Called when zkey removes a KMS-bound key from the zkey repository. The KMS
  * plugin can then set the state of the key in the KMS, or remove it also from
@@ -5085,7 +5203,11 @@ out:
 int kms_remove_key(const kms_handle_t handle, const char *key_id,
 		   const struct kms_option *options, size_t num_options)
 {
+	struct ekmf_key_info *key_info = NULL;
 	struct plugin_handle *ph = handle;
+	char *error_msg = NULL;
+	char *state = NULL;
+	int rc = 0;
 	size_t i;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
@@ -5107,6 +5229,29 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 
 	_clear_error(ph);
 
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 's':
+			state = util_strdup(options[i].argument);
+			util_str_toupper(state);
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	if (state == NULL)
+		goto out;
+
+	pr_verbose(ph, "State to set: '%s'", state);
+
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
 			  "kms configure [OPTIONS]' to complete the "
@@ -5114,8 +5259,41 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 		return -EINVAL;
 	}
 
-	_set_error(ph, "Not yet implemented");
-	return -ENOTSUP;
+	rc = ekmf_get_key_info(&ph->ekmf_config, &ph->curl_handle,
+			       key_id, &key_info, &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get key '%s': %s", key_id,
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	pr_verbose(ph, "Key state: '%s'", key_info->state);
+
+	rc = _check_state(ph, key_info->label, state, key_info->state);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_set_key_state(&ph->ekmf_config, &ph->curl_handle,
+				key_id, state, key_info->updated_on,
+				&error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to set key state '%s': %s",
+				key_id, error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+out:
+	if (key_info != NULL)
+		ekmf_free_key_info(key_info);
+	if (error_msg != NULL)
+		free(error_msg);
+	if (state != NULL)
+		free(state);
+
+	return rc;
 }
 
 /**
