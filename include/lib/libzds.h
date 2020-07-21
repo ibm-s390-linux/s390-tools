@@ -191,6 +191,8 @@
 #define ENDTOKEN 0xFFFFFFFFFFFFFFFFULL
 
 
+#define MAX_LINE_LENGTH 512
+
 
 /**
  * @brief This structure represents the count field in an ECKD record.
@@ -854,6 +856,7 @@ int lzds_zdsroot_extract_datasets_from_dasd(struct zdsroot *root,
 
 void lzds_dslist_free(struct zdsroot *root);
 
+int lzds_ping_rest(struct dshandle *dsh, char *server);
 
 /** @} */ /* end of group libzds_functions_high */
 
@@ -878,6 +881,8 @@ int lzds_analyse_open_count(struct zdsroot *root, int warn);
 /** @} */ /* end of group libzds_functions_helper */
 
 
-
+int lzds_rest_get_enq(struct dshandle *dsh, char *server);
+int lzds_rest_release_enq(struct dshandle *dsh, char *server);
+int lzds_rest_ping(struct dshandle *dsh, char *server);
 
 #endif /* LIB_LIBZDS_H */

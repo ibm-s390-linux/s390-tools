@@ -18,7 +18,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#ifdef HAVE_CURL
+#include <curl/curl.h>
+#endif /* HAVE_CURL */
 
+#include "lib/util_libc.h"
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 #include "lib/libzds.h"
@@ -300,6 +305,8 @@ struct dshandle {
 	unsigned long long skip;
 	/** @brief Detailed error messages in case of a problem */
 	struct errorlog *log;
+
+	char *session_ref;
 };
 
 /** @endcond */
@@ -2941,6 +2948,280 @@ void lzds_dshandle_close(struct dshandle *dsh)
 			lzds_dasdhandle_close(dsh->dasdhandle[i]);
 	dsh->is_open = 0;
 }
+
+#ifdef HAVE_CURL
+
+struct response_data {
+	char *session_ref;
+	unsigned long statuscode;
+};
+
+static size_t
+parse_response_callback(void *data, size_t size, size_t member, void *target)
+{
+	struct response_data *response = target;
+
+	if (strstr(data, "HTTP/1.1 500 Internal Server Error")) {
+		response->statuscode = 500;
+	} else if (strstr(data, "HTTP/1.1 200 OK")) {
+		response->statuscode = 200;
+	} else
+		sscanf(data, "X-IBM-Session-Ref: %m[^\n]\n",
+		       &response->session_ref);
+
+	return size*member;
+}
+
+static size_t write_discard_callback(void *UNUSED(data), size_t size, size_t member,
+				     void *UNUSED(target))
+{
+	/* do nothing just pretend all data has been processed */
+	return size*member;
+}
+
+CURL *lzds_prepare_curl(char *url)
+{
+	CURL *curl;
+
+	curl = curl_easy_init();
+	if (!curl)
+		return NULL;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+	curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+	curl_easy_setopt(curl, CURLOPT_CONNECT_ONLY, 0L);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_discard_callback);
+
+	return curl;
+}
+
+/**
+ * Ping the z/OSMS REST server.
+ * Used to check if the server is responding and accessible and to prevent
+ * the ENQ from timing out. If not used it would be automatically released
+ * after 10 minutes.
+ *
+ * @param[in]  dsh  The dshandle that keeps track of the I/O operations.
+ *             server The URL to the z/OSMF REST services
+ * @return     1 on success, 0 otherwise
+ */
+int lzds_rest_ping(struct dshandle *dsh, char *server)
+{
+	struct curl_slist *list = NULL;
+	char *release;
+	CURLcode res;
+	size_t size;
+	CURL *curl;
+	char *url;
+
+	url = util_strcat_realloc(NULL, server);
+	url = util_strcat_realloc(url, "restfiles/ping");
+
+	curl = lzds_prepare_curl(url);
+	if (!curl) {
+		free(url);
+		return 0;
+	}
+
+	list = curl_slist_append(list, "X-CSRF-ZOSMF-HEADER: none");
+	if (dsh && dsh->session_ref) {
+		size = sizeof("X-IBM-Session-Ref: ") + strlen(dsh->session_ref);
+		release = util_zalloc(size);
+		snprintf(release, size, "X-IBM-Session-Ref: %s",
+			 dsh->session_ref);
+		list = curl_slist_append(list, release);
+	}
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+	res = curl_easy_perform(curl);
+	curl_slist_free_all(list);
+	curl_easy_cleanup(curl);
+
+	if (res == CURLE_OK) {
+		free(url);
+		return 1;
+	}
+
+	fprintf(stderr, "URL: %s\n", url);
+	fprintf(stderr, "Error: %s\n", curl_easy_strerror(res));
+	free(url);
+	return 0;
+}
+
+/**
+ * Mark the dataset as in use for z/OS.
+ * Use z/OSMF REST services to read a small amount of data and get an exclusive
+ * ENQ that prevents z/OS applications from writing to the dataset in parallel
+ * until the ENQ is released.
+ *
+ * @param[in]  dsh  The dshandle that keeps track of the I/O operations.
+ *             server The URL to the z/OSMF REST services
+ * @return     0 on success, otherwise one of the following error codes:
+ *   - ENOTSUP Unable to setup curl and therefore no further access possible.
+ *   - EPERM ENQ not obtained and therefore access is not allowed.
+ */
+int lzds_rest_get_enq(struct dshandle *dsh, char *server)
+{
+	struct curl_slist *list = NULL;
+	struct response_data response;
+	int first_run;
+	CURLcode res;
+	CURL *curl;
+	char *url;
+	int rc;
+
+	url = util_strcat_realloc(NULL, server);
+	url = util_strcat_realloc(url, "restfiles/ds/");
+	url = util_strcat_realloc(url, dsh->ds->name);
+
+	memset(&response, 0, sizeof(response));
+	/*
+	 * in the first run provide a range statement to read only 1 record of
+	 * the dataset to get an ENQ.
+	 * For the unlikely case that the dataset is empty
+	 * "500 Internal Server Error" will be returned.
+	 * If this is the case give it a second try without a range statement
+	 */
+	first_run = 1;
+	list = curl_slist_append(list, "X-IBM-Record-Range: 0-1");
+retry:
+	rc = 1;
+	curl = lzds_prepare_curl(url);
+	if (!curl) {
+		free(url);
+		return errorlog_add_message(
+			&dsh->log,
+			NULL, ENOTSUP,
+			"curl handle not established for dataset %s\n",
+			dsh->ds->name);
+	}
+
+	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, parse_response_callback);
+	curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response);
+	list = curl_slist_append(list, "X-CSRF-ZOSMF-HEADER: none");
+	list = curl_slist_append(list, "X-IBM-Obtain-ENQ: EXCLU");
+
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+	res = curl_easy_perform(curl);
+
+	if (res != CURLE_OK) {
+		rc = errorlog_add_message(&dsh->log, NULL, ECONNREFUSED,
+					  "Error: %s\n",
+					  curl_easy_strerror(res));
+	} else {
+		if (first_run && response.statuscode == 500) {
+			curl_slist_free_all(list);
+			curl_easy_cleanup(curl);
+			first_run = 0;
+			list = NULL;
+			goto retry;
+		}
+		/* expect that the callback function found a reference string, double check */
+		if (response.statuscode == 200 && response.session_ref) {
+			dsh->session_ref = response.session_ref;
+			rc = 0;
+		} else {
+			rc = errorlog_add_message(
+				&dsh->log,
+				NULL, EPERM,
+				"no session ref obtained for dataset %s rest rc %ld\n",
+				dsh->ds->name, response.statuscode);
+		}
+	}
+
+	free(url);
+	curl_slist_free_all(list);
+	curl_easy_cleanup(curl);
+
+	return rc;
+}
+
+/**
+ * Mark the dataset as no longer in use for z/OS.
+ * Use z/OSMF REST services to read a small amount of data and release the exclusive
+ * ENQ that was previously obtained.
+ *
+ * @param[in]  dsh  The dshandle that keeps track of the I/O operations.
+ *             server The URL to the z/OSMF REST services
+ * @return     0 on success, otherwise one of the following error codes:
+ *   - ENOTSUP Unable to release the ENQ.
+ */
+int lzds_rest_release_enq(struct dshandle *dsh, char *server)
+{
+	struct curl_slist *list = NULL;
+	struct response_data response;
+	char *release;
+	int first_run;
+	CURLcode res;
+	CURL *curl;
+	char *url;
+
+
+	if (!dsh->session_ref) {
+		fprintf(stderr, "No ENQ to release.\n");
+		return 0;
+	}
+
+	url = util_strcat_realloc(NULL, server);
+	url = util_strcat_realloc(url, "restfiles/ds/");
+	url = util_strcat_realloc(url, dsh->ds->name);
+
+	release = util_strcat_realloc(NULL, "X-IBM-Session-Ref: ");
+	release = util_strcat_realloc(release, dsh->session_ref);
+
+	memset(&response, 0, sizeof(response));
+	/*
+	 * in the first run provide a range statement to read only 1 record of
+	 * the dataset to release the ENQ.
+	 * For the unlikely case that the dataset is empty
+	 * "500 Internal Server Error" will be returned.
+	 * If this is the case give it a second try without a range statement
+	 */
+	first_run = 1;
+	list = curl_slist_append(list, "X-IBM-Record-Range: 0-1");
+retry:
+	curl = lzds_prepare_curl(url);
+	if (!curl) {
+		free(url);
+		free(release);
+		return errorlog_add_message(
+			&dsh->log,
+			NULL, ENOTSUP,
+			"curl handle not established for dataset %s\n",
+			dsh->ds->name);
+	}
+
+	list = curl_slist_append(list, "X-CSRF-ZOSMF-HEADER: none");
+	list = curl_slist_append(list, "X-IBM-Release-ENQ: true");
+	list = curl_slist_append(list, release);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, parse_response_callback);
+	curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response);
+	res = curl_easy_perform(curl);
+
+	if (res != CURLE_OK) {
+		errorlog_add_message(&dsh->log, NULL, ENOTSUP, "Error: %s\n",
+				     curl_easy_strerror(res));
+	} else if (first_run && response.statuscode == 500) {
+		curl_slist_free_all(list);
+		curl_easy_cleanup(curl);
+		first_run = 0;
+		list = NULL;
+		goto retry;
+	}
+
+	curl_slist_free_all(list);
+	curl_easy_cleanup(curl);
+	free(dsh->session_ref);
+	free(release);
+	free(url);
+	dsh->session_ref = NULL;
+
+	return res;
+}
+
+#endif /* HAVE_CURL */
 
 
 /**

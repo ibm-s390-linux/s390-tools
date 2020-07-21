@@ -13,6 +13,17 @@ all:
 install:
 	$(SKIP) HAVE_FUSE=0
 
+
+else
+
+ifeq (${HAVE_CURL},0)
+
+all:
+	$(SKIP) HAVE_CURL=0
+
+install:
+	$(SKIP) HAVE_CURL=0
+
 else
 
 check_dep:
@@ -21,17 +32,26 @@ check_dep:
 		"fuse.h", \
 		"fuse-devel or libfuse-dev", \
 		"HAVE_FUSE=0")
+	$(call check_dep, \
+		"zdsfs", \
+		"curl/curl.h", \
+		"curl-devel or libcurl-dev", \
+		"HAVE_CURL=0")
 
 ifneq ($(shell sh -c 'command -v pkg-config'),)
 FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse)
 FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse)
+CURL_CFLAGS = $(shell pkg-config --silence-errors --cflags libcurl)
+CURL_LDLIBS = $(shell pkg-config --silence-errors --libs libcurl)
 else
 FUSE_CFLAGS = -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse
 FUSE_LDLIBS = -lfuse
+CURL_CFLAGS = -I/usr/include/s390x-linux-gnu/curl
+CURL_LDLIBS = -lcurl
 endif
 ALL_CPPFLAGS += -DSYSFS
-ALL_CFLAGS += -DHAVE_SETXATTR -pthread $(FUSE_CFLAGS)
-LDLIBS += $(FUSE_LDLIBS) -lpthread -lrt -lm
+ALL_CFLAGS += -DHAVE_SETXATTR -pthread $(FUSE_CFLAGS) $(CURL_CFLAGS)
+LDLIBS += $(FUSE_LDLIBS) $(CURL_LDLIBS) -lpthread -lrt -lm
 
 all: check_dep zdsfs
 
@@ -42,6 +62,8 @@ install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zdsfs $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 zdsfs.1 \
 		$(DESTDIR)$(MANDIR)/man1
+
+endif
 
 endif
 
