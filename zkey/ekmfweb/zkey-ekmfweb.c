@@ -357,8 +357,27 @@ static void _check_config_complete(struct plugin_handle *ph)
 		_check_property(ph, EKMFWEB_CONFIG_VERIFY_SERVER_CERT) &&
 		_check_property(ph, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
 
+	ph->settings_retrieved =
+		_check_property(ph, EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
+
+	ph->templates_retrieved =
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS1) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS2) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS1_LABEL) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS2_LABEL) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS_LABEL) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY_LABEL) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS1_ID) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS2_ID) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID) &&
+		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
+
 	ph->config_complete = ph->apqns_configured &&
-			      ph->connection_configured;
+			      ph->connection_configured &&
+			      ph->settings_retrieved &&
+			      ph->templates_retrieved;
 }
 
 /**
@@ -407,6 +426,9 @@ static int _get_ekmf_config(struct plugin_handle *ph)
 
 	ph->ekmf_config.login_token = properties_get(ph->properties,
 						EKMFWEB_CONFIG_LOGIN_TOKEN);
+
+	ph->ekmf_config.ekmf_server_pubkey = properties_get(ph->properties,
+						EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
 
 	return 0;
 }
@@ -621,6 +643,74 @@ bool kms_supports_key_type(const kms_handle_t handle,
 }
 
 /**
+ * Returns information about the public key in the PEM file
+ *
+ * @param ph               the plugin handle
+ * @param pem_file         the name of a PEM file containing the public key
+ * @param pkey_type        on return: If not NULL, the PKEY type (EVP_PKEY_EC
+ *                         or EVP_PKEY_RSA)
+ * @param ecc_curve_nid    on return: If not NULL and it is an ECC key, the
+ *                         OpenSSL NID of the curve of the ECC key.
+ * @param rsa_mod_bits     on return: If not NULL and it is an RSA key, the
+ *                         modulus bit size of the RSA key.
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _get_pub_key_info(struct plugin_handle *ph, const char *pem_file,
+			     int *pkey_type, int *ecc_curve_nid,
+			     int *rsa_mod_bits)
+{
+	int rc = 0, curve_nid, mod_len;
+	EVP_PKEY *pkey;
+	FILE *fp;
+
+	fp = fopen(pem_file, "r");
+	if (fp == NULL) {
+		rc = -errno;
+		_set_error(ph, "Failed to open pubkey PEM file '%s': %s",
+			   pem_file, strerror(-rc));
+		return rc;
+	}
+
+	pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
+
+	fclose(fp);
+
+	if (pkey == NULL) {
+		rc = -EIO;
+		_set_error(ph, "Failed to read pubkey from PEM file '%s': %s",
+			   pem_file, strerror(-rc));
+		return rc;
+	}
+
+	if (pkey_type != NULL)
+		*pkey_type = EVP_PKEY_id(pkey);
+
+	switch (EVP_PKEY_id(pkey)) {
+	case EVP_PKEY_EC:
+		curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(
+						EVP_PKEY_get0_EC_KEY(pkey)));
+		if (ecc_curve_nid != NULL)
+			*ecc_curve_nid = curve_nid;
+		break;
+
+	case EVP_PKEY_RSA:
+		mod_len = BN_num_bits(RSA_get0_n(EVP_PKEY_get0_RSA(pkey)));
+		if (rsa_mod_bits != NULL)
+			*rsa_mod_bits = mod_len;
+		break;
+
+	default:
+		rc = -EIO;
+		_set_error(ph, "Unknown pubkey type: %d", EVP_PKEY_id(pkey));
+		break;
+	}
+
+	EVP_PKEY_free(pkey);
+	return rc;
+}
+
+/**
  * Displays information about the KMS Plugin and its current configuration on
  * stdout.
  *
@@ -632,6 +722,7 @@ bool kms_supports_key_type(const kms_handle_t handle,
  */
 int kms_display_info(const kms_handle_t handle)
 {
+	int rc, type = 0, curve = 0, mod_bits = 0;
 	struct plugin_handle *ph = handle;
 	char *tmp = NULL;
 
@@ -692,6 +783,81 @@ int kms_display_info(const kms_handle_t handle)
 		if (strcasecmp(tmp, "yes") == 0)
 			printf("  The server's certificate must match the "
 			       "hostname\n");
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
+	if (tmp != NULL) {
+		rc = _get_pub_key_info(ph, tmp, &type, &curve, &mod_bits);
+		if (rc == 0) {
+			switch (type) {
+			case EVP_PKEY_EC:
+				printf("  EBMF Web public key:  ECC (%s)\n",
+				       OBJ_nid2sn(curve));
+				break;
+			case EVP_PKEY_RSA:
+				printf("  EBMF Web public key:  RSA "
+				       "(%d bits)\n", mod_bits);
+				break;
+			default:
+				printf("  EBMF Web public key:  "
+				       "(unknown key type)\n");
+				break;
+			}
+		} else {
+			printf("  EBMF Web public key:  (not available)\n");
+		}
+		free(tmp);
+	} else {
+		printf("  EBMF Web public key:  (configuration required)\n");
+	}
+
+	printf("  Key templates:\n");
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_IDENTITY);
+	printf("    Identity:           %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_TEMPLATE_IDENTITY_LABEL);
+	if (tmp != NULL) {
+		printf("      Label template:   %s\n", tmp);
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_XTS1);
+	printf("    XTS-Key1:           %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_TEMPLATE_XTS1_LABEL);
+	if (tmp != NULL) {
+		printf("      Label template:   %s\n", tmp);
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_XTS2);
+	printf("    XTS-Key2:           %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_TEMPLATE_XTS2_LABEL);
+	if (tmp != NULL) {
+		printf("      Label template:   %s\n", tmp);
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_NONXTS);
+	printf("    Non-XTS:            %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_TEMPLATE_NONXTS_LABEL);
+	if (tmp != NULL) {
+		printf("      Label template:   %s\n", tmp);
 		free(tmp);
 	}
 
@@ -803,6 +969,15 @@ const struct util_opt configure_options[] = {
 			"Name' field or a 'Subject Alternate Name' field "
 			"matches the host name used to connect to the EKMF "
 			"Web server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "refresh-settings", 0, NULL, 'R' },
+		.desc = "Refresh the EKMF Web server settings. This is "
+			"automatically performed when the connection to the "
+			"EKMF Web server is (re-)configured. Use this option "
+			"when the settings of the already configured EKMF Web "
+			"server have changed",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
 	UTIL_OPT_END,
@@ -1232,6 +1407,428 @@ static char *_build_apqn_string(const struct kms_apqn *apqns, size_t num_apqns)
 	return apqn_str;
 }
 
+struct template_cb_data {
+	const char *template;
+	struct ekmf_template_info **info;
+};
+
+/**
+ * Callback for ekmf_list_templates function to get template info by name
+ *
+ * @param curl_handle      a CURL handle that can be used to perform further
+ *                         EKMFWeb functions within the callback.
+ * @param template_info    a struct containing information about the template.
+ *                         If any of the information needs to be kept, then the
+ *                         callback function must make a copy of the
+ *                         information. The memory holding the information
+ *                         passed to the callback is no longer valid after the
+ *                         callback has returned.
+ * @param private          the private pointer that was specified with the
+ *                         ekmf_list_templates invocation.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _template_cb(CURL *UNUSED(curl_handle),
+			struct ekmf_template_info *template_info,
+			void *private)
+{
+	struct template_cb_data *data = private;
+	int rc;
+
+	if (*data->info != NULL)
+		return 0;
+
+	if (strcmp(template_info->name, data->template) != 0)
+		return 0;
+
+	rc = ekmf_clone_template_info(template_info, data->info);
+
+	return rc;
+}
+
+/**
+ * Get information about a template by name
+ *
+ * @param ph                the plugin handle
+ * @param template          the name of the template
+ * @param info              On return: the template info. Must be freed by the
+ *                          caller via ekmf_free_template_info.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _get_template_by_name(struct plugin_handle *ph, const char *template,
+				 struct ekmf_template_info **info)
+{
+	struct template_cb_data data;
+	char *error_msg = NULL;
+	int rc;
+
+	*info = NULL;
+
+	data.template = template;
+	data.info = info;
+
+	rc = ekmf_list_templates(&ph->ekmf_config, &ph->curl_handle,
+				 _template_cb, &data, template,
+				 EKMFWEB_TEMPLATE_STATE_ACTIVE,
+				 &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get the template '%s': %s", template,
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+	if (*info == NULL) {
+		rc = -ENOENT;
+		_set_error(ph, "Template '%s' does not exist", template);
+		goto out;
+	}
+
+out:
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return rc;
+}
+
+/**
+ * Check a template if it is using the desired settings
+ *
+ * @param ph                the plugin handle
+ * @param info              the template info
+ * @param keystore_type     the expected keystore type
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_template(struct plugin_handle *ph,
+			   struct ekmf_template_info *info,
+			   const char *keystore_type)
+{
+	int rc = 0;
+
+	if (strcmp(info->state, EKMFWEB_TEMPLATE_STATE_ACTIVE) != 0) {
+		if (strcmp(info->state, EKMFWEB_TEMPLATE_STATE_HISTORY) == 0)
+			_set_error(ph, "Template '%s' is in state '%s'. "
+				   "If the template has been recently changed, "
+				   "run 'zkey kms configure --refresh-settings'"
+				   " to refresh the templates.", info->name,
+				   EKMFWEB_TEMPLATE_STATE_HISTORY);
+		else
+			_set_error(ph, "Template '%s' is in state '%s', "
+				   "but only templates in state '%s' can "
+				   "be used.", info->name, info->state,
+				   EKMFWEB_TEMPLATE_STATE_ACTIVE);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (strcmp(info->key_state, EKMFWEB_KEY_STATE_ACTIVE) != 0) {
+		_set_error(ph, "Template '%s' generates key in state '%s', but "
+			   "only templates that generate keys in state '%s' "
+			   "are supported.", info->name, info->key_state,
+			   EKMFWEB_KEY_STATE_ACTIVE);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (strcmp(info->keystore_type, keystore_type) != 0) {
+		_set_error(ph, "Template '%s' uses key store type '%s', but "
+			   "only key store type '%s' is supported for %s.",
+			   info->name, info->keystore_type, keystore_type,
+			   strcmp(keystore_type,
+				  EKMFWEB_KEYSTORE_TYPE_PERV_ENCR) == 0 ?
+				"volume encryption keys" : "identity keys");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (strcmp(info->keystore_type, EKMFWEB_KEYSTORE_TYPE_PERV_ENCR) == 0) {
+		if (strcmp(info->key_type, EKMFWEB_KEY_TYPE_CIPHER) != 0) {
+			_set_error(ph, "Template '%s' generates keys of type "
+				   "'%s', but only key type '%s' is supported "
+				   "for volume encryption keys.",
+				   info->name, info->key_type,
+				   EKMFWEB_KEY_TYPE_CIPHER);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (strcmp(info->algorithm, EKMFWEB_KEY_ALGORITHM_AES) != 0) {
+			_set_error(ph, "Template '%s' generates keys with "
+				   "algorithm '%s', but only algorithm '%s' is "
+				   "supported for volume encryption keys.",
+				   info->name, info->algorithm,
+				   EKMFWEB_KEY_ALGORITHM_AES);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (info->export_allowed == false) {
+			_set_error(ph, "Template '%s' generates key that are "
+				   "not allowed to be exported, but only "
+				   "templates that generate keys that are "
+				   "allowed to be exported are supported for "
+				   "volume encryption keys.",
+				   info->name);
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (strcmp(info->keystore_type, EKMFWEB_KEYSTORE_TYPE_IDENTITY) == 0) {
+		if (strcmp(info->algorithm, EKMFWEB_KEY_ALGORITHM_ECC) != 0 &&
+		    strcmp(info->algorithm, EKMFWEB_KEY_ALGORITHM_RSA) != 0) {
+			_set_error(ph, "Template '%s' generates keys with "
+				   "algorithm '%s', but only algorithms '%s' "
+				   "and '%s' are supported for identity keys.",
+				   info->name, info->algorithm,
+				   EKMFWEB_KEY_ALGORITHM_ECC,
+				   EKMFWEB_KEY_ALGORITHM_RSA);
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+out:
+	return rc;
+}
+
+/**
+ * Check the 2 XTS templates
+ *
+ * @param ph                the plugin handle
+ * @param xts1_info         the template info if XTS key 1
+ * @param xts2_info         the template info if XTS key 2
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_xts_templates(struct plugin_handle *ph,
+				struct ekmf_template_info *xts1_info,
+				struct ekmf_template_info *xts2_info)
+{
+	size_t i;
+
+	if (strcasecmp(xts1_info->label_template,
+		       xts2_info->label_template) == 0) {
+		_set_error(ph, "The 2 XTS templates can not have the same "
+			   "label template.");
+		return -EINVAL;
+	}
+
+	if (xts1_info->key_size != xts2_info->key_size) {
+		_set_error(ph, "The 2 XTS templates must have the same key "
+			   "size.");
+		return -EINVAL;
+	}
+
+	if (xts1_info->label_tags.num_tag_defs !=
+				xts2_info->label_tags.num_tag_defs) {
+		_set_error(ph, "The 2 XTS templates must have the same label "
+			   "tags. The templates differ in the number of label "
+			   "tags: '%s' '%s'", xts1_info->label_template,
+			   xts2_info->label_template);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < xts1_info->label_tags.num_tag_defs; i++) {
+		if (strcasecmp(xts1_info->label_tags.tag_defs[i].name,
+			       xts2_info->label_tags.tag_defs[i].name) != 0) {
+			_set_error(ph, "The 2 XTS templates must have the same "
+				   "label tags. Mismatch in tag '%s': "
+				   "'%s' '%s'",
+				   xts1_info->label_tags.tag_defs[i].name,
+				   xts1_info->label_template,
+				   xts2_info->label_template);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+struct template_infos {
+	char *template;
+	struct ekmf_template_info *info;
+	const char *name_prop;
+	const char *label_prop;
+	const char *id_prop;
+	const char *keystore_type;
+};
+
+#define NUM_TEMPLATES		4
+#define IDENTITY		0
+#define XTS1			1
+#define XTS2			2
+#define NONXTS			3
+
+/**
+ * Retrieves the key templates to be used by the plugin
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _get_templates(struct plugin_handle *ph)
+{
+	struct template_infos tmpl[NUM_TEMPLATES] = {
+		{ .template = NULL, .info = NULL,
+		  .name_prop = EKMFWEB_CONFIG_TEMPLATE_IDENTITY,
+		  .label_prop = EKMFWEB_CONFIG_TEMPLATE_IDENTITY_LABEL,
+		  .id_prop = EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID,
+		  .keystore_type = EKMFWEB_KEYSTORE_TYPE_IDENTITY, },
+		{ .template = NULL, .info = NULL,
+		  .name_prop = EKMFWEB_CONFIG_TEMPLATE_XTS1,
+		  .label_prop = EKMFWEB_CONFIG_TEMPLATE_XTS1_LABEL,
+		  .id_prop = EKMFWEB_CONFIG_TEMPLATE_XTS1_ID,
+		  .keystore_type = EKMFWEB_KEYSTORE_TYPE_PERV_ENCR, },
+		{ .template = NULL, .info = NULL,
+		  .name_prop = EKMFWEB_CONFIG_TEMPLATE_XTS2,
+		  .label_prop = EKMFWEB_CONFIG_TEMPLATE_XTS2_LABEL,
+		  .id_prop = EKMFWEB_CONFIG_TEMPLATE_XTS2_ID,
+		  .keystore_type = EKMFWEB_KEYSTORE_TYPE_PERV_ENCR, },
+		{ .template = NULL, .info = NULL,
+		  .name_prop = EKMFWEB_CONFIG_TEMPLATE_NONXTS,
+		  .label_prop = EKMFWEB_CONFIG_TEMPLATE_NONXTS_LABEL,
+		  .id_prop = EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID,
+		  .keystore_type = EKMFWEB_KEYSTORE_TYPE_PERV_ENCR, },
+	};
+	char *error_msg = NULL;
+	int t, rc;
+
+	rc = ekmf_get_settings(&ph->ekmf_config, &ph->curl_handle,
+			       &tmpl[IDENTITY].template, &tmpl[XTS1].template,
+			       &tmpl[XTS2].template, &tmpl[NONXTS].template,
+			       &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get settings from EKMF Web: %s",
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		goto out;
+	}
+
+	for (t = 0; t < NUM_TEMPLATES; t++) {
+		rc = _get_template_by_name(ph, tmpl[t].template, &tmpl[t].info);
+		if (rc != 0)
+			goto out;
+	}
+
+	rc = _check_xts_templates(ph, tmpl[XTS1].info, tmpl[XTS2].info);
+	if (rc != 0)
+		goto out;
+
+	for (t = 0; t < NUM_TEMPLATES; t++) {
+		rc = _check_template(ph, tmpl[t].info, tmpl[t].keystore_type);
+		if (rc != 0)
+			goto out;
+
+		rc = _set_or_remove_property(ph, tmpl[t].name_prop,
+					     tmpl[t].template);
+		if (rc != 0)
+			goto out;
+		rc = _set_or_remove_property(ph, tmpl[t].label_prop,
+					     tmpl[t].info->label_template);
+		if (rc != 0)
+			goto out;
+		rc = _set_or_remove_property(ph, tmpl[t].id_prop,
+					     tmpl[t].info->uuid);
+		if (rc != 0)
+			goto out;
+	}
+
+out:
+	for (t = 0; t < NUM_TEMPLATES; t++) {
+		if (tmpl[t].info != NULL)
+			ekmf_free_template_info(tmpl[t].info);
+		if (tmpl[t].template != NULL)
+			free(tmpl[t].template);
+	}
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return rc;
+}
+
+/**
+ * Retrieves the EKMF Web system settings. This requires a login. If no
+ * valid login token is available, a login is performed.
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _get_ekmfweb_settings(struct plugin_handle *ph)
+{
+	char *error_msg = NULL;
+	int rc;
+
+	_check_config_complete(ph);
+
+	if (ph->ekmf_config.login_token != NULL) {
+		remove(ph->ekmf_config.login_token);
+		FREE_AND_SET_NULL(ph->ekmf_config.login_token);
+	}
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_LOGIN_TOKEN, NULL);
+	if (rc != 0)
+		goto out;
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_PASSCODE_URL, NULL);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_check_feature(&ph->ekmf_config, &ph->curl_handle,
+				&error_msg, ph->verbose);
+	if (rc != 0) {
+		if (rc == -ENOTSUP)
+			_set_error(ph, "%s", error_msg);
+		else
+			_set_error(ph, "Failed to check the features of the "
+				   "EKMF Web server at '%s': %s",
+				   ph->ekmf_config.base_url,
+				   error_msg != NULL ? error_msg :
+							   strerror(-rc));
+		goto out;
+	}
+
+	rc = kms_login((kms_handle_t)ph);
+	if (rc != 0)
+		goto out;
+
+	if (ph->ekmf_config.ekmf_server_pubkey != NULL)
+		remove(ph->ekmf_config.ekmf_server_pubkey);
+	FREE_AND_SET_NULL(ph->ekmf_config.ekmf_server_pubkey);
+
+	util_asprintf((char **)&ph->ekmf_config.ekmf_server_pubkey,
+		      "%s/%s", ph->config_path,
+		      EKMFWEB_CONFIG_EKMFWEB_PUBKEY_FILE);
+
+	rc = ekmf_get_public_key(&ph->ekmf_config, &ph->curl_handle,
+				 &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get the public key of the EKMF Web "
+			   "server at '%s': %s", ph->ekmf_config.base_url,
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _set_file_permission(ph, ph->ekmf_config.ekmf_server_pubkey);
+	if (rc != 0)
+		goto out;
+
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_EKMFWEB_PUBKEY,
+				     ph->ekmf_config.ekmf_server_pubkey);
+	if (rc != 0)
+		goto out;
+
+	rc = _get_templates(ph);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return rc;
+}
+
 /**
  * Check if the certificate is a self signed certificate, and if it is expired
  * or not yet valid.
@@ -1508,6 +2105,14 @@ static int _configure_connection(struct plugin_handle *ph,
 	if (rc != 0)
 		goto out;
 
+	rc = _get_ekmfweb_settings(ph);
+	if (rc != 0) {
+		util_print_indented("The server you are connected with is not "
+				     "a valid EKMF Web server, or is not "
+				     "configured properly", 0);
+		goto out;
+	}
+
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_server_cert);
 	util_asprintf(&server_cert_file, "%s/%s", ph->config_path,
 		      EKMFWEB_CONFIG_SERVER_CERT_FILE);
@@ -1574,6 +2179,7 @@ struct config_options {
 	bool tls_trust_server_cert;
 	bool tls_dont_verify_server_cert;
 	bool tls_verify_hostname;
+	bool refresh_settings;
 };
 
 /**
@@ -1754,6 +2360,9 @@ int kms_configure(const kms_handle_t handle,
 		case OPT_TLS_VERIFY_HOSTNAME:
 			opts.tls_verify_hostname = true;
 			break;
+		case 'R':
+			opts.refresh_settings = true;
+			break;
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -1776,13 +2385,24 @@ int kms_configure(const kms_handle_t handle,
 					   opts.tls_trust_server_cert,
 					   opts.tls_dont_verify_server_cert,
 					   opts.tls_verify_hostname);
-		if (rc == 0)
+		if (rc == 0) {
 			config_changed = true;
+			opts.refresh_settings = false; /* Already done */
+		}
 	} else {
 		rc = _error_connection_opts(ph, &opts);
 	}
 	if (rc != 0)
 		goto out;
+
+	if (opts.refresh_settings) {
+		rc = _get_ekmfweb_settings(ph);
+		if (rc != 0)
+			goto out;
+
+		config_changed = true;
+	}
+
 out:
 	if (apqn_str != NULL)
 		free(apqn_str);
