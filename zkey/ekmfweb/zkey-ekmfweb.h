@@ -33,6 +33,7 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_FILE			"ekmfweb.conf"
 #define EKMFWEB_CONFIG_SERVER_CERT_FILE		"server-cert.pem"
 #define EKMFWEB_CONFIG_SERVER_PUBKEY_FILE	"server-pubkey.pem"
+#define EKMFWEB_CONFIG_LOGIN_TOKEN_FILE		"login.token"
 
 #define EKMFWEB_CONFIG_APQNS			"apqns"
 #define EKMFWEB_CONFIG_URL			"url"
@@ -44,5 +45,9 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_SERVER_PUBKEY		"server-pubkey"
 #define EKMFWEB_CONFIG_VERIFY_SERVER_CERT	"verify-server-cert"
 #define EKMFWEB_CONFIG_VERIFY_HOSTNAME		"verify-hostname"
+#define EKMFWEB_CONFIG_LOGIN_TOKEN		"login-token"
+#define EKMFWEB_CONFIG_PASSCODE_URL		"passcode-url"
+
+#define EKMFWEB_PASSCODE_URL			"/administration/passcode"
 
 #endif

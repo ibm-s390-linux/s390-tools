@@ -405,6 +405,9 @@ static int _get_ekmf_config(struct plugin_handle *ph)
 		free(tmp);
 	ph->ekmf_config.max_redirs = 0;
 
+	ph->ekmf_config.login_token = properties_get(ph->properties,
+						EKMFWEB_CONFIG_LOGIN_TOKEN);
+
 	return 0;
 }
 
@@ -437,6 +440,29 @@ static void _free_ekmf_config(struct plugin_handle *ph)
 		free((void *)ph->ekmf_config.identity_secure_key);
 	if (ph->ekmf_config.ekmf_server_pubkey != NULL)
 		free((void *)ph->ekmf_config.ekmf_server_pubkey);
+}
+
+/**
+ * Removes the login token file, if the error indicates an authorization or
+ * authentication error (-EACCES or -EPERM)
+ *
+ * @param ph                the plugin handle
+ * @param error             the negative errno value of the last error
+ */
+static void _remove_login_token_if_error(struct plugin_handle *ph, int error)
+{
+	switch (error) {
+	case -EACCES:
+	case -EPERM:
+		remove(ph->ekmf_config.login_token);
+		FREE_AND_SET_NULL(ph->ekmf_config.login_token);
+		break;
+	default:
+		break;
+	}
+
+	return;
+
 }
 
 /**
@@ -1806,6 +1832,41 @@ int kms_deconfigure(const kms_handle_t handle)
 }
 
 /**
+ * Prompts the user for input on stdin, and returns the entered value.
+ * The returned string must be freed by the caller.
+ *
+ * @param ph                the plugin handle
+ * @param msg               the message to prompt for the input (can be NULL)
+ *
+ * @returns the entered value, or NULL in case of an error.
+ */
+static char *_prompt_for_input(struct plugin_handle *ph, const char *msg)
+{
+	size_t input_len = 0;
+	char *input = NULL;
+	int rc;
+
+	while (input_len == 0 || input == NULL || strlen(input) < 1) {
+		if (msg != NULL)
+			printf("%s: %s: ", program_invocation_short_name, msg);
+
+		rc = getline(&input, &input_len, stdin);
+		if (rc < 0) {
+			_set_error(ph, "Failed to read from stdin: %s",
+				   strerror(errno));
+			if (input != NULL)
+				free(input);
+			return NULL;
+		}
+
+		if (input != NULL && input[strlen(input) - 1] == '\n')
+			input[strlen(input) - 1] = '\0';
+	}
+
+	return input;
+}
+
+/**
  * Allows the KMS plugin to perform a login to the KMS (if required). This
  * function is called at least once before any key operation function, typically
  * shortly after opening the repository.
@@ -1826,6 +1887,12 @@ int kms_deconfigure(const kms_handle_t handle)
 int kms_login(const kms_handle_t handle)
 {
 	struct plugin_handle *ph = handle;
+	char *passcode_url = NULL;
+	char *error_msg = NULL;
+	char *passcode = NULL;
+	char *user_id = NULL;
+	bool valid = false;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
@@ -1833,14 +1900,102 @@ int kms_login(const kms_handle_t handle)
 
 	_clear_error(ph);
 
-	if (!ph->config_complete) {
+	if (!ph->connection_configured) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
 			  "kms configure [OPTIONS]' to complete the "
 			  "configuration.");
 		return -EINVAL;
 	}
 
-	return 0;
+	if (ph->ekmf_config.login_token != NULL) {
+		rc = ekmf_check_login_token(&ph->ekmf_config, &valid, NULL,
+					    ph->verbose);
+		pr_verbose(ph, "Login token valid: %d", valid);
+
+		if (rc == 0 && valid)
+			return 0;
+
+		remove(ph->ekmf_config.login_token);
+		FREE_AND_SET_NULL(ph->ekmf_config.login_token);
+
+		rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_LOGIN_TOKEN,
+					     NULL);
+		if (rc != 0)
+			goto out;
+	}
+
+	passcode_url = properties_get(ph->properties,
+				      EKMFWEB_CONFIG_PASSCODE_URL);
+	if (passcode_url == NULL) {
+		util_asprintf(&passcode_url, "%s%s", ph->ekmf_config.base_url,
+			      EKMFWEB_PASSCODE_URL);
+
+		rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_PASSCODE_URL,
+					     passcode_url);
+		if (rc != 0)
+			goto out;
+	}
+
+	pr_verbose(ph, "passcode url: '%s'", passcode_url);
+
+	user_id = _prompt_for_input(ph, "EKMF Web user ID");
+	if (user_id == NULL) {
+		rc = -EIO;
+		goto out;
+	}
+
+	pr_verbose(ph, "User-id: '%s'", user_id);
+
+	util_print_indented("Go to the following web page in your web browser, "
+			    "login with the same user ID as entered above and "
+			    "your password, and obtain a one time passcode and "
+			    "enter it here.", 0);
+	printf("%s\n", passcode_url);
+
+	passcode = _prompt_for_input(ph, "Passcode");
+	if (passcode == NULL) {
+		rc = -EIO;
+		goto out;
+	}
+
+	pr_verbose(ph, "Passcode: '%s'", passcode);
+
+	util_asprintf((char **)&ph->ekmf_config.login_token, "%s/%s",
+		      ph->config_path, EKMFWEB_CONFIG_LOGIN_TOKEN_FILE);
+
+	rc = ekmf_login(&ph->ekmf_config, &ph->curl_handle, user_id, passcode,
+			&error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to login to EKMF Web server at '%s': "
+			   "%s", ph->ekmf_config.base_url,
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		goto out;
+	}
+
+	rc = _set_file_permission(ph, ph->ekmf_config.login_token);
+	if (rc != 0)
+		goto out;
+
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_LOGIN_TOKEN,
+				     ph->ekmf_config.login_token);
+	if (rc != 0)
+		goto out;
+
+	rc = _save_config(ph);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (passcode_url != NULL)
+		free(passcode_url);
+	if (user_id != NULL)
+		free(user_id);
+	if (passcode != NULL)
+		free(passcode);
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return rc;
 }
 
 /**
