@@ -75,6 +75,11 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_IDENTITY_KEY_REENC	"identity-key-reenc"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_LABEL	"identity-key-label"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_ID		"identity-key-id"
+#define EKMFWEB_CONFIG_SESSION_KEY_CURVE	"session-key-curve"
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+#define EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST	"session-rsa-sign-digest"
+#define EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS	"session-rsa-sign-pss"
+#endif
 
 #define EKMFWEB_PASSCODE_URL			"/administration/passcode"
 #define EKMFWEB_TEMPLATE_STATE_ACTIVE		"ACTIVE"

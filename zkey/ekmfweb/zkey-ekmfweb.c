@@ -828,6 +828,9 @@ int kms_display_info(const kms_handle_t handle)
 	struct plugin_handle *ph = handle;
 	char *tmp = NULL;
 	bool rsa = false;
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	char *info;
+#endif
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
@@ -993,6 +996,35 @@ int kms_display_info(const kms_handle_t handle)
 	if (tmp != NULL)
 		free(tmp);
 
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	printf("  Key transport settings:\n");
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
+	printf("    Session Key:        ECC (%s)\n",
+	       tmp != NULL ? tmp : "secp521r1");
+	if (tmp != NULL)
+		free(tmp);
+
+	info = properties_get(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_INFO);
+	if (info != NULL && strncmp(info, "RSA", 3) == 0) {
+		tmp = properties_get(ph->properties,
+				     EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST);
+		printf("    RSA sign digest:    %s\n",
+		       tmp != NULL ? tmp : "SHA512");
+		if (tmp != NULL)
+			free(tmp);
+		tmp = properties_get(ph->properties,
+				     EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS);
+		printf("    RSA sign alorithm:  %s\n",
+		       tmp != NULL && strcasecmp(tmp, "yes") == 0 ?
+							"RSA-PSS" : "RSA");
+		if (tmp != NULL)
+			free(tmp);
+	}
+	if (info != NULL)
+		free(info);
+#endif
+
 	return 0;
 }
 #define OPT_TLS_CLIENT_CERT			256
@@ -1002,6 +1034,10 @@ int kms_display_info(const kms_handle_t handle)
 #define OPT_TLS_TRUST_SERVER_CERT		260
 #define OPT_TLS_DONT_VERIFY_SERVER_CERT		261
 #define OPT_TLS_VERIFY_HOSTNAME			262
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+#define OPT_KT_RSA_SIGNATURE_DIGEST		263
+#define OPT_KT_RSA_PSS_SIGNATURE		264
+#endif
 
 const struct util_opt configure_options[] = {
 	{
@@ -1245,6 +1281,55 @@ const struct util_opt configure_options[] = {
 			"registration, the template for identity keys is used.",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS FOR KEY TRANSPORT",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "session-rsa-sign-digest", required_argument, NULL,
+						OPT_KT_RSA_SIGNATURE_DIGEST },
+		.argument = "DIGEST",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "The digest algorithm to use for signing the key "
+			"transport request, when the identity key type is "
+			"RSA. Ignored otherwise. The default is SHA512.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "session-rsa-sign-algo", required_argument, NULL,
+						OPT_KT_RSA_PSS_SIGNATURE },
+		.argument = "ALGORITHM",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "The algorithm to use for signing the key transport "
+			"request, when the identity key type is RSA, ignored "
+			"otherwise. Supported algorithms are 'RSA'and "
+			"'RSA-PSS'.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+#endif
+	UTIL_OPT_END,
+};
+
+const struct util_opt generate_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS",
+		.command = KMS_COMMAND_GENERATE,
+	},
+	{
+		.option = { "label-tags", required_argument, NULL, 'T'},
+		.argument = "LABEL-TAGS",
+		.desc = "The label tags for generating a secure key in EKMF "
+			"Web, in the form '<tag>=<value>(,<tag>=<value>)*[,]' "
+			"with tags as defined by the key template. Use 'zkey "
+			"kms info' to display the key templates used by zkey. "
+			"For XTS type keys the two templates for XTS-Key1 and "
+			"XTS-Key2 are used. For non-XTS type keys, the "
+			"template for Non-XTS keys is used.",
+		.command = KMS_COMMAND_GENERATE,
+	},
 	UTIL_OPT_END,
 };
 
@@ -1276,6 +1361,8 @@ const struct util_opt *kms_get_command_options(const char *command,
 
 	if (strcasecmp(command, KMS_COMMAND_CONFIGURE) == 0)
 		return configure_options;
+	if (strcasecmp(command, KMS_COMMAND_GENERATE) == 0)
+		return generate_options;
 
 	return NULL;
 }
@@ -2171,8 +2258,8 @@ out:
  */
 static int _get_ekmfweb_settings(struct plugin_handle *ph)
 {
+	int rc, type = 0, curve = NID_undef;
 	char *error_msg = NULL;
-	int rc;
 
 	_check_config_complete(ph);
 
@@ -2229,6 +2316,18 @@ static int _get_ekmfweb_settings(struct plugin_handle *ph)
 
 	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_EKMFWEB_PUBKEY,
 				     ph->ekmf_config.ekmf_server_pubkey);
+	if (rc != 0)
+		goto out;
+
+	rc = _get_pub_key_info(ph, ph->ekmf_config.ekmf_server_pubkey, &type,
+			       &curve, NULL);
+	if (rc != 0)
+		goto out;
+	if (type != EVP_PKEY_EC || curve == NID_undef)
+		curve = NID_secp521r1;
+
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_SESSION_KEY_CURVE,
+				     OBJ_nid2sn(curve));
 	if (rc != 0)
 		goto out;
 
@@ -2608,6 +2707,10 @@ struct config_options {
 #endif
 	const char *register_cert_file;
 	const char *register_label_tags;
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	const char *session_rsa_sign_digest;
+	const char *session_rsa_sign_algo;
+#endif
 };
 
 /**
@@ -3578,6 +3681,62 @@ out:
 	return rc;
 }
 
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+/*
+ * Configures the key transport specific settings
+ *
+ * @param ph                the plugin handle
+ * @param session_rsa_sign_digest the name of the digest for RSA signatures
+ * @param session_rsa_sign_algo the signature algorithm for RSA signatures
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _configure_key_transport(struct plugin_handle *ph,
+				    const char *session_rsa_sign_digest,
+				    const char *session_rsa_sign_algo)
+{
+	int nid, rc = 0;
+
+	if (session_rsa_sign_digest != NULL) {
+		nid = OBJ_txt2nid(session_rsa_sign_digest);
+		if (nid == NID_undef) {
+			_set_error(ph, "Invalid RSA signature digest '%s'",
+				   session_rsa_sign_digest);
+			return -EINVAL;
+		}
+
+		rc = _set_or_remove_property(ph,
+				    EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST,
+				    session_rsa_sign_digest);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (session_rsa_sign_algo != NULL) {
+		if (strcasecmp(session_rsa_sign_algo, "RSA") == 0) {
+			rc = _set_or_remove_property(ph,
+					EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS,
+					NULL);
+			if (rc != 0)
+				goto out;
+		} else if (strcasecmp(session_rsa_sign_algo, "RSA-PSS") == 0) {
+			rc = _set_or_remove_property(ph,
+					EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS,
+					"yes");
+			if (rc != 0)
+				goto out;
+		} else {
+			_set_error(ph, "Invalid RSA signature algorithm '%s'",
+				   session_rsa_sign_algo);
+			return -EINVAL;
+		}
+	}
+
+out:
+	return rc;
+}
+#endif
+
 /**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
@@ -3729,6 +3888,14 @@ int kms_configure(const kms_handle_t handle,
 		case 'T':
 			opts.register_label_tags = options[i].argument;
 			break;
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+		case OPT_KT_RSA_SIGNATURE_DIGEST:
+			opts.session_rsa_sign_digest = options[i].argument;
+			break;
+		case OPT_KT_RSA_PSS_SIGNATURE:
+			opts.session_rsa_sign_algo = options[i].argument;
+			break;
+#endif
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -3811,6 +3978,18 @@ int kms_configure(const kms_handle_t handle,
 			goto out;
 		}
 	}
+
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	if (opts.session_rsa_sign_digest != NULL ||
+	    opts.session_rsa_sign_algo != NULL) {
+		rc = _configure_key_transport(ph, opts.session_rsa_sign_digest,
+					      opts.session_rsa_sign_algo);
+		if (rc != 0)
+			goto out;
+
+		config_changed = true;
+	}
+#endif
 
 out:
 	if (apqn_str != NULL)
@@ -4312,6 +4491,93 @@ out:
 }
 
 /**
+ * Converts a list of KMS properties into a EKMF tag list
+ *
+ * @param ph                the plugin handle
+ * @param properties        a list of properties to associate the key with
+ * @param num_properties    the number of properties in above array
+ * @param ekmf_tag_list     On return: a list of tags
+ * @param null_values_only  if true, only properties with a NULL-value are
+ *                          converted. If false, only properties with a non-NULL
+ *                          value are converted.
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _properties_to_ekmf_tags(struct plugin_handle *UNUSED(ph),
+				    const struct kms_property *properties,
+				    size_t num_properties,
+				    struct ekmf_tag_list *ekmf_tag_list,
+				    bool null_values_only)
+{
+	size_t i;
+
+	ekmf_tag_list->num_tags = 0;
+	ekmf_tag_list->tags = util_malloc(
+				sizeof(struct ekmf_tag) * num_properties);
+
+	for (i = 0; i < num_properties; i++) {
+		if (!null_values_only && properties[i].value == NULL)
+			continue;
+		if (null_values_only && properties[i].value != NULL)
+			continue;
+
+		ekmf_tag_list->tags[i].name = util_strdup(properties[i].name);
+		ekmf_tag_list->tags[i].value = properties[i].value != NULL ?
+				util_strdup(properties[i].value) : NULL;
+		ekmf_tag_list->num_tags++;
+	}
+
+	return 0;
+}
+
+/**
+ * Restricts an retrieved secure key from further export and checks the
+ * required key attributes. If the secure key is not as expected, the user
+ * is prompted to confirm the use of the key.
+ *
+ * @param ph                the plugin handle
+ * @param key_blob          the secure key to restrict
+ * @param key_blob_length   the size of the the secure key
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _restrict_key(struct plugin_handle *ph, unsigned char *key_blob,
+			 size_t key_blob_length)
+{
+	struct cca_lib cca = { 0 };
+	int rc;
+
+	cca.lib_csulcca = ph->cca.cca_lib;
+	cca.dll_CSNBRKA = (t_CSNBRKA)dlsym(cca.lib_csulcca, "CSNBRKA");
+	if (cca.dll_CSNBRKA == NULL) {
+		_set_error(ph, "Failed to get CCA verb CSNBRKA");
+		return -ELIBACC;
+	}
+
+	rc = restrict_key_export(&cca, key_blob, key_blob_length,
+				 ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to export-restrict the retrieved secure "
+			   "key: %s", strerror(-rc));
+		return rc;
+	}
+
+	rc = check_aes_cipher_key(key_blob, key_blob_length);
+	if (rc != 0) {
+		warnx("The secure key retrieved from EKMF Web might not be "
+		      "secure");
+		printf("%s: Do you want to use it anyway [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->verbose)) {
+			warnx("Operation aborted");
+			return -ECANCELED;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * Generates a key in or with the KMS and returns a secure key that is
  * enciphered under the current HSM master key.
  *
@@ -4354,13 +4620,25 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		     const struct kms_property *properties,
 		     size_t num_properties,
 		     const struct kms_option *options, size_t num_options,
-		     unsigned char *UNUSED(key_blob),
-		     size_t *UNUSED(key_blob_length),
-		     char *UNUSED(key_id), size_t UNUSED(key_id_size),
-		     char *UNUSED(key_label), size_t UNUSED(key_label_size))
+		     unsigned char *key_blob, size_t *key_blob_length,
+		     char *key_id, size_t key_id_size,
+		     char *key_label, size_t key_label_size)
 {
+	struct ekmf_template_info *template_info = NULL;
+	struct ekmf_tag_list custom_tag_list = { 0 };
+	struct ekmf_tag_list label_tag_list = { 0 };
+	struct ekmf_key_info *key_info = NULL;
+	int curve_nid = 0, digest_nid = 0;
 	struct plugin_handle *ph = handle;
+	const char *template_uuid = NULL;
+	char *identity_key_uuid = NULL;
+	const char *label_tags = NULL;
+	const char *tmpl_prop_name;
+	char *error_msg = NULL;
+	bool rsa_pss = false;
+	char *tmp;
 	size_t i;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(num_properties == 0 || properties != NULL,
@@ -4368,6 +4646,11 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		    " > 0 ");
 	util_assert(num_options == 0 || options != NULL,
 		    "Internal error: options is NULL but num_options > 0 ");
+	util_assert(key_blob != NULL, "Internal error: key_blob is NULL");
+	util_assert(key_blob_length != NULL, "Internal error: key_blob_length "
+		    "is NULL");
+	util_assert(key_id != NULL, "Internal error: key_id is NULL");
+	util_assert(key_label != NULL, "Internal error: key_label is NULL");
 
 	pr_verbose(ph, "Generate key: key-type: '%s', keybits: %lu, mode: %d",
 			key_type, key_bits, key_mode);
@@ -4405,8 +4688,170 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		return -ENOTSUP;
 	}
 
-	_set_error(ph, "Not yet implemented");
-	return -ENOTSUP;
+	switch (key_mode) {
+	case KMS_KEY_MODE_NON_XTS:
+		tmpl_prop_name = EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID;
+		break;
+	case KMS_KEY_MODE_XTS_1:
+		tmpl_prop_name = EKMFWEB_CONFIG_TEMPLATE_XTS1_ID;
+		break;
+	case KMS_KEY_MODE_XTS_2:
+		tmpl_prop_name = EKMFWEB_CONFIG_TEMPLATE_XTS2_ID;
+		break;
+	default:
+		_set_error(ph, "Unsupported key mode: %d", key_mode);
+		return -EINVAL;
+	}
+
+	identity_key_uuid = properties_get(ph->properties,
+					   EKMFWEB_CONFIG_IDENTITY_KEY_ID);
+	if (identity_key_uuid == NULL) {
+		_set_error(ph, "The zkey client is not registered with EKMF "
+			  "Web, run 'zkey kms configure --register CERT-FILE' "
+			  "to register the zkey client.");
+		return -EINVAL;
+	}
+
+	pr_verbose(ph, "identity_key_uuid: '%s'", identity_key_uuid);
+
+	rc = _select_cca_adapter(ph);
+	if (rc != 0)
+		goto out;
+
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 'T':
+			label_tags = options[i].argument;
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	template_uuid = properties_get(ph->properties, tmpl_prop_name);
+	if (template_uuid == NULL) {
+		rc = -EIO;
+		_set_error(ph, "No key template configured");
+		goto out;
+	}
+
+	rc = ekmf_get_template(&ph->ekmf_config, &ph->curl_handle,
+			       template_uuid, &template_info,
+			       &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get key template '%s': %s",
+			   template_uuid, error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _check_template(ph, template_info,
+			     EKMFWEB_KEYSTORE_TYPE_PERV_ENCR, true);
+	if (rc != 0)
+		goto out;
+
+	if (key_bits == 0)
+		key_bits = template_info->key_size;
+	if (key_bits != template_info->key_size) {
+		_set_error(ph, "Key size %u bits is not allowed by the "
+			   "template used to generate the key. The template "
+			   "uses a key size of %u bits.", key_bits,
+			   template_info->key_size);
+		return -EINVAL;
+	}
+
+	rc = _parse_label_tags(ph, template_info, label_tags, &label_tag_list);
+	if (rc != 0)
+		goto out;
+
+	rc = _properties_to_ekmf_tags(ph, properties, num_properties,
+				      &custom_tag_list, false);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_generate_key(&ph->ekmf_config, &ph->curl_handle,
+			      template_info->name, "Generated by zkey",
+			      &label_tag_list, &custom_tag_list,
+			      identity_key_uuid, NULL, 0, &key_info,
+			      &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to generate key in EKMF Web: %s",
+			   error_msg != NULL ? error_msg : strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
+	if (tmp != NULL) {
+		curve_nid = OBJ_txt2nid(tmp);
+		free(tmp);
+	}
+
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST);
+	if (tmp != NULL) {
+		digest_nid = OBJ_txt2nid(tmp);
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS);
+	if (tmp != NULL) {
+		if (strcasecmp(tmp, "yes") == 0)
+			rsa_pss = true;
+		free(tmp);
+	}
+#endif
+
+	rc = ekmf_retrieve_key(&ph->ekmf_config, &ph->curl_handle,
+				key_info->uuid, curve_nid, digest_nid, rsa_pss,
+				identity_key_uuid, key_blob, key_blob_length,
+				&error_msg, &ph->ext_lib, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to retrieve the generated key from EKMF "
+			   "Web: %s", error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _restrict_key(ph, key_blob, *key_blob_length);
+	if (rc != 0)
+		goto out;
+
+	strncpy(key_id, key_info->uuid, key_id_size);
+	key_id[key_id_size - 1] = '\0';
+
+	strncpy(key_label, key_info->label, key_label_size);
+	key_label[key_label_size - 1] = '\0';
+
+	pr_verbose(ph, "Generated key id: '%s'", key_id);
+	pr_verbose(ph, "Generated key label: '%s'", key_label);
+
+out:
+	if (identity_key_uuid != NULL)
+		free(identity_key_uuid);
+	if (template_uuid != NULL)
+		free((char *)template_uuid);
+	if (template_info != NULL)
+		ekmf_free_template_info(template_info);
+	_free_ekmf_tags(&label_tag_list);
+	_free_ekmf_tags(&custom_tag_list);
+	if (error_msg != NULL)
+		free(error_msg);
+	if (key_info != NULL)
+		ekmf_free_key_info(key_info);
+
+	return rc;
 }
 
 /**
