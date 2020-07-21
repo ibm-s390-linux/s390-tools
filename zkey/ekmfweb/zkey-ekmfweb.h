@@ -26,6 +26,7 @@ struct plugin_handle {
 	bool settings_retrieved;
 	bool templates_retrieved;
 	bool identity_key_generated;
+	bool registered;
 	bool config_complete;
 	struct ekmf_ext_lib ext_lib;
 	struct ekmf_cca_lib cca;
@@ -72,6 +73,8 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM	"identity-key-algorithm"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS	"identity-key-params"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_REENC	"identity-key-reenc"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_LABEL	"identity-key-label"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_ID		"identity-key-id"
 
 #define EKMFWEB_PASSCODE_URL			"/administration/passcode"
 #define EKMFWEB_TEMPLATE_STATE_ACTIVE		"ACTIVE"
@@ -85,6 +88,7 @@ struct plugin_handle {
 #define EKMFWEB_KEY_STATE_ACTIVE		"ACTIVE"
 #define EKMFWEB_CURVE_PRIME			"PRIME_CURVE"
 #define EKMFWEB_CURVE_BAINPOOL			"BRAINPOOL_CURVE"
+#define EKMFWEB_SEQNO_TAG			"seqno"
 
 #define DEFAULT_IDENTITY_KEY_PUBLIC_EXPONENT	65537
 

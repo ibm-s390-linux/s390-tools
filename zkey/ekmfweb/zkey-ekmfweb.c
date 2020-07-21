@@ -15,6 +15,7 @@
 #include <string.h>
 #include <errno.h>
 #include <err.h>
+#include <sys/utsname.h>
 
 #include <openssl/evp.h>
 #include <openssl/x509.h>
@@ -379,11 +380,16 @@ static void _check_config_complete(struct plugin_handle *ph)
 		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM) &&
 		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
 
+	ph->registered =
+		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL) &&
+		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ID);
+
 	ph->config_complete = ph->apqns_configured &&
 			      ph->connection_configured &&
 			      ph->settings_retrieved &&
 			      ph->templates_retrieved &&
-			      ph->identity_key_generated;
+			      ph->identity_key_generated &&
+			      ph->registered;
 }
 
 /**
@@ -981,6 +987,12 @@ int kms_display_info(const kms_handle_t handle)
 		free(tmp);
 	}
 
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
+	printf("  Registered key label: %s\n", tmp != NULL ?
+			tmp : "(registration required)");
+	if (tmp != NULL)
+		free(tmp);
+
 	return 0;
 }
 #define OPT_TLS_CLIENT_CERT			256
@@ -1202,6 +1214,37 @@ const struct util_opt configure_options[] = {
 		.command = KMS_COMMAND_CONFIGURE,
 	},
 #endif
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS FOR REGISTRATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "register", required_argument, NULL, 'r'},
+		.argument = "CERT-FILE",
+		.desc = "Register the zkey client with EKMF Web by generating "
+			"an identity key in EKMF Web using the certificate "
+			"from the specified file. Supported certificate files "
+			"formats are .pem, .crt, .cert, .cer, and .der (i.e. "
+			"either base64 or DER encoded). If you want to "
+			"register a self signed certificate that you are about "
+			"to generate using option '--gen-self-signed-cert', "
+			"then specify the same certificate file name here, "
+			"and the generated certificate is registered "
+			"right away.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "label-tags", required_argument, NULL, 'T'},
+		.argument = "LABEL-TAGS",
+		.desc = "The label tags for generating the identity key in "
+			"EKMF Web when registering the zkey client, in the "
+			"form '<tag>=<value>(,<tag>=<value>)*[,]' with tags as "
+			"defined by the key template. Use 'zkey kms info' to "
+			"display the key templates used by zkey. For "
+			"registration, the template for identity keys is used.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
 	UTIL_OPT_END,
 };
 
@@ -2563,6 +2606,8 @@ struct config_options {
 #ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
 	bool cert_rsa_pss;
 #endif
+	const char *register_cert_file;
+	const char *register_label_tags;
 };
 
 /**
@@ -2790,6 +2835,9 @@ static int _generate_identity_key(struct plugin_handle *ph)
 		properties_remove(ph->properties,
 				  EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 	}
+
+	properties_remove(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
+	properties_remove(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_ID);
 
 	pr_verbose(ph, "Generated identity key into '%s'",
 		   ph->ekmf_config.identity_secure_key);
@@ -3118,6 +3166,419 @@ out:
 }
 
 /**
+ * Frees an EKMF tag list
+ *
+ * @param ekmf_tag_list     the EKMF tag list
+ */
+static void _free_ekmf_tags(struct ekmf_tag_list *ekmf_tag_list)
+{
+	size_t i;
+
+	if (ekmf_tag_list->tags == NULL)
+		return;
+
+	for (i = 0;  i < ekmf_tag_list->num_tags; i++) {
+		free((char *)ekmf_tag_list->tags[i].name);
+		free((char *)ekmf_tag_list->tags[i].value);
+	}
+
+	free(ekmf_tag_list->tags);
+	ekmf_tag_list->tags = NULL;
+	ekmf_tag_list->num_tags = 0;
+}
+
+/**
+ * Gets the next sequence number of the template
+ *
+ * @param ph                the plugin handle
+ * @param template_uuid     the template UUID
+ *
+ * @returns an allocated string, or NULL in case of an error.
+ */
+static char *_get_seqno(struct plugin_handle *ph, const char *template_uuid)
+{
+	unsigned int seqno = 0;
+	char *error_msg = NULL;
+	char *ret = NULL;
+	int rc;
+
+	rc = ekmf_get_last_seq_no(&ph->ekmf_config, &ph->curl_handle,
+				  template_uuid, &seqno, &error_msg,
+				  ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get last used sequence number for "
+			   "template '%s': %s",
+			   template_uuid, error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	seqno++;
+	util_asprintf(&ret, "%05u", seqno);
+
+	pr_verbose(ph, "Seqno: '%s'", ret);
+
+out:
+	if (error_msg != NULL)
+		free(error_msg);
+
+	return ret;
+}
+
+/**
+ * Parses the label tags passed in via option (<tag>=<value>;<tag>=<value;....)
+ * and allocates an array of KMS properties. The tags must be freed by the
+ * caller.
+ *
+ * @param ph                the plugin handle
+ * @param template_info     the template info
+ * @param label_tags        the label tags option value (can be NULL)
+ * @param ekmf_tag_list     On return: a list of label tags
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _parse_label_tags(struct plugin_handle *ph,
+			     const struct ekmf_template_info *template_info,
+			     const char *label_tags,
+			     struct ekmf_tag_list *ekmf_tag_list)
+{
+	const struct ekmf_tag_def_list *tag_defs;
+	char *tag, *value = NULL;
+	char **tag_list = NULL;
+	size_t i, k;
+	int rc = 0;
+
+	tag_defs = &template_info->label_tags;
+
+	pr_verbose(ph, "Label tags: '%s'", label_tags);
+
+	if (label_tags != NULL && strlen(label_tags) == 0)
+		label_tags = NULL;
+	tag_list = str_list_split(label_tags != NULL ? label_tags : "");
+
+	ekmf_tag_list->tags = util_malloc(sizeof(struct ekmf_tag) *
+						tag_defs->num_tag_defs);
+	ekmf_tag_list->num_tags = tag_defs->num_tag_defs;
+
+	memset(ekmf_tag_list->tags, 0,
+	       sizeof(struct ekmf_tag) * tag_defs->num_tag_defs);
+
+	for (i = 0, k = 0; i < tag_defs->num_tag_defs; i++) {
+		pr_verbose(ph, "Expected tag: '%s'",
+			   tag_defs->tag_defs[i].name);
+		pr_verbose(ph, "Specified tag: '%s'", tag_list[k]);
+
+		tag = tag_list[k] != NULL ? util_strdup(tag_list[k]) : NULL;
+		if (tag != NULL) {
+			value = strchr(tag, '=');
+			if (value != NULL) {
+				*value = '\0';
+				value++;
+			}
+		}
+
+		ekmf_tag_list->tags[i].name =
+				util_strdup(tag_defs->tag_defs[i].name);
+
+		if (strcasecmp(tag_defs->tag_defs[i].name,
+			       EKMFWEB_SEQNO_TAG) == 0) {
+			/* <seqno> tag may or may not be specified */
+			if (tag != NULL && strcasecmp(tag,
+						      EKMFWEB_SEQNO_TAG) == 0) {
+				/* <seqno> tag may or may not have a value */
+				if (value != NULL) {
+					ekmf_tag_list->tags[i].value =
+							util_strdup(value);
+				} else {
+					ekmf_tag_list->tags[i].value =
+						_get_seqno(ph,
+							   template_info->uuid);
+					if (ekmf_tag_list->tags[i].value ==
+									NULL) {
+						rc = -EIO;
+						goto out;
+					}
+				}
+				k++;
+			} else {
+				ekmf_tag_list->tags[i].value =
+						_get_seqno(ph,
+							   template_info->uuid);
+				if (ekmf_tag_list->tags[i].value == NULL) {
+					rc = -EIO;
+					goto out;
+				}
+			}
+		} else {
+			if (tag == NULL) {
+				if (label_tags != NULL)
+					_set_error(ph, "Failed to parse label "
+						   "tags. Expected tag '%s', "
+						   "but no more tags are "
+						   "specified.",
+						   tag_defs->tag_defs[i].name);
+				else
+					_set_error(ph, "Option '--label-tags' "
+						   "is required. Use 'zkey kms "
+						   "info' to see which label "
+						   "tags are required by the "
+						   "key template(s)");
+				rc = -EINVAL;
+				goto out;
+			}
+			if (strcasecmp(tag, tag_defs->tag_defs[i].name) != 0) {
+				_set_error(ph, "Failed to parse the specified "
+					   "label tags: Expected tag '%s', but "
+					   "found '%s'.",
+					   tag_defs->tag_defs[i].name, tag);
+				rc = -EINVAL;
+				goto out;
+			}
+			if (value == NULL) {
+				_set_error(ph, "Failed to parse the specified "
+					   "label tags: Tag '%s' has no value",
+					   tag_defs->tag_defs[i].name);
+				rc = -EINVAL;
+				goto out;
+			}
+
+			ekmf_tag_list->tags[i].value = util_strdup(value);
+			k++;
+		}
+
+		util_str_toupper((char *)ekmf_tag_list->tags[i].value);
+
+		pr_verbose(ph, "Tag: '%s', Value: '%s'",
+			   ekmf_tag_list->tags[i].name,
+			   ekmf_tag_list->tags[i].value);
+
+		if (tag != NULL)
+			free(tag);
+		tag = NULL;
+	}
+
+	if (tag_list[k] != NULL) {
+		_set_error(ph, "Failed to parse the specified label tags: More "
+			   "tags specified than expected: '%s'", tag_list[k]);
+		rc = -EINVAL;
+		goto out;
+	}
+
+out:
+	if (tag != NULL)
+		free(tag);
+	if (tag_list != NULL)
+		str_list_free_string_array(tag_list);
+	if (rc != 0)
+		_free_ekmf_tags(ekmf_tag_list);
+
+	return rc;
+}
+
+/**
+ * Loads the certificate from a file into memory.
+ *
+ * @param ph                the plugin handle
+ * @param cert_file         the file name of the certificate file
+ * @param cert              On return: an allocated buffer containing the data
+ * @param cert_size         On return: the size of the certificate data
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ */
+static int _load_certificate(struct plugin_handle *ph, const char *cert_file,
+			     unsigned char **cert, size_t *cert_size)
+{
+	size_t count, size;
+	unsigned char *buf;
+	struct stat sb;
+	int rc = 0;
+	FILE *fp;
+
+	if (stat(cert_file, &sb)) {
+		rc = -errno;
+		_set_error(ph, "Failed to read certificate from file '%s': %s",
+			   cert_file, strerror(-rc));
+		return rc;
+	}
+	size = sb.st_size;
+
+	fp = fopen(cert_file, "r");
+	if (fp == NULL) {
+		rc = -errno;
+		_set_error(ph, "Failed to read certificate from file '%s': %s",
+			   cert_file, strerror(-rc));
+		return rc;
+	}
+
+	buf = util_malloc(size);
+	count = fread(buf, 1, size, fp);
+	if (count != size) {
+		rc = ferror(fp) ? -errno : -EIO;
+		_set_error(ph, "Failed to read certificate from file '%s': %s",
+			   cert_file, strerror(-rc));
+		goto out;
+	}
+
+	*cert_size = size;
+	*cert = buf;
+
+	pr_verbose(ph, "%lu bytes read from file '%s'", size, cert_file);
+out:
+	if (rc != 0)
+		free(buf);
+	fclose(fp);
+
+	return rc;
+}
+
+/**
+ * Registers the client with EKMF Web
+ *
+ * @param ph                the plugin handle
+ * @param cert_file         the certificate file to register
+ * @param label_tags        the label tags for generating an identity key
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _register_client(struct plugin_handle *ph, const char *cert_file,
+			    const char *label_tags)
+{
+	struct ekmf_template_info *template_info = NULL;
+	struct ekmf_tag_list label_tag_list = { 0 };
+	struct ekmf_key_info *key_info = NULL;
+	const char *template_uuid = NULL;
+	unsigned char *cert = NULL;
+	char *description = NULL;
+	struct utsname utsname;
+	char *error_msg = NULL;
+	size_t cert_size = 0;
+	char *key_id = NULL;
+	int rc;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->identity_key_generated) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the EKMF Web server connection.");
+		return -EINVAL;
+	}
+
+	rc = kms_login((kms_handle_t)ph);
+	if (rc != 0)
+		goto out;
+
+	key_id = properties_get(ph->properties,
+				EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
+	if (key_id != NULL) {
+		free(key_id);
+		util_print_indented("ATTENTION: The zkey client has already "
+				    "been registered with EKMF Web!\n"
+				    "When you re-register with EKMF Web you "
+				    "will no longer have access to keys that "
+				    "have been generated in EKMF Web with your "
+				    "previous registration, until an EKMF Web "
+				    "operator approves the export of these "
+				    "keys for the identity key that is being "
+				    "generated with this registration.", 0);
+		printf("%s: Re-register the zkey client [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->verbose)) {
+			_set_error(ph, "Opertion aborted by user");
+			return -ECANCELED;
+		}
+	}
+
+	rc  = _load_certificate(ph, cert_file, &cert, &cert_size);
+	if (rc != 0)
+		goto out;
+
+	template_uuid = properties_get(ph->properties,
+				       EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
+	if (template_uuid == NULL) {
+		rc = -EIO;
+		_set_error(ph, "No identity key template configured");
+		goto out;
+	}
+
+	rc = ekmf_get_template(&ph->ekmf_config, &ph->curl_handle,
+			       template_uuid, &template_info,
+			       &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get identity key template '%s': %s",
+			   template_uuid, error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _check_template(ph, template_info, EKMFWEB_KEYSTORE_TYPE_IDENTITY,
+			     false);
+	if (rc != 0)
+		goto out;
+
+	rc = _parse_label_tags(ph, template_info, label_tags, &label_tag_list);
+	if (rc != 0)
+		goto out;
+
+	if (uname(&utsname) != 0) {
+		rc = -errno;
+		_set_error(ph, "Failed to obtain the system's hostname: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	util_asprintf(&description, "Identity key for zkey client on system %s",
+		      utsname.nodename);
+
+	rc = ekmf_generate_key(&ph->ekmf_config, &ph->curl_handle,
+			      template_info->name, description,
+			      &label_tag_list, NULL, NULL, cert, cert_size,
+			      &key_info, &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to generate identity key in EKMF Web:"
+			   " %s", error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ID,
+				     key_info->uuid);
+	if (rc != 0)
+		goto out;
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL,
+				     key_info->label);
+	if (rc != 0)
+		goto out;
+
+	pr_verbose(ph, "Generated identity key id: '%s'", key_info->uuid);
+	pr_verbose(ph, "Generated identity key label: '%s'", key_info->label);
+
+out:
+	if (template_uuid != NULL)
+		free((char *)template_uuid);
+	if (error_msg != NULL)
+		free(error_msg);
+	if (template_info != NULL)
+		ekmf_free_template_info(template_info);
+	_free_ekmf_tags(&label_tag_list);
+	if (key_info != NULL)
+		ekmf_free_key_info(key_info);
+	if (cert != NULL)
+		free(cert);
+	if (description != NULL)
+		free(description);
+
+	return rc;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -3262,6 +3723,12 @@ int kms_configure(const kms_handle_t handle,
 			opts.cert_rsa_pss = true;
 			break;
 #endif
+		case 'r':
+			opts.register_cert_file = options[i].argument;
+			break;
+		case 'T':
+			opts.register_label_tags = options[i].argument;
+			break;
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -3328,6 +3795,22 @@ int kms_configure(const kms_handle_t handle,
 		rc = _error_gen_csr_sscert_opts(ph, &opts);
 	if (rc != 0)
 		goto out;
+
+	if (opts.register_cert_file != NULL) {
+		rc = _register_client(ph, opts.register_cert_file,
+				      opts.register_label_tags);
+		if (rc != 0)
+			goto out;
+
+		config_changed = true;
+	} else {
+		if (opts.register_label_tags != NULL) {
+			_set_error(ph, "Option ' --label-tags' is only valid "
+				   "together with option '--register'.");
+			rc = -EINVAL;
+			goto out;
+		}
+	}
 
 out:
 	if (apqn_str != NULL)
