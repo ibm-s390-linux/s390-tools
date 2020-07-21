@@ -16,6 +16,10 @@
 #include <errno.h>
 #include <err.h>
 
+#include <openssl/evp.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+
 #include "lib/zt_common.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
@@ -37,6 +41,13 @@
 			fprintf(stderr, fmt);			\
 			fprintf(stderr, "\n");			\
 		}						\
+	} while (0)
+
+#define FREE_AND_SET_NULL(ptr)					\
+	do {							\
+		if ((ptr) != NULL)				\
+			free((void *)ptr);			\
+		(ptr) = NULL;					\
 	} while (0)
 
 /**
@@ -136,6 +147,44 @@ static int _set_file_permission(struct plugin_handle *ph, const char *filename)
 }
 
 /**
+ * Makes a temporary file an active file, by first removing the current active
+ * file (if existent), and then renaming the temporary file to the active file.
+ * The active file permissions are also set to the permissions and the group of
+ * configuration directory.
+ *
+ * @param ph                the plugin handle
+ * @param temp_file         the name of the temporary file
+ * @param active_file       the name of the active file
+ *
+ * @returns 0 on success, or a negative errno value on failure
+ */
+static int _activate_temp_file(struct plugin_handle *ph, const char *temp_file,
+			       const char *active_file)
+{
+	int rc;
+
+	if (util_path_exists(active_file)) {
+		rc = remove(active_file);
+		if (rc != 0) {
+			rc = -errno;
+			_set_error(ph, "remove failed on file '%s': %s",
+				   active_file, strerror(-rc));
+			return rc;
+		}
+	}
+
+	rc = rename(temp_file, active_file);
+	if (rc != 0) {
+		rc = -errno;
+		_set_error(ph, "rename failed on file '%s': %s",
+			   temp_file, strerror(-rc));
+		return rc;
+	}
+
+	return _set_file_permission(ph, active_file);
+}
+
+/**
  * Save the EKMFWeb plugin config file
  *
  * @param ph                the plugin handle
@@ -165,6 +214,106 @@ static int _save_config(struct plugin_handle *ph)
 
 out:
 	free(file_name);
+	return rc;
+}
+
+/**
+ * Base64-encodes the passphrase to make it unreadable.
+ *
+ * @param passphrase        the passphrase to encode
+ *
+ * @returns the encoded passphrase or NULL in case of an error.
+ * The caller must free the string when no longer needed.
+ */
+char *_encode_passphrase(const char *passphrase)
+{
+	int inlen, outlen, len;
+	char *out;
+
+	inlen = strlen(passphrase);
+	outlen = (inlen / 3) * 4;
+	if (inlen % 3 > 0)
+		outlen += 4;
+
+	out = util_malloc(outlen + 1);
+	memset(out, 0, outlen + 1);
+
+	len = EVP_EncodeBlock((unsigned char *)out, (unsigned char *)passphrase,
+			      inlen);
+	if (len != outlen) {
+		free(out);
+		return NULL;
+	}
+
+	out[outlen] = '\0';
+	return out;
+}
+
+/**
+ * Base64-decodes the passphrase
+ *
+ * @param passphrase        the passphrase to decode
+ *
+ * @returns the decoded passphrase or NULL in case of an error.
+ * The caller must free the string when no longer needed.
+ */
+char *_decode_passphrase(const char *passphrase)
+{
+	int inlen, outlen, len;
+	char *out;
+
+	inlen = strlen(passphrase);
+	outlen = (inlen / 4) * 3;
+	if (inlen % 4 > 0)
+		outlen += 3;
+
+	out = util_malloc(outlen + 1);
+	memset(out, 0, outlen + 1);
+
+	len = EVP_DecodeBlock((unsigned char *)out, (unsigned char *)passphrase,
+			      inlen);
+	if (len != outlen) {
+		free(out);
+		return NULL;
+	}
+
+	out[outlen] = '\0';
+	return out;
+}
+
+/**
+ * Sets or removes a property. If value is NULL it is removed, otherwise it
+ * is set.
+ *
+ * @param ph                the plugin handle
+ * @param name              the name of the property
+ * @param value             the value of the property or NULL
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _set_or_remove_property(struct plugin_handle *ph, const char *name,
+				   const char *value)
+{
+	int rc = 0;
+
+	if (value != NULL) {
+		rc = properties_set(ph->properties, name, value);
+		if (rc != 0) {
+			_set_error(ph, "Failed to set property '%s': %s", name,
+				   strerror(-rc));
+			goto out;
+		}
+	} else {
+		rc = properties_remove(ph->properties, name);
+		if (rc != 0 && rc != -ENOENT) {
+			_set_error(ph, "Failed to remove property '%s': %s",
+				   name, strerror(-rc));
+			goto out;
+		}
+		rc = 0;
+	}
+
+out:
 	return rc;
 }
 
@@ -203,7 +352,91 @@ static void _check_config_complete(struct plugin_handle *ph)
 {
 	ph->apqns_configured = _check_property(ph, EKMFWEB_CONFIG_APQNS);
 
-	ph->config_complete = ph->apqns_configured;
+	ph->connection_configured =
+		_check_property(ph, EKMFWEB_CONFIG_URL) &&
+		_check_property(ph, EKMFWEB_CONFIG_VERIFY_SERVER_CERT) &&
+		_check_property(ph, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
+
+	ph->config_complete = ph->apqns_configured &&
+			      ph->connection_configured;
+}
+
+/**
+ * Gets the EKMF config structure contents from the plugin properties
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns a KMS plugin handle, or NULL in case of an error.
+ */
+static int _get_ekmf_config(struct plugin_handle *ph)
+{
+	char *tmp;
+
+	ph->ekmf_config.base_url = properties_get(ph->properties,
+						  EKMFWEB_CONFIG_URL);
+	ph->ekmf_config.tls_ca = properties_get(ph->properties,
+						EKMFWEB_CONFIG_CA_BUNDLE);
+	ph->ekmf_config.tls_client_cert = properties_get(ph->properties,
+						EKMFWEB_CONFIG_CLIENT_CERT);
+	ph->ekmf_config.tls_client_key = properties_get(ph->properties,
+						EKMFWEB_CONFIG_CLIENT_KEY);
+
+	tmp = properties_get(ph->properties,
+			    EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE);
+	if (tmp != NULL) {
+		ph->ekmf_config.tls_client_key_passphrase =
+				_decode_passphrase(tmp);
+		free(tmp);
+	}
+	ph->ekmf_config.tls_issuer_cert = NULL;
+	ph->ekmf_config.tls_pinned_pubkey = properties_get(ph->properties,
+						EKMFWEB_CONFIG_SERVER_PUBKEY);
+	ph->ekmf_config.tls_server_cert = properties_get(ph->properties,
+						EKMFWEB_CONFIG_SERVER_CERT);
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
+	ph->ekmf_config.tls_verify_peer =
+				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
+	ph->ekmf_config.tls_verify_host =
+				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
+	if (tmp != NULL)
+		free(tmp);
+	ph->ekmf_config.max_redirs = 0;
+
+	return 0;
+}
+
+/**
+ * Frees the EKMF config structure contents
+ *
+ * @param ph                the plugin handle
+ */
+static void _free_ekmf_config(struct plugin_handle *ph)
+{
+	if (ph->ekmf_config.base_url != NULL)
+		free((void *)ph->ekmf_config.base_url);
+	if (ph->ekmf_config.tls_ca != NULL)
+		free((void *)ph->ekmf_config.tls_ca);
+	if (ph->ekmf_config.tls_client_cert != NULL)
+		free((void *)ph->ekmf_config.tls_client_cert);
+	if (ph->ekmf_config.tls_client_key != NULL)
+		free((void *)ph->ekmf_config.tls_client_key);
+	if (ph->ekmf_config.tls_client_key_passphrase != NULL)
+		free((void *)ph->ekmf_config.tls_client_key_passphrase);
+	if (ph->ekmf_config.tls_issuer_cert != NULL)
+		free((void *)ph->ekmf_config.tls_issuer_cert);
+	if (ph->ekmf_config.tls_pinned_pubkey != NULL)
+		free((void *)ph->ekmf_config.tls_pinned_pubkey);
+	if (ph->ekmf_config.tls_server_cert != NULL)
+		free((void *)ph->ekmf_config.tls_server_cert);
+	if (ph->ekmf_config.login_token != NULL)
+		free((void *)ph->ekmf_config.login_token);
+	if (ph->ekmf_config.identity_secure_key != NULL)
+		free((void *)ph->ekmf_config.identity_secure_key);
+	if (ph->ekmf_config.ekmf_server_pubkey != NULL)
+		free((void *)ph->ekmf_config.ekmf_server_pubkey);
 }
 
 /**
@@ -264,6 +497,10 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 		goto error;
 	}
 
+	rc = _get_ekmf_config(ph);
+	if (rc != 0)
+		goto error;
+
 	_check_config_complete(ph);
 	pr_verbose(ph, "Plugin configuration is %scomplete",
 		   ph->config_complete ? "" : "in");
@@ -292,6 +529,11 @@ int kms_terminate(const kms_handle_t handle)
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
 	pr_verbose(ph, "Plugin terminated");
+
+	_free_ekmf_config(ph);
+
+	if (ph->curl_handle != NULL)
+		ekmf_curl_destroy(ph->curl_handle);
 
 	if (ph->config_path != NULL)
 		free((void *)ph->config_path);
@@ -365,6 +607,7 @@ bool kms_supports_key_type(const kms_handle_t handle,
 int kms_display_info(const kms_handle_t handle)
 {
 	struct plugin_handle *ph = handle;
+	char *tmp = NULL;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
@@ -372,8 +615,172 @@ int kms_display_info(const kms_handle_t handle)
 
 	_clear_error(ph);
 
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_URL);
+	printf("  EKMF Web server:      %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	else
+		return 0;
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_CA_BUNDLE);
+	printf("  CA-bundle:            %s\n", tmp != NULL ? tmp :
+			"System's CA certificates");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_CLIENT_CERT);
+	printf("  Client certificate:   %s\n", tmp != NULL ? tmp : "(none)");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_CLIENT_KEY);
+	printf("  Client private key:   %s\n", tmp != NULL ? tmp : "(none)");
+	if (tmp != NULL) {
+		free(tmp);
+		tmp = properties_get(ph->properties,
+				     EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE);
+		if (tmp != NULL) {
+			printf("                        "
+			       "(passphrase protected)\n");
+			free(tmp);
+		}
+	}
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SERVER_CERT);
+	if (tmp != NULL) {
+		printf("  Trusting the server certificate\n");
+		free(tmp);
+	}
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SERVER_PUBKEY);
+	if (tmp != NULL) {
+		printf("  Using server public key pinning\n");
+		free(tmp);
+	}
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
+	if (tmp != NULL) {
+		if (strcasecmp(tmp, "yes") == 0)
+			printf("  The server's certificate must be valid\n");
+		free(tmp);
+	} else {
+		printf("  The server's certificate is not verified\n");
+	}
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
+	if (tmp != NULL) {
+		if (strcasecmp(tmp, "yes") == 0)
+			printf("  The server's certificate must match the "
+			       "hostname\n");
+		free(tmp);
+	}
+
 	return 0;
 }
+#define OPT_TLS_CLIENT_CERT			256
+#define OPT_TLS_CLIENT_KEY			257
+#define OPT_TLS_CLIENT_KEY_PASSPHRASE		258
+#define OPT_TLS_PIN_SERVER_PUBKEY		259
+#define OPT_TLS_TRUST_SERVER_CERT		260
+#define OPT_TLS_DONT_VERIFY_SERVER_CERT		261
+#define OPT_TLS_VERIFY_HOSTNAME			262
+
+const struct util_opt configure_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS FOR THE SERVER CONNECTION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "ekmfweb-url", required_argument, NULL, 'u'},
+		.argument = "URL",
+		.desc = "The URL of the EKMF Web server. The URL should start "
+			"with 'https://', and may contain a port number "
+			"separated by a colon. If no port number is specified, "
+			"443 is used for HTTPS.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-ca-bundle", required_argument, NULL, 'b'},
+		.argument = "CA-BUNDLE",
+		.desc = "The CA bundle PEM file or directory containing the CA "
+			"certificates used to verify the EKMF Web server "
+			"certificate during TLS handshake. If this specifies a "
+			"directory path, then this directory must have been "
+			"prepared with OpenSSL's c_rehash utility. Default are "
+			"the system CA certificates.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-client-cert", required_argument, NULL,
+							OPT_TLS_CLIENT_CERT },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.argument = "PEM-FILE",
+		.desc = "The PEM file containing the client's TLS certificate "
+			"for use with TLS client authentication.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-client-key", required_argument, NULL,
+							OPT_TLS_CLIENT_KEY },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.argument = "PEM-FILE",
+		.desc = "The PEM file containing the client's private key "
+			"for use with TLS client authentication.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-client-key-passphrase", required_argument,
+					NULL, OPT_TLS_CLIENT_KEY_PASSPHRASE },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.argument = "PASSPHRASE",
+		.desc = "If the PEM file is passphrase protected, this option "
+			"specifies the passphrase to unlock the PEM file that "
+			"is specified with option '--tls-client-key'.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-pin-server-pubkey", 0, NULL,
+				OPT_TLS_PIN_SERVER_PUBKEY },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Pin the EKMF Web server's public key to verify on "
+			"every connection that the public key of the EKMF Web "
+			"server's certificate is the same that was used when "
+			"the connection to the EKMF Web server was configured. "
+			"This option can only be used with CA signed EKMF Web "
+			"server certificates.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-trust-server-cert", 0, NULL,
+				OPT_TLS_TRUST_SERVER_CERT },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Trust the EKMF Web server's certificate even if it is "
+			"a self signed certificate, or could not be verified "
+			"due to other reasons. This option can be used instead "
+			"of option '--tls-pin-server-pubkey' with self signed "
+			"EKMF Web server certificates.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-dont-verify-server-cert", 0, NULL,
+					OPT_TLS_DONT_VERIFY_SERVER_CERT },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Do not verify the authenticity of the EKMF Web "
+			"server's certificate. For self signed EKMF Web server "
+			"certificates, this is the default. Use option "
+			"'--tls-pin-server-cert' to ensure the self signed "
+			"certificate's authenticity explicitely. CA signed "
+			"EKMF Web server certificates are verified by default. "
+			"This option disables the verification.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-verify-hostname", 0, NULL,
+						OPT_TLS_VERIFY_HOSTNAME },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Verify that the EKMF Web server certificate's 'Common "
+			"Name' field or a 'Subject Alternate Name' field "
+			"matches the host name used to connect to the EKMF "
+			"Web server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	UTIL_OPT_END,
+};
 
 /**
  * Returns a list of KMS specific command line options that zkey should accept
@@ -400,6 +807,9 @@ const struct util_opt *kms_get_command_options(const char *command,
 					       int UNUSED(max_opts))
 {
 	util_assert(command != NULL, "Internal error: command is NULL");
+
+	if (strcasecmp(command, KMS_COMMAND_CONFIGURE) == 0)
+		return configure_options;
 
 	return NULL;
 }
@@ -797,6 +1207,418 @@ static char *_build_apqn_string(const struct kms_apqn *apqns, size_t num_apqns)
 }
 
 /**
+ * Check if the certificate is a self signed certificate, and if it is expired
+ * or not yet valid.
+ *
+ * @param ph                the plugin handle
+ * @param cert_file         the file name of the PEM file containing the cert
+ * @param self_signed       on return: true if the cetr is a self signed cert
+ * @param valid             on return: false if the cert is expired or not yet
+ *                          valid
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_certificate(struct plugin_handle *ph,
+			      const char *cert_file, bool *self_signed,
+			      bool *valid)
+{
+	X509 *cert;
+	FILE *fp;
+	int rc;
+
+	fp = fopen(cert_file, "r");
+	if (fp == NULL) {
+		rc = -errno;
+		_set_error(ph, "Failed to open certificate PEM file '%s': %s",
+			   cert_file, strerror(-rc));
+		return rc;
+	}
+
+	cert = PEM_read_X509(fp, NULL, NULL, NULL);
+	fclose(fp);
+
+	if (cert == NULL) {
+		_set_error(ph, "Failed to read certificate PEM file '%s'",
+			   cert_file);
+		return -EIO;
+	}
+
+
+	*self_signed = (X509_NAME_cmp(X509_get_subject_name(cert),
+				      X509_get_issuer_name(cert)) == 0);
+
+	*valid = (X509_cmp_current_time(X509_get0_notBefore(cert)) < 0 &&
+		  X509_cmp_current_time(X509_get0_notAfter(cert)) > 0);
+
+	X509_free(cert);
+
+	return 0;
+}
+
+/**
+ * Configures the connection to the EKMF Web server
+ *
+ * @param ph                the plugin handle
+ * @param ekmfweb_url       the URL of the EKMF Web server
+ * @param tls_ca_bundle     the file or directory name of the CA bundle to use
+ * @param tls_client_cert   the file name of the client certificate
+ * @param tls_client_key   the file name of the client private key
+ * @param tls_client_key_passphrase   the passphrase to unlock the key
+ * @param tls_pin_server_pubkey if true, pin the server public key
+ * @param tls_trust_server_cert if true, trust the server certificate
+ * @param tls_dont_verify_server_cert if true, don't verify the server cert
+ * @param tls_verify_hostname if true verify the server's hostname
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _configure_connection(struct plugin_handle *ph,
+				 const char *ekmfweb_url,
+				 const char *tls_ca_bundle,
+				 const char *tls_client_cert,
+				 const char *tls_client_key,
+				 const char *tls_client_key_passphrase,
+				 bool tls_pin_server_pubkey,
+				 bool tls_trust_server_cert,
+				 bool tls_dont_verify_server_cert,
+				 bool tls_verify_hostname)
+{
+	char *server_pubkey_temp = NULL;
+	char *server_pubkey_file = NULL;
+	char *server_cert_file = NULL;
+	char *server_cert_temp = NULL;
+	bool self_signed = false;
+	bool add_https = false;
+	bool verified = false;
+	bool valid = false;
+	char *error = NULL;
+	char *url = NULL;
+	int rc = 0;
+	char *tmp;
+
+	if (tls_client_cert != NULL && tls_client_key == NULL) {
+		_set_error(ph, "Option '--tls-client-key' is required when "
+			   "option '--tls-client-cert' is specified.");
+		return -EINVAL;
+	}
+	if (tls_client_key != NULL && tls_client_cert == NULL) {
+		_set_error(ph, "Option '--tls-client-cert' is required when "
+			   "option '--tls-client-key' is specified.");
+		return -EINVAL;
+	}
+	if (tls_client_key_passphrase != NULL && tls_client_key == NULL) {
+		_set_error(ph, "Option '--tls-client-key-passphrase' is only "
+			   "valid together with option "
+			   "'--tls-client-key'.");
+		return -EINVAL;
+	}
+	if (tls_pin_server_pubkey && tls_trust_server_cert) {
+		_set_error(ph, "Option ' --tls-pin-server-pubkey' is not valid "
+			   "together with option '--tls-pin-server-cert");
+		return -EINVAL;
+	}
+
+	if (ph->ekmf_config.base_url != NULL) {
+		util_print_indented("ATTENTION: The EKMF Web server connection "
+				    "has already been configured!\n"
+				    "When you re-configure the EKMF Web server "
+				    "connection, you may need to re-register "
+				    "this zkey client with the changed EKMF "
+				    "Web server.", 0);
+		printf("%s: Re-configure the EKMF Web server connection "
+		       "[y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->verbose)) {
+			_set_error(ph, "Opertion aborted by user");
+			return -ECANCELED;
+		}
+	}
+
+	if (strncmp(ekmfweb_url, "http://", 6) == 0) {
+		_set_error(ph, "The use of insecured HTTP is not allowed.");
+		return -EINVAL;
+	}
+
+	if (strncmp(ekmfweb_url, "https://", 7) != 0)
+		add_https = true;
+
+	util_asprintf(&url, "%s%s", add_https ? "https://" : "", ekmfweb_url);
+	if (url[strlen(url) - 1] == '/')
+		url[strlen(url) - 1] = '\0';
+
+	pr_verbose(ph, "url: '%s'", url);
+
+	FREE_AND_SET_NULL(ph->ekmf_config.base_url);
+	ph->ekmf_config.base_url = url;
+
+	rc = properties_set(ph->properties, EKMFWEB_CONFIG_URL, url);
+	if (rc != 0) {
+		_set_error(ph, "Failed to set URL property: "
+			   "%s", strerror(-rc));
+		goto out;
+	}
+
+	FREE_AND_SET_NULL(ph->ekmf_config.tls_ca);
+	if (tls_ca_bundle != NULL)
+		ph->ekmf_config.tls_ca = util_strdup(tls_ca_bundle);
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CA_BUNDLE,
+				     tls_ca_bundle);
+
+	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_cert);
+	if (tls_client_cert != NULL)
+		ph->ekmf_config.tls_client_cert = util_strdup(tls_client_cert);
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CLIENT_CERT,
+				     tls_client_cert);
+	if (rc != 0)
+		goto out;
+
+	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_key);
+	if (tls_client_key != NULL)
+		ph->ekmf_config.tls_client_key = util_strdup(tls_client_key);
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CLIENT_KEY,
+				     tls_client_key);
+	if (rc != 0)
+		goto out;
+
+	tmp = NULL;
+	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_key_passphrase);
+	if (tls_client_key_passphrase != NULL) {
+		ph->ekmf_config.tls_client_key_passphrase =
+				util_strdup(tls_client_key_passphrase);
+		tmp = _encode_passphrase(tls_client_key_passphrase);
+		if (tmp == NULL) {
+			_set_error(ph, "Failed to encode the passphrase");
+			rc = -EIO;
+			goto out;
+		}
+	}
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE,
+				     tmp);
+	if (tmp != NULL)
+		free(tmp);
+	if (rc != 0)
+		goto out;
+
+	util_asprintf(&server_cert_temp, "%s/%s-tmp", ph->config_path,
+		      EKMFWEB_CONFIG_SERVER_CERT_FILE);
+	util_asprintf(&server_pubkey_temp, "%s/%s-tmp", ph->config_path,
+		      EKMFWEB_CONFIG_SERVER_PUBKEY_FILE);
+
+	rc = ekmf_get_server_cert_chain(&ph->ekmf_config,
+					server_cert_temp,
+					server_pubkey_temp,
+					NULL, &verified,
+					&error, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to connect to EKMF Web server at '%s': "
+			   "%s", ph->ekmf_config.base_url,
+			   error != NULL ? error : strerror(-rc));
+		goto out;
+	}
+
+	rc = _check_certificate(ph, server_cert_temp, &self_signed, &valid);
+	if (rc != 0)
+		goto out;
+
+	pr_verbose(ph, "verified: %d", verified);
+	pr_verbose(ph, "self signed: %d", self_signed);
+	pr_verbose(ph, "valid: %d", valid);
+
+	util_print_indented("The EKMF Web server presented the following "
+			    "certificate to identify itself:", 0);
+
+	rc = ekmf_print_certificates(server_cert_temp, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to print the server certificate: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	printf("\n");
+	if (!valid)
+		printf("ATTENTION: The certificate is expired or not yet "
+		       "valid.\n");
+	if (self_signed) {
+		printf("ATTENTION: The certificate is self signed "
+			      "and thus could not be verified.\n");
+	} else if (!verified) {
+		if (!tls_dont_verify_server_cert) {
+			if (tls_ca_bundle != NULL)
+				_set_error(ph, "The certificate could not be "
+					   "verified using the specified CA "
+					   "bundle '%s'. Use option "
+					   "'--tls-dont-verify-server-cert' to "
+					   "connect to this server anyway.",
+					   tls_ca_bundle);
+			else
+				_set_error(ph, "The certificate could not be "
+					   "verified using the system's "
+					   "CA certificates. Use option "
+					   "'--tls-dont-verify-server-cert' to "
+					   "connect to this server anyway.");
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+	printf("%s: Is this the EKMF Web server you intent to work with "
+	      "[y/N]? ", program_invocation_short_name);
+	if (!prompt_for_yes(ph->verbose)) {
+		_set_error(ph, "Opertion aborted by user");
+		rc = -ECANCELED;
+		goto out;
+	}
+
+	ph->ekmf_config.tls_verify_peer = !self_signed || tls_trust_server_cert;
+	if (tls_dont_verify_server_cert)
+		ph->ekmf_config.tls_verify_peer = false;
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_VERIFY_SERVER_CERT,
+				     ph->ekmf_config.tls_verify_peer ?
+						     "yes" : "no");
+	if (rc != 0)
+		goto out;
+
+	ph->ekmf_config.tls_verify_host = tls_verify_hostname;
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_VERIFY_HOSTNAME,
+				     ph->ekmf_config.tls_verify_host ?
+						     "yes" : "no");
+	if (rc != 0)
+		goto out;
+
+	FREE_AND_SET_NULL(ph->ekmf_config.tls_server_cert);
+	util_asprintf(&server_cert_file, "%s/%s", ph->config_path,
+		      EKMFWEB_CONFIG_SERVER_CERT_FILE);
+	if (tls_trust_server_cert) {
+		ph->ekmf_config.tls_server_cert = util_strdup(server_cert_file);
+		rc = _activate_temp_file(ph, server_cert_temp,
+					 server_cert_file);
+		if (rc != 0)
+			goto out;
+	} else {
+		remove(server_cert_file);
+	}
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_SERVER_CERT,
+				     tls_trust_server_cert ?
+						server_cert_file : NULL);
+	if (rc != 0)
+		goto out;
+
+	FREE_AND_SET_NULL(ph->ekmf_config.tls_pinned_pubkey);
+	util_asprintf(&server_pubkey_file, "%s/%s", ph->config_path,
+		      EKMFWEB_CONFIG_SERVER_PUBKEY_FILE);
+	if (tls_pin_server_pubkey) {
+		ph->ekmf_config.tls_pinned_pubkey =
+				util_strdup(server_pubkey_file);
+		rc = _activate_temp_file(ph, server_pubkey_temp,
+					 server_pubkey_file);
+		if (rc != 0)
+			goto out;
+	} else {
+		remove(server_pubkey_file);
+	}
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_SERVER_PUBKEY,
+				     tls_pin_server_pubkey ?
+						server_pubkey_file : NULL);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (server_cert_temp != NULL) {
+		remove(server_cert_temp);
+		free(server_cert_temp);
+	}
+	if (server_cert_file != NULL)
+		free(server_cert_file);
+	if (server_pubkey_temp != NULL) {
+		remove(server_pubkey_temp);
+		free(server_pubkey_temp);
+	}
+	if (server_pubkey_file != NULL)
+		free(server_pubkey_file);
+	if (error != NULL)
+		free(error);
+
+	return rc;
+}
+
+struct config_options {
+	const char *ekmfweb_url;
+	const char *tls_ca_bundle;
+	const char *tls_client_cert;
+	const char *tls_client_key;
+	const char *tls_client_key_passphrase;
+	bool tls_pin_server_pubkey;
+	bool tls_trust_server_cert;
+	bool tls_dont_verify_server_cert;
+	bool tls_verify_hostname;
+};
+
+/**
+ * Checks that none of the options for seting up a connection  is specified,
+ * and sets up the error message and return code if
+ * so.
+ *
+ * @param ph                the plugin handle
+ * @param opts              the config options structure
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _error_connection_opts(struct plugin_handle *ph,
+				  struct config_options *opts)
+{
+	int rc = 0;
+
+	if (opts->tls_ca_bundle != NULL) {
+		_set_error(ph, "Option '--tls-ca-bundle' is only valid "
+			   "together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_client_cert != NULL) {
+		_set_error(ph, "Option '--tls-client-cert' is only valid "
+			   "together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_client_key != NULL) {
+		_set_error(ph, "Option '--tls-client-key' is only valid "
+			   "together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_client_key_passphrase != NULL) {
+		_set_error(ph, "Option '--tls-client-key-passphrase' is only "
+			   "valid together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_pin_server_pubkey) {
+		_set_error(ph, "Option '--tls-pin-server-pubkey' is only valid "
+			   "together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_trust_server_cert) {
+		_set_error(ph, "Option '--tls-trust-server-cert' is only valid "
+			   "together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_dont_verify_server_cert) {
+		_set_error(ph, "Option '--tls-dont-verify-server-cert' is only "
+			   "valid together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_verify_hostname) {
+		_set_error(ph, "Option '--tls-verify-hostname' is only valid "
+			   "together with option '--ekmfweb-url'.");
+		rc = -EINVAL;
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -827,6 +1649,7 @@ int kms_configure(const kms_handle_t handle,
 		  const struct kms_apqn *apqns, size_t num_apqns,
 		  const struct kms_option *options, size_t num_options)
 {
+	struct config_options opts = { 0 };
 	struct plugin_handle *ph = handle;
 	bool config_changed = false;
 	char *apqn_str = NULL;
@@ -876,6 +1699,64 @@ int kms_configure(const kms_handle_t handle,
 		config_changed = true;
 	}
 
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 'u':
+			opts.ekmfweb_url = options[i].argument;
+			break;
+		case 'b':
+			opts.tls_ca_bundle = options[i].argument;
+			break;
+		case OPT_TLS_CLIENT_CERT:
+			opts.tls_client_cert = options[i].argument;
+			break;
+		case OPT_TLS_CLIENT_KEY:
+			opts.tls_client_key = options[i].argument;
+			break;
+		case OPT_TLS_CLIENT_KEY_PASSPHRASE:
+			opts.tls_client_key_passphrase = options[i].argument;
+			break;
+		case OPT_TLS_PIN_SERVER_PUBKEY:
+			opts.tls_pin_server_pubkey = true;
+			break;
+		case OPT_TLS_TRUST_SERVER_CERT:
+			opts.tls_trust_server_cert = true;
+			break;
+		case OPT_TLS_DONT_VERIFY_SERVER_CERT:
+			opts.tls_dont_verify_server_cert = true;
+			break;
+		case OPT_TLS_VERIFY_HOSTNAME:
+			opts.tls_verify_hostname = true;
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	if (opts.ekmfweb_url != NULL) {
+		rc = _configure_connection(ph, opts.ekmfweb_url,
+					   opts.tls_ca_bundle,
+					   opts.tls_client_cert,
+					   opts.tls_client_key,
+					   opts.tls_client_key_passphrase,
+					   opts.tls_pin_server_pubkey,
+					   opts.tls_trust_server_cert,
+					   opts.tls_dont_verify_server_cert,
+					   opts.tls_verify_hostname);
+		if (rc == 0)
+			config_changed = true;
+	} else {
+		rc = _error_connection_opts(ph, &opts);
+	}
+	if (rc != 0)
+		goto out;
 out:
 	if (apqn_str != NULL)
 		free(apqn_str);

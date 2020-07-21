@@ -22,13 +22,27 @@ struct plugin_handle {
 	gid_t config_path_owner;
 	struct properties *properties;
 	bool apqns_configured;
+	bool connection_configured;
 	bool config_complete;
+	struct ekmf_config ekmf_config;
+	CURL *curl_handle;
 	char error_msg[1024];
 	bool verbose;
 };
 
 #define EKMFWEB_CONFIG_FILE			"ekmfweb.conf"
+#define EKMFWEB_CONFIG_SERVER_CERT_FILE		"server-cert.pem"
+#define EKMFWEB_CONFIG_SERVER_PUBKEY_FILE	"server-pubkey.pem"
 
 #define EKMFWEB_CONFIG_APQNS			"apqns"
+#define EKMFWEB_CONFIG_URL			"url"
+#define EKMFWEB_CONFIG_CA_BUNDLE		"ca-bundle"
+#define EKMFWEB_CONFIG_CLIENT_CERT		"client-cert"
+#define EKMFWEB_CONFIG_CLIENT_KEY		"client-key"
+#define EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE	"client-key-passphrase"
+#define EKMFWEB_CONFIG_SERVER_CERT		"server-cert"
+#define EKMFWEB_CONFIG_SERVER_PUBKEY		"server-pubkey"
+#define EKMFWEB_CONFIG_VERIFY_SERVER_CERT	"verify-server-cert"
+#define EKMFWEB_CONFIG_VERIFY_HOSTNAME		"verify-hostname"
 
 #endif
