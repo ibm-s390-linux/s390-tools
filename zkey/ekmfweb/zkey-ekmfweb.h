@@ -25,7 +25,10 @@ struct plugin_handle {
 	bool connection_configured;
 	bool settings_retrieved;
 	bool templates_retrieved;
+	bool identity_key_generated;
 	bool config_complete;
+	struct ekmf_ext_lib ext_lib;
+	struct ekmf_cca_lib cca;
 	struct ekmf_config ekmf_config;
 	CURL *curl_handle;
 	char error_msg[1024];
@@ -37,6 +40,7 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_SERVER_PUBKEY_FILE	"server-pubkey.pem"
 #define EKMFWEB_CONFIG_LOGIN_TOKEN_FILE		"login.token"
 #define EKMFWEB_CONFIG_EKMFWEB_PUBKEY_FILE	"ekmfweb-pubkey.pem"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_FILE	"identity-key.skey"
 
 #define EKMFWEB_CONFIG_APQNS			"apqns"
 #define EKMFWEB_CONFIG_URL			"url"
@@ -63,6 +67,9 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_TEMPLATE_XTS2_ID		"template-xts2-id"
 #define EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID	"template-nonxts-id"
 #define EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID	"template-identity-id"
+#define EKMFWEB_CONFIG_IDENTITY_KEY		"identity-key"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM	"identity-key-algorithm"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS	"identity-key-params"
 
 #define EKMFWEB_PASSCODE_URL			"/administration/passcode"
 #define EKMFWEB_TEMPLATE_STATE_ACTIVE		"ACTIVE"
@@ -74,5 +81,12 @@ struct plugin_handle {
 #define EKMFWEB_KEY_ALGORITHM_RSA		"RSA"
 #define EKMFWEB_KEY_TYPE_CIPHER			"CIPHER"
 #define EKMFWEB_KEY_STATE_ACTIVE		"ACTIVE"
+#define EKMFWEB_CURVE_PRIME			"PRIME_CURVE"
+#define EKMFWEB_CURVE_BAINPOOL			"BRAINPOOL_CURVE"
+
+#define DEFAULT_IDENTITY_KEY_PUBLIC_EXPONENT	65537
+
+#define CCA_LIBRARY_NAME	"libcsulcca.so"
+#define CCA_WEB_PAGE		"http://www.ibm.com/security/cryptocards"
 
 #endif

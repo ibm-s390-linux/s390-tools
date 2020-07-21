@@ -374,10 +374,16 @@ static void _check_config_complete(struct plugin_handle *ph)
 		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID) &&
 		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
 
+	ph->identity_key_generated =
+		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY) &&
+		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM) &&
+		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
+
 	ph->config_complete = ph->apqns_configured &&
 			      ph->connection_configured &&
 			      ph->settings_retrieved &&
-			      ph->templates_retrieved;
+			      ph->templates_retrieved &&
+			      ph->identity_key_generated;
 }
 
 /**
@@ -390,6 +396,9 @@ static void _check_config_complete(struct plugin_handle *ph)
 static int _get_ekmf_config(struct plugin_handle *ph)
 {
 	char *tmp;
+
+	ph->ekmf_config.identity_secure_key = properties_get(ph->properties,
+						EKMFWEB_CONFIG_IDENTITY_KEY);
 
 	ph->ekmf_config.base_url = properties_get(ph->properties,
 						  EKMFWEB_CONFIG_URL);
@@ -484,7 +493,93 @@ static void _remove_login_token_if_error(struct plugin_handle *ph, int error)
 	}
 
 	return;
+}
 
+/**
+ * UnlLoads the CCA library
+ *
+ * @param ph                the plugin handle
+ */
+static void _unload_cca_library(struct plugin_handle *ph)
+{
+	if (ph->cca.cca_lib != NULL)
+		dlclose(ph->cca.cca_lib);
+	ph->cca.cca_lib = NULL;
+
+	ph->ext_lib.type = 0;
+	ph->ext_lib.cca = NULL;
+}
+
+/**
+ * Selects one the CCA APQNs associated with this plugin, and loads the CCA
+ * library and sets up the external library field in the plugin handle.
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _select_cca_adapter(struct plugin_handle *ph)
+{
+	struct cca_lib cca = { 0 };
+	char **apqn_list = NULL;
+	bool selected = false;
+	int card, domain;
+	int rc = 0, i;
+	char *apqns;
+
+	apqns = properties_get(ph->properties, EKMFWEB_CONFIG_APQNS);
+	if (apqns == NULL) {
+		_set_error(ph, "No APQN are associated with the plugin.");
+		rc = -ENODEV;
+		goto out;
+	}
+
+	pr_verbose(ph, "Associated APQNs: %s", apqns);
+
+	_unload_cca_library(ph);
+
+	apqn_list = str_list_split(apqns);
+	for (i = 0; apqn_list[i] != NULL; i++) {
+		if (sscanf(apqn_list[i], "%x.%x", &card, &domain) != 2)
+			continue;
+
+		if (sysfs_is_apqn_online(card, domain, CARD_TYPE_CCA) != 1)
+			continue;
+
+		rc = select_cca_adapter(&cca, card, domain, ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to select APQN %02x.%04x: %s",
+				   card, domain, strerror(-rc));
+			goto out;
+		}
+
+		selected = true;
+		break;
+	}
+
+	if (!selected) {
+		_set_error(ph, "None of the associated APQNs is available: %s",
+			   apqns);
+		rc = -ENODEV;
+		goto out;
+	}
+
+	pr_verbose(ph, "Selected APQN %02x.%04x", card, domain);
+
+	ph->cca.cca_lib = cca.lib_csulcca;
+	ph->ext_lib.type = EKMF_EXT_LIB_CCA;
+	ph->ext_lib.cca = &ph->cca;
+
+out:
+	if (apqns != NULL)
+		free(apqns);
+	if (apqn_list != NULL)
+		str_list_free_string_array(apqn_list);
+
+	if (rc != 0 && cca.lib_csulcca != NULL)
+		dlclose(cca.lib_csulcca);
+
+	return rc;
 }
 
 /**
@@ -579,6 +674,7 @@ int kms_terminate(const kms_handle_t handle)
 	pr_verbose(ph, "Plugin terminated");
 
 	_free_ekmf_config(ph);
+	_unload_cca_library(ph);
 
 	if (ph->curl_handle != NULL)
 		ekmf_curl_destroy(ph->curl_handle);
@@ -725,6 +821,7 @@ int kms_display_info(const kms_handle_t handle)
 	int rc, type = 0, curve = 0, mod_bits = 0;
 	struct plugin_handle *ph = handle;
 	char *tmp = NULL;
+	bool rsa = false;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
@@ -861,6 +958,23 @@ int kms_display_info(const kms_handle_t handle)
 		free(tmp);
 	}
 
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM);
+	if (tmp != NULL) {
+		printf("  Identity key:         %s", tmp);
+		rsa = strcmp(tmp, EKMFWEB_KEY_ALGORITHM_RSA) == 0;
+		free(tmp);
+		tmp = properties_get(ph->properties,
+				     EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
+		if (tmp != NULL) {
+			printf(" (%s%s)", tmp, rsa ? " bits" : "");
+			free(tmp);
+		}
+		printf("\n");
+	} else {
+		printf("  Identity key:         (configuration required)\n");
+	}
+
 	return 0;
 }
 #define OPT_TLS_CLIENT_CERT			256
@@ -978,6 +1092,22 @@ const struct util_opt configure_options[] = {
 			"EKMF Web server is (re-)configured. Use this option "
 			"when the settings of the already configured EKMF Web "
 			"server have changed",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "EKMFWEB SPECIFIC OPTIONS FOR IDENTITY KEY GENERATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-identity-key", 0, NULL, 'i'},
+		.desc = "Generate an identity key for the EKMF Web plugin. "
+			"An identity key is automatically generated when the "
+			"EKMF Web server connection has been configured. Use "
+			"this option to generate a new identity key. You need "
+			"to re-generate a registration certificate with the "
+			"newly generated identity key, and re-register this "
+			"zkey client with the EKMF Web server.",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
 	UTIL_OPT_END,
@@ -1407,6 +1537,79 @@ static char *_build_apqn_string(const struct kms_apqn *apqns, size_t num_apqns)
 	return apqn_str;
 }
 
+/**
+ * Gets the OpenSSL curve NID from the infos from the identity template.
+ *
+ * @param ph                the plugin handle
+ * @param curve             the name of the curve from the template
+ * @param key_size          the size of the key in bits
+ *
+ * @returns the OpenSSL NID for the curve, or NID_undef in case of an error
+ */
+static int _get_curve_nid(struct plugin_handle *ph, const char *curve,
+			  size_t key_size)
+{
+	int nid = NID_undef;
+
+	if (strcmp(curve, EKMFWEB_CURVE_PRIME) == 0) {
+		switch (key_size) {
+		case 192:
+			nid = NID_X9_62_prime192v1;
+			break;
+		case 224:
+			nid = NID_secp224r1;
+			break;
+		case 256:
+			nid = NID_X9_62_prime256v1;
+			break;
+		case 384:
+			nid = NID_secp384r1;
+			break;
+		case 521:
+			nid = NID_secp521r1;
+			break;
+		default:
+			_set_error(ph, "Unsupported bit size %u of curve '%s'",
+				   key_size, curve);
+			goto out;
+		}
+	} else if (strcmp(curve, EKMFWEB_CURVE_BAINPOOL) == 0) {
+		switch (key_size) {
+		case 160:
+			nid = NID_brainpoolP160r1;
+			break;
+		case 192:
+			nid = NID_brainpoolP192r1;
+			break;
+		case 224:
+			nid = NID_brainpoolP224r1;
+			break;
+		case 256:
+			nid = NID_brainpoolP256r1;
+			break;
+		case 320:
+			nid = NID_brainpoolP320r1;
+			break;
+		case 384:
+			nid = NID_brainpoolP384r1;
+			break;
+		case 512:
+			nid = NID_brainpoolP512r1;
+			break;
+		default:
+			_set_error(ph, "Unsupported bit size %u of curve '%s'",
+				   key_size, curve);
+			goto out;
+		}
+	} else {
+		_set_error(ph, "Unsupported curve '%s'", curve);
+		goto out;
+	}
+
+out:
+	return nid;
+}
+
 struct template_cb_data {
 	const char *template;
 	struct ekmf_template_info **info;
@@ -1497,13 +1700,19 @@ out:
  * @param ph                the plugin handle
  * @param info              the template info
  * @param keystore_type     the expected keystore type
+ * @param no_warnig         if true, do not issue warning messages
  *
  * @returns 0 on success, a negative errno in case of an error.
  */
 static int _check_template(struct plugin_handle *ph,
 			   struct ekmf_template_info *info,
-			   const char *keystore_type)
+			   const char *keystore_type, bool no_warning)
 {
+	char *identity_key_param = NULL;
+	char *identity_key_alg = NULL;
+	size_t modulus_bits;
+	char *msg = NULL;
+	int curve_nid;
 	int rc = 0;
 
 	if (strcmp(info->state, EKMFWEB_TEMPLATE_STATE_ACTIVE) != 0) {
@@ -1587,9 +1796,78 @@ static int _check_template(struct plugin_handle *ph,
 			rc = -EINVAL;
 			goto out;
 		}
+
+		if (no_warning)
+			goto out;
+
+		identity_key_alg = properties_get(ph->properties,
+					EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM);
+		if (identity_key_alg == NULL)
+			goto out;
+
+		if (strcmp(info->algorithm, identity_key_alg) != 0) {
+			util_asprintf(&msg, "WARNING: Template '%s' uses "
+				      "algorithm '%s', but the existing "
+				      "identity key uses algorithm '%s'. You "
+				      "may need to generate a new identity "
+				      "key and re-register this zkey client.",
+				      info->name, info->algorithm,
+				      identity_key_alg);
+			util_print_indented(msg, 0);
+			free(msg);
+			goto out;
+		}
+
+		identity_key_param = properties_get(ph->properties,
+					EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
+		if (identity_key_param == NULL)
+			goto out;
+
+		if (strcmp(identity_key_alg, EKMFWEB_KEY_ALGORITHM_ECC) == 0) {
+			curve_nid = _get_curve_nid(ph, info->curve,
+						   info->key_size);
+			if (curve_nid == NID_undef) {
+				rc = -EINVAL;
+				goto out;
+			}
+			if (OBJ_txt2nid(identity_key_param) != curve_nid) {
+				util_asprintf(&msg, "WARNING: Template '%s' "
+					      "uses algorithm ECC with curve "
+					      "'%s', but the existing identity "
+					      "key uses curve '%s'. You may "
+					      "need to generate a new identity "
+					      "key and re-register this zkey "
+					      "client.", info->name,
+					      OBJ_nid2sn(curve_nid),
+					      identity_key_param);
+				util_print_indented(msg, 0);
+				free(msg);
+			}
+		} else if (strcmp(identity_key_alg, EKMFWEB_KEY_ALGORITHM_RSA)
+									== 0) {
+			modulus_bits = strtoul(identity_key_param, NULL, 10);
+			if (modulus_bits != info->key_size) {
+				util_asprintf(&msg, "WARNING: Template '%s' "
+					      "uses algorithm RSA with a "
+					      "modulus bit size of %lu, but "
+					      "the existing identity key uses "
+					      "%lu bits. You may need to "
+					      "generate a new identity key and "
+					      "re-register this zkey client.",
+					      info->name, info->key_size,
+					      modulus_bits);
+				util_print_indented(msg, 0);
+				free(msg);
+			}
+		}
 	}
 
 out:
+	if (identity_key_alg != NULL)
+		free(identity_key_alg);
+	if (identity_key_param != NULL)
+		free(identity_key_param);
+
 	return rc;
 }
 
@@ -1716,7 +1994,8 @@ static int _get_templates(struct plugin_handle *ph)
 		goto out;
 
 	for (t = 0; t < NUM_TEMPLATES; t++) {
-		rc = _check_template(ph, tmpl[t].info, tmpl[t].keystore_type);
+		rc = _check_template(ph, tmpl[t].info, tmpl[t].keystore_type,
+				     false);
 		if (rc != 0)
 			goto out;
 
@@ -2180,6 +2459,7 @@ struct config_options {
 	bool tls_dont_verify_server_cert;
 	bool tls_verify_hostname;
 	bool refresh_settings;
+	bool generate_identity_key;
 };
 
 /**
@@ -2247,6 +2527,168 @@ static int _error_connection_opts(struct plugin_handle *ph,
 	}
 
 out:
+	return rc;
+}
+
+/**
+ * Generates (or re-generates) a identity key for the plugin using the
+ * settings from the identity template
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _generate_identity_key(struct plugin_handle *ph)
+{
+	struct ekmf_template_info *template_info = NULL;
+	struct ekmf_key_gen_info gen_info;
+	char *template_uuid = NULL;
+	char *error_msg = NULL;
+	char key_params[200];
+	int rc = 0;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->templates_retrieved) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the EKMF Web server connection.");
+		return -EINVAL;
+	}
+
+	rc = kms_login((kms_handle_t)ph);
+	if (rc != 0)
+		goto out;
+
+	template_uuid = properties_get(ph->properties,
+				       EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
+	if (template_uuid == NULL) {
+		rc = -EIO;
+		_set_error(ph, "No identity key template configured");
+		goto out;
+	}
+
+	rc = ekmf_get_template(&ph->ekmf_config, &ph->curl_handle,
+			       template_uuid, &template_info,
+			       &error_msg, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get identity key template '%s': %s",
+			   template_uuid, error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _check_template(ph, template_info, EKMFWEB_KEYSTORE_TYPE_IDENTITY,
+			     true);
+	if (rc != 0)
+		goto out;
+
+	pr_verbose(ph, "Identity template algorithm: '%s'",
+			template_info->algorithm);
+	pr_verbose(ph, "Identity template key size: %lu",
+			template_info->key_size);
+
+	if (strcmp(template_info->algorithm, EKMFWEB_KEY_ALGORITHM_ECC) == 0) {
+		pr_verbose(ph, "Identity template curve: '%s'",
+					template_info->curve);
+
+		gen_info.type = EKMF_KEY_TYPE_ECC;
+		gen_info.params.ecc.curve_nid =
+				_get_curve_nid(ph, template_info->curve,
+					       template_info->key_size);
+		if (gen_info.params.ecc.curve_nid == NID_undef)
+			return -EINVAL;
+
+		strcpy(key_params, OBJ_nid2sn(gen_info.params.ecc.curve_nid));
+	} else if (strcmp(template_info->algorithm,
+			  EKMFWEB_KEY_ALGORITHM_RSA) == 0) {
+		gen_info.type = EKMF_KEY_TYPE_RSA;
+		switch (template_info->key_size) {
+		case 512:
+		case 1024:
+		case 2048:
+		case 4096:
+			gen_info.params.rsa.modulus_bits =
+					template_info->key_size;
+			break;
+		default:
+			_set_error(ph, "Invalid modulus bits: '%s'",
+				   template_info->key_size);
+			return -EINVAL;
+		}
+		gen_info.params.rsa.pub_exp =
+					DEFAULT_IDENTITY_KEY_PUBLIC_EXPONENT;
+
+		sprintf(key_params, "%lu", gen_info.params.rsa.modulus_bits);
+	} else {
+		_set_error(ph, "Invalid identity template algorithm type '%s'",
+			   template_info->algorithm);
+		return -EINVAL;
+	}
+
+	if (ph->ekmf_config.identity_secure_key != NULL) {
+		printf("ATTENTION: An identity key already exists!\n");
+		util_print_indented("When you generate a new identity key, "
+				    "you will need to re-register this zkey "
+				    "client with the EKMF Web server.", 0);
+		printf("%s: Re-generate the identity key [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->verbose)) {
+			_set_error(ph, "Opertion aborted by user");
+			return -ECANCELED;
+		}
+	} else {
+		util_asprintf((char **)&ph->ekmf_config.identity_secure_key,
+			      "%s/%s", ph->config_path,
+			      EKMFWEB_CONFIG_IDENTITY_KEY_FILE);
+
+		rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY,
+					ph->ekmf_config.identity_secure_key);
+		if (rc != 0)
+			goto out;
+	}
+
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM,
+				     template_info->algorithm);
+	if (rc != 0)
+		goto out;
+	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS,
+				     key_params);
+	if (rc != 0)
+		goto out;
+
+	rc = _select_cca_adapter(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_generate_identity_key(&ph->ekmf_config, &gen_info,
+					&ph->ext_lib, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to generate the identity key: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = _set_file_permission(ph, ph->ekmf_config.identity_secure_key);
+	if (rc != 0)
+		goto out;
+
+	pr_verbose(ph, "Generated identity key into '%s'",
+		   ph->ekmf_config.identity_secure_key);
+
+out:
+	if (template_uuid != NULL)
+		free(template_uuid);
+	if (error_msg != NULL)
+		free(error_msg);
+	if (template_info != NULL)
+		ekmf_free_template_info(template_info);
+
 	return rc;
 }
 
@@ -2363,6 +2805,9 @@ int kms_configure(const kms_handle_t handle,
 		case 'R':
 			opts.refresh_settings = true;
 			break;
+		case 'i':
+			opts.generate_identity_key = true;
+			break;
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -2397,6 +2842,15 @@ int kms_configure(const kms_handle_t handle,
 
 	if (opts.refresh_settings) {
 		rc = _get_ekmfweb_settings(ph);
+		if (rc != 0)
+			goto out;
+
+		config_changed = true;
+	}
+
+	if ((ph->connection_configured && !ph->identity_key_generated) ||
+	    opts.generate_identity_key) {
+		rc = _generate_identity_key(ph);
 		if (rc != 0)
 			goto out;
 
