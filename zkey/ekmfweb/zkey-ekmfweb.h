@@ -41,6 +41,7 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_LOGIN_TOKEN_FILE		"login.token"
 #define EKMFWEB_CONFIG_EKMFWEB_PUBKEY_FILE	"ekmfweb-pubkey.pem"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_FILE	"identity-key.skey"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE	"identity-key.reenc"
 
 #define EKMFWEB_CONFIG_APQNS			"apqns"
 #define EKMFWEB_CONFIG_URL			"url"
@@ -70,6 +71,7 @@ struct plugin_handle {
 #define EKMFWEB_CONFIG_IDENTITY_KEY		"identity-key"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM	"identity-key-algorithm"
 #define EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS	"identity-key-params"
+#define EKMFWEB_CONFIG_IDENTITY_KEY_REENC	"identity-key-reenc"
 
 #define EKMFWEB_PASSCODE_URL			"/administration/passcode"
 #define EKMFWEB_TEMPLATE_STATE_ACTIVE		"ACTIVE"

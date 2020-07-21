@@ -975,6 +975,12 @@ int kms_display_info(const kms_handle_t handle)
 		printf("  Identity key:         (configuration required)\n");
 	}
 
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+	if (tmp != NULL) {
+		printf("                        (re-enciphering pending)\n");
+		free(tmp);
+	}
+
 	return 0;
 }
 #define OPT_TLS_CLIENT_CERT			256
@@ -2543,6 +2549,7 @@ static int _generate_identity_key(struct plugin_handle *ph)
 	struct ekmf_template_info *template_info = NULL;
 	struct ekmf_key_gen_info gen_info;
 	char *template_uuid = NULL;
+	char *reenc_file = NULL;
 	char *error_msg = NULL;
 	char key_params[200];
 	int rc = 0;
@@ -2677,6 +2684,15 @@ static int _generate_identity_key(struct plugin_handle *ph)
 	rc = _set_file_permission(ph, ph->ekmf_config.identity_secure_key);
 	if (rc != 0)
 		goto out;
+
+	reenc_file = properties_get(ph->properties,
+				    EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+	if (reenc_file != NULL) {
+		remove(reenc_file);
+		free(reenc_file);
+		properties_remove(ph->properties,
+				  EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+	}
 
 	pr_verbose(ph, "Generated identity key into '%s'",
 		   ph->ekmf_config.identity_secure_key);
@@ -3120,7 +3136,10 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 		  const struct kms_option *options, size_t num_options)
 {
 	struct plugin_handle *ph = handle;
+	char *reenc_file = NULL;
+	const char *tmp = NULL;
 	size_t i;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(num_options == 0 || options != NULL,
@@ -3140,7 +3159,217 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 
 	_clear_error(ph);
 
-	return 0;
+	if (ph->ekmf_config.identity_secure_key == NULL)
+		return 0;
+
+	reenc_file = properties_get(ph->properties,
+				    EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+	if (reenc_file != NULL && mode == KMS_REENC_MODE_AUTO)
+		mode = KMS_REENC_MODE_STAGED_COMPLETE;
+
+	if (mode == KMS_REENC_MODE_STAGED_COMPLETE) {
+		if (reenc_file == NULL) {
+			_set_error(ph, "Staged re-enciphering is not pending");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		printf("Completing re-enciphering of identity key.\n");
+
+		rc = remove(ph->ekmf_config.identity_secure_key);
+		if (rc != 0) {
+			rc = -errno;
+			_set_error(ph, "Failed to remove file '%s': %s",
+				   ph->ekmf_config.identity_secure_key,
+				   strerror(-rc));
+			goto out;
+		}
+
+		rc = rename(reenc_file, ph->ekmf_config.identity_secure_key);
+		if (rc != 0) {
+			rc = -errno;
+			_set_error(ph, "Failed to rename file '%s' to '%s': %s",
+				   reenc_file,
+				   ph->ekmf_config.identity_secure_key,
+				   strerror(-rc));
+			goto out;
+		}
+
+		rc = properties_remove(ph->properties,
+				       EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+		if (rc != 0) {
+			_set_error(ph, "Failed to remove property %s: %s",
+				   EKMFWEB_CONFIG_IDENTITY_KEY_REENC,
+				   strerror(-rc));
+			goto out;
+		}
+
+		rc = _save_config(ph);
+		if (rc != 0)
+			goto out;
+
+		printf("Successfully completed re-enciphering of identity "
+		       "key.\n");
+
+		rc = 0;
+		goto out;
+	}
+
+	if (reenc_file != NULL)
+		free(reenc_file);
+	reenc_file = NULL;
+
+	rc = _select_cca_adapter(ph);
+	if (rc != 0)
+		goto out;
+
+	switch (mkreg) {
+	case KMS_REENC_MKREG_AUTO:
+	case KMS_REENC_MKREG_TO_NEW:
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_STAGED;
+
+		if (mode == KMS_REENC_MODE_STAGED)
+			util_asprintf(&reenc_file, "%s/%s", ph->config_path,
+				      EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE);
+
+		printf("Re-enciphering the identity key with the APKA master "
+		       "key in the NEW register.\n");
+
+		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, true,
+						  reenc_file, &ph->ext_lib,
+						  ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to re-encipher identity key "
+				   "'%s': %s",
+				   ph->ekmf_config.identity_secure_key,
+				   strerror(-rc));
+			goto out;
+		}
+		break;
+
+	case KMS_REENC_MKREG_FROM_OLD:
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_IN_PLACE;
+
+		if (mode == KMS_REENC_MODE_STAGED)
+			util_asprintf(&reenc_file, "%s/%s", ph->config_path,
+				      EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE);
+
+		printf("Re-enciphering the identity key with the APKA master "
+		       "key in the CURRENT register.\n");
+
+		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, false,
+						  reenc_file, &ph->ext_lib,
+						  ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to re-encipher identity key "
+				   "'%s': %s",
+				   ph->ekmf_config.identity_secure_key,
+				   strerror(-rc));
+			goto out;
+		}
+		break;
+
+	case KMS_REENC_MKREG_FROM_OLD_TO_NEW:
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_STAGED;
+
+		if (mode == KMS_REENC_MODE_STAGED)
+			util_asprintf(&reenc_file, "%s/%s", ph->config_path,
+				      EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE);
+
+		printf("Re-enciphering the identity key with the APKA master "
+		       "key in the CURRENT and then the NEW register.\n");
+
+		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, false,
+						  reenc_file, &ph->ext_lib,
+						  ph->verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to re-encipher identity key "
+				   "'%s': %s",
+				   ph->ekmf_config.identity_secure_key,
+				   strerror(-rc));
+			goto out;
+		}
+
+		if (reenc_file != NULL) {
+			tmp = ph->ekmf_config.identity_secure_key;
+			ph->ekmf_config.identity_secure_key = reenc_file;
+		}
+
+		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, true,
+						  reenc_file, &ph->ext_lib,
+						  ph->verbose);
+
+		if (tmp != NULL)
+			ph->ekmf_config.identity_secure_key = tmp;
+
+		if (rc != 0) {
+			_set_error(ph, "Failed to re-encipher identity key "
+				   "'%s': %s",
+				   ph->ekmf_config.identity_secure_key,
+				   strerror(-rc));
+			goto out;
+		}
+
+		break;
+
+	default:
+		_set_error(ph, "Invalid re-encipher MK register selection");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (mode == KMS_REENC_MODE_STAGED) {
+		rc = _set_file_permission(ph, reenc_file);
+		if (rc != 0)
+			goto out;
+
+		rc = properties_set(ph->properties,
+				    EKMFWEB_CONFIG_IDENTITY_KEY_REENC,
+				    reenc_file);
+		if (rc != 0) {
+			_set_error(ph, "Failed to set property %s: %s",
+				   EKMFWEB_CONFIG_IDENTITY_KEY_REENC,
+				   strerror(-rc));
+			goto out;
+		}
+
+	} else {
+		rc = properties_remove(ph->properties,
+				       EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+		if (rc != 0 && rc != -ENOENT) {
+			_set_error(ph, "Failed to remove property %s: %s",
+				   EKMFWEB_CONFIG_IDENTITY_KEY_REENC,
+				   strerror(-rc));
+			goto out;
+		}
+	}
+
+	rc = _save_config(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = 0;
+
+	if (mode == KMS_REENC_MODE_STAGED)
+		util_print_indented("Staged re-enciphering is initiated for "
+				    "the identity key. After the NEW master "
+				    "key has been set to become the CURRENT "
+				    "master key run 'zkey kms reencipher' with "
+				    "option '--complete' to complete the "
+				    "re-enciphering process.", 0);
+	else
+		printf("Successfully re-enciphered the identity key\n");
+
+out:
+	if (rc != 0 && reenc_file != NULL)
+		remove(reenc_file);
+	if (reenc_file != NULL)
+		free(reenc_file);
+
+	return rc;
 }
 
 /**
