@@ -5627,6 +5627,12 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 		   unsigned char *key_blob, size_t *key_blob_length)
 {
 	struct plugin_handle *ph = handle;
+	int curve_nid = 0, digest_nid = 0;
+	char *identity_key_uuid = NULL;
+	char *error_msg = NULL;
+	bool rsa_pss = false;
+	int rc = 0;
+	char *tmp;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(key_blob != NULL, "Internal error: key_blob is NULL");
@@ -5644,8 +5650,65 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 		return -EINVAL;
 	}
 
-	_set_error(ph, "Not yet implemented");
-	return -ENOTSUP;
+	identity_key_uuid = properties_get(ph->properties,
+					   EKMFWEB_CONFIG_IDENTITY_KEY_ID);
+	if (identity_key_uuid == NULL) {
+		_set_error(ph, "The zkey client is not registered with EKMF "
+			  "Web, run 'zkey kms configure --register CERT-FILE' "
+			  "to register the zkey client.");
+		return -EINVAL;
+	}
+
+	pr_verbose(ph, "identity_key_uuid: '%s'", identity_key_uuid);
+
+	rc = _select_cca_adapter(ph);
+	if (rc != 0)
+		goto out;
+
+	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
+	if (tmp != NULL) {
+		curve_nid = OBJ_txt2nid(tmp);
+		free(tmp);
+	}
+
+#ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST);
+	if (tmp != NULL) {
+		digest_nid = OBJ_txt2nid(tmp);
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->properties,
+			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS);
+	if (tmp != NULL) {
+		if (strcasecmp(tmp, "yes") == 0)
+			rsa_pss = true;
+		free(tmp);
+	}
+#endif
+
+	rc = ekmf_retrieve_key(&ph->ekmf_config, &ph->curl_handle,
+				key_id, curve_nid, digest_nid, rsa_pss,
+				identity_key_uuid, key_blob, key_blob_length,
+				&error_msg, &ph->ext_lib, ph->verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to retrieve key '%s' from EKMF "
+			   "Web: %s", key_id, error_msg != NULL ? error_msg :
+			   strerror(-rc));
+		_remove_login_token_if_error(ph, rc);
+		goto out;
+	}
+
+	rc = _restrict_key(ph, key_blob, *key_blob_length);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (identity_key_uuid != NULL)
+		free(identity_key_uuid);
+
+	return rc;
 }
 
 static const struct kms_functions kms_functions = {
