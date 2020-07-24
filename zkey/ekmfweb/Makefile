@@ -37,6 +37,8 @@ install-libekmfweb.dep:
 	touch install-libekmfweb.dep
 
 install: all install-libekmfweb.dep zkey-ekmfweb.so
+	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
+	$(INSTALL) -m 644 -c zkey-ekmfweb.1 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -d -m 755 $(DESTDIR)$(LIB64DIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T zkey-ekmfweb.so $(DESTDIR)$(LIB64DIR)/zkey-ekmfweb.so
 
