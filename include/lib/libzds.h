@@ -192,7 +192,7 @@
 
 
 #define MAX_LINE_LENGTH 512
-
+#define MAX_SERVER 3
 
 /**
  * @brief This structure represents the count field in an ECKD record.
