@@ -25,6 +25,7 @@
 #include <linux/fiemap.h>
 
 #include "lib/util_proc.h"
+#include "lib/util_sys.h"
 
 #include "disk.h"
 #include "error.h"
@@ -86,88 +87,6 @@ disk_determine_dasd_type(struct disk_info *data,
 		error_reason("Unknown DASD type");
 		return -1;
 	}
-	return 0;
-}
-
-static int blkext_get_partnum(dev_t dev)
-{
-	char path[PATH_MAX], *buf;
-	int dev_major, dev_minor, partnum = -1;
-
-	dev_major = major(dev);
-	dev_minor = minor(dev);
-	snprintf(path, PATH_MAX, "/sys/dev/block/%d:%d/partition",
-		dev_major, dev_minor);
-
-	if (misc_read_special_file(path, &buf, NULL, 1)) {
-		error_text("Could not read from path '%s'", path);
-		return -1;
-	}
-
-	partnum = atoi(buf);
-	free(buf);
-	if (partnum < 0) {
-		error_text("Bad partition number in '%s'", path);
-		return -1;
-	}
-
-	return partnum;
-}
-
-static int blkext_is_base_device(dev_t dev)
-{
-	int dev_major, dev_minor;
-	char path[PATH_MAX];
-	struct stat stats;
-
-	dev_major = major(dev);
-	dev_minor = minor(dev);
-
-	snprintf(path, PATH_MAX, "/sys/dev/block/%d:%d/partition",
-		dev_major, dev_minor);
-	return (stat(path, &stats));
-}
-
-static int blkext_get_base_dev(dev_t dev, dev_t *base_dev)
-{
-	int base_major, base_minor;
-	char dev_path[PATH_MAX], base_path[PATH_MAX];
-	char *temp_path, *buf;
-
-	misc_asprintf(&temp_path, "/sys/dev/block/%d:%d", major(dev), minor(dev));
-	if (!realpath(temp_path, dev_path)) {
-		error_reason(strerror(errno));
-		error_text("Could not resolve link %s", temp_path);
-		free(temp_path);
-		return -1;
-	}
-	free(temp_path);
-
-	misc_asprintf(&temp_path, "%s/..", dev_path);
-	if (!realpath(temp_path, base_path)) {
-		error_reason(strerror(errno));
-		error_text("Could not resolve path %s", temp_path);
-		free(temp_path);
-		return -1;
-	}
-	free(temp_path);
-
-	misc_asprintf(&temp_path, "%s/dev", base_path);
-	if (misc_read_special_file(temp_path, &buf, NULL, 1)) {
-		error_text("Could not read from path '%s'", temp_path);
-		free(temp_path);
-		return -1;
-	}
-	free(temp_path);
-
-	if (sscanf(buf, "%i:%i", &base_major, &base_minor) != 2) {
-		error_text("Could not parse major:minor from string '%s'", buf);
-		free(buf);
-		return -1;
-	}
-
-	free(buf);
-	*base_dev = makedev(base_major, base_minor);
 	return 0;
 }
 
@@ -492,15 +411,15 @@ disk_get_info(const char* device, struct job_target_data* target,
 		data->devno = -1;
 		data->type = disk_type_scsi;
 
-		if (blkext_is_base_device(stats.st_rdev)) {
-			data->device = stats.st_rdev;
-			data->partnum = 0;
-		} else {
-			if (blkext_get_base_dev(stats.st_rdev, &data->device))
+		if (util_sys_dev_is_partition(stats.st_rdev)) {
+			if (util_sys_get_base_dev(stats.st_rdev, &data->device))
 				goto out_close;
-			data->partnum = blkext_get_partnum(stats.st_rdev);
+			data->partnum = util_sys_get_partnum(stats.st_rdev);
 			if (data->partnum == -1)
 				goto out_close;
+		} else {
+			data->device = stats.st_rdev;
+			data->partnum = 0;
 		}
 	} else {
 		/* Driver name is unknown */
