@@ -509,7 +509,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	size_t stage3_params_size;
 	const char *comp_name[10];
 	size_t signature_size;
-	int offset, flags = 0;
+	int offset;
+	uint64_t flags = 0;
 	void *stage3_params;
 	struct stat stats;
 	void *signature;
