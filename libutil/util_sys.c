@@ -141,13 +141,17 @@ int util_sys_get_dev_addr(const char *dev, char *addr)
 	unsigned int maj, min;
 	struct stat s;
 	ssize_t len;
+	dev_t base;
 	char *path;
 
 	if (stat(dev, &s) != 0)
 		return -1;
 
-	maj = major(s.st_rdev);
-	min = minor(s.st_rdev);
+	if (util_sys_get_base_dev(s.st_rdev, &base))
+		return -1;
+
+	maj = major(base);
+	min = minor(base);
 
 	if (S_ISBLK(s.st_mode))
 		path = util_path_sysfs("dev/block/%u:%u/device", maj, min);
