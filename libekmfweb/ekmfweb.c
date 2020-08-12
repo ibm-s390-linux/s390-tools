@@ -43,6 +43,8 @@
 #define MAX_SYM_KEY_BLOB_SIZE		CCA_MAX_SYM_KEY_TOKEN_SIZE
 
 #define EKMF_URI_SYSTEM_PUBKEY		"/api/v1/system/publicKey"
+#define EKMF_URI_SYSTEM_SETTINGS	"/api/v1/system/settings"
+#define EKMF_URI_SYSTEM_FEATURES	"/api/v1/system/features"
 #define EKMF_URI_SYSTEM_LOGIN		"/api/v1/system/login"
 #define EKMF_URI_KEYS_GENERATE		"/api/v1/keys"
 #define EKMF_URI_KEYS_EXPORT		"/api/v1/keys/%s/export"
@@ -71,6 +73,12 @@
 #define KEYSTORE_TYPE_PERV_ENCR		"PERVASIVE_ENCRYPTION"
 #define ORDER_BY_NAME_ASC		"name%3Aasc"
 #define ORDER_BY_LABEL_ASC		"label%3Aasc"
+#define SETTING_ID_IDENTITY_TEMPLATE	"ekmf.web.public.identity.template"
+#define SETTING_ID_XTS_KEY1_TEMPLATE	"ekmf.web.public.xts.template.1"
+#define SETTING_ID_XTS_KEY2_TEMPLATE	"ekmf.web.public.xts.template.2"
+#define SETTING_ID_NON_XTS_TEMPLATE	"ekmf.web.public.non-xts.template"
+#define FEATURE_ID_PERVASIVE_ENCRYPTION					\
+		"com.ibm.ccc.ekmf.web.features.PervasiveEncryptionFeature"
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -1487,6 +1495,343 @@ out:
 
 	return rc;
 }
+
+/**
+ * Finds the setting with the specified ID in the settings array, and returns
+ * its value if found, or NULL otherwise. The returned string is allocated
+ * and must be freed by the caller when no lnger used.
+ *
+ * @param settings_array    the JSON array containing the settings
+ * @param config            the setting ID to get
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns an allocated string conmtaining the setting value, or NULL
+ */
+static char *_ekmf_find_setting(json_object *settings_array,
+				const char *setting_id, bool verbose)
+{
+	const char *id, *value;
+	json_object *obj;
+	int rc = 0, i;
+
+	JSON_CHECK_OBJ(settings_array, json_type_array, rc, -EIO,
+		       "No settings array", verbose, out);
+
+	for (i = 0; i < (int)json_object_array_length(settings_array); i++) {
+		obj = json_object_array_get_idx(settings_array, i);
+		JSON_CHECK_OBJ(obj, json_type_object, rc, -EIO,
+			       "No settings object", verbose, out);
+
+		id = json_get_string(obj, "id");
+		JSON_CHECK_ERROR(id == NULL, rc, -EIO,
+				 "No id field in settings object", verbose,
+				 out);
+
+		if (strcmp(id, setting_id) != 0)
+			continue;
+
+		value = json_get_string(obj, "value");
+		JSON_CHECK_ERROR(value == NULL, rc, -EIO,
+				 "No value field in settings object", verbose,
+				 out);
+
+		return strdup(value);
+	}
+
+	pr_verbose(verbose, "Setting '%s' not found", setting_id);
+out:
+	return NULL;
+}
+
+/**
+ * Retrieves settings from the EKMFWeb server, such as the template names for
+ * generating keys in EKMFWeb.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param identity_template on return: If not NULL, the name of the template
+ *                          used to generate identity keys with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param xts_key1_template on return: If not NULL, the name of the template
+ *                          used to generate the first XTS key with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param xts_key1_template on return: If not NULL, the name of the template
+ *                          used to generate the second XTS key with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param xts_key1_template on return: If not NULL, the name of the template
+ *                          used to generate a non-XTS key with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ */
+int ekmf_get_settings(const struct ekmf_config *config, CURL **curl_handle,
+		      char **identity_template, char **xts_key1_template,
+		      char **xts_key2_template, char **non_xts_template,
+		      char **error_msg, bool verbose)
+{
+	json_object *response_obj = NULL;
+	char *login_token = NULL;
+	bool token_valid = false;
+	CURL *curl = NULL;
+	long status_code;
+	int rc;
+
+	if (config == NULL)
+		return -EINVAL;
+
+	if (identity_template == NULL && xts_key1_template == NULL &&
+	    xts_key2_template == NULL && non_xts_template == NULL)
+		return 0;
+
+	rc = ekmf_check_login_token(config, &token_valid, &login_token,
+				    verbose);
+	if (rc != 0 || !token_valid) {
+		pr_verbose(verbose, "No valid login token available");
+		rc = -EACCES;
+		goto out;
+	}
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, EKMF_URI_SYSTEM_SETTINGS, "GET",
+				   NULL, NULL, login_token, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	case 401:
+		pr_verbose(verbose, "Not authorized");
+		rc = -EACCES;
+		goto out;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_array, rc, -EIO,
+		       "No or invalid response content", verbose, out);
+
+	if (identity_template != NULL) {
+		*identity_template = _ekmf_find_setting(response_obj,
+					SETTING_ID_IDENTITY_TEMPLATE, verbose);
+		if (*identity_template == NULL) {
+			if (error_msg != NULL) {
+				if (asprintf(error_msg, "The EKMF Web setting "
+					     "'Identity Key Template Name' "
+					     "must be configured") < 0)
+					error_msg = NULL;
+			}
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (xts_key1_template != NULL) {
+		*xts_key1_template = _ekmf_find_setting(response_obj,
+					SETTING_ID_XTS_KEY1_TEMPLATE, verbose);
+		if (*xts_key1_template == NULL) {
+			if (error_msg != NULL) {
+				if (asprintf(error_msg, "The EKMF Web setting "
+					     "'XTS Key Template Name (Key 1)' "
+					     "must be configured") < 0)
+					error_msg = NULL;
+			}
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (xts_key2_template != NULL) {
+		*xts_key2_template = _ekmf_find_setting(response_obj,
+					SETTING_ID_XTS_KEY2_TEMPLATE, verbose);
+		if (*identity_template == NULL) {
+			if (error_msg != NULL) {
+				if (asprintf(error_msg, "The EKMF Web setting "
+					     "'XTS Key Template Name (Key 2)' "
+					     "must be configured") < 0)
+					error_msg = NULL;
+			}
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (non_xts_template != NULL) {
+		*non_xts_template = _ekmf_find_setting(response_obj,
+					SETTING_ID_NON_XTS_TEMPLATE, verbose);
+		if (*non_xts_template == NULL) {
+			if (error_msg != NULL) {
+				if (asprintf(error_msg, "The EKMF Web setting "
+					     "'Non-XTS Key Template Name' "
+					     "must be configured") < 0)
+					error_msg = NULL;
+			}
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+	if (login_token != NULL)
+		free(login_token);
+	if (rc != 0) {
+		if (identity_template != NULL && *identity_template != NULL) {
+			free(*identity_template);
+			*identity_template = NULL;
+		}
+		if (xts_key1_template != NULL && *xts_key1_template != NULL) {
+			free(*xts_key1_template);
+			*xts_key1_template = NULL;
+		}
+		if (xts_key2_template != NULL && *xts_key2_template != NULL) {
+			free(*xts_key2_template);
+			*xts_key2_template = NULL;
+		}
+		if (non_xts_template != NULL && *non_xts_template != NULL) {
+			free(*non_xts_template);
+			*non_xts_template = NULL;
+		}
+	}
+
+	return rc;
+}
+
+/**
+ * Checks if the EKMFWeb server has the required Pervasive Encryption feature
+ * installed
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -ENOTSUP is returned, if the feature is not installed.
+ */
+int ekmf_check_feature(const struct ekmf_config *config, CURL **curl_handle,
+		       char **error_msg, bool verbose)
+{
+	json_object *response_obj = NULL, *obj;
+	bool found = false;
+	CURL *curl = NULL;
+	long status_code;
+	const char *id;
+	int rc, i;
+
+	if (config == NULL)
+		return -EINVAL;
+
+	rc = _ekmf_get_curl_handle(curl_handle, &curl);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get CURL handle");
+		rc = -EIO;
+		goto out;
+	}
+
+	rc = _ekmf_perform_request(config, EKMF_URI_SYSTEM_FEATURES, "GET",
+				   NULL, NULL, NULL, &response_obj, NULL,
+				   &status_code, error_msg, curl, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed perform the REST call");
+		if (rc > 0)
+			rc = -EIO;
+		goto out;
+	}
+
+	switch (status_code) {
+	case 200:
+		break;
+	default:
+		pr_verbose(verbose, "REST Call failed with HTTP status code: "
+			   "%ld", status_code);
+		rc = -EIO;
+		goto out;
+	}
+
+	JSON_CHECK_OBJ(response_obj, json_type_array, rc, -EIO,
+		       "No or invalid response content", verbose, out);
+
+	for (i = 0; i < (int)json_object_array_length(response_obj); i++) {
+		obj = json_object_array_get_idx(response_obj, i);
+		JSON_CHECK_OBJ(obj, json_type_object, rc, -EIO,
+			       "No features object", verbose, out);
+
+		id = json_get_string(obj, "id");
+		JSON_CHECK_ERROR(id == NULL, rc, -EIO,
+				 "No id field in settings object", verbose,
+				 out);
+
+		if (strcmp(id, FEATURE_ID_PERVASIVE_ENCRYPTION) != 0)
+			continue;
+
+		found = true;
+		break;
+	}
+
+	if (!found) {
+		pr_verbose(verbose, "Feature '%s' is not installed",
+			   FEATURE_ID_PERVASIVE_ENCRYPTION);
+		rc = -ENOTSUP;
+		if (asprintf(error_msg, "EKMF Web feature "
+			     "'Pervasive Encryption' is not installed.")) {
+			pr_verbose(verbose, "asprintf failed");
+			rc = -ENOMEM;
+		}
+		goto out;
+	}
+
+out:
+	_ekmf_release_curl_handle(curl_handle, curl);
+
+	if (response_obj != NULL)
+		json_object_put(response_obj);
+
+	return rc;
+}
+
 
 /**
  * Build the party info JSON object as base64(sha256(key_uuid|timestamp)).

@@ -380,6 +380,72 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 			  const struct ekmf_ext_lib *ext_lib, bool verbose);
 
 /**
+ * Retrieves settings from the EKMFWeb server, such as the template names for
+ * generating keys in EKMFWeb.
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param identity_template on return: If not NULL, the name of the template
+ *                          used to generate identity keys with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param xts_key1_template on return: If not NULL, the name of the template
+ *                          used to generate the first XTS key with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param xts_key1_template on return: If not NULL, the name of the template
+ *                          used to generate the second XTS key with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param xts_key1_template on return: If not NULL, the name of the template
+ *                          used to generate a non-XTS key with. The caller
+ *                          must free the error string when it is not NULL.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned, if no or no valid login token is available.
+ */
+int ekmf_get_settings(const struct ekmf_config *config, CURL **curl_handle,
+		      char **identity_template, char **xts_key1_template,
+		      char **xts_key2_template, char **non_xts_template,
+		      char **error_msg, bool verbose);
+
+/**
+ * Checks if the EKMFWeb server has the required Pervasive Encryption feature
+ * installed
+ *
+ * To perform a single request, set curl_handle to NULL. This will cause the
+ * function to initialize a new CURL handle, use it, and destroy it.
+ * If you plan to perform multiple requests to the same host, supply the address
+ * of a CURL pointer that is initially NULL. This function will then initialize
+ * a new CURL handle on the first call. On subsequent calls, pass in the address
+ * of the same CURL pointer so that the CURL handle is reused. After the last
+ * request, the CURL handle must be destroyed by calling ekmf_curl_destroy).
+ *
+ * @param config            the configuration structure
+ * @param curl_handle       address of a CURL handle used for reusing the same
+ *                          CURL handle with multiple requests.
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -ENOTSUP is returned, if the feature is not installed.
+ */
+int ekmf_check_feature(const struct ekmf_config *config, CURL **curl_handle,
+		       char **error_msg, bool verbose);
+
+/**
  * Request the EKMFWeb server's public signing key and store it into PEM file
  * specified in field server_pubkey of the config structure.
  *

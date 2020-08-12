@@ -9,6 +9,8 @@ LIBEKMFWEB_1.0 {
         ekmf_generate_csr;
         ekmf_generate_ss_cert;
         ekmf_get_public_key;
+        ekmf_get_settings;
+        ekmf_check_feature;
         ekmf_retrieve_key;
         ekmf_list_templates;
         ekmf_get_template;
