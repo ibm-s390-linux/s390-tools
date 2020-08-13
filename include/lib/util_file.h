@@ -25,4 +25,5 @@ int util_file_write_ll(long long val, int base, const char *fmt, ...);
 int util_file_write_ul(unsigned long val, int base, const char *fmt, ...);
 int util_file_write_ull(unsigned long long val, int base, const char *fmt, ...);
 
+int util_file_read_va(const char *path, const char *fmt, ...);
 #endif /** LIB_UTIL_FILE_H @} */

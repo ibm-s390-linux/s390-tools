@@ -508,3 +508,31 @@ int util_file_read_ull(unsigned long long *val, int base, const char *fmt, ...)
 	}
 	return (count == 1) ? 0 : -1;
 }
+
+/**
+ * Read a file and convert it according to format string
+ *
+ * @param[in]  path     File name to read
+ * @param[in]  fmt      Format string for parsing the content
+ * @param[out] ...      Parameters for format string
+ *
+ * @retval     != -1    Number of values parsed correctly
+ * @retval    -1        Error while reading file
+ */
+
+int util_file_read_va(const char *path, const char *fmt, ...)
+{
+	char buf[512];
+	va_list ap;
+	int ret;
+
+	if (file_gets(buf, sizeof(buf), path))
+		return -1;
+
+	va_start(ap, fmt);
+	ret = vsscanf(buf, fmt, ap);
+	va_end(ap);
+	if (ret == EOF)
+		return -1;
+	return ret;
+}
