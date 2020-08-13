@@ -12,8 +12,10 @@
 #define LIB_UTIL_FILE_H
 
 int util_file_read_line(char *str, size_t size, const char *fmt, ...);
+int util_file_read_i(int *val, int base, const char *fmt, ...);
 int util_file_read_l(long *val, int base, const char *fmt, ...);
 int util_file_read_ll(long long *val, int base, const char *fmt, ...);
+int util_file_read_ui(unsigned int *val, int base, const char *fmt, ...);
 int util_file_read_ul(unsigned long *val, int base, const char *fmt, ...);
 int util_file_read_ull(unsigned long long *val, int base, const char *fmt, ...);
 
