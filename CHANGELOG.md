@@ -1,13 +1,22 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.1x.x (2020-xx-xx)__
+* __v2.14.0 (2020-08-21)__
 
-  For Linux kernel version: 5.x
+  For Linux kernel version: 5.7 / 5.8
 
   Changes of existing tools:
-
+  - cpacfstats: Add ECC counters
+  - dbginfo: Added collection of /proc/softirqs
+  - ipl-tools: Add nvme device support to lsreipl/chreipl
+  - zdsfs: Add coordinated read access
+  - libzds: Add curl interface to access zosmf rest api
+  - util_opt: Change util_opt_init() to honor current command, if set
   Bug Fixes:
-
+  - lsluns: Try harder to find udevadm
+  - mon_tools: Update udevadm location
+  - zipl: Fix NVMe partition and base device detection
+  - zipl/stage3: Correctly handle diag308 response code
+  - znetconf: Introduce better ways to locate udevadm
 
 * __v2.13.0 (2020-05-06)__
 

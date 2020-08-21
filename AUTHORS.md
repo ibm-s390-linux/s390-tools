@@ -1,6 +1,7 @@
 List of all individuals having contributed content to s390-tools
 ----------------------------------------------------------------
 
+- Alexander Egorenkov
 - Alexey Ishchuk
 - Andreas Herrmann
 - Andre Wild
@@ -32,6 +33,7 @@ List of all individuals having contributed content to s390-tools
 - Fritz Elfert
 - Gerald Schaefer
 - Gerhard Tonn
+- Guevenc Guelce
 - Hannes Reinecke
 - Hans-Joachim Picht
 - Hans Wippel
@@ -52,6 +54,7 @@ List of all individuals having contributed content to s390-tools
 - Jean-Baptiste Joret
 - Jens Remus
 - Jochen Roehrig
+- Juergen Christ
 - Julian Wiedmann
 - Karsten Graul
 - Kittipon Meesompop
