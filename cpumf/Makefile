@@ -1,7 +1,5 @@
 include ../common.mak
 
-TESTS := tests/
-
 BIN_FILES = lscpumf chcpumf
 MAN_FILES = lscpumf.1 chcpumf.8
 
