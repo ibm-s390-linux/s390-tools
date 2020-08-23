@@ -10,10 +10,11 @@ zipl-switch-to-blscfg \- Switch zipl to use BootLoaderSpec configuration
 \fBzipl-switch-to-blscfg\fP {\-h|\-v}
 
 .SH DESCRIPTION
-This script switches the zipl boot-loader configuration to use BootLoaderSpec files
-to define IPL sections. For each Linux kernel defined in the zipl.conf config file,
-a BLS fragment is generated in the BLS directory specified. Also, the zipl.conf is
-modified it only contains global configurations, all IPL sections comes from BLS.
+This script switches the zipl boot-loader configuration to use BootLoaderSpec
+files to define IPL sections. For each Linux kernel defined in the zipl.conf
+config file, a BLS fragment is generated in the BLS directory specified. Also,
+zipl.conf is modified to only contain global configuration. All IPL sections
+come from BLS files.
 
 .SH OPTIONS
 .TP
@@ -30,7 +31,8 @@ The suffix used for backup files, defaults to .bak.
 
 .TP
 \fB\-\-bls-directory <DIRECTORY>\fP
-The DIRECTORY where the BLS fragments will be generated. The directory is created if it doesn't exists, by default /boot/loader/entries is used.
+The DIRECTORY where the BLS fragments will be stored. The directory is
+created if it does not exist. By default /boot/loader/entries is used.
 
 .TP
 \fB\-\-config-file <FILE>\fP
