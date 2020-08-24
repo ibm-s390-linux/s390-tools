@@ -21,6 +21,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -28,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include <sys/stat.h>
 
@@ -730,6 +732,67 @@ scan_bls_field(struct misc_file_buffer *file, struct scan_token* scan,
 	return 0;
 }
 
+/**
+ * find a line with keyword "title" and move it to the top
+ */
+static int sort_bls_fields(struct misc_file_buffer *file, char *filename)
+{
+	bool is_title = false;
+	size_t title_len = 0;
+	int nr_titles = 0;
+	size_t title_off;
+	char *title;
+	int current;
+	size_t len;
+
+	while (file->length - file->pos > 4 /* for "title" */) {
+		if (strncmp("title", &file->buffer[file->pos], 5) == 0) {
+			is_title = true;
+			nr_titles++;
+			title_off = file->pos;
+		}
+		for (len = 0;; file->pos++, len++) {
+			current = misc_get_char(file, 0);
+			if (current == '\n' || current == EOF)
+				break;
+		}
+		if (is_title == true)
+			title_len = len;
+		if (current == EOF)
+			break;
+		file->pos++;
+	}
+	file->pos = 0;
+
+	if (nr_titles == 0) {
+		error_reason("no title in %s", filename);
+		return -1;
+	}
+	if (nr_titles > 1) {
+		error_reason("more than one title in %s", filename);
+		return -1;
+	}
+	if (title_off == 0)
+		return 0;
+
+	title = misc_malloc(title_len);
+	if (!title)
+		return -1;
+	/*
+	 * copy the title field w/o trailing '\n' to the temporary buffer
+	 */
+	memcpy(title, &file->buffer[title_off], title_len);
+	/*
+	 * shift preceded memory region w/o trailing '\n' to the right
+	 */
+	assert(file->buffer[title_off - 1] == '\n');
+	memmove(&file->buffer[title_len + 1], &file->buffer[0], title_off - 1);
+	file->buffer[title_len] = '\n';
+	memcpy(&file->buffer[0], title, title_len);
+
+	free(title);
+	return 0;
+}
 
 int
 scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
@@ -777,6 +840,10 @@ scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
 		printf("Using BLS config file '%s'\n", filename);
 
 		rc = misc_get_file_buffer(filename, &file);
+		if (rc)
+			goto err;
+
+		rc = sort_bls_fields(&file, filename);
 		if (rc)
 			goto err;
 
