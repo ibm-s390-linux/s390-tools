@@ -517,7 +517,7 @@ void VirtAdapterPrinter::print_num_requests(FILE *fp, const struct blkiomon_stat
 void VirtAdapterPrinter::print_topline(FILE *fp)
 {
 	if (m_csv)
-		fprintf(fp, "timestamp,aggregated,CHPID,Bus-ID,qdio utilization max %%,qdio utilization avg %%,queue full,fail erc,throughput read / MS/s,throughput write / MS/s,I/O requests read,I/O requqests write\n");
+		fprintf(fp, "timestamp,aggregated,CHPID,Bus-ID,qdio utilization max %%,qdio utilization avg %%,queue full,fail erc,throughput read / MS/s,throughput write / MS/s,I/O requests read,I/O requests write\n");
 	else {
 		fprintf(fp, "CHP Bus-ID  |qdio util.%%|queu|fail|-thp in MB/s-|I/O reqs-|\n");
 		fprintf(fp, " ID            max   avg full  erc     rd    wrt   rd  wrt\n");
