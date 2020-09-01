@@ -420,7 +420,7 @@ void VirtAdapterPrinter::print_virt_adpt(FILE *fp, __u32 devno,
 					int *rc)
 {
 	if (m_csv)
-		fprintf(fp, "%x,%x.%x.%04x,",
+		fprintf(fp, "%x,%x.%x.%04x",
 			       m_cfg->get_chpid_by_devno(devno, rc),
 			       ZIOREP_BUSID_UNPACKED(devno));
 	else
