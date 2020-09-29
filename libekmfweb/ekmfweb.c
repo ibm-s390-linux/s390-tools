@@ -80,6 +80,9 @@
 #define FEATURE_ID_PERVASIVE_ENCRYPTION					\
 		"com.ibm.ccc.ekmf.web.features.PervasiveEncryptionFeature"
 
+void __attribute__ ((constructor)) ekmf_init(void);
+void __attribute__ ((destructor)) ekmf_exit(void);
+
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
 							warnx(fmt);	\
@@ -137,9 +140,9 @@ struct curl_sslctx_cb_data {
 #define CURL_CERTINFO_CERT	"Cert:"
 #define HTTP_HDR_CONTENT_TYPE	"Content-Type:"
 
-const char *accepted_content_types[] = { "application/json",
-					 "text/x-json",
-					 NULL};
+static const char *accepted_content_types[] = { "application/json",
+						"text/x-json",
+						NULL};
 
 struct private_data {
 	const struct ekmf_ext_lib *ext_lib;
