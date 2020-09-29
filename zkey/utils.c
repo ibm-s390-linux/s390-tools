@@ -45,7 +45,7 @@
  *          0 if offline,
  *          -1 if its not the specified type.
  */
-int sysfs_is_card_online(int card, enum card_type cardtype)
+int sysfs_is_card_online(unsigned int card, enum card_type cardtype)
 {
 	long int online;
 	char *dev_path;
@@ -106,7 +106,8 @@ out:
  *          0 if offline,
  *          -1 if its not the specified type.
  */
-int sysfs_is_apqn_online(int card, int domain, enum card_type cardtype)
+int sysfs_is_apqn_online(unsigned int card, unsigned int domain,
+			 enum card_type cardtype)
 {
 	long int online;
 	char *dev_path;
@@ -144,7 +145,7 @@ out:
  *
  * @returns The card level, or -1 of the level can not be determined.
  */
-int sysfs_get_card_level(int card)
+int sysfs_get_card_level(unsigned int card)
 {
 	char *dev_path;
 	char type[20];
@@ -187,7 +188,7 @@ out:
  *
  * @returns The card type, or -1 of the type can not be determined.
  */
-enum card_type sysfs_get_card_type(int card)
+enum card_type sysfs_get_card_type(unsigned int card)
 {
 	char *dev_path;
 	char type[20];
@@ -235,7 +236,7 @@ out:
  *          -ENOTSUP if the serialnr sysfs attribute is not available, because
  *          the zcrypt kernel module is on an older level.
  */
-int sysfs_get_serialnr(int card, char *serialnr, bool verbose)
+int sysfs_get_serialnr(unsigned int card, char *serialnr, bool verbose)
 {
 	char *dev_path;
 	int rc = 0;
@@ -286,7 +287,7 @@ out:
  *          the zcrypt kernel module is on an older level, or because the card
  *          type does not provide this information.
  */
-int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
+int sysfs_get_firmware_version(unsigned int card, struct fw_version *fw_version,
 			       bool verbose)
 {
 	char *dev_path;
@@ -310,7 +311,7 @@ int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
 		goto out;
 	}
 
-	if (sscanf(buf, "%d.%d", &fw_version->major, &fw_version->minor) != 2) {
+	if (sscanf(buf, "%u.%u", &fw_version->major, &fw_version->minor) != 2) {
 		rc = -ENODEV;
 		goto out;
 	}
@@ -321,7 +322,7 @@ int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
 		goto out;
 	}
 
-	if (sscanf(buf, "%d", &fw_version->api_ordinal) != 1) {
+	if (sscanf(buf, "%u", &fw_version->api_ordinal) != 1) {
 		rc = -ENODEV;
 		goto out;
 	}
@@ -477,7 +478,8 @@ static int parse_ep11_mk_info(char *line, struct mk_info *mk_info)
  *          -ENOTSUP if the mkvps sysfs attribute is not available, because the
  *          zcrypt kernel module is on an older level.
  */
-int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info, bool verbose)
+int sysfs_get_mkvps(unsigned int card, unsigned int domain,
+		    struct mk_info *mk_info, bool verbose)
 {
 	enum card_type cardtype;
 	char *dev_path;
@@ -572,13 +574,14 @@ out:
 	return rc;
 }
 
-static int scan_for_domains(int card, enum card_type cardtype,
+static int scan_for_domains(unsigned int card, enum card_type cardtype,
 			    apqn_handler_t handler, void *handler_data,
 			    bool verbose)
 {
 	struct dirent **namelist;
 	char fname[290];
-	int i, n, domain, rc = 0;
+	int i, n, rc = 0;
+	unsigned int domain;
 
 	sprintf(fname, "/sys/devices/ap/card%02x/", card);
 	n = util_scandir(&namelist, alphasort, fname,
@@ -613,7 +616,8 @@ static int scan_for_apqns(enum card_type cardtype, apqn_handler_t handler,
 			  void *handler_data, bool verbose)
 {
 	struct dirent **namelist;
-	int i, n, card, rc = 0;
+	int i, n, rc = 0;
+	unsigned int card;
 
 	if (handler == NULL)
 		return -EINVAL;
@@ -663,7 +667,7 @@ static int scan_for_apqns(enum card_type cardtype, apqn_handler_t handler,
 int handle_apqns(const char *apqns, enum card_type cardtype,
 		 apqn_handler_t handler, void *handler_data, bool verbose)
 {
-	int card, domain;
+	unsigned int card, domain;
 	char *copy, *tok;
 	char *save;
 	int rc = 0;
@@ -702,7 +706,8 @@ struct print_apqn_info {
 	bool verbose;
 };
 
-static int print_apqn_mk_info(int card, int domain, void *handler_data)
+static int print_apqn_mk_info(unsigned int card, unsigned int domain,
+			      void *handler_data)
 {
 	struct print_apqn_info *info = (struct print_apqn_info *)handler_data;
 	struct mk_info mk_info;
@@ -819,7 +824,8 @@ struct cross_check_info {
 	bool	verbose;
 };
 
-static int cross_check_mk_info(int card, int domain, void *handler_data)
+static int cross_check_mk_info(unsigned int card, unsigned int domain,
+			       void *handler_data)
 {
 	struct cross_check_info *info = (struct cross_check_info *)handler_data;
 	struct fw_version fw_version;
@@ -1050,7 +1056,7 @@ int cross_check_apqns(const char *apqns, u8 *mkvp, int min_level,
 		      enum card_type cardtype, bool print_mks, bool verbose)
 {
 	struct cross_check_info info;
-	char temp[200];
+	char temp[250];
 	int rc;
 
 	memset(&info, 0, sizeof(info));

@@ -158,8 +158,9 @@ struct ep11_lib {
 
 int load_ep11_library(struct ep11_lib *ep11, bool verbose);
 
-int get_ep11_target_for_apqn(struct ep11_lib *ep11, int card, int domain,
-			     target_t *target, bool verbose);
+int get_ep11_target_for_apqn(struct ep11_lib *ep11, unsigned int card,
+			     unsigned int domain, target_t *target,
+			     bool verbose);
 
 void free_ep11_target_for_apqn(struct ep11_lib *ep11, target_t target);
 
@@ -168,11 +169,11 @@ void free_ep11_target_for_apqn(struct ep11_lib *ep11, target_t target);
 
 int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
 			     const char *apqns,  unsigned int flags,
-			     target_t *target, int *card, int *domain,
-			     bool verbose);
+			     target_t *target, unsigned int *card,
+			     unsigned int *domain, bool verbose);
 
-int reencipher_ep11_key(struct ep11_lib *ep11, target_t target, int card,
-			int domain, u8 *secure_key,
+int reencipher_ep11_key(struct ep11_lib *ep11, target_t target,
+			unsigned int card, unsigned int domain, u8 *secure_key,
 			unsigned int secure_key_size, bool verbose);
 
 #endif

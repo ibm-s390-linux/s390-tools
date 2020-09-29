@@ -73,7 +73,7 @@ static void misc_print_required_parms(const char *parm_name1,
 /*
  * Program configuration
  */
-const struct util_prg prg = {
+static const struct util_prg prg = {
 	.desc = "Manage secure volume keys of volumes encrypted with LUKS2 and "
 		"the 'paes' cipher",
 	.command_args = "COMMAND DEVICE",
@@ -368,8 +368,8 @@ static void set_int_handler(void)
 	pr_verbose("Installing SIGINT/SIGTERM handler");
 	memset(&sigaction_open, 0, sizeof(struct sigaction));
 	sigaction_open.sa_handler = int_handler;
-	sigaction(SIGINT, &sigaction_open, 0);
-	sigaction(SIGTERM, &sigaction_open, 0);
+	sigaction(SIGINT, &sigaction_open, NULL);
+	sigaction(SIGTERM, &sigaction_open, NULL);
 }
 
 static void print_usage_command(const struct zkey_cryptsetup_command *command)
@@ -2256,7 +2256,7 @@ static bool is_command(struct zkey_cryptsetup_command *command, const char *str)
 /*
  * Find the command in the command table
  */
-struct zkey_cryptsetup_command *find_command(const char *command)
+static struct zkey_cryptsetup_command *find_command(const char *command)
 {
 	struct zkey_cryptsetup_command *cmd = zkey_cryptsetup_commands;
 

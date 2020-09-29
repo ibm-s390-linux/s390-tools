@@ -227,7 +227,7 @@ out:
  * @returns the encoded passphrase or NULL in case of an error.
  * The caller must free the string when no longer needed.
  */
-char *_encode_passphrase(const char *passphrase)
+static char *_encode_passphrase(const char *passphrase)
 {
 	int inlen, outlen, len;
 	char *out;
@@ -259,7 +259,7 @@ char *_encode_passphrase(const char *passphrase)
  * @returns the decoded passphrase or NULL in case of an error.
  * The caller must free the string when no longer needed.
  */
-char *_decode_passphrase(const char *passphrase)
+static char *_decode_passphrase(const char *passphrase)
 {
 	int inlen, outlen, len;
 	char *out;
@@ -528,9 +528,9 @@ static void _unload_cca_library(struct plugin_handle *ph)
 static int _select_cca_adapter(struct plugin_handle *ph)
 {
 	struct cca_lib cca = { 0 };
+	unsigned int card, domain;
 	char **apqn_list = NULL;
 	bool selected = false;
-	int card, domain;
 	int rc = 0, i;
 	char *apqns;
 
@@ -1040,7 +1040,7 @@ int kms_display_info(const kms_handle_t handle)
 #define OPT_KT_RSA_PSS_SIGNATURE		264
 #endif
 
-const struct util_opt configure_options[] = {
+static const struct util_opt configure_options[] = {
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "EKMFWEB SPECIFIC OPTIONS FOR THE SERVER CONNECTION",
@@ -1313,7 +1313,7 @@ const struct util_opt configure_options[] = {
 	UTIL_OPT_END,
 };
 
-const struct util_opt generate_options[] = {
+static const struct util_opt generate_options[] = {
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "EKMFWEB SPECIFIC OPTIONS",
@@ -1334,7 +1334,7 @@ const struct util_opt generate_options[] = {
 	UTIL_OPT_END,
 };
 
-const struct util_opt remove_options[] = {
+static const struct util_opt remove_options[] = {
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "EKMFWEB SPECIFIC OPTIONS",
@@ -1356,7 +1356,7 @@ const struct util_opt remove_options[] = {
 	UTIL_OPT_END,
 };
 
-const struct util_opt list_options[] = {
+static const struct util_opt list_options[] = {
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "EKMFWEB SPECIFIC OPTIONS",

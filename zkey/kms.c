@@ -1041,11 +1041,12 @@ static int _parse_and_check_apqn(const char *apqn, struct kms_apqn *kms_apqn,
 {
 	struct card_info *card_info = NULL;
 	struct fw_version fw_version;
-	int rc, card, domain, level;
+	unsigned int card, domain;
 	enum card_type type;
 	regmatch_t pmatch[1];
-	regex_t reg_buf;
 	unsigned int num;
+	regex_t reg_buf;
+	int rc, level;
 	size_t i;
 
 	rc = regcomp(&reg_buf, "[[:xdigit:]]+\\.[[:xdigit:]]", REG_EXTENDED);
@@ -1059,9 +1060,8 @@ static int _parse_and_check_apqn(const char *apqn, struct kms_apqn *kms_apqn,
 		goto out;
 	}
 
-	if (sscanf(apqn, "%x.%x%n", &card, &domain, &num) != 2 ||
-	    num != strlen(apqn) || card < 0 || card > 0xff ||
-	    domain < 0 || domain > 0xFFFF) {
+	if (sscanf(apqn, "%x.%x%n", &card, &domain, (int *)&num) != 2 ||
+	    num != strlen(apqn) || card > 0xff || domain > 0xFFFF) {
 		warnx("The APQN '%s' is not valid", apqn);
 		rc = -EINVAL;
 		goto out;
@@ -3224,7 +3224,7 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		str = _find_property(properties, num_properties,
 				     KMS_KEY_PROP_SECTOR_SIZE);
 		if (str != NULL)
-			sscanf(str, "%lu", sector_size);
+			sscanf(str, "%lu", (long unsigned int *)sector_size);
 	}
 
 	key_blob_size = sizeof(key_blob);

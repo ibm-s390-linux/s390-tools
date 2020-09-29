@@ -702,11 +702,11 @@ static int _keystore_change_association(struct properties *key_props,
 static int _keystore_apqn_match(const char *pattern, const char *apqn,
 				int UNUSED(flags))
 {
-	char *modified;
+	unsigned int card, domain;
 	char *pattern_domain;
 	char *pattern_card;
+	char *modified;
 	char *copy;
-	int card, domain;
 	size_t i;
 	char *ch;
 	int rc;
@@ -996,8 +996,10 @@ static int _keystore_process_filtered(struct keystore *keystore,
 	int len;
 
 	pr_verbose(keystore, "Process_filtered: name_filter = '%s', "
-		   "volume_filter = '%s', apqn_filter = '%s'", name_filter,
-		   volume_filter, apqn_filter);
+		   "volume_filter = '%s', apqn_filter = '%s'",
+		   name_filter ? name_filter : "(null)",
+		   volume_filter ? volume_filter : "(null)",
+		   apqn_filter ? apqn_filter : "(null)");
 
 	if (volume_filter != NULL)
 		vol_filter_list = str_list_split(volume_filter);
@@ -1145,10 +1147,11 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 				char **normalized, void *private)
 {
 	struct apqn_check *info = (struct apqn_check *)private;
-	int rc, card, domain;
+	unsigned int card, domain;
 	regmatch_t pmatch[1];
-	regex_t reg_buf;
 	unsigned int num;
+	regex_t reg_buf;
+	int rc;
 
 	*normalized = NULL;
 
@@ -1163,9 +1166,8 @@ static int _keystore_apqn_check(const char *apqn, bool remove, bool UNUSED(set),
 		goto out;
 	}
 
-	if (sscanf(apqn, "%x.%x%n", &card, &domain, &num) != 2 ||
-	    num != strlen(apqn) || card < 0 || card > 0xff ||
-	    domain < 0 || domain > 0xFFFF) {
+	if (sscanf(apqn, "%x.%x%n", &card, &domain, (int *)&num) != 2 ||
+	    num != strlen(apqn) || card > 0xff || domain > 0xFFFF) {
 		warnx("the APQN '%s' is not valid", apqn);
 		rc = -EINVAL;
 		goto out;
@@ -3791,7 +3793,8 @@ static int _keystore_display_key(struct keystore *keystore,
 			       file_names->skey_filename, secure_key_size,
 			       is_xts_key(secure_key, secure_key_size),
 			       clear_key_bitsize, 0, 0,
-			       _keystore_reencipher_key_exists(file_names), 0);
+			       _keystore_reencipher_key_exists(file_names),
+			       NULL);
 
 out:
 	free(secure_key);
@@ -5015,7 +5018,6 @@ prompt_alt_name:
 	key_type = get_key_type(secure_key, secure_key_size);
 	if (key_type == NULL) {
 		warnx("Key '%s' is not a valid secure key", key_name);
-		free(secure_key);
 		rc = -EINVAL;
 		goto out;
 	}

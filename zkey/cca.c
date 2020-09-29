@@ -554,7 +554,8 @@ static int get_cca_adapter_version(struct cca_lib *cca,
  *          because the zcrypt kernel module is on an older level. -ENODEV is
  *          returned if the APQN is not available.
  */
-int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose)
+int select_cca_adapter(struct cca_lib *cca, unsigned int card,
+		       unsigned int domain, bool verbose)
 {
 	unsigned int adapters, adapter;
 	char adapter_serialnr[9];
@@ -633,12 +634,12 @@ struct find_mkvp_info {
 	u8		mkvp[MKVP_LENGTH];
 	unsigned int	flags;
 	bool		found;
-	int		card;
-	int		domain;
+	unsigned int	card;
+	unsigned int	domain;
 	bool		verbose;
 };
 
-static int find_mkvp(int card, int domain, void *handler_data)
+static int find_mkvp(unsigned int card, unsigned int domain, void *handler_data)
 {
 	struct find_mkvp_info *info = (struct find_mkvp_info *)handler_data;
 	struct mk_info mk_info;
@@ -711,7 +712,7 @@ int select_cca_adapter_by_mkvp(struct cca_lib *cca, u8 *mkvp, const char *apqns,
 
 	pr_verbose(verbose, "Select mkvp %s in APQNs %s for the CCA host "
 		   "library", printable_mkvp(CARD_TYPE_CCA, mkvp),
-		   apqns == 0 ? "ANY" : apqns);
+		   apqns == NULL ? "ANY" : apqns);
 
 	memcpy(info.mkvp, mkvp, sizeof(info.mkvp));
 	info.flags = flags;

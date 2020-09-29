@@ -115,10 +115,14 @@ struct ep11keytoken {
 #define AESCIPHER_KEY_SIZE	sizeof(struct aescipherkeytoken)
 #define EP11_KEY_SIZE		sizeof(struct ep11keytoken)
 
-#define MAX_SECURE_KEY_SIZE	MAX(EP11_KEY_SIZE, \
-				    MAX(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE))
-#define MIN_SECURE_KEY_SIZE	MIN(EP11_KEY_SIZE, \
-				    MIN(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE))
+/* MAX/MIN from zt_common.h produces warnings for variable length arrays */
+#define _MIN(a, b)  ((a) < (b) ? (a) : (b))
+#define _MAX(a, b)  ((a) > (b) ? (a) : (b))
+
+#define MAX_SECURE_KEY_SIZE	_MAX(EP11_KEY_SIZE, \
+				     _MAX(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE))
+#define MIN_SECURE_KEY_SIZE	_MIN(EP11_KEY_SIZE, \
+				     _MIN(AESDATA_KEY_SIZE, AESCIPHER_KEY_SIZE))
 
 struct pkey_seckey {
 	u8  seckey[AESDATA_KEY_SIZE];  /* the secure key blob */

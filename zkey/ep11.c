@@ -182,8 +182,9 @@ int load_ep11_library(struct ep11_lib *ep11, bool verbose)
  *
  * @returns 0 on success, a negative errno in case of errors
  */
-int get_ep11_target_for_apqn(struct ep11_lib *ep11, int card, int domain,
-			     target_t *target, bool verbose)
+int get_ep11_target_for_apqn(struct ep11_lib *ep11, unsigned int card,
+		             unsigned int domain, target_t *target,
+			     bool verbose)
 {
 	ep11_target_t *target_list;
 	struct XCP_Module module;
@@ -248,12 +249,12 @@ struct find_mkvp_info {
 	u8		mkvp[MKVP_LENGTH];
 	unsigned int	flags;
 	bool		found;
-	int		card;
-	int		domain;
+	unsigned int	card;
+	unsigned int	domain;
 	bool		verbose;
 };
 
-static int find_mkvp(int card, int domain, void *handler_data)
+static int find_mkvp(unsigned int card, unsigned int domain, void *handler_data)
 {
 	struct find_mkvp_info *info = (struct find_mkvp_info *)handler_data;
 	struct mk_info mk_info;
@@ -312,8 +313,8 @@ static int find_mkvp(int card, int domain, void *handler_data)
  */
 int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
 			     const char *apqns,  unsigned int flags,
-			     target_t *target, int *card, int *domain,
-			     bool verbose)
+			     target_t *target, unsigned int *card,
+			     unsigned int *domain, bool verbose)
 {
 	struct find_mkvp_info info;
 	int rc;
@@ -323,7 +324,7 @@ int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
 
 	pr_verbose(verbose, "Select mkvp %s in APQNs %s for the EP11 host "
 		   "library", printable_mkvp(CARD_TYPE_EP11, mkvp),
-		   apqns == 0 ? "ANY" : apqns);
+		   apqns == NULL ? "ANY" : apqns);
 
 	memcpy(info.mkvp, mkvp, sizeof(info.mkvp));
 	info.flags = flags;
@@ -369,8 +370,9 @@ int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
  *
  * @returns 0 on success, a negative errno in case of errors
  */
-static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target, int card,
-			      int domain, struct ep11keytoken *ep11key,
+static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target,
+			      unsigned int card, unsigned int domain,
+			      struct ep11keytoken *ep11key,
 			      unsigned int ep11key_size, bool verbose)
 {
 	CK_BYTE resp[MAX_BLOBSIZE];
@@ -406,8 +408,8 @@ static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target, int card,
 		return -EIO;
 	}
 
-	rv = ep11->dll_m_admin(resp, &resp_len, NULL, 0, req, req_len, NULL, 0,
-			       target);
+	rv = ep11->dll_m_admin(resp, &resp_len, NULL, NULL, req, req_len, NULL,
+			       0, target);
 	if (rv != CKR_OK || resp_len == 0) {
 		pr_verbose(verbose, "Command XCP_ADM_REENCRYPT failed. "
 			   "rc = 0x%lx, resp_len = %ld", rv, resp_len);
@@ -461,8 +463,8 @@ static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target, int card,
  *
  * @returns 0 on success, a negative errno in case of errors
  */
-int reencipher_ep11_key(struct ep11_lib *ep11, target_t target, int card,
-			int domain, u8 *secure_key,
+int reencipher_ep11_key(struct ep11_lib *ep11, target_t target,
+			unsigned int card, unsigned int domain, u8 *secure_key,
 			unsigned int secure_key_size, bool verbose)
 {
 	struct ep11keytoken *ep11key = (struct ep11keytoken *)secure_key;

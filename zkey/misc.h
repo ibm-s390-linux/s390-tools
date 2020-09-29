@@ -37,7 +37,7 @@ static inline void misc_print_missing_sub_command(void)
 /**
  * Invalid command specified (for 'git' like tools)
  */
-void misc_print_invalid_command(const char *command)
+static void misc_print_invalid_command(const char *command)
 {
 	warnx("Invalid command '%s'", command);
 	util_prg_print_parse_error();
@@ -48,7 +48,7 @@ void misc_print_invalid_command(const char *command)
  *
  * @param[in] parm_name  Parameter string
  */
-void misc_print_required_parm(const char *parm_name)
+static void misc_print_required_parm(const char *parm_name)
 {
 	warnx("Parameter '%s' is required", parm_name);
 	util_prg_print_parse_error();

@@ -38,7 +38,7 @@
 /*
  * Program configuration
  */
-const struct util_prg prg = {
+static const struct util_prg prg = {
 	.desc = "Manage secure AES keys",
 	.command_args = "COMMAND [SECURE-KEY-FILE]",
 	.args = "",
@@ -2769,8 +2769,8 @@ static bool is_command(struct zkey_command *command, const char *str)
 /*
  * Find the command in the command table
  */
-struct zkey_command *find_command(const struct zkey_command *commands,
-				  const char *command)
+static struct zkey_command *find_command(const struct zkey_command *commands,
+				         const char *command)
 {
 	struct zkey_command *cmd = (struct zkey_command *)commands;
 

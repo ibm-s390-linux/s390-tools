@@ -123,7 +123,8 @@ int key_token_change(struct cca_lib *cca,
 		     u8 *secure_key, unsigned int secure_key_size,
 		     char *method, bool verbose);
 
-int select_cca_adapter(struct cca_lib *cca, int card, int domain, bool verbose);
+int select_cca_adapter(struct cca_lib *cca, unsigned int card,
+		       unsigned int domain, bool verbose);
 
 #define FLAG_SEL_CCA_MATCH_CUR_MKVP	0x01
 #define FLAG_SEL_CCA_MATCH_OLD_MKVP	0x02

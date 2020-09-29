@@ -16,17 +16,18 @@
 
 #include "pkey.h"
 
-int sysfs_is_card_online(int card, enum card_type cardtype);
+int sysfs_is_card_online(unsigned int card, enum card_type cardtype);
 
-int sysfs_is_apqn_online(int card, int domain, enum card_type cardtype);
+int sysfs_is_apqn_online(unsigned int card, unsigned int domain,
+			 enum card_type cardtype);
 
-int sysfs_get_card_level(int card);
+int sysfs_get_card_level(unsigned int card);
 
-enum card_type sysfs_get_card_type(int card);
+enum card_type sysfs_get_card_type(unsigned int card);
 
 #define SERIALNR_LENGTH		17
 
-int sysfs_get_serialnr(int card, char *serialnr, bool verbose);
+int sysfs_get_serialnr(unsigned int card, char *serialnr, bool verbose);
 
 struct fw_version {
 	unsigned int	major;
@@ -34,7 +35,7 @@ struct fw_version {
 	unsigned int	api_ordinal;
 };
 
-int sysfs_get_firmware_version(int card, struct fw_version *fw_version,
+int sysfs_get_firmware_version(unsigned int card, struct fw_version *fw_version,
 			       bool verbose);
 
 #define MK_STATE_EMPTY		0
@@ -57,10 +58,11 @@ struct mk_info {
 	struct mk_info_reg	old_mk; /* only available on CCA cards */
 };
 
-int sysfs_get_mkvps(int card, int domain, struct mk_info *mk_info,
-		    bool verbose);
+int sysfs_get_mkvps(unsigned int card, unsigned int domain,
+		    struct mk_info *mk_info, bool verbose);
 
-typedef int(*apqn_handler_t) (int card, int domain, void *handler_data);
+typedef int(*apqn_handler_t) (unsigned int card, unsigned int domain,
+			      void *handler_data);
 
 int handle_apqns(const char *apqns, enum card_type cardtype,
 		 apqn_handler_t handler, void *handler_data, bool verbose);

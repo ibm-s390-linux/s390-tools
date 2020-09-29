@@ -1392,7 +1392,7 @@ int generate_key_verification_pattern(const u8 *key, size_t key_size,
 		goto out;
 	}
 
-	opfd = accept(tfmfd, NULL, 0);
+	opfd = accept(tfmfd, NULL, NULL);
 	if (opfd < 0) {
 		rc = -errno;
 		pr_verbose(verbose, "Failed to accept on the AF_ALG socket");
@@ -1923,8 +1923,8 @@ static int reencipher_ep11_secure_key(struct ep11_lib *ep11, u8 *secure_key,
 				      u8 *mkvp, bool *apqn_selected,
 				      bool verbose)
 {
+	unsigned int card, domain;
 	unsigned int flags;
-	int card, domain;
 	target_t target;
 	int rc;
 
