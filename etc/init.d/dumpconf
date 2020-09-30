@@ -225,7 +225,7 @@ function CheckDeviceString() {
 	fi
 }
 
-setup_device()
+setup_ccw_device()
 {
 	DEV="$(CheckDeviceString $DEVICE)"
 	if [ "$DEV" != "" ]; then
@@ -235,33 +235,67 @@ setup_device()
 		pr_error "ERROR: Invalid DEVICE '$DEVICE'." $ERRMSG
 		return
 	fi
-	if [ $2 == "fcp" ]; then
-		echo $WWPN > $1/fcp/wwpn 2>/dev/null || RETVAL=1
-		if [ $RETVAL -eq 1 ]; then
-			pr_error "ERROR: Invalid WWPN '$WWPN'." $ERRMSG
-			return
-		fi
-		echo $LUN > $1/fcp/lun 2>/dev/null || RETVAL=1
-		if [ $RETVAL -eq 1 ]; then
-			pr_error "ERROR: Invalid LUN '$LUN'." $ERRMSG
-			return
-		fi
-		echo $BOOTPROG > $1/fcp/bootprog 2>/dev/null || RETVAL=1
-		if [ $RETVAL -eq 1 ]; then
-			pr_error "ERROR: Invalid BOOTPROG '$BOOTPROG'." $ERRMSG
-			return
-		fi
-		echo $BR_LBA > $1/fcp/br_lba 2>/dev/null || RETVAL=1
-		if [ $RETVAL -eq 1 ]; then
-			pr_error "ERROR: Invalid BR_LBA '$BR_LBA'." $ERRMSG
-			return
-		fi
+}
+
+setup_fcp_device()
+{
+	DEV="$(CheckDeviceString $DEVICE)"
+	if [ "$DEV" != "" ]; then
+		echo $DEV > $1/$2/device
+	else
+		RETVAL=1
+		pr_error "ERROR: Invalid DEVICE '$DEVICE'." $ERRMSG
+		return
+	fi
+	echo $WWPN > $1/fcp/wwpn 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid WWPN '$WWPN'." $ERRMSG
+		return
+	fi
+	echo $LUN > $1/fcp/lun 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid LUN '$LUN'." $ERRMSG
+		return
+	fi
+	echo $BOOTPROG > $1/fcp/bootprog 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid BOOTPROG '$BOOTPROG'." $ERRMSG
+		return
+	fi
+	echo $BR_LBA > $1/fcp/br_lba 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid BR_LBA '$BR_LBA'." $ERRMSG
+		return
 	fi
 }
 
 setup_nss_device()
 {
 	echo $NSS_NAME > $1/nss/name || RETVAL=1
+}
+
+setup_nvme_device()
+{
+	echo $FID > $1/nvme/fid 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid FID '$FID'." $ERRMSG
+		return
+	fi
+	echo $NSID > $1/nvme/nsid 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid NSID '$NSID'." $ERRMSG
+		return
+	fi
+	echo $BOOTPROG > $1/nvme/bootprog 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid BOOTPROG '$BOOTPROG'." $ERRMSG
+		return
+	fi
+	echo $BR_LBA > $1/nvme/br_lba 2>/dev/null || RETVAL=1
+	if [ $RETVAL -eq 1 ]; then
+		pr_error "ERROR: Invalid BR_LBA '$BR_LBA'." $ERRMSG
+		return
+	fi
 }
 
 setup_reipl()
@@ -271,15 +305,25 @@ setup_reipl()
 		return
 	fi
 
-	if [ "$REIPL_TYPE" == "ccw" ] || [ "$REIPL_TYPE" == "fcp" ]; then
-		setup_device $REIPL_CONFIG_DIR $REIPL_TYPE
-	elif [ "$REIPL_TYPE" == "nss" ]; then
-		setup_nss_device $REIPL_CONFIG_DIR
-	else
-		pr_error "ERROR: Unknown reipl type '$REIPL_TYPE'." $ERRMSG
-		RETVAL=1
-		return
-	fi
+	case "$REIPL_TYPE" in
+		ccw)
+			setup_ccw_device $REIPL_CONFIG_DIR $REIPL_TYPE
+			;;
+		fcp)
+			setup_fcp_device $REIPL_CONFIG_DIR $REIPL_TYPE
+			;;
+		nvme)
+			setup_nvme_device $REIPL_CONFIG_DIR
+			;;
+		nss)
+			setup_nss_device $REIPL_CONFIG_DIR
+			;;
+		*)
+			pr_error "ERROR: Unknown reipl type '$REIPL_TYPE'." $ERRMSG
+			RETVAL=1
+			return
+			;;
+	esac
 
 	echo $REIPL_TYPE > $REIPL_CONFIG_DIR/reipl_type || RETVAL=1
 
@@ -292,13 +336,24 @@ setup_reipl()
 
 setup_dump()
 {
-	if [ "$DUMP_TYPE" == "ccw" ] || [ "$DUMP_TYPE" == "fcp" ]; then
-		setup_device $DUMP_CONFIG_DIR $DUMP_TYPE
-	elif [ "$DUMP_TYPE" != "none" ]; then
-		pr_error "ERROR: Unknown dump type '$DUMP_TYPE'." $ERRMSG
-		RETVAL=1
-		return
-	fi
+	case "$DUMP_TYPE" in
+		ccw)
+			setup_ccw_device $DUMP_CONFIG_DIR $DUMP_TYPE
+			;;
+		fcp)
+			setup_fcp_device $DUMP_CONFIG_DIR $DUMP_TYPE
+			;;
+		nvme)
+			setup_nvme_device $DUMP_CONFIG_DIR
+			;;
+		none)
+			;;
+		*)
+			pr_error "ERROR: Unknown dump type '$DUMP_TYPE'." $ERRMSG
+			RETVAL=1
+			return
+			;;
+	esac
 
 	echo $DUMP_TYPE > $DUMP_CONFIG_DIR/dump_type || RETVAL=1
 
@@ -358,6 +413,18 @@ print_ccw_device()
 	pr_info "device..: $DEVICE"
 }
 
+print_nvme_device()
+{
+	FID=$(cat $1/nvme/fid) || RETVAL=1
+	pr_info "fid.....: $FID"
+	NSID=$(cat $1/nvme/nsid) || RETVAL=1
+	pr_info "nsid....: $NSID"
+	BOOTPROG=$(cat $1/nvme/bootprog) || RETVAL=1
+	pr_info "bootprog: $BOOTPROG"
+	BR_LBA=$(cat $1/nvme/br_lba) || RETVAL=1
+	pr_info "br_lba..: $BR_LBA"
+}
+
 print_nss_name()
 {
 	NAME=$(cat $1/nss/device) || RETVAL=1
@@ -367,35 +434,52 @@ print_nss_name()
 status_dump()
 {
 	CONF_DUMP_TYPE=$(cat $DUMP_CONFIG_DIR/dump_type) || RETVAL=1
-	if [ "$CONF_DUMP_TYPE" == "none" ]; then
-		pr_info "type....: no dump device configured"
-	elif [ "$CONF_DUMP_TYPE" == "ccw" ]; then
-		pr_info "type....: ccw"
-		print_ccw_device $DUMP_CONFIG_DIR
-		verify_ccw_dump_device $(cat $DUMP_CONFIG_DIR/ccw/device)
-	elif [ "$CONF_DUMP_TYPE" == "fcp" ]; then
-		pr_info "type....: fcp"
-		print_fcp_device $DUMP_CONFIG_DIR
-	else
-		pr_error "ERROR: Unknown dump device type '$CONF_DUMP_TYPE'!"
-		pr_error "       Please check if you have the latest dumpconf package!"
-	fi
+	case "$CONF_DUMP_TYPE" in
+		none)
+			pr_info "type....: no dump device configured"
+			;;
+		ccw)
+			pr_info "type....: ccw"
+			print_ccw_device $DUMP_CONFIG_DIR
+			verify_ccw_dump_device $(cat $DUMP_CONFIG_DIR/ccw/device)
+			;;
+		fcp)
+			pr_info "type....: fcp"
+			print_fcp_device $DUMP_CONFIG_DIR
+			;;
+		nvme)
+			pr_info "type....: nvme"
+			print_nvme_device $DUMP_CONFIG_DIR
+			;;
+		*)
+			pr_error "ERROR: Unknown dump device type '$CONF_DUMP_TYPE'!"
+			pr_error "       Please check if you have the latest dumpconf package!"
+			;;
+	esac
 }
 
 status_reipl()
 {
 	REIPL_TYPE=$(cat $REIPL_CONFIG_DIR/reipl_type) || RETVAL=1
 	pr_info "type....: $REIPL_TYPE"
-	if [ "$REIPL_TYPE" == "ccw" ]; then
-		print_ccw_device $REIPL_CONFIG_DIR
-	elif [ "$REIPL_TYPE" == "fcp" ]; then
-		print_fcp_device $REIPL_CONFIG_DIR
-	elif [ "$REIPL_TYPE" == "nss" ]; then
-		print_nss_name $REIPL_CONFIG_DIR
-	else
-		pr_error "ERROR: Unknown reipl device type '$REIPL_TYPE'!"
-		pr_error "       Please check if you have the latest dumpconf package!"
-	fi
+	case "$REIPL_TYPE" in
+		ccw)
+			print_ccw_device $REIPL_CONFIG_DIR
+			;;
+		fcp)
+			print_fcp_device $REIPL_CONFIG_DIR
+			;;
+		nvme)
+			print_nvme_device $REIPL_CONFIG_DIR
+			;;
+		nss)
+			print_nss_name $REIPL_CONFIG_DIR
+			;;
+		*)
+			pr_error "ERROR: Unknown reipl device type '$REIPL_TYPE'!"
+			pr_error "       Please check if you have the latest dumpconf package!"
+			;;
+	esac
 }
 
 status_dump_reipl()

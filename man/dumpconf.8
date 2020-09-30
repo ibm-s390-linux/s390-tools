@@ -45,7 +45,7 @@ vmcmd: Trigger CP command according to the 'VMCMD_X' configuration in
 
 .TP
 \fB  - DUMP_TYPE:\fR
-Type of dump device. Possible values are 'ccw' and 'fcp'.
+Type of dump device. Possible values are 'ccw', 'fcp' and 'nvme'.
 
 .TP
 \fB  - DEVICE:\fR
@@ -58,6 +58,14 @@ WWPN for SCSI dump device.
 .TP
 \fB  - LUN\fR
 LUN for SCSI dump device.
+
+.TP
+\fB  - FID\fR
+Function ID for NVMe dump device.
+
+.TP
+\fB  - NSID\fR
+Namespace ID for NVMe dump device.
 
 .TP
 \fB  - BOOTPROG:\fR
@@ -153,6 +161,25 @@ DEVICE=0.0.2345
 WWPN=0x5005076303004712
 .br
 LUN=0x4713000000000000
+.br
+BOOTPROG=0
+.br
+BR_LBA=0
+.br
+
+#
+.br
+# Example configuration for an NVMe dump device (NVMe Disk)
+.br
+#
+.br
+ON_PANIC=dump
+.br
+DUMP_TYPE=nvme
+.br
+FID=0x0300
+.br
+NSID=0x0001
 .br
 BOOTPROG=0
 .br

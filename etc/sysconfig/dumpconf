@@ -40,6 +40,16 @@
 # BR_LBA=0
 
 #
+# Dump on nvme device (NVMe Disk)
+#
+# ON_PANIC=dump
+# DUMP_TYPE=nvme
+# FID=0x00000300
+# NSID=0x00000001
+# BOOTPROG=3
+# BR_LBA=0
+
+#
 # Use VMDUMP
 #
 # ON_PANIC=vmcmd
