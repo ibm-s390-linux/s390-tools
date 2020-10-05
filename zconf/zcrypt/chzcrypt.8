@@ -1,8 +1,10 @@
-.\" Copyright 2019 IBM Corp.
+.\" chzcrypt.8
+.\"
+.\" Copyright 2020 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH CHZCRYPT 8 "AUG 2019" "s390-tools"
+.TH CHZCRYPT 8 "OCT 2020" "s390-tools"
 .SH NAME
 chzcrypt \- modify zcrypt configuration
 .SH SYNOPSIS
@@ -11,6 +13,14 @@ chzcrypt \- modify zcrypt configuration
 .B -e
 .RB "|"
 .B -d
+.RB "( " -a " | "
+.I <device id>
+[...] )
+.TP
+.B chzcrypt
+.B --config-on
+.RB "|"
+.B --config-off
 .RB "( " -a " | "
 .I <device id>
 [...] )
@@ -54,11 +64,22 @@ Set the given cryptographic device(s) offline.
 .B -a, --all
 Set all available cryptographic device(s) online or offline.
 .TP 8
+.B --config-on
+Set the given cryptographic card device(s) config on ('configured').
+.TP 8
+.B --config-off
+Set the given cryptographic card device(s) config off ('deconfigured').
+.TP 8
 .B <device id>
-Specifies a cryptographic device which will be set either online or offline.
-The device can either be a card device or a queue device.
-A queue device can only get switched online when the providing card is online.
-
+Specifies a cryptographic device which will be set either online or
+offline or configured on or off. For online and offline the device can
+either be a card device or a queue device. A queue device can only get
+switched online when the providing card is online.
+.br
+For config on/off the device needs to be a card device. A card or
+queue device cannot get switched online if the card is in deconfigured
+state.
+.br
 Please note that the card device and queue device representation are both
 in hexadecimal notation.
 .TP 8
@@ -103,11 +124,25 @@ Will set the cryptographic device '10.0038' respectively card id 16
 .B chzcrypt -d -a
 Will set all available cryptographic devices offline.
 .TP
+.B chzcrypt --config-on -a -V
+Set all available crypto cards to config on, be verbose.
+.TP
+.B chzcrypt -V --config-off card01 card03
+Switch the two crypto cards 1 and 3 to deconfigured, be verbose.
+.TP
 .B chzcrypt -c 60 -n
 Will set configuration timer for re-scanning the AP bus to 60 seconds and
 disable zcrypt's poll thread.
 .TP
 .B chzcrypt -q 67
 Will set the default domain to 67.
+.SH NOTES
+Support for crypto cards to get switched config on or off requires a
+Linux kernel supporting this. If the required sysfs attribute file
+does not exist, it is assumed there is an older kernel running and
+chzcrypt exits with an appropriate message. Even more config on/off
+may require support from a hypervisor like KVM or zVM and may fail if
+the Linux kernel is unable to perform the SCLP command. Check syslog
+on failure.
 .SH SEE ALSO
 \fBlszcrypt\fR(8)

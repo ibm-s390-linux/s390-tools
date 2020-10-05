@@ -10,7 +10,7 @@
 .\"   nroff -man lszcrypt.8
 .\" to process this source
 .\"
-.TH LSZCRYPT 8 "AUG 2019" "s390-tools"
+.TH LSZCRYPT 8 "OCT 2020" "s390-tools"
 .SH NAME
 lszcrypt \- display zcrypt device and configuration information
 .SH SYNOPSIS
@@ -111,9 +111,9 @@ Displays help text and exits.
 .TP 8
 .B -v, --version
 Displays version information and exits.
-.SH VERBOSE LISTING DETAILS
-Some of the columns showing up in verbose listing mode may need some
-explanation:
+.SH LISTING DETAILS
+Here is an explanation of the columns displayed. Please note that some
+of the columns show up in verbose mode only.
 .TP
 .B TYPE and HWTYPE
 The HWTYPE is a numeric value showing which type of hardware the zcrypt
@@ -123,6 +123,31 @@ are 7=CEX3C, 8=CEX3A, 10=CEX4, 11=CEX5, 12=CEX6 and 13=CEX7.
 The TYPE is a human readable value showing the hardware type and the basic
 function type (A=Accelerator, C=CCA Coprocessor, P=EP11 Coprocessor). So
 for example CEX6P means a CEX6 card in EP11 Coprocessor mode.
+.TP
+.B MODE
+A crypto card can be configured to run into one of 3 modes:
+.br
+Accelerator - Acceleration of clear key RSA (CRT and ME) cryptographic
+operations.
+.br
+CCA Coprocessor - Support CCA secure key cryptographic operations.
+.br
+EP11 Coprocessor - Support EP11 secure key cryptographic operations.
+.TP
+.B STATUS
+A crypto card and/or a crypto queue may be switched offline to
+prohibit it's use. There are two levels of offline state. A software
+online/offline state is kept by the zcrypt device driver and can be
+switched on or off with the help of the chzcrypt application.
+.br
+A crypto card can also be 'configured' or 'deconfigured'. This state
+may be adjusted on the HMC or SE. The chzcrypt application can also
+trigger this state with the --config-on and --config-off options.
+.br
+lszcrypt shows 'online' when a card or queue is available for
+cryptograhic operations. 'offline' is displayed when a card or queue
+is switched to (software) offline. If a card is 'deconfigured' via
+HMC, SE or chzcrypt the field shows 'deconfig'.
 .TP
 .B REQUESTS
 This is the counter value of successful processed requests on card or queue

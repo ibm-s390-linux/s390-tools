@@ -1,7 +1,7 @@
 /*
  * chzcrypt - Tool to modify zcrypt configuration
  *
- * Copyright IBM Corp. 2008, 2019
+ * Copyright IBM Corp. 2008, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -47,7 +47,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2019,
+			.pub_last = 2020,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -56,6 +56,10 @@ const struct util_prg prg = {
 /*
  * Configuration of command line options
  */
+
+#define OPT_CONFIG_ON  0x80
+#define OPT_CONFIG_OFF 0x81
+
 static struct util_opt opt_vec[] = {
 	{
 		.option = { "enable", no_argument, NULL, 'e'},
@@ -72,6 +76,18 @@ static struct util_opt opt_vec[] = {
 		.desc = "Set all available cryptographic device(s) "
 			"online/offline, must be used in conjunction "
 			"with the enable or disable option",
+	},
+	{
+		.option = { "config-on", no_argument, NULL, OPT_CONFIG_ON},
+		.argument = "DEVICE_IDS",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Set the given cryptographic card device(s) configured"
+	},
+	{
+		.option = { "config-off", no_argument, NULL, OPT_CONFIG_OFF},
+		.argument = "DEVICE_IDS",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Set the given cryptographic card device(s) deconfigured"
 	},
 	{
 		.option = { "poll-thread-enable", no_argument, NULL, 'p'},
@@ -212,6 +228,116 @@ static void default_domain_set(const char *default_domain_str)
 	free(attr);
 }
 
+static void set_online(const char *online, const char *online_text,
+		       char *dev_list, size_t len)
+{
+	long value;
+	int id, dom;
+	char *dev, *dev_path;
+	char device[256], online_read[32];
+
+	for (dev = dev_list; dev != NULL; dev = argz_next(dev_list, len, dev)) {
+		if (strncmp(dev, "card", 4) == 0) {
+			/* dev == "card2" */
+			if (sscanf(dev, "card%02x", &id) != 1)
+				errx(EXIT_FAILURE, "Error - unable to parse '%s'.", dev);
+			sprintf(device, "card%02x", id);
+		} else if (strncmp(dev, "0x", 2) == 0) {
+			/* dev == "0x.." */
+			if (sscanf(dev, "0x%02x", &id) != 1)
+				errx(EXIT_FAILURE, "Error - unable to parse '%s'.", dev);
+			sprintf(device, "card%02x", id);
+		} else if (misc_regex_match(dev, "^[0-9a-fA-F]+$")) {
+			/* dev == "2" */
+			if (sscanf(dev, "%02x", &id) != 1)
+				errx(EXIT_FAILURE, "Error - unable to parse '%s'.", dev);
+			sprintf(device, "card%02x", id);
+		} else {
+			/* Form: 01.0003 ? */
+			if (sscanf(dev, "%02x.%04x", &id, &dom) != 2)
+				errx(EXIT_FAILURE,
+				     "Error - cryptographic device %s malformed.", dev);
+			sprintf(device, "card%02x/%02x.%04x", id, id, dom);
+		}
+		dev_path = util_path_sysfs("bus/ap/devices/%s", device);
+		if (!util_path_is_dir(dev_path))
+			errx(EXIT_FAILURE,
+			     "Error - cryptographic device %s does not exist.", device);
+		if (!util_path_is_writable("%s/online", dev_path))
+			errx(EXIT_FAILURE, "Error - can't write to %s/online.\n"
+			     " Wrong permissions or wrong tools version.", dev_path);
+		if (*online == '1' && util_path_is_readable("%s/config", dev_path)) {
+			util_file_read_l(&value, 10, "%s/config", dev_path);
+			if (value <= 0) {
+				warnx("Warning - device %s is deconfigured,"
+				      " can't set to online.\n", dev);
+				goto next;
+			}
+		}
+		verbose("Setting cryptographic device %s %s\n", device, online_text);
+		util_file_write_s(online, "%s/online", dev_path);
+		util_file_read_line(online_read, sizeof(online_read), "%s/online", dev_path);
+		if (strcmp(online, online_read) != 0)
+			errx(EXIT_FAILURE, "Error - unable to set cryptographic device %s %s.",
+			     device, online_text);
+next:
+		free(dev_path);
+	}
+}
+
+static void set_config(const char *config, const char *config_text,
+		       char *dev_list, size_t len)
+{
+	int id;
+	char *dev, *dev_path;
+	char device[256], config_read[32];
+
+	for (dev = dev_list; dev != NULL; dev = argz_next(dev_list, len, dev)) {
+		if (strncmp(dev, "card", 4) == 0) {
+			/* dev == "card2" */
+			if (sscanf(dev, "card%02x", &id) != 1)
+				errx(EXIT_FAILURE, "Error - unable to parse '%s'.", dev);
+			sprintf(device, "card%02x", id);
+		} else if (strncmp(dev, "0x", 2) == 0) {
+			/* dev == "0x.." */
+			if (sscanf(dev, "0x%02x", &id) != 1)
+				errx(EXIT_FAILURE, "Error - unable to parse '%s'.", dev);
+			sprintf(device, "card%02x", id);
+		} else if (misc_regex_match(dev, "^[0-9a-fA-F]+$")) {
+			/* dev == "2" */
+			if (sscanf(dev, "%02x", &id) != 1)
+				errx(EXIT_FAILURE, "Error - unable to parse '%s'.", dev);
+			sprintf(device, "card%02x", id);
+		} else {
+			errx(EXIT_FAILURE, "Error - invalid device %s\n"
+			     " Config on/off is only valid for card devices.", dev);
+		}
+		dev_path = util_path_sysfs("bus/ap/devices/%s", device);
+		if (!util_path_is_dir(dev_path))
+			errx(EXIT_FAILURE,
+			     "Error - cryptographic device %s does not exist.", device);
+		if (!util_path_is_readable("%s/config", dev_path))
+			errx(EXIT_FAILURE, "Error - can't read %s/config.\n"
+			     "File may not exist due to an older zcrypt device driver.", dev_path);
+		util_file_read_line(config_read, sizeof(config_read), "%s/config", dev_path);
+		if (strcmp(config, config_read) == 0) {
+			warnx("Warning - device %s is already %s.", device, config_text);
+			goto next;
+		}
+		if (!util_path_is_writable("%s/config", dev_path))
+			errx(EXIT_FAILURE, "Error - can't write to %s/config.\n"
+			     "Wrong permissions or wrong tools version.", dev_path);
+		verbose("Setting cryptographic device %s %s\n", device, config_text);
+		util_file_write_s(config, "%s/config", dev_path);
+		util_file_read_line(config_read, sizeof(config_read), "%s/config", dev_path);
+		if (strcmp(config, config_read) != 0)
+			errx(EXIT_FAILURE, "Error - unable to set cryptographic device %s %s.",
+			     device, config_text);
+next:
+		free(dev_path);
+	}
+}
+
 /*
  * Print invalid commandline error message and then exit with error code
  */
@@ -276,7 +402,6 @@ void print_adapter_id_help(void)
 	printf("  Enable the cryptographic devices with card id '03' and domain id '0005'.\n");
 	printf("  #>chzcrypt -e 03.0005\n");
 	printf("  \n");
-
 }
 
 /*
@@ -284,19 +409,19 @@ void print_adapter_id_help(void)
  */
 int main(int argc, char *argv[])
 {
-	const char *online, *online_text = NULL, *poll_thread, *config_time;
-	const char *poll_timeout, *default_domain;
-	char *path, *dev_path, *dev, *dev_list, device[256], online_read[32];
+	const char *online = NULL, *online_text = NULL, *poll_thread = NULL;
+	const char *config_time = NULL, *poll_timeout = NULL;
+	const char *default_domain = NULL, *config = NULL, *config_text = NULL;
+	char *path, *dev_list;
 	bool all = false, actionset = false;
 	size_t len;
-	int id, dom, c, i, j;
+	int c, i, j;
 
 	for (i=0; i < argc; i++)
 		for (j=2; j < (int) strlen(argv[i]); j++)
 			if (argv[i][j] == '_')
 				argv[i][j] = '-';
 
-	online = poll_thread = config_time = poll_timeout = default_domain = NULL;
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 	while (1) {
@@ -348,6 +473,16 @@ int main(int argc, char *argv[])
 		case 'v':
 			util_prg_print_version();
 			return EXIT_SUCCESS;
+		case OPT_CONFIG_ON:
+			actionset = true;
+			config = "1";
+			config_text = "config on";
+			break;
+		case OPT_CONFIG_OFF:
+			actionset = true;
+			config = "0";
+			config_text = "config off";
+			break;
 		default:
 			util_opt_print_parse_error(c, argv);
 			return EXIT_FAILURE;
@@ -380,42 +515,13 @@ int main(int argc, char *argv[])
 	else
 		dev_list_argv(&dev_list, &len, &argv[optind]);
 
-	if (online && len == 0)
+	if ((online || config) && len == 0)
 		errx(EXIT_FAILURE, "Error - missing cryptographic device id(s).");
 
-	for (dev = dev_list; dev != NULL; dev = argz_next(dev_list, len, dev)) {
-		if (strncmp(dev, "card", 4) == 0) {
-			/* dev == "card2" */
-			sscanf(dev, "card%02x", &id);
-			sprintf(device, "card%02x", id);
-		} else if (strncmp(dev, "0x", 2) == 0) {
-			/* dev == "0x.." */
-			sscanf(dev, "0x%02x", &id);
-			sprintf(device, "card%02x", id);
-		} else if (misc_regex_match(dev, "^[0-9a-fA-F]+$")) {
-			/* dev == "2" */
-			sscanf(dev, "%02x", &id);
-			sprintf(device, "card%02x", id);
-		} else {
-			/* Form: 01.0003 ? */
-			if (sscanf(dev, "%02x.%04x", &id, &dom) != 2)
-				errx(EXIT_FAILURE, "Error - cryptographic device %s malformed.", dev);
-			sprintf(device, "card%02x/%02x.%04x", id, id, dom);
-		}
-		dev_path = util_path_sysfs("bus/ap/devices/%s", device);
-		if (!util_path_is_dir(dev_path))
-			errx(EXIT_FAILURE, "Error - cryptographic device %s does not exist.", device);
-		if (!util_path_is_writable("%s/online", dev_path))
-			errx(EXIT_FAILURE, "Error - can't write to %s/online.\n Wrong permissions"
-			     " or wrong tools version.", dev_path);
-		verbose("Setting cryptographic device %s %s\n", device, online_text);
-		util_file_write_s(online, "%s/online", dev_path);
-		util_file_read_line(online_read, sizeof(online_read), "%s/online", dev_path);
-		if (strcmp(online, online_read) != 0)
-			errx(EXIT_FAILURE, "Error - unable to set cryptographic device %s %s.",
-			     device, online_text);
-		free(dev_path);
-	}
-	free(dev_list);
+	if (online)
+		set_online(online, online_text, dev_list, len);
+	else if (config)
+		set_config(config, config_text, dev_list, len);
+
 	return EXIT_SUCCESS;
 }

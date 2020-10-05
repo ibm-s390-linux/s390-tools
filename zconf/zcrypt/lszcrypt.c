@@ -1,7 +1,7 @@
 /**
  * lszcrypt - Display zcrypt devices and configuration settings
  *
- * Copyright IBM Corp. 2008, 2019
+ * Copyright IBM Corp. 2008, 2020
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -86,7 +86,7 @@ const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2019,
+			.pub_last = 2020,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -339,6 +339,7 @@ static void show_capability(const char *id_str)
 static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 				    const char *sub_dev)
 {
+	long value;
 	char buf[256];
 	unsigned long facility;
 
@@ -347,14 +348,25 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 	else
 		util_rec_set(rec, "type", buf);
 
-	if (util_file_read_line(buf, sizeof(buf), "%s/%s/online",
-				grp_dev, sub_dev))
-		util_rec_set(rec, "online", "-");
-	else
-		if (strcmp(buf, "0") == 0)
-			util_rec_set(rec, "online", "offline");
-		else
+	if (util_path_is_readable("%s/%s/online", grp_dev, sub_dev)) {
+		util_file_read_l(&value, 10, "%s/%s/online", grp_dev, sub_dev);
+		if (value > 0)
 			util_rec_set(rec, "online", "online");
+		else {
+			/* device is offline, check config (if available) */
+			if (util_path_is_readable("%s/%s/config", grp_dev, sub_dev)) {
+				util_file_read_l(&value, 10, "%s/%s/config", grp_dev, sub_dev);
+				if (value > 0)
+					util_rec_set(rec, "online", "offline");
+				else
+					util_rec_set(rec, "online", "deconfig");
+			} else
+				util_rec_set(rec, "online", "offline");
+		}
+	} else {
+		/* no online attribute */
+		util_rec_set(rec, "online", "-");
+	}
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
 	if (facility & MASK_COPRO)
@@ -457,6 +469,7 @@ static void show_subdevices(struct util_rec *rec, const char *grp_dev)
  */
 static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 {
+	long value;
 	char buf[256];
 	unsigned long facility;
 
@@ -475,13 +488,21 @@ static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 	else
 		util_rec_set(rec, "mode", "Unknown");
 
-	if (util_file_read_line(buf, sizeof(buf), "%s/online", grp_dev))
-		util_rec_set(rec, "online", "-");
-	else
-		if (strcmp(buf, "0") == 0)
-			util_rec_set(rec, "online", "offline");
-		else
+	if (util_path_is_readable("%s/online", grp_dev)) {
+		util_file_read_l(&value, 10, "%s/online", grp_dev);
+		if (value > 0)
 			util_rec_set(rec, "online", "online");
+		else {
+			if (util_path_is_readable("%s/config", grp_dev)) {
+				util_file_read_l(&value, 10, "%s/config", grp_dev);
+				if (value > 0)
+					util_rec_set(rec, "online", "offline");
+				else
+					util_rec_set(rec, "online", "deconfig");
+			} else
+				util_rec_set(rec, "online", "offline");
+		}
+	}
 
 	util_file_read_line(buf, sizeof(buf), "%s/request_count", grp_dev);
 	util_rec_set(rec, "requests", buf);
@@ -567,7 +588,7 @@ static void define_rec_default(struct util_rec *rec)
 	util_rec_def(rec, "card", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
 	util_rec_def(rec, "type", UTIL_REC_ALIGN_LEFT, 5, "TYPE");
 	util_rec_def(rec, "mode", UTIL_REC_ALIGN_LEFT, 11, "MODE");
-	util_rec_def(rec, "online", UTIL_REC_ALIGN_LEFT, 7, "STATUS");
+	util_rec_def(rec, "online", UTIL_REC_ALIGN_LEFT, 8, "STATUS");
 	util_rec_def(rec, "requests", UTIL_REC_ALIGN_RIGHT, 8, "REQUESTS");
 }
 
