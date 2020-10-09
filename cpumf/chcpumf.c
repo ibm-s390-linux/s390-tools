@@ -60,10 +60,6 @@ static const struct util_prg prg = {
 	}
 };
 
-/* Parse tool parameters. Fill in global variables keep_case, buffersize and
- * command according to parameters. Return VMCP_OK on success, VMCP_OPT
- * in case of parameter errors. In case of --help or --version, print
- * respective text to stdout and exit. */
 static long parse_buffersize(char *string)
 {
 	char *suffix;
@@ -91,6 +87,7 @@ static long parse_buffersize(char *string)
 
 static int read_sfb(unsigned long *min, unsigned long *max)
 {
+	unsigned long cur_min_sdb, cur_max_sdb;
 	int rc = EXIT_SUCCESS;
 	FILE *fp;
 
@@ -99,9 +96,14 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 		linux_error(PERF_SFB_SIZE);
 		return EXIT_FAILURE;
 	}
-	if (fscanf(fp, "%ld,%ld", min, max) != 2) {
+	if (fscanf(fp, "%ld,%ld", &cur_min_sdb, &cur_max_sdb) != 2) {
 		fprintf(stderr, "Error: Can not parse file " PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
+	} else {
+		if (*min == 0)
+			*min = cur_min_sdb;
+		if (*max == 0)
+			*max = cur_max_sdb;
 	}
 	fclose(fp);
 	return rc;
@@ -196,6 +198,7 @@ int main(int argc, char **argv)
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
+	parse_args(argc, argv);
 	if (stat(PERF_PATH PERF_SF, &sbuf) != 0) {
 		fprintf(stderr,
 			"No CPU-measurement sampling facility detected\n");
@@ -203,8 +206,6 @@ int main(int argc, char **argv)
 	}
 	if (read_sfb(&min_sdb, &max_sdb))
 		return ret;
-	/* Overwrite min_sdb and/or max_sdb */
-	parse_args(argc, argv);
 	if (min_sdb >= max_sdb) {
 		fprintf(stderr, "The specified maximum must be greater "
 				"than the minimum\n");
