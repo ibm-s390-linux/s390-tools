@@ -47,8 +47,8 @@ libutil/util_path_example
 libutil/util_prg_example
 libutil/util_rec_example
 libutil/util_scandir_example
-libzds/libzds.a
 libvmcp/vmcp_example
+libzds/libzds.a
 lsstp/lsstp
 mon_tools/mon_fsstatd
 mon_tools/mon_procd
@@ -79,10 +79,10 @@ zdev/src/lszdev
 zdev/src/lszdev_usage.c
 zdsfs/zdsfs
 zdump/zgetdump
-zfcpdump/cpioinit
-zfcpdump/zfcpdump_part
-zfcpdump/zfcpdump-initrd
 zfcpdump/10-zfcpdump.install
+zfcpdump/cpioinit
+zfcpdump/zfcpdump-initrd
+zfcpdump/zfcpdump_part
 ziomon/ziomon_mgr
 ziomon/ziomon_util
 ziomon/ziomon_zfcpdd
@@ -94,10 +94,10 @@ zipl/boot/data.h
 zipl/src/chreipl_helper.device-mapper
 zipl/src/zipl
 zipl/src/zipl_helper.device-mapper
-zkey/zkey
-zkey/zkey-cryptsetup
 zkey/check-dep-zkey
 zkey/check-dep-zkey-cryptsetup
 zkey/detect-libcryptsetup.dep
 zkey/ekmfweb/zkey-ekmfweb.so
+zkey/zkey
+zkey/zkey-cryptsetup
 zpcictl/zpcictl
