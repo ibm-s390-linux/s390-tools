@@ -1,12 +1,28 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.1x.x (2020-xx-xx)__
+* __v2.15.0 (2020-10-15)__
 
-  For Linux kernel version: 5.x
+  For Linux kernel version: 5.9
+
+  Add new tool:
+  - lsstp: A small utility to display the Server Time Protocol (STP) information present in sysfs
 
   Changes of existing tools:
+  - dumpconf: support NVMe dump/reipl device
+  - ipl_tools: support clear attribute for nvme re-IPL
+  - zcrypt: Support new config state with lszcrypt and chzcrypt
+  - zkey: Add support for key management system plugins
+        including the KMS commands:
+            bind, unbind, info, configure, rencipher, list, import, refresh
+  - zkey: Add EKMFWeb support to remotely generate secure keys
+  - libekmfweb: Add new EKMFWeb client library
+  - libutil: Add util_file_read_va()
+  - libutil: Add util_file_read_i()/util_file_read_ui()
 
   Bug Fixes:
+  - cpumf: Fix version and help printout when CPUMF is not installed
+  - ziomon/ziorep_printers: fix virtual adapter CSV output
+  - zipl: Fix Error when title is not the first field in BLS file
 
 
 * __v2.14.0 (2020-08-21)__

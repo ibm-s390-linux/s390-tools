@@ -19,6 +19,7 @@ List of all individuals having contributed content to s390-tools
 - Despina Papadopoulou
 - Dimitri John Ledkov
 - Eberhard Pasch
+- Eduard Shishkin
 - Einar Lueck
 - Eric Sandeen
 - Erwin Vicari
@@ -97,6 +98,7 @@ List of all individuals having contributed content to s390-tools
 - Steffen Maier
 - Steffen Thoss
 - Susanne Wintenberger
+- Sven Schnelle
 - Sven Schuetz
 - Swen Schillig
 - Taraka R. Bodireddy
