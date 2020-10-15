@@ -727,22 +727,26 @@ disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
 	}
 }
 
-
-/* Write BYTECOUNT bytes of data from memory at location DATA as a block to
- * the file identified by file descriptor FD. Make sure that the data is
- * aligned on a block size boundary and that at most INFO->PHY_BLOCK_SIZE
- * bytes are written. INFO provides information about the disk layout. Upon
- * success, return 0 and store the pointer to the resulting disk block to BLOCK
- * (if BLOCK is not NULL). Return non-zero otherwise. */
+/**
+ * Write BYTECOUNT bytes of data from memory at location DATA as a block to
+ * the file identified by file descriptor FD at the current position in that
+ * file aligned on ALIGN block size boundary and make sure that at most
+ * INFO->PHY_BLOCK_SIZE bytes are written. INFO provides information about
+ * the disk layout. Upon success, store the pointer to the resulting disk
+ * block to BLOCK (if BLOCK is not NULL) and return 0. Return non-zero
+ * otherwise. On success OFFSET contains offset of the first written byte
+ */
 static int
 disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 			      size_t bytecount, disk_blockptr_t* block,
-			      struct disk_info* info)
+			      struct disk_info *info, int align, off_t *offset)
 {
 	blocknum_t current_block;
 	blocknum_t blocknum;
 	off_t current_pos;
-	int align;
+
+	if (align == 0)
+		align = info->phy_block_size;
 
 	current_pos = lseek(fd, 0, SEEK_CUR);
 	if (current_pos == -1) {
@@ -750,18 +754,18 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 		return -1;
 	}
 	/* Ensure block alignment of current file pos */
-	align = info->phy_block_size;
+
 	if (current_pos % align != 0) {
 		current_pos = lseek(fd, align - current_pos % align, SEEK_CUR);
-	       	if (current_pos == -1) {
+		if (current_pos == -1) {
 	       		error_text(strerror(errno));
 			return -1;
 		}
 	}
-	current_block = current_pos / align;
+	current_block = current_pos / info->phy_block_size;
 	/* Ensure maximum size */
-	if (bytecount > (size_t) align)
-		bytecount = align;
+	if (bytecount > (size_t)info->phy_block_size)
+		bytecount = info->phy_block_size;
 	/* Write data block */
 	if (misc_write(fd, data, bytecount))
 		return -1;
@@ -772,33 +776,38 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 			return -1;
 		disk_blockptr_from_blocknum(block, blocknum, info);
 	}
+	if (offset)
+		*offset = current_pos;
 	return 0;
 }
 
-int
-disk_write_block_aligned(int fd, const void* data, size_t bytecount,
-			 disk_blockptr_t* block, struct disk_info* info)
+int disk_write_block_aligned(int fd, const void *data, size_t bytecount,
+			     disk_blockptr_t *block, struct disk_info *info)
 {
 	return disk_write_block_aligned_base(fd, 0, data, bytecount, block,
-					     info);
+					     info, info->phy_block_size, NULL);
 }
 
-/* Write BYTECOUNT bytes from memory at location BUFFER to the file identified
- * by file descriptor FD and return the list of pointers to the disk blocks
- * that make up the respective part of the file. Upon success return the number
- * of blocks and set BLOCKLIST to point to the uncompressed list. Return zero
- * otherwise. Note that the data is written to a file position which is aligned
- * on a block size boundary. */
+/**
+ * Write BYTECOUNT bytes from memory at location BUFFER to the file identified
+ * by file descriptor FD at the current position in that file aligned on ALIGN
+ * block size boundary and return the list of pointers to the disk blocks that
+ * make up the respective part of the file. Upon success return the number of
+ * blocks, set BLOCKLIST to point to the uncompressed list, and store offset of
+ * the first written byte in OFFSET (if OFFSET is not NULL). Return zero
+ * otherwise.
+ */
 blocknum_t
-disk_write_block_buffer(int fd, int fd_is_basedisk, const void* buffer,
-			size_t bytecount, disk_blockptr_t** blocklist,
-			struct disk_info* info)
+disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
+			      size_t bytecount, disk_blockptr_t **blocklist,
+			      struct disk_info *info, int align, off_t *offset)
 {
 	disk_blockptr_t* list;
 	blocknum_t count;
 	blocknum_t i;
 	size_t written;
 	size_t chunk_size;
+	off_t pos;
 	int rc;
 
 	count = (bytecount + info->phy_block_size - 1) / info->phy_block_size;
@@ -815,18 +824,30 @@ disk_write_block_buffer(int fd, int fd_is_basedisk, const void* buffer,
 		if (chunk_size > (size_t) info->phy_block_size)
 			chunk_size = info->phy_block_size;
 		rc = disk_write_block_aligned_base(fd, fd_is_basedisk,
-						   VOID_ADD(buffer, written),
-				chunk_size,
-				&list[i], info);
+					VOID_ADD(buffer, written),
+					chunk_size,  &list[i], info,
+					i == 0 ? align : info->phy_block_size,
+					&pos);
 		if (rc) {
 			free(list);
 			return 0;
 		}
+		if (offset != NULL && i == 0)
+			*offset = pos;
 	}
 	*blocklist = list;
 	return count;
 }
 
+blocknum_t
+disk_write_block_buffer(int fd, int fd_is_basedisk, const void *buffer,
+			size_t bytecount, disk_blockptr_t **blocklist,
+			struct disk_info *info)
+{
+	return disk_write_block_buffer_align(fd, fd_is_basedisk, buffer,
+					     bytecount, blocklist, info,
+					     info->phy_block_size, NULL);
+}
 
 /* Print device node. */
 void

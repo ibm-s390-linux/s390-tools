@@ -372,9 +372,11 @@ add_component_file(int fd, const char *filename, address_t load_address,
 }
 
 static int
-add_component_buffer(int fd, void* buffer, size_t size, component_data data,
-		     void* component, struct disk_info* info,
-		     struct component_loc *location, int type)
+add_component_buffer_align(int fd, void *buffer, size_t size,
+			   component_data data, void *component,
+			   struct disk_info *info,
+			   struct component_loc *location, int type,
+			   int align, off_t *offset)
 {
 	struct component_loc loc;
 	disk_blockptr_t segment;
@@ -383,7 +385,8 @@ add_component_buffer(int fd, void* buffer, size_t size, component_data data,
 	int rc;
 
 	/* Write buffer */
-	count = disk_write_block_buffer(fd, 0, buffer, size, &list, info);
+	count = disk_write_block_buffer_align(fd, 0, buffer, size, &list, info,
+					      align, offset);
 	if (count == 0) {
 		error_text("Could not write to bootmap file");
 		return -1;
@@ -410,6 +413,15 @@ add_component_buffer(int fd, void* buffer, size_t size, component_data data,
 	return rc;
 }
 
+static int
+add_component_buffer(int fd, void *buffer, size_t size, component_data data,
+		     void *component, struct disk_info *info,
+		     struct component_loc *location, int type)
+{
+	return add_component_buffer_align(fd, buffer, size, data, component,
+					  info, location, type,
+					  info->phy_block_size, NULL);
+}
 
 static int
 add_dummy_buffer(int fd, size_t size, address_t addr, void *component,

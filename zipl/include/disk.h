@@ -117,7 +117,12 @@ int disk_write_block_aligned(int fd, const void* data, size_t bytecount,
 blocknum_t disk_write_block_buffer(int fd, int fd_is_basedisk,
 				   const void* buffer, size_t bytecount,
 				   disk_blockptr_t** blocklist,
-				   struct disk_info* info);
+				   struct disk_info *info);
+blocknum_t disk_write_block_buffer_align(int fd, int fd_is_basedisk,
+					 const void *buffer, size_t bytecount,
+					 disk_blockptr_t **blocklist,
+					 struct disk_info *info, int align,
+					 off_t *offset);
 void disk_print_devt(dev_t d);
 void disk_print_info(struct disk_info* info);
 int disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info);
