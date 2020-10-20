@@ -1,10 +1,9 @@
 include ../common.mak
 
-SUB_DIRS = ekmfweb
-
 ifneq (${HAVE_OPENSSL},0)
 	BUILD_TARGETS += zkey
 	INSTALL_TARGETS += install-zkey
+	SUB_DIRS += ekmfweb
 else
 	BUILD_TARGETS += zkey-skip
 	INSTALL_TARGETS += zkey-skip
@@ -12,9 +11,14 @@ endif
 
 ifneq (${HAVE_CRYPTSETUP2},0)
 	ifneq (${HAVE_JSONC},0)
-		BUILD_TARGETS += zkey-cryptsetup
-		INSTALL_TARGETS += install-zkey-cryptsetup
-		CPPFLAGS += -DHAVE_LUKS2_SUPPORT
+		ifneq (${HAVE_OPENSSL},0)
+			BUILD_TARGETS += zkey-cryptsetup
+			INSTALL_TARGETS += install-zkey-cryptsetup
+			CPPFLAGS += -DHAVE_LUKS2_SUPPORT
+		else
+			BUILD_TARGETS += zkey-cryptsetup-skip-openssl
+			INSTALL_TARGETS += zkey-cryptsetup-skip-openssl
+		endif
 	else
 		BUILD_TARGETS += zkey-cryptsetup-skip-jsonc
 		INSTALL_TARGETS += zkey-cryptsetup-skip-jsonc
@@ -63,6 +67,9 @@ zkey-cryptsetup-skip-cryptsetup2:
 
 zkey-cryptsetup-skip-jsonc:
 	echo "  SKIP    zkey-cryptsetup due to HAVE_JSONC=0"
+
+zkey-cryptsetup-skip-openssl:
+	echo "  SKIP    zkey-cryptsetup due to HAVE_OPENSSL=0"
 
 all: $(BUILD_TARGETS) $(SUB_DIRS)
 
