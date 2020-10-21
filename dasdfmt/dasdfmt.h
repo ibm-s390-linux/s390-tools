@@ -65,30 +65,30 @@ static const char mode_str[3][10] = {
 	"is in invalid format\n",prog_name);}
 
 typedef struct bootstrap1 {
-        u_int32_t key;
-        u_int32_t data[6];
+	u_int32_t key;
+	u_int32_t data[6];
 } __attribute__ ((packed)) bootstrap1_t;
 
 typedef struct bootstrap2 {
-        u_int32_t key;
-        u_int32_t data[36];
+	u_int32_t key;
+	u_int32_t data[36];
 } __attribute__ ((packed)) bootstrap2_t;
 
 typedef struct dasdfmt_info {
 	dasd_information2_t dasd_info;
-        int   verbosity;
-        int   testmode;
-        int   withoutprompt;
-        int   print_progressbar;
-        int   print_hashmarks, hashstep;
+	int   verbosity;
+	int   testmode;
+	int   withoutprompt;
+	int   print_progressbar;
+	int   print_hashmarks, hashstep;
 	int   print_percentage;
-        int   force;
-        int   writenolabel;
-        int   labelspec;
-        int   cdl_format;
-        int   blksize_specified;
+	int   force;
+	int   writenolabel;
+	int   labelspec;
+	int   cdl_format;
+	int   blksize_specified;
 	int   reqsize_specified;
-        int   keep_volser;
+	int   keep_volser;
 	int   force_host;
 	int   layout_specified;
 	int   check;
@@ -97,15 +97,14 @@ typedef struct dasdfmt_info {
 	int   no_discard;
 } dasdfmt_info_t;
 
-
 /*
 C9D7D3F1 000A0000 0000000F 03000000  00000001 00000000 00000000
 */
 static bootstrap1_t ipl1 = {
-        0xC9D7D3F1, {
-                0x000A0000, 0x0000000F, 0x03000000,
-                0x00000001, 0x00000000, 0x00000000
-        }
+	0xC9D7D3F1, {
+		0x000A0000, 0x0000000F, 0x03000000,
+		0x00000001, 0x00000000, 0x00000000
+	}
 };
 
 /*
@@ -116,21 +115,20 @@ C9D7D3F2 07003AB8 40000006 31003ABE  40000005 08003AA0 00000000 06000000
 00000000 00000000 00000000 00000000  00000000
 */
 static bootstrap2_t ipl2 = {
-        0xC9D7D3F2, {
-                0x07003AB8, 0x40000006, 0x31003ABE,
-                0x40000005, 0x08003AA0, 0x00000000,
-                0x06000000, 0x20000000, 0x00000000,
-                0x00000000, 0x00000400, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000,
-                0x00000000, 0x00000000, 0x00000000
-        }
+	0xC9D7D3F2, {
+		0x07003AB8, 0x40000006, 0x31003ABE,
+		0x40000005, 0x08003AA0, 0x00000000,
+		0x06000000, 0x20000000, 0x00000000,
+		0x00000000, 0x00000400, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000,
+		0x00000000, 0x00000000, 0x00000000
+	}
 };
 
 #endif /* DASDFMT_H */
-
