@@ -15,6 +15,7 @@
 
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
+#include "lib/util_libc.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
 #include "lib/util_proc.h"
@@ -28,7 +29,6 @@
 #define SEC_PER_HOUR (60 * 60)
 
 static int filedes;
-static char dev_filename[PATH_MAX];
 static int disk_disabled;
 static format_data_t format_params;
 static format_mode_t mode;
@@ -55,6 +55,8 @@ static const struct util_prg prg = {
  */
 static struct dasdfmt_globals {
 	dasd_information2_t dasd_info;
+	char *dev_path; /* device path entered by user */
+	char *dev_node; /* reliable device node determined by dasdfmt */
 	int   verbosity;
 	int   testmode;
 	int   withoutprompt;
@@ -473,7 +475,7 @@ static void program_interrupt_signal(int sig)
 	}
 
 	printf("Rereading the partition table...\n");
-	rc = dasd_reread_partition_table(dev_filename, 5);
+	rc = dasd_reread_partition_table(g.dev_node, 5);
 	if (rc) {
 		ERRMSG("%s: (signal handler) Re-reading partition table "
 		       "failed. (%s)\n", prog_name, strerror(rc));
@@ -486,12 +488,14 @@ static void program_interrupt_signal(int sig)
 }
 
 /*
- * check given device name for blanks and some special characters
+ * Check given device name for blanks and some special characters.
+ * Retrieve reliable device node and store device information in global
+ * dev_node and dev_path accordingly.
  */
-static void get_device_name(char *devname,
-			    int optind, int argc, char *argv[])
+static void get_device_name(int optind, int argc, char *argv[])
 {
 	struct util_proc_dev_entry dev_entry;
+	unsigned int maj, min;
 	struct stat dev_stat;
 
 	if (optind + 1 < argc)
@@ -505,17 +509,19 @@ static void get_device_name(char *devname,
 	if (strlen(argv[optind]) >= PATH_MAX)
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: device name too long!\n",
 			    prog_name);
-	strcpy(devname, argv[optind]);
+	util_asprintf(&g.dev_path, argv[optind]);
 
-	if (stat(devname, &dev_stat) != 0)
+	if (stat(g.dev_path, &dev_stat) != 0)
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: Could not get information for "
-			    "device node %s: %s\n", prog_name, devname,
+			    "device node %s: %s\n", prog_name, g.dev_path,
 			    strerror(errno));
 
-	if (minor(dev_stat.st_rdev) & PARTN_MASK) {
+	maj = major(dev_stat.st_rdev);
+	min = minor(dev_stat.st_rdev);
+	if (min & PARTN_MASK) {
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: Unable to format partition %s. "
 			    "Please specify a device.\n", prog_name,
-			    devname);
+			    g.dev_path);
 	}
 
 	if (util_proc_dev_get_entry(dev_stat.st_rdev, 1, &dev_entry) == 0) {
@@ -525,15 +531,17 @@ static void get_device_name(char *devname,
 				    prog_name, dev_entry.name);
 	} else {
 		printf("%s WARNING: Unable to get driver name for device node %s",
-		       prog_name, devname);
+		       prog_name, g.dev_path);
 	}
+	/* Get reliable device node */
+	util_asprintf(&g.dev_node, "/dev/block/%d:%d", maj, min);
 }
 
-static void get_blocksize(const char *device, unsigned int *blksize)
+static void get_blocksize(unsigned int *blksize)
 {
 	int err;
 
-	err = dasd_get_blocksize(device, blksize);
+	err = dasd_get_blocksize(g.dev_node, blksize);
 	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl to get the blocksize "
 			    "of the device failed (%s).\n", prog_name,
@@ -551,7 +559,7 @@ static void check_blocksize(unsigned int blksize)
 	    g.dasd_info.format == DASD_FORMAT_NONE)
 		return;
 
-	get_blocksize(dev_filename, &dev_blksize);
+	get_blocksize(&dev_blksize);
 	if (dev_blksize != blksize) {
 		ERRMSG_EXIT(EXIT_FAILURE, "WARNING: Device is formatted with a "
 			    "different blocksize (%d).\nUse --mode=full to "
@@ -591,12 +599,12 @@ static void check_layout(unsigned int intensity)
 /*
  * check for disk type and set some variables (e.g. usage count)
  */
-static void check_disk(char *devname)
+static void check_disk(void)
 {
 	int err;
 	bool ro;
 
-	err = dasd_is_ro(devname, &ro);
+	err = dasd_is_ro(g.dev_node, &ro);
 	if (err != 0)
 		ERRMSG_EXIT(EXIT_FAILURE,
 			    "%s: the ioctl call to retrieve read/write "
@@ -613,13 +621,13 @@ static void check_disk(char *devname)
 	if (strncmp(g.dasd_info.type, "ECKD", 4) != 0) {
 		ERRMSG_EXIT(EXIT_FAILURE,
 			    "%s: Unsupported disk type\n%s is not an "
-			    "ECKD disk!\n", prog_name, devname);
+			    "ECKD disk!\n", prog_name, g.dev_path);
 	}
 
-	if (dasd_sys_raw_track_access(devname)) {
+	if (dasd_sys_raw_track_access(g.dev_node)) {
 		ERRMSG_EXIT(EXIT_FAILURE,
 			    "%s: Device '%s' is in raw-track access mode\n",
-			    prog_name, devname);
+			    prog_name, g.dev_path);
 	}
 }
 
@@ -793,7 +801,7 @@ static format_check_t check_track_format(format_data_t *p)
 	};
 	int err;
 
-	err = dasd_check_format(dev_filename, &cdata);
+	err = dasd_check_format(g.dev_node, &cdata);
 	if (err != 0) {
 		if (err == ENOTTY) {
 			ERRMSG("%s: Missing kernel support for format checking",
@@ -942,9 +950,8 @@ static format_data_t ask_user_for_blksize(format_data_t params)
 /*
  * print all information needed to format the device
  */
-static void dasdfmt_print_info(char *devname, volume_label_t *vlabel,
-			       unsigned int cylinders, unsigned int heads,
-			       format_data_t *p)
+static void dasdfmt_print_info(volume_label_t *vlabel, unsigned int cylinders,
+			       unsigned int heads, format_data_t *p)
 {
 	char volser[6], vollbl[4];
 
@@ -954,7 +961,7 @@ static void dasdfmt_print_info(char *devname, volume_label_t *vlabel,
 	printf("Device Type: %s Provisioned\n",
 	       g.ese ? "Thinly" : "Fully");
 	printf("\nI am going to format the device ");
-	printf("%s in the following way:\n", devname);
+	printf("%s in the following way:\n", g.dev_path);
 	printf("   Device number of device : 0x%x\n", g.dasd_info.devno);
 	printf("   Labelling device        : %s\n",
 	       (g.writenolabel) ? "no" : "yes");
@@ -982,17 +989,17 @@ static void dasdfmt_print_info(char *devname, volume_label_t *vlabel,
 /*
  * get volser
  */
-static int dasdfmt_get_volser(char *devname, char *volser)
+static int dasdfmt_get_volser(char *volser)
 {
 	unsigned int blksize;
 	volume_label_t vlabel;
 
-	get_blocksize(devname, &blksize);
+	get_blocksize(&blksize);
 
 	if ((strncmp(g.dasd_info.type, "ECKD", 4) == 0) &&
 	    !g.dasd_info.FBA_layout) {
 		/* OS/390 and zOS compatible disk layout */
-		vtoc_read_volume_label(devname,
+		vtoc_read_volume_label(g.dev_node,
 				       g.dasd_info.label_block * blksize,
 				       &vlabel);
 		vtoc_volume_label_get_volser(&vlabel, volser);
@@ -1021,14 +1028,14 @@ static void dasdfmt_write_labels(volume_label_t *vlabel,
 	if (g.verbosity > 0)
 		printf("Retrieving dasd information... ");
 
-	get_blocksize(dev_filename, &blksize);
+	get_blocksize(&blksize);
 
 	/*
 	 * Don't rely on the cylinders returned by HDIO_GETGEO, they might be
 	 * to small. geo is only used to get the number of sectors, which may
 	 * vary depending on the format.
 	 */
-	rc = dasd_get_geo(dev_filename, &geo);
+	rc = dasd_get_geo(g.dev_node, &geo);
 	if (rc != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: (write labels) IOCTL "
 			    "HDIO_GETGEO failed (%s).\n",
@@ -1058,10 +1065,10 @@ static void dasdfmt_write_labels(volume_label_t *vlabel,
 		ipl2_record_len	= sizeof(ipl2.data);
 	}
 
-	fd = open(dev_filename, O_RDWR);
+	fd = open(g.dev_node, O_RDWR);
 	if (fd < 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Unable to open device "
-			    "'%s' (%s)\n", prog_name, dev_filename,
+			    "'%s' (%s)\n", prog_name, g.dev_path,
 			    strerror(errno));
 
 	if (lseek(fd, 0, SEEK_SET) != 0) {
@@ -1272,7 +1279,7 @@ static void dasdfmt_release_space(void)
 		return;
 
 	printf("Releasing space for the entire device...\n");
-	err = dasd_release_space(dev_filename, &r);
+	err = dasd_release_space(g.dev_node, &r);
 	if (err) {
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: Could not release space (%s)\n",
 			    prog_name, strerror(err));
@@ -1298,7 +1305,7 @@ static void dasdfmt_prepare_and_format(unsigned int cylinders, unsigned int head
 	if (g.verbosity > 0)
 		printf("Detaching the device...\n");
 
-	disk_disable(dev_filename);
+	disk_disable(g.dev_node);
 
 	if (g.verbosity > 0)
 		printf("Invalidate first track...\n");
@@ -1347,7 +1354,7 @@ static void dasdfmt_expand_format(unsigned int cylinders, unsigned int heads,
 	if (g.verbosity > 0)
 		printf("Detaching the device...\n");
 
-	disk_disable(dev_filename);
+	disk_disable(g.dev_node);
 
 	process_tracks(cylinders, heads, p);
 
@@ -1402,7 +1409,7 @@ static void dasdfmt_quick_format(unsigned int cylinders, unsigned int heads,
 		printf("Formatting the first two tracks of the device.\n");
 
 	/* Disable the device before we do anything */
-	disk_disable(dev_filename);
+	disk_disable(g.dev_node);
 
 	/* Now do the actual formatting of our first two tracks */
 	err = dasd_format_disk(filedes, p);
@@ -1414,10 +1421,8 @@ static void dasdfmt_quick_format(unsigned int cylinders, unsigned int heads,
 	disk_enable();
 }
 
-static void do_format_dasd(char *devname,
-			   volume_label_t *vlabel,
-			   format_data_t *p, unsigned int cylinders,
-			   unsigned int heads)
+static void do_format_dasd(volume_label_t *vlabel, format_data_t *p,
+			   unsigned int cylinders, unsigned int heads)
 {
 	char inp_buffer[5];
 	int count, err;
@@ -1438,19 +1443,19 @@ static void do_format_dasd(char *devname,
 	}
 
 	if (g.verbosity > 0 || !g.withoutprompt || g.testmode)
-		dasdfmt_print_info(devname, vlabel, cylinders, heads, p);
+		dasdfmt_print_info(vlabel, cylinders, heads, p);
 
-	count = dasd_get_host_access_count(devname);
+	count = dasd_get_host_access_count(g.dev_node);
 	if (g.force_host) {
 		if (count > 1) {
 			ERRMSG_EXIT(EXIT_FAILURE,
 				    "\n%s: Disk %s is online on OS instances in %d different LPARs.\n"
 				    "Note: Your installation might include z/VM systems that are configured to\n"
 				    "automatically vary on disks, regardless of whether they are subsequently used.\n\n",
-				    prog_name, devname, count);
+				    prog_name, g.dev_path, count);
 		} else if (count < 0) {
 			ERRMSG("\nHosts access information not available for disk %s.\n\n",
-			       devname);
+			       g.dev_path);
 			return;
 		}
 	} else if (count > 1)
@@ -1459,7 +1464,7 @@ static void do_format_dasd(char *devname,
 		       "Ensure that the disk is not being used by a system outside your LPAR.\n"
 		       "Note: Your installation might include z/VM systems that are configured to\n"
 		       "automatically vary on disks, regardless of whether they are subsequently used.\n",
-		       devname, count);
+		       g.dev_path, count);
 
 	if (!g.testmode) {
 		if (!g.withoutprompt) {
@@ -1498,7 +1503,7 @@ static void do_format_dasd(char *devname,
 			dasdfmt_write_labels(vlabel, cylinders, heads);
 
 		printf("Rereading the partition table... ");
-		err = dasd_reread_partition_table(dev_filename, 5);
+		err = dasd_reread_partition_table(g.dev_node, 5);
 		if (err != 0) {
 			ERRMSG("%s: error during rereading the partition "
 			       "table: %s.\n", prog_name, strerror(err));
@@ -1696,22 +1701,22 @@ int main(int argc, char *argv[])
 	if (g.print_hashmarks)
 		PARSE_PARAM_INTO(g.hashstep, hashstep_str, 10, "hashstep");
 
-	get_device_name(dev_filename, optind, argc, argv);
+	get_device_name(optind, argc, argv);
 
-	rc = dasd_get_info(dev_filename, &g.dasd_info);
+	rc = dasd_get_info(g.dev_node, &g.dasd_info);
 	if (rc != 0)
 		ERRMSG_EXIT(EXIT_FAILURE, "%s: the ioctl call to retrieve "
 			    "device information failed (%s).\n",
 			    prog_name, strerror(rc));
 
-	g.ese = dasd_sys_ese(dev_filename);
+	g.ese = dasd_sys_ese(g.dev_node);
 	eval_format_mode();
 
 	/* Either let the user specify the blksize or get it from the kernel */
 	if (!g.blksize_specified) {
 		if (!(mode == FULL ||
 		      g.dasd_info.format == DASD_FORMAT_NONE) || g.check)
-			get_blocksize(dev_filename, &format_params.blksize);
+			get_blocksize(&format_params.blksize);
 		else
 			format_params = ask_user_for_blksize(format_params);
 	}
@@ -1727,15 +1732,15 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		if (dasdfmt_get_volser(dev_filename, old_volser) == 0)
+		if (dasdfmt_get_volser(old_volser) == 0)
 			vtoc_volume_label_set_volser(&vlabel, old_volser);
 		else
 			ERRMSG_EXIT(EXIT_FAILURE,
 				    "%s: VOLSER not found on device %s\n",
-				    prog_name, dev_filename);
+				    prog_name, g.dev_path);
 	}
 
-	check_disk(dev_filename);
+	check_disk();
 
 	if (check_param(str, ERR_LENGTH, &format_params) < 0)
 		ERRMSG_EXIT(EXIT_MISUSE, "%s: %s\n", prog_name, str);
@@ -1746,8 +1751,10 @@ int main(int argc, char *argv[])
 	if (g.check)
 		check_disk_format(cylinders, heads, &format_params);
 	else
-		do_format_dasd(dev_filename, &vlabel, &format_params,
-			       cylinders, heads);
+		do_format_dasd(&vlabel, &format_params, cylinders, heads);
+
+	free(g.dev_path);
+	free(g.dev_node);
 
 	return 0;
 }
