@@ -74,28 +74,6 @@ typedef struct bootstrap2 {
 	u_int32_t data[36];
 } __attribute__ ((packed)) bootstrap2_t;
 
-typedef struct dasdfmt_info {
-	dasd_information2_t dasd_info;
-	int   verbosity;
-	int   testmode;
-	int   withoutprompt;
-	int   print_progressbar;
-	int   print_hashmarks, hashstep;
-	int   print_percentage;
-	int   force;
-	int   writenolabel;
-	int   labelspec;
-	int   cdl_format;
-	int   blksize_specified;
-	int   reqsize_specified;
-	int   keep_volser;
-	int   force_host;
-	int   layout_specified;
-	int   check;
-	int   mode_specified;
-	int   ese;
-	int   no_discard;
-} dasdfmt_info_t;
 
 /*
 C9D7D3F1 000A0000 0000000F 03000000  00000001 00000000 00000000
