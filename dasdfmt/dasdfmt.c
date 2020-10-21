@@ -1236,15 +1236,6 @@ static void dasdfmt_find_start(dasdfmt_info_t *info, unsigned int cylinders,
 	format_params->start_unit = first;
 }
 
-/*
- * formats the disk cylinderwise
- */
-static void dasdfmt_format(dasdfmt_info_t *info, unsigned int cylinders,
-			   unsigned int heads, format_data_t *format_params)
-{
-	process_tracks(info, cylinders, heads, format_params);
-}
-
 static void dasdfmt_release_space(dasdfmt_info_t *info)
 {
 	format_data_t r = {
@@ -1299,7 +1290,7 @@ static void dasdfmt_prepare_and_format(dasdfmt_info_t *info,
 	/* except track 0 from standard formatting procss */
 	p->start_unit = 1;
 
-	dasdfmt_format(info, cylinders, heads, p);
+	process_tracks(info, cylinders, heads, p);
 
 	if (info->verbosity > 0)
 		printf("formatting tracks complete...\n");
@@ -1336,7 +1327,7 @@ static void dasdfmt_expand_format(dasdfmt_info_t *info, unsigned int cylinders,
 
 	disk_disable(dev_filename);
 
-	dasdfmt_format(info, cylinders, heads, p);
+	process_tracks(info, cylinders, heads, p);
 
 	if (info->verbosity > 0)
 		printf("Formatting tracks complete...\n");
