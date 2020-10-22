@@ -3,7 +3,11 @@ include ../common.mak
 ifneq (${HAVE_OPENSSL},0)
 	BUILD_TARGETS += zkey
 	INSTALL_TARGETS += install-zkey
-	SUB_DIRS += ekmfweb
+	ifneq (${HAVE_JSONC},0)
+		ifneq (${HAVE_LIBCURL},0)
+			SUB_DIRS += ekmfweb
+		endif
+	endif
 else
 	BUILD_TARGETS += zkey-skip
 	INSTALL_TARGETS += zkey-skip
