@@ -40,6 +40,7 @@
 
 #define ENVVAR_ZKEY_KMS_PLUGINS		"ZKEY_KMS_PLUGINS"
 #define DEFAULT_KMS_PLUGINS		"/etc/zkey/kms-plugins.conf"
+#define KMS_PLUGIN_LOCATION		"/usr/lib64/zkey"
 
 #define KMS_CONFIG_FILE			"kms.conf"
 #define KMS_CONFIG_PROP_KMS		"kms"
@@ -209,6 +210,7 @@ static int load_kms_plugin(const char *plugin,
 			   void **plugin_lib, char **plugin_name, bool verbose)
 {
 	kms_get_functions_t _kms_get_functions;
+	char load_so_name[PATH_MAX];
 	char *so_name = NULL;
 	FILE *fp = NULL;
 	char line[4096];
@@ -258,15 +260,26 @@ static int load_kms_plugin(const char *plugin,
 		goto out;
 	}
 
+	/* Try to load via LD_LIBRARY_PATH first */
+	snprintf(load_so_name, sizeof(load_so_name), "%s", so_name);
 	pr_verbose(verbose, "Loading KMS plugin '%s': '%s'", *plugin_name,
-		   so_name);
-	*plugin_lib = dlopen(so_name, RTLD_GLOBAL | RTLD_NOW);
+		   load_so_name);
+	*plugin_lib = dlopen(load_so_name, RTLD_GLOBAL | RTLD_NOW);
 	if (*plugin_lib == NULL) {
-		pr_verbose(verbose, "%s", dlerror());
-		warnx("Failed to load KMS plugin '%s': '%s'", *plugin_name,
-		      so_name);
-		rc = -ELIBACC;
-		goto out;
+		/* Try to load from default plugin location */
+		snprintf(load_so_name, sizeof(load_so_name), "%s/%s",
+			 KMS_PLUGIN_LOCATION, so_name);
+		pr_verbose(verbose, "Loading KMS plugin '%s': '%s'",
+			   *plugin_name, load_so_name);
+
+		*plugin_lib = dlopen(load_so_name, RTLD_GLOBAL | RTLD_NOW);
+		if (*plugin_lib == NULL) {
+			pr_verbose(verbose, "%s", dlerror());
+			warnx("Failed to load KMS plugin '%s': '%s'",
+			      *plugin_name, load_so_name);
+			rc = -ELIBACC;
+			goto out;
+		}
 	}
 
 	_kms_get_functions = (kms_get_functions_t)dlsym(*plugin_lib,
@@ -274,7 +287,7 @@ static int load_kms_plugin(const char *plugin,
 	if (_kms_get_functions == NULL) {
 		pr_verbose(verbose, "%s", dlerror());
 		warnx("Failed to load KMS plugin '%s': '%s'", *plugin_name,
-		      so_name);
+		      load_so_name);
 		rc = -ELIBACC;
 		goto out;
 	}
@@ -283,13 +296,13 @@ static int load_kms_plugin(const char *plugin,
 	if (*kms_functions == NULL) {
 		pr_verbose(verbose, "kms_get_functions() reutned NULL");
 		warnx("Failed to load KMS plugin '%s': '%s'", *plugin_name,
-		      so_name);
+		      load_so_name);
 		rc = -ELIBACC;
 		goto out;
 	}
 
 	pr_verbose(verbose, "Successfully loaded KMS plugin '%s': '%s' (API "
-			    "version: %u)", *plugin_name, so_name,
+			    "version: %u)", *plugin_name, load_so_name,
 			    (*kms_functions)->api_version);
 
 out:

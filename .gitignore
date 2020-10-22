@@ -37,6 +37,8 @@ iucvterm/test/test_afiucv
 libekmfweb/check-dep-libekmfweb
 libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
+libekmfweb/libekmfweb.so.1
+libekmfweb/libekmfweb.so.1.0
 libutil/util_base_example
 libutil/util_file_example
 libutil/util_libc_example
@@ -97,6 +99,7 @@ zipl/src/zipl_helper.device-mapper
 zkey/check-dep-zkey
 zkey/check-dep-zkey-cryptsetup
 zkey/detect-libcryptsetup.dep
+zkey/ekmfweb/libekmfweb.dep
 zkey/ekmfweb/zkey-ekmfweb.so
 zkey/zkey
 zkey/zkey-cryptsetup
