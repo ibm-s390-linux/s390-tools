@@ -1481,6 +1481,20 @@ static void eval_format_mode(void)
 		mode = g.ese ? QUICK : FULL;
 }
 
+/*
+ * Set prog_name to the last component of the program name to be in line with
+ * err() and warn() function (and its derivatives).
+ */
+static void set_prog_name(char *s)
+{
+	char *p = strrchr(s, '/');
+
+	if (p == NULL)
+		prog_name = s;
+	else
+		prog_name = p + 1;
+}
+
 int main(int argc, char *argv[])
 {
 	volume_label_t vlabel;
@@ -1502,7 +1516,7 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, program_interrupt_signal);
 
 	/******************* initialization ********************/
-	prog_name = argv[0];
+	set_prog_name(argv[0]);
 
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
