@@ -791,19 +791,18 @@ static format_check_t check_track_format(format_data_t *p)
 			.stop_unit = p->stop_unit
 		}, 0
 	};
+	char msg[128] = "";
 	int err;
 
 	err = dasd_check_format(g.dev_node, &cdata);
 	if (err != 0) {
 		if (err == ENOTTY) {
-			ERRMSG("%s: Missing kernel support for format checking",
-			       prog_name);
-			if (mode == EXPAND) {
-				ERRMSG(". Mode 'expand' cannot be used");
-			} else if (!g.check) {
-				ERRMSG(" (--force to override)");
-			}
-			error(".");
+			sprintf(msg, "Missing kernel support for format checking");
+			if (mode == EXPAND)
+				strcat(msg, ". Mode 'expand' cannot be used");
+			else if (!g.check)
+				strcat(msg, " (--force to override)");
+			error("%s.", msg);
 		}
 		error("Could not check format: %s", strerror(err));
 	}
