@@ -129,6 +129,9 @@ dobuild()
 		parmfile_size=$(du -b $parmfile | cut -f1)
 		if [ $parmfile_size -le $MAX_PARMFILE_SIZE ]
 		then
+			# Clear any previous parameters
+			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count=$MAX_PARMFILE_SIZE \
+                            if=/dev/zero of=$image conv=notrunc status=none
 			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 if=$parmfile \
 			    of=$image conv=notrunc status=none
 		else
