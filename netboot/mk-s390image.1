@@ -1,0 +1,17 @@
+.TH MK-S390IMAGE "1" "November 2020" "s390-tools" "User Commands"
+.SH NAME
+mk-s390image \- tool for creating bootable image
+.SH SYNOPSIS
+.B mk-s390image
+\fI\,KERNEL BOOT_IMAGE \/\fR[\fI\,-r RAMDISK\/\fR] [\fI\,-p PARMFILE\/\fR]
+.SH DESCRIPTION
+Build an s390 image BOOT_IMAGE suitable for CD/tape/network boot or as a
+KVM firmware image using a stripped Linux kernel file KERNEL.
+.PP
+.SH OPTIONS
+.TP
+\fB\-p\fR        Use PARMFILE with kernel parameters in the image
+.TP
+\fB\-r\fR        Include RAMDISK in the image
+.TP
+\fB\-h\fR        Print usage message, then exit
