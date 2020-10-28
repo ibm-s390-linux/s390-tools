@@ -31,7 +31,7 @@ configuration.
  * Issue "make bzImage" to build the zfcpdump kernel image.
 
 In a Linux distribution the zfcpdump enabled kernel image must be copied to
-/lib/s390-tools/zfcpdump/zfcpdump_part.image, where the s390 zipl tool is
+/lib/s390-tools/zfcpdump/zfcpdump-image, where the s390 zipl tool is
 looking for the dump kernel when preparing a SCSI dump disk.
 
 Create and install initrd
