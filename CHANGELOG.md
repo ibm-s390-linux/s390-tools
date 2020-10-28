@@ -1,13 +1,22 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.15.x (2020-xx-xx)__
+* __v2.15.1 (2020-10-28)__
 
-  For Linux kernel version: 5.x
+  For Linux kernel version: 5.9
 
   Changes of existing tools:
+  - lsstp: Improve wording and fix typos in man page
+  - zkey: Ensure zkey and friends are skipped with HAVE_OPENSSL=0
+  - zkey: Add library versioning for libekmfweb and zkey-ekmfweb
+  - libutil: Add function to determine base device of a partition block device
 
   Bug Fixes:
-
+  - dasdfmt: Fix bad file descriptor error when running on symlinks
+  - libdasd: Fix dasd_get_host_access_count()
+  - zipl: Fix multivolume dump
+  - zgetdump: Fix device node determination via sysfs to work with multivolume again
+  - genprotimg/boot: Fix build by disabling SSP
+  - zipl/boot: Fix build by disabling SSP
 
 * __v2.15.0 (2020-10-15)__
 
