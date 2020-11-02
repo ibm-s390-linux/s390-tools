@@ -6,6 +6,7 @@ Release history for s390-tools (MIT version)
 
   Changes of existing tools:
   - hsci: New tool to manage HSCI interfaces
+  - genprotimg: Add host-key document verification support
 
   Bug Fixes:
 

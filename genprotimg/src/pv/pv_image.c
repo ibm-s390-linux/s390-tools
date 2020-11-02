@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <glib.h>
 #include <openssl/evp.h>
+#include <openssl/x509.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -138,22 +139,18 @@ static EVP_PKEY *pv_img_get_cust_pub_priv_key(gint nid, GError **err)
 	return generate_ec_key(nid, err);
 }
 
-static HostKeyList *pv_img_get_host_keys(gchar **host_cert_paths,
-					 X509_STORE *store, gint nid,
+static HostKeyList *pv_img_get_host_keys(GSList *host_keys_with_path, gint nid,
 					 GError **err)
 {
 	g_autoslist(EVP_PKEY) ret = NULL;
 
-	g_assert(host_cert_paths);
-
-	for (gchar **iterator = host_cert_paths; iterator != NULL && *iterator != NULL;
-	     iterator++) {
+	for (GSList *iterator = host_keys_with_path; iterator;
+	     iterator = iterator->next) {
+		x509_with_path *cert_with_path = iterator->data;
 		g_autoptr(EVP_PKEY) host_key = NULL;
-		const gchar *path = *iterator;
+		X509 *cert = cert_with_path->cert;
 
-		g_assert(path);
-
-		host_key = read_ec_pubkey_cert(store, nid, path, err);
+		host_key = read_ec_pubkey_cert(cert, nid, err);
 		if (!host_key)
 			return NULL;
 
@@ -253,10 +250,172 @@ static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
 	return 0;
 }
 
+static gint pv_img_hostkey_verify(GSList *host_key_certs,
+				  const gchar *root_ca_path,
+				  const gchar *const *crl_paths,
+				  const gchar *const *untrusted_cert_paths,
+				  gboolean offline, GError **err)
+{
+	g_autoslist(x509_with_path) untrusted_certs_with_path = NULL;
+	g_autoptr(STACK_OF_X509) ibm_signing_certs = NULL;
+	g_autoptr(STACK_OF_X509) untrusted_certs = NULL;
+	g_autoslist(x509_pair) ibm_z_pairs = NULL;
+	g_autoptr(X509_STORE) trusted = NULL;
+	gint ibm_signing_certs_count;
+
+	/* Load trusted root CAs of the system if and only if @root_ca_path is
+	 * NULL, otherwise use the root CA specified by @root_ca_path.
+	 */
+	trusted = store_setup(root_ca_path, crl_paths, err);
+	if (!trusted)
+		goto error;
+
+	if (!offline) {
+		g_autoptr(STACK_OF_X509_CRL) downloaded_ibm_signing_crls = NULL;
+
+		/* Set up the download routine for the lookup of CRLs. */
+		store_setup_crl_download(trusted);
+
+		/* Try to download the CRLs of the IBM Z signing certificates
+		 * specified in the host-key documents. Ignore download errors
+		 * as it's still possible that a CRL is specified via command
+		 * line.
+		 */
+		downloaded_ibm_signing_crls = try_load_crls_by_certs(host_key_certs);
+
+		/* Add the downloaded CRLs to the store so they can be used for
+		 * the verification later.
+		 */
+		for (int i = 0; i < sk_X509_CRL_num(downloaded_ibm_signing_crls); i++) {
+			X509_CRL *crl = sk_X509_CRL_value(downloaded_ibm_signing_crls, i);
+
+			if (X509_STORE_add_crl(trusted, crl) != 1) {
+				g_set_error(err, PV_CRYPTO_ERROR,
+					    PV_CRYPTO_ERROR_INTERNAL,
+					    _("failed to load CRL"));
+				goto error;
+			}
+		}
+	}
+
+	/* Load all untrusted certificates (e.g. IBM Z signing key and
+	 * DigiCert intermediate CA) that are required to establish a chain of
+	 * trust starting from the host-key document up to the root CA (if not
+	 * otherwise specified that's the DigiCert Assured ID Root CA).
+	 */
+	untrusted_certs_with_path = load_certificates(untrusted_cert_paths, err);
+	if (!untrusted_certs_with_path)
+		goto error;
+
+	/* Convert to STACK_OF(X509) */
+	untrusted_certs = get_x509_stack(untrusted_certs_with_path);
+
+	/* Find all IBM Z signing keys and remove them from the chain as we
+	 * have to verify that they're valid. The last step of the chain of
+	 * trust verification must be done manually, as the IBM Z signing keys
+	 * are not marked as (intermediate) CA and therefore the standard
+	 * `X509_verify_cert` function of OpenSSL cannot be used to verify the
+	 * actual host-key documents.
+	 */
+	ibm_signing_certs = delete_ibm_signing_certs(untrusted_certs);
+	ibm_signing_certs_count = sk_X509_num(ibm_signing_certs);
+	if (ibm_signing_certs_count < 1) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_NO_IBM_Z_SIGNING_KEY,
+			    _("please specify at least one IBM Z signing key"));
+		goto error;
+	} else if (ibm_signing_certs_count > 1) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_NO_IBM_Z_SIGNING_KEY,
+			    _("please specify only one IBM Z signing key"));
+		goto error;
+	}
+
+	if (store_set_verify_param(trusted, err) < 0)
+		goto error;
+
+	/* Verify that the IBM Z signing keys are trustable.
+	 * For this we must check:
+	 *
+	 * 1. Can a chain of trust be established ending in a root CA
+	 * 2. Is the correct root CA ued? It has either to be the
+	 *    'DigiCert Assured ID Root CA' or the root CA specified via
+	 *    command line.
+	 */
+	for (gint i = 0; i < sk_X509_num(ibm_signing_certs); ++i) {
+		X509 *ibm_signing_cert = sk_X509_value(ibm_signing_certs, i);
+		g_autoptr(STACK_OF_X509_CRL) ibm_signing_crls = NULL;
+		g_autoptr(X509_STORE_CTX) ctx = NULL;
+		x509_pair *pair = NULL;
+
+		g_assert(ibm_signing_cert);
+
+		/* Create the verification context and set the trusted
+		 * and chain parameters.
+		 */
+		ctx = create_store_ctx(trusted, untrusted_certs, err);
+		if (!ctx)
+			goto error;
+
+		/* Verify the IBM Z signing key */
+		if (verify_cert(ibm_signing_cert, ctx, err) < 0)
+			goto error;
+
+		/* Verify the build chain of trust chain. If the user passes a
+		 * trusted root CA on the command line then the check for the
+		 * Subject Key Identifier (SKID) is skipped, otherwise let's
+		 * check if the SKID meets our expectation.
+		 */
+		if (!root_ca_path &&
+		    check_chain_parameters(X509_STORE_CTX_get0_chain(ctx),
+					   get_digicert_assured_id_root_ca_skid(),
+					   err) < 0) {
+			goto error;
+		}
+
+		ibm_signing_crls = store_ctx_find_valid_crls(ctx, ibm_signing_cert, err);
+		if (!ibm_signing_crls) {
+			g_prefix_error(err, _("IBM Z signing key: "));
+			goto error;
+		}
+
+		/* Increment reference counter of @ibm_signing_cert as the
+		 * certificate will now also be owned by @ibm_z_pairs.
+		 */
+		if (X509_up_ref(ibm_signing_cert) != 1)
+			g_abort();
+
+		pair = x509_pair_new(&ibm_signing_cert, &ibm_signing_crls);
+		ibm_z_pairs = g_slist_append(ibm_z_pairs, pair);
+		g_assert(!ibm_signing_cert);
+		g_assert(!ibm_signing_crls);
+	}
+
+	/* Verify host-key documents by using the IBM Z signing
+	 * certificates and the corresponding certificate revocation
+	 * lists.
+	 */
+	for (GSList *iterator = host_key_certs; iterator; iterator = iterator->next) {
+		x509_with_path *host_key_with_path = iterator->data;
+		const gchar *host_key_path = host_key_with_path->path;
+		X509 *host_key = host_key_with_path->cert;
+		gint flags = X509_V_FLAG_CRL_CHECK;
+
+		if (verify_host_key(host_key, ibm_z_pairs, flags,
+				    PV_CERTS_SECURITY_LEVEL, err) < 0) {
+			g_prefix_error(err, "'%s': ", host_key_path);
+			goto error;
+		}
+	}
+
+	return 0;
+error:
+	g_prefix_error(err, _("Failed to verify host-key document: "));
+	return -1;
+}
+
 /* read in the keys or auto-generate them */
 static gint pv_img_set_keys(PvImage *img, const PvArgs *args, GError **err)
 {
-	g_autoptr(X509_STORE) store = NULL;
+	g_autoslist(x509_with_path) host_key_certs = NULL;
 
 	g_assert(img->xts_cipher);
 	g_assert(img->cust_comm_cipher);
@@ -285,8 +444,25 @@ static gint pv_img_set_keys(PvImage *img, const PvArgs *args, GError **err)
 	if (!img->cust_pub_priv_key)
 		return -1;
 
+	/* Load all host-key documents specified on the command line */
+	host_key_certs = load_certificates((const gchar **)args->host_keys,
+					   err);
+	if (!host_key_certs)
+		return -1;
+
+	if (!args->no_verify &&
+	    pv_img_hostkey_verify(host_key_certs, args->root_ca_path,
+				  (const gchar * const *)args->crl_paths,
+				  (const gchar * const *)args->untrusted_cert_paths,
+				  args->offline, err) < 0) {
+		return -1;
+	}
+
+	/* Loads the public keys stored in the host-key documents and verify
+	 * that the correct elliptic curve is used.
+	 */
 	img->host_pub_keys =
-		pv_img_get_host_keys(args->host_keys, store, img->nid, err);
+		pv_img_get_host_keys(host_key_certs, img->nid, err);
 	if (!img->host_pub_keys)
 		return -1;
 
@@ -405,6 +581,9 @@ PvImage *pv_img_new(PvArgs *args, const gchar *stage3a_path, GError **err)
 
 	if (args->no_verify)
 		g_warning(_("host-key document verification is disabled. Your workload is not secured."));
+
+	if (args->root_ca_path)
+		g_warning(_("A different root CA than the default DigiCert root CA is selected. Ensure that this root CA is trusted."));
 
 	ret->comps = pv_img_comps_new(EVP_sha512(), EVP_sha512(), EVP_sha512(), err);
 	if (!ret->comps)

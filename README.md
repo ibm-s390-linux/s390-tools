@@ -280,7 +280,7 @@ build options:
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb           |
 | glib2          | `HAVE_GLIB2`       | genprotimg                            |
-| libcurl        | `HAVE_LIBCURL`     | libekmfweb                            |
+| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb                |
 
 This table lists additional build or install options:
 

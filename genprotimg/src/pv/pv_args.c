@@ -18,7 +18,9 @@
 
 static gchar summary[] =
 	"Use genprotimg to create a protected virtualization kernel image file,\n"
-	"which can be loaded using zipl or QEMU.";
+	"which can be loaded using zipl or QEMU. For all certificates, revocation\n"
+	"lists, and host-key documents, both the PEM and DER input formats are\n"
+	"supported.";
 
 static gint pv_arg_compare(gconstpointer arg_1, gconstpointer arg_2)
 {
@@ -97,9 +99,14 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 		return -1;
 	}
 
-	if (!args->no_verify) {
-		g_set_error(err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
-			    _("Use the option '--no-verify' as the verification support is not available yet."));
+	if (!args->no_verify &&
+	    (!args->untrusted_cert_paths ||
+	     g_strv_length(args->untrusted_cert_paths) == 0)) {
+		g_set_error(
+			err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
+			_("Either specify the IBM Z signing key and (DigiCert) intermediate CA certificate\n"
+			  "by using the '--cert' option, or use the '--no-verify' flag to disable the\n"
+			  "host-key document verification completely (at your own risk)."));
 		return -1;
 	}
 
@@ -141,6 +148,8 @@ static gboolean cb_set_string_option(const gchar *option, const gchar *value,
 {
 	gchar **args_option = NULL;
 
+	if (g_str_equal(option, "--root-ca"))
+		args_option = &args->root_ca_path;
 	if (g_str_equal(option, "-o") || g_str_equal(option, "--output"))
 		args_option = &args->output_path;
 	if (g_str_equal(option, "--x-comp-key"))
@@ -211,6 +220,18 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 			_("FILE specifies a host-key document. At least\n" INDENT
 			  "one is required."),
 		  .arg_description = _("FILE") },
+		{ .long_name = "cert",
+		  .short_name = 'C',
+		  .flags = G_OPTION_FLAG_NONE,
+		  .arg = G_OPTION_ARG_FILENAME_ARRAY,
+		  .arg_data = &args->untrusted_cert_paths,
+		  .description = _(
+			  "FILE contains a certificate that is used to\n" INDENT
+			  "establish a chain of trust for the verification\n" INDENT
+			  "of the host-key documents. The IBM Z signing\n" INDENT
+			  "key and intermediate CA certificate (signed\n" INDENT
+			  "by the root CA) are required."),
+		  .arg_description = _("FILE") },
 		{ .long_name = "output",
 		  .short_name = 'o',
 		  .flags = G_OPTION_FLAG_FILENAME,
@@ -241,6 +262,31 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .description = _("Use the kernel parameters stored in PARMFILE\n" INDENT
 				   "(optional)."),
 		  .arg_description = _("PARMFILE") },
+		{ .long_name = "crl",
+		  .short_name = 0,
+		  .flags = G_OPTION_FLAG_NONE,
+		  .arg = G_OPTION_ARG_FILENAME_ARRAY,
+		  .arg_data = &args->crl_paths,
+		  .description = _(
+			  "FILE contains a certificate revocation list\n" INDENT
+			  "(optional)."),
+		  .arg_description = _("FILE") },
+		{ .long_name = "offline",
+		  .short_name = 0,
+		  .flags = G_OPTION_FLAG_NONE,
+		  .arg = G_OPTION_ARG_NONE,
+		  .arg_data = &args->offline,
+		  .description = _("Don't download CRLs (optional)."),
+		  .arg_description = NULL },
+		{ .long_name = "root-ca",
+		  .short_name = 0,
+		  .flags = G_OPTION_FLAG_FILENAME,
+		  .arg = G_OPTION_ARG_CALLBACK,
+		  .arg_data = cb_set_string_option,
+		  .description = _(
+			  "Set FILE as the trusted root CA and don't use the\n" INDENT
+			  "root CAs that are installed on the system (optional)."),
+		  .arg_description = _("FILE") },
 		{ .long_name = "no-verify",
 		  .short_name = 0,
 		  .flags = G_OPTION_FLAG_NONE,
@@ -378,6 +424,9 @@ void pv_args_free(PvArgs *args)
 	g_free(args->cust_root_key_path);
 	g_free(args->cust_comm_key_path);
 	g_free(args->gcm_iv_path);
+	g_free(args->root_ca_path);
+	g_strfreev(args->crl_paths);
+	g_strfreev(args->untrusted_cert_paths);
 	g_strfreev(args->host_keys);
 	g_free(args->xts_key_path);
 	g_slist_free_full(args->comps, (GDestroyNotify)pv_arg_free);

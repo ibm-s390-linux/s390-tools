@@ -18,6 +18,8 @@
 #include "common.h"
 #include "pv/pv_args.h"
 #include "pv/pv_image.h"
+#include "utils/crypto.h"
+#include "utils/curl.h"
 
 enum {
 	LOG_LEVEL_CRITICAL = 0,
@@ -117,6 +119,8 @@ static void remove_signal_handler(const gint *signals, const gsize signals_n)
 		signal(signals[i], SIG_DFL);
 }
 
+static void __attribute__((constructor)) __init(void);
+static void __attribute__((destructor)) __cleanup(void);
 gint main(gint argc, gchar *argv[])
 {
 	g_autoptr(PvArgs) args = pv_args_new();
@@ -180,4 +184,17 @@ error:
 	g_clear_pointer(&img, pv_img_free);
 	g_clear_pointer(&args, pv_args_free);
 	exit(ret);
+}
+
+static void __init(void)
+{
+	pv_crypto_init();
+	if (curl_init() != 0)
+		g_abort();
+}
+
+static void __cleanup(void)
+{
+	curl_cleanup();
+	pv_crypto_cleanup();
 }

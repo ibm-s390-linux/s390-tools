@@ -23,16 +23,16 @@ WARNINGS := -Wall -Wextra -Wshadow \
 $(bin_PROGRAM)_SRCS := $(bin_PROGRAM).c pv/pv_stage3.c pv/pv_image.c \
 	pv/pv_comp.c pv/pv_hdr.c pv/pv_ipib.c utils/crypto.c utils/file_utils.c \
 	pv/pv_args.c utils/buffer.c pv/pv_comps.c pv/pv_error.c \
-	pv/pv_opt_item.c \
+	pv/pv_opt_item.c utils/curl.c \
 	$(NULL)
 $(bin_PROGRAM)_OBJS := $($(bin_PROGRAM)_SRCS:.c=.o)
 
 ALL_CFLAGS += -std=gnu11 -DPKGDATADIR=$(PKGDATADIR) \
-	$(GLIB2_CFLAGS) $(LIBCRYPTO_CFLAGS) \
+	$(GLIB2_CFLAGS) $(LIBCRYPTO_CFLAGS) $(LIBCURL_CFLAGS) \
 	$(WARNINGS) \
 	$(NULL)
 ALL_CPPFLAGS += $(INCLUDE_PARMS)
-LDLIBS += $(GLIB2_LIBS) $(LIBCRYPTO_LIBS)
+LDLIBS += $(GLIB2_LIBS) $(LIBCRYPTO_LIBS) $(LIBCURL_LIBS)
 
 
 ifneq ($(shell sh -c 'command -v pkg-config'),)
@@ -40,19 +40,25 @@ GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
 GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
 LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
 LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
+LIBCURL_CFLAGS := $(shell pkg-config --silence-errors --cflags libcurl)
+LIBCURL_LIBS := $(shell pkg-config --silence-errors --libs libcurl)
 else
 GLIB2_CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 GLIB2_LIBS := -lglib-2.0
 LIBCRYPTO_CFLAGS :=
 LIBCRYPTO_LIBS := -lcrypto
+LIBCURL_CFLAGS :=
+LIBCURL_LIBS := -lcurl
 endif
 
 BUILD_TARGETS := skip-$(bin_PROGRAM)
 INSTALL_TARGETS := skip-$(bin_PROGRAM)
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_GLIB2},0)
+ifneq (${HAVE_LIBCURL},0)
 BUILD_TARGETS := $(bin_PROGRAM)
 INSTALL_TARGETS := install-$(bin_PROGRAM)
+endif
 endif
 endif
 
@@ -98,4 +104,9 @@ $($(bin_PROGRAM)_OBJS): .check-dep-$(bin_PROGRAM)
 		"openssl-devel / libssl-dev version >= 1.1.0", \
 		"HAVE_OPENSSL=0", \
 		"-I.")
+	$(call check_dep, \
+		"$(bin_PROGRAM)", \
+		"curl/curl.h", \
+		"libcurl-devel", \
+		"HAVE_LIBCURL=0")
 	touch $@

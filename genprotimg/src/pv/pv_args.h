@@ -25,6 +25,7 @@ void pv_arg_free(PvArg *arg);
 typedef struct {
 	gint log_level;
 	gint no_verify;
+	gboolean offline;
 	gchar *pcf;
 	gchar *scf;
 	gchar *psw_addr; /* PSW address which will be used for the start of
@@ -34,6 +35,11 @@ typedef struct {
 	gchar *cust_comm_key_path;
 	gchar *gcm_iv_path;
 	gchar **host_keys;
+	gchar *root_ca_path; /* Trusted root CA used for the verification of the
+			      * chain of trust (if specified).
+			      */
+	gchar **untrusted_cert_paths;
+	gchar **crl_paths;
 	gchar *xts_key_path;
 	GSList *comps;
 	gchar *output_path;
