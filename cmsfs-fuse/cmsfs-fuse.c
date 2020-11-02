@@ -2050,7 +2050,7 @@ static int update_dir_levels(int blocks)
 	if (blocks < 2)
 		return 0;
 
-	while (blocks / (PTRS_PER_BLOCK + 1)) {
+	while (blocks / PTRS_PER_BLOCK) {
 		levels++;
 		blocks /= PTRS_PER_BLOCK;
 	}
@@ -3103,7 +3103,7 @@ static void update_levels(struct file *f)
 		return;
 	}
 
-	while (blocks / (per_block + 1)) {
+	while (blocks / per_block) {
 		levels++;
 		blocks /= per_block;
 	}
