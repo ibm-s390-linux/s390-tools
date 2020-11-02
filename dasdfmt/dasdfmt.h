@@ -41,6 +41,10 @@ static const char mode_str[3][10] = {
 	"Full", "Quick", "Expand"
 };
 
+/* Report error, free memory, and exit */
+static void error(const char *format, ...)
+	__attribute__((__noreturn__, __format__(__printf__, 1, 2)));
+
 #define DASD_PARTN_BITS 2
 #define PARTN_MASK ((1 << DASD_PARTN_BITS) - 1)
 
