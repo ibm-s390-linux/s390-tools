@@ -1637,7 +1637,7 @@ int main(int argc, char *argv[])
 			/* End of options string - start of devices list */
 			break;
 		default:
-			error("Try '%s --help' for more information.");
+			error("Try '%s --help' for more information.", prog_name);
 		}
 
 		if (rc == -1)
