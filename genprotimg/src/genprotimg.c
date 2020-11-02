@@ -177,5 +177,7 @@ error:
 	rmdir_recursive(tmp_dir, NULL);
 	remove_signal_handler(signals, G_N_ELEMENTS(signals));
 	g_free(tmp_dir);
+	g_clear_pointer(&img, pv_img_free);
+	g_clear_pointer(&args, pv_args_free);
 	exit(ret);
 }
