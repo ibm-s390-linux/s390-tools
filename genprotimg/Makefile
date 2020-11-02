@@ -21,7 +21,7 @@ clean: clean-recursive
 $(RECURSIVE_TARGETS):
 	@target=`echo $@ |sed s/-recursive//`; \
 		for d in $(SUBDIRS); do \
-			$(MAKE) -C $$d $$target; \
+			$(MAKE) -C $$d $$target || exit 1; \
 		done
 
 .PHONY: all install clean $(RECURSIVE_TARGETS)
