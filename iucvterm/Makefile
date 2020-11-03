@@ -21,7 +21,7 @@ clean: clean-recursive
 $(RECURSIVE_TARGETS):
 	@target=`echo $@ |sed s/-recursive//`; \
 	for d in $(SUBDIRS); do \
-		(cd $$d && $(MAKE) $$target) \
+		(cd $$d && $(MAKE) $$target) || exit 1; \
 	done
 
 
