@@ -81,7 +81,7 @@ install-libekmfweb.so.$(VERSION): libekmfweb.so.$(VERSION)
 	ln -srf $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERM)
 	ln -srf $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so
 	$(INSTALL) -d -m 770 $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 $(rootdir)include/ekmfweb/ekmfweb.h $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(rootdir)include/ekmfweb/ekmfweb.h $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
 
 install: all $(INSTALL_TARGETS)
 
