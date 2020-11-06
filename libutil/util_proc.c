@@ -460,7 +460,7 @@ int util_proc_mnt_get_entry(const char *file_name, const char *spec,
 		rc = scan_mnt_entry(&file, entry);
 		if (rc)
 			goto out_free;
-		if (!strcmp(entry->spec, spec)) {
+		if (!strcmp(entry->vfstype, spec)) {
 			rc = 0;
 			goto out_free;
 		}
