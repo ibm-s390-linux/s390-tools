@@ -5,6 +5,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 5.x
 
   Changes of existing tools:
+  - hsci: New tool to manage HSCI interfaces
 
   Bug Fixes:
 

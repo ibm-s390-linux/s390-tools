@@ -1,0 +1,100 @@
+.\" Copyright IBM Corp. 2020
+
+.TH HSCI 8 "November 2020" "s390-tools" "Linux Programmer's Manual"
+
+
+.SH NAME
+.B hsci
+\- control and show HSCI settings.
+
+
+.SH SYNOPSIS
+.B hsci add
+.I HSDEV
+.I NETDEV
+.br
+.B hsci del
+.I HSCINAME
+.br
+.B hsci show
+.br
+.B hsci [\-hv]
+
+.SH DESCRIPTION
+.BI hsci
+is used to control and show HSCI (HiperSockets Converged Interfaces) settings. A HiperSockets interface and an external network interface are converged into an HSCI interface.
+
+.SH COMMANDS
+.TP
+.B add \fIHSDEV\fR \fINETDEV\fR
+.RS .4i
+.PP
+Adds an HSCI interface
+.PP
+.I HSDEV
+is the interface name of the HiperSockets device to be converged into the HSCI interface.
+.PP
+.I NETDEV
+is the interface name of the external network device to be converged into the HSCI interface.
+.RE
+
+.TP
+.B del \fIHSCINAME\fR
+.RS .4i
+.PP
+Deletes an HSCI interface
+.PP
+.I HSCINAME
+is the name of the HSCI interface for the HiperSockets device and the external network device.
+.RE
+
+.TP
+.B show
+.RS .4i
+.PP
+Lists the configured HSCI interfaces.
+.RE
+
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-version
+Prints the version number of hsci and exits.
+.TP
+.BR \-h ", " \-\-help
+Displays the help information for the command.
+
+.SH EXIT CODES
+.TP
+.BR "0"
+The hsci command ran successfully.
+
+.TP
+.BR "1"
+An error occurred.
+
+.SH EXAMPLE
+.BR "hsci show"
+.TP
+.RB
+Lists the configured HSCI interfaces:
+.RS 1.2i
+
+HSCI      PNET_ID  HiperSockets  External
+.br
+-----------------------------------------
+.br
+hsci8410  NET1     enc8410       encb040
+
+.RE
+
+.SH SEE ALSO
+.nf
+ip(8), bridge(8)
+.fi
+
+.SH AUTHOR
+.nf
+Written by Alexandra Winter <wintera@linux.ibm.com>
+           Wenjia Zhang <wenjia@linux.ibm.com>
+.fi
+

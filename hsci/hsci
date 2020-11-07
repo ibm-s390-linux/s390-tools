@@ -1,0 +1,441 @@
+#!/bin/bash
+#
+# hsci - Tool to manage HiperSockets Converged Interfaces (HSCI)
+#
+# Copyright IBM Corp. 2020
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+hsdev=""
+ndev=""
+hsci=""
+hsdev_mac=""
+hsif_pnetid=""
+netif_pnetid=""
+hsci_pnetid=""
+
+function usage {
+cat <<-EOD
+Usage: hsci COMMAND [OPTION]
+
+This tool is designed to control and show HSCI (HiperSockets Converged
+Interfaces) settings. A HiperSockets interface and an external network
+
+COMMANDS
+        add HIPERSOCKETS_DEV NET_DEV    Adds an HSCI interface
+        del HSCI_NAME                   Deletes an HSCI interface
+        show                            Lists the configured HSCI interfaces
+
+OPTIONS:
+        -v, --version                   Prints the version number of the hsci tool and exits
+        -h, --help                      Displays the help information for the command
+EOD
+}
+
+function prereqs_check {
+	if ! [ -x "$(command -v ip)" ]; then
+		echo "Error: No iproute2 installed on this system" >&2
+		return 1
+	fi
+}
+
+function check_pnetids {
+	# get PNETID of the HS
+	local hsif_pnetids=""
+	local netif_pnetids=""
+
+	if [ -e /sys/class/net/$hsdev/device/util_string ]; then
+		hsif_pnetids="$(cat /sys/class/net/$hsdev/device/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+	else
+		if [ -e /sys/class/net/$hsdev/device/chpid ]; then
+			chpid="$(cat /sys/class/net/$hsdev/device/chpid | tr [:upper:] [:lower:])"
+			hsif_pnetids="$(cat /sys/devices/css0/chp0.$chpid/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+		fi
+	fi
+	if [ "$hsif_pnetids" != "" ]; then
+		port_hsif="$(cat /sys/class/net/$hsdev/dev_port)"
+		(( idx=16*$port_hsif+1 ))
+		(( end=$idx+15 ))
+		hsif_pnetid="$(echo "$hsif_pnetids" | cut -c $idx-$end | tr -d ' ')"
+	fi
+
+	# get PNETID of the NET_DEV
+	if [ -e /sys/class/net/$ndev/device/util_string ]; then
+		netif_pnetids="$(cat /sys/class/net/$ndev/device/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+	else
+		if [ -e /sys/class/net/$ndev/device/chpid ]; then
+			chpid="$(cat /sys/class/net/$ndev/device/chpid | tr [:upper:] [:lower:])"
+			netif_pnetids="$(cat /sys/devices/css0/chp0.$chpid/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+		fi
+	fi
+	if [ "$netif_pnetids" != "" ]; then
+		port_netif="$(cat /sys/class/net/$ndev/dev_port)"
+		(( idx=16*$port_netif+1 ))
+		(( end=$idx+15 ))
+		netif_pnetid="$(echo "$netif_pnetids" | cut -c $idx-$end | tr -d ' ')"
+	fi
+
+	#Check PNETIDs
+	if [ "$hsif_pnetid" != "" ] && [ "$netif_pnetid" != "" ] && [ "$netif_pnetid" != "$hsif_pnetid" ]; then
+		echo "Error: $hsdev and $ndev have different PNETIDs! They are $hsif_pnetid and $netif_pnetid respectively" >&2
+		return 1
+	fi
+
+	if [ "$hsif_pnetid" != "" ] && [ "$netif_pnetid" != "" ] && [ "$netif_pnetid" == "$hsif_pnetid" ]; then
+		hsci_pnetid=$hsif_pnetid
+	fi
+}
+
+function verify_precon {
+	echo "Verifying net dev $ndev and HiperSockets dev $hsdev"
+
+	if [ ! -e /sys/class/net/$hsdev ]; then
+		echo "Error: $hsdev does not exist" >&2
+		return 1
+	fi
+	if [ "$(cat /sys/class/net/$hsdev/device/card_type)" != "HiperSockets" ]; then
+		echo "Error: $hsdev is not a HiperSockets device" >&2
+		return 1
+	fi
+	if [ "$(cat /sys/class/net/$hsdev/device/layer2)" != "1" ]; then
+		echo "Error: $hsdev is not in layer 2 mode" >&2
+		return 1
+	fi
+	if [ ! -e /sys/class/net/$hsdev/device/vnicc/bridge_invisible ]; then
+		echo "Error: Missing vnic-characteristics support" >&2
+		return 1
+	fi
+	if [ "$(cat /sys/class/net/$hsdev/device/vnicc/bridge_invisible)" == "n/a" ]; then
+		echo "Error: $hsdev does not support vnicc" >&2
+		return 1
+	fi
+	if [ $(ip link show $hsdev | grep UP | wc -l) -eq 0 ]; then
+		echo "Error: $hsdev is not in state UP" >&2
+		return 1
+	fi
+	if [ $(bridge -d link show dev $hsdev self | grep learning_sync | wc -l) -eq 0 ]; then
+		echo "Error: $hsdev does not support attribute learning_sync" >&2
+		return 1
+	fi
+	if [ $(ip link show $hsdev | grep master | wc -l) -ne 0 ]; then
+		echo "Error: $hsdev is already a bridge port" >&2
+		return 1
+	fi
+
+	#Pre-verify net_dev
+	if [ ! -e /sys/class/net/$ndev ]; then
+		echo "Error: $ndev does not exist" >&2
+		return 1
+	fi
+	if [ "$(cat /sys/class/net/$ndev/device/card_type)" == "HiperSockets" ]; then
+		echo "Error: $ndev is also a HiperSockets device" >&2
+		return 1
+	fi
+	if [ $(ip link show $ndev | grep UP | wc -l) -eq 0 ]; then
+		echo "Error: $ndev is not in state UP" >&2
+		return 1
+	fi
+	if [ $(ip link show $ndev | grep master | wc -l) -ne 0 ]; then
+		echo "Error: $ndev is already a bridge port" >&2
+		return 1
+	fi
+
+	#Check PNETIDs
+	check_pnetids
+	if [ $? -ne 0 ]; then
+		return $?
+	fi
+
+	return 0
+}
+
+function clean_up {
+	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
+	echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible >/dev/null 2>&1
+	bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
+	ip link del $hsci >/dev/null 2>&1
+}
+
+##############################################################################
+##	add a new HSCI interface
+##############################################################################
+function add_hsci {
+
+	if [ $# != 2 ]; then
+		echo "hsci: Invalid parameters" >&2
+		echo "Use 'hsci --help' for more information" >&2
+		return 1
+	fi
+	hsdev=$1
+	ndev=$2
+
+	#### Verify preconditions
+	verify_precon
+	if [ $? -ne 0 ]; then
+		return $?
+	fi
+
+	hsci_postfix="$(readlink /sys/class/net/$hsdev/device/cdev0 | tail -c5)"
+	hsci=hsci$hsci_postfix
+
+	echo "Adding $hsci with a HiperSockets dev $hsdev and an external dev $ndev"
+
+	#### Create bridge
+	ip link add name $hsci type bridge stp_state 0 >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Could not create a bridge" >&2
+		return 1
+	fi
+
+	#### Prepare hsdev
+	# Set VNICC of hsdev to invisible
+	#(mandatory for co-existence with HS-OSA bridges!)
+	echo 1 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
+
+	#### Create bridge ports
+	ip link set dev $ndev master $hsci >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Could not set master for $ndev" >&2
+		clean_up
+		return 1
+	fi
+	ip link set dev $hsdev master $hsci >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Could not set master for $hsdev" >&2
+		clean_up
+		return 1
+	fi
+
+	# no forwarding between ndev and hsdev -> isolated on
+	# ndev is default for outgoing unknown targets -> flood on
+	# no need to learn external LAN targets into fdb -> learning off
+	bridge link set dev $ndev isolated on learning off flood on mcast_flood on >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set bridge attributes on $ndev" >&2
+		clean_up
+		return 1
+	fi
+
+	# no forwarding between ndev and hsdev -> isolated on
+	# fdb will be populated by dev-to-bridge-notification, no need to learn
+	#	-> learning off
+	# only send to hsdev, if listed in fdb -> flood off
+	# don't send MC/BC on hsdev -> mcast_flood off
+	bridge link set dev $hsdev isolated on learning off flood off mcast_flood off >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set bridge attributes on $hsdev" >&2
+		clean_up
+		return 1
+	fi
+
+	# NOTE: Although not required, BCs will be sent out on hsdev.
+	# NOTE: We need to receive BCs on hsdev, as z/OS HSCI does ARP requests on HS.
+
+	hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
+	echo "Set $hsdev MAC $hsdev_mac on $ndev and $hsci"
+
+	# set HS MAC on OSA as secondary MAC
+	bridge fdb add $hsdev_mac dev $ndev >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set HS MAC on OSA as secondary MAC" >&2
+		clean_up
+		return 1
+	fi
+
+	# set HS MAC (common MAC) on HSCI as primary MAC
+	ip link set address $hsdev_mac dev $hsci >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set HiperSockets MAC (common MAC) on HSCI as primary MAC" >&2
+		clean_up
+		return 1
+	fi
+
+	# use hsdev MTU
+	if [ -e /sys/class/net/$hsdev/mtu ]; then
+		hs_mtu="$(cat /sys/class/net/$hsdev/mtu)"
+		ip link set dev $hsci mtu $hs_mtu >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to set MTU for $hsci " >&2
+			clean_up
+			return 1
+		fi
+	fi
+	ip link set dev $hsci up >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set $hsci up" >&2
+		clean_up
+		return 1
+	fi
+
+	# Turn on device for bridge notification
+	bridge link set dev $hsdev learning_sync on self >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to turn on device for bridge notification" >&2
+		clean_up
+		return 1
+	fi
+	echo "Successfully added HSCI interface $hsci"
+	return 0
+}
+
+##############################################################################
+##	Delete HSCI
+##############################################################################
+
+function del_hsci {
+	if [ $# != 1 ]; then
+		echo "hsci: invalid parameters" >&2
+		echo "Use 'hsci --help' for more information" >&2
+		return 1
+	fi
+	hsci=$1
+	if [ $(ip link show dev $hsci | wc -l) -eq 0 ]; then
+		echo "Error: $hsci does not exit" >&2
+		return 1
+	fi
+	if [ $(ip link show | grep "master $hsci" | wc -l) -eq 0 ]; then
+		echo "Error: $hsci is not an active HSCI interface" >&2
+		return 1
+	fi
+
+	bports="$(ip link show | grep "master $hsci" | awk '{print $2}')"
+	for bport in $bports; do
+		if [ $(bridge -d link show dev $bport | grep "learning_sync on" | wc -l) -ne 0 ]; then
+			hsdev=${bport%:}
+		else
+			ndev=${bport%:}
+		fi
+	done
+	if [ "$hsdev" == "" ]; then
+		echo "Error: $hsci has no active HiperSockets port" >&2
+		return 1
+	fi
+	echo "Deleting HSCI interface $hsci with the HiperSockets $hsdev and the external $ndev"
+
+	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to turn off learning_sync on $hsdev" >&2
+		return 1
+	fi
+	echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
+
+	hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
+	echo "Deleting $hsev MAC $hsdev_mac on $ndev"
+	bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to delete $hsev MAC $hsdev_mac on $ndev" >&2
+		return 1
+	fi
+
+	ip link del $hsci >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to delete $hsci" >&2
+		return 1
+	fi
+	echo "Successfully deleted device $hsci"
+
+	return 0
+}
+
+##############################################################################
+##	Show HSCI
+##############################################################################
+
+function list_active {
+	hsdev=$1
+	local ext=""
+
+	hsci="$(ip link show dev $hsdev | awk '{for(x=1;x<NF;x++) if($x~/master/) print $(x+1)}')"
+	ext="$(ip link show | grep "master $hsci" | grep --invert-match $hsdev | awk '{print $2}')"
+	# remove trailing ':'
+	ndev="${ext%:}"
+
+	check_pnetids
+
+	printf '%-8s  %-16s  %-15s  %-15s\n' "$hsci" "$hsci_pnetid" "$hsdev" "$ndev"
+
+	return 0
+}
+
+function print_header {
+	if [ $header -eq 0 ]; then
+		echo "HSCI      PNET_ID           HiperSockets     External       "
+		echo "------------------------------------------------------------"
+	fi
+}
+
+function list_one {
+	local hsnetdev=$1
+
+	if [ $(bridge -d link show dev $hsnetdev | grep	 "learning_sync on" | wc -l) -ne 0 ]; then
+		print_header
+		list_active $hsnetdev
+	fi
+
+	return 0
+}
+
+function show_hsci {
+	if [ $# != 0 ]; then
+		echo "hsci: invalid parameters" >&2
+		echo "Use 'hsci --help' for more information" >&2
+		return 1
+	fi
+	header=0
+
+	for hs_net_dev in $(ls -1 /sys/class/net/); do
+		list_one $hs_net_dev
+	done
+
+	return 0
+}
+
+#==============================================================================
+
+function print_version()
+{
+	echo "hsci utility: version %S390_TOOLS_VERSION%"
+	echo "Copyright IBM Corp. 2020"
+}
+
+##############################################################################
+##### Main
+##############################################################################
+prereqs_check
+
+args="$(getopt -u -o hv -l help,version -- $*)"
+[ $? -ne 0 ] && exit 2
+set -- $args
+while true; do
+	case $1 in
+		-v | --version)
+			print_version
+			exit 0
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		--)
+			;;
+		add)	shift
+			add_hsci "$@"
+			exit $?
+			;;
+		del)	shift
+			del_hsci "$@"
+			exit $?
+			;;
+		show)	shift
+			show_hsci "$@"
+			exit $?
+			;;
+		*)	echo "hsci: Please specify a valid command or option" >&2
+			echo "Use 'hsci --help' for more information" >&2
+			exit 1
+	esac
+	shift
+done
+

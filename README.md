@@ -249,6 +249,9 @@ Package contents
    Management Foundation - Web Edition, and is used to manage keys in an
    enterprise.
 
+ * hsci:
+   Manage HiperSockets Converged Interfaces (HSCI).
+
 For more information refer to the following publications:
 
   * "Device Drivers, Features, and Commands" chapter "Useful Linux commands"
