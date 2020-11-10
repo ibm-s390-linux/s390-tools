@@ -60,7 +60,16 @@ OPTIONS
 -p        Use PARMFILE with kernel parameters in the image
 -r        Include RAMDISK in the image
 -h        Print this help, then exit
+-v        Print version information, then exit
 EOF
+}
+
+printversion()
+{
+	cat <<-EOD
+	$cmd: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp. 2017
+	EOD
 }
 
 # Convert decimal number to big endian doubleword
@@ -145,7 +154,7 @@ dobuild()
 }
 
 # check args and build
-args=$(getopt "r:p:h" $*)
+args=$(getopt "r:p:hv" $*)
 if [ $? = 0 ]
 then
 	set -- $args
@@ -155,6 +164,7 @@ then
 			-r) ramdisk=$2; shift 2;;
 			-p) parmfile=$2; shift 2;;
 			-h) usage; exit 0;;
+			-v) printversion; exit 0;;
 			--) shift; break;;
 			*) echo "$cmd: Unexpected argument $1, exiting..." >&2; exit 1;;
 		esac

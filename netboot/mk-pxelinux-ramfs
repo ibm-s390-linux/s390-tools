@@ -54,7 +54,16 @@ OPTIONS
 -b        Search installed busybox in directory BUSYBOX_DIR
 -k        Use KERNEL_VERSION instead of currently running kernel
 -h        Print this help, then exit
+-v        Print version information, then exit
 EOF
+}
+
+printversion()
+{
+	cat <<-EOD
+	$cmd: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp. 2017
+	EOD
 }
 
 # Get shared objects for binary
@@ -64,7 +73,7 @@ sharedobjs()
 }
 
 # Check args
-args=$(getopt b:k:h $*)
+args=$(getopt b:k:hv $*)
 if [ $? = 0 ]
 then
 	set -- $args
@@ -74,6 +83,7 @@ then
 			-b) busyboxdir=$2; shift 2;;
 			-k) kernelversion=$2; shift 2;;
 		        -h) usage; exit 0;;
+		        -v) printversion; exit 0;;
 		        --) shift; break;;
 		        *) echo "$cmd: Unexpected argument $1, exiting..." >&2; exit 1;;
 		esac
