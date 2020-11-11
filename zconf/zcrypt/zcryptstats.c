@@ -1178,8 +1178,14 @@ static int get_apqn_measurement_data(uint8_t card)
 		scdmd_area.request.header.code = 0x102d;
 		scdmd_area.request.header.length =
 				sizeof(struct chsc_scdmd_request);
-		scdmd_area.request.first_drid.ap_index = card;
-		scdmd_area.request.first_drid.domain_index = g.min_domain;
+		if (scdmd_area.response.p) {
+			scdmd_area.request.first_drid =
+						scdmd_area.response.crid;
+		} else {
+			scdmd_area.request.first_drid.ap_index = card;
+			scdmd_area.request.first_drid.domain_index =
+								g.min_domain;
+		}
 		scdmd_area.request.last_drid.ap_index = card;
 		scdmd_area.request.last_drid.domain_index = g.max_domain;
 		scdmd_area.request.s = 1;
@@ -1217,10 +1223,6 @@ static int get_apqn_measurement_data(uint8_t card)
 		rc = process_apqn_measurement_data(&scdmd_area);
 		if (rc != 0)
 			break;
-
-		if (scdmd_area.response.p)
-			scdmd_area.request.first_drid =
-					scdmd_area.response.crid;
 	} while (scdmd_area.response.p);
 
 	return rc;
