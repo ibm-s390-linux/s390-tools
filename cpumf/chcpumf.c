@@ -91,13 +91,18 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 	int rc = EXIT_SUCCESS;
 	FILE *fp;
 
+	if (geteuid()) {
+		fprintf(stderr, "Error: Must run as root\n");
+		return EXIT_FAILURE;
+	}
 	fp = fopen(PERF_SFB_SIZE, "r");
 	if (fp == NULL) {
 		linux_error(PERF_SFB_SIZE);
 		return EXIT_FAILURE;
 	}
 	if (fscanf(fp, "%ld,%ld", &cur_min_sdb, &cur_max_sdb) != 2) {
-		fprintf(stderr, "Error: Can not parse file " PERF_SFB_SIZE);
+		fprintf(stderr, "Error: Can not parse file " PERF_SFB_SIZE
+				"\n");
 		rc = EXIT_FAILURE;
 	} else {
 		if (*min == 0)
