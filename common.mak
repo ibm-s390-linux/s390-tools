@@ -366,9 +366,9 @@ install: install_echo install_dirs
 clean_echo:
 	$(call echocmd,"  CLEAN   ")
 clean_gcov:
-	rm -f *.gcda *.gcno *.gcov
+	rm -f -- *.gcda *.gcno *.gcov
 clean_dep:
-	rm -f .*.o.d
+	rm -f -- .*.o.d
 
 clean: clean_echo clean_gcov clean_dep
 endif
