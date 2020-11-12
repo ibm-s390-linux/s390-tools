@@ -3095,11 +3095,11 @@ int main(int argc, char **argv)
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
-	ret = read_info();
-	if (ret == EXIT_FAILURE)
-		return ret;
+	ret = parse_args(argc, argv);
+	if (read_info() == EXIT_FAILURE)
+		return EXIT_FAILURE;
 
-	switch ((ret = parse_args(argc, argv))) {
+	switch (ret) {
 	case ACTION_CNT:
 	case ACTION_CNTALL:
 		all = ret == ACTION_CNTALL;
@@ -3115,6 +3115,7 @@ int main(int argc, char **argv)
 	case ACTION_NONE:
 	case ACTION_INFO:
 		show_info(&cpumf, ret == ACTION_INFO);
+		ret = EXIT_SUCCESS;
 		break;
 	}
 	return ret;
