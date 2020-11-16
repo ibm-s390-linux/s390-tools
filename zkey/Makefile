@@ -34,6 +34,8 @@ endif
 
 libs = $(rootdir)/libutil/libutil.a
 
+CFLAGS += -DKMS_PLUGIN_LOCATION=\"$(ZKEYKMSPLUGINDIR)\"
+
 detect-libcryptsetup.dep:
 	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.dep
 	echo "#ifndef CRYPT_LUKS2" >> detect-libcryptsetup.dep

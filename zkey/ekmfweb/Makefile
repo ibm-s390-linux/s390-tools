@@ -44,9 +44,8 @@ libekmfweb.dep:
 install: all install-libekmfweb.dep zkey-ekmfweb.so
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -m 644 -c zkey-ekmfweb.1 $(DESTDIR)$(MANDIR)/man1
-	$(INSTALL) -d -m 755 $(DESTDIR)$(USRLIB64DIR)
-	$(INSTALL) -d -m 755 $(DESTDIR)$(USRLIB64DIR)/zkey
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T zkey-ekmfweb.so $(DESTDIR)$(USRLIB64DIR)/zkey/zkey-ekmfweb.so
+	$(INSTALL) -d -m 755 $(DESTDIR)$(ZKEYKMSPLUGINDIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T zkey-ekmfweb.so $(DESTDIR)$(ZKEYKMSPLUGINDIR)/zkey-ekmfweb.so
 
 clean:
 	rm -f *.o zkey-ekmfweb.so install-libekmfweb.dep libekmfweb.dep

@@ -40,7 +40,9 @@
 
 #define ENVVAR_ZKEY_KMS_PLUGINS		"ZKEY_KMS_PLUGINS"
 #define DEFAULT_KMS_PLUGINS		"/etc/zkey/kms-plugins.conf"
-#define KMS_PLUGIN_LOCATION		"/usr/lib64/zkey"
+#ifndef KMS_PLUGIN_LOCATION
+#error KMS_PLUGIN_LOCATION must be defined
+#endif
 
 #define KMS_CONFIG_FILE			"kms.conf"
 #define KMS_CONFIG_PROP_KMS		"kms"
