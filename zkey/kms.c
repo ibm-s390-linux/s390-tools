@@ -46,8 +46,8 @@
 #define KMS_CONFIG_PROP_KMS		"kms"
 #define KMS_CONFIG_PROP_KMS_CONFIG	"config"
 #define KMS_CONFIG_PROP_APQNS		"apqns"
-#define KMS_CONFIG_PROP_CCA_APQNS	"ep11_apqns"
-#define KMS_CONFIG_PROP_EP11_APQNS	"cca_apqns"
+#define KMS_CONFIG_PROP_CCA_APQNS	"cca_apqns"
+#define KMS_CONFIG_PROP_EP11_APQNS	"ep11_apqns"
 #define KMS_CONFIG_LOCAL		"local"
 
 #define KMS_KEY_PROP_NAME		"zkey-name"
