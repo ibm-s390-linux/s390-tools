@@ -899,24 +899,24 @@ int kms_display_info(const kms_handle_t handle)
 		if (rc == 0) {
 			switch (type) {
 			case EVP_PKEY_EC:
-				printf("  EBMF Web public key:  ECC (%s)\n",
+				printf("  EKMF Web public key:  ECC (%s)\n",
 				       OBJ_nid2sn(curve));
 				break;
 			case EVP_PKEY_RSA:
-				printf("  EBMF Web public key:  RSA "
+				printf("  EKMF Web public key:  RSA "
 				       "(%d bits)\n", mod_bits);
 				break;
 			default:
-				printf("  EBMF Web public key:  "
+				printf("  EKMF Web public key:  "
 				       "(unknown key type)\n");
 				break;
 			}
 		} else {
-			printf("  EBMF Web public key:  (not available)\n");
+			printf("  EKMF Web public key:  (not available)\n");
 		}
 		free(tmp);
 	} else {
-		printf("  EBMF Web public key:  (configuration required)\n");
+		printf("  EKMF Web public key:  (configuration required)\n");
 	}
 
 	printf("  Key templates:\n");
