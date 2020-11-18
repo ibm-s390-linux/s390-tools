@@ -77,9 +77,9 @@ libekmfweb.so.$(VERSION): ekmfweb.o utilities.o cca.o
 	ln -srf libekmfweb.so.$(VERSION) libekmfweb.so
 
 install-libekmfweb.so.$(VERSION): libekmfweb.so.$(VERSION)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T libekmfweb.so.$(VERSION) $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERSION)
-	ln -srf $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERM)
-	ln -srf $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(USRLIB64DIR)/libekmfweb.so
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERSION)
+	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERM)
+	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so
 	$(INSTALL) -d -m 770 $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(rootdir)include/ekmfweb/ekmfweb.h $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
 
