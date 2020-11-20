@@ -1475,7 +1475,7 @@ static STACK_OF_X509_CRL *crls_download_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
 		g_abort();
 	cert = X509_STORE_CTX_get_current_cert(ctx);
 	if (!cert)
-		g_steal_pointer(&crls);
+		return g_steal_pointer(&crls);
 	g_assert(X509_NAME_cmp(X509_get_issuer_name(cert), nm) == 0);
 	crl = lookup_crl(nm);
 	if (!crl) {
