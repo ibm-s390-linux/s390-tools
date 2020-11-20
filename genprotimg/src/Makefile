@@ -15,7 +15,7 @@ INCLUDE_PARMS = $(addprefix -I,$(INCLUDE_PATHS))
 
 WARNINGS := -Wall -Wextra -Wshadow \
 	-Wcast-align -Wwrite-strings -Wmissing-prototypes \
-	-Wmissing-declarations -Wredundant-decls -Wnested-externs -Winline \
+	-Wmissing-declarations -Wredundant-decls -Wnested-externs \
 	-Wno-long-long -Wuninitialized -Wconversion -Wstrict-prototypes \
 	-Wpointer-arith -Werror \
 	$(NULL)
