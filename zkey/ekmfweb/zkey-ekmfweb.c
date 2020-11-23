@@ -4981,10 +4981,10 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 	for (i = 0; i < num_properties; i++) {
 		util_assert(properties[i].name != NULL,
 			    "Internal error: property name is NULL");
-		util_assert(properties[i].value != NULL,
-			    "Internal error: property value is NULL");
-		pr_verbose(ph, "  Property '%s': '%s", properties[i].name,
-			   properties[i].value);
+
+		pr_verbose(ph, "  Property '%s': '%s'", properties[i].name,
+			   properties[i].value != NULL ? properties[i].value :
+			   "(null)");
 	}
 
 	_clear_error(ph);
