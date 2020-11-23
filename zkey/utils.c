@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -25,7 +26,8 @@
 #include "lib/util_rec.h"
 #include "lib/util_base.h"
 
- #include <openssl/crypto.h>
+#include <openssl/crypto.h>
+#include <openssl/evp.h>
 
 #include "utils.h"
 #include "properties.h"
@@ -1128,6 +1130,7 @@ bool prompt_for_yes(bool verbose)
 {
 	char str[20];
 
+	fflush(stdout);
 	if (fgets(str, sizeof(str), stdin) == NULL)
 		return false;
 
@@ -1174,3 +1177,199 @@ char *printable_mkvp(enum card_type cardtype, u8 *mkvp)
 
 	return mkvp_print_buf;
 }
+
+/*
+ * Copy the contents of one file into another file. If num_bytes is zero,
+ * then all content until EOF of the input file is copied. Otherwise only up to
+ * num_bytes is copied.
+ *
+ * @param[in] in_file_name   the file name of the input file
+ * @param[in] out_file_name  the file name of the output file
+ * @param[in] num_bytes      the number of  bytes to copy, or 0 to copy until
+ *                           EOF of the input file
+ *
+ * @returns zero for success, or a negative error in case of an error
+ */
+int copy_file(const char *in_file_name, const char *out_file_name,
+	      size_t num_bytes)
+{
+	FILE *fp_in = NULL, *fp_out = NULL;
+	size_t num = 0, len;
+	char buff[1024];
+	int rc = 0;
+
+	fp_in = fopen(in_file_name, "r");
+	if (fp_in == NULL) {
+		rc = -errno;
+		warnx("Failed to open '%s': %s", in_file_name, strerror(-rc));
+		goto out;
+	}
+
+	fp_out = fopen(out_file_name, "w");
+	if (fp_out == NULL) {
+		rc = -errno;
+		warnx("Failed to open '%s': %s", out_file_name, strerror(-rc));
+		goto out;
+	}
+
+	while (!feof(fp_in) && (num_bytes == 0 || num < num_bytes)) {
+		len  = fread(buff, 1, num_bytes == 0 ? sizeof(buff) :
+			     MIN(num_bytes - num, sizeof(buff)), fp_in);
+		if (ferror(fp_in)) {
+			rc = -EIO;
+			warnx("Failed to read from '%s': %s", in_file_name,
+			      strerror(-rc));
+			break;
+		}
+
+		if (len == 0)
+			break;
+
+		if (fwrite(buff, len, 1, fp_out) != 1) {
+			rc = -errno;
+			warnx("Failed to write to '%s': %s", out_file_name,
+			      strerror(-rc));
+			break;
+		}
+
+		num += len;
+	}
+
+out:
+	if (fp_in != NULL)
+		fclose(fp_in);
+	if (fp_out != NULL)
+		fclose(fp_out);
+
+	return rc;
+}
+
+/**
+ * Reads the passphrase from the specified file and returns the passphrase as
+ * an base64 encoded string. The returned string must be freed by the caller.
+ *
+ * @param[in] filename      the file name of the file containing the passphrase
+ * @param[in] verbose       if true, additional error messages are printed.
+ *
+ * @returns an allocated string
+ */
+char *read_passphrase_as_base64(const char *filename, bool verbose)
+{
+	unsigned char *ret = NULL, *buf = NULL;
+	int outlen, len;
+	struct stat sb;
+	FILE *fp;
+
+	if (stat(filename, &sb) != 0) {
+		pr_verbose(verbose, "stat on file '%s' failed: %s", filename,
+			   strerror(errno));
+		return NULL;
+	}
+
+	if (sb.st_size == 0) {
+		pr_verbose(verbose, "File '%s' is empty", filename);
+		return NULL;
+	}
+
+	fp = fopen(filename, "r");
+	if (fp == NULL) {
+		pr_verbose(verbose, "Open of file '%s' failed: %s", filename,
+			   strerror(errno));
+		return NULL;
+	}
+
+	buf = malloc(sb.st_size);
+	if (buf == NULL) {
+		pr_verbose(verbose, "Malloc failed");
+		goto out;
+	}
+
+	if (fread(buf, sb.st_size, 1, fp) != 1) {
+		pr_verbose(verbose, "Reading file '%s' failed: %s", filename,
+			   strerror(errno));
+		goto out;
+	}
+
+	outlen = (sb.st_size / 3) * 4;
+	if (sb.st_size % 3 > 0)
+		outlen += 4;
+
+	ret = malloc(outlen + 1);
+	if (ret == NULL) {
+		pr_verbose(verbose, "Malloc failed");
+		goto out;
+	}
+
+	len = EVP_EncodeBlock(ret, buf, sb.st_size);
+	if (len != outlen) {
+		pr_verbose(verbose, "EVP_EncodeBlock failed");
+		free(ret);
+		ret = NULL;
+		goto out;
+	}
+
+	ret[outlen] = '\0';
+
+out:
+	free(buf);
+	fclose(fp);
+
+	return (char *)ret;
+}
+
+/**
+ * Stores the passphrase into the specified file. Decodes the base64 string into
+ * bytes.
+ *
+ * @param[in] b64_string    the passphrase as a base64 string
+ * @param[in] filename      the file name of the file containing the passphrase
+ * @param[in] verbose       if true, additional error messages are printed.
+ *
+ * @returns 0 for success or a negative errno in case of an error.
+ */
+int store_passphrase_from_base64(const char *b64_string, const char *filename,
+				 bool verbose)
+{
+	size_t len, outlen, rawlen, i;
+	unsigned char *buf;
+	FILE *fp = NULL;
+	int rc = 0;
+
+	len = strlen(b64_string);
+	rawlen = outlen = (len / 4) * 3;
+	for (i = len - 1; b64_string[i] == '='; i--, rawlen--)
+		;
+
+	buf = malloc(outlen);
+	if (buf == NULL) {
+		pr_verbose(verbose, "Malloc failed");
+		return -ENOMEM;
+	}
+
+	fp = fopen(filename, "w");
+	if (fp == NULL) {
+		pr_verbose(verbose, "Open of file '%s' failed: %s", filename,
+			   strerror(errno));
+		rc = -EIO;
+		goto out;
+	}
+
+	len = EVP_DecodeBlock(buf, (unsigned char *)b64_string, len);
+	if (len != outlen) {
+		pr_verbose(verbose, "EVP_DecodeBlock failed");
+		goto out;
+	}
+
+	if (fwrite(buf, rawlen, 1, fp) != 1) {
+		pr_verbose(verbose, "Writing file '%s' failed: %s", filename,
+			   strerror(errno));
+		goto out;
+	}
+
+out:
+	if (fp != NULL)
+		fclose(fp);
+	free(buf);
+	return rc;
+}
+

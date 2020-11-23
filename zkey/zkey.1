@@ -126,6 +126,9 @@ key repository.
 .RB [ \-\-key-type | \-K
 .IR type ]
 .RB [ \-\-local | \-L ]
+.RB [ \-\-gen\-dummy\-passphrase ]
+.RB [ \-\-set\-dummy\-passphrase
+.IR passphrase\-file ]
 .RB [ KMS\-plugin\ specific\ options ]
 .RB [ \-\-verbose | \-V ]
 .PP
@@ -379,6 +382,9 @@ EP11-AES to be installed. For the supported environments and downloads, see:
 .IR bytes ]
 .RB [ \-\-volume-type | \-t
 .IR type ]
+.RB [ \-\-gen\-dummy\-passphrase ]
+.RB [ \-\-set\-dummy\-passphrase
+.IR passphrase\-file ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -515,6 +521,11 @@ because the secure key is contained in the LUKS2 header.
 .IR bytes ]
 .RB [ \-\-volume-type | \-t
 .IR type ]
+.RB [ \-\-gen\-dummy\-passphrase ]
+.RB [ \-\-set\-dummy\-passphrase
+.IR passphrase\-file ]
+.RB [ \-\-remove\-dummy\-passphrase ]
+.RB [ \-\-force | \-F ]
 .RB [ \-\-verbose | \-V ]
 .
 .PP
@@ -661,7 +672,7 @@ option to generate crypttab entries for the specified volume type only.
 For LUKS2 volumes, a passphrase is required. You are prompted for the
 passphrase during system startup when crypttab is evaluated, unless option
 .B \-\-key\-file
-is specified. Option
+is specified, or a dummy passphrase is associated with the secure key. Option
 .B \-\-tries
 specifies how often a passphrase can be re-entered. When option
 .B \-\-key\-file
@@ -734,7 +745,7 @@ LUKS key slots is of less relevance.
 For LUKS2 volumes, a passphrase is required. You are prompted for the
 passphrase when running the generated commands, unless option
 .B \-\-key\-file
-is specified. Option
+is specified, or a dummy passphrase is associated with the secure key. Option
 .B \-\-tries
 specifies how often a passphrase can be re-entered. When option
 .B \-\-key\-file
@@ -1236,6 +1247,26 @@ system plugin (KMS plugin) is bound to the secure key repository. If the
 repository is bound to a key management system plugin, then keys are generated
 using the key management system by default.
 .TP
+.BR \-\-gen\-dummy\-passphrase
+Generate a dummy passphrase randomly and associate it with the secure AES key
+used to encrypt LUKS2 volume(s). The LUKS2 passphrase is of less or no relevance
+for the security of the volume(s), when an secure AES key is used to encrypt the
+volume(s), and can therefore be stored insecurely inside the secure key
+repository. If for a certain usage the passphrase is of relevance for
+security, then do not use this option. This option can only be specified for
+keys with a volume type of \fBluks2\fP.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
+Set a dummy passphrase that is read from the specified file and associate it
+with the secure AES key used to encrypt LUKS2 volume(s). The LUKS2 passphrase
+is of less or no relevance for the security of the volume(s), when an secure
+AES key is used to encrypt the volume(s), and can therefore be stored insecurely
+inside the secure key repository. If for a certain usage the passphrase is of
+relevance for security, then do not use this option. This option can only be
+specified for keys with a volume type of \fBluks2\fP.
+This option is only used for secure keys contained in the secure key repository.
+.TP
 .B KMS-plugin specific options
 A key management system plugin may offer and even require plugin specific
 options that can be specified with the generate command when the secure key
@@ -1371,6 +1402,26 @@ This option is only available if
 .B zkey
 has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
 the default volume type is \fBplain\fP.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-gen\-dummy\-passphrase
+Generate a dummy passphrase randomly and associate it with the secure AES key
+used to encrypt LUKS2 volume(s). The LUKS2 passphrase is of less or no relevance
+for the security of the volume(s), when an secure AES key is used to encrypt the
+volume(s), and can therefore be stored insecurely inside the secure key
+repository. If for a certain usage the passphrase is of relevance for
+security, then do not use this option. This option can only be specified for
+keys with a volume type of \fBluks2\fP.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
+Set a dummy passphrase that is read from the specified file and associate it
+with the secure AES key used to encrypt LUKS2 volume(s). The LUKS2 passphrase
+is of less or no relevance for the security of the volume(s), when an secure
+AES key is used to encrypt the volume(s), and can therefore be stored insecurely
+inside the secure key repository. If for a certain usage the passphrase is of
+relevance for security, then do not use this option. This option can only be
+specified for keys with a volume type of \fBluks2\fP.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -1523,6 +1574,47 @@ This option is only available if
 .B zkey
 has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-gen\-dummy\-passphrase
+Generate a dummy passphrase randomly and associate it with the secure AES key
+used to encrypt LUKS2 volume(s). The LUKS2 passphrase is of less or no relevance
+for the security of the volume(s), when an secure AES key is used to encrypt the
+volume(s), and can therefore be stored insecurely inside the secure key
+repository. If for a certain usage the passphrase is of relevance for
+security, then do not use this option. This option can only be specified for
+keys with a volume type of \fBluks2\fP. When there is already a dummy
+passphrase associated with the key, you muts first remove the dummy passphrase
+with option \fB\-\-remove\-dummy\-passphrase\fP before you can associate a new
+dummy passphrase.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
+Set a dummy passphrase that is read from the specified file and associate it
+with the secure AES key used to encrypt LUKS2 volume(s). The LUKS2 passphrase
+is of less or no relevance for the security of the volume(s), when an secure
+AES key is used to encrypt the volume(s), and can therefore be stored insecurely
+inside the secure key repository. If for a certain usage the passphrase is of
+relevance for security, then do not use this option. This option can only be
+specified for keys with a volume type of \fBluks2\fP. When there is already a
+dummy passphrase associated with the key, you muts first remove the dummy
+passphrase with option \fB\-\-remove\-dummy\-passphrase\fP before you can
+associate a new dummy passphrase.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-remove\-dummy\-passphrase
+Remove the associated dummy passphrase used with LUKS2 volume(s).
+The user is prompted to confirm the removal of the associated dummy passphrase.
+Use the \fB\-\-force\fP option to remove the associated dummy passphrase without
+prompting for a confirmation.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-F ", " \-\-force\fP
+The user is prompted to confirm the removal of the associated dummy passphrase.
+Use this option to remove the associated dummy passphrase without prompting for
+a confirmation.
+This option is only used for secure keys contained in the secure key repository,
+and can only be specified together with option
+\fB\-\-remove\-dummy\-passphrase\fP.
 .
 .
 .
@@ -1590,8 +1682,9 @@ has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-key\-file\~\fIfile\-name\fP
-Reads the passphrase from the specified file. If this option is omitted, then
-you are prompted to enter the passphrase interactively during system startup.
+Reads the passphrase from the specified file. If this option is omitted, and
+no dummy passphrase is associated with the secure key, then you are prompted to
+enter the passphrase interactively during system startup.
 This option is passed to the generated crypttab entries for LUKS2 volumes, and
 is only available if
 .B zkey
@@ -1677,10 +1770,11 @@ option, and is only available if
 has been compiled with LUKS2 support enabled.
 .TP
 .BR \-\-key\-file\~\fIfile\-name\fP
-Reads the passphrase from the specified file. If this option is omitted,
-or if the file\-name is \fI-\fP (a dash), then you are prompted to enter the
-passphrase interactively. This option is passed to the generated command(s)
-for LUKS2 volumes, and is only available if
+Reads the passphrase from the specified file. If this option is omitted, and
+no dummy passphrase is associated with the secure key, or if the file\-name is
+\fI-\fP (a dash), then you are prompted to enter the passphrase interactively.
+This option is passed to the generated command(s) for LUKS2 volumes, and is
+only available if
 .B zkey
 has been compiled with LUKS2 support enabled.
 .TP

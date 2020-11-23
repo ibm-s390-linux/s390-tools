@@ -64,6 +64,7 @@
 #define KMS_KEY_PROP_XTS_KEY2_ID	"xts-key2-id"
 #define KMS_KEY_PROP_XTS_KEY1_LABEL	"xts-key1-label"
 #define KMS_KEY_PROP_XTS_KEY2_LABEL	"xts-key2-label"
+#define KMS_KEY_PROP_PASSPHRASE		"dummy-passphrase-base64"
 
 #define KMS_REC_LABEL			"Key label"
 #define KMS_REC_NAME			"Name"
@@ -2120,6 +2121,8 @@ static char *_get_system_specific_prop_name(const char *prop_name)
  * @param[in] keybits         the key bit size (e.g. 128, 196, 256, 0 to use the
  *                            plugin's default)
  * @param[in] filename        the file name to store the key in
+ * @param[in] passphrase_file the file name containing the LUKS2 passphrase,
+ *                            or NULL if no passphrase is set
  * @param[in] kms_options     an array of KMS options specified, or NULL if no
  *                            KMS options have been specified
  * @param[in] num_kms_options the number of options in above array
@@ -2131,6 +2134,7 @@ static char *_get_system_specific_prop_name(const char *prop_name)
 int generate_kms_key(struct kms_info *kms_info, const char *name,
 		     const char *key_type, struct properties *key_props,
 		     bool xts, size_t keybits, const char *filename,
+		     const char *passphrase_file,
 		     struct kms_option *kms_options, size_t num_kms_options,
 		     bool verbose)
 {
@@ -2140,12 +2144,13 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	char key2_label[KMS_KEY_LABEL_SIZE + 1] = { 0 };
 	char key1_id[KMS_KEY_ID_SIZE + 1] = { 0 };
 	char key2_id[KMS_KEY_ID_SIZE + 1] = { 0 };
-	struct kms_property kms_props[12];
+	struct kms_property kms_props[13];
 	int xts_mode_prop = -1, rc = 0;
 	size_t key_size, key_blob_size;
 	enum kms_key_mode key_mode;
 	size_t num_kms_props = 0;
 	char *sys_volumes = NULL;
+	char *passphrase = NULL;
 
 	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
@@ -2207,6 +2212,19 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 		xts_mode_prop = num_kms_props;
 		ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_XTS_KEY,
 			      "XTS-KEY-1");
+	}
+
+	if (passphrase_file != NULL) {
+		passphrase = read_passphrase_as_base64(passphrase_file,
+						       verbose);
+		if (passphrase == NULL) {
+			pr_verbose(verbose, "Failed to read passphrase from "
+				   "file '%s'", passphrase_file);
+			goto out;
+		}
+
+		ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_PASSPHRASE,
+			      passphrase);
 	}
 
 	key_mode = xts ? KMS_KEY_MODE_XTS_1 : KMS_KEY_MODE_NON_XTS;
@@ -2333,6 +2351,8 @@ out:
 		free(sector_size);
 	if (sys_volumes != NULL)
 		free(sys_volumes);
+	if (passphrase != NULL)
+		free(passphrase);
 
 	return rc;
 }
@@ -2348,20 +2368,28 @@ out:
  * @param[in] volumes         the volumes of the key (can be NULL)
  * @param[in] vol_type        the volume type of the key (can be NULL)
  * @param[in] sector_size     the sector_size of the key (can be NULL)
+ * @param[in] passphrase_file an address to a character string containing the
+ *                            file name containing the LUKS2 passphrase,
+ *                            or NULL if no passphrase is set. If
+ *                            passphrase_file itself is NULL, then no change in
+ *                            the passphrase property.
+ * @param[in] verbose         if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error.
  */
-
 int set_kms_key_properties(struct kms_info *kms_info,
 			   struct properties *key_props,
 			   const char *name, const char *description,
 			   const char *volumes, const char *vol_type,
-			   const char *sector_size, bool verbose)
+			   const char *sector_size,
+			   const char **passphrase_file,
+			   bool verbose)
 {
 	char *key1_id = NULL, *key2_id = NULL;
-	struct kms_property kms_props[10];
+	struct kms_property kms_props[11];
 	size_t num_kms_props = 0;
 	char *sys_volumes = NULL;
+	char *passphrase = NULL;
 	char *sys_name = NULL;
 	bool xts = false;
 
@@ -2416,6 +2444,22 @@ int set_kms_key_properties(struct kms_info *kms_info,
 	if (sector_size != NULL)
 		ADD_KMS_PROPS(kms_props, num_kms_props,
 			      KMS_KEY_PROP_SECTOR_SIZE, sector_size);
+	if (passphrase_file != NULL) {
+		/* *passphrase_file is NULL to remove the propoerty */
+		if (*passphrase_file != NULL) {
+			passphrase =
+				read_passphrase_as_base64(*passphrase_file,
+							  verbose);
+			if (passphrase == NULL) {
+				pr_verbose(verbose, "Failed to read passphrase"
+					   " from file '%s'", *passphrase_file);
+				goto out;
+			}
+		}
+
+		ADD_KMS_PROPS(kms_props, num_kms_props,
+			      KMS_KEY_PROP_PASSPHRASE, passphrase);
+	}
 
 	if (num_kms_props == 0)
 		goto out;
@@ -2450,6 +2494,8 @@ out:
 		free(key1_id);
 	if (key2_id != NULL)
 		free(key2_id);
+	if (passphrase != NULL)
+		free(passphrase);
 
 	return rc;
 }
@@ -2642,6 +2688,7 @@ static int _process_kms_keys_cb(const char *key_id, const char *key_label,
 	const char *name, *volumes, *cipher, *iv_mode, *description;
 	const char *xts_key2_id = NULL, *xts_key2_label = NULL;
 	const char *xts_key, *volume_type, *temp;
+	const char *passphrase;
 	size_t sector_size = 0;
 	bool xts = false;
 
@@ -2697,6 +2744,8 @@ static int _process_kms_keys_cb(const char *key_id, const char *key_label,
 				     KMS_KEY_PROP_SECTOR_SIZE);
 	if (temp != NULL)
 		sscanf(temp, "%lu", &sector_size);
+	passphrase = _find_property(properties, num_properties,
+				    KMS_KEY_PROP_PASSPHRASE);
 
 	if (process_data->label_filter != NULL) {
 		if (fnmatch(process_data->label_filter, key_label,
@@ -2730,6 +2779,7 @@ static int _process_kms_keys_cb(const char *key_id, const char *key_label,
 				      xts ? key_bits * 2 : key_bits,
 				      description, cipher, iv_mode,
 				      volumes, volume_type, sector_size,
+				      passphrase,
 				      addl_info_argz, addl_info_len,
 				      process_data->private_data);
 }
@@ -2867,6 +2917,7 @@ static int _list_kms_keys_cb(const char *UNUSED(key1_id),
 			     const char *UNUSED(cipher),
 			     const char *UNUSED(iv_mode), const char *volumes,
 			     const char *volume_type, size_t sector_size,
+			     const char *UNUSED(passphrase),
 			     const char *addl_info_argz, size_t addl_info_len,
 			     void *private_data)
 {
@@ -3141,6 +3192,7 @@ out:
  * @param[out] volume_type    on return: the volume_type property
  * @param[out] sector_size    on return: the sector_size property
  * @param[in] filename        the file name to store the refreshed key blob in
+ * @param[in] passphrase_file the file name to store the dummy passphras in
  * @param[in] verbose         if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error.
@@ -3148,7 +3200,8 @@ out:
 int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		    char **description, char **cipher, char **iv_mode,
 		    char **volumes, char **volume_type, ssize_t *sector_size,
-		    const char *filename, bool verbose)
+		    const char *filename, const char *passphrase_file,
+		    bool verbose)
 {
 	struct kms_property *properties = NULL;
 	u8 key_blob[2 * MAX_SECURE_KEY_SIZE];
@@ -3240,6 +3293,29 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 				     KMS_KEY_PROP_SECTOR_SIZE);
 		if (str != NULL)
 			sscanf(str, "%lu", (long unsigned int *)sector_size);
+	}
+	if (passphrase_file != NULL && volume_type != NULL &&
+	    *volume_type != NULL && strcasecmp(*volume_type, "luks2") == 0) {
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_PASSPHRASE);
+		if (str != NULL) {
+			rc = store_passphrase_from_base64(str, passphrase_file,
+							  verbose);
+			if (rc != 0) {
+				pr_verbose(verbose,
+					   "Failed to parse passphrase: %s",
+					   strerror(-rc));
+				goto out;
+			}
+		} else {
+			rc = remove(passphrase_file);
+			if (rc != 0 && errno != ENOENT) {
+				pr_verbose(verbose,
+					   "Failed to remove passphrase_file: "
+					   "%s", strerror(errno));
+				goto out;
+			}
+		}
 	}
 
 	key_blob_size = sizeof(key_blob);

@@ -74,6 +74,7 @@ int get_kms_apqns_for_key_type(struct kms_info *kms_info, const char *key_type,
 int generate_kms_key(struct kms_info *kms_info, const char *name,
 		     const char *key_type, struct properties *key_props,
 		     bool xts, size_t keybits, const char *filename,
+		     const char *passphrase_file,
 		     struct kms_option *kms_options, size_t num_kms_options,
 		     bool verbose);
 
@@ -81,7 +82,9 @@ int set_kms_key_properties(struct kms_info *kms_info,
 			   struct properties *key_props,
 			   const char *name, const char *description,
 			   const char *volumes, const char *vol_type,
-			   const char *sector_size, bool verbose);
+			   const char *sector_size,
+			   const char **passphrase_file,
+			   bool verbose);
 
 int remove_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		   struct kms_option *kms_options, size_t num_kms_options,
@@ -94,6 +97,7 @@ typedef int (*kms_process_callback)(const char *key1_id, const char *key1_label,
 				    const char *description, const char *cipher,
 				    const char *iv_mode, const char *volumes,
 				    const char *volume_type, size_t sector_size,
+				    const char *passphrase,
 				    const char *addl_info_argz,
 				    size_t addl_info_len,
 				    void *private_data);
@@ -118,6 +122,7 @@ int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		    char **description, char **cipher, char **iv_mode,
 		    char **volumes, char **volume_type, ssize_t *sector_size,
-		    const char *filename, bool verbose);
+		    const char *filename, const char *passphrase_file,
+		    bool verbose);
 
 #endif
