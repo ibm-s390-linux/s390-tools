@@ -4394,19 +4394,6 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 	char temp[1000];
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
-		if (sector_size > 0) {
-			sprintf(temp,
-				"WARNING: volume '%s' is using a sector size "
-				"of %lu. At the time this utility was "
-				"developed, systemd's support of crypttab did "
-				"not support to specify a sector size with "
-				"plain dm-crypt devices. The generated "
-				"crypttab entry might or might not work, and "
-				"might need manual adoptions.", volume,
-				sector_size);
-			util_print_indented(temp, 0);
-		}
-
 		sprintf(temp, ",sector-size=%lu", sector_size);
 		printf("%s\t%s\t%s\tplain,cipher=%s,size=%lu%s\n",
 		       dmname, volume, key_file_name, cipher_spec,
