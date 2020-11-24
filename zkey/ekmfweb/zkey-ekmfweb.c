@@ -4566,22 +4566,23 @@ static int _properties_to_ekmf_tags(struct plugin_handle *UNUSED(ph),
 				    struct ekmf_tag_list *ekmf_tag_list,
 				    bool null_values_only)
 {
-	size_t i;
+	size_t i, k;
 
 	ekmf_tag_list->num_tags = 0;
 	ekmf_tag_list->tags = util_malloc(
 				sizeof(struct ekmf_tag) * num_properties);
 
-	for (i = 0; i < num_properties; i++) {
+	for (i = 0, k = 0; i < num_properties; i++) {
 		if (!null_values_only && properties[i].value == NULL)
 			continue;
 		if (null_values_only && properties[i].value != NULL)
 			continue;
 
-		ekmf_tag_list->tags[i].name = util_strdup(properties[i].name);
-		ekmf_tag_list->tags[i].value = properties[i].value != NULL ?
+		ekmf_tag_list->tags[k].name = util_strdup(properties[i].name);
+		ekmf_tag_list->tags[k].value = properties[i].value != NULL ?
 				util_strdup(properties[i].value) : NULL;
 		ekmf_tag_list->num_tags++;
+		k++;
 	}
 
 	return 0;
