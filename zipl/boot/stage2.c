@@ -90,6 +90,7 @@ void start(void)
 	void *load_address;
 	struct component_entry *entry;
 	disk_blockptr_t *blockptr;
+	uint64_t load_psw;
 	void *load_page;
 	int config_nr;
 
@@ -133,11 +134,13 @@ void start(void)
 	if (entry->type != COMPONENT_EXECUTE)
 		panic(EWRONGTYPE, "");
 
+	load_psw = entry->address.load_psw;
+
 	free_page((unsigned long)load_page);
 	io_irq_disable();
 	set_device(subchannel_id, DISABLED);
 
-	execute(entry->address.load_psw);
+	execute(load_psw);
 }
 
 void panic_notify(unsigned long UNUSED(reason))
