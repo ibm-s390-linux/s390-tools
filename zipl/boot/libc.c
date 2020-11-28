@@ -32,9 +32,10 @@ struct ex_table_entry {
 };
 
 #define MEM_ALLOC_START	((unsigned long) __heap_start)
-#define MEM_ALLOC_CNT 4
+#define MEM_ALLOC_END	((unsigned long) __heap_stop)
+#define MEM_ALLOC_MAX 4
 
-static uint8_t mem_page_alloc_vec[MEM_ALLOC_CNT];
+static uint8_t mem_page_alloc_vec[MEM_ALLOC_MAX];
 
 /*
  * Initialize memory with value
@@ -417,10 +418,11 @@ void printf(const char *fmt, ...)
  */
 unsigned long get_zeroed_page(void)
 {
+	const int page_count = MIN(MEM_ALLOC_MAX, (int)((MEM_ALLOC_END - MEM_ALLOC_START) / PAGE_SIZE));
 	unsigned long addr;
 	int i;
 
-	for (i = 0; i < MEM_ALLOC_CNT; i++) {
+	for (i = 0; i < page_count; i++) {
 		if (mem_page_alloc_vec[i] != 0)
 			continue;
 		addr = MEM_ALLOC_START + i * PAGE_SIZE;
@@ -436,6 +438,9 @@ unsigned long get_zeroed_page(void)
  */
 void free_page(unsigned long addr)
 {
+	if (addr < MEM_ALLOC_START || addr >= MEM_ALLOC_END)
+		libc_stop(EINTERNAL);
+
 	mem_page_alloc_vec[(addr - MEM_ALLOC_START) / PAGE_SIZE] = 0;
 }
 
