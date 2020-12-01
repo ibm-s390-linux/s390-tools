@@ -17,7 +17,7 @@ WARNINGS := -Wall -Wextra -Wshadow \
 	-Wcast-align -Wwrite-strings -Wmissing-prototypes \
 	-Wmissing-declarations -Wredundant-decls -Wnested-externs \
 	-Wno-long-long -Wuninitialized -Wconversion -Wstrict-prototypes \
-	-Wpointer-arith -Werror \
+	-Wpointer-arith -Werror -Wno-error=inline \
 	$(NULL)
 
 $(bin_PROGRAM)_SRCS := $(bin_PROGRAM).c pv/pv_stage3.c pv/pv_image.c \
