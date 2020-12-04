@@ -90,6 +90,11 @@ struct disk_info {
 	definition_t targetbase;
 };
 
+struct file_range {
+	off_t offset;
+	size_t len;
+};
+
 struct job_target_data;
 
 int disk_get_info(const char* device, struct job_target_data* target,
@@ -119,6 +124,7 @@ int disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info);
 blocknum_t disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 				  struct disk_info* info);
 blocknum_t disk_get_blocklist_from_file(const char* filename,
+					struct file_range *reg,
 					disk_blockptr_t** blocklist,
 					struct disk_info* pinfo);
 int disk_check_subchannel_set(int devno, dev_t device, char* dev_name);

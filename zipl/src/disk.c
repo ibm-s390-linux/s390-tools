@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <linux/fs.h>
 #include <linux/fiemap.h>
-
 #include "lib/util_proc.h"
 #include "lib/util_sys.h"
 
@@ -1064,19 +1063,26 @@ disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 	return last + 1;
 }
 
-
-/* Retrieve a list of pointers to the disk blocks that make up the file
- * specified by FILENAME. Upon success, return the number of blocks and set
- * BLOCKLIST to point to the uncompacted list. INFO provides information
- * about the device which contains the file. Return zero otherwise. */
+/**
+ * Retrieve a list of pointers to the disk blocks that make up the whole
+ * file specified by FILENAME, or only its part specified by REG (if the
+ * last one is not NULL).
+ * Upon success, return the number of blocks and set BLOCKLIST to point to
+ * the uncompacted list. INFO provides information about the device which
+ * contains the file. Return zero otherwise
+ */
 blocknum_t
-disk_get_blocklist_from_file(const char* filename, disk_blockptr_t** blocklist,
+disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
+			     disk_blockptr_t **blocklist,
 			     struct disk_info* info)
 {
 	disk_blockptr_t* list;
 	struct stat stats;
 	int fd;
-	blocknum_t count;
+	off_t off;
+	size_t count;
+	blocknum_t blk_off;
+	blocknum_t blk_count;
 	blocknum_t i;
 	blocknum_t blocknum;
 
@@ -1093,24 +1099,36 @@ disk_get_blocklist_from_file(const char* filename, disk_blockptr_t** blocklist,
 		close (fd);
 		return 0;
 	}
-	/* Get number of blocks */
-	count = ((blocknum_t) stats.st_size +
-			info->phy_block_size - 1) / info->phy_block_size;
-	if (count == 0) {
-		error_reason("Could not read empty file '%s'", filename);
+	if (reg) {
+		off = reg->offset;
+		count = reg->len;
+	} else {
+		off = 0;
+		count = stats.st_size;
+	}
+	if (off >= stats.st_size) {
+		error_reason("Offset %llu is outside the file '%s'",
+			     off, filename);
 		close(fd);
 		return 0;
 	}
+	if (off + count > (size_t)stats.st_size)
+		count = stats.st_size - off;
+
+	blk_off = off / info->phy_block_size;
+	blk_count = ((blocknum_t) count +
+		     info->phy_block_size - 1) / info->phy_block_size;
+
 	list = (disk_blockptr_t *) misc_malloc(sizeof(disk_blockptr_t) *
-					       count);
+					       blk_count);
 	if (list == NULL) {
 		close(fd);
 		return 0;
 	}
-	memset((void *) list, 0, sizeof(disk_blockptr_t) * count);
+	memset((void *) list, 0, sizeof(disk_blockptr_t) * blk_count);
 	/* Build list */
-	for (i=0; i < count; i++) {
-		if (disk_get_blocknum(fd, 0, i, &blocknum, info)) {
+	for (i = 0; i < blk_count; i++) {
+		if (disk_get_blocknum(fd, 0, blk_off + i, &blocknum, info)) {
 			free(list);
 			close(fd);
 			return 0;
@@ -1119,7 +1137,7 @@ disk_get_blocklist_from_file(const char* filename, disk_blockptr_t** blocklist,
 	}
 	close(fd);
 	*blocklist = list;
-	return count;
+	return blk_count;
 }
 
 /* Check whether input device is in subchannel set 0.

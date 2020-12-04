@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "lib/zt_common.h"
 #include "lib/util_part.h"
@@ -291,10 +292,11 @@ struct component_loc {
 };
 
 static int
-add_component_file(int fd, const char* filename, address_t load_address,
-		   size_t trailer, void *component, int add_files,
-		   struct disk_info* info, struct job_target_data* target,
-		   struct component_loc *location)
+add_component_file_range(int fd, const char *filename, struct file_range *reg,
+			 address_t load_address,
+			 size_t trailer, void *component, int add_files,
+			 struct disk_info *info, struct job_target_data *target,
+			 struct component_loc *location)
 {
 	struct disk_info* file_info;
 	struct component_loc loc;
@@ -306,6 +308,7 @@ add_component_file(int fd, const char* filename, address_t load_address,
 	int rc;
 
 	if (add_files) {
+		assert(reg == NULL); /* not implemented */
 		/* Read file to buffer */
 		rc = misc_read_file(filename, &buffer, &size, 0);
 		if (rc) {
@@ -332,8 +335,8 @@ add_component_file(int fd, const char* filename, address_t load_address,
 			return -1;
 		}
 		/* Get block list from existing file */
-		count = disk_get_blocklist_from_file(filename, &list,
-						     file_info);
+		count = disk_get_blocklist_from_file(filename, reg,
+						     &list, file_info);
 		disk_free_info(file_info);
 		if (count == 0)
 			return -1;
@@ -355,6 +358,17 @@ add_component_file(int fd, const char* filename, address_t load_address,
 			*location = loc;
 	}
 	return rc;
+}
+
+static int
+add_component_file(int fd, const char *filename, address_t load_address,
+		   size_t trailer, void *component, int add_files,
+		   struct disk_info *info, struct job_target_data *target,
+		   struct component_loc *location)
+{
+	return add_component_file_range(fd, filename, NULL, load_address,
+					trailer, component, add_files,
+					info, target, location);
 }
 
 static int
@@ -834,7 +848,7 @@ add_segment_program(int fd, struct job_segment_data* segment,
 	rc = add_component_file(fd, segment->segment, segment->segment_addr, 0,
 				VOID_ADD(table, offset), add_files, info,
 				target, &comp_loc[0]);
-if (rc) {
+	if (rc) {
 		error_text("Could not add segment file '%s'",
 			   segment->segment);
 		free(table);
