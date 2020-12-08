@@ -22,6 +22,7 @@ Usage: hsci COMMAND [OPTION]
 
 This tool is designed to control and show HSCI (HiperSockets Converged
 Interfaces) settings. A HiperSockets interface and an external network
+interface are converged into an HSCI interface.
 
 COMMANDS
         add HIPERSOCKETS_DEV NET_DEV    Adds an HSCI interface
