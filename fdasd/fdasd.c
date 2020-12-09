@@ -1232,7 +1232,7 @@ static void fdasd_reread_partition_table(fdasd_anchor_t *anc)
 	if (!anc->silent)
 		printf("rereading partition table...\n");
 
-	if (dasd_reread_partition_table(options.device, 1) != 0) {
+	if (dasd_reread_partition_table(options.device, 5) != 0) {
 		fdasd_error(anc, unable_to_ioctl, "Error while rereading "
 			    "partition table.\nPlease reboot!");
 	}
