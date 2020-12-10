@@ -284,10 +284,11 @@ build options:
 
 This table lists additional build or install options:
 
-| __COMPONENT__  | __OPTION__       | __TOOLS__                       |
-|----------------|:----------------:|:-------------------------------:|
-| dracut         | `HAVE_DRACUT`    | zdev                            |
-| initramfs-tools| `HAVE_INITRAMFS` | zdev                            |
+| __COMPONENT__    | __OPTION__                   | __TOOLS__      |
+|------------------|:----------------------------:|:--------------:|
+| dracut           | `HAVE_DRACUT`                | zdev           |
+| initramfs-tools  | `HAVE_INITRAMFS`             | zdev           |
+|                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev           |
 
 The s390-tools build process uses "pkg-config" if available and hard-coded
 compiler and linker options otherwise.
@@ -377,6 +378,17 @@ the different tools are provided:
 
   Distributors with different boot or RAM-disk mechanisms should provide
   a custom zdev-root-update helper script.
+
+  - `ZDEV_ALWAYS_UPDATE_INITRD=1` upon modification of any persistent device
+    configuration, chzdev updates the initial RAM-disk by default, without any
+    additional user interaction.
+
+  For some distributions, all the configuration attributes must be copied to
+  the initial RAM-disk. Because the device configuration directives applied
+  in the initial RAM-disk takes precedence over those stored in the root file-
+  system. This copying is done usually by explicitly invoking a command. This
+  build option makes it user-friendly and does this copying without any manual
+  intervention.
 
   Some functions of zdev require that the following programs are available:
 

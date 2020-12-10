@@ -3027,7 +3027,7 @@ int main(int argc, char *argv[])
 	    !dryrun) {
 		/* If the root device/device type or early devices have been
 		 * modified, additional work might be necessary. */
-		rc = root_check();
+		rc = initrd_check(ZDEV_ALWAYS_UPDATE_INITRD);
 		if (rc && !drc)
 			drc = rc;
 	}

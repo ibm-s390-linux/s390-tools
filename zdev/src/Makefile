@@ -4,6 +4,16 @@ include ../../common.mak
 ALL_CPPFLAGS += -I ../include -std=gnu99 -Wno-unused-parameter \
 	-Wno-missing-field-initializers
 
+# Adding ZDEV_ALWAYS_UPDATE_INITRD=1 option will update the initial RAM-disk
+# without the user interaction upon the modification of a persistent device
+# configuration.
+
+ifeq ($(ZDEV_ALWAYS_UPDATE_INITRD),1)
+ALL_CPPFLAGS += -DZDEV_ALWAYS_UPDATE_INITRD=true
+else
+ALL_CPPFLAGS += -DZDEV_ALWAYS_UPDATE_INITRD=false
+endif
+
 # Core
 chzdev_objects += attrib.o chzdev.o device.o devnode.o devtype.o exit_code.o \
 		  export.o hash.o inuse.o misc.o namespace.o opts.o path.o \

@@ -12,6 +12,6 @@
 
 #include "exit_code.h"
 
-exit_code_t root_check(void);
+exit_code_t initrd_check(bool all_pers);
 
 #endif /* ROOT_H */
