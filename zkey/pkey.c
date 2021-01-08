@@ -1337,7 +1337,7 @@ int validate_secure_key(int pkey_fd,
 int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose)
 {
-	int tfmfd = -1, opfd = -1, rc = 0;
+	int tfmfd = -1, opfd = -1, rc = 0, retry_count = 0;
 	char null_msg[ENC_ZERO_LEN];
 	char enc_zero[ENC_ZERO_LEN];
 	struct af_alg_iv *alg_iv;
@@ -1385,12 +1385,30 @@ int generate_key_verification_pattern(const u8 *key, size_t key_size,
 		goto out;
 	}
 
+retry_setkey:
 	if (setsockopt(tfmfd, SOL_ALG, ALG_SET_KEY, key,
 		       key_size) < 0) {
 		rc = -errno;
-		pr_verbose(verbose, "Failed to set the key");
+		pr_verbose(verbose, "Failed to set the key: %s",
+			   strerror(-rc));
+
+		/*
+		 * After a master key change, it can happen that the setkey
+		 * operation returns EINVAL or EAGAIN, although the key is
+		 * valid. This is a temporary situation and the operation will
+		 * succeed, once the firmware has completed some internal
+		 * processing related with the master key change.
+		 * Delay 1 second and retry up to 10 times.
+		 */
+		if ((rc == -EINVAL || rc == -EAGAIN) && retry_count < 10) {
+			pr_verbose(verbose, "Retrying after 1 second...");
+			retry_count++;
+			sleep(1);
+			goto retry_setkey;
+		}
 		goto out;
 	}
+	rc = 0;
 
 	opfd = accept(tfmfd, NULL, NULL);
 	if (opfd < 0) {
