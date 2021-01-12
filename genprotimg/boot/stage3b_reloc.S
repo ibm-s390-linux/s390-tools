@@ -31,12 +31,12 @@ stage3b_reloc_start:
 	sigp	%r1, %r0, SIGP_SET_ARCHITECTURE
 	sam64
 
-.copy_stage3b:
 	/* Location of stage3b in memory */
 	larl	%r8, stage3b_start
 
 	/* Destination for stage3b */
-	lgfi	%r9, STAGE3B_LOAD_ADDRESS
+	basr	%r13, 0
+.Lbase:	llgf	%r9, .Lstage3b_load_address - .Lbase(%r13)
 
 	/* Size of stage3b */
 	lghi	%r11, stage3b_end - stage3b_start
@@ -45,8 +45,10 @@ stage3b_reloc_start:
 	MEMCPY	%r9, %r8, %r11
 
 	/* Branch to STAGE3B_ENTRY */
-	lgfi	%r9, STAGE3B_ENTRY
+	llgf	%r9, .Lstage3b_entry - .Lbase(%r13)
 	br	%r9
+.Lstage3b_load_address:	.long STAGE3B_LOAD_ADDRESS
+.Lstage3b_entry:	.long STAGE3B_ENTRY
 stage3b_start:
 	.incbin	"stage3b.bin"
 stage3b_end:

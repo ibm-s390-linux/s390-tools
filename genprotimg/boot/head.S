@@ -1,5 +1,5 @@
 /*
- * Entry code for stage 3a boot loader
+ * Entry code for stage 3a and stage 3b boot loader
  *
  * Copyright IBM Corp. 2020
  *
@@ -24,6 +24,8 @@ _start:
 	sam64
 
 	/* Initialize stack */
-	lgfi	%r15, STACK_ADDRESS + STACK_SIZE - STACK_FRAME_OVERHEAD
+	basr	%r13, 0
+.Lbase:	llgf	%r15, .Lstack - .Lbase(%r13)
 	brasl	%r14, initialize
+.Lstack: .long STACK_ADDRESS + STACK_SIZE - STACK_FRAME_OVERHEAD
 .previous

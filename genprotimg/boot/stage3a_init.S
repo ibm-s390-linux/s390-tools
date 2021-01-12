@@ -21,6 +21,8 @@ _init:
 	 * kernel command line and the address and size of the
 	 * ramdisk. Simply ignore this by starting at 0x11000.
 	 */
-	lgfi	%r1, STAGE3A_ENTRY
+	basr	%r13, 0
+.Lbase:	llgf	%r1, .Lstage3a_entry - .Lbase(%r13)
 	br	%r1
+.Lstage3a_entry: .long STAGE3A_ENTRY
 .previous
