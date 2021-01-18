@@ -1,0 +1,139 @@
+.\" Copyright 2021 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH HSAVMCORE 8 "May 2021" "s390-tools"
+.
+.SH NAME
+hsavmcore - Enable kdump to release the HSA memory early in the dump process
+.
+.SH SYNOPSIS
+.B hsavmcore
+.RI [ OPTIONS ]
+.
+.SH DESCRIPTION
+.B hsavmcore
+is designed to make the dump process with kdump more efficient.
+The HSA memory contains a part of the production kernel's memory.
+Use hsavmcore to cache this information and release HSA memory early in the process.
+.PP
+Depending on the size of the production kernel's memory, writing the dump to persistent
+storage can be time consuming and prevent the HSA memory from being reused by other LPARs.
+.
+The
+.B hsavmcore
+tool performs these steps:
+.IP "  1)"
+Read the size of the HSA memory from
+.B /sys/kernel/debug/zcore/hsa.
+.IP "  2)"
+Cache the HSA memory content contained in
+.B /proc/vmcore
+either in regular memory or within the file system.
+.IP "  3)"
+Releases the HSA memory by writing to
+.B /sys/kernel/debug/zcore/hsa.
+.PP
+At this stage, the HSA memory region is unavailable to
+.B /proc/vmcore
+and cannot be used by kdump.
+.
+The
+.B hsavmcore
+tool now combines the cached HSA memory and the non-HSA memory from the original
+.B /proc/vmcore
+to create a replacement for
+.B /proc/vmcore.
+.
+The replacement
+.B /proc/vmcore
+can be processed as usual.
+.
+.SH OPTIONS
+.TP
+\fB\-h\fP or \fB\-\-help\fP
+Print usage information and exit.
+.
+.TP
+\fB\-v\fP or \fB\-\-version\fP
+Print version information and exit.
+.
+.TP
+\fB\-V\fP or \fB\-\-verbose\fP
+Print verbose messages to stdout. Repeat this option for increased verbosity
+from just error messages to also include warning, information, debug, and trace messages.
+This option is intended for debugging.
+.
+.TP
+\fB\-c\fP or \fB\-\-config\fP \fICONFIGFILE\fP
+Path to the configuration file. By default, no configuration file is used.
+.
+.TP
+\fB\-C\fP or \fB\-\-vmcore\fP \fIVMCOREFILE\fP
+Path to the vmcore file. Default:
+.B /proc/vmcore.
+.
+.TP
+\fB\-H\fP or \fB\-\-hsa\fP \fIZCOREHSAFILE\fP
+Path to the zcore HSA file. Default:
+.B /sys/kernel/debug/zcore/hsa.
+.
+.TP
+\fB\-W\fP or \fB\-\-workdir\fP \fIWORKDIR\fP
+Path to the work directory where temporary files can be stored. Default:
+.B /var/crash.
+.
+.TP
+\fB\-B\fP or \fB\-\-bmvmcore\fP \fIVMCOREFILE\fP
+Path to the target of the bind mount for the replacement vmcore file. Default:
+.B /proc/vmcore.
+.
+.TP
+\fB\-S\fP or \fB\-\-swap\fP \fIPATH\fP
+Path to a swap device or file. The specified swap device or file must exist and have the proper
+swap format. Default: no swap device or file is activated.
+.
+.TP
+\fB\-T\fP or \fB\-\-hsasize\fP \fIHSASIZE\fP
+HSA size in bytes. Used for testing purposes. Default: -1 (read from the zcore HSA file).
+.
+.TP
+\fB\-D\fP or \fB\-\-dbgfsmnt\fP
+Mount the debug file system. Default: the debug file system is not mounted.
+.
+.TP
+\fB\-F\fP or \fB\-\-hsamem\fP
+Cache the HSA memory in regular memory. Default: the HSA memory is cached as a file
+within WORKDIR.
+.
+.TP
+\fB\-R\fP or \fB\-\-norelhsa\fP
+Do NOT release the HSA memory after caching. Default: the HSA memory is released.
+.
+.TP
+\fB\-N\fP or \fB\-\-nobindmnt\fP
+Do NOT replace the system's vmcore file. Default: the system's vmcore file is replaced.
+.
+.TP
+\fB\-G\fP or \fB\-\-fusedbg\fP
+Enable FUSE debugging. Default: FUSE debugging is disabled.
+.RE
+.
+.SH EXAMPLES
+.TP
+.B To run hsavmcore on a kdump system during a stand-alone dump with default parameters:
+.RS 4
+hsavmcore
+.br
+makedumpfile \-d 31 /proc/vmcore test-dump.elf
+.RE
+.TP
+.B To test hsavmcore with a vmcore copy and without being in a kdump system (for debugging):
+.RS 4
+hsavmcore \-VVV \-T 0x1ffff000 \-C vmcore-dump.elf \-N \-R
+.br
+makedumpfile \-d 31 /tmp/hsavmcore-overlay/vmcore test-dump.elf
+.RE
+
+.SH SEE ALSO
+.BR hsavmcore.conf (5)

@@ -1,0 +1,118 @@
+.\" Copyright 2021 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH HSAVMCORE.CONF 5 "May 2021" "s390-tools"
+.SH NAME
+hsavmcore.conf \- Configuration file for the hsavmcore tool
+.
+.SH DESCRIPTION
+The
+.B hsavmcore.conf
+configuration file contains the configuration information for
+the
+.B hsavmcore
+tool.
+
+All specifications in the configuration file are optional.
+The command defaults apply for omitted parameters.
+.
+.SS "verbose"
+This parameter sets the verbosity level of the output messages.
+The following pre-defined numeric values can be used:
+.
+.RS 2
+.IP "-" 2
+\fB0\fP - show only error messages (default)
+.IP "-" 2
+\fB1\fP - show error and warning messages
+.IP "-" 2
+\fB2\fP - show error, warning and information messages
+.IP "-" 2
+\fB3\fP - show error, warning, information and debug messages
+.IP "-" 2
+\fB4\fP - show error, warning, information, debug and trace messages
+.RE
+.PP
+.
+.SS "mount_debugfs"
+Mount (1) or do not mount (0) debugfs. Use this configuration if the kdump kernel
+does not mount the debugfs during the boot process.
+.
+.SS "workdir"
+Specifies a work directory on the kdump system where the hsavmcore tool can create
+temporary files. This specification is required if
+.B use_hsa_mem
+is set to 0.
+.
+.SS "use_hsa_mem"
+Cache the HSA memory in regular memory (1) or in a file on a file system (0).
+.
+.SS "hsa_size"
+Specify a value, in bytes, for the HSA memory size instead of reading the size
+from
+.B /sys/kernel/debug/zcore/hsa.
+This parameter is intended only to test
+the
+.B hsavmcore
+tool without being in a kdump kernel. Specifying -1 falls back
+to reading the size from
+.B /sys/kernel/debug/zcore/hsa.
+.
+.SS "release_hsa"
+Release (1) or do not release (0) the HSA memory after it is cached by
+the
+.B hsavmcore
+tool.
+.
+.SS "bind_mount_vmcore"
+Replace (1) the original vmcore file with the new file created by the
+.B hsavmcore
+tool or keep the original file (0), which no longer contains the information
+from the HSA memory. Set this parameter to 1 if you intend to use kdump tools to
+create a core dump.
+.
+.SS "swap"
+Specify a swap device or file through its path in a kdump system.
+The specified swap device or file must exist and have the proper swap format.
+You might need a swap device because the amount of memory available in the kdump
+kernel during a stand-alone dump is limited to the size of the HSA memory.
+.
+.SS "fuse_debug"
+Enable (1) or disable (0) fuse debugging.
+.
+.SH EXAMPLES
+A complete configuration file could look like this:
+
+.nf
+------------------------------ config file start ------------------------------
+# Example configuration for hsavmcore
+
+# 0 - ERROR
+# 1 - WARN
+# 2 - INFO
+# 3 - DEBUG
+# 4 - TRACE
+verbose = 3
+
+workdir = /var/crash
+
+mount_debugfs = 1
+
+use_hsa_mem = 1
+
+hsa_size = -1
+release_hsa = 1
+
+bind_mount_vmcore = 1
+
+swap = /dev/disk/by-uuid/3cf6630b-4c4d-49ac-a0ae-0f5484cb5721
+#swap = /swap.img
+
+fuse_debug = 0
+------------------------------ config file end ------------------------------
+.fi
+
+.
+.SH SEE ALSO
+.BR hsavmcore (8)

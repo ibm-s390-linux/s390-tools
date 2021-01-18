@@ -82,6 +82,10 @@ hsavmcore: $(OBJECTS) $(libs)
 install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 hsavmcore \
 		$(DESTDIR)$(USRSBINDIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 man/hsavmcore.8 \
+		$(DESTDIR)$(MANDIR)/man8
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 man/hsavmcore.conf.5 \
+		$(DESTDIR)$(MANDIR)/man5
 
 endif # HAVE_FUSE
 
