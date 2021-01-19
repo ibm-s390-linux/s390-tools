@@ -42,6 +42,8 @@ static int pt_load_add(Elf64_Phdr *phdr)
 		STDERR("Dump file \"%s\" is a user space core dump\n",
 		      g.opts.device);
 	}
+	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
+		return -EINVAL;
 	if (phdr->p_filesz == 0) {
 		/* Add zero memory chunk */
 		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, NULL,
@@ -52,8 +54,6 @@ static int pt_load_add(Elf64_Phdr *phdr)
 		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, off_ptr,
 				  dfi_elf_mem_chunk_read_fn, zg_free);
 	}
-	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
-		return -EINVAL;
 	return 0;
 }
 
