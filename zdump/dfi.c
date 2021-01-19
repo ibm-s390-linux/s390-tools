@@ -407,7 +407,7 @@ void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
 	if (size == 0)
 		return;
 	mem_chunk_create(&l.mem_phys, start, size, data, read_fn, free_fn);
-	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, free_fn);
+	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, NULL);
 	l.mem_virt.chunk_cache->volnr = volnr;
 
 }
