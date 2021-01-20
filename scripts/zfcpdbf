@@ -227,6 +227,16 @@ sub get_common
 	# function name or hexadecimal caller address.
 	#
 	$line =~ s/<\s+/</;
+	#
+	# Since crash 7.2.9 commit
+	# https://github.com/crash-utility/crash/commit/f1f43bf355df2564543c39f5d7e13b15c67eb13d
+	# in support of kernel v5.9 commit 0990d836cecb
+	# ("s390/debug: debug feature version 3"),
+	# the symbolic caller function name is left aligned instead of right
+	# aligned, so now we alternatively have to remove whitespace between
+	# function name and offset.
+	#
+	$line =~ s/<([^+> ]+)[ \t]+/<\1/;
 	@common = split(/\s+/, $line);
 	#
 	# Process symbolic kernel module name, if necessary.
@@ -388,6 +398,17 @@ sub get_foreign_records
 			# caller address.
 			#
 			$line =~ s/<\s+/</;
+			#
+			# Since crash 7.2.9 commit
+			# https://github.com/crash-utility/crash/commit/f1f43bf355df2564543c39f5d7e13b15c67eb13d
+			# in support of kernel v5.9 commit 0990d836cecb
+			# ("s390/debug: debug feature version 3"),
+			# the symbolic caller function name is left aligned
+			# instead of right aligned, so now we alternatively
+			# have to remove whitespace between function name and
+			# offset.
+			#
+			$line =~ s/<([^+> ]+)[ \t]+/<\1/;
 			my @raw_rec = split(/\s+/,($line =~ /[|]/) ?
 					substr($line, 0, index($line, '|')):
 					$line);
