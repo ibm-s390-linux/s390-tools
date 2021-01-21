@@ -321,7 +321,7 @@ Specifies the subject name for generating a certificate signing request (CSR)
 or self signed certificate, in the form
 \fB<type>=<value>(;<type>=<value>)*[;]\fP with types recognized by OpenSSL.
 .TP
-.BR \-s ", " \-\-cert\-extensions\~\fIextensions\fP
+.BR \-e ", " \-\-cert\-extensions\~\fIextensions\fP
 Specifies the certificate extensions for generating a certificate signing
 request (CSR) or self signed certificate, in the form
 \fB<name>=[critical,]<value(s)>(;<name>=[critical,]<value(s)>)*[;]\fP
@@ -416,7 +416,7 @@ Configures the connection to the EKMF Web server on 'my.ekmfweb.server'.
 .B zkey kms configure \-\-ekmfweb\-url https://my.ekmfweb.server \-\-tls\-pin\-server\-pubkey \-\-tls\-verify\-hostname
 Configures the connection to the EKMF Web server on 'my.ekmfweb.server' and
 pins the server's public key from the server's TSL certificate as well as
-enables verification of the host nmae to match the server's Common Name in the
+enables verification of the host name to match the server's Common Name in the
 certificate.
 .TP
 .B zkey kms configure \-\-gen\-csr csr.pem \-\-cert\-subject \(dqCN=my.zkey.client;OU=Example;C=US\(dq
@@ -437,10 +437,10 @@ subject name and a certificate extension to limit the key usage, and stores it
 in file 'cert.pem'.
 .TP
 .B zkey kms configure \-\-register cert.pem
-Registers the zkey client with EKMF Web using the certifcate in file 'cert.pem'.
+Registers the zkey client with EKMF Web using the certificate in file 'cert.pem'.
 .TP
 .B zkey kms configure \-\-register cert.pem \-\-label\-tags \(dqENV=TEST,APP=LINUX\(dq
-Registers the zkey client with EKMF Web using the certifcate in file 'cert.pem'
+Registers the zkey client with EKMF Web using the certificate in file 'cert.pem'
 and the label tags 'ENV=TEST' and 'APP=LINUX' for the identity key.
 .TP
 .B zkey kms info
@@ -480,7 +480,7 @@ client is allowed to use it or not.
 .TP
 .B zkey kms list \-\-label \(dq*LUKS2*\(dq
 Displays eligible secure keys managed by EKMF Web where the label name in EKMF
-Web contains the work 'LUKS2'.
+Web contains the word 'LUKS2'.
 .TP
 .B zkey kms import \-\-name seckey
 Imports the secure key managed by EKMF Web with a zkey name of 'seckey'.
