@@ -146,7 +146,7 @@ function verify_precon {
 	#Check PNETIDs
 	check_pnetids
 	if [ $? -ne 0 ]; then
-		return $?
+		return 1
 	fi
 
 	return 0
@@ -175,7 +175,7 @@ function add_hsci {
 	#### Verify preconditions
 	verify_precon
 	if [ $? -ne 0 ]; then
-		return $?
+		return 1
 	fi
 
 	hsci_postfix="$(readlink /sys/class/net/$hsdev/device/cdev0 | tail -c5)"
