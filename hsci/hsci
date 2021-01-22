@@ -303,10 +303,14 @@ function del_hsci {
 
 	bports="$(ip link show | grep "master $hsci" | awk '{print $2}')"
 	for bport in $bports; do
+		bport=${bport%:}
+			if [[ $bport == *@* ]]; then
+				bport=${bport%@*}
+			fi
 		if [ $(bridge -d link show dev $bport | grep "learning_sync on" | wc -l) -ne 0 ]; then
-			hsdev=${bport%:}
+			hsdev=$bport
 		else
-			ndev=${bport%:}
+			ndev=$bport
 		fi
 	done
 	if [ "$hsdev" == "" ]; then
