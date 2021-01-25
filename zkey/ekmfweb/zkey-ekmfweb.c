@@ -3348,45 +3348,6 @@ static void _free_ekmf_tags(struct ekmf_tag_list *ekmf_tag_list)
 }
 
 /**
- * Gets the next sequence number of the template
- *
- * @param ph                the plugin handle
- * @param template_uuid     the template UUID
- *
- * @returns an allocated string, or NULL in case of an error.
- */
-static char *_get_seqno(struct plugin_handle *ph, const char *template_uuid)
-{
-	unsigned int seqno = 0;
-	char *error_msg = NULL;
-	char *ret = NULL;
-	int rc;
-
-	rc = ekmf_get_last_seq_no(&ph->ekmf_config, &ph->curl_handle,
-				  template_uuid, &seqno, &error_msg,
-				  ph->verbose);
-	if (rc != 0) {
-		_set_error(ph, "Failed to get last used sequence number for "
-			   "template '%s': %s",
-			   template_uuid, error_msg != NULL ? error_msg :
-			   strerror(-rc));
-		_remove_login_token_if_error(ph, rc);
-		goto out;
-	}
-
-	seqno++;
-	util_asprintf(&ret, "%05u", seqno);
-
-	pr_verbose(ph, "Seqno: '%s'", ret);
-
-out:
-	if (error_msg != NULL)
-		free(error_msg);
-
-	return ret;
-}
-
-/**
  * Parses the label tags passed in via option (<tag>=<value>;<tag>=<value;....)
  * and allocates an array of KMS properties. The tags must be freed by the
  * caller.
@@ -3450,25 +3411,16 @@ static int _parse_label_tags(struct plugin_handle *ph,
 				if (value != NULL) {
 					ekmf_tag_list->tags[i].value =
 							util_strdup(value);
+					util_str_toupper((char *)
+						ekmf_tag_list->tags[i].value);
 				} else {
 					ekmf_tag_list->tags[i].value =
-						_get_seqno(ph,
-							   template_info->uuid);
-					if (ekmf_tag_list->tags[i].value ==
-									NULL) {
-						rc = -EIO;
-						goto out;
-					}
+						util_strdup(EKMFWEB_SEQNO_NEXT);
 				}
 				k++;
 			} else {
 				ekmf_tag_list->tags[i].value =
-						_get_seqno(ph,
-							   template_info->uuid);
-				if (ekmf_tag_list->tags[i].value == NULL) {
-					rc = -EIO;
-					goto out;
-				}
+						util_strdup(EKMFWEB_SEQNO_NEXT);
 			}
 		} else {
 			if (tag == NULL) {
@@ -3504,10 +3456,9 @@ static int _parse_label_tags(struct plugin_handle *ph,
 			}
 
 			ekmf_tag_list->tags[i].value = util_strdup(value);
+			util_str_toupper((char *)ekmf_tag_list->tags[i].value);
 			k++;
 		}
-
-		util_str_toupper((char *)ekmf_tag_list->tags[i].value);
 
 		pr_verbose(ph, "Tag: '%s', Value: '%s'",
 			   ekmf_tag_list->tags[i].name,
