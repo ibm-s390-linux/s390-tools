@@ -299,7 +299,7 @@ static unsigned long dec_to_hex(unsigned long long num)
 {
 	unsigned long res;
 
-	asm volatile("cvb %0,%1" : "=d" (res) : "m" (num));
+	asm volatile("cvb %0,%1" : "=d" (res) : "Q" (num));
 	return res & 0xffffffff;
 }
 
@@ -307,7 +307,7 @@ static unsigned int hex_to_dec(unsigned int num)
 {
 	unsigned long long res;
 
-	asm volatile("cvd %1,%0" : "=m" (res) : "d" (num));
+	asm volatile("cvd %1,%0" : "=Q" (res) : "d" (num));
 	return res & 0xffffffff;
 }
 
