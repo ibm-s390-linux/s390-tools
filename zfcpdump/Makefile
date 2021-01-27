@@ -3,6 +3,9 @@ include ../common.mak
 CPIOINIT  = $(call echocmd,"  CPIOINI ",/$@)./cpioinit
 INSTALL_SCRIPTS = 10-zfcpdump.install
 
+ALL_CFLAGS += -fno-sanitize=all
+ALL_LDFLAGS += -fno-sanitize=all
+
 ifeq (${HAVE_LIBC_STATIC},0)
 
 all:

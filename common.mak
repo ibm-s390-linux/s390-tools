@@ -106,6 +106,11 @@ endif
 DEFAULT_CPPFLAGS = -D_GNU_SOURCE
 DEFAULT_LDFLAGS = -rdynamic
 
+ifeq ("${ASAN}","1")
+	DEFAULT_CFLAGS  += -fsanitize=address -fno-omit-frame-pointer
+	DEFAULT_LDFLAGS += -fsanitize=address
+endif
+
 #
 # Check for build dependency
 #
@@ -272,6 +277,7 @@ help:
 	@echo '  G=1      Build with gcov to collect code coverage data'
 	@echo '  V=1      Generate verbose build output'
 	@echo '  W=1      Build with higher warning level'
+	@echo '  ASAN=1   Build with address sanitizer'
 	@echo ''
 	@echo 'EXAMPLES'
 	@echo '  # make clean all D=1 W=1 -j'
