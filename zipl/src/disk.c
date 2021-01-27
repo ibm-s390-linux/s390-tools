@@ -444,6 +444,9 @@ type_determined:
 	}
 	/* Convert device size to size in physical blocks */
 	data->phy_blocks = devsize / (data->phy_block_size / 512);
+	/* Adjust start on SCSI according to block_size. device-mapper devices are skipped */
+	if (data->type == disk_type_scsi && target->targetbase == NULL)
+		data->geo.start = data->geo.start / (data->phy_block_size / 512);
 	if (data->partnum != 0)
 		data->partition = stats.st_rdev;
 	/* Try to get device name */
