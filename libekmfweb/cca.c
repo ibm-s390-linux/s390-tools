@@ -1061,12 +1061,24 @@ int cca_import_key_from_json_web_key(const struct ekmf_cca_lib *cca_lib,
 			pr_verbose(verbose, "Failed to get and decode x");
 			goto out;
 		}
+		if (len != prime_len) {
+			/* RFC 7517: Must be full size of a coordinate */
+			pr_verbose(verbose, "x coordinate length is wrong");
+			rc = -EINVAL;
+			goto out;
+		}
 
 		len = prime_len;
 		rc = json_object_get_base64url(jwk, "y", &q[1 + prime_len],
 					       &len);
 		if (rc != 0) {
 			pr_verbose(verbose, "Failed to get and decode y");
+			goto out;
+		}
+		if (len != prime_len) {
+			/* RFC 7517: Must be full size of a coordinate */
+			pr_verbose(verbose, "y coordinate length is wrong");
+			rc = -EINVAL;
 			goto out;
 		}
 

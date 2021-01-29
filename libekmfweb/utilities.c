@@ -2254,11 +2254,21 @@ int json_web_key_as_pkey(json_object *jwk, int pkey_type, EVP_PKEY **pkey)
 		rc = json_object_get_base64url(jwk, "x", x, &len);
 		if (rc != 0)
 			goto out;
+		if (len != prime_len) {
+			/* RFC 7517: Must be full size of a coordinate */
+			rc = -EINVAL;
+			goto out;
+		}
 
 		len = prime_len;
 		rc = json_object_get_base64url(jwk, "y", y, &len);
 		if (rc != 0)
 			goto out;
+		if (len != prime_len) {
+			/* RFC 7517: Must be full size of a coordinate */
+			rc = -EINVAL;
+			goto out;
+		}
 
 		rc = ecc_pub_key_as_pkey(nid, prime_len, x, y, pkey);
 		if (rc != 0)
