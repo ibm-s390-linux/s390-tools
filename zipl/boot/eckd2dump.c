@@ -449,13 +449,14 @@ void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count)
  * block number
  */
 unsigned long write_dump_segment(unsigned long blk,
-				 struct df_s390_dump_segm_hdr *segm,
-				 unsigned long zero_page)
+				 struct df_s390_dump_segm_hdr *segm)
 {
-	unsigned long addr, start_blk, blk_count;
+	unsigned long addr, start_blk, blk_count, zero_page;
 
 	/* Write the dump segment header itself (1 page) */
+	zero_page = get_zeroed_page();
 	writeblock(blk, (unsigned long)segm, m2b(PAGE_SIZE), zero_page);
+	free_page(zero_page);
 	blk += m2b(PAGE_SIZE);
 	/* Write the dump segment */
 	addr = segm->start;
@@ -464,7 +465,9 @@ unsigned long write_dump_segment(unsigned long blk,
 		/* Remaining blocks to write */
 		blk_count = m2b(segm->len) - (blk - start_blk);
 		blk_count = MIN(blk_count, eckd_blk_max);
+		zero_page = get_zeroed_page();
 		writeblock(blk, addr, blk_count, zero_page);
+		free_page(zero_page);
 		progress_print(addr);
 		blk += blk_count;
 		addr += b2m(blk_count);

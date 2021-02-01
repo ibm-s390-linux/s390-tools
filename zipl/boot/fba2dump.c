@@ -141,13 +141,14 @@ static void writeblock_fba(unsigned long blk, unsigned long addr,
  * block number
  */
 unsigned long write_dump_segment_fba(unsigned long blk,
-				     struct df_s390_dump_segm_hdr *dump_segm,
-				     unsigned long zero_page)
+				     struct df_s390_dump_segm_hdr *dump_segm)
 {
-	unsigned long addr, start_blk, blk_count;
+	unsigned long addr, start_blk, blk_count, zero_page;
 
 	/* Write the dump segment header itself (1 page) */
+	zero_page = get_zeroed_page();
 	writeblock_fba(blk, __pa(dump_segm), BLK_PER_PAGE, zero_page);
+	free_page(zero_page);
 	blk += BLK_PER_PAGE;
 	/* Write the dump segment */
 	addr = dump_segm->start;
@@ -156,7 +157,9 @@ unsigned long write_dump_segment_fba(unsigned long blk,
 		/* Remaining blocks to write */
 		blk_count = m2b(dump_segm->len) - (blk - start_blk);
 		blk_count = MIN(blk_count, BLK_PWRT);
+		zero_page = get_zeroed_page();
 		writeblock_fba(blk, addr, blk_count, zero_page);
+		free_page(zero_page);
 		progress_print(addr);
 		blk += blk_count;
 		addr += b2m(blk_count);
@@ -198,7 +201,6 @@ void dt_dump_mem(void)
 
 	ccw_program_init();
 	blk = device.blk_start;
-	page = get_zeroed_page();
 	dump_segm = (void *)get_zeroed_page();
 
 	/* Write dump header */
@@ -211,18 +213,19 @@ void dt_dump_mem(void)
 	end = dump_hdr->mem_size;
 	while (addr < end) {
 		addr = find_dump_segment(addr, end, 0, dump_segm);
-		blk = write_dump_segment_fba(blk, dump_segm, page);
+		blk = write_dump_segment_fba(blk, dump_segm);
 		total_dump_size += dump_segm->len;
 		if (dump_segm->stop_marker) {
 			addr = end;
 			break;
 		}
 	}
+	free_page(__pa(dump_segm));
 	progress_print(addr);
 
 	/* Write end marker */
+	page = get_zeroed_page();
 	df_s390_em_page_init(page);
 	writeblock_fba(blk, page, 1, 0);
 	free_page(page);
-	free_page(__pa(dump_segm));
 }

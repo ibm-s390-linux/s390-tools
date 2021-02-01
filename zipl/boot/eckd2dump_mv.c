@@ -192,10 +192,13 @@ void dt_device_enable(void)
  * Check for the volume timestamp and validate the dump signature
  * before writing a dump.
  */
-static void check_volume(unsigned long page)
+static void check_volume(void)
 {
 	struct mvdump_parm_table *mvdump_table_new;
 	struct df_s390_hdr *hdr_new;
+	unsigned long page;
+
+	page = get_zeroed_page();
 
 	/*
 	 * Check whether parameter table on dump device has a valid
@@ -222,6 +225,8 @@ static void check_volume(unsigned long page)
 		if (dump_hdr->magic != hdr_new->mvdump_sign)
 			panic(ENOSIGN, "Wrong signature");
 	}
+
+	free_page(page);
 }
 
 /*
@@ -229,10 +234,10 @@ static void check_volume(unsigned long page)
  * address to write for the next volume or memory size if the dump ended
  * on this volume
  */
-static unsigned long write_volume(unsigned long addr, unsigned long page,
+static unsigned long write_volume(unsigned long addr,
 				  struct df_s390_dump_segm_hdr *dump_segm)
 {
-	unsigned long free_space, blk;
+	unsigned long free_space, blk, page;
 
 	/*
 	 * Write dump header
@@ -245,7 +250,7 @@ static unsigned long write_volume(unsigned long addr, unsigned long page,
 	 * header and the end marker)
 	 */
 	free_space = b2m(device.blk_end - blk + 1) - b2m(2);
-	memset((void *) page, 0, PAGE_SIZE);
+
 	/*
 	 * Write dump data
 	 */
@@ -257,7 +262,7 @@ static unsigned long write_volume(unsigned long addr, unsigned long page,
 		addr = find_dump_segment(addr, dump_hdr->mem_size,
 					 ROUND_DOWN(free_space, MIB),
 					 dump_segm);
-		blk = write_dump_segment(blk, dump_segm, page);
+		blk = write_dump_segment(blk, dump_segm);
 		/* Update free space left on vol */
 		free_space -= dump_segm->len;
 		/* Reserve one block for the next segment header */
@@ -267,8 +272,10 @@ static unsigned long write_volume(unsigned long addr, unsigned long page,
 		/* Check if no more dump segments follow */
 		if (dump_segm->stop_marker) {
 			/* Write end marker */
+			page = get_zeroed_page();
 			df_s390_em_page_init(page);
 			writeblock(blk, page, 1, 0);
+			free_page(page);
 			return dump_hdr->mem_size;
 		}
 		/*
@@ -286,19 +293,18 @@ static unsigned long write_volume(unsigned long addr, unsigned long page,
 void dt_dump_mem(void)
 {
 	struct df_s390_dump_segm_hdr *dump_segm;
-	unsigned long addr, page;
+	unsigned long addr;
 
 	dump_hdr->mvdump_sign = DF_S390_MAGIC_EXT;
 	dump_hdr->mvdump = 1;
 	addr = 0;
 	total_dump_size = 0;
-	page = get_zeroed_page();
 	dump_segm = (void *)get_zeroed_page();
 
 	while (1) {
 		printf("Dumping to: 0.%x.%04x", device.sid.ssid, device.devno);
-		check_volume(page);
-		addr = write_volume(addr, page, dump_segm);
+		check_volume();
+		addr = write_volume(addr, dump_segm);
 		if (addr == dump_hdr->mem_size)
 			break;
 		/*
@@ -312,7 +318,6 @@ void dt_dump_mem(void)
 		set_device(device.sid, DISABLED);
 		dt_device_enable();
 	}
-	progress_print(addr);
-	free_page(page);
 	free_page(__pa(dump_segm));
+	progress_print(addr);
 }

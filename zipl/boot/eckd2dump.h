@@ -48,7 +48,6 @@ void writeblock(unsigned long blk, unsigned long addr, unsigned long blk_count,
 		unsigned long zero_page);
 void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count);
 unsigned long write_dump_segment(unsigned long blk,
-				 struct df_s390_dump_segm_hdr *segm,
-				 unsigned long zero_page);
+				 struct df_s390_dump_segm_hdr *segm);
 
 #endif /* ECKD2DUMP_H */

@@ -66,7 +66,6 @@ void dt_dump_mem(void)
 	struct df_s390_dump_segm_hdr *dump_segm;
 
 	blk = device.blk_start;
-	page = get_zeroed_page();
 	dump_segm = (void *)get_zeroed_page();
 
 	/* Write dump header */
@@ -79,18 +78,19 @@ void dt_dump_mem(void)
 	end = dump_hdr->mem_size;
 	while (addr < end) {
 		addr = find_dump_segment(addr, end, 0, dump_segm);
-		blk = write_dump_segment(blk, dump_segm, page);
+		blk = write_dump_segment(blk, dump_segm);
 		total_dump_size += dump_segm->len;
 		if (dump_segm->stop_marker) {
 			addr = end;
 			break;
 		}
 	}
+	free_page(__pa(dump_segm));
 	progress_print(addr);
 
 	/* Write end marker */
+	page = get_zeroed_page();
 	df_s390_em_page_init(page);
 	writeblock(blk, page, 1, 0);
 	free_page(page);
-	free_page(__pa(dump_segm));
 }
