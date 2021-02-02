@@ -253,16 +253,6 @@ function add_hsci {
 		return 1
 	fi
 
-	# use hsdev MTU
-	if [ -e /sys/class/net/$hsdev/mtu ]; then
-		hs_mtu="$(cat /sys/class/net/$hsdev/mtu)"
-		ip link set dev $hsci mtu $hs_mtu >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo "Error: Failed to set MTU for $hsci " >&2
-			clean_up
-			return 1
-		fi
-	fi
 	ip link set dev $hsci up >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to set $hsci up" >&2
