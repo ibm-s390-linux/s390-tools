@@ -72,7 +72,7 @@ In the examples below we use this fictive identity:
 ### Setup GitHub and local git
 
 1. Create a fork of this repository by clicking the `Fork` button on the top
-   right of the [s390-tools](https://github.com/ibm-s390-tools/s390-tools)
+   right of the [s390-tools](https://github.com/ibm-s390-linux/s390-tools)
    main page
 
 2. Clone your forked repository to your local development system
@@ -84,7 +84,7 @@ In the examples below we use this fictive identity:
    s390-tools repository on GitHub
    ```
    $ cd s390-tools
-   ~/s390-tools $ git remote add upstream https://github.com/ibm-s390-tools/s390-tools.git
+   ~/s390-tools $ git remote add upstream https://github.com/ibm-s390-linux/s390-tools.git
    ```
 
 4. Verify your remotes
@@ -92,8 +92,8 @@ In the examples below we use this fictive identity:
    ~/s390-tools $ git remote -v
    origin  https://github.com/random-developer/s390-tools.git (fetch)
    origin  https://github.com/random-developer/s390-tools.git (push)
-   upstream        https://github.com/ibm-s390-tools/s390-tools.git (fetch)
-   upstream        https://github.com/ibm-s390-tools/s390-tools.git (push)
+   upstream        https://github.com/ibm-s390-linux/s390-tools.git (fetch)
+   upstream        https://github.com/ibm-s390-linux/s390-tools.git (push)
    ```
    You now have two remotes: The "origin" remote points to your fork
    and the "upstream" remote to the official s390-tools repository.
