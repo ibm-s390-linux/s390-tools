@@ -2520,7 +2520,7 @@ static int _configure_connection(struct plugin_handle *ph,
 		       "[y/N]? ",
 		       program_invocation_short_name);
 		if (!prompt_for_yes(ph->verbose)) {
-			_set_error(ph, "Opertion aborted by user");
+			_set_error(ph, "Operation aborted by user");
 			return -ECANCELED;
 		}
 	}
@@ -2651,10 +2651,10 @@ static int _configure_connection(struct plugin_handle *ph,
 			goto out;
 		}
 	}
-	printf("%s: Is this the EKMF Web server you intent to work with "
+	printf("%s: Is this the EKMF Web server you intend to work with "
 	      "[y/N]? ", program_invocation_short_name);
 	if (!prompt_for_yes(ph->verbose)) {
-		_set_error(ph, "Opertion aborted by user");
+		_set_error(ph, "Operation aborted by user");
 		rc = -ECANCELED;
 		goto out;
 	}
@@ -2948,7 +2948,7 @@ static int _generate_identity_key(struct plugin_handle *ph)
 		printf("%s: Re-generate the identity key [y/N]? ",
 		       program_invocation_short_name);
 		if (!prompt_for_yes(ph->verbose)) {
-			_set_error(ph, "Opertion aborted by user");
+			_set_error(ph, "Operation aborted by user");
 			return -ECANCELED;
 		}
 	} else {
@@ -3600,7 +3600,7 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 		printf("%s: Re-register the zkey client [y/N]? ",
 		       program_invocation_short_name);
 		if (!prompt_for_yes(ph->verbose)) {
-			_set_error(ph, "Opertion aborted by user");
+			_set_error(ph, "Operation aborted by user");
 			return -ECANCELED;
 		}
 	}
