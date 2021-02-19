@@ -1,14 +1,35 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.15.x (2020-xx-xx)__
+* __v2.16.0 (2021-02-19)__
 
-  For Linux kernel version: 5.x
+  For Linux kernel version: 5.10 / 5.11
+
+  Add new tool:
+  - hsci: New tool to manage HSCI (HiperSockets Converged Interfaces)
 
   Changes of existing tools:
-  - hsci: New tool to manage HSCI interfaces
   - genprotimg: Add host-key document verification support
+  - genprotimg: boot: Make boot loader -march=z900 compatible
+  - libekmfweb: Make install directory for shared libraries configurable
+  - lsdasd: Add FC Endpoint Security information
+  - make: Add address sanitizer support
+  - netboot: Add version information to scripts
+  - netboot: Bump busybox version in pxelinux.0 build
+  - zdev: Add FC Endpoint Security information for DASD devices
+  - zdev: Add build option to update initial RAM-disk by default
+  - zkey-ekmfweb: Avoid sequence number clash when generating keys
+  - zkey/zkey-ekmfweb: Install KMS plugins into configurable location
+  - zkey: Add support to store LUKS2 dummy passphrase in key repository
 
   Bug Fixes:
+  - dasdfmt: Fix segfault when an incorrect option is specified
+  - genprotimg: Fix several build issues
+  - genprotimg: Require argument for 'ramdisk' and 'parmfile' options
+  - zcryptstats: Fix handling of partial results with many domains
+  - zfcpdbf: Deal with crash 7.2.9 change in caller name formatting
+  - zipl/boot: Fix memory use after free in stage2
+  - zipl/boot: Fix potential heap overflow in stage2
+  - zipl: Fix reading 4k disk's geometry
 
 * __v2.15.1 (2020-10-28)__
 

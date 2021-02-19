@@ -9,12 +9,14 @@ List of all individuals having contributed content to s390-tools
 - Arnd Bergmann
 - Axel Wirbser
 - Benjamin Block
+- Brian C. Lane
 - Carsten Otte
 - Christian Borntraeger
 - Christian Ehrhardt
 - Christof Schmitt
 - Claudio Imbrenda
 - Clemens von Mann
+- Colin Walters
 - Dan Horak
 - Despina Papadopoulou
 - Dimitri John Ledkov
@@ -75,11 +77,13 @@ List of all individuals having contributed content to s390-tools
 - Michael Mueller
 - Mijo Safradin
 - Mikhail Zaslonko
+- Nikita Dubrovskii
 - Niklas Schnelle
 - Peter Oberparleiter
 - Peter Tiedemann
 - Philipp Kern
 - Philipp Rudo
+- Prashanth Sundararaman
 - Rafael Fonseca
 - Raimund Schroeder
 - Ralph Wuerthner
@@ -109,7 +113,10 @@ List of all individuals having contributed content to s390-tools
 - Tuan Hoang
 - Ursula Braun
 - Utz Bacher
+- Vance Morris
 - Vasily Gorbik
 - Viktor Mihajlovski
+- Vineeth Vijayan
 - Volker Sameske
+- Wenjia Zhang
 - Wolfgang Taphorn
