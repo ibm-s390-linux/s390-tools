@@ -1967,10 +1967,9 @@ This option is only available if
 has been compiled with LUKS2 support enabled.
 .TP
 .BR \-q ", " \-\-batch\-mode
-Suppress prompts to skip or to enter an anternate name, if a secure key with the
+Suppress prompts to skip or to enter an alternate name, if a secure key with the
 same name as the secure key to be imported already exists in the repository.
-When this option is specified, then keys with an altready existing name are
-skipped.
+When this option is specified, then keys with an existing name are skipped.
 .TP
 .BR \-\-no\-volume\-check
 Do not check if the volume(s) associated with the to be imported secure key(s)
@@ -2011,7 +2010,7 @@ Specifies the key type of the secure key. Possible values are \fBCCA-AESDATA\fP,
 \fBCCA-AESCIPHER\fP, and \fBEP11-AES\fP. Only keys with the specified key type
 are refreshed.
 .TP
-.BR \-q ", " \-\-refresh\-properties
+.BR \-P ", " \-\-refresh\-properties
 Also update the associated information, such as the textual description,
 associated volumes, volume type, and sector size, with the information stored in
 the key management system.
