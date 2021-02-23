@@ -18,7 +18,7 @@ ifneq (${HAVE_CRYPTSETUP2},0)
 		ifneq (${HAVE_OPENSSL},0)
 			BUILD_TARGETS += zkey-cryptsetup
 			INSTALL_TARGETS += install-zkey-cryptsetup
-			CPPFLAGS += -DHAVE_LUKS2_SUPPORT
+			ALL_CPPFLAGS += -DHAVE_LUKS2_SUPPORT
 		else
 			BUILD_TARGETS += zkey-cryptsetup-skip-openssl
 			INSTALL_TARGETS += zkey-cryptsetup-skip-openssl
@@ -34,7 +34,7 @@ endif
 
 libs = $(rootdir)/libutil/libutil.a
 
-CFLAGS += -DKMS_PLUGIN_LOCATION=\"$(ZKEYKMSPLUGINDIR)\"
+ALL_CFLAGS += -DKMS_PLUGIN_LOCATION=\"$(ZKEYKMSPLUGINDIR)\"
 
 detect-libcryptsetup.dep:
 	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.dep
