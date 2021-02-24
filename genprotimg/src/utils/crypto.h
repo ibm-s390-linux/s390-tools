@@ -117,8 +117,8 @@ union tweak {
 
 struct cipher_parms {
 	const EVP_CIPHER *cipher;
-	const Buffer *key;
-	const Buffer *iv_or_tweak;
+	const PvBuffer *key;
+	const PvBuffer *iv_or_tweak;
 };
 
 int check_crl_valid_for_cert(X509_CRL *crl, X509 *cert,
@@ -152,24 +152,24 @@ X509_CRL *get_first_valid_crl(X509_STORE_CTX *ctx, X509 *cert, GError **err);
 void store_setup_crl_download(X509_STORE *st);
 EVP_PKEY *read_ec_pubkey_cert(X509 *cert, gint nid, GError **err);
 
-Buffer *compute_exchange_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err);
-Buffer *generate_aes_key(guint size, GError **err);
-Buffer *generate_aes_iv(guint size, GError **err);
+PvBuffer *compute_exchange_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err);
+PvBuffer *generate_aes_key(guint size, GError **err);
+PvBuffer *generate_aes_iv(guint size, GError **err);
 EVP_PKEY *generate_ec_key(gint nid, GError **err);
 gint generate_tweak(union tweak *tweak, uint16_t i, GError **err);
 union ecdh_pub_key *evp_pkey_to_ecdh_pub_key(EVP_PKEY *key, GError **err);
 EVP_MD_CTX *digest_ctx_new(const EVP_MD *md, GError **err);
-Buffer *digest_ctx_finalize(EVP_MD_CTX *ctx, GError **err);
-Buffer *sha256_buffer(const Buffer *buf, GError **err);
-int64_t gcm_encrypt(const Buffer *in, const Buffer *aad,
-		    const struct cipher_parms *parms, Buffer *out,
-		    Buffer *tag, GError **err);
+PvBuffer *digest_ctx_finalize(EVP_MD_CTX *ctx, GError **err);
+PvBuffer *sha256_buffer(const PvBuffer *buf, GError **err);
+int64_t gcm_encrypt(const PvBuffer *in, const PvBuffer *aad,
+		    const struct cipher_parms *parms, PvBuffer *out,
+		    PvBuffer *tag, GError **err);
 gint encrypt_file(const struct cipher_parms *parms, const gchar *in_path,
 		  const gchar *path_out, gsize *in_size, gsize *out_size,
 		  GError **err);
-Buffer *encrypt_buf(const struct cipher_parms *parms, const Buffer *in,
-		    GError **err);
-G_GNUC_UNUSED Buffer *decrypt_buf(const struct cipher_parms *parms,
-				  const Buffer *in, GError **err);
+PvBuffer *encrypt_buf(const struct cipher_parms *parms, const PvBuffer *in,
+		      GError **err);
+G_GNUC_UNUSED PvBuffer *decrypt_buf(const struct cipher_parms *parms,
+				    const PvBuffer *in, GError **err);
 
 #endif

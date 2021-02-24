@@ -210,13 +210,13 @@ GSList *pv_img_comps_get_comps(const PvImgComps *comps)
 	return comps->comps;
 }
 
-gint pv_img_comps_finalize(PvImgComps *comps, Buffer **pld_digest,
-			   Buffer **ald_digest, Buffer **tld_digest,
+gint pv_img_comps_finalize(PvImgComps *comps, PvBuffer **pld_digest,
+			   PvBuffer **ald_digest, PvBuffer **tld_digest,
 			   uint64_t *nep, GError **err)
 {
-	g_autoptr(Buffer) tmp_pld_digest = NULL;
-	g_autoptr(Buffer) tmp_ald_digest = NULL;
-	g_autoptr(Buffer) tmp_tld_digest = NULL;
+	g_autoptr(PvBuffer) tmp_pld_digest = NULL;
+	g_autoptr(PvBuffer) tmp_ald_digest = NULL;
+	g_autoptr(PvBuffer) tmp_tld_digest = NULL;
 
 	comps->finalized = TRUE;
 	for (GSList *iterator = comps->comps; iterator; iterator = iterator->next) {

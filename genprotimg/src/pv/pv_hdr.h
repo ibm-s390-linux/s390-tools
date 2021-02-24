@@ -23,8 +23,8 @@
 PvHdr *pv_hdr_new(const PvImage *img, GError **err);
 void pv_hdr_free(PvHdr *hdr);
 G_GNUC_UNUSED gboolean pv_hdr_uses_encryption(const PvHdr *hdr);
-Buffer *pv_hdr_serialize(const PvHdr *hdr, const PvImage *img,
-			 enum PvCryptoMode mode, GError **err);
+PvBuffer *pv_hdr_serialize(const PvHdr *hdr, const PvImage *img,
+			   enum PvCryptoMode mode, GError **err);
 uint32_t pv_hdr_size(const PvHdr *hdr);
 uint32_t pv_hdr_aad_size(const PvHdr *hdr);
 uint64_t pv_hdr_enc_size(const PvHdr *hdr);

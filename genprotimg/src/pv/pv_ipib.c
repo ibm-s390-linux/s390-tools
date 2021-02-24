@@ -35,7 +35,7 @@ uint64_t pv_ipib_get_size(uint32_t num_comp)
 }
 
 static gint pv_ipib_init(IplParameterBlock *ipib, GSList *comps,
-			 const Buffer *hdr)
+			 const PvBuffer *hdr)
 {
 	g_assert(sizeof(struct ipl_pl_hdr) <= UINT32_MAX);
 	g_assert(sizeof(struct ipl_pb0_pv_comp) <= UINT32_MAX);
@@ -100,7 +100,7 @@ static gint pv_ipib_init(IplParameterBlock *ipib, GSList *comps,
 	return 0;
 }
 
-IplParameterBlock *pv_ipib_new(GSList *comps, const Buffer *hdr, GError **err)
+IplParameterBlock *pv_ipib_new(GSList *comps, const PvBuffer *hdr, GError **err)
 {
 	uint64_t ipib_size = pv_ipib_get_size(g_slist_length(comps));
 	g_autoptr(IplParameterBlock) ret = NULL;

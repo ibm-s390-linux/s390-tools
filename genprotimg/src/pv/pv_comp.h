@@ -41,7 +41,7 @@ typedef struct {
 	gint d_type; /* PvComponentDataType */
 	union {
 		struct comp_file *file;
-		Buffer *buf;
+		PvBuffer *buf;
 		void *data;
 	};
 	uint64_t src_addr;
@@ -51,7 +51,7 @@ typedef struct {
 
 PvComponent *pv_component_new_file(PvComponentType type, const gchar *path,
 				   GError **err);
-PvComponent *pv_component_new_buf(PvComponentType type, const Buffer *buf,
+PvComponent *pv_component_new_buf(PvComponentType type, const PvBuffer *buf,
 				  GError **err);
 void pv_component_free(PvComponent *component);
 gint pv_component_type(const PvComponent *component);

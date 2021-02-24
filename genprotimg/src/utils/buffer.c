@@ -17,18 +17,18 @@
 #include "common.h"
 #include "file_utils.h"
 
-Buffer *buffer_alloc(gsize size)
+PvBuffer *pv_buffer_alloc(gsize size)
 {
-	Buffer *ret = g_new0(Buffer, 1);
+	PvBuffer *ret = g_new0(PvBuffer, 1);
 
 	ret->data = g_malloc0(size);
 	ret->size = size;
 	return ret;
 }
 
-Buffer *buffer_dup(const Buffer *buf, gboolean page_aligned)
+PvBuffer *pv_buffer_dup(const PvBuffer *buf, gboolean page_aligned)
 {
-	Buffer *ret;
+	PvBuffer *ret;
 	gsize size;
 
 	if (!buf)
@@ -38,19 +38,19 @@ Buffer *buffer_dup(const Buffer *buf, gboolean page_aligned)
 	if (page_aligned)
 		size = PAGE_ALIGN(size);
 
-	ret = buffer_alloc(size);
+	ret = pv_buffer_alloc(size);
 
 	/* content will be 0-right-padded */
 	memcpy(ret->data, buf->data, buf->size);
 	return ret;
 }
 
-gint buffer_write(const Buffer *buf, FILE *file, GError **err)
+gint pv_buffer_write(const PvBuffer *buf, FILE *file, GError **err)
 {
 	return file_write(file, buf->data, buf->size, 1, NULL, err);
 }
 
-void buffer_free(Buffer *buf)
+void pv_buffer_free(PvBuffer *buf)
 {
 	if (!buf)
 		return;
@@ -59,11 +59,11 @@ void buffer_free(Buffer *buf)
 	g_free(buf);
 }
 
-void buffer_clear(Buffer **buf)
+void pv_buffer_clear(PvBuffer **buf)
 {
 	if (!buf || !*buf)
 		return;
 
-	buffer_free(*buf);
+	pv_buffer_free(*buf);
 	*buf = NULL;
 }

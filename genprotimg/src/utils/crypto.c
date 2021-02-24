@@ -89,15 +89,15 @@ EVP_MD_CTX *digest_ctx_new(const EVP_MD *md, GError **err)
 	return g_steal_pointer(&ctx);
 }
 
-Buffer *digest_ctx_finalize(EVP_MD_CTX *ctx, GError **err)
+PvBuffer *digest_ctx_finalize(EVP_MD_CTX *ctx, GError **err)
 {
 	gint md_size = EVP_MD_size(EVP_MD_CTX_md(ctx));
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 	guint digest_size;
 
 	g_assert(md_size > 0);
 
-	ret = buffer_alloc((guint)md_size);
+	ret = pv_buffer_alloc((guint)md_size);
 	if (EVP_DigestFinal_ex(ctx, ret->data, &digest_size) != 1) {
 		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
 			    _("EVP_DigestFinal_ex failed"));
@@ -110,10 +110,10 @@ Buffer *digest_ctx_finalize(EVP_MD_CTX *ctx, GError **err)
 }
 
 /* Returns the digest of @buf using the hash algorithm @md */
-static Buffer *digest_buffer(const EVP_MD *md, const Buffer *buf, GError **err)
+static PvBuffer *digest_buffer(const EVP_MD *md, const PvBuffer *buf, GError **err)
 {
 	g_autoptr(EVP_MD_CTX) md_ctx = NULL;
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 	g_assert(buf);
 
 	md_ctx = digest_ctx_new(md, err);
@@ -134,9 +134,9 @@ static Buffer *digest_buffer(const EVP_MD *md, const Buffer *buf, GError **err)
 }
 
 /* Returns the SHA256 digest of @buf */
-Buffer *sha256_buffer(const Buffer *buf, GError **err)
+PvBuffer *sha256_buffer(const PvBuffer *buf, GError **err)
 {
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 
 	ret = digest_buffer(EVP_sha256(), buf, err);
 	if (!ret)
@@ -207,10 +207,10 @@ union ecdh_pub_key *evp_pkey_to_ecdh_pub_key(EVP_PKEY *key, GError **err)
 	return g_steal_pointer(&ret);
 }
 
-static Buffer *derive_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err)
+static PvBuffer *derive_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err)
 {
 	g_autoptr(EVP_PKEY_CTX) ctx = NULL;
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 	gsize key_size;
 
 	ctx = EVP_PKEY_CTX_new(cust, NULL);
@@ -236,7 +236,7 @@ static Buffer *derive_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err)
 		return NULL;
 	}
 
-	ret = buffer_alloc(key_size);
+	ret = pv_buffer_alloc(key_size);
 	if (EVP_PKEY_derive(ctx, ret->data, &key_size) != 1) {
 		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_DERIVE,
 			    _("Key derivation failed"));
@@ -247,11 +247,11 @@ static Buffer *derive_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err)
 	return g_steal_pointer(&ret);
 }
 
-Buffer *compute_exchange_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err)
+PvBuffer *compute_exchange_key(EVP_PKEY *cust, EVP_PKEY *host, GError **err)
 {
-	g_autoptr(Buffer) raw = buffer_alloc(70);
-	g_autoptr(Buffer) ret = NULL;
-	g_autoptr(Buffer) key = NULL;
+	g_autoptr(PvBuffer) raw = pv_buffer_alloc(70);
+	g_autoptr(PvBuffer) ret = NULL;
+	g_autoptr(PvBuffer) key = NULL;
 	guchar *data;
 
 	key = derive_key(cust, host, err);
@@ -290,10 +290,10 @@ gint generate_tweak(union tweak *tweak, uint16_t i, GError **err)
 	return 0;
 }
 
-static Buffer *generate_rand_data(guint size, const gchar *err_msg,
-				  GError **err)
+static PvBuffer *generate_rand_data(guint size, const gchar *err_msg,
+				    GError **err)
 {
-	g_autoptr(Buffer) buf = buffer_alloc(size);
+	g_autoptr(PvBuffer) buf = pv_buffer_alloc(size);
 
 	g_assert(size <= INT_MAX);
 
@@ -307,14 +307,14 @@ static Buffer *generate_rand_data(guint size, const gchar *err_msg,
 	return g_steal_pointer(&buf);
 }
 
-Buffer *generate_aes_iv(guint size, GError **err)
+PvBuffer *generate_aes_iv(guint size, GError **err)
 {
 	return generate_rand_data(size,
 				  _("Generating a IV failed because the required amount of random data is not available"),
 				  err);
 }
 
-Buffer *generate_aes_key(guint size, GError **err)
+PvBuffer *generate_aes_key(guint size, GError **err)
 {
 	return generate_rand_data(size,
 				  _("Generating a key failed because the required amount of random data is not available"),
@@ -1756,8 +1756,8 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 	gint cipher_block_size = EVP_CIPHER_block_size(cipher);
 	guchar in_buf[PAGE_SIZE],
 		out_buf[PAGE_SIZE + (guint)cipher_block_size];
-	const Buffer *key = parms->key;
-	const Buffer *tweak = parms->iv_or_tweak;
+	const PvBuffer *key = parms->key;
+	const PvBuffer *tweak = parms->iv_or_tweak;
 	g_autofree guchar *tmp_tweak = NULL;
 	gint out_len, tweak_size;
 	gsize tmp_size_in = 0, tmp_size_out = 0;
@@ -1895,11 +1895,11 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 	return 0;
 }
 
-static Buffer *__encrypt_decrypt_buffer(const struct cipher_parms *parms,
-					const Buffer *in, gboolean encrypt,
-					GError **err)
+static PvBuffer *__encrypt_decrypt_buffer(const struct cipher_parms *parms,
+					  const PvBuffer *in, gboolean encrypt,
+					  GError **err)
 {
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 	g_autoptr(BIO) b_out = NULL;
 	g_autoptr(BIO) b_in = NULL;
 	gsize in_size, out_size;
@@ -1927,19 +1927,19 @@ static Buffer *__encrypt_decrypt_buffer(const struct cipher_parms *parms,
 		return NULL;
 	}
 
-	ret = buffer_alloc((unsigned long)data_size);
+	ret = pv_buffer_alloc((unsigned long)data_size);
 	memcpy(ret->data, data, ret->size);
 	return g_steal_pointer(&ret);
 }
 
-Buffer *encrypt_buf(const struct cipher_parms *parms, const Buffer *in,
-		    GError **err)
+PvBuffer *encrypt_buf(const struct cipher_parms *parms, const PvBuffer *in,
+		      GError **err)
 {
 	return __encrypt_decrypt_buffer(parms, in, TRUE, err);
 }
 
-Buffer *decrypt_buf(const struct cipher_parms *parms, const Buffer *in,
-		    GError **err)
+PvBuffer *decrypt_buf(const struct cipher_parms *parms, const PvBuffer *in,
+		      GError **err)
 {
 	return __encrypt_decrypt_buffer(parms, in, FALSE, err);
 }
@@ -1993,16 +1993,16 @@ G_GNUC_UNUSED static gint decrypt_file(const struct cipher_parms *parms,
 }
 
 /* GCM mode uses (zero-)padding */
-static int64_t gcm_encrypt_decrypt(const Buffer *in, const Buffer *aad,
+static int64_t gcm_encrypt_decrypt(const PvBuffer *in, const PvBuffer *aad,
 				   const struct cipher_parms *parms,
-				   Buffer *out, Buffer *tag,
+				   PvBuffer *out, PvBuffer *tag,
 				   enum PvCryptoMode mode, GError **err)
 {
 	g_autoptr(EVP_CIPHER_CTX) ctx = NULL;
 	const EVP_CIPHER *cipher = parms->cipher;
-	const Buffer *iv = parms->iv_or_tweak;
+	const PvBuffer *iv = parms->iv_or_tweak;
 	gboolean encrypt = mode == PV_ENCRYPT;
-	const Buffer *key = parms->key;
+	const PvBuffer *key = parms->key;
 	int64_t ret = -1;
 	gint len = -1;
 
@@ -2097,8 +2097,8 @@ static int64_t gcm_encrypt_decrypt(const Buffer *in, const Buffer *aad,
 	return ret;
 }
 
-int64_t gcm_encrypt(const Buffer *in, const Buffer *aad,
-		    const struct cipher_parms *parms, Buffer *out, Buffer *tag,
+int64_t gcm_encrypt(const PvBuffer *in, const PvBuffer *aad,
+		    const struct cipher_parms *parms, PvBuffer *out, PvBuffer *tag,
 		    GError **err)
 {
 	return gcm_encrypt_decrypt(in, aad, parms, out, tag, PV_ENCRYPT, err);

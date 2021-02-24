@@ -56,7 +56,7 @@ static gint pv_img_prepare_component(const PvImage *img, PvComponent *comp,
 				     GError **err)
 {
 	struct cipher_parms parms = { 0 };
-	g_autoptr(Buffer) tweak = NULL;
+	g_autoptr(PvBuffer) tweak = NULL;
 	prepare_func func = NULL;
 	void *opaque = NULL;
 	gint rc;
@@ -76,7 +76,7 @@ static gint pv_img_prepare_component(const PvImage *img, PvComponent *comp,
 				EVP_CIPHER_iv_length(cipher));
 		g_assert(img->xts_key->size <= UINT_MAX);
 
-		tweak = buffer_alloc(sizeof(comp->tweak.data));
+		tweak = pv_buffer_alloc(sizeof(comp->tweak.data));
 		memcpy(tweak->data, comp->tweak.data, tweak->size);
 		func = pv_component_align_and_encrypt;
 		parms.cipher = cipher;
@@ -93,11 +93,11 @@ static gint pv_img_prepare_component(const PvImage *img, PvComponent *comp,
 	return 0;
 }
 
-static Buffer *pv_img_read_key(const gchar *path, guint key_size,
-			       GError **err)
+static PvBuffer *pv_img_read_key(const gchar *path, guint key_size,
+				 GError **err)
 {
-	g_autoptr(Buffer) tmp_ret = NULL;
-	Buffer *ret = NULL;
+	g_autoptr(PvBuffer) tmp_ret = NULL;
+	PvBuffer *ret = NULL;
 	gsize bytes_read;
 	FILE *f = NULL;
 	gsize size;
@@ -116,7 +116,7 @@ static Buffer *pv_img_read_key(const gchar *path, guint key_size,
 	if (!f)
 		return NULL;
 
-	tmp_ret = buffer_alloc(size);
+	tmp_ret = pv_buffer_alloc(size);
 	if (file_read(f, tmp_ret->data, 1, tmp_ret->size, &bytes_read, err) < 0)
 		goto err;
 
@@ -160,8 +160,8 @@ static HostKeyList *pv_img_get_host_keys(GSList *host_keys_with_path, gint nid,
 	return g_steal_pointer(&ret);
 }
 
-static Buffer *pv_img_get_key(const EVP_CIPHER *cipher, const gchar *path,
-			      GError **err)
+static PvBuffer *pv_img_get_key(const EVP_CIPHER *cipher, const gchar *path,
+				GError **err)
 {
 	gint key_len = EVP_CIPHER_key_length(cipher);
 
@@ -173,8 +173,8 @@ static Buffer *pv_img_get_key(const EVP_CIPHER *cipher, const gchar *path,
 	return generate_aes_key((guint)key_len, err);
 }
 
-static Buffer *pv_img_get_iv(const EVP_CIPHER *cipher, const gchar *path,
-			     GError **err)
+static PvBuffer *pv_img_get_iv(const EVP_CIPHER *cipher, const gchar *path,
+			       GError **err)
 {
 	gint iv_len = EVP_CIPHER_iv_length(cipher);
 
@@ -485,23 +485,23 @@ static void pv_hdr_key_slot_free(PvHdrKeySlot *slot)
 WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(PvHdrKeySlot, pv_hdr_key_slot_free)
 
 static PvHdrKeySlot *pv_hdr_key_slot_new(const EVP_CIPHER *gcm_cipher,
-					 const Buffer *cust_root_key,
+					 const PvBuffer *cust_root_key,
 					 EVP_PKEY *cust_key, EVP_PKEY *host_key,
 					 GError **err)
 {
 	g_autoptr(PvHdrKeySlot) ret = g_new0(PvHdrKeySlot, 1);
 	g_autofree union ecdh_pub_key *pub = NULL;
-	g_autoptr(Buffer) exchange_key = NULL;
-	g_autoptr(Buffer) digest_key = NULL;
-	g_autoptr(Buffer) iv = NULL;
-	Buffer pub_buf;
+	g_autoptr(PvBuffer) exchange_key = NULL;
+	g_autoptr(PvBuffer) digest_key = NULL;
+	g_autoptr(PvBuffer) iv = NULL;
+	PvBuffer pub_buf;
 	/* No AAD data is used */
-	Buffer aad = { .data = NULL, .size = 0 };
+	PvBuffer aad = { .data = NULL, .size = 0 };
 	/* Set the output buffers for the encrypted data and the
 	 * generated GCM tag
 	 */
-	Buffer enc = { .data = ret->wrapped_key, .size = sizeof(ret->wrapped_key) };
-	Buffer tag = { .data = ret->tag, .size = sizeof(ret->tag) };
+	PvBuffer enc = { .data = ret->wrapped_key, .size = sizeof(ret->wrapped_key) };
+	PvBuffer tag = { .data = ret->tag, .size = sizeof(ret->tag) };
 	struct cipher_parms parms;
 	int64_t c_len = 0;
 
@@ -530,7 +530,7 @@ static PvHdrKeySlot *pv_hdr_key_slot_new(const EVP_CIPHER *gcm_cipher,
 	g_assert(exchange_key->size == (guint)EVP_CIPHER_key_length(gcm_cipher));
 
 	/* create zero IV */
-	iv = buffer_alloc((guint)EVP_CIPHER_iv_length(gcm_cipher));
+	iv = pv_buffer_alloc((guint)EVP_CIPHER_iv_length(gcm_cipher));
 	parms.iv_or_tweak = iv;
 	parms.key = exchange_key;
 	parms.cipher = gcm_cipher;
@@ -637,13 +637,13 @@ void pv_img_free(PvImage *img)
 	g_slist_free_full(img->key_slots, (GDestroyNotify)pv_hdr_key_slot_free);
 	g_slist_free_full(img->host_pub_keys, (GDestroyNotify)EVP_PKEY_free);
 	EVP_PKEY_free(img->cust_pub_priv_key);
-	buffer_clear(&img->stage3a);
+	pv_buffer_clear(&img->stage3a);
 	pv_img_comps_free(img->comps);
 	g_free(img->tmp_dir);
-	buffer_free(img->xts_key);
-	buffer_free(img->cust_root_key);
-	buffer_free(img->gcm_iv);
-	buffer_free(img->cust_comm_key);
+	pv_buffer_free(img->xts_key);
+	pv_buffer_free(img->cust_root_key);
+	pv_buffer_free(img->gcm_iv);
+	pv_buffer_free(img->cust_comm_key);
 	g_free(img);
 }
 
@@ -684,13 +684,13 @@ gint pv_img_add_component(PvImage *img, const PvArg *arg, GError **err)
 	return 0;
 }
 
-gint pv_img_calc_pld_ald_tld_nep(const PvImage *img, Buffer **pld, Buffer **ald,
-				 Buffer **tld, uint64_t *nep, GError **err)
+gint pv_img_calc_pld_ald_tld_nep(const PvImage *img, PvBuffer **pld, PvBuffer **ald,
+				 PvBuffer **tld, uint64_t *nep, GError **err)
 {
 	return pv_img_comps_finalize(img->comps, pld, ald, tld, nep, err);
 }
 
-static gint pv_img_build_stage3b(PvImage *img, Buffer *stage3b, GError **err)
+static gint pv_img_build_stage3b(PvImage *img, PvBuffer *stage3b, GError **err)
 {
 	g_autofree struct stage3b_args *args = NULL;
 
@@ -708,7 +708,7 @@ static gint pv_img_build_stage3b(PvImage *img, Buffer *stage3b, GError **err)
 gint pv_img_add_stage3b_comp(PvImage *img, const gchar *path, GError **err)
 {
 	g_autoptr(PvComponent) comp = NULL;
-	g_autoptr(Buffer) stage3b = NULL;
+	g_autoptr(PvBuffer) stage3b = NULL;
 
 	stage3b = stage3b_getblob(path, err);
 	if (!stage3b)
@@ -825,7 +825,7 @@ static gint get_stage3a_data_size(const PvImage *img, gsize *data_size,
 
 gint pv_img_load_and_set_stage3a(PvImage *img, const gchar *path, GError **err)
 {
-	g_autoptr(Buffer) stage3a = NULL;
+	g_autoptr(PvBuffer) stage3a = NULL;
 	gsize bin_size, data_size = 0;
 
 	if (get_stage3a_data_size(img, &data_size, err) < 0)
@@ -845,8 +845,8 @@ gint pv_img_load_and_set_stage3a(PvImage *img, const gchar *path, GError **err)
 }
 
 /* Creates the PV IPIB and sets the stage3a arguments */
-static gint pv_img_build_stage3a(Buffer *stage3a, gsize stage3a_bin_size,
-				 GSList *comps, const Buffer *hdr, GError **err)
+static gint pv_img_build_stage3a(PvBuffer *stage3a, gsize stage3a_bin_size,
+				 GSList *comps, const PvBuffer *hdr, GError **err)
 {
 	g_autofree struct ipl_parameter_block *ipib = NULL;
 
@@ -866,9 +866,9 @@ static gint pv_img_build_stage3a(Buffer *stage3a, gsize stage3a_bin_size,
 }
 
 /* Creates the actual PV header (serialized and AES-GCM encrypted) */
-static Buffer *pv_img_create_pv_hdr(PvImage *img, GError **err)
+static PvBuffer *pv_img_create_pv_hdr(PvImage *img, GError **err)
 {
-	g_autoptr(Buffer) hdr_buf = NULL;
+	g_autoptr(PvBuffer) hdr_buf = NULL;
 	g_autoptr(PvHdr) hdr = NULL;
 
 	hdr = pv_hdr_new(img, err);
@@ -887,7 +887,7 @@ static Buffer *pv_img_create_pv_hdr(PvImage *img, GError **err)
  */
 gint pv_img_finalize(PvImage *pv, const gchar *stage3b_path, GError **err)
 {
-	g_autoptr(Buffer) hdr = NULL;
+	g_autoptr(PvBuffer) hdr = NULL;
 
 	/* load stage3b template into memory and add it to the list of
 	 * components. This must be done before calling

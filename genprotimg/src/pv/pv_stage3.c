@@ -24,12 +24,12 @@
 	((struct stage3a_args *)((uint64_t)data_ptr + loader_size - \
 				 sizeof(struct stage3a_args)))
 
-static Buffer *loader_getblob(const gchar *filename, gsize *loader_size,
-			      gsize args_size, gsize data_size,
-			      gboolean data_aligned, GError **err)
+static PvBuffer *loader_getblob(const gchar *filename, gsize *loader_size,
+				gsize args_size, gsize data_size,
+				gboolean data_aligned, GError **err)
 {
 	g_autoptr(GMappedFile) mapped_file = NULL;
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 	gsize size, tmp_loader_size;
 	gchar *loader_data;
 
@@ -60,7 +60,7 @@ static Buffer *loader_getblob(const gchar *filename, gsize *loader_size,
 	size = (data_aligned ? PAGE_ALIGN(tmp_loader_size) : tmp_loader_size) +
 	       data_size;
 
-	ret = buffer_alloc(size);
+	ret = pv_buffer_alloc(size);
 
 	/* copy the loader "template" */
 	memcpy(ret->data, loader_data, tmp_loader_size);
@@ -71,8 +71,8 @@ static Buffer *loader_getblob(const gchar *filename, gsize *loader_size,
 	return g_steal_pointer(&ret);
 }
 
-Buffer *stage3a_getblob(const gchar *filename, gsize *loader_size,
-			gsize data_size, GError **err)
+PvBuffer *stage3a_getblob(const gchar *filename, gsize *loader_size,
+			  gsize data_size, GError **err)
 {
 	return loader_getblob(filename, loader_size,
 			      sizeof(struct stage3a_args), data_size, TRUE,
@@ -83,8 +83,8 @@ Buffer *stage3a_getblob(const gchar *filename, gsize *loader_size,
 /* Set the right offsets and sizes in the stage3a template + add
  * the IPIB block with the PV header
  */
-static gint stage3a_set_data(Buffer *loader, gsize loader_size,
-			     const Buffer *hdr, struct ipl_parameter_block *ipib,
+static gint stage3a_set_data(PvBuffer *loader, gsize loader_size,
+			     const PvBuffer *hdr, struct ipl_parameter_block *ipib,
 			     GError **err)
 {
 	uint32_t ipib_size = GUINT32_FROM_BE(ipib->hdr.len);
@@ -126,15 +126,15 @@ static gint stage3a_set_data(Buffer *loader, gsize loader_size,
 	return 0;
 }
 
-gint build_stage3a(Buffer *loader, gsize loader_size, const Buffer *hdr,
+gint build_stage3a(PvBuffer *loader, gsize loader_size, const PvBuffer *hdr,
 		   struct ipl_parameter_block *ipib, GError **err)
 {
 	return stage3a_set_data(loader, loader_size, hdr, ipib, err);
 }
 
-Buffer *stage3b_getblob(const gchar *filename, GError **err)
+PvBuffer *stage3b_getblob(const gchar *filename, GError **err)
 {
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 	gsize rb_size;
 
 	ret = loader_getblob(filename, &rb_size, sizeof(struct stage3b_args), 0,
@@ -146,7 +146,7 @@ Buffer *stage3b_getblob(const gchar *filename, GError **err)
 	return g_steal_pointer(&ret);
 }
 
-void build_stage3b(Buffer *stage3b, const struct stage3b_args *args)
+void build_stage3b(PvBuffer *stage3b, const struct stage3b_args *args)
 {
 	g_assert(stage3b->size > sizeof(*args));
 

@@ -171,13 +171,13 @@ err:
 	return ret;
 }
 
-gint seek_and_write_buffer(FILE *o, const Buffer *buf, uint64_t offset,
+gint seek_and_write_buffer(FILE *o, const PvBuffer *buf, uint64_t offset,
 			   GError **err)
 {
 	if (file_seek(o, offset, err) < 0)
 		return -1;
 
-	if (buffer_write(buf, o, err) < 0)
+	if (pv_buffer_write(buf, o, err) < 0)
 		return -1;
 
 	return 0;

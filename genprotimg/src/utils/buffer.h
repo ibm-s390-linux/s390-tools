@@ -15,17 +15,17 @@
 
 #include "common.h"
 
-typedef struct Buffer {
+typedef struct PvBuffer {
 	void *data;
 	gsize size; /* in bytes */
-} Buffer;
+} PvBuffer;
 
-Buffer *buffer_alloc(gsize size);
-void buffer_free(Buffer *buf);
-void buffer_clear(Buffer **buf);
-gint buffer_write(const Buffer *buf, FILE *file, GError **err);
-Buffer *buffer_dup(const Buffer *buf, gboolean page_aligned);
+PvBuffer *pv_buffer_alloc(gsize size);
+void pv_buffer_free(PvBuffer *buf);
+void pv_buffer_clear(PvBuffer **buf);
+gint pv_buffer_write(const PvBuffer *buf, FILE *file, GError **err);
+PvBuffer *pv_buffer_dup(const PvBuffer *buf, gboolean page_aligned);
 
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(Buffer, buffer_free)
+WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(PvBuffer, pv_buffer_free)
 
 #endif

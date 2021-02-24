@@ -76,17 +76,17 @@ uint64_t pv_hdr_get_nks(const PvHdr *hdr)
 }
 
 /* In-place modification of ``buf`` */
-static gint pv_hdr_encrypt(const PvHdr *hdr, const PvImage *img, Buffer *buf,
+static gint pv_hdr_encrypt(const PvHdr *hdr, const PvImage *img, PvBuffer *buf,
 			   GError **err)
 {
 	uint32_t hdr_len = pv_hdr_size(hdr);
 	uint32_t aad_len = pv_hdr_aad_size(hdr);
 	guint tag_len = pv_hdr_tag_size(hdr);
 	uint32_t enc_len = pv_hdr_enc_size_casted(hdr);
-	const Buffer aad_part = { .data = buf->data, .size = aad_len };
-	Buffer enc_part = { .data = (uint8_t *)buf->data + aad_len,
+	const PvBuffer aad_part = { .data = buf->data, .size = aad_len };
+	PvBuffer enc_part = { .data = (uint8_t *)buf->data + aad_len,
 			    .size = enc_len };
-	Buffer tag_part = { .data = (uint8_t *)buf->data + hdr_len - tag_len,
+	PvBuffer tag_part = { .data = (uint8_t *)buf->data + hdr_len - tag_len,
 			    .size = tag_len };
 	struct cipher_parms parms;
 	int64_t c_len;
@@ -119,9 +119,9 @@ static gint pv_hdr_aad_init(PvHdr *hdr, const PvImage *img, GError **err)
 	g_autofree union ecdh_pub_key *cust_pub_key = NULL;
 	struct pv_hdr_key_slot *hdr_slot = hdr->slots;
 	struct pv_hdr_head *head = &hdr->head;
-	g_autoptr(Buffer) pld = NULL;
-	g_autoptr(Buffer) ald = NULL;
-	g_autoptr(Buffer) tld = NULL;
+	g_autoptr(PvBuffer) pld = NULL;
+	g_autoptr(PvBuffer) ald = NULL;
+	g_autoptr(PvBuffer) tld = NULL;
 	uint64_t nep = 0;
 
 	g_assert(sizeof(head->iv) == img->gcm_iv->size);
@@ -250,7 +250,7 @@ PvHdr *pv_hdr_new(const PvImage *img, GError **err)
 	return g_steal_pointer(&ret);
 }
 
-static void pv_hdr_memcpy(const PvHdr *hdr, const Buffer *dst)
+static void pv_hdr_memcpy(const PvHdr *hdr, const PvBuffer *dst)
 {
 	uint64_t nks = pv_hdr_get_nks(hdr);
 	uint8_t *data;
@@ -270,13 +270,13 @@ static void pv_hdr_memcpy(const PvHdr *hdr, const Buffer *dst)
 	}
 }
 
-Buffer *pv_hdr_serialize(const PvHdr *hdr, const PvImage *img,
-			 enum PvCryptoMode mode, GError **err)
+PvBuffer *pv_hdr_serialize(const PvHdr *hdr, const PvImage *img,
+			   enum PvCryptoMode mode, GError **err)
 {
 	uint32_t hdr_size = pv_hdr_size(hdr);
-	g_autoptr(Buffer) ret = NULL;
+	g_autoptr(PvBuffer) ret = NULL;
 
-	ret = buffer_alloc(hdr_size);
+	ret = pv_buffer_alloc(hdr_size);
 	pv_hdr_memcpy(hdr, ret);
 
 	if (mode == PV_ENCRYPT) {

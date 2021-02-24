@@ -73,12 +73,12 @@ PvComponent *pv_component_new_file(PvComponentType type, const gchar *path,
 	return pv_component_new(type, size, DATA_FILE, (void **)&file, err);
 }
 
-PvComponent *pv_component_new_buf(PvComponentType type, const Buffer *buf,
+PvComponent *pv_component_new_buf(PvComponentType type, const PvBuffer *buf,
 				  GError **err)
 {
 	g_assert(buf);
 
-	g_autoptr(Buffer) dup_buf = buffer_dup(buf, FALSE);
+	g_autoptr(PvBuffer) dup_buf = pv_buffer_dup(buf, FALSE);
 	return pv_component_new(type, buf->size, DATA_BUFFER, (void **)&dup_buf,
 				err);
 }
@@ -90,7 +90,7 @@ void pv_component_free(PvComponent *component)
 
 	switch ((PvComponentDataType)component->d_type) {
 	case DATA_BUFFER:
-		buffer_clear(&component->buf);
+		pv_buffer_clear(&component->buf);
 		break;
 	case DATA_FILE:
 		comp_file_free(component->file);
@@ -162,21 +162,21 @@ gint pv_component_align_and_encrypt(PvComponent *component, const gchar *tmp_pat
 
 	switch ((PvComponentDataType)component->d_type) {
 	case DATA_BUFFER: {
-		g_autoptr(Buffer) enc_buf = NULL;
+		g_autoptr(PvBuffer) enc_buf = NULL;
 
 		if (!(IS_PAGE_ALIGNED(pv_component_size(component)))) {
-			g_autoptr(Buffer) new = NULL;
+			g_autoptr(PvBuffer) new = NULL;
 
 			/* create a page aligned copy */
-			new = buffer_dup(component->buf, TRUE);
-			buffer_clear(&component->buf);
+			new = pv_buffer_dup(component->buf, TRUE);
+			pv_buffer_clear(&component->buf);
 			component->buf = g_steal_pointer(&new);
 		}
 		enc_buf = encrypt_buf(parms, component->buf, err);
 		if (!enc_buf)
 			return -1;
 
-		buffer_clear(&component->buf);
+		pv_buffer_clear(&component->buf);
 		component->buf = g_steal_pointer(&enc_buf);
 		return 0;
 	}
@@ -220,10 +220,10 @@ gint pv_component_align(PvComponent *component, const gchar *tmp_path,
 
 	switch (component->d_type) {
 	case DATA_BUFFER: {
-		g_autoptr(Buffer) buf = NULL;
+		g_autoptr(PvBuffer) buf = NULL;
 
-		buf = buffer_dup(component->buf, TRUE);
-		buffer_clear(&component->buf);
+		buf = pv_buffer_dup(component->buf, TRUE);
+		pv_buffer_clear(&component->buf);
 		component->buf = g_steal_pointer(&buf);
 		return 0;
 	} break;
@@ -301,7 +301,7 @@ int64_t pv_component_update_pld(const PvComponent *comp, EVP_MD_CTX *ctx,
 
 	switch (comp->d_type) {
 	case DATA_BUFFER: {
-		const Buffer *buf = comp->buf;
+		const PvBuffer *buf = comp->buf;
 
 		g_assert(buf->size <= INT64_MAX);
 		g_assert(buf->size == size);
@@ -425,7 +425,7 @@ gint pv_component_write(const PvComponent *component, FILE *f, GError **err)
 
 	switch (component->d_type) {
 	case DATA_BUFFER: {
-		const Buffer *buf = component->buf;
+		const PvBuffer *buf = component->buf;
 
 		if (seek_and_write_buffer(f, buf, offset, err) < 0)
 			return -1;

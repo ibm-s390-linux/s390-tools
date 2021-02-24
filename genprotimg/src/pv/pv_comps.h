@@ -32,8 +32,8 @@ gint pv_img_comps_add_component(PvImgComps *comps, PvComponent **comp,
 				GError **err);
 PvComponent *pv_img_comps_get_nth_comp(PvImgComps *comps, guint n);
 gint pv_img_comps_set_offset(PvImgComps *comps, gsize offset, GError **err);
-gint pv_img_comps_finalize(PvImgComps *comps, Buffer **pld_digest,
-			   Buffer **ald_digest, Buffer **tld_digest,
+gint pv_img_comps_finalize(PvImgComps *comps, PvBuffer **pld_digest,
+			   PvBuffer **ald_digest, PvBuffer **tld_digest,
 			   uint64_t *nep, GError **err);
 void pv_img_comps_free(PvImgComps *comps);
 

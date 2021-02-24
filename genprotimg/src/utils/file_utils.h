@@ -26,7 +26,7 @@ gint file_write(FILE *out, const void *ptr, gsize size, gsize count,
 		gsize *count_written, GError **err);
 gint pad_file_right(const gchar *path_out, const gchar *path_in,
 		    gsize *size_out, guint padding, GError **err);
-gint seek_and_write_buffer(FILE *out, const Buffer *buf, uint64_t offset,
+gint seek_and_write_buffer(FILE *out, const PvBuffer *buf, uint64_t offset,
 			   GError **err);
 gint seek_and_write_file(FILE *o, const CompFile *ifile, uint64_t offset,
 			 GError **err);
