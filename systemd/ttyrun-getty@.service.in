@@ -16,7 +16,7 @@ After=dev-%i.device systemd-user-sessions.service plymouth-quit-wait.service
 After=rc-local.service
 Before=getty.target
 IgnoreOnIsolate=yes
-
+Conflicts=serial-getty@%i.service
 
 [Service]
 Environment=TERM=linux
