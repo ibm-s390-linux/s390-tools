@@ -1,0 +1,134 @@
+.\" lshwc.1
+.\"
+.\"
+.\" Copyright IBM Corp. 2021
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.ds c \fBlshwc\fP
+.
+.TH \*c "1" "February 2021" "s390-tools" "CPU-MF management programs"
+.
+.SH NAME
+\*c \- extract CPU Measurement Facilities counter sets
+.
+.SH SYNOPSIS
+\*c
+.RB [ \-a ]
+.RB [ \-l
+.IR count ]
+.RB [ \-i
+.IR interval ]
+\fR[\fIcpulist\fR][:\fIsets\fR]\fP
+.br
+\*c
+.BR \-h | \-\-help
+.br
+\*c
+.BR \-v | \-\-version
+.
+.
+.SH DESCRIPTION
+The \*c command extracts complete counter sets from the CPU
+Measurement Facilities for Linux on Z.
+Counter sets can be specified and extracted for individual CPUs.
+The output is a comma-separated values file.
+Each line starts with a timestamp and the CPU number,
+followed by the extracted counter values.
+.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Displays help information, then exits.
+.
+.TP
+.BR \-v ", " \-\-version
+Displays version information, then exits.
+.
+.TP
+.BR \-a ", " \-\-allcpu
+Displays counter values from each CPU.
+The default is a total summary line of all counters from all CPUs.
+.
+.TP
+.BR \-i ", " \-\-interval \fI\ seconds\fP
+Specifies a time interval, in seconds,
+that the command waits between read operations.
+The default is 60 seconds.
+.
+.TP
+.BR \-l ", " \-\-loop \fI\ count\fP
+Performs the specified number of read operations.
+.
+.TP
+\fR[\fIcpulist\fR][:\fIsets\fR]\fP
+A comma-separated list of CPUs.
+Each CPU can optionally be followed by characters that specify the counter set.
+See below for details.
+.
+.SS "CPU List and counter-set specification"
+In the comma-separated list of CPUs,
+each element is a CPU or a range of CPUs.
+By default, \*c lists all CPUs.
+.P
+The CPU list can be followed by an optional list
+of characters that specify the counter sets to be extracted,
+preceded by a colon.
+The characters can be upper or lower case.
+By default, all counter sets are used.
+.IP b
+Include the basic counter set.
+.IP c
+Include the crypto counter set.
+.IP e
+Include the extended counter set.
+.IP m
+Include the MT_Diagnostic counter set.
+.IP p|u
+Include the problem counter set.
+.IP a
+Include all known counter sets (default).
+.SH "Concurrency with perf tool"
+The \*c tool and the linux
+.B perf
+tool use the same hardware and cannot be used concurrently.
+Both tools print an error message and abort when they
+detect this situation.
+.SH "EXAMPLES"
+The first example enables the basic and problem counter sets on CPU 0 and 1.
+Two read operations are performed and a summary line is printed for each
+read operation.
+.sp 1
+.nf
+.ft CW
+# lshwc -l2 0-1:BP
+Date,Time,CPU,CPU_CYCLES(0),INSTRUCTIONS(1),L1I_DIR_WRITES(2),L1I_PENALTY_CYCLES(3),L1D_DIR_WRITES(4),
+	L1D_PENALTY_CYCLES(5),PROBLEM_STATE_CPU_CYCLES(32),PROBLEM_STATE_INSTRUCTIONS(33)
+2021-04-01,11:50:32,Total,125422,39421,304,13953,454,
+	97489,0,0
+2021-04-01,11:51:32,Total,68074231,16386850,194028,21382384,317227,
+	104503489,777383,14198
+.ft
+.fi
+.sp 1
+This example shows the counter values of the problem state counter set
+per CPU. CPU 0 and CPU 1 is selected.
+.nf
+.ft CW
+.sp 1
+# lshwc -l3 -a 0-1:P
+Date,Time,CPU,PROBLEM_STATE_CPU_CYCLES(32),PROBLEM_STATE_INSTRUCTIONS(33)
+2021-04-01,11:54:47,CPU0,0,0
+2021-04-01,11:54:47,CPU1,0,0
+2021-04-01,11:54:47,Total,0,0
+2021-04-01,11:55:47,CPU0,818775,14198
+2021-04-01,11:55:47,CPU1,125689,1306
+2021-04-01,11:55:47,Total,944464,15504
+2021-04-01,11:56:47,CPU0,3207071426,1489122591
+2021-04-01,11:56:47,CPU1,3225092021,1489278312
+2021-04-01,11:56:47,Total,6432163447,2978400903
+.ft
+.fi
+.SH "SEE ALSO"
+.BR lscpumf (1)
+.BR chcpumf (8)
