@@ -26,10 +26,10 @@ KERNEL=="dasd*[0-9]", ENV{ID_XUID}=="?*", SYMLINK+="disk/by-id/$env{ID_BUS}-$env
 
 LABEL="dasd_symlinks_end"
 
-# on device add set request queue scheduler to deadline
+# on device add set request queue scheduler to none
 SUBSYSTEM!="block", GOTO="sched_end"
 
 ACTION!="change", GOTO="sched_end"
-KERNEL=="dasd*[!0-9]", TEST=="queue/scheduler", ATTR{queue/scheduler}="deadline"
+KERNEL=="dasd*[!0-9]", TEST=="queue/scheduler", ATTR{queue/scheduler}="none"
 
 LABEL="sched_end"
