@@ -2,7 +2,7 @@
 #
 # dbginfo.sh - Tool to collect runtime, configuration, and trace information
 #
-# Copyright IBM Corp. 2002, 2020
+# Copyright IBM Corp. 2002, 2021
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -21,7 +21,7 @@ readonly SCRIPTNAME="${0##*/}"
 print_version() {
     cat <<EOF
 ${SCRIPTNAME}: Debug information script version %S390_TOOLS_VERSION%
-Copyright IBM Corp. 2002, 2020
+Copyright IBM Corp. 2002, 2021
 EOF
 }
 
@@ -37,8 +37,8 @@ print_usage()
 
 Usage: ${SCRIPTNAME} [OPTIONS]
 
-This script collects runtime, configuration and trace information about
-your Linux on System z installation for debugging purposes.
+This script collects runtime, configuration and trace information on
+a Linux on IBM Z installation for debugging purposes.
 
 It also traces information about z/VM if the Linux runs under z/VM.
 
@@ -253,6 +253,7 @@ PROCFILES="\
   /proc/driver/z90crypt\
   /proc/interrupts\
   /proc/iomem\
+  /proc/kallsyms\
   /proc/mdstat\
   /proc/meminfo\
   /proc/misc\
@@ -435,6 +436,7 @@ CMDS="uname -a\
   :lschp\
   :lscss\
   :lscpu -ae\
+  :lscpu -ye\
   :lsmem\
   :lsdasd\
   :lsdasd -u\
@@ -532,7 +534,7 @@ VM_CMDS="q userid\
   :q lan\
   :q lan all details\
   :q lan all access\
-  :q cache\
+  :q memassist\
   :q nic\
   :q pav\
   :q proc\
@@ -549,6 +551,8 @@ VM_CMDS="q userid\
   :q dumpdev\
   :q reorder VMUSERID\
   :q quickdsp VMUSERID\
+  :q pcifunction\
+  :q vmrelocate\
   :ind load\
   :ind sp\
   :ind user\
@@ -1008,6 +1012,22 @@ post_processing() {
         touch --time=mtime -t "${file_mtime}" "${file_name}"
     done
 
+    find "${WORKPATH}proc/" -name "kallsyms" 2>/dev/null | while IFS= read -r file_name; do
+        tmp_file=${file_name}-`uname -r`.tgz
+        ch_dir="${WORKPATH}proc/"
+        orig_file="kallsyms"
+
+
+        echo " ${file_name}"
+        if ! test -e "${file_name}"; then
+            echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
+            echo
+        fi
+
+        tar -cvzf "${tmp_file}" -C "${ch_dir}" "${orig_file}"
+        rm -f  "${file_name}"
+
+    done
 
     pr_log_stdout " "
 }
@@ -1124,6 +1144,8 @@ create_package()
     pr_stdout "Finalizing: Creating archive with collected data"
     cd "${WORKDIR_BASE}"
 
+    touch "${WORKARCHIVE}"
+    chmod 0600 "${WORKARCHIVE}"
     tar -czf "${WORKARCHIVE}" "${WORKDIR_CURRENT}"
     rc_tar=$?
     if [ $rc_tar -eq 0 ]; then

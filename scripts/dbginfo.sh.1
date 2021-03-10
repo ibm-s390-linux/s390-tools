@@ -2,7 +2,7 @@
 
 .SH NAME
 dbginfo.sh \- collect runtime, configuration and trace information
-for debugging Linux on System z
+for debugging Linux on IBM Z
 
 .SH SYNOPSIS
 .br
@@ -12,7 +12,7 @@ for debugging Linux on System z
 
 .SH DESCRIPTION
 This script collects runtime, configuration and trace information that can
-be used to debug a Linux on System z instance.
+be used to debug a Linux on IBM Z instance.
 For Linux on z/VM, the script also traces information about the z/VM system.
 The debug information is written to a file
 /tmp/DBGINFO\-<date>\-<time>\-<hostname>\-<processorid>.tgz
@@ -52,7 +52,7 @@ Sample invocation:
 .br
 dbginfo.sh: Debug information script version %S390_TOOLS_VERSION%
 .br
-Copyright IBM Corp. 2002, 2019
+Copyright IBM Corp. 2002, 2021
 .PP
 Hardware platform     = s390x
 .br
@@ -104,4 +104,4 @@ Run the script with root authority.
 For Linux on z/VM, only z/VM guest virtual machines with class B privileges
 yield the complete debug information.
 .SH AUTHOR
-Linux on System z development <linux390@de.ibm.com>
+Linux on IBM Z development <linux390@de.ibm.com>
