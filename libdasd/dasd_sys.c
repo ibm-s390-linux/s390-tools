@@ -218,7 +218,8 @@ int dasd_get_host_access_count(char *device)
 		return 0;
 
 	path = util_path_sysfs("bus/ccw/devices/%s/host_access_count", busid);
-	util_file_read_l(&value, 10, path);
+	if (util_file_read_l(&value, 10, path))
+		value = 0;
 	free(path);
 
 	return value;
