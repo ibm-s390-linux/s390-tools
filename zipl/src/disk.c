@@ -554,14 +554,6 @@ disk_free_info(struct disk_info* info)
 }
 
 
-#ifndef REISERFS_SUPER_MAGIC
-#define REISERFS_SUPER_MAGIC	0x52654973
-#endif /* not REISERFS_SUPER_MAGIC */
-
-#ifndef REISERFS_IOC_UNPACK
-#define REISERFS_IOC_UNPACK	_IOW(0xCD,1,long)
-#endif /* not REISERFS_IOC_UNPACK */
-
 /* Retrieve the physical blocknumber (block on disk) of the specified logical
  * block (block in file). FD provides the file descriptor, LOGICAL is the
  * logical block number. Upon success, return 0 and store the physical
@@ -571,14 +563,9 @@ int
 disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 		  blocknum_t* physical, struct disk_info* info)
 {
-	struct statfs buf;
 	blocknum_t phy_per_fs;
 	blocknum_t mapped;
-	int block;
 	int subblock;
-	int fiemap_size;
-	int map_offset;
-	struct fiemap *fiemap;
 
 	/* No file system: partition or raw disk */
 	if (info->fs_block_size == -1) {
@@ -588,70 +575,15 @@ disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 			*physical = logical + info->geo.start;
 		return 0;
 	}
-
-	/* Get file system type */
-	if (fstatfs(fd, &buf)) {
-		error_reason(strerror(errno));
-		return -1;
-	}
-	/* Files on ReiserFS need unpacking */
-	if (buf.f_type == REISERFS_SUPER_MAGIC) {
-		if (ioctl(fd, REISERFS_IOC_UNPACK, 1)) {
-			error_reason("Could not unpack ReiserFS file");
-			return -1;
-		}
-	}
-	/* Get mapping in file system blocks */
+	/*
+	 * Get mapping in file system blocks
+	 */
 	phy_per_fs = info->fs_block_size / info->phy_block_size;
 	subblock = logical % phy_per_fs;
 
-	/* First try FIEMAP, more complicated to set up */
-	fiemap_size = sizeof(struct fiemap) + sizeof(struct fiemap_extent);
-
-	fiemap = misc_malloc(fiemap_size);
-	if (!fiemap)
+	if (fs_map(fd, logical * info->phy_block_size,
+		   &mapped, info->fs_block_size) != 0)
 		return -1;
-	memset(fiemap, 0, fiemap_size);
-
-	fiemap->fm_extent_count = 1;
-	fiemap->fm_flags = FIEMAP_FLAG_SYNC;
-	/* fm_start, fm_length in bytes; logical is in physical block units */
-	fiemap->fm_start = logical * info->phy_block_size;
-	fiemap->fm_length = info->phy_block_size;
-
-	if (ioctl(fd, FS_IOC_FIEMAP, (unsigned long)fiemap)) {
-		/* FIEMAP failed, fall back to FIBMAP */
-		block = logical / phy_per_fs;
-		if (ioctl(fd, FIBMAP, &block)) {
-			error_reason("Could not get file mapping");
-			free(fiemap);
-			return -1;
-		}
-		mapped = block;
-	} else {
-		if (fiemap->fm_mapped_extents) {
-			if (fiemap->fm_extents[0].fe_flags &
-			    FIEMAP_EXTENT_ENCODED) {
-				error_reason("File mapping is encoded");
-				free(fiemap);
-				return -1;
-			}
-			/*
-			 * returned extent may start prior to our request
-			 */
-			map_offset = fiemap->fm_start -
-				     fiemap->fm_extents[0].fe_logical;
-			mapped = fiemap->fm_extents[0].fe_physical +
-				 map_offset;
-			/* set mapped to fs block units */
-			mapped = mapped / info->fs_block_size;
-		} else {
-			mapped = 0;
-		}
-	}
-
-	free(fiemap);
-
 	if (mapped == 0) {
 		/* This is a hole in the file */
 		*physical = 0;

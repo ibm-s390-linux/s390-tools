@@ -134,5 +134,6 @@ blocknum_t disk_get_blocklist_from_file(const char* filename,
 					struct disk_info* pinfo);
 int disk_check_subchannel_set(int devno, dev_t device, char* dev_name);
 void disk_print_geo(struct disk_info *data);
+int fs_map(int fd, uint64_t offset, blocknum_t *mapped, int fs_block_size);
 
 #endif /* not DISK_H */
