@@ -442,7 +442,7 @@ CMDS="uname -a\
   :lsdasd -u\
   :ziorep_config -ADM\
   :lsmod\
-  :lsdev\
+  :lszdev\
   :lsscsi\
   :lstape\
   :lszfcp\
