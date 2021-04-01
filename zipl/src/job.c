@@ -1419,7 +1419,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 		}
 		job->data.ipl.optional =
 			data[(int) scan_keyword_optional] != NULL ?
-			true : false;
+			atoi(data[(int) scan_keyword_optional]) == 1 : false;
 		job->data.ipl.ignore = false;
 		break;
 	case section_ipl_tape:
