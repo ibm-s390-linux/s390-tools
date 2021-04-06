@@ -1,4 +1,4 @@
-.TH DBGINFO.SH  1 "February 2017" "s390-tools"
+.TH DBGINFO.SH  1 "April 2021" "s390-tools"
 
 .SH NAME
 dbginfo.sh \- collect runtime, configuration and trace information
@@ -56,46 +56,46 @@ Copyright IBM Corp. 2002, 2021
 .PP
 Hardware platform     = s390x
 .br
-Kernel version        = <kernel\-version>
+Kernel version        = 5.4.0 (5.4.0-70-generic)
 .br
 Runtime environment   = z/VM
 .PP
-1 of 15: Collecting command output
+1 of 16: Collecting command output
 .PP
-2 of 15: Collecting z/VM command output
+2 of 16: Collecting z/VM command output
 .PP
-3 of 15: Collecting procfs
+3 of 16: Collecting procfs
 .PP
-4 of 15: Collecting sysfs
+4 of 16: Collecting sysfs
 .PP
-5 of 15: Collecting log files
+5 of 16: Collecting log files
 .PP
-6 of 15: Collecting config files
+6 of 16: Collecting config files
 .PP
-7 of 15: Collecting osa oat output skipped \- not available
+7 of 16: Collecting osa oat output
 .PP
-8 of 15: Collecting ethtool output
+8 of 16: Collecting ethtool output
 .PP
-9 of 15: Collecting tc output
-.pp
-10 of 15: Collecting bridge output
-.pp
-11 of 15: Collecting OpenVSwitch output
+9 of 16: Collecting tc output
 .PP
-12 of 15: Collecting domain xml files
+10 of 16: Collecting bridge output
 .PP
-13a of 15: Collecting docker container output
-13b of 15: Collecting docker network output
+11 of 16: Collecting OpenVSwitch output
 .PP
-14 of 15: Collecting nvme output
+12a of 16: Collecting docker container
+12b of 16: Collecting docker network
 .PP
-15 of 15: Postprocessing
+13 of 16: Collecting nvme output
 .PP
-Finalizing: Creating archive with collected data
+14 of 16: Collecting KVM data
+.PP
+15 of 16: Postprocessing
+.PP
+16 of 16: Finalizing: Creating archive with collected data
 .PP
 Collected data was saved to:
 .br
- >>  /data\-collection/DBGINFO\-2019\-08\-19\-21\-39\-16\-host\-012345.tgz  <<
+ >>  /data\-collection/DBGINFO\-2021\-04\-20\-14\-00\-07\-host\-012345.tgz  <<
 .br
 Review the collected data before sending to your service organization.
 .SH HINTS
