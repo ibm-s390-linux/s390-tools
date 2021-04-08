@@ -45,6 +45,8 @@ libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
 libekmfweb/libekmfweb.so.1
 libekmfweb/libekmfweb.so.1.0
+libseckey/check-dep-libseckey
+libseckey/detect-openssl-version.dep
 libutil/*_example
 libvmcp/vmcp_example
 libzds/libzds.a

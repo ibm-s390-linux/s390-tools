@@ -374,6 +374,10 @@ $(rootdir)/libekmfweb/libekmfweb.so: $(rootdir)/libekmfweb
 	$(MAKE) -C $(rootdir)/libekmfweb/ libekmfweb.so
 .PHONY: $(rootdir)/libekmfweb
 
+$(rootdir)/libseckey/libseckey.a: $(rootdir)/libseckey
+	$(MAKE) -C $(rootdir)/libseckey/ libseckey.a
+.PHONY: $(rootdir)/libseckey
+
 $(rootdir)/zipl/boot/data.o:
 	$(MAKE) -C $(rootdir)/zipl/boot/ data.o
 
