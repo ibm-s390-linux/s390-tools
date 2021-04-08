@@ -21,17 +21,31 @@ else
 	INSTALL_TARGETS += skip-libekmfweb-openssl
 endif
 
-libs = $(rootdir)/libutil/libutil.a
+libs = $(rootdir)/libseckey/libseckey.a
+
+TMPFILE := $(shell mktemp)
 
 detect-openssl-version.dep:
-	echo "#include <openssl/opensslv.h>" > detect-openssl-version.dep
-	echo "#include <openssl/evp.h>" >> detect-openssl-version.dep
-	echo "#if OPENSSL_VERSION_NUMBER < 0x10101000L" >> detect-openssl-version.dep
-	echo "  #error openssl version 1.1.1 is required" >> detect-openssl-version.dep
-	echo "#endif" >> detect-openssl-version.dep
-	echo "static void __attribute__((unused)) test(void) {" >> detect-openssl-version.dep
-	echo "    EVP_PKEY_meth_remove(NULL);" >> detect-openssl-version.dep
-	echo "}" >> detect-openssl-version.dep
+	echo "#include <openssl/opensslv.h>" > $(TMPFILE)
+	echo "#include <openssl/evp.h>" >> $(TMPFILE)
+	echo "#ifndef OPENSSL_VERSION_PREREQ" >> $(TMPFILE)
+	echo "  #if defined(OPENSSL_VERSION_MAJOR) && defined(OPENSSL_VERSION_MINOR)" >> $(TMPFILE)
+	echo "    #define OPENSSL_VERSION_PREREQ(maj, min) \\" >> $(TMPFILE)
+	echo "                 ((OPENSSL_VERSION_MAJOR << 16) + \\" >> $(TMPFILE)
+	echo "                  OPENSSL_VERSION_MINOR >= ((maj) << 16) + (min))" >> $(TMPFILE)
+	echo "  #else" >> $(TMPFILE)
+	echo "    #define OPENSSL_VERSION_PREREQ(maj, min) \\" >> $(TMPFILE)
+	echo "                 (OPENSSL_VERSION_NUMBER >= (((maj) << 28) | \\" >> $(TMPFILE)
+	echo "		        ((min) << 20)))" >> $(TMPFILE)
+	echo "  #endif" >> $(TMPFILE)
+	echo "#endif" >> $(TMPFILE)
+	echo "#if !OPENSSL_VERSION_PREREQ(1, 1)" >> $(TMPFILE)
+	echo "  #error openssl version 1.1 is required" >> $(TMPFILE)
+	echo "#endif" >> $(TMPFILE)
+	echo "static void __attribute__((unused)) test(void) {" >> $(TMPFILE)
+	echo "    EVP_PKEY_meth_remove(NULL);" >> $(TMPFILE)
+	echo "}" >> $(TMPFILE)
+	mv $(TMPFILE) $@
 
 check-dep-libekmfweb: detect-openssl-version.dep
 	$(call check_dep, \
@@ -39,7 +53,7 @@ check-dep-libekmfweb: detect-openssl-version.dep
 		"detect-openssl-version.dep", \
 		"openssl-devel version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
-		-I. -lcrypto)
+		-I. -lcrypto -DOPENSSL_SUPPRESS_DEPRECATED)
 	$(call check_dep, \
 		"libekmfweb", \
 		"json-c/json.h", \
@@ -73,7 +87,7 @@ libekmfweb.so.$(VERSION): ALL_CFLAGS += -fPIC `curl-config --cflags`
 libekmfweb.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl `curl-config --libs` -ldl
 libekmfweb.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libekmfweb.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,libekmfweb.so.$(VERM)
-libekmfweb.so.$(VERSION): ekmfweb.o utilities.o cca.o
+libekmfweb.so.$(VERSION): ekmfweb.o utilities.o cca.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 	ln -srf libekmfweb.so.$(VERSION) libekmfweb.so.$(VERM)
 	ln -srf libekmfweb.so.$(VERSION) libekmfweb.so
