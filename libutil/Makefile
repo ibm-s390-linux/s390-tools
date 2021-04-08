@@ -22,6 +22,7 @@ objects =	util_base.o \
 		util_file.o \
 		util_libc.o \
 		util_list.o \
+		util_log.o \
 		util_opt.o \
 		util_panic.o \
 		util_part.o \
