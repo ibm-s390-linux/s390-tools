@@ -252,6 +252,14 @@ Package contents
  * hsci:
    Manage HiperSockets Converged Interfaces (HSCI).
 
+ * hsavmcore:
+   hsavmcore is designed to make the dump process with kdump more efficient.
+   With hsavmcore, the HSA memory that contains a part of the production
+   kernel's memory can be released early in the process. Depending on the size
+   of the production kernel's memory, writing the dump to persistent storage
+   can be time consuming and prevent the HSA memory from being reused
+   by other LPARs.
+
 For more information refer to the following publications:
 
   * "Device Drivers, Features, and Commands" chapter "Useful Linux commands"
@@ -270,7 +278,8 @@ build options:
 
 | __LIBRARY__    | __BUILD OPTION__   | __TOOLS__                             |
 |----------------|:------------------:|:-------------------------------------:|
-| fuse           | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump |
+| fuse           | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump,|
+|                |                    | hsavmcore                             |
 | zlib           | `HAVE_ZLIB`        | zgetdump, dump2tar                    |
 | ncurses        | `HAVE_NCURSES`     | hyptop                                |
 | pfm            | `HAVE_PFM`         | cpacfstats                            |
@@ -281,6 +290,7 @@ build options:
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb           |
 | glib2          | `HAVE_GLIB2`       | genprotimg                            |
 | libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb                |
+| systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 
 This table lists additional build or install options:
 
@@ -427,3 +437,10 @@ the different tools are provided:
   (libcurl-devel.rpm).
   Tip: you may skip the libekmfweb build by adding `HAVE_OPENSSL=0`,
   `HAVE_JSONC=0`, or `HAVE_LIBCURL=0` to the make invocation.
+
+* hsavmcore:
+  For building the hsavmcore tool you need fuse version 2.6 and optionally
+  systemd which is enabled by default, to disable systemd support,
+  add `HAVE_SYSTEMD=0` to the make invocation.
+  Tip: you may skip the hsavmcore build by adding `HAVE_FUSE=0`
+  to the make invocation.
