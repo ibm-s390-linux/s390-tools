@@ -630,6 +630,21 @@ function configure_ccwgroupdev_option()
 
 	# check if attribute exists
 	local ATTRFILE="$CCWGROUPBUS_DEVICEDIR/$CCWGROUPDEVID/$OPTION_NAME"
+
+	if [ "`cat $CCWGROUPBUS_DEVICEDIR/$CCWGROUPDEVID/online`" == "1" ]
+	then
+		# Could be done by udev rule or else
+		logger "znetconf: Device $CCWGROUPDEVID is already online."
+		if [ "$OPTION_VALUE" != "`cat $ATTRFILE`" ]
+		then
+			logger "znetconf: Device $CCWGROUPDEVID is set offline to set $OPTION_NAME=$OPTION_VALUE"
+			echo "0" >> "$CCWGROUPBUS_DEVICEDIR/$CCWGROUPDEVID/online" 2> /dev/null
+		else
+			logger "znetconf: Device $CCWGROUPDEVID has $OPTION_NAME=`cat $ATTRFILE` already set, skipping...."
+			return 0
+		fi
+	fi
+
 	if [ -f $ATTRFILE ]
 	then
 		echo $OPTION_VALUE >> $ATTRFILE 2> /dev/null
@@ -646,6 +661,7 @@ function configure_ccwgroupdev_option()
 		print_error "$ATTRFILE does not exist"
 		return 2
 	fi
+
 	return 0
 }
 
@@ -681,6 +697,13 @@ function add_net_device()
 		return $?
 	fi
 
+	# To avoid conflict with unfinished uevents triggered potentially by creating groupe device
+	prepare_udevsettle_cmd
+	if [ "$UDEVSETTLE" != "" ]
+	then
+		$UDEVSETTLE_CALL
+	fi
+
 	local i=0
 	local SOMEOPTION_FAILED=0
 	local HAS_LAYER2_OPTION=0
@@ -707,8 +730,11 @@ function add_net_device()
 		local LAYER2=$?
 		if [ $LAYER2 -eq 0 ] || [ $LAYER2 -eq 1 ]
 		then
-			configure_ccwgroupdev_option $CCWGROUPDEVID \
+			if ! configure_ccwgroupdev_option $CCWGROUPDEVID \
 				"layer2" "$LAYER2"
+			then
+				SOMEOPTION_FAILED=1
+			fi
 		fi
 	fi
 
@@ -717,14 +743,14 @@ function add_net_device()
 		return $RC_COULD_NOT_SET_DEV_ONLINE
 	fi
 
-	if ! wait_for_net_device $CCWGROUPDEVNO
-	then
-		return $RC_NET_DEVICE_NOT_ONLINE
-	fi
-
 	if [ $SOMEOPTION_FAILED -ne 0 ]
 	then
 		return $RC_OPTION_NOT_CONFIGURED
+	fi
+
+	if ! wait_for_net_device $CCWGROUPDEVNO
+	then
+		return $RC_NET_DEVICE_NOT_ONLINE
 	fi
 
 	return 0
