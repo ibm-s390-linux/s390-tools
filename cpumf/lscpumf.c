@@ -2638,10 +2638,8 @@ static int parse_args(int argc, char **argv)
 		case 'C':
 			actions[ACTION_CNTALL] = true;
 			break;
-		case '?':
-			fprintf(stderr, "One or more options are not valid\n");
-			fprintf(stderr, "Try 'lscpumf --help' for more"
-				" information.\n");
+		default:
+			util_opt_print_parse_error(opt, argv);
 			exit(EXIT_FAILURE);
 		}
 	}
