@@ -2589,13 +2589,12 @@ static int read_cpumf_type(const char *filename, const char *type)
 	FILE *fp = fopen(filename, "r");
 
 	if (fp == NULL) {
-		fprintf(stderr, "No CPU-measurement %s facility detected\n",
-			type);
+		warnx("No CPU-measurement %s facility detected", type);
 		return rc;
 	}
-	if (fscanf(fp, "%d", &nr) != 1)
-		fprintf(stderr, "Can not parse file %s\n", filename);
-	else {
+	if (fscanf(fp, "%d", &nr) != 1) {
+		warnx("Can not parse file %s", filename);
+	} else {
 		rc = EXIT_SUCCESS;
 		if (nr == PERF_TYPE_RAW)
 			strcat(prefix, "r");
@@ -2685,7 +2684,7 @@ static void show_info(struct cpumf_info *p, int details)
 	struct stat sbuf;
 
 	if (!p->have_counter && !p->have_samples) {
-		fprintf(stderr, "No CPU-measurement facilities detected\n");
+		warnx("No CPU-measurement facilities detected");
 		return;
 	}
 	if (p->have_counter) {
@@ -2715,8 +2714,7 @@ static void show_info(struct cpumf_info *p, int details)
 
 		}
 	} else
-		fprintf(stderr,
-			"No CPU-measurement counter facility detected\n");
+		warnx("No CPU-measurement counter facility detected");
 	if (p->have_samples) {
 		unsigned long total, fdiag;
 		char text[32];
@@ -2774,8 +2772,7 @@ static void show_info(struct cpumf_info *p, int details)
 			printf("        Size factor: %2ld\n", fdiag);
 		}
 	} else
-		fprintf(stderr,
-			"No CPU-measurement sampling facility detected\n");
+		warnx("No CPU-measurement sampling facility detected");
 }
 
 /* Funktion to read machine type */
@@ -2799,7 +2796,7 @@ static int read_machine(unsigned short *mt)
 		if (!strncmp(linep, MACH_TYPE, sizeof MACH_TYPE - 1)) {
 			int rc_scan = sscanf(linep, MACH_TYPE "%hd", mt);
 			if (rc_scan != 1)
-				fprintf(stderr, "Can not parse line %s", linep);
+				warnx("Can not parse line %s", linep);
 			else
 				rc = EXIT_SUCCESS;
 			break;
@@ -2824,7 +2821,7 @@ static int read_sfb(struct cpumf_info *p)
 		return EXIT_FAILURE;
 	}
 	if (fscanf(fp, "%d,%d", &p->min_sfb, &p->max_sfb) != 2) {
-		fprintf(stderr, "Can not parse %s\n", PERF_SFB_SIZE);
+		warnx("Can not parse %s", PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
 	}
 	fclose(fp);
@@ -2877,7 +2874,7 @@ static int read_info(void)
 				    " version=%f authorization=%x",
 				    &cpumf.version, &cpumf.authorization);
 			if (rc != 2) {
-				fprintf(stderr, "Can not parse line %s", linep);
+				warnx("Can not parse line %s", linep);
 				rc = EXIT_FAILURE;
 				goto out;
 			}
@@ -2891,7 +2888,7 @@ static int read_info(void)
 				    &cpumf.min_rate, &cpumf.max_rate,
 				    &cpumf.cpu_speed);
 			if (rc != 3) {
-				fprintf(stderr, "Can not parse line %s", linep);
+				warnx("Can not parse line %s", linep);
 				rc = EXIT_FAILURE;
 				goto out;
 			}
@@ -2902,7 +2899,7 @@ static int read_info(void)
 				    " mode=basic sample_size=%u",
 				    &cpumf.basic_sample_sz);
 			if (rc != 1) {
-				fprintf(stderr, "Can not parse line %s", linep);
+				warnx("Can not parse line %s", linep);
 				rc = EXIT_FAILURE;
 				goto out;
 			}
@@ -2912,7 +2909,7 @@ static int read_info(void)
 				    " mode=diagnostic sample_size=%u",
 				    &cpumf.diag_sample_sz);
 			if (rc != 1) {
-				fprintf(stderr, "Can not parse line %s", linep);
+				warnx("Can not parse line %s", linep);
 				rc = EXIT_FAILURE;
 				goto out;
 			}
