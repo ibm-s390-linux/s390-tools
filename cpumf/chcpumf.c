@@ -181,10 +181,8 @@ static int parse_args(int argc, char **argv)
 		case 'V':
 			verbose = 1;
 			break;
-		case '?':
-			fprintf(stderr, "One or more options are not valid\n");
-			fprintf(stderr, "Try 'chcpumf --help' for more"
-					" information\n");
+		default:
+			util_opt_print_parse_error(opt, argv);
 			exit(EXIT_FAILURE);
 		}
 	}
