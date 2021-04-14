@@ -85,10 +85,9 @@ static long parse_buffersize(char *string)
 	return bytes;
 }
 
-static int read_sfb(unsigned long *min, unsigned long *max)
+static void read_sfb(unsigned long *min, unsigned long *max)
 {
 	unsigned long cur_min_sdb, cur_max_sdb;
-	int rc = EXIT_SUCCESS;
 	FILE *fp;
 
 	if (geteuid())
@@ -97,8 +96,8 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 	if (!fp)
 		err(EXIT_FAILURE, PERF_SFB_SIZE);
 	if (fscanf(fp, "%ld,%ld", &cur_min_sdb, &cur_max_sdb) != 2) {
-		warnx("Can not parse file " PERF_SFB_SIZE);
-		rc = EXIT_FAILURE;
+		fclose(fp);
+		errx(EXIT_FAILURE, "Can not parse file " PERF_SFB_SIZE);
 	} else {
 		if (*min == 0)
 			*min = cur_min_sdb;
@@ -106,7 +105,9 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 			*max = cur_max_sdb;
 	}
 	fclose(fp);
-	return rc;
+	if (*min >= *max)
+		errx(EXIT_FAILURE,
+		     "The specified maximum must be greater than the minimum");
 }
 
 static int write_sfb(unsigned long min, unsigned long max)
@@ -182,7 +183,6 @@ static int parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-	int ret = EXIT_FAILURE;
 	struct stat sbuf;
 
 	util_prg_init(&prg);
@@ -192,10 +192,6 @@ int main(int argc, char **argv)
 	if (stat(PERF_PATH PERF_SF, &sbuf))
 		errx(EXIT_FAILURE,
 		     "No CPU-measurement sampling facility detected");
-	if (read_sfb(&min_sdb, &max_sdb))
-		return ret;
-	if (min_sdb >= max_sdb)
-		errx(EXIT_FAILURE,
-		     "The specified maximum must be greater than the minimum");
+	read_sfb(&min_sdb, &max_sdb);
 	return write_sfb(min_sdb, max_sdb);
 }
