@@ -94,10 +94,8 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 	if (geteuid())
 		errx(EXIT_FAILURE, "Must run as root");
 	fp = fopen(PERF_SFB_SIZE, "r");
-	if (!fp) {
-		linux_error(PERF_SFB_SIZE);
-		return EXIT_FAILURE;
-	}
+	if (!fp)
+		err(EXIT_FAILURE, PERF_SFB_SIZE);
 	if (fscanf(fp, "%ld,%ld", &cur_min_sdb, &cur_max_sdb) != 2) {
 		warnx("Can not parse file " PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
@@ -119,18 +117,16 @@ static int write_sfb(unsigned long min, unsigned long max)
 	FILE *fp;
 
 	fp = fopen(PERF_SFB_SIZE, "w");
-	if (!fp) {
-		linux_error(PERF_SFB_SIZE);
-		return EXIT_FAILURE;
-	}
+	if (!fp)
+		err(EXIT_FAILURE, PERF_SFB_SIZE);
 	snprintf(text, sizeof text, "%ld,%ld", min, max);
 	len = strlen(text) + 1;
 	if (fwrite(text, 1, len, fp) != len) {
-		linux_error(PERF_SFB_SIZE);
+		warn(PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
 	}
 	if (fclose(fp)) {
-		linux_error(PERF_SFB_SIZE);
+		warn(PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
 	}
 	if (verbose && rc != EXIT_FAILURE)
