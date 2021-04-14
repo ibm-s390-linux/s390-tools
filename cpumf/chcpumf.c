@@ -96,7 +96,7 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 		return EXIT_FAILURE;
 	}
 	fp = fopen(PERF_SFB_SIZE, "r");
-	if (fp == NULL) {
+	if (!fp) {
 		linux_error(PERF_SFB_SIZE);
 		return EXIT_FAILURE;
 	}
@@ -122,7 +122,7 @@ static int write_sfb(unsigned long min, unsigned long max)
 	FILE *fp;
 
 	fp = fopen(PERF_SFB_SIZE, "w");
-	if (fp == NULL) {
+	if (!fp) {
 		linux_error(PERF_SFB_SIZE);
 		return EXIT_FAILURE;
 	}
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 	util_opt_init(opt_vec, NULL);
 
 	parse_args(argc, argv);
-	if (stat(PERF_PATH PERF_SF, &sbuf) != 0) {
+	if (stat(PERF_PATH PERF_SF, &sbuf)) {
 		fprintf(stderr,
 			"No CPU-measurement sampling facility detected\n");
 		return ret;
