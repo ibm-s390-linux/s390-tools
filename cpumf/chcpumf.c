@@ -91,18 +91,15 @@ static int read_sfb(unsigned long *min, unsigned long *max)
 	int rc = EXIT_SUCCESS;
 	FILE *fp;
 
-	if (geteuid()) {
-		fprintf(stderr, "Error: Must run as root\n");
-		return EXIT_FAILURE;
-	}
+	if (geteuid())
+		errx(EXIT_FAILURE, "Must run as root");
 	fp = fopen(PERF_SFB_SIZE, "r");
 	if (!fp) {
 		linux_error(PERF_SFB_SIZE);
 		return EXIT_FAILURE;
 	}
 	if (fscanf(fp, "%ld,%ld", &cur_min_sdb, &cur_max_sdb) != 2) {
-		fprintf(stderr, "Error: Can not parse file " PERF_SFB_SIZE
-				"\n");
+		warnx("Can not parse file " PERF_SFB_SIZE);
 		rc = EXIT_FAILURE;
 	} else {
 		if (*min == 0)
@@ -137,10 +134,10 @@ static int write_sfb(unsigned long min, unsigned long max)
 		rc = EXIT_FAILURE;
 	}
 	if (verbose && rc != EXIT_FAILURE)
-		fprintf(stderr, "Sampling buffer sizes:\n"
-				"    Minimum:%7ld sample-data-blocks\n"
-				"    Maximum:%7ld sample-data-blocks\n",
-				min, max);
+		warnx("Sampling buffer sizes:\n"
+		      "    Minimum:%7ld sample-data-blocks\n"
+		      "    Maximum:%7ld sample-data-blocks\n",
+		      min, max);
 	return rc;
 }
 
@@ -160,21 +157,17 @@ static int parse_args(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 		case 'x':
 			new = parse_buffersize(optarg);
-			if (new < 1) {
-				fprintf(stderr, "The specified number(s)"
-						" are not valid\n");
-				exit(EXIT_FAILURE);
-			}
+			if (new < 1)
+				errx(EXIT_FAILURE,
+				     "The specified number(s) are not valid");
 			max_sdb = new;
 			action = 1;
 			break;
 		case 'm':
 			new = parse_buffersize(optarg);
-			if (new < 1) {
-				fprintf(stderr, "The specified number(s)"
-						" are not valid\n");
-				exit(EXIT_FAILURE);
-			}
+			if (new < 1)
+				errx(EXIT_FAILURE,
+				     "The specified number(s) are not valid");
 			min_sdb = new;
 			action = 1;
 			break;
@@ -186,10 +179,8 @@ static int parse_args(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 	}
-	if (!action) {
-		fprintf(stderr, "You must specify a valid option\n");
-		exit(EXIT_FAILURE);
-	}
+	if (!action)
+		errx(EXIT_FAILURE, "You must specify a valid option");
 	return action;
 }
 
@@ -202,17 +193,13 @@ int main(int argc, char **argv)
 	util_opt_init(opt_vec, NULL);
 
 	parse_args(argc, argv);
-	if (stat(PERF_PATH PERF_SF, &sbuf)) {
-		fprintf(stderr,
-			"No CPU-measurement sampling facility detected\n");
-		return ret;
-	}
+	if (stat(PERF_PATH PERF_SF, &sbuf))
+		errx(EXIT_FAILURE,
+		     "No CPU-measurement sampling facility detected");
 	if (read_sfb(&min_sdb, &max_sdb))
 		return ret;
-	if (min_sdb >= max_sdb) {
-		fprintf(stderr, "The specified maximum must be greater "
-				"than the minimum\n");
-		return ret;
-	}
+	if (min_sdb >= max_sdb)
+		errx(EXIT_FAILURE,
+		     "The specified maximum must be greater than the minimum");
 	return write_sfb(min_sdb, max_sdb);
 }
