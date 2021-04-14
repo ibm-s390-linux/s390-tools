@@ -2707,7 +2707,7 @@ static void show_info(struct cpumf_info *p, int details)
 			if (0x8000 & p->authorization)
 				printf("    Coprocessor Group counter Set\n");
 			printf("\nLinux perf event support: %s\n\n",
-				(stat(PERF_PATH PERF_CF, &sbuf) != 0) ? "No" :
+				(stat(PERF_PATH PERF_CF, &sbuf)) ? "No" :
 				"Yes (PMU: " PERF_CF ")");
 
 		}
@@ -2736,7 +2736,7 @@ static void show_info(struct cpumf_info *p, int details)
 			       p->diag_sample_sz);
 
 			printf("\nLinux perf event support: %s\n\n",
-				(stat(PERF_PATH PERF_SF, &sbuf) != 0) ? "No" :
+				(stat(PERF_PATH PERF_SF, &sbuf)) ? "No" :
 				"Yes (PMU: " PERF_SF ")");
 
 			printf("Current sampling buffer settings for %s:\n",
@@ -2786,8 +2786,8 @@ static int read_machine(unsigned short *mt)
 	FILE *fp;
 
 	fp = fopen(SYSINFO, "r");
-	if (fp == NULL) {
-		linux_error(SYSINFO);
+	if (!fp) {
+		warn(SYSINFO);
 		return rc;
 	}
 	while ((nbytes = getline(&linep, &line_sz, fp)) != EOF) {
@@ -2810,12 +2810,12 @@ static int read_machine(unsigned short *mt)
  */
 static int read_sfb(struct cpumf_info *p)
 {
-	FILE *fp;
 	int rc = EXIT_SUCCESS;
+	FILE *fp;
 
 	fp = fopen(PERF_SFB_SIZE, "r");
-	if (fp == NULL) {
-		linux_error(PERF_SFB_SIZE);
+	if (!fp) {
+		warn(PERF_SFB_SIZE);
 		return EXIT_FAILURE;
 	}
 	if (fscanf(fp, "%d,%d", &p->min_sfb, &p->max_sfb) != 2) {
@@ -2838,7 +2838,7 @@ static void read_ccerror(struct counters *cp, size_t cp_cnt)
 	char *ctrname;
 	size_t i = 0;
 
-	if (stat(CCERROR, &sbuf) == 0)
+	if (!stat(CCERROR, &sbuf))
 		ctrname = "DFLT_CCERROR";
 	else
 		ctrname = "DFLT_CCFINISH";
@@ -2861,8 +2861,8 @@ static int read_info(void)
 
 	memset(&cpumf, 0, sizeof cpumf);
 	slp = fopen(SERVICELEVEL, "r");
-	if (slp == NULL) {
-		linux_error(SERVICELEVEL);
+	if (!slp) {
+		warn(SERVICELEVEL);
 		return EXIT_FAILURE;
 	}
 

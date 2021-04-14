@@ -15,9 +15,4 @@
 #define	PERF_SF		"cpum_sf"
 #define	PERF_CF		"cpum_cf"
 
-static inline void linux_error(const char *message)
-{
-	fprintf(stderr, "Error: %s: %s\n", message, strerror(errno));
-}
-
 #endif
