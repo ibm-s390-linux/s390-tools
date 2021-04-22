@@ -8,6 +8,7 @@ examples =	util_base_example \
 		util_scandir_example \
 		util_file_example \
 		util_libc_example \
+		util_log_example \
 		util_opt_example \
 		util_opt_command_example \
 		util_prg_example \
@@ -37,6 +38,7 @@ util_path_example: util_path_example.o $(lib)
 util_scandir_example: util_scandir_example.o $(lib)
 util_file_example: util_file_example.o $(lib)
 util_libc_example: util_libc_example.o $(lib)
+util_log_example: util_log_example.o $(lib)
 util_opt_example: util_opt_example.o $(lib)
 util_opt_command_example: util_opt_command_example.o $(lib)
 util_panic_example: util_panic_example.o $(lib)
