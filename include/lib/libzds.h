@@ -115,7 +115,7 @@
 #include "lib/util_base.h"
 #include "lib/util_list.h"
 #include "vtoc.h"
-
+#include <iconv.h>
 
 
 /**
@@ -833,6 +833,11 @@ void lzds_dshandle_get_errorlog(struct dshandle *dsh, struct errorlog **log);
  */
 int lzds_dshandle_set_seekbuffer(struct dshandle *dsh,
 				 unsigned long long seek_buffer_size);
+
+/**
+ * @brief Set iconv handle for codepage conversion.
+ */
+int lzds_dshandle_set_iconv(struct dshandle *dsh, iconv_t *iconv);
 
 /**
  * @brief Get the size of the data set in number of tracks (sum of all extents).

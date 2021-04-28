@@ -61,6 +61,9 @@ struct errorlog {
 
 #define BUSIDSIZE  8
 
+#define EBCDIC_SP 0x40
+#define EBCDIC_LF 0x25
+
 /**
  * @brief An internal structure that represents an entry in the error log.
  */
@@ -307,6 +310,8 @@ struct dshandle {
 	struct errorlog *log;
 
 	char *session_ref;
+	iconv_t *iconv;
+	char *convbuffer;
 };
 
 /** @endcond */
@@ -2813,6 +2818,38 @@ int lzds_dshandle_set_keepRDW(struct dshandle *dsh, int keepRDW)
 }
 
 /**
+ * @pre The dsh must not be open when this function is called.
+ *
+ * @param[in] dsh      The dshandle we want to modify.
+ * @param[in] iconv_t  The iconv handle for codepage conversion.
+ *
+ * @return     0 on success, otherwise one of the following error codes:
+ *   - EBUSY   The handle is already open.
+ */
+int lzds_dshandle_set_iconv(struct dshandle *dsh, iconv_t *iconv)
+{
+	errorlog_clear(dsh->log);
+	if (dsh->is_open)
+		return errorlog_add_message(
+			&dsh->log, NULL, EBUSY,
+			"dshandle: cannot set iconv while handle is open\n");
+
+	/*
+	 * if conversion is enabled the returned data might in worst case
+	 * be 4 times the size of the input buffer. So realloc the buffer.
+	 * If for whatever very unlikely reason the converted size is still
+	 * larger the conversion will fail.
+	 */
+	if (iconv) {
+		dsh->databufmax *= 4;
+		dsh->databuffer = util_realloc(dsh->databuffer,
+					       dsh->databufmax);
+	}
+	dsh->iconv = iconv;
+	return 0;
+}
+
+/**
  * @param[in]  dsh     The dshandle that we want to know the member of.
  * @param[out] keepRDW Reference to a variable in which the previously
  *                     set keepRDW value is returned.
@@ -2946,6 +2983,8 @@ void lzds_dshandle_close(struct dshandle *dsh)
 	for (i = 0; i < MAXVOLUMESPERDS; ++i)
 		if (dsh->dasdhandle[i])
 			lzds_dasdhandle_close(dsh->dasdhandle[i]);
+	free(dsh->convbuffer);
+	free(dsh->iconv);
 	dsh->is_open = 0;
 }
 
@@ -3280,8 +3319,128 @@ int lzds_dshandle_open(struct dshandle *dsh)
 			return rc;
 		}
 	}
+	if (dsh->iconv)
+		dsh->convbuffer = util_zalloc(dsh->databufmax);
+
 	dsh->is_open = 1;
 	return 0;
+}
+
+/**
+ * @brief subroutine of parse_fixed_record for codepage conversion
+ *
+ * Converts the provided data from one codepage to another using iconv.
+ * Stores converted data directly in the target buffer.
+ * Adds a linebreak at the end of each record to end the line.
+ * Also remove trailing spaces.
+ *
+ * @param[in]  dsh  The dshandle that keeps track of the I/O operations.
+ * @param[in]  rec         Pointer to the record buffer.
+ * @param[in]  targetdata  Pointer to the data buffer.
+ * @return     Number of copied data bytes on success,
+ *             otherwise one of the following (negative) error codes:
+ *   - -EPROTO  The record is malformed.
+ */
+static ssize_t convert_fixed_record(struct dshandle *dsh,
+				    char *rec, char *targetdata)
+{
+	struct eckd_count *ecount = (struct eckd_count *)rec;
+	size_t in_count, out_count, max_count;
+	int reclen, blocksize, reccount;
+	char *inbuf, *outbuf;
+	char *src, *target;
+	size_t rc;
+	int i;
+
+	blocksize = ecount->dl;
+	reclen = dsh->ds->dsp[0]->f1->DS1LRECL;
+	reccount = blocksize / reclen;
+
+	outbuf = targetdata;
+	out_count =  max_count =
+		(unsigned long)dsh->databuffer + dsh->databufmax -
+		(unsigned long)targetdata;
+	in_count = 0;
+	inbuf = dsh->convbuffer;
+
+	/* skip block header */
+	src = (rec + sizeof(*ecount) + ecount->kl);
+	target = inbuf;
+	/* for each record aka line */
+	for (i = 0; i < reccount; i++) {
+		/* remove trailing spaces */
+		while (reclen && (*(src + reclen - 1) == EBCDIC_SP))
+			reclen--;
+		/* move remaining data and add linebreak at end of record */
+		memcpy(target, src, reclen);
+		target += reclen;
+		*target = EBCDIC_LF;
+		target++;
+		/* count how much chars remain after whitespace cleanup */
+		in_count += reclen + 1;
+
+		/* reset for next line */
+		reclen = dsh->ds->dsp[0]->f1->DS1LRECL;
+		src += reclen;
+	}
+	/* convert directly into target buffer */
+	rc = iconv(*(dsh->iconv), &inbuf, &in_count, &outbuf, &out_count);
+	if ((rc == (size_t) -1) || (in_count != 0))
+		return -errorlog_add_message(
+			&dsh->log, NULL, EPROTO,
+			"fixed record parser: codepage conversion failed\n");
+	/* return how much was written in the target buffer */
+	return max_count - out_count;
+}
+
+/**
+ * @brief subroutine of parse_variable_record for codepage conversion
+ *
+ * Converts the record data from one codepage to another using iconv.
+ * Stores converted data directly in the target buffer
+ *
+ * @param[in]  dsh  The dshandle that keeps track of the I/O operations.
+ * @param[in]  reclen      Length of the record.
+ * @param[in]  rec         Pointer to the record buffer.
+ * @param[in]  targetdata  Pointer to the data buffer.
+ * @return     Number of copied data bytes on success,
+ *             otherwise one of the following (negative) error codes:
+ *   - -EPROTO  The record is malformed.
+ */
+static ssize_t convert_variable_record(struct dshandle *dsh, int reclen,
+				       char *rec, char *targetdata)
+{
+	size_t in_count, out_count, max_count;
+	char *inbuf, *outbuf;
+	size_t rc;
+
+	inbuf = rec;
+	outbuf = targetdata;
+	in_count = reclen + 1;
+	out_count = max_count =
+		(unsigned long)dsh->databuffer + dsh->databufmax -
+		(unsigned long)targetdata;
+	/*
+	 * we can not overwrite the track end marker since it is still used
+	 * for this case we have to make a copy of the source data to add the
+	 * linebreak
+	 */
+	if (inbuf[reclen] == 0xFF) {
+		inbuf = dsh->convbuffer;
+		memcpy(inbuf, rec, reclen);
+	}
+
+	/* add linebreak */
+	inbuf[reclen] = 0x25;
+
+	rc = iconv(*(dsh->iconv), &inbuf, &in_count, &outbuf, &out_count);
+	if ((rc == (size_t) -1) || (in_count != 0))
+		return -errorlog_add_message(
+			&dsh->log, NULL, EPROTO,
+			"variable record parser: codepage conversion failed\n");
+
+	/* return how much was written in the target buffer */
+	return max_count - out_count;
 }
 
 /**
@@ -3298,6 +3457,7 @@ static ssize_t parse_fixed_record(struct dshandle *dsh,
 				  char *rec, char *targetdata)
 {
 	struct eckd_count *ecount;
+	int count;
 
 	ecount = (struct eckd_count *)rec;
 	/* Make sure that we do not copy data beyond the end of
@@ -3308,8 +3468,13 @@ static ssize_t parse_fixed_record(struct dshandle *dsh,
 		return - errorlog_add_message(
 			&dsh->log, NULL, EPROTO,
 			"fixed record to long for target buffer\n");
-	memcpy(targetdata, (rec + sizeof(*ecount) + ecount->kl), ecount->dl);
-	return ecount->dl;
+	if (dsh->iconv) {
+		count = convert_fixed_record(dsh, rec, targetdata);
+	} else {
+		memcpy(targetdata, (rec + sizeof(*ecount) + ecount->kl), ecount->dl);
+		count = ecount->dl;
+	}
+	return count;
 }
 
 /**
@@ -3333,6 +3498,7 @@ static ssize_t parse_variable_record(struct dshandle *dsh, char *rec,
 	struct segment_header *blockhead;
 	struct segment_header *seghead;
 	size_t totaldatalength;
+	int count;
 
 	/* We must not rely on the data in rec, as it was read from disk and
 	 * may be broken. Wherever we interprete the data we must have sanity
@@ -3398,9 +3564,19 @@ static ssize_t parse_variable_record(struct dshandle *dsh, char *rec,
 				&dsh->log, NULL, EPROTO,
 				"variable record parser: "
 				"record to long for target buffer\n");
-		memcpy(targetdata, data, segmentlength);
-		targetdata += segmentlength;
-		totaldatalength += segmentlength;
+		if (dsh->iconv) {
+			count = convert_variable_record(dsh, segmentlength,
+							data, targetdata);
+			if (count < 0)
+				return count;
+
+			totaldatalength += count;
+			targetdata += count;
+		} else {
+			memcpy(targetdata, data, segmentlength);
+			totaldatalength += segmentlength;
+			targetdata += segmentlength;
+		}
 		data += segmentlength;
 	}
 	return totaldatalength;
