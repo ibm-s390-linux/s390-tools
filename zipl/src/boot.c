@@ -391,6 +391,10 @@ store_stage2_menu(void* data, size_t size, struct job_data* job)
 		return 0;
 	/* Config texts */
 	for (i = 0; i < job->data.menu.num; i++) {
+		if (job->data.menu.entry[i].data.ipl.ignore) {
+			params->config[job->data.menu.entry[i].pos] = 0;
+			continue;
+		}
 		const char *kdump_str = "";
 		if (job->data.menu.entry[i].data.ipl.is_kdump)
 			kdump_str = " (kdump)";
