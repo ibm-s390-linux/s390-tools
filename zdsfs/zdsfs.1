@@ -32,29 +32,23 @@ Only read access is supported.
 
 Data sets on tape devices are not supported.
 
-To maintain data consistency, a DASD must not be modified while it is
-in use by zdsfs. This can be assured by varying the device offline
-in z/OS before setting it online in Linux or by using z/OSMF REST
-services to notify z/OS about access to data sets.
+If the z/OSMF REST services are not used for a coordinated-read
+access, access to the device by Linux is not subject to RACF or any
+other z/OS auditing mechanism. Ensure the security of the data on the
+device by using the well-known Linux methods. By default, zdsfs grants
+access to the files in the fuse file system only to the user who
+started the tool. Configure file access behavior by using the
+‘allow_other’, ‘default_permissions’, ‘umask’, ‘uid’, and ‘gid’
+options.
 
-Device access by Linux is not subject to RACF or other
-z/OS auditing mechanisms unless the z/OSMF REST services are used for
-a coordinated read access.
-The safety of the data on the device must be established by
-therespective Linux mechanisms. By default, zdsfs grants access to the
-files in the fuse file system only to the user who started the
-tool. This behavior can be changed by using the options `allow_other',
-`default_permissions', `umask', `uid', and `gid'.
-
-When using the z/OSMF REST services for coordinated read access, a
-connection is established for every opened file. The z/OSMF REST
-services confirm that the z/OS userid that is specified in the .netrc
-configuration file has the required access rights for the data set.
-Using this mechanism also an exclusive ENQ is obtained to mark the
-data set as in use to z/OS. The ENQ prevents z/OS applications from
-modifying the data set during zdsfs access.
-If the ENQ cannot be obtained, the access from Linux fails with an
-error.
+When using the z/OSMF REST services for coordinated read access, every
+file open establishes a connection to the z/OSMF REST server. This
+checks that the accessing z/OS user ID has the appropriate access
+rights for the data set. Using this mechanism, an exclusive ENQ is
+obtained that marks the data set as in-use to z/OS. An ENQ is a z/OS
+method to control a serially reusable resource. While the ENQ is held,
+no z/OS application can modify the data set. If the ENQ cannot be
+obtained, the access attempt from Linux fails.
 
 Only physical sequential (PS) and partitioned data sets (PDS) are
 supported. Supported record formats are: V, F, U, B, S, A, and M.
@@ -171,20 +165,20 @@ instance.
 
 .TP
 \fB\-c\fR \fI<config_file>\fR
-zdsfs configuration file. The default is /etc/zdsfs.conf.
+Provide a configuration file for zdsfs. The default is /etc/zdsfs.conf.
 
 .TP
 \fB\-o\fR restapi
-Make zdsfs use z/OSMF REST services for coordinated read access to
-data sets. The user credentials are taken from .netrc file in the
-user's home directory or where the NETRC environment variable points
+Use z/OSMF REST services for coordinated read-access to data sets. The
+user credentials are read from the .netrc file in the user's home
+directory, or from the location the NETRC environment variable points
 to.
 
 .TP
 \fB\-o\fR restserver=<server_URL>
-Specify up to 3 server URLs to z/OSMF REST services.
-For multiple specifications, the URLs are tried sequentially, and the
-first functioning URL is used.
+Specify up to three server URLs to z/OSMF REST services. If more than
+one server is specified, the first that responds is used. If a server
+does not respond any longer during operation all specified server are probed again.
 
 .SS "Applicable FUSE options (version 2.8):"
 This is a selected subset of all FUSE options. Use the zdsfs
@@ -273,44 +267,40 @@ directory:
 
 \fBuser.dsorg\fR: The data set organization of a file.
 
-.SH zdsfs configuration file
+.SH zdsfs config file
 
-The default search path is /etc/zdsfs.conf.
-Use the \fB\-c\fR \fI<config_file>\fR option to specify other zdsfs
-configuration file locations.
-
+The default path is /etc/zdsfs.conf. Specify a different zdsfs config
+file location with the \fB\-c\fR \fI<config_file>\fR option.
 .br
-
-The configuration file can contain the following options:
+The config file may contain the following options:
 .PP
 
 .B restapi
 =
 .IR 0 / 1
 .IP
-Setting this option to 1 enables the z/OSMF REST services.
-The z/OSMF REST services require a valid URL specification for a REST
-server, and a .netrc file with a valid z/OS user ID and password.
+Determines whether the z/OSMF REST services should be used. If
+enabled, a valid REST server must be specified, as well as a .netrc
+file with a valid z/OS user ID and password.
 .PP
 
 .B restserver
 =
 .IR URL
 .IP
-Specifies the URL of the z/OSMF REST server that is
-used for coordinated read access. For failover, up to 3 different
-server addresses can be provided.
+Specifies the address of the z/OSMF REST server that is used for
+coordinating read-access. For failover scenarios, provide up to three
+different server addresses. These will be tried in the specified order
+when one of the servers cannot be reached during mount or operation.
 .PP
 
 .B keepalive
 =
-.I timeout
-(in seconds)
+.I timeout (in seconds)
 .IP
-Specifies the keepalive timer for ENQs.
-By default the timer is set to 540 seconds to prevent the ENQ from a
-timeout after 10 minutes in case access to the data set takes longer
-than this.
+Optionally change the keepalive timer for ENQs. By default the
+keepalive refreshes the access after 540 seconds (9 minutes).The 9
+minutes are chosen to prevent a timeout by z/OS after 10 minutes.
 
 .SH EXAMPLES
 To mount the z/OS disk with the name dasde enter:
@@ -341,9 +331,8 @@ assuming the z/OS disk was mounted on /mnt:
 
 To mount the z/OS disk using the z/OSMF REST services for coordinated
 read access:
-.br
 
-  # ./zdsfs -o restapi -o restserver=zos1.server.tld/zosmf /dev/dasde /mnt/
+ # ./zdsfs -o restapi -o restserver=zos1.server.tld/zosmf /dev/dasde /mnt/
 
 .SH SEE ALSO
 getfattr(1), fuse(8), z/OS DFSMS Using Data Sets,
