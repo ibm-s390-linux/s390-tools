@@ -21,6 +21,7 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 #include <openssl/pem.h>
+#include <openssl/opensslv.h>
 
 #include "lib/zt_common.h"
 #include "lib/util_libc.h"
@@ -35,6 +36,22 @@
 #include "../utils.h"
 #include "../pkey.h"
 #include "../properties.h"
+
+#ifndef OPENSSL_VERSION_PREREQ
+	#if defined(OPENSSL_VERSION_MAJOR) && defined(OPENSSL_VERSION_MINOR)
+		#define OPENSSL_VERSION_PREREQ(maj, min)		\
+			((OPENSSL_VERSION_MAJOR << 16) +		\
+			OPENSSL_VERSION_MINOR >= ((maj) << 16) + (min))
+	#else
+		#define OPENSSL_VERSION_PREREQ(maj, min)		\
+			(OPENSSL_VERSION_NUMBER >= (((maj) << 28) |	\
+			((min) << 20)))
+	#endif
+#endif
+
+#if OPENSSL_VERSION_PREREQ(3, 0)
+#include <openssl/core_names.h>
+#endif
 
 #define pr_verbose(handle, fmt...)				\
 	do {							\
@@ -764,6 +781,10 @@ static int _get_pub_key_info(struct plugin_handle *ph, const char *pem_file,
 			     int *rsa_mod_bits)
 {
 	int rc = 0, curve_nid, mod_len;
+#if OPENSSL_VERSION_PREREQ(3, 0)
+	size_t curve_len;
+	char curve[80];
+#endif
 	EVP_PKEY *pkey;
 	FILE *fp;
 
@@ -791,14 +812,35 @@ static int _get_pub_key_info(struct plugin_handle *ph, const char *pem_file,
 
 	switch (EVP_PKEY_id(pkey)) {
 	case EVP_PKEY_EC:
+#if !OPENSSL_VERSION_PREREQ(3, 0)
 		curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(
 						EVP_PKEY_get0_EC_KEY(pkey)));
+#else
+		if (!EVP_PKEY_get_utf8_string_param(pkey,
+						    OSSL_PKEY_PARAM_GROUP_NAME,
+						    curve, sizeof(curve),
+						    &curve_len)) {
+			EVP_PKEY_free(pkey);
+			_set_error(ph, "Failed to get the curve name");
+			return -EIO;
+		}
+		curve_nid = OBJ_sn2nid(curve);
+#endif
 		if (ecc_curve_nid != NULL)
 			*ecc_curve_nid = curve_nid;
 		break;
 
 	case EVP_PKEY_RSA:
+#if !OPENSSL_VERSION_PREREQ(3, 0)
 		mod_len = BN_num_bits(RSA_get0_n(EVP_PKEY_get0_RSA(pkey)));
+#else
+		if (!EVP_PKEY_get_int_param(pkey, OSSL_PKEY_PARAM_BITS,
+					    &mod_len)) {
+			EVP_PKEY_free(pkey);
+			_set_error(ph, "Failed to get the RSA key size");
+			return -EIO;
+		}
+#endif
 		if (rsa_mod_bits != NULL)
 			*rsa_mod_bits = mod_len;
 		break;
