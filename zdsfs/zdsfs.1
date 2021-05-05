@@ -180,6 +180,36 @@ Specify up to three server URLs to z/OSMF REST services. If more than
 one server is specified, the first that responds is used. If a server
 does not respond any longer during operation all specified server are probed again.
 
+.TP
+\fB\-x\fR \fI<dataset_file>\fR
+Use a config file with code-page conversion options for
+specific data sets.
+
+.TP
+\fB\-o\fR codepage_convert
+Enable code-page conversion for all data sets. Unless specified
+otherwise, the source code-page is EBCDIC CP1047 and the target
+code-page is UTF-8.
+
+You can change the default for the source code-page with the -o
+codepage_from option and for the target code-page with the -o
+codepage_to option. To specify source and target code-pages for
+individual data sets use a data set config file.
+
+.TP
+\fB\-o\fR codepage_from=\fI<n>\fR
+Override EBCDIC CP1047 as the default code-page for the source. Must
+be combined with \fB\-o\fR codepage_to=\fI<n>\fR. Overrides settings
+in a data set config file. Issue iconv -l for a list of valid
+specifications for <n>.
+
+.TP
+\fB\-o\fR codepage_to=\fI<n>\fR
+Override UTF-8 as the default code-page for the target. Must be
+combined with \fB\-o\fR codepage_from=\fI<n>\fR. Overrides settings
+in a data set configu file. Issue iconv -l for a list of valid
+specifications for <n>.
+
 .SS "Applicable FUSE options (version 2.8):"
 This is a selected subset of all FUSE options. Use the zdsfs
 \fB\--help\fR option to print a full list.
@@ -302,6 +332,47 @@ Optionally change the keepalive timer for ENQs. By default the
 keepalive refreshes the access after 540 seconds (9 minutes).The 9
 minutes are chosen to prevent a timeout by z/OS after 10 minutes.
 
+.SH data-set config file <dataset_file>
+Provides code-page conversion settings for individual data sets.
+The default config file is /etc/zdsfs-dataset.conf. Use the \fB\-x\fR
+\fI<dataset_file>\fR option to specify a different file.
+.br
+Each config-file entry must contain the following options:
+.PP
+
+.B
+DATASET.TITLE
+.IP
+Specifies the data-set title or a pattern of titles to which the entry
+applies. The title can have a trailing asterisk to match all titles
+that begin with the leading characters.
+.PP
+
+.B conv
+=
+.IR 0 / 1 / <codepage_from>,<codepage_to>
+.IP
+\fI0\fR disables code-page conversion.
+.br
+\fI1\fR performs conversion with the default conversion table.
+.br
+An explicit specification of source and target code-page overrides the default conversion tables
+The code-page specifications must be separated by a comma.
+Issue iconv -l for a list of valid code-page specifications.
+
+.PP
+
+.B rdw
+=
+.I 0 / 1
+.IP
+\fI0\fR omits the record descriptor word from the data stream.
+.br
+\fI1\fR keeps the record descriptor word from the data stream.
+.br
+Code-page conversion can render data unreadable if the record descriptor word is kept.
+
+
 .SH EXAMPLES
 To mount the z/OS disk with the name dasde enter:
 .br
@@ -333,6 +404,13 @@ To mount the z/OS disk using the z/OSMF REST services for coordinated
 read access:
 
  # ./zdsfs -o restapi -o restserver=zos1.server.tld/zosmf /dev/dasde /mnt/
+
+.br
+To mount the z/OS disk and enable code-page conversion for all data
+sets using a custom source and target code page:
+
+  # ./zdsfs -o codepage_from=CP037 -o codepage_to=ISO-8859-1 /dev/dasde /mnt/
+
 
 .SH SEE ALSO
 getfattr(1), fuse(8), z/OS DFSMS Using Data Sets,
