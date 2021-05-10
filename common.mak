@@ -378,6 +378,10 @@ $(rootdir)/libseckey/libseckey.a: $(rootdir)/libseckey
 	$(MAKE) -C $(rootdir)/libseckey/ libseckey.a
 .PHONY: $(rootdir)/libseckey
 
+$(rootdir)/libkmipclient/libkmipclient.so: $(rootdir)/libkmipclient
+	$(MAKE) -C $(rootdir)/libkmipclient/ libkmipclient.so
+.PHONY: $(rootdir)/libkmipclient
+
 $(rootdir)/zipl/boot/data.o:
 	$(MAKE) -C $(rootdir)/zipl/boot/ data.o
 

@@ -45,6 +45,11 @@ libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
 libekmfweb/libekmfweb.so.1
 libekmfweb/libekmfweb.so.1.0
+libkmipclient/check-dep-libkmipclient
+libkmipclient/detect-openssl-version.dep
+libkmipclient/libkmipclient.so
+libkmipclient/libkmipclient.so.1
+libkmipclient/libkmipclient.so.1.0
 libseckey/check-dep-libseckey
 libseckey/detect-openssl-version.dep
 libutil/*_example

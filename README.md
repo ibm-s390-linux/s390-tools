@@ -249,6 +249,12 @@ Package contents
    Management Foundation - Web Edition, and is used to manage keys in an
    enterprise.
 
+ * libkmipclient:
+   A shared library that provides an KMIP client to communicate with an KMIP
+   server. KMIP stands for Key Management Interoperability Protocol, and is an
+   extensible communication protocol that defines message formats for the
+   manipulation of cryptographic keys on a key management server.
+
  * hsci:
    Manage HiperSockets Converged Interfaces (HSCI).
 
@@ -285,11 +291,14 @@ build options:
 | pfm            | `HAVE_PFM`         | cpacfstats                            |
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
-| openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb          |
+| openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
+|                |                    | libkmipclient                         |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
-| json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb           |
+| json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
+|                |                    | libkmipclient                         |
 | glib2          | `HAVE_GLIB2`       | genprotimg                            |
-| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb                |
+| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient |
+| libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 
 This table lists additional build or install options:
@@ -444,3 +453,11 @@ the different tools are provided:
   add `HAVE_SYSTEMD=0` to the make invocation.
   Tip: you may skip the hsavmcore build by adding `HAVE_FUSE=0`
   to the make invocation.
+
+* libkmipclient:
+  For building the libkmipclient shared library you need openssl version 1.1.1
+  or newer installed (openssl-devel.rpm). Also required are json-c version 0.13
+  or newer (json-c-devel.rpm), libxml2 version 2.9.10 or newer
+  (libxml2-devel.rpm), and libcurl version 7.59 or newer (libcurl-devel.rpm).
+  Tip: you may skip the libkmipclient build by adding `HAVE_OPENSSL=0`,
+  `HAVE_JSONC=0`, `HAVE_LIBXML2=0`, or `HAVE_LIBCURL=0` to the make invocation.
