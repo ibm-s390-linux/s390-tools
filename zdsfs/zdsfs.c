@@ -1400,7 +1400,7 @@ static void zdsfs_process_config_file(const char *config)
 			continue;
 
 		/* remove all whitespaces */
-		tmp = util_malloc(strlen(line));
+		tmp = util_malloc(strlen(line) + 1);
 		remove_whitespace(line, tmp);
 
 		key = strtok(tmp, delimiter);
