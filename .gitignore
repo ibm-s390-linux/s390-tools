@@ -105,6 +105,8 @@ zkey/check-dep-zkey-cryptsetup
 zkey/detect-libcryptsetup.dep
 zkey/ekmfweb/libekmfweb.dep
 zkey/ekmfweb/zkey-ekmfweb.so
+zkey/kmip/libkmipclient.dep
+zkey/kmip/zkey-kmip.so
 zkey/zkey
 zkey/zkey-cryptsetup
 zpcictl/zpcictl
