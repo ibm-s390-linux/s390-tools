@@ -19,6 +19,7 @@
 #include "lib/zt_common.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
+#include "lib/util_path.h"
 
 #include "zkey-kmip.h"
 #include "../kms-plugin.h"
@@ -45,6 +46,58 @@ int kms_bind(const char *UNUSED(config_path))
 }
 
 /**
+ * Checks if the plugin configuration is complete. Sets the appropriate flags
+ * in the plugin handle
+ *
+ * @param ph                the plugin handle
+ */
+static void _check_config_complete(struct plugin_handle *ph)
+{
+	ph->apqns_configured =
+		plugin_check_property(&ph->pd, KMIP_CONFIG_APQNS) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_APQN_TYPE) &&
+		ph->card_type != CARD_TYPE_ANY;
+
+	ph->config_complete = ph->apqns_configured;
+}
+
+/**
+ * Returns a textual name of the specified card type.
+ *
+ * @param card_type          the card type
+ *
+ * @returns a constant string, or NULL if an invalid card type is specified
+ */
+static const char *_card_type_to_str(enum card_type card_type)
+{
+	switch (card_type) {
+	case CARD_TYPE_CCA:
+		return KMIP_APQN_TYPE_CCA;
+	case CARD_TYPE_EP11:
+		return KMIP_APQN_TYPE_EP11;
+	default:
+		return NULL;
+	}
+}
+
+/**
+ * Returns the card type for the textual name of the card type.
+ *
+ * @param card_type          the card type as string
+ *
+ * @returns the card type value, or CARD_TYPE_ANY if unknown
+ */
+static enum card_type _card_type_from_str(const char *card_type)
+{
+	if (strcmp(card_type, KMIP_APQN_TYPE_CCA) == 0)
+		return CARD_TYPE_CCA;
+	if (strcmp(card_type, KMIP_APQN_TYPE_EP11) == 0)
+		return CARD_TYPE_EP11;
+
+	return CARD_TYPE_ANY;
+}
+
+/**
  * Initializes a KMS plugin for usage by zkey. When a repository is bound to a
  * KMS plugin, zkey calls this function when opening the repository.
  *
@@ -58,6 +111,7 @@ int kms_bind(const char *UNUSED(config_path))
 kms_handle_t kms_initialize(const char *config_path, bool verbose)
 {
 	struct plugin_handle *ph;
+	char *apqn_type = NULL;
 	int rc;
 
 	util_assert(config_path != NULL, "Internal error: config_path is NULL");
@@ -69,6 +123,21 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 			 KMIP_CONFIG_FILE, verbose);
 	if (rc != 0)
 		goto error;
+
+	_check_config_complete(ph);
+	pr_verbose(&ph->pd, "Plugin configuration is %scomplete",
+		   ph->config_complete ? "" : "in");
+
+	ph->card_type = CARD_TYPE_ANY;
+	apqn_type = properties_get(ph->pd.properties, KMIP_CONFIG_APQN_TYPE);
+	if (apqn_type != NULL) {
+		ph->card_type = _card_type_from_str(apqn_type);
+		free(apqn_type);
+		if (ph->card_type == CARD_TYPE_ANY) {
+			pr_verbose(&ph->pd, "APQN type invalid: %s", apqn_type);
+			goto error;
+		}
+	}
 
 	return (kms_handle_t)ph;
 
@@ -148,6 +217,27 @@ bool kms_supports_key_type(const kms_handle_t handle,
 
 	plugin_clear_error(&ph->pd);
 
+	switch (ph->card_type) {
+	case CARD_TYPE_CCA:
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+			return true;
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+			return true;
+		break;
+	case CARD_TYPE_EP11:
+		if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+			return true;
+		break;
+	default:
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+			return true;
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+			return true;
+		if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+			return true;
+		break;
+	}
+
 	return false;
 }
 
@@ -204,6 +294,60 @@ const struct util_opt *kms_get_command_options(const char *command,
 }
 
 /**
+ * Check the specified APQns and assure that they are all of the right type.
+ *
+ * @param ph                the plugin handle
+ * @param apqns             a list of APQNs to associate with the KMS plugin, or
+ *                          NULL if no APQNs are specified.
+ * @param num_apqns         number of APQNs in above array. 0 if no APQNs are
+ *                          specified.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_apqns(struct plugin_handle *ph, const struct kms_apqn *apqns,
+			size_t num_apqns)
+{
+	size_t i;
+	int rc;
+
+	if (num_apqns == 0)
+		return 0;
+
+	if (ph->card_type == CARD_TYPE_ANY) {
+		/*
+		 * No APQNs configured yet, accept any APQN type, but all must
+		 * be of the same type.
+		 */
+		ph->card_type = sysfs_get_card_type(apqns[0].card);
+		if (ph->card_type == CARD_TYPE_ANY) {
+			_set_error(ph, "The APQN %02x.%04x is not available or "
+				   "has an unsupported type", apqns[0].card,
+				   apqns[0].domain);
+			return -EINVAL;
+		}
+	}
+
+	pr_verbose(&ph->pd, "Check APQNs for card type %s",
+		   _card_type_to_str(ph->card_type));
+
+	for (i = 0; i < num_apqns; i++) {
+		rc = sysfs_is_apqn_online(apqns[i].card, apqns[i].domain,
+					  ph->card_type);
+		if (rc != 1) {
+			_set_error(ph, "APQN %02x.%04x is not of the right "
+				   "type. The plugin is configured to use "
+				   "APQNs of type %s", apqns[i].card,
+				   apqns[i].domain,
+				   _card_type_to_str(ph->card_type));
+
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -235,6 +379,9 @@ int kms_configure(const kms_handle_t handle,
 		  const struct kms_option *options, size_t num_options)
 {
 	struct plugin_handle *ph = handle;
+	bool config_changed = false;
+	char *apqn_str = NULL;
+	int rc = 0;
 	size_t i;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
@@ -263,7 +410,63 @@ int kms_configure(const kms_handle_t handle,
 
 	plugin_clear_error(&ph->pd);
 
-	return 0;
+	if (apqns != NULL) {
+		rc = _check_apqns(ph, apqns, num_apqns);
+		if (rc != 0)
+			goto out;
+
+		if (num_apqns > 0 && ph->card_type == CARD_TYPE_CCA) {
+			rc = cross_check_cca_apka_apqns(&ph->pd, apqns,
+							num_apqns);
+			if (rc != 0) {
+				_set_error(ph, "Your CCA APKA master key setup "
+					   "is improper");
+				goto out;
+			}
+		}
+
+		apqn_str = build_kms_apqn_string(apqns, num_apqns);
+		rc = properties_set(ph->pd.properties, KMIP_CONFIG_APQNS,
+				    apqn_str);
+		if (rc != 0) {
+			_set_error(ph, "Failed to set APQNs property: %s",
+				   strerror(-rc));
+			goto out;
+		}
+
+		rc = properties_set(ph->pd.properties, KMIP_CONFIG_APQN_TYPE,
+				    _card_type_to_str(ph->card_type));
+		if (rc != 0) {
+			_set_error(ph, "Failed to set APQN-Type property: %s",
+				   strerror(-rc));
+			goto out;
+		}
+
+		config_changed = true;
+	}
+
+out:
+	if (apqn_str != NULL)
+		free(apqn_str);
+
+	if (rc == 0) {
+		if (config_changed) {
+			rc = plugin_save_config(&ph->pd);
+			if (rc != 0)
+				goto ret;
+
+			_check_config_complete(ph);
+			pr_verbose(&ph->pd,
+				   "Plugin configuration is %scomplete",
+				   ph->config_complete ? "" : "in");
+		}
+
+		if (!ph->config_complete)
+			rc = -EAGAIN;
+	}
+
+ret:
+	return rc;
 }
 
 /**

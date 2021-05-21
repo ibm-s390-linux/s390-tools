@@ -16,11 +16,20 @@
 #include "kmipclient/kmipclient.h"
 
 #include "../plugin-utils.h"
+#include "../pkey.h"
 
 struct plugin_handle {
 	struct plugin_data pd;
+	bool apqns_configured;
+	enum card_type card_type;
+	bool config_complete;
 };
 
 #define KMIP_CONFIG_FILE			"kmip.conf"
+#define KMIP_CONFIG_APQNS			"apqns"
+#define KMIP_CONFIG_APQN_TYPE			"apqn-type"
+
+#define KMIP_APQN_TYPE_CCA			"CCA"
+#define KMIP_APQN_TYPE_EP11			"EP11"
 
 #endif
