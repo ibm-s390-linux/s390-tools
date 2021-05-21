@@ -16,10 +16,13 @@
 #include <errno.h>
 #include <err.h>
 
+#include <openssl/objects.h>
+
 #include "lib/zt_common.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
 #include "lib/util_path.h"
+#include "lib/util_base.h"
 
 #include "zkey-kmip.h"
 #include "../kms-plugin.h"
@@ -27,6 +30,8 @@
 #include "../utils.h"
 #include "../pkey.h"
 #include "../properties.h"
+
+#include "libseckey/sk_utilities.h"
 
 #define _set_error(ph, fmt...)	plugin_set_error(&(ph)->pd, fmt)
 
@@ -58,7 +63,14 @@ static void _check_config_complete(struct plugin_handle *ph)
 		plugin_check_property(&ph->pd, KMIP_CONFIG_APQN_TYPE) &&
 		ph->card_type != CARD_TYPE_ANY;
 
-	ph->config_complete = ph->apqns_configured;
+	ph->identity_key_generated =
+		plugin_check_property(&ph->pd, KMIP_CONFIG_IDENTITY_KEY) &&
+		plugin_check_property(&ph->pd,
+				      KMIP_CONFIG_IDENTITY_KEY_ALGORITHM) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_IDENTITY_KEY_PARAMS);
+
+	ph->config_complete = ph->apqns_configured &&
+			      ph->identity_key_generated;
 }
 
 /**
@@ -95,6 +107,226 @@ static enum card_type _card_type_from_str(const char *card_type)
 		return CARD_TYPE_EP11;
 
 	return CARD_TYPE_ANY;
+}
+
+/**
+ * Unloads the CCA library
+ *
+ * @param ph                the plugin handle
+ */
+static void _terminate_cca_library(struct plugin_handle *ph)
+{
+	if (ph->cca_lib.cca_lib != NULL)
+		dlclose(ph->cca_lib.cca_lib);
+	ph->cca_lib.cca_lib = NULL;
+}
+
+/*
+ * Sets up the CCA library structure in the handle. Load the CCA library
+ * and selects one of the associated APQNs.
+ *
+ * @param ph                the plugin handle
+ * @param apqns             the associated APQNs
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _setup_cca_library(struct plugin_handle *ph, const char *apqns)
+{
+	int rc;
+
+	_terminate_cca_library(ph);
+
+	rc = select_cca_adapter_by_apqns(&ph->pd, apqns, &ph->cca);
+	if (rc != 0) {
+		_set_error(ph, "Failed to select one of the associated APQNs: "
+			   "%s", apqns);
+		_terminate_cca_library(ph);
+	}
+
+	ph->cca_lib.cca_lib = ph->cca.lib_csulcca;
+
+	return rc;
+}
+
+/**
+ * Unloads the Ep11 library
+ *
+ * @param ph                the plugin handle
+ */
+static void _terminate_ep11_library(struct plugin_handle *ph)
+{
+	if (ph->ep11.lib_ep11 == NULL)
+		return;
+
+	if (ph->ep11_lib.target != 0) {
+		free_ep11_target_for_apqn(&ph->ep11, ph->ep11_lib.target);
+		ph->ep11_lib.target = 0;
+	}
+	ph->ep11_lib.ep11_lib = NULL;
+
+	if (ph->ep11.lib_ep11 != NULL)
+		dlclose(ph->ep11.lib_ep11);
+	memset(&ph->ep11, 0, sizeof(ph->ep11));
+}
+
+/*
+ * Sets up the EP11 library structure in the handle. Load the EP11 library
+ * and sets up the EP11 target with the APQNs specified
+ *
+ * @param ph                the plugin handle
+ * @param apqns             the associated APQNs
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _setup_ep11_library(struct plugin_handle *ph, const char *apqns)
+{
+	unsigned int card, domain;
+	bool selected = false;
+	char **apqn_list;
+	int rc, i;
+
+	rc = load_ep11_library(&ph->ep11, ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed load the EP11 host library");
+		return rc;
+	}
+
+	apqn_list = str_list_split(apqns);
+	for (i = 0; apqn_list[i] != NULL; i++) {
+		if (sscanf(apqn_list[i], "%x.%x", &card, &domain) != 2)
+			continue;
+
+		if (sysfs_is_apqn_online(card, domain, CARD_TYPE_EP11) != 1)
+			continue;
+
+		rc = get_ep11_target_for_apqn(&ph->ep11, card, domain,
+					      &ph->ep11_lib.target,
+					      ph->pd.verbose);
+		if (rc != 0) {
+			_set_error(ph, "Failed to get EP11 target for "
+				   "APQN %02x.%04x: %s", card, domain,
+				   strerror(-rc));
+			goto out;
+		}
+
+		selected = true;
+		break;
+	}
+
+	if (!selected) {
+		_set_error(ph, "None of the associated APQNs is "
+			   "available: %s", apqns);
+		rc = -ENODEV;
+		goto out;
+	}
+
+	pr_verbose(&ph->pd, "Selected APQN %02x.%04x", card, domain);
+
+	ph->ep11_lib.ep11_lib = ph->ep11.lib_ep11;
+
+out:
+	if (apqn_list != NULL)
+		str_list_free_string_array(apqn_list);
+
+	if (rc != 0)
+		_terminate_ep11_library(ph);
+
+	return rc;
+}
+
+/**
+ * Terminates the external secure key library structure in the handle
+ * and the OpenSSL secure key interface.
+ *
+ * @param ph                the plugin handle
+ */
+static void _terminate_ext_lib(struct plugin_handle *ph)
+{
+	if (ph->ext_lib.type != 0)
+		SK_OPENSSL_term();
+
+	switch (ph->ext_lib.type) {
+	case SK_EXT_LIB_CCA:
+		_terminate_cca_library(ph);
+		ph->ext_lib.cca = NULL;
+		break;
+
+	case SK_EXT_LIB_EP11:
+		_terminate_ep11_library(ph);
+		ph->ext_lib.ep11 = NULL;
+		break;
+
+	default:
+		break;
+	}
+
+	ph->ext_lib.type = 0;
+}
+
+/**
+ * Initializes the external secure key library structure in the handle
+ * with the information from the associated APQNs. Also initializes the
+ * OpenSSL secure key interface.
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _setup_ext_lib(struct plugin_handle *ph)
+{
+	char *apqns;
+	int rc = 0;
+
+	if (ph->ext_lib.type != 0)
+		return 0;
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+
+	apqns = properties_get(ph->pd.properties, KMIP_CONFIG_APQNS);
+	if (apqns == NULL) {
+		_set_error(ph, "No APQN are associated with the plugin.");
+		return -ENODEV;
+	}
+
+	pr_verbose(&ph->pd, "Associated APQNs: %s", apqns);
+
+	switch (ph->card_type) {
+	case CARD_TYPE_CCA:
+		rc = _setup_cca_library(ph, apqns);
+		if (rc != 0)
+			goto out;
+
+		ph->ext_lib.type = SK_EXT_LIB_CCA;
+		ph->ext_lib.cca = &ph->cca_lib;
+		break;
+
+	case CARD_TYPE_EP11:
+		rc = _setup_ep11_library(ph, apqns);
+		if (rc != 0)
+			goto out;
+
+		ph->ext_lib.type = SK_EXT_LIB_EP11;
+		ph->ext_lib.ep11 = &ph->ep11_lib;
+		break;
+
+	default:
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+
+	rc = SK_OPENSSL_init(ph->pd.verbose);
+	if (rc != 0)
+		_terminate_ext_lib(ph);
+
+out:
+	free(apqns);
+
+	return rc;
 }
 
 /**
@@ -139,6 +371,9 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 		}
 	}
 
+	ph->identity_secure_key = properties_get(ph->pd.properties,
+						 KMIP_CONFIG_IDENTITY_KEY);
+
 	return (kms_handle_t)ph;
 
 error:
@@ -167,6 +402,10 @@ int kms_terminate(const kms_handle_t handle)
 
 	pr_verbose(&ph->pd, "Plugin terminating");
 
+	if (ph->identity_secure_key != NULL)
+		free((void *)ph->identity_secure_key);
+
+	_terminate_ext_lib(ph);
 	plugin_term(&ph->pd);
 	free(ph);
 
@@ -254,6 +493,8 @@ bool kms_supports_key_type(const kms_handle_t handle,
 int kms_display_info(const kms_handle_t handle)
 {
 	struct plugin_handle *ph = handle;
+	char *tmp = NULL;
+	bool rsa;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
@@ -261,8 +502,51 @@ int kms_display_info(const kms_handle_t handle)
 
 	plugin_clear_error(&ph->pd);
 
+	tmp = properties_get(ph->pd.properties,
+			     KMIP_CONFIG_IDENTITY_KEY_ALGORITHM);
+	if (tmp != NULL) {
+		printf("  Identity key:         %s", tmp);
+		rsa = strcmp(tmp, KMIP_KEY_ALGORITHM_RSA) == 0;
+		free(tmp);
+		tmp = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_IDENTITY_KEY_PARAMS);
+		if (tmp != NULL) {
+			printf(" (%s%s)", tmp, rsa ? " bits" : "");
+			free(tmp);
+		}
+		printf("\n");
+	} else {
+		printf("  Identity key:         (configuration required)\n");
+	}
+
 	return 0;
 }
+
+static const struct util_opt configure_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS FOR IDENTITY KEY GENERATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-identity-key", required_argument, NULL, 'i'},
+		.argument = "KEY-SPEC",
+		.desc = "Generates an identity key for the KMIP plugin. The "
+			"identity key is a secure ECC or RSA key. The identity "
+			"key is automatically generated with the default "
+			"values ECC with curve secp521r1 when a certificate "
+			"signing request (CSR) or self-signed certificate is "
+			"to be generated and no identity key is available. Use "
+			"this option to generate or regenerate a new identity "
+			"key with with specific parameters. You need to "
+			"regenerate a certificate with the newly generated "
+			"identity key and reregister this certificate with the "
+			"KMIP server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	UTIL_OPT_END,
+};
+
 
 /**
  * Returns a list of KMS specific command line options that zkey should accept
@@ -290,8 +574,15 @@ const struct util_opt *kms_get_command_options(const char *command,
 {
 	util_assert(command != NULL, "Internal error: command is NULL");
 
+	if (strcasecmp(command, KMS_COMMAND_CONFIGURE) == 0)
+		return configure_options;
+
 	return NULL;
 }
+
+struct config_options {
+	const char *generate_identity_key;
+};
 
 /**
  * Check the specified APQns and assure that they are all of the right type.
@@ -348,6 +639,215 @@ static int _check_apqns(struct plugin_handle *ph, const struct kms_apqn *apqns,
 }
 
 /**
+ * Parse a key specification and setup the key gen info struct
+ *
+ * @param ph                the plugin handle
+ * @param key_spec          the key specification (ECC:CURVE or RSA:KEYBITS).
+ *                          If NULL, the default key specification is used.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _parse_key_spec(struct plugin_handle *ph, const char *key_spec,
+			   struct sk_key_gen_info *gen_info)
+{
+	char *copy = NULL, *algorithm, *params;
+	int rc = 0;
+
+	copy = util_strdup(key_spec);
+
+	algorithm = strtok(copy, ":");
+	if (algorithm == NULL) {
+		_set_error(ph, "Invalid key specification format: '%s'",
+			   key_spec);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	params = strtok(NULL, ":");
+	if (params == NULL) {
+		_set_error(ph, "Invalid key specification format: '%s'",
+			   key_spec);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (strcasecmp(algorithm, KMIP_KEY_ALGORITHM_RSA) == 0) {
+		gen_info->type = SK_KEY_TYPE_RSA;
+	} else if (strcasecmp(algorithm, KMIP_KEY_ALGORITHM_ECC) == 0) {
+		gen_info->type = SK_KEY_TYPE_EC;
+	} else {
+		_set_error(ph, "Invalid key algorithm: '%s'", key_spec);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	switch (gen_info->type) {
+	case SK_KEY_TYPE_RSA:
+		gen_info->rsa.modulus_bits = atol(params);
+		switch (gen_info->rsa.modulus_bits) {
+		case 512:
+		case 1024:
+		case 2048:
+		case 4096:
+			break;
+		default:
+			_set_error(ph, "Invalid RSA key bits: '%s'", key_spec);
+			rc = -EINVAL;
+			goto out;
+		}
+		gen_info->rsa.pub_exp = 65537;
+		gen_info->rsa.x9_31 = false;
+		break;
+
+	case SK_KEY_TYPE_EC:
+		gen_info->ec.curve_nid = OBJ_txt2nid(params);
+		if (gen_info->ec.curve_nid == NID_undef) {
+			_set_error(ph, "Invalid ECC curve: '%s'", key_spec);
+			rc = -EINVAL;
+			goto out;
+		}
+		break;
+	}
+
+out:
+	free(copy);
+	return rc;
+}
+
+/**
+ * Generates (or re-generates) a identity key for the plugin using the
+ * specified key specification, or the default key specifications, of none
+ * is specified.
+ *
+ * @param ph                the plugin handle
+ * @param key_spec          the key specification (ECC:CURVE or RSA:KEYBITS).
+ *                          If NULL, the default key specification is used.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _generate_identity_key(struct plugin_handle *ph,
+				  const char *key_spec)
+{
+	unsigned char identity_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	size_t identity_key_size = sizeof(identity_key);
+	struct sk_key_gen_info gen_info = { 0 };
+	char *reenc_file = NULL;
+	char tmp[200];
+	int rc;
+
+	if (key_spec == NULL)
+		key_spec = KMIP_DEFAULT_IDENTITY_KEY_SPEC;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+
+	rc = _parse_key_spec(ph, key_spec, &gen_info);
+	if (rc != 0)
+		return rc;
+
+	if (ph->identity_secure_key != NULL) {
+		printf("ATTENTION: An identity key already exists\n");
+		util_print_indented("When you generate a new identity key, "
+				    "you must re-generate a certificate and "
+				    "re-register it with the KMIP server.", 0);
+		printf("%s: Re-generate the identity key [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->pd.verbose)) {
+			_set_error(ph, "Operation aborted by user");
+			return -ECANCELED;
+		}
+	} else {
+		util_asprintf((char **)&ph->identity_secure_key,
+			      "%s/%s", ph->pd.config_path,
+			      KMIP_CONFIG_IDENTITY_KEY_FILE);
+
+		rc = plugin_set_or_remove_property(&ph->pd,
+						   KMIP_CONFIG_IDENTITY_KEY,
+						   ph->identity_secure_key);
+		if (rc != 0)
+			goto out;
+	}
+
+	switch (gen_info.type) {
+	case SK_KEY_TYPE_RSA:
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_IDENTITY_KEY_ALGORITHM,
+					KMIP_KEY_ALGORITHM_RSA);
+		if (rc != 0)
+			goto out;
+		sprintf(tmp, "%lu", gen_info.rsa.modulus_bits);
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_IDENTITY_KEY_PARAMS,
+					tmp);
+		if (rc != 0)
+			goto out;
+		break;
+
+	case SK_KEY_TYPE_EC:
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_IDENTITY_KEY_ALGORITHM,
+					KMIP_KEY_ALGORITHM_ECC);
+		if (rc != 0)
+			goto out;
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_IDENTITY_KEY_PARAMS,
+					OBJ_nid2sn(gen_info.ec.curve_nid));
+		if (rc != 0)
+			goto out;
+		break;
+	default:
+		break;
+	}
+
+	rc = _setup_ext_lib(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = SK_OPENSSL_generate_secure_key(identity_key, &identity_key_size,
+					    &gen_info, &ph->ext_lib,
+					    ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to generate the identity key: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = SK_UTIL_write_key_blob(ph->identity_secure_key, identity_key,
+				    identity_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to write the identity key into file "
+			   "'%s': %s", ph->identity_secure_key, strerror(-rc));
+		goto out;
+	}
+
+	rc = plugin_set_file_permission(&ph->pd, ph->identity_secure_key);
+	if (rc != 0)
+		goto out;
+
+	reenc_file = properties_get(ph->pd.properties,
+				    KMIP_CONFIG_IDENTITY_KEY_REENC);
+	if (reenc_file != NULL) {
+		remove(reenc_file);
+		free(reenc_file);
+		properties_remove(ph->pd.properties,
+				  KMIP_CONFIG_IDENTITY_KEY_REENC);
+	}
+
+	pr_verbose(&ph->pd, "Generated identity key into '%s'",
+		   ph->identity_secure_key);
+
+out:
+
+
+	return rc;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -378,6 +878,7 @@ int kms_configure(const kms_handle_t handle,
 		  const struct kms_apqn *apqns, size_t num_apqns,
 		  const struct kms_option *options, size_t num_options)
 {
+	struct config_options opts = { 0 };
 	struct plugin_handle *ph = handle;
 	bool config_changed = false;
 	char *apqn_str = NULL;
@@ -441,6 +942,31 @@ int kms_configure(const kms_handle_t handle,
 				   strerror(-rc));
 			goto out;
 		}
+
+		config_changed = true;
+	}
+
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 'i':
+			opts.generate_identity_key = options[i].argument;
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	if (opts.generate_identity_key != NULL) {
+		rc = _generate_identity_key(ph, opts.generate_identity_key);
+		if (rc != 0)
+			goto out;
 
 		config_changed = true;
 	}

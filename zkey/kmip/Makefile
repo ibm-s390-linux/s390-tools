@@ -5,7 +5,7 @@ VERM = $(shell echo $(VERSION) | cut -d '.' -f 1)
 
 all: zkey-kmip.so
 
-libs = $(rootdir)/libutil/libutil.a
+libs = $(rootdir)/libutil/libutil.a $(rootdir)/libseckey/libseckey.a
 
 zkey-kmip.o: zkey-kmip.c zkey-kmip.h ../kms-plugin.h ../plugin-utils.h \
 	../cca.h ../utils.h ../pkey.h ../properties.h \
