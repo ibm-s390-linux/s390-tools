@@ -15,6 +15,7 @@
 #include <string.h>
 #include <errno.h>
 #include <err.h>
+#include <sys/utsname.h>
 
 #include <openssl/objects.h>
 
@@ -69,8 +70,15 @@ static void _check_config_complete(struct plugin_handle *ph)
 				      KMIP_CONFIG_IDENTITY_KEY_ALGORITHM) &&
 		plugin_check_property(&ph->pd, KMIP_CONFIG_IDENTITY_KEY_PARAMS);
 
+	ph->client_cert_avail =
+		plugin_check_property(&ph->pd,
+				      KMIP_CONFIG_CLIENT_CERTIFICATE) &&
+		plugin_check_property(&ph->pd,
+				      KMIP_CONFIG_CLIENT_CERT_ALGORITHM);
+
 	ph->config_complete = ph->apqns_configured &&
-			      ph->identity_key_generated;
+			      ph->identity_key_generated &&
+			      ph->client_cert_avail;
 }
 
 /**
@@ -493,8 +501,10 @@ bool kms_supports_key_type(const kms_handle_t handle,
 int kms_display_info(const kms_handle_t handle)
 {
 	struct plugin_handle *ph = handle;
+	X509 *cert = NULL;
 	char *tmp = NULL;
 	bool rsa;
+	BIO *b;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
@@ -517,6 +527,42 @@ int kms_display_info(const kms_handle_t handle)
 		printf("\n");
 	} else {
 		printf("  Identity key:         (configuration required)\n");
+	}
+
+	tmp = properties_get(ph->pd.properties,
+			     KMIP_CONFIG_CLIENT_CERTIFICATE);
+	if (tmp != NULL) {
+		SK_UTIL_read_x509_certificate(tmp, &cert);
+		free(tmp);
+		if (cert != NULL) {
+			b = BIO_new_fp(stdout, BIO_NOCLOSE);
+			BIO_printf(b,
+				   "  Client certificate:   Subject:\n");
+			X509_NAME_print_ex(b, X509_get_subject_name(cert), 26,
+					   XN_FLAG_SEP_MULTILINE);
+			BIO_printf(b,
+				   "\n                        Issuer:\n");
+			X509_NAME_print_ex(b, X509_get_issuer_name(cert), 26,
+					   XN_FLAG_SEP_MULTILINE);
+			BIO_printf(b, "\n                        Validity:\n");
+			BIO_printf(b,
+				   "                          Not before:  ");
+			ASN1_TIME_print(b, X509_get0_notBefore(cert));
+			BIO_printf(b,
+				   "\n                          Not after:   ");
+			ASN1_TIME_print(b, X509_get0_notAfter(cert));
+			BIO_printf(b,
+				   "\n                        Serial Number: ");
+			i2a_ASN1_INTEGER(b, X509_get0_serialNumber(cert));
+			BIO_printf(b, "\n");
+			BIO_free(b);
+			X509_free(cert);
+		} else {
+			printf("  Client certificate:   (error)\n");
+		}
+	} else {
+		printf("  Client certificate:   (configuration required)\n");
+		return 0;
 	}
 
 	return 0;
@@ -542,6 +588,135 @@ static const struct util_opt configure_options[] = {
 			"regenerate a certificate with the newly generated "
 			"identity key and reregister this certificate with the "
 			"KMIP server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS FOR CERTIFICATE GENERATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-csr", required_argument, NULL, 'c'},
+		.argument = "CSR-PEM-FILE",
+		.desc = "Generates a certificate signing request (CSR) with "
+			"the identity key and stores it in the specified PEM "
+			"file. Pass this CSR to a certificate authority (CA) "
+			"to request a CA-signed certificate for the KMIP "
+			"plugin. You need to register the certificate with the "
+			"KMIP server. Registering a client certificate with "
+			"the KMIP server is a manual procedure, and is "
+			"specific to the KMIP server used. The KMIP server "
+			"accepts communication with the KMIP plugin only after "
+			"the certificate was registered. You must also specify "
+			"the CA-signed certificate with the 'zkey kms "
+			"configure --client-cert' option so that the KMIP "
+			"plugin uses it for communicating with the KMIP."
+			"server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-self-signed-cert", required_argument, NULL,
+			    'C'},
+		.argument = "CERT-PEM-FILE",
+		.desc = "Generates a self-signed certificate with the "
+			"identity key and stores it in the specified PEM "
+			"file. You need to register the certificate with the "
+			"KMIP server. Registering a client certificate with "
+			"the KMIP server is a manual procedure, and is "
+			"specific to the KMIP server used. The KMIP server "
+			"accepts communication with the KMIP plugin only after "
+			"the certificate was registered.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-subject", required_argument, NULL, 's'},
+		.argument = "SUBJECT-RDNS",
+		.desc = "Specifies the subject name for generating a "
+			"certificate signing request (CSR) or self-signed "
+			"certificate, in the form '<type>=<value>(;<type>="
+			"<value>)*[;]' with types recognized by OpenSSL.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-extensions", required_argument, NULL, 'e'},
+		.argument = "EXTENSIONS",
+		.desc = "Specifies the certificate extensions for generating a "
+			"certificate signing request (CSR) or self-signed "
+			"certificate, in the form '<name>=[critical,]<value(s)>"
+			" (;<name>=[critical,]<value(s)>)*[;]' with extension "
+			"names and values recognized by OpenSSL. A certificate "
+			"used to authenticate at a KMIP server usually needs "
+			"the 'TLS Web client authentication' extended-key-"
+			"usage certificate extension. Additionally, the "
+			"'Common Name' field or the 'Subject Alternate Name' "
+			"extension must match the host name (or IP address) of "
+			"the client system. If no extended-key-usage extension "
+			"is specified, then a 'TLS Web client authentication' "
+			"extension ('extendedKeyUsage = clientAuth') is "
+			"automatically added. If no 'Subject Alternate Name' "
+			"extension is specified, then an 'Subject Alternate "
+			"Name' extension with the system's host name "
+			"(subjectAltName = DNS:hostname) is automatically "
+			"added.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "renew-cert", required_argument, NULL, 'N'},
+		.argument = "CERT-PEM-FILE",
+		.desc = "Specifies an existing PEM file that contains the "
+			"certificate to be renewed. The subject name and "
+			"extensions of the certificate are used to generate "
+			"the certificate signing request (CSR) or renewed "
+			"self-signed certificate.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "csr-new-header", 0, NULL, 'n'},
+		.desc = "Adds the word 'NEW' to the PEM file header and footer "
+			"lines on the certificate signing request. Some "
+			"software and some CAs require this marking.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-validity-days", required_argument, NULL, 'd'},
+		.argument = "DAYS",
+		.desc = "Specifies the number of days the self-signed "
+			"certificate is valid. The default is 30 days.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-digest", required_argument, NULL, 'D'},
+		.argument = "DIGEST",
+		.desc = "Specifies the digest algorithm to use when generating "
+			"a certificate signing request or self-signed "
+			"certificate. The default is determined by OpenSSL.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "cert-rsa-pss", 0, NULL, 'P'},
+		.desc = "Uses the RSA-PSS algorithm to sign the certificate "
+			"signing request or the self-signed certificate. This "
+			"option is accepted only when the identity key type is "
+			"RSA, it is ignored otherwise.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS FOR CERTIFICATE REGISTRATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "client-cert", required_argument, NULL,
+			    'r'},
+		.argument = "CERT-PEM-FILE",
+		.desc = "Uses a CA-signed certificate for authenticating the "
+			"KMIP plugin at the KMIP server. The certificate must "
+			"be registered with the KMIP server. Registering a "
+			"client certificate with the KMIP server is a manual "
+			"procedure, and is specific to the KMIP server used. "
+			"The KMIP server accepts communication with the KMIP "
+			"plugin only after the certificate has been "
+			"registered.",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
 	UTIL_OPT_END,
@@ -582,6 +757,16 @@ const struct util_opt *kms_get_command_options(const char *command,
 
 struct config_options {
 	const char *generate_identity_key;
+	const char *sscert_pem_file;
+	const char *csr_pem_file;
+	const char *cert_subject;
+	const char *cert_extensions;
+	const char *renew_cert_pem_file;
+	bool csr_new_header;
+	const char *cert_validity_days;
+	const char *cert_digest;
+	bool cert_rsa_pss;
+	const char *client_cert;
 };
 
 /**
@@ -730,8 +915,8 @@ static int _generate_identity_key(struct plugin_handle *ph,
 {
 	unsigned char identity_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
 	size_t identity_key_size = sizeof(identity_key);
+	char *reenc_file = NULL, *client_cert = NULL;
 	struct sk_key_gen_info gen_info = { 0 };
-	char *reenc_file = NULL;
 	char tmp[200];
 	int rc;
 
@@ -838,11 +1023,623 @@ static int _generate_identity_key(struct plugin_handle *ph,
 				  KMIP_CONFIG_IDENTITY_KEY_REENC);
 	}
 
+	client_cert = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_CLIENT_CERTIFICATE);
+	if (client_cert != NULL) {
+		remove(client_cert);
+		free(client_cert);
+		properties_remove(ph->pd.properties,
+				  KMIP_CONFIG_CLIENT_CERTIFICATE);
+		properties_remove(ph->pd.properties,
+				  KMIP_CONFIG_CLIENT_CERT_ALGORITHM);
+	}
+
 	pr_verbose(&ph->pd, "Generated identity key into '%s'",
 		   ph->identity_secure_key);
 
 out:
 
+
+	return rc;
+}
+
+/**
+ * Add client authentication specific certificate extensions, if they are not
+ * already contained. The extension list is reallocated, if required.
+ * If no extended key usage extension is specified, then an 'TLS Web client
+ * authentication' extension ('extendedKeyUsage=clientAuth') is added.
+ * If no 'Subject Alternate Name' extension is specified, then an 'Subject
+ * Alternate Name' extension with the system's host name (subjectAltName=
+ * DNS:hostname) is added.
+ *
+ * @param ph                the plugin handle
+ * @param extension_list    the list of extensions
+ * @param num_extensions    the number of extensions
+ * @param exts              Stack of extensions to add of NULL.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _add_client_auth_extensions(struct plugin_handle *ph,
+				       char ***extension_list,
+				       size_t *num_extensions,
+				       const STACK_OF(X509_EXTENSION) *exts)
+{
+	bool keyusage_found = false;
+	bool altname_found = false;
+	struct utsname utsname;
+	int rc, count, k, nid;
+	X509_EXTENSION *ex;
+	size_t elements;
+	char **list;
+	size_t i;
+
+	for (i = 0; i < *num_extensions; i++) {
+		if (strncmp((*extension_list)[i], KMIP_CERT_EXT_KEY_USAGE,
+			    strlen(KMIP_CERT_EXT_KEY_USAGE)) == 0)
+			keyusage_found = true;
+		if (strncmp((*extension_list)[i],
+			    KMIP_CERT_EXT_SUBJECT_ALT_NAME,
+			    strlen(KMIP_CERT_EXT_SUBJECT_ALT_NAME)) == 0)
+			altname_found = true;
+	}
+
+	if (exts != NULL) {
+		count = sk_X509_EXTENSION_num(exts);
+		for (k = 0; k < count; k++) {
+			ex = sk_X509_EXTENSION_value(exts, k);
+			nid = OBJ_obj2nid(X509_EXTENSION_get_object(ex));
+
+			switch (nid) {
+			case NID_subject_alt_name:
+				altname_found = true;
+				break;
+			case NID_ext_key_usage:
+				keyusage_found = true;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	if (keyusage_found && altname_found)
+		return 0;
+
+	elements = *num_extensions;
+	if (!keyusage_found)
+		elements++;
+
+	if (!altname_found) {
+		elements++;
+
+		if (uname(&utsname) != 0) {
+			rc = -errno;
+			_set_error(ph, "Failed to obtain the system's "
+				   "hostname: %s", strerror(-rc));
+			return rc;
+		}
+	}
+
+	list = util_realloc(*extension_list, elements * sizeof(char *));
+	i = 0;
+
+	if (!keyusage_found) {
+		list[*num_extensions + i] =
+			util_strdup(KMIP_CERT_EXT_KEY_USAGE_CLIENT_AUTH);
+		i++;
+	}
+
+	if (!altname_found) {
+		list[*num_extensions + i] = NULL;
+		util_asprintf(&list[*num_extensions + i],
+			      KMIP_CERT_EXT_SUBJECT_ALT_NAME_DNS,
+			      utsname.nodename);
+		i++;
+	}
+
+	*extension_list = list;
+	*num_extensions = elements;
+	return 0;
+}
+
+/**
+ * Generates certificate signing request or self-signed certificate using the
+ * identity key
+ *
+ * @param ph                the plugin handle
+ * @param csr_pem_file      name of the PEM file to store a CSR to. NULL if no
+ *                          CSR is to be generated.
+ * @param sscert_pem_file   name of the PEM file to store a self-signed
+ *                          certificate to. NULL if no certificate is to be
+ *                          generated.
+ * @param subject           the subject RNDs separated by semicolon (;). Can be
+ *                          NULL if a renew certificate is specified.
+ * @param extensions        the extensions separated by semicolon (;). Can be
+ *                          NULL.
+ * @param renew_cert_pem_file name of a PEM file containing a certificate to
+ *                          renew. Can be NULL.
+ * @param csr_new_header    if true output NEW header and footer lines in CSR
+ * @param validity_days     the number of days the certificate is valid. Only
+ *                          valid when generating a self-signed certificate.
+ *                          Can be NULL.
+ * @param digest            the digest to use with CSR and certificates. Can be
+ *                          NULL
+ * @param rsa_pss           if true, RSA-PSS is used with RSA-based identity
+ *                          keys
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _generate_csr_sscert(struct plugin_handle *ph,
+				const char *csr_pem_file,
+				const char *sscert_pem_file,
+				const char *subject, const char *extensions,
+				const char *renew_cert_pem_file,
+				bool csr_new_header, const char *validity_days,
+				const char *digest, bool rsa_pss)
+{
+	struct sk_rsa_pss_params rsa_pss_parms = {
+		.salt_len = RSA_PSS_SALTLEN_DIGEST, .mgf_digest_nid = 0 };
+	unsigned char identity_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	size_t identity_key_size = sizeof(identity_key);
+	char **subject_rdn_list = NULL;
+	char **extension_list = NULL;
+	size_t num_subject_rdns = 0;
+	int digest_nid = NID_undef;
+	size_t num_extensions = 0;
+	char *client_cert = NULL;
+	X509 *renew_cert = NULL;
+	const char *cert_algo;
+	X509_REQ *csr = NULL;
+	X509 *ss_cert = NULL;
+	int days = 30;
+	int rc = 0;
+	size_t i;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->identity_key_generated) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first generate the identity key.");
+		return -EINVAL;
+	}
+
+	if (csr_pem_file != NULL && sscert_pem_file != NULL) {
+		_set_error(ph, "Either '--gen-csr' or option "
+			   "'--gen-self-signed-cert' can be specified.");
+		return -EINVAL;
+	}
+	if (csr_new_header && csr_pem_file == NULL) {
+		_set_error(ph, "Option '--csr-new-header' is only valid with "
+			   "option '--gen-csr'.");
+		return -EINVAL;
+	}
+	if (validity_days != NULL && sscert_pem_file == NULL) {
+		_set_error(ph, "Option '--cert-validity-days' is only valid "
+			   "with option '--gen-self-signed-cert'.");
+		return -EINVAL;
+	}
+	if (subject == NULL && renew_cert_pem_file == NULL) {
+		_set_error(ph, "Option '--cert-subject' is required, unless "
+			   " option '--renew-cert' is specified.");
+		return -EINVAL;
+	}
+
+	if (sscert_pem_file != NULL && ph->client_cert_avail) {
+		printf("ATTENTION: A client certificate already exists\n");
+		util_print_indented("When you generate a new client "
+				    "certificate, the existing certificate is "
+				    "removed and must re-register the newly "
+				    "created certificate with the KMIP server "
+				    "and the KMIP plugin before you can "
+				    "communicate with the KMIP server", 0);
+		printf("%s: Re-generate the client certificate [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->pd.verbose)) {
+			_set_error(ph, "Operation aborted by user");
+			return -ECANCELED;
+		}
+	}
+
+	if (validity_days != NULL) {
+		days = atoi(validity_days);
+		if (days <= 0) {
+			_set_error(ph, "Invalid validity days: '%s'",
+				   validity_days);
+			return -EINVAL;
+		}
+	}
+
+	if (digest != NULL) {
+		digest_nid = OBJ_txt2nid(digest);
+		if (digest_nid == NID_undef) {
+			_set_error(ph, "Invalid digest: '%s'", digest);
+			return -EINVAL;
+		}
+	}
+
+	if (subject != NULL) {
+		rc = parse_list(subject, &subject_rdn_list, &num_subject_rdns);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (extensions != NULL) {
+		rc = parse_list(extensions, &extension_list, &num_extensions);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (renew_cert_pem_file != NULL) {
+		rc = SK_UTIL_read_x509_certificate(renew_cert_pem_file,
+						   &renew_cert);
+		if (rc != 0) {
+			_set_error(ph, "Failed to load the renew certificate "
+				   "from'%s'", renew_cert_pem_file);
+			goto out;
+		}
+	}
+
+	rc = _add_client_auth_extensions(ph, &extension_list, &num_extensions,
+					 renew_cert != NULL ?
+						X509_get0_extensions(renew_cert)
+						: NULL);
+	if (rc != 0)
+		goto out;
+
+	rc = _setup_ext_lib(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = SK_UTIL_read_key_blob(ph->identity_secure_key, identity_key,
+				   &identity_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to load the identity key from '%s': %s",
+			   ph->identity_secure_key, strerror(-rc));
+		goto out;
+	}
+
+	if (csr_pem_file != NULL) {
+		rc = SK_OPENSSL_generate_csr(identity_key, identity_key_size,
+					     (const char **)subject_rdn_list,
+					     num_subject_rdns, true, renew_cert,
+					     (const char **)extension_list,
+					     num_extensions, digest_nid,
+					     rsa_pss ? &rsa_pss_parms : NULL,
+					     &csr, &ph->ext_lib, ph->pd.verbose);
+	} else {
+		rc = SK_OPENSSL_generate_ss_cert(identity_key,
+						 identity_key_size,
+						(const char **)subject_rdn_list,
+						 num_subject_rdns, true,
+						 renew_cert,
+						 (const char **)extension_list,
+						 num_extensions, days,
+						 digest_nid,
+						 rsa_pss ? &rsa_pss_parms :
+									NULL,
+						 &ss_cert, &ph->ext_lib,
+						 ph->pd.verbose);
+	}
+	switch (rc) {
+	case 0:
+		break;
+	case -EBADMSG:
+		_set_error(ph, "The subject or extensions could not be parsed "
+			   "or are not recognized by OpenSSL.");
+		rc = -EINVAL;
+		goto out;
+	case -EEXIST:
+		_set_error(ph, "One of the subject name entries or extensions "
+			   "is a duplicate.");
+		rc = -EINVAL;
+		goto out;
+	case -ENOTSUP:
+		_set_error(ph, "The specified digest is not supported.");
+		rc = -EINVAL;
+		goto out;
+	default:
+		_set_error(ph, "Failed to generate the %s: %s",
+			   csr_pem_file != NULL ? "certificate signing request"
+					   : "self-signed certificate",
+			   strerror(-rc));
+		goto out;
+	}
+
+	if (csr_pem_file != NULL) {
+		rc = SK_UTIL_write_x509_request(csr_pem_file, csr,
+						csr_new_header);
+		if (rc != 0) {
+			_set_error(ph, "Failed to write the certificate "
+				   "signing request to '%s'", csr_pem_file);
+			goto out;
+		}
+
+		pr_verbose(&ph->pd, "Generated certificate signing request "
+			   "into '%s'", csr_pem_file);
+	} else {
+		switch (EVP_PKEY_id(X509_get0_pubkey(ss_cert))) {
+		case EVP_PKEY_RSA:
+			cert_algo = KMIP_KEY_ALGORITHM_RSA;
+			break;
+		case EVP_PKEY_RSA_PSS:
+			cert_algo = KMIP_KEY_ALGORITHM_RSA_PSS;
+			rsa_pss = true;
+			break;
+		case EVP_PKEY_EC:
+			cert_algo = KMIP_KEY_ALGORITHM_ECC;
+			break;
+		default:
+			_set_error(ph, "Unsupported certificate algorithm");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		rc = SK_UTIL_write_x509_certificate(sscert_pem_file, ss_cert);
+		if (rc != 0) {
+			_set_error(ph, "Failed to write the self-signed "
+				   "certificate to '%s'", sscert_pem_file);
+			goto out;
+		}
+
+		util_asprintf(&client_cert, "%s/%s", ph->pd.config_path,
+			      KMIP_CONFIG_CLIENT_CERTIFICATE_FILE);
+
+		rc = plugin_set_or_remove_property(&ph->pd,
+				KMIP_CONFIG_CLIENT_CERTIFICATE, client_cert);
+		if (rc != 0)
+			goto out;
+
+		rc = plugin_set_or_remove_property(&ph->pd,
+				KMIP_CONFIG_CLIENT_CERT_ALGORITHM, cert_algo);
+		if (rc != 0)
+			goto out;
+
+		rc = SK_UTIL_write_x509_certificate(client_cert, ss_cert);
+		if (rc != 0) {
+			_set_error(ph, "Failed to write the self-signed "
+				   "certificate to '%s'", client_cert);
+			goto out;
+		}
+
+		pr_verbose(&ph->pd, "Generated self-signed certificate into "
+			   "'%s' and '%s'", sscert_pem_file, client_cert);
+	}
+
+out:
+	if (subject_rdn_list != NULL) {
+		for (i = 0; i < num_subject_rdns; i++)
+			free(subject_rdn_list[i]);
+		free(subject_rdn_list);
+	}
+	if (extension_list != NULL) {
+		for (i = 0; i < num_extensions; i++)
+			free(extension_list[i]);
+		free(extension_list);
+	}
+	if (renew_cert != NULL)
+		X509_free(renew_cert);
+	if (ss_cert != NULL)
+		X509_free(ss_cert);
+	if (csr != NULL)
+		X509_REQ_free(csr);
+	if (client_cert != NULL)
+		free(client_cert);
+
+	return rc;
+}
+
+/**
+ * Checks that none of the options for generating a CSR or self-signed
+ * certificate is specified, and sets up the error message and return code if
+ * so.
+ *
+ * @param ph                the plugin handle
+ * @param opts              the config options structure
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _error_gen_csr_sscert_opts(struct plugin_handle *ph,
+				      struct config_options *opts)
+{
+	int rc = 0;
+
+	if (opts->cert_subject != NULL) {
+		_set_error(ph, "Option '--cert-subject' is only valid "
+			   "together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_extensions != NULL) {
+		_set_error(ph, "Option '--cert-extensions' is only "
+			   "valid together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->renew_cert_pem_file != NULL) {
+		_set_error(ph, "Option '--renew-cert' is only "
+			   "valid together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->csr_new_header == true) {
+		_set_error(ph, "Option '--csr-new-header' is only "
+			   "valid together with option '--gen-csr'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_validity_days != NULL) {
+		_set_error(ph, "Option '--cert-validity-days' is only "
+			   "valid together with option "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_digest != NULL) {
+		_set_error(ph, "Option '--cert-digest' is only "
+			   "valid together with options '--gen-csr' or "
+			   "'--gen-self-signed-cert'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->cert_rsa_pss == true) {
+		_set_error(ph, "Option '--cert-rsa-pss' is only "
+			   "valid together with option '--gen-csr' or "
+			   "'--gen-self-signed-cert'");
+		rc = -EINVAL;
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
+/**
+ * Use a client certificate with the KMIP plugin. The client certificate's
+ * public key must match the identity key.
+ *
+ * @param ph                the plugin handle
+ * @param client_cert       The client certificate to use
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _use_client_cert(struct plugin_handle *ph, const char *client_cert)
+{
+	unsigned char identity_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	size_t identity_key_size = sizeof(identity_key);
+	char *client_cert_file = NULL;
+	EVP_PKEY *pkey = NULL;
+	bool rsa_pss = false;
+	X509 *cert = NULL;
+	char *cert_algo;
+	int rc;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->identity_key_generated) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first generate the identity key.");
+		return -EINVAL;
+	}
+
+	if (ph->client_cert_avail) {
+		printf("ATTENTION: A client certificate already exists\n");
+		util_print_indented("When you set a new client certificate, "
+				    "the existing certificate is removed and "
+				    "you must re-register the new certificate "
+				    "with the KMIP server before you can "
+				    "communicate with the KMIP server", 0);
+		printf("%s: Set the new client certificate [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->pd.verbose)) {
+			_set_error(ph, "Operation aborted by user");
+			return -ECANCELED;
+		}
+	}
+
+	rc = _setup_ext_lib(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = SK_UTIL_read_x509_certificate(client_cert, &cert);
+	if (rc != 0) {
+		_set_error(ph, "Failed to read the client certificate from "
+			   "file '%s': %s", client_cert, strerror(-rc));
+		return rc;
+	}
+
+	if (ph->pd.verbose) {
+		pr_verbose(&ph->pd, "Client certificate read from '%s'",
+			   client_cert);
+		X509_print_fp(stderr, cert);
+	}
+
+	rc = SK_UTIL_read_key_blob(ph->identity_secure_key, identity_key,
+				   &identity_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to load the identity key from '%s': %s",
+			   ph->identity_secure_key, strerror(-rc));
+		goto out;
+	}
+
+	switch (EVP_PKEY_id(X509_get0_pubkey(cert))) {
+	case EVP_PKEY_RSA:
+		cert_algo = KMIP_KEY_ALGORITHM_RSA;
+		break;
+	case EVP_PKEY_RSA_PSS:
+		cert_algo = KMIP_KEY_ALGORITHM_RSA_PSS;
+		rsa_pss = true;
+		break;
+	case EVP_PKEY_EC:
+		cert_algo = KMIP_KEY_ALGORITHM_ECC;
+		break;
+	default:
+		_set_error(ph, "Unsupported certificate algorithm");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = SK_OPENSSL_get_secure_key_as_pkey(identity_key, identity_key_size,
+					       rsa_pss, &pkey, &ph->ext_lib,
+					       ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get the PKEY from the identity key: "
+			   "%s", strerror(-rc));
+		goto out;
+	}
+
+#if !OPENSSL_VERSION_PREREQ(3, 0)
+	if (EVP_PKEY_cmp(X509_get0_pubkey(cert), pkey) != 1) {
+#else
+	if (EVP_PKEY_eq(X509_get0_pubkey(cert), pkey) != 1) {
+#endif
+		_set_error(ph, "The client certificate's public key does not "
+			   "match the identity key.");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	util_asprintf(&client_cert_file, "%s/%s", ph->pd.config_path,
+		      KMIP_CONFIG_CLIENT_CERTIFICATE_FILE);
+
+	rc = plugin_set_or_remove_property(&ph->pd,
+			KMIP_CONFIG_CLIENT_CERTIFICATE, client_cert_file);
+	if (rc != 0)
+		goto out;
+
+	rc = plugin_set_or_remove_property(&ph->pd,
+			KMIP_CONFIG_CLIENT_CERT_ALGORITHM, cert_algo);
+	if (rc != 0)
+		goto out;
+
+	rc = SK_UTIL_write_x509_certificate(client_cert_file, cert);
+	if (rc != 0) {
+		_set_error(ph, "Failed to write the self-signed "
+			   "certificate to '%s'", client_cert_file);
+		goto out;
+	}
+
+	pr_verbose(&ph->pd, "Client certificate stored in '%s'",
+		   client_cert_file);
+
+out:
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+	if (client_cert_file != NULL)
+		free(client_cert_file);
+	X509_free(cert);
 
 	return rc;
 }
@@ -951,6 +1748,36 @@ int kms_configure(const kms_handle_t handle,
 		case 'i':
 			opts.generate_identity_key = options[i].argument;
 			break;
+		case 'c':
+			opts.csr_pem_file = options[i].argument;
+			break;
+		case 'C':
+			opts.sscert_pem_file = options[i].argument;
+			break;
+		case 's':
+			opts.cert_subject = options[i].argument;
+			break;
+		case 'e':
+			opts.cert_extensions = options[i].argument;
+			break;
+		case 'N':
+			opts.renew_cert_pem_file = options[i].argument;
+			break;
+		case 'n':
+			opts.csr_new_header = true;
+			break;
+		case 'd':
+			opts.cert_validity_days = options[i].argument;
+			break;
+		case 'D':
+			opts.cert_digest = options[i].argument;
+			break;
+		case 'P':
+			opts.cert_rsa_pss = true;
+			break;
+		case 'r':
+			opts.client_cert = options[i].argument;
+			break;
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -965,6 +1792,48 @@ int kms_configure(const kms_handle_t handle,
 
 	if (opts.generate_identity_key != NULL) {
 		rc = _generate_identity_key(ph, opts.generate_identity_key);
+		if (rc != 0)
+			goto out;
+
+		config_changed = true;
+	}
+
+	if (opts.csr_pem_file != NULL || opts.sscert_pem_file != NULL) {
+		if (opts.client_cert != NULL) {
+			_set_error(ph, "Option '--client-cert' in not valid "
+				   "together with options '--gen-csr' or "
+				   "'--gen-self-signed-cert'.");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (!ph->identity_key_generated) {
+			/* Generate identity key with default key-specs */
+			rc = _generate_identity_key(ph, NULL);
+			if (rc != 0)
+				goto out;
+
+			config_changed = true;
+		}
+
+		rc = _generate_csr_sscert(ph, opts.csr_pem_file,
+					  opts.sscert_pem_file,
+					  opts.cert_subject,
+					  opts.cert_extensions,
+					  opts.renew_cert_pem_file,
+					  opts.csr_new_header,
+					  opts.cert_validity_days,
+					  opts.cert_digest,
+					  opts.cert_rsa_pss);
+		config_changed = true;
+	} else {
+		rc = _error_gen_csr_sscert_opts(ph, &opts);
+	}
+	if (rc != 0)
+		goto out;
+
+	if (opts.client_cert != NULL) {
+		rc = _use_client_cert(ph, opts.client_cert);
 		if (rc != 0)
 			goto out;
 
