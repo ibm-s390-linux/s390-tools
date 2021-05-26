@@ -65,5 +65,98 @@ struct plugin_handle {
 #define KMIP_CERT_EXT_SUBJECT_ALT_NAME		"subjectAltName"
 #define KMIP_CERT_EXT_SUBJECT_ALT_NAME_DNS	"subjectAltName=DNS:%s"
 
+#define KMIP_PROFILES_LOCATION			"/etc/zkey/kmip/profiles"
+#define KMIP_PROFILES_LOCATION_ENVVAR		"ZKEY_KMIP_PROFILES"
+#define KMIP_PROFILES_FILE_TYPE			".profile"
+#define KMIP_PROFILES_FILE_TYPE_LEN		8
+#define KMIP_PROFILES_DEFAULT_PROFILE		"default.profile"
+
+#define KMIP_PROFILES_SERVER_REGEX		"server-regex"
+#define KMIP_PROFILES_KMIP_VERSION		"kmip-version"
+#define KMIP_PROFILES_TRANSPORT			"transport"
+#define KMIP_PROFILES_ENCODING			"encoding"
+#define KMIP_PROFILES_HTTPS_URI			"https-uri"
+#define KMIP_PROFILES_AUTH_SCHEME		"auth-scheme"
+#define KMIP_PROFILES_WRAP_KEY_ALGORITHM	"wrap-key-algorithm"
+#define KMIP_PROFILES_WRAP_KEY_PARAMS		"wrap-key-params"
+#define KMIP_PROFILES_WRAP_KEY_FORMAT		"wrap-key-format"
+#define KMIP_PROFILES_WRAP_PADDING_METHOD	"wrap-padding-method"
+#define KMIP_PROFILES_WRAP_HASHING_ALOGRITHM	"wrap-hashing-algorithm"
+#define KMIP_PROFILES_SUPPORTS_LINK_ATTR	"supports-link-attr"
+#define KMIP_PROFILES_SUPPORTS_DESCRIPTION_ATTR	"supports-description-attr"
+#define KMIP_PROFILES_SUPPORTS_COMMENT_ATTR	"supports-comment-attr"
+#define KMIP_PROFILES_CUSTOM_ATTR_SCHEME	"custom-attr-scheme"
+#define KMIP_PROFILES_SUPPORTS_SENSITIVE_ATTR	"supports-sensitive-attr"
+#define KMIP_PROFILES_CHECK_ALWAYS_SENS_ATTR	"check-always-sensitive-attr"
+
+#define KMIP_PROFILES_VERSION_AUTO		"AUTO"
+
+#define KMIP_PROFILES_TRANSPORT_TLS		"TLS"
+#define KMIP_PROFILES_TRANSPORT_HTTPS		"HTTPS"
+
+#define KMIP_PROFILES_ENCODING_TTLV		"TTLV"
+#define KMIP_PROFILES_ENCODING_JSON		"JSON"
+#define KMIP_PROFILES_ENCODING_XML		"XML"
+
+#define KMIP_PROFILES_HTTPS_URI_DEFAULT		"/kmip"
+
+#define KMIP_PROFILES_AUTH_TLS_CLIENT_CERT	"TLSClientCert"
+
+#define KMIP_PROFILES_WRAP_KEY_ALGORITHM_RSA	"RSA"
+
+#define KMIP_PROFILES_WRAP_KEY_FORMAT_PKCS1	"PKCS1"
+#define KMIP_PROFILES_WRAP_KEY_FORMAT_PKCS8	"PKCS8"
+#define KMIP_PROFILES_WRAP_KEY_FORMAT_TRANSP	"TransparentPublicKey"
+
+#define KMIP_PROFILES_WRAP_PADDING_PKCS1_5	"PKCS1.5"
+#define KMIP_PROFILES_WRAP_PADDING_OAEP		"OAEP"
+
+#define KMIP_PROFILES_WRAP_HASHING_ALGO_SHA1	"SHA-1"
+#define KMIP_PROFILES_WRAP_HASHING_ALGO_SHA256	"SHA-256"
+
+#define KMIP_PROFILES_BOOLEAN_TRUE		"TRUE"
+#define KMIP_PROFILES_BOOLEAN_FALSE		"FALSE"
+
+#define KMIP_PROFILES_CUST_ATTR_SCHEME_V1	"v1-style"
+#define KMIP_PROFILES_CUST_ATTR_SCHEME_V2	"v2-style"
+
+enum kmip_profile_auth_scheme {
+	KMIP_PROFILE_AUTH_TLS_CLIENT_CERT = 1,
+};
+
+enum kmip_profile_cust_attr_scheme {
+	KMIP_PROFILE_CUST_ATTR_V1_STYLE	= 1, /* x-zkey-something */
+	KMIP_PROFILE_CUST_ATTR_V2_STYLE	= 2, /* zkey-something */
+};
+
+struct kmip_profile {
+	const char *name;
+	const char *server_regex;
+	struct kmip_version kmip_version; /* 0.0 means AUTO */
+	enum kmip_transport transport; /* Default: TLS */
+	enum kmip_encoding encoding; /* Default : TTLV */
+	const char *https_uri; /* Default '/kmip' for HTTPS transport */
+	enum kmip_profile_auth_scheme auth_scheme; /* Default: TLSClientCert */
+	enum kmip_crypto_algo wrap_key_algo; /* only RSA supported currently */
+	size_t wrap_key_size; /* Required for RSA */
+	enum kmip_key_format_type wrap_key_format; /* Default for RSA: PKCS1 */
+	enum kmip_padding_method wrap_padding_method; /* RSA default: PKCS 1.5*/
+	enum kmip_hashing_algo wrap_hashing_algo; /* OAEP default: SHA-1 */
+	bool supports_link_attr; /* Default: FALSE */
+	bool supports_description_attr; /* Default: FALSE */
+	bool supports_comment_attr; /* Default: FALSE */
+	enum kmip_profile_cust_attr_scheme cust_attr_scheme;
+	bool supports_sensitive_attr; /* Default: FALSE */
+	bool check_always_sensitive_attr; /* Default: FALSE */
+};
+
+int profile_read(struct plugin_handle *ph, const char *profile_dir,
+		 const char *profile_file, struct kmip_profile **profile);
+void profile_free(struct kmip_profile *profile);
+int profile_find_by_server_info(struct plugin_handle *ph,
+				const char *server_info,
+				struct kmip_profile **profile);
+int profile_find_by_name(struct plugin_handle *ph, const char *profile_name,
+			 struct kmip_profile **profile);
 
 #endif
