@@ -3230,12 +3230,12 @@ int build_subject_name(X509_NAME **name, const char *rdns[], size_t num_rdns,
 /**
  * Compares X509 Extensions by their nid
  */
-static int X509_EXTENSION_compfunc(const X509_EXTENSION * const* a,
-				   const X509_EXTENSION * const* b)
+static int X509_EXTENSION_compfunc(const X509_EXTENSION * const *a,
+				   const X509_EXTENSION * const *b)
 {
 
-	return (OBJ_obj2nid(X509_EXTENSION_get_object((X509_EXTENSION *)a)) -
-		OBJ_obj2nid(X509_EXTENSION_get_object((X509_EXTENSION *)b)));
+	return (OBJ_obj2nid(X509_EXTENSION_get_object((X509_EXTENSION *)*a)) -
+		OBJ_obj2nid(X509_EXTENSION_get_object((X509_EXTENSION *)*b)));
 }
 
 /**
