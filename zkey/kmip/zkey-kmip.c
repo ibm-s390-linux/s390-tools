@@ -36,6 +36,218 @@
 
 #define _set_error(ph, fmt...)	plugin_set_error(&(ph)->pd, fmt)
 
+#define FREE_AND_SET_NULL(ptr)					\
+	do {							\
+		if ((ptr) != NULL)				\
+			free((void *)ptr);			\
+		(ptr) = NULL;					\
+	} while (0)
+
+#define CHECK_ERROR(cond, rc_var, rc, text, ph, label)		\
+	do {							\
+		if (cond) {					\
+			(rc_var) = (rc);			\
+			pr_verbose((&ph->pd), "%s: %s", (text),	\
+				   strerror(-(rc_var)));	\
+			_set_error((ph), "%s: %s", (text),	\
+				   strerror(-(rc_var)));	\
+			goto label;				\
+		}						\
+	} while (0)
+
+struct kmip_enum_name {
+	uint32_t value;
+	const char *name;
+};
+
+static const struct kmip_enum_name required_operations[] = {
+	{ .value = KMIP_OPERATION_QUERY, .name = "Query" },
+	{ .value = KMIP_OPERATION_CREATE, .name = "Create" },
+	{ .value = KMIP_OPERATION_REGISTER, .name = "Register" },
+	{ .value = KMIP_OPERATION_ACTIVATE, .name = "Activate" },
+	{ .value = KMIP_OPERATION_REVOKE, .name = "Revoke" },
+	{ .value = KMIP_OPERATION_DESTROY, .name = "Destroy" },
+	{ .value = KMIP_OPERATION_GET, .name = "Get" },
+	{ .value = KMIP_OPERATION_LOCATE, .name = "Locate" },
+	{ .value = KMIP_OPERATION_GET_ATTRIBUTE_LIST,
+					.name = "Get Attribute List" },
+	{ .value = KMIP_OPERATION_GET_ATTRIBUTES,
+					.name = "Get Attributes" },
+	{ .value = KMIP_OPERATION_ADD_ATTRIBUTE,
+					.name = "Add Attribute" },
+	{ .value = KMIP_OPERATION_DELETE_ATTRIBUTE,
+					.name = "Delete Attribute" },
+	{ .value = 0, .name = NULL },
+};
+
+static const struct kmip_enum_name required_objtypes[] = {
+	{ .value = KMIP_OBJECT_TYPE_SYMMETRIC_KEY, .name = "Symmetric Key" },
+	{ .value = KMIP_OBJECT_TYPE_PUBLIC_KEY, .name = "Public Key" },
+	{ .value = 0, .name = NULL },
+};
+
+static const struct kmip_version kmip_version_1_0 = {
+	.major = 1, .minor = 0,
+};
+
+static const struct kmip_version kmip_version_1_2 = {
+	.major = 1, .minor = 2,
+};
+
+static const struct kmip_enum_name kmip_result_statuses[] = {
+	{ .value = KMIP_RESULT_STATUS_SUCCESS, .name = "Success" },
+	{ .value = KMIP_RESULT_STATUS_OPERATION_FAILED,
+				.name = "Operation Failed" },
+	{ .value = KMIP_RESULT_STATUS_OPERATION_PENDING,
+				.name = "Operation Pending" },
+	{ .value = KMIP_RESULT_STATUS_OPERATION_UNDONE,
+				.name = "Operation Undone" },
+	{ .value = 0, .name = NULL },
+};
+
+static const struct kmip_enum_name kmip_result_reasons[] = {
+	{ .value = KMIP_RESULT_REASON_ITEM_NOT_FOUND,
+				.name = "Item Not Found" },
+	{ .value = KMIP_RESULT_REASON_RESPONSE_TOO_LARGE,
+				.name = "Response Too Large" },
+	{ .value = KMIP_RESULT_REASON_AUTH_NOT_SUCCESSFUL,
+				.name = "Authentication Not Successful" },
+	{ .value = KMIP_RESULT_REASON_INVALID_MESSAGE,
+				.name = "Invalid Message" },
+	{ .value = KMIP_RESULT_REASON_OPERATION_NOT_SUCCESSFUL,
+				.name = "Operation Not Supported" },
+	{ .value = KMIP_RESULT_REASON_MISSING_DATA, .name = "Missing Data" },
+	{ .value = KMIP_RESULT_REASON_INVALIUD_FIELD, .name = "Invalid Field" },
+	{ .value = KMIP_RESULT_REASON_FEATURE_NOT_SUPPORTED,
+				.name = "Feature Not Supported" },
+	{ .value = KMIP_RESULT_REASON_OP_CANCELED_BY_REQUESTOR,
+				.name = "Operation Canceled By Requeste" },
+	{ .value = KMIP_RESULT_REASON_CRYPTOGRAPHIC_FAILURE,
+				.name = "Cryptographic Failure" },
+	{ .value = KMIP_RESULT_REASON_ILLEGAL_OPERATION,
+				.name = "Illegal Operation" },
+	{ .value = KMIP_RESULT_REASON_PERMISSION_DENIED,
+				.name = "Permission Denied" },
+	{ .value = KMIP_RESULT_REASON_OBJECT_ARCHIVED,
+				.name = "Object Archived" },
+	{ .value = KMIP_RESULT_REASON_INDEX_OUT_OF_BOUNDS,
+				.name = "Index Out Of Bounds" },
+	{ .value = KMIP_RESULT_REASON_APP_NAMESPACE_NOT_SUPPORTED,
+				.name = "Application Namespace Not Supported" },
+	{ .value = KMIP_RESULT_REASON_KEY_FORMAT_TYPE_NOT_SUPPORTED,
+				.name = "Key Format Type Not Supported" },
+	{ .value = KMIP_RESULT_REASON_KEY_COMPRESSION_TYPE_NOT_SUPPORTED,
+				.name = "Key Compression Type Not Supported" },
+	{ .value = KMIP_RESULT_REASON_ENCODING_OPTION_ERROR,
+				.name = "Encoding Option Error" },
+	{ .value = KMIP_RESULT_REASON_KEY_VALUE_NOT_PRESENT,
+				.name = "Key Value Not Present" },
+	{ .value = KMIP_RESULT_REASON_ATTESTATION_REQUIRED,
+				.name = "Attestation Required" },
+	{ .value = KMIP_RESULT_REASON_ATTESTATION_FAILED,
+				.name = "Attestation Failed" },
+	{ .value = KMIP_RESULT_REASON_SENSITIVE, .name = "Sensitive" },
+	{ .value = KMIP_RESULT_REASON_NOT_EXTRACTABLE,
+				.name = "Not Extractable" },
+	{ .value = KMIP_RESULT_REASON_OBJECT_ALREADY_EXISTS,
+				.name = "Object Already Exists" },
+	{ .value = KMIP_RESULT_REASON_INVALID_TICKET,
+				.name = "Invalid Ticket" },
+	{ .value = KMIP_RESULT_REASON_USAGE_LIMIT_EXCEEDED,
+				.name = "Usage Limit Exceeded" },
+	{ .value = KMIP_RESULT_REASON_NUMERIC_RANGE, .name = "Numeric Range" },
+	{ .value = KMIP_RESULT_REASON_INVALID_DATA_TYPE,
+				.name = "Invalid Data Type" },
+	{ .value = KMIP_RESULT_REASON_READ_ONLY_ATTRIBUTE,
+				.name = "Read Only Attribute" },
+	{ .value = KMIP_RESULT_REASON_MULTI_VALUED_ATTRIBUTE,
+				.name = "Multi Valued Attribute" },
+	{ .value = KMIP_RESULT_REASON_UNSUPPORTED_ATTRIBUTE,
+				.name = "Unsupported Attribute" },
+	{ .value = KMIP_RESULT_REASON_ATTRIBUTE_INSTANCE_NOT_FOUND,
+				.name = "Attribute Instance Not Found" },
+	{ .value = KMIP_RESULT_REASON_ATTRIBUTE_NOT_FOUND,
+				.name = "Attribute Not Found" },
+	{ .value = KMIP_RESULT_REASON_ATTRIBUTE_READ_ONLY,
+				.name = "Attribute Read Only" },
+	{ .value = KMIP_RESULT_REASON_ATTRIBUTE_SINGLE_VALUED,
+				.name = "Attribute Single Valued" },
+	{ .value = KMIP_RESULT_REASON_BAD_CRYPTOGRAPHIC_PARAMETERS,
+				.name = "Bad Cryptographic Parameters" },
+	{ .value = KMIP_RESULT_REASON_BAD_PASSWORD, .name = "Bad Password" },
+	{ .value = KMIP_RESULT_REASON_CODEC_ERROR, .name = "Codec Error" },
+	{ .value = KMIP_RESULT_REASON_ILLEGAL_OBJECT_TYPE,
+				.name = "Illegal Object Type" },
+	{ .value = KMIP_RESULT_REASON_INCOMPATIBLE_CRYPTO_USAGE_MASK,
+			.name = "Incompatible Cryptographic Usage Mask" },
+	{ .value = KMIP_RESULT_REASON_INTERNAL_SERVER_ERROR,
+				.name = "Internal Server Error" },
+	{ .value = KMIP_RESULT_REASON_INVALID_ASYNC_CORRELATION_VALUE,
+			.name = "Invalid Asynchronous Correlation Value" },
+	{ .value = KMIP_RESULT_REASON_INVALID_ATTRIBUTE,
+				.name = "Invalid Attribute" },
+	{ .value = KMIP_RESULT_REASON_INVALID_ATTRIBUTE_VALUE,
+				.name = "Invalid Attribute Value" },
+	{ .value = KMIP_RESULT_REASON_INVALID_CORRELATION_VALUE,
+				.name = "Invalid Correlation Value" },
+	{ .value = KMIP_RESULT_REASON_INVALID_CSR, .name = "Invalid CSR" },
+	{ .value = KMIP_RESULT_REASON_INVALID_OBJECT_TYPE,
+				.name = "Invalid Object Type" },
+	{ .value = KMIP_RESULT_REASON_KEY_WRAP_TYPE_NOT_SUPPORTED,
+				.name = "Key Wrap Type Not Supported" },
+	{ .value = KMIP_RESULT_REASON_MISSING_INITIALIZATION_VECTOR,
+				.name = "Missing Initialization Vector" },
+	{ .value = KMIP_RESULT_REASON_NOT_UNIQUE_NAME_ATTRIBUTE,
+				.name = "Non Unique Name Attribute" },
+	{ .value = KMIP_RESULT_REASON_OBJECT_DESTROYED,
+				.name = "Object Destroyed" },
+	{ .value = KMIP_RESULT_REASON_OBJECT_NOT_FOUND,
+				.name = "Object Not Found" },
+	{ .value = KMIP_RESULT_REASON_NOT_AUTHORISED,
+				.name = "Not Authorised" },
+	{ .value = KMIP_RESULT_REASON_SERVER_LIMIT_EXCEEDED,
+				.name = "Server Limit Exceeded" },
+	{ .value = KMIP_RESULT_REASON_UNKNOWN_ENUMERATION,
+				.name = "Unknown Enumeration" },
+	{ .value = KMIP_RESULT_REASON_UNKNOWN_MESSAGE_EXTENSION,
+				.name = "Unknown Message Extension" },
+	{ .value = KMIP_RESULT_REASON_UNKNOWN_TAG, .name = "Unknown Tag" },
+	{ .value = KMIP_RESULT_REASON_UNSUPPORTED_CRYPTO_PARAMETERS,
+			.name = "Unsupported Cryptographic Parameters" },
+	{ .value = KMIP_RESULT_REASON_UNSUPPORTED_PROTOCOL_VERSION,
+				.name = "Unsupported Protocol Version" },
+	{ .value = KMIP_RESULT_REASON_WRAPPING_OBJECT_ARCHIVED,
+				.name = "Wrapping Object Archived" },
+	{ .value = KMIP_RESULT_REASON_WRAPPING_OBJECT_DESTROYED,
+				.name = "Wrapping Object Destroyed" },
+	{ .value = KMIP_RESULT_REASON_WRAPPING_OBJECT_NOT_FOUND,
+				.name = "Wrapping Object Not Found" },
+	{ .value = KMIP_RESULT_REASON_WRONG_KEY_LIFECYCLE_STATE,
+				.name = "Wrong Key Lifecycle State" },
+	{ .value = KMIP_RESULT_REASON_PROTECTION_STORAGE_UNAVAILABLE,
+				.name = "Protection Storage Unavailable" },
+	{ .value = KMIP_RESULT_REASON_PKCS_11_CODE_ERROR,
+				.name = "PKCS#11 Codec Error" },
+	{ .value = KMIP_RESULT_REASON_PKCS_11_INVALID_FUNCTION,
+				.name = "PKCS#11 Invalid Function" },
+	{ .value = KMIP_RESULT_REASON_PKCS_11_INVALID_INTERFACE,
+				.name = "PKCS#11 Invalid Interface" },
+	{ .value = KMIP_RESULT_REASON_PRIVATE_PROT_STORAGE_UNAVAILABLE,
+			.name = "Private Protection Storage Unavailable" },
+	{ .value = KMIP_RESULT_REASON_PUBLIC_PROT_STORAGE_UNAVAILABLE,
+			.name = "Public Protection Storage Unavailable" },
+	{ .value = KMIP_RESULT_REASON_UNKNOWN_OBJECT_GROUP,
+				.name = "Unknown Object Group" },
+	{ .value = KMIP_RESULT_REASON_CONSTRAINT_VIOLATION,
+				.name = "Constraint Violation" },
+	{ .value = KMIP_RESULT_REASON_DUPLICATE_PROCESS_REQUEST,
+				.name = "Duplicate Process Request" },
+	{ .value = KMIP_RESULT_REASON_GENERAL_FAILURE,
+			.name = "General Failure" },
+	{ .value = 0, .name = NULL },
+};
+
+
 /**
  * Informs a KMS plugin that it is bound to a zkey repository.
  *
@@ -76,9 +288,19 @@ static void _check_config_complete(struct plugin_handle *ph)
 		plugin_check_property(&ph->pd,
 				      KMIP_CONFIG_CLIENT_CERT_ALGORITHM);
 
+	ph->connection_configured =
+		plugin_check_property(&ph->pd, KMIP_CONFIG_SERVER) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_SERVER_INFO) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_PROFILE) &&
+		plugin_check_property(&ph->pd,
+				      KMIP_CONFIG_VERIFY_SERVER_CERT) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_VERIFY_HOSTNAME) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_PROTOCOL_VERSION);
+
 	ph->config_complete = ph->apqns_configured &&
 			      ph->identity_key_generated &&
-			      ph->client_cert_avail;
+			      ph->client_cert_avail &&
+			      ph->connection_configured;
 }
 
 /**
@@ -338,6 +560,146 @@ out:
 }
 
 /**
+ * Gets the client key as PKEY
+ *
+ * @param ph                the plugin handle
+ * @param pkey              on return: the client key as pkey
+ *
+ * @returns a KMS plugin handle, or NULL in case of an error.
+ */
+static int _get_client_key(struct plugin_handle *ph, EVP_PKEY **pkey)
+{
+	unsigned char identity_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	size_t identity_key_size = sizeof(identity_key);
+	bool rsa_pss = false;
+	char *cert_algo;
+	int rc;
+
+	if (ph->identity_secure_key == NULL)
+		return -EINVAL;
+
+	rc = SK_UTIL_read_key_blob(ph->identity_secure_key, identity_key,
+				   &identity_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to load the identity key from '%s': %s",
+			   ph->identity_secure_key, strerror(-rc));
+		return rc;
+	}
+
+	cert_algo = properties_get(ph->pd.properties,
+				   KMIP_CONFIG_CLIENT_CERT_ALGORITHM);
+	if (cert_algo != NULL) {
+		rsa_pss = (strcmp(cert_algo, KMIP_KEY_ALGORITHM_RSA_PSS) == 0);
+		free(cert_algo);
+	}
+
+	rc = SK_OPENSSL_get_secure_key_as_pkey(identity_key, identity_key_size,
+					       rsa_pss, pkey, &ph->ext_lib,
+					       ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get the PKEY from the identity key: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
+	return 0;
+}
+
+
+/**
+ * Gets the KMIP config structure contents from the plugin properties
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns a KMS plugin handle, or NULL in case of an error.
+ */
+static int _get_kmip_config(struct plugin_handle *ph)
+{
+
+	char *tmp;
+	int rc;
+
+	if (ph->server == NULL || ph->profile == NULL)
+		return 0;
+
+	rc = _setup_ext_lib(ph);
+	if (rc != 0)
+		return rc;
+
+	rc = _get_client_key(ph, &ph->kmip_config.tls_client_key);
+	if (rc != 0)
+		return rc;
+
+	ph->kmip_config.transport = ph->profile->transport;
+	ph->kmip_config.encoding = ph->profile->encoding;
+
+	if (strncmp(ph->server, "https://", 8) == 0) {
+		/* User overrides transport to HTTPS */
+		ph->kmip_config.transport = KMIP_TRANSPORT_HTTPS;
+		ph->kmip_config.server = util_strdup(ph->server);
+	} else if (ph->kmip_config.transport == KMIP_TRANSPORT_HTTPS) {
+		/* HTTPS selected, but no URL specified: build URL */
+		util_asprintf((char **)&ph->kmip_config.server, "https://%s%s",
+			      ph->server, ph->profile->https_uri);
+	} else {
+		ph->kmip_config.server = util_strdup(ph->server);
+	}
+
+	ph->kmip_config.tls_client_cert = properties_get(ph->pd.properties,
+						KMIP_CONFIG_CLIENT_CERTIFICATE);
+
+	ph->kmip_config.tls_ca = properties_get(ph->pd.properties,
+						KMIP_CONFIG_CA_BUNDLE);
+
+	ph->kmip_config.tls_issuer_cert = NULL;
+	ph->kmip_config.tls_pinned_pubkey = properties_get(ph->pd.properties,
+						KMIP_CONFIG_SERVER_PUBKEY);
+	ph->kmip_config.tls_server_cert = properties_get(ph->pd.properties,
+						KMIP_CONFIG_SERVER_CERT);
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_VERIFY_SERVER_CERT);
+	ph->kmip_config.tls_verify_peer =
+				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_VERIFY_HOSTNAME);
+	ph->kmip_config.tls_verify_host =
+				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
+	if (tmp != NULL)
+		free(tmp);
+
+	return 0;
+}
+
+/**
+ * Frees the KMIP config structure contents
+ *
+ * @param ph                the plugin handle
+ */
+static void _free_kmip_config(struct plugin_handle *ph)
+{
+	if (ph->kmip_config.server != NULL)
+		free((void *)ph->kmip_config.server);
+	if (ph->kmip_config.tls_client_key != NULL)
+		EVP_PKEY_free(ph->kmip_config.tls_client_key);
+	if (ph->kmip_config.tls_client_cert != NULL)
+		free((void *)ph->kmip_config.tls_client_cert);
+	if (ph->kmip_config.tls_ca != NULL)
+		free((void *)ph->kmip_config.tls_ca);
+	if (ph->kmip_config.tls_issuer_cert != NULL)
+		free((void *)ph->kmip_config.tls_issuer_cert);
+	if (ph->kmip_config.tls_pinned_pubkey != NULL)
+		free((void *)ph->kmip_config.tls_pinned_pubkey);
+	if (ph->kmip_config.tls_server_cert != NULL)
+		free((void *)ph->kmip_config.tls_server_cert);
+	if (ph->kmip_config.tls_cipher_list != NULL)
+		free((void *)ph->kmip_config.tls_cipher_list);
+	if (ph->kmip_config.tls13_cipher_list != NULL)
+		free((void *)ph->kmip_config.tls13_cipher_list);
+
+	memset(&ph->kmip_config, 0, sizeof(ph->kmip_config));
+}
+
+/**
  * Initializes a KMS plugin for usage by zkey. When a repository is bound to a
  * KMS plugin, zkey calls this function when opening the repository.
  *
@@ -352,6 +714,7 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 {
 	struct plugin_handle *ph;
 	char *apqn_type = NULL;
+	char *tmp;
 	int rc;
 
 	util_assert(config_path != NULL, "Internal error: config_path is NULL");
@@ -381,6 +744,34 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 
 	ph->identity_secure_key = properties_get(ph->pd.properties,
 						 KMIP_CONFIG_IDENTITY_KEY);
+	ph->server = properties_get(ph->pd.properties, KMIP_CONFIG_SERVER);
+
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_PROFILE);
+	if (tmp != NULL) {
+		rc = profile_find_by_name(ph, tmp, &ph->profile);
+		free(tmp);
+		if (rc != 0)
+			goto error;
+	}
+
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_PROTOCOL_VERSION);
+	if (tmp != NULL &&
+	    strcmp(tmp, KMIP_CONFIG_PROTOCOL_VERSION_PROFILE) != 0) {
+		if (sscanf(tmp, "%u.%u", &ph->kmip_version.major,
+			   &ph->kmip_version.minor) != 2) {
+			_set_error(ph, "Invalid value for '%s': '%s'",
+				   KMIP_CONFIG_PROTOCOL_VERSION, tmp);
+			rc = -EINVAL;
+			free(tmp);
+			goto error;
+		}
+	}
+	if (tmp != NULL)
+		free(tmp);
+
+	rc = _get_kmip_config(ph);
+	if (rc != 0)
+		goto error;
 
 	return (kms_handle_t)ph;
 
@@ -410,8 +801,17 @@ int kms_terminate(const kms_handle_t handle)
 
 	pr_verbose(&ph->pd, "Plugin terminating");
 
+	if (ph->connection != NULL)
+		kmip_connection_free(ph->connection);
+
+	_free_kmip_config(ph);
+
 	if (ph->identity_secure_key != NULL)
 		free((void *)ph->identity_secure_key);
+	if (ph->server != NULL)
+		free((void *)ph->server);
+	if (ph->profile != NULL)
+		profile_free(ph->profile);
 
 	_terminate_ext_lib(ph);
 	plugin_term(&ph->pd);
@@ -565,8 +965,83 @@ int kms_display_info(const kms_handle_t handle)
 		return 0;
 	}
 
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_SERVER);
+	printf("  KMIP server:          %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	else
+		return 0;
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_SERVER_INFO);
+	if (tmp != NULL) {
+		printf("  KMIP server info:     %s\n", tmp);
+		free(tmp);
+	}
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_PROFILE);
+	printf("  KMIP plugin profile:  %s\n", tmp != NULL ? tmp :
+			"(configuration required)");
+	if (tmp != NULL)
+		free(tmp);
+	else
+		return 0;
+	if (ph->kmip_version.major != 0)
+		printf("  KMIP version:         %u.%u\n",
+		       ph->kmip_version.major, ph->kmip_version.minor);
+	else if (ph->profile != NULL && ph->profile->kmip_version.major != 0)
+		printf("  KMIP version:         %u.%u (from profile)\n",
+		       ph->profile->kmip_version.major,
+		       ph->profile->kmip_version.minor);
+	else
+		printf("  KMIP version:         (configuration required)\n");
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_CA_BUNDLE);
+	printf("  CA-bundle:            %s\n", tmp != NULL ? tmp :
+			"System's CA certificates");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_SERVER_CERT);
+	if (tmp != NULL) {
+		printf("  Trusting the server certificate\n");
+		free(tmp);
+	}
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_SERVER_PUBKEY);
+	if (tmp != NULL) {
+		printf("  Using server public key pinning\n");
+		free(tmp);
+	}
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_VERIFY_SERVER_CERT);
+	if (tmp != NULL && strcasecmp(tmp, "yes") == 0)
+		printf("  The server's certificate must be valid\n");
+	else
+		printf("  The server's certificate is not verified\n");
+	if (tmp != NULL)
+		free(tmp);
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_VERIFY_HOSTNAME);
+	if (tmp != NULL) {
+		if (strcasecmp(tmp, "yes") == 0)
+			printf("  The server's certificate must match the "
+			       "hostname\n");
+		free(tmp);
+	}
+
+	if (ph->profile != NULL) {
+		switch (ph->profile->auth_scheme) {
+		case KMIP_PROFILE_AUTH_TLS_CLIENT_CERT:
+			printf("  Authentication:       TLS Client "
+			       "Authentication\n");
+			break;
+		default:
+			printf("  Authentication:       (unknown)\n");
+			break;
+		}
+	}
+
 	return 0;
 }
+
+#define OPT_TLS_PIN_SERVER_PUBKEY		256
+#define OPT_TLS_TRUST_SERVER_CERT		257
+#define OPT_TLS_DONT_VERIFY_SERVER_CERT		258
+#define OPT_TLS_VERIFY_HOSTNAME			259
 
 static const struct util_opt configure_options[] = {
 	{
@@ -719,6 +1194,96 @@ static const struct util_opt configure_options[] = {
 			"registered.",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS FOR THE SERVER CONNECTION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "kmip-server", required_argument, NULL, 'S'},
+		.argument = "KMIP-SERVER",
+		.desc = "Specifies the hostname or IP address of the KMIP "
+			"server, and an optional port number separated by a "
+			"colon. If no port number is specified, 5696 is used "
+			"for KMIP. To use HTTPS transport, specify the URL, "
+			"starting with 'https://', followed by the hostname or "
+			"IP address of the KMIP server, an optional port "
+			"number, and an URI (for example '/kmip').",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "profile", required_argument, NULL, 'p'},
+		.argument = "PROFILE-NAME",
+		.desc = "Specifies the name of the KMIP plugin profile to use "
+			"with the KMIP server connection. If no profile name "
+			"is specified, the KMIP plugin queries the KMIP server "
+			"information and attempts to match a profile to the "
+			"information. If no profile matches, the default "
+			"profile is used. Profiles are contained in the "
+			"directory '/etc/zkey/kmip/profiles'. You can set the "
+			"location of the profiles by using the environment "
+			"variable 'ZKEY_KMIP_PROFILES'.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-ca-bundle", required_argument, NULL, 'b'},
+		.argument = "CA-BUNDLE",
+		.desc = "Specifies the CA-bundle PEM file or directory "
+			"containing the CA certificates that are used to "
+			"verify the KMIP server certificate during TLS "
+			"handshake. If the option specifies a directory path, "
+			"the directory must have been prepared with the "
+			"'c_rehash' utility of OpenSSL. Default is to use the "
+			"system CA certificates.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-pin-server-pubkey", 0, NULL,
+				OPT_TLS_PIN_SERVER_PUBKEY },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Pins the public key of the KMIP server. With a pinned "
+			"key, the KMIP plugin verifies that every connection "
+			"uses the same KMIP server-certificate public key that "
+			"was also used to configure the connection to the KMIP "
+			"server. This option can be used only with CA-signed "
+			"KMIP server certificates.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-trust-server-cert", 0, NULL,
+				OPT_TLS_TRUST_SERVER_CERT },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Trusts the certificate of the KMIP server even if it "
+			"is a self-signed certificate, or it can not be "
+			"verified due to other reasons. Use this option "
+			"instead of the '--tls-pin-server-pubkey' option when "
+			"you are using self-signed KMIP server certificates.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-dont-verify-server-cert", 0, NULL,
+					OPT_TLS_DONT_VERIFY_SERVER_CERT },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Do not verify the authenticity of the certificate of "
+			"the KMIP server. For self-signed KMIP server "
+			"certificates, this is the default. Use the "
+			"'--tls-pin-server-cert' option to ensure the "
+			"authenticity of the self-signed certificate "
+			"explicitly. For CA-signed KMIP server certificates, "
+			"the default is to verify them. This option disables "
+			"the verification.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "tls-verify-hostname", 0, NULL,
+						OPT_TLS_VERIFY_HOSTNAME },
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Verifies that the KMIP server certificates 'Common "
+			"Name' field or a 'Subject Alternate Name' field "
+			"matches the hostname that is used to connect to the "
+			"KMIP server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
 	UTIL_OPT_END,
 };
 
@@ -767,6 +1332,13 @@ struct config_options {
 	const char *cert_digest;
 	bool cert_rsa_pss;
 	const char *client_cert;
+	const char *kmip_server;
+	const char *profile;
+	const char *tls_ca_bundle;
+	bool tls_pin_server_pubkey;
+	bool tls_trust_server_cert;
+	bool tls_dont_verify_server_cert;
+	bool tls_verify_hostname;
 };
 
 /**
@@ -1502,6 +2074,821 @@ out:
 }
 
 /**
+ * Connects to the KMIP server
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _connect_to_server(struct plugin_handle *ph)
+{
+	int rc;
+
+	if (ph->connection != NULL)
+		kmip_connection_free(ph->connection);
+	ph->connection = NULL;
+
+	rc = kmip_connection_new(&ph->kmip_config, &ph->connection,
+				 ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to connect to KMIP server at '%s': "
+			   "%s", ph->kmip_config.server, strerror(-rc));
+		return rc;
+	}
+
+	if (ph->kmip_version.major == 0)
+		ph->kmip_version = ph->profile->kmip_version;
+
+	pr_verbose(&ph->pd, "Protocol version: %u.%u", ph->kmip_version.major,
+		   ph->kmip_version.minor);
+	kmip_set_default_protocol_version(&ph->kmip_version);
+	return 0;
+}
+
+/**
+ * Returns the name of the enumeration value.
+ *
+ * @param values            the list of enumeration values
+ * @param value             the value
+ *
+ * @returns a constant string
+ */
+static const char *_enum_value_to_str(const struct kmip_enum_name *values,
+				      uint32_t value)
+{
+	unsigned int i;
+
+	for (i = 0; values[i].name != NULL; i++) {
+		if (values[i].value == value)
+			return values[i].name;
+	}
+
+	return "UNKNOWN";
+}
+
+/**
+ * Check a KMIP response and extract information from it.
+ *
+ * @param ph                the plugin handle
+ * @param resp              the response KMIP node
+ * @param batch_item        the batch item index (staring at 0)
+ * @param operation         the operation (to verify the batch item)
+ * @param payload           On return : the payload of this batch item
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_kmip_response(struct plugin_handle *ph,
+				struct kmip_node *resp, int32_t batch_item,
+				enum kmip_operation operation,
+				struct kmip_node **payload)
+{
+	struct kmip_node *resp_hdr = NULL, *resp_bi = NULL;
+	enum kmip_result_status status = 0;
+	enum kmip_result_reason reason = 0;
+	const char *message = NULL;
+	int32_t batch_count;
+	int rc;
+
+	rc = kmip_get_response(resp, &resp_hdr, 0, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Get KMIP response header failed",
+		    ph, out);
+
+	rc = kmip_get_response_header(resp_hdr, NULL, NULL, NULL, NULL,
+				      &batch_count);
+	CHECK_ERROR(rc != 0, rc, rc, "Get KMIP response header infos failed",
+			    ph, out);
+	CHECK_ERROR(batch_item >= batch_count, rc, -EBADMSG,
+		    "Response contains less batch items than expected",
+		    ph, out);
+
+	rc = kmip_get_response(resp, NULL, batch_item, &resp_bi);
+	CHECK_ERROR(rc != 0, rc, rc, "Get KMIP response batch item failed",
+		    ph, out);
+
+	rc = kmip_get_response_batch_item(resp_bi, NULL, NULL, NULL, &status,
+					  &reason, &message, NULL, NULL,
+					  payload);
+	CHECK_ERROR(rc != 0, rc, rc, "Get KMIP response status infos failed",
+			    ph, out);
+
+	pr_verbose(&ph->pd, "KMIP response, operation: %d, status: %d, "
+		   "reason: %d message: '%s'", operation, status, reason,
+		   message ? message : "(none)");
+
+	if (status != KMIP_RESULT_STATUS_SUCCESS) {
+		_set_error(ph, "KMIP Request failed: Operation: '%s', "
+			   "Status: '%s', Reason: '%s', Message: '%s'",
+			   _enum_value_to_str(required_operations, operation),
+			   _enum_value_to_str(kmip_result_statuses, status),
+			   _enum_value_to_str(kmip_result_reasons, reason),
+			   message ? message : "(none)");
+		rc = -EBADMSG;
+		goto out;
+	}
+out:
+	kmip_node_free(resp_hdr);
+	kmip_node_free(resp_bi);
+
+	return rc;
+}
+
+/**
+ * Build a KMIP request with the up to 2 operations and payloads
+ *
+ * @param ph                the plugin handle
+ * @param operation1        The 1st operation to perform
+ * @param req_pl1           the request payload of the 1st operation
+ * @param operation2        The 2nd operation to perform (or 0)
+ * @param req_pl2           the request payload of the 2nd operation (or NULL)
+ * @param req               On return: the created request.
+ * @param batch_err_opt     Batch error option
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _build_kmip_request2(struct plugin_handle *ph,
+			       enum kmip_operation operation1,
+			       struct kmip_node *req_pl1,
+			       enum kmip_operation operation2,
+			       struct kmip_node *req_pl2,
+			       struct kmip_node **req,
+			       enum kmip_batch_error_cont_option batch_err_opt)
+{
+	struct kmip_node *req_bi1 = NULL, *req_bi2 = NULL, *req_hdr = NULL;
+	int rc = 0;
+
+	req_bi1 = kmip_new_request_batch_item(operation1, NULL, 0, req_pl1);
+	CHECK_ERROR(req_bi1 == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	if (operation2 != 0) {
+		req_bi2 = kmip_new_request_batch_item(operation2, NULL, 0,
+						      req_pl2);
+		CHECK_ERROR(req_bi2 == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+	}
+
+	req_hdr = kmip_new_request_header(NULL, 0, NULL, NULL, false, NULL,
+					  batch_err_opt, true,
+					  operation2 != 0 ? 2 : 1);
+	CHECK_ERROR(req_hdr == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	*req = kmip_new_request_va(req_hdr, 2, req_bi1, req_bi2);
+	CHECK_ERROR(*req == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+out:
+	kmip_node_free(req_bi1);
+	kmip_node_free(req_bi2);
+	kmip_node_free(req_hdr);
+
+	return rc;
+}
+
+/**
+ * Perform a KMIP request with up to 2 operations and payloads.
+ * Returns the response payloads.
+ *
+ * @param ph                the plugin handle
+ * @param operation1        The 1st operation to perform
+ * @param req_pl1           the request payload if the 1st operation
+ * @param resp_pl 1         On return: the response payload.
+ * @param operation2        The 2nd operation to perform (or zero)
+ * @param req_pl2           the request payload of the 2nd operation (or NULL)
+ * @param resp_pl2          On return: the response payload.
+ * @param batch_err_opt     Batch error option
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _perform_kmip_request2(struct plugin_handle *ph,
+				  enum kmip_operation operation1,
+				  struct kmip_node *req_pl1,
+				  struct kmip_node **resp_pl1,
+				  enum kmip_operation operation2,
+				  struct kmip_node *req_pl2,
+				  struct kmip_node **resp_pl2,
+				enum kmip_batch_error_cont_option batch_err_opt)
+{
+	struct kmip_node *req = NULL, *resp = NULL;
+	int rc;
+
+	if (operation2 != 0)
+		pr_verbose(&ph->pd, "Perform KMIP request, operations: %d, %d",
+			   operation1, operation2);
+	else
+		pr_verbose(&ph->pd, "Perform KMIP request, operation: %d",
+			   operation1);
+
+
+	rc = _build_kmip_request2(ph, operation1, req_pl1, operation2, req_pl2,
+				  &req, batch_err_opt);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_connection_perform(ph->connection, req, &resp,
+				     ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to perform KMIP request: %s",
+			   strerror(-rc));
+	}
+
+	rc  = _check_kmip_response(ph, resp, 0, operation1, resp_pl1);
+	if (rc != 0 && batch_err_opt == KMIP_BATCH_ERR_CONT_CONTINUE &&
+	    operation2 != 0) {
+		rc = 0;
+		plugin_clear_error(&ph->pd);
+	}
+	if (rc != 0)
+		goto out;
+
+	if (operation2 != 0) {
+		rc  = _check_kmip_response(ph, resp, 1, operation2, resp_pl2);
+		if (rc != 0)
+			goto out;
+	}
+
+out:
+	kmip_node_free(req);
+	kmip_node_free(resp);
+
+	return rc;
+}
+
+/**
+ * Perform a KMIP request with the specified operation and payload. Returns the
+ * response payload.
+ *
+ * @param ph                the plugin handle
+ * @param operation         The operation to perform
+ * @param req_pl            the request payload
+ * @param resp_pl           On return: the response payload.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _perform_kmip_request(struct plugin_handle *ph,
+				 enum kmip_operation operation,
+				 struct kmip_node *req_pl,
+				 struct kmip_node **resp_pl)
+{
+	return _perform_kmip_request2(ph, operation, req_pl, resp_pl, 0, NULL,
+				      NULL, KMIP_BATCH_ERR_CONT_STOP);
+}
+
+
+/**
+ * Checks if all required enumeration values are contained in the query
+ * response payload
+ *
+ * @param ph                the plugin handle
+ * @param query_function    the query function to check
+ * @param enum_name         the enumeration name (for error message)
+ * @param required          the list of required values
+ * @param query_pl          the QUERY response payload node
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_required_enum_values(struct plugin_handle *ph,
+				       enum kmip_query_function query_function,
+				       const char *enum_name,
+				       const struct kmip_enum_name *required,
+				       struct kmip_node *query_pl)
+{
+	struct kmip_node *info = NULL;
+	unsigned int i, k;
+	bool found;
+	int rc;
+
+	for (i = 0; required[i].value != 0; i++) {
+		for (k = 0, found = false; !found; k++) {
+			rc = kmip_get_query_response_payload(query_pl,
+					query_function, NULL, k, &info);
+			if (rc != 0)
+				break;
+
+			if (kmip_node_get_enumeration(info) ==
+					required[i].value)
+				found = true;
+			kmip_node_free(info);
+		}
+
+		if (!found) {
+			_set_error(ph, "KMIP server does not support required "
+				   "%s '%s'", enum_name, required[i].name);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Queries the KMIP server, checks if it supports all required features,
+ * and returns the server information string.
+ *
+ * @param ph                the plugin handle
+ * @param server_info       On return : the server information string. Must be
+ *                          freed by the caller
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_kmip_server(struct plugin_handle *ph, char **server_info)
+{
+	struct kmip_node *req_pl = NULL, *resp_pl = NULL, *serv_info = NULL;
+	const char *info;
+	int rc = 0;
+
+	req_pl = kmip_new_query_request_payload_va(3, KMIP_QUERY_OPERATIONS,
+			KMIP_QUERY_OBJECTS, KMIP_QUERY_SERVER_INFORMATION);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_QUERY, req_pl, &resp_pl);
+	if (rc != 0)
+		goto out;
+
+	rc = _check_required_enum_values(ph, KMIP_QUERY_OPERATIONS, "operation",
+					 required_operations, resp_pl);
+	if (rc != 0)
+		goto out;
+
+	rc = _check_required_enum_values(ph, KMIP_QUERY_OBJECTS, "object type",
+					 required_objtypes, resp_pl);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_get_query_response_payload(resp_pl,
+					     KMIP_QUERY_SERVER_INFORMATION,
+					     NULL, 0, &serv_info);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get server version",
+		    ph, out);
+
+	info = kmip_node_get_text_string(serv_info);
+	CHECK_ERROR(info == NULL, rc, -EBADMSG, "Failed to get server version",
+		    ph, out);
+
+	pr_verbose(&ph->pd, "Server info: '%s'", info);
+
+	*server_info = util_strdup(info);
+
+out:
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+	kmip_node_free(serv_info);
+
+	return rc;
+}
+
+/**
+ * Discovers the KMIP protocol versions that the KMIP server supports
+ *
+ * @param ph                the plugin handle
+ * @param version           On return : the highest KMIP version that the server
+ *                          and the KMIP client supports
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _discover_kmip_versions(struct plugin_handle *ph,
+				   struct kmip_version *version)
+{
+	struct kmip_node *req_pl = NULL, *resp_pl = NULL;
+	int rc = 0;
+
+	req_pl = kmip_new_discover_versions_payload(-1, NULL);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_DISCOVER_VERSIONS,
+				   req_pl, &resp_pl);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_get_discover_versions_response_payload(resp_pl, NULL, 0,
+							 version);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get discover version response",
+		    ph, out);
+
+out:
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+
+	return rc;
+}
+
+/**
+ * Configures the connection to the KMIP server
+ *
+ * @param ph                the plugin handle
+ * @param kmip_server       the KMIP server
+ * @param profil            the profile to use
+ * @param tls_ca_bundle     the file or directory name of the CA bundle to use
+ * @param tls_pin_server_pubkey if true, pin the server public key
+ * @param tls_trust_server_cert if true, trust the server certificate
+ * @param tls_dont_verify_server_cert if true, don't verify the server cert
+ * @param tls_verify_hostname if true verify the server's hostname
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _configure_connection(struct plugin_handle *ph,
+				 const char *kmip_server,
+				 const char *profile,
+				 const char *tls_ca_bundle,
+				 bool tls_pin_server_pubkey,
+				 bool tls_trust_server_cert,
+				 bool tls_dont_verify_server_cert,
+				 bool tls_verify_hostname)
+{
+	char *server_pubkey_temp = NULL;
+	char *server_pubkey_file = NULL;
+	char *server_cert_file = NULL;
+	char *server_cert_temp = NULL;
+	char *server_info = NULL;
+	bool self_signed = false;
+	bool verified = false;
+	bool valid = false;
+	char tmp[50];
+	int rc;
+
+	if (tls_pin_server_pubkey && tls_trust_server_cert) {
+		_set_error(ph, "Option ' --tls-pin-server-pubkey' is not valid "
+			   "together with option '--tls-pin-server-cert");
+		return -EINVAL;
+	}
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->identity_key_generated) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first generate the identity key.");
+		return -EINVAL;
+	}
+	if (!ph->client_cert_avail) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first register the client certificate.");
+		return -EINVAL;
+	}
+
+	if (ph->server != NULL) {
+		util_print_indented("ATTENTION: The KMIP server connection "
+				    "is already configured\n"
+				    "When you re-configure the KMIP server "
+				    "connection, you might need to re-register "
+				    "this zkey client with the changed KMIP "
+				    "server.", 0);
+		printf("%s: Re-configure the KMIP server connection [y/N]? ",
+		       program_invocation_short_name);
+		if (!prompt_for_yes(ph->pd.verbose)) {
+			_set_error(ph, "Operation aborted by user");
+			return -ECANCELED;
+		}
+	}
+
+	FREE_AND_SET_NULL(ph->server);
+	ph->server = util_strdup(kmip_server);
+
+	if (ph->profile != NULL)
+		profile_free(ph->profile);
+	ph->profile = NULL;
+
+	rc = profile_find_by_name(ph, profile != NULL ? profile :
+				  KMIP_PROFILES_DEFAULT_PROFILE_NAME,
+				  &ph->profile);
+	if (rc != 0)
+		return rc;
+
+	if (ph->profile->kmip_version.major != 0)
+		ph->kmip_version = ph->profile->kmip_version;
+	else
+		ph->kmip_version = kmip_version_1_0;
+
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_SERVER,
+					   ph->server);
+	if (rc != 0)
+		return rc;
+
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_PROFILE,
+					   profile);
+	if (rc != 0)
+		return rc;
+
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_CA_BUNDLE,
+					   tls_ca_bundle);
+	if (rc != 0)
+		return rc;
+
+	/* Establish initial KMIP config */
+	_free_kmip_config(ph);
+	rc = _get_kmip_config(ph);
+	if (rc != 0)
+		return rc;
+
+	/* Connect to the server the 1st time to get its certificate */
+	util_asprintf(&server_cert_temp, "%s/%s-tmp", ph->pd.config_path,
+		      KMIP_CONFIG_SERVER_CERT_FILE);
+	util_asprintf(&server_pubkey_temp, "%s/%s-tmp", ph->pd.config_path,
+		      KMIP_CONFIG_SERVER_PUBKEY_FILE);
+
+	rc = kmip_connection_get_server_cert(ph->kmip_config.server,
+					     ph->kmip_config.transport,
+					     ph->kmip_config.tls_ca,
+					     ph->kmip_config.tls_client_key,
+					     ph->kmip_config.tls_client_cert,
+					     server_cert_temp,
+					     server_pubkey_temp,
+					     NULL, &verified, ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to connect to KMIP server at '%s': "
+			   "%s", ph->kmip_config.server, strerror(-rc));
+		goto out;
+	}
+
+	rc = plugin_check_certificate(&ph->pd, server_cert_temp, &self_signed,
+				      &valid);
+	if (rc != 0) {
+		_set_error(ph, "Failed to check certificate PEM file '%s': %s",
+			   server_cert_temp, strerror(-rc));
+		goto out;
+	}
+
+	pr_verbose(&ph->pd, "verified: %d", verified);
+	pr_verbose(&ph->pd, "self-signed: %d", self_signed);
+	pr_verbose(&ph->pd, "valid: %d", valid);
+
+	util_print_indented("The KMIP server presented the following "
+			    "certificate to identify itself:", 0);
+
+	rc = plugin_print_certificates(&ph->pd, server_cert_temp);
+	if (rc != 0) {
+		_set_error(ph, "Failed to print the server certificate: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	printf("\n");
+	if (!valid)
+		printf("ATTENTION: The certificate is expired or not yet "
+		       "valid.\n");
+	if (self_signed) {
+		printf("ATTENTION: The certificate is self-signed "
+			      "and thus could not be verified.\n");
+	} else if (!verified) {
+		if (!tls_dont_verify_server_cert) {
+			if (tls_ca_bundle != NULL)
+				_set_error(ph, "The certificate could not be "
+					   "verified using the specified CA "
+					   "bundle '%s'. Use option "
+					   "'--tls-dont-verify-server-cert' to "
+					   "connect to this server anyway.",
+					   tls_ca_bundle);
+			else
+				_set_error(ph, "The certificate could not be "
+					   "verified using the system's "
+					   "CA certificates. Use option "
+					   "'--tls-dont-verify-server-cert' to "
+					   "connect to this server anyway.");
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+	printf("%s: Is this the KMIP server you intend to work with "
+	      "[y/N]? ", program_invocation_short_name);
+	if (!prompt_for_yes(ph->pd.verbose)) {
+		_set_error(ph, "Operation aborted by user");
+		rc = -ECANCELED;
+		goto out;
+	}
+
+	ph->kmip_config.tls_verify_peer = !self_signed || tls_trust_server_cert;
+	if (tls_dont_verify_server_cert)
+		ph->kmip_config.tls_verify_peer = false;
+
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_VERIFY_SERVER_CERT,
+					   ph->kmip_config.tls_verify_peer ?
+						     "yes" : "no");
+	if (rc != 0)
+		goto out;
+
+	ph->kmip_config.tls_verify_host = tls_verify_hostname;
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_VERIFY_HOSTNAME,
+					   ph->kmip_config.tls_verify_host ?
+						     "yes" : "no");
+	if (rc != 0)
+		goto out;
+
+	/* Establish a connection to the server with the initial config */
+	rc = _connect_to_server(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = _check_kmip_server(ph, &server_info);
+	if (rc != 0)
+		goto out;
+
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_SERVER_INFO,
+					   server_info);
+	if (rc != 0)
+		return rc;
+
+	if (profile == NULL) {
+		/* Try to match a profile for the server */
+		if (ph->profile != NULL)
+			profile_free(ph->profile);
+
+		rc = profile_find_by_server_info(ph, server_info, &ph->profile);
+		if (rc != 0)
+			return rc;
+
+		pr_verbose(&ph->pd, "Profile selected: %s", ph->profile->name);
+
+		rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_PROFILE,
+						   ph->profile->name);
+		if (rc != 0)
+			return rc;
+
+		/* re-establish the kmip configuration with the new profile */
+		kmip_connection_free(ph->connection);
+		ph->connection = NULL;
+
+		_free_kmip_config(ph);
+		rc = _get_kmip_config(ph);
+		if (rc != 0)
+			return rc;
+
+		ph->kmip_version = ph->profile->kmip_version;
+
+		/* re-establish the connection with the new configuration */
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			goto out;
+	}
+
+	/* discover the KMIP protocol version if not pre-set by the profile */
+	if (ph->profile->kmip_version.major == 0) {
+		rc = _discover_kmip_versions(ph, &ph->kmip_version);
+		if (rc != 0) {
+			pr_verbose(&ph->pd, "DISCOVER-VERSION failed, retry "
+				   "with KMIP v1.2");
+			plugin_clear_error(&ph->pd);
+
+			kmip_set_default_protocol_version(&kmip_version_1_2);
+
+			rc = _discover_kmip_versions(ph, &ph->kmip_version);
+			if (rc != 0) {
+				pr_verbose(&ph->pd, "2nd DISCOVER-VERSION "
+					   "failed, assume KMIP server only "
+					   "supports v1.0");
+				plugin_clear_error(&ph->pd);
+
+				ph->kmip_version = kmip_version_1_0;
+				rc = 0;
+			}
+		}
+
+		pr_verbose(&ph->pd, "Discovered protocol version: %u.%u",
+			   ph->kmip_version.major, ph->kmip_version.minor);
+
+		kmip_set_default_protocol_version(&ph->kmip_version);
+
+		sprintf(tmp, "%u.%u", ph->kmip_version.major,
+			ph->kmip_version.minor);
+		rc = plugin_set_or_remove_property(&ph->pd,
+						   KMIP_CONFIG_PROTOCOL_VERSION,
+						   tmp);
+		if (rc != 0)
+			goto out;
+	} else {
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_PROTOCOL_VERSION,
+					KMIP_CONFIG_PROTOCOL_VERSION_PROFILE);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (ph->profile->auth_scheme != KMIP_PROFILE_AUTH_TLS_CLIENT_CERT) {
+		_set_error(ph, "Unsupported authentication scheme: %d",
+			   ph->profile->auth_scheme);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	FREE_AND_SET_NULL(ph->kmip_config.tls_server_cert);
+	util_asprintf(&server_cert_file, "%s/%s", ph->pd.config_path,
+		      KMIP_CONFIG_SERVER_CERT_FILE);
+	if (tls_trust_server_cert) {
+		ph->kmip_config.tls_server_cert = util_strdup(server_cert_file);
+		rc = plugin_activate_temp_file(&ph->pd, server_cert_temp,
+					       server_cert_file);
+		if (rc != 0)
+			goto out;
+	} else {
+		remove(server_cert_file);
+	}
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_SERVER_CERT,
+					   tls_trust_server_cert ?
+						server_cert_file : NULL);
+	if (rc != 0)
+		goto out;
+
+	FREE_AND_SET_NULL(ph->kmip_config.tls_pinned_pubkey);
+	util_asprintf(&server_pubkey_file, "%s/%s", ph->pd.config_path,
+		      KMIP_CONFIG_SERVER_PUBKEY_FILE);
+	if (tls_pin_server_pubkey) {
+		ph->kmip_config.tls_pinned_pubkey =
+				util_strdup(server_pubkey_file);
+		rc = plugin_activate_temp_file(&ph->pd, server_pubkey_temp,
+					       server_pubkey_file);
+		if (rc != 0)
+			goto out;
+	} else {
+		remove(server_pubkey_file);
+	}
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_SERVER_PUBKEY,
+					   tls_pin_server_pubkey ?
+						server_pubkey_file : NULL);
+	if (rc != 0)
+		goto out;
+
+out:
+	if (server_cert_temp != NULL) {
+		remove(server_cert_temp);
+		free(server_cert_temp);
+	}
+	if (server_cert_file != NULL)
+		free(server_cert_file);
+	if (server_pubkey_temp != NULL) {
+		remove(server_pubkey_temp);
+		free(server_pubkey_temp);
+	}
+	if (server_pubkey_file != NULL)
+		free(server_pubkey_file);
+	if (server_info != NULL)
+		free(server_info);
+
+	return rc;
+}
+
+/**
+ * Checks that none of the options for seting up a connection  is specified,
+ * and sets up the error message and return code if
+ * so.
+ *
+ * @param ph                the plugin handle
+ * @param opts              the config options structure
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _error_connection_opts(struct plugin_handle *ph,
+				  struct config_options *opts)
+{
+	int rc = 0;
+
+	if (opts->profile != NULL) {
+		_set_error(ph, "Option '--profile' is only valid "
+			   "together with option '--kmip-server'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_ca_bundle != NULL) {
+		_set_error(ph, "Option '--tls-ca-bundle' is only valid "
+			   "together with option '--kmip-server'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_pin_server_pubkey) {
+		_set_error(ph, "Option '--tls-pin-server-pubkey' is only valid "
+			   "together with option '--kmip-server'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_trust_server_cert) {
+		_set_error(ph, "Option '--tls-trust-server-cert' is only valid "
+			   "together with option '--kmip-server'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_dont_verify_server_cert) {
+		_set_error(ph, "Option '--tls-dont-verify-server-cert' is only "
+			   "valid together with option '--kmip-server'.");
+		rc = -EINVAL;
+		goto out;
+	}
+	if (opts->tls_verify_hostname) {
+		_set_error(ph, "Option '--tls-verify-hostname' is only valid "
+			   "together with option '--kmip-server'.");
+		rc = -EINVAL;
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
+/**
  * Use a client certificate with the KMIP plugin. The client certificate's
  * public key must match the identity key.
  *
@@ -1778,6 +3165,27 @@ int kms_configure(const kms_handle_t handle,
 		case 'r':
 			opts.client_cert = options[i].argument;
 			break;
+		case 'S':
+			opts.kmip_server = options[i].argument;
+			break;
+		case 'p':
+			opts.profile = options[i].argument;
+			break;
+		case 'b':
+			opts.tls_ca_bundle = options[i].argument;
+			break;
+		case OPT_TLS_PIN_SERVER_PUBKEY:
+			opts.tls_pin_server_pubkey = true;
+			break;
+		case OPT_TLS_TRUST_SERVER_CERT:
+			opts.tls_trust_server_cert = true;
+			break;
+		case OPT_TLS_DONT_VERIFY_SERVER_CERT:
+			opts.tls_dont_verify_server_cert = true;
+			break;
+		case OPT_TLS_VERIFY_HOSTNAME:
+			opts.tls_verify_hostname = true;
+			break;
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -1839,6 +3247,21 @@ int kms_configure(const kms_handle_t handle,
 
 		config_changed = true;
 	}
+
+	if (opts.kmip_server != NULL) {
+		rc = _configure_connection(ph, opts.kmip_server,
+					   opts.profile,
+					   opts.tls_ca_bundle,
+					   opts.tls_pin_server_pubkey,
+					   opts.tls_trust_server_cert,
+					   opts.tls_dont_verify_server_cert,
+					   opts.tls_verify_hostname);
+		config_changed = true;
+	} else {
+		rc = _error_connection_opts(ph, &opts);
+	}
+	if (rc != 0)
+		goto out;
 
 out:
 	if (apqn_str != NULL)

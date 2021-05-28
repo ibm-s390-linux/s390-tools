@@ -26,19 +26,27 @@ struct plugin_handle {
 	enum card_type card_type;
 	bool identity_key_generated;
 	const char *identity_secure_key;
+	const char *server;
 	bool client_cert_avail;
+	bool connection_configured;
 	bool config_complete;
 	struct sk_ext_lib ext_lib;
 	struct sk_ext_cca_lib cca_lib;
 	struct sk_ext_ep11_lib ep11_lib;
 	struct ep11_lib ep11;
 	struct cca_lib cca;
+	struct kmip_conn_config kmip_config;
+	struct kmip_version kmip_version;
+	struct kmip_profile *profile;
+	struct kmip_connection *connection;
 };
 
 #define KMIP_CONFIG_FILE			"kmip.conf"
 #define KMIP_CONFIG_IDENTITY_KEY_FILE		"identity-key.skey"
 #define KMIP_CONFIG_IDENTITY_KEY_REENC_FILE	"identity-key.reenc"
 #define KMIP_CONFIG_CLIENT_CERTIFICATE_FILE	"client-certificate.pem"
+#define KMIP_CONFIG_SERVER_CERT_FILE		"server-cert.pem"
+#define KMIP_CONFIG_SERVER_PUBKEY_FILE		"server-pubkey.pem"
 
 #define KMIP_CONFIG_APQNS			"apqns"
 #define KMIP_CONFIG_APQN_TYPE			"apqn-type"
@@ -48,6 +56,15 @@ struct plugin_handle {
 #define KMIP_CONFIG_IDENTITY_KEY_PARAMS		"identity-key-params"
 #define KMIP_CONFIG_CLIENT_CERTIFICATE		"client-certificate"
 #define KMIP_CONFIG_CLIENT_CERT_ALGORITHM	"client-certificate-algorithm"
+#define KMIP_CONFIG_SERVER			"kmip-server"
+#define KMIP_CONFIG_SERVER_INFO			"kmip-server-info"
+#define KMIP_CONFIG_PROFILE			"profile"
+#define KMIP_CONFIG_PROTOCOL_VERSION		"protocol-version"
+#define KMIP_CONFIG_CA_BUNDLE			"ca-bundle"
+#define KMIP_CONFIG_SERVER_CERT			"server-cert"
+#define KMIP_CONFIG_SERVER_PUBKEY		"server-pubkey"
+#define KMIP_CONFIG_VERIFY_SERVER_CERT		"verify-server-cert"
+#define KMIP_CONFIG_VERIFY_HOSTNAME		"verify-hostname"
 
 #define KMIP_APQN_TYPE_CCA			"CCA"
 #define KMIP_APQN_TYPE_EP11			"EP11"
@@ -57,6 +74,8 @@ struct plugin_handle {
 #define KMIP_KEY_ALGORITHM_RSA_PSS		"RSA-PSS"
 
 #define KMIP_DEFAULT_IDENTITY_KEY_SPEC		"ECC:secp521r1"
+
+#define KMIP_CONFIG_PROTOCOL_VERSION_PROFILE	"PROFILE"
 
 #define KMIP_MAX_KEY_TOKEN_SIZE			8192
 
@@ -69,7 +88,9 @@ struct plugin_handle {
 #define KMIP_PROFILES_LOCATION_ENVVAR		"ZKEY_KMIP_PROFILES"
 #define KMIP_PROFILES_FILE_TYPE			".profile"
 #define KMIP_PROFILES_FILE_TYPE_LEN		8
-#define KMIP_PROFILES_DEFAULT_PROFILE		"default.profile"
+#define KMIP_PROFILES_DEFAULT_PROFILE_NAME	"default"
+#define KMIP_PROFILES_DEFAULT_PROFILE	KMIP_PROFILES_DEFAULT_PROFILE_NAME \
+					KMIP_PROFILES_FILE_TYPE
 
 #define KMIP_PROFILES_SERVER_REGEX		"server-regex"
 #define KMIP_PROFILES_KMIP_VERSION		"kmip-version"
