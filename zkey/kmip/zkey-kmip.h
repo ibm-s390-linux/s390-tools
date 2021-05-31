@@ -29,6 +29,7 @@ struct plugin_handle {
 	const char *server;
 	bool client_cert_avail;
 	bool connection_configured;
+	bool wrapping_key_avail;
 	bool config_complete;
 	struct sk_ext_lib ext_lib;
 	struct sk_ext_cca_lib cca_lib;
@@ -47,6 +48,8 @@ struct plugin_handle {
 #define KMIP_CONFIG_CLIENT_CERTIFICATE_FILE	"client-certificate.pem"
 #define KMIP_CONFIG_SERVER_CERT_FILE		"server-cert.pem"
 #define KMIP_CONFIG_SERVER_PUBKEY_FILE		"server-pubkey.pem"
+#define KMIP_CONFIG_WRAPPING_KEY_FILE		"wrapping-key.skey"
+#define KMIP_CONFIG_WRAPPING_KEY_REENC_FILE	"wrapping-key.reenc"
 
 #define KMIP_CONFIG_APQNS			"apqns"
 #define KMIP_CONFIG_APQN_TYPE			"apqn-type"
@@ -65,6 +68,12 @@ struct plugin_handle {
 #define KMIP_CONFIG_SERVER_PUBKEY		"server-pubkey"
 #define KMIP_CONFIG_VERIFY_SERVER_CERT		"verify-server-cert"
 #define KMIP_CONFIG_VERIFY_HOSTNAME		"verify-hostname"
+#define KMIP_CONFIG_WRAPPING_KEY		"wrapping-key"
+#define KMIP_CONFIG_WRAPPING_KEY_REENC		"wrapping-key-reenc"
+#define KMIP_CONFIG_WRAPPING_KEY_ALGORITHM	"wrapping-key-algorithm"
+#define KMIP_CONFIG_WRAPPING_KEY_PARAMS		"wrapping-key-params"
+#define KMIP_CONFIG_WRAPPING_KEY_ID		"wrapping-key-id"
+#define KMIP_CONFIG_WRAPPING_KEY_LABEL		"wrapping-key-label"
 
 #define KMIP_APQN_TYPE_CCA			"CCA"
 #define KMIP_APQN_TYPE_EP11			"EP11"

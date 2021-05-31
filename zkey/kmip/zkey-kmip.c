@@ -34,7 +34,13 @@
 
 #include "libseckey/sk_utilities.h"
 
+#if OPENSSL_VERSION_PREREQ(3, 0)
+#include <openssl/core_names.h>
+#endif
+
 #define _set_error(ph, fmt...)	plugin_set_error(&(ph)->pd, fmt)
+
+#define KMS_KEY_PROP_DESCRIPTION	"description"
 
 #define FREE_AND_SET_NULL(ptr)					\
 	do {							\
@@ -297,10 +303,19 @@ static void _check_config_complete(struct plugin_handle *ph)
 		plugin_check_property(&ph->pd, KMIP_CONFIG_VERIFY_HOSTNAME) &&
 		plugin_check_property(&ph->pd, KMIP_CONFIG_PROTOCOL_VERSION);
 
+	ph->wrapping_key_avail =
+		plugin_check_property(&ph->pd, KMIP_CONFIG_WRAPPING_KEY) &&
+		plugin_check_property(&ph->pd,
+				      KMIP_CONFIG_WRAPPING_KEY_ALGORITHM) &&
+		plugin_check_property(&ph->pd,
+				      KMIP_CONFIG_WRAPPING_KEY_PARAMS) &&
+		plugin_check_property(&ph->pd, KMIP_CONFIG_WRAPPING_KEY_ID);
+
 	ph->config_complete = ph->apqns_configured &&
 			      ph->identity_key_generated &&
 			      ph->client_cert_avail &&
-			      ph->connection_configured;
+			      ph->connection_configured &&
+			      ph->wrapping_key_avail;
 }
 
 /**
@@ -1035,6 +1050,54 @@ int kms_display_info(const kms_handle_t handle)
 		}
 	}
 
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_WRAPPING_KEY_ID);
+	if (tmp != NULL) {
+		printf("  Wrapping key ID:      %s\n", tmp);
+		free(tmp);
+		tmp = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_WRAPPING_KEY_LABEL);
+		if (tmp != NULL) {
+			printf("  Wrapping key label:   %s\n", tmp);
+			free(tmp);
+		}
+		tmp = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_WRAPPING_KEY_ALGORITHM);
+		printf("  Wrapping algorithm:   %s", tmp);
+		rsa = strcmp(tmp, KMIP_KEY_ALGORITHM_RSA) == 0;
+		free(tmp);
+		tmp = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_WRAPPING_KEY_PARAMS);
+		if (tmp != NULL) {
+			printf(" (%s%s)", tmp, rsa ? " bits" : "");
+			free(tmp);
+		}
+		if (ph->profile != NULL) {
+			switch (ph->profile->wrap_padding_method) {
+			case KMIP_PADDING_METHOD_PKCS_1_5:
+				printf(" with PKCS 1.5 padding");
+				break;
+			case KMIP_PADDING_METHOD_OAEP:
+				printf(" with OAEP padding");
+				switch (ph->profile->wrap_hashing_algo) {
+				case KMIP_HASHING_ALGO_SHA_1:
+					printf(" using SHA-1");
+					break;
+				case KMIP_HASHING_ALGO_SHA_256:
+					printf(" using SHA-256");
+					break;
+				default:
+					break;
+				}
+				break;
+			default:
+				break;
+			}
+		}
+		printf("\n");
+	} else {
+		printf("  Wrapping key ID:      (configuration required)\n");
+	}
+
 	return 0;
 }
 
@@ -1284,6 +1347,30 @@ static const struct util_opt configure_options[] = {
 			"KMIP server.",
 		.command = KMS_COMMAND_CONFIGURE,
 	},
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS FOR WRAPPING KEY GENERATION",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "gen-wrapping-key", 0, NULL, 'w' },
+		.desc = "Generates a new wrapping key (key-encrypting key) "
+			"based on the settings in the profile and registers it "
+			"with the KMIP server. A wrapping key is automatically "
+			"generated when the KMIP server connection is "
+			"configured. Use this option to generate a new "
+			"wrapping key at a later time.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
+	{
+		.option = { "label", required_argument, NULL, 'B'},
+		.argument = "LABEL",
+		.desc = "Specifies an optional human-readable identifier of "
+			"the wrapping key stored in the 'Name' KMIP attribute "
+			"of the key. KMIP names must usually be unique within "
+			"the KMIP server.",
+		.command = KMS_COMMAND_CONFIGURE,
+	},
 	UTIL_OPT_END,
 };
 
@@ -1339,6 +1426,8 @@ struct config_options {
 	bool tls_trust_server_cert;
 	bool tls_dont_verify_server_cert;
 	bool tls_verify_hostname;
+	bool gen_wrapping_key;
+	const char *wrapping_key_label;
 };
 
 /**
@@ -2505,6 +2594,7 @@ static int _configure_connection(struct plugin_handle *ph,
 	bool self_signed = false;
 	bool verified = false;
 	bool valid = false;
+	char *file_name;
 	char tmp[50];
 	int rc;
 
@@ -2813,6 +2903,48 @@ static int _configure_connection(struct plugin_handle *ph,
 	if (rc != 0)
 		goto out;
 
+	/* Remove any wrapping key properties from previous configuration */
+	file_name = properties_get(ph->pd.properties, KMIP_CONFIG_WRAPPING_KEY);
+	if (file_name != NULL) {
+		remove(file_name);
+		free(file_name);
+	}
+	file_name = properties_get(ph->pd.properties,
+				   KMIP_CONFIG_WRAPPING_KEY_REENC);
+	if (file_name != NULL) {
+		remove(file_name);
+		free(file_name);
+	}
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_WRAPPING_KEY,
+					   NULL);
+	if (rc != 0)
+		goto out;
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_WRAPPING_KEY_REENC,
+					   NULL);
+	if (rc != 0)
+		goto out;
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_WRAPPING_KEY_ALGORITHM,
+					   NULL);
+	if (rc != 0)
+		goto out;
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_WRAPPING_KEY_PARAMS,
+					   NULL);
+	if (rc != 0)
+		goto out;
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_WRAPPING_KEY_ID,
+					   NULL);
+	if (rc != 0)
+		goto out;
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_WRAPPING_KEY_LABEL,
+					   NULL);
+	if (rc != 0)
+		goto out;
+
 out:
 	if (server_cert_temp != NULL) {
 		remove(server_cert_temp);
@@ -3032,6 +3164,587 @@ out:
 }
 
 /**
+ * Set the state of a key.
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the ID of the key to set the state
+ * @param state             the new state
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _set_key_state(struct plugin_handle *ph, const char *key_id,
+			  enum kmip_state state)
+{
+	struct kmip_node *uid = NULL, *req_pl = NULL, *resp_pl = NULL;
+	enum kmip_operation operation;
+	int rc;
+
+	uid = kmip_new_unique_identifier(key_id, 0, 0);
+	CHECK_ERROR(uid == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	switch (state) {
+	case KMIP_STATE_ACTIVE:
+		req_pl = kmip_new_activate_request_payload(uid);
+		operation = KMIP_OPERATION_ACTIVATE;
+		break;
+	case KMIP_STATE_DEACTIVATED:
+		req_pl = kmip_new_revoke_request_payload(uid,
+					KMIP_REVOK_RSN_SUPERSEDED, NULL, 0);
+		operation = KMIP_OPERATION_REVOKE;
+		break;
+	case KMIP_STATE_COMPROMISED:
+		req_pl = kmip_new_revoke_request_payload(uid,
+					KMIP_REVOK_RSN_KEY_COMPROMISE, NULL,
+					time(NULL));
+		operation = KMIP_OPERATION_REVOKE;
+		break;
+	case KMIP_STATE_DESTROYED:
+		req_pl = kmip_new_destroy_request_payload(uid);
+		operation = KMIP_OPERATION_DESTROY;
+		break;
+	default:
+		_set_error(ph, "Invalid state: %d", state);
+		rc = -EINVAL;
+		goto out;
+	}
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, operation, req_pl, &resp_pl);
+
+out:
+	kmip_node_free(uid);
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+
+	return rc;
+}
+
+/**
+ * Returns true if the KMIP server supports the 'Description' attribute.
+ * This is dependent on the profile settings, and the used KMIP protocol
+ * version (>= v1.4).
+ *
+ * @param ph                the plugin handle
+ *
+ * @return true or false
+ */
+static bool _supports_description_attr(struct plugin_handle *ph)
+{
+	if (ph->kmip_version.major <= 1)
+		return false;
+
+	if (ph->kmip_version.major == 1 && ph->kmip_version.minor < 4)
+		return false;
+
+	return ph->profile->supports_description_attr;
+}
+
+/**
+ * Returns true if the KMIP server supports the 'Comment' attribute.
+ * This is dependent on the profile settings, and the used KMIP protocol
+ * version (>= v1.4).
+ *
+ * @param ph                the plugin handle
+ *
+ * @return true or false
+ */
+static bool _supports_comment_attr(struct plugin_handle *ph)
+{
+	if (ph->kmip_version.major <= 1)
+		return false;
+
+	if (ph->kmip_version.major == 1 && ph->kmip_version.minor < 4)
+		return false;
+
+	return ph->profile->supports_comment_attr;
+}
+
+/**
+ * Destroy a key.
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the ID of the key to destroy
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _destroy_key(struct plugin_handle *ph, const char *key_id)
+{
+	struct kmip_node *uid = NULL, *req_pl = NULL, *resp_pl = NULL;
+	int rc;
+
+	uid = kmip_new_unique_identifier(key_id, 0, 0);
+	CHECK_ERROR(uid == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	req_pl = kmip_new_destroy_request_payload(uid);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_DESTROY, req_pl,
+				   &resp_pl);
+
+out:
+	kmip_node_free(uid);
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+
+	return rc;
+}
+
+/**
+ * Build Custom/Vendor attribute according to the Custom attribute style of the
+ * profile.
+ *
+ * @param ph                the plugin handle
+ * @param name              the attribute name
+ * @param value             the attribute value
+ *
+ * @returns the attribute node or NULL in case of an error.
+ */
+static struct kmip_node *_build_custom_attr(struct plugin_handle *ph,
+					    const char *name,
+					    const char *value)
+{
+	struct kmip_node *attr = NULL, *text;
+	char *v1_name = NULL;
+
+	text = kmip_node_new_text_string(KMIP_TAG_ATTRIBUTE_VALUE, NULL, value);
+
+	switch (ph->profile->cust_attr_scheme) {
+	case KMIP_PROFILE_CUST_ATTR_V1_STYLE:
+		util_asprintf(&v1_name, "zkey-%s", name);
+		attr = kmip_new_vendor_attribute("x", v1_name, text);
+		free(v1_name);
+		break;
+	case KMIP_PROFILE_CUST_ATTR_V2_STYLE:
+		attr = kmip_new_vendor_attribute("zkey", name, text);
+		break;
+	default:
+		_set_error(ph, "Invalid custom attribute style: %d",
+			   ph->profile->cust_attr_scheme);
+		goto out;
+	}
+
+out:
+	kmip_node_free(text);
+	return attr;
+}
+
+/**
+ * Build Description attribute, dependent on the profile settings.
+ * This is either a 'Description' attribute, a 'Comment' attribute, or a
+ * Custom/Vendor attribute according to the Custom attribute style of the
+ * profile.
+ *
+ * @param ph                the plugin handle
+ * @param description       the description text
+ *
+ * @returns the attribute node or NULL in case of an error.
+ */
+static struct kmip_node *_build_description_attr(struct plugin_handle *ph,
+						 const char *description)
+{
+	if (_supports_description_attr(ph))
+		return kmip_new_description(description);
+
+	if (_supports_comment_attr(ph))
+		return kmip_new_comment(description);
+
+	return _build_custom_attr(ph, KMS_KEY_PROP_DESCRIPTION, description);
+}
+
+/**
+ * Register and activate an RSA wrapping key.
+ *
+ * @param ph                the plugin handle
+ * @param pkey              the wrapping key as OpenSSL PKEY.
+ * @param wrapping_key_label the label name for the wrapping key (can be NULL)
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _register_rsa_wrapping_key(struct plugin_handle *ph, EVP_PKEY *pkey,
+				      const char *wrapping_key_label)
+{
+	struct kmip_node *kobj = NULL, *name_attr = NULL, *unique_id = NULL;
+	struct kmip_node *reg_req = NULL, *reg_resp = NULL, *descr_attr = NULL;
+	struct kmip_node *key = NULL, *kval = NULL, *kblock = NULL;
+	struct kmip_node *umask_attr = NULL, *cparams_attr = NULL;
+	struct kmip_node *act_req = NULL, *act_resp = NULL;
+#if !OPENSSL_VERSION_PREREQ(3, 0)
+	const BIGNUM *modulus = NULL, *pub_exp = NULL;
+#else
+	BIGNUM *modulus = NULL, *pub_exp = NULL;
+#endif
+	const char *wrap_key_id = NULL;
+	char *description = NULL;
+	struct utsname utsname;
+	int rc;
+
+	pr_verbose(&ph->pd, "Wrapping key format: %d",
+		   ph->profile->wrap_key_format);
+	pr_verbose(&ph->pd, "Wrap padding method: %d",
+		   ph->profile->wrap_padding_method);
+	pr_verbose(&ph->pd, "Wrap hashing algorithm: %d",
+		   ph->profile->wrap_hashing_algo);
+
+	switch (ph->profile->wrap_key_format) {
+	case KMIP_KEY_FORMAT_TYPE_PKCS_1:
+		key = kmip_new_pkcs1_public_key(pkey);
+		break;
+	case KMIP_KEY_FORMAT_TYPE_PKCS_8:
+		key = kmip_new_pkcs8_public_key(pkey);
+		break;
+	case KMIP_KEY_FORMAT_TYPE_TRANSPARENT_RSA_PUBLIC_KEY:
+#if !OPENSSL_VERSION_PREREQ(3, 0)
+		modulus = RSA_get0_n(EVP_PKEY_get0_RSA(pkey));
+		pub_exp = RSA_get0_e(EVP_PKEY_get0_RSA(pkey));
+#else
+		EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_RSA_N, &modulus);
+		EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_RSA_E, &pub_exp);
+#endif
+		if (modulus == NULL || pub_exp == NULL) {
+			_set_error(ph, "Failed to get RSA public key parts");
+			rc = -EIO;
+			goto out;
+		}
+
+		key = kmip_new_transparent_rsa_public_key(modulus, pub_exp);
+		break;
+	default:
+		_set_error(ph, "Unsupported wrapping key format: %d",
+			   ph->profile->wrap_key_format);
+		rc = -EINVAL;
+		goto out;
+	}
+	CHECK_ERROR(key == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	kval = kmip_new_key_value_va(NULL, key, 0);
+	CHECK_ERROR(kval == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	kblock = kmip_new_key_block(ph->profile->wrap_key_format, 0, kval,
+				    ph->profile->wrap_key_algo,
+				    ph->profile->wrap_key_size, NULL);
+	CHECK_ERROR(kblock == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	kobj = kmip_new_public_key(kblock);
+	CHECK_ERROR(kobj == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	if (wrapping_key_label != NULL) {
+		name_attr = kmip_new_name(wrapping_key_label,
+				KMIP_NAME_TYPE_UNINTERPRETED_TEXT_STRING);
+		CHECK_ERROR(name_attr == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+	}
+
+	umask_attr = kmip_new_cryptographic_usage_mask(
+						KMIP_CRY_USAGE_MASK_ENCRYPT |
+						KMIP_CRY_USAGE_MASK_WRAP_KEY);
+	CHECK_ERROR(umask_attr == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+
+	cparams_attr = kmip_new_cryptographic_parameters(NULL, 0,
+				ph->profile->wrap_padding_method,
+				ph->profile->wrap_padding_method ==
+					KMIP_PADDING_METHOD_OAEP ?
+					ph->profile->wrap_hashing_algo : 0,
+				KMIP_KEY_ROLE_TYPE_KEK, 0,
+				ph->profile->wrap_key_algo, NULL, NULL, NULL,
+				NULL, NULL, NULL, NULL, NULL,
+				ph->profile->wrap_padding_method ==
+					KMIP_PADDING_METHOD_OAEP ?
+					KMIP_MASK_GENERATOR_MGF1 : 0,
+				ph->profile->wrap_padding_method ==
+					KMIP_PADDING_METHOD_OAEP ?
+					ph->profile->wrap_hashing_algo : 0,
+				NULL);
+	CHECK_ERROR(cparams_attr == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+
+	if (uname(&utsname) != 0) {
+		rc = -errno;
+		_set_error(ph, "Failed to obtain the system's "
+			   "hostname: %s", strerror(-rc));
+		goto out;
+	}
+
+	util_asprintf(&description, "Wrapping key for zkey client on system %s",
+		      utsname.nodename);
+	descr_attr = _build_description_attr(ph, description);
+	free(description);
+	CHECK_ERROR(descr_attr == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+
+	reg_req = kmip_new_register_request_payload_va(NULL,
+					KMIP_OBJECT_TYPE_PUBLIC_KEY, kobj, NULL,
+					4, name_attr, umask_attr, cparams_attr,
+					descr_attr);
+	CHECK_ERROR(reg_req == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	act_req = kmip_new_activate_request_payload(NULL); /* ID placeholder */
+	CHECK_ERROR(act_req == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request2(ph, KMIP_OPERATION_REGISTER, reg_req,
+				    &reg_resp, KMIP_OPERATION_ACTIVATE, act_req,
+				    &act_resp, KMIP_BATCH_ERR_CONT_STOP);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_get_register_response_payload(reg_resp, &unique_id, NULL,
+						0, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get key unique-id", ph, out);
+
+	rc = kmip_get_unique_identifier(unique_id, &wrap_key_id, NULL, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get key unique-id", ph, out);
+
+	pr_verbose(&ph->pd, "Wrapping key ID: '%s'", wrap_key_id);
+
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_WRAPPING_KEY_ID,
+					   wrap_key_id);
+	if (rc != 0)
+		goto out;
+
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   KMIP_CONFIG_WRAPPING_KEY_LABEL,
+					   wrapping_key_label);
+	if (rc != 0)
+		goto out;
+
+out:
+	kmip_node_free(key);
+	kmip_node_free(kval);
+	kmip_node_free(kblock);
+	kmip_node_free(kobj);
+	kmip_node_free(name_attr);
+	kmip_node_free(umask_attr);
+	kmip_node_free(cparams_attr);
+	kmip_node_free(descr_attr);
+	kmip_node_free(reg_req);
+	kmip_node_free(reg_resp);
+	kmip_node_free(act_req);
+	kmip_node_free(act_resp);
+	kmip_node_free(unique_id);
+
+#if OPENSSL_VERSION_PREREQ(3, 0)
+	if (modulus != NULL)
+		BN_free(modulus);
+	if (pub_exp != NULL)
+		BN_free(pub_exp);
+#endif
+
+	return rc;
+}
+
+
+/**
+ * (Re-)Generate a wrapping key using the settings from the profile.
+ * register the new wrapping key with the KMIP server, and deactivate any
+ * previous wrapping key (if any).
+ *
+ * @param ph                the plugin handle
+ * @param wrapping_key_label the label name for the wrapping key (can be NULL)
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _generate_wrapping_key(struct plugin_handle *ph,
+				  const char *wrapping_key_label)
+{
+	unsigned char wrapping_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	size_t wrapping_key_size = sizeof(wrapping_key);
+	struct sk_key_gen_info gen_info = { 0 };
+	char *wrapping_key_file_tmp = NULL;
+	char *wrapping_key_file = NULL;
+	char *prev_wrap_key_id = NULL;
+	char *reenc_file = NULL;
+	EVP_PKEY *pkey = NULL;
+	char tmp[200];
+	int rc = 0;
+
+	_check_config_complete(ph);
+
+	if (!ph->apqns_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the APQNs used with this plugin.");
+		return -EINVAL;
+	}
+	if (!ph->connection_configured) {
+		_set_error(ph, "The configuration is incomplete, you must "
+			   "first configure the KMIP server connection.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	prev_wrap_key_id = properties_get(ph->pd.properties,
+					  KMIP_CONFIG_WRAPPING_KEY_ID);
+	pr_verbose(&ph->pd, "Previous wrapping key: '%s'", prev_wrap_key_id ?
+		   prev_wrap_key_id : "(none)");
+
+	pr_verbose(&ph->pd, "Wrapping key algorithm: %d",
+		   ph->profile->wrap_key_algo);
+	pr_verbose(&ph->pd, "Wrapping key size: %lu",
+		   ph->profile->wrap_key_size);
+
+	util_asprintf(&wrapping_key_file_tmp, "%s/%s-tmp", ph->pd.config_path,
+		      KMIP_CONFIG_WRAPPING_KEY_FILE);
+	util_asprintf((char **)&wrapping_key_file, "%s/%s", ph->pd.config_path,
+		      KMIP_CONFIG_WRAPPING_KEY_FILE);
+
+	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_WRAPPING_KEY,
+					   wrapping_key_file);
+	if (rc != 0)
+		goto out;
+
+	/* Generate the wrapping key */
+	switch (ph->profile->wrap_key_algo) {
+	case KMIP_CRYPTO_ALGO_RSA:
+		gen_info.type = SK_KEY_TYPE_RSA;
+
+		if (ph->profile->wrap_key_size == 0) {
+			_set_error(ph, "RSA Wrapping key size must be "
+				   "specified");
+			rc = -EINVAL;
+			goto out;
+		}
+		gen_info.rsa.modulus_bits = ph->profile->wrap_key_size;
+		gen_info.rsa.pub_exp = 65537;
+		gen_info.rsa.x9_31 = false;
+
+		rc = plugin_set_or_remove_property(&ph->pd,
+				KMIP_CONFIG_WRAPPING_KEY_ALGORITHM,
+				KMIP_KEY_ALGORITHM_RSA);
+		if (rc != 0)
+			goto out;
+
+		sprintf(tmp, "%lu", gen_info.rsa.modulus_bits);
+		rc = plugin_set_or_remove_property(&ph->pd,
+				KMIP_CONFIG_WRAPPING_KEY_PARAMS, tmp);
+		if (rc != 0)
+			goto out;
+
+		break;
+	default:
+		_set_error(ph, "Unsupported wrapping key algorithm: %d",
+			   ph->profile->wrap_key_algo);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = SK_OPENSSL_generate_secure_key(wrapping_key, &wrapping_key_size,
+					    &gen_info, &ph->ext_lib,
+					    ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to generate the wrapping key: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = SK_UTIL_write_key_blob(wrapping_key_file_tmp, wrapping_key,
+				    wrapping_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to write the wrapping key into file "
+			   "'%s': %s", wrapping_key_file_tmp, strerror(-rc));
+		goto out;
+	}
+
+	rc = plugin_set_file_permission(&ph->pd, wrapping_key_file_tmp);
+	if (rc != 0)
+		goto out;
+
+	/* Register the wrapping key with the KMIP server */
+	rc = SK_OPENSSL_get_secure_key_as_pkey(wrapping_key, wrapping_key_size,
+					       false, &pkey, &ph->ext_lib,
+					       ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to get the PKEY from the wrapping key: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
+	switch (ph->profile->wrap_key_algo) {
+	case KMIP_CRYPTO_ALGO_RSA:
+		rc = _register_rsa_wrapping_key(ph, pkey, wrapping_key_label);
+		if (rc != 0)
+			goto out;
+		break;
+
+	default:
+		_set_error(ph, "Unsupported wrapping key algorithm: %d",
+			   ph->profile->wrap_key_algo);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	/* Activate the newly created wrapping key */
+	rc = plugin_activate_temp_file(&ph->pd, wrapping_key_file_tmp,
+				       wrapping_key_file);
+	if (rc != 0)
+		goto out;
+
+	reenc_file = properties_get(ph->pd.properties,
+				    KMIP_CONFIG_WRAPPING_KEY_REENC);
+	if (reenc_file != NULL) {
+		remove(reenc_file);
+		free(reenc_file);
+		properties_remove(ph->pd.properties,
+				  KMIP_CONFIG_WRAPPING_KEY_REENC);
+	}
+
+	/* Deactivate and destroy previous wrapping key */
+	if (prev_wrap_key_id != NULL) {
+		rc = _set_key_state(ph, prev_wrap_key_id,
+				    KMIP_STATE_DEACTIVATED);
+		if (rc != 0) {
+			/* Ignore error, just issue warning message */
+			warnx("WARNING: Failed to deactivate the previous "
+			      "wrapping key '%s'", prev_wrap_key_id);
+			rc = 0;
+			plugin_clear_error(&ph->pd);
+			goto out;
+		}
+
+		printf("%s: Destroy the previous wrapping key at the KMIP "
+		       "server [y/N]? ", program_invocation_short_name);
+		if (!prompt_for_yes(ph->pd.verbose))
+			goto out;
+
+		rc = _destroy_key(ph, prev_wrap_key_id);
+		if (rc != 0) {
+			/* Ignore error, just issue warning message */
+			warnx("WARNING: Failed to destroy the previous "
+			      "wrapping key '%s'", prev_wrap_key_id);
+			rc = 0;
+			plugin_clear_error(&ph->pd);
+		}
+	}
+
+out:
+	if (wrapping_key_file_tmp != NULL) {
+		remove(wrapping_key_file_tmp);
+		free(wrapping_key_file_tmp);
+	}
+	if (wrapping_key_file != NULL)
+		free(wrapping_key_file);
+	if (prev_wrap_key_id != NULL)
+		free(prev_wrap_key_id);
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+
+	return rc;
+}
+
+/**
  * Configures (or re-configures) a KMS plugin. This function can be called
  * several times to configure a KMS plugin is several steps (if supported by the
  * KMS plugin). In case a configuration is not fully complete, this function
@@ -3186,6 +3899,12 @@ int kms_configure(const kms_handle_t handle,
 		case OPT_TLS_VERIFY_HOSTNAME:
 			opts.tls_verify_hostname = true;
 			break;
+		case 'w':
+			opts.gen_wrapping_key = true;
+			break;
+		case 'B':
+			opts.wrapping_key_label = options[i].argument;
+			break;
 		default:
 			rc = -EINVAL;
 			if (isalnum(options[i].option))
@@ -3257,11 +3976,20 @@ int kms_configure(const kms_handle_t handle,
 					   opts.tls_dont_verify_server_cert,
 					   opts.tls_verify_hostname);
 		config_changed = true;
+		opts.gen_wrapping_key = true;
 	} else {
 		rc = _error_connection_opts(ph, &opts);
 	}
 	if (rc != 0)
 		goto out;
+
+	if (opts.gen_wrapping_key) {
+		rc = _generate_wrapping_key(ph, opts.wrapping_key_label);
+		if (rc != 0)
+			goto out;
+
+		config_changed = true;
+	}
 
 out:
 	if (apqn_str != NULL)
