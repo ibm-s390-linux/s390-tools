@@ -28,11 +28,13 @@
 #include "zkey-kmip.h"
 #include "../kms-plugin.h"
 #include "../cca.h"
+#include "../ep11.h"
 #include "../utils.h"
 #include "../pkey.h"
 #include "../properties.h"
 
 #include "libseckey/sk_utilities.h"
+#include "libseckey/sk_ep11.h"
 
 #if OPENSSL_VERSION_PREREQ(3, 0)
 #include <openssl/core_names.h>
@@ -40,7 +42,38 @@
 
 #define _set_error(ph, fmt...)	plugin_set_error(&(ph)->pd, fmt)
 
+typedef void (*t_CSNDSYI)(long *return_code,
+			  long *reason_code,
+			  long *exit_data_length,
+			  unsigned char *exit_data,
+			  long *rule_array_count,
+			  unsigned char *rule_array,
+			  long *RSA_enciphered_key_length,
+			  unsigned char *RSA_enciphered_key,
+			  long *RSA_private_key_identifier_length,
+			  unsigned char *RSA_private_key_identifier,
+			  long *target_key_identifier_length,
+			  unsigned char *target_key_identifier);
+
+typedef CK_RV (*m_UnwrapKey_t)(const CK_BYTE_PTR wrapped, CK_ULONG wlen,
+			       const unsigned char *kek, size_t keklen,
+			       const unsigned char *mackey,
+			       size_t mklen, const unsigned char *pin,
+			       size_t pinlen,
+			       const CK_MECHANISM_PTR uwmech,
+			       const CK_ATTRIBUTE_PTR ptempl,
+			       CK_ULONG pcount,
+			       unsigned char *unwrapped, size_t *uwlen,
+			       CK_BYTE_PTR csum, CK_ULONG * cslen,
+			       target_t target);
+
+#define CKO_SECRET_KEY			0x00000004
+#define CKK_AES				0x0000001F
+#define CKA_IBM_PROTKEY_EXTRACTABLE	0x8001000C
+
 #define KMS_KEY_PROP_DESCRIPTION	"description"
+#define KMS_KEY_PROP_XTS_KEY1_ID	"xts-key1-id"
+#define KMS_KEY_PROP_XTS_KEY2_ID	"xts-key2-id"
 
 #define FREE_AND_SET_NULL(ptr)					\
 	do {							\
@@ -1386,6 +1419,24 @@ static const struct util_opt configure_options[] = {
 	UTIL_OPT_END,
 };
 
+static const struct util_opt generate_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS",
+		.command = KMS_COMMAND_GENERATE,
+	},
+	{
+		.option = { "label", required_argument, NULL, 'B'},
+		.argument = "LABEL[:LABEL]",
+		.desc = "Specifies an optional human-readable identifier of "
+			"the key or keys stored in the 'Name' KMIP attribute "
+			"of the key. KMIP names must be unique within the KMIP "
+			"server. For XTS type keys, two different labels must "
+			"be specified, separated by a colon.",
+		.command = KMS_COMMAND_GENERATE,
+	},
+	UTIL_OPT_END,
+};
 
 /**
  * Returns a list of KMS specific command line options that zkey should accept
@@ -1415,6 +1466,8 @@ const struct util_opt *kms_get_command_options(const char *command,
 
 	if (strcasecmp(command, KMS_COMMAND_CONFIGURE) == 0)
 		return configure_options;
+	if (strcasecmp(command, KMS_COMMAND_GENERATE) == 0)
+		return generate_options;
 
 	return NULL;
 }
@@ -3234,6 +3287,26 @@ out:
 }
 
 /**
+ * Returns true if the KMIP server supports the 'Sensitive' attribute.
+ * This is dependent on the profile settings, and the used KMIP protocol
+ * version (>= v1.4).
+ *
+ * @param ph                the plugin handle
+ *
+ * @return true or false
+ */
+static bool _supports_sensitive_attr(struct plugin_handle *ph)
+{
+	if (ph->kmip_version.major <= 1)
+		return false;
+
+	if (ph->kmip_version.major == 1 && ph->kmip_version.minor < 4)
+		return false;
+
+	return ph->profile->supports_sensitive_attr;
+}
+
+/**
  * Returns true if the KMIP server supports the 'Description' attribute.
  * This is dependent on the profile settings, and the used KMIP protocol
  * version (>= v1.4).
@@ -4472,6 +4545,893 @@ out:
 }
 
 /**
+ * Parse a label for use with the key mode. For a non-XTS key, the label must
+ * not contain a colon. For an XTS key, split the label at the colon and
+ * return the desired part.
+ *
+ * @param ph                the plugin handle
+ * @param label             the label to parse: 'label' or 'label1:label2'
+ * @param key_mode          the key mode to parse the label for
+ *
+ * @returns the label part to use for the key mode. The returned string must be
+ * freed by the caller. NULL is returnd in case of an error.
+ */
+static char *_parse_label(struct plugin_handle *ph, const char *label,
+			  enum kms_key_mode key_mode)
+{
+	char *tok, *ret = NULL;
+
+	tok = strchr(label, ':');
+
+	switch (key_mode) {
+	case KMS_KEY_MODE_NON_XTS:
+		if (tok != NULL) {
+			_set_error(ph, "Label can not contain a colon");
+			return NULL;
+		}
+
+		ret = util_strdup(label);
+		break;
+
+	case KMS_KEY_MODE_XTS_1:
+		if (tok == NULL) {
+			_set_error(ph, "For an XTS key two labels must "
+				   "be specified, separated by a colon");
+			return NULL;
+		}
+
+		ret = util_zalloc(tok - label + 1);
+		strncpy(ret, label, tok - label);
+		break;
+
+	case KMS_KEY_MODE_XTS_2:
+		if (tok == NULL) {
+			_set_error(ph, "For an XTS key two labels must "
+				   "be specified, separated by a colon");
+			return NULL;
+		}
+
+		ret = util_strdup(tok + 1);
+		break;
+
+	default:
+		_set_error(ph, "Unsupported key mode: %d", key_mode);
+		return NULL;
+	}
+
+	if (strlen(ret) == 0 || ret[0] == ' ') {
+		_set_error(ph, "The specified label is invalid: '%s'", ret);
+		free(ret);
+		return NULL;
+	}
+
+	return ret;
+}
+
+/**
+ * Build an KMIP attribute from a KMS property. Some KMS properties are
+ * converted into specific KMIP attributes, the others into Custom/Vendor
+ * attributes.
+ *
+ * @param ph                the plugin handle
+ * @param prop              the KMS property to build an Attribute for
+ *
+ * @returns The KMIP attribute node, or NULL in case of an error
+ */
+static struct kmip_node *_build_attr_from_prop(struct plugin_handle *ph,
+					       const struct kms_property *prop)
+{
+	struct kmip_node *attr, *linked_id;
+	const char *value = prop->value;
+
+	/* No empty values are allowed */
+	if (value == NULL || strlen(value) == 0)
+		value = " ";
+
+	if (strcmp(prop->name, KMS_KEY_PROP_DESCRIPTION) == 0)
+		return _build_description_attr(ph, value);
+
+	if (ph->profile->supports_link_attr &&
+	    strcmp(prop->name, KMS_KEY_PROP_XTS_KEY1_ID) == 0) {
+		linked_id = kmip_new_linked_object_identifier(value, 0, 0);
+		if (linked_id == NULL)
+			return NULL;
+
+		attr = kmip_new_link(KMIP_LINK_TYPE_PREVIOUS, linked_id);
+		kmip_node_free(linked_id);
+		return attr;
+	}
+
+	if (ph->profile->supports_link_attr &&
+	    strcmp(prop->name, KMS_KEY_PROP_XTS_KEY2_ID) == 0) {
+		linked_id = kmip_new_linked_object_identifier(value, 0, 0);
+		if (linked_id == NULL)
+			return NULL;
+
+		attr = kmip_new_link(KMIP_LINK_TYPE_NEXT, linked_id);
+		kmip_node_free(linked_id);
+		return attr;
+	}
+
+	return _build_custom_attr(ph, prop->name, value);
+}
+
+/**
+ * Generate an AES key at the KMIP server.
+ *
+ * @param ph                the plugin handle
+ * @param key_bits          the key size in bits (128, 196, 256)
+ * @param properties        the KMS properties to set
+ * @param num_properties    number of KMS properties
+ * @param label             the key label (can be NULL)
+ * @param key_id            On return: the key id. Must be freed by the caller.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _generate_aes_key(struct plugin_handle *ph, size_t key_bits,
+			     const struct kms_property *properties,
+			     size_t num_properties,
+			     const char *label, char **key_id)
+{
+	struct kmip_node *act_req = NULL, *act_resp = NULL, *unique_id = NULL;
+	struct kmip_node **attrs = NULL, *crea_req = NULL, *crea_resp = NULL;
+	unsigned int num_attrs, i, idx = 0;
+	const char *uid;
+	int rc = 0;
+
+	num_attrs = 3 + (_supports_sensitive_attr(ph) ? 1 : 0) +
+		    (label != NULL ? 1 : 0) + num_properties;
+	attrs = util_zalloc(num_attrs * sizeof(struct kmip_node *));
+
+	attrs[idx] = kmip_new_cryptographic_algorithm(KMIP_CRYPTO_ALGO_AES);
+	CHECK_ERROR(attrs[idx] == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+	idx++;
+
+	attrs[idx] = kmip_new_cryptographic_length(key_bits);
+	CHECK_ERROR(attrs[idx] == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+	idx++;
+
+	attrs[idx] = kmip_new_cryptographic_usage_mask(
+		KMIP_CRY_USAGE_MASK_ENCRYPT | KMIP_CRY_USAGE_MASK_DECRYPT);
+	CHECK_ERROR(attrs[idx] == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+	idx++;
+
+	if (_supports_sensitive_attr(ph)) {
+		attrs[idx] = kmip_new_sensitive(true);
+		CHECK_ERROR(attrs[idx] == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+		idx++;
+	}
+
+	if (label != NULL) {
+		attrs[idx] = kmip_new_name(label,
+				KMIP_NAME_TYPE_UNINTERPRETED_TEXT_STRING);
+		CHECK_ERROR(attrs[idx] == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+		idx++;
+	}
+
+	for (i = 0; i < num_properties; i++) {
+		attrs[idx] = _build_attr_from_prop(ph, &properties[i]);
+		CHECK_ERROR(attrs[idx] == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+		idx++;
+	}
+
+	crea_req = kmip_new_create_request_payload(NULL,
+					KMIP_OBJECT_TYPE_SYMMETRIC_KEY, NULL,
+					num_attrs, attrs);
+	CHECK_ERROR(crea_req == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	act_req = kmip_new_activate_request_payload(NULL); /* ID placeholder */
+	CHECK_ERROR(act_req == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request2(ph, KMIP_OPERATION_CREATE, crea_req,
+				    &crea_resp, KMIP_OPERATION_ACTIVATE,
+				    act_req, &act_resp,
+				    KMIP_BATCH_ERR_CONT_STOP);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_get_create_response_payload(crea_resp, NULL, &unique_id,
+					      NULL, 0, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get key unique-id", ph, out);
+
+	rc = kmip_get_unique_identifier(unique_id, &uid, NULL, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get key unique-id", ph, out);
+
+	pr_verbose(&ph->pd, "Key ID: '%s'", uid);
+
+	*key_id = util_strdup(uid);
+
+out:
+	if (attrs != NULL) {
+		for (i = 0; i < num_attrs; i++)
+			kmip_node_free(attrs[i]);
+		free(attrs);
+	}
+	kmip_node_free(crea_req);
+	kmip_node_free(crea_resp);
+	kmip_node_free(act_req);
+	kmip_node_free(act_resp);
+
+	return rc;
+}
+
+/**
+ * Retrieves an AES key from the KMIP server. The key is wrapped with the
+ * RSA wrapping key.
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the key id of the key to get
+ * @param wrapped_key       On return: an allocated buffer with the wrapped key.
+ *                          Must be freed by the caller.
+ * @param wrapped_key_len   On return: the size of the wrapped key.
+ * @param key_bits          On return the cryptographic size of the key in bits
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _get_key_rsa_wrapped(struct plugin_handle *ph, const char *key_id,
+				unsigned char **wrapped_key,
+				size_t *wrapped_key_len, size_t *key_bits)
+{
+	struct kmip_node *cparams = NULL, *wrap_id = NULL, *wkey_info = NULL;
+	struct kmip_node *wrap_spec = NULL, *req_pl = NULL, *resp_pl = NULL;
+	struct kmip_node *uid = NULL, *kobj = NULL, *kblock = NULL;
+	struct kmip_node *kval = NULL, *wrap = NULL, *key = NULL;
+	struct kmip_node *wkinfo = NULL, *wcparms = NULL;
+	enum kmip_hashing_algo halgo, mgfhalgo;
+	enum kmip_wrapping_method wmethod;
+	enum kmip_key_format_type ftype;
+	enum kmip_padding_method pmeth;
+	enum kmip_encoding_option enc;
+	enum kmip_mask_generator mgf;
+	enum kmip_object_type otype;
+	enum kmip_crypto_algo algo;
+	const unsigned char *kdata;
+	char *wrap_key_id = NULL;
+	uint32_t klen;
+	int32_t bits;
+	int rc = 0;
+
+	pr_verbose(&ph->pd, "Wrap padding method: %d",
+		   ph->profile->wrap_padding_method);
+	pr_verbose(&ph->pd, "Wrap hashing algorithm: %d",
+		   ph->profile->wrap_hashing_algo);
+
+	wrap_key_id = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_WRAPPING_KEY_ID);
+	if (wrap_key_id == NULL) {
+		_set_error(ph, "Wrapping key ID is not available");
+		return -EINVAL;
+	}
+
+	pr_verbose(&ph->pd, "Wrapping key id: '%s'", wrap_key_id);
+
+	cparams = kmip_new_cryptographic_parameters(NULL, 0,
+				ph->profile->wrap_padding_method,
+				ph->profile->wrap_padding_method ==
+					KMIP_PADDING_METHOD_OAEP ?
+					ph->profile->wrap_hashing_algo : 0,
+				KMIP_KEY_ROLE_TYPE_KEK, 0,
+				ph->profile->wrap_key_algo, NULL, NULL, NULL,
+				NULL, NULL, NULL, NULL, NULL,
+				ph->profile->wrap_padding_method ==
+					KMIP_PADDING_METHOD_OAEP ?
+					KMIP_MASK_GENERATOR_MGF1 : 0,
+				ph->profile->wrap_padding_method ==
+					KMIP_PADDING_METHOD_OAEP ?
+					ph->profile->wrap_hashing_algo : 0,
+				NULL);
+	CHECK_ERROR(cparams == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	wrap_id = kmip_new_unique_identifier(wrap_key_id, 0, 0);
+	CHECK_ERROR(wrap_id == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	wkey_info = kmip_new_key_info(false, wrap_id, cparams);
+	CHECK_ERROR(wkey_info == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	wrap_spec = kmip_new_key_wrapping_specification_va(NULL,
+				KMIP_WRAPPING_METHOD_ENCRYPT, wkey_info, NULL,
+				KMIP_ENCODING_OPTION_NO, 0);
+	CHECK_ERROR(wrap_spec == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	uid = kmip_new_unique_identifier(key_id, 0, 0);
+	CHECK_ERROR(uid == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	req_pl = kmip_new_get_request_payload(NULL, uid,
+					      KMIP_KEY_FORMAT_TYPE_RAW, 0, 0,
+					      wrap_spec);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_GET, req_pl, &resp_pl);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_get_get_response_payload(resp_pl, &otype, NULL, &kobj);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get wrapped key", ph, out);
+	CHECK_ERROR(otype != KMIP_OBJECT_TYPE_SYMMETRIC_KEY, rc, -EINVAL,
+		    "Key is not a symmetric key", ph, out);
+
+	rc = kmip_get_symmetric_key(kobj, &kblock);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get symmetric key", ph, out);
+
+	rc = kmip_get_key_block(kblock, &ftype, NULL, &kval, &algo, &bits,
+				&wrap);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get key block", ph, out);
+	CHECK_ERROR(ftype != KMIP_KEY_FORMAT_TYPE_RAW, rc, -EINVAL,
+		    "Key format is not RAW", ph, out);
+	CHECK_ERROR(algo != KMIP_CRYPTO_ALGO_AES, rc, -EINVAL,
+			    "Key algorithm is not AES", ph, out);
+	CHECK_ERROR(bits < 128 || bits > 256, rc, -EINVAL,
+		    "Key bit size is invalid", ph, out);
+
+	rc = kmip_get_key_wrapping_data(wrap, &wmethod, &wkinfo, NULL, NULL,
+					NULL, NULL, NULL, &enc);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get wrapping data", ph, out);
+	CHECK_ERROR(wmethod != KMIP_WRAPPING_METHOD_ENCRYPT, rc, -EINVAL,
+		    "Wrapping method is not 'Encrypt'", ph, out);
+	if (ph->kmip_version.major > 1 ||
+	    (ph->kmip_version.major == 1 && ph->kmip_version.minor >= 2)) {
+		CHECK_ERROR(enc != KMIP_ENCODING_OPTION_NO, rc, -EINVAL,
+			    "Encoding is not 'No encoding'", ph, out);
+	}
+
+	rc = kmip_get_key_info(wkinfo, NULL, &wcparms);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get wrap key infos", ph, out);
+
+	rc = kmip_get_cryptographic_parameter(wcparms, NULL, &pmeth, &halgo,
+					      NULL, NULL, &algo, NULL, NULL,
+					      NULL, NULL, NULL, NULL, NULL,
+					      NULL, &mgf, &mgfhalgo, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get crypto params", ph, out);
+	if (ph->kmip_version.major > 1 ||
+	    (ph->kmip_version.major == 1 && ph->kmip_version.minor >= 2)) {
+		CHECK_ERROR(algo != ph->profile->wrap_key_algo, rc, -EINVAL,
+			    "wrap algorithm is not as expected", ph, out);
+	}
+	CHECK_ERROR(pmeth != ph->profile->wrap_padding_method, rc, -EINVAL,
+		    "padding method is not as expected", ph, out);
+	if (ph->profile->wrap_padding_method == KMIP_PADDING_METHOD_OAEP) {
+		CHECK_ERROR(halgo != ph->profile->wrap_hashing_algo, rc,
+			    -EINVAL, "hashing algorithm is not as expected",
+			    ph, out);
+		if (ph->kmip_version.major > 1 ||
+		    (ph->kmip_version.major == 1 &&
+		     ph->kmip_version.minor >= 4)) {
+			CHECK_ERROR(mgf != KMIP_MASK_GENERATOR_MGF1, rc,
+				    -EINVAL, "OAEP MGF is not as expected",
+				    ph, out);
+			CHECK_ERROR(mgfhalgo != ph->profile->wrap_hashing_algo,
+				    rc, -EINVAL, "MGF hashing algorithm is not "
+				    "as expected", ph, out);
+		}
+	}
+
+	rc = kmip_get_key_value(kval, &key, NULL, 0, NULL);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get key value", ph, out);
+
+	kdata = kmip_node_get_byte_string(key, &klen);
+	CHECK_ERROR(kdata == NULL, rc, -ENOMEM, "Failed to get key data",
+		    ph, out);
+
+	pr_verbose(&ph->pd, "Wrapped key size: %u", klen);
+	*wrapped_key = util_malloc(klen);
+	*wrapped_key_len = klen;
+	memcpy(*wrapped_key, kdata, klen);
+
+	pr_verbose(&ph->pd, "AES key size: %u bits", bits);
+	*key_bits = bits;
+
+out:
+	kmip_node_free(cparams);
+	kmip_node_free(wrap_id);
+	kmip_node_free(wkey_info);
+	kmip_node_free(wrap_spec);
+	kmip_node_free(uid);
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+	kmip_node_free(kobj);
+	kmip_node_free(kblock);
+	kmip_node_free(kval);
+	kmip_node_free(wrap);
+	kmip_node_free(wkinfo);
+	kmip_node_free(wcparms);
+	kmip_node_free(key);
+
+	if (wrap_key_id != NULL)
+		free(wrap_key_id);
+
+	return rc;
+}
+
+
+
+/**
+ * Unwraps (Imports) an wrapped AES key with an CCA RSA wrapping key
+ *
+ * @param ph                the plugin handle
+ * @param wrapping_key      a buffer containing the wrapping secure key
+ * @param wrapping_key_len  the size of the wrapping key
+ * @param wrapped_key       a buffer containing the wrapped key
+ * @param wrapped_key_len   the size of the wrapped key
+ * @param key_blob          A buffer to store the secure key to
+ * @param key_blob_length   On entry: the size of the key blob buffer.
+ *                          On return: the size of the key blob
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _cca_unwrap_key_rsa(struct plugin_handle *ph,
+			       const unsigned char *wrapping_key,
+			       size_t wrapping_key_len,
+			       const unsigned char *wrapped_key,
+			       size_t wrapped_key_len,
+			       unsigned char *unwrapped_key,
+			       size_t *unwrapped_key_len)
+{
+	long return_code, reason_code, rule_array_count;
+	unsigned char rule_array[3 * 8] = { 0 };
+	t_CSNDSYI dll_CSNDSYI;
+
+	/* Get the Symmetric Key Import function */
+	dll_CSNDSYI = (t_CSNDSYI)dlsym(ph->cca_lib.cca_lib, "CSNDSYI");
+	if (dll_CSNDSYI == NULL) {
+		_set_error(ph, "CCA library function CSNDSYI is not available");
+		return -ELIBACC;
+	}
+
+	pr_verbose(&ph->pd, "Wrap padding method: %d",
+		   ph->profile->wrap_padding_method);
+	pr_verbose(&ph->pd, "Wrap hashing algorithm: %d",
+		   ph->profile->wrap_hashing_algo);
+
+	memset(unwrapped_key, 0, *unwrapped_key_len);
+
+	switch (ph->profile->wrap_padding_method) {
+	case KMIP_PADDING_METHOD_PKCS_1_5:
+		rule_array_count = 2;
+		memcpy(rule_array, "AES     PKCS-1.2 ", 2 * 8);
+		break;
+
+	case KMIP_PADDING_METHOD_OAEP:
+		rule_array_count = 3;
+		switch (ph->profile->wrap_hashing_algo) {
+		case KMIP_HASHING_ALGO_SHA_1:
+			memcpy(rule_array, "AES     PKCSOAEPSHA-1   ", 3 * 8);
+			break;
+
+		case KMIP_HASHING_ALGO_SHA_256:
+			memcpy(rule_array, "AES     PKCSOAEPSHA-256 ", 3 * 8);
+			break;
+
+		default:
+			_set_error(ph, "Unsupported hashing algorithm: %d",
+				   ph->profile->wrap_hashing_algo);
+			return -EINVAL;
+		}
+		break;
+	default:
+		_set_error(ph, "Unsupported padding method: %d",
+			   ph->profile->wrap_padding_method);
+		return -EINVAL;
+	}
+
+	*unwrapped_key_len = AESDATA_KEY_SIZE;
+
+	dll_CSNDSYI(&return_code, &reason_code, NULL, NULL,
+		    &rule_array_count, rule_array,
+		    (long *)&wrapped_key_len, (unsigned char *)wrapped_key,
+		    (long *)&wrapping_key_len, (unsigned char *)wrapping_key,
+		    (long *)&unwrapped_key_len, unwrapped_key);
+
+	if (return_code != 0) {
+		_set_error(ph, "CCA CSNDSYI (SYMMETRIC KEY IMPORT) failed. "
+			   " return: %ld, reason: %ld", return_code,
+			   reason_code);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * Unwraps an wrapped AES key with an EP11 RSA wrapping key
+ *
+ * @param ph                the plugin handle
+ * @param wrapping_key      a buffer containing the wrapping secure key
+ * @param wrapping_key_len  the size of the wrapping key
+ * @param wrapped_key       a buffer containing the wrapped key
+ * @param wrapped_key_len   the size of the wrapped key
+ * @param key_blob          A buffer to store the secure key to
+ * @param key_blob_length   On entry: the size of the key blob buffer.
+ *                          On return: the size of the key blob *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _ep11_unwrap_key_rsa(struct plugin_handle *ph,
+			       const unsigned char *wrapping_key,
+			       size_t wrapping_key_len,
+			       const unsigned char *wrapped_key,
+			       size_t wrapped_key_len,
+			       unsigned char *unwrapped_key,
+			       size_t *unwrapped_key_len)
+{
+	CK_OBJECT_CLASS key_class = CKO_SECRET_KEY;
+	CK_RSA_PKCS_OAEP_PARAMS oaep_param = { 0 };
+	size_t csum_len, key_blob_len, bit_len;
+	CK_KEY_TYPE key_type = CKK_AES;
+	m_UnwrapKey_t dll_m_UnwrapKey;
+	const unsigned char *key_blob;
+	struct ep11keytoken *ep11key;
+	CK_MECHANISM mech = { 0 };
+	CK_BYTE csum[7] = { 0 };
+	CK_BBOOL ck_true = true;
+	CK_RV rv;
+
+	CK_ATTRIBUTE template[] = {
+		{ CKA_CLASS, &key_class, sizeof(key_class) },
+		{ CKA_KEY_TYPE, &key_type, sizeof(key_type) },
+		{ CKA_ENCRYPT, &ck_true, sizeof(ck_true) },
+		{ CKA_DECRYPT, &ck_true, sizeof(ck_true) },
+		{ CKA_SIGN, &ck_true, sizeof(ck_true) },
+		{ CKA_VERIFY, &ck_true, sizeof(ck_true) },
+		{ CKA_IBM_PROTKEY_EXTRACTABLE, &ck_true, sizeof(ck_true) },
+	};
+
+	dll_m_UnwrapKey =
+		(m_UnwrapKey_t)dlsym(ph->ep11.lib_ep11, "m_UnwrapKey");
+	if (dll_m_UnwrapKey == NULL) {
+		_set_error(ph, "EP11 library function m_UnwrapKey is not "
+			   "available");
+		return -ELIBACC;
+	}
+
+	pr_verbose(&ph->pd, "Wrap padding method: %d",
+		   ph->profile->wrap_padding_method);
+	pr_verbose(&ph->pd, "Wrap hashing algorithm: %d",
+		   ph->profile->wrap_hashing_algo);
+
+	if (*unwrapped_key_len < sizeof(struct ep11keytoken)) {
+		_set_error(ph, "Key buffer is too small");
+		return -EINVAL;
+	}
+	memset(unwrapped_key, 0, *unwrapped_key_len);
+
+	switch (ph->profile->wrap_padding_method) {
+	case KMIP_PADDING_METHOD_PKCS_1_5:
+		mech.mechanism = CKM_RSA_PKCS;
+		break;
+
+	case KMIP_PADDING_METHOD_OAEP:
+		mech.mechanism = CKM_RSA_PKCS_OAEP;
+		mech.pParameter = &oaep_param;
+		mech.ulParameterLen = sizeof(oaep_param);
+
+		switch (ph->profile->wrap_hashing_algo) {
+		case KMIP_HASHING_ALGO_SHA_1:
+			oaep_param.hashAlg = CKM_SHA_1;
+			oaep_param.mgf = CKG_MGF1_SHA1;
+			break;
+
+		case KMIP_HASHING_ALGO_SHA_256:
+			oaep_param.hashAlg = CKM_SHA256;
+			oaep_param.mgf = CKG_MGF1_SHA256;
+			break;
+
+		default:
+			_set_error(ph, "Unsupported hashing algorithm: %d",
+				   ph->profile->wrap_hashing_algo);
+			return -EINVAL;
+		}
+		break;
+	default:
+		_set_error(ph, "Unsupported padding method: %d",
+			   ph->profile->wrap_padding_method);
+		return -EINVAL;
+	}
+
+	key_blob = SK_EP11_get_key_blob(wrapping_key, wrapping_key_len);
+	key_blob_len = SK_EP11_get_key_blob_size(wrapping_key,
+						 wrapping_key_len);
+	if (key_blob == NULL || key_blob_len == 0) {
+		_set_error(ph, "Invalid EP11 key blob");
+		return -EINVAL;
+	}
+
+	csum_len = sizeof(csum);
+
+	rv = dll_m_UnwrapKey((unsigned char *)wrapped_key, wrapped_key_len,
+			     key_blob, key_blob_len, NULL, 0, NULL, 0, &mech,
+			     template, sizeof(template) / sizeof(CK_ATTRIBUTE),
+			     unwrapped_key, unwrapped_key_len,
+			     csum, &csum_len,
+			     ph->ep11_lib.target);
+	pr_verbose(&ph->pd, "EP11 m_UnwrapKey: rv: 0x%08lx", rv);
+	if (rv != CKR_OK) {
+		_set_error(ph, "EP11 m_UnwrapKey failed, rv: 0x%08lx", rv);
+		return -EIO;
+	}
+
+	pr_verbose(&ph->pd, "unwrapped_key_len: %lu", *unwrapped_key_len);
+	if (*unwrapped_key_len > sizeof(struct ep11keytoken)) {
+		_set_error(ph, "Unwrapped EP11 key blob is too long");
+		return -EIO;
+	}
+
+	if (csum_len < 4) {
+		_set_error(ph, "EP11 m_UnwrapKey returned invalid key infos");
+		return -EIO;
+	}
+	bit_len = csum[csum_len - 1] + 256 * csum[csum_len - 2] +
+		  256 * 256 * csum[csum_len - 3] +
+		  256 * 256 * 256 * csum[csum_len - 4];
+
+	/* Setup the EP11 token header */
+	ep11key = (struct ep11keytoken *)unwrapped_key;
+	memset(&ep11key->session, 0, sizeof(ep11key->session));
+	ep11key->head.type = TOKEN_TYPE_NON_CCA;
+	ep11key->head.length = *unwrapped_key_len;
+	ep11key->head.version = TOKEN_VERSION_EP11_AES;
+	ep11key->head.keybitlen = bit_len;
+
+	pr_verbose(&ph->pd, "unwrapped bit length: %u",
+		   ep11key->head.keybitlen);
+
+	/* return full length, blob is already zero padded */
+	*unwrapped_key_len = sizeof(struct ep11keytoken);
+
+	return 0;
+}
+
+/**
+ * Unwraps an wrapped AES key with the RSA wrapping key
+ *
+ * @param ph                the plugin handle
+ * @param wrapped_key       a buffer containing the wrapped key
+ * @param wrapped_key_len   the size of the wrapped key
+ * @param key_blob          A buffer to store the secure key to
+ * @param key_blob_length   On entry: the size of the key blob buffer.
+ *                          On return: the size of the key blob
+ * @param key_type          The key type to unwrap
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _unwrap_key_rsa(struct plugin_handle *ph,
+			   const unsigned char *wrapped_key,
+			   size_t wrapped_key_len,
+			   unsigned char *key_blob,
+			   size_t *key_blob_length,
+			   const char *key_type)
+{
+	unsigned char wrapping_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	unsigned char secure_key[MAX_SECURE_KEY_SIZE] = { 0 };
+	size_t wrapping_key_size = sizeof(wrapping_key);
+	size_t secure_key_len = sizeof(secure_key);
+	char *wrapping_key_file = NULL;
+	unsigned int out_len;
+	int rc;
+
+	wrapping_key_file = properties_get(ph->pd.properties,
+					   KMIP_CONFIG_WRAPPING_KEY);
+	if (wrapping_key_file == NULL) {
+		_set_error(ph, "Wrapping key is not available");
+		return -EINVAL;
+	}
+
+	rc = SK_UTIL_read_key_blob(wrapping_key_file, wrapping_key,
+				   &wrapping_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to load the secure key from '%s': %s",
+			   wrapping_key_file, strerror(-rc));
+		goto out;
+	}
+
+	switch (ph->card_type) {
+	case CARD_TYPE_CCA:
+		rc = _cca_unwrap_key_rsa(ph, wrapping_key, wrapping_key_size,
+					 wrapped_key, wrapped_key_len,
+					 secure_key, &secure_key_len);
+		if (rc != 0)
+			goto out;
+
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0) {
+			if (*key_blob_length < secure_key_len) {
+				_set_error(ph, "Secure key too large");
+				rc = -EINVAL;
+				goto out;
+			}
+
+			*key_blob_length = secure_key_len;
+			memcpy(key_blob, secure_key, secure_key_len);
+			goto out;
+		}
+
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) != 0) {
+			_set_error(ph, "Unsupported key type '%s'", key_type);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		out_len = *key_blob_length;
+		rc = convert_aes_data_to_cipher_key(&ph->cca,
+						    secure_key, secure_key_len,
+						    key_blob, &out_len,
+						    ph->pd.verbose);
+		if (rc != 0) {
+			_set_error(ph, "Converting the secure key from "
+				   "CCA-AESDATA to CCA-AESCIPHER has failed");
+			goto out;
+		}
+		*key_blob_length = out_len;
+
+		rc = restrict_key_export(&ph->cca, key_blob, *key_blob_length,
+					 ph->pd.verbose);
+		if (rc != 0) {
+			_set_error(ph, "Export restricting the secure key has "
+				   "failed");
+			goto out;
+		}
+		break;
+
+	case CARD_TYPE_EP11:
+		rc = _ep11_unwrap_key_rsa(ph, wrapping_key, wrapping_key_size,
+					  wrapped_key, wrapped_key_len,
+					  secure_key, &secure_key_len);
+		if (rc != 0)
+			goto out;
+
+		*key_blob_length = secure_key_len;
+		memcpy(key_blob, secure_key, secure_key_len);
+		break;
+
+	default:
+		_set_error(ph, "Unsupported card type: %d", ph->card_type);
+		rc = -EINVAL;
+		break;
+	}
+
+out:
+	if (wrapping_key_file != NULL)
+		free(wrapping_key_file);
+
+	return rc;
+}
+
+/**
+ * Check if the 'Always Sensitive' attribute is True for the key
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the ID of the key to check
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _check_always_sensitive(struct plugin_handle *ph, const char *key_id)
+{
+	struct kmip_node *uid = NULL, *req_pl = NULL, *resp_pl = NULL;
+	struct kmip_node *attr_ref = NULL, *attr = NULL;
+	int rc;
+
+	uid = kmip_new_unique_identifier(key_id, 0, 0);
+	CHECK_ERROR(uid == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	attr_ref = kmip_new_attribute_reference(KMIP_TAG_ALWAYS_SENSITIVE, NULL,
+						NULL);
+	CHECK_ERROR(attr_ref == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	req_pl = kmip_new_get_attributes_request_payload_va(NULL, uid, 1,
+							    attr_ref);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_GET_ATTRIBUTES, req_pl,
+				   &resp_pl);
+	if (rc != 0)
+		goto out;
+
+	rc = kmip_get_get_attributes_response_payload(resp_pl, NULL, NULL,
+						      0, &attr);
+	CHECK_ERROR(rc != 0, rc, rc, "Failed to get attribute", ph, out);
+	CHECK_ERROR(kmip_node_get_tag(attr) != KMIP_TAG_ALWAYS_SENSITIVE, rc,
+		    -EINVAL, "Unexpected attribute", ph, out);
+
+	if (kmip_node_get_boolean(attr) != true) {
+		_set_error(ph, "The 'Always Sensitive' attribute of the key "
+			   "'%s' is false. This key might have been retrieved "
+			   "in clear.", key_id);
+		rc = -EPERM;
+		goto out;
+	}
+
+out:
+	kmip_node_free(uid);
+	kmip_node_free(attr_ref);
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+	kmip_node_free(attr);
+
+	return rc;
+}
+
+/**
+ * Retrieves an AES key from the KMIP server in the specified key type
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the key id of the key to get
+ * @param key_blob          A buffer to store the secure key to
+ * @param key_blob_length   On entry: the size of the key blob buffer.
+ *                          On return: the size of the key blob
+ * @param key_type          The key type to retrieve
+ * @param key_bits          The expected key size, or 0 if it is not known
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _retrieve_key(struct plugin_handle *ph, const char *key_id,
+			 unsigned char *key_blob, size_t *key_blob_length,
+			 const char *key_type, size_t key_bits)
+{
+
+	size_t bits = 0, wrapped_key_len = 0;
+	unsigned char *wrapped_key = NULL;
+	int rc = 0;
+
+	if (_supports_sensitive_attr(ph) &&
+	    ph->profile->check_always_sensitive_attr) {
+		rc = _check_always_sensitive(ph, key_id);
+		if (rc != 0)
+			goto out;
+	}
+
+	pr_verbose(&ph->pd, "Wrapping key algorithm: %d",
+		   ph->profile->wrap_key_algo);
+
+	switch (ph->profile->wrap_key_algo) {
+	case KMIP_CRYPTO_ALGO_RSA:
+		rc = _get_key_rsa_wrapped(ph, key_id, &wrapped_key,
+					  &wrapped_key_len, &bits);
+		if (rc != 0)
+			goto out;
+
+		if (key_bits != 0 && key_bits != bits) {
+			_set_error(ph, "The retrieved key has an unexpected "
+				   "key size: %u (expected %u)", bits,
+				   key_bits);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		rc = _unwrap_key_rsa(ph, wrapped_key, wrapped_key_len,
+				     key_blob, key_blob_length, key_type);
+		if (rc != 0)
+			goto out;
+		break;
+	default:
+		_set_error(ph, "Unsupported wrapping key algorithm: %d",
+			   ph->profile->wrap_key_algo);
+		return -EINVAL;
+
+	}
+
+out:
+	if (wrapped_key != NULL)
+		free(wrapped_key);
+
+	return rc;
+}
+
+
+/**
  * Generates a key in or with the KMS and returns a secure key that is
  * enciphered under the current HSM master key.
  *
@@ -4519,7 +5479,9 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		     char *key_label, size_t key_label_size)
 {
 	struct plugin_handle *ph = handle;
+	char *label = NULL, *id = NULL;
 	size_t i;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(num_properties == 0 || properties != NULL,
@@ -4558,7 +5520,71 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 'B':
+			if (label != NULL)
+				break;
+			label = _parse_label(ph, options[i].argument, key_mode);
+			if (label == NULL)
+				return -EINVAL;
+			break;
+		default:
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	pr_verbose(&ph->pd, "Label: '%s'", label ? label : "(none)");
+
+	if (key_bits == 0)
+		key_bits = DEFAULT_KEYBITS;
+
+	rc = _generate_aes_key(ph, key_bits, properties, num_properties, label,
+			       &id);
+	if (rc != 0)
+		goto out;
+
+	rc = _retrieve_key(ph, id, key_blob, key_blob_length, key_type,
+			   key_bits);
+	if (rc != 0)
+		goto out;
+
+	strncpy(key_id, id, key_id_size);
+	key_id[key_id_size - 1] = '\0';
+
+	strncpy(key_label, label != NULL ? label : id, key_label_size);
+	key_label[key_label_size - 1] = '\0';
+
+	pr_verbose(&ph->pd, "Generated key id: '%s'", key_id);
+	pr_verbose(&ph->pd, "Generated key label: '%s'", key_label);
+
+out:
+	if (label != NULL)
+		free(label);
+	if (id != NULL)
+		free(id);
+
+	return rc;
 }
 
 /**
