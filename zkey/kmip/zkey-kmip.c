@@ -943,6 +943,11 @@ int kms_display_info(const kms_handle_t handle)
 	} else {
 		printf("  Identity key:         (configuration required)\n");
 	}
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_IDENTITY_KEY_REENC);
+	if (tmp != NULL) {
+		printf("                        (re-enciphering pending)\n");
+		free(tmp);
+	}
 
 	tmp = properties_get(ph->pd.properties,
 			     KMIP_CONFIG_CLIENT_CERTIFICATE);
@@ -1094,6 +1099,13 @@ int kms_display_info(const kms_handle_t handle)
 			}
 		}
 		printf("\n");
+		tmp = properties_get(ph->pd.properties,
+				     KMIP_CONFIG_WRAPPING_KEY_REENC);
+		if (tmp != NULL) {
+			printf(
+			  "                        (re-enciphering pending)\n");
+			free(tmp);
+		}
 	} else {
 		printf("  Wrapping key ID:      (configuration required)\n");
 	}
@@ -4072,6 +4084,110 @@ int kms_login(const kms_handle_t handle)
 }
 
 /**
+ * Completes re-enciphering of a secure key
+ *
+ * @param ph                the plugin handle
+ * @param key_file_prop     the property name containing the key file name
+ * @param reenc_file_prop   the property name containing the re-enciphered key
+ *                          file name
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _complete_reencipher(struct plugin_handle *ph,
+				const char *key_file_prop,
+				const char *reenc_file_prop)
+{
+	char *key_file, *reenc_file;
+	int rc = 0;
+
+	key_file = properties_get(ph->pd.properties, key_file_prop);
+	reenc_file = properties_get(ph->pd.properties, reenc_file_prop);
+
+	if (key_file == NULL || reenc_file == NULL)
+		goto out;
+
+	rc = remove(key_file);
+	if (rc != 0) {
+		rc = -errno;
+		_set_error(ph, "Failed to remove file '%s': %s",
+			   key_file,  strerror(-rc));
+		goto out;
+	}
+
+	rc = rename(reenc_file, key_file);
+	if (rc != 0) {
+		rc = -errno;
+		_set_error(ph, "Failed to rename file '%s' to '%s': %s",
+			   reenc_file, key_file, strerror(-rc));
+		goto out;
+	}
+
+	rc = properties_remove(ph->pd.properties, reenc_file_prop);
+	if (rc != 0) {
+		_set_error(ph, "Failed to remove property %s: %s",
+			   reenc_file_prop, strerror(-rc));
+		goto out;
+	}
+
+out:
+	if (key_file != NULL)
+		free(key_file);
+	if (reenc_file != NULL)
+		free(reenc_file);
+
+	return rc;
+}
+
+/**
+ * Re-enciphering a secure key
+ *
+ * @param ph                the plugin handle
+ * @param to_new            if true reencipher from CURRENT to NEW.
+ * @param key_file_name     file name of the secure key file
+ * @param reenc_file_name   file name of the re-enciphered key file
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _reencipher_key(struct plugin_handle *ph, bool to_new,
+			   const char *key_file_name,
+			   const char *reenc_file_name)
+{
+	unsigned char secure_key[KMIP_MAX_KEY_TOKEN_SIZE] = { 0 };
+	size_t secure_key_size = sizeof(secure_key);
+	int rc;
+
+	rc = SK_UTIL_read_key_blob(key_file_name, secure_key, &secure_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to load the secure key from '%s': %s",
+			   key_file_name, strerror(-rc));
+		return rc;
+	}
+
+	rc = SK_OPENSSL_reencipher_secure_key(secure_key, secure_key_size,
+					      to_new, &ph->ext_lib,
+					      ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "Failed to re-encipher the secure key from file "
+			   "'%s': %s", key_file_name, strerror(-rc));
+		return rc;
+	}
+
+	rc = SK_UTIL_write_key_blob(reenc_file_name, secure_key,
+				    secure_key_size);
+	if (rc != 0) {
+		_set_error(ph, "Failed to write the secure key into '%s': %s",
+			   reenc_file_name, strerror(-rc));
+		return rc;
+	}
+
+	rc = plugin_set_file_permission(&ph->pd, reenc_file_name);
+	if (rc != 0)
+		return rc;
+
+	return 0;
+}
+
+/**
  * Called when the master keys of an APQN associated with the KMS plugin has
  * been changed. The KMS plugin can then re-encipher all its secure keys (if
  * any) that it has stored in its config directory.
@@ -4118,8 +4234,11 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 		  enum kms_reenc_mkreg mkreg,
 		  const struct kms_option *options, size_t num_options)
 {
+	char *ident_reenc_file = NULL, *ident_key_file = NULL;
+	char *wrap_reenc_file = NULL, *wrap_key_file = NULL;
 	struct plugin_handle *ph = handle;
 	size_t i;
+	int rc = 0;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(num_options == 0 || options != NULL,
@@ -4141,7 +4260,215 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	if (ph->identity_secure_key == NULL)
+		return 0;
+
+	ident_reenc_file = properties_get(ph->pd.properties,
+					  KMIP_CONFIG_IDENTITY_KEY_REENC);
+	if (ident_reenc_file != NULL && mode == KMS_REENC_MODE_AUTO)
+		mode = KMS_REENC_MODE_STAGED_COMPLETE;
+
+	if (mode == KMS_REENC_MODE_STAGED_COMPLETE) {
+		if (ident_reenc_file == NULL) {
+			_set_error(ph, "Staged re-enciphering is not pending");
+			rc = -EINVAL;
+			goto out;
+		}
+
+		printf("Completing re-enciphering of KMIP plugin keys.\n");
+
+		rc = _complete_reencipher(ph, KMIP_CONFIG_IDENTITY_KEY,
+					  KMIP_CONFIG_IDENTITY_KEY_REENC);
+		if (rc != 0)
+			goto out;
+
+		rc = _complete_reencipher(ph, KMIP_CONFIG_WRAPPING_KEY,
+					  KMIP_CONFIG_WRAPPING_KEY_REENC);
+		if (rc != 0)
+			goto out;
+
+		rc = plugin_save_config(&ph->pd);
+		if (rc != 0)
+			goto out;
+
+		printf("Successfully completed re-enciphering of KMIP plugin "
+		       "keys.\n");
+
+		rc = 0;
+		goto out;
+	}
+
+	if (ident_reenc_file != NULL)
+		free(ident_reenc_file);
+	ident_reenc_file = NULL;
+
+	if (ph->card_type == CARD_TYPE_EP11 &&
+	    (mkreg == KMS_REENC_MKREG_FROM_OLD ||
+	     mkreg == KMS_REENC_MKREG_FROM_OLD_TO_NEW)) {
+		_set_error(ph, "ERROR: An APQN of a IBM cryptographic adapter "
+			   "in EP11 coprocessor mode does not have an OLD "
+			   "master key register. Thus, you can not re-encipher "
+			   "a secure key of type 'EP11-AES' from the OLD to "
+			   "the CURRENT/NEW master key register.");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	switch (mkreg) {
+	case KMS_REENC_MKREG_AUTO:
+	case KMS_REENC_MKREG_TO_NEW:
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_STAGED;
+
+		printf("Re-enciphering the KMIP plugin keys with the master "
+		       "key in the NEW register.\n");
+		break;
+
+	case KMS_REENC_MKREG_FROM_OLD:
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_IN_PLACE;
+
+		printf("Re-enciphering the KMIP plugin keys with the master "
+		       "key in the CURRENT register.\n");
+		break;
+
+	case KMS_REENC_MKREG_FROM_OLD_TO_NEW:
+		if (mode == KMS_REENC_MODE_AUTO)
+			mode = KMS_REENC_MODE_STAGED;
+
+		printf("Re-enciphering the KMIP plugin keys with the master "
+		       "key in the CURRENT and then the NEW register.\n");
+		break;
+
+	default:
+		_set_error(ph, "Invalid re-encipher MK register selection");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	ident_key_file = properties_get(ph->pd.properties,
+					KMIP_CONFIG_IDENTITY_KEY);
+	if (ident_key_file == NULL)
+		goto out;
+
+	wrap_key_file = properties_get(ph->pd.properties,
+				       KMIP_CONFIG_WRAPPING_KEY);
+	if (mode == KMS_REENC_MODE_STAGED) {
+		util_asprintf(&ident_reenc_file, "%s/%s",
+			      ph->pd.config_path,
+			      KMIP_CONFIG_IDENTITY_KEY_REENC_FILE);
+		util_asprintf(&wrap_reenc_file, "%s/%s",
+			      ph->pd.config_path,
+			      KMIP_CONFIG_WRAPPING_KEY_REENC_FILE);
+	}
+
+	if (mkreg == KMS_REENC_MKREG_AUTO || mkreg == KMS_REENC_MKREG_TO_NEW ||
+	    mkreg == KMS_REENC_MKREG_FROM_OLD_TO_NEW) {
+		rc = _reencipher_key(ph, true, ident_key_file,
+				     ident_reenc_file ? ident_reenc_file :
+								ident_key_file);
+		if (rc != 0)
+			goto out;
+
+		if (wrap_key_file != NULL) {
+			rc = _reencipher_key(ph, true, wrap_key_file,
+					     wrap_reenc_file ? wrap_reenc_file :
+								wrap_key_file);
+			if (rc != 0)
+				goto out;
+		}
+	}
+
+	if (mkreg == KMS_REENC_MKREG_FROM_OLD) {
+		rc = _reencipher_key(ph, false, ident_key_file,
+				     ident_reenc_file ? ident_reenc_file :
+								ident_key_file);
+		if (rc != 0)
+			goto out;
+
+		if (wrap_key_file != NULL) {
+			rc = _reencipher_key(ph, false, wrap_key_file,
+					     wrap_reenc_file ? wrap_reenc_file :
+								wrap_key_file);
+			if (rc != 0)
+				goto out;
+		}
+	}
+
+	if (mkreg == KMS_REENC_MKREG_FROM_OLD_TO_NEW) {
+		rc = _reencipher_key(ph, false, ident_reenc_file ?
+					ident_reenc_file : ident_key_file,
+				     ident_reenc_file ? ident_reenc_file :
+								ident_key_file);
+		if (rc != 0)
+			goto out;
+
+		if (wrap_key_file != NULL) {
+			rc = _reencipher_key(ph, false, wrap_reenc_file ?
+						wrap_reenc_file : wrap_key_file,
+					     wrap_reenc_file ? wrap_reenc_file :
+								wrap_key_file);
+			if (rc != 0)
+				goto out;
+		}
+	}
+
+	if (mode == KMS_REENC_MODE_STAGED) {
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_IDENTITY_KEY_REENC,
+					ident_reenc_file);
+		if (rc != 0)
+			goto out;
+
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_WRAPPING_KEY_REENC,
+					wrap_reenc_file);
+		if (rc != 0)
+			goto out;
+	} else {
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_IDENTITY_KEY_REENC, NULL);
+		if (rc != 0)
+			goto out;
+
+		rc = plugin_set_or_remove_property(&ph->pd,
+					KMIP_CONFIG_WRAPPING_KEY_REENC, NULL);
+		if (rc != 0)
+			goto out;
+	}
+
+	rc = plugin_save_config(&ph->pd);
+	if (rc != 0)
+		goto out;
+
+	rc = 0;
+
+	if (mode == KMS_REENC_MODE_STAGED)
+		util_print_indented("Staged re-enciphering is initiated for "
+				    "the KMIP plugin keys. After the NEW "
+				    "master key has been set to become the "
+				    "CURRENT master key run 'zkey kms "
+				    "reencipher' with option '--complete' to "
+				    "complete the re-enciphering process.", 0);
+	else
+		printf("Successfully re-enciphered the KMIP plugin keys\n");
+
+out:
+	if (rc != 0 && ident_reenc_file != NULL)
+		remove(ident_reenc_file);
+	if (ident_reenc_file != NULL)
+		free(ident_reenc_file);
+	if (ident_key_file != NULL)
+		free(ident_key_file);
+
+	if (rc != 0 && wrap_reenc_file != NULL)
+		remove(wrap_reenc_file);
+	if (wrap_reenc_file != NULL)
+		free(wrap_reenc_file);
+	if (wrap_key_file != NULL)
+		free(wrap_key_file);
+
+	return rc;
 }
 
 /**
