@@ -68,6 +68,25 @@ typedef void (*t_CSUACRD)(long *return_code,
 			  long *ressource_name_length,
 			  unsigned char *ressource_name);
 
+typedef void (*t_CSNBKTB2)(long *return_code,
+			   long *reason_code,
+			   long *exit_data_length,
+			   unsigned char *exit_data,
+			   long *rule_array_count,
+			   unsigned char *rule_array,
+			   long *clear_key_bit_length,
+			   unsigned char *clear_key_value,
+			   long *key_name_length,
+			   unsigned char *key_name,
+			   long *user_associated_data_length,
+			   unsigned char *user_associated_data,
+			   long *token_data_length,
+			   unsigned char *token_data,
+			   long *verb_data_length,
+			   unsigned char *verb_data,
+			   long *target_key_token_length,
+			   unsigned char *target_key_token);
+
 typedef void (*t_CSNBKTR2)(long *return_code,
 			   long *reason_code,
 			   long *exit_data_length,
@@ -112,6 +131,7 @@ struct cca_lib {
 	t_CSUACFQ dll_CSUACFQ;
 	t_CSUACRA dll_CSUACRA;
 	t_CSUACRD dll_CSUACRD;
+	t_CSNBKTB2 dll_CSNBKTB2;
 	t_CSNBKTR2 dll_CSNBKTR2;
 	t_CSNBRKA dll_CSNBRKA;
 	struct cca_version version;
