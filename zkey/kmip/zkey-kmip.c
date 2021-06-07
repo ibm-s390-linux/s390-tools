@@ -1438,6 +1438,28 @@ static const struct util_opt generate_options[] = {
 	UTIL_OPT_END,
 };
 
+static const struct util_opt remove_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS",
+		.command = KMS_COMMAND_REMOVE,
+	},
+	{
+		.option = { "state", required_argument, NULL, 's'},
+		.argument = "STATE",
+		.desc = "The state to which to change the key in the KMIP "
+			"server, after removing the secure key from the local "
+			"secure key repository. Possible states are "
+			"'DEACTIVATED', 'COMPROMISED', 'DESTROYED', and "
+			"'DESTROYED-COMPROMISED'. If this option is not "
+			"specified, the state of the key in the KMIP server is "
+			"not changed, but the key is removed from the local "
+			"secure key repository only.",
+		.command = KMS_COMMAND_REMOVE,
+	},
+	UTIL_OPT_END,
+};
+
 /**
  * Returns a list of KMS specific command line options that zkey should accept
  * and pass to the appropriate KMS plugin function. The option list must be
@@ -1468,6 +1490,8 @@ const struct util_opt *kms_get_command_options(const char *command,
 		return configure_options;
 	if (strcasecmp(command, KMS_COMMAND_GENERATE) == 0)
 		return generate_options;
+	if (strcasecmp(command, KMS_COMMAND_REMOVE) == 0)
+		return remove_options;
 
 	return NULL;
 }
@@ -5852,6 +5876,8 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 		   const struct kms_option *options, size_t num_options)
 {
 	struct plugin_handle *ph = handle;
+	char *state = NULL;
+	int rc = 0;
 	size_t i;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
@@ -5875,7 +5901,76 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 's':
+			state = util_strdup(options[i].argument);
+			util_str_toupper(state);
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	if (state == NULL)
+		goto out;
+
+	pr_verbose(&ph->pd, "State to set: '%s'", state);
+	if (strcmp(state, KMIP_KEY_STATE_DEACTIVATED) != 0 &&
+	    strcmp(state, KMIP_KEY_STATE_COMPROMISED) != 0 &&
+	    strcmp(state, KMIP_KEY_STATE_DESTROYED) != 0 &&
+	    strcmp(state, KMIP_KEY_STATE_DESTROYED_COMPROMISED) != 0) {
+		_set_error(ph, "Invalid state specified: '%s'", state);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	if (strcmp(state, KMIP_KEY_STATE_DEACTIVATED) == 0 ||
+	    strcmp(state, KMIP_KEY_STATE_DESTROYED) == 0) {
+		rc = _set_key_state(ph, key_id, KMIP_STATE_DEACTIVATED);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (strcmp(state, KMIP_KEY_STATE_COMPROMISED) == 0 ||
+	    strcmp(state, KMIP_KEY_STATE_DESTROYED_COMPROMISED) == 0) {
+		rc = _set_key_state(ph, key_id, KMIP_STATE_COMPROMISED);
+		if (rc != 0)
+			goto out;
+	}
+
+	if (strcmp(state, KMIP_KEY_STATE_DESTROYED) == 0 ||
+	    strcmp(state, KMIP_KEY_STATE_DESTROYED_COMPROMISED) == 0) {
+		rc = _set_key_state(ph, key_id, KMIP_STATE_DESTROYED);
+		if (rc != 0)
+			goto out;
+	}
+
+out:
+	if (state != NULL)
+		free(state);
+
+	return rc;
 }
 
 /**
