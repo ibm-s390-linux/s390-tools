@@ -117,12 +117,12 @@ int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
 int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 		   const char *key2_id, bool xts, const char *name,
 		   unsigned char *key_blob, size_t *key_blob_length,
-		   bool verbose);
+		   const char *key_type, bool verbose);
 
 int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		    char **description, char **cipher, char **iv_mode,
 		    char **volumes, char **volume_type, ssize_t *sector_size,
 		    const char *filename, const char *passphrase_file,
-		    bool verbose);
+		    const char *key_type, bool verbose);
 
 #endif

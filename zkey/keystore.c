@@ -5235,7 +5235,7 @@ static int _keystore_process_kms_import(const char *key1_id,
 					const char *key2_id,
 					const char *key2_label,
 					bool xts, const char *name,
-					const char *UNUSED(key_type),
+					const char *key_type,
 					size_t UNUSED(key_bits),
 					const char *description,
 					const char *UNUSED(cipher),
@@ -5259,7 +5259,6 @@ static int _keystore_process_kms_import(const char *key1_id,
 	size_t secure_key_size;
 	bool fatal_err = false;
 	char *alt_name = NULL;
-	const char *key_type;
 	char *apqns = NULL;
 	int rc;
 
@@ -5309,7 +5308,8 @@ prompt_alt_name:
 
 	secure_key_size = sizeof(secure_key);
 	rc = import_kms_key(keystore->kms_info, key1_id, key2_id, xts, key_name,
-			    secure_key, &secure_key_size, keystore->verbose);
+			    secure_key, &secure_key_size, key_type,
+			    keystore->verbose);
 	if (rc != 0) {
 		warnx("KMS plugin '%s' failed to import key '%s': %s",
 		      keystore->kms_info->plugin_name, key_name, strerror(-rc));
@@ -5579,17 +5579,21 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 	char *volumes = NULL, *volume_type = NULL;
 	ssize_t sector_size = -1;
 	bool fatal_err = false;
+	char *key_type = NULL;
 	char sect_size[30];
 	char *msg;
 	int rc;
 
 	vol_check.nocheck = refresh_data->novolcheck;
 
+	key_type = _keystore_get_key_type(properties);
+
 	rc = refresh_kms_key(keystore->kms_info, properties,
 			     &description, &cipher, &iv_mode, &volumes,
 			     &volume_type, &sector_size,
 			     file_names->skey_filename,
 			     file_names->pass_filename,
+			     key_type,
 			     keystore->verbose);
 	if (rc != 0) {
 		warnx("KMS plugin '%s' failed to refresh key '%s': %s",
@@ -5711,6 +5715,8 @@ out:
 		free(volumes);
 	if (volume_type != NULL)
 		free(volume_type);
+	if (key_type != NULL)
+		free(key_type);
 
 	return fatal_err ? rc : 0;
 }

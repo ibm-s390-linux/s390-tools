@@ -3067,6 +3067,7 @@ int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
  *                            buffer is specified in key_blob_length
  * @param[out] key_blob_length  on entry: the size of the key_blob buffer.
  *                              on exit: the size of the key blob returned.
+ * @param[in] key_type        the key type to import (can be NULL)
  * @param[in] verbose         if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error.
@@ -3074,7 +3075,7 @@ int list_kms_keys(struct kms_info *kms_info, const char *label_filter,
 int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 		   const char *key2_id, bool xts, const char *name,
 		   unsigned char *key_blob, size_t *key_blob_length,
-		   bool verbose)
+		   const char *key_type, bool verbose)
 {
 	size_t key_blob_size, key_blob_ofs, key_size = 0;
 	struct kms_property kms_prop;
@@ -3094,7 +3095,10 @@ int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 		return -ENOENT;
 	}
 
-	if (kms_info->funcs->kms_import_key == NULL ||
+	if ((kms_info->funcs->kms_import_key == NULL &&
+	     (kms_info->funcs->api_version < KMS_API_VERSION_2 ||
+	      (kms_info->funcs->api_version >= KMS_API_VERSION_2 &&
+	       kms_info->funcs->kms_import_key2 == NULL))) ||
 	    kms_info->funcs->kms_set_key_properties == NULL) {
 		pr_verbose(verbose, "The KMS plugin does not support to "
 			   "import keys");
@@ -3108,8 +3112,14 @@ int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 	key_blob_size = *key_blob_length;
 	memset(key_blob, 0, key_blob_size);
 
-	rc = kms_info->funcs->kms_import_key(kms_info->handle, key1_id,
-					     key_blob, &key_blob_size);
+	if (kms_info->funcs->api_version >= KMS_API_VERSION_2 &&
+	    kms_info->funcs->kms_import_key2 != NULL)
+		rc = kms_info->funcs->kms_import_key2(kms_info->handle, key1_id,
+						      key_type, key_blob,
+						      &key_blob_size);
+	else
+		rc = kms_info->funcs->kms_import_key(kms_info->handle, key1_id,
+						     key_blob, &key_blob_size);
 	if (rc != 0) {
 		pr_verbose(verbose, "KMS plugin failed to import key '%s': %s",
 			   key1_id, strerror(-rc));
@@ -3134,9 +3144,20 @@ int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 
 	if (xts) {
 		key_blob_size = key_size;
-		rc = kms_info->funcs->kms_import_key(kms_info->handle, key2_id,
-						     key_blob + key_blob_ofs,
-						     &key_blob_size);
+		if (kms_info->funcs->api_version >= KMS_API_VERSION_2 &&
+		    kms_info->funcs->kms_import_key2 != NULL)
+			rc = kms_info->funcs->kms_import_key2(kms_info->handle,
+							      key2_id,
+							      key_type,
+							      key_blob +
+								key_blob_ofs,
+							      &key_blob_size);
+		else
+			rc = kms_info->funcs->kms_import_key(kms_info->handle,
+							     key2_id,
+							     key_blob +
+								key_blob_ofs,
+							     &key_blob_size);
 		if (rc != 0) {
 			pr_verbose(verbose, "KMS plugin failed to import key #2"
 				   "'%s': %s", key2_id, strerror(-rc));
@@ -3193,6 +3214,7 @@ out:
  * @param[out] sector_size    on return: the sector_size property
  * @param[in] filename        the file name to store the refreshed key blob in
  * @param[in] passphrase_file the file name to store the dummy passphras in
+ * @param[in] key_type        the key type
  * @param[in] verbose         if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error.
@@ -3201,7 +3223,7 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		    char **description, char **cipher, char **iv_mode,
 		    char **volumes, char **volume_type, ssize_t *sector_size,
 		    const char *filename, const char *passphrase_file,
-		    bool verbose)
+		    const char *key_type, bool verbose)
 {
 	struct kms_property *properties = NULL;
 	u8 key_blob[2 * MAX_SECURE_KEY_SIZE];
@@ -3222,8 +3244,11 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		return -ENOENT;
 	}
 
-	if (kms_info->funcs->kms_import_key == NULL ||
-	    kms_info->funcs->kms_get_key_properties == NULL) {
+	if ((kms_info->funcs->kms_import_key == NULL &&
+	     (kms_info->funcs->api_version < KMS_API_VERSION_2 ||
+	      (kms_info->funcs->api_version >= KMS_API_VERSION_2 &&
+	       kms_info->funcs->kms_import_key2 == NULL))) ||
+	    kms_info->funcs->kms_set_key_properties == NULL) {
 		pr_verbose(verbose, "The KMS plugin does not support to "
 			   "import keys or get properties");
 		return -ENOTSUP;
@@ -3321,8 +3346,14 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 	key_blob_size = sizeof(key_blob);
 	memset(key_blob, 0, key_blob_size);
 
-	rc = kms_info->funcs->kms_import_key(kms_info->handle, key1_id,
-					     key_blob, &key_blob_size);
+	if (kms_info->funcs->api_version >= KMS_API_VERSION_2 &&
+	    kms_info->funcs->kms_import_key2 != NULL)
+		rc = kms_info->funcs->kms_import_key2(kms_info->handle, key1_id,
+						      key_type, key_blob,
+						      &key_blob_size);
+	else
+		rc = kms_info->funcs->kms_import_key(kms_info->handle, key1_id,
+						     key_blob, &key_blob_size);
 	if (rc != 0) {
 		pr_verbose(verbose, "KMS plugin failed to import key '%s': %s",
 			   key1_id, strerror(-rc));
@@ -3345,9 +3376,20 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 
 	if (xts) {
 		key_blob_size = key_size;
-		rc = kms_info->funcs->kms_import_key(kms_info->handle, key2_id,
-						     key_blob + key_size,
-						     &key_blob_size);
+		if (kms_info->funcs->api_version >= KMS_API_VERSION_2 &&
+		    kms_info->funcs->kms_import_key2 != NULL)
+			rc = kms_info->funcs->kms_import_key2(kms_info->handle,
+							      key2_id,
+							      key_type,
+							      key_blob +
+								key_size,
+							      &key_blob_size);
+		else
+			rc = kms_info->funcs->kms_import_key(kms_info->handle,
+							     key2_id,
+							     key_blob +
+								key_size,
+							     &key_blob_size);
 		if (rc != 0) {
 			pr_verbose(verbose, "KMS plugin failed to import key #2"
 				   "'%s': %s", key2_id, strerror(-rc));
