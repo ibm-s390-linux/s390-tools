@@ -3441,6 +3441,63 @@ static struct kmip_node *_build_description_attr(struct plugin_handle *ph,
 }
 
 /**
+ * Build Custom/Vendor attribute reference according to the Custom attribute
+ * style of the profile.
+ *
+ * @param ph                the plugin handle
+ * @param name              the attribute name
+ *
+ * @returns the attribute node or NULL in case of an error.
+ */
+static struct kmip_node *_build_custom_attr_ref(struct plugin_handle *ph,
+						const char *name)
+{
+	struct kmip_node *attr_ref = NULL;
+	char *v1_name = NULL;
+
+	switch (ph->profile->cust_attr_scheme) {
+	case KMIP_PROFILE_CUST_ATTR_V1_STYLE:
+		util_asprintf(&v1_name, "zkey-%s", name);
+		attr_ref = kmip_new_attribute_reference(0, "x", v1_name);
+		free(v1_name);
+		break;
+	case KMIP_PROFILE_CUST_ATTR_V2_STYLE:
+		attr_ref = kmip_new_attribute_reference(0, "zkey", name);
+		break;
+	default:
+		_set_error(ph, "Invalid custom attribute style: %d",
+			   ph->profile->cust_attr_scheme);
+		goto out;
+	}
+
+out:
+	return attr_ref;
+}
+
+/**
+ * Build Description attribute reference, dependent on the profile settings.
+ * This is either a 'Description' attribute, a 'Comment' attribute, or a
+ * Custom/Vendor attribute according to the Custom attribute style of the
+ * profile.
+ *
+ * @param ph                the plugin handle
+ *
+ * @returns the attribute node or NULL in case of an error.
+ */
+static struct kmip_node *_build_description_attr_ref(struct plugin_handle *ph)
+{
+	if (_supports_description_attr(ph))
+		return kmip_new_attribute_reference(KMIP_TAG_DESCRIPTION,
+						    NULL, NULL);
+
+	if (_supports_comment_attr(ph))
+		return kmip_new_attribute_reference(KMIP_TAG_COMMENT,
+						    NULL, NULL);
+
+	return _build_custom_attr_ref(ph, KMS_KEY_PROP_DESCRIPTION);
+}
+
+/**
  * Register and activate an RSA wrapping key.
  *
  * @param ph                the plugin handle
@@ -4657,6 +4714,30 @@ static struct kmip_node *_build_attr_from_prop(struct plugin_handle *ph,
 }
 
 /**
+ * Build an KMIP attribute reference from a KMS property. Some KMS properties
+ * are converted into specific KMIP attributes, the others into Custom/Vendor
+ * attributes.
+ *
+ * @param ph                the plugin handle
+ * @param prop              the KMS property to build an Attribute reference for
+ *
+ * @returns The KMIP attribute node, or NULL in case of an error
+ */
+static struct kmip_node *_build_attr_ref_from_prop(struct plugin_handle *ph,
+						const struct kms_property *prop)
+{
+	if (strcmp(prop->name, KMS_KEY_PROP_DESCRIPTION) == 0)
+		return _build_description_attr_ref(ph);
+
+	if (ph->profile->supports_link_attr &&
+	    (strcmp(prop->name, KMS_KEY_PROP_XTS_KEY1_ID) == 0 ||
+	     strcmp(prop->name, KMS_KEY_PROP_XTS_KEY2_ID) == 0))
+		return kmip_new_attribute_reference(KMIP_TAG_LINK, NULL, NULL);
+
+	return _build_custom_attr_ref(ph, prop->name);
+}
+
+/**
  * Generate an AES key at the KMIP server.
  *
  * @param ph                the plugin handle
@@ -5588,6 +5669,72 @@ out:
 }
 
 /**
+ * Set (Add/Modify) or delete a key attribute.
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the ID of the key to set/delet th attribute for
+ * @param prop              the KMS property. If the value is NULL, the
+ *                          attribute is deleted
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _set_key_attribute(struct plugin_handle *ph, const char *key_id,
+			      const struct kms_property *prop)
+{
+	struct kmip_node *req1_pl = NULL, *resp1_pl = NULL, *req2_pl = NULL;
+	struct kmip_node *resp2_pl = NULL, *attr_ref = NULL, *attr = NULL;
+	struct kmip_node *uid1 = NULL, *uid2 = NULL;
+	enum kmip_operation op2 = 0;
+	int rc;
+
+	uid1 = kmip_new_unique_identifier(key_id, 0, 0);
+	CHECK_ERROR(uid1 == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	attr_ref = _build_attr_ref_from_prop(ph, prop);
+	CHECK_ERROR(attr_ref == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	req1_pl = kmip_new_delete_attribute_request_payload(NULL, uid1, NULL,
+							    attr_ref);
+	CHECK_ERROR(req1_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	if (prop->value != NULL) {
+		uid2 = kmip_new_unique_identifier(key_id, 0, 0);
+		CHECK_ERROR(uid2 == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+
+		attr = _build_attr_from_prop(ph, prop);
+		CHECK_ERROR(attr == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+
+		req2_pl = kmip_new_add_attribute_request_payload(NULL, uid2,
+								 attr);
+		CHECK_ERROR(req2_pl == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+
+		op2 = KMIP_OPERATION_ADD_ATTRIBUTE;
+	}
+
+	rc = _perform_kmip_request2(ph, KMIP_OPERATION_DELETE_ATTRIBUTE,
+				    req1_pl, &resp1_pl, op2, req2_pl, &resp2_pl,
+				    KMIP_BATCH_ERR_CONT_CONTINUE);
+
+out:
+	kmip_node_free(uid1);
+	kmip_node_free(attr_ref);
+	kmip_node_free(req1_pl);
+	kmip_node_free(resp1_pl);
+	kmip_node_free(uid2);
+	kmip_node_free(attr);
+	kmip_node_free(req2_pl);
+	kmip_node_free(resp2_pl);
+
+	return rc;
+}
+
+/**
  * Sets (adds/replaces/removes) properties of a key. Already existing properties
  * with the same property name are replaced, non-existing properties are added.
  * To remove a property, set the property value to NULL.
@@ -5606,6 +5753,7 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 			   size_t num_properties)
 {
 	struct plugin_handle *ph = handle;
+	int rc = 0;
 	size_t i;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
@@ -5626,7 +5774,26 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	for (i = 0; i < num_properties; i++) {
+		rc = _set_key_attribute(ph, key_id, &properties[i]);
+		if (rc != 0)
+			break;
+	}
+
+	return rc;
 }
 
 /**
