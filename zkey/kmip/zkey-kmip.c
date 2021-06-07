@@ -15,6 +15,7 @@
 #include <string.h>
 #include <errno.h>
 #include <err.h>
+#include <fnmatch.h>
 #include <sys/utsname.h>
 
 #include <openssl/objects.h>
@@ -74,6 +75,8 @@ typedef CK_RV (*m_UnwrapKey_t)(const CK_BYTE_PTR wrapped, CK_ULONG wlen,
 #define KMS_KEY_PROP_DESCRIPTION	"description"
 #define KMS_KEY_PROP_XTS_KEY1_ID	"xts-key1-id"
 #define KMS_KEY_PROP_XTS_KEY2_ID	"xts-key2-id"
+
+#define KMIP_KEY_TYPE_ANY		"(any)"
 
 #define FREE_AND_SET_NULL(ptr)					\
 	do {							\
@@ -1460,6 +1463,27 @@ static const struct util_opt remove_options[] = {
 	UTIL_OPT_END,
 };
 
+static const struct util_opt list_import_options[] = {
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "KMIP SPECIFIC OPTIONS",
+		.command = KMS_COMMAND_LIST_IMPORT,
+	},
+	{
+		.option = { "key-type", required_argument, NULL, 'K'},
+		.argument = "type",
+		.desc = "The type of the key to import. Possible values are '"
+			KEY_TYPE_CCA_AESDATA"', '"KEY_TYPE_CCA_AESCIPHER"' "
+			"and '"KEY_TYPE_EP11_AES"'. When this option is "
+			"omitted, the default is '"KEY_TYPE_CCA_AESDATA"' "
+			"when the KMIP plugin is bound to CCA-type APQNs, or "
+			"'"KEY_TYPE_EP11_AES"' when the KMIP plugin is bound "
+			"to EP11-type APQNs.",
+		.command = KMS_COMMAND_LIST_IMPORT,
+	},
+	UTIL_OPT_END,
+};
+
 /**
  * Returns a list of KMS specific command line options that zkey should accept
  * and pass to the appropriate KMS plugin function. The option list must be
@@ -1492,6 +1516,8 @@ const struct util_opt *kms_get_command_options(const char *command,
 		return generate_options;
 	if (strcasecmp(command, KMS_COMMAND_REMOVE) == 0)
 		return remove_options;
+	if (strcasecmp(command, KMS_COMMAND_LIST_IMPORT) == 0)
+		return list_import_options;
 
 	return NULL;
 }
@@ -3519,6 +3545,76 @@ static struct kmip_node *_build_description_attr_ref(struct plugin_handle *ph)
 						    NULL, NULL);
 
 	return _build_custom_attr_ref(ph, KMS_KEY_PROP_DESCRIPTION);
+}
+
+/**
+ * Checks if the Attribute is a Custom/Vendor attribute that was set by this
+ * plugin, and returns its name and value.
+ *
+ * @param ph                the plugin handle
+ * @param attr              the custom/vendor attribute node
+ * @param name              On return: the name of the custom attribute
+ * @param value             On return: the value of the custom attribute
+ *
+ * @returns true if this is a custom/vendor attribute created by the plugin
+ */
+static bool _get_custom_attr(struct plugin_handle *ph, struct kmip_node *attr,
+			     const char **name, const char **value)
+{
+	struct kmip_node *attr_value = NULL;
+	const char *vendor_id, *attr_name;
+	bool ret = false;
+	int rc;
+
+	rc = kmip_get_vendor_attribute(attr, &vendor_id, &attr_name,
+				       &attr_value);
+	if (rc != 0)
+		goto out;
+
+	switch (ph->profile->cust_attr_scheme) {
+	case KMIP_PROFILE_CUST_ATTR_V1_STYLE:
+		if (strcmp(vendor_id, "zkey") == 0)
+			break;
+		if (strcmp(vendor_id, "x") != 0 ||
+		    strncmp(attr_name, "zkey-", 5) != 0) {
+			rc = -EBADMSG;
+			goto out;
+		}
+		attr_name += 5;
+		break;
+	case KMIP_PROFILE_CUST_ATTR_V2_STYLE:
+		if (strcmp(vendor_id, "zkey") != 0)
+			goto out;
+		break;
+	default:
+		goto out;
+	}
+
+	if (kmip_node_get_type(attr_value) != KMIP_TYPE_TEXT_STRING)
+		goto out;
+
+	if ((_supports_description_attr(ph) || _supports_comment_attr(ph)) &&
+	    strcmp(attr_name, KMS_KEY_PROP_DESCRIPTION) == 0)
+		goto out;
+
+	if (ph->profile->supports_link_attr &&
+	    (strcmp(attr_name, KMS_KEY_PROP_XTS_KEY1_ID) == 0 ||
+	     strcmp(attr_name, KMS_KEY_PROP_XTS_KEY2_ID) == 0))
+		goto out;
+
+	if (name != NULL)
+		*name = attr_name;
+	if (value != NULL) {
+		*value = kmip_node_get_text_string(attr_value);
+		if (*value == NULL || strcmp(*value, " ") == 0)
+			*value = "";
+	}
+
+	ret = true;
+
+out:
+	kmip_node_free(attr_value);
+	return ret;
 }
 
 /**
@@ -5821,6 +5917,284 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 }
 
 /**
+ * Ensures that the properties array is at least count elements large, if not
+ * then it is reallocated to be at least that large, and the size is updated.
+ *
+ * @param array             the properties array. May be updated with a
+ *                          re-allocated array
+ * @param size              the size of the array. May be updated with the
+ *                          new size of the array
+ * @param count             The number of required elements
+ */
+static void _reealloc_props_array(struct kms_property **array,
+				  unsigned int *size, unsigned int count)
+{
+	if (*size >= count)
+		return;
+
+	(*size) += 10;
+	*array = util_realloc(*array, *size * sizeof(struct kms_property));
+}
+
+/**
+ * Get a list of key attributes that can be mapped to KMS properties.
+ * The returned list of properties must be freed by the caller. Each property
+ * name and value must be freed individually (using free()), as well as the
+ * complete array.
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the ID of the key to get the attributes for
+ * @param properties        On return: a list of properties
+ * @param num_properties    On return: the number of properties in above array
+ * @param key_name          On return: the 'Name' of the key or NULL if no Name.
+ *                          Must be breed by the caller. Can be NULL to
+ *                          retrieve the name.
+ * @param key_bits          On return: the size of the key in bits. Can be NULL.
+ * @param state             On return: the state of the key. Can be NULL.
+ * @param obj_type          On return: the object type. Can be NULL.
+ * @param algo              On return: the algorithm of the key. Can be NULL.
+ * @param sensitive         On return: true if the key is sensitive
+ * @param always_sensitive  On return: true if the key was always sensitive
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _get_key_attributes(struct plugin_handle *ph, const char *key_id,
+			       struct kms_property **properties,
+			       size_t *num_properties, char **key_name,
+			       size_t *key_bits, enum kmip_state *state,
+			       enum kmip_object_type *obj_type,
+			       enum kmip_crypto_algo *algo,
+			       bool *sensitive, bool *always_sensitive)
+{
+	struct kmip_node *req_pl = NULL, *resp_pl = NULL, *uid = NULL;
+	struct kmip_node *attr = NULL, *linked_id = NULL;
+	const char *description, *id, *name, *value;
+	struct kms_property *props = NULL;
+	enum kmip_link_type link_type;
+	unsigned int i, k, count = 0;
+	int32_t key_size;
+	int rc;
+
+	if (key_name != NULL)
+		*key_name = NULL;
+	if (key_bits != NULL)
+		*key_bits = 0;
+	if (state != NULL)
+		*state = 0;
+	if (obj_type != NULL)
+		*obj_type = 0;
+	if (algo != NULL)
+		*algo = 0;
+	if (sensitive != NULL)
+		*sensitive = false;
+	if (always_sensitive != NULL)
+		*always_sensitive = false;
+
+	uid = kmip_new_unique_identifier(key_id, 0, 0);
+	CHECK_ERROR(uid == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	/* With no Attr-Refs specified, all attributes are to be returned */
+	req_pl = kmip_new_get_attributes_request_payload(NULL, uid, 0, NULL);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_GET_ATTRIBUTES, req_pl,
+				   &resp_pl);
+	if (rc != 0)
+		goto out;
+
+	for (i = 0, k = 0; ; i++) {
+		rc = kmip_get_get_attributes_response_payload(resp_pl, NULL,
+							      NULL, i, &attr);
+		if (rc != 0)
+			break;
+
+		switch (kmip_node_get_tag(attr)) {
+		case KMIP_TAG_DESCRIPTION:
+			if (!_supports_description_attr(ph))
+				break;
+
+			rc = kmip_get_description(attr, &description);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get description", ph, out);
+
+			if (description == NULL ||
+			    strcmp(description, " ") == 0)
+				description = "";
+
+			_reealloc_props_array(&props, &count, k + 1);
+			props[k].name = util_strdup(KMS_KEY_PROP_DESCRIPTION);
+			props[k].value = util_strdup(description);
+			k++;
+			break;
+
+		case KMIP_TAG_COMMENT:
+			if (!_supports_comment_attr(ph) ||
+			    _supports_description_attr(ph))
+				break;
+
+			rc = kmip_get_comment(attr, &description);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get comment", ph, out);
+
+			if (description == NULL ||
+			    strcmp(description, " ") == 0)
+				description = "";
+
+			_reealloc_props_array(&props, &count, k + 1);
+			props[k].name = util_strdup(KMS_KEY_PROP_DESCRIPTION);
+			props[k].value = util_strdup(description);
+			k++;
+
+			break;
+
+		case KMIP_TAG_LINK:
+			if (!ph->profile->supports_link_attr)
+				break;
+
+			rc = kmip_get_link(attr, &link_type, &linked_id);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get link", ph, out);
+
+			_reealloc_props_array(&props, &count, k + 1);
+			if (link_type == KMIP_LINK_TYPE_NEXT)
+				props[k].name =
+					util_strdup(KMS_KEY_PROP_XTS_KEY2_ID);
+			else if (link_type == KMIP_LINK_TYPE_PREVIOUS)
+				props[k].name =
+					util_strdup(KMS_KEY_PROP_XTS_KEY1_ID);
+			else
+				break;
+
+			rc = kmip_get_linked_object_identifier(linked_id, &id,
+							       NULL, NULL);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get link ID", ph, out);
+			props[k].value = util_strdup(id);
+			k++;
+
+			kmip_node_free(linked_id);
+			linked_id = NULL;
+			break;
+
+		case KMIP_TAG_ATTRIBUTE: /* Custom/Vendor attribute */
+			if (!_get_custom_attr(ph, attr, &name, &value))
+				break;
+
+			_reealloc_props_array(&props, &count, k + 1);
+			props[k].name = util_strdup(name);
+			props[k].value = util_strdup(value);
+			k++;
+			break;
+
+		case KMIP_TAG_NAME:
+			if (key_name == NULL || *key_name != NULL)
+				break;
+
+			rc = kmip_get_name(attr, &name, NULL);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get key name", ph, out);
+
+			if (name == NULL || strcmp(name, " ") == 0)
+				name = "";
+
+			*key_name = util_strdup(name);
+			break;
+
+		case KMIP_TAG_CRYPTOGRAPHIC_LENGTH:
+			if (key_bits == NULL)
+				break;
+
+			rc = kmip_get_cryptographic_length(attr, &key_size);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get key size", ph, out);
+
+			*key_bits = key_size;
+			break;
+
+		case KMIP_TAG_CRYPTOGRAPHIC_ALGORITHM:
+			if (algo == NULL)
+				break;
+
+			rc = kmip_get_cryptographic_algorithm(attr, algo);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get key algorithm", ph, out);
+			break;
+
+		case KMIP_TAG_OBJECT_TYPE:
+			if (obj_type == NULL)
+				break;
+
+			rc = kmip_get_object_type(attr, obj_type);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get object type", ph, out);
+			break;
+
+		case KMIP_TAG_STATE:
+			if (state == NULL)
+				break;
+
+			rc = kmip_get_state(attr, state);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get key state", ph, out);
+			break;
+
+		case KMIP_TAG_SENSITIVE:
+			if (sensitive == NULL)
+				break;
+
+			rc = kmip_get_sensitive(attr, sensitive);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get sensitive flag", ph, out);
+			break;
+
+		case KMIP_TAG_ALWAYS_SENSITIVE:
+			if (always_sensitive == NULL)
+				break;
+
+			rc = kmip_get_always_sensitive(attr, always_sensitive);
+			CHECK_ERROR(rc != 0, rc, rc,
+				    "Failed to get always sensitive flag",
+				    ph, out);
+			break;
+
+		default:
+			break;
+		}
+
+		kmip_node_free(attr);
+		attr = NULL;
+	}
+
+	*num_properties = k;
+	*properties = props;
+
+	rc = 0;
+
+out:
+	kmip_node_free(uid);
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+	kmip_node_free(attr);
+	kmip_node_free(linked_id);
+
+	if (rc != 0 && props != NULL) {
+		for (i = 0; i < count; i++) {
+			free((char *)props[i].name);
+			free((char *)props[i].value);
+		}
+		free(props);
+	}
+	if (rc != 0 && key_name != NULL && *key_name != NULL) {
+		free(*key_name);
+		*key_name = NULL;
+	}
+
+	return rc;
+}
+
+/**
  * Gets properties of a key.
  *
  * The returned list of properties must be freed by the caller. Each property
@@ -5841,6 +6215,12 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 			   size_t *num_properties)
 {
 	struct plugin_handle *ph = handle;
+	bool sensitive, always_sensitive;
+	enum kmip_object_type obj_type;
+	enum kmip_crypto_algo algo;
+	enum kmip_state state;
+	size_t i;
+	int rc;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(key_id != NULL, "Internal error: key_id is NULL");
@@ -5852,7 +6232,68 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	rc = _get_key_attributes(ph, key_id, properties, num_properties,
+				 NULL, NULL, &state, &obj_type, &algo,
+				 &sensitive, &always_sensitive);
+	if (rc != 0)
+		goto out;
+
+	if (state != KMIP_STATE_ACTIVE) {
+		_set_error(ph, "The key '%s' is not in state ACTIVE.", key_id);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (obj_type != KMIP_OBJECT_TYPE_SYMMETRIC_KEY) {
+		_set_error(ph, "The key '%s' is not a symmetric key.", key_id);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (algo != KMIP_CRYPTO_ALGO_AES) {
+		_set_error(ph, "The key '%s' is not an AES key.", key_id);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (_supports_sensitive_attr(ph) && sensitive == false) {
+		_set_error(ph, "The key '%s' is not sensitive.", key_id);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (_supports_sensitive_attr(ph) &&
+	    ph->profile->check_always_sensitive_attr &&
+	    always_sensitive == false) {
+		_set_error(ph, "The key '%s' was not always sensitive.",
+			   key_id);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	for (i = 0; i < *num_properties; i++) {
+		util_assert((*properties)[i].name != NULL,
+			    "Internal error: property name is NULL");
+
+		pr_verbose(&ph->pd, "  Property '%s': '%s'",
+			   (*properties)[i].name, (*properties)[i].value);
+	}
+
+out:
+	return rc;
 }
 
 /**
@@ -5974,6 +6415,101 @@ out:
 }
 
 /**
+ * Process a located key item.
+ *
+ * @param ph                the plugin handle
+ * @param key_id            the ID of the key found
+ * @param label_pattern     a pattern of the label used to filter the keys, or
+ *                          NULL if no label pattern is specified.
+ * @param key_type          the key type
+ * @param callback          a callback function that is called for each key that
+ *                          matches the filter (if any).
+ * @private_data            a private pointer passed as is to the callback
+ *                          function. Can be used to pass user specific
+ *                          information to the callback.
+ *
+ * @returns 0 on success, a negative errno in case of an error.
+ */
+static int _process_list_item(struct plugin_handle *ph, const char *key_id,
+			      const char *label_pattern, const char *key_type,
+			      kms_list_callback callback, void *private_data)
+{
+	size_t i, key_bits = 0, num_properties = 0;
+	struct kms_property *properties = NULL;
+	bool sensitive, always_sensitive;
+	enum kmip_object_type obj_type;
+	enum kmip_crypto_algo algo;
+	enum kmip_state state;
+	char *name = NULL;
+	int rc;
+
+	rc = _get_key_attributes(ph, key_id, &properties, &num_properties,
+				 &name, &key_bits, &state, &obj_type, &algo,
+				 &sensitive, &always_sensitive);
+	if (rc != 0)
+		goto out;
+
+	pr_verbose(&ph->pd, "Name: '%s'", name ? name : "(none)");
+
+	if (state != KMIP_STATE_ACTIVE) {
+		pr_verbose(&ph->pd, "State is not ACTIVE, skip.");
+		goto out;
+	}
+
+	if (obj_type != KMIP_OBJECT_TYPE_SYMMETRIC_KEY) {
+		pr_verbose(&ph->pd, "Object type is not Symmetric Key, skip.");
+		goto out;
+	}
+
+	if (algo != KMIP_CRYPTO_ALGO_AES) {
+		pr_verbose(&ph->pd, "Key algorithm is not AES, skip.");
+		goto out;
+	}
+
+	if (_supports_sensitive_attr(ph) && sensitive == false) {
+		pr_verbose(&ph->pd, "The key is not sensitive.");
+		goto out;
+	}
+
+	if (_supports_sensitive_attr(ph) &&
+	    ph->profile->check_always_sensitive_attr &&
+	    always_sensitive == false) {
+		pr_verbose(&ph->pd, "The key was not always sensitive.");
+		goto out;
+	}
+
+	if (label_pattern != NULL) {
+		if (fnmatch(label_pattern, name ? name : key_id, 0) != 0) {
+			pr_verbose(&ph->pd, "Label filter not matched");
+			goto out;
+		}
+	}
+
+	for (i = 0; i < num_properties; i++) {
+		pr_verbose(&ph->pd, "  Property '%s': '%s'", properties[i].name,
+			   properties[i].value != NULL ? properties[i].value :
+			   "(null)");
+	}
+
+	rc = callback(key_id, name ? name : key_id, key_type ? key_type :
+		      "(any)", key_bits, properties, num_properties, NULL, 0,
+		      private_data);
+
+out:
+	if (properties != NULL) {
+		for (i = 0; i < num_properties; i++) {
+			free((char *)properties[i].name);
+			free((char *)properties[i].value);
+		}
+		free(properties);
+	}
+	if (name != NULL)
+		free(name);
+
+	return rc;
+}
+
+/**
  * List keys managed by the KMS. This list is independent of the zkey key
  * repository. It lists keys as known by the KMS.
  *
@@ -6003,8 +6539,15 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 		  const struct kms_option *options, size_t num_options,
 		  kms_list_callback callback, void *private_data)
 {
+	struct kmip_node *req_pl = NULL, *resp_pl = NULL, *item_uid = NULL;
 	struct plugin_handle *ph = handle;
-	size_t i;
+	struct kmip_node **attrs = NULL;
+	bool label_filter = false;
+	char *key_type = NULL;
+	size_t num_attrs;
+	const char *id;
+	size_t i, k;
+	int rc = 0;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(num_properties == 0 || properties != NULL,
@@ -6037,7 +6580,154 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	for (i = 0; i < num_options; i++) {
+		switch (options[i].option) {
+		case 'K':
+			key_type = util_strdup(options[i].argument);
+			util_str_toupper(key_type);
+			break;
+		default:
+			rc = -EINVAL;
+			if (isalnum(options[i].option))
+				_set_error(ph, "Unsupported option '%c'",
+					   options[i].option);
+			else
+				_set_error(ph, "Unsupported option %d",
+					   options[i].option);
+			goto out;
+		}
+	}
+
+	if (key_type != NULL) {
+		switch (ph->card_type) {
+		case CARD_TYPE_CCA:
+			if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) != 0 &&
+			    strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) != 0) {
+				_set_error(ph, "The KMIP plugin is bound to "
+					   "CCA-type APQNs, and can only "
+					   "import keys of type '%s' or '%s'.",
+					   KEY_TYPE_CCA_AESDATA,
+					   KEY_TYPE_CCA_AESCIPHER);
+				rc = -EINVAL;
+				goto out;
+			}
+			break;
+		case CARD_TYPE_EP11:
+			if (strcasecmp(key_type, KEY_TYPE_EP11_AES) != 0) {
+				_set_error(ph, "The KMIP plugin is bound to "
+					   "CCA-type APQNs, and can only "
+					   "import keys of type '%s'.",
+					   KEY_TYPE_EP11_AES);
+				rc = -EINVAL;
+				goto out;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	if (label_pattern != NULL &&
+	    strchr(label_pattern, '*') == NULL &&
+	    strchr(label_pattern, '?') == NULL)
+		label_filter = true;
+
+	num_attrs = 3 + num_properties;
+	if (label_filter)
+		num_attrs += 1;
+
+	attrs = util_zalloc(num_attrs * sizeof(struct kmip_node *));
+	k = 0;
+
+	attrs[k] = kmip_new_state(KMIP_STATE_ACTIVE);
+	CHECK_ERROR(attrs[k] == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+	k++;
+
+	attrs[k] = kmip_new_object_type(KMIP_OBJECT_TYPE_SYMMETRIC_KEY);
+	CHECK_ERROR(attrs[k] == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+	k++;
+
+	attrs[k] = kmip_new_cryptographic_algorithm(KMIP_CRYPTO_ALGO_AES);
+	CHECK_ERROR(attrs[k] == NULL, rc, -ENOMEM,
+		    "Allocate KMIP node failed", ph, out);
+	k++;
+
+	if (label_filter) {
+		attrs[k] = kmip_new_name(label_pattern,
+				KMIP_NAME_TYPE_UNINTERPRETED_TEXT_STRING);
+		CHECK_ERROR(attrs[k] == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+		k++;
+	}
+
+	for (i = 0; i < num_properties; i++) {
+		attrs[k] = _build_attr_from_prop(ph, &properties[i]);
+		CHECK_ERROR(attrs[k] == NULL, rc, -ENOMEM,
+			    "Allocate KMIP node failed", ph, out);
+		k++;
+	}
+
+	req_pl = kmip_new_locate_request_payload(NULL, 0, 0, 0, 0,
+						 num_attrs, attrs);
+	CHECK_ERROR(req_pl == NULL, rc, -ENOMEM, "Allocate KMIP node failed",
+		    ph, out);
+
+	rc = _perform_kmip_request(ph, KMIP_OPERATION_LOCATE, req_pl, &resp_pl);
+	if (rc != 0)
+		goto out;
+
+	for (i = 0; ; i++) {
+		rc = kmip_get_locate_response_payload(resp_pl, NULL, NULL, i,
+						      &item_uid);
+		if (rc != 0)
+			break;
+
+		rc = kmip_get_unique_identifier(item_uid, &id, NULL, NULL);
+		CHECK_ERROR(rc != 0, rc, rc, "Failed to get item id", ph, out);
+
+		pr_verbose(&ph->pd, "Item ID: '%s'", id);
+
+		rc = _process_list_item(ph, id, label_pattern, key_type,
+					callback, private_data);
+		if (rc != 0)
+			goto out;
+
+		kmip_node_free(item_uid);
+		item_uid = NULL;
+	}
+
+	rc = 0;
+
+out:
+	if (key_type != NULL)
+		free(key_type);
+
+	if (attrs != NULL) {
+		for (i = 0; i < num_attrs; i++)
+			kmip_node_free(attrs[i]);
+		free(attrs);
+	}
+
+	kmip_node_free(req_pl);
+	kmip_node_free(resp_pl);
+	kmip_node_free(item_uid);
+
+	return rc;
 }
 
 /**
@@ -6062,6 +6752,7 @@ int kms_import_key2(const kms_handle_t handle, const char *key_id,
 		    unsigned char *key_blob, size_t *key_blob_length)
 {
 	struct plugin_handle *ph = handle;
+	int rc = 0;
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(key_blob != NULL, "Internal error: key_blob is NULL");
@@ -6072,7 +6763,58 @@ int kms_import_key2(const kms_handle_t handle, const char *key_id,
 
 	plugin_clear_error(&ph->pd);
 
-	return -ENOTSUP;
+	if (!ph->config_complete) {
+		_set_error(ph, "The configuration is incomplete, run 'zkey "
+			  "kms configure [OPTIONS]' to complete the "
+			  "configuration.");
+		return -EINVAL;
+	}
+
+	if (ph->connection == NULL) {
+		rc = _connect_to_server(ph);
+		if (rc != 0)
+			return rc;
+	}
+
+	switch (ph->card_type) {
+	case CARD_TYPE_CCA:
+		if (key_type == NULL ||
+		    (key_type != NULL && strcmp(key_type,
+						KMIP_KEY_TYPE_ANY) == 0))
+			key_type = KEY_TYPE_CCA_AESDATA;
+
+		if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) != 0 &&
+		    strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) != 0) {
+			_set_error(ph, "The KMIP plugin is bound to "
+				   "CCA-type APQNs, and can only "
+				   "import keys of type '%s' or '%s'.",
+				   KEY_TYPE_CCA_AESDATA,
+				   KEY_TYPE_CCA_AESCIPHER);
+			return -EINVAL;
+		}
+		break;
+	case CARD_TYPE_EP11:
+		if (key_type == NULL ||
+		    (key_type != NULL && strcmp(key_type,
+						KMIP_KEY_TYPE_ANY) == 0))
+			key_type = KEY_TYPE_EP11_AES;
+
+		if (strcasecmp(key_type, KEY_TYPE_EP11_AES) != 0) {
+			_set_error(ph, "The KMIP plugin is bound to "
+				   "EP11-type APQNs, and can only "
+				   "import keys of type '%s'.",
+				   KEY_TYPE_EP11_AES);
+			return -EINVAL;
+		}
+		break;
+	default:
+		break;
+	}
+
+	rc = _retrieve_key(ph, key_id, key_blob, key_blob_length, key_type,
+			   0);
+
+	return rc;
 }
 
 static const struct kms_functions kms_functions = {
