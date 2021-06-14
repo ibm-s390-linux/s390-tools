@@ -47,6 +47,8 @@ libkmipclient.dep:
 	touch libkmipclient.dep
 
 install: all install-libkmipclient.dep zkey-kmip.so
+	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
+	$(INSTALL) -m 644 -c zkey-kmip.1 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -d -m 755 $(DESTDIR)$(ZKEYKMSPLUGINDIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T zkey-kmip.so $(DESTDIR)$(ZKEYKMSPLUGINDIR)/zkey-kmip.so
 	$(INSTALL) -d -m 770 $(DESTDIR)$(SYSCONFDIR)/zkey/kmip
