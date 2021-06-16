@@ -5,6 +5,10 @@
 *.a
 *.o.d
 
+# ctags files
+tags
+TAGS
+
 #
 # Ignore generated executables and other generated files
 #
