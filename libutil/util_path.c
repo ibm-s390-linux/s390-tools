@@ -20,7 +20,6 @@
 #include "lib/util_libc.h"
 #include "lib/util_path.h"
 #include "lib/util_prg.h"
-#include "lib/util_proc.h"
 
 /*
  * Verify that directory exists
@@ -39,28 +38,20 @@ static void verify_dir(const char *dir)
 
 /*
  * Return sysfs mount point
+ *
+ * The caller must free the memory for mount_point.
  */
-static char *sys_mount_point(void)
+static void sys_mount_point(char **mount_point)
 {
-	struct util_proc_mnt_entry mnt_entry;
-	static char *mount_point;
 	char *dir;
 
-	if (mount_point)
-		return mount_point;
 	/* Check the environment variable */
-	dir = getenv("SYSFS_ROOT");
-	if (dir) {
-		mount_point = util_strdup(dir);
-	} else {
-		if (util_proc_mnt_get_entry("/proc/mounts", "sysfs",
-					    &mnt_entry))
-			errx(EXIT_FAILURE, "No mount point found for sysfs");
-		mount_point = util_strdup(mnt_entry.file);
-		util_proc_mnt_free_entry(&mnt_entry);
-	}
-	verify_dir(mount_point);
-	return mount_point;
+	dir = secure_getenv("SYSFS_ROOT");
+	if (dir)
+		*mount_point = util_strdup(dir);
+	else
+		*mount_point = util_strdup("/sys");
+	verify_dir(*mount_point);
 }
 
 /**
@@ -76,15 +67,17 @@ static char *sys_mount_point(void)
  */
 char *util_path_sysfs(const char *fmt, ...)
 {
-	char *path, *fmt_tot;
+	char *path, *fmt_path, *sysfs;
 	va_list ap;
 
-	util_asprintf(&fmt_tot, "%s/%s", sys_mount_point(), fmt);
-	 /* Format and return full sysfs path */
 	va_start(ap, fmt);
-	util_vasprintf(&path, fmt_tot, ap);
+	util_vasprintf(&fmt_path, fmt, ap);
 	va_end(ap);
-	free(fmt_tot);
+	sys_mount_point(&sysfs);
+	 /* Format and return full sysfs path */
+	util_asprintf(&path, "%s/%s", sysfs, fmt_path);
+	free(fmt_path);
+	free(sysfs);
 
 	return path;
 }
