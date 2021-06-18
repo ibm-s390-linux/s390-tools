@@ -332,53 +332,6 @@ util_proc_dev_free_entry(struct util_proc_dev_entry *entry)
 	}
 }
 
-/* Parse one record. */
-static int
-scan_mnt_entry(struct file_buffer *file, struct util_proc_mnt_entry *entry)
-{
-	int rc;
-
-	skip_whitespaces(file);
-	rc = scan_name(file, &entry->spec);
-	if (rc)
-		return rc;
-	skip_whitespaces(file);
-	rc = scan_name(file, &entry->file);
-	if (rc)
-		return rc;
-	skip_whitespaces(file);
-	rc = scan_name(file, &entry->vfstype);
-	if (rc)
-		return rc;
-	skip_whitespaces(file);
-	rc = scan_name(file, &entry->mntOpts);
-	if (rc)
-		return rc;
-	skip_whitespaces(file);
-	rc = scan_name(file, &entry->dump);
-	if (rc)
-		return rc;
-	skip_whitespaces(file);
-	rc = scan_name(file, &entry->passno);
-	if (rc)
-		return rc;
-	skip_line(file);
-	return 0;
-}
-
-/* Free the memory allocated for one record. */
-void
-util_proc_mnt_free_entry(struct util_proc_mnt_entry *entry)
-{
-	free(entry->spec);
-	free(entry->file);
-	free(entry->vfstype);
-	free(entry->mntOpts);
-	free(entry->dump);
-	free(entry->passno);
-	memset(entry, 0, sizeof(*entry));
-}
-
 /* Scan /proc/partitions for an entry matching DEVICE. When there is a match,
  * store entry data in ENTRY and return 0. Return non-zero otherwise. */
 int
@@ -436,38 +389,6 @@ util_proc_dev_get_entry(dev_t device, int blockdev,
 		} else
 			skip_line(&file);
 	}
-	free_file_buffer(&file);
-	return rc;
-}
-
-
-/*
- * Provide one record from a /proc/mounts like file
- *
- * The parameter file_name distinguishes the file from procfs which
- * is read, the parameter spec is the selector for the record.
- */
-int util_proc_mnt_get_entry(const char *file_name, const char *spec,
-			    struct util_proc_mnt_entry *entry)
-{
-	struct file_buffer file;
-	int rc;
-
-	rc = get_file_buffer(&file, file_name);
-	if (rc)
-		return rc;
-	while (!eof(&file)) {
-		rc = scan_mnt_entry(&file, entry);
-		if (rc)
-			goto out_free;
-		if (!strcmp(entry->vfstype, spec)) {
-			rc = 0;
-			goto out_free;
-		}
-		util_proc_mnt_free_entry(entry);
-	}
-	rc = -1;
-out_free:
 	free_file_buffer(&file);
 	return rc;
 }
