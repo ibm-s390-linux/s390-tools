@@ -9,6 +9,8 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <err.h>
+#include <limits.h>
 #include <string.h>
 
 #include "lib/util_base.h"
@@ -90,4 +92,92 @@ void util_print_indented(const char *str, int indent)
 	}
 	printf("\n");
 	free(desc_ptr);
+}
+
+/**
+ * Determines the absolute name of an s390-tools system directory
+ * (it could be data, or library directory)
+ */
+static const char *util_sysdir(const char *env_var, const char *default_dir)
+{
+	return secure_getenv(env_var) ?: default_dir;
+}
+
+/**
+ * Determines the absolute name of a file installed in the s390-tools
+ * system directory
+ */
+static const char *util_sysdir_path(const char *filename, const char *dirname)
+{
+	static char libdir_pathname[PATH_MAX];
+	int ret;
+
+	ret = snprintf(libdir_pathname, sizeof(libdir_pathname),
+		       "%s/%s", dirname, filename);
+
+	if (ret < 0 || ret >= (int)sizeof(libdir_pathname))
+		errx(EXIT_FAILURE,
+		     "Could not compose absolute pathname of %s and %s",
+                     dirname, filename);
+	return libdir_pathname;
+}
+
+/**
+ * Determines the absolute name of a s390-tools library directory
+ *
+ * Resources are handled by the library
+ *
+ * @returns Pointer to a buffer, which contains the null-terminated name
+ */
+const char *util_libdir(void)
+{
+	return util_sysdir("S390TOOLS_LIBDIR", TOOLS_LIBDIR);
+}
+
+/**
+ * Determines the absolute name of a file installed in the s390-tools
+ * library directory by its relative name.
+ *
+ * Resources are handled by the library. A second call of this function
+ * overwrites previously returned data. Care must be taken when attempting
+ * to do a second call.
+ *
+ * @param[in] filename Null-terminated file name relative to the s390-tools
+ *                     library directory
+ * @returns Pointer to a buffer of PATH_MAX size, which contains the
+ *          null-terminated absolute name
+ */
+const char *util_libdir_path(const char *filename)
+{
+	return util_sysdir_path(filename, util_libdir());
+}
+
+/**
+ * Determines the absolute name of a s390-tools data directory
+ *
+ * Resources are handled by the library
+ *
+ * @returns Pointer to a buffer which contains the null-terminated name
+ */
+const char *util_datadir(void)
+{
+	return util_sysdir("S390TOOLS_DATADIR", TOOLS_DATADIR);
+}
+
+/**
+ * Determines the absolute name of a file installed in the s390-tools
+ * data directory by its relative name.
+ *
+ * Resources are handled by the library. A second call of this function
+ * overwrites previously returned data. Care must be taken when attempting
+ * to do a second call.
+ *
+ * @param[in] filename Null-terminated file name relative to the s390-tools
+ *            data directory
+ * @returns Pointer to a buffer of PATH_MAX size, which contains the
+ *          null-terminated absolute name
+ */
+const char *util_datadir_path(const char *filename)
+{
+	return util_sysdir_path(filename, util_datadir());
 }

@@ -52,6 +52,7 @@
 #define TOOLS_LIBDIR	STRINGIFY (S390_TOOLS_LIBDIR)
 #define TOOLS_SYSCONFDIR STRINGIFY (S390_TOOLS_SYSCONFDIR)
 #define TOOLS_BINDIR	STRINGIFY (S390_TOOLS_BINDIR)
+#define TOOLS_DATADIR	STRINGIFY (S390_TOOLS_DATADIR)
 
 #define __noreturn __attribute__((noreturn))
 #define __packed __attribute__((packed))
