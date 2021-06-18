@@ -794,102 +794,6 @@ static int sort_bls_fields(struct misc_file_buffer *file, char *filename)
 	return 0;
 }
 
-int
-scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
-{
-	int count = 0;
-	int size, remaining = 0, n, current, rc = -1;
-	struct scan_token* buffer;
-	struct scan_token* array = *token;
-	struct dirent** bls_entries;
-	struct misc_file_buffer file;
-	struct stat sb;
-	char filename[PATH_MAX];
-
-	if (!(stat(blsdir, &sb) == 0 && S_ISDIR(sb.st_mode)))
-		return 0;
-
-	n = scandir(blsdir, &bls_entries, bls_filter, bls_sort);
-	if (n <= 0)
-		return n;
-
-	while (array[count].id != 0)
-		count++;
-
-	remaining = scan_size - count;
-
-	/* The array of scanned tokens is allocated when the zipl config file is
-	 * parsed. Its size is a multiple of INITIAL_ARRAY_LENGTH so it may have
-	 * enough space to scan all the tokens that are defined in the BLS files.
-	 * Calculate if is enough assuming that a BLS fragment can contain up to
-	 * 4 tokens: a section heading and 3 keywords (image, ramdisk, parameter).
-	 */
-	if (remaining < n * 4) {
-		size = scan_size - remaining + (n * 4);
-		buffer = (struct scan_token *)misc_malloc(size * sizeof(struct scan_token));
-		if (!buffer)
-			goto err;
-		memset(buffer, 0, size * sizeof(struct scan_token));
-		memcpy(buffer, array, count * sizeof(struct scan_token));
-	} else {
-		buffer = array;
-	}
-
-	while (n--) {
-		sprintf(filename, "%s/%s", blsdir, bls_entries[n]->d_name);
-		printf("Using BLS config file '%s'\n", filename);
-
-		rc = misc_get_file_buffer(filename, &file);
-		if (rc)
-			goto err;
-
-		rc = sort_bls_fields(&file, filename);
-		if (rc)
-			goto err;
-
-		while ((size_t)file.pos < file.length) {
-			current = misc_get_char(&file, 0);
-			switch (current) {
-			case '#':
-				file.pos++;
-				skip_line(&file);
-				break;
-			case EOF:
-				break;
-			case '\t':
-			case '\n':
-			case '\0':
-			case ' ':
-				file.pos++;
-				break;
-			default:
-				rc = scan_bls_field(&file, buffer, &count);
-				if (rc) {
-					error_reason("Incorrect BLS field in "
-						"config file %s\n", filename);
-					goto err;
-				}
-				break;
-			}
-		}
-
-		misc_free_file_buffer(&file);
-		free(bls_entries[n]);
-	}
-
-	*token = buffer;
-	rc = 0;
-err:
-	if (n > 0) {
-		do {
-			free(bls_entries[n]);
-		} while (n-- > 0);
-	}
-
-	free(bls_entries);
-	return rc;
-}
-
 
 /* Search scanned tokens SCAN for a section/menu heading (according to
  * TYPE) of the given NAME, beginning at token OFFSET. Return the index of
@@ -1355,6 +1259,165 @@ scan_get_section_keywords(struct scan_token* scan, int* index, char* name,
 	*index = i;
 
 	return 0;
+}
+
+
+/* Get the default target defined either in the defaultboot section or the
+ * menu section for the defaultmenu if there is a default menu defined. */
+static char *
+scan_get_default_target(struct scan_token* scan)
+{
+	int i;
+	int j;
+	int rc;
+	char* keyword[SCAN_KEYWORD_NUM];
+	int keyword_line[SCAN_KEYWORD_NUM];
+	char* num[BOOT_MENU_ENTRIES];
+	int num_line[BOOT_MENU_ENTRIES];
+
+	/* Find the defaultboot section */
+	i = scan_find_section(scan, DEFAULTBOOT_SECTION,
+			      scan_id_section_heading, 0);
+	if (i < 0) {
+		error_reason("No '%s' section found and no section specified "
+			     "on command line", DEFAULTBOOT_SECTION);
+		return NULL;
+	}
+
+	/* Get keyword and number data */
+	rc = scan_get_section_keywords(scan, &i, DEFAULTBOOT_SECTION, keyword,
+				       keyword_line, NULL, NULL);
+	if (rc) {
+		error_reason("Could not get keywords for '%s' section",
+			     DEFAULTBOOT_SECTION);
+		return NULL;
+	}
+
+	/* Check if a defaultmenu is set */
+	i = (int) scan_keyword_defaultmenu;
+	if (keyword[i]) {
+		j = scan_find_section(scan, keyword[i],
+				      scan_id_menu_heading, 0);
+		if (j < 0) {
+			error_reason("No '%s' section found", keyword[i]);
+			return NULL;
+		}
+
+		/* Get keyword and number data */
+		rc = scan_get_section_keywords(scan, &j, keyword[i], keyword,
+					       keyword_line, num, num_line);
+		if (rc) {
+			error_reason("Could not get keywords for '%s' section",
+				     keyword[i]);
+			return NULL;
+		}
+	}
+
+	return keyword[(int) scan_keyword_target];
+}
+
+#define BLS_TOKEN_MAX 5 /* section heading, image, ramdisk, parameter, target */
+
+int
+scan_bls(const char* blsdir, struct scan_token** token, int scan_size)
+{
+	int count = 0;
+	int size, remaining = 0, n, current, rc = -1;
+	struct scan_token* buffer;
+	struct scan_token* array = *token;
+	struct dirent** bls_entries;
+	struct misc_file_buffer file;
+	struct stat sb;
+	char filename[PATH_MAX];
+	char* target = scan_get_default_target(array);
+
+	if (!(stat(blsdir, &sb) == 0 && S_ISDIR(sb.st_mode)))
+		return 0;
+
+	n = scandir(blsdir, &bls_entries, bls_filter, bls_sort);
+	if (n <= 0)
+		return n;
+
+	while (array[count].id != 0)
+		count++;
+
+	remaining = scan_size - count;
+
+	/* The array of scanned tokens is allocated when the zipl config file is
+	 * parsed. Its size is a multiple of INITIAL_ARRAY_LENGTH so it may have
+	 * enough space to scan all the tokens that are defined in the BLS files.
+	 * Calculate if is enough assuming that a BLS fragment can contain up to
+	 * BLS_TOKEN_MAX.
+	 */
+	if (remaining < n * BLS_TOKEN_MAX) {
+		size = scan_size - remaining + (n * BLS_TOKEN_MAX);
+		buffer = (struct scan_token *)misc_malloc(size * sizeof(struct scan_token));
+		if (!buffer)
+			goto err;
+		memset(buffer, 0, size * sizeof(struct scan_token));
+		memcpy(buffer, array, count * sizeof(struct scan_token));
+	} else {
+		buffer = array;
+	}
+
+	while (n--) {
+		sprintf(filename, "%s/%s", blsdir, bls_entries[n]->d_name);
+		printf("Using BLS config file '%s'\n", filename);
+
+		rc = misc_get_file_buffer(filename, &file);
+		if (rc)
+			goto err;
+
+		rc = sort_bls_fields(&file, filename);
+		if (rc)
+			goto err;
+
+		while ((size_t)file.pos < file.length) {
+			current = misc_get_char(&file, 0);
+			switch (current) {
+			case '#':
+				file.pos++;
+				skip_line(&file);
+				break;
+			case EOF:
+				break;
+			case '\t':
+			case '\n':
+			case '\0':
+			case ' ':
+				file.pos++;
+				break;
+			default:
+				rc = scan_bls_field(&file, buffer, &count);
+				if (rc) {
+					error_reason("Incorrect BLS field in "
+						"config file %s\n", filename);
+					goto err;
+				}
+				break;
+			}
+		}
+
+		if (target != NULL)
+			scan_append_keyword_assignment(buffer, &count,
+						       scan_keyword_target,
+						       target);
+
+		misc_free_file_buffer(&file);
+		free(bls_entries[n]);
+	}
+
+	*token = buffer;
+	rc = 0;
+err:
+	if (n > 0) {
+		do {
+			free(bls_entries[n]);
+		} while (n-- > 0);
+	}
+
+	free(bls_entries);
+	return rc;
 }
 
 
