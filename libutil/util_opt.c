@@ -39,8 +39,6 @@ static struct util_opt_l {
 	const char *command;
 } l;
 
-struct util_opt_l *util_opt_l = &l;
-
 /// @endcond
 
 #define util_opt_iterate(opt) \
