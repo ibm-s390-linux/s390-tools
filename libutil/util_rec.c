@@ -208,7 +208,7 @@ static void rec_print_wide_hdr(struct util_rec *rec)
 /*
  * Print record field values in "wide" output format
  */
-void rec_print_wide(struct util_rec *rec)
+static void rec_print_wide(struct util_rec *rec)
 {
 	const char argz_sep = rec->fmt.d.wide_p.argz_sep;
 	struct util_rec_fld *fld;
@@ -380,7 +380,7 @@ struct util_rec *util_rec_new_csv(const char *col_sep)
 /*
  * Print record header in "csv" output format
  */
-void rec_print_csv_hdr(struct util_rec *rec)
+static void rec_print_csv_hdr(struct util_rec *rec)
 {
 	const char *col_sep = rec->fmt.d.csv_p.col_sep;
 	struct util_rec_fld *fld;
@@ -401,7 +401,7 @@ void rec_print_csv_hdr(struct util_rec *rec)
 /*
  * Print record field values in "csv" output format
  */
-void rec_print_csv(struct util_rec *rec)
+static void rec_print_csv(struct util_rec *rec)
 {
 	const char argz_sep = rec->fmt.d.csv_p.argz_sep;
 	const char *col_sep = rec->fmt.d.csv_p.col_sep;
