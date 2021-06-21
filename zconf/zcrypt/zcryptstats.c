@@ -170,13 +170,13 @@ struct crypto_type {
 };
 
 #define NUM_COPROC_COUNTERS	2
-const struct crypto_counter counter_coproc[NUM_COPROC_COUNTERS] = {
+static const struct crypto_counter counter_coproc[NUM_COPROC_COUNTERS] = {
 		{ .name = "All", .is_totals = true },
 		{ .name = "RSA Key-gen" },
 };
 
 #define NUM_ACCEL_COUNTERS	6
-const struct crypto_counter counter_accel[NUM_ACCEL_COUNTERS] = {
+static const struct crypto_counter counter_accel[NUM_ACCEL_COUNTERS] = {
 		{ .name = "RSA 1024 ME" },
 		{ .name = "RSA 2048 ME" },
 		{ .name = "RSA 1024 CRT" },
@@ -186,7 +186,7 @@ const struct crypto_counter counter_accel[NUM_ACCEL_COUNTERS] = {
 };
 
 #define NUM_EP11_COUNTERS	5
-const struct crypto_counter counter_ep11[NUM_EP11_COUNTERS] = {
+static const struct crypto_counter counter_ep11[NUM_EP11_COUNTERS] = {
 		{ .name = "Asym. Slow" },
 		{ .name = "Asym. Fast" },
 		{ .name = "Symm. Partial" },
@@ -195,7 +195,7 @@ const struct crypto_counter counter_ep11[NUM_EP11_COUNTERS] = {
 };
 
 #define NUM_PCICA_COUNTERS	20
-const struct crypto_counter counter_pcica[NUM_PCICA_COUNTERS] = {
+static const struct crypto_counter counter_pcica[NUM_PCICA_COUNTERS] = {
 		{ .name = "RSA 1024 ME (E0)" },
 		{ .name = "RSA 2048 ME (E0)" },
 		{ .name = "RSA 1024 CRT (E0)" },
@@ -219,25 +219,25 @@ const struct crypto_counter counter_pcica[NUM_PCICA_COUNTERS] = {
 };
 
 #define NUM_COPROC_MODES	1
-const struct crypto_mode mode_coproc[1] = {
+static const struct crypto_mode mode_coproc[1] = {
 		{ .num_counters = NUM_COPROC_COUNTERS,
 		  .counters = counter_coproc},
 };
 
 #define NUM_ACCEL_MODES		1
-const struct crypto_mode mode_accel[1] = {
+static const struct crypto_mode mode_accel[1] = {
 		{ .num_counters = NUM_ACCEL_COUNTERS,
 		  .counters = counter_accel },
 };
 
 #define NUM_PCICA_MODES		1
-const struct crypto_mode mode_pcica[1] = {
+static const struct crypto_mode mode_pcica[1] = {
 		{ .num_counters = NUM_PCICA_COUNTERS,
 		  .counters = counter_pcica },
 };
 
 #define NUM_CEX4567_MODES	11
-const struct crypto_mode mode_cex4567[NUM_CEX4567_MODES] = {
+static const struct crypto_mode mode_cex4567[NUM_CEX4567_MODES] = {
 		{ 0 },
 		{ 0 },
 		{ 0 },
@@ -258,7 +258,7 @@ const struct crypto_mode mode_cex4567[NUM_CEX4567_MODES] = {
 };
 
 #define NUM_CRYPTO_TYPES	14
-const struct crypto_type crypto_types[NUM_CRYPTO_TYPES] = {
+static const struct crypto_type crypto_types[NUM_CRYPTO_TYPES] = {
 		{ 0 },
 		{ 0 },
 		{ 0 },
@@ -430,7 +430,7 @@ static const struct print_func csv_print = {
 /*
  * Program configuration
  */
-const struct util_prg prg = {
+static const struct util_prg prg = {
 	.desc = "Display usage statistics of IBM Crypto Express adapters",
 	.args = "[DEVICE_IDS]",
 	.copyright_vec = {

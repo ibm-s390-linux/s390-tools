@@ -31,16 +31,14 @@
 /*
  * Private data
  */
-struct chzcrypt_l {
+static struct chzcrypt_l {
 	int verbose;
 } l;
-
-struct chzcrypt_l *chzcrypt_l = &l;
 
 /*
  * Program configuration
  */
-const struct util_prg prg = {
+static const struct util_prg prg = {
 	.desc	= "Modify zcrypt configuration.",
 	.args = "[DEVICE_IDS]",
 	.copyright_vec = {
@@ -385,7 +383,7 @@ static void dev_list_argv(char **argz, size_t *len, char * const argv[])
 /*
  * Describe adapter ids
  */
-void print_adapter_id_help(void)
+static void print_adapter_id_help(void)
 {
 	printf("\n");
 	printf("DEVICE_IDS\n");

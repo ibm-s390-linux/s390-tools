@@ -25,11 +25,9 @@
 /*
  * Private data
  */
-struct lszcrypt_l {
+static struct lszcrypt_l {
 	int verbose;
 } l;
-
-struct lszcrypt_l *lszcrypt_l = &l;
 
 /*
  * Capabilities
@@ -79,7 +77,7 @@ static struct fac_bits_s {
 /*
  * Program configuration
  */
-const struct util_prg prg = {
+static const struct util_prg prg = {
 	.desc = "Display zcrypt device and configuration information.",
 	.args = "[DEVICE_IDS]",
 	.copyright_vec = {
@@ -553,8 +551,6 @@ static void show_device(struct util_rec *rec, const char *device)
 {
 	char *grp_dev, card[16];
 
-	util_rec_set(rec, "card", card);
-
 	strcpy(card, &device[4]);
 	grp_dev = util_path_sysfs("devices/ap/%s", device);
 	if (!util_path_is_dir(grp_dev))
@@ -707,7 +703,7 @@ static void show_devices_argv(char *argv[])
 /*
  * Describe adapter ids
  */
-void print_adapter_id_help(void)
+static void print_adapter_id_help(void)
 {
 	printf("\n");
 	printf("DEVICE_IDS\n");
