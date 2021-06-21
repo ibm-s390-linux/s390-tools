@@ -2894,7 +2894,7 @@ static int open_keystore(void)
 {
 	char *directory;
 
-	directory = getenv(ENVVAR_ZKEY_REPOSITORY);
+	directory = secure_getenv(ENVVAR_ZKEY_REPOSITORY);
 	if (directory == NULL)
 		directory = DEFAULT_KEYSTORE;
 

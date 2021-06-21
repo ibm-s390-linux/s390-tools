@@ -125,7 +125,7 @@ static FILE *open_kms_plugins_file(bool verbose)
 	char *conf;
 	FILE *fp;
 
-	conf = getenv(ENVVAR_ZKEY_KMS_PLUGINS);
+	conf = secure_getenv(ENVVAR_ZKEY_KMS_PLUGINS);
 	if (conf == NULL)
 		conf = DEFAULT_KMS_PLUGINS;
 
@@ -438,7 +438,7 @@ int check_for_kms_plugin(struct kms_info *kms_info, bool verbose)
 
 	memset(kms_info, 0, sizeof(*kms_info));
 
-	directory = getenv(ENVVAR_ZKEY_REPOSITORY);
+	directory = secure_getenv(ENVVAR_ZKEY_REPOSITORY);
 	if (directory == NULL)
 		directory = DEFAULT_KEYSTORE;
 
@@ -634,7 +634,7 @@ int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 	if (rc != 0)
 		goto out;
 
-	directory = getenv(ENVVAR_ZKEY_REPOSITORY);
+	directory = secure_getenv(ENVVAR_ZKEY_REPOSITORY);
 	if (directory == NULL)
 		directory = DEFAULT_KEYSTORE;
 	util_asprintf(&config_dir, "%s/%s", directory, plugin_name);
