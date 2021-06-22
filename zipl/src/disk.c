@@ -198,7 +198,7 @@ disk_get_info(const char* device, struct job_target_data* target,
 	int fd;
 	long devsize;
 	FILE *fh;
-	char *script_pre = TOOLS_LIBDIR "/zipl_helper.";
+	const char *script_pre = util_libdir_path("/zipl_helper.");
 	char *script_file = NULL;
 	char *ppn_cmd = NULL;
 	char buffer[80];

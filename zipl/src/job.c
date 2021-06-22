@@ -1920,6 +1920,9 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
 	job->is_secure =  SECURE_BOOT_UNDEFINED;
+	if (job->verbose)
+		printf("Looking for components in '%s'\n", util_libdir());
+
 	/* Get job data from user input */
 	if (cmdline.help) {
 		job->command_line = 1;

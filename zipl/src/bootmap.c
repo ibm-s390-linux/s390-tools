@@ -440,7 +440,7 @@ print_components(const char *name[], struct component_loc *loc, int num)
 }
 
 static int
-extract_signature(char *filename, void **ret_signature,
+extract_signature(const char *filename, void **ret_signature,
 		  struct signature_header *sig_head)
 {
 	struct file_signature *file_sig;
