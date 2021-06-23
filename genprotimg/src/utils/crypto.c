@@ -440,10 +440,14 @@ static int check_signature_algo_match(const EVP_PKEY *pkey, const X509 *subject,
 static X509_CRL *load_crl_from_bio(BIO *bio)
 {
 	g_autoptr(X509_CRL) crl = PEM_read_bio_X509_CRL(bio, NULL, 0, NULL);
+	gint rc;
+
 	if (crl)
 		return g_steal_pointer(&crl);
 	ERR_clear_error();
-	BIO_reset(bio);
+	rc = BIO_reset(bio);
+	if (rc != 1 || (rc != 0 && BIO_method_type(bio) == BIO_TYPE_FILE))
+		return NULL;
 
 	/* maybe the CRL is stored in DER format */
 	crl = d2i_X509_CRL_bio(bio, NULL);
@@ -514,6 +518,7 @@ X509 *load_cert_from_file(const char *path, GError **err)
 {
 	g_autoptr(BIO) bio = bio_read_from_file(path);
 	g_autoptr(X509) cert = NULL;
+	gint rc;
 
 	if (!bio) {
 		g_set_error(err, PV_CRYPTO_ERROR,
@@ -526,7 +531,12 @@ X509 *load_cert_from_file(const char *path, GError **err)
 	if (cert)
 		return g_steal_pointer(&cert);
 	ERR_clear_error();
-	BIO_reset(bio);
+	rc = BIO_reset(bio);
+	if (rc != 1 || (rc != 0 && BIO_method_type(bio) == BIO_TYPE_FILE)) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_READ_CERTIFICATE,
+			    _("unable to load certificate: '%s'"), path);
+		return NULL;
+	}
 
 	/* maybe the certificate is stored in DER format */
 	cert = d2i_X509_bio(bio, NULL);
