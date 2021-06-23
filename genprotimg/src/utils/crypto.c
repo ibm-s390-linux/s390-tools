@@ -1655,8 +1655,8 @@ gint verify_host_key(X509 *host_key, GSList *issuer_pairs,
 	}
 
 	if (!(verify_flags & X509_V_FLAG_NO_CHECK_TIME)) {
-		const ASN1_TIME *last = X509_get_notBefore(host_key);
-		const ASN1_TIME *next = X509_get_notAfter(host_key);
+		const ASN1_TIME *last = X509_get0_notBefore(host_key);
+		const ASN1_TIME *next = X509_get0_notAfter(host_key);
 
 		if (!last || !next || check_validity_period(last, next)) {
 			g_set_error(err, PV_CRYPTO_ERROR,
