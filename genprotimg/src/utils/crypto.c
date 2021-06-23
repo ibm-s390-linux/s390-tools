@@ -31,6 +31,7 @@
 
 #include "buffer.h"
 #include "curl.h"
+#include "openssl_compat.h"
 #include "crypto.h"
 
 #define DEFINE_GSLIST_MAP(t2, t1)					\
@@ -1438,7 +1439,7 @@ static const char *get_first_dp_url(DIST_POINT *dp)
 	return NULL;
 }
 
-static gboolean insert_crl(X509_NAME *name, X509_CRL *crl)
+static gboolean insert_crl(const X509_NAME *name, X509_CRL *crl)
 {
 	g_autofree gchar *key = NULL;
 
@@ -1453,7 +1454,7 @@ static gboolean insert_crl(X509_NAME *name, X509_CRL *crl)
 }
 
 /* Caller is responsible for free'ing */
-static X509_CRL *lookup_crl(X509_NAME *name)
+static X509_CRL *lookup_crl(const X509_NAME *name)
 {
 	g_autoptr(X509_CRL) crl = NULL;
 	g_autofree gchar *key = NULL;
@@ -1473,7 +1474,7 @@ static X509_CRL *lookup_crl(X509_NAME *name)
 }
 
 /* Returns empty stack if no CRL downloaded. */
-static STACK_OF_X509_CRL *crls_download_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
+static STACK_OF_X509_CRL *crls_download_cb(const X509_STORE_CTX *ctx, const X509_NAME *nm)
 {
 	g_autoptr(STACK_OF_X509_CRL) crls = NULL;
 	g_autoptr(X509_CRL) crl = NULL;
@@ -1483,7 +1484,7 @@ static STACK_OF_X509_CRL *crls_download_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
 	crls = sk_X509_CRL_new_null();
 	if (!crls)
 		g_abort();
-	cert = X509_STORE_CTX_get_current_cert(ctx);
+	cert = Pv_X509_STORE_CTX_get_current_cert(ctx);
 	if (!cert)
 		return g_steal_pointer(&crls);
 	g_assert(X509_NAME_cmp(X509_get_issuer_name(cert), nm) == 0);
@@ -1527,19 +1528,19 @@ void STACK_OF_X509_CRL_free(STACK_OF_X509_CRL *stack)
 /* Downloaded CRLs have a higher precedence than the CRLs specified on the
  * command line.
  */
-static STACK_OF_X509_CRL *crls_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
+static STACK_OF_X509_CRL *crls_cb(const X509_STORE_CTX *ctx, const X509_NAME *nm)
 {
 	g_autoptr(STACK_OF_X509_CRL) crls = crls_download_cb(ctx, nm);
 
 	if (sk_X509_CRL_num(crls) > 0)
 		return g_steal_pointer(&crls);
-	return X509_STORE_CTX_get1_crls(ctx, nm);
+	return Pv_X509_STORE_CTX_get1_crls(ctx, nm);
 }
 
 /* Set up CRL lookup with download support */
 void store_setup_crl_download(X509_STORE *st)
 {
-	X509_STORE_set_lookup_crls(st, crls_cb);
+	Pv_X509_STORE_set_lookup_crls(st, crls_cb);
 }
 
 /* Download a CRL using the URI specified in the distribution @crldp */

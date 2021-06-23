@@ -5,6 +5,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 5.xx
 
   Changes of existing tools:
+  - genprotimg: Add OpenSSL 3.0 support
 
   Bug Fixes:
   - dbginfo: add KVM data collection for server and guest - fix lszdev
