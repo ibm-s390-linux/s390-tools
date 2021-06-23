@@ -9,6 +9,7 @@ Release history for s390-tools (MIT version)
   Bug Fixes:
   - dbginfo: add KVM data collection for server and guest - fix lszdev
   - dbginfo: add /proc/kallsyms - refresh zVM, lscpu - fix WORKARCHIVE handling
+  - genprotimg: Add missing return values in error paths
 
 * __v2.16.0 (2021-02-19)__
 

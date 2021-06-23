@@ -1847,6 +1847,7 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("BN_add_word failed"));
+			return -1;
 		}
 		g_assert(BN_num_bytes(tweak_num) > 0);
 		g_assert(BN_num_bytes(tweak_num) <= tweak_size);
@@ -1855,6 +1856,7 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("BN_bn2binpad failed"));
+			return -1;
 		};
 
 		/* set new tweak */
