@@ -49,7 +49,9 @@ check-dep-libekmfweb: detect-openssl-version.dep
 		"libekmfweb", \
 		"curl/curl.h", \
 		"libcurl-devel", \
-		"HAVE_LIBCURL=0")
+		"HAVE_LIBCURL=0" \
+		`curl-config --cflags` `curl-config --libs`)
+	curl-config --ssl-backends | grep OpenSSL >/dev/null 2>&1 || { echo "Error: libcurl is not built with the OpenSSL backend"; exit 1; }
 	touch check-dep-libekmfweb
 
 skip-libekmfweb-openssl:
@@ -67,8 +69,8 @@ ekmfweb.o: check-dep-libekmfweb ekmfweb.c utilities.h cca.h $(rootdir)include/ek
 utilities.o: check-dep-libekmfweb utilities.c utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 cca.o: check-dep-libekmfweb cca.c cca.h utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 
-libekmfweb.so.$(VERSION): ALL_CFLAGS += -fPIC
-libekmfweb.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl -lcurl -ldl
+libekmfweb.so.$(VERSION): ALL_CFLAGS += -fPIC `curl-config --cflags`
+libekmfweb.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl `curl-config --libs` -ldl
 libekmfweb.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libekmfweb.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,libekmfweb.so.$(VERM)
 libekmfweb.so.$(VERSION): ekmfweb.o utilities.o cca.o

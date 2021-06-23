@@ -705,6 +705,7 @@ static int _ekmf_perform_request(const struct ekmf_config *config,
 				 long *status_code, char **error_msg,
 				 CURL *curl, bool verbose)
 {
+	const struct curl_tlssessioninfo *info = NULL;
 	struct curl_header_cb_data header_cb = { 0 };
 	struct curl_sslctx_cb_data sslctx_cb = { 0 };
 	struct curl_write_cb_data write_cb = { 0 };
@@ -731,6 +732,19 @@ static int _ekmf_perform_request(const struct ekmf_config *config,
 	pr_verbose(verbose, "Performing request for '%s'", url);
 
 	curl_easy_reset(curl);
+
+	/*
+	 * The CURLOPT_SSL_CTX_FUNCTION callback only works with the OpenSSL
+	 * curl backend. Check that OpenSSL is the current curl backend.
+	 */
+	rc = curl_easy_getinfo(curl, CURLINFO_TLS_SSL_PTR, &info);
+	CURL_ERROR_CHECK(rc, "curl_easy_getinfo CURLINFO_TLS_SSL_PTR", verbose,
+			 out);
+	if (info->backend != CURLSSLBACKEND_OPENSSL) {
+		pr_verbose(verbose, "libcurl is not using the OpenSSL backend");
+		rc = -EIO;
+		goto out;
+	}
 
 	rc = curl_easy_setopt(curl, CURLOPT_VERBOSE, verbose ? 1 : 0);
 	CURL_ERROR_CHECK(rc, "curl_easy_setopt CURLOPT_VERBOSE", verbose, out);
@@ -5617,6 +5631,20 @@ void ekmf_curl_destroy(CURL *curl_handle)
  */
 void __attribute__ ((constructor)) ekmf_init(void)
 {
+	CURLsslset rc;
+
+	/*
+	 * Ensure that curl uses OpenSSL as SSL backend. If curl has already
+	 * been itialized by the calling application, the backend can't be
+	 * changed anymore, but we continue anyway. However, it will later be
+	 * checked if curl uses the OpenSSL backend, and a HTTPS connection
+	 * will fail if it is not using the OpenSSL backend.
+	 */
+	rc = curl_global_sslset(CURLSSLBACKEND_OPENSSL, NULL, NULL);
+	if (rc != CURLSSLSET_OK && rc != CURLSSLSET_TOO_LATE)
+		errx(EXIT_FAILURE, "libekmfweb: libcurl was not built with "
+		     "the OpenSSL backend");
+
 	curl_global_init(CURL_GLOBAL_ALL);
 }
 
