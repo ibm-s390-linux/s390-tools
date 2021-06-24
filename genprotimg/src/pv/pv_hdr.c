@@ -41,7 +41,7 @@ uint32_t pv_hdr_size(const PvHdr *hdr)
 
 gboolean pv_hdr_uses_encryption(const PvHdr *hdr)
 {
-	return !(GUINT64_FROM_BE(hdr->head.pcf) & PV_CFLAG_NO_DECRYPTION);
+	return !(GUINT64_FROM_BE(hdr->head.pcf) & PV_PCF_NO_DECRYPTION);
 }
 
 uint64_t pv_hdr_enc_size(const PvHdr *hdr)

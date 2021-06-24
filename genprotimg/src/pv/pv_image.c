@@ -61,7 +61,7 @@ static gint pv_img_prepare_component(const PvImage *img, PvComponent *comp,
 	void *opaque = NULL;
 	gint rc;
 
-	if (img->pcf & PV_CFLAG_NO_DECRYPTION) {
+	if (img->pcf & PV_PCF_NO_DECRYPTION) {
 		/* we only need to align the components */
 		func = pv_component_align;
 		opaque = NULL;

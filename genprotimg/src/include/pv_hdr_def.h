@@ -24,8 +24,8 @@
 #define PV_MAGIC_NUMBER 0x49424d5365634578ULL
 #define PV_VERSION_1	0x00000100U
 
-/* prevent Ultravisor decryption during unpack operation */
-#define PV_CFLAG_NO_DECRYPTION 0x10000000ULL
+/* Plaintext control flags */
+#define PV_PCF_NO_DECRYPTION	(1ULL << 28) /* prevent Ultravisor decryption during unpack operation */
 
 /* maxima for the PV version 1 */
 #define PV_V1_IPIB_MAX_SIZE	PAGE_SIZE
