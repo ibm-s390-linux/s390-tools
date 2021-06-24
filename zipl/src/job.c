@@ -19,6 +19,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/util_arch.h"
+
 #include "error.h"
 #include "job.h"
 #include "misc.h"
@@ -758,7 +760,8 @@ finalize_ipl_address_data(struct job_ipl_data* ipl, char *name)
 	int num;
 	int rc;
 
-	address_limit = ipl->is_kdump ? ADDRESS_LIMIT_KDUMP : ADDRESS_LIMIT;
+	address_limit = ipl->is_kdump ?
+		MIN(util_arch_hsa_maxsize(), ADDRESS_LIMIT) : ADDRESS_LIMIT;
 	rc = get_ipl_components(ipl, &cl, &num);
 	if (rc)
 		return rc;
