@@ -7,6 +7,7 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
   - genprotimg: Add OpenSSL 3.0 support
   - genprotimg: Change plaintext control flags defaults so PCKMO functions are allowed
+  - genprotimg: Add '--(enable|disable)-pckmo' options
 
   Bug Fixes:
   - dbginfo: add KVM data collection for server and guest - fix lszdev

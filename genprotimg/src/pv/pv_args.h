@@ -22,12 +22,19 @@ typedef struct pv_arg {
 PvArg *pv_arg_new(PvComponentType type, const gchar *path);
 void pv_arg_free(PvArg *arg);
 
+typedef enum pv_tristate {
+		  PV_NOT_SET = 0,
+		  PV_TRUE,
+		  PV_FALSE,
+} PvTristate;
+
 typedef struct {
 	gint log_level;
 	gint no_verify;
 	gboolean offline;
 	gchar *pcf;
 	gchar *scf;
+	PvTristate allow_pckmo;
 	gchar *psw_addr; /* PSW address which will be used for the start of
 			  * the actual component (e.g. Linux kernel)
 			  */

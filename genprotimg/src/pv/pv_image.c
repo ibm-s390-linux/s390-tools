@@ -229,7 +229,7 @@ static gint pv_img_set_psw_addr(PvImage *img, const gchar *psw_addr_s,
 }
 
 static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
-				     const gchar *scf_s, GError **err)
+				     const gchar *scf_s, PvTristate allow_pckmo, GError **err)
 {
 	uint64_t flags;
 
@@ -246,6 +246,11 @@ static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
 
 		img->scf = flags;
 	}
+
+	if (allow_pckmo == PV_TRUE)
+		img->pcf |= PV_PCF_PCKM_ECC | PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA;
+	else if (allow_pckmo == PV_FALSE)
+		img->pcf &= ~(PV_PCF_PCKM_ECC | PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA);
 
 	return 0;
 }
@@ -603,7 +608,7 @@ PvImage *pv_img_new(PvArgs *args, const gchar *stage3a_path, GError **err)
 		return NULL;
 
 	/* set the control flags: PCF and SCF */
-	if (pv_img_set_control_flags(ret, args->pcf, args->scf, err) < 0)
+	if (pv_img_set_control_flags(ret, args->pcf, args->scf, args->allow_pckmo, err) < 0)
 		return NULL;
 
 	/* read in the keys */

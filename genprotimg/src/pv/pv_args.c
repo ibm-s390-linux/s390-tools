@@ -64,6 +64,13 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 {
 	PvComponentType KERNEL = PV_COMP_TYPE_KERNEL;
 
+	if (args->pcf && args->allow_pckmo != PV_NOT_SET) {
+		g_set_error(err, PV_PARSE_ERROR, PV_PARSE_ERROR_SYNTAX,
+			    _("The '--x-pcf' and '--(enable|disable)-pckmo' options are mutually"
+			      " exclusive.\nUse 'genprotimg --help' for more information"));
+		return -1;
+	}
+
 	if (args->unused_values->len > 0) {
 		g_autofree gchar *unused = NULL;
 
@@ -181,6 +188,19 @@ static gboolean cb_set_string_option(const gchar *option, const gchar *value,
 	return TRUE;
 }
 
+static gboolean cb_enable_disable_flag(const gchar *option, const gchar *value G_GNUC_UNUSED,
+				       PvArgs *args, GError **err G_GNUC_UNUSED)
+{
+	if (g_str_equal(option, "--enable-pckmo"))
+		args->allow_pckmo = PV_TRUE;
+	else if (g_str_equal(option, "--disable-pckmo"))
+		args->allow_pckmo = PV_FALSE;
+	else
+		g_assert_not_reached();
+
+	return TRUE;
+}
+
 static gboolean cb_set_log_level(const gchar *option G_GNUC_UNUSED,
 				 const gchar *value G_GNUC_UNUSED, PvArgs *args,
 				 GError **err G_GNUC_UNUSED)
@@ -262,6 +282,21 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .description = _("Use the kernel parameters stored in PARMFILE\n" INDENT
 				   "(optional)."),
 		  .arg_description = _("PARMFILE") },
+		{.long_name = "enable-pckmo",
+		 .short_name = 0,
+		 .flags = G_OPTION_FLAG_NO_ARG,
+		 .arg = G_OPTION_ARG_CALLBACK,
+		 .arg_data = cb_enable_disable_flag,
+		 .description = _("Enable the support for the DEA, TDEA, AES, and\n" INDENT
+				  "ECC PCKMO key encryption functions (default)\n" INDENT
+				  "(optional).")},
+		{.long_name = "disable-pckmo",
+		 .short_name = 0,
+		 .flags = G_OPTION_FLAG_NO_ARG,
+		 .arg = G_OPTION_ARG_CALLBACK,
+		 .arg_data = cb_enable_disable_flag,
+		 .description = _("Disable the support for the DEA, TDEA, AES, and\n" INDENT
+				  "ECC PCKMO key encryption functions (optional).")},
 		{ .long_name = "crl",
 		  .short_name = 0,
 		  .flags = G_OPTION_FLAG_NONE,
@@ -357,7 +392,8 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .description =
 			  _("Specify the plaintext control flags\n" INDENT
 			    "as a hexadecimal value.\n" INDENT
-			    "Optional; default: '0xe0'."),
+			    "Optional; mutually exclusive with\n" INDENT
+			    "'--(enable|disable)-pckmo'; default: '0xe0'."),
 		  .arg_description = _("VALUE") },
 		{ .long_name = "x-psw",
 		  .short_name = 0,
@@ -410,6 +446,7 @@ PvArgs *pv_args_new(void)
 	g_autoptr(PvArgs) args = g_new0(PvArgs, 1);
 
 	args->unused_values = g_ptr_array_new_with_free_func(g_free);
+	args->allow_pckmo = PV_NOT_SET;
 	return g_steal_pointer(&args);
 }
 
