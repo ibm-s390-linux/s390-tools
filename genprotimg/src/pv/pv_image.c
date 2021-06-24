@@ -589,6 +589,7 @@ PvImage *pv_img_new(PvArgs *args, const gchar *stage3a_path, GError **err)
 	if (!ret->comps)
 		return NULL;
 
+	ret->pcf = PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA | PV_PCF_PCKM_ECC;
 	ret->cust_comm_cipher = EVP_aes_256_gcm();
 	ret->gcm_cipher = EVP_aes_256_gcm();
 	ret->initial_psw.addr = DEFAULT_INITIAL_PSW_ADDR;

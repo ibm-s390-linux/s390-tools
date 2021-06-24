@@ -357,7 +357,7 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .description =
 			  _("Specify the plaintext control flags\n" INDENT
 			    "as a hexadecimal value.\n" INDENT
-			    "Optional; default: '0x0'."),
+			    "Optional; default: '0xe0'."),
 		  .arg_description = _("VALUE") },
 		{ .long_name = "x-psw",
 		  .short_name = 0,
