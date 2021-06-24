@@ -23,9 +23,10 @@
 
 #include <linux/perf_event.h>
 
+#include "lib/util_arch.h"
+#include "lib/util_base.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
-#include "lib/util_base.h"
 
 #include "defines.h"
 
@@ -2558,25 +2559,6 @@ static struct counters cpumcf_z15_counters[] = {
 	},
 };
 
-static const char *machine_name(void)
-{
-	switch (cpumf.machine_type) {
-	case 2097:	return "IBM System z10 EC";
-	case 2098:	return "IBM System z10 BC";
-	case 2817:	return "IBM zEnterprise 196";
-	case 2818:	return "IBM zEnterprise 114";
-	case 2827:	return "IBM zEnterprise EC12";
-	case 2828:	return "IBM zEnterprise BC12";
-	case 2964:	return "IBM z13";
-	case 2965:	return "IBM z13s";
-	case 3906:	return "IBM z14";
-	case 3907:	return "IBM z14 ZR1";
-	case 8561:	return "IBM z15";
-	case 8562:	return "IBM z15 Model T02";
-	}
-	return "Unknown hardware model";
-}
-
 /* Return the type number of the CPU Measurement facility from the sysfs file.
  * If the type number is equal to PERF_TYPE_RAW, then the prefix is 'r' to
  * specify the raw counter number by the perf tool.
@@ -2773,38 +2755,6 @@ static void show_info(struct cpumf_info *p, int details)
 		warnx("No CPU-measurement sampling facility detected");
 }
 
-/* Funktion to read machine type */
-#define	SYSINFO		"/proc/sysinfo"
-#define	MACH_TYPE	"Type:"
-
-static int read_machine(unsigned short *mt)
-{
-	int rc = EXIT_FAILURE;
-	char *linep = NULL;
-	size_t line_sz;
-	ssize_t nbytes;
-	FILE *fp;
-
-	fp = fopen(SYSINFO, "r");
-	if (!fp) {
-		warn(SYSINFO);
-		return rc;
-	}
-	while ((nbytes = getline(&linep, &line_sz, fp)) != EOF) {
-		if (!strncmp(linep, MACH_TYPE, sizeof MACH_TYPE - 1)) {
-			int rc_scan = sscanf(linep, MACH_TYPE "%hd", mt);
-			if (rc_scan != 1)
-				warnx("Can not parse line %s", linep);
-			else
-				rc = EXIT_SUCCESS;
-			break;
-		}
-	}
-	fclose(fp);
-	free(linep);
-	return rc;
-}
-
 /* Read CPU Measurement sampling facility device driver minimum and maximum
  * buffer size
  */
@@ -2918,9 +2868,11 @@ static int read_info(void)
 		if (rc == EXIT_FAILURE)
 			goto out;
 	}
-	rc = read_machine(&cpumf.machine_type);
-	if (rc == EXIT_FAILURE)
+	cpumf.machine_type = util_arch_machine_type();
+	if (cpumf.machine_type == UTIL_ARCH_MACHINE_TYPE_UNKNOWN) {
+		rc = EXIT_FAILURE;
 		goto out;
+	}
 	rc = EXIT_SUCCESS;
 out:
 	fclose(slp);
@@ -3008,33 +2960,33 @@ static struct counters *get_counter(int ctrset, size_t *len)
 		break;
 	case CPUMF_CTRSET_EXTENDED:
 		switch (cpumf.machine_type) {
-		case 2097:
-		case 2098:
+		case UTIL_ARCH_MACHINE_TYPE_Z10_EC:
+		case UTIL_ARCH_MACHINE_TYPE_Z10_BC:
 			cp = cpumcf_z10_counters;
 			*len = ARRAY_SIZE(cpumcf_z10_counters);
 			break;
-		case 2817:
-		case 2818:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_196:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_114:
 			cp = cpumcf_z196_counters;
 			*len = ARRAY_SIZE(cpumcf_z196_counters);
 			break;
-		case 2827:
-		case 2828:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_EC12:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_BC12:
 			cp = cpumcf_zec12_counters;
 			*len = ARRAY_SIZE(cpumcf_zec12_counters);
 			break;
-		case 2964:
-		case 2965:
+		case UTIL_ARCH_MACHINE_TYPE_Z13:
+		case UTIL_ARCH_MACHINE_TYPE_Z13_S:
 			cp = cpumcf_z13_counters;
 			*len = ARRAY_SIZE(cpumcf_z13_counters);
 			break;
-		case 3906:
-		case 3907:
+		case UTIL_ARCH_MACHINE_TYPE_Z14:
+		case UTIL_ARCH_MACHINE_TYPE_Z14_ZR1:
 			cp = cpumcf_z14_counters;
 			*len = ARRAY_SIZE(cpumcf_z14_counters);
 			break;
-		case 8561:
-		case 8562:
+		case UTIL_ARCH_MACHINE_TYPE_Z15:
+		case UTIL_ARCH_MACHINE_TYPE_Z15_T02:
 			cp = cpumcf_z15_counters;
 			*len = ARRAY_SIZE(cpumcf_z15_counters);
 			read_ccerror(cp, *len);
@@ -3069,7 +3021,8 @@ static void show_counter(bool all)
 	struct counters *cp;
 	size_t cp_cnt;
 
-	printf("perf event counter list for %s\n", machine_name());
+	printf("perf event counter list for %s\n",
+	       util_arch_machine_type_str());
 	show_hdr();
 	/* Basic counter set */
 	cp = get_counter(CPUMF_CTRSET_BASIC, &cp_cnt);
