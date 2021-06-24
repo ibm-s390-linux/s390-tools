@@ -112,6 +112,20 @@ ifeq ("${ASAN}","1")
 endif
 
 #
+# Check for header prerequisite
+#
+# $1: Name of include file to check
+# $2: Additional compiler & linker options (optional)
+#
+# Returns "yes" on success and nothing otherwise
+#
+define check_header_prereq
+$(shell printf "#include <%s>\n int main(void) {return 0;}" $1 | \
+        ( $(CC) $(filter-out --coverage, $(ALL_CFLAGS)) $(ALL_CPPFLAGS) \
+                $2 -o /dev/null -xc - ) >/dev/null 2>&1 && echo -n yes)
+endef
+
+#
 # Check for build dependency
 #
 # $1: Name of tool or feature that requires dependency
