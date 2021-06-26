@@ -45,16 +45,7 @@ libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
 libekmfweb/libekmfweb.so.1
 libekmfweb/libekmfweb.so.1.0
-libutil/util_base_example
-libutil/util_file_example
-libutil/util_libc_example
-libutil/util_opt_command_example
-libutil/util_opt_example
-libutil/util_panic_example
-libutil/util_path_example
-libutil/util_prg_example
-libutil/util_rec_example
-libutil/util_scandir_example
+libutil/*_example
 libvmcp/vmcp_example
 libzds/libzds.a
 lsstp/lsstp
