@@ -51,23 +51,14 @@ endif
 ALL_CFLAGS += $(FUSE_CFLAGS) $(SYSTEMD_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) $(SYSTEMD_LDLIBS) -lpthread
 
-OBJECTS = \
-	main.o \
-	cmdline_options.o \
-	config.o \
-	mount.o \
-	swap.o \
-	hsa.o \
-	hsa_file.o \
-	hsa_mem.o \
-	proxy.o \
-	overlay.o
+sources := $(wildcard *.c)
+objects := $(patsubst %.c,%.o,$(sources))
 
 libs = $(rootdir)/libutil/libutil.a
 
 all: hsavmcore
 
-hsavmcore: $(OBJECTS) $(libs)
+hsavmcore: $(objects) $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 overlay.o: check-dep-fuse overlay.c overlay.h
@@ -90,6 +81,6 @@ install: all
 endif # HAVE_FUSE
 
 clean:
-	rm -f hsavmcore $(OBJECTS)
+	rm -f hsavmcore $(objects)
 
 .PHONY: all install clean
