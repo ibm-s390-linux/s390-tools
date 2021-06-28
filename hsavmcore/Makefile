@@ -7,6 +7,8 @@
 
 include ../common.mak
 
+ALL_CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
 ifeq (${HAVE_FUSE},0)
 
 all:
@@ -46,7 +48,6 @@ ifneq (${HAVE_SYSTEMD},0)
   endif
 endif
 
-ALL_CPPFLAGS += -D_FILE_OFFSET_BITS=64
 ALL_CFLAGS += $(FUSE_CFLAGS) $(SYSTEMD_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) $(SYSTEMD_LDLIBS) -lpthread
 
@@ -64,17 +65,19 @@ OBJECTS = \
 
 libs = $(rootdir)/libutil/libutil.a
 
-all: check_dep hsavmcore
+all: hsavmcore
 
-check_dep:
+hsavmcore: $(OBJECTS) $(libs)
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
+
+overlay.o: check-dep-fuse overlay.c overlay.h
+
+check-dep-fuse:
 	$(call check_dep, \
 		"hsavmcore", \
 		"fuse.h", \
 		"fuse-devel or libfuse-dev", \
 		"HAVE_FUSE=0")
-
-hsavmcore: $(OBJECTS) $(libs)
-	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 hsavmcore \
