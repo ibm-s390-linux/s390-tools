@@ -23,9 +23,10 @@
 #include <unistd.h>
 #include <linux/fs.h>
 #include <linux/fiemap.h>
+#include <assert.h>
+
 #include "lib/util_proc.h"
 #include "lib/util_sys.h"
-
 #include "disk.h"
 #include "error.h"
 #include "install.h"
@@ -1085,9 +1086,9 @@ disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 }
 
 /**
- * Retrieve a list of pointers to the disk blocks that make up the whole
- * file specified by FILENAME, or only its part specified by REG (if the
- * last one is not NULL).
+ * Retrieve a list of pointers to the disk blocks that make up a continuous
+ * region REG in a file specified by FILENAME. If REG is NULL, then retrieve
+ * a list of pointers for the whole file.
  * Upon success, return the number of blocks and set BLOCKLIST to point to
  * the uncompacted list. INFO provides information about the device which
  * contains the file. Return zero otherwise
@@ -1121,18 +1122,19 @@ disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
 		return 0;
 	}
 	if (reg) {
+		/*
+		 * case of not block-aligned offsets is not implemented
+		 */
+		assert(reg->offset % info->phy_block_size == 0);
+
 		off = reg->offset;
 		count = reg->len;
 	} else {
 		off = 0;
 		count = stats.st_size;
 	}
-	if (off >= stats.st_size) {
-		error_reason("Offset %llu is outside the file '%s'",
-			     off, filename);
-		close(fd);
-		return 0;
-	}
+	assert(off < stats.st_size);
+
 	if (off + count > (size_t)stats.st_size)
 		count = stats.st_size - off;
 

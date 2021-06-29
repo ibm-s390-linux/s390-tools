@@ -17,9 +17,19 @@
 #include "disk.h"
 #include "job.h"
 #include "zipl.h"
+#include "stddef.h"
+
+#define BOOTMAP_HEADER_VERSION  1
 
 #define SIGNATURE_MAGIC  "~Module signature appended~\n"
 #define	PKCS7_FORMAT 0x01
+
+struct bootmap_header {
+	char header_text[48];
+	u64 version;
+	u64 envblk_offset;
+	char reserved[448];
+};
 
 struct signature_header {
 	uint8_t format;
@@ -50,6 +60,9 @@ struct file_signature {
 
 #define PKEY_ID_PKCS7 0x02
 
+int bootmap_header_init(int fd);
+int bootmap_header_read(int fd, struct bootmap_header *bh);
+int bootmap_header_write(int fd, struct bootmap_header *bh);
 int bootmap_create(struct job_data* job, disk_blockptr_t* program_table,
 		   disk_blockptr_t *scsi_dump_sb_blockptr,
 		   disk_blockptr_t** stage2_list, blocknum_t* stage2_count,

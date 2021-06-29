@@ -10,7 +10,7 @@ ALL_LDFLAGS += -Wl,-z,noexecstack $(NO_PIE_LDFLAGS)
 libs = $(rootdir)/libutil/libutil.a
 
 objects = misc.o error.o scan.o job.o boot.o bootmap.o disk.o \
-	  install.o zipl.o $(rootdir)/zipl/boot/data.o
+	  bootmap_header.o envblk.o install.o zipl.o $(rootdir)/zipl/boot/data.o
 
 zipl_helpers = $(basename $(wildcard zipl_helper.*.c))
 chreipl_helpers = $(subst zipl_,chreipl_, $(zipl_helpers))

@@ -82,7 +82,8 @@ int
 boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 		      address_t initrd_addr, size_t initrd_len,
 		      address_t entry, int extra_parm, uint64_t flags,
-		      address_t image_addr, size_t image_len)
+		      address_t image_addr, size_t image_len,
+		      address_t envblk_addr, size_t envblk_len)
 {
 	struct stage3_parms params;
 	void* data;
@@ -106,6 +107,8 @@ boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 	params.flags = flags;
 	params.image_len = (uint64_t) image_len;
 	params.image_addr = (uint64_t) image_addr;
+	params.envblk_addr = (uint64_t) envblk_addr;
+	params.envblk_len = (uint64_t) envblk_len;
 	/* Initialize buffer */
 	memcpy(data, &params, sizeof(params));
 	*buffer = data;

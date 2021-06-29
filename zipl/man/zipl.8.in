@@ -139,6 +139,11 @@ It is not possible to specify both this parameter and the name of a menu
 or configuration section on the command line at the same time.
 
 .TP
+.BR "\-\-environment=<FILE>"
+Import zIPL environment from specified <FILE>. If none is supplied,
+it will be imported from "/etc/ziplenv".
+
+.TP
 .BR "\-\-targetbase=<BASE DEVICE>"
 Install the actual boot loader on the device node specified by BASE DEVICE.
 

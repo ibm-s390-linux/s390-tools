@@ -46,7 +46,13 @@ struct job_ipl_data {
 	address_t image_addr;
 	address_t parm_addr;
 	address_t ramdisk_addr;
+	address_t envblk_addr;
 	int is_kdump;
+};
+
+struct job_envblk_data {
+	int size;
+	char *buf;
 };
 
 struct job_segment_data {
@@ -108,6 +114,7 @@ struct job_menu_data {
 struct job_data {
 	enum job_id id;
 	struct job_target_data target;
+	struct job_envblk_data envblk;
 	char* name;
 	union {
 		struct job_ipl_data ipl;

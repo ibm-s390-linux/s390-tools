@@ -296,7 +296,8 @@ int boot_get_eckd_stage2(void** data, size_t* size, struct job_data* job);
 int boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 			  address_t initrd_addr, size_t initrd_len,
 			  address_t entry, int extra_parm, uint64_t flags,
-			  address_t image_addr, size_t image_len);
+			  address_t image_addr, size_t image_len,
+			  address_t envblk_addr, size_t envblk_len);
 int boot_get_tape_ipl(void** data, size_t* size, address_t parm_addr,
 		      address_t initrd_addr, address_t image_addr);
 int boot_get_tape_dump(void** data, size_t* size, uint64_t mem);
