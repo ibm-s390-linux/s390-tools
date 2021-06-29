@@ -7,7 +7,7 @@
 dasdfmt \- formatting of DASD (ECKD) disk drives.
 
 .SH SYNOPSIS
-\fBdasdfmt\fR [-h] [-t] [-v] [-y] [-p] [-P] [-m \fIstep\fR]
+\fBdasdfmt\fR [-h] [-t] [-v] [-y] [-p] [-Q] [-P] [-m \fIstep\fR]
 .br
         [-r \fIcylinder\fR] [-b \fIblksize\fR] [-l \fIvolser\fR] [-d \fIlayout\fR]
 .br
@@ -96,7 +96,7 @@ Do not use this option if you are using a 3270 console,
 running in background or redirecting the output to a file.
 
 .TP
-\fB-P\fR or \fB--percentage\fR
+\fB-Q\fR or \fB--percentage\fR
 Print one line for each formatted cylinder showing the number of the
 cylinder and percentage of formatting process.
 Intended to be used by higher level interfaces.
@@ -157,6 +157,18 @@ devices, counting the base device and all alias devices.
 \fB-b\fR \fIblksize\fR or \fB--blocksize\fR=\fIblksize\fR
 Specify blocksize to be used. \fIblksize\fR must be a positive integer
 and always be a power of two. The recommended blocksize is 4096 bytes.
+
+.TP
+\fB-P\fR \fInumdisks\fR or \fB--max_parallel\fR=\fInumdisks\fR
+Specify the number of disks to be formatted in parallel.
+\fInumdisks\fR specifies the number of formatting processed,
+independent on the overall number of disks to be formatted.
+The maximum value for \fInumdisks\fR is 512. Default is 1.
+.br
+Using this option can decrease overall processing time when formatting
+several disks. Please note that the I/O throughput will dramatically
+increase when using this option. Use with care.
+.br
 
 .TP
 \fB-l\fR \fIvolser\fR or \fB--label\fR=\fIvolser\fR

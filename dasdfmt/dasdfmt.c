@@ -13,6 +13,7 @@
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
@@ -81,6 +82,7 @@ static struct dasdfmt_globals {
 	int   mode_specified;
 	int   ese;
 	int   no_discard;
+	int   procnum;
 } g = {
 	.dasd_info = { 0 },
 };
@@ -104,6 +106,11 @@ static struct util_opt opt_vec[] = {
 		.option = { "check", no_argument, NULL, OPT_CHECK },
 		.desc = "Perform complete format check on device",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = { "max_parallel", required_argument, NULL, 'P' },
+		.desc = "Format devices in parallel",
+		.flags = UTIL_OPT_FLAG_NOLONG,
 	},
 	UTIL_OPT_SECTION("FORMAT OPTIONS"),
 	{
@@ -162,7 +169,7 @@ static struct util_opt opt_vec[] = {
 		.desc = "Show a progressbar",
 	},
 	{
-		.option = { "percentage", no_argument, NULL, 'P' },
+		.option = { "percentage", no_argument, NULL, 'Q' },
 		.desc = "Show progress in percent",
 	},
 	UTIL_OPT_SECTION("MISC"),
@@ -311,7 +318,7 @@ static void draw_progress(int cyl, unsigned int cylinders, int aborted)
 	}
 
 	if (g.print_hashmarks && (cyl / g.hashstep - hashcount) != 0) {
-		printf("#");
+		printf("%d|", g.procnum);
 		fflush(stdout);
 		hashcount++;
 	}
@@ -1560,7 +1567,11 @@ int main(int argc, char *argv[])
 	char *reqsize_param_str = NULL;
 	char *hashstep_str      = NULL;
 
-	int rc, numdev = 0, i;
+	int rc, numdev = 0, numproc = 0, status;
+	int max_parallel =1 ;
+	int running = 0;
+	int chpid;
+	int tmp;
 
 	/* Establish a handler for interrupt signals. */
 	signal(SIGTERM, program_interrupt_signal);
@@ -1623,7 +1634,7 @@ int main(int argc, char *argv[])
 				g.print_hashmarks = 1;
 			}
 			break;
-		case 'P':
+		case 'Q':
 			if (!(g.print_hashmarks || g.print_progressbar))
 				g.print_percentage = 1;
 			break;
@@ -1682,6 +1693,9 @@ int main(int argc, char *argv[])
 		case OPT_NODISCARD:
 			g.no_discard = 1;
 			break;
+		case 'P':
+			max_parallel = atoi(optarg);
+			break;
 		case OPT_CHECK:
 			g.check = 1;
 			break;
@@ -1733,15 +1747,35 @@ int main(int argc, char *argv[])
 	if (numdev > 1 && g.labelspec)
 		error("Specifying a volser to be written doesn't make sense when formatting multiple DASD volumes.");
 
-	for (i = 0; i < numdev; i++)
-	{
-		strncpy(g.dev_path, g.dev_path_array[i], strlen(g.dev_path_array[i])+1);
-		strncpy(g.dev_node, g.dev_node_array[i], strlen(g.dev_node_array[i])+1);	
-		process_dasd(&vlabel, format_params);
+	for (numproc = 0; numproc < numdev; numproc++) {
+		chpid = fork();
+		if (chpid == -1 )
+			ERRMSG_EXIT(EXIT_FAILURE,
+					"%s: Unable to create child process: %s\n",
+					prog_name, strerror(errno));
+		if (!chpid) {
+				g.procnum = numproc;
+				strncpy(g.dev_path, g.dev_path_array[numproc], strlen(g.dev_path_array[numproc])+1);
+				strncpy(g.dev_node, g.dev_node_array[numproc], strlen(g.dev_node_array[numproc])+1);
+				process_dasd(&vlabel, format_params);
+
+				free(g.dev_path);
+				free(g.dev_node);
+				exit(0);
+		} else {
+			running++;
+			if (running >= max_parallel) {
+				if (wait(&tmp) > 0 && WEXITSTATUS(tmp))
+					rc = WEXITSTATUS(tmp);
+				running--;
+			}
+		}
 	}
 
-	free(g.dev_path);
-	free(g.dev_node);
+	/* wait until all formatting children have finished */
+	while(wait(&status) > 0)
+		if (WEXITSTATUS(status))
+			rc = WEXITSTATUS(status);
 
-	return 0;
+       return rc;
 }
