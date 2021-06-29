@@ -5,6 +5,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 5.xx
 
   Changes of existing tools:
+  - dbginfo.sh: Collect zipl boot menu entries from boot loader specification
 
   Bug Fixes:
 

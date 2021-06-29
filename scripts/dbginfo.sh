@@ -358,6 +358,7 @@ LOGFILES="\
 ########################################
 
 CONFIGFILES="\
+  /boot/loader/entries/*.conf\
   /boot/grub2/grub.cfg\
   /boot/zipl/active_devices.txt\
   /boot/zipl/config\
