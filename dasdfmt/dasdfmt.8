@@ -11,14 +11,15 @@ dasdfmt \- formatting of DASD (ECKD) disk drives.
 .br
         [-r \fIcylinder\fR] [-b \fIblksize\fR] [-l \fIvolser\fR] [-d \fIlayout\fR]
 .br
-        [-L] [-V] [-F] [-k] [-C] [-M \fImode\fR] \fIdevice\fR
+        [-L] [-V] [-F] [-k] [-C] [-M \fImode\fR] \fIdevice\fR [\fIdevice\fR]
 
 .SH DESCRIPTION
-\fBdasdfmt\fR formats a DASD (ECKD) disk drive to prepare it
+\fBdasdfmt\fR formats one or several DASD (ECKD) disk drives to prepare it
 for usage with Linux for S/390. 
 The \fIdevice\fR is the node of the device (e.g. '/dev/dasda').
 Any device node created by udev for kernel 2.6 can be used 
 (e.g. '/dev/dasd/0.0.b100/disc').
+It is possible to specify up to 512 devices.
 .br
 
 \fBWARNING\fR: Careless usage of \fBdasdfmt\fR can result in 
