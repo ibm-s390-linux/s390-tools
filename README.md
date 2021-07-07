@@ -223,7 +223,8 @@ Package contents
  * CPU-measurement facilities (CPU-MF) tools:
    Use the lscpumf tool to display information about the CPU-measurement
    counter and sampling facilities.  Use the chcpumf tool to control the
-   sampling facility support.
+   sampling facility support. Use lshwc to extract complete counter sets from
+   the CPU Measurement Facilities.
 
  * cpacfstats:
    The cpacfstats tools provide a client/server application set to monitor
