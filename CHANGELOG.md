@@ -1,18 +1,32 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.16.x (2021-xx-xx)__
+* __v2.17.0 (2021-07-07)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.12 / 5.13
+
+  Add new tools / libraries:
+  - hsavmcore: New utility to make the dump process with kdump more efficient
+  - libkmipclient: Add KMIP client shared library
+  - libseckey: Add a secure key library
+  - lshwc: New tool to extract and list complete counter sets
 
   Changes of existing tools:
+  - genprotimg: Add '--(enable|disable)-pckmo' options
   - genprotimg: Add OpenSSL 3.0 support
   - genprotimg: Change plaintext control flags defaults so PCKMO functions are allowed
-  - genprotimg: Add '--(enable|disable)-pckmo' options
+  - libutil: Introduce multi-level message logging (util_log)
+  - libutil: Introduce util_arch module
+  - udev/dasd: Change DASD udev-rule to set none scheduler
+  - zdsfs: Add transparent codepage conversion
+  - zkey: Add support for KMIP-based key management systems
 
   Bug Fixes:
-  - dbginfo: add KVM data collection for server and guest - fix lszdev
+  - ttyrun-getty: Avoid conflicts with serial-getty@
   - dbginfo: add /proc/kallsyms - refresh zVM, lscpu - fix WORKARCHIVE handling
+  - dbginfo: add KVM data collection for server and guest - fix lszdev
   - genprotimg: Add missing return values in error paths
+  - zkey: Fix conversion of CCA DATA keys to CCA CIPHER keys
+  - znetconf: avoid conflict with "chzdev -e"
 
 * __v2.16.0 (2021-02-19)__
 
