@@ -3,8 +3,14 @@ ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/ar
 # Include common definitions
 include common.mak
 
-LIB_DIRS = libvtoc libutil libzds libdasd libvmdump libccw libvmcp libekmfweb \
-	   libseckey libkmipclient
+#
+# BASELIBS: Libraries that have no dependency to other libraries in s390-tools
+# LIBS: Libraries that can have a dependency to base libraries
+# TOOLS: Tools that can have a dependency to base libraries or libraries
+#
+BASELIB_DIRS = libutil libseckey
+LIB_DIRS = libvtoc libzds libdasd libvmdump libccw libvmcp libekmfweb \
+	   libkmipclient
 TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   tape390 osasnmpd qetharp ip_watcher qethconf scripts zconf \
 	   vmconvert vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
@@ -12,7 +18,7 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
 	   genprotimg lsstp hsci hsavmcore
 
-SUB_DIRS = $(LIB_DIRS) $(TOOL_DIRS)
+SUB_DIRS = $(BASELIB_DIRS) $(LIB_DIRS) $(TOOL_DIRS)
 
 all: $(TOOL_DIRS)
 clean: $(TOOL_DIRS)
@@ -26,9 +32,10 @@ MAKECMDGOALS = all
 endif
 
 #
-# We have to build the libraries before the tools are built. Otherwise
-# the tools would trigger parallel "make -C" builds for libraries in
-# case of "make -j".
+# We have to build the base libraries before the other libraries are built,
+# and then build the other libraries before the tools are built. Otherwise the 
+# other libraries and tools would trigger parallel "make -C" builds for the
+# base libraries and the other libraries in case of "make -j".
 #
 # MAKECMDGOALS contains the list of goals, e.g. "clean all". We use
 # "foreach" to generate a ";" separated list of "make -C <target>".
@@ -45,7 +52,12 @@ $(TOOL_DIRS): $(LIB_DIRS)
 		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
 .PHONY: $(TOOL_DIRS)
 
-$(LIB_DIRS):
+$(LIB_DIRS): $(BASELIB_DIRS)
 	$(foreach goal,$(MAKECMDGOALS), \
 		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
 .PHONY: $(LIB_DIRS)
+
+$(BASELIB_DIRS):
+	$(foreach goal,$(MAKECMDGOALS), \
+		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
+.PHONY: $(BASELIB_DIRS)
