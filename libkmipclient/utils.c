@@ -125,7 +125,7 @@ int kmip_parse_hex(const char *str, bool has_prefix, unsigned char **val,
 {
 	unsigned char *buf;
 	BIGNUM *b = NULL;
-	int len, rc;
+	int len;
 
 	if (str == NULL)
 		return -EINVAL;
@@ -133,18 +133,20 @@ int kmip_parse_hex(const char *str, bool has_prefix, unsigned char **val,
 	if (has_prefix && strncmp(str, "0x", 2) != 0)
 		return -EBADMSG;
 
-	rc = BN_hex2bn(&b, str + (has_prefix ? 2 : 0));
-	if (rc <= 0)
+	len = BN_hex2bn(&b, str + (has_prefix ? 2 : 0));
+	if (len <= 0)
+		return -EBADMSG;
+	if (len < (int)strlen(str) - (has_prefix ? 2 : 0))
 		return -EBADMSG;
 
-	len = BN_num_bytes(b);
+	len = len / 2 + (len % 2 > 0 ? 1 : 0);
 	buf = calloc(1, len);
 	if (buf == NULL) {
 		BN_free(b);
 		return -ENOMEM;
 	}
 
-	if (BN_bn2bin(b, buf) != len) {
+	if (BN_bn2binpad(b, buf, len) != len) {
 		BN_free(b);
 		free(buf);
 		return -EIO;
