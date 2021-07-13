@@ -9,7 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#define FUSE_USE_VERSION 25
+#define FUSE_USE_VERSION 30
 
 #include <errno.h>
 #include <fcntl.h>
@@ -104,9 +104,9 @@ static int zfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if (strcmp(path, "/") != 0)
 		return -ENOENT;
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-	filler(buf, &l.path[1], NULL, 0);
+	filler(buf, ".", NULL, 0, 0);
+	filler(buf, "..", NULL, 0, 0);
+	filler(buf, &l.path[1], NULL, 0, 0);
 	return 0;
 }
 
@@ -209,7 +209,7 @@ int zfuse_mount_dump(void)
 	stat_root_init();
 	stat_dump_init();
 	snprintf(l.path, sizeof(l.path), "/dump.%s", dfo_name());
-	return fuse_main(args.argc, args.argv, &zfuse_ops);
+	return fuse_main(args.argc, args.argv, &zfuse_ops, NULL);
 }
 
 /*

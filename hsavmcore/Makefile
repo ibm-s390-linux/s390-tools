@@ -23,11 +23,11 @@ else # HAVE_FUSE
 # FUSE
 #
 ifneq ($(shell sh -c 'command -v pkg-config'),)
-  FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse)
-  FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse)
+  FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
+  FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
 else
-  FUSE_CFLAGS = -I/usr/include/fuse
-  FUSE_LDLIBS = -lfuse
+  FUSE_CFLAGS = -I/usr/include/fuse3
+  FUSE_LDLIBS = -lfuse3
 endif
 
 #
@@ -67,8 +67,9 @@ check-dep-fuse:
 	$(call check_dep, \
 		"hsavmcore", \
 		"fuse.h", \
-		"fuse-devel or libfuse-dev", \
-		"HAVE_FUSE=0")
+		"fuse3-devel or libfuse3-dev", \
+		"HAVE_FUSE=0", \
+		"-DFUSE_USE_VERSION=30")
 	touch check-dep-fuse
 
 install: all

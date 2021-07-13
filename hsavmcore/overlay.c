@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 30
 #include <fuse.h>
 
 #include "lib/util_log.h"
@@ -63,9 +63,9 @@ static int vmcore_fuse_readdir(const char *path, void *buf,
 		return -ENOENT;
 
 	/* We have only one file */
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-	filler(buf, VMCORE_FILE, NULL, 0);
+	filler(buf, ".", NULL, 0, 0);
+	filler(buf, "..", NULL, 0, 0);
+	filler(buf, VMCORE_FILE, NULL, 0, 0);
 
 	return 0;
 }

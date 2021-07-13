@@ -30,8 +30,9 @@ check_dep:
 	$(call check_dep, \
 		"zdsfs", \
 		"fuse.h", \
-		"fuse-devel or libfuse-dev", \
-		"HAVE_FUSE=0")
+		"fuse3-devel or libfuse3-dev", \
+		"HAVE_FUSE=0", \
+		"-DFUSE_USE_VERSION=30")
 	$(call check_dep, \
 		"zdsfs", \
 		"curl/curl.h", \
@@ -39,13 +40,13 @@ check_dep:
 		"HAVE_CURL=0")
 
 ifneq ($(shell sh -c 'command -v pkg-config'),)
-FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse)
+FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
 CURL_CFLAGS = $(shell pkg-config --silence-errors --cflags libcurl)
 CURL_LDLIBS = $(shell pkg-config --silence-errors --libs libcurl)
 else
-FUSE_CFLAGS = -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse
-FUSE_LDLIBS = -lfuse
+FUSE_CFLAGS = -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse3
+FUSE_LDLIBS = -lfuse3
 CURL_CFLAGS = -I/usr/include/s390x-linux-gnu/curl
 CURL_LDLIBS = -lcurl
 endif

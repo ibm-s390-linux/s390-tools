@@ -8,7 +8,7 @@
  */
 
 /* The fuse version define tells fuse that we want to use the new API */
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 30
 
 #include <errno.h>
 #include <fcntl.h>
@@ -544,9 +544,9 @@ static int zdsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	 * type one: the root directory contains all data sets
 	 */
 	if (strcmp(path, "/") == 0) {
-		filler(buf, ".", NULL, 0);
-		filler(buf, "..", NULL, 0);
-		filler(buf, METADATAFILE, NULL, 0);
+		filler(buf, ".", NULL, 0, 0);
+		filler(buf, "..", NULL, 0, 0);
+		filler(buf, METADATAFILE, NULL, 0, 0);
 		/* note that we do not need to distinguish between
 		 * normal files and directories here, that is done
 		 * in the rdf_getattr function
@@ -558,7 +558,7 @@ static int zdsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			lzds_dataset_get_is_supported(ds, &issupported);
 			if (issupported) {
 				lzds_dataset_get_name(ds, &dsname);
-				filler(buf, dsname, NULL, 0);
+				filler(buf, dsname, NULL, 0, 0);
 			}
 		}
 		lzds_dsiterator_free(dsit);
@@ -572,14 +572,14 @@ static int zdsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		return -ENOENT;
 	lzds_dataset_get_is_PDS(ds, &ispds);
 	if (ispds) {
-		filler(buf, ".", NULL, 0);
-		filler(buf, "..", NULL, 0);
+		filler(buf, ".", NULL, 0, 0);
+		filler(buf, "..", NULL, 0, 0);
 		rc = lzds_dataset_alloc_memberiterator(ds, &it);
 		if (rc)
 			return -ENOMEM;
 		while (!lzds_memberiterator_get_next_member(it, &member)) {
 			lzds_pdsmember_get_name(member, &mbrname);
-			filler(buf, mbrname, NULL, 0);
+			filler(buf, mbrname, NULL, 0, 0);
 		}
 		lzds_memberiterator_free(it);
 	} else

@@ -9,7 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 30
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -1516,7 +1516,7 @@ static void walk_dir_block(struct fst_entry *fst, struct walk_file *walk,
 				decode_edf_name(file, fst->name, fst->type);
 				if (!file_unlinked(file)) {
 					cache_fst_addr(walk->addr, file);
-					walk->filler(walk->buf, file, NULL, 0);
+					walk->filler(walk->buf, file, NULL, 0, 0);
 				}
 			}
 		}
@@ -1800,8 +1800,8 @@ static int cmsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if (strcmp(path, "/") != 0)
 		return -ENOENT;
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
+	filler(buf, ".", NULL, 0, 0);
+	filler(buf, "..", NULL, 0, 0);
 
 	memset(&walk, 0, sizeof(walk));
 	/* readdir is possible without open so fi->fh is not set */
