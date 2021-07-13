@@ -15,8 +15,9 @@ check_dep_fuse:
 	$(call check_dep, \
 		"zgetdump mount support", \
 		"fuse.h", \
-		"fuse-devel or libfuse-dev", \
-		"HAVE_FUSE=0")
+		"fuse3-devel or libfuse3-dev", \
+		"HAVE_FUSE=0", \
+		"-DFUSE_USE_VERSION=30")
 endif
 
 #
@@ -58,11 +59,11 @@ ifeq ("$(HAVE_FUSE)","0")
 FUSE_CFLAGS = -DHAVE_FUSE=0 -D_FILE_OFFSET_BITS=64
 FUSE_LDLIBS =
 else ifneq ($(shell sh -c 'command -v pkg-config'),)
-FUSE_CFLAGS = -DHAVE_FUSE=1 $(shell pkg-config --silence-errors --cflags fuse)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse)
+FUSE_CFLAGS = -DHAVE_FUSE=1 $(shell pkg-config --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
 else
-FUSE_CFLAGS = -DHAVE_FUSE=1 -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse
-FUSE_LDLIBS = -lfuse
+FUSE_CFLAGS = -DHAVE_FUSE=1 -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse3
+FUSE_LDLIBS = -lfuse3
 endif
 LDLIBS += -lz $(FUSE_LDLIBS)
 ALL_CFLAGS += $(FUSE_CFLAGS)

@@ -990,7 +990,7 @@ static int hmcdrv_cache_dir(const char *dir, fuse_fill_dir_t filler, void *buf)
 				hmcdrv_cache_refresh(path, &st, symlink);
 
 				if ((filler != NULL) &&
-				    (filler(buf, fname, &st, 0) != 0))
+				    (filler(buf, fname, &st, 0, 0) != 0))
 					filler = NULL; /* stop filling */
 #ifdef DEBUG
 				strftime(symlink, sizeof(symlink),
@@ -1179,8 +1179,8 @@ static int hmcdrv_fuse_readdir(const char *path, void *buf,
 {
 	int ret;
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
+	filler(buf, ".", NULL, 0, 0);
+	filler(buf, "..", NULL, 0, 0);
 
 	pthread_mutex_lock(&hmcdrv_ctx.mutex);
 	ret = hmcdrv_cache_dir(path, filler, buf);
