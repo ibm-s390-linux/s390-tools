@@ -56,14 +56,12 @@ objects := $(patsubst %.c,%.o,$(sources))
 
 libs = $(rootdir)/libutil/libutil.a
 
-all: hsavmcore
+all: check-dep hsavmcore
 
 hsavmcore: $(objects) $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
-overlay.o: check-dep-fuse overlay.c overlay.h
-
-check-dep-fuse:
+check-dep:
 	$(call check_dep, \
 		"hsavmcore", \
 		"fuse.h", \
@@ -83,4 +81,4 @@ endif # HAVE_FUSE
 clean:
 	rm -f hsavmcore $(objects)
 
-.PHONY: all install clean
+.PHONY: all install clean check-dep
