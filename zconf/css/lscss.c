@@ -463,7 +463,15 @@ static int fill_io_devid(struct util_rec *rec, char *path)
 			util_scandir_free(de_vec, count);
 			return 1;
 		}
-		strncpy(buf, "none", sizeof(buf));
+		if (util_file_read_line(buf, sizeof(buf), "%s/dev_busid",
+					path) == 0) {
+			if (cmd.opt_short) {
+				if (strncmp(buf, "0.0.", PREFIX_ID_LENGTH) != 0)
+					return 1;
+				memmove(buf, buf + PREFIX_ID_LENGTH,
+					(sizeof(buf) - PREFIX_ID_LENGTH));
+			}
+		}
 		fill_device_info(rec, NULL, NULL);
 	}
 	if (cmd.opt_uppercase)
