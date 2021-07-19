@@ -240,7 +240,7 @@ static char *show_ctrset(unsigned long set)
 /* Parse CPU list and counter sets */
 static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 {
-	__u64 *words = start->cpumask;
+	uint64_t *words = start->cpumask;
 	unsigned long i, no_a, no_b;
 	char *cp, *tokens[16];		/* Used to parse command line params */
 	char cpubuf[256];
@@ -300,7 +300,7 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 	/* no_b is highest used index, swap array */
 	start->cpumask_len = (no_b + 1) * 8;
 	for (no_a = 0; no_a < no_b; ++no_a, --no_b) {
-		__u64 tmp =  words[no_a];
+		uint64_t tmp =  words[no_a];
 
 		words[no_a] = words[no_b];
 		words[no_b] = tmp;
@@ -525,7 +525,7 @@ static int test_read(struct s390_hwctr_read *read)
 			}
 			/* Iterate over all counters in each set */
 			for (unsigned int k = 0; k < sp->no_cnts; ++k) {
-				__u64 value;
+				uint64_t value;
 				void *addr = base + offset;
 				size_t idx = ctrset_offset(sp->set) + k;
 
@@ -608,8 +608,8 @@ static int do_it(char *s)
 	int rc;
 
 	memset(&start, 0, sizeof(start));
-	rc = max_possible_cpus / sizeof(__u64);
-	start.cpumask = alloca(max_possible_cpus / sizeof(__u64));
+	rc = max_possible_cpus / sizeof(uint64_t);
+	start.cpumask = alloca(max_possible_cpus / sizeof(uint64_t));
 	memset(start.cpumask, 0, rc);
 	parse_cpulist(s, &start);
 	errno = 0;
