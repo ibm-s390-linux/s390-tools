@@ -17,6 +17,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -292,8 +293,8 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 	/* Convert the CPU list to a bitmask for kernel cpumask_t */
 	for (i = 0, no_b = 0; i < max_possible_cpus; ++i) {
 		if (check[i].cpu_req) {
-			no_a = i % __BITS_PER_LONG;
-			no_b = i / __BITS_PER_LONG;
+			no_a = i % LONG_BIT;
+			no_b = i / LONG_BIT;
 			words[no_b] |= 1ULL << no_a;
 		}
 	}
