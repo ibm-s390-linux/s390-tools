@@ -54,7 +54,7 @@ static unsigned char *ioctlbuffer;
 static bool allcpu;
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
-struct ctrname {		/* List of defined counters */
+static struct ctrname {		/* List of defined counters */
 	char *name;		/* Counter name */
 	bool hitcnt;		/* Counter number read from ioctl() */
 	unsigned long total;	/* Total counter value */
