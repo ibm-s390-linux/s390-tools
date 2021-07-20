@@ -276,8 +276,8 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 		      show_ctrset(noton));
 	}
 
-	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ",")) != 0;
-	    ++i, parm = 0) {
+	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ","));
+	    ++i, parm = NULL) {
 		cp = strchr(tokens[i], '-');	/* Range character? */
 		if (cp) {
 			no_a = getnumber(tokens[i], *cp);
@@ -327,7 +327,7 @@ static bool check_setpossible(void)
 	}
 	parm = cpubuf;
 	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ","));
-							++i, parm = 0) {
+							++i, parm = NULL) {
 		cp = strchr(tokens[i], '-');
 		if (cp) {		/* Range */
 			no_a = getnumber(tokens[i], *cp);
