@@ -69,6 +69,7 @@ check-dep-fuse:
 		"fuse.h", \
 		"fuse-devel or libfuse-dev", \
 		"HAVE_FUSE=0")
+	touch check-dep-fuse
 
 install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 hsavmcore \
@@ -81,6 +82,6 @@ install: all
 endif # HAVE_FUSE
 
 clean:
-	rm -f hsavmcore $(objects)
+	rm -f hsavmcore $(objects) check-dep-fuse
 
 .PHONY: all install clean
