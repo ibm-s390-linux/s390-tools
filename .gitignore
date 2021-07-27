@@ -25,6 +25,7 @@ dasdview/dasdview
 dump2tar/src/dump2tar
 fdasd/fdasd
 hmcdrvfs/hmcdrvfs
+hsavmcore/check-dep-fuse
 hsavmcore/hsavmcore
 hyptop/hyptop
 ip_watcher/xcec-bridge
