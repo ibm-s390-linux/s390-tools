@@ -887,14 +887,13 @@ sub print_scsi_common
 	print "FCP rsp inf cod: 0x", substr($rec->[2], 44, 2), "\n";
 	print "FCP rsp IU     : ", payload_format(substr($rec->[2], 114, 48));
 
-	if (defined($pay_sns)) {
-		print "Sense len      : ", $payload_length, "\n"
-			if ($payload_length);
-		print_payload($payload_length, $pay_sns, "Sense info")
-	}
-	if (defined($pay_riu) && ($payload_length > FCP_RESP_WITH_EXT)) {
+	if ($payload_length && defined($pay_sns)) {
+		print "Sense len      : ", $payload_length, "\n";
+		print_payload($payload_length, $pay_sns, "Sense info");
+	} elsif ($payload_length) {
 		print "FCP rsp IU len : ", $payload_length, "\n";
-		print_payload($payload_length, $pay_riu, "FCP rsp IU all");
+		print_payload($payload_length, $pay_riu, "FCP rsp IU all")
+			if ($payload_length > FCP_RESP_WITH_EXT);
 	}
 	print "\n";
 }
