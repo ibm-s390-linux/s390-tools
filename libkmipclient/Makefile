@@ -50,6 +50,9 @@ detect-openssl-version.dep:
 	echo "}" >> $(TMPFILE)
 	mv $(TMPFILE) $@
 
+CURL_CONFIG ?= curl-config
+XML2_CONFIG ?= xml2-config
+
 check-dep-libkmipclient: detect-openssl-version.dep
 	$(call check_dep, \
 		"libkmipclient", \
@@ -67,14 +70,14 @@ check-dep-libkmipclient: detect-openssl-version.dep
 		"libxml/tree.h", \
 		"libxml2-devel", \
 		"HAVE_LIBXML2=0", \
-		`xml2-config --cflags` `xml2-config --libs`)
+		`$(XML2_CONFIG) --cflags` `$(XML2_CONFIG) --libs`)
 	$(call check_dep, \
 		"libkmipclient", \
 		"curl/curl.h", \
 		"libcurl-devel", \
 		"HAVE_LIBCURL=0" \
-		`curl-config --cflags` `curl-config --libs`)
-	curl-config --ssl-backends | grep OpenSSL >/dev/null 2>&1 || { echo "Error: libcurl is not built with the OpenSSL backend"; exit 1; }
+		`$(CURL_CONFIG) --cflags` `$(CURL_CONFIG) --libs`)
+	$(CURL_CONFIG) --ssl-backends | grep OpenSSL >/dev/null 2>&1 || { echo "Error: libcurl is not built with the OpenSSL backend"; exit 1; }
 	touch check-dep-libkmipclient
 
 skip-libkmipclient-openssl:
@@ -104,8 +107,8 @@ tls.o: check-dep-libkmipclient tls.c kmip.h utils.h $(rootdir)include/kmipclient
 names.o: check-dep-libkmipclient names.c names.h utils.h $(rootdir)include/kmipclient/kmipclient.h
 utils.o: check-dep-libkmipclient utils.c names.h utils.h $(rootdir)include/kmipclient/kmipclient.h
 
-libkmipclient.so.$(VERSION): ALL_CFLAGS += -fPIC `xml2-config --cflags` `curl-config --cflags`
-libkmipclient.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl `xml2-config --libs` `curl-config --libs`
+libkmipclient.so.$(VERSION): ALL_CFLAGS += -fPIC `$(XML2_CONFIG) --cflags` `$(CURL_CONFIG) --cflags`
+libkmipclient.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl `$(XML2_CONFIG) --libs` `$(CURL_CONFIG) --libs`
 libkmipclient.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libkmipclient.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,libkmipclient.so.$(VERM)
 libkmipclient.so.$(VERSION): kmip.o request.o response.o attribute.o key.o ttlv.o json.o \
