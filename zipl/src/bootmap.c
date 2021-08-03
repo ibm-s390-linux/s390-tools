@@ -1157,6 +1157,55 @@ write_empty_block(int fd, disk_blockptr_t* block, struct disk_info* info)
 }
 
 
+static int
+bootmap_install_stages(struct job_data *job, struct disk_info *info, int fd,
+		       disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count)
+{
+	disk_blockptr_t *stage2_list;
+	blocknum_t stage2_count;
+	size_t stage2_size;
+	void *stage2_data;
+
+	switch (info->type) {
+	case disk_type_fba:
+		if (boot_get_fba_stage2(&stage2_data, &stage2_size, job))
+			return -1;
+		stage2_count = disk_write_block_buffer(fd, 0, stage2_data,
+						stage2_size, &stage2_list,
+						info);
+		free(stage2_data);
+		if (stage2_count == 0)
+			return -1;
+		if (install_fba_stage1b(fd, stage1b_list, stage1b_count,
+					stage2_list, stage2_count, info))
+			return -1;
+		free(stage2_list);
+		break;
+	case disk_type_eckd_ldl:
+	case disk_type_eckd_cdl:
+		if (boot_get_eckd_stage2(&stage2_data, &stage2_size, job))
+			return -1;
+		stage2_count = disk_write_block_buffer(fd, 0, stage2_data,
+						stage2_size, &stage2_list,
+						info);
+		free(stage2_data);
+		if (stage2_count == 0)
+			return -1;
+		if (install_eckd_stage1b(fd, stage1b_list, stage1b_count,
+					 stage2_list, stage2_count, info))
+			return -1;
+		free(stage2_list);
+		break;
+	case disk_type_scsi:
+	case disk_type_diag:
+		*stage1b_list = NULL;
+		*stage1b_count = 0;
+		break;
+	}
+	return 0;
+}
+
+
 int
 bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 	       disk_blockptr_t *scsi_dump_sb_blockptr,
@@ -1165,11 +1214,7 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 {
 	struct scsi_dump_sb scsi_sb;
 	char *device, *filename, *mapname;
-	disk_blockptr_t *stage2_list;
-	blocknum_t stage2_count;
 	struct disk_info *info;
-	size_t stage2_size;
-	void *stage2_data;
 	int fd, rc, part_ext;
 
 	/* Get full path of bootmap file */
@@ -1316,46 +1361,11 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 	} else
 		scsi_dump_sb_blockptr->linear.block = 0;
 
-	/* Add stage 2 loader to bootmap if necessary */
-	switch (info->type) {
-	case disk_type_fba:
-		if (boot_get_fba_stage2(&stage2_data, &stage2_size, job))
-			goto out_misc_free_temp_dev;
-		stage2_count = disk_write_block_buffer(fd, 0, stage2_data,
-						stage2_size, &stage2_list,
-						info);
-		free(stage2_data);
-		if (stage2_count == 0) {
-			error_text("Could not write to file '%s'", filename);
-			goto out_misc_free_temp_dev;
-		}
-		if (install_fba_stage1b(fd, stage1b_list, stage1b_count,
-					stage2_list, stage2_count, info))
-			goto out_misc_free_temp_dev;
-		free(stage2_list);
-		break;
-	case disk_type_eckd_ldl:
-	case disk_type_eckd_cdl:
-		if (boot_get_eckd_stage2(&stage2_data, &stage2_size, job))
-			goto out_misc_free_temp_dev;
-		stage2_count = disk_write_block_buffer(fd, 0, stage2_data,
-						stage2_size, &stage2_list,
-						info);
-		free(stage2_data);
-		if (stage2_count == 0) {
-			error_text("Could not write to file '%s'", filename);
-			goto out_misc_free_temp_dev;
-		}
-		if (install_eckd_stage1b(fd, stage1b_list, stage1b_count,
-					 stage2_list, stage2_count, info))
-			goto out_misc_free_temp_dev;
-		free(stage2_list);
-		break;
-	case disk_type_scsi:
-	case disk_type_diag:
-		*stage1b_list = NULL;
-		*stage1b_count = 0;
-		break;
+	/* Install stage 2 loader to bootmap if necessary */
+	if (bootmap_install_stages(job, info, fd, stage1b_list, stage1b_count)) {
+		error_text("Could not install loader stages to file '%s'",
+			   filename);
+		goto out_misc_free_temp_dev;
 	}
 	if (dry_run) {
 		misc_free_temp_file(filename);
