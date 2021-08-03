@@ -1210,12 +1210,35 @@ bootmap_install_stages(struct job_data *job, struct disk_info *info, int fd,
 
 
 static int
+bootmap_write_scsi_superblock(int fd, struct disk_info *info,
+			      disk_blockptr_t *scsi_dump_sb_blockptr,
+			      ulong dump_size)
+{
+	struct scsi_dump_sb scsi_sb;
+
+	memset(&scsi_sb, 0, sizeof(scsi_sb));
+	scsi_sb.magic = SCSI_DUMP_SB_MAGIC;
+	scsi_sb.version = 1;
+	scsi_sb.part_start = info->geo.start * info->phy_block_size;
+	scsi_sb.part_size = info->phy_blocks * info->phy_block_size;
+	scsi_sb.dump_offset = 0;
+	scsi_sb.dump_size = dump_size;
+	scsi_sb.csum_offset = 0;
+	scsi_sb.csum_size = SCSI_DUMP_SB_CSUM_SIZE;
+	/* Set seed because otherwise csum over zero block is 0 */
+	scsi_sb.csum = SCSI_DUMP_SB_SEED;
+	return disk_write_block_aligned(fd, &scsi_sb,
+					sizeof(scsi_sb),
+					scsi_dump_sb_blockptr, info);
+}
+
+
+static int
 bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 		      disk_blockptr_t *scsi_dump_sb_blockptr,
 		      disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
 		      char **new_device, struct disk_info **new_info)
 {
-	struct scsi_dump_sb scsi_sb;
 	char *device, *filename;
 	struct disk_info *info;
 	int fd, rc, part_ext;
@@ -1312,7 +1335,6 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	unused_size = (info->phy_blocks - size) * info->phy_block_size;
 	if (lseek(fd, unused_size, SEEK_SET) < 0)
 		goto out_misc_free_temp_dev;
-	scsi_sb.dump_size = unused_size;
 
 	/* Initialize bootmap header */
 	if (bootmap_header_init(fd)) {
@@ -1327,19 +1349,12 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	/* Build program table */
 	if (build_program_table(fd, filename, job, program_table, info))
 		goto out_misc_free_temp_dev;
-	scsi_sb.magic = SCSI_DUMP_SB_MAGIC;
-	scsi_sb.version = 1;
-	scsi_sb.part_start = info->geo.start * info->phy_block_size;
-	scsi_sb.part_size = info->phy_blocks * info->phy_block_size;
-	scsi_sb.dump_offset = 0;
-	scsi_sb.csum_offset = 0;
-	scsi_sb.csum_size = SCSI_DUMP_SB_CSUM_SIZE;
-	/* Set seed because otherwise csum over zero block is 0 */
-	scsi_sb.csum = SCSI_DUMP_SB_SEED;
-	disk_write_block_aligned(fd, &scsi_sb,
-				 sizeof(scsi_sb),
-				 scsi_dump_sb_blockptr, info);
-
+	if (bootmap_write_scsi_superblock(fd, info, scsi_dump_sb_blockptr,
+					  unused_size)) {
+		error_text("Could not write SCSI superblock to file '%s'",
+			   filename);
+		goto out_misc_free_temp_dev;
+	}
 	/* Install stage 2 loader to bootmap if necessary */
 	if (bootmap_install_stages(job, info, fd, stage1b_list, stage1b_count)) {
 		error_text("Could not install loader stages to bootmap");
