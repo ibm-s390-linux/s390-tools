@@ -1,0 +1,35 @@
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it
+#  under the terms of the GNU Lesser General Public License as published by
+#  the Free Software Foundation; either version 2.1 of the License, or
+#  (at your option) any later version.
+#
+#  man bootup(7)
+#  man systemd.service(5)
+#  man systemd.special(7)
+#
+
+[Unit]
+Description=NGDump
+After=initrd.target initrd-parse-etc.service
+After=dracut-initqueue.service dracut-pre-mount.service dracut-mount.service dracut-pre-pivot.service
+Before=initrd-cleanup.service
+ConditionPathExists=/etc/initrd-release
+OnFailure=emergency.target
+OnFailureJobMode=isolate
+
+[Service]
+Environment=DRACUT_SYSTEMD=1
+Type=oneshot
+ExecStart=/usr/bin/ngdump.sh
+ExecStopPost=/usr/bin/ngdump-reipl.sh
+StandardInput=null
+StandardOutput=journal+console
+StandardError=journal+console
+KillMode=process
+RemainAfterExit=yes
+
+# Bash ignores SIGTERM, so we send SIGHUP instead, to ensure that bash
+# terminates cleanly.
+KillSignal=SIGHUP
