@@ -17,9 +17,11 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/mount.h>
 #include <assert.h>
 
 #include "lib/zt_common.h"
+#include "lib/util_libc.h"
 #include "lib/util_part.h"
 #include "lib/util_path.h"
 #include "boot/s390.h"
@@ -32,6 +34,8 @@
 #include "error.h"
 #include "install.h"
 #include "misc.h"
+
+#define NGDUMP_FSTYPE	"ext4"
 
 /* Pointer to dedicated empty block in bootmap. */
 static disk_blockptr_t empty_block;
@@ -964,8 +968,11 @@ get_dump_parmline(char *partition, char *parameters,
 		disk_free_info(info);
 		return -1;
 	}
-	buffer = create_dump_parmline(parameters, "/dev/ram0",
-				      info->partnum, 1);
+	if (is_ngdump_enabled(partition, target))
+		buffer = misc_strdup(parameters);
+	else
+		buffer = create_dump_parmline(parameters, "/dev/ram0",
+					      info->partnum, 1);
 	disk_free_info(info);
 	if (buffer == NULL)
 		return -1;
@@ -1513,18 +1520,136 @@ out_free_filename:
 }
 
 
+static int
+ngdump_create_meta(const char *path)
+{
+	char *filename = NULL;
+	FILE *fp;
+	int rc;
+
+	util_asprintf(&filename, "%s/ngdump.meta", path);
+
+	fp = fopen(filename, "w");
+	if (!fp) {
+		free(filename);
+		error_reason(strerror(errno));
+		error_text("Could not create file '%s'", filename);
+		return -1;
+	}
+	free(filename);
+
+	rc = fprintf(fp, "version=1\n");
+	if (rc < 0)
+		return -1;
+	rc = fprintf(fp, "file=\n");
+	if (rc < 0)
+		return -1;
+	rc = fprintf(fp, "sha256sum=\n");
+	if (rc < 0)
+		return -1;
+	rc = fclose(fp);
+	if (rc < 0)
+		return -1;
+
+	return 0;
+}
+
+
+static int
+bootmap_create_device_ngdump(struct job_data *job, disk_blockptr_t *program_table,
+			     disk_blockptr_t *scsi_dump_sb_blockptr,
+			     disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
+			     char **new_device, struct disk_info **new_info)
+{
+	char mount_point[] = "/tmp/zipl-dump-mount-point-XXXXXX";
+	struct disk_info *info;
+	char *device;
+	int rc;
+
+	/* Retrieve target device information */
+	if (disk_get_info(job->data.dump.device, &job->target, &info))
+		return -1;
+	if (misc_temp_dev(info->device, 1, &device))
+		goto out_disk_free_info;
+	if (check_dump_device(job, info, device))
+		goto out_misc_free_temp_dev;
+	/* Create a mount point directory */
+	if (mkdtemp(mount_point) == NULL) {
+		error_reason(strerror(errno));
+		error_text("Could not create mount point '%s'", mount_point);
+		goto out_misc_free_temp_dev;
+	}
+	if (!dry_run) {
+		char *cmd = NULL;
+		util_asprintf(&cmd, "mkfs.%s -qF %s >/dev/null",
+			      NGDUMP_FSTYPE, job->data.dump.device);
+		if (verbose)
+			printf("Formatting partition '%s'\n",
+				job->data.dump.device);
+		rc = system(cmd);
+		free(cmd);
+		if (rc) {
+			error_reason(strerror(errno));
+			error_text("Could not format partition '%s':",
+				   job->data.dump.device);
+			goto out_rmdir;
+		}
+	}
+	/*
+	 * Mount partition where bootmap file and also a dump file will
+	 * be stored.
+	 */
+	if (mount(job->data.dump.device, mount_point, NGDUMP_FSTYPE, 0, NULL)) {
+		error_reason(strerror(errno));
+		error_text("Could not mount partition '%s':",
+			   job->data.dump.device);
+		goto out_rmdir;
+	}
+	if (bootmap_create_file(job, mount_point, program_table,
+				scsi_dump_sb_blockptr,
+				stage1b_list, stage1b_count,
+				new_device, new_info))
+		goto out_umount;
+	if (ngdump_create_meta(mount_point))
+		goto out_umount;
+	/* Cleanup */
+	umount(mount_point);
+	rmdir(mount_point);
+	misc_free_temp_dev(device);
+	disk_free_info(info);
+	return 0;
+
+out_umount:
+	umount(mount_point);
+out_rmdir:
+	rmdir(mount_point);
+out_misc_free_temp_dev:
+	misc_free_temp_dev(device);
+out_disk_free_info:
+	disk_free_info(info);
+	return -1;
+}
+
+
 int
 bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 	       disk_blockptr_t *scsi_dump_sb_blockptr,
 	       disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
 	       char **new_device, struct disk_info **new_info)
 {
-	if (job->id == job_dump_partition)
-		return bootmap_create_device(job, program_table,
-					     scsi_dump_sb_blockptr,
-					     stage1b_list, stage1b_count,
-					     new_device, new_info);
-	else
+	if (job->id == job_dump_partition) {
+		if (is_ngdump_enabled(job->data.dump.device, &job->target))
+			return bootmap_create_device_ngdump(job, program_table,
+							    scsi_dump_sb_blockptr,
+							    stage1b_list,
+							    stage1b_count,
+							    new_device, new_info);
+		else
+			return bootmap_create_device(job, program_table,
+						     scsi_dump_sb_blockptr,
+						     stage1b_list, stage1b_count,
+						     new_device, new_info);
+	} else
 		return bootmap_create_file(job, job->target.bootmap_dir,
 					   program_table,
 					   scsi_dump_sb_blockptr,

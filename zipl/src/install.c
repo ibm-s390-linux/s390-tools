@@ -316,7 +316,8 @@ install_bootloader(const char *device, disk_blockptr_t *program_table,
 	case disk_type_scsi:
 		rc = install_scsi(fd, program_table, info,
 				  scsi_dump_sb_blockptr);
-		if (rc == 0 && job->id == job_dump_partition)
+		if (rc == 0 && job->id == job_dump_partition &&
+		    !is_ngdump_enabled(device, &job->target))
 			rc = overwrite_partition_start(fd, info, 0);
 		break;
 	case disk_type_fba:

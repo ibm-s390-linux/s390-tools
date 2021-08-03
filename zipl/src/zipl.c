@@ -187,7 +187,10 @@ main(int argc, char* argv[])
 			rc = -1;
 			break;
 		}
-		rc = check_job_dump_images(&job->data.dump, job->name);
+		if (is_ngdump_enabled(job->data.dump.device, &job->target))
+			rc = check_job_images_ngdump(&job->data.dump, job->name);
+		else
+			rc = check_job_dump_images(&job->data.dump, job->name);
 		if (rc != 0)
 			break;
 		/* Fall through. */

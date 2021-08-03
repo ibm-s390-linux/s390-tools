@@ -2009,3 +2009,9 @@ job_get(int argc, char* argv[], struct job_data** data)
 	*data = job;
 	return rc;
 }
+
+bool
+is_ngdump_enabled(const char* device, struct job_target_data* target)
+{
+	return disk_is_nvme(device, target);
+}
