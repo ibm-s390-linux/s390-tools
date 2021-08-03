@@ -1209,19 +1209,22 @@ bootmap_install_stages(struct job_data *job, struct disk_info *info, int fd,
 }
 
 
-int
-bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
-	       disk_blockptr_t *scsi_dump_sb_blockptr,
-	       disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
-	       char **new_device, struct disk_info **new_info)
+static int
+bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
+		      disk_blockptr_t *scsi_dump_sb_blockptr,
+		      disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
+		      char **new_device, struct disk_info **new_info)
 {
 	struct scsi_dump_sb scsi_sb;
-	char *device, *filename, *mapname;
+	char *device, *filename;
 	struct disk_info *info;
 	int fd, rc, part_ext;
+	ulong unused_size;
+	struct stat st;
+	ulong size;
 
 	/* Get full path of bootmap file */
-	if (job->id == job_dump_partition && !dry_run) {
+	if (!dry_run) {
 		filename = misc_strdup(job->data.dump.device);
 		if (filename == NULL)
 			return -1;
@@ -1244,16 +1247,151 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 			goto out_free_filename;
 		}
 	}
+	/* Retrieve target device information */
+	if (disk_get_info(filename, &job->target, &info))
+		goto out_close_fd;
+	/* Check for supported disk and driver types */
+	if ((info->source == source_auto) && (info->type == disk_type_diag)) {
+		error_reason("Unsupported disk type (%s)",
+			     disk_get_type_name(info->type));
+		goto out_disk_free_info;
+	}
+	/* Check if secure boot was enabled only for SCSI */
+	if (job->is_secure == SECURE_BOOT_ENABLED &&
+	    info->type != disk_type_scsi) {
+		error_reason("Secure boot forced for non-SCSI disk type");
+		goto out_disk_free_info;
+	}
+	if (verbose) {
+		printf("Target device information\n");
+		disk_print_info(info);
+	}
+	if (misc_temp_dev(info->device, 1, &device))
+		goto out_disk_free_info;
+	rc = util_part_search(device, info->geo.start, info->phy_blocks,
+			      info->phy_block_size, &part_ext);
+	if (rc <= 0 || part_ext) {
+		if (rc == 0)
+			error_reason("No partition");
+		else if (rc < 0)
+			error_reason("Could not read partition table");
+		else if (part_ext)
+			error_reason("Extended partitions not allowed");
+		error_text("Invalid dump device");
+		goto out_misc_free_temp_dev;
+	}
+	printf("Building bootmap directly on partition '%s'%s\n",
+	       filename,
+	       job->add_files ? " (files will be added to partition)"
+	       : "");
+	/* For partition dump set raw partition offset
+	   to expected size before end of disk */
+	/* Use approximated stage 3 size as starting point */
+	size = IMAGE_LOAD_ADDRESS;
+
+	/* Ramdisk */
+	if (job->data.dump.ramdisk != NULL) {
+		if (stat(job->data.dump.ramdisk, &st))
+			goto out_misc_free_temp_dev;
+		size += DIV_ROUND_UP(st.st_size, info->phy_block_size);
+		size += 1; /* For ramdisk section entry */
+	}
+	/* Kernel */
+	if (stat(job->data.dump.image, &st))
+		goto out_misc_free_temp_dev;
+	size += DIV_ROUND_UP(st.st_size - IMAGE_LOAD_ADDRESS,
+			     info->phy_block_size);
+	/* Parmfile */
+	size += DIV_ROUND_UP(DUMP_PARAM_MAX_LEN, info->phy_block_size);
+	size += 8;  /* 1x table + 1x script + 3x section + 1x empty
+		       1x header + 1x scsi dump super block */
+	if (size > info->phy_blocks) {
+		error_text("Partition too small for dump tool");
+		goto out_misc_free_temp_dev;
+	}
+	unused_size = (info->phy_blocks - size) * info->phy_block_size;
+	if (lseek(fd, unused_size, SEEK_SET) < 0)
+		goto out_misc_free_temp_dev;
+	scsi_sb.dump_size = unused_size;
+
+	/* Initialize bootmap header */
+	if (bootmap_header_init(fd)) {
+		error_text("Could not init bootmap header at '%s'", filename);
+		goto out_misc_free_temp_dev;
+	}
+	/* Write empty block to be read in place of holes in files */
+	if (write_empty_block(fd, &empty_block, info)) {
+		error_text("Could not write to file '%s'", filename);
+		goto out_misc_free_temp_dev;
+	}
+	/* Build program table */
+	if (build_program_table(fd, filename, job, program_table, info))
+		goto out_misc_free_temp_dev;
+	scsi_sb.magic = SCSI_DUMP_SB_MAGIC;
+	scsi_sb.version = 1;
+	scsi_sb.part_start = info->geo.start * info->phy_block_size;
+	scsi_sb.part_size = info->phy_blocks * info->phy_block_size;
+	scsi_sb.dump_offset = 0;
+	scsi_sb.csum_offset = 0;
+	scsi_sb.csum_size = SCSI_DUMP_SB_CSUM_SIZE;
+	/* Set seed because otherwise csum over zero block is 0 */
+	scsi_sb.csum = SCSI_DUMP_SB_SEED;
+	disk_write_block_aligned(fd, &scsi_sb,
+				 sizeof(scsi_sb),
+				 scsi_dump_sb_blockptr, info);
+
+	/* Install stage 2 loader to bootmap if necessary */
+	if (bootmap_install_stages(job, info, fd, stage1b_list, stage1b_count)) {
+		error_text("Could not install loader stages to bootmap");
+		goto out_misc_free_temp_dev;
+	}
+	if (dry_run)
+		misc_free_temp_file(filename);
+	*new_device = device;
+	*new_info = info;
+	close(fd);
+	free(filename);
+	return 0;
+
+out_misc_free_temp_dev:
+	misc_free_temp_dev(device);
+out_disk_free_info:
+	disk_free_info(info);
+out_close_fd:
+	close(fd);
+out_free_filename:
+	free(filename);
+	return -1;
+}
+
+
+static int
+bootmap_create_file(struct job_data *job, disk_blockptr_t *program_table,
+		    disk_blockptr_t *scsi_dump_sb_blockptr,
+		    disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
+		    char **new_device, struct disk_info **new_info)
+{
+	char *device, *filename, *mapname;
+	struct disk_info *info;
+	int fd;
+
+	/* Get full path of bootmap file */
+	filename = misc_make_path(job->target.bootmap_dir,
+				  BOOTMAP_TEMPLATE_FILENAME);
+	if (filename == NULL)
+		return -1;
+	/* Create temporary bootmap file */
+	fd = mkstemp(filename);
+	if (fd == -1) {
+		error_reason(strerror(errno));
+		error_text("Could not create file '%s':", filename);
+		goto out_free_filename;
+	}
 	/* Retrieve target device information. Note that we have to
 	 * call disk_get_info_from_file() to also get the file system
 	 * block size. */
-	if (job->id == job_dump_partition) {
-		if (disk_get_info(filename, &job->target, &info))
-			goto out_close_fd;
-	} else {
-		if (disk_get_info_from_file(filename, &job->target, &info))
-			goto out_close_fd;
-	}
+	if (disk_get_info_from_file(filename, &job->target, &info))
+		goto out_close_fd;
 	/* Check for supported disk and driver types */
 	if ((info->source == source_auto) && (info->type == disk_type_diag)) {
 		error_reason("Unsupported disk type (%s)",
@@ -1277,63 +1415,10 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		if (check_menu_positions(&job->data.menu, job->name, info))
 			goto out_misc_free_temp_dev;
 	}
-	if (job->id == job_dump_partition) {
-		rc = util_part_search(device, info->geo.start, info->phy_blocks,
-				      info->phy_block_size, &part_ext);
-		if (rc <= 0 || part_ext) {
-			if (rc == 0)
-				error_reason("No partition");
-			else if (rc < 0)
-				error_reason("Could not read partition table");
-			else if (part_ext)
-				error_reason("Extended partitions not allowed");
-			error_text("Invalid dump device");
-			goto out_misc_free_temp_dev;
-		}
-		printf("Building bootmap directly on partition '%s'%s\n",
-		       filename,
-		       job->add_files ? " (files will be added to partition)"
-		       : "");
-	} else {
-		printf("Building bootmap in '%s'%s\n", job->target.bootmap_dir,
-		       job->add_files ? " (files will be added to bootmap file)"
-		       : "");
-	}
-	/* For partition dump set raw partition offset
-	   to expected size before end of disk */
-	if (job->id == job_dump_partition) {
-		struct stat st;
-		ulong size;
-		ulong unused_size;
 
-		/* Use approximated stage 3 size as starting point */
-		size = IMAGE_LOAD_ADDRESS;
-
-		/* Ramdisk */
-		if (job->data.dump.common.ramdisk != NULL) {
-			if (stat(job->data.dump.common.ramdisk, &st))
-				goto out_misc_free_temp_dev;
-			size += DIV_ROUND_UP(st.st_size, info->phy_block_size);
-			size += 1; /* For ramdisk section entry */
-		}
-		/* Kernel */
-		if (stat(job->data.dump.common.image, &st))
-			goto out_misc_free_temp_dev;
-		size += DIV_ROUND_UP(st.st_size - IMAGE_LOAD_ADDRESS,
-				     info->phy_block_size);
-		/* Parmfile */
-		size += DIV_ROUND_UP(DUMP_PARAM_MAX_LEN, info->phy_block_size);
-		size += 8;  /* 1x table + 1x script + 3x section + 1x empty
-			       1x header + 1x scsi dump super block */
-		if (size > info->phy_blocks) {
-			error_text("Partition too small for dump tool");
-			goto out_misc_free_temp_dev;
-		}
-		unused_size = (info->phy_blocks - size) * info->phy_block_size;
-		if (lseek(fd, unused_size, SEEK_SET) < 0)
-			goto out_misc_free_temp_dev;
-		scsi_sb.dump_size = unused_size;
-	}
+	printf("Building bootmap in '%s'%s\n", job->target.bootmap_dir,
+	       job->add_files ? " (files will be added to bootmap file)"
+	       : "");
 
 	/* Initialize bootmap header */
 	if (bootmap_header_init(fd)) {
@@ -1348,21 +1433,8 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 	/* Build program table */
 	if (build_program_table(fd, filename, job, program_table, info))
 		goto out_misc_free_temp_dev;
-	if (job->id == job_dump_partition) {
-		scsi_sb.magic = SCSI_DUMP_SB_MAGIC;
-		scsi_sb.version = 1;
-		scsi_sb.part_start = info->geo.start * info->phy_block_size;
-		scsi_sb.part_size = info->phy_blocks * info->phy_block_size;
-		scsi_sb.dump_offset = 0;
-		scsi_sb.csum_offset = 0;
-		scsi_sb.csum_size = SCSI_DUMP_SB_CSUM_SIZE;
-		/* Set seed because otherwise csum over zero block is 0 */
-		scsi_sb.csum = SCSI_DUMP_SB_SEED;
-		disk_write_block_aligned(fd, &scsi_sb,
-					 sizeof(scsi_sb),
-					 scsi_dump_sb_blockptr, info);
-	} else
-		scsi_dump_sb_blockptr->linear.block = 0;
+
+	scsi_dump_sb_blockptr->linear.block = 0;
 
 	/* Install stage 2 loader to bootmap if necessary */
 	if (bootmap_install_stages(job, info, fd, stage1b_list, stage1b_count)) {
@@ -1372,7 +1444,7 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 	}
 	if (dry_run) {
 		misc_free_temp_file(filename);
-	} else if (job->id != job_dump_partition) {
+	} else {
 		/* Rename to final bootmap name */
 		mapname = misc_make_path(job->target.bootmap_dir,
 				BOOTMAP_FILENAME);
@@ -1398,9 +1470,27 @@ out_disk_free_info:
 	disk_free_info(info);
 out_close_fd:
 	close(fd);
-	if (job->id != job_dump_partition)
-		misc_free_temp_file(filename);
+	misc_free_temp_file(filename);
 out_free_filename:
 	free(filename);
 	return -1;
+}
+
+
+int
+bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
+	       disk_blockptr_t *scsi_dump_sb_blockptr,
+	       disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
+	       char **new_device, struct disk_info **new_info)
+{
+	if (job->id == job_dump_partition)
+		return bootmap_create_device(job, program_table,
+					     scsi_dump_sb_blockptr,
+					     stage1b_list, stage1b_count,
+					     new_device, new_info);
+	else
+		return bootmap_create_file(job, program_table,
+					   scsi_dump_sb_blockptr,
+					   stage1b_list, stage1b_count,
+					   new_device, new_info);
 }
