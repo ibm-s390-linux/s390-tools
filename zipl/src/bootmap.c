@@ -1234,6 +1234,40 @@ bootmap_write_scsi_superblock(int fd, struct disk_info *info,
 
 
 static int
+estimate_scsi_dump_size(struct job_data *job, struct disk_info *info, ulong *dump_size)
+{
+	struct stat st;
+	ulong size;
+
+	/* Use approximated stage 3 size as starting point */
+	size = IMAGE_LOAD_ADDRESS;
+
+	/* Ramdisk */
+	if (job->data.dump.common.ramdisk != NULL) {
+		if (stat(job->data.dump.common.ramdisk, &st))
+			return -1;
+		size += DIV_ROUND_UP(st.st_size, info->phy_block_size);
+		size += 1; /* For ramdisk section entry */
+	}
+	/* Kernel */
+	if (stat(job->data.dump.common.image, &st))
+		return -1;
+	size += DIV_ROUND_UP(st.st_size - IMAGE_LOAD_ADDRESS,
+			     info->phy_block_size);
+	/* Parmfile */
+	size += DIV_ROUND_UP(DUMP_PARAM_MAX_LEN, info->phy_block_size);
+	size += 8;  /* 1x table + 1x script + 3x section + 1x empty
+		       1x header + 1x scsi dump super block */
+	if (size > info->phy_blocks) {
+		error_text("Partition too small for dump tool");
+		return -1;
+	}
+	*dump_size = (info->phy_blocks - size) * info->phy_block_size;
+	return 0;
+}
+
+
+static int
 bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 		      disk_blockptr_t *scsi_dump_sb_blockptr,
 		      disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
@@ -1243,8 +1277,6 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	struct disk_info *info;
 	int fd, rc, part_ext;
 	ulong unused_size;
-	struct stat st;
-	ulong size;
 
 	/* Get full path of bootmap file */
 	if (!dry_run) {
@@ -1309,30 +1341,8 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	       : "");
 	/* For partition dump set raw partition offset
 	   to expected size before end of disk */
-	/* Use approximated stage 3 size as starting point */
-	size = IMAGE_LOAD_ADDRESS;
-
-	/* Ramdisk */
-	if (job->data.dump.ramdisk != NULL) {
-		if (stat(job->data.dump.ramdisk, &st))
-			goto out_misc_free_temp_dev;
-		size += DIV_ROUND_UP(st.st_size, info->phy_block_size);
-		size += 1; /* For ramdisk section entry */
-	}
-	/* Kernel */
-	if (stat(job->data.dump.image, &st))
+	if (estimate_scsi_dump_size(job, info, &unused_size))
 		goto out_misc_free_temp_dev;
-	size += DIV_ROUND_UP(st.st_size - IMAGE_LOAD_ADDRESS,
-			     info->phy_block_size);
-	/* Parmfile */
-	size += DIV_ROUND_UP(DUMP_PARAM_MAX_LEN, info->phy_block_size);
-	size += 8;  /* 1x table + 1x script + 3x section + 1x empty
-		       1x header + 1x scsi dump super block */
-	if (size > info->phy_blocks) {
-		error_text("Partition too small for dump tool");
-		goto out_misc_free_temp_dev;
-	}
-	unused_size = (info->phy_blocks - size) * info->phy_block_size;
 	if (lseek(fd, unused_size, SEEK_SET) < 0)
 		goto out_misc_free_temp_dev;
 
