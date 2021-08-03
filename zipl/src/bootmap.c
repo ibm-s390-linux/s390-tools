@@ -1403,7 +1403,8 @@ out_free_filename:
 
 
 static int
-bootmap_create_file(struct job_data *job, disk_blockptr_t *program_table,
+bootmap_create_file(struct job_data *job, char *bootmap_dir,
+		    disk_blockptr_t *program_table,
 		    disk_blockptr_t *scsi_dump_sb_blockptr,
 		    disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
 		    char **new_device, struct disk_info **new_info)
@@ -1413,8 +1414,7 @@ bootmap_create_file(struct job_data *job, disk_blockptr_t *program_table,
 	int fd;
 
 	/* Get full path of bootmap file */
-	filename = misc_make_path(job->target.bootmap_dir,
-				  BOOTMAP_TEMPLATE_FILENAME);
+	filename = misc_make_path(bootmap_dir, BOOTMAP_TEMPLATE_FILENAME);
 	if (filename == NULL)
 		return -1;
 	/* Create temporary bootmap file */
@@ -1453,7 +1453,7 @@ bootmap_create_file(struct job_data *job, disk_blockptr_t *program_table,
 			goto out_misc_free_temp_dev;
 	}
 
-	printf("Building bootmap in '%s'%s\n", job->target.bootmap_dir,
+	printf("Building bootmap in '%s'%s\n", bootmap_dir,
 	       job->add_files ? " (files will be added to bootmap file)"
 	       : "");
 
@@ -1483,8 +1483,7 @@ bootmap_create_file(struct job_data *job, disk_blockptr_t *program_table,
 		misc_free_temp_file(filename);
 	} else {
 		/* Rename to final bootmap name */
-		mapname = misc_make_path(job->target.bootmap_dir,
-				BOOTMAP_FILENAME);
+		mapname = misc_make_path(bootmap_dir, BOOTMAP_FILENAME);
 		if (mapname == NULL)
 			goto out_misc_free_temp_dev;
 		if (rename(filename, mapname)) {
@@ -1526,7 +1525,8 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 					     stage1b_list, stage1b_count,
 					     new_device, new_info);
 	else
-		return bootmap_create_file(job, program_table,
+		return bootmap_create_file(job, job->target.bootmap_dir,
+					   program_table,
 					   scsi_dump_sb_blockptr,
 					   stage1b_list, stage1b_count,
 					   new_device, new_info);
