@@ -1268,6 +1268,40 @@ estimate_scsi_dump_size(struct job_data *job, struct disk_info *info, ulong *dum
 
 
 static int
+check_dump_device(const struct job_data *job, const struct disk_info *info,
+		  const char *device)
+{
+	int rc, part_ext;
+
+	/* Check for supported disk and driver types */
+	if ((info->source == source_auto) && (info->type == disk_type_diag)) {
+		error_reason("Unsupported disk type (%s)",
+			     disk_get_type_name(info->type));
+		return -1;
+	}
+	/* Check if secure boot was enabled only for SCSI */
+	if (job->is_secure == SECURE_BOOT_ENABLED &&
+	    info->type != disk_type_scsi) {
+		error_reason("Secure boot forced for non-SCSI disk type");
+		return -1;
+	}
+	rc = util_part_search(device, info->geo.start,
+			      info->phy_blocks, info->phy_block_size, &part_ext);
+	if (rc <= 0 || part_ext) {
+		if (rc == 0)
+			error_reason("No partition");
+		else if (rc < 0)
+			error_reason("Could not read partition table");
+		else if (part_ext)
+			error_reason("Extended partitions not allowed");
+		error_text("Invalid dump device");
+		return -1;
+	}
+	return 0;
+}
+
+
+static int
 bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 		      disk_blockptr_t *scsi_dump_sb_blockptr,
 		      disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
@@ -1275,8 +1309,8 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 {
 	char *device, *filename;
 	struct disk_info *info;
-	int fd, rc, part_ext;
 	ulong unused_size;
+	int fd;
 
 	/* Get full path of bootmap file */
 	if (!dry_run) {
@@ -1305,36 +1339,14 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	/* Retrieve target device information */
 	if (disk_get_info(filename, &job->target, &info))
 		goto out_close_fd;
-	/* Check for supported disk and driver types */
-	if ((info->source == source_auto) && (info->type == disk_type_diag)) {
-		error_reason("Unsupported disk type (%s)",
-			     disk_get_type_name(info->type));
-		goto out_disk_free_info;
-	}
-	/* Check if secure boot was enabled only for SCSI */
-	if (job->is_secure == SECURE_BOOT_ENABLED &&
-	    info->type != disk_type_scsi) {
-		error_reason("Secure boot forced for non-SCSI disk type");
-		goto out_disk_free_info;
-	}
 	if (verbose) {
 		printf("Target device information\n");
 		disk_print_info(info);
 	}
 	if (misc_temp_dev(info->device, 1, &device))
 		goto out_disk_free_info;
-	rc = util_part_search(device, info->geo.start, info->phy_blocks,
-			      info->phy_block_size, &part_ext);
-	if (rc <= 0 || part_ext) {
-		if (rc == 0)
-			error_reason("No partition");
-		else if (rc < 0)
-			error_reason("Could not read partition table");
-		else if (part_ext)
-			error_reason("Extended partitions not allowed");
-		error_text("Invalid dump device");
+	if (check_dump_device(job, info, device))
 		goto out_misc_free_temp_dev;
-	}
 	printf("Building bootmap directly on partition '%s'%s\n",
 	       filename,
 	       job->add_files ? " (files will be added to partition)"
