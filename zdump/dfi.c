@@ -36,6 +36,7 @@ static struct dfi *dfi_vec[] = {
 	&dfi_elf,
 	&dfi_kdump,
 	&dfi_kdump_flat,
+	&dfi_ngdump,
 	NULL,
 };
 

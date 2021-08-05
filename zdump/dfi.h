@@ -242,5 +242,6 @@ extern struct dfi dfi_elf;
 extern struct dfi dfi_kdump;
 extern struct dfi dfi_kdump_flat;
 extern struct dfi dfi_devmem;
+extern struct dfi dfi_ngdump;
 
 #endif /* DFI_H */
