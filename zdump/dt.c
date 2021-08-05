@@ -22,6 +22,7 @@ static struct dt *dt_vec[] = {
 	&dt_s390sv_ext,
 	&dt_s390sv,
 	&dt_scsi,
+	&dt_ngdump,
 	NULL,
 };
 
@@ -55,8 +56,8 @@ void dt_init(void)
 	while ((dt = dt_vec[i])) {
 		g.fh = zg_open(g.opts.device, O_RDONLY, ZG_CHECK);
 		if (!S_ISBLK(g.fh->sb.st_mode))
-			ERR_EXIT("Please specify DASD or SCSI device node"
-				 "(e.g. /dev/dasdd or /dev/sda )");
+			ERR_EXIT("Please specify DASD, SCSI or NVMe device node"
+				 "(e.g. /dev/dasdd, /dev/sda or /dev/nvme0n1 )");
 		if (dt->init() == 0) {
 			l.dt = dt;
 			return;

@@ -41,5 +41,6 @@ extern struct dt dt_s390mv_ext;
 extern struct dt dt_s390sv;
 extern struct dt dt_s390sv_ext;
 extern struct dt dt_scsi;
+extern struct dt dt_ngdump;
 
 #endif
