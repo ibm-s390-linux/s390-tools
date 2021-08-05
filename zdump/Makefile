@@ -53,7 +53,8 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  df_elf.o df_s390.o \
 	  dt.o dt_s390sv.o dt_s390sv_ext.o \
 	  dt_s390mv.o dt_s390mv_ext.o \
-	  dt_scsi.o output.o
+	  dt_scsi.o output.o \
+	  ngdump.o
 
 ifeq ("$(HAVE_FUSE)","0")
 FUSE_CFLAGS = -DHAVE_FUSE=0 -D_FILE_OFFSET_BITS=64
