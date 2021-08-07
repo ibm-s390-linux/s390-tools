@@ -42,6 +42,8 @@ static int pt_load_add(Elf64_Phdr *phdr)
 		STDERR("Dump file \"%s\" is a user space core dump\n",
 		      g.opts.device);
 	}
+	if (phdr->p_memsz == 0)
+		return -EINVAL;
 	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
 		return -EINVAL;
 	if (phdr->p_filesz == 0) {
