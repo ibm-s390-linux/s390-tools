@@ -117,7 +117,7 @@ of the columns show up in verbose mode only.
 .TP
 .B CARD.DOM
 The crypto card number in hexadecimal for a crypto card line or
-the crypto card number and the domain id both in hex seperated by a single
+the crypto card number and the domain id both in hex separated by a single
 dot for a queue line.
 .TP
 .B TYPE and HWTYPE
@@ -150,9 +150,16 @@ may be adjusted on the HMC or SE. The chzcrypt application can also
 trigger this state with the --config-on and --config-off options.
 .br
 lszcrypt shows 'online' when a card or queue is available for
-cryptograhic operations. 'offline' is displayed when a card or queue
+cryptographic operations. 'offline' is displayed when a card or queue
 is switched to (software) offline. If a card is 'deconfigured' via
 HMC, SE or chzcrypt the field shows 'deconfig'.
+.br
+If a queue is not bound to a device driver there is no detailed
+information available and thus the status shows only '-'.
+.br
+If a queue is bound to the vfio-ap device driver it is up to this driver
+to give some status information and what exactly this means. So lszcrypt
+shows the text retrieved from the underlying sysfs attribute here.
 .TP
 .B REQUESTS
 This is the counter value of successful processed requests on card or queue
@@ -173,7 +180,7 @@ S - APSC available: card/queue can handle requests with the special bit
 enabled.
 .br
 M - Accelerator card/queue with support for RSA ME with up to 4k key size.
-.br
+.Sr
 C - Accelerator card/queue with support for RSA CRT with up to 4k key size.
 .br
 D - Card/queue is providing CCA functions (this is the CCA Coprocessor mode).

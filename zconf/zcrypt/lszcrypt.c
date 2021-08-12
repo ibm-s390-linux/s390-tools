@@ -397,6 +397,16 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 			util_rec_set(rec, "status", "online");
 		else if (online == 0)
 			util_rec_set(rec, "status", "offline");
+		else {
+			/* no online attribute, maybe use status attribute */
+			if (util_path_is_readable("%s/%s/status",
+						  grp_dev, sub_dev)) {
+				util_file_read_line(buf, sizeof(buf),
+						    "%s/%s/status",
+						    grp_dev, sub_dev);
+				util_rec_set(rec, "status", buf);
+			}
+		}
 	}
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
