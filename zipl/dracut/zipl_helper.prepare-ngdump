@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# Copyright IBM Corp. 2021
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+set -u
+
+DRACUT_OMIT_MODULES=(
+	nfs network network-manager
+	dbus dbus-broker dbus-daemon plymouth
+	znet dash resume ifcfg earlykdump
+	kdumpcore i18n lvm mdraid memstrack
+	systemd-timedated systemd-timesyncd
+	systemd-networkd systemd-network-manager systemd-coredump)
+
+[ $# -gt 0 ] || { echo "Usage: $0 <dump partition device>" >&2; exit 1; }
+
+#
+# Retrieve partition UUID
+#
+# We use PARTUUID because zipl re-formats the given partition after
+# calling us, therefore, a UUID will change.
+#
+device=$(readlink -f $1)
+disk_path=/dev/disk/by-partuuid/$(blkid -o value -s PARTUUID "$device")
+
+[ -e "$disk_path" ] || { echo "Couldn't find disk by PARTUUID." >&2; exit 1; }
+
+function get_kernel_version()
+{
+	local version=$(uname -r)
+
+	echo $version
+}
+
+function get_kernel_image()
+{
+	local version=$1
+
+	if [ -e "/boot/image-$version" ]; then
+		# SLES kernel image
+		echo "/boot/image-$version"
+	else
+		# Fedora/RHEL kernel image
+		echo "/boot/vmlinuz-$version"
+	fi
+}
+
+#
+# dracut is the standard tool for building initramfs images
+# on Fedora, RHEL, and SLES.
+#
+function create_initrd()
+{
+	local disk=$1
+	local kver=$2
+	local initrd=$3
+	local omit_modules=$(echo ${DRACUT_OMIT_MODULES[@]})
+
+	command -v dracut >/dev/null ||
+		{ echo "Please install dracut." >&2; return 1; }
+
+	dracut -v --hostonly --no-hostonly-cmdline --hostonly-i18n \
+	       -o "$omit_modules" --add ngdump \
+	       --mount "$disk /ngdump ext4 defaults" \
+	       --kver "$kver" -f "$initrd" 2>&1
+}
+
+kernel_version=$(get_kernel_version)
+kernel=$(get_kernel_image "$kernel_version")
+[ -e "$kernel" ] || { echo "Couldn't find kernel image." >&2; exit 1; }
+
+initrd=$(mktemp)
+create_initrd "$disk_path" "$kernel_version" "$initrd"
+[ $? -eq 0 ] || { echo "Failed to create initramfs image" >&2; exit 1; }
+
+#
+# zipl expects this script to output three variables to stdout:
+#  * kernel: path to bzImage file of Linux kernel
+#  * initrd: path to dumper initramfs image
+#  * cmdline: command-line for dumper's kernel
+#
+# The output order is irrelevant.
+#
+
+echo "kernel=$kernel"
+echo "initrd=$initrd"
+echo "cmdline=reset_devices cgroup_disable=memory nokaslr numa=off irqpoll nr_cpus=1"
+
+exit 0

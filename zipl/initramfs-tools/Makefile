@@ -16,6 +16,8 @@ INITPREMOUNTDIR := $(INITRAMFSTOOLSDIR)/scripts/init-premount
 #
 ifeq ($(HAVE_INITRAMFS),1)
 install:
+	$(INSTALL) -m 755 zipl_helper.prepare-ngdump \
+		$(DESTDIR)$(TOOLS_LIBDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(HOOKSDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(INITPREMOUNTDIR)
 	$(INSTALL) -m 755 hooks/ngdump $(DESTDIR)$(HOOKSDIR)/

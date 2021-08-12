@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Copyright IBM Corp. 2021
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[ $# -gt 0 ] || { echo "Usage: $0 <dump partition device>" >&2; exit 1; }
+
+#
+# Retrieve partition UUID
+#
+# We use PARTUUID because zipl re-formats the given partition after
+# calling us, therefore, a UUID will change.
+#
+device=$(readlink -f $1)
+disk_path=/dev/disk/by-partuuid/$(blkid -o value -s PARTUUID "$device")
+
+[ -e "$disk_path" ] || { echo "Couldn't find disk by PARTUUID." >&2; exit 1; }
+
+function get_kernel_version()
+{
+	local version=$(uname -r)
+
+	echo $version
+}
+
+function get_kernel_image()
+{
+	local version=$1
+
+	echo "/boot/vmlinuz-$version"
+}
+
+#
+# initramfs-tools is the standard tool for building initramfs images
+# on Ubuntu and Debian.
+#
+function create_initrd()
+{
+	local disk=$1
+	local kver=$2
+	local initrd=$3
+
+	command -v mkinitramfs >/dev/null ||
+		{ echo "Please install mkinitramfs." >&2; return 1; }
+
+	NGDUMP=y NGDUMP_DEVICE="$disk" mkinitramfs -o "$initrd" "$kver" 2>&1
+}
+
+kernel_version=$(get_kernel_version)
+kernel=$(get_kernel_image "$kernel_version")
+[ -e "$kernel" ] || { echo "Couldn't find kernel image." >&2; exit 1; }
+
+initrd=$(mktemp)
+create_initrd "$disk_path" "$kernel_version" "$initrd"
+[ $? -eq 0 ] || { echo "Failed to create initramfs image" >&2; exit 1; }
+
+#
+# zipl expects this script to output three variables to stdout:
+#  * kernel: path to bzImage file of Linux kernel
+#  * initrd: path to dumper initramfs image
+#  * cmdline: command-line for dumper's kernel
+#
+# The output order is irrelevant.
+#
+
+echo "kernel=$kernel"
+echo "initrd=$initrd"
+echo "cmdline=reset_devices cgroup_disable=memory nokaslr numa=off irqpoll nr_cpus=1"
+
+exit 0

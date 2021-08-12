@@ -15,6 +15,8 @@ NGDUMPDIR := 99ngdump
 #
 ifeq ($(HAVE_DRACUT),1)
 install:
+	$(INSTALL) -m 755 zipl_helper.prepare-ngdump \
+		$(DESTDIR)$(TOOLS_LIBDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(MODULESDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(MODULESDIR)/$(NGDUMPDIR)
 	$(INSTALL) -m 755 $(NGDUMPDIR)/module-setup.sh \

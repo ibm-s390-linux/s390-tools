@@ -896,6 +896,92 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 }
 
 
+int
+check_job_images_ngdump(struct job_dump_data* dump, char *name)
+{
+	const char *helper = TOOLS_LIBDIR "/zipl_helper.prepare-ngdump";
+	char *ppn_cmd = NULL;
+	char *line = NULL;
+	FILE *fp;
+	int rc;
+
+	misc_asprintf(&ppn_cmd, "%s %s", helper, dump->device);
+	printf("Run %s\n", ppn_cmd);
+
+	fp = popen(ppn_cmd, "r");
+	if (fp == NULL) {
+		error_reason("Failed to run popen(%s,\"r\",)");
+		free(ppn_cmd);
+		return -1;
+	}
+	free(ppn_cmd);
+
+	while (fscanf(fp, "%m[^\n]\n", &line) != EOF) {
+		char *param = NULL;
+		char *value = NULL;
+
+		int n = sscanf(line, "%m[^=]=%m[^\n]\n", &param, &value);
+
+		if (n != 2) {
+			if (verbose)
+				printf("%s\n", line);
+			free(line);
+			free(param);
+			free(value);
+			continue;
+		}
+
+		if (strcmp(param, "kernel") == 0) {
+			dump->common.image = value;
+			value = NULL;
+		} else if (strcmp(param, "initrd") == 0) {
+			dump->common.ramdisk = value;
+			value = NULL;
+		} else if (strcmp(param, "cmdline") == 0) {
+			dump->common.parmline = value;
+			value = NULL;
+		} else {
+			printf("%s\n", line);
+		}
+
+		free(line);
+		free(param);
+		free(value);
+	}
+
+	switch (pclose(fp)) {
+	case 0:
+		/* success */
+		break;
+	case -1:
+		error_reason("Failed to run pclose");
+		return -1;
+	default:
+		error_reason("Script could not determine dump parameters");
+		return -1;
+	}
+
+	rc = misc_check_readable_file(dump->common.image);
+	if (rc) {
+		error_text("Need external file '%s' for dump",
+			   dump->common.image);
+		return rc;
+	}
+	dump->common.image_addr = IMAGE_LOAD_ADDRESS;
+
+	rc = misc_check_readable_file(dump->common.ramdisk);
+	if (rc) {
+		error_text("Need external file '%s' for dump",
+			   dump->common.ramdisk);
+		return rc;
+	}
+	dump->common.ramdisk_addr = UNSPECIFIED_ADDRESS;
+
+	dump->common.parm_addr = UNSPECIFIED_ADDRESS;
+	return finalize_common_address_data(&dump->common, name);
+}
+
+
 static int
 check_job_menu_data(struct job_menu_data *menu, struct job_envblk_data *envblk)
 {
