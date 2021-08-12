@@ -388,15 +388,15 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 		util_file_read_l(&config, 10, "%s/%s/config", grp_dev, sub_dev);
 	if (util_path_is_readable("%s/%s/online", grp_dev, sub_dev))
 		util_file_read_l(&online, 10, "%s/%s/online", grp_dev, sub_dev);
+
+	util_rec_set(rec, "status", "-");
 	if (config == 0) {
-		util_rec_set(rec, "online", "deconfig");
+		util_rec_set(rec, "status", "deconfig");
 	} else {
 		if (online > 0)
-			util_rec_set(rec, "online", "online");
+			util_rec_set(rec, "status", "online");
 		else if (online == 0)
-			util_rec_set(rec, "online", "offline");
-		else
-			util_rec_set(rec, "online", "-");
+			util_rec_set(rec, "status", "offline");
 	}
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
@@ -530,14 +530,14 @@ static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 	if (util_path_is_readable("%s/online", grp_dev))
 		util_file_read_l(&online, 10, "%s/online", grp_dev);
 	if (config == 0) {
-		util_rec_set(rec, "online", "deconfig");
+		util_rec_set(rec, "status", "deconfig");
 	} else {
 		if (online > 0)
-			util_rec_set(rec, "online", "online");
+			util_rec_set(rec, "status", "online");
 		else if (online == 0)
-			util_rec_set(rec, "online", "offline");
+			util_rec_set(rec, "status", "offline");
 		else
-			util_rec_set(rec, "online", "-");
+			util_rec_set(rec, "status", "-");
 	}
 
 	if (config == 0) {
@@ -625,10 +625,10 @@ out_free:
  */
 static void define_rec_default(struct util_rec *rec)
 {
-	util_rec_def(rec, "card", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
+	util_rec_def(rec, "card", UTIL_REC_ALIGN_LEFT, 8, "CARD.DOM");
 	util_rec_def(rec, "type", UTIL_REC_ALIGN_LEFT, 5, "TYPE");
 	util_rec_def(rec, "mode", UTIL_REC_ALIGN_LEFT, 11, "MODE");
-	util_rec_def(rec, "online", UTIL_REC_ALIGN_LEFT, 8, "STATUS");
+	util_rec_def(rec, "status", UTIL_REC_ALIGN_LEFT, 10, "STATUS");
 	util_rec_def(rec, "requests", UTIL_REC_ALIGN_RIGHT, 8, "REQUESTS");
 }
 
