@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Copyright IBM Corp. 2021
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+OPTION=NGDUMP
+PREREQ=""
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case "${1}" in
+	prereqs)
+		prereqs
+		exit 0
+		;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+#
+# Install required kernel modules
+#
+manual_add_modules nvme ext4
+block_dev_mod_add "$NGDUMP_DEVICE"
+
+#
+# Installs required tools
+#
+for tool in logsave findmnt sha256sum makedumpfile; do
+	path=$(command -v "$tool")
+	if [ ! -e "$path" ]; then
+		echo "$tool not found" >&2
+		exit 1
+	fi
+	copy_exec $path
+done
+
+force_load nvme
+
+#
+# Store the dump partition in a config file within initramfs.
+# The config file will be included by the dump script.
+#
+echo "NGDUMP_DEVICE=${NGDUMP_DEVICE}" > "${DESTDIR}/conf/conf.d/ngdump"
