@@ -3,7 +3,7 @@
  *
  * Utility classes to print framsets
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2021
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -128,7 +128,8 @@ private:
 			      const struct adapter_utilization *res);
 	void print_queue_full(FILE *fp, const struct adapter_utilization *res);
 	void print_failures(FILE *fp, const struct ioerr_cnt *cnt);
-	void print_throughput(FILE *fp, const struct blkiomon_stat *stat);
+	void print_throughput(FILE *fp, const struct blkiomon_stat *stat,
+			      const __u64 interval);
 	void print_num_requests(FILE *fp, const struct blkiomon_stat *stat);
 };
 
@@ -147,7 +148,8 @@ protected:
 	 * Print the actual row, excluding the first column */
 	virtual void print_data_row(FILE *fp,
 			   const struct blkiomon_stat *blk_stat,
-			   const struct zfcpdd_dstat *zfcp_stat) = 0;
+			   const struct zfcpdd_dstat *zfcp_stat,
+			   const __u64 interval) = 0;
 
 	void print_topline_prefix1(FILE *fp);
 	void print_topline_prefix2(FILE *fp);
@@ -185,8 +187,10 @@ public:
 private:
 	virtual void print_data_row(FILE *fp,
 			   const struct blkiomon_stat *blk_stat,
-			   const struct zfcpdd_dstat *zfcp_stat);
-	void print_throughput(FILE *fp, const struct blkiomon_stat *stat);
+			   const struct zfcpdd_dstat *zfcp_stat,
+			   const __u64 interval);
+	void print_throughput(FILE *fp, const struct blkiomon_stat *stat,
+			      const __u64 interval);
 	void print_request_stats(FILE *fp, const struct blkiomon_stat *stat);
 	void print_io_subsystem_latency(FILE *fp, const struct blkiomon_stat *stat);
 	void print_channel_latency(FILE *fp, const struct zfcpdd_dstat *stat);
@@ -207,7 +211,8 @@ public:
 private:
 	virtual void print_data_row(FILE *fp,
 			   const struct blkiomon_stat *blk_stat,
-			   const struct zfcpdd_dstat *zfcp_stat);
+			   const struct zfcpdd_dstat *zfcp_stat,
+			   const __u64 interval);
 	void print_histogram_io_reqs(FILE *fp,
 				    const struct blkiomon_stat *stat);
 	void print_histogram_io_subs_lat(FILE *fp,

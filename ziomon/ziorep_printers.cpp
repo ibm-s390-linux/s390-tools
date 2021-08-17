@@ -3,7 +3,7 @@
  *
  * Utility classes to print framsets
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2021
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -478,21 +478,22 @@ void VirtAdapterPrinter::print_failures(FILE *fp, const struct ioerr_cnt *cnt)
 }
 
 void VirtAdapterPrinter::print_throughput(FILE *fp,
-					 const struct blkiomon_stat *stat)
+					 const struct blkiomon_stat *stat,
+					 const __u64 interval)
 {
 	double tmp;
 
-	if (!stat || stat->d2c_r.num <= 0 || stat->size_r.num <= 0)
+	if (!stat || interval == 0 || stat->size_r.num <= 0)
 		tmp = 0;
 	else
-		tmp = stat->size_r.sum/(double)stat->d2c_r.sum;
+		tmp = calc_avg(stat->size_r.sum, interval);
 	print_delimiter(fp);
 	print_abbrev_num(fp, tmp);
 
-	if (!stat || stat->d2c_w.num <= 0 || stat->size_w.num <= 0)
+	if (!stat || interval == 0 || stat->size_w.num <= 0)
 		tmp = 0;
 	else
-		tmp = stat->size_w.sum/(double)stat->d2c_w.sum;
+		tmp = calc_avg(stat->size_w.sum, interval);
 	print_delimiter(fp);
 	print_abbrev_num(fp, tmp);
 }
@@ -536,6 +537,12 @@ int VirtAdapterPrinter::print_frame(FILE *fp,
 	const struct blkiomon_stat		*blk_stat;
 	const struct zfcpdd_dstat		*zfcp_stat;
 
+	/**
+	 * Receive Frameset interval and convert it
+	 * from seconds to microseconds
+	 */
+	__u64 interval = frameset.get_duration() * 1000000;
+
 	list<__u32> devnos;
 	devnos = ((StagedDeviceFilter*)&dev_filt)->get_filter_devnos();
 
@@ -557,7 +564,7 @@ int VirtAdapterPrinter::print_frame(FILE *fp,
 		print_queue_fill(fp, zfcp_stat, util);
 		print_queue_full(fp, util);
 		print_failures(fp, ioerr);
-		print_throughput(fp, blk_stat);
+		print_throughput(fp, blk_stat, interval);
 		print_num_requests(fp, blk_stat);
 		if (lrc) {
 			fprintf(stderr, "%s: Did not find matching data in"
@@ -810,6 +817,12 @@ int TrafficPrinter::print_frame(FILE *fp, const Frameset &frameset,
 	const struct zfcpdd_dstat	*zfcp_stat = NULL;
 	const AggregationCollapser *agg_col;
 
+	/**
+	 * Receive Frameset interval and convert it
+	 * from seconds to microseconds
+	 */
+	__u64 interval = frameset.get_duration() * 1000000;
+
 	switch (m_agg_crit) {
 	case none:
 		get_device_list(lst_32, dev_filt);
@@ -847,7 +860,7 @@ int TrafficPrinter::print_frame(FILE *fp, const Frameset &frameset,
 			blk_stat = frameset.get_blkiomon_stat_by_wwpn(*i);
 			zfcp_stat = frameset.get_zfcpdd_stat_by_wwpn(*i);
 			print_device_wwpn(fp, *i);
-			print_data_row(fp, blk_stat, zfcp_stat);
+			print_data_row(fp, blk_stat, zfcp_stat, interval);
 		}
 	}
 	else if (m_agg_crit == all) {
@@ -856,7 +869,7 @@ int TrafficPrinter::print_frame(FILE *fp, const Frameset &frameset,
 		blk_stat = frameset.get_first_blkiomon_stat();
 		zfcp_stat = frameset.get_first_zfcpdd_stat();
 		print_device_all(fp);
-		print_data_row(fp, blk_stat, zfcp_stat);
+		print_data_row(fp, blk_stat, zfcp_stat, interval);
 	}
 	else {
 		for (list<__u32>::const_iterator i = lst_32.begin();
@@ -894,7 +907,7 @@ int TrafficPrinter::print_frame(FILE *fp, const Frameset &frameset,
 			}
 			if (rc )
 				return -1;
-			print_data_row(fp, blk_stat, zfcp_stat);
+			print_data_row(fp, blk_stat, zfcp_stat, interval);
 		}
 	}
 
@@ -930,7 +943,8 @@ void SummaryTrafficPrinter::print_topline(FILE *fp)
 }
 
 
-void SummaryTrafficPrinter::print_throughput(FILE *fp, const struct blkiomon_stat *stat)
+void SummaryTrafficPrinter::print_throughput(FILE *fp, const struct blkiomon_stat *stat,
+					     const __u64 interval)
 {
 	struct minmax thrp_data, total_size, total_latency;
 	double tmp;
@@ -968,7 +982,7 @@ void SummaryTrafficPrinter::print_throughput(FILE *fp, const struct blkiomon_sta
 
 	tmp = 0;
 	if (stat && total_size.sum > 0)
-		tmp = calc_avg(total_size.sum, total_latency.sum);
+		tmp = calc_avg(total_size.sum, interval);
 	print_delimiter(fp);
 	print_abbrev_num(fp, tmp);
 
@@ -1101,14 +1115,15 @@ void SummaryTrafficPrinter::print_fabric_latency(FILE *fp, const struct zfcpdd_d
 
 void SummaryTrafficPrinter::print_data_row(FILE *fp,
 					const struct blkiomon_stat *blk_stat,
-					const struct zfcpdd_dstat *zfcp_stat)
+					const struct zfcpdd_dstat *zfcp_stat,
+					const __u64 interval)
 {
 	if (!blk_stat)
 		blk_stat = get_empty_blkiomon_stat();
 	if (!zfcp_stat)
 		zfcp_stat = get_empty_zfcpdd_dstat();
 
-	print_throughput(fp, blk_stat);
+	print_throughput(fp, blk_stat, interval);
 	print_request_stats(fp, blk_stat);
 	print_io_subsystem_latency(fp, blk_stat);
 	print_channel_latency(fp, zfcp_stat);
@@ -1177,7 +1192,8 @@ void DetailedTrafficPrinter::print_topline(FILE *fp)
 
 void DetailedTrafficPrinter::print_data_row(FILE *fp,
 			   const struct blkiomon_stat *blk_stat,
-			   const struct zfcpdd_dstat *zfcp_stat)
+			   const struct zfcpdd_dstat *zfcp_stat,
+			   const __u64 interval __attribute__ ((unused)))
 {
 	if (!blk_stat)
 		blk_stat = get_empty_blkiomon_stat();
