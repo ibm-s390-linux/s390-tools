@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <linux/fs.h>
 #include <linux/fiemap.h>
+#include <linux/nvme_ioctl.h>
 #include <assert.h>
 
 #include "lib/util_proc.h"
@@ -346,6 +347,9 @@ disk_get_info(const char* device, struct job_target_data* target,
 			data->device = stats.st_rdev;
 			data->targetbase = defined_as_name;
 		}
+		if (data->type == disk_type_scsi &&
+		    ioctl(fd, NVME_IOCTL_ID) >= 0)
+			data->is_nvme = 1;
 		goto type_determined;
 	}
 	if (ioctl(fd, BLKSSZGET, &data->phy_block_size)) {
@@ -407,9 +411,11 @@ disk_get_info(const char* device, struct job_target_data* target,
 			goto out_close;
 		}
 	/* NVMe path, driver name is 'blkext' */
-	} else if (strcmp(data->drv_name, "blkext") == 0) {
+	} else if (strcmp(data->drv_name, "blkext") == 0 &&
+		   ioctl(fd, NVME_IOCTL_ID) >= 0) {
 		data->devno = -1;
 		data->type = disk_type_scsi;
+		data->is_nvme = 1;
 
 		if (util_sys_dev_is_partition(stats.st_rdev)) {
 			if (util_sys_get_base_dev(stats.st_rdev, &data->device))

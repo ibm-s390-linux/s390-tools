@@ -88,6 +88,7 @@ struct disk_info {
 	char* drv_name;
 	source_t source;
 	definition_t targetbase;
+	int is_nvme;
 };
 
 struct file_range {
