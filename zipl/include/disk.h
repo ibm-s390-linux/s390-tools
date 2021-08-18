@@ -102,6 +102,7 @@ int disk_get_info(const char* device, struct job_target_data* target,
 		  struct disk_info** info);
 int disk_is_tape(const char* device);
 int disk_is_scsi(const char* device, struct job_target_data* target);
+int disk_is_nvme(const char* device, struct job_target_data* target);
 int disk_get_info_from_file(const char* filename,
 			    struct job_target_data* target,
 			    struct disk_info** info);
