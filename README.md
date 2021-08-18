@@ -53,7 +53,7 @@ Package contents
    - ttyrun-getty@.service: Instance unit to manage ttyrun
 
  * zipl:
-   Make DASDs or tapes bootable for system IPL or system dump.
+   Make DASDs, SCSIs, NVMes or tapes bootable for system IPL or system dump.
 
  * zgetdump:
    Retrieve system dumps from either tapes or DASDs.
@@ -319,11 +319,12 @@ build options:
 
 This table lists additional build or install options:
 
-| __COMPONENT__    | __OPTION__                   | __TOOLS__               |
-|------------------|:----------------------------:|:-----------------------:|
-| dracut           | `HAVE_DRACUT`                | zdev, chreipl-fcp-mpath |
-| initramfs-tools  | `HAVE_INITRAMFS`             | zdev                    |
-|                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev                    |
+| __COMPONENT__    | __OPTION__                   | __TOOLS__                |
+|------------------|:----------------------------:|:------------------------:|
+| dracut           | `HAVE_DRACUT`                | zdev, chreipl-fcp-mpath, |
+|                  |                              | zipl                     |
+| initramfs-tools  | `HAVE_INITRAMFS`             | zdev, zipl               |
+|                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev                     |
 
 The s390-tools build process uses "pkg-config" if available and hard-coded
 compiler and linker options otherwise.

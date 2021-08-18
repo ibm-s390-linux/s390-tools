@@ -75,7 +75,7 @@ for booting when the following requirements are met by the logical device setup:
 .IP "     -"
 all boot relevant files (i.e. kernel, ramdisk and parameter files) must be
 located on a logical device which is mapped to a single physical disk of a type
-supported by zipl (i.e. DASD or SCSI disk)
+supported by zipl (i.e. DASD, SCSI or NVMe disk)
 .IP "     -"
 adjacent data blocks on the logical device must correspond to adjacent blocks on
 the physical device
@@ -133,7 +133,7 @@ Use the specified <TARGET DIRECTORY>.
 .B zipl
 uses this directory to store the bootmap, i.e. a file containing
 boot data. The actual boot loader is installed onto the device containing
-the target directory. Supported devices are DASD and SCSI disks.
+the target directory. Supported devices are DASD, SCSI and NVMe disks.
 
 It is not possible to specify both this parameter and the name of a menu
 or configuration section on the command line at the same time.
@@ -160,7 +160,7 @@ LDL: DASD disk with ECKD/linux disk layout
 .IP "         -" 12
 FBA: FBA disk DASD
 .IP "         -" 12
-SCSI: SCSI disk
+SCSI: SCSI or NVMe disk
 .PP
 .IP " " 8
 This option is required when working with logical devices (see section
@@ -257,10 +257,10 @@ or configuration section on the command line at the same time.
 .BR "\-d <DEVNODE[,SIZE]>" " or " "--dumpto=<DEVNODE[,SIZE]>"
 Install a system dump record on the device identified by DEVNODE.
 Supported devices are DASD ECKD or FBA disk partitions,
-device mapper multipath partitions of FCP attached SCSI disks and IBM
-3480/3490/3590/3592 tape devices.
+device mapper multipath partitions of FCP attached SCSI disks,
+partitions of NVMe disks and IBM 3480/3490/3590/3592 tape devices.
 
-With the exception of SCSI, an optional decimal SIZE parameter may be
+With the exception of SCSI/NVMe, an optional decimal SIZE parameter may be
 specified to determine the maximum dump size in bytes. SIZE can be suffixed
 by either of the letters K, M or G to signify that the decimal number be
 interpreted as kilobytes, megabytes or gigabytes respectively. SIZE will be
@@ -406,6 +406,12 @@ following parameters:
 While it is not recommended for reasons of recovery and redundancy, FCP.
 attached SCSI disks can also be accessed directly without multipathing,.
 for example via the "/dev/disk/by-path/" device nodes.
+
+The NVMe stand-alone dump can be used only on IBM z15 or newer
+machine generations because it requires larger amount of HSA memory offered
+by firmware only on IBM z15 machines. Whereas the SCSI stand-alone dump is able
+to work with HSA memory of 32M, the NVMe stand-alone dump requires 512M HSA
+memory.
 
 .SH SEE ALSO
 .BR zipl.conf (5),
