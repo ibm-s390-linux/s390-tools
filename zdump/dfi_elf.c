@@ -16,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
 #include "zgetdump.h"
 
 /*
@@ -204,7 +205,6 @@ static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
  */
 static int pt_notes_add(Elf64_Phdr *phdr)
 {
-	u64 start_off = zg_tell(g.fh, ZG_CHECK);
 	struct dfi_cpu *cpu_current = NULL;
 	u64 notes_start_off;
 	Elf64_Nhdr note;
@@ -262,7 +262,6 @@ static int pt_notes_add(Elf64_Phdr *phdr)
 			break;
 		}
 	}
-	zg_seek(g.fh, start_off, ZG_CHECK);
 	return 0;
 }
 
@@ -289,7 +288,7 @@ static int read_elf_hdr(Elf64_Ehdr *ehdr)
 static int dfi_elf_init(void)
 {
 	Elf64_Ehdr ehdr;
-	Elf64_Phdr phdr;
+	Elf64_Phdr *phdr;
 	int i;
 
 	if (read_elf_hdr(&ehdr) != 0)
@@ -299,21 +298,29 @@ static int dfi_elf_init(void)
 	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 
+	phdr = util_malloc(sizeof(*phdr) * ehdr.e_phnum);
+	zg_seek(g.fh, ehdr.e_phoff, ZG_CHECK);
+	zg_read(g.fh, phdr, sizeof(*phdr) * ehdr.e_phnum, ZG_CHECK);
 	for (i = 0; i < ehdr.e_phnum; i++) {
-		zg_read(g.fh, &phdr, sizeof(phdr), ZG_CHECK);
-		switch (phdr.p_type) {
+		switch (phdr[i].p_type) {
 		case PT_LOAD:
-			if (pt_load_add(&phdr))
+			if (pt_load_add(&phdr[i])) {
+				free(phdr);
 				return -EINVAL;
+			}
 			break;
 		case PT_NOTE:
-			if (pt_notes_add(&phdr))
+			if (pt_notes_add(&phdr[i])) {
+				free(phdr);
 				return -EINVAL;
+			}
 			break;
 		default:
 			break;
 		}
 	}
+	free(phdr);
+
 	dfi_attr_version_set(ehdr.e_ident[EI_VERSION]);
 	return 0;
 }
