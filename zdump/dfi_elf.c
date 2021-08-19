@@ -47,15 +47,19 @@ static int pt_load_add(Elf64_Phdr *phdr)
 		return -EINVAL;
 	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
 		return -EINVAL;
-	if (phdr->p_filesz == 0) {
-		/* Add zero memory chunk */
-		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, NULL,
-				  dfi_mem_chunk_read_zero, NULL);
-	} else {
+	if (phdr->p_filesz > phdr->p_memsz)
+		return -EINVAL;
+	if (phdr->p_filesz > 0) {
 		off_ptr = zg_alloc(sizeof(*off_ptr));
 		*off_ptr = phdr->p_offset;
-		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, off_ptr,
+		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_filesz, off_ptr,
 				  dfi_elf_mem_chunk_read_fn, zg_free);
+	}
+	if (phdr->p_memsz - phdr->p_filesz > 0) {
+		/* Add zero memory chunk */
+		dfi_mem_chunk_add(phdr->p_paddr + phdr->p_filesz,
+				  phdr->p_memsz - phdr->p_filesz, NULL,
+				  dfi_mem_chunk_read_zero, NULL);
 	}
 	return 0;
 }
