@@ -56,7 +56,7 @@ Package contents
    Make DASDs, SCSIs, NVMes or tapes bootable for system IPL or system dump.
 
  * zgetdump:
-   Retrieve system dumps from either tapes or DASDs.
+   Retrieve system dumps from either tapes, DASDs, SCSIs or NVMes.
 
  * qetharp:
    Read and flush the ARP cache on OSA Express network cards.

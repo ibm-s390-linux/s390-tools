@@ -110,6 +110,8 @@ DASD device node for multi-volume dump (e.g. /dev/dasdc)
 Device mapper multipath partition device node of a FCP attached SCSI disk (e.g.
 /dev/mapper/3600..20c0-part1)
 .IP "         -" 12
+NVMe partition device node (e.g. /dev/nvme0n1p1)
+.IP "         -" 12
 Tape device node (e.g. /dev/ntibm0)
 .IP "         -" 12
 Device node for live system (/dev/mem or /dev/crash)
@@ -122,7 +124,8 @@ multi-volume DASD partitions as DUMP.
 \fBDUMPDEV\fR
 When using the "--device" option, DUMPDEV must be the device node of
 the dump disk that should be verified. This can be either a DASD device
-node or a device mapper multipath device node of a FCP attached SCSI disk.
+node, a device mapper multipath device node of a FCP attached SCSI disk or
+a NVMe device node.
 
 .SH COPY DUMP
 The default action of zgetdump is to copy the source dump to standard output in
@@ -294,6 +297,12 @@ For SCSI partition dump, the partition number and the maximum dump size is
 printed. The partition number corresponds to the output of
 "parted /dev/sdx print" or "fdisk -l /dev/sdx".
 
+For NVMe partition dump, the partition number is printed. The partition number
+corresponds to the output of "parted /dev/nvm0n1 print" or "fdisk -l /dev/nvme0n1".
+.TP
+.BR "Meta info"
+For NVMe partition dump, the dump file name is printed.
+
 .SH EXAMPLES
 .TP
 .B Copy single-volume DASD dump
@@ -345,6 +354,23 @@ dump.elf issue:
 .br
 
   # zgetdump /dev/mapper/3600..20c0-part1 > dump.elf
+
+.br
+.TP
+.B Copy NVMe dump
+
+The NVMe partition device node /dev/nvme0n1p1 was prepared for dump with:
+.br
+
+  # zipl -d /dev/nvme0n1p1
+
+.br
+An IPL was performed on the corresponding dump tool and a dump
+has been created. To copy the dump from the NVMe partition to file
+dump.elf issue:
+.br
+
+  # zgetdump /dev/nvme0n1p1 > dump.elf
 
 .TP
 .B Copy tape dump
@@ -435,6 +461,12 @@ node of a SCSI disk:
   # zgetdump -i /dev/mapper/3600..20c0-part1
 
 .br
+Print information about a dump on a partition device node of a NVMe disk:
+.br
+
+  # zgetdump -i /dev/nvme0n1p1
+
+.br
 .TP
 .B Print dump tool information (--device)
 
@@ -448,6 +480,12 @@ Print information about a dump tool on a SCSI multipath device:
 .br
 
   # zgetdump -d /dev/mapper/3600..02c0
+
+.br
+Print information about a dump tool on a NVMe device:
+.br
+
+  # zgetdump -d /dev/nvme0n1
 
 .br
 .SH NOTES
