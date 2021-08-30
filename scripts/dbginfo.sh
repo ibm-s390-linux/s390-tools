@@ -14,8 +14,9 @@ export LC_ALL
 
 ########################################
 # Global used variables
-readonly SCRIPTNAME="${0##*/}"  # general name of this script
+readonly SCRIPTNAME="${0##*/}"	# general name of this script
 #
+readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
 readonly DOCKER=$(if which docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 readonly HW="$(uname -i 2>/dev/null)"
 # retrieve and split kernel version
@@ -30,20 +31,25 @@ readonly LOCKFILE="/tmp/${SCRIPTNAME}.lock"
 # check limits for logfiles like /var/log/messages
 readonly LOG_FILE_SIZE_CHECK=50  # max logfile size in MB
 readonly LOG_FILE_AGE_CHECK=7  # age in days to include for size checking
+# Mount point of the debug file system
+readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
 # distro info
 readonly OSPRETTY="$(cat /etc/os* 2>/dev/null | grep -m1 PRETTY_NAME | sed 's/\"//g')"
 readonly OS_NAME="${OSPRETTY##*=}"
 # The processor ID for the first processor
 readonly PROCESSORID="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
-                sed 's/.*identification[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
+		sed 's/.*identification[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
 readonly PROCESSORVERSION="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
-                sed 's/.*version[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
+		sed 's/.*version[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
 if test "x${PROCESSORVERSION}" = "xFF" || test "x${PROCESSORVERSION}" = "xff"; then
     RUNTIME_ENVIRONMENT=$(grep -E "VM00.*Control Program.*" /proc/sysinfo | \
-                sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
+		sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
 else
     RUNTIME_ENVIRONMENT="LPAR"
 fi
+readonly SYSTEMHOSTNAME="$(hostname -s 2>/dev/null)" # hostname of system being analysed
+readonly TERMINAL="$(tty 2>/dev/null)"
+# The processor version for the first processor and resulting vitrtualization RUNTIME
 readonly TOS=15  # timeout seconds for command execution
 readonly ZDEV_CONF=$(lszdev --configured 2>/dev/null | wc -l)
 readonly ZDEV_OFF=$(lszdev --offline 2>/dev/null | wc -l)
@@ -66,7 +72,6 @@ print_usage() {
     print_version
 
     cat <<EOF
-
 
 Usage: ${SCRIPTNAME} [OPTION]
 
@@ -101,35 +106,35 @@ EOF
 ########################################
 # check for oversize logfiles and missing rotation
 logfile_checker() {
-        local counter
-        local logfile
-        local logfiles
+	local counter
+	local logfile
+	local logfiles
 
-        # find files bigger than recommended
-        counter=$(find $1 -maxdepth 1 -type f -mtime -${LOG_FILE_AGE_CHECK} \
-                        -size ${LOG_FILE_SIZE_CHECK}M | wc -l)
+	# find files bigger than recommended
+	counter=$(find $1 -maxdepth 1 -type f -mtime -${LOG_FILE_AGE_CHECK} \
+			-size ${LOG_FILE_SIZE_CHECK}M | wc -l)
 
-        echo " ${counter} logfiles over ${LOG_FILE_SIZE_CHECK} MB"
-        # maybe check for rotation of base names
-        if [ ${counter} -ne 0 ]; then
-                for logfile in $(find $1 -maxdepth 1 -type f -mtime -${LOG_FILE_AGE_CHECK} \
-                               -size ${LOG_FILE_SIZE_CHECK}M -print); do
-                        # use a neutral separtor ':' as concat is different in some bash
-                        # insert the 'blank' for later use in for loop
-                        # add the base name before '.' or '-' only for checks
-                        logfiles="${logfiles}: ${logfile%%[.-]*}"
-                done
-                # change separator to new line for sorting
-                logfiles=$(echo "${logfiles}" | sed s'/:/\n/g' | sort -u)
-                for logfile in ${logfiles}; do
-                        counter=$(ls ${logfile}* 2>/dev/null | wc -l)
-                        if [ ${counter} -eq 1 ]; then
-                                echo " CHECK - ${logfile} may miss a rotation"
+	echo " ${counter} logfiles over ${LOG_FILE_SIZE_CHECK} MB"
+	# maybe check for rotation of base names
+	if [ ${counter} -ne 0 ]; then
+		for logfile in $(find $1 -maxdepth 1 -type f -mtime -${LOG_FILE_AGE_CHECK} \
+		               -size ${LOG_FILE_SIZE_CHECK}M -print); do
+			# use a neutral separtor ':' as concat is different in some bash
+			# insert the 'blank' for later use in for loop
+			# add the base name before '.' or '-' only for checks
+			logfiles="${logfiles}: ${logfile%%[.-]*}"
+		done
+		# change separator to new line for sorting
+		logfiles=$(echo "${logfiles}" | sed s'/:/\n/g' | sort -u)
+		for logfile in ${logfiles}; do
+ 			counter=$(ls ${logfile}* 2>/dev/null | wc -l)
+			if [ ${counter} -eq 1 ]; then
+			  echo " CHECK - ${logfile} may miss a rotation"
 			else
-                                echo "    OK - ${logfile}* may have a rotation in place: ${counter} files"
-                        fi
-                done
-        fi
+			  echo "    OK - ${logfile}* may have a rotation in place: ${counter} files"
+			fi
+ 		done
+	fi
 }
 
 ########################################
@@ -180,18 +185,18 @@ while [ ${#} -gt 0 ]; do
 		echo
 		exit 1
 	    elif test ! -d "${paramWORKDIR_BASE}"; then
-                echo "${SCRIPTNAME}: Error: The specified directory \"${paramWORKDIR_BASE}\" does not exist!"
-                echo
-                exit 1
+		echo "${SCRIPTNAME}: Error: The specified directory does not exist!"
+		echo
+		exit 1
 	    else
 	        # jump to next param
 		shift
 	    fi
 	    ;;
 	--check|-c)
-            print_check
-            exit 0
-            ;;
+	    print_check
+	    exit 0
+	    ;;
 	-*|--*|*)
 	    echo
 	    echo "${SCRIPTNAME}: invalid option \"${1}\""
@@ -210,109 +215,67 @@ if test "$(/usr/bin/id -u 2>/dev/null)" -ne 0; then
     exit 1
 fi
 
-
-########################################
-# Global used variables
-#
-# The base working directory
+#########################################
+# The base working directory and derieved path info
 readonly WORKDIR_BASE="$(echo "${paramWORKDIR_BASE}" | sed -e 's#/$##')/"
-
-# The terminal
-readonly TERMINAL="$(tty 2>/dev/null)"
-
-# The hostname of the system
-readonly SYSTEMHOSTNAME="$(hostname -s 2>/dev/null)"
-
-# The kernel release version as delivered from uname -r
-readonly KERNEL_RELEASE_VERSION="$(uname -r 2>/dev/null)"
-
-# The current date
-readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
-
 # The current working directory for the actual script execution
 if test -z "${PROCESSORID}"; then
     readonly WORKDIR_CURRENT="DBGINFO-${DATETIME}-${SYSTEMHOSTNAME:-localhost}"
 else
     readonly WORKDIR_CURRENT="DBGINFO-${DATETIME}-${SYSTEMHOSTNAME:-localhost}-${PROCESSORID}"
 fi
-
 # The current path where the collected information is put together
 readonly WORKPATH="${WORKDIR_BASE}${WORKDIR_CURRENT}/"
-
 # The current TAR archive that finally includes all collected information
 readonly WORKARCHIVE="${WORKDIR_BASE}${WORKDIR_CURRENT}.tgz"
-
 # The log file of activities from this script execution
 readonly LOGFILE="${WORKPATH}dbginfo.log"
-
-# File that includes output of Linux commands
+# File names for output files per section (duplicates are ok)
+readonly OUTPUT_FILE_BRIDGE="${WORKPATH}network.out"
 readonly OUTPUT_FILE_CMD="${WORKPATH}runtime.out"
-
-# File that includes output of z/VM commands (if running in z/VM)
-readonly OUTPUT_FILE_VMCMD="${WORKPATH}zvm_runtime.out"
-
-# File that includes content of files from sysfs
-readonly OUTPUT_FILE_SYSFS="${WORKPATH}sysfsfiles.out"
-
-# File that includes the output of lsof
-readonly OUTPUT_FILE_LSOF="${WORKPATH}open_files.out"
-
-# File that includes content of OSA OAT
-readonly OUTPUT_FILE_OSAOAT="${WORKPATH}osa_oat"
-
-# File that includes content of Ethtool commands
-readonly OUTPUT_FILE_ETHTOOL="${WORKPATH}ethtool.out"
-
-# File that includes content of tc commands
-readonly OUTPUT_FILE_TC="${WORKPATH}tc.out"
-
-# File that includes content of bridge commands
-readonly OUTPUT_FILE_BRIDGE="${WORKPATH}bridge.out"
-
-# File that includes the output of journalctl
+readonly OUTPUT_FILE_COREDUMPCTL="${WORKPATH}coredump.out" # separate file needed
+readonly OUTPUT_FILE_DOCKER="${WORKPATH}docker_runtime.out"
+readonly OUTPUT_FILE_ETHTOOL="${WORKPATH}network.out"
+readonly OUTPUT_FILE_HYPTOP="${WORKPATH}runtime.out"
 readonly OUTPUT_FILE_JOURNALCTL="${WORKPATH}journalctl.out"
-
-# File that includes the output of OpenVSwitch
-readonly OUTPUT_FILE_OVS="${WORKPATH}openvswitch"
-
-# File that includes the docker inspect output
-readonly OUTPUT_FILE_DOCKER="${WORKPATH}docker_inspect.out"
-
-# File that includes nvme related information
-readonly OUTPUT_FILE_NVME="${WORKPATH}nvme.out"
-
-# File that includes KVM related information
 readonly OUTPUT_FILE_KVM="${WORKPATH}kvm_runtime.out"
-
-# Mount point of the debug file system
-readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
+readonly OUTPUT_FILE_LSOF="${WORKPATH}open_files.out"
+readonly OUTPUT_FILE_NETWORK="${WORKPATH}network.out"
+readonly OUTPUT_FILE_NVME="${WORKPATH}runtime.out"
+readonly OUTPUT_FILE_OVS="${WORKPATH}network.out"
+readonly OUTPUT_FILE_ISW="${WORKPATH}installed_sw.out"
+readonly OUTPUT_FILE_TC="${WORKPATH}network.out"
+readonly OUTPUT_FILE_VMCMD="${WORKPATH}zvm_runtime.out"
+# Base file names for different output files - no extension !
+readonly OUTPUT_FILE_OSAOAT="${WORKPATH}network"
+readonly OUTPUT_FILE_SYSFS="${WORKPATH}sysfs"
 
 # define order of collection steps
 ALL_STEPS="\
  collect_cmdsout\
+ collect_hyptop\
  collect_vmcmdsout\
  collect_procfs\
  collect_sysfs\
- collect_logfiles\
  collect_configfiles\
+ collect_network\
  collect_osaoat\
  collect_ethtool\
  collect_tc\
  collect_bridge\
  collect_ovs\
+ collect_kvm\
  collect_docker\
  collect_nvme\
- collect_kvm\
+ collect_logfiles\
  post_processing\
  create_package\
  environment_cleanup\
  "
-
 # The amount of steps running the whole collections, without last cleanup
 readonly COLLECTION_COUNT=`expr $(echo ${ALL_STEPS} | wc -w) - 1`
 
 ########################################
-
 # Collection of proc fs entries
 PROCFILES="\
   /proc/buddyinfo\
@@ -324,7 +287,6 @@ PROCFILES="\
   /proc/dasd/statistics\
   /proc/devices\
   /proc/diskstats\
-  /proc/driver/z90crypt\
   /proc/interrupts\
   /proc/iomem\
   /proc/kallsyms\
@@ -373,7 +335,6 @@ LOGFILES="\
   /var/log/IBMtape.trace\
   /var/log/IBMtape.errorlog\
   /var/log/libvirt\
-  /sys/module/kvm/parameters\
   /var/log/lin_tape.trace\
   /var/log/lin_tape.errorlog\
   /var/log/messages*\
@@ -445,35 +406,43 @@ CONFIGFILES="\
 ########################################
 CMDS="uname -a\
   :uptime\
+  :timedatectl\
   :runlevel\
-  :iptables -L\
   :ulimit -a\
-  :ps -emo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
-  :ps -eHo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
-  :ps axX\
+  :blockdev --report\
+  :env\
+  :df -h\
+  :df -i\
   :dmesg -s 1048576\
-  :last\
-  :lsshut\
-  :ifconfig -a\
-  :nm-tool\
-  :route -n\
-  :ip route list\
-  :ip route list table all\
-  :ip rule list\
-  :ip neigh list\
-  :ip link show\
-  :ip ntable\
-  :ip a sh\
-  :ip -s -s link\
-  :firewall-cmd --list-all\
-  :ipcs -a\
-  :netstat -pantu\
-  :netstat -s\
   :dmsetup ls\
   :dmsetup ls --tree\
   :dmsetup table\
   :dmsetup table --target multipath\
   :dmsetup status\
+  :icainfo\
+  :icastats\
+  :ipcs -a\
+  :ivp.e # IBM CCA package install check\
+  :java -version\
+  :last\
+  :lschp\
+  :lscpu -ae\
+  :lscpu -ye\
+  :lscss\
+  :lsmem\
+  :lsdasd\
+  :lsdasd -u\
+  :lsmod\
+  :lspci -vv\
+  :lsscsi\
+  :lsshut\
+  :lstape\
+  :lszcrypt -VV\
+  :lszdev\
+  :lszfcp\
+  :lszfcp -D\
+  :lszfcp -V\
+  :mount\
   :multipathd -k'show config'\
   :multipathd -k'show maps'\
   :multipathd -k'show topo'\
@@ -487,61 +456,62 @@ CMDS="uname -a\
   :multipath -v6 -ll\
   :multipath -d\
   :multipath -t\
-  :lsqeth\
-  :lschp\
-  :lscss\
-  :lscpu -ae\
-  :lscpu -ye\
-  :lsmem\
-  :lsdasd\
-  :lsdasd -u\
-  :ziorep_config -ADM\
-  :lsmod\
-  :lszdev\
-  :lsscsi\
-  :lstape\
-  :lszfcp\
-  :lszfcp -D\
-  :lszfcp -V\
-  :icainfo\
-  :icastats\
-  :lszcrypt -VV\
-  :ivp.e\
   :pkcsconf -mlist\
+  :ps -emo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
+  :ps -eHo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
+  :ps axX\
+  :pvpath -qa\
+  :SPident # SLES service package\
   :cat /var/lib/opencryptoki/pk_config_data\
   :ls -al /usr/lib64/opencryptoki/stdll\
-  :SPident\
-  :rpm -qa | sort\
-  :sysctl -a\
-  :lsof \
-   > '${OUTPUT_FILE_LSOF}'\
-  :mount\
-  :df -h\
-  :df -i\
-  :pvpath -qa\
+  :rpm -qa | sort >> '${OUTPUT_FILE_ISW}'\
+  :apt list >> '${OUTPUT_FILE_ISW}'\
+  :lsof >> '${OUTPUT_FILE_LSOF}'\
   :find /boot -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
-  :java -version\
+  :find /var/crash -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :cat /root/.bash_history\
-  :env\
   :journalctl --all --no-pager --lines=100000 --output=short-precise\
-   > '${OUTPUT_FILE_JOURNALCTL}'\
-  :openssl engine\
-  :systemd-delta\
+   >> '${OUTPUT_FILE_JOURNALCTL}'\
+  :smc_dbg\
+  :sysctl -a\
   :systemctl --all --no-pager show\
   :systemctl --all --no-pager list-units\
   :systemctl --all --no-pager list-unit-files\
+  :systemd-delta\
+  :lvdisplay\
+  :coredumpctl && coredumpctl info -o ${OUTPUT_FILE_COREDUMPCTL}\
+  :ziorep_config -ADM\
+  "
+
+########################################
+NETWORK_CMDS="ip a sh\
+  :ip route list\
+  :ip route list table all\
+  :ip rule list\
+  :ip neigh list\
+  :ip link show\
+  :ip ntable\
+  :ip -s -s link\
+  :firewall-cmd --list-all\
+  :ifconfig -a\
+  :iptables -L\
+  :lsqeth\
+  :netstat -pantu\
+  :netstat -s\
+  :nm-tool\
+  :openssl engine\
+  :route -n\
+  "
+
+########################################
+DOCKER_CMDS="docker version\
   :docker info\
   :docker images\
   :docker network ls\
   :docker ps -a\
-  :docker version\
   :docker stats --no-stream\
   :systemctl status docker.service\
-  :blockdev --report\
-  :lvdisplay\
-  :lspci -vv\
-  :smc_dbg\
   "
 
 ########################################
@@ -612,6 +582,7 @@ VM_CMDS="q userid\
   :ind user\
   :qemu-ga -V\
   "
+
 ###############################################################################
 KVM_CMDS="virsh version\
   :virsh nodeinfo\
@@ -629,25 +600,30 @@ KVM_CMDS="virsh version\
 ########################################
 collect_cmdsout() {
     local cmd
-    local ifs_orig
+    local ifs_orig="${IFS}"
 
-    ifs_orig="${IFS}"
-    pr_syslog_stdout "${step_num} Collecting command output"
+    pr_collect_output "command"
 
     IFS=:
     for cmd in ${CMDS}; do
 	IFS=${ifs_orig}	call_run_command "${cmd}" "${OUTPUT_FILE_CMD}"
     done
     IFS="${ifs_orig}"
-
-    if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
-        call_run_command "hyptop -b -d 1 -n 5 -f \#,c,m,C:s,M:s,o -S c" "${OUTPUT_FILE_CMD}"
-    else call_run_command "hyptop -b -d 1 -n 5 -f \#,T,c,e,m,C:s,E:s,M:s,o -S c" "${OUTPUT_FILE_CMD}"
-    fi
-
-    pr_log_stdout " "
 }
 
+########################################
+collect_network() {
+    local cmd
+    local ifs_orig="${IFS}"
+
+    pr_collect_output "network"
+
+    IFS=:
+    for cmd in ${NETWORK_CMDS}; do
+	IFS=${ifs_orig}	call_run_command "${cmd}" "${OUTPUT_FILE_NETWORK}"
+    done
+    IFS="${ifs_orig}"
+}
 
 ########################################
 collect_vmcmdsout() {
@@ -655,16 +631,13 @@ collect_vmcmdsout() {
     local cp_command
     local vm_cmds
     local vm_userid
-    local module_loaded
-    local ifs_orig
-    local cp_buffer_size
-    local rc_buffer_size
-
-    module_loaded=1
-    ifs_orig="${IFS}"
+    local module_loaded=1
+    local ifs_orig="${IFS}"
+    local cp_buffer_size=2
+    local rc_buffer_size=2
 
     if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
-	pr_syslog_stdout "${step_num} Collecting z/VM command output"
+	pr_collect_output "z/VM"
 
 	if which vmcp >/dev/null 2>&1; then
 	    cp_command="vmcp"
@@ -677,21 +650,16 @@ collect_vmcmdsout() {
 		modprobe cpint && module_loaded=0 && sleep 2
 	    fi
 	else
-	    pr_log_stdout " "
 	    pr_log_stdout "${SCRIPTNAME}: Warning: No program found to communicate to z/VM CP"
-	    pr_log_stdout "       Skipping collection of z/VM command output"
-	    pr_log_stdout " "
+	    pr_skip "z/VM: vmcp not available"
 	    return 1
 	fi
 	vm_userid=$(${cp_command} q userid 2>/dev/null | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
-
 	vm_cmds=$(echo "${VM_CMDS}" | sed "s/VMUSERID/${vm_userid}/g")
 
 	IFS=:
 	for vm_command in ${vm_cmds}; do
 	    IFS="${ifs_orig}"
-	    cp_buffer_size=2
-	    rc_buffer_size=2
 	    while test ${rc_buffer_size} -eq 2 && test ${cp_buffer_size} -lt 1024; do
 		cp_buffer_size=$(( cp_buffer_size * 2 ))
 
@@ -701,7 +669,7 @@ collect_vmcmdsout() {
 	    call_run_command "${cp_command} -b ${cp_buffer_size}k ${vm_command}" "${OUTPUT_FILE_VMCMD}"
 	    IFS=:
 	done
-	IFS=${ifs_orig}
+	IFS="${ifs_orig}"
 
 	if test ${module_loaded} -eq 0 && test "x${cp_command}" = "xhcp"; then
 	    rmmod cpint
@@ -709,81 +677,99 @@ collect_vmcmdsout() {
 	    rmmod vmcp
 	fi
     else
-	pr_syslog_stdout "${step_num} Collecting z/VM command output skipped - no z/VM environment"
+	pr_skip "z/VM: no z/VM environment"
     fi
-
-    pr_log_stdout " "
 }
 
+########################################
+collect_hyptop() {
+	local param
+	local delay=1  # seconds
+	local iter=5
+	local sec=`expr ${delay} \\* ${iter}`
 
+	case ${RUNTIME_ENVIRONMENT} in
+		"z/VM")
+		param="\#,c,m,C:s,M:s,o"	# z/VM guest fields
+		;;
+		"LPAR")
+		param="\#,T,c,e,m,C:s,E:s,M:s,o"  # all LPAR fields
+		;;
+		*)  # KVM guest
+		pr_skip "hyptop: not available for ${RUNTIME_ENVIRONMENT}"
+		return 1
+		;;
+	esac
+	pr_collect_output "hyptop for ${RUNTIME_ENVIRONMENT} - ${sec}s"
+	call_run_command "hyptop -b -d ${delay} -n ${iter} -f ${param} -S c" "${OUTPUT_FILE_HYPTOP}"
+}
 ########################################
 collect_procfs() {
     local file_name
 
-    pr_syslog_stdout "${step_num} Collecting procfs"
+    pr_collect "procfs"
 
     for file_name in ${PROCFILES}; do
 	call_collect_file "${file_name}"
     done
-
-    pr_log_stdout " "
 }
-
 
 ########################################
 collect_sysfs() {
-    local debugfs_mounted
+    local debugfs_mounted=0
     local dir_name
     local file_name
 
-    debugfs_mounted=0
-	pr_syslog_stdout "${step_num} Collecting sysfs"
-	    if ! grep -qE "${MOUNT_POINT_DEBUGFS}.*debugfs" /proc/mounts 2>/dev/null; then
-		if mount -t debugfs debugfs "${MOUNT_POINT_DEBUGFS}" >/dev/null 2>&1; then
-		    sleep 2
-		    debugfs_mounted=1
-		else
-		    pr_log_stdout "${SCRIPTNAME}: Warning: Unable to mount debugfs at \"${MOUNT_POINT_DEBUGFS}\""
-		fi
+    pr_collect "sysfs"
+    if ! grep -qE "${MOUNT_POINT_DEBUGFS}.*debugfs" /proc/mounts 2>/dev/null; then
+	if mount -t debugfs debugfs "${MOUNT_POINT_DEBUGFS}" >/dev/null 2>&1; then
+	    sleep 2
+	    debugfs_mounted=1
+	else
+	    pr_log_stdout "${SCRIPTNAME}: Warning: Unable to mount debugfs at \"${MOUNT_POINT_DEBUGFS}\""
+	fi
+    fi
+
+    # Collect sysfs files using multiple threads (-J 1) while excluding
+    # files known to block on read (-x). Stop reading a file that takes
+    # more than 5 seconds (-T 5) such as an active ftrace buffer.
+    # error messages are not written to the log
+    dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" -x '*/tracing/trace_pipe*' \
+	 -x '*/tracing/per_cpu/*' --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
+
+    if [ $? -ne 0 ] ; then
+        echo "${SCRIPTNAME}: Warning: dump2tar failed or is unavailable"
+	pr_log_stdout " Warning: falling back to slow path"
+        call_run_command "find /sys -print0 | sort -z \
+		| xargs -0 -n 10 ls -ld" "${OUTPUT_FILE_SYSFS}.out"
+
+        find /sys -noleaf -type d 2>/dev/null | while IFS= read -r dir_name; do
+            mkdir -p "${WORKPATH}${dir_name}"
+        done
+
+        find /sys -noleaf -type f -perm /444 -a -not -name "*trace_pipe*"\
+	      2>/dev/null | while IFS= read -r file_name;
+        do
+            echo " ${file_name}"
+            if ! dd if="${file_name}" status=noxfer iflag=nonblock \
+		    of="${WORKPATH}${file_name}" >/dev/null 2>&1; then
+	                echo "${SCRIPTNAME}: Warning: failed to copy \"${file_name}\""
 	    fi
+        done
+    else
+	echo " all failed entries are logged to ${OUTPUT_FILE_SYSFS}.err"
+    fi
 
-	# Collect sysfs files using multiple threads (-J 1) while excluding
-	# files known to block on read (-x). Stop reading a file that takes
-	# more than 5 seconds (-T 5) such as an active ftrace buffer.
-	dump2tar /sys -z -o "${WORKPATH}/sysfs.tgz" -x '*/tracing/trace_pipe*' \
-		 -x '*/tracing/per_cpu/*' --ignore-failed-read -J 1 -T 5
-
-	if [ $? -ne 0 ] ; then
-	    echo "${SCRIPTNAME}: Warning: dump2tar failed or is unavailable - falling back to slow path"
-	    call_run_command "find /sys -print0 | sort -z | xargs -0 -n 10 ls -ld" "${OUTPUT_FILE_SYSFS}"
-
-	    find /sys -noleaf -type d 2>/dev/null | while IFS= read -r dir_name; do
-	        mkdir -p "${WORKPATH}${dir_name}"
-	    done
-
-	    find /sys -noleaf -type f -perm /444\
-		      -a -not -name "*trace_pipe*"\
-		      2>/dev/null | while IFS= read -r file_name; do
-		echo " ${file_name}"
-		if ! dd if="${file_name}" status=noxfer iflag=nonblock of="${WORKPATH}${file_name}" >/dev/null 2>&1; then
-		    echo "${SCRIPTNAME}: Warning: failed to copy \"${file_name}\""
-		fi
-	    done
-	fi
-
-	if test ${debugfs_mounted} -eq 1; then
-	    umount "${MOUNT_POINT_DEBUGFS}"
-	fi
-
-    pr_log_stdout " "
+    if test ${debugfs_mounted} -eq 1; then
+        umount "${MOUNT_POINT_DEBUGFS}"
+    fi
 }
-
 
 ########################################
 collect_logfiles() {
     local file_name
 
-    pr_syslog_stdout "${step_num} Collecting log files"
+    pr_collect "log files"
 
     for file_name in ${LOGFILES}; do
 	call_collect_file "${file_name}"
@@ -792,20 +778,16 @@ collect_logfiles() {
     pr_log_stdout "$(logfile_checker "/var/log*")"
 }
 
-
 ########################################
 collect_configfiles() {
     local file_name
 
-    pr_syslog_stdout "${step_num} Collecting config files"
+    pr_collect "config files"
 
     for file_name in ${CONFIGFILES}; do
 	call_collect_file "${file_name}"
     done
-
-    pr_log_stdout " "
 }
-
 
 ########################################
 collect_osaoat() {
@@ -813,22 +795,20 @@ collect_osaoat() {
     local network_device
 
     network_devices=$(lsqeth 2>/dev/null | grep "Device name" \
-                     | sed 's/.*:[[:space:]]\+\([^[:space:]]*\)[[:space:]]\+/\1/g')
+                     | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g')
     if which qethqoat >/dev/null 2>&1; then
 	if test -n "${network_devices}"; then
-	    pr_syslog_stdout "${step_num} Collecting osa oat output"
+	    pr_collect_output "osa oat"
 	    for network_device in ${network_devices}; do
 		call_run_command "qethqoat ${network_device}" "${OUTPUT_FILE_OSAOAT}.out" &&
 		call_run_command "qethqoat -r ${network_device}" "${OUTPUT_FILE_OSAOAT}_${network_device}.raw"
 	    done
 	else
-	    pr_syslog_stdout "${step_num} Collecting osa oat output skipped - no devices"
+	    pr_skip "osa oat: no devices"
 	fi
     else
-	pr_syslog_stdout "${step_num} Collecting osa oat output skipped - not available"
+	pr_skip "osa oat: qethqoat not available"
     fi
-
-    pr_log_stdout " "
 }
 
 ########################################
@@ -839,7 +819,7 @@ collect_ethtool() {
     network_devices=$(ls /sys/class/net 2>/dev/null)
     if which ethtool >/dev/null 2>&1; then
 	if test -n "${network_devices}"; then
-	    pr_syslog_stdout "${step_num} Collecting ethtool output"
+	    pr_collect_output "ethtool"
 	    for network_device in ${network_devices}; do
 		call_run_command "ethtool ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
 		call_run_command "ethtool -k ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
@@ -854,13 +834,11 @@ collect_ethtool() {
 		call_run_command "ethtool -T ${network_device}" "${OUTPUT_FILE_ETHTOOL}"
 	    done
 	else
-	    pr_syslog_stdout "${step_num} Collecting ethtool output skipped - no devices"
+	    pr_skip "ethtool: no devices"
 	fi
     else
-	pr_syslog_stdout "${step_num} Collecting ethtool output skipped - not available"
+	pr_skip "ethtool: not available"
     fi
-
-    pr_log_stdout " "
 }
 
 ########################################
@@ -871,18 +849,16 @@ collect_tc() {
     network_devices=$(ls /sys/class/net 2>/dev/null)
     if which tc >/dev/null 2>&1; then
 	if test -n "${network_devices}"; then
-	    pr_syslog_stdout "${step_num} Collecting tc output"
+	    pr_collect_output "Trafic Control"
 	    for network_device in ${network_devices}; do
 		call_run_command "tc -s qdisc show dev ${network_device}" "${OUTPUT_FILE_TC}"
 	    done
 	else
-	    pr_syslog_stdout "${step_num} Collecting tc output skipped - no devices"
+	    pr_skip "Trafic Control: no devices"
 	fi
     else
-	pr_syslog_stdout "${step_num} Collecting tc output skipped - not available"
+	pr_skip "Trafic Control: tc not available"
     fi
-
-    pr_log_stdout " "
 }
 
 ########################################
@@ -893,124 +869,124 @@ collect_bridge() {
     network_devices=$(ls /sys/class/net 2>/dev/null)
     if which bridge >/dev/null 2>&1; then
 	if test -n "${network_devices}"; then
-	    pr_syslog_stdout "${step_num} Collecting bridge output"
+	    pr_collect_output "bridge"
 	    for network_device in ${network_devices}; do
 		call_run_command "bridge -d link show dev ${network_device}" "${OUTPUT_FILE_BRIDGE}"
 		call_run_command "bridge -s fdb show dev ${network_device}" "${OUTPUT_FILE_BRIDGE}"
 		call_run_command "bridge -d mdb show dev ${network_device}" "${OUTPUT_FILE_BRIDGE}"
 	    done
 	else
-	    pr_syslog_stdout "${step_num} Collecting bridge output skipped - no devices"
+	    pr_skip "bridge: no devices"
 	fi
     else
-	pr_syslog_stdout "${step_num} Collecting bridge output skipped - not available"
+	pr_skip "bridge: not available"
     fi
-
-    pr_log_stdout " "
 }
 
 ########################################
 # OpenVSwitch
 collect_ovs() {
-    local br_list
     local ovscmd
     local bridge
-    local ovsbrcmd
     local ovscmds
+    local ovsbrcmd
     local ovsbrcmds
 
-    br_list=$(ovs-vsctl list-br)
     ovscmds="ovs-dpctl -s show\
             :ovs-vsctl -t 5 show\
             :ovsdb-client dump\
             "
-    if test -n "${br_list}"; then
-        pr_syslog_stdout "${step_num} Collecting OpenVSwitch output"
+    if which ovs-vsctl >/dev/null 2>&1;
+    then
+        pr_collect_output "OpenVSwitch"
         IFS=:
           for ovscmd in ${ovscmds}; do
-            IFS=${ifs_orig} call_run_command "${ovscmd}" "${OUTPUT_FILE_OVS}.out"
+            IFS=${ifs_orig} call_run_command "${ovscmd}" "${OUTPUT_FILE_OVS}"
           done
         IFS="${ifs_orig}"
 
-        for bridge in ${br_list}; do
-        ovsbrcmds="ovs-ofctl show ${bridge}\
+        for bridge in ${ovs-vsctl list-br}; do
+         ovsbrcmds="ovs-ofctl show ${bridge}\
                     :ovs-ofctl dump-flows ${bridge}\
                     :ovs-appctl fdb/show ${bridge}\
                     "
          IFS=:
           for ovsbrcmd in ${ovsbrcmds}; do
-            IFS=${ifs_orig} call_run_command "${ovsbrcmd}" "${OUTPUT_FILE_OVS}.out"
+            IFS=${ifs_orig} call_run_command "${ovsbrcmd}" "${OUTPUT_FILE_OVS}"
           done
          IFS="${ifs_orig}"
         done
     else
-        pr_syslog_stdout "${step_num} Collecting OpenVSwitch output skipped"
+        pr_skip "OpenVSwitch: ovs-vsctl not available"
     fi
-
-    pr_log_stdout " "
 }
 
 ########################################
 collect_docker() {
-    local item_list
+    local container_list
+    local network_list
     local item
 
-    # call docker inspect for all containers
-    item_list=$(docker ps -qa)
-    if test -n "${item_list}"; then
-        pr_syslog_stdout "${current_step}a of ${COLLECTION_COUNT}: Collecting docker container output"
-        for item in ${item_list}; do
-            call_run_command "docker inspect ${item}" "${OUTPUT_FILE_DOCKER}"
+    # check if docker command exists
+    if [ "x${DOCKER}" = "xYES" ];
+    then
+        pr_collect_output "docker"
+        container_list=$(docker ps -qa)
+        network_list=$(docker network ls -q)
+        ifs_orig="${IFS}"
+        IFS=:
+        for item in ${DOCKER_CMDS}; do
+            IFS=${ifs_orig} call_run_command "${item}" "${OUTPUT_FILE_DOCKER}"
         done
-    else
-        pr_syslog_stdout "${current_step}a of ${COLLECTION_COUNT}: Collecting docker container output skipped"
-    fi
+        IFS="${ifs_orig}"
 
-    # call docker inspect for all networks
-    item_list=$(docker network ls -q)
-    if test -n "${item_list}"; then
-        pr_syslog_stdout "${current_step}b of ${COLLECTION_COUNT}: Collecting docker network output"
-        for item in ${item_list}; do
-            call_run_command "docker network inspect ${item}" "${OUTPUT_FILE_DOCKER}"
-        done
-    else
-        pr_syslog_stdout "${current_step}b of ${COLLECTION_COUNT}: Collecting docker network output skipped"
-    fi
+        if test -n "${container_list}"; then
+            for item in ${container_list}; do
+                call_run_command "docker inspect ${item}" "${OUTPUT_FILE_DOCKER}"
+            done
+	fi
 
-    pr_log_stdout " "
+        if test -n "${network_list}"; then
+            for item in ${network_list}; do
+                call_run_command "docker network inspect ${item}" "${OUTPUT_FILE_DOCKER}"
+            done
+	fi
+    else
+        pr_skip "docker: not available"
+    fi
 }
 
 ########################################
 collect_nvme() {
-    local NVME
+    local device
 
-    pr_syslog_stdout "${step_num} Collecting nvme output"
-    call_run_command "nvme list" "${OUTPUT_FILE_NVME}"
-
-    for NVME in /dev/nvme[0-9]*; do
-	if [ -c $NVME ]; then
-	    call_run_command "smartctl -x $NVME" "${OUTPUT_FILE_NVME}"
-	    call_run_command "nvme fw-log $NVME" "${OUTPUT_FILE_NVME}"
-	    call_run_command "nvme smart-log $NVME" "${OUTPUT_FILE_NVME}"
-	    call_run_command "nvme error-log $NVME" "${OUTPUT_FILE_NVME}"
-	fi
-    done
-
-    pr_log_stdout " "
+    if which nvme >/dev/null 2>&1; then
+       pr_collect_output "NVME storage"
+       call_run_command "nvme list" "${OUTPUT_FILE_NVME}"
+       for device in /dev/nvme[0-9]*; do
+           if [ -c $device ]; then
+	    call_run_command "smartctl -x $device" "${OUTPUT_FILE_NVME}"
+	    call_run_command "nvme fw-log $device" "${OUTPUT_FILE_NVME}"
+	    call_run_command "nvme smart-log $device" "${OUTPUT_FILE_NVME}"
+	    call_run_command "nvme error-log $device" "${OUTPUT_FILE_NVME}"
+           fi
+       done
+    else
+        pr_skip "nvme: not available"
+    fi
 }
 
 ########################################
 collect_kvm() {
     local cmd
-    local ifs_orig
+    local ifs_orig="${IFS}"
     local domain_list
     local domain
 
     # check if KVM virsh command exists
-    if type virsh >/dev/null 2>&1;
+    if [ "x${KVM}" = "xYES" ];
     then
-        pr_syslog_stdout "${step_num} Collecting KVM data"
-        ifs_orig="${IFS}"
+        pr_collect_output "KVM"
 	IFS=:
 	for cmd in ${KVM_CMDS}; do
             IFS=${ifs_orig} call_run_command "${cmd}" "${OUTPUT_FILE_KVM}"
@@ -1029,10 +1005,8 @@ collect_kvm() {
 	  echo "no KVM doamins found" | tee -a ${OUTPUT_FILE_KVM}
         fi
     else
-        pr_syslog_stdout "${step_num} Skip KVM data - no virsh command"
+        pr_skip "KVM: no virsh command"
     fi
-
-    pr_log_stdout " "
 }
 
 ########################################
@@ -1041,74 +1015,44 @@ post_processing() {
     local file_mtime_epoche
     local tmp_file
     local file_name
+    local base_dir
+    local dir_list
 
     pr_syslog_stdout "${step_num} Postprocessing"
 
-    find "${WORKPATH}etc/libvirt/qemu/" -maxdepth 1 -name "*.xml" 2>/dev/null | while IFS= read -r file_name; do
-	file_mtime_epoche=$(stat --format=%Y "${file_name}")
-	file_mtime=$(date +%Y%m%d%H%M.%S --date="@${file_mtime_epoche}")
-	tmp_file=${file_name}.$$
+    # wipe possible passwords
+    dir_list="${WORKPATH} \
+	${WORKPATH}etc/ssl/ \
+	${WORKPATH}etc/libvirt/"
+    for base_dir in ${dir_list}; do
+      find "${base_dir}" -maxdepth 2 -name "*xml" -o -name "*conf" -o -name "*cnf" 2>/dev/null | \
+	while read -r file_name; do
+		file_mtime_epoche=$(stat --format=%Y "${file_name}")
+		file_mtime=$(date +%Y%m%d%H%M.%S --date="@${file_mtime_epoche}")
+		tmp_file=${file_name}.$$
+		echo " clean pw: ${file_name}"
+		if ! sed "s/\(.*[Pp]assw.*=\).*/\1********/g" "${file_name}" > "${tmp_file}"; then
+			echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
+		fi
+		mv "${tmp_file}" "${file_name}"
+		touch --time=mtime -t "${file_mtime}" "${file_name}"
+	done
+    done
 
-	echo " ${file_name}"
-	if ! sed "s/\( \+passwd='\).*\('\)/\1********\2/g" "${file_name}" > "${tmp_file}"; then
-	    echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
-	    echo
+    # compressing data folder to avoid full unpack for any DBGINFO
+    base_dir="${WORKPATH}proc/"
+    search4="kallsyms"
+    find "${base_dir}" -name ${search4} 2>/dev/null | while read -r file_name; do
+        tmp_file=${file_name}-${KERNEL_BASE}.tgz
+        echo " compress: ${file_name}"
+        if ! tar -czf "${tmp_file}" -C "${base_dir}" "${search4}"; then
+		echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
+		echo
+	else
+		rm -f "${file_name}"
 	fi
-
-	mv "${tmp_file}" "${file_name}"
-	touch --time=mtime -t "${file_mtime}" "${file_name}"
     done
-
-    find "${WORKPATH}etc/libvirt/" -name "auth.conf" 2>/dev/null | while IFS= read -r file_name; do
-        file_mtime_epoche=$(stat --format=%Y "${file_name}")
-        file_mtime=$(date +%Y%m%d%H%M.%S --date="@${file_mtime_epoche}")
-        tmp_file=${file_name}.$$
-
-        echo " ${file_name}"
-        if ! sed "s/\(password=\).*/\1********/g" "${file_name}" > "${tmp_file}"; then
-            echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
-            echo
-        fi
-
-        mv "${tmp_file}" "${file_name}"
-        touch --time=mtime -t "${file_mtime}" "${file_name}"
-    done
-
-    find "${WORKPATH}" -maxdepth 1 -name "*.xml" 2>/dev/null | while IFS= read -r file_name; do
-        file_mtime_epoche=$(stat --format=%Y "${file_name}")
-        file_mtime=$(date +%Y%m%d%H%M.%S --date="@${file_mtime_epoche}")
-        tmp_file=${file_name}.$$
-
-        echo " ${file_name}"
-        if ! sed "s/\( \+passwd='\).*\('\)/\1********\2/g" "${file_name}" > "${tmp_file}"; then
-            echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
-            echo
-        fi
-
-        mv "${tmp_file}" "${file_name}"
-        touch --time=mtime -t "${file_mtime}" "${file_name}"
-    done
-
-    find "${WORKPATH}proc/" -name "kallsyms" 2>/dev/null | while IFS= read -r file_name; do
-        tmp_file=${file_name}-`uname -r`.tgz
-        ch_dir="${WORKPATH}proc/"
-        orig_file="kallsyms"
-
-
-        echo " ${file_name}"
-        if ! test -e "${file_name}"; then
-            echo "${SCRIPTNAME}: Warning: Postprocessing failed on ${file_name}"
-            echo
-        fi
-
-        tar -cvzf "${tmp_file}" -C "${ch_dir}" "${orig_file}"
-        rm -f  "${file_name}"
-
-    done
-
-    pr_log_stdout " "
 }
-
 
 ########################################
 # Be aware that this output must be
@@ -1124,39 +1068,35 @@ call_run_command() {
 
     # check if calling command and timeout exist
     if which "${raw_cmd}" >/dev/null 2>&1 && which timeout >/dev/null 2>&1; then
-        eval timeout ${TOS} "${cmd}" >> ${logfile} 2>&1
-        rc=$?
+	eval timeout ${TOS} "${cmd}" >> ${logfile} 2>&1
+	rc=$?
     # check if command is a builtin (no use of timeout possible)
     elif command -v "${raw_cmd}" >/dev/null 2>&1; then
-        eval "${cmd}" >> ${logfile} 2>&1
-        rc=$?
+	eval "${cmd}" >> ${logfile} 2>&1
+	rc=$?
     else
-        echo "${SCRIPTNAME}: Warning: Command \"${raw_cmd}\" not available" >> "${logfile}"
-        echo >> "${logfile}"
-        return 1
+	echo "${SCRIPTNAME}: Warning: Command \"${raw_cmd}\" not available" >> "${logfile}"
+	echo >> "${logfile}"
+	return 1
     fi
 
     # log a warning on rc not 0 and define return
     if [ ${rc} ]; then
-        echo >> "${logfile}"
-        return 0
+	echo >> "${logfile}"
+	return 0
     else
-        echo "${SCRIPTNAME}: Warning: Command \"${cmd}\" failed" >> "${logfile}"
-        echo >> "${logfile}"
-        return 1
+	echo "${SCRIPTNAME}: Warning: Command \"${cmd}\" failed" >> "${logfile}"
+	echo >> "${logfile}"
+	return 1
     fi
 }
 
-
 ########################################
 call_collect_file() {
-    local directory_name
-    local file_name
-
-    file_name="${1}"
+    local file_name="${1}"
+    local directory_name=$(dirname "${file_name}" 2>/dev/null)
     echo " ${file_name}"
 
-    directory_name=$(dirname "${file_name}" 2>/dev/null)
     if test ! -e "${WORKPATH}${directory_name}"; then
 	mkdir -p "${WORKPATH}${directory_name}" 2>&1
     fi
@@ -1166,10 +1106,6 @@ call_collect_file() {
 	return 0
     fi
 }
-
-
-###############################################################################
-
 
 ########################################
 # print that an instance is already running
@@ -1185,11 +1121,9 @@ running. If this is not the case, please remove the lock file
 EOF
 }
 
-
 ########################################
 # Setup the environment
-environment_setup()
-{
+environment_setup() {
     if test ! -e "${WORKDIR_BASE}"; then
 	mkdir -p "${WORKDIR_BASE}"
     elif test ! -d "${WORKDIR_BASE}"; then
@@ -1197,7 +1131,6 @@ environment_setup()
 	echo "       Please make sure \"${WORKDIR_BASE}\" is a directory."
 	exit 1
     fi
-
     if test -e "${LOCKFILE}"; then
 	print_alreadyrunning
 	exit 1
@@ -1205,7 +1138,6 @@ environment_setup()
 	touch "${LOCKFILE}"
 	echo "${DATETIME}" > "${LOCKFILE}"
     fi
-
     if ! mkdir "${WORKPATH}" 2>/dev/null; then
 	echo "${SCRIPTNAME}: Error: Target directory \"${WORKPATH}\" already exists or"
 	echo "       \"${WORKDIR_BASE}\" does not exist!"
@@ -1214,11 +1146,9 @@ environment_setup()
     chmod 0700 "${WORKPATH}"
 }
 
-
 ########################################
 # create gzip-ped tar file
-create_package()
-{
+create_package() {
     local rc_tar
     pr_stdout "${step_num} Finalizing: Creating archive with collected data"
     cd "${WORKDIR_BASE}"
@@ -1233,7 +1163,7 @@ create_package()
         pr_stdout "Collected data was saved to:"
         pr_stdout " >>  ${WORKARCHIVE}  <<"
         pr_stdout " "
-        pr_stdout "Review the collected data before sending to your service organization. "
+        pr_stdout "Please review all collected data before sending to your service organization. "
         pr_stdout " "
     elif [ $rc_tar -eq 127 ]; then
         pr_stdout " "
@@ -1248,11 +1178,9 @@ create_package()
     fi
 }
 
-
 ########################################
 # Cleaning up the prepared/collected information
-environment_cleanup()
-{
+environment_cleanup() {
     if ! rm -rf "${WORKPATH}" 2>/dev/null; then
 	pr_stdout " "
 	pr_stdout "${SCRIPTNAME}: Warning: Deletion of \"${WORKPATH}\" failed"
@@ -1261,17 +1189,15 @@ environment_cleanup()
     fi
     if ! rm -f "${LOCKFILE}" 2>/dev/null; then
 	pr_stdout " "
-	pr_stdout "${SCRIPTNAME}: Warning: Deletion of \"${WORKDIR_BASE}${SCRIPTNAME}\" failed"
+	pr_stdout "${SCRIPTNAME}: Warning: Deletion of \"${LOCKFILE}\" failed"
 	pr_stdout "       Please remove the file manually"
 	pr_stdout " "
     fi
 }
 
-
 ########################################
 # Function to perform a cleanup in case of a received signal
-emergency_exit()
-{
+emergency_exit() {
     pr_stdout " "
     pr_stdout "${SCRIPTNAME}: Info: Data collection has been interrupted"
     pr_stdout "       Cleanup of temporary collected data"
@@ -1283,31 +1209,44 @@ emergency_exit()
     exit
 }
 
-
 ########################################
 # Function to print to stdout when rediretion is active
-pr_stdout()
-{
+pr_stdout() {
     echo "${@}" >&8
 }
 
-
 ########################################
 # Function to print to stdout and into log file when rediretion is active
-pr_log_stdout()
-{
+pr_log_stdout() {
     echo "$@"
     echo "$@" >&8
 }
 
-
 ########################################
 # Function to print to stdout and into log file when rediretion is active
-pr_syslog_stdout()
-{
-    echo "$@"
+pr_syslog_stdout() {
     echo "$@" >&8
+    echo
+    echo "$(date +%H:%M:%S.%N) - $@"
     logger -t "${SCRIPTNAME}" "$@"
+}
+
+########################################
+# print "Collecting ... output"
+pr_collect_output() {
+	pr_syslog_stdout ${step_num} "Collecting" $1 "output"
+}
+
+########################################
+# print "Collecting ..." like fs
+pr_collect() {
+	pr_syslog_stdout ${step_num} "Collecting" $@
+}
+
+########################################
+# print "Skipping ..." info with reason
+pr_skip() {
+	pr_syslog_stdout ${step_num} "Skip" $@
 }
 
 ###############################################################################
@@ -1324,9 +1263,10 @@ trap emergency_exit SIGHUP SIGINT SIGTERM
 
 pr_log_stdout ""
 pr_log_stdout "Hardware platform     = ${HW}"
-pr_log_stdout "Kernel version        = ${KERNEL_INFO} (${KERNEL_BASE})"
 pr_log_stdout "Runtime environment   = ${RUNTIME_ENVIRONMENT}"
+pr_log_stdout "Kernel version        = ${KERNEL_INFO} (${KERNEL_BASE})"
 pr_log_stdout "OS version / distro   = ${OS_NAME}"
+pr_log_stdout "Date and time of info = ${DATETIME}"
 pr_log_stdout ""
 
 logger -t "${SCRIPTNAME}" "Starting data collection"
