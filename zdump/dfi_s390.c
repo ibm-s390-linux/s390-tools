@@ -113,27 +113,28 @@ static int mem_chunks_add(void)
 static int mem_chunks_add_ext(void)
 {
 	struct df_s390_dump_segm_hdr dump_segm;
-	u64 rc, *off_ptr, old = 0, dump_size = 0;
+	u64 rc, off, old = 0, dump_size = 0;
 
-	off_ptr = zg_alloc(sizeof(*off_ptr));
-	*off_ptr = zg_seek(g.fh, DF_S390_HDR_SIZE, ZG_CHECK_NONE);
-	if (*off_ptr != DF_S390_HDR_SIZE)
+	off = zg_seek(g.fh, DF_S390_HDR_SIZE, ZG_CHECK_NONE);
+	if (off != DF_S390_HDR_SIZE)
 		return -EINVAL;
-	while (*off_ptr < DF_S390_HDR_SIZE + l.hdr.mem_size - PAGE_SIZE) {
+	while (off < DF_S390_HDR_SIZE + l.hdr.mem_size - PAGE_SIZE) {
 		rc = zg_read(g.fh, &dump_segm, PAGE_SIZE, ZG_CHECK_ERR);
 		if (rc != PAGE_SIZE)
 			return -EINVAL;
-		*off_ptr += PAGE_SIZE;
+		off += PAGE_SIZE;
 		/* Add zero memory chunk */
 		dfi_mem_chunk_add(old, dump_segm.start - old, NULL,
 				  dfi_mem_chunk_read_zero, NULL);
 		/* Add memory chunk for a dump segment */
+		u64 *off_ptr = zg_alloc(sizeof(*off_ptr));
+		*off_ptr = off;
 		dfi_mem_chunk_add(dump_segm.start, dump_segm.len, off_ptr,
 				  dfi_s390_ext_mem_chunk_read, zg_free);
+		off_ptr = NULL;
 		old = dump_segm.start + dump_segm.len;
 		dump_size += dump_segm.len;
-		off_ptr = zg_alloc(sizeof(*off_ptr));
-		*off_ptr = zg_seek_cur(g.fh, dump_segm.len, ZG_CHECK_NONE);
+		off = zg_seek_cur(g.fh, dump_segm.len, ZG_CHECK_NONE);
 		if (dump_segm.stop_marker)
 			break;
 	}
