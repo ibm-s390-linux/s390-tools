@@ -12,12 +12,47 @@
 LC_ALL=C
 export LC_ALL
 
-# The general name of this script
-readonly SCRIPTNAME="${0##*/}"
+########################################
+# Global used variables
+readonly SCRIPTNAME="${0##*/}"  # general name of this script
+#
+readonly DOCKER=$(if which docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+readonly HW="$(uname -i 2>/dev/null)"
+# retrieve and split kernel version
+readonly KERNEL_BASE="$(uname -r 2>/dev/null)"
+readonly KERNEL_VERSION=$(echo ${KERNEL_BASE} | cut -d'.' -f1 )
+readonly KERNEL_MAJOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f2 )
+readonly KERNEL_MINOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f3 | sed 's/[^0-9].*//g')
+readonly KERNEL_INFO=${KERNEL_VERSION}.${KERNEL_MAJOR_REVISION}.${KERNEL_MINOR_REVISION}
+readonly KVM=$(if which virsh >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+# The file to indicate that another instance of the script is already running
+readonly LOCKFILE="/tmp/${SCRIPTNAME}.lock"
+# check limits for logfiles like /var/log/messages
+readonly LOG_FILE_SIZE_CHECK=50  # max logfile size in MB
+readonly LOG_FILE_AGE_CHECK=7  # age in days to include for size checking
+# distro info
+readonly OSPRETTY="$(cat /etc/os* 2>/dev/null | grep -m1 PRETTY_NAME | sed 's/\"//g')"
+readonly OS_NAME="${OSPRETTY##*=}"
+# The processor ID for the first processor
+readonly PROCESSORID="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
+                sed 's/.*identification[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
+readonly PROCESSORVERSION="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
+                sed 's/.*version[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
+if test "x${PROCESSORVERSION}" = "xFF" || test "x${PROCESSORVERSION}" = "xff"; then
+    RUNTIME_ENVIRONMENT=$(grep -E "VM00.*Control Program.*" /proc/sysinfo | \
+                sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
+else
+    RUNTIME_ENVIRONMENT="LPAR"
+fi
+readonly TOS=15  # timeout seconds for command execution
+readonly ZDEV_CONF=$(lszdev --configured 2>/dev/null | wc -l)
+readonly ZDEV_OFF=$(lszdev --offline 2>/dev/null | wc -l)
+readonly ZDEV_ONL=$(lszdev --online 2>/dev/null | wc -l)
 
+paramWORKDIR_BASE="/tmp/"  # initial default path
 
 ########################################
-# print version info
+# print dbginfo.sh version info
 print_version() {
     cat <<EOF
 ${SCRIPTNAME}: Debug information script version %S390_TOOLS_VERSION%
@@ -25,11 +60,9 @@ Copyright IBM Corp. 2002, 2021
 EOF
 }
 
-
 ########################################
 # print how to use this script
-print_usage()
-{
+print_usage() {
     print_version
 
     cat <<EOF
@@ -41,11 +74,12 @@ This script collects runtime, configuration and trace information on
 a Linux on IBM Z installation for debugging purposes.
 
 It also traces information about z/VM if the Linux runs under z/VM.
+KVM or DOCKER data ist collected on a host serving this.
 
-
+Default location for data collection and final tar file is "/tmp/".
 The collected information is written to a TAR archive named
 
-    /tmp/DBGINFO-[date]-[time]-[hostname]-[processorid].tgz
+    DBGINFO-[date]-[time]-[hostname]-[processorid].tgz
 
 where [date] and [time] are the date and time when debug data is collected.
 [hostname] indicates the hostname of the system the data was collected from.
@@ -53,24 +87,82 @@ The [processorid] is taken from the processor 0 and indicates the processor
 identification.
 
 Options:
-
 	-d|--directory     specify the directory where the data collection
 			   stores the temporary data and the final archive.
 	-h|--help          print this help
 	-v|--version       print version information
-
+	-c|--check         online quick check (no data collection)
 
 Please report bugs to: linux390@de.ibm.com
 
 EOF
 }
 
+########################################
+# check for oversize logfiles and missing rotation
+logfile_checker() {
+        local counter
+        local logfile
+        local logfiles
+
+        # find files bigger than recommended
+        counter=$(find $1 -maxdepth 1 -type f -mtime -${LOG_FILE_AGE_CHECK} \
+                        -size ${LOG_FILE_SIZE_CHECK}M | wc -l)
+
+        echo " ${counter} logfiles over ${LOG_FILE_SIZE_CHECK} MB"
+        # maybe check for rotation of base names
+        if [ ${counter} -ne 0 ]; then
+                for logfile in $(find $1 -maxdepth 1 -type f -mtime -${LOG_FILE_AGE_CHECK} \
+                               -size ${LOG_FILE_SIZE_CHECK}M -print); do
+                        # use a neutral separtor ':' as concat is different in some bash
+                        # insert the 'blank' for later use in for loop
+                        # add the base name before '.' or '-' only for checks
+                        logfiles="${logfiles}: ${logfile%%[.-]*}"
+                done
+                # change separator to new line for sorting
+                logfiles=$(echo "${logfiles}" | sed s'/:/\n/g' | sort -u)
+                for logfile in ${logfiles}; do
+                        counter=$(ls ${logfile}* 2>/dev/null | wc -l)
+                        if [ ${counter} -eq 1 ]; then
+                                echo " CHECK - ${logfile} may miss a rotation"
+			else
+                                echo "    OK - ${logfile}* may have a rotation in place: ${counter} files"
+                        fi
+                done
+        fi
+}
+
+########################################
+# print basic info and online checks
+print_check() {
+    print_version
+    cat <<EOF
+
+Hardware platform     = ${HW}
+Runtime environment   = ${RUNTIME_ENVIRONMENT}
+Kernel version        = ${KERNEL_INFO}
+OS version / distro   = ${OS_NAME}
+KVM host              = ${KVM}
+DOCKER host           = ${DOCKER}
+
+Current user          = $(whoami) (must be root for data collection)
+Date and time         = $(date)
+Uptime                =$(uptime)
+Number of coredumps   = $(corecumpctl 2>/dev/null | wc -l)
+zdevice onl/conf/offl = ${ZDEV_ONL} / ${ZDEV_CONF} / ${ZDEV_OFF}
+Log file check        =$(logfile_checker "/var/log*")
+
+Working directory     = $(ls -d ${paramWORKDIR_BASE} 2>&1 && df -k ${paramWORKDIR_BASE})
+$(ls -ltr ${paramWORKDIR_BASE}/DBGINFO*tgz 2>/dev/null | tail -2)
+$(ls ${LOCKFILE} 2>/dev/null && echo "     WARNING: dbginfo running since: $(cat ${LOCKFILE})")
+
+This is a console output only - no data was saved using option -c !
+
+EOF
+}
 
 #######################################
 # Parsing the command line and pre checks
-#
-paramWORKDIR_BASE="/tmp/"
-
 while [ ${#} -gt 0 ]; do
     case ${1} in
 	--help|-h)
@@ -87,11 +179,19 @@ while [ ${#} -gt 0 ]; do
 	        echo "${SCRIPTNAME}: Error: No directory specified for data collection!"
 		echo
 		exit 1
+	    elif test ! -d "${paramWORKDIR_BASE}"; then
+                echo "${SCRIPTNAME}: Error: The specified directory \"${paramWORKDIR_BASE}\" does not exist!"
+                echo
+                exit 1
 	    else
-	        # jump to next param, if already last the final shift can do termination
+	        # jump to next param
 		shift
 	    fi
 	    ;;
+	--check|-c)
+            print_check
+            exit 0
+            ;;
 	-*|--*|*)
 	    echo
 	    echo "${SCRIPTNAME}: invalid option \"${1}\""
@@ -100,16 +200,9 @@ while [ ${#} -gt 0 ]; do
 	    exit 1
 	    ;;
     esac
-    # next parameter
+    # next parameter, if already last the final shift will do termination
     shift
 done
-
-# check for a valid path
-if test ! -d "${paramWORKDIR_BASE}"; then
-    echo "${SCRIPTNAME}: Error: The specified directory \"${paramWORKDIR_BASE}\" does not exist!"
-    echo
-    exit 1
-fi
 
 # finally verification to run as root
 if test "$(/usr/bin/id -u 2>/dev/null)" -ne 0; then
@@ -133,12 +226,6 @@ readonly SYSTEMHOSTNAME="$(hostname -s 2>/dev/null)"
 # The kernel release version as delivered from uname -r
 readonly KERNEL_RELEASE_VERSION="$(uname -r 2>/dev/null)"
 
-# The processor ID for the first processor
-readonly PROCESSORID="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
-                      sed 's/.*identification[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
-# The processor version for the first processor
-readonly PROCESSORVERSION="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
-                      sed 's/.*version[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
 # The current date
 readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
 
@@ -157,9 +244,6 @@ readonly WORKARCHIVE="${WORKDIR_BASE}${WORKDIR_CURRENT}.tgz"
 
 # The log file of activities from this script execution
 readonly LOGFILE="${WORKPATH}dbginfo.log"
-
-# The file to indicate that another instance of the script is already running
-readonly LOCKFILE="/tmp/${SCRIPTNAME}.lock"
 
 # File that includes output of Linux commands
 readonly OUTPUT_FILE_CMD="${WORKPATH}runtime.out"
@@ -202,39 +286,6 @@ readonly OUTPUT_FILE_KVM="${WORKPATH}kvm_runtime.out"
 
 # Mount point of the debug file system
 readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
-
-# The kernel version (e.g. '2' from 2.6.32 or '3' from 3.2.1)
-readonly KERNEL_VERSION=$(uname -r 2>/dev/null | cut -d'.' -f1)
-
-# The kernel major revision number (e.g. '6' from 2.6.32 or '2' from 3.2.1)
-readonly KERNEL_MAJOR_REVISION=$(uname -r 2>/dev/null | cut -d'.' -f2)
-
-# The kernel mainor revision number (e.g. '32' from 2.6.32 or '1' from 3.2.1)
-readonly KERNEL_MINOR_REVISION=$(uname -r 2>/dev/null | cut -d'.' -f3 | sed 's/[^0-9].*//g')
-
-# Is this kernel supporting sysfs - since 2.4 (0=yes, 1=no)
-if test "${KERNEL_VERSION}" -lt 2 ||
-    ( test  "${KERNEL_VERSION}" -eq 2 && test "${KERNEL_MAJOR_REVISION}" -le 4 ); then
-    readonly LINUX_SUPPORT_SYSFS=1
-else
-    readonly LINUX_SUPPORT_SYSFS=0
-fi
-
-# Is this kernel potentially using the /sys/kernel/debug feature - since 2.6.13 (0=yes, 1=no)
-if test "${KERNEL_VERSION}" -lt 2 ||
-    ( test "${KERNEL_VERSION}" -eq 2 &&
-	( test "${KERNEL_MAJOR_REVISION}" -lt 6 ||
-	    ( test "${KERNEL_MAJOR_REVISION}" -eq 6 && test "${KERNEL_MINOR_REVISION}" -lt 13 ))); then
-    readonly LINUX_SUPPORT_SYSFSDBF=1
-else
-    readonly LINUX_SUPPORT_SYSFSDBF=0
-fi
-
-if test "x${PROCESSORVERSION}" = "xFF" || test "x${PROCESSORVERSION}" = "xff"; then
-    readonly RUNTIME_ENVIRONMENT=$(grep -E "VM00.*Control Program.*" /proc/sysinfo| sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
-else
-    readonly RUNTIME_ENVIRONMENT="LPAR"
-fi
 
 # define order of collection steps
 ALL_STEPS="\
@@ -308,26 +359,6 @@ if test -e /proc/scsi; then
     PROCFILES="${PROCFILES}\
       $(find /proc/scsi -type f -perm /444 2>/dev/null)\
       "
-fi
-
-# Adding files to PROCFILES in case we run on Kernel 2.4 or older
-if test "${LINUX_SUPPORT_SYSFS}" -eq 1; then
-    PROCFILES="${PROCFILES}\
-      /proc/chpids\
-      /proc/chandev\
-      /proc/ksyms\
-      /proc/lvm/global\
-      /proc/subchannels\
-      "
-fi
-
-# Adding s390dbf files to PROCFILE in case we run on Kernel lower than 2.6.13
-if test "${LINUX_SUPPORT_SYSFSDBF}" -eq 1; then
-    if test -e /proc/s390dbf; then
-	PROCFILES="${PROCFILES}\
-	  $(find /proc/s390dbf -type f -not -path "*/raw" -not -path "*/flush" 2>/dev/null)\
-	  "
-    fi
 fi
 
 ########################################
@@ -706,11 +737,7 @@ collect_sysfs() {
     local file_name
 
     debugfs_mounted=0
-    # Requires kernel version newer then 2.4
-    if test "${LINUX_SUPPORT_SYSFS}" -eq 0; then
 	pr_syslog_stdout "${step_num} Collecting sysfs"
-	# Requires kernel version of 2.6.13 or newer
-	if test "${LINUX_SUPPORT_SYSFSDBF}" -eq 0; then
 	    if ! grep -qE "${MOUNT_POINT_DEBUGFS}.*debugfs" /proc/mounts 2>/dev/null; then
 		if mount -t debugfs debugfs "${MOUNT_POINT_DEBUGFS}" >/dev/null 2>&1; then
 		    sleep 2
@@ -719,7 +746,6 @@ collect_sysfs() {
 		    pr_log_stdout "${SCRIPTNAME}: Warning: Unable to mount debugfs at \"${MOUNT_POINT_DEBUGFS}\""
 		fi
 	    fi
-	fi
 
 	# Collect sysfs files using multiple threads (-J 1) while excluding
 	# files known to block on read (-x). Stop reading a file that takes
@@ -748,9 +774,6 @@ collect_sysfs() {
 	if test ${debugfs_mounted} -eq 1; then
 	    umount "${MOUNT_POINT_DEBUGFS}"
 	fi
-    else
-	pr_syslog_stdout "${step_num} Collecting sysfs skipped. Kernel $(uname -r) must be newer than 2.4"
-    fi
 
     pr_log_stdout " "
 }
@@ -766,7 +789,7 @@ collect_logfiles() {
 	call_collect_file "${file_name}"
     done
 
-    pr_log_stdout " "
+    pr_log_stdout "$(logfile_checker "/var/log*")"
 }
 
 
@@ -1091,34 +1114,36 @@ post_processing() {
 # Be aware that this output must be
 # redirected into a separate logfile
 call_run_command() {
-    local cmd
-    local logfile
-    local raw_cmd
-
-    cmd="${1}"
-    logfile="${2}"
-    raw_cmd=$(echo "${cmd}" | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
+    local rc
+    local cmd="${1}"
+    local logfile="${2}"
+    local raw_cmd=$(echo "${cmd}" | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
 
     echo "#######################################################" >> "${logfile}"
     echo "${USER}@${SYSTEMHOSTNAME:-localhost}> ${cmd}" >> "${logfile}"
 
-    # check if command exists
-    if ! which "${raw_cmd}" >/dev/null 2>&1; then
-	# check if command is a builtin
-	if ! command -v "${raw_cmd}" >/dev/null 2>&1; then
-	    echo "${SCRIPTNAME}: Warning: Command \"${raw_cmd}\" not available" >> "${logfile}"
-	    echo >> "${logfile}"
-	    return 1
-	fi
+    # check if calling command and timeout exist
+    if which "${raw_cmd}" >/dev/null 2>&1 && which timeout >/dev/null 2>&1; then
+        eval timeout ${TOS} "${cmd}" >> ${logfile} 2>&1
+        rc=$?
+    # check if command is a builtin (no use of timeout possible)
+    elif command -v "${raw_cmd}" >/dev/null 2>&1; then
+        eval "${cmd}" >> ${logfile} 2>&1
+        rc=$?
+    else
+        echo "${SCRIPTNAME}: Warning: Command \"${raw_cmd}\" not available" >> "${logfile}"
+        echo >> "${logfile}"
+        return 1
     fi
 
-    if ! eval "${cmd}" >> "${logfile}" 2>&1; then
-	echo "${SCRIPTNAME}: Warning: Command \"${cmd}\" failed" >> "${logfile}"
-	echo >> "${logfile}"
-	return 1
+    # log a warning on rc not 0 and define return
+    if [ ${rc} ]; then
+        echo >> "${logfile}"
+        return 0
     else
-	echo >> "${logfile}"
-	return 0
+        echo "${SCRIPTNAME}: Warning: Command \"${cmd}\" failed" >> "${logfile}"
+        echo >> "${logfile}"
+        return 1
     fi
 }
 
@@ -1285,9 +1310,8 @@ pr_syslog_stdout()
     logger -t "${SCRIPTNAME}" "$@"
 }
 
-
 ###############################################################################
-# Running the script
+# Running the script (main)
 
 environment_setup
 print_version
@@ -1299,9 +1323,10 @@ exec 8>&1 9>&2 >"${LOGFILE}" 2>&1
 trap emergency_exit SIGHUP SIGINT SIGTERM
 
 pr_log_stdout ""
-pr_log_stdout "Hardware platform     = $(uname -i)"
-pr_log_stdout "Kernel version        = ${KERNEL_VERSION}.${KERNEL_MAJOR_REVISION}.${KERNEL_MINOR_REVISION} ($(uname -r 2>/dev/null))"
+pr_log_stdout "Hardware platform     = ${HW}"
+pr_log_stdout "Kernel version        = ${KERNEL_INFO} (${KERNEL_BASE})"
 pr_log_stdout "Runtime environment   = ${RUNTIME_ENVIRONMENT}"
+pr_log_stdout "OS version / distro   = ${OS_NAME}"
 pr_log_stdout ""
 
 logger -t "${SCRIPTNAME}" "Starting data collection"
