@@ -94,6 +94,8 @@ void dfi_vmcoreinfo_init(void)
 			return;
 		if (dfi_mem_read_rc(addr, &note, sizeof(note)))
 			return;
+		if (note.n_namesz == 0 || note.n_namesz > sizeof(str))
+			return;
 		memset(str, 0, sizeof(str));
 		if (dfi_mem_read_rc(addr + sizeof(note), str, note.n_namesz))
 			return;
