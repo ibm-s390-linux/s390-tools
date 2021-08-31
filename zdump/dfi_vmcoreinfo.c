@@ -90,7 +90,8 @@ void dfi_vmcoreinfo_init(void)
 		addr = l.os_info->vmcoreinfo_addr;
 		size = l.os_info->vmcoreinfo_size;
 	} else {
-		dfi_mem_read(LC_VMCORE_INFO, &addr, sizeof(addr));
+		if (dfi_mem_read_rc(LC_VMCORE_INFO, &addr, sizeof(addr)))
+			return;
 		if (addr == 0)
 			return;
 		if (dfi_mem_read_rc(addr, &note, sizeof(note)))
