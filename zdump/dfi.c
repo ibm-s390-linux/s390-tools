@@ -1074,6 +1074,10 @@ static void kdump_init(void)
 {
 	unsigned long base, size;
 
+	if (!dfi_mem_range_valid(0x10418, sizeof(base)))
+		return;
+	if (!dfi_mem_range_valid(0x10420, sizeof(size)))
+		return;
 	dfi_mem_phys_read(0x10418, &base, sizeof(base));
 	dfi_mem_phys_read(0x10420, &size, sizeof(size));
 	if (base == 0 || size == 0)
