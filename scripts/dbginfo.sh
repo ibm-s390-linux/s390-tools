@@ -398,6 +398,7 @@ CONFIGFILES="\
   /etc/udev*\
   /etc/xinet.d\
   /etc/*release\
+  /run/udev/rules.d\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
   /etc/docker\
   /lib/systemd/system/docker.service\
