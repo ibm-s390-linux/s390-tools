@@ -251,13 +251,14 @@ readonly OUTPUT_FILE_OSAOAT="${WORKPATH}network"
 readonly OUTPUT_FILE_SYSFS="${WORKPATH}sysfs"
 
 # define order of collection steps
+# - state/debug files are collected first, to avoid overwriting by command execution
 ALL_STEPS="\
+ collect_sysfs\
+ collect_procfs\
+ collect_configfiles\
  collect_cmdsout\
  collect_hyptop\
  collect_vmcmdsout\
- collect_procfs\
- collect_sysfs\
- collect_configfiles\
  collect_network\
  collect_osaoat\
  collect_ethtool\
