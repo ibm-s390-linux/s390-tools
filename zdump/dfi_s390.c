@@ -68,6 +68,8 @@ static int read_s390_hdr(void)
 		return -ENODEV;
 	if (l.hdr.magic != magic_number)
 		return -ENODEV;
+	if (l.hdr.cpu_cnt > DF_S390_CPU_MAX)
+		return -ENODEV;
 	df_s390_hdr_add(&l.hdr);
 	return 0;
 }
