@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "lib/util_libc.h"
+#include "lib/util_log.h"
 #include "zgetdump.h"
 
 /*
@@ -37,6 +38,11 @@ static void dfi_elf_mem_chunk_read_fn(struct dfi_mem_chunk *mem_chunk, u64 off,
 static int pt_load_add(Elf64_Phdr *phdr)
 {
 	u64 *off_ptr;
+
+	util_log_print(UTIL_LOG_DEBUG,
+		       "DFI ELF p_paddr 0x%016lx p_vaddr 0x%016lx p_offset 0x%016lx p_filesz 0x%016lx p_memsz 0x%016lx\n",
+		       phdr->p_paddr, phdr->p_vaddr, phdr->p_offset,
+		       phdr->p_filesz, phdr->p_memsz);
 
 	if (phdr->p_paddr != phdr->p_vaddr) {
 		phdr->p_paddr = phdr->p_vaddr;
@@ -79,6 +85,8 @@ static int nt_read(Elf64_Nhdr *note, void *buf)
 {
 	off_t buf_len = ROUNDUP(note->n_descsz, 4);
 	char tmp_buf[buf_len];
+
+	util_log_print(UTIL_LOG_TRACE, "DFI ELF n_descsz %u\n", buf_len);
 
 	nt_name_skip(note);
 	if (zg_read(g.fh, tmp_buf, buf_len, ZG_CHECK_ERR) != buf_len)
@@ -220,6 +228,8 @@ static int pt_notes_add(Elf64_Phdr *phdr)
 		rc = zg_read(g.fh, &note, sizeof(note), ZG_CHECK_ERR);
 		if (rc != sizeof(note))
 			return -EINVAL;
+		util_log_print(UTIL_LOG_DEBUG, "DFI ELF n_type 0x%x\n",
+			       note.n_type);
 		switch (note.n_type) {
 		case NT_PRSTATUS:
 			cpu_current = nt_prstatus_read(&note);
@@ -295,6 +305,8 @@ static int dfi_elf_init(void)
 	Elf64_Phdr *phdr;
 	int i;
 
+	util_log_print(UTIL_LOG_DEBUG, "DFI ELF initialization\n");
+
 	if (read_elf_hdr(&ehdr) != 0)
 		return -ENODEV;
 
@@ -305,7 +317,10 @@ static int dfi_elf_init(void)
 	phdr = util_malloc(sizeof(*phdr) * ehdr.e_phnum);
 	zg_seek(g.fh, ehdr.e_phoff, ZG_CHECK);
 	zg_read(g.fh, phdr, sizeof(*phdr) * ehdr.e_phnum, ZG_CHECK);
+	util_log_print(UTIL_LOG_DEBUG, "DFI ELF e_phnum %u\n", ehdr.e_phnum);
 	for (i = 0; i < ehdr.e_phnum; i++) {
+		util_log_print(UTIL_LOG_DEBUG, "DFI ELF p_type[%d] 0x%lx\n",
+			       i, phdr[i].p_type);
 		switch (phdr[i].p_type) {
 		case PT_LOAD:
 			if (pt_load_add(&phdr[i])) {

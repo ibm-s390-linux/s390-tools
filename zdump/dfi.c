@@ -10,6 +10,8 @@
  */
 
 #include <time.h>
+
+#include "lib/util_log.h"
 #include "zgetdump.h"
 
 #define TIME_FMT_STR "%a, %d %b %Y %H:%M:%S %z"
@@ -160,7 +162,7 @@ static void mem_map_print(void)
 	/*
 	 * Print each memory chunk if verbose specified
 	 */
-	if (g.opts.verbose_specified) {
+	if (g.opts.verbose) {
 		dfi_mem_chunk_iterate(mem_chunk) {
 			zero_str = "";
 			if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
@@ -391,6 +393,11 @@ void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
 			    dfi_mem_chunk_read_fn read_fn,
 			    dfi_mem_chunk_free_fn free_fn)
 {
+	util_log_print(UTIL_LOG_DEBUG,
+		       "DFI add %svirt mem chunk start 0x%016lx size 0x%016lx\n",
+		       read_fn == dfi_mem_chunk_read_zero ? "zero " : "",
+		       start, size);
+
 	if (size == 0)
 		return;
 	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, free_fn);
@@ -404,6 +411,11 @@ void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
 			   dfi_mem_chunk_free_fn free_fn,
 			   u32 volnr)
 {
+	util_log_print(UTIL_LOG_DEBUG,
+		       "DFI add %svol mem chunk start 0x%016lx size 0x%016lx volnr %u\n",
+		       read_fn == dfi_mem_chunk_read_zero ? "zero " : "",
+		       start, size, volnr);
+
 	if (size == 0)
 		return;
 	mem_chunk_create(&l.mem_phys, start, size, data, read_fn, free_fn);
@@ -605,6 +617,9 @@ struct util_list *dfi_cpu_list(void)
  */
 void dfi_mem_read(u64 addr, void *buf, size_t cnt)
 {
+	util_log_print(UTIL_LOG_TRACE,
+		       "DFI virt mem read addr 0x%016lx size 0x%016lx\n",
+		       addr, cnt);
 	mem_read(&l.mem_virt, addr, buf, cnt);
 }
 
@@ -613,6 +628,9 @@ void dfi_mem_read(u64 addr, void *buf, size_t cnt)
  */
 void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt)
 {
+	util_log_print(UTIL_LOG_TRACE,
+		       "DFI phys mem read addr 0x%016lx size 0x%016lx\n",
+		       addr, cnt);
 	mem_read(&l.mem_phys, addr, buf, cnt);
 }
 
@@ -1074,6 +1092,8 @@ static void kdump_init(void)
 {
 	unsigned long base, size;
 
+	util_log_print(UTIL_LOG_TRACE, "DFI kdump initialization\n");
+
 	if (!dfi_mem_range_valid(0x10418, sizeof(base)))
 		return;
 	if (!dfi_mem_range_valid(0x10420, sizeof(size)))
@@ -1088,6 +1108,9 @@ static void kdump_init(void)
 		return;
 	l.kdump_base = base;
 	l.kdump_size = size;
+	util_log_print(UTIL_LOG_INFO,
+		       "DFI found valid kdump base 0x%016lx size 0x%016lx\n",
+		       l.kdump_base, l.kdump_size);
 	/*
 	 * For dumped kdump and user has selected "prod" we swap
 	 * the crashkernel memory with old memory. If user selected "kdump",
@@ -1150,6 +1173,8 @@ static void utsname_init(void)
 	unsigned long ptr;
 	char buf[1024];
 
+	util_log_print(UTIL_LOG_TRACE, "DFI utsname initialization\n");
+
 	if (dfi_vmcoreinfo_symbol(&ptr, "init_uts_ns"))
 		return;
 	if (dfi_mem_read_rc(ptr, buf, sizeof(buf)))
@@ -1160,6 +1185,8 @@ static void utsname_init(void)
 	if (strncmp(utsname->sysname, "Linux", sizeof(utsname->version)) != 0)
 		return;
 	dfi_attr_utsname_set(utsname);
+	util_log_print(UTIL_LOG_INFO, "DFI utsname release %s version %s\n",
+		       utsname->release, utsname->version);
 }
 
 /*
@@ -1168,6 +1195,8 @@ static void utsname_init(void)
 static void livedump_init(void)
 {
 	u64 magic;
+
+	util_log_print(UTIL_LOG_TRACE, "DFI livedump initialization\n");
 
 	if (dfi_mem_read_rc(0, &magic, sizeof(magic)))
 		return;
@@ -1205,12 +1234,15 @@ int dfi_init(void)
 	struct dfi *dfi;
 	int i = 0, rc;
 
+	util_log_print(UTIL_LOG_TRACE, "DFI initialization\n");
+
 	l.arch = DFI_ARCH_UNKNOWN;
 	mem_init(&l.mem_virt);
 	mem_init(&l.mem_phys);
 	attr_init();
 	dfi_cpu_info_init(DFI_CPU_CONTENT_NONE);
 	while ((dfi = dfi_vec[i])) {
+		util_log_print(UTIL_LOG_DEBUG, "DFI trying %s\n", dfi->name);
 		l.dfi = dfi;
 		g.fh = dfi_dump_open(g.opts.device);
 		rc = dfi->init();
@@ -1222,6 +1254,8 @@ int dfi_init(void)
 			utsname_init();
 			livedump_init();
 		}
+		util_log_print(UTIL_LOG_DEBUG, "DFI %s returned with rc %d\n",
+			       dfi->name, rc);
 		if (rc == 0 || rc == -EINVAL)
 			return rc;
 		zg_close(g.fh);
@@ -1235,6 +1269,8 @@ int dfi_init(void)
  */
 void dfi_exit(void)
 {
+	util_log_print(UTIL_LOG_TRACE, "DFI exit\n");
+
 	if (l.dfi && l.dfi->exit)
 		l.dfi->exit();
 }

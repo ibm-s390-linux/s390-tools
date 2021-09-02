@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "lib/zt_common.h"
+#include "lib/util_log.h"
 #include "zgetdump.h"
 
 /*
@@ -46,7 +47,10 @@ static char help_text[] =
 "-s, --select   Select system data SYS (\"kdump\", \"prod\", or \"all\")\n"
 "-d, --device   Print DUMPDEV (dump device) information\n"
 "-v, --version  Print version information, then exit\n"
-"-V, --verbose  Show detailed layout of memory map on printing DUMP information\n"
+"-V, --verbose  Print verbose messages to stdout. Repeat this option\n"
+"               for increased verbosity from just error messages to\n"
+"               also include warning,  information, debug, and trace\n"
+"               messages. This option is intended for debugging\n"
 "-h, --help     Print this help, then exit\n";
 
 static const char copyright_str[] = "Copyright IBM Corp. 2001, 2018";
@@ -71,6 +75,9 @@ static void init_defaults(void)
 	g.opts.fmt = "s390";
 #endif
 	dfo_set(g.opts.fmt);
+	/* Verbose logging */
+	g.opts.verbose = UTIL_LOG_ERROR;
+	util_log_set_level(g.opts.verbose);
 }
 
 /*
@@ -265,7 +272,8 @@ void opts_parse(int argc, char *argv[])
 		case 'v':
 			print_version_exit();
 		case 'V':
-			g.opts.verbose_specified = 1;
+			g.opts.verbose++;
+			util_log_set_level(g.opts.verbose);
 			break;
 		case 'i':
 			action_set(ZG_ACTION_DUMP_INFO);

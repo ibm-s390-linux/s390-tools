@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/util_log.h"
 #include "zgetdump.h"
 
 /*
@@ -70,6 +71,7 @@ static int read_s390_hdr(void)
 		return -ENODEV;
 	if (l.hdr.cpu_cnt > DF_S390_CPU_MAX)
 		return -ENODEV;
+	util_log_print(UTIL_LOG_INFO, "DFI S390 version %u\n", l.hdr.version);
 	df_s390_hdr_add(&l.hdr);
 	return 0;
 }
@@ -96,6 +98,9 @@ static int read_s390_em(void)
 static int mem_chunks_add(void)
 {
 	u64 rc;
+
+	util_log_print(UTIL_LOG_DEBUG, "DFI S390 mem_size 0x%016lx\n",
+		       l.hdr.mem_size);
 
 	/* Single memory chunk for non-extended dump format */
 	dfi_mem_chunk_add(0, l.hdr.mem_size, NULL,
@@ -124,6 +129,9 @@ static int mem_chunks_add_ext(void)
 		rc = zg_read(g.fh, &dump_segm, PAGE_SIZE, ZG_CHECK_ERR);
 		if (rc != PAGE_SIZE)
 			return -EINVAL;
+		util_log_print(UTIL_LOG_DEBUG,
+			       "DFI S390 dump segment start 0x%016lx size 0x%016lx stop marker %d\n",
+			       dump_segm.start, dump_segm.len, dump_segm.stop_marker);
 		off += PAGE_SIZE;
 		/* Add zero memory chunk */
 		dfi_mem_chunk_add(old, dump_segm.start - old, NULL,
@@ -158,6 +166,9 @@ static int mem_chunks_add_ext(void)
 int dfi_s390_init_gen(bool extended)
 {
 	int rc;
+
+	util_log_print(UTIL_LOG_DEBUG, "DFI S390 %sinitialization\n",
+		       extended ? "extended " : "");
 
 	l.extended = extended;
 	if (read_s390_hdr() != 0)
