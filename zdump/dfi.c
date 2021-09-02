@@ -236,7 +236,7 @@ void dfi_info_print(void)
 	STDERR("General dump info:\n");
 	STDERR("  Dump format........: %s\n", l.dfi->name);
 	if (l.attr.dfi_version)
-		STDERR("  Version............: %d\n", *l.attr.dfi_version);
+		STDERR("  Version............: %u\n", *l.attr.dfi_version);
 	date_print();
 	if (l.attr.dump_method)
 		STDERR("  Dump method........: %s\n", l.attr.dump_method);
@@ -248,15 +248,15 @@ void dfi_info_print(void)
 		STDERR("  UTS kernel version.: %s\n", l.attr.utsname->version);
 	}
 	if (l.attr.vol_nr)
-		STDERR("  Volume number......: %d\n", *l.attr.vol_nr);
+		STDERR("  Volume number......: %u\n", *l.attr.vol_nr);
 	if (l.attr.build_arch)
 		STDERR("  Build arch.........: %s\n",
 		      dfi_arch_str(*l.attr.build_arch));
 	STDERR("  System arch........: %s\n", dfi_arch_str(l.arch));
 	if (l.cpus.cnt)
-		STDERR("  CPU count (online).: %d\n", l.cpus.cnt);
+		STDERR("  CPU count (online).: %u\n", l.cpus.cnt);
 	if (l.attr.real_cpu_cnt)
-		STDERR("  CPU count (real)...: %d\n", *l.attr.real_cpu_cnt);
+		STDERR("  CPU count (real)...: %u\n", *l.attr.real_cpu_cnt);
 	if (dfi_mem_range())
 		STDERR("  Dump memory range..: %lld MB\n",
 		       TO_MIB(dfi_mem_range()));
