@@ -119,7 +119,7 @@ static int mem_chunks_add(void)
  */
 static int mem_chunks_add_ext(void)
 {
-	struct df_s390_dump_segm_hdr dump_segm;
+	struct df_s390_dump_segm_hdr dump_segm = { 0 };
 	u64 rc, off, old = 0, dump_size = 0;
 
 	off = zg_seek(g.fh, DF_S390_HDR_SIZE, ZG_CHECK_NONE);
@@ -148,14 +148,14 @@ static int mem_chunks_add_ext(void)
 		if (dump_segm.stop_marker)
 			break;
 	}
+	/* Check if the last dump segment found */
+	if (!dump_segm.stop_marker)
+		return -EINVAL;
 	/* Add zero memory chunk at the end */
 	dfi_mem_chunk_add(old, l.hdr.mem_size - old, NULL,
 			  dfi_mem_chunk_read_zero, NULL);
 	/* Set the actual size of the dump file */
 	dfi_attr_file_size_set(dump_size);
-	/* Check if the last dump segment found */
-	if (!dump_segm.stop_marker)
-		return -EINVAL;
 	/* Read and verify the end marker */
 	return read_s390_em();
 }
