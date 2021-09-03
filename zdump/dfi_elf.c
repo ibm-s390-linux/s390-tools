@@ -71,37 +71,35 @@ static int pt_load_add(Elf64_Phdr *phdr)
 }
 
 /*
- * Skip name of note
- */
-static void nt_name_skip(Elf64_Nhdr *note)
-{
-	zg_seek_cur(g.fh, ROUNDUP(note->n_namesz, 4), ZG_CHECK);
-}
-
-/*
  * Read note
  */
-static int nt_read(Elf64_Nhdr *note, void *buf)
+static int nt_read(const Elf64_Nhdr *note, void *buf, size_t buf_len)
 {
-	off_t buf_len = ROUNDUP(note->n_descsz, 4);
-	char tmp_buf[buf_len];
+	ssize_t nread;
 
-	util_log_print(UTIL_LOG_TRACE, "DFI ELF n_descsz %u\n", buf_len);
-
-	nt_name_skip(note);
-	if (zg_read(g.fh, tmp_buf, buf_len, ZG_CHECK_ERR) != buf_len)
+	/* We cannot read more than the current note provides */
+	if (note->n_descsz < buf_len)
 		return -EINVAL;
-	if (buf)
-		memcpy(buf, tmp_buf, note->n_descsz);
+	/* Skip note's name and position file at note's descriptor */
+	zg_seek_cur(g.fh, ROUNDUP(note->n_namesz, 4), ZG_CHECK);
+	/* Read note's descriptor */
+	nread = zg_read(g.fh, buf, buf_len, ZG_CHECK_ERR);
+	if (nread < 0 || (size_t)nread != buf_len)
+		return -EINVAL;
+	/* Skip the rest of note's descriptor until the next note */
+	zg_seek_cur(g.fh, ROUNDUP(note->n_descsz, 4) - buf_len, ZG_CHECK);
 	return 0;
 }
 
 /*
  * Skip note
  */
-static int nt_skip(Elf64_Nhdr *note)
+static void nt_skip(const Elf64_Nhdr *note)
 {
-	return nt_read(note, NULL);
+	/* Skip note's name + descriptor and position file at the next note */
+	zg_seek_cur(g.fh,
+		    ROUNDUP(note->n_namesz, 4) + ROUNDUP(note->n_descsz, 4),
+		    ZG_CHECK);
 }
 
 /*
@@ -122,7 +120,7 @@ static struct dfi_cpu *nt_prstatus_read(Elf64_Nhdr *note)
 	struct dfi_cpu *cpu = dfi_cpu_alloc();
 	struct nt_prstatus_64 nt_prstatus;
 
-	if (nt_read(note, &nt_prstatus))
+	if (nt_read(note, &nt_prstatus, sizeof(nt_prstatus)))
 		return NULL;
 
 	memcpy(cpu->gprs, &nt_prstatus.gprs, sizeof(cpu->gprs));
@@ -141,7 +139,7 @@ static int nt_fpregset_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 	struct nt_fpregset_64 nt_fpregset;
 
 	check_cpu(cpu, "FPREGSET");
-	if (nt_read(note, &nt_fpregset))
+	if (nt_read(note, &nt_fpregset, sizeof(nt_fpregset)))
 		return -EINVAL;
 
 	memcpy(&cpu->fpc, &nt_fpregset.fpc, sizeof(cpu->fpc));
@@ -155,7 +153,7 @@ static int nt_fpregset_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_timer_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TIMER");
-	return nt_read(note, &cpu->timer);
+	return nt_read(note, &cpu->timer, sizeof(cpu->timer));
 }
 
 /*
@@ -164,7 +162,7 @@ static int nt_s390_timer_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_todcmp_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TODCMP");
-	return nt_read(note, &cpu->todcmp);
+	return nt_read(note, &cpu->todcmp, sizeof(cpu->todcmp));
 }
 
 /*
@@ -173,7 +171,7 @@ static int nt_s390_todcmp_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_todpreg_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TODPREG");
-	return nt_read(note, &cpu->todpreg);
+	return nt_read(note, &cpu->todpreg, sizeof(cpu->todpreg));
 }
 
 /*
@@ -182,7 +180,7 @@ static int nt_s390_todpreg_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_ctrs_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_CTRS");
-	return nt_read(note, &cpu->ctrs);
+	return nt_read(note, &cpu->ctrs, sizeof(cpu->ctrs));
 }
 
 /*
@@ -191,7 +189,7 @@ static int nt_s390_ctrs_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_prefix_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_PREFIX");
-	return nt_read(note, &cpu->prefix);
+	return nt_read(note, &cpu->prefix, sizeof(cpu->prefix));
 }
 
 /*
@@ -200,7 +198,7 @@ static int nt_s390_prefix_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_vxrs_low_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_VXRS_LOW");
-	return nt_read(note, &cpu->vxrs_low);
+	return nt_read(note, &cpu->vxrs_low, sizeof(cpu->vxrs_low));
 }
 
 /*
@@ -209,7 +207,7 @@ static int nt_s390_vxrs_low_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_VXRS_HIGH");
-	return nt_read(note, &cpu->vxrs_high);
+	return nt_read(note, &cpu->vxrs_high, sizeof(cpu->vxrs_high));
 }
 
 /*
@@ -271,8 +269,7 @@ static int pt_notes_add(Elf64_Phdr *phdr)
 			dfi_cpu_content_fac_add(DFI_CPU_CONTENT_FAC_VX);
 			break;
 		default:
-			if (nt_skip(&note))
-				return -EINVAL;
+			nt_skip(&note);
 			break;
 		}
 	}
