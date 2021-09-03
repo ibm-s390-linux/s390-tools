@@ -315,7 +315,7 @@ static struct dfi_mem_chunk *mem_chunk_find(struct mem *mem, u64 addr)
 {
 	struct dfi_mem_chunk *mem_chunk;
 
-	if (mem_chunk_has_addr(mem->chunk_cache, addr))
+	if (mem->chunk_cache && mem_chunk_has_addr(mem->chunk_cache, addr))
 		return mem->chunk_cache;
 	util_list_iterate(&mem->chunk_list, mem_chunk) {
 		if (mem_chunk_has_addr(mem_chunk, addr)) {
