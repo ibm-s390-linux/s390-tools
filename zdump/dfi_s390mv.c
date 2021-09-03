@@ -574,6 +574,8 @@ static void set_magic_numbers(void)
  */
 int dfi_s390mv_init_gen(bool extended)
 {
+	int rc;
+
 	l.extended = extended;
 	set_magic_numbers();
 	if (open_dump() != 0)
@@ -590,7 +592,9 @@ int dfi_s390mv_init_gen(bool extended)
 		return -EINVAL;
 	if (l.dump_incomplete)
 		return -EINVAL;
-	df_s390_cpu_info_add(&l.hdr, l.hdr.mem_end);
+	rc = df_s390_cpu_info_add(&l.hdr, l.hdr.mem_end);
+	if (rc)
+		return rc;
 	df_s390_em_add(&l.em);
 	return 0;
 }

@@ -166,7 +166,9 @@ static int vol_init(void)
 
 	/* Init memory read & CPU info */
 	mem_read_init();
-	df_s390_cpu_info_add(&hdr, hdr.mem_size - 1);
+	rc = df_s390_cpu_info_add(&hdr, hdr.mem_size - 1);
+	if (rc)
+		return rc;
 	return 0;
 }
 

@@ -179,7 +179,9 @@ int dfi_s390_init_gen(bool extended)
 		rc = mem_chunks_add_ext();
 	if (rc)
 		return rc;
-	df_s390_cpu_info_add(&l.hdr, l.hdr.mem_size);
+	rc = df_s390_cpu_info_add(&l.hdr, l.hdr.mem_size);
+	if (rc)
+		return rc;
 	zg_seek(g.fh, sizeof(l.hdr), ZG_CHECK);
 	return 0;
 }

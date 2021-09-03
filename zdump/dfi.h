@@ -142,7 +142,7 @@ extern struct dfi_cpu *dfi_cpu(unsigned int cpu_nr);
 extern void dfi_cpu_add(struct dfi_cpu *cpu);
 extern unsigned int dfi_cpu_cnt(void);
 extern enum dfi_cpu_content dfi_cpu_content(void);
-extern void dfi_cpu_add_from_lc(u32 lc_addr);
+extern int dfi_cpu_add_from_lc(u32 lc_addr);
 
 #define DFI_VX_SA_SIZE		(32 * 16)
 extern int dfi_cpu_lc_has_vx_sa(void *lc);

@@ -935,7 +935,7 @@ static void lc2cpu_32(struct dfi_cpu_32 *cpu, struct dfi_lowcore_32 *lc)
  * Note: When this function is called, the memory chunks have to be already
  *       defined by the DFI dump specific code.
  */
-void dfi_cpu_add_from_lc(u32 lc_addr)
+int dfi_cpu_add_from_lc(u32 lc_addr)
 {
 	struct dfi_cpu *cpu = dfi_cpu_alloc();
 
@@ -948,12 +948,14 @@ void dfi_cpu_add_from_lc(u32 lc_addr)
 		if (l.arch == DFI_ARCH_32) {
 			struct dfi_cpu_32 cpu_32;
 			struct dfi_lowcore_32 lc;
-			dfi_mem_read(lc_addr, &lc, sizeof(lc));
+			if (dfi_mem_read_rc(lc_addr, &lc, sizeof(lc)))
+				return -EINVAL;
 			lc2cpu_32(&cpu_32, &lc);
 			cpu_32_to_64(cpu, &cpu_32);
 		} else {
 			struct dfi_lowcore_64 lc;
-			dfi_mem_read(lc_addr, &lc, sizeof(lc));
+			if (dfi_mem_read_rc(lc_addr, &lc, sizeof(lc)))
+				return -EINVAL;
 			lc2cpu_64(cpu, &lc);
 		}
 		break;
@@ -961,6 +963,7 @@ void dfi_cpu_add_from_lc(u32 lc_addr)
 		ABORT("dfi_cpu_add_from_lc() called for CONTENT_NONE");
 	}
 	dfi_cpu_add(cpu);
+	return 0;
 }
 
 /*
