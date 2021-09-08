@@ -9,6 +9,10 @@
 tags
 TAGS
 
+# Ignore coverage data
+*.gcda
+*.gcno
+
 #
 # Ignore generated executables and other generated files
 #
