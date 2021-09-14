@@ -204,6 +204,10 @@ int dfi_mem_range_valid(u64 addr, u64 len)
 	struct dfi_mem_chunk *mem_chunk;
 	u64 addr_end = addr + len;
 
+	/* check for unsigned wrap */
+	if (addr_end < addr)
+		return 0;
+
 	do {
 		mem_chunk = dfi_mem_chunk_find(addr);
 		if (!mem_chunk)
