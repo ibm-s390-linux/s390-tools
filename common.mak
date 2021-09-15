@@ -383,6 +383,10 @@ $(rootdir)/libkmipclient/libkmipclient.so: $(rootdir)/libkmipclient
 	$(MAKE) -C $(rootdir)/libkmipclient/ libkmipclient.so
 .PHONY: $(rootdir)/libkmipclient
 
+$(rootdir)/libap/libap.a: $(rootdir)/libap
+	$(MAKE) -C $(rootdir)/libap/ libap.a
+.PHONY: $(rootdir)/libap
+
 $(rootdir)/zipl/boot/data.o:
 	$(MAKE) -C $(rootdir)/zipl/boot/ data.o
 

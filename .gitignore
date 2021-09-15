@@ -46,6 +46,8 @@ iucvterm/src/iucvconn
 iucvterm/src/iucvtty
 iucvterm/src/ttyrun
 iucvterm/test/test_afiucv
+libap/check-dep-lock
+libap/check-dep-json
 libekmfweb/check-dep-libekmfweb
 libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
