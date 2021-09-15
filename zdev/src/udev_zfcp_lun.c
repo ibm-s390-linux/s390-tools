@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "lib/util_path.h"
+#include "lib/util_udev.h"
 
 #include "attrib.h"
 #include "device.h"
@@ -126,7 +127,7 @@ void zfcp_lun_node_list_print(struct util_list *list, int indent)
 }
 
 static bool zfcp_lun_devid_from_entry(struct zfcp_lun_devid *id_ptr,
-				      struct udev_entry_node *entry)
+				      struct util_udev_entry_node *entry)
 {
 	struct zfcp_lun_devid id;
 	char *copy = NULL, *s, *e, *u;
@@ -214,7 +215,7 @@ out:
 }
 
 static struct zfcp_lun_node *zfcp_lun_node_from_entry(
-					struct udev_entry_node *entry,
+					struct util_udev_entry_node *entry,
 					struct zfcp_lun_node *old,
 					struct util_list *list)
 {
@@ -234,7 +235,7 @@ static struct zfcp_lun_node *zfcp_lun_node_from_entry(
 	return node;
 }
 
-static void add_internal_setting_from_entry(struct udev_entry_node *entry,
+static void add_internal_setting_from_entry(struct util_udev_entry_node *entry,
 					    struct zfcp_lun_node *node)
 {
 	char *copy, *name, *end, *u;
@@ -263,7 +264,7 @@ out:
 	free(copy);
 }
 
-static void add_fc_setting_from_entry(struct udev_entry_node *entry,
+static void add_fc_setting_from_entry(struct util_udev_entry_node *entry,
 				      struct zfcp_lun_node *node)
 {
 	char *copy, *s, *e;
@@ -294,7 +295,7 @@ out:
 	free(copy);
 }
 
-static void add_scsi_setting_from_entry(struct udev_entry_node *entry,
+static void add_scsi_setting_from_entry(struct util_udev_entry_node *entry,
 					struct zfcp_lun_node *node)
 {
 	char *copy, *s, *e;
@@ -336,9 +337,9 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 					   struct util_list *list)
 {
 	exit_code_t rc;
-	struct udev_file *file = NULL;
-	struct udev_line_node *line;
-	struct udev_entry_node *entry;
+	struct util_udev_file *file = NULL;
+	struct util_udev_line_node *line;
+	struct util_udev_entry_node *entry;
 	struct zfcp_lun_node *node = NULL;
 	enum {
 		none,
@@ -347,7 +348,7 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 	} state = none;
 	bool empty_rule = true;
 
-	rc = udev_read_file(filename, &file);
+	rc = (exit_code_t) util_udev_read_file(filename, &file);
 	if (rc)
 		goto out;
 
@@ -398,7 +399,7 @@ static exit_code_t udev_read_zfcp_lun_rule(const char *filename,
 	sort_zfcp_lun_list(list);
 
 out:
-	udev_free_file(file);
+	util_udev_free_file(file);
 
 	if (empty_rule)
 		warn_once("Warning: Invalid udev rule: %s\n", filename);

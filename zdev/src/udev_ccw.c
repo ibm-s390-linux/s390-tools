@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "lib/util_path.h"
+#include "lib/util_udev.h"
 
 #include "attrib.h"
 #include "ccw.h"
@@ -44,7 +45,7 @@ bool udev_ccw_exists(const char *type, const char *id, bool autoconf)
 }
 
 static void add_setting_from_entry(struct setting_list *list,
-				   struct udev_entry_node *entry,
+				   struct util_udev_entry_node *entry,
 				   struct attrib **attribs)
 {
 	char *copy, *name, *end;
@@ -79,12 +80,12 @@ out:
 }
 
 /* Extract CCW device settings from a CCW device udev rule file. */
-static void udev_file_get_settings(struct udev_file *file,
+static void udev_file_get_settings(struct util_udev_file *file,
 				   struct attrib **attribs,
 				   struct setting_list *list)
 {
-	struct udev_line_node *line;
-	struct udev_entry_node *entry;
+	struct util_udev_line_node *line;
+	struct util_udev_entry_node *entry;
 
 	util_list_iterate(&file->lines, line) {
 		entry = util_list_start(&line->entries);
@@ -100,12 +101,12 @@ exit_code_t udev_ccw_read_device(struct device *dev, bool autoconf)
 	struct subtype *st = dev->subtype;
 	struct device_state *state = autoconf ? &dev->autoconf :
 						&dev->persistent;
-	struct udev_file *file = NULL;
+	struct util_udev_file *file = NULL;
 	exit_code_t rc;
 	char *path;
 
 	path = path_get_udev_rule(st->name, dev->id, autoconf);
-	rc = udev_read_file(path, &file);
+	rc = (exit_code_t) util_udev_read_file(path, &file);
 	if (rc)
 		goto out;
 	if (udev_file_is_empty(file)) {
@@ -115,7 +116,7 @@ exit_code_t udev_ccw_read_device(struct device *dev, bool autoconf)
 		udev_file_get_settings(file, st->dev_attribs, state->settings);
 		state->exists = 1;
 	}
-	udev_free_file(file);
+	util_udev_free_file(file);
 
 out:
 	free(path);

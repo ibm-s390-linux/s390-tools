@@ -11,7 +11,7 @@
 #define UDEV_H
 
 #include "lib/util_list.h"
-#include "exit_code.h"
+#include "lib/util_udev.h"
 
 struct attrib;
 struct setting_list;
@@ -19,30 +19,7 @@ struct setting_list;
 extern int udev_need_settle;
 extern int udev_no_settle;
 
-/* Single key-operator-value entry in a udev rule line.*/
-struct udev_entry_node {
-	struct util_list_node node;
-	char *key;
-	char *op;
-	char *value;
-};
-
-/* Single udev line in a udev rule file. */
-struct udev_line_node {
-	struct util_list_node node;
-	struct util_list entries;
-	char *line;
-};
-
-/* Udev rule file. */
-struct udev_file {
-	struct util_list lines;
-};
-
-exit_code_t udev_read_file(const char *, struct udev_file **);
-bool udev_file_is_empty(struct udev_file *file);
-void udev_free_file(struct udev_file *);
-void udev_file_print(struct udev_file *);
+bool udev_file_is_empty(struct util_udev_file *file);
 
 void udev_get_device_ids(const char *type, struct util_list *list,
 			 bool autoconf);
@@ -51,7 +28,7 @@ exit_code_t udev_remove_rule(const char *type, const char *id, bool autoconf);
 void udev_settle(void);
 
 void udev_add_internal_from_entry(struct setting_list *list,
-				  struct udev_entry_node *entry,
+				  struct util_udev_entry_node *entry,
 				  struct attrib **attribs);
 
 #endif /* UDEV_H */

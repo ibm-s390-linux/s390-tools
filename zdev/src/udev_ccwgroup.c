@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "lib/util_path.h"
+#include "lib/util_udev.h"
 
 #include "attrib.h"
 #include "ccwgroup.h"
@@ -63,7 +64,7 @@ bool udev_ccwgroup_exists(const char *type, const char *id, bool autoconf)
 }
 
 static void add_setting_from_entry(struct setting_list *list,
-				   struct udev_entry_node *entry,
+				   struct util_udev_entry_node *entry,
 				   struct attrib **attribs)
 {
 	char *copy, *name, *end;
@@ -98,12 +99,12 @@ out:
 }
 
 /* Extract CCWGROUP device settings from a CCWGROUP device udev rule file. */
-static void udev_file_get_settings(struct udev_file *file,
+static void udev_file_get_settings(struct util_udev_file *file,
 				   struct attrib **attribs,
 				   struct setting_list *list)
 {
-	struct udev_line_node *line;
-	struct udev_entry_node *entry;
+	struct util_udev_line_node *line;
+	struct util_udev_entry_node *entry;
 
 	util_list_iterate(&file->lines, line) {
 		entry = util_list_start(&line->entries);
@@ -114,12 +115,12 @@ static void udev_file_get_settings(struct udev_file *file,
 }
 
 /* Determine full CCWGROUP from data in udev rule file. */
-static void expand_id(struct device *dev, struct udev_file *file)
+static void expand_id(struct device *dev, struct util_udev_file *file)
 {
 	struct ccwgroup_devid devid;
 	struct ccwgroup_devid *devid_ptr = dev->devid;
-	struct udev_line_node *line;
-	struct udev_entry_node *entry;
+	struct util_udev_line_node *line;
+	struct util_udev_entry_node *entry;
 	char *id;
 	int i;
 
@@ -155,12 +156,12 @@ exit_code_t udev_ccwgroup_read_device(struct device *dev, bool autoconf)
 	struct subtype *st = dev->subtype;
 	struct device_state *state = autoconf ? &dev->autoconf :
 						&dev->persistent;
-	struct udev_file *file = NULL;
+	struct util_udev_file *file = NULL;
 	exit_code_t rc;
 	char *path;
 
 	path = get_rule_path_by_devid(st->name, dev->devid, autoconf);
-	rc = udev_read_file(path, &file);
+	rc = (exit_code_t) util_udev_read_file(path, &file);
 	if (rc)
 		goto out;
 	if (udev_file_is_empty(file)) {
@@ -171,7 +172,7 @@ exit_code_t udev_ccwgroup_read_device(struct device *dev, bool autoconf)
 		expand_id(dev, file);
 		state->exists = 1;
 	}
-	udev_free_file(file);
+	util_udev_free_file(file);
 
 out:
 	free(path);
