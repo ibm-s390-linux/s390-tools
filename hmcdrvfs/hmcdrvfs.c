@@ -1109,7 +1109,8 @@ static struct hmcdrv_fuse_file *hmcdrv_file_get(const char *path)
  *
  * Note: The most important function which FUSE calls (very often).
  */
-static int hmcdrv_fuse_getattr(const char *path, struct stat *stbuf)
+static int hmcdrv_fuse_getattr(const char *path, struct stat *stbuf,
+			       struct fuse_file_info *UNUSED(fi))
 {
 	struct hmcdrv_fuse_file *fp;
 	int rc = 0;
@@ -1175,7 +1176,8 @@ static int hmcdrv_fuse_opendir(const char *UNUSED(path),
  */
 static int hmcdrv_fuse_readdir(const char *path, void *buf,
 			       fuse_fill_dir_t filler, off_t UNUSED(offset),
-			       struct fuse_file_info *UNUSED(fi))
+			       struct fuse_file_info *UNUSED(fi),
+			       enum fuse_readdir_flags UNUSED(flags))
 {
 	int ret;
 
@@ -1232,7 +1234,8 @@ static int hmcdrv_fuse_read(const char *path, char *buf, size_t size,
  * Return: value to be passed in the private_data field of fuse_context to
  *         all file operations and as a parameter to the destroy() method
  */
-static void *hmcdrv_fuse_init(struct fuse_conn_info *UNUSED(conn))
+static void *hmcdrv_fuse_init(struct fuse_conn_info *UNUSED(conn),
+			      struct fuse_config *UNUSED(cfg))
 {
 	pthread_mutexattr_t attr;
 
