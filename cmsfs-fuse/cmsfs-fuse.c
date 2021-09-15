@@ -1728,8 +1728,11 @@ static off_t get_file_size_logical(struct fst_entry *fst)
 	return total;
 }
 
-static int cmsfs_getattr(const char *path, struct stat *stbuf)
+static int cmsfs_getattr(const char *path, struct stat *stbuf,
+			 struct fuse_file_info *fi)
 {
+	(void) fi;
+
 	int mask = (cmsfs.allow_other) ? 0444 : 0440;
 	struct fst_entry fst;
 
@@ -1783,13 +1786,15 @@ static int cmsfs_getattr(const char *path, struct stat *stbuf)
 }
 
 static int cmsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
+			 off_t offset, struct fuse_file_info *fi,
+			 enum fuse_readdir_flags flags)
 {
 	struct walk_file walk;
 	struct fst_entry fst;
 
 	(void) offset;
 	(void) fi;
+	(void) flags;
 
 	/*
 	 * Offset is ignored and 0 passed to the filler fn so the whole
@@ -2683,12 +2688,15 @@ static int cmsfs_statfs(const char *path, struct statvfs *buf)
 	return 0;
 }
 
-static int cmsfs_utimens(const char *path, const struct timespec ts[2])
+static int cmsfs_utimens(const char *path, const struct timespec ts[2],
+			 struct fuse_file_info *fi)
 {
 	struct fst_entry fst;
 	off_t fst_addr;
 	struct tm tm;
 	int rc;
+
+	(void) fi;
 
 	if (cmsfs.readonly)
 		return -EACCES;
@@ -2825,7 +2833,8 @@ error:
 	return rc;
 }
 
-static int cmsfs_rename(const char *path, const char *new_path)
+static int cmsfs_rename(const char *path, const char *new_path,
+			unsigned int flags)
 {
 	struct fst_entry fst, fst_new;
 	off_t fst_addr, fst_addr_new;
@@ -2834,6 +2843,8 @@ static int cmsfs_rename(const char *path, const char *new_path)
 	char *uc_new_name;
 	struct file *f;
 	int rc;
+
+	(void) flags;
 
 	if (cmsfs.readonly)
 		return -EACCES;
@@ -3232,12 +3243,15 @@ static void update_fst(struct file *f, off_t addr)
 	unhide_null_blocks(f);
 }
 
-static int cmsfs_truncate(const char *path, off_t size)
+static int cmsfs_truncate(const char *path, off_t size,
+			  struct fuse_file_info *fi)
 {
 	struct fst_entry fst;
 	off_t fst_addr, len;
 	struct file *f;
 	int rc = 0;
+
+	(void) fi;
 
 	if (cmsfs.readonly)
 		return -EROFS;
