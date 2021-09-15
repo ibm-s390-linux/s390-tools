@@ -398,3 +398,9 @@ char *path_get_scsi_hctl_dev(const char *hctl)
 {
 	return path_get("/sys/bus/scsi/devices/%s", hctl);
 }
+
+/* Return sysfs path to a bus attribute */
+char *path_get_bus_attr(const char *bus, const char *attr)
+{
+	return path_get("/sys/bus/%s/%s", bus, attr);
+}

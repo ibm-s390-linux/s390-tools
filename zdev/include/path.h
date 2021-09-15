@@ -64,6 +64,7 @@ char *path_get_sys_bus_drv(const char *, const char *);
 char *path_get_zfcp_lun_dev(struct zfcp_lun_devid *);
 char *path_get_zfcp_port_dev(struct zfcp_lun_devid *);
 char *path_get_scsi_hctl_dev(const char *);
+char *path_get_bus_attr(const char *, const char *);
 
 exit_code_t path_for_each(const char *,
 			  exit_code_t (*callback)(const char *, const char *,

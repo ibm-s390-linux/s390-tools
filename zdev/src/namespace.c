@@ -17,6 +17,7 @@
 #include "namespace.h"
 #include "qeth.h"
 #include "zfcp_lun.h"
+#include "ap.h"
 
 struct namespace *namespaces[] = {
 	&ccw_namespace,
@@ -24,6 +25,7 @@ struct namespace *namespaces[] = {
 	&qeth_namespace,
 	&ctc_namespace,
 	&lcs_namespace,
+	&ap_namespace,
 	NULL,
 };
 

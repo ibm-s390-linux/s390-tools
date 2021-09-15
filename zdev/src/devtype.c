@@ -27,6 +27,7 @@
 #include "setting.h"
 #include "subtype.h"
 #include "zfcp.h"
+#include "ap.h"
 
 /* Array of pointers to known device types. */
 struct devtype *devtypes[] = {
@@ -35,6 +36,7 @@ struct devtype *devtypes[] = {
 	&qeth_devtype,
 	&ctc_devtype,
 	&lcs_devtype,
+	&ap_devtype,
 	&generic_ccw_devtype,	/* Generic types should come last. */
 	NULL
 };

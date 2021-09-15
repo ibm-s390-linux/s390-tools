@@ -40,6 +40,9 @@ chzdev_objects += ctc.o ctc_auto.o
 # LCS devtype
 chzdev_objects += lcs.o lcs_auto.o
 
+# AP devtype
+chzdev_objects += ap.o
+
 # Generic CCW devtype
 chzdev_objects += generic_ccw.o
 
@@ -70,10 +73,20 @@ lszdev_objects += ctc.o ctc_auto.o
 # LCS devtype
 lszdev_objects += lcs.o lcs_auto.o
 
+# AP devtype
+lszdev_objects += ap.o
+
 # Generic CCW devtype
 lszdev_objects += generic_ccw.o
 
 all: chzdev lszdev zdev_id
+
+ifneq (${HAVE_LOCKFILE}, 0)
+LDLIBS += -llockfile
+endif
+ifneq (${HAVE_JSONC}, 0)
+LDLIBS += -ljson-c
+endif
 
 chzdev_usage.c: chzdev_usage.txt
 	$(SED) $< >$@ -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/g' \
@@ -90,7 +103,8 @@ lszdev_usage.c: lszdev_usage.txt
 chzdev.o: chzdev_usage.c
 lszdev.o: lszdev_usage.c
 
-libs = $(rootdir)/libutil/libutil.a
+libs =	$(rootdir)/libap/libap.a \
+	$(rootdir)/libutil/libutil.a
 
 chzdev: $(chzdev_objects) $(libs)
 lszdev: $(lszdev_objects) $(libs)

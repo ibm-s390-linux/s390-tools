@@ -36,7 +36,7 @@ struct namespace;
 struct subtype;
 
 /* NULL-terminated list of namespaces. */
-#define NUM_NAMESPACES	5
+#define NUM_NAMESPACES	6
 extern struct namespace *namespaces[NUM_NAMESPACES + 1];
 
 /* struct namespace - Definition of a device ID namespace
