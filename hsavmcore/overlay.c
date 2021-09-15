@@ -31,8 +31,11 @@ struct vmcore_overlay {
 	bool fuse_debug;
 };
 
-static int vmcore_fuse_getattr(const char *path, struct stat *stbuf)
+static int vmcore_fuse_getattr(const char *path, struct stat *stbuf,
+			       struct fuse_file_info *fi)
 {
+	(void)fi;
+
 	struct vmcore_overlay *overlay = fuse_get_context()->private_data;
 	int ret = 0;
 
@@ -54,10 +57,12 @@ static int vmcore_fuse_getattr(const char *path, struct stat *stbuf)
 
 static int vmcore_fuse_readdir(const char *path, void *buf,
 			       fuse_fill_dir_t filler, off_t offset,
-			       struct fuse_file_info *fi)
+			       struct fuse_file_info *fi,
+			       enum fuse_readdir_flags flags)
 {
 	(void)offset;
 	(void)fi;
+	(void)flags;
 
 	if (strcmp(path, ROOT_DIR) != 0)
 		return -ENOENT;
