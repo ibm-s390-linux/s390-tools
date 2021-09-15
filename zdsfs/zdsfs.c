@@ -312,7 +312,8 @@ void keepalive_start(void)
 	setup_timer(zdsfsinfo.keepalive);
 }
 
-static int zdsfs_getattr(const char *path, struct stat *stbuf)
+static int zdsfs_getattr(const char *path, struct stat *stbuf,
+			 struct fuse_file_info *UNUSED(fi))
 {
 	char normds[MAXDSNAMELENGTH];
 	size_t dssize;
@@ -524,7 +525,8 @@ static int zdsfs_update_vtoc(void)
 }
 
 static int zdsfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t UNUSED(offset), struct fuse_file_info *UNUSED(fi))
+			 off_t UNUSED(offset), struct fuse_file_info *UNUSED(fi),
+			 enum fuse_readdir_flags UNUSED(flags))
 {
 	char normds[MAXDSNAMELENGTH];
 	char *mbrname;
