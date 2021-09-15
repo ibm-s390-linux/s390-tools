@@ -19,6 +19,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/util_file.h"
+
 #include "attrib.h"
 #include "ccw.h"
 #include "ccwgroup.h"
@@ -187,7 +189,8 @@ static exit_code_t read_fw(struct fw_file *file, FILE *fd, const char *filename)
 
 	for (retry = 0; retry < READ_RETRY; retry++) {
 		/* Read complete file once */
-		rc = misc_read_fd(fd, (void **) &buffer, &size);
+		rc = (exit_code_t) util_file_read_fd_buf(fd, (void **) &buffer,
+							 &size);
 		if (rc) {
 			warn("%s: Could not read file", filename);
 			return rc;
@@ -203,7 +206,8 @@ static exit_code_t read_fw(struct fw_file *file, FILE *fd, const char *filename)
 			/* Could be a pipe, socket, or FIFO - accept v1. */
 			break;
 		}
-		rc = misc_read_fd(fd, (void **) &buffer2, &size2);
+		rc = (exit_code_t) util_file_read_fd_buf(fd, (void **) &buffer2,
+							 &size2);
 		if (rc || !buffer2) {
 			/* Could not get second version - accept v1. */
 			break;

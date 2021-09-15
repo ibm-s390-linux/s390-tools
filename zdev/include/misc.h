@@ -173,7 +173,6 @@ bool misc_read_dir(const char *, struct util_list *,
 		       bool (*)(const char *, void *), void *);
 bool file_is_devnode(const char *);
 exit_code_t remove_file(const char *);
-exit_code_t misc_read_fd(FILE *fd, void **buffer, size_t *size_ptr);
 char *misc_read_text_file(const char *, int, err_t);
 char *misc_read_cmd_output(const char *, int, err_t);
 char *config_read_cmd_output(const char *, int, err_t);

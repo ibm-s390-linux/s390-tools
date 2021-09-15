@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <linux/limits.h>
@@ -21,10 +22,15 @@
 #include <unistd.h>
 
 #include "lib/util_base.h"
+#include "lib/util_exit_code.h"
 #include "lib/util_file.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
 #include "lib/util_prg.h"
+
+#define READ_CHUNK_SIZE		4096
+
+extern const char *toolname;
 
 /*
  * Read the first line of a file into given buffer
@@ -535,4 +541,130 @@ int util_file_read_va(const char *path, const char *fmt, ...)
 	if (ret == EOF)
 		return -1;
 	return ret;
+}
+
+/**
+ * Print an error message indicating an out-of-memory situation and exit.
+ */
+static void oom(void)
+{
+	fprintf(stderr, "Out of memory\n");
+
+	/* We can't rely on our clean-up routines to work reliably during an
+	 * OOM situation, so just exit here.
+	 */
+	exit(UTIL_EXIT_OUT_OF_MEMORY);
+}
+
+/**
+ * Read all data from @fd and return address of resulting buffer in
+ * @buffer_ptr. If @size_ptr is non-zero, use it to store the size of the
+ * resulting buffer. Return %UTIL_EXIT_OK on success.
+ *
+ * @param[in]      fd         File descriptor to read data from
+ * @param[in, out] buffer_ptr Buffer to read data into
+ * @param[in, out] size_ptr   Buffer to save size of data read into buffer_ptr
+ *
+ * @retval         0                       read was successful
+ * @retval         UTIL_EXIT_RUNTIME_ERROR error while reading file
+ */
+util_exit_code_t util_file_read_fd_buf(FILE *fd, void **buffer_ptr,
+				       size_t *size_ptr)
+{
+	char *buffer = NULL;
+	size_t done = 0;
+
+	while (!feof(fd)) {
+		buffer = realloc(buffer, done + READ_CHUNK_SIZE);
+		if (!buffer)
+			oom();
+		done += fread(&buffer[done], 1, READ_CHUNK_SIZE, fd);
+		if (ferror(fd)) {
+			free(buffer);
+			return UTIL_EXIT_RUNTIME_ERROR;
+		}
+	}
+
+	buffer = realloc(buffer, done);
+	if (!buffer && done > 0)
+		oom();
+
+	*buffer_ptr = buffer;
+	if (size_ptr)
+		*size_ptr = done;
+
+	return UTIL_EXIT_OK;
+}
+
+/**
+ * Read text from @fd and return resulting NULL-terminated text buffer.
+ * If @chomp is non-zero, remove trailing newline character. Return %NULL
+ * on error or when unprintable characters are read.
+ *
+ * @param[in]  fd         File descriptor to read data from
+ * @param[in]  chomp      Flag to indicate trailing newlines should be removed
+ *
+ * @retval     NULL       Error reading from fd
+ * @retval     != 0       Data read successfully, buffer returned
+ */
+char *util_file_read_fd(FILE *fd, int chomp)
+{
+	char *buffer;
+	size_t done, i;
+
+	if (util_file_read_fd_buf(fd, (void **) &buffer, &done))
+		return NULL;
+
+	/* Check if this is a text file at all (required to filter out
+	 * binary sysfs attributes).
+	 */
+	for (i = 0; i < done; i++) {
+		if (!isgraph(buffer[i]) && !isspace(buffer[i])) {
+			free(buffer);
+			return NULL;
+		}
+	}
+
+	/* Remove trailing new-line character if requested. */
+	if (chomp && done > 0 && buffer[done - 1] == '\n')
+		done--;
+
+	/* NULL-terminate. */
+	buffer = realloc(buffer, done + 1);
+	if (!buffer)
+		oom();
+	buffer[done] = 0;
+
+	return buffer;
+}
+
+/**
+ * Read file as text and return NULL-terminated contents. Remove trailing
+ * newline if CHOMP is specified.
+ *
+ * @param[in]  path       Path to the file that will be read from
+ * @param[in]  chomp      Flag to indicate trailing newlines should be removed
+ *
+ * @retval     NULL       Error reading from file
+ * @retval     != 0       File read successfully, contents returned in buffer
+ */
+char *util_file_read_text_file(const char *path, int chomp)
+{
+	char *buffer = NULL;
+	FILE *fd;
+
+	fd = fopen(path, "r");
+	if (!fd)
+		goto out;
+
+	buffer = util_file_read_fd(fd, chomp);
+	fclose(fd);
+
+out:
+	if (!buffer) {
+		fprintf(stderr, "Could not read file %s: %s\n", path,
+			strerror(errno));
+	}
+
+	return buffer;
 }
