@@ -274,6 +274,10 @@ Package contents
    Use multipath information to change the configured FCP re-IPL path on
    detecting issues with the current path.
 
+ * ap-check:
+   A utility called by mdevctl to assist in managing vfio_ap-passthrough
+   devices.
+
 For more information refer to the following publications:
 
   * "Device Drivers, Features, and Commands" chapter "Useful Linux commands"
@@ -308,6 +312,7 @@ build options:
 | libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient |
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
+| liblockfile    | `HAVE_LOCKFILE`    | ap-check                              |
 
 This table lists additional build or install options:
 
@@ -481,3 +486,10 @@ the different tools are provided:
   make invocation to build a fresh man page (instead of using the pre-cooked
   version) and render the README.md as HTML, make further requires pandoc and
   GNU awk for the build process.
+
+* ap-check:
+  For building the ap-check mdevctl callout utility you need liblockfile
+  version 1.14 or newer installed (liblockfile-devel.rpm).  Also required is
+  json-c version 0.13 or newer (json-c-devel.rpm).
+  Tip: you may skip ap-check build by adding `HAVE_LOCKFILE=0` or `HAVE_JSONC=0`
+  to the make invocation.

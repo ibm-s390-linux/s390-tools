@@ -16,6 +16,7 @@ TAGS
 #
 # Ignore generated executables and other generated files
 #
+ap_tools/ap-check
 cmsfs-fuse/cmsfs-fuse
 cpacfstats/cpacfstats
 cpacfstats/cpacfstatsd
