@@ -84,8 +84,11 @@ static void stat_dump_init(void)
 /*
  * FUSE callback: Getattr
  */
-static int zfuse_getattr(const char *path, struct stat *stat)
+static int zfuse_getattr(const char *path, struct stat *stat,
+			 struct fuse_file_info *fi)
 {
+	(void) fi;
+
 	if (strcmp(path, "/") == 0) {
 		*stat = l.stat_root;
 		return 0;
@@ -101,10 +104,12 @@ static int zfuse_getattr(const char *path, struct stat *stat)
  * FUSE callback: Readdir - Return ".", ".." and dump file
  */
 static int zfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
+			 off_t offset, struct fuse_file_info *fi,
+			 enum fuse_readdir_flags flags)
 {
 	(void) offset;
 	(void) fi;
+	(void) flags;
 
 	if (strcmp(path, "/") != 0)
 		return -ENOENT;
