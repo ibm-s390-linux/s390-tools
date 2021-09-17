@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+
+# Did the event affect a multipath or scsi disk device?
+ACTION=="change", KERNEL=="dm-[0-9]*", SUBSYSTEM=="block",		\
+	ENV{DM_UUID}=="mpath-*", ENV{DM_ACTION}=="PATH_FAILED",		\
+	GOTO="chreipl_fcp_mpath_path_change"
+ACTION=="change", KERNEL=="dm-[0-9]*", SUBSYSTEM=="block",		\
+	ENV{DM_UUID}=="mpath-*", ENV{DM_ACTION}=="PATH_REINSTATED",	\
+	GOTO="chreipl_fcp_mpath_path_change"
+ACTION=="add", KERNEL=="sd[a-z]*", SUBSYSTEM=="block",			\
+	GOTO="chreipl_fcp_mpath_path_change"
+GOTO="chreipl_fcp_mpath_end"
+LABEL="chreipl_fcp_mpath_path_change"
+
+LABEL="chreipl_fcp_mpath_end"
