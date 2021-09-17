@@ -11,6 +11,7 @@
 #     - sync
 #   util-linux:
 #     - flock
+#     - logger
 
 # Makes use of udev event environment variables:
 #	SEQNUM
@@ -113,6 +114,40 @@ function id_file_lock_exclusive_create() {
 }
 
 # Output variables:
+#  id_file_unlock_exclusive_no_create() - call to unlock when finished with
+#                                         critical section
+#
+# XXX: `id_file_lock_*` can't be taken recursively
+function id_file_lock_exclusive_no_create() {
+	declare -g ID_FILE_LOCK=""
+
+	# Open the file defined in ${ID_FILE} for reading, and store the
+	# corresponding file descriptor in ${ID_FILE_LOCK}.
+	#
+	# XXX: return code is used in `chreipl-fcp-mpath-try-change-ipl-path`
+	{ exec {ID_FILE_LOCK}<"${ID_FILE}"; } 2>/dev/null	|| return 1
+
+	declare -gf id_file_unlock_exclusive_no_create 1>/dev/null
+	function id_file_unlock_exclusive_no_create() {
+		if [ -v ID_FILE_LOCK ]; then
+			sync "${ID_FILE}" 2>/dev/null
+			# release file and implicitly the lock, if taken
+			exec {ID_FILE_LOCK}<&-
+			unset ID_FILE_LOCK
+		fi
+
+		unset "TRAP_EXIT_FN[id_file_unlock_exclusive_no_create]"
+	}
+	TRAP_EXIT_FN+=(
+		[id_file_unlock_exclusive_no_create]=id_file_unlock_exclusive_no_create
+	)
+
+	flock --exclusive --timeout 5 "${ID_FILE_LOCK}"		|| return 2
+
+	return 0
+}
+
+# Output variables:
 #  id_file_unlock_shared_no_create() - call to unlock when finished with
 #                                      critical section
 #
@@ -139,6 +174,36 @@ function id_file_lock_shared_no_create() {
 	)
 
 	flock --shared --timeout 5 "${ID_FILE_LOCK}"		|| return 2
+
+	return 0
+}
+
+# Output variables:
+#  firmware_unlock_exclusive() - call to unlock when finished with critical section
+#
+# XXX: `firmware_lock_*` can't be taken recursively
+function firmware_lock_exclusive() {
+	declare -g FIRMWARE_LOCK=""
+
+	# Open the file defined in ${FW_LOCK_FILE} for reading, and store the
+	# corresponding file descriptor in ${FIRMWARE_LOCK} (it doesn't matter
+	# whether this is a normal file or directory). This file descriptor
+	# will only be used for locking - not for actual I/O.
+	{ exec {FIRMWARE_LOCK}<"${FW_LOCK_FILE}"; } 2>/dev/null	|| return 1
+
+	declare -gf firmware_unlock_exclusive 1>/dev/null
+	function firmware_unlock_exclusive() {
+		if [ -v FIRMWARE_LOCK ]; then
+			# release file and implicitly the lock, if taken
+			exec {FIRMWARE_LOCK}<&-
+			unset FIRMWARE_LOCK
+		fi
+
+		unset "TRAP_EXIT_FN[firmware_unlock_exclusive]"
+	}
+	TRAP_EXIT_FN+=([firmware_unlock_exclusive]=firmware_unlock_exclusive)
+
+	flock --exclusive --timeout 5 "${FIRMWARE_LOCK}"	|| return 2
 
 	return 0
 }
@@ -326,4 +391,57 @@ function sdev_get_wwid() {
 	# shellcheck disable=2034
 	SDEV_WWID="${wwid[0]}"
 	return 0
+}
+
+# Input:
+#  1: path to the scsi device in sysfs
+# Return Value:
+#  == 0: SDEV referenced by `1` in good state
+#  != 0: otherwise
+function sdev_test_path_state() {
+	local sdev="${1}" state zfcp_failed zfcp_in_recovery rport port_state
+
+	sdev="$(readlink -se "${sdev}")"			|| return 1
+
+	{ read -r state _ < "${sdev}"/state; } 2>/dev/null	|| return 2
+	{ read -r zfcp_failed _ < "${sdev}"/zfcp_failed; } 2>/dev/null	\
+								|| return 3
+	{ read -r zfcp_in_recovery _ < "${sdev}"/zfcp_in_recovery; } 2>/dev/null \
+								|| return 4
+
+	printf -v rport "%s" "${sdev}"/../../fc_remote_ports/rport-*:*-*
+	# e.g.: /sys/devices/css0/0.0.0016/0.0.1740/host0/rport-0:0-1/fc_remote_ports/rport-0:0-1
+	[ "${rport}" != "" ]					|| return 5
+	{ read -r port_state _ < "${rport}"/port_state; } 2>/dev/null	\
+								|| return 6
+
+	if '@DEBUG@'; then
+		declare -p state zfcp_failed zfcp_in_recovery port_state 1>&2
+	fi
+
+	[ "${state}" = "running" ]				|| return 7
+	[ "${zfcp_failed}" = "0" ]				|| return 8
+	[ "${zfcp_in_recovery}" = "0" ]				|| return 9
+	{ [ "${port_state}" = "Online" ]				\
+	  || [ "${port_state}" = "Marginal" ]; }		|| return 10
+
+	return 0
+}
+
+# Input:
+#  *: all input parameters are used as quoted message
+function log_note() {
+	logger -p 'daemon.notice' -t 'chreipl-fcp-mpath' "${*}" &>/dev/null
+}
+
+# Input:
+#  *: all input parameters are used as quoted message
+function log_crit() {
+	logger -p 'daemon.crit' -t 'chreipl-fcp-mpath' "${*}" &>/dev/null
+}
+
+# Input:
+#  *: all input parameters are used as quoted message
+function log_alert() {
+	logger -p 'daemon.alert' -t 'chreipl-fcp-mpath' "${*}" &>/dev/null
 }

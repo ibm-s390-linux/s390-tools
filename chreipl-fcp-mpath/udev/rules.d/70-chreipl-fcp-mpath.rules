@@ -92,6 +92,10 @@ LABEL="chreipl_fcp_mpath_not_direct_match"
 #      know whether that stayed the same when the change was done.
 PROGRAM!="chreipl-fcp-mpath-is-ipl-vol", GOTO="chreipl_fcp_mpath_end"
 
+# We are here because of scenarios:
+#     (A) (a)/(b),
+#     (B) (a)/(b)/(c)/(d)
 LABEL="chreipl_fcp_mpath_try_change_ipl_path"
+RUN{program}+="chreipl-fcp-mpath-try-change-ipl-path"
 
 LABEL="chreipl_fcp_mpath_end"

@@ -47,7 +47,8 @@ CHREIPL_FCP_MPATH_UDEV_HELPER	:=					\
 	chreipl-fcp-mpath-is-ipl-tgt					\
 	chreipl-fcp-mpath-is-ipl-vol					\
 	chreipl-fcp-mpath-is-reipl-zfcp					\
-	chreipl-fcp-mpath-record-volume-identifier
+	chreipl-fcp-mpath-record-volume-identifier			\
+	chreipl-fcp-mpath-try-change-ipl-path
 
 $(CHREIPL_FCP_MPATH_UDEV_HELPER) $(CHREIPL_FCP_MPATH_COMMON): $(MAKEFILE_LIST)
 $(CHREIPL_FCP_MPATH_UDEV_HELPER) $(CHREIPL_FCP_MPATH_COMMON): % : %.in
