@@ -66,6 +66,17 @@ udev/rules.d/70-chreipl-fcp-mpath.rules: $(CHREIPL_FCP_MPATH_UDEV_HELPER)
 chreipl-fcp-mpath: udev/rules.d/70-chreipl-fcp-mpath.rules
 chreipl-fcp-mpath-clean: chreipl-fcp-mpath-udev-helper-clean
 
+dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf: $(MAKEFILE_LIST)
+dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf: % : %.in
+	$(call chreiplzfcpmp-sed-buildvar-replace,$(<),$(@))
+
+.PHONY: chreipl-fcp-mpath-dracut-clean
+chreipl-fcp-mpath-dracut-clean:
+	rm -f dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
+
+chreipl-fcp-mpath: dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
+chreipl-fcp-mpath-clean: chreipl-fcp-mpath-dracut-clean
+
 #
 ## Install
 #
@@ -112,6 +123,21 @@ chreipl-fcp-mpath-install-libfiles: $(CHREIPL_FCP_MPATH_COMMON)
 		$(CHREIPL_FCP_MPATH_COMMON)
 
 chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-libfiles
+
+ifeq ($(HAVE_DRACUT),1)
+
+# install dracut config files
+INSTDIRS += $(DRACUTCONFDIR)
+
+.PHONY: chreipl-fcp-mpath-install-dracut-config
+chreipl-fcp-mpath-install-dracut-config: | $(DESTDIR)$(DRACUTCONFDIR)
+chreipl-fcp-mpath-install-dracut-config: dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
+	$(INSTALL_DATA) -t $(DESTDIR)$(DRACUTCONFDIR)			\
+		dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
+
+chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-dracut-config
+
+endif
 
 #
 ## Utility

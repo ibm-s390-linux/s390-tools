@@ -13,11 +13,17 @@
 ## Paths and Build Variables
 #
 
+# Install the configuration file for dracut, to automatically pull in the
+# toolset into the initial ramdisk, when built with it.
+HAVE_DRACUT	 = 0
+
 # https://www.gnu.org/software/make/manual/make.html#Directory-Variables
 CHREIPLZFCPMPDIR = $(USRLIBDIR)/chreipl-fcp-mpath
 UDEVDIR		 = $(USRLIBDIR)/udev
 UDEVRULESDIR	 = $(UDEVDIR)/rules.d
 UDEVRUNDIR	 = /run/udev
+DRACUTDIR	 = $(USRLIBDIR)/dracut
+DRACUTCONFDIR	 = $(DRACUTDIR)/dracut.conf.d
 DEBUGOUTDIR	 = $(UDEVRUNDIR)
 
 INSTALL_EXEC	 = $(INSTALL) -g $(GROUP) -o $(OWNER) --preserve-timestamps
@@ -43,6 +49,8 @@ tmpout=$$(mktemp -p ./ .make.tmp.XXXXXXXXXXXXXXXX) && {			\
 		-e 's|@chreiplzfcpmp-fwlock-file@|$(chreiplzfcpmp-fwlock-file)|g' \
 		-e 's|@chreiplzfcpmp-lib@|$(CHREIPLZFCPMPDIR)/chreipl-fcp-mpath-common.sh|g' \
 		-e 's|@debugoutdir@|$(DEBUGOUTDIR)|g'			\
+		-e 's|@udevdir@|$(UDEVDIR)|g'				\
+		-e 's|@udevrulesdir@|$(UDEVRULESDIR)|g'			\
 		$(1) > $${tmpout}					\
 	    && mv $${tmpout} $(2)					\
 	    || { rm $${tmpout}; false; }				\

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+
+add_dracutmodules+=" bash multipath udev-rules "
+
+install_items+=" @udevrulesdir@/70-chreipl-fcp-mpath.rules "
+install_items+=" @chreiplzfcpmp-lib@ "
+install_items+=" @udevdir@/chreipl-fcp-mpath-is-ipl-tgt "
+install_items+=" @udevdir@/chreipl-fcp-mpath-is-ipl-vol "
+install_items+=" @udevdir@/chreipl-fcp-mpath-is-reipl-zfcp "
+install_items+=" @udevdir@/chreipl-fcp-mpath-record-volume-identifier "
+install_items+=" @udevdir@/chreipl-fcp-mpath-try-change-ipl-path "
+
+install_items+=" flock hexdump logger mktemp readlink sync truncate "
