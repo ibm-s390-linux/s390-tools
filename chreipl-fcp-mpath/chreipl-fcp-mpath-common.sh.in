@@ -113,6 +113,37 @@ function id_file_lock_exclusive_create() {
 }
 
 # Output variables:
+#  id_file_unlock_shared_no_create() - call to unlock when finished with
+#                                      critical section
+#
+# XXX: `id_file_lock_*` can't be taken recursively
+function id_file_lock_shared_no_create() {
+	declare -g ID_FILE_LOCK=""
+
+	# Open the file defined in ${ID_FILE} for reading, and store the
+	# corresponding file descriptor in ${ID_FILE_LOCK}.
+	{ exec {ID_FILE_LOCK}<"${ID_FILE}"; } 2>/dev/null	|| return 1
+
+	declare -gf id_file_unlock_shared_no_create 1>/dev/null
+	function id_file_unlock_shared_no_create() {
+		if [ -v ID_FILE_LOCK ]; then
+			# release file and implicitly the lock, if taken
+			exec {ID_FILE_LOCK}<&-
+			unset ID_FILE_LOCK
+		fi
+
+		unset "TRAP_EXIT_FN[id_file_unlock_shared_no_create]"
+	}
+	TRAP_EXIT_FN+=(
+		[id_file_unlock_shared_no_create]=id_file_unlock_shared_no_create
+	)
+
+	flock --shared --timeout 5 "${ID_FILE_LOCK}"		|| return 2
+
+	return 0
+}
+
+# Output variables:
 #  firmware_unlock_shared() - call to unlock when finished with critical section
 #
 # XXX: `firmware_lock_*` can't be taken recursively

@@ -27,7 +27,9 @@ PROGRAM!="chreipl-fcp-mpath-is-reipl-zfcp", GOTO="chreipl_fcp_mpath_end"
 # Either:
 #
 # (A) We recognized a new SCSI Disk. This might represent:
-#     (a) the path we want to ReIPL from.
+#     (a) the path we want to ReIPL from;
+#     (b) an alternative path to the volume we want to ReIPL from;
+#     (c) a path to some unrelated volume.
 #
 # Or:
 #
@@ -37,7 +39,8 @@ PROGRAM!="chreipl-fcp-mpath-is-reipl-zfcp", GOTO="chreipl_fcp_mpath_end"
 #         (b) came back online;
 #     an alternative path to the volume we want to ReIPL from:
 #         (c) went away;
-#         (d) came back online.
+#         (d) came back online;
+#     (e) some unrelated multipath device saw an event.
 
 # Test whether the affected device is, or contains, the current IPL target.
 #
@@ -67,6 +70,27 @@ GOTO="chreipl_fcp_mpath_try_change_ipl_path"
 # If the even subject is not a direct match (not the sdev that is the current
 # ReIPL target, and not a mpath device that contains the current ReIPL target)
 LABEL="chreipl_fcp_mpath_not_direct_match"
+
+# While this sdev/mpath device doesn't directly correspond to the path
+# currently set as ReIPL target, it might still point to the same volume.
+#
+# For mpath devices this can happen if the original ReIPL target is completely
+# gone from the machine, and so there is no way we can successfully, directly
+# compare the ReIPL parameters to the sdevs of the mpath device.
+#
+# For cases like these we recorded the volume identifier, which we now can
+# compare, and so still decide whether we are addressing the correct volume.
+#
+# This covers scenarios:
+#     (A) (b)/(c),
+#     (B) (c)/(d)/(e)
+#
+# XXX: we recorded WWID, Device-Bus-ID, Remote WWPN, LUN of the ReIPL target at
+#      the time; if the latter three don't match the current ReIPL setting
+#      anymore, we have to assume that someone changed the ReIPL target
+#      manually, and we cannot use the WWID anymore since we can't possibly
+#      know whether that stayed the same when the change was done.
+PROGRAM!="chreipl-fcp-mpath-is-ipl-vol", GOTO="chreipl_fcp_mpath_end"
 
 LABEL="chreipl_fcp_mpath_try_change_ipl_path"
 

@@ -45,6 +45,7 @@ CHREIPL_FCP_MPATH_COMMON	:=					\
 	chreipl-fcp-mpath-common.sh
 CHREIPL_FCP_MPATH_UDEV_HELPER	:=					\
 	chreipl-fcp-mpath-is-ipl-tgt					\
+	chreipl-fcp-mpath-is-ipl-vol					\
 	chreipl-fcp-mpath-is-reipl-zfcp					\
 	chreipl-fcp-mpath-record-volume-identifier
 

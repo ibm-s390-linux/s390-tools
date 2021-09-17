@@ -1,0 +1,86 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+#
+# Uses the following system-utilities (and shell-builtins):
+#   Those necessary for sourced library:
+#     - chreipl-fcp-mpath-common.sh
+
+# Find out whether the device in environment variable ${DEVPATH} represents the
+# _volume_ that we IPL'ed from. We do this by comparing its WWID to the one
+# recorded in `@chreiplzfcpmp-id-file@`.
+#
+# Makes use of udev event environment variables:
+#	DM_UUID
+#	SUBSYSTEM
+#	DEVPATH
+
+# shellcheck disable=SC2034
+declare -gr debug_trace_tag=11iilv
+# shellcheck disable=SC1091
+source '@chreiplzfcpmp-lib@' || exit 127
+
+function id_file_read_ipl_information() {
+	local -a records
+
+	declare -g REC_WWID="" REC_BUSID="" REC_WWPN="" REC_LUN=""
+
+	# lock file before reading ID, so we don't see any intermediate state
+	id_file_lock_shared_no_create				|| return 1
+
+	{ readarray -d "" -t -u "${ID_FILE_LOCK}" records; } 2>/dev/null \
+								|| return 2
+	if '@DEBUG@'; then declare -p records 1>&2; fi
+
+	id_file_unlock_shared_no_create
+
+	[ "${#records[@]}" = "4" ]				|| return 3
+	# check that none of the array fields contains whitespace only
+	[ "${records[0]/#*([[:space:]])}" != "" ]		|| return 4
+	[ "${records[1]/#*([[:space:]])}" != "" ]		|| return 5
+	[ "${records[2]/#*([[:space:]])}" != "" ]		|| return 6
+	[ "${records[3]/#*([[:space:]])}" != "" ]		|| return 7
+
+	REC_WWID="${records[0]}"
+	REC_BUSID="${records[1]}"
+	REC_WWPN="${records[2]}"
+	REC_LUN="${records[3]}"
+	return 0
+}
+
+id_file_read_ipl_information					|| exit 1
+
+if [[ "${DM_UUID}" == mpath-* ]]; then
+	# Assume Multipath Device Mapper Device;
+	# e.g.: DEVPATH = /devices/virtual/block/dm-0
+	declare sdev found=false
+
+	for sdev in /sys/"${DEVPATH}"/slaves/sd*/device; do
+		if sdev_get_wwid "${sdev}"; then
+			found=true
+			break
+		fi
+	done
+	unset sdev
+
+	"${found}"						|| exit 2
+
+elif [ "${SUBSYSTEM}" = block ]; then
+	# Assume SCSI Disk;
+	# e.g.: DEVPATH = /devices/css0/0.0.0014/0.0.1700/host0/rport-0:0-0/target0:0:0/0:0:0:1074806808/block/sds
+
+	sdev_get_wwid /sys/"${DEVPATH}"/device			|| exit 3
+fi
+
+# set by `sdev_get_wwid` and `id_file_read_ipl_information`
+[ "${SDEV_WWID}" = "${REC_WWID}" ]				|| exit 4
+
+firmware_get_ipl_information					|| exit 5
+# set by `firmware_get_ipl_information` and `id_file_read_ipl_information`
+[ "${IPL_BUSID}" = "${REC_BUSID}" ]				|| exit 6
+[ "${IPL_WWPN}" = "${REC_WWPN}" ]				|| exit 7
+[ "${IPL_LUN}" = "${REC_LUN}" ]					|| exit 8
+
+exit 0
