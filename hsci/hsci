@@ -42,50 +42,53 @@ function prereqs_check {
 	fi
 }
 
+function get_pnetid {
+	local netdev=$1
+	local pnetid=""
+
+	#### ROCE:
+	if [ -e /sys/class/net/$netdev/device/util_string ]; then
+		pnetids="$(cat /sys/class/net/$netdev/device/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+	else
+	#### OSA /HiperSockets:
+		if [ -e /sys/class/net/$netdev/device/chpid ]; then
+			chpid="$(cat /sys/class/net/$netdev/device/chpid | tr [:upper:] [:lower:])"
+			pnetids="$(cat /sys/devices/css0/chp0.$chpid/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+		fi
+	fi
+	if [ "$pnetids" != "" ]; then
+		port_if="$(cat /sys/class/net/$netdev/dev_port)"
+		(( idx=16*$port_if+1 ))
+		(( end=$idx+15 ))
+		pnetid="$(echo "$pnetids" | cut -c $idx-$end | tr -d ' ')"
+	fi
+
+	echo $pnetid
+}
+
 function check_pnetids {
-	# get PNETID of the HS
-	local hsif_pnetids=""
-	local netif_pnetids=""
-
-	if [ -e /sys/class/net/$hsdev/device/util_string ]; then
-		hsif_pnetids="$(cat /sys/class/net/$hsdev/device/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+	if [ "$hsdev" != "" ]; then
+		hsif_pnetid="$(get_pnetid $hsdev)"
 	else
-		if [ -e /sys/class/net/$hsdev/device/chpid ]; then
-			chpid="$(cat /sys/class/net/$hsdev/device/chpid | tr [:upper:] [:lower:])"
-			hsif_pnetids="$(cat /sys/devices/css0/chp0.$chpid/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
-		fi
+		hsif_pnetid=""
 	fi
-	if [ "$hsif_pnetids" != "" ]; then
-		port_hsif="$(cat /sys/class/net/$hsdev/dev_port)"
-		(( idx=16*$port_hsif+1 ))
-		(( end=$idx+15 ))
-		hsif_pnetid="$(echo "$hsif_pnetids" | cut -c $idx-$end | tr -d ' ')"
-	fi
-
-	# get PNETID of the NET_DEV
-	if [ -e /sys/class/net/$ndev/device/util_string ]; then
-		netif_pnetids="$(cat /sys/class/net/$ndev/device/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
+	if [ "$ndev" != "" ]; then
+		netif_pnetid="$(get_pnetid $ndev)"
 	else
-		if [ -e /sys/class/net/$ndev/device/chpid ]; then
-			chpid="$(cat /sys/class/net/$ndev/device/chpid | tr [:upper:] [:lower:])"
-			netif_pnetids="$(cat /sys/devices/css0/chp0.$chpid/util_string | tr -d '\000' | iconv -f IBM-1047 -t ASCII)"
-		fi
-	fi
-	if [ "$netif_pnetids" != "" ]; then
-		port_netif="$(cat /sys/class/net/$ndev/dev_port)"
-		(( idx=16*$port_netif+1 ))
-		(( end=$idx+15 ))
-		netif_pnetid="$(echo "$netif_pnetids" | cut -c $idx-$end | tr -d ' ')"
+		netif_pnetid=""
 	fi
 
 	#Check PNETIDs
 	if [ "$hsif_pnetid" != "" ] && [ "$netif_pnetid" != "" ] && [ "$netif_pnetid" != "$hsif_pnetid" ]; then
 		echo "Error: $hsdev and $ndev have different PNETIDs! They are $hsif_pnetid and $netif_pnetid respectively" >&2
 		return 1
-	fi
-
-	if [ "$hsif_pnetid" != "" ] && [ "$netif_pnetid" != "" ] && [ "$netif_pnetid" == "$hsif_pnetid" ]; then
-		hsci_pnetid=$hsif_pnetid
+	else
+		if [ "$hsif_pnetid" != "" ]; then
+			hsci_pnetid=$hsif_pnetid
+		else
+			hsci_pnetid=$netif_pnetid
+		fi
+		return 0
 	fi
 }
 
@@ -96,11 +99,11 @@ function verify_precon {
 		echo "Error: $hsdev does not exist" >&2
 		return 1
 	fi
-	if [ "$(cat /sys/class/net/$hsdev/device/card_type)" != "HiperSockets" ]; then
+	if [ "$(cat /sys/class/net/$hsdev/device/card_type 2>/dev/null)" != "HiperSockets" ]; then
 		echo "Error: $hsdev is not a HiperSockets device" >&2
 		return 1
 	fi
-	if [ "$(cat /sys/class/net/$hsdev/device/layer2)" != "1" ]; then
+	if [ "$(cat /sys/class/net/$hsdev/device/layer2 2>/dev/null)" != "1" ]; then
 		echo "Error: $hsdev is not in layer 2 mode" >&2
 		return 1
 	fi
@@ -108,7 +111,7 @@ function verify_precon {
 		echo "Error: Missing vnic-characteristics support" >&2
 		return 1
 	fi
-	if [ "$(cat /sys/class/net/$hsdev/device/vnicc/bridge_invisible)" == "n/a" ]; then
+	if [ "$(cat /sys/class/net/$hsdev/device/vnicc/bridge_invisible 2>/dev/null)" == "n/a" ]; then
 		echo "Error: $hsdev does not support vnicc" >&2
 		return 1
 	fi
@@ -121,8 +124,10 @@ function verify_precon {
 		return 1
 	fi
 	if [ $(ip link show $hsdev | grep master | wc -l) -ne 0 ]; then
-		echo "Error: $hsdev is already a bridge port" >&2
-		return 1
+		if [ $(ip link show $hsdev | grep "master $hsci" | wc -l) -eq 0 ]; then
+			echo "Error: $hsdev is already a subordinate to another master" >&2
+			return 1
+		fi
 	fi
 
 	#Pre-verify net_dev
@@ -130,17 +135,15 @@ function verify_precon {
 		echo "Error: $ndev does not exist" >&2
 		return 1
 	fi
-	if [ "$(cat /sys/class/net/$ndev/device/card_type)" == "HiperSockets" ]; then
-		echo "Error: $ndev is also a HiperSockets device" >&2
-		return 1
-	fi
 	if [ $(ip link show $ndev | grep UP | wc -l) -eq 0 ]; then
 		echo "Error: $ndev is not in state UP" >&2
 		return 1
 	fi
 	if [ $(ip link show $ndev | grep master | wc -l) -ne 0 ]; then
-		echo "Error: $ndev is already a bridge port" >&2
-		return 1
+		if [ $(ip link show $ndev | grep "master $hsci" | wc -l) -eq 0 ]; then
+			echo "Error: $ndev is already a subordinate to another master" >&2
+			return 1
+		fi
 	fi
 
 	#Check PNETIDs
@@ -183,11 +186,20 @@ function add_hsci {
 
 	echo "Adding $hsci with a HiperSockets dev $hsdev and an external dev $ndev"
 
-	#### Create bridge
-	ip link add name $hsci type bridge stp_state 0 >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Error: Could not create a bridge" >&2
-		return 1
+	#### Create bridge (idempotent)
+	if [ ! -e /sys/class/net/$hsci ]; then
+		# ageing_time of $hsci defaults to 30000 (300 secs)
+		ip link add name $hsci type bridge stp_state 0 >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Could not create a bridge" >&2
+			return 1
+		fi
+	else
+		ip link set dev $hsci type bridge stp_state 0 >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: $hsci is not a bridge" >&2
+			return 1
+		fi
 	fi
 
 	#### Prepare hsdev
@@ -230,27 +242,30 @@ function add_hsci {
 		clean_up
 		return 1
 	fi
-
 	# NOTE: Although not required, BCs will be sent out on hsdev.
 	# NOTE: We need to receive BCs on hsdev, as z/OS HSCI does ARP requests on HS.
 
 	hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
 	echo "Set $hsdev MAC $hsdev_mac on $ndev and $hsci"
 
-	# set HS MAC on OSA as secondary MAC
-	bridge fdb add $hsdev_mac dev $ndev >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Error: Failed to set HS MAC on OSA as secondary MAC" >&2
-		clean_up
-		return 1
+	# set HS MAC on OSA as secondary MAC (idempotent)
+	if [ $(bridge fdb show dev $ndev | grep "$hsdev_mac self permanent" | wc -l) -eq 0 ]; then
+		bridge fdb add $hsdev_mac dev $ndev >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to set HS MAC on OSA as secondary MAC" >&2
+			clean_up
+			return 1
+		fi
 	fi
 
-	# set HS MAC (common MAC) on HSCI as primary MAC
-	ip link set address $hsdev_mac dev $hsci >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Error: Failed to set HiperSockets MAC (common MAC) on HSCI as primary MAC" >&2
-		clean_up
-		return 1
+	# set HS MAC (common MAC) on HSCI as primary MAC (idempotent)
+	if [ $(bridge fdb show dev $hsci | grep "$hsdev_mac self permanent" | wc -l) -eq 0 ]; then
+		ip link set address $hsdev_mac dev $hsci >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to set HiperSockets MAC (common MAC) on HSCI as primary MAC" >&2
+			clean_up
+			return 1
+		fi
 	fi
 
 	ip link set dev $hsci up >/dev/null 2>&1
@@ -261,13 +276,17 @@ function add_hsci {
 	fi
 
 	# Turn on device for bridge notification
+	####  Toggle is required to learn full list of HS targets,
+	####   not only future changes.
+	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
 	bridge link set dev $hsdev learning_sync on self >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to turn on device for bridge notification" >&2
 		clean_up
 		return 1
 	fi
-	echo "Successfully added HSCI interface $hsci"
+
+	echo "Added HSCI interface $hsci"
 	return 0
 }
 
@@ -306,22 +325,23 @@ function del_hsci {
 	if [ "$hsdev" == "" ]; then
 		echo "Error: $hsci has no active HiperSockets port" >&2
 		return 1
-	fi
-	echo "Deleting HSCI interface $hsci with the HiperSockets $hsdev and the external $ndev"
+	else
+		echo "Deleting HSCI interface $hsci with the HiperSockets $hsdev and the external $ndev"
 
-	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Error: Failed to turn off learning_sync on $hsdev" >&2
-		return 1
-	fi
-	echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
+		bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to turn off learning_sync on $hsdev" >&2
+		fi
+		echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
 
-	hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
-	echo "Deleting $hsev MAC $hsdev_mac on $ndev"
-	bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Error: Failed to delete $hsev MAC $hsdev_mac on $ndev" >&2
-		return 1
+		if [ "$ndev" == "" ]; then
+			hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
+			echo "Deleting $hsev MAC $hsdev_mac on $ndev"
+			bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				echo "Error: Failed to delete $hsdev MAC $hsdev_mac on $ndev" >&2
+			fi
+		fi
 	fi
 
 	ip link del $hsci >/dev/null 2>&1
@@ -329,8 +349,8 @@ function del_hsci {
 		echo "Error: Failed to delete $hsci" >&2
 		return 1
 	fi
-	echo "Successfully deleted device $hsci"
 
+	echo "Deleted $hsci"
 	return 0
 }
 
@@ -358,13 +378,14 @@ function print_header {
 	if [ $header -eq 0 ]; then
 		echo "HSCI      PNET_ID           HiperSockets     External       "
 		echo "------------------------------------------------------------"
+		header=1
 	fi
 }
 
 function list_one {
 	local hsnetdev=$1
 
-	if [ $(bridge -d link show dev $hsnetdev | grep	 "learning_sync on" | wc -l) -ne 0 ]; then
+	if [ $(bridge -d link show dev $hsnetdev 2>/dev/null | grep "learning_sync on" | wc -l) -ne 0 ]; then
 		print_header
 		list_active $hsnetdev
 	fi
@@ -433,4 +454,3 @@ while true; do
 	esac
 	shift
 done
-
