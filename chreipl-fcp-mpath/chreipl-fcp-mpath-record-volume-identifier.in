@@ -1,0 +1,73 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+#
+# Uses the following system-utilities (and shell-builtins):
+#   Those necessary for sourced library:
+#     - chreipl-fcp-mpath-common.sh
+#   GNU coreutils:
+#     - truncate
+#   util-linux:
+#     - hexdump
+
+# Record the identification of the volume we want to re-IPL from
+#
+# Makes use of udev event environment variables:
+#	DM_UUID
+#	SUBSYSTEM
+#	DEVPATH
+
+# shellcheck disable=SC2034
+declare -gr debug_trace_tag=10rvid
+# shellcheck disable=SC1091
+source '@chreiplzfcpmp-lib@' || exit 127
+
+function id_file_record_ipl_information() {
+	local sdev_wwid="${1}" ipl_busid="${2}" ipl_wwpn="${3}" ipl_lun="${4}"
+
+	# lock file before writing ID, so noone sees any intermediate state
+	id_file_lock_exclusive_create				|| return 1
+
+	# reset ID without removing the file (necessary for the locking to work
+	# properly, since the FD we use for locking is on this file/inode)
+	truncate --no-create --size=0 "${ID_FILE}"		|| return 3
+	echo -ne "${sdev_wwid}\x00${ipl_busid}\x00${ipl_wwpn}\x00${ipl_lun}\x00" \
+		>>"${ID_FILE}"					|| return 4
+
+	if '@DEBUG@'; then hexdump -vC "${ID_FILE}" 1>&2; fi
+
+	id_file_unlock_exclusive_create
+
+	return 0
+}
+
+if [[ "${DM_UUID}" == mpath-* ]]; then
+	# Assume Multipath Device Mapper Device;
+	# e.g.: DEVPATH = /devices/virtual/block/dm-0
+	declare sdev
+
+	for sdev in /sys/"${DEVPATH}"/slaves/sd*/device; do
+		if sdev_get_wwid "${sdev}"; then
+			break
+		fi
+	done
+	unset sdev
+
+elif [ "${SUBSYSTEM}" = block ]; then
+	# Assume SCSI Disk;
+	# e.g.: DEVPATH = /devices/css0/0.0.0014/0.0.1700/host0/rport-0:0-0/target0:0:0/0:0:0:1074806808/block/sds
+
+	sdev_get_wwid /sys/"${DEVPATH}"/device
+fi
+# shellcheck disable=SC2153
+[ "${SDEV_WWID}" != "" ]					|| exit 1
+
+firmware_get_ipl_information					|| exit 2
+# shellcheck disable=SC2153
+id_file_record_ipl_information						\
+	"${SDEV_WWID}" "${IPL_BUSID}" "${IPL_WWPN}" "${IPL_LUN}"	\
+								|| exit 3
+
+exit 0

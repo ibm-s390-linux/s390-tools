@@ -8,6 +8,7 @@
 #   GNU coreutils:
 #     - mktemp
 #     - readlink
+#     - sync
 #   util-linux:
 #     - flock
 
@@ -15,7 +16,8 @@
 #	SEQNUM
 
 # (1) expand failed globs to an empty string
-shopt -s nullglob
+# (2) extended pattern matching to strip leading/trailing whitespaces
+shopt -s nullglob extglob
 # (1) don't overwrite existing files using redirects (e.g.: `>`)
 set -o noclobber
 
@@ -48,6 +50,7 @@ else
 	unset tlg
 fi
 
+declare -gr ID_FILE='@chreiplzfcpmp-id-file@'
 declare -gr FW_LOCK_FILE='@chreiplzfcpmp-fwlock-file@'
 
 declare -gA TRAP_EXIT_FN=()
@@ -62,6 +65,52 @@ function trap_exit() {
 	trap - EXIT
 }
 trap trap_exit EXIT
+
+# Output variables:
+#  id_file_unlock_exclusive_create() - call to unlock when finished with
+#                                      critical section
+#
+# XXX: `id_file_lock_*` can't be taken recursively
+function id_file_lock_exclusive_create() {
+	declare -g ID_FILE_LOCK=""
+
+	# prevent concurrent file creation
+	#
+	# First, open the file defined in ${ID_FILE} for writing; this will
+	# succeed and create the file only if it doesn't exist already. If the
+	# file already exist, the first open attempt will fail and we fall
+	# back to opening it only for reading; this will always succeed if the
+	# file already exists (the reason why the first attempty failed). In
+	# both cases store the corresponding file descriptor in
+	# ${ID_FILE_LOCK}.
+	#
+	# XXX: This should be race free.
+	#      open() with O_EXCL... is atomic (we set `noclobber` as shell
+	#      option); at least as long as we talk about a local FS.
+	if ! { exec {ID_FILE_LOCK}>"${ID_FILE}"; } 2>/dev/null; then
+		{ exec {ID_FILE_LOCK}<"${ID_FILE}"; } 2>/dev/null	\
+								|| return 1
+	fi
+
+	declare -gf id_file_unlock_exclusive_create 1>/dev/null
+	function id_file_unlock_exclusive_create() {
+		if [ -v ID_FILE_LOCK ]; then
+			sync "${ID_FILE}" 2>/dev/null
+			# release file and implicitly the lock, if taken
+			exec {ID_FILE_LOCK}>&-
+			unset ID_FILE_LOCK
+		fi
+
+		unset "TRAP_EXIT_FN[id_file_unlock_exclusive_create]"
+	}
+	TRAP_EXIT_FN+=(
+		[id_file_unlock_exclusive_create]=id_file_unlock_exclusive_create
+	)
+
+	flock --exclusive --timeout 5 "${ID_FILE_LOCK}"		|| return 2
+
+	return 0
+}
 
 # Output variables:
 #  firmware_unlock_shared() - call to unlock when finished with critical section
@@ -206,5 +255,44 @@ function sdev_get_fcp_addressing() {
 	SDEV_BUSID="${zfcp_dev}"
 	# shellcheck disable=2034
 	SDEV_WWPN="${rport_wwpn}"
+	return 0
+}
+
+# Input:
+#  1: path to the scsi device in sysfs
+# Output variables:
+#  SDEV_WWID
+function sdev_get_wwid() {
+	local sdev="${1}"
+	local -a wwid
+
+	declare -g SDEV_WWID=""
+
+	# read the volume identifier without stripping any content
+	#
+	# XXX: we can read the WWID file, even if the SDEV is currently not
+	#      operational (e.g.: due to the path has gone away), as long as
+	#      the VPD PG 83 is still cached in the kernel; and the page gets
+	#      only released on SDEV device release.
+	{ readarray -d "" -t wwid < "${sdev}"/wwid; } 2>/dev/null	\
+								|| return 1
+	if '@DEBUG@'; then declare -p wwid 1>&2; fi
+
+	# test whether we read something
+	#
+	# This strips all leading spaces from the beginning of the read WWID
+	# (until the first non-space or NUL character), and checks whether the
+	# result is empty.
+	# Hence, we return early if the WWID consists of only whitespace.
+	#
+	# XXX: there could be unexpected characters in the returned ID.
+	#      `scsi_id` from the udev helpers sanitizes the strings it reads
+	#      from the devices, so they can be used in environment variables
+	#      without much danger.
+	#      But we don't export anything here, so it should be fine.
+	[ "${wwid[0]/#*([[:space:]])}" != "" ]			|| return 2
+
+	# shellcheck disable=2034
+	SDEV_WWID="${wwid[0]}"
 	return 0
 }

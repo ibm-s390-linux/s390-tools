@@ -49,8 +49,25 @@ PROGRAM!="chreipl-fcp-mpath-is-ipl-tgt",				\
 	GOTO="chreipl_fcp_mpath_not_direct_match"
 ENV{CHREIPL_FCP_MPATH_IS_TGT}="true"
 
+# Record the WWID, Device-Bus-ID, Remote WWPN, and LUN of the ReIPL target
+# (see `chreipl-fcp-mpath-is-ipl-vol` for usecases). This information
+# might change, depending on whether the machine operator changes the ReIPL
+# target to a different volume.
+#
+# XXX: Because the kernel doesn't generate any events upon changing of
+#      the ReIPL target, the chreipl-fcp-mpath toolset can't take any
+#      actions until the next path event for the new target is
+#      generated. Following that, we assume that when the machine
+#      operator changes the ReIPL target, the new target is reachable
+#      and in a good state at this point in time.
+PROGRAM!="chreipl-fcp-mpath-record-volume-identifier",			\
+	GOTO="chreipl_fcp_mpath_try_change_ipl_path"
+GOTO="chreipl_fcp_mpath_try_change_ipl_path"
+
 # If the even subject is not a direct match (not the sdev that is the current
 # ReIPL target, and not a mpath device that contains the current ReIPL target)
 LABEL="chreipl_fcp_mpath_not_direct_match"
+
+LABEL="chreipl_fcp_mpath_try_change_ipl_path"
 
 LABEL="chreipl_fcp_mpath_end"

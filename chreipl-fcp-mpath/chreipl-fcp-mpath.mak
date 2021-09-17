@@ -23,6 +23,8 @@ DEBUGOUTDIR	 = $(UDEVRUNDIR)
 INSTALL_EXEC	 = $(INSTALL) -g $(GROUP) -o $(OWNER) --preserve-timestamps
 INSTALL_DATA	 = $(INSTALL_EXEC) --mode=0644
 
+# used for data exchange and synchronization across the different helpers
+chreiplzfcpmp-id-file		 = $(UDEVRUNDIR)/chreiplzfcpmp-ipl-volume-id
 # file used to implement mutual exclusion when accessing firmware IPL info:
 #   - this should be something that is (practically) always available, so we
 #     dont have to worry about fallbacks or error-handling;
@@ -37,6 +39,7 @@ define chreiplzfcpmp-sed-buildvar-replace =
 tmpout=$$(mktemp -p ./ .make.tmp.XXXXXXXXXXXXXXXX) && {			\
 	$(SED) -E 							\
 		-e 's|@DEBUG@|$(if $(filter 1,$(D)),true,false)|g'	\
+		-e 's|@chreiplzfcpmp-id-file@|$(chreiplzfcpmp-id-file)|g' \
 		-e 's|@chreiplzfcpmp-fwlock-file@|$(chreiplzfcpmp-fwlock-file)|g' \
 		-e 's|@chreiplzfcpmp-lib@|$(CHREIPLZFCPMPDIR)/chreipl-fcp-mpath-common.sh|g' \
 		-e 's|@debugoutdir@|$(DEBUGOUTDIR)|g'			\
