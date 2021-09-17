@@ -1,0 +1,56 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+#
+# Uses the following system-utilities (and shell-builtins):
+#   Those necessary for sourced library:
+#     - chreipl-fcp-mpath-common.sh
+
+# Find out whether the device in udev event environment variable ${DEVPATH}
+# represents the device we want to re-IPL from. We do this by comparing
+# Device-Bus-ID/Target-WWPN/LUN of the individual SDEVs to the parameters set
+# in `/sys/firmware/reipl/fcp/`.
+#
+# Makes use of udev event environment variables:
+#	DM_UUID
+#	SUBSYSTEM
+#	DEVPATH
+
+# shellcheck disable=SC2034
+declare -gr debug_trace_tag=05iilt
+# shellcheck disable=SC1091
+source '@chreiplzfcpmp-lib@' || exit 127
+
+firmware_get_ipl_information					|| exit 1
+
+if [[ "${DM_UUID}" == mpath-* ]]; then
+	# Assume Multipath Device Mapper Device;
+	# e.g.: DEVPATH = /devices/virtual/block/dm-0
+	declare sdev
+
+	# depends on `nullglob` from `chreipl-fcp-mpath-common.sh`
+	for sdev in /sys/"${DEVPATH}"/slaves/sd*/device; do
+		sdev_get_fcp_addressing "${sdev}"		|| continue
+		[ "${SDEV_LUN}" = "${IPL_LUN}" ]		|| continue
+		[ "${SDEV_WWPN}" = "${IPL_WWPN}" ]		|| continue
+		[ "${SDEV_BUSID}" = "${IPL_BUSID}" ]		|| continue
+
+		exit 0
+	done
+	unset sdev
+
+elif [ "${SUBSYSTEM}" = block ]; then
+	# Assume SCSI Disk;
+	# e.g.: DEVPATH = /devices/css0/0.0.0014/0.0.1700/host0/rport-0:0-0/target0:0:0/0:0:0:1074806808/block/sds
+
+	sdev_get_fcp_addressing /sys/"${DEVPATH}"/device	|| exit 2
+	[ "${SDEV_LUN}" = "${IPL_LUN}" ]			|| exit 3
+	[ "${SDEV_WWPN}" = "${IPL_WWPN}" ]			|| exit 4
+	[ "${SDEV_BUSID}" = "${IPL_BUSID}" ]			|| exit 5
+
+	exit 0
+fi
+
+exit 6

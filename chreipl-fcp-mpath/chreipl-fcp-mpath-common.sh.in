@@ -7,10 +7,15 @@
 # Uses the following system-utilities (and shell-builtins):
 #   GNU coreutils:
 #     - mktemp
+#     - readlink
+#   util-linux:
+#     - flock
 
 # Makes use of udev event environment variables:
 #	SEQNUM
 
+# (1) expand failed globs to an empty string
+shopt -s nullglob
 # (1) don't overwrite existing files using redirects (e.g.: `>`)
 set -o noclobber
 
@@ -42,3 +47,164 @@ then
 else
 	unset tlg
 fi
+
+declare -gr FW_LOCK_FILE='@chreiplzfcpmp-fwlock-file@'
+
+declare -gA TRAP_EXIT_FN=()
+declare -gf trap_exit 1>/dev/null
+function trap_exit() {
+	local fn
+
+	for fn in "${TRAP_EXIT_FN[@]}"; do
+		"${fn}"
+	done
+
+	trap - EXIT
+}
+trap trap_exit EXIT
+
+# Output variables:
+#  firmware_unlock_shared() - call to unlock when finished with critical section
+#
+# XXX: `firmware_lock_*` can't be taken recursively
+function firmware_lock_shared() {
+	declare -g FIRMWARE_LOCK=""
+
+	# Open the file defined in ${FW_LOCK_FILE} for reading, and store the
+	# corresponding file descriptor in ${FIRMWARE_LOCK} (it doesn't matter
+	# whether this is a normal file or directory). This file descriptor
+	# will only be used for locking - not for actual I/O.
+	{ exec {FIRMWARE_LOCK}<"${FW_LOCK_FILE}"; } 2>/dev/null	|| return 1
+
+	declare -gf firmware_unlock_shared 1>/dev/null
+	function firmware_unlock_shared() {
+		if [ -v FIRMWARE_LOCK ]; then
+			# release file and implicitly the lock, if taken
+			exec {FIRMWARE_LOCK}<&-
+			unset FIRMWARE_LOCK
+		fi
+
+		unset "TRAP_EXIT_FN[firmware_unlock_shared]"
+	}
+	TRAP_EXIT_FN+=([firmware_unlock_shared]=firmware_unlock_shared)
+
+	flock --shared --timeout 5 "${FIRMWARE_LOCK}"		|| return 2
+
+	return 0
+}
+
+# Output variables:
+#  IPL_TYPE
+#  IPL_BUSID
+#  IPL_WWPN
+#  IPL_LUN
+function firmware_get_ipl_information() {
+	declare -g IPL_TYPE="" IPL_BUSID="" IPL_WWPN="" IPL_LUN=""
+
+	# Take lock so we don't see any intermediate state from other helpers
+	# running in parallel
+	firmware_lock_shared					|| return 5
+
+	{ read -r IPL_TYPE _ < /sys/firmware/reipl/reipl_type; } 2>/dev/null \
+								|| return 1
+	{ read -r IPL_BUSID _ < /sys/firmware/reipl/fcp/device; } 2>/dev/null \
+								|| return 2
+	{ read -r IPL_WWPN _ < /sys/firmware/reipl/fcp/wwpn; } 2>/dev/null \
+								|| return 3
+	{ read -r IPL_LUN _ < /sys/firmware/reipl/fcp/lun; } 2>/dev/null \
+								|| return 4
+
+	firmware_unlock_shared
+
+	# show read values in debug log if enabled
+	if '@DEBUG@'; then
+		declare -p IPL_TYPE IPL_BUSID IPL_WWPN IPL_LUN 1>&2
+	fi
+
+	return 0
+}
+
+# Input:
+#  1: absolute canonical path to the scsi device in sysfs, e.g.:
+#     /sys/devices/css0/0.0.0014/0.0.1700/host1/rport-1:0-0/target1:0:0/1:0:0:1075789848
+# Output variables:
+#  SDEV_LUN
+function sdev_get_lun() {
+	local sdev="${1}" sdev_lun_str
+	# bash uses `intmax_t` as width for integer variables, and glibc
+	# defines this either as `long int` on 64 bit systems, or
+	# `long long int` on other.
+	local -i sdev_lun=0 fcp_lun=0
+
+	sdev_lun_str="${sdev##*:}"
+	# e.g.: 1075789848
+	[[ "${sdev_lun_str}" == +([[:digit:]]) ]]		|| return 1
+	# "cast" to integer
+	sdev_lun="${sdev_lun_str}"
+
+	# convert the Linux integer LUN format to the hexadecimal 64 bit T10
+	# LUN representation format used by many s390x interfaces
+	(( fcp_lun = (((sdev_lun >> 0) & 0xffff) << 48)
+			| (((sdev_lun >> 16) & 0xffff) << 32)
+			| (((sdev_lun >> 32) & 0xffff) << 16)
+			| (((sdev_lun >> 48) & 0xffff) << 0) ))
+	# the '0x' prefix is part of the length
+	printf -v SDEV_LUN "%#018llx" "${fcp_lun}"
+
+	# show read values in debug log if enabled
+	if '@DEBUG@'; then
+		declare -p SDEV_LUN 1>&2
+	fi
+
+	return 0
+}
+
+# Input:
+#  1: path to the scsi device in sysfs, e.g.:
+#     /sys/devices/css0/0.0.0014/0.0.1700/host1/rport-1:0-0/target1:0:0/1:0:0:1075789848
+#     , or a symlink pointing to the scsi device, e.g.:
+#     /sys/class/block/sds/device
+# Output variables:
+#  SDEV_BUSID
+#  SDEV_WWPN
+#  SDEV_LUN
+function sdev_get_fcp_addressing() {
+	local sdev="${1}" fcp_lun rport rport_wwpn zfcp_dev
+
+	declare -g SDEV_BUSID="" SDEV_WWPN="" SDEV_LUN=""
+
+	sdev="$(readlink -se "${sdev}")"			|| return 1
+
+	# get the LUN for this SDEV
+	#
+	# sets ${SDEV_LUN}
+	sdev_get_lun "${sdev}"					|| return 2
+
+	# get the WWPN of the remote port this SDEV is attached to
+	printf -v rport "%s" "${sdev}"/../../fc_remote_ports/rport-*:*-*
+	# e.g.: /sys/devices/css0/0.0.0016/0.0.1740/host0/rport-0:0-1/fc_remote_ports/rport-0:0-1
+	[ "${rport}" != "" ]					|| return 3
+
+	# XXX: This works even if the rport is currently in a bad
+	#      state, so e.g. when it has just gone down because of a
+	#      cable pull.
+	{ read -r rport_wwpn _ < "${rport}"/port_name; } 2>/dev/null	\
+								|| return 4
+
+	# The Linux kernel doesn't guarantee the same format as in
+	# /sys/firmware/..., so make sure it is the one we expect.
+	[[ "${rport_wwpn}" =~ ^0x[[:xdigit:]]{1,16}$ ]]		|| return 5
+	# the '0x' prefix is part of the length
+	printf -v rport_wwpn "%#018llx" "${rport_wwpn}"
+
+	# get the Device Bus-ID of the device via which this SDEV is attached
+	zfcp_dev="$(readlink -se "${sdev}"/../../../..)"	|| return 6
+	# e.g.: /sys/devices/css0/0.0.0016/0.0.1740
+	zfcp_dev="${zfcp_dev##*/}"
+
+	# shellcheck disable=2034
+	SDEV_BUSID="${zfcp_dev}"
+	# shellcheck disable=2034
+	SDEV_WWPN="${rport_wwpn}"
+	return 0
+}

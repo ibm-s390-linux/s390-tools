@@ -44,6 +44,7 @@ clean: chreipl-fcp-mpath-clean
 CHREIPL_FCP_MPATH_COMMON	:=					\
 	chreipl-fcp-mpath-common.sh
 CHREIPL_FCP_MPATH_UDEV_HELPER	:=					\
+	chreipl-fcp-mpath-is-ipl-tgt					\
 	chreipl-fcp-mpath-is-reipl-zfcp
 
 $(CHREIPL_FCP_MPATH_UDEV_HELPER) $(CHREIPL_FCP_MPATH_COMMON): $(MAKEFILE_LIST)

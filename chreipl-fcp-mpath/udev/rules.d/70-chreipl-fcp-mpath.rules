@@ -23,4 +23,34 @@ LABEL="chreipl_fcp_mpath_path_change"
 TEST!="/sys/firmware/ipl", GOTO="chreipl_fcp_mpath_end"
 PROGRAM!="chreipl-fcp-mpath-is-reipl-zfcp", GOTO="chreipl_fcp_mpath_end"
 
+# Consider the following scenarios.
+# Either:
+#
+# (A) We recognized a new SCSI Disk. This might represent:
+#     (a) the path we want to ReIPL from.
+#
+# Or:
+#
+# (B) We recognized a PATH_ event for a multipath device. This might represent:
+#     the path we want to ReIPL from:
+#         (a) went away;
+#         (b) came back online;
+#     an alternative path to the volume we want to ReIPL from:
+#         (c) went away;
+#         (d) came back online.
+
+# Test whether the affected device is, or contains, the current IPL target.
+#
+# This covers scenarios:
+#     (A) (a),
+#     (B) (a)/(b)/(c)/(d)
+PROGRAM!="chreipl-fcp-mpath-is-ipl-tgt",				\
+	ENV{CHREIPL_FCP_MPATH_IS_TGT}="false",				\
+	GOTO="chreipl_fcp_mpath_not_direct_match"
+ENV{CHREIPL_FCP_MPATH_IS_TGT}="true"
+
+# If the even subject is not a direct match (not the sdev that is the current
+# ReIPL target, and not a mpath device that contains the current ReIPL target)
+LABEL="chreipl_fcp_mpath_not_direct_match"
+
 LABEL="chreipl_fcp_mpath_end"
