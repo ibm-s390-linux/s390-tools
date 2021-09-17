@@ -15,4 +15,12 @@ ACTION=="add", KERNEL=="sd[a-z]*", SUBSYSTEM=="block",			\
 GOTO="chreipl_fcp_mpath_end"
 LABEL="chreipl_fcp_mpath_path_change"
 
+# Is this system IPL'ed (IOW, are we on s390x)? And do we ReIPL via zFCP?
+#
+#    udev(7): If no absolute path is given, the program is expected to live
+#             in /usr/lib/udev; otherwise, the absolute path must be
+#             specified.
+TEST!="/sys/firmware/ipl", GOTO="chreipl_fcp_mpath_end"
+PROGRAM!="chreipl-fcp-mpath-is-reipl-zfcp", GOTO="chreipl_fcp_mpath_end"
+
 LABEL="chreipl_fcp_mpath_end"

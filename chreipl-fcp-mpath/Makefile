@@ -40,9 +40,27 @@ chreipl-fcp-mpath-clean:
 all: chreipl-fcp-mpath
 clean: chreipl-fcp-mpath-clean
 
-udev/rules.d/70-chreipl-fcp-mpath.rules:
+# common function used in the helper scripts
+CHREIPL_FCP_MPATH_COMMON	:=					\
+	chreipl-fcp-mpath-common.sh
+CHREIPL_FCP_MPATH_UDEV_HELPER	:=					\
+	chreipl-fcp-mpath-is-reipl-zfcp
+
+$(CHREIPL_FCP_MPATH_UDEV_HELPER) $(CHREIPL_FCP_MPATH_COMMON): $(MAKEFILE_LIST)
+$(CHREIPL_FCP_MPATH_UDEV_HELPER) $(CHREIPL_FCP_MPATH_COMMON): % : %.in
+	$(call chreiplzfcpmp-sed-buildvar-replace,$(<),$(@))
+	chmod a+x $(@)
+
+$(CHREIPL_FCP_MPATH_UDEV_HELPER): $(CHREIPL_FCP_MPATH_COMMON)
+
+.PHONY: chreipl-fcp-mpath-udev-helper-clean
+chreipl-fcp-mpath-udev-helper-clean:
+	rm -f $(CHREIPL_FCP_MPATH_UDEV_HELPER) $(CHREIPL_FCP_MPATH_COMMON)
+
+udev/rules.d/70-chreipl-fcp-mpath.rules: $(CHREIPL_FCP_MPATH_UDEV_HELPER)
 
 chreipl-fcp-mpath: udev/rules.d/70-chreipl-fcp-mpath.rules
+chreipl-fcp-mpath-clean: chreipl-fcp-mpath-udev-helper-clean
 
 #
 ## Install
@@ -69,3 +87,82 @@ chreipl-fcp-mpath-install-udev-rules: udev/rules.d/70-chreipl-fcp-mpath.rules
 		udev/rules.d/70-chreipl-fcp-mpath.rules
 
 chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-udev-rules
+
+# install udev helper programs
+INSTDIRS += $(UDEVDIR)
+
+.PHONY: chreipl-fcp-mpath-install-udev-helper
+chreipl-fcp-mpath-install-udev-helper: | $(DESTDIR)$(UDEVDIR)
+chreipl-fcp-mpath-install-udev-helper: $(CHREIPL_FCP_MPATH_UDEV_HELPER)
+	$(INSTALL_EXEC) -t $(DESTDIR)$(UDEVDIR) $(CHREIPL_FCP_MPATH_UDEV_HELPER)
+
+chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-udev-helper
+
+# install common library files
+INSTDIRS += $(CHREIPLZFCPMPDIR)
+
+.PHONY: chreipl-fcp-mpath-install-libfiles
+chreipl-fcp-mpath-install-libfiles: | $(DESTDIR)$(CHREIPLZFCPMPDIR)
+chreipl-fcp-mpath-install-libfiles: $(CHREIPL_FCP_MPATH_COMMON)
+	$(INSTALL_DATA) -t $(DESTDIR)$(CHREIPLZFCPMPDIR)		\
+		$(CHREIPL_FCP_MPATH_COMMON)
+
+chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-libfiles
+
+#
+## Utility
+#
+
+# Utilities for the debug feature of chreipl-fcp-mpath-common.sh.
+#
+# When `chreipl-fcp-mpath` is built with D=1 (default is D=0), each run
+# of one of the helper scripts will create a debug log in $(DEBUGOUTDIR)
+# (default: /run/udev) which among other things contains the complete shell
+# trace of that script run, with some added information that would not be
+# inspectable otherwise with just the trace.
+#
+# There is currently no way of enabling/disabling this at runtime.
+#
+# chreipl-fcp-mpath-common.sh defines debug log file name as
+# "chreiplzfcpmp-${debug_trace_tag}-${SEQNUM:-0}.XXXXXXXXXX" where SEQNUM is a
+# udev rule environment variable and each X is replaced with some [[:alnum:]]
+# by mktemp. For a definition of `debug_trace_tag`, please see the comments
+# in the source.
+#
+# The following targets can be used for some simple access and filtering of the
+# logs during development.
+
+DEBUG_LOG_GLOB = $(DEBUGOUTDIR)/chreiplzfcpmp-[[:digit:]][[:digit:]][[:alpha:]][[:alpha:]][[:alpha:]][[:alpha:]]-+([[:digit:]]).[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]]
+
+# display all debug log files on the system
+.PHONY: chreipl-fcp-mpath-debug-logs
+chreipl-fcp-mpath-debug-logs:
+	@ls -1d $(DEBUG_LOG_GLOB)
+
+# display only debug log files of script runs that exited with status 0 (= good)
+#
+# XXX: `sed -n -e '$p'` is used instead of `tail -n1` to prevent an other
+#      dependency just for that (both invocations do the same thing).
+.PHONY: chreipl-fcp-mpath-debug-logs-filter-good
+chreipl-fcp-mpath-debug-logs-filter-good:
+	@for lg in $(DEBUG_LOG_GLOB); do				\
+		sed -e '/^+ trap_exit$$/,/^+ trap - EXIT$$/d' "$${lg}"	\
+		    | sed -n -e '$$p'					\
+		    | grep -q -e '^+ exit 0$$'		|| continue;	\
+		ls -d "$${lg}";						\
+	done
+
+# display only debug log files of script runs that didn't exit with status 0
+# (= bad)
+.PHONY: chreipl-fcp-mpath-debug-logs-filter-bad
+chreipl-fcp-mpath-debug-logs-filter-bad:
+	@for lg in $(DEBUG_LOG_GLOB); do				\
+		sed -e '/^+ trap_exit$$/,/^+ trap - EXIT$$/d' "$${lg}"	\
+		    | sed -n -e '$$p'					\
+		    | grep -q -e '^+ exit 0$$'		&& continue;	\
+		ls -d "$${lg}";						\
+	done
+
+.PHONY: chreipl-fcp-mpath-debug-logs-clean
+chreipl-fcp-mpath-debug-logs-clean:
+	rm -f $(DEBUG_LOG_GLOB)

@@ -1,0 +1,44 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+#
+# Uses the following system-utilities (and shell-builtins):
+#   GNU coreutils:
+#     - mktemp
+
+# Makes use of udev event environment variables:
+#	SEQNUM
+
+# (1) don't overwrite existing files using redirects (e.g.: `>`)
+set -o noclobber
+
+# make sure any state files created are only writeable by the owning user
+umask 027
+
+# create log if DEBUG is enabled (with Make: D=1)
+#
+# Each script importing this library and expecting a debug log to be created
+# must declare a *trace tag* in a variable `debug_trace_tag`. This is used as
+# identifier in the log file name. The format is:
+#
+#     [[:digit:]][[:digit:]][[:alpha:]][[:alpha:]][[:alpha:]][[:alpha:]]
+#     \                    /\                                          /
+#      --------\  /--------  -------------------\  /-------------------
+#               \/                               \/
+#      relative position of  some unique abbreviation for the script
+#      execution in the      name, excluding any common prefix
+#      udev rules
+if '@DEBUG@' && [ -v debug_trace_tag ] && tlg="$(
+	mktemp -p '@debugoutdir@'					\
+		"chreiplzfcpmp-${debug_trace_tag}-${SEQNUM:-0}.XXXXXXXXXX" \
+		2>/dev/null)"
+then
+	readonly tlg
+	exec >|"${tlg}" 2>&1
+	set -x
+	set
+else
+	unset tlg
+fi

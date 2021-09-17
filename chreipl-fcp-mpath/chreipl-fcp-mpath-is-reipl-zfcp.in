@@ -1,0 +1,25 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# chreipl-fcp-mpath: use multipath information to change FCP IPL target
+# (C) Copyright IBM Corp. 2021
+#
+# Uses the following system-utilities (and shell-builtins):
+#   Those necessary for sourced library:
+#     - chreipl-fcp-mpath-common.sh
+
+# Find out whether ReIPL is gonna happen from a SCSI volume attached via zFCP
+
+# shellcheck disable=SC2034
+declare -gr debug_trace_tag=00iriz
+# shellcheck disable=SC1091
+source '@chreiplzfcpmp-lib@' || exit 127
+
+declare reipl_type
+
+{ read -r reipl_type _ < /sys/firmware/reipl/reipl_type; } 2>/dev/null || exit 1
+if '@DEBUG@'; then declare -p reipl_type 1>&2; fi
+
+[ "${reipl_type}" = "fcp" ]					|| exit 2
+
+exit 0
