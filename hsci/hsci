@@ -405,9 +405,11 @@ function del_hsci {
 	if [[ $hscibp != *@* ]]; then
 		#  $hsci has no HSCI veth peer
 		echo "Warning: $hsci may have been created by an older version of hsci" >&2
+		mvp=1
 		hscibp=""
-		hscibr=""
+		hscibr=$hsci
 	else
+		mvp=0
 		hscibp=${hscibp##*@}
 		hscibp=${hscibp%:}
 		echo "$hsci is paired with $hscibp" >&2
@@ -418,22 +420,18 @@ function del_hsci {
 	#### Find hsdev and ndev
 	hsdev=""
 	ndev=""
-	if [ "$hscibr" == "" ]; then
-			echo "Error: $hscibp has no HSCI master bridge" >&2
-	else
-		bports="$(ip link show | grep "master $hscibr" | awk '{print $2}')"
-		for bport in $bports; do
-			bport=${bport%:}
-			bport=${bport%@*}
-			if [ $(bridge -d link show dev $bport | grep "isolated on" | wc -l) -ne 0 ]; then
-					if [ $(bridge -d link show dev $bport | grep "learning_sync on" | wc -l) -ne 0 ]; then
-						hsdev=$bport
-					else
-						ndev=$bport
-					fi
-			fi
-		done
-	fi
+	bports="$(ip link show | grep "master $hscibr" | awk '{print $2}')"
+	for bport in $bports; do
+		bport=${bport%:}
+		bport=${bport%@*}
+		if [ $(bridge -d link show dev $bport | grep "isolated on" | wc -l) -ne 0 ]; then
+				if [ $(bridge -d link show dev $bport | grep "learning_sync on" | wc -l) -ne 0 ]; then
+					hsdev=$bport
+				else
+					ndev=$bport
+				fi
+		fi
+	done
 	if [ "$hsdev" == "" ]; then
 		echo "Error: $hsci has no active HiperSockets port" >&2
 	fi
@@ -452,7 +450,7 @@ function del_hsci {
 	# Old kernel code doesn't do hsci bridge-to-device learning.
 	#  In this case: Remove the hsci_mac that was added during 'add' from
 	#  hsdev and ndev.
-	if  [ "$hsdev" != "" ]; then
+	if  [ "$hsdev" != "" ] && [ $mvp -eq 0 ]; then
 		if [ $(bridge fdb show dev $hsdev | grep "$hsci_mac self permanent" | wc -l) -ne 0 ]; then
 			echo "Warning: It seems your kernel does not support all hsci features, please upgrade." >&2
 			bridge fdb del $hsci_mac dev $hsdev self local
@@ -461,6 +459,7 @@ function del_hsci {
 			fi
 		fi
 	fi
+	# In the mvp case hsci_mac == hs_mac and was only set on ndev.
 	if [ "$ndev" != "" ]; then
 		if [ $(bridge fdb show dev $ndev | grep "$hsci_mac self permanent" | wc -l) -ne 0 ]; then
 			bridge fdb del $hsci_mac dev $ndev self local
@@ -498,7 +497,11 @@ function del_hsci {
 ##############################################################################
 
 function print_row {
-	printf '%-8s  %-16s  %-15s  %-15s\n' "$hsci" "$hsci_pnetid" "$hsdev" "$ndev"
+	if [ $mvp -eq 0 ]; then
+		printf '%-8s  %-16s  %-15s  %-15s\n' "$hsci" "$hsci_pnetid" "$hsdev" "$ndev"
+	else
+		printf '%-8s  %-16s  %-15s  %-15s    (v1)\n' "$hsci" "$hsci_pnetid" "$hsdev" "$ndev"
+	fi
 }
 
 function list_active {
@@ -506,6 +509,7 @@ function list_active {
 	hsdev=$1
 	ndev=""
 	hscibp=""
+	mvp=1
 
 	hsci_pnetid="$(get_pnetid $hsdev)"
 
@@ -526,10 +530,17 @@ function list_active {
 			fi
 		else
 			hscibp=$bport
+			mvp=0
 		fi
 	done
 
 	check_pnetids
+
+	if [ $mvp -ne 0 ]; then
+		hsci=$hscibr
+		print_row
+		return 0
+	fi
 
 	#### find hsci (veth-peer of non-isolated subordinate of hscibr)
 	hsci="$(ip -o link show dev $hscibp | awk '{print $2}')"
