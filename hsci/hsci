@@ -11,10 +11,35 @@
 hsdev=""
 ndev=""
 hsci=""
+hscibr=""
+hscibp=""
 hsdev_mac=""
 hsif_pnetid=""
 netif_pnetid=""
 hsci_pnetid=""
+
+##############################################################################
+#  Concept:
+#	     --------
+#	     | hsci |
+#	     --------
+#	     /       \
+#	--------    --------
+#	| ndev |    | hsdev |
+#	--------    --------
+#
+# Detail (bridge w/ bridgeports):
+#	           --------
+#	           | hsci |
+#	           --------
+#	               |
+#	----------------------
+#	|          |hsci-bp| |
+#	| hsci-br  --------- |
+#	|                    |
+#	--------   --------  |
+#	| ndev |   | hsdev | |
+#	----------------------
 
 function usage {
 cat <<-EOD
@@ -156,10 +181,11 @@ function verify_precon {
 }
 
 function clean_up {
+	ip link del $hsci >/dev/null 2>&1
 	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
 	echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible >/dev/null 2>&1
 	bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
-	ip link del $hsci >/dev/null 2>&1
+	ip link del $hscibr >/dev/null 2>&1
 }
 
 ##############################################################################
@@ -175,29 +201,31 @@ function add_hsci {
 	hsdev=$1
 	ndev=$2
 
+	hsci_postfix="$(readlink /sys/class/net/$hsdev/device/cdev0 | tail -c5)"
+	hscibr=hsci$hsci_postfix-br
+	hscibp=hsci$hsci_postfix-bp
+	hsci=hsci$hsci_postfix
+
 	#### Verify preconditions
 	verify_precon
 	if [ $? -ne 0 ]; then
 		return 1
 	fi
 
-	hsci_postfix="$(readlink /sys/class/net/$hsdev/device/cdev0 | tail -c5)"
-	hsci=hsci$hsci_postfix
-
 	echo "Adding $hsci with a HiperSockets dev $hsdev and an external dev $ndev"
 
 	#### Create bridge (idempotent)
-	if [ ! -e /sys/class/net/$hsci ]; then
-		# ageing_time of $hsci defaults to 30000 (300 secs)
-		ip link add name $hsci type bridge stp_state 0 >/dev/null 2>&1
+	if [ ! -e /sys/class/net/$hscibr ]; then
+		# ageing_time of $hscibr defaults to 30000 (300 secs)
+		ip link add name $hscibr type bridge stp_state 0 >/dev/null 2>&1
 		if [ $? -ne 0 ]; then
 			echo "Error: Could not create a bridge" >&2
 			return 1
 		fi
 	else
-		ip link set dev $hsci type bridge stp_state 0 >/dev/null 2>&1
+		ip link set dev $hscibr type bridge stp_state 0 >/dev/null 2>&1
 		if [ $? -ne 0 ]; then
-			echo "Error: $hsci is not a bridge" >&2
+			echo "Error: $hscibr is not a bridge" >&2
 			return 1
 		fi
 	fi
@@ -208,18 +236,23 @@ function add_hsci {
 	echo 1 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
 
 	#### Create bridge ports
-	ip link set dev $ndev master $hsci >/dev/null 2>&1
+	ip link set dev $ndev master $hscibr >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo "Error: Could not set master for $ndev" >&2
 		clean_up
 		return 1
 	fi
-	ip link set dev $hsdev master $hsci >/dev/null 2>&1
+	ip link set dev $hsdev master $hscibr >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo "Error: Could not set master for $hsdev" >&2
 		clean_up
 		return 1
 	fi
+
+# Do not learn from ndev, but do learn from hsci-bp:
+#  - First define hsdev and ndev as _isolated_ bridgeports
+#  - Then turn on learning_sync on self on hsdev
+#  - Then define hsci-bp as non-isolated veth bridgeport
 
 	# no forwarding between ndev and hsdev -> isolated on
 	# ndev is default for outgoing unknown targets -> flood on
@@ -258,6 +291,53 @@ function add_hsci {
 		fi
 	fi
 
+	ip link set dev $hscibr up >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set $hscibr up" >&2
+		clean_up
+		return 1
+	fi
+
+	#### Turn on device for bridge notification
+	####  Toggle is required to learn full list of HS targets,
+	####   not only future changes.
+	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
+	bridge link set dev $hsdev learning_sync on self >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to turn on device for bridge notification" >&2
+		clean_up
+		return 1
+	fi
+
+	# define veth pair for hsci (idempotent)
+	if [ ! -e /sys/class/net/$hsci ]; then
+		ip link add dev $hsci type veth peer name $hscibp >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Could not create veth pair $hsci - $hscibp " >&2
+			clean_up
+			return 1
+		fi
+	else
+		if [ $hsci@$hscibp: != "$(ip -o -d link show dev $hsci | awk '/veth/ {print $2}' )" ]; then
+			echo "Error: $hsci@$hscibp is not a veth" >&2
+			clean_up
+			return 1
+		fi
+	fi
+
+	ip link set dev $hscibp master $hscibr >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to add $hscibp to $hscibr" >&2
+		clean_up
+		return 1
+	fi
+	bridge link set dev $hscibp isolated off learning on flood on mcast_flood on >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set bridge parameters for $hscibp" >&2
+		clean_up
+		return 1
+	fi
+
 	# set HS MAC (common MAC) on HSCI as primary MAC (idempotent)
 	if [ $(bridge fdb show dev $hsci | grep "$hsdev_mac self permanent" | wc -l) -eq 0 ]; then
 		ip link set address $hsdev_mac dev $hsci >/dev/null 2>&1
@@ -268,20 +348,16 @@ function add_hsci {
 		fi
 	fi
 
-	ip link set dev $hsci up >/dev/null 2>&1
+	#### Set veth pair to UP
+	ip link set dev $hscibp up >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
-		echo "Error: Failed to set $hsci up" >&2
+		echo "Error: Failed to set $hscibp up" >&2
 		clean_up
 		return 1
 	fi
-
-	# Turn on device for bridge notification
-	####  Toggle is required to learn full list of HS targets,
-	####   not only future changes.
-	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
-	bridge link set dev $hsdev learning_sync on self >/dev/null 2>&1
+	ip link set dev $hsci up >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
-		echo "Error: Failed to turn on device for bridge notification" >&2
+		echo "Error: Failed to set $hsci up" >&2
 		clean_up
 		return 1
 	fi
@@ -305,49 +381,84 @@ function del_hsci {
 		echo "Error: $hsci does not exit" >&2
 		return 1
 	fi
-	if [ $(ip link show | grep "master $hsci" | wc -l) -eq 0 ]; then
-		echo "Error: $hsci is not an active HSCI interface" >&2
-		return 1
+
+	#### Find hscibp and hscibr
+	hscibp="$(ip -o link show dev $hsci | awk '{print $2}')"
+	if [[ $hscibp != *@* ]]; then
+		#  $hsci has no HSCI veth peer
+		echo "Warning: $hsci may have been created by an older version of hsci" >&2
+		hscibp=""
+		hscibr=""
+	else
+		hscibp=${hscibp##*@}
+		hscibp=${hscibp%:}
+		echo "$hsci is paired with $hscibp" >&2
+
+		hscibr="$(ip link show dev $hscibp | awk '{for(x=1;x<NF;x++) if($x~/master/) print $(x+1)}')"
 	fi
 
-	bports="$(ip link show | grep "master $hsci" | awk '{print $2}')"
-	for bport in $bports; do
-		bport=${bport%:}
-			if [[ $bport == *@* ]]; then
-				bport=${bport%@*}
+	#### Find hsdev and ndev
+	hsdev=""
+	ndev=""
+	if [ "$hscibr" == "" ]; then
+			echo "Error: $hscibp has no HSCI master bridge" >&2
+	else
+		bports="$(ip link show | grep "master $hscibr" | awk '{print $2}')"
+		for bport in $bports; do
+			bport=${bport%:}
+			bport=${bport%@*}
+			if [ $(bridge -d link show dev $bport | grep "isolated on" | wc -l) -ne 0 ]; then
+					if [ $(bridge -d link show dev $bport | grep "learning_sync on" | wc -l) -ne 0 ]; then
+						hsdev=$bport
+					else
+						ndev=$bport
+					fi
 			fi
-		if [ $(bridge -d link show dev $bport | grep "learning_sync on" | wc -l) -ne 0 ]; then
-			hsdev=$bport
-		else
-			ndev=$bport
-		fi
-	done
+		done
+	fi
 	if [ "$hsdev" == "" ]; then
 		echo "Error: $hsci has no active HiperSockets port" >&2
-		return 1
-	else
-		echo "Deleting HSCI interface $hsci with the HiperSockets $hsdev and the external $ndev"
-
-		bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo "Error: Failed to turn off learning_sync on $hsdev" >&2
-		fi
-		echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
-
-		if [ "$ndev" == "" ]; then
-			hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
-			echo "Deleting $hsev MAC $hsdev_mac on $ndev"
-			bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
-			if [ $? -ne 0 ]; then
-				echo "Error: Failed to delete $hsdev MAC $hsdev_mac on $ndev" >&2
-			fi
-		fi
 	fi
+	if [ "$ndev" == "" ]; then
+		echo "Error: $hsci has no active external port" >&2
+	fi
+	echo "Deleting HSCI interface $hsci with HiperSockets interface $hsdev and external interface $ndev"
 
+	#### Delete veth before resetting learning_sync and deleting bridge,
+	####  so fdb entries are cleaned up (synced)!
 	ip link del $hsci >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to delete $hsci" >&2
-		return 1
+	fi
+	echo "Successfully deleted device $hsci"
+
+	#### Reset learning_sync
+	if [ "$hsdev" != "" ]; then
+		bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				echo "Error: Failed to turn off learning_sync on $hsdev" >&2
+			fi
+	fi
+
+	if [ "$hsdev" != "" ] && [ "$ndev" != "" ]; then
+		hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
+		echo "Deleting $hsev MAC $hsdev_mac on $ndev"
+		bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to delete $hsev MAC $hsdev_mac on $ndev" >&2
+		fi
+	fi
+
+	#### Delete bridge
+	if [ "$hscibr" != "" ]; then
+		ip link del $hscibr >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to delete $hscibr" >&2
+		fi
+	fi
+
+	if [ "$hsdev" != "" ]; then
+		echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible
 	fi
 
 	echo "Deleted $hsci"
@@ -358,19 +469,51 @@ function del_hsci {
 ##	Show HSCI
 ##############################################################################
 
-function list_active {
-	hsdev=$1
-	local ext=""
+function print_row {
+	printf '%-8s  %-16s  %-15s  %-15s\n' "$hsci" "$hsci_pnetid" "$hsdev" "$ndev"
+}
 
-	hsci="$(ip link show dev $hsdev | awk '{for(x=1;x<NF;x++) if($x~/master/) print $(x+1)}')"
-	ext="$(ip link show | grep "master $hsci" | grep --invert-match $hsdev | awk '{print $2}')"
-	# remove trailing ':'
-	ndev="${ext%:}"
+function list_active {
+	hsci=""
+	hsdev=$1
+	ndev=""
+	hscibp=""
+
+	hsci_pnetid="$(get_pnetid $hsdev)"
+
+	hscibr="$(ip link show dev $hsdev | awk '{for(x=1;x<NF;x++) if($x~/master/) print $(x+1)}')"
+	if [ "$hscibr" == "" ]; then
+		print_row
+		return 0
+	fi
+
+	#### find ndev (the other isolated subordinate)
+	bports="$(ip link show | grep "master $hscibr" | awk '{print $2}')"
+	for bport in $bports; do
+		bport=${bport%:}
+		bport=${bport%@*}
+		if [ $(ip -d link show dev $bport | grep "isolated on" | wc -l) -ne 0 ]; then
+			if [ $bport != $hsdev ]; then
+				ndev=$bport
+			fi
+		else
+			hscibp=$bport
+		fi
+	done
 
 	check_pnetids
 
-	printf '%-8s  %-16s  %-15s  %-15s\n' "$hsci" "$hsci_pnetid" "$hsdev" "$ndev"
+	#### find hsci (veth-peer of non-isolated subordinate of hscibr)
+	hsci="$(ip -o link show dev $hscibp | awk '{print $2}')"
+	if [[ $hsci != *@* ]]; then
+		echo "Error: $hscibp has no HSCI veth peer" >&2
+		print_row
+		return 1
+	fi
+	hsci=${hsci##*@}
+	hsci=${hsci%:}
 
+	print_row
 	return 0
 }
 
