@@ -109,6 +109,9 @@ Package contents
    feature. Those traces are filtered with the zfcpdbf script, i.e. merge
    several traces, make it more readable etc.
 
+ * sclpdbf:
+   Display debug data for the sclp kernel component.
+
  * scsi_logging_level:
    Create, get or set the logging level for the SCSI logging facility.
 
