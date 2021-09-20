@@ -13,7 +13,7 @@ ndev=""
 hsci=""
 hscibr=""
 hscibp=""
-hsdev_mac=""
+hsci_mac=""
 hsif_pnetid=""
 netif_pnetid=""
 hsci_pnetid=""
@@ -184,7 +184,8 @@ function clean_up {
 	ip link del $hsci >/dev/null 2>&1
 	bridge link set dev $hsdev learning_sync off self >/dev/null 2>&1
 	echo 0 > /sys/class/net/$hsdev/device/vnicc/bridge_invisible >/dev/null 2>&1
-	bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
+	bridge fdb del $hsci_mac dev $hsdev self local >/dev/null 2>&1
+	bridge fdb del $hsci_mac dev $ndev self local >/dev/null 2>&1
 	ip link del $hscibr >/dev/null 2>&1
 }
 
@@ -278,18 +279,6 @@ function add_hsci {
 	# NOTE: Although not required, BCs will be sent out on hsdev.
 	# NOTE: We need to receive BCs on hsdev, as z/OS HSCI does ARP requests on HS.
 
-	hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
-	echo "Set $hsdev MAC $hsdev_mac on $ndev and $hsci"
-
-	# set HS MAC on OSA as secondary MAC (idempotent)
-	if [ $(bridge fdb show dev $ndev | grep "$hsdev_mac self permanent" | wc -l) -eq 0 ]; then
-		bridge fdb add $hsdev_mac dev $ndev >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo "Error: Failed to set HS MAC on OSA as secondary MAC" >&2
-			clean_up
-			return 1
-		fi
-	fi
 
 	ip link set dev $hscibr up >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
@@ -338,11 +327,39 @@ function add_hsci {
 		return 1
 	fi
 
-	# set HS MAC (common MAC) on HSCI as primary MAC (idempotent)
-	if [ $(bridge fdb show dev $hsci | grep "$hsdev_mac self permanent" | wc -l) -eq 0 ]; then
-		ip link set address $hsdev_mac dev $hsci >/dev/null 2>&1
+	#### Set a static forwarding rule for hsci MAC, so hsci can be used as a
+	####  single-MAC network interface without being subject to
+	####  ageing and re-learning
+        #### Wait for systemd to change the MAC of hsci, if it wants to:
+        sleep 1
+	hsci_mac="$(cat /sys/class/net/$hsci/address)"
+	####  (idempotent)
+	if [ $(bridge fdb show dev $hscibp | grep "$hsci_mac master $hscibr static" | wc -l) -eq 0 ]; then
+		bridge fdb add $hsci_mac dev $hscibp master static
 		if [ $? -ne 0 ]; then
-			echo "Error: Failed to set HiperSockets MAC (common MAC) on HSCI as primary MAC" >&2
+			echo "Error: Failed to set $hsci_mac to $hscibr fdb" >&2
+			clean_up
+			return 1
+		fi
+	fi
+
+	# Bridge-to-device learning will set this MAC on hsdev and ndev.
+	# Old kernel code doesn't do hsci bridge-to-device learning.
+	#  In this case: Set hsci_mac as local MAC of hsdev and ndev,
+	#  so at least the single-MAC scenario works.
+	if [ $(bridge fdb show dev $hsdev | grep "$hsci_mac self permanent" | wc -l) -eq 0 ]; then
+		echo "Warning: $hsci will support only its current static MAC address. Please upgrade your kernel to the latest level." >&2
+		bridge fdb add $hsci_mac dev $hsdev self local
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to add $hsci_mac to $hsdev" >&2
+			clean_up
+			return 1
+		fi
+	fi
+	if [ $(bridge fdb show dev $ndev | grep "$hsci_mac self permanent" | wc -l) -eq 0 ]; then
+		bridge fdb add $hsci_mac dev $ndev self local
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to add $hsci_mac to $ndev" >&2
 			clean_up
 			return 1
 		fi
@@ -381,6 +398,7 @@ function del_hsci {
 		echo "Error: $hsci does not exit" >&2
 		return 1
 	fi
+	hsci_mac="$(cat /sys/class/net/$hsci/address)"
 
 	#### Find hscibp and hscibr
 	hscibp="$(ip -o link show dev $hsci | awk '{print $2}')"
@@ -430,7 +448,27 @@ function del_hsci {
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to delete $hsci" >&2
 	fi
-	echo "Successfully deleted device $hsci"
+	# Bridge-to-device learning will remove learned MACs from hsdev and ndev.
+	# Old kernel code doesn't do hsci bridge-to-device learning.
+	#  In this case: Remove the hsci_mac that was added during 'add' from
+	#  hsdev and ndev.
+	if  [ "$hsdev" != "" ]; then
+		if [ $(bridge fdb show dev $hsdev | grep "$hsci_mac self permanent" | wc -l) -ne 0 ]; then
+			echo "Warning: It seems your kernel does not support all hsci features, please upgrade." >&2
+			bridge fdb del $hsci_mac dev $hsdev self local
+			if [ $? -ne 0 ]; then
+				echo "Error: Failed to delete $hsci_mac from $hsdev" >&2
+			fi
+		fi
+	fi
+	if [ "$ndev" != "" ]; then
+		if [ $(bridge fdb show dev $ndev | grep "$hsci_mac self permanent" | wc -l) -ne 0 ]; then
+			bridge fdb del $hsci_mac dev $ndev self local
+			if [ $? -ne 0 ]; then
+				echo "Error: Failed to delete $hsci_mac from $ndev" >&2
+			fi
+		fi
+	fi
 
 	#### Reset learning_sync
 	if [ "$hsdev" != "" ]; then
@@ -439,16 +477,6 @@ function del_hsci {
 				echo "Error: Failed to turn off learning_sync on $hsdev" >&2
 			fi
 	fi
-
-	if [ "$hsdev" != "" ] && [ "$ndev" != "" ]; then
-		hsdev_mac="$(cat /sys/class/net/$hsdev/address)"
-		echo "Deleting $hsev MAC $hsdev_mac on $ndev"
-		bridge fdb del $hsdev_mac dev $ndev >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo "Error: Failed to delete $hsev MAC $hsdev_mac on $ndev" >&2
-		fi
-	fi
-
 	#### Delete bridge
 	if [ "$hscibr" != "" ]; then
 		ip link del $hscibr >/dev/null 2>&1
