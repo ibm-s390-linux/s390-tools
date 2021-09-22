@@ -20,7 +20,7 @@ check() {
     [ "$_arch" = "s390" -o "$_arch" = "s390x" ] || return 1
 
     # Ensure that required tools are available
-    require_binaries chzdev lszdev || return 1
+    require_binaries chzdev lszdev /lib/s390-tools/zdev_id || return 1
 
     return 0
 }
@@ -40,10 +40,13 @@ install() {
     local _tempfile
 
     # Ensure that required tools are available
-    inst_multiple chzdev lszdev vmcp
+    inst_multiple chzdev lszdev vmcp /lib/s390-tools/zdev_id
 
     # Hook to parse zdev kernel parameter
     inst_hook cmdline 95 "$moddir/parse-zdev.sh"
+
+    # Rule to automatically enable devices when running in DPM
+    inst_rules "81-dpm.rules"
 
     # Obtain early + root device configuration
     _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
