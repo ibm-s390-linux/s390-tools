@@ -85,7 +85,7 @@ const char *OPTS_SELECT_ALL	= "all";
 static void init_defaults(struct options *opts)
 {
 	opts->prog_name = "zgetdump";
-	opts->action = ZG_ACTION_STDOUT;
+	opts->action = ZG_ACTION_COPY;
 #ifdef __s390x__
 	opts->fmt = "elf";
 #else
@@ -201,7 +201,7 @@ static void verify_opts(struct options *opts)
 {
 	if (opts->select_specified) {
 		if (opts->action != ZG_ACTION_MOUNT &&
-		    opts->action != ZG_ACTION_STDOUT &&
+		    opts->action != ZG_ACTION_COPY &&
 		    opts->action != ZG_ACTION_DUMP_INFO)
 			ERR_EXIT("The \"--select\" option can only be "
 				 "specified for info, mount, or copy");
@@ -228,7 +228,7 @@ static void parse_pos_args(struct options *opts, char *argv[], int argc)
 	int pos_args = argc - optind;
 
 	switch (opts->action) {
-	case ZG_ACTION_STDOUT:
+	case ZG_ACTION_COPY:
 	case ZG_ACTION_DUMP_INFO:
 	case ZG_ACTION_DEVICE_INFO:
 		if (pos_args == 0)

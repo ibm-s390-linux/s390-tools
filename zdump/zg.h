@@ -188,7 +188,7 @@ extern enum zg_type zg_type(struct zg_fh *zg_fh);
  * zgetdump actions
  */
 enum zg_action {
-	ZG_ACTION_STDOUT,
+	ZG_ACTION_COPY,
 	ZG_ACTION_DUMP_INFO,
 	ZG_ACTION_DEVICE_INFO,
 	ZG_ACTION_MOUNT,

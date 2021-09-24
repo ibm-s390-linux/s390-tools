@@ -159,7 +159,7 @@ static int do_mount(void)
 /*
  * Run "copy to stdout" action
  */
-static int do_stdout(void)
+static int do_copy(void)
 {
 	int rc;
 
@@ -184,8 +184,8 @@ int main(int argc, char *argv[])
 		ERR_EXIT("Invalid target format \"%s\" specified", g.opts.fmt);
 
 	switch (g.opts.action) {
-	case ZG_ACTION_STDOUT:
-		return do_stdout();
+	case ZG_ACTION_COPY:
+		return do_copy();
 	case ZG_ACTION_DUMP_INFO:
 		return do_dump_info();
 	case ZG_ACTION_DEVICE_INFO:
