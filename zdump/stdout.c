@@ -17,9 +17,8 @@
 int stdout_write_dump(void)
 {
 	const u64 output_size = dfo_size();
-	u64 cnt, written = 0;
+	u64 written = 0;
 	char buf[32768];
-	ssize_t rc;
 
 	if (!dfi_feat_copy())
 		ERR_EXIT("Copying not possible for %s dumps", dfi_name());
@@ -28,7 +27,10 @@ int stdout_write_dump(void)
 	STDERR("  Target: %s\n", dfo_name());
 	STDERR("\n");
 	zg_progress_init("Copying dump", output_size);
-	do {
+	while (written != output_size) {
+		ssize_t rc;
+		u64 cnt;
+
 		cnt = dfo_read(buf, sizeof(buf));
 		rc = write(STDOUT_FILENO, buf, cnt);
 		if (rc == -1)
@@ -37,7 +39,7 @@ int stdout_write_dump(void)
 			ERR_EXIT("Error: Could not write full block");
 		written += cnt;
 		zg_progress(written);
-	} while (written != output_size);
+	};
 	STDERR("\n");
 	STDERR("Success: Dump has been copied\n");
 	return 0;
