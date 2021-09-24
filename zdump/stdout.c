@@ -17,8 +17,8 @@
 int stdout_write_dump(void)
 {
 	const u64 output_size = dfo_size();
+	char buf[8UL * PAGE_SIZE];
 	u64 written = 0;
-	char buf[32768];
 
 	if (!dfi_feat_copy())
 		ERR_EXIT("Copying not possible for %s dumps", dfi_name());
