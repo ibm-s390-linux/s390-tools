@@ -5,6 +5,7 @@ Release history for s390-tools (MIT version)
   For Linux kernel version: 5.xx
 
   Changes of existing tools:
+  - dbginfo.sh: add exception on dump2tar for /sys/kernel/mm/page_idle/bitmap
   - dbginfo.sh: cleanup of outdated sections and general code rework
   - dbginfo.sh: Collect zipl boot menu entries from boot loader specification
   - dbginfo.sh: add collection in area of timedate, coredump and --check option

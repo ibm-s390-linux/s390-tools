@@ -145,6 +145,7 @@ print_check() {
 
 Hardware platform     = ${HW}
 Runtime environment   = ${RUNTIME_ENVIRONMENT}
+$(cat /proc/sysinfo | grep 'Name')
 Kernel version        = ${KERNEL_INFO}
 OS version / distro   = ${OS_NAME}
 KVM host              = ${KVM}
@@ -735,7 +736,7 @@ collect_sysfs() {
     # files known to block on read (-x). Stop reading a file that takes
     # more than 5 seconds (-T 5) such as an active ftrace buffer.
     # error messages are not written to the log
-    dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" -x '*/tracing/trace_pipe*' \
+    dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" -x '*/tracing/trace_pipe*' -x '*/page_idle/bitmap*' \
 	 -x '*/tracing/per_cpu/*' --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
 
     if [ $? -ne 0 ] ; then
