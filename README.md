@@ -270,6 +270,10 @@ Package contents
    can be time consuming and prevent the HSA memory from being reused
    by other LPARs.
 
+ * chreipl-fcp-mpath:
+   Use multipath information to change the configured FCP re-IPL path on
+   detecting issues with the current path.
+
 For more information refer to the following publications:
 
   * "Device Drivers, Features, and Commands" chapter "Useful Linux commands"
@@ -307,11 +311,11 @@ build options:
 
 This table lists additional build or install options:
 
-| __COMPONENT__    | __OPTION__                   | __TOOLS__      |
-|------------------|:----------------------------:|:--------------:|
-| dracut           | `HAVE_DRACUT`                | zdev           |
-| initramfs-tools  | `HAVE_INITRAMFS`             | zdev           |
-|                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev           |
+| __COMPONENT__    | __OPTION__                   | __TOOLS__               |
+|------------------|:----------------------------:|:-----------------------:|
+| dracut           | `HAVE_DRACUT`                | zdev, chreipl-fcp-mpath |
+| initramfs-tools  | `HAVE_INITRAMFS`             | zdev                    |
+|                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev                    |
 
 The s390-tools build process uses "pkg-config" if available and hard-coded
 compiler and linker options otherwise.
@@ -465,3 +469,14 @@ the different tools are provided:
   (libxml2-devel.rpm), and libcurl version 7.59 or newer (libcurl-devel.rpm).
   Tip: you may skip the libkmipclient build by adding `HAVE_OPENSSL=0`,
   `HAVE_JSONC=0`, `HAVE_LIBXML2=0`, or `HAVE_LIBCURL=0` to the make invocation.
+
+* chreipl-fcp-mpath:
+  For a complete list and documentation of the requirements, installation and
+  uninstallation, please see
+  [chreipl-fcp-mpath/README.md](chreipl-fcp-mpath/README.md).
+
+  Summarized: chreipl-fcp-mpath requires GNU Bash, GNU Core Utilities,
+  util-linux, udev, and multipath-tools. When using `HAVE_DRACUT=1` with the
+  make invocation, it also requires dracut. When using `ENABLE_DOC=1` with the
+  make invocation to build a man page and render the README.md as HTML, make
+  further requires pandoc, GNU awk, and GNU Gzip for the build process.

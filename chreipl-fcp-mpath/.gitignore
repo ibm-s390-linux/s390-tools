@@ -6,3 +6,8 @@
 /chreipl-fcp-mpath-record-volume-identifier
 /chreipl-fcp-mpath-try-change-ipl-path
 /dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
+/README.html
+/README.pdf
+/chreipl-fcp-mpath.md
+/chreipl-fcp-mpath.7
+/chreipl-fcp-mpath.7.gz

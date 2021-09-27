@@ -8,6 +8,11 @@
 #     https://www.gnu.org/software/make/manual/make.html#Utilities-in-Makefiles
 #   GNU coreutils:
 #     - mktemp
+# If $(ENABLE_DOC) is `1`:
+#   Pandoc:
+#     - pandoc
+#   GNU coreutils:
+#     - date
 
 #
 ## Paths and Build Variables
@@ -16,6 +21,9 @@
 # Install the configuration file for dracut, to automatically pull in the
 # toolset into the initial ramdisk, when built with it.
 HAVE_DRACUT	 = 0
+
+# Build documentation; requires: Pandoc
+ENABLE_DOC	 = 0
 
 # https://www.gnu.org/software/make/manual/make.html#Directory-Variables
 CHREIPLZFCPMPDIR = $(USRLIBDIR)/chreipl-fcp-mpath
@@ -61,3 +69,25 @@ endef
 clean: clean-mk-temp
 clean-mk-temp:
 	rm -f .make.tmp.[[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]][[:alnum:]]
+
+# Definitions for generating documentation when $(ENABLE_DOC) is set to `1`
+
+PANDOCFLAGS	 = --fail-if-warnings
+ALL_PANDOCFLAGS	 = --preserve-tabs --tab-stop=8 --strip-comments	\
+		   --standalone --self-contained			\
+		   -M date="$(shell date +'%Y-%m-%d')"			\
+		   $(PANDOCFLAGS)
+
+$(eval $(call cmd_define, PANDOC,"  PANDOC  ",pandoc))
+
+%.html : ALL_PANDOCFLAGS += -t html
+%.html : %.md
+	$(PANDOC) $(ALL_PANDOCFLAGS) -f gfm -o $(@) $(<)
+
+%.pdf : ALL_PANDOCFLAGS += -t latex --toc
+%.pdf : %.md
+	$(PANDOC) $(ALL_PANDOCFLAGS) -f gfm -o $(@) $(<)
+
+%.7 : ALL_PANDOCFLAGS += -t man
+%.7 : %.md
+	$(PANDOC) $(ALL_PANDOCFLAGS) -f gfm -o $(@) $(<)

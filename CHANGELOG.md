@@ -4,6 +4,10 @@ Release history for s390-tools (MIT version)
 
   For Linux kernel version: 5.xx
 
+  Add new tools / libraries:
+  - chreipl-fcp-mpath: New toolset that uses multipath information to change
+      the configured FCP re-IPL path on detecting issues with the current path
+
   Changes of existing tools:
 
   Bug Fixes:

@@ -11,6 +11,11 @@
 #     - chreipl-fcp-mpath.mak
 #   bash:
 #     - bash
+# If $(ENABLE_DOC) is `1`:
+#   GNU Gzip:
+#     - gzip
+#   GNU awk:
+#     - gawk
 
 override SHELL		:= /bin/bash
 override .SHELLFLAGS	:= -O globstar -O nullglob -O extglob -c
@@ -77,6 +82,40 @@ chreipl-fcp-mpath-dracut-clean:
 chreipl-fcp-mpath: dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
 chreipl-fcp-mpath-clean: chreipl-fcp-mpath-dracut-clean
 
+ifeq ($(ENABLE_DOC),1)
+
+.PHONY: chreipl-fcp-mpath-doc
+chreipl-fcp-mpath-doc: README.html chreipl-fcp-mpath.7
+
+ifeq ($(ENABLE_DOC_PDF),1)
+chreipl-fcp-mpath-doc: README.pdf
+
+README.pdf: PANDOCFLAGS += -M title="chreipl-fcp-mpath" -M subtitle="README"
+endif
+
+README.html: PANDOCFLAGS += -M title="chreipl-fcp-mpath" -M subtitle="README"
+
+chreiplzfcpmp-doc-man-meta =						\
+	-M title="CHREIPL-FCP-MPATH"					\
+	-V header="Administrator Manual"				\
+	-V section="7"							\
+	-V footer="s390-tools $(S390_TOOLS_RELEASE)"
+
+chreipl-fcp-mpath.7: PANDOCFLAGS += $(chreiplzfcpmp-doc-man-meta)
+
+.INTERMEDIATE: chreipl-fcp-mpath.md
+chreipl-fcp-mpath.md: README.md
+	gawk -- '/NOT-IN-MAN \{/,/NOT-IN-MAN \}/ { next } { print }' $(<) > $(@)
+
+.PHONY: chreipl-fcp-mpath-doc-clean
+chreipl-fcp-mpath-doc-clean:
+	rm -f README.html README.pdf chreipl-fcp-mpath.md chreipl-fcp-mpath.7
+
+chreipl-fcp-mpath: chreipl-fcp-mpath-doc
+chreipl-fcp-mpath-clean: chreipl-fcp-mpath-doc-clean
+
+endif
+
 #
 ## Install
 #
@@ -136,6 +175,28 @@ chreipl-fcp-mpath-install-dracut-config: dracut/dracut.conf.d/70-chreipl-fcp-mpa
 		dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
 
 chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-dracut-config
+
+endif
+
+ifeq ($(ENABLE_DOC),1)
+
+# chreipl-fcp-mpath: install man page
+INSTDIRS += $(MANDIR)
+
+.PHONY: chreipl-fcp-mpath-install-man-page
+chreipl-fcp-mpath-install-man-page: | $(DESTDIR)$(MANDIR)/man7
+chreipl-fcp-mpath-install-man-page: chreipl-fcp-mpath.7
+	$(GZIP) -fk --best chreipl-fcp-mpath.7
+	$(INSTALL_DATA) -t $(DESTDIR)$(MANDIR)/man7			\
+		chreipl-fcp-mpath.7.gz
+
+chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-man-page
+
+.PHONY: chreipl-fcp-mpath-install-man-page-clean
+chreipl-fcp-mpath-install-man-page-clean:
+	rm -f chreipl-fcp-mpath.7.gz
+
+chreipl-fcp-mpath-clean: chreipl-fcp-mpath-install-man-page-clean
 
 endif
 
