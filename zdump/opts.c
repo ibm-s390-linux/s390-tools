@@ -233,7 +233,7 @@ static void parse_pos_args(struct options *opts, char *argv[], int argc)
 	case ZG_ACTION_DEVICE_INFO:
 		if (pos_args == 0)
 			ERR_EXIT("No device or dump specified");
-		if (pos_args > 1 && !opts->debug_specified)
+		if (pos_args > 1)
 			ERR_EXIT("Too many positional parameters specified");
 		device_set(opts, argv[optind]);
 		break;
@@ -252,6 +252,8 @@ static void parse_pos_args(struct options *opts, char *argv[], int argc)
 	case ZG_ACTION_UMOUNT:
 		if (pos_args == 0)
 			ERR_EXIT("No mount point specified");
+		if (pos_args > 1)
+			ERR_EXIT("Too many positional parameters specified");
 		mount_point_set(opts, argv[optind]);
 		break;
 	}
