@@ -206,7 +206,7 @@ int zfuse_mount_dump(void)
 	fuse_opt_add_arg(&args, "zgetdump");
 	fuse_opt_add_arg(&args, "-s");
 	snprintf(tmp_str, sizeof(tmp_str),
-		 "-ofsname=%s,ro,default_permissions,nonempty",
+		 "-ofsname=%s,ro,default_permissions",
 		 g.opts.device);
 	fuse_opt_add_arg(&args, tmp_str);
 	fuse_opt_add_arg(&args, g.opts.mount_point);
