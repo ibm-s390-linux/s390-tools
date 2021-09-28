@@ -28,6 +28,16 @@ static inline void __noreturn load_psw(struct psw_t psw)
 		;
 }
 
+static unsigned long get_kernel_cmdline_size(void)
+{
+	unsigned long size = *(volatile unsigned long *)MAX_COMMAND_LINE_SIZE;
+
+	if (size != 0)
+		return size;
+
+	return LEGACY_COMMAND_LINE_SIZE;
+}
+
 void __noreturn start(void)
 {
 	volatile struct stage3b_args *args = &loader_parms;
@@ -42,13 +52,13 @@ void __noreturn start(void)
 	if (kernel->size < IMAGE_LOAD_ADDRESS)
 		panic(EINTERNAL, "Invalid kernel\n");
 
-	if (cmdline->size > LEGACY_COMMAND_LINE_SIZE)
-		panic(EINTERNAL, "Command line is too large\n");
-
 	/* move the kernel and cut the kernel header */
 	memmove((void *)IMAGE_LOAD_ADDRESS,
 		(void *)(kernel->src + IMAGE_LOAD_ADDRESS),
 		kernel->size - IMAGE_LOAD_ADDRESS);
+
+	if (cmdline->size > get_kernel_cmdline_size())
+		panic(EINTERNAL, "Command line is too large\n");
 
 	/* move the kernel cmdline */
 	memmove((void *)COMMAND_LINE,
