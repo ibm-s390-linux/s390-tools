@@ -27,14 +27,6 @@
 #define HDR_BASE_SIZE		0x2000
 
 /*
- * File local static data
- */
-static struct {
-	void	*hdr;
-	u32	hdr_size;
-} l;
-
-/*
  * Initialize ELF header
  */
 static void *ehdr_init(Elf64_Ehdr *ehdr)
@@ -278,13 +270,13 @@ out:
 /*
  * Setup dump chunks
  */
-static void dump_chunks_init(void)
+static void dump_chunks_init(void *hdr, u64 hdr_size)
 {
 	struct dfi_mem_chunk *mem_chunk;
 	u64 off = 0;
 
-	dfo_chunk_add(off, l.hdr_size, l.hdr, dfo_chunk_buf_fn);
-	off += l.hdr_size;
+	dfo_chunk_add(off, hdr_size, hdr, dfo_chunk_buf_fn);
+	off += hdr_size;
 	dfi_mem_chunk_iterate(mem_chunk) {
 		if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
 			/* Zero memory chunk */
@@ -313,31 +305,29 @@ static void dfo_elf_init(void)
 {
 	Elf64_Phdr *phdr_notes, *phdr_loads;
 	u32 alloc_size;
+	void *buf, *ptr;
 	u64 hdr_off;
-	void *ptr;
 
 	ensure_s390x();
 	alloc_size = HDR_BASE_SIZE +
 		dfi_cpu_cnt() * HDR_PER_CPU_SIZE +
 		dfi_mem_chunk_cnt() * HDR_PER_MEMC_SIZE;
-	l.hdr = zg_alloc(alloc_size);
+	buf = zg_alloc(alloc_size);
 	/* Init elf header */
-	ptr = ehdr_init(l.hdr);
+	ptr = ehdr_init(buf);
 	/* Init program headers */
 	phdr_notes = ptr;
 	ptr = PTR_ADD(ptr, sizeof(Elf64_Phdr));
 	phdr_loads = ptr;
 	ptr = PTR_ADD(ptr, sizeof(Elf64_Phdr) * dfi_mem_chunk_cnt());
 	/* Init notes */
-	hdr_off = PTR_DIFF(ptr, l.hdr);
+	hdr_off = PTR_DIFF(ptr, buf);
 	ptr = notes_init(phdr_notes, ptr, hdr_off);
-	/* Init loads */
-	hdr_off = PTR_DIFF(ptr, l.hdr);
+	hdr_off = PTR_DIFF(ptr, buf);
 	load_phdrs_init(phdr_loads, hdr_off);
-	l.hdr_size = hdr_off;
-	if (l.hdr_size > alloc_size)
-		ABORT("hdr_size=%u alloc_size=%u", l.hdr_size, alloc_size);
-	dump_chunks_init();
+	if (hdr_off > alloc_size)
+		ABORT("hdr_size=%llu alloc_size=%u", hdr_off, alloc_size);
+	dump_chunks_init(buf, hdr_off);
 }
 
 /*
