@@ -103,7 +103,9 @@ zipl/boot/*.bin
 zipl/boot/*.exec
 zipl/boot/data.h
 zipl/src/chreipl_helper.device-mapper
+zdev/src/zdev_id
 zipl/src/zipl
+zipl/src/zipl-editenv
 zipl/src/zipl_helper.device-mapper
 zkey/check-dep-zkey
 zkey/check-dep-zkey-cryptsetup
