@@ -62,7 +62,8 @@ static struct os_info *os_info_get(void)
 	static struct os_info os_info;
 	unsigned long addr;
 
-	dfi_mem_read(LC_OS_INFO, &addr, sizeof(addr));
+	if (dfi_mem_read_rc(LC_OS_INFO, &addr, sizeof(addr)))
+		return NULL;
 	if (addr % 0x1000)
 		return NULL;
 	if (dfi_mem_read_rc(addr, &os_info, sizeof(os_info)))
