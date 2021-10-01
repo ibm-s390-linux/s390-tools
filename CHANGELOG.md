@@ -1,17 +1,33 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.17.x (2021-xx-xx)__
+* __v2.18.0 (2021-10-01)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.14
+
+  Add new tools:
+  - scripts: Add tool for parsing sclp s390dbf logs
+  - zdev: Add udev rule helper tool
+  - zipl-editenv: Add tool to operate with zIPL environment installed in the boot record
 
   Changes of existing tools:
-  - dbginfo.sh: add exception on dump2tar for /sys/kernel/mm/page_idle/bitmap
-  - dbginfo.sh: cleanup of outdated sections and general code rework
+  - Makefile: Fix order of build of libraries for parallel builds
+  - dbginfo.sh: Add collection in area of timedate, coredump and --check option
+  - dbginfo.sh: Add exception on dump2tar for /sys/kernel/mm/page_idle/bitmap
+  - dbginfo.sh: Cleanup of outdated sections and general code rework
   - dbginfo.sh: Collect zipl boot menu entries from boot loader specification
-  - dbginfo.sh: add collection in area of timedate, coredump and --check option
+  - lszcrypt: Add support for vfio-ap status field
+  - lszcrypt: Improved output for deconfig cards and queues
+  - lszfcp: Add linkdown case to host marker of extended output
+  - zdev: Add auto-config for PCI and crypto devices
+  - zdump: Introduce multi-level message logging
+  - zipl: Add support for environment block interpretation
+  - zkey-cryptsetup: Support LUKS2 volumes with integrity support enabled
 
   Bug Fixes:
-
+  - hsavmcore: Avoid recompilation of overlay during install step
+  - libkmipclient: Fix parsing of hex values for XML and JSON encoding
+  - vmur/vmur.cpp: Fix error handling on transfer failure
+  - zdump: Lots of smaller fixes across the board
 
 * __v2.17.0 (2021-07-07)__
 
