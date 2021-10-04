@@ -270,7 +270,7 @@ out:
 	memset(phdr, 0, sizeof(*phdr));
 	phdr->p_type = PT_NOTE;
 	phdr->p_offset = notes_offset;
-	phdr->p_filesz = (unsigned long) PTR_SUB(ptr, ptr_start);
+	phdr->p_filesz = PTR_DIFF(ptr, ptr_start);
 	return ptr;
 }
 
