@@ -675,7 +675,8 @@ static int add_ipl_program(int fd, char *filename,
 				   IMAGE_ENTRY,
 				   (info->type == disk_type_scsi) ? 0 : 1,
 				   flags, ipl->image_addr, image_size,
-				   ipl->envblk_addr, envblk->size);
+				   ipl->envblk_addr,
+				   add_envblk ? envblk->size : 0);
 	if (rc) {
 		free(table);
 		return rc;
