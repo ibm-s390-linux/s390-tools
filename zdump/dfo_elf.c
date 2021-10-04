@@ -63,19 +63,19 @@ static void *ehdr_init(Elf64_Ehdr *ehdr)
 }
 
 /*
- * Initialize ELF loads
+ * Initialize ELF loads program headers
  */
-static u64 loads_init(Elf64_Phdr *phdr, u64 loads_offset)
+static u64 load_phdrs_init(Elf64_Phdr *phdr, u64 elf_offset)
 {
 	struct dfi_mem_chunk *mem_chunk;
 	u64 mem_size = 0;
 
 	dfi_mem_chunk_iterate(mem_chunk) {
 		phdr->p_type = PT_LOAD;
-		phdr->p_offset = loads_offset;
+		phdr->p_offset = elf_offset;
 		phdr->p_vaddr = mem_chunk->start;
-		phdr->p_paddr = mem_chunk->start;
-		phdr->p_memsz = mem_chunk->end - mem_chunk->start + 1;
+		phdr->p_paddr = phdr->p_vaddr;
+		phdr->p_memsz = mem_chunk->size;
 		if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
 			/* Zero memory chunk */
 			phdr->p_filesz = 0;
@@ -83,7 +83,7 @@ static u64 loads_init(Elf64_Phdr *phdr, u64 loads_offset)
 			phdr->p_filesz = phdr->p_memsz;
 		phdr->p_flags = PF_R | PF_W | PF_X;
 		phdr->p_align = PAGE_SIZE;
-		loads_offset += phdr->p_filesz;
+		elf_offset += phdr->p_filesz;
 		mem_size += phdr->p_memsz;
 		phdr++;
 	}
@@ -332,7 +332,7 @@ static void dfo_elf_init(void)
 	ptr = notes_init(phdr_notes, ptr, hdr_off);
 	/* Init loads */
 	hdr_off = PTR_DIFF(ptr, l.hdr);
-	loads_init(phdr_loads, hdr_off);
+	load_phdrs_init(phdr_loads, hdr_off);
 	l.hdr_size = hdr_off;
 	if (l.hdr_size > alloc_size)
 		ABORT("hdr_size=%u alloc_size=%u", l.hdr_size, alloc_size);
