@@ -17,7 +17,7 @@
 #include "lib/zt_common.h"
 #include "lib/util_list.h"
 
-#include "zg.h"
+#include "dfi_mem_chunk.h"
 
 /*
  * CPU info functions and definitions
@@ -149,51 +149,6 @@ extern int dfi_cpu_lc_has_vx_sa(void *lc);
 extern void dfi_cpu_vx_copy(void *buf, struct dfi_cpu *cpu);
 
 /*
- * Mem chunk functions and definitions
- */
-struct dfi_mem_chunk;
-
-typedef void (*dfi_mem_chunk_read_fn)(struct dfi_mem_chunk *mem_chunk,
-				      u64 off, void *buf, u64 cnt);
-typedef void (*dfi_mem_chunk_free_fn)(void *data);
-
-struct dfi_mem_chunk {
-	struct util_list_node	list;		/* List */
-	u64			start;		/* Start address in memory */
-	u64			end;		/* End address in memory */
-	u64			size;		/* Size of chunk in dump file */
-	dfi_mem_chunk_read_fn	read_fn;	/* Chunk read callback */
-	dfi_mem_chunk_free_fn	free_fn;	/* Free data callback */
-	void			*data;		/* Data for callback */
-	u32			volnr;		/* Volume id where chunk resides */
-};
-
-extern void dfi_mem_chunk_read_zero(struct dfi_mem_chunk *UNUSED(mem_chunk),
-				    u64 UNUSED(off), void *buf, u64 cnt);
-extern void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
-				  dfi_mem_chunk_read_fn read_fn,
-				  dfi_mem_chunk_free_fn free_fn,
-				  u32 volnr);
-extern void dfi_mem_chunk_add(u64 start, u64 size, void *data,
-			      dfi_mem_chunk_read_fn read_fn,
-			      dfi_mem_chunk_free_fn free_fn);
-extern void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
-				   dfi_mem_chunk_read_fn read_fn,
-				   dfi_mem_chunk_free_fn free_fn);
-extern u64 dfi_mem_range(void);
-extern int dfi_mem_range_valid(u64 addr, u64 len);
-extern unsigned int dfi_mem_chunk_cnt(void);
-extern struct dfi_mem_chunk *dfi_mem_chunk_first(void);
-extern struct dfi_mem_chunk *dfi_mem_chunk_last(void);
-extern struct dfi_mem_chunk *dfi_mem_chunk_next(struct dfi_mem_chunk *chunk);
-extern struct dfi_mem_chunk *dfi_mem_chunk_prev(struct dfi_mem_chunk *chunk);
-extern struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr);
-
-extern struct util_list *dfi_mem_chunk_list(void);
-#define dfi_mem_chunk_iterate(mem_chunk) \
-	util_list_iterate(dfi_mem_chunk_list(), mem_chunk)
-
-/*
  * Dump header attribute set/get functions
  */
 extern void dfi_attr_time_set(struct timeval *time);
@@ -229,12 +184,6 @@ extern enum dfi_arch *dfi_attr_build_arch(void);
 extern void dfi_attr_real_cpu_cnt_set(u32 real_cpu_cnt);
 extern u32 *dfi_attr_real_cpu_cnt(void);
 
-/*
- * DFI external functions
- */
-extern void dfi_mem_read(u64 addr, void *buf, size_t cnt);
-extern int dfi_mem_read_rc(u64 addr, void *buf, size_t cnt);
-extern void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt);
 extern void dfi_info_print(void);
 
 /*
