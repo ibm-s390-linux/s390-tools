@@ -116,11 +116,11 @@ struct dfi_cpu_32 {
 	struct dfi_vxrs	vxrs_high[16];
 };
 
-extern void dfi_cpu_64_to_32(struct dfi_cpu_32 *cpu_32, struct dfi_cpu *cpu_64);
+void dfi_cpu_64_to_32(struct dfi_cpu_32 *cpu_32, struct dfi_cpu *cpu_64);
 
-extern enum dfi_arch dfi_arch(void);
-extern void dfi_arch_set(enum dfi_arch arch);
-extern const char *dfi_arch_str(enum dfi_arch arch);
+enum dfi_arch dfi_arch(void);
+void dfi_arch_set(enum dfi_arch arch);
+const char *dfi_arch_str(enum dfi_arch arch);
 
 enum dfi_cpu_content {
 	DFI_CPU_CONTENT_NONE,	/* No register information available */
@@ -129,62 +129,62 @@ enum dfi_cpu_content {
 };
 
 #define DFI_CPU_CONTENT_FAC_VX	0x00000001
-extern int dfi_cpu_content_fac_check(int flags);
-extern void dfi_cpu_content_fac_add(int flags);
+int dfi_cpu_content_fac_check(int flags);
+void dfi_cpu_content_fac_add(int flags);
 
 #define dfi_cpu_iterate(cpu) \
 	util_list_iterate(dfi_cpu_list(), cpu)
 
-extern struct util_list *dfi_cpu_list(void);
-extern void dfi_cpu_info_init(enum dfi_cpu_content content);
-extern struct dfi_cpu *dfi_cpu_alloc(void);
-extern struct dfi_cpu *dfi_cpu(unsigned int cpu_nr);
-extern void dfi_cpu_add(struct dfi_cpu *cpu);
-extern unsigned int dfi_cpu_cnt(void);
-extern enum dfi_cpu_content dfi_cpu_content(void);
-extern int dfi_cpu_add_from_lc(u32 lc_addr);
+struct util_list *dfi_cpu_list(void);
+void dfi_cpu_info_init(enum dfi_cpu_content content);
+struct dfi_cpu *dfi_cpu_alloc(void);
+struct dfi_cpu *dfi_cpu(unsigned int cpu_nr);
+void dfi_cpu_add(struct dfi_cpu *cpu);
+unsigned int dfi_cpu_cnt(void);
+enum dfi_cpu_content dfi_cpu_content(void);
+int dfi_cpu_add_from_lc(u32 lc_addr);
 
 #define DFI_VX_SA_SIZE		(32 * 16)
-extern int dfi_cpu_lc_has_vx_sa(void *lc);
-extern void dfi_cpu_vx_copy(void *buf, struct dfi_cpu *cpu);
+int dfi_cpu_lc_has_vx_sa(void *lc);
+void dfi_cpu_vx_copy(void *buf, struct dfi_cpu *cpu);
 
 /*
  * Dump header attribute set/get functions
  */
-extern void dfi_attr_time_set(struct timeval *time);
-extern struct timeval *dfi_attr_time(void);
+void dfi_attr_time_set(struct timeval *time);
+struct timeval *dfi_attr_time(void);
 
-extern void dfi_attr_time_end_set(struct timeval *time_end);
-extern struct timeval *dfi_attr_time_end(void);
+void dfi_attr_time_end_set(struct timeval *time_end);
+struct timeval *dfi_attr_time_end(void);
 
-extern void dfi_attr_cpu_id_set(u64 cpu_id);
-extern u64 *dfi_attr_cpu_id(void);
+void dfi_attr_cpu_id_set(u64 cpu_id);
+u64 *dfi_attr_cpu_id(void);
 
-extern void dfi_attr_utsname_set(struct new_utsname *utsname);
-extern struct new_utsname *dfi_attr_utsname(void);
+void dfi_attr_utsname_set(struct new_utsname *utsname);
+struct new_utsname *dfi_attr_utsname(void);
 
-extern void dfi_attr_dump_method_set(char *dump_method);
-extern char *dfi_attr_dump_method(void);
+void dfi_attr_dump_method_set(char *dump_method);
+char *dfi_attr_dump_method(void);
 
-extern void dfi_attr_mem_size_real_set(u64 mem_size_real);
-extern u64 *dfi_attr_mem_size_real(void);
+void dfi_attr_mem_size_real_set(u64 mem_size_real);
+u64 *dfi_attr_mem_size_real(void);
 
-extern void dfi_attr_file_size_set(u64 dump_size);
-extern u64 *dfi_attr_file_size(void);
+void dfi_attr_file_size_set(u64 dump_size);
+u64 *dfi_attr_file_size(void);
 
-extern void dfi_attr_vol_nr_set(unsigned int vol_nr);
-extern unsigned int *dfi_attr_vol_nr(void);
+void dfi_attr_vol_nr_set(unsigned int vol_nr);
+unsigned int *dfi_attr_vol_nr(void);
 
-extern void dfi_attr_version_set(unsigned int dfi_version);
-extern unsigned int *dfi_attr_dfi_version(void);
+void dfi_attr_version_set(unsigned int dfi_version);
+unsigned int *dfi_attr_dfi_version(void);
 
-extern void dfi_attr_build_arch_set(enum dfi_arch build_arch);
-extern enum dfi_arch *dfi_attr_build_arch(void);
+void dfi_attr_build_arch_set(enum dfi_arch build_arch);
+enum dfi_arch *dfi_attr_build_arch(void);
 
-extern void dfi_attr_real_cpu_cnt_set(u32 real_cpu_cnt);
-extern u32 *dfi_attr_real_cpu_cnt(void);
+void dfi_attr_real_cpu_cnt_set(u32 real_cpu_cnt);
+u32 *dfi_attr_real_cpu_cnt(void);
 
-extern void dfi_info_print(void);
+void dfi_info_print(void);
 
 /*
  * DFI feature bits
@@ -192,25 +192,25 @@ extern void dfi_info_print(void);
 #define DFI_FEAT_SEEK	0x1 /* Necessary for fuse mount */
 #define DFI_FEAT_COPY	0x2 /* Necessary for stdout */
 
-extern int dfi_feat_seek(void);
-extern int dfi_feat_copy(void);
+int dfi_feat_seek(void);
+int dfi_feat_copy(void);
 
 /*
  * DFI kdump functions
  */
-extern unsigned long dfi_kdump_base(void);
+unsigned long dfi_kdump_base(void);
 
 /*
  * DFI vmcoreinfo functions
  */
-extern void dfi_vmcoreinfo_init(void);
-extern char *dfi_vmcoreinfo_get(void);
-extern int dfi_vmcoreinfo_tag(char *str, int len, const char *sym);
-extern int dfi_vmcoreinfo_symbol(unsigned long *val, const char *sym);
-extern int dfi_vmcoreinfo_offset(unsigned long *offs, const char *sym);
-extern int dfi_vmcoreinfo_size(unsigned long *size, const char *sym);
-extern int dfi_vmcoreinfo_length(unsigned long *len, const char *sym);
-extern int dfi_vmcoreinfo_val(unsigned long *val, const char *sym);
+void dfi_vmcoreinfo_init(void);
+char *dfi_vmcoreinfo_get(void);
+int dfi_vmcoreinfo_tag(char *str, int len, const char *sym);
+int dfi_vmcoreinfo_symbol(unsigned long *val, const char *sym);
+int dfi_vmcoreinfo_offset(unsigned long *offs, const char *sym);
+int dfi_vmcoreinfo_size(unsigned long *size, const char *sym);
+int dfi_vmcoreinfo_length(unsigned long *len, const char *sym);
+int dfi_vmcoreinfo_val(unsigned long *val, const char *sym);
 
 /*
  * DFI operations
@@ -223,14 +223,14 @@ struct dfi {
 	int		feat_bits;
 };
 
-extern const char *dfi_name(void);
-extern int dfi_init(void);
-extern void dfi_exit(void);
+const char *dfi_name(void);
+int dfi_init(void);
+void dfi_exit(void);
 
 /*
  * Dump access
  */
-extern struct zg_fh *dfi_dump_open(const char *path);
+struct zg_fh *dfi_dump_open(const char *path);
 
 /*
  * Live dump memory magic

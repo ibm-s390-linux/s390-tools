@@ -33,37 +33,37 @@ struct dfi_mem_chunk {
 	u32			volnr;		/* Volume id where chunk resides */
 };
 
-extern void dfi_mem_chunk_read_zero(struct dfi_mem_chunk *UNUSED(mem_chunk),
-				    u64 UNUSED(off), void *buf, u64 cnt);
-extern void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
-				  dfi_mem_chunk_read_fn read_fn,
-				  dfi_mem_chunk_free_fn free_fn,
-				  u32 volnr);
-extern void dfi_mem_chunk_add(u64 start, u64 size, void *data,
-			      dfi_mem_chunk_read_fn read_fn,
-			      dfi_mem_chunk_free_fn free_fn);
-extern void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
-				   dfi_mem_chunk_read_fn read_fn,
-				   dfi_mem_chunk_free_fn free_fn);
-extern u64 dfi_mem_range(void);
-extern int dfi_mem_range_valid(u64 addr, u64 len);
-extern unsigned int dfi_mem_chunk_cnt(void);
-extern struct dfi_mem_chunk *dfi_mem_chunk_first(void);
-extern struct dfi_mem_chunk *dfi_mem_chunk_last(void);
-extern struct dfi_mem_chunk *dfi_mem_chunk_next(struct dfi_mem_chunk *chunk);
-extern struct dfi_mem_chunk *dfi_mem_chunk_prev(struct dfi_mem_chunk *chunk);
-extern struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr);
+void dfi_mem_chunk_read_zero(struct dfi_mem_chunk *UNUSED(mem_chunk),
+			     u64 UNUSED(off), void *buf, u64 cnt);
+void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
+			   dfi_mem_chunk_read_fn read_fn,
+			   dfi_mem_chunk_free_fn free_fn,
+			   u32 volnr);
+void dfi_mem_chunk_add(u64 start, u64 size, void *data,
+		       dfi_mem_chunk_read_fn read_fn,
+		       dfi_mem_chunk_free_fn free_fn);
+void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
+			    dfi_mem_chunk_read_fn read_fn,
+			    dfi_mem_chunk_free_fn free_fn);
+u64 dfi_mem_range(void);
+int dfi_mem_range_valid(u64 addr, u64 len);
+unsigned int dfi_mem_chunk_cnt(void);
+struct dfi_mem_chunk *dfi_mem_chunk_first(void);
+struct dfi_mem_chunk *dfi_mem_chunk_last(void);
+struct dfi_mem_chunk *dfi_mem_chunk_next(struct dfi_mem_chunk *chunk);
+struct dfi_mem_chunk *dfi_mem_chunk_prev(struct dfi_mem_chunk *chunk);
+struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr);
 
-extern struct util_list *dfi_mem_chunk_list(void);
+struct util_list *dfi_mem_chunk_list(void);
 #define dfi_mem_chunk_iterate(mem_chunk) \
 	util_list_iterate(dfi_mem_chunk_list(), mem_chunk)
 
 /*
  * DFI external functions
  */
-extern void dfi_mem_read(u64 addr, void *buf, size_t cnt);
-extern int dfi_mem_read_rc(u64 addr, void *buf, size_t cnt);
-extern void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt);
+void dfi_mem_read(u64 addr, void *buf, size_t cnt);
+int dfi_mem_read_rc(u64 addr, void *buf, size_t cnt);
+void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt);
 
 void dfi_mem_map_print(bool verbose);
 
