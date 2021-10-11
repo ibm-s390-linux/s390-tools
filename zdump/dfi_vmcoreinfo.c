@@ -9,12 +9,16 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <stdio.h>
+#include <string.h>
 #include <elf.h>
 
 #include "lib/zt_common.h"
 #include "lib/util_log.h"
 
-#include "zgetdump.h"
+#include "zg.h"
+#include "dfi_mem_chunk.h"
+#include "dfi_vmcoreinfo.h"
 
 #ifdef __s390x__
 #define LC_VMCORE_INFO		0xe0c
@@ -23,7 +27,7 @@
 #endif
 
 #define LC_OS_INFO		0xe18
-#define OS_INFO_MAGIC  0x4f53494e464f535aULL /* OSINFOSZ */
+#define OS_INFO_MAGIC		0x4f53494e464f535aULL /* OSINFOSZ */
 
 struct os_info {
 	u64	magic;

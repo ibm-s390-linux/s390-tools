@@ -16,7 +16,10 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "zgetdump.h"
+#include "df_elf.h"
+#include "dfi.h"
+#include "dfi_vmcoreinfo.h"
+#include "dfo.h"
 
 #define HDR_PER_CPU_SIZE	0x4a0
 #define HDR_PER_MEMC_SIZE	0x100

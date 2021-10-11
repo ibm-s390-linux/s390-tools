@@ -201,18 +201,6 @@ int dfi_feat_copy(void);
 unsigned long dfi_kdump_base(void);
 
 /*
- * DFI vmcoreinfo functions
- */
-void dfi_vmcoreinfo_init(void);
-char *dfi_vmcoreinfo_get(void);
-int dfi_vmcoreinfo_tag(char *str, int len, const char *sym);
-int dfi_vmcoreinfo_symbol(unsigned long *val, const char *sym);
-int dfi_vmcoreinfo_offset(unsigned long *offs, const char *sym);
-int dfi_vmcoreinfo_size(unsigned long *size, const char *sym);
-int dfi_vmcoreinfo_length(unsigned long *len, const char *sym);
-int dfi_vmcoreinfo_val(unsigned long *val, const char *sym);
-
-/*
  * DFI operations
  */
 struct dfi {
