@@ -72,20 +72,6 @@ void zfuse_umount(void);
 #endif
 
 /*
- * Supported DFI dump formats
- */
-extern struct dfi dfi_s390tape;
-extern struct dfi dfi_s390mv;
-extern struct dfi dfi_s390mv_ext;
-extern struct dfi dfi_s390;
-extern struct dfi dfi_s390_ext;
-extern struct dfi dfi_lkcd;
-extern struct dfi dfi_elf;
-extern struct dfi dfi_kdump;
-extern struct dfi dfi_kdump_flat;
-extern struct dfi dfi_devmem;
-
-/*
  * Supported s390 dumpers
  */
 extern struct dt dt_s390mv;

@@ -230,4 +230,18 @@ extern u64 dfi_live_dump_magic;
  */
 #define DFI_DUMP_METHOD_LIVE	"live"
 
+/*
+ * Supported DFI dump formats
+ */
+extern struct dfi dfi_s390tape;
+extern struct dfi dfi_s390mv;
+extern struct dfi dfi_s390mv_ext;
+extern struct dfi dfi_s390;
+extern struct dfi dfi_s390_ext;
+extern struct dfi dfi_lkcd;
+extern struct dfi dfi_elf;
+extern struct dfi dfi_kdump;
+extern struct dfi dfi_kdump_flat;
+extern struct dfi dfi_devmem;
+
 #endif /* DFI_H */
