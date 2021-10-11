@@ -9,7 +9,11 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <errno.h>
+
 #include "zgetdump.h"
+#include "zg.h"
+#include "dfi.h"
 
 struct df_kdump_hdr {
 	char			signature[8];

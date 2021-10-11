@@ -9,8 +9,14 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <string.h>
+#include <errno.h>
 #include <zlib.h>
+
 #include "zgetdump.h"
+#include "zg.h"
+#include "df_lkcd.h"
+#include "dfi.h"
 
 #define MEM_HOLE_SIZE_MIN	(1024 * 1024)
 #define IDX_KIB		64	/* One index entry per IDX_KIB */

@@ -9,8 +9,13 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <errno.h>
 #include <linux/fs.h>
+
 #include "zgetdump.h"
+#include "zg.h"
+#include "dt.h"
+#include "df_s390.h"
 
 /*
  * File local static data

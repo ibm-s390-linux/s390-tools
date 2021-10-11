@@ -9,7 +9,8 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include "zgetdump.h"
+#include "dt.h"
+#include "df_s390.h"
 
 /*
  * Initialize s390 multi-volume dump tool (for -d option)

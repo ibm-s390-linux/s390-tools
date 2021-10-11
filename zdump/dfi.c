@@ -9,13 +9,12 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <time.h>
-
 #include "lib/util_log.h"
 
 #include "zgetdump.h"
 #include "dfi_mem_chunk.h"
 #include "dfi_vmcoreinfo.h"
+#include "dfi.h"
 
 #define TIME_FMT_STR "%a, %d %b %Y %H:%M:%S %z"
 #define PROGRESS_HASH_CNT 50

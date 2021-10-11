@@ -10,7 +10,9 @@
  */
 
 #include <linux/fs.h>
-#include "zgetdump.h"
+
+#include "dt.h"
+#include "df_s390.h"
 
 /*
  * Initialize s390 single-volume extended dump tool (for -d option)

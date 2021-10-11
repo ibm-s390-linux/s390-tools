@@ -17,8 +17,11 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "zgetdump.h"
+#include "df_s390.h"
+#include "dfi.h"
 
 #define TAPE_BLK_SIZE	32768	/* Defined by zipl tape dumper */
 

@@ -21,6 +21,8 @@
 #include <unistd.h>
 
 #include "zgetdump.h"
+#include "df_s390.h"
+#include "dfi.h"
 
 /*
  * Add live dump magic to buffer

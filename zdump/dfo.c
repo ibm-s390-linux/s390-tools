@@ -10,7 +10,11 @@
  */
 
 #include <time.h>
-#include "zgetdump.h"
+
+#include "lib/util_list.h"
+
+#include "dfi_mem_chunk.h"
+#include "dfo.h"
 
 #define dfo_chunk_iterate(dfo_chunk) \
 	util_list_iterate(&l.dump.chunk_list, dfo_chunk)

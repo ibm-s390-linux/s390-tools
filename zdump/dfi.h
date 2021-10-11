@@ -12,6 +12,7 @@
 #ifndef DFI_H
 #define DFI_H
 
+#include <time.h>
 #include <linux/utsname.h>
 
 #include "lib/zt_common.h"

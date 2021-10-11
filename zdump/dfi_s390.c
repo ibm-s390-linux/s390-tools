@@ -17,9 +17,16 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "lib/util_log.h"
+
 #include "zgetdump.h"
+#include "zg.h"
+#include "dfi.h"
+#include "dfi_mem_chunk.h"
+#include "df_elf.h"
+#include "df_s390.h"
 
 /*
  * File local static data

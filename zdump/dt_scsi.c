@@ -9,13 +9,16 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <linux/fs.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <linux/fs.h>
 
 #include "lib/zt_common.h"
 #include "lib/util_part.h"
 
 #include "zgetdump.h"
+#include "zg.h"
+#include "dt.h"
 
 /*
  * Single volume SCSI dump superblock

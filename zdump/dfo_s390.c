@@ -17,7 +17,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "zgetdump.h"
+#include "df_s390.h"
+#include "dfo.h"
 
 /*
  * File local static data

@@ -16,7 +16,9 @@
 
 #include "lib/zt_common.h"
 #include "lib/util_log.h"
+
 #include "zgetdump.h"
+#include "dfo.h"
 
 /*
  * Text for --help option

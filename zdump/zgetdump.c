@@ -27,6 +27,9 @@
 #include <unistd.h>
 
 #include "zgetdump.h"
+#include "dt.h"
+#include "dfi.h"
+#include "dfo.h"
 #include "zfuse.h"
 
 /*

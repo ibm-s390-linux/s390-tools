@@ -20,11 +20,15 @@
 #include <sys/sysmacros.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "lib/util_file.h"
 #include "lib/util_path.h"
 
 #include "zgetdump.h"
+#include "dt.h"
+#include "df_s390.h"
+#include "dfi.h"
 #include "dfi_s390mv.h"
 
 /*

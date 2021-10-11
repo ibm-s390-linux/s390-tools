@@ -10,6 +10,9 @@
  */
 
 #include "zgetdump.h"
+#include "dt.h"
+#include "df_s390.h"
+#include "dfi.h"
 
 /*
  * Initialize s390 multi-volume input dump format (extedend)

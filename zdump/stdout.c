@@ -9,7 +9,9 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include "zgetdump.h"
+#include "zg.h"
+#include "dfi.h"
+#include "dfo.h"
 
 int stdout_write_dump(void)
 {

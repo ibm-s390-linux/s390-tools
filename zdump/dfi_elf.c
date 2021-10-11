@@ -18,7 +18,11 @@
 
 #include "lib/util_libc.h"
 #include "lib/util_log.h"
+
 #include "zgetdump.h"
+#include "zg.h"
+#include "df_elf.h"
+#include "dfi.h"
 
 /*
  * Read memory for given memory chunk

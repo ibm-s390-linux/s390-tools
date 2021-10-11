@@ -17,7 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "zgetdump.h"
+#include "df_s390.h"
 
 /*
  * Check, if we can access the lowcore information in the dump
