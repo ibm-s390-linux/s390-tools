@@ -395,17 +395,6 @@ struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr)
 }
 
 /*
- * Read memory at given address and do kdump swap if necessary
- */
-void dfi_mem_read(u64 addr, void *buf, size_t cnt)
-{
-	util_log_print(UTIL_LOG_TRACE,
-		       "DFI virt mem read addr 0x%016lx size 0x%016lx\n",
-		       addr, cnt);
-	mem_read(&l.mem_virt, addr, buf, cnt);
-}
-
-/*
  * Read physical memory at given address
  */
 void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt)
@@ -421,9 +410,12 @@ void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt)
  */
 int dfi_mem_read_rc(u64 addr, void *buf, size_t cnt)
 {
+	util_log_print(UTIL_LOG_TRACE,
+		       "DFI virt mem read addr 0x%016lx size 0x%016lx\n",
+		       addr, cnt);
 	if (!dfi_mem_range_valid(addr, cnt))
 		return -EINVAL;
-	dfi_mem_read(addr, buf, cnt);
+	mem_read(&l.mem_virt, addr, buf, cnt);
 	return 0;
 }
 
