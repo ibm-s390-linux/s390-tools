@@ -179,6 +179,9 @@ int main(int argc, char *argv[])
 	sig_handler_init();
 	opts_parse(argc, argv, &g.opts);
 
+	if (dfo_set(g.opts.fmt) != 0)
+		ERR_EXIT("Invalid target format \"%s\" specified", g.opts.fmt);
+
 	switch (g.opts.action) {
 	case ZG_ACTION_STDOUT:
 		return do_stdout();

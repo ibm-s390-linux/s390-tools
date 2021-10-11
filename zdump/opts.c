@@ -18,7 +18,6 @@
 #include "lib/util_log.h"
 
 #include "opts.h"
-#include "dfo.h"
 
 static struct option long_opts[] = {
 	{"help",    no_argument,       NULL, 'h'},
@@ -92,7 +91,6 @@ static void init_defaults(struct options *opts)
 #else
 	opts->fmt = "s390";
 #endif
-	dfo_set(opts->fmt);
 	/* Verbose logging */
 	opts->verbose = UTIL_LOG_ERROR;
 	util_log_set_level(opts->verbose);
@@ -132,8 +130,6 @@ static void __noreturn print_version_exit(const char *prog_name)
  */
 static void fmt_set(struct options *opts, const char *fmt)
 {
-	if (dfo_set(fmt) != 0)
-		ERR_EXIT("Invalid target format \"%s\" specified", fmt);
 	opts->fmt_specified = 1;
 	opts->fmt = fmt;
 }
