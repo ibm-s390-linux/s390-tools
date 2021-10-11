@@ -18,8 +18,6 @@
 #include "lib/zt_common.h"
 #include "lib/util_list.h"
 
-#include "dfi_mem_chunk.h"
-
 /*
  * CPU info functions and definitions
  */

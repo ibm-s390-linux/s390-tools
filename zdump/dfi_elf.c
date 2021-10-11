@@ -23,6 +23,7 @@
 #include "zg.h"
 #include "df_elf.h"
 #include "dfi.h"
+#include "dfi_mem_chunk.h"
 
 /*
  * Read memory for given memory chunk

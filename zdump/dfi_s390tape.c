@@ -22,6 +22,7 @@
 #include "zgetdump.h"
 #include "df_s390.h"
 #include "dfi.h"
+#include "dfi_mem_chunk.h"
 
 #define TAPE_BLK_SIZE	32768	/* Defined by zipl tape dumper */
 

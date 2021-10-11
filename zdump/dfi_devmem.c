@@ -23,6 +23,7 @@
 #include "zgetdump.h"
 #include "df_s390.h"
 #include "dfi.h"
+#include "dfi_mem_chunk.h"
 
 /*
  * Add live dump magic to buffer

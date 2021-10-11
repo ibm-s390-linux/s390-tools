@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "df_s390.h"
+#include "dfi_mem_chunk.h"
 #include "dfo.h"
 
 /*

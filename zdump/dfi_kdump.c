@@ -14,6 +14,7 @@
 #include "zgetdump.h"
 #include "zg.h"
 #include "dfi.h"
+#include "dfi_mem_chunk.h"
 
 struct df_kdump_hdr {
 	char			signature[8];

@@ -30,6 +30,7 @@
 #include "df_s390.h"
 #include "dfi.h"
 #include "dfi_s390mv.h"
+#include "dfi_mem_chunk.h"
 
 /*
  * Volume information

@@ -17,6 +17,7 @@
 #include "zg.h"
 #include "df_lkcd.h"
 #include "dfi.h"
+#include "dfi_mem_chunk.h"
 
 #define MEM_HOLE_SIZE_MIN	(1024 * 1024)
 #define IDX_KIB		64	/* One index entry per IDX_KIB */
