@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "zgetdump.h"
+#include "zfuse.h"
 
 /*
  * Globals

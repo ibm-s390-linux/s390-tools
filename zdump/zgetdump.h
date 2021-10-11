@@ -57,18 +57,4 @@ extern struct zgetdump_globals {
 extern void opts_parse(int argc, char *argv[]);
 extern int stdout_write_dump(void);
 
-#if HAVE_FUSE == 0
-static inline int zfuse_mount_dump(void)
-{
-	ERR_EXIT("Program compiled without fuse support");
-}
-static inline void zfuse_umount(void)
-{
-	ERR_EXIT("Program compiled without fuse support");
-}
-#else
-int zfuse_mount_dump(void);
-void zfuse_umount(void);
-#endif
-
 #endif /* ZGETDUMP_H */
