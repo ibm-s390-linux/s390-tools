@@ -12,6 +12,7 @@
 #include "zg.h"
 #include "dfi.h"
 #include "dfo.h"
+#include "stdout.h"
 
 int stdout_write_dump(void)
 {

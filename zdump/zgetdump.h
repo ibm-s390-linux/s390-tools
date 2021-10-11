@@ -12,6 +12,7 @@
 #ifndef ZGETDUMP_H
 #define ZGETDUMP_H
 
+#include "zg.h"
 #include "opts.h"
 
 /*
@@ -21,7 +22,5 @@ extern struct zgetdump_globals {
 	struct zg_fh	*fh;
 	struct options	opts;
 } g;
-
-int stdout_write_dump(void);
 
 #endif /* ZGETDUMP_H */

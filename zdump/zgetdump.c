@@ -30,6 +30,7 @@
 #include "dt.h"
 #include "dfi.h"
 #include "dfo.h"
+#include "stdout.h"
 #include "zfuse.h"
 
 /*
