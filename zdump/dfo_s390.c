@@ -98,7 +98,7 @@ static void dfo_s390_dump_chunk_lc_fn(struct dfo_chunk *dump_chunk,
 	struct dfi_cpu *cpu = dump_chunk->data;
 	char lc[0x2000];
 
-	if (dfi_mem_read_rc(cpu->prefix + off, &lc[off], cnt))
+	if (dfi_mem_virt_read(cpu->prefix + off, &lc[off], cnt))
 		return;
 	if (dfi_arch() == DFI_ARCH_64)
 		cpu2lc_64(lc, cpu);
@@ -143,7 +143,7 @@ static void add_cpu_to_dfo(struct dfi_cpu *cpu)
 		return;
 	if (!dfi_cpu_content_fac_check(DFI_CPU_CONTENT_FAC_VX))
 		return;
-	if (dfi_mem_read_rc(cpu->prefix, &lc, sizeof(lc)))
+	if (dfi_mem_virt_read(cpu->prefix, &lc, sizeof(lc)))
 		return;
 	if (!dfi_cpu_lc_has_vx_sa(&lc))
 		return;
@@ -183,8 +183,8 @@ static void dump_chunks_init(void)
 	dfi_cpu_iterate(cpu)
 		add_cpu_to_dfo(cpu);
 	dfo_chunk_add(dfi_mem_range() + DF_S390_HDR_SIZE,
-			   DF_S390_EM_SIZE,
-			   &l.em, dfo_chunk_buf_fn);
+		      DF_S390_EM_SIZE,
+		      &l.em, dfo_chunk_buf_fn);
 }
 
 /*

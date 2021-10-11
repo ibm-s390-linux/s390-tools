@@ -406,9 +406,9 @@ void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt)
 }
 
 /*
- * Read memory at given address with return code
+ * Read virtual memory at given address
  */
-int dfi_mem_read_rc(u64 addr, void *buf, size_t cnt)
+int dfi_mem_virt_read(u64 addr, void *buf, size_t cnt)
 {
 	util_log_print(UTIL_LOG_TRACE,
 		       "DFI virt mem read addr 0x%016lx size 0x%016lx\n",

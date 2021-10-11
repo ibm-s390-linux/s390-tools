@@ -122,7 +122,7 @@ void dfi_info_print(void)
 		STDERR("  Volume number......: %u\n", *l.attr.vol_nr);
 	if (l.attr.build_arch)
 		STDERR("  Build arch.........: %s\n",
-		      dfi_arch_str(*l.attr.build_arch));
+		       dfi_arch_str(*l.attr.build_arch));
 	STDERR("  System arch........: %s\n", dfi_arch_str(l.arch));
 	if (l.cpus.cnt)
 		STDERR("  CPU count (online).: %u\n", l.cpus.cnt);
@@ -133,10 +133,10 @@ void dfi_info_print(void)
 		       TO_MIB(dfi_mem_range()));
 	if (l.attr.mem_size_real)
 		STDERR("  Real memory range..: %lld MB\n",
-		      TO_MIB(*l.attr.mem_size_real));
+		       TO_MIB(*l.attr.mem_size_real));
 	if (l.attr.file_size)
 		STDERR("  Dump file size.....: %lld MB\n",
-		      TO_MIB(*l.attr.file_size));
+		       TO_MIB(*l.attr.file_size));
 	if (dfi_mem_range())
 		dfi_mem_map_print(g.opts.verbose);
 	if (l.dfi->info_dump) {
@@ -503,7 +503,7 @@ static void lc2cpu_64(struct dfi_cpu *cpu, struct dfi_lowcore_64 *lc)
 	/* Add VX registers if available */
 	if (!dfi_cpu_lc_has_vx_sa(lc))
 		return;
-	if (dfi_mem_read_rc(lc->vector_save_area_addr, &vx_sa, sizeof(vx_sa))) {
+	if (dfi_mem_virt_read(lc->vector_save_area_addr, &vx_sa, sizeof(vx_sa))) {
 		STDERR("zgetdump: Vector registers save area is beyond dump memory limit for CPU %d\n", cpu->cpu_id);
 		return;
 	}
@@ -547,13 +547,13 @@ int dfi_cpu_add_from_lc(u32 lc_addr)
 		if (l.arch == DFI_ARCH_32) {
 			struct dfi_cpu_32 cpu_32;
 			struct dfi_lowcore_32 lc;
-			if (dfi_mem_read_rc(lc_addr, &lc, sizeof(lc)))
+			if (dfi_mem_virt_read(lc_addr, &lc, sizeof(lc)))
 				return -EINVAL;
 			lc2cpu_32(&cpu_32, &lc);
 			cpu_32_to_64(cpu, &cpu_32);
 		} else {
 			struct dfi_lowcore_64 lc;
-			if (dfi_mem_read_rc(lc_addr, &lc, sizeof(lc)))
+			if (dfi_mem_virt_read(lc_addr, &lc, sizeof(lc)))
 				return -EINVAL;
 			lc2cpu_64(cpu, &lc);
 		}
@@ -672,8 +672,8 @@ static void kdump_select_prod_init(void)
 	}
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 	for (i = 0; i < count; i++) {
-		if (dfi_mem_read_rc(ptr + i * sizeof(long), &prefix,
-				   sizeof(prefix)))
+		if (dfi_mem_virt_read(ptr + i * sizeof(long), &prefix,
+				      sizeof(prefix)))
 			continue;
 		if (prefix == 0)
 			continue;
@@ -696,7 +696,7 @@ static void utsname_init(void)
 
 	if (dfi_vmcoreinfo_symbol(&ptr, "init_uts_ns"))
 		return;
-	if (dfi_mem_read_rc(ptr, buf, sizeof(buf)))
+	if (dfi_mem_virt_read(ptr, buf, sizeof(buf)))
 		return;
 	utsname = memchr(buf, 'L', sizeof(buf) - sizeof(*utsname));
 	if (!utsname)
@@ -717,7 +717,7 @@ static void livedump_init(void)
 
 	util_log_print(UTIL_LOG_TRACE, "DFI livedump initialization\n");
 
-	if (dfi_mem_read_rc(0, &magic, sizeof(magic)))
+	if (dfi_mem_virt_read(0, &magic, sizeof(magic)))
 		return;
 	if (magic == dfi_live_dump_magic)
 		dfi_attr_dump_method_set(DFI_DUMP_METHOD_LIVE);

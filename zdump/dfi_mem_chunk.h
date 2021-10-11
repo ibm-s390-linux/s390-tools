@@ -55,7 +55,7 @@ struct util_list *dfi_mem_chunk_list(void);
 #define dfi_mem_chunk_iterate(mem_chunk) \
 	util_list_iterate(dfi_mem_chunk_list(), mem_chunk)
 
-int dfi_mem_read_rc(u64 addr, void *buf, size_t cnt);
+int dfi_mem_virt_read(u64 addr, void *buf, size_t cnt);
 void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt);
 
 void dfi_mem_map_print(bool verbose);

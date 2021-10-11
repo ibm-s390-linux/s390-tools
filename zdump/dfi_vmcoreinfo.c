@@ -65,11 +65,11 @@ static struct os_info *os_info_get(void)
 
 	util_log_print(UTIL_LOG_TRACE, "DFI get osinfo\n");
 
-	if (dfi_mem_read_rc(LC_OS_INFO, &addr, sizeof(addr)))
+	if (dfi_mem_virt_read(LC_OS_INFO, &addr, sizeof(addr)))
 		return NULL;
 	if (addr % 0x1000)
 		return NULL;
-	if (dfi_mem_read_rc(addr, &os_info, sizeof(os_info)))
+	if (dfi_mem_virt_read(addr, &os_info, sizeof(os_info)))
 		return NULL;
 	if (os_info.magic != OS_INFO_MAGIC)
 		return NULL;
@@ -96,16 +96,16 @@ void dfi_vmcoreinfo_init(void)
 		addr = l.os_info->vmcoreinfo_addr;
 		size = l.os_info->vmcoreinfo_size;
 	} else {
-		if (dfi_mem_read_rc(LC_VMCORE_INFO, &addr, sizeof(addr)))
+		if (dfi_mem_virt_read(LC_VMCORE_INFO, &addr, sizeof(addr)))
 			return;
 		if (addr == 0)
 			return;
-		if (dfi_mem_read_rc(addr, &note, sizeof(note)))
+		if (dfi_mem_virt_read(addr, &note, sizeof(note)))
 			return;
 		if (note.n_namesz == 0 || note.n_namesz > sizeof(str))
 			return;
 		memset(str, 0, sizeof(str));
-		if (dfi_mem_read_rc(addr + sizeof(note), str, note.n_namesz))
+		if (dfi_mem_virt_read(addr + sizeof(note), str, note.n_namesz))
 			return;
 		if (memcmp(str, "VMCOREINFO", sizeof("VMCOREINFO")) != 0)
 			return;
@@ -116,7 +116,7 @@ void dfi_vmcoreinfo_init(void)
 		       "DFI vmcoreinfo addr 0x%016lx size 0x%016lx\n",
 		       addr, size);
 	l.vmcoreinfo = zg_alloc(size + 1);
-	if (dfi_mem_read_rc(addr, l.vmcoreinfo, size)) {
+	if (dfi_mem_virt_read(addr, l.vmcoreinfo, size)) {
 		zg_free(l.vmcoreinfo);
 		l.vmcoreinfo = NULL;
 		return;
