@@ -177,7 +177,7 @@ static int do_stdout(void)
 int main(int argc, char *argv[])
 {
 	sig_handler_init();
-	opts_parse(argc, argv);
+	opts_parse(argc, argv, &g.opts);
 
 	switch (g.opts.action) {
 	case ZG_ACTION_STDOUT:
