@@ -18,6 +18,9 @@
 #define TIME_FMT_STR "%a, %d %b %Y %H:%M:%S %z"
 #define PROGRESS_HASH_CNT 50
 
+#define KDUMP_OLDMEM_BASE	0x10418
+#define KDUMP_OLDMEM_SIZE	0x10420
+
 /*
  * DFI vector - ensure that tape is the first in the list and devmem the second!
  */
@@ -613,9 +616,9 @@ static void kdump_init(void)
 
 	util_log_print(UTIL_LOG_TRACE, "DFI kdump initialization\n");
 
-	if (dfi_mem_phys_read(0x10418, &base, sizeof(base)))
+	if (dfi_mem_phys_read(KDUMP_OLDMEM_BASE, &base, sizeof(base)))
 		return;
-	if (dfi_mem_phys_read(0x10420, &size, sizeof(size)))
+	if (dfi_mem_phys_read(KDUMP_OLDMEM_SIZE, &size, sizeof(size)))
 		return;
 	if (base == 0 || size == 0)
 		return;
