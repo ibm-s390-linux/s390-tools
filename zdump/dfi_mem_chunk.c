@@ -257,22 +257,11 @@ static u64 mem_chunk_start_phys(struct dfi_mem_chunk *mem_chunk)
 }
 
 /*
- * Add virtual memory chunk with simple virtual mapping
- */
-static void mem_chunk_map_add(u64 start, u64 size, u64 start_p)
-{
-	u64 *data = util_malloc(sizeof(*data));
-
-	*data = start_p;
-	dfi_mem_chunk_virt_add(start, size, data, mem_chunk_map_read_fn, free);
-}
-
-/*
  * Add virtual memory chunk
  */
-void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
-			    dfi_mem_chunk_read_fn read_fn,
-			    dfi_mem_chunk_free_fn free_fn)
+static void mem_chunk_virt_add(u64 start, u64 size, void *data,
+			       dfi_mem_chunk_read_fn read_fn,
+			       dfi_mem_chunk_free_fn free_fn)
 {
 	util_log_print(UTIL_LOG_DEBUG,
 		       "DFI add %svirt mem chunk start 0x%016lx size 0x%016lx\n",
@@ -282,6 +271,17 @@ void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
 	if (size == 0)
 		return;
 	mem_chunk_create(&l.mem_virt, start, size, data, read_fn, free_fn);
+}
+
+/*
+ * Add virtual memory chunk with simple virtual mapping
+ */
+static void mem_chunk_map_add(u64 start, u64 size, u64 start_p)
+{
+	u64 *data = util_malloc(sizeof(*data));
+
+	*data = start_p;
+	mem_chunk_virt_add(start, size, data, mem_chunk_map_read_fn, free);
 }
 
 /*

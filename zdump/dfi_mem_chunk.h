@@ -42,9 +42,6 @@ void dfi_mem_chunk_add_vol(u64 start, u64 size, void *data,
 void dfi_mem_chunk_add(u64 start, u64 size, void *data,
 		       dfi_mem_chunk_read_fn read_fn,
 		       dfi_mem_chunk_free_fn free_fn);
-void dfi_mem_chunk_virt_add(u64 start, u64 size, void *data,
-			    dfi_mem_chunk_read_fn read_fn,
-			    dfi_mem_chunk_free_fn free_fn);
 u64 dfi_mem_range(void);
 int dfi_mem_range_valid(u64 addr, u64 len);
 unsigned int dfi_mem_chunk_cnt(void);
