@@ -52,4 +52,10 @@ struct dfo {
 	void		(*init)(void);
 };
 
+/*
+ * Supported DFO dump formats
+ */
+extern struct dfo dfo_s390;
+extern struct dfo dfo_elf;
+
 #endif /* DFO_H */

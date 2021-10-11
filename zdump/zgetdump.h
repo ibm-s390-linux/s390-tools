@@ -86,12 +86,6 @@ extern struct dfi dfi_kdump_flat;
 extern struct dfi dfi_devmem;
 
 /*
- * Supported DFO dump formats
- */
-extern struct dfo dfo_s390;
-extern struct dfo dfo_elf;
-
-/*
  * Supported s390 dumpers
  */
 extern struct dt dt_s390mv;
