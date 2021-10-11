@@ -613,12 +613,10 @@ static void kdump_init(void)
 
 	util_log_print(UTIL_LOG_TRACE, "DFI kdump initialization\n");
 
-	if (!dfi_mem_range_valid(0x10418, sizeof(base)))
+	if (dfi_mem_phys_read(0x10418, &base, sizeof(base)))
 		return;
-	if (!dfi_mem_range_valid(0x10420, sizeof(size)))
+	if (dfi_mem_phys_read(0x10420, &size, sizeof(size)))
 		return;
-	dfi_mem_phys_read(0x10418, &base, sizeof(base));
-	dfi_mem_phys_read(0x10420, &size, sizeof(size));
 	if (base == 0 || size == 0)
 		return;
 	if (base % MIB || size % MIB)

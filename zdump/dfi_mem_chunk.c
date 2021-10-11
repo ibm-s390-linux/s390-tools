@@ -120,9 +120,35 @@ void dfi_mem_map_print(bool verbose)
 }
 
 /*
+ * Check if memory chunk contains address
+ */
+static int mem_chunk_has_addr(struct dfi_mem_chunk *mem_chunk, u64 addr)
+{
+	return (addr >= mem_chunk->start && addr <= mem_chunk->end);
+}
+
+/*
+ * Find memory chunk that contains address
+ */
+static struct dfi_mem_chunk *mem_chunk_find(struct mem *mem, u64 addr)
+{
+	struct dfi_mem_chunk *mem_chunk;
+
+	if (mem->chunk_cache && mem_chunk_has_addr(mem->chunk_cache, addr))
+		return mem->chunk_cache;
+	util_list_iterate(&mem->chunk_list, mem_chunk) {
+		if (mem_chunk_has_addr(mem_chunk, addr)) {
+			mem->chunk_cache = mem_chunk;
+			return mem_chunk;
+		}
+	}
+	return NULL;
+}
+
+/*
  * Is memory range valid?
  */
-int dfi_mem_range_valid(u64 addr, u64 len)
+static int mem_range_valid(struct mem *mem, u64 addr, u64 len)
 {
 	struct dfi_mem_chunk *mem_chunk;
 	u64 addr_end = addr + len;
@@ -132,7 +158,7 @@ int dfi_mem_range_valid(u64 addr, u64 len)
 		return 0;
 
 	do {
-		mem_chunk = dfi_mem_chunk_find(addr);
+		mem_chunk = mem_chunk_find(mem, addr);
 		if (!mem_chunk)
 			return 0;
 		addr += MIN(len, mem_chunk->end - addr + 1);
@@ -180,32 +206,6 @@ static void mem_chunk_create(struct mem *mem, u64 start, u64 size, void *data,
 	mem->end_addr = MAX(mem->end_addr, mem_chunk->end);
 	mem->chunk_cache = mem_chunk;
 	mem->chunk_cnt++;
-}
-
-/*
- * Check if memory chunk contains address
- */
-static int mem_chunk_has_addr(struct dfi_mem_chunk *mem_chunk, u64 addr)
-{
-	return (addr >= mem_chunk->start && addr <= mem_chunk->end);
-}
-
-/*
- * Find memory chunk that contains address
- */
-static struct dfi_mem_chunk *mem_chunk_find(struct mem *mem, u64 addr)
-{
-	struct dfi_mem_chunk *mem_chunk;
-
-	if (mem->chunk_cache && mem_chunk_has_addr(mem->chunk_cache, addr))
-		return mem->chunk_cache;
-	util_list_iterate(&mem->chunk_list, mem_chunk) {
-		if (mem_chunk_has_addr(mem_chunk, addr)) {
-			mem->chunk_cache = mem_chunk;
-			return mem_chunk;
-		}
-	}
-	return NULL;
 }
 
 /*
@@ -351,6 +351,14 @@ u64 dfi_mem_range(void)
 }
 
 /*
+ * Is memory range valid?
+ */
+int dfi_mem_range_valid(u64 addr, u64 len)
+{
+	return mem_range_valid(&l.mem_virt, addr, len);
+}
+
+/*
  * Return first memory chunk
  */
 struct dfi_mem_chunk *dfi_mem_chunk_first(void)
@@ -397,12 +405,15 @@ struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr)
 /*
  * Read physical memory at given address
  */
-void dfi_mem_phys_read(u64 addr, void *buf, size_t cnt)
+int dfi_mem_phys_read(u64 addr, void *buf, size_t cnt)
 {
 	util_log_print(UTIL_LOG_TRACE,
 		       "DFI phys mem read addr 0x%016lx size 0x%016lx\n",
 		       addr, cnt);
+	if (!mem_range_valid(&l.mem_phys, addr, cnt))
+		return -EINVAL;
 	mem_read(&l.mem_phys, addr, buf, cnt);
+	return 0;
 }
 
 /*
@@ -413,7 +424,7 @@ int dfi_mem_virt_read(u64 addr, void *buf, size_t cnt)
 	util_log_print(UTIL_LOG_TRACE,
 		       "DFI virt mem read addr 0x%016lx size 0x%016lx\n",
 		       addr, cnt);
-	if (!dfi_mem_range_valid(addr, cnt))
+	if (!mem_range_valid(&l.mem_virt, addr, cnt))
 		return -EINVAL;
 	mem_read(&l.mem_virt, addr, buf, cnt);
 	return 0;
@@ -478,7 +489,7 @@ void dfi_mem_unmap(u64 start, u64 size)
 			addr_phys = start_phys;
 			mem_chunk_map_add(addr_virt, size_virt, addr_phys);
 		}
-free:
+	free:
 		util_list_remove(&l.mem_virt.chunk_list, mem_chunk);
 		l.mem_virt.chunk_cnt--;
 		if (mem_chunk->data && mem_chunk->free_fn)
