@@ -10,6 +10,8 @@
  */
 
 #include "zgetdump.h"
+#include "zg.h"
+#include "dt.h"
 
 /*
  * Supported dump tools

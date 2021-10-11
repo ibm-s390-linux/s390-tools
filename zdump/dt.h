@@ -12,8 +12,9 @@
 #ifndef DT_H
 #define DT_H
 
-#include "dfi.h"
 #include <stdbool.h>
+
+#include "dfi.h"
 
 #define DUMP_EXTENDED		true
 #define DUMP_NON_EXTENDED	false
@@ -24,12 +25,21 @@ struct dt {
 	void		(*info)(void);
 };
 
-extern void dt_init(void);
-extern void dt_info_print(void);
-extern void dt_arch_set(enum dfi_arch arch);
-extern void dt_version_set(int version);
-extern void dt_attr_mem_limit_set(u64 mem_limit);
-extern void dt_attr_force_set(int value);
-extern void dt_attr_dasd_type_set(const char *dasd_type);
+void dt_init(void);
+void dt_info_print(void);
+void dt_arch_set(enum dfi_arch arch);
+void dt_version_set(int version);
+void dt_attr_mem_limit_set(u64 mem_limit);
+void dt_attr_force_set(int value);
+void dt_attr_dasd_type_set(const char *dasd_type);
+
+/*
+ * Supported s390 dumpers
+ */
+extern struct dt dt_s390mv;
+extern struct dt dt_s390mv_ext;
+extern struct dt dt_s390sv;
+extern struct dt dt_s390sv_ext;
+extern struct dt dt_scsi;
 
 #endif

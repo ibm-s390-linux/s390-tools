@@ -71,13 +71,4 @@ int zfuse_mount_dump(void);
 void zfuse_umount(void);
 #endif
 
-/*
- * Supported s390 dumpers
- */
-extern struct dt dt_s390mv;
-extern struct dt dt_s390mv_ext;
-extern struct dt dt_s390sv;
-extern struct dt dt_s390sv_ext;
-extern struct dt dt_scsi;
-
 #endif /* ZGETDUMP_H */
