@@ -15,7 +15,7 @@ sudo reboot
 ## Dependencies
 
 ```shell
-sudo dnf install -y fuse fuse-devel systemd-devel
+sudo dnf install -y fuse3 fuse3-devel systemd-devel
 ```
 
 ## Build hsavmcore

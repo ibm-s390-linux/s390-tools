@@ -11,7 +11,7 @@
 ## Dependencies
 
 ```shell
-sudo apt-get install -y make gcc kdump-tools fuse libfuse-dev libsystemd-dev
+sudo apt-get install -y make gcc kdump-tools fuse3 libfuse3-dev libsystemd-dev
 ```
 
 ## Build hsavmcore
