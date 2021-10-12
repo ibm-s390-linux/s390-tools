@@ -288,7 +288,7 @@ build options:
 
 | __LIBRARY__    | __BUILD OPTION__   | __TOOLS__                             |
 |----------------|:------------------:|:-------------------------------------:|
-| fuse           | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump,|
+| fuse3          | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump,|
 |                |                    | hsavmcore                             |
 | zlib           | `HAVE_ZLIB`        | zgetdump, dump2tar                    |
 | ncurses        | `HAVE_NCURSES`     | hyptop                                |
@@ -351,12 +351,12 @@ the different tools are provided:
 
 * cmsfs-fuse/zdsfs/hmcdrvfs/zgetdump:
   The tools cmsfs-fuse, zdsfs, hmcdrvfs, and zgetdump depend on FUSE.
-  FUSE is provided by installing the fuse and libfuse packages and by a
+  FUSE is provided by installing the fuse3 and libfuse3 packages and by a
   kernel compiled with `CONFIG_FUSE_FS`. For compiling the s390-tools package
-  the fuse-devel package is required.
-  The cmsfs-fuse tool requires FUSE version 2.8.1 or newer for full
+  the fuse3-devel package is required.
+  The cmsfs-fuse tool requires FUSE version 3.0 or newer for full
   functionality.
-  For further information about FUSE see: http://fuse.sourceforge.net
+  For further information about FUSE see: https://github.com/libfuse/libfuse
 
 * hyptop:
   The ncurses-devel package is required to build hyptop.
@@ -452,7 +452,7 @@ the different tools are provided:
   `HAVE_JSONC=0`, or `HAVE_LIBCURL=0` to the make invocation.
 
 * hsavmcore:
-  For building the hsavmcore tool you need fuse version 2.6 and optionally
+  For building the hsavmcore tool you need fuse version 3.0 and optionally
   systemd which is enabled by default, to disable systemd support,
   add `HAVE_SYSTEMD=0` to the make invocation.
   Tip: you may skip the hsavmcore build by adding `HAVE_FUSE=0`
