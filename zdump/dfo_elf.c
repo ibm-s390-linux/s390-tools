@@ -240,11 +240,12 @@ static void *nt_vmcoreinfo(void *ptr)
 }
 
 /*
- * Initialize notes
+ * Initialize the program header entries for the notes and the related segment
+ * data.
  */
-static void *notes_init(Elf64_Phdr *phdr, void *ptr, u64 notes_offset)
+static void *notes_init(Elf64_Phdr *phdr, void *segment_start, u64 elf_offset)
 {
-	void *ptr_start = ptr;
+	void *ptr = segment_start;
 	struct dfi_cpu *cpu;
 
 	ptr = nt_prpsinfo(ptr);
@@ -269,8 +270,8 @@ out:
 	ptr = nt_vmcoreinfo(ptr);
 	memset(phdr, 0, sizeof(*phdr));
 	phdr->p_type = PT_NOTE;
-	phdr->p_offset = notes_offset;
-	phdr->p_filesz = PTR_DIFF(ptr, ptr_start);
+	phdr->p_offset = elf_offset;
+	phdr->p_filesz = PTR_DIFF(ptr, segment_start);
 	return ptr;
 }
 
