@@ -36,8 +36,10 @@ struct stage3_parms {
 	unsigned long long flags;       /* flags (e.g. STAGE3_FLAG_KDUMP) */
 	unsigned long long image_len;   /* length of kernel */
 	unsigned long long image_addr;  /* target address of kernel */
+	unsigned long long envblk_addr; /* address of environment block */
+	unsigned long long envblk_len;  /* size of environment block */
 };
-STATIC_ASSERT(sizeof(struct stage3_parms) == 8 * 8)
+STATIC_ASSERT(sizeof(struct stage3_parms) == 8 * 10)
 
 extern struct stage3_parms _stage3_parms;
 extern void kdump_stage3();

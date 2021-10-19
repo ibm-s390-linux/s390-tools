@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include "lib/zt_common.h"
+#include "lib/util_base.h"
 #include "boot/loaders_layout.h"
 
 #define ZIPL_MAGIC			"zIPL"
@@ -21,7 +22,6 @@
 #define DISK_LAYOUT_ID			0x00000001
 
 #define ADDRESS_LIMIT			0x80000000UL
-#define ADDRESS_LIMIT_KDUMP		0x2000000UL /* HSA size: 32 MiB */
 #define UNSPECIFIED_ADDRESS		-1UL
 #define MAXIMUM_PARMLINE_SIZE		0x380UL
 #define MAXIMUM_PHYSICAL_BLOCKSIZE	0x1000UL
@@ -36,7 +36,7 @@
 #define ZIPL_DEFAULT_CONF		TOOLS_SYSCONFDIR "/zipl.conf"
 #define ZIPL_MINIMAL_CONF		TOOLS_LIBDIR "/zipl.conf"
 #define ZIPL_DEFAULT_BLSDIR		"/boot/loader/entries"
-#define ZIPL_STAGE3_PATH		TOOLS_LIBDIR "/stage3.bin"
+#define ZIPL_STAGE3_PATH		util_libdir_path("stage3.bin")
 #define ZIPL_SIPL_PATH			"/sys/firmware/ipl/has_secure"
 
 #define MENU_DEFAULT_PROMPT		0

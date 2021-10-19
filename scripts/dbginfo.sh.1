@@ -1,4 +1,4 @@
-.TH DBGINFO.SH  1 "April 2021" "s390-tools"
+.TH DBGINFO.SH  1 "September 2021" "s390-tools"
 
 .SH NAME
 dbginfo.sh \- collect runtime, configuration and trace information
@@ -14,8 +14,10 @@ for debugging Linux on IBM Z
 This script collects runtime, configuration and trace information that can
 be used to debug a Linux on IBM Z instance.
 For Linux on z/VM, the script also traces information about the z/VM system.
+KVM or DOCKER data ist collected on a host serving this.
+
 The debug information is written to a file
-/tmp/DBGINFO\-<date>\-<time>\-<hostname>\-<processorid>.tgz
+/<DIRECTORY>/DBGINFO\-<date>\-<time>\-<hostname>\-<processorid>.tgz
 where [date] and [time] are the date and time when the debug data was
 collected. [hostname] indicates the hostname of the system the data was
 collected from. The [processorid] is taken from the processor 0 and indicates
@@ -32,7 +34,12 @@ Print version information, then exit.
 
 .TP
 \fB\-d <DIRECTORY>\fP, \fB\-\-directory <DIRECTORY>\fP
-Specify the DIRECTORY where the data collection stores the temporary data and the final archive. The specified directory must already exist. If this parameter is not specified, /tmp is used by default.
+Specify the DIRECTORY where the data collection stores the temporary data and the final archive.
+The specified directory must already exist. If this parameter is not specified, /tmp is used by default.
+
+.TP
+\fB\-c\fP, \fB\-\-check\fP
+Print online quick check (not saving any data) - can be combind with a preceding -d option.
 
 .SH FILES
 A .tgz file of the form
@@ -56,48 +63,57 @@ Copyright IBM Corp. 2002, 2021
 .PP
 Hardware platform     = s390x
 .br
-Kernel version        = 5.4.0 (5.4.0-70-generic)
-.br
 Runtime environment   = z/VM
+.br
+Kernel version        = 4.18.0 (4.18.0-305.el8.s390x)
+.br
+OS version / distro   = Red Hat Enterprise Linux 8.4 (Ootpa)
+.br
+Date and time of info = 2021-08-26-15-27-58
 .PP
-1 of 16: Collecting command output
+1 of 18: Collecting sysfs
 .PP
-2 of 16: Collecting z/VM command output
+2 of 18: Collecting procfs
 .PP
-3 of 16: Collecting procfs
+3 of 18: Collecting config files
 .PP
-4 of 16: Collecting sysfs
+4 of 18: Collecting command output
 .PP
-5 of 16: Collecting log files
+5 of 18: Collecting hyptop for z/VM - 5s output
 .PP
-6 of 16: Collecting config files
+6 of 18: Collecting z/VM output
 .PP
-7 of 16: Collecting osa oat output
+7 of 18: Collecting network output
 .PP
-8 of 16: Collecting ethtool output
+8 of 18: Collecting osa oat output
 .PP
-9 of 16: Collecting tc output
+9 of 18: Collecting ethtool output
 .PP
-10 of 16: Collecting bridge output
+10 of 18: Collecting Trafic Control output
 .PP
-11 of 16: Collecting OpenVSwitch output
+11 of 18: Collecting bridge output
 .PP
-12a of 16: Collecting docker container
-12b of 16: Collecting docker network
+12 of 18: Skip OpenVSwitch: ovs-vsctl not available
 .PP
-13 of 16: Collecting nvme output
+13 of 18: Skip KVM: no virsh command
 .PP
-14 of 16: Collecting KVM data
+14 of 18: Collecting docker output
 .PP
-15 of 16: Postprocessing
+15 of 18: Collecting NVME storage output
 .PP
-16 of 16: Finalizing: Creating archive with collected data
+16 of 18: Collecting log files
+.PP
+ 0 logfiles over 50 MB
+.PP
+17 of 18: Postprocessing
+.PP
+18 of 18: Finalizing: Creating archive with collected data
 .PP
 Collected data was saved to:
 .br
- >>  /data\-collection/DBGINFO\-2021\-04\-20\-14\-00\-07\-host\-012345.tgz  <<
+ >>  /data\-collection/DBGINFO\-2021\-08\-26\-15\-27\-58\-host\-012345.tgz  <<
 .br
-Review the collected data before sending to your service organization.
+Please review all collected data before sending to your service organization.
 .SH HINTS
 Run the script with root authority.
 .br

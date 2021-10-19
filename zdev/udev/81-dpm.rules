@@ -1,0 +1,40 @@
+# Automatically activate certain s390-specific device types that are attached
+# in offline state when running in an LPAR managed by the Dynamic Partition
+# Manager (DPM).
+#
+# Note that processing is restricted to DPM as there may be use cases for
+# not enabling these device types in non-DPM mode.
+#
+# To deactivate this processing, specify the following on the kernel command
+# line:
+#
+#   rd.zdev=no-auto
+
+ACTION!="add", GOTO="end_dpm"
+
+# Handle newly added PCI devices in offline state
+SUBSYSTEM=="slots", ATTR{power}=="0", GOTO="check_dpm"
+# Handle newly added crypto devices in offline state
+SUBSYSTEM=="ap", ENV{DEVTYPE}=="ap_card", ATTR{config}=="0", GOTO="check_dpm"
+
+GOTO="end_dpm"
+
+LABEL="check_dpm"
+
+IMPORT{program}="/lib/s390-tools/zdev_id"
+
+# Check for off-switch
+ENV{ZDEV_NO_AUTO}=="1", GOTO="end_dpm"
+
+# Check for DPM LPAR
+ENV{ZDEV_IS_DPM}!="1", GOTO="end_dpm"
+ENV{ZDEV_NEST_LEVEL}!="1", GOTO="end_dpm"
+ENV{ZDEV_HYPERVISOR_0}!="LPAR", GOTO="end_dpm"
+
+# Enable PCI device
+SUBSYSTEM=="slots", ATTR{power}="1"
+# Enable crypto device
+SUBSYSTEM=="ap", ATTR{config}="1"
+
+# End of rule
+LABEL="end_dpm"

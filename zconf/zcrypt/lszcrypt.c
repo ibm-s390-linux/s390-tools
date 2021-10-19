@@ -22,14 +22,14 @@
 #include "lib/util_scandir.h"
 #include "lib/zt_common.h"
 
+#include "misc.h"
+
 /*
  * Private data
  */
-struct lszcrypt_l {
+static struct lszcrypt_l {
 	int verbose;
 } l;
-
-struct lszcrypt_l *lszcrypt_l = &l;
 
 /*
  * Capabilities
@@ -79,7 +79,7 @@ static struct fac_bits_s {
 /*
  * Program configuration
  */
-const struct util_prg prg = {
+static const struct util_prg prg = {
 	.desc = "Display zcrypt device and configuration information.",
 	.args = "[DEVICE_IDS]",
 	.copyright_vec = {
@@ -334,12 +334,48 @@ static void show_capability(const char *id_str)
 }
 
 /*
+ * Read driver entry in dir or in dir/subdir and store driver into buf.
+ * Returns:
+ *    0 if there is no driver link (no driver bound to this device or error)
+ *    1 if one of the cexXcard or cexXqueue driver is bound to this device
+ *    2 if the vfio is bound to this device
+ */
+static int read_driver(const char *dir, const char *subdir, char *buf, size_t buflen)
+{
+	char drvlink[PATH_MAX], linktarget[PATH_MAX];
+	char *p, driver[256];
+
+	if (subdir)
+		snprintf(drvlink, sizeof(drvlink), "%s/%s/driver", dir, subdir);
+	else
+		snprintf(drvlink, sizeof(drvlink), "%s/driver", dir);
+	drvlink[sizeof(drvlink) - 1] = '\0';
+
+	memset(linktarget, 0, sizeof(linktarget));
+
+	if (readlink(drvlink, linktarget, sizeof(linktarget)) > 0) {
+		p = strrchr(linktarget, '/');
+		if (p) {
+			strncpy(driver, p + 1, sizeof(driver));
+			driver[sizeof(driver) - 1] = '\0';
+			strncpy(buf, driver, buflen);
+			if (misc_regex_match(driver, "cex[0-9](card|queue)"))
+				return 1;
+			else if (misc_regex_match(driver, "vfio.ap"))
+				return 2;
+		}
+	}
+
+	return 0;
+}
+
+/*
  * Read subdevice default attributes
  */
 static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 				    const char *sub_dev)
 {
-	long value;
+	long config = -1, online = -1;
 	char buf[256];
 	unsigned long facility;
 
@@ -348,24 +384,29 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 	else
 		util_rec_set(rec, "type", buf);
 
-	if (util_path_is_readable("%s/%s/online", grp_dev, sub_dev)) {
-		util_file_read_l(&value, 10, "%s/%s/online", grp_dev, sub_dev);
-		if (value > 0)
-			util_rec_set(rec, "online", "online");
-		else {
-			/* device is offline, check config (if available) */
-			if (util_path_is_readable("%s/%s/config", grp_dev, sub_dev)) {
-				util_file_read_l(&value, 10, "%s/%s/config", grp_dev, sub_dev);
-				if (value > 0)
-					util_rec_set(rec, "online", "offline");
-				else
-					util_rec_set(rec, "online", "deconfig");
-			} else
-				util_rec_set(rec, "online", "offline");
-		}
+	if (util_path_is_readable("%s/%s/config", grp_dev, sub_dev))
+		util_file_read_l(&config, 10, "%s/%s/config", grp_dev, sub_dev);
+	if (util_path_is_readable("%s/%s/online", grp_dev, sub_dev))
+		util_file_read_l(&online, 10, "%s/%s/online", grp_dev, sub_dev);
+
+	util_rec_set(rec, "status", "-");
+	if (config == 0) {
+		util_rec_set(rec, "status", "deconfig");
 	} else {
-		/* no online attribute */
-		util_rec_set(rec, "online", "-");
+		if (online > 0)
+			util_rec_set(rec, "status", "online");
+		else if (online == 0)
+			util_rec_set(rec, "status", "offline");
+		else {
+			/* no online attribute, maybe use status attribute */
+			if (util_path_is_readable("%s/%s/status",
+						  grp_dev, sub_dev)) {
+				util_file_read_line(buf, sizeof(buf),
+						    "%s/%s/status",
+						    grp_dev, sub_dev);
+				util_rec_set(rec, "status", buf);
+			}
+		}
 	}
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
@@ -378,9 +419,13 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 	else
 		util_rec_set(rec, "mode", "Unknown");
 
-	util_file_read_line(buf, sizeof(buf), "%s/%s/request_count",
-			    grp_dev, sub_dev);
-	util_rec_set(rec, "requests", buf);
+	if (config == 0) {
+		util_rec_set(rec, "requests", "-");
+	} else {
+		util_file_read_line(buf, sizeof(buf), "%s/%s/request_count",
+				    grp_dev, sub_dev);
+		util_rec_set(rec, "requests", buf);
+	}
 }
 
 /*
@@ -389,19 +434,29 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 				    const char *sub_dev)
 {
-	int i;
+	int i, drvinfo;
 	unsigned long facility;
-	char buf[256], afile[PATH_MAX];
-	long depth, pending1, pending2;
+	char buf[256];
+	long depth, pending1, pending2, config = -1;
 
 	if (l.verbose == 0)
 		return;
 
-	util_file_read_l(&pending1, 10, "%s/%s/pendingq_count",
-			 grp_dev, sub_dev);
-	util_file_read_l(&pending2, 10, "%s/%s/requestq_count",
-			 grp_dev, sub_dev);
-	util_rec_set(rec, "pending", "%ld", pending1 + pending2);
+	drvinfo = read_driver(grp_dev, sub_dev, buf, sizeof(buf));
+	util_rec_set(rec, "driver", drvinfo > 0 ? buf : "-no-driver-");
+
+	if (util_path_is_readable("%s/config", grp_dev))
+		util_file_read_l(&config, 10, "%s/config", grp_dev);
+
+	if (config == 0 || drvinfo != 1) {
+		util_rec_set(rec, "pending", "-");
+	} else {
+		util_file_read_l(&pending1, 10, "%s/%s/pendingq_count",
+				 grp_dev, sub_dev);
+		util_file_read_l(&pending2, 10, "%s/%s/requestq_count",
+				 grp_dev, sub_dev);
+		util_rec_set(rec, "pending", "%ld", pending1 + pending2);
+	}
 
 	util_file_read_line(buf, sizeof(buf), "%s/hwtype", grp_dev);
 	util_rec_set(rec, "hwtype", buf);
@@ -414,14 +469,6 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 		buf[i] = facility & fac_bits[i].mask ? fac_bits[i].c : '-';
 	buf[i] = '\0';
 	util_rec_set(rec, "facility", buf);
-
-	snprintf(afile, sizeof(afile), "%s/%s/driver", grp_dev, sub_dev);
-	afile[sizeof(afile) - 1] = '\0';
-	memset(buf, 0, sizeof(buf));
-	if (readlink(afile, buf, sizeof(buf)) > 0)
-		util_rec_set(rec, "driver", strrchr(buf, '/') + 1);
-	else
-		util_rec_set(rec, "driver", "-no-driver-");
 }
 
 /*
@@ -469,7 +516,7 @@ static void show_subdevices(struct util_rec *rec, const char *grp_dev)
  */
 static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 {
-	long value;
+	long config = -1, online = -1;
 	char buf[256];
 	unsigned long facility;
 
@@ -488,24 +535,27 @@ static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 	else
 		util_rec_set(rec, "mode", "Unknown");
 
-	if (util_path_is_readable("%s/online", grp_dev)) {
-		util_file_read_l(&value, 10, "%s/online", grp_dev);
-		if (value > 0)
-			util_rec_set(rec, "online", "online");
-		else {
-			if (util_path_is_readable("%s/config", grp_dev)) {
-				util_file_read_l(&value, 10, "%s/config", grp_dev);
-				if (value > 0)
-					util_rec_set(rec, "online", "offline");
-				else
-					util_rec_set(rec, "online", "deconfig");
-			} else
-				util_rec_set(rec, "online", "offline");
-		}
+	if (util_path_is_readable("%s/config", grp_dev))
+		util_file_read_l(&config, 10, "%s/config", grp_dev);
+	if (util_path_is_readable("%s/online", grp_dev))
+		util_file_read_l(&online, 10, "%s/online", grp_dev);
+	if (config == 0) {
+		util_rec_set(rec, "status", "deconfig");
+	} else {
+		if (online > 0)
+			util_rec_set(rec, "status", "online");
+		else if (online == 0)
+			util_rec_set(rec, "status", "offline");
+		else
+			util_rec_set(rec, "status", "-");
 	}
 
-	util_file_read_line(buf, sizeof(buf), "%s/request_count", grp_dev);
-	util_rec_set(rec, "requests", buf);
+	if (config == 0) {
+		util_rec_set(rec, "requests", "-");
+	} else {
+		util_file_read_line(buf, sizeof(buf), "%s/request_count", grp_dev);
+		util_rec_set(rec, "requests", buf);
+	}
 }
 
 /*
@@ -515,15 +565,22 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 {
 	int i;
 	unsigned long facility;
-	char buf[256], afile[PATH_MAX];
-	long depth, pending1, pending2;
+	char buf[256];
+	long depth, pending1, pending2, config = -1;
 
 	if (l.verbose == 0)
 		return;
 
-	util_file_read_l(&pending1, 10, "%s/pendingq_count", grp_dev);
-	util_file_read_l(&pending2, 10, "%s/requestq_count", grp_dev);
-	util_rec_set(rec, "pending", "%ld", pending1 + pending2);
+	if (util_path_is_readable("%s/config", grp_dev))
+		util_file_read_l(&config, 10, "%s/config", grp_dev);
+
+	if (config == 0) {
+		util_rec_set(rec, "pending", "-");
+	} else {
+		util_file_read_l(&pending1, 10, "%s/pendingq_count", grp_dev);
+		util_file_read_l(&pending2, 10, "%s/requestq_count", grp_dev);
+		util_rec_set(rec, "pending", "%ld", pending1 + pending2);
+	}
 
 	util_file_read_line(buf, sizeof(buf), "%s/hwtype", grp_dev);
 	util_rec_set(rec, "hwtype", buf);
@@ -537,13 +594,8 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 	buf[i] = '\0';
 	util_rec_set(rec, "facility", buf);
 
-	snprintf(afile, sizeof(afile), "%s/driver", grp_dev);
-	afile[sizeof(afile) - 1] = '\0';
-	memset(buf, 0, sizeof(buf));
-	if (readlink(afile, buf, sizeof(buf)) > 0)
-		util_rec_set(rec, "driver", strrchr(buf, '/') + 1);
-	else
-		util_rec_set(rec, "driver", "-no-driver-");
+	i = read_driver(grp_dev, NULL, buf, sizeof(buf));
+	util_rec_set(rec, "driver", i > 0 ? buf : "-no-driver-");
 }
 
 /*
@@ -552,8 +604,6 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 static void show_device(struct util_rec *rec, const char *device)
 {
 	char *grp_dev, card[16];
-
-	util_rec_set(rec, "card", card);
 
 	strcpy(card, &device[4]);
 	grp_dev = util_path_sysfs("devices/ap/%s", device);
@@ -585,10 +635,10 @@ out_free:
  */
 static void define_rec_default(struct util_rec *rec)
 {
-	util_rec_def(rec, "card", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
+	util_rec_def(rec, "card", UTIL_REC_ALIGN_LEFT, 8, "CARD.DOM");
 	util_rec_def(rec, "type", UTIL_REC_ALIGN_LEFT, 5, "TYPE");
 	util_rec_def(rec, "mode", UTIL_REC_ALIGN_LEFT, 11, "MODE");
-	util_rec_def(rec, "online", UTIL_REC_ALIGN_LEFT, 8, "STATUS");
+	util_rec_def(rec, "status", UTIL_REC_ALIGN_LEFT, 10, "STATUS");
 	util_rec_def(rec, "requests", UTIL_REC_ALIGN_RIGHT, 8, "REQUESTS");
 }
 
@@ -707,7 +757,7 @@ static void show_devices_argv(char *argv[])
 /*
  * Describe adapter ids
  */
-void print_adapter_id_help(void)
+static void print_adapter_id_help(void)
 {
 	printf("\n");
 	printf("DEVICE_IDS\n");

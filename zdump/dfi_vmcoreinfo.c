@@ -12,6 +12,7 @@
 #include <elf.h>
 
 #include "lib/zt_common.h"
+#include "lib/util_log.h"
 
 #include "zgetdump.h"
 
@@ -62,7 +63,10 @@ static struct os_info *os_info_get(void)
 	static struct os_info os_info;
 	unsigned long addr;
 
-	dfi_mem_read(LC_OS_INFO, &addr, sizeof(addr));
+	util_log_print(UTIL_LOG_TRACE, "DFI get osinfo\n");
+
+	if (dfi_mem_read_rc(LC_OS_INFO, &addr, sizeof(addr)))
+		return NULL;
 	if (addr % 0x1000)
 		return NULL;
 	if (dfi_mem_read_rc(addr, &os_info, sizeof(os_info)))
@@ -83,16 +87,22 @@ void dfi_vmcoreinfo_init(void)
 	Elf64_Nhdr note;
 	char str[128];
 
+	util_log_print(UTIL_LOG_TRACE, "DFI vmcoreinfo initialization\n");
+
 	l.os_info = os_info_get();
 
 	if (l.os_info && l.os_info->vmcoreinfo_size) {
+		util_log_print(UTIL_LOG_DEBUG, "DFI found valid osinfo\n");
 		addr = l.os_info->vmcoreinfo_addr;
 		size = l.os_info->vmcoreinfo_size;
 	} else {
-		dfi_mem_read(LC_VMCORE_INFO, &addr, sizeof(addr));
+		if (dfi_mem_read_rc(LC_VMCORE_INFO, &addr, sizeof(addr)))
+			return;
 		if (addr == 0)
 			return;
 		if (dfi_mem_read_rc(addr, &note, sizeof(note)))
+			return;
+		if (note.n_namesz == 0 || note.n_namesz > sizeof(str))
 			return;
 		memset(str, 0, sizeof(str));
 		if (dfi_mem_read_rc(addr + sizeof(note), str, note.n_namesz))
@@ -102,6 +112,9 @@ void dfi_vmcoreinfo_init(void)
 		size = note.n_descsz;
 		addr += 24;
 	}
+	util_log_print(UTIL_LOG_DEBUG,
+		       "DFI vmcoreinfo addr 0x%016lx size 0x%016lx\n",
+		       addr, size);
 	l.vmcoreinfo = zg_alloc(size + 1);
 	if (dfi_mem_read_rc(addr, l.vmcoreinfo, size)) {
 		zg_free(l.vmcoreinfo);
@@ -109,6 +122,7 @@ void dfi_vmcoreinfo_init(void)
 		return;
 	}
 	l.vmcoreinfo[size] = 0;
+	util_log_print(UTIL_LOG_INFO, "DFI found valid vmcoreinfo\n");
 }
 
 /*

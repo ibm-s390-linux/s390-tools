@@ -16,6 +16,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
+#include "lib/util_log.h"
 #include "zgetdump.h"
 
 /*
@@ -37,56 +39,68 @@ static int pt_load_add(Elf64_Phdr *phdr)
 {
 	u64 *off_ptr;
 
+	util_log_print(UTIL_LOG_DEBUG,
+		       "DFI ELF p_paddr 0x%016lx p_vaddr 0x%016lx p_offset 0x%016lx p_filesz 0x%016lx p_memsz 0x%016lx\n",
+		       phdr->p_paddr, phdr->p_vaddr, phdr->p_offset,
+		       phdr->p_filesz, phdr->p_memsz);
+
 	if (phdr->p_paddr != phdr->p_vaddr) {
 		phdr->p_paddr = phdr->p_vaddr;
 		STDERR("Dump file \"%s\" is a user space core dump\n",
 		      g.opts.device);
+		return -EINVAL;
 	}
+	if (phdr->p_memsz == 0)
+		return -EINVAL;
 	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
 		return -EINVAL;
-	if (phdr->p_filesz == 0) {
-		/* Add zero memory chunk */
-		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, NULL,
-				  dfi_mem_chunk_read_zero, NULL);
-	} else {
+	if (phdr->p_filesz > phdr->p_memsz)
+		return -EINVAL;
+	if (phdr->p_filesz > 0) {
 		off_ptr = zg_alloc(sizeof(*off_ptr));
 		*off_ptr = phdr->p_offset;
-		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_memsz, off_ptr,
+		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_filesz, off_ptr,
 				  dfi_elf_mem_chunk_read_fn, zg_free);
+	}
+	if (phdr->p_memsz - phdr->p_filesz > 0) {
+		/* Add zero memory chunk */
+		dfi_mem_chunk_add(phdr->p_paddr + phdr->p_filesz,
+				  phdr->p_memsz - phdr->p_filesz, NULL,
+				  dfi_mem_chunk_read_zero, NULL);
 	}
 	return 0;
 }
 
 /*
- * Skip name of note
- */
-static void nt_name_skip(Elf64_Nhdr *note)
-{
-	zg_seek_cur(g.fh, ROUNDUP(note->n_namesz, 4), ZG_CHECK);
-}
-
-/*
  * Read note
  */
-static int nt_read(Elf64_Nhdr *note, void *buf)
+static int nt_read(const Elf64_Nhdr *note, void *buf, size_t buf_len)
 {
-	off_t buf_len = ROUNDUP(note->n_descsz, 4);
-	char tmp_buf[buf_len];
+	ssize_t nread;
 
-	nt_name_skip(note);
-	if (zg_read(g.fh, tmp_buf, buf_len, ZG_CHECK_ERR) != buf_len)
+	/* We cannot read more than the current note provides */
+	if (note->n_descsz < buf_len)
 		return -EINVAL;
-	if (buf)
-		memcpy(buf, tmp_buf, note->n_descsz);
+	/* Skip note's name and position file at note's descriptor */
+	zg_seek_cur(g.fh, ROUNDUP(note->n_namesz, 4), ZG_CHECK);
+	/* Read note's descriptor */
+	nread = zg_read(g.fh, buf, buf_len, ZG_CHECK_ERR);
+	if (nread < 0 || (size_t)nread != buf_len)
+		return -EINVAL;
+	/* Skip the rest of note's descriptor until the next note */
+	zg_seek_cur(g.fh, ROUNDUP(note->n_descsz, 4) - buf_len, ZG_CHECK);
 	return 0;
 }
 
 /*
  * Skip note
  */
-static int nt_skip(Elf64_Nhdr *note)
+static void nt_skip(const Elf64_Nhdr *note)
 {
-	return nt_read(note, NULL);
+	/* Skip note's name + descriptor and position file at the next note */
+	zg_seek_cur(g.fh,
+		    ROUNDUP(note->n_namesz, 4) + ROUNDUP(note->n_descsz, 4),
+		    ZG_CHECK);
 }
 
 /*
@@ -107,7 +121,7 @@ static struct dfi_cpu *nt_prstatus_read(Elf64_Nhdr *note)
 	struct dfi_cpu *cpu = dfi_cpu_alloc();
 	struct nt_prstatus_64 nt_prstatus;
 
-	if (nt_read(note, &nt_prstatus))
+	if (nt_read(note, &nt_prstatus, sizeof(nt_prstatus)))
 		return NULL;
 
 	memcpy(cpu->gprs, &nt_prstatus.gprs, sizeof(cpu->gprs));
@@ -126,7 +140,7 @@ static int nt_fpregset_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 	struct nt_fpregset_64 nt_fpregset;
 
 	check_cpu(cpu, "FPREGSET");
-	if (nt_read(note, &nt_fpregset))
+	if (nt_read(note, &nt_fpregset, sizeof(nt_fpregset)))
 		return -EINVAL;
 
 	memcpy(&cpu->fpc, &nt_fpregset.fpc, sizeof(cpu->fpc));
@@ -140,7 +154,7 @@ static int nt_fpregset_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_timer_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TIMER");
-	return nt_read(note, &cpu->timer);
+	return nt_read(note, &cpu->timer, sizeof(cpu->timer));
 }
 
 /*
@@ -149,7 +163,7 @@ static int nt_s390_timer_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_todcmp_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TODCMP");
-	return nt_read(note, &cpu->todcmp);
+	return nt_read(note, &cpu->todcmp, sizeof(cpu->todcmp));
 }
 
 /*
@@ -158,7 +172,7 @@ static int nt_s390_todcmp_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_todpreg_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TODPREG");
-	return nt_read(note, &cpu->todpreg);
+	return nt_read(note, &cpu->todpreg, sizeof(cpu->todpreg));
 }
 
 /*
@@ -167,7 +181,7 @@ static int nt_s390_todpreg_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_ctrs_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_CTRS");
-	return nt_read(note, &cpu->ctrs);
+	return nt_read(note, &cpu->ctrs, sizeof(cpu->ctrs));
 }
 
 /*
@@ -176,7 +190,7 @@ static int nt_s390_ctrs_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_prefix_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_PREFIX");
-	return nt_read(note, &cpu->prefix);
+	return nt_read(note, &cpu->prefix, sizeof(cpu->prefix));
 }
 
 /*
@@ -185,7 +199,7 @@ static int nt_s390_prefix_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_vxrs_low_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_VXRS_LOW");
-	return nt_read(note, &cpu->vxrs_low);
+	return nt_read(note, &cpu->vxrs_low, sizeof(cpu->vxrs_low));
 }
 
 /*
@@ -194,7 +208,7 @@ static int nt_s390_vxrs_low_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_VXRS_HIGH");
-	return nt_read(note, &cpu->vxrs_high);
+	return nt_read(note, &cpu->vxrs_high, sizeof(cpu->vxrs_high));
 }
 
 /*
@@ -202,7 +216,6 @@ static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
  */
 static int pt_notes_add(Elf64_Phdr *phdr)
 {
-	u64 start_off = zg_tell(g.fh, ZG_CHECK);
 	struct dfi_cpu *cpu_current = NULL;
 	u64 notes_start_off;
 	Elf64_Nhdr note;
@@ -214,6 +227,8 @@ static int pt_notes_add(Elf64_Phdr *phdr)
 		rc = zg_read(g.fh, &note, sizeof(note), ZG_CHECK_ERR);
 		if (rc != sizeof(note))
 			return -EINVAL;
+		util_log_print(UTIL_LOG_DEBUG, "DFI ELF n_type 0x%x\n",
+			       note.n_type);
 		switch (note.n_type) {
 		case NT_PRSTATUS:
 			cpu_current = nt_prstatus_read(&note);
@@ -255,12 +270,10 @@ static int pt_notes_add(Elf64_Phdr *phdr)
 			dfi_cpu_content_fac_add(DFI_CPU_CONTENT_FAC_VX);
 			break;
 		default:
-			if (nt_skip(&note))
-				return -EINVAL;
+			nt_skip(&note);
 			break;
 		}
 	}
-	zg_seek(g.fh, start_off, ZG_CHECK);
 	return 0;
 }
 
@@ -287,8 +300,10 @@ static int read_elf_hdr(Elf64_Ehdr *ehdr)
 static int dfi_elf_init(void)
 {
 	Elf64_Ehdr ehdr;
-	Elf64_Phdr phdr;
+	Elf64_Phdr *phdr;
 	int i;
+
+	util_log_print(UTIL_LOG_DEBUG, "DFI ELF initialization\n");
 
 	if (read_elf_hdr(&ehdr) != 0)
 		return -ENODEV;
@@ -297,21 +312,32 @@ static int dfi_elf_init(void)
 	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 
+	phdr = util_malloc(sizeof(*phdr) * ehdr.e_phnum);
+	zg_seek(g.fh, ehdr.e_phoff, ZG_CHECK);
+	zg_read(g.fh, phdr, sizeof(*phdr) * ehdr.e_phnum, ZG_CHECK);
+	util_log_print(UTIL_LOG_DEBUG, "DFI ELF e_phnum %u\n", ehdr.e_phnum);
 	for (i = 0; i < ehdr.e_phnum; i++) {
-		zg_read(g.fh, &phdr, sizeof(phdr), ZG_CHECK);
-		switch (phdr.p_type) {
+		util_log_print(UTIL_LOG_DEBUG, "DFI ELF p_type[%d] 0x%lx\n",
+			       i, phdr[i].p_type);
+		switch (phdr[i].p_type) {
 		case PT_LOAD:
-			if (pt_load_add(&phdr))
+			if (pt_load_add(&phdr[i])) {
+				free(phdr);
 				return -EINVAL;
+			}
 			break;
 		case PT_NOTE:
-			if (pt_notes_add(&phdr))
+			if (pt_notes_add(&phdr[i])) {
+				free(phdr);
 				return -EINVAL;
+			}
 			break;
 		default:
 			break;
 		}
 	}
+	free(phdr);
+
 	dfi_attr_version_set(ehdr.e_ident[EI_VERSION]);
 	return 0;
 }

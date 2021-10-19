@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "lib/zt_common.h"
 #include "lib/util_part.h"
@@ -26,18 +27,14 @@
 
 #include "boot.h"
 #include "bootmap.h"
+#include "envblk.h"
 #include "disk.h"
 #include "error.h"
 #include "install.h"
 #include "misc.h"
 
-/* Header text of the bootmap file */
-static const char header_text[] = "zSeries bootmap file\n"
-				  "created by zIPL\n";
-
 /* Pointer to dedicated empty block in bootmap. */
 disk_blockptr_t empty_block;
-
 
 /* Get size of a bootmap block pointer for disk with given INFO. */
 static int
@@ -291,10 +288,11 @@ struct component_loc {
 };
 
 static int
-add_component_file(int fd, const char* filename, address_t load_address,
-		   size_t trailer, void *component, int add_files,
-		   struct disk_info* info, struct job_target_data* target,
-		   struct component_loc *location)
+add_component_file_range(int fd, const char *filename, struct file_range *reg,
+			 address_t load_address,
+			 size_t trailer, void *component, int add_files,
+			 struct disk_info *info, struct job_target_data *target,
+			 struct component_loc *location)
 {
 	struct disk_info* file_info;
 	struct component_loc loc;
@@ -306,6 +304,7 @@ add_component_file(int fd, const char* filename, address_t load_address,
 	int rc;
 
 	if (add_files) {
+		assert(reg == NULL); /* not implemented */
 		/* Read file to buffer */
 		rc = misc_read_file(filename, &buffer, &size, 0);
 		if (rc) {
@@ -332,8 +331,8 @@ add_component_file(int fd, const char* filename, address_t load_address,
 			return -1;
 		}
 		/* Get block list from existing file */
-		count = disk_get_blocklist_from_file(filename, &list,
-						     file_info);
+		count = disk_get_blocklist_from_file(filename, reg,
+						     &list, file_info);
 		disk_free_info(file_info);
 		if (count == 0)
 			return -1;
@@ -358,9 +357,22 @@ add_component_file(int fd, const char* filename, address_t load_address,
 }
 
 static int
-add_component_buffer(int fd, void* buffer, size_t size, component_data data,
-		     void* component, struct disk_info* info,
-		     struct component_loc *location, int type)
+add_component_file(int fd, const char *filename, address_t load_address,
+		   size_t trailer, void *component, int add_files,
+		   struct disk_info *info, struct job_target_data *target,
+		   struct component_loc *location)
+{
+	return add_component_file_range(fd, filename, NULL, load_address,
+					trailer, component, add_files,
+					info, target, location);
+}
+
+static int
+add_component_buffer_align(int fd, void *buffer, size_t size,
+			   component_data data, void *component,
+			   struct disk_info *info,
+			   struct component_loc *location, int type,
+			   int align, off_t *offset)
 {
 	struct component_loc loc;
 	disk_blockptr_t segment;
@@ -369,7 +381,8 @@ add_component_buffer(int fd, void* buffer, size_t size, component_data data,
 	int rc;
 
 	/* Write buffer */
-	count = disk_write_block_buffer(fd, 0, buffer, size, &list, info);
+	count = disk_write_block_buffer_align(fd, 0, buffer, size, &list, info,
+					      align, offset);
 	if (count == 0) {
 		error_text("Could not write to bootmap file");
 		return -1;
@@ -396,6 +409,15 @@ add_component_buffer(int fd, void* buffer, size_t size, component_data data,
 	return rc;
 }
 
+static int
+add_component_buffer(int fd, void *buffer, size_t size, component_data data,
+		     void *component, struct disk_info *info,
+		     struct component_loc *location, int type)
+{
+	return add_component_buffer_align(fd, buffer, size, data, component,
+					  info, location, type,
+					  info->phy_block_size, NULL);
+}
 
 static int
 add_dummy_buffer(int fd, size_t size, address_t addr, void *component,
@@ -440,7 +462,7 @@ print_components(const char *name[], struct component_loc *loc, int num)
 }
 
 static int
-extract_signature(char *filename, void **ret_signature,
+extract_signature(const char *filename, void **ret_signature,
 		  struct signature_header *sig_head)
 {
 	struct file_signature *file_sig;
@@ -496,8 +518,9 @@ check_remaining_filesize(size_t filesize, size_t signature_size,
 	}
 }
 
-static int
-add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
+static int add_ipl_program(int fd, char *filename,
+		bool add_envblk, struct job_envblk_data *envblk,
+		struct job_ipl_data *ipl, disk_blockptr_t *program,
 		int verbose, int add_files, component_header_type type,
 		struct disk_info* info, struct job_target_data* target,
 		int is_secure)
@@ -507,12 +530,13 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 	size_t ramdisk_size, image_size;
 	bool secure_boot_supported;
 	size_t stage3_params_size;
-	const char *comp_name[10];
+	const char *comp_name[11];
 	size_t signature_size;
 	int offset;
 	uint64_t flags = 0;
 	void *stage3_params;
 	struct stat stats;
+	off_t envblk_off;
 	void *signature;
 	int comp_nr = 0;
 	void *table;
@@ -650,7 +674,8 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 				   ipl->is_kdump ? IMAGE_ENTRY_KDUMP :
 				   IMAGE_ENTRY,
 				   (info->type == disk_type_scsi) ? 0 : 1,
-				   flags, ipl->image_addr, image_size);
+				   flags, ipl->image_addr, image_size,
+				   ipl->envblk_addr, envblk->size);
 	if (rc) {
 		free(table);
 		return rc;
@@ -743,8 +768,7 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		comp_name[comp_nr] = "parmline";
 		comp_nr++;
 	}
-
-	/* finally add ramdisk */
+	/* add ramdisk */
 	if (ipl->ramdisk != NULL) {
 		signature_size = extract_signature(ipl->ramdisk, &signature,
 						   &sig_head);
@@ -787,6 +811,65 @@ add_ipl_program(int fd, struct job_ipl_data* ipl, disk_blockptr_t* program,
 		}
 		offset += sizeof(struct component_entry);
 		comp_name[comp_nr] = "initial ramdisk";
+		comp_nr++;
+	}
+	if (add_envblk == true) {
+		/*
+		 * finally add environment block
+		 */
+		rc = envblk_offset_get(fd, &envblk_off);
+		if (rc) {
+			free(table);
+			return rc;
+		}
+		if (envblk_off == 0) {
+			/*
+			 * write with fs_block_size alignment to make sure that the
+			 * logical environment block will get to single file system
+			 * block
+			 */
+			rc = add_component_buffer_align(fd,
+					       envblk->buf, envblk->size,
+					       (component_data)ipl->envblk_addr,
+					       VOID_ADD(table, offset),
+					       info, &comp_loc[comp_nr],
+					       component_load,
+					       info->fs_block_size,
+					       &envblk_off);
+			if (rc) {
+				error_text("Could not add environment block");
+				free(table);
+				return rc;
+			}
+			assert(envblk_off % info->fs_block_size == 0);
+			/*
+			 * store environment block location
+			 * in the bootmap header
+			 */
+			rc = envblk_offset_set(fd, envblk_off);
+			if (rc) {
+				error_text("Could not store environment block location");
+				free(table);
+				return rc;
+			}
+		} else {
+			struct file_range reg;
+
+			reg.offset = envblk_off;
+			reg.len = envblk->size;
+			rc = add_component_file_range(fd, filename, &reg,
+						      ipl->envblk_addr, 0,
+						      VOID_ADD(table, offset),
+						      0, info, target,
+						      &comp_loc[comp_nr]);
+			if (rc) {
+				error_text("Could not add environment block");
+				free(table);
+				return rc;
+			}
+		}
+		offset += sizeof(struct component_entry);
+		comp_name[comp_nr] = "environment blk";
 		comp_nr++;
 	}
 	if (verbose)
@@ -834,7 +917,7 @@ add_segment_program(int fd, struct job_segment_data* segment,
 	rc = add_component_file(fd, segment->segment, segment->segment_addr, 0,
 				VOID_ADD(table, offset), add_files, info,
 				target, &comp_loc[0]);
-if (rc) {
+	if (rc) {
 		error_text("Could not add segment file '%s'",
 			   segment->segment);
 		free(table);
@@ -936,7 +1019,7 @@ add_dump_program(int fd, struct job_dump_data* dump,
 	if (rc)
 		return rc;
 	ipl.parm_addr = dump->parm_addr;
-	return add_ipl_program(fd, &ipl, program, verbose, 1,
+	return add_ipl_program(fd, NULL, false, NULL, &ipl, program, verbose, 1,
 			       type, info, target, SECURE_BOOT_DISABLED);
 }
 
@@ -944,8 +1027,8 @@ add_dump_program(int fd, struct job_dump_data* dump,
 /* Build a program table from job data and set pointer to program table
  * block upon success. */
 static int
-build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
-		    struct disk_info* info)
+build_program_table(int fd, char *filename, struct job_data *job,
+		    disk_blockptr_t *pointer, struct disk_info *info)
 {
 	disk_blockptr_t* table;
 	int entries, component_header;
@@ -959,6 +1042,7 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 						entries);
 	if (table == NULL)
 		return -1;
+
 	memset((void *) table, 0, sizeof(disk_blockptr_t) * entries);
 	/* Add programs */
 	switch (job->id) {
@@ -972,8 +1056,9 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 			component_header = component_header_dump;
 		else
 			component_header = component_header_ipl;
-		rc = add_ipl_program(fd, &job->data.ipl, &table[0],
-				     verbose || job->command_line,
+		rc = add_ipl_program(fd, filename,
+				     true, &job->envblk, &job->data.ipl,
+				     &table[0], verbose || job->command_line,
 				     job->add_files, component_header,
 				     info, &job->target, job->is_secure);
 		break;
@@ -1026,7 +1111,8 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 				else
 					is_secure =
 					      job->data.menu.entry[i].is_secure;
-				rc = add_ipl_program(fd,
+				rc = add_ipl_program(fd, filename,
+					true, &job->envblk,
 					&job->data.menu.entry[i].data.ipl,
 					&table[job->data.menu.entry[i].pos],
 					verbose || job->command_line,
@@ -1060,6 +1146,9 @@ build_program_table(int fd, struct job_data* job, disk_blockptr_t* pointer,
 		rc = -1;
 		break;
 	}
+	if (job->envblk.buf && verbose)
+		envblk_print(job->envblk.buf, job->envblk.size);
+
 	if (rc == 0) {
 		/* Add program table block */
 		rc = add_program_table(fd, table, entries, pointer, info);
@@ -1218,9 +1307,9 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		scsi_sb.dump_size = unused_size;
 	}
 
-	/* Write bootmap header */
-	if (misc_write(fd, header_text, sizeof(header_text))) {
-		error_text("Could not write to file '%s'", filename);
+	/* Initialize bootmap header */
+	if (bootmap_header_init(fd)) {
+		error_text("Could not init bootmap header at '%s'", filename);
 		goto out_misc_free_temp_dev;
 	}
 	/* Write empty block to be read in place of holes in files */
@@ -1229,7 +1318,7 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		goto out_misc_free_temp_dev;
 	}
 	/* Build program table */
-	if (build_program_table(fd, job, program_table, info))
+	if (build_program_table(fd, filename, job, program_table, info))
 		goto out_misc_free_temp_dev;
 	if (job->id == job_dump_partition) {
 		scsi_sb.magic = SCSI_DUMP_SB_MAGIC;

@@ -27,6 +27,7 @@ List of all individuals having contributed content to s390-tools
 - Erwin Vicari
 - Eugene Crosser
 - Eugene Dvurechenski
+- Fabrice Fontaine
 - Farhan Ali
 - Fedor Loshakov
 - Felix Beck
@@ -57,6 +58,7 @@ List of all individuals having contributed content to s390-tools
 - Jean-Baptiste Joret
 - Jens Remus
 - Jochen Roehrig
+- Joern Siglen
 - Juergen Christ
 - Julian Wiedmann
 - Karsten Graul
@@ -64,6 +66,7 @@ List of all individuals having contributed content to s390-tools
 - Klaus-Dieter Wacker
 - Lakhvich Dmitriy
 - Marc Hartmayer
+- Mario Held
 - Mark Dettinger
 - Mark Post
 - Martin Kammerer

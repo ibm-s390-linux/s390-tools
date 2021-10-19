@@ -386,8 +386,12 @@ int properties_load(struct properties *properties, const char *filename,
 
 	while (fgets(line, sizeof(line), fp) != NULL) {
 		len = strlen(line);
-		if (line[len-1] == '\n')
-			line[len-1] = '\0';
+		if (line[len - 1] == '\n')
+			line[len - 1] = '\0';
+		if (line[0] == '#')
+			continue;
+		if (strlen(line) == 0)
+			continue;
 		ch = strchr(line, '=');
 		if (ch == NULL) {
 			rc = -EPERM;

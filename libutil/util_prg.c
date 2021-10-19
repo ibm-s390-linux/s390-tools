@@ -25,8 +25,6 @@ static struct util_prg_l {
 	const char *command;
 } l;
 
-struct util_prg_l *util_prg_l = &l;
-
 /**
  * Set the current command for command line option processing
  *

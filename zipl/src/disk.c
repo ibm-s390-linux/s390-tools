@@ -23,10 +23,10 @@
 #include <unistd.h>
 #include <linux/fs.h>
 #include <linux/fiemap.h>
+#include <assert.h>
 
 #include "lib/util_proc.h"
 #include "lib/util_sys.h"
-
 #include "disk.h"
 #include "error.h"
 #include "install.h"
@@ -198,7 +198,7 @@ disk_get_info(const char* device, struct job_target_data* target,
 	int fd;
 	long devsize;
 	FILE *fh;
-	char *script_pre = TOOLS_LIBDIR "/zipl_helper.";
+	const char *script_pre = util_libdir_path("/zipl_helper.");
 	char *script_file = NULL;
 	char *ppn_cmd = NULL;
 	char buffer[80];
@@ -554,14 +554,6 @@ disk_free_info(struct disk_info* info)
 }
 
 
-#ifndef REISERFS_SUPER_MAGIC
-#define REISERFS_SUPER_MAGIC	0x52654973
-#endif /* not REISERFS_SUPER_MAGIC */
-
-#ifndef REISERFS_IOC_UNPACK
-#define REISERFS_IOC_UNPACK	_IOW(0xCD,1,long)
-#endif /* not REISERFS_IOC_UNPACK */
-
 /* Retrieve the physical blocknumber (block on disk) of the specified logical
  * block (block in file). FD provides the file descriptor, LOGICAL is the
  * logical block number. Upon success, return 0 and store the physical
@@ -571,14 +563,9 @@ int
 disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 		  blocknum_t* physical, struct disk_info* info)
 {
-	struct statfs buf;
 	blocknum_t phy_per_fs;
 	blocknum_t mapped;
-	int block;
 	int subblock;
-	int fiemap_size;
-	int map_offset;
-	struct fiemap *fiemap;
 
 	/* No file system: partition or raw disk */
 	if (info->fs_block_size == -1) {
@@ -588,70 +575,15 @@ disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 			*physical = logical + info->geo.start;
 		return 0;
 	}
-
-	/* Get file system type */
-	if (fstatfs(fd, &buf)) {
-		error_reason(strerror(errno));
-		return -1;
-	}
-	/* Files on ReiserFS need unpacking */
-	if (buf.f_type == REISERFS_SUPER_MAGIC) {
-		if (ioctl(fd, REISERFS_IOC_UNPACK, 1)) {
-			error_reason("Could not unpack ReiserFS file");
-			return -1;
-		}
-	}
-	/* Get mapping in file system blocks */
+	/*
+	 * Get mapping in file system blocks
+	 */
 	phy_per_fs = info->fs_block_size / info->phy_block_size;
 	subblock = logical % phy_per_fs;
 
-	/* First try FIEMAP, more complicated to set up */
-	fiemap_size = sizeof(struct fiemap) + sizeof(struct fiemap_extent);
-
-	fiemap = misc_malloc(fiemap_size);
-	if (!fiemap)
+	if (fs_map(fd, logical * info->phy_block_size,
+		   &mapped, info->fs_block_size) != 0)
 		return -1;
-	memset(fiemap, 0, fiemap_size);
-
-	fiemap->fm_extent_count = 1;
-	fiemap->fm_flags = FIEMAP_FLAG_SYNC;
-	/* fm_start, fm_length in bytes; logical is in physical block units */
-	fiemap->fm_start = logical * info->phy_block_size;
-	fiemap->fm_length = info->phy_block_size;
-
-	if (ioctl(fd, FS_IOC_FIEMAP, (unsigned long)fiemap)) {
-		/* FIEMAP failed, fall back to FIBMAP */
-		block = logical / phy_per_fs;
-		if (ioctl(fd, FIBMAP, &block)) {
-			error_reason("Could not get file mapping");
-			free(fiemap);
-			return -1;
-		}
-		mapped = block;
-	} else {
-		if (fiemap->fm_mapped_extents) {
-			if (fiemap->fm_extents[0].fe_flags &
-			    FIEMAP_EXTENT_ENCODED) {
-				error_reason("File mapping is encoded");
-				free(fiemap);
-				return -1;
-			}
-			/*
-			 * returned extent may start prior to our request
-			 */
-			map_offset = fiemap->fm_start -
-				     fiemap->fm_extents[0].fe_logical;
-			mapped = fiemap->fm_extents[0].fe_physical +
-				 map_offset;
-			/* set mapped to fs block units */
-			mapped = mapped / info->fs_block_size;
-		} else {
-			mapped = 0;
-		}
-	}
-
-	free(fiemap);
-
 	if (mapped == 0) {
 		/* This is a hole in the file */
 		*physical = 0;
@@ -728,22 +660,26 @@ disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
 	}
 }
 
-
-/* Write BYTECOUNT bytes of data from memory at location DATA as a block to
- * the file identified by file descriptor FD. Make sure that the data is
- * aligned on a block size boundary and that at most INFO->PHY_BLOCK_SIZE
- * bytes are written. INFO provides information about the disk layout. Upon
- * success, return 0 and store the pointer to the resulting disk block to BLOCK
- * (if BLOCK is not NULL). Return non-zero otherwise. */
+/**
+ * Write BYTECOUNT bytes of data from memory at location DATA as a block to
+ * the file identified by file descriptor FD at the current position in that
+ * file aligned on ALIGN block size boundary and make sure that at most
+ * INFO->PHY_BLOCK_SIZE bytes are written. INFO provides information about
+ * the disk layout. Upon success, store the pointer to the resulting disk
+ * block to BLOCK (if BLOCK is not NULL) and return 0. Return non-zero
+ * otherwise. On success OFFSET contains offset of the first written byte
+ */
 static int
 disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 			      size_t bytecount, disk_blockptr_t* block,
-			      struct disk_info* info)
+			      struct disk_info *info, int align, off_t *offset)
 {
 	blocknum_t current_block;
 	blocknum_t blocknum;
 	off_t current_pos;
-	int align;
+
+	if (align == 0)
+		align = info->phy_block_size;
 
 	current_pos = lseek(fd, 0, SEEK_CUR);
 	if (current_pos == -1) {
@@ -751,18 +687,18 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 		return -1;
 	}
 	/* Ensure block alignment of current file pos */
-	align = info->phy_block_size;
+
 	if (current_pos % align != 0) {
 		current_pos = lseek(fd, align - current_pos % align, SEEK_CUR);
-	       	if (current_pos == -1) {
+		if (current_pos == -1) {
 	       		error_text(strerror(errno));
 			return -1;
 		}
 	}
-	current_block = current_pos / align;
+	current_block = current_pos / info->phy_block_size;
 	/* Ensure maximum size */
-	if (bytecount > (size_t) align)
-		bytecount = align;
+	if (bytecount > (size_t)info->phy_block_size)
+		bytecount = info->phy_block_size;
 	/* Write data block */
 	if (misc_write(fd, data, bytecount))
 		return -1;
@@ -773,33 +709,38 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 			return -1;
 		disk_blockptr_from_blocknum(block, blocknum, info);
 	}
+	if (offset)
+		*offset = current_pos;
 	return 0;
 }
 
-int
-disk_write_block_aligned(int fd, const void* data, size_t bytecount,
-			 disk_blockptr_t* block, struct disk_info* info)
+int disk_write_block_aligned(int fd, const void *data, size_t bytecount,
+			     disk_blockptr_t *block, struct disk_info *info)
 {
 	return disk_write_block_aligned_base(fd, 0, data, bytecount, block,
-					     info);
+					     info, info->phy_block_size, NULL);
 }
 
-/* Write BYTECOUNT bytes from memory at location BUFFER to the file identified
- * by file descriptor FD and return the list of pointers to the disk blocks
- * that make up the respective part of the file. Upon success return the number
- * of blocks and set BLOCKLIST to point to the uncompressed list. Return zero
- * otherwise. Note that the data is written to a file position which is aligned
- * on a block size boundary. */
+/**
+ * Write BYTECOUNT bytes from memory at location BUFFER to the file identified
+ * by file descriptor FD at the current position in that file aligned on ALIGN
+ * block size boundary and return the list of pointers to the disk blocks that
+ * make up the respective part of the file. Upon success return the number of
+ * blocks, set BLOCKLIST to point to the uncompressed list, and store offset of
+ * the first written byte in OFFSET (if OFFSET is not NULL). Return zero
+ * otherwise.
+ */
 blocknum_t
-disk_write_block_buffer(int fd, int fd_is_basedisk, const void* buffer,
-			size_t bytecount, disk_blockptr_t** blocklist,
-			struct disk_info* info)
+disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
+			      size_t bytecount, disk_blockptr_t **blocklist,
+			      struct disk_info *info, int align, off_t *offset)
 {
 	disk_blockptr_t* list;
 	blocknum_t count;
 	blocknum_t i;
 	size_t written;
 	size_t chunk_size;
+	off_t pos;
 	int rc;
 
 	count = (bytecount + info->phy_block_size - 1) / info->phy_block_size;
@@ -816,18 +757,30 @@ disk_write_block_buffer(int fd, int fd_is_basedisk, const void* buffer,
 		if (chunk_size > (size_t) info->phy_block_size)
 			chunk_size = info->phy_block_size;
 		rc = disk_write_block_aligned_base(fd, fd_is_basedisk,
-						   VOID_ADD(buffer, written),
-				chunk_size,
-				&list[i], info);
+					VOID_ADD(buffer, written),
+					chunk_size,  &list[i], info,
+					i == 0 ? align : info->phy_block_size,
+					&pos);
 		if (rc) {
 			free(list);
 			return 0;
 		}
+		if (offset != NULL && i == 0)
+			*offset = pos;
 	}
 	*blocklist = list;
 	return count;
 }
 
+blocknum_t
+disk_write_block_buffer(int fd, int fd_is_basedisk, const void *buffer,
+			size_t bytecount, disk_blockptr_t **blocklist,
+			struct disk_info *info)
+{
+	return disk_write_block_buffer_align(fd, fd_is_basedisk, buffer,
+					     bytecount, blocklist, info,
+					     info->phy_block_size, NULL);
+}
 
 /* Print device node. */
 void
@@ -1064,19 +1017,26 @@ disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 	return last + 1;
 }
 
-
-/* Retrieve a list of pointers to the disk blocks that make up the file
- * specified by FILENAME. Upon success, return the number of blocks and set
- * BLOCKLIST to point to the uncompacted list. INFO provides information
- * about the device which contains the file. Return zero otherwise. */
+/**
+ * Retrieve a list of pointers to the disk blocks that make up a continuous
+ * region REG in a file specified by FILENAME. If REG is NULL, then retrieve
+ * a list of pointers for the whole file.
+ * Upon success, return the number of blocks and set BLOCKLIST to point to
+ * the uncompacted list. INFO provides information about the device which
+ * contains the file. Return zero otherwise
+ */
 blocknum_t
-disk_get_blocklist_from_file(const char* filename, disk_blockptr_t** blocklist,
+disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
+			     disk_blockptr_t **blocklist,
 			     struct disk_info* info)
 {
 	disk_blockptr_t* list;
 	struct stat stats;
 	int fd;
-	blocknum_t count;
+	off_t off;
+	size_t count;
+	blocknum_t blk_off;
+	blocknum_t blk_count;
 	blocknum_t i;
 	blocknum_t blocknum;
 
@@ -1093,24 +1053,37 @@ disk_get_blocklist_from_file(const char* filename, disk_blockptr_t** blocklist,
 		close (fd);
 		return 0;
 	}
-	/* Get number of blocks */
-	count = ((blocknum_t) stats.st_size +
-			info->phy_block_size - 1) / info->phy_block_size;
-	if (count == 0) {
-		error_reason("Could not read empty file '%s'", filename);
-		close(fd);
-		return 0;
+	if (reg) {
+		/*
+		 * case of not block-aligned offsets is not implemented
+		 */
+		assert(reg->offset % info->phy_block_size == 0);
+
+		off = reg->offset;
+		count = reg->len;
+	} else {
+		off = 0;
+		count = stats.st_size;
 	}
+	assert(off < stats.st_size);
+
+	if (off + count > (size_t)stats.st_size)
+		count = stats.st_size - off;
+
+	blk_off = off / info->phy_block_size;
+	blk_count = ((blocknum_t) count +
+		     info->phy_block_size - 1) / info->phy_block_size;
+
 	list = (disk_blockptr_t *) misc_malloc(sizeof(disk_blockptr_t) *
-					       count);
+					       blk_count);
 	if (list == NULL) {
 		close(fd);
 		return 0;
 	}
-	memset((void *) list, 0, sizeof(disk_blockptr_t) * count);
+	memset((void *) list, 0, sizeof(disk_blockptr_t) * blk_count);
 	/* Build list */
-	for (i=0; i < count; i++) {
-		if (disk_get_blocknum(fd, 0, i, &blocknum, info)) {
+	for (i = 0; i < blk_count; i++) {
+		if (disk_get_blocknum(fd, 0, blk_off + i, &blocknum, info)) {
 			free(list);
 			close(fd);
 			return 0;
@@ -1119,7 +1092,7 @@ disk_get_blocklist_from_file(const char* filename, disk_blockptr_t** blocklist,
 	}
 	close(fd);
 	*blocklist = list;
-	return count;
+	return blk_count;
 }
 
 /* Check whether input device is in subchannel set 0.

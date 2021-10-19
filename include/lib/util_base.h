@@ -20,6 +20,10 @@ void util_hexdump(FILE *fh, const char *tag, const void *data, int cnt);
 void util_hexdump_grp(FILE *fh, const char *tag, const void *data, int group,
 		      int cnt, int indent);
 void util_print_indented(const char *str, int indent);
+const char *util_libdir(void);
+const char *util_libdir_path(const char *filename);
+const char *util_datadir(void);
+const char *util_datadir_path(const char *filename);
 
 static inline void util_ptr_vec_free(void **ptr_vec, int count)
 {

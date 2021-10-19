@@ -73,7 +73,7 @@ lszdev_objects += lcs.o lcs_auto.o
 # Generic CCW devtype
 lszdev_objects += generic_ccw.o
 
-all: chzdev lszdev
+all: chzdev lszdev zdev_id
 
 chzdev_usage.c: chzdev_usage.txt
 	$(SED) $< >$@ -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/g' \
@@ -95,16 +95,17 @@ libs = $(rootdir)/libutil/libutil.a
 chzdev: $(chzdev_objects) $(libs)
 lszdev: $(lszdev_objects) $(libs)
 
-install: chzdev
+install: chzdev zdev_id
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c chzdev $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c lszdev $(DESTDIR)$(BINDIR)
+	$(INSTALL) -c zdev_id $(DESTDIR)$(TOOLS_LIBDIR)
 ifeq ($(HAVE_DRACUT),1)
 	$(INSTALL) -m 755 zdev-root-update.dracut \
 		$(DESTDIR)$(TOOLS_LIBDIR)/zdev-root-update
 endif
 
 clean:
-	@rm -f *.o chzdev lszdev chzdev_usage.c lszdev_usage.c gmon.out *.gcda *.gcno
+	@rm -f *.o chzdev lszdev chzdev_usage.c lszdev_usage.c gmon.out *.gcda *.gcno zdev_id
 
 .PHONY: all install clean

@@ -19,21 +19,6 @@
 
 #include "ekmfweb/ekmfweb.h"
 
-/* CCA PKA Key Generate function */
-typedef void (*CSNDPKG_t)(long *return_code,
-			  long *reason_code,
-			  long *exit_data_length,
-			  unsigned char *exit_data,
-			  long *rule_array_count,
-			  unsigned char *rule_array,
-			  long *regeneration_data_length,
-			  unsigned char *regeneration_data,
-			  long *skeleton_key_token_length,
-			  unsigned char *skeleton_key_token,
-			  unsigned char *transport_key_identifier,
-			  long *generated_key_identifier_length,
-			  unsigned char *generated_key_identifier);
-
 /* CCA PKA Key Token Build function */
 typedef void (*CSNDPKB_t)(long *return_code,
 			  long *reason_code,
@@ -56,31 +41,6 @@ typedef void (*CSNDPKB_t)(long *return_code,
 			  long *reserved_5_length,
 			  unsigned char *reserved_5,
 			  long *token_length, unsigned char *token);
-
-/* CCA PKA Key Token Change function */
-typedef void (*CSNDKTC_t)(long *return_code,
-			  long *reason_code,
-			  long *exit_data_length,
-			  unsigned char *exit_data,
-			  long *rule_array_count,
-			  unsigned char *rule_array,
-			  long *key_identifier_length,
-			  unsigned char *key_identifier);
-
-/* CCA Digital Signature Generate function */
-typedef void (*CSNDDSG_t)(long *return_code,
-			  long *reason_code,
-			  long *exit_data_length,
-			  unsigned char *exit_data,
-			  long *rule_array_count,
-			  unsigned char *rule_array,
-			  long *PKA_private_key_identifier_length,
-			  unsigned char *PKA_private_key_identifier,
-			  long *hash_length,
-			  unsigned char *hash,
-			  long *signature_field_length,
-			  long *signature_bit_length,
-			  unsigned char *signature_field);
 
 /* CCA Key Token Build2 function */
 typedef void (*CSNBKTB2_t)(long *return_code,
@@ -153,9 +113,6 @@ typedef void (*CSNDSYI2_t)(long *return_code,
 
 struct cca_lib {
 	CSNDPKB_t dll_CSNDPKB;
-	CSNDPKG_t dll_CSNDPKG;
-	CSNDKTC_t dll_CSNDKTC;
-	CSNDDSG_t dll_CSNDDSG;
 	CSNBKTB2_t dll_CSNBKTB2;
 	CSNDEDH_t dll_CSNDEDH;
 	CSNDSYI2_t dll_CSNDSYI2;
@@ -163,34 +120,6 @@ struct cca_lib {
 
 #define CCA_MAX_PKA_KEY_TOKEN_SIZE	3500
 #define CCA_MAX_SYM_KEY_TOKEN_SIZE	725
-
-int cca_generate_ecc_key_pair(const struct ekmf_cca_lib *cca_lib,
-			      int curve_nid, unsigned char *key_token,
-			      size_t *key_token_length, bool verbose);
-
-int cca_generate_rsa_key_pair(const struct ekmf_cca_lib *cca_lib,
-			      size_t modulus_bits, unsigned int pub_exp,
-			      unsigned char *key_token,
-			      size_t *key_token_length, bool verbose);
-
-int cca_get_key_type(const unsigned char *key_token, size_t key_token_length,
-		     int *pkey_type);
-
-int cca_reencipher_key(const struct ekmf_cca_lib *cca_lib,
-		       const unsigned char *key_token, size_t key_token_length,
-		       bool to_new, bool verbose);
-
-int cca_get_ecc_pub_key_as_pkey(const unsigned char *key_token,
-				size_t key_token_length,
-				EVP_PKEY **pkey, bool verbose);
-
-int cca_get_ecc_pub_key_as_json_web_key(const unsigned char *key_token,
-					size_t key_token_length,
-					json_object **jwk, bool verbose);
-
-int cca_get_rsa_pub_key_as_pkey(const unsigned char *key_token,
-				size_t key_token_length,
-				int pkey_type, EVP_PKEY **pkey, bool verbose);
 
 int cca_import_key_from_json_web_key(const struct ekmf_cca_lib *cca_lib,
 				     json_object *jwk, unsigned char *key_token,
@@ -224,24 +153,5 @@ int cca_import_external_key(const struct ekmf_cca_lib *cca_lib,
 			    unsigned char *imported_key_token,
 			    size_t *imported_key_token_length,
 			    bool verbose);
-
-int cca_rsa_sign(const struct ekmf_cca_lib *cca_lib,
-		 const unsigned char *key_token, size_t key_token_length,
-		 unsigned char *sig, size_t *siglen,
-		 const unsigned char *tbs, size_t tbslen,
-		 int padding_type, int digest_nid, bool verbose);
-
-int cca_rsa_pss_sign(const struct ekmf_cca_lib *cca_lib,
-		     const unsigned char *key_token, size_t key_token_length,
-		     unsigned char *sig, size_t *siglen,
-		     const unsigned char *tbs, size_t tbslen,
-		     int digest_nid, int mgf_digest_nid, int saltlen,
-		     bool verbose);
-
-int cca_ecdsa_sign(const struct ekmf_cca_lib *cca_lib,
-		   const unsigned char *key_token, size_t key_token_length,
-		   unsigned char *sig, size_t *siglen,
-		   const unsigned char *tbs, size_t tbslen, int digest_nid,
-		   bool verbose);
 
 #endif

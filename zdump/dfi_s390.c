@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/util_log.h"
 #include "zgetdump.h"
 
 /*
@@ -68,6 +69,9 @@ static int read_s390_hdr(void)
 		return -ENODEV;
 	if (l.hdr.magic != magic_number)
 		return -ENODEV;
+	if (l.hdr.cpu_cnt > DF_S390_CPU_MAX)
+		return -ENODEV;
+	util_log_print(UTIL_LOG_INFO, "DFI S390 version %u\n", l.hdr.version);
 	df_s390_hdr_add(&l.hdr);
 	return 0;
 }
@@ -95,6 +99,9 @@ static int mem_chunks_add(void)
 {
 	u64 rc;
 
+	util_log_print(UTIL_LOG_DEBUG, "DFI S390 mem_size 0x%016lx\n",
+		       l.hdr.mem_size);
+
 	/* Single memory chunk for non-extended dump format */
 	dfi_mem_chunk_add(0, l.hdr.mem_size, NULL,
 			  dfi_s390_mem_chunk_read,
@@ -112,39 +119,43 @@ static int mem_chunks_add(void)
  */
 static int mem_chunks_add_ext(void)
 {
-	struct df_s390_dump_segm_hdr dump_segm;
-	u64 rc, *off_ptr, old = 0, dump_size = 0;
+	struct df_s390_dump_segm_hdr dump_segm = { 0 };
+	u64 rc, off, old = 0, dump_size = 0;
 
-	off_ptr = zg_alloc(sizeof(*off_ptr));
-	*off_ptr = zg_seek(g.fh, DF_S390_HDR_SIZE, ZG_CHECK_NONE);
-	if (*off_ptr != DF_S390_HDR_SIZE)
+	off = zg_seek(g.fh, DF_S390_HDR_SIZE, ZG_CHECK_NONE);
+	if (off != DF_S390_HDR_SIZE)
 		return -EINVAL;
-	while (*off_ptr < DF_S390_HDR_SIZE + l.hdr.mem_size - PAGE_SIZE) {
+	while (off < DF_S390_HDR_SIZE + l.hdr.mem_size - PAGE_SIZE) {
 		rc = zg_read(g.fh, &dump_segm, PAGE_SIZE, ZG_CHECK_ERR);
 		if (rc != PAGE_SIZE)
 			return -EINVAL;
-		*off_ptr += PAGE_SIZE;
+		util_log_print(UTIL_LOG_DEBUG,
+			       "DFI S390 dump segment start 0x%016lx size 0x%016lx stop marker %d\n",
+			       dump_segm.start, dump_segm.len, dump_segm.stop_marker);
+		off += PAGE_SIZE;
 		/* Add zero memory chunk */
 		dfi_mem_chunk_add(old, dump_segm.start - old, NULL,
 				  dfi_mem_chunk_read_zero, NULL);
 		/* Add memory chunk for a dump segment */
+		u64 *off_ptr = zg_alloc(sizeof(*off_ptr));
+		*off_ptr = off;
 		dfi_mem_chunk_add(dump_segm.start, dump_segm.len, off_ptr,
 				  dfi_s390_ext_mem_chunk_read, zg_free);
+		off_ptr = NULL;
 		old = dump_segm.start + dump_segm.len;
 		dump_size += dump_segm.len;
-		off_ptr = zg_alloc(sizeof(*off_ptr));
-		*off_ptr = zg_seek_cur(g.fh, dump_segm.len, ZG_CHECK_NONE);
+		off = zg_seek_cur(g.fh, dump_segm.len, ZG_CHECK_NONE);
 		if (dump_segm.stop_marker)
 			break;
 	}
+	/* Check if the last dump segment found */
+	if (!dump_segm.stop_marker)
+		return -EINVAL;
 	/* Add zero memory chunk at the end */
 	dfi_mem_chunk_add(old, l.hdr.mem_size - old, NULL,
 			  dfi_mem_chunk_read_zero, NULL);
 	/* Set the actual size of the dump file */
 	dfi_attr_file_size_set(dump_size);
-	/* Check if the last dump segment found */
-	if (!dump_segm.stop_marker)
-		return -EINVAL;
 	/* Read and verify the end marker */
 	return read_s390_em();
 }
@@ -156,6 +167,9 @@ int dfi_s390_init_gen(bool extended)
 {
 	int rc;
 
+	util_log_print(UTIL_LOG_DEBUG, "DFI S390 %sinitialization\n",
+		       extended ? "extended " : "");
+
 	l.extended = extended;
 	if (read_s390_hdr() != 0)
 		return -ENODEV;
@@ -165,7 +179,9 @@ int dfi_s390_init_gen(bool extended)
 		rc = mem_chunks_add_ext();
 	if (rc)
 		return rc;
-	df_s390_cpu_info_add(&l.hdr, l.hdr.mem_size);
+	rc = df_s390_cpu_info_add(&l.hdr, l.hdr.mem_size);
+	if (rc)
+		return rc;
 	zg_seek(g.fh, sizeof(l.hdr), ZG_CHECK);
 	return 0;
 }

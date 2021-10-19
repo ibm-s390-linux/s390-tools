@@ -5,7 +5,7 @@ COMMON_INCLUDED = true
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
 VERSION            = 2
-RELEASE            = 16
+RELEASE            = 18
 PATCHLEVEL         = 0
 DISTRELEASE        = build-$(shell date +%Y%m%d)
 S390_TOOLS_RELEASE = $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)
@@ -110,6 +110,20 @@ ifeq ("${ASAN}","1")
 	DEFAULT_CFLAGS  += -fsanitize=address -fno-omit-frame-pointer
 	DEFAULT_LDFLAGS += -fsanitize=address
 endif
+
+#
+# Check for header prerequisite
+#
+# $1: Name of include file to check
+# $2: Additional compiler & linker options (optional)
+#
+# Returns "yes" on success and nothing otherwise
+#
+define check_header_prereq
+$(shell printf "#include <%s>\n int main(void) {return 0;}" $1 | \
+        ( $(CC) $(filter-out --coverage, $(ALL_CFLAGS)) $(ALL_CPPFLAGS) \
+                $2 -o /dev/null -xc - ) >/dev/null 2>&1 && echo -n yes)
+endef
 
 #
 # Check for build dependency
@@ -359,6 +373,14 @@ $(rootdir)/libvmcp/libvmcp.a: $(rootdir)/libvmcp
 $(rootdir)/libekmfweb/libekmfweb.so: $(rootdir)/libekmfweb
 	$(MAKE) -C $(rootdir)/libekmfweb/ libekmfweb.so
 .PHONY: $(rootdir)/libekmfweb
+
+$(rootdir)/libseckey/libseckey.a: $(rootdir)/libseckey
+	$(MAKE) -C $(rootdir)/libseckey/ libseckey.a
+.PHONY: $(rootdir)/libseckey
+
+$(rootdir)/libkmipclient/libkmipclient.so: $(rootdir)/libkmipclient
+	$(MAKE) -C $(rootdir)/libkmipclient/ libkmipclient.so
+.PHONY: $(rootdir)/libkmipclient
 
 $(rootdir)/zipl/boot/data.o:
 	$(MAKE) -C $(rootdir)/zipl/boot/ data.o

@@ -49,7 +49,7 @@ static void sig_exit(int sig)
  */
 static void sig_handler_init(void)
 {
-	struct sigaction sigact;
+	struct sigaction sigact = { 0 };
 
 	/* Ignore signals SIGUSR1 and SIGUSR2 */
 	if (sigemptyset(&sigact.sa_mask) < 0)

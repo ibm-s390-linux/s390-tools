@@ -6,6 +6,9 @@ ifneq (${HAVE_OPENSSL},0)
 	ifneq (${HAVE_JSONC},0)
 		ifneq (${HAVE_LIBCURL},0)
 			SUB_DIRS += ekmfweb
+			ifneq (${HAVE_LIBXML2},0)
+				SUB_DIRS += kmip
+			endif
 		endif
 	endif
 else

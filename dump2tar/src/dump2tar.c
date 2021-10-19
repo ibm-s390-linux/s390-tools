@@ -110,6 +110,7 @@ static struct util_opt dump2tar_opts[] = {
 	{
 		.option = { "file-timeout", required_argument, NULL, 'T' },
 		.desc = "Stop reading file after SEC seconds",
+		.argument = "SEC",
 	},
 	{
 		.option = { "file-max-size", required_argument, NULL, 'M' },

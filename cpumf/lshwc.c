@@ -17,6 +17,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -53,7 +54,7 @@ static unsigned char *ioctlbuffer;
 static bool allcpu;
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
-struct ctrname {		/* List of defined counters */
+static struct ctrname {		/* List of defined counters */
 	char *name;		/* Counter name */
 	bool hitcnt;		/* Counter number read from ioctl() */
 	unsigned long total;	/* Total counter value */
@@ -240,7 +241,7 @@ static char *show_ctrset(unsigned long set)
 /* Parse CPU list and counter sets */
 static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 {
-	__u64 *words = start->cpumask;
+	uint64_t *words = start->cpumask;
 	unsigned long i, no_a, no_b;
 	char *cp, *tokens[16];		/* Used to parse command line params */
 	char cpubuf[256];
@@ -275,8 +276,8 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 		      show_ctrset(noton));
 	}
 
-	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ",")) != 0;
-	    ++i, parm = 0) {
+	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ","));
+	    ++i, parm = NULL) {
 		cp = strchr(tokens[i], '-');	/* Range character? */
 		if (cp) {
 			no_a = getnumber(tokens[i], *cp);
@@ -292,15 +293,15 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 	/* Convert the CPU list to a bitmask for kernel cpumask_t */
 	for (i = 0, no_b = 0; i < max_possible_cpus; ++i) {
 		if (check[i].cpu_req) {
-			no_a = i % __BITS_PER_LONG;
-			no_b = i / __BITS_PER_LONG;
+			no_a = i % LONG_BIT;
+			no_b = i / LONG_BIT;
 			words[no_b] |= 1ULL << no_a;
 		}
 	}
 	/* no_b is highest used index, swap array */
 	start->cpumask_len = (no_b + 1) * 8;
 	for (no_a = 0; no_a < no_b; ++no_a, --no_b) {
-		__u64 tmp =  words[no_a];
+		uint64_t tmp =  words[no_a];
 
 		words[no_a] = words[no_b];
 		words[no_b] = tmp;
@@ -326,7 +327,7 @@ static bool check_setpossible(void)
 	}
 	parm = cpubuf;
 	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ","));
-							++i, parm = 0) {
+							++i, parm = NULL) {
 		cp = strchr(tokens[i], '-');
 		if (cp) {		/* Range */
 			no_a = getnumber(tokens[i], *cp);
@@ -525,7 +526,7 @@ static int test_read(struct s390_hwctr_read *read)
 			}
 			/* Iterate over all counters in each set */
 			for (unsigned int k = 0; k < sp->no_cnts; ++k) {
-				__u64 value;
+				uint64_t value;
 				void *addr = base + offset;
 				size_t idx = ctrset_offset(sp->set) + k;
 
@@ -608,8 +609,8 @@ static int do_it(char *s)
 	int rc;
 
 	memset(&start, 0, sizeof(start));
-	rc = max_possible_cpus / sizeof(__u64);
-	start.cpumask = alloca(max_possible_cpus / sizeof(__u64));
+	rc = max_possible_cpus / sizeof(uint64_t);
+	start.cpumask = alloca(max_possible_cpus / sizeof(uint64_t));
 	memset(start.cpumask, 0, rc);
 	parse_cpulist(s, &start);
 	errno = 0;

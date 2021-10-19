@@ -203,6 +203,7 @@ $(readlink -e $HOST_PATH)/-"
 
 		read ONLINE < $ADAPTER_PATH/online
 		read AVAILABILITY < $ADAPTER_PATH/availability
+		[ -r "$SYSFS/class/fc_host/$SCSI_HOST/port_state" ] && read PORT_STATE < "$SYSFS/class/fc_host/$SCSI_HOST/port_state"
 		[ -r $ADAPTER_PATH/failed ] && read FAILED < $ADAPTER_PATH/failed
 		DEFUNCT=${ADAPTER_PATH%/*} # strip devbusid
 		DEFUNCT=${DEFUNCT##*/}     # basename
@@ -212,6 +213,8 @@ $(readlink -e $HOST_PATH)/-"
 				HOSTMARKER=" defunct"
 			elif [ "$ONLINE" = "0" ]; then
 				HOSTMARKER=" offline"
+			elif [ "$PORT_STATE" = "Linkdown" ]; then
+				HOSTMARKER=" linkdown"
 			elif [ "$FAILED" = "1" ]; then
 				HOSTMARKER=" failed"
 			elif [ "$AVAILABILITY" != "good" ]; then

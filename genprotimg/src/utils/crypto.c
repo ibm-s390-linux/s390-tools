@@ -31,6 +31,7 @@
 
 #include "buffer.h"
 #include "curl.h"
+#include "openssl_compat.h"
 #include "crypto.h"
 
 #define DEFINE_GSLIST_MAP(t2, t1)					\
@@ -440,10 +441,14 @@ static int check_signature_algo_match(const EVP_PKEY *pkey, const X509 *subject,
 static X509_CRL *load_crl_from_bio(BIO *bio)
 {
 	g_autoptr(X509_CRL) crl = PEM_read_bio_X509_CRL(bio, NULL, 0, NULL);
+	gint rc;
+
 	if (crl)
 		return g_steal_pointer(&crl);
 	ERR_clear_error();
-	BIO_reset(bio);
+	rc = BIO_reset(bio);
+	if (rc != 1 || (rc != 0 && BIO_method_type(bio) == BIO_TYPE_FILE))
+		return NULL;
 
 	/* maybe the CRL is stored in DER format */
 	crl = d2i_X509_CRL_bio(bio, NULL);
@@ -514,6 +519,7 @@ X509 *load_cert_from_file(const char *path, GError **err)
 {
 	g_autoptr(BIO) bio = bio_read_from_file(path);
 	g_autoptr(X509) cert = NULL;
+	gint rc;
 
 	if (!bio) {
 		g_set_error(err, PV_CRYPTO_ERROR,
@@ -526,7 +532,12 @@ X509 *load_cert_from_file(const char *path, GError **err)
 	if (cert)
 		return g_steal_pointer(&cert);
 	ERR_clear_error();
-	BIO_reset(bio);
+	rc = BIO_reset(bio);
+	if (rc != 1 || (rc != 0 && BIO_method_type(bio) == BIO_TYPE_FILE)) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_READ_CERTIFICATE,
+			    _("unable to load certificate: '%s'"), path);
+		return NULL;
+	}
 
 	/* maybe the certificate is stored in DER format */
 	cert = d2i_X509_bio(bio, NULL);
@@ -1428,7 +1439,7 @@ static const char *get_first_dp_url(DIST_POINT *dp)
 	return NULL;
 }
 
-static gboolean insert_crl(X509_NAME *name, X509_CRL *crl)
+static gboolean insert_crl(const X509_NAME *name, X509_CRL *crl)
 {
 	g_autofree gchar *key = NULL;
 
@@ -1443,7 +1454,7 @@ static gboolean insert_crl(X509_NAME *name, X509_CRL *crl)
 }
 
 /* Caller is responsible for free'ing */
-static X509_CRL *lookup_crl(X509_NAME *name)
+static X509_CRL *lookup_crl(const X509_NAME *name)
 {
 	g_autoptr(X509_CRL) crl = NULL;
 	g_autofree gchar *key = NULL;
@@ -1463,7 +1474,7 @@ static X509_CRL *lookup_crl(X509_NAME *name)
 }
 
 /* Returns empty stack if no CRL downloaded. */
-static STACK_OF_X509_CRL *crls_download_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
+static STACK_OF_X509_CRL *crls_download_cb(const X509_STORE_CTX *ctx, const X509_NAME *nm)
 {
 	g_autoptr(STACK_OF_X509_CRL) crls = NULL;
 	g_autoptr(X509_CRL) crl = NULL;
@@ -1473,7 +1484,7 @@ static STACK_OF_X509_CRL *crls_download_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
 	crls = sk_X509_CRL_new_null();
 	if (!crls)
 		g_abort();
-	cert = X509_STORE_CTX_get_current_cert(ctx);
+	cert = Pv_X509_STORE_CTX_get_current_cert(ctx);
 	if (!cert)
 		return g_steal_pointer(&crls);
 	g_assert(X509_NAME_cmp(X509_get_issuer_name(cert), nm) == 0);
@@ -1517,19 +1528,19 @@ void STACK_OF_X509_CRL_free(STACK_OF_X509_CRL *stack)
 /* Downloaded CRLs have a higher precedence than the CRLs specified on the
  * command line.
  */
-static STACK_OF_X509_CRL *crls_cb(X509_STORE_CTX *ctx, X509_NAME *nm)
+static STACK_OF_X509_CRL *crls_cb(const X509_STORE_CTX *ctx, const X509_NAME *nm)
 {
 	g_autoptr(STACK_OF_X509_CRL) crls = crls_download_cb(ctx, nm);
 
 	if (sk_X509_CRL_num(crls) > 0)
 		return g_steal_pointer(&crls);
-	return X509_STORE_CTX_get1_crls(ctx, nm);
+	return Pv_X509_STORE_CTX_get1_crls(ctx, nm);
 }
 
 /* Set up CRL lookup with download support */
 void store_setup_crl_download(X509_STORE *st)
 {
-	X509_STORE_set_lookup_crls(st, crls_cb);
+	Pv_X509_STORE_set_lookup_crls(st, crls_cb);
 }
 
 /* Download a CRL using the URI specified in the distribution @crldp */
@@ -1645,8 +1656,8 @@ gint verify_host_key(X509 *host_key, GSList *issuer_pairs,
 	}
 
 	if (!(verify_flags & X509_V_FLAG_NO_CHECK_TIME)) {
-		const ASN1_TIME *last = X509_get_notBefore(host_key);
-		const ASN1_TIME *next = X509_get_notAfter(host_key);
+		const ASN1_TIME *last = X509_get0_notBefore(host_key);
+		const ASN1_TIME *next = X509_get0_notAfter(host_key);
 
 		if (!last || !next || check_validity_period(last, next)) {
 			g_set_error(err, PV_CRYPTO_ERROR,
@@ -1847,6 +1858,7 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("BN_add_word failed"));
+			return -1;
 		}
 		g_assert(BN_num_bytes(tweak_num) > 0);
 		g_assert(BN_num_bytes(tweak_num) <= tweak_size);
@@ -1855,6 +1867,7 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("BN_bn2binpad failed"));
+			return -1;
 		};
 
 		/* set new tweak */

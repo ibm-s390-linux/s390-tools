@@ -1863,7 +1863,6 @@ static void close_ur_device(struct vmur *info)
 	}
 	cpcmd_cs(cmd, &response, &cprc, 0);
 	memcpy(spoolid, &response[9], 4);
-	free(response);
 	if (cprc == 439) {
 		if (info->action == PUNCH)
 			sprintf(cmd, "PURGE * PUN %s", spoolid);
@@ -1872,7 +1871,10 @@ static void close_ur_device(struct vmur *info)
 		cpcmd(cmd, NULL, NULL, 0);
 		ERR_EXIT("User %s spool fileid limit exceeded.\n"
 			 , info->user);
+	} else if (cprc) {
+		ERR_EXIT("CP command failed with rc=%i\n%s\n", cprc, response);
 	}
+	free(response);
 	if (info->rdr_specified) {
 		if (info->node_specified)
 			printf("Reader file with spoolid %s created and "

@@ -8,8 +8,11 @@ all: zkey-ekmfweb.so
 libs = $(rootdir)/libutil/libutil.a
 
 zkey-ekmfweb.o: zkey-ekmfweb.c zkey-ekmfweb.h ../kms-plugin.h \
-	../cca.h ../utils.h ../pkey.h ../properties.h \
+	../plugin-utils.h ../cca.h ../utils.h ../pkey.h ../properties.h \
 	$(rootdir)include/ekmfweb/ekmfweb.h libekmfweb.dep
+
+plugin-utils.o: ../plugin-utils.c ../plugin-utils.h ../kms-plugin.h
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -fPIC -c $< -o $@
 
 properties.o: ../properties.c ../properties.h
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -fPIC -c $< -o $@
@@ -30,7 +33,8 @@ zkey-ekmfweb.so: ALL_CFLAGS += -fPIC
 zkey-ekmfweb.so: LDLIBS = -L$(rootdir)/libekmfweb -lekmfweb -ldl -lcrypto
 zkey-ekmfweb.so: ALL_LDFLAGS += -shared -Wl,--version-script=zkey-ekmfweb.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,zkey-ekmfweb.so.$(VERM)
-zkey-ekmfweb.so: zkey-ekmfweb.o properties.o pkey.o cca.o ep11.o utils.o $(libs)
+zkey-ekmfweb.so: zkey-ekmfweb.o plugin-utils.o properties.o pkey.o cca.o \
+	ep11.o utils.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-libekmfweb.dep:

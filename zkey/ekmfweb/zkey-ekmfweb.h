@@ -12,15 +12,13 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-#include <sys/stat.h>
 
 #include "ekmfweb/ekmfweb.h"
 
+#include "../plugin-utils.h"
+
 struct plugin_handle {
-	const char *config_path;
-	mode_t config_path_mode;
-	gid_t config_path_owner;
-	struct properties *properties;
+	struct plugin_data pd;
 	bool apqns_configured;
 	bool connection_configured;
 	bool settings_retrieved;
@@ -32,8 +30,6 @@ struct plugin_handle {
 	struct ekmf_cca_lib cca;
 	struct ekmf_config ekmf_config;
 	CURL *curl_handle;
-	char error_msg[1024];
-	bool verbose;
 };
 
 #define EKMFWEB_CONFIG_FILE			"ekmfweb.conf"

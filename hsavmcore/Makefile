@@ -7,6 +7,8 @@
 
 include ../common.mak
 
+ALL_CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
 ifeq (${HAVE_FUSE},0)
 
 all:
@@ -21,63 +23,53 @@ else # HAVE_FUSE
 # FUSE
 #
 ifneq ($(shell sh -c 'command -v pkg-config'),)
-FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse)
+  FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse)
+  FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse)
 else
-FUSE_CFLAGS = -I/usr/include/fuse
-FUSE_LDLIBS = -lfuse
+  FUSE_CFLAGS = -I/usr/include/fuse
+  FUSE_LDLIBS = -lfuse
 endif
 
 #
 # systemd
 #
 ifneq (${HAVE_SYSTEMD},0)
-ifneq ($(shell sh -c 'command -v pkg-config'),)
-SYSTEMD_CFLAGS = $(shell pkg-config --silence-errors --cflags libsystemd)
-SYSTEMD_LDLIBS = $(shell pkg-config --silence-errors --libs libsystemd)
-else
-SYSTEMD_CFLAGS =
-SYSTEMD_LDLIBS = -lsystemd
+  ifeq ($(call check_header_prereq,"systemd/sd-daemon.h"),yes)
+    ifneq ($(shell sh -c 'command -v pkg-config'),)
+      SYSTEMD_CFLAGS = $(shell pkg-config --silence-errors --cflags libsystemd)
+      SYSTEMD_LDLIBS = $(shell pkg-config --silence-errors --libs libsystemd)
+    else
+      SYSTEMD_CFLAGS =
+      SYSTEMD_LDLIBS = -lsystemd
+    endif
+    ALL_CPPFLAGS += -DHAVE_SYSTEMD
+  else
+    $(warning "systemd support disabled")
+  endif
 endif
-ALL_CPPFLAGS += -DHAVE_SYSTEMD
-endif # HAVE_SYSTEMD
 
-ALL_CPPFLAGS += -D_FILE_OFFSET_BITS=64
 ALL_CFLAGS += $(FUSE_CFLAGS) $(SYSTEMD_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) $(SYSTEMD_LDLIBS) -lpthread
 
-OBJECTS = \
-	main.o \
-	cmdline_options.o \
-	config.o \
-	mount.o \
-	swap.o \
-	hsa.o \
-	hsa_file.o \
-	hsa_mem.o \
-	proxy.o \
-	overlay.o
+sources := $(wildcard *.c)
+objects := $(patsubst %.c,%.o,$(sources))
 
 libs = $(rootdir)/libutil/libutil.a
 
-all: check_dep hsavmcore
+all: hsavmcore
 
-check_dep:
+hsavmcore: $(objects) $(libs)
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
+
+overlay.o: check-dep-fuse overlay.c overlay.h
+
+check-dep-fuse:
 	$(call check_dep, \
 		"hsavmcore", \
 		"fuse.h", \
 		"fuse-devel or libfuse-dev", \
 		"HAVE_FUSE=0")
-ifneq (${HAVE_SYSTEMD},0)
-	$(call check_dep, \
-		"hsavmcore", \
-		"systemd/sd-daemon.h", \
-		"systemd-devel or libsystemd-dev", \
-		"HAVE_SYSTEMD=0")
-endif
-
-hsavmcore: $(OBJECTS) $(libs)
-	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
+	touch check-dep-fuse
 
 install: all
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 hsavmcore \
@@ -90,6 +82,6 @@ install: all
 endif # HAVE_FUSE
 
 clean:
-	rm -f hsavmcore $(OBJECTS)
+	rm -f hsavmcore $(objects) check-dep-fuse
 
 .PHONY: all install clean

@@ -91,6 +91,7 @@ int dasd_sys_ese(char *devnode)
 
 	rc = fgetc(fp) - '0';
 	fclose(fp);
+	free(path);
 
 	return (rc == 1) ? 1 : 0;
 }

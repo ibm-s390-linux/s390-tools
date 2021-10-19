@@ -1,5 +1,7 @@
 include ../common.mak
 
+ALL_CFLAGS += -Wno-address-of-packed-member
+
 #
 # HAVE_FUSE: Allow to build zgetdump without mount support
 #

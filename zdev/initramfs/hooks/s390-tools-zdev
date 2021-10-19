@@ -38,6 +38,9 @@ done
 copy_exec /sbin/chzdev
 copy_exec /sbin/lszdev
 copy_exec /sbin/vmcp
+copy_exec /lib/s390-tools/zdev_id
+
+cp -p /usr/lib/udev/rules.d/81-dpm.rules "$DESTDIR/usr/lib/udev/rules.d/"
 
 _tempfile=$(mktemp --tmpdir initramfs-zdev.XXXXXX)
 

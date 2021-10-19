@@ -31,11 +31,11 @@
 
 #include "lib/zt_common.h"
 
+#include "libseckey/sk_openssl.h"
+
 #include "ekmfweb/ekmfweb.h"
 #include "utilities.h"
 #include "cca.h"
-
-#define SERIAL_NUMBER_BIT_SIZE		159
 
 #define DEFAULT_SESSION_EC_KEY_CURVE	NID_secp521r1
 
@@ -144,19 +144,61 @@ static const char *accepted_content_types[] = { "application/json",
 						"text/x-json",
 						NULL};
 
-struct private_data {
-	const struct ekmf_ext_lib *ext_lib;
-	bool verbose;
+struct ext_lib_info {
+	struct sk_ext_lib ext_lib;
+	union {
+		struct sk_ext_cca_lib cca; /* Used if type = EXT_LIB_CCA */
+		struct sk_ext_ep11_lib ep11; /* Used if type = EXT_LIB_EP11 */
+	};
 };
 
-static int _ekmf_setup_sign_context(const unsigned char *key_blob,
-				    size_t key_blob_size, EVP_PKEY *pkey,
-				    int digest_nid,
-				    struct ekmf_rsa_pss_params *rsa_pss_params,
-				    EVP_MD_CTX **md_ctx,
-				    EVP_PKEY_CTX **pkey_ctx,
-				    struct private_data *private,
-				    bool verbose);
+static void _ekmf_copy_ext_lib(const struct ekmf_ext_lib *ekmf_ext_lib,
+			       struct ext_lib_info *ext_lib_info)
+{
+	switch (ekmf_ext_lib->type) {
+	case EKMF_EXT_LIB_CCA:
+		ext_lib_info->ext_lib.type = SK_EXT_LIB_CCA;
+		ext_lib_info->ext_lib.cca = &ext_lib_info->cca;
+		ext_lib_info->cca.cca_lib = ekmf_ext_lib->cca->cca_lib;
+		break;
+	default:
+		ext_lib_info->ext_lib.type = 0;
+	}
+}
+
+static void _ekmf_copy_key_gen_info(const struct ekmf_key_gen_info *ekmf_info,
+				    struct sk_key_gen_info *sk_info)
+{
+	switch (ekmf_info->type) {
+	case EKMF_KEY_TYPE_ECC:
+		sk_info->type = SK_KEY_TYPE_EC;
+		sk_info->ec.curve_nid = ekmf_info->params.ecc.curve_nid;
+		break;
+	case EKMF_KEY_TYPE_RSA:
+		sk_info->type = SK_KEY_TYPE_RSA;
+		sk_info->rsa.modulus_bits = ekmf_info->params.rsa.modulus_bits;
+		sk_info->rsa.pub_exp = ekmf_info->params.rsa.pub_exp;
+		sk_info->rsa.x9_31 = 0;
+		break;
+	default:
+		sk_info->type = 0;
+		break;
+	}
+}
+
+static void _ekmf_copy_pss_params(
+			const struct ekmf_rsa_pss_params *ekmf_pss_params,
+			struct sk_rsa_pss_params *rsa_pss_params)
+{
+	if (ekmf_pss_params != NULL) {
+		rsa_pss_params->mgf_digest_nid =
+					ekmf_pss_params->mgf_digest_nid;
+		rsa_pss_params->salt_len = ekmf_pss_params->salt_len;
+	} else {
+		rsa_pss_params->mgf_digest_nid = NID_undef;
+		rsa_pss_params->salt_len = 0;
+	}
+}
 
 /**
  * Extract the public key from a certificate in PEM format and store it into a
@@ -705,6 +747,7 @@ static int _ekmf_perform_request(const struct ekmf_config *config,
 				 long *status_code, char **error_msg,
 				 CURL *curl, bool verbose)
 {
+	const struct curl_tlssessioninfo *info = NULL;
 	struct curl_header_cb_data header_cb = { 0 };
 	struct curl_sslctx_cb_data sslctx_cb = { 0 };
 	struct curl_write_cb_data write_cb = { 0 };
@@ -731,6 +774,19 @@ static int _ekmf_perform_request(const struct ekmf_config *config,
 	pr_verbose(verbose, "Performing request for '%s'", url);
 
 	curl_easy_reset(curl);
+
+	/*
+	 * The CURLOPT_SSL_CTX_FUNCTION callback only works with the OpenSSL
+	 * curl backend. Check that OpenSSL is the current curl backend.
+	 */
+	rc = curl_easy_getinfo(curl, CURLINFO_TLS_SSL_PTR, &info);
+	CURL_ERROR_CHECK(rc, "curl_easy_getinfo CURLINFO_TLS_SSL_PTR", verbose,
+			 out);
+	if (info->backend != CURLSSLBACKEND_OPENSSL) {
+		pr_verbose(verbose, "libcurl is not using the OpenSSL backend");
+		rc = -EIO;
+		goto out;
+	}
 
 	rc = curl_easy_setopt(curl, CURLOPT_VERBOSE, verbose ? 1 : 0);
 	CURL_ERROR_CHECK(rc, "curl_easy_setopt CURLOPT_VERBOSE", verbose, out);
@@ -1428,6 +1484,13 @@ int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
 	if (config == NULL)
 		return -EINVAL;
 
+	rc = SK_OPENSSL_init(verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to initialize secure key support: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
 	rc = ekmf_check_login_token(config, &token_valid, &login_token,
 				    verbose);
 	if (rc != 0 || !token_valid) {
@@ -1495,6 +1558,7 @@ out:
 		free(login_token);
 	if (pkey != NULL)
 		EVP_PKEY_free(pkey);
+	SK_OPENSSL_term();
 
 	return rc;
 }
@@ -1924,53 +1988,26 @@ static int _ekmf_build_signature(unsigned char *key_blob,
 				 const struct ekmf_ext_lib *ext_lib,
 				 bool verbose)
 {
-	struct ekmf_rsa_pss_params rsa_pss_params;
+	struct sk_rsa_pss_params rsa_pss_params;
+	struct ext_lib_info ext_lib_info;
 	EVP_PKEY_CTX *pkey_ctx = NULL;
-	struct private_data private;
 	EVP_MD_CTX *md_ctx = NULL;
-	bool pkey_meth = false;
 	EVP_PKEY *pkey = NULL;
 	const char *payload;
 	const char *jws_alg;
 	int rc, curve_nid;
 	char *jws = NULL;
-	int pkey_type;
 	BIO *b;
 
-	switch (ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		rc = cca_get_key_type(key_blob, key_blob_length, &pkey_type);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to get the identity key "
-				   "type");
-			goto out;
-		}
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
 
-		switch (pkey_type) {
-		case EVP_PKEY_EC:
-			rc = cca_get_ecc_pub_key_as_pkey(key_blob,
-							 key_blob_length,
-							 &pkey, verbose);
-			break;
-		case EVP_PKEY_RSA:
-		case EVP_PKEY_RSA_PSS:
-			rc = cca_get_rsa_pub_key_as_pkey(key_blob,
-							 key_blob_length,
-							 use_rsa_pss ?
-							     EVP_PKEY_RSA_PSS :
-							     EVP_PKEY_RSA,
-							 &pkey, verbose);
-			break;
-		}
-
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to get the identity PKEY");
-			goto out;
-		}
-		break;
-	default:
-		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
-		return -EINVAL;
+	rc = SK_OPENSSL_get_secure_key_as_pkey(key_blob, key_blob_length,
+					       use_rsa_pss, &pkey,
+					       &ext_lib_info.ext_lib,
+					       verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the identity PKEY");
+		goto out;
 	}
 
 	/*
@@ -1988,8 +2025,7 @@ static int _ekmf_build_signature(unsigned char *key_blob,
 	 */
 	switch (EVP_PKEY_id(pkey)) {
 	case EVP_PKEY_EC:
-		curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(
-						EVP_PKEY_get0_EC_KEY(pkey)));
+		curve_nid = SK_OPENSSL_get_curve_from_ec_pkey(pkey);
 		switch (curve_nid) {
 		case NID_secp521r1:
 			digest_nid = NID_sha512;
@@ -2055,15 +2091,13 @@ static int _ekmf_build_signature(unsigned char *key_blob,
 		goto out;
 	}
 
-	private.ext_lib = ext_lib;
-	private.verbose = verbose;
-
-	rc = _ekmf_setup_sign_context(key_blob, key_blob_length, pkey,
-				      digest_nid, &rsa_pss_params, &md_ctx,
-				      &pkey_ctx, &private, verbose);
-	if (rc != 0)
+	rc =  SK_OPENSSL_setup_sign_context(pkey, false, digest_nid,
+					    &rsa_pss_params, &md_ctx, &pkey_ctx,
+					    verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to setup secure key sign context");
 		goto out;
-	pkey_meth = true;
+	}
 
 	payload = json_object_to_json_string_ext(payload_obj,
 					JSON_C_TO_STRING_PLAIN |
@@ -2097,8 +2131,6 @@ static int _ekmf_build_signature(unsigned char *key_blob,
 out:
 	if (md_ctx != NULL)
 		EVP_MD_CTX_free(md_ctx);
-	if (pkey_meth)
-		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
 	if (pkey != NULL)
 		EVP_PKEY_free(pkey);
 	if (jws != NULL)
@@ -2266,6 +2298,51 @@ out:
 	return rc;
 }
 
+/*
+ * Callback function for SK_OPENSSL_get_public_from_secure_key. Construct
+ * a JSON Web key from a public EC key.
+ */
+static int _ekmf_pub_key_as_json_web_key(const struct sk_pub_key_info *pub_key,
+					 void *private)
+{
+	json_object **jwk_ret = private;
+	json_object *jwk_obj = NULL;
+	int rc = 0;
+
+	if (pub_key->type != SK_KEY_TYPE_EC)
+		return -EINVAL;
+
+	/* construct the JWK */
+	jwk_obj = json_object_new_object();
+	if (jwk_obj == NULL)
+		return -ENOMEM;
+
+	/*
+	 * Note: The order of the fields is important, EKMFWeb expects it in
+	 * exactly this order!
+	 */
+	rc = json_object_object_add_ex(jwk_obj, "kty",
+				       json_object_new_string("EC"), 0);
+	rc |= json_object_object_add_ex(jwk_obj, "crv", json_object_new_string(
+				EC_curve_nid2nist(pub_key->ec.curve_nid)), 0);
+	rc |= json_object_object_add_ex(jwk_obj, "x",
+					json_object_new_base64url(pub_key->ec.x,
+							pub_key->ec.prime_len),
+					0);
+	rc |= json_object_object_add_ex(jwk_obj, "y",
+					json_object_new_base64url(pub_key->ec.y,
+							pub_key->ec.prime_len),
+					0);
+	if (rc != 0) {
+		json_object_put(jwk_obj);
+		return -EIO;
+	}
+
+	*jwk_ret = jwk_obj;
+
+	return 0;
+}
+
 /**
  * Requests a key to be retrieved from EKMFweb and imported under the current
  * HSM's master key.
@@ -2328,8 +2405,10 @@ int ekmf_retrieve_key(const struct ekmf_config *config, CURL **curl_handle,
 	json_object *resp_sess_jwk_obj = NULL;
 	json_object *req_sess_jwk_obj = NULL;
 	json_object *resp_exp_jwk_obj = NULL;
+	struct ext_lib_info ext_lib_info;
 	json_object *response_obj = NULL;
 	json_object *request_obj = NULL;
+	struct sk_key_gen_info gen_info;
 	EVP_PKEY *server_pubkey = NULL;
 	char *escaped_uuid = NULL;
 	char *login_token = NULL;
@@ -2342,6 +2421,15 @@ int ekmf_retrieve_key(const struct ekmf_config *config, CURL **curl_handle,
 	if (config == NULL || key_uuid == NULL || key_blob == NULL ||
 	    key_blob_length == NULL || ext_lib == NULL)
 		return -EINVAL;
+
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
+
+	rc = SK_OPENSSL_init(verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to initialize secure key support: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
 
 	rc = ekmf_check_login_token(config, &token_valid, &login_token,
 				    verbose);
@@ -2376,34 +2464,30 @@ int ekmf_retrieve_key(const struct ekmf_config *config, CURL **curl_handle,
 		goto out;
 	}
 
-	switch (ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		req_sess_ec_key_length = sizeof(req_sess_ec_key);
-		rc = cca_generate_ecc_key_pair(ext_lib->cca,
-					       sess_ec_curve_nid != 0 ?
-						  sess_ec_curve_nid :
-						  DEFAULT_SESSION_EC_KEY_CURVE,
-					       req_sess_ec_key,
-					       &req_sess_ec_key_length,
-					       verbose);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to generate a session EC "
-				   "key");
-			goto out;
-		}
+	gen_info.type = SK_KEY_TYPE_EC;
+	gen_info.ec.curve_nid = sess_ec_curve_nid != 0 ? sess_ec_curve_nid :
+						DEFAULT_SESSION_EC_KEY_CURVE;
 
-		rc = cca_get_ecc_pub_key_as_json_web_key(req_sess_ec_key,
-							 req_sess_ec_key_length,
-							 &req_sess_jwk_obj,
-							 verbose);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to generate session JWK");
-			goto out;
-		}
-		break;
-	default:
-		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
-		return -EINVAL;
+	req_sess_ec_key_length = sizeof(req_sess_ec_key);
+	rc = SK_OPENSSL_generate_secure_key(req_sess_ec_key,
+					    &req_sess_ec_key_length,
+					    &gen_info, &ext_lib_info.ext_lib,
+					    verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to generate a session EC "
+			   "key");
+		goto out;
+	}
+
+	rc = SK_OPENSSL_get_public_from_secure_key(req_sess_ec_key,
+						   req_sess_ec_key_length,
+						_ekmf_pub_key_as_json_web_key,
+						   &req_sess_jwk_obj,
+						   &ext_lib_info.ext_lib,
+						   verbose);
+	if (rc != 0 || req_sess_jwk_obj == NULL) {
+		pr_verbose(verbose, "Failed to generate session JWK");
+		goto out;
 	}
 
 	req_timestamp_obj = get_json_timestamp();
@@ -2625,6 +2709,7 @@ out:
 		free(resp_party_info);
 	if (escaped_uuid != NULL)
 		curl_free(escaped_uuid);
+	SK_OPENSSL_term();
 
 	return rc;
 }
@@ -4789,6 +4874,8 @@ int ekmf_generate_identity_key(const struct ekmf_config *config,
 {
 	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
 	size_t key_blob_size = sizeof(key_blob);
+	struct ext_lib_info ext_lib_info;
+	struct sk_key_gen_info gen_info;
 	int rc;
 
 	if (config == NULL || info == NULL || ext_lib == NULL)
@@ -4796,30 +4883,11 @@ int ekmf_generate_identity_key(const struct ekmf_config *config,
 	if (config->identity_secure_key == NULL)
 		return -EINVAL;
 
-	switch (ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		switch (info->type) {
-		case EKMF_KEY_TYPE_ECC:
-			rc = cca_generate_ecc_key_pair(ext_lib->cca,
-					info->params.ecc.curve_nid,
-					key_blob, &key_blob_size, verbose);
-			break;
-		case EKMF_KEY_TYPE_RSA:
-			rc = cca_generate_rsa_key_pair(ext_lib->cca,
-					info->params.rsa.modulus_bits,
-					info->params.rsa.pub_exp,
-					key_blob, &key_blob_size, verbose);
-			break;
-		default:
-			pr_verbose(verbose, "Invalid key type: %d", info->type);
-			return -EINVAL;
-		}
-		break;
-	default:
-		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
-		return -EINVAL;
-	}
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
+	_ekmf_copy_key_gen_info(info, &gen_info);
 
+	rc = SK_OPENSSL_generate_secure_key(key_blob, &key_blob_size, &gen_info,
+					    &ext_lib_info.ext_lib, verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to generate a key: rc: %d - %s",
 			   rc, strerror(-rc));
@@ -4882,6 +4950,7 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 {
 	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
 	size_t key_blob_size = sizeof(key_blob);
+	struct ext_lib_info ext_lib_info;
 	const char *out_file;
 	int rc;
 
@@ -4889,6 +4958,8 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 		return -EINVAL;
 	if (config->identity_secure_key == NULL)
 		return -EINVAL;
+
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
 
 	rc = read_key_blob(config->identity_secure_key, key_blob,
 			   &key_blob_size);
@@ -4899,16 +4970,8 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 		return rc;
 	}
 
-	switch (ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		rc = cca_reencipher_key(ext_lib->cca, key_blob, key_blob_size,
-					to_new, verbose);
-		break;
-	default:
-		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
-		return -EINVAL;
-	}
-
+	rc = SK_OPENSSL_reencipher_secure_key(key_blob, key_blob_size, to_new,
+					      &ext_lib_info.ext_lib, verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to re-encipher the secure identity "
 			   "key from file '%s': %s",
@@ -4926,217 +4989,6 @@ int ekmf_reencipher_identity_key(const struct ekmf_config *config,
 	}
 
 	return 0;
-}
-
-/**
- * Wrapper for the RSA sign callback to route the call to the selected
- * secure key library.
- */
-static int _ekmf_rsa_sign(const unsigned char *key_blob, size_t key_blob_length,
-			  unsigned char *sig, size_t *siglen,
-			  const unsigned char *tbs, size_t tbslen,
-			  int padding_type, int md_nid, void *private)
-{
-	struct private_data *prv = (struct private_data *)private;
-
-	if (prv == NULL || prv->ext_lib == NULL)
-		return 1;
-
-	switch (prv->ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		return cca_rsa_sign(prv->ext_lib->cca, key_blob,
-				    key_blob_length, sig, siglen, tbs, tbslen,
-				    padding_type, md_nid, prv->verbose);
-	default:
-		return 1;
-	}
-}
-
-/**
- * Wrapper for the RSA-PSS sign callback to route the call to the selected
- * secure key library.
- */
-static int _ekmf_rsa_pss_sign(const unsigned char *key_blob,
-			      size_t key_blob_length, unsigned char *sig,
-			      size_t *siglen, const unsigned char *tbs,
-			      size_t tbslen, int md_nid, int mgfmd_nid,
-			      int saltlen, void *private)
-{
-	struct private_data *prv = (struct private_data *)private;
-
-	if (prv == NULL || prv->ext_lib == NULL)
-		return 1;
-
-	switch (prv->ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		return cca_rsa_pss_sign(prv->ext_lib->cca, key_blob,
-					key_blob_length, sig, siglen, tbs,
-					tbslen, md_nid, mgfmd_nid, saltlen,
-					prv->verbose);
-	default:
-		return 1;
-	}
-}
-
-/**
- * Wrapper for the ECDSA sign callback to route the call to the selected
- * secure key library.
- */
-static int _ekmf_ecdsa_sign(const unsigned char *key_blob,
-			    size_t key_blob_length, unsigned char *sig,
-			    size_t *siglen, const unsigned char *tbs,
-			    size_t tbslen, int md_nid, void *private)
-{
-	struct private_data *prv = (struct private_data *)private;
-
-	if (prv == NULL || prv->ext_lib == NULL)
-		return 1;
-
-	switch (prv->ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		return cca_ecdsa_sign(prv->ext_lib->cca, key_blob,
-				      key_blob_length, sig, siglen, tbs, tbslen,
-				      md_nid, prv->verbose);
-	default:
-		return 1;
-	}
-}
-
-/**
- * Gets the public key from the key blob as a PKEY object.
- */
-static int _ekmf_get_pub_key_as_pkey(const unsigned char *key_blob,
-				     size_t key_blob_size, EVP_PKEY **pkey,
-				     bool rsa_pss,
-				     const struct ekmf_ext_lib *ext_lib,
-				     bool verbose)
-{
-	int rc, pkey_type;
-
-	switch (ext_lib->type) {
-	case EKMF_EXT_LIB_CCA:
-		rc = cca_get_key_type(key_blob, key_blob_size, &pkey_type);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to get the identity key "
-				   "type: %s", strerror(-rc));
-			return rc;
-		}
-
-		switch (pkey_type) {
-		case EVP_PKEY_EC:
-			rc = cca_get_ecc_pub_key_as_pkey(key_blob,
-					key_blob_size, pkey, verbose);
-			break;
-		case EVP_PKEY_RSA:
-		case EVP_PKEY_RSA_PSS:
-			rc = cca_get_rsa_pub_key_as_pkey(key_blob,
-					key_blob_size, rsa_pss ?
-						EVP_PKEY_RSA_PSS : pkey_type,
-					pkey, verbose);
-			break;
-		default:
-			pr_verbose(verbose, "Invalid identity key type: %d",
-				   pkey_type);
-			return -EIO;
-		}
-
-		if (rc != 0)
-			return rc;
-		break;
-	default:
-		pr_verbose(verbose, "Invalid ext lib type: %d", ext_lib->type);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
- * Setup a signing context for the specified key, digest_nid, and RSA-PSS
- * parameters.
- */
-static int _ekmf_setup_sign_context(const unsigned char *key_blob,
-				    size_t key_blob_size, EVP_PKEY *pkey,
-				    int digest_nid,
-				    struct ekmf_rsa_pss_params *rsa_pss_params,
-				    EVP_MD_CTX **md_ctx,
-				    EVP_PKEY_CTX **pkey_ctx,
-				    struct private_data *private,
-				    bool verbose)
-{
-	struct sk_pkey_sign_func sign_func;
-	EVP_PKEY_CTX *pctx = NULL;
-	const EVP_MD *md = NULL;
-	int rc, default_nid;
-	EVP_MD_CTX *ctx;
-
-	rc = setup_secure_key_pkey_method(EVP_PKEY_id(pkey));
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to setup secure key PKEY method");
-		return rc;
-	}
-
-	ctx = EVP_MD_CTX_new();
-	if (ctx == NULL) {
-		pr_verbose(verbose, "Failed to allocate the digest context");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	if (digest_nid != 0) {
-		md = EVP_get_digestbynid(digest_nid);
-		if (md == NULL) {
-			pr_verbose(verbose, "Requested digest not supported");
-			rc = -ENOTSUP;
-			goto out;
-		}
-
-		if (EVP_PKEY_get_default_digest_nid(pkey, &default_nid) == 2 &&
-		    default_nid == 0) {
-			pr_verbose(verbose, "The signing algorithm requires "
-				   "there to be no digest");
-			md = NULL;
-		}
-	}
-
-	rc = EVP_DigestSignInit(ctx, &pctx, md, NULL, pkey);
-	if (rc != 1) {
-		pr_verbose(verbose, "Failed to initialize the signing "
-			   "operation");
-		rc = -EIO;
-		goto out;
-	}
-
-	sign_func.rsa_sign = _ekmf_rsa_sign;
-	sign_func.rsa_pss_sign = _ekmf_rsa_pss_sign;
-	sign_func.ecdsa_sign = _ekmf_ecdsa_sign;
-
-	rc = setup_secure_key_pkey_context(pctx, key_blob, key_blob_size,
-					   &sign_func, private);
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to setup the secure key PKEY "
-			   "context: %s", strerror(-rc));
-		goto out;
-	}
-
-	if (EVP_PKEY_id(pkey) == EVP_PKEY_RSA_PSS && rsa_pss_params != NULL) {
-		rc = setup_rsa_pss_pkey_context(pctx, rsa_pss_params);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to setup RSA-PSS context");
-			goto out;
-		}
-	}
-
-	*md_ctx = ctx;
-	*pkey_ctx = pctx;
-
-out:
-	if (rc != 0) {
-		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
-		if (ctx != NULL)
-			EVP_MD_CTX_free(ctx);
-	}
-	return rc;
 }
 
 /**
@@ -5201,15 +5053,10 @@ int ekmf_generate_csr(const struct ekmf_config *config,
 		      const char *csr_pem_filename, bool new_hdr,
 		      const struct ekmf_ext_lib *ext_lib, bool verbose)
 {
-	const STACK_OF(X509_EXTENSION) *cert_exts = NULL;
 	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
 	size_t key_blob_size = sizeof(key_blob);
-	X509_NAME *subject_name = NULL;
-	EVP_PKEY_CTX *pkey_ctx = NULL;
-	struct private_data private;
-	EVP_MD_CTX *md_ctx = NULL;
-	bool pkey_meth = false;
-	EVP_PKEY *pkey = NULL;
+	struct sk_rsa_pss_params pss_params;
+	struct ext_lib_info ext_lib_info;
 	X509_REQ *req = NULL;
 	X509 *cert = NULL;
 	int rc;
@@ -5224,36 +5071,21 @@ int ekmf_generate_csr(const struct ekmf_config *config,
 	if (num_extensions != 0 && extensions == NULL)
 		return -EINVAL;
 
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
+
+	rc = SK_OPENSSL_init(verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to initialize secure key support: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
 	rc = read_key_blob(config->identity_secure_key, key_blob,
 			   &key_blob_size);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to read identity key from file "
 			   "'%s': %s", config->identity_secure_key,
 			   strerror(-rc));
-		goto out;
-	}
-
-	rc = _ekmf_get_pub_key_as_pkey(key_blob, key_blob_size, &pkey,
-				       rsa_pss_params != NULL, ext_lib,
-				       verbose);
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to get identity key as PKEY from "
-			   "file '%s': %s", config->identity_secure_key,
-			   strerror(-rc));
-		goto out;
-	}
-
-	req = X509_REQ_new();
-	if (req == NULL) {
-		pr_verbose(verbose, "X509_REQ_new failed");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	rc = X509_REQ_set_version(req, 0L);
-	if (rc != 1) {
-		pr_verbose(verbose, "X509_REQ_set_version failed: rc: %d", rc);
-		rc = -EIO;
 		goto out;
 	}
 
@@ -5265,63 +5097,20 @@ int ekmf_generate_csr(const struct ekmf_config *config,
 				   strerror(-rc));
 			goto out;
 		}
-
-		subject_name = X509_NAME_dup(X509_get_subject_name(cert));
-		cert_exts = X509_get0_extensions(cert);
 	}
 
-	if (subject_rdns != NULL && num_subject_rdns > 0) {
-		rc = build_subject_name(&subject_name, subject_rdns,
-					num_subject_rdns, subject_utf8);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to parse the subject name "
-				   "RDSn: %s", strerror(-rc));
-			goto out;
-		}
-	}
 
-	if (subject_name == NULL) {
-		rc = -EINVAL;
-		pr_verbose(verbose, "Subject name can not be empty");
-		goto out;
-	}
+	_ekmf_copy_pss_params(rsa_pss_params, &pss_params);
 
-	rc = X509_REQ_set_subject_name(req, subject_name);
-	if (rc != 1) {
-		rc = -EIO;
-		pr_verbose(verbose, "Failed to set subject name into request");
-		goto out;
-	}
-
-	rc = build_certificate_extensions(NULL, req, extensions,
-					  num_extensions, cert_exts);
+	rc = SK_OPENSSL_generate_csr(key_blob, key_blob_size,
+				     subject_rdns, num_subject_rdns,
+				     subject_utf8, cert,
+				     extensions, num_extensions,
+				     digest_nid, &pss_params, &req,
+				     &ext_lib_info.ext_lib, verbose);
 	if (rc != 0) {
-		pr_verbose(verbose, "Failed to parse the extensions: "
-			   "%s", strerror(-rc));
-		goto out;
-	}
-
-	rc = X509_REQ_set_pubkey(req, pkey);
-	if (rc != 1) {
-		pr_verbose(verbose, "Failed to set the public key");
-		rc = -EIO;
-		goto out;
-	}
-
-	private.ext_lib = ext_lib;
-	private.verbose = verbose;
-
-	rc = _ekmf_setup_sign_context(key_blob, key_blob_size, pkey, digest_nid,
-				      rsa_pss_params, &md_ctx, &pkey_ctx,
-				      &private, verbose);
-	if (rc != 0)
-		goto out;
-	pkey_meth = true;
-
-	rc = X509_REQ_sign_ctx(req, md_ctx);
-	if (rc <= 0) {
-		pr_verbose(verbose, "Failed to perform the signing operation");
-		rc = -EIO;
+		pr_verbose(verbose, "SK_OPENSSL_generate_csr failed "
+			   "'%s': %s", csr_pem_filename, strerror(-rc));
 		goto out;
 	}
 
@@ -5332,24 +5121,15 @@ int ekmf_generate_csr(const struct ekmf_config *config,
 		goto out;
 	}
 
-	if (verbose) {
-		pr_verbose(verbose, "Certificate Signing Request created:");
-		X509_REQ_print_fp(stderr, req);
-	}
+	pr_verbose(verbose, "Certificate Signing Request created successfully "
+		   "into '%s'", csr_pem_filename);
 
 out:
-	if (md_ctx != NULL)
-		EVP_MD_CTX_free(md_ctx);
-	if (pkey_meth)
-		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
-	if (subject_name != NULL)
-		X509_NAME_free(subject_name);
 	if (cert != NULL)
 		X509_free(cert);
 	if (req != NULL)
 		X509_REQ_free(req);
-	if (pkey != NULL)
-		EVP_PKEY_free(pkey);
+	SK_OPENSSL_term();
 
 	return rc;
 }
@@ -5419,15 +5199,10 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 			  const char *cert_pem_filename,
 			  const struct ekmf_ext_lib *ext_lib, bool verbose)
 {
-	const STACK_OF(X509_EXTENSION) *cert_exts = NULL;
 	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
 	size_t key_blob_size = sizeof(key_blob);
-	X509_NAME *subject_name = NULL;
-	EVP_PKEY_CTX *pkey_ctx = NULL;
-	struct private_data private;
-	EVP_MD_CTX *md_ctx = NULL;
-	bool pkey_meth = false;
-	EVP_PKEY *pkey = NULL;
+	struct sk_rsa_pss_params pss_params;
+	struct ext_lib_info ext_lib_info;
 	X509 *rcert = NULL;
 	X509 *cert = NULL;
 	int rc;
@@ -5442,42 +5217,20 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 	if (num_extensions != 0 && extensions == NULL)
 		return -EINVAL;
 
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
+
+	rc = SK_OPENSSL_init(verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to initialize secure key support: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
 	rc = read_key_blob(config->identity_secure_key, key_blob,
 			   &key_blob_size);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to read identity key from file "
 			   "'%s': %s", config->identity_secure_key,
-			   strerror(-rc));
-		goto out;
-	}
-
-	rc = _ekmf_get_pub_key_as_pkey(key_blob, key_blob_size, &pkey,
-				       rsa_pss_params != NULL, ext_lib,
-				       verbose);
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to get identity key as PKEY from "
-			   "file '%s': %s", config->identity_secure_key,
-			   strerror(-rc));
-		goto out;
-	}
-
-	cert = X509_new();
-	if (cert == NULL) {
-		pr_verbose(verbose, "X509_new failed");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	rc = X509_set_version(cert, 2L);
-	if (rc != 1) {
-		pr_verbose(verbose, "X509_set_version failed: rc: %d", rc);
-		rc = -EIO;
-		goto out;
-	}
-
-	rc = generate_x509_serial_number(cert, SERIAL_NUMBER_BIT_SIZE);
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to set the serial number: %s",
 			   strerror(-rc));
 		goto out;
 	}
@@ -5490,83 +5243,20 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 				   strerror(-rc));
 			goto out;
 		}
-
-		subject_name = X509_NAME_dup(X509_get_subject_name(rcert));
-		cert_exts = X509_get0_extensions(rcert);
 	}
 
-	if (subject_rdns != NULL && num_subject_rdns > 0) {
-		rc = build_subject_name(&subject_name, subject_rdns,
-					num_subject_rdns, subject_utf8);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to parse the subject name "
-				   "RDSn: %s", strerror(-rc));
-			goto out;
-		}
-	}
+	_ekmf_copy_pss_params(rsa_pss_params, &pss_params);
 
-	if (subject_name == NULL) {
-		rc = -EINVAL;
-		pr_verbose(verbose, "Subject name can not be empty");
-		goto out;
-	}
-
-	rc = X509_set_subject_name(cert, subject_name);
-	if (rc != 1) {
-		rc = -EIO;
-		pr_verbose(verbose, "Failed to set subject name into cert");
-		goto out;
-	}
-
-	rc = X509_set_issuer_name(cert, subject_name);
-	if (rc != 1) {
-		rc = -EIO;
-		pr_verbose(verbose, "Failed to set issuer name into cert");
-		goto out;
-	}
-
-	rc = build_certificate_extensions(cert, NULL, extensions,
-					  num_extensions, cert_exts);
+	rc = SK_OPENSSL_generate_ss_cert(key_blob, key_blob_size,
+					 subject_rdns, num_subject_rdns,
+					 subject_utf8, rcert,
+					 extensions, num_extensions,
+					 validity_days, digest_nid,
+					 &pss_params, &cert,
+					 &ext_lib_info.ext_lib, verbose);
 	if (rc != 0) {
-		pr_verbose(verbose, "Failed to parse the extensions: "
-			   "%s", strerror(-rc));
-		goto out;
-	}
-
-	if (X509_gmtime_adj(X509_getm_notBefore(cert), 0) == NULL) {
-		rc = -EIO;
-		pr_verbose(verbose, "Failed to set notBefore time inti cert");
-		goto out;
-	}
-
-	if (X509_time_adj_ex(X509_getm_notAfter(cert),
-			     validity_days, 0, NULL) == NULL) {
-		rc = -EIO;
-		pr_verbose(verbose, "Failed to set notAfter time into cert");
-		goto out;
-	}
-
-	rc = X509_set_pubkey(cert, pkey);
-	if (rc != 1) {
-		pr_verbose(verbose, "Failed to set the public key");
-		rc = -EIO;
-		goto out;
-	}
-
-	private.ext_lib = ext_lib;
-	private.verbose = verbose;
-
-	rc = _ekmf_setup_sign_context(key_blob, key_blob_size, pkey, digest_nid,
-				      rsa_pss_params, &md_ctx, &pkey_ctx,
-				      &private, verbose);
-	if (rc != 0)
-		goto out;
-	pkey_meth = true;
-
-	rc = X509_sign_ctx(cert, md_ctx);
-	if (rc <= 0) {
-		pr_verbose(verbose, "Failed to perform the signing operation");
-		rc = -EIO;
+		pr_verbose(verbose, "SK_OPENSSL_generate_ss_cert failed "
+			   "'%s': %s", cert_pem_filename, strerror(-rc));
 		goto out;
 	}
 
@@ -5577,24 +5267,15 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 		goto out;
 	}
 
-	if (verbose) {
-		pr_verbose(verbose, "Self-signed Certificate created:");
-		X509_print_fp(stderr, cert);
-	}
+	pr_verbose(verbose, "Self-signed Certificate created successfully "
+		   "into '%s'", cert_pem_filename);
 
 out:
-	if (md_ctx != NULL)
-		EVP_MD_CTX_free(md_ctx);
-	if (pkey_meth)
-		cleanup_secure_key_pkey_method(EVP_PKEY_id(pkey));
-	if (subject_name != NULL)
-		X509_NAME_free(subject_name);
 	if (cert != NULL)
 		X509_free(cert);
 	if (rcert != NULL)
 		X509_free(rcert);
-	if (pkey != NULL)
-		EVP_PKEY_free(pkey);
+	SK_OPENSSL_term();
 
 	return rc;
 }
@@ -5617,6 +5298,20 @@ void ekmf_curl_destroy(CURL *curl_handle)
  */
 void __attribute__ ((constructor)) ekmf_init(void)
 {
+	CURLsslset rc;
+
+	/*
+	 * Ensure that curl uses OpenSSL as SSL backend. If curl has already
+	 * been itialized by the calling application, the backend can't be
+	 * changed anymore, but we continue anyway. However, it will later be
+	 * checked if curl uses the OpenSSL backend, and a HTTPS connection
+	 * will fail if it is not using the OpenSSL backend.
+	 */
+	rc = curl_global_sslset(CURLSSLBACKEND_OPENSSL, NULL, NULL);
+	if (rc != CURLSSLSET_OK && rc != CURLSSLSET_TOO_LATE)
+		errx(EXIT_FAILURE, "libekmfweb: libcurl was not built with "
+		     "the OpenSSL backend");
+
 	curl_global_init(CURL_GLOBAL_ALL);
 }
 

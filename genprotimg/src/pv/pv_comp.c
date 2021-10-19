@@ -383,6 +383,7 @@ int64_t pv_component_update_tld(const PvComponent *comp, EVP_MD_CTX *ctx,
 		g_set_error(err, PV_CRYPTO_ERROR,
 			    PV_CRYPTO_ERROR_INTERNAL,
 			    _("BN_bin2bn failed"));
+		return -1;
 	}
 
 	for (uint64_t cur = 0; cur < size; cur += PAGE_SIZE) {
@@ -395,6 +396,7 @@ int64_t pv_component_update_tld(const PvComponent *comp, EVP_MD_CTX *ctx,
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("BN_bn2binpad failed"));
+			return -1;
 		}
 
 		if (EVP_DigestUpdate(ctx, tmp, sizeof(tmp)) != 1) {
@@ -409,6 +411,7 @@ int64_t pv_component_update_tld(const PvComponent *comp, EVP_MD_CTX *ctx,
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("BN_add_word failed"));
+			return -1;
 		}
 
 		nep++;

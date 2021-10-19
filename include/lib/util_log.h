@@ -1,5 +1,5 @@
 /**
- * @defgroup util_log_h util_file: Multi-level message logging interface
+ * @defgroup util_log_h util_log: Multi-level message logging interface
  * @{
  * @brief Multi-level message logging
  *

@@ -54,6 +54,8 @@ char *strcat(char *, const char *);
 int strncmp(const char *, const char *, unsigned long);
 int strlen(const char *);
 char *strcpy(char *, const char *);
+char *strchr(const char *str, char c);
+unsigned int strhash(unsigned char *str, unsigned int hash_size);
 unsigned long get_zeroed_page(void);
 void free_page(unsigned long);
 void initialize(void);

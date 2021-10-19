@@ -267,19 +267,25 @@ static int mem_init(void)
 /*
  * Initialize CPU information
  */
-static void cpu_init(void)
+static int cpu_init(void)
 {
 	unsigned int i;
+	int rc;
 
 	if (l.hdr_asm.magic != DF_LKCD_MAGIC_ASM) {
 		/* Old LKCD dump without asm header */
 		dfi_cpu_info_init(DFI_CPU_CONTENT_NONE);
-		return;
+		return 0;
 	}
 
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
-	for (i = 0; i < l.hdr_asm.cpu_cnt; i++)
-		dfi_cpu_add_from_lc(l.hdr_asm.lc_vec[i]);
+	for (i = 0; i < l.hdr_asm.cpu_cnt; i++) {
+		rc = dfi_cpu_add_from_lc(l.hdr_asm.lc_vec[i]);
+		if (rc)
+			return rc;
+	}
+
+	return 0;
 }
 
 /*
@@ -321,7 +327,8 @@ static int dfi_lkcd_init(void)
 		return -ENODEV;
 	if (mem_init() != 0)
 		return -EINVAL;
-	cpu_init();
+	if (cpu_init() != 0)
+		return -EINVAL;
 	return 0;
 }
 

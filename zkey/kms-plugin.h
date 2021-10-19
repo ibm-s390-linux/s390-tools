@@ -455,6 +455,9 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
  * Imports a key from the KMS and returns a secure key that is
  * enciphered under the current HSM master key.
  *
+ * Note: This function is used for an API version 1 plugin. See function
+ * kms_import_key2 for the version 2 equivalent.
+ *
  * @param handle            the KMS plugin handle obtained from kms_initialize()
  * @param key_id            the key-ID of the key to import
  * @param key_blob          a buffer to return the key blob. The size of the
@@ -469,7 +472,35 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 int kms_import_key(const kms_handle_t handle, const char *key_id,
 		   unsigned char *key_blob, size_t *key_blob_length);
 
+/**
+ * Imports a key from the KMS and returns a secure key that is
+ * enciphered under the current HSM master key.
+ *
+ * Note: This function should be available for an API version 2 plugin.
+ * The difference to functionkms_import_key is that it also get the
+ * desired key type of the key to import.
+ *
+ * @param handle            the KMS plugin handle obtained from kms_initialize()
+ * @param key_id            the key-ID of the key to import
+ * @param key_type          the zkey key type, such as 'CCA-AESDATA',
+ *                          'CCA-AESCIPHER', 'EP11-AES'. If NULL, then the
+ *                          plugin can choose its own default.
+ * @param key_blob          a buffer to return the key blob. The size of the
+ *                          buffer is specified in key_blob_length
+ * @param key_blob_length   on entry: the size of the key_blob buffer.
+ *                          on exit: the size of the key blob returned.
+ *
+ * @returns 0 on success, or a negative errno in case of an error.
+ * Function kms_get_last_error() can be used to obtain more details about the
+ * error.
+ *
+ */
+int kms_import_key2(const kms_handle_t handle, const char *key_id,
+		    const char *key_type,
+		    unsigned char *key_blob, size_t *key_blob_length);
+
 #define KMS_API_VERSION_1	1
+#define KMS_API_VERSION_2	2
 
 struct kms_functions {
 	unsigned int api_version;
@@ -523,6 +554,11 @@ struct kms_functions {
 			     size_t num_options,
 			     kms_list_callback callback, void *private_data);
 	int (*kms_import_key)(const kms_handle_t handle, const char *key_id,
+			      unsigned char *key_blob,
+			      size_t *key_blob_length);
+	/* Version 2 functions. Only used when api_version is >= 2. */
+	int (*kms_import_key2)(const kms_handle_t handle, const char *key_id,
+			      const char *key_type,
 			      unsigned char *key_blob,
 			      size_t *key_blob_length);
 };

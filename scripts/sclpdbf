@@ -1,0 +1,1172 @@
+#!/bin/bash
+#
+# sclpdbf - Tool to display sclp kernel traces
+#
+# Copyright IBM Corp. 2021
+#
+# Usage: sclpdbf [TRACEFILE] [OPTIONS]
+#
+# Display the contents of the s390dbf kernel trace area for the sclp component
+# in a human readable format.
+#
+# TRACEFILE may specify the name of a file containing the trace data in
+# hex_ascii view format. If no TRACEFILE is specified, trace data of the
+# currently running kernel is read from its default location at:
+#
+#   /sys/kernel/debug/s390dbf/sclp/hex_ascii      (default source)
+#   /sys/kernel/debug/s390dbf/sclp_err/hex_ascii  (if -e is specified)
+#
+# OPTIONS
+#   -h, --help            Print this help, then exit
+#       --version         Print version information, then exit
+#   -v, --verbose         Display verbose trace output
+#   -e, --errlog          Display sclp error log instead of normal log
+#   -r, --raw             Display log in raw format
+#   -s, --symtab SYMFILE  Use symbol table in SYMFILE (default /proc/kallsyms)
+#   -S, --no-symtab       Do not resolve kernel addresses to symbol names
+#   -f, --flush           Flush current trace buffers
+#   -l, --level LEVEL     Set tracing level to LEVEL (-1=off, 0 to 6)
+#   -p, --pages PAGES     Set trace area size to PAGES
+#   -P, --no-pager        Do not pipe trace output into pager
+
+TOOLPATH="$(readlink -f "${BASH_SOURCE[0]}")"
+TOOLNAME="${0##*/}"
+
+DEBUGFS="/sys/kernel/debug"
+
+# Enable color usage and pager when writing to terminal
+if [[ -t 1 ]] ; then
+	BOLD="\033[1m"
+	RED="\033[7;31m"
+	GREEN="\033[1;32m"
+	BLUE="\033[1;34m"
+	YELLOW="\033[33m"
+	RESET="\033[0m"
+
+	PAGER="less -r"
+else
+	PAGER="cat"
+fi
+
+# List of known trace entry IDs
+declare -A IDS=(
+	["SRV1"]="handle_SRV1"
+	["SRV2"]="handle_SRV2"
+	["INT"]="handle_INT"
+	["UNEX"]="handle_UNEX"
+	["RQAD"]="handle_RQAD"
+	["RQOK"]="handle_RQOK"
+	["RQAB"]="handle_RQAB"
+	["RQTM"]="handle_RQTM"
+	["EVNT"]="handle_EVNT"
+	["STCG"]="handle_STCG"
+	["REG"]="handle_REG"
+	["UREG"]="handle_UREG"
+	["TMO"]="handle_TMO"
+	["SYN1"]="handle_SYN1"
+	["SYN2"]="handle_SYN2"
+)
+
+# Symbolic names for SCLP request status
+declare -a REQSTATUS=(
+	"FILLED"
+	"QUEUED"
+	"RUNNING"
+	"DONE"
+	"${RED}FAILED${RESET}"
+	"${RED}QUEUED_TIMEOUT${RESET}"
+)
+
+# Symbolic names for SCLP command words
+declare -A CMDWS=(
+	[0x00010001]="READ_CPU_INFO"
+	[0x00020001]="READ_SCP_INFO"
+	[0x00040001]="READ_STORAGE_INFO"
+	[0x00120001]="READ_SCP_INFO_FORCED"
+	[0x00770005]="READ_EVENT_DATA"
+	[0x00760005]="WRITE_EVENT_DATA"
+	[0x00780005]="WRITE_EVENT_MASK"
+)
+
+# Symbolic names for RC values
+declare -a RC=(
+	[0]="OK"
+	[5]="${RED}EIO${RESET}"
+	[16]="${RED}EBUSY${RESET}"
+	[22]="${RED}EINVAL${RESET}"
+)
+
+# Colors to be used for hex dump display
+FIELDCOLS=(
+	[0]=""
+	[1]="$BLUE"
+	[2]="$GREEN"
+)
+
+# Color index for hex bytes in SCCB hex dump display
+SCCBFIELDS="1 1 2 2 2 2 1 1"
+
+# Color index for hex bytes in event buffer hex dump display
+EVNTFIELDS="1 1 2 1"
+
+# ASCII -> printable ASCII mapping table
+ASCII='................................ !"#$%&'\''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~.................................................................................................................................'
+
+# EBCDIC 500 -> printable ASCII mapping table
+EBCDIC='................................................................ .........[.<(+!&.........]$*);^-/.........,%_>?........p`:#@'\''=".abcdefghi.......jklmnopqr.......~stuvwxyz.................|....{ABCDEFGHI......}JKLMNOPQR......\.STUVWXYZ......0123456789......'
+
+
+function print_help() {
+	local line started=0
+
+	while read -r line ; do
+		[[ $started -eq 0 && $line =~ Usage: ]] && started=1
+		[[ $started -eq 1 && $line =~ ^$ ]] && break
+		[[ $started -eq 1 ]] && echo "${line:2}"
+	done < "$TOOLPATH"
+}
+
+function print_version() {
+	local line
+
+	echo "${TOOLNAME}: version %S390_TOOLS_VERSION%"
+	while read -r line ; do
+		[[ ! $line =~ Copyright ]] && continue
+		echo "${line:2}"
+		break
+	done < "$TOOLPATH"
+}
+
+#
+# die MSG
+#
+# Terminate with the specified error message and a non-zero exit code.
+#
+function die() {
+	local msg="$*"
+
+	echo "Error: $msg" >&2
+	exit 1
+}
+
+#
+# indent NUM
+#
+# Indent all data read from stdin by NUM spaces.
+#
+function indent() {
+	local num=$1 spaces
+
+	printf -v spaces "%*s" "$num" ""
+	sed -e "s/^/$spaces/g"
+}
+
+#
+# repeat STR NUM
+#
+# Print STR for NUM times.
+#
+function repeat() {
+	local str="$1" num="$2"
+
+	eval "printf '$str%.0s' {1..$num}"
+}
+
+# Trace file may be wrapped (4 5 6 1 2 3) - ensure ascending timestamp order
+function sort_file() {
+	local filename="$1"
+	local before=() after=() area t data t_start line
+
+	{
+		read -r area t_start data
+		after+=("$area $t_start $data")
+
+		while read -r area t data ; do
+			# Look for wrap in time sequence
+			if [[ "$t" < "$t_start" ]] ; then
+				before+=("$area $t $data")
+				break
+			fi
+			after+=("$area $t $data")
+		done
+
+		while read -r area t data ; do
+			before+=("$area $t $data")
+		done
+	} <"$filename"
+
+	if [[ ${#before[@]} -gt 0 ]] ; then
+		printf "%s\n" "${before[@]}"
+	fi
+
+	if [[ -n "$t_start" ]] ; then
+		printf "%s\n" "${after[@]}"
+	fi
+}
+
+function check_tracefile() {
+	local file="$1" area ts level ex cpu caller data
+
+	if [[ ! -e "$file" ]] ; then
+		die "Could not find trace data file $file"
+	fi
+
+	if [[ ! -r "$file" ]] ; then
+		die "Missing access permissions for $file"
+	fi
+
+	read -r area ts level ex cpu caller data <"$file"
+
+	if [[ -z "$area" ]] ; then
+		echo "No traces found in $file"
+		exit 0
+	fi
+
+	if [[ -z "$ts" ]] || [[ -z "$level" ]] || [[ -z "$ex" ]] ||
+	   [[ -z "$cpu" ]] || [[ -z "$caller" ]] || [[ -z "$data" ]] ; then
+		die "Unrecognized trace data format in $file"
+	fi
+}
+
+#
+# print_ascii HEX
+#
+# Convert ASCII bytes in hexadecimal notation to printable ASCII.
+#
+function print_ascii() {
+	local hex="$1" asc
+
+	printf -v asc '${ASCII:0x%s:1}' $hex
+	eval echo -n "$asc"
+}
+
+#
+# print_ebcdic HEX
+#
+# Convert EBCDIC bytes in hexadecimal notation to printable ASCII.
+#
+function print_ebcdic() {
+	local hex="$1" ebc
+
+	printf -v ebc '${EBCDIC:0x%s:1}' $hex
+	eval echo -n "$ebc"
+}
+
+#
+# hex_to_num HEX START LEN CONV VAR
+#
+# Convert hex bytes in HEX starting at position START with length LEN to
+# an integer. The result will be stored in VAR as hexadecimal number if CONV
+# is 0, decimal if CONV is 1.
+#
+function hex_to_num() {
+	local _hex="$1" _start="$2" _len="$3" _conv="$4" _var="$5" _value _fmt
+
+	# Remove spaces
+	_hex="${_hex// /}"
+
+	# Extract relevant hex digits as decimal number
+	(( _start*=2 ))
+	(( _len*=2 ))
+	_value="0x${_hex:$_start:$_len}"
+	(( _value=_value ))
+
+	# Store as requested output format
+	if [[ "$_conv" -eq 1 ]] ; then
+		_fmt="%d"
+	else
+		_fmt="0x%x"
+	fi
+
+	printf -v "$_var" "$_fmt" "$_value"
+}
+
+#
+# is_id TAG
+#
+# Return 0 if TAG is a known trace tag, non-zero otherwise.
+#
+function is_id() {
+	local tag="$1"
+
+	[[ -z "$tag" ]] && return 1
+	[[ "$tag" =~ [^A-Z0-9] ]] && return 1
+	[[ -n "${IDS[$tag]}" ]]
+}
+
+#
+# reqstatus NUM
+#
+# Convert the specified SCLP request status to a named representation.
+#
+function reqstatus() {
+	local num="$1" _var="$2" txt
+
+	[[ -n "$_var" ]] && _var="-v $_var"
+
+	txt="${REQSTATUS[$num]}"
+
+	eval "printf $_var '${txt:-Unknown} ($num)'"
+}
+
+#
+# cmdwname CMDW
+#
+# Convert the specified SCLP command word to a symbolic name.
+#
+function cmdwname() {
+	local _cmdw="$1" _var="$2" c
+
+	[[ -n "$_var" ]] && _var="-v $_var"
+	printf -v c "0x%08x" $(( _cmdw ))
+
+	if [[ -n "${CMDWS[$c]}" ]] ; then
+		if [[ $OPT_VERBOSE -eq 1 ]] ; then
+			_cmdw="${CMDWS[$c]} ($_cmdw)"
+		else
+			_cmdw="${CMDWS[$c]}"
+		fi
+	fi
+
+	eval "printf $_var \"$_cmdw\""
+}
+
+#
+# rcname RC
+#
+# Convert the specified return code to a symbolic name.
+#
+function rcname() {
+	local _rc="$1" _var="$2"
+
+	if [[ -n "${RC[$_rc]}" ]] ; then
+		if [[ $OPT_VERBOSE -eq 1 ]] ; then
+			_rc="${RC[$_rc]} ($_rc)"
+		else
+			_rc="${RC[$_rc]}"
+		fi
+	fi
+
+	printf -v "$_var" "$_rc"
+}
+
+#
+# respcol RESP
+#
+# Add color to the specified SCCB response code
+#
+function respcol() {
+	local _resp="$1" _var="$2" _c
+
+	_c=$(( _resp&0xff ))
+	if [[ $_c -ne 0x10 ]] && [[ $_c -ne 0x20 ]] && [[ $_c -ne 0 ]] ; then
+		_resp="$RED$_resp$RESET"
+	fi
+
+	printf -v "$_var" "$_resp"
+}
+
+#
+# lencol LEN
+#
+# Add color to the specified SCCB length
+#
+function lencol() {
+	local _len="$1" _var="$2"
+
+	if [[ $_len -lt 8 ]] ; then
+		_len="$RED$_len$RESET"
+	fi
+
+	printf -v "$_var" "$_len"
+}
+
+#
+# sccbcol SCCB
+#
+# Add color to the specified SCCB address
+#
+function sccbcol() {
+	local _sccb="$1" _var="$2"
+
+	if [[ $(( _sccb&0x7 )) -ne 0 ]] ; then
+		_sccb="$RED$_sccb$RESET"
+	fi
+
+	printf -v "$_var" "$_sccb"
+}
+
+#
+# bitlist NUM
+#
+# Print list of bit numbers set in the 64 bit word specified by NUM.
+#
+function bitlist() {
+	local num="$1" _var="$2" list="" i c="" w=64
+
+	i=1
+	while [[ $i -lt $w ]] ; do
+		if [[ $(( num&1<<(w-i) )) -ne 0 ]] ; then
+			list="$list$c$i"
+			c=','
+		fi
+		(( i++ ))
+	done
+
+	[[ -z "$list" ]] && list="-"
+
+	eval "$_var='$list'"
+}
+
+
+function read_symtab() {
+	local filename="$1" symtab=() i
+
+	echo "Reading symbol table from $OPT_SYMTAB"
+	readarray symtab <"$filename"
+
+	for i in "${symtab[@]}" ; do
+		set -- $i
+		(( i=0x$1 ))
+		SYMS[$i]="$3"
+	done
+
+	echo "Found ${#SYMS[@]} symbols"
+}
+
+#
+# get_sym ADDR
+#
+# Convert the specified kernel address to a symbolic name.
+#
+function get_sym() {
+	local _addr="$1" _var="$2" from to i
+
+	[[ -n "$_var" ]] && _var="-v $_var"
+
+	_addr=0x${_addr#0x}
+
+	if [[ $OPT_NOSYM -eq 1 ]] ; then
+		eval printf $_var "0x%x" $_addr
+		return
+	fi
+
+	from=$_addr
+	(( to=from-0x10000 ))
+	[[ $to -lt 1 ]] && to=1
+
+	i=$from
+	while [[ $i -ge $to ]] ; do
+		if [[ -z "${SYMS[$i]}" ]] ; then
+			(( i-- ))
+			continue
+		fi
+
+		if [[ $_addr -eq $i ]] ; then
+			eval printf $_var "${SYMS[$i]}"
+		else
+			eval printf $_var "%s+0x%x" "${SYMS[$i]}" $(( _addr-$i ))
+		fi
+		return
+	done
+
+	eval printf $_var "0x%x" $_addr
+}
+
+# Print hex data in alternating colors to help visual grouping
+function hex_color() {
+	local hex="$1" delim="$2" fields=($3) i byte currcol lastcol
+
+	lastcol=0
+	i=0
+	for byte in $hex ; do
+		currcol="${fields[$i]}"
+		[[ -z "$currcol" ]] && currcol=0
+
+		if [[ "$currcol" -ne "$lastcol" ]] ; then
+			echo -en "$RESET${FIELDCOLS[$currcol]}"
+		fi
+		echo -n "$byte$delim"
+
+		lastcol="$currcol"
+		(( i++ ))
+	done
+	echo -ne "$RESET"
+}
+
+function handle_buffer() {
+	local name="$1" fields="$2" hex=("${@:3}") offset=0 v size
+
+	[[ ${#hex[@]} -eq 0 ]] && return
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		for v in "${hex[@]}" ; do
+			hex_color "$v" "" "$fields"
+			echo -n "  "
+			print_ascii "$v"
+			echo -n "  "
+			print_ebcdic "$v"
+			echo
+			fields=""
+		done
+		return
+	fi
+
+	[[ -n "$name" ]] && printf "\n%s:\n" "$name"
+	hex_to_num "${hex[0]}" 0 2 1 size
+
+	printf "$BOLD%-4s  %-48s %-16s  %-16s$RESET\n" "OFF" "HEX" "ASCII" "EBCDIC"
+
+	for v in "${hex[@]}" ; do
+		printf "%04x: " "$offset"
+		hex_color "$v" " " "$fields"
+		echo -n " "
+		print_ascii "$v"
+		echo -n "  "
+		print_ebcdic "$v"
+		echo
+		fields=""
+
+		(( offset+=16 ))
+	done
+
+	if [[ -n "$size" ]] && [[ $offset -lt $size ]] ; then
+		(( size-=offset ))
+		echo "Truncated $size bytes"
+	fi
+}
+
+function short() {
+	set -- $*
+	echo -en "$BOLD$1$RESET"
+	printf " %s" "${@:2}"
+}
+
+function long() {
+	echo -e "$BOLD$*$RESET"
+}
+
+function handle_SRV1() {
+	local hex1="$1" hex2=("${@:2}") cmdw sccb len response
+
+	hex_to_num "$hex1" 4 4 0 cmdw
+	cmdwname "$cmdw" cmdw
+	hex_to_num "$hex1" 8 8 0 sccb
+	sccbcol "$sccb" sccb
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "SERVC cmd=$cmdw sccb=$sccb"
+		echo
+		handle_buffer "SCCB contents" "$SCCBFIELDS" "${hex2[@]}" |
+			indent 4
+		return
+	fi
+
+	hex_to_num "${hex2[0]}" 0 2 1 len
+	lencol "$len" len
+	hex_to_num "${hex2[0]}" 6 2 0 response
+	respcol "$response" response
+
+	long "Service call about to be issued"
+	echo "  SCLP command ....: $cmdw"
+	echo -e "  SCCB address ....: $sccb"
+	echo -e "  SCCB length .....: $len"
+	echo -e "  SCCB response ...: $response"
+
+	handle_buffer "SCCB contents" "$SCCBFIELDS" "${hex2[@]}" | indent 2
+}
+
+function handle_SRV2() {
+	local hex="$1" rc seq
+
+	hex_to_num "$hex" 4 4 1 rc
+	rcname "$rc" rc
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "SERVC rc=$rc"
+		echo
+		return
+	fi
+
+	hex_to_num "$hex" 8 8 1 seq
+
+	long "Service call completed"
+	echo -e "  Result code ...........: $rc"
+	echo "  SRVC sequence number ..: $seq"
+}
+
+function handle_INT() {
+	local hex1="$1" hex2=("${@:2}") parm32 pending sccb cmdw len response
+
+	hex_to_num "$hex1" 4 4 1 parm32
+	(( pending=parm32 & 0x3 ))
+	(( sccb=parm32 & 0xfffffff8 ))
+	printf -v sccb "0x%x" "$sccb"
+	sccbcol "$sccb" sccb
+	hex_to_num "$hex1" 12 4 0 cmdw
+	cmdwname "$cmdw" cmdw
+	hex_to_num "${hex2[0]}" 6 2 0 response
+	respcol "$response" response
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "INT pend=$pending sccb=$sccb resp=$response"
+		echo
+		handle_buffer "SCCB contents" "$SCCBFIELDS" "${hex2[@]}" |
+			indent 4
+		return
+	fi
+
+	hex_to_num "${hex2[0]}" 0 2 1 len
+	lencol "$len" len
+
+	long "Interrupt received"
+	echo "  Event pending indicator ..: $pending"
+	echo "  Active command ...........: $cmdw"
+	echo -e "  SCCB address .............: $sccb"
+	echo -e "  SCCB length ..............: $len"
+	echo -e "  SCCB response ............: $response"
+
+	handle_buffer "SCCB contents" "$SCCBFIELDS" "${hex2[@]}" | indent 2
+}
+
+function handle_UNEX() {
+	local hex="$1" sccb
+
+	hex_to_num "$hex" 4 4 0 sccb
+	sccbcol "$sccb" sccb
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "${RESET}${RED}UNEXPECTED${RESET} sccb=$sccb"
+		echo
+		return
+	fi
+
+	long "${RESET}${RED}Unexpected SCCB completion${RESET}"
+	echo "  SCCB address ...: $sccb"
+}
+
+function handle_req() {
+	local hex="$1"
+	local sccb status response timeout start_count
+
+	hex_to_num "$hex" 4 4 0 sccb
+	sccbcol "$sccb" sccb
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		echo -n "sccb=$sccb"
+		return
+	fi
+
+	hex_to_num "$hex" 8 2 1 status
+	reqstatus "$status" status
+	hex_to_num "$hex" 10 2 0 response
+	respcol "$response" response
+	hex_to_num "$hex" 12 2 1 timeout
+	hex_to_num "$hex" 14 2 1 start_count
+
+	echo -e "Request status ........: $status"
+	echo "Request timeout .......: $timeout"
+	echo "Request start count ...: $start_count"
+	echo -e "SCCB address ..........: $sccb"
+	echo -e "SCCB response .........: $response"
+}
+
+function handle_RQAD() {
+	local hex="$1" sccb caller
+
+	hex_to_num "$hex" 4 4 0 sccb
+	sccbcol "$sccb" sccb
+	hex_to_num "$hex" 8 8 0 caller
+	get_sym "$caller" caller
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "RQADD caller=$caller"
+		echo
+		return
+	fi
+
+	long "Request is added"
+	echo -e "  SCCB address...........: $sccb"
+	echo "  Caller ................: $caller"
+}
+
+function handle_RQOK() {
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "RQOK "
+		handle_req "$1"
+		echo
+		return
+	fi
+
+	long "Request completed successfully"
+
+	handle_req "$1" | indent 2
+}
+
+function handle_RQAB() {
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "${RESET}${RED}RQABORT${RESET} "
+		handle_req "$1"
+		echo
+		return
+	fi
+
+	long "${RESET}${RED}Request was aborted${RESET}"
+
+	handle_req "$1" | indent 2
+}
+
+function handle_RQTM() {
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "${RESET}${RED}RQTIMEOUT${RESET} "
+		handle_req "$1"
+		echo
+		return
+	fi
+
+	long "${RESET}${RED}Request timed out${RESET}"
+
+	handle_req "$1" | indent 2
+}
+
+function handle_EVNT() {
+	local hex="$1" hex2=("${@:2}") cb len type
+
+	hex_to_num "$hex" 8 8 0 cb
+	get_sym "$cb" cb
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "EVENT callback=$cb"
+		echo
+		handle_buffer "Event buffer contents" "$EVNTFIELDS" \
+			"${hex2[@]}" | indent 4
+		return
+	fi
+
+	hex_to_num "${hex2[0]}" 0 2 1 len
+	hex_to_num "${hex2[0]}" 2 1 1 type
+
+	long "Dispatching event buffer"
+	echo "  Receiving callback ......: $cb"
+	echo "  Event buffer length .....: $len"
+	echo "  Event type ..............: $type"
+
+	handle_buffer "Event buffer contents" "$EVNTFIELDS" "${hex2[@]}" |
+		indent 2
+}
+
+function handle_STCG() {
+	local hex="$1" cb
+
+	hex_to_num "$hex" 8 8 0 cb
+	get_sym $cb cb
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "STATECHANGE callback=$cb"
+		echo
+		return
+	fi
+
+	long "Dispatching state change"
+	echo "  Receiving callback ...: $cb"
+}
+
+function handle_register() {
+	local hex="$1" receive send
+
+	hex_to_num "$hex" 0 8 0 receive
+	bitlist "$receive" receive
+	hex_to_num "$hex" 8 8 0 send
+	bitlist "$send" send
+
+	echo "Receive mask ...: $receive"
+	echo "Send mask ......: $send"
+}
+
+function handle_REG() {
+	local hex1="$1" hex2="$2" retip
+
+	hex_to_num "$hex1" 8 8 0 retip
+	get_sym "$retip" retip
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "LISTENERADD caller=$retip"
+		echo
+		return
+	fi
+
+	long "Register event listener"
+	echo "  Caller .........: $retip"
+
+	handle_register "$hex2" | indent 2
+}
+
+function handle_UREG() {
+	local hex1="$1" hex2="$2" retip
+
+	hex_to_num "$hex1" 8 8 0 retip
+	get_sym "$retip" retip
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "LISTENERDEL caller=$retip"
+		echo
+		return
+	fi
+
+	long "Unregister event listener"
+	echo "  Caller .........: $retip"
+
+	handle_register "$hex2" | indent 2
+}
+
+function handle_TMO() {
+	local hex="$1" force
+
+	hex_to_num "$hex" 4 4 1 force
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "${RESET}${RED}TIMEOUT${RESET} force=$force"
+		echo
+		return
+	fi
+
+	long "${RESET}${RED}Timeout occurred${RESET}"
+	echo "  Force restart ..: $force"
+}
+
+function handle_SYN1() {
+	local hex="$1" state seq c cr
+
+	hex_to_num "$hex" 4 4 1 state
+	hex_to_num "$hex" 8 8 1 seq
+
+	if [[ $state -eq 0 ]] ; then
+		# Sync wait despite running state=idle
+		c="${RESET}${RED}"
+		cr="${RESET}"
+	fi
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "${c}SYNCWAIT_START${cr}"
+		echo
+		return
+	fi
+
+	long "Synchronous wait start"
+	echo -e "  SCLP running state ...... ...: ${c}$state${cr}"
+	echo "  Sync wait sequence number ...: $seq"
+}
+
+function handle_SYN2() {
+	local hex="$1" state c cr
+
+	hex_to_num "$hex" 4 4 1 state
+	hex_to_num "$hex" 8 8 1 seq
+
+	if [[ $state -eq 1 ]] ; then
+		# Sync wait exit despite running state=running
+		c="${RESET}${RED}"
+		cr="${RESET}"
+	fi
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "${c}SYNCWAIT_END${cr}"
+		echo
+		return
+	fi
+
+	long "Synchronous wait end"
+	echo -e "  SCLP running state ...... ...: ${c}$state${cr}"
+	echo "  Sync wait sequence number ...: $seq"
+}
+
+#
+# handle_unknown LINES
+#
+# Handle unrecognized trace data.
+#
+function handle_unknown() {
+	local hex=("$@")
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		short "INCOMPLETE_ENTRY"
+		echo
+		handle_buffer "" "" "${hex[@]}" | indent 4
+	else
+		long "Incomplete trace entry"
+		handle_buffer "Raw data" "" "${hex[@]}" | indent 2
+	fi
+}
+
+#
+# print_ts
+#
+# Convert timestamp to date format, assuming local timezone.
+#
+function print_ts() {
+	local ts="$1" s ns
+
+	s=${ts%:*}
+	ns=${ts#*:}
+	echo -n "$(date '+%Y-%m-%d %H:%M:%S' -d @"$s").$ns"
+}
+
+#
+# print_ts_diff NOW LAST
+#
+# Print delta between timestamps NOW and LAST.
+#
+function print_ts_diff() {
+	local now="$1" last="$2" _var="$3"
+	local now_s now_us last_s last_us dist_s dist_us
+
+	[[ -z "$last" ]] && return
+	[[ -n "$_var" ]] && _var="-v $_var"
+
+	now_s=${now%:*}
+	now_us=${now#*:}
+	last_s=${last%:*}
+	last_us=${last#*:}
+
+	now_s=$(( 10#$now_s ))
+	now_us=$(( 10#$now_us ))
+	last_s=$(( 10#$last_s ))
+	last_us=$(( 10#$last_us ))
+
+	(( dist_us=now_us-last_us ))
+	(( dist_s=now_s-last_s ))
+	if [[ $dist_us -lt 0 ]] ; then
+		(( dist_us+=1000000 ))
+		(( dist_s--))
+	fi
+
+	if [[ $dist_s -gt 3599 ]] ; then
+		eval printf $_var "+%dh%dm" "$((dist_s/3600 ))" "$(( (dist_s%3600)/60 ))"
+	elif [[ $dist_s -gt 59 ]] ; then
+		eval printf $_var "+%dm%ds" "$((dist_s/60 ))" "$(( dist_s%60 ))"
+	elif [[ $dist_s -gt 0 ]] ; then
+		eval printf $_var "+%d.%ds" $dist_s "$(( dist_us/100000 ))"
+	elif [[ $dist_us -gt 1000 ]] ; then
+		eval printf $_var "+%dms" "$(( dist_us/1000 ))"
+	else
+		eval printf $_var "+%dus" $dist_us
+	fi
+}
+
+function header() {
+	local ts="$1" cpu="$2" caller="$3" ts2 tsdiff=""
+
+	cpu=$(( 10#$cpu ))
+
+	if [[ $OPT_VERBOSE -eq 0 ]] ; then
+		echo -ne "$YELLOW"
+		ts2=${ts//:/.}
+		print_ts_diff "$ts" "$LAST_TS" tsdiff
+		printf "%03d %-18s (%7s)" "$cpu" "$ts2" "$tsdiff"
+		echo -ne ": $RESET"
+	else
+		echo -ne "${YELLOW}CPU $cpu at "
+		print_ts "$ts"
+		if [[ -n "$LAST_TS" ]] ; then
+			printf " ("
+			print_ts_diff "$ts" "$LAST_TS"
+			printf ")"
+		fi
+		get_sym "$caller" caller
+		echo -e " at $caller$RESET"
+		echo -ne "$YELLOW"
+		repeat "=" 78
+		echo -e "$RESET"
+	fi
+	LAST_TS="$ts"
+}
+
+function handle_lines() {
+	local id="$1" fn
+
+	shift
+	[[ $# -eq 0 ]] && return
+
+	if [[ -z "$id" ]] ; then
+		fn="handle_unknown"
+	else
+		fn="${IDS[$id]}"
+	fi
+
+	"$fn" "$@"
+
+	[[ $OPT_VERBOSE -eq 1 ]] && echo
+}
+
+# Read trace file in s390dbf hex_ascii format and convert to readable format
+function process() {
+	local area ts level ex cpu caller data hex ascii id
+	local active_id lines=() once=0
+
+	while read -r area ts level ex cpu caller data ; do
+		hex="${data%% |*}"
+		ascii="${data#*| }"
+
+		id=${ascii:0:4}
+		id=${id%%.*}
+
+		if [[ "$once" != 1 ]] ; then
+			echo -n "  Start time ...: "
+			print_ts "$ts"
+			printf "\n\n"
+			if [[ $OPT_VERBOSE -eq 0 ]] ; then
+				echo -en "$BOLD"
+				printf "%3s %18s (%7s): %s" \
+					"CPU" "TIME" "DELTA" "TRACE ENTRY"
+				echo -e "$RESET"
+			fi
+			once=1
+		fi
+
+		if ! is_id "$id" ; then
+			if [[ -z "$active_id" ]] &&
+			   [[ "${#lines[@]}" -eq 0 ]]; then
+				header "$ts" "$cpu" "$caller"
+			fi
+
+			# Add to data for active ID
+			lines+=("$hex")
+
+			continue
+		fi
+
+		# Handle previous data
+		handle_lines "$active_id" "${lines[@]}"
+
+		active_id="$id"
+		header "$ts" "$cpu" "$caller"
+		lines=("$hex")
+	done
+
+	# Handle final data
+	handle_lines "$active_id" "${lines[@]}"
+}
+
+
+#
+# Main
+#
+
+declare -a SYMS
+declare TRACEFILE TRACEBASE TRACELEVEL TRACEPAGES LAST_TS SHORTOPTS LONGOPTS
+declare OPT_VERBOSE OPT_SYMTAB OPT_NOSYM OPT_RAW OPTS
+
+TRACEBASE="$DEBUGFS/s390dbf/sclp"
+TRACENAME="default log"
+SHORTOPTS="vhs:fl:SePp:r"
+LONGOPTS="help,version,verbose,symtab:,no-symtab,raw,flush,level:,pages:,no-pager,errlog"
+
+# Parse parameters
+OPTS=$(getopt -o "$SHORTOPTS" -l "$LONGOPTS" -n "Usage error" -- "$@") || exit 1
+
+eval set -- $OPTS
+
+OPT_VERBOSE=0
+OPT_SYMTAB="/proc/kallsyms"
+OPT_NOSYM=0
+OPT_RAW=0
+OPT_NOTRACE=0
+
+while [[ "$1" != "--" ]] ; do
+	case "$1" in
+	-h|--help)
+		print_help
+		exit 0
+		;;
+	--version)
+		print_version
+		exit 0
+		;;
+	-v|--verbose)
+		OPT_VERBOSE=1
+		;;
+	-s|--symtab)
+		[[ ! -e "$2" ]] && die "Cannot access symbol table file $2"
+		OPT_SYMTAB="$2"
+		shift
+		;;
+	-S|--no-symtab)
+		OPT_NOSYM=1
+		;;
+	-r|--raw)
+		OPT_RAW=1
+		;;
+	-f|--flush)
+		echo "Flushing trace buffers for $TRACENAME"
+		if ! echo - > "$TRACEBASE/flush" ; then
+			die "Cannot flush trace buffer"
+		fi
+		OPT_NOTRACE=1
+		;;
+	-l|--level)
+		shift
+		echo "Setting trace level for $TRACENAME to $1"
+		if ! echo "$1" > "$TRACEBASE/level" ; then
+			die "Cannot set trace level"
+		fi
+		OPT_NOTRACE=1
+		;;
+	-p|--pages)
+		shift
+		echo "Setting trace size for $TRACENAME to $1 pages ($(($1*4))kb)"
+		if ! echo "$1" > "$TRACEBASE/pages" ; then
+			die "Cannot set trace size"
+		fi
+		OPT_NOTRACE=1
+		;;
+	-P|--no-pager)
+		PAGER="cat"
+		;;
+	-e|--errlog)
+		TRACEBASE="$DEBUGFS/s390dbf/sclp_err"
+		TRACENAME="error log"
+		echo "Switching to $TRACENAME"
+		;;
+	esac
+	shift
+done
+shift
+
+if [[ $OPT_NOTRACE -eq 1 ]] ; then
+	echo "Done"
+	exit 0
+fi
+
+if [[ $# -gt 0 ]] ; then
+	TRACEFILE="$(readlink -f "$1")"
+	[[ ! -e "$TRACEFILE" ]] && die "Cannot access $TRACEFILE: File not found"
+else
+	TRACEFILE="$TRACEBASE/hex_ascii"
+	[[ ! -d "$DEBUGFS" ]] && die "Cannot access $DEBUGFS: Directory not found"
+	[[ ! -x "$DEBUGFS" ]] && die "Cannot read $DEBUGFS: Permission denied"
+	[[ ! -d "$TRACEBASE" ]] && die "Kernel is missing required support"
+	read TRACELEVEL <"$TRACEBASE/level"
+	read TRACEPAGES <"$TRACEBASE/pages"
+fi
+
+check_tracefile "$TRACEFILE"
+
+if [[ $OPT_RAW -eq 1 ]] ; then
+	sort_file "$TRACEFILE" | $PAGER
+	exit 0
+fi
+
+if [[ $OPT_NOSYM -eq 0 ]] ; then
+	read_symtab "$OPT_SYMTAB"
+fi
+
+{
+	echo "Trace data:"
+	echo "  Source .......: $TRACEFILE"
+	[[ -n "$TRACELEVEL" ]] && echo "  Level ........: $TRACELEVEL"
+	[[ -n "$TRACEPAGES" ]] &&
+		echo "  Size .........: $TRACEPAGES pages ($((4*TRACEPAGES))kb)"
+	process  < <(sort_file "$TRACEFILE")
+} | $PAGER
+
+exit 0

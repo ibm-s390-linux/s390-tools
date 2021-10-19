@@ -14,16 +14,20 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "lib/util_arch.h"
 
 #include "error.h"
 #include "job.h"
 #include "misc.h"
 #include "scan.h"
 #include "zipl.h"
+#include "envblk.h"
 
 /* Command line options */
 static struct option options[] = {
@@ -35,6 +39,7 @@ static struct option options[] = {
 	{ "targetgeometry",     required_argument,      NULL, 0xac},
 	{ "targetblocksize",    required_argument,      NULL, 0xad},
 	{ "targetoffset",       required_argument,      NULL, 0xae},
+	{ "environment",        required_argument,      NULL, 0xaf},
 	{ "image", 		required_argument,	NULL, 'i'},
 	{ "ramdisk",		required_argument,	NULL, 'r'},
 	{ "parmfile",		required_argument,	NULL, 'p'},
@@ -71,6 +76,7 @@ static const char *zipl_conf[] = {
 struct command_line {
 	char* data[SCAN_KEYWORD_NUM];
 	char* config;
+	char *envblk_import_hint;
 	char *blsdir;
 	char* menu;
 	char* section;
@@ -84,7 +90,6 @@ struct command_line {
 	int is_secure;
 	enum scan_section_type type;
 };
-
 
 static int
 store_option(struct command_line* cmdline, enum scan_keyword_id keyword,
@@ -208,6 +213,13 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 			is_keyword = 1;
 			rc = store_option(&cmdline, scan_keyword_targetoffset,
 					  optarg);
+			break;
+		case 0xaf:
+			if (cmdline.envblk_import_hint != NULL) {
+				error_reason("Option 'environment' specified more than once");
+				rc = -1;
+			} else
+				cmdline.envblk_import_hint = optarg;
 			break;
 		case 'T':
 			is_keyword = 1;
@@ -350,6 +362,12 @@ free_target_data(struct job_target_data* data)
 }
 
 static void
+free_envblk_data(struct job_envblk_data *data)
+{
+	free(data->buf);
+}
+
+static void
 free_ipl_data(struct job_ipl_data* data)
 {
 	if (data->image != NULL)
@@ -442,6 +460,7 @@ job_free(struct job_data* job)
 	if (job->target.bootmap_dir != NULL)
 		free(job->target.bootmap_dir);
 	free_target_data(&job->target);
+	free_envblk_data(&job->envblk);
 	if (job->name != NULL)
 		free(job->name);
 	switch (job->id) {
@@ -478,7 +497,7 @@ struct component_loc {
 };
 
 static int
-set_cl_element(struct component_loc *cl, char *name, char *filename,
+set_cl_element(struct component_loc *cl, char *name, const char *filename,
 	       address_t *addrp, size_t size, off_t off, off_t align)
 {
 	struct stat stats;
@@ -526,17 +545,16 @@ sort_cl_array(struct component_loc* cl, int elements)
 		}
 	}
 }
-
 static int
 get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
-		   int *nump)
+		   int *nump, struct job_envblk_data *envblk)
 {
 	struct component_loc *cl;
 	int num;
 	int rc;
 
-	/* Get memory for image, parmline, ramdisk */
-	cl = misc_calloc(3, sizeof(struct component_loc));
+	/* Get memory for image, parmline, ramdisk and environment block */
+	cl = misc_calloc(4, sizeof(struct component_loc));
 	if (cl == NULL)
 		return -1;
 	/* Fill in component data */
@@ -559,6 +577,12 @@ get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
 		if (rc)
 			goto error;
 	}
+	rc = set_cl_element(&cl[num++], "environment block",
+			    NULL,
+			    &ipl->envblk_addr, envblk->size, 0,
+			    MAXIMUM_PHYSICAL_BLOCKSIZE);
+	if (rc)
+		goto error;
 
 	*clp = cl;
 	*nump = num;
@@ -751,15 +775,17 @@ finalize_component_address_data(struct component_loc *cl, int num,
 
 
 static int
-finalize_ipl_address_data(struct job_ipl_data* ipl, char *name)
+finalize_ipl_address_data(struct job_ipl_data *ipl, char *name,
+			  struct job_envblk_data *envblk)
 {
 	unsigned long address_limit;
 	struct component_loc *cl;
 	int num;
 	int rc;
 
-	address_limit = ipl->is_kdump ? ADDRESS_LIMIT_KDUMP : ADDRESS_LIMIT;
-	rc = get_ipl_components(ipl, &cl, &num);
+	address_limit = ipl->is_kdump ?
+		MIN(util_arch_hsa_maxsize(), ADDRESS_LIMIT) : ADDRESS_LIMIT;
+	rc = get_ipl_components(ipl, &cl, &num, envblk);
 	if (rc)
 		return rc;
 	sort_cl_array(cl, num);
@@ -825,7 +851,8 @@ out_free:
 
 
 static int
-check_job_ipl_data(struct job_ipl_data *ipl, char* name)
+check_job_ipl_data(struct job_ipl_data *ipl, char *name,
+		   struct job_envblk_data *envblk)
 {
 	int rc;
 
@@ -853,7 +880,7 @@ check_job_ipl_data(struct job_ipl_data *ipl, char* name)
 			return rc;
 		}
 	}
-	return finalize_ipl_address_data(ipl, name);
+	return finalize_ipl_address_data(ipl, name, envblk);
 }
 
 
@@ -932,7 +959,7 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 
 
 static int
-check_job_menu_data(struct job_menu_data* menu)
+check_job_menu_data(struct job_menu_data *menu, struct job_envblk_data *envblk)
 {
 	int rc;
 	int i;
@@ -941,7 +968,8 @@ check_job_menu_data(struct job_menu_data* menu)
 		switch (menu->entry[i].id) {
 		case job_ipl:
 			rc = check_job_ipl_data(&menu->entry[i].data.ipl,
-						menu->entry[i].name);
+						menu->entry[i].name,
+						envblk);
 			if (rc)
 				return rc;
 			break;
@@ -1107,10 +1135,11 @@ check_job_data(struct job_data* job)
 		rc = 0;
 		break;
 	case job_ipl:
-		rc = check_job_ipl_data(&job->data.ipl, job->name);
+		rc = check_job_ipl_data(&job->data.ipl, job->name,
+					&job->envblk);
 		break;
 	case job_menu:
-		rc = check_job_menu_data(&job->data.menu);
+		rc = check_job_menu_data(&job->data.menu, &job->envblk);
 		break;
 	case job_segment:
 		rc = check_job_segment_data(&job->data.segment, job->name);
@@ -1369,6 +1398,9 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 				  &job->data.ipl.parm_addr, section);
 		if (rc)
 			return rc;
+		/* Fill in environment block */
+		job->data.ipl.envblk_addr = UNSPECIFIED_ADDRESS;
+
 		/* Fill in name and address of ramdisk file */
 		if (data[(int) scan_keyword_ramdisk] != NULL) {
 			job->data.ipl.ramdisk =
@@ -1895,6 +1927,45 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	return rc;
 }
 
+static int get_job_envblk_data(struct job_data *job, char *import_hint)
+{
+	struct job_envblk_data *data = &job->envblk;
+	int fd;
+
+	switch (job->id) {
+	case job_ipl:
+	case job_menu:
+		break;
+	default:
+		return 0;
+	}
+	fd = open(job->target.bootmap_dir, O_RDONLY);
+	if (fd < 0) {
+		error_reason(strerror(errno));
+		error_text("Could not open bootmap dir");
+		return -1;
+	}
+	if (envblk_size_get(fd, &data->size)) {
+		close(fd);
+		error_text("Could not get environment block size");
+		return -1;
+	}
+	close(fd);
+	data->buf = misc_malloc(data->size);
+	if (data->buf == NULL) {
+		error_text("Could not allocate environment block");
+		return -1;
+	}
+	envblk_create_blank(data->buf, data->size);
+
+	if (envblk_import(import_hint ?: ENVBLK_DEFAULT_IMPORT_SOURCE,
+			  data->buf, data->size)) {
+		free(data->buf);
+		data->buf = NULL;
+		return -1;
+	}
+	return 0;
+}
 
 int
 job_get(int argc, char* argv[], struct job_data** data)
@@ -1917,6 +1988,9 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
 	job->is_secure =  SECURE_BOOT_UNDEFINED;
+	if (job->verbose)
+		printf("Looking for components in '%s'\n", util_libdir());
+
 	/* Get job data from user input */
 	if (cmdline.help) {
 		job->command_line = 1;
@@ -1940,6 +2014,11 @@ job_get(int argc, char* argv[], struct job_data** data)
 	else if (job->id != job_menu && job->is_secure == SECURE_BOOT_UNDEFINED)
 		job->is_secure = SECURE_BOOT_AUTO;
 
+	rc = get_job_envblk_data(job, cmdline.envblk_import_hint);
+	if (rc) {
+		job_free(job);
+		return -1;
+	}
 	/* Check job data for validity */
 	rc = check_job_data(job);
 	if (rc) {

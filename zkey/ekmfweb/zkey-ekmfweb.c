@@ -21,6 +21,7 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 #include <openssl/pem.h>
+#include <openssl/opensslv.h>
 
 #include "lib/zt_common.h"
 #include "lib/util_libc.h"
@@ -36,14 +37,21 @@
 #include "../pkey.h"
 #include "../properties.h"
 
-#define pr_verbose(handle, fmt...)				\
-	do {							\
-		if (handle->verbose) {				\
-			fprintf(stderr, "zkey-ekmfweb: ");	\
-			fprintf(stderr, fmt);			\
-			fprintf(stderr, "\n");			\
-		}						\
-	} while (0)
+#ifndef OPENSSL_VERSION_PREREQ
+	#if defined(OPENSSL_VERSION_MAJOR) && defined(OPENSSL_VERSION_MINOR)
+		#define OPENSSL_VERSION_PREREQ(maj, min)		\
+			((OPENSSL_VERSION_MAJOR << 16) +		\
+			OPENSSL_VERSION_MINOR >= ((maj) << 16) + (min))
+	#else
+		#define OPENSSL_VERSION_PREREQ(maj, min)		\
+			(OPENSSL_VERSION_NUMBER >= (((maj) << 28) |	\
+			((min) << 20)))
+	#endif
+#endif
+
+#if OPENSSL_VERSION_PREREQ(3, 0)
+#include <openssl/core_names.h>
+#endif
 
 #define FREE_AND_SET_NULL(ptr)					\
 	do {							\
@@ -52,30 +60,7 @@
 		(ptr) = NULL;					\
 	} while (0)
 
-/**
- * Clears the error message in the plugin handle
- *
- * @param ph                the plugin handle
- */
-static void _clear_error(struct plugin_handle *ph)
-{
-	memset(ph->error_msg, 0, sizeof(ph->error_msg));
-}
-
-/**
- * Sets the error message in the plugin handle
- *
- * @param ph                the plugin handle
- * @param fmt               the format string for sprintf
- */
-static void _set_error(struct plugin_handle *ph, const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	vsnprintf(ph->error_msg, sizeof(ph->error_msg), fmt, ap);
-	va_end(ap);
-}
+#define _set_error(ph, fmt...)	plugin_set_error(&(ph)->pd, fmt)
 
 /**
  * Informs a KMS plugin that it is bound to a zkey repository.
@@ -90,133 +75,6 @@ static void _set_error(struct plugin_handle *ph, const char *fmt, ...)
 int kms_bind(const char *UNUSED(config_path))
 {
 	return 0;
-}
-
-/**
- * Load the EKMFWeb plugin config file
- *
- * @param ph                the plugin handle
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _load_config(struct plugin_handle *ph)
-{
-	char *file_name = NULL;
-	int rc;
-
-	util_asprintf(&file_name, "%s/%s", ph->config_path,
-		      EKMFWEB_CONFIG_FILE);
-
-	rc = properties_load(ph->properties, file_name, true);
-	if (rc != 0)
-		pr_verbose(ph, "Failed to load plugin config file '%s': %s",
-			   file_name, strerror(-rc));
-	else
-		pr_verbose(ph, "Config file '%s' loaded", file_name);
-
-	free(file_name);
-	return rc;
-}
-
-/**
- * Sets the file permissions of the file to the permissions and the group
- * of configuration directory
- *
- * @param ph                the plugin handle
- * @param filename           the name of the file to set permissions for
- *
- * @returns 0 on success, or a negative errno value on failure
- */
-static int _set_file_permission(struct plugin_handle *ph, const char *filename)
-{
-	int rc;
-
-	if (chmod(filename, ph->config_path_mode) != 0) {
-		rc = -errno;
-		_set_error(ph, "chmod failed on file '%s': %s", filename,
-			   strerror(-rc));
-		return rc;
-	}
-
-	if (chown(filename, geteuid(), ph->config_path_owner) != 0) {
-		rc = -errno;
-		_set_error(ph, "chown failed on file '%s': %s", filename,
-			   strerror(-rc));
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Makes a temporary file an active file, by first removing the current active
- * file (if existent), and then renaming the temporary file to the active file.
- * The active file permissions are also set to the permissions and the group of
- * configuration directory.
- *
- * @param ph                the plugin handle
- * @param temp_file         the name of the temporary file
- * @param active_file       the name of the active file
- *
- * @returns 0 on success, or a negative errno value on failure
- */
-static int _activate_temp_file(struct plugin_handle *ph, const char *temp_file,
-			       const char *active_file)
-{
-	int rc;
-
-	if (util_path_exists(active_file)) {
-		rc = remove(active_file);
-		if (rc != 0) {
-			rc = -errno;
-			_set_error(ph, "remove failed on file '%s': %s",
-				   active_file, strerror(-rc));
-			return rc;
-		}
-	}
-
-	rc = rename(temp_file, active_file);
-	if (rc != 0) {
-		rc = -errno;
-		_set_error(ph, "rename failed on file '%s': %s",
-			   temp_file, strerror(-rc));
-		return rc;
-	}
-
-	return _set_file_permission(ph, active_file);
-}
-
-/**
- * Save the EKMFWeb plugin config file
- *
- * @param ph                the plugin handle
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _save_config(struct plugin_handle *ph)
-{
-	char *file_name = NULL;
-	int rc;
-
-	util_asprintf(&file_name, "%s/%s", ph->config_path,
-		      EKMFWEB_CONFIG_FILE);
-
-	pr_verbose(ph, "Saving '%s'", file_name);
-
-	rc = properties_save(ph->properties, file_name, true);
-	if (rc != 0) {
-		_set_error(ph, "Failed to save plugin config file '%s': %s",
-			   file_name, strerror(-rc));
-		goto out;
-	}
-
-	rc = _set_file_permission(ph, file_name);
-	if (rc != 0)
-		goto out;
-
-out:
-	free(file_name);
-	return rc;
 }
 
 /**
@@ -284,67 +142,6 @@ static char *_decode_passphrase(const char *passphrase)
 }
 
 /**
- * Sets or removes a property. If value is NULL it is removed, otherwise it
- * is set.
- *
- * @param ph                the plugin handle
- * @param name              the name of the property
- * @param value             the value of the property or NULL
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _set_or_remove_property(struct plugin_handle *ph, const char *name,
-				   const char *value)
-{
-	int rc = 0;
-
-	if (value != NULL) {
-		rc = properties_set(ph->properties, name, value);
-		if (rc != 0) {
-			_set_error(ph, "Failed to set property '%s': %s", name,
-				   strerror(-rc));
-			goto out;
-		}
-	} else {
-		rc = properties_remove(ph->properties, name);
-		if (rc != 0 && rc != -ENOENT) {
-			_set_error(ph, "Failed to remove property '%s': %s",
-				   name, strerror(-rc));
-			goto out;
-		}
-		rc = 0;
-	}
-
-out:
-	return rc;
-}
-
-/**
- * Checks if a plugin config propertiy is set and not empty
- *
- * @param ph                the plugin handle
- * @param name              the name of the property
- *
- * @returns true if the property is set and is not empty, false otherwise
- */
-static bool _check_property(struct plugin_handle *ph, const char *name)
-{
-	bool ok = true;
-	char *value;
-
-	value = properties_get(ph->properties, name);
-	pr_verbose(ph, "Property '%s': %s", name,
-		   value != NULL ? value : "(missing)");
-
-	ok &= (value != NULL && strlen(value) > 0);
-
-	if (value != NULL)
-		free(value);
-
-	return ok;
-}
-
-/**
  * Checks if the plugin configuration is complete. Sets the appropriate flags
  * in the plugin handle
  *
@@ -352,38 +149,53 @@ static bool _check_property(struct plugin_handle *ph, const char *name)
  */
 static void _check_config_complete(struct plugin_handle *ph)
 {
-	ph->apqns_configured = _check_property(ph, EKMFWEB_CONFIG_APQNS);
+	ph->apqns_configured =
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_APQNS);
 
 	ph->connection_configured =
-		_check_property(ph, EKMFWEB_CONFIG_URL) &&
-		_check_property(ph, EKMFWEB_CONFIG_VERIFY_SERVER_CERT) &&
-		_check_property(ph, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_URL) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_VERIFY_SERVER_CERT) &&
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
 
 	ph->settings_retrieved =
-		_check_property(ph, EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
 
 	ph->templates_retrieved =
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS1) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS2) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS1_LABEL) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS2_LABEL) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS_LABEL) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY_LABEL) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS1_ID) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_XTS2_ID) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID) &&
-		_check_property(ph, EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_TEMPLATE_XTS1) &&
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_TEMPLATE_XTS2) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_NONXTS) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_IDENTITY) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_XTS1_LABEL) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_XTS2_LABEL) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_NONXTS_LABEL) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_IDENTITY_LABEL) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_XTS1_ID) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_XTS2_ID) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_NONXTS_ID) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
 
 	ph->identity_key_generated =
-		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY) &&
-		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM) &&
-		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_IDENTITY_KEY) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM) &&
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
 
 	ph->registered =
-		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL) &&
-		_check_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ID);
+		plugin_check_property(&ph->pd,
+				      EKMFWEB_CONFIG_IDENTITY_KEY_LABEL) &&
+		plugin_check_property(&ph->pd, EKMFWEB_CONFIG_IDENTITY_KEY_ID);
 
 	ph->config_complete = ph->apqns_configured &&
 			      ph->connection_configured &&
@@ -404,19 +216,19 @@ static int _get_ekmf_config(struct plugin_handle *ph)
 {
 	char *tmp;
 
-	ph->ekmf_config.identity_secure_key = properties_get(ph->properties,
+	ph->ekmf_config.identity_secure_key = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_IDENTITY_KEY);
 
-	ph->ekmf_config.base_url = properties_get(ph->properties,
+	ph->ekmf_config.base_url = properties_get(ph->pd.properties,
 						  EKMFWEB_CONFIG_URL);
-	ph->ekmf_config.tls_ca = properties_get(ph->properties,
+	ph->ekmf_config.tls_ca = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_CA_BUNDLE);
-	ph->ekmf_config.tls_client_cert = properties_get(ph->properties,
+	ph->ekmf_config.tls_client_cert = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_CLIENT_CERT);
-	ph->ekmf_config.tls_client_key = properties_get(ph->properties,
+	ph->ekmf_config.tls_client_key = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_CLIENT_KEY);
 
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			    EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE);
 	if (tmp != NULL) {
 		ph->ekmf_config.tls_client_key_passphrase =
@@ -424,26 +236,27 @@ static int _get_ekmf_config(struct plugin_handle *ph)
 		free(tmp);
 	}
 	ph->ekmf_config.tls_issuer_cert = NULL;
-	ph->ekmf_config.tls_pinned_pubkey = properties_get(ph->properties,
+	ph->ekmf_config.tls_pinned_pubkey = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_SERVER_PUBKEY);
-	ph->ekmf_config.tls_server_cert = properties_get(ph->properties,
+	ph->ekmf_config.tls_server_cert = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_SERVER_CERT);
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
+	tmp = properties_get(ph->pd.properties,
+			     EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
 	ph->ekmf_config.tls_verify_peer =
 				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
 	ph->ekmf_config.tls_verify_host =
 				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
 	if (tmp != NULL)
 		free(tmp);
 	ph->ekmf_config.max_redirs = 0;
 
-	ph->ekmf_config.login_token = properties_get(ph->properties,
+	ph->ekmf_config.login_token = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_LOGIN_TOKEN);
 
-	ph->ekmf_config.ekmf_server_pubkey = properties_get(ph->properties,
+	ph->ekmf_config.ekmf_server_pubkey = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
 
 	return 0;
@@ -528,50 +341,26 @@ static void _unload_cca_library(struct plugin_handle *ph)
 static int _select_cca_adapter(struct plugin_handle *ph)
 {
 	struct cca_lib cca = { 0 };
-	unsigned int card, domain;
-	char **apqn_list = NULL;
-	bool selected = false;
-	int rc = 0, i;
 	char *apqns;
+	int rc = 0;
 
-	apqns = properties_get(ph->properties, EKMFWEB_CONFIG_APQNS);
+	apqns = properties_get(ph->pd.properties, EKMFWEB_CONFIG_APQNS);
 	if (apqns == NULL) {
 		_set_error(ph, "No APQN are associated with the plugin.");
 		rc = -ENODEV;
 		goto out;
 	}
 
-	pr_verbose(ph, "Associated APQNs: %s", apqns);
+	pr_verbose(&ph->pd, "Associated APQNs: %s", apqns);
 
 	_unload_cca_library(ph);
 
-	apqn_list = str_list_split(apqns);
-	for (i = 0; apqn_list[i] != NULL; i++) {
-		if (sscanf(apqn_list[i], "%x.%x", &card, &domain) != 2)
-			continue;
-
-		if (sysfs_is_apqn_online(card, domain, CARD_TYPE_CCA) != 1)
-			continue;
-
-		rc = select_cca_adapter(&cca, card, domain, ph->verbose);
-		if (rc != 0) {
-			_set_error(ph, "Failed to select APQN %02x.%04x: %s",
-				   card, domain, strerror(-rc));
-			goto out;
-		}
-
-		selected = true;
-		break;
-	}
-
-	if (!selected) {
-		_set_error(ph, "None of the associated APQNs is available: %s",
-			   apqns);
-		rc = -ENODEV;
+	rc = select_cca_adapter_by_apqns(&ph->pd, apqns, &cca);
+	if (rc != 0) {
+		_set_error(ph, "Failed to select one of the associated APQNs: "
+			   "%s", apqns);
 		goto out;
 	}
-
-	pr_verbose(ph, "Selected APQN %02x.%04x", card, domain);
 
 	ph->cca.cca_lib = cca.lib_csulcca;
 	ph->ext_lib.type = EKMF_EXT_LIB_CCA;
@@ -580,11 +369,9 @@ static int _select_cca_adapter(struct plugin_handle *ph)
 out:
 	if (apqns != NULL)
 		free(apqns);
-	if (apqn_list != NULL)
-		str_list_free_string_array(apqn_list);
 
-	if (rc != 0 && cca.lib_csulcca != NULL)
-		dlclose(cca.lib_csulcca);
+	if (rc != 0)
+		_unload_cca_library(ph);
 
 	return rc;
 }
@@ -603,7 +390,6 @@ out:
 kms_handle_t kms_initialize(const char *config_path, bool verbose)
 {
 	struct plugin_handle *ph;
-	struct stat sb;
 	int rc;
 
 	util_assert(config_path != NULL, "Internal error: config_path is NULL");
@@ -611,48 +397,17 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 	ph = util_malloc(sizeof(struct plugin_handle));
 	memset(ph, 0, sizeof(struct plugin_handle));
 
-	ph->config_path = util_strdup(config_path);
-	ph->verbose = verbose;
-
-	pr_verbose(ph, "Plugin initializing, config_path: '%s'", config_path);
-
-	if (stat(config_path, &sb) != 0) {
-		warnx("Can not access '%s': %s", config_path, strerror(errno));
+	rc = plugin_init(&ph->pd, "zkey-ekmfweb", config_path,
+			 EKMFWEB_CONFIG_FILE, verbose);
+	if (rc != 0)
 		goto error;
-	}
-	if (!S_ISDIR(sb.st_mode)) {
-		warnx("'%s' is not a directory", config_path);
-		goto error;
-	}
-	if (!util_path_is_readable(config_path) ||
-	    !util_path_is_writable(config_path)) {
-		warnx("Permission denied for '%s'", config_path);
-		goto error;
-	}
-	if (sb.st_mode & S_IWOTH) {
-		warnx("Directory '%s' is writable for others, this is not "
-		      "accepted", config_path);
-		goto error;
-	}
-
-	ph->config_path_owner = sb.st_gid;
-	ph->config_path_mode = sb.st_mode & (S_IRUSR | S_IWUSR |
-					     S_IRGRP  | S_IWGRP |
-					     S_IROTH);
-
-	ph->properties = properties_new();
-	rc = _load_config(ph);
-	if (rc != 0 && rc != -EIO) {
-		warnx("Failed to load plugin config file: %s", strerror(-rc));
-		goto error;
-	}
 
 	rc = _get_ekmf_config(ph);
 	if (rc != 0)
 		goto error;
 
 	_check_config_complete(ph);
-	pr_verbose(ph, "Plugin configuration is %scomplete",
+	pr_verbose(&ph->pd, "Plugin configuration is %scomplete",
 		   ph->config_complete ? "" : "in");
 
 	return (kms_handle_t)ph;
@@ -678,7 +433,7 @@ int kms_terminate(const kms_handle_t handle)
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
-	pr_verbose(ph, "Plugin terminated");
+	pr_verbose(&ph->pd, "Plugin terminating");
 
 	_free_ekmf_config(ph);
 	_unload_cca_library(ph);
@@ -686,10 +441,7 @@ int kms_terminate(const kms_handle_t handle)
 	if (ph->curl_handle != NULL)
 		ekmf_curl_destroy(ph->curl_handle);
 
-	if (ph->config_path != NULL)
-		free((void *)ph->config_path);
-	if (ph->properties != NULL)
-		properties_free(ph->properties);
+	plugin_term(&ph->pd);
 	free(ph);
 
 	return 0;
@@ -712,12 +464,12 @@ const char *kms_get_last_error(const kms_handle_t handle)
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
-	pr_verbose(ph, "Last error: '%s'", ph->error_msg);
+	pr_verbose(&ph->pd, "Last error: '%s'", ph->pd.error_msg);
 
-	if (strlen(ph->error_msg) == 0)
+	if (strlen(ph->pd.error_msg) == 0)
 		return NULL;
 
-	return ph->error_msg;
+	return ph->pd.error_msg;
 }
 
 /**
@@ -737,7 +489,7 @@ bool kms_supports_key_type(const kms_handle_t handle,
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 	util_assert(key_type != NULL, "Internal error: key_type is NULL");
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return true;
@@ -764,6 +516,10 @@ static int _get_pub_key_info(struct plugin_handle *ph, const char *pem_file,
 			     int *rsa_mod_bits)
 {
 	int rc = 0, curve_nid, mod_len;
+#if OPENSSL_VERSION_PREREQ(3, 0)
+	size_t curve_len;
+	char curve[80];
+#endif
 	EVP_PKEY *pkey;
 	FILE *fp;
 
@@ -791,14 +547,35 @@ static int _get_pub_key_info(struct plugin_handle *ph, const char *pem_file,
 
 	switch (EVP_PKEY_id(pkey)) {
 	case EVP_PKEY_EC:
+#if !OPENSSL_VERSION_PREREQ(3, 0)
 		curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(
 						EVP_PKEY_get0_EC_KEY(pkey)));
+#else
+		if (!EVP_PKEY_get_utf8_string_param(pkey,
+						    OSSL_PKEY_PARAM_GROUP_NAME,
+						    curve, sizeof(curve),
+						    &curve_len)) {
+			EVP_PKEY_free(pkey);
+			_set_error(ph, "Failed to get the curve name");
+			return -EIO;
+		}
+		curve_nid = OBJ_sn2nid(curve);
+#endif
 		if (ecc_curve_nid != NULL)
 			*ecc_curve_nid = curve_nid;
 		break;
 
 	case EVP_PKEY_RSA:
+#if !OPENSSL_VERSION_PREREQ(3, 0)
 		mod_len = BN_num_bits(RSA_get0_n(EVP_PKEY_get0_RSA(pkey)));
+#else
+		if (!EVP_PKEY_get_int_param(pkey, OSSL_PKEY_PARAM_BITS,
+					    &mod_len)) {
+			EVP_PKEY_free(pkey);
+			_set_error(ph, "Failed to get the RSA key size");
+			return -EIO;
+		}
+#endif
 		if (rsa_mod_bits != NULL)
 			*rsa_mod_bits = mod_len;
 		break;
@@ -835,31 +612,31 @@ int kms_display_info(const kms_handle_t handle)
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
-	pr_verbose(ph, "Display Info");
+	pr_verbose(&ph->pd, "Display Info");
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_URL);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_URL);
 	printf("  EKMF Web server:      %s\n", tmp != NULL ? tmp :
 			"(configuration required)");
 	if (tmp != NULL)
 		free(tmp);
 	else
 		return 0;
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_CA_BUNDLE);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_CA_BUNDLE);
 	printf("  CA-bundle:            %s\n", tmp != NULL ? tmp :
 			"System's CA certificates");
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_CLIENT_CERT);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_CLIENT_CERT);
 	printf("  Client certificate:   %s\n", tmp != NULL ? tmp : "(none)");
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_CLIENT_KEY);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_CLIENT_KEY);
 	printf("  Client private key:   %s\n", tmp != NULL ? tmp : "(none)");
 	if (tmp != NULL) {
 		free(tmp);
-		tmp = properties_get(ph->properties,
+		tmp = properties_get(ph->pd.properties,
 				     EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE);
 		if (tmp != NULL) {
 			printf("                        "
@@ -867,17 +644,18 @@ int kms_display_info(const kms_handle_t handle)
 			free(tmp);
 		}
 	}
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SERVER_CERT);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_SERVER_CERT);
 	if (tmp != NULL) {
 		printf("  Trusting the server certificate\n");
 		free(tmp);
 	}
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SERVER_PUBKEY);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_SERVER_PUBKEY);
 	if (tmp != NULL) {
 		printf("  Using server public key pinning\n");
 		free(tmp);
 	}
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
+	tmp = properties_get(ph->pd.properties,
+			     EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
 	if (tmp != NULL) {
 		if (strcasecmp(tmp, "yes") == 0)
 			printf("  The server's certificate must be valid\n");
@@ -885,7 +663,7 @@ int kms_display_info(const kms_handle_t handle)
 	} else {
 		printf("  The server's certificate is not verified\n");
 	}
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_VERIFY_HOSTNAME);
 	if (tmp != NULL) {
 		if (strcasecmp(tmp, "yes") == 0)
 			printf("  The server's certificate must match the "
@@ -893,7 +671,7 @@ int kms_display_info(const kms_handle_t handle)
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
 	if (tmp != NULL) {
 		rc = _get_pub_key_info(ph, tmp, &type, &curve, &mod_bits);
 		if (rc == 0) {
@@ -920,61 +698,62 @@ int kms_display_info(const kms_handle_t handle)
 	}
 
 	printf("  Key templates:\n");
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_IDENTITY);
+	tmp = properties_get(ph->pd.properties,
+			     EKMFWEB_CONFIG_TEMPLATE_IDENTITY);
 	printf("    Identity:           %s\n", tmp != NULL ? tmp :
 			"(configuration required)");
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_TEMPLATE_IDENTITY_LABEL);
 	if (tmp != NULL) {
 		printf("      Label template:   %s\n", tmp);
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_XTS1);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_TEMPLATE_XTS1);
 	printf("    XTS-Key1:           %s\n", tmp != NULL ? tmp :
 			"(configuration required)");
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_TEMPLATE_XTS1_LABEL);
 	if (tmp != NULL) {
 		printf("      Label template:   %s\n", tmp);
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_XTS2);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_TEMPLATE_XTS2);
 	printf("    XTS-Key2:           %s\n", tmp != NULL ? tmp :
 			"(configuration required)");
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_TEMPLATE_XTS2_LABEL);
 	if (tmp != NULL) {
 		printf("      Label template:   %s\n", tmp);
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_TEMPLATE_NONXTS);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_TEMPLATE_NONXTS);
 	printf("    Non-XTS:            %s\n", tmp != NULL ? tmp :
 			"(configuration required)");
 	if (tmp != NULL)
 		free(tmp);
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_TEMPLATE_NONXTS_LABEL);
 	if (tmp != NULL) {
 		printf("      Label template:   %s\n", tmp);
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM);
 	if (tmp != NULL) {
 		printf("  Identity key:         %s", tmp);
 		rsa = strcmp(tmp, EKMFWEB_KEY_ALGORITHM_RSA) == 0;
 		free(tmp);
-		tmp = properties_get(ph->properties,
+		tmp = properties_get(ph->pd.properties,
 				     EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
 		if (tmp != NULL) {
 			printf(" (%s%s)", tmp, rsa ? " bits" : "");
@@ -985,13 +764,15 @@ int kms_display_info(const kms_handle_t handle)
 		printf("  Identity key:         (configuration required)\n");
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
+	tmp = properties_get(ph->pd.properties,
+			     EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 	if (tmp != NULL) {
 		printf("                        (re-enciphering pending)\n");
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
+	tmp = properties_get(ph->pd.properties,
+			     EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
 	printf("  Registered key label: %s\n", tmp != NULL ?
 			tmp : "(registration required)");
 	if (tmp != NULL)
@@ -1000,21 +781,23 @@ int kms_display_info(const kms_handle_t handle)
 #ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
 	printf("  Key transport settings:\n");
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
+	tmp = properties_get(ph->pd.properties,
+			     EKMFWEB_CONFIG_SESSION_KEY_CURVE);
 	printf("    Session Key:        ECC (%s)\n",
 	       tmp != NULL ? tmp : "secp521r1");
 	if (tmp != NULL)
 		free(tmp);
 
-	info = properties_get(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_INFO);
+	info = properties_get(ph->pd.properties,
+			      EKMFWEB_CONFIG_IDENTITY_KEY_INFO);
 	if (info != NULL && strncmp(info, "RSA", 3) == 0) {
-		tmp = properties_get(ph->properties,
+		tmp = properties_get(ph->pd.properties,
 				     EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST);
 		printf("    RSA sign digest:    %s\n",
 		       tmp != NULL ? tmp : "SHA512");
 		if (tmp != NULL)
 			free(tmp);
-		tmp = properties_get(ph->properties,
+		tmp = properties_get(ph->pd.properties,
 				     EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS);
 		printf("    RSA sign alorithm:  %s\n",
 		       tmp != NULL && strcasecmp(tmp, "yes") == 0 ?
@@ -1425,398 +1208,6 @@ const struct util_opt *kms_get_command_options(const char *command,
 }
 
 /**
- * Queries the APKA master key states and verification patterns of the current
- * CCA adapter
- *
- * @param ph               the plugin handle
- * @param cca              the CCA library structure
- * @param apka_mk_info     the master key info of the APKA master key
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _get_cca_apka_mk_info(struct plugin_handle *ph, struct cca_lib *cca,
-				 struct mk_info *apka_mk_info)
-{
-	long exit_data_len = 0, rule_array_count, verb_data_length = 0;
-	unsigned char rule_array[16 * 8] = { 0, };
-	unsigned char exit_data[4] = { 0, };
-	long return_code, reason_code;
-	struct cca_staticsb {
-		u16	sym_old_mk_mdc4_len;
-		u16	sym_old_mk_mdc4_id;
-		u8	sym_old_mk_mdc4_hp[16];
-		u16	sym_cur_mk_mdc4_len;
-		u16	sym_cur_mk_mdc4_id;
-		u8	sym_cur_mk_mdc4_hp[16];
-		u16	sym_new_mk_mdc4_len;
-		u16	sym_new_mk_mdc4_id;
-		u8	sym_new_mk_mdc4_hp[16];
-		u16	asym_old_mk_mdc4_len;
-		u16	asym_old_mk_mdc4_id;
-		u8	asym_old_mk_mdc4_hp[16];
-		u16	asym_cur_mk_mdc4_len;
-		u16	asym_cur_mk_mdc4_id;
-		u8	asym_cur_mk_mdc4_hp[16];
-		u16	asym_new_mk_mdc4_len;
-		u16	asym_new_mk_mdc4_id;
-		u8	asym_new_mk_mdc4_hp[16];
-		u16	sym_old_mk_vp_len;
-		u16	sym_old_mk_vp_id;
-		u8	sym_old_mk_vp[8];
-		u16	sym_cur_mk_vp_len;
-		u16	sym_cur_mk_vp_id;
-		u8	sym_cur_mk_vp[8];
-		u16	sym_new_mk_vp_len;
-		u16	sym_new_mk_vp_id;
-		u8	sym_new_mk_vp[8];
-		u16	sym_new_mk_mkap_len;
-		u16	sym_new_mk_mkap_id;
-		u8	sym_new_mk_mkap[8];
-		u16	aes_old_mk_vp_len;
-		u16	aes_old_mk_vp_id;
-		u8	aes_old_mk_vp[8];
-		u16	aes_cur_mk_vp_len;
-		u16	aes_cur_mk_vp_id;
-		u8	aes_cur_mk_vp[8];
-		u16	aes_new_mk_vp_len;
-		u16	aes_new_mk_vp_id;
-		u8	aes_new_mk_vp[8];
-		u16	apka_old_mk_vp_len;
-		u16	apka_old_mk_vp_id;
-		u8	apka_old_mk_vp[8];
-		u16	apka_cur_mk_vp_len;
-		u16	apka_cur_mk_vp_id;
-		u8	apka_cur_mk_vp[8];
-		u16	apka_new_mk_vp_len;
-		u16	apka_new_mk_vp_id;
-		u8	apka_new_mk_vp[8];
-	} statis_csb = { 0 };
-
-	util_assert(cca != NULL, "Internal error: cca is NULL");
-	util_assert(apka_mk_info != NULL,
-		    "Internal error: apka_mk_info is NULL");
-
-	memset(apka_mk_info, 0, sizeof(struct mk_info));
-
-	memset(rule_array, 0, sizeof(rule_array));
-	memcpy(rule_array, "STATICSB", 8);
-	rule_array_count = 1;
-
-	verb_data_length = sizeof(statis_csb);
-
-	cca->dll_CSUACFQ(&return_code, &reason_code,
-			 &exit_data_len, exit_data,
-			 &rule_array_count, rule_array,
-			 &verb_data_length, (unsigned char *)&statis_csb);
-
-	pr_verbose(ph, "CSUACFQ (Cryptographic Facility Query) returned: "
-		   "return_code: %ld, reason_code: %ld", return_code,
-		   reason_code);
-	if (return_code != 0)
-		return -EIO;
-
-	switch (rule_array[10 * 8]) {
-	case '3':
-		apka_mk_info->new_mk.mk_state = MK_STATE_FULL;
-		break;
-	case '2':
-		apka_mk_info->new_mk.mk_state = MK_STATE_PARTIAL;
-		break;
-	case '1':
-	default:
-		apka_mk_info->new_mk.mk_state = MK_STATE_EMPTY;
-		break;
-	}
-	memcpy(apka_mk_info->new_mk.mkvp, statis_csb.apka_new_mk_vp,
-	       sizeof(statis_csb.apka_new_mk_vp));
-
-	switch (rule_array[11 * 8]) {
-	case '2':
-		apka_mk_info->cur_mk.mk_state = MK_STATE_VALID;
-		break;
-	case '1':
-	default:
-		apka_mk_info->cur_mk.mk_state = MK_STATE_INVALID;
-		break;
-	}
-	memcpy(apka_mk_info->cur_mk.mkvp, statis_csb.apka_cur_mk_vp,
-	       sizeof(statis_csb.apka_cur_mk_vp));
-
-	switch (rule_array[12 * 8]) {
-	case '2':
-		apka_mk_info->old_mk.mk_state = MK_STATE_VALID;
-		break;
-	case '1':
-	default:
-		apka_mk_info->old_mk.mk_state = MK_STATE_INVALID;
-		break;
-	}
-	memcpy(apka_mk_info->old_mk.mkvp, statis_csb.apka_old_mk_vp,
-	       sizeof(statis_csb.apka_old_mk_vp));
-
-	return 0;
-}
-
-/**
- * Print the APKA master key infos of the selected APQNs
- *
- * @param ph                the plugin handle
- * @param cca               CCA library structure
- * @param apqns             a list of APQNs
- * @param num_apqns         number of APQNs in above array
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-
-static int _print_apka_mks(struct plugin_handle *ph, struct cca_lib *cca,
-			   const struct kms_apqn *apqns, size_t num_apqns)
-{
-	struct mk_info mk_info;
-	struct util_rec *rec;
-	enum card_type type;
-	int rc = 0, level;
-	size_t i;
-
-	rec = util_rec_new_wide("-");
-	util_rec_def(rec, "APQN", UTIL_REC_ALIGN_LEFT, 11, "CARD.DOMAIN");
-	util_rec_def(rec, "NEW", UTIL_REC_ALIGN_LEFT, 16, "NEW APKA MK");
-	util_rec_def(rec, "CUR", UTIL_REC_ALIGN_LEFT, 16, "CURRENT APKA MK");
-	util_rec_def(rec, "OLD", UTIL_REC_ALIGN_LEFT, 16, "OLD APKA MK");
-	util_rec_def(rec, "TYPE", UTIL_REC_ALIGN_LEFT, 6, "TYPE");
-	util_rec_print_hdr(rec);
-
-	for (i = 0; i < num_apqns; i++) {
-		rc = select_cca_adapter(cca, apqns[i].card, apqns[i].domain,
-					ph->verbose);
-		if (rc != 0) {
-			_set_error(ph, "Failed to select APQN %02x.%04x: %s",
-				   apqns[i].card, apqns[i].domain,
-				   strerror(-rc));
-			goto out;
-		}
-
-		rc = _get_cca_apka_mk_info(ph, cca, &mk_info);
-		if (rc != 0) {
-			_set_error(ph, "Failed to get the APKA master key "
-				   "infos for APQN %02x.%04x: %s",
-				   apqns[i].card, apqns[i].domain,
-				   strerror(-rc));
-			goto out;
-		}
-
-		level = sysfs_get_card_level(apqns[i].card);
-		type = sysfs_get_card_type(apqns[i].card);
-
-		util_rec_set(rec, "APQN", "%02x.%04x", apqns[i].card,
-			     apqns[i].domain);
-
-		if (mk_info.new_mk.mk_state == MK_STATE_FULL ||
-		    mk_info.new_mk.mk_state == MK_STATE_COMMITTED)
-			util_rec_set(rec, "NEW", "%s",
-				     printable_mkvp(type, mk_info.new_mk.mkvp));
-		else if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL)
-			util_rec_set(rec, "NEW", "partially loaded");
-		else if (mk_info.new_mk.mk_state == MK_STATE_UNCOMMITTED)
-			util_rec_set(rec, "NEW", "uncommitted");
-		else
-			util_rec_set(rec, "NEW", "-");
-
-		if (mk_info.cur_mk.mk_state ==  MK_STATE_VALID)
-			util_rec_set(rec, "CUR", "%s",
-				     printable_mkvp(type, mk_info.cur_mk.mkvp));
-		else
-			util_rec_set(rec, "CUR", "-");
-
-		if (mk_info.old_mk.mk_state ==  MK_STATE_VALID)
-			util_rec_set(rec, "OLD", "%s",
-				     printable_mkvp(type, mk_info.old_mk.mkvp));
-		else
-			util_rec_set(rec, "OLD", "-");
-
-		if (level > 0 && type != CARD_TYPE_ANY)
-			util_rec_set(rec, "TYPE", "CEX%d%c", level,
-				     type == CARD_TYPE_CCA ? 'C' : 'P');
-		else
-			util_rec_set(rec, "TYPE", "?");
-
-		util_rec_print(rec);
-	}
-
-out:
-	util_rec_free(rec);
-
-	return rc;
-}
-
-/**
- * Cross checks the APQNs associated with the plugin. Checks if the CCA master
- * keys of all APQNs for the APKA master key are the same.
- *
- * @param ph                the plugin handle
- * @param apqns             a list of APQNs
- * @param num_apqns         number of APQNs in above array
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _cross_check_apqns(struct plugin_handle *ph,
-			      const struct kms_apqn *apqns, size_t num_apqns)
-{
-	u8 new_mkvp[MKVP_LENGTH] = { 0, };
-	u8 mkvp[MKVP_LENGTH] = { 0, };
-	struct cca_lib cca = { 0 };
-	struct mk_info mk_info;
-	bool mismatch = false;
-	bool print = false;
-	int rc = -ENODEV;
-	char temp[200];
-	size_t i;
-
-	for (i = 0; i < num_apqns; i++) {
-		rc = select_cca_adapter(&cca, apqns[i].card, apqns[i].domain,
-					ph->verbose);
-		if (rc != 0) {
-			_set_error(ph, "Failed to select APQN %02x.%04x: %s",
-				   apqns[i].card, apqns[i].domain,
-				   strerror(-rc));
-			goto out;
-		}
-
-		rc = _get_cca_apka_mk_info(ph, &cca, &mk_info);
-		if (rc != 0) {
-			_set_error(ph, "Failed to get the APKA master key "
-				   "infos for APQN %02x.%04x: %s",
-				   apqns[i].card, apqns[i].domain,
-				   strerror(-rc));
-			goto out;
-		}
-
-		if (mk_info.new_mk.mk_state == MK_STATE_PARTIAL) {
-			print = true;
-			sprintf(temp, "INFO: APQN %02x.%04x: The NEW APKA "
-				"master key register is only partially loaded.",
-				apqns[i].card, apqns[i].domain);
-			util_print_indented(temp, 0);
-		}
-
-		if (MKVP_ZERO(new_mkvp) &&
-		    mk_info.new_mk.mk_state == MK_STATE_FULL)
-			memcpy(new_mkvp, mk_info.new_mk.mkvp, sizeof(new_mkvp));
-
-		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-		    !MKVP_EQ(mk_info.new_mk.mkvp, new_mkvp)) {
-			print = true;
-			sprintf(temp, "WARNING: APQN %02x.%04x: The NEW APKA "
-				"master key register contains a different "
-				"master key than the NEW APKA register of "
-				"other APQNs.", apqns[i].card, apqns[i].domain);
-			util_print_indented(temp, 0);
-		}
-
-		if (mk_info.cur_mk.mk_state != MK_STATE_VALID) {
-			mismatch = true;
-			print = true;
-			printf("WARNING: APQN %02x.%04x: No APKA master key is "
-			       "set.\n", apqns[i].card, apqns[i].domain);
-			continue;
-		}
-
-		if (mk_info.old_mk.mk_state == MK_STATE_VALID &&
-		    MKVP_EQ(mk_info.old_mk.mkvp, mk_info.cur_mk.mkvp)) {
-			print = true;
-			sprintf(temp, "INFO: APQN %02x.%04x: The OLD APKA "
-				"master key register contains the same master "
-				"key as the CURRENT APKA master key register.",
-				apqns[i].card, apqns[i].domain);
-			util_print_indented(temp, 0);
-		}
-
-		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-		    MKVP_EQ(mk_info.new_mk.mkvp, mk_info.cur_mk.mkvp)) {
-			print = true;
-			sprintf(temp, "INFO: APQN %02x.%04x: The NEW APKA "
-				"master key register contains the same master "
-				"key as the CURRENT APKA master key register.",
-				apqns[i].card, apqns[i].domain);
-			util_print_indented(temp, 0);
-		}
-
-		if (mk_info.new_mk.mk_state == MK_STATE_FULL &&
-		    mk_info.old_mk.mk_state == MK_STATE_VALID &&
-		    MKVP_EQ(mk_info.new_mk.mkvp, mk_info.old_mk.mkvp)) {
-			print = true;
-			sprintf(temp, "INFO: APQN %02x.%04x: The NEW APKA "
-				"master key register contains the same master "
-				"key as the OLD APKA master key register.",
-				apqns[i].card, apqns[i].domain);
-			util_print_indented(temp, 0);
-		}
-
-		if (MKVP_ZERO(mkvp))
-			memcpy(mkvp, mk_info.cur_mk.mkvp, sizeof(mkvp));
-
-		if (!MKVP_EQ(mk_info.cur_mk.mkvp, mkvp)) {
-			mismatch = true;
-			print = true;
-			sprintf(temp, "WARNING: APQN %02x.%04x: The CURRENT "
-				"APKA master key register contains a different "
-				"master key than the CURRENT APKA register of "
-				"other APQNs.", apqns[i].card, apqns[i].domain);
-			util_print_indented(temp, 0);
-		}
-	}
-
-	if (mismatch) {
-		_set_error(ph, "Your APKA master key setup is improper");
-		rc = -ENODEV;
-	}
-
-	if (print)
-		_print_apka_mks(ph, &cca, apqns, num_apqns);
-
-out:
-	if (cca.lib_csulcca != NULL)
-		dlclose(cca.lib_csulcca);
-
-	return rc;
-}
-
-/**
- * Build an APQN string from an APQN array
- *
- * @param apqns           An array of APQNs
- * @param num_apqns       The number of elements in above array
- *
- * @return an allocated string with the APQNs
- */
-static char *_build_apqn_string(const struct kms_apqn *apqns, size_t num_apqns)
-{
-	char *apqn_str, *str;
-	size_t size, i;
-
-	if (num_apqns == 0) {
-		apqn_str = util_malloc(1);
-		*apqn_str = '\0';
-		return apqn_str;
-	}
-
-	size = num_apqns * 8; /* 'cc.dddd' plus ',' or '\0' */
-	apqn_str = util_malloc(size);
-
-	str = apqn_str;
-	for (i = 0; i < num_apqns; i++) {
-		if (i != 0) {
-			*str = ',';
-			str++;
-		}
-
-		sprintf(str, "%02x.%04x", apqns[i].card, apqns[i].domain);
-		str += 7;
-	}
-
-	return apqn_str;
-}
-
-/**
  * Gets the OpenSSL curve NID from the infos from the identity template.
  *
  * @param ph                the plugin handle
@@ -1953,7 +1344,7 @@ static int _get_template_by_name(struct plugin_handle *ph, const char *template,
 	rc = ekmf_list_templates(&ph->ekmf_config, &ph->curl_handle,
 				 _template_cb, &data, template,
 				 EKMFWEB_TEMPLATE_STATE_ACTIVE,
-				 &error_msg, ph->verbose);
+				 &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get the template '%s': %s", template,
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -2079,7 +1470,7 @@ static int _check_template(struct plugin_handle *ph,
 		if (no_warning)
 			goto out;
 
-		identity_key_alg = properties_get(ph->properties,
+		identity_key_alg = properties_get(ph->pd.properties,
 					EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM);
 		if (identity_key_alg == NULL)
 			goto out;
@@ -2097,7 +1488,7 @@ static int _check_template(struct plugin_handle *ph,
 			goto out;
 		}
 
-		identity_key_param = properties_get(ph->properties,
+		identity_key_param = properties_get(ph->pd.properties,
 					EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS);
 		if (identity_key_param == NULL)
 			goto out;
@@ -2255,7 +1646,7 @@ static int _get_templates(struct plugin_handle *ph)
 	rc = ekmf_get_settings(&ph->ekmf_config, &ph->curl_handle,
 			       &tmpl[IDENTITY].template, &tmpl[XTS1].template,
 			       &tmpl[XTS2].template, &tmpl[NONXTS].template,
-			       &error_msg, ph->verbose);
+			       &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get settings from EKMF Web: %s",
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -2278,16 +1669,16 @@ static int _get_templates(struct plugin_handle *ph)
 		if (rc != 0)
 			goto out;
 
-		rc = _set_or_remove_property(ph, tmpl[t].name_prop,
-					     tmpl[t].template);
+		rc = plugin_set_or_remove_property(&ph->pd, tmpl[t].name_prop,
+						   tmpl[t].template);
 		if (rc != 0)
 			goto out;
-		rc = _set_or_remove_property(ph, tmpl[t].label_prop,
-					     tmpl[t].info->label_template);
+		rc = plugin_set_or_remove_property(&ph->pd, tmpl[t].label_prop,
+						   tmpl[t].info->label_template);
 		if (rc != 0)
 			goto out;
-		rc = _set_or_remove_property(ph, tmpl[t].id_prop,
-					     tmpl[t].info->uuid);
+		rc = plugin_set_or_remove_property(&ph->pd, tmpl[t].id_prop,
+						   tmpl[t].info->uuid);
 		if (rc != 0)
 			goto out;
 	}
@@ -2324,15 +1715,17 @@ static int _get_ekmfweb_settings(struct plugin_handle *ph)
 		remove(ph->ekmf_config.login_token);
 		FREE_AND_SET_NULL(ph->ekmf_config.login_token);
 	}
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_LOGIN_TOKEN, NULL);
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_LOGIN_TOKEN,
+					   NULL);
 	if (rc != 0)
 		goto out;
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_PASSCODE_URL, NULL);
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_PASSCODE_URL,
+					   NULL);
 	if (rc != 0)
 		goto out;
 
 	rc = ekmf_check_feature(&ph->ekmf_config, &ph->curl_handle,
-				&error_msg, ph->verbose);
+				&error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		if (rc == -ENOTSUP)
 			_set_error(ph, "%s", error_msg);
@@ -2354,11 +1747,11 @@ static int _get_ekmfweb_settings(struct plugin_handle *ph)
 	FREE_AND_SET_NULL(ph->ekmf_config.ekmf_server_pubkey);
 
 	util_asprintf((char **)&ph->ekmf_config.ekmf_server_pubkey,
-		      "%s/%s", ph->config_path,
+		      "%s/%s", ph->pd.config_path,
 		      EKMFWEB_CONFIG_EKMFWEB_PUBKEY_FILE);
 
 	rc = ekmf_get_public_key(&ph->ekmf_config, &ph->curl_handle,
-				 &error_msg, ph->verbose);
+				 &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get the public key of the EKMF Web "
 			   "server at '%s': %s", ph->ekmf_config.base_url,
@@ -2367,12 +1760,14 @@ static int _get_ekmfweb_settings(struct plugin_handle *ph)
 		goto out;
 	}
 
-	rc = _set_file_permission(ph, ph->ekmf_config.ekmf_server_pubkey);
+	rc = plugin_set_file_permission(&ph->pd,
+					ph->ekmf_config.ekmf_server_pubkey);
 	if (rc != 0)
 		goto out;
 
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_EKMFWEB_PUBKEY,
-				     ph->ekmf_config.ekmf_server_pubkey);
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_EKMFWEB_PUBKEY,
+					   ph->ekmf_config.ekmf_server_pubkey);
 	if (rc != 0)
 		goto out;
 
@@ -2383,8 +1778,9 @@ static int _get_ekmfweb_settings(struct plugin_handle *ph)
 	if (type != EVP_PKEY_EC || curve == NID_undef)
 		curve = NID_secp521r1;
 
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_SESSION_KEY_CURVE,
-				     OBJ_nid2sn(curve));
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_SESSION_KEY_CURVE,
+					   OBJ_nid2sn(curve));
 	if (rc != 0)
 		goto out;
 
@@ -2397,54 +1793,6 @@ out:
 		free(error_msg);
 
 	return rc;
-}
-
-/**
- * Check if the certificate is a self signed certificate, and if it is expired
- * or not yet valid.
- *
- * @param ph                the plugin handle
- * @param cert_file         the file name of the PEM file containing the cert
- * @param self_signed       on return: true if the cetr is a self signed cert
- * @param valid             on return: false if the cert is expired or not yet
- *                          valid
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _check_certificate(struct plugin_handle *ph,
-			      const char *cert_file, bool *self_signed,
-			      bool *valid)
-{
-	X509 *cert;
-	FILE *fp;
-	int rc;
-
-	fp = fopen(cert_file, "r");
-	if (fp == NULL) {
-		rc = -errno;
-		_set_error(ph, "Failed to open certificate PEM file '%s': %s",
-			   cert_file, strerror(-rc));
-		return rc;
-	}
-
-	cert = PEM_read_X509(fp, NULL, NULL, NULL);
-	fclose(fp);
-
-	if (cert == NULL) {
-		_set_error(ph, "Failed to read certificate PEM file '%s'",
-			   cert_file);
-		return -EIO;
-	}
-
-
-	*self_signed = (X509_NAME_cmp(X509_get_subject_name(cert),
-				      X509_get_issuer_name(cert)) == 0);
-
-	*valid = (X509_cmp_current_time(X509_get0_notBefore(cert)) < 0 &&
-		  X509_cmp_current_time(X509_get0_notAfter(cert)) > 0);
-
-	X509_free(cert);
-
-	return 0;
 }
 
 /**
@@ -2519,7 +1867,7 @@ static int _configure_connection(struct plugin_handle *ph,
 		printf("%s: Re-configure the EKMF Web server connection "
 		       "[y/N]? ",
 		       program_invocation_short_name);
-		if (!prompt_for_yes(ph->verbose)) {
+		if (!prompt_for_yes(ph->pd.verbose)) {
 			_set_error(ph, "Operation aborted by user");
 			return -ECANCELED;
 		}
@@ -2537,12 +1885,12 @@ static int _configure_connection(struct plugin_handle *ph,
 	if (url[strlen(url) - 1] == '/')
 		url[strlen(url) - 1] = '\0';
 
-	pr_verbose(ph, "url: '%s'", url);
+	pr_verbose(&ph->pd, "url: '%s'", url);
 
 	FREE_AND_SET_NULL(ph->ekmf_config.base_url);
 	ph->ekmf_config.base_url = url;
 
-	rc = properties_set(ph->properties, EKMFWEB_CONFIG_URL, url);
+	rc = properties_set(ph->pd.properties, EKMFWEB_CONFIG_URL, url);
 	if (rc != 0) {
 		_set_error(ph, "Failed to set URL property: "
 			   "%s", strerror(-rc));
@@ -2552,22 +1900,22 @@ static int _configure_connection(struct plugin_handle *ph,
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_ca);
 	if (tls_ca_bundle != NULL)
 		ph->ekmf_config.tls_ca = util_strdup(tls_ca_bundle);
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CA_BUNDLE,
-				     tls_ca_bundle);
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_CA_BUNDLE,
+					   tls_ca_bundle);
 
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_cert);
 	if (tls_client_cert != NULL)
 		ph->ekmf_config.tls_client_cert = util_strdup(tls_client_cert);
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CLIENT_CERT,
-				     tls_client_cert);
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_CLIENT_CERT,
+					   tls_client_cert);
 	if (rc != 0)
 		goto out;
 
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_key);
 	if (tls_client_key != NULL)
 		ph->ekmf_config.tls_client_key = util_strdup(tls_client_key);
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CLIENT_KEY,
-				     tls_client_key);
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_CLIENT_KEY,
+					   tls_client_key);
 	if (rc != 0)
 		goto out;
 
@@ -2583,23 +1931,24 @@ static int _configure_connection(struct plugin_handle *ph,
 			goto out;
 		}
 	}
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE,
-				     tmp);
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_CLIENT_KEY_PASSPHRASE,
+					   tmp);
 	if (tmp != NULL)
 		free(tmp);
 	if (rc != 0)
 		goto out;
 
-	util_asprintf(&server_cert_temp, "%s/%s-tmp", ph->config_path,
+	util_asprintf(&server_cert_temp, "%s/%s-tmp", ph->pd.config_path,
 		      EKMFWEB_CONFIG_SERVER_CERT_FILE);
-	util_asprintf(&server_pubkey_temp, "%s/%s-tmp", ph->config_path,
+	util_asprintf(&server_pubkey_temp, "%s/%s-tmp", ph->pd.config_path,
 		      EKMFWEB_CONFIG_SERVER_PUBKEY_FILE);
 
 	rc = ekmf_get_server_cert_chain(&ph->ekmf_config,
 					server_cert_temp,
 					server_pubkey_temp,
 					NULL, &verified,
-					&error, ph->verbose);
+					&error, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to connect to EKMF Web server at '%s': "
 			   "%s", ph->ekmf_config.base_url,
@@ -2607,18 +1956,22 @@ static int _configure_connection(struct plugin_handle *ph,
 		goto out;
 	}
 
-	rc = _check_certificate(ph, server_cert_temp, &self_signed, &valid);
-	if (rc != 0)
+	rc = plugin_check_certificate(&ph->pd, server_cert_temp, &self_signed,
+				      &valid);
+	if (rc != 0) {
+		_set_error(ph, "Failed to check certificate PEM file '%s': %s",
+			   server_cert_temp, strerror(-rc));
 		goto out;
+	}
 
-	pr_verbose(ph, "verified: %d", verified);
-	pr_verbose(ph, "self signed: %d", self_signed);
-	pr_verbose(ph, "valid: %d", valid);
+	pr_verbose(&ph->pd, "verified: %d", verified);
+	pr_verbose(&ph->pd, "self signed: %d", self_signed);
+	pr_verbose(&ph->pd, "valid: %d", valid);
 
 	util_print_indented("The EKMF Web server presented the following "
 			    "certificate to identify itself:", 0);
 
-	rc = ekmf_print_certificates(server_cert_temp, ph->verbose);
+	rc = ekmf_print_certificates(server_cert_temp, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to print the server certificate: %s",
 			   strerror(-rc));
@@ -2653,7 +2006,7 @@ static int _configure_connection(struct plugin_handle *ph,
 	}
 	printf("%s: Is this the EKMF Web server you intend to work with "
 	      "[y/N]? ", program_invocation_short_name);
-	if (!prompt_for_yes(ph->verbose)) {
+	if (!prompt_for_yes(ph->pd.verbose)) {
 		_set_error(ph, "Operation aborted by user");
 		rc = -ECANCELED;
 		goto out;
@@ -2662,15 +2015,17 @@ static int _configure_connection(struct plugin_handle *ph,
 	ph->ekmf_config.tls_verify_peer = !self_signed || tls_trust_server_cert;
 	if (tls_dont_verify_server_cert)
 		ph->ekmf_config.tls_verify_peer = false;
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_VERIFY_SERVER_CERT,
-				     ph->ekmf_config.tls_verify_peer ?
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_VERIFY_SERVER_CERT,
+					   ph->ekmf_config.tls_verify_peer ?
 						     "yes" : "no");
 	if (rc != 0)
 		goto out;
 
 	ph->ekmf_config.tls_verify_host = tls_verify_hostname;
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_VERIFY_HOSTNAME,
-				     ph->ekmf_config.tls_verify_host ?
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_VERIFY_HOSTNAME,
+					   ph->ekmf_config.tls_verify_host ?
 						     "yes" : "no");
 	if (rc != 0)
 		goto out;
@@ -2684,38 +2039,39 @@ static int _configure_connection(struct plugin_handle *ph,
 	}
 
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_server_cert);
-	util_asprintf(&server_cert_file, "%s/%s", ph->config_path,
+	util_asprintf(&server_cert_file, "%s/%s", ph->pd.config_path,
 		      EKMFWEB_CONFIG_SERVER_CERT_FILE);
 	if (tls_trust_server_cert) {
 		ph->ekmf_config.tls_server_cert = util_strdup(server_cert_file);
-		rc = _activate_temp_file(ph, server_cert_temp,
-					 server_cert_file);
+		rc = plugin_activate_temp_file(&ph->pd, server_cert_temp,
+					       server_cert_file);
 		if (rc != 0)
 			goto out;
 	} else {
 		remove(server_cert_file);
 	}
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_SERVER_CERT,
-				     tls_trust_server_cert ?
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_SERVER_CERT,
+					   tls_trust_server_cert ?
 						server_cert_file : NULL);
 	if (rc != 0)
 		goto out;
 
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_pinned_pubkey);
-	util_asprintf(&server_pubkey_file, "%s/%s", ph->config_path,
+	util_asprintf(&server_pubkey_file, "%s/%s", ph->pd.config_path,
 		      EKMFWEB_CONFIG_SERVER_PUBKEY_FILE);
 	if (tls_pin_server_pubkey) {
 		ph->ekmf_config.tls_pinned_pubkey =
 				util_strdup(server_pubkey_file);
-		rc = _activate_temp_file(ph, server_pubkey_temp,
-					 server_pubkey_file);
+		rc = plugin_activate_temp_file(&ph->pd, server_pubkey_temp,
+					       server_pubkey_file);
 		if (rc != 0)
 			goto out;
 	} else {
 		remove(server_pubkey_file);
 	}
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_SERVER_PUBKEY,
-				     tls_pin_server_pubkey ?
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_SERVER_PUBKEY,
+					   tls_pin_server_pubkey ?
 						server_pubkey_file : NULL);
 	if (rc != 0)
 		goto out;
@@ -2873,7 +2229,7 @@ static int _generate_identity_key(struct plugin_handle *ph)
 	if (rc != 0)
 		goto out;
 
-	template_uuid = properties_get(ph->properties,
+	template_uuid = properties_get(ph->pd.properties,
 				       EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
 	if (template_uuid == NULL) {
 		rc = -EIO;
@@ -2883,7 +2239,7 @@ static int _generate_identity_key(struct plugin_handle *ph)
 
 	rc = ekmf_get_template(&ph->ekmf_config, &ph->curl_handle,
 			       template_uuid, &template_info,
-			       &error_msg, ph->verbose);
+			       &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get identity key template '%s': %s",
 			   template_uuid, error_msg != NULL ? error_msg :
@@ -2897,14 +2253,14 @@ static int _generate_identity_key(struct plugin_handle *ph)
 	if (rc != 0)
 		goto out;
 
-	pr_verbose(ph, "Identity template algorithm: '%s'",
-			template_info->algorithm);
-	pr_verbose(ph, "Identity template key size: %lu",
-			template_info->key_size);
+	pr_verbose(&ph->pd, "Identity template algorithm: '%s'",
+		   template_info->algorithm);
+	pr_verbose(&ph->pd, "Identity template key size: %lu",
+		   template_info->key_size);
 
 	if (strcmp(template_info->algorithm, EKMFWEB_KEY_ALGORITHM_ECC) == 0) {
-		pr_verbose(ph, "Identity template curve: '%s'",
-					template_info->curve);
+		pr_verbose(&ph->pd, "Identity template curve: '%s'",
+			   template_info->curve);
 
 		gen_info.type = EKMF_KEY_TYPE_ECC;
 		gen_info.params.ecc.curve_nid =
@@ -2947,27 +2303,30 @@ static int _generate_identity_key(struct plugin_handle *ph)
 				    "client with the EKMF Web server.", 0);
 		printf("%s: Re-generate the identity key [y/N]? ",
 		       program_invocation_short_name);
-		if (!prompt_for_yes(ph->verbose)) {
+		if (!prompt_for_yes(ph->pd.verbose)) {
 			_set_error(ph, "Operation aborted by user");
 			return -ECANCELED;
 		}
 	} else {
 		util_asprintf((char **)&ph->ekmf_config.identity_secure_key,
-			      "%s/%s", ph->config_path,
+			      "%s/%s", ph->pd.config_path,
 			      EKMFWEB_CONFIG_IDENTITY_KEY_FILE);
 
-		rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY,
+		rc = plugin_set_or_remove_property(&ph->pd,
+						   EKMFWEB_CONFIG_IDENTITY_KEY,
 					ph->ekmf_config.identity_secure_key);
 		if (rc != 0)
 			goto out;
 	}
 
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM,
-				     template_info->algorithm);
+	rc = plugin_set_or_remove_property(&ph->pd,
+					EKMFWEB_CONFIG_IDENTITY_KEY_ALGORITHM,
+					template_info->algorithm);
 	if (rc != 0)
 		goto out;
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS,
-				     key_params);
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_IDENTITY_KEY_PARAMS,
+					   key_params);
 	if (rc != 0)
 		goto out;
 
@@ -2976,30 +2335,31 @@ static int _generate_identity_key(struct plugin_handle *ph)
 		goto out;
 
 	rc = ekmf_generate_identity_key(&ph->ekmf_config, &gen_info,
-					&ph->ext_lib, ph->verbose);
+					&ph->ext_lib, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to generate the identity key: %s",
 			   strerror(-rc));
 		goto out;
 	}
 
-	rc = _set_file_permission(ph, ph->ekmf_config.identity_secure_key);
+	rc = plugin_set_file_permission(&ph->pd,
+					ph->ekmf_config.identity_secure_key);
 	if (rc != 0)
 		goto out;
 
-	reenc_file = properties_get(ph->properties,
+	reenc_file = properties_get(ph->pd.properties,
 				    EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 	if (reenc_file != NULL) {
 		remove(reenc_file);
 		free(reenc_file);
-		properties_remove(ph->properties,
+		properties_remove(ph->pd.properties,
 				  EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 	}
 
-	properties_remove(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
-	properties_remove(ph->properties, EKMFWEB_CONFIG_IDENTITY_KEY_ID);
+	properties_remove(ph->pd.properties, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
+	properties_remove(ph->pd.properties, EKMFWEB_CONFIG_IDENTITY_KEY_ID);
 
-	pr_verbose(ph, "Generated identity key into '%s'",
+	pr_verbose(&ph->pd, "Generated identity key into '%s'",
 		   ph->ekmf_config.identity_secure_key);
 
 out:
@@ -3031,46 +2391,6 @@ static long _parse_unsigned(const char *str)
 		return -1;
 
 	return val;
-}
-
-/**
- * Parse a semi-colon separated list and return an allocated array of the
- * elements.
- *
- * @param list              the semi-colon separated list
- * @param elements          on return, an allocated array of elements
- * @param num_elements      on return, the number of elements in the array
- *
- * @returns 0 on success, a negative errno in case of an error.
- */
-static int _parse_list(const char *list, char ***elements,
-		       size_t *num_elements)
-{
-	char *copy, *tok;
-	size_t count;
-	int i;
-
-	for (i = 0, count = 1; list[i] != '\0'; i++)
-		if (list[i] == ';')
-			count++;
-
-	*elements = util_zalloc(count * sizeof(char *));
-
-	copy = util_strdup(list);
-	tok = strtok(copy, ";");
-	i = 0;
-	while (tok != NULL) {
-		if (strlen(tok) > 0) {
-			(*elements)[i] = util_strdup(tok);
-			i++;
-		}
-		tok = strtok(NULL, ";");
-	}
-	*num_elements = i;
-
-	free(copy);
-
-	return 0;
 }
 
 /**
@@ -3171,14 +2491,13 @@ static int _generate_csr_sscert(struct plugin_handle *ph,
 	}
 
 	if (subject != NULL) {
-		rc = _parse_list(subject, &subject_rdn_list,
-				 &num_subject_rdns);
+		rc = parse_list(subject, &subject_rdn_list, &num_subject_rdns);
 		if (rc != 0)
 			goto out;
 	}
 
 	if (extensions != NULL) {
-		rc = _parse_list(extensions, &extension_list, &num_extensions);
+		rc = parse_list(extensions, &extension_list, &num_extensions);
 		if (rc != 0)
 			goto out;
 	}
@@ -3196,7 +2515,7 @@ static int _generate_csr_sscert(struct plugin_handle *ph,
 				       num_extensions, digest_nid,
 				       rsa_pss ? &rsa_pss_parms : NULL,
 				       csr_pem_file, csr_new_header,
-				       &ph->ext_lib, ph->verbose);
+				       &ph->ext_lib, ph->pd.verbose);
 	} else {
 		rc = ekmf_generate_ss_cert(&ph->ekmf_config,
 				       (const char **)subject_rdn_list,
@@ -3206,7 +2525,7 @@ static int _generate_csr_sscert(struct plugin_handle *ph,
 				       num_extensions, days, digest_nid,
 				       rsa_pss ? &rsa_pss_parms : NULL,
 				       sscert_pem_file, &ph->ext_lib,
-				       ph->verbose);
+				       ph->pd.verbose);
 	}
 	switch (rc) {
 	case 0:
@@ -3234,11 +2553,11 @@ static int _generate_csr_sscert(struct plugin_handle *ph,
 	}
 
 	if (csr_pem_file != NULL)
-		pr_verbose(ph, "Generated certificate signing request into "
-			   "'%s'", csr_pem_file);
+		pr_verbose(&ph->pd, "Generated certificate signing request "
+			   "into '%s'", csr_pem_file);
 	else
-		pr_verbose(ph, "Generated self signed certificate into '%s'",
-			   sscert_pem_file);
+		pr_verbose(&ph->pd, "Generated self signed certificate into "
+			   "'%s'", sscert_pem_file);
 
 out:
 	if (subject_rdn_list != NULL) {
@@ -3372,7 +2691,7 @@ static int _parse_label_tags(struct plugin_handle *ph,
 
 	tag_defs = &template_info->label_tags;
 
-	pr_verbose(ph, "Label tags: '%s'", label_tags);
+	pr_verbose(&ph->pd, "Label tags: '%s'", label_tags);
 
 	if (label_tags != NULL && strlen(label_tags) == 0)
 		label_tags = NULL;
@@ -3386,9 +2705,9 @@ static int _parse_label_tags(struct plugin_handle *ph,
 	       sizeof(struct ekmf_tag) * tag_defs->num_tag_defs);
 
 	for (i = 0, k = 0; i < tag_defs->num_tag_defs; i++) {
-		pr_verbose(ph, "Expected tag: '%s'",
+		pr_verbose(&ph->pd, "Expected tag: '%s'",
 			   tag_defs->tag_defs[i].name);
-		pr_verbose(ph, "Specified tag: '%s'", tag_list[k]);
+		pr_verbose(&ph->pd, "Specified tag: '%s'", tag_list[k]);
 
 		tag = tag_list[k] != NULL ? util_strdup(tag_list[k]) : NULL;
 		if (tag != NULL) {
@@ -3460,7 +2779,7 @@ static int _parse_label_tags(struct plugin_handle *ph,
 			k++;
 		}
 
-		pr_verbose(ph, "Tag: '%s', Value: '%s'",
+		pr_verbose(&ph->pd, "Tag: '%s', Value: '%s'",
 			   ekmf_tag_list->tags[i].name,
 			   ekmf_tag_list->tags[i].value);
 
@@ -3534,7 +2853,7 @@ static int _load_certificate(struct plugin_handle *ph, const char *cert_file,
 	*cert_size = size;
 	*cert = buf;
 
-	pr_verbose(ph, "%lu bytes read from file '%s'", size, cert_file);
+	pr_verbose(&ph->pd, "%lu bytes read from file '%s'", size, cert_file);
 out:
 	if (rc != 0)
 		free(buf);
@@ -3584,7 +2903,7 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 	if (rc != 0)
 		goto out;
 
-	key_id = properties_get(ph->properties,
+	key_id = properties_get(ph->pd.properties,
 				EKMFWEB_CONFIG_IDENTITY_KEY_LABEL);
 	if (key_id != NULL) {
 		free(key_id);
@@ -3599,7 +2918,7 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 				    "generated with this registration.", 0);
 		printf("%s: Re-register the zkey client [y/N]? ",
 		       program_invocation_short_name);
-		if (!prompt_for_yes(ph->verbose)) {
+		if (!prompt_for_yes(ph->pd.verbose)) {
 			_set_error(ph, "Operation aborted by user");
 			return -ECANCELED;
 		}
@@ -3609,7 +2928,7 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 	if (rc != 0)
 		goto out;
 
-	template_uuid = properties_get(ph->properties,
+	template_uuid = properties_get(ph->pd.properties,
 				       EKMFWEB_CONFIG_TEMPLATE_IDENTITY_ID);
 	if (template_uuid == NULL) {
 		rc = -EIO;
@@ -3619,7 +2938,7 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 
 	rc = ekmf_get_template(&ph->ekmf_config, &ph->curl_handle,
 			       template_uuid, &template_info,
-			       &error_msg, ph->verbose);
+			       &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get identity key template '%s': %s",
 			   template_uuid, error_msg != NULL ? error_msg :
@@ -3650,7 +2969,7 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 	rc = ekmf_generate_key(&ph->ekmf_config, &ph->curl_handle,
 			      template_info->name, description,
 			      &label_tag_list, NULL, NULL, cert, cert_size,
-			      &key_info, &error_msg, ph->verbose);
+			      &key_info, &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to generate identity key in EKMF Web:"
 			   " %s", error_msg != NULL ? error_msg :
@@ -3659,17 +2978,20 @@ static int _register_client(struct plugin_handle *ph, const char *cert_file,
 		goto out;
 	}
 
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_ID,
-				     key_info->uuid);
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_IDENTITY_KEY_ID,
+					   key_info->uuid);
 	if (rc != 0)
 		goto out;
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_IDENTITY_KEY_LABEL,
-				     key_info->label);
+	rc = plugin_set_or_remove_property(&ph->pd,
+					   EKMFWEB_CONFIG_IDENTITY_KEY_LABEL,
+					   key_info->label);
 	if (rc != 0)
 		goto out;
 
-	pr_verbose(ph, "Generated identity key id: '%s'", key_info->uuid);
-	pr_verbose(ph, "Generated identity key label: '%s'", key_info->label);
+	pr_verbose(&ph->pd, "Generated identity key id: '%s'", key_info->uuid);
+	pr_verbose(&ph->pd, "Generated identity key label: '%s'",
+		   key_info->label);
 
 out:
 	if (template_uuid != NULL)
@@ -3713,7 +3035,7 @@ static int _configure_key_transport(struct plugin_handle *ph,
 			return -EINVAL;
 		}
 
-		rc = _set_or_remove_property(ph,
+		rc = plugin_set_or_remove_property(&ph->pd,
 				    EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST,
 				    session_rsa_sign_digest);
 		if (rc != 0)
@@ -3722,13 +3044,13 @@ static int _configure_key_transport(struct plugin_handle *ph,
 
 	if (session_rsa_sign_algo != NULL) {
 		if (strcasecmp(session_rsa_sign_algo, "RSA") == 0) {
-			rc = _set_or_remove_property(ph,
+			rc = plugin_set_or_remove_property(&ph->pd,
 					EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS,
 					NULL);
 			if (rc != 0)
 				goto out;
 		} else if (strcasecmp(session_rsa_sign_algo, "RSA-PSS") == 0) {
-			rc = _set_or_remove_property(ph,
+			rc = plugin_set_or_remove_property(&ph->pd,
 					EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS,
 					"yes");
 			if (rc != 0)
@@ -3789,33 +3111,39 @@ int kms_configure(const kms_handle_t handle,
 	util_assert(num_options == 0 || options != NULL,
 		    "Internal error: options is NULL but num_options > 0 ");
 
-	pr_verbose(ph, "Configure");
+	pr_verbose(&ph->pd, "Configure");
 	for (i = 0; i < num_apqns; i++) {
-		pr_verbose(ph, "  APQN: %02x.%04x", apqns[i].card,
+		pr_verbose(&ph->pd, "  APQN: %02x.%04x", apqns[i].card,
 			   apqns[i].domain);
 	}
 	for (i = 0; i < num_options; i++) {
 		if (isalnum(options[i].option))
-			pr_verbose(ph, "  Option '%c': '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option '%c': '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 		else
-			pr_verbose(ph, "  Option %d: '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option %d: '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 	}
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (apqns != NULL) {
 		if (num_apqns > 0) {
-			rc = _cross_check_apqns(ph, apqns, num_apqns);
-			if (rc != 0)
+			rc = cross_check_cca_apka_apqns(&ph->pd, apqns,
+							num_apqns);
+			if (rc != 0) {
+				_set_error(ph, "Your APKA master key setup is "
+					   "improper");
 				goto out;
+			}
 		}
 
-		apqn_str = _build_apqn_string(apqns, num_apqns);
-		rc = properties_set(ph->properties, EKMFWEB_CONFIG_APQNS,
+		apqn_str = build_kms_apqn_string(apqns, num_apqns);
+		rc = properties_set(ph->pd.properties, EKMFWEB_CONFIG_APQNS,
 				    apqn_str);
 		if (rc != 0) {
 			_set_error(ph, "Failed to set APQNs property: %s",
@@ -4005,12 +3333,13 @@ out:
 
 	if (rc == 0) {
 		if (config_changed) {
-			rc = _save_config(ph);
+			rc = plugin_save_config(&ph->pd);
 			if (rc != 0)
 				goto ret;
 
 			_check_config_complete(ph);
-			pr_verbose(ph, "Plugin configuration is %scomplete",
+			pr_verbose(&ph->pd,
+				   "Plugin configuration is %scomplete",
 				   ph->config_complete ? "" : "in");
 		}
 
@@ -4040,9 +3369,9 @@ int kms_deconfigure(const kms_handle_t handle)
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
-	pr_verbose(ph, "Deconfigure");
+	pr_verbose(&ph->pd, "Deconfigure");
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	return 0;
 }
@@ -4112,9 +3441,9 @@ int kms_login(const kms_handle_t handle)
 
 	util_assert(handle != NULL, "Internal error: handle is NULL");
 
-	pr_verbose(ph, "Login");
+	pr_verbose(&ph->pd, "Login");
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (!ph->connection_configured) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -4125,8 +3454,8 @@ int kms_login(const kms_handle_t handle)
 
 	if (ph->ekmf_config.login_token != NULL) {
 		rc = ekmf_check_login_token(&ph->ekmf_config, &valid, NULL,
-					    ph->verbose);
-		pr_verbose(ph, "Login token valid: %d", valid);
+					    ph->pd.verbose);
+		pr_verbose(&ph->pd, "Login token valid: %d", valid);
 
 		if (rc == 0 && valid)
 			return 0;
@@ -4134,25 +3463,27 @@ int kms_login(const kms_handle_t handle)
 		remove(ph->ekmf_config.login_token);
 		FREE_AND_SET_NULL(ph->ekmf_config.login_token);
 
-		rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_LOGIN_TOKEN,
-					     NULL);
+		rc = plugin_set_or_remove_property(&ph->pd,
+						   EKMFWEB_CONFIG_LOGIN_TOKEN,
+						   NULL);
 		if (rc != 0)
 			goto out;
 	}
 
-	passcode_url = properties_get(ph->properties,
+	passcode_url = properties_get(ph->pd.properties,
 				      EKMFWEB_CONFIG_PASSCODE_URL);
 	if (passcode_url == NULL) {
 		util_asprintf(&passcode_url, "%s%s", ph->ekmf_config.base_url,
 			      EKMFWEB_PASSCODE_URL);
 
-		rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_PASSCODE_URL,
-					     passcode_url);
+		rc = plugin_set_or_remove_property(&ph->pd,
+						   EKMFWEB_CONFIG_PASSCODE_URL,
+						   passcode_url);
 		if (rc != 0)
 			goto out;
 	}
 
-	pr_verbose(ph, "passcode url: '%s'", passcode_url);
+	pr_verbose(&ph->pd, "passcode url: '%s'", passcode_url);
 
 	user_id = _prompt_for_input(ph, "EKMF Web user ID");
 	if (user_id == NULL) {
@@ -4160,7 +3491,7 @@ int kms_login(const kms_handle_t handle)
 		goto out;
 	}
 
-	pr_verbose(ph, "User-id: '%s'", user_id);
+	pr_verbose(&ph->pd, "User-id: '%s'", user_id);
 
 	util_print_indented("Go to the following web page in your web browser, "
 			    "login with the same user ID as entered above and "
@@ -4174,13 +3505,13 @@ int kms_login(const kms_handle_t handle)
 		goto out;
 	}
 
-	pr_verbose(ph, "Passcode: '%s'", passcode);
+	pr_verbose(&ph->pd, "Passcode: '%s'", passcode);
 
 	util_asprintf((char **)&ph->ekmf_config.login_token, "%s/%s",
-		      ph->config_path, EKMFWEB_CONFIG_LOGIN_TOKEN_FILE);
+		      ph->pd.config_path, EKMFWEB_CONFIG_LOGIN_TOKEN_FILE);
 
 	rc = ekmf_login(&ph->ekmf_config, &ph->curl_handle, user_id, passcode,
-			&error_msg, ph->verbose);
+			&error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to login to EKMF Web server at '%s': "
 			   "%s", ph->ekmf_config.base_url,
@@ -4188,16 +3519,16 @@ int kms_login(const kms_handle_t handle)
 		goto out;
 	}
 
-	rc = _set_file_permission(ph, ph->ekmf_config.login_token);
+	rc = plugin_set_file_permission(&ph->pd, ph->ekmf_config.login_token);
 	if (rc != 0)
 		goto out;
 
-	rc = _set_or_remove_property(ph, EKMFWEB_CONFIG_LOGIN_TOKEN,
-				     ph->ekmf_config.login_token);
+	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_LOGIN_TOKEN,
+					   ph->ekmf_config.login_token);
 	if (rc != 0)
 		goto out;
 
-	rc = _save_config(ph);
+	rc = plugin_save_config(&ph->pd);
 	if (rc != 0)
 		goto out;
 
@@ -4271,24 +3602,26 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 	util_assert(num_options == 0 || options != NULL,
 		    "Internal error: options is NULL but num_options > 0 ");
 
-	pr_verbose(ph, "Re-encipher mode: %d, kmreg=%d", mode, mkreg);
+	pr_verbose(&ph->pd, "Re-encipher mode: %d, kmreg=%d", mode, mkreg);
 	for (i = 0; i < num_options; i++) {
 		if (isalnum(options[i].option))
-			pr_verbose(ph, "  Option '%c': '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option '%c': '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 		else
-			pr_verbose(ph, "  Option %d: '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option %d: '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 	}
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (ph->ekmf_config.identity_secure_key == NULL)
 		return 0;
 
-	reenc_file = properties_get(ph->properties,
+	reenc_file = properties_get(ph->pd.properties,
 				    EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 	if (reenc_file != NULL && mode == KMS_REENC_MODE_AUTO)
 		mode = KMS_REENC_MODE_STAGED_COMPLETE;
@@ -4321,7 +3654,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 			goto out;
 		}
 
-		rc = properties_remove(ph->properties,
+		rc = properties_remove(ph->pd.properties,
 				       EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 		if (rc != 0) {
 			_set_error(ph, "Failed to remove property %s: %s",
@@ -4330,7 +3663,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 			goto out;
 		}
 
-		rc = _save_config(ph);
+		rc = plugin_save_config(&ph->pd);
 		if (rc != 0)
 			goto out;
 
@@ -4356,7 +3689,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 			mode = KMS_REENC_MODE_STAGED;
 
 		if (mode == KMS_REENC_MODE_STAGED)
-			util_asprintf(&reenc_file, "%s/%s", ph->config_path,
+			util_asprintf(&reenc_file, "%s/%s", ph->pd.config_path,
 				      EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE);
 
 		printf("Re-enciphering the identity key with the APKA master "
@@ -4364,7 +3697,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 
 		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, true,
 						  reenc_file, &ph->ext_lib,
-						  ph->verbose);
+						  ph->pd.verbose);
 		if (rc != 0) {
 			_set_error(ph, "Failed to re-encipher identity key "
 				   "'%s': %s",
@@ -4379,7 +3712,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 			mode = KMS_REENC_MODE_IN_PLACE;
 
 		if (mode == KMS_REENC_MODE_STAGED)
-			util_asprintf(&reenc_file, "%s/%s", ph->config_path,
+			util_asprintf(&reenc_file, "%s/%s", ph->pd.config_path,
 				      EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE);
 
 		printf("Re-enciphering the identity key with the APKA master "
@@ -4387,7 +3720,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 
 		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, false,
 						  reenc_file, &ph->ext_lib,
-						  ph->verbose);
+						  ph->pd.verbose);
 		if (rc != 0) {
 			_set_error(ph, "Failed to re-encipher identity key "
 				   "'%s': %s",
@@ -4402,7 +3735,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 			mode = KMS_REENC_MODE_STAGED;
 
 		if (mode == KMS_REENC_MODE_STAGED)
-			util_asprintf(&reenc_file, "%s/%s", ph->config_path,
+			util_asprintf(&reenc_file, "%s/%s", ph->pd.config_path,
 				      EKMFWEB_CONFIG_IDENTITY_KEY_REENC_FILE);
 
 		printf("Re-enciphering the identity key with the APKA master "
@@ -4410,7 +3743,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 
 		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, false,
 						  reenc_file, &ph->ext_lib,
-						  ph->verbose);
+						  ph->pd.verbose);
 		if (rc != 0) {
 			_set_error(ph, "Failed to re-encipher identity key "
 				   "'%s': %s",
@@ -4426,7 +3759,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 
 		rc = ekmf_reencipher_identity_key(&ph->ekmf_config, true,
 						  reenc_file, &ph->ext_lib,
-						  ph->verbose);
+						  ph->pd.verbose);
 
 		if (tmp != NULL)
 			ph->ekmf_config.identity_secure_key = tmp;
@@ -4448,11 +3781,11 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 	}
 
 	if (mode == KMS_REENC_MODE_STAGED) {
-		rc = _set_file_permission(ph, reenc_file);
+		rc = plugin_set_file_permission(&ph->pd, reenc_file);
 		if (rc != 0)
 			goto out;
 
-		rc = properties_set(ph->properties,
+		rc = properties_set(ph->pd.properties,
 				    EKMFWEB_CONFIG_IDENTITY_KEY_REENC,
 				    reenc_file);
 		if (rc != 0) {
@@ -4463,7 +3796,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 		}
 
 	} else {
-		rc = properties_remove(ph->properties,
+		rc = properties_remove(ph->pd.properties,
 				       EKMFWEB_CONFIG_IDENTITY_KEY_REENC);
 		if (rc != 0 && rc != -ENOENT) {
 			_set_error(ph, "Failed to remove property %s: %s",
@@ -4473,7 +3806,7 @@ int kms_reenciper(const kms_handle_t handle, enum kms_reencipher_mode mode,
 		}
 	}
 
-	rc = _save_config(ph);
+	rc = plugin_save_config(&ph->pd);
 	if (rc != 0)
 		goto out;
 
@@ -4597,7 +3930,7 @@ static int _restrict_key(struct plugin_handle *ph, unsigned char *key_blob,
 	}
 
 	rc = restrict_key_export(&cca, key_blob, key_blob_length,
-				 ph->verbose);
+				 ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to export-restrict the retrieved secure "
 			   "key: %s", strerror(-rc));
@@ -4610,7 +3943,7 @@ static int _restrict_key(struct plugin_handle *ph, unsigned char *key_blob,
 		      "secure");
 		printf("%s: Do you want to use it anyway [y/N]? ",
 		       program_invocation_short_name);
-		if (!prompt_for_yes(ph->verbose)) {
+		if (!prompt_for_yes(ph->pd.verbose)) {
 			warnx("Operation aborted");
 			return -ECANCELED;
 		}
@@ -4694,28 +4027,30 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 	util_assert(key_id != NULL, "Internal error: key_id is NULL");
 	util_assert(key_label != NULL, "Internal error: key_label is NULL");
 
-	pr_verbose(ph, "Generate key: key-type: '%s', keybits: %lu, mode: %d",
-			key_type, key_bits, key_mode);
+	pr_verbose(&ph->pd, "Generate key: key-type: '%s', keybits: %lu, "
+		   "mode: %d", key_type, key_bits, key_mode);
 	for (i = 0; i < num_properties; i++) {
 		util_assert(properties[i].name != NULL,
 			    "Internal error: property name is NULL");
 		util_assert(properties[i].value != NULL,
 			    "Internal error: property value is NULL");
-		pr_verbose(ph, "  Property '%s': '%s", properties[i].name,
+		pr_verbose(&ph->pd, "  Property '%s': '%s", properties[i].name,
 			   properties[i].value);
 	}
 	for (i = 0; i < num_options; i++) {
 		if (isalnum(options[i].option))
-			pr_verbose(ph, "  Option '%c': '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option '%c': '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 		else
-			pr_verbose(ph, "  Option %d: '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option %d: '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 	}
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -4745,7 +4080,7 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		return -EINVAL;
 	}
 
-	identity_key_uuid = properties_get(ph->properties,
+	identity_key_uuid = properties_get(ph->pd.properties,
 					   EKMFWEB_CONFIG_IDENTITY_KEY_ID);
 	if (identity_key_uuid == NULL) {
 		_set_error(ph, "The zkey client is not registered with EKMF "
@@ -4754,7 +4089,7 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		return -EINVAL;
 	}
 
-	pr_verbose(ph, "identity_key_uuid: '%s'", identity_key_uuid);
+	pr_verbose(&ph->pd, "identity_key_uuid: '%s'", identity_key_uuid);
 
 	rc = _select_cca_adapter(ph);
 	if (rc != 0)
@@ -4777,7 +4112,7 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		}
 	}
 
-	template_uuid = properties_get(ph->properties, tmpl_prop_name);
+	template_uuid = properties_get(ph->pd.properties, tmpl_prop_name);
 	if (template_uuid == NULL) {
 		rc = -EIO;
 		_set_error(ph, "No key template configured");
@@ -4786,7 +4121,7 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 
 	rc = ekmf_get_template(&ph->ekmf_config, &ph->curl_handle,
 			       template_uuid, &template_info,
-			       &error_msg, ph->verbose);
+			       &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get key template '%s': %s",
 			   template_uuid, error_msg != NULL ? error_msg :
@@ -4823,7 +4158,7 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 			      template_info->name, "Generated by zkey",
 			      &label_tag_list, &custom_tag_list,
 			      identity_key_uuid, NULL, 0, &key_info,
-			      &error_msg, ph->verbose);
+			      &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to generate key in EKMF Web: %s",
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -4831,21 +4166,21 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 		goto out;
 	}
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
 	if (tmp != NULL) {
 		curve_nid = OBJ_txt2nid(tmp);
 		free(tmp);
 	}
 
 #ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST);
 	if (tmp != NULL) {
 		digest_nid = OBJ_txt2nid(tmp);
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS);
 	if (tmp != NULL) {
 		if (strcasecmp(tmp, "yes") == 0)
@@ -4857,7 +4192,7 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 	rc = ekmf_retrieve_key(&ph->ekmf_config, &ph->curl_handle,
 				key_info->uuid, curve_nid, digest_nid, rsa_pss,
 				identity_key_uuid, key_blob, key_blob_length,
-				&error_msg, &ph->ext_lib, ph->verbose);
+				&error_msg, &ph->ext_lib, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to retrieve the generated key from EKMF "
 			   "Web: %s", error_msg != NULL ? error_msg :
@@ -4876,8 +4211,8 @@ int kms_generate_key(const kms_handle_t handle, const char *key_type,
 	strncpy(key_label, key_info->label, key_label_size);
 	key_label[key_label_size - 1] = '\0';
 
-	pr_verbose(ph, "Generated key id: '%s'", key_id);
-	pr_verbose(ph, "Generated key label: '%s'", key_label);
+	pr_verbose(&ph->pd, "Generated key id: '%s'", key_id);
+	pr_verbose(&ph->pd, "Generated key label: '%s'", key_label);
 
 out:
 	if (identity_key_uuid != NULL)
@@ -4929,17 +4264,17 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 		    "Internal error: properties is NULL but num_properties"
 		    " > 0 ");
 
-	pr_verbose(ph, "Set key properties: key-ID: '%s'", key_id);
+	pr_verbose(&ph->pd, "Set key properties: key-ID: '%s'", key_id);
 	for (i = 0; i < num_properties; i++) {
 		util_assert(properties[i].name != NULL,
 			    "Internal error: property name is NULL");
 
-		pr_verbose(ph, "  Property '%s': '%s'", properties[i].name,
+		pr_verbose(&ph->pd, "  Property '%s': '%s'", properties[i].name,
 			   properties[i].value != NULL ? properties[i].value :
 			   "(null)");
 	}
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -4959,7 +4294,7 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 		goto out;
 
 	rc = ekmf_get_key_info(&ph->ekmf_config, &ph->curl_handle,
-			       key_id, &key_info, &error_msg, ph->verbose);
+			       key_id, &key_info, &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get key '%s': %s", key_id,
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -4971,7 +4306,7 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 		rc = ekmf_set_key_tags(&ph->ekmf_config, &ph->curl_handle,
 				       key_id, &set_tag_list,
 				       key_info->updated_on, &updated_on,
-				       &error_msg, ph->verbose);
+				       &error_msg, ph->pd.verbose);
 		if (rc != 0) {
 			_set_error(ph, "Failed to set custom tags for key "
 				   "'%s': %s", key_id, error_msg != NULL ?
@@ -4986,7 +4321,7 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
 				       key_id, &delete_tag_list,
 				       updated_on != NULL ? updated_on :
 						       key_info->updated_on,
-				       NULL, &error_msg, ph->verbose);
+				       NULL, &error_msg, ph->pd.verbose);
 		if (rc != 0) {
 			_set_error(ph, "Failed to delete custom tags for key "
 				   "'%s': %s", key_id, error_msg != NULL ?
@@ -5040,9 +4375,9 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 	util_assert(num_properties != NULL,
 		    "Internal error: num_properties is NULL");
 
-	pr_verbose(ph, "Get key properties: key-ID: '%s'", key_id);
+	pr_verbose(&ph->pd, "Get key properties: key-ID: '%s'", key_id);
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -5052,7 +4387,7 @@ int kms_get_key_properties(const kms_handle_t handle, const char *key_id,
 	}
 
 	rc = ekmf_get_key_info(&ph->ekmf_config, &ph->curl_handle,
-			       key_id, &key_info, &error_msg, ph->verbose);
+			       key_id, &key_info, &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get key '%s': %s", key_id,
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -5200,19 +4535,21 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 	util_assert(num_options == 0 || options != NULL,
 		    "Internal error: options is NULL but num_options > 0 ");
 
-	pr_verbose(ph, "Remove key: key-ID: '%s'", key_id);
+	pr_verbose(&ph->pd, "Remove key: key-ID: '%s'", key_id);
 	for (i = 0; i < num_options; i++) {
 		if (isalnum(options[i].option))
-			pr_verbose(ph, "  Option '%c': '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option '%c': '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 		else
-			pr_verbose(ph, "  Option %d: '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option %d: '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 	}
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	for (i = 0; i < num_options; i++) {
 		switch (options[i].option) {
@@ -5235,7 +4572,7 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 	if (state == NULL)
 		goto out;
 
-	pr_verbose(ph, "State to set: '%s'", state);
+	pr_verbose(&ph->pd, "State to set: '%s'", state);
 
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -5245,7 +4582,7 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 	}
 
 	rc = ekmf_get_key_info(&ph->ekmf_config, &ph->curl_handle,
-			       key_id, &key_info, &error_msg, ph->verbose);
+			       key_id, &key_info, &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get key '%s': %s", key_id,
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -5253,7 +4590,7 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 		goto out;
 	}
 
-	pr_verbose(ph, "Key state: '%s'", key_info->state);
+	pr_verbose(&ph->pd, "Key state: '%s'", key_info->state);
 
 	rc = _check_state(ph, key_info->label, state, key_info->state);
 	if (rc != 0)
@@ -5261,7 +4598,7 @@ int kms_remove_key(const kms_handle_t handle, const char *key_id,
 
 	rc = ekmf_set_key_state(&ph->ekmf_config, &ph->curl_handle,
 				key_id, state, key_info->updated_on,
-				&error_msg, ph->verbose);
+				&error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to set key state '%s': %s",
 				key_id, error_msg != NULL ? error_msg :
@@ -5459,28 +4796,30 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 		    "> 0 ");
 	util_assert(callback != NULL, "Internal error: callback is NULL");
 
-	pr_verbose(ph, "List Keys, label-pattern: '%s'",
+	pr_verbose(&ph->pd, "List Keys, label-pattern: '%s'",
 		   label_pattern != NULL ? label_pattern : "(null)");
 	for (i = 0; i < num_properties; i++) {
 		util_assert(properties[i].name != NULL,
 			    "Internal error: property name is NULL");
 		util_assert(properties[i].value != NULL,
 			    "Internal error: property value is NULL");
-		pr_verbose(ph, "  Property '%s': '%s", properties[i].name,
+		pr_verbose(&ph->pd, "  Property '%s': '%s", properties[i].name,
 			   properties[i].value);
 	}
 	for (i = 0; i < num_options; i++) {
 		if (isalnum(options[i].option))
-			pr_verbose(ph, "  Option '%c': '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option '%c': '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 		else
-			pr_verbose(ph, "  Option %d: '%s'", options[i].option,
+			pr_verbose(&ph->pd, "  Option %d: '%s'",
+				   options[i].option,
 				   options[i].argument != NULL ?
 					options[i].argument : "(null)");
 	}
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -5515,9 +4854,9 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 		}
 	}
 
-	pr_verbose(ph, "State filter: '%s'", states != NULL ? states :
+	pr_verbose(&ph->pd, "State filter: '%s'", states != NULL ? states :
 		   "(none)");
-	pr_verbose(ph, "List all: %d", data.list_all);
+	pr_verbose(&ph->pd, "List all: %d", data.list_all);
 
 	if (states != NULL) {
 		state_list = str_list_split(states);
@@ -5528,7 +4867,7 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 		}
 	}
 
-	data.exporting_key = properties_get(ph->properties,
+	data.exporting_key = properties_get(ph->pd.properties,
 					    EKMFWEB_CONFIG_IDENTITY_KEY_ID);
 
 	rc = _properties_to_ekmf_tags(ph, properties, num_properties,
@@ -5538,7 +4877,7 @@ int kms_list_keys(const kms_handle_t handle, const char *label_pattern,
 
 	rc = ekmf_list_keys(&ph->ekmf_config, &ph->curl_handle,
 			    _list_callback, &data, label_pattern, states,
-			    &tag_list, &error_msg, ph->verbose);
+			    &tag_list, &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to list keys: %s",
 			   error_msg != NULL ? error_msg : strerror(-rc));
@@ -5591,9 +4930,9 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 	util_assert(key_blob_length != NULL, "Internal error: key_blob_length "
 		    "is NULL");
 
-	pr_verbose(ph, "Import Key, key-ID: '%s'", key_id);
+	pr_verbose(&ph->pd, "Import Key, key-ID: '%s'", key_id);
 
-	_clear_error(ph);
+	plugin_clear_error(&ph->pd);
 
 	if (!ph->config_complete) {
 		_set_error(ph, "The configuration is incomplete, run 'zkey "
@@ -5602,7 +4941,7 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 		return -EINVAL;
 	}
 
-	identity_key_uuid = properties_get(ph->properties,
+	identity_key_uuid = properties_get(ph->pd.properties,
 					   EKMFWEB_CONFIG_IDENTITY_KEY_ID);
 	if (identity_key_uuid == NULL) {
 		_set_error(ph, "The zkey client is not registered with EKMF "
@@ -5611,27 +4950,27 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 		return -EINVAL;
 	}
 
-	pr_verbose(ph, "identity_key_uuid: '%s'", identity_key_uuid);
+	pr_verbose(&ph->pd, "identity_key_uuid: '%s'", identity_key_uuid);
 
 	rc = _select_cca_adapter(ph);
 	if (rc != 0)
 		goto out;
 
-	tmp = properties_get(ph->properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
+	tmp = properties_get(ph->pd.properties, EKMFWEB_CONFIG_SESSION_KEY_CURVE);
 	if (tmp != NULL) {
 		curve_nid = OBJ_txt2nid(tmp);
 		free(tmp);
 	}
 
 #ifdef EKMFWEB_SUPPORTS_RSA_DIGESTS_AND_PSS_SIGNATURES
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_DIGEST);
 	if (tmp != NULL) {
 		digest_nid = OBJ_txt2nid(tmp);
 		free(tmp);
 	}
 
-	tmp = properties_get(ph->properties,
+	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_SESSION_RSA_SIGN_PSS);
 	if (tmp != NULL) {
 		if (strcasecmp(tmp, "yes") == 0)
@@ -5643,7 +4982,7 @@ int kms_import_key(const kms_handle_t handle, const char *key_id,
 	rc = ekmf_retrieve_key(&ph->ekmf_config, &ph->curl_handle,
 				key_id, curve_nid, digest_nid, rsa_pss,
 				identity_key_uuid, key_blob, key_blob_length,
-				&error_msg, &ph->ext_lib, ph->verbose);
+				&error_msg, &ph->ext_lib, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to retrieve key '%s' from EKMF "
 			   "Web: %s", key_id, error_msg != NULL ? error_msg :

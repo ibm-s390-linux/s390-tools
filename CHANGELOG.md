@@ -1,14 +1,69 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.16.x (2021-xx-xx)__
+* __v2.18.x (2021-xx-xx)__
 
   For Linux kernel version: 5.xx
 
   Changes of existing tools:
 
   Bug Fixes:
-  - dbginfo: add KVM data collection for server and guest - fix lszdev
+
+* __v2.18.0 (2021-10-01)__
+
+  For Linux kernel version: 5.14
+
+  Add new tools:
+  - scripts: Add tool for parsing sclp s390dbf logs
+  - zdev: Add udev rule helper tool
+  - zipl-editenv: Add tool to operate with zIPL environment installed in the boot record
+
+  Changes of existing tools:
+  - Makefile: Fix order of build of libraries for parallel builds
+  - dbginfo.sh: Add collection in area of timedate, coredump and --check option
+  - dbginfo.sh: Add exception on dump2tar for /sys/kernel/mm/page_idle/bitmap
+  - dbginfo.sh: Cleanup of outdated sections and general code rework
+  - dbginfo.sh: Collect zipl boot menu entries from boot loader specification
+  - lszcrypt: Add support for vfio-ap status field
+  - lszcrypt: Improved output for deconfig cards and queues
+  - lszfcp: Add linkdown case to host marker of extended output
+  - zdev: Add auto-config for PCI and crypto devices
+  - zdump: Introduce multi-level message logging
+  - zipl: Add support for environment block interpretation
+  - zkey-cryptsetup: Support LUKS2 volumes with integrity support enabled
+
+  Bug Fixes:
+  - hsavmcore: Avoid recompilation of overlay during install step
+  - libkmipclient: Fix parsing of hex values for XML and JSON encoding
+  - vmur/vmur.cpp: Fix error handling on transfer failure
+  - zdump: Lots of smaller fixes across the board
+
+* __v2.17.0 (2021-07-07)__
+
+  For Linux kernel version: 5.12 / 5.13
+
+  Add new tools / libraries:
+  - hsavmcore: New utility to make the dump process with kdump more efficient
+  - libkmipclient: Add KMIP client shared library
+  - libseckey: Add a secure key library
+  - lshwc: New tool to extract and list complete counter sets
+
+  Changes of existing tools:
+  - genprotimg: Add '--(enable|disable)-pckmo' options
+  - genprotimg: Add OpenSSL 3.0 support
+  - genprotimg: Change plaintext control flags defaults so PCKMO functions are allowed
+  - libutil: Introduce multi-level message logging (util_log)
+  - libutil: Introduce util_arch module
+  - udev/dasd: Change DASD udev-rule to set none scheduler
+  - zdsfs: Add transparent codepage conversion
+  - zkey: Add support for KMIP-based key management systems
+
+  Bug Fixes:
+  - ttyrun-getty: Avoid conflicts with serial-getty@
   - dbginfo: add /proc/kallsyms - refresh zVM, lscpu - fix WORKARCHIVE handling
+  - dbginfo: add KVM data collection for server and guest - fix lszdev
+  - genprotimg: Add missing return values in error paths
+  - zkey: Fix conversion of CCA DATA keys to CCA CIPHER keys
+  - znetconf: avoid conflict with "chzdev -e"
 
 * __v2.16.0 (2021-02-19)__
 

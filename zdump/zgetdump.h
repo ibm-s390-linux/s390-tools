@@ -35,7 +35,7 @@ struct options {
 	int		argc_fuse;
 	const char	*select;
 	int		select_specified;
-	int		verbose_specified;
+	int		verbose;
 };
 
 extern const char *OPTS_SELECT_KDUMP;

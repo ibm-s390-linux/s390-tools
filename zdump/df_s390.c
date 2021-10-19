@@ -37,9 +37,10 @@ static int check_addr_max(struct df_s390_hdr *hdr, u64 addr_max)
 /*
  * Convert lowcore information into internal CPU representation
  */
-void df_s390_cpu_info_add(struct df_s390_hdr *hdr, u64 addr_max)
+int df_s390_cpu_info_add(struct df_s390_hdr *hdr, u64 addr_max)
 {
 	unsigned int i;
+	int rc;
 
 	if (hdr->version < 5 && hdr->magic == DF_S390_MAGIC) {
 		/* No Prefix registers in header */
@@ -53,8 +54,13 @@ void df_s390_cpu_info_add(struct df_s390_hdr *hdr, u64 addr_max)
 		dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 	}
 
-	for (i = 0; i < hdr->cpu_cnt; i++)
-		dfi_cpu_add_from_lc(hdr->lc_vec[i]);
+	for (i = 0; i < hdr->cpu_cnt; i++) {
+		rc = dfi_cpu_add_from_lc(hdr->lc_vec[i]);
+		if (rc)
+			return rc;
+	}
+
+	return 0;
 }
 
 /*

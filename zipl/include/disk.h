@@ -90,6 +90,11 @@ struct disk_info {
 	definition_t targetbase;
 };
 
+struct file_range {
+	off_t offset;
+	size_t len;
+};
+
 struct job_target_data;
 
 int disk_get_info(const char* device, struct job_target_data* target,
@@ -112,16 +117,23 @@ int disk_write_block_aligned(int fd, const void* data, size_t bytecount,
 blocknum_t disk_write_block_buffer(int fd, int fd_is_basedisk,
 				   const void* buffer, size_t bytecount,
 				   disk_blockptr_t** blocklist,
-				   struct disk_info* info);
+				   struct disk_info *info);
+blocknum_t disk_write_block_buffer_align(int fd, int fd_is_basedisk,
+					 const void *buffer, size_t bytecount,
+					 disk_blockptr_t **blocklist,
+					 struct disk_info *info, int align,
+					 off_t *offset);
 void disk_print_devt(dev_t d);
 void disk_print_info(struct disk_info* info);
 int disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info);
 blocknum_t disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 				  struct disk_info* info);
 blocknum_t disk_get_blocklist_from_file(const char* filename,
+					struct file_range *reg,
 					disk_blockptr_t** blocklist,
 					struct disk_info* pinfo);
 int disk_check_subchannel_set(int devno, dev_t device, char* dev_name);
 void disk_print_geo(struct disk_info *data);
+int fs_map(int fd, uint64_t offset, blocknum_t *mapped, int fs_block_size);
 
 #endif /* not DISK_H */

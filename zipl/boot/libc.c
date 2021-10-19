@@ -130,6 +130,37 @@ int strncmp(const char *s1, const char *s2, unsigned long count)
 	return 0;
 }
 
+/**
+ * Find the first occurrence of character in string.
+ * STR: address of the string, which is different from NULL!
+ */
+char *strchr(const char *str, char c)
+{
+	while (*str) {
+		if (*str == c)
+			return (char *)str;
+		str++;
+	}
+	return NULL;
+}
+
+/**
+ * Minimalistic hash function on strings.
+ * It doesn't provide perfect quality of distribution.
+ *
+ * STR: null-terminated string
+ * HASH_SIZE: number of buckets
+ */
+unsigned int strhash(unsigned char *str, unsigned int hash_size)
+{
+	unsigned int sum = 0;
+
+	while (*str)
+		sum += 5 * *(str++);
+
+	return sum % hash_size;
+}
+
 static int skip_atoi(const char **c)
 {
 	int i = 0;

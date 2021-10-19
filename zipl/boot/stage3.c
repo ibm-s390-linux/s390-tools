@@ -131,6 +131,205 @@ secure_boot_enabled()
 	return rc;
 }
 
+#define ZIPL_ENVBLK_SIGNATURE	"# zIPL Environment Block\n"
+#define STR_HASH_SIZE (16)
+
+struct env_hash_entry {
+	unsigned int next;
+	unsigned int name;
+};
+
+/**
+ * ITEMS: pointer to pre-allocated page, where the new item will be allocated
+ * NAME: null-terminated name
+ */
+static void hash_table_add(struct env_hash_entry *items,
+			   struct env_hash_entry **buckets,
+			   unsigned int *new_idx,
+			   unsigned long name)
+{
+	struct env_hash_entry *new;
+	unsigned int hash;
+
+	new = &items[*new_idx];
+	new->name = name;
+	hash = strhash((unsigned char *)name, STR_HASH_SIZE);
+	new->next = (unsigned long)buckets[hash];
+	buckets[hash] = new;
+	(*new_idx)++;
+}
+
+struct env_hash_entry *hash_table_find(struct env_hash_entry **buckets,
+				       char *name)
+{
+	struct env_hash_entry *item;
+
+	if (strlen(name) == 0)
+		return NULL;
+	item = buckets[strhash((unsigned char *)name, STR_HASH_SIZE)];
+	while (item) {
+		if (strlen((char *)(unsigned long)item->name) ==
+		    strlen(name) &&
+		    !strncmp((char *)(unsigned long)item->name,
+			     name, strlen(name)))
+			return item;
+		item = (struct env_hash_entry *)(unsigned long)item->next;
+	}
+	return NULL;
+}
+
+/**
+ * Format of environment block:
+ *
+ * magic'\n'name1=value1'\n'...nameN=valueN'\n'zero-padding
+ */
+static void parse_envblk(struct env_hash_entry *items,
+			 struct env_hash_entry **buckets,
+			 unsigned int *nr)
+{
+	char sgn[] = ZIPL_ENVBLK_SIGNATURE;
+	unsigned int len = 0;
+	unsigned int off = 0;
+	char *name;
+	char *value;
+
+	ebcdic_to_ascii((unsigned char *)sgn,
+			(unsigned char *)sgn, sizeof(sgn) - 1);
+
+	if (strncmp((char *)_stage3_parms.envblk_addr, sgn, sizeof(sgn) - 1)) {
+		printf("Bad envblk\n");
+		return;
+	}
+	/* we rely that environment block is consistent */
+	name = (char *)_stage3_parms.envblk_addr + sizeof(sgn) - 1;
+	/*
+	 * calculate significant length of the environment block
+	 * (excluding trailing zeros)
+	 */
+	while (len < _stage3_parms.envblk_len) {
+		if (name[len] == 0)
+			break;
+		len++;
+	}
+	while (off < len) {
+		value = strchr(name, 0x3D /* = */) + 1;
+		/* null-terminate the name */
+		*(value - 1) = 0;
+		hash_table_add(items, buckets, nr, (unsigned long)name);
+		off += (value - name); /* offset of the value */
+
+		name = strchr(value, 0x0A /* /n */) + 1;
+		/* null-terminate the value */
+		*(name - 1) = 0;
+		off += (name - value); /* offset of the next name (if any) */
+	}
+}
+
+/**
+ * Find all instances of the pattern ${NAME} in the command line, and replace
+ * each one with corresponding VALUE as found in the hash table by NAME
+ *
+ * CMDL_LEN: length of the command line to be processed
+ * BUCKETS: hash table of pairs (NAME, VALUE)
+ */
+void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len)
+{
+	struct env_hash_entry *item;
+	char empty_str = 0;
+	char *cmdl_end;
+	char *start;
+	char *end;
+	char *val;
+	int len;
+
+	start = (char *)COMMAND_LINE;
+	cmdl_end = start + cmdl_len;
+
+	while (start < cmdl_end) {
+		start = strchr(start, 0x24 /* $ */);
+
+		if (start == NULL || start + 3 >= cmdl_end)
+			/* no more instances */
+			break;
+		if (*(start + 1) != 0x7B /* { */) {
+			/* skip "$" without braces */
+			start += 1;
+			continue;
+		}
+		end = strchr(start, 0x7D /* } */);
+		if (end == NULL || end >= cmdl_end)
+			/* no more instances */
+			break;
+		/* terminate the NAME and find it in the hash table */
+		*end = 0;
+		item = hash_table_find(buckets, start + 2);
+		if (!item) {
+			/*
+			 * Item to replace with not found.
+			 * The case of "${}" (empty NAME) also gets here!
+			 *
+			 * Assign the empty string to remove the instance
+			 * from the command line
+			 */
+			val = &empty_str;
+		} else {
+			val = (char *)(unsigned long)item->name +
+				strlen((char *)(unsigned long)item->name) + 1;
+		}
+		/*
+		 * try to replace the instance by VALUE as found
+		 * in the hash table by NAME
+		 */
+		len = strlen(val);
+
+		if (cmdl_len + len - (end - start + 1) >= COMMAND_LINE_SIZE)
+			/* VALUE doesn't fit */
+			break;
+		/*
+		 * make a room with the beginning at "$" by moving
+		 * the rest of parm line at the right of "}" to @dst,
+		 * which is (offset of "$" + size of the VALUE")
+		 */
+		memmove(start + len, end + 1, cmdl_end - (end + 1));
+		/*
+		 * copy VALUE to the room
+		 */
+		memcpy(start, val, len);
+		cmdl_end += (len - (end - start + 1));
+		start += len;
+	}
+	if (cmdl_len > cmdl_end - (char *)COMMAND_LINE)
+		memset(cmdl_end, 0,
+		       cmdl_len - (cmdl_end - (char *)COMMAND_LINE));
+}
+
+/**
+ * LEN: length of the command line to be processed
+ */
+static void handle_environment(unsigned int len)
+{
+	struct env_hash_entry *buckets[STR_HASH_SIZE];
+	struct env_hash_entry *items;
+	unsigned int nr_items = 0;
+
+	if (_stage3_parms.envblk_addr == 0 ||
+	    _stage3_parms.envblk_addr == UNSPECIFIED_ADDRESS)
+		return;
+
+	memset(buckets, 0, sizeof(buckets));
+	items = (struct env_hash_entry *)get_zeroed_page();
+	/*
+	 * scan in-memory environment block and populate hash table
+	 */
+	parse_envblk(items, buckets, &nr_items);
+	/*
+	 * find environment variables in the command line and
+	 * replace them with their values as found in the hash table
+	 */
+	process_parm_line(buckets, len);
+	free_page((unsigned long)items);
+}
+
 void start(void)
 {
 	unsigned int subchannel_id;
@@ -171,6 +370,9 @@ void start(void)
 		/* terminate \0 */
 		cmdline[COMMAND_LINE_SIZE - 1] = 0;
 	}
+	/* determine length of original parm line */
+	cmdline_len = MIN(strlen((const char *)cmdline),
+			  COMMAND_LINE_SIZE - 1);
 
 	/* convert extra parameter to ascii */
 	if (!_stage3_parms.extra_parm || !*cextra)
@@ -187,11 +389,6 @@ void start(void)
 		cextra++;
 		cextra_len--;
 	}
-
-	/* determine length of original parm line */
-	cmdline_len = MIN(strlen((const char *)cmdline),
-			  COMMAND_LINE_SIZE - 1);
-
 	/*
 	 * if extra parm string starts with '=' replace original string,
 	 * else append
@@ -214,8 +411,9 @@ void start(void)
 		/* terminate 0 */
 		cmdline[cmdline_len + cextra_len] = 0;
 	}
-
 noextra:
+	handle_environment(cmdline_len + cextra_len);
+
 	/* copy initrd start address and size intop new kernle space */
 	*(unsigned long long *)INITRD_START = _stage3_parms.initrd_addr;
 	*(unsigned long long *)INITRD_SIZE = _stage3_parms.initrd_len;

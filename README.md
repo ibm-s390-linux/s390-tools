@@ -109,6 +109,9 @@ Package contents
    feature. Those traces are filtered with the zfcpdbf script, i.e. merge
    several traces, make it more readable etc.
 
+ * sclpdbf:
+   Display debug data for the sclp kernel component.
+
  * scsi_logging_level:
    Create, get or set the logging level for the SCSI logging facility.
 
@@ -223,7 +226,8 @@ Package contents
  * CPU-measurement facilities (CPU-MF) tools:
    Use the lscpumf tool to display information about the CPU-measurement
    counter and sampling facilities.  Use the chcpumf tool to control the
-   sampling facility support.
+   sampling facility support. Use lshwc to extract complete counter sets from
+   the CPU Measurement Facilities.
 
  * cpacfstats:
    The cpacfstats tools provide a client/server application set to monitor
@@ -248,6 +252,12 @@ Package contents
    server via REST calls over HTTPS. EKMF Web stands for IBM Enterprise Key
    Management Foundation - Web Edition, and is used to manage keys in an
    enterprise.
+
+ * libkmipclient:
+   A shared library that provides an KMIP client to communicate with an KMIP
+   server. KMIP stands for Key Management Interoperability Protocol, and is an
+   extensible communication protocol that defines message formats for the
+   manipulation of cryptographic keys on a key management server.
 
  * hsci:
    Manage HiperSockets Converged Interfaces (HSCI).
@@ -285,11 +295,14 @@ build options:
 | pfm            | `HAVE_PFM`         | cpacfstats                            |
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
-| openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb          |
+| openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
+|                |                    | libkmipclient                         |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
-| json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb           |
+| json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
+|                |                    | libkmipclient                         |
 | glib2          | `HAVE_GLIB2`       | genprotimg                            |
-| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb                |
+| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient |
+| libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 
 This table lists additional build or install options:
@@ -444,3 +457,11 @@ the different tools are provided:
   add `HAVE_SYSTEMD=0` to the make invocation.
   Tip: you may skip the hsavmcore build by adding `HAVE_FUSE=0`
   to the make invocation.
+
+* libkmipclient:
+  For building the libkmipclient shared library you need openssl version 1.1.1
+  or newer installed (openssl-devel.rpm). Also required are json-c version 0.13
+  or newer (json-c-devel.rpm), libxml2 version 2.9.10 or newer
+  (libxml2-devel.rpm), and libcurl version 7.59 or newer (libcurl-devel.rpm).
+  Tip: you may skip the libkmipclient build by adding `HAVE_OPENSSL=0`,
+  `HAVE_JSONC=0`, `HAVE_LIBXML2=0`, or `HAVE_LIBCURL=0` to the make invocation.

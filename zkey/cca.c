@@ -604,6 +604,10 @@ int select_cca_adapter(struct cca_lib *cca, unsigned int card,
 	if (rc != 0)
 		return rc;
 
+	/* Deallocate any adapter first, in case one is already allocated */
+	for (adapter = 1; adapter <= adapters; adapter++)
+		deallocate_cca_adapter(cca, adapter, false);
+
 	/* Disable the AUTOSELECT option */
 	rc = deallocate_cca_adapter(cca, 0, verbose);
 	if (rc != 0)

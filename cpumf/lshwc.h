@@ -13,6 +13,7 @@
 #ifndef LSHWC_H
 #define LSHWC_H
 
+#include <stdint.h>
 #include <sys/ioctl.h>
 
 enum {
@@ -58,27 +59,27 @@ enum {
  */
 
 struct s390_hwctr_start {		/* Set CPUs to operate on */
-	__u64 version;			/* Version of interface */
-	__u64 data_bytes;		/* # of bytes required */
-	__u64 cpumask_len;		/* Length of CPU mask in bytes */
-	__u64 *cpumask;			/* Pointer to CPU mask */
-	__u64 counter_sets;		/* Bit mask of counter set to get */
+	uint64_t version;		/* Version of interface */
+	uint64_t data_bytes;		/* # of bytes required */
+	uint64_t cpumask_len;		/* Length of CPU mask in bytes */
+	uint64_t *cpumask;		/* Pointer to CPU mask */
+	uint64_t counter_sets;		/* Bit mask of counter set to get */
 };
 
 struct s390_hwctr_setdata {		/* Counter set data */
-	__u32 set;			/* Counter set number */
-	__u32 no_cnts;			/* # of counters stored in cv[] */
-	__u64 cv[0];			/* Counter values (variable length) */
+	uint32_t set;			/* Counter set number */
+	uint32_t no_cnts;		/* # of counters stored in cv[] */
+	uint64_t cv[0];			/* Counter values (variable length) */
 };
 
 struct s390_hwctr_cpudata {		/* Counter set data per CPU */
-	__u32 cpu_nr;			/* Counter set number */
-	__u32 no_sets;			/* # of counters sets in data[] */
+	uint32_t cpu_nr;		/* Counter set number */
+	uint32_t no_sets;		/* # of counters sets in data[] */
 	struct s390_hwctr_setdata data[0];
 };
 
 struct s390_hwctr_read {		/* Structure to get all ctr sets */
-	__u64 no_cpus;			/* Total # of CPUs data taken from */
+	uint64_t no_cpus;		/* Total # of CPUs data taken from */
 	struct s390_hwctr_cpudata data[0];
 };
 
