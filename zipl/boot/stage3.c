@@ -347,60 +347,42 @@ static void verify_secure_boot(void)
 
 static void setup_cmdline(void)
 {
-	unsigned char *cextra = (unsigned char *)COMMAND_LINE_EXTRA;
-	unsigned char *cmdline =  (unsigned char *)COMMAND_LINE;
-	unsigned int cmdline_len = 0, cextra_len = 0;
+	char *cextra = (char *)COMMAND_LINE_EXTRA;
+	char *cmdline =  (char *)COMMAND_LINE;
+	unsigned int cmdline_len = 0;
 
 	/* if valid command line is given, copy it into new kernel space */
 	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
-		memcpy(cmdline, (void *)(unsigned long *)_stage3_parms.parm_addr,
+		strlcpy(cmdline, (void *)(unsigned long *)_stage3_parms.parm_addr,
 		       COMMAND_LINE_SIZE);
-		/* terminate \0 */
-		cmdline[COMMAND_LINE_SIZE - 1] = 0;
 	}
 	/* determine length of original parm line */
-	cmdline_len = MIN(strlen((const char *)cmdline), COMMAND_LINE_SIZE - 1);
+	cmdline_len = MIN(strlen(cmdline), COMMAND_LINE_SIZE - 1);
 
 	/* convert extra parameter to ascii */
 	if (!_stage3_parms.extra_parm || !*cextra)
 		goto noextra;
 
 	/* Handle extra kernel parameters specified in DASD boot menu. */
-	ebcdic_to_ascii(cextra, cextra, COMMAND_LINE_SIZE);
+	ebcdic_to_ascii((unsigned char *)cextra, (unsigned char *)cextra, COMMAND_LINE_EXTRA_SIZE);
 
-	/* determine length of extra parameter */
-	cextra_len = MIN(strlen((const char *)cextra), COMMAND_LINE_SIZE - 1);
-
-	/* remove leading whitespace of extra parameter */
-	while (cextra_len > 0 && *cextra == 0x20) {
+	while (isspace(*cextra))
 		cextra++;
-		cextra_len--;
-	}
+
 	/*
 	 * if extra parm string starts with '=' replace original string,
 	 * else append
 	 */
-	if (*cextra == 0x3d && cextra_len >= 1) {
-		/* skip '=' */
-		cextra++;
-		cextra_len--;
-		memcpy(cmdline, cextra, cextra_len);
-		cmdline[cextra_len] = 0;
-	} else if (cmdline_len + 1 <= COMMAND_LINE_SIZE - 1) {
+	if (*cextra == 0x3d) {
+		strlcpy(cmdline, cextra+1, COMMAND_LINE_SIZE);
+	} else if (*cextra && cmdline_len + 1 <= COMMAND_LINE_SIZE - 1) {
 		/* add blank */
-		cmdline[cmdline_len] = 0x20;
-		cmdline_len++;
-		/* check if length is within max value */
-		cextra_len = (cmdline_len + cextra_len <= COMMAND_LINE_SIZE - 1) ?
-			cextra_len : (COMMAND_LINE_SIZE - 1 - cmdline_len);
-		/* append string */
-		memcpy(cmdline + cmdline_len, cextra, cextra_len);
-		/* terminate 0 */
-		cmdline[cmdline_len + cextra_len] = 0;
+		cmdline[cmdline_len++] = 0x20;
+		strlcpy(cmdline + cmdline_len, cextra, COMMAND_LINE_SIZE - cmdline_len);
 	}
 
 noextra:
-	handle_environment(cmdline_len + cextra_len);
+	handle_environment(strlen(cmdline));
 }
 
 void start(void)
