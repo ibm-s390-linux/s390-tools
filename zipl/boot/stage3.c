@@ -330,6 +330,21 @@ static void handle_environment(unsigned int len)
 	free_page((unsigned long)items);
 }
 
+static void verify_secure_boot(void)
+{
+	/*
+	 * IPL process is secure we have to use default IPL values and
+	 * check if the psw jump address is within at the start of a
+	 * verified component. If it is not IPL is aborted.
+	 */
+	if (_stage3_parms.image_addr != IMAGE_LOAD_ADDRESS ||
+	    _stage3_parms.load_psw != DEFAULT_PSW_LOAD)
+		panic(ESECUREBOOT, "%s", msg_sipl_inval);
+
+	if (!is_verified_address(_stage3_parms.load_psw & PSW32_ADDR_MASK))
+		panic(ESECUREBOOT, "%s", msg_sipl_unverified);
+}
+
 void start(void)
 {
 	unsigned int subchannel_id;
@@ -337,19 +352,10 @@ void start(void)
 	unsigned char *cmdline =  (unsigned char *)COMMAND_LINE;
 	unsigned int cmdline_len = 0, cextra_len = 0;
 
-	/*
-	 * IPL process is secure we have to use default IPL values and
-	 * check if the psw jump address is within at the start of a
-	 * verified component. If it is not IPL is aborted.
-	 */
-	if (secure_boot_enabled()) {
-		if (_stage3_parms.image_addr != IMAGE_LOAD_ADDRESS ||
-		    _stage3_parms.load_psw != DEFAULT_PSW_LOAD)
-			panic(ESECUREBOOT, "%s", msg_sipl_inval);
 
-		if (!is_verified_address(_stage3_parms.load_psw & PSW32_ADDR_MASK))
-			panic(ESECUREBOOT, "%s", msg_sipl_unverified);
-	}
+	if (secure_boot_enabled())
+		verify_secure_boot();
+
 	/*
 	 * cut the kernel header
 	 */
