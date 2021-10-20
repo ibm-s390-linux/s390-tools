@@ -236,9 +236,9 @@ iplstart:
 	clc   0(3,%r4),.L_eof			# if it is EOFx
 	bz    .Lagain1				# skip dateset trailer
 
-	chi   %r2,COMMAND_LINE_SIZE-1		# truncate if line too long
+	chi   %r2,LEGACY_COMMAND_LINE_SIZE-1	# truncate if line too long
 	bnh   .Lnotrunc
-	la    %r2,COMMAND_LINE_SIZE-1
+	la    %r2,LEGACY_COMMAND_LINE_SIZE-1
 .Lnotrunc:
 
 	la    %r5,0(%r4,%r2)			# search for EBCDIC chars

@@ -282,7 +282,7 @@ void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len)
 		 */
 		len = strlen(val);
 
-		if (cmdl_len + len - (end - start + 1) >= COMMAND_LINE_SIZE)
+		if (cmdl_len + len - (end - start + 1) >= LEGACY_COMMAND_LINE_SIZE)
 			/* VALUE doesn't fit */
 			break;
 		/*
@@ -354,10 +354,10 @@ static void setup_cmdline(void)
 	/* if valid command line is given, copy it into new kernel space */
 	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
 		strlcpy(cmdline, (void *)(unsigned long *)_stage3_parms.parm_addr,
-		       COMMAND_LINE_SIZE);
+		       LEGACY_COMMAND_LINE_SIZE);
 	}
 	/* determine length of original parm line */
-	cmdline_len = MIN(strlen(cmdline), COMMAND_LINE_SIZE - 1);
+	cmdline_len = MIN(strlen(cmdline), LEGACY_COMMAND_LINE_SIZE - 1);
 
 	/* convert extra parameter to ascii */
 	if (!_stage3_parms.extra_parm || !*cextra)
@@ -374,11 +374,11 @@ static void setup_cmdline(void)
 	 * else append
 	 */
 	if (*cextra == 0x3d) {
-		strlcpy(cmdline, cextra+1, COMMAND_LINE_SIZE);
-	} else if (*cextra && cmdline_len + 1 <= COMMAND_LINE_SIZE - 1) {
+		strlcpy(cmdline, cextra+1, LEGACY_COMMAND_LINE_SIZE);
+	} else if (*cextra && cmdline_len + 1 <= LEGACY_COMMAND_LINE_SIZE - 1) {
 		/* add blank */
 		cmdline[cmdline_len++] = 0x20;
-		strlcpy(cmdline + cmdline_len, cextra, COMMAND_LINE_SIZE - cmdline_len);
+		strlcpy(cmdline + cmdline_len, cextra, LEGACY_COMMAND_LINE_SIZE - cmdline_len);
 	}
 
 noextra:

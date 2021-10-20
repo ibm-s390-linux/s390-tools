@@ -26,7 +26,7 @@
 #define COMMAND_LINE		_AC(0x10480, UL)
 
 /* Parameter sizes */
-#define COMMAND_LINE_SIZE	896
+#define LEGACY_COMMAND_LINE_SIZE	896
 
 
 #ifndef __ASSEMBLER__

@@ -188,7 +188,7 @@ boot:
 
 	/* append 'BOOT_IMAGE=<num>' to parmline */
 	snprintf(endstring, sizeof(endstring), " BOOT_IMAGE=%u", value);
-	if ((strlen(cmd_line_extra) + strlen(endstring)) < COMMAND_LINE_SIZE)
+	if ((strlen(cmd_line_extra) + strlen(endstring)) < LEGACY_COMMAND_LINE_SIZE)
 		strcat(cmd_line_extra, endstring);
 
 	sclp_setup(SCLP_DISABLE);

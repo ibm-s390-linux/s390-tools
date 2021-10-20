@@ -42,7 +42,7 @@ void __noreturn start(void)
 	if (kernel->size < IMAGE_LOAD_ADDRESS)
 		panic(EINTERNAL, "Invalid kernel\n");
 
-	if (cmdline->size > COMMAND_LINE_SIZE)
+	if (cmdline->size > LEGACY_COMMAND_LINE_SIZE)
 		panic(EINTERNAL, "Command line is too large\n");
 
 	/* move the kernel and cut the kernel header */
