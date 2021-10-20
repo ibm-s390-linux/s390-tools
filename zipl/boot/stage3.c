@@ -345,40 +345,21 @@ static void verify_secure_boot(void)
 		panic(ESECUREBOOT, "%s", msg_sipl_unverified);
 }
 
-void start(void)
+static void setup_cmdline(void)
 {
-	unsigned int subchannel_id;
 	unsigned char *cextra = (unsigned char *)COMMAND_LINE_EXTRA;
 	unsigned char *cmdline =  (unsigned char *)COMMAND_LINE;
 	unsigned int cmdline_len = 0, cextra_len = 0;
 
-
-	if (secure_boot_enabled())
-		verify_secure_boot();
-
-	/*
-	 * cut the kernel header
-	 */
-	memmove((void *)_stage3_parms.image_addr,
-		(void *)_stage3_parms.image_addr + IMAGE_LOAD_ADDRESS,
-		_stage3_parms.image_len - IMAGE_LOAD_ADDRESS);
-
-	/* store subchannel ID into low core and into new kernel space */
-	subchannel_id = S390_lowcore.subchannel_id;
-	*(unsigned int *)__LC_IPLDEV = subchannel_id;
-	*(unsigned long long *)IPL_DEVICE = subchannel_id;
-
 	/* if valid command line is given, copy it into new kernel space */
 	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
-		memcpy(cmdline,
-		       (void *)(unsigned long *)_stage3_parms.parm_addr,
+		memcpy(cmdline, (void *)(unsigned long *)_stage3_parms.parm_addr,
 		       COMMAND_LINE_SIZE);
 		/* terminate \0 */
 		cmdline[COMMAND_LINE_SIZE - 1] = 0;
 	}
 	/* determine length of original parm line */
-	cmdline_len = MIN(strlen((const char *)cmdline),
-			  COMMAND_LINE_SIZE - 1);
+	cmdline_len = MIN(strlen((const char *)cmdline), COMMAND_LINE_SIZE - 1);
 
 	/* convert extra parameter to ascii */
 	if (!_stage3_parms.extra_parm || !*cextra)
@@ -417,8 +398,31 @@ void start(void)
 		/* terminate 0 */
 		cmdline[cmdline_len + cextra_len] = 0;
 	}
+
 noextra:
 	handle_environment(cmdline_len + cextra_len);
+}
+
+void start(void)
+{
+	unsigned int subchannel_id;
+
+	if (secure_boot_enabled())
+		verify_secure_boot();
+
+	/*
+	 * cut the kernel header
+	 */
+	memmove((void *)_stage3_parms.image_addr,
+		(void *)_stage3_parms.image_addr + IMAGE_LOAD_ADDRESS,
+		_stage3_parms.image_len - IMAGE_LOAD_ADDRESS);
+
+	/* store subchannel ID into low core and into new kernel space */
+	subchannel_id = S390_lowcore.subchannel_id;
+	*(unsigned int *)__LC_IPLDEV = subchannel_id;
+	*(unsigned long long *)IPL_DEVICE = subchannel_id;
+
+	setup_cmdline();
 
 	/* copy initrd start address and size intop new kernle space */
 	*(unsigned long long *)INITRD_START = _stage3_parms.initrd_addr;
