@@ -1165,6 +1165,7 @@ bootmap_install_stages(struct job_data *job, struct disk_info *info, int fd,
 	blocknum_t stage2_count;
 	size_t stage2_size;
 	void *stage2_data;
+	int rc;
 
 	switch (info->type) {
 	case disk_type_fba:
@@ -1176,10 +1177,11 @@ bootmap_install_stages(struct job_data *job, struct disk_info *info, int fd,
 		free(stage2_data);
 		if (stage2_count == 0)
 			return -1;
-		if (install_fba_stage1b(fd, stage1b_list, stage1b_count,
-					stage2_list, stage2_count, info))
-			return -1;
+		rc = install_fba_stage1b(fd, stage1b_list, stage1b_count,
+					 stage2_list, stage2_count, info);
 		free(stage2_list);
+		if (rc)
+			return -1;
 		break;
 	case disk_type_eckd_ldl:
 	case disk_type_eckd_cdl:
@@ -1191,10 +1193,11 @@ bootmap_install_stages(struct job_data *job, struct disk_info *info, int fd,
 		free(stage2_data);
 		if (stage2_count == 0)
 			return -1;
-		if (install_eckd_stage1b(fd, stage1b_list, stage1b_count,
-					 stage2_list, stage2_count, info))
-			return -1;
+		rc = install_eckd_stage1b(fd, stage1b_list, stage1b_count,
+					  stage2_list, stage2_count, info);
 		free(stage2_list);
+		if (rc)
+			return -1;
 		break;
 	case disk_type_scsi:
 	case disk_type_diag:
