@@ -143,12 +143,13 @@ int menu(void)
 	int rc;
 
 	cmd_line_extra = (char *)COMMAND_LINE_EXTRA;
+	memset(cmd_line_extra, 0, COMMAND_LINE_EXTRA_SIZE);
+
 	rc = sclp_setup(SCLP_INIT);
 	if (rc)
 		/* sclp setup failed boot default */
 		goto boot;
 
-	memset(cmd_line_extra, 0, COMMAND_LINE_SIZE);
 	rc = menu_param(&value);
 	if (rc == 0) {
 		/* got number from loadparm, boot it */
