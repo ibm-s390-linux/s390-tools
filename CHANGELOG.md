@@ -8,6 +8,9 @@ Release history for s390-tools (MIT version)
 
   Bug Fixes:
 
+  Changes of existing tools:
+  - dbginfo.sh: retry for timeout and remove possible blocking "blockdev --report"
+
 * __v2.18.0 (2021-10-01)__
 
   For Linux kernel version: 5.14

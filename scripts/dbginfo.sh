@@ -55,7 +55,7 @@ readonly ZDEV_CONF=$(lszdev --configured 2>/dev/null | wc -l)
 readonly ZDEV_OFF=$(lszdev --offline 2>/dev/null | wc -l)
 readonly ZDEV_ONL=$(lszdev --online 2>/dev/null | wc -l)
 
-paramWORKDIR_BASE="/tmp/"  # initial default path
+paramWORKDIR_BASE="/tmp"  # initial default path
 
 ########################################
 # print dbginfo.sh version info
@@ -412,7 +412,6 @@ CMDS="uname -a\
   :timedatectl\
   :runlevel\
   :ulimit -a\
-  :blockdev --report\
   :env\
   :df -h\
   :df -i\
@@ -1071,7 +1070,7 @@ call_run_command() {
 
     # check if calling command and timeout exist
     if which "${raw_cmd}" >/dev/null 2>&1 && which timeout >/dev/null 2>&1; then
-	eval timeout ${TOS} "${cmd}" >> ${logfile} 2>&1
+	eval timeout -k ${TOS} ${TOS} "${cmd}" >> ${logfile} 2>&1
 	rc=$?
     # check if command is a builtin (no use of timeout possible)
     elif command -v "${raw_cmd}" >/dev/null 2>&1; then
