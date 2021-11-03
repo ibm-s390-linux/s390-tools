@@ -142,7 +142,7 @@ static inline u32 zg_csum_partial(const void *buf, int len, u32 sum)
  */
 #define PTR_SUB(x, y) (((char *) (x)) - ((unsigned long) (y)))
 #define PTR_ADD(x, y) (((char *) (x)) + ((unsigned long) (y)))
-#define PTR_DIFF(x, y) ((unsigned long)(((char *) (x)) - ((unsigned long) (y))))
+#define PTR_DIFF(x, y) ((unsigned long)PTR_SUB(x, y))
 
 /*
  * File functions
