@@ -232,7 +232,8 @@ static void parse_envblk(struct env_hash_entry *items,
  * CMDL_LEN: length of the command line to be processed
  * BUCKETS: hash table of pairs (NAME, VALUE)
  */
-void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len)
+void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len,
+		       unsigned int max_len)
 {
 	struct env_hash_entry *item;
 	char empty_str = 0;
@@ -282,7 +283,7 @@ void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len)
 		 */
 		len = strlen(val);
 
-		if (cmdl_len + len - (end - start + 1) >= LEGACY_COMMAND_LINE_SIZE)
+		if (cmdl_len + len - (end - start + 1) >= max_len)
 			/* VALUE doesn't fit */
 			break;
 		/*
@@ -306,7 +307,7 @@ void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len)
 /**
  * LEN: length of the command line to be processed
  */
-static void handle_environment(unsigned int len)
+static void handle_environment(unsigned int len, unsigned int max_len)
 {
 	struct env_hash_entry *buckets[STR_HASH_SIZE];
 	struct env_hash_entry *items;
@@ -326,7 +327,7 @@ static void handle_environment(unsigned int len)
 	 * find environment variables in the command line and
 	 * replace them with their values as found in the hash table
 	 */
-	process_parm_line(buckets, len);
+	process_parm_line(buckets, len, max_len);
 	free_page((unsigned long)items);
 }
 
@@ -350,14 +351,18 @@ static void setup_cmdline(void)
 	char *cextra = (char *)COMMAND_LINE_EXTRA;
 	char *cmdline =  (char *)COMMAND_LINE;
 	unsigned int cmdline_len = 0;
+	unsigned int max_cmdline_len = *(unsigned long *)MAX_COMMAND_LINE_SIZE;
+
+	if (!max_cmdline_len)
+		max_cmdline_len = LEGACY_COMMAND_LINE_SIZE;
 
 	/* if valid command line is given, copy it into new kernel space */
 	if (_stage3_parms.parm_addr != UNSPECIFIED_ADDRESS) {
 		strlcpy(cmdline, (void *)(unsigned long *)_stage3_parms.parm_addr,
-		       LEGACY_COMMAND_LINE_SIZE);
+		       max_cmdline_len);
 	}
 	/* determine length of original parm line */
-	cmdline_len = MIN(strlen(cmdline), LEGACY_COMMAND_LINE_SIZE - 1);
+	cmdline_len = MIN((unsigned int)strlen(cmdline), max_cmdline_len - 1);
 
 	/* convert extra parameter to ascii */
 	if (!_stage3_parms.extra_parm || !*cextra)
@@ -374,15 +379,15 @@ static void setup_cmdline(void)
 	 * else append
 	 */
 	if (*cextra == 0x3d) {
-		strlcpy(cmdline, cextra+1, LEGACY_COMMAND_LINE_SIZE);
-	} else if (*cextra && cmdline_len + 1 <= LEGACY_COMMAND_LINE_SIZE - 1) {
+		strlcpy(cmdline, cextra+1, max_cmdline_len);
+	} else if (*cextra && cmdline_len + 1 <= max_cmdline_len - 1) {
 		/* add blank */
 		cmdline[cmdline_len++] = 0x20;
-		strlcpy(cmdline + cmdline_len, cextra, LEGACY_COMMAND_LINE_SIZE - cmdline_len);
+		strlcpy(cmdline + cmdline_len, cextra, max_cmdline_len - cmdline_len);
 	}
 
 noextra:
-	handle_environment(strlen(cmdline));
+	handle_environment(strlen(cmdline), max_cmdline_len);
 }
 
 void start(void)

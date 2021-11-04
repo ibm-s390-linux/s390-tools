@@ -249,31 +249,35 @@ iplstart:
 	clc   0(3,%r4),.L_eof			# if it is EOFx
 	bz    .Lagain1				# skip dateset trailer
 
-	chi   %r2,LEGACY_COMMAND_LINE_SIZE-1	# truncate if line too long
+	lt    %r3,MAX_COMMAND_LINE_SIZE-PARMAREA+4(%r12)
+	jnz   0f
+	lhi   %r3,LEGACY_COMMAND_LINE_SIZE
+0:	cr    %r2,%r3				# truncate if line too long
 	bnh   .Lnotrunc
-	la    %r2,LEGACY_COMMAND_LINE_SIZE-1
+	lr    %r2,%r3
 .Lnotrunc:
-
 	la    %r5,0(%r4,%r2)			# search for EBCDIC chars
-	lr    %r3,%r2
+	ahi   %r5,-1
+	lr    %r6,%r2
 .Lidebc:
 	tm    0(%r5),0x80			# high order bit set ?
 	bo    .Ldocv				#  yes -> convert from EBCDIC
 	ahi   %r5,-1
-	bct   %r3,.Lidebc
+	bct   %r6,.Lidebc
 	b     .Lnocv
 .Ldocv:
-	la    %r3,_ebcasc
-	tr    0(256,%r4),0(%r3)			# convert parameters to ascii
-	tr    256(256,%r4),0(%r3)
-	tr    512(256,%r4),0(%r3)
-	tr    768(127,%r4),0(%r3)
+	lr    %r6,%r2
+	la    %r5,_ebcasc
+0:	tr    0(1,%r4),0(%r5)
+	ahi   %r4,1
+	brct  %r6,0b
+	l     %r4,_parm_addr+4
 .Lnocv:
-	la    %r3,COMMAND_LINE-PARMAREA(%r12)	# load adr. of command line
-	mvc   0(256,%r3),0(%r4)
-	mvc   256(256,%r3),256(%r4)
-	mvc   512(256,%r3),512(%r4)
-	mvc   768(127,%r3),768(%r4)
+	lr    %r5,%r2
+	ahi   %r5,-1
+	la    %r6,COMMAND_LINE-PARMAREA(%r12)
+	lr    %r7,%r2
+	mvcl  %r6,%r4
 	slr   %r0,%r0
 	b     .Lcntlp
 .Ldelspc:

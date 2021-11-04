@@ -23,6 +23,7 @@
 #define INITRD_SIZE		_AC(0x10410, UL)
 #define OLDMEM_BASE		_AC(0x10418, UL)
 #define OLDMEM_SIZE		_AC(0x10420, UL)
+#define MAX_COMMAND_LINE_SIZE	_AC(0x10430, UL)
 #define COMMAND_LINE		_AC(0x10480, UL)
 
 /* Parameter sizes */
