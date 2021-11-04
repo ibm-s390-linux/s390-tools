@@ -347,6 +347,7 @@ LOGFILES="\
   /var/log/openvswitch/ovsdb-server.log\
   /run/docker/libcontainerd/containerd/events.log\
   /run/containerd/events.log\
+  /run/udev/chreiplzfcpmp-[0-9][0-9][a-z][a-z][a-z][a-z]-*\
   "
 
 ########################################
@@ -404,6 +405,7 @@ CONFIGFILES="\
   /lib/systemd/system/docker.service\
   /usr/lib/systemd/system\
   /etc/apparmor.d\
+  /run/udev/chreiplzfcpmp-ipl-volume-id\
   "
 
 ########################################
