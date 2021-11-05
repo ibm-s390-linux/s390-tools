@@ -218,12 +218,25 @@ iplstart:
 	la    %r2,_initrd_addr			# store ramdisk address
 	mvc   INITRD_START-PARMAREA(8,%r12),0(%r2)
 
+# copy kernel to final destination
+
+	l	%r6,.Lkernsize
+	sl	%r6,.Lkernoff
+	l	%r2,.Lkernoff			# 0x10000
+	lr	%r3,%r6
+	l	%r4,.Loffset			# 0x4000
+	a	%r4,.Lkernoff
+	lr	%r5,%r6
+	mvcl	%r2,%r4
+	l	%r12,.Lparmarea
 
 #
 # Load parameter file
 #
 
 	l     %r4,_parm_addr+4
+	chi   %r4,-1
+	be    .Lnopf
 .Lagain1:
 	lr    %r2,%r4				# load parmfile
 	bas   %r14,.Lloader
@@ -284,6 +297,8 @@ iplstart:
 
 .Lagain2:
  	l     %r2,INITRD_START-PARMAREA+4(%r12)	# load ramdisk
+	chi   %r2,-1
+	be    .Lnoinitrd
 	bas   %r14,.Lloader
 
  	st    %r2,INITRD_SIZE-PARMAREA+4(%r12)	# store ramdisk size
@@ -298,86 +313,14 @@ iplstart:
 	clc   0(3,%r2),.L_eof
 	bz    .Lagain2
 
-#
-# Copy kernel image to final position
-#
-
-	la    %r2,_load_psw			# prepare copy code
-	la    %r3,.Lcopypsw
-	mvc   0(8,%r3),0(%r2)			# copy load psw
-
-	l     %r4,_initrd_addr+4
-	ahi   %r4,-0x100
-
-	la    %r2,.Lcopystart			# get copy code addr (from)
-	mvc   0(.Lcopyend-.Lcopystart,%r4),0(%r2)	# copy code
-
-	l     %r1,.Loffset			# temp kernel address (from)
-
-	l     %r2,4(%r3)			# get kernel addr from psw (to)
-	n     %r2,.Lpswmask
-	s     %r2,.Lkernoff
-
-	l     %r3,.Lkernsize			# (length)
-	br    %r4				# branch to copy routine
-
-#
-# Copy kernel, then load PSW
-#
-# R1 = from
-# R2 = to
-# R3 = length
-#
-
-	.align 8
-.Lcopystart:
-	clr   %r1,%r2
-	je    .Lcopyfinish			# kernel is already at dest
-	jh    .Lcopytolower			# need move to lower address
-
-# Copy last to first
-
-	ar    %r1,%r3				# start from last long
-	ar    %r2,%r3
-	lhi   %r4,-4				# set addr increment to -4
-	j     .Lcopygo
-
-# Copy first to last
-
-.Lcopytolower:
-	lhi   %r4,4				# set addr increment to 4
-
-.Lcopygo:
-	ahi   %r3,3				# get size in longs
-	srl   %r3,2
-
-.Lcopyloop:
-	l     %r0,0(%r1)			# copy longs
-	st    %r0,0(%r2)
-	ar    %r1,%r4
-	ar    %r2,%r4
-	brct  %r3,.Lcopyloop
-
-.Lcopyfinish:
-	bras  %r13,.Lcopyload			# set up base register
-.Lcopyload:
-	sr    %r0,%r0
-	la    %r1,.Lcopypsw-.Lcopyload(%r13)
-	mvc   0(8,%r0),0(%r1)			# copy load psw to 0
-
-	lm    %r0,%r15,.Lvmparam-.Lcopyload(%r13) # load saved registers
+.Lnoinitrd:
+	mvc   0(8,0),_load_psw			# copy load psw
 	lpsw  0					# start kernel
 
 	.align  8
-.Lcopypsw:
-	.quad 0
 .Lvmparam:
 	.long 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0	# vm parameter space
 
-.Lcopyend:
-
-.Lpswmask:
-	.long 0x7fffffff
 .Lkernsize:
 	.long 0
 .Lkernoff:
