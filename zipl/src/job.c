@@ -368,28 +368,25 @@ free_envblk_data(struct job_envblk_data *data)
 }
 
 static void
+free_common_ipl_data(struct job_common_ipl_data *common)
+{
+	free(common->image);
+	free(common->parmline);
+	free(common->ramdisk);
+}
+
+static void
 free_ipl_data(struct job_ipl_data* data)
 {
-	if (data->common.image != NULL)
-		free(data->common.image);
-	if (data->common.parmline != NULL)
-		free(data->common.parmline);
-	if (data->common.ramdisk != NULL)
-		free(data->common.ramdisk);
+	free_common_ipl_data(&data->common);
 }
 
 
 static void
 free_ipl_tape_data(struct job_ipl_tape_data* data)
 {
-	if (data->device != NULL)
-		free(data->device);
-	if (data->common.image != NULL)
-		free(data->common.image);
-	if (data->common.parmline != NULL)
-		free(data->common.parmline);
-	if (data->common.ramdisk != NULL)
-		free(data->common.ramdisk);
+	free(data->device);
+	free_common_ipl_data(&data->common);
 }
 
 
@@ -404,14 +401,8 @@ free_segment_data(struct job_segment_data* data)
 static void
 free_dump_data(struct job_dump_data* data)
 {
-	if (data->device != NULL)
-		free(data->device);
-	if (data->common.image != NULL)
-		free(data->common.image);
-	if (data->common.parmline != NULL)
-		free(data->common.parmline);
-	if (data->common.ramdisk != NULL)
-		free(data->common.ramdisk);
+	free(data->device);
+	free_common_ipl_data(&data->common);
 }
 
 
