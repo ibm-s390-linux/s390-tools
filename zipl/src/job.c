@@ -762,25 +762,36 @@ static void error_text_section(const char *text, const char *section, const char
 
 
 static int
+check_common_ipl_data(struct job_common_ipl_data *common, const char *section)
+{
+	int rc;
+
+	if (common->image != NULL) {
+		rc = misc_check_readable_file(common->image);
+		if (rc) {
+			error_text_section("Image file", section, common->image);
+			return rc;
+		}
+	}
+	if (common->ramdisk != NULL) {
+		rc = misc_check_readable_file(common->ramdisk);
+		if (rc) {
+			error_text_section("Ramdisk file", section, common->ramdisk);
+			return rc;
+		}
+	}
+	return 0;
+}
+
+static int
 check_job_ipl_data(struct job_ipl_data *ipl, char *name,
 		   struct job_envblk_data *envblk)
 {
 	int rc;
 
-	if (ipl->common.image != NULL) {
-		rc = misc_check_readable_file(ipl->common.image);
-		if (rc) {
-			error_text_section("Image file", name, ipl->common.image);
-			return rc;
-		}
-	}
-	if (ipl->common.ramdisk != NULL) {
-		rc = misc_check_readable_file(ipl->common.ramdisk);
-		if (rc) {
-			error_text_section("Ramdisk file", name, ipl->common.ramdisk);
-			return rc;
-		}
-	}
+	rc = check_common_ipl_data(&ipl->common, name);
+	if (rc)
+		return rc;
 	return finalize_ipl_address_data(ipl, name, envblk);
 }
 
@@ -889,20 +900,9 @@ check_job_ipl_tape_data(struct job_ipl_tape_data *ipl, char* name)
 			return rc;
 		}
 	}
-	if (ipl->common.image != NULL) {
-		rc = misc_check_readable_file(ipl->common.image);
-		if (rc) {
-			error_text_section("Image file", name, ipl->common.image);
-			return rc;
-		}
-	}
-	if (ipl->common.ramdisk != NULL) {
-		rc = misc_check_readable_file(ipl->common.ramdisk);
-		if (rc) {
-			error_text_section("Ramdisk file", name, ipl->common.ramdisk);
-			return rc;
-		}
-	}
+	rc = check_common_ipl_data(&ipl->common, name);
+	if (rc)
+		return rc;
 	return finalize_common_address_data(&ipl->common, name);
 }
 
