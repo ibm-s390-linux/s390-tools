@@ -212,12 +212,12 @@ main(int argc, char* argv[])
 		break;
 	case job_ipl_tape:
 		rc = install_tapeloader(job->data.ipl_tape.device,
-					job->data.ipl_tape.image,
-					job->data.ipl_tape.parmline,
-					job->data.ipl_tape.ramdisk,
-					job->data.ipl_tape.image_addr,
-					job->data.ipl_tape.parm_addr,
-					job->data.ipl_tape.ramdisk_addr);
+					job->data.ipl_tape.common.image,
+					job->data.ipl_tape.common.parmline,
+					job->data.ipl_tape.common.ramdisk,
+					job->data.ipl_tape.common.image_addr,
+					job->data.ipl_tape.common.parm_addr,
+					job->data.ipl_tape.common.ramdisk_addr);
 		break;
 	case job_mvdump:
 		rc = install_mvdump(job->data.mvdump.device,

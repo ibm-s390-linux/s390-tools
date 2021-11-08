@@ -560,16 +560,16 @@ static int add_ipl_program(int fd, char *filename,
 	 */
 	/* initiate values for ramdisk */
 	stats.st_size = 0;
-	if (ipl->ramdisk != NULL) {
+	if (ipl->common.ramdisk != NULL) {
 		/* Add ramdisk */
 		if (verbose) {
-			printf("  initial ramdisk...: %s\n", ipl->ramdisk);
+			printf("  initial ramdisk...: %s\n", ipl->common.ramdisk);
 		}
 		/* Get ramdisk file size */
-		if (stat(ipl->ramdisk, &stats)) {
+		if (stat(ipl->common.ramdisk, &stats)) {
 			error_reason(strerror(errno));
 			error_text("Could not get information for file '%s'",
-				   ipl->ramdisk);
+				   ipl->common.ramdisk);
 			free(table);
 			return -1;
 		}
@@ -609,10 +609,10 @@ static int add_ipl_program(int fd, char *filename,
 		flags |= STAGE3_FLAG_KDUMP;
 
 	/* Get kernel file size */
-	if (stat(ipl->image, &stats)) {
+	if (stat(ipl->common.image, &stats)) {
 		error_reason(strerror(errno));
 		error_text("Could not get information for file '%s'",
-			   ipl->image);
+			   ipl->common.image);
 		free(table);
 		return -1;
 	}
@@ -669,12 +669,12 @@ static int add_ipl_program(int fd, char *filename,
 
 	/* Add stage 3 parameter to bootmap */
 	rc = boot_get_stage3_parms(&stage3_params, &stage3_params_size,
-				   ipl->parm_addr, ipl->ramdisk_addr,
+				   ipl->common.parm_addr, ipl->common.ramdisk_addr,
 				   ramdisk_size,
 				   ipl->is_kdump ? IMAGE_ENTRY_KDUMP :
 				   IMAGE_ENTRY,
 				   (info->type == disk_type_scsi) ? 0 : 1,
-				   flags, ipl->image_addr, image_size,
+				   flags, ipl->common.image_addr, image_size,
 				   ipl->envblk_addr,
 				   add_envblk ? envblk->size : 0);
 	if (rc) {
@@ -698,14 +698,14 @@ static int add_ipl_program(int fd, char *filename,
 
 	/* Add kernel image */
 	if (verbose) {
-		printf("  kernel image......: %s\n", ipl->image);
+		printf("  kernel image......: %s\n", ipl->common.image);
 	}
-	signature_size = extract_signature(ipl->image, &signature, &sig_head);
+	signature_size = extract_signature(ipl->common.image, &signature, &sig_head);
 	if (signature_size &&
 	    (is_secure == SECURE_BOOT_ENABLED ||
 	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
 		if (verbose)
-			printf("  signature for.....: %s\n", ipl->image);
+			printf("  signature for.....: %s\n", ipl->common.image);
 
 		rc = add_component_buffer(fd, signature, sig_head.length,
 					  (component_data)sig_head,
@@ -722,7 +722,7 @@ static int add_ipl_program(int fd, char *filename,
 		comp_nr++;
 		free(signature);
 		check_remaining_filesize(image_size, signature_size, info,
-					 ipl->image);
+					 ipl->common.image);
 	} else if (is_secure == SECURE_BOOT_ENABLED) {
 		/*
 		 * If secure boot is forced and we have failed to extract a
@@ -731,16 +731,16 @@ static int add_ipl_program(int fd, char *filename,
 		 */
 		error_text("Could not install Secure Boot IPL records");
 		error_reason("Missing signature in image file %s",
-			     ipl->image);
+			     ipl->common.image);
 		free(table);
 		return -1;
 	}
 
-	rc = add_component_file(fd, ipl->image, ipl->image_addr,
+	rc = add_component_file(fd, ipl->common.image, ipl->common.image_addr,
 				signature_size, VOID_ADD(table, offset),
 				add_files, info, target, &comp_loc[comp_nr]);
 	if (rc) {
-		error_text("Could not add image file '%s'", ipl->image);
+		error_text("Could not add image file '%s'", ipl->common.image);
 		free(table);
 		return rc;
 	}
@@ -749,19 +749,19 @@ static int add_ipl_program(int fd, char *filename,
 	comp_nr++;
 
 	/* Add kernel parmline */
-	if (ipl->parmline != NULL) {
+	if (ipl->common.parmline != NULL) {
 		if (verbose) {
-			printf("  kernel parmline...: '%s'\n", ipl->parmline);
+			printf("  kernel parmline...: '%s'\n", ipl->common.parmline);
 		}
-		rc = add_component_buffer(fd, ipl->parmline,
-					  strlen(ipl->parmline) + 1,
-					  (component_data) ipl->parm_addr,
+		rc = add_component_buffer(fd, ipl->common.parmline,
+					  strlen(ipl->common.parmline) + 1,
+					  (component_data) ipl->common.parm_addr,
 					  VOID_ADD(table, offset),
 					  info, &comp_loc[comp_nr],
 					  component_load);
 		if (rc) {
 			error_text("Could not add parmline '%s'",
-				   ipl->parmline);
+				   ipl->common.parmline);
 			free(table);
 			return -1;
 		}
@@ -770,8 +770,8 @@ static int add_ipl_program(int fd, char *filename,
 		comp_nr++;
 	}
 	/* add ramdisk */
-	if (ipl->ramdisk != NULL) {
-		signature_size = extract_signature(ipl->ramdisk, &signature,
+	if (ipl->common.ramdisk != NULL) {
+		signature_size = extract_signature(ipl->common.ramdisk, &signature,
 						   &sig_head);
 		if (signature_size &&
 		    (is_secure == SECURE_BOOT_ENABLED ||
@@ -779,7 +779,7 @@ static int add_ipl_program(int fd, char *filename,
 		      secure_boot_supported))) {
 			if (verbose) {
 				printf("  signature for.....: %s\n",
-				       ipl->ramdisk);
+				       ipl->common.ramdisk);
 			}
 			rc = add_component_buffer(fd, signature,
 						  sig_head.length,
@@ -797,16 +797,16 @@ static int add_ipl_program(int fd, char *filename,
 			comp_nr++;
 			free(signature);
 			check_remaining_filesize(ramdisk_size, signature_size,
-						 info, ipl->ramdisk);
+						 info, ipl->common.ramdisk);
 		}
-		rc = add_component_file(fd, ipl->ramdisk,
-					ipl->ramdisk_addr, signature_size,
+		rc = add_component_file(fd, ipl->common.ramdisk,
+					ipl->common.ramdisk_addr, signature_size,
 					VOID_ADD(table, offset),
 					add_files, info, target,
 					&comp_loc[comp_nr]);
 		if (rc) {
 			error_text("Could not add ramdisk '%s'",
-				   ipl->ramdisk);
+				   ipl->common.ramdisk);
 			free(table);
 			return -1;
 		}
@@ -1009,17 +1009,14 @@ add_dump_program(int fd, struct job_dump_data* dump,
 
 	/* Convert fs dump job to IPL job */
 	memset(&ipl, 0, sizeof(ipl));
-	ipl.image = dump->image;
-	ipl.image_addr = dump->image_addr;
-	ipl.ramdisk = dump->ramdisk;
-	ipl.ramdisk_addr = dump->ramdisk_addr;
+	ipl.common = dump->common;
 
 	/* Get file system dump parmline */
-	rc = get_dump_parmline(dump->device, dump->parmline,
-			       info, target, &ipl.parmline);
+	rc = get_dump_parmline(dump->device, dump->common.parmline,
+			       info, target, &ipl.common.parmline);
 	if (rc)
 		return rc;
-	ipl.parm_addr = dump->parm_addr;
+	ipl.common.parm_addr = dump->common.parm_addr;
 	return add_ipl_program(fd, NULL, false, NULL, &ipl, program, verbose, 1,
 			       type, info, target, SECURE_BOOT_DISABLED);
 }
@@ -1283,14 +1280,14 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 		size = IMAGE_LOAD_ADDRESS;
 
 		/* Ramdisk */
-		if (job->data.dump.ramdisk != NULL) {
-			if (stat(job->data.dump.ramdisk, &st))
+		if (job->data.dump.common.ramdisk != NULL) {
+			if (stat(job->data.dump.common.ramdisk, &st))
 				goto out_misc_free_temp_dev;
 			size += DIV_ROUND_UP(st.st_size, info->phy_block_size);
 			size += 1; /* For ramdisk section entry */
 		}
 		/* Kernel */
-		if (stat(job->data.dump.image, &st))
+		if (stat(job->data.dump.common.image, &st))
 			goto out_misc_free_temp_dev;
 		size += DIV_ROUND_UP(st.st_size - IMAGE_LOAD_ADDRESS,
 				     info->phy_block_size);

@@ -370,12 +370,12 @@ free_envblk_data(struct job_envblk_data *data)
 static void
 free_ipl_data(struct job_ipl_data* data)
 {
-	if (data->image != NULL)
-		free(data->image);
-	if (data->parmline != NULL)
-		free(data->parmline);
-	if (data->ramdisk != NULL)
-		free(data->ramdisk);
+	if (data->common.image != NULL)
+		free(data->common.image);
+	if (data->common.parmline != NULL)
+		free(data->common.parmline);
+	if (data->common.ramdisk != NULL)
+		free(data->common.ramdisk);
 }
 
 
@@ -384,12 +384,12 @@ free_ipl_tape_data(struct job_ipl_tape_data* data)
 {
 	if (data->device != NULL)
 		free(data->device);
-	if (data->image != NULL)
-		free(data->image);
-	if (data->parmline != NULL)
-		free(data->parmline);
-	if (data->ramdisk != NULL)
-		free(data->ramdisk);
+	if (data->common.image != NULL)
+		free(data->common.image);
+	if (data->common.parmline != NULL)
+		free(data->common.parmline);
+	if (data->common.ramdisk != NULL)
+		free(data->common.ramdisk);
 }
 
 
@@ -406,12 +406,12 @@ free_dump_data(struct job_dump_data* data)
 {
 	if (data->device != NULL)
 		free(data->device);
-	if (data->image != NULL)
-		free(data->image);
-	if (data->parmline != NULL)
-		free(data->parmline);
-	if (data->ramdisk != NULL)
-		free(data->ramdisk);
+	if (data->common.image != NULL)
+		free(data->common.image);
+	if (data->common.parmline != NULL)
+		free(data->common.parmline);
+	if (data->common.ramdisk != NULL)
+		free(data->common.ramdisk);
 }
 
 
@@ -559,21 +559,21 @@ get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
 		return -1;
 	/* Fill in component data */
 	num = 0;
-	rc = set_cl_element(&cl[num++], "kernel image", ipl->image,
-			    &ipl->image_addr, 0, 0,
+	rc = set_cl_element(&cl[num++], "kernel image", ipl->common.image,
+			    &ipl->common.image_addr, 0, 0,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;
-	if (ipl->parmline) {
+	if (ipl->common.parmline) {
 		rc = set_cl_element(&cl[num++], "parmline", NULL,
-				    &ipl->parm_addr, MAXIMUM_PARMLINE_SIZE, 0,
+				    &ipl->common.parm_addr, MAXIMUM_PARMLINE_SIZE, 0,
 				    MAXIMUM_PHYSICAL_BLOCKSIZE);
 		if (rc)
 			goto error;
 	}
-	if (ipl->ramdisk) {
-		rc = set_cl_element(&cl[num++], "initial ramdisk", ipl->ramdisk,
-			&ipl->ramdisk_addr, 0, 0, 0x10000);
+	if (ipl->common.ramdisk) {
+		rc = set_cl_element(&cl[num++], "initial ramdisk", ipl->common.ramdisk,
+			&ipl->common.ramdisk_addr, 0, 0, 0x10000);
 		if (rc)
 			goto error;
 	}
@@ -607,19 +607,19 @@ get_dump_components(struct job_dump_data *dump,
 		return -1;
 	/* Fill in component data */
 	num = 0;
-	rc = set_cl_element(&cl[num++], "kernel image", dump->image,
-			    &dump->image_addr, 0, 0x0,
+	rc = set_cl_element(&cl[num++], "kernel image", dump->common.image,
+			    &dump->common.image_addr, 0, 0x0,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;
-	rc = set_cl_element(&cl[num++], "parmline", NULL, &dump->parm_addr,
+	rc = set_cl_element(&cl[num++], "parmline", NULL, &dump->common.parm_addr,
 			    MAXIMUM_PARMLINE_SIZE, 0,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;
-	if (dump->ramdisk) {
+	if (dump->common.ramdisk) {
 		rc = set_cl_element(&cl[num++], "initial ramdisk",
-				    dump->ramdisk, &dump->ramdisk_addr,
+				    dump->common.ramdisk, &dump->common.ramdisk_addr,
 				    0, 0, 0x10000);
 		if (rc)
 			goto error;
@@ -648,23 +648,23 @@ get_ipl_tape_components(struct job_ipl_tape_data *ipl_tape,
 		return -1;
 	/* Fill in component data */
 	num = 0;
-	rc = set_cl_element(&cl[num++], "kernel image", ipl_tape->image,
-			    &ipl_tape->image_addr, 0, 0x10000,
+	rc = set_cl_element(&cl[num++], "kernel image", ipl_tape->common.image,
+			    &ipl_tape->common.image_addr, 0, 0x10000,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;
 	/* Enhance the image size value for tape loader specific logic */
 	cl[0].size = ALIGN(cl[0].size + 0x100, MAXIMUM_PHYSICAL_BLOCKSIZE);
-	if (ipl_tape->parmline) {
+	if (ipl_tape->common.parmline) {
 		rc = set_cl_element(&cl[num++], "parmline", NULL,
-				    &ipl_tape->parm_addr, MAXIMUM_PARMLINE_SIZE,
+				    &ipl_tape->common.parm_addr, MAXIMUM_PARMLINE_SIZE,
 				    0, MAXIMUM_PHYSICAL_BLOCKSIZE);
 		if (rc)
 			goto error;
 	}
-	if (ipl_tape->ramdisk) {
+	if (ipl_tape->common.ramdisk) {
 		rc = set_cl_element(&cl[num++], "initial ramdisk",
-				    ipl_tape->ramdisk, &ipl_tape->ramdisk_addr,
+				    ipl_tape->common.ramdisk, &ipl_tape->common.ramdisk_addr,
 				    0, 0, 0x10000);
 		if (rc)
 			goto error;
@@ -837,10 +837,10 @@ finalize_ipl_tape_address_data(struct job_ipl_tape_data* ipl_tape, char *name)
 		goto out_free;
 	rc = finalize_component_address_data(cl, num, ADDRESS_LIMIT);
 	/* The loader needs a ramdisk_addr anyway */
-	if (ipl_tape->ramdisk_addr == 0) {
+	if (ipl_tape->common.ramdisk_addr == 0) {
 		for (i = 0; i < num; i++) {
-			if (*cl[i].addrp == ipl_tape->image_addr)
-				ipl_tape->ramdisk_addr =
+			if (*cl[i].addrp == ipl_tape->common.image_addr)
+				ipl_tape->common.ramdisk_addr =
 					*cl[i].addrp + cl[i].size;
 		}
 	}
@@ -856,26 +856,26 @@ check_job_ipl_data(struct job_ipl_data *ipl, char *name,
 {
 	int rc;
 
-	if (ipl->image != NULL) {
-		rc = misc_check_readable_file(ipl->image);
+	if (ipl->common.image != NULL) {
+		rc = misc_check_readable_file(ipl->common.image);
 		if (rc) {
 			if (name == NULL) {
-				error_text("Image file '%s'", ipl->image);
+				error_text("Image file '%s'", ipl->common.image);
 			} else {
 				error_text("Image file '%s' in section '%s'",
-					   ipl->image, name);
+					   ipl->common.image, name);
 			}
 			return rc;
 		}
 	}
-	if (ipl->ramdisk != NULL) {
-		rc = misc_check_readable_file(ipl->ramdisk);
+	if (ipl->common.ramdisk != NULL) {
+		rc = misc_check_readable_file(ipl->common.ramdisk);
 		if (rc) {
 			if (name == NULL) {
-				error_text("Ramdisk file '%s'", ipl->ramdisk);
+				error_text("Ramdisk file '%s'", ipl->common.ramdisk);
 			} else {
 				error_text("Ramdisk file '%s' in section '%s'",
-					   ipl->ramdisk, name);
+					   ipl->common.ramdisk, name);
 			}
 			return rc;
 		}
@@ -938,22 +938,22 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 			   ZFCPDUMP_IMAGE);
 		return rc;
 	}
-	dump->image = misc_strdup(ZFCPDUMP_IMAGE);
-	if (dump->image == NULL)
+	dump->common.image = misc_strdup(ZFCPDUMP_IMAGE);
+	if (dump->common.image == NULL)
 		return -1;
-	dump->image_addr = IMAGE_LOAD_ADDRESS;
+	dump->common.image_addr = IMAGE_LOAD_ADDRESS;
 
 	/* Ramdisk is no longer required with new initramfs dump system */
 	if (misc_check_readable_file(ZFCPDUMP_INITRD))
-		dump->ramdisk = NULL;
+		dump->common.ramdisk = NULL;
 	else {
-		dump->ramdisk = misc_strdup(ZFCPDUMP_INITRD);
-		if (dump->ramdisk == NULL)
+		dump->common.ramdisk = misc_strdup(ZFCPDUMP_INITRD);
+		if (dump->common.ramdisk == NULL)
 			return -1;
-		dump->ramdisk_addr = UNSPECIFIED_ADDRESS;
+		dump->common.ramdisk_addr = UNSPECIFIED_ADDRESS;
 	}
 
-	dump->parm_addr = UNSPECIFIED_ADDRESS;
+	dump->common.parm_addr = UNSPECIFIED_ADDRESS;
 	return finalize_dump_address_data(dump, name);
 }
 
@@ -1004,26 +1004,26 @@ check_job_ipl_tape_data(struct job_ipl_tape_data *ipl, char* name)
 			return rc;
 		}
 	}
-	if (ipl->image != NULL) {
-		rc = misc_check_readable_file(ipl->image);
+	if (ipl->common.image != NULL) {
+		rc = misc_check_readable_file(ipl->common.image);
 		if (rc) {
 			if (name == NULL) {
-				error_text("Image file '%s'", ipl->image);
+				error_text("Image file '%s'", ipl->common.image);
 			} else {
 				error_text("Image file '%s' in section '%s'",
-					   ipl->image, name);
+					   ipl->common.image, name);
 			}
 			return rc;
 		}
 	}
-	if (ipl->ramdisk != NULL) {
-		rc = misc_check_readable_file(ipl->ramdisk);
+	if (ipl->common.ramdisk != NULL) {
+		rc = misc_check_readable_file(ipl->common.ramdisk);
 		if (rc) {
 			if (name == NULL) {
-				error_text("Ramdisk file '%s'", ipl->ramdisk);
+				error_text("Ramdisk file '%s'", ipl->common.ramdisk);
 			} else {
 				error_text("Ramdisk file '%s' in section '%s'",
-					   ipl->ramdisk, name);
+					   ipl->common.ramdisk, name);
 			}
 			return rc;
 		}
@@ -1383,19 +1383,19 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 				atol(data[(int) scan_keyword_targetoffset]);
 		/* Fill in name and address of image file */
 
-		job->data.ipl.image = misc_strdup(
+		job->data.ipl.common.image = misc_strdup(
 					data[(int) scan_keyword_image]);
-		if (job->data.ipl.image == NULL)
+		if (job->data.ipl.common.image == NULL)
 			return -1;
-		if (extract_address(job->data.ipl.image,
-				    &job->data.ipl.image_addr)) {
-			job->data.ipl.image_addr = IMAGE_LOAD_ADDRESS;
+		if (extract_address(job->data.ipl.common.image,
+				    &job->data.ipl.common.image_addr)) {
+			job->data.ipl.common.image_addr = IMAGE_LOAD_ADDRESS;
 		}
 		/* Fill in parmline */
 		rc = get_parmline(data[(int) scan_keyword_parmfile],
 				  data[(int) scan_keyword_parameters],
-				  &job->data.ipl.parmline,
-				  &job->data.ipl.parm_addr, section);
+				  &job->data.ipl.common.parmline,
+				  &job->data.ipl.common.parm_addr, section);
 		if (rc)
 			return rc;
 		/* Fill in environment block */
@@ -1403,13 +1403,13 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 
 		/* Fill in name and address of ramdisk file */
 		if (data[(int) scan_keyword_ramdisk] != NULL) {
-			job->data.ipl.ramdisk =
+			job->data.ipl.common.ramdisk =
 				misc_strdup(data[(int) scan_keyword_ramdisk]);
-			if (job->data.ipl.ramdisk == NULL)
+			if (job->data.ipl.common.ramdisk == NULL)
 				return -1;
-			if (extract_address(job->data.ipl.ramdisk,
-					    &job->data.ipl.ramdisk_addr)) {
-				job->data.ipl.ramdisk_addr =
+			if (extract_address(job->data.ipl.common.ramdisk,
+					    &job->data.ipl.common.ramdisk_addr)) {
+				job->data.ipl.common.ramdisk_addr =
 					UNSPECIFIED_ADDRESS;
 			}
 		}
@@ -1441,30 +1441,30 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 		if (job->data.ipl_tape.device == NULL)
 			return -1;
 		/* Fill in name and address of image file */
-		job->data.ipl_tape.image = misc_strdup(
+		job->data.ipl_tape.common.image = misc_strdup(
 					data[(int) scan_keyword_image]);
-		if (job->data.ipl_tape.image == NULL)
+		if (job->data.ipl_tape.common.image == NULL)
 			return -1;
-		if (extract_address(job->data.ipl_tape.image,
-				    &job->data.ipl_tape.image_addr)) {
-			job->data.ipl_tape.image_addr = IMAGE_LOAD_ADDRESS;
+		if (extract_address(job->data.ipl_tape.common.image,
+				    &job->data.ipl_tape.common.image_addr)) {
+			job->data.ipl_tape.common.image_addr = IMAGE_LOAD_ADDRESS;
 		}
 		/* Fill in parmline */
 		rc = get_parmline(data[(int) scan_keyword_parmfile],
 				  data[(int) scan_keyword_parameters],
-				  &job->data.ipl_tape.parmline,
-				  &job->data.ipl_tape.parm_addr, section);
+				  &job->data.ipl_tape.common.parmline,
+				  &job->data.ipl_tape.common.parm_addr, section);
 		if (rc)
 			return rc;
 		/* Fill in name and address of ramdisk file */
 		if (data[(int) scan_keyword_ramdisk] != NULL) {
-			job->data.ipl_tape.ramdisk =
+			job->data.ipl_tape.common.ramdisk =
 				misc_strdup(data[(int) scan_keyword_ramdisk]);
-			if (job->data.ipl_tape.ramdisk == NULL)
+			if (job->data.ipl_tape.common.ramdisk == NULL)
 				return -1;
-			if (extract_address(job->data.ipl_tape.ramdisk,
-					    &job->data.ipl_tape.ramdisk_addr)) {
-				job->data.ipl_tape.ramdisk_addr =
+			if (extract_address(job->data.ipl_tape.common.ramdisk,
+					    &job->data.ipl_tape.common.ramdisk_addr)) {
+				job->data.ipl_tape.common.ramdisk_addr =
 					UNSPECIFIED_ADDRESS;
 			}
 		}
@@ -1801,15 +1801,15 @@ get_section_job(struct scan_token* scan, char* section, struct job_data* job,
 	if (extra_parmline != NULL) {
 		switch (job->id) {
 		case job_ipl:
-			if (job->data.ipl.parmline == NULL)
+			if (job->data.ipl.common.parmline == NULL)
 				buffer = misc_strdup(extra_parmline);
 			else {
 				buffer = append_parmline(
-						job->data.ipl.parmline,
+						job->data.ipl.common.parmline,
 						extra_parmline);
-				free(job->data.ipl.parmline);
+				free(job->data.ipl.common.parmline);
 			}
-			job->data.ipl.parmline = buffer;
+			job->data.ipl.common.parmline = buffer;
 			if (buffer == NULL)
 				return -1;
 			break;

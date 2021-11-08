@@ -39,13 +39,17 @@ struct job_target_data {
 	blocknum_t targetoffset;
 };
 
-struct job_ipl_data {
+struct job_common_ipl_data {
 	char* image;
 	char* parmline;
 	char* ramdisk;
 	address_t image_addr;
 	address_t parm_addr;
 	address_t ramdisk_addr;
+};
+
+struct job_ipl_data {
+	struct job_common_ipl_data common;
 	address_t envblk_addr;
 	int is_kdump;
 };
@@ -61,13 +65,8 @@ struct job_segment_data {
 };
 
 struct job_dump_data {
+	struct job_common_ipl_data common;
 	char* device;
-	char* image;
-	char* parmline;
-	char* ramdisk;
-	address_t image_addr;
-	address_t parm_addr;
-	address_t ramdisk_addr;
 	uint64_t mem;
 };
 
@@ -80,13 +79,8 @@ struct job_mvdump_data {
 };
 
 struct job_ipl_tape_data {
+	struct job_common_ipl_data common;
 	char* device;
-	char* image;
-	char* parmline;
-	char* ramdisk;
-	address_t image_addr;
-	address_t parm_addr;
-	address_t ramdisk_addr;
 };
 
 
