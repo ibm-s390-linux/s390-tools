@@ -283,8 +283,8 @@ static void dump_chunks_init(void)
 	struct dfi_mem_chunk *mem_chunk;
 	u64 off = 0;
 
-	dfo_chunk_add(0, l.hdr_size, l.hdr, dfo_chunk_buf_fn);
-	off = l.hdr_size;
+	dfo_chunk_add(off, l.hdr_size, l.hdr, dfo_chunk_buf_fn);
+	off += l.hdr_size;
 	dfi_mem_chunk_iterate(mem_chunk) {
 		if (mem_chunk->read_fn == dfi_mem_chunk_read_zero)
 			/* Zero memory chunk */
