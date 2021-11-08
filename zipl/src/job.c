@@ -758,15 +758,36 @@ static void error_text_section(const char *text, const char *section, const char
 static int
 check_common_ipl_data(struct job_common_ipl_data *common, const char *section)
 {
+	uint64_t max_parm_size, len;
+	char *buffer = NULL;
+	size_t size;
 	int rc;
 
 	if (common->image != NULL) {
-		rc = misc_check_readable_file(common->image);
+		rc = misc_read_file(common->image, &buffer, &size, 0);
 		if (rc) {
 			error_text_section("Image file", section, common->image);
 			return rc;
 		}
+
+		if (size < MAX_COMMAND_LINE_SIZE + sizeof(uint64_t)) {
+			error_text_section("Image file", section, common->image);
+			return -1;
+		}
+
+		max_parm_size = *(uint64_t *)(buffer + MAX_COMMAND_LINE_SIZE);
+		if (!max_parm_size)
+			max_parm_size = LEGACY_MAXIMUM_PARMLINE_SIZE;
+
+		len = strlen(common->parmline);
+		if (len > max_parm_size) {
+			error_text("The length of the parameters line "
+				   "(%d bytes) exceeds the allowed maximum "
+				   "(%d bytes) in section '%s'", len, max_parm_size, section);
+			return -1;
+		}
 	}
+
 	if (common->ramdisk != NULL) {
 		rc = misc_check_readable_file(common->ramdisk);
 		if (rc) {
@@ -1152,17 +1173,6 @@ get_parmline(char* filename, char* line, char** parmline, address_t* address,
 			return -1;
 
 	} else result = NULL;
-	/* Check for maximum length */
-	if (result) {
-		len = strlen(result);
-		if (len > MAXIMUM_PARMLINE_SIZE) {
-			error_text("The length of the parameters line "
-				   "(%d bytes) exceeds the allowed maximum "
-				   "(%d bytes)", len, MAXIMUM_PARMLINE_SIZE);
-			free(result);
-			return -1;
-		}
-	}
 	*parmline = result;
 	*address = addr;
 	return 0;
