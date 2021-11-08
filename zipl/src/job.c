@@ -357,8 +357,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 static void
 free_target_data(struct job_target_data* data)
 {
-	if (data->targetbase != NULL)
-		free(data->targetbase);
+	free(data->targetbase);
 }
 
 static void
@@ -393,8 +392,7 @@ free_ipl_tape_data(struct job_ipl_tape_data* data)
 static void
 free_segment_data(struct job_segment_data* data)
 {
-	if (data->segment != NULL)
-		free(data->segment);
+	free(data->segment);
 }
 
 
@@ -413,8 +411,7 @@ free_menu_data(struct job_menu_data* data)
 
 	if (data->entry != NULL) {
 		for (i=0; i < data->num; i++) {
-			if (data->entry[i].name != NULL)
-				free(data->entry[i].name);
+			free(data->entry[i].name);
 			switch (data->entry[i].id) {
 			case job_ipl:
 				free_ipl_data(&data->entry[i].data.ipl);
@@ -437,23 +434,20 @@ free_mvdump_data(struct job_mvdump_data* data)
 {
 	int i;
 
-	if (data->device_list != NULL)
-		free(data->device_list);
+	free(data->device_list);
 	for (i = 0; i < data->device_count; i++)
-		if (data->device[i] != NULL)
-			free(data->device[i]);
+		free(data->device[i]);
 }
 
 
 void
 job_free(struct job_data* job)
 {
-	if (job->target.bootmap_dir != NULL)
-		free(job->target.bootmap_dir);
+
+	free(job->target.bootmap_dir);
 	free_target_data(&job->target);
 	free_envblk_data(&job->envblk);
-	if (job->name != NULL)
-		free(job->name);
+	free(job->name);
 	switch (job->id) {
 	case job_ipl:
 		free_ipl_data(&job->data.ipl);
