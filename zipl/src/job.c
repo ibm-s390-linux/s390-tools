@@ -536,6 +536,53 @@ sort_cl_array(struct component_loc* cl, int elements)
 		}
 	}
 }
+
+
+static int
+get_common_components(struct job_common_ipl_data *common,
+		      struct component_loc **clp, int *nump,
+		      int extra)
+{
+	struct component_loc *cl;
+	int num;
+	int rc;
+
+	/*
+	 * Get memory for image, parmline, ramdisk, loader and
+	 * possible extra components
+	 */
+	cl = misc_calloc(3 + extra, sizeof(struct component_loc));
+	if (cl == NULL)
+		return -1;
+	/* Fill in component data */
+	num = 0;
+	rc = set_cl_element(&cl[num++], "kernel image", common->image,
+			    &common->image_addr, 0, 0,
+			    MAXIMUM_PHYSICAL_BLOCKSIZE);
+	if (rc)
+		goto error;
+	rc = set_cl_element(&cl[num++], "parmline", NULL, &common->parm_addr,
+			    MAXIMUM_PARMLINE_SIZE, 0,
+			    MAXIMUM_PHYSICAL_BLOCKSIZE);
+	if (rc)
+		goto error;
+	if (common->ramdisk) {
+		rc = set_cl_element(&cl[num++], "initial ramdisk",
+				    common->ramdisk, &common->ramdisk_addr,
+				    0, 0, 0x10000);
+		if (rc)
+			goto error;
+	}
+
+	*clp = cl;
+	*nump = num;
+	return 0;
+error:
+	free(cl);
+	return rc;
+}
+
+
 static int
 get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
 		   int *nump, struct job_envblk_data *envblk)
@@ -544,30 +591,9 @@ get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
 	int num;
 	int rc;
 
-	/* Get memory for image, parmline, ramdisk and environment block */
-	cl = misc_calloc(4, sizeof(struct component_loc));
-	if (cl == NULL)
-		return -1;
-	/* Fill in component data */
-	num = 0;
-	rc = set_cl_element(&cl[num++], "kernel image", ipl->common.image,
-			    &ipl->common.image_addr, 0, 0,
-			    MAXIMUM_PHYSICAL_BLOCKSIZE);
+	rc = get_common_components(&ipl->common, &cl, &num, 1);
 	if (rc)
-		goto error;
-	if (ipl->common.parmline) {
-		rc = set_cl_element(&cl[num++], "parmline", NULL,
-				    &ipl->common.parm_addr, MAXIMUM_PARMLINE_SIZE, 0,
-				    MAXIMUM_PHYSICAL_BLOCKSIZE);
-		if (rc)
-			goto error;
-	}
-	if (ipl->common.ramdisk) {
-		rc = set_cl_element(&cl[num++], "initial ramdisk", ipl->common.ramdisk,
-			&ipl->common.ramdisk_addr, 0, 0, 0x10000);
-		if (rc)
-			goto error;
-	}
+		return rc;
 	rc = set_cl_element(&cl[num++], "environment block",
 			    NULL,
 			    &ipl->envblk_addr, envblk->size, 0,
@@ -575,91 +601,6 @@ get_ipl_components(struct job_ipl_data *ipl, struct component_loc **clp,
 	if (rc)
 		goto error;
 
-	*clp = cl;
-	*nump = num;
-	return 0;
-error:
-	free(cl);
-	return rc;
-}
-
-
-static int
-get_dump_components(struct job_dump_data *dump,
-		       struct component_loc **clp, int *nump)
-{
-	struct component_loc *cl;
-	int num;
-	int rc;
-
-	/* Get memory for image, parmline, ramdisk, loader */
-	cl = misc_calloc(3, sizeof(struct component_loc));
-	if (cl == NULL)
-		return -1;
-	/* Fill in component data */
-	num = 0;
-	rc = set_cl_element(&cl[num++], "kernel image", dump->common.image,
-			    &dump->common.image_addr, 0, 0x0,
-			    MAXIMUM_PHYSICAL_BLOCKSIZE);
-	if (rc)
-		goto error;
-	rc = set_cl_element(&cl[num++], "parmline", NULL, &dump->common.parm_addr,
-			    MAXIMUM_PARMLINE_SIZE, 0,
-			    MAXIMUM_PHYSICAL_BLOCKSIZE);
-	if (rc)
-		goto error;
-	if (dump->common.ramdisk) {
-		rc = set_cl_element(&cl[num++], "initial ramdisk",
-				    dump->common.ramdisk, &dump->common.ramdisk_addr,
-				    0, 0, 0x10000);
-		if (rc)
-			goto error;
-	}
-
-	*clp = cl;
-	*nump = num;
-	return 0;
-error:
-	free(cl);
-	return rc;
-}
-
-
-static int
-get_ipl_tape_components(struct job_ipl_tape_data *ipl_tape,
-			struct component_loc **clp, int *nump)
-{
-	struct component_loc *cl;
-	int num;
-	int rc;
-
-	/* Get memory for image, parmline, ramdisk */
-	cl = misc_calloc(3, sizeof(struct component_loc));
-	if (cl == NULL)
-		return -1;
-	/* Fill in component data */
-	num = 0;
-	rc = set_cl_element(&cl[num++], "kernel image", ipl_tape->common.image,
-			    &ipl_tape->common.image_addr, 0, 0x10000,
-			    MAXIMUM_PHYSICAL_BLOCKSIZE);
-	if (rc)
-		goto error;
-	/* Enhance the image size value for tape loader specific logic */
-	cl[0].size = ALIGN(cl[0].size + 0x100, MAXIMUM_PHYSICAL_BLOCKSIZE);
-	if (ipl_tape->common.parmline) {
-		rc = set_cl_element(&cl[num++], "parmline", NULL,
-				    &ipl_tape->common.parm_addr, MAXIMUM_PARMLINE_SIZE,
-				    0, MAXIMUM_PHYSICAL_BLOCKSIZE);
-		if (rc)
-			goto error;
-	}
-	if (ipl_tape->common.ramdisk) {
-		rc = set_cl_element(&cl[num++], "initial ramdisk",
-				    ipl_tape->common.ramdisk, &ipl_tape->common.ramdisk_addr,
-				    0, 0, 0x10000);
-		if (rc)
-			goto error;
-	}
 	*clp = cl;
 	*nump = num;
 	return 0;
@@ -791,13 +732,13 @@ out_free:
 
 
 static int
-finalize_dump_address_data(struct job_dump_data* dump, char *name)
+finalize_common_address_data(struct job_common_ipl_data *common, char *name)
 {
 	struct component_loc *cl;
 	int num;
 	int rc;
 
-	rc = get_dump_components(dump, &cl, &num);
+	rc = get_common_components(common, &cl, &num, 0);
 	if (rc)
 		return rc;
 	sort_cl_array(cl, num);
@@ -805,36 +746,6 @@ finalize_dump_address_data(struct job_dump_data* dump, char *name)
 	if (rc)
 		goto out_free;
 	rc = finalize_component_address_data(cl, num, ADDRESS_LIMIT);
-out_free:
-	free(cl);
-	return rc;
-}
-
-
-static int
-finalize_ipl_tape_address_data(struct job_ipl_tape_data* ipl_tape, char *name)
-{
-	struct component_loc *cl;
-	int num;
-	int rc;
-	int i;
-
-	rc = get_ipl_tape_components(ipl_tape, &cl, &num);
-	if (rc)
-		return rc;
-	sort_cl_array(cl, num);
-	rc = check_component_address_data(cl, num, name, ADDRESS_LIMIT);
-	if (rc)
-		goto out_free;
-	rc = finalize_component_address_data(cl, num, ADDRESS_LIMIT);
-	/* The loader needs a ramdisk_addr anyway */
-	if (ipl_tape->common.ramdisk_addr == 0) {
-		for (i = 0; i < num; i++) {
-			if (*cl[i].addrp == ipl_tape->common.image_addr)
-				ipl_tape->common.ramdisk_addr =
-					*cl[i].addrp + cl[i].size;
-		}
-	}
 out_free:
 	free(cl);
 	return rc;
@@ -945,7 +856,7 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 	}
 
 	dump->common.parm_addr = UNSPECIFIED_ADDRESS;
-	return finalize_dump_address_data(dump, name);
+	return finalize_common_address_data(&dump->common, name);
 }
 
 
@@ -1019,7 +930,7 @@ check_job_ipl_tape_data(struct job_ipl_tape_data *ipl, char* name)
 			return rc;
 		}
 	}
-	return finalize_ipl_tape_address_data(ipl, name);
+	return finalize_common_address_data(&ipl->common, name);
 }
 
 static int
