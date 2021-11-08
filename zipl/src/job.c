@@ -751,6 +751,15 @@ out_free:
 	return rc;
 }
 
+static void error_text_section(const char *text, const char *section, const char *file)
+{
+	if (section == NULL) {
+		error_text("%s '%s'", text, file);
+	} else {
+		error_text("%s '%s' in section '%s'", text, file, section);
+	}
+}
+
 
 static int
 check_job_ipl_data(struct job_ipl_data *ipl, char *name,
@@ -761,24 +770,14 @@ check_job_ipl_data(struct job_ipl_data *ipl, char *name,
 	if (ipl->common.image != NULL) {
 		rc = misc_check_readable_file(ipl->common.image);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Image file '%s'", ipl->common.image);
-			} else {
-				error_text("Image file '%s' in section '%s'",
-					   ipl->common.image, name);
-			}
+			error_text_section("Image file", name, ipl->common.image);
 			return rc;
 		}
 	}
 	if (ipl->common.ramdisk != NULL) {
 		rc = misc_check_readable_file(ipl->common.ramdisk);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Ramdisk file '%s'", ipl->common.ramdisk);
-			} else {
-				error_text("Ramdisk file '%s' in section '%s'",
-					   ipl->common.ramdisk, name);
-			}
+			error_text_section("Ramdisk file", name, ipl->common.ramdisk);
 			return rc;
 		}
 	}
@@ -794,13 +793,7 @@ check_job_segment_data(struct job_segment_data* segment, char* name)
 	if (segment->segment != NULL) {
 		rc = misc_check_readable_file(segment->segment);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Segment file '%s'",
-					   segment->segment);
-			} else {
-				error_text("Segment file '%s' in section '%s'",
-					   segment->segment, name);
-			}
+			error_text_section("Segment file", name, segment->segment);
 			return rc;
 		}
 	}
@@ -816,12 +809,7 @@ check_job_dump_data(struct job_dump_data* dump, char* name)
 	if (dump->device != NULL) {
 		rc = misc_check_writable_device(dump->device, 1, 1);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Dump device '%s'", dump->device);
-			} else {
-				error_text("Dump device '%s' in section '%s'",
-					   dump->device, name);
-			}
+			error_text_section("Dump device", name, dump->device);
 			return rc;
 		}
 	}
@@ -897,36 +885,21 @@ check_job_ipl_tape_data(struct job_ipl_tape_data *ipl, char* name)
 	if (ipl->device != NULL) {
 		rc = misc_check_writable_device(ipl->device, 1, 1);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Tape device '%s'", ipl->device);
-			} else {
-				error_text("Tape device '%s' in section '%s'",
-					   ipl->device, name);
-			}
+			error_text_section("Tape device", name, ipl->device);
 			return rc;
 		}
 	}
 	if (ipl->common.image != NULL) {
 		rc = misc_check_readable_file(ipl->common.image);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Image file '%s'", ipl->common.image);
-			} else {
-				error_text("Image file '%s' in section '%s'",
-					   ipl->common.image, name);
-			}
+			error_text_section("Image file", name, ipl->common.image);
 			return rc;
 		}
 	}
 	if (ipl->common.ramdisk != NULL) {
 		rc = misc_check_readable_file(ipl->common.ramdisk);
 		if (rc) {
-			if (name == NULL) {
-				error_text("Ramdisk file '%s'", ipl->common.ramdisk);
-			} else {
-				error_text("Ramdisk file '%s' in section '%s'",
-					   ipl->common.ramdisk, name);
-			}
+			error_text_section("Ramdisk file", name, ipl->common.ramdisk);
 			return rc;
 		}
 	}
@@ -942,12 +915,7 @@ check_job_mvdump_data(struct job_mvdump_data* dump, char* name)
 
 	rc = misc_read_file(dump->device_list, &buffer, &size, 0);
 	if (rc) {
-		if (name == NULL) {
-			error_text("Dump target list '%s'", dump->device_list);
-		} else {
-			error_text("Dump target list '%s' in section '%s'",
-				   dump->device_list, name);
-		}
+		error_text_section("Dump target list", name, dump->device_list);
 		return rc;
 	}
 	if (size == 0) {
@@ -1020,14 +988,7 @@ check_job_data(struct job_data* job)
 	if (job->target.bootmap_dir != NULL) {
 		rc = misc_check_writable_directory(job->target.bootmap_dir);
 		if (rc) {
-			if (job->name == NULL) {
-				error_text("Target directory '%s'",
-					   job->target.bootmap_dir);
-			} else {
-				error_text("Target directory '%s' in section "
-					   "'%s'",
-					   job->target.bootmap_dir, job->name);
-			}
+			error_text_section("Target directory", job->name, job->target.bootmap_dir);
 			return rc;
 		}
 	}
@@ -1164,12 +1125,7 @@ get_parmline(char* filename, char* line, char** parmline, address_t* address,
 		extract_address(filename, &addr);
 		rc = misc_read_file(filename, &buffer, &len, 1);
 		if (rc) {
-			if (section == NULL)
-				error_text("Parmfile '%s'", filename);
-			else {
-				error_text("Parmfile '%s' in section '%s'",
-					   filename, section);
-			}
+			error_text_section("Parmfile", section, filename);
 			free(filename);
 			return rc;
 		}
