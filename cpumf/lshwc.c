@@ -46,9 +46,9 @@
 #define CPUS_POSSIBLE	"/sys/devices/system/cpu/possible"
 #define CPUS_KERNELMAX	"/sys/devices/system/cpu/kernel_max"
 #define MAXCTRS		512
+#define IOCTLSLEEP	60U
 
-static const unsigned int ioctlsleep = 60;
-static unsigned int read_interval = ioctlsleep, cfvn, csvn, authorization;
+static unsigned int read_interval = IOCTLSLEEP, cfvn, csvn, authorization;
 static unsigned long loop_count = 1;
 static unsigned char *ioctlbuffer;
 static bool allcpu;
