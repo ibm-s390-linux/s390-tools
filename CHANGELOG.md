@@ -1,19 +1,23 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.18.x (2021-xx-xx)__
+* __v2.19.0 (2021-11-10)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.15
 
   Add new tools / libraries:
   - chreipl-fcp-mpath: New toolset that uses multipath information to change
       the configured FCP re-IPL path on detecting issues with the current path
 
   Changes of existing tools:
+  - dbginfo.sh: Add retry timeout and remove possible blocking "blockdev --report"
+  - dbginfo.sh: Collect config- and debug-data for chreipl-fcp-mpath
+  - hsci: Add support for multiple MAC addresses
 
   Bug Fixes:
-
-  Changes of existing tools:
-  - dbginfo.sh: retry for timeout and remove possible blocking "blockdev --report"
+  - lshwc: Fix compile error for gcc <8.1
+  - zdump: Various clean-ups and fixes
+  - ziomon: Correct throughput calculation in ziorep_printers
+  - zipl: Fix segmentation fault when setting stage3_parms
 
 * __v2.18.0 (2021-10-01)__
 

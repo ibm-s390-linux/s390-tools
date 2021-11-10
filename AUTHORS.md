@@ -2,6 +2,7 @@ List of all individuals having contributed content to s390-tools
 ----------------------------------------------------------------
 
 - Alexander Egorenkov
+- Alexandra Winter
 - Alexey Ishchuk
 - Andreas Herrmann
 - Andre Wild
@@ -110,6 +111,7 @@ List of all individuals having contributed content to s390-tools
 - Swen Schillig
 - Taraka R. Bodireddy
 - Thomas Heidrich
+- Thomas Huth
 - Thomas Richter
 - Thomas Spatzier
 - Thomas Weber
