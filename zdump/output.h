@@ -5,9 +5,9 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#ifndef STDOUT_H
-#define STDOUT_H
+#ifndef OUTPUT_H
+#define OUTPUT_H
 
-int stdout_write_dump(void);
+int write_dump(int fd);
 
-#endif /* STDOUT_H */
+#endif /* OUTPUT_H */

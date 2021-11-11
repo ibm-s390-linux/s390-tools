@@ -18,6 +18,8 @@ struct options {
 	int		action_specified;
 	enum zg_action	action;
 	char		*device;
+	/* If `output_path == NULL` the output is written to `stdout` */
+	const char	*output_path;
 	char		*mount_point;
 	int		fmt_specified;
 	const char	*fmt;

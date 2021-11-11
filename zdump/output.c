@@ -1,7 +1,7 @@
 /*
  * zgetdump - Tool for copying and converting System z dumps
  *
- * Write dump to standard output (stdout)
+ * Write dump to the file descriptor (fd)
  *
  * Copyright IBM Corp. 2001, 2017
  *
@@ -12,13 +12,16 @@
 #include "zg.h"
 #include "dfi.h"
 #include "dfo.h"
-#include "stdout.h"
+#include "output.h"
 
-int stdout_write_dump(void)
+int write_dump(int fd)
 {
 	const u64 output_size = dfo_size();
 	char buf[8UL * PAGE_SIZE];
 	u64 written = 0;
+
+	if (fd < 0)
+		ERR_EXIT("fd must be a valid file descriptor");
 
 	if (!dfi_feat_copy())
 		ERR_EXIT("Copying not possible for %s dumps", dfi_name());
@@ -32,7 +35,7 @@ int stdout_write_dump(void)
 		u64 cnt;
 
 		cnt = dfo_read(buf, sizeof(buf));
-		rc = write(STDOUT_FILENO, buf, cnt);
+		rc = write(fd, buf, cnt);
 		if (rc == -1)
 			ERR_EXIT_ERRNO("Error: Write failed");
 		if (rc != (ssize_t) cnt)

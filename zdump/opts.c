@@ -40,6 +40,7 @@ static const char optstr[] = "hvVidmus:f:X";
  */
 static const char help_text[] =
 	"Usage: zgetdump    DUMP [-s SYS] [-f FMT] > DUMP_FILE\n"
+	"                   DUMP [-s SYS] [-f FMT] DUMP_FILE\n"
 	"                -m DUMP [-s SYS] [-f FMT] DIR\n"
 	"                -i DUMP [-s SYS]\n"
 	"                -d DUMPDEV\n"
@@ -86,6 +87,7 @@ static void init_defaults(struct options *opts)
 {
 	opts->prog_name = "zgetdump";
 	opts->action = ZG_ACTION_COPY;
+	opts->output_path = NULL;
 #ifdef __s390x__
 	opts->fmt = "elf";
 #else
@@ -167,6 +169,14 @@ static void device_set(struct options *opts, const char *path)
 }
 
 /*
+ * Set output path
+ */
+static void output_set(struct options *opts, const char *path)
+{
+	opts->output_path = zg_strdup(path);
+}
+
+/*
  * Set FUSE debug options
  */
 static void argv_fuse_set(struct options *opts, char **argv, int argc)
@@ -229,6 +239,14 @@ static void parse_pos_args(struct options *opts, char *argv[], int argc)
 
 	switch (opts->action) {
 	case ZG_ACTION_COPY:
+		if (pos_args == 0)
+			ERR_EXIT("No device or dump specified");
+		if (pos_args > 2)
+			ERR_EXIT("Too many positional parameters specified");
+		device_set(opts, argv[optind]);
+		if (pos_args > 1)
+			output_set(opts, argv[optind + 1]);
+		break;
 	case ZG_ACTION_DUMP_INFO:
 	case ZG_ACTION_DEVICE_INFO:
 		if (pos_args == 0)

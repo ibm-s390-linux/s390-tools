@@ -30,7 +30,7 @@
 #include "dt.h"
 #include "dfi.h"
 #include "dfo.h"
-#include "stdout.h"
+#include "output.h"
 #include "zfuse.h"
 
 /*
@@ -156,18 +156,39 @@ static int do_mount(void)
 	return rc;
 }
 
-/*
- * Run "copy to stdout" action
- */
-static int do_copy(void)
+static int open_file_for_writing(const char *output)
 {
-	int rc;
+	int fd;
+
+	if (output) {
+		fd = open(output,
+			  O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC,
+			  0600);
+		if (fd == -1)
+			ERR_EXIT_ERRNO("Could not open '%s' exclusively", output);
+	} else {
+		fd = dup(STDOUT_FILENO);
+		if (fd == -1)
+			ERR_EXIT_ERRNO("Could not dup() stdout");
+	}
+
+	return fd;
+}
+
+/*
+ * Run "copy to output" action
+ */
+static int do_copy(const char *output)
+{
+	int rc, fd;
 
 	if (dfi_init() != 0)
 		ERR_EXIT("Dump cannot be processed (is not complete)");
 	dfo_init();
 	kdump_select_check();
-	rc = stdout_write_dump();
+	fd = open_file_for_writing(output);
+	rc = write_dump(fd);
+	close(fd);
 	dfi_exit();
 	return rc;
 }
@@ -185,7 +206,7 @@ int main(int argc, char *argv[])
 
 	switch (g.opts.action) {
 	case ZG_ACTION_COPY:
-		return do_copy();
+		return do_copy(g.opts.output_path);
 	case ZG_ACTION_DUMP_INFO:
 		return do_dump_info();
 	case ZG_ACTION_DEVICE_INFO:
