@@ -19,6 +19,7 @@
 
 #include "df_s390.h"
 #include "dfi_mem_chunk.h"
+#include "dfo_mem_chunk.h"
 #include "dfo.h"
 
 /*

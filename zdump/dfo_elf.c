@@ -19,6 +19,7 @@
 #include "df_elf.h"
 #include "dfi.h"
 #include "dfi_mem_chunk.h"
+#include "dfo_mem_chunk.h"
 #include "dfi_vmcoreinfo.h"
 #include "dfo.h"
 
