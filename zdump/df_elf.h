@@ -17,7 +17,6 @@
 
 #include "lib/zt_common.h"
 
-#include "dfo.h"
 #include "zg.h"
 
 /*
