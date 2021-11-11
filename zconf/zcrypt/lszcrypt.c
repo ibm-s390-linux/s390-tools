@@ -45,15 +45,17 @@ static struct lszcrypt_l {
 #define CAP_RNG		"Long RNG"
 #define CAP_EP11	"EP11 Secure Key"
 #define CAP_APMMS       "AP bus max message size limit %ld Kb"
+#define CAP_HSL         "Hardware support for stateless filtering"
 
 /*
- * Card types
+ * Card types and other feature masks
  */
 #define MASK_APSC	    0x80000000
 #define MASK_RSA4K	    0x60000000
 #define MASK_COPRO	    0x10000000
 #define MASK_ACCEL	    0x08000000
 #define MASK_EP11	    0x04000000
+#define MASK_HSL            0x01000000
 
 /*
  * Classification
@@ -66,20 +68,21 @@ static struct lszcrypt_l {
 /*
  * facility bits
  */
-#define MAX_FAC_BITS 9
+#define MAX_FAC_BITS 10
 static struct fac_bits_s {
 	int mask;
 	char c;
 } fac_bits[MAX_FAC_BITS] = {
-	{ 0x80000000, 'S' },
-	{ 0x40000000, 'M' },
-	{ 0x20000000, 'C' },
-	{ 0x10000000, 'D' },
-	{ 0x08000000, 'A' },
-	{ 0x04000000, 'X' },
-	{ 0x02000000, 'N' },
-	{ 0x00800000, 'F' },
-	{ 0x00400000, 'R' },
+	{ 0x80000000, 'S' }, /* bit 0 */
+	{ 0x40000000, 'M' }, /* bit 1 */
+	{ 0x20000000, 'C' }, /* bit 2 */
+	{ 0x10000000, 'D' }, /* bit 3, cca mode */
+	{ 0x08000000, 'A' }, /* bit 4, accel mode */
+	{ 0x04000000, 'X' }, /* bit 5, ep11 mode */
+	{ 0x02000000, 'N' }, /* bit 6, apxa */
+	{ 0x01000000, 'H' }, /* bit 7, stateless filtering by hardware */
+	{ 0x00800000, 'F' }, /* bit 8, full function set */
+	{ 0x00400000, 'R' }, /* bit 9, restricted function set */
 };
 
 /*
@@ -444,6 +447,8 @@ static void show_capability(const char *id_str)
 				printf("%s (%s)\n", CAP_CCA, cbuf);
 			else
 				printf("%s\n", CAP_CCA);
+			if (func_val & MASK_HSL)
+				printf("%s\n", CAP_HSL);
 			printf("%s\n", CAP_RNG);
 		} else if (func_val & MASK_EP11) {
 			printf("%s\n", CAP_EP11);
