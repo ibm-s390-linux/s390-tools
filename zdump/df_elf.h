@@ -18,6 +18,7 @@
 #include "lib/zt_common.h"
 
 #include "zg.h"
+#include "dfi.h"
 
 /*
  * S390 CPU timer note (u64)
@@ -114,5 +115,21 @@ static inline void df_elf_ensure_s390x(void)
 	ERR_EXIT("The ELF dump format is only supported on s390x (64 bit)");
 #endif
 }
+
+void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum);
+
+void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
+	      const char *name);
+void *nt_prstatus(void *ptr, const struct dfi_cpu *cpu);
+void *nt_fpregset(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_timer(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_tod_cmp(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_tod_preg(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_ctrs(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_prefix(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_vxrs_low(void *ptr, const struct dfi_cpu *cpu);
+void *nt_s390_vxrs_high(void *ptr, const struct dfi_cpu *cpu);
+void *nt_prpsinfo(void *ptr);
+void *nt_vmcoreinfo(void *ptr, const char *vmcoreinfo);
 
 #endif /* DF_ELF_H */

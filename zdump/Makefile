@@ -49,7 +49,7 @@ OBJECTS = zgetdump.o opts.o zg.o \
 	  dfi_s390tape.o dfi_kdump.o \
 	  dfi_devmem.o dfo.o dfo_mem_chunk.o \
 	  dfo_elf.o dfo_s390.o \
-	  df_s390.o \
+	  df_elf.o df_s390.o \
 	  dt.o dt_s390sv.o dt_s390sv_ext.o \
 	  dt_s390mv.o dt_s390mv_ext.o \
 	  dt_scsi.o stdout.o \
