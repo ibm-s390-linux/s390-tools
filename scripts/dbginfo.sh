@@ -1154,7 +1154,7 @@ environment_setup() {
 # create gzip-ped tar file
 create_package() {
     local rc_tar
-    pr_stdout "${step_num} Finalizing: Creating archive with collected data"
+    pr_syslog_stdout "${step_num} Finalizing: Creating archive with collected data"
     cd "${WORKDIR_BASE}"
 
     touch "${WORKARCHIVE}"
