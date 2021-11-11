@@ -1,7 +1,7 @@
 /**
  * lszcrypt - Display zcrypt devices and configuration settings
  *
- * Copyright IBM Corp. 2008, 2020
+ * Copyright IBM Corp. 2008, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -306,6 +306,7 @@ static void show_capability(const char *id_str)
 	case 11: /* CEX5S */
 	case 12: /* CEX6S */
 	case 13: /* CEX7S */
+	case 14: /* CEX8S */
 		if (func_val & MASK_ACCEL) {
 			if (func_val & MASK_RSA4K)
 				printf("%s", CAP_RSA4K);
