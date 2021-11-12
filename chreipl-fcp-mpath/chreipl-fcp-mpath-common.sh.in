@@ -1,4 +1,3 @@
-#!/bin/bash
 # SPDX-License-Identifier: MIT
 #
 # chreipl-fcp-mpath: use multipath information to change FCP IPL target
