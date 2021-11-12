@@ -9,6 +9,10 @@
 
 #include "df_elf.h"
 
+#define NOTE_NAME_CORE		"CORE"
+#define NOTE_NAME_LINUX		"LINUX"
+#define NOTE_NAME_VMCOREINFO	"VMCOREINFO"
+
 /*
  * Initialize ELF header
  */
@@ -77,7 +81,7 @@ void *nt_prstatus(void *ptr, const struct dfi_cpu *cpu)
 	cpu_nr++;
 
 	return nt_init(ptr, NT_PRSTATUS, &nt_prstatus, sizeof(nt_prstatus),
-		       "CORE");
+		       NOTE_NAME_CORE);
 }
 
 /*
@@ -92,7 +96,7 @@ void *nt_fpregset(void *ptr, const struct dfi_cpu *cpu)
 	memcpy(&nt_fpregset.fprs, &cpu->fprs, sizeof(cpu->fprs));
 
 	return nt_init(ptr, NT_FPREGSET, &nt_fpregset, sizeof(nt_fpregset),
-		       "CORE");
+		       NOTE_NAME_CORE);
 }
 
 /*
@@ -101,7 +105,7 @@ void *nt_fpregset(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_timer(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_TIMER, &cpu->timer, sizeof(cpu->timer),
-		       "LINUX");
+		       NOTE_NAME_LINUX);
 }
 
 /*
@@ -110,7 +114,7 @@ void *nt_s390_timer(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_tod_cmp(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_TODCMP, &cpu->todcmp,
-		       sizeof(cpu->todcmp), "LINUX");
+		       sizeof(cpu->todcmp), NOTE_NAME_LINUX);
 }
 
 /*
@@ -119,7 +123,7 @@ void *nt_s390_tod_cmp(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_tod_preg(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_TODPREG, &cpu->todpreg,
-		       sizeof(cpu->todpreg), "LINUX");
+		       sizeof(cpu->todpreg), NOTE_NAME_LINUX);
 }
 
 /*
@@ -128,7 +132,7 @@ void *nt_s390_tod_preg(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_ctrs(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_CTRS, &cpu->ctrs, sizeof(cpu->ctrs),
-		       "LINUX");
+		       NOTE_NAME_LINUX);
 }
 
 /*
@@ -137,7 +141,7 @@ void *nt_s390_ctrs(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_prefix(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_PREFIX, &cpu->prefix,
-		       sizeof(cpu->prefix), "LINUX");
+		       sizeof(cpu->prefix), NOTE_NAME_LINUX);
 }
 
 /*
@@ -146,7 +150,7 @@ void *nt_s390_prefix(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_vxrs_low(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_VXRS_LOW, &cpu->vxrs_low,
-		       sizeof(cpu->vxrs_low), "LINUX");
+		       sizeof(cpu->vxrs_low), NOTE_NAME_LINUX);
 }
 
 /*
@@ -155,7 +159,7 @@ void *nt_s390_vxrs_low(void *ptr, const struct dfi_cpu *cpu)
 void *nt_s390_vxrs_high(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_VXRS_HIGH, &cpu->vxrs_high,
-		       sizeof(cpu->vxrs_high), "LINUX");
+		       sizeof(cpu->vxrs_high), NOTE_NAME_LINUX);
 }
 
 /*
@@ -171,7 +175,8 @@ void *nt_prpsinfo(void *ptr)
 	prpsinfo.pr_zomb = 0;
 	strcpy(prpsinfo.pr_fname, "vmlinux");
 
-	return nt_init(ptr, NT_PRPSINFO, &prpsinfo, sizeof(prpsinfo), "CORE");
+	return nt_init(ptr, NT_PRPSINFO, &prpsinfo, sizeof(prpsinfo),
+		       NOTE_NAME_CORE);
 }
 
 /*
@@ -181,5 +186,6 @@ void *nt_vmcoreinfo(void *ptr, const char *vmcoreinfo)
 {
 	if (!vmcoreinfo)
 		return ptr;
-	return nt_init(ptr, 0, vmcoreinfo, strlen(vmcoreinfo), "VMCOREINFO");
+	return nt_init(ptr, 0, vmcoreinfo, strlen(vmcoreinfo),
+		       NOTE_NAME_VMCOREINFO);
 }
