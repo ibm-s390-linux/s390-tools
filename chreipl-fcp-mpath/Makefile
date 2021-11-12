@@ -12,8 +12,6 @@
 #   bash:
 #     - bash
 # If $(ENABLE_DOC) is `1`:
-#   GNU Gzip:
-#     - gzip
 #   GNU awk:
 #     - gawk
 
@@ -186,17 +184,10 @@ INSTDIRS += $(MANDIR)
 .PHONY: chreipl-fcp-mpath-install-man-page
 chreipl-fcp-mpath-install-man-page: | $(DESTDIR)$(MANDIR)/man7
 chreipl-fcp-mpath-install-man-page: chreipl-fcp-mpath.7
-	$(GZIP) -fk --best chreipl-fcp-mpath.7
 	$(INSTALL_DATA) -t $(DESTDIR)$(MANDIR)/man7			\
-		chreipl-fcp-mpath.7.gz
+		chreipl-fcp-mpath.7
 
 chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-man-page
-
-.PHONY: chreipl-fcp-mpath-install-man-page-clean
-chreipl-fcp-mpath-install-man-page-clean:
-	rm -f chreipl-fcp-mpath.7.gz
-
-chreipl-fcp-mpath-clean: chreipl-fcp-mpath-install-man-page-clean
 
 endif
 

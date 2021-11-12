@@ -131,8 +131,7 @@ To build and install the documentation (man page) you need:
 
   - pandoc;
   - GNU Core Utilities (date);
-  - GNU awk;
-  - GNU Gzip.
+  - GNU awk.
 
 INSTALLATION
 ============
@@ -207,7 +206,7 @@ files to these default locations:
     /usr/lib/udev/chreipl-fcp-mpath-record-volume-identifier
     /usr/lib/udev/chreipl-fcp-mpath-try-change-ipl-path
     /usr/lib/udev/rules.d/70-chreipl-fcp-mpath.rules
-    /usr/share/man/man7/chreipl-fcp-mpath.7.gz
+    /usr/share/man/man7/chreipl-fcp-mpath.7
 
 UNINSTALL
 =========

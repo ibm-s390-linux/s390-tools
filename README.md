@@ -479,4 +479,4 @@ the different tools are provided:
   util-linux, udev, and multipath-tools. When using `HAVE_DRACUT=1` with the
   make invocation, it also requires dracut. When using `ENABLE_DOC=1` with the
   make invocation to build a man page and render the README.md as HTML, make
-  further requires pandoc, GNU awk, and GNU Gzip for the build process.
+  further requires pandoc and GNU awk for the build process.

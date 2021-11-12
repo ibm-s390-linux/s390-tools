@@ -7,6 +7,7 @@ Release history for s390-tools (MIT version)
   Add new tools / libraries:
 
   Changes of existing tools:
+  - chreipl-fcp-mpath: don't compress the manpage before installing it
 
   Bug Fixes:
 
