@@ -38,7 +38,7 @@ void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum)
 
 bool ehdr_is_elf_object(const Elf64_Ehdr *ehdr)
 {
-	return (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) == 0);
+	return (ehdr->e_version == ELF_VERSION_1) && (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) == 0);
 }
 
 bool ehdr_is_vmcore(const Elf64_Ehdr *ehdr)
