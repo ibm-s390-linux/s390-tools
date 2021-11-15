@@ -7,6 +7,8 @@
 
 #include <string.h>
 
+#include "lib/util_libc.h"
+
 #include "df_elf.h"
 
 void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum)
@@ -48,6 +50,32 @@ bool ehdr_is_s390x(const Elf64_Ehdr *ehdr)
 {
 	return ehdr->e_machine == EM_S390 &&
 	       ehdr->e_ident[EI_CLASS] == ELFCLASS64;
+}
+
+int read_elf_hdr(const struct zg_fh *fh, Elf64_Ehdr *ehdr)
+{
+	const size_t ehdr_size = sizeof(*ehdr);
+
+	if (zg_size(fh) < ehdr_size)
+		return -1;
+
+	zg_read(fh, ehdr, ehdr_size, ZG_CHECK);
+	return 0;
+}
+
+Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsigned int *phdr_count)
+{
+	const Elf64_Half phnum = ehdr->e_phnum;
+	size_t phdrs_size;
+	Elf64_Phdr *phdrs;
+
+	/* Cannot wraparound since `Elf64_Half`` is `uint16_t` */
+	phdrs_size = sizeof(*phdrs) * phnum;
+	phdrs = util_malloc(phdrs_size);
+	zg_seek(fh, ehdr->e_phoff, ZG_CHECK);
+	zg_read(fh, phdrs, phdrs_size, ZG_CHECK);
+	*phdr_count = phnum;
+	return phdrs;
 }
 
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,

@@ -280,15 +280,8 @@ static int pt_notes_add(Elf64_Phdr *phdr)
 	return 0;
 }
 
-/*
- * Read ELF header
- */
-static int read_elf_hdr(Elf64_Ehdr *ehdr)
+static int check_elf_hdr(const Elf64_Ehdr *ehdr)
 {
-	if (zg_size(g.fh) < sizeof(*ehdr))
-		return -ENODEV;
-	zg_read(g.fh, ehdr, sizeof(*ehdr), ZG_CHECK);
-
 	if (!ehdr_is_elf_object(ehdr) || !ehdr_is_vmcore(ehdr))
 		return -ENODEV;
 	if (!ehdr_is_s390x(ehdr))
@@ -301,24 +294,25 @@ static int read_elf_hdr(Elf64_Ehdr *ehdr)
  */
 static int dfi_elf_init(void)
 {
-	Elf64_Ehdr ehdr;
+	unsigned int phnum, i;
 	Elf64_Phdr *phdr;
-	int i;
+	Elf64_Ehdr ehdr;
 
 	util_log_print(UTIL_LOG_DEBUG, "DFI ELF initialization\n");
 
-	if (read_elf_hdr(&ehdr) != 0)
+	if (read_elf_hdr(g.fh, &ehdr) != 0)
+		return -ENODEV;
+
+	if (check_elf_hdr(&ehdr) < 0)
 		return -ENODEV;
 
 	df_elf_ensure_s390x();
 	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 
-	phdr = util_malloc(sizeof(*phdr) * ehdr.e_phnum);
-	zg_seek(g.fh, ehdr.e_phoff, ZG_CHECK);
-	zg_read(g.fh, phdr, sizeof(*phdr) * ehdr.e_phnum, ZG_CHECK);
-	util_log_print(UTIL_LOG_DEBUG, "DFI ELF e_phnum %u\n", ehdr.e_phnum);
-	for (i = 0; i < ehdr.e_phnum; i++) {
+	phdr = read_elf_phdrs(g.fh, &ehdr, &phnum);
+	util_log_print(UTIL_LOG_DEBUG, "DFI ELF e_phnum %u\n", phnum);
+	for (i = 0; i < phnum; i++) {
 		util_log_print(UTIL_LOG_DEBUG, "DFI ELF p_type[%d] 0x%lx\n",
 			       i, phdr[i].p_type);
 		switch (phdr[i].p_type) {

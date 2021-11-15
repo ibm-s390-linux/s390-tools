@@ -144,6 +144,19 @@ bool ehdr_is_vmcore(const Elf64_Ehdr *ehdr);
 bool ehdr_is_s390x(const Elf64_Ehdr *ehdr);
 
 /*
+ * Read ELF header at current offset
+ */
+int read_elf_hdr(const struct zg_fh *fh, Elf64_Ehdr *ehdr);
+
+/*
+ * Read ELF program headers
+ *
+ * To read the program headers the offset of @fh is changed.
+ */
+Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr,
+			   unsigned int *phdr_count);
+
+/*
  * Initialize ELF note
  */
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
