@@ -48,7 +48,7 @@ bool ehdr_is_vmcore(const Elf64_Ehdr *ehdr)
 
 bool ehdr_is_s390x(const Elf64_Ehdr *ehdr)
 {
-	return ehdr->e_machine == EM_S390 &&
+	return ehdr->e_machine == EM_S390 && ehdr->e_ident[EI_DATA] == ELFDATA2MSB &&
 	       ehdr->e_ident[EI_CLASS] == ELFCLASS64;
 }
 
