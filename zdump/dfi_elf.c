@@ -217,7 +217,7 @@ static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 /*
  * Add all notes for notes phdr
  */
-static int pt_notes_add(Elf64_Phdr *phdr)
+static int pt_notes_add(const Elf64_Phdr *phdr)
 {
 	struct dfi_cpu *cpu_current = NULL;
 	u64 notes_start_off;
@@ -295,7 +295,7 @@ static int check_elf_hdr(const Elf64_Ehdr *ehdr)
 static int dfi_elf_init(void)
 {
 	unsigned int phnum, i;
-	Elf64_Phdr *phdr;
+	Elf64_Phdr *phdrs;
 	Elf64_Ehdr ehdr;
 
 	util_log_print(UTIL_LOG_DEBUG, "DFI ELF initialization\n");
@@ -310,21 +310,22 @@ static int dfi_elf_init(void)
 	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 
-	phdr = read_elf_phdrs(g.fh, &ehdr, &phnum);
+	phdrs = read_elf_phdrs(g.fh, &ehdr, &phnum);
 	util_log_print(UTIL_LOG_DEBUG, "DFI ELF e_phnum %u\n", phnum);
 	for (i = 0; i < phnum; i++) {
-		util_log_print(UTIL_LOG_DEBUG, "DFI ELF p_type[%d] 0x%lx\n",
-			       i, phdr[i].p_type);
-		switch (phdr[i].p_type) {
+		const Elf64_Phdr *phdr = &phdrs[i];
+
+		util_log_print(UTIL_LOG_DEBUG, "DFI ELF p_type[%d] 0x%lx\n", i, phdr->p_type);
+		switch (phdr->p_type) {
 		case PT_LOAD:
-			if (pt_load_add(&phdr[i])) {
-				free(phdr);
+			if (pt_load_add(phdr)) {
+				free(phdrs);
 				return -EINVAL;
 			}
 			break;
 		case PT_NOTE:
-			if (pt_notes_add(&phdr[i])) {
-				free(phdr);
+			if (pt_notes_add(phdr)) {
+				free(phdrs);
 				return -EINVAL;
 			}
 			break;
@@ -332,7 +333,7 @@ static int dfi_elf_init(void)
 			break;
 		}
 	}
-	free(phdr);
+	free(phdrs);
 
 	dfi_attr_version_set(ehdr.e_ident[EI_VERSION]);
 	return 0;
