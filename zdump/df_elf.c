@@ -9,9 +9,6 @@
 
 #include "df_elf.h"
 
-/*
- * Initialize ELF header
- */
 void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum)
 {
 	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
@@ -37,9 +34,6 @@ void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum)
 	return ehdr + 1;
 }
 
-/*
- * Initialize ELF note
- */
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
 	      const char *name)
 {
@@ -61,9 +55,6 @@ void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
 	return PTR_ADD(buf, len);
 }
 
-/*
- * Initialize prstatus note
- */
 void *nt_prstatus(void *ptr, const struct dfi_cpu *cpu)
 {
 	struct nt_prstatus_64 nt_prstatus;
@@ -80,9 +71,6 @@ void *nt_prstatus(void *ptr, const struct dfi_cpu *cpu)
 		       NOTE_NAME_CORE);
 }
 
-/*
- * Initialize fpregset (floating point) note
- */
 void *nt_fpregset(void *ptr, const struct dfi_cpu *cpu)
 {
 	struct nt_fpregset_64 nt_fpregset;
@@ -95,72 +83,48 @@ void *nt_fpregset(void *ptr, const struct dfi_cpu *cpu)
 		       NOTE_NAME_CORE);
 }
 
-/*
- * Initialize timer note
- */
 void *nt_s390_timer(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_TIMER, &cpu->timer, sizeof(cpu->timer),
 		       NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize TOD clock comparator note
- */
 void *nt_s390_tod_cmp(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_TODCMP, &cpu->todcmp,
 		       sizeof(cpu->todcmp), NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize TOD programmable register note
- */
 void *nt_s390_tod_preg(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_TODPREG, &cpu->todpreg,
 		       sizeof(cpu->todpreg), NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize control register note
- */
 void *nt_s390_ctrs(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_CTRS, &cpu->ctrs, sizeof(cpu->ctrs),
 		       NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize prefix register note
- */
 void *nt_s390_prefix(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_PREFIX, &cpu->prefix,
 		       sizeof(cpu->prefix), NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize vxrs_low register note
- */
 void *nt_s390_vxrs_low(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_VXRS_LOW, &cpu->vxrs_low,
 		       sizeof(cpu->vxrs_low), NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize vxrs_high register note
- */
 void *nt_s390_vxrs_high(void *ptr, const struct dfi_cpu *cpu)
 {
 	return nt_init(ptr, NT_S390_VXRS_HIGH, &cpu->vxrs_high,
 		       sizeof(cpu->vxrs_high), NOTE_NAME_LINUX);
 }
 
-/*
- * Initialize prpsinfo note
- */
 void *nt_prpsinfo(void *ptr)
 {
 	struct nt_prpsinfo_64 prpsinfo;
@@ -175,9 +139,6 @@ void *nt_prpsinfo(void *ptr)
 		       NOTE_NAME_CORE);
 }
 
-/*
- * Initialize vmcoreinfo note
- */
 void *nt_vmcoreinfo(void *ptr, const char *vmcoreinfo)
 {
 	if (!vmcoreinfo)

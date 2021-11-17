@@ -122,20 +122,70 @@ static inline void df_elf_ensure_s390x(void)
 #endif
 }
 
+/*
+ * Initialize ELF header
+ */
 void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum);
 
+/*
+ * Initialize ELF note
+ */
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
 	      const char *name);
+
+/*
+ * Initialize prstatus note
+ */
 void *nt_prstatus(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize fpregset (floating point) note
+ */
 void *nt_fpregset(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize timer note
+ */
 void *nt_s390_timer(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize TOD clock comparator note
+ */
 void *nt_s390_tod_cmp(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize TOD programmable register note
+ */
 void *nt_s390_tod_preg(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize control register note
+ */
 void *nt_s390_ctrs(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize prefix register note
+ */
 void *nt_s390_prefix(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize vxrs_low register note
+ */
 void *nt_s390_vxrs_low(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize vxrs_high register note
+ */
 void *nt_s390_vxrs_high(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize prpsinfo note
+ */
 void *nt_prpsinfo(void *ptr);
+
+/*
+ * Initialize vmcoreinfo note
+ */
 void *nt_vmcoreinfo(void *ptr, const char *vmcoreinfo);
 
 #endif /* DF_ELF_H */
