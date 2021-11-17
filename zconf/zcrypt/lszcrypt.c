@@ -381,7 +381,7 @@ static int read_driver(const char *dir, const char *subdir, char *buf, size_t bu
 static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 				    const char *sub_dev)
 {
-	long config = -1, online = -1;
+	long config = -1, online = -1, chkstop = -1;
 	char buf[256];
 	unsigned long facility;
 
@@ -392,6 +392,8 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 
 	if (util_path_is_readable("%s/%s/config", grp_dev, sub_dev))
 		util_file_read_l(&config, 10, "%s/%s/config", grp_dev, sub_dev);
+	if (util_path_is_readable("%s/%s/chkstop", grp_dev, sub_dev))
+		util_file_read_l(&chkstop, 10, "%s/%s/chkstop", grp_dev, sub_dev);
 	if (util_path_is_readable("%s/%s/online", grp_dev, sub_dev))
 		util_file_read_l(&online, 10, "%s/%s/online", grp_dev, sub_dev);
 
@@ -399,7 +401,9 @@ static void read_subdev_rec_default(struct util_rec *rec, const char *grp_dev,
 	if (config == 0) {
 		util_rec_set(rec, "status", "deconfig");
 	} else {
-		if (online > 0)
+		if (chkstop > 0)
+			util_rec_set(rec, "status", "chkstop");
+		else if (online > 0)
 			util_rec_set(rec, "status", "online");
 		else if (online == 0)
 			util_rec_set(rec, "status", "offline");
@@ -522,7 +526,7 @@ static void show_subdevices(struct util_rec *rec, const char *grp_dev)
  */
 static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 {
-	long config = -1, online = -1;
+	long config = -1, online = -1, chkstop = -1;
 	char buf[256];
 	unsigned long facility;
 
@@ -543,12 +547,16 @@ static void read_rec_default(struct util_rec *rec, const char *grp_dev)
 
 	if (util_path_is_readable("%s/config", grp_dev))
 		util_file_read_l(&config, 10, "%s/config", grp_dev);
+	if (util_path_is_readable("%s/chkstop", grp_dev))
+		util_file_read_l(&chkstop, 10, "%s/chkstop", grp_dev);
 	if (util_path_is_readable("%s/online", grp_dev))
 		util_file_read_l(&online, 10, "%s/online", grp_dev);
 	if (config == 0) {
 		util_rec_set(rec, "status", "deconfig");
 	} else {
-		if (online > 0)
+		if (chkstop > 0)
+			util_rec_set(rec, "status", "chkstop");
+		else if (online > 0)
 			util_rec_set(rec, "status", "online");
 		else if (online == 0)
 			util_rec_set(rec, "status", "offline");
