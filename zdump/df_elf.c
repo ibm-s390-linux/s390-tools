@@ -34,6 +34,22 @@ void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum)
 	return ehdr + 1;
 }
 
+bool ehdr_is_elf_object(const Elf64_Ehdr *ehdr)
+{
+	return (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) == 0);
+}
+
+bool ehdr_is_vmcore(const Elf64_Ehdr *ehdr)
+{
+	return ehdr->e_type == ET_CORE;
+}
+
+bool ehdr_is_s390x(const Elf64_Ehdr *ehdr)
+{
+	return ehdr->e_machine == EM_S390 &&
+	       ehdr->e_ident[EI_CLASS] == ELFCLASS64;
+}
+
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
 	      const char *name)
 {

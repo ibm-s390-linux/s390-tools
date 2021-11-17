@@ -14,6 +14,7 @@
 
 #include <elf.h>
 #include <linux/types.h>
+#include <stdbool.h>
 
 #include "lib/zt_common.h"
 
@@ -126,6 +127,21 @@ static inline void df_elf_ensure_s390x(void)
  * Initialize ELF header
  */
 void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum);
+
+/*
+ * Checks whether @ehdr is a ELF object
+ */
+bool ehdr_is_elf_object(const Elf64_Ehdr *ehdr);
+
+/*
+ * Checks whether @ehdr is a vmcore
+ */
+bool ehdr_is_vmcore(const Elf64_Ehdr *ehdr);
+
+/*
+ * Checks whether @ehdr is a s390x header
+ */
+bool ehdr_is_s390x(const Elf64_Ehdr *ehdr);
 
 /*
  * Initialize ELF note

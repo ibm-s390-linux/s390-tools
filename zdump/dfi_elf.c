@@ -289,11 +289,10 @@ static int read_elf_hdr(Elf64_Ehdr *ehdr)
 	if (zg_size(g.fh) < sizeof(*ehdr))
 		return -ENODEV;
 	zg_read(g.fh, ehdr, sizeof(*ehdr), ZG_CHECK);
-	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0)
+
+	if (!ehdr_is_elf_object(ehdr) || !ehdr_is_vmcore(ehdr))
 		return -ENODEV;
-	if (ehdr->e_type != ET_CORE)
-		return -ENODEV;
-	if (ehdr->e_machine != EM_S390 || ehdr->e_ident[EI_CLASS] != ELFCLASS64)
+	if (!ehdr_is_s390x(ehdr))
 		ERR_EXIT("Only s390x (64 bit) core dump files are supported");
 	return 0;
 }
