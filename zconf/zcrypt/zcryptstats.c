@@ -1,7 +1,7 @@
 /*
  * zcryptstats - Show usage statistics of IBM Crypto Express adapters
  *
- * Copyright IBM Corp. 2019
+ * Copyright IBM Corp. 2019, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -148,8 +148,9 @@ struct chsc_cmb_area {
 #define CRYPTO_TYPE_CEX5S	11
 #define CRYPTO_TYPE_CEX6S	12
 #define CRYPTO_TYPE_CEX7S	13
+#define CRYPTO_TYPE_CEX8S	14
 
-#define CRYPTO_TYPE_TOLERATION	CRYPTO_TYPE_CEX7S
+#define CRYPTO_TYPE_TOLERATION	CRYPTO_TYPE_CEX8S
 
 struct crypto_counter {
 	const char *name;
@@ -236,8 +237,8 @@ static const struct crypto_mode mode_pcica[1] = {
 		  .counters = counter_pcica },
 };
 
-#define NUM_CEX4567_MODES	11
-static const struct crypto_mode mode_cex4567[NUM_CEX4567_MODES] = {
+#define NUM_CEX45678_MODES	11
+static const struct crypto_mode mode_cex45678[NUM_CEX45678_MODES] = {
 		{ 0 },
 		{ 0 },
 		{ 0 },
@@ -257,7 +258,7 @@ static const struct crypto_mode mode_cex4567[NUM_CEX4567_MODES] = {
 		  .counters = counter_ep11 },
 };
 
-#define NUM_CRYPTO_TYPES	14
+#define NUM_CRYPTO_TYPES	15
 static const struct crypto_type crypto_types[NUM_CRYPTO_TYPES] = {
 		{ 0 },
 		{ 0 },
@@ -276,14 +277,16 @@ static const struct crypto_type crypto_types[NUM_CRYPTO_TYPES] = {
 		  .modes = mode_accel },
 		{ .name = "CEX3C", .num_modes = NUM_COPROC_MODES,
 		  .modes = mode_coproc },
-		{ .name = "CEX4", .num_modes = NUM_CEX4567_MODES,
-		  .modes = mode_cex4567 },
-		{ .name = "CEX5", .num_modes = NUM_CEX4567_MODES,
-		  .modes = mode_cex4567 },
-		{ .name = "CEX6", .num_modes = NUM_CEX4567_MODES,
-		  .modes = mode_cex4567 },
-		{ .name = "CEX7", .num_modes = NUM_CEX4567_MODES,
-		  .modes = mode_cex4567 },
+		{ .name = "CEX4", .num_modes = NUM_CEX45678_MODES,
+		  .modes = mode_cex45678 },
+		{ .name = "CEX5", .num_modes = NUM_CEX45678_MODES,
+		  .modes = mode_cex45678 },
+		{ .name = "CEX6", .num_modes = NUM_CEX45678_MODES,
+		  .modes = mode_cex45678 },
+		{ .name = "CEX7", .num_modes = NUM_CEX45678_MODES,
+		  .modes = mode_cex45678 },
+		{ .name = "CEX8", .num_modes = NUM_CEX45678_MODES,
+		  .modes = mode_cex45678 },
 };
 
 
@@ -2424,4 +2427,3 @@ out:
 
 	return rc;
 }
-
