@@ -20,7 +20,7 @@ install:
 	sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' cpictl > \
 		$(DESTDIR)$(TOOLS_LIBDIR)/cpictl
 	chown $(OWNER):$(GROUP) $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
-	chmod 775 $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
+	chmod 755 $(DESTDIR)$(TOOLS_LIBDIR)/cpictl
 
 	@for i in $(MAN_PAGES); \
 	do \
