@@ -8,6 +8,8 @@
 #ifndef OUTPUT_H
 #define OUTPUT_H
 
-int write_dump(int fd);
+#include <stdio.h>
+
+int write_dump(FILE *stream);
 
 #endif /* OUTPUT_H */

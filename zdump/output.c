@@ -14,14 +14,11 @@
 #include "dfo.h"
 #include "output.h"
 
-int write_dump(int fd)
+int write_dump(FILE *stream)
 {
 	const u64 output_size = dfo_size();
 	char buf[8UL * PAGE_SIZE];
 	u64 written = 0;
-
-	if (fd < 0)
-		ERR_EXIT("fd must be a valid file descriptor");
 
 	if (!dfi_feat_copy())
 		ERR_EXIT("Copying not possible for %s dumps", dfi_name());
@@ -31,15 +28,13 @@ int write_dump(int fd)
 	STDERR("\n");
 	zg_progress_init("Copying dump", output_size);
 	while (written != output_size) {
-		ssize_t rc;
+		size_t rc;
 		u64 cnt;
 
 		cnt = dfo_read(buf, sizeof(buf));
-		rc = write(fd, buf, cnt);
-		if (rc == -1)
-			ERR_EXIT_ERRNO("Error: Write failed");
-		if (rc != (ssize_t) cnt)
-			ERR_EXIT("Error: Could not write full block");
+		rc = fwrite(buf, cnt, 1, stream);
+		if (rc != 1 && ferror(stream))
+			ERR_EXIT("Error: Write failed");
 		written += cnt;
 		zg_progress(written);
 	};

@@ -156,8 +156,9 @@ static int do_mount(void)
 	return rc;
 }
 
-static int open_file_for_writing(const char *output)
+static FILE *open_file_for_writing(const char *output)
 {
+	FILE *stream;
 	int fd;
 
 	if (output) {
@@ -172,7 +173,12 @@ static int open_file_for_writing(const char *output)
 			ERR_EXIT_ERRNO("Could not dup() stdout");
 	}
 
-	return fd;
+	stream = fdopen(fd, "w");
+	if (!stream)
+		ERR_EXIT_ERRNO("Could not fdopen()");
+	fd = -1;
+
+	return stream;
 }
 
 /*
@@ -180,15 +186,16 @@ static int open_file_for_writing(const char *output)
  */
 static int do_copy(const char *output)
 {
-	int rc, fd;
+	FILE *stream;
+	int rc;
 
 	if (dfi_init() != 0)
 		ERR_EXIT("Dump cannot be processed (is not complete)");
 	dfo_init();
 	kdump_select_check();
-	fd = open_file_for_writing(output);
-	rc = write_dump(fd);
-	close(fd);
+	stream = open_file_for_writing(output);
+	rc = write_dump(stream);
+	fclose(stream);
 	dfi_exit();
 	return rc;
 }
