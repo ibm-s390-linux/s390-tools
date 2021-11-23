@@ -34,7 +34,7 @@ void __noreturn start(void)
 	volatile struct memblob *kernel = &args->kernel;
 	volatile struct memblob *cmdline = &args->cmdline;
 	volatile struct memblob *initrd = &args->initrd;
-	volatile struct psw_t psw = args->psw;
+	struct psw_t psw = args->psw;
 
 	/* set up ASCII and line-mode */
 	sclp_setup(SCLP_LINE_ASCII_INIT);
