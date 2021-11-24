@@ -41,7 +41,7 @@ check_dep_zlib:
 
 all: check_dep_fuse check_dep_zlib zgetdump
 
-OBJECTS = zgetdump.o opts.o zg.o \
+OBJECTS = zgetdump.o opts.o zg.o zg_error.o \
 	  dfi.o dfi_mem_chunk.o dfi_vmcoreinfo.o \
 	  dfi_lkcd.o dfi_elf.o \
 	  dfi_s390.o dfi_s390_ext.o\

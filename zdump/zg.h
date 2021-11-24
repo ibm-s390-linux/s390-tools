@@ -71,34 +71,16 @@ void zg_progress(u64 addr);
 /*
  * Error and print functions
  */
-#define ERR(x...) \
-do { \
-	fprintf(stderr, "%s: ", "zgetdump"); \
-	fprintf(stderr, x); \
-	fprintf(stderr, "\n"); \
-} while (0)
 
-#define ERR_EXIT(x...) \
-do { \
-	ERR(x); \
-	zg_exit(1); \
-} while (0)
+void zg_err(const char *fmt, ...);
+void zg_err_exit(const char *fmt, ...);
+void zg_err_exit_errno(const char *fmt, ...);
+void zg_abort(const char *fmt, ...);
 
-#define ABORT(x...) \
-do { \
-	ERR("Internal Error: " x); \
-	abort(); \
-} while (0)
-
-#define ERR_EXIT_ERRNO(x...) \
-	do { \
-		fflush(stdout); \
-		fprintf(stderr, "%s: ", "zgetdump"); \
-		fprintf(stderr, x); \
-		fprintf(stderr, " (%s)", strerror(errno)); \
-		fprintf(stderr, "\n"); \
-		zg_exit(1); \
-	} while (0)
+#define ERR(fmt, ...)			zg_err(fmt, ## __VA_ARGS__)
+#define ERR_EXIT(fmt, ...)		zg_err_exit(fmt, ## __VA_ARGS__)
+#define ERR_EXIT_ERRNO(fmt, ...)	zg_err_exit_errno(fmt, ## __VA_ARGS__)
+#define ABORT(fmt, ...)			zg_abort(fmt, ## __VA_ARGS__)
 
 #define STDERR(x...) \
 do { \

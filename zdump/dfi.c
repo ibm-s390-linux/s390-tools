@@ -286,6 +286,7 @@ const char *dfi_arch_str(enum dfi_arch arch)
 		return "unknown";
 	}
 	ABORT("dfi_arch_str: Invalid dfi arch: %d", arch);
+	return NULL; /* UNREACHABLE */
 }
 
 /*
@@ -784,6 +785,7 @@ int dfi_init(void)
 		i++;
 	}
 	ERR_EXIT("No valid dump found on \"%s\"", g.opts.device);
+	return -1; /* UNREACHABLE */
 }
 
 /*
