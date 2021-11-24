@@ -19,10 +19,12 @@ static inline void _zg_err(const char *fmt, va_list ap)
 
 static inline void _zg_err_errno(const char *fmt, va_list ap)
 {
+	const int errno_backup = errno;
+
 	fflush(stdout);
 	fprintf(stderr, "%s: ", "zgetdump");
 	vfprintf(stderr, fmt, ap);
-	fprintf(stderr, " (%s)", strerror(errno));
+	fprintf(stderr, " (%s)", strerror(errno_backup));
 	fprintf(stderr, "\n");
 }
 
