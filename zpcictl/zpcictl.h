@@ -23,6 +23,7 @@
 
 struct options {
 	unsigned int reset;
+	unsigned int reset_fw;
 	unsigned int deconfigure;
 	unsigned int report;
 };

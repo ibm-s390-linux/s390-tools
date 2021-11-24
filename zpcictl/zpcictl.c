@@ -46,12 +46,27 @@ static const struct util_prg prg = {
 #define OPT_RESET	128
 #define OPT_DECONF	129
 #define OPT_REPORT_ERR	130
+#define OPT_RESET_FW	131
 
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("ERROR HANDLING OPTIONS"),
 	{
 		.option = { "reset", no_argument, NULL, OPT_RESET },
-		.desc = "Reset the device",
+		.desc = "Reset the device and report an error to the Support Element (SE). "
+			"The reset consists of a controlled shutdown and a subsequent "
+			"re-enabling of the device. As a result, higher level interfaces such "
+			"as network interfaces and block devices are destroyed and re-created.\n"
+			"Manual configuration steps might be required to re-integrate the device, "
+			"for example, in bonded interfaces or software RAIDs.\n"
+			"Use this option only if the automatic recovery failed, or if it did "
+			"not succeed to restore regular operations of the device and manual "
+			"intervention is required.\n",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = { "reset-fw", no_argument, NULL, OPT_RESET_FW },
+		.desc = "Reset the device through a firmware driven reset that triggers "
+			"automatic recovery and reports an error to the Support Element (SE).\n",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
@@ -342,6 +357,15 @@ static void sclp_reset_device(struct zpci_device *pdev)
 }
 
 /*
+ * Reset the PCI device via firmware and let auto recovery handle
+ * re-initialization
+ */
+static void sclp_reset_device_fw(struct zpci_device *pdev)
+{
+	sclp_issue_action(pdev, SCLP_ERRNOTIFY_AQ_RESET);
+}
+
+/*
  * De-Configure/repair PCI device. Moves the device from configured
  * to reserved state.
  */
@@ -371,6 +395,9 @@ static void parse_cmdline(int argc, char *argv[], struct options *opts)
 		switch (cmd) {
 		case OPT_RESET:
 			opts->reset = 1;
+			break;
+		case OPT_RESET_FW:
+			opts->reset_fw = 1;
 			break;
 		case OPT_DECONF:
 			opts->deconfigure = 1;
@@ -411,6 +438,8 @@ int main(int argc, char *argv[])
 
 	if (opts.reset)
 		sclp_reset_device(&pdev);
+	if (opts.reset_fw)
+		sclp_reset_device_fw(&pdev);
 	else if (opts.deconfigure)
 		sclp_deconfigure(&pdev);
 	else if (opts.report)

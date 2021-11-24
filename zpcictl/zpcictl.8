@@ -1,4 +1,4 @@
-.\" Copyright IBM Corp. 2018
+.\" Copyright IBM Corp. 2022
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -17,7 +17,7 @@
 .  PD
 ..
 .
-.TH zpcictl 8 "Oct 2018" s390-tools zpcictl
+.TH zpcictl 8 "Mar 2022" s390-tools zpcictl
 .
 .SH NAME
 zpcictl - Manage PCI devices on IBM Z
@@ -52,7 +52,45 @@ device (e.g.
 .SH OPTIONS
 .SS Error Handling Options
 .OD reset "" "DEVICE"
-Reset and re-initialize the PCI device.
+Reset and re-initialize the PCI device and report a device error to the Support
+Element (SE). The reset consists of a controlled shutdown and a subsequent
+re-enabling of the device from the shut off state. This process destroys and
+then re-creates higher level interfaces such as network interfaces and block
+devices. This reset is disruptive and often requires manual intervention on
+multiple layers. In particular, network interfaces that are part of a bonded
+interface must be re-added to the bond after the reset. Similarly, block
+devices backed by an NVMe that are part of a software RAID must be re-synced by
+re-adding to the RAID after resetting the NVMe.
+
+Use this reset option only if the less disruptive automatic recovery mechanism
+is not supported by your kernel or it failed to restore the device's
+functionality. Unsuccessful automatic recovery can result in kernel messages
+indicating required manual intervention. If the device is malfunctioning
+without automatic recovery being triggered, consider using the \fB--reset-fw\fR
+option to trigger a less disruptive automatic recovery through
+a firmware-driven reset.
+.PP
+.
+.OD reset-fw "" "DEVICE"
+Reset the PCI device using a firmware-driven reset that also reports a device
+error on the Support Element (SE). If supported by your kernel, automatic recovery
+re-initializes the device after the firmware reports a successful device reset.
+
+Use this option if the device is malfunctioning and automatic recovery is
+supported by the kernel but was not triggered. This condition can occur if the
+error is not detected by the low level PCI interfaces. A successful automatic
+recovery after the firmware-driven reset, is less disruptive than the full
+reset that is performed by the \fB--reset\fR option. Other than the full reset,
+the automatic recovery does not completely shut down the device and re-create
+it from the shut down state. Instead, it works with the device driver to
+restore the device in place. Thus, higher level interfaces such as network
+interfaces and block devices remain intact. In particular, with this type of
+reset high availability mechanisms like a bonded network interface or
+a software RAID can transparently re-integrate the recovered device. For
+example, after a failure and recovery, a software RAID can resync a stroage
+device or a network interface can be re-integrated in a bond. In contrast to
+a complete shut down, the device driver remains active and informs higher
+layers of both the occurence of an error state and the eventual recovery.
 .PP
 .
 .OD deconfigure "" "DEVICE"
