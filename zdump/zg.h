@@ -82,24 +82,13 @@ void zg_abort(const char *fmt, ...);
 #define ERR_EXIT_ERRNO(fmt, ...)	zg_err_exit_errno(fmt, ## __VA_ARGS__)
 #define ABORT(fmt, ...)			zg_abort(fmt, ## __VA_ARGS__)
 
-#define STDERR(x...) \
-do { \
-	fprintf(stderr, x); \
-	fflush(stderr); \
-} while (0)
+void zg_stderr(const char *fmt, ...);
+void zg_stderr_pr(const char *fmt, ...);
+void zg_stdout(const char *fmt, ...);
 
-#define STDERR_PR(x...) \
-do { \
-	fprintf(stderr, "\r%s: ", "zgetdump"); \
-	fprintf(stderr, x); \
-} while (0)
-
-#define STDOUT(x...) \
-do { \
-	fprintf(stdout, x); \
-	fflush(stdout); \
-} while (0)
-
+#define STDERR(fmt, ...)	zg_stderr(fmt, ## __VA_ARGS__)
+#define STDERR_PR(fmt, ...)	zg_stderr_pr(fmt, ## __VA_ARGS__)
+#define STDOUT(fmt, ...)	zg_stdout(fmt, ## __VA_ARGS__)
 /*
  * Misc
  */
