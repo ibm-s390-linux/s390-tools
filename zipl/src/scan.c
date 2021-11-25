@@ -82,7 +82,7 @@ enum scan_key_state scan_key_table[SCAN_SECTION_NUM][SCAN_KEYWORD_NUM] = {
 };
 
 /* Determines which keyword may be present in a menu section */
-enum scan_key_state scan_menu_key_table[SCAN_KEYWORD_NUM] = {
+static enum scan_key_state scan_menu_key_table[SCAN_KEYWORD_NUM] = {
 /* menu section */
 	 opt, inv, inv, inv, inv, inv, inv, inv, req, opt, opt, inv, inv, inv,
 	 opt, opt, opt, opt, opt, inv, inv, opt

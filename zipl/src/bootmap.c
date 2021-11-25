@@ -34,7 +34,7 @@
 #include "misc.h"
 
 /* Pointer to dedicated empty block in bootmap. */
-disk_blockptr_t empty_block;
+static disk_blockptr_t empty_block;
 
 /* Get size of a bootmap block pointer for disk with given INFO. */
 static int
@@ -142,7 +142,7 @@ check_secure_boot_support(void)
  * of segment table blocks to the file identified by file descriptor FD. Upon
  * success, return 0 and set SECTION_POINTER to point to the first block in
  * the resulting segment table. Return non-zero otherwise. */
-int
+static int
 add_segment_table(int fd, disk_blockptr_t* list, blocknum_t count,
 		  disk_blockptr_t* segment_pointer,
 		  struct disk_info* info)

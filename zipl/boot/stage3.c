@@ -159,8 +159,8 @@ static void hash_table_add(struct env_hash_entry *items,
 	(*new_idx)++;
 }
 
-struct env_hash_entry *hash_table_find(struct env_hash_entry **buckets,
-				       char *name)
+static struct env_hash_entry *hash_table_find(struct env_hash_entry **buckets,
+					      char *name)
 {
 	struct env_hash_entry *item;
 

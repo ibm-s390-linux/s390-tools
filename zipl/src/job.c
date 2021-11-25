@@ -430,7 +430,7 @@ free_menu_data(struct job_menu_data* data)
 }
 
 
-void
+static void
 free_mvdump_data(struct job_mvdump_data* data)
 {
 	int i;

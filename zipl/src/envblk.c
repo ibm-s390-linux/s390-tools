@@ -167,8 +167,8 @@ static int hash_table_add(struct line_hash_entry **table, char *line, int len)
  * LINE: string contailing NAME=VALUE
  * LEN: length of the NAME with trailing delimiter "="
  */
-struct line_hash_entry *hash_table_find(struct line_hash_entry **table,
-					char *name, size_t len)
+static struct line_hash_entry *hash_table_find(struct line_hash_entry **table,
+					       char *name, size_t len)
 {
 	struct line_hash_entry *item;
 

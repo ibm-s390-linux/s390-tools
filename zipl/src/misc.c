@@ -497,7 +497,7 @@ misc_check_writable_device(const char* devno, int blockdev, int chardev)
 
 
 /* ASCII to EBCDIC conversion table. */
-unsigned char ascebc[256] =
+static unsigned char ascebc[256] =
 {
 	0x00, 0x01, 0x02, 0x03, 0x37, 0x2D, 0x2E, 0x2F,
 	0x16, 0x05, 0x15, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
@@ -534,7 +534,7 @@ unsigned char ascebc[256] =
 };
 
 /* EBCDIC to ASCII conversion table. */
-unsigned char ebcasc[256] =
+static unsigned char ebcasc[256] =
 {
 /* 0x00  NUL   SOH   STX   ETX  *SEL    HT  *RNL   DEL */
 	0x00, 0x01, 0x02, 0x03, 0x07, 0x09, 0x07, 0x7F,

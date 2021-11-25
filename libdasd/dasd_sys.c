@@ -96,7 +96,7 @@ int dasd_sys_ese(char *devnode)
 	return (rc == 1) ? 1 : 0;
 }
 
-int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
+static int dasd_get_pm_from_chpid(char *busid, unsigned int chpid, int *mask)
 {
 	unsigned int val;
 	int count, i;

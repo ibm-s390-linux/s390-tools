@@ -91,7 +91,7 @@ disk_determine_dasd_type(struct disk_info *data,
 }
 
 /* Return non-zero for ECKD type. */
-int
+static int
 disk_is_eckd(disk_type_t type)
 {
 	return (type == disk_type_eckd_ldl ||
@@ -114,7 +114,7 @@ read_block_by_offset(int fd, int blksize, uint64_t offset, char *buffer)
 	return 0;
 }
 
-int
+static int
 determine_virtblk_type(struct disk_info *data, struct stat *stats)
 {
 	char *device;
@@ -559,7 +559,7 @@ disk_free_info(struct disk_info* info)
  * logical block number. Upon success, return 0 and store the physical
  * blocknumber in the variable pointed to by PHYSICAL. Return non-zero
  * otherwise. */
-int
+static int
 disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 		  blocknum_t* physical, struct disk_info* info)
 {
