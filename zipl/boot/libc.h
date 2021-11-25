@@ -61,7 +61,7 @@ unsigned long get_zeroed_page(void);
 void free_page(unsigned long);
 void initialize(void);
 void libc_stop(unsigned long) __noreturn;
-void start(void);
+void __noreturn start(void);
 void pgm_check_handler(void);
 void pgm_check_handler_fn(void);
 void panic_notify(unsigned long reason);

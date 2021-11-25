@@ -393,7 +393,7 @@ static void store_status(void)
  * Block followed by a valid checksum (as defined in lowcore.h and set
  * by ipl.c). In case of match use diag308 to IPL.
  */
-static void dump_exit(unsigned long code)
+static __noreturn void dump_exit(unsigned long code)
 {
 	struct ipib_info *ipib_info = (struct ipib_info *)&S390_lowcore.ipib;
 	uint32_t ipib_len, csum;
@@ -406,6 +406,7 @@ static void dump_exit(unsigned long code)
 		libc_stop(code);
 	diag308(DIAG308_SET, (void *) ipib_info->ipib);
 	diag308(DIAG308_IPL, NULL);
+	__builtin_unreachable();
 }
 
 /*
@@ -420,7 +421,7 @@ void panic_notify(unsigned long code)
 /*
  * Create stand-alone dump
  */
-void start(void)
+void __noreturn start(void)
 {
 	init_early();
 	dt_device_parm_setup();

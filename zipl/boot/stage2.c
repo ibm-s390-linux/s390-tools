@@ -75,15 +75,16 @@ out_free_page:
 }
 
 
-static void execute(uint64_t psw)
+static __noreturn void execute(uint64_t psw)
 {
 	asm volatile(
 		"      lpsw    %[psw]\n"
 		: : [psw] "Q" (psw) : "cc"
 		);
+	__builtin_unreachable();
 }
 
-void start(void)
+void __noreturn start(void)
 {
 	struct stage2_descr stage2_descr;
 	struct subchannel_id subchannel_id;
