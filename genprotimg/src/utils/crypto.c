@@ -440,7 +440,7 @@ static int check_signature_algo_match(const EVP_PKEY *pkey, const X509 *subject,
 
 static X509_CRL *load_crl_from_bio(BIO *bio)
 {
-	g_autoptr(X509_CRL) crl = PEM_read_bio_X509_CRL(bio, NULL, 0, NULL);
+	g_autoptr(X509_CRL) crl = PEM_read_bio_X509_CRL(bio, NULL, NULL, NULL);
 	gint rc;
 
 	if (crl)
