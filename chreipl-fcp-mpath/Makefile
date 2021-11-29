@@ -131,6 +131,7 @@ install: chreipl-fcp-mpath-install
 
 # install udev rules
 INSTDIRS += $(UDEVRULESDIR)
+$(DESTDIR)$(UDEVRULESDIR): install_dirs
 
 .PHONY: chreipl-fcp-mpath-install-udev-rules
 chreipl-fcp-mpath-install-udev-rules: | $(DESTDIR)$(UDEVRULESDIR)
@@ -142,6 +143,7 @@ chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-udev-rules
 
 # install udev helper programs
 INSTDIRS += $(UDEVDIR)
+$(DESTDIR)$(UDEVDIR): install_dirs
 
 .PHONY: chreipl-fcp-mpath-install-udev-helper
 chreipl-fcp-mpath-install-udev-helper: | $(DESTDIR)$(UDEVDIR)
@@ -152,6 +154,7 @@ chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-udev-helper
 
 # install common library files
 INSTDIRS += $(CHREIPLZFCPMPDIR)
+$(DESTDIR)$(CHREIPLZFCPMPDIR): install_dirs
 
 .PHONY: chreipl-fcp-mpath-install-libfiles
 chreipl-fcp-mpath-install-libfiles: | $(DESTDIR)$(CHREIPLZFCPMPDIR)
@@ -165,6 +168,7 @@ ifeq ($(HAVE_DRACUT),1)
 
 # install dracut config files
 INSTDIRS += $(DRACUTCONFDIR)
+$(DESTDIR)$(DRACUTCONFDIR): install_dirs
 
 .PHONY: chreipl-fcp-mpath-install-dracut-config
 chreipl-fcp-mpath-install-dracut-config: | $(DESTDIR)$(DRACUTCONFDIR)
@@ -180,6 +184,7 @@ ifeq ($(ENABLE_DOC),1)
 
 # chreipl-fcp-mpath: install man page
 INSTDIRS += $(MANDIR)
+$(DESTDIR)$(MANDIR)/man7: install_dirs
 
 .PHONY: chreipl-fcp-mpath-install-man-page
 chreipl-fcp-mpath-install-man-page: | $(DESTDIR)$(MANDIR)/man7
