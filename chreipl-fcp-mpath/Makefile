@@ -11,6 +11,8 @@
 #     - chreipl-fcp-mpath.mak
 #   bash:
 #     - bash
+#   GNU coreutils:
+#     - sha256sum
 # If $(ENABLE_DOC) is `1`:
 #   GNU awk:
 #     - gawk
@@ -100,19 +102,40 @@ chreiplzfcpmp-doc-man-meta =						\
 	-V footer="s390-tools $(S390_TOOLS_RELEASE)"
 
 chreipl-fcp-mpath.7: PANDOCFLAGS += $(chreiplzfcpmp-doc-man-meta)
+chreipl-fcp-mpath.7: .chreipl-fcp-mpath.7.cksum
 
 .INTERMEDIATE: chreipl-fcp-mpath.md
 chreipl-fcp-mpath.md: README.md
 	gawk -- '/NOT-IN-MAN \{/,/NOT-IN-MAN \}/ { next } { print }' $(<) > $(@)
 
+.chreipl-fcp-mpath.7.cksum: README.md
+	sha256sum $(<) > $(@)
+
 .PHONY: chreipl-fcp-mpath-doc-clean
 chreipl-fcp-mpath-doc-clean:
-	rm -f README.html README.pdf chreipl-fcp-mpath.md chreipl-fcp-mpath.7
+	rm -f README.html README.pdf chreipl-fcp-mpath.md
 
 chreipl-fcp-mpath: chreipl-fcp-mpath-doc
 chreipl-fcp-mpath-clean: chreipl-fcp-mpath-doc-clean
 
+else # $(ENABLE_DOC) != 1
+
+# We bundle a pre-cooked man page with the source-code so that distributions
+# don't need `pandoc` in order to be able to ship the man page. As of this
+# writing multiple distributions don't have a packaged version of it.
+#
+# In order to remember to regenerate this pre-cooked version whenever the
+# README.md is changed, we also generate a checksum of the README.md, bundle
+# that as well, and compare that whenever `make` is called. This way, the
+# freshness of the man page can be checked, even if `pandoc` is not available,
+# or ENABLE_DOC disabled.
+
+MANPAGE_FRESH	:= $(shell sha256sum --check .chreipl-fcp-mpath.7.cksum >/dev/null && echo 1 || echo 0)
+ifeq ($(MANPAGE_FRESH),0)
+$(warning chreipl-fcp-mpath.7 is outdated, please regenerate it by calling `make ENABLE_DOC=1`)
 endif
+
+endif # $(ENABLE_DOC) == 1
 
 #
 ## Install
@@ -180,8 +203,6 @@ chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-dracut-config
 
 endif
 
-ifeq ($(ENABLE_DOC),1)
-
 # chreipl-fcp-mpath: install man page
 INSTDIRS += $(MANDIR)
 $(DESTDIR)$(MANDIR)/man7: install_dirs
@@ -193,8 +214,6 @@ chreipl-fcp-mpath-install-man-page: chreipl-fcp-mpath.7
 		chreipl-fcp-mpath.7
 
 chreipl-fcp-mpath-install: chreipl-fcp-mpath-install-man-page
-
-endif
 
 #
 ## Utility

@@ -10,6 +10,8 @@ Release history for s390-tools (MIT version)
   - dbginfo.sh: rework script formatting (indents, order)
   - dbginfo.sh: update sysfs collection (excludes, messages)
   - dbginfo.sh: replace "which" by builtin command "type"
+  - chreipl-fcp-mpath: bundle a pre-cooked version of the manpage for
+      build environments without access to `pandoc`
 
   Bug Fixes:
 

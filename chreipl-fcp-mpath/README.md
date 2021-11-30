@@ -120,18 +120,20 @@ in place, but the toolset has some software dependencies besides the
 requirements in section [Requirements](#requirements):
 
   - GNU Bash;
-  - GNU Core Utilities (mktemp, readlink, sync, truncate);
+  - GNU Core Utilities (mktemp, readlink, sync, truncate, sha256sum);
   - util-linux (flock, hexdump, logger);
   - udev / systemd-udev;
   - multipath-tools.
 
 To make use of the optional dracut configuration you need: dracut.
 
-To build and install the documentation (man page) you need:
+To build a fresh version of the documentation (man page) you need:
 
   - pandoc;
   - GNU Core Utilities (date);
-  - GNU awk.
+  - GNU awk;
+
+otherwise the pre-cooked version shipped with the source will be used.
 
 INSTALLATION
 ============
@@ -160,7 +162,7 @@ steps and copies the resulting components to their final destination.
 | Option      | Values | Default | Effect
 | :-----      | :----: | :-----: | :-----
 | HAVE_DRACUT | 0, 1   | 0       | Install a dracut configuration file that includes **chreipl-fcp-mpath** in the initial ramdisks built with **dracut**.
-| ENABLE_DOC  | 0, 1   | 0       | Build and install a man page for **chreipl-fcp-mpath**.
+| ENABLE_DOC  | 0, 1   | 0       | Build a fresh version of the man page for **chreipl-fcp-mpath**.
 
 Specify any options as arguments for both the **make** and **make install**
 command as shown in the following example:
@@ -195,8 +197,8 @@ the boot record to find the new initial ramdisk.
 
     ~ # zipl
 
-With dracut and documentation enabled, **make install** deploys the following
-files to these default locations:
+With dracut enabled, **make install** deploys the following files to these
+default locations:
 
     /usr/lib/chreipl-fcp-mpath/chreipl-fcp-mpath-common.sh
     /usr/lib/dracut/dracut.conf.d/70-chreipl-fcp-mpath.conf
