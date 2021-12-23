@@ -1,7 +1,7 @@
 /*
  * chcpumf -  Change CPU Measurement Facility Characteristics
  *
- * Copyright IBM Corp. 2020
+ * Copyright IBM Corp. 2020, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -20,9 +20,9 @@
 #include "lib/util_prg.h"
 #include "lib/util_base.h"
 
-#include "defines.h"
+#include "lib/libcpumf.h"
 
-static int verbose;
+static unsigned int verbose;
 static unsigned long min_sdb, max_sdb;
 
 static struct util_opt opt_vec[] = {
@@ -85,55 +85,30 @@ static long parse_buffersize(char *string)
 	return bytes;
 }
 
-static void read_sfb(unsigned long *min, unsigned long *max)
-{
-	unsigned long cur_min_sdb, cur_max_sdb;
-	FILE *fp;
-
-	if (geteuid())
-		errx(EXIT_FAILURE, "Must run as root");
-	fp = fopen(PERF_SFB_SIZE, "r");
-	if (!fp)
-		err(EXIT_FAILURE, PERF_SFB_SIZE);
-	if (fscanf(fp, "%ld,%ld", &cur_min_sdb, &cur_max_sdb) != 2) {
-		fclose(fp);
-		errx(EXIT_FAILURE, "Can not parse file " PERF_SFB_SIZE);
-	} else {
-		if (*min == 0)
-			*min = cur_min_sdb;
-		if (*max == 0)
-			*max = cur_max_sdb;
-	}
-	fclose(fp);
-	if (*min >= *max)
-		errx(EXIT_FAILURE,
-		     "The specified maximum must be greater than the minimum");
-}
-
-static int write_sfb(unsigned long min, unsigned long max)
+static int write_sfb(unsigned int min, unsigned int max)
 {
 	int rc = EXIT_SUCCESS;
 	char text[64];
 	size_t len;
 	FILE *fp;
 
-	fp = fopen(PERF_SFB_SIZE, "w");
+	fp = fopen(S390_CPUMSF_BUFFERSZ, "w");
 	if (!fp)
-		err(EXIT_FAILURE, PERF_SFB_SIZE);
-	snprintf(text, sizeof text, "%ld,%ld", min, max);
+		err(EXIT_FAILURE, S390_CPUMSF_BUFFERSZ);
+	snprintf(text, sizeof(text), "%u,%u", min, max);
 	len = strlen(text) + 1;
 	if (fwrite(text, 1, len, fp) != len) {
-		warn(PERF_SFB_SIZE);
+		warn(S390_CPUMSF_BUFFERSZ);
 		rc = EXIT_FAILURE;
 	}
 	if (fclose(fp)) {
-		warn(PERF_SFB_SIZE);
+		warn(S390_CPUMSF_BUFFERSZ);
 		rc = EXIT_FAILURE;
 	}
 	if (verbose && rc != EXIT_FAILURE)
 		warnx("Sampling buffer sizes:\n"
-		      "    Minimum:%7ld sample-data-blocks\n"
-		      "    Maximum:%7ld sample-data-blocks\n",
+		      "    Minimum:%7d sample-data-blocks\n"
+		      "    Maximum:%7d sample-data-blocks\n",
 		      min, max);
 	return rc;
 }
@@ -183,15 +158,21 @@ static int parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-	struct stat sbuf;
+	unsigned long my_min, my_max;
 
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
 	parse_args(argc, argv);
-	if (stat(PERF_PATH PERF_SF, &sbuf))
+	if (geteuid())
+		errx(EXIT_FAILURE, "Must run as root");
+	if (!libcpumf_have_sfb())
 		errx(EXIT_FAILURE,
 		     "No CPU-measurement sampling facility detected");
-	read_sfb(&min_sdb, &max_sdb);
+	libcpumf_sfb_info(&my_min, &my_max);
+	if (!min_sdb)
+		min_sdb = my_min;
+	if (!max_sdb)
+		max_sdb = my_max;
 	return write_sfb(min_sdb, max_sdb);
 }

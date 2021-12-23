@@ -5,7 +5,7 @@ MAN_FILES = lscpumf.1 chcpumf.8 lshwc.1
 
 all: $(BIN_FILES)
 
-libs =	$(rootdir)/libutil/libutil.a
+libs =	$(rootdir)/libutil/libutil.a $(rootdir)/libcpumf/libcpumf.a
 
 lscpumf: lscpumf.o $(libs)
 chcpumf: chcpumf.o $(libs)

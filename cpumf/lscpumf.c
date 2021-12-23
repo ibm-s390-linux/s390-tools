@@ -1,7 +1,7 @@
 /*
  * lscpumf -  Show CPU Measurement Facility Characteristics
  *
- * Copyright IBM Corp. 2020
+ * Copyright IBM Corp. 2020, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -28,7 +28,7 @@
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
 
-#include "defines.h"
+#include "lib/libcpumf.h"
 
 #define	ACTION_NONE	0
 #define	ACTION_INFO	1
@@ -45,9 +45,6 @@ static bool actions[ACTION_SAMPLE + 1];	/* Specified command line options */
 #define	PER_SDBT_SIZE	511
 
 /* File names to read data from */
-#define	SERVICELEVEL	"/proc/service_levels"
-#define	CPUMF_CF_TYPE	"/sys/devices/cpum_cf/type"
-#define	CPUMF_SF_TYPE	"/sys/devices/cpum_sf/type"
 
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS"),
@@ -92,19 +89,18 @@ static char prefix[32];			/* Counter prefix */
 static bool show_names;
 
 static struct cpumf_info {
-	unsigned int first_vn;		/* Counter facility first version nr */
-	unsigned int second_vn;		/* Counter facility second version nr */
-	unsigned int authorization;	/* Counter facility  authorization */
-	float version;
+	int first_vn;			/* Counter facility first version nr */
+	int second_vn;			/* Counter facility second version nr */
+	int authorization;		/* Counter facility  authorization */
 	unsigned long min_rate;		/* Minimum sampling rate */
 	unsigned long max_rate;		/* Maximum sampling rate */
 	unsigned long cpu_speed;	/* CPU Cycles per micro second */
-	unsigned int basic_sample_sz;	/* # of Bytes per basic sample */
-	unsigned int diag_sample_sz;	/* # of bytes per diagnostic sample */
-	unsigned char have_counter;	/* CPUM counter facility detected */
-	unsigned char have_samples;	/* CPUM sampling facility detected */
-	unsigned int min_sfb;		/* Minimum sampling buffer size */
-	unsigned int max_sfb;		/* Maximum sampling buffer size */
+	int basic_sample_sz;		/* # of Bytes per basic sample */
+	int diag_sample_sz;		/* # of bytes per diagnostic sample */
+	bool have_counter;		/* CPUM counter facility detected */
+	bool have_samples;		/* CPUM sampling facility detected */
+	unsigned long min_sfb;		/* Minimum sampling buffer size */
+	unsigned long max_sfb;		/* Maximum sampling buffer size */
 	unsigned short machine_type;	/* Machine Type */
 } cpumf;
 
@@ -2565,26 +2561,12 @@ static struct counters cpumcf_z15_counters[] = {
  * If perf_pmu_register() kernel function assigned any other (higher) type
  * number, set the prefix to <type-nr>:
  */
-static int read_cpumf_type(const char *filename, const char *type)
+static void set_prefix(int nr)
 {
-	int nr, rc = EXIT_FAILURE;
-	FILE *fp = fopen(filename, "r");
-
-	if (fp == NULL) {
-		warnx("No CPU-measurement %s facility detected", type);
-		return rc;
-	}
-	if (fscanf(fp, "%d", &nr) != 1) {
-		warnx("Can not parse file %s", filename);
-	} else {
-		rc = EXIT_SUCCESS;
-		if (nr == PERF_TYPE_RAW)
-			strcat(prefix, "r");
-		else
-			snprintf(prefix, sizeof prefix, "%d:", nr);
-	}
-	fclose(fp);
-	return rc;
+	if (nr == PERF_TYPE_RAW)
+		strcat(prefix, "r");
+	else
+		snprintf(prefix, sizeof(prefix), "%d:", nr);
 }
 
 /* Parse tool parameters. In case of --help or --version, print
@@ -2661,8 +2643,6 @@ static unsigned long div_ceil(unsigned long a, unsigned long b)
 
 static void show_info(struct cpumf_info *p, int details)
 {
-	struct stat sbuf;
-
 	if (!p->have_counter && !p->have_samples) {
 		warnx("No CPU-measurement facilities detected");
 		return;
@@ -2672,7 +2652,7 @@ static void show_info(struct cpumf_info *p, int details)
 		if (details) {
 			printf("----------------------------------------------"
 			       "----------------------------\n");
-			printf("Version: %3.1f\n\n", p->version);
+			printf("Version: %d.%d\n\n", p->first_vn, p->second_vn);
 			printf("Authorized counter sets:\n");
 			if (!p->authorization)
 				printf("    None\n");
@@ -2689,8 +2669,7 @@ static void show_info(struct cpumf_info *p, int details)
 			if (0x8000 & p->authorization)
 				printf("    Coprocessor Group counter Set\n");
 			printf("\nLinux perf event support: %s\n\n",
-				(stat(PERF_PATH PERF_CF, &sbuf)) ? "No" :
-				"Yes (PMU: " PERF_CF ")");
+				!p->have_counter ? "No" : "Yes (PMU: cpum_cf)");
 
 		}
 	} else
@@ -2718,19 +2697,18 @@ static void show_info(struct cpumf_info *p, int details)
 			       p->diag_sample_sz);
 
 			printf("\nLinux perf event support: %s\n\n",
-				(stat(PERF_PATH PERF_SF, &sbuf)) ? "No" :
-				"Yes (PMU: " PERF_SF ")");
+				!p->have_samples ? "No" : "Yes (PMU: cpum_sf)");
 
-			printf("Current sampling buffer settings for %s:\n",
-			       PERF_SF);
+			printf("Current sampling buffer settings for"
+			       " cpum_sf:\n");
 			printf("    Basic-sampling mode\n");
 			total = p->min_sfb + div_ceil(p->min_sfb, PER_SDBT_SIZE);
-			human(text, sizeof text, PAGE_SIZE * total);
-			printf("	Minimum: %6d"
+			human(text, sizeof(text), PAGE_SIZE * total);
+			printf("	Minimum: %6ld"
 			       " sample-data-blocks (%6s)\n", p->min_sfb, text);
 			total = p->max_sfb + div_ceil(p->max_sfb, PER_SDBT_SIZE);
-			human(text, sizeof text, PAGE_SIZE * total);
-			printf("	Maximum: %6d"
+			human(text, sizeof(text), PAGE_SIZE * total);
+			printf("	Maximum: %6ld"
 			       " sample-data-blocks (%6s)\n\n", p->max_sfb,
 			       text);
 
@@ -2739,13 +2717,13 @@ static void show_info(struct cpumf_info *p, int details)
 			fdiag = div_ceil(p->diag_sample_sz, p->basic_sample_sz);
 			total = fdiag * p->min_sfb
 				+ div_ceil(p->min_sfb, PER_SDBT_SIZE);
-			human(text, sizeof text, PAGE_SIZE * total);
+			human(text, sizeof(text), PAGE_SIZE * total);
 			printf("	Minimum: %6ld"
 			       " sample-data-blocks (%6s)\n",
 			       fdiag * p->min_sfb, text);
 			total = fdiag * p->max_sfb
 				+ div_ceil(p->max_sfb * fdiag, PER_SDBT_SIZE);
-			human(text, sizeof text, PAGE_SIZE * total);
+			human(text, sizeof(text), PAGE_SIZE * total);
 			printf("	Maximum: %6ld"
 			       " sample-data-blocks (%6s)\n", fdiag * p->max_sfb,
 			       text);
@@ -2753,27 +2731,6 @@ static void show_info(struct cpumf_info *p, int details)
 		}
 	} else
 		warnx("No CPU-measurement sampling facility detected");
-}
-
-/* Read CPU Measurement sampling facility device driver minimum and maximum
- * buffer size
- */
-static int read_sfb(struct cpumf_info *p)
-{
-	int rc = EXIT_SUCCESS;
-	FILE *fp;
-
-	fp = fopen(PERF_SFB_SIZE, "r");
-	if (!fp) {
-		warn(PERF_SFB_SIZE);
-		return EXIT_FAILURE;
-	}
-	if (fscanf(fp, "%d,%d", &p->min_sfb, &p->max_sfb) != 2) {
-		warnx("Can not parse %s", PERF_SFB_SIZE);
-		rc = EXIT_FAILURE;
-	}
-	fclose(fp);
-	return rc;
 }
 
 /* Set the counter name for z15 counter numbered 265. It is either named
@@ -2803,81 +2760,23 @@ static void read_ccerror(struct counters *cp, size_t cp_cnt)
 /* Read allnecessary information from /sysfs file /proc/service_levels */
 static int read_info(void)
 {
-	char *linep = NULL;
-	size_t line_sz;
-	ssize_t nbytes;
-	FILE *slp;
-	int rc;
+	int rc = EXIT_FAILURE;
 
-	memset(&cpumf, 0, sizeof cpumf);
-	slp = fopen(SERVICELEVEL, "r");
-	if (!slp) {
-		warn(SERVICELEVEL);
-		return EXIT_FAILURE;
-	}
-
-	while ((nbytes = getline(&linep, &line_sz, slp)) != EOF) {
-		if (!strncmp(linep, "CPU-MF: Counter facility:", 25)) {
-			rc = sscanf(linep, "CPU-MF: Counter facility:"
-				    " version=%f authorization=%x",
-				    &cpumf.version, &cpumf.authorization);
-			if (rc != 2) {
-				warnx("Can not parse line %s", linep);
-				rc = EXIT_FAILURE;
-				goto out;
-			}
-			cpumf.have_counter = 1;
-			cpumf.first_vn = (int)cpumf.version;
-			cpumf.second_vn = ((int)(10 * cpumf.version) % 10);
-		}
-		if (!strncmp(linep, "CPU-MF: Sampling facility: min", 30)) {
-			rc = sscanf(linep, "CPU-MF: Sampling facility:"
-				    " min_rate=%ld max_rate=%ld cpu_speed=%ld",
-				    &cpumf.min_rate, &cpumf.max_rate,
-				    &cpumf.cpu_speed);
-			if (rc != 3) {
-				warnx("Can not parse line %s", linep);
-				rc = EXIT_FAILURE;
-				goto out;
-			}
-			cpumf.have_samples = 1;
-		}
-		if (!strncmp(linep, "CPU-MF: Sampling facility: mode=basic", 37)) {
-			rc = sscanf(linep, "CPU-MF: Sampling facility:"
-				    " mode=basic sample_size=%u",
-				    &cpumf.basic_sample_sz);
-			if (rc != 1) {
-				warnx("Can not parse line %s", linep);
-				rc = EXIT_FAILURE;
-				goto out;
-			}
-		}
-		if (!strncmp(linep, "CPU-MF: Sampling facility: mode=diag", 36)) {
-			rc = sscanf(linep, "CPU-MF: Sampling facility:"
-				    " mode=diagnostic sample_size=%u",
-				    &cpumf.diag_sample_sz);
-			if (rc != 1) {
-				warnx("Can not parse line %s", linep);
-				rc = EXIT_FAILURE;
-				goto out;
-			}
-		}
-	}
-	if (cpumf.have_samples) {
-		rc = read_sfb(&cpumf);
-		if (rc == EXIT_FAILURE)
-			goto out;
-	}
+	cpumf.have_counter = libcpumf_cpumcf_info(&cpumf.first_vn,
+						  &cpumf.second_vn,
+						  &cpumf.authorization);
+	cpumf.have_samples = libcpumf_cpumsf_info(&cpumf.min_rate,
+						  &cpumf.max_rate,
+						  &cpumf.cpu_speed,
+						  &cpumf.basic_sample_sz,
+						  &cpumf.diag_sample_sz);
+	if (cpumf.have_samples)
+		libcpumf_sfb_info(&cpumf.min_sfb, &cpumf.max_sfb);
 	cpumf.machine_type = util_arch_machine_type();
-	if (cpumf.machine_type == UTIL_ARCH_MACHINE_TYPE_UNKNOWN) {
+	if (cpumf.machine_type == UTIL_ARCH_MACHINE_TYPE_UNKNOWN)
 		rc = EXIT_FAILURE;
-		goto out;
-	}
-	rc = EXIT_SUCCESS;
-out:
-	fclose(slp);
-	free(linep);
-
+	else
+		rc = EXIT_SUCCESS;
 	return rc;
 }
 
@@ -3051,14 +2950,18 @@ int main(int argc, char **argv)
 	case ACTION_CNT:
 	case ACTION_CNTALL:
 		all = ret == ACTION_CNTALL;
-		ret = read_cpumf_type(CPUMF_CF_TYPE, "counter");
-		if (ret == EXIT_SUCCESS)
+		ret = libcpumf_pmutype(S390_CPUMF_CF);
+		if (ret >= EXIT_SUCCESS) {
+			set_prefix(ret);
 			show_counter(all);
+		}
 		break;
 	case ACTION_SAMPLE:
-		ret = read_cpumf_type(CPUMF_SF_TYPE, "sampling");
-		if (ret == EXIT_SUCCESS)
+		ret = libcpumf_pmutype(S390_CPUMF_SF);
+		if (ret >= EXIT_SUCCESS) {
+			set_prefix(ret);
 			show_sample();
+		}
 		break;
 	case ACTION_NONE:
 	case ACTION_INFO:

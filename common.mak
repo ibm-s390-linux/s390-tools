@@ -371,6 +371,10 @@ $(rootdir)/libvmcp/libvmcp.a: $(rootdir)/libvmcp
 	$(MAKE) -C $(rootdir)/libvmcp/ libvmcp.a
 .PHONY: $(rootdir)/libvmcp
 
+$(rootdir)/libcpumf/libcpumf.a: $(rootdir)/libcpumf
+	$(MAKE) -C $(rootdir)/libcpumf/ libcpumf.a
+.PHONY: $(rootdir)/libcpumf
+
 $(rootdir)/libekmfweb/libekmfweb.so: $(rootdir)/libekmfweb
 	$(MAKE) -C $(rootdir)/libekmfweb/ libekmfweb.so
 .PHONY: $(rootdir)/libekmfweb
