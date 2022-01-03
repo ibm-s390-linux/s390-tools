@@ -109,7 +109,7 @@ fail_with()
 
 cpi_commit()
 {
-	echo 1 > "$CPI_SET"
+	echo 1 > "$CPI_SET" 2> /dev/null
 }
 
 do_length_check()
