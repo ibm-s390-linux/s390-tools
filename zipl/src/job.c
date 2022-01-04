@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "lib/util_arch.h"
 
@@ -495,6 +496,7 @@ set_cl_element(struct component_loc *cl, char *name, const char *filename,
 		cl->size = ALIGN(size, MAXIMUM_PHYSICAL_BLOCKSIZE);
 		return 0;
 	}
+	assert(filename != NULL);
 	/* Get size */
 	if (stat(filename, &stats)) {
 		error_reason(strerror(errno));
