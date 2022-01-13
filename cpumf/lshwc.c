@@ -38,17 +38,18 @@
 #include "lib/util_path.h"
 #include "lib/util_scandir.h"
 #include "lib/util_libc.h"
+#include "lib/libcpumf.h"
 
 #include "lshwc.h"
 
-#define SERVICELEVEL	"/proc/service_levels"
 #define CPUS_ONLINE	"/sys/devices/system/cpu/online"
 #define CPUS_POSSIBLE	"/sys/devices/system/cpu/possible"
 #define CPUS_KERNELMAX	"/sys/devices/system/cpu/kernel_max"
 #define MAXCTRS		512
 #define IOCTLSLEEP	60U
 
-static unsigned int read_interval = IOCTLSLEEP, cfvn, csvn, authorization;
+static unsigned int read_interval = IOCTLSLEEP;
+static int cfvn, csvn, authorization;
 static unsigned long loop_count = 1;
 static unsigned char *ioctlbuffer;
 static bool allcpu;
@@ -151,20 +152,6 @@ static unsigned long getnumber(char *word, char stopchar)
 	return no;
 }
 
-/* Remove all whitespace from string.  */
-static void kill_whitespace(char *s)
-{
-	char *cp = s;
-
-	for (; *s != '\0'; ++s) {
-		if (isspace(*s))
-			continue;
-		if (isprint(*s))
-			*cp++ = *s;
-	}
-	*cp = '\0';
-}
-
 /* Read file to get all online CPUs */
 static bool get_cpus(char *file, char *buf, size_t bufsz)
 {
@@ -242,29 +229,34 @@ static char *show_ctrset(unsigned long set)
 static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 {
 	uint64_t *words = start->cpumask;
-	unsigned long i, no_a, no_b;
-	char *cp, *tokens[16];		/* Used to parse command line params */
-	char cpubuf[256];
+	unsigned int i, no_a, no_b;
+	cpu_set_t cpulist;
+	int rc;
 
+	CPU_ZERO(&cpulist);
 	start->data_bytes = 0;
-	if (parm)
-		kill_whitespace(parm);
-	if (!parm || *parm == ':') {
-		/* No CPU list or just counter sets */
-		if (!get_cpus(CPUS_ONLINE, cpubuf, sizeof(cpubuf)))
-			exit(EXIT_FAILURE);
-		if (parm)
-			strcat(cpubuf, parm);
-		parm = cpubuf;
+	start->counter_sets = S390_HWCTR_ALL;	/* Default all counter sets */
+
+	if (parm) {		/* CPU list with optional counter set */
+		char *cp = strchr(parm, ':');
+
+		if (cp) {			/* Handle counter set */
+			*cp = '\0';
+			start->counter_sets = parse_ctrset(++cp);
+		}
+
+		if (strlen(parm) > 0) {		/* Handle CPU list */
+			rc = libcpumf_cpuset(parm, &cpulist);
+			if (rc)
+				errx(EXIT_FAILURE, "Cannot use CPU list %s",
+				     parm);
+		}
+	} else {		/* No CPU list and no counter sets */
+		rc = libcpumf_cpuset_fn(S390_CPUS_ONLINE, &cpulist);
+		if (rc)
+			err(EXIT_FAILURE, "Cannot read file " S390_CPUS_ONLINE);
 	}
 
-	cp = strchr(parm, ':');
-	if (cp) {		/* Handle counter set */
-		*cp = '\0';
-		start->counter_sets = parse_ctrset(++cp);
-	} else {
-		start->counter_sets = S390_HWCTR_ALL;
-	}
 	/* Check with authorized counter sets */
 	if ((start->counter_sets & authorization) != start->counter_sets) {
 		unsigned int noton = ~(start->counter_sets & authorization);
@@ -276,19 +268,10 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 		      show_ctrset(noton));
 	}
 
-	for (i = 0; i < ARRAY_SIZE(tokens) && (tokens[i] = strtok(parm, ","));
-	    ++i, parm = NULL) {
-		cp = strchr(tokens[i], '-');	/* Range character? */
-		if (cp) {
-			no_a = getnumber(tokens[i], *cp);
-			no_b = getnumber(++cp, '\0');
-		} else {
-			no_b = getnumber(tokens[i], '\0');
-			no_a = no_b;
-		}
-		if (!check_set(no_a, no_b, start->counter_sets))
-			errx(EXIT_FAILURE, "Invalid CPU list %s", tokens[i]);
-	}
+	for (rc = 0; rc < CPU_SETSIZE; ++rc)
+		if (CPU_ISSET(rc, &cpulist))
+			if (!check_set(rc, rc, start->counter_sets))
+				errx(EXIT_FAILURE, "Invalid CPU %d", rc);
 
 	/* Convert the CPU list to a bitmask for kernel cpumask_t */
 	for (i = 0, no_b = 0; i < max_possible_cpus; ++i) {
@@ -632,37 +615,6 @@ static int do_it(char *s)
 	return rc ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-/* Read counter first and second version number */
-static bool get_cvn(void)
-{
-	char *linep = NULL;
-	bool good = false;
-	size_t line_sz;
-	ssize_t nbytes;
-	FILE *slp;
-
-	slp = fopen(SERVICELEVEL, "r");
-	if (!slp) {
-		warn(SERVICELEVEL);
-		return false;
-	}
-	while ((nbytes = getline(&linep, &line_sz, slp)) != EOF) {
-		if (!strncmp(linep, "CPU-MF: Counter facility:", 25)) {
-			int rc;
-
-			rc = sscanf(linep, "CPU-MF: Counter facility: version=%d.%d authorization=%x",
-				    &cfvn, &csvn, &authorization);
-			good = rc == 3;
-			if (!good)
-				warnx("Cannot parse line %s", linep);
-			break;
-		}
-	}
-	fclose(slp);
-	free(linep);
-	return good;
-}
-
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS"),
 	{
@@ -746,7 +698,7 @@ int main(int argc, char **argv)
 	}
 
 	have_support();
-	if (!get_cvn())
+	if (!libcpumf_cpumcf_info(&cfvn, &csvn, &authorization))
 		return EXIT_FAILURE;
 	if (!check_setpossible())
 		return EXIT_FAILURE;
