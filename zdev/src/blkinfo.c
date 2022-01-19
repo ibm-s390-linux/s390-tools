@@ -108,6 +108,8 @@ static struct blkinfo *blkinfo_from_line(char *line)
 
 	name		= isolate_keyword(&line, "NAME=\"");
 	majmin		= isolate_keyword(&line, "MAJ:MIN=\"");
+	if (!majmin)
+		majmin  = isolate_keyword(&line, "MAJ_MIN=\"");
 	fstype		= isolate_keyword(&line, "FSTYPE=\"");
 	uuid		= isolate_keyword(&line, "UUID=\"");
 	mountpoint	= isolate_keyword(&line, "MOUNTPOINT=\"");
