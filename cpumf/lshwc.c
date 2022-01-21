@@ -298,14 +298,8 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 			words[no_b] |= 1ULL << no_a;
 		}
 	}
-	/* no_b is highest used index, swap array */
-	start->cpumask_len = (no_b + 1) * 8;
-	for (no_a = 0; no_a < no_b; ++no_a, --no_b) {
-		uint64_t tmp =  words[no_a];
-
-		words[no_a] = words[no_b];
-		words[no_b] = tmp;
-	}
+	/* no_b is highest used index */
+	start->cpumask_len = (no_b + 1) * CHAR_BIT;
 	start->version = S390_HWCTR_START_VERSION;
 }
 
