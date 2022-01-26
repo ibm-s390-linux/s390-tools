@@ -7,6 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@
 #include "misc.h"
 
 #define LSBLK_CMDLINE	"lsblk -P -o NAME,MAJ:MIN,FSTYPE,UUID,MOUNTPOINT,PKNAME 2>/dev/null"
+#define LSBLK_CMDLINE2	"lsblk -P -o NAME,MAJ:MIN,FSTYPE,UUID,MOUNTPOINTS,PKNAME 2>/dev/null"
 
 struct blkinfo {
 	struct devnode *devnode;
@@ -82,6 +84,26 @@ void blkinfo_print(struct blkinfo *blkinfo, int level)
 		printf("%*sparent=%s\n", level, "", blkinfo->parent);
 }
 
+/* Convert each occurrence of '\xnn' in @str to character with hex code <nn>. */
+static void hex_unescape(char *str)
+{
+	unsigned int c;
+
+	while ((str = strstr(str, "\\x"))) {
+		if (isxdigit(str[2]) && isxdigit(str[3]) &&
+		    sscanf(str + 2, "%2x", &c) == 1) {
+			str[0] = (char)c;
+
+			/* Move remainder of str including nul behind <c>. */
+			memmove(str + /* <c> */ 1,
+				str + /* '\xnn' */ 4,
+				strlen(str + 4) + /* <nul> */ 1);
+		}
+
+		str++;
+	}
+}
+
 static char *isolate_keyword(char **line_ptr, const char *keyword)
 {
 	char *start, *end;
@@ -102,9 +124,11 @@ static char *isolate_keyword(char **line_ptr, const char *keyword)
 	return start;
 }
 
-static struct blkinfo *blkinfo_from_line(char *line)
+static void add_blkinfos_from_line(struct util_list *blkinfos,
+				   char *line)
 {
-	char *name, *majmin, *fstype, *uuid, *mountpoint, *parent;
+	char *name, *majmin, *fstype, *uuid, *mountpoint, *mountpoints, *parent;
+	struct blkinfo *blkinfo;
 
 	name		= isolate_keyword(&line, "NAME=\"");
 	majmin		= isolate_keyword(&line, "MAJ:MIN=\"");
@@ -113,21 +137,45 @@ static struct blkinfo *blkinfo_from_line(char *line)
 	fstype		= isolate_keyword(&line, "FSTYPE=\"");
 	uuid		= isolate_keyword(&line, "UUID=\"");
 	mountpoint	= isolate_keyword(&line, "MOUNTPOINT=\"");
+	mountpoints	= isolate_keyword(&line, "MOUNTPOINTS=\"");
 	parent		= isolate_keyword(&line, "PKNAME=\"");
 
-	return blkinfo_new(name, majmin, fstype, uuid, mountpoint, parent);
+	if (!mountpoints) {
+		/* Handle old lsblk output format. */
+		blkinfo = blkinfo_new(name, majmin, fstype, uuid, mountpoint,
+				      parent);
+		ptrlist_add(blkinfos, blkinfo);
+		return;
+	}
+
+	/* Restore newline mount point separator encoded as hex. */
+	hex_unescape(mountpoints);
+
+	/* Represent each mount point as a separate blkinfo to support
+	 * resolution of multi-mount point file systems like btrfs
+	 * subvolumes. */
+	while ((mountpoint = strsep(&mountpoints, "\n"))) {
+		blkinfo = blkinfo_new(name, majmin, fstype, uuid, mountpoint,
+				      parent);
+		ptrlist_add(blkinfos, blkinfo);
+	}
 }
 
 static struct util_list *blkinfos_read(void)
 {
 	char *output, *curr, *next;
 	struct util_list *blkinfos;
-	struct blkinfo *blkinfo;
 
 	if (cached_blkinfos)
 		return cached_blkinfos;
 
-	output = misc_read_cmd_output(LSBLK_CMDLINE, 0, 1);
+	output = misc_read_cmd_output(LSBLK_CMDLINE2, 0, 1);
+	if (output && !*output) {
+		/* No output might indicate no support for new lsblk command-
+		 * line format - fall back to old format. */
+		free(output);
+		output = misc_read_cmd_output(LSBLK_CMDLINE, 0, 1);
+	}
 	if (!output)
 		return NULL;
 
@@ -136,9 +184,7 @@ static struct util_list *blkinfos_read(void)
 	/* Iterate over each line. */
 	next = output;
 	while ((curr = strsep(&next, "\n"))) {
-		blkinfo = blkinfo_from_line(curr);
-		if (blkinfo)
-			ptrlist_add(blkinfos, blkinfo);
+		add_blkinfos_from_line(blkinfos, curr);
 	}
 
 	free(output);
