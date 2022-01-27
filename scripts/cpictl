@@ -24,6 +24,9 @@ readonly SYSTEM_NAME_PATH="/sys/firmware/cpi/system_name"
 readonly SYSPLEX_NAME_PATH="/sys/firmware/cpi/sysplex_name"
 readonly CPI_SET="/sys/firmware/cpi/set"
 
+# Location of os-release file - can be specified externally for testing purpose
+readonly OS_RELEASE=${CPI_OS_RELEASE:-"/etc/os-release"}
+
 declare LEVEL
 declare TYPE
 declare NAME
@@ -37,6 +40,16 @@ readonly EXIT_FAILURE=1
 readonly EXIT_ARG_TOO_LONG=3
 readonly EXIT_INVALID_CHARS=4
 
+# Distro-IDs as supported by SE/HMC firmware
+readonly DISTRO_GENERIC=0
+readonly DISTRO_RHEL=1
+readonly DISTRO_SLES=2
+readonly DISTRO_UBUNTU=3
+readonly DISTRO_FEDORA=4
+readonly DISTRO_OPENSUSE=5
+readonly DISTRO_DEBIAN=6
+readonly DISTRO_RHCOS=7
+
 print_help_and_exit()
 {
 	cat <<EndHelp
@@ -49,7 +62,8 @@ Configure the Control-Program-Information (CPI) settings.
                          sysplex name with values taken from environment
                          variables
   -h, --help             Print this help, then exit
-  -L, --level LEVEL      Set and commit OS level to LEVEL (format xx.yy.zzABCD)
+  -L, --level LEVEL      Set and commit OS level to LEVEL. Format: 0x<level> or
+                         [[[flags:]distro_id:distro_version:]kernel_version]
   -N, --name SYSTEM      Set and commit the system name to SYSTEM
   -S, --sysplex SYSPLEX  Set and commit the sysplex name to SYSPLEX
   -T, --type TYPE        Set and commit OS type to TYPE
@@ -129,15 +143,228 @@ cpi_set_bit()
 	LEVEL=$(printf '0x%x' $((LEVEL | (1 << (63 - $1)) )) )
 }
 
+#
+# split_version - Split generic version string into array of sub-versions
+#
+# @version: Version string
+# @delim: Characters that delimit sub-versions in version string
+# @num: Number of sub-versions
+#
+# Print @num sub-versions of @version where each sub-version is delimited by
+# any of the characters in @delim. Print 0 in place of non-decimal or missing
+# sub-versions.
+#
+# Examples:
+# version=10   delim=.  num=3 => 10 0 0
+# version=4.8  delim=.  num=2 => 4 8
+#
+split_version()
+{
+	local version="$1" delim="$2" num="$3"
+	local list i subver
+
+	IFS="$delim" read -r -a list <<< "$version"
+
+	for (( i=0; i<num; i++ )) ; do
+		subver="${list[i]:-0}"
+		# Handle non-number sub-versions
+		[[ "$subver" =~ ^[0-9]+$ ]] || subver=0
+		# Force decimal interpretation in case of leading zeroes
+		subver=$(( 10#$subver ))
+		printf "%s " "$subver"
+	done
+}
+
+#
+# split_kver - Split Linux kernel version string into array of sub-versions
+#
+# @version: Linux kernel version string
+# @num: Number of sub-versions
+#
+# Print @num sub-versions of the specified kernel @version. Print 0 in place
+# of non-decimal or missing sub-versions.
+#
+# Examples:
+# version=2.4-13                      num=4 => 2 4 0 13
+# version=3.0.93_3.0.101-0.8.2_0.8.1  num=6 => 3 0 93 3 0 101
+# version=4.12.14-lp150.11.4          num=5 => 4 12 14 0 11
+#
+split_kver()
+{
+	local version="$1" num="$2"
+	local main extra
+
+	# Separate extra version to handle short main version (e.g. 2.4-13)
+	IFS="-_" read -r main extra <<< "$version"
+
+	split_version "$main" "." $(( num > 3 ? 3 : num ))
+	[[ "$num" -gt 3 ]] && split_version "$extra" ".-_" $(( num - 3 ))
+}
+
+#
+# bytes_to_word - Convert byte array to hexadecimal word
+#
+# @bytes: List of numbers representing byte values
+#
+# Print a big-endian hexadecimal representation of the word that results from
+# combining the specified byte values.
+#
+bytes_to_word()
+{
+	printf "0x"
+	printf "%02x" "$@"
+}
+
+#
+# get_system_level - Print system level word for specified distribution version
+#
+# @distro: Distro ID (ID value from /etc/os-release)
+# @ver_str: Distro version string (VERSION_ID from /etc/os-release)
+# @kver_str: Kernel version string (output of 'uname -r')
+# @flags: Optional statistics flags
+#
+# Print a 64 bit hexadecimal system level in a format as understood by firmware.
+#
+# The format is 0xabccddeeeeffgghh, where
+# - a=statistics flags
+# - b=distro id
+# - c=distro major version
+# - d=distro minor version(s)
+# - e=kernel sublevel 2
+# - f=kernel version
+# - g=kernel patchlevel
+# - h=kernel sublevel 1
+#
+get_system_level()
+{
+	local distro="$1" ver_str="$2" kver_str="$3" flags="${4:-0}"
+	local distro_id d_major d_minor d_minor2
+	local k_ver k_patchlvl k_sublvl k_sublvl2 bytes=()
+
+	# Extract list of sub-version numbers from version strings
+	read -r d_major d_minor d_minor2 <<< "$(split_version "$ver_str" "._-" 3)"
+	read -r k_ver k_patchlvl k_sublvl k_sublvl2 <<< "$(split_kver "$kver_str" 4)"
+
+	# Apply distro-specific logic
+	case "$distro" in
+	"rhel")
+		distro_id=$DISTRO_RHEL
+		;;
+
+	"sles")
+		distro_id=$DISTRO_SLES
+		;;
+
+	"ubuntu")
+		distro_id=$DISTRO_UBUNTU
+
+		# Encode minor and update version numbers in minor field
+		(( d_minor=((d_minor & 0xf) * 0x10) + (d_minor2 & 0xf) ))
+		;;
+
+	"fedora")
+		distro_id=$DISTRO_FEDORA
+		;;
+
+	"opensuse-leap")
+		distro_id=$DISTRO_OPENSUSE
+		;;
+
+	"debian")
+		distro_id=$DISTRO_DEBIAN
+		;;
+
+	"rhcos")
+		distro_id=$DISTRO_RHCOS
+		;;
+
+	*)
+		distro_id=$DISTRO_GENERIC
+
+		# Reset unsupported fields
+		d_major=0
+		d_minor=0
+		k_sublvl2=0
+		;;
+	esac
+
+	# Assemble byte data
+	(( bytes[0] = (flags & 0xf) * 0x10 + distro_id ))
+	(( bytes[1] = d_major ))
+	(( bytes[2] = d_minor ))
+	(( bytes[3] = (k_sublvl2 / 256) & 0xff ))
+	(( bytes[4] = k_sublvl2 & 0xff ))
+	(( bytes[5] = k_ver ))
+	(( bytes[6] = k_patchlvl ))
+	(( bytes[7] = k_sublvl ))
+
+	# Print as single hex word
+	bytes_to_word "${bytes[@]}"
+}
+
+get_distro()
+{
+	local line ID="linux" VERSION_ID="0" VERSION="" update
+
+	[[ ! -e "$OS_RELEASE" ]] && return
+
+	# Only import required variables
+	while read -r line ; do
+		if [[ "$line" =~ ^ID= ]] || [[ "$line" =~ ^VERSION_ID= ]] ||
+		   [[ "$line" =~ ^VERSION= ]] ; then
+			eval "$line"
+		fi
+	done <"$OS_RELEASE"
+
+	if [[ "$ID" == "ubuntu" ]] ; then
+		# Extract update version number only found in VERSION, e.g.
+		# VERSION_ID="18.04" VERSION="18.04.5 LTS"
+		update="${VERSION/*$VERSION_ID/}"
+		update="${update%% *}"
+		VERSION_ID="$VERSION_ID$update"
+	fi
+
+	echo "$ID:$VERSION_ID"
+}
+
 cpi_set_oslevel()
 {
-	local kver=$(echo "${1:-$(uname -r)}" | grep -E -o '^[0-9]+[.][0-9]+[.][0-9]+')
-	local maj=$((${kver%%.*} % 256))
-	local min=${kver#*.}
-	min=$((${min%.*} % 256))
-	local rev=$((${kver##*.} % 256))
-	local hexlevel=$(printf '0x%02x%02x%02x' $maj $min $rev)
-	LEVEL=$(printf '0x%016x' $(((LEVEL & 0xFFFFFFFFFF000000) | hexlevel)))
+	local level="${1:-}"
+	local flags list distro_id distro_ver kver id ver
+
+	if [[ "$level" =~ ^0x ]] && ! [[ "$level" =~ : ]] ; then
+		# Format: level=0x<hex>
+		printf -v LEVEL "0x%016x" "$level" 2>/dev/null ||
+			fail_with "$PRG: Invalid hexadecimal number in $level" \
+				  $EXIT_INVALID_CHARS
+		return
+	fi
+
+	# Format: level=[[[flags:]distro_id:distro_ver:]kver]
+	IFS=":" read -r -a list <<< "$level:"
+	kver="${list[*]: -1: 1}"
+	distro_ver="${list[*]: -2: 1}"
+	distro_id="${list[*]: -3: 1}"
+	flags="${list[*]: -4: 1}"
+
+	if [[ -z "$kver" ]] ; then
+		# Use version of currently running kernel
+		kver="$(uname -r)"
+	fi
+
+	if [[ -z "$distro_ver" ]] || [[ -z "$distro_id" ]] ; then
+		# Use distro ID and version from os-release file
+		IFS=":" read -r id ver <<< "$(get_distro)"
+		distro_id=${distro_id:-$id}
+		distro_ver=${distro_ver:-$ver}
+	fi
+
+	if [[ -z "$flags" ]] ; then
+		# Keep statistics flags from current system level
+		flags=$(( (LEVEL >> 60) & 0xf ))
+	fi
+
+	LEVEL=$(get_system_level "$distro_id" "$distro_ver" "$kver" "$flags")
 }
 
 cpi_set_type()
