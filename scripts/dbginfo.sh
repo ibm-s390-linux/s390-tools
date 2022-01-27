@@ -463,6 +463,7 @@ CMDS="${CMDS}\
   :multipathd -k'show maps'\
   :multipathd -k'show topo'\
   :multipathd -k'show paths'\
+  :multipathd -k'show paths format %w|%a|%r|%p|%i|%d|%D|%t|%T|%o|%0|%C' | sort\
   :multipathd -k'show maps stats'\
   :multipathd -k'show maps status'\
   :multipathd -k'show status'\
