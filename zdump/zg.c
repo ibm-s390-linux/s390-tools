@@ -280,7 +280,7 @@ off_t zg_seek(struct zg_fh *zg_fh, off_t off, enum zg_check check)
 {
 	off_t rc;
 
-	if (off >= zg_fh->sb.st_size)
+	if (S_ISREG(zg_fh->sb.st_mode) && off >= zg_fh->sb.st_size)
 		ERR_EXIT("Trying to seek past file end \"%s\"", zg_fh->path);
 
 	rc = lseek(zg_fh->fh, off, SEEK_SET);
