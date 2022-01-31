@@ -74,7 +74,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 		2) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-T,stage2.lds";; \
 		3) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-T,stage3.lds";; \
 	esac; \
-	$(LINK) $$SFLAGS -m64 $(filter %.o, $^) -o $@
+	$(LINK) $$SFLAGS -m64 -static $(filter %.o, $^) -o $@
 
 %.bin:	%.exec
 	$(OBJCOPY) -O binary \
