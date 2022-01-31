@@ -59,4 +59,10 @@ SECTIONS
            "Stack section doesn't conform to the described memory layout");
   }
   __stack_end = .;
+
+  /* List this explicitly as otherwise .note.gnu.build-id will be
+  * put at 0x0 */
+  .notes : {
+  *(.note.*)
+  }
 }
