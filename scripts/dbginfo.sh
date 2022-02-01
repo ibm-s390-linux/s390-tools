@@ -160,7 +160,7 @@ Log file check        =$(logfile_checker "/var/log*")
 
 Working directory     = $(ls -d ${paramWORKDIR_BASE} 2>&1 && df -k ${paramWORKDIR_BASE})
 $(ls -ltr ${paramWORKDIR_BASE}/DBGINFO*tgz 2>/dev/null | tail -2)
-$(ls ${LOCKFILE} 2>/dev/null && echo "     WARNING: dbginfo running since: $(cat ${LOCKFILE})")
+$(ls ${LOCKFILE} 2>/dev/null && echo "     Warning: dbginfo running since: $(cat ${LOCKFILE})")
 
 This is a console output only - no data was saved using option -c !
 
@@ -1022,7 +1022,7 @@ post_processing() {
     local base_dir
     local dir_list
 
-    pr_syslog_stdout "${step_num} Postprocessing"
+    pr_syslog_stdout ${step_num} "Postprocessing"
 
     # wipe possible passwords
     dir_list="${WORKPATH} \
@@ -1154,7 +1154,7 @@ environment_setup() {
 # create gzip-ped tar file
 create_package() {
     local rc_tar
-    pr_syslog_stdout "${step_num} Finalizing: Creating archive with collected data"
+    pr_syslog_stdout ${step_num} "Finalizing: Creating archive with collected data"
     cd "${WORKDIR_BASE}"
 
     touch "${WORKARCHIVE}"
