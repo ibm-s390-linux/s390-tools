@@ -68,13 +68,13 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 			}' \
 	); \
 	case $$STAGE in \
-		0) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-Ttext,0";; \
-		1) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-Ttext,0x18";; \
-		1b) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-Ttext,0xE000";; \
-		2) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-T,stage2.lds";; \
-		3) SFLAGS="$(NO_PIE_LDFLAGS) -nostdlib -Wl,-T,stage3.lds";; \
+		0) SFLAGS="-Wl,-Ttext,0";; \
+		1) SFLAGS="-Wl,-Ttext,0x18";; \
+		1b) SFLAGS="-Wl,-Ttext,0xE000";; \
+		2) SFLAGS="-Wl,-T,stage2.lds";; \
+		3) SFLAGS="-Wl,-T,stage3.lds";; \
 	esac; \
-	$(LINK) $$SFLAGS -m64 -static $(filter %.o, $^) -o $@
+	$(LINK) $$SFLAGS $(NO_PIE_LDFLAGS) -m64 -static -nostdlib $(filter %.o, $^) -o $@
 
 %.bin:	%.exec
 	$(OBJCOPY) -O binary \
