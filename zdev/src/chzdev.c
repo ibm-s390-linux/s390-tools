@@ -2088,12 +2088,18 @@ static exit_code_t devtype_remove_settings(struct devtype *dt, config_t config,
 	found = strlist_new();
 	notfound = strlist_new();
 
-	if (SCOPE_ACTIVE(config))
-		remove_settings(dt->active_settings, names, found, notfound, 1);
+	if (SCOPE_ACTIVE(config)) {
+		rc = remove_settings(dt->active_settings, names, found,
+				     notfound, 1);
+		if (rc)
+			goto out;
+	}
 
 	if (SCOPE_PERSISTENT(config)) {
-		remove_settings(dt->persistent_settings, names, found,
-				notfound, 0);
+		rc = remove_settings(dt->persistent_settings, names, found,
+				     notfound, 0);
+		if (rc)
+			goto out;
 	}
 
 	if (!util_list_is_empty(notfound)) {
@@ -2104,6 +2110,7 @@ static exit_code_t devtype_remove_settings(struct devtype *dt, config_t config,
 		rc = EXIT_SETTING_NOT_FOUND;
 	}
 
+out:
 	strlist_free(found);
 	strlist_free(notfound);
 
