@@ -248,19 +248,6 @@ gint pv_component_align(PvComponent *component, const gchar *tmp_path,
 	g_assert_not_reached();
 }
 
-/* Convert uint64_t address to byte array */
-static void uint64_to_uint8_buf(uint8_t dst[8], uint64_t addr)
-{
-	uint8_t *p = (uint8_t *)&addr;
-
-	g_assert(dst);
-
-	for (gint i = 0; i < 8; i++) {
-		/* cppcheck-suppress objectIndex */
-		dst[i] = p[i];
-	}
-}
-
 int64_t pv_component_update_ald(const PvComponent *comp, EVP_MD_CTX *ctx,
 				GError **err)
 {
@@ -273,11 +260,8 @@ int64_t pv_component_update_ald(const PvComponent *comp, EVP_MD_CTX *ctx,
 
 	do {
 		uint64_t cur_be = GUINT64_TO_BE(cur);
-		uint8_t addr_buf[8];
 
-		uint64_to_uint8_buf(addr_buf, cur_be);
-
-		if (EVP_DigestUpdate(ctx, addr_buf, sizeof(addr_buf)) != 1) {
+		if (EVP_DigestUpdate(ctx, &cur_be, sizeof(cur_be)) != 1) {
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("EVP_DigestUpdate failed"));
