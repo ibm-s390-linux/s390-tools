@@ -15,7 +15,7 @@
 #include "libc.h"
 #include "boot/s390.h"
 
-#define IPL_SC	*((struct subchannel_id *) &S390_lowcore.subchannel_id)
+#define IPL_SC				S390_lowcore.tpi_info.schid
 #define ROUND_DOWN(x, a)		((x) & ~((typeof(x))(a) - 1))
 #define IS_ALIGNED(x, a)		~((x) & ((typeof(x))(a) - 1))
 

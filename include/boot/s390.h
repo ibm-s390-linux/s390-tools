@@ -58,6 +58,26 @@ struct psw32_t {
 
 void load_wait_psw(uint64_t, struct psw_t *);
 
+struct subchannel_id {
+	uint32_t cssid:8;
+	uint32_t:4;
+	uint32_t m:1;
+	uint32_t ssid:2;
+	uint32_t one:1;
+	uint32_t sch_no:16;
+} __packed __aligned(4);
+
+struct tpi_info {
+	struct subchannel_id schid;
+	uint32_t intparm;
+	uint32_t adapter_IO:1;
+	uint32_t directed_irq:1;
+	uint32_t isc:3;
+	uint32_t:12;
+	uint32_t type:3;
+	uint32_t:12;
+} __packed __aligned(4);
+
 struct _lowcore {
 	uint8_t	pad_0x0000[0x0014-0x0000];	/* 0x0000 */
 	uint32_t	ipl_parmblock_ptr;		/* 0x0014 */
@@ -80,10 +100,15 @@ struct _lowcore {
 	uint8_t	pad_0x00a4[0x00a8-0x00a4];	/* 0x00a4 */
 	uint64_t	trans_exc_code;			/* 0x00a8 */
 	uint64_t	monitor_code;			/* 0x00b0 */
-	uint16_t	subchannel_id;			/* 0x00b8 */
-	uint16_t	subchannel_nr;			/* 0x00ba */
-	uint32_t	io_int_parm;			/* 0x00bc */
-	uint32_t	io_int_word;			/* 0x00c0 */
+	union {
+		struct {
+			uint16_t subchannel_id;		/* 0x00b8 */
+			uint16_t subchannel_nr;		/* 0x00ba */
+			uint32_t io_int_parm;		/* 0x00bc */
+			uint32_t io_int_word;		/* 0x00c0 */
+		};
+		struct tpi_info tpi_info;		/* 0x00b8 */
+	};
 	uint8_t	pad_0x00c4[0x00c8-0x00c4];	/* 0x00c4 */
 	uint32_t	stfl_fac_list;			/* 0x00c8 */
 	uint8_t	pad_0x00cc[0x00e8-0x00cc];	/* 0x00cc */

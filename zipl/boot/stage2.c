@@ -95,7 +95,7 @@ void __noreturn start(void)
 	void *load_page;
 	int config_nr;
 
-	subchannel_id = *(struct subchannel_id *)&S390_lowcore.subchannel_id;
+	subchannel_id = S390_lowcore.tpi_info.schid;
 	stage2_descr = *(struct stage2_descr*)STAGE2_DESC;
 
 	/* print menu and get configuration number */

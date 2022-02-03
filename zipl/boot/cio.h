@@ -32,15 +32,6 @@
 
 #define MAX_RETRIES		255
 
-struct subchannel_id {
-	uint32_t cssid:8;
-	uint32_t:4;
-	uint32_t m:1;
-	uint32_t ssid:2;
-	uint32_t one:1;
-	uint32_t sch_no:16;
-} __packed __aligned(4);
-
 struct ccw1 {
 	uint8_t cmd_code;
 	uint8_t flags;
