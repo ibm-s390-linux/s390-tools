@@ -329,6 +329,9 @@ fi
 ########################################
 
 LOGFILES="\
+  /run/containerd/events.log\
+  /run/docker/libcontainerd/containerd/events.log\
+  /run/udev/chreiplzfcpmp-[0-9][0-9][a-z][a-z][a-z][a-z]-*\
   /var/log/anaconda.*\
   /var/log/audit\
   /var/log/boot*\
@@ -341,31 +344,31 @@ LOGFILES="\
   /var/log/lin_tape.trace\
   /var/log/lin_tape.errorlog\
   /var/log/messages*\
-  /var/log/syslog*\
-  /var/log/sa\
-  /var/log/yum.log\
   /var/log/openvswitch/ovs-vswitchd.log\
   /var/log/openvswitch/ovsdb-server.log\
-  /run/docker/libcontainerd/containerd/events.log\
-  /run/containerd/events.log\
-  /run/udev/chreiplzfcpmp-[0-9][0-9][a-z][a-z][a-z][a-z]-*\
+  /var/log/sa\
+  /var/log/syslog*\
+  /var/log/yum.log\
   "
 
 ########################################
 
 CONFIGFILES="\
-  /boot/loader/entries/*.conf\
   /boot/grub2/grub.cfg\
+  /boot/loader/entries/*.conf\
   /boot/zipl/active_devices.txt\
   /boot/zipl/config\
   /etc/*.conf\
+  /etc/*release\
   /etc/anacrontab\
+  /etc/apparmor.d\
   /etc/auto.*\
   /etc/cron.*\
   /etc/crontab\
   /etc/crypttab\
   /etc/default\
   /etc/depmod.d\
+  /etc/docker\
   /etc/dracut.conf.d\
   /etc/exports\
   /etc/fstab\
@@ -399,14 +402,11 @@ CONFIGFILES="\
   /etc/systemd\
   /etc/udev*\
   /etc/xinet.d\
-  /etc/*release\
-  /run/udev/rules.d\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
-  /etc/docker\
   /lib/systemd/system/docker.service\
   /usr/lib/systemd/system\
-  /etc/apparmor.d\
   /run/udev/chreiplzfcpmp-ipl-volume-id\
+  /run/udev/rules.d\
   "
 
 ########################################
