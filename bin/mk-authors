@@ -32,7 +32,7 @@ Usage: $cmd [-t LAST_GIT_TAG]
 Add all new authors since last release to the $authors_file file. Without
 the -t option the tool uses the last available git tag as last release.
 
-The tool should be called form the s390-tools master branch.
+The tool runs on the s390-tools master branch.
 
 OPTIONS
 -t, --tag LAST_GIT_TAG  Use git tag LAST_GIT_TAG as starting point
@@ -116,7 +116,7 @@ echo "$cmd: Adding new authors since tag: $release_tag_last"
 	# Print authors list without header
 	tail -n +4 $authors_file_path
 	# Add the new authors
-	git log --format="- %an" $release_tag_last..
+	git log --format="- %an" $release_tag_last..master
 	# Then sort everything and remove duplicates
 } | sort | uniq > $authors_file_tmp
 # Create new AUTHORS file with header ...
