@@ -726,6 +726,7 @@ collect_sysfs() {
         local debugfs_mounted=0
         local dir_name
         local file_name
+        local rc=0
 
         pr_collect "sysfs"
         if ! grep -qE "${MOUNT_POINT_DEBUGFS}.*debugfs" /proc/mounts 2>/dev/null; then
@@ -742,14 +743,25 @@ collect_sysfs() {
         # files known to block on read (-x). Stop reading a file that takes
         # more than 5 seconds (-T 5) such as an active ftrace buffer.
         # error messages are not written to the log
-        dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" \
-            -x '*/tracing/trace_pipe*' \
-            -x '*/page_idle/bitmap*' \
-            -x '*/tracing/per_cpu/*' \
-            --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
+        if type -t dump2tar >/dev/null; then
+                dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" \
+                    -x '*/tracing/trace_pipe*' \
+                    -x '*/page_idle/bitmap*' \
+                    -x '*/tracing/per_cpu/*' \
+                    --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
+                rc=$?
+        else
+                echo "${SCRIPTNAME}: Warning: dump2tar is unavailable"
+                rc=255
+        fi
 
-        if [ $? -ne 0 ] ; then
-                echo "${SCRIPTNAME}: Warning: dump2tar failed or is unavailable"
+
+        if [ ${rc} -eq 0 ] ; then
+                echo " all failed entries are logged to ${OUTPUT_FILE_SYSFS}.err"
+        else
+                if [ $rc -ne 255 ]; then
+                        echo "${SCRIPTNAME}: Warning: dump2tar failed with $rc"
+                fi
                 pr_log_stdout " Warning: falling back to slow path"
                 call_run_command "find /sys -print0 | sort -z \
                     | xargs -0 -n 10 ls -ld" "${OUTPUT_FILE_SYSFS}.out"
@@ -769,8 +781,6 @@ collect_sysfs() {
                                 echo "${SCRIPTNAME}: Warning: failed to copy \"${file_name}\""
                         fi
                 done
-        else
-                echo " all failed entries are logged to ${OUTPUT_FILE_SYSFS}.err"
         fi
 
         if test ${debugfs_mounted} -eq 1; then
