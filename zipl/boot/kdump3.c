@@ -15,7 +15,6 @@
 #include "sclp_stage3.h"
 #include "stage3.h"
 
-static struct os_info **lc_os_info = (struct os_info **)&S390_lowcore.os_info;
 
 /*
  * Copy memory from HSA and exit in case of an error
@@ -89,8 +88,10 @@ static void kdump_stage3_scsi(unsigned long *base, unsigned long *size)
  */
 static void kdump_stage3_dasd(unsigned long *base, unsigned long *size)
 {
-	*base = (*lc_os_info)->crashkernel_addr;
-	*size = (*lc_os_info)->crashkernel_size;
+	struct os_info *lc_os_info = (struct os_info *)S390_lowcore.os_info;
+
+	*base = lc_os_info->crashkernel_addr;
+	*size = lc_os_info->crashkernel_size;
 }
 
 /*

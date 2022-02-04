@@ -15,8 +15,6 @@
 #include "menu.h"
 #include "stage2.h"
 
-static struct os_info **lc_os_info = ((struct os_info **)&S390_lowcore.os_info);
-
 /*
  * Copy crashkernel memory from [0, crash size] to
  * [crash base, crash base + crash size] if config_nr specifies a
@@ -27,7 +25,7 @@ static struct os_info **lc_os_info = ((struct os_info **)&S390_lowcore.os_info);
  */
 void kdump_stage2(unsigned long config_nr)
 {
-	struct os_info *os_info = *lc_os_info;
+	struct os_info *os_info = (struct os_info *)S390_lowcore.os_info;
 	unsigned long crash_size;
 	void *crash_base;
 
@@ -45,5 +43,5 @@ void kdump_stage2(unsigned long config_nr)
 	 */
 	if (__pa(os_info) >= crash_size)
 		return;
-	*lc_os_info = (void *) __pa(os_info) + __pa(crash_base);
+	S390_lowcore.os_info = __pa(os_info) + __pa(crash_base);
 }
