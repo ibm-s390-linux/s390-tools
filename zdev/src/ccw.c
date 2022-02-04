@@ -804,17 +804,17 @@ void ccw_unblacklist_id_range(const char *range)
 
 static char ***id_bitmap_new(void)
 {
-	return misc_malloc(sizeof(char **) * CSSID_MAX);
+	return misc_malloc(sizeof(char **) * (CSSID_MAX + 1));
 }
 
 static void id_bitmap_free(char ***id_bitmap)
 {
 	unsigned int cssid, ssid;
 
-	for (cssid = 0; cssid < CSSID_MAX; cssid++) {
+	for (cssid = 0; cssid <= CSSID_MAX; cssid++) {
 		if (!id_bitmap[cssid])
 			continue;
-		for (ssid = 0; ssid < SSID_MAX; ssid++)
+		for (ssid = 0; ssid <= SSID_MAX; ssid++)
 			free(id_bitmap[cssid][ssid]);
 		free(id_bitmap[cssid]);
 	}
@@ -965,15 +965,15 @@ static struct util_list *cio_ignore_get_ranges(bool autoconf)
 	ranges = strlist_new();
 
 	id_bitmap = id_bitmap_collect(autoconf);
-	for (cssid = 0; cssid < CSSID_MAX; cssid++) {
+	for (cssid = 0; cssid <= CSSID_MAX; cssid++) {
 		if (!id_bitmap[cssid])
 			continue;
-		for (ssid = 0; ssid < SSID_MAX; ssid++) {
+		for (ssid = 0; ssid <= SSID_MAX; ssid++) {
 			if (!id_bitmap[cssid][ssid])
 				continue;
 			first = NULL;
 			last = NULL;
-			for (devno = 0; devno < DEVNO_MAX; devno++) {
+			for (devno = 0; devno <= DEVNO_MAX; devno++) {
 				if (!id_bitmap_get(id_bitmap, cssid, ssid,
 						   devno)) {
 					if (first) {
