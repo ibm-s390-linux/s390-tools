@@ -38,6 +38,7 @@ List of all individuals having contributed content to s390-tools
 - Fritz Elfert
 - Gerald Schaefer
 - Gerhard Tonn
+- Graham Inggs
 - Guevenc Guelce
 - Hannes Reinecke
 - Hans-Joachim Picht
@@ -74,6 +75,7 @@ List of all individuals having contributed content to s390-tools
 - Martin Peschke
 - Martin Petermann
 - Martin Schwidefsky
+- Matthew Rosato
 - Maxim Shchetynin
 - Melissa Howland
 - Michael Ernst
@@ -103,6 +105,7 @@ List of all individuals having contributed content to s390-tools
 - Stefan Raspl
 - Stefan Reimbold
 - Stefan Weinhuber
+- Steffen Eiden
 - Steffen Maier
 - Steffen Thoss
 - Susanne Wintenberger

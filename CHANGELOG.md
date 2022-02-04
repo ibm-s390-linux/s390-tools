@@ -1,15 +1,27 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.19.x (2021-xx-xx)__
+* __v2.20.0 (2021-02-04)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.16
 
   Add new tools / libraries:
+  - Add EditorConfig configuration
 
   Changes of existing tools:
+  - s390-tools switches to Fuse 3 as Fuse 2 is deprecated.
+        Affected tools: cmsfs, hmcdrvfs, hsavmcore, zdsfs, zdump
   - chreipl-fcp-mpath: don't compress the manpage before installing it
+  - cpictl: Report extended version information
+  - genprotimg: Add extended kernel command line support
+  - zdev: modify the lsblk output parser in lszdev
+  - zipl: Add support for longer kernel command lines (now supports up to 64k length)
 
   Bug Fixes:
+  - cpictl: Suppress messages for unwritable sysfs files
+  - dbginfo.sh: Fix missing syslog for step create_package
+  - lshwc: Fix CPU list parameter setup for device driver
+  - zdev: Check for errors when removing a devtype setting
+  - zdev: Fix path resolution for multi-mount point file systems
 
 * __v2.19.0 (2021-11-10)__
 
