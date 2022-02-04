@@ -7,6 +7,9 @@ Release history for s390-tools (MIT version)
   Add new tools / libraries:
 
   Changes of existing tools:
+  - dbginfo.sh: rework script formatting (indents, order)
+  - dbginfo.sh: update sysfs collection (excludes, messages)
+  - dbginfo.sh: replace "which" by builtin command "type"
 
   Bug Fixes:
 

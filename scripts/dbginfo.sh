@@ -17,7 +17,7 @@ export LC_ALL
 readonly SCRIPTNAME="${0##*/}" # general name of this script
 #
 readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
-readonly DOCKER=$(if which docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+readonly DOCKER=$(if type -t docker >/dev/null; then echo "YES"; else echo "NO"; fi)
 readonly HW="$(uname -i 2>/dev/null)"
 # retrieve and split kernel version
 readonly KERNEL_BASE="$(uname -r 2>/dev/null)"
@@ -25,7 +25,7 @@ readonly KERNEL_VERSION=$(echo ${KERNEL_BASE} | cut -d'.' -f1 )
 readonly KERNEL_MAJOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f2 )
 readonly KERNEL_MINOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f3 | sed 's/[^0-9].*//g')
 readonly KERNEL_INFO=${KERNEL_VERSION}.${KERNEL_MAJOR_REVISION}.${KERNEL_MINOR_REVISION}
-readonly KVM=$(if which virsh >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+readonly KVM=$(if type -t virsh >/dev/null; then echo "YES"; else echo "NO"; fi)
 # The file to indicate that another instance of the script is already running
 readonly LOCKFILE="/tmp/${SCRIPTNAME}.lock"
 # check limits for logfiles like /var/log/messages
@@ -644,12 +644,12 @@ collect_vmcmdsout() {
         if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
                 pr_collect_output "z/VM"
 
-                if which vmcp >/dev/null 2>&1; then
+                if type -t vmcp >/dev/null; then
                         cp_command="vmcp"
                         if ! lsmod 2>/dev/null | grep -q vmcp && modinfo vmcp >/dev/null 2>&1; then
                                 modprobe vmcp && module_loaded=0 && sleep 2
                         fi
-                elif which hcp >/dev/null 2>&1; then
+                elif type -t hcp >/dev/null; then
                         cp_command="hcp"
                         if ! lsmod 2>/dev/null | grep -q cpint; then
                                 modprobe cpint && module_loaded=0 && sleep 2
@@ -819,7 +819,7 @@ collect_osaoat() {
 
         network_devices=$(lsqeth 2>/dev/null | grep "Device name" \
                      | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g')
-        if which qethqoat >/dev/null 2>&1; then
+        if type -t qethqoat >/dev/null; then
                 if test -n "${network_devices}"; then
                         pr_collect_output "osa oat"
                         for network_device in ${network_devices}; do
@@ -842,7 +842,7 @@ collect_ethtool() {
         local network_device
 
         network_devices=$(ls /sys/class/net 2>/dev/null)
-        if which ethtool >/dev/null 2>&1; then
+        if type -t ethtool >/dev/null; then
                 if test -n "${network_devices}"; then
                         pr_collect_output "ethtool"
                         for network_device in ${network_devices}; do
@@ -883,7 +883,7 @@ collect_tc() {
         local network_device
 
         network_devices=$(ls /sys/class/net 2>/dev/null)
-        if which tc >/dev/null 2>&1; then
+        if type -t tc >/dev/null; then
                 if test -n "${network_devices}"; then
                         pr_collect_output "Trafic Control"
                         for network_device in ${network_devices}; do
@@ -904,7 +904,7 @@ collect_bridge() {
         local network_device
 
         network_devices=$(ls /sys/class/net 2>/dev/null)
-        if which bridge >/dev/null 2>&1; then
+        if type -t bridge >/dev/null; then
                 if test -n "${network_devices}"; then
                         pr_collect_output "bridge"
                         for network_device in ${network_devices}; do
@@ -936,7 +936,7 @@ collect_ovs() {
                 :ovs-vsctl -t 5 show\
                 :ovsdb-client dump\
                 "
-        if which ovs-vsctl >/dev/null 2>&1; then
+        if type -t ovs-vsctl >/dev/null; then
                 pr_collect_output "OpenVSwitch"
                 IFS=:
                 for ovscmd in ${ovscmds}; do
@@ -999,7 +999,7 @@ collect_docker() {
 collect_nvme() {
         local device
 
-        if which nvme >/dev/null 2>&1; then
+        if type -t nvme >/dev/null; then
                 pr_collect_output "NVME storage"
                 call_run_command "nvme list" "${OUTPUT_FILE_NVME}"
                 for device in /dev/nvme[0-9]*; do
@@ -1096,22 +1096,32 @@ post_processing() {
 # Be aware that this output must be
 # redirected into a separate logfile
 call_run_command() {
-        local rc
+        local rc=0
         local cmd="${1}"
         local logfile="${2}"
+        # extract the raw_command and set cmd_type
         local raw_cmd=$(echo "${cmd}" | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
+        local cmd_type=$(type -t ${raw_cmd})
+        # timeout_ok - like a boolean - is not empty if command exists
+        local timeout_ok=$(type -t timeout)
 
         echo "#######################################################" >> "${logfile}"
         echo "${USER}@${SYSTEMHOSTNAME:-localhost}> ${cmd}" >> "${logfile}"
 
-        # check if calling command and timeout exist
-        if which "${raw_cmd}" >/dev/null 2>&1 && which timeout >/dev/null 2>&1; then
-                eval timeout -k ${TOS} ${TOS} "${cmd}" >> ${logfile} 2>&1
-                rc=$?
-        # check if command is a builtin (no use of timeout possible)
-        elif command -v "${raw_cmd}" >/dev/null 2>&1; then
+        # check calling command type
+        if [ "X${cmd_type}" = "Xbuiltin" ]; then
+                # command is a builtin (no use of timeout possible)
                 eval "${cmd}" >> ${logfile} 2>&1
                 rc=$?
+        elif [ "X${cmd_type}" != "X" ]; then
+                if [ "X${timeout_ok}" = "Xfile" ]; then
+                        eval timeout -k ${TOS} ${TOS} "${cmd}" >> ${logfile} 2>&1
+                        rc=$?
+                else
+                        # fall back - call all existing commands without timeout
+                        eval "${cmd}" >> ${logfile} 2>&1
+                        rc=$?
+                fi
         else
                 echo "${SCRIPTNAME}: Warning: Command \"${raw_cmd}\" not available" >> "${logfile}"
                 echo >> "${logfile}"
