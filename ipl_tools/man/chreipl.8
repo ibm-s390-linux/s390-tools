@@ -139,8 +139,20 @@ the same as 0.0.5000).
 .BR "\-L" " or " "\-\-loadparm"
 Specifies an entry in the
 .BR zipl (8)
-boot menu. If this option is omitted, the default menu entry is used.
+boot menu, and an active namespace in the installed zIPL environment block
+for evaluation of zIPL environment variables in the kernel command line.
 
+This option requires an argument, which has to be a string of the form
+"nSX", where optional number 'n' indicates the boot menu entry, and optional
+token 'SX' specifies the active namespace. This token consists of a mandatory
+leading capital 'S' and of an optional trailing character 'X', which is
+either any decimal digit, indicating ID of the active site, or a capital 'S'.
+In the last case, ID of the active namespace is determined as the SSID
+(Subchannel Set ID).
+
+If the menu entry is omitted in the argument, then the default menu entry
+is used. If the 'X' is omitted, or the whole token 'SX' is omitted, then the
+common namespace of the installed zIPL environment block will be activated.
 .TP
 .BR "\-c" " or " "\-\-clear"
 Specify whether memory should be cleared on re-IPL. Possible values are 0 to
@@ -158,9 +170,11 @@ loadparm:
 \fB# chreipl ccw 0.0.7e78\fP
 
 2. Next time reboot from the CCW device with the bus-ID 0.0.7e78
-using the first entry of the zipl boot menu:
+using the first entry of the zipl boot menu and the second site namespace
+in the installed zIPL environment block for evaluation of zIPL environment
+variables in the kernel command line:
 
-\fB# chreipl ccw -d 0.0.7e78 -L 1\fP
+\fB# chreipl ccw -d 0.0.7e78 -L 1S2\fP
 .SH fcp
 Use the fcp re-IPL target for SCSI disks that are accessed by the hardware
 using Fibre Channel Protocol (FCP) channels.
@@ -306,4 +320,5 @@ that you would otherwise have to specify with the ccw or fcp target.
 .BR lsreipl (8),
 .BR zipl (8),
 .BR zipl.conf (5),
+.BR zipl-editenv (8)
 .BR reboot (8)
