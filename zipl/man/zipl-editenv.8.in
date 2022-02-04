@@ -28,24 +28,21 @@ Remove all variables from the environment
 .PP
 
 .B zIPL environment
-(don't confuse with shell environment!)
-is a set of variables with their values. All the variables are identified by
-their unique names. Names of zIPL environment variables have to satisfy POSIX
-requirements for shell environment variables (IEEE Std 1003.1-2001).
-That is, such names should consist solely of uppercase letters, digits, and
-the '_' (underscore) from the characters defined in Portable Character Set and
-should not begin with a digit.
+(don't confuse with shell environment!) is a method of evaluation of zIPL
+environment variables, which is used at boot time. Names of zIPL environment
+variables have to satisfy POSIX requirements for shell environment variables
+(IEEE Std 1003.1-2001). That is, such names should consist solely of uppercase
+letters, digits, and underscores ('_') from the characters defined in Portable
+Character Set and should not begin with a digit.
 
 zIPL environment is defined per boot partition by a special boot component
 called
 .B zIPL environment block.
-This component is used for evaluation of variables in another boot component,
-kernel command line.
-zIPL environment variables can be used in kernel parameter string, where they
-should be specified by their names as ${NAME}. During boot, such variables
-are replaced with their current values, as defined by the installed environment.
-
-Maximum number of zIPL environment variables per boot partition is 512.
+This component is used for evaluation of zIPL environment variables present
+in another boot component, kernel command line, where the mentioned variables
+have to be specified by their names as ${NAME}. During boot, such variables
+are replaced with values, as defined by the active namespace in the installed
+environment block.
 
 zIPL environment is installed every time when preparing a device for initial
 program load (IPL) by
@@ -67,6 +64,33 @@ re-installation, unless
 .B '/etc/ziplenv'
 was updated respectively.
 
+At boot time any zIPL environment variable can be evaluated by different
+preinstalled ways. An individual method of evaluation of all environment
+variables is called an
+.B environment namespace.
+zIPL supports 10 identified namespaces called
+.B sites
+and one so-called
+.B common
+(or default) namespace per boot partition.
+Maximum number of values defined by all installed namespaces is 512.
+Sites are identified by positive integer numbers from 0 to 9.
+In contrast with sites, common namespace doesn't have any identifier.
+User can set anyone of the installed site namespaces to be used for
+evaluation of zIPL environment variables (in the kernel command line)
+at boot time. This operation is also called
+.B namespace activation.
+Namespace can be activated either "in advance" by
+.B chreipl(8)
+utility for the next boot session, or directly at boot time by the boot
+command. In both ways ID of the active site should be properly encoded
+in the LOADPARM. If no site ID is identified in the LOADPARM, then the
+common namespace gets activated.
+If some variable is missed (undefined) in the active namespace, then it
+gets evaluated by the common namespace. If some variable is missed in
+both, active and common namespaces, then it gets removed from the command
+line by the boot process.
+
 .SH OPTIONS
 .TP
 .BR "\-h" " or " "\-\-help"
@@ -78,22 +102,30 @@ Print version information, then exit.
 
 .TP
 .BR "\-t <TARGET DIRECTORY>" " or " "\-\-target <TARGET DIRECTORY>"
-Specify a directory, where the environment was installed. This directory should
-contain boot data (bootmap file). Default value is "/boot". A similar option
+Specify a directory, where the environment is installed. This directory should
+contain boot data (bootmap file). If this option is not specified, then the
+tool assumes that the environment is installed in  "/boot". A similar option
 with the same name exists also for
 .B zipl(8)
 utility.
 
 .TP
 .BR "\-l" " or " "\-\-list"
-Print zIPL environment, that is a list of all zIPL environment variables with
-their current values.
+Prints a list of zIPL environment variables with their values as found in the
+installed environment block.
+
+In a combination with the option -S (--site) it prints only values defined in
+the respective site namespace.
+In a combination with the option -E (--effective-site) it prints the way of
+evaluation of zIPL environment variables that would take place, if the
+specified site was encoded in the LOADPARM for the boot session.
+By default it simply dumps all the installed namespaces.
 
 .TP
 .BR "\-s <NAME=VALUE>" " or " "\-\-set <NAME=VALUE>"
-Assign value
+Assign
 .B VALUE
-to the variable with name
+to the variable
 .B NAME.
 .B NAME
 has to satisfy the requirements above.
@@ -101,16 +133,38 @@ has to satisfy the requirements above.
 may consist of any printable characters different from the new line symbol.
 If variable with such name didn't exist in the environment,
 then it will be added.
-
+In a combination with the option -S (--site) the value is assigned in the
+specified namespace. By default - in the common namespace.
 .TP
 .BR "\-u <NAME>" " or " "\-\-unset <NAME>"
 Remove the variable with name
 .B NAME
 from zIPL environment.
-
+In a combination with the option -S (--site) the variable gets removed from
+the specified namespace. By default - from the common namespace.
 .TP
 .BR "\-r" " or " "\-\-reset"
 Remove all variables from zIPL environment.
+In a combination with the option -S (--site) the variables get removed only
+from the specified site. By default - from all namespaces.
+.TP
+.BR "\-S" " or " "\-\-site <SITE_ID>"
+Specifies a particular site namespace to operate on. Can be used in a
+combination with options \-s (\-\-set), \-u (\-\-unset), -r (\-\-reset) and
+\-l (\-\-list).
+This option makes the tool operate on a specified namespace only.
+Specifically, when using in a combination with \-s, \-u, or -r, changes are
+applied only to the specified namespace. When using in a combination with
+\-l, only specified namespace is displayed.
+.B SITE_ID
+is a site identifier - any decimal positive number from 0 till 9.
+.TP
+.BR "\-E" " or " "\-\-effective\-site <SITE_ID>"
+When using in a combination with option \-l (\-\-list), it displays the way
+of evaluation of zIPL environment variables that would take place, if the
+specified site was activated for the boot session.
+.B SITE_ID
+is a site identifier - any decimal positive number from 0 till 9.
 
 .SH FILES
 
@@ -133,10 +187,22 @@ is identified as a sequence of characters before the leftmost '=' in the line.
 has to satisfy the requirements above. Lines beginning from "#" are ignored.
 Lines with not identified
 .B NAME
-are ignored. If lines contain identical names,
-then only the last one takes an effect. If the file defines more than 512
-variables, or if the environment defined by that file doesn't fit to the
-environment block, then
+are ignored.
+
+Namespaces in an environment file are specified by sections. Sections are
+indicated by titles - lines, starting with a keyword '[site X]', where X is a
+namespace ID. Rectangle brackets in any such keyword are mandatory. The word
+"site" is case insensitive. Any keyword may be followed with a comment on the
+same line. Any lines between neighboring section titles do form a section,
+defined by the upper title. If the environment file doesn't begin from a
+section title, then the area at the beginning, not indicated by a title,
+defines the "common" namespace. Sections with identical titles are considered
+as parts of the same "compound" section. If a section (simple or compound)
+contains lines with identical names, then only the last one takes an effect.
+
+If the file defines more than 512 effective values (summed over all sections)
+or if all namespaces defined by that file don't fit to the environment block,
+then
 .B zipl(8)
 will fail to import such file.
 
@@ -144,13 +210,24 @@ This file can be modified, using any suitable text editor.
 
 .SH NOTES
 
+Site namespace corresponds to a
+.B fail-over site
+which is a set of block devices, participating in hardware replication,
+and used for planned/unplanned swap.
+
 Any installed zIPL environment (environment block) should be accessed only
 by this
 .B zipl-editenv
 tool. Using other ways to access the environment block is not allowed.
+
+Any modification of installed zIPL environment block doesn't affect the
+environment file. The user is responsible for keeping the environment file
+up to date.
 
 .TP
 
 .SH SEE ALSO
 .BR zipl (8),
 .BR zipl.conf (5)
+.BR chreipl (8)
+.BR lsreipl (8)
