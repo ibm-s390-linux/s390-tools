@@ -743,8 +743,10 @@ collect_sysfs() {
         # more than 5 seconds (-T 5) such as an active ftrace buffer.
         # error messages are not written to the log
         dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" \
-            -x '*/tracing/trace_pipe*' -x '*/page_idle/bitmap*' \
-            -x '*/tracing/per_cpu/*' --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
+            -x '*/tracing/trace_pipe*' \
+            -x '*/page_idle/bitmap*' \
+            -x '*/tracing/per_cpu/*' \
+            --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
 
         if [ $? -ne 0 ] ; then
                 echo "${SCRIPTNAME}: Warning: dump2tar failed or is unavailable"
@@ -756,7 +758,10 @@ collect_sysfs() {
                         mkdir -p "${WORKPATH}${dir_name}"
                 done
 
-                find /sys -noleaf -type f -perm /444 -a -not -name "*trace_pipe*"\
+                find /sys -noleaf -type f -perm /444 \
+                    -a -not \( -path '*tracing*' -a -name "trace_pipe*" \) \
+                    -a -not \( -path '*page_idle*' -a -name 'bitmap*' \) \
+                    -a -not -path '*tracing/per_cpu*' \
                     2>/dev/null | while IFS= read -r file_name; do
                         echo " ${file_name}"
                         if ! dd if="${file_name}" status=noxfer iflag=nonblock \
