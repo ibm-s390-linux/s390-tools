@@ -39,6 +39,7 @@ static struct lszcrypt_l {
 #define CAP_CCA		"CCA Secure Key"
 #define CAP_RNG		"Long RNG"
 #define CAP_EP11	"EP11 Secure Key"
+#define CAP_APMMS       "AP bus max message size limit %ld Kb"
 
 /*
  * Card types
@@ -253,7 +254,7 @@ static void show_domains(void)
 static void show_capability(const char *id_str)
 {
 	unsigned long func_val;
-	long hwtype, id;
+	long hwtype, id, max_msg_size;
 	char *p, *ap, *dev, card[16], cbuf[256];
 
 	/* check if ap driver is available */
@@ -272,6 +273,9 @@ static void show_capability(const char *id_str)
 	/* If sysfs attribute is missing, set functions to 0 */
 	if (util_file_read_ul(&func_val, 16, "%s/ap_functions", dev))
 		func_val = 0x00000000;
+	/* try to read the ap bus max message size for this card */
+	if (util_file_read_l(&max_msg_size, 10, "%s/max_msg_size", dev))
+		max_msg_size = 0;
 	/* Skip devices, which are not supported by zcrypt layer */
 	if (!util_path_is_readable("%s/type", dev) ||
 	    !util_path_is_readable("%s/online", dev)) {
@@ -289,9 +293,9 @@ static void show_capability(const char *id_str)
 	case 6:
 	case 8:
 		if (func_val & MASK_RSA4K)
-			printf("%s", CAP_RSA4K);
+			printf("%s\n", CAP_RSA4K);
 		else
-			printf("%s", CAP_RSA2K);
+			printf("%s\n", CAP_RSA2K);
 		break;
 	case 7:
 	case 9:
@@ -300,7 +304,7 @@ static void show_capability(const char *id_str)
 			printf("%s (%s)\n", CAP_CCA, cbuf);
 		else
 			printf("%s\n", CAP_CCA);
-		printf("%s", CAP_RNG);
+		printf("%s\n", CAP_RNG);
 		break;
 	case 10: /* CEX4S */
 	case 11: /* CEX5S */
@@ -309,29 +313,30 @@ static void show_capability(const char *id_str)
 	case 14: /* CEX8S */
 		if (func_val & MASK_ACCEL) {
 			if (func_val & MASK_RSA4K)
-				printf("%s", CAP_RSA4K);
+				printf("%s\n", CAP_RSA4K);
 			else
-				printf("%s", CAP_RSA2K);
+				printf("%s\n", CAP_RSA2K);
 		} else if (func_val & MASK_COPRO) {
 			printf("%s\n", CAP_RSA4K);
 			if (cbuf[0])
 				printf("%s (%s)\n", CAP_CCA, cbuf);
 			else
 				printf("%s\n", CAP_CCA);
-			printf("%s", CAP_RNG);
+			printf("%s\n", CAP_RNG);
 		} else if (func_val & MASK_EP11) {
-			printf("%s", CAP_EP11);
+			printf("%s\n", CAP_EP11);
 		} else {
-			printf("Detailed capability information for %s (hardware type %ld) is not available.",
+			printf("Detailed capability information for %s (hardware type %ld) is not available.\n",
 			       card, hwtype);
 		}
+		if (max_msg_size > 0)
+			printf(CAP_APMMS "\n", max_msg_size / 1024);
 		break;
 	default:
-			printf("Detailed capability information for %s (hardware type %ld) is not available.",
-			       card, hwtype);
+		printf("Detailed capability information for %s (hardware type %ld) is not available.\n",
+		       card, hwtype);
 		break;
 	}
-	printf("\n");
 }
 
 /*
