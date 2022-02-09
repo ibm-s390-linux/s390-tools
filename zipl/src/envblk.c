@@ -23,9 +23,13 @@
 #include "envblk.h"
 #include "error.h"
 #include "misc.h"
+#include <assert.h>
 
 /* from linux/fs.h */
 #define FIGETBSZ	_IO(0x00, 2)
+#define KEYWORD_SIZE    strlen("[site X]\n")
+#define MAX_NR_SITES    10
+#define PARAM_SIZE      8
 
 void envblk_create_blank(char *envblk, int envblk_len)
 {
@@ -90,21 +94,45 @@ int envblk_size_get(int fd, int *result)
 
 #define LINE_HASH_SIZE (16)
 
-/**
- * Calculate hash function of "environment line"
- *
- * LINE: pointer to a string, containing NANE=VALUE
- * LEN: length of the NAME with trailing delimiter "="
+/*
+ * This defines "extended string", an object consisting of
+ * an optional prefix and a substring
  */
-static unsigned int linehash(char *line, int len, unsigned int hash_size)
-{
-	unsigned int sum = 0;
+struct estr {
+	char *prefix; /* pointer to the prefix */
+	char *str;    /* pointer to the substring */
+	int len;      /* length of the substring */
+};
 
+/**
+ * Hash function on "extended strings"
+ */
+static unsigned int hash_fn(struct estr *estr)
+{
+	char *str = estr->str;
+	int len = estr->len;
+	unsigned int sum;
+
+	sum = 0;
+	if (estr->prefix)
+		sum += 5 * *estr->prefix;
 	while (len) {
-		sum += 5 * *(line++);
+		sum += 5 * *(str++);
 		len--;
 	}
-	return sum % hash_size;
+	return sum % LINE_HASH_SIZE;
+}
+
+/**
+ * Compare a string STR with an "extended string" ESTR
+ */
+static int cmp_fn(char *str, struct estr *estr)
+{
+	if (!estr->prefix)
+		return strncmp(str, estr->str, estr->len);
+	if (str[0] != *estr->prefix)
+		return -1;
+	return strncmp(str + 1, estr->str, estr->len);
 }
 
 struct line_hash_entry {
@@ -116,83 +144,86 @@ struct line_hash_entry {
 };
 
 /**
- * Check if @name meets the requirements for shell environment variables
- * (IEEE Std 1003.1-2001), mitigated with lowercase letter allowance
- *
- * Return 0, if it meets, and 1 otherwise
+ * Populate a hash TABLE with an item built by an "extended string" ESTR
  */
-int envblk_check_name(char *name, int len)
+static int hash_table_add(struct line_hash_entry **table, struct estr *estr)
 {
-	int i;
-
-	if (len == 0)
-		return 1;
-	if (!isalpha(name[0]) && name[0] != '_')
-		return 1;
-	for (i = 1; i < len; i++)
-		if (!isalpha(name[i]) && !isdigit(name[i]) && name[i] != '_')
-			return 1;
-	return 0;
-}
-
-/**
- * Add environment line to hash table
- *
- * LINE: pointer to a string containing NAME=VALUE
- * LEN: length of NAME with trailing delimiter "="
- */
-static int hash_table_add(struct line_hash_entry **table, char *line, int len)
-{
-	unsigned int hash;
 	struct line_hash_entry *new;
+	unsigned int hash;
+	int len;
 
 	new = malloc(sizeof(*new));
 	if (!new)
 		return -ENOMEM;
 	memset(new, 0, sizeof(*new));
-	new->line = misc_strdup(line);
-	if (!new->line) {
-		free(new);
-		return -ENOMEM;
+
+	len = strlen(estr->str);
+	if (estr->prefix) {
+		new->line = misc_malloc(len + 2);
+		if (!new->line) {
+			free(new);
+			return -ENOMEM;
+		}
+		new->line[0] = *estr->prefix;
+		memcpy(new->line + 1, estr->str, len);
+		new->line[len + 1] = '\0';
+	} else {
+		new->line = misc_strdup(estr->str);
+		if (!new->line) {
+			free(new);
+			return -ENOMEM;
+		}
 	}
-	hash = linehash(new->line, len, LINE_HASH_SIZE);
+	hash = hash_fn(estr);
 	new->next = table[hash];
 	table[hash] = new;
 	return 0;
 }
 
 /**
- * Find environment line in the hash table by name
- *
- * LINE: string contailing NAME=VALUE
- * LEN: length of the NAME with trailing delimiter "="
+ * Search an item in the hash table by an "extended string" ESTR
  */
 static struct line_hash_entry *hash_table_find(struct line_hash_entry **table,
-					       char *name, size_t len)
+					       struct estr *estr)
 {
 	struct line_hash_entry *item;
 
-	item = table[linehash(name, len, LINE_HASH_SIZE)];
+	item = table[hash_fn(estr)];
 	while (item) {
-		if (!strncmp(item->line, name, len))
+		if (!cmp_fn(item->line, estr))
 			return item;
 		item = item->next;
 	}
 	return NULL;
 }
 
-static int hash_entry_replace(struct line_hash_entry *item, char *name,
+/**
+ * Replace an ITEM with another one built by an "extended string" ESTR
+ */
+static int hash_entry_replace(struct line_hash_entry *item, struct estr *estr,
 			      int *offset)
 {
-	char *dup;
+	int len;
+	char *new;
 
-	dup = misc_strdup(name);
-	if (!dup)
-		return -ENOMEM;
+	len = strlen(estr->str);
+	if (estr->prefix) {
+		len++;
+		new = misc_malloc(len + 1);
+		if (!new)
+			return -ENOMEM;
+		new[0] = *estr->prefix;
+		memcpy(new + 1, estr->str, len - 1);
+		new[len] = '\0';
+	} else {
+		new = misc_strdup(estr->str);
+		if (!new)
+			return -ENOMEM;
+	}
 	*offset -= strlen(item->line);
 	free(item->line);
-	item->line = dup;
-	*offset += strlen(item->line);
+	item->line = new;
+	*offset += len;
 	return 1;
 }
 
@@ -257,24 +288,106 @@ static void hash_table_flush(struct line_hash_entry **table, char *dst,
 	}
 }
 
+enum keyword_status {
+	KW_UNKNOWN,
+	KW_VALID,
+	KW_MALFORMED,
+	KW_UNSUPP_ID
+};
+
 /**
- * Put a zIPL environment line into hash table.
+ * Return 1, if the line's TAIL is empty, or is a whitespace
+ * (may be empty) followed by a comment. Otherwise, return 0.
+ */
+static int ignore_tail(const char *tail)
+{
+	if (*tail == '\n')
+		return 1;
+	do {
+		if (*tail == '#')
+			return 1;
+		if (*tail == '\t' || *tail == ' ') {
+			tail++;
+			continue;
+		}
+		return 0;
+	} while (*tail != '\n');
+	return 0;
+}
+
+/**
+ * Check if LINE represents a keyword to identify a section in the
+ * environment file. Return the result of the check. If the LINE
+ * represents a valid keyword (KW_VALID is returned), then SITE_ID
+ * contains ID of the namespace represented by that section.
  *
- * Identify a name in the line THIS which contains a pair NAME=VALUE, and
- * look for an entry in the hash table TABLE with a similar name. If such
- * entry exists, then replace the line in that entry with the new one
- * specified by THIS. Othewise, insert a new entry to the hash table.
+ * LINE: a null-terminated string with optional end-of-line symbol
+ * LEN: number of characters in the LINE excluding NULL-termination
+ */
+static enum keyword_status check_keyword(char *line, size_t len,
+					 char *site_id, long *val)
+{
+	char *endptr;
+
+	if (len < KEYWORD_SIZE || line[len - 1] != '\n')
+		return KW_UNKNOWN;
+
+	if ((line[0] == '[') &&
+	    (line[1] == 's' || line[1] == 'S') &&
+	    (line[2] == 'i' || line[2] == 'I') &&
+	    (line[3] == 't' || line[3] == 'T') &&
+	    (line[4] == 'e' || line[4] == 'E') &&
+	    (line[5] == ' ') && isdigit(line[6])) {
+		*site_id = line[6];
+		*val = strtol(&line[6], &endptr, 10);
+		if (*endptr == ']') {
+			if (endptr - &line[6] > PARAM_SIZE ||
+			    !ignore_tail(endptr + 1))
+				return KW_MALFORMED;
+			return *val < MAX_NR_SITES ? KW_VALID : KW_UNSUPP_ID;
+		}
+		return KW_MALFORMED;
+	}
+	return KW_UNKNOWN;
+}
+
+/**
+ * Check if @name meets the requirements for shell environment variables
+ * (IEEE Std 1003.1-2001), mitigated with lowercase letter allowance
  *
- * THIS: pointer to a NULL-terminated string, which contains the line to
- * be imported. If the line was successfully imported, and no line with the
- * same NAME was added before, then return 0.
+ * Return 0, if it meets, and 1 otherwise
+ */
+int envblk_check_name(char *name, int len)
+{
+	int i;
+
+	if (len == 0)
+		return 1;
+	if (!isalpha(name[0]) && name[0] != '_')
+		return 1;
+	for (i = 1; i < len; i++)
+		if (!isalpha(name[i]) && !isdigit(name[i]) && name[i] != '_')
+			return 1;
+	return 0;
+}
+
+/**
+ * Put a zIPL environment line 'NAME=VALUE' to a namespace referenced by NS_ID
+ *
+ * If the line was successfully imported without replacement a line with
+ * the same NAME, that was added before, then return 0.
  * If the line should be ignored, or it replaced previously added line with
  * the same NAME, then return > 0. On errors return < 0.
+ *
+ * THIS: pointer to a NULL-terminated string, which contains the line to
+ * be imported.
+ * NS_ID: Pointer to a numerical character, indicating namespace ID
  */
 static int import_one_line(char *this, struct line_hash_entry **table,
-			   int *offset)
+			   int *offset, char *ns_id)
 {
 	struct line_hash_entry *item;
+	struct estr estr;
 	char *p;
 
 	if (*this == '#')
@@ -289,13 +402,13 @@ static int import_one_line(char *this, struct line_hash_entry **table,
 		error_reason("Unacceptable name '%.*s'", p - this, this);
 		return -EINVAL;
 	}
-	/*
-	 * Try to find an entry with similar NAME.
-	 */
-	item = hash_table_find(table, this, p - this + 1);
+	estr.prefix = ns_id;
+	estr.str = this;
+	estr.len = p - this + 1;
 
-	return item != NULL ? hash_entry_replace(item, this, offset) :
-		hash_table_add(table, this, p - this + 1);
+	item = hash_table_find(table, &estr);
+	return item != NULL ? hash_entry_replace(item, &estr, offset) :
+		hash_table_add(table, &estr);
 }
 
 /**
@@ -313,6 +426,8 @@ int envblk_import(char *from_file, char *to_buf, int envblk_size)
 	struct line_hash_entry *table[LINE_HASH_SIZE];
 	unsigned int lines_imported = 0;
 	char *line = NULL;
+	char site_id = 0;
+	long site_id_val;
 	size_t len = 0;
 	FILE *stream;
 	ssize_t read;
@@ -337,6 +452,31 @@ int envblk_import(char *from_file, char *to_buf, int envblk_size)
 		if (read < 2)
 			/* malformed line. Ignored */
 			continue;
+
+		switch (check_keyword(line, read, &site_id, &site_id_val)) {
+		case KW_VALID:
+			continue;
+		case KW_MALFORMED:
+			/*
+			 * any line not ended with line feed character
+			 * has to be evaluated as KW_UNKNOWN
+			 */
+			assert(line[read - 1] == '\n');
+			line[read - 1] = '\0';
+			error_reason("%s %s: bad section title '%s'",
+				     err_prefix, from_file, line);
+			ret = -EINVAL;
+			goto error;
+		case KW_UNSUPP_ID:
+			error_reason("%s %s: unsupported site ID '%li'",
+				     err_prefix, from_file, site_id_val);
+			ret = -EINVAL;
+			goto error;
+		case KW_UNKNOWN:
+			break;
+		}
+		/* LINE is not a secton title */
+
 		if (line[read - 1] != '\n' && read == envblk_size - offset) {
 			/*
 			 * file's tail doesn't contain end-of-line symbol at
@@ -350,7 +490,8 @@ int envblk_import(char *from_file, char *to_buf, int envblk_size)
 			ret = -EINVAL;
 			break;
 		}
-		ret = import_one_line(line, table, &offset);
+		ret = import_one_line(line, table, &offset,
+				      site_id ? &site_id : NULL);
 		if (ret < 0) {
 			/* error */
 			error_text("%s %s", err_prefix, from_file);
@@ -373,6 +514,7 @@ int envblk_import(char *from_file, char *to_buf, int envblk_size)
 		lines_imported++;
 	}
 	hash_table_flush(table, to_buf, sizeof(ZIPL_ENVBLK_SIGNATURE) - 1);
+error:
 	hash_table_free(table);
 	free(line);
 	fclose(stream);
