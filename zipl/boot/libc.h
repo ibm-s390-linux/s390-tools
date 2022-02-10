@@ -56,7 +56,7 @@ int strlen(const char *);
 char *strcpy(char *, const char *);
 size_t strlcpy(char *dest, const char *src, size_t size);
 char *strchr(const char *str, char c);
-unsigned int strhash(unsigned char *str, unsigned int hash_size);
+unsigned int strhash(unsigned char *str, char *prefix, unsigned int hash_size);
 unsigned long get_zeroed_page(void);
 void free_page(unsigned long);
 void initialize(void);

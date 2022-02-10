@@ -172,16 +172,20 @@ char *strchr(const char *str, char c)
 }
 
 /**
- * Minimalistic hash function on strings.
+ * Minimalistic hash function on "extended" strings with optional
+ * logical prefixes.
  * It doesn't provide perfect quality of distribution.
  *
  * STR: null-terminated string
+ * PREFIX: Pointer to a one-character logical prefix (can be NULL)
  * HASH_SIZE: number of buckets
  */
-unsigned int strhash(unsigned char *str, unsigned int hash_size)
+unsigned int strhash(unsigned char *str, char *prefix, unsigned int hash_size)
 {
 	unsigned int sum = 0;
 
+	if (prefix)
+		sum += 5 * *prefix;
 	while (*str)
 		sum += 5 * *(str++);
 

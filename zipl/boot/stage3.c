@@ -10,6 +10,8 @@
  */
 
 #include "libc.h"
+#include "sclp.h"
+#include "menu.h"
 #include "boot/sigp.h"
 #include "boot/s390.h"
 #include "boot/sigp.h"
@@ -153,25 +155,37 @@ static void hash_table_add(struct env_hash_entry *items,
 
 	new = &items[*new_idx];
 	new->name = name;
-	hash = strhash((unsigned char *)name, STR_HASH_SIZE);
+	hash = strhash((unsigned char *)name, NULL, STR_HASH_SIZE);
 	new->next = (unsigned long)buckets[hash];
 	buckets[hash] = new;
 	(*new_idx)++;
 }
 
+/**
+ * Check if string STR coincides with string SHORT_STR prepended
+ * with a logical PREFIX (if any).
+ * Return 1, if coincides. Otherwise, return 0.
+ */
+static int str_eq(char *str, char *short_str, char *prefix)
+{
+	if (prefix)
+		return strlen(str) == strlen(short_str) + 1 &&
+			*str == *prefix &&
+			!strncmp(str + 1, short_str, strlen(short_str));
+	return strlen(str) == strlen(short_str) &&
+		!strncmp(str, short_str, strlen(str));
+}
+
 static struct env_hash_entry *hash_table_find(struct env_hash_entry **buckets,
-					      char *name)
+					      char *name, char *prefix)
 {
 	struct env_hash_entry *item;
 
 	if (strlen(name) == 0)
 		return NULL;
-	item = buckets[strhash((unsigned char *)name, STR_HASH_SIZE)];
+	item = buckets[strhash((unsigned char *)name, prefix, STR_HASH_SIZE)];
 	while (item) {
-		if (strlen((char *)(unsigned long)item->name) ==
-		    strlen(name) &&
-		    !strncmp((char *)(unsigned long)item->name,
-			     name, strlen(name)))
+		if (str_eq((char *)(unsigned long)item->name, name, prefix))
 			return item;
 		item = (struct env_hash_entry *)(unsigned long)item->next;
 	}
@@ -226,14 +240,32 @@ static void parse_envblk(struct env_hash_entry *items,
 }
 
 /**
+ * Lookup by NAME prepended with optional PREFIX in the hash table.
+ * First, search by prefixed NAME. If nothing was found, then search
+ * by NAME without prefix
+ */
+static struct env_hash_entry *lookup_item(struct env_hash_entry **buckets,
+					  char *name, char *prefix)
+{
+	struct env_hash_entry *result;
+
+	result = hash_table_find(buckets, name, prefix);
+	if (result)
+		return result;
+	return prefix ? hash_table_find(buckets, name, NULL) : NULL;
+}
+
+/**
  * Find all instances of the pattern ${NAME} in the command line, and replace
  * each one with corresponding VALUE as found in the hash table by NAME
+ * and SITE_ID, using lookup_item() search procedure.
  *
  * CMDL_LEN: length of the command line to be processed
  * BUCKETS: hash table of pairs (NAME, VALUE)
+ * SITE_ID: pointer to an alphanumerical string representing a number
  */
 void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len,
-		       unsigned int max_len)
+		       unsigned int max_len, char *site_id)
 {
 	struct env_hash_entry *item;
 	char empty_str = 0;
@@ -261,9 +293,13 @@ void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len,
 		if (end == NULL || end >= cmdl_end)
 			/* no more instances */
 			break;
-		/* terminate the NAME and find it in the hash table */
+		/*
+		 * terminate the NAME and find a respective item
+		 * in the hash table by that NAME prefixed with
+		 * site-ID (if any)
+		 */
 		*end = 0;
-		item = hash_table_find(buckets, start + 2);
+		item = lookup_item(buckets, start + 2, site_id);
 		if (!item) {
 			/*
 			 * Item to replace with not found.
@@ -304,6 +340,79 @@ void process_parm_line(struct env_hash_entry **buckets, unsigned int cmdl_len,
 		       cmdl_len - (cmdl_end - (char *)COMMAND_LINE));
 }
 
+/*
+ * This represents a number as a pair consisting of an
+ * alphanumerical string, and a variable which contains
+ * its numerical value (as a result of strtoul conversion)
+ */
+struct nr_pair {
+	char str[PARAM_SIZE];
+	unsigned long val;
+};
+
+#define IPL_SC	  (*((struct subchannel_id *) &S390_lowcore.subchannel_id))
+
+/**
+ * Parse LOADPARM to identify a site to be activated.
+ * If the site is identified, then store its ID in the structure
+ * pointed out by NP
+ */
+static void get_active_site_by_loadparm(struct nr_pair *np)
+{
+	char loadparm[PARAM_SIZE + 1];
+	char *endptr;
+	int i = 0;
+
+	memset(loadparm, 0, sizeof(loadparm));
+
+	if (sclp_param(loadparm))
+		return;
+	/*
+	 * extract site-ID as a sequence of digits after the first
+	 * leading 'S'
+	 */
+	while (i < PARAM_SIZE) {
+		if (loadparm[i++] == 'S') {
+			if (loadparm[i] == 'S') {
+				/*
+				 * the case of automatic
+				 * site activation by SSID
+				 */
+				if ((IPL_SC).one) {
+					np->val = (IPL_SC).ssid;
+					snprintf(np->str, PARAM_SIZE - 1,
+						 "%u", np->val);
+					return;
+				}
+				/* site undefined */
+				return;
+			}
+			np->val = ebcdic_strtoul(&loadparm[i], &endptr, 10);
+			memcpy(np->str, &loadparm[i], endptr - &loadparm[i]);
+			/*
+			 * not more than (PARAM_SIZE - 1) bytes were copied!
+			 */
+			return;
+		}
+	}
+}
+
+static char *get_active_site(struct nr_pair *np)
+{
+	memset(np->str, 0, sizeof(np->str));
+	np->val = 0;
+
+	get_active_site_by_loadparm(np);
+	if (!np->str[0]) {
+		/* No site-ID was found in LOADPARM */
+		return NULL;
+	}
+	ebcdic_to_ascii((unsigned char *)np->str,
+			(unsigned char *)np->str,
+			strlen(np->str));
+	return np->str;
+}
+
 /**
  * LEN: length of the command line to be processed
  */
@@ -312,6 +421,7 @@ static void handle_environment(unsigned int len, unsigned int max_len)
 	struct env_hash_entry *buckets[STR_HASH_SIZE];
 	struct env_hash_entry *items;
 	unsigned int nr_items = 0;
+	struct nr_pair np;
 
 	if (_stage3_parms.envblk_addr == 0 ||
 	    _stage3_parms.envblk_addr == UNSPECIFIED_ADDRESS)
@@ -327,7 +437,7 @@ static void handle_environment(unsigned int len, unsigned int max_len)
 	 * find environment variables in the command line and
 	 * replace them with their values as found in the hash table
 	 */
-	process_parm_line(buckets, len, max_len);
+	process_parm_line(buckets, len, max_len, get_active_site(&np));
 	free_page((unsigned long)items);
 }
 
