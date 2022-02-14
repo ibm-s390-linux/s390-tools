@@ -418,7 +418,6 @@ CMDS="uname -a\
   :env\
   :df -h\
   :df -i\
-  :dmesg -s 1048576\
   :dmsetup ls\
   :dmsetup ls --tree\
   :dmsetup table\
@@ -461,22 +460,13 @@ CMDS="uname -a\
   :multipath -d\
   :multipath -t\
   :pkcsconf -mlist\
-  :ps -emo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
-  :ps -eHo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
-  :ps axX\
   :pvpath -qa\
   :SPident # SLES service package\
   :cat /var/lib/opencryptoki/pk_config_data\
   :ls -al /usr/lib64/opencryptoki/stdll\
-  :rpm -qa | sort >> '${OUTPUT_FILE_ISW}'\
-  :apt list >> '${OUTPUT_FILE_ISW}'\
-  :lsof >> '${OUTPUT_FILE_LSOF}'\
   :find /boot -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /var/crash -print0 | sort -z | xargs -0 -n 10 ls -ld\
-  :cat /root/.bash_history\
-  :journalctl --all --no-pager --lines=100000 --output=short-precise\
-   >> '${OUTPUT_FILE_JOURNALCTL}'\
   :smc_dbg\
   :sysctl -a\
   :systemctl --all --no-pager show\
@@ -484,8 +474,26 @@ CMDS="uname -a\
   :systemctl --all --no-pager list-unit-files\
   :systemd-delta\
   :lvdisplay\
-  :coredumpctl && coredumpctl info -o ${OUTPUT_FILE_COREDUMPCTL}\
   :ziorep_config -ADM\
+  "
+
+# commands with long output at the end
+CMDS="${CMDS}\
+  :cat /root/.bash_history\
+  :dmesg -s 1048576\
+  :ps -emo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
+  :ps -eHo pid,tid,nlwp,policy,user,tname,ni,pri,psr,sgi_p,stat,wchan,start_time,time,pcpu,pmem,vsize,size,rss,share,command\
+  :ps axX\
+  "
+
+# commands with separate output file
+CMDS="${CMDS}\
+  :apt list >> '${OUTPUT_FILE_ISW}'\
+  :coredumpctl && coredumpctl info -o ${OUTPUT_FILE_COREDUMPCTL}\
+  :journalctl --all --no-pager --lines=100000 --output=short-precise\
+   >> '${OUTPUT_FILE_JOURNALCTL}'\
+  :lsof >> '${OUTPUT_FILE_LSOF}'\
+  :rpm -qa | sort >> '${OUTPUT_FILE_ISW}'\
   "
 
 ########################################
