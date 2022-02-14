@@ -410,37 +410,48 @@ CONFIGFILES="\
   "
 
 ########################################
+# system state commands (non alphabetical order here)
 CMDS="uname -a\
   :uptime\
   :timedatectl\
+  :last\
+  :lscpu -ae\
+  :lscpu -ye\
+  :lsmem\
+  :lsmod\
+  :lsshut\
   :runlevel\
+  :sysctl -a\
+  :systemctl --all --no-pager show\
+  :systemctl --all --no-pager list-units\
+  :systemctl --all --no-pager list-unit-files\
+  :systemd-delta\
   :ulimit -a\
   :env\
+  :find /boot -print0 | sort -z | xargs -0 -n 10 ls -ld\
+  :find /var/crash -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :df -h\
   :df -i\
+  :mount\
+  "
+
+CMDS="${CMDS}\
   :dmsetup ls\
   :dmsetup ls --tree\
   :dmsetup table\
   :dmsetup table --target multipath\
   :dmsetup status\
-  :last\
   :lschp\
-  :lscpu -ae\
-  :lscpu -ye\
   :lscss\
-  :lsmem\
   :lsdasd\
   :lsdasd -u\
-  :lsmod\
   :lspci -vv\
   :lsscsi\
-  :lsshut\
   :lstape\
   :lszdev\
   :lszfcp\
   :lszfcp -D\
   :lszfcp -V\
-  :mount\
   :multipathd -k'show config'\
   :multipathd -k'show maps'\
   :multipathd -k'show topo'\
@@ -455,15 +466,8 @@ CMDS="uname -a\
   :multipath -d\
   :multipath -t\
   :pvpath -qa\
-  :find /boot -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
-  :find /var/crash -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :smc_dbg\
-  :sysctl -a\
-  :systemctl --all --no-pager show\
-  :systemctl --all --no-pager list-units\
-  :systemctl --all --no-pager list-unit-files\
-  :systemd-delta\
   :lvdisplay\
   :ziorep_config -ADM\
   "
