@@ -31,7 +31,6 @@
 
 /* from linux/fs.h */
 #define FIBMAP		_IO(0x00, 1)
-#define FIGETBSZ	_IO(0x00, 2)
 
 static const struct util_prg prg = {
 	.desc = "zipl-editenv: Environment Editor for zSeries Initial Program Loader",
@@ -46,6 +45,8 @@ static const struct util_prg prg = {
 
 int verbose;
 static char *bootmap_dir;
+static char *site_id;
+static char *eff_site_id;
 
 enum op_id {
 	INVALID_OP_ID,
@@ -77,151 +78,19 @@ static void zipl_envblk_init(struct zipl_envblk *zeb)
 	zeb->fd = -1;
 }
 
-static void print_name_value(char *this)
-{
-	printf("%s\n", this);
-}
-
 static int do_list(char *envblk, unsigned int envblk_size)
 {
-	return envblk_scan(envblk, envblk_size, print_name_value);
-}
+	assert(!site_id || !eff_site_id);
 
-static int do_set(char *envblk, unsigned int envblk_size,
-		  const char *name, const char *new_val)
-{
-	unsigned int name_len, new_val_len;
-	char *fss; /* free space start */
-	unsigned int lines_scanned = 0;
-	int name_found = 0;
-	char *s, *end;
-
-	name_len = strlen(name);
-	new_val_len = strlen(new_val);
-
-	s = envblk + sizeof(ZIPL_ENVBLK_SIGNATURE) - 1;
-	end = envblk + envblk_size;
-
-	/*
-	 * find the start of free space
-	 */
-	for (fss = end - 1; *fss == '\0'; fss--)
-		;
-	if (*fss != '\n') {
-		error_reason("Found corrupted environment block - please run zipl");
-		return -1;
-	}
-	fss++;
-
-	while (fss - s > name_len) {
-		if (lines_scanned >= ENVBLK_MAX_LINES) {
-			error_reason("Found corrupted environment block - please run zipl");
-			return -1;
-		}
-		if (memcmp(s, name, name_len) == 0 && s[name_len] == '=') {
-			unsigned int cur_val_len;
-			/*
-			 * such name exists, replace its current value
-			 */
-			s += (name_len + 1);
-
-			cur_val_len = 0;
-			while (s + cur_val_len < end && s[cur_val_len] != '\n')
-				cur_val_len++;
-			if (s + cur_val_len >= end) {
-				error_reason("Found corrupted environment block - please run zipl");
-				return -1;
-			}
-			if (new_val_len > cur_val_len &&
-			    end - fss < new_val_len - cur_val_len) {
-				error_reason("Not enough space for new value");
-				return -1;
-			}
-			/*
-			 * make a precise-sized room for the new value
-			 */
-			if (new_val_len < cur_val_len) {
-				memmove(s + new_val_len, s + cur_val_len,
-					end - (s + cur_val_len));
-
-				memset(fss + cur_val_len - new_val_len, '\0',
-				       cur_val_len - new_val_len);
-			} else
-				memmove(s + new_val_len, s + cur_val_len,
-					end - (s + new_val_len));
-			name_found = 1;
-			break;
-		}
-		lines_scanned++;
-		s = envblk_next_line(s, end);
-	}
-	assert(lines_scanned <= ENVBLK_MAX_LINES);
-
-	if (!name_found) {
-		if (lines_scanned == ENVBLK_MAX_LINES) {
-			error_reason("Maximum number of lines reached");
-			return -1;
-		}
-		/*
-		 * append a new variable
-		 */
-		if (end - fss < name_len + new_val_len + 2) {
-			error_reason("Not enough space in environment block");
-			return -1;
-		}
-		memcpy(fss, name, name_len);
-		s = fss + name_len;
-		*s++ = '=';
-	}
-	/*
-	 * copy the new value and terminate it with a new line symbol
-	 */
-	memcpy(s, new_val, new_val_len);
-	s[new_val_len] = '\n';
-	return 0;
-}
-
-static int do_unset(char *envblk, int envblk_len, const char *name)
-{
-	unsigned int name_len;
-	char *s, *end;
-
-	name_len = strlen(name);
-	s = envblk + sizeof(ZIPL_ENVBLK_SIGNATURE) - 1;
-	end = envblk + envblk_len;
-
-	while (end - s >= name_len + 2 /* minimal length of
-					* pattern "name=foo"
-					*/) {
-		if (memcmp(s, name, name_len) == 0 && s[name_len] == '=') {
-			/*
-			 * name was found. Locate the whole
-			 * "named" line and cut it including
-			 * the trailing "\n"
-			 */
-			unsigned int cut_len = name_len + 1;
-
-			while (s + cut_len < end) {
-				if (s[cut_len] == '\n')
-					break;
-				cut_len++;
-			}
-			if (s + cut_len >= end) {
-				/*
-				 * trailing "\n" not found
-				 */
-				error_reason("Found corrupted environment block - please run zipl");
-				return -1;
-			}
-			cut_len++;
-			memmove(s, s + cut_len, end - (s + cut_len));
-			memset(end - cut_len, '\0', cut_len);
-			return 0;
-		}
-		s = envblk_next_line(s, end);
-	}
-	error_reason("Name %s not found", name);
-	return -1;
+	if (site_id)
+		return envblk_list_site(envblk,
+					envblk_size,
+					atoi(site_id));
+	if (eff_site_id)
+		return envblk_list_effective_site(envblk,
+						  envblk_size,
+						  atoi(eff_site_id));
+	return envblk_list_all(envblk, envblk_size, 0);
 }
 
 /**
@@ -376,6 +245,21 @@ error:
 	return -1;
 }
 
+static char *build_prefixed_name(char *arg)
+{
+	char *name = NULL;
+
+	if (!site_id)
+		return strdup(arg);
+
+	name = misc_malloc(strlen(arg) + 1);
+	if (name) {
+		name[0] = *site_id;
+		strcpy(name + 1, arg);
+	}
+	return name;
+}
+
 static int env_list(struct zipl_envblk *zeb)
 {
 	if (envblk_open(zeb))
@@ -385,19 +269,22 @@ static int env_list(struct zipl_envblk *zeb)
 
 static int env_set(struct zipl_envblk *zeb, char *arg)
 {
-	char *name, *value;
+	char *pname;
+	char *value;
 
 	if (envblk_open(zeb))
 		return -1;
-	/*
-	 * parse the argument, locate name and value
-	 */
-	name = strdup(arg);
-	if (!name)
-		return -1;
 
-	value = strchr(name, '=');
-	if (!value || value == name) {
+	pname = build_prefixed_name(arg);
+	if (!pname) {
+		error_reason(strerror(errno));
+		return -1;
+	}
+	/*
+	 * identify name and locate value
+	 */
+	value = strchr(pname, '=');
+	if (!value || value == pname) {
 		/* name is not identified */
 		error_reason("Invalid argument %s", arg);
 		goto error;
@@ -405,50 +292,58 @@ static int env_set(struct zipl_envblk *zeb, char *arg)
 	*value = '\0';
 	value++;
 
-	if (envblk_check_name(name, strlen(name))) {
-		error_reason("Unacceptable name '%s'", name);
+	if (envblk_check_name(get_name(site_id, pname),
+			      get_name_len(site_id, pname))) {
+		error_reason("Unacceptable name '%s'",
+			     get_name(site_id, pname));
 		goto error;
 	}
-	if (do_set(zeb->buf, zeb->size, name, value) == 0) {
-		free(name);
+	if (envblk_set(zeb->buf, zeb->size, pname, value) == 0) {
+		free(pname);
 		zeb->need_update = 1;
 		return 0;
 	}
 error:
-	free(name);
+	free(pname);
 	return -1;
 }
 
-static int env_unset(struct zipl_envblk *zeb, char *name)
+static int env_unset(struct zipl_envblk *zeb, char *arg)
 {
+	char *pname;
+
 	if (envblk_open(zeb))
 		return -1;
 	/*
 	 * check name for validness
 	 */
-	if (strchr(name, '=') != NULL) {
-		error_reason("Invalid argument %s", name);
+	if (strchr(arg, '=') != NULL) {
+		error_reason("Invalid argument %s", arg);
 		return -1;
 	}
-	if (do_unset(zeb->buf, strnlen(zeb->buf, zeb->size), name) == 0) {
+	pname = build_prefixed_name(arg);
+	if (!pname) {
+		error_reason(strerror(errno));
+		return -1;
+	}
+	if (envblk_unset(zeb->buf, strnlen(zeb->buf, zeb->size),
+			 pname, site_id) == 0) {
 		zeb->need_update = 1;
+		free(pname);
 		return 0;
 	}
+	free(pname);
 	return -1;
-}
-
-static void env_blank(char *envblk, int envblk_len)
-{
-	memset(envblk + sizeof(ZIPL_ENVBLK_SIGNATURE) - 1, '\0',
-	       envblk_len - sizeof(ZIPL_ENVBLK_SIGNATURE) + 1);
 }
 
 static int env_reset(struct zipl_envblk *zeb)
 {
 	if (envblk_open(zeb))
 		return -1;
-
-	env_blank(zeb->buf, zeb->size);
+	if (site_id)
+		envblk_remove_namespace(zeb->buf, zeb->size, site_id);
+	else
+		envblk_blank(zeb->buf, zeb->size);
 	zeb->need_update = 1;
 	return 0;
 }
@@ -480,6 +375,57 @@ static int save_op_arg(enum op_id *dst, enum op_id src,
 	return 0;
 }
 
+static int set_site_id_common(char *arg, char **id)
+{
+	long val;
+	char *endptr;
+
+	val = strtol(arg, &endptr, 10);
+	if (endptr == arg || *endptr != '\0') {
+		error_reason("Site-ID '%s' is not a decimal number", arg);
+		return -EINVAL;
+	}
+	if (val < 0 || val > 9) {
+		error_reason("Unsupported site-ID '%s'", arg);
+		return -EINVAL;
+	}
+	if (endptr - arg > 1) {
+		/* case of '00...0' */
+		error_reason("Site-ID '%s' is not a decimal number", arg);
+		return -EINVAL;
+	}
+	*id = strdup(arg);
+	if (!*id) {
+		error_reason(strerror(errno));
+		return -ENOMEM;
+	}
+	/* larger IDs are unsupported */
+	assert(strlen(*id) == 1);
+	return 0;
+}
+
+#define warn_on_incompat_site_opts				\
+	error_reason("options %s and %s are incompatible",	\
+		     "'-S (--site)'", "'-E (--effective-site)'")
+
+static int set_site_id(char *arg)
+{
+	if (eff_site_id) {
+		warn_on_incompat_site_opts;
+		return -EINVAL;
+	}
+	return set_site_id_common(arg, &site_id);
+}
+
+static int set_effective_site_id(char *arg)
+{
+	if (site_id) {
+		warn_on_incompat_site_opts;
+		return -EINVAL;
+	}
+	return set_site_id_common(arg, &eff_site_id);
+}
+
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS WITHOUT ARGUMENTS"),
 	{
@@ -499,6 +445,16 @@ static struct util_opt opt_vec[] = {
 		.option = { "target", required_argument, NULL, 't'},
 		.argument = "DIR",
 		.desc = "specify directory, where bootmap file is located",
+	},
+	{
+		.option = { "site", required_argument, NULL, 'S'},
+		.argument = "SITE",
+		.desc = "specify site ID",
+	},
+	{
+		.option = { "effective-site", required_argument, NULL, 'E'},
+		.argument = "SITE",
+		.desc = "specify effective site ID",
 	},
 	{
 		.option = { "set", required_argument, NULL, 's'},
@@ -528,12 +484,6 @@ int main(int argc, char *argv[])
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
-	if (argc < 2) {
-		fprintf(stderr,
-			"%s: Missing command\nUse 'zipl-editenv --help' for more information\n",
-			argv[0]);
-		return EXIT_FAILURE;
-	}
 	while (1) {
 		c = util_opt_getopt_long(argc, argv);
 		if (c == -1)
@@ -550,7 +500,15 @@ int main(int argc, char *argv[])
 			verbose = 1;
 			break;
 		case 't':
-			bootmap_dir = optarg;
+			bootmap_dir = strdup(optarg);
+			if (!bootmap_dir)
+				ret = -1;
+			break;
+		case 'S':
+			ret = set_site_id(optarg);
+			break;
+		case 'E':
+			ret = set_effective_site_id(optarg);
 			break;
 		case 'r':
 			ret = save_op(&opcode, RESET_OP_ID);
@@ -594,6 +552,9 @@ int main(int argc, char *argv[])
 		ret = env_list(&zeb);
 		break;
 	default:
+		fprintf(stderr,
+			"%s: Missing command\nUse '%s --help' for more information\n",
+			argv[0], argv[0]);
 		break;
 	}
 out:
@@ -601,8 +562,10 @@ out:
 		ret = envblk_update(&zeb);
 
 	envblk_close(&zeb);
-	if (saved_arg != NULL)
-		free(saved_arg);
+	free(saved_arg);
+	free(bootmap_dir);
+	free(site_id);
+	free(eff_site_id);
 	if (ret) {
 		error_print();
 		return EXIT_FAILURE;
