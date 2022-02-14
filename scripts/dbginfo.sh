@@ -426,7 +426,6 @@ CMDS="uname -a\
   :dmsetup status\
   :icainfo\
   :icastats\
-  :ipcs -a\
   :ivp.e # IBM CCA package install check\
   :java -version\
   :last\
@@ -490,16 +489,19 @@ CMDS="uname -a\
   "
 
 ########################################
-NETWORK_CMDS="ip a sh\
+# network comamnds for separate output file with ip -br a as header command
+NETWORK_CMDS="ip -br a\
+  :firewall-cmd --list-all\
+  :ifconfig -a\
+  :ip a sh\
+  :ip -s -s link\
+  :ip link show\
+  :ip neigh list\
+  :ip ntable\
   :ip route list\
   :ip route list table all\
   :ip rule list\
-  :ip neigh list\
-  :ip link show\
-  :ip ntable\
-  :ip -s -s link\
-  :firewall-cmd --list-all\
-  :ifconfig -a\
+  :ipcs -a\
   :iptables -L\
   :lsqeth\
   :netstat -pantu\
