@@ -423,10 +423,6 @@ CMDS="uname -a\
   :dmsetup table\
   :dmsetup table --target multipath\
   :dmsetup status\
-  :icainfo\
-  :icastats\
-  :ivp.e # IBM CCA package install check\
-  :java -version\
   :last\
   :lschp\
   :lscpu -ae\
@@ -440,7 +436,6 @@ CMDS="uname -a\
   :lsscsi\
   :lsshut\
   :lstape\
-  :lszcrypt -VV\
   :lszdev\
   :lszfcp\
   :lszfcp -D\
@@ -459,11 +454,7 @@ CMDS="uname -a\
   :multipath -v6 -ll\
   :multipath -d\
   :multipath -t\
-  :pkcsconf -mlist\
   :pvpath -qa\
-  :SPident # SLES service package\
-  :cat /var/lib/opencryptoki/pk_config_data\
-  :ls -al /usr/lib64/opencryptoki/stdll\
   :find /boot -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /var/crash -print0 | sort -z | xargs -0 -n 10 ls -ld\
@@ -475,6 +466,23 @@ CMDS="uname -a\
   :systemd-delta\
   :lvdisplay\
   :ziorep_config -ADM\
+  "
+
+# crypto specific commands
+CMDS="${CMDS}\
+  :cat /var/lib/opencryptoki/pk_config_data\
+  :icainfo\
+  :icastats\
+  :ivp.e # IBM CCA package install check\
+  :ls -al /usr/lib64/opencryptoki/stdll\
+  :lszcrypt -VV\
+  :pkcsconf -mlist\
+  "
+
+# product / distro specific commands
+CMDS="${CMDS}\
+  :java -version\
+  :SPident # SLES service package\
   "
 
 # commands with long output at the end
