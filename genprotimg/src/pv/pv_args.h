@@ -34,6 +34,7 @@ typedef struct {
 	gboolean offline;
 	gchar *pcf;
 	gchar *scf;
+	PvTristate allow_dump;
 	PvTristate allow_pckmo;
 	gchar *psw_addr; /* PSW address which will be used for the start of
 			  * the actual component (e.g. Linux kernel)

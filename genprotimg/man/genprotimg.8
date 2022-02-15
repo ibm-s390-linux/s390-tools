@@ -94,6 +94,16 @@ this only if you trust the specified certificate. Optional.
 Do not require the host-key documents to be valid. For testing
 purposes, do not use for a production image. Optional.
 .TP
+\fB\-\-comm\-key\fR=\fI\,FILE\/\fR
+Specifies the encryption key you want to use for the PV guest dump. Use a
+secure, random, plaintext AES-256 GCM key. Optional.
+.TP
+\fB\-\-enable\-dump\fR
+Enable PV guest dumps. Requires the \fB\-\-comm-key\fR option. Optional.
+.TP
+\fB\-\-disable\-dump\fR
+Disable PV guest dumps. This is the default. Optional.
+.TP
 \fB\-\-enable\-pckmo\fR
 Enable the support for the DEA, TDEA, AES, and ECC PCKMO key encryption
 functions. This is the default. Optional.
@@ -105,21 +115,25 @@ functions. Optional.
 \fB\-v\fR, \fB\-\-version\fR
 Prints version information, then exits.
 
-.SH EXAMPLE
+.SH EXAMPLES
+
+These are examples to generate a protected virtualization image in
+\fI\,/boot/vmlinuz.pv\/\fR, using the kernel file \fI\,vmlinuz\/\fR, the
+initrd in \fI\,initramfs\/\fR, the kernel parameters contained in
+\fI\,parmfile\/\fR, the intermediate CA in \fI\,DigiCertCA.crt\/\fR, the
+IBM Z signing key in \fI\,ibm-z-host-key-signing.crt\/\fR, and the
+host-key document in \fI\,host_key.crt\/\fR. An AES-256 GCM key is stored in
+\fI\,comm-key\/\fR, which is used for the PV guest dump support in the second
+example.
+
+Generate a protected virtualization image:
+
 .PP
-Generate a protected virtualization image in
-\fI\,/boot/vmlinuz.pv\/\fR, using the kernel file \fI\,vmlinuz\/\fR,
-the initrd in \fI\,initramfs\/\fR, the kernel parameters contained in
-\fI\,parmfile\/\fR, the intermediate CA in \fI\,DigiCertCA.crt\/\fR,
-the IBM Z signing key in \fI\,ibm-z-host-key-signing.crt\/\fR, and the
-host-key document in \fI\,host_key.crt\/\fR:
+.B genprotimg \-i \fI\,vmlinuz\/\fR \-r \fI\,initramfs\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/vmlinuz.pv\/\fR
+
+Generate a protected virtualization image with PV guest dump support:
 .PP
-.Vb 1
-.EX
-\&        genprotimg \-i \fI\,vmlinuz\/\fR \-r \fI\,initramfs\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt \-o \fI\,/boot/vmlinuz.pv\/\fR
-.EE
-.Ve
-.PP
+.B genprotimg \-i \fI\,vmlinuz\/\fR \-r \fI\,initramfs\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/vmlinuz.pv\/\fR \-\-enable\-dump \-\-comm\-key \fI\,comm-key\fR
 
 .SH NOTES
 .IP "1." 4

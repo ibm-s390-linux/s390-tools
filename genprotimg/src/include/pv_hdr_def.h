@@ -28,6 +28,7 @@
 #define __PV_BIT(nr)		(1ULL << (63 - (nr)))
 
 /* Plaintext control flags */
+#define PV_PCF_ALLOW_DUMPING	__PV_BIT(34) /* dumping of the configuration is allowed */
 #define PV_PCF_NO_DECRYPTION	__PV_BIT(35) /* prevent Ultravisor decryption during unpack operation */
 #define PV_PCF_PCKMO_DEA_TDEA	__PV_BIT(56) /* PCKMO encrypt-DEA/TDEA-key functions allowed */
 #define PV_PCF_PCKMO_AES	__PV_BIT(57) /* PCKMO encrypt-AES-key functions allowed */

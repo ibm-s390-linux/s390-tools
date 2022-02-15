@@ -64,13 +64,17 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 {
 	PvComponentType KERNEL = PV_COMP_TYPE_KERNEL;
 
-	if (args->pcf && args->allow_pckmo != PV_NOT_SET) {
-		g_set_error(err, PV_PARSE_ERROR, PV_PARSE_ERROR_SYNTAX,
-			    _("The '--x-pcf' and '--(enable|disable)-pckmo' options are mutually"
-			      " exclusive.\nUse 'genprotimg --help' for more information"));
+	/* Check for mutually exclusive arguments */
+	if (args->pcf && !(args->allow_pckmo == PV_NOT_SET &&
+			   args->allow_dump == PV_NOT_SET)) {
+		g_set_error(
+			err, PV_PARSE_ERROR, PV_PARSE_ERROR_SYNTAX,
+			_("The '--x-pcf' option cannot be used with the '--(enable|disable)-pckmo' or"
+			  " '--(enable|disable)-dump' flags.\nUse 'genprotimg --help' for more information"));
 		return -1;
 	}
 
+	/* Check for unused arguments */
 	if (args->unused_values->len > 0) {
 		g_autofree gchar *unused = NULL;
 
@@ -85,6 +89,14 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 		g_set_error(err, PV_PARSE_ERROR, PR_PARSE_ERROR_INVALID_ARGUMENT,
 			    _("Unrecognized arguments: '%s'.\nUse 'genprotimg --help' for more information"),
 			    unused);
+		return -1;
+	}
+
+	/* Check for mandatory arguments */
+	if (args->allow_dump == PV_TRUE && !args->cust_comm_key_path) {
+		g_set_error(err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
+			    _("Option '--allow-dump' requires the '--comm-key' option.\nUse 'genprotimg "
+			      "--help' for more information"));
 		return -1;
 	}
 
@@ -155,14 +167,14 @@ static gboolean cb_set_string_option(const gchar *option, const gchar *value,
 {
 	gchar **args_option = NULL;
 
+	if (g_str_equal(option, "--comm-key"))
+		args_option = &args->cust_comm_key_path;
 	if (g_str_equal(option, "--root-ca"))
 		args_option = &args->root_ca_path;
 	if (g_str_equal(option, "-o") || g_str_equal(option, "--output"))
 		args_option = &args->output_path;
 	if (g_str_equal(option, "--x-comp-key"))
 		args_option = &args->xts_key_path;
-	if (g_str_equal(option, "--x-comm-key"))
-		args_option = &args->cust_comm_key_path;
 	if (g_str_equal(option, "--x-header-key"))
 		args_option = &args->cust_root_key_path;
 	if (g_str_equal(option, "--x-pcf"))
@@ -246,6 +258,7 @@ static gboolean cb_remaining_values(const gchar *option G_GNUC_UNUSED,
 #define INDENT "                                   "
 
 /* Define the callbacks for mutually exclusive command line flags */
+DEFINE_MUT_EXCL_BOOL_FLAG_CBS(dump)
 DEFINE_MUT_EXCL_BOOL_FLAG_CBS(pckmo)
 
 gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
@@ -312,12 +325,27 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 				   "(optional)."),
 		  .arg_description = _("PARMFILE") },
 		MUT_EXCL_BOOL_FLAG(
+			dump,
+			_("Enable PV guest dumps (optional). This option\n" INDENT
+			  "requires the '--comm-key' option."),
+			_("Disable PV guest dumps (default) (optional).")),
+		MUT_EXCL_BOOL_FLAG(
 			pckmo,
 			_("Enable the support for the DEA, TDEA, AES, and\n" INDENT
 			  "ECC PCKMO key encryption functions (default)\n" INDENT
 			  "(optional)."),
 			_("Disable the support for the DEA, TDEA, AES, and\n" INDENT
 			  "ECC PCKMO key encryption functions (optional).")),
+		{ .long_name = "comm-key",
+		  .short_name = 0,
+		  .flags = G_OPTION_FLAG_FILENAME,
+		  .arg = G_OPTION_ARG_CALLBACK,
+		  .arg_data = cb_set_string_option,
+		  .description = _(
+			  "FILE contains the key with which you encrypt\n" INDENT
+			  "the PV guest dump (optional). Required by\n" INDENT
+			  "the '--enable-dump' option."),
+		  .arg_description = _("FILE") },
 		{ .long_name = "crl",
 		  .short_name = 0,
 		  .flags = G_OPTION_FLAG_NONE,
@@ -376,15 +404,6 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 	};
 
 	GOptionEntry x_entries[] = {
-		{ .long_name = "x-comm-key",
-		  .short_name = 0,
-		  .flags = G_OPTION_FLAG_FILENAME,
-		  .arg = G_OPTION_ARG_CALLBACK,
-		  .arg_data = cb_set_string_option,
-		  .description = _(
-			  "Use FILE as the customer communication key.\n" INDENT
-			  "Optional; default: auto-generated."),
-		  .arg_description = _("FILE") },
 		{ .long_name = "x-comp-key",
 		  .short_name = 0,
 		  .flags = G_OPTION_FLAG_FILENAME,
@@ -467,6 +486,7 @@ PvArgs *pv_args_new(void)
 	g_autoptr(PvArgs) args = g_new0(PvArgs, 1);
 
 	args->unused_values = g_ptr_array_new_with_free_func(g_free);
+	args->allow_dump = PV_NOT_SET;
 	args->allow_pckmo = PV_NOT_SET;
 	return g_steal_pointer(&args);
 }
