@@ -12,6 +12,7 @@ Release history for s390-tools (MIT version)
   - dbginfo.sh: replace "which" by builtin command "type"
   - chreipl-fcp-mpath: bundle a pre-cooked version of the manpage for
       build environments without access to `pandoc`
+  - dbginfo.sh: Add multipath info to map paths to FC addressing and prio group
 
   Bug Fixes:
 
