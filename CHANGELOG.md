@@ -13,6 +13,7 @@ Release history for s390-tools (MIT version)
   - chreipl-fcp-mpath: bundle a pre-cooked version of the manpage for
       build environments without access to `pandoc`
   - dbginfo.sh: Add multipath info to map paths to FC addressing and prio group
+  - dbginfo.sh: Sort list of environment variables for readability
 
   Bug Fixes:
 

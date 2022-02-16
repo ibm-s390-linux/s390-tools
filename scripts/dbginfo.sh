@@ -427,7 +427,7 @@ CMDS="uname -a\
   :systemctl --all --no-pager list-unit-files\
   :systemd-delta\
   :ulimit -a\
-  :env\
+  :env --null | sort --zero-terminated | tr '\000' '\n'\
   :find /boot -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :find /var/crash -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :df -h\
