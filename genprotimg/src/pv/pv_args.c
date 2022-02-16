@@ -188,19 +188,6 @@ static gboolean cb_set_string_option(const gchar *option, const gchar *value,
 	return TRUE;
 }
 
-static gboolean cb_enable_disable_flag(const gchar *option, const gchar *value G_GNUC_UNUSED,
-				       PvArgs *args, GError **err G_GNUC_UNUSED)
-{
-	if (g_str_equal(option, "--enable-pckmo"))
-		args->allow_pckmo = PV_TRUE;
-	else if (g_str_equal(option, "--disable-pckmo"))
-		args->allow_pckmo = PV_FALSE;
-	else
-		g_assert_not_reached();
-
-	return TRUE;
-}
-
 static gboolean cb_set_log_level(const gchar *option G_GNUC_UNUSED,
 				 const gchar *value G_GNUC_UNUSED, PvArgs *args,
 				 GError **err G_GNUC_UNUSED)
@@ -217,7 +204,49 @@ static gboolean cb_remaining_values(const gchar *option G_GNUC_UNUSED,
 	return TRUE;
 }
 
+#define MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, VALUE) (cb_##FLAG##_##VALUE)
+#define DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, VALUE)                                        \
+	static gboolean MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, VALUE)(                         \
+		const gchar *option G_GNUC_UNUSED, const gchar *value G_GNUC_UNUSED,     \
+		PvArgs *args, GError **err)                                              \
+	{                                                                                \
+		if (!(args->allow_##FLAG == PV_NOT_SET ||                                \
+		      args->allow_##FLAG == VALUE)) {                                    \
+			g_set_error(err, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,          \
+				    "'--enable-" #FLAG "' and '--disable-" #FLAG         \
+				    "' are mutually exclusive");                         \
+			return FALSE;                                                    \
+		}                                                                        \
+		args->allow_##FLAG = VALUE;                                              \
+		return TRUE;                                                             \
+	}
+
+#define DEFINE_MUT_EXCL_BOOL_FLAG_CBS(FLAG)                                    \
+	DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, PV_TRUE)                            \
+	DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, PV_FALSE)
+
+#define MUT_EXCL_BOOL_FLAG(FLAG, ENABLE_DESC, DISABLE_DESC)                    \
+	{                                                                      \
+		.long_name = "enable-" #FLAG,                                  \
+		.short_name = 0,                                               \
+		.flags = G_OPTION_FLAG_NO_ARG,                                 \
+		.arg = G_OPTION_ARG_CALLBACK,                                  \
+		.arg_data = MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, PV_TRUE),         \
+		.description = ENABLE_DESC,                                    \
+	},                                                                     \
+	{                                                                      \
+		.long_name = "disable-" #FLAG,                                 \
+		.short_name = 0,                                               \
+		.flags = G_OPTION_FLAG_NO_ARG,                                 \
+		.arg = G_OPTION_ARG_CALLBACK,                                  \
+		.arg_data = MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, PV_FALSE),        \
+		.description = DISABLE_DESC,                                   \
+	}
+
 #define INDENT "                                   "
+
+/* Define the callbacks for mutually exclusive command line flags */
+DEFINE_MUT_EXCL_BOOL_FLAG_CBS(pckmo)
 
 gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 			   GError **err)
@@ -282,21 +311,13 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .description = _("Use the kernel parameters stored in PARMFILE\n" INDENT
 				   "(optional)."),
 		  .arg_description = _("PARMFILE") },
-		{.long_name = "enable-pckmo",
-		 .short_name = 0,
-		 .flags = G_OPTION_FLAG_NO_ARG,
-		 .arg = G_OPTION_ARG_CALLBACK,
-		 .arg_data = cb_enable_disable_flag,
-		 .description = _("Enable the support for the DEA, TDEA, AES, and\n" INDENT
-				  "ECC PCKMO key encryption functions (default)\n" INDENT
-				  "(optional).")},
-		{.long_name = "disable-pckmo",
-		 .short_name = 0,
-		 .flags = G_OPTION_FLAG_NO_ARG,
-		 .arg = G_OPTION_ARG_CALLBACK,
-		 .arg_data = cb_enable_disable_flag,
-		 .description = _("Disable the support for the DEA, TDEA, AES, and\n" INDENT
-				  "ECC PCKMO key encryption functions (optional).")},
+		MUT_EXCL_BOOL_FLAG(
+			pckmo,
+			_("Enable the support for the DEA, TDEA, AES, and\n" INDENT
+			  "ECC PCKMO key encryption functions (default)\n" INDENT
+			  "(optional)."),
+			_("Disable the support for the DEA, TDEA, AES, and\n" INDENT
+			  "ECC PCKMO key encryption functions (optional).")),
 		{ .long_name = "crl",
 		  .short_name = 0,
 		  .flags = G_OPTION_FLAG_NONE,
