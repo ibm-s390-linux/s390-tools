@@ -447,18 +447,18 @@ CMDS="${CMDS}\
   :smc_dbg\
   "
 
+# block device and other scsi device commands (in non alphabetical order)
+#   command groups itself have an intentional topical grouping and order
 CMDS="${CMDS}\
+  :lsdasd\
+  :lsdasd -u\
+  :lvdisplay\
+  :pvpath -qa\
   :dmsetup ls\
   :dmsetup ls --tree\
   :dmsetup table\
   :dmsetup table --target multipath\
   :dmsetup status\
-  :lsdasd\
-  :lsdasd -u\
-  :lsscsi\
-  :lszfcp\
-  :lszfcp -D\
-  :lszfcp -V\
   :multipathd -k'show config'\
   :multipathd -k'show maps'\
   :multipathd -k'show topo'\
@@ -472,9 +472,11 @@ CMDS="${CMDS}\
   :multipath -v6 -ll\
   :multipath -d\
   :multipath -t\
-  :pvpath -qa\
-  :lvdisplay\
+  :lszfcp\
+  :lszfcp -D\
+  :lszfcp -V\
   :ziorep_config -ADM\
+  :lsscsi\
   "
 
 # crypto specific commands
