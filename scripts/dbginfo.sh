@@ -435,20 +435,27 @@ CMDS="uname -a\
   :mount\
   "
 
+# Z device subsystem commands (first commands in non alphabetical order)
+CMDS="${CMDS}\
+  :lschp\
+  :lscss\
+  :lszdev\
+  :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
+  :lspci -t\
+  :lspci -vv\
+  :lstape\
+  :smc_dbg\
+  "
+
 CMDS="${CMDS}\
   :dmsetup ls\
   :dmsetup ls --tree\
   :dmsetup table\
   :dmsetup table --target multipath\
   :dmsetup status\
-  :lschp\
-  :lscss\
   :lsdasd\
   :lsdasd -u\
-  :lspci -vv\
   :lsscsi\
-  :lstape\
-  :lszdev\
   :lszfcp\
   :lszfcp -D\
   :lszfcp -V\
@@ -466,8 +473,6 @@ CMDS="${CMDS}\
   :multipath -d\
   :multipath -t\
   :pvpath -qa\
-  :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
-  :smc_dbg\
   :lvdisplay\
   :ziorep_config -ADM\
   "
