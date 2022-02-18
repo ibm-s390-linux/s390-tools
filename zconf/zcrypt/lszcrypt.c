@@ -151,6 +151,10 @@ static struct util_opt opt_vec[] = {
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 		.desc = "Show only information from queues but no card info",
 	},
+	{
+		.option = {"serial", 0, NULL, 's'},
+		.desc = "Show the serial numbers for CCA and EP11 crypto cards",
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -283,6 +287,87 @@ static void show_domains(void)
 		domain_array[n++] = "";
 
 	show_domains_util_rec(domain_array);
+}
+
+/*
+ * Show serialnumbers
+ */
+static void show_serialnumbers(void)
+{
+	struct util_rec *rec = util_rec_new_wide("-");
+	struct dirent **dev_vec;
+	int i, count;
+	char *ap, *path, *device, *grp_dev, card[16], buf[256];
+	long config = -1, online = -1, chkstop = -1;
+	unsigned long facility;
+
+	/* check if ap driver is available */
+	ap = util_path_sysfs("bus/ap");
+	if (!util_path_is_dir(ap))
+		errx(EXIT_FAILURE, "Crypto device driver not available.");
+
+	/* define the record */
+	util_rec_def(rec, "card", UTIL_REC_ALIGN_LEFT, 8, "CARD.DOM");
+	util_rec_def(rec, "type", UTIL_REC_ALIGN_LEFT, 5, "TYPE");
+	util_rec_def(rec, "mode", UTIL_REC_ALIGN_LEFT, 11, "MODE");
+	util_rec_def(rec, "status", UTIL_REC_ALIGN_LEFT, 10, "STATUS");
+	util_rec_def(rec, "serialnr", UTIL_REC_ALIGN_LEFT, 8, "SERIALNR");
+
+	/* scan the devices */
+	path = util_path_sysfs("devices/ap/");
+	count = util_scandir(&dev_vec, alphasort, path, "card[0-9a-fA-F]+");
+	if (count < 1)
+		errx(EXIT_FAILURE, "No crypto card devices found.");
+	util_rec_print_hdr(rec);
+	for (i = 0; i < count; i++) {
+		device = dev_vec[i]->d_name;
+		grp_dev = util_path_sysfs("devices/ap/%s", device);
+		if (!util_path_is_dir(grp_dev))
+			errx(EXIT_FAILURE, "Error - cryptographic device %s does not exist.", device);
+		if (!util_path_is_readable("%s/type", grp_dev) ||
+		    !util_path_is_readable("%s/online", grp_dev))
+			goto next;
+		strcpy(card, device + 4);
+		util_rec_set(rec, "card", card);
+		util_file_read_line(buf, sizeof(buf), "%s/type", grp_dev);
+		util_rec_set(rec, "type", buf);
+		util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
+		if (facility & MASK_COPRO)
+			util_rec_set(rec, "mode", "CCA-Coproc");
+		else if (facility & MASK_EP11)
+			util_rec_set(rec, "mode", "EP11-Coproc");
+		else
+			goto next;
+		if (util_path_is_readable("%s/config", grp_dev))
+			util_file_read_l(&config, 10, "%s/config", grp_dev);
+		if (util_path_is_readable("%s/chkstop", grp_dev))
+			util_file_read_l(&chkstop, 10, "%s/chkstop", grp_dev);
+		if (util_path_is_readable("%s/online", grp_dev))
+			util_file_read_l(&online, 10, "%s/online", grp_dev);
+		if (config == 0) {
+			util_rec_set(rec, "status", "deconfig");
+		} else {
+			if (chkstop > 0)
+				util_rec_set(rec, "status", "chkstop");
+			else if (online > 0)
+				util_rec_set(rec, "status", "online");
+			else if (online == 0)
+				util_rec_set(rec, "status", "offline");
+			else
+				util_rec_set(rec, "status", "-");
+		}
+		if (util_file_read_line(buf, sizeof(buf), "%s/serialnr", grp_dev))
+			util_rec_set(rec, "serialnr", "-");
+		else {
+			buf[8] = '\0';
+			util_rec_set(rec, "serialnr", buf);
+		}
+		util_rec_print(rec);
+next:
+		free(grp_dev);
+	}
+
+	free(path);
 }
 
 /*
@@ -862,6 +947,9 @@ int main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		case 'd':
 			show_domains();
+			return EXIT_SUCCESS;
+		case 's':
+			show_serialnumbers();
 			return EXIT_SUCCESS;
 		case 'V':
 			l.verbose++;
