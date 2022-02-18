@@ -32,6 +32,8 @@ static struct lszcrypt_l {
 	int showaccel;
 	int showcca;
 	int showep11;
+	int showcard;
+	int showqueue;
 } l;
 
 /*
@@ -103,6 +105,8 @@ static const struct util_prg prg = {
 #define OPT_ACCELONLY  0x81
 #define OPT_CCAONLY    0x82
 #define OPT_EP11ONLY   0x83
+#define OPT_CARDONLY   0x84
+#define OPT_QUEUEONLY  0x85
 
 static struct util_opt opt_vec[] = {
 	{
@@ -136,6 +140,16 @@ static struct util_opt opt_vec[] = {
 		.option = {"ep11only", 0, NULL, OPT_EP11ONLY},
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 		.desc = "Show only information from cards/queues in EP11-Coprocessor mode",
+	},
+	{
+		.option = {"cardonly", 0, NULL, OPT_CARDONLY},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Show only information from cards but no queue info",
+	},
+	{
+		.option = {"queueonly", 0, NULL, OPT_QUEUEONLY},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Show only information from queues but no card info",
 	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
@@ -522,6 +536,9 @@ static void show_subdevice(struct util_rec *rec, const char *grp_dev,
 	     !util_path_is_readable("%s/%s/online", grp_dev, sub_dev)))
 		return;
 
+	if (!l.showqueue)
+		return;
+
 	util_rec_set(rec, "card", sub_dev);
 	read_subdev_rec_default(rec, grp_dev, sub_dev);
 	read_subdev_rec_verbose(rec, grp_dev, sub_dev);
@@ -669,8 +686,10 @@ static void show_device(struct util_rec *rec, const char *device)
 	read_rec_default(rec, grp_dev);
 	read_rec_verbose(rec, grp_dev);
 
-	util_rec_print(rec);
-	show_subdevices(rec, grp_dev);
+	if (l.showcard)
+		util_rec_print(rec);
+	if (l.showqueue)
+		show_subdevices(rec, grp_dev);
 out_free:
 	free(grp_dev);
 }
@@ -856,6 +875,12 @@ int main(int argc, char **argv)
 		case OPT_EP11ONLY:
 			l.showep11 = 1;
 			break;
+		case OPT_CARDONLY:
+			l.showcard = 1;
+			break;
+		case OPT_QUEUEONLY:
+			l.showqueue = 1;
+			break;
 		case 'h':
 			util_prg_print_help();
 			util_opt_print_help();
@@ -878,6 +903,17 @@ int main(int argc, char **argv)
 		break;
 	default:
 		warnx("Only one of --accelonly or --ccaonly or --ep11only can be specified");
+		return EXIT_FAILURE;
+	}
+
+	switch (l.showcard + l.showqueue) {
+	case 0:
+		l.showcard = l.showqueue = 1;
+		break;
+	case 1:
+		break;
+	default:
+		warnx("Only one of --cardonly or --queueonly can be specified");
 		return EXIT_FAILURE;
 	}
 

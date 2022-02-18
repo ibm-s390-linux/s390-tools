@@ -16,7 +16,7 @@ lszcrypt \- display zcrypt device and configuration information
 .SH SYNOPSIS
 .TP 9
 .B lszcrypt
-.RB "[" --accelonly | --ccaonly | --ep11only "]"
+.RB "[" <filteroptions> "]"
 .RB "[" -V "]"
 [
 .I <device-id>
@@ -33,6 +33,9 @@ lszcrypt \- display zcrypt device and configuration information
 .B lszcrypt -h
 .TP
 .B lszcrypt -v
+. TP
+.B <filteroptions>
+[--accelonly|--ccaonly|--ep11only] [--cardonly|--queueonly]
 .SH DESCRIPTION
 The
 .B lszcrypt
@@ -121,6 +124,12 @@ Show only information for cards/queues in CCA-Coprocessor mode.
 .TP 8
 .B --ep11only
 Show only information for cards/queues in EP11-Coprocessor mode.
+.TP 8
+.B --cardonly
+Show only information for cards but no queue info.
+.TP 8
+.B --queueonly
+Show only information for queues but no card info.
 .SH LISTING DETAILS
 Here is an explanation of the columns displayed. Please note that some
 of the columns show up in verbose mode only.
@@ -223,6 +232,11 @@ cex2acard/cex2aqueue (CEX2A and CEX3A hardware) and vfio_ap (queue reserved
 for use by kvm hypervisor for kvm guests and not accessible to host
 applications). It is also valid to have no driver handling a queue which is
 shown as a -no-driver- entry.
+.SH NOTES
+Use only one of the mode filtering options --accelonly, --ccaonly, --ep11only.
+Same with card/queue filtering: Use only one of --cardonly, --queueonly.
+However, one of the mode filtering options and one of the card/queue filtering
+can be combined.
 .SH EXAMPLES
 .TP
 .B lszcrypt
