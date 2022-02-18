@@ -16,7 +16,8 @@ lszcrypt \- display zcrypt device and configuration information
 .SH SYNOPSIS
 .TP 9
 .B lszcrypt
-.RB "[ " -V " ] "
+.RB "[" --accelonly | --ccaonly | --ep11only "]"
+.RB "[" -V "]"
 [
 .I <device-id>
 [...]]
@@ -111,6 +112,15 @@ Displays help text and exits.
 .TP 8
 .B -v, --version
 Displays version information and exits.
+.TP 8
+.B --accelonly
+Show only information for cards/queues in Accelerator mode.
+.TP 8
+.B --ccaonly
+Show only information for cards/queues in CCA-Coprocessor mode.
+.TP 8
+.B --ep11only
+Show only information for cards/queues in EP11-Coprocessor mode.
 .SH LISTING DETAILS
 Here is an explanation of the columns displayed. Please note that some
 of the columns show up in verbose mode only.

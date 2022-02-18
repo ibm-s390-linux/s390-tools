@@ -29,6 +29,9 @@
  */
 static struct lszcrypt_l {
 	int verbose;
+	int showaccel;
+	int showcca;
+	int showep11;
 } l;
 
 /*
@@ -96,6 +99,11 @@ static const struct util_prg prg = {
 /*
  * Configuration of command line options
  */
+
+#define OPT_ACCELONLY  0x81
+#define OPT_CCAONLY    0x82
+#define OPT_EP11ONLY   0x83
+
 static struct util_opt opt_vec[] = {
 	{
 		.option = {"bus", 0, NULL, 'b'},
@@ -113,6 +121,21 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = {"verbose", 0, NULL, 'V'},
 		.desc = "Print verbose messages",
+	},
+	{
+		.option = {"accelonly", 0, NULL, OPT_ACCELONLY},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Show only information from cards/queues in Accelerator mode",
+	},
+	{
+		.option = {"ccaonly", 0, NULL, OPT_CCAONLY},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Show only information from cards/queues in CCA-Coprocessor mode",
+	},
+	{
+		.option = {"ep11only", 0, NULL, OPT_EP11ONLY},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Show only information from cards/queues in EP11-Coprocessor mode",
 	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
@@ -617,7 +640,7 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
  */
 static void show_device(struct util_rec *rec, const char *device)
 {
-	char *grp_dev, card[16];
+	char *grp_dev, card[16], type[16], t = '\0';
 
 	strcpy(card, &device[4]);
 	grp_dev = util_path_sysfs("devices/ap/%s", device);
@@ -634,6 +657,14 @@ static void show_device(struct util_rec *rec, const char *device)
 		goto out_free;
 	}
 	util_rec_set(rec, "card", card);
+
+	if (util_file_read_line(type, sizeof(type), "%s/type", grp_dev) == 0)
+		t = type[strlen(type) - 1];
+
+	if ((t == 'A' && !l.showaccel) ||
+	    (t == 'C' && !l.showcca) ||
+	    (t == 'P' && !l.showep11))
+		goto out_free;
 
 	read_rec_default(rec, grp_dev);
 	read_rec_verbose(rec, grp_dev);
@@ -816,6 +847,15 @@ int main(int argc, char **argv)
 		case 'V':
 			l.verbose++;
 			break;
+		case OPT_ACCELONLY:
+			l.showaccel = 1;
+			break;
+		case OPT_CCAONLY:
+			l.showcca = 1;
+			break;
+		case OPT_EP11ONLY:
+			l.showep11 = 1;
+			break;
 		case 'h':
 			util_prg_print_help();
 			util_opt_print_help();
@@ -829,6 +869,18 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 	}
+
+	switch (l.showaccel + l.showcca + l.showep11) {
+	case 0:
+		l.showaccel = l.showcca = l.showep11 = 1;
+		break;
+	case 1:
+		break;
+	default:
+		warnx("Only one of --accelonly or --ccaonly or --ep11only can be specified");
+		return EXIT_FAILURE;
+	}
+
 	if (optind == argc)
 		show_devices_all();
 	else
