@@ -249,7 +249,8 @@ iplstart:
 	clc   0(3,%r4),.L_eof			# if it is EOFx
 	bz    .Lagain1				# skip dateset trailer
 
-	lt    %r3,MAX_COMMAND_LINE_SIZE-PARMAREA+4(%r12)
+	l     %r3,MAX_COMMAND_LINE_SIZE-PARMAREA+4(%r12)
+	ltr   %r3,%r3
 	jnz   0f
 	lhi   %r3,LEGACY_COMMAND_LINE_SIZE
 0:	cr    %r2,%r3				# truncate if line too long
