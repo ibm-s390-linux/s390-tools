@@ -28,7 +28,7 @@ int is_zero_block(void *data) {
 void *load_direct(disk_blockptr_t *data, struct subchannel_id subchannel_id,
 	    void *load_addr)
 {
-	struct linear_blockptr *blockptr = (struct linear_blockptr *)data;
+	struct linear_blockptr *blockptr = &data->linear;
 	struct DE_fba_data *de_data;
 	struct LO_fba_data *lo_data;
 	struct ccw1 *ccws;
