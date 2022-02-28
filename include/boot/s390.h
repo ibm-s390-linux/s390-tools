@@ -16,6 +16,8 @@
 #define __LC_IPLDEV		0x0c6c
 #define __LC_OS_INFO		0x0e18
 
+#define LOWCORE_SIZE		_AC(0x2000, UL)
+
 #define PAGE_SIZE		_AC(4096, UL)
 
 /* Minimum size of a stack frame in bytes */
@@ -210,6 +212,7 @@ struct _lowcore {
 	/* align to the top of the prefix area */
 	uint8_t	pad_0x1900[0x2000-0x1900];	/* 0x1900 */
 } __packed __aligned(8192);
+STATIC_ASSERT(sizeof(struct _lowcore) == LOWCORE_SIZE)
 
 #define S390_lowcore (*((struct _lowcore *) 0))
 
