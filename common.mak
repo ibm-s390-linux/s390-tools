@@ -251,11 +251,9 @@ export AS LD CC CPP AR NM STRIP OBJCOPY OBJDUMP INSTALL CFLAGS CXXFLAGS \
 
 ifneq ($(shell $(CC_SILENT) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 	NO_PIE_CFLAGS := -fno-pie
-	NO_PIE_LINKFLAGS := -no-pie
 	NO_PIE_LDFLAGS := -no-pie
 else
 	NO_PIE_CFLAGS :=
-	NO_PIE_LINKFLAGS :=
 	NO_PIE_LDFLAGS :=
 endif
 
