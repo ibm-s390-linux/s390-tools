@@ -60,7 +60,6 @@ endef
 
 $(eval $(call cmd_define,     AS,"  AS      ",$(CROSS_COMPILE)as))
 $(eval $(call cmd_define,   LINK,"  LINK    ",$(CROSS_COMPILE)gcc))
-$(eval $(call cmd_define,     LD,"  LD      ",$(CROSS_COMPILE)ld))
 $(eval $(call cmd_define,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
 $(eval $(call cmd_define, HOSTCC,"  HOSTCC  ",gcc))
 $(eval $(call cmd_define, LINKXX,"  LINKXX  ",$(CROSS_COMPILE)g++))

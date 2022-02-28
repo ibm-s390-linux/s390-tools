@@ -110,7 +110,7 @@ stage3.bin:	stage3.exec
 		$< $@
 
 data.o: $(FILES)
-	$(LD) $(NO_PIE_LDFLAGS) -r -b binary -o data.o $(FILES)
+	$(LINK) $(NO_PIE_LDFLAGS) -static -nostdlib -Wl,--relocatable -Wl,--format,binary -o data.o $(FILES)
 
 data.h: data.o
 	rm -f data.h
