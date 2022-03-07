@@ -687,10 +687,10 @@ static int check_eckd_dump_partition(struct disk_info* info)
 static void eckd_dump_store_param(struct eckd_dump_param *param,
 				  struct disk_info *info, blocknum_t count)
 {
-	param->start_blk = info->geo.start;
-	param->end_blk = info->geo.start + info->phy_blocks - 1 - count;
+	param->blk_start = info->geo.start;
+	param->blk_end = info->geo.start + info->phy_blocks - 1 - count;
 	param->num_heads = info->geo.heads;
-	param->blocksize = info->phy_block_size;
+	param->blk_size = info->phy_block_size;
 	param->bpt = info->geo.sectors;
 }
 
@@ -901,8 +901,8 @@ install_svdump_fba(int fd, struct disk_info *info, uint64_t mem)
 	if (boot_init_fba_stage0(&stage0, stage1b_list, stage1b_count))
 		goto out_free_stage1b_list;
 
-	param.start_blk = (uint64_t) info->geo.start;
-	param.blockct = (uint64_t) blk - 1;
+	param.blk_start = info->geo.start;
+	param.blk_end = blk - 1;
 	boot_get_dump_info(&stage0.boot_info, BOOT_INFO_DEV_TYPE_FBA, &param);
 
 	if (DRY_RUN_FUNC(misc_pwrite(fd, &stage0, sizeof(stage0), 0)))

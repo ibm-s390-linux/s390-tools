@@ -19,27 +19,12 @@
 
 #ifndef __ASSEMBLER__
 
+#include "boot/boot_defs.h"
+
 #include "libc.h"
 #include "boot/s390.h"
 #include "cio.h"
 #include "error.h"
-
-/* Layout of ECKD disk block pointer */
-struct eckd_blockptr {
-	uint16_t cyl;
-	uint16_t head;
-	uint8_t sec;
-	uint16_t size;
-	uint8_t blockct;
-	uint8_t reserved[8];
-} __packed;
-
-struct linear_blockptr {
-	uint64_t blockno;
-	uint16_t size;
-	uint16_t blockct;
-	uint8_t reserved[4];
-} __packed;
 
 typedef union {
 	struct eckd_blockptr eckd;

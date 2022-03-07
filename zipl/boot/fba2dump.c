@@ -10,6 +10,8 @@
  */
 
 #include "lib/zt_common.h"
+#include "boot/boot_defs.h"
+
 #include "error.h"
 #include "fba.h"
 #include "stage2dump.h"
@@ -71,16 +73,6 @@ static struct {
 	struct ccw1 wrccw;
 	unsigned long ida_list[BLK_PWRT * BLK_SIZE / 4096];
 } ccw_program __aligned(8);
-
-/*
- * FBA parameter block passed by zipl
- */
-struct fba_dump_param {
-	uint32_t	res1;
-	uint32_t	blk_start;
-	uint32_t	res2;
-	uint32_t	blk_end;
-} __packed;
 
 /*
  * Convert memory size to number of blocks

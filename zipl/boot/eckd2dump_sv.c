@@ -10,6 +10,7 @@
  */
 
 #include "lib/zt_common.h"
+#include "boot/boot_defs.h"
 
 #include "eckd2dump.h"
 #include "error.h"
@@ -19,18 +20,6 @@
  * Magic number at start of dump record
  */
 uint64_t __section(.stage2.head) magic = 0x5845434b44363401ULL; /* "XECKD64", version 1 */
-
-/*
- * ECKD parameter block passed by zipl
- */
-struct eckd_dump_param {
-	uint32_t blk_start;
-	uint32_t blk_end;
-	uint16_t blk_size;
-	uint8_t num_heads;
-	uint8_t bpt;
-	char reserved[4];
-} __packed;
 
 /*
  * Get device characteristics from zipl parameter block

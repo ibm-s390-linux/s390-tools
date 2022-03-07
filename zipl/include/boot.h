@@ -14,6 +14,7 @@
 
 #include <sys/types.h>
 
+#include "boot/boot_defs.h"
 #include "lib/zt_common.h"
 
 #include "disk.h"
@@ -60,30 +61,6 @@ struct scsi_dump_sb {
 #define SCSI_DUMP_SB_SEED	0x12345678
 #define SCSI_DUMP_SB_CSUM_SIZE  4096
 
-/* SCSI dump parameter */
-
-struct scsi_dump_param {
-	uint64_t block;
-	uint64_t reserved;
-} __packed;
-/* ECKD dump parameter */
-
-struct eckd_dump_param {
-	uint32_t	start_blk;
-	uint32_t	end_blk;
-	uint16_t	blocksize;
-	uint8_t		num_heads;
-	uint8_t		bpt;
-	char		reserved[4];
-} __packed __may_alias;
-
-/* FBA dump parameter */
-
-struct fba_dump_param {
-	uint64_t	start_blk;
-	uint64_t	blockct;
-} __packed;
-
 struct boot_info_bp_dump {
 	union {
 		struct eckd_dump_param eckd;
@@ -91,32 +68,6 @@ struct boot_info_bp_dump {
 		struct scsi_dump_param scsi;
 	} param;
 	uint8_t		unused[16];
-} __packed;
-
-/*
- * Layout of block pointer for linear devices
- * e.g. SCSI
- */
-/* Layout of SCSI disk block pointer */
-struct linear_blockptr {
-	uint64_t blockno;
-	uint16_t size;
-	uint16_t blockct;
-	uint8_t reserved[4];
-} __packed;
-
-/*
- * Layout of block pointer for cylinder/head/sector devices
- * e.g. SCSI or FBA
- */
-/* Layout of ECKD disk block pointer */
-struct eckd_blockptr {
-	uint16_t cyl;
-	uint16_t head;
-	uint8_t sec;
-	uint16_t size;
-	uint8_t blockct;
-	uint8_t reserved[8];
 } __packed;
 
 struct boot_info_bp_ipl {
