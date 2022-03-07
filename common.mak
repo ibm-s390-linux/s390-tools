@@ -96,7 +96,7 @@ ifeq ("${W}","1")
 	DEFAULT_CFLAGS += -Wextra -Wshadow -Wundef -Wuninitialized -Wdouble-promotion -Wconversion
 endif
 ifeq ("${D}","1")
-	DEFAULT_CFLAGS += -Og
+	DEFAULT_CFLAGS += -Og -g3 -ggdb3
 else
 	DEFAULT_CFLAGS += -O3
 endif
