@@ -382,6 +382,7 @@ CONFIGFILES="\
   /etc/lvm\
   /etc/modprobe.conf*\
   /etc/modprobe.d\
+  /etc/modules-load.d/*.conf\
   /etc/mtab\
   /etc/multipath\
   /etc/network\
@@ -404,7 +405,10 @@ CONFIGFILES="\
   /etc/xinet.d\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
   /lib/systemd/system/docker.service\
+  /usr/lib/modules-load.d/*.conf\
   /usr/lib/systemd/system\
+  /usr/local/lib/modules-load.d/*.conf\
+  /run/modules-load.d/*.conf\
   /run/udev/chreiplzfcpmp-ipl-volume-id\
   /run/udev/rules.d\
   "

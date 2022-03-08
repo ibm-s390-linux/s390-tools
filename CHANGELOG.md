@@ -14,6 +14,7 @@ Release history for s390-tools (MIT version)
       build environments without access to `pandoc`
   - dbginfo.sh: Add multipath info to map paths to FC addressing and prio group
   - dbginfo.sh: Sort list of environment variables for readability
+  - dbginfo.sh: Collect config files of systemd-modules-load.service
 
   Bug Fixes:
 
