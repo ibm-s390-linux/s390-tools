@@ -17,6 +17,7 @@ Release history for s390-tools (MIT version)
   - dbginfo.sh: Collect config files of systemd-modules-load.service
 
   Bug Fixes:
+  - dbginfo.sh: Collect all places where modprobe.d config files could exist
 
 * __v2.20.0 (2022-02-04)__
 

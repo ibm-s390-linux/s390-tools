@@ -403,11 +403,15 @@ CONFIGFILES="\
   /etc/systemd\
   /etc/udev*\
   /etc/xinet.d\
+  /lib/modprobe.d\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
   /lib/systemd/system/docker.service\
+  /usr/lib/modprobe.d\
   /usr/lib/modules-load.d/*.conf\
   /usr/lib/systemd/system\
+  /usr/local/lib/modprobe.d\
   /usr/local/lib/modules-load.d/*.conf\
+  /run/modprobe.d\
   /run/modules-load.d/*.conf\
   /run/udev/chreiplzfcpmp-ipl-volume-id\
   /run/udev/rules.d\
