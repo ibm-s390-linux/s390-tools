@@ -1,6 +1,6 @@
 .\" zcryptctl.8
 .\"
-.\" Copyright 2018 IBM Corp.
+.\" Copyright 2018, 2022 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -10,7 +10,7 @@
 .\"   nroff -man zcryptctl.8
 .\" to process this source
 .\"
-.TH ZCRYPTCTL 8 "AUG 2018" "s390-tools"
+.TH ZCRYPTCTL 8 "JAN 2022" "s390-tools"
 .SH NAME
 zcryptctl \- display information and administrate zcrypt multiple device nodes
 .SH SYNOPSIS
@@ -35,6 +35,11 @@ zcryptctl \- display information and administrate zcrypt multiple device nodes
 .B deldom
 .I node-name domain-nr
 .TP
+.B zcryptctl addctrl
+.R |
+.B delctrl
+.I node-name domain-nr
+.TP
 .B zcryptctl addioctl
 .R |
 .B delioctl
@@ -57,6 +62,7 @@ driver. Each zcrypt device node can be restricted in terms of crypto
 cards, domains, and available ioctls. Such a device node can be used
 as a base for container solutions like Docker to control and restrict
 the access to crypto resources.
+See the NOTES section below for information on control domains.
 .SH COMMANDS
 .TP 8
 .B zcryptctl list
@@ -96,6 +102,14 @@ Update the filter for the specified zcrypt device node and add or
 delete a domain to be accessible through this node. The symbol
 \fBALL\fP can be used to enable or disable all domains.
 .TP
+.B zcryptctl addctrl
+.R |
+.B delctrl
+.I node-name domain-nr
+Update the filter for the specified zcrypt device node and add or
+delete a control domain to be accessible through this node. The symbol
+\fBALL\fP can be used to enable or disable all domains.
+.TP
 .B zcryptctl addioctl
 .R |
 .B delioctl
@@ -116,19 +130,20 @@ line and the settings are applied. Syntax is simple:
 .IP "node=<node-name>"
 .IP "aps=<list of ap numbers separated by space, tab or ','>"
 .IP "doms=<list of domain numbers separated by space, tab or ','>"
+.IP "ctrls=<list of control domain numbers separated by space, tab or ','>"
 .IP "ioctls=<list of ioctl as numeric or symbolic number separated by space, tab or ','>"
 .LP
 Empty lines are ignored and the '#' marks the rest of the
 line as comment.
 .LP
 The \fBnode=\fP line creates a new zcrypt device node, the \fBaps=\fP,
-\fBdoms=\fP and \fBioctls=\fP lines customize the previously created
-node. The symbol \fBALL\fP is also recognized for aps, doms, and
-ioctls.
+\fBdoms=\fP, \fBctrls=\fP and \fBioctls=\fP lines customize the
+previously created node. The symbol \fBALL\fP is also recognized for
+aps, doms, and ioctls.
 .LP
 Each action must fit into one line, spreading over multiple lines is
-not supported. But you can use more than one \fBaps=\fP, \fBdoms=\fP
-and \fBioctls=\fP lines to customize the very same node.
+not supported. But you can use more than one \fBaps=\fP, \fBdoms=\fP,
+\fBctrls=\fP and \fBioctls=\fP lines to customize the very same node.
 .LP
 Processing stops when a line cannot be parsed or the current action
 fails. In this case the exit status is non zero but the successful
@@ -139,6 +154,17 @@ actions until the failure occurs are not rolled back.
 List the current configuration in a form suitable for input to the
 \fBzcryptctl config\fP command.
 .LP
+.SH NOTES
+
+Control domain filtering is only supported for custom device
+<nodename> if the \fBadmask\fP file in sysfs under
+/sys/class/zcrypt/<nodename>/admask exists.  If this file does not
+exist, the kernel is too old and does not support control command
+filtering.  This is the same effect as setting the control domain mask
+to ALL.  Note that, even though you can allow more than available to
+the system, you can only send control commands to control domains
+available to the system.
+
 .SH EXIT STATUS
 On successful completion of the command the exit status is 0. A non
 zero return code (and some kind of failure message) is emitted if the

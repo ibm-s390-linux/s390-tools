@@ -2,7 +2,7 @@
  * zcryptctl - Maintain zcrypt multi device nodes.
  *
  * by Harald Freudenberger <freude@linux.ibm.com>
- * Copyright IBM Corp. 2018
+ * Copyright IBM Corp. 2018, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -58,6 +58,8 @@
 #define CMD_DEL_IOCTL  0x0009
 #define CMD_CONFIG     0x000A
 #define CMD_LISTCONFIG 0x000B
+#define CMD_ADD_CTRL   0x000C
+#define CMD_DEL_CTRL   0x000D
 
 /*
  * Program configuration
@@ -70,7 +72,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2018,
-			.pub_last = 2018,
+			.pub_last = 2022,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -346,6 +348,18 @@ static int cmd_list(int cmd,
 				printf("%c%d", n++ == 0 ? tab : ',', i);
 		putchar('\n');
 		if (cmd == CMD_LISTCONFIG)
+			printf(" ctrls =");
+		else
+			printf("  control domains:");
+		if (read_dn_attr(de->d_name, "admask", buf, sizeof(buf)) != 0)
+			errx(EXIT_FAILURE,
+			     "Could not fetch admask attribute from sysfs for zcrypt node '%s'",
+			     de->d_name);
+		for (i = n = 0; i < MAX_ZDEV_DOMAINS_EXT; i++)
+			if (test_bit(i, buf))
+				printf("%c%d", n++ == 0 ? tab : ',', i);
+		putchar('\n');
+		if (cmd == CMD_LISTCONFIG)
 			printf(" ioctls =");
 		else
 			printf("  ioctls:");
@@ -526,6 +540,52 @@ static int cmd_add_del_dom(int cmd, const char *node, const char *arg)
 	return 0;
 }
 
+static void add_del_ctrl(int cmd, const char *node, int dom)
+{
+	int rc;
+	char buf[PATH_MAX];
+
+	if (cmd == CMD_ADD_CTRL)
+		sprintf(buf, "+%d", dom);
+	else
+		sprintf(buf, "-%d", dom);
+	rc = write_dn_attr(node, "admask", buf);
+	if (rc != 0)
+		errx(EXIT_FAILURE,
+		     "Could not write into sysfs entry to %s domain %d for zdev node '%s'",
+		     cmd == CMD_ADD_CTRL ? "add" : "remove", dom, node);
+}
+
+static int cmd_add_del_ctrl(int cmd, const char *node, const char *arg)
+{
+	int dom, all = 0;
+
+	if (strcasecmp(arg, "ALL") == 0) {
+		all = 1;
+	} else {
+		if (sscanf(arg, "%i", &dom) != 1)
+			errx(EXIT_FAILURE,
+			     "Invalid domain argument '%s'", arg);
+		if (dom < 0 || dom >= MAX_ZDEV_DOMAINS_EXT)
+			errx(EXIT_FAILURE,
+			     "Domain argument '%s' out of range [0..%d]",
+			     arg, MAX_ZDEV_DOMAINS_EXT - 1);
+	}
+
+	if (!all) {
+		add_del_ctrl(cmd, node, dom);
+		printf("Control domain %d %s\n", dom,
+		       (cmd == CMD_ADD_CTRL ? "added" : "removed"));
+	} else {
+		for (dom = 0; dom < MAX_ZDEV_DOMAINS_EXT; dom++)
+			add_del_ctrl(cmd, node, dom);
+		printf("All control domains %s\n",
+		       (cmd == CMD_ADD_CTRL ? "added" : "removed"));
+	}
+
+	return 0;
+}
+
 static void add_del_ioctl(int cmd, const char *node, int ioctlnr)
 {
 	int rc;
@@ -700,6 +760,28 @@ static int cmd_config(int cmd _UNUSED_,
 				while (isblank(*p) || *p == ',')
 					p++;
 			}
+		} else if (_match_keyword(&p, "ctrls")) {
+			if (!havenode)
+				errx(EXIT_FAILURE,
+				     "Missing node=... before processing any ctrls=... statements in line %d '%s'",
+				     nr, line);
+			if (!_match_character(&p, '='))
+				errx(EXIT_FAILURE,
+				     "Missing '=' at '%-8.8s...' in line %d '%s'",
+				     p, nr, line);
+			while (1) {
+				while (isspace(*p))
+					p++;
+				if (*p == '\0' || *p == '#')
+					break;
+				if (!_match_string(&p, buf))
+					errx(EXIT_FAILURE,
+					     "Missing argument(s) for ctrls=... at '%-8.8s...' in line %d '%s'",
+					     p, nr, line);
+				cmd_add_del_ctrl(CMD_ADD_CTRL, node, buf);
+				while (isblank(*p) || *p == ',')
+					p++;
+			}
 		} else if (_match_keyword(&p, "ioctls")) {
 			if (!havenode)
 				errx(EXIT_FAILURE,
@@ -816,6 +898,28 @@ static struct zcryptctl_cmds_s {
 		"remove a crypto domain from the allowed domains list. The\n"
 		"domain argument may be a number in the range 0-255 or the\n"
 		"symbol ALL.",
+	},
+	{
+		.cmd = CMD_ADD_CTRL,
+		.command = "addctrl",
+		.function = cmd_add_del_ctrl,
+		.usage = "zcryptctl addctrl <domain>",
+		.description =
+		"Update the filter for the specified zcrypt device node and\n"
+		"add a crypto control domain to be accessible via this node.\n"
+		"The domain argument may be a number in the range 0-255 or\n"
+		"the symbol ALL.",
+	},
+	{
+		.cmd = CMD_DEL_CTRL,
+		.command = "delctrl",
+		.function = cmd_add_del_ctrl,
+		.usage = "zcryptctl delctrl <domain>",
+		.description =
+		"Update the filter for the specified zcrypt device node and\n"
+		"remove a crypto control domain from the allowed domains list.\n"
+		"The domain argument may be a number in the range 0-255 or\n"
+		"the symbol ALL.",
 	},
 	{
 		.cmd = CMD_ADD_IOCTL,
@@ -992,6 +1096,19 @@ int main(int argc, char *argv[])
 		break;
 	case CMD_ADD_DOM:
 	case CMD_DEL_DOM:
+		if (optind + 1 >= argc)
+			errx(EXIT_FAILURE, "Missing node name argument");
+		if (optind + 2 >= argc)
+			errx(EXIT_FAILURE, "Missing domain argument");
+		if (check_nodename(argv[optind + 1]) != 0)
+			errx(EXIT_FAILURE, "Invalid or unknown nodename '%s'",
+			     argv[optind + 1]);
+		rc = zcryptctl_cmds[cmdindex].function(c,
+						       argv[optind + 1],
+						       argv[optind + 2]);
+		break;
+	case CMD_ADD_CTRL:
+	case CMD_DEL_CTRL:
 		if (optind + 1 >= argc)
 			errx(EXIT_FAILURE, "Missing node name argument");
 		if (optind + 2 >= argc)
