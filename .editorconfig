@@ -11,3 +11,11 @@ tab_width = 8
 
 [*.sh]
 shell_variant = bash  # used by `shfmt`
+
+[*.y{a,}ml]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4
