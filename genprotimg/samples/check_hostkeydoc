@@ -48,13 +48,21 @@ set -e
 usage()
 {
 cat <<-EOF
-Usage: `basename $1` host-key-doc signing-key-cert [-c CA-cert] [-r CRL]
+Usage: `basename $1` [-d] [-c CA-cert] [-r CRL] host-key-doc signing-key-cert
 
 Verify an IBM Secure Execution host key document against
 a signing key.
 
+Options:
+-d         disable default issuer check of host-key-doc
+-c CA-cert trusted CA certificate
+-r CRL     list of revoked host-key-docs
+
 Note that in order to have the full trust chain verified
-it is necessary to provide the issueing CA's certificate.
+it is necessary to provide the issuing CA's certificate.
+The default issuer check may be disabled if a non-default
+signing key certificate needs to be verified against the
+CA certificate.
 
 EOF
 }
@@ -146,7 +154,10 @@ verify_default_issuer()
 
 verify_issuer_files()
 {
-    verify_default_issuer
+    if [ $1 -eq 1  ]
+    then
+       verify_default_issuer
+    fi
 
     if diff $ISSUER_DN_FILE $SUBJECT_DN_FILE
     then
@@ -208,14 +219,16 @@ check_file()
 # check args
 CRL_FILE=
 CA_FILE=
+CHECK_DEFAULT_ISSUER=1
 
-args=$(getopt -qu "r:c:h" $*)
+args=$(getopt -qu "dr:c:h" $*)
 if [ $? = 0 ]
 then
     set -- $args
     while [ $1 != "" ]
     do
         case $1 in
+            -d) CHECK_DEFAULT_ISSUER=0; shift;;
             -r) CRL_FILE=$2; shift 2;;
             -c) CA_FILE=$2; shift 2;;
             -h) usage $0; exit 0;;
@@ -256,7 +269,7 @@ exit 1
 # Verify the issuer
 canonical_dn x509 $HKD_FILE issuer $ISSUER_DN_FILE
 canonical_dn x509 $HKSK_FILE subject $SUBJECT_DN_FILE
-verify_issuer_files
+verify_issuer_files $CHECK_DEFAULT_ISSUER
 
 # Verify dates
 verify_dates $(cert_time $HKD_FILE startdate) $(cert_time $HKD_FILE enddate)
@@ -273,7 +286,7 @@ then
     echo -n "CRL "
     canonical_dn crl $CRL_FILE issuer $ISSUER_DN_FILE
     canonical_dn x509 $HKSK_FILE subject $SUBJECT_DN_FILE
-    verify_issuer_files
+    verify_issuer_files $CHECK_DEFAULT_ISSUER
 
     verify_dates $(crl_time $CRL_FILE lastupdate) $(crl_time $CRL_FILE nextupdate) 'CRL'
 
