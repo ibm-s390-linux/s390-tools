@@ -23,6 +23,7 @@ BODY_FILE=$(mktemp)
 ISSUER_DN_FILE=$(mktemp)
 SUBJECT_DN_FILE=$(mktemp)
 DEF_ISSUER_DN_FILE=$(mktemp)
+CANONICAL_ISSUER_DN_FILE=$(mktemp)
 CRL_SERIAL_FILE=$(mktemp)
 
 # Cleanup on exit
@@ -30,7 +31,7 @@ cleanup()
 {
     rm -f $ISSUER_PUBKEY_FILE $SIGNATURE_FILE $BODY_FILE \
         $ISSUER_DN_FILE $SUBJECT_DN_FILE $DEF_ISSUER_DN_FILE \
-        $CRL_SERIAL_FILE
+        $CANONICAL_ISSUER_DN_FILE $CRL_SERIAL_FILE
 }
 trap cleanup EXIT
 
@@ -121,20 +122,31 @@ default_issuer()
     commonName                = International Business Machines Corporation
     countryName               = US
     localityName              = Poughkeepsie
-    organizationalUnitName    = IBM Z Host Key Signing Service
+    organizationalUnitName    = Key Signing Service
     organizationName          = International Business Machines Corporation
     stateOrProvinceName       = New York
 EOF
 }
 
-verify_issuer_files()
+# As organizationalUnitName can have an arbitrary prefix but must
+# end with "Key Signing Service" let's normalize the OU name by
+# stripping off the prefix
+verify_default_issuer()
 {
     default_issuer > $DEF_ISSUER_DN_FILE
 
-    if ! diff $ISSUER_DN_FILE $DEF_ISSUER_DN_FILE
+    sed "s/\(^[ ]*organizationalUnitName[ ]*=[ ]*\).*\(Key Signing Service$\)/\1\2/" \
+	$ISSUER_DN_FILE > $CANONICAL_ISSUER_DN_FILE
+
+    if ! diff $CANONICAL_ISSUER_DN_FILE $DEF_ISSUER_DN_FILE
     then
         echo Incorrect default issuer >&2 && exit 1
     fi
+}
+
+verify_issuer_files()
+{
+    verify_default_issuer
 
     if diff $ISSUER_DN_FILE $SUBJECT_DN_FILE
     then
