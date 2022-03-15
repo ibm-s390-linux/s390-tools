@@ -754,7 +754,7 @@ static int cmd_config(int cmd _UNUSED_,
 					break;
 				if (!_match_string(&p, buf))
 					errx(EXIT_FAILURE,
-					     "Missing argument(s) for aps=... at '%-8.8s...' in line %d '%s'",
+					     "Missing argument(s) for doms=... at '%-8.8s...' in line %d '%s'",
 					     p, nr, line);
 				cmd_add_del_dom(CMD_ADD_DOM, node, buf);
 				while (isblank(*p) || *p == ',')
@@ -892,7 +892,7 @@ static struct zcryptctl_cmds_s {
 		.cmd = CMD_DEL_DOM,
 		.command = "deldom",
 		.function = cmd_add_del_dom,
-		.usage = "zcryptctl deldom <adapter>",
+		.usage = "zcryptctl deldom <domain>",
 		.description =
 		"Update the filter for the specified zcrypt device node and\n"
 		"remove a crypto domain from the allowed domains list. The\n"
