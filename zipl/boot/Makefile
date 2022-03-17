@@ -118,7 +118,7 @@ data.h: data.o
 				echo "extern char $$SYMBOL;" >>data.h; done
 
 clean:
-	rm -f *.o *.exec *.bin $(FILES) data.o data.h tape0.bin *.xxx *.yyy \
-	      stage3.bin *.lds *.lds.d
+	rm -f -- *.o *.exec *.bin $(FILES) data.o data.h tape0.bin *.xxx *.yyy \
+	      stage3.bin *.lds .*.lds.d
 
 .PHONY: all clean
