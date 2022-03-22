@@ -69,6 +69,11 @@ Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsig
 	size_t phdrs_size;
 	Elf64_Phdr *phdrs;
 
+	if (!phnum) {
+		*phdr_count = phnum;
+		return NULL;
+	}
+
 	/* Cannot wraparound since `Elf64_Half`` is `uint16_t` */
 	phdrs_size = sizeof(*phdrs) * phnum;
 	phdrs = util_malloc(phdrs_size);
