@@ -556,7 +556,6 @@ static int open_dump(void)
 	}
 	if (mv_dumper_read() != 0)
 		return -ENODEV;
-	zg_close(g.fh);
 	return 0;
 }
 
