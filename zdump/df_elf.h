@@ -21,6 +21,10 @@
 #include "zg.h"
 #include "dfi.h"
 
+#ifndef ELF_VERSION_1
+#define ELF_VERSION_1 0x1
+#endif
+
 /*
  * S390 CPU timer note (u64)
  */

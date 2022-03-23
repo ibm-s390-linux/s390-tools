@@ -16,13 +16,13 @@ void *ehdr_init(Elf64_Ehdr *ehdr, Elf64_Half phnum)
 	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
 	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
 	ehdr->e_ident[EI_DATA] = ELFDATA2MSB;
-	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+	ehdr->e_ident[EI_VERSION] = ELF_VERSION_1;
 	ehdr->e_ident[EI_OSABI] = ELFOSABI_SYSV;
 	ehdr->e_ident[EI_ABIVERSION] = 0;
 	memset(ehdr->e_ident+EI_PAD, 0, EI_NIDENT-EI_PAD);
 	ehdr->e_type = ET_CORE;
 	ehdr->e_machine = EM_S390;
-	ehdr->e_version = EV_CURRENT;
+	ehdr->e_version = ELF_VERSION_1;
 	ehdr->e_entry = 0;
 	ehdr->e_phoff = sizeof(Elf64_Ehdr);
 	ehdr->e_shoff = 0;
