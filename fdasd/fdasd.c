@@ -408,8 +408,10 @@ static int read_line(void)
 {
 	bzero(line_buffer, LINE_LENGTH);
 	line_ptr = line_buffer;
-	if (!fgets(line_buffer, LINE_LENGTH, stdin))
+	if (!fgets(line_buffer, LINE_LENGTH, stdin)) {
+		clearerr(stdin);
 		return 0;
+	}
 	while (*line_ptr && !isgraph(*line_ptr))
 		line_ptr++;
 
