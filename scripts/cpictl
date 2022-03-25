@@ -245,6 +245,11 @@ get_system_level()
 	read -r d_major d_minor d_minor2 <<< "$(split_version "$ver_str" "._-" 3)"
 	read -r k_ver k_patchlvl k_sublvl k_sublvl2 <<< "$(split_kver "$kver_str" 4)"
 
+	# Handle excessive sublevel numbers consistently
+	if [[ "$k_sublvl2" -gt 65535 ]] ; then
+		k_sublvl2=0
+	fi
+
 	# Apply distro-specific logic
 	case "$distro" in
 	"rhel")
