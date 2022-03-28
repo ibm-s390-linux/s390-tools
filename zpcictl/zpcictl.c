@@ -337,7 +337,7 @@ static void sclp_issue_action(struct zpci_device *pdev, int action)
  */
 static void sclp_reset_device(struct zpci_device *pdev)
 {
-	sclp_issue_action(pdev, SCLP_ERRNOTIFY_AQ_RESET);
+	sclp_issue_action(pdev, SCLP_ERRNOTIFY_AQ_REPORT_ERR);
 	sysfs_write_value(pdev, "recover", 1);
 }
 
