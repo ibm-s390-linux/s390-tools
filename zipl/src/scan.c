@@ -40,7 +40,6 @@
 #include "misc.h"
 #include "scan.h"
 
-
 /* Determines which keyword may be present in which section */
 enum scan_key_state scan_key_table[SCAN_SECTION_NUM][SCAN_KEYWORD_NUM] = {
 /*	 defa dump dump imag para parm ramd segm targ prom time defa tape mv
@@ -1318,7 +1317,7 @@ static char *scan_get_default_target(struct scan_token *scan)
 
 #define BLS_TOKEN_MAX 5 /* section heading, image, ramdisk, parameter, target */
 
-int scan_bls(const char *blsdir, struct scan_token **token, int scan_size)
+int scan_bls(struct scan_token **token, int scan_size)
 {
 	int size, remaining = 0, n, current, rc = -1, count = 0;
 	struct scan_token *array = *token;

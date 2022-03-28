@@ -30,6 +30,8 @@
 #include "zipl.h"
 #include "envblk.h"
 
+const char *blsdir;
+
 /* Command line options */
 static struct option options[] = {
 	{ "config",		required_argument,	NULL, 'c'},
@@ -1732,7 +1734,6 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	struct scan_token* scan;
 	struct scan_token* new_scan;
 	const char *filename = NULL;
-	char *blsdir;
 	char* source;
 	int i, rc, scan_size;
 
@@ -1772,7 +1773,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 	} else {
 		blsdir = ZIPL_DEFAULT_BLSDIR;
 	}
-	rc = scan_bls(blsdir, &scan, scan_size);
+	rc = scan_bls(&scan, scan_size);
 	if (rc) {
 		error_text("BLS parsing '%s'", blsdir);
 		return rc;
