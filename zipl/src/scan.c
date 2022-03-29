@@ -10,6 +10,7 @@
  *
  */
 
+static const char *VERSION_KEYWORD = "version";
 
 /* Need ISOC99 function isblank() in ctype.h */
 #ifndef __USE_ISOC99
@@ -645,7 +646,7 @@ scan_file(const char* filename, struct scan_token** token)
 
 
 static int
-bls_filter(const struct dirent *ent)
+bls_filter_by_names(const struct dirent *ent)
 {
 	int offset = strlen(ent->d_name) - strlen(".conf");
 
@@ -655,13 +656,111 @@ bls_filter(const struct dirent *ent)
 	return strncmp(ent->d_name + offset, ".conf", strlen(".conf")) == 0;
 }
 
+struct version {
+	char *line; /* pointer to a line with version keyword */
+	int offset; /* offset of version value in the line */
+};
+
+/*
+ * Locate version in bls file represented by ENT
+ */
+static void get_version(const struct dirent *ent, struct version *v)
+{
+	char *line = NULL;
+	size_t len = 0;
+	char *d_name;
+	FILE *stream;
+	ssize_t read;
+
+	memset(v, 0, sizeof(*v));
+	d_name = misc_make_path((char *)blsdir, (char *)ent->d_name);
+	if (!d_name)
+		return;
+
+	stream = fopen(d_name, "r");
+	free(d_name);
+	if (!stream)
+		return;
+
+	while ((read = getline(&line, &len, stream)) != -1) {
+		if (line[read - 1] == '\n') {
+			line[read - 1] = '\0';
+			read--;
+		}
+		if ((size_t)read <= strlen(VERSION_KEYWORD) + 1)
+			continue;
+		if (strcmp(VERSION_KEYWORD, line) > 0)
+			continue;
+		if (!isblank(line[strlen(VERSION_KEYWORD)]))
+			continue;
+		/* skip blanks */
+		v->offset = strlen(VERSION_KEYWORD) + 1;
+		while (v->offset < read - 1 && isblank(line[v->offset]))
+			v->offset++;
+		if (isblank(line[v->offset]))
+			/*
+			 * all characters after the keyword
+			 * are blanks. Invalid version
+			 */
+			continue;
+		v->line = line;
+		fclose(stream);
+		return;
+	}
+	free(line);
+	fclose(stream);
+}
+
+static void put_version(struct version *v)
+{
+	free(v->line);
+}
+
+/**
+ * Check version in bls file represented by ENT.
+ * Return 1 if version is valid. Otherwise return 0
+ */
+static int bls_filter_by_versions(const struct dirent *ent)
+{
+	struct version v;
+
+	if (bls_filter_by_names(ent) == 0)
+		return 0;
+
+	get_version(ent, &v);
+	if (v.line) {
+		put_version(&v);
+		return 1;
+	}
+	return 0;
+}
+
 
 static int
-bls_sort(const struct dirent **ent_a, const struct dirent **ent_b)
+bls_sort_by_names(const struct dirent **ent_a, const struct dirent **ent_b)
 {
 	return strverscmp((*ent_a)->d_name, (*ent_b)->d_name);
 }
 
+static int
+bls_sort_by_versions(const struct dirent **ent_a, const struct dirent **ent_b)
+{
+	struct version v1, v2;
+	int ret;
+
+	get_version(*ent_a, &v1);
+	get_version(*ent_b, &v2);
+	/*
+	 * Both versions are valid.
+	 * It is guaranteed by bls_filter_by_versions()
+	 */
+	ret = strverscmp(v1.line + v1.offset, v2.line + v2.offset);
+
+	put_version(&v1);
+	put_version(&v2);
+
+	return ret;
+}
 
 static int
 scan_append_section_heading(struct scan_token* scan, int* index, char* name);
@@ -1011,6 +1110,40 @@ scan_count_target_keywords(char* keyword[])
 	return num;
 }
 
+static int bls_scandir(struct dirent ***bls_entries)
+{
+	struct dirent **entries1;
+	struct dirent **entries2;
+	int n1, n2;
+
+	/* arrange by names */
+	n1 = scandir(blsdir, &entries1,
+		     bls_filter_by_names, bls_sort_by_names);
+	if (n1 <= 0)
+		return n1;
+	/* arrange by versions */
+	n2 = scandir(blsdir, &entries2,
+		     bls_filter_by_versions, bls_sort_by_versions);
+
+	if (n2 <= 0 || n2 < n1) {
+		/*
+		 * failed to sort by versions,
+		 * fall back to sorting by filenames
+		 */
+		*bls_entries = entries1;
+		while (n2--)
+			free(entries2[n2]);
+		free(entries2);
+		return n1;
+	}
+	/* use arrangement by versions */
+	*bls_entries = entries2;
+	while (n1--)
+		free(entries1[n1]);
+	free(entries1);
+	return n2;
+}
+
 int
 scan_check_target_data(char* keyword[], int* line)
 {
@@ -1331,7 +1464,7 @@ int scan_bls(struct scan_token **token, int scan_size)
 	if (!(stat(blsdir, &sb) == 0 && S_ISDIR(sb.st_mode)))
 		return 0;
 
-	n = scandir(blsdir, &bls_entries, bls_filter, bls_sort);
+	n = bls_scandir(&bls_entries);
 	if (n <= 0)
 		return n;
 
