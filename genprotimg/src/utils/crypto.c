@@ -1079,8 +1079,8 @@ int store_set_verify_param(X509_STORE *store, GError **err)
 		g_abort();
 
 	/* The maximum depth level of the chain of trust for the verification of
-	 * the IBM Z signing key is 2, i.e. IBM Z signing key -> (DigiCert)
-	 * intermediate CA -> (DigiCert) root CA
+	 * the IBM Z signing key is 2, i.e. IBM Z signing key -> intermediate CA
+	 * -> root CA
 	 */
 	X509_VERIFY_PARAM_set_depth(param, 2);
 
@@ -1267,46 +1267,38 @@ static int security_level_to_bits(int level)
 	return security_bits[level];
 }
 
-static ASN1_OCTET_STRING *digicert_assured_id_root_ca;
-
-const ASN1_OCTET_STRING *get_digicert_assured_id_root_ca_skid(void)
-{
-	pv_crypto_init();
-	return digicert_assured_id_root_ca;
-}
-
 /* Used for the caching of the downloaded CRLs */
 static GHashTable *cached_crls;
 
 void pv_crypto_init(void)
 {
-	if (digicert_assured_id_root_ca)
+	if (cached_crls)
 		return;
-
 	cached_crls = g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
 					    (GDestroyNotify)X509_CRL_free);
-	digicert_assured_id_root_ca = s2i_ASN1_OCTET_STRING(
-		NULL, NULL, DIGICERT_ASSURED_ID_ROOT_CA_SKID);
 }
 
 void pv_crypto_cleanup(void)
 {
-	if (!digicert_assured_id_root_ca)
+	if (!cached_crls)
 		return;
 	g_clear_pointer(&cached_crls, g_hash_table_destroy);
-	g_clear_pointer(&digicert_assured_id_root_ca, ASN1_OCTET_STRING_free);
 }
 
 gint check_chain_parameters(const STACK_OF_X509 *chain,
-			    const ASN1_OCTET_STRING *skid, GError **err)
+			    GError **err)
 {
-	const ASN1_OCTET_STRING *ca_skid = NULL;
+	const X509_NAME *ca_x509_subject = NULL;
+	g_autofree gchar *ca_subject = NULL;
 	gint len = sk_X509_num(chain);
 	X509 *ca = NULL;
 
-	g_assert(skid);
 	/* at least one root and one leaf certificate must be defined */
-	g_assert(len >= 2);
+	if (len < 2) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+			    _("there must be at least on root and one leaf certificate in the chain of trust"));
+		return -1;
+	}
 
 	/* get the root certificate of the chain of trust */
 	ca = sk_X509_value(chain, len - 1);
@@ -1316,19 +1308,21 @@ gint check_chain_parameters(const STACK_OF_X509 *chain,
 		return -1;
 	}
 
-	ca_skid = X509_get0_subject_key_id(ca);
-	if (!ca_skid) {
-		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_MALFORMED_ROOT_CA,
-			    _("malformed root certificate"));
+	ca_x509_subject = X509_get_subject_name(ca);
+	if (!ca_x509_subject) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+			    _("subject of the root CA cannot be retrieved"));
 		return -1;
 	}
 
-	if (ASN1_STRING_cmp(ca_skid, skid) != 0) {
-		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_WRONG_CA_USED,
-			    _("expecting DigiCert root CA to be used"));
+	ca_subject = X509_NAME_oneline(ca_x509_subject, NULL, 0);
+	if (!ca_subject) {
+		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+			    _("subject name of the root CA cannot be retrieved"));
 		return -1;
 	}
 
+	g_info("Root CA used: '%s'", ca_subject);
 	return 0;
 }
 

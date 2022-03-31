@@ -125,7 +125,6 @@ int check_crl_valid_for_cert(X509_CRL *crl, X509 *cert,
 			     gint verify_flags, GError **err);
 void pv_crypto_init(void);
 void pv_crypto_cleanup(void);
-const ASN1_OCTET_STRING *get_digicert_assured_id_root_ca_skid(void);
 gint verify_host_key(X509 *host_key, GSList *issuer_pairs,
 		     gint verify_flags, int level, GError **err);
 X509 *load_cert_from_file(const char *path, GError **err);
@@ -138,8 +137,7 @@ X509_STORE *store_setup(const gchar *root_ca_path,
 int store_set_verify_param(X509_STORE *store, GError **err);
 X509_CRL *load_crl_by_cert(X509 *cert, GError **err);
 STACK_OF_X509_CRL *try_load_crls_by_certs(GSList *certs_with_path);
-gint check_chain_parameters(const STACK_OF_X509 *chain,
-			    const ASN1_OCTET_STRING *skid, GError **err);
+gint check_chain_parameters(const STACK_OF_X509 *chain, GError **err);
 X509_NAME *c2b_name(const X509_NAME *name);
 
 STACK_OF_X509 *delete_ibm_signing_certs(STACK_OF_X509 *certs);

@@ -123,7 +123,7 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 	     g_strv_length(args->untrusted_cert_paths) == 0)) {
 		g_set_error(
 			err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
-			_("Either specify the IBM Z signing key and (DigiCert) intermediate CA certificate\n"
+			_("Either specify the IBM Z signing key and intermediate CA certificate\n"
 			  "by using the '--cert' option, or use the '--no-verify' flag to disable the\n"
 			  "host-key document verification completely (at your own risk)."));
 		return -1;

@@ -29,9 +29,6 @@
  */
 #define PV_CERTS_SECURITY_LEVEL 2
 
-/* SKID for DigiCert Assured ID Root CA */
-#define DIGICERT_ASSURED_ID_ROOT_CA_SKID "45EBA2AFF492CB82312D518BA7A7219DF36DC80F"
-
 union ecdh_pub_key {
 	struct {
 		uint8_t x[80];

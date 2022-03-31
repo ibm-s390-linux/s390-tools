@@ -311,9 +311,10 @@ static gint pv_img_hostkey_verify(GSList *host_key_certs,
 	}
 
 	/* Load all untrusted certificates (e.g. IBM Z signing key and
-	 * DigiCert intermediate CA) that are required to establish a chain of
-	 * trust starting from the host-key document up to the root CA (if not
-	 * otherwise specified that's the DigiCert Assured ID Root CA).
+	 * intermediate CA) that are required to establish a chain of trust
+	 * starting from the host-key document up to the root CA (if not
+	 * otherwise specified that can be one of the system wide installed
+	 * root CAs, e.g. DigiCert).
 	 */
 	untrusted_certs_with_path = load_certificates(untrusted_cert_paths, err);
 	if (!untrusted_certs_with_path)
@@ -348,9 +349,8 @@ static gint pv_img_hostkey_verify(GSList *host_key_certs,
 	 * For this we must check:
 	 *
 	 * 1. Can a chain of trust be established ending in a root CA
-	 * 2. Is the correct root CA ued? It has either to be the
-	 *    'DigiCert Assured ID Root CA' or the root CA specified via
-	 *    command line.
+	 * 2. Is the correct root CA used? It has either to be a system CA
+	 *    or the root CA specified via command line.
 	 */
 	for (gint i = 0; i < sk_X509_num(ibm_signing_certs); ++i) {
 		X509 *ibm_signing_cert = sk_X509_value(ibm_signing_certs, i);
@@ -371,17 +371,12 @@ static gint pv_img_hostkey_verify(GSList *host_key_certs,
 		if (verify_cert(ibm_signing_cert, ctx, err) < 0)
 			goto error;
 
-		/* Verify the build chain of trust chain. If the user passes a
-		 * trusted root CA on the command line then the check for the
-		 * Subject Key Identifier (SKID) is skipped, otherwise let's
-		 * check if the SKID meets our expectation.
+		/* If there is a chain of trust using either the provided root
+		 * CA on the command line or a system wide trusted root CA.
 		 */
-		if (!root_ca_path &&
-		    check_chain_parameters(X509_STORE_CTX_get0_chain(ctx),
-					   get_digicert_assured_id_root_ca_skid(),
-					   err) < 0) {
+		if (check_chain_parameters(X509_STORE_CTX_get0_chain(ctx),
+					   err) < 0)
 			goto error;
-		}
 
 		ibm_signing_crls = store_ctx_find_valid_crls(ctx, ibm_signing_cert, err);
 		if (!ibm_signing_crls) {
@@ -595,7 +590,7 @@ PvImage *pv_img_new(PvArgs *args, const gchar *stage3a_path, GError **err)
 		g_warning(_("host-key document verification is disabled. Your workload is not secured."));
 
 	if (args->root_ca_path)
-		g_warning(_("A different root CA than the default DigiCert root CA is selected. Ensure that this root CA is trusted."));
+		g_warning(_("The root CA is selected through the command line. Ensure that this root CA is trusted."));
 
 	ret->comps = pv_img_comps_new(EVP_sha512(), EVP_sha512(), EVP_sha512(), err);
 	if (!ret->comps)
