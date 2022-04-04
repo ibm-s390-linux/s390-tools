@@ -1549,6 +1549,59 @@ int SK_EP11_reencipher_key(const struct sk_ext_ep11_lib *ep11_lib,
 		return -EIO;
 	}
 
+	memcpy(blob, lrb.payload, lrb.pllen);
+
+	/* re-encipher MACed SPKI */
+	rb.domain = domain;
+	lrb.domain = domain;
+
+	resp_len = sizeof(resp);
+	req_len = ep11.dll_xcpa_cmdblock(req, sizeof(req), XCP_ADM_REENCRYPT,
+					 &rb, NULL, key_token + hdr->len,
+					 key_token_length - hdr->len);
+	if (req_len < 0) {
+		sk_debug(debug, "Failed to build XCP command block");
+		return -EIO;
+	}
+
+	rv = ep11.dll_m_admin(resp, &resp_len, NULL, NULL, req, req_len, NULL,
+			      0, ep11_lib->target);
+	if (rv != CKR_OK || resp_len == 0) {
+		sk_debug(debug, "Command XCP_ADM_REENCRYPT failed. "
+			 "rc = 0x%lx, resp_len = %ld", rv, resp_len);
+		return -EIO;
+	}
+
+	rc = ep11.dll_xcpa_internal_rv(resp, resp_len, &lrb, &rv);
+	if (rc != 0) {
+		sk_debug(debug, "Failed to parse response. rc = %d", rc);
+		return -EIO;
+	}
+
+	if (rv != CKR_OK) {
+		sk_debug(debug, "Failed to re-encrypt the EP11 secure key. "
+			 "rc = 0x%lx", rv);
+		switch (rv) {
+		case CKR_IBM_WKID_MISMATCH:
+			sk_debug(debug, "The EP11 secure key is currently "
+				 "encrypted under a different master that does "
+				 "not match the master key in the CURRENT "
+				 "master key register of APQN %02X.%04X",
+				 card, domain);
+			break;
+		}
+		return -EIO;
+	}
+
+	if (key_token_length - hdr->len != lrb.pllen) {
+		sk_debug(debug, "Re-encrypted EP11 secure key size has "
+			 "changed: org-len: %lu, new-len: %lu",
+			 hdr->len - sizeof(*hdr), lrb.pllen);
+		return -EIO;
+	}
+
+	memcpy(key_token + hdr->len, lrb.payload, lrb.pllen);
+
 	return 0;
 }
 
