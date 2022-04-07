@@ -137,22 +137,19 @@ enum zg_check {
 	ZG_CHECK_NONE,
 };
 
-const char *zg_path(struct zg_fh *zg_fh);
-const struct stat *zg_stat(struct zg_fh *zg_fh);
+const char *zg_path(const struct zg_fh *zg_fh);
+const struct stat *zg_stat(const struct zg_fh *zg_fh);
 struct zg_fh *zg_open(const char *path, int flags, enum zg_check check);
 void zg_close(struct zg_fh *zg_fh);
-ssize_t zg_read(struct zg_fh *zg_fh, void *buf, size_t cnt,
-		enum zg_check check);
-ssize_t zg_gets(struct zg_fh *zg_fh, void *buf, size_t cnt,
-		enum zg_check check);
-u64 zg_size(struct zg_fh *zg_fh);
-off_t zg_tell(struct zg_fh *zg_fh, enum zg_check check);
-off_t zg_seek(struct zg_fh *zg_fh, off_t off, enum zg_check check);
-off_t zg_seek_end(struct zg_fh *zg_fh, off_t off, enum zg_check check);
-off_t zg_seek_cur(struct zg_fh *zg_fh, off_t off, enum zg_check check);
-int zg_ioctl(struct zg_fh *zg_fh, int rq, void *data, const char *op,
-	     enum zg_check check);
-enum zg_type zg_type(struct zg_fh *zg_fh);
+ssize_t zg_read(const struct zg_fh *zg_fh, void *buf, size_t cnt, enum zg_check check);
+ssize_t zg_gets(const struct zg_fh *zg_fh, void *buf, size_t cnt, enum zg_check check);
+u64 zg_size(const struct zg_fh *zg_fh);
+off_t zg_tell(const struct zg_fh *zg_fh, enum zg_check check);
+off_t zg_seek(const struct zg_fh *zg_fh, off_t off, enum zg_check check);
+off_t zg_seek_end(const struct zg_fh *zg_fh, off_t off, enum zg_check check);
+off_t zg_seek_cur(const struct zg_fh *zg_fh, off_t off, enum zg_check check);
+int zg_ioctl(const struct zg_fh *zg_fh, int rq, void *data, const char *op, enum zg_check check);
+enum zg_type zg_type(const struct zg_fh *zg_fh);
 
 /*
  * zgetdump actions

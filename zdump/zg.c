@@ -130,7 +130,7 @@ void zg_free(void *ptr)
 /*
  * Return path name of open file
  */
-const char *zg_path(struct zg_fh *zg_fh)
+const char *zg_path(const struct zg_fh *zg_fh)
 {
 	return zg_fh->path;
 }
@@ -138,7 +138,7 @@ const char *zg_path(struct zg_fh *zg_fh)
 /*
  * Return stat buffer of open file
  */
-const struct stat *zg_stat(struct zg_fh *zg_fh)
+const struct stat *zg_stat(const struct zg_fh *zg_fh)
 {
 	return &zg_fh->sb;
 }
@@ -190,7 +190,7 @@ void zg_close(struct zg_fh *zg_fh)
 /*
  * Read file
  */
-ssize_t zg_read(struct zg_fh *zg_fh, void *buf, size_t cnt, enum zg_check check)
+ssize_t zg_read(const struct zg_fh *zg_fh, void *buf, size_t cnt, enum zg_check check)
 {
 	size_t copied = 0;
 	ssize_t rc;
@@ -216,7 +216,7 @@ ssize_t zg_read(struct zg_fh *zg_fh, void *buf, size_t cnt, enum zg_check check)
 /*
  * Read line
  */
-ssize_t zg_gets(struct zg_fh *zg_fh, void *ptr, size_t cnt, enum zg_check check)
+ssize_t zg_gets(const struct zg_fh *zg_fh, void *ptr, size_t cnt, enum zg_check check)
 {
 	size_t copied = 0;
 	char *buf = ptr;
@@ -242,7 +242,7 @@ ssize_t zg_gets(struct zg_fh *zg_fh, void *ptr, size_t cnt, enum zg_check check)
 /*
  * Return file size
  */
-u64 zg_size(struct zg_fh *zg_fh)
+u64 zg_size(const struct zg_fh *zg_fh)
 {
 	return zg_fh->sb.st_size;
 }
@@ -250,7 +250,7 @@ u64 zg_size(struct zg_fh *zg_fh)
 /*
  * Return file position
  */
-off_t zg_tell(struct zg_fh *zg_fh, enum zg_check check)
+off_t zg_tell(const struct zg_fh *zg_fh, enum zg_check check)
 {
 	off_t rc;
 
@@ -264,7 +264,7 @@ off_t zg_tell(struct zg_fh *zg_fh, enum zg_check check)
 /*
  * Seek to "off" relative to END
  */
-off_t zg_seek_end(struct zg_fh *zg_fh, off_t off, enum zg_check check)
+off_t zg_seek_end(const struct zg_fh *zg_fh, off_t off, enum zg_check check)
 {
 	off_t rc;
 
@@ -277,7 +277,7 @@ off_t zg_seek_end(struct zg_fh *zg_fh, off_t off, enum zg_check check)
 /*
  * Seek to "off" in file
  */
-off_t zg_seek(struct zg_fh *zg_fh, off_t off, enum zg_check check)
+off_t zg_seek(const struct zg_fh *zg_fh, off_t off, enum zg_check check)
 {
 	off_t rc;
 
@@ -295,7 +295,7 @@ off_t zg_seek(struct zg_fh *zg_fh, off_t off, enum zg_check check)
 /*
  * Seek from current position
  */
-off_t zg_seek_cur(struct zg_fh *zg_fh, off_t off, enum zg_check check)
+off_t zg_seek_cur(const struct zg_fh *zg_fh, off_t off, enum zg_check check)
 {
 	off_t rc;
 
@@ -308,8 +308,7 @@ off_t zg_seek_cur(struct zg_fh *zg_fh, off_t off, enum zg_check check)
 /*
  * Do ioctl and exit in case of an error
  */
-int zg_ioctl(struct zg_fh *zg_fh, int rq, void *data, const char *op,
-	     enum zg_check check)
+int zg_ioctl(const struct zg_fh *zg_fh, int rq, void *data, const char *op, enum zg_check check)
 {
 	int rc;
 
@@ -323,10 +322,10 @@ int zg_ioctl(struct zg_fh *zg_fh, int rq, void *data, const char *op,
 /*
  * Return file type
  */
-enum zg_type zg_type(struct zg_fh *zg_fh)
+enum zg_type zg_type(const struct zg_fh *zg_fh)
 {
 	struct mtop mtop;
-	struct stat *sb = &zg_fh->sb;
+	const struct stat *sb = &zg_fh->sb;
 
 	if (S_ISREG(sb->st_mode))
 		return ZG_TYPE_FILE;
