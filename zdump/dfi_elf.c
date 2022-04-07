@@ -40,7 +40,7 @@ static void dfi_elf_mem_chunk_read_fn(struct dfi_mem_chunk *mem_chunk, u64 off,
 /*
  * Add load (memory chunk) to DFI dump
  */
-static int pt_load_add(Elf64_Phdr *phdr)
+static int pt_load_add(const Elf64_Phdr *phdr)
 {
 	u64 *off_ptr;
 
@@ -50,7 +50,6 @@ static int pt_load_add(Elf64_Phdr *phdr)
 		       phdr->p_filesz, phdr->p_memsz);
 
 	if (phdr->p_paddr != phdr->p_vaddr) {
-		phdr->p_paddr = phdr->p_vaddr;
 		STDERR("Dump file \"%s\" is a user space core dump\n",
 		      g.opts.device);
 		return -EINVAL;
