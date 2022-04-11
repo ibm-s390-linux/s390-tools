@@ -146,7 +146,7 @@ bool ehdr_is_s390x(const Elf64_Ehdr *ehdr);
 /*
  * Read ELF header at current offset
  */
-int read_elf_hdr(const struct zg_fh *fh, Elf64_Ehdr *ehdr);
+Elf64_Ehdr *read_elf_hdr(const struct zg_fh *fh);
 
 /*
  * Read ELF program headers

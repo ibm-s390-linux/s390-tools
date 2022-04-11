@@ -52,15 +52,17 @@ bool ehdr_is_s390x(const Elf64_Ehdr *ehdr)
 	       ehdr->e_ident[EI_CLASS] == ELFCLASS64;
 }
 
-int read_elf_hdr(const struct zg_fh *fh, Elf64_Ehdr *ehdr)
+Elf64_Ehdr *read_elf_hdr(const struct zg_fh *fh)
 {
+	Elf64_Ehdr *ehdr;
 	const size_t ehdr_size = sizeof(*ehdr);
 
 	if (zg_size(fh) < ehdr_size)
-		return -1;
+		return NULL;
 
+	ehdr = util_malloc(ehdr_size);
 	zg_read(fh, ehdr, ehdr_size, ZG_CHECK);
-	return 0;
+	return ehdr;
 }
 
 Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsigned int *phdr_count)

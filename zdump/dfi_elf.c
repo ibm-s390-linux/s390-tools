@@ -267,21 +267,23 @@ static int dfi_elf_init(void)
 {
 	unsigned int phnum, i;
 	Elf64_Phdr *phdrs;
-	Elf64_Ehdr ehdr;
+	Elf64_Ehdr *ehdr;
+	int rc = -ENODEV;
 
 	util_log_print(UTIL_LOG_DEBUG, "DFI ELF initialization\n");
 
-	if (read_elf_hdr(g.fh, &ehdr) != 0)
+	ehdr = read_elf_hdr(g.fh);
+	if (!ehdr)
 		return -ENODEV;
 
-	if (check_elf_hdr(&ehdr) < 0)
-		return -ENODEV;
+	if (check_elf_hdr(ehdr) < 0)
+		goto free_ehdr;
 
 	df_elf_ensure_s390x();
 	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 
-	phdrs = read_elf_phdrs(g.fh, &ehdr, &phnum);
+	phdrs = read_elf_phdrs(g.fh, ehdr, &phnum);
 	util_log_print(UTIL_LOG_DEBUG, "DFI ELF e_phnum %u\n", phnum);
 	for (i = 0; i < phnum; i++) {
 		const Elf64_Phdr *phdr = &phdrs[i];
@@ -290,24 +292,29 @@ static int dfi_elf_init(void)
 		switch (phdr->p_type) {
 		case PT_LOAD:
 			if (pt_load_add(phdr)) {
-				free(phdrs);
-				return -EINVAL;
+				rc = -EINVAL;
+				goto free_phdrs;
 			}
 			break;
 		case PT_NOTE:
 			if (pt_notes_add(phdr)) {
-				free(phdrs);
-				return -EINVAL;
+				rc = -EINVAL;
+				goto free_phdrs;
 			}
 			break;
 		default:
 			break;
 		}
 	}
-	free(phdrs);
 
-	dfi_attr_version_set(ehdr.e_ident[EI_VERSION]);
-	return 0;
+	dfi_attr_version_set(ehdr->e_ident[EI_VERSION]);
+	rc = 0;
+
+free_phdrs:
+	free(phdrs);
+free_ehdr:
+	free(ehdr);
+	return rc;
 }
 
 /*
