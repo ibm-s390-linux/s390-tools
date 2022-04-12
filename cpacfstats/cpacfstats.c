@@ -91,9 +91,20 @@ static int recv_answer(int s, int *ctr, int *state, uint64_t *value)
 	return rc;
 }
 
+static void print_virtual_counter_answer(int ctr, int state, uint64_t value)
+{
+	if (ctr == HOTPLUG_DETECTED) {
+		if (state >= 0 && value > 0)
+			printf(" hotplug detected\n");
+	}
+}
 
 static void print_answer(int ctr, int state, uint64_t value)
 {
+	if (ctr > ALL_COUNTER) {
+		print_virtual_counter_answer(ctr, state, value);
+		return;
+	}
 	if (state < 0)
 		printf(" %s counter: error state %d\n",
 		       counter_str[ctr], state);
@@ -232,6 +243,18 @@ int main(int argc, char *argv[])
 		}
 		print_answer(j, state, value);
 	}
+	/* receive hotplug state */
+	if (recv_answer(s, &j, &state, &value) != 0) {
+		eprint("Error on receiving hotplug state from daemon\n");
+		close(s);
+		exit(1);
+	}
+	if (state < 0) {
+		eprint("Received bad status code %d from daemon\n", state);
+		close(s);
+		exit(1);
+	}
+	print_answer(j, state, value);
 
 	/* close connection */
 	close(s);

@@ -306,7 +306,6 @@ build options:
 |                |                    | hsavmcore                             |
 | zlib           | `HAVE_ZLIB`        | zgetdump, dump2tar                    |
 | ncurses        | `HAVE_NCURSES`     | hyptop                                |
-| pfm            | `HAVE_PFM`         | cpacfstats                            |
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 | openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
@@ -320,6 +319,7 @@ build options:
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 | liblockfile    | `HAVE_LOCKFILE`    | ap-check                              |
+| libudev        | `HAVE_LIBUDEV`     | cpacfstatsd                           |
 
 This table lists additional build or install options:
 
@@ -403,14 +403,13 @@ the different tools are provided:
   As of s390-tools-1.13.0, the minimum required kernel level is 2.6.38.
 
 * cpacfstats:
-  For building the cpacfstats tools you need libpfm version 4 or
-  newer installed (libpfm-devel.rpm). Tip: you may skip the cpacfstats
-  build by adding `HAVE_PFN=0` to the make invocation. To run the
-  cpacfstats daemon the kernel needs to have performance
-  events enabled (check for `CONFIG_PERF_EVENTS=y`) and you need libpfm
-  version 4 or newer installed. A new group 'cpacfstats' needs to be
-  created and all users intending to use the tool should be added to
-  this group.
+  For building the cpacfstats tools you need libudev installed
+  (systemd-devel.rpm). Tip: you may skip the cpacfstats build by
+  adding `HAVE_LIBUDEV=0` to the make invocation. To run the
+  cpacfstats daemon the kernel needs to have performance events
+  enabled (check for `CONFIG_PERF_EVENTS=y`). A new group 'cpacfstats'
+  needs to be created and all users intending to use the tool should
+  be added to this group.
 
 * zdev:
   Depending on the boot loader and initial RAM-disk mechanism used by a

@@ -28,6 +28,7 @@
 #include "lib/zt_common.h"
 #include "cpacfstats.h"
 
+static volatile int stopsig;
 
 static const char *const name = "cpacfstatsd";
 
@@ -42,9 +43,6 @@ static const char *const usage =
 	"\t-f, --foreground    Run in foreground, do not detach\n";
 
 static int daemonized;
-
-static int ctr_state[ALL_COUNTER];
-
 
 static int recv_query(int s, enum ctr_e *ctr, enum cmd_e *cmd)
 {
@@ -89,32 +87,35 @@ static int send_answer(int s, int ctr, int state, uint64_t value)
 
 static int do_enable(int s, enum ctr_e ctr)
 {
-	uint64_t value;
+	uint64_t value = 0;
 	int i, rc = 0;
+	int state;
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i] == DISABLED) {
+			state = perf_ctr_state(i);
+			if (state == DISABLED) {
 				rc = perf_enable_ctr(i);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
-				ctr_state[i] = ENABLED;
+				state = ENABLED;
 			}
-			if (ctr_state[i] == UNSUPPORTED) {
-				send_answer(s, i, UNSUPPORTED, 0);
-			} else {
+			if (state != UNSUPPORTED) {
 				rc = perf_read_ctr(i, &value);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
-				send_answer(s, i, ENABLED, value);
 			}
+			send_answer(s, i, state, value);
 		}
 	}
-
+	if (rc == 0) {
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		send_answer(s, HOTPLUG_DETECTED, rc, value);
+	}
 	return rc;
 }
 
@@ -122,67 +123,75 @@ static int do_enable(int s, enum ctr_e ctr)
 static int do_disable(int s, enum ctr_e ctr)
 {
 	int i, rc = 0;
+	uint64_t value;
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i] == ENABLED) {
+			if (perf_ctr_state(i) == ENABLED) {
 				rc = perf_disable_ctr(i);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
-				ctr_state[i] = 0;
 			}
-			send_answer(s, i, ctr_state[i], 0);
+			send_answer(s, i, perf_ctr_state(i), 0);
 		}
 	}
-
+	if (rc == 0) {
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		send_answer(s, HOTPLUG_DETECTED, rc, value);
+	}
 	return rc;
 }
 
 
 static int do_reset(int s, enum ctr_e ctr)
 {
-	int i, rc = 0;
+	int i, rc = 0, state;
+	uint64_t value;
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i] == ENABLED) {
+			state = perf_ctr_state(i);
+			if (state == ENABLED) {
 				rc = perf_reset_ctr(i);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
-				send_answer(s, i, ENABLED, 0);
-			} else {
-				send_answer(s, i, ctr_state[i], 0);
 			}
+			send_answer(s, i, state, 0);
 		}
 	}
-
+	if (rc == 0) {
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		send_answer(s, HOTPLUG_DETECTED, rc, value);
+	}
 	return rc;
 }
 
 static int do_print(int s, enum ctr_e ctr)
 {
-	int i, rc = 0;
-	uint64_t value;
+	int i, rc = 0, state;
+	uint64_t value = 0;
 
 	for (i = 0; i < ALL_COUNTER; i++) {
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
-			if (ctr_state[i] == ENABLED) {
+			state = perf_ctr_state(i);
+			if (state == ENABLED) {
 				rc = perf_read_ctr(i, &value);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
-				send_answer(s, i, ENABLED, value);
-			} else {
-				send_answer(s, i, ctr_state[i], 0);
 			}
+			send_answer(s, i, state, value);
 		}
 	}
-
+	if (rc == 0) {
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		send_answer(s, HOTPLUG_DETECTED, rc, value);
+	}
 	return rc;
 }
 
@@ -324,18 +333,8 @@ static void remove_pidfile(void)
 
 void signalhandler(int sig)
 {
-	if (sig == SIGTERM)
-		eprint("Caught signal SIGTERM, terminating...\n");
-	else if (sig == SIGINT)
-		eprint("Caught signal SIGINT, terminating...\n");
-	else
-		eprint("Caught signal %d, terminating...\n", sig);
-
-	remove_sock();
-	perf_close();
-	remove_pidfile();
-
-	exit(0);
+	perf_stop();
+	stopsig = sig;
 }
 
 
@@ -416,9 +415,6 @@ int main(int argc, char *argv[])
 	}
 	atexit(perf_close);
 
-	if (!perf_ecc_supported())
-		ctr_state[ECC_FUNCTIONS] = UNSUPPORTED;
-
 	sfd = open_socket(SERVER);
 	if (sfd < 0) {
 		eprint("Couldn't initialize server socket\n");
@@ -442,7 +438,7 @@ int main(int argc, char *argv[])
 
 	eprint("Running\n");
 
-	while (1) {
+	while (!stopsig) {
 		enum ctr_e ctr;
 		enum cmd_e cmd;
 		int s;
@@ -479,6 +475,14 @@ int main(int argc, char *argv[])
 cleanup:
 		close(s);
 	}
+
+	if (stopsig == SIGTERM)
+		eprint("Caught signal SIGTERM, terminating...\n");
+	else if (stopsig == SIGINT)
+		eprint("Caught signal SIGINT, terminating...\n");
+	else
+		eprint("Caught signal %d, terminating...\n", stopsig);
+	remove_pidfile();
 
 	return 0;
 }

@@ -13,6 +13,7 @@
 #include <endian.h>
 #include <errno.h>
 #include <grp.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -244,7 +245,7 @@ int recv_msg(int sfd, struct msg *m, int timeout)
 		return -1;
 	}
 
-	n = timeout ? __timedread(sfd, ((char *)m) + sizeof(m->head), len) :
+	n = timeout ? __timedread(sfd, ((char *)m) + sizeof(m->head), len, timeout) :
 		__read(sfd, ((char *)m) + sizeof(m->head), len);
 	if (n != len) {
 		eprint("Recv() error: recv()=%d expected %d, errno=%d [%s]\n",

@@ -23,7 +23,8 @@ int eprint(const char *format, ...);
 
 /*
  * Counter names
- * ALL_COUNTER must always be the last member of the enum
+ * ALL_COUNTER specifies the number of physical counters.  Virtual
+ * counters might be added afterwards.
  */
 enum ctr_e {
 	DES_FUNCTIONS = 0,
@@ -31,7 +32,8 @@ enum ctr_e {
 	SHA_FUNCTIONS,
 	PRNG_FUNCTIONS,
 	ECC_FUNCTIONS,
-	ALL_COUNTER
+	ALL_COUNTER,
+	HOTPLUG_DETECTED
 };
 
 enum type_e {
@@ -53,7 +55,7 @@ enum state_e {
 };
 
 /*
- * query send from clent to daemon
+ * query send from client to daemon
  * Consist of:
  * enum counter
  * enum command
@@ -102,17 +104,19 @@ struct msg {
 } __packed;
 
 int open_socket(int mode);
-int send_msg(int sfd, struct msg *m);
-int recv_msg(int sfd, struct msg *m);
+int send_msg(int sfd, struct msg *m, int timeout);
+int recv_msg(int sfd, struct msg *m, int timeout);
 
 /* perf_crypto.c */
 
 int  perf_init(void);
+void perf_stop(void);
 void perf_close(void);
 int  perf_enable_ctr(enum ctr_e ctr);
 int  perf_disable_ctr(enum ctr_e ctr);
 int  perf_reset_ctr(enum ctr_e ctr);
 int  perf_read_ctr(enum ctr_e ctr, uint64_t *value);
 int  perf_ecc_supported(void);
+int  perf_ctr_state(enum ctr_e ctr);
 
 #endif
