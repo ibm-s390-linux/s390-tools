@@ -62,7 +62,7 @@ static int send_query(int s, enum cmd_e cmd, enum ctr_e ctr)
 	m.query.m_ctr = ctr;
 	m.query.m_cmd = cmd;
 
-	return send_msg(s, &m);
+	return send_msg(s, &m, 0);
 }
 
 
@@ -71,7 +71,7 @@ static int recv_answer(int s, int *ctr, int *state, uint64_t *value)
 	struct msg m;
 	int rc;
 
-	rc = recv_msg(s, &m);
+	rc = recv_msg(s, &m, 0);
 	if (rc == 0) {
 		if (m.head.m_ver != VERSION) {
 			eprint("Received msg with wrong version %d != %d\n",

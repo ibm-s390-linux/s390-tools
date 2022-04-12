@@ -14,7 +14,10 @@
 
 #include "lib/zt_common.h"
 
-#define COPYRIGHT "Copyright IBM Corp. 2015, 2020"
+#define COPYRIGHT "Copyright IBM Corp. 2015, 2022"
+
+#define DEFAULT_SEND_TIMEOUT  (2 * 1000)
+#define DEFAULT_RECV_TIMEOUT  (2 * 1000)
 
 int eprint(const char *format, ...);
 

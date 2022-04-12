@@ -3,7 +3,7 @@
  *
  * basic socket and receive/send functions
  *
- * Copyright IBM Corp. 2015, 2017
+ * Copyright IBM Corp. 2015, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -148,7 +148,51 @@ static int __read(int fd, void *buf, int buflen)
 }
 
 
-int send_msg(int sfd, struct msg *m)
+static int __timedwrite(int fd, const void *buf, int buflen, int timeout)
+{
+	struct pollfd pfd = { .fd = fd, .events = POLLOUT };
+	int i = 0, n;
+
+	while (poll(&pfd, 1, timeout) == 1) {
+		n = write(fd, buf + i, buflen - i);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			else
+				return n;
+		} else if (n == 0) {
+			return i;
+		}
+		i += n;
+		if (buflen == i)
+			return i;
+	}
+	return -1;
+}
+
+static int __timedread(int fd, void *buf, int buflen, int timeout)
+{
+	struct pollfd pfd = { .fd = fd, .events = POLLIN };
+	int i = 0, n;
+
+	while (poll(&pfd, 1, timeout) == 1) {
+		n = read(fd, buf + i, buflen - i);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			else
+				return n;
+		} else if (n == 0) {
+			return i;
+		}
+		i += n;
+		if (buflen == i)
+			return i;
+	}
+	return -1;
+}
+
+int send_msg(int sfd, struct msg *m, int timeout)
 {
 	int n, len;
 
@@ -166,7 +210,7 @@ int send_msg(int sfd, struct msg *m)
 		return -1;
 	}
 
-	n = __write(sfd, m, len);
+	n = timeout ? __timedwrite(sfd, m, len, timeout) : __write(sfd, m, len);
 	if (n != len) {
 		eprint("Write() error: write()=%d expected %d, errno=%d [%s]\n",
 		       n, len, errno, strerror(errno));
@@ -176,12 +220,12 @@ int send_msg(int sfd, struct msg *m)
 	return 0;
 }
 
-int recv_msg(int sfd, struct msg *m)
+int recv_msg(int sfd, struct msg *m, int timeout)
 {
 	int n, len;
 
 	len = sizeof(m->head);
-	n = __read(sfd, m, len);
+	n = timeout ? __timedread(sfd, m, len, timeout) : __read(sfd, m, len);
 	if (n != len) {
 		eprint("Recv() error: read()=%d expected %d, errno=%d [%s]\n",
 		       n, len, errno, strerror(errno));
@@ -200,7 +244,8 @@ int recv_msg(int sfd, struct msg *m)
 		return -1;
 	}
 
-	n = __read(sfd, ((char *)m) + sizeof(m->head), len);
+	n = timeout ? __timedread(sfd, ((char *)m) + sizeof(m->head), len) :
+		__read(sfd, ((char *)m) + sizeof(m->head), len);
 	if (n != len) {
 		eprint("Recv() error: recv()=%d expected %d, errno=%d [%s]\n",
 		       n, len, errno, strerror(errno));

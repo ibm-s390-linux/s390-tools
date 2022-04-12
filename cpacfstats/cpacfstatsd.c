@@ -51,7 +51,7 @@ static int recv_query(int s, enum ctr_e *ctr, enum cmd_e *cmd)
 	struct msg m;
 	int rc;
 
-	rc = recv_msg(s, &m);
+	rc = recv_msg(s, &m, DEFAULT_RECV_TIMEOUT);
 	if (rc == 0) {
 		if (m.head.m_ver != VERSION) {
 			eprint("Received msg with wrong version %d != %d\n",
@@ -83,7 +83,7 @@ static int send_answer(int s, int ctr, int state, uint64_t value)
 	m.answer.m_state = state;
 	m.answer.m_value = value;
 
-	return send_msg(s, &m);
+	return send_msg(s, &m, DEFAULT_SEND_TIMEOUT);
 }
 
 
