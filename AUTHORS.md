@@ -5,7 +5,7 @@ List of all individuals having contributed content to s390-tools
 - Alexandra Winter
 - Alexey Ishchuk
 - Andreas Herrmann
-- Andre Wild
+- André Wild
 - Antoinette Kaschner
 - Arnd Bergmann
 - Axel Wirbser
@@ -19,6 +19,7 @@ List of all individuals having contributed content to s390-tools
 - Clemens von Mann
 - Colin Walters
 - Dan Horak
+- Dan Horák
 - Despina Papadopoulou
 - Dimitri John Ledkov
 - Eberhard Pasch
@@ -53,7 +54,7 @@ List of all individuals having contributed content to s390-tools
 - Ingo Franzki
 - Ingo Tuchscherer
 - Jan Glauber
-- Jan Hoeppner
+- Jan Höppner
 - Jan Willeke
 - Jason J. Herne
 - Javier Martinez Canillas

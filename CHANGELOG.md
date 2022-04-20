@@ -1,23 +1,37 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.20.x (2022-xx-xx)__
+* __v2.21.0 (2022-04-20)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.17
 
   Add new tools / libraries:
+  - libcpumf: Create library libcpumf for CPU Measurement functions
 
   Changes of existing tools:
-  - dbginfo.sh: rework script formatting (indents, order)
-  - dbginfo.sh: update sysfs collection (excludes, messages)
-  - dbginfo.sh: replace "which" by builtin command "type"
-  - chreipl-fcp-mpath: bundle a pre-cooked version of the manpage for
-      build environments without access to `pandoc`
+  - chreipl-fcp-mpath: bundle a pre-cooked version of the manpage for build
+                       environments without access to `pandoc`
   - dbginfo.sh: Add multipath info to map paths to FC addressing and prio group
-  - dbginfo.sh: Sort list of environment variables for readability
   - dbginfo.sh: Collect config files of systemd-modules-load.service
+  - dbginfo.sh: Sort list of environment variables for readability
+  - dbginfo.sh: Replace "which" by builtin command "type"
+  - dbginfo.sh: Rework script formatting (indents, order)
+  - dbginfo.sh: Update sysfs collection (excludes, messages)
+  - genprotimg: Add Protected Virtualization (PV) dump support
+  - genprotimg: Remove DigiCert root CA pinning
+  - lszcrypt: Add CEX8S support
+  - zcryptctl: Add control domain handling
+  - zcryptstats: Add CEX8 support
+  - zipl: Allow optional entries that are left out when files are missing
+  - zipl: make IPL sections defined with BLS to inherit a target field
+  - zpcictl: Add option to trigger firmware reset
 
   Bug Fixes:
+  - cpictl: Handle excessive kernel version numbers
   - dbginfo.sh: Collect all places where modprobe.d config files could exist
+  - fdasd: Fix endless menu loop on EOF
+  - zdump/dfi: Fix segfault due to double free
+  - zdump: Fix /dev/mem reading
+  - zpcictl: Fix race of SCLP reset and Linux recovery
 
 * __v2.20.0 (2022-02-04)__
 
