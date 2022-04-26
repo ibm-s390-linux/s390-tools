@@ -15,7 +15,8 @@ ALL_CFLAGS := $(NO_PIE_CFLAGS) -Os -g \
 	-fno-delete-null-pointer-checks -fno-stack-protector \
 	-fexec-charset=IBM1047 -m64 -mpacked-stack \
 	-mstack-size=4096 -mstack-guard=128 -msoft-float \
-	-Wall -Wformat-security -Wextra -Werror
+	-Wall -Wformat-security -Wextra -Werror \
+	-Wno-array-bounds
 
 FILES := stage3a.bin stage3b.bin stage3b_reloc.bin
 
