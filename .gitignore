@@ -22,6 +22,7 @@ cpacfstats/cpacfstatsd
 cpumf/chcpumf
 cpumf/lscpumf
 cpumf/lshwc
+cpumf/pai
 cpuplugd/cpuplugd
 dasdfmt/dasdfmt
 dasdinfo/dasdinfo

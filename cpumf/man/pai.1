@@ -1,0 +1,224 @@
+.\" pai.1
+.\"
+.\"
+.\" Copyright IBM Corp. 2022
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.ds c \fBpai\fP
+.
+.TH \*c "1" "May 2022" "s390-tools" "PAI Management Programs"
+.
+.SH NAME
+\*c \- record and report Processor Activity Instrumentation (PAI) counters
+.
+.SH SYNOPSIS
+\*c
+.RB [ \-V ][ \-m | \-\-mapsize
+.IR size ]
+.RB [ \-i | \-\-interval
+.IR ms ]
+.BR  \-c | \-\-crypto [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
+.br
+\*c
+.RB [ \-V ][ \-H | \-\-humantime ][ \-S | \-\-summary "] " \-r | \-\-report " [" \fIfiles\fP ]
+.br
+\*c
+.BR \-h | \-\-help
+.br
+\*c
+.BR \-v | \-\-version
+.
+.
+.SH DESCRIPTION
+\*c
+counters tally calls for specific CPU instructions.
+The \*c command records PAI counters in a ring buffer.
+\*c can record counter data for all CPUs or for selected CPUs.
+The main command options are
+.B \-c
+for recording cryptographic CPU instructions and
+.B \-r
+for reporting.
+If both options are omitted, option
+.B \-r
+is assumed and a message is printed.
+Recording stores data, by CPU, in files
+.I paicrypto.<X>,
+where <X> specifies the CPU number.
+The files are created in the working directory,
+existing files are overwritten.
+Reporting evaluates files that are created by recording.
+
+.SH OPTIONS
+.TP
+.BR \-c ", " \-\-crypto "\fR[\fIcpulist\fR][:\fIdata\fR]"
+Records data for all (default) or a specified list of CPUs.
+The CPU list is a comma-separated list of CPU numbers and ranges.
+In a range, a hyphen separates the first CPU number
+from the last CPU number.
+By default \*c lists all CPUs.
+.RS
+The optional data specification
+follows the colon
+and determines additional collection of data.
+The specification consists of alphabetic
+characters that can be upper or lower case:
+.IP c|C
+Include task rename system calls
+.B exec
+and
+.BR prctl .
+.IP f|F
+Include task creation and deletion system calls
+.B fork
+and
+.BR exit .
+.IP s|S
+Include context switch records created by the kernel scheduler.
+.IP k|K
+Include only PAI cryptographic counters changed during system call
+execution.
+.IP u|U
+Include only PAI cryptographic counters changed during user space
+execution.
+.RE
+.
+.TP
+.BR \-r ", " \-\-report
+Generates a report from the specified files.
+Files is a list of blank-separated file names.
+If no files are specified,
+uses all files named
+.I paicrypto.<X>,
+in the working directory, where
+.I <X>
+is a CPU number that
+identifies the CPU for which the data was recorded.
+.
+.TP
+.BR \-h ", " \-\-help
+Displays help information, then exits.
+.
+.TP
+.BR \-v ", " \-\-version
+Displays version information, then exits.
+.
+.TP
+.BR \-V ", " \-\-verbose
+Displays the following information during reporting:
+the file name and the hexadecimal offset for each sample header.
+Displays the following information during recording:
+the read position in the ring buffer,
+the file name, and the hexadecimal offset for each sample header.
+.
+.TP
+.BR \-H ", " \-\-humantime
+Changes the time stamp format for sample entries from a hexadecimal
+number to a human readable <seconds>.<nanoseconds> format.
+The time stamp specifies the elapsed time since Linux was booted.
+.
+.TP
+.BR \-S ", " \-\-summary
+Prints a summary of counter names and
+counter numbers with non-zero values.
+The summary is the last line in the command output.
+It shows the sum of the counter values of all processed files.
+.
+.TP
+.BR \-i ", " \-\-interval "\ ms"
+Specifies the waiting time,
+in milliseconds,
+between ring buffer read operations during recording.
+The default is 1000 milliseconds.
+Argument
+.B loops
+is an integer that specifies the number of
+read operations during recording. The default is 1.
+.
+.TP
+.BR \-m ", " \-\-mapsize "\ size"
+Specifies the size of the ring buffer
+that holds the collected data.
+The value specifies the number of 4 KB pages
+to be allocated and must be a power of 2.
+The default size is 512 pages.
+The ring buffer is created with the
+.IR mmap (2)
+system call.
+.
+.SH ARGUMENT
+The command line options determine how command line
+arguments are interpreted.
+For option
+.B \-c
+to start recording, the argument specifies
+the number of read operations.
+If omitted, the default is one.
+For option
+.B \-r
+to start reporting, the argument specifies
+the file names to be read.
+If omitted all files in the current directory
+with file name
+.I paicryto.<X>
+are read.
+.SH "Concurrency with perf tool"
+The following concurrency restrictions apply
+for \*c and the
+.B perf
+tool.
+Both tools use the
+.IR perf_event_open ()
+system call and use the same device driver.
+The device driver supports limited concurrency:
+.IP Counting:
+Counting pai events can run in parallel.
+.IP Sampling:
+Only one sampling event pai_crypto/CRYPTO_ALL can be active at any one time.
+If a sampling event is active, no pai counting event can be active.
+Both tools stop with an error message if they detect a collision
+reported by the device driver.
+.SH "EXAMPLES"
+This example collects cryptographic counter on CPU 0.
+The program runs for 10 seconds
+(10 intervals of 1000 milliseconds).
+.sp 1
+.nf
+.ft CW
+# \*c -c0 10
+.ft R
+.fi
+.sp 1
+This example displays the data
+that is collected in the first example.
+Each data line shows the time stamp in jiffies,
+followed by the CPU number,
+the event number,
+process and thread identifier (pid/tid) separated by slash (/),
+and a comma-separated list of counter number, colon (:),
+and the counter value n hexadecimal notation.
+.sp 1
+.nf
+.ft CW
+# \*c -r
+0x62a668f2fa 0 event 4096 sample pid 4956/4956 9:0xa7,73:0x8,74:0x18
+0x6319c75653 0 event 4096 sample pid 4972/4972 32:0x1
+0x6319e2ddee 0 event 4096 sample pid 4972/4972 32:0x1
+0x631d3e44f5 0 event 4096 sample pid 4972/4972 32:0x2
+0x631d4cfc2e 0 event 4096 sample pid 4972/4972 32:0x3
+0x631d529fdd 0 event 4096 sample pid 4972/4972 32:0x2
+0x631d84cfa0 0 event 4096 sample pid 4972/4972 73:0x1
+0x636e9826bc 0 event 4096 sample pid 4984/4984 9:0xa7,73:0x8,74:0x18
+0x636f81a137 0 event 4096 sample pid 4984/4984 9:0x2,74:0x7
+0x6378026e54 0 event 4096 sample pid 4984/4984 73:0x2
+0x637bcdc8da 0 event 4096 sample pid 4984/4984 73:0x2
+0x637bd426cd 0 event 4096 sample pid 4984/4984 73:0x6
+0x637c503384 0 event 4096 sample pid 4984/4984 73:0x2
+0x64991d83ba 0 event 4096 sample pid 5026/5026 9:0xb0,73:0x8,74:0x18
+#
+.ft R
+.fi
+.sp 1
+.SH "SEE ALSO"
+perf(1)

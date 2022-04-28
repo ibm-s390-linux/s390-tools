@@ -1,15 +1,16 @@
 include ../common.mak
 
-BIN_FILES = lscpumf chcpumf lshwc
-MAN_FILES = lscpumf.1 chcpumf.8 lshwc.1
+BIN_FILES = lscpumf chcpumf lshwc pai
+MAN_FILES = lscpumf.1 chcpumf.8 lshwc.1 pai.1
 
 all: $(BIN_FILES)
 
-libs =	$(rootdir)/libutil/libutil.a $(rootdir)/libcpumf/libcpumf.a
+libs =	$(rootdir)/libcpumf/libcpumf.a $(rootdir)/libutil/libutil.a
 
 lscpumf: lscpumf.o $(libs)
 chcpumf: chcpumf.o $(libs)
 lshwc: lshwc.o $(libs)
+pai: pai.o $(libs)
 
 install: all install-man
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man8
