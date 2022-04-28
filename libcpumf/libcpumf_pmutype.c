@@ -4,10 +4,16 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <err.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "lib/util_file.h"
+#include "lib/util_libc.h"
+#include "lib/util_path.h"
+#include "lib/util_scandir.h"
 #include "lib/libcpumf.h"
 
 int libcpumf_pmutype(const char *dirname)
@@ -30,4 +36,37 @@ int libcpumf_pmutype(const char *dirname)
 		fclose(file);
 	}
 	return ret;
+}
+
+int libcpumf_pmuname(unsigned int wanted_type, char **name)
+{
+	struct dirent **de_vec;
+	unsigned int type;
+	char *dirname;
+	char *path;
+	int count;
+	int rc;
+
+	path = util_path_sysfs("devices");
+	count = util_scandir(&de_vec, alphasort, path, "(pai|cpum_).*");
+	free(path);
+
+	*name = NULL;
+	for (int i = 0; i < count; i++) {
+		if (de_vec[i]->d_type == DT_DIR) {
+			dirname = de_vec[i]->d_name;
+			path = util_path_sysfs("devices/%s/type", dirname);
+			rc = util_file_read_ui(&type, 10, path);
+			if (rc)
+				warn("Failed to open %s", path);
+			free(path);
+			if (!rc && type == wanted_type) {
+				*name = util_strdup(dirname);
+				goto out;
+			}
+		}
+	}
+out:
+	util_scandir_free(de_vec, count);
+	return *name ? 0 : -1;
 }

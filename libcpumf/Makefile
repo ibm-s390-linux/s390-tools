@@ -13,7 +13,7 @@ $(lib): $(objects)
 
 install: all
 
-libcpumf_example: libcpumf_example.o $(lib)
+libcpumf_example: libcpumf_example.o $(lib) $(rootdir)/libutil/libutil.a
 
 clean:
 	rm -f *.o $(lib) $(examples)

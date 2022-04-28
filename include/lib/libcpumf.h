@@ -31,6 +31,20 @@
 int libcpumf_pmutype(const char *dirname);
 
 /**
+ * Read out the PMU name from a given type.
+ *
+ * Return the PMU name this PMU was registered in kernel. If the PMU was
+ * registered without a name, it is not listed in the directory.
+ * The caller must free the memory returned by name.
+ *
+ * @param[in]    wanted_type Type number of the PMU
+ * @param[out]   name        Name of the PMU (when retval is 0)
+ * @retval       0           PMU wanted_type detected and PMU name valid
+ * @retval       -1          No PMU with wanted_type
+ */
+int libcpumf_pmuname(unsigned int wanted_type, char **name);
+
+/**
  * Read out the CPU list from a given file name, for example from files
  * /sys/devices/system/cpu/online or /sys/devices/system/cpu/possible.
  *

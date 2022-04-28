@@ -14,6 +14,7 @@ int main(void)
 {
 	unsigned long min, max, speed, sfb_min, sfb_max;
 	int rc, pmu, cfvn, csvn, auth;
+	char *pmuname;
 	cpu_set_t set;
 
 	pmu = libcpumf_pmutype(S390_CPUMF_CF);
@@ -74,5 +75,13 @@ int main(void)
 	putchar('\n');
 
 	printf("PAI crypto support %d\n", libcpumf_have_pai_crypto());
+
+	rc = libcpumf_pmuname(10, &pmuname);
+	if (rc) {
+		printf("PMU type 10 PMU name lookup error %d\n", rc);
+	} else {
+		printf("PMU type 10 PMU name %s\n", pmuname);
+		free(pmuname);
+	}
 	return EXIT_SUCCESS;
 }
