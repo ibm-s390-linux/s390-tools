@@ -22,9 +22,10 @@
  *
  * Return the PMU type number assigned to this PMU by the kernel. This is
  * a non zero number.
- * If the PMU does not exist return -1 and set errno.
  *
  * @param[in]    dirname   Name of the event directory in sysfs
+ * @retval       >=0       Number of PMU assigned by the kernel
+ * @retval       -1        PMU unknown to kernel
  */
 int libcpumf_pmutype(const char *dirname);
 
@@ -34,12 +35,12 @@ int libcpumf_pmutype(const char *dirname);
  *
  * Return the cpu_set_t created from parsing the CPU list in the second
  * parameter.
- * Return code of zero indicates proper conversion and -1 indicates an
- * error.
  *
  * @param[in]    buffer   Comma separated string of a CPU list
  * @param[in]    filename Name of a sysfs CPU list file name
  * @param[out]   mask     Converted buffer into cpu_set_t mask structure
+ * @retval       0        Successful conversion of cpulist
+ * @retval       -1       Unsuccessful conversion of cpulist
  */
 int libcpumf_cpuset(const char *buffer, cpu_set_t *mask);
 int libcpumf_cpuset_fn(const char *filename, cpu_set_t *mask);
@@ -55,11 +56,16 @@ int libcpumf_cpuset_fn(const char *filename, cpu_set_t *mask);
  * @param[out]   cfvn     Contains CPUMF counter first version number
  * @param[out]   csvn     Contains CPUMF counter second version number
  * @param[out]   auth     Contains CPUMF counter set authorization level
+ * @retval       true     Information returned in parameters is valid
+ * @retval       false    Information could not be retrieved
  */
 bool libcpumf_cpumcf_info(int *cfvn, int *csvn, int *auth);
 
 /**
  * Return true if CPU Measurement Counter Facility is available.
+ *
+ * @retval       true     CPU Measurement Counter Facility is available
+ * @retval       false    CPU Measurement Counter Facility is not available
  */
 bool libcpumf_have_cpumcf(void);
 
@@ -77,18 +83,28 @@ bool libcpumf_have_cpumcf(void);
  *                         microsecond
  * @param[out]   basic_sz  Basic sample size in bytes
  * @param[out]   diag_sz   Diagnostic sample size in bytes
+ * @retval       true      Information returned in parameters is valid
+ * @retval       false     Information could not be retrieved
  */
 bool libcpumf_cpumsf_info(unsigned long *min, unsigned long *max,
 			  unsigned long *speed, int *basic_sz, int *diag_sz);
 
 /**
  * Return true if CPU Measurement Sampling Facility is available.
+ *
+ * @retval       true     CPU Measurement Sampling Facility is available
+ * @retval       false    CPU Measurement Sampling Facility is not available
  */
 bool libcpumf_have_cpumsf(void);
 
 /**
  * Return true if CPU Measurement Sampling Facility buffer sizes are
  * available.
+ *
+ * @retval       true     CPU Measurement Sampling Facility buffer sizes are
+ *                        available
+ * @retval       false    CPU Measurement Sampling Facility buffer sizes are
+ *                        not available
  */
 bool libcpumf_have_sfb(void);
 
@@ -101,6 +117,8 @@ bool libcpumf_have_sfb(void);
  *
  * @param[out]   min       Minimum supported sampling buffer size
  * @param[out]   max       Maximum supported sampling buffer size
+ * @retval       true      Information returned in parameters is valid
+ * @retval       false     Information could not be retrieved
  */
 bool libcpumf_sfb_info(unsigned long *min, unsigned long *max);
 #endif
