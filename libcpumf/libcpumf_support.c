@@ -139,3 +139,10 @@ bool libcpumf_sfb_info(unsigned long *min, unsigned long *max)
 	fclose(fp);
 	return rc;
 }
+
+bool libcpumf_have_pai_crypto(void)
+{
+	struct stat statbuf;
+
+	return (stat(S390_SYSFS_PAI_CRYPTO, &statbuf) == -1) ? false : true;
+}

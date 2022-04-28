@@ -72,5 +72,7 @@ int main(void)
 	if (rc)
 		printf(" sfb_min %lu sfb_max %lu", sfb_min, sfb_max);
 	putchar('\n');
+
+	printf("PAI crypto support %d\n", libcpumf_have_pai_crypto());
 	return EXIT_SUCCESS;
 }

@@ -16,6 +16,7 @@
 #define S390_CPUS_POSSIBLE	"/sys/devices/system/cpu/possible"
 #define S390_CPUS_ONLINE	"/sys/devices/system/cpu/online"
 #define S390_CPUMSF_BUFFERSZ	"/sys/module/kernel/parameters/cpum_sfb_size"
+#define S390_SYSFS_PAI_CRYPTO	"/sys/devices/pai_crypto/"
 
 /**
  * Read out the PMU type from a given file.
@@ -121,4 +122,12 @@ bool libcpumf_have_sfb(void);
  * @retval       false     Information could not be retrieved
  */
 bool libcpumf_sfb_info(unsigned long *min, unsigned long *max);
+
+/**
+ * Return true if PAI_CRYPTO counter Facility is supported.
+ *
+ * @retval       true     PAI_CRYPTO counter Facility is available
+ * @retval       false    PAI_CRYPTO counter Facility is not available
+ */
+bool libcpumf_have_pai_crypto(void);
 #endif
