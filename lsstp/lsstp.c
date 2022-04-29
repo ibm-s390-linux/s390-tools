@@ -1,3 +1,12 @@
+/*
+ * lsstp - Display STP system information
+ *
+ * Copyright IBM Corp. 2020, 2022
+ *
+ * s390-tools is free software; you can redistribute it and/or modify
+ * it under the terms of the MIT license. See LICENSE for details.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
