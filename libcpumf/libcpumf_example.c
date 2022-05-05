@@ -83,5 +83,7 @@ int main(void)
 		printf("PMU type 10 PMU name %s\n", pmuname);
 		free(pmuname);
 	}
+
+	printf("PAI NNPA support %d\n", libcpumf_have_pai_nnpa());
 	return EXIT_SUCCESS;
 }

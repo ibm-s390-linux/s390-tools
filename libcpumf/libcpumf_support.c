@@ -146,3 +146,10 @@ bool libcpumf_have_pai_crypto(void)
 
 	return (stat(S390_SYSFS_PAI_CRYPTO, &statbuf) == -1) ? false : true;
 }
+
+bool libcpumf_have_pai_nnpa(void)
+{
+	struct stat statbuf;
+
+	return (stat(S390_SYSFS_PAI_NNPA, &statbuf) == -1) ? false : true;
+}
