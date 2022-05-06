@@ -4492,6 +4492,15 @@ static void destroy_file_object(struct file *f)
 	free(f);
 }
 
+static void *cmsfs_oper_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
+{
+	(void)conn;
+
+	/* force immediate file removal */
+	cfg->hard_remove = 1;
+	return NULL;
+}
+
 static struct file_operations fops_fixed = {
 	.cache_data = cache_file_fixed,
 	.write_data = extend_block_fixed,
@@ -4507,6 +4516,7 @@ static struct file_operations fops_variable = {
 };
 
 static struct fuse_operations cmsfs_oper = {
+	.init		= cmsfs_oper_init,
 	.getattr	= cmsfs_getattr,
 	.statfs		= cmsfs_statfs,
 	.readdir	= cmsfs_readdir,
@@ -4683,8 +4693,6 @@ int main(int argc, char *argv[])
 		fuse_opt_add_arg(&args, "-oro");
 	/* force single threaded mode which requires no locking */
 	fuse_opt_add_arg(&args, "-s");
-	/* force immediate file removal */
-	fuse_opt_add_arg(&args, "-ohard_remove");
 
 	if (cmsfs.mode == BINARY_MODE &&
 	    (cmsfs.codepage_from != NULL || cmsfs.codepage_to != NULL))
