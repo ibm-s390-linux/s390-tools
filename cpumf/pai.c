@@ -42,6 +42,7 @@
 #include "pai.h"
 
 #define S390_EVT_PAI_CRYPTO	0x1000
+#define S390_EVT_PAI_NNPA	0x1800
 
 /* Default values for select() timeout: 1 second */
 static unsigned long read_interval = 1000;
@@ -104,7 +105,18 @@ static void ev_alloc(int enr, int cpu, int flags)
 	event->flags = flags;
 	event->attr.size = sizeof(event->attr);
 	event->attr.config = enr;
-	event->attr.type = libcpumf_pmutype(S390_SYSFS_PAI_CRYPTO);
+	switch (enr) {
+	case S390_EVT_PAI_CRYPTO:
+		event->attr.type = libcpumf_pmutype(S390_SYSFS_PAI_CRYPTO);
+		break;
+	case S390_EVT_PAI_NNPA:
+		if ((flags & as)) {
+			warnx("NNPA does not support kernel/user space selector");
+			flags &= ~as;
+		}
+		event->attr.type = libcpumf_pmutype(S390_SYSFS_PAI_NNPA);
+		break;
+	}
 	event->attr.sample_type = PERF_SAMPLE_TID | PERF_SAMPLE_CPU |
 				  PERF_SAMPLE_TIME | PERF_SAMPLE_RAW;
 	event->attr.disabled = 1;
@@ -120,7 +132,7 @@ static void ev_alloc(int enr, int cpu, int flags)
 		event->attr.comm = 1;
 		event->attr.comm_exec = 1;
 	}
-	if ((flags & as) != as) {
+	if ((flags & as) != as && enr == S390_EVT_PAI_CRYPTO) {
 		/* User space or kernel space selector */
 		if (flags & S390_EVTATTR_USERSPACE)
 			event->attr.exclude_kernel = 1;
@@ -129,8 +141,8 @@ static void ev_alloc(int enr, int cpu, int flags)
 	}
 	event->cpu = cpu;
 	event->map_size = mapsize;
-	snprintf(event->file_name, sizeof(event->file_name),
-		 "paicrypto.%03d", cpu);
+	snprintf(event->file_name, sizeof(event->file_name), "pai%s.%03d",
+		 enr == S390_EVT_PAI_CRYPTO ? "crypto" : "nnpa", cpu);
 	ev_merge(event);
 }
 
@@ -915,6 +927,11 @@ static struct util_opt opt_vec[] = {
 		.desc = "Collect PAI crypto counters"
 	},
 	{
+		.option = { "nnpa", optional_argument, NULL, 'n' },
+		.argument = "CPULIST[:DATA]",
+		.desc = "Collect PAI nnpa counters"
+	},
+	{
 		.option = { "mapsize", required_argument, NULL, 'm' },
 		.argument = "SIZE",
 		.desc = "Specifies number of 4KB pages for event ring buffer"
@@ -957,11 +974,18 @@ static const struct util_prg prg = {
 	}
 };
 
-static void record_cpus(const char *cp)
+static void record_cpus_crypto(const char *cp)
 {
 	if (!libcpumf_have_pai_crypto())
 		errx(EXIT_FAILURE, "No support for PAI crypto counters");
 	parse_cpulist(S390_EVT_PAI_CRYPTO, cp);
+}
+
+static void record_cpus_nnpa(const char *cp)
+{
+	if (!libcpumf_have_pai_nnpa())
+		errx(EXIT_FAILURE, "No support for PAI nnpa counters");
+	parse_cpulist(S390_EVT_PAI_NNPA, cp);
 }
 
 /* Mapsize must be power of 2 and larger than 4. Count bits in n and
@@ -981,7 +1005,8 @@ static unsigned long check_mapsize(unsigned long n)
 
 int main(int argc, char **argv)
 {
-	bool record = false, report = false, summary = false;
+	bool crypto_record = false, report = false, summary = false;
+	bool nnpa_record = false;
 	unsigned long loop_count = 1;
 	int ch, group = 0;
 	char *slash;
@@ -1012,8 +1037,8 @@ int main(int argc, char **argv)
 			util_prg_print_version();
 			return EXIT_SUCCESS;
 		case 'c':
-			record_cpus(optarg);
-			record = true;
+			record_cpus_crypto(optarg);
+			crypto_record = true;
 			break;
 		case 'i':
 			errno = 0;
@@ -1027,6 +1052,10 @@ int main(int argc, char **argv)
 			mapsize = check_mapsize(mapsize);
 			if (errno || !mapsize || *slash)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			break;
+		case 'n':
+			record_cpus_nnpa(optarg);
+			nnpa_record = true;
 			break;
 		case 'r':
 			report = true;
@@ -1044,11 +1073,12 @@ int main(int argc, char **argv)
 	}
 
 	/* Without options do report on all files */
-	if (!record && !report) {
+	if (!crypto_record && !nnpa_record && !report) {
 		warnx("No action specified assume report");
 		report = true;
 	}
-	if (record) {
+
+	if (crypto_record || nnpa_record) {
 		/* In record mode command line parameter is run-time */
 		if (optind < argc) {
 			errno = 0;
@@ -1076,7 +1106,7 @@ int main(int argc, char **argv)
 	} else {		/* Scan files in local directory */
 		struct dirent **de_vec;
 		int count = util_scandir(&de_vec, alphasort, ".",
-					 "paicrypto.[0-9]+");
+					 "pai(crypto|nnpa).[0-9]+");
 		for (int i = 0; i < count; i++)
 			if (de_vec[i]->d_type == DT_REG)
 				ch += map_check(de_vec[i]->d_name, evt_scan);

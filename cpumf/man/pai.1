@@ -21,6 +21,13 @@
 .BR  \-c | \-\-crypto [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
 .br
 \*c
+.RB [ \-V ][ \-m | \-\-mapsize
+.IR size ]
+.RB [ \-i | \-\-interval
+.IR ms ]
+.BR  \-n | \-\-nnpa [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
+.br
+\*c
 .RB [ \-V ][ \-H | \-\-humantime ][ \-S | \-\-summary "] " \-r | \-\-report " [" \fIfiles\fP ]
 .br
 \*c
@@ -37,15 +44,25 @@ The \*c command records PAI counters in a ring buffer.
 \*c can record counter data for all CPUs or for selected CPUs.
 The main command options are
 .B \-c
-for recording cryptographic CPU instructions and
+for recording cryptographic CPU instructions,
+.B \-n
+for recording NNPA CPU instructions
+and
 .B \-r
 for reporting.
-If both options are omitted, option
+If all three options are omitted, option
 .B \-r
 is assumed and a message is printed.
 Recording stores data, by CPU, in files
-.I paicrypto.<X>,
-where <X> specifies the CPU number.
+.I paicrypto.<XXX>,
+for option
+.B \-c
+or
+.I painnpa.<XXX>,
+for option
+.B \-n
+where <XXX> specifies the CPU number with leading
+zeros.
 The files are created in the working directory,
 existing files are overwritten.
 Reporting evaluates files that are created by recording.
@@ -82,6 +99,33 @@ execution.
 .IP u|U
 Include only PAI cryptographic counters changed during user space
 execution.
+.RE
+.
+.TP
+.BR \-n ", " \-\-nnpa "\fR[\fIcpulist\fR][:\fIdata\fR]"
+Records data for all (default) or a specified list of CPUs.
+The CPU list is a comma-separated list of CPU numbers and ranges.
+In a range, a hyphen separates the first CPU number
+from the last CPU number.
+By default \*c lists all CPUs.
+.RS
+The optional data specification
+follows the colon
+and determines additional collection of data.
+The specification consists of alphabetic
+characters that can be upper or lower case:
+.IP c|C
+Include task rename system calls
+.B exec
+and
+.BR prctl .
+.IP f|F
+Include task creation and deletion system calls
+.B fork
+and
+.BR exit .
+.IP s|S
+Include context switch records created by the kernel scheduler.
 .RE
 .
 .TP
