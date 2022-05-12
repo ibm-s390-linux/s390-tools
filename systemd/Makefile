@@ -18,8 +18,6 @@ install: system_units
 	  $(INSTALL) -g $(GROUP) -o $(OWNER) \
 	             -m 644 $$unit $(DESTDIR)$(SYSTEMDSYSTEMUNITDIR) ; \
 	done
-	# For systemd install dumpconf to TOOLS_LIBDIR
-	$(INSTALL) -m 755 ../scripts/dumpconf $(DESTDIR)$(TOOLS_LIBDIR)
 
 else
 

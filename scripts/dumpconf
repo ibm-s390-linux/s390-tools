@@ -101,7 +101,7 @@ EOF
 printversion()
 {
     cat <<EOF
-dumpconf: zSeries dump configuration script version 1.1
+dumpconf: zSeries dump configuration script version %S390_TOOLS_VERSION%
 Copyright IBM Corp. 2006, 2022
 EOF
 }
