@@ -1,23 +1,18 @@
 #!/bin/bash
-### BEGIN INIT INFO
-# Provides: dumpconf
-# Required-Start: $local_fs
-# Required-Stop: $local_fs
-# Should-Start:
-# Should-Stop:
-# Default-Start: 0 1 2 3 5 6
-# Default-Stop:
-# Short-Description: Configure s390 dump feature
-# Description: Configures the s390 dump feature. It uses the configuration file
-#              /etc/sysconfig/dumpconf
-# X-Systemd-RemainAfterExit: true
-### END INIT INFO
+#
+# dumpconf - dump configuration script
+#
+# This script is called by the corresponding systemd unit file dumpconf.service
+# but can also be used stand-alone.
+#
+# The configuration file is located in /etc/sysconfig/dumpconf
+#
+# Copyright IBM Corp. 2006, 2022
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
 
-# chkconfig: 012356 01 99
-
-# This script can be either used stand-alone or as System V init script.
-
-DUMPCONF_BIN=/etc/init.d/dumpconf
 DUMP_CONFIG_FILE=/etc/sysconfig/dumpconf
 CMDFULL=$0
 CMD="dumpconf"
@@ -107,7 +102,7 @@ printversion()
 {
     cat <<EOF
 dumpconf: zSeries dump configuration script version 1.1
-Copyright IBM Corp. 2006, 2009
+Copyright IBM Corp. 2006, 2022
 EOF
 }
 
