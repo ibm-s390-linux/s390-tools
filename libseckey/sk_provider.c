@@ -2216,13 +2216,23 @@ static int sk_prov_keymgmt_match(const struct sk_prov_key *key1,
 
 	if (key1->type != key2->type)
 		return 0;
+
+	if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+		/* match everything except private key */
+		return default_match_fn(key1->default_key, key2->default_key,
+					selection &
+					    (~OSSL_KEYMGMT_SELECT_PRIVATE_KEY));
+	}
+
 	if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
 		if (key1->secure_key_size != key2->secure_key_size)
 			return 0;
-		if (key1->secure_key_size > 0 &&
-		    memcmp(key1->secure_key, key2->secure_key,
-			    key1->secure_key_size) != 0)
-			return 0;
+		if (key1->secure_key_size > 0) {
+			if (memcmp(key1->secure_key, key2->secure_key,
+				   key1->secure_key_size) != 0)
+				return 0;
+			selection &= (~OSSL_KEYMGMT_SELECT_PRIVATE_KEY);
+		}
 	}
 
 	return default_match_fn(key1->default_key, key2->default_key,
