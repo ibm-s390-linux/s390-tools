@@ -93,6 +93,8 @@ const char *util_arch_machine_type_to_str(int type)
 		return "IBM z15";
 	case UTIL_ARCH_MACHINE_TYPE_Z15_T02:
 		return "IBM z15 Model T02";
+	case UTIL_ARCH_MACHINE_TYPE_Z16:
+		return "IBM z16";
 	default:
 		return "Unknown machine type";
 	}

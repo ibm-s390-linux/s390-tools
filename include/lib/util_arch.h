@@ -26,6 +26,7 @@ enum util_arch_machine_type {
 	UTIL_ARCH_MACHINE_TYPE_Z14_ZR1	= 3907,
 	UTIL_ARCH_MACHINE_TYPE_Z15	= 8561,
 	UTIL_ARCH_MACHINE_TYPE_Z15_T02	= 8562,
+	UTIL_ARCH_MACHINE_TYPE_Z16	= 3931,
 };
 
 int util_arch_machine_type(void);
