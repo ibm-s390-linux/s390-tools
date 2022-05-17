@@ -17,6 +17,31 @@ This package started in 2001 and has a long "tradition" - therefore, older tools
 might not follow all recommendations. Note that when changing existing code,
 consistency could have priority over applying rules.
 
+Automatic Code Formatting
+-------------------------
+
+> **NOTE:** clang-format is a helpful tool but please don't use it blindly!
+
+s390-tools provides a ClangFormat (https://clang.llvm.org/docs/ClangFormat.html)
+configuration file - see [`.clang-format`](.clang-format). It can be used to
+format your C/C++ code automatically.
+
+Clang-format can format a single file or multiple files at once. For example, to
+format `main.c` in place, run the following command in a terminal:
+
+```bash
+clang-format -i main.c
+```
+
+In order to format only your current staged changes use the clang-format git
+plugin:
+
+```bash
+git clang-format --staged
+```
+
+See also `git clang-format -h`.
+
 Standard abbreviations
 ----------------------
 

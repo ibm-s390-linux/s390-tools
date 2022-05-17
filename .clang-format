@@ -1,0 +1,134 @@
+# Must be compatible with clang-format 14
+---
+AccessModifierOffset: "-4"
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: None
+AlignConsecutiveAssignments: false
+AlignConsecutiveBitFields: AcrossComments
+AlignConsecutiveMacros: AcrossComments
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Right
+AlignOperands: true
+AlignTrailingComments: true
+AllowAllArgumentsOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: false
+BitFieldColonSpacing: Both
+BinPackArguments: true
+BinPackParameters: true
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: true
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BreakBeforeInheritanceComma: false
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializers: BeforeComma
+BreakConstructorInitializersBeforeComma: false
+BreakStringLiterals: false
+ColumnLimit: "100"
+CompactNamespaces: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+ConstructorInitializerIndentWidth: "8"
+ContinuationIndentWidth: "8"
+Cpp11BracedListStyle: false
+DerivePointerAlignment: false
+DisableFormat: false
+ExperimentalAutoDetectBinPacking: false
+FixNamespaceComments: false
+# git grep -h '^#define [^[:space:]]*\(for_each\|iterate\)[^[:space:]]*('  \
+#   | sed "s,^#define \([^[:space:]]*\(for_each\|iterate\)[^[:space:]]*\)(.*$,  - '\1'," \
+#   | LC_ALL=C sort -u
+ForEachMacros:
+  - "dfi_cpu_iterate"
+  - "dfi_mem_chunk_iterate"
+  - "dfo_chunk_iterate"
+  - "for_each_rb_entry"
+  - "ns_range_for_each"
+  - "sd_cpu_item_enable_iterate"
+  - "sd_cpu_item_iterate"
+  - "sd_cpu_iterate"
+  - "sd_cpu_type_iterate"
+  - "sd_sys_item_enable_iterate"
+  - "sd_sys_item_iterate"
+  - "sd_sys_iterate"
+  - "table_col_iterate"
+  - "table_iterate_mark_keys"
+  - "util_list_iterate"
+  - "util_list_iterate_safe"
+  - "util_opt_iterate"
+  - "util_rec_iterate"
+IncludeBlocks: Preserve
+# Leave imports as is
+IncludeCategories:
+  - Regex: .*
+    Priority: 1
+IndentCaseLabels: false
+IndentGotoLabels: false
+IndentPPDirectives: None
+IndentWidth: "8"
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MacroBlockBegin: ""
+MacroBlockEnd: ""
+MaxEmptyLinesToKeep: "1"
+NamespaceIndentation: Inner
+PackConstructorInitializers: CurrentLine
+PenaltyBreakAssignment: "10"
+PenaltyBreakBeforeFirstCallParameter: "30"
+PenaltyBreakComment: "10"
+PenaltyBreakFirstLessLess: "0"
+PenaltyBreakString: "10"
+PenaltyExcessCharacter: "100"
+PenaltyReturnTypeOnItsOwnLine: "60"
+PointerAlignment: Right
+ReflowComments: true
+SortIncludes: false
+SortUsingDeclarations: false
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatementsExceptForEachMacros
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: "1"
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard: Auto
+StatementMacros:
+  - "STATIC_ASSERT"
+TabWidth: "8"
+TypenameMacros:
+  - "STACK_OF"
+UseTab: Always
+WhitespaceSensitiveMacros:
+  - "STRINGIFY"
