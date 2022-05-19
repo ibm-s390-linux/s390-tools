@@ -38,6 +38,7 @@
 #include "lib/util_path.h"
 #include "lib/util_scandir.h"
 #include "lib/util_libc.h"
+#include "lib/util_file.h"
 #include "lib/libcpumf.h"
 
 #include "lshwc.h"
@@ -62,25 +63,6 @@ static struct ctrname {		/* List of defined counters */
 	unsigned long *ccv;	/* Per CPU counter value */
 } ctrname[MAXCTRS];
 
-/* Open file and extract counter number */
-static int read_counter(const char *p)
-{
-	FILE *fp = fopen(p, "r");
-	int rc = 0, ctr;
-
-	if (fp) {
-		rc = fscanf(fp, "event=%x", &ctr);
-		fclose(fp);
-	}
-	return rc == 1 ? ctr : -EINVAL;
-}
-
-static int add_countername(char *name, int nr)
-{
-	ctrname[nr].name = strdup(name);
-	return ctrname[nr].name ? 0 : -ENOMEM;
-}
-
 static bool read_counternames(void)
 {
 	struct dirent **namelist = NULL;
@@ -96,13 +78,12 @@ static bool read_counternames(void)
 	}
 	for (i = 0; i < count && ctr >= 0; i++) {
 		util_asprintf(&ctrpath, "%s/%s", path, namelist[i]->d_name);
-		ctr = read_counter(ctrpath);
+		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1)
+			ctrname[ctr].name = util_strdup(namelist[i]->d_name);
+		else
+			warnx("Cannot parse %s", ctrpath);
 		free(ctrpath);
-		if (ctr >= 0)
-			ctr = add_countername(namelist[i]->d_name, ctr);
 	}
-	if (ctr < 0)
-		warnx("Cannot parse %s", path);
 	util_scandir_free(namelist, count);
 	free(path);
 	return ctr < 0 ? false : true;
