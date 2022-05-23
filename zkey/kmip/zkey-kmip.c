@@ -786,11 +786,12 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 	apqn_type = properties_get(ph->pd.properties, KMIP_CONFIG_APQN_TYPE);
 	if (apqn_type != NULL) {
 		ph->card_type = _card_type_from_str(apqn_type);
-		free(apqn_type);
 		if (ph->card_type == CARD_TYPE_ANY) {
 			pr_verbose(&ph->pd, "APQN type invalid: %s", apqn_type);
+			free(apqn_type);
 			goto error;
 		}
+		free(apqn_type);
 	}
 
 	ph->identity_secure_key = properties_get(ph->pd.properties,

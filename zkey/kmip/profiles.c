@@ -161,6 +161,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		}
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_TRANSPORT);
 	if (val == NULL)
@@ -178,7 +179,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		goto out;
 	}
 	free(val);
-
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_ENCODING);
 	if (val == NULL)
@@ -212,6 +213,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		goto out;
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_HTTPS_URI);
 	switch (prof->transport) {
@@ -245,6 +247,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		goto out;
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_WRAP_KEY_ALGORITHM);
 	if (val == NULL)
@@ -260,6 +263,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		goto out;
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_WRAP_KEY_PARAMS);
 	if (prof->wrap_key_algo == KMIP_CRYPTO_ALGO_RSA) {
@@ -284,6 +288,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 			   KMIP_PROFILES_WRAP_KEY_PARAMS, val);
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_WRAP_KEY_FORMAT);
 	switch (prof->wrap_key_algo) {
@@ -316,6 +321,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		break;
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_WRAP_PADDING_METHOD);
 	switch (prof->wrap_key_algo) {
@@ -345,6 +351,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		break;
 	}
 	free(val);
+	val = NULL;
 
 	val = properties_get(props, KMIP_PROFILES_WRAP_HASHING_ALOGRITHM);
 	switch (prof->wrap_padding_method) {
@@ -374,6 +381,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		break;
 	}
 	free(val);
+	val = NULL;
 
 	rc = profile_get_bool(ph, props, file_name,
 			      KMIP_PROFILES_SUPPORTS_LINK_ATTR, false,
@@ -409,6 +417,7 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 		goto out;
 	}
 	free(val);
+	val = NULL;
 
 	rc = profile_get_bool(ph, props, file_name,
 			      KMIP_PROFILES_SUPPORTS_SENSITIVE_ATTR, false,
@@ -421,8 +430,6 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 			      &prof->check_always_sensitive_attr);
 	if (rc != 0)
 		goto out;
-
-	val = NULL;
 
 out:
 	properties_free(props);
