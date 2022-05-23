@@ -3,7 +3,7 @@
  *
  * low level perf functions
  *
- * Copyright IBM Corp. 2015, 2020
+ * Copyright IBM Corp. 2015, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <libudev.h>
@@ -31,14 +32,12 @@
 #include "cpacfstats.h"
 #include "../include/lib/zt_common.h"
 
-#define NUM_COUNTER ALL_COUNTER
-
 /* correlation between counter and perf counter string */
 static const struct {
 	char pmu[20];
 	char pfm_name[60];
 	enum ctr_e ctr;
-} pmf_counter_name[NUM_COUNTER] = {
+} pmf_counter_name[ALL_COUNTER] = {
 	{"cpum_cf", "DEA_FUNCTIONS", DES_FUNCTIONS},
 	{"cpum_cf", "AES_FUNCTIONS", AES_FUNCTIONS},
 	{"cpum_cf", "SHA_FUNCTIONS", SHA_FUNCTIONS},
@@ -49,10 +48,12 @@ static const struct {
 static struct pmf_data {
 	int pmutype;
 	int eventid;
-} pmf_counter_data[NUM_COUNTER];
+} pmf_counter_data[ALL_COUNTER];
 
 struct percpucounter {
-	int                   ctr_fds[NUM_COUNTER];
+	int                   ctr_fds[ALL_COUNTER];
+	int                   pai_user[NUM_PAI_USER];
+	int                   pai_kernel[NUM_PAI_KERNEL];
 	unsigned int          cpunum;
 	struct percpucounter *next;
 };
@@ -71,6 +72,8 @@ static int ctr_state[NUM_COUNTER];
 
 static volatile int stoprequested;
 
+static int paipmutype, paipmueventstart;
+
 static struct percpucounter *allocpercpucounter(unsigned int cpunum)
 {
 	struct percpucounter *ppc;
@@ -79,8 +82,12 @@ static struct percpucounter *allocpercpucounter(unsigned int cpunum)
 	if (ppc) {
 		int i;
 
-		for (i = 0; i < NUM_COUNTER; ++i)
+		for (i = 0; i < ALL_COUNTER; ++i)
 			ppc->ctr_fds[i] = -1;
+		for (i = 0; i < NUM_PAI_USER; ++i)
+			ppc->pai_user[i] = -1;
+		for (i = 0; i < NUM_PAI_KERNEL; ++i)
+			ppc->pai_kernel[i] = -1;
 		ppc->cpunum = cpunum;
 		ppc->next = NULL;
 	}
@@ -91,8 +98,12 @@ static void freepercpucounter(struct percpucounter *pcpu)
 {
 	int i;
 
-	for (i = 0; i < NUM_COUNTER; ++i)
+	for (i = 0; i < ALL_COUNTER; ++i)
 		(void)close(pcpu->ctr_fds[i]);
+	for (i = 0; i < NUM_PAI_USER; ++i)
+		(void)close(pcpu->pai_user[i]);
+	for (i = 0; i < NUM_PAI_KERNEL; ++i)
+		(void)close(pcpu->pai_kernel[i]);
 	free(pcpu);
 }
 
@@ -137,6 +148,39 @@ static int perf_counter_supported(const char *pmu, const char *counter)
 		return 0;
 	}
 	return !access(buf, R_OK);
+}
+
+static int cpumf_authorized(void)
+{
+	unsigned vermin, vermax, auth;
+	int res = 0, found = 0;
+	size_t linesize = 0;
+	char *line = NULL;
+	FILE *f;
+
+	f = fopen("/proc/service_levels", "r");
+	if (f == NULL) {
+		eprint("Failed to open /proc/service_levels (%d:%s)\n",
+			errno, strerror(errno));
+		return 0;
+	}
+	while (getline(&line, &linesize, f) >= 0) {
+		if (sscanf(line,
+			   "CPU-MF: Counter facility: version=%d.%d authorization=%x",
+			   &vermin, &vermax, &auth) == 3) {
+			if (auth & 0x8)
+				res = 1;
+			else
+				eprint("CPU-MF counters not authorized.\n");
+			found = 1;
+			break;
+		}
+	}
+	if (!found)
+		eprint("CPU-MF counters not available.\n");
+	free(line);
+	fclose(f);
+	return res;
 }
 
 static int perf_event_encode(int *pmutype, int *eventid,
@@ -196,7 +240,8 @@ static int activatecpu(unsigned int cpu)
 		freepercpucounter(ppc);
 		return -1;
 	}
-	for (i = 0; i < NUM_COUNTER; ++i) {
+	/* activate CPU-MF */
+	for (i = 0; i < ALL_COUNTER; ++i) {
 		if (ctr_state[i] == UNSUPPORTED)
 			continue;
 		memset(&pfm_event, 0, sizeof(pfm_event));
@@ -223,6 +268,67 @@ static int activatecpu(unsigned int cpu)
 			ppc->ctr_fds[i] = fd;
 		}
 	}
+	/* activate pai_user and pai_kernel */
+	/* invariant:
+	   (ctr_state[PAI_USER] == UNSUPPORTED) ==
+	   (ctr_state[PAI_KERNEL] == UNSUPPORTED) */
+	if (ctr_state[PAI_USER] != UNSUPPORTED) {
+		for (i = 1; i <= NUM_PAI_USER; ++i) {
+			memset(&pfm_event, 0, sizeof(pfm_event));
+			pfm_event.size = sizeof(pfm_event);
+			pfm_event.type = paipmutype;
+			pfm_event.config = paipmueventstart + i;
+			pfm_event.exclude_kernel = 1;
+			pfm_event.exclude_user = 0;
+			pfm_event.disabled = ctr_state[PAI_USER] == DISABLED;
+			fd = perf_event_open(&pfm_event, -1, cpu, -1, 0);
+			if (fd < 0) {
+				eprint("Perf_event_open() failed with errno=%d [%s]\n",
+					errno, strerror(errno));
+				rc = -1;
+				ctr_state[PAI_USER] = UNSUPPORTED;
+				ctr_state[PAI_KERNEL] = UNSUPPORTED;
+				goto outevents;
+			} else {
+				ppc->pai_user[i - 1] = fd;
+			}
+			pfm_event.exclude_kernel = 0;
+			pfm_event.exclude_user = 1;
+			pfm_event.disabled = ctr_state[PAI_KERNEL] == DISABLED;
+			fd = perf_event_open(&pfm_event, -1, cpu, -1, 0);
+			if (fd < 0) {
+				eprint("Perf_event_open() failed with errno=%d [%s]\n",
+					errno, strerror(errno));
+				rc = -1;
+				ctr_state[PAI_USER] = UNSUPPORTED;
+				ctr_state[PAI_KERNEL] = UNSUPPORTED;
+				goto outevents;
+			} else {
+				ppc->pai_kernel[i - 1] = fd;
+			}
+		}
+		for (; i <= NUM_PAI_KERNEL; ++i) {
+			memset(&pfm_event, 0, sizeof(pfm_event));
+			pfm_event.size = sizeof(pfm_event);
+			pfm_event.type = paipmutype;
+			pfm_event.config = paipmueventstart + i;
+			pfm_event.exclude_kernel = 0;
+			pfm_event.exclude_user = 1;
+			pfm_event.disabled = ctr_state[PAI_KERNEL] == DISABLED;
+			fd = perf_event_open(&pfm_event, -1, cpu, -1, 0);
+			if (fd < 0) {
+				eprint("Perf_event_open() failed with errno=%d [%s]\n",
+					errno, strerror(errno));
+				rc = -1;
+				ctr_state[PAI_USER] = UNSUPPORTED;
+				ctr_state[PAI_KERNEL] = UNSUPPORTED;
+				goto outevents;
+			} else {
+				ppc->pai_kernel[i - 1] = fd;
+			}
+		}
+	}
+outevents:
 	ppc->next = root;
 	root = ppc;
 	if (enabledcounter)
@@ -240,8 +346,12 @@ static void deactivatecpu(unsigned int cpunum)
 		return;
 	pcpu = findcpu(cpunum, 1);
 	if (pcpu != NULL) {
-		for (i = 0; i < NUM_COUNTER; ++i)
+		for (i = 0; i < ALL_COUNTER; ++i)
 			(void)close(pcpu->ctr_fds[i]);
+		for (i = 0; i < NUM_PAI_USER; ++i)
+			(void)close(pcpu->pai_user[i]);
+		for (i = 0; i < NUM_PAI_KERNEL; ++i)
+			(void)close(pcpu->pai_kernel[i]);
 		free(pcpu);
 		if (enabledcounter)
 			hotplugdetected = 1;
@@ -286,13 +396,16 @@ static int perf_load_counter_data(void)
 {
 	int i, res = 0;
 
-	for (i = 0; i < NUM_COUNTER; ++i) {
+	for (i = 0; i < ALL_COUNTER; ++i) {
 		if (ctr_state[i] != UNSUPPORTED)
 			res |= perf_event_encode(&pmf_counter_data[i].pmutype,
 						 &pmf_counter_data[i].eventid,
 						 pmf_counter_name[i].pmu,
 						 pmf_counter_name[i].pfm_name);
 	}
+	if (ctr_state[PAI_USER] != UNSUPPORTED)
+		res |= perf_event_encode(&paipmutype, &paipmueventstart,
+					 "pai_crypto", "CRYPTO_ALL");
 	return res;
 }
 
@@ -351,7 +464,10 @@ static void *hotplughandler(void *UNUSED(unused))
 
 int perf_init(void)
 {
-	int ecc_supported;
+	int ecc_supported, i, num;
+	unsigned long maxfd;
+	struct rlimit rlim;
+	FILE *f;
 
 	/*  initialize performance monitoring library */
 	if (!perf_supported()) {
@@ -359,13 +475,56 @@ int perf_init(void)
 		return -1;
 	}
 
+	/* We currently support all cpumf counters plus two virtual
+	 * counters for PAI. */
+	num = ALL_COUNTER + 2;
 	/* Check if ECC is supported on current hardware */
 	ecc_supported = perf_counter_supported("cpum_cf", "ECC_FUNCTION_COUNT");
-	if (!ecc_supported)
+
+	if (!cpumf_authorized()) {
+		for (i = 0; i < ALL_COUNTER; ++i)
+			ctr_state[i] = UNSUPPORTED;
+		num -= ALL_COUNTER;
+	} else if (!ecc_supported) {
 		ctr_state[ECC_FUNCTIONS] = UNSUPPORTED;
+		--num;
+	}
+
+	if (!perf_counter_supported("pai_crypto", "CRYPTO_ALL")) {
+		ctr_state[PAI_USER] = UNSUPPORTED;
+		ctr_state[PAI_KERNEL] = UNSUPPORTED;
+		num -= 2;
+	}
+
+	if (num == 0) {
+		eprint("No crypto counters supported!\n");
+		return -1;
+	}
 
 	if (perf_load_counter_data())
 		return -1;
+	/* We have to adjust the number of FDs possible since we might
+	 * need more than 1024 (the typical soft limit) */
+	f = fopen("/proc/sys/fs/nr_open", "r");
+	if (f == NULL) {
+		eprint("fopen failed for /proc/sys/fs/nr_open with errno=%d [%s]\n",
+			errno, strerror(errno));
+		return -1;
+	}
+	if (fscanf(f, "%lu", &maxfd) != 1) {
+		fclose(f);
+		eprint("Failed to parse /proc/sys/fs/nr_open\n");
+		return -1;
+	}
+	fclose(f);
+	rlim.rlim_cur = maxfd;
+	rlim.rlim_max = maxfd;
+	if (setrlimit(RLIMIT_NOFILE, &rlim) == -1) {
+		eprint("setrlimit failed with errno=%d [%s]\n",
+			errno, strerror(errno));
+		return -1;
+	}
+
 	if (pthread_create(&hotplugthread, NULL, hotplughandler, NULL)) {
 		eprint("Failed to start hotplug handler thread\n");
 		return -1;
@@ -395,6 +554,22 @@ void perf_close(void)
 }
 
 
+static int enable_array(int *arr, int size)
+{
+	int i, ec, rc = 0;
+
+	for (i = 0; i < size; ++i) {
+		ec = ioctl(arr[i], PERF_EVENT_IOC_ENABLE, 0);
+		if (ec < 0) {
+			eprint("Ioctl(PERF_EVENT_IOC_ENABLE) failed with errno=%d [%s]\n",
+				errno, strerror(errno));
+			rc = -1;
+		}
+	}
+	return rc;
+}
+
+
 int perf_enable_ctr(enum ctr_e ctr)
 {
 	struct percpucounter *pcpu;
@@ -418,10 +593,44 @@ int perf_enable_ctr(enum ctr_e ctr)
 		ctr_state[ctr] = ENABLED;
 		++enabledcounter;
 		endforeachcpu();
+	} else if (ctr == PAI_USER) {
+		foreachcpu(pcpu) {
+			ec = enable_array(pcpu->pai_user, NUM_PAI_USER);
+			if (ec < 0)
+				rc = -1;
+		}
+		ctr_state[ctr] = ENABLED;
+		++enabledcounter;
+		endforeachcpu();
+	} else if (ctr == PAI_KERNEL) {
+		foreachcpu(pcpu) {
+			ec = enable_array(pcpu->pai_kernel, NUM_PAI_KERNEL);
+			if (ec < 0)
+				rc = -1;
+		}
+		ctr_state[ctr] = ENABLED;
+		++enabledcounter;
+		endforeachcpu();
 	} else {
 		rc = -1;
 	}
 
+	return rc;
+}
+
+
+static int disable_array(int *arr, int size)
+{
+	int i, ec, rc = 0;
+
+	for (i = 0; i < size; ++i) {
+		ec = ioctl(arr[i], PERF_EVENT_IOC_DISABLE, 0);
+		if (ec < 0) {
+			eprint("Ioctl(PERF_EVENT_IOC_DISABLE) failed with errno=%d [%s]\n",
+				errno, strerror(errno));
+			rc = -1;
+		}
+	}
 	return rc;
 }
 
@@ -451,6 +660,28 @@ int perf_disable_ctr(enum ctr_e ctr)
 		if (enabledcounter == 0)
 			hotplugdetected = 0;
 		endforeachcpu();
+	} else if (ctr == PAI_USER) {
+		foreachcpu(pcpu) {
+			ec = disable_array(pcpu->pai_user, NUM_PAI_USER);
+			if (ec < 0)
+				rc = -1;
+		}
+		ctr_state[ctr] = DISABLED;
+		--enabledcounter;
+		if (enabledcounter == 0)
+			hotplugdetected = 0;
+		endforeachcpu();
+	} else if (ctr == PAI_KERNEL) {
+		foreachcpu(pcpu) {
+			ec = disable_array(pcpu->pai_kernel, NUM_PAI_KERNEL);
+			if (ec < 0)
+				rc = -1;
+		}
+		ctr_state[ctr] = DISABLED;
+		--enabledcounter;
+		if (enabledcounter == 0)
+			hotplugdetected = 0;
+		endforeachcpu();
 	} else {
 		rc = -1;
 	}
@@ -459,14 +690,30 @@ int perf_disable_ctr(enum ctr_e ctr)
 }
 
 
-int perf_reset_ctr(enum ctr_e ctr)
+static int reset_array(int *arr, int size)
+{
+	int ec, rc = 0, i;
+
+	for (i = 0; i < size; ++i) {
+		ec = ioctl(arr[i], PERF_EVENT_IOC_RESET, 0);
+		if (ec < 0) {
+			eprint("Ioctl(PERF_EVENT_IOC_RESET) failed with errno=%d [%s]\n",
+				errno, strerror(errno));
+			rc = -1;
+		}
+	}
+	return rc;
+}
+
+
+int perf_reset_ctr(enum ctr_e ctr, uint64_t *value)
 {
 	struct percpucounter *pcpu;
 	int ec, rc = 0;
 
 	if (ctr == ALL_COUNTER) {
 		for (ctr = 0; ctr < ALL_COUNTER; ctr++) {
-			rc = perf_reset_ctr(ctr);
+			rc = perf_reset_ctr(ctr, value);
 			if (rc != 0)
 				return rc;
 		}
@@ -480,10 +727,25 @@ int perf_reset_ctr(enum ctr_e ctr)
 			}
 		}
 		endforeachcpu();
+	} else if (ctr == PAI_USER) {
+		foreachcpu(pcpu) {
+			ec = reset_array(pcpu->pai_user, NUM_PAI_USER);
+			if (ec < 0)
+				rc = -1;
+		}
+		endforeachcpu();
+	} else if (ctr == PAI_KERNEL) {
+		foreachcpu(pcpu) {
+			ec = reset_array(pcpu->pai_kernel, NUM_PAI_KERNEL);
+			if (ec < 0)
+				rc = -1;
+		}
+		endforeachcpu();
 	} else {
 		rc = -1;
 	}
-
+	if (rc == 0)
+		rc = perf_read_ctr(ctr, value);
 	return rc;
 }
 
@@ -491,13 +753,21 @@ int perf_reset_ctr(enum ctr_e ctr)
 int perf_read_ctr(enum ctr_e ctr, uint64_t *value)
 {
 	struct percpucounter *pcpu;
-	int ec, rc = -1;
+	int ec, rc = 0;
 	uint64_t val;
 
 	if (!value)
 		return -1;
 	if (ctr == HOTPLUG_DETECTED) {
 		*value = hotplugdetected;
+		return 0;
+	}
+	if (ctr == PAI_USER) {
+		*value = NUM_PAI_USER;
+		return 0;
+	}
+	if (ctr == PAI_KERNEL) {
+		*value = NUM_PAI_KERNEL;
 		return 0;
 	}
 	if (ctr >= ALL_COUNTER)
@@ -509,9 +779,9 @@ int perf_read_ctr(enum ctr_e ctr, uint64_t *value)
 		if (ec != sizeof(val)) {
 			eprint("Read() on perf file descriptor failed with errno=%d [%s]\n",
 			       errno, strerror(errno));
+			rc = -1;
 		} else {
 			*value += val;
-			rc = 0;
 		}
 	}
 	endforeachcpu();
@@ -525,7 +795,34 @@ int  perf_ecc_supported(void)
 }
 
 int perf_ctr_state(enum ctr_e ctr) {
-	if (ctr < ALL_COUNTER)
+	if (ctr < NUM_COUNTER)
 		return ctr_state[ctr];
 	return UNSUPPORTED;
+}
+
+
+int perf_read_pai_ctr(unsigned int ctrnum, int user, uint64_t *value)
+{
+	struct percpucounter *pcpu;
+	unsigned int maxctr;
+	int *arr, ec, rc = 0;
+	uint64_t val;
+
+	*value = 0;
+	maxctr = user ? NUM_PAI_USER : NUM_PAI_KERNEL;
+	if (ctrnum >= maxctr)
+		return -1;
+	foreachcpu(pcpu) {
+		arr = user ? pcpu->pai_user : pcpu->pai_kernel;
+		ec = read(arr[ctrnum], &val, sizeof(val));
+		if (ec != sizeof(val)) {
+			eprint("Read() on perf file descriptor failed with errno=%d [%s]\n",
+			       errno, strerror(errno));
+			rc = -1;
+		} else {
+			*value += val;
+		}
+	}
+	endforeachcpu();
+	return rc;
 }

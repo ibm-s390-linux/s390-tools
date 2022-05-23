@@ -3,7 +3,7 @@
  *
  * common function prototypes and definitions
  *
- * Copyright IBM Corp. 2015, 2020
+ * Copyright IBM Corp. 2015, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -16,15 +16,25 @@
 
 #define COPYRIGHT "Copyright IBM Corp. 2015, 2022"
 
-#define DEFAULT_SEND_TIMEOUT  (2 * 1000)
-#define DEFAULT_RECV_TIMEOUT  (2 * 1000)
+#define DEFAULT_SEND_TIMEOUT  (30 * 1000)
+#define DEFAULT_RECV_TIMEOUT  (30 * 1000)
+
+/*
+ * Number of PAI counters for user space.  This excludes PCKMO since
+ * this instruction is privileged.
+ */
+#define NUM_PAI_USER     143
+/* Number of PAI counters for kernel space.  Contains all counters. */
+#define NUM_PAI_KERNEL   156
 
 int eprint(const char *format, ...);
 
 /*
  * Counter names
  * ALL_COUNTER specifies the number of physical counters.  Virtual
- * counters might be added afterwards.
+ * counters might be added afterwards.  NUM_COUNTER is the last
+ * managed counter (i.e., a counter that can be activated, reset,
+ * deactivated).
  */
 enum ctr_e {
 	DES_FUNCTIONS = 0,
@@ -33,7 +43,10 @@ enum ctr_e {
 	PRNG_FUNCTIONS,
 	ECC_FUNCTIONS,
 	ALL_COUNTER,
-	HOTPLUG_DETECTED
+	PAI_USER,
+	PAI_KERNEL,
+	NUM_COUNTER,
+	HOTPLUG_DETECTED = 0xffff
 };
 
 enum type_e {
@@ -68,7 +81,7 @@ struct msg_query {
 /*
  * answer send from daemon to client
  * Consist of:
- * enum counter
+ * enum counter or PAI counter number if following PAI_USER or PAI_KERNEL
  * status code: < 0 error, 0 disabled, > 0 enabled
  * counter value
  */
@@ -114,9 +127,10 @@ void perf_stop(void);
 void perf_close(void);
 int  perf_enable_ctr(enum ctr_e ctr);
 int  perf_disable_ctr(enum ctr_e ctr);
-int  perf_reset_ctr(enum ctr_e ctr);
+int  perf_reset_ctr(enum ctr_e ctr, uint64_t *value);
 int  perf_read_ctr(enum ctr_e ctr, uint64_t *value);
 int  perf_ecc_supported(void);
 int  perf_ctr_state(enum ctr_e ctr);
+int  perf_read_pai_ctr(unsigned int ctrnum, int user, uint64_t *value);
 
 #endif

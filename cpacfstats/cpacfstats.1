@@ -1,6 +1,6 @@
 .\" cpacfstats.1
 .\"
-.\" Copyright IBM Corp. 2015, 2020
+.\" Copyright IBM Corp. 2015, 2022
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -32,7 +32,9 @@ cpacfstats \- enable, disable and display CPACF statistical data
 .RB ]
 .RB [ \-p | \-\-print
 .I counter
+.RB [ \-n | \-\-nonzero]
 .RB ]
+.RB [ \-j | \-\-json ]
 .
 .SH DESCRIPTION
 The cpacfstats client application interacts with the cpacfstatsd daemon and
@@ -44,12 +46,344 @@ All counters are initially disabled and must be switched on to measure
 CPACF activities of the system. There is a slight performance penalty with
 CPACF counters enabled.
 
-Note: All cryptographic counters are bound to physical CPUs. If you use
-dedicated CPUs for your LPAR, you obtain only your CPACF activities. If
-your CPUs are shared with other LPARs, their cryptographic activities might
-distort the results. CPACF performance counters are available on LPARs
-only. For security reasons only members of the group \fIcpacfstats\fR are
-allowed to run the cpacfstats client application.
+CPACF activity counters come in two flavors: CPU-MF and PAI.  CPU-MF
+counters are only available on LPARs and have to be authorized.  If
+they are available, the counters
+.B des,
+.B aes,
+.B sha,
+.B rng,
+and
+.B ecc
+are made available.  These counters can individually be activated,
+reset, printed, or deactivated.  PAI counters are a lot more detailed.
+The user interface only offers the counters
+.B pai_user
+and
+.B pai_kernel
+to count CPACF usage in user-space or kernel-space.  When printing
+these counters, detailed counters are shown.  The detailed names are:
+.RS
+.IP \(bu
+KM DES,
+.IP \(bu
+KM 2key TDES,
+.IP \(bu
+KM TDES,
+.IP \(bu
+KM DES protected key,
+.IP \(bu
+KM 2key TDES protected key,
+.IP \(bu
+KM TDES protected key,
+.IP \(bu
+KM AES 128bit,
+.IP \(bu
+KM AES 192bit,
+.IP \(bu
+KM AES 256bit,
+.IP \(bu
+KM AES 128bit protected key,
+.IP \(bu
+KM AES 192bit protected key,
+.IP \(bu
+KM AES 256bit protected key,
+.IP \(bu
+KM AES-XTS 128bit,
+.IP \(bu
+KM AES-XTS 256bit,
+.IP \(bu
+KM AES-XTS 128bit protected key,
+.IP \(bu
+KM AES-XTS 256bit protected key,
+.IP \(bu
+KMC DES,
+.IP \(bu
+KMC 2key TDES,
+.IP \(bu
+KMC TDES,
+.IP \(bu
+KMC DES protected key,
+.IP \(bu
+KMC 2key TDES protected key,
+.IP \(bu
+KMC TDES protected key,
+.IP \(bu
+KMC AES 128bit,
+.IP \(bu
+KMC AES 192bit,
+.IP \(bu
+KMC AES 256bit,
+.IP \(bu
+KMC AES 128bit protected key,
+.IP \(bu
+KMC AES 192bit protected key,
+.IP \(bu
+KMC AES 256bit protected key,
+.IP \(bu
+KMC PRNG,
+.IP \(bu
+KMA AES 128bit,
+.IP \(bu
+KMA AES 192bit,
+.IP \(bu
+KMA AES 256bit,
+.IP \(bu
+KMA AES 128bit protected key,
+.IP \(bu
+KMA AES 192bit protected key,
+.IP \(bu
+KMA AES 256bit protected key,
+.IP \(bu
+KMF DES,
+.IP \(bu
+KMF 2key TDES,
+.IP \(bu
+KMF TDES,
+.IP \(bu
+KMF DES protected key,
+.IP \(bu
+KMF 2key TDES protected key,
+.IP \(bu
+KMF TDES protected key,
+.IP \(bu
+KMF AES 128bit,
+.IP \(bu
+KMF AES 192bit,
+.IP \(bu
+KMF AES 256bit,
+.IP \(bu
+KMF AES 128bit protected key,
+.IP \(bu
+KMF AES 192bit protected key,
+.IP \(bu
+KMF AES 256bit protected key,
+.IP \(bu
+KMCTR DES,
+.IP \(bu
+KMCTR 2key TDES,
+.IP \(bu
+KMCTR TDES,
+.IP \(bu
+KMCTR DES protected key,
+.IP \(bu
+KMCTR 2key TDES protected key,
+.IP \(bu
+KMCTR TDES protected key,
+.IP \(bu
+KMCTR AES 128bit,
+.IP \(bu
+KMCTR AES 192bit,
+.IP \(bu
+KMCTR AES 256bit,
+.IP \(bu
+KMCTR AES 128bit protected key,
+.IP \(bu
+KMCTR AES 192bit protected key,
+.IP \(bu
+KMCTR AES 256bit protected key,
+.IP \(bu
+KMO DES,
+.IP \(bu
+KMO 2key TDES,
+.IP \(bu
+KMO TDES,
+.IP \(bu
+KMO DES protected key,
+.IP \(bu
+KMO 2key TDES protected key,
+.IP \(bu
+KMO TDES protected key,
+.IP \(bu
+KMO AES 128bit,
+.IP \(bu
+KMO AES 192bit,
+.IP \(bu
+KMO AES 256bit,
+.IP \(bu
+KMO AES 128bit protected key,
+.IP \(bu
+KMO AES 192bit protected key,
+.IP \(bu
+KMO AES 256bit protected key,
+.IP \(bu
+KIMD SHA1,
+.IP \(bu
+KIMD SHA256,
+.IP \(bu
+KIMD SHA512,
+.IP \(bu
+KIMD SHA3-224,
+.IP \(bu
+KIMD SHA3-256,
+.IP \(bu
+KIMD SHA3-384,
+.IP \(bu
+KIMD SHA3-512,
+.IP \(bu
+KIMD SHAKE 128,
+.IP \(bu
+KIMD SHAE 256,
+.IP \(bu
+KIMD GHASH,
+.IP \(bu
+KLMD SHA1,
+.IP \(bu
+KLMD SHA256,
+.IP \(bu
+KLMD SHA512,
+.IP \(bu
+KLMD SHA3-224,
+.IP \(bu
+KLMD SHA3-256,
+.IP \(bu
+KLMD SHA3-384,
+.IP \(bu
+KLMD SHA3-512,
+.IP \(bu
+KLMD SHAKE 128,
+.IP \(bu
+KLMD SHAKE 256,
+.IP \(bu
+KMAC DES,
+.IP \(bu
+KMAC 2key TDES,
+.IP \(bu
+KMAC TDES,
+.IP \(bu
+KMAC DES protected key,
+.IP \(bu
+KMAC 2key TDES protected key,
+.IP \(bu
+KMAC TDES protected key,
+.IP \(bu
+KMAC AES 128bit,
+.IP \(bu
+KMAC AES 192bit,
+.IP \(bu
+KMAC AES 256bit,
+.IP \(bu
+KMAC AES 128bit protected key,
+.IP \(bu
+KMAC AES 192bit protected key,
+.IP \(bu
+KMAC AES 256bit protected key,
+.IP \(bu
+PCC Last Block CMAC DES,
+.IP \(bu
+PCC Last Block CMAC 2key TDES,
+.IP \(bu
+PCC Last Block CMAC TDES,
+.IP \(bu
+PCC Last Block CMAC DES protected key,
+.IP \(bu
+PCC Last Block CMAC 2key TDES protected key,
+.IP \(bu
+PCC Last Block CMAC TDES protected key,
+.IP \(bu
+PCC Last Block CMAC AES 128bit,
+.IP \(bu
+PCC Last Block CMAC AES 192bit,
+.IP \(bu
+PCC Last Block CMAC AES 256bit,
+.IP \(bu
+PCC Last Block CMAC AES 128bit protected key,
+.IP \(bu
+PCC Last Block CMAC AES 192bit protected key,
+.IP \(bu
+PCC Last Block CMAC AES 256bit protected key,
+.IP \(bu
+PCC XTS Parameter AES 128bit,
+.IP \(bu
+PCC XTS Parameter AES 256bit,
+.IP \(bu
+PCC XTS Parameter AES 128bit protected key,
+.IP \(bu
+PCC XTS Parameter AES 256bit protected key,
+.IP \(bu
+PCC Scalar Mult P256,
+.IP \(bu
+PCC Scalar Mult P384,
+.IP \(bu
+PCC Scalar Mult P521,
+.IP \(bu
+PCC Scalar Mult Ed25519,
+.IP \(bu
+PCC Scalar Mult Ed448,
+.IP \(bu
+PCC Scalar Mult X25519,
+.IP \(bu
+PCC Scalar Mult X448,
+.IP \(bu
+PRNO SHA512 DRNG,
+.IP \(bu
+PRNO TRNG Query Ratio,
+.IP \(bu
+PRNO TRNG,
+.IP \(bu
+KDSA ECDSA Verify P256,
+.IP \(bu
+KDSA ECDSA Verify P384,
+.IP \(bu
+KDSA ECDSA Verify P521,
+.IP \(bu
+KDSA ECDSA Sign P256,
+.IP \(bu
+KDSA ECDSA Sign P384,
+.IP \(bu
+KDSA ECDSA Sign P521,
+.IP \(bu
+KDSA ECDSA Sign P256 protected key,
+.IP \(bu
+KDSA ECDSA Sign P384 protected key,
+.IP \(bu
+KDSA ECDSA Sign P521 protected key,
+.IP \(bu
+KDSA EdDSA Verify Ed25519,
+.IP \(bu
+KDSA EdDSA Verify Ed448,
+.IP \(bu
+KDSA EdDSA Sign Ed25519,
+.IP \(bu
+KDSA EdDSA Sign Ed448,
+.IP \(bu
+KDSA EdDSA Sign Ed25519 protected key,
+.IP \(bu
+KDSA EdDSA Sign Ed448 protected key,
+.IP \(bu
+PCKMO DES,
+.IP \(bu
+PCKMO 2key TDES,
+.IP \(bu
+PCMKO TDES,
+.IP \(bu
+PCKMO AES 128bit,
+.IP \(bu
+PCKMO AES 192bit,
+.IP \(bu
+PCMKO AES 256bit,
+.IP \(bu
+PCKMO ECC P256,
+.IP \(bu
+PCKMO ECC P384,
+.IP \(bu
+PCKMO ECC P521,
+.IP \(bu
+PCKMO ECC Ed25519,
+.IP \(bu
+PCKMO ECC Ed448,
+.IP \(bu
+Reserved 1, and
+.IP \(bu
+Reserved 2.
+.RE
+Note that the counters starting with PCKMO and Reserved are only
+available in the pai_kernel set.
+
+Note: CPU-MF based CPACF performance counters are available on LPARs
+only. PAI counters are available on all hypervisors. For security
+reasons only members of the group \fIcpacfstats\fR are allowed to run
+the cpacfstats client application.
 
 Example usage scenario:
 .P
@@ -101,12 +435,34 @@ argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
 \fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
 performance counters are reset to 0.
 .TP
-\fB\-p\fR or \fB\-\-print\fR [counter]
+\fB\-p\fR or \fB\-\-print\fR  [\fB\-n\fR or \fB\-\-nonzero\fR] [counter]
 Display the value of one or all CPACF performance counters. The
 optional counter argument can be one of: \fBdes\fR, \fBaes\fR,
-\fBsha\fR, \fBprng\fR, \fBecc\fR, or \fBall\fR. If the counter
-argument is omitted or if there is no argument, all performance
-counters are displayed.
+\fBsha\fR, \fBprng\fR, \fBecc\fR, \fBpai_user\fR, \fBpai_kernel\fR, or
+\fBall\fR. If the counter argument is omitted or if there is no
+argument, all performance counters are displayed.  If the optional
+\fB\-n\fR or \fB\-\-nonzero\fR argument is given, then only PAI
+counters that have a non-zero value are printed.
+.TP
+\fB\-j\fR or \fB\-\-json\fR
+Display all activated counters in JSON format.  The JSON contains an
+array of counter objects.  Each object contains the property
+.B counter
+specifying either a CPU-MF counter of one of the detailed PAI counter.
+Additional properties include
+.B error
+an error number if the counter could not be read,
+.B value
+the counter value if the counter could be read,
+.B space
+for PAI counters to specify
+.B user
+or
+.B kernel
+space counter set, and
+.B counterid
+for PAI counters to specify the PAI counter number as specified in the
+Principles of Operation.
 .TP
 The default command is --print all.
 .

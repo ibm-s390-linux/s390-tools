@@ -3,7 +3,7 @@
  *
  * cpacfstatsd daemon implementation
  *
- * Copyright IBM Corp. 2015, 2017
+ * Copyright IBM Corp. 2015, 2022
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -85,13 +85,50 @@ static int send_answer(int s, int ctr, int state, uint64_t value)
 }
 
 
+/*
+ * Print according to protocol for PAI:
+ * - first the state and the number of PAI counters that follow
+ * - if state is ENABLED:
+ *   - for each PAI counter the value with state ENABLED
+ * Note that the PAI counters are 0-based, not 1 based as in PoP!
+ * Sending ends with the first error.
+ */
+static int do_send_pai(int s, int user)
+{
+	int ctr, state, i, maxctr, rc = 0;
+	uint64_t value;
+	
+	if (user) {
+		ctr = PAI_USER;
+		maxctr = NUM_PAI_USER;
+	} else {
+		ctr = PAI_KERNEL;
+		maxctr = NUM_PAI_KERNEL;
+	}
+	state = perf_ctr_state(ctr);
+	if (state != ENABLED)
+		return rc;
+	for (i = 0; i < maxctr; ++i) {
+		rc = perf_read_pai_ctr(i, user, &value);
+		if (rc != 0) {
+			send_answer(s, i, rc, 0);
+			break;
+		}
+		send_answer(s, i, state, value);
+	}
+	return rc;
+}
+
+
 static int do_enable(int s, enum ctr_e ctr)
 {
 	uint64_t value = 0;
 	int i, rc = 0;
 	int state;
 
-	for (i = 0; i < ALL_COUNTER; i++) {
+	for (i = 0; i < NUM_COUNTER; i++) {
+		if (i == ALL_COUNTER)
+			continue;
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			state = perf_ctr_state(i);
 			if (state == DISABLED) {
@@ -110,6 +147,10 @@ static int do_enable(int s, enum ctr_e ctr)
 				}
 			}
 			send_answer(s, i, state, value);
+			if (i == PAI_USER)
+				rc = do_send_pai(s, 1);
+			if (i == PAI_KERNEL)
+				rc = do_send_pai(s, 0);
 		}
 	}
 	if (rc == 0) {
@@ -125,7 +166,9 @@ static int do_disable(int s, enum ctr_e ctr)
 	int i, rc = 0;
 	uint64_t value;
 
-	for (i = 0; i < ALL_COUNTER; i++) {
+	for (i = 0; i < NUM_COUNTER; i++) {
+		if (i == ALL_COUNTER)
+			continue;
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			if (perf_ctr_state(i) == ENABLED) {
 				rc = perf_disable_ctr(i);
@@ -150,17 +193,23 @@ static int do_reset(int s, enum ctr_e ctr)
 	int i, rc = 0, state;
 	uint64_t value;
 
-	for (i = 0; i < ALL_COUNTER; i++) {
+	for (i = 0; i < NUM_COUNTER; i++) {
+		if (i == ALL_COUNTER)
+			continue;
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			state = perf_ctr_state(i);
 			if (state == ENABLED) {
-				rc = perf_reset_ctr(i);
+				rc = perf_reset_ctr(i, &value);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
 				}
 			}
-			send_answer(s, i, state, 0);
+			send_answer(s, i, state, value);
+			if (i == PAI_USER)
+				rc = do_send_pai(s, 1);
+			if (i == PAI_KERNEL)
+				rc = do_send_pai(s, 0);
 		}
 	}
 	if (rc == 0) {
@@ -170,12 +219,15 @@ static int do_reset(int s, enum ctr_e ctr)
 	return rc;
 }
 
+
 static int do_print(int s, enum ctr_e ctr)
 {
 	int i, rc = 0, state;
 	uint64_t value = 0;
 
-	for (i = 0; i < ALL_COUNTER; i++) {
+	for (i = 0; i < NUM_COUNTER; i++) {
+		if (i == ALL_COUNTER)
+			continue;
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			state = perf_ctr_state(i);
 			if (state == ENABLED) {
@@ -186,6 +238,10 @@ static int do_print(int s, enum ctr_e ctr)
 				}
 			}
 			send_answer(s, i, state, value);
+			if (i == PAI_USER)
+				rc = do_send_pai(s, 1);
+			if (i == PAI_KERNEL)
+				rc = do_send_pai(s, 0);
 		}
 	}
 	if (rc == 0) {
@@ -380,7 +436,7 @@ int main(int argc, char *argv[])
 			switch (opt) {
 			case 'h':
 				printf(usage, name);
-				exit(0);
+				return 0;
 			case 'f':
 				foreground = 1;
 				break;
@@ -388,37 +444,37 @@ int main(int argc, char *argv[])
 				printf("%s: Linux on System z CPACF Crypto Activity Counters Daemon\n"
 				       "Version %s\n%s\n",
 				       name, RELEASE_STRING, COPYRIGHT);
-				exit(0);
+				return 0;
 			default:
 				printf("%s: Invalid argument, try -h or --help for more information\n",
 					name);
-				exit(1);
+				return EXIT_FAILURE;
 			}
 		}
 	}
 
 	if (check_pidfile() != 0) {
 		eprint("Stalled pid file or daemon allready running, terminating\n");
-		exit(1);
+		return EXIT_FAILURE;
 	}
 
 	if (!foreground) {
 		if (become_daemon() != 0) {
 			eprint("Couldn't daemonize\n");
-			exit(1);
+			return EXIT_FAILURE;
 		}
 	}
 
 	if (perf_init() != 0) {
 		eprint("Couldn't initialize perf lib\n");
-		exit(1);
+		return EXIT_FAILURE;
 	}
 	atexit(perf_close);
 
 	sfd = open_socket(SERVER);
 	if (sfd < 0) {
 		eprint("Couldn't initialize server socket\n");
-		exit(1);
+		return EXIT_FAILURE;
 	}
 	atexit(remove_sock);
 
@@ -428,13 +484,15 @@ int main(int argc, char *argv[])
 	if (sigaction(SIGINT, &act, 0) != 0) {
 		eprint("Couldn't establish signal handler for SIGINT, errno=%d [%s]\n",
 		       errno, strerror(errno));
-		exit(1);
+		return EXIT_FAILURE;
 	}
 	if (sigaction(SIGTERM, &act, 0) != 0) {
 		eprint("Couldn't establish signal handler for SIGTERM, errno=%d [%s]\n",
 		       errno, strerror(errno));
-		exit(1);
+		return EXIT_FAILURE;
 	}
+	/* Ignore SIGPIPE such that we see EPIPE as return from write. */
+	signal(SIGPIPE, SIG_IGN);
 
 	eprint("Running\n");
 
@@ -449,7 +507,7 @@ int main(int argc, char *argv[])
 				continue;
 			eprint("Accept() failure, errno=%d [%s]\n",
 			       errno, strerror(errno));
-			exit(1);
+			return EXIT_FAILURE;
 		}
 
 		rc = recv_query(s, &ctr, &cmd);
