@@ -102,9 +102,7 @@ struct sk_prov_op_ctx {
 	void (*default_op_ctx_free)(void *default_op_ctx);
 	struct sk_prov_key *key;
 	int operation;
-	int (*sign_fn)(struct sk_prov_op_ctx *ctx, unsigned char *sig,
-		       size_t *siglen, size_t sigsize, const unsigned char *tbs,
-		       size_t tbslen);
+	OSSL_FUNC_signature_sign_fn *sign_fn;
 	EVP_MD_CTX *mdctx;
 	EVP_MD *md;
 };
@@ -125,6 +123,143 @@ int sk_openssl_get_pkey_rsa(const unsigned char *secure_key,
 			    const unsigned char *pub_exp, size_t pub_exp_length,
 			    int pkey_type, const struct sk_funcs *sk_funcs,
 			    const void *private, EVP_PKEY **pkey, bool debug);
+
+
+static OSSL_FUNC_provider_teardown_fn		sk_prov_teardown;
+static OSSL_FUNC_provider_gettable_params_fn	sk_prov_gettable_params;
+static OSSL_FUNC_provider_get_params_fn		sk_prov_get_params;
+static OSSL_FUNC_provider_query_operation_fn	sk_prov_query;
+static OSSL_FUNC_provider_get_reason_strings_fn	sk_prov_get_reason_strings;
+static OSSL_FUNC_provider_get_capabilities_fn	sk_prov_prov_get_capabilities;
+
+static OSSL_FUNC_keymgmt_free_fn		sk_prov_keymgmt_free;
+static OSSL_FUNC_keymgmt_gen_cleanup_fn		sk_prov_keymgmt_gen_cleanup;
+static OSSL_FUNC_keymgmt_load_fn		sk_prov_keymgmt_load;
+static OSSL_FUNC_keymgmt_gen_set_template_fn
+					sk_prov_keymgmt_gen_set_template;
+static OSSL_FUNC_keymgmt_gen_set_params_fn	sk_prov_keymgmt_gen_set_params;
+static OSSL_FUNC_keymgmt_gen_fn			sk_prov_keymgmt_gen;
+static OSSL_FUNC_keymgmt_get_params_fn		sk_prov_keymgmt_get_params;
+static OSSL_FUNC_keymgmt_set_params_fn		sk_prov_keymgmt_set_params;
+static OSSL_FUNC_keymgmt_has_fn			sk_prov_keymgmt_has;
+static OSSL_FUNC_keymgmt_match_fn		sk_prov_keymgmt_match;
+static OSSL_FUNC_keymgmt_validate_fn		sk_prov_keymgmt_validate;
+static OSSL_FUNC_keymgmt_export_fn		sk_prov_keymgmt_export;
+static OSSL_FUNC_keymgmt_import_fn		sk_prov_keymgmt_import;
+static OSSL_FUNC_keymgmt_new_fn			sk_prov_keymgmt_rsa_new;
+static OSSL_FUNC_keymgmt_new_fn			sk_prov_keymgmt_rsa_pss_new;
+static OSSL_FUNC_keymgmt_new_fn			sk_prov_keymgmt_ec_new;
+static OSSL_FUNC_keymgmt_gen_init_fn		sk_prov_keymgmt_rsa_gen_init;
+static OSSL_FUNC_keymgmt_gen_init_fn	sk_prov_keymgmt_rsa_pss_gen_init;
+static OSSL_FUNC_keymgmt_gen_init_fn		sk_prov_keymgmt_ec_gen_init;
+static OSSL_FUNC_keymgmt_gen_settable_params_fn
+					sk_prov_keymgmt_rsa_gen_settable_params;
+static OSSL_FUNC_keymgmt_gen_settable_params_fn
+				sk_prov_keymgmt_rsa_pss_gen_settable_params;
+static OSSL_FUNC_keymgmt_gen_settable_params_fn
+					sk_prov_keymgmt_ec_gen_settable_params;
+static OSSL_FUNC_keymgmt_query_operation_name_fn
+				sk_prov_keymgmt_rsa_query_operation_name;
+static OSSL_FUNC_keymgmt_query_operation_name_fn
+				sk_prov_keymgmt_ec_query_operation_name;
+static OSSL_FUNC_keymgmt_gettable_params_fn
+					sk_prov_keymgmt_rsa_gettable_params;
+static OSSL_FUNC_keymgmt_gettable_params_fn
+					sk_prov_keymgmt_rsa_pss_gettable_params;
+static OSSL_FUNC_keymgmt_gettable_params_fn
+					sk_prov_keymgmt_ec_gettable_params;
+static OSSL_FUNC_keymgmt_settable_params_fn
+					sk_prov_keymgmt_rsa_settable_params;
+static OSSL_FUNC_keymgmt_settable_params_fn
+					sk_prov_keymgmt_rsa_pss_settable_params;
+static OSSL_FUNC_keymgmt_settable_params_fn
+					sk_prov_keymgmt_ec_settable_params;
+static OSSL_FUNC_keymgmt_export_types_fn
+					sk_prov_keymgmt_rsa_export_types;
+static OSSL_FUNC_keymgmt_export_types_fn
+					sk_prov_keymgmt_rsa_pss_export_types;
+static OSSL_FUNC_keymgmt_export_types_fn
+					sk_prov_keymgmt_ec_export_types;
+static OSSL_FUNC_keymgmt_import_types_fn
+					sk_prov_keymgmt_rsa_import_types;
+static OSSL_FUNC_keymgmt_import_types_fn
+					sk_prov_keymgmt_rsa_pss_import_types;
+static OSSL_FUNC_keymgmt_import_types_fn	sk_prov_keymgmt_ec_import_types;
+
+static OSSL_FUNC_keyexch_newctx_fn		sk_prov_keyexch_ec_newctx;
+static OSSL_FUNC_keyexch_dupctx_fn		sk_prov_keyexch_ec_dupctx;
+static OSSL_FUNC_keyexch_init_fn		sk_prov_keyexch_ec_init;
+static OSSL_FUNC_keyexch_set_peer_fn		sk_prov_keyexch_ec_set_peer;
+static OSSL_FUNC_keyexch_derive_fn		sk_prov_keyexch_ec_derive;
+static OSSL_FUNC_keyexch_set_ctx_params_fn
+					sk_prov_keyexch_ec_set_ctx_params;
+static OSSL_FUNC_keyexch_settable_ctx_params_fn
+					sk_prov_keyexch_ec_settable_ctx_params;
+static OSSL_FUNC_keyexch_get_ctx_params_fn sk_prov_keyexch_ec_get_ctx_params;
+static OSSL_FUNC_keyexch_gettable_ctx_params_fn
+					sk_prov_keyexch_ec_gettable_ctx_params;
+
+static OSSL_FUNC_signature_newctx_fn		sk_prov_sign_rsa_newctx;
+static OSSL_FUNC_signature_newctx_fn		sk_prov_sign_ec_newctx;
+static OSSL_FUNC_signature_dupctx_fn		sk_prov_sign_op_dupctx;
+static OSSL_FUNC_signature_sign_init_fn		sk_prov_sign_op_sign_init;
+static OSSL_FUNC_signature_sign_fn		sk_prov_sign_rsa_sign;
+static OSSL_FUNC_signature_sign_fn		sk_prov_sign_ec_sign;
+static OSSL_FUNC_signature_verify_init_fn	sk_prov_sign_op_verify_init;
+static OSSL_FUNC_signature_verify_fn		sk_prov_sign_op_verify;
+static OSSL_FUNC_signature_verify_recover_init_fn
+					sk_prov_sign_op_verify_recover_init;
+static OSSL_FUNC_signature_verify_recover_fn	sk_prov_sign_op_verify_recover;
+static OSSL_FUNC_signature_digest_sign_init_fn
+					sk_prov_sign_rsa_digest_sign_init;
+static OSSL_FUNC_signature_digest_sign_init_fn
+					sk_prov_sign_ec_digest_sign_init;
+static OSSL_FUNC_signature_digest_sign_update_fn
+					sk_prov_sign_op_digest_sign_update;
+static OSSL_FUNC_signature_digest_sign_final_fn
+					sk_prov_sign_op_digest_sign_final;
+static OSSL_FUNC_signature_digest_verify_init_fn
+					sk_prov_sign_op_digest_verify_init;
+static OSSL_FUNC_signature_digest_verify_update_fn
+					sk_prov_sign_op_digest_verify_update;
+static OSSL_FUNC_signature_digest_verify_final_fn
+					sk_prov_sign_op_digest_verify_final;
+static OSSL_FUNC_signature_get_ctx_params_fn	sk_prov_sign_op_get_ctx_params;
+static OSSL_FUNC_signature_gettable_ctx_params_fn
+					sk_prov_sign_rsa_gettable_ctx_params;
+static OSSL_FUNC_signature_gettable_ctx_params_fn
+					sk_prov_sign_ec_gettable_ctx_params;
+static OSSL_FUNC_signature_set_ctx_params_fn	sk_prov_sign_op_set_ctx_params;
+static OSSL_FUNC_signature_settable_ctx_params_fn
+					sk_prov_sign_rsa_settable_ctx_params;
+static OSSL_FUNC_signature_settable_ctx_params_fn
+					sk_prov_sign_ec_settable_ctx_params;
+static OSSL_FUNC_signature_get_ctx_md_params_fn
+					sk_prov_sign_op_get_ctx_md_params;
+static OSSL_FUNC_signature_gettable_ctx_md_params_fn
+					sk_prov_sign_rsa_gettable_ctx_md_params;
+static OSSL_FUNC_signature_gettable_ctx_md_params_fn
+					sk_prov_sign_ec_gettable_ctx_md_params;
+static OSSL_FUNC_signature_set_ctx_md_params_fn
+					sk_prov_sign_op_set_ctx_md_params;
+static OSSL_FUNC_signature_settable_ctx_md_params_fn
+					sk_prov_sign_rsa_settable_ctx_md_params;
+static OSSL_FUNC_signature_settable_ctx_md_params_fn
+					sk_prov_sign_ec_settable_ctx_md_params;
+
+static OSSL_FUNC_asym_cipher_newctx_fn		sk_prov_asym_rsa_newctx;
+static OSSL_FUNC_asym_cipher_dupctx_fn		sk_prov_asym_op_dupctx;
+static OSSL_FUNC_asym_cipher_freectx_fn		sk_prov_op_freectx;
+static OSSL_FUNC_asym_cipher_get_ctx_params_fn	sk_prov_asym_op_get_ctx_params;
+static OSSL_FUNC_asym_cipher_gettable_ctx_params_fn
+					sk_prov_asym_rsa_gettable_ctx_params;
+static OSSL_FUNC_asym_cipher_set_ctx_params_fn	sk_prov_asym_op_set_ctx_params;
+static OSSL_FUNC_asym_cipher_settable_ctx_params_fn
+					sk_prov_asym_rsa_settable_ctx_params;
+static OSSL_FUNC_asym_cipher_encrypt_init_fn	sk_prov_asym_op_encrypt_init;
+static OSSL_FUNC_asym_cipher_encrypt_fn		sk_prov_asym_op_encrypt;
+static OSSL_FUNC_asym_cipher_decrypt_init_fn	sk_prov_asym_op_decrypt_init;
+static OSSL_FUNC_asym_cipher_decrypt_fn		sk_prov_asym_rsa_decrypt;
 
 #define SK_PROV_ERR_INTERNAL_ERROR		1
 #define SK_PROV_ERR_MALLOC_FAILED		2
@@ -189,7 +324,6 @@ static void sk_prov_put_error(struct sk_prov_ctx *provctx, int err,
 static void sk_prov_keymgmt_upref(struct sk_prov_key *key);
 static struct sk_prov_key *sk_prov_keymgmt_new(struct sk_prov_ctx *provctx,
 					       int type);
-static void sk_prov_keymgmt_free(struct sk_prov_key *key);
 static int sk_prov_keymgmt_get_bits(struct sk_prov_key *key);
 
 typedef void (*func_t)(void);
@@ -454,8 +588,10 @@ static struct sk_prov_op_ctx *sk_prov_op_newctx(struct sk_prov_ctx *provctx,
 	return ctx;
 }
 
-static void sk_prov_op_freectx(struct sk_prov_op_ctx *ctx)
+static void sk_prov_op_freectx(void *vctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (ctx == NULL)
 		return;
 
@@ -632,9 +768,10 @@ static struct sk_prov_op_ctx *sk_prov_asym_op_newctx(
 	return ctx;
 }
 
-static struct sk_prov_op_ctx *sk_prov_asym_op_dupctx(struct sk_prov_op_ctx *ctx)
+static void *sk_prov_asym_op_dupctx(void *vctx)
 {
 	OSSL_FUNC_asym_cipher_dupctx_fn *default_dupctx_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	struct sk_prov_op_ctx *new_ctx;
 
 	if (ctx == NULL)
@@ -669,10 +806,10 @@ static struct sk_prov_op_ctx *sk_prov_asym_op_dupctx(struct sk_prov_op_ctx *ctx)
 	return new_ctx;
 }
 
-static int sk_prov_asym_op_get_ctx_params(struct sk_prov_op_ctx *ctx,
-					  OSSL_PARAM params[])
+static int sk_prov_asym_op_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
 	OSSL_FUNC_asym_cipher_get_ctx_params_fn *default_get_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -700,10 +837,10 @@ static int sk_prov_asym_op_get_ctx_params(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_asym_op_set_ctx_params(struct sk_prov_op_ctx *ctx,
-					  const OSSL_PARAM params[])
+static int sk_prov_asym_op_set_ctx_params(void *vctx, const OSSL_PARAM params[])
 {
 	OSSL_FUNC_asym_cipher_set_ctx_params_fn *default_set_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -941,11 +1078,12 @@ static int sk_prov_asym_op_get_padding(struct sk_prov_op_ctx *ctx)
 	return sk_prov_parse_padding(padding);
 }
 
-static int sk_prov_asym_op_encrypt_init(struct sk_prov_op_ctx *ctx,
-					struct sk_prov_key *key,
+static int sk_prov_asym_op_encrypt_init(void *vctx, void *vkey,
 					const OSSL_PARAM params[])
 {
 	OSSL_FUNC_asym_cipher_encrypt_init_fn *default_encrypt_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -980,11 +1118,12 @@ static int sk_prov_asym_op_encrypt_init(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_asym_op_decrypt_init(struct sk_prov_op_ctx *ctx,
-					struct sk_prov_key *key,
+static int sk_prov_asym_op_decrypt_init(void *vctx, void *vkey,
 					const OSSL_PARAM params[])
 {
 	OSSL_FUNC_asym_cipher_decrypt_init_fn *default_decrypt_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -1019,12 +1158,13 @@ static int sk_prov_asym_op_decrypt_init(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_asym_op_encrypt(struct sk_prov_op_ctx *ctx,
+static int sk_prov_asym_op_encrypt(void *vctx,
 				   unsigned char *out, size_t *outlen,
 				   size_t outsize, const unsigned char *in,
 				   size_t inlen)
 {
 	OSSL_FUNC_asym_cipher_encrypt_fn *default_encrypt_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || in == NULL || outlen == NULL)
 		return 0;
@@ -1140,9 +1280,10 @@ static struct sk_prov_op_ctx *sk_prov_sign_op_newctx(
 	return ctx;
 }
 
-static struct sk_prov_op_ctx *sk_prov_sign_op_dupctx(struct sk_prov_op_ctx *ctx)
+static void *sk_prov_sign_op_dupctx(void *vctx)
 {
 	OSSL_FUNC_signature_dupctx_fn *default_dupctx_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	struct sk_prov_op_ctx *new_ctx;
 
 	if (ctx == NULL)
@@ -1177,10 +1318,10 @@ static struct sk_prov_op_ctx *sk_prov_sign_op_dupctx(struct sk_prov_op_ctx *ctx)
 	return new_ctx;
 }
 
-static int sk_prov_sign_op_get_ctx_params(struct sk_prov_op_ctx *ctx,
-					  OSSL_PARAM params[])
+static int sk_prov_sign_op_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_get_ctx_params_fn *default_get_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -1207,10 +1348,10 @@ static int sk_prov_sign_op_get_ctx_params(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_set_ctx_params(struct sk_prov_op_ctx *ctx,
-					  const OSSL_PARAM params[])
+static int sk_prov_sign_op_set_ctx_params(void *vctx, const OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_set_ctx_params_fn *default_set_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -1293,10 +1434,10 @@ static const OSSL_PARAM *sk_prov_sign_op_settable_ctx_params(
 	return params;
 }
 
-static int sk_prov_sign_op_get_ctx_md_params(struct sk_prov_op_ctx *ctx,
-					     OSSL_PARAM params[])
+static int sk_prov_sign_op_get_ctx_md_params(void *vctx, OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_get_ctx_md_params_fn *default_get_md_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -1324,10 +1465,11 @@ static int sk_prov_sign_op_get_ctx_md_params(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_set_ctx_md_params(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_set_ctx_md_params(void *vctx,
 					     const OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_set_ctx_md_params_fn *default_set_md_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -1572,11 +1714,12 @@ static int sk_prov_sign_op_get_pss_saltlen(struct sk_prov_op_ctx *ctx,
 	return salt_len;
 }
 
-static int sk_prov_sign_op_sign_init(struct sk_prov_op_ctx *ctx,
-				     struct sk_prov_key *key,
+static int sk_prov_sign_op_sign_init(void *vctx, void *vkey,
 				     const OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_sign_init_fn *default_sign_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -1611,11 +1754,12 @@ static int sk_prov_sign_op_sign_init(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_verify_init(struct sk_prov_op_ctx *ctx,
-				       struct sk_prov_key *key,
+static int sk_prov_sign_op_verify_init(void *vctx, void *vkey,
 				       const OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_verify_init_fn *default_verify_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -1649,12 +1793,13 @@ static int sk_prov_sign_op_verify_init(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_verify_recover_init(struct sk_prov_op_ctx *ctx,
-					       struct sk_prov_key *key,
+static int sk_prov_sign_op_verify_recover_init(void *vctx, void *vkey,
 					       const OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_verify_recover_init_fn
 					*default_verify_recover_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -1725,11 +1870,12 @@ static int sk_prov_sign_op_sign(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_verify(struct sk_prov_op_ctx *ctx,
-				  unsigned char *sig, size_t siglen,
+static int sk_prov_sign_op_verify(void *vctx,
+				  const unsigned char *sig, size_t siglen,
 				  const unsigned char *tbs, size_t tbslen)
 {
 	OSSL_FUNC_signature_verify_fn *default_verify_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || tbs == NULL || sig == NULL)
 		return 0;
@@ -1755,13 +1901,14 @@ static int sk_prov_sign_op_verify(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_verify_recover(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_verify_recover(void *vctx,
 					  unsigned char *rout, size_t *routlen,
 					  size_t routsize,
 					  const unsigned char *sig,
 					  size_t siglen)
 {
 	OSSL_FUNC_signature_verify_recover_fn *default_verify_recover_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || routlen == NULL || sig == NULL)
 		return 0;
@@ -1795,11 +1942,7 @@ static int sk_prov_sign_op_digest_sign_init(struct sk_prov_op_ctx *ctx,
 					    const char *mdname,
 					    struct sk_prov_key *key,
 					    const OSSL_PARAM params[],
-					    int (*sign_fn)
-						(struct sk_prov_op_ctx *,
-						unsigned char *, size_t *,
-						size_t, const unsigned char *,
-						size_t))
+					  OSSL_FUNC_signature_sign_fn *sign_fn)
 {
 	OSSL_FUNC_signature_digest_sign_init_fn *default_digest_sign_init_fn;
 	const OSSL_PARAM *p;
@@ -1869,12 +2012,13 @@ static int sk_prov_sign_op_digest_sign_init(struct sk_prov_op_ctx *ctx,
 	return EVP_DigestInit_ex2(ctx->mdctx, ctx->md, params);
 }
 
-static int sk_prov_sign_op_digest_sign_update(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_digest_sign_update(void *vctx,
 					      const unsigned char *data,
 					      size_t datalen)
 {
 	OSSL_FUNC_signature_digest_sign_update_fn
 					*default_digest_sign_update_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL)
 		return 0;
@@ -1922,12 +2066,13 @@ secure_key:
 	return EVP_DigestUpdate(ctx->mdctx, data, datalen);
 }
 
-static int sk_prov_sign_op_digest_sign_final(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_digest_sign_final(void *vctx,
 					     unsigned char *sig,
 					     size_t *siglen, size_t sigsize)
 {
 	OSSL_FUNC_signature_digest_sign_final_fn *default_digest_sign_final_fn;
 	unsigned char digest[EVP_MAX_MD_SIZE];
+	struct sk_prov_op_ctx *ctx = vctx;
 	unsigned int dlen = 0;
 
 	if (ctx == NULL || siglen == NULL)
@@ -1991,13 +2136,15 @@ secure_key:
 	return 1;
 }
 
-static int sk_prov_sign_op_digest_verify_init(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_digest_verify_init(void *vctx,
 					      const char *mdname,
-					      struct sk_prov_key *key,
+					      void *vkey,
 					      const OSSL_PARAM params[])
 {
 	OSSL_FUNC_signature_digest_verify_init_fn
 					*default_digest_verify_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -2034,12 +2181,13 @@ static int sk_prov_sign_op_digest_verify_init(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_digest_verify_update(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_digest_verify_update(void *vctx,
 						const unsigned char *data,
 						size_t datalen)
 {
 	OSSL_FUNC_signature_digest_verify_update_fn
 					*default_digest_verify_update_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL)
 		return 0;
@@ -2067,12 +2215,13 @@ static int sk_prov_sign_op_digest_verify_update(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_sign_op_digest_verify_final(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_op_digest_verify_final(void *vctx,
 					       const unsigned char *sig,
 					       size_t siglen)
 {
 	OSSL_FUNC_signature_digest_verify_final_fn
 					*default_digest_verify_final_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || sig == NULL)
 		return 0;
@@ -2167,9 +2316,10 @@ static struct sk_prov_key *sk_prov_keymgmt_new(struct sk_prov_ctx *provctx,
 	return key;
 }
 
-static void sk_prov_keymgmt_free(struct sk_prov_key *key)
+static void sk_prov_keymgmt_free(void *vkey)
 {
 	OSSL_FUNC_keymgmt_free_fn *default_free_fn;
+	struct sk_prov_key *key = vkey;
 
 	if (key == NULL)
 		return;
@@ -2194,11 +2344,12 @@ static void sk_prov_keymgmt_free(struct sk_prov_key *key)
 	OPENSSL_free(key);
 }
 
-static int sk_prov_keymgmt_match(const struct sk_prov_key *key1,
-				 const struct sk_prov_key *key2,
+static int sk_prov_keymgmt_match(const void *vkey1, const void *vkey2,
 				 int selection)
 {
 	OSSL_FUNC_keymgmt_match_fn *default_match_fn;
+	const struct sk_prov_key *key1 = vkey1;
+	const struct sk_prov_key *key2 = vkey2;
 
 	if (key1 == NULL || key2 == NULL)
 		return 0;
@@ -2239,10 +2390,11 @@ static int sk_prov_keymgmt_match(const struct sk_prov_key *key1,
 				selection);
 }
 
-static int sk_prov_keymgmt_validate(const struct sk_prov_key *key,
+static int sk_prov_keymgmt_validate(const void *vkey,
 				    int selection, int checktype)
 {
 	OSSL_FUNC_keymgmt_validate_fn *default_validate_fn;
+	const struct sk_prov_key *key = vkey;
 	int default_selection = selection;
 
 	if (key == NULL)
@@ -2268,10 +2420,10 @@ static int sk_prov_keymgmt_validate(const struct sk_prov_key *key,
 				   checktype);
 }
 
-static int sk_prov_keymgmt_get_params(struct sk_prov_key *key,
-				      OSSL_PARAM params[])
+static int sk_prov_keymgmt_get_params(void *vkey, OSSL_PARAM params[])
 {
 	OSSL_FUNC_keymgmt_get_params_fn *default_get_params_fn;
+	struct sk_prov_key *key = vkey;
 	OSSL_PARAM *p;
 
 	if (key == NULL)
@@ -2322,10 +2474,10 @@ static int sk_prov_keymgmt_get_params(struct sk_prov_key *key,
 }
 
 
-static int sk_prov_keymgmt_set_params(struct sk_prov_key *key,
-				      OSSL_PARAM params[])
+static int sk_prov_keymgmt_set_params(void *vkey, const OSSL_PARAM params[])
 {
 	OSSL_FUNC_keymgmt_set_params_fn *default_set_params_fn;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 	size_t len;
 
@@ -2458,9 +2610,10 @@ static const OSSL_PARAM *sk_prov_keymgmt_settable_params(
 					   sk_prov_key_settable_params);
 }
 
-static int sk_prov_keymgmt_has(const struct sk_prov_key *key, int selection)
+static int sk_prov_keymgmt_has(const void *vkey, int selection)
 {
 	OSSL_FUNC_keymgmt_has_fn *default_has_fn;
+	const struct sk_prov_key *key = vkey;
 	int default_selection = selection;
 
 	if (key == NULL)
@@ -2551,11 +2704,12 @@ static int sk_prov_keymgmt_export_cb(const OSSL_PARAM params[], void *arg)
 	return rc;
 }
 
-static int sk_prov_keymgmt_export(struct sk_prov_key *key, int selection,
+static int sk_prov_keymgmt_export(void *vkey, int selection,
 				  OSSL_CALLBACK *param_callback, void *cbarg)
 {
 	OSSL_FUNC_keymgmt_export_fn *default_export_fn;
 	struct sk_prov_export_cb cb_data;
+	struct sk_prov_key *key = vkey;
 
 	if (key == NULL || param_callback == NULL)
 		return 0;
@@ -2600,11 +2754,12 @@ static int sk_prov_keymgmt_export(struct sk_prov_key *key, int selection,
 	return 1;
 }
 
-static int sk_prov_keymgmt_import(struct sk_prov_key *key, int selection,
+static int sk_prov_keymgmt_import(void *vkey, int selection,
 				  const OSSL_PARAM params[])
 {
 	const OSSL_PARAM *p_blob, *p_funcs, *p_private, *p;
 	OSSL_FUNC_keymgmt_import_fn *default_import_fn;
+	struct sk_prov_key *key = vkey;
 	size_t len;
 
 	if (key == NULL)
@@ -2806,8 +2961,10 @@ static struct sk_prov_op_ctx *sk_prov_keymgmt_gen_init(
 	return genctx;
 }
 
-static void sk_prov_keymgmt_gen_cleanup(struct sk_prov_op_ctx *genctx)
+static void sk_prov_keymgmt_gen_cleanup(void *vgenctx)
 {
+	struct sk_prov_op_ctx *genctx = vgenctx;
+
 	if (genctx == NULL)
 		return;
 
@@ -2815,10 +2972,11 @@ static void sk_prov_keymgmt_gen_cleanup(struct sk_prov_op_ctx *genctx)
 	sk_prov_op_freectx(genctx);
 }
 
-static int sk_prov_keymgmt_gen_set_params(struct sk_prov_op_ctx *genctx,
+static int sk_prov_keymgmt_gen_set_params(void *vgenctx,
 					  const OSSL_PARAM params[])
 {
 	OSSL_FUNC_keymgmt_gen_set_params_fn *default_gen_set_params_fn;
+	struct sk_prov_op_ctx *genctx = vgenctx;
 	const OSSL_PARAM *p;
 
 	if (genctx == NULL)
@@ -2877,10 +3035,11 @@ static const OSSL_PARAM *sk_prov_keymgmt_gen_settable_params(
 	return params;
 }
 
-static int sk_prov_keymgmt_gen_set_template(struct sk_prov_op_ctx *genctx,
-					    struct sk_prov_key *templ)
+static int sk_prov_keymgmt_gen_set_template(void *vgenctx, void *vtempl)
 {
 	OSSL_FUNC_keymgmt_gen_set_template_fn *default_gen_set_template_fn;
+	struct sk_prov_op_ctx *genctx = vgenctx;
+	struct sk_prov_key *templ = vtempl;
 
 	if (genctx == NULL || templ == NULL)
 		return 0;
@@ -2902,10 +3061,11 @@ static int sk_prov_keymgmt_gen_set_template(struct sk_prov_op_ctx *genctx,
 					   templ->default_key);
 }
 
-static struct sk_prov_key *sk_prov_keymgmt_gen(struct sk_prov_op_ctx *genctx,
+static void *sk_prov_keymgmt_gen(void *vgenctx,
 				 OSSL_CALLBACK *osslcb, void *cbarg)
 {
 	OSSL_FUNC_keymgmt_gen_fn *default_gen_fn;
+	struct sk_prov_op_ctx *genctx = vgenctx;
 	struct sk_prov_key *key;
 
 	if (genctx == NULL)
@@ -2949,8 +3109,7 @@ static struct sk_prov_key *sk_prov_keymgmt_gen(struct sk_prov_op_ctx *genctx,
 	return key;
 }
 
-static struct sk_prov_key *sk_prov_keymgmt_load(const void *reference,
-					 size_t reference_sz)
+static void *sk_prov_keymgmt_load(const void *reference, size_t reference_sz)
 {
 	struct sk_prov_key *key;
 
@@ -3015,8 +3174,10 @@ static int sk_prov_keymgmt_get_bits(struct sk_prov_key *key)
 	return bits;
 }
 
-static void *sk_prov_keymgmt_rsa_new(struct sk_prov_ctx *provctx)
+static void *sk_prov_keymgmt_rsa_new(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3036,9 +3197,10 @@ static const char *sk_prov_keymgmt_rsa_query_operation_name(int operation_id)
 	return NULL;
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_rsa_gettable_params(
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_gettable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3046,9 +3208,10 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_gettable_params(
 	return sk_prov_keymgmt_gettable_params(provctx, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_rsa_settable_params(
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_settable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3066,10 +3229,11 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_import_types(int selection)
 	return sk_prov_keymgmt_import_types(selection, EVP_PKEY_RSA);
 }
 
-static struct sk_prov_op_ctx *sk_prov_keymgmt_rsa_gen_init(
-				struct sk_prov_ctx *provctx, int selection,
-				const OSSL_PARAM params[])
+static void *sk_prov_keymgmt_rsa_gen_init(void *vprovctx, int selection,
+					  const OSSL_PARAM params[])
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3078,10 +3242,12 @@ static struct sk_prov_op_ctx *sk_prov_keymgmt_rsa_gen_init(
 					EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_rsa_gen_settable_params(
-					struct sk_prov_op_ctx *genctx,
-					struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_gen_settable_params(void *vgenctx,
+								 void *vprovctx)
 {
+	struct sk_prov_op_ctx *genctx = vgenctx;
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3090,8 +3256,10 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_gen_settable_params(
 						   EVP_PKEY_RSA);
 }
 
-static void *sk_prov_keymgmt_rsa_pss_new(struct sk_prov_ctx *provctx)
+static void *sk_prov_keymgmt_rsa_pss_new(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3099,9 +3267,10 @@ static void *sk_prov_keymgmt_rsa_pss_new(struct sk_prov_ctx *provctx)
 	return sk_prov_keymgmt_new(provctx, EVP_PKEY_RSA_PSS);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_gettable_params(
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_gettable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3109,9 +3278,10 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_gettable_params(
 	return sk_prov_keymgmt_gettable_params(provctx, EVP_PKEY_RSA_PSS);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_settable_params(
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_settable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3129,10 +3299,11 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_import_types(int selection)
 	return sk_prov_keymgmt_import_types(selection, EVP_PKEY_RSA_PSS);
 }
 
-static struct sk_prov_op_ctx *sk_prov_keymgmt_rsa_pss_gen_init(
-				struct sk_prov_ctx *provctx, int selection,
-				const OSSL_PARAM params[])
+static void *sk_prov_keymgmt_rsa_pss_gen_init(void *vprovctx, int selection,
+					      const OSSL_PARAM params[])
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3142,9 +3313,12 @@ static struct sk_prov_op_ctx *sk_prov_keymgmt_rsa_pss_gen_init(
 }
 
 static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_gen_settable_params(
-					struct sk_prov_op_ctx *genctx,
-					struct sk_prov_ctx *provctx)
+								void *vgenctx,
+								void *vprovctx)
 {
+	struct sk_prov_op_ctx *genctx = vgenctx;
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3153,8 +3327,10 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_gen_settable_params(
 						   EVP_PKEY_RSA_PSS);
 }
 
-static void *sk_prov_keymgmt_ec_new(struct sk_prov_ctx *provctx)
+static void *sk_prov_keymgmt_ec_new(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3174,9 +3350,10 @@ static const char *sk_prov_keymgmt_ec_query_operation_name(int operation_id)
 	return NULL;
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_ec_gettable_params(
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_ec_gettable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3184,9 +3361,10 @@ static const OSSL_PARAM *sk_prov_keymgmt_ec_gettable_params(
 	return sk_prov_keymgmt_gettable_params(provctx, EVP_PKEY_EC);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_ec_settable_params(
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_ec_settable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3204,10 +3382,11 @@ static const OSSL_PARAM *sk_prov_keymgmt_ec_import_types(int selection)
 	return sk_prov_keymgmt_import_types(selection, EVP_PKEY_EC);
 }
 
-static struct sk_prov_op_ctx *sk_prov_keymgmt_ec_gen_init(
-				struct sk_prov_ctx *provctx, int selection,
-				const OSSL_PARAM params[])
+static void *sk_prov_keymgmt_ec_gen_init(void *vprovctx, int selection,
+					 const OSSL_PARAM params[])
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3216,10 +3395,12 @@ static struct sk_prov_op_ctx *sk_prov_keymgmt_ec_gen_init(
 					EVP_PKEY_EC);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_ec_gen_settable_params(
-					struct sk_prov_op_ctx *genctx,
-					struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keymgmt_ec_gen_settable_params(void *vgenctx,
+								void *vprovctx)
 {
+	struct sk_prov_op_ctx *genctx = vgenctx;
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3228,11 +3409,11 @@ static const OSSL_PARAM *sk_prov_keymgmt_ec_gen_settable_params(
 						   EVP_PKEY_EC);
 }
 
-static struct sk_prov_op_ctx *sk_prov_keyexch_ec_newctx(
-						struct sk_prov_ctx *provctx)
+static void *sk_prov_keyexch_ec_newctx(void *vprovctx)
 {
 	OSSL_FUNC_keyexch_freectx_fn *default_freectx_fn;
 	OSSL_FUNC_keyexch_newctx_fn *default_newctx_fn;
+	struct sk_prov_ctx *provctx = vprovctx;
 	struct sk_prov_op_ctx *ctx;
 
 	if (provctx == NULL)
@@ -3278,9 +3459,10 @@ static struct sk_prov_op_ctx *sk_prov_keyexch_ec_newctx(
 	return ctx;
 }
 
-static void *sk_prov_keyexch_ec_dupctx(struct sk_prov_op_ctx *ctx)
+static void *sk_prov_keyexch_ec_dupctx(void *vctx)
 {
 	OSSL_FUNC_keyexch_dupctx_fn *default_dupctx_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	struct sk_prov_op_ctx *new_ctx;
 
 	if (ctx == NULL)
@@ -3315,11 +3497,12 @@ static void *sk_prov_keyexch_ec_dupctx(struct sk_prov_op_ctx *ctx)
 	return new_ctx;
 }
 
-static int sk_prov_keyexch_ec_init(struct sk_prov_op_ctx *ctx,
-				   struct sk_prov_key *key,
+static int sk_prov_keyexch_ec_init(void *vctx, void *vkey,
 				   const OSSL_PARAM params[])
 {
 	OSSL_FUNC_keyexch_init_fn *default_init_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL || key == NULL)
@@ -3352,11 +3535,12 @@ static int sk_prov_keyexch_ec_init(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_keyexch_ec_set_peer(struct sk_prov_op_ctx *ctx,
-				       struct sk_prov_key *peerkey)
+static int sk_prov_keyexch_ec_set_peer(void *vctx, void *vpeerkey)
 
 {
 	OSSL_FUNC_keyexch_set_peer_fn *default_set_peer_fn;
+	struct sk_prov_key *peerkey = vpeerkey;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || peerkey == NULL)
 		return 0;
@@ -3388,11 +3572,12 @@ static int sk_prov_keyexch_ec_set_peer(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_keyexch_ec_derive(struct sk_prov_op_ctx *ctx,
+static int sk_prov_keyexch_ec_derive(void *vctx,
 				     unsigned char *secret, size_t *secretlen,
 				     size_t outlen)
 {
 	OSSL_FUNC_keyexch_derive_fn *default_derive_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || secretlen == NULL)
 		return 0;
@@ -3427,10 +3612,11 @@ static int sk_prov_keyexch_ec_derive(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static int sk_prov_keyexch_ec_set_ctx_params(struct sk_prov_op_ctx *ctx,
+static int sk_prov_keyexch_ec_set_ctx_params(void *vctx,
 					     const OSSL_PARAM params[])
 {
 	OSSL_FUNC_keyexch_set_ctx_params_fn *default_set_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -3458,13 +3644,14 @@ static int sk_prov_keyexch_ec_set_ctx_params(struct sk_prov_op_ctx *ctx,
 
 }
 
-static const OSSL_PARAM *sk_prov_keyexch_ec_settable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keyexch_ec_settable_ctx_params(void *vctx,
+								void *vprovctx)
 {
 	OSSL_FUNC_keyexch_settable_ctx_params_fn
 						*default_settable_params_fn;
+	struct sk_prov_ctx *provctx = vprovctx;
 	const OSSL_PARAM *params = NULL, *p;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || provctx == NULL)
 		return NULL;
@@ -3485,10 +3672,10 @@ static const OSSL_PARAM *sk_prov_keyexch_ec_settable_ctx_params(
 	return params;
 }
 
-static int sk_prov_keyexch_ec_get_ctx_params(struct sk_prov_op_ctx *ctx,
-					     OSSL_PARAM params[])
+static int sk_prov_keyexch_ec_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
 	OSSL_FUNC_keyexch_get_ctx_params_fn *default_get_params_fn;
+	struct sk_prov_op_ctx *ctx = vctx;
 	const OSSL_PARAM *p;
 
 	if (ctx == NULL)
@@ -3515,13 +3702,14 @@ static int sk_prov_keyexch_ec_get_ctx_params(struct sk_prov_op_ctx *ctx,
 	return 1;
 }
 
-static const OSSL_PARAM *sk_prov_keyexch_ec_gettable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_keyexch_ec_gettable_ctx_params(void *vctx,
+								void *vprovctx)
 {
 	OSSL_FUNC_keyexch_gettable_ctx_params_fn
 						*default_gettable_params_fn;
+	struct sk_prov_ctx *provctx = vprovctx;
 	const OSSL_PARAM *params = NULL, *p;
+	struct sk_prov_op_ctx *ctx = vctx;
 
 	if (ctx == NULL || provctx == NULL)
 		return NULL;
@@ -3542,9 +3730,10 @@ static const OSSL_PARAM *sk_prov_keyexch_ec_gettable_ctx_params(
 	return params;
 }
 
-static struct sk_prov_op_ctx *sk_prov_asym_rsa_newctx(
-					struct sk_prov_ctx *provctx)
+static void *sk_prov_asym_rsa_newctx(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3552,10 +3741,12 @@ static struct sk_prov_op_ctx *sk_prov_asym_rsa_newctx(
 	return sk_prov_asym_op_newctx(provctx, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_asym_rsa_gettable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_asym_rsa_gettable_ctx_params(void *vctx,
+							      void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3563,10 +3754,12 @@ static const OSSL_PARAM *sk_prov_asym_rsa_gettable_ctx_params(
 	return sk_prov_asym_op_gettable_ctx_params(ctx, provctx, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_asym_rsa_settable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_asym_rsa_settable_ctx_params(void *vctx,
+							      void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3574,13 +3767,14 @@ static const OSSL_PARAM *sk_prov_asym_rsa_settable_ctx_params(
 	return sk_prov_asym_op_settable_ctx_params(ctx, provctx, EVP_PKEY_RSA);
 }
 
-static int sk_prov_asym_rsa_decrypt(struct sk_prov_op_ctx *ctx,
+static int sk_prov_asym_rsa_decrypt(void *vctx,
 				    unsigned char *out, size_t *outlen,
 				    size_t outsize, const unsigned char *in,
 				    size_t inlen)
 {
 	int rsa_size, pad_mode, oaep_label_len = 0, rc;
 	EVP_MD *oaep_md = NULL, *mgf_md = NULL;
+	struct sk_prov_op_ctx *ctx = vctx;
 	unsigned char *oaep_label = NULL;
 	unsigned char *tmp = NULL;
 	struct sk_prov_key *key;
@@ -3734,10 +3928,10 @@ out:
 	return rc;
 }
 
-static struct sk_prov_op_ctx *sk_prov_sign_rsa_newctx(
-					struct sk_prov_ctx *provctx,
-					const char *propq)
+static void *sk_prov_sign_rsa_newctx(void *vprovctx, const char *propq)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3746,10 +3940,12 @@ static struct sk_prov_op_ctx *sk_prov_sign_rsa_newctx(
 	return sk_prov_sign_op_newctx(provctx, propq, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_sign_rsa_gettable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_sign_rsa_gettable_ctx_params(void *vctx,
+							      void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3757,10 +3953,12 @@ static const OSSL_PARAM *sk_prov_sign_rsa_gettable_ctx_params(
 	return sk_prov_sign_op_gettable_ctx_params(ctx, provctx, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_sign_rsa_settable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_sign_rsa_settable_ctx_params(void *vctx,
+							      void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3768,9 +3966,10 @@ static const OSSL_PARAM *sk_prov_sign_rsa_settable_ctx_params(
 	return sk_prov_sign_op_settable_ctx_params(ctx, provctx, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_sign_rsa_gettable_ctx_md_params(
-						struct sk_prov_op_ctx *ctx)
+static const OSSL_PARAM *sk_prov_sign_rsa_gettable_ctx_md_params(void *vctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (ctx == NULL)
 		return NULL;
 
@@ -3778,9 +3977,10 @@ static const OSSL_PARAM *sk_prov_sign_rsa_gettable_ctx_md_params(
 	return sk_prov_sign_op_gettable_ctx_md_params(ctx, EVP_PKEY_RSA);
 }
 
-static const OSSL_PARAM *sk_prov_sign_rsa_settable_ctx_md_params(
-						struct sk_prov_op_ctx *ctx)
+static const OSSL_PARAM *sk_prov_sign_rsa_settable_ctx_md_params(void *vctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (ctx == NULL)
 		return NULL;
 
@@ -3788,13 +3988,14 @@ static const OSSL_PARAM *sk_prov_sign_rsa_settable_ctx_md_params(
 	return sk_prov_sign_op_settable_ctx_md_params(ctx, EVP_PKEY_RSA);
 }
 
-static int sk_prov_sign_rsa_sign(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_rsa_sign(void *vctx,
 				 unsigned char *sig, size_t *siglen,
 				 size_t sigsize,
 				 const unsigned char *tbs, size_t tbslen)
 {
 	EVP_MD *sign_md = NULL, *mgf_md = NULL;
 	int rsa_size, pad_mode, salt_len, rc;
+	struct sk_prov_op_ctx *ctx = vctx;
 	struct sk_prov_key *key;
 	struct sk_funcs *funcs;
 
@@ -3952,21 +4153,24 @@ out:
 	return rc;
 }
 
-static int sk_prov_sign_rsa_digest_sign_init(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_rsa_digest_sign_init(void *vctx,
 					     const char *mdname,
-					     struct sk_prov_key *key,
+					     void *vkey,
 					     const OSSL_PARAM params[])
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
+
 	sk_debug_op_ctx(ctx, "ctx: %p mdname: %s key: %p", ctx,
 			mdname != NULL ? mdname : "", key);
 	return sk_prov_sign_op_digest_sign_init(ctx, mdname, key, params,
 						sk_prov_sign_rsa_sign);
 }
 
-static struct sk_prov_op_ctx *sk_prov_sign_ec_newctx(
-					struct sk_prov_ctx *provctx,
-					const char *propq)
+static void *sk_prov_sign_ec_newctx(void *vprovctx, const char *propq)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3975,10 +4179,12 @@ static struct sk_prov_op_ctx *sk_prov_sign_ec_newctx(
 	return sk_prov_sign_op_newctx(provctx, propq, EVP_PKEY_EC);
 }
 
-static const OSSL_PARAM *sk_prov_sign_ec_gettable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_sign_ec_gettable_ctx_params(void *vctx,
+							     void *vprovctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3986,10 +4192,12 @@ static const OSSL_PARAM *sk_prov_sign_ec_gettable_ctx_params(
 	return sk_prov_sign_op_gettable_ctx_params(ctx, provctx, EVP_PKEY_EC);
 }
 
-static const OSSL_PARAM *sk_prov_sign_ec_settable_ctx_params(
-						struct sk_prov_op_ctx *ctx,
-						struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_sign_ec_settable_ctx_params(void *vctx,
+							     void *vprovctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -3997,9 +4205,10 @@ static const OSSL_PARAM *sk_prov_sign_ec_settable_ctx_params(
 	return sk_prov_sign_op_settable_ctx_params(ctx, provctx, EVP_PKEY_EC);
 }
 
-static const OSSL_PARAM *sk_prov_sign_ec_gettable_ctx_md_params(
-						struct sk_prov_op_ctx *ctx)
+static const OSSL_PARAM *sk_prov_sign_ec_gettable_ctx_md_params(void *vctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (ctx == NULL)
 		return NULL;
 
@@ -4007,9 +4216,10 @@ static const OSSL_PARAM *sk_prov_sign_ec_gettable_ctx_md_params(
 	return sk_prov_sign_op_gettable_ctx_md_params(ctx, EVP_PKEY_EC);
 }
 
-static const OSSL_PARAM *sk_prov_sign_ec_settable_ctx_md_params(
-						struct sk_prov_op_ctx *ctx)
+static const OSSL_PARAM *sk_prov_sign_ec_settable_ctx_md_params(void *vctx)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+
 	if (ctx == NULL)
 		return NULL;
 
@@ -4017,11 +4227,12 @@ static const OSSL_PARAM *sk_prov_sign_ec_settable_ctx_md_params(
 	return sk_prov_sign_op_settable_ctx_md_params(ctx, EVP_PKEY_EC);
 }
 
-static int sk_prov_sign_ec_sign(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_ec_sign(void *vctx,
 				unsigned char *sig, size_t *siglen,
 				size_t sigsize,
 				const unsigned char *tbs, size_t tbslen)
 {
+	struct sk_prov_op_ctx *ctx = vctx;
 	struct sk_prov_key *key;
 	EVP_MD *sign_md = NULL;
 	struct sk_funcs *funcs;
@@ -4116,11 +4327,14 @@ out:
 	return rc;
 }
 
-static int sk_prov_sign_ec_digest_sign_init(struct sk_prov_op_ctx *ctx,
+static int sk_prov_sign_ec_digest_sign_init(void *vctx,
 					    const char *mdname,
-					    struct sk_prov_key *key,
+					    void *vkey,
 					    const OSSL_PARAM params[])
 {
+	struct sk_prov_op_ctx *ctx = vctx;
+	struct sk_prov_key *key = vkey;
+
 	sk_debug_op_ctx(ctx, "ctx: %p mdname: %s key: %p", ctx,
 			mdname != NULL ? mdname : "", key);
 	return sk_prov_sign_op_digest_sign_init(ctx, mdname, key, params,
@@ -4482,8 +4696,10 @@ static const OSSL_PARAM sk_prov_param_types[] = {
 	OSSL_PARAM_END
 };
 
-static const OSSL_PARAM *sk_prov_gettable_params(struct sk_prov_ctx *provctx)
+static const OSSL_PARAM *sk_prov_gettable_params(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -4491,8 +4707,9 @@ static const OSSL_PARAM *sk_prov_gettable_params(struct sk_prov_ctx *provctx)
 	return sk_prov_param_types;
 }
 
-static int sk_prov_get_params(struct sk_prov_ctx *provctx, OSSL_PARAM params[])
+static int sk_prov_get_params(void *vprovctx, OSSL_PARAM params[])
 {
+	struct sk_prov_ctx *provctx = vprovctx;
 	OSSL_PARAM *p;
 
 	if (provctx == NULL)
@@ -4528,9 +4745,11 @@ static int sk_prov_get_params(struct sk_prov_ctx *provctx, OSSL_PARAM params[])
 	return 1;
 }
 
-static const OSSL_ALGORITHM *sk_prov_query(struct sk_prov_ctx *provctx,
+static const OSSL_ALGORITHM *sk_prov_query(void *vprovctx,
 					   int operation_id, int *no_cache)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	if (provctx == NULL)
 		return NULL;
 
@@ -4553,8 +4772,9 @@ static const OSSL_ALGORITHM *sk_prov_query(struct sk_prov_ctx *provctx,
 	return NULL;
 }
 
-static void sk_prov_teardown(struct sk_prov_ctx *provctx)
+static void sk_prov_teardown(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
 	int i;
 
 	if (provctx == NULL)
@@ -4570,16 +4790,20 @@ static void sk_prov_teardown(struct sk_prov_ctx *provctx)
 	OPENSSL_free(provctx);
 }
 
-static const OSSL_ITEM *sk_prov_get_reason_strings(struct sk_prov_ctx *provctx)
+static const OSSL_ITEM *sk_prov_get_reason_strings(void *vprovctx)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	sk_debug_ctx(provctx, "provctx: %p", provctx);
 	return sk_prov_reason_strings;
 }
 
-static int sk_prov_prov_get_capabilities(struct sk_prov_ctx *provctx,
+static int sk_prov_prov_get_capabilities(void *vprovctx,
 					 const char *capability,
 					 OSSL_CALLBACK *cb, void *arg)
 {
+	struct sk_prov_ctx *provctx = vprovctx;
+
 	sk_debug_ctx(provctx, "provctx: %p capability: %s", provctx,
 		     capability);
 
