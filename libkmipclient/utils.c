@@ -259,7 +259,7 @@ int kmip_decode_bignum(const unsigned char *data, uint32_t length, BIGNUM **bn)
 	if (data[0] & 0x80) {
 		neg = 1;
 
-		tmp = malloc(length);
+		tmp = calloc(1, length);
 		if (tmp == NULL)
 			return -ENOMEM;
 
