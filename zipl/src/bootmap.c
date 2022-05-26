@@ -40,6 +40,9 @@
 /* Pointer to dedicated empty block in bootmap. */
 static disk_blockptr_t empty_block;
 
+/* State of secure boot in the system */
+static bool secure_boot_supported;
+
 /* Get size of a bootmap block pointer for disk with given INFO. */
 static int
 get_blockptr_size(struct disk_info* info)
@@ -519,7 +522,6 @@ static int add_ipl_program(int fd, char *filename,
 	struct component_loc comp_loc[10];
 	struct signature_header sig_head;
 	size_t ramdisk_size, image_size;
-	bool secure_boot_supported;
 	size_t stage3_params_size;
 	const char *comp_name[11];
 	size_t signature_size;
@@ -608,7 +610,6 @@ static int add_ipl_program(int fd, char *filename,
 		return -1;
 	}
 	image_size = stats.st_size;
-	secure_boot_supported = check_secure_boot_support();
 	signature_size = extract_signature(ZIPL_STAGE3_PATH, &signature,
 					   &sig_head);
 	if (signature_size &&
@@ -1329,6 +1330,8 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	struct disk_info *info;
 	ulong unused_size;
 	int fd;
+
+	secure_boot_supported = check_secure_boot_support();
 
 	/* Get full path of bootmap file */
 	if (!dry_run) {
