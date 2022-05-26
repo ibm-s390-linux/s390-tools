@@ -124,15 +124,26 @@ check_secure_boot_support(void)
 	unsigned int val;
 	FILE *fp;
 
+	if (verbose)
+		printf("Secure boot support: ");
+
 	fp = fopen(ZIPL_SIPL_PATH, "r");
-	if (!fp)
+	if (!fp) {
+		if (verbose)
+			printf("not available\n");
 		return false;
+	}
 
 	if (fscanf(fp, "%d", &val) != 1) {
+		if (verbose)
+			printf("error\n");
 		fclose(fp);
 		return false;
 	}
 	fclose(fp);
+
+	if (verbose)
+		printf("%s\n", val ? "yes" : "no");
 
 	return val ? true : false;
 }
