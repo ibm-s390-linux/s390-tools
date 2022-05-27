@@ -41,7 +41,7 @@ time.
 .B BLS config files:
 boot configurations are specified using BootLoaderSpec (BLS) configuration files. The
 .BR zipl.conf (5)
-configuration file is still used to specify parameters or aditional boot configurations.
+configuration file is still used to specify parameters or additional boot configurations.
 .PP
 
 To use a single boot configuration section, provide its name as parameter to
