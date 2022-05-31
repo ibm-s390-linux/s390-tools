@@ -1,7 +1,7 @@
 include ../common.mak
 
 BIN_FILES = lscpumf chcpumf lshwc pai
-MAN_FILES = lscpumf.1 chcpumf.8 lshwc.1 pai.1
+MAN_FILES = lscpumf.8 chcpumf.8 lshwc.8 pai.8
 
 all: $(BIN_FILES)
 
@@ -23,8 +23,8 @@ clean:
 
 install-man:
 	for man in $(MAN_FILES); do \
-	  msection=`echo $$man |sed 's/.*\.\([1-9]\)$$/man\1/'` ; \
-	  $(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 -D man/$$man $(DESTDIR)$(MANDIR)/$$msection/$$man ; \
+		$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 man/$$man \
+		$(DESTDIR)$(MANDIR)/man8 ; \
 	done
 
 .PHONY: all install clean
