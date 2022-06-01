@@ -13,6 +13,9 @@
 
 #include "lib/zt_common.h"
 
+#define ZIPL_MAGIC			"zIPL"
+#define ZIPL_MAGIC_SIZE			4
+
 /*
  * ECKD dump parameter
  */

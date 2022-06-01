@@ -17,9 +17,6 @@
 #include "lib/util_base.h"
 #include "boot/loaders_layout.h"
 
-#define ZIPL_MAGIC			"zIPL"
-#define ZIPL_MAGIC_SIZE			4
-
 #define ADDRESS_LIMIT			0x80000000UL
 #define UNSPECIFIED_ADDRESS		-1UL
 #define LEGACY_MAXIMUM_PARMLINE_SIZE	0x380UL
