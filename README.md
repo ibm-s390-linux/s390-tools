@@ -33,6 +33,9 @@ Package contents
  * genprotimg:
    Create a protected virtualization image.
 
+ * pvattest:
+   Create, perform, and verify protected virtualization attestation measurements.
+
  * udev rules:
    - 59-dasd.rules: rules for unique DASD device nodes created in /dev/disk/.
    - 57-osasnmpd.rules: udev rules for osasnmpd.
@@ -307,12 +310,13 @@ build options:
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 | openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
-|                |                    | libkmipclient                         |
+|                |                    | libkmipclient, pvattest               |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
 |                |                    | libkmipclient                         |
-| glib2          | `HAVE_GLIB2`       | genprotimg                            |
-| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient |
+| glib2          | `HAVE_GLIB2`       | genprotimg, pvattest                  |
+| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient,|
+|                |                    | pvattest                              |
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 | liblockfile    | `HAVE_LOCKFILE`    | ap-check                              |
@@ -345,6 +349,16 @@ the different tools are provided:
   `HAVE_OPENSSL=0` or `HAVE_GLIB2=0`.
 
   The runtime requirements are: openssl-libs (>= 1.1.0) and glib2.
+
+* pvattest:
+  For building pvattest you need OpenSSL version 1.1.1 or newer
+  installed (openssl-devel.rpm). Also required is glib2.56 or newer
+  (glib2-devel.rpm) and libcurl.
+  Tip: you may skip the pvattest build by adding
+  `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_GLIB2=0`.
+
+  The runtime requirements are: openssl-libs (>= 1.1.1) and
+  glib2.56 or newer.
 
 * osasnmpd:
   You need at least the NET-SNMP 5.1.x package (net-snmp-devel.rpm)

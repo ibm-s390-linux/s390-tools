@@ -1,0 +1,47 @@
+.\" Copyright 2022 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH pvattest-perform 1 "07 June 2022" "s390-tools" "Attestation Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvattest [OPTION?] perform [OPTIONS] \fP- execute an attestation measurement request
+\fB
+.SH DESCRIPTION
+Run a measurement of this system using '/dev/uv'. Works only if this device is available and the attestation Ultravisor facility is present. The input must be an attestation request created with 'pvattest create'. Output will contain the original request, the attestation measurement result, the configuration UID, and if requested in the request Additional Data.
+.RE
+.PP
+
+.SH OPTIONS
+.TP
+.B
+\fB-h\fP, \fB--help\fP
+Show help options
+.TP
+.B
+\fB-i\fP, \fB--input\fP=\fBFILE\fP
+\fBFILE\fP specifies the attestation request as input.
+.TP
+.B
+\fB-o\fP, \fB--output\fP=\fBFILE\fP
+\fBFILE\fP specifies the output for the attestation result.
+.TP
+.B
+\fB-V\fP, \fB--verbose\fP
+Provide more detailed output (optional)
+.RE
+.PP
+
+.SH EXAMPLE
+Perform an attestation measurement with the attestation request 'arcb.bin' and write the output to 'measurement.bin'.
+.PP
+.nf
+.fam C
+        pvattest perform --input attreq.bin --output attresp.bin
+
+
+.fam T
+.fi
+.SH SEE ALSO
+\fBpvattest\fP(1), \fBpvattest-create\fP(1), \fBpvattest-verify\fP(1)

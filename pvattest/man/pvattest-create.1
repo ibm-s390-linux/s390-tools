@@ -1,0 +1,73 @@
+.\" Copyright 2022 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH pvattest-create 1 "07 June 2022" "s390-tools" "Attestation Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvattest [OPTION?] create [OPTIONS] \fP- create an attestation measurement request
+\fB
+.SH DESCRIPTION
+Prepare attestation measurement requests for an IBM Secure Execution guest. Only prepare attestation requests in a trusted environment, such as your workstation. The 'pvattest create' command creates a randomly generated key to protect the attestation request. This key is only valid for this specific request.In order to avoid compromising the attestation, do not publish the protection key and delete it after verification. Every 'create' command generates a new, random protection key.
+.SH OPTIONS
+.TP
+.B
+\fB-h\fP, \fB--help\fP
+Show help options
+.TP
+.B
+\fB-k\fP, \fB--host-key-document\fP=\fBFILE\fP
+Specify one or more host key documents.
+.TP
+.B
+\fB-C\fP, \fB--cert\fP=\fBFILE\fP
+Specifies  the  certificate that is used to establish a chain of trust for the verification of the host-key documents. Specify this option twice to specify the IBM Z signing key and the intermediate CA certificate (signed by the root CA). Required. Ignored when \fB--no-verify\fP is specified.
+.TP
+.B
+\fB--crl\fP=\fBFILE\fP
+Specify \fBFILE\fP to be a certificate revocation list (optional).
+.TP
+.B
+\fB--root-ca\fP=\fBFILE\fP
+Use \fBFILE\fP as the trusted root CA instead the root CAs that are installed on the system (optional).
+.TP
+.B
+\fB-o\fP, \fB--output\fP=\fBFILE\fP
+\fBFILE\fP specifies the output for the attestation request control block.
+.TP
+.B
+\fB-a\fP, \fB--arpk\fP=\fBFILE\fP
+Save the protection key as GCM-AES256 key in \fBFILE\fP Do not publish this key, otherwise your attestation is compromised.
+.TP
+.B
+\fB--no-verify\fP
+Disable the host-key-document verification. Does not require the host-key documents to be valid. For testing purposes, do not use for a production image. (Optional)
+.TP
+.B
+\fB--offline\fP
+Don't download CRLs (optional).
+.TP
+.B
+\fB-V\fP, \fB--verbose\fP
+Provide more detailed output (optional)
+.SH EXAMPLE
+Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', and verify the host-key document using the CA-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt'.
+.PP
+.nf
+.fam C
+        pvattest create -k hkd.crt --arpk arp.key -o attreq.bin --cert DigiCertCA.crt --cert IbmSigningKey.crt
+
+.fam T
+.fi
+Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', verify the host-key document using the CA-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt', and instead of downloading the certificate revocation list use certificate revocation lists 'DigiCertCA.crl', 'IbmSigningKey.crl', and 'rootCA.crl'.
+.PP
+.nf
+.fam C
+        pvattest create -k hkd.crt --arpk arp.key -o attreq.bin --cert DigiCertCA.crt --cert IbmSigningKey.crt --offline --crl DigiCertCA.crl --crl IbmSigningKey.crl --crl rootCA.crl
+
+
+.fam T
+.fi
+.SH SEE ALSO
+\fBpvattest\fP(1), \fBpvattest-verify\fP(1), \fBpvattest-perform\fP(1)

@@ -16,7 +16,7 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   vmconvert vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
 	   ziomon iucvterm hyptop cmsfs-fuse qethqoat zfcpdump zdsfs cpumf \
 	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
-	   genprotimg lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools
+	   genprotimg lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools pvattest
 
 SUB_DIRS = $(BASELIB_DIRS) $(LIB_DIRS) $(TOOL_DIRS)
 

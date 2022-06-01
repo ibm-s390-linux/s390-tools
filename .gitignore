@@ -68,6 +68,7 @@ lsstp/lsstp
 mon_tools/mon_fsstatd
 mon_tools/mon_procd
 osasnmpd/osasnmpd
+pvattest/src/pvattest
 qetharp/qetharp
 qethqoat/qethqoat
 systemd/cpacfstatsd.service
@@ -121,3 +122,4 @@ zkey/kmip/zkey-kmip.so
 zkey/zkey
 zkey/zkey-cryptsetup
 zpcictl/zpcictl
+**/.detect-openssl.dep.c

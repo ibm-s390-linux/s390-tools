@@ -1,0 +1,104 @@
+.\" Copyright 2022 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH pvattest 1 "07 June 2022" "s390-tools" "Attestation Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvattest [OPTION?] COMMAND [OPTIONS] \fP- create, perform, and verify attestation measurements
+\fB
+.RE
+\fB
+.SH SYNOPSIS
+.nf
+.fam C
+\fBpvattest\fP \fIcreate\fP [\fIOPTIONS\fP]
+\fBpvattest\fP \fIperform\fP [\fIOPTIONS\fP]
+\fBpvattest\fP \fIverify\fP [\fIOPTIONS\fP]
+
+.fam T
+.fi
+.fam T
+.fi
+.SH DESCRIPTION
+Use \fBpvattest\fP to attest that an IBM Secure Execution guest is the correct guest, and that it was started in a secure manner.
+Run '\fBpvattest\fP \fIcreate\fP' and '\fBpvattest\fP \fIverify\fP' in a trusted environment only.
+.PP
+.nf
+.fam C
+        create    On a trusted system, creates an attestation request.
+
+        perform   On the SE-guest to be attested, sends the attestation request to the Ultravisor and receives the answer.
+
+        verify    On a trusted system, compares the answer from the Ultravisor to the one from your trusted environment. If they differ, the Secure Execution guest might be compromised.
+
+.fam T
+.fi
+For meaningful results, run '\fIcreate\fP' and '\fIverify\fP' in a trusted environment, like your workstation or a previously attested IBM Secure Execution guest. Otherwise, the attestation might be tampered with. For all certificates, revocation lists, and host-key documents, both the PEM and DER input formats are supported. If you run \fBpvattest\fP on a machine architecture other than z/Architecture, 'measure' is not available.
+.PP
+Use '\fBpvattest\fP [COMMAND] \fB-h\fP' to get detailed help
+.RE
+.PP
+
+.SH OPTIONS
+.TP
+.B
+\fB-h\fP, \fB--help\fP
+Show help options
+.TP
+.B
+\fB-v\fP, \fB--version\fP
+Print the version and exit.
+.TP
+.B
+\fB-V\fP, \fB--verbose\fP
+Provide more detailed output (optional)
+.RE
+.PP
+
+.SH EXAMPLE
+For details refer to the man page of the command.
+.PP
+Create the request on a trusted system.
+.PP
+.nf
+.fam C
+	trusted:~$ pvattest create -k hkd.crt --cert CA.crt --cert ibmsk.crt --arpk arp.key -o attreq.bin
+
+.fam T
+.fi
+On the SE-guest, \fIperform\fP the attestation.
+.PP
+.nf
+.fam C
+	seguest:~$ pvattest perform -i attreq.bin -o attresp.bin
+
+.fam T
+.fi
+On a trusted system, \fIverify\fP that the response is correct. Here, the protection key from the creation and the SE-guest’s header is used to \fIverify\fP the measurement.
+.PP
+.nf
+.fam C
+	trusted:~$ pvattest verify -i attresp.bin --arpk arp.key --hdr se_guest.hdr
+	trusted:~$ echo $?
+	0
+
+.fam T
+.fi
+
+If the measurements do not match \fBpvattest\fP exits with code 2 and emits an error message. The SE-guest attestation failed.
+.PP
+.nf
+.fam C
+	trusted:~$ pvattest verify -i wrongresp.bin --arpk arp.key --hdr se_guest.hdr
+	ERROR: Attestation measurement verification failed:
+	       Calculated and received attestation measurement are not the same.
+	trusted:~$ echo $?
+	2
+
+.fam T
+.fi
+
+.SH SEE ALSO
+\fBpvattest\fP-\fIcreate\fP(1), \fBpvattest-\fIverify\fP\fP(1), \fBpvattest\fP-\fIperform\fP(1)
