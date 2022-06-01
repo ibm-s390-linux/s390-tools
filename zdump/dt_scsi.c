@@ -22,21 +22,6 @@
 #include "dt.h"
 
 /*
- * Single volume SCSI dump superblock
- */
-struct scsi_dump_sb {
-	uint64_t	magic;
-	uint64_t	version;
-	uint64_t	part_start;
-	uint64_t	part_size;
-	uint64_t	dump_off;
-	uint64_t	dump_size;
-	uint64_t	csum_off;
-	uint64_t	csum_size;
-	uint64_t	csum;
-} __packed;
-
-/*
  * File local static data
  */
 static struct {
@@ -131,14 +116,14 @@ static int check_sb(void)
 {
 	char buf[l.sb.csum_size];
 
-	if (l.sb.magic != 0x5a46435044554d50ULL) /* ZFCPDUMP */
+	if (l.sb.magic != SCSI_DUMP_SB_MAGIC)
 		return -1;
 	/*
 	 * Verify checksum
 	 */
-	zg_seek(g.fh, l.sb.part_start + l.sb.csum_off, ZG_CHECK);
+	zg_seek(g.fh, l.sb.part_start + l.sb.csum_offset, ZG_CHECK);
 	zg_read(g.fh, &buf, sizeof(buf), ZG_CHECK);
-	if (zg_csum_partial(&buf, l.sb.csum_size, 0x12345678) != l.sb.csum)
+	if (zg_csum_partial(&buf, l.sb.csum_size, SCSI_DUMP_SB_SEED) != l.sb.csum)
 		return -1;
 	return 0;
 }
