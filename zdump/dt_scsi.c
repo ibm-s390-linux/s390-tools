@@ -15,6 +15,7 @@
 
 #include "lib/zt_common.h"
 #include "lib/util_part.h"
+#include "boot/boot_defs.h"
 
 #include "zgetdump.h"
 #include "zg.h"
@@ -51,32 +52,6 @@ struct scsi_blockptr {
 	uint16_t	size;
 	uint16_t	blockct;
 	uint8_t		reserved[4];
-} __packed;
-
-enum component_entry_type {
-	component_execute	= 0x01,
-	component_load		= 0x02
-};
-
-struct component_entry {
-	struct scsi_blockptr	data;
-	uint8_t			pad[7];
-	uint8_t			component_type;
-	union {
-		uint64_t	load_address;
-		uint64_t	load_psw;
-	} address;
-} __packed;
-
-enum component_header_type {
-	component_header_ipl	= 0x00,
-	component_header_dump	= 0x01
-};
-
-struct component_header {
-	uint8_t	magic[4];
-	uint8_t	type;
-	uint8_t	reserved[27];
 } __packed;
 
 struct boot_info {
@@ -124,7 +99,7 @@ static int check_dump_program(struct scsi_blockptr *blockptr)
 	zg_read(g.fh, &header, sizeof(header), ZG_CHECK_ERR);
 	if (check_zipl_magic(&header.magic))
 		return -1;
-	return (header.type == component_header_dump) ? 0 : -1;
+	return (header.type == COMPONENT_HEADER_DUMP) ? 0 : -1;
 }
 
 /*
