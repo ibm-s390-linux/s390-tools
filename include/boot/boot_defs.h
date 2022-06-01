@@ -168,4 +168,15 @@ struct boot_info {
 	} bp;
 } __packed;
 
+#define DISK_LAYOUT_ID 0x00000001
+
+struct scsi_mbr {
+	uint8_t			magic[4];
+	uint32_t		version_id;
+	uint8_t			reserved[8];
+	struct linear_blockptr	program_table_pointer;
+	uint8_t			reserved2[0x50];
+	struct boot_info 	boot_info;
+}  __packed;
+
 #endif /* BOOT_DEFS_H */

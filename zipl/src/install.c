@@ -70,9 +70,6 @@ get_scsi_layout(unsigned char* bootblock)
 	return scsi_layout_unknown;
 }
 
-
-#define DISK_LAYOUT_ID 0x00000001
-
 static int
 overwrite_partition_start(int fd, struct disk_info* info, int mv_dump_magic);
 
@@ -83,14 +80,7 @@ static int
 update_scsi_mbr(void* bootblock, disk_blockptr_t* table,
 		struct disk_info* info, disk_blockptr_t* scsi_dump_sb_blockptr)
 {
-	struct scsi_mbr {
-		uint8_t		magic[4];
-		uint32_t	version_id;
-		uint8_t		reserved[8];
-		uint8_t		program_table_pointer[16];
-		uint8_t		reserved2[0x50];
-		struct boot_info boot_info;
-	}  __packed* mbr;
+	struct scsi_mbr *mbr;
 	struct scsi_dump_param param;
 	void* buffer;
 
