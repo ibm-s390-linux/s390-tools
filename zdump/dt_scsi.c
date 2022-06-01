@@ -30,25 +30,6 @@ static struct {
 } l;
 
 /*
- * zipl on-disc / bootloader structs from zipl includes
- */
-struct scsi_blockptr {
-	uint64_t	blockno;
-	uint16_t	size;
-	uint16_t	blockct;
-	uint8_t		reserved[4];
-} __packed;
-
-struct scsi_mbr {
-	char			magic[4];
-	uint32_t		version;
-	uint8_t			reserved1[8];
-	struct scsi_blockptr	blockptr;
-	uint8_t			reserved2[0x50];
-	struct boot_info	boot_info;
-} __packed;
-
-/*
  * Check the zIPL magic number
  */
 static int check_zipl_magic(void *buf)
@@ -61,7 +42,7 @@ static int check_zipl_magic(void *buf)
 /*
  * Final step looks into program to find dump flag
  */
-static int check_dump_program(struct scsi_blockptr *blockptr)
+static int check_dump_program(struct linear_blockptr *blockptr)
 {
 	uint64_t off = blockptr->blockno * l.blk_size;
 	struct component_header header;
@@ -78,7 +59,7 @@ static int check_dump_program(struct scsi_blockptr *blockptr)
  */
 static int check_program_table(uint64_t blockno)
 {
-	struct scsi_blockptr entries[l.blk_size / sizeof(struct scsi_blockptr)];
+	struct linear_blockptr entries[l.blk_size / sizeof(struct linear_blockptr)];
 	unsigned int i;
 
 	/* Entry 0, holds the magic, entry 1 the default */
@@ -86,7 +67,7 @@ static int check_program_table(uint64_t blockno)
 	zg_read(g.fh, &entries, l.blk_size, ZG_CHECK);
 	if (check_zipl_magic(&entries[0]))
 		return -1;
-	for (i = 1; i < l.blk_size / sizeof(struct scsi_blockptr); i++) {
+	for (i = 1; i < l.blk_size / sizeof(struct linear_blockptr); i++) {
 		if (entries[i].blockno == 0)
 			break;
 		if (check_dump_program(&entries[i]) == 0)
@@ -143,7 +124,7 @@ static int dt_scsi_init(void)
 		return -1;
 	if (check_zipl_magic(mbr.magic))
 		return -1;
-	if (check_program_table(mbr.blockptr.blockno))
+	if (check_program_table(mbr.program_table_pointer.blockno))
 		return -1;
 	if (check_boot_info(&mbr.boot_info))
 		return -1;
