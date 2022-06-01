@@ -35,6 +35,7 @@
 
 #include "lib/util_base.h"
 #include "lib/zt_common.h"
+#include "boot/boot_defs.h"
 
 #include "zfcpdump.h"
 
@@ -48,57 +49,6 @@ struct copy_table_entry {
 	unsigned long size;
 	unsigned long off;
 };
-
-/*
- * Single volume SCSI dump superblock
- */
-struct scsi_dump_sb {
-	uint64_t	magic;
-	uint64_t	version;
-	uint64_t	part_start;
-	uint64_t	part_size;
-	uint64_t	dump_off;
-	uint64_t	dump_size;
-	uint64_t	csum_off;
-	uint64_t	csum_size;
-	uint64_t	csum;
-} __packed;
-
-/*
- * Layout of SCSI disk block pointer
- */
-struct linear_blockptr {
-	uint64_t	blockno;
-	uint16_t	size;
-	uint16_t	blockct;
-	uint8_t		reserved[4];
-} __packed;
-
-/* From boot.h in zipl */
-struct boot_info {
-	char		magic[4];
-	uint8_t		version;
-	uint8_t		bp_type;
-	uint8_t		dev_type;
-	uint8_t		flags;
-	uint64_t	sb_off;
-} __packed;
-
-/* From install.c in zipl */
-struct scsi_mbr {
-	uint8_t			magic[4];
-	uint32_t		version_id;
-	uint8_t			reserved[8];
-	struct linear_blockptr	lin;
-	uint8_t			reserverd[0x50];
-	struct boot_info	boot_info;
-}  __packed;
-
-/* From boot.h in zipl */
-#define BOOT_INFO_VERSION		1
-#define BOOT_INFO_MAGIC			"zIPL"
-#define BOOT_INFO_DEV_TYPE_SCSI		0x02
-#define BOOT_INFO_BP_TYPE_DUMP		0x01
 
 /*
  * Globals
@@ -160,7 +110,7 @@ static int csum_get(uint64_t off, uint64_t len, uint64_t *result)
 		PRINT_ERR("Error reading checksum from disk\n");
 		return -1;
 	}
-	*result = (uint64_t)csum_partial(&buf, len, 0x12345678);
+	*result = (uint64_t)csum_partial(&buf, len, SCSI_DUMP_SB_SEED);
 	PRINT_TRACE("Got crc %llx\n", (unsigned long long) *result);
 	return 0;
 }
@@ -171,12 +121,12 @@ static int csum_get(uint64_t off, uint64_t len, uint64_t *result)
 static int csum_update(int fd)
 {
 	/* Write crc into zfcpdump header */
-	if (csum_get(dump_sb.part_start + dump_sb.csum_off,
+	if (csum_get(dump_sb.part_start + dump_sb.csum_offset,
 		     dump_sb.csum_size, &dump_sb.csum)) {
 		PRINT_ERR("Get check sum failed\n");
 		return -1;
 	}
-	if (lseek(fd, mbr.boot_info.sb_off, SEEK_SET) < 0) {
+	if (lseek(fd, mbr.boot_info.bp.dump.param.scsi.block, SEEK_SET) < 0) {
 		PRINT_PERR("Seek failed\n");
 		return -1;
 	}
@@ -406,11 +356,11 @@ static int get_scsi_dump_params(void)
 		return -1;
 	}
 	if (pread_file(DEV_SCSI, (char *)&dump_sb, sizeof(dump_sb),
-		       mbr.boot_info.sb_off) < 0) {
+		       mbr.boot_info.bp.dump.param.scsi.block) < 0) {
 		PRINT_ERR("Cannot read superblock\n");
 		return -1;
 	}
-	if (dump_sb.magic != 0x5a46435044554d50ULL) { /* ZFCPDUMP */
+	if (dump_sb.magic != SCSI_DUMP_SB_MAGIC) {
 		PRINT_ERR("Dump data block wrong magic\n");
 		return -1;
 	}
@@ -419,7 +369,7 @@ static int get_scsi_dump_params(void)
 		PRINT_ERR("Specified dump partition not found\n");
 		return -1;
 	}
-	if (csum_get(dump_sb.part_start + dump_sb.csum_off,
+	if (csum_get(dump_sb.part_start + dump_sb.csum_offset,
 		     dump_sb.csum_size, &csum)) {
 		PRINT_ERR("Getting Checksum failed\n");
 		return -1;
@@ -451,6 +401,6 @@ int main(int UNUSED(argc), char *UNUSED(argv[]))
 	print_newline();
 	PRINT("Writing dump:\n");
 	rc = copy_dump("/proc/vmcore", DEV_SCSI,
-		       dump_sb.part_start + dump_sb.dump_off);
+		       dump_sb.part_start + dump_sb.dump_offset);
 	return terminate(rc);
 }
