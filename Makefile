@@ -10,7 +10,7 @@ include common.mak
 #
 BASELIB_DIRS = libutil libseckey
 LIB_DIRS = libvtoc libzds libdasd libvmdump libccw libvmcp libekmfweb \
-	   libkmipclient libcpumf libap
+	   libkmipclient libcpumf libap libpv
 TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   tape390 osasnmpd qetharp ip_watcher qethconf scripts zconf \
 	   vmconvert vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
