@@ -219,18 +219,6 @@ add_program_table(int fd, disk_blockptr_t* table, int entries,
 	return rc;
 }
 
-struct component_entry {
-	uint8_t data[23];
-	uint8_t type;
-	component_data compdat;
-} __packed;
-
-typedef enum {
-	component_execute = 0x01,
-	component_load = 0x02,
-	component_signature = 0x03
-} component_type;
-
 static void
 create_component_entry(void* buffer, disk_blockptr_t* pointer,
 		       component_type type, component_data data,
@@ -242,33 +230,21 @@ create_component_entry(void* buffer, disk_blockptr_t* pointer,
 	memset(entry, 0, sizeof(struct component_entry));
 	entry->type = (uint8_t) type;
 	switch (type) {
-		case component_load:
+		case COMPONENT_LOAD:
 			bootmap_store_blockptr(&entry->data, pointer,
 					       info);
 			entry->compdat.load_address = data.load_address;
 			break;
-		case component_execute:
+		case COMPONENT_EXECUTE:
 			entry->compdat.load_psw = data.load_psw;
 			break;
-		case component_signature:
+		case COMPONENT_SIGNATURE:
 			bootmap_store_blockptr(&entry->data, pointer,
 					       info);
 			entry->compdat.sig_head = data.sig_head;
 			break;
 	}
 }
-
-
-struct component_header {
-	uint8_t magic[4];
-	uint8_t type;
-	uint8_t reserved[27];
-}  __packed;
-
-typedef enum {
-	component_header_ipl = 0x00,
-	component_header_dump = 0x01
-} component_header_type;
 
 static void
 create_component_header(void* buffer, component_header_type type)
@@ -347,7 +323,7 @@ add_component_file_range(int fd, const char *filename, struct file_range *reg,
 	rc = add_segment_table(fd, list, count, &segment, info);
 	free(list);
 	if (rc == 0) {
-		create_component_entry(component, &segment, component_load,
+		create_component_entry(component, &segment, COMPONENT_LOAD,
 				       (component_data) load_address, info);
 		/* Return location if requested */
 		if (location != NULL)
@@ -387,7 +363,7 @@ add_component_buffer_align(int fd, void *buffer, size_t size,
 		error_text("Could not write to bootmap file");
 		return -1;
 	}
-	if (type == component_load) {
+	if (type == COMPONENT_LOAD) {
 		/* Fill in component location */
 		loc.addr = data.load_address;
 		loc.size = count * info->phy_block_size;
@@ -433,7 +409,7 @@ add_dummy_buffer(int fd, size_t size, address_t addr, void *component,
 	memset(buffer, 0, size);
 	rc = add_component_buffer(fd, buffer, size,
 				  (component_data) (uint64_t) addr,
-				  component, info, comp_loc, component_load);
+				  component, info, comp_loc, COMPONENT_LOAD);
 	if (rc) {
 		free(buffer);
 		return rc;
@@ -630,7 +606,7 @@ static int add_ipl_program(int fd, char *filename,
 					  (component_data)sig_head,
 					  VOID_ADD(table, offset), info,
 					  &comp_loc[comp_nr],
-					  component_signature);
+					  COMPONENT_SIGNATURE);
 		if (rc) {
 			error_text("Could not add stage3 signature");
 			free(table);
@@ -685,7 +661,7 @@ static int add_ipl_program(int fd, char *filename,
 				  (component_data) (uint64_t)
 				  STAGE3_PARAMS_ADDRESS,
 				  VOID_ADD(table, offset), info,
-				  &comp_loc[comp_nr], component_load);
+				  &comp_loc[comp_nr], COMPONENT_LOAD);
 	free(stage3_params);
 	if (rc) {
 		error_text("Could not add parameters");
@@ -711,7 +687,7 @@ static int add_ipl_program(int fd, char *filename,
 					  (component_data)sig_head,
 					  VOID_ADD(table, offset), info,
 					  &comp_loc[comp_nr],
-					  component_signature);
+					  COMPONENT_SIGNATURE);
 		if (rc) {
 			error_text("Could not add image signature");
 			free(table);
@@ -758,7 +734,7 @@ static int add_ipl_program(int fd, char *filename,
 					  (component_data) ipl->common.parm_addr,
 					  VOID_ADD(table, offset),
 					  info, &comp_loc[comp_nr],
-					  component_load);
+					  COMPONENT_LOAD);
 		if (rc) {
 			error_text("Could not add parmline '%s'",
 				   ipl->common.parmline);
@@ -786,7 +762,7 @@ static int add_ipl_program(int fd, char *filename,
 						  (component_data)sig_head,
 						  VOID_ADD(table, offset), info,
 						  &comp_loc[comp_nr],
-						  component_signature);
+						  COMPONENT_SIGNATURE);
 			if (rc) {
 				error_text("Could not add ramdisk signature");
 				free(table);
@@ -834,7 +810,7 @@ static int add_ipl_program(int fd, char *filename,
 					       (component_data)ipl->envblk_addr,
 					       VOID_ADD(table, offset),
 					       info, &comp_loc[comp_nr],
-					       component_load,
+					       COMPONENT_LOAD,
 					       info->fs_block_size,
 					       &envblk_off);
 			if (rc) {
@@ -877,7 +853,7 @@ static int add_ipl_program(int fd, char *filename,
 		print_components(comp_name, comp_loc, comp_nr);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
-			       component_execute,
+			       COMPONENT_EXECUTE,
 			       (component_data) (uint64_t)
 			       (STAGE3_ENTRY | PSW_LOAD),
 			       info);
@@ -930,7 +906,7 @@ add_segment_program(int fd, struct job_segment_data* segment,
 		print_components(comp_name, comp_loc, 1);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
-			       component_execute, (component_data) (uint64_t)
+			       COMPONENT_EXECUTE, (component_data) (uint64_t)
 			       PSW_DISABLED_WAIT, info);
 	/* Write component table */
 	rc = disk_write_block_aligned(fd, table, info->phy_block_size,
@@ -1051,9 +1027,9 @@ build_program_table(int fd, char *filename, struct job_data *job,
 			printf("Adding IPL section '%s' (default)\n",
 			       job->name);
 		if (job->data.ipl.is_kdump)
-			component_header = component_header_dump;
+			component_header = COMPONENT_HEADER_DUMP;
 		else
-			component_header = component_header_ipl;
+			component_header = COMPONENT_HEADER_IPL;
 		rc = add_ipl_program(fd, filename,
 				     true, &job->envblk, &job->data.ipl,
 				     &table[0], verbose || job->command_line,
@@ -1068,7 +1044,7 @@ build_program_table(int fd, char *filename, struct job_data *job,
 			       job->name);
 		rc = add_segment_program(fd, &job->data.segment, &table[0],
 					 verbose || job->command_line,
-					 job->add_files, component_header_ipl,
+					 job->add_files, COMPONENT_HEADER_IPL,
 					 info, &job->target);
 		break;
 	case job_dump_partition:
@@ -1080,7 +1056,7 @@ build_program_table(int fd, char *filename, struct job_data *job,
 			       job->name);
 		rc = add_dump_program(fd, &job->data.dump, &table[0],
 					 verbose || job->command_line,
-					 component_header_dump,
+					 COMPONENT_HEADER_DUMP,
 					 info, &job->target);
 		break;
 	case job_menu:
@@ -1103,11 +1079,11 @@ build_program_table(int fd, char *filename, struct job_data *job,
 						" (default)": "");
 				if (job->data.menu.entry[i].data.ipl.is_kdump) {
 					component_header =
-						component_header_dump;
+						COMPONENT_HEADER_DUMP;
 					printf(" (kdump)\n");
 				} else {
 					component_header =
-						component_header_ipl;
+						COMPONENT_HEADER_IPL;
 					printf("\n");
 				}
 				if (job->is_secure != SECURE_BOOT_UNDEFINED)

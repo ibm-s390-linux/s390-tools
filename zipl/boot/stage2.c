@@ -127,15 +127,15 @@ void __noreturn start(void)
 			entry++;
 			continue;
 		}
-		load_address = (void *)(unsigned long)
-			entry->address.load_address[1];
+		load_address = (void *)
+			(entry->compdat.load_address & 0xfffffffful);
 		load_blocklist(entry, subchannel_id, load_address);
 		entry++;
 	}
 	if (entry->type != COMPONENT_EXECUTE)
 		panic(EWRONGTYPE, "");
 
-	load_psw = entry->address.load_psw;
+	load_psw = entry->compdat.load_psw;
 
 	free_page((unsigned long)load_page);
 	io_irq_disable();

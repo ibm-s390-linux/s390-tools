@@ -67,4 +67,39 @@ struct eckd_blockptr {
 	uint8_t reserved[8];
 } __packed;
 
+typedef enum {
+	COMPONENT_EXECUTE = 0x01,
+	COMPONENT_LOAD = 0x02,
+	COMPONENT_SIGNATURE = 0x03
+} component_type;
+
+typedef enum {
+	COMPONENT_HEADER_IPL = 0x00,
+	COMPONENT_HEADER_DUMP = 0x01
+} component_header_type;
+
+struct component_header {
+	uint8_t magic[4];
+	uint8_t type;
+	uint8_t reserved[27];
+} __packed;
+
+struct signature_header {
+	uint8_t format;
+	uint8_t reserved[3];
+	uint32_t length;
+} __packed;
+
+typedef union {
+	uint64_t load_address;
+	uint64_t load_psw;
+	struct signature_header sig_head;
+} component_data;
+
+struct component_entry {
+	uint8_t data[23];
+	uint8_t type;
+	component_data compdat;
+} __packed;
+
 #endif /* BOOT_DEFS_H */

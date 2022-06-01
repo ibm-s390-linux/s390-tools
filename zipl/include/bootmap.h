@@ -31,18 +31,6 @@ struct bootmap_header {
 	char reserved[448];
 };
 
-struct signature_header {
-	uint8_t format;
-	uint8_t reserved[3];
-	uint32_t length;
-} __packed;
-
-typedef union {
-	uint64_t load_address;
-	uint64_t load_psw;
-	struct signature_header sig_head;
-} component_data;
-
 /*
  * The file_signature structure and the PKEY_ID definition
  * are based on linux/scripts/sign-file.c
