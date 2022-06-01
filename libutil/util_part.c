@@ -128,7 +128,7 @@ static int mbr_table_ext_search(int fh, size_t blk_start_mbr,
 	start = blk_start_mbr + le32toh(mbr.part_entry_vec[0].blk_start);
 	cnt = le32toh(mbr.part_entry_vec[0].blk_cnt);
 
-	if ((start == blk_start) && (cnt == blk_cnt))
+	if ((start <= blk_start) && (cnt >= (blk_start - start) + blk_cnt))
 		return part_num;
 
 	/* Second entry contains relative offset for next logical volume */
@@ -162,11 +162,11 @@ static int mbr_table_search(int fh, struct mbr *mbr, size_t blk_start,
 		 * The kernel sets count for extended partitions explicitly.
 		 * Therefore we do not check count here.
 		 */
-		if (mbr_part_is_ext(type) && (start == blk_start)) {
+		if (mbr_part_is_ext(type) && (start <= blk_start)) {
 			*part_ext = 1;
 			return part_num;
 		}
-		if ((start == blk_start) && (cnt == blk_cnt))
+		if ((start <= blk_start) && (cnt >= (blk_start - start) + blk_cnt))
 			return part_num;
 		if (!mbr_part_is_ext(type))
 			continue;
@@ -207,7 +207,7 @@ static int gpt_table_search(int fh, struct gpt *gpt, size_t blk_start,
 		end = le64toh(part_entry->blk_end);
 		if (start == 0) /* Empty slot */
 			continue;
-		if ((start == blk_start) && (end == blk_end))
+		if ((start <= blk_start) && (end >= blk_end))
 			return part_num;
 	}
 	return 0;
