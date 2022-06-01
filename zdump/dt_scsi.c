@@ -34,7 +34,7 @@ static struct {
  */
 static int check_zipl_magic(void *buf)
 {
-	if (memcmp(buf, "zIPL", 4))
+	if (memcmp(buf, ZIPL_MAGIC, ZIPL_MAGIC_SIZE))
 		return -1;
 	return 0;
 }
