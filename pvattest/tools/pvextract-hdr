@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# pvextract_hdr - extract an IBM Secure Execution header from the Image
+#
+# Sample:
+# ./pvextract-hdr -o sehdr.bin se-image.bin
+#
+# Copyright IBM Corp. 2022
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+
+set -o pipefail
+set -o nounset
+set -e
+
+def_output="sehdr.bin"
+def_skip=0x14
+def_len=0x4
+
+usage() {
+	cat <<-EOF
+		Usage: $(basename "$0") [-o ${def_output}] [-s ${def_skip}] [-l ${def_len}] FILE
+
+		Extract the header of the SE-image located in FILE.
+		By default ${def_skip} pages will be skipped until starting to search
+		for the header. By default the search will be stopped after ${def_len} pages.
+		'${def_output}' is the default output file name.
+	EOF
+}
+
+function check_file() {
+	[ -e "$1" ] ||
+		{ echo "ERROR: File '$1' not found" >&2 && exit 1; }
+}
+
+function check_hdr_ver() {
+	local hdr_start="$1"
+	local input="$2"
+	xxd -s $((hdr_start + 8)) -l 4 "$input" | grep -q "000 0100" ||
+		{ echo -n "WARNING: unknown hdr version " &&
+			xxd -s $((hdr_start + 8)) -l 4 "$input" | awk '{print "0x" $2 $3}'; }
+}
+
+output=${def_output}
+parsed_skip=${def_skip}
+parsed_len=${def_len}
+# the last argument must be the input file
+input="${*: -1}"
+while getopts 'o:s:l:h' OPTION; do
+	case "$OPTION" in
+	o) output="$OPTARG" ;;
+	s) parsed_skip="$OPTARG" ;;
+	l) parsed_len="$OPTARG" ;;
+	h)
+		usage
+		exit 0
+		;;
+	:)
+		echo "ERROR: Must supply an argument to -$OPTARG." >&2
+		exit 1
+		;;
+	*)
+		usage
+		exit 1
+		;;
+	esac
+done
+
+#argument specify pages; convert to bytes
+skip=$((parsed_skip * 0x1000))
+len=$((parsed_len * 0x1000))
+
+if [ $# -eq 0 ]; then
+	echo "ERROR: Input not set. Use '$(basename "$0") [FILE]' to specify the Input file" >&2
+	exit 1
+fi
+
+check_file "$input"
+hdr_start=$(xxd -s $((skip)) -l $((len)) "${input}" | grep IBMSecEx || { echo ERROR: "${input} does not contain an SE header." >&2 && exit 1; })
+hdr_start=$(echo "${hdr_start}" | awk '{print "0x" $1}' | cut -c 1-10)
+echo "SE header found at offset ${hdr_start}"
+
+check_hdr_ver "$hdr_start" "$input"
+
+size=$(xxd -s $((hdr_start + 12)) -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+
+dd if="${input}" of="${output}" bs=1 count=$((size)) skip=$((hdr_start)) status=none
+echo "SE header written to '${output}' ($((size)) bytes)"

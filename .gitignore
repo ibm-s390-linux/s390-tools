@@ -69,6 +69,7 @@ mon_tools/mon_fsstatd
 mon_tools/mon_procd
 osasnmpd/osasnmpd
 pvattest/src/pvattest
+pvattest/tools/exchange_info
 qetharp/qetharp
 qethqoat/qethqoat
 systemd/cpacfstatsd.service

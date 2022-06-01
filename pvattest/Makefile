@@ -4,7 +4,7 @@ include ../common.mak
 .DEFAULT_GOAL := all
 
 PKGDATADIR := "$(DESTDIR)$(TOOLS_DATADIR)/pvattest"
-SUBDIRS := src man
+SUBDIRS := src man tools
 RECURSIVE_TARGETS := all-recursive clean-recursive install-recursive
 
 all: all-recursive
