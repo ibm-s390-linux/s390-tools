@@ -42,25 +42,6 @@
 #define BOOT_INFO_FLAGS_ARCH		0x00
 #endif
 
-/* SCSI dump super block */
-
-struct scsi_dump_sb {
-	uint64_t        magic;
-	uint64_t        version;
-	uint64_t        part_start;
-	uint64_t        part_size;
-	uint64_t        dump_offset;
-	uint64_t        dump_size;
-	uint64_t        csum_offset;
-	uint64_t        csum_size;
-	uint64_t        csum;
-} __packed;
-
-#define SCSI_DUMP_SB_MAGIC	0x5a46435044554d50ULL; /* ZFCPDUMP */
-/* To avoid a csum entry of 0 a seed is used */
-#define SCSI_DUMP_SB_SEED	0x12345678
-#define SCSI_DUMP_SB_CSUM_SIZE  4096
-
 struct boot_info_bp_dump {
 	union {
 		struct eckd_dump_param eckd;
