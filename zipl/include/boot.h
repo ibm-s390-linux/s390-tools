@@ -24,53 +24,6 @@
 #define STAGE2_BLK_CNT_MAX	24 /* Stage 1b can load up to 24 blocks */
 #define STAGE1B_BLK_CNT_MAX	2  /* Stage 1 can load up to 2 blocks */
 
-/* Boot info */
-
-#define BOOT_INFO_VERSION		1
-#define BOOT_INFO_MAGIC			"zIPL"
-
-#define BOOT_INFO_DEV_TYPE_ECKD		0x00
-#define BOOT_INFO_DEV_TYPE_FBA		0x01
-#define BOOT_INFO_DEV_TYPE_SCSI         0x02
-
-#define BOOT_INFO_BP_TYPE_IPL		0x00
-#define BOOT_INFO_BP_TYPE_DUMP		0x01
-
-#ifdef __s390x__
-#define BOOT_INFO_FLAGS_ARCH		0x01
-#else
-#define BOOT_INFO_FLAGS_ARCH		0x00
-#endif
-
-struct boot_info_bp_dump {
-	union {
-		struct eckd_dump_param eckd;
-		struct fba_dump_param fba;
-		struct scsi_dump_param scsi;
-	} param;
-	uint8_t		unused[16];
-} __packed;
-
-struct boot_info_bp_ipl {
-	union {
-		struct eckd_blockptr eckd;
-		struct linear_blockptr lin;
-	} bm_ptr;
-	uint8_t		unused[16];
-} __packed;
-
-struct boot_info {
-	char		magic[4];
-	uint8_t		version;
-	uint8_t		bp_type;
-	uint8_t		dev_type;
-	uint8_t		flags;
-	union {
-		struct boot_info_bp_dump dump;
-		struct boot_info_bp_ipl ipl;
-	} bp;
-} __packed;
-
 struct boot_ccw0 {
 	uint8_t cmd;
 	uint8_t address_hi;
