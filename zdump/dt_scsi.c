@@ -39,15 +39,6 @@ struct scsi_blockptr {
 	uint8_t		reserved[4];
 } __packed;
 
-struct boot_info {
-	char		magic[4];
-	uint8_t		version;
-	uint8_t		bp_type;
-	uint8_t		dev_type;
-	uint8_t		flags;
-	uint64_t	sb_off;
-} __packed;
-
 struct scsi_mbr {
 	char			magic[4];
 	uint32_t		version;
@@ -56,11 +47,6 @@ struct scsi_mbr {
 	uint8_t			reserved2[0x50];
 	struct boot_info	boot_info;
 } __packed;
-
-#define BOOT_INFO_VERSION		1
-#define BOOT_INFO_MAGIC			"zIPL"
-#define BOOT_INFO_DEV_TYPE_SCSI		0x02
-#define BOOT_INFO_BP_TYPE_DUMP		0x01
 
 /*
  * Check the zIPL magic number
@@ -139,7 +125,7 @@ static int check_boot_info(struct boot_info *info)
 		return -1;
 	if (info->bp_type != BOOT_INFO_BP_TYPE_DUMP)
 		return -1;
-	zg_seek(g.fh, info->sb_off, ZG_CHECK);
+	zg_seek(g.fh, info->bp.dump.param.scsi.block, ZG_CHECK);
 	zg_read(g.fh, &l.sb, sizeof(l.sb), ZG_CHECK);
 	return check_sb();
 }
