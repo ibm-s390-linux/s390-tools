@@ -40,6 +40,9 @@ Package contents
    - 40-z90crypt.rules: udev rules for z90crypt driver
    - 90-cpi.rules: udev rule to update Control-Program-Information when KVM is
                    used.
+   - 70-chreipl-fcp-mpath.rules: udev rules to monitor multipath events for
+                                 re-IPL path failover and to adjust the re-IPL
+                                 device in case needed.
 
  * systemd units:
    - cpi.service: Unit to apply CPI settings
