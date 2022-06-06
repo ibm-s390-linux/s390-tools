@@ -1,8 +1,8 @@
 include ../common.mak
 
 ALL_CPPFLAGS += -DNDEBUG
-ALL_CFLAGS   += -Wundef -Wstrict-prototypes -Wno-trigraphs
-ALL_CXXFLAGS += -Wundef -Wno-trigraphs
+ALL_CFLAGS   += -Wundef -Wstrict-prototypes -Wno-trigraphs -Wno-address-of-packed-member
+ALL_CXXFLAGS += -Wundef -Wno-trigraphs -Wno-address-of-packed-member
 
 TARGETS = ziomon_util ziomon_mgr ziomon_zfcpdd ziorep_utilization ziorep_traffic
 all: $(TARGETS)
