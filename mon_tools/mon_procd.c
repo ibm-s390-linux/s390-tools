@@ -248,7 +248,7 @@ static void count_users(void)
 	proc_sum.users = 0;
 	setutent();
 	while ((temp = getutent())) {
-		if ((temp->ut_type == USER_PROCESS) && (temp->ut_name))
+		if (temp->ut_type == USER_PROCESS)
 			proc_sum.users++;
 	}
 	endutent();
