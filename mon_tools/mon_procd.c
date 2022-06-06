@@ -859,8 +859,6 @@ static void read_tasks(void)
 	}
 
 	while ((entry = readdir(proc_dir))) {
-		if (!entry->d_name)
-			break;
 		if (!isdigit(entry->d_name[0]) || !atoi(entry->d_name))
 			continue;
 		memset(&task, 0, sizeof(struct task_t));
