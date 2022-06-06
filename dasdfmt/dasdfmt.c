@@ -1107,8 +1107,8 @@ static void dasdfmt_write_labels(volume_label_t *vlabel,
 	} else {
 		vlabel->ldl_version = 0xf2; /* EBCDIC '2' */
 		vlabel->formatted_blocks = cylinders * heads * geo.sectors;
-		rc = write(fd, &vlabel->vollbl, (sizeof(*vlabel)
-						 - sizeof(vlabel->volkey)));
+		rc = write(fd, (void *)vlabel + sizeof(vlabel->volkey),
+			   (sizeof(*vlabel) - sizeof(vlabel->volkey)));
 	}
 
 	if (((rc != sizeof(*vlabel) - sizeof(vlabel->formatted_blocks)) &&
