@@ -50,6 +50,7 @@ public:
 	RegisterSet64 getRegisterSet(int cpu);
 	void addRegisterSet(const RegisterSet64&);
 	inline int getNumCpus(void) const { return nrCpus; }
+	RegisterContent64& operator=(const RegisterContent64&) = default;
 
 	RegisterSet64 regSets[MAX_CPUS];
 private:
@@ -64,6 +65,7 @@ public:
 	RegisterSet32 getRegisterSet(int cpu);
 	void addRegisterSet(const RegisterSet32&);
 	inline int getNumCpus(void) const { return nrCpus; }
+	RegisterContent32& operator=(const RegisterContent32&) = default;
 
 	RegisterSet32 regSets[MAX_CPUS];
 private:
