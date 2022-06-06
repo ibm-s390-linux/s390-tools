@@ -29,6 +29,7 @@
 #include "lib/dasd_sys.h"
 #include "lib/libzds.h"
 #include "lib/util_base.h"
+#include "lib/util_libc.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
 #include "lib/util_sys.h"
@@ -1788,10 +1789,8 @@ dasdview_print_format1(unsigned int size, unsigned char *dumpstr)
 	for (i = 0; i < size; i++) {
 		if ((i / 16) * 16 == i) {
 			printf("\n|  ");
-			strncpy(asc, (char *)dumpstr + i, 16);
-			strncpy(ebc, (char *)dumpstr + i, 16);
-			asc[16] = '\0';
-			ebc[16] = '\0';
+			util_strlcpy(asc, (char *)dumpstr + i, 16);
+			util_strlcpy(ebc, (char *)dumpstr + i, 16);
 		}
 		printf("%02X", dumpstr[i]);
 		if (((i + 1) / 4)  * 4  == i + 1)
@@ -1822,8 +1821,8 @@ dasdview_print_format2(unsigned int size, unsigned char *dumpstr,
 			       begin + (unsigned long long)i,
 			       begin + (unsigned long long)i);
 
-			strncpy(asc, (char *)dumpstr + i, 8);
-			strncpy(ebc, (char *)dumpstr + i, 8);
+			util_strlcpy(asc, (char *)dumpstr + i, 8);
+			util_strlcpy(ebc, (char *)dumpstr + i, 8);
 		}
 		printf("%02X", dumpstr[i]);
 		if (((i + 1) / 4) * 4 == i + 1)
