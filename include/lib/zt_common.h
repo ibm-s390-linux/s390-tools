@@ -21,10 +21,12 @@
  * Usage example:
  *  #define IMAGE_ENTRY _AC(0x10000, UL)
  */
+#ifndef _AC
 #ifdef __ASSEMBLER__
 #define _AC(X, TYPE)	X
 #else
 #define _AC(X, TYPE)	X##TYPE
+#endif
 #endif
 
 
