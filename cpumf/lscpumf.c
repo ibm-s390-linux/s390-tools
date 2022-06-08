@@ -26,6 +26,7 @@
 #include "lib/util_arch.h"
 #include "lib/util_base.h"
 #include "lib/util_opt.h"
+#include "lib/util_path.h"
 #include "lib/util_prg.h"
 
 #include "lib/libcpumf.h"
@@ -3318,17 +3319,18 @@ static void show_info(struct cpumf_info *p, int details)
  * counter was renamed from CCERROR to CCFINISH in linux version 5.8.
  * Check for existence of file /sys/devices/cpum_cf/events/DLFT_CCERROR.
  */
-#define	CCERROR		"/sys/devices/cpum_cf/events/DFLT_CCERROR"
 static void read_ccerror(struct counters *cp, size_t cp_cnt)
 {
+	char *ctrname, *path;
 	struct stat sbuf;
-	char *ctrname;
 	size_t i = 0;
 
-	if (!stat(CCERROR, &sbuf))
+	path = util_path_sysfs("devices/cpum_cf/events/DFLT_CCERROR");
+	if (!stat(path, &sbuf))
 		ctrname = "DFLT_CCERROR";
 	else
 		ctrname = "DFLT_CCFINISH";
+	free(path);
 	/* Find DFLT_CC{FINISH,ERROR} in table and set name */
 	for (struct counters *p = cp; i < cp_cnt; ++i, ++p)
 		if (p->ctrnum == 265) {
