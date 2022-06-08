@@ -32,6 +32,7 @@
 #include <linux/perf_event.h>
 
 #include "lib/util_base.h"
+#include "lib/util_file.h"
 #include "lib/util_libc.h"
 #include "lib/util_list.h"
 #include "lib/util_opt.h"
@@ -633,30 +634,13 @@ bypass:
 	return 0;
 }
 
-/* Read perf_event_open() config value for event. */
-static int read_event(char *dirname, char *filename)
-{
-	int config, rc = 0;
-	char *pathname;
-	FILE *fp;
-
-	util_asprintf(&pathname, "%s/%s", dirname, filename);
-	fp = fopen(pathname, "r");
-	if (fp) {
-		rc = fscanf(fp, "event=%x", &config);
-		fclose(fp);
-	}
-	free(pathname);
-	return rc == 1 ? config : -1;
-}
-
 /* Scan event directory and fill event list. */
 static int scan_events(struct pmu_events *p)
 {
+	char *evtname, *evtdir, *path;
 	struct dirent **de_vec;
 	struct event_name *ep;
-	char *evtdir, *path;
-	int  count, rc;
+	int evtnr, count, rc;
 
 	path = util_path_sysfs("devices");
 	rc = util_asprintf(&evtdir, "%s/%s/events", path, p->name);
@@ -677,8 +661,10 @@ static int scan_events(struct pmu_events *p)
 		if (de_vec[i]->d_type == DT_DIR)
 			continue;
 		ep->name = util_strdup(de_vec[i]->d_name);
-		rc = read_event(evtdir, de_vec[i]->d_name);
-		if (rc == -1 || !ep->name) {
+		util_asprintf(&evtname, "%s/%s", evtdir, de_vec[i]->d_name);
+		rc = util_file_read_va(evtname, "event=%x", &evtnr);
+		free(evtname);
+		if (rc != 1) {
 			for (ep = p->lst, rc = 0; rc < p->lstlen; ++rc, ++ep)
 				free(ep->name);
 			free(p->lst);
@@ -686,7 +672,7 @@ static int scan_events(struct pmu_events *p)
 			rc = -1;
 			goto out;
 		}
-		ep->config = rc;
+		ep->config = evtnr;
 		if (p->base > ep->config)
 			p->base = ep->config;
 		++p->lstlen;
