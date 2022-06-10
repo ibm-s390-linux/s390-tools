@@ -670,12 +670,15 @@ static int _get_kmip_config(struct plugin_handle *ph)
 	char *tmp;
 	int rc;
 
-	if (ph->server == NULL || ph->profile == NULL)
+	if (!ph->apqns_configured)
 		return 0;
 
 	rc = _setup_ext_lib(ph);
 	if (rc != 0)
 		return rc;
+
+	if (ph->server == NULL || ph->profile == NULL)
+		return 0;
 
 	rc = _get_client_key(ph, &ph->kmip_config.tls_client_key);
 	if (rc != 0)
