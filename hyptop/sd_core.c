@@ -150,7 +150,7 @@ void sd_update(void)
  */
 void sd_dg_register(struct sd_dg *dg, int has_core_data)
 {
-	struct timespec ts = {0, SD_DG_INIT_INTERVAL_MS * 1000000};
+	struct timespec ts = {SD_DG_INIT_INTERVAL_SEC, 0};
 	struct sd_sys_item *sys_item;
 	struct sd_cpu_item *cpu_item;
 	unsigned int i;

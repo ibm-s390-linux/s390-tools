@@ -17,7 +17,7 @@
 #include "helper.h"
 #include "table.h"
 
-#define SD_DG_INIT_INTERVAL_MS	200
+#define SD_DG_INIT_INTERVAL_SEC	1
 #define SD_SYS_ID_SIZE		9
 
 /*
