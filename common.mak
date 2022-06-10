@@ -118,7 +118,7 @@ endif
 # Returns "yes" on success and nothing otherwise
 #
 define check_header_prereq
-$(shell printf "#include <%s>\n int main(void) {return 0;}" $1 | \
+$(shell printf "#include <%s>\n int main(void) {return 0;}\n" $1 | \
         ( $(CC) $(filter-out --coverage, $(ALL_CFLAGS)) $(ALL_CPPFLAGS) \
                 $2 -o /dev/null -xc - ) >/dev/null 2>&1 && echo -n yes)
 endef
@@ -133,7 +133,7 @@ endef
 # $5: Additional compiler & linker options (optional)
 #
 check_dep=\
-printf "\#include <%s>\n int main(void) {return 0;}" $2 | ( $(CC) $(filter-out --coverage, $(ALL_CFLAGS)) $(ALL_CPPFLAGS) $5 -o /dev/null -xc - ) > /dev/null 2>&1; \
+printf "\#include <%s>\n int main(void) {return 0;}\n" $2 | ( $(CC) $(filter-out --coverage, $(ALL_CFLAGS)) $(ALL_CPPFLAGS) $5 -o /dev/null -xc - ) > /dev/null 2>&1; \
 if [ $$? != 0 ]; \
 then \
 	printf "  REQCHK  %s (%s)\n" $1 $2; \
