@@ -33,7 +33,7 @@ endif
 
 #
 # We have to build the base libraries before the other libraries are built,
-# and then build the other libraries before the tools are built. Otherwise the 
+# and then build the other libraries before the tools are built. Otherwise the
 # other libraries and tools would trigger parallel "make -C" builds for the
 # base libraries and the other libraries in case of "make -j".
 #
