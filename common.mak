@@ -91,7 +91,7 @@ ifneq ("${V}","1")
 else
 	echocmd=
 endif
-DEFAULT_CFLAGS = -g -rdynamic -fstack-protector-all -W -Wall -Wformat-security
+DEFAULT_CFLAGS = -g -fstack-protector-all -W -Wall -Wformat-security
 ifeq ("${W}","1")
 	DEFAULT_CFLAGS += -Wextra -Wshadow -Wundef -Wuninitialized -Wdouble-promotion -Wconversion
 endif

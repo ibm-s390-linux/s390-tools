@@ -22,7 +22,7 @@
 /*
  * Obtain a backtrace and print it to stderr
  *
- * To get symbols, compile the code with "-rdynamic".
+ * To get symbols, link the code with "-rdynamic".
  */
 static void print_backtrace(void)
 {
