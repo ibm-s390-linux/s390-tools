@@ -140,8 +140,9 @@ typedef long (*xcpa_internal_rv_t)(const unsigned char *rsp, size_t rlen,
 				   struct XCPadmresp *rspblk, CK_RV *rv);
 
 struct ep11_version {
-	unsigned int	minor;
 	unsigned int	major;
+	unsigned int	minor;
+	unsigned int	modification;
 };
 
 struct ep11_lib {

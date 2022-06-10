@@ -63,7 +63,8 @@ static int get_ep11_version(struct ep11_lib *ep11, bool verbose)
 	pr_verbose(verbose, "host_version: 0x%08x", host_version);
 
 	ep11->version.major = (host_version & 0x00FF0000) >> 16;
-	ep11->version.minor = host_version & 0x000000FF;
+	ep11->version.minor = (host_version & 0x0000FF00) >> 8;
+	ep11->version.modification = host_version & 0x000000FF;
 	/*
 	 * EP11 host library < v2.0 returns an invalid version (i.e. 0x100).
 	 * This can safely be treated as version 1.0
@@ -73,8 +74,9 @@ static int get_ep11_version(struct ep11_lib *ep11, bool verbose)
 		ep11->version.minor = 0;
 	}
 
-	pr_verbose(verbose, "EP11 library version: %u.%u",
-		   ep11->version.major, ep11->version.minor);
+	pr_verbose(verbose, "EP11 library version: %u.%u.%u",
+		   ep11->version.major, ep11->version.minor,
+		   ep11->version.modification);
 
 	return 0;
 }
