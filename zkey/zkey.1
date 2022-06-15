@@ -734,13 +734,12 @@ type, this is the default. If specified for the plain volume type, then no
 command is generated.
 .P
 For LUKS2 volumes, the generated \fBcryptsetup luksFormat\fP contains
-option \fB\-\-pbkdf pbkdf2\fP to set \fBPBKDF2\fP as password based key
-derivation function. LUKS2 volumes typically default to \fBArgon2i\fP as
-password based key derivation function, but this might cause out-of-memory
-errors when multiple encrypted volumes are unlocked automatically at boot
-through /etc/crypttab. Because PAES uses secure AES keys as volume keys, the
-security of the key derivation function used to encrypt the volume key in the
-LUKS key slots is of less relevance. 
+options \fB-\-pbkdf argon2i \-\-pbkdf\-memory 32 \-\-pbkdf\-force\-iterations 4
+\fP for low memory and time requirements. Using the default \fBArgon2i\fP
+options might cause out-of-memory errors when multiple encrypted volumes are
+unlocked automatically at boot through /etc/crypttab. Because PAES uses secure
+AES keys as volume keys, the security of the key derivation function used to encrypt
+the volume key in the LUKS key slots is of less relevance.
 .P
 For LUKS2 volumes, a passphrase is required. You are prompted for the
 passphrase when running the generated commands, unless option
