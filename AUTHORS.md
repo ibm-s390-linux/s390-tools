@@ -34,6 +34,7 @@ List of all individuals having contributed content to s390-tools
 - Fedor Loshakov
 - Felix Beck
 - Frank Blaschka
+- Frank Heimes
 - Frank Munzert
 - Frank Pavlic
 - Fritz Elfert
@@ -79,6 +80,7 @@ List of all individuals having contributed content to s390-tools
 - Matthew Rosato
 - Maxim Shchetynin
 - Melissa Howland
+- Mete Durlu
 - Michael Ernst
 - Michael Holzheu
 - Michael Mueller

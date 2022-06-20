@@ -1,14 +1,36 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
-* __v2.2x.x (2022-xx-xx)__
+* __v2.22.0 (2022-06-20)__
 
-  For Linux kernel version: 5.xx
+  For Linux kernel version: 5.18
 
   Add new tools / libraries:
+  - ap_tools: Introduce ap_tools and the ap-check tool
+  - cpumf/pai: Add Processor Activity Instrumentation tool
+  - libpv: New library for PV tools
+  - pvattest: Add new tool to create, perform, and verify attestation measurements
+  - zipl/zdump: Add Next Gen Dump (NGDump) support
 
   Changes of existing tools:
+  - Move man pages to System commands section (lscpumf, lshwc, pai, dbginfo.sh, zfcpdbf, zipl-switch-to-blscfg)
+  - README.md: Add 70-chreipl-fcp-mpath.rules to the list of udev rule descriptions
+  - Remove SysV related daemon scripts (cpacfstatsd, cpuplugd, mon_statd)
+  - genprotimg: Move man page to section 1 for user commands
+  - hyptop: increase initial update interval
+  - libseckey: Adapt keymgmt_match() implementation to OpenSSL
+  - libutil: Add util_exit_code
+  - libutil: Introduce util_udev
+  - zdev: Introduce the ap device type
+  - zipl-editenv: Add zIPL multienvironment support
+  - zipl: Implement sorting BLS entries by versions
+  - zkey: Add initramfs hook
 
   Bug Fixes:
+  - cmsfs-fuse: Fix enabling of hard_remove option
+  - s390-tools: Fix typos that were detected by lintian as 'typo-in-manual-page'
+  - zkey-kmip: Fix possible use after free
+  - zkey: Fix EP11 host library version checking
+  - zkey_kmip: Setup ext-lib once the APQNs have been configured
 
 * __v2.21.0 (2022-04-20)__
 
