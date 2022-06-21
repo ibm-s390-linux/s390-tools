@@ -116,7 +116,7 @@ static void ev_alloc(int enr, int cpu, int flags)
 			warnx("NNPA does not support kernel/user space selector");
 			flags &= ~as;
 		}
-		event->attr.type = libcpumf_pmutype(S390_SYSFS_PAI_NNPA);
+		event->attr.type = libcpumf_pmutype(S390_SYSFS_PAI_EXT);
 		break;
 	}
 	event->attr.sample_type = PERF_SAMPLE_TID | PERF_SAMPLE_CPU |
