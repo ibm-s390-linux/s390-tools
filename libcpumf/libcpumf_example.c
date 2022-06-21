@@ -85,5 +85,6 @@ int main(void)
 	}
 
 	printf("PAI NNPA support %d\n", libcpumf_have_pai_nnpa());
+	printf("PAI EXTENSION support %d\n", libcpumf_have_pai_ext());
 	return EXIT_SUCCESS;
 }

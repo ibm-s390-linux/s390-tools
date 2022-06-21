@@ -17,7 +17,8 @@
 #define S390_CPUS_ONLINE	"/sys/devices/system/cpu/online"
 #define S390_CPUMSF_BUFFERSZ	"/sys/module/kernel/parameters/cpum_sfb_size"
 #define S390_SYSFS_PAI_CRYPTO	"/sys/devices/pai_crypto/"
-#define S390_SYSFS_PAI_NNPA	"/sys/devices/pai_nnpa/"
+#define S390_SYSFS_PAI_EXT	"/sys/devices/pai_ext/"
+#define S390_SYSFS_PAI_NNPA	S390_SYSFS_PAI_EXT "events/NNPA_ALL"
 
 /**
  * Read out the PMU type from a given file.
@@ -145,6 +146,14 @@ bool libcpumf_sfb_info(unsigned long *min, unsigned long *max);
  * @retval       false    PAI_CRYPTO counter Facility is not available
  */
 bool libcpumf_have_pai_crypto(void);
+
+/**
+ * Return true if PAI_EXTENSION Facility is supported.
+ *
+ * @retval       true     PAI_EXTENSION counter Facility is available
+ * @retval       false    PAI_EXTENSION counter Facility is not available
+ */
+bool libcpumf_have_pai_ext(void);
 
 /**
  * Return true if PAI_NNPA counter Facility is supported. This PMU facility
