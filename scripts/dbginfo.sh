@@ -786,6 +786,7 @@ collect_sysfs() {
 		    -x '*/tracing/trace_pipe*' \
 		    -x '*/page_idle/bitmap*' \
 		    -x '*/tracing/per_cpu/*' \
+		    -x '*/tracing/free_buffer' \
 		    --ignore-failed-read -J 1 -T 5 2>>${OUTPUT_FILE_SYSFS}.err
 		rc=$?
 	else
@@ -812,6 +813,7 @@ collect_sysfs() {
 		    -a -not \( -path '*tracing*' -a -name "trace_pipe*" \) \
 		    -a -not \( -path '*page_idle*' -a -name 'bitmap*' \) \
 		    -a -not -path '*tracing/per_cpu*' \
+		    -a -not -path '*/tracing/free_buffer' \
 		    2>/dev/null | while IFS= read -r file_name; do
 			echo " ${file_name}"
 			if ! dd if="${file_name}" status=noxfer iflag=nonblock \
