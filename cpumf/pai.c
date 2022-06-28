@@ -264,9 +264,11 @@ static int savemap(int fd, void *data, struct data_pos *dp)
 	int wrapped;
 
 	d_head_old = d_head;
-	printf("Data head:%#llx tail:%#llx offset:%#llx size:%#llx\n",
-	       dp->data_head, dp->data_tail, dp->data_offset,
-	       dp->data_size);
+	if (verbose) {
+		printf("Data head:%#llx tail:%#llx offset:%#llx size:%#llx\n",
+		       dp->data_head, dp->data_tail, dp->data_offset,
+		       dp->data_size);
+	}
 	if (!diff)
 		return 0;
 	wrapped = d_head / dp->data_size != d_prev / dp->data_size;
@@ -281,13 +283,16 @@ static int savemap(int fd, void *data, struct data_pos *dp)
 		int part2 = dp->data_size - d_prev;
 
 		diff -= part2;
-		printf("Write %d bytes [%ld,%lld)\n", part2, d_prev,
-		       dp->data_size);
+		if (verbose) {
+			printf("Write %d bytes [%ld,%lld)\n", part2, d_prev,
+			       dp->data_size);
+		}
 		if (write(fd, data + d_prev, part2) == -1)
 			err(EXIT_FAILURE, "write error for event file");
 		d_prev = 0;		/* Start at position zero */
 	}
-	printf("Write %d bytes [%ld,%ld)\n", diff, d_prev, d_head);
+	if (verbose)
+		printf("Write %d bytes [%ld,%ld)\n", diff, d_prev, d_head);
 	if (write(fd, data + d_prev, diff) == -1)
 		err(EXIT_FAILURE, "write error for event file");
 
@@ -300,7 +305,10 @@ static void readmap(int fd)
 	struct pai_event *p = perffd_2_event(fd);
 	struct perf_event_mmap_page *area;
 
-	printf("Ring buffer for fd %d %s(%d)\n", fd, p->file_name, p->file_fd);
+	if (verbose) {
+		printf("Ring buffer for fd %d %s(%d)\n", fd, p->file_name,
+		       p->file_fd);
+	}
 	area = p->map_addr;
 	savemap(p->file_fd, p->map_addr + area->data_offset,
 		(struct data_pos *)&area->data_head);
