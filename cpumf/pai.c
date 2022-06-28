@@ -57,6 +57,7 @@ static cpu_set_t cpu_online_mask;
 static int verbose, humantime;
 static struct util_list list_pai_event;
 static struct util_list list_pmu_event;
+static bool summary;
 
 /* System call to perf_event_open(2) */
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
@@ -392,7 +393,10 @@ static int evtraw_show(__u64 evtnum, unsigned char *p)
 		offset += sizeof(ctr);
 		value = *(__u64 *)(p + offset);
 		offset += sizeof(value);
-		printf("%c%hd:%#llx", offset > 14 ? ',' : ' ', ctr, value);
+		if (!summary) {
+			printf("%c%hd:%#llx", offset > 14 ? ',' : ' ', ctr,
+			       value);
+		}
 		lookup_event(evtnum, ctr, value);
 		if (offset + sizeof(ctr) + sizeof(value) > bytes)
 			break;
@@ -421,6 +425,12 @@ static const char *evt_selector(struct perf_event_attr *pa)
 
 static void evt_show(__u64 evtnum, const char *evtsel, struct pai_event_out *ev)
 {
+	if (summary) {
+		if (ev->type == PERF_RECORD_SAMPLE)
+			evtraw_show(evtnum, ev->raw);
+		return;
+	}
+
 	timestamp(ev->time);
 	printf("%d ", ev->cpu);
 
@@ -999,7 +1009,7 @@ static unsigned long check_mapsize(unsigned long n)
 
 int main(int argc, char **argv)
 {
-	bool crypto_record = false, report = false, summary = false;
+	bool crypto_record = false, report = false;
 	bool nnpa_record = false;
 	unsigned long loop_count = 1;
 	int ch, group = 0;
