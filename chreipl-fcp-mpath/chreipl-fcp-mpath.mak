@@ -27,8 +27,6 @@ ENABLE_DOC	 = 0
 
 # https://www.gnu.org/software/make/manual/make.html#Directory-Variables
 CHREIPLZFCPMPDIR = $(USRLIBDIR)/chreipl-fcp-mpath
-UDEVDIR		 = $(USRLIBDIR)/udev
-UDEVRULESDIR	 = $(UDEVDIR)/rules.d
 UDEVRUNDIR	 = /run/udev
 DRACUTDIR	 = $(USRLIBDIR)/dracut
 DRACUTCONFDIR	 = $(DRACUTDIR)/dracut.conf.d
