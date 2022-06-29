@@ -1,7 +1,6 @@
 
 include ../../common.mak
 
-MODULESDIR := /usr/lib/dracut/modules.d/
 NGDUMPDIR := 99ngdump
 
 # HAVE_DRACUT
@@ -17,14 +16,14 @@ ifeq ($(HAVE_DRACUT),1)
 install:
 	$(INSTALL) -m 755 zipl_helper.prepare-ngdump \
 		$(DESTDIR)$(TOOLS_LIBDIR)
-	$(INSTALL) -m 755 -d $(DESTDIR)$(MODULESDIR)
-	$(INSTALL) -m 755 -d $(DESTDIR)$(MODULESDIR)/$(NGDUMPDIR)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(NGDUMPDIR)
 	$(INSTALL) -m 755 $(NGDUMPDIR)/module-setup.sh \
-		$(DESTDIR)$(MODULESDIR)/$(NGDUMPDIR)/
+		$(DESTDIR)$(DRACUTMODDIR)/$(NGDUMPDIR)/
 	$(INSTALL) -m 644 $(NGDUMPDIR)/ngdump.service \
-		$(DESTDIR)$(MODULESDIR)/$(NGDUMPDIR)/
+		$(DESTDIR)$(DRACUTMODDIR)/$(NGDUMPDIR)/
 	$(INSTALL) -m 755 $(NGDUMPDIR)/ngdump.sh \
-		$(DESTDIR)$(MODULESDIR)/$(NGDUMPDIR)/
+		$(DESTDIR)$(DRACUTMODDIR)/$(NGDUMPDIR)/
 	$(INSTALL) -m 755 $(NGDUMPDIR)/ngdump-reipl.sh \
-		$(DESTDIR)$(MODULESDIR)/$(NGDUMPDIR)/
+		$(DESTDIR)$(DRACUTMODDIR)/$(NGDUMPDIR)/
 endif

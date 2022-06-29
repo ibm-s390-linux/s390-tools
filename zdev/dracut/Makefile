@@ -1,7 +1,6 @@
 # Common definitions
 include ../../common.mak
 
-MODDIR := /usr/lib/dracut/modules.d/
 ZDEVDIR := 95zdev
 
 # HAVE_DRACUT
@@ -16,9 +15,9 @@ ZDEVDIR := 95zdev
 #
 ifeq ($(HAVE_DRACUT),1)
 install:
-	$(INSTALL) -m 755 -d $(DESTDIR)$(MODDIR)
-	$(INSTALL) -m 755 -d $(DESTDIR)$(MODDIR)/$(ZDEVDIR)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)
 	$(INSTALL) -m 755 $(ZDEVDIR)/module-setup.sh \
 		$(ZDEVDIR)/parse-zdev.sh \
-		$(DESTDIR)$(MODDIR)/$(ZDEVDIR)/
+		$(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)/
 endif
