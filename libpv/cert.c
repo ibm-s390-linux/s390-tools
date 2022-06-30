@@ -492,7 +492,9 @@ static X509_CRL *load_crl_by_dist_point(DIST_POINT *crldp, GError **error)
 X509_CRL *pv_load_first_crl_by_cert(X509 *cert, GError **error)
 {
 	g_autoptr(STACK_OF_DIST_POINT) crldps = NULL;
+	g_autoptr(GError) last_error = NULL;
 	g_autoptr(X509_CRL) ret = NULL;
+	int dist_points_cnt;
 
 	g_assert(cert);
 
@@ -503,19 +505,24 @@ X509_CRL *pv_load_first_crl_by_cert(X509 *cert, GError **error)
 		return NULL;
 	}
 
-	for (int i = 0; i < sk_DIST_POINT_num(crldps); i++) {
+	dist_points_cnt = sk_DIST_POINT_num(crldps);
+	for (int i = 0; i < dist_points_cnt; i++) {
 		DIST_POINT *crldp = sk_DIST_POINT_value(crldps, i);
-
 		g_assert(crldp);
 
-		/* ignore error */
-		ret = load_crl_by_dist_point(crldp, NULL);
+		g_clear_error(&last_error);
+		ret = load_crl_by_dist_point(crldp, &last_error);
 		if (ret)
 			return g_steal_pointer(&ret);
 	}
 
-	g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_FAILED_DOWNLOAD_CRL,
-		    _("failed to download CRL"));
+	/* relabel error */
+	if (last_error)
+		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_FAILED_DOWNLOAD_CRL,
+		     "%s", last_error->message);
+	else
+		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_FAILED_DOWNLOAD_CRL,
+		     _("failed to download CRL"));
 	return NULL;
 }
 
