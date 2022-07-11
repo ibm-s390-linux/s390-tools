@@ -73,7 +73,7 @@ endif
 endif
 endif
 
-all: $(BUILD_TARGETS) .check-dep-$(BIN_PROGRAM)
+all: $(BUILD_TARGETS)
 
 install: $(INSTALL_TARGETS)
 
@@ -97,7 +97,7 @@ $($(BIN_PROGRAM)_OBJS): .check-dep-$(BIN_PROGRAM)
 .detect-openssl.dep.c:
 	echo "#include <openssl/evp.h>" > $@
 	echo "#if OPENSSL_VERSION_NUMBER < 0x10101000L" >> $@
-	echo "  #error openssl version 1.1.0 is required" >> $@
+	echo "  #error openssl version 1.1.1 is required" >> $@
 	echo "#endif" >> $@
 	echo "static void __attribute__((unused)) test(void) {" >> $@
 	echo "    EVP_MD_CTX *ctx = EVP_MD_CTX_new();" >> $@
@@ -112,8 +112,8 @@ $($(BIN_PROGRAM)_OBJS): .check-dep-$(BIN_PROGRAM)
 		"HAVE_GLIB2=0")
 	$(call check_dep, \
 		"$(BIN_PROGRAM)", \
-		"openssl/evp.h", \
-		"openssl-devel / libssl-dev version >= 1.1.0", \
+		$^, \
+		"openssl-devel / libssl-dev version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
 		"-I.")
 	$(call check_dep, \
