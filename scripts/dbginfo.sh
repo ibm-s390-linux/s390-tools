@@ -450,7 +450,7 @@ CMDS="${CMDS}\
   :lszdev\
   :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :lspci -t\
-  :lspci -vv\
+  :lspci -vvv\
   :lstape\
   :smc_dbg\
   "
