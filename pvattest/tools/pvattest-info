@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# pvattest-info - get additional information from an attestation measurement
+#
+# Sample:
+# ./pvattest-info attestresp.bin
+#
+# Copyright IBM Corp. 2022
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+
+set -o pipefail
+set -o nounset
+set -e
+
+usage() {
+	cat <<-EOF
+		Usage: $(basename "$0") FILE
+
+		Prints config UID and additional data if available.
+	EOF
+}
+
+function check_is_pvattest_binary() {
+	local input="$1"
+	local size
+	local version
+
+	size=$(wc -c <"$input")
+	if [ "$size" -lt 64 ]; then
+		echo "ERROR: Input file is too small." >&2
+		exit 1
+	fi
+
+	xxd -l 16 "${input}" | grep -q pvattest ||
+		{ echo "ERROR: ${input} does not contain a pvattest binary output." >&2 && exit 1; }
+
+	size=$(xxd -s 12 -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+	if [ $((size)) -lt 64 ]; then
+		echo "ERROR: ${input} does not contain a pvattest binary output." >&2
+		exit 1
+	fi
+
+	version=$(xxd -s 8 -l 4 "$input")
+	echo "$version" | grep -q "0000 0100" ||
+		{ echo -n "WARNING: unknown hdr version " >&2  &&
+		echo "$version" | awk '{print "0x" $2 $3}'>&2 ; }
+}
+
+function print_entry() {
+	local file_off="$1"
+	local text="$2"
+	local input="$3"
+	local size
+	local off
+
+	size=$(xxd -s $((file_off)) -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+	off=$(xxd -s $((file_off + 4)) -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+
+	if [[ $size != "0x00000000" ]] || [[ $off != "0x00000000" ]]; then
+		echo "${text}:"
+		xxd -s $((off)) -l $((size)) -p "${input}"
+	fi
+}
+
+function require_command() {
+	local cmd="$1"
+
+	command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "ERROR: $cmd required but not installed."; exit 1;  }
+}
+
+require_command xxd
+require_command awk
+require_command wc
+
+if [ $# -eq 0 ]; then
+	echo "ERROR: Input not set. Use '$(basename "$0") [FILE]' to specify the Input file" >&2
+	exit 1
+fi
+
+input="$1"
+
+[ -e "$input" ] || { echo "ERROR: File '$1' not found" >&2 && exit 1; }
+check_is_pvattest_binary "$input"
+
+print_entry 0x38 "Config UID" "$input"
+print_entry 0x28 "Additional Data" "$input"
