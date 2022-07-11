@@ -51,7 +51,7 @@ endif
 sources := $(wildcard *.c)
 objects := $(patsubst %.c,%.o,$(sources))
 
-all: $(BUILD_TARGETS) .check_dep-$(LIB)
+all: $(BUILD_TARGETS)
 
 $(LIB): $(objects)
 $(LIB): ALL_CFLAGS += -fPIC
@@ -74,7 +74,7 @@ skip-$(LIB):
 .detect-openssl.dep.c:
 	echo "#include <openssl/evp.h>" > $@
 	echo "#if OPENSSL_VERSION_NUMBER < 0x10101000L" >> $@
-	echo "  #error openssl version 1.1.0 is required" >> $@
+	echo "  #error openssl version 1.1.1 is required" >> $@
 	echo "#endif" >> $@
 	echo "static void __attribute__((unused)) test(void) {" >> $@
 	echo "    EVP_MD_CTX *ctx = EVP_MD_CTX_new();" >> $@
@@ -90,7 +90,7 @@ skip-$(LIB):
 	$(call check_dep, \
 		"$(LIB)", \
 		$^, \
-		"openssl-devel / libssl-dev version >= 1.1.0", \
+		"openssl-devel / libssl-dev version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
 		"-I.")
 	$(call check_dep, \
