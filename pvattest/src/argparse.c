@@ -156,76 +156,75 @@ static gboolean hex_str_toull(const char *nptr, uint64_t *dst, GError **error)
 
 /************************* SHARED OPTIONS *************************************/
 /* NOTE REQUIRED */
-#define _entry_host_key_document(__arg_data, __indent)                                            \
-	{                                                                                         \
-		.long_name = "host-key-document", .short_name = 'k', .flags = G_OPTION_FLAG_NONE, \
-		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,                       \
-		.description = "Specify one or more host key documents.\n",                       \
-		.arg_description = "FILE",                                                        \
+#define _entry_host_key_document(__arg_data, __indent)                                             \
+	{                                                                                          \
+		.long_name = "host-key-document", .short_name = 'k', .flags = G_OPTION_FLAG_NONE,  \
+		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,                        \
+		.description =                                                                     \
+			"FILE specifies a host-key document. At least one is required.\n" __indent \
+			"Specify this option multiple times to enable the request for\n" __indent  \
+			"more than one host.\n",                                                   \
+		.arg_description = "FILE",                                                         \
 	}
 
 /* NOTE REQUIRED */
-#define _entry_certs(__arg_data, __indent)                                                            \
-	{                                                                                             \
-		.long_name = "cert", .short_name = 'C', .flags = G_OPTION_FLAG_NONE,                  \
-		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,                           \
-		.description =                                                                        \
-			"Specifies  the  certificate that is used to establish a chain\n" __indent    \
-			"of trust for the verification of the host-key documents. Specify\n" __indent \
-			"this option twice to specify the IBM Z signing key and the\n" __indent       \
-			"intermediate CA certificate (signed by the root CA). Required.\n" __indent   \
-			"Ignored when --no-verify is specified.\n",                                   \
-		.arg_description = "FILE",                                                            \
+#define _entry_certs(__arg_data, __indent)                                                  \
+	{                                                                                   \
+		.long_name = "cert", .short_name = 'C', .flags = G_OPTION_FLAG_NONE,        \
+		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,                 \
+		.description = "FILE contains a certificate that is used to\n" __indent     \
+			       "establish a chain of trust for the verification\n" __indent \
+			       "of the host-key documents. The IBM Z signing\n" __indent    \
+			       "key and intermediate CA certificate (signed\n" __indent     \
+			       "by the root CA) are required.\n",                           \
+		.arg_description = "FILE",                                                  \
 	}
 
 /* NOTE REQUIRED */
-#define _entry_crls(__arg_data, __indent)                                                    \
-	{                                                                                    \
-		.long_name = "crl", .short_name = 0, .flags = G_OPTION_FLAG_NONE,            \
-		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,                  \
-		.description = "Specify FILE to be a certificate revocation list\n" __indent \
-			       "(optional).",                                                \
-		.arg_description = "FILE",                                                   \
+#define _entry_crls(__arg_data, __indent)                                                   \
+	{                                                                                   \
+		.long_name = "crl", .short_name = 0, .flags = G_OPTION_FLAG_NONE,           \
+		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,                 \
+		.description = "FILE contains a certificate revocation list (optional).\n", \
+		.arg_description = "FILE",                                                  \
 	}
 
 /* NOTE REQUIRED */
-#define _entry_root_ca(__arg_data, __indent)                                            \
-	{                                                                               \
-		.long_name = "root-ca", .short_name = 0, .flags = G_OPTION_FLAG_NONE,   \
-		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,             \
-		.description = "Use FILE as the trusted root CA instead the\n" __indent \
-			       "root CAs that are installed on the system (optional).", \
-		.arg_description = "FILE",                                              \
+#define _entry_root_ca(__arg_data, __indent)                                              \
+	{                                                                                 \
+		.long_name = "root-ca", .short_name = 0, .flags = G_OPTION_FLAG_NONE,     \
+		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,               \
+		.description = "Use FILE as the trusted root CA instead the\n" __indent   \
+			       "root CAs that are installed on the system (optional).\n", \
+		.arg_description = "FILE",                                                \
 	}
 
 /* NOTE REQUIRED */
-#define _entry_guest_hdr(__arg_data, __indent)                                               \
-	{                                                                                    \
-		.long_name = "hdr", .short_name = 0, .flags = G_OPTION_FLAG_NONE,            \
-		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                        \
-		.description =                                                               \
-			"Specify the header of the guest image. Exactly one is required.\n", \
-		.arg_description = "FILE",                                                   \
+#define _entry_guest_hdr(__arg_data, __indent)                                            \
+	{                                                                                 \
+		.long_name = "hdr", .short_name = 0, .flags = G_OPTION_FLAG_NONE,         \
+		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                     \
+		.description = "FILE specifies the header of the guest image.\n" __indent \
+			       "Exactly one is required.\n",                              \
+		.arg_description = "FILE",                                                \
 	}
 
 /* NOTE REQUIRED */
-#define _entry_input(__arg_data, __additional_text, __indent)                         \
-	{                                                                             \
-		.long_name = "input", .short_name = 'i', .flags = G_OPTION_FLAG_NONE, \
-		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                 \
-		.description = "FILE specifies the " __additional_text "\n" __indent  \
-			       " as input.\n",                                        \
-		.arg_description = "FILE",                                            \
+#define _entry_input(__arg_data, __additional_text, __indent)                          \
+	{                                                                              \
+		.long_name = "input", .short_name = 'i', .flags = G_OPTION_FLAG_NONE,  \
+		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                  \
+		.description = "FILE specifies the " __additional_text " as input.\n", \
+		.arg_description = "FILE",                                             \
 	}
 
 /* NOTE REQUIRED */
-#define _entry_output(__arg_data, __additional_text, __indent)                                  \
-	{                                                                                       \
-		.long_name = "output", .short_name = 'o', .flags = G_OPTION_FLAG_NONE,          \
-		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                           \
-		.description = "FILE specifies the output for the\n" __indent __additional_text \
-			       ".\n",                                                           \
-		.arg_description = "FILE",                                                      \
+#define _entry_output(__arg_data, __additional_text, __indent)                              \
+	{                                                                                   \
+		.long_name = "output", .short_name = 'o', .flags = G_OPTION_FLAG_NONE,      \
+		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                       \
+		.description = "FILE specifies the output for the " __additional_text "\n", \
+		.arg_description = "FILE",                                                  \
 	}
 
 /* NOTE REQUIRED */
@@ -254,7 +253,7 @@ static gboolean hex_str_toull(const char *nptr, uint64_t *dst, GError **error)
 	{                                                                                \
 		.long_name = "x-phkh-img", .short_name = 0, .flags = G_OPTION_FLAG_NONE, \
 		.arg = G_OPTION_ARG_NONE, .arg_data = __arg_data,                        \
-		.description = "add the public host key hash of the\n" __indent          \
+		.description = "Add the public host key hash of the\n" __indent          \
 			       "image header used to decrypt\n" __indent                 \
 			       "the secure guest to the measurement. (optional)\n"       \
 	}
@@ -263,34 +262,31 @@ static gboolean hex_str_toull(const char *nptr, uint64_t *dst, GError **error)
 	{                                                                                 \
 		.long_name = "x-phkh-att", .short_name = 0, .flags = G_OPTION_FLAG_NONE,  \
 		.arg = G_OPTION_ARG_NONE, .arg_data = __arg_data,                         \
-		.description = "add the public host key hash of the\n" __indent           \
+		.description = "Add the public host key hash of the\n" __indent           \
 			       "attestation header used to decrypt\n" __indent            \
 			       "the attestation request to the measurement. (optional)\n" \
 	}
 
-#define _entry_no_verify(__arg_data, __indent)                                                \
-	{                                                                                     \
-		.long_name = "no-verify", .short_name = 0, .flags = G_OPTION_FLAG_NONE,       \
-		.arg = G_OPTION_ARG_NONE, .arg_data = __arg_data,                             \
-		.description =                                                                \
-			"Disable the host-key-document verification.\n" __indent              \
-			"Does not require the host-key documents to be valid.\n" __indent     \
-			"For testing purposes, do not use for a production image.\n" __indent \
-			"(optional)\n",                                                       \
+#define _entry_no_verify(__arg_data, __indent)                                          \
+	{                                                                               \
+		.long_name = "no-verify", .short_name = 0, .flags = G_OPTION_FLAG_NONE, \
+		.arg = G_OPTION_ARG_NONE, .arg_data = __arg_data,                       \
+		.description = "Disable the host-key document verification.\n" __indent \
+			       "(optional)\n",                                          \
 	}
 
 #define _entry_offline_maps_to_online(__arg_data, __indent)                              \
 	{                                                                                \
 		.long_name = "offline", .short_name = 0, .flags = G_OPTION_FLAG_REVERSE, \
 		.arg = G_OPTION_ARG_NONE, .arg_data = __arg_data,                        \
-		.description = "Don't download CRLs (optional).\n",                      \
+		.description = "Don't download CRLs. (optional)\n",                      \
 	}
 
 #define _entry_verbose(__indent)                                                          \
 	{                                                                                 \
 		.long_name = "verbose", .short_name = 'V', .flags = G_OPTION_FLAG_NO_ARG, \
 		.arg = G_OPTION_ARG_CALLBACK, .arg_data = &increase_log_lvl,              \
-		.description = "Provide more detailed output (optional)\n",               \
+		.description = "Provide more detailed output. (optional)\n",              \
 		.arg_description = NULL,                                                  \
 	}
 

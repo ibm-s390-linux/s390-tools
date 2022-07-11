@@ -9,7 +9,10 @@
 \fBpvattest [OPTION?] perform [OPTIONS] \fP- execute an attestation measurement request
 \fB
 .SH DESCRIPTION
-Run a measurement of this system using '/dev/uv'. Works only if this device is available and the attestation Ultravisor facility is present. The input must be an attestation request created with 'pvattest create'. Output will contain the original request, the attestation measurement result, the configuration UID, and if requested in the request Additional Data.
+Run a measurement of this system using '/dev/uv'. Works only if this device is
+available and the attestation Ultravisor facility is present.
+The input must be an attestation request created with 'pvattest create'.
+Output will contain the original request and the response from the Ultravisor.
 .RE
 .PP
 

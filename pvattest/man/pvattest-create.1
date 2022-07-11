@@ -9,16 +9,22 @@
 \fBpvattest [OPTION?] create [OPTIONS] \fP- create an attestation measurement request
 \fB
 .SH DESCRIPTION
-Prepare attestation measurement requests for an IBM Secure Execution guest. Only prepare attestation requests in a trusted environment, such as your workstation. The 'pvattest create' command creates a randomly generated key to protect the attestation request. This key is only valid for this specific request.In order to avoid compromising the attestation, do not publish the protection key and delete it after verification. Every 'create' command generates a new, random protection key.
+Prepare attestation measurement requests for an IBM Secure Execution guest.
+Only prepare attestation requests in a trusted environment, such as your workstation.
+The 'pvattest create' command creates a randomly generated key to protect the attestation request.
+This key is only valid for this specific request. In order to avoid compromising the attestation,
+do not publish the protection key and delete it after verification.
+Every 'create' command generates a new, random protection key.
 .SH OPTIONS
 .TP
 .B
 \fB-h\fP, \fB--help\fP
-Show help options
+Prints usage information, then exits.
 .TP
 .B
 \fB-k\fP, \fB--host-key-document\fP=\fBFILE\fP
-Specify one or more host key documents.
+Specify one or more host key documents. At least one is required.
+Specify this option multiple times to enable the image to run on more than one host.
 .TP
 .B
 \fB-C\fP, \fB--cert\fP=\fBFILE\fP
@@ -26,11 +32,14 @@ Specifies  the  certificate that is used to establish a chain of trust for the v
 .TP
 .B
 \fB--crl\fP=\fBFILE\fP
-Specify \fBFILE\fP to be a certificate revocation list (optional).
+Specifies the revocation list that is used to check whether a certificate of the chain of trust is
+revoked. Specify this option multiple times to use multiple CRLs (optional).
 .TP
 .B
 \fB--root-ca\fP=\fBFILE\fP
-Use \fBFILE\fP as the trusted root CA instead the root CAs that are installed on the system (optional).
+Specifies the root CA certificate for the verification. If omitted,
+the system wide root CAs installed on the system are used. Use
+this only if you trust the specified certificate. Optional.
 .TP
 .B
 \fB-o\fP, \fB--output\fP=\fBFILE\fP
@@ -42,15 +51,16 @@ Save the protection key as GCM-AES256 key in \fBFILE\fP Do not publish this key,
 .TP
 .B
 \fB--no-verify\fP
-Disable the host-key-document verification. Does not require the host-key documents to be valid. For testing purposes, do not use for a production image. (Optional)
+Disable the host-key document verification. Does not require the host-key documents to be valid. Do
+not use for a production request unless you verified the host-key document before (optional).
 .TP
 .B
 \fB--offline\fP
-Don't download CRLs (optional).
+Specifies offline mode, in which no attempt is made to download CRLs. (optional).
 .TP
 .B
 \fB-V\fP, \fB--verbose\fP
-Provide more detailed output (optional)
+Provide more detailed output (optional).
 .SH EXAMPLE
 Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', and verify the host-key document using the CA-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt'.
 .PP
