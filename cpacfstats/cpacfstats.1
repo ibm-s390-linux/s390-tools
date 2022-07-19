@@ -223,7 +223,7 @@ KIMD SHA3-512,
 .IP \(bu
 KIMD SHAKE 128,
 .IP \(bu
-KIMD SHAE 256,
+KIMD SHAKE 256,
 .IP \(bu
 KIMD GHASH,
 .IP \(bu
@@ -378,7 +378,10 @@ Reserved 1, and
 Reserved 2.
 .RE
 Note that the counters starting with PCKMO and Reserved are only
-available in the pai_kernel set.
+available in the pai_kernel set.  Also note that the counters are
+designed to count successful operations.  In the case of KMA this
+means only complete GCM operations including final hashing are
+counted.
 
 Note: CPU-MF based CPACF performance counters are available on LPARs
 only. PAI counters are available on all hypervisors. For security
