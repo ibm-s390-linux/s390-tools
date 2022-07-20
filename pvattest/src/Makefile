@@ -4,12 +4,11 @@ BIN_PROGRAM = pvattest
 PKGDATADIR ?= "$(DESTDIR)$(TOOLS_DATADIR)/$(BIN_PROGRAM)"
 
 SRC_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-ROOT_DIR = $(rootdir)
-PVATTESTDIR := $(ROOT_DIR)/pvattest
-INCLUDE_PATHS = "$(SRC_DIR)" "$(ROOT_DIR)/include"
+PVATTESTDIR := $(rootdir)/pvattest
+INCLUDE_PATHS = "$(SRC_DIR)" "$(rootdir)/include"
 INCLUDE_PARMS = $(addprefix -I,$(INCLUDE_PATHS))
 
-LIBPV_DIR = $(ROOT_DIR)/libpv
+LIBPV_DIR = $(rootdir)/libpv
 LIBPV = $(LIBPV_DIR)/libpv.a
 
 WARNINGS := -Wall -Wextra -Wshadow \
