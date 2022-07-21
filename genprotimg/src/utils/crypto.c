@@ -447,7 +447,7 @@ static X509_CRL *load_crl_from_bio(BIO *bio)
 		return g_steal_pointer(&crl);
 	ERR_clear_error();
 	rc = BIO_reset(bio);
-	if (rc != 1 || (rc != 0 && BIO_method_type(bio) == BIO_TYPE_FILE))
+	if (rc != 1 && !(rc == 0 && BIO_method_type(bio) == BIO_TYPE_FILE))
 		return NULL;
 
 	/* maybe the CRL is stored in DER format */
@@ -533,7 +533,7 @@ X509 *load_cert_from_file(const char *path, GError **err)
 		return g_steal_pointer(&cert);
 	ERR_clear_error();
 	rc = BIO_reset(bio);
-	if (rc != 1 || (rc != 0 && BIO_method_type(bio) == BIO_TYPE_FILE)) {
+	if (rc != 1 && !(rc == 0 && BIO_method_type(bio) == BIO_TYPE_FILE)) {
 		g_set_error(err, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_READ_CERTIFICATE,
 			    _("unable to load certificate: '%s'"), path);
 		return NULL;
