@@ -41,7 +41,7 @@ int pv_BIO_reset(BIO *b)
 {
 	int rc = BIO_reset(b);
 
-	if (rc != 1 && (BIO_method_type(b) == BIO_TYPE_FILE && rc != 0))
+	if (rc != 1 && !(BIO_method_type(b) == BIO_TYPE_FILE && rc == 0))
 		return -1;
 	return 1;
 }
