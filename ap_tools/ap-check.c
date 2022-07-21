@@ -685,6 +685,14 @@ static int ap_check_handle_start(struct ap_check_anchor *anc)
 		goto out;
 	}
 
+	/* Ensure device with control domains also has usage domains */
+	if (util_list_is_empty(anc->dev->domains) &&
+	    !util_list_is_empty(anc->dev->controls)) {
+		fprintf(stderr, "At least one usage domain must be specified\n");
+		rc = -1;
+		goto out;
+	}
+
 	/* Check against all other active vfio-ap devices */
 	rc = check_other_mdevs_sysfs(anc);
 	/* Check against the system sysfs values for apmask/aqmask */
