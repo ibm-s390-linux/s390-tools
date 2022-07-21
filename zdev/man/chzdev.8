@@ -690,6 +690,29 @@ Answer all confirmation questions with 'yes'.
 .RE
 .PP
 .
+If you intend to assign a cryptographic (AP) adapter or domain to a KVM
+guest you must first release its usage by the zcrypt driver in the host
+operating system using chzdev commands similar to the following examples:
+.
+.PP
+.B Remove AP adapters 1 and 20 through 22 from host usage:
+.RS 4
+.CL chzdev \-\-type ap apmask=-1,-20-22
+.RE
+.PP
+.
+.B Return AP domains 5 and 8 through 10 to host usage:
+.RS 4
+.CL chzdev \-\-type ap aqmask=+5,+8-10
+.RE
+.PP
+.
+.B Specify the list of AP adapters and domains available for host usage:
+.RS 4
+.CL chzdev \-\-type ap apmask=0-120,129-255 aqmask=0-200,220-255
+.RE
+.PP
+.
 .
 .SH "EXIT CODES"
 .TP
