@@ -467,6 +467,7 @@ CMDS="${CMDS}\
   :dmsetup table --target multipath\
   :dmsetup status\
   :multipathd -k'show config'\
+  :multipathd -k'show config local'\
   :multipathd -k'show maps'\
   :multipathd -k'show topo'\
   :multipathd -k'show paths'\
