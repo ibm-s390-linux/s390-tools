@@ -790,7 +790,7 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section,
 		if (!max_parm_size)
 			max_parm_size = LEGACY_MAXIMUM_PARMLINE_SIZE;
 
-		len = strlen(common->parmline);
+		len = common->parmline ? strlen(common->parmline) : 0;
 		if (len > max_parm_size) {
 			error_text("The length of the parameters line "
 				   "(%d bytes) exceeds the allowed maximum "
