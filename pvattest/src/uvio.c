@@ -156,6 +156,8 @@ int uvio_open(const char *uv_path, GError **error)
 const char *uvio_uv_rc_to_str(const int rc)
 {
 	switch (rc) {
+	case 0x02:
+		return _("Invalid UV command");
 	case 0x106:
 		return _("Unsupported attestation request version");
 	case 0x108:
