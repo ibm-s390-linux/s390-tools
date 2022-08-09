@@ -147,6 +147,62 @@ function findDASDDebugfsDirectorie() {
 }
 
 #------------------------------------------------------------------------------
+# The blockpath can usually be found over the DEVPATH
+# In case of a swapped Copy Pair device the blockdev is likely associated
+# with one of the secondary devices
+# this function checks if the blockdev is associated with the primary device
+# and if not search for it in the secondary device list
+#------------------------------------------------------------------------------
+function setCorrectBlockPath() {
+	local DRIVERECKD="$SYSFSDIR/bus/ccw/drivers/dasd-eckd/"
+	local DRIVERFBA="$SYSFSDIR/bus/ccw/drivers/dasd-fba/"
+	local SEARCHDIRS=
+	local SEARCHLIST=
+
+	if [[ "$COPYROLE" == "none" ]] || [[ -d "$DEVPATH/block" ]]; then
+		BLOCKPATH="$DEVPATH"/block/dasd*
+		return
+	fi
+
+	if [[ -d "$DRIVERECKD" ]]; then
+		SEARCHDIRS="$DRIVERECKD"
+	fi
+	if [[ -d "$DRIVERFBA" ]]; then
+		SEARCHDIRS="$SEARCHDIRS $DRIVERFBA"
+	fi
+
+	SEARCHLIST=$(echo $SECONDARY_LIST | sed 's/,/ /g')
+	for SEARCHDEV in $SEARCHLIST
+	do
+		if [[ -n "$SEARCHDIRS" ]]; then
+			PRIM_DEVPATH=$(find $SEARCHDIRS -type l -name $SEARCHDEV \
+					    -printf "%h/%l\n" 2> /dev/null)
+			if [[ -d "$PRIM_DEVPATH/block" ]]; then
+				break
+			fi
+		else
+			# The above paths may become invalid in the future, so we keep the
+			# following query as backup:
+			PRIM_DEVPATH=$(find "$SYSFSDIR/devices" -type l -name $SEARCHDEV \
+					    "driver" -lname "*/dasd*" -printf "%h\n" \
+					    2> /dev/null)
+		fi
+	done
+
+	BLOCKPATH="$PRIM_DEVPATH"/block/dasd*
+}
+
+#------------------------------------------------------------------------------
+# gather Copy Pair related data
+#------------------------------------------------------------------------------
+function gatherCopyPairData() {
+	read COPYPAIR 2> /dev/null < $DEVPATH/copy_pair
+	PRIMARY_UID=`echo $COPYPAIR | cut -d " " -f1 | cut -d "," -f1`
+	COPYPAIR=`echo "$COPYPAIR" | sed 's/ /,/g' | sed 's/^,//' `
+	SECONDARY_LIST=`echo ${COPYPAIR//$PRIMARY_UID","/} `
+}
+
+#------------------------------------------------------------------------------
 # gather device data and call appropriate output function
 #------------------------------------------------------------------------------
 function gatherDeviceData() {
@@ -165,16 +221,18 @@ function gatherDeviceData() {
 		read READONLY 2> /dev/null < $DEVPATH/readonly || continue
 		read DISCIPLINE 2> /dev/null < $DEVPATH/discipline || continue
 		read ESE 2> /dev/null < $DEVPATH/ese
+		read COPYROLE 2> /dev/null < $DEVPATH/copy_role
 
+		if [[ "$COPYROLE" != "none" ]]; then
+			gatherCopyPairData
+		fi
 		# Block device specific information is only available for
 		# devices that are online and not a PAV alias
-		if [[ ! "$ONLINE" == 0 ]] && [[ ! "$ALIAS" == 1 ]]; then
-			#find device Path to the block device
-			if [[ -d "$DEVPATH/block" ]]; then
-				set - "$DEVPATH"/block/dasd*
-			else
-				set - "$DEVPATH"/block:dasd*
-			fi
+		if [[ ! "$ONLINE" == 0 ]] && [[ ! "$ALIAS" == 1 ]] &&
+			   [[ ! "$COPYROLE" == "secondary" ]]; then
+		        #find device Path to the block device
+		        setCorrectBlockPath
+		    	set - $BLOCKPATH
 			MAJMIN=
 			MAJOR=
 			MINOR=
@@ -194,10 +252,12 @@ function gatherDeviceData() {
 				fi
 			fi
 		else
-			# BLOCKNAME for offline and alias devices will not be
-			# printed, it's just a key for sorting
+			# BLOCKNAME for offline, alias and secondary devices
+			# will not be printed, it's just a key for sorting
 			if [[ "$ONLINE" == 0 ]]; then
 				BLOCKNAME=""
+			elif [[ "$COPYROLE" == "secondary" ]]; then
+				BLOCKNAME="b"
 			else
 				BLOCKNAME="a"
 			fi
@@ -258,6 +318,15 @@ function newoutput()
 				"$BUSID" \
 				"$DISCIPLINE"
 		fi
+		return
+	fi
+
+	if [[ "$COPYROLE" == "secondary" ]]; then
+		printf "%s:%s:%-8s  secondary %-8s %13s\n" \
+		       "$SORTKEYLEN" "$SORTKEY" \
+		       "$BUSID" \
+		       "$PRIMARY_BLOCKNAME" \
+		       "$DISCIPLINE"
 		return
 	fi
 
@@ -519,10 +588,14 @@ function extended()
 		        "${HPF_PATHS[@]}" \
 		        "${IFCC_PATHS[@]}" ;
 		return
-	elif [[ "$ALIAS" == 1 ]]; then
-		if [[ "$BASEONLY" == "false" ]]; then
-			ACTIVE="alias"
-			printf "%s:%s:%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s #  uid:  \t\t\t\t%s#  fc_security: \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+	elif [[ "$ALIAS" == 1 ]] || [[ "$COPYROLE" == "secondary" ]]; then
+		if [[ "$BASEONLY" == "false" ]] || [[ "$COPYROLE" == "secondary" ]]; then
+			if [[ "$COPYROLE" == "secondary" ]]; then
+				ACTIVE="secondary"
+			else
+				ACTIVE="alias"
+			fi
+			printf "%s:%s:%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s #  uid:  \t\t\t\t%s#  fc_security: \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#  copy_pairs:\t\t\t\t%s#\n" \
 				"$SORTKEYLEN" "$SORTKEY" \
 				"$BUSID" \
 				"$ACTIVE" \
@@ -540,7 +613,8 @@ function extended()
 			        "${CABLE_PATHS[@]}" \
 			        "${CUIR_PATHS[@]}" \
 			        "${HPF_PATHS[@]}" \
-		                "${IFCC_PATHS[@]}" ;
+		                "${IFCC_PATHS[@]}" \
+		                "${COPYPAIR}" ;
 		fi
 		return
 	elif [[ -z "$BLOCKNAME" ]] || [[ -z "$SIZE" ]]; then
@@ -565,7 +639,7 @@ function extended()
 		DISCIPLINE="${DISCIPLINE} (ESE)"
 	fi
 
-	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  extent_size:\t\t\t\t%s#  logical_capacity:\t\t\t%s#  space_allocated:\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  fc_security: \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#\n" \
+	printf "%s:%s:%s/%s/%s%s%s#  status:\t\t\t\t%s#  type: \t\t\t\t%s#  blksz:\t\t\t\t%s#  size: \t\t\t\t%s#  blocks:\t\t\t\t%s#  extent_size:\t\t\t\t%s#  logical_capacity:\t\t\t%s#  space_allocated:\t\t\t%s#  use_diag:\t\t\t\t%s#  readonly:\t\t\t\t%s#  eer_enabled:\t\t\t\t%s#  erplog:\t\t\t\t%s#  hpf:\t\t\t\t\t%s#  uid:  \t\t\t\t%s#  fc_security: \t\t\t\t%s#  paths_installed: \t\t\t%s %s %s %s %s %s %s %s#  paths_in_use: \t\t\t%s %s %s %s %s %s %s %s#  paths_non_preferred: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_cabling: \t\t%s %s %s %s %s %s %s %s#  paths_cuir_quiesced: \t\t\t%s %s %s %s %s %s %s %s#  paths_invalid_hpf_characteristics: \t%s %s %s %s %s %s %s %s#  paths_error_threshold_exceeded: \t%s %s %s %s %s %s %s %s#  copy_pairs:\t\t\t\t%s#\n" \
 		"$SORTKEYLEN" "$SORTKEY" \
 		"$BUSID" \
 		"$BLOCKNAME" \
@@ -593,7 +667,8 @@ function extended()
 	        "${CABLE_PATHS[@]}" \
 	        "${CUIR_PATHS[@]}" \
 	        "${HPF_PATHS[@]}"  \
-	        "${IFCC_PATHS[@]}" ;
+	        "${IFCC_PATHS[@]}" \
+		"${COPYPAIR}" ;
 }
 
 function host()
@@ -710,7 +785,11 @@ function uid()
 		fi
 	fi
 
-	printf "%s:%s:%-8s  %-8s  %s\n" \
+	if [[ "$COPYROLE" == "secondary" ]]; then
+		BLOCKNAME="secondary"
+	fi
+
+	printf "%s:%s:%-8s  %-10s  %s\n" \
 		"$SORTKEYLEN" "$SORTKEY" \
 		"$BUSID" \
 		"$BLOCKNAME" \
