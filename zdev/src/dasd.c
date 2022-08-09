@@ -137,6 +137,21 @@ static struct attrib dasd_attr_readonly = {
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
 };
 
+static struct attrib dasd_attr_copy_pair = {
+	.name = "copy_pair",
+	.title = "Modify copy-pair relations",
+	.desc = "Make a copy-pair relation for this device known to the DASD "
+		"driver.\n"
+		"A copy-pair is a comma-separated pair of device bus-IDs\n"
+		"<primary>,<secondary>.\n"
+		"Example: 0.0.1000,0.0.2000\n"
+		"Up to 4 copy-pairs are accepted by the DASD driver for each "
+		"device.\n",
+	.unstable = 1,
+	.multi = 1,
+	.activerem = 1,
+};
+
 static struct attrib dasd_attr_erplog = {
 	.name = "erplog",
 	.title = "Enable logging of Error Recovery Processing",
@@ -600,6 +615,81 @@ persistent:
 	return rc;
 }
 
+/* Remove all entries from the copy_pair attribute by writing 'clear' to it. */
+static void dasd_clear_copy_pair(struct setting *s)
+{
+	free(s->value);
+	s->value = misc_strdup("clear");
+	strlist_free(s->values);
+	s->values = strlist_new();
+	strlist_add(s->values, "clear");
+	s->removed = 0;
+	s->modified = 1;
+}
+
+/*
+ * Copy-pair values may contain multiple values in one line
+ * those need to be split up and put in multiple values entries
+ * delimiter is " " and "\n" depending on the source
+ * values read from sysfs have " " as delimiter and values from
+ * zdev have "\n"
+ */
+static void dasd_split_copy_pair(struct setting *s)
+{
+	struct util_list *new = NULL;
+	struct strlist_node *node;
+
+	new = strlist_new();
+	util_list_iterate(s->values, node)
+		strlist_add_multi(new, node->str, "\n ", 0);
+
+	strlist_free(s->values);
+	s->values = new;
+}
+
+/*
+ * For persistent configurations one value per values[] entry is required
+ * to achieve a correct multi-line copy-pair statement in the resulting
+ * udev-rule.
+ */
+static exit_code_t dasd_st_configure_persistent(struct subtype *st,
+						struct device *dev)
+{
+	struct setting *s;
+
+	util_list_iterate(&dev->persistent.settings->list, s) {
+		if (strcmp(s->name, "copy_pair") == 0)
+			dasd_split_copy_pair(s);
+	}
+
+	return st->super->configure_persistent(st, dev);
+}
+
+/*
+ * For active configurations one value per values[] entry is required to
+ * correctly operate the sysfs attribute.
+ *
+ * In case of removal the string "clear" has to be written to the
+ * value and values[] entry.
+ */
+static exit_code_t dasd_st_configure_active(struct subtype *st,
+					    struct device *dev)
+{
+	struct setting *s;
+
+	util_list_iterate(&dev->active.settings->list, s) {
+		if (strcmp(s->name, "copy_pair") != 0)
+			continue;
+
+		if (s->removed)
+			dasd_clear_copy_pair(s);
+		else
+			dasd_split_copy_pair(s);
+	}
+
+	return st->super->configure_active(st, dev);
+}
+
 /*
  * DASD device sub-types.
  */
@@ -634,10 +724,13 @@ struct subtype dasd_subtype_eckd = {
 		&dasd_attr_last_known_reservation_state,
 		&dasd_attr_safe_offline,
 		&dasd_attr_fc_security,
+		&dasd_attr_copy_pair,
 		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
 
+	.configure_active	= &dasd_st_configure_active,
+	.configure_persistent	= &dasd_st_configure_persistent,
 	.check_pre_configure	= &dasd_st_check_pre_configure,
 	.add_modules		= &dasd_st_add_modules,
 };
