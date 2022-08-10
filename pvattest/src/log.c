@@ -131,26 +131,35 @@ void pvattest_log_plain_logger(const char *log_domain G_GNUC_UNUSED, GLogLevelFl
 	_log_logger(level, message, log_level, FALSE, "");
 }
 
-void hexdump(const void *data, size_t size, size_t len, const char *prefix, GLogLevelFlags log_lvl)
+void pvattest_log_bytes(const void *data, size_t size, size_t width, const char *prefix,
+			gboolean beautify, GLogLevelFlags log_lvl)
 {
 	const uint8_t *data_b = data;
 
 	pv_wrapped_g_assert(data);
 
-	g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, log_lvl, "%s0x0000  ", prefix);
+	if (beautify)
+		g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "%s0x0000  ", prefix);
+	else
+		g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "%s", prefix);
 	for (size_t i = 0; i < size; i++) {
-		g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, log_lvl, "%02x", data_b[i]);
-		if (i % 2 == 1)
-			g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, log_lvl, " ");
+		g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "%02x", data_b[i]);
+		if (i % 2 == 1 && beautify)
+			g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, " ");
 		if (i == size - 1)
 			break;
-		if (i % len == len - 1)
-			g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, log_lvl, "\n%s0x%04lx  ", prefix, i + 1);
+		if (i % width == width - 1) {
+			if (beautify)
+				g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "\n%s0x%04lx  ", prefix,
+				      i + 1);
+			else
+				g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "\n%s", prefix);
+		}
 	}
-	g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, log_lvl, "\n");
+	g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "\n");
 }
 
-void printf_hexdump(const void *data, size_t size, size_t len, const char *prefix, FILE *stream)
+void pvattest_hexdump(const void *data, size_t size, size_t width, const char *prefix, FILE *stream)
 {
 	const uint8_t *data_b = data;
 
@@ -164,7 +173,7 @@ void printf_hexdump(const void *data, size_t size, size_t len, const char *prefi
 			fprintf(stream, " ");
 		if (i == size - 1)
 			break;
-		if (i % len == len - 1)
+		if (i % width == width - 1)
 			fprintf(stream, "\n%s0x%04lx  ", prefix, i + 1);
 	}
 	fprintf(stream, "\n");

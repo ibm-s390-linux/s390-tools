@@ -355,7 +355,7 @@ int main(int argc, char *argv[])
 	 * message)to filter messages based on the log level specified by the
 	 * user.
 	 */
-	g_log_set_handler(PVATTEST_HEXDUMP_LOG_DOMAIN,
+	g_log_set_handler(PVATTEST_BYTES_LOG_DOMAIN,
 			  G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
 			  &pvattest_log_plain_logger, &appl_log_lvl);
 

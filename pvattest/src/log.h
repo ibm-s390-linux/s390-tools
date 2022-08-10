@@ -23,7 +23,7 @@
 #define PVATTEST_LOG_LVL_DEFAULT PVATTEST_LOG_LVL_WARNING
 #define PVATTEST_LOG_LVL_MAX PVATTEST_LOG_LVL_DEBUG
 
-#define PVATTEST_HEXDUMP_LOG_DOMAIN "pvattest_hdump"
+#define PVATTEST_BYTES_LOG_DOMAIN "pvattest_bytes"
 
 void pvattest_log_increase_log_lvl(int *log_lvl);
 void pvattest_log_error(const char *format, ...);
@@ -45,22 +45,22 @@ void pvattest_log_default_logger(const char *log_domain, GLogLevelFlags level, c
  */
 void pvattest_log_plain_logger(const char *log_domain, GLogLevelFlags level, const char *message,
 			       void *user_data);
-#define dhexdump(v, s)                                                            \
-	{                                                                         \
-		pvattest_log_debug("%s (%li byte):", #v, s);                      \
-		hexdump(v, s, 16L, "    ", PVATTEST_LOG_LVL_DEBUG);               \
-		g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, PVATTEST_LOG_LVL_DEBUG, "\n"); \
-	}
-#define gbhexdump(v)                                                                 \
+#define dhexdump(v, s)                                                               \
 	{                                                                            \
-		pvattest_log_debug("%s:(%li byte):", #v, g_bytes_get_size(v));       \
-		hexdump(g_bytes_get_data(v, NULL), g_bytes_get_size(v), 16L, "    ", \
-			PVATTEST_LOG_LVL_DEBUG);                                     \
-		g_log(PVATTEST_HEXDUMP_LOG_DOMAIN, PVATTEST_LOG_LVL_DEBUG, "\n");    \
+		pvattest_log_debug("%s (%li byte):", #v, s);                         \
+		pvattest_log_bytes(v, s, 16L, "    ", TRUE, PVATTEST_LOG_LVL_DEBUG); \
+		g_log(PVATTEST_BYTES_LOG_DOMAIN, PVATTEST_LOG_LVL_DEBUG, "\n");      \
 	}
-void hexdump(const void *data, size_t size, size_t len, const char *prefix, GLogLevelFlags log_lvl)
-	PV_NONNULL(1);
-void printf_hexdump(const void *data, size_t size, size_t len, const char *prefix, FILE *stream)
+#define gbhexdump(v)                                                                            \
+	{                                                                                       \
+		pvattest_log_debug("%s:(%li byte):", #v, g_bytes_get_size(v));                  \
+		pvattest_log_bytes(g_bytes_get_data(v, NULL), g_bytes_get_size(v), 16L, "    ", \
+				   TRUE, PVATTEST_LOG_LVL_DEBUG);                               \
+		g_log(PVATTEST_BYTES_LOG_DOMAIN, PVATTEST_LOG_LVL_DEBUG, "\n");                 \
+	}
+void pvattest_log_bytes(const void *data, size_t size, size_t width, const char *prefix,
+			gboolean beautify, GLogLevelFlags log_lvl) PV_NONNULL(1);
+void pvattest_hexdump(const void *data, size_t size, size_t width, const char *prefix, FILE *stream)
 	PV_NONNULL(1, 5);
 void pvattest_log_GError(const char *info, GError *error) PV_NONNULL(1);
 
