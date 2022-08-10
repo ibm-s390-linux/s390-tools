@@ -322,8 +322,17 @@ static int do_verify(pvattest_verify_config_t *verify_config)
 		return PVATTEST_EXIT_MEASURE_NOT_VERIFIED;
 	}
 
-	pvattest_log_debug(_("Measurement verified."));
+	pvattest_log_info(_("Attestation measurement verified"));
+	pvattest_log_info(_("Config UID:"));
+	pvattest_log_bytes(g_bytes_get_data(config_uid, NULL), g_bytes_get_size(config_uid), 16L,
+			   "", FALSE, PVATTEST_LOG_LVL_INFO);
 
+	if (additional_data) {
+		pvattest_log_info(_("\nAdditional Data:"));
+		pvattest_log_bytes(g_bytes_get_data(additional_data, NULL),
+				   g_bytes_get_size(additional_data), 16L, "", FALSE,
+				   PVATTEST_LOG_LVL_INFO);
+	}
 	return EXIT_SUCCESS;
 
 err_exit:
