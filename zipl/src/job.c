@@ -561,11 +561,13 @@ get_common_components(struct job_common_ipl_data *common,
 			    MAXIMUM_PHYSICAL_BLOCKSIZE);
 	if (rc)
 		goto error;
-	rc = set_cl_element(&cl[num++], "parmline", NULL, &common->parm_addr,
-			    MAXIMUM_PARMLINE_SIZE, 0,
-			    MAXIMUM_PHYSICAL_BLOCKSIZE);
-	if (rc)
-		goto error;
+	if (common->parmline) {
+		rc = set_cl_element(&cl[num++], "parmline", NULL, &common->parm_addr,
+				    MAXIMUM_PARMLINE_SIZE, 0,
+				    MAXIMUM_PHYSICAL_BLOCKSIZE);
+		if (rc)
+			goto error;
+	}
 	if (common->ramdisk) {
 		rc = set_cl_element(&cl[num++], "initial ramdisk",
 				    common->ramdisk, &common->ramdisk_addr,
