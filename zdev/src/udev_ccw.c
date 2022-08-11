@@ -221,6 +221,7 @@ static void write_attr_to_file(FILE *fd, struct device_state *state, const char 
 	struct ptrlist_node *p;
 	struct setting *s;
 	struct util_list *list = NULL;
+	struct strlist_node *str;
 
 	/* Apply attributes in correct order. */
 	list = setting_list_get_sorted(state->settings);
@@ -229,8 +230,13 @@ static void write_attr_to_file(FILE *fd, struct device_state *state, const char 
 		s = p->ptr;
 		if (s->removed)
 			continue;
-		if ((s->attrib && s->attrib->internal) ||
-		    internal_by_name(s->name)) {
+		if (s->values) {
+			util_list_iterate(s->values, str) {
+				fprintf(fd, "ATTR{[ccw/%s]%s}=\"%s\"\n",
+					id, s->name, str->str);
+			}
+		} else if ((s->attrib && s->attrib->internal) ||
+			   internal_by_name(s->name)) {
 			fprintf(fd, "ENV{zdev_%s}=\"%s\"\n",
 				internal_get_name(s->name), s->value);
 		} else {
