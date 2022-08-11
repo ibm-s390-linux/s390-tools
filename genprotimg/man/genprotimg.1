@@ -62,7 +62,8 @@ host.
 Specifies the certificate that is used to establish a chain of trust
 for the verification of the host-key documents. Specify this option
 twice to specify the IBM Z signing key and the intermediate CA
-certificate (signed by the root CA). Required.
+certificate (signed by the root CA).
+Required. Ignored if \fB--no-verify\fP is specified.
 .TP
 \fB\-o\fR, \fB\-\-output\fR=\fI\,OUTPUT_FILE\/\fR
 Specifies the output file. Required.
@@ -91,8 +92,9 @@ the system wide root CAs installed on the system is used. Use
 this only if you trust the specified certificate. Optional.
 .TP
 \fB\-\-no-verify\fR
-Do not require the host-key documents to be valid. For testing
-purposes, do not use for a production image. Optional.
+Does not require the host-key documents to be valid.
+Do not use for a production image unless you verified
+the host-key document before. Optional.
 .TP
 \fB\-\-comm\-key\fR=\fI\,FILE\/\fR
 Specifies the encryption key you want to use for the PV guest dump. Use a
