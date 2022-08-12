@@ -328,6 +328,8 @@ fi
 ########################################
 
 LOGFILES="\
+  /root/anaconda-ks.cfg\
+  /root/original-ks.cfg\
   /run/containerd/events.log\
   /run/docker/libcontainerd/containerd/events.log\
   /run/udev/chreiplzfcpmp-[0-9][0-9][a-z][a-z][a-z][a-z]-*\
