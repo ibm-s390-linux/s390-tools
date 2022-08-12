@@ -331,6 +331,7 @@ LOGFILES="\
   /run/containerd/events.log\
   /run/docker/libcontainerd/containerd/events.log\
   /run/udev/chreiplzfcpmp-[0-9][0-9][a-z][a-z][a-z][a-z]-*\
+  /var/log/anaconda\
   /var/log/anaconda.*\
   /var/log/audit\
   /var/log/boot*\
