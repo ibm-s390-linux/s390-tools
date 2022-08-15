@@ -339,6 +339,7 @@ LOGFILES="\
   /var/log/boot*\
   /var/log/cron*\
   /var/log/dmesg*\
+  /var/log/dnf.*\
   /var/log/dracut.log*\
   /var/log/IBMtape.trace\
   /var/log/IBMtape.errorlog\
@@ -373,6 +374,7 @@ CONFIGFILES="\
   /etc/crypttab\
   /etc/default\
   /etc/depmod.d\
+  /etc/dnf/dnf.conf\
   /etc/docker\
   /etc/dracut.conf.d\
   /etc/exports\
