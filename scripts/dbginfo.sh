@@ -348,9 +348,12 @@ LOGFILES="\
   /var/log/messages*\
   /var/log/openvswitch/ovs-vswitchd.log\
   /var/log/openvswitch/ovsdb-server.log\
+  /var/log/pbl.log\
   /var/log/sa\
   /var/log/syslog*\
   /var/log/yum.log\
+  /var/log/YaST2\
+  /var/log/zypp*\
   "
 
 ########################################
