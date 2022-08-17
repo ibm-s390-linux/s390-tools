@@ -36,6 +36,9 @@ The first argument specifies the re-IPL target:
 .RB "- " ccw :
 Specify a DASD CCW device for reboot
 .TP
+.RB "- " eckd :
+Specify a DASD ECKD device for reboot
+.TP
 .RB "- " fcp :
 Specify a FCP device for reboot
 .TP
@@ -175,6 +178,63 @@ in the installed zIPL environment block for evaluation of zIPL environment
 variables in the kernel command line:
 
 \fB# chreipl ccw -d 0.0.7e78 -L 1S2\fP
+
+.SH eckd
+Use the eckd re-IPL target for DASD devices that are accessed by the hardware
+using channel command word (CCW) channels. In contrast to the ccw re-IPL target,
+the eckd target uses a list-directed bootloader that supports secure boot.
+.TP
+.BR "\-d" " or " "\-\-device"
+Specifies the device bus-ID of the DASD. If the bus-ID starts with "0.0." this
+prefix can be omitted and the four digit short notation can be used (e.g. 5000 is
+the same as 0.0.5000).
+
+.TP
+.BR "\-b" " or " "\-\-bootprog"
+Specifies an entry in the ECKD boot configuration by defining the IPL boot
+program selector. If omitted, '0' is used.
+
+.TP
+.BR "\-\-brchr"
+Specifies the block on the DASD where the boot record is located. If omitted,
+0 is used. The specification comprises comma-separated values for cylinder, head,
+and record: "--brchr C,H,R". Alternatively, specifying "0" or "auto" makes the
+bootloader determine the boot record location from the volume label.
+
+.TP
+.BR "\-L" " or " "\-\-loadparm"
+The loadparm for the eckd re-IPL target is not used to control the ECKD boot
+configuration that is defined by the
+.BR zipl (8)
+boot menu. Instead it can be used to control higher level boot loaders
+like GRUB. For more details refer to distribution specific documentation.
+
+.TP
+.BR "\-c" " or " "\-\-clear"
+Controls whether memory is cleared on re-IPL. Possible values are 0 to
+disable and 1 to enable memory clearing on re-IPL.
+Memory clearing is supported if the "clear" attribute is present in
+/sys/firmware/reipl/eckd/.
+
+.PP
+\fBExamples:\fP
+.br
+
+1. Next time reboot from the ECKD device with the bus-ID 0.0.7e78 and boot
+program selector 0:
+
+\fB# chreipl eckd 0.0.7e78\fP
+
+2. Next time reboot from the ECKD device with the bus-ID 0.0.7e78 and boot
+program selector 2:
+
+\fB# chreipl eckd -d 0.0.7e78 -b 2\fP
+
+3. Next time reboot from the ECKD device with the bus-ID 0.0.7e78 and tell
+the bootloader that the bootrecord is located in Cylinder 3, Head 0, Record 1:
+
+\fB# chreipl eckd -d 0.0.7e78 --brchr 3,0,1\fP
+
 .SH fcp
 Use the fcp re-IPL target for SCSI disks that are accessed by the hardware
 using Fibre Channel Protocol (FCP) channels.

@@ -45,6 +45,7 @@ extern void print_ccw(int show_ipl);
 extern void print_fcp(int show_ipl, int dump);
 extern void print_nvme(int show_ipl, int dump);
 extern void print_nss(int show_ipl);
+extern void print_eckd(int show_ipl, const char *name);
 
 /*
  * Helper

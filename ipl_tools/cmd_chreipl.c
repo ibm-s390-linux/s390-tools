@@ -23,12 +23,15 @@
 #define BOOTPARMS_CCW_MAX	64
 #define BOOTPARMS_FCP_MAX	3452
 
+#define OPT_BRCHR		0x80
+
 enum target_type {
 	TT_CCW,
 	TT_FCP,
 	TT_NSS,
 	TT_NODE,
 	TT_NVME,
+	TT_ECKD,
 };
 
 enum reipl_type {
@@ -36,12 +39,14 @@ enum reipl_type {
 	REIPL_CCW,
 	REIPL_NSS,
 	REIPL_NVME,
+	REIPL_ECKD,
 };
 
 static const char *const usage_chreipl =
 "Usage: %s [TARGET] [ARGS] [OPTIONS]\n"
 "\n"
 " chreipl [ccw] [-d] <DEVICE> [OPTIONS]\n"
+" chreipl [eckd] [-d] <DEVICE> [OPTIONS]\n"
 " chreipl [fcp] [-d] <DEVICE> [-w] <WWPN> [-l] <LUN> [OPTIONS]\n"
 " chreipl nvme  [-i] <FID> [-s] <NSID> [OPTIONS]\n"
 " chreipl [node] <NODE|DIR> [OPTIONS]\n"
@@ -50,6 +55,7 @@ static const char *const usage_chreipl =
 "\n"
 "The following re-IPL targets are supported:\n"
 "  ccw      IPL from CCW device\n"
+"  eckd     IPL from ECKD device\n"
 "  fcp      IPL from FCP device\n"
 "  nvme     IPL from NVME device\n"
 "  nss      IPL from NSS\n"
@@ -63,6 +69,13 @@ static const char *const usage_chreipl =
 "\n"
 "Options for ccw target:\n"
 "  -d, --device <DEVICE>   Device number of the CCW IPL device\n"
+"  -L, --loadparm <PARM>   Loadparm specification\n"
+"  -c, --clear 0|1         Control if memory is cleared on re-IPL\n"
+"\n"
+"Options for eckd target:\n"
+"  -d, --device <DEVICE>   Device number of the ECKD IPL device\n"
+"  -b, --bootprog <BPROG>  Bootprog specification\n"
+"      --brchr <C,H,R>     Boot record location in Cylinder,Head,Record format\n"
 "  -L, --loadparm <PARM>   Loadparm specification\n"
 "  -c, --clear 0|1         Control if memory is cleared on re-IPL\n"
 "\n"
@@ -114,6 +127,8 @@ static struct locals {
 	int			target_type_auto_mode;
 	enum reipl_type		reipl_type;	/* CCW, FCP, NVME, NSS */
 	int			reipl_clear;
+	char			*brchr;
+	int			brchr_set;
 } l;
 
 static void __noreturn print_usage_chreipl_exit(void)
@@ -329,6 +344,19 @@ static void parse_ccw_args(char *nargv[], int nargc)
 	set_device(nargv[0]);
 }
 
+static void parse_eckd_args(char *nargv[], int nargc)
+{
+	/*
+	 * we might be called like this:
+	 * chreipl eckd 4711
+	 */
+	if (l.busid_set)
+		ERR_EXIT("Use either options or positional parameters");
+	if (nargc > 1)
+		ERR_EXIT("Too many arguments specified for \"eckd\" re-IPL type");
+	set_device(nargv[0]);
+}
+
 static void parse_nss_args(char *nargv[], int nargc)
 {
 	/*
@@ -369,6 +397,8 @@ static int set_reipl_type(const char *dev_name)
 		l.reipl_type = REIPL_FCP;
 	else if (strncmp(dev_name, "nvme", strlen("nvme")) == 0)
 		l.reipl_type = REIPL_NVME;
+	else if (strncmp(dev_name, "eckd", strlen("eckd")) == 0)
+		l.reipl_type = REIPL_ECKD;
 	else
 		return -1;
 
@@ -493,12 +523,15 @@ static void parse_pos_args(char *nargv[], int nargc)
 	case TT_NODE:
 		parse_node_args(nargv, nargc);
 		break;
+	case TT_ECKD:
+		parse_eckd_args(nargv, nargc);
+		break;
 	}
 }
 
 static void check_fcp_opts(void)
 {
-	if (l.nss_name_set)
+	if (l.nss_name_set || l.brchr_set)
 		ERR_EXIT("Invalid option for \"fcp\" target specified");
 	if (!(l.busid_set && l.wwpn_set && l.lun_set))
 		ERR_EXIT("The \"fcp\" target requires device, WWPN, "
@@ -507,7 +540,8 @@ static void check_fcp_opts(void)
 
 static void check_nvme_opts(void)
 {
-	if (l.nss_name_set || l.wwpn_set || l.lun_set || l.busid_set)
+	if (l.nss_name_set || l.wwpn_set || l.lun_set || l.busid_set ||
+	    l.brchr_set)
 		ERR_EXIT("Invalid option for \"nvme\" target specified");
 	if (!(l.fid_set && l.nsid_set))
 		ERR_EXIT("The \"nvme\" target requires FID, and optional NSID");
@@ -515,16 +549,25 @@ static void check_nvme_opts(void)
 
 static void check_ccw_opts(void)
 {
-	if (l.bootprog_set || l.lun_set || l.wwpn_set || l.nss_name_set)
+	if (l.bootprog_set || l.lun_set || l.wwpn_set || l.nss_name_set ||
+	    l.brchr_set)
 		ERR_EXIT("Invalid option for \"ccw\" target specified");
 	if (!l.busid_set)
 		ERR_EXIT("The \"ccw\" target requires device");
 }
 
+static void check_eckd_opts(void)
+{
+	if (l.nss_name_set || l.wwpn_set || l.lun_set || l.fid_set)
+		ERR_EXIT("Invalid option for \"eckd\" target specified");
+	if (!(l.busid_set))
+		ERR_EXIT("The \"eckd\" target requires device");
+}
+
 static void check_nss_opts(void)
 {
 	if (l.bootprog_set || l.loadparm_set || l.busid_set || l.wwpn_set ||
-	    l.lun_set)
+	    l.lun_set || l.brchr_set)
 		ERR_EXIT("Invalid option for \"nss\" target specified");
 	if (!l.nss_name_set)
 		ERR_EXIT("The \"nss\" target requires NSS name");
@@ -563,6 +606,12 @@ static void set_reipl_clear(const char *arg)
 		ERR_EXIT("re-IPL clear argument must be either 1 or 0");
 }
 
+static void set_brchr(const char *arg)
+{
+	l.brchr = strdup(arg);
+	l.brchr_set = 1;
+}
+
 static void parse_chreipl_options(int argc, char *argv[])
 {
 	int opt, idx;
@@ -580,6 +629,7 @@ static void parse_chreipl_options(int argc, char *argv[])
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "version",	 no_argument,		NULL, 'v' },
 		{ "clear",	 required_argument,	NULL, 'c' },
+		{ "brchr",       required_argument,	NULL, OPT_BRCHR },
 		{ NULL,		 0,			NULL,  0  }
 	};
 	static const char optstr[] = "hd:vw:l:fL:b:n:p:c:i:s:";
@@ -592,6 +642,8 @@ static void parse_chreipl_options(int argc, char *argv[])
 		set_target_type(TT_FCP, 0);
 	else if (strcmp(argv[1], "ccw") == 0)
 		set_target_type(TT_CCW, 0);
+	else if (strcmp(argv[1], "eckd") == 0)
+		set_target_type(TT_ECKD, 0);
 	else if (strcmp(argv[1], "nss") == 0)
 		set_target_type(TT_NSS, 0);
 	else if (strcmp(argv[1], "nvme") == 0)
@@ -639,6 +691,9 @@ static void parse_chreipl_options(int argc, char *argv[])
 			break;
 		case 'c':
 			set_reipl_clear(optarg);
+			break;
+		case OPT_BRCHR:
+			set_brchr(optarg);
 			break;
 		case 'v':
 			print_version_exit();
@@ -735,6 +790,34 @@ static void chreipl_ccw(void)
 	write_str("ccw", "reipl/reipl_type");
 
 	print_ccw(0);
+}
+
+static void chreipl_eckd(void)
+{
+	check_eckd_opts();
+
+	if (!ccw_is_device(l.busid) && !l.force_set) {
+		if (is_ignored(l.busid))
+			ERR_EXIT("Device is on cio_ignore list, try \"cio_ignore -r %s\"?",
+				 l.busid);
+		ERR_EXIT("Could not find DASD ECKD device \"%s\"", l.busid);
+	}
+
+	if (l.reipl_clear >= 0) {
+		check_exists("reipl/eckd/clear", "ECKD re-IPL clear attribute");
+		write_str(l.reipl_clear ? "1" : "0", "reipl/eckd/clear");
+	}
+
+	if (!l.brchr_set)
+		l.brchr = "auto";
+	write_str(l.brchr, "reipl/eckd/br_chr");
+	if (!l.bootprog_set)
+		sprintf(l.bootprog, "0");
+	write_str(l.bootprog, "reipl/eckd/bootprog");
+	write_str(l.busid, "reipl/eckd/device");
+	write_str_optional(l.loadparm, "reipl/eckd/loadparm", l.loadparm_set, "loadparm");
+	write_str("eckd", "reipl/reipl_type");
+	print_eckd(0, "eckd");
 }
 
 static void chreipl_fcp(void)
@@ -850,6 +933,11 @@ static void chreipl_node(void)
 		l.busid_set = 1;
 		chreipl_ccw();
 		break;
+	case REIPL_ECKD:
+		ccw_busid_get(l.dev, l.busid);
+		l.busid_set = 1;
+		chreipl_eckd();
+		break;
 	case REIPL_FCP:
 		fcp_wwpn_get(l.dev, l.wwpn);
 		l.wwpn_set = 1;
@@ -877,6 +965,9 @@ void cmd_chreipl(int argc, char *argv[])
 	switch (l.target_type) {
 	case TT_CCW:
 		chreipl_ccw();
+		break;
+	case TT_ECKD:
+		chreipl_eckd();
 		break;
 	case TT_FCP:
 		chreipl_fcp();

@@ -141,6 +141,30 @@ void print_ccw(int show_ipl)
 		print_fw_str("clear:       %s\n", dir, "clear");
 }
 
+void print_eckd(int show_ipl, const char *name)
+{
+	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
+		"/sys/firmware/reipl/eckd/loadparm";
+	char *dir = show_ipl ? "ipl" : "reipl/eckd";
+	char loadparm[9], loadparm_path[PATH_MAX];
+
+	printf("%-12s %s\n", get_ipl_banner(show_ipl), name);
+
+	print_fw_str("Device:      %s\n", dir, "device");
+	print_fw_str("bootprog:    %s\n", dir, "bootprog");
+	print_fw_str("br_chr:      %s\n", dir, "br_chr");
+	print_fw_str("Bootparm:    \"%s\"\n", dir, "scp_data");
+	if (access(path_loadparm, R_OK) == 0) {
+		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
+		read_fw_str(loadparm, loadparm_path, sizeof(loadparm));
+		if (strcmp(loadparm, "        ") == 0)
+			loadparm[0] = 0;
+		printf("Loadparm:    \"%s\"\n", loadparm);
+	}
+	if (!show_ipl)
+		print_fw_str("clear:       %s\n", dir, "clear");
+}
+
 static void parse_lsreipl_options(int argc, char *argv[])
 {
 	int opt, idx;
@@ -193,6 +217,9 @@ void cmd_lsreipl(int argc, char *argv[])
 		print_nvme(l.ipl_set, 1);
 	else if (strcmp(reipl_type_str, "ccw") == 0)
 		print_ccw(l.ipl_set);
+	else if (strcmp(reipl_type_str, "eckd") == 0 ||
+		 strcmp(reipl_type_str, "eckd_dump") == 0)
+		print_eckd(l.ipl_set, reipl_type_str);
 	else if (strcmp(reipl_type_str, "nss") == 0)
 		print_nss(l.ipl_set);
 	else
