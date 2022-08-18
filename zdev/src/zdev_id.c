@@ -11,9 +11,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+
+#include "zdev_id.h"
 
 #define	SYSINFO		"/proc/sysinfo"
 #define	CMDLINE		"/proc/cmdline"
+#define LOADPARM	"/sys/firmware/ipl/loadparm"
+#define IPL_DEV_ID	"/sys/firmware/ipl/device"
+#define IPL_DEV_TYPE	"/sys/firmware/ipl/ipl_type"
+#define SITE_FALLBACK	10
+
 #define	WHITESPACE	" \t\n"
 
 static void array_add(char ***array_p, int *num_p, const char *str)
@@ -140,15 +148,139 @@ out:
 	printf("ZDEV_NO_AUTO=%d\n", no_auto);
 }
 
+/*
+ * If the erraneous loadparm provides a site_id which is not valid,
+ * default it to the common-site id.
+ */
+static int validate_site(int site_id)
+{
+	if (site_id < SITE_FALLBACK)
+		return site_id;
+	return SITE_FALLBACK;
+}
+
+/* get the ipl device and extract the SSID */
+static int get_site_id(void)
+{
+	FILE *fd;
+	char *line;
+	size_t n;
+	int site_id = SITE_FALLBACK, ssid;
+
+	fd = fopen(IPL_DEV_ID, "r");
+	if (!fd)
+		goto fail_safe;
+
+	if (getline(&line, &n, fd) == -1)
+		goto out;
+
+	if (sscanf(line, "%*d.%d.%*d", &ssid) == 1)
+		site_id = validate_site(ssid);
+
+out:
+	free(line);
+	fclose(fd);
+fail_safe:
+	return site_id;
+}
+
+/*
+ * Find the ipl type and see if it belongs to ccw  or zfcp, if different,
+ * default it to common-site.
+ */
+static int read_ssid(void)
+{
+	FILE *fd;
+	char *line = NULL;
+	size_t n;
+	int site_id = SITE_FALLBACK;
+
+	fd = fopen(IPL_DEV_TYPE, "r");
+	if (!fd)
+		goto out;
+
+	if (getline(&line, &n, fd) != -1) {
+		if (strcmp(line, "ccw") == 0 || strcmp(line, "zfcp"))
+			site_id =  get_site_id();
+	}
+
+	free(line);
+	fclose(fd);
+out:
+	return site_id;
+}
+
+static void write_zdev_site_id(int site_id)
+{
+	FILE *fd;
+
+	fd = fopen(ZDEV_SITE_ID_FILE, "w");
+	if (!fd)
+		err(1, "Could not write to zdev_site_id file");
+	if (site_id == SITE_FALLBACK)
+		fprintf(fd, "ZDEV_SITE_ID=\n");
+	else
+		fprintf(fd, "ZDEV_SITE_ID=%d\n", site_id);
+
+	fclose(fd);
+}
+
+/* Read the loadparm and extract the current site_id.
+ * loadparm can contains either Sn or "Ss". Sn indicate the site_id, where
+ * 'n' is the integer which could be one of the valid site_ids from 0 to 9.
+ * When loadparm value is "Ss", zdev_id extracts the site_id from the SSID
+ * of the current ipl device. For ccw and zfcp devices, the current ipl
+ * device-id can be found at /sys/firmware/ipl/device.
+ * For all other invalid cases, set ZDEV_SITE_ID to NULL.
+ */
+
+static void process_loadparm(const char *filename)
+{
+	size_t n;
+	FILE *fd;
+	char *line = NULL, *substr;
+	int site_id = SITE_FALLBACK;
+
+	fd = fopen(filename, "r");
+	if (!fd)
+		goto out;
+
+	/*
+	 * We expect the value here to be either SX, where X is the site-id
+	 * or SS,in which case, the site-id will be derived from the SSID
+	 */
+	if ((getline(&line, &n, fd)) != -1) {
+		substr = strchr(line, 'S');
+		if (!substr)
+			goto out;
+
+		if (isdigit(substr[1]))
+			site_id = validate_site(atoi(&substr[1]));
+		else if (substr[1] == 'S')
+			site_id = read_ssid();
+	}
+
+	free(line);
+	fclose(fd);
+out:
+	write_zdev_site_id(site_id);
+	if (site_id == SITE_FALLBACK)
+		printf("ZDEV_SITE_ID=\n");
+	else
+		printf("ZDEV_SITE_ID=%d\n", site_id);
+}
+
 int main(int argc, char *argv[])
 {
-	char *sysinfo, *cmdline;
+	char *sysinfo, *cmdline, *loadparm;
 
 	sysinfo = argc < 2 ? SYSINFO : argv[1];
 	cmdline = argc < 3 ? CMDLINE : argv[2];
+	loadparm = argc < 4 ? LOADPARM : argv[3];
 
 	process_sysinfo(sysinfo);
 	process_cmdline(cmdline);
+	process_loadparm(loadparm);
 
 	return 0;
 }
