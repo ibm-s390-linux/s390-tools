@@ -9,6 +9,7 @@ List of all individuals having contributed content to s390-tools
 - Antoinette Kaschner
 - Arnd Bergmann
 - Axel Wirbser
+- Balint Reczey
 - Benjamin Block
 - Brian C. Lane
 - Carsten Otte

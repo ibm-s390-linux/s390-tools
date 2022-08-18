@@ -1,15 +1,28 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.22.x (2022-xx-xx)__
+* __v2.23.0 (2022-08-18)__
 
-  For Linux kernel version: 5.xx
-
-  Add new tools / libraries:
+  For Linux kernel version: 5.19
 
   Changes of existing tools:
+  - Makefile: use common Make definition for DRACUTDIR
+  - Makefile: use common Make definition for UDEVDIR and UDEVRULESDIR
+  - cpacfstats: Add PAI and hotplug support
+  - cpumf/pai: Omit file write progress information
+  - dbginfo.sh: Get more details on lspci command
+  - dumpconf: Prevent running the service in containers
+  - libcpumf: Detect PMU named pai_ext
+  - pvattest: Improve error reporting and logging
+  - zdev: Add some --type ap examples to manpages
+  - zkey: Use default benchmarked Argon2i with LUKS2
 
   Bug Fixes:
+  - dbginfo.sh: Fix accidental ftrace buffer shrinkage/free
+  - genprotimg: Fix BIO_reset() returncode handling
+  - libpv: Fix dependency checking
+  - pvattest: Fix dependency checking
+  - zipl: Fix segmentation fault when no parmline is provided
 
 
 * __v2.22.0 (2022-06-20)__
