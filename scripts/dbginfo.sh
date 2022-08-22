@@ -1347,6 +1347,9 @@ print_version
 # saving stdout/stderr and redirecting stdout/stderr into log file
 exec 8>&1 9>&2 >"${LOGFILE}" 2>&1
 
+# run print_version again to be logged in dbginfo.log
+print_version
+
 # trap on SIGHUP=1 SIGINT=2 SIGTERM=15
 trap emergency_exit SIGHUP SIGINT SIGTERM
 

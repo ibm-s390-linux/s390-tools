@@ -10,6 +10,7 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
 
   Bug Fixes:
+  - dbginfo.sh: save dbginfo.sh version to dbginfo.log
 
 * __v2.23.0 (2022-08-18)__
 
