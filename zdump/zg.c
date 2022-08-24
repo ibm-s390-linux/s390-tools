@@ -183,6 +183,7 @@ fail:
 void zg_close(struct zg_fh *zg_fh)
 {
 	close(zg_fh->fh);
+	free((void *)zg_fh->path);
 	free(zg_fh);
 }
 
