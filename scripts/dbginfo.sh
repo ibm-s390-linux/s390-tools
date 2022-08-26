@@ -43,13 +43,12 @@ readonly PROCESSORVERSION="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
 	sed 's/.*version[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
 if test "x${PROCESSORVERSION}" = "xFF" || test "x${PROCESSORVERSION}" = "xff"; then
 	RUNTIME_ENVIRONMENT=$(grep -E "VM00.*Control Program.*" /proc/sysinfo | \
-	    sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
+	sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
 else
 	RUNTIME_ENVIRONMENT="LPAR"
 fi
 readonly SYSTEMHOSTNAME="$(hostname -s 2>/dev/null)" # hostname of system being analysed
 readonly TERMINAL="$(tty 2>/dev/null)"
-# The processor version for the first processor and resulting vitrtualization RUNTIME
 readonly TOS=15  # timeout seconds for command execution
 readonly ZDEV_CONF=$(lszdev --configured 2>/dev/null | wc -l)
 readonly ZDEV_OFF=$(lszdev --offline 2>/dev/null | wc -l)
