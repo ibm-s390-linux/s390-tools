@@ -23,7 +23,6 @@
 #include "dfi_vmcoreinfo.h"
 #include "dfo.h"
 
-#define HDR_PER_CPU_SIZE	0x4a0
 #define HDR_PER_MEMC_SIZE	0x100
 #define HDR_BASE_SIZE		0x2000
 
@@ -133,9 +132,8 @@ static void dfo_elf_init(void)
 	u64 hdr_off;
 
 	ensure_s390x();
-	alloc_size = HDR_BASE_SIZE +
-		dfi_cpu_cnt() * HDR_PER_CPU_SIZE +
-		dfi_mem_chunk_cnt() * HDR_PER_MEMC_SIZE;
+	alloc_size = HDR_BASE_SIZE + dfi_cpu_cnt() * get_max_note_size_per_cpu() +
+		     dfi_mem_chunk_cnt() * HDR_PER_MEMC_SIZE;
 	buf = zg_alloc(alloc_size);
 	/* Init elf header */
 	ptr = ehdr_init(buf, dfi_mem_chunk_cnt() + 1);

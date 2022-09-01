@@ -331,3 +331,21 @@ void *nt_vmcoreinfo(void *ptr, const char *vmcoreinfo)
 	return nt_init(ptr, 0, vmcoreinfo, strlen(vmcoreinfo),
 		       NOTE_NAME_VMCOREINFO);
 }
+
+/* Keep in sync with `struct dfi_cpu` */
+size_t get_max_note_size_per_cpu(void)
+{
+	size_t size = 0;
+
+	size += ELF64_NOTE_SIZE(NOTE_NAME_CORE, sizeof(struct nt_prstatus_64));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_CORE, sizeof(struct nt_fpregset_64));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, timer));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, todcmp));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, todpreg));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, ctrs));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, prefix));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, vxrs_low));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, vxrs_high));
+
+	return size;
+}

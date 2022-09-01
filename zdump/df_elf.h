@@ -79,6 +79,9 @@
 #define NOTE_NAME_VMCOREINFO "VMCOREINFO"
 
 #define ELF_NOTE_ROUNDUP(size) ROUNDUP(size, 4)
+#define ELF_NOTE_NAME_SIZE(name) ELF_NOTE_ROUNDUP(name ? strlen(name) + 1 : 0)
+#define ELF64_NOTE_SIZE(name, desc_size) \
+	(sizeof(Elf64_Nhdr) + ELF_NOTE_NAME_SIZE(name) + ELF_NOTE_ROUNDUP(desc_size))
 
 /*
  * prstatus ELF Note
@@ -265,5 +268,7 @@ void *nt_prpsinfo(void *ptr);
  * Initialize vmcoreinfo note
  */
 void *nt_vmcoreinfo(void *ptr, const char *vmcoreinfo);
+
+size_t get_max_note_size_per_cpu(void);
 
 #endif /* DF_ELF_H */
