@@ -17,7 +17,8 @@ export LC_ALL
 readonly SCRIPTNAME="${0##*/}" # general name of this script
 #
 readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
-readonly DOCKER=$(if type docker >/dev/null; then echo "YES"; else echo "NO"; fi)
+readonly DOCKER=$(if type docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+readonly DUMP2TAR_OK=$(if type dump2tar >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 readonly HW="$(uname -i 2>/dev/null)"
 # retrieve and split kernel version
 readonly KERNEL_BASE="$(uname -r 2>/dev/null)"
@@ -25,7 +26,7 @@ readonly KERNEL_VERSION=$(echo ${KERNEL_BASE} | cut -d'.' -f1 )
 readonly KERNEL_MAJOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f2 )
 readonly KERNEL_MINOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f3 | sed 's/[^0-9].*//g')
 readonly KERNEL_INFO=${KERNEL_VERSION}.${KERNEL_MAJOR_REVISION}.${KERNEL_MINOR_REVISION}
-readonly KVM=$(if type virsh >/dev/null; then echo "YES"; else echo "NO"; fi)
+readonly KVM=$(if type virsh >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 # The file to indicate that another instance of the script is already running
 readonly LOCKFILE="/tmp/${SCRIPTNAME}.lock"
 # check limits for logfiles like /var/log/messages
@@ -49,7 +50,14 @@ else
 fi
 readonly SYSTEMHOSTNAME="$(hostname -s 2>/dev/null)" # hostname of system being analysed
 readonly TERMINAL="$(tty 2>/dev/null)"
-readonly TOS=15  # timeout seconds for command execution
+# timeout seconds TOS / kill timeout TOKS
+readonly TOS=15
+readonly TOKS=30
+readonly TIMEOUT=$(if type timeout >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+readonly TIMEOUT_OK=$(if test "x${TIMEOUT}" = "xYES"; then
+	if test $(timeout -k ${TOKS} ${TOS} uname 2>/dev/null) = $(uname); then
+		echo "YES"; else echo "WRONG_VERSION"; fi
+	else echo "NO"; fi)
 readonly ZDEV_CONF=$(lszdev --configured 2>/dev/null | wc -l)
 readonly ZDEV_OFF=$(lszdev --offline 2>/dev/null | wc -l)
 readonly ZDEV_ONL=$(lszdev --online 2>/dev/null | wc -l)
@@ -161,6 +169,10 @@ Log file check        =$(logfile_checker "/var/log*")
 Working directory     = $(ls -d ${paramWORKDIR_BASE} 2>&1 && df -k ${paramWORKDIR_BASE})
 $(ls -ltr ${paramWORKDIR_BASE}/DBGINFO*tgz 2>/dev/null | tail -2)
 $(ls ${LOCKFILE} 2>/dev/null && echo "     Warning: dbginfo running since: $(cat ${LOCKFILE})")
+
+Tool/command dependency check successful:
+        timeout       = ${TIMEOUT_OK}
+        dump2tar      = ${DUMP2TAR_OK}
 
 This is a console output only - no data was saved using option -c !
 
@@ -789,7 +801,7 @@ collect_sysfs() {
 	# files known to block on read (-x). Stop reading a file that takes
 	# more than 5 seconds (-T 5) such as an active ftrace buffer.
 	# error messages are not written to the log
-	if type dump2tar >/dev/null; then
+	if test "x${DUMP2TAR_OK}" = "xYES"; then
 		dump2tar /sys -z -o "${OUTPUT_FILE_SYSFS}.tgz" \
 		    -x '*/tracing/trace_pipe*' \
 		    -x '*/page_idle/bitmap*' \
@@ -1150,8 +1162,6 @@ call_run_command() {
 	# extract the raw_command and set cmd_type
 	local raw_cmd=$(echo "${cmd}" | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
 	local cmd_type=$(type ${raw_cmd} | cut -d' ' -sf4,5)
-	# timeout_ok - like a boolean - is not empty if command exists
-	local timeout_ok=$(type timeout)
 
 	echo "#######################################################" >> "${logfile}"
 	echo "${USER}@${SYSTEMHOSTNAME:-localhost}> ${cmd}" >> "${logfile}"
@@ -1162,8 +1172,9 @@ call_run_command() {
 		eval "${cmd}" >> ${logfile} 2>&1
 		rc=$?
 	elif [ "X${cmd_type}" != "Xnot found" ]; then
-		if [ "X${timeout_ok}" = "Xfile" ]; then
-			eval timeout -k ${TOS} ${TOS} "${cmd}" >> ${logfile} 2>&1
+		if [ "x${TIMEOUT_OK}" = "xYES" ]; then
+			eval timeout -k ${TOKS} ${TOS} "${cmd}" >> ${logfile} 2>&1
+
 			rc=$?
 		else
 			# fall back - call all existing commands without timeout
