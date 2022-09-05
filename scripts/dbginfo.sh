@@ -103,7 +103,7 @@ Options:
                            stores the temporary data and the final archive.
         -h|--help          print this help
         -v|--version       print version information
-        -c|--check         online quick check (no data collection)
+        -c|--check         online base system information (no data collection)
 
 Please report bugs to: linux390@de.ibm.com
 
@@ -224,7 +224,8 @@ done
 
 # finally verification to run as root
 if test "$(/usr/bin/id -u 2>/dev/null)" -ne 0; then
-	echo "${SCRIPTNAME}: Error: You must be user root to run \"${SCRIPTNAME}\"!"
+	echo "${SCRIPTNAME}: Error: You must be user root to run data collection \"${SCRIPTNAME}\"!"
+	echo "${SCRIPTNAME}: Hint: for base system information you may run \"${SCRIPTNAME} -c\""
 	exit 1
 fi
 
