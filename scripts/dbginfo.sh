@@ -1160,8 +1160,9 @@ call_run_command() {
 	local rc=0
 	local cmd="${1}"
 	local logfile="${2}"
-	# extract the raw_command and set cmd_type
-	local raw_cmd=$(echo "${cmd}" | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
+	# extract the raw_command and set cmd_type, as some shell might split into
+	# several lines restrict the cmd echo to the first line only
+	local raw_cmd=$(echo "${cmd}" | head -1 | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
 	local cmd_type=$(type ${raw_cmd} | cut -d' ' -sf4,5)
 
 	echo "#######################################################" >> "${logfile}"
