@@ -50,6 +50,10 @@
 #define __ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 #define ARRAY_SIZE(x)		(sizeof(x) / sizeof((x)[0]))
 
+#ifndef ROUNDUP
+# define ROUNDUP(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
+#endif
+
 #define RELEASE_STRING	STRINGIFY (S390_TOOLS_RELEASE)
 #define TOOLS_LIBDIR	STRINGIFY (S390_TOOLS_LIBDIR)
 #define TOOLS_SYSCONFDIR STRINGIFY (S390_TOOLS_SYSCONFDIR)

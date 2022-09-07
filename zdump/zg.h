@@ -94,7 +94,6 @@ void zg_stdout(const char *fmt, ...);
  */
 #define PAGE_SIZE 4096UL
 #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
-#define ROUNDUP(x, y)	((((x) + ((y) - 1)) / (y)) * (y))
 
 static inline u32 zg_csum_partial(const void *buf, int len, u32 sum)
 {
