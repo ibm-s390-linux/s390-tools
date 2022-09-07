@@ -32,6 +32,10 @@
 
 #ifndef __ASSEMBLER__
 
+#ifndef sizeof_field
+#define sizeof_field(type, field) (sizeof((type *)0)->field)
+#endif
+
 #ifdef UNUSED
 #elif defined(__GNUC__)
 # define UNUSED(x) UNUSED_ ## x __attribute__((unused))
