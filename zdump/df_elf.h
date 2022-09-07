@@ -69,6 +69,8 @@
 #define NT_S390_VXRS_HIGH 0x30a
 #endif
 
+#define ELF_NOTE_ROUNDUP(size) ROUNDUP(size, 4)
+
 /*
  * prstatus ELF Note
  */

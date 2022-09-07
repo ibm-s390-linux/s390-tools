@@ -57,10 +57,10 @@ void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
 	len = sizeof(Elf64_Nhdr);
 
 	memcpy(buf + len, name, note->n_namesz);
-	len = ROUNDUP(len + note->n_namesz, 4);
+	len = ELF_NOTE_ROUNDUP(len + note->n_namesz);
 
 	memcpy(buf + len, desc, note->n_descsz);
-	len = ROUNDUP(len + note->n_descsz, 4);
+	len = ELF_NOTE_ROUNDUP(len + note->n_descsz);
 
 	return PTR_ADD(buf, len);
 }

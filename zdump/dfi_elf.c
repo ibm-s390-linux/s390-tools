@@ -87,13 +87,13 @@ static int nt_read(const Elf64_Nhdr *note, void *buf, size_t buf_len)
 	if (note->n_descsz < buf_len)
 		return -EINVAL;
 	/* Skip note's name and position file at note's descriptor */
-	zg_seek_cur(g.fh, ROUNDUP(note->n_namesz, 4), ZG_CHECK);
+	zg_seek_cur(g.fh, ELF_NOTE_ROUNDUP(note->n_namesz), ZG_CHECK);
 	/* Read note's descriptor */
 	nread = zg_read(g.fh, buf, buf_len, ZG_CHECK_ERR);
 	if (nread < 0 || (size_t)nread != buf_len)
 		return -EINVAL;
 	/* Skip the rest of note's descriptor until the next note */
-	zg_seek_cur(g.fh, ROUNDUP(note->n_descsz, 4) - buf_len, ZG_CHECK);
+	zg_seek_cur(g.fh, ELF_NOTE_ROUNDUP(note->n_descsz) - buf_len, ZG_CHECK);
 	return 0;
 }
 
@@ -103,8 +103,7 @@ static int nt_read(const Elf64_Nhdr *note, void *buf, size_t buf_len)
 static void nt_skip(const Elf64_Nhdr *note)
 {
 	/* Skip note's name + descriptor and position file at the next note */
-	zg_seek_cur(g.fh,
-		    ROUNDUP(note->n_namesz, 4) + ROUNDUP(note->n_descsz, 4),
+	zg_seek_cur(g.fh, ELF_NOTE_ROUNDUP(note->n_namesz) + ELF_NOTE_ROUNDUP(note->n_descsz),
 		    ZG_CHECK);
 }
 
