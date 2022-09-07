@@ -9,10 +9,6 @@
 
 #include "df_elf.h"
 
-#define NOTE_NAME_CORE		"CORE"
-#define NOTE_NAME_LINUX		"LINUX"
-#define NOTE_NAME_VMCOREINFO	"VMCOREINFO"
-
 /*
  * Initialize ELF header
  */

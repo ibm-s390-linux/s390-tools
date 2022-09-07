@@ -69,6 +69,10 @@
 #define NT_S390_VXRS_HIGH 0x30a
 #endif
 
+#define NOTE_NAME_CORE	     "CORE"
+#define NOTE_NAME_LINUX	     "LINUX"
+#define NOTE_NAME_VMCOREINFO "VMCOREINFO"
+
 #define ELF_NOTE_ROUNDUP(size) ROUNDUP(size, 4)
 
 /*
