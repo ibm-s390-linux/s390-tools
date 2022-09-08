@@ -7,21 +7,14 @@ MDEVCTL_CALLOUTS = /etc/mdevctl.d/scripts.d/callouts/
 libs =	$(rootdir)/libap/libap.a \
 	$(rootdir)/libutil/libutil.a
 
-ifeq (${HAVE_LOCKFILE},0)
-all:
-	$(SKIP) HAVE_LOCKFILE=0
-
-install:
-	$(SKIP) HAVE_LOCKFILE=0
-
-else ifeq (${HAVE_JSONC},0)
+ifeq (${HAVE_JSONC},0)
 all:
 	$(SKIP) HAVE_JSONC=0
 
 install:
 	$(SKIP) HAVE_JSONC=0
 else
-LDLIBS += -llockfile -ljson-c
+LDLIBS += -ljson-c
 
 all: ap-check
 

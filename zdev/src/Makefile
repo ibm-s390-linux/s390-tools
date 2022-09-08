@@ -81,9 +81,6 @@ lszdev_objects += generic_ccw.o
 
 all: chzdev lszdev zdev_id
 
-ifneq (${HAVE_LOCKFILE}, 0)
-LDLIBS += -llockfile
-endif
 ifneq (${HAVE_JSONC}, 0)
 LDLIBS += -ljson-c
 endif

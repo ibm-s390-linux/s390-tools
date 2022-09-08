@@ -319,7 +319,6 @@ build options:
 |                |                    | pvattest                              |
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
-| liblockfile    | `HAVE_LOCKFILE`    | ap-check                              |
 | libudev        | `HAVE_LIBUDEV`     | cpacfstatsd                           |
 
 This table lists additional build or install options:
@@ -513,8 +512,7 @@ the different tools are provided:
   GNU awk for the build process.
 
 * ap-check:
-  For building the ap-check mdevctl callout utility you need liblockfile
-  version 1.14 or newer installed (liblockfile-devel.rpm).  Also required is
-  json-c version 0.13 or newer (json-c-devel.rpm).
-  Tip: you may skip ap-check build by adding `HAVE_LOCKFILE=0` or `HAVE_JSONC=0`
-  to the make invocation.
+  For building the ap-check mdevctl callout utility you need json-c version
+  0.13 or newer (json-c-devel.rpm).
+  Tip: you may skip ap-check build by adding `HAVE_JSONC=0` to the make
+  invocation.

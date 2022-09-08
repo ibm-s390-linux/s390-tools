@@ -133,7 +133,7 @@ static void ap_check_cleanup(struct ap_check_anchor *anc)
 	if (anc->dev)
 		vfio_ap_device_free(anc->dev);
 	if (anc->cleanup_lock)
-		ap_release_lock();
+		ap_release_lock_callout();
 }
 
 /*
@@ -775,7 +775,7 @@ out:
  */
 static int ap_check_handle_post(void)
 {
-	return ap_release_lock();
+	return ap_release_lock_callout();
 }
 
 /* For the specified device, print the attributes to stdout in JSON format */
