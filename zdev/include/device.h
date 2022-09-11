@@ -116,5 +116,7 @@ struct setting_list *device_get_setting_list(struct device *dev,
 					     int site_id);
 
 config_t device_get_config(struct device *dev);
+char *device_get_sites(struct device *dev);
+bool is_dev_pers(struct device *dev);
 
 #endif /* DEVICE_H */

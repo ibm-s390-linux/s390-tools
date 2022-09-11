@@ -225,6 +225,41 @@ static action_t get_action(struct options *opts)
 	return ACT_LIST;
 }
 
+/* Determine the site information from the device */
+static char *get_site_from_pers(struct device *dev)
+{
+	int site, i, num = 0;
+
+	for (i = 0; i < NUM_SITES; i++) {
+		if (dev->site_specific[i].exists) {
+			site = i;
+			num++;
+			if (site == global_site_id && site != SITE_FALLBACK)
+				return misc_asprintf("s%d", site);
+		}
+	}
+
+	/* Incase of devices which do not have --site support, all the
+	 * read configurations will be in the dev->persistent and not
+	 * in dev->site_specific.
+	 */
+	if (num == 0 && dev->persistent.exists == 1 &&
+	    global_site_id == SITE_FALLBACK)
+		return misc_asprintf("yes");
+
+	/* Found more site-specific information ? return s+ */
+	if (num > 1)
+		return misc_asprintf("s+");
+
+	if (num == 1)
+		if (site == SITE_FALLBACK)
+			return misc_asprintf("yes");
+		else
+			return misc_asprintf("s%d", site);
+	else
+		return misc_asprintf("no");
+}
+
 /* Check options data structure for syntax errors. */
 static exit_code_t check_options(struct options *opts,
 				 int specified[OPTS_MAX + 1], int op)
@@ -691,8 +726,8 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 			/* site information is a persistent configuration.
 			 * set opts->persistent here.
 			 */
-			opts->site_id = atoi(optarg);
 			opts->persistent = 1;
+			opts->site_id = atoi(optarg);
 			break;
 
 		case ':':
@@ -817,33 +852,52 @@ static struct column *dev_table = COLUMN_ARRAY(
 );
 
 static char *merge_str(const char *act, const char *pers, const char *ac,
-		       config_t config)
+		       config_t config, char **site, int max_sites)
 {
 	char *str;
-	size_t len;
+	int i;
+	struct util_list *str_list;
+
+	str_list = strlist_new();
 
 	act	= act  ? act  : "-";
 	pers	= pers ? pers : "-";
 	ac	= ac   ? ac   : "-";
 
-	if (strcmp(act, pers) == 0 && strcmp(act, ac) == 0)
+	if (strcmp(act, pers) == 0 && strcmp(act, ac) == 0 &&
+	    max_sites == 1)
 		return misc_strdup(act);
 
-	len = strlen(act) + strlen(pers) + strlen(ac) + /* 3 * / + NUL */ 4;
-	str = misc_malloc(len);
-
 	if (SCOPE_ACTIVE(config))
-		strcat(str, act);
+		strlist_add(str_list, act);
 	if (SCOPE_PERSISTENT(config)) {
-		if (*str)
-			strcat(str, "/");
-		strcat(str, pers);
+		if (global_site_id == SITE_FALLBACK) {
+			strlist_add(str_list, pers);
+		} else {
+			strlist_add(str_list, site[global_site_id]);
+			goto out;
+		}
 	}
 	if (SCOPE_AUTOCONF(config)) {
-		if (*str)
-			strcat(str, "/");
-		strcat(str, ac);
+		strlist_add(str_list, ac);
 	}
+
+	/* Do not show site-specific information when user specifically
+	 * asked for persistent configuration setting.
+	 */
+	if (SCOPE_PERSISTENT(config) && config != config_persistent) {
+		for (i = 0; i <= max_sites; i++) {
+			if (site[i])
+				strlist_add(str_list, site[i]);
+			else
+				if (str_list)
+					strlist_add(str_list, "-");
+		}
+	}
+
+out:
+	str = strlist_flatten(str_list, "/");
+	strlist_free(str_list);
 
 	return str;
 }
@@ -904,12 +958,27 @@ static char *get_attr(struct device *dev, const char *name, config_t config,
 	return misc_strdup(s->value);
 }
 
+/* When lszdev --info, make sure that the output contains only the
+ * valid site information. Check if the site is valid and then add
+ * the new SITEn column. For SITE_FALLBACK, the PERSISTENT column will
+ * be used.
+ */
+static bool is_site_show(int site_id, int current_site)
+{
+	if (site_id == SITE_FALLBACK || site_id == current_site)
+		return true;
+	return false;
+}
+
 /* Return string for attribute with specified @name for device @dev. */
 static char *dev_table_get_attr(struct device *dev, const char *attr,
 				config_t config)
 {
 	char *act = NULL, *pers = NULL, *ac = NULL, *str;
 	const char *name;
+	char *site[NUM_USER_SITES];
+	int i;
+	static int max_sites;
 
 	name = strchr(attr, ':');
 	if (!name)
@@ -923,15 +992,26 @@ static char *dev_table_get_attr(struct device *dev, const char *attr,
 	 */
 	if (SCOPE_ACTIVE(config))
 		act = get_attr(dev, name, config_active, SITE_FALLBACK);
-	if (SCOPE_PERSISTENT(config))
+	if (SCOPE_PERSISTENT(config)) {
 		pers = get_attr(dev, name, config_persistent, SITE_FALLBACK);
+		for (i = 0; i < NUM_USER_SITES; i++)
+			site[i] = get_attr(dev, name, config, i);
+	}
 	if (SCOPE_AUTOCONF(config))
 		ac = get_attr(dev, name, config_autoconf, SITE_FALLBACK);
 
-	str = merge_str(act, pers, ac, config);
+	for (i = 0; i < NUM_USER_SITES; i++)
+		if (dev->site_specific[i].exists)
+			max_sites = (max_sites < i) ? i : max_sites;
+
+	str = merge_str(act, pers, ac, config, site, max_sites);
 	free(act);
 	free(pers);
 	free(ac);
+
+	if (SCOPE_PERSISTENT(config))
+		for (i = 0; i < NUM_USER_SITES; i++)
+			free(site[i]);
 
 	return str;
 }
@@ -979,9 +1059,9 @@ static char *dev_table_get_value(void *item, int id, const char *heading,
 		return misc_strdup(YESNO(dev->active.exists ||
 					 dev->active.definable));
 	case dev_pers:
-		if (!dev->persistent.exists && dev->autoconf.exists)
+		if (!is_dev_pers(dev) && dev->autoconf.exists)
 			return misc_strdup("auto");
-		return misc_strdup(YESNO(dev->persistent.exists));
+		return get_site_from_pers(dev);
 	case dev_auto:
 		return misc_strdup(YESNO(dev->autoconf.exists));
 	case dev_online:
@@ -1073,11 +1153,17 @@ static struct util_list *dev_table_build(struct options *opts,
 
 		/* Only process existing devices. */
 		active = dev->active.exists || dev->active.definable;
-		persistent = dev->persistent.exists;
+		persistent = (int)is_dev_pers(dev);
 		autoconf = dev->autoconf.exists;
 		if (!active && !persistent && !autoconf)
 			continue;
 
+		/* with --site option, we consider only the persistent
+		 * configurations available on the specified site-id.
+		 * ignore active and autoconf here
+		 */
+		if (!persistent && global_site_id != SITE_FALLBACK)
+			continue;
 		ptrlist_add(devices, dev);
 	}
 
@@ -1148,6 +1234,16 @@ enum settings_table_id {
 	settings_active,
 	settings_persistent,
 	settings_autoconf,
+	settings_site0,
+	settings_site1,
+	settings_site2,
+	settings_site3,
+	settings_site4,
+	settings_site5,
+	settings_site6,
+	settings_site7,
+	settings_site8,
+	settings_site9,
 };
 
 static struct column *settings_table = COLUMN_ARRAY(
@@ -1155,17 +1251,29 @@ static struct column *settings_table = COLUMN_ARRAY(
 	COLUMN("READONLY", align_left, settings_readonly, 1, ""),
 	COLUMN("ACTIVE", align_left, settings_active, 1, ""),
 	COLUMN("PERSISTENT", align_left, settings_persistent, 1, ""),
-	COLUMN("AUTOCONF", align_left, settings_autoconf, 0, "")
+	COLUMN("AUTOCONF", align_left, settings_autoconf, 0, ""),
+	COLUMN("SITE0", align_left, settings_site0, 0, ""),
+	COLUMN("SITE1", align_left, settings_site1, 0, ""),
+	COLUMN("SITE2", align_left, settings_site2, 0, ""),
+	COLUMN("SITE3", align_left, settings_site3, 0, ""),
+	COLUMN("SITE4", align_left, settings_site4, 0, ""),
+	COLUMN("SITE5", align_left, settings_site5, 0, ""),
+	COLUMN("SITE6", align_left, settings_site6, 0, ""),
+	COLUMN("SITE7", align_left, settings_site7, 0, ""),
+	COLUMN("SITE8", align_left, settings_site8, 0, ""),
+	COLUMN("SITE9", align_left, settings_site9, 0, "")
 );
 
 static struct util_list *settings_table_build(struct setting_list *active,
 					      struct setting_list *persistent,
 					      struct setting_list *autoconf,
+					      struct device *dev,
 					      bool readonly)
 {
 	struct util_list *names, *items;
 	struct setting *s;
 	struct strlist_node *str;
+	int i;
 
 	/* Get a list of all configured attributes. */
 	names = strlist_new();
@@ -1180,6 +1288,11 @@ static struct util_list *settings_table_build(struct setting_list *active,
 	if (persistent && !readonly) {
 		util_list_iterate(&persistent->list, s)
 			strlist_add(names, s->name);
+		if (dev) {
+			for (i = 0; i < NUM_SITES; i++)
+				util_list_iterate(&dev->site_specific[i].settings->list, s)
+					strlist_add(names, s->name);
+		}
 	}
 	if (autoconf && !readonly) {
 		util_list_iterate(&autoconf->list, s)
@@ -1200,6 +1313,7 @@ struct settings_table_data {
 	struct setting_list *active;
 	struct setting_list *persistent;
 	struct setting_list *autoconf;
+	struct setting_list *sites[NUM_SITES];
 	int pairs;
 	bool readonly;
 };
@@ -1225,6 +1339,37 @@ static char *settings_table_get_value(void *item, int id, const char *heading,
 	case settings_autoconf:
 		list = stdata->autoconf;
 		break;
+	case settings_site0:
+		list = stdata->sites[0];
+		break;
+	case settings_site1:
+		list = stdata->sites[1];
+		break;
+	case settings_site2:
+		list = stdata->sites[2];
+		break;
+	case settings_site3:
+		list = stdata->sites[3];
+		break;
+	case settings_site4:
+		list = stdata->sites[4];
+		break;
+	case settings_site5:
+		list = stdata->sites[5];
+		break;
+	case settings_site6:
+		list = stdata->sites[6];
+		break;
+	case settings_site7:
+		list = stdata->sites[7];
+		break;
+	case settings_site8:
+		list = stdata->sites[8];
+		break;
+	case settings_site9:
+		list = stdata->sites[9];
+		break;
+
 	default:
 		break;
 	}
@@ -1249,16 +1394,18 @@ static char *settings_table_get_value(void *item, int id, const char *heading,
 static void settings_table_print(struct setting_list *active,
 				 struct setting_list *persistent,
 				 struct setting_list *autoconf,
+				 struct device *dev,
 				 struct options *opts, int ind, bool readonly,
 				 bool neednl)
 {
 	struct util_list *items;
 	struct settings_table_data data;
+	int i;
 
 	items = settings_table_build(
 			SCOPE_ACTIVE(opts->config) ? active : NULL,
 			SCOPE_PERSISTENT(opts->config) ? persistent : NULL,
-			autoconf, readonly);
+			autoconf, dev, readonly);
 	if (util_list_is_empty(items)) {
 		if (!opts->pairs && !readonly)
 			indent(ind, "%sNo settings found\n",
@@ -1273,14 +1420,28 @@ static void settings_table_print(struct setting_list *active,
 	table_set_default(settings_table, settings_active,
 			  SCOPE_ACTIVE(opts->config));
 	table_set_default(settings_table, settings_persistent,
+			  is_site_show(opts->site_id, SITE_FALLBACK) &&
 			  SCOPE_PERSISTENT(opts->config) && !readonly ? 1 : 0);
 	table_set_default(settings_table, settings_autoconf,
 			  (SCOPE_AUTOCONF(opts->config) || autoconf) &&
 				!readonly ? 1 : 0);
+	if (dev) {
+		for (i = 0; i < NUM_USER_SITES; i++)
+			table_set_default(settings_table, settings_site0 + i,
+					  SCOPE_PERSISTENT(opts->config) &&
+					  is_site_show(opts->site_id, i)  &&
+					  dev->site_specific[i].exists &&
+					  !readonly ? 1 : 0);
+
+		for (i = 0; i < NUM_SITES; i++)
+			data.sites[i] = dev->site_specific[i].settings;
+	}
+
 	data.active = active;
 	data.persistent = persistent;
 	data.autoconf = autoconf;
 	data.pairs = opts->pairs;
+
 	table_print(settings_table, settings_table_get_value, &data, items,
 		    NULL, 1, opts->pairs, ind, 0);
 
@@ -1361,7 +1522,7 @@ static exit_code_t do_info_type(struct options *opts)
 		}
 	} else {
 		settings_table_print(dt->active_settings,
-				     dt->persistent_settings, NULL, opts,
+				     dt->persistent_settings, NULL, NULL, opts,
 				     INFO_INDENT, false, false);
 	}
 
@@ -1387,7 +1548,7 @@ static void do_list_columns(struct options *opts)
 static void do_info_one_device(struct device *dev, struct options *opts)
 {
 	struct subtype *st = dev->subtype;
-	char *names, *bdevs, *cdevs, *ndevs, *modules, *online, *path, *key;
+	char *names, *bdevs, *cdevs, *ndevs, *modules, *online, *path, *key, *sites;
 	const char *id, *type, *exists, *persist, *ac, *prefix;
 	struct util_list *resources, *errors;
 	struct strlist_node *s;
@@ -1408,6 +1569,7 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 	exists	= YESNO(dev->active.exists || dev->active.definable);
 	persist	= YESNO(dev->persistent.exists);
 	ac	= YESNO(dev->autoconf.exists);
+	sites	= device_get_sites(dev);
 
 	/* Print information. */
 	if (opts->pairs) {
@@ -1425,6 +1587,9 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 		print_pair("ONLINE", online);
 		print_pair("EXISTS", exists);
 		print_pair("PERSISTENT", persist);
+		if (*sites)
+			print_pair("SITES", sites);
+
 		if (SCOPE_AUTOCONF(opts->config) || dev->autoconf.exists)
 			print_pair("AUTOCONF", ac);
 		if (errors) {
@@ -1454,6 +1619,9 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 		print_info("Persistent", persist);
 		if (SCOPE_AUTOCONF(opts->config) || dev->autoconf.exists)
 			print_info("Auto-configured", ac);
+		if (*sites)
+			print_info("Sites", sites);
+
 		if (errors) {
 			first = true;
 			util_list_iterate(errors, s) {
@@ -1494,17 +1662,17 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 	}
 
 	settings_table_print(dev->active.exists ? dev->active.settings : NULL,
-			     dev->persistent.exists ? dev->persistent.settings :
+			     is_dev_pers(dev) ? dev->persistent.settings :
 			     NULL,
 			     dev->autoconf.exists ? dev->autoconf.settings :
-			     NULL,
+			     NULL, dev,
 			     opts, INFO_INDENT, false, !opts->pairs);
 
 	settings_table_print(dev->active.exists ? dev->active.settings : NULL,
-			     dev->persistent.exists ? dev->persistent.settings :
+			     is_dev_pers(dev) ? dev->persistent.settings :
 			     NULL,
 			     dev->autoconf.exists ? dev->autoconf.settings :
-			     NULL,
+			     NULL, dev,
 			     opts, INFO_INDENT, true, !opts->pairs);
 
 	strlist_free(errors);
@@ -1515,6 +1683,7 @@ static void do_info_one_device(struct device *dev, struct options *opts)
 	free(cdevs);
 	free(bdevs);
 	free(names);
+	free(sites);
 }
 
 /* Perform --info on devices. */
@@ -1559,10 +1728,18 @@ static exit_code_t do_info_devices(struct options *opts)
 
 		/* Only process existing devices. */
 		active = dev->active.exists || dev->active.definable;
-		persistent = dev->persistent.exists;
+		persistent = (int)is_dev_pers(dev);
 		autoconf = dev->autoconf.exists;
 		if (!active && !persistent && !autoconf)
 			continue;
+
+		/* with --site option, we consider only the persistent
+		 * configurations available on the specified site-id.
+		 * ignore active and autoconf here
+		 */
+		if (!persistent && global_site_id != SITE_FALLBACK)
+			continue;
+
 		if (found > 0)
 			printf("\n");
 		do_info_one_device(dev, opts);

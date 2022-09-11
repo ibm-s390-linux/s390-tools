@@ -122,6 +122,24 @@ void device_print(struct device *dev, int level)
 	}
 }
 
+char *device_get_sites(struct device *dev)
+{
+	struct util_list *names;
+	char *str;
+	int i;
+
+	names = strlist_new();
+	for (i = 0; i < NUM_USER_SITES; i++) {
+		if (dev->site_specific[i].exists)
+			strlist_add(names, "%d", i);
+	}
+
+	str = strlist_flatten(names, ",");
+	strlist_free(names);
+
+	return str;
+}
+
 static const void *device_hash_get_id(void *dev_ptr)
 {
 	struct device *dev = dev_ptr;
@@ -687,4 +705,22 @@ config_t device_get_config(struct device *dev)
 		config |= config_autoconf;
 
 	return config;
+}
+
+/* Determine if persistent configuration available for any of the sites*/
+bool is_dev_pers(struct device *dev)
+{
+	int i;
+
+	if (global_site_id != SITE_FALLBACK &&
+	    !dev->site_specific[global_site_id].exists)
+		return false;
+	else if (dev->persistent.exists)
+		return true;
+
+	for (i = 0; i < NUM_SITES; i++)
+		if (dev->site_specific[i].exists)
+			return true;
+
+	return false;
 }
