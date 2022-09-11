@@ -1593,7 +1593,7 @@ static exit_code_t ccw_st_deconfigure_active(struct subtype *st,
 static exit_code_t ccw_st_deconfigure_persistent(struct subtype *st,
 						 struct device *dev)
 {
-	return udev_remove_rule(st->name, dev->id, false);
+	return ccw_st_configure_persistent(st, dev);
 }
 
 /**

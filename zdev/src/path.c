@@ -404,3 +404,13 @@ char *path_get_bus_attr(const char *bus, const char *attr)
 {
 	return path_get("/sys/bus/%s/%s", bus, attr);
 }
+
+ /* Return path will be with ZDEV_PREFIX oon PATH_UDEV_RULES */
+char *path_get_zdev_rule(const char *name)
+{
+	const char *path = PATH_UDEV_RULES;
+
+	/* Create file. */
+	return path_get("%s/%s-%s%s", path,
+			ZDEV_PREFIX, name, UDEV_SUFFIX);
+}

@@ -26,6 +26,8 @@
 #include "udev.h"
 #include "udev_ccw.h"
 
+#define SITE_FALLBACK_SUFFIX	"fb"
+
 /* Check if a udev rule for the specified ccw device exists. */
 bool udev_ccw_exists(const char *type, const char *id, bool autoconf)
 {
@@ -79,10 +81,68 @@ out:
 	free(copy);
 }
 
+static void get_site_from_line(char *line, int *site, bool *in_site)
+{
+	char site_str[2];
+
+	if (starts_with(line, SITE_BLOCK_START)) {
+		memcpy(site_str, line + sizeof(SITE_BLOCK_START), 2);
+		if (strcmp(site_str, "fb") != 0)
+			*site = atoi(site_str);
+		else
+			*site = SITE_FALLBACK;
+		*in_site = true;
+	} else if (starts_with(line, SITE_BLOCK_END)) {
+		memcpy(site_str, line + sizeof(SITE_BLOCK_END), 2);
+		if (strcmp(site_str, "fb") != 0)
+			*site = atoi(site_str);
+		else
+			*site = SITE_FALLBACK;
+		*in_site = false;
+	}
+}
+
+static void dev_state_copy(struct device_state *dst, struct device_state *src)
+{
+	setting_list_free(dst->settings);
+	dst->settings = setting_list_copy(src->settings);
+	dst->exists = src->exists;
+	dst->modified = src->modified;
+	dst->deconfigured = src->deconfigured;
+	dst->blacklisted = src->blacklisted;
+	dst->definable = src->definable;
+}
+
+/* Extract per-site CCW device settings from a CCW device udev rule file. */
+static void _udev_file_get_settings_new(struct util_udev_file *file,
+					struct attrib **attribs,
+					struct device *dev)
+{
+	struct util_udev_line_node *line;
+	struct util_udev_entry_node *entry;
+	int site_id = SITE_FALLBACK;
+	struct setting_list *list;
+	bool in_site = false;
+
+	util_list_iterate(&file->lines, line) {
+		get_site_from_line(line->line, &site_id, &in_site);
+		if (!in_site || site_id >= NUM_SITES || site_id < 0)
+			continue;
+		entry = util_list_start(&line->entries);
+		if (!entry)
+			continue;
+		list = dev->site_specific[site_id].settings;
+		add_setting_from_entry(list, entry, attribs);
+		dev->site_specific[site_id].exists = 1;
+		if (site_id == global_site_id)
+			dev_state_copy(&dev->persistent, &dev->site_specific[site_id]);
+	}
+}
+
 /* Extract CCW device settings from a CCW device udev rule file. */
-static void udev_file_get_settings(struct util_udev_file *file,
-				   struct attrib **attribs,
-				   struct setting_list *list)
+static void _udev_file_get_settings_legacy(struct util_udev_file *file,
+					   struct attrib **attribs,
+					   struct setting_list *list)
 {
 	struct util_udev_line_node *line;
 	struct util_udev_entry_node *entry;
@@ -92,6 +152,22 @@ static void udev_file_get_settings(struct util_udev_file *file,
 		if (!entry)
 			continue;
 		add_setting_from_entry(list, entry, attribs);
+	}
+}
+
+static void udev_file_get_settings(struct util_udev_file *file,
+				   struct attrib **attribs,
+				   struct device *dev,
+				   bool autoconf)
+{
+	struct device_state *state = autoconf ? &dev->autoconf :
+		&dev->persistent;
+
+	if (is_legacy_rule(file) || autoconf) {
+		_udev_file_get_settings_legacy(file, attribs, state->settings);
+		state->exists = 1;
+	} else {
+		_udev_file_get_settings_new(file, attribs, dev);
 	}
 }
 
@@ -113,8 +189,7 @@ exit_code_t udev_ccw_read_device(struct device *dev, bool autoconf)
 		warn_once("Warning: Invalid udev rule: %s\n", path);
 		state->exists = 0;
 	} else {
-		udev_file_get_settings(file, st->dev_attribs, state->settings);
-		state->exists = 1;
+		udev_file_get_settings(file, st->dev_attribs, dev, autoconf);
 	}
 	util_udev_free_file(file);
 
@@ -141,8 +216,32 @@ static char *get_label_id(const char *prefix, const char *type,
 	return id;
 }
 
-/* Write the persistent configuration of a CCW device to a udev rule. */
-exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
+static void write_attr_to_file(FILE *fd, struct device_state *state, const char *id)
+{
+	struct ptrlist_node *p;
+	struct setting *s;
+	struct util_list *list = NULL;
+
+	/* Apply attributes in correct order. */
+	list = setting_list_get_sorted(state->settings);
+
+	util_list_iterate(list, p) {
+		s = p->ptr;
+		if (s->removed)
+			continue;
+		if ((s->attrib && s->attrib->internal) ||
+		    internal_by_name(s->name)) {
+			fprintf(fd, "ENV{zdev_%s}=\"%s\"\n",
+				internal_get_name(s->name), s->value);
+		} else {
+			fprintf(fd, "ATTR{[ccw/%s]%s}=\"%s\"\n", id, s->name,
+				s->value);
+		}
+	}
+	ptrlist_free(list, 0);
+}
+
+static exit_code_t udev_ccw_write_device_legacy(struct device *dev, bool autoconf)
 {
 	struct subtype *st = dev->subtype;
 	struct ccw_subtype_data *data = st->data;
@@ -150,22 +249,16 @@ exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
 	struct device_state *state = autoconf ? &dev->autoconf :
 						&dev->persistent;
 	char *path, *cfg_label = NULL, *end_label = NULL;
-	struct util_list *list;
-	struct ptrlist_node *p;
-	struct setting *s;
 	exit_code_t rc = EXIT_OK;
 	FILE *fd;
 
 	if (!state->exists)
-		return udev_remove_rule(type, id, autoconf);
+		return udev_remove_rule(type, id, true);
 
 	cfg_label = get_label_id("cfg", type, id);
 	end_label = get_label_id("end", type, id);
 
-	/* Apply attributes in correct order. */
-	list = setting_list_get_sorted(state->settings);
-
-	path = path_get_udev_rule(type, id, autoconf);
+	path = path_get_udev_rule(type, id, true);
 	debug("Writing %s udev rule file %s\n", type, path);
 	if (!util_path_exists(path)) {
 		rc = path_create(path);
@@ -196,22 +289,8 @@ exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
 	}
 	fprintf(fd, "GOTO=\"%s\"\n", end_label);
 	fprintf(fd, "\n");
-	fprintf(fd, "LABEL=\"%s\"\n", cfg_label);
 
-	/* Write settings. */
-	util_list_iterate(list, p) {
-		s = p->ptr;
-		if (s->removed)
-			continue;
-		if ((s->attrib && s->attrib->internal) ||
-		    internal_by_name(s->name)) {
-			fprintf(fd, "ENV{zdev_%s}=\"%s\"\n",
-				internal_get_name(s->name), s->value);
-		} else {
-			fprintf(fd, "ATTR{[ccw/%s]%s}=\"%s\"\n", id, s->name,
-				s->value);
-		}
-	}
+	write_attr_to_file(fd, state, id);
 
 	/* Write udev rule epilog. */
 	fprintf(fd, "\n");
@@ -221,12 +300,155 @@ exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
 		warn("Could not close file %s: %s\n", path, strerror(errno));
 
 out:
-	ptrlist_free(list, 0);
 	free(end_label);
 	free(cfg_label);
 	free(path);
 
 	return rc;
+}
+
+/* Write the persistent configuration of a CCW device to a udev rule. */
+static exit_code_t udev_ccw_write_device_new(struct device *dev)
+{
+	struct subtype *st = dev->subtype;
+	struct ccw_subtype_data *data = st->data;
+	const char *type = st->name, *drv = data->any_driver ? "*" : data->ccwdrv, *id = dev->id;
+	char *path, *cfg_label = NULL, *end_label = NULL;
+	exit_code_t rc = EXIT_OK;
+	FILE *fd;
+	int i, configured = 0;
+
+	/*
+	 * Remove the previous file; The new udev rule will be created based on the
+	 * current configuration settings
+	 */
+	udev_remove_rule(type, id, 0);
+
+	/*
+	 * Copy the dev->persistent to the site_specific array; While writing the new
+	 * udev-rule we consider the site_specific array only
+	 */
+
+	dev_state_copy(&dev->site_specific[global_site_id], &dev->persistent);
+	for (i = 0; i < NUM_SITES; i++) {
+		configured += dev->site_specific[i].exists;
+		configured -= dev->site_specific[i].deconfigured;
+	}
+
+	/*
+	 * If there is no configuration settings available, do not create the new
+	 * udev-rule file; exit here
+	 */
+	if (!configured)
+		return rc;
+
+	cfg_label = get_label_id("cfg", type, id);
+	end_label = get_label_id("end", type, id);
+
+	path = path_get_udev_rule(type, id, false);
+	debug("Writing %s udev rule file %s\n", type, path);
+	if (!util_path_exists(path)) {
+		rc = path_create(path);
+		if (rc)
+			goto out;
+	}
+
+	fd = misc_fopen(path, "w");
+	if (!fd) {
+		error("Could not write to file %s: %s\n", path,
+		      strerror(errno));
+		rc = EXIT_RUNTIME_ERROR;
+		goto out;
+	}
+
+	/* Write udev rule prolog. */
+	fprintf(fd, "# Generated by chzdev\n");
+
+	if (drv) {
+		fprintf(fd, "ACTION==\"add\", SUBSYSTEM==\"ccw\", "
+			"KERNEL==\"%s\", DRIVER==\"%s\", GOTO=\"%s\"\n", id,
+			drv, cfg_label);
+		fprintf(fd, "ACTION==\"add\", SUBSYSTEM==\"drivers\", "
+			"KERNEL==\"%s\", TEST==\"[ccw/%s]\", "
+			"GOTO=\"%s\"\n", drv, id, cfg_label);
+	} else {
+		fprintf(fd, "ACTION==\"add\", SUBSYSTEM==\"ccw\", "
+			"KERNEL==\"%s\", GOTO=\"%s\"\n", id, cfg_label);
+	}
+	fprintf(fd, "GOTO=\"%s\"\n", end_label);
+	fprintf(fd, "\n");
+
+	fprintf(fd, "LABEL=\"%s\"\n", cfg_label);
+	/* site comparison block */
+	for (i = 0; i < NUM_USER_SITES; i++) {
+		if (dev->site_specific[i].exists &&
+		    !dev->site_specific[i].deconfigured) {
+			fprintf(fd, "ENV{ZDEV_SITE_ID}==\"%d\",GOTO=\"%s_site%d\"\n", i,
+				cfg_label, i);
+		}
+	}
+
+	/*
+	 * If we have a generic configuration available, then use that setting as a
+	 * fail-over incase of no site-id information in LOADPARM
+	 */
+	if (dev->site_specific[SITE_FALLBACK].exists &&
+	    !dev->site_specific[SITE_FALLBACK].deconfigured)
+		fprintf(fd, "GOTO=\"%s_site_fb\"\n", cfg_label);
+	else
+		fprintf(fd, "GOTO=\"%s\"\n", end_label);
+	fprintf(fd, "\n");
+
+	/* Write the site blocks for all the available configurations */
+	for (i = 0; i < NUM_USER_SITES; i++) {
+		if (dev->site_specific[i].exists &&
+		    !dev->site_specific[i].deconfigured) {
+			fprintf(fd, "# site_start_%d\n", i);
+			fprintf(fd, "LABEL=\"%s_site%d\"\n", cfg_label, i);
+
+			write_attr_to_file(fd, &dev->site_specific[i], id);
+			/* Write udev rule epilog. */
+			fprintf(fd, "GOTO=\"%s\"\n", end_label);
+			fprintf(fd, "# site_end_%d\n", i);
+			fprintf(fd, "\n");
+		}
+	}
+	if (dev->site_specific[SITE_FALLBACK].exists &&
+	    !dev->site_specific[SITE_FALLBACK].deconfigured) {
+		fprintf(fd, "# site_start_fb\n");
+		fprintf(fd, "LABEL=\"%s_site_fb\"\n", cfg_label);
+
+		write_attr_to_file(fd, &dev->site_specific[i], id);
+		/* Write udev rule epilog. */
+		fprintf(fd, "GOTO=\"%s\"\n", end_label);
+		fprintf(fd, "# site_end_fb\n");
+		fprintf(fd, "\n");
+	}
+
+	/* Write udev rule epilog. */
+	fprintf(fd, "\n");
+	fprintf(fd, "LABEL=\"%s\"\n", end_label);
+
+	if (misc_fclose(fd))
+		warn("Could not close file %s: %s\n", path, strerror(errno));
+
+	rc = udev_write_site_rule();
+	if (rc)
+		goto out;
+out:
+	free(end_label);
+	free(cfg_label);
+	free(path);
+
+	return rc;
+}
+
+exit_code_t udev_ccw_write_device(struct device *dev, bool autoconf)
+{
+	if (autoconf)
+		return udev_ccw_write_device_legacy(dev, autoconf);
+	else
+		return udev_ccw_write_device_new(dev);
 }
 
 #define MARKER	"echo free "
@@ -300,6 +522,7 @@ exit_code_t udev_ccw_write_cio_ignore(const char *id_list, bool autoconf)
 
 	/* Write udev rule. */
 	fprintf(fd, "# Generated by chzdev\n");
+
 	fprintf(fd, "ACTION==\"add\", SUBSYSTEM==\"subsystem\", "
 		"KERNEL==\"ccw\", RUN{program}+=\"/bin/sh -c "
 		"'echo free %s > /proc/cio_ignore'\"\n", id_list);
