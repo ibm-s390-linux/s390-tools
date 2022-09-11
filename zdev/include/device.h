@@ -20,6 +20,20 @@ struct subtype;
 struct setting_list;
 
 /**
+ * Currently zdev supports 10 sites. Which means, zdev support 10 different
+ * set of attributes which are specific to each site. When the user does
+ * not provide any site information, the common set will be used which is
+ * not specific to any site. So, total we have 11 persistent attribute sets
+ * Where,
+ * 0- 9: Site specific attributes
+ * 10: Common attributes which do not belong to any sites
+ */
+
+#define NUM_SITES 11
+#define NUM_USER_SITES (NUM_SITES - 1)
+#define SITE_FALLBACK NUM_USER_SITES
+
+/**
  * struct device_state - Represent the state of a device in a configuration
  * @settings: List of attribute settings
  * @exists: Device exists

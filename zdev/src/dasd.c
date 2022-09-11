@@ -688,6 +688,7 @@ struct devtype dasd_devtype = {
 			  "(DASDs)",
 	.devname	= "DASD",
 	.modules	= STRING_ARRAY(DASD_MOD_NAME),
+	.site_support	= 1,
 
 	.subtypes = SUBTYPE_ARRAY(
 		&dasd_subtype_eckd,

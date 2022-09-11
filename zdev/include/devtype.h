@@ -38,6 +38,7 @@ extern struct devtype *devtypes[];
  *         devtypes with empty title will not be shown with --list-types.
  * @devname: Short name for devices of this device type
  * @modules: (Optional) Array of kernel modules required for this devtype
+ * @site_support: Support for site-specific configuration for the device-type
  * @subtypes: Array of subtypes
  * @type_attribs: Array of device type attributes (may point to empty array)
  * @unknown_type_attribs: Allow specification of unknown device type attributes
@@ -59,6 +60,7 @@ struct devtype {
 	const char	title[DEVTYPE_TITLE_LEN + 1];
 	const char	*devname;
 	const char	**modules;
+	unsigned int	site_support:1;
 
 	struct subtype **subtypes;
 	struct attrib **type_attribs;

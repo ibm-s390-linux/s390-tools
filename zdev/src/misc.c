@@ -1695,3 +1695,20 @@ char *misc_strrstr(const char *haystack, const char *needle)
 
 	return result;
 }
+
+/* Check if the site mentioned is valid */
+bool is_valid_site(const char *str)
+{
+	char *ptr = NULL;
+	long site_id;
+
+	site_id = strtol(str, &ptr, 10);
+
+	if (*ptr)
+		return false;
+
+	if (site_id < 0 || site_id >= NUM_USER_SITES)
+		return false;
+
+	return true;
+}

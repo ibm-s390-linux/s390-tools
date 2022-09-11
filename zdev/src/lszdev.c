@@ -32,6 +32,12 @@
 #include "table.h"
 #include "table_types.h"
 
+/* current site-id in action. By default, operations are always on fallback
+ * site; We need the current site-id as global variable to avoid excessive
+ * diff of simple function parameter modifications to pass this value.
+ */
+int global_site_id = SITE_FALLBACK;
+
 /* Main program action. */
 typedef enum {
 	ACT_LIST,
@@ -66,6 +72,7 @@ struct options {
 	unsigned int pairs:1;
 	unsigned int verbose:1;
 	unsigned int quiet:1;
+	unsigned int site_id;
 };
 
 /* Makefile converts lszdev_usage.txt into C file which we include here. */
@@ -100,6 +107,7 @@ enum {
 	OPT_QUIET		= 'q',
 	OPT_PAIRS		= 'P',
 	OPT_AUTO_CONF		= (OPT_ANONYMOUS_BASE+__COUNTER__),
+	OPT_SITE		= 's',
 };
 
 static struct opts_conflict conflict_list[] = {
@@ -120,6 +128,8 @@ static struct opts_conflict conflict_list[] = {
 		      OPT_CONFIGURED, OPT_EXISTING, OPT_ONLINE, OPT_OFFLINE,
 		      OPT_BY_PATH, OPT_BY_NODE, OPT_BY_INTERFACE, OPT_FAILED,
 		      0),
+	OPTS_CONFLICT(OPT_SITE,
+		      OPT_TYPE),
 	OPTS_CONFLICT(OPT_ONLINE,
 		      OPT_OFFLINE),
 	OPTS_CONFLICT(OPT_QUIET,
@@ -159,11 +169,12 @@ static const struct option opt_list[] = {
 	{ "pairs",		no_argument,	NULL, OPT_PAIRS },
 	{ "verbose",		no_argument,	NULL, OPT_VERBOSE },
 	{ "quiet",		no_argument,	NULL, OPT_QUIET },
+	{ "site",		required_argument, NULL, OPT_SITE },
 	{ NULL,			no_argument,	NULL, 0 },
 };
 
 /* Command line abbreviations. */
-static const char opt_str[] = ":tilLhvapPc:nVq";
+static const char opt_str[] = ":tilLhvapPc:nVqs:";
 
 /* Initialize options data structure. */
 static void init_options(struct options *opts)
@@ -172,6 +183,8 @@ static void init_options(struct options *opts)
 	opts->select = select_opts_new();
 	opts->columns = strlist_new();
 	opts->base = strlist_new();
+	/* Default operations are on fallback site*/
+	opts->site_id = SITE_FALLBACK;
 }
 
 /* Release memory used in options data structure. */
@@ -661,6 +674,27 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 			opts->quiet = 1;
 			break;
 
+		case OPT_SITE:
+			/* --site */
+			/* User can specify only site-ids from 0 to 9 */
+			if (!is_valid_site(optarg)) {
+				syntax("Unsupported site ID\n");
+				return EXIT_USAGE_ERROR;
+			}
+
+			if (opts->site_id != SITE_FALLBACK) {
+				syntax("Cannot specify '--site' multiple "
+				       "times\n");
+				return EXIT_USAGE_ERROR;
+			}
+
+			/* site information is a persistent configuration.
+			 * set opts->persistent here.
+			 */
+			opts->site_id = atoi(optarg);
+			opts->persistent = 1;
+			break;
+
 		case ':':
 			/* Missing option argument. */
 			syntax("Option '%s' requires an argument\n",
@@ -718,7 +752,8 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 					opts->select->all = 1;
 				else if (opts->config == config_active)
 					opts->select->existing = 1;
-				else if (opts->config == config_persistent)
+				else if (opts->config == config_persistent ||
+					 opts->site_id != SITE_FALLBACK)
 					opts->select->configured = 1;
 			}
 			break;
@@ -1558,6 +1593,7 @@ int main(int argc, char *argv[])
 	/* Set globals. */
 	verbose		= opts.verbose;
 	quiet		= opts.quiet;
+	global_site_id	= opts.site_id;
 	path_set_base(opts.base);
 	if (opts.pairs)
 		set_stdout_data();

@@ -42,5 +42,6 @@ OPTIONS
       --base PATH        Use PATH as base for accessing files
       --pairs            Produce output in KEY="VALUE" format
       --auto-conf        Only show auto-configuration data
+  -s, --site ID          Only show data configured for the specified site
   -V, --verbose          Print additional run-time information
   -q, --quiet            Print only minimal run-time information

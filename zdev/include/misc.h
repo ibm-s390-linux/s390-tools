@@ -103,6 +103,8 @@ extern int delayed_warnings;
 extern unsigned long longrun_total;
 extern unsigned long longrun_current;
 
+extern int global_site_id;
+
 void misc_exit(void);
 void indent(unsigned int, const char *, ...);
 void error(const char *, ...);
@@ -239,6 +241,7 @@ void longrun_stop(void);
 char *skip_comp(char *);
 void byte_swap(uint8_t *, unsigned int *, unsigned);
 bool valid_hex(const char *);
+bool is_valid_site(const char *);
 void debug_init(int, char **);
 
 #endif /* MISC_H */

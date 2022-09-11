@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "lib/util_path.h"
 #include "lib/zt_common.h"
@@ -43,6 +44,12 @@
 #include "table_types.h"
 #include "udev.h"
 #include "zfcp_lun.h"
+
+/* current site-id in action. By default, operations are always on fallback
+ * site; We need the current site-id as global variable to avoid excessive
+ * diff of simple function parameter modifications to pass this value.
+ */
+int global_site_id = SITE_FALLBACK;
 
 /* Main program action. */
 typedef enum {
@@ -97,6 +104,7 @@ struct options {
 	unsigned int verbose:1;
 	unsigned int quiet:1;
 	unsigned int no_settle:1;
+	unsigned int site_id;
 };
 
 /* Makefile converts chzdev_usage.txt into C file which we include here. */
@@ -140,6 +148,7 @@ enum {
 	OPT_QUIET		= 'q',
 	OPT_NO_SETTLE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_AUTO_CONF		= (OPT_ANONYMOUS_BASE+__COUNTER__),
+	OPT_SITE		= 's',
 };
 
 static struct opts_conflict conflict_list[] = {
@@ -177,6 +186,8 @@ static struct opts_conflict conflict_list[] = {
 		      OPT_REMOVE_ALL, OPT_ACTIVE, 0),
 	OPTS_CONFLICT(OPT_ONLINE,
 		      OPT_OFFLINE),
+	OPTS_CONFLICT(OPT_SITE,
+		      OPT_TYPE, OPT_EXPORT, OPT_IMPORT, 0),
 	OPTS_CONFLICT(OPT_QUIET,
 		      OPT_VERBOSE),
 	OPTS_CONFLICT(OPT_AUTO_CONF,
@@ -225,11 +236,12 @@ static const struct option opt_list[] = {
 	{ "verbose",		no_argument,	NULL, OPT_VERBOSE },
 	{ "quiet",		no_argument,	NULL, OPT_QUIET },
 	{ "no-settle",		no_argument,	NULL, OPT_NO_SETTLE },
+	{ "site",		required_argument, NULL, OPT_SITE },
 	{ NULL,			no_argument,	NULL, 0 },
 };
 
 /* Command line abbreviations. */
-static const char opt_str[] = ":edlHLapr:RfyhvVqt";
+static const char opt_str[] = ":edlHLapr:RfyhvVqts:";
 
 /* Count of persistently modified devices. */
 static int pers_mod_devs;
@@ -246,6 +258,8 @@ static void init_options(struct options *opts)
 	opts->settings = strlist_new();
 	opts->remove = strlist_new();
 	opts->base = strlist_new();
+	/* Default operations are on fallback site*/
+	opts->site_id = SITE_FALLBACK;
 }
 
 /* Release memory used in options data structure. */
@@ -953,6 +967,28 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		case OPT_NO_SETTLE:
 			/* --no-settle */
 			opts->no_settle = 1;
+			break;
+
+		case OPT_SITE:
+			/* --site */
+			/* 1. User can specify only site-ids from 0 to 9
+			 * 2. only one --site parameter is accepted
+			 */
+
+			if (!is_valid_site(optarg)) {
+				syntax("Unsupported site ID\n");
+				return EXIT_USAGE_ERROR;
+			}
+
+			if (opts->site_id != SITE_FALLBACK) {
+				syntax("Cannot specify '--site' multiple "
+				       "times\n");
+				return EXIT_USAGE_ERROR;
+			}
+
+			opts->site_id	= atoi(optarg);
+			global_site_id	= opts->site_id;
+			opts->persistent = 1;
 			break;
 
 		case ':':
@@ -1794,6 +1830,24 @@ static void unblacklist_ranges(struct selected_dev_node *sel,
 	*param_ptr = param;
 }
 
+/* Currently the site-specific configurations are supported only
+ * for some device types. Make sure that user get an error message when
+ * try to configure other device-types with site parameter.
+ */
+static exit_code_t is_site_supported(struct util_list *selected)
+{
+	struct selected_dev_node *sel;
+
+	util_list_iterate(selected, sel) {
+		if (sel->dt && !sel->dt->site_support) {
+			error("Site specific configuration is not supported"
+			      " for %s devices\n", sel->dt->devname);
+			return EXIT_USAGE_ERROR;
+		}
+	}
+	return EXIT_OK;
+}
+
 /* Handle device configuration. */
 static exit_code_t configure_devices(struct options *opts, int specified,
 				     int *found_ptr)
@@ -1827,6 +1881,9 @@ static exit_code_t configure_devices(struct options *opts, int specified,
 		error("No device was selected!\n");
 		rc = EXIT_EMPTY_SELECTION;
 		goto out;
+	} else  if (opts->site_id != SITE_FALLBACK) {
+		if (is_site_supported(selected))
+			goto out;
 	}
 
 	/* Work on selected devices. */
@@ -2036,6 +2093,9 @@ static exit_code_t deconfigure_devices(struct options *opts)
 		error("No device was selected!\n");
 		rc = EXIT_EMPTY_SELECTION;
 		goto out;
+	} else  if (opts->site_id != SITE_FALLBACK) {
+		if (is_site_supported(selected))
+			goto out;
 	}
 
 	/* Work on selected devices. */
@@ -2558,8 +2618,13 @@ static void action_note(const char *msg, config_t config)
 {
 	if (config == config_active)
 		info("%s the active configuration only\n", msg);
-	else if (config == config_persistent)
-		info("%s the persistent configuration only\n", msg);
+	else if (config == config_persistent) {
+		if (global_site_id == SITE_FALLBACK)
+			info("%s the persistent configuration only\n", msg);
+		else
+			info("%s the site %d configuration only\n", msg,
+			     global_site_id);
+	}
 	else if (config == config_autoconf)
 		info("%s the auto-configuration only\n", msg);
 }
