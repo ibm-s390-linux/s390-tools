@@ -651,9 +651,15 @@ exit_code_t device_check_settings(struct device *dev, config_t config,
 }
 
 struct setting_list *device_get_setting_list(struct device *dev,
-					     config_t config)
+					     config_t config,
+					     int site_id)
 {
 	struct setting_list *settings = NULL;
+
+	if (site_id < SITE_FALLBACK) {
+		settings = dev->site_specific[site_id].settings;
+		goto out;
+	}
 
 	if (config == config_active)
 		settings = dev->active.settings;
@@ -662,6 +668,7 @@ struct setting_list *device_get_setting_list(struct device *dev,
 	else if (config == config_autoconf)
 		settings = dev->autoconf.settings;
 
+out:
 	return settings;
 }
 

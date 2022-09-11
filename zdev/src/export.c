@@ -154,7 +154,7 @@ static int count_exportable(struct device *dev, config_t config)
 	struct setting *s;
 	int count;
 
-	list = device_get_setting_list(dev, config);
+	list = device_get_setting_list(dev, config, SITE_FALLBACK);
 	if (!list)
 		return 0;
 	count = 0;
@@ -462,7 +462,7 @@ static exit_code_t handle_setting(const char *filename, int lineno,
 	} else if (dev) {
 		/* We're inside a device section. */
 		attribs = dev->subtype->dev_attribs;
-		list = device_get_setting_list(dev, config);
+		list = device_get_setting_list(dev, config, SITE_FALLBACK);
 	} else
 		return EXIT_OK;
 

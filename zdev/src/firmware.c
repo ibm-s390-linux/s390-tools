@@ -348,7 +348,7 @@ static void _add_setting(const char *filename, struct device *dev,
 	struct attrib *a;
 	struct setting_list *list;
 
-	list = device_get_setting_list(dev, config);
+	list = device_get_setting_list(dev, config, SITE_FALLBACK);
 	a = attrib_find(dev->subtype->dev_attribs, key);
 	if (!a) {
 		warnx("%s: Applying unknown device setting %s=%s", filename,

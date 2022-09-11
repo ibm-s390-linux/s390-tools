@@ -883,12 +883,13 @@ static char *dev_table_get_modules(struct device *dev)
 	return str;
 }
 
-static char *get_attr(struct device *dev, const char *name, config_t config)
+static char *get_attr(struct device *dev, const char *name, config_t config,
+		      int site_id)
 {
 	struct setting_list *list;
 	struct setting *s;
 
-	list = device_get_setting_list(dev, config);
+	list = device_get_setting_list(dev, config, site_id);
 	if (!list)
 		return NULL;
 	s = setting_list_find(list, name);
@@ -915,12 +916,17 @@ static char *dev_table_get_attr(struct device *dev, const char *attr,
 		return NULL;
 	name++;
 
+	/* To get the default settings on any configuration, make sure that
+	 * the site_id is specified as SITE_FALLBACK. Any value of site_id
+	 * less than SITE_FALLBACK will endup providing site-specific attribute
+	 * settings.
+	 */
 	if (SCOPE_ACTIVE(config))
-		act = get_attr(dev, name, config_active);
+		act = get_attr(dev, name, config_active, SITE_FALLBACK);
 	if (SCOPE_PERSISTENT(config))
-		pers = get_attr(dev, name, config_persistent);
+		pers = get_attr(dev, name, config_persistent, SITE_FALLBACK);
 	if (SCOPE_AUTOCONF(config))
-		ac = get_attr(dev, name, config_autoconf);
+		ac = get_attr(dev, name, config_autoconf, SITE_FALLBACK);
 
 	str = merge_str(act, pers, ac, config);
 	free(act);
