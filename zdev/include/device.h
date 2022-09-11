@@ -75,6 +75,7 @@ struct device {
 	struct device_state active;
 	struct device_state persistent;
 	struct device_state autoconf;
+	struct device_state site_specific[NUM_SITES];
 
 	unsigned int processed:1;
 };

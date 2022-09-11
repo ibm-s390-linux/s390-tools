@@ -29,6 +29,7 @@ struct device *device_new(struct subtype *st, const char *id)
 {
 	struct device *dev;
 	struct namespace *ns = st->namespace;
+	int i;
 
 	dev = misc_malloc(sizeof(struct device));
 	dev->subtype = st;
@@ -44,12 +45,17 @@ struct device *device_new(struct subtype *st, const char *id)
 	dev->persistent.settings = setting_list_new();
 	dev->autoconf.settings = setting_list_new();
 
+	for (i = 0; i < NUM_SITES; i++)
+		dev->site_specific[i].settings = setting_list_new();
+
 	return dev;
 }
 
 /* Release all resources associated with the specified device. */
 void device_free(struct device *dev)
 {
+	int i;
+
 	if (!dev)
 		return;
 	free(dev->id);
@@ -57,12 +63,18 @@ void device_free(struct device *dev)
 	setting_list_free(dev->active.settings);
 	setting_list_free(dev->persistent.settings);
 	setting_list_free(dev->autoconf.settings);
+
+	for (i = 0; i  < NUM_SITES; i++)
+		setting_list_free(dev->site_specific[i].settings);
+
 	free(dev);
 }
 
 /* Used for debugging. */
 void device_print(struct device *dev, int level)
 {
+	int i;
+
 	printf("%*sdevice at %p:\n", level, "", (void *) dev);
 	if (!dev)
 		return;
@@ -96,6 +108,18 @@ void device_print(struct device *dev, int level)
 		setting_list_print(dev->autoconf.settings, level + 8);
 	else
 		printf("%*s<none>\n", level + 8, "");
+
+	printf("%*spersistent-site-specific:\n", level + 4, "");
+	for (i = 0; i < NUM_SITES; i++) {
+		printf("%*sexists=%d mod=%d deconf=%d\n",
+		       level + 8, "", dev->site_specific[i].exists,
+		       dev->site_specific[i].modified,
+		       dev->site_specific[i].deconfigured);
+		if (dev->site_specific[i].settings)
+			setting_list_print(dev->site_specific[i].settings, level + 8);
+		else
+			printf("%*s<none>\n", level + 8, "");
+	}
 }
 
 static const void *device_hash_get_id(void *dev_ptr)
