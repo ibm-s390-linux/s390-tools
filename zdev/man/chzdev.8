@@ -82,6 +82,42 @@ when a device driver is loaded.
 .PP
 By default chzdev applies changes to both the active and the persistent
 configuration.
+.
+.SS "Site-specific configurations"
+In some high-availability setups, root and boot disks of a Linux installation are
+copied to remote sites that can take over execution of a Linux workload in case of
+an outage of the original site. A
+.B site
+in this context is an execution environment such as an
+.B LPAR or
+.B z/VM guest.
+Each site may provide a different set of devices, or require different parameters to be
+applied per device.
+
+chzdev supports site-specific device configuration for up to
+.B 10
+sites. Each site is identified by a number in the range 0 to 9. You can provide a separate
+set of persistent device configuration for each site. The IPL Load Parameter value specified
+during boot determines the currently active site. Only the device configuration of the active
+site is applied during boot and when new devices become available. A common configuration can
+be provided that is applied when no site-specific configuration is available for a device in
+the active site.
+
+You can use the
+.B --site
+parameter to configure devices for a specific site only. Configuration actions without a site
+parameter apply to the common configuration.
+
+Linux supports the following IPL Load Parameter values for selecting the active site:
+
+.B S<n>
+  Site with number <n> becomes the active site. Example: "S2" specifies site 2 as active site.
+
+.B SS
+  The Subchannel-Set ID (SSID) of the IPL device specifies the number of the active site.
+
+If no site is specified in the Load Parameter, only the common configuration is applied.
+
 .PP
 .
 .SS "Tool actions"
@@ -583,6 +619,34 @@ Apply changes to persistent configuration only.
 
 The persistent configuration is put into effect when the system boots, or
 when a device becomes available, or when a device driver is loaded.
+.PP
+.
+.OD site "s" "SITE-ID"
+Apply the persistent configuration to the specified site only.
+
+This option can be used to configure the device in such a way that, the
+same configuration can be used on multiple different sites with different
+device hardwares, without any modification. With the site information, we
+can add different configurations which are specific to different sites. Where
+each site represents different systems or different hardware devices which
+are even located in different locations.
+For example, having
+the configuration of main-site or failover-site in the same place, but these
+configurations used only on the respective sites. Currently a user can define
+10 different configurations for 10 different sites with
+.I SITE-ID
+0 to 9.
+
+The configuration settings is put into effect only on the system with the
+site number which is mentioned in
+.I SITE-ID.
+
+This parameter is only effective only for persistent configurations and for
+dasd device-types.
+
+.B Example:
+.CL chzdev -ep 0.0.f001 --site 3
+
 .PP
 .
 .OD quiet "q" ""

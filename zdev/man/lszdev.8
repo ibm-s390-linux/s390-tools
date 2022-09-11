@@ -74,9 +74,43 @@ of the currently running system, the persistent configuration stored in
 configuration files, and the auto-configuration that is provided by some
 machine types to automatically enable I/O devices.
 .PP
+Persistent configuration data is of two different types. Site-specific configuration
+and common-configuration. Common configuration refers to the persistent configuration
+which is not bound to any site. In many use cases, this configuration is being
+used as a fallback configuration.
+Refer the
+.B site
+section below to learn more about site-specific configuration.
+.PP
 By default lszdev displays information from both the active and the persistent
 configuration, and, if available, from the auto-configuration.
 .PP
+.SS Output Format
+In list format, lszdev uses values with the following meaning for the persistent colums (PERS):
+
+.B yes
+.CL A persistent, non-site specific configuration exists; No site specific configurations available.
+
+.B no
+.CL No persistent configurations is available.
+
+.B auto
+.CL Machine-provided auto-configuration is available.
+
+.B s<n>
+.CL A site-specific configuration is available for site-id n.
+
+.B s+
+.CL Site specific configurations are available for multiple sites.
+
+.B Example
+
+.CL TYPE			ID						ON	PERS	NAMES
+.CL dasd-eckd		0.0.f001					no   	s+    	dasda
+.CL dasd-eckd		0.0.f002					no   	s4    	dasdb
+.CL dasd-eckd		0.0.f003				no	no
+.CL qeth			0.0.1200:0.0.1201:0.0.1202	no   	yes	encbdf0
+
 .
 .
 .SH TYPE
@@ -123,6 +157,7 @@ comma (,).
 .PP
 .
 .
+
 .SH SELECTION
 In addition to specifying devices by their ID, you can also select devices by
 their state or by the Linux functions they provide.
@@ -292,6 +327,7 @@ Display detailed information.
 Displays detailed information about the configuration of the selected device
 or device type. Specifying \-\-info twice will display additional device
 information.
+
 .PP
 .
 .OD list-columns "l" ""
@@ -392,6 +428,25 @@ escaped by placing a slash in front of it.
 List information from the persistent configuration only.
 
 Restricts output to information obtained from configuration files.
+.PP
+.
+.OD site "s" "SITE-ID"
+List the persistent configuration from the specified site only.
+
+The resulted persistent configuration details are filtered based on the
+.ID SITE-ID
+value. The site specific information can be found in a basic lszdev output.
+For example, the PERS column may show "s+" which indicates that the device
+has multiple configurations for multiple sites, and "sn" where 'n' is an
+number between 0 to 9, which indicates that the persistent configuration
+for the device is available only for site 'n'.
+
+.B Example:
+
+.CL lszdev --site 3
+.CL lszdev -i --site 2
+.CL lszdev f001 --site 9
+
 .PP
 .
 .OD quiet "q" ""
