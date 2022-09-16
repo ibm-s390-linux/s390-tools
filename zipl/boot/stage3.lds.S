@@ -14,6 +14,7 @@
  */
 
 #include "boot/loaders_layout.h"
+#include "boot/s390.h"
 
 SECTIONS
 {
@@ -45,6 +46,15 @@ SECTIONS
   __bss_stop = .;
   .rodata : {*(.rodata) }
   .data : { *(.data) }
+
+  /* Trailer needed for Secure Boot */
+  . = COMMAND_LINE_EXTRA - 32;
+  .sb.trailer : {
+    QUAD(0x0000c00000000000)
+    QUAD(STAGE3_ENTRY + PSW_LOAD)
+    QUAD(STAGE3_ENTRY)
+    QUAD(0x000000207a49504c)
+  }
 
   . = COMMAND_LINE_EXTRA;
   .cmdline_extra : {

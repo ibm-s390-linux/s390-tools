@@ -106,7 +106,7 @@ stage3.bin:	stage3.exec
 		--only-section=.stage2dump.tail \
 		--only-section=.eckd2dump_mv.tail \
 		--only-section=.fixup \
-		--pad-to=0xe000 \
+		--only-section=.sb.trailer \
 		$< $@
 
 data.o: $(FILES)
