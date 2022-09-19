@@ -36,4 +36,21 @@ install:
 
 clean:
 
+.zfcpdbf.ct: zfcpdbf
+	$(PERLC) $(ALL_PERLCFLAGS) zfcpdbf 2>$(@);			\
+	if [ "$${?}" -ne 0 ]; then					\
+		cat "$(@)" >&2 && rm "$(@)";				\
+	elif [ "$$(cat '$(@)' | wc -l)" -gt 1 ]; then			\
+		cat "$(@)" >&2;						\
+	elif [ " $(V)" = " 1" ]; then					\
+		cat "$(@)";						\
+	fi
+
+.PHONY: .zfcpdbf.ct-clean
+.zfcpdbf.ct-clean:
+	rm -f .zfcpdbf.ct
+
+all: .zfcpdbf.ct
+clean: .zfcpdbf.ct-clean
+
 .PHONY: all install clean

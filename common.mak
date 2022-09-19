@@ -75,6 +75,7 @@ $(eval $(call cmd_define,    CAT,"  CAT     ",cat))
 $(eval $(call cmd_define,    SED,"  SED     ",sed))
 $(eval $(call cmd_define,   GZIP,"  GZIP    ",gzip))
 $(eval $(call cmd_define,     MV,"  MV      ",mv))
+$(eval $(call cmd_define,  PERLC,"  PERLC   ",perl -c))
 
 CHECK           = sparse
 CHECK_SILENT   := $(CHECK)
@@ -111,6 +112,11 @@ DEFAULT_LDFLAGS = -rdynamic
 ifeq ("${ASAN}","1")
 	DEFAULT_CFLAGS  += -fsanitize=address -fno-omit-frame-pointer
 	DEFAULT_LDFLAGS += -fsanitize=address
+endif
+
+DEFAULT_PERLCFLAGS =
+ifeq ("${W}","1")
+	DEFAULT_PERLCFLAGS += -w
 endif
 
 #
@@ -259,6 +265,8 @@ ALL_CXXFLAGS	= -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 			$(CXXFLAGS)
 ALL_CPPFLAGS	= -I $(rootdir)include $(CPPFLAGS)
 ALL_LDFLAGS	= $(LDFLAGS)
+
+ALL_PERLCFLAGS	= $(DEFAULT_PERLCFLAGS)
 
 # make G=1
 # Compile tools so that gcov can be used to collect code coverage data.
