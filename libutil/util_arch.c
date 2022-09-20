@@ -107,13 +107,12 @@ const char *util_arch_machine_type_to_str(int type)
  */
 unsigned long util_arch_hsa_maxsize(void)
 {
-	unsigned long size = HSA_SIZE_32M;
-	int type;
-
-	type = util_arch_machine_type();
-	if (type != UTIL_ARCH_MACHINE_TYPE_UNKNOWN &&
-	    type >= UTIL_ARCH_MACHINE_TYPE_Z15)
-		size = HSA_SIZE_512M;
-
-	return size;
+	switch (util_arch_machine_type()) {
+	case UTIL_ARCH_MACHINE_TYPE_Z15:
+	case UTIL_ARCH_MACHINE_TYPE_Z15_T02:
+	case UTIL_ARCH_MACHINE_TYPE_Z16:
+		return HSA_SIZE_512M;
+	default:
+		return HSA_SIZE_32M;
+	}
 }
