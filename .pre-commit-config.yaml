@@ -1,0 +1,35 @@
+---
+exclude: \.(crt|crl)$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.1.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+        exclude_types: ['rust']
+  - repo: local
+    hooks:
+      - id: git-clang-format
+        name: git-clang-format
+        description: Run git-clang-format
+        entry: git
+        args: [clang-format, --staged, --]
+        pass_filenames: true
+        language: system
+        require_serial: true
+        minimum_pre_commit_version: "2.9.0"
+        types_or: [c++, c]
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.1
+    hooks:
+      - id: codespell
+        exclude_types: ['rust']
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 3.0.0
+    hooks:
+      - id: shellcheck
+        args: ["--external-sources"]
