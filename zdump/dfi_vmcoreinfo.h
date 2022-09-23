@@ -9,7 +9,7 @@
 #define DFI_VMCOREINFO_H
 
 void dfi_vmcoreinfo_init(void);
-char *dfi_vmcoreinfo_get(void);
+const char *dfi_vmcoreinfo_get(void);
 int dfi_vmcoreinfo_tag(char *str, int len, const char *sym);
 int dfi_vmcoreinfo_symbol(unsigned long *val, const char *sym);
 int dfi_vmcoreinfo_offset(unsigned long *offs, const char *sym);

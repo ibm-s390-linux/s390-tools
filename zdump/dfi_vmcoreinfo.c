@@ -132,7 +132,7 @@ void dfi_vmcoreinfo_init(void)
 /*
  * Return vmcoreinfo data
  */
-char *dfi_vmcoreinfo_get(void)
+const char *dfi_vmcoreinfo_get(void)
 {
 	return l.vmcoreinfo;
 }
