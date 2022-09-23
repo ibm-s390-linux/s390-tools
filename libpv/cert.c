@@ -790,7 +790,7 @@ int pv_store_set_verify_param(X509_STORE *store, GError **error)
 	return 0;
 
 error:
-	g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+	g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_INTERNAL,
 		    _("X509 store initialization failed"));
 	return -1;
 }
@@ -1375,14 +1375,14 @@ int pv_check_chain_parameters(const STACK_OF_X509 *chain, GError **error)
 
 	ca_x509_subject = X509_get_subject_name(ca);
 	if (!ca_x509_subject) {
-		g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_INTERNAL,
 			    _("subject of the root CA cannot be retrieved"));
 		return -1;
 	}
 
 	ca_subject = pv_X509_NAME_oneline(ca_x509_subject);
 	if (!ca_subject) {
-		g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_INTERNAL,
 			    _("subject name of the root CA cannot be retrieved"));
 		return -1;
 	}
@@ -1476,11 +1476,11 @@ static STACK_OF_X509 *get_ibm_signing_certs(STACK_OF_X509 *certs, GError **error
 	ibm_signing_certs = pv_remove_ibm_signing_certs(certs);
 	ibm_signing_certs_count = sk_X509_num(ibm_signing_certs);
 	if (ibm_signing_certs_count < 1) {
-		g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_NO_IBM_Z_SIGNING_KEY,
+		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_NO_IBM_Z_SIGNING_KEY,
 			    _("Specify at least one IBM Z signing key"));
 		return NULL;
 	} else if (ibm_signing_certs_count > 1) {
-		g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_NO_IBM_Z_SIGNING_KEY,
+		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_NO_IBM_Z_SIGNING_KEY,
 			    _("Specify only one IBM Z signing key"));
 		return NULL;
 	}
@@ -1511,7 +1511,7 @@ static gboolean download_crls(X509_STORE *trusted, PvCertWithPathList *host_key_
 		X509_CRL *crl = sk_X509_CRL_value(downloaded_ibm_signing_crls, i);
 
 		if (X509_STORE_add_crl(trusted, crl) != 1) {
-			g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_INTERNAL,
+			g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_INTERNAL,
 				    _("failed to load CRL"));
 			return FALSE;
 		}
