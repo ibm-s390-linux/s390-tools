@@ -24,6 +24,7 @@
 #include "df_elf.h"
 #include "dfi.h"
 #include "dfi_mem_chunk.h"
+#include "dfi_elf_common.h"
 
 /*
  * Read memory for given memory chunk
@@ -35,44 +36,6 @@ static void dfi_elf_mem_chunk_read_fn(struct dfi_mem_chunk *mem_chunk, u64 off,
 
 	zg_seek(g.fh, elf_load_off + off, ZG_CHECK);
 	zg_read(g.fh, buf, cnt, ZG_CHECK);
-}
-
-/*
- * Add load (memory chunk) to DFI dump
- */
-static int pt_load_add(const Elf64_Phdr *phdr)
-{
-	u64 *off_ptr;
-
-	util_log_print(UTIL_LOG_DEBUG,
-		       "DFI ELF p_paddr 0x%016lx p_vaddr 0x%016lx p_offset 0x%016lx p_filesz 0x%016lx p_memsz 0x%016lx\n",
-		       phdr->p_paddr, phdr->p_vaddr, phdr->p_offset,
-		       phdr->p_filesz, phdr->p_memsz);
-
-	if (phdr->p_paddr != phdr->p_vaddr) {
-		STDERR("Dump file \"%s\" is a user space core dump\n",
-		      g.opts.device);
-		return -EINVAL;
-	}
-	if (phdr->p_memsz == 0)
-		return -EINVAL;
-	if (phdr->p_offset + phdr->p_filesz > zg_size(g.fh))
-		return -EINVAL;
-	if (phdr->p_filesz > phdr->p_memsz)
-		return -EINVAL;
-	if (phdr->p_filesz > 0) {
-		off_ptr = zg_alloc(sizeof(*off_ptr));
-		*off_ptr = phdr->p_offset;
-		dfi_mem_chunk_add(phdr->p_paddr, phdr->p_filesz, off_ptr,
-				  dfi_elf_mem_chunk_read_fn, zg_free);
-	}
-	if (phdr->p_memsz - phdr->p_filesz > 0) {
-		/* Add zero memory chunk */
-		dfi_mem_chunk_add(phdr->p_paddr + phdr->p_filesz,
-				  phdr->p_memsz - phdr->p_filesz, NULL,
-				  dfi_mem_chunk_read_zero, NULL);
-	}
-	return 0;
 }
 
 /*
@@ -295,12 +258,17 @@ static int dfi_elf_init(void)
 
 		util_log_print(UTIL_LOG_DEBUG, "DFI ELF p_type[%d] 0x%lx\n", i, phdr->p_type);
 		switch (phdr->p_type) {
-		case PT_LOAD:
-			if (pt_load_add(phdr)) {
+		case PT_LOAD: {
+			u64 *off_ptr = zg_alloc(sizeof(*off_ptr));
+			*off_ptr = phdr->p_offset;
+
+			if (pt_load_add(g.fh, phdr, (void **)&off_ptr, dfi_elf_mem_chunk_read_fn,
+					free) < 0) {
+				free(off_ptr);
 				rc = -EINVAL;
 				goto free_phdrs;
 			}
-			break;
+		} break;
 		case PT_NOTE:
 			if (pt_notes_add(phdr)) {
 				rc = -EINVAL;
