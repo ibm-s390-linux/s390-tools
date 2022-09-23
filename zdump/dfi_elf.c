@@ -76,37 +76,6 @@ static int pt_load_add(const Elf64_Phdr *phdr)
 }
 
 /*
- * Read note
- */
-static int nt_read(const Elf64_Nhdr *note, void *buf, size_t buf_len)
-{
-	ssize_t nread;
-
-	/* We cannot read more than the current note provides */
-	if (note->n_descsz < buf_len)
-		return -EINVAL;
-	/* Skip note's name and position file at note's descriptor */
-	zg_seek_cur(g.fh, ELF_NOTE_ROUNDUP(note->n_namesz), ZG_CHECK);
-	/* Read note's descriptor */
-	nread = zg_read(g.fh, buf, buf_len, ZG_CHECK_ERR);
-	if (nread < 0 || (size_t)nread != buf_len)
-		return -EINVAL;
-	/* Skip the rest of note's descriptor until the next note */
-	zg_seek_cur(g.fh, ELF_NOTE_ROUNDUP(note->n_descsz) - buf_len, ZG_CHECK);
-	return 0;
-}
-
-/*
- * Skip note
- */
-static void nt_skip(const Elf64_Nhdr *note)
-{
-	/* Skip note's name + descriptor and position file at the next note */
-	zg_seek_cur(g.fh, ELF_NOTE_ROUNDUP(note->n_namesz) + ELF_NOTE_ROUNDUP(note->n_descsz),
-		    ZG_CHECK);
-}
-
-/*
  * Ensure that CPU is already defined by prstatus note
  */
 static void check_cpu(struct dfi_cpu *cpu, const char *note_str)
@@ -119,12 +88,12 @@ static void check_cpu(struct dfi_cpu *cpu, const char *note_str)
 /*
  * Read prstatus note and return new DFI CPU
  */
-static struct dfi_cpu *nt_prstatus_read(Elf64_Nhdr *note)
+static struct dfi_cpu *nt_prstatus_read(const struct zg_fh *fh, const Elf64_Nhdr *note)
 {
 	struct dfi_cpu *cpu = dfi_cpu_alloc();
 	struct nt_prstatus_64 nt_prstatus;
 
-	if (nt_read(note, &nt_prstatus, sizeof(nt_prstatus)))
+	if (nt_read(fh, note, &nt_prstatus, sizeof(nt_prstatus)))
 		return NULL;
 
 	memcpy(cpu->gprs, &nt_prstatus.gprs, sizeof(cpu->gprs));
@@ -138,12 +107,12 @@ static struct dfi_cpu *nt_prstatus_read(Elf64_Nhdr *note)
 /*
  * Read fpregset note
  */
-static int nt_fpregset_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_fpregset_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
 {
 	struct nt_fpregset_64 nt_fpregset;
 
 	check_cpu(cpu, "FPREGSET");
-	if (nt_read(note, &nt_fpregset, sizeof(nt_fpregset)))
+	if (nt_read(fh, note, &nt_fpregset, sizeof(nt_fpregset)))
 		return -EINVAL;
 
 	memcpy(&cpu->fpc, &nt_fpregset.fpc, sizeof(cpu->fpc));
@@ -154,64 +123,66 @@ static int nt_fpregset_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 /*
  * Read s390 timer note
  */
-static int nt_s390_timer_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_timer_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TIMER");
-	return nt_read(note, &cpu->timer, sizeof(cpu->timer));
+	return nt_read(fh, note, &cpu->timer, sizeof(cpu->timer));
 }
 
 /*
  * Read s390 todcmp note
  */
-static int nt_s390_todcmp_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_todcmp_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TODCMP");
-	return nt_read(note, &cpu->todcmp, sizeof(cpu->todcmp));
+	return nt_read(fh, note, &cpu->todcmp, sizeof(cpu->todcmp));
 }
 
 /*
  * Read s390 todpreg note
  */
-static int nt_s390_todpreg_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_todpreg_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_TODPREG");
-	return nt_read(note, &cpu->todpreg, sizeof(cpu->todpreg));
+	return nt_read(fh, note, &cpu->todpreg, sizeof(cpu->todpreg));
 }
 
 /*
  * Read s390 ctrs note
  */
-static int nt_s390_ctrs_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_ctrs_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_CTRS");
-	return nt_read(note, &cpu->ctrs, sizeof(cpu->ctrs));
+	return nt_read(fh, note, &cpu->ctrs, sizeof(cpu->ctrs));
 }
 
 /*
  * Read s390 prefix note
  */
-static int nt_s390_prefix_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_prefix_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_PREFIX");
-	return nt_read(note, &cpu->prefix, sizeof(cpu->prefix));
+	return nt_read(fh, note, &cpu->prefix, sizeof(cpu->prefix));
 }
 
 /*
  * Read s390 vxrs_low note
  */
-static int nt_s390_vxrs_low_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_vxrs_low_read(const struct zg_fh *fh, struct dfi_cpu *cpu,
+				 const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_VXRS_LOW");
-	return nt_read(note, &cpu->vxrs_low, sizeof(cpu->vxrs_low));
+	return nt_read(fh, note, &cpu->vxrs_low, sizeof(cpu->vxrs_low));
 }
 
 /*
  * Read s390 vxrs_high note
  */
-static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
+static int nt_s390_vxrs_high_read(const struct zg_fh *fh, struct dfi_cpu *cpu,
+				  const Elf64_Nhdr *note)
 {
 	check_cpu(cpu, "S390_VXRS_HIGH");
-	return nt_read(note, &cpu->vxrs_high, sizeof(cpu->vxrs_high));
+	return nt_read(fh, note, &cpu->vxrs_high, sizeof(cpu->vxrs_high));
 }
 
 /*
@@ -220,60 +191,60 @@ static int nt_s390_vxrs_high_read(struct dfi_cpu *cpu, Elf64_Nhdr *note)
 static int pt_notes_add(const Elf64_Phdr *phdr)
 {
 	struct dfi_cpu *cpu_current = NULL;
-	u64 notes_start_off;
-	Elf64_Nhdr note;
+	const struct zg_fh *fh = g.fh;
 	int rc;
 
-	zg_seek(g.fh, phdr->p_offset, ZG_CHECK);
-	notes_start_off = zg_tell(g.fh, ZG_CHECK);
-	while (zg_tell(g.fh, ZG_CHECK) - notes_start_off < phdr->p_filesz) {
-		rc = zg_read(g.fh, &note, sizeof(note), ZG_CHECK_ERR);
+	zg_seek(fh, phdr->p_offset, ZG_CHECK);
+	while (zg_tell(fh, ZG_CHECK) - phdr->p_offset < phdr->p_filesz) {
+		Elf64_Nhdr note;
+
+		rc = zg_read(fh, &note, sizeof(note), ZG_CHECK_ERR);
 		if (rc != sizeof(note))
 			return -EINVAL;
 		util_log_print(UTIL_LOG_DEBUG, "DFI ELF n_type 0x%x\n",
 			       note.n_type);
 		switch (note.n_type) {
 		case NT_PRSTATUS:
-			cpu_current = nt_prstatus_read(&note);
+			cpu_current = nt_prstatus_read(fh, &note);
 			if (!cpu_current)
 				return -EINVAL;
 			break;
 		case NT_FPREGSET:
-			if (nt_fpregset_read(cpu_current, &note))
+			if (nt_fpregset_read(fh, cpu_current, &note))
 				return -EINVAL;
 			break;
 		case NT_S390_TIMER:
-			if (nt_s390_timer_read(cpu_current, &note))
+			if (nt_s390_timer_read(fh, cpu_current, &note))
 				return -EINVAL;
 			break;
 		case NT_S390_TODCMP:
-			if (nt_s390_todcmp_read(cpu_current, &note))
+			if (nt_s390_todcmp_read(fh, cpu_current, &note))
 				return -EINVAL;
 			break;
 		case NT_S390_TODPREG:
-			if (nt_s390_todpreg_read(cpu_current, &note))
+			if (nt_s390_todpreg_read(fh, cpu_current, &note))
 				return -EINVAL;
 			break;
 		case NT_S390_CTRS:
-			if (nt_s390_ctrs_read(cpu_current, &note))
+			if (nt_s390_ctrs_read(fh, cpu_current, &note))
 				return -EINVAL;
 			break;
 		case NT_S390_PREFIX:
-			if (nt_s390_prefix_read(cpu_current, &note))
+			if (nt_s390_prefix_read(fh, cpu_current, &note))
 				return -EINVAL;
 			break;
 		case NT_S390_VXRS_LOW:
-			if (nt_s390_vxrs_low_read(cpu_current, &note))
+			if (nt_s390_vxrs_low_read(fh, cpu_current, &note))
 				return -EINVAL;
 			dfi_cpu_content_fac_add(DFI_CPU_CONTENT_FAC_VX);
 			break;
 		case NT_S390_VXRS_HIGH:
-			if (nt_s390_vxrs_high_read(cpu_current, &note))
+			if (nt_s390_vxrs_high_read(fh, cpu_current, &note))
 				return -EINVAL;
 			dfi_cpu_content_fac_add(DFI_CPU_CONTENT_FAC_VX);
 			break;
 		default:
-			nt_skip(&note);
+			nt_skip(fh, &note);
 			break;
 		}
 	}

@@ -157,6 +157,16 @@ Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr,
 			   unsigned int *phdr_count);
 
 /*
+ * Read note and store the note description in @buf
+ */
+int nt_read(const struct zg_fh *fh, const Elf64_Nhdr *note, void *buf, size_t buf_len);
+
+/*
+ * Skip note
+ */
+void nt_skip(const struct zg_fh *fh, const Elf64_Nhdr *note);
+
+/*
  * Initialize ELF note
  */
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,

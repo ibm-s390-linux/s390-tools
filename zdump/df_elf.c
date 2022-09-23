@@ -86,6 +86,31 @@ Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsig
 	return phdrs;
 }
 
+int nt_read(const struct zg_fh *fh, const Elf64_Nhdr *note, void *buf, size_t buf_len)
+{
+	ssize_t nread;
+
+	/* We cannot read more than the current note provides */
+	if (note->n_descsz < buf_len)
+		return -EINVAL;
+	/* Skip note's name and position file at note's descriptor */
+	zg_seek_cur(fh, ELF_NOTE_ROUNDUP(note->n_namesz), ZG_CHECK);
+	/* Read note's descriptor */
+	nread = zg_read(fh, buf, buf_len, ZG_CHECK_ERR);
+	if (nread < 0 || (size_t)nread != buf_len)
+		return -EINVAL;
+	/* Skip the rest of note's descriptor until the next note */
+	zg_seek_cur(fh, ELF_NOTE_ROUNDUP(note->n_descsz) - buf_len, ZG_CHECK);
+	return 0;
+}
+
+void nt_skip(const struct zg_fh *fh, const Elf64_Nhdr *note)
+{
+	/* Skip note's name + descriptor and position file at the next note */
+	zg_seek_cur(fh, ELF_NOTE_ROUNDUP(note->n_namesz) + ELF_NOTE_ROUNDUP(note->n_descsz),
+		    ZG_CHECK);
+}
+
 void *nt_init(void *buf, Elf64_Word type, const void *desc, int d_len,
 	      const char *name)
 {
