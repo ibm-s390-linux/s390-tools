@@ -52,6 +52,15 @@ bool ehdr_is_s390x(const Elf64_Ehdr *ehdr)
 	       ehdr->e_ident[EI_CLASS] == ELFCLASS64;
 }
 
+int ehdr_check_s390x(const Elf64_Ehdr *ehdr)
+{
+	if (!ehdr_is_elf_object(ehdr) || !ehdr_is_vmcore(ehdr))
+		return -ENODEV;
+	if (!ehdr_is_s390x(ehdr))
+		ERR_EXIT("Only s390x (64 bit) core dump files are supported");
+	return 0;
+}
+
 Elf64_Ehdr *read_elf_hdr(const struct zg_fh *fh)
 {
 	Elf64_Ehdr *ehdr;

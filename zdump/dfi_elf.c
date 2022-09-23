@@ -251,15 +251,6 @@ static int pt_notes_add(const Elf64_Phdr *phdr)
 	return 0;
 }
 
-static int check_elf_hdr(const Elf64_Ehdr *ehdr)
-{
-	if (!ehdr_is_elf_object(ehdr) || !ehdr_is_vmcore(ehdr))
-		return -ENODEV;
-	if (!ehdr_is_s390x(ehdr))
-		ERR_EXIT("Only s390x (64 bit) core dump files are supported");
-	return 0;
-}
-
 /*
  * Initialize ELF input dump format
  */
@@ -276,7 +267,7 @@ static int dfi_elf_init(void)
 	if (!ehdr)
 		return -ENODEV;
 
-	if (check_elf_hdr(ehdr) < 0)
+	if (ehdr_check_s390x(ehdr) < 0)
 		goto free_ehdr;
 
 	df_elf_ensure_s390x();

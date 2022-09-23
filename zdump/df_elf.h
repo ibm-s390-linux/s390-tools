@@ -148,6 +148,11 @@ bool ehdr_is_vmcore(const Elf64_Ehdr *ehdr);
 bool ehdr_is_s390x(const Elf64_Ehdr *ehdr);
 
 /*
+ * Verify that given header is a s390x ELF header
+ */
+int ehdr_check_s390x(const Elf64_Ehdr *ehdr);
+
+/*
  * Read ELF header at current offset
  */
 Elf64_Ehdr *read_elf_hdr(const struct zg_fh *fh);
