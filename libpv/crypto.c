@@ -276,7 +276,7 @@ int64_t pv_gcm_decrypt(GBytes *cipher, GBytes *aad, GBytes *tag, const PvCipherP
 }
 
 GBytes *pv_hkdf_extract_and_expand(size_t derived_key_len, GBytes *key, GBytes *salt, GBytes *info,
-				   const EVP_MD *md, G_GNUC_UNUSED GError **error)
+				   const EVP_MD *md, GError **error)
 {
 	const unsigned char *salt_data, *key_data, *info_data;
 	g_autoptr(EVP_PKEY_CTX) ctx = NULL;
