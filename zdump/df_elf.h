@@ -166,6 +166,36 @@ Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr,
 			   unsigned int *phdr_count);
 
 /*
+ * Read ELF section headers
+ *
+ * To read the section headers the offset of @fh is changed.
+ */
+Elf64_Shdr *read_elf_shdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr,
+			   unsigned int *shdr_count);
+
+/*
+ * Read ELF section content
+ *
+ * To read the section content the offset of @fh is changed.
+ */
+unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *shdr, size_t *size);
+
+/*
+ * Read ELF section header string table
+ *
+ * To read the section header string table the offset of @fh is changed.
+ */
+char *read_elf_shstrtab(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, const Elf64_Shdr *shdrs,
+			const unsigned int shnum, size_t *shstrtab_size);
+
+/*
+ * Find ELF section header by section name
+ */
+const Elf64_Shdr *find_elf_shdr_by_name(const Elf64_Shdr *shdrs, const unsigned int shnum,
+					const char *shstrtab, const size_t shstrtab_size,
+					const char *name);
+
+/*
  * Read note and store the note description in @buf
  */
 int nt_read(const struct zg_fh *fh, const Elf64_Nhdr *note, void *buf, size_t buf_len);

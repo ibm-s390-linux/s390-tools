@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "lib/util_libc.h"
+#include "lib/util_log.h"
 
 #include "df_elf.h"
 
@@ -95,6 +96,102 @@ Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsig
 	zg_read(fh, phdrs, phdrs_size, ZG_CHECK);
 	*phdr_count = phnum;
 	return phdrs;
+}
+
+Elf64_Shdr *read_elf_shdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsigned int *shdr_count)
+{
+	const Elf64_Half shnum = ehdr->e_shnum;
+	size_t shdrs_size;
+	Elf64_Shdr *shdrs;
+
+	if (!shnum) {
+		*shdr_count = shnum;
+		return NULL;
+	}
+
+	if (ehdr->e_shoff > OFF_T_MAX)
+		ERR_EXIT("Unsupported offset");
+
+	/* Cannot wraparound since `Elf64_Half`` is `uint16_t` */
+	shdrs_size = sizeof(*shdrs) * shnum;
+	shdrs = util_malloc(shdrs_size);
+	zg_seek(fh, (off_t)ehdr->e_shoff, ZG_CHECK);
+	zg_read(fh, shdrs, shdrs_size, ZG_CHECK);
+	*shdr_count = shnum;
+	return shdrs;
+}
+
+unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *shdr, size_t *size)
+{
+	const size_t sh_size = shdr->sh_size;
+	unsigned char *ret;
+
+	if (!sh_size) {
+		*size = sh_size;
+		return NULL;
+	}
+	if (shdr->sh_offset > OFF_T_MAX)
+		ERR_EXIT("Unsupported offset");
+
+	ret = util_malloc(sh_size);
+	zg_seek(fh, (off_t)shdr->sh_offset, ZG_CHECK);
+	zg_read(fh, ret, sh_size, ZG_CHECK);
+	*size = sh_size;
+	return ret;
+}
+
+char *read_elf_shstrtab(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, const Elf64_Shdr *shdrs,
+			const unsigned int shnum, size_t *shstrtab_size)
+{
+	const size_t shstrndx = ehdr->e_shstrndx;
+	Elf64_Xword tmp_shstrtab_size;
+	Elf64_Off shstrndx_off;
+	char *shstrtab;
+
+	/* file has no section name string table */
+	if (shstrndx == SHN_UNDEF) {
+		*shstrtab_size = 0;
+		return NULL;
+	}
+
+	/* Invalid ELF file */
+	if (shstrndx >= shnum) {
+		util_log_print(UTIL_LOG_ERROR, "Invalid ELF file: invalid string table index\n");
+		*shstrtab_size = 0;
+		return NULL;
+	}
+
+	shstrndx_off = shdrs[shstrndx].sh_offset;
+	if (shstrndx_off > OFF_T_MAX)
+		ERR_EXIT("Unsupported offset");
+
+	tmp_shstrtab_size = shdrs[shstrndx].sh_size;
+	shstrtab = util_malloc(tmp_shstrtab_size);
+	zg_seek(fh, (off_t)shstrndx_off, ZG_CHECK);
+	zg_read(fh, shstrtab, tmp_shstrtab_size, ZG_CHECK);
+	*shstrtab_size = tmp_shstrtab_size;
+	return shstrtab;
+}
+
+const Elf64_Shdr *find_elf_shdr_by_name(const Elf64_Shdr *shdrs, const unsigned int shnum,
+					const char *const shstrtab, const size_t shstrtab_size,
+					const char *name)
+{
+	const Elf64_Shdr *shdr = shdrs;
+	unsigned int idx;
+
+	for (idx = 0; idx < shnum; idx++, shdr++) {
+		/* Invalid ELF file */
+		if (shdr->sh_name >= shstrtab_size) {
+			util_log_print(UTIL_LOG_ERROR,
+				       "Invalid ELF file: section name is too large\n");
+			return NULL;
+		}
+		if (strcmp(name, &shstrtab[shdr->sh_name]) == 0)
+			return shdr;
+	}
+	/* Not found */
+	return NULL;
 }
 
 int nt_read(const struct zg_fh *fh, const Elf64_Nhdr *note, void *buf, size_t buf_len)
