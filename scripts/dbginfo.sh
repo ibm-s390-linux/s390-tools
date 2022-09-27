@@ -697,8 +697,8 @@ collect_vmcmdsout() {
 	local vm_userid
 	local module_loaded=1
 	local ifs_orig="${IFS}"
-	local cp_buffer_size=2
-	local rc_buffer_size=2
+	local cp_buffer_size
+	local rc_buffer_check
 
 	if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
 		pr_collect_output "z/VM"
@@ -724,11 +724,14 @@ collect_vmcmdsout() {
 		IFS=:
 		for vm_command in ${vm_cmds}; do
 			IFS="${ifs_orig}"
-			while test ${rc_buffer_size} -eq 2 && test ${cp_buffer_size} -lt 1024; do
+			# initialize buffer values for automatic resizing
+			cp_buffer_size=2
+			rc_buffer_check=2
+			while test ${rc_buffer_check} -eq 2 && test ${cp_buffer_size} -lt 1024; do
 				cp_buffer_size=$(( cp_buffer_size * 2 ))
 				eval ${cp_command} -b ${cp_buffer_size}k "${vm_command}" \
 					>/dev/null 2>&1
-				rc_buffer_size=$?
+				rc_buffer_check=$?
 			done
 			call_run_command "${cp_command} -b ${cp_buffer_size}k ${vm_command}" \
 				"${OUTPUT_FILE_VMCMD}"
