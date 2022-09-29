@@ -12,6 +12,6 @@
 
 #include "exit_code.h"
 
-exit_code_t initrd_check(bool all_pers);
+exit_code_t initrd_check(bool all_pers, int site_validate);
 
 #endif /* ROOT_H */

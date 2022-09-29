@@ -83,23 +83,58 @@ static bool is_zdev_early_0(struct selected_dev_node *sel)
 {
 	struct setting *s;
 	struct device *dev;
+	int i;
 
 	dev = device_list_find(sel->st->devices, sel->id, NULL);
 	if (!dev)
 		return false;
-	s = setting_list_find(dev->persistent.settings,
-			      internal_attr_early.name);
-	if (!s)
+
+	for (i = 0; i < NUM_SITES; i++) {
+		s = setting_list_find(dev->site_specific[i].settings,
+				      internal_attr_early.name);
+		if (!s)
+			return false;
+		if (s->specified && strcmp(s->value, "0") == 0)
+			return true;
+	}
+
+	return false;
+}
+
+/* When site-specific settings has zdev:early configured, it is not
+ * detected with the --by-attr functionality of select_devices. Instead
+ * we will have to iterate through each configuration and check if there
+ * is a zdev:early set in the device. This is usually applicable only in
+ * the case of deconfigure-all command, because, for all other commands
+ * we copy the settings-in-action to the persistent settings and do the
+ * processing there.
+ */
+static bool is_zdev_early_site(struct selected_dev_node *sel)
+{
+	struct setting *s;
+	struct device *dev;
+	int i;
+
+	if (global_site_id != SITE_FALLBACK)
 		return false;
-	if (s->specified && strcmp(s->value, "0") == 0)
-		return true;
+
+	dev = device_list_find(sel->st->devices, sel->id, NULL);
+	if (!dev)
+		return false;
+
+	for (i = 0; i < NUM_SITES; i++) {
+		s = setting_list_find(dev->site_specific[i].settings,
+				      internal_attr_early.name);
+		if (s)
+			return true;
+	}
 
 	return false;
 }
 
 /* Determine if initial RAM-disk needs updating. If so, run the corresponding
  * scripts if available. */
-exit_code_t initrd_check(bool all_pers)
+exit_code_t initrd_check(bool all_pers, int site_validate)
 {
 	struct util_list *selected, *params, *mod = strlist_new();
 	struct selected_dev_node *sel;
@@ -142,7 +177,12 @@ exit_code_t initrd_check(bool all_pers)
 	}
 	/* Finally add devices with zdev:early=1. */
 	select = select_opts_new();
-	strlist_add(&select->by_attr, "%s=1", INTERNAL_ATTR_EARLY);
+	/* If we need information from multiple site, we cannot use the by-attr
+	 * functionality of select_devices function. Instead we have to iterate
+	 * through individual devices and site settings to find the key.
+	 */
+	if (!site_validate)
+		strlist_add(&select->by_attr, "%s=1", INTERNAL_ATTR_EARLY);
 	select_devices(select, selected, 1, 0, 0,
 		       config_active | config_persistent, scope_mandatory,
 		       err_ignore);
@@ -162,7 +202,12 @@ check_mod:
 		/* Check devices. */
 		dev = device_list_find(sel->st->devices, sel->id, NULL);
 		if (dev && dev->persistent.exists &&
-		    (device_needs_writing(dev, config_persistent) || force)) {
+		    (device_needs_writing(dev, config_persistent) || force) &&
+		    !site_validate) {
+			strlist_add(mod, "%s %s", dev->subtype->devname,
+				    dev->id);
+		} else if (site_validate && is_zdev_early_site(sel) &&
+			   device_needs_writing(dev, config_persistent)) {
 			strlist_add(mod, "%s %s", dev->subtype->devname,
 				    dev->id);
 		}

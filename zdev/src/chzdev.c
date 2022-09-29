@@ -80,6 +80,7 @@ struct options {
 	/* Actions */
 	unsigned int enable:1;
 	unsigned int deconfigure:1;
+	unsigned int deconfigure_all:1;
 	unsigned int list_attribs:1;
 	unsigned int list_types:1;
 	unsigned int help_attribs:1;
@@ -127,6 +128,7 @@ enum {
 	OPT_TYPE		= 't',
 	OPT_ENABLE		= 'e',
 	OPT_DECONFIGURE		= 'd',
+	OPT_DECONFIGURE_ALL	= 'D',
 	OPT_LIST_ATTRIBS	= 'l',
 	OPT_HELP_ATTRIBS	= 'H',
 	OPT_LIST_TYPES		= 'L',
@@ -154,36 +156,42 @@ enum {
 static struct opts_conflict conflict_list[] = {
 	OPTS_CONFLICT(OPT_ENABLE,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_LIST_TYPES,
-		      OPT_EXPORT, OPT_IMPORT, OPT_APPLY, OPT_TYPE, 0),
+		      OPT_EXPORT, OPT_IMPORT, OPT_APPLY, OPT_TYPE,
+		      OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_DECONFIGURE,
 		      OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS, OPT_LIST_TYPES,
 		      OPT_EXPORT, OPT_IMPORT, OPT_APPLY, OPT_REMOVE,
-		      OPT_REMOVE_ALL, OPT_TYPE, 0),
+		      OPT_REMOVE_ALL, OPT_TYPE,
+		      OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_LIST_ATTRIBS,
 		      OPT_DECONFIGURE, OPT_HELP_ATTRIBS, OPT_LIST_TYPES,
 		      OPT_EXPORT, OPT_IMPORT, OPT_APPLY, OPT_REMOVE,
 		      OPT_REMOVE_ALL, OPT_CONFIGURED, OPT_EXISTING, OPT_ONLINE,
 		      OPT_OFFLINE, OPT_BY_PATH, OPT_BY_NODE, OPT_BY_INTERFACE,
-		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED, 0),
+		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED,
+		      OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_LIST_TYPES,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_EXPORT, OPT_IMPORT, OPT_APPLY, OPT_REMOVE,
 		      OPT_REMOVE_ALL, OPT_CONFIGURED, OPT_EXISTING, OPT_ONLINE,
 		      OPT_OFFLINE, OPT_BY_PATH, OPT_BY_NODE, OPT_BY_INTERFACE,
-		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED, 0),
+		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED,
+		      OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_EXPORT,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_LIST_TYPES, OPT_IMPORT, OPT_APPLY, OPT_REMOVE,
-		      OPT_REMOVE_ALL, 0),
+		      OPT_REMOVE_ALL, OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_IMPORT,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_LIST_TYPES, OPT_EXPORT, OPT_APPLY, OPT_REMOVE,
 		      OPT_REMOVE_ALL, OPT_CONFIGURED, OPT_EXISTING, OPT_BY_PATH,
-		      OPT_BY_ATTRIB, OPT_BY_NODE, OPT_BY_INTERFACE, 0),
+		      OPT_BY_ATTRIB, OPT_BY_NODE, OPT_BY_INTERFACE,
+		      OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_APPLY,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_LIST_TYPES, OPT_EXPORT, OPT_IMPORT, OPT_REMOVE,
-		      OPT_REMOVE_ALL, OPT_ACTIVE, 0),
+		      OPT_REMOVE_ALL, OPT_ACTIVE,
+		      OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_ONLINE,
 		      OPT_OFFLINE),
 	OPTS_CONFLICT(OPT_SITE,
@@ -213,6 +221,7 @@ static const struct option opt_list[] = {
 	/* Actions. */
 	{ "enable",		no_argument,	NULL, OPT_ENABLE },
 	{ "disable",		no_argument,	NULL, OPT_DECONFIGURE },
+	{ "disable-all",	no_argument,	NULL, OPT_DECONFIGURE_ALL },
 	{ "list-attributes",	no_argument,	NULL, OPT_LIST_ATTRIBS },
 	{ "help-attribute",	no_argument,	NULL, OPT_HELP_ATTRIBS },
 	{ "list-types",		no_argument,	NULL, OPT_LIST_TYPES },
@@ -241,7 +250,7 @@ static const struct option opt_list[] = {
 };
 
 /* Command line abbreviations. */
-static const char opt_str[] = ":edlHLapr:RfyhvVqts:";
+static const char opt_str[] = ":edlHLapr:RfyhvVqts:D";
 
 /* Count of persistently modified devices. */
 static int pers_mod_devs;
@@ -852,6 +861,12 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 			opts->deconfigure = 1;
 			break;
 
+		case OPT_DECONFIGURE_ALL:
+			/* --disable all the settings*/
+			opts->deconfigure = 1;
+			opts->deconfigure_all = 1;
+			break;
+
 		case OPT_LIST_ATTRIBS:
 			/* --list-attributes */
 			opts->list_attribs = 1;
@@ -1023,7 +1038,9 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		goto out;
 
 	/* Determine configuration set. */
-	if (!opts->active && !opts->persistent && !opts->auto_conf) {
+	if (opts->deconfigure_all) {
+		opts->config = config_all;
+	} else if (!opts->active && !opts->persistent && !opts->auto_conf) {
 		/* Default configuration targets are active + persistent */
 		opts->config = config_active | config_persistent;
 	} else {
@@ -1970,6 +1987,18 @@ static exit_code_t check_in_use(struct device *dev)
 	return EXIT_OK;
 }
 
+static bool is_site_modified(struct device *dev)
+{
+	int i;
+
+	for (i = 0; i < NUM_USER_SITES; i++) {
+		if (dev->site_specific[i].modified)
+			return true;
+	}
+
+	return false;
+}
+
 /* Deconfigure specified device. */
 static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 					  struct options *opts, int try,
@@ -1979,6 +2008,7 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 	exit_code_t rc;
 	struct device *dev;
 	config_t config, read_config;
+	int i, site_available = 0;
 
 	/* Reset processed flag. */
 	if (proc_ptr)
@@ -2011,7 +2041,7 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 	dev->processed = 1;
 
 	if (try && !(dev->active.exists || dev->active.definable ||
-		     dev->persistent.exists || dev->autoconf.exists)) {
+		     is_dev_pers(dev) || dev->autoconf.exists)) {
 		/* Attempt to deconfigure this device will fail. */
 		return EXIT_DEVICE_NOT_FOUND;
 	}
@@ -2021,7 +2051,7 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 	 * dev. */
 	if (SCOPE_ACTIVE(config) &&
 	    !(dev->active.exists || dev->active.definable)) {
-		if (!((SCOPE_PERSISTENT(config) && dev->persistent.exists) ||
+		if (!((SCOPE_PERSISTENT(config) && is_dev_pers(dev)) ||
 		      (SCOPE_AUTOCONF(config) && dev->autoconf.exists)))
 			return EXIT_DEVICE_NOT_FOUND;
 	}
@@ -2042,16 +2072,48 @@ static exit_code_t deconfigure_one_device(struct subtype *st, const char *id,
 		} else if (subtype_online_get(st, dev, config_active) == 1)
 			dev->active.modified = 1;
 	}
-	if (SCOPE_PERSISTENT(config) && dev->persistent.exists) {
-		dev->persistent.deconfigured = 1;
-		dev->persistent.modified = 1;
+	if (SCOPE_PERSISTENT(config)) {
+		if (dev->persistent.exists) {
+			dev->persistent.deconfigured = 1;
+			dev->persistent.modified = 1;
+		} else if (is_dev_pers(dev) && global_site_id != SITE_FALLBACK) {
+			dev->persistent.deconfigured = 1;
+			dev->persistent.modified = 1;
+		}
 	}
 	if (SCOPE_AUTOCONF(config) && dev->autoconf.exists) {
 		dev->autoconf.deconfigured = 1;
 		dev->autoconf.modified = 1;
 	}
+
+	/* In case of deconfigure_all command, make sure that site specific
+	 * settings  are also removed.
+	 */
+	if (opts->deconfigure_all) {
+		for (i = 0; i < NUM_USER_SITES; i++) {
+			if (dev->site_specific[i].exists) {
+				site_available++;
+				/* To remove site-specific settings, simply
+				 * make the deconfigured = 1
+				 */
+				dev->site_specific[i].deconfigured = 1;
+				dev->site_specific[i].modified = 1;
+			}
+		}
+	}
+
+	if (site_available) {
+		/* set persistent.exists = 1 to let the
+		 * drivers know that we need to modify the
+		 * udev-rule
+		 */
+		dev->persistent.exists = 1;
+		dev->persistent.modified = 1;
+		dev->persistent.deconfigured = 1;
+	}
+
 	if (!dev->active.modified && !dev->persistent.modified &&
-	    !dev->autoconf.modified)
+	    !dev->autoconf.modified && !is_site_modified(dev))
 		return EXIT_OK;
 
 	/* Pre-write check. */
@@ -3099,7 +3161,7 @@ int main(int argc, char *argv[])
 	    !dryrun) {
 		/* If the root device/device type or early devices have been
 		 * modified, additional work might be necessary. */
-		rc = initrd_check(ZDEV_ALWAYS_UPDATE_INITRD);
+		rc = initrd_check(ZDEV_ALWAYS_UPDATE_INITRD, opts.deconfigure_all);
 		if (rc && !drc)
 			drc = rc;
 	}

@@ -33,7 +33,8 @@ SETTINGS
 
 ACTIONS
   -e, --enable           Enable device
-  -d, --disable          Disable device
+  -d, --disable          Disable specified setting of the device
+  -D, --disable-all      Disable all the settings of the device
   -l, --list-attributes  List attributes
   -L, --list-types       List supported device types
   -H, --help-attribute   Show detailed help on specified attribute
