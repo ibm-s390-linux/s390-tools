@@ -168,12 +168,14 @@ GBytes *pv_file_get_content_as_secure_bytes(const char *filename)
 	return pv_sec_gbytes_new_take(g_steal_pointer(&data), data_size);
 }
 
-void *pv_gbytes_memcpy(void *dst, size_t dst_size, GBytes *src)
+void *pv_gbytes_memcpy(void *dst, size_t dst_size, GBytes *src, size_t *copied)
 {
 	size_t src_size;
 	const void *src_data = g_bytes_get_data(src, &src_size);
 
 	if (dst_size < src_size)
 		return NULL;
+	if (copied)
+		*copied = src_size;
 	return memcpy(dst, src_data, src_size);
 }

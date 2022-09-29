@@ -102,9 +102,12 @@ FILE *pv_file_open(const char *filename, const char *mode, GError **error);
 
 /** pv_gbytes_memcpy:
  *
- * memcpy with size check.
+ * memcpy with size check. In case @dst_size is smaller than the size of @src
+ * the error value %NULL is returned and @copied and @dst are left unchanged.
+ *
+ * If @dst and @src data overlap, the behavior is undefined.
  */
-void *pv_gbytes_memcpy(void *dst, size_t dst_size, GBytes *src);
+void *pv_gbytes_memcpy(void *dst, size_t dst_size, GBytes *src, size_t *copied);
 
 #define PV_GLIB_HELPER_ERROR g_quark_from_static_string("pv-glib-helper_error-quark")
 typedef enum {

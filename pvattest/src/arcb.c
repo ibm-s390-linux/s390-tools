@@ -171,9 +171,9 @@ int arcb_v1_add_key_slot(arcb_v1_t *arcb, EVP_PKEY *evp_host, GError **error)
 	g_assert(g_bytes_get_size(phkh) == sizeof(key_slot->phkh));
 
 	key_slot = g_malloc0(sizeof(*key_slot));
-	pv_gbytes_memcpy(key_slot->warpk, sizeof(key_slot->warpk), warpk);
-	pv_gbytes_memcpy(key_slot->kst, sizeof(key_slot->warpk), tag);
-	pv_gbytes_memcpy(key_slot->phkh, sizeof(key_slot->warpk), phkh);
+	pv_gbytes_memcpy(key_slot->warpk, sizeof(key_slot->warpk), warpk, NULL);
+	pv_gbytes_memcpy(key_slot->kst, sizeof(key_slot->warpk), tag, NULL);
+	pv_gbytes_memcpy(key_slot->phkh, sizeof(key_slot->warpk), phkh, NULL);
 
 	arcb->host_key_slots = g_slist_prepend(arcb->host_key_slots, g_steal_pointer(&key_slot));
 	return 0;
@@ -246,7 +246,7 @@ GBytes *arcb_v1_serialize(const arcb_v1_t *arcb, GError **error)
 	/* copy plain data to contiguous memory  */
 	hdr.arl = GUINT32_TO_BE((uint32_t)att_req_len);
 
-	pv_gbytes_memcpy(hdr.iv, ARCB_V1_IV_SIZE, arcb->iv);
+	pv_gbytes_memcpy(hdr.iv, ARCB_V1_IV_SIZE, arcb->iv, NULL);
 	hdr.nks = (uint8_t)nks;
 	hdr.sea = GUINT32_TO_BE((uint32_t)sea);
 	ecdh_cpk = pv_evp_pkey_to_ecdh_pub_key(arcb->evp_cust_pub_key, error);

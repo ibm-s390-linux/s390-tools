@@ -48,17 +48,17 @@ uvio_attest_t *build_attestation_v1_ioctl(GBytes *serialized_arcb, GBytes *user_
 	g_steal_pointer(&serialized_arcb);
 
 	if (user_data) {
-		size_t user_data_size = g_bytes_get_size(user_data);
+		size_t copied_data_size;
 
-		if (user_data_size > sizeof(uvio_attest->user_data)) {
+		if (pv_gbytes_memcpy(uvio_attest->user_data, sizeof(uvio_attest->user_data),
+				     user_data, &copied_data_size) == NULL) {
 			g_set_error(error, ATT_ERROR, ATT_ERR_INVALID_USER_DATA,
 				    _("User data %li bytes is larger than %li bytes"),
-				    user_data_size, sizeof(uvio_attest->user_data));
+				    g_bytes_get_size(user_data), sizeof(uvio_attest->user_data));
 			return NULL;
 		}
-		pv_gbytes_memcpy(uvio_attest->user_data, sizeof(uvio_attest->user_data), user_data);
 		STATIC_ASSERT(sizeof(uvio_attest->user_data) <= UINT16_MAX);
-		uvio_attest->user_data_len = (uint16_t)user_data_size;
+		uvio_attest->user_data_len = (uint16_t)copied_data_size;
 	}
 
 	uvio_attest->meas_addr = PTR_TO_U64(g_malloc0(measurement_size));

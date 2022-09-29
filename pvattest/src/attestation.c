@@ -130,7 +130,7 @@ void att_add_uid(att_meas_ctx_t *meas_ctx, GBytes *config_uid)
 	pv_wrapped_g_assert(config_uid);
 
 	g_assert(g_bytes_get_size(config_uid) == ATT_CONFIG_UID_SIZE);
-	pv_gbytes_memcpy(meas_ctx->config_uid, ATT_CONFIG_UID_SIZE, config_uid);
+	pv_gbytes_memcpy(meas_ctx->config_uid, ATT_CONFIG_UID_SIZE, config_uid, NULL);
 }
 
 gboolean att_verify_measurement(const GBytes *calculated_measurement,
