@@ -42,7 +42,7 @@ uvio_attest_t *build_attestation_v1_ioctl(GBytes *serialized_arcb, GBytes *user_
 	uvio_attest = g_malloc0(sizeof(*uvio_attest));
 	uvio_attest->arcb_addr = PTR_TO_U64(g_steal_pointer(&arcb));
 	g_assert_cmpuint(arcb_size, <, UINT32_MAX);
-	uvio_attest->arcb_len = GUINT32_TO_BE((uint32_t)arcb_size);
+	uvio_attest->arcb_len = (uint32_t)arcb_size;
 	/* transferred the local ownership of the arcb from this function to uvio_attest; nullify pointer */
 	g_steal_pointer(&serialized_arcb);
 
@@ -53,15 +53,15 @@ uvio_attest_t *build_attestation_v1_ioctl(GBytes *serialized_arcb, GBytes *user_
 				    sizeof(uvio_attest->user_data));
 			return NULL;
 		}
-		uvio_attest->user_data_len = GUINT16_TO_BE((uint16_t)g_bytes_get_size(user_data));
+		uvio_attest->user_data_len = (uint16_t)g_bytes_get_size(user_data);
 		pv_gbytes_memcpy(uvio_attest->user_data, uvio_attest->user_data_len, user_data);
 	}
 
-	uvio_attest->meas_len = GUINT32_TO_BE(measurement_size);
-	uvio_attest->meas_addr = PTR_TO_U64(g_malloc0(uvio_attest->meas_len));
+	uvio_attest->meas_addr = PTR_TO_U64(g_malloc0(measurement_size));
+	uvio_attest->meas_len = measurement_size;
 
-	uvio_attest->add_data_len = GUINT32_TO_BE(add_data_size);
-	uvio_attest->add_data_addr = PTR_TO_U64(g_malloc0(uvio_attest->add_data_len));
+	uvio_attest->add_data_addr = PTR_TO_U64(g_malloc0(add_data_size));
+	uvio_attest->add_data_len = add_data_size;
 
 	return g_steal_pointer(&uvio_attest);
 }
@@ -83,7 +83,7 @@ GBytes *uvio_get_measurement(const uvio_attest_t *attest)
 
 	if (attest->meas_addr == (__u64)0)
 		return NULL;
-	return g_bytes_new(U64_TO_PTR(attest->meas_addr), GUINT32_FROM_BE(attest->meas_len));
+	return g_bytes_new(U64_TO_PTR(attest->meas_addr), attest->meas_len);
 }
 
 GBytes *uvio_get_additional_data(const uvio_attest_t *attest)
@@ -92,8 +92,7 @@ GBytes *uvio_get_additional_data(const uvio_attest_t *attest)
 
 	if (attest->add_data_addr == (__u64)0)
 		return NULL;
-	return g_bytes_new(U64_TO_PTR(attest->add_data_addr),
-			   GUINT32_FROM_BE(attest->add_data_len));
+	return g_bytes_new(U64_TO_PTR(attest->add_data_addr), attest->add_data_len);
 }
 
 GBytes *uvio_get_config_uid(const uvio_attest_t *attest)
@@ -127,7 +126,7 @@ uint16_t uvio_ioctl(const int uv_fd, const unsigned int cmd, const uint32_t flag
 		g_set_error(error, UVIO_ERROR, UVIO_ERR_UV_NOT_OK,
 			    _("Ultravisor call returned '%#x' (%s)"), uv_ioctl->uv_rc,
 			    uvio_uv_rc_to_str(uv_ioctl->uv_rc));
-	return GUINT16_FROM_BE(uv_ioctl->uv_rc);
+	return uv_ioctl->uv_rc;
 }
 
 uint16_t uvio_ioctl_attest(const int uv_fd, uvio_attest_t *attest, GError **error)
