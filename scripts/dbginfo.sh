@@ -1104,7 +1104,7 @@ collect_kvm() {
 				call_run_command "virsh domstats ${domain}" "${OUTPUT_FILE_KVM}"
 			done
 		else
-			echo "no KVM doamins found" | tee -a ${OUTPUT_FILE_KVM}
+			echo "no KVM domains found" | tee -a ${OUTPUT_FILE_KVM}
 		fi
 	else
 		pr_skip "KVM: no virsh command"
