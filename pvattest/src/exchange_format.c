@@ -191,7 +191,7 @@ exchange_format_ctx_t *exchange_ctx_from_file(const char *filename, GError **err
 	}
 	ctx->req_meas_size = GUINT32_FROM_BE(hdr_v1->measurement.size);
 	ctx->req_add_size = GUINT32_FROM_BE(hdr_v1->additional_data.size);
-	ctx->version = GUINT32_TO_BE(hdr->version);
+	ctx->version = GUINT32_FROM_BE(hdr->version);
 
 	return g_steal_pointer(&ctx);
 }
