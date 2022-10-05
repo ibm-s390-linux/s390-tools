@@ -12,6 +12,7 @@ Release history for s390-tools (MIT version)
   Bug Fixes:
   - dbginfo.sh: save dbginfo.sh version to dbginfo.log
   - dbginfo.sh: ensure compatibility with /bin/dash shell
+  - dbginfo.sh: add Kubernetes data collection
 
 * __v2.23.0 (2022-08-18)__
 

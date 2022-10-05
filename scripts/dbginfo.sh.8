@@ -1,4 +1,4 @@
-.TH DBGINFO.SH  8 "May 2022" "s390-tools"
+.TH DBGINFO.SH  8 "Sep 2022" "s390-tools"
 
 .SH NAME
 dbginfo.sh \- collect runtime, configuration and trace information
@@ -14,7 +14,7 @@ for debugging Linux on IBM Z
 This script collects runtime, configuration and trace information that can
 be used to debug a Linux on IBM Z instance.
 For Linux on z/VM, the script also traces information about the z/VM system.
-KVM or DOCKER data ist collected on a host serving this.
+Virtualization platform data is collected on a host serving this.
 
 The debug information is written to a file
 /<DIRECTORY>/DBGINFO\-<date>\-<time>\-<hostname>\-<processorid>.tgz
@@ -59,7 +59,7 @@ Sample invocation:
 .br
 dbginfo.sh: Debug information script version %S390_TOOLS_VERSION%
 .br
-Copyright IBM Corp. 2002, 2021
+Copyright IBM Corp. 2002, 2022
 .PP
 Hardware platform     = s390x
 .br
@@ -97,8 +97,10 @@ Date and time of info = 2021-08-26-15-27-58
 .PP
 13 of 18: Skip KVM: no virsh command
 .PP
-14 of 18: Collecting docker output
+14 of 18: Collecting container host output
 .PP
+ Kubernetes ...
+.br
 15 of 18: Collecting NVME storage output
 .PP
 16 of 18: Collecting log files

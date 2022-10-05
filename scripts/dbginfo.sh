@@ -26,6 +26,8 @@ readonly KERNEL_VERSION=$(echo ${KERNEL_BASE} | cut -d'.' -f1 )
 readonly KERNEL_MAJOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f2 )
 readonly KERNEL_MINOR_REVISION=$(echo ${KERNEL_BASE} | cut -d'.' -f3 | sed 's/[^0-9].*//g')
 readonly KERNEL_INFO=${KERNEL_VERSION}.${KERNEL_MAJOR_REVISION}.${KERNEL_MINOR_REVISION}
+readonly KUBERNETES=$(if type kubectl >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
+readonly KUBERNETES_LOG_LINES=50
 readonly KVM=$(if type virsh >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 # The file to indicate that another instance of the script is already running
 readonly LOCKFILE="/tmp/${SCRIPTNAME}.lock"
@@ -86,7 +88,7 @@ This script collects runtime, configuration and trace information on
 a Linux on IBM Z installation for debugging purposes.
 
 It also traces information about z/VM if the Linux runs under z/VM.
-KVM or DOCKER data ist collected on a host serving this.
+Virtualization platform data is collected on a host serving this.
 
 Default location for data collection and final tar file is "/tmp/".
 The collected information is written to a TAR archive named
@@ -157,7 +159,7 @@ $(cat /proc/sysinfo | grep 'Name')
 Kernel version        = ${KERNEL_INFO}
 OS version / distro   = ${OS_NAME}
 KVM host              = ${KVM}
-DOCKER host           = ${DOCKER}
+container host        Kubernetes: ${KUBERNETES} - docker: ${DOCKER}
 
 Current user          = $(whoami) (must be root for data collection)
 Date and time         = $(date)
@@ -169,7 +171,6 @@ Log file check        =$(logfile_checker "/var/log*")
 Working directory     = $(ls -d ${paramWORKDIR_BASE} 2>&1 && df -k ${paramWORKDIR_BASE})
 $(ls -ltr ${paramWORKDIR_BASE}/DBGINFO*tgz 2>/dev/null | tail -2)
 $(ls ${LOCKFILE} 2>/dev/null && echo "     Warning: dbginfo running since: $(cat ${LOCKFILE})")
-
 Tool/command dependency check successful:
         timeout       = ${TIMEOUT_OK}
         dump2tar      = ${DUMP2TAR_OK}
@@ -261,6 +262,7 @@ readonly OUTPUT_FILE_ISW="${WORKPATH}installed_sw.out"
 readonly OUTPUT_FILE_TC="${WORKPATH}network.out"
 readonly OUTPUT_FILE_VMCMD="${WORKPATH}zvm_runtime.out"
 # Base file names for different output files - no extension !
+readonly OUTPUT_FILE_KUBERNETES="${WORKPATH}kubernetes"
 readonly OUTPUT_FILE_OSAOAT="${WORKPATH}network"
 readonly OUTPUT_FILE_SYSFS="${WORKPATH}sysfs"
 
@@ -280,7 +282,7 @@ ALL_STEPS="\
   collect_bridge\
   collect_ovs\
   collect_kvm\
-  collect_docker\
+  collect_container\
   collect_nvme\
   collect_logfiles\
   post_processing\
@@ -576,6 +578,18 @@ DOCKER_CMDS="docker version\
   :docker ps -a\
   :docker stats --no-stream\
   :systemctl status docker.service\
+  "
+
+########################################
+KUBERNETES_CMDS="kubectl version\
+  :oc version   # get also OCP version if installed\
+  :kubectl top pod\
+  :kubectl top node\
+  :kubectl describe pod -A\
+  :kubectl describe node -A\
+  :kubectl describe endpoints\
+  :ls -l /var/log/containers # list of logs is sufficent\
+  :kubectl cluster-info dump >>${OUTPUT_FILE_KUBERNETES}.dmp\
   "
 
 ########################################
@@ -1025,14 +1039,21 @@ collect_ovs() {
 }
 
 ########################################
-collect_docker() {
+collect_container() {
 	local container_list
 	local network_list
 	local item
 
-	# check if docker command exists
+	# check if container environment exists
+	if test "x${DOCKER}" = "xYES" || test "x${KUBERNETES}" = "xYES"; then
+		pr_collect_output "container host"
+	else
+		pr_skip "container host: not found"
+	fi
+
+	# for docker command exists
 	if [ "x${DOCKER}" = "xYES" ]; then
-		pr_collect_output "docker"
+		pr_syslog_stdout " docker ..."
 		container_list=$(docker ps -qa)
 		network_list=$(docker network ls -q)
 		ifs_orig="${IFS}"
@@ -1054,8 +1075,25 @@ collect_docker() {
 					"${OUTPUT_FILE_DOCKER}"
 			done
 		fi
-	else
-		pr_skip "docker: not available"
+	fi
+
+	# for kubectl command exists
+	if [ "x${KUBERNETES}" = "xYES" ]; then
+		pr_syslog_stdout " Kubernetes ..."
+		container_list=$(kubectl top pod | grep -v "MEMORY(bytes)" | cut -d' ' -f1)
+
+		ifs_orig="${IFS}"
+		IFS=:
+		for item in ${KUBERNETES_CMDS}; do
+			IFS=${ifs_orig} call_run_command "${item}" "${OUTPUT_FILE_KUBERNETES}.out"
+		done
+		IFS="${ifs_orig}"
+		if test -n "${container_list}"; then
+			for item in ${container_list}; do
+				call_run_command "kubectl logs --tail=${KUBERNETES_LOG_LINES} ${item}"\
+				"${OUTPUT_FILE_KUBERNETES}.log"
+			done
+		fi
 	fi
 }
 
