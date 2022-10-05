@@ -99,6 +99,15 @@ struct dfi_cpu {
 	u32		todpreg;
 	u64		vxrs_low[16];
 	struct dfi_vxrs	vxrs_high[16];
+	union {
+		u64	gscb[4];
+		struct {
+			u64 reserved;
+			u64 gsd;
+			u64 gssm;
+			u64 gs_epl_a;
+		};
+	};
 	u16		cpu_id;
 };
 
@@ -127,7 +136,8 @@ enum dfi_cpu_content {
 	DFI_CPU_CONTENT_ALL,	/* Complete register information available */
 };
 
-#define DFI_CPU_CONTENT_FAC_VX	0x00000001
+#define DFI_CPU_CONTENT_FAC_VX 0x00000001
+#define DFI_CPU_CONTENT_FAC_GS 0x00000002
 int dfi_cpu_content_fac_check(int flags);
 void dfi_cpu_content_fac_add(int flags);
 

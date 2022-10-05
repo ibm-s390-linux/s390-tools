@@ -80,6 +80,8 @@ static void *notes_init(Elf64_Phdr *phdr, void *segment_start, u64 elf_offset)
 			ptr = nt_s390_vxrs_low(ptr, cpu);
 			ptr = nt_s390_vxrs_high(ptr, cpu);
 		}
+		if (dfi_cpu_content_fac_check(DFI_CPU_CONTENT_FAC_GS))
+			ptr = nt_s390_gs_cb(ptr, cpu);
 	}
 out:
 	ptr = nt_vmcoreinfo(ptr, dfi_vmcoreinfo_get());

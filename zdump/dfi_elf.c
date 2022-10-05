@@ -186,6 +186,15 @@ static int nt_s390_vxrs_high_read(const struct zg_fh *fh, struct dfi_cpu *cpu,
 }
 
 /*
+ * Read s390 gs_cb note
+ */
+static int nt_s390_gs_cb_read(const struct zg_fh *fh, struct dfi_cpu *cpu, const Elf64_Nhdr *note)
+{
+	check_cpu(cpu, "S390_GSCB");
+	return nt_read(fh, note, &cpu->gscb, sizeof(cpu->gscb));
+}
+
+/*
  * Add all notes for notes phdr
  */
 static int pt_notes_add(const Elf64_Phdr *phdr)
@@ -242,6 +251,11 @@ static int pt_notes_add(const Elf64_Phdr *phdr)
 			if (nt_s390_vxrs_high_read(fh, cpu_current, &note))
 				return -EINVAL;
 			dfi_cpu_content_fac_add(DFI_CPU_CONTENT_FAC_VX);
+			break;
+		case NT_S390_GS_CB:
+			if (nt_s390_gs_cb_read(fh, cpu_current, &note))
+				return -EINVAL;
+			dfi_cpu_content_fac_add(DFI_CPU_CONTENT_FAC_GS);
 			break;
 		default:
 			nt_skip(fh, &note);

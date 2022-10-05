@@ -310,6 +310,11 @@ void *nt_s390_vxrs_high(void *ptr, const struct dfi_cpu *cpu)
 		       sizeof(cpu->vxrs_high), NOTE_NAME_LINUX);
 }
 
+void *nt_s390_gs_cb(void *ptr, const struct dfi_cpu *cpu)
+{
+	return nt_init(ptr, NT_S390_GS_CB, &cpu->gscb, sizeof(cpu->gscb), NOTE_NAME_LINUX);
+}
+
 void *nt_prpsinfo(void *ptr)
 {
 	struct nt_prpsinfo_64 prpsinfo;
@@ -346,6 +351,7 @@ size_t get_max_note_size_per_cpu(void)
 	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, prefix));
 	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, vxrs_low));
 	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, vxrs_high));
+	size += ELF64_NOTE_SIZE(NOTE_NAME_LINUX, sizeof_field(struct dfi_cpu, gscb));
 
 	return size;
 }

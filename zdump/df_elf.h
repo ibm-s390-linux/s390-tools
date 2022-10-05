@@ -74,6 +74,13 @@
 #define NT_S390_VXRS_HIGH 0x30a
 #endif
 
+/*
+ * S390 guarded-storage registers note (4 * u64)
+ */
+#ifndef NT_S390_GS_CB
+#define NT_S390_GS_CB 0x30b
+#endif
+
 #define NOTE_NAME_CORE	     "CORE"
 #define NOTE_NAME_LINUX	     "LINUX"
 #define NOTE_NAME_VMCOREINFO "VMCOREINFO"
@@ -258,6 +265,11 @@ void *nt_s390_vxrs_low(void *ptr, const struct dfi_cpu *cpu);
  * Initialize vxrs_high register note
  */
 void *nt_s390_vxrs_high(void *ptr, const struct dfi_cpu *cpu);
+
+/*
+ * Initialize guarded-storage registers note
+ */
+void *nt_s390_gs_cb(void *ptr, const struct dfi_cpu *cpu);
 
 /*
  * Initialize prpsinfo note
