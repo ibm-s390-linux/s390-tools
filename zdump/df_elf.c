@@ -74,10 +74,13 @@ Elf64_Phdr *read_elf_phdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsig
 		return NULL;
 	}
 
+	if (ehdr->e_phoff > OFF_T_MAX)
+		ERR_EXIT("Unsupported offset");
+
 	/* Cannot wraparound since `Elf64_Half`` is `uint16_t` */
 	phdrs_size = sizeof(*phdrs) * phnum;
 	phdrs = util_malloc(phdrs_size);
-	zg_seek(fh, ehdr->e_phoff, ZG_CHECK);
+	zg_seek(fh, (off_t)ehdr->e_phoff, ZG_CHECK);
 	zg_read(fh, phdrs, phdrs_size, ZG_CHECK);
 	*phdr_count = phnum;
 	return phdrs;

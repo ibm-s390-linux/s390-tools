@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -31,6 +32,8 @@
 #define U32_MAX	((u32) -1)
 #define U16_MAX	((u16) -1)
 #define U8_MAX	((u8) -1)
+#define OFF_T_MAX LONG_MAX
+STATIC_ASSERT(sizeof(off_t) == sizeof(long))
 
 /*
  * IEC definitions
