@@ -15,6 +15,7 @@
 
 #include "lib/zt_common.h"
 #include "libpv/crypto.h"
+#include "libpv/macros.h"
 
 #include "types.h"
 
@@ -28,18 +29,17 @@
 #define ARCB_V1_IV_SIZE 12
 #define ARCB_V1_PHKH_SIZE 32
 
-#define BIT(bit) ((uint64_t)1 << (63 - (bit)))
 /* Optional nonce in ARCB */
-#define ARCB_V1_PAF_NONCE BIT(1)
+#define ARCB_V1_PAF_NONCE PV_MSB(1)
 /* Public host key hash used to unseal SE header added to additional data to be measured */
-#define ARCB_V1_PAF_AAD_PHKH_HEADER BIT(2)
+#define ARCB_V1_PAF_AAD_PHKH_HEADER PV_MSB(2)
 /* Public host key hash used to unseal this attestation added to additional data to be measured */
-#define ARCB_V1_PAF_AAD_PHKH_ATTEST BIT(3)
+#define ARCB_V1_PAF_AAD_PHKH_ATTEST PV_MSB(3)
 /* Temporary backup-host-key use allowed */
-#define ARCB_V1_PAF_TMP_BACKUP_ALLOWED BIT(62)
+#define ARCB_V1_PAF_TMP_BACKUP_ALLOWED PV_MSB(62)
 
 /* Global not-host-specific key allowed */
-#define ARCB_V1_PAF_GLOBAL_NHS_KEY_ALLOWED BIT(63)
+#define ARCB_V1_PAF_GLOBAL_NHS_KEY_ALLOWED PV_MSB(63)
 
 #define ARCB_V1_PAF_ALL                                                                  \
 	(ARCB_V1_PAF_NONCE | ARCB_V1_PAF_AAD_PHKH_HEADER | ARCB_V1_PAF_AAD_PHKH_ATTEST | \

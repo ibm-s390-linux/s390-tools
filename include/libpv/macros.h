@@ -10,7 +10,12 @@
 #ifndef LIBPV_MACROS_H
 #define LIBPV_MACROS_H
 
+#include <stdint.h>
+
 #define PV_NONNULL(...)
 #define DO_PRAGMA(x) _Pragma(#x)
+
+/* Most significant bit */
+#define PV_MSB(idx) ((uint64_t)1 << (63 - (idx)))
 
 #endif /* LIBPV_MACROS_H */

@@ -15,6 +15,7 @@
 
 #include "boot/s390.h"
 #include "libpv/crypto.h"
+#include "libpv/macros.h"
 
 /* Magic number which is used to identify the file containing the PV
  * header
@@ -22,20 +23,17 @@
 #define PV_MAGIC_NUMBER 0x49424d5365634578ULL
 #define PV_VERSION_1 0x00000100U
 
-/* Internal helper macro */
-#define __PV_BIT(nr) (1ULL << (63 - (nr)))
-
 /* Plaintext control flags */
 /* dumping of the configuration is allowed */
-#define PV_PCF_ALLOW_DUMPING __PV_BIT(34)
+#define PV_PCF_ALLOW_DUMPING PV_MSB(34)
 /* prevent Ultravisor decryption during unpack operation */
-#define PV_PCF_NO_DECRYPTION __PV_BIT(35)
+#define PV_PCF_NO_DECRYPTION PV_MSB(35)
 /* PCKMO encrypt-DEA/TDEA-key functions allowed */
-#define PV_PCF_PCKMO_DEA_TDEA __PV_BIT(56)
+#define PV_PCF_PCKMO_DEA_TDEA PV_MSB(56)
 /* PCKMO encrypt-AES-key functions allowed */
-#define PV_PCF_PCKMO_AES __PV_BIT(57)
+#define PV_PCF_PCKMO_AES PV_MSB(57)
 /* PCKMO encrypt-ECC-key functions allowed */
-#define PV_PCF_PCKM_ECC __PV_BIT(58)
+#define PV_PCF_PCKM_ECC PV_MSB(58)
 
 /* maxima for the PV version 1 */
 #define PV_V1_IPIB_MAX_SIZE PAGE_SIZE
