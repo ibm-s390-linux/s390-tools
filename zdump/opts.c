@@ -101,7 +101,7 @@ static void init_defaults(struct options *opts)
 /*
  * Print "help" hint
  */
-static void __noreturn print_usage_exit(const char *prog_name)
+void __noreturn print_usage_exit(const char *prog_name)
 {
 	STDERR("Try '%s --help' for more information.\n", prog_name);
 	zg_exit(1);
