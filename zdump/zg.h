@@ -48,8 +48,8 @@ STATIC_ASSERT(sizeof(off_t) == sizeof(long))
 /*
  * Memory functions
  */
-void *zg_alloc(unsigned int size);
-void *zg_realloc(void *ptr, unsigned int size);
+void *zg_alloc(size_t size);
+void *zg_realloc(void *ptr, size_t size);
 void zg_free(void *ptr);
 char *zg_strdup(const char *str);
 
@@ -151,7 +151,8 @@ off_t zg_tell(const struct zg_fh *zg_fh, enum zg_check check);
 off_t zg_seek(const struct zg_fh *zg_fh, off_t off, enum zg_check check);
 off_t zg_seek_end(const struct zg_fh *zg_fh, off_t off, enum zg_check check);
 off_t zg_seek_cur(const struct zg_fh *zg_fh, off_t off, enum zg_check check);
-int zg_ioctl(const struct zg_fh *zg_fh, int rq, void *data, const char *op, enum zg_check check);
+int zg_ioctl(const struct zg_fh *zg_fh, unsigned long rq, void *data, const char *op,
+	     enum zg_check check);
 enum zg_type zg_type(const struct zg_fh *zg_fh);
 
 /*

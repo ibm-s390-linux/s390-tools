@@ -88,7 +88,7 @@ void __noreturn zg_exit(int rc)
 /*
  * Alloc memory and check for errors
  */
-void *zg_alloc(unsigned int size)
+void *zg_alloc(size_t size)
 {
 	void *ptr = calloc(size, 1);
 	if (!ptr)
@@ -99,7 +99,7 @@ void *zg_alloc(unsigned int size)
 /*
  * Realloc memory and check for errors
  */
-void *zg_realloc(void *ptr, unsigned int size)
+void *zg_realloc(void *ptr, size_t size)
 {
 	void *new_ptr = realloc(ptr, size);
 	if (!new_ptr)
@@ -308,7 +308,8 @@ off_t zg_seek_cur(const struct zg_fh *zg_fh, off_t off, enum zg_check check)
 /*
  * Do ioctl and exit in case of an error
  */
-int zg_ioctl(const struct zg_fh *zg_fh, int rq, void *data, const char *op, enum zg_check check)
+int zg_ioctl(const struct zg_fh *zg_fh, unsigned long rq, void *data, const char *op,
+	     enum zg_check check)
 {
 	int rc;
 
