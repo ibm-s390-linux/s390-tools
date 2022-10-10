@@ -103,8 +103,13 @@ static void init_defaults(struct options *opts)
  */
 void __noreturn print_usage_exit(const char *prog_name)
 {
-	STDERR("Try '%s --help' for more information.\n", prog_name);
+	opts_print_usage(prog_name);
 	zg_exit(1);
+}
+
+void opts_print_usage(const char *prog_name)
+{
+	STDERR("Try '%s --help' for more information.\n", prog_name);
 }
 
 /*

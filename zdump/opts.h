@@ -36,6 +36,7 @@ extern const char *OPTS_SELECT_PROD;
 extern const char *OPTS_SELECT_ALL;
 
 void opts_parse(int argc, char *argv[], struct options *opts);
+void opts_print_usage(const char *prog_name);
 void __noreturn print_usage_exit(const char *prog_name);
 
 #endif /* OPTS_H */
