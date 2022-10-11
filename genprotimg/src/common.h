@@ -10,7 +10,7 @@
 
 #define GETTEXT_PACKAGE "genprotimg"
 #include <glib.h>
-#include <glib/gi18n-lib.h>
+#include <glib/gi18n.h>
 
 #include "boot/linux_layout.h"
 #include "boot/s390.h"

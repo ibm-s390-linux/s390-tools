@@ -15,7 +15,7 @@
  */
 #include "libpv/glib-helper.h"
 
-#include <glib/gi18n-lib.h>
+#include <glib/gi18n.h>
 
 #include "libpv/openssl-compat.h"
 #include "libpv/macros.h"
