@@ -20,27 +20,48 @@ check_dep_fuse:
 		"-DFUSE_USE_VERSION=30")
 endif
 
-#
-# HAVE_ZLIB: Allow skip zgetdump build, when no zlib-devel is available
-#
-ifeq (${HAVE_ZLIB},0)
+.detect_openssl.dep.c:
+	echo "#include <openssl/evp.h>" > $@
+	echo "#if OPENSSL_VERSION_NUMBER < 0x10100000L" >> $@
+	echo "  #error At least OpenSSL version 1.1.0 is required" >> $@
+	echo "#endif" >> $@
+	echo "static void __attribute__((unused)) test(void) {" >> $@
+	echo "    EVP_MD_CTX *ctx = EVP_MD_CTX_new();" >> $@
+	echo "    EVP_MD_CTX_free(ctx);" >> $@
+	echo "}" >> $@
 
-all:
-	$(SKIP) HAVE_ZLIB=0
-
-install:
-	$(SKIP) HAVE_ZLIB=0
-
-else
-
-check_dep_zlib:
+.check_dep_zgetdump: .detect_openssl.dep.c check_dep_fuse
 	$(call check_dep, \
-			"zgetdump", \
-			"zlib.h", \
-			"zlib-devel or libz-dev", \
-			"HAVE_ZLIB=0")
+		"zgetdump", \
+		"zlib.h", \
+		"zlib-devel or libz-dev", \
+		"HAVE_ZLIB=0")
+	$(call check_dep, \
+		"zgetdump", \
+		"glib.h", \
+		"glib2-devel / libglib2.0-dev", \
+		"HAVE_GLIB2=0")
+	$(call check_dep, \
+		"zgetdump", \
+		$<, \
+		"openssl-devel / libssl-dev version >= 1.1.0", \
+		"HAVE_OPENSSL=0", \
+		"-I.")
+	touch $@
 
-all: check_dep_fuse check_dep_zlib zgetdump
+#
+# Allow skip of zgetdump build, when no zlib-devel, openssl-devel, glib2-devel is available
+#
+BUILD_TARGETS :=skip-zgetdump
+INSTALL_TARGETS := skip-zgetdump
+ifneq (${HAVE_ZLIB},0)
+ifneq (${HAVE_OPENSSL},0)
+ifneq (${HAVE_GLIB2},0)
+BUILD_TARGETS := zgetdump
+INSTALL_TARGETS := install-zgetdump
+endif
+endif
+endif
 
 OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dfi.o dfi_mem_chunk.o dfi_vmcoreinfo.o \
@@ -56,6 +77,25 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dt_scsi.o output.o \
 	  ngdump.o dt_ngdump.o dfi_ngdump.o
 
+ifneq ($(shell sh -c 'command -v pkg-config'),)
+GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
+GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
+LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
+LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
+else
+GLIB2_CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
+GLIB2_LIBS := -lglib-2.0
+LIBCRYPTO_CFLAGS :=
+LIBCRYPTO_LIBS := -lcrypto
+endif
+
+LIBPV = $(rootdir)/libpv/libpv.a
+LIBPV_CFLAGS := -DOPENSSL_API_COMPAT=0x10100000L \
+	$(GLIB2_CFLAGS) \
+	$(LIBCRYPTO_CFLAGS) \
+	$(NULL)
+LIBPV_LIBS := $(GLIB2_LIBS) $(LIBCRYPTO_LIBS)
+
 ifeq ("$(HAVE_FUSE)","0")
 FUSE_CFLAGS = -DHAVE_FUSE=0 -D_FILE_OFFSET_BITS=64
 FUSE_LDLIBS =
@@ -66,23 +106,30 @@ else
 FUSE_CFLAGS = -DHAVE_FUSE=1 -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse3
 FUSE_LDLIBS = -lfuse3
 endif
-LDLIBS += -lz $(FUSE_LDLIBS)
-ALL_CFLAGS += $(FUSE_CFLAGS)
+LDLIBS += -lz $(FUSE_LDLIBS) $(LIBPV_LIBS)
+ALL_CFLAGS += $(FUSE_CFLAGS) $(LIBPV_CFLAGS)
 
 ifneq ("$(HAVE_FUSE)","0")
 OBJECTS += zfuse.o
 endif
 
-libs = $(rootdir)/libutil/libutil.a
-zgetdump: $(OBJECTS) $(libs)
+libs = $(rootdir)/libutil/libutil.a $(LIBPV)
 
-install: all
+all: $(BUILD_TARGETS)
+
+zgetdump: .check_dep_zgetdump $(OBJECTS) $(libs)
+
+skip-zgetdump:
+	echo "  SKIP    zgetdump due to unresolved dependencies"
+
+install-zgetdump: zgetdump
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man8 $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 755 zgetdump $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 644 zgetdump.8 $(DESTDIR)$(MANDIR)/man8
 
-clean:
-	rm -f *.o *~ zgetdump core.*
-endif
+install: $(INSTALL_TARGETS)
 
-.PHONY: all install clean check_dep_fuse check_dep_zlib
+clean:
+	rm -f -- *.o *~ zgetdump core.* .detect_openssl.dep.c .check_dep_zgetdump
+
+.PHONY: all install clean check_dep_fuse check_dep_zlib skip-zgetdump install-zgetdump
