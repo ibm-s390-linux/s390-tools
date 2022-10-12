@@ -81,6 +81,13 @@
 #define NT_S390_GS_CB 0x30b
 #endif
 
+/*
+ * S390 confidential CPU data from secure guest.
+ */
+#ifndef NT_S390_PV_CPU_DATA
+#define NT_S390_PV_CPU_DATA 0x30e
+#endif
+
 #define NOTE_NAME_CORE	     "CORE"
 #define NOTE_NAME_LINUX	     "LINUX"
 #define NOTE_NAME_VMCOREINFO "VMCOREINFO"

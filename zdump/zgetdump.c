@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "lib/zt_common.h"
+#include "opts.h"
 #include "zgetdump.h"
 #include "dt.h"
 #include "dfi.h"
@@ -106,9 +107,17 @@ static void kdump_select_check(void)
 	ERR_EXIT("%s", msg);
 }
 
-static int dfi_init_error(int UNUSED(rc))
+static int dfi_init_error(int rc)
 {
-	STDERR("Dump cannot be processed (is not complete)\n");
+	if (rc == -ENOKEY) {
+		if (g.opts.key_path)
+			ERR("Cannot read key: '%s'", g.opts.key_path);
+		else
+			ERR("No key for dump decryption provided.");
+		opts_print_usage(g.opts.prog_name);
+	} else {
+		STDERR("Dump cannot be processed (is not complete)\n");
+	}
 	return 1;
 }
 

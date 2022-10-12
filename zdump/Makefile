@@ -65,7 +65,7 @@ endif
 
 OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dfi.o dfi_mem_chunk.o dfi_vmcoreinfo.o \
-	  dfi_lkcd.o dfi_elf.o dfi_elf_common.o \
+	  dfi_lkcd.o dfi_elf.o dfi_elf_common.o dfi_pv_elf.o \
 	  dfi_s390.o dfi_s390_ext.o\
 	  dfi_s390mv.o dfi_s390mv_ext.o \
 	  dfi_s390tape.o dfi_kdump.o \
@@ -75,7 +75,8 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dt.o dt_s390sv.o dt_s390sv_ext.o \
 	  dt_s390mv.o dt_s390mv_ext.o \
 	  dt_scsi.o output.o \
-	  ngdump.o dt_ngdump.o dfi_ngdump.o
+	  ngdump.o dt_ngdump.o dfi_ngdump.o \
+	  pv_utils.o
 
 ifneq ($(shell sh -c 'command -v pkg-config'),)
 GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)

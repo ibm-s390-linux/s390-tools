@@ -1,19 +1,19 @@
-.\" Copyright 2018 IBM Corp.
+.\" Copyright 2022 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH ZGETDUMP 8 "April 2012" "s390-tools"
+.TH ZGETDUMP 8 "October 2022" "s390-tools"
 .SH NAME
 zgetdump \- Tool for copying and converting System z dumps
 .SH SYNOPSIS
 
-\fBzgetdump\fR    DUMP [-s SYS] [-f FMT] > DUMP_FILE
+\fBzgetdump\fR    DUMP [-s SYS] [-f FMT] [-k KEY] > DUMP_FILE
 .br
-            DUMP [-s SYS] [-f FMT] DUMP_FILE
+            DUMP [-s SYS] [-f FMT] [-k KEY] DUMP_FILE
 .br
-         -m DUMP [-s SYS] [-f FMT] DIR
+         -m DUMP [-s SYS] [-f FMT] [-k KEY] DIR
 .br
-         -i DUMP [-s SYS]
+         -i DUMP [-s SYS] [-k KEY]
 .br
          -d DUMPDEV
 .br
@@ -36,6 +36,10 @@ Print usage information, then exit.
 .TP
 .BR "\-v" " or " "\-\-version"
 Print version information, then exit.
+
+.TP
+.BR "\-k <KEY>" " or " "\-\-key <KEY>"
+Specify the file KEY to use as key for the decryption of a protected virtualization dump.
 
 .TP
 .BR "\-m <DUMP> <DIR>" " or " "\-\-mount <DUMP> <DIR>"
@@ -115,6 +119,8 @@ NVMe partition device node (e.g. /dev/nvme0n1p1)
 Tape device node (e.g. /dev/ntibm0)
 .IP "         -" 12
 Device node for live system (/dev/mem or /dev/crash)
+.IP "         -" 12
+Protected virtualization dump file (e.g. /dumps/pv.elf)
 .PP
 .IP  " " 8
 Note: For DASD multi-volume dump it is sufficient to specify only one of the
@@ -175,6 +181,9 @@ target and source dump:
 .BR "elf"
 Executable and Linkable Format core dump. This dump format is also used for
 Linux user space core dumps.
+.TP
+.BR "ELF (protected virtualization dump):"
+Protected virtualization vmcore dump in Executable and Linkable Format
 .TP
 .BR "s390"
 This dump format is System z specific and is used for DASD and tape dumps.

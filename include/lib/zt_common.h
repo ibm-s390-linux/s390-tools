@@ -70,6 +70,7 @@
 #define __may_alias __attribute__((may_alias))
 #define __section(x) __attribute__((__section__(#x)))
 #define __noinline __attribute__((__noinline__))
+#define __big_endian
 /* The Linux kernel (in stddef.h) and glibc (sys/cdefs.h) define
  * __always_inline. Therefore undefine it first to allow the headers
  * to be included first.

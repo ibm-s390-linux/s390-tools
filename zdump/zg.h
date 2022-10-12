@@ -85,6 +85,7 @@ void zg_abort(const char *fmt, ...);
 #define ERR_EXIT(fmt, ...)		zg_err_exit(fmt, ## __VA_ARGS__)
 #define ERR_EXIT_ERRNO(fmt, ...)	zg_err_exit_errno(fmt, ## __VA_ARGS__)
 #define ABORT(fmt, ...)			zg_abort(fmt, ## __VA_ARGS__)
+#define ERR_NEWLINE			"\n          "
 
 void zg_stderr(const char *fmt, ...);
 void zg_stderr_pr(const char *fmt, ...);
@@ -97,6 +98,8 @@ void zg_stdout(const char *fmt, ...);
  * Misc
  */
 #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+#define IS_ALIGNED(addr, size)	(!((addr) & (size - 1)))
+#define IS_PAGE_ALIGNED(addr)	IS_ALIGNED((unsigned long)(addr), PAGE_SIZE)
 
 static inline u32 zg_csum_partial(const void *buf, int len, u32 sum)
 {

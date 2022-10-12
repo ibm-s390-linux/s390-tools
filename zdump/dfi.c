@@ -26,6 +26,7 @@
  * DFI vector - ensure that tape is the first in the list and devmem the second!
  */
 static struct dfi *dfi_vec[] = {
+	/* clang-format off */
 	&dfi_s390tape,
 	&dfi_devmem,
 	&dfi_s390mv_ext,
@@ -33,11 +34,13 @@ static struct dfi *dfi_vec[] = {
 	&dfi_s390_ext,
 	&dfi_s390,
 	&dfi_lkcd,
+	&dfi_pv_elf,
 	&dfi_elf,
 	&dfi_kdump,
 	&dfi_kdump_flat,
 	&dfi_ngdump,
 	NULL,
+	/* clang-format on */
 };
 
 /*
@@ -166,6 +169,11 @@ void dfi_cpu_info_init(enum dfi_cpu_content cpu_content)
 struct dfi_cpu *dfi_cpu_alloc(void)
 {
 	return zg_alloc(sizeof(struct dfi_cpu));
+}
+
+void dfi_cpu_free(struct dfi_cpu *cpu)
+{
+	zg_free(cpu);
 }
 
 /*
@@ -780,7 +788,7 @@ int dfi_init(void)
 		}
 		util_log_print(UTIL_LOG_DEBUG, "DFI %s returned with rc %d\n",
 			       dfi->name, rc);
-		if (rc == 0 || rc == -EINVAL)
+		if (rc == 0 || rc == -EINVAL || rc == -ENOKEY)
 			return rc;
 		zg_close(g.fh);
 		i++;

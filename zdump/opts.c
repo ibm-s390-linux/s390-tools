@@ -20,9 +20,11 @@
 #include "opts.h"
 
 static struct option long_opts[] = {
+	/* clang-format off */
 	{"help",    no_argument,       NULL, 'h'},
 	{"version", no_argument,       NULL, 'v'},
 	{"info",    no_argument,       NULL, 'i'},
+	{"key",     required_argument, NULL, 'k'},
 	{"device",  no_argument,       NULL, 'd'},
 	{"mount",   no_argument,       NULL, 'm'},
 	{"umount",  no_argument,       NULL, 'u'},
@@ -30,19 +32,20 @@ static struct option long_opts[] = {
 	{"select",  required_argument, NULL, 's'},
 	{"debug",   no_argument,       NULL, 'X'},
 	{"verbose", no_argument,       NULL, 'V'},
-	{NULL,      0,                 NULL,  0 }
+	{NULL,      0,                 NULL,  0 },
+	/* clang-format on */
 };
 
-static const char optstr[] = "hvVidmus:f:X";
+static const char optstr[] = "hvVidmuk:s:f:X";
 
 /*
  * Text for --help option
  */
 static const char help_text[] =
-	"Usage: zgetdump    DUMP [-s SYS] [-f FMT] > DUMP_FILE\n"
-	"                   DUMP [-s SYS] [-f FMT] DUMP_FILE\n"
-	"                -m DUMP [-s SYS] [-f FMT] DIR\n"
-	"                -i DUMP [-s SYS]\n"
+	"Usage: zgetdump    DUMP [-s SYS] [-f FMT] [-k KEY] > DUMP_FILE\n"
+	"                   DUMP [-s SYS] [-f FMT] [-k KEY] DUMP_FILE\n"
+	"                -m DUMP [-s SYS] [-f FMT] [-k KEY] DIR\n"
+	"                -i DUMP [-s SYS] [-k KEY]\n"
 	"                -d DUMPDEV\n"
 	"                -u DIR\n"
 	"\n"
@@ -58,6 +61,7 @@ static const char help_text[] =
 	"In the syntax description, DUMP specifies a dump device or dump file to be\n"
 	"read. The following options are available:\n"
 	"\n"
+	"-k, --key      Specify the key KEY to decrypt the protected virtualization dump\n"
 	"-m, --mount    Mount DUMP to mount point DIR\n"
 	"-u, --umount   Unmount dump from mount point DIR\n"
 	"-i, --info     Print DUMP information\n"
@@ -71,7 +75,7 @@ static const char help_text[] =
 	"               messages. This option is intended for debugging\n"
 	"-h, --help     Print this help, then exit\n";
 
-static const char copyright_str[] = "Copyright IBM Corp. 2001, 2018";
+static const char copyright_str[] = "Copyright IBM Corp. 2001, 2022";
 
 /*
  * Select option strings
@@ -88,6 +92,7 @@ static void init_defaults(struct options *opts)
 	opts->prog_name = "zgetdump";
 	opts->action = ZG_ACTION_COPY;
 	opts->output_path = NULL;
+	opts->key_path = NULL;
 #ifdef __s390x__
 	opts->fmt = "elf";
 #else
@@ -179,6 +184,16 @@ static void device_set(struct options *opts, const char *path)
 static void output_set(struct options *opts, const char *path)
 {
 	opts->output_path = zg_strdup(path);
+}
+
+/*
+ * Set customer communication key (CCK)
+ */
+static void key_set(struct options *opts, const char *key)
+{
+	assert(!opts->key_path);
+
+	opts->key_path = zg_strdup(key);
 }
 
 /*
@@ -317,6 +332,9 @@ void opts_parse(int argc, char *argv[], struct options *opts)
 			break;
 		case 's':
 			select_set(opts, optarg);
+			break;
+		case 'k':
+			key_set(opts, optarg);
 			break;
 		case 'X':
 			opts->debug_specified = 1;

@@ -20,6 +20,7 @@ struct options {
 	char		*device;
 	/* If `output_path == NULL` the output is written to `stdout` */
 	const char	*output_path;
+	const char *key_path;
 	char		*mount_point;
 	int		fmt_specified;
 	const char	*fmt;
