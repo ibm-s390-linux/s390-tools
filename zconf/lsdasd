@@ -35,6 +35,8 @@ function PrintUsage() {
 		 		Print extended information about DASDs.
 		 	-H|--host-access-list
 		 		Print information about hosts accessing DASDs.
+		 	-P|--copy-pairs
+		 		Print information about copy pairs.
 		 	-v|--verbose
 		 		For compatibility/future use. Currently ignored.
 		 	--version
@@ -292,6 +294,8 @@ function gatherDeviceData() {
 			uid
 		elif [[ "$OUTPUT" == "host" ]]; then
 			host
+		elif [[ "$OUTPUT" == "copy" ]]; then
+			copy
 		else
 			newoutput
 		fi
@@ -769,6 +773,41 @@ printf "\n";
 rm -f $temp
 }
 
+# pad sortkey with given number zeroes
+function padSortKey()
+{
+	local LEN=$1
+	for (( i=0; i<$LEN; i++ ))
+	do
+		printf -v SORTKEY "%s0" $SORTKEY
+	done
+}
+
+function copy()
+{
+	if [[ "$COPYROLE" == "none" ]]; then
+		return
+	fi
+
+	SORTKEYLEN=$((${#PRIMARY_UID}+${#DEV_UID}))
+	if [[ "$COPYROLE" == "secondary" ]]; then
+		SORTKEY=$PRIMARY_UID$DEV_UID
+		PAIREDDEVICES=$PRIMARY_UID
+		BLOCKNAME=""
+	else
+		SORTKEY=$PRIMARY_UID
+		padSortKey ${#DEV_UID}
+		PAIREDDEVICES=$SECONDARY_LIST
+	fi
+
+	printf "%s:%s:%-8s  %-10s %-8s  %-8s %s  \n" \
+	       "$SORTKEYLEN" "$SORTKEY" \
+	       "$BUSID" \
+	       "$COPYROLE" \
+	       "$BLOCKNAME" \
+	       "$PAIREDDEVICES";
+}
+
 function uid()
 {
 	#-------------------------------------------#
@@ -835,6 +874,9 @@ while [ $# -gt 0 ]; do
 	--host-access-list|-H)
 		OUTPUT="host"
 		;;
+	--copy-pairs|-P)
+		OUTPUT="copy"
+		;;
 	--version)
 		PrintVersion
 		exit 0
@@ -889,6 +931,9 @@ if  [[ "$PRINTUID" == "true" ]] && [[ "$OUTPUT" != "old" ]]; then
 elif [[ "$OUTPUT" == "new" ]]; then
 	printf "Bus-ID    Status    Name      Device  Type         BlkSz  Size      Blocks\n"
 	printf "================================================================================\n"
+elif [[ "$OUTPUT" == "copy" ]]; then
+	printf "Bus-ID    Role       Name      Paired devices\n";
+	printf "================================================================================\n";
 elif [[ "$OUTPUT" == "extended" ]]; then
 	PROCESSING=" $PROCESSING | sed 's/#/\n/g' "
 fi
