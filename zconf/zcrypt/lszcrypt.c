@@ -872,7 +872,7 @@ static void show_devices_argv(char *argv[])
 				show_device(rec, card);
 				free(card);
 			}
-			return;
+			continue;
 		}
 		if (sscanf(argv[i]+1, "%x", &dom) == 1) {
 			/* list specific domains of all adapters */
@@ -897,7 +897,7 @@ static void show_devices_argv(char *argv[])
 				}
 				free(path);
 			}
-			return;
+			continue;
 		}
 		printf("Invalid adpater id!\n");
 	}
