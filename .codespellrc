@@ -1,0 +1,5 @@
+[codespell]
+ignore-words-list = parm,parms
+skip = ''
+count = ''
+quiet-level = 3
