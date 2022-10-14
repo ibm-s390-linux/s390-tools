@@ -4,8 +4,10 @@ Coding guidelines for s390-tools
 For s390-tools the preferred language is C. We provide libraries, e.g.
 [`libutil`](libutil) that should be used by all tools if possible.
 
-The coding style is based on the Linux [kernel guidelines]. Therefore, use
-the [checkpatch] tool for verification before you submit a patch.
+The coding style is based on the Linux [kernel guidelines]. Therefore, use the
+[checkpatch] tool for verification before you submit a patch. s390-tools
+provides a CheckPatch configuration for this - see
+[`.checkpatch.conf`](.checkpatch.conf).
 
 [kernel guidelines]: https://www.kernel.org/doc/html/latest/process/coding-style.html
 [checkpatch]: https://github.com/torvalds/linux/blob/master/scripts/checkpatch.pl
