@@ -195,7 +195,7 @@ static struct opts_conflict conflict_list[] = {
 	OPTS_CONFLICT(OPT_ONLINE,
 		      OPT_OFFLINE),
 	OPTS_CONFLICT(OPT_SITE,
-		      OPT_TYPE, OPT_EXPORT, OPT_IMPORT, 0),
+		      OPT_TYPE, 0),
 	OPTS_CONFLICT(OPT_QUIET,
 		      OPT_VERBOSE),
 	OPTS_CONFLICT(OPT_AUTO_CONF,
