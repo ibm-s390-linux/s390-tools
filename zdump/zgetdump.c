@@ -26,6 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/zt_common.h"
 #include "zgetdump.h"
 #include "dt.h"
 #include "dfi.h"
@@ -105,6 +106,12 @@ static void kdump_select_check(void)
 	ERR_EXIT("%s", msg);
 }
 
+static int dfi_init_error(int UNUSED(rc))
+{
+	STDERR("Dump cannot be processed (is not complete)\n");
+	return 1;
+}
+
 /*
  * Run "--umount" action
  */
@@ -129,10 +136,13 @@ static int do_device_info(void)
  */
 static int do_dump_info(void)
 {
-	if (dfi_init() != 0) {
+	int rc;
+
+	rc = dfi_init();
+	if (rc != 0) {
 		dfi_info_print();
-		STDERR("\nERROR: Dump is not complete\n");
-		zg_exit(1);
+		STDERR("\n");
+		return dfi_init_error(rc);
 	}
 	kdump_select_check();
 	dfi_info_print();
@@ -147,8 +157,9 @@ static int do_mount(void)
 {
 	int rc;
 
-	if (dfi_init() != 0)
-		ERR_EXIT("Dump cannot be processed (is not complete)");
+	rc = dfi_init();
+	if (rc != 0)
+		return dfi_init_error(rc);
 	dfo_init();
 	kdump_select_check();
 	rc = zfuse_mount_dump();
@@ -189,8 +200,9 @@ static int do_copy(const char *output)
 	FILE *stream;
 	int rc;
 
-	if (dfi_init() != 0)
-		ERR_EXIT("Dump cannot be processed (is not complete)");
+	rc = dfi_init();
+	if (rc != 0)
+		return dfi_init_error(rc);
 	dfo_init();
 	kdump_select_check();
 	stream = open_file_for_writing(output);
