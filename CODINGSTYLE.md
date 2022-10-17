@@ -42,6 +42,14 @@ git clang-format --staged
 
 See also `git clang-format -h`.
 
+Automatic Editor Configuration
+------------------------------
+
+s390-tools provides a EditorConfig (https://editorconfig.org/) configuration
+file - see [`.editorconfig`](.editorconfig). EditorConfig defines coding style
+rules (such as indentation size, use of tabs, etc.) and is supported by most
+common editors natively or via plugins.
+
 Standard abbreviations
 ----------------------
 
