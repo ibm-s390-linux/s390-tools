@@ -290,7 +290,9 @@ static char *pv_X509_NAME_oneline(const X509_NAME *name)
 	long len;
 
 	if (X509_NAME_print_ex(key_bio, name, 0, XN_FLAG_RFC2253) == -1) {
-		g_warning(_("Cannot receive X509-NAME from CRL: %s"), pv_get_openssl_error());
+		g_autofree char *openssl_err_msg = pv_get_openssl_errors();
+
+		g_warning(_("Cannot receive X509-NAME from CRL: %s"), openssl_err_msg);
 		return NULL;
 	}
 

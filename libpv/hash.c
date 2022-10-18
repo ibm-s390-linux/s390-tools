@@ -97,8 +97,10 @@ HMAC_CTX *pv_hmac_ctx_new(GBytes *key, const EVP_MD *md, GError **error)
 	key_data = g_bytes_get_data(key, &key_size);
 
 	if (HMAC_Init_ex(ctx, key_data, (int)key_size, md, NULL) != 1) {
+		g_autofree char *openssl_err_msg = pv_get_openssl_errors();
+
 		g_set_error(error, PV_HASH_ERROR, PV_HASH_ERROR_INTERNAL,
-			    "unable to create HMAC context: %s", pv_get_openssl_error());
+			    "unable to create HMAC context: %s", openssl_err_msg);
 		return NULL;
 	}
 	return g_steal_pointer(&ctx);
@@ -110,8 +112,10 @@ int pv_hmac_ctx_update_raw(HMAC_CTX *ctx, const void *buf, size_t size, GError *
 		return 0;
 
 	if (HMAC_Update(ctx, buf, size) != 1) {
+		g_autofree char *openssl_err_msg = pv_get_openssl_errors();
+
 		g_set_error(error, PV_HASH_ERROR, PV_HASH_ERROR_INTERNAL,
-			    "unable to add data to HMAC context: %s", pv_get_openssl_error());
+			    "unable to add data to HMAC context: %s", openssl_err_msg);
 		return -1;
 	}
 	return 0;
@@ -139,8 +143,10 @@ GBytes *pv_hamc_ctx_finalize(HMAC_CTX *ctx, GError **error)
 	hmac = g_malloc0((unsigned int)md_size);
 
 	if (HMAC_Final(ctx, hmac, &hmac_size) != 1) {
+		g_autofree char *openssl_err_msg = pv_get_openssl_errors();
+
 		g_set_error(error, PV_HASH_ERROR, PV_HASH_ERROR_INTERNAL,
-			    "unable to calculate HMAC: %s", pv_get_openssl_error());
+			    "unable to calculate HMAC: %s", openssl_err_msg);
 		return NULL;
 	}
 	return g_bytes_new_take(g_steal_pointer(&hmac), hmac_size);

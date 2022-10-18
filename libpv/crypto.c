@@ -19,18 +19,18 @@
 #include "libpv/glib-helper.h"
 #include "libpv/hash.h"
 
-const char *pv_get_openssl_error(void)
+char *pv_get_openssl_errors(void)
 {
-	const char *ret;
-	BIO *bio;
+	char *ret;
 	char *buf;
+	BIO *bio;
 	long len;
 
 	bio = BIO_new(BIO_s_mem());
 	ERR_print_errors(bio);
 	len = BIO_get_mem_data(bio, &buf);
-	if (len < 0)
-		ret = "Cannot receive OpenSSL error message.";
+	if (len <= 0 || !buf)
+		ret = g_strdup("Cannot receive OpenSSL error message.");
 	else
 		ret = g_strndup(buf, (size_t)len);
 	BIO_free(bio);
@@ -354,7 +354,6 @@ GBytes *pv_hkdf_extract_and_expand(size_t derived_key_len, GBytes *key, GBytes *
 	if (EVP_PKEY_derive(ctx, derived_key, &derived_key_len) != 1) {
 		g_set_error(error, PV_CRYPTO_ERROR, PV_CRYPTO_ERROR_HKDF_FAIL,
 			    "FAILED to derive key via HKDF");
-		printf("%s\n", pv_get_openssl_error());
 		return NULL;
 	}
 

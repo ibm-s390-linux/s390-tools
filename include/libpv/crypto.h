@@ -42,11 +42,14 @@ enum PvCryptoMode {
 	PV_DECRYPT,
 };
 
-/** pv_get_openssl_error:
+/** pv_get_openssl_errors:
  *
- * Returns: (transfer full): String representing the error.
+ * Returns the last OpenSSL error messages.
+ * Caller is responsible to free the returned value.
+ *
+ * Returns: String representing the error.
  */
-const char *pv_get_openssl_error(void);
+char *pv_get_openssl_errors(void);
 
 /**
  * pv_BIO_reset:
