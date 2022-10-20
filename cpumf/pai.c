@@ -426,7 +426,7 @@ static const char *evt_selector(struct perf_event_attr *pa)
 static void evt_show(__u64 evtnum, const char *evtsel, struct pai_event_out *ev)
 {
 	if (summary) {
-		if (ev->type == PERF_RECORD_SAMPLE)
+		if (ev->type == PERF_RECORD_SAMPLE && ev->raw)
 			evtraw_show(evtnum, ev->raw);
 		return;
 	}
