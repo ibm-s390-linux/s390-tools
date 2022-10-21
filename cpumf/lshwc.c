@@ -356,6 +356,8 @@ static void line(char *header)
 			putchar(',');
 		printf("%ld", ctrname[i].total);
 		comma = true;
+		ctrname[i].total = 0;
+		ctrname[i].hitcnt = false;
 	}
 	putchar('\n');
 }
@@ -446,7 +448,7 @@ static bool add_countervalue(size_t idx, unsigned int cpu, unsigned long value)
 		ctrname[idx].ccv = calloc(max_possible_cpus,
 					  sizeof(unsigned long));
 	if (ctrname[idx].ccv)
-		ctrname[idx].ccv[cpu] += value;
+		ctrname[idx].ccv[cpu] = value;
 	ctrname[idx].total += value;
 	ctrname[idx].hitcnt = true;
 	return true;
@@ -458,10 +460,8 @@ static int test_read(struct s390_hwctr_read *read)
 	size_t offset = 0;
 
 	/* Clear previous hit counters */
-	for (unsigned int i = 0; i < max_possible_cpus; ++i) {
-		check[i].sets_hit = 0;
+	for (unsigned int i = 0; i < max_possible_cpus; ++i)
 		check[i].cpu_hit = false;
-	}
 
 	/* Iterate over all CPUs */
 	for (unsigned int i = 0; i < read->no_cpus; ++i) {
