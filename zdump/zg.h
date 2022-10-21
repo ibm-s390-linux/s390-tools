@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "boot/s390.h"
 #include "lib/util_base.h"
 #include "lib/zt_common.h"
 
@@ -95,7 +96,6 @@ void zg_stdout(const char *fmt, ...);
 /*
  * Misc
  */
-#define PAGE_SIZE 4096UL
 #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
 
 static inline u32 zg_csum_partial(const void *buf, int len, u32 sum)
