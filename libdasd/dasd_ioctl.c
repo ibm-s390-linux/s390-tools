@@ -28,11 +28,13 @@
 
 #define RUN_IOCTL(fd, req, argp)				\
 	do {							\
-		if (ioctl(fd, req, argp) != 0) {		\
-			int err = errno;			\
-			if (err != EBADF)			\
+		int rc = ioctl(fd, req, argp);			\
+		if (rc != 0) {					\
+			if (rc == -1)				\
+				rc = errno;			\
+			if (rc != EBADF)			\
 				dasd_close_device(fd);		\
-			return err;				\
+			return rc;				\
 		}						\
 	} while (0)
 
