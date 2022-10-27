@@ -60,6 +60,7 @@ Package contents
 
  * zgetdump:
    Retrieve system dumps from either tapes, DASDs, SCSIs or NVMes.
+   Decrypt Protected Virtualization (PV) dumps from IBM Secure Execution guests.
 
  * qetharp:
    Read and flush the ARP cache on OSA Express network cards.
@@ -309,11 +310,11 @@ build options:
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 | openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
-|                |                    | libkmipclient, pvattest               |
+|                |                    | libkmipclient, pvattest, zgetdump     |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
 |                |                    | libkmipclient                         |
-| glib2          | `HAVE_GLIB2`       | genprotimg, pvattest                  |
+| glib2          | `HAVE_GLIB2`       | genprotimg, pvattest, zgetdump        |
 | libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient,|
 |                |                    | pvattest                              |
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
@@ -375,6 +376,13 @@ the different tools are provided:
   For running the ziomon tools the following tools/packages are required:
   - Packages: blktrace, multipath-tools, sg3-utils
   - Tools: rsync, tar, lsscsi
+
+* zgetdump
+  For building zgetdump you need OpenSSL version 1.1.0 or newer
+  installed (openssl-devel.rpm). Also required is glib2
+  (glib2-devel.rpm) and zlib (zlib-devel.rpm).
+  Tip: you may skip the zgetdump build by adding
+  `HAVE_OPENSSL=0`, `HAVE_GLIB2=0`, or `HAVE_ZLIB=0`.
 
 * cmsfs-fuse/zdsfs/hmcdrvfs/zgetdump:
   The tools cmsfs-fuse, zdsfs, hmcdrvfs, and zgetdump depend on FUSE.
