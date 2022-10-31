@@ -18,15 +18,31 @@
 #include "lib/util_file.h"
 #include "ipl_tools.h"
 
+static void nvme_dev_from_bdev(char *dev_name)
+{
+	char *delim = strrchr(dev_name, 'n');
+
+	if (delim)
+		*delim = 0;
+}
+
 /*
  * Return the fid of a device
  */
 void nvme_fid_get(const char *device, char *fid)
 {
 	char path[PATH_MAX], buf[FID_MAX_LEN];
+	char nvme_dev[NVME_DEV_MAX_LEN];
 
-	snprintf(path, PATH_MAX, "/sys/block/%s/device/device/function_id",
-		device);
+	/*
+	 * An NVMe may present multiple namespaces and thus block devices, even
+	 * before partitioning, so we need the nvme<NUM> part of the block
+	 * device name to get to the PCI function ID.
+	 */
+	util_strlcpy(nvme_dev, device, sizeof(nvme_dev));
+	nvme_dev_from_bdev(nvme_dev);
+
+	snprintf(path, PATH_MAX, "/sys/class/nvme/%s/device/function_id", nvme_dev);
 	if (util_file_read_line(buf, FID_MAX_LEN, path))
 		ERR_EXIT_ERRNO("Could not read from \"%s\"", path);
 

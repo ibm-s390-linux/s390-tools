@@ -75,6 +75,7 @@ extern void fcp_busid_get(const char *device, char *devno);
  * NVME
  */
 #define FID_MAX_LEN	11	/* 8 characters + 0x + null */
+#define NVME_DEV_MAX_LEN	15	/* "nvme" + u32 in decimal + null */
 #define NVME_PATH_MAX	(PATH_MAX + NAME_MAX + 1)
 
 extern void nvme_fid_get(const char *device, char *fid);
