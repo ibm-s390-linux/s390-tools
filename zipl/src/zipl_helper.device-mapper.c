@@ -611,9 +611,6 @@ static struct util_list *get_multipath_status(const char *devname)
 		}
 	}
 
-	free(line);
-	pclose(fp);
-
 	len = util_list_len(status);
 	if (len == 0) {
 		ERR("No paths found for '%s'\n", devname);
@@ -625,15 +622,14 @@ static struct util_list *get_multipath_status(const char *devname)
 		WARN("There are one or more failed paths for device '%s'\n",
 		     devname);
 	}
-
-	return status;
-
-out:
+	goto success;
+ out:
+	status_list_free(status);
+	status = NULL;
+ success:
 	free(line);
 	pclose(fp);
-	status_list_free(status);
-
-	return NULL;
+	return status;
 }
 
 static struct util_list *get_multipath_data(const char *devname, char *args)
