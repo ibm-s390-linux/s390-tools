@@ -1331,8 +1331,6 @@ bootmap_create_device(struct job_data *job, disk_blockptr_t *program_table,
 	ulong unused_size;
 	int fd;
 
-	secure_boot_supported = check_secure_boot_support();
-
 	/* Get full path of bootmap file */
 	if (!dry_run) {
 		filename = misc_strdup(job->data.dump.device);
@@ -1651,6 +1649,8 @@ bootmap_create(struct job_data *job, disk_blockptr_t *program_table,
 	       disk_blockptr_t **stage1b_list, blocknum_t *stage1b_count,
 	       char **new_device, struct disk_info **new_info)
 {
+	secure_boot_supported = check_secure_boot_support();
+
 	if (job->id == job_dump_partition) {
 		if (is_ngdump_enabled(job->data.dump.device, &job->target))
 			return bootmap_create_device_ngdump(job, program_table,
