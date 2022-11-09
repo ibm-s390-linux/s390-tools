@@ -195,7 +195,8 @@ Elf64_Shdr *read_elf_shdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr,
  *
  * To read the section content the offset of @fh is changed.
  */
-unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *shdr, size_t *size);
+unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *shdr, size_t *size,
+				     const size_t max_size);
 
 /*
  * Read ELF section header string table
@@ -203,7 +204,8 @@ unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *s
  * To read the section header string table the offset of @fh is changed.
  */
 char *read_elf_shstrtab(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, const Elf64_Shdr *shdrs,
-			const unsigned int shnum, size_t *shstrtab_size);
+			const unsigned int shnum, size_t *shstrtab_size,
+			const size_t max_shstrtab_size);
 
 /*
  * Find ELF section header by section name

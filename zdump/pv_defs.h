@@ -20,6 +20,16 @@
 #define PV_ELF_SECTION_NAME_COMPL  "pv_compl"
 #define PV_ELF_SECTION_NAME_TWEAKS "pv_mem_meta"
 
+/* Maximum size (in bytes) of completion section data */
+#define PV_MAX_COMPL_DATA_SIZE ROUNDUP(sizeof(pv_dump_completion_data_v1_t), PAGE_SIZE)
+/* Maximum size (in bytes) of section header string table */
+#define PV_MAX_SHSTRTAB_SIZE                                                                       \
+	ROUNDUP(sizeof(PV_ELF_SECTION_NAME_COMPL) + sizeof(PV_ELF_SECTION_NAME_TWEAKS) +           \
+			sizeof(".shstrtab"),                                                       \
+		PAGE_SIZE)
+/* Maximum size of NT_S390_PV_CPU_DATA */
+#define PV_MAX_NT_S390_PV_CPU_DATA_SIZE ROUNDUP(sizeof(pv_cpu_dump_v1_t), PAGE_SIZE)
+
 #define PV_COMPL_DATA_VERSION_1	  ((uint32_t)1)
 #define PV_SEC_CPU_DATA_VERSION_1 ((uint32_t)1)
 

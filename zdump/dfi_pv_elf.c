@@ -46,17 +46,19 @@ WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(Elf64_Ehdr, free);
  * read_elf_section_data_as_gbytes:
  * @fh: (not nullable): open input file
  * @shdr: (not nullable): section header of the section to read
+ * @max_size: maximum section data size in bytes
  *
  * Try to read section data and return it as #GBytes.
  *
  * Returns: #GBytes on success, %NULL if an error occurred
  */
-static GBytes *read_elf_section_data_as_gbytes(const struct zg_fh *fh, const Elf64_Shdr *shdr)
+static GBytes *read_elf_section_data_as_gbytes(const struct zg_fh *fh, const Elf64_Shdr *shdr,
+					       const size_t max_size)
 {
 	unsigned char *data;
 	size_t size;
 
-	data = read_elf_section_data(fh, shdr, &size);
+	data = read_elf_section_data(fh, shdr, &size, max_size);
 	if (!data)
 		return NULL;
 	return g_bytes_new_with_free_func(data, size, free, data);
@@ -105,6 +107,12 @@ static dfi_cpu_t *nt_s390_pv_cpu_data_read(const struct zg_fh *fh, const Elf64_N
 	g_autoptr(GBytes) note = NULL;
 
 	g_assert(dump_key);
+
+	if (note_descsz > PV_MAX_NT_S390_PV_CPU_DATA_SIZE) {
+		g_set_error(error, ZDUMP_PV_UTILS_ERROR, ZDUMP_ERR_CORRUPTED_NOTE,
+			    _("Unable to read confidential CPU data. Dump probably corrupted."));
+		return NULL;
+	}
 
 	note_data = g_malloc(note_descsz);
 	if (nt_read(fh, note_hdr, note_data, note_descsz) < 0) {
@@ -224,7 +232,7 @@ static int dfi_pv_elf_init(void)
 	if (!shdrs)
 		return -ENODEV;
 
-	shstrtab = read_elf_shstrtab(fh, ehdr, shdrs, shnum, &shstrtab_size);
+	shstrtab = read_elf_shstrtab(fh, ehdr, shdrs, shnum, &shstrtab_size, PV_MAX_SHSTRTAB_SIZE);
 	if (!shstrtab)
 		return -ENODEV;
 
@@ -255,7 +263,8 @@ static int dfi_pv_elf_init(void)
 		return -EINVAL;
 
 	/* Read the PV completion configuration section data */
-	completion_sdata = read_elf_section_data_as_gbytes(fh, completion_shdr);
+	completion_sdata =
+		read_elf_section_data_as_gbytes(fh, completion_shdr, PV_MAX_COMPL_DATA_SIZE);
 	if (!completion_sdata)
 		return -EINVAL;
 

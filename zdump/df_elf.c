@@ -121,7 +121,8 @@ Elf64_Shdr *read_elf_shdrs(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, unsig
 	return shdrs;
 }
 
-unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *shdr, size_t *size)
+unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *shdr, size_t *size,
+				     const size_t max_size)
 {
 	const size_t sh_size = shdr->sh_size;
 	unsigned char *ret;
@@ -133,6 +134,9 @@ unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *s
 	if (shdr->sh_offset > OFF_T_MAX)
 		ERR_EXIT("Unsupported offset");
 
+	if (sh_size > max_size)
+		ERR_EXIT("Unsupported section size: %#lx > %#lx", sh_size, max_size);
+
 	ret = util_malloc(sh_size);
 	zg_seek(fh, (off_t)shdr->sh_offset, ZG_CHECK);
 	zg_read(fh, ret, sh_size, ZG_CHECK);
@@ -141,7 +145,8 @@ unsigned char *read_elf_section_data(const struct zg_fh *fh, const Elf64_Shdr *s
 }
 
 char *read_elf_shstrtab(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, const Elf64_Shdr *shdrs,
-			const unsigned int shnum, size_t *shstrtab_size)
+			const unsigned int shnum, size_t *shstrtab_size,
+			const size_t max_shstrtab_size)
 {
 	const size_t shstrndx = ehdr->e_shstrndx;
 	Elf64_Xword tmp_shstrtab_size;
@@ -166,6 +171,10 @@ char *read_elf_shstrtab(const struct zg_fh *fh, const Elf64_Ehdr *ehdr, const El
 		ERR_EXIT("Unsupported offset");
 
 	tmp_shstrtab_size = shdrs[shstrndx].sh_size;
+	if (tmp_shstrtab_size > max_shstrtab_size)
+		ERR_EXIT("Unsupported shstrtab size: %#lx > %#lx", tmp_shstrtab_size,
+			 max_shstrtab_size);
+
 	shstrtab = util_malloc(tmp_shstrtab_size);
 	zg_seek(fh, (off_t)shstrndx_off, ZG_CHECK);
 	zg_read(fh, shstrtab, tmp_shstrtab_size, ZG_CHECK);
