@@ -608,14 +608,26 @@ ssize_t pv_process_pglist(pv_crypto_ctx_t *ctx, BIO *output,
 					return -1;
 				}
 			}
-			g_assert(!(page_state & ~PV_ZERO_PAGE));
+			if (page_state & ~PV_ZERO_PAGE) {
+				g_set_error(error, ZDUMP_PV_UTILS_ERROR,
+					    ZDUMP_ERR_PGLIST_INVAL_STATE,
+					    _("Invalid page state. page-idx: %#lx, state: %#lx"),
+					    page_idx, page_state);
+				return -1;
+			}
 			continue;
 		}
 
 		if (page_state & PV_SHARED_PAGE) {
 			/* shared pages are not encrypted */
 			input = ctx->input;
-			g_assert(!(page_state & ~PV_SHARED_PAGE));
+			if (page_state & ~PV_SHARED_PAGE) {
+				g_set_error(error, ZDUMP_PV_UTILS_ERROR,
+					    ZDUMP_ERR_PGLIST_INVAL_STATE,
+					    _("Invalid page state. page-idx: %#lx, state: %#lx"),
+					    page_idx, page_state);
+				return -1;
+			}
 		} else if (page_state & PV_ENCRYPTED_PAGE) {
 			input = ctx->filter;
 			calculate_tweak(tweak_comp, ctx->nonce, &ctx->tweak_scratch);
@@ -624,7 +636,13 @@ ssize_t pv_process_pglist(pv_crypto_ctx_t *ctx, BIO *output,
 			if (update_tweak(ctx, error) < 0)
 				return -1;
 
-			g_assert(!(page_state & ~PV_ENCRYPTED_PAGE));
+			if (page_state & ~PV_ENCRYPTED_PAGE) {
+				g_set_error(error, ZDUMP_PV_UTILS_ERROR,
+					    ZDUMP_ERR_PGLIST_INVAL_STATE,
+					    _("Invalid page state. page-idx: %#lx, state: %#lx"),
+					    page_idx, page_state);
+				return -1;
+			}
 		} else {
 			g_set_error(error, ZDUMP_PV_UTILS_ERROR, ZDUMP_ERR_PGLIST_INVAL_STATE,
 				    _("Invalid page state. page-idx: %#lx, state: %#lx"), page_idx,
