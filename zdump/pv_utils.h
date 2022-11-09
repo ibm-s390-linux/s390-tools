@@ -258,9 +258,9 @@ bool pv_is_pv_elf(const Elf64_Shdr *shdrs, const unsigned int shnum, const char 
  *
  * Returns: 0 in case of success, -1 otherwise.
  */
-int pv_process_section_data(const int fd, GBytes *completion_sec, const u64 storage_state_offset,
-			    const size_t storage_state_size, GBytes *cck,
-			    pv_dump_completion_t **completion_decr, GBytes **dump_key,
+int pv_process_section_data(const int fd, const size_t file_size, GBytes *completion_sec,
+			    const u64 storage_state_offset, const size_t storage_state_size,
+			    GBytes *cck, pv_dump_completion_t **completion_decr, GBytes **dump_key,
 			    storage_state_mmap_t **storage_state_data, GError **error);
 
 /**
@@ -283,14 +283,15 @@ int pv_elf_read(const pv_elf_ctx_t *elf_ctx, const u64 start_addr, void *dst, co
 /**
  * storage_state_mmap_new:
  * @fd: file descriptor for which to create the mapping
+ * @file_size: file size in bytes
  * @offset: offset in fd to pv_mem_meta section
  * @size: size of mapping  (and pv_mem_meta section)
  * @error: return value for GError
  *
  * Returns: new storage_state_mmap context
  */
-storage_state_mmap_t *storage_state_mmap_new(const int fd, const u64 offset, const u64 size,
-					     GError **error);
+storage_state_mmap_t *storage_state_mmap_new(const int fd, const size_t file_size, const u64 offset,
+					     const u64 size, GError **error);
 
 /**
  * storage_state_ref:

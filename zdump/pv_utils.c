@@ -677,10 +677,10 @@ struct _storage_state_mmap {
 	gatomicrefcount ref_count;
 };
 
-storage_state_mmap_t *storage_state_mmap_new(const int fd, const u64 offset, const u64 size,
-					     GError **error)
+storage_state_mmap_t *storage_state_mmap_new(const int fd, const size_t file_size, const u64 offset,
+					     const u64 size, GError **error)
 {
-	size_t tweak_components_cnt, start_addr, in_page_offset, mmapped_size;
+	size_t tweak_components_cnt, start_addr, min_size, in_page_offset, mmapped_size;
 	g_autoptr(storage_state_mmap_t) ret = NULL;
 	int saved_errno = 0;
 	u8 *ptr;
@@ -704,6 +704,19 @@ storage_state_mmap_t *storage_state_mmap_new(const int fd, const u64 offset, con
 		g_set_error(error, ZDUMP_PV_UTILS_ERROR, ZDUMP_ERR_MMAP,
 			    _("StorageState MMAP: page start address is too large (%#lx)"),
 			    start_addr);
+		return NULL;
+	}
+
+	if (G_UNLIKELY(!g_uint64_checked_add(&min_size, start_addr, mmapped_size))) {
+		g_set_error(error, ZDUMP_PV_UTILS_ERROR, ZDUMP_ERR_PAGE_END_ADDR_OVERFLOW,
+			    _("UInt overflow detected: %s: start_addr %#lx mmap_size %#lx"),
+			    __func__, start_addr, mmapped_size);
+		return NULL;
+	}
+
+	if (file_size < min_size) {
+		g_set_error(error, ZDUMP_PV_UTILS_ERROR, ZDUMP_ERR_MMAP,
+			    _("mmap failed: file too small"));
 		return NULL;
 	}
 	ptr = mmap(NULL, mmapped_size, PROT_READ, MAP_POPULATE | MAP_PRIVATE, fd,
@@ -814,9 +827,9 @@ static long completion_data_get_version(GBytes *cpl_data, GError **error)
 	return *version;
 }
 
-int pv_process_section_data(const int fd, GBytes *completion_sec, const u64 storage_state_offset,
-			    const size_t storage_state_size, GBytes *cck,
-			    pv_dump_completion_t **completion_decr, GBytes **dump_key,
+int pv_process_section_data(const int fd, const size_t file_size, GBytes *completion_sec,
+			    const u64 storage_state_offset, const size_t storage_state_size,
+			    GBytes *cck, pv_dump_completion_t **completion_decr, GBytes **dump_key,
 			    storage_state_mmap_t **storage_state, GError **error)
 {
 	g_autoptr(pv_dump_completion_t) _completion_decr = NULL;
@@ -870,8 +883,8 @@ int pv_process_section_data(const int fd, GBytes *completion_sec, const u64 stor
 		return -1;
 	}
 
-	_storage_state_data =
-		storage_state_mmap_new(fd, storage_state_offset, storage_state_size, error);
+	_storage_state_data = storage_state_mmap_new(fd, file_size, storage_state_offset,
+						     storage_state_size, error);
 	if (!_storage_state_data)
 		return -1;
 

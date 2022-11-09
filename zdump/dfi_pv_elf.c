@@ -263,9 +263,9 @@ static int dfi_pv_elf_init(void)
 	 * completion configuration data and store it in `@cpl_conf_decr`. In addition, mmap the
 	 * configuration storage state area and use the `tweak_nonce`.
 	 */
-	if (pv_process_section_data(fh->fh, completion_sdata, storage_state_shdr->sh_offset,
-				    storage_state_shdr->sh_size, key, &cpl_conf_decr, &dump_key,
-				    &storage_state_data, &error) < 0) {
+	if (pv_process_section_data(fh->fh, fh->sb.st_size, completion_sdata,
+				    storage_state_shdr->sh_offset, storage_state_shdr->sh_size, key,
+				    &cpl_conf_decr, &dump_key, &storage_state_data, &error) < 0) {
 		ERR(_("Unable to read decryption information:" ERR_NEWLINE "%s."), error->message);
 		return -EINVAL;
 	}
