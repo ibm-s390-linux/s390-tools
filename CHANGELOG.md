@@ -1,18 +1,28 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.23.x (2022-xx-xx)__
+* __v2.24.0 (2022-11-09)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.0
 
   Add new tools / libraries:
+  - Provide config files for checkpatch, codespell, and clang-format
 
   Changes of existing tools:
+  - dbginfo.sh: Collect log from various distro tools (YaST, DNF, Anaconda)
+  - dbginfo.sh: add Kubernetes data collection
+  - libutil: Introduce util_lockfile
+  - zdev: Add site-aware device configuration
+  - zdump: Add support to read Protected Virtualization dumps
+  - zipl/boot: Add secure boot trailer
 
   Bug Fixes:
-  - dbginfo.sh: save dbginfo.sh version to dbginfo.log
-  - dbginfo.sh: ensure compatibility with /bin/dash shell
-  - dbginfo.sh: add Kubernetes data collection
+  - ap_tools/ap-check: Reject start for control domains without usage
+  - cpumf/lshwc: Fix incremented counter output
+  - cpumf/pai: Fix core dump when summary flag set
+  - dbginfo.sh: Ensure compatibility with /bin/dash shell
+  - dbginfo.sh: Save dbginfo.sh version to dbginfo.log
+  - zipl/src/zipl_helper.device-mapper: Fix bug in error path
 
 * __v2.23.0 (2022-08-18)__
 
