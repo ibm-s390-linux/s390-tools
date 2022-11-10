@@ -19,97 +19,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
 
 #include "disk.h"
 #include "tunedasd.h"
 
 #define BUS_ID_SIZE 30
-
-/*
- * DASD DEFINITIONS (copied from dasd.h) 
- */
-
-#define DASD_IOCTL_LETTER 'D'
-
-/* 
- * struct profile_info_t
- * holds the profiling information 
- */
-typedef struct dasd_profile_info_t {
-        unsigned int dasd_io_reqs;	  /* # of requests processed at all */
-        unsigned int dasd_io_sects;	  /* # of sectors processed at all */
-        unsigned int dasd_io_secs[32];	  /* request's sizes */
-        unsigned int dasd_io_times[32];	  /* requests's times */
-        unsigned int dasd_io_timps[32];	  /* requests's times per sector */
-        unsigned int dasd_io_time1[32];	  /* time from build to start */
-        unsigned int dasd_io_time2[32];	  /* time from start to irq */
-        unsigned int dasd_io_time2ps[32]; /*time from start to irq */
-        unsigned int dasd_io_time3[32];	  /* time from irq to end */
-        unsigned int dasd_io_nr_req[32];  /* # of requests in chanq */
-} dasd_profile_info_t;
-
-
-/* 
- * struct attrib_data_t
- * represents the operation (cache) bits for the device.
- * Used in DE to influence caching of the DASD.
- */
-typedef struct attrib_data_t {
-	unsigned char   operation:3;     /* cache operation mode */
-	unsigned char   reserved:5;      
-	unsigned short  nr_cyl;          /* no of cyliners for read ahaed */
-	unsigned char   reserved2[29];   /* for future use */
-} __attribute__ ((packed)) attrib_data_t;
-
-/* definition of operation (cache) bits within attributes of DE */
-#define DASD_NORMAL_CACHE  0x0
-#define DASD_BYPASS_CACHE  0x1
-#define DASD_INHIBIT_LOAD  0x2
-#define DASD_SEQ_ACCESS    0x3
-#define DASD_SEQ_PRESTAGE  0x4
-#define DASD_REC_ACCESS    0x5
-
-/*
- * Data returned by Sense Path Group ID (SNID)
- */
-struct dasd_snid_data {
-	struct {
-		__u8 group:2;
-		__u8 reserve:2;
-		__u8 mode:1;
-		__u8 res:3;
-	} __attribute__ ((packed)) path_state;
-	__u8 pgid[11];
-} __attribute__ ((packed));
-
-struct dasd_snid_ioctl_data {
-	struct dasd_snid_data data;
-	__u8 path_mask;
-} __attribute__ ((packed));
-
-
-/*
- * DASD-IOCTLs (copied from dasd.h) 
- */
-/* Issue a reserve/release command, rsp. */
-#define BIODASDRSRV    _IO (DASD_IOCTL_LETTER,2) /* reserve */
-#define BIODASDRLSE    _IO (DASD_IOCTL_LETTER,3) /* release */
-#define BIODASDSLCK    _IO (DASD_IOCTL_LETTER,4) /* steal lock */
-/* reset profiling information of a device */
-#define BIODASDPRRST   _IO (DASD_IOCTL_LETTER,5)
-
-/* retrieve profiling information of a device */
-#define BIODASDPRRD    _IOR (DASD_IOCTL_LETTER,2,dasd_profile_info_t)
-/* Get Attributes (cache operations) */
-#define BIODASDGATTR   _IOR(DASD_IOCTL_LETTER,5,attrib_data_t)
-
-/* Set Attributes (cache operations) */
-#define BIODASDSATTR   _IOW (DASD_IOCTL_LETTER,2,attrib_data_t) 
-
-/* Get Sense Path Group ID (SNID) data */
-#define BIODASDSNID    _IOWR(DASD_IOCTL_LETTER, 1, struct dasd_snid_ioctl_data)
-
 
 /* id definition for profile items */
 enum prof_id {
@@ -241,48 +157,33 @@ check_prof_item (char* prof_item)
  * 'cache' is the caching mode (see ESS docu for more info) and 'no_cyl'
  * the number of cylinders to be cached.
  */
-int
-disk_get_cache (char* device)
+int disk_get_cache(char *device)
 {
-	int fd;
 	attrib_data_t attrib_data;
-	
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
+	int rc;
 
-	/* Get the given caching attributes */
-	if (ioctl (fd, BIODASDGATTR, &attrib_data)) {
-		error_print ("Could not get cache attributes for device <%s>",
-			     device);
-		close (fd);
-		return -1;
-	}
+	rc = dasd_get_cache(device, &attrib_data);
+	if (rc)
+		return rc;
 
 	printf ("%s (%i cyl)\n",
 		get_cache_name(attrib_data.operation),
 		attrib_data.nr_cyl);
 
-	close (fd);
 	return 0;
 }
-
 
 /*
  * Set the caching algorithm used for the channel programs of this device.
  * 'cache' is the caching mode (see ESS docu for more info) and 'no_cyl'
  * the number of cylinders to be cached.
  */
-int
-disk_set_cache (char* device, char* cache, char* no_cyl)
+int disk_set_cache(char *device, char *cache, char *no_cyl)
 {
-	int fd;
 	attrib_data_t attrib_data;
-	
-        /* get caching mode and # cylinders */
+	int rc;
+
+	/* get caching mode and # cylinders */
 	attrib_data.operation = check_cache (cache);
 	attrib_data.nr_cyl = check_no_cyl (no_cyl);
 
@@ -292,52 +193,34 @@ disk_set_cache (char* device, char* cache, char* no_cyl)
 			attrib_data.nr_cyl);
 	}
 
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
-
 	/* Set the given caching attributes */
 	printf ("Setting cache mode for device <%s>...\n", device);
-	if (ioctl (fd, BIODASDSATTR, &attrib_data)) {
-		error_print ("Could not set caching for device <%s>", device);
-		close (fd);
+	rc = dasd_set_cache(device, &attrib_data);
+	if (rc) {
+		error_print("Could not set caching for device <%s>", device);
 		return -1;
 	}
-
 	printf ("Done.\n");
-	close (fd);
+
 	return 0;
 }
-
 
 /*
  * Reserve the device.
  */
-int 
-disk_reserve (char* device)
+int disk_reserve(char *device)
 {
-	int fd;
-
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
+	int rc;
 
 	/* Reserve device */
 	printf ("Reserving device <%s>...\n", device);
-	if (ioctl (fd, BIODASDRSRV)) {
-		error_print ("Could not reserve device <%s>", device);
-		close (fd);
+	rc = dasd_disk_reserve(device);
+	if (rc) {
+		error_print("Could not reserve device <%s>", device);
 		return -1;
 	}
 
-	printf ("Done.\n");
-	close (fd);
+	printf("Done.\n");
 	return 0;
 }
 
@@ -345,28 +228,18 @@ disk_reserve (char* device)
 /*
  * Release the device.
  */
-int 
-disk_release (char* device)
+int disk_release(char *device)
 {
-	int fd;
+	int rc;
 
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
-
-	/* Release device */
 	printf ("Releasing device <%s>...\n", device);
-	if (ioctl (fd, BIODASDRLSE)) {
-		error_print ("Could not release device <%s>", device);
-		close (fd);
+	rc = dasd_disk_release(device);
+	if (rc) {
+		error_print("Could not release device <%s>", device);
 		return -1;
 	}
 
-	printf ("Done.\n");
-	close (fd);
+	printf("Done.\n");
 	return 0;
 }
 
@@ -376,29 +249,19 @@ disk_release (char* device)
  * This means to reserve the device even if it was already reserved.
  * The current reserve is broken (steal lock).
  */
-int 
-disk_slock (char* device)
+int disk_slock(char *device)
 {
-	int fd;
-
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
+	int rc;
 
 	/* Unconditional reserve device */
 	printf ("Unconditional reserving device <%s>...\n", device);
-	if (ioctl (fd, BIODASDSLCK)) {
-		error_print ("Could not unconditional reserve device <%s>", 
-			     device);
-		close (fd);
+	rc = dasd_slock(device);
+	if (rc) {
+		error_print("Could not unconditional reserve device <%s>", device);
 		return -1;
 	}
-
 	printf ("Done.\n");
-	close (fd);
+
 	return 0;
 }
 
@@ -407,27 +270,16 @@ disk_slock (char* device)
  * Uses the Sense Path Group ID (SNID) ioctl to find out if
  * a device is reserved to it's path group.
  */
-int
-disk_query_reserve_status(char* device)
+int disk_query_reserve_status(char *device)
 {
-	int fd;
-	struct dasd_snid_ioctl_data snid;
+	int rc;
 
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
+	rc = dasd_query_reserve(device);
+	if (rc < 0) {
+		error_print("Could not read reserve status for device <%s>", device);
 		return -1;
 	}
-	snid.path_mask = 0;
-	/* Release device */
-	if (ioctl(fd, BIODASDSNID, &snid)) {
-		error_print("Could not read reserve status"
-			    " for device <%s>", device);
-		close (fd);
-		return -1;
-	}
-	switch (snid.data.path_state.reserve) {
+	switch (rc) {
 	case 0:
 		printf("none\n");
 		break;
@@ -441,7 +293,7 @@ disk_query_reserve_status(char* device)
 		printf("reserved\n");
 		break;
 	}
-	close (fd);
+
 	return 0;
 }
 
@@ -615,21 +467,14 @@ static int disk_profile_item(dasd_profile_info_t dasd_profile_info,
 /*
  * Get and print the profiling info of the device.
  */
-int 
-disk_profile (char* device, char* prof_item)
+int disk_profile(char *device, char *prof_item)
 {
-	int fd, rc;
 	dasd_profile_info_t dasd_profile_info;
-
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
+	int rc;
 
 	/* Get the profile info */
-	if (ioctl (fd, BIODASDPRRD, &dasd_profile_info)) {
+	rc = dasd_profile(device, &dasd_profile_info);
+	if (rc) {
 		switch (errno) {
 		case EIO:		/* profiling is not active */
 			error_print ("Profiling (on device <%s>) is not "
@@ -639,7 +484,6 @@ disk_profile (char* device, char* prof_item)
 			error_print ("Could not get profile info for device "
 				     "<%s>.", device);
 		}
-		close (fd);
 		return -1;
 	}
 	/* Check for profile item or summary */
@@ -648,38 +492,26 @@ disk_profile (char* device, char* prof_item)
 	} else {
 		rc = disk_profile_item (dasd_profile_info, prof_item);
 	}
-	
-	close (fd);
+
 	return rc;
 }
-
 
 /*
  * Reset the profiling counters of the device.
  */
-int 
-disk_reset_prof (char* device)
+int disk_reset_prof(char *device)
 {
-	int fd;
-
-	/* Open device file */
-	fd = open (device, O_RDONLY);
-	if (fd == -1) {
-		error_print ("<%s> - %s", device, strerror (errno));
-		return -1;
-	}
+	int rc;
 
 	/* reset profile info */
 	printf ("Resetting profile info for device <%s>...\n", device);
-	if (ioctl (fd, BIODASDPRRST)) {
-		error_print ("Could not reset profile info for device <%s>",
-			     device);
-		close (fd);
+	rc = dasd_reset_profile(device);
+	if (rc) {
+		error_print("Could not reset profile info for device <%s>", device);
 		return -1;
 	}
-
 	printf ("Done.\n");
-	close (fd);
+
 	return 0;
 }
 

@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "lib/dasd_base.h"
 
@@ -317,6 +318,134 @@ int dasd_disk_release(const char *device)
 
 	fd = dasd_open_device(device, O_RDONLY);
 	RUN_IOCTL(fd, BIODASDRLSE, NULL);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
+ * Unconditionally reserve DASD disk
+ *
+ * An existing reserve lock is lifted (steal lock) and the device
+ * is reserved.
+ *
+ * @param[in] device node   device node's name
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_slock(const char *device)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDSLCK, NULL);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
+ * Get the caching algorithm used for the channel programs of this device.
+ *
+ * @param[in] device node	device node's name
+ * @param[out] attrib_data	pointer to dasd attrib data with:
+ *				'cache' is the caching mode
+ *				'no_cyl' the number of cylinders to be cached.
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_get_cache(const char *device, attrib_data_t *attrib_data)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDGATTR, attrib_data);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
+ * Set the caching algorithm used for the channel programs of this device.
+ *
+ * @param[in] device node	device node's name
+ * @param[in] attrib_data	pointer to dasd attrib data with:
+ *				'cache' is the caching mode
+ *				'no_cyl' the number of cylinders to be cached.
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_set_cache(const char *device, attrib_data_t *attrib_data)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDSATTR, attrib_data);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
+ * Get reserve status of device.
+ *
+ * @param[in] device node	device node's name
+ *
+ * @retval errno	in case of failure
+ * @retval 0		unreserved
+ * @retval 1		implicit reserved
+ * @retval 2		other reservation
+ * @retval 3		reserved
+ */
+int dasd_query_reserve(const char *device)
+{
+	struct dasd_snid_ioctl_data snid = { 0 };
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDSNID, &snid);
+	dasd_close_device(fd);
+
+	return snid.data.path_state.reserve;
+}
+
+/*
+ * Get and print the profiling info of the device.
+ *
+ * @param[in] device node		device node's name
+ * @param[in] dasd_profile_info		pointer to dasd profile info
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_profile(const char *device, dasd_profile_info_t *dasd_profile_info)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDPRRD, dasd_profile_info);
+	dasd_close_device(fd);
+
+	return 0;
+}
+
+/*
+ * Reset the profiling counters of the device.
+ *
+ * @param[in] device node	device node's name
+ *
+ * @retval 0		in case of success
+ * @retval errno	in case of failure
+ */
+int dasd_reset_profile(const char *device)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDPRRST, NULL);
 	dasd_close_device(fd);
 
 	return 0;

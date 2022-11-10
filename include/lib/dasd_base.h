@@ -187,6 +187,61 @@ typedef struct format_check_t {
 #define DASD_FMT_ERR_RECORD_ID		4
 #define DASD_FMT_ERR_KEY_LENGTH		5
 
+/*
+ * struct profile_info_t
+ * holds the profiling information
+ */
+typedef struct dasd_profile_info_t {
+	unsigned int dasd_io_reqs;	  /* # of requests processed at all */
+	unsigned int dasd_io_sects;	  /* # of sectors processed at all */
+	unsigned int dasd_io_secs[32];	  /* request's sizes */
+	unsigned int dasd_io_times[32];	  /* requests's times */
+	unsigned int dasd_io_timps[32];	  /* requests's times per sector */
+	unsigned int dasd_io_time1[32];	  /* time from build to start */
+	unsigned int dasd_io_time2[32];	  /* time from start to irq */
+	unsigned int dasd_io_time2ps[32]; /* time from start to irq */
+	unsigned int dasd_io_time3[32];	  /* time from irq to end */
+	unsigned int dasd_io_nr_req[32];  /* # of requests in chanq */
+} dasd_profile_info_t;
+
+/*
+ * struct attrib_data_t
+ * represents the operation (cache) bits for the device.
+ * Used in DE to influence caching of the DASD.
+ */
+typedef struct attrib_data_t {
+	unsigned char operation : 3; /* cache operation mode */
+	unsigned char reserved	: 5;
+	unsigned short nr_cyl;	     /* no of cyliners for read ahaed */
+	unsigned char reserved2[29]; /* for future use */
+} __attribute__((packed)) attrib_data_t;
+
+/* definition of operation (cache) bits within attributes of DE */
+#define DASD_NORMAL_CACHE 0x0
+#define DASD_BYPASS_CACHE 0x1
+#define DASD_INHIBIT_LOAD 0x2
+#define DASD_SEQ_ACCESS	  0x3
+#define DASD_SEQ_PRESTAGE 0x4
+#define DASD_REC_ACCESS	  0x5
+
+/*
+ * Data returned by Sense Path Group ID (SNID)
+ */
+struct dasd_snid_data {
+	struct {
+		__u8 group   : 2;
+		__u8 reserve : 2;
+		__u8 mode    : 1;
+		__u8 res     : 3;
+	} __attribute__((packed)) path_state;
+	__u8 pgid[11];
+} __attribute__((packed));
+
+struct dasd_snid_ioctl_data {
+	struct dasd_snid_data data;
+	__u8 path_mask;
+} __attribute__((packed));
+
 #ifndef __linux__
 /* definition from hdreg.h */
 struct hd_geometry {
@@ -207,12 +262,24 @@ struct hd_geometry {
 #define BIODASDRSRV    _IO(DASD_IOCTL_LETTER, 2)
 /* Release the device for the current LPAR */
 #define BIODASDRLSE    _IO(DASD_IOCTL_LETTER, 3)
+/* Unconditional reserve the device for the current LPAR */
+#define BIODASDSLCK	_IO(DASD_IOCTL_LETTER, 4)
+/* reset profiling information of a device */
+#define BIODASDPRRST	_IO(DASD_IOCTL_LETTER, 5)
+/* retrieve profiling information of a device */
+#define BIODASDPRRD	_IOR(DASD_IOCTL_LETTER, 2, dasd_profile_info_t)
 /* Get information on a dasd device (enhanced) */
 #define BIODASDINFO2   _IOR(DASD_IOCTL_LETTER, 3, dasd_information2_t)
+/* Get Attributes (cache operations) */
+#define BIODASDGATTR	_IOR(DASD_IOCTL_LETTER, 5, attrib_data_t)
 /* #define BIODASDFORMAT  _IOW(IOCTL_LETTER,0,format_data_t) , deprecated */
 #define BIODASDFMT     _IOW(DASD_IOCTL_LETTER, 1, format_data_t)
+/* Set Attributes (cache operations) */
+#define BIODASDSATTR	_IOW(DASD_IOCTL_LETTER, 2, attrib_data_t)
 /* Release Allocated Space */
 #define BIODASDRAS     _IOW(DASD_IOCTL_LETTER, 3, format_data_t)
+/* Get Sense Path Group ID (SNID) data */
+#define BIODASDSNID	_IOWR(DASD_IOCTL_LETTER, 1, struct dasd_snid_ioctl_data)
 /* Check device format according to format_data_t */
 #define BIODASDCHECKFMT _IOWR(DASD_IOCTL_LETTER, 2, format_check_t)
 
@@ -245,5 +312,11 @@ int dasd_is_ro(const char *device, bool *ro);
 int dasd_reread_partition_table(const char *device, int ntries);
 int dasd_disk_reserve(const char *device);
 int dasd_disk_release(const char *device);
+int dasd_slock(const char *device);
+int dasd_get_cache(const char *device, attrib_data_t *attrib_data);
+int dasd_set_cache(const char *device, attrib_data_t *attrib_data);
+int dasd_query_reserve(const char *device);
+int dasd_profile(const char *device, dasd_profile_info_t *dasd_profile_info);
+int dasd_reset_profile(const char *device);
 
 #endif /* LIB_DASD_BASE_H */
