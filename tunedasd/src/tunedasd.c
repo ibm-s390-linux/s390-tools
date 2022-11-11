@@ -119,12 +119,17 @@ static struct util_opt opt_vec[] = {
 		.desc = "Reset all channel paths of a device",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
+	{
+		.option = { "copy-pair-swap", required_argument, NULL, 's' },
+		.argument = "COPY_PAIR",
+		.desc = "Swap a specified, comma separated copy pair.",
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
 };
 
-#define CMD_KEYWORD_NUM		16
+#define CMD_KEYWORD_NUM		17
 #define DEVICES_NUM		256
 
 enum cmd_keyword_id {
@@ -144,6 +149,7 @@ enum cmd_keyword_id {
 	cmd_keyword_path_all,
 	cmd_keyword_enable_stats,
 	cmd_keyword_disable_stats,
+	cmd_keyword_copy_swap,
 };
 
 
@@ -167,7 +173,8 @@ static const struct {
 	{ "path_reset",     cmd_keyword_path },
 	{ "path_reset_all", cmd_keyword_path_all },
 	{ "enable-stats",   cmd_keyword_enable_stats },
-	{ "disable-stats",  cmd_keyword_disable_stats }
+	{ "disable-stats",  cmd_keyword_disable_stats },
+	{ "copy-swap",      cmd_keyword_copy_swap },
 };	
 
 
@@ -180,26 +187,27 @@ enum cmd_key_state {
 
 /* Determines which combination of keywords are valid */
 static enum cmd_key_state cmd_key_table[CMD_KEYWORD_NUM][CMD_KEYWORD_NUM] = {
-	/*		      help vers get_ cach no_c rese rele sloc prof prof rese quer path path
-	 *		           ion  cach e    yl   rve  ase  k    ile  _ite t_pr y_re      _all
-	 *		               	e                                  m    of  serv
+	/*		      help vers get_ cach no_c rese rele sloc prof prof rese quer path path enab disa copy
+	 *		           ion  cach e    yl   rve  ase  k    ile  _ite t_pr y_re      _all le-s ble- -swa
+	 *		               	e                                  m    of  serv            tats stat p
 	 */
-	/* help  	 */ { req, opt, opt, opt, opt, opt, opt, opt, opt, opt, opt, inv, inv, inv, inv, inv },
-	/* version	 */ { inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* get_cache	 */ { opt, opt, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* cache 	 */ { opt, opt, inv, req, opt, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* no_cyl	 */ { opt, opt, inv, req, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* reserve	 */ { opt, opt, inv, inv, inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* release	 */ { opt, opt, inv, inv, inv, inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* slock 	 */ { opt, opt, inv, inv, inv, inv, inv, req, inv, inv, inv, inv, inv, inv, inv, inv },
-	/* profile	 */ { opt, opt, inv, inv, inv, inv, inv, inv, req, opt, inv, inv, inv, inv, inv, inv },
-	/* prof_item	 */ { opt, opt, inv, inv, inv, inv, inv, inv, req, req, inv, inv, inv, inv, inv, inv },
-	/* reset_prof	 */ { opt, opt, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv, inv, inv },
-	/* query_reserve */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv, inv },
-	/* path          */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv },
-	/* path_all      */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv },
-	/* enable-stats  */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv },
-	/* disable-stats */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req },
+	/* help  	 */ { req, opt, opt, opt, opt, opt, opt, opt, opt, opt, opt, inv, inv, inv, inv, inv, inv },
+	/* version	 */ { inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* get_cache	 */ { opt, opt, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* cache 	 */ { opt, opt, inv, req, opt, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* no_cyl	 */ { opt, opt, inv, req, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* reserve	 */ { opt, opt, inv, inv, inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* release	 */ { opt, opt, inv, inv, inv, inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* slock 	 */ { opt, opt, inv, inv, inv, inv, inv, req, inv, inv, inv, inv, inv, inv, inv, inv, inv },
+	/* profile	 */ { opt, opt, inv, inv, inv, inv, inv, inv, req, opt, inv, inv, inv, inv, inv, inv, inv },
+	/* prof_item	 */ { opt, opt, inv, inv, inv, inv, inv, inv, req, req, inv, inv, inv, inv, inv, inv, inv },
+	/* reset_prof	 */ { opt, opt, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv, inv, inv, inv },
+	/* query_reserve */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv, inv, inv },
+	/* path          */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv, inv },
+	/* path_all      */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv, inv },
+	/* enable-stats  */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv, inv },
+	/* disable-stats */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req, inv },
+	/* copy-swap     */ { inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, inv, req },
 };
 
 struct parameter {
@@ -439,7 +447,9 @@ static int get_command_line(int argc, char *argv[], struct command_line *line)
 			rc = store_option (&cmdline, cmd_keyword_query_reserve,
 					   optarg);
 			break;
-
+		case 's':
+			rc = store_option(&cmdline, cmd_keyword_copy_swap, optarg);
+			break;
 		case -1:
 			/* End of options string - start of devices list */
 			cmdline.device_id = optind;
@@ -507,6 +517,9 @@ static int do_command(char *device, struct command_line cmdline)
 		break;
 	case cmd_keyword_path_all:
 		rc = disk_reset_chpid(device, NULL);
+		break;
+	case cmd_keyword_copy_swap:
+		rc = disk_copy_swap(device, cmdline.parm[cmd_keyword_copy_swap].data);
 		break;
 	default:
 		error_print ("Unknown command '%s' specified",

@@ -20,8 +20,8 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-/* A bus id of a DASD is 8 characters long. E.g. 0.0.4711 */
-#define DASD_BUS_ID_SIZE	9
+/* the definition of a BUSID in the DASD driver is 20 */
+#define DASD_BUS_ID_SIZE	20
 
 typedef struct dasd_information2_t {
 	unsigned int devno;         /* S/390 devno */
@@ -242,6 +242,13 @@ struct dasd_snid_ioctl_data {
 	__u8 path_mask;
 } __attribute__((packed));
 
+struct dasd_copypair_swap_data {
+	char primary[DASD_BUS_ID_SIZE]; /* BUSID of primary */
+	char secondary[DASD_BUS_ID_SIZE]; /* BUSID of secondary */
+	/* Reserved for future updates. */
+	char reserved[64];
+};
+
 #ifndef __linux__
 /* definition from hdreg.h */
 struct hd_geometry {
@@ -278,6 +285,8 @@ struct hd_geometry {
 #define BIODASDSATTR	_IOW(DASD_IOCTL_LETTER, 2, attrib_data_t)
 /* Release Allocated Space */
 #define BIODASDRAS     _IOW(DASD_IOCTL_LETTER, 3, format_data_t)
+/* Swap copy pair */
+#define BIODASDPPRCSWAP _IOW(DASD_IOCTL_LETTER, 4, struct dasd_copypair_swap_data)
 /* Get Sense Path Group ID (SNID) data */
 #define BIODASDSNID	_IOWR(DASD_IOCTL_LETTER, 1, struct dasd_snid_ioctl_data)
 /* Check device format according to format_data_t */
@@ -318,5 +327,6 @@ int dasd_set_cache(const char *device, attrib_data_t *attrib_data);
 int dasd_query_reserve(const char *device);
 int dasd_profile(const char *device, dasd_profile_info_t *dasd_profile_info);
 int dasd_reset_profile(const char *device);
+int dasd_copy_swap(const char *device, struct dasd_copypair_swap_data *data);
 
 #endif /* LIB_DASD_BASE_H */

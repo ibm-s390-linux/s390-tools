@@ -31,6 +31,7 @@ int disk_query_reserve_status(char* device);
 int disk_profile (char* device, char* prof_item);
 int disk_reset_prof(char *device);
 int disk_reset_chpid(char *device, char *chpid);
+int disk_copy_swap(char *device, char *copy_pair);
 
 #endif /* not DISK_H */
 

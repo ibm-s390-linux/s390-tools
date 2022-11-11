@@ -21,11 +21,10 @@
 
 #include "lib/dasd_base.h"
 #include "lib/dasd_sys.h"
+#include "lib/util_libc.h"
 
 #include "disk.h"
 #include "tunedasd.h"
-
-#define BUS_ID_SIZE 30
 
 /* id definition for profile items */
 enum prof_id {
@@ -544,6 +543,53 @@ int disk_reset_chpid(char *device, char *chpid)
 	default:
 		error_print("%s: Could not reset chpid %s",
 			     device, chpid);
+		break;
+	}
+
+	return -1;
+}
+
+int disk_copy_swap(char *device, char *copy_pair)
+{
+	struct dasd_copypair_swap_data data = { 0 };
+	char *primary, *secondary;
+	int rc = 0;
+
+	primary = strtok(copy_pair, ",");
+	secondary = strtok(NULL, ",");
+
+	if (!primary || !secondary) {
+		error_print("%s: Error parsing Copy Pair %s", device, copy_pair);
+		return -1;
+	}
+
+	util_strlcpy(data.primary, primary, DASD_BUS_ID_SIZE);
+	util_strlcpy(data.secondary, secondary, DASD_BUS_ID_SIZE);
+
+	printf("Swapping copy pair %s %s on device <%s>...\n", primary, secondary, device);
+	rc = dasd_copy_swap(device, &data);
+
+	switch (rc) {
+	case 0:
+		printf("Done.\n");
+		return 0;
+	case 1:
+		error_print("Swap data invalid");
+		break;
+	case 2:
+		error_print("No active device found");
+		break;
+	case 3:
+		error_print("Wrong primary device specified");
+		break;
+	case 4:
+		error_print("Secondary device not found");
+		break;
+	case 5:
+		error_print("Swap already running");
+		break;
+	default:
+		error_print("Swap not successful rc %d", rc);
 		break;
 	}
 

@@ -452,3 +452,31 @@ int dasd_reset_profile(const char *device)
 
 	return 0;
 }
+
+/*
+ * Initiate the swap of a copy pairs primary,secondary relation.
+ * The old secondary will become the new primary and vice versa.
+ *
+ * @param[in] device node	device node's name
+ * @param[in] copy_pair data	pointer to dasd copypair data with:
+ *				'primary' old primary, becoming secondary
+ *				'secondary' old secondary, becoming primary.
+ *
+ * @retval errno	in case of failure
+ * @retval 0		in case of success
+ * @retval 1		swap data invalid
+ * @retval 2		no active device found
+ * @retval 3		wrong primary specified
+ * @retval 4		secondary device not found
+ * @retval 5		swap already running
+ */
+int dasd_copy_swap(const char *device, struct dasd_copypair_swap_data *data)
+{
+	int fd;
+
+	fd = dasd_open_device(device, O_RDONLY);
+	RUN_IOCTL(fd, BIODASDPPRCSWAP, data);
+	dasd_close_device(fd);
+
+	return 0;
+}
