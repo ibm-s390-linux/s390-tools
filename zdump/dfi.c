@@ -3,7 +3,7 @@
  *
  * Generic input dump format functions (DFI - Dump Format Input)
  *
- * Copyright IBM Corp. 2001, 2018
+ * Copyright IBM Corp. 2001, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -34,6 +34,7 @@ static struct dfi *dfi_vec[] = {
 	&dfi_s390_ext,
 	&dfi_s390,
 	&dfi_lkcd,
+	&dfi_vmdump,
 	&dfi_pv_elf,
 	&dfi_elf,
 	&dfi_kdump,

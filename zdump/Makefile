@@ -76,7 +76,7 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dt.o dt_s390sv.o dt_s390sv_ext.o \
 	  dt_s390mv.o dt_s390mv_ext.o \
 	  dt_scsi.o output.o \
-	  ngdump.o dt_ngdump.o dfi_ngdump.o \
+	  ngdump.o dt_ngdump.o dfi_ngdump.o dfi_vmdump.o \
 	  pv_utils.o
 
 ifneq ($(shell sh -c 'command -v pkg-config'),)
