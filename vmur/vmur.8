@@ -50,7 +50,7 @@ Position a file at the top of a spool file queue
 The \*v program requires the vmcp kernel module as prerequisite.
 For the receive, punch, and print commands the vmur kernel module is also
 required, and the corresponding z/VM virtual unit record devices
-(in most cases 000c as reader, 000d as punch, and 000e as printer) 
+(in most cases 000c as reader, 000d as punch, and 000e as printer)
 must be set online.
 See
 .BR chccwdev (8)
@@ -77,7 +77,7 @@ respective command context.
 .IP "" 0
 Synopsis:
 .IP "" 2
-receive [-fH] [-d dev_node] [-C class] [-t | -b sep.pad | -c]
+receive [-fH] [-d dev_node] [-C class] [-t | -b sep.pad]
 spoolid
 [-O | outfile]
 .PP
@@ -124,7 +124,7 @@ If omitted, /dev/vmrdr-0.0.000c is assumed.
 .IP "" 0
 \fB-t or --text\fR
 .IP "" 2
-Specifies that a text file requiring EBCDIC-to-ASCII conversion is to be 
+Specifies that a text file requiring EBCDIC-to-ASCII conversion is to be
 received. Character sets IBM037 and ISO-8859-1 are used for the conversion.
 An ASCII line feed character (0x0a) is inserted for each 80-byte input
 record read from the z/VM reader. Trailing EBCDIC blanks (0x40) in the
@@ -150,8 +150,14 @@ using the appropriate character sets, for example:
 .IP "" 0
 \fB-c or --convert\fR
 .IP "" 2
-Specifies to convert the VMDUMP spool file into a
-format appropriate for further analysis with crash or lcrash.
+Dump file conversion has been removed from
+.BR vmur (8)
+and -c is no longer a valid option.
+An error message is displayed and the program terminates.
+Use
+.BR zgetdump (8)
+to convert VMDUMP files to a format
+appropriate for further analysis with crash.
 .SP
 .IP "" 0
 \fB-O or --stdout\fR
@@ -299,7 +305,7 @@ residual of the record is filled up with the specified padding byte.
 If a line exceeds the record length, an error is printed.
 .br
 .BR iconv (1)
-output can be piped to punch or print, for example: 
+output can be piped to punch or print, for example:
 .IP "" 2
 # iconv xyz -f ISO-8859-1 -t EBCDIC-US | vmur pun -b 0x25,0x40 -N abc
 .SP
@@ -403,7 +409,7 @@ The following command argument is supported by \fBlist\fR:
 \fBspoolid\fR
 .IP "" 2
 Identifies the z/VM spool file to be listed.
-If omitted, all spool files on the specified queue are listed 
+If omitted, all spool files on the specified queue are listed
 .PD
 .IP "" 0
 .SP
@@ -530,7 +536,7 @@ In the example below, the spool ID is 398:
 .in +0.25in
 .nf
 # vmcp sp cons clo \(rs* rdr
-RDR FILE 0398 SENT FROM LINUX025 CON WAS 0398 RECS 1872 
+RDR FILE 0398 SENT FROM LINUX025 CON WAS 0398 RECS 1872
 .fi
 .in -0.25in
 .ft
@@ -605,6 +611,7 @@ Prepare re-IPL from the z/VM reader and reboot:
 .SH "SEE ALSO"
 .BR chccwdev (8),
 .BR vmcp (8),
-.BR iconv (1)
+.BR iconv (1),
+.BR zgetdump (8)
 
 .I "Linux on System z - Device Drivers, Features, and Commands"

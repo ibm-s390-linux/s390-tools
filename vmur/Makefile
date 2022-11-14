@@ -5,13 +5,12 @@ LDLIBS += -lz
 
 all: vmur
 
-libs =  $(rootdir)/libvmdump/libvmdump.a \
-	$(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a
+libs = $(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a
 
 objects = vmur.o
 
 vmur: $(objects) $(libs)
-	$(LINKXX) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
+	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRSBINDIR) $(DESTDIR)$(MANDIR)/man8

@@ -77,7 +77,6 @@ struct vmur {
 	int   force_specified;
 	int   stdout_specified;
 	int   hold_specified;
-	int   convert_specified;
 	enum  ur_action action;
 	int   devno;
 	int   ur_reclen;
@@ -183,8 +182,6 @@ static char HELP_TEXT[] =
 "-t, --text               Indicates text data causing EBCDIC to ASCII\n"
 "                         conversion.\n"
 "-b, --blocked            Use blocked mode.\n"
-"-c, --convert            Specifies to convert VMDUMP file into a format\n"
-"                         appropriate for further analysis with (l)crash.\n"
 "-O, --stdout             Write spool file to stdout.\n"
 "-f, --force              Overwrite files without prompt.\n"
 "-H, --hold               Hold spool file in reader after receive.\n"
@@ -814,7 +811,10 @@ static void parse_opts_receive(struct vmur *info, int argc, char *argv[])
 			++info->hold_specified;
 			break;
 		case 'c':
-			++info->convert_specified;
+			fprintf(stderr, "%s: Option '-c' is no longer valid. "
+				"Use zgetdump for dump file conversion.\n",
+				prog_name);
+			std_usage_exit();
 			break;
 		case 'C':
 			set_spool_class(info, optarg, 1);
@@ -834,14 +834,12 @@ static void parse_opts_receive(struct vmur *info, int argc, char *argv[])
 	CHECK_SPEC_MAX(info->force_specified, 1, "force");
 	CHECK_SPEC_MAX(info->hold_specified, 1, "hold");
 	CHECK_SPEC_MAX(info->stdout_specified, 1, "stdout");
-	CHECK_SPEC_MAX(info->convert_specified, 1, "convert");
 	CHECK_SPEC_MAX(info->spool_class_specified, 1, "class");
 
 	if (info->stdout_specified && info->file_name_specified)
 		ERR_EXIT("File name not allowed, when --stdout specified!\n");
-	if (info->blocked_specified + info->text_specified +
-	    info->convert_specified > 1)
-		ERR_EXIT("Conflicting options: -b, -t and -c are mutually "
+	if (info->blocked_specified + info->text_specified)
+		ERR_EXIT("Conflicting options: -b and -t are mutually "
 			 "exclusive.\n");
 	if (!info->spool_class_specified)
 		set_spool_class(info, "*", 1);
@@ -1749,25 +1747,6 @@ static void ur_receive(struct vmur *info)
 	}
 
 	type = get_spoolfile_fmt(info, &sfdata[0]);
-	if (info->convert_specified) {
-		if (type != TYPE_VMDUMP) {
-			ERR("Reader file %s does not have VMDUMP format, "
-			    "conversion not possible.\n", info->spoolid);
-			goto fail;
-		} else {
-			close(fhi);
-			if (info->stdout_specified)
-				rc = vmdump_convert(info->devnode, NULL,
-						    prog_name);
-			else
-				rc = vmdump_convert(info->devnode,
-						    info->file_name, prog_name);
-			if (rc)
-				goto fail;
-			else
-				goto vm_convert_done;
-		}
-	}
 	if (type == TYPE_VMDUMP)
 		ERR("INFO: Reader file %s has VMDUMP format.\n", info->spoolid);
 	if (type == TYPE_NETDATA)
@@ -1819,7 +1798,6 @@ static void ur_receive(struct vmur *info)
 	if (fho != STDOUT_FILENO)
 		close(fho);
 	close(fhi);
-vm_convert_done:
 	if (info->hold_specified)
 		close_reader(info, "HOLD");
 	else
