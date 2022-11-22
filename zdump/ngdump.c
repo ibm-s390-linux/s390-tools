@@ -271,7 +271,7 @@ int ngdump_get_dump_part(struct zg_fh *zg_fh)
 			       __func__, comp_entry.type,
 			       comp_entry.compdat.load_address);
 		/* Is this a kernel image ? */
-		if (comp_entry.type == COMPONENT_LOAD &&
+		if (comp_entry.type == COMPONENT_TYPE_LOAD &&
 		    comp_entry.compdat.load_address == IMAGE_ENTRY)
 			break;
 	}

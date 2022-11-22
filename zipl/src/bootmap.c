@@ -248,19 +248,19 @@ create_component_entry(void* buffer, disk_blockptr_t* pointer,
 	memset(entry, 0, sizeof(struct component_entry));
 	entry->type = (uint8_t) type;
 	switch (type) {
-		case COMPONENT_LOAD:
-			bootmap_store_blockptr(&entry->data, pointer,
-					       info);
-			entry->compdat.load_address = data.load_address;
-			break;
-		case COMPONENT_EXECUTE:
-			entry->compdat.load_psw = data.load_psw;
-			break;
-		case COMPONENT_SIGNATURE:
-			bootmap_store_blockptr(&entry->data, pointer,
-					       info);
-			entry->compdat.sig_head = data.sig_head;
-			break;
+	case COMPONENT_TYPE_LOAD:
+		bootmap_store_blockptr(&entry->data, pointer,
+				       info);
+		entry->compdat.load_address = data.load_address;
+		break;
+	case COMPONENT_TYPE_EXECUTE:
+		entry->compdat.load_psw = data.load_psw;
+		break;
+	case COMPONENT_TYPE_SIGNATURE:
+		bootmap_store_blockptr(&entry->data, pointer,
+				       info);
+		entry->compdat.sig_head = data.sig_head;
+		break;
 	}
 }
 
@@ -341,7 +341,7 @@ add_component_file_range(int fd, const char *filename, struct file_range *reg,
 	rc = add_segment_table(fd, list, count, &segment, info);
 	free(list);
 	if (rc == 0) {
-		create_component_entry(component, &segment, COMPONENT_LOAD,
+		create_component_entry(component, &segment, COMPONENT_TYPE_LOAD,
 				       (component_data) load_address, info);
 		/* Return location if requested */
 		if (location != NULL)
@@ -381,7 +381,7 @@ add_component_buffer_align(int fd, void *buffer, size_t size,
 		error_text("Could not write to bootmap file");
 		return -1;
 	}
-	if (type == COMPONENT_LOAD) {
+	if (type == COMPONENT_TYPE_LOAD) {
 		/* Fill in component location */
 		loc.addr = data.load_address;
 		loc.size = count * info->phy_block_size;
@@ -427,7 +427,8 @@ add_dummy_buffer(int fd, size_t size, address_t addr, void *component,
 	memset(buffer, 0, size);
 	rc = add_component_buffer(fd, buffer, size,
 				  (component_data) (uint64_t) addr,
-				  component, info, comp_loc, COMPONENT_LOAD);
+				  component, info, comp_loc,
+				  COMPONENT_TYPE_LOAD);
 	if (rc) {
 		free(buffer);
 		return rc;
@@ -622,7 +623,7 @@ static int add_ipl_program(int fd, char *filename,
 					  (component_data)sig_head,
 					  VOID_ADD(table, offset), info,
 					  &comp_loc[comp_nr],
-					  COMPONENT_SIGNATURE);
+					  COMPONENT_TYPE_SIGNATURE);
 		if (rc) {
 			error_text("Could not add stage3 signature");
 			free(table);
@@ -677,7 +678,7 @@ static int add_ipl_program(int fd, char *filename,
 				  (component_data) (uint64_t)
 				  STAGE3_PARAMS_ADDRESS,
 				  VOID_ADD(table, offset), info,
-				  &comp_loc[comp_nr], COMPONENT_LOAD);
+				  &comp_loc[comp_nr], COMPONENT_TYPE_LOAD);
 	free(stage3_params);
 	if (rc) {
 		error_text("Could not add parameters");
@@ -703,7 +704,7 @@ static int add_ipl_program(int fd, char *filename,
 					  (component_data)sig_head,
 					  VOID_ADD(table, offset), info,
 					  &comp_loc[comp_nr],
-					  COMPONENT_SIGNATURE);
+					  COMPONENT_TYPE_SIGNATURE);
 		if (rc) {
 			error_text("Could not add image signature");
 			free(table);
@@ -750,7 +751,7 @@ static int add_ipl_program(int fd, char *filename,
 					  (component_data) ipl->common.parm_addr,
 					  VOID_ADD(table, offset),
 					  info, &comp_loc[comp_nr],
-					  COMPONENT_LOAD);
+					  COMPONENT_TYPE_LOAD);
 		if (rc) {
 			error_text("Could not add parmline '%s'",
 				   ipl->common.parmline);
@@ -778,7 +779,7 @@ static int add_ipl_program(int fd, char *filename,
 						  (component_data)sig_head,
 						  VOID_ADD(table, offset), info,
 						  &comp_loc[comp_nr],
-						  COMPONENT_SIGNATURE);
+						  COMPONENT_TYPE_SIGNATURE);
 			if (rc) {
 				error_text("Could not add ramdisk signature");
 				free(table);
@@ -826,7 +827,7 @@ static int add_ipl_program(int fd, char *filename,
 					       (component_data)ipl->envblk_addr,
 					       VOID_ADD(table, offset),
 					       info, &comp_loc[comp_nr],
-					       COMPONENT_LOAD,
+					       COMPONENT_TYPE_LOAD,
 					       info->fs_block_size,
 					       &envblk_off);
 			if (rc) {
@@ -869,7 +870,7 @@ static int add_ipl_program(int fd, char *filename,
 		print_components(comp_name, comp_loc, comp_nr);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
-			       COMPONENT_EXECUTE,
+			       COMPONENT_TYPE_EXECUTE,
 			       (component_data) (uint64_t)
 			       (STAGE3_ENTRY | PSW_LOAD),
 			       info);
@@ -922,7 +923,8 @@ add_segment_program(int fd, struct job_segment_data* segment,
 		print_components(comp_name, comp_loc, 1);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
-			       COMPONENT_EXECUTE, (component_data) (uint64_t)
+			       COMPONENT_TYPE_EXECUTE,
+			       (component_data)(uint64_t)
 			       PSW_DISABLED_WAIT, info);
 	/* Write component table */
 	rc = disk_write_block_aligned(fd, table, info->phy_block_size,

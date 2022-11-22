@@ -120,9 +120,9 @@ void __noreturn start(void)
 	/* skip header */
 	entry = (struct component_entry *)
 		(load_address + sizeof(struct component_header));
-	while (entry->type == COMPONENT_LOAD ||
-	       entry->type == COMPONENT_SIGNATURE) {
-		if (entry->type == COMPONENT_SIGNATURE) {
+	while (entry->type == COMPONENT_TYPE_LOAD ||
+	       entry->type == COMPONENT_TYPE_SIGNATURE) {
+		if (entry->type == COMPONENT_TYPE_SIGNATURE) {
 			/* Skip unhandled signature components */
 			entry++;
 			continue;
@@ -132,7 +132,7 @@ void __noreturn start(void)
 		load_blocklist(entry, subchannel_id, load_address);
 		entry++;
 	}
-	if (entry->type != COMPONENT_EXECUTE)
+	if (entry->type != COMPONENT_TYPE_EXECUTE)
 		panic(EWRONGTYPE, "");
 
 	load_psw = entry->compdat.load_psw;

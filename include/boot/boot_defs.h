@@ -71,9 +71,9 @@ struct eckd_blockptr {
 } __packed;
 
 typedef enum {
-	COMPONENT_EXECUTE = 0x01,
-	COMPONENT_LOAD = 0x02,
-	COMPONENT_SIGNATURE = 0x03
+	COMPONENT_TYPE_EXECUTE = 0x01,
+	COMPONENT_TYPE_LOAD = 0x02,
+	COMPONENT_TYPE_SIGNATURE = 0x03
 } component_type;
 
 typedef enum {
