@@ -292,18 +292,6 @@ struct hd_geometry {
 /* Check device format according to format_data_t */
 #define BIODASDCHECKFMT _IOWR(DASD_IOCTL_LETTER, 2, format_check_t)
 
-/********************************************************************************
- * SECTION: Further IOCTL Definitions  (see fs.h and hdreq.h)
- *******************************************************************************/
-/* get read-only status (0 = read_write) */
-#define BLKROGET   _IO(0x12, 94)
-/* re-read partition table */
-#define BLKRRPART  _IO(0x12, 95)
-/* get block device sector size */
-#define BLKSSZGET  _IO(0x12, 104)
-/* return device size in bytes (u64 *arg) */
-#define BLKGETSIZE64 _IOR(0x12, 114, size_t)
-
 #ifndef __linux__ /* from <linux/hdreg.h> */
 #define HDIO_GETGEO	0x0301
 #endif
