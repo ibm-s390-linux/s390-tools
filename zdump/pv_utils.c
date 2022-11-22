@@ -239,7 +239,7 @@ dfi_cpu_t *pv_decrypt_cpu_note_data(const unsigned int expected_version, GBytes 
 		/* Check dump flags */
 		if (pv_cpu->has_osii)
 			util_log_print(UTIL_LOG_WARN,
-				       _("CPU state may contain partial instruction results"));
+				       _("CPU state may contain partial instruction results\n"));
 
 		return pv_dfi_cpu_from_pv_cpu(pv_cpu);
 	}
@@ -753,7 +753,7 @@ void storage_state_mmap_unref(storage_state_mmap_t *storage_state)
 	if (storage_state->first_page_ptr) {
 		int rc = munmap(storage_state->first_page_ptr, storage_state->mapped_size);
 		if (rc != 0)
-			util_log_print(UTIL_LOG_WARN, _("munmap has failed"));
+			util_log_print(UTIL_LOG_WARN, _("munmap has failed\n"));
 	}
 	g_free(storage_state);
 }

@@ -172,7 +172,7 @@ static int pt_notes_add(const struct zg_fh *fh, const Elf64_Phdr *phdr, const un
 			dfi_cpu_add(g_steal_pointer(&cpu_current));
 			break;
 		default:
-			util_log_print(UTIL_LOG_WARN, _("Unknown ELF-Note %#x"), note.n_type);
+			util_log_print(UTIL_LOG_WARN, _("Unknown ELF-Note %#x\n"), note.n_type);
 			__attribute__((fallthrough));
 		case NT_PRSTATUS:
 		case NT_FPREGSET:
@@ -322,7 +322,8 @@ static int dfi_pv_elf_init(void)
 			}
 			break;
 		default:
-			util_log_print(UTIL_LOG_WARN, _("Unknown ELF-PHDR type %#x"), phdr->p_type);
+			util_log_print(UTIL_LOG_WARN, _("Unknown ELF-PHDR type %#x\n"),
+				       phdr->p_type);
 			break;
 		}
 	}
