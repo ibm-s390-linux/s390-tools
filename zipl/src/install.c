@@ -25,6 +25,7 @@
 
 #include "lib/zt_common.h"
 #include "lib/util_sys.h"
+#include "lib/vtoc.h"
 
 #include "boot.h"
 #include "bootmap.h"
@@ -109,7 +110,8 @@ update_scsi_mbr(void* bootblock, disk_blockptr_t* table,
 	memset(buffer, 0, sizeof(struct scsi_mbr));
 	memcpy(&mbr->magic, ZIPL_MAGIC, ZIPL_MAGIC_SIZE);
 	mbr->version_id = DISK_LAYOUT_ID;
-	bootmap_store_blockptr(&mbr->program_table_pointer, table, info);
+	bootmap_store_blockptr(&mbr->program_table_pointer, table, info,
+			       0 /* this argument is ignored for scsi */);
 	if (scsi_dump_sb_blockptr->linear.block != 0) {
 		/* Write dump boot_info */
 		param.block = scsi_dump_sb_blockptr->linear.block *
@@ -168,11 +170,11 @@ install_scsi(int fd, disk_blockptr_t* program_table, struct disk_info* info,
 }
 
 
-/* Install bootloader for initial program load from an FBA type disk. */
+/* Install bootloader for CCW-type IPL from a FBA type disk */
 static int
-install_fba(int fd, disk_blockptr_t *program_table,
-	    disk_blockptr_t *stage1b_list, blocknum_t stage1b_count,
-	    struct disk_info *info)
+install_fba_ccw(int fd, disk_blockptr_t *program_table,
+		disk_blockptr_t *stage1b_list, blocknum_t stage1b_count,
+		struct disk_info *info)
 {
 	struct boot_fba_stage0 stage0;
 
@@ -180,8 +182,8 @@ install_fba(int fd, disk_blockptr_t *program_table,
 	if (boot_init_fba_stage0(&stage0, stage1b_list, stage1b_count))
 		return -1;
 
-	boot_get_ipl_info(&stage0.boot_info,  BOOT_INFO_DEV_TYPE_FBA,
-			  program_table, info);
+	boot_get_ipl_info_ccw(&stage0.boot_info,  BOOT_INFO_DEV_TYPE_FBA,
+			      program_table, info);
 
 	if (DRY_RUN_FUNC(misc_pwrite(fd, &stage0, sizeof(stage0), 0)))
 		return -1;
@@ -218,12 +220,14 @@ out:
 	return rc;
 }
 
-/* Install bootloader for initial program load from an ECKD type disk with
- * Linux Disk Layout. */
+/*
+ * Install bootloader for CCW-type IPL from ECKD type disk with
+ * Linux Disk Layout
+ */
 static int
-install_eckd_ldl(int fd, disk_blockptr_t *program_table,
-		 disk_blockptr_t *stage1b_list, blocknum_t stage1b_count,
-		 struct disk_info *info)
+install_eckd_ldl_ccw(int fd, disk_blockptr_t *program_table,
+		     disk_blockptr_t *stage1b_list, blocknum_t stage1b_count,
+		     struct disk_info *info)
 {
 	struct boot_eckd_ldl_stage0 stage0;
 	struct boot_eckd_stage1 stage1;
@@ -236,8 +240,8 @@ install_eckd_ldl(int fd, disk_blockptr_t *program_table,
 	if (boot_init_eckd_stage1(&stage1, stage1b_list, stage1b_count))
 		return -1;
 
-	boot_get_ipl_info(&stage1.boot_info, BOOT_INFO_DEV_TYPE_ECKD,
-			  program_table, info);
+	boot_get_ipl_info_ccw(&stage1.boot_info, BOOT_INFO_DEV_TYPE_ECKD,
+			      program_table, info);
 
 	if (DRY_RUN_FUNC(misc_pwrite(fd, &stage1, sizeof(stage1),
 				     sizeof(stage0))))
@@ -246,12 +250,14 @@ install_eckd_ldl(int fd, disk_blockptr_t *program_table,
 	return 0;
 }
 
-/* Install bootloader for initial program load from an ECKD type disk with
- * OS/390 compatible disk layout. */
-static int
-install_eckd_cdl(int fd, disk_blockptr_t *program_table,
-		 disk_blockptr_t *stage1b_list, blocknum_t stage1b_count,
-		 struct disk_info *info)
+/**
+ * Install bootloader for CCW-type IPL from ECKD type disk with
+ * OS/390 compatible disk layout
+ */
+static int install_eckd_cdl_ccw(int fd, disk_blockptr_t *program_table,
+				disk_blockptr_t *stage1b_list,
+				blocknum_t stage1b_count,
+				struct disk_info *info)
 {
 	struct boot_eckd_cdl_stage0 stage0;
 	struct boot_eckd_stage1 stage1;
@@ -264,8 +270,8 @@ install_eckd_cdl(int fd, disk_blockptr_t *program_table,
 	if (boot_init_eckd_stage1(&stage1, stage1b_list, stage1b_count))
 		return -1;
 
-	boot_get_ipl_info(&stage1.boot_info, BOOT_INFO_DEV_TYPE_ECKD,
-			  program_table, info);
+	boot_get_ipl_info_ccw(&stage1.boot_info, BOOT_INFO_DEV_TYPE_ECKD,
+			      program_table, info);
 
 	if (DRY_RUN_FUNC(misc_pwrite(fd, &stage1, sizeof(stage1),
 				     4 + info->phy_block_size)))
@@ -273,16 +279,74 @@ install_eckd_cdl(int fd, disk_blockptr_t *program_table,
 	return 0;
 }
 
-int
-install_bootloader(const char *device, disk_blockptr_t *program_table,
-		   disk_blockptr_t *scsi_dump_sb_blockptr,
-		   disk_blockptr_t *stage1b_list, blocknum_t stage1b_count,
-		   struct disk_info *info, struct job_data *job)
+/**
+ * Install a program table for List-Directed IPL on a CDL-formatted DASD.
+ *
+ * The installation means storing an actual boot record address in the
+ * volume label.
+ *
+ * BR: represents an actual boot record address.
+ */
+static int install_eckd_cdl_ld(int fd, disk_blockptr_t *br,
+			       struct disk_info *info)
 {
+	struct vol_label_cdl vl;
+	int rc;
+
+	/* Read a volume label from CDL-formatted DASD */
+	if (misc_seek(fd, 2 * info->phy_block_size))
+		return -1;
+	rc = misc_read(fd, &vl, sizeof(vl));
+	if (rc) {
+		error_text("Could not read volume label");
+		return rc;
+	}
+	/* Verify that we have a VOL1 label */
+	if (!is_vol1(vl.vollbl)) {
+		error_text("Volume label 'vol1' not initialized");
+		return -1;
+	}
+	/* Pack the actual boot record address */
+	vtoc_set_cchhb(&vl.br, br->chs.cyl, br->chs.head, br->chs.sec);
+
+	/* Write out the updated volume label */
+	if (misc_seek(fd, 2 * info->phy_block_size))
+		return -1;
+	rc = DRY_RUN_FUNC(misc_write(fd, &vl, sizeof(vl)));
+	if (rc)
+		error_text("Could not update volume lablel 'vol1'");
+	return 0;
+}
+
+/**
+ * Install a "compatible" boot record referring one, or two "similar"
+ * program tables.
+ *
+ * The picture below shows which program table is used for IPL
+ * of specified type from disk of specified type.
+ * E.g. program table "0" is used for CCW-type IPL from ECKD DASD,
+ * LD-IPL from DASD FBA is unsupported (respectively, only one program
+ * table "0" is used), etc.
+ *
+ *                            CCW-IPL   LD-IPL
+ *
+ * SCSI                          X        0
+ * DASD FBA                      0        X
+ * ECKD DASD LDL                 0        X
+ * ECKD DASD CDL                 0        1
+ */
+int install_bootloader(struct job_data *job, struct install_set *bis)
+{
+	disk_blockptr_t *scsi_dump_sb_blockptr = &bis->scsi_dump_sb_blockptr;
+	struct program_table *pt0 = &bis->tables[PROGRAM_TABLE_0];
+	struct program_table *pt1 = &bis->tables[PROGRAM_TABLE_1];
+	struct disk_info *info = bis->info;
+	char *device = bis->device;
 	int fd, rc;
 
 	/* Inform user about what we're up to */
-	printf("Preparing boot device: ");
+	printf("Preparing boot device for %sIPL: ",
+	       disk_get_ipl_type(info->type));
 	if (info->name) {
 		printf("%s", info->name);
 		if (info->devno >= 0)
@@ -310,27 +374,40 @@ install_bootloader(const char *device, disk_blockptr_t *program_table,
 				"caches.\n");
 		}
 	}
-	/* Call disk specific install functions */
+	/*
+	 * Depending on disk type, install one or two program tables
+	 * for CCW-type IPL and (or) for List-Directed IPL (see the
+	 * picture in comments above)
+	 */
 	rc = -1;
 	switch (info->type) {
 	case disk_type_scsi:
-		rc = install_scsi(fd, program_table, info,
+		rc = install_scsi(fd, &pt0->table, info,
 				  scsi_dump_sb_blockptr);
 		if (rc == 0 && job->id == job_dump_partition &&
 		    !is_ngdump_enabled(device, &job->target))
 			rc = overwrite_partition_start(fd, info, 0);
 		break;
 	case disk_type_fba:
-		rc = install_fba(fd, program_table, stage1b_list,
-				 stage1b_count, info);
+		rc = install_fba_ccw(fd,
+				     &pt0->table,
+				     pt0->stage1b_list,
+				     pt0->stage1b_count, info);
 		break;
 	case disk_type_eckd_ldl:
-		rc = install_eckd_ldl(fd, program_table, stage1b_list,
-				      stage1b_count, info);
+		rc = install_eckd_ldl_ccw(fd,
+					  &pt0->table,
+					  pt0->stage1b_list,
+					  pt0->stage1b_count, info);
 		break;
 	case disk_type_eckd_cdl:
-		rc = install_eckd_cdl(fd, program_table, stage1b_list,
-				      stage1b_count, info);
+		rc = install_eckd_cdl_ccw(fd,
+					  &pt0->table,
+					  pt0->stage1b_list,
+					  pt0->stage1b_count, info);
+		if (rc)
+			break;
+		rc = install_eckd_cdl_ld(fd, pt1->stage1b_list, info);
 		break;
 	case disk_type_diag:
 		/* Should not happen */

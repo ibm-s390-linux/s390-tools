@@ -28,6 +28,7 @@
 
 #include "lib/util_proc.h"
 #include "lib/util_sys.h"
+#include "lib/util_libc.h"
 #include "disk.h"
 #include "error.h"
 #include "install.h"
@@ -755,7 +756,6 @@ disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
 			      size_t bytecount, disk_blockptr_t **blocklist,
 			      struct disk_info *info, int align, off_t *offset)
 {
-	disk_blockptr_t* list;
 	blocknum_t count;
 	blocknum_t i;
 	size_t written;
@@ -764,13 +764,12 @@ disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
 	int rc;
 
 	count = (bytecount + info->phy_block_size - 1) / info->phy_block_size;
-	list = (disk_blockptr_t *) misc_malloc(sizeof(disk_blockptr_t) *
-					       count);
-	if (list == NULL) {
+	*blocklist = (disk_blockptr_t *)util_zalloc(sizeof(disk_blockptr_t) *
+						    count);
+	if (*blocklist == NULL) {
 		close(fd);
 		return 0;
 	}
-	memset((void *) list, 0, sizeof(disk_blockptr_t) * count);
 	/* Build list */
 	for (i=0, written=0; i < count; i++, written += chunk_size) {
 		chunk_size = bytecount - written;
@@ -778,17 +777,15 @@ disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
 			chunk_size = info->phy_block_size;
 		rc = disk_write_block_aligned_base(fd, fd_is_basedisk,
 					VOID_ADD(buffer, written),
-					chunk_size,  &list[i], info,
+					chunk_size, &(*blocklist)[i],
+					info,
 					i == 0 ? align : info->phy_block_size,
 					&pos);
-		if (rc) {
-			free(list);
+		if (rc)
 			return 0;
-		}
 		if (offset != NULL && i == 0)
 			*offset = pos;
 	}
-	*blocklist = list;
 	return count;
 }
 
@@ -830,6 +827,21 @@ disk_get_type_name(disk_type_t type)
 	}
 }
 
+/* Return IPL types supported for a given disk TYPE */
+char *disk_get_ipl_type(disk_type_t type)
+{
+	switch (type) {
+	case disk_type_scsi:
+		return "LD-";
+	case disk_type_fba:
+	case disk_type_eckd_ldl:
+		return "CCW-";
+	case disk_type_eckd_cdl:
+		return "CCW- and LD-";
+	default:
+		return "";
+	}
+}
 
 /* Return non-zero for ECKD large volumes. */
 int
@@ -1050,7 +1062,6 @@ disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
 			     disk_blockptr_t **blocklist,
 			     struct disk_info* info)
 {
-	disk_blockptr_t* list;
 	struct stat stats;
 	int fd;
 	off_t off;
@@ -1094,24 +1105,21 @@ disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
 	blk_count = ((blocknum_t) count +
 		     info->phy_block_size - 1) / info->phy_block_size;
 
-	list = (disk_blockptr_t *) misc_malloc(sizeof(disk_blockptr_t) *
-					       blk_count);
-	if (list == NULL) {
+	*blocklist = (disk_blockptr_t *)util_zalloc(sizeof(disk_blockptr_t) *
+						    blk_count);
+	if (*blocklist == NULL) {
 		close(fd);
 		return 0;
 	}
-	memset((void *) list, 0, sizeof(disk_blockptr_t) * blk_count);
 	/* Build list */
 	for (i = 0; i < blk_count; i++) {
 		if (disk_get_blocknum(fd, 0, blk_off + i, &blocknum, info)) {
-			free(list);
 			close(fd);
 			return 0;
 		}
-		disk_blockptr_from_blocknum(&list[i], blocknum, info);
+		disk_blockptr_from_blocknum(&(*blocklist)[i], blocknum, info);
 	}
 	close(fd);
-	*blocklist = list;
 	return blk_count;
 }
 

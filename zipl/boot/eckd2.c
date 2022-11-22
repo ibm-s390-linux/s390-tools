@@ -15,14 +15,16 @@
 
 int extract_length(void *data)
 {
-	struct eckd_blockptr *blockptr = (struct eckd_blockptr *)data;
+	struct eckd_blockptr_legacy *blockptr =
+		(struct eckd_blockptr_legacy *)data;
 
 	return blockptr->size * (blockptr->blockct + 1);
 }
 
 int is_zero_block(void *data)
 {
-	struct eckd_blockptr *blockptr = (struct eckd_blockptr *)data;
+	struct eckd_blockptr_legacy *blockptr =
+		(struct eckd_blockptr_legacy *)data;
 
 	return blockptr->cyl  || blockptr->head || blockptr->sec;
 }
@@ -30,7 +32,7 @@ int is_zero_block(void *data)
 void * load_direct(disk_blockptr_t *data, struct subchannel_id subchannel_id,
 	    void *load_addr)
 {
-	struct eckd_blockptr *blockptr = &data->eckd;
+	struct eckd_blockptr_legacy *blockptr = &data->eckd;
 	struct ccw1 *ccws;
 	unsigned long record_size;
 	struct seek_arg seek_addr;

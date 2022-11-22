@@ -97,6 +97,17 @@ typedef struct volume_label
  	unsigned long long formatted_blocks; /* valid when ldl_version >= f2 */
 } __attribute__ ((packed)) volume_label_t;
 
+/**
+ * This represents a volume label specific for OS/390 compatible disk layout
+ */
+struct vol_label_cdl {
+	char volkey[4];
+	char vollbl[4];
+	char opaq[70];
+	cchhb_t br; /* boot record address */
+	char stdv[1]; /* standard version ID */
+} __attribute__ ((packed));
+
 static inline int is_vol1(char *this)
 {
 	char vol1[] = {0xe5, 0xd6, 0xd3, 0xf1, 0x00} /* "VOL1" in EBCDIC */;

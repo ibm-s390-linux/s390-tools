@@ -158,8 +158,8 @@ struct mvdump_parm_table {
 
 void boot_get_dump_info(struct boot_info *boot_info, uint8_t dev_type,
 			void *param);
-void boot_get_ipl_info(struct boot_info *boot_info, uint8_t dev_type,
-		       disk_blockptr_t *bm_ptr, struct disk_info *info);
+void boot_get_ipl_info_ccw(struct boot_info *boot_info, uint8_t dev_type,
+			   disk_blockptr_t *bm_ptr, struct disk_info *info);
 
 int boot_check_data(void);
 int boot_init_fba_stage0(struct boot_fba_stage0* stage0,
@@ -187,6 +187,8 @@ int boot_get_tape_ipl(void** data, size_t* size, address_t parm_addr,
 		      address_t initrd_addr, address_t image_addr);
 int boot_get_tape_dump(void** data, size_t* size, uint64_t mem);
 int boot_get_eckd_dump_stage2(void** data, size_t* size, uint64_t mem);
+int boot_get_eckd_ld_ipl_br(void **br_ptr, size_t *size_ptr,
+			    disk_blockptr_t *table, struct disk_info *info);
 int boot_get_eckd_mvdump_stage2(void** data, size_t* size, uint64_t mem,
 				uint8_t force, struct mvdump_parm_table);
 int boot_get_fba_dump_stage2(void** data, size_t* size, uint64_t mem);

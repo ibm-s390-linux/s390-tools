@@ -126,11 +126,8 @@ check_for_root(void)
 int
 main(int argc, char* argv[])
 {
-	struct disk_info* info;
-	disk_blockptr_t program_table, scsi_dump_sb_blockptr, *stage1b_list;
-	blocknum_t stage1b_count;
+	struct install_set bis;
 	struct job_data* job;
-	char* device;
 	int rc;
 
 	/* Check internals */
@@ -197,21 +194,11 @@ main(int argc, char* argv[])
 	case job_ipl:
 	case job_segment:
 	case job_menu:
-		/* Create bootmap */
-		stage1b_list = NULL;
-		rc = bootmap_create(job, &program_table, &scsi_dump_sb_blockptr,
-				    &stage1b_list, &stage1b_count, &device,
-				    &info);
+		rc = prepare_bootloader(job, &bis);
 		if (rc)
 			break;
-		/* Install boot loader */
-		rc = install_bootloader(device, &program_table,
-					&scsi_dump_sb_blockptr, stage1b_list,
-					stage1b_count, info, job);
-		if (stage1b_list != NULL)
-			free(stage1b_list);
-		misc_free_temp_dev(device);
-		disk_free_info(info);
+		rc = install_bootloader(job, &bis);
+		free_bootloader(&bis);
 		break;
 	case job_ipl_tape:
 		rc = install_tapeloader(job->data.ipl_tape.device,
@@ -251,3 +238,57 @@ main(int argc, char* argv[])
 	job_free(job);
 	return abs(rc);
 }
+
+/**
+ * Program Component Footers
+ */
+struct component_footer component_footers[NR_PROGRAM_COMPONENTS] = {
+	[COMPONENT_ID_HEAP_AREA] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "heap area"
+	},
+	[COMPONENT_ID_STACK_AREA] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "stack area"
+	},
+	[COMPONENT_ID_LOADER_SIGNATURE] = {
+		.type = COMPONENT_TYPE_SIGNATURE,
+		.desc = "loader signature"
+	},
+	[COMPONENT_ID_LOADER] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "internal loader"
+	},
+	[COMPONENT_ID_PARAMETERS] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "parameters"
+	},
+	[COMPONENT_ID_IMAGE_SIGNATURE] = {
+		.type = COMPONENT_TYPE_SIGNATURE,
+		.desc = "image signature"
+	},
+	[COMPONENT_ID_KERNEL_IMAGE] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "kernel image"
+	},
+	[COMPONENT_ID_PARMLINE] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "parmline"
+	},
+	[COMPONENT_ID_RAMDISK_SIGNATURE] = {
+		.type = COMPONENT_TYPE_SIGNATURE,
+		.desc = "ramdisk signature"
+	},
+	[COMPONENT_ID_RAMDISK] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "initial ramdisk"
+	},
+	[COMPONENT_ID_ENVBLK] = {
+		.type = COMPONENT_TYPE_LOAD,
+		.desc = "environment blk"
+	},
+	[COMPONENT_ID_SEGMENT_FILE] = {
+		.type  = COMPONENT_TYPE_EXECUTE,
+		.desc = "segment file"
+	}
+};

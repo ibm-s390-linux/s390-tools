@@ -16,6 +16,7 @@
 #include <sys/types.h>
 
 #include "zipl.h"
+#include "lib/vtoc.h"
 
 
 /* Type for representing disk block numbers */
@@ -23,7 +24,7 @@ typedef uint64_t blocknum_t;
 
 /* Pointer to block on a disk with cyl/head/sec layout */
 struct disk_blockptr_chs {
-	int cyl;
+	unsigned int cyl;
 	int head;
 	int sec;
 	int size;
@@ -51,14 +52,6 @@ typedef enum {
 	disk_type_eckd_ldl,
 	disk_type_eckd_cdl,
 } disk_type_t;
-
-/* from linux/hdregs.h */
-struct hd_geometry {
-	unsigned char heads;
-	unsigned char sectors;
-	unsigned short cylinders;
-	unsigned long start;
-};
 
 /* Disk information source */
 typedef enum {
@@ -108,6 +101,7 @@ int disk_get_info_from_file(const char* filename,
 			    struct disk_info** info);
 void disk_free_info(struct disk_info* info);
 char* disk_get_type_name(disk_type_t type);
+char *disk_get_ipl_type(disk_type_t type);
 int disk_is_large_volume(struct disk_info* info);
 int disk_cyl_from_blocknum(blocknum_t blocknum, struct disk_info* info);
 int disk_head_from_blocknum(blocknum_t blocknum, struct disk_info* info);

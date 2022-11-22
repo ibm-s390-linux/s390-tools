@@ -58,16 +58,58 @@ struct linear_blockptr {
 } __packed;
 
 /*
+ * Format of a boot record on ECKD DASD for List-Directed IPL
+ */
+struct eckd_boot_record {
+	uint8_t magic[4];
+	uint32_t version_id;
+	uint8_t unused[8];
+	uint8_t program_table_pointer[16];
+	uint8_t reserved[478];
+	uint16_t os_id;
+} __packed;
+
+/*
  * Layout of block pointer for cylinder/head/sector devices
  * e.g. ECKD
  */
-struct eckd_blockptr {
+
+enum blkptr_format_id {
+	/*
+	 * this is the old format which serves only CCW-type IPL,
+	 * and doesn't fit List-Directed IPL. Still supported for
+	 * compatibility reasons.
+	 */
+	LEGACY_BLKPTR_FORMAT_ID,
+	/*
+	 * this is the "new" format which serves only List-Directed IPL,
+	 * but is also suitable for CCW-type IPL.
+	 */
+	BLKPTR_FORMAT_ID
+};
+
+/*
+ * Block pointers format identified as LEGACY_BLKPTR_FORMAT_ID.
+ */
+struct eckd_blockptr_legacy {
 	uint16_t cyl;
 	uint16_t head;
 	uint8_t sec;
 	uint16_t size;
 	uint8_t blockct;
 	uint8_t reserved[8];
+} __packed;
+
+/*
+ * Block pointers format identified as BLKPTR_FORMAT_ID.
+ */
+struct eckd_blockptr {
+	uint32_t cyl;
+	uint8_t head;
+	uint8_t sec;
+	uint8_t reserved1[4];
+	uint16_t blockct;
+	uint8_t reserved2[4];
 } __packed;
 
 typedef enum {
@@ -153,6 +195,7 @@ struct boot_info_bp_dump {
 
 struct boot_info_bp_ipl {
 	union {
+		struct eckd_blockptr_legacy eckd_legacy;
 		struct eckd_blockptr eckd;
 		struct linear_blockptr lin;
 	} bm_ptr;

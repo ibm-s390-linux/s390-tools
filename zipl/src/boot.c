@@ -16,6 +16,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "lib/util_libc.h"
 
 #include "stage3.h"
 
@@ -560,9 +561,12 @@ boot_get_dump_info(struct boot_info *boot_info, uint8_t dev_type, void *param)
 	       sizeof(boot_info->bp.dump.param));
 }
 
+/*
+ * Helper function to install a boot record for CCW-type IPL from DASD
+ */
 void
-boot_get_ipl_info(struct boot_info *boot_info, uint8_t dev_type,
-		  disk_blockptr_t *bm_ptr, struct disk_info *info)
+boot_get_ipl_info_ccw(struct boot_info *boot_info, uint8_t dev_type,
+		      disk_blockptr_t *bm_ptr, struct disk_info *info)
 {
 	memset(boot_info, 0, sizeof(*boot_info));
 	memcpy(&boot_info->magic, BOOT_INFO_MAGIC, sizeof(boot_info->magic));
@@ -570,6 +574,30 @@ boot_get_ipl_info(struct boot_info *boot_info, uint8_t dev_type,
 	boot_info->dev_type = dev_type;
 	boot_info->bp_type = BOOT_INFO_BP_TYPE_IPL;
 	boot_info->version = BOOT_INFO_VERSION;
-	bootmap_store_blockptr(&boot_info->bp, bm_ptr, info);
+	bootmap_store_blockptr(&boot_info->bp, bm_ptr, info,
+			       LEGACY_BLKPTR_FORMAT_ID);
 }
 
+/**
+ * Allocate and initialize a boot record for List-Directed IPL from DASD
+ *
+ * TABLE: address of an actual program table
+ */
+int boot_get_eckd_ld_ipl_br(void **br_ptr, size_t *size_ptr,
+			    disk_blockptr_t *table, struct disk_info *info)
+{
+	struct eckd_boot_record *br;
+
+	br = util_zalloc(info->phy_block_size);
+	if (!br)
+		return -1;
+
+	memcpy(&br->magic, ZIPL_MAGIC, ZIPL_MAGIC_SIZE);
+	br->version_id = DISK_LAYOUT_ID;
+	bootmap_store_blockptr(&br->program_table_pointer, table, info,
+			       BLKPTR_FORMAT_ID);
+	br->os_id = 0x55aa; /* LINUX */
+	*br_ptr = br;
+	*size_ptr = info->phy_block_size;
+	return 0;
+}

@@ -27,7 +27,7 @@
 #include "error.h"
 
 typedef union {
-	struct eckd_blockptr eckd;
+	struct eckd_blockptr_legacy eckd;
 	struct linear_blockptr linear;
 } disk_blockptr_t;
 
