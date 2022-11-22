@@ -1419,7 +1419,6 @@ int lzds_dasd_read_rawvtoc(struct dasd *dasd, struct raw_vtoc *rawvtoc)
 
 	volume_label_t *vlabel = NULL;
 	char *trackdata = NULL;
-	char vol1[] = {0xe5, 0xd6, 0xd3, 0xf1, 0x00}; /* "VOL1" in EBCDIC */
 
 	errorlog_clear(dasd->log);
 
@@ -1431,8 +1430,7 @@ int lzds_dasd_read_rawvtoc(struct dasd *dasd, struct raw_vtoc *rawvtoc)
 		goto cleanup;
 	}
 	/* verify that we have a proper VOL1 label */
-	if (strncmp(vlabel->volkey, vol1, 4) ||
-	    strncmp(vlabel->vollbl, vol1, 4)) {
+	if (!is_vol1(vlabel->volkey) || !is_vol1(vlabel->vollbl)) {
 		rc = EINVAL;
 		errorlog_add_message(
 			&dasd->log, NULL, rc,

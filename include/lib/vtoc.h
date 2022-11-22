@@ -97,6 +97,13 @@ typedef struct volume_label
  	unsigned long long formatted_blocks; /* valid when ldl_version >= f2 */
 } __attribute__ ((packed)) volume_label_t;
 
+static inline int is_vol1(char *this)
+{
+	char vol1[] = {0xe5, 0xd6, 0xd3, 0xf1, 0x00} /* "VOL1" in EBCDIC */;
+
+	return !strncmp(this, vol1, 4);
+}
+
 typedef struct extent 
 {
         u_int8_t  typeind;          /* extent type indicator                     */
