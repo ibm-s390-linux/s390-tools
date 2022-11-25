@@ -14,6 +14,8 @@ set -o pipefail
 set -o nounset
 set -e
 
+XDUMP='od -A x -t x2z -v'
+
 usage() {
 	cat <<-EOF
 		Usage: $(basename "$0") FILE
@@ -33,16 +35,16 @@ function check_is_pvattest_binary() {
 		exit 1
 	fi
 
-	xxd -l 16 "${input}" | grep -q pvattest ||
+	${XDUMP} --read-bytes 16 -- "${input}" 2>/dev/null | grep -q pvattest ||
 		{ echo "ERROR: ${input} does not contain a pvattest binary output." >&2 && exit 1; }
 
-	size=$(xxd -s 12 -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+	size=$(${XDUMP} --skip-bytes 12 --read-bytes 4 -- "${input}" 2>/dev/null | awk 'NR==1 {print "0x" $2 $3}')
 	if [ $((size)) -lt 64 ]; then
 		echo "ERROR: ${input} does not contain a pvattest binary output." >&2
 		exit 1
 	fi
 
-	version=$(xxd -s 8 -l 4 "$input")
+	version=$(${XDUMP} --skip-bytes 8 --read-bytes 4 -- "$input" 2>/dev/null)
 	echo "$version" | grep -q "0000 0100" ||
 		{ echo -n "WARNING: unknown hdr version " >&2  &&
 		echo "$version" | awk '{print "0x" $2 $3}'>&2 ; }
@@ -55,24 +57,28 @@ function print_entry() {
 	local size
 	local off
 
-	size=$(xxd -s $((file_off)) -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
-	off=$(xxd -s $((file_off + 4)) -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+	size=$(${XDUMP} --skip-bytes $((file_off)) --read-bytes 4 -- "${input}" 2>/dev/null |
+	       	awk 'NR==1 {print "0x" $2 $3}')
+	off=$(${XDUMP} --skip-bytes $((file_off + 4)) --read-bytes 4 -- "${input}" 2>/dev/null |
+	       	awk 'NR==1 {print "0x" $2 $3}')
 
 	if [[ $size != "0x00000000" ]] || [[ $off != "0x00000000" ]]; then
 		echo "${text}:"
-		xxd -s $((off)) -l $((size)) -p "${input}"
+		od -A n -w$((size)) -t x8 --skip-bytes $((off)) --read-bytes $((size)) -- "${input}" 2>/dev/null |\
+			sed -e 's/\s//g'
 	fi
 }
 
 function require_command() {
 	local cmd="$1"
 
-	command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "ERROR: $cmd required but not installed."; exit 1;  }
+	command -v "$cmd" >/dev/null 2>&1 || \
+		{ echo >&2 "ERROR: $cmd required but not installed."; exit 1;  }
 }
 
-require_command xxd
 require_command awk
 require_command wc
+require_command od
 
 if [ $# -eq 0 ]; then
 	echo "ERROR: Input not set. Use '$(basename "$0") [FILE]' to specify the Input file" >&2

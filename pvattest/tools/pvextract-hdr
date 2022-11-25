@@ -14,7 +14,9 @@ set -o pipefail
 set -o nounset
 set -e
 
-def_output="sehdr.bin"
+XDUMP='od -A x -t x2z -v'
+
+def_output='sehdr.bin'
 def_skip=0x14
 def_len=0x4
 
@@ -37,10 +39,21 @@ function check_file() {
 function check_hdr_ver() {
 	local hdr_start="$1"
 	local input="$2"
-	xxd -s $((hdr_start + 8)) -l 4 "$input" | grep -q "000 0100" ||
+	${XDUMP} --skip-bytes $((hdr_start + 8)) --read-bytes 4 -- "$input" 2>/dev/null | grep -q "000 0100" ||
 		{ echo -n "WARNING: unknown hdr version " &&
-			xxd -s $((hdr_start + 8)) -l 4 "$input" | awk '{print "0x" $2 $3}'; }
+			${XDUMP} --skip-bytes $((hdr_start + 8)) --read_bytes 4 -- "$input" 2>/dev/null | awk '{print "0x" $2 $3}'; }
 }
+
+function require_command() {
+	local cmd="$1"
+
+	command -v "$cmd" >/dev/null 2>&1 || \
+		{ echo >&2 "ERROR: $cmd required but not installed."; exit 1;  }
+}
+
+require_command od
+require_command awk
+require_command grep
 
 output=${def_output}
 parsed_skip=${def_skip}
@@ -77,13 +90,15 @@ if [ $# -eq 0 ]; then
 fi
 
 check_file "$input"
-hdr_start=$(xxd -s $((skip)) -l $((len)) "${input}" | grep IBMSecEx || { echo ERROR: "${input} does not contain an SE header." >&2 && exit 1; })
+hdr_start=$(${XDUMP} --skip-bytes $((skip)) --read-bytes $((len)) -- "${input}" 2>/dev/null | grep IBMSecEx ||
+       	{ echo ERROR: "${input} does not contain an SE header." >&2 && exit 1; })
 hdr_start=$(echo "${hdr_start}" | awk '{print "0x" $1}' | cut -c 1-10)
 echo "SE header found at offset ${hdr_start}"
 
 check_hdr_ver "$hdr_start" "$input"
 
-size=$(xxd -s $((hdr_start + 12)) -l 4 "${input}" | awk 'NR==1 {print "0x" $2 $3}')
+size=$(${XDUMP} --skip-bytes $((hdr_start + 12)) --read-bytes 4 -- "${input}" 2>/dev/null |
+       	awk 'NR==1 {print "0x" $2 $3}')
 
 dd if="${input}" of="${output}" bs=1 count=$((size)) skip=$((hdr_start)) status=none
 echo "SE header written to '${output}' ($((size)) bytes)"
