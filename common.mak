@@ -60,8 +60,10 @@ endef
 
 $(eval $(call cmd_define,     AS,"  AS      ",$(CROSS_COMPILE)as))
 $(eval $(call cmd_define,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
+$(eval $(call cmd_define,   LINK,"  LINK    ",$(CC)))
 $(eval $(call cmd_define, HOSTCC,"  HOSTCC  ",gcc))
 $(eval $(call cmd_define,    CXX,"  CXX     ",$(CROSS_COMPILE)g++))
+$(eval $(call cmd_define, LINKXX,"  LINKXX  ",$(CXX)))
 $(eval $(call cmd_define,    CPP,"  CPP     ",$(CROSS_COMPILE)gcc -E))
 $(eval $(call cmd_define,     AR,"  AR      ",$(CROSS_COMPILE)ar))
 $(eval $(call cmd_define,     NM,"  NM      ",$(CROSS_COMPILE)nm))
@@ -81,8 +83,6 @@ CHECKTOOL       = $(call echocmd,"  CHECK   ",/$@)$(CHECK_SILENT)
 SKIP            = echo           "  SKIP    $(call reldir) due to"
 
 INSTALL         = install
-LINK            = $(CC)
-LINKXX          = $(CXX)
 CP              = cp
 ifneq ("${V}","1")
 	MAKEFLAGS += --quiet
