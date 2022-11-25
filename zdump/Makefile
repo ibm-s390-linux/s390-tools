@@ -7,17 +7,18 @@ ALL_CFLAGS += -Wno-address-of-packed-member
 #
 ifeq (${HAVE_FUSE},0)
 
-check_dep_fuse:
-
+.check_dep_fuse:
+	touch $@
 else
 
-check_dep_fuse:
+.check_dep_fuse:
 	$(call check_dep, \
 		"zgetdump mount support", \
 		"fuse.h", \
 		"fuse3-devel or libfuse3-dev", \
 		"HAVE_FUSE=0", \
 		"-DFUSE_USE_VERSION=30")
+	touch $@
 endif
 
 .detect_openssl.dep.c:
@@ -30,7 +31,7 @@ endif
 	echo "    EVP_MD_CTX_free(ctx);" >> $@
 	echo "}" >> $@
 
-.check_dep_zgetdump: .detect_openssl.dep.c check_dep_fuse
+.check_dep_zgetdump: .detect_openssl.dep.c .check_dep_fuse
 	$(call check_dep, \
 		"zgetdump", \
 		"zlib.h", \
@@ -131,6 +132,6 @@ install-zgetdump: zgetdump
 install: $(INSTALL_TARGETS)
 
 clean:
-	rm -f -- *.o *~ zgetdump core.* .detect_openssl.dep.c .check_dep_zgetdump
+	rm -f -- *.o *~ zgetdump core.* .detect_openssl.dep.c .check_dep_zgetdump .check_dep_fuse
 
-.PHONY: all install clean check_dep_fuse check_dep_zlib skip-zgetdump install-zgetdump
+.PHONY: all install clean skip-zgetdump install-zgetdump

@@ -95,6 +95,9 @@ zdev/src/chzdev_usage.c
 zdev/src/lszdev
 zdev/src/lszdev_usage.c
 zdsfs/zdsfs
+zdump/.check_dep_fuse
+zdump/.check_dep_zgetdump
+zdump/.detect_openssl.dep.c
 zdump/zgetdump
 zfcpdump/10-zfcpdump.install
 zfcpdump/cpioinit
