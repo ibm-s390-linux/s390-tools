@@ -18,6 +18,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "lib/util_libc.h"
 #include "lib/util_lockfile.h"
