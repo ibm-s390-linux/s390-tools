@@ -159,7 +159,8 @@ struct scsi_dump_sb {
 	uint64_t        csum_offset;
 	uint64_t        csum_size;
 	uint64_t        csum;
-} __packed;
+};
+STATIC_ASSERT(sizeof(struct scsi_dump_sb) == 72);
 
 #define SCSI_DUMP_SB_MAGIC	0x5a46435044554d50ULL /* ZFCPDUMP */
 /* To avoid a csum entry of 0 a seed is used */
