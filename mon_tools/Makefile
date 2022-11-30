@@ -1,5 +1,7 @@
 include ../common.mak
 
+ALL_CFLAGS += -Wno-address-of-packed-member
+
 all: mon_fsstatd mon_procd
 
 mon_fsstatd: mon_fsstatd.o
