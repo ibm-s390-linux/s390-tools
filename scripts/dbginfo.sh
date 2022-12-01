@@ -1192,6 +1192,10 @@ post_processing() {
 			rm -f "${file_name}"
 		fi
 	done
+
+	echo "log work directory state after post processing:"
+	echo "du summary: $(du -ks ${WORKPATH})"
+	df -k ${WORKPATH}
 }
 
 ########################################
