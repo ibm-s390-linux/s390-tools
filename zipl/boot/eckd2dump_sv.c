@@ -15,6 +15,7 @@
 #include "dump/s390_dump.h"
 
 #include "eckd2dump.h"
+#include "eckd2dump_zlib.h"
 #include "stage2dump.h"
 
 /*
@@ -47,24 +48,14 @@ void dt_device_enable(void)
 	stage2dump_eckd_init();
 }
 
-/*
- * Dump all memory to DASD partition
- */
-void dt_dump_mem(void)
+static unsigned long dt_dump_mem_non_compressed(unsigned long addr,
+						unsigned long blk)
 {
-	unsigned long blk, addr, end, page;
 	struct df_s390_dump_segm_hdr *dump_segm;
+	unsigned long end;
 
-	blk = device.blk_start;
 	dump_segm = (void *)get_zeroed_page();
-
-	/* Write dump header */
-	writeblock(blk, __pa(dump_hdr), m2b(DF_S390_HDR_SIZE), 0);
-	blk += m2b(DF_S390_HDR_SIZE);
-
-	/* Write memory */
-	addr = 0;
-	total_dump_size = 0;
+	/* Write memory uncompressed */
 	end = dump_hdr->mem_size;
 	while (addr < end) {
 		addr = find_dump_segment(addr, end, 0, dump_segm);
@@ -77,7 +68,91 @@ void dt_dump_mem(void)
 	}
 	free_page(__pa(dump_segm));
 	progress_print(addr);
+	return blk;
+}
 
+static unsigned long dt_dump_mem_compressed(unsigned long addr,
+					    unsigned long blk)
+{
+	struct df_s390_dump_segm_hdr *dump_segm;
+	unsigned long end;
+	z_stream strm;
+
+	/* Write memory compressed with zlib deflate */
+	dump_segm = (void *)get_zeroed_page();
+	end = dump_hdr->mem_size;
+	/*
+	 * Always write first megabyte of memory uncompressed in
+	 * order to use it as zlib workarea
+	 */
+	dump_segm->start = addr;
+	dump_segm->len = ZLIB_WORKSPACE_LIMIT;
+	blk = write_dump_segment(blk, dump_segm);
+	total_dump_size += dump_segm->len;
+	addr += dump_segm->len;
+	/* Initialize zlib workarea, return value 0 is expected */
+	if (zlib_workarea_init(dump_segm->start, &strm)) {
+		printf("Zlib workarea initialization failed! Dumping without compression");
+		free_page(__pa(dump_segm));
+		return dt_dump_mem_non_compressed(addr, blk);
+	}
+	/*
+	 * Compress on level 1 (hardware only) using default zlib
+	 * wrapped stream.
+	 */
+	if (zlib_deflateInit2(&strm, 1, Z_DEFLATED, MAX_WBITS,
+			      DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK) {
+		/*
+		 * Could not allocate or initialyze a workarea for zlib deflate,
+		 * continue dumping without compression.
+		 */
+		printf("Deflate initialization failed! Dumping without compression");
+		free_page(__pa(dump_segm));
+		return dt_dump_mem_non_compressed(addr, blk);
+	}
+	while (addr < end) {
+		/*
+		 * Limit the max size of compressed dump segment in order to
+		 * fit all the compressed chunk entries in the segment header.
+		 */
+		addr = find_dump_segment(addr, end, DUMP_SEGM_ZLIB_MAXLEN,
+					 dump_segm);
+		blk = write_compressed_dump_segment(blk, dump_segm, &strm);
+		total_dump_size += dump_segm->size_on_disk ?
+			b2m(dump_segm->size_on_disk) : dump_segm->len;
+		if (dump_segm->stop_marker) {
+			addr = end;
+			break;
+		}
+	}
+	zlib_deflateEnd(&strm);
+	free_page(__pa(dump_segm));
+	progress_print(addr);
+	return blk;
+}
+
+/*
+ * Dump all memory to DASD partition.
+ * Use zlib compression if DFLTCC facility is available.
+ */
+void dt_dump_mem(void)
+{
+	unsigned long blk, start, page;
+
+	total_dump_size = 0;
+	/* Write dump header */
+	blk = device.blk_start;
+	writeblock(blk, __pa(dump_hdr), m2b(DF_S390_HDR_SIZE), 0);
+	blk += m2b(DF_S390_HDR_SIZE);
+	/* Write memory starting from zero address */
+	start = 0;
+	/* Check for zlib flag in the dump header */
+	if (dump_hdr->zlib_version_s390) {
+		printf("DFLTCC facility available, using zlib compression");
+		blk = dt_dump_mem_compressed(start, blk);
+	} else {
+		blk = dt_dump_mem_non_compressed(start, blk);
+	}
 	/* Write end marker */
 	page = get_zeroed_page();
 	df_s390_em_page_init(page);

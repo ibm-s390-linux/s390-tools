@@ -17,6 +17,7 @@
 
 #define IPL_SC				S390_lowcore.tpi_info.schid
 #define ROUND_DOWN(x, a)		((x) & ~((typeof(x))(a) - 1))
+#define ROUND_UP(x, a)			ROUND_DOWN((x) + (typeof(x))(a) - 1, a)
 #define IS_ALIGNED(x, a)		~((x) & ((typeof(x))(a) - 1))
 
 /*

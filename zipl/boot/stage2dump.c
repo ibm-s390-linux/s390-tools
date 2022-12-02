@@ -20,6 +20,7 @@
 #include "stage2dump.h"
 #include "boot/ipl.h"
 #include "boot/os_info.h"
+#include "boot/s390.h"
 
 #define CPU_ADDRESS_MAX	1000
 #define MACHINE_HAS_VX	machine_has_vx
@@ -223,6 +224,11 @@ static void df_s390_dump_init(void)
 	get_cpu_id((struct cpuid *) &dh->cpu_id);
 	dh->tod = get_tod_clock();
 	dh->volnr = 0;
+	dh->zlib_version_s390 = 0;
+	if (test_facility(DFLTCC_FACILITY)) {
+		dh->zlib_version_s390 = 1; /* Indicate interlnal Zlib version */
+		dh->zlib_entry_size = DUMP_SEGM_ZLIB_ENTSIZE;
+	}
 }
 
 /*
@@ -445,6 +451,9 @@ void __noreturn start(void)
 	init_early();
 	dt_device_parm_setup();
 	sclp_setup(SCLP_INIT);
+	/* Store facility-list for future checks */
+	stfle(S390_lowcore.stfle_fac_list,
+	      ARRAY_SIZE(S390_lowcore.stfle_fac_list));
 	dt_device_enable();
 	df_s390_dump_init();
 	printf("zIPL v%s dump tool (64 bit)", RELEASE_STRING);

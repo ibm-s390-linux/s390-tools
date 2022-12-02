@@ -260,6 +260,11 @@ Supported devices are DASD ECKD or FBA disk partitions,
 device mapper multipath partitions of FCP attached SCSI disks,
 partitions of NVMe disks and IBM 3480/3490/3590/3592 tape devices.
 
+For CCW-type DASD dump, zlib compression is used to compress the
+dump data before writing it to the DASD ECKD partition. Zlib compression
+requires the DFLTCC facility. Compression might increase dumping
+performance, thus minimizing system downtime. It also saves DASD space.
+
 With the exception of SCSI/NVMe, an optional decimal SIZE parameter may be
 specified to determine the maximum dump size in bytes. SIZE can be suffixed
 by either of the letters K, M or G to signify that the decimal number be

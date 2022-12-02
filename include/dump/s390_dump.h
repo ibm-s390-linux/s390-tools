@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 
+#include "boot/page.h"
 #include "lib/zt_common.h"
 
 /*
@@ -57,7 +58,9 @@ struct df_s390_hdr {
 	uint8_t		mvdump;				/* 0x05c */
 	uint16_t	cpu_cnt;			/* 0x05d */
 	uint16_t	real_cpu_cnt;			/* 0x05f */
-	uint8_t		end_pad1[0x200 - 0x061];	/* 0x061 */
+	uint8_t		zlib_version_s390;		/* 0x061 */
+	uint32_t	zlib_entry_size;		/* 0x062 */
+	uint8_t		end_pad1[0x200 - 0x066];	/* 0x066 */
 	uint64_t	mvdump_sign;			/* 0x200 */
 	uint64_t	mvdump_zipl_time;		/* 0x208 */
 	uint8_t		end_pad2[0x800 - 0x210];	/* 0x210 */
@@ -79,10 +82,43 @@ struct df_s390_em {
  * Dump segment header
  */
 struct df_s390_dump_segm_hdr {
-	uint64_t start;
-	uint64_t len;
-	uint64_t stop_marker;
-	uint8_t reserved[0x1000 - 24];
-} __packed;
+	union {
+		struct {
+			uint64_t start;				/* 0x000 */
+			uint64_t len;				/* 0x008 */
+			uint64_t stop_marker;			/* 0x010 */
+			/* Size in blocks of compressed dump segment written to disk */
+			uint32_t size_on_disk;			/* 0x018 */
+			uint8_t  reserved_pad[0x30 - 0x1c];	/* 0x01c */
+			/*
+			 * Number of compressed entries in this dump segment (up to
+			 * 1011 entries)
+			 */
+			uint32_t entry_count;			/* 0x030 */
+			/*
+			 * Offsets in blocks to compressed entries written to disk
+			 * from the start of the dump segment.
+			 * High-order bit is set if the entry has been written
+			 * uncompressed.
+			 */
+			uint32_t entry_offset[];		/* 0x034 */
+		} __packed;
+		uint8_t padding[PAGE_SIZE];
+	};
+};
+
+/* Data compression granularity (size of input data chunk for zlib deflate) */
+#define DUMP_SEGM_ZLIB_ENTSIZE   (1 * MIB)
+/* Maximum number of compressed entries in one dump segment */
+#define DUMP_SEGM_ZLIB_MAXENTS   ((sizeof(struct df_s390_dump_segm_hdr) \
+				   - offsetof(struct df_s390_dump_segm_hdr, entry_offset)) \
+				   / sizeof(uint32_t))
+/*
+ * Maximum length of compressed dump segment considering the size of
+ * a single input chunk
+ */
+#define DUMP_SEGM_ZLIB_MAXLEN    (DUMP_SEGM_ZLIB_MAXENTS * DUMP_SEGM_ZLIB_ENTSIZE)
+/* Bitmask to mark uncompressed chunks */
+#define DUMP_SEGM_ENTRY_UNCOMPRESSED    0x80000000
 
 #endif /* S390_DUMP_H */

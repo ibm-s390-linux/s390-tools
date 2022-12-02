@@ -25,6 +25,7 @@
 #define STACK_FRAME_OVERHEAD	_AC(160, U)
 
 /* Facilities */
+#define DFLTCC_FACILITY		_AC(151, U)
 #define UNPACK_FACILITY		_AC(161, U)
 
 #ifndef __ASSEMBLER__
