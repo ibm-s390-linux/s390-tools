@@ -422,7 +422,7 @@ show_devices()
 		fi
 
 		if [ $VERBOSITY -eq 0 ]; then
-			echo "$ADAPTER/$WWPN/$LUN `basename $SCSI_DEVICE_PATH`$SDEVMARKER"
+			echo "$ADAPTER/$WWPN/$LUN ${SCSI_DEVICE_PATH##*/}$SDEVMARKER"
 		else
 			echo "`ls -d $SYSFS/devices/css0/[0-9d]*/$ADAPTER`/$WWPN/$LUN"
 			echo ${SCSI_DEVICE_PATH%*/}$SDEVMARKER # without trailing slash
