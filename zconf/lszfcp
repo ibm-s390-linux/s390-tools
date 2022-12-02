@@ -2,7 +2,7 @@
 #
 # lszfcp - Tool to display information about zfcp devices (adapters/ports/units)
 #
-# Copyright IBM Corp. 2006, 2019
+# Copyright IBM Corp. 2006, 2023
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -372,15 +372,18 @@ show_devices()
 		SCSI_DEVICE_LIST=`ls -d $SYSFS/devices/css0/*/*/host[0-9]*/*/`
 	fi
 
+	declare -a ZFCP_UNIT_ARRAY
 	if $SHOW_EXTENDED; then
-		ZFCP_UNIT_LIST=$(ls -d \
-			$SYSFS/devices/css[0-9]*/[0-9d]*/[0-9]*/0x*/0x* \
-			2> /dev/null)
+		ZFCP_UNIT_ARRAY=( $SYSFS/devices/css[0-9]*/[0-9d]*/[0-9]*/0x*/0x* )
+		# remember original array size since array becomes sparse below
+		# so the array length seems to reduce but we still need to
+		# iterate the original indexe range to find all existing entries
+		ZFCP_UNIT_ARRAY_LENGTH="${#ZFCP_UNIT_ARRAY[@]}"
 	else
-		ZFCP_UNIT_LIST=""
+		ZFCP_UNIT_ARRAY_LENGTH=0
 	fi
 
-	if [ -z "$SCSI_DEVICE_LIST" ] && [ -z "$ZFCP_UNIT_LIST" ]; then
+	if [ -z "$SCSI_DEVICE_LIST" ] && [ "$ZFCP_UNIT_ARRAY_LENGTH" -eq 0 ]; then
 		if $SHOW_EXTENDED; then
 			echo "Error: No zfcp-attached SCSI devices found."
 		else
@@ -393,31 +396,38 @@ show_devices()
 		read WWPN < $SCSI_DEVICE_PATH/wwpn
 		read LUN < $SCSI_DEVICE_PATH/fcp_lun
 
-		# remove from ZFCP_UNIT_LIST if SCSI device exists
-		REDUCED_LIST=""
-		for UNIT_PATH in $ZFCP_UNIT_LIST; do
+		# loop is NOP without $SHOW_EXTENDED.
+		# remove from ZFCP_UNIT_ARRAY if SCSI device exists
+		ZFCP_UNIT_PATH=""
+		for ((i=0; i < "$ZFCP_UNIT_ARRAY_LENGTH"; i++)); do
+			UNIT_PATH="${ZFCP_UNIT_ARRAY[i]}"
+			[ -z "$UNIT_PATH" ] && continue # skip unset elements
 			STRIPPED_PATH=$UNIT_PATH
 			L=${UNIT_PATH##*/}
 			STRIPPED_PATH=${STRIPPED_PATH%/*}
 			W=${STRIPPED_PATH##*/}
 			STRIPPED_PATH=${STRIPPED_PATH%/*}
 			A=${STRIPPED_PATH##*/}
-			[ "$A/$W/$L" = "$ADAPTER/$WWPN/$LUN" ] && continue
-			REDUCED_LIST="$REDUCED_LIST $UNIT_PATH"
+			if [ "$A/$W/$L" = "$ADAPTER/$WWPN/$LUN" ]; then
+				ZFCP_UNIT_PATH="$UNIT_PATH"
+				unset "ZFCP_UNIT_ARRAY[i]"
+				break # minor optimization, still O(n)
+			fi
 		done
-		ZFCP_UNIT_LIST="$REDUCED_LIST"
 
 		[ $LUN != ${PAR_LUN:-$LUN} ] && continue
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
 		[ $ADAPTER != ${PAR_BUSID:-$ADAPTER} ] && continue
 
-		ZFCP_UNIT_PATH=$SYSFS/devices/css[0-9]*/[0-9d]*/$ADAPTER/$WWPN/$LUN
 		SDEVMARKER=""
 		if $SHOW_EXTENDED; then
-			[ -d $ZFCP_UNIT_PATH ] || SDEVMARKER="$SDEVMARKER auto"
+			[ -n "$ZFCP_UNIT_PATH" ] || SDEVMARKER="$SDEVMARKER auto"
 			read SDEVSTATE < $SCSI_DEVICE_PATH/state
 			[ "$SDEVSTATE" != "running" ] \
 				&& SDEVMARKER="$SDEVMARKER NotRunning"
+		else
+			# build manually because ZFCP_UNIT_ARRAY loop was NOP
+			ZFCP_UNIT_PATH=$SYSFS/devices/css[0-9]*/[0-9d]*/$ADAPTER/$WWPN/$LUN
 		fi
 
 		if [ $VERBOSITY -eq 0 ]; then
@@ -464,7 +474,7 @@ show_devices()
 
 		if $SHOW_ATTRIBUTES && [ $SHOW_MORE_ATTRS -ge 1 ]; then
 			# auto scan LUNs not necessarily have a zfcp_unit
-			if [ -d $ZFCP_UNIT_PATH ]; then
+			if [ -n "$ZFCP_UNIT_PATH" ] && [ -d $ZFCP_UNIT_PATH ]; then
 				echo 'Class = "zfcp_unit"'
 				show_attributes "$ZFCP_UNIT_PATH"
 			fi
@@ -500,8 +510,8 @@ show_devices()
 		fi
 	done
 
-	# what's left in ZFCP_UNIT_LIST are now units without SCSI device
-	for UNIT_PATH in $ZFCP_UNIT_LIST; do
+	# what's left in ZFCP_UNIT_ARRAY are now units without SCSI device
+	for UNIT_PATH in "${ZFCP_UNIT_ARRAY[@]}"; do
 		STRIPPED_PATH=$UNIT_PATH
 		LUN=${UNIT_PATH##*/}
 		STRIPPED_PATH=${STRIPPED_PATH%/*}
