@@ -400,6 +400,7 @@ CONFIGFILES="\
   /etc/hosts*\
   /etc/iscsi\
   /etc/inittab\
+  /etc/kdump\
   /etc/libvirt\
   /etc/logrotate.d\
   /etc/lvm\
