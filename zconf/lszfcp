@@ -415,8 +415,7 @@ show_devices()
 		SDEVMARKER=""
 		if $SHOW_EXTENDED; then
 			[ -d $ZFCP_UNIT_PATH ] || SDEVMARKER="$SDEVMARKER auto"
-			[ -r $SCSI_DEVICE_PATH/state ] \
-				&& read SDEVSTATE < $SCSI_DEVICE_PATH/state
+			read SDEVSTATE < $SCSI_DEVICE_PATH/state
 			[ "$SDEVSTATE" != "running" ] \
 				&& SDEVMARKER="$SDEVMARKER NotRunning"
 		fi
