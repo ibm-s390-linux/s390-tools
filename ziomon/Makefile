@@ -43,17 +43,17 @@ ziorep_utilization: ziorep_utilization.o ziorep_framer.o ziorep_frameset.o \
 install: all
 	$(SED) -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		< ziomon > $(DESTDIR)$(USRSBINDIR)/ziomon;
-	chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/ziomon;
+	chown $(OWNER):$(GROUP) $(DESTDIR)$(USRSBINDIR)/ziomon;
 	chmod 755 $(DESTDIR)$(USRSBINDIR)/ziomon;
 	$(SED) -e \
 		's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		< ziomon_fcpconf > $(DESTDIR)$(USRSBINDIR)/ziomon_fcpconf;
-	chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/ziomon_fcpconf;
+	chown $(OWNER):$(GROUP) $(DESTDIR)$(USRSBINDIR)/ziomon_fcpconf;
 	chmod 755 $(DESTDIR)$(USRSBINDIR)/ziomon_fcpconf;
 	$(SED) -e \
 		's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		< ziorep_config > $(DESTDIR)$(USRSBINDIR)/ziorep_config;
-	chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/ziorep_config;
+	chown $(OWNER):$(GROUP) $(DESTDIR)$(USRSBINDIR)/ziorep_config;
 	chmod 755 $(DESTDIR)$(USRSBINDIR)/ziorep_config;
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 ziomon.8 \
 		$(DESTDIR)$(MANDIR)/man8
