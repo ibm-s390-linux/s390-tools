@@ -23,7 +23,7 @@ struct table_attrib {
 };
 
 struct table_attrib *table_attrib_new(struct subtype *, struct attrib *);
-void table_attribs_show(struct util_list *, int, int, struct devtype *);
+void table_attribs_show(struct util_list *, int, int, int, struct devtype *);
 void table_attribs_show_details(struct util_list *, struct devtype *);
 
 #endif /* TABLE_ATTRIBS_H */

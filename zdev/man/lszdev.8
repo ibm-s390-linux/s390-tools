@@ -423,6 +423,17 @@ with the name of the corresponding column. Values are enclosed in double
 quotation marks. Any quotation marks or slashes in the value string are
 escaped by placing a slash in front of it.
 .PP
+
+.OD shell "" ""
+Produces KEY="VALUE" format usable as shell variables.
+
+You can use this option together with the --pairs option to generate
+output that is suitable to be sourced in a shell environment. This
+option generates similar output as it would be provided by the --pairs
+option but it would take care of replacing any character of a column
+name that would not be appropriate to be used as part of a shell
+variable name by an underscore.
+.PP
 .
 .OD persistent "p" ""
 List information from the persistent configuration only.

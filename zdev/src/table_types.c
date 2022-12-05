@@ -83,7 +83,7 @@ exit_code_t table_types_show(struct util_list *columns, int headings, int pairs)
 
 	items = table_types_build();
 	rc = table_print(table_types, table_types_get_value, NULL,
-			 items, columns, headings, pairs, 0, 0);
+			 items, columns, headings, pairs, 0, 0, 0);
 	ptrlist_free(items, 1);
 
 	return rc;

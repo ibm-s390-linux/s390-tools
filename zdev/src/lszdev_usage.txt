@@ -41,6 +41,7 @@ OPTIONS
   -n, --no-headings      Do not print column headings
       --base PATH        Use PATH as base for accessing files
       --pairs            Produce output in KEY="VALUE" format
+      --shell            Produces KEY="VALUE" format usable as shell variables
       --auto-conf        Only show auto-configuration data
   -s, --site ID          Only show data configured for the specified site
   -V, --verbose          Print additional run-time information

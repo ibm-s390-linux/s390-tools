@@ -2532,7 +2532,7 @@ static exit_code_t do_list_attribs(struct options *opts)
 	remove_duplicate_attribs(attribs, devtype_count_subtypes(dt));
 
 	if (attribs) {
-		table_attribs_show(attribs, 1, 0, dt);
+		table_attribs_show(attribs, 1, 0, 0, dt);
 		ptrlist_free(attribs, 1);
 	} else
 		rc = EXIT_ATTRIB_NOT_FOUND;

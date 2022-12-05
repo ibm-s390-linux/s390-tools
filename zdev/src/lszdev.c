@@ -70,6 +70,7 @@ struct options {
 	unsigned int no_headings:1;
 	struct util_list *base;		/* List of struct strlist_node */
 	unsigned int pairs:1;
+	unsigned int shell:1;
 	unsigned int verbose:1;
 	unsigned int quiet:1;
 	unsigned int site_id;
@@ -106,6 +107,7 @@ enum {
 	OPT_VERBOSE		= 'V',
 	OPT_QUIET		= 'q',
 	OPT_PAIRS		= 'P',
+	OPT_SHELL		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_AUTO_CONF		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_SITE		= 's',
 };
@@ -167,6 +169,7 @@ static const struct option opt_list[] = {
 	{ "no-headings",	no_argument,	NULL, OPT_NO_HEADINGS },
 	{ "base",		required_argument, NULL, OPT_BASE },
 	{ "pairs",		no_argument,	NULL, OPT_PAIRS },
+	{ "shell",              no_argument,    NULL, OPT_SHELL },
 	{ "verbose",		no_argument,	NULL, OPT_VERBOSE },
 	{ "quiet",		no_argument,	NULL, OPT_QUIET },
 	{ "site",		required_argument, NULL, OPT_SITE },
@@ -699,6 +702,11 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 			opts->pairs = 1;
 			break;
 
+		case OPT_SHELL:
+			/* --shell */
+			opts->shell = 1;
+			break;
+
 		case OPT_VERBOSE:
 			/* --verbose */
 			opts->verbose = 1;
@@ -760,6 +768,13 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 
 	if (rc)
 		goto out;
+
+	/* check whether --pairs and --columns is used */
+	if (opts->shell == 1 && (opts->pairs != 1 || util_list_is_empty(opts->columns))) {
+		syntax("'--shell' must be used together with "
+		       "'--pairs' and '--columns'\n");
+		return EXIT_USAGE_ERROR;
+	}
 
 	/* Determine configuration set. */
 	if (!opts->active && !opts->persistent && !opts->auto_conf) {
@@ -1209,7 +1224,7 @@ static exit_code_t do_list_devices(struct options *opts)
 	/* Display table. */
 	rc = table_print(dev_table, dev_table_get_value, opts, items,
 			 opts->columns, !opts->no_headings, opts->pairs, 0,
-			 util_list_is_empty(opts->columns));
+			 util_list_is_empty(opts->columns), opts->shell);
 	ptrlist_free(items, 0);
 
 	return rc;
@@ -1443,7 +1458,7 @@ static void settings_table_print(struct setting_list *active,
 	data.pairs = opts->pairs;
 
 	table_print(settings_table, settings_table_get_value, &data, items,
-		    NULL, 1, opts->pairs, ind, 0);
+		    NULL, 1, opts->pairs, ind, 0, opts->shell);
 
 out:
 	ptrlist_free(items, 1);

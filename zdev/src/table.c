@@ -7,6 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -114,6 +115,40 @@ static struct cell *cells_get_default(struct column *columns)
 	}
 
 	return cells;
+}
+
+bool is_shell_char(const char c)
+{
+	/* check whether character is alphabetic */
+	if (tolower(c) >= 'a' && tolower(c) <= 'z')
+		return true;
+	if (isdigit(c) || c == '_')
+		return true;
+	return false;
+}
+
+/* replaces bad characters that won't work if using them
+ * as part of variable names in a shell environment
+ */
+char *replace_bad_chars(const char *value)
+{
+	int i;
+	char *copy, c;
+
+	/* remove bad characters and replace them by an underscore */
+	copy = misc_strdup(value);
+	for (i = 0; (c = value[i]); i++) {
+		/*
+		 * check whether character is alphabetic,
+		 * first character of an env var can't be a digit
+		 */
+		if (!is_shell_char(c) || (i == 0 && isdigit(c)))
+			c = '_';
+		/* copy character into string copy */
+		copy[i] = c;
+	}
+
+	return copy;
 }
 
 /* Return a newly allocated array of struct cells containing a struct cell for
@@ -320,17 +355,23 @@ do_print:
 }
 
 /* Print all cells in a row in pairs format. */
-static void print_row_pairs(struct cell *cells)
+static void print_row_pairs(struct cell *cells, int shell)
 {
 	int i;
 	struct cell *c;
 	char *val;
+	char *heading;
 
 	for (i = 0; cells[i].heading; i++) {
 		c = &cells[i];
 		val = quote_str(c->value ? c->value : "", 1);
-		printf("%s%s=%s", i > 0 ? " " : "", c->heading, val);
+		if (shell)
+			heading = replace_bad_chars(c->heading);
+		else
+			heading = misc_strdup(c->heading);
+		printf("%s%s=%s", i > 0 ? " " : "", heading, val);
 		free(val);
+		free(heading);
 	}
 	printf("\n");
 }
@@ -342,7 +383,7 @@ static void print_row_pairs(struct cell *cells)
 exit_code_t table_print(struct column *columns, table_value_cb_t get_value_cb,
 			void *data, struct util_list *items,
 			struct util_list *names, int heading, int pairs,
-			int indent, int wrap)
+			int indent, int wrap, int shell)
 {
 	struct cell *cells;
 	struct ptrlist_node *p;
@@ -372,7 +413,7 @@ exit_code_t table_print(struct column *columns, table_value_cb_t get_value_cb,
 	util_list_iterate(items, p) {
 		cells_get_values(cells, p->ptr, get_value_cb, data);
 		if (pairs)
-			print_row_pairs(cells);
+			print_row_pairs(cells, shell);
 		else
 			print_row(cells, space, indent, wrap);
 	}
@@ -434,7 +475,7 @@ void table_print_columns(struct column *columns, struct util_list *names,
 	for (i = 0; columns[i].name; i++)
 		ptrlist_add(items, &columns[i]);
 	table_print(columns_table, columns_table_get_value, NULL, items, names,
-		    heading, pairs, 0, 0);
+		    heading, pairs, 0, 0, 0);
 	ptrlist_free(items, 0);
 }
 

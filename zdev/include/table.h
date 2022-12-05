@@ -66,7 +66,7 @@ typedef char *(*table_value_cb_t)(void *item, int id, const char *heading,
 struct column *table_get_column(struct column *, const char *);
 exit_code_t table_print(struct column *, table_value_cb_t, void *,
 			struct util_list *, struct util_list *, int, int, int,
-			int);
+			int, int);
 exit_code_t table_check_columns(struct column *, struct util_list *);
 void table_print_columns(struct column *, struct util_list *, int, int);
 void table_set_default(struct column *, int, int);

@@ -115,7 +115,7 @@ void print_type(struct devtype *dt, struct subtype *st, bool multiple)
 
 /* Display table of attributes. */
 void table_attribs_show(struct util_list *attribs, int headings, int pairs,
-			struct devtype *dt)
+			int shell, struct devtype *dt)
 {
 	struct util_list *subtypes, *subattribs;
 	struct ptrlist_node *p;
@@ -145,7 +145,7 @@ void table_attribs_show(struct util_list *attribs, int headings, int pairs,
 		print_type(dt, st, multiple);
 
 		table_print(table_attribs, table_attribs_get_value, st,
-			    subattribs, NULL, headings, pairs, indent, 0);
+			    subattribs, NULL, headings, pairs, shell, indent, 0);
 
 		ptrlist_free(subattribs, 0);
 	}
