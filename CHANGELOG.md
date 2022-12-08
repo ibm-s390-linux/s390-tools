@@ -1,15 +1,19 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.2x.x (2022-xx-xx)__
+* __v2.25.0 (2022-12-08)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.1
 
   Changes of existing tools:
+  - ap_tools: Use new mdevctl installation location
+  - lsdasd/tunedasd/zdev: Add support to handle copy pair relations presented by the DASD driver
+  - zdev: Add --shell command line switch to generate output suitable for shell environments
+  - zipl: Add List-Directed IPL from ECKD DASD to support secure boot
 
   Bug Fixes:
+  - ipl_tools: Fix chreipl node for NVMes with CONFIG_NVME_MULTIPATH
+  - libdasd: Fix bug that prevented positive ioctl return codes
 
 * __v2.24.0 (2022-11-09)__
 

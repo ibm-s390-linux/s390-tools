@@ -21,6 +21,7 @@ List of all individuals having contributed content to s390-tools
 - Colin Walters
 - Dan Horak
 - Dan Horák
+- Daniel S. Haischt
 - Despina Papadopoulou
 - Dimitri John Ledkov
 - Eberhard Pasch
