@@ -39,7 +39,6 @@ SECTIONS
   __ex_table_start = .;
   .ex_table : { *(.ex_table) }
   __ex_table_stop = .;
-  .eh_frame : { *(.eh_frame) }
 
   __bss_start = .;
   .bss : { *(.bss) }
@@ -74,5 +73,11 @@ SECTIONS
   * put at 0x0 */
   .notes : {
   *(.note.*)
+  }
+
+  /* Sections to be discarded */
+  /DISCARD/ : {
+    *(.eh_frame)
+    *(.interp)
   }
 }
