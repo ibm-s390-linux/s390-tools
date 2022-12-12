@@ -52,7 +52,7 @@ install-scripts: lshmc
 		cat $$i | \
 		sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		>$(DESTDIR)$(USRSBINDIR)/$$i; \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/$$i; \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(USRSBINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(USRSBINDIR)/$$i; \
 	done
 

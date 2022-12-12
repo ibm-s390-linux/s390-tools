@@ -25,7 +25,7 @@ install-scripts:	$(SCRIPTS)
 		cat $$i | \
 		sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		>$(DESTDIR)$(BINDIR)/$$i; \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(BINDIR)/$$i; \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(BINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(BINDIR)/$$i; \
 	done
 
@@ -34,15 +34,15 @@ install-usrsbin-scripts:	$(USRSBIN_SCRIPTS)
 		cat $$i | \
 		sed -e 's/%S390_TOOLS_VERSION%/$(S390_TOOLS_RELEASE)/' \
 		>$(DESTDIR)$(USRSBINDIR)/$$i; \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(USRSBINDIR)/$$i; \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(USRSBINDIR)/$$i; \
 		chmod 755 $(DESTDIR)$(USRSBINDIR)/$$i; \
 	done
 
 install-manpages:	$(MANPAGES)
 	@if [ ! -d $(DESTDIR)$(MANDIR) ]; then \
 		mkdir -p $(DESTDIR)$(MANDIR)/man8; \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MANDIR); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MANDIR)/man8; \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MANDIR); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MANDIR)/man8; \
 		chmod 755 $(DESTDIR)$(MANDIR); \
 		chmod 755 $(DESTDIR)$(MANDIR)/man8; \
 	fi; \

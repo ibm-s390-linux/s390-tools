@@ -26,9 +26,9 @@ ap-check: ap-check.o $(libs)
 install: all
 	@if [ ! -d $(DESTDIR)$(MDEVCTL_CALLOUTS) ]; then \
 		mkdir -p $(DESTDIR)$(MDEVCTL_CALLOUTS); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MDEVCTL_DIR); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MDEVCTL_SCRIPTS); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MDEVCTL_CALLOUTS); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MDEVCTL_DIR); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MDEVCTL_SCRIPTS); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MDEVCTL_CALLOUTS); \
 		chmod 755 $(DESTDIR)$(MDEVCTL_DIR); \
 		chmod 755 $(DESTDIR)$(MDEVCTL_SCRIPTS); \
 		chmod 755 $(DESTDIR)$(MDEVCTL_CALLOUTS); \
@@ -37,9 +37,9 @@ install: all
 		$(DESTDIR)$(MDEVCTL_CALLOUTS)
 	@if [ ! -d $(DESTDIR)$(MDEVCTL_DEP_CALLOUTS) ]; then \
 		mkdir -p $(DESTDIR)$(MDEVCTL_DEP_CALLOUTS); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MDEVCTL_DEP_DIR); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MDEVCTL_DEP_SCRIPTS); \
-		chown $(OWNER).$(GROUP) $(DESTDIR)$(MDEVCTL_DEP_CALLOUTS); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MDEVCTL_DEP_DIR); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MDEVCTL_DEP_SCRIPTS); \
+		chown $(OWNER):$(GROUP) $(DESTDIR)$(MDEVCTL_DEP_CALLOUTS); \
 		chmod 755 $(DESTDIR)$(MDEVCTL_DEP_DIR); \
 		chmod 755 $(DESTDIR)$(MDEVCTL_DEP_SCRIPTS); \
 		chmod 755 $(DESTDIR)$(MDEVCTL_DEP_CALLOUTS); \
