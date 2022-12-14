@@ -674,7 +674,7 @@ struct _storage_state_mmap {
 	size_t mapped_size;
 	pv_tweak_component_t *tweak_components;
 	size_t num_tweaks;
-	gatomicrefcount ref_count;
+	int ref_count;
 };
 
 storage_state_mmap_t *storage_state_mmap_new(const int fd, const size_t file_size, const u64 offset,
@@ -733,14 +733,14 @@ storage_state_mmap_t *storage_state_mmap_new(const int fd, const size_t file_siz
 	ret->tweak_components = (pv_tweak_component_t *)(ptr + in_page_offset);
 	ret->num_tweaks = tweak_components_cnt;
 	ret->mapped_size = mmapped_size;
-	g_atomic_ref_count_init(&ret->ref_count);
+	ret->ref_count = 1;
 	return g_steal_pointer(&ret);
 }
 
 storage_state_mmap_t *storage_state_mmap_ref(storage_state_mmap_t *storage_state)
 {
 	g_assert(storage_state);
-	g_atomic_ref_count_inc(&storage_state->ref_count);
+	g_atomic_int_inc(&storage_state->ref_count);
 	return storage_state;
 }
 
@@ -748,7 +748,7 @@ void storage_state_mmap_unref(storage_state_mmap_t *storage_state)
 {
 	if (!storage_state)
 		return;
-	if (storage_state->ref_count && !g_atomic_ref_count_dec(&storage_state->ref_count))
+	if (storage_state->ref_count && !g_atomic_int_dec_and_test(&storage_state->ref_count))
 		return;
 	if (storage_state->first_page_ptr) {
 		int rc = munmap(storage_state->first_page_ptr, storage_state->mapped_size);
