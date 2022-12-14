@@ -11,10 +11,10 @@
 /* Must be included before any other header */
 #include "config.h"
 
-#include <glib/gi18n.h>
 #include <stdio.h>
 
 #include "libpv/glib-helper.h"
+#include <glib/gi18n.h>
 #include "libpv/macros.h"
 #include "lib/zt_common.h"
 

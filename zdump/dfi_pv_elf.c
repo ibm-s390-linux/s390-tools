@@ -21,7 +21,6 @@
 #include <elf.h>
 #include <errno.h>
 
-#include <glib.h>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 

@@ -18,6 +18,12 @@
 #define GLIB_VERSION_MIN_REQUIRED GLIB_VERSION_2_56
 #endif
 
+#define GLIB_VERSION_MAX_ALLOWED GLIB_VERSION_2_56
+
+#ifdef __G_LIB_H__
+#error "glib.h must be included via libpv/glib-helper.h"
+#endif
+
 #include <glib.h>
 #include <gmodule.h>
 #include <stdio.h>
