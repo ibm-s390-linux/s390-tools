@@ -119,7 +119,9 @@ libs = $(rootdir)/libutil/libutil.a $(LIBPV)
 
 all: $(BUILD_TARGETS)
 
-zgetdump: .check_dep_zgetdump $(OBJECTS) $(libs)
+$(OBJECTS): .check_dep_zgetdump
+
+zgetdump: $(OBJECTS) $(libs)
 
 skip-zgetdump:
 	echo "  SKIP    zgetdump due to unresolved dependencies"
