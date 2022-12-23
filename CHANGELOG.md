@@ -22,6 +22,7 @@ Release history for s390-tools (MIT version)
     `CC_FOR_BUILD`. This is useful for cross compiling, and this naming
     convention is very similar to the Meson convention (see
     https://mesonbuild.com/Reference-tables.html#environment-variables-per-machine).
+  - add support for architectures other than s390x for `pvattest`
 
   Bug Fixes:
 

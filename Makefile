@@ -6,6 +6,7 @@ include common.mak
 # LIBS: Libraries that can have a dependency to base libraries
 # TOOLS: Tools that can have a dependency to base libraries or libraries
 #
+ifeq ($(HOST_ARCH),s390x)
 BASELIB_DIRS = libutil libseckey
 LIB_DIRS = libvtoc libzds libdasd libccw libvmcp libekmfweb \
 	   libkmipclient libcpumf libap libpv
@@ -15,6 +16,11 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   ziomon iucvterm hyptop cmsfs-fuse qethqoat zfcpdump zdsfs cpumf \
 	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
 	   genprotimg lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools pvattest
+else
+BASELIB_DIRS =
+LIB_DIRS = libpv
+TOOL_DIRS = pvattest
+endif
 
 SUB_DIRS = $(BASELIB_DIRS) $(LIB_DIRS) $(TOOL_DIRS)
 
