@@ -552,6 +552,33 @@ static const OSSL_PARAM *sk_prov_cached_params_build(
 	return provctx->cached_parms[index];
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static bool sk_prov_check_uint_param(const OSSL_PARAM params[],
+				     const char *param_name,
+				     const struct sk_prov_key *key,
+				     int key_type,
+				     unsigned int expected_value)
+{
+	const OSSL_PARAM *p;
+	unsigned int value;
+
+	if (key == NULL)
+		return true;
+	if (key->type != key_type)
+		return true;
+
+	p = OSSL_PARAM_locate_const(params, param_name);
+	if (p == NULL)
+		return true;
+
+	if (OSSL_PARAM_get_uint(p, &value) != 1)
+		return true;
+
+	return value == expected_value;
+}
+#pragma GCC diagnostic pop
+
 static struct sk_prov_op_ctx *sk_prov_op_newctx(struct sk_prov_ctx *provctx,
 						const char *propq,
 						int type)
@@ -1361,6 +1388,16 @@ static int sk_prov_sign_op_set_ctx_params(void *vctx, const OSSL_PARAM params[])
 	for (p = params; p != NULL && p->key != NULL; p++)
 		sk_debug_op_ctx(ctx, "param: %s", p->key);
 
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+	/* OSSL_SIGNATURE_PARAM_NONCE_TYPE is used for EC sign ops only */
+	if (!sk_prov_check_uint_param(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE,
+				      ctx->key, EVP_PKEY_EC, 0)) {
+		put_error_op_ctx(ctx, SK_PROV_ERR_INVALID_PARAM,
+				 "Deterministic signature is not supported");
+		return 0;
+	}
+#endif
+
 	default_set_params_fn = (OSSL_FUNC_signature_set_ctx_params_fn *)
 			sk_prov_get_default_sign_func(ctx->provctx,
 				ctx->type, OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS);
@@ -1729,6 +1766,16 @@ static int sk_prov_sign_op_sign_init(void *vctx, void *vkey,
 	for (p = params; p != NULL && p->key != NULL; p++)
 		sk_debug_op_ctx(ctx, "param: %s", p->key);
 
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+	/* OSSL_SIGNATURE_PARAM_NONCE_TYPE is used for EC sign ops only */
+	if (!sk_prov_check_uint_param(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE,
+				      key, EVP_PKEY_EC, 0)) {
+		put_error_op_ctx(ctx, SK_PROV_ERR_INVALID_PARAM,
+				 "Deterministic signature is not supported");
+		return 0;
+	}
+#endif
+
 	default_sign_init_fn = (OSSL_FUNC_signature_sign_init_fn *)
 				sk_prov_get_default_sign_func(ctx->provctx,
 					ctx->type,
@@ -1954,6 +2001,16 @@ static int sk_prov_sign_op_digest_sign_init(struct sk_prov_op_ctx *ctx,
 			mdname != NULL ? mdname : "", key);
 	for (p = params; p != NULL && p->key != NULL; p++)
 		sk_debug_op_ctx(ctx, "param: %s", p->key);
+
+#ifdef OSSL_SIGNATURE_PARAM_NONCE_TYPE
+	/* OSSL_SIGNATURE_PARAM_NONCE_TYPE is used for EC sign ops only */
+	if (!sk_prov_check_uint_param(params, OSSL_SIGNATURE_PARAM_NONCE_TYPE,
+				      key, EVP_PKEY_EC, 0)) {
+		put_error_op_ctx(ctx, SK_PROV_ERR_INVALID_PARAM,
+				 "Deterministic signature is not supported");
+		return 0;
+	}
+#endif
 
 	default_digest_sign_init_fn =
 			(OSSL_FUNC_signature_digest_sign_init_fn *)
