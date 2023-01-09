@@ -877,6 +877,20 @@ static int sk_prov_asym_op_set_ctx_params(void *vctx, const OSSL_PARAM params[])
 	for (p = params; p != NULL && p->key != NULL; p++)
 		sk_debug_op_ctx(ctx, "param: %s", p->key);
 
+#ifdef OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION
+	/* OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION is for RSA decrypt only */
+	if (!sk_prov_check_uint_param(params,
+				      OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION,
+				      ctx->key, EVP_PKEY_RSA, 0) ||
+	    !sk_prov_check_uint_param(params,
+				      OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION,
+				      ctx->key, EVP_PKEY_RSA_PSS, 0)) {
+		put_error_op_ctx(ctx, SK_PROV_ERR_INVALID_PARAM,
+				 "Implicit rejection is not supported");
+		return 0;
+	}
+#endif
+
 	default_set_params_fn = (OSSL_FUNC_asym_cipher_set_ctx_params_fn *)
 			sk_prov_get_default_asym_func(ctx->provctx,
 				ctx->type,
@@ -1152,6 +1166,14 @@ static int sk_prov_asym_op_decrypt_init(void *vctx, void *vkey,
 	struct sk_prov_op_ctx *ctx = vctx;
 	struct sk_prov_key *key = vkey;
 	const OSSL_PARAM *p;
+#ifdef OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION
+	unsigned int implicit_rejection = 0;
+	OSSL_PARAM set_params[] = {
+		OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION,
+				&implicit_rejection),
+		OSSL_PARAM_END
+	};
+#endif
 
 	if (ctx == NULL || key == NULL)
 		return 0;
@@ -1159,6 +1181,20 @@ static int sk_prov_asym_op_decrypt_init(void *vctx, void *vkey,
 	sk_debug_op_ctx(ctx, "ctx: %p key: %p", ctx, key);
 	for (p = params; p != NULL && p->key != NULL; p++)
 		sk_debug_op_ctx(ctx, "param: %s", p->key);
+
+#ifdef OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION
+	/* OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION is for RSA decrypt only */
+	if (!sk_prov_check_uint_param(params,
+				      OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION,
+				      key, EVP_PKEY_RSA, 0) ||
+	    !sk_prov_check_uint_param(params,
+				      OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION,
+				      key, EVP_PKEY_RSA_PSS, 0)) {
+		put_error_op_ctx(ctx, SK_PROV_ERR_INVALID_PARAM,
+				 "Implicit rejection is not supported");
+		return 0;
+	}
+#endif
 
 	default_decrypt_init_fn = (OSSL_FUNC_asym_cipher_decrypt_init_fn *)
 				sk_prov_get_default_asym_func(ctx->provctx,
@@ -1181,6 +1217,26 @@ static int sk_prov_asym_op_decrypt_init(void *vctx, void *vkey,
 				 "default_decrypt_init_fn failed");
 		return 0;
 	}
+
+#ifdef OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION
+	if ((key->type == EVP_PKEY_RSA || key->type == EVP_PKEY_RSA_PSS) &&
+	    key->secure_key != NULL) {
+		/*
+		 * By default, implicit rejection is enabled for the default
+		 * provider. We currently do not support implicit rejection with
+		 * secure keys, so disable implicit rejection in the default
+		 * provider operation context to report its status correctly
+		 * with get-params.
+		 */
+		implicit_rejection = 0;
+		if (!sk_prov_asym_op_set_ctx_params(ctx, set_params)) {
+			sk_debug_op_ctx(ctx,
+					"ERROR: sk_prov_asym_op_set_ctx_params "
+					"failed");
+			return 0;
+		}
+	}
+#endif
 
 	return 1;
 }
