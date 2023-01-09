@@ -1738,6 +1738,11 @@ static int sk_prov_sign_op_get_pss_saltlen(struct sk_prov_op_ctx *ctx,
 		salt_len = max_saltlen;
 	else if (strcmp(saltlen, OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO) == 0)
 		salt_len = max_saltlen;
+#ifdef OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX
+	else if (strcmp(saltlen,
+			OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX) == 0)
+		salt_len = MIN(max_saltlen, EVP_MD_size(mgf_md));
+#endif
 	else
 		salt_len = atoi(saltlen);
 
