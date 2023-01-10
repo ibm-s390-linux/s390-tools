@@ -2,7 +2,7 @@
 #
 # dbginfo.sh - Tool to collect runtime, configuration, and trace information
 #
-# Copyright IBM Corp. 2002, 2022
+# Copyright IBM Corp. 2002, 2023
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -71,7 +71,7 @@ paramWORKDIR_BASE="/tmp"  # initial default path
 print_version() {
 	cat <<EOF
 ${SCRIPTNAME}: Debug information script version %S390_TOOLS_VERSION%
-Copyright IBM Corp. 2002, 2022
+Copyright IBM Corp. 2002, 2023
 EOF
 }
 
