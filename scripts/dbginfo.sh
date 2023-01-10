@@ -655,6 +655,7 @@ VM_CMDS="q userid\
   :q quickdsp VMUSERID\
   :q pcifunction\
   :q vmrelocate\
+  :q syscontrol\
   :ind load\
   :ind sp\
   :ind user\
