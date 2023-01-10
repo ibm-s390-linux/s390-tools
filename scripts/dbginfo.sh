@@ -525,6 +525,7 @@ CMDS="${CMDS}\
 # product / distro specific commands
 CMDS="${CMDS}\
   :java -version\
+  :qemu-ga -V\
   :SPident # SLES service package\
   "
 
@@ -659,7 +660,6 @@ VM_CMDS="q userid\
   :ind load\
   :ind sp\
   :ind user\
-  :qemu-ga -V\
   "
 
 ###############################################################################
