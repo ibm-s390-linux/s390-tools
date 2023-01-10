@@ -18,3 +18,8 @@ pgm_check_handler:
 	basr	%r14,%r14
 	lmg	%r0,%r15,__LC_SAVE_AREA_SYNC
 	lpswe	__LC_PGM_OLD_PSW(%r0)
+
+/* The code doesn't require an executable stack */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif

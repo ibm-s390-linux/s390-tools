@@ -94,5 +94,6 @@ SECTIONS
   /DISCARD/ : {
     *(.eh_frame)
     *(.interp)
+    *(.note.GNU-stack)
   }
 }
