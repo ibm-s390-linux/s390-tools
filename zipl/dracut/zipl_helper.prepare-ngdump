@@ -16,14 +16,21 @@ DRACUT_OMIT_MODULES=(
 	systemd-timedated systemd-timesyncd
 	systemd-networkd systemd-network-manager systemd-coredump)
 
-[ $# -gt 0 ] || { echo "Usage: $0 <dump partition device>" >&2; exit 1; }
+function create_dumpfs()
+{
+	[ "$dryrun" -eq 1 ] && { echo "/dev/null"; return 0; }
+	mkfs -F "$device" >/dev/null || { echo "Couldn't create filesystem on $1." >&2; return 1; }
+	local disk_path=/dev/disk/by-uuid/$(blkid -o value -s UUID "$device")
+	for i in $(seq 0 30)
+	do
+		[ -e "$disk_path" ] && break;
+		sleep 1
+	done
 
-#
-# Retrieve partition UUID
-#
-# We use PARTUUID because zipl re-formats the given partition after
-# calling us, therefore, a UUID will change.
-#
+	[ -e "$disk_path" ] || { echo "Filesystem device link missing." >&2; return 1; }
+	echo "$disk_path"
+}
+
 device=$(readlink -f $1)
 disk_path=/dev/disk/by-partuuid/$(blkid -o value -s PARTUUID "$device")
 
@@ -69,6 +76,11 @@ function create_initrd()
 	       --kver "$kver" -f "$initrd" 2>&1
 }
 
+[ $# -gt 1 ] || { echo "Usage: $0 <dump partition device> <dryrun>" >&2; exit 1; }
+
+device=$(readlink -f $1)
+dryrun=$2
+disk_path=$(create_dumpfs $device)
 kernel_version=$(get_kernel_version)
 kernel=$(get_kernel_image "$kernel_version")
 [ -e "$kernel" ] || { echo "Couldn't find kernel image." >&2; exit 1; }

@@ -919,7 +919,7 @@ check_job_images_ngdump(struct job_dump_data* dump, char *name)
 	FILE *fp;
 	int rc;
 
-	misc_asprintf(&ppn_cmd, "%s %s", helper, dump->device);
+	misc_asprintf(&ppn_cmd, "%s %s %d", helper, dump->device, dry_run);
 	printf("Run %s\n", ppn_cmd);
 
 	fp = popen(ppn_cmd, "r");

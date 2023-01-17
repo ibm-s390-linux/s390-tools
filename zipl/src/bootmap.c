@@ -1667,7 +1667,6 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 {
 	struct disk_info *info;
 	char *bootmap_dir;
-	int rc;
 
 	/* Retrieve target device information */
 	if (disk_get_info(job->data.dump.device, &job->target, &info))
@@ -1693,22 +1692,6 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 		return -1;
 	}
 	bis->dump_tmp_dir_created = 1;
-	if (!dry_run) {
-		char *cmd = NULL;
-		util_asprintf(&cmd, "mkfs.%s -qF %s >/dev/null",
-			      NGDUMP_FSTYPE, job->data.dump.device);
-		if (verbose)
-			printf("Formatting partition '%s'\n",
-				job->data.dump.device);
-		rc = system(cmd);
-		free(cmd);
-		if (rc) {
-			error_reason(strerror(errno));
-			error_text("Could not format partition '%s':",
-				   job->data.dump.device);
-			return -1;
-		}
-	}
 	/*
 	 * Mount partition where bootmap file and also a dump file will
 	 * be stored.
