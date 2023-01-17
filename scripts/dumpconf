@@ -301,6 +301,9 @@ setup_reipl()
 	fi
 
 	case "$REIPL_TYPE" in
+		eckd)
+			setup_ccw_device $REIPL_CONFIG_DIR $REIPL_TYPE
+			;;
 		ccw)
 			setup_ccw_device $REIPL_CONFIG_DIR $REIPL_TYPE
 			;;
@@ -332,6 +335,9 @@ setup_reipl()
 setup_dump()
 {
 	case "$DUMP_TYPE" in
+		eckd)
+			setup_ccw_device $DUMP_CONFIG_DIR $DUMP_TYPE
+			;;
 		ccw)
 			setup_ccw_device $DUMP_CONFIG_DIR $DUMP_TYPE
 			;;
@@ -408,6 +414,16 @@ print_ccw_device()
 	pr_info "device..: $DEVICE"
 }
 
+print_eckd_device()
+{
+	DEVICE=$(cat $1/eckd/device) || RETVAL=1
+	pr_info "device..: $DEVICE"
+	BR_CHR=$(cat $1/eckd/br_chr) || RETVAL=1
+	pr_info "br_chr..: $BR_CHR"
+	BOOTPROG=$(cat $1/eckd/bootprog) || RETVAL=1
+	pr_info "bootprog: $BOOTPROG"
+}
+
 print_nvme_device()
 {
 	FID=$(cat $1/nvme/fid) || RETVAL=1
@@ -432,6 +448,11 @@ status_dump()
 	case "$CONF_DUMP_TYPE" in
 		none)
 			pr_info "type....: no dump device configured"
+			;;
+		eckd)
+			pr_info "type....: eckd"
+			print_eckd_device $DUMP_CONFIG_DIR
+			verify_ccw_dump_device $(cat $DUMP_CONFIG_DIR/eckd/device)
 			;;
 		ccw)
 			pr_info "type....: ccw"
@@ -458,6 +479,9 @@ status_reipl()
 	REIPL_TYPE=$(cat $REIPL_CONFIG_DIR/reipl_type) || RETVAL=1
 	pr_info "type....: $REIPL_TYPE"
 	case "$REIPL_TYPE" in
+		eckd)
+			print_eckd_device $REIPL_CONFIG_DIR
+			;;
 		ccw)
 			print_ccw_device $REIPL_CONFIG_DIR
 			;;
