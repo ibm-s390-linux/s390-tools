@@ -282,6 +282,10 @@ or configuration section on the command line at the same time.
 This option has been removed, use --dumpto instead.
 
 .TP
+.BR "\-\-ldipl-dump"
+Install a List-directed dump record instead of a CCW-type dump.
+
+.TP
 .BR "\-M <DUMPLIST[,SIZE]>" " or " "--mvdump=<DUMPLIST[,SIZE]>"
 Install a multi-volume dump record on each device associated with one of the
 partitions listed in file DUMPLIST.

@@ -72,6 +72,7 @@ static const char* usage_text[] = {
 "                                stand-alone dump tool",
 "-d, --dumpto DUMPDEV[,SIZE]     Install a system dump record on tape device",
 "                                or disk partition DUMPDEV",
+"    --ldipl-dump                Install a List-directed dump",
 "-M, --mvdump DEVLIST[,SIZE]     Install a multi-volume dump record on each",
 "                                disk partition listed in file DEVLIST",
 "-f, --force                     Disable sanity check while producing a",

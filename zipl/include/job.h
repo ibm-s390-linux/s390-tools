@@ -128,6 +128,7 @@ struct job_data {
 	int dry_run;
 	int command_line;
 	int is_secure;
+	int is_ldipl_dump;
 };
 
 

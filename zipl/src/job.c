@@ -63,6 +63,7 @@ static struct option options[] = {
 	{ "dry-run",		no_argument,		NULL, '0'},
 	{ "force",		no_argument,		NULL, 'f'},
 	{ "kdump",		required_argument,	NULL, 'k'},
+	{ "ldipl-dump",         no_argument,            NULL, 0xb0},
 	{ "secure",		required_argument,	NULL, 'S'},
 	{ NULL,			0,			NULL, 0 }
 };
@@ -93,6 +94,7 @@ struct command_line {
 	int dry_run;
 	int force;
 	int is_secure;
+	int is_ldipl_dump;
 	enum scan_section_type type;
 };
 
@@ -283,6 +285,9 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 			break;
 		case 'f':
 			cmdline.force = 1;
+			break;
+		case 0xb0:
+			cmdline.is_ldipl_dump = 1;
 			break;
 		case 1:
 			/* Non-option is interpreted as section name */
@@ -1978,6 +1983,7 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
 	job->is_secure =  SECURE_BOOT_UNDEFINED;
+	job->is_ldipl_dump = cmdline.is_ldipl_dump;
 	if (job->verbose)
 		printf("Looking for components in '%s'\n", util_libdir());
 
