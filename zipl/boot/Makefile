@@ -41,6 +41,15 @@ endif
 %.lds: %.lds.S
 	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -P -C -o $@ $<
 
+fba0.exec eckd0_ldl.exec eckd0_cdl.exec tape0.exec: \
+	stage0.lds
+
+eckd1.exec: \
+	stage1.lds
+
+eckd1b.exec fba1b.exec: \
+	stage1b.lds
+
 eckd2dump_sv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o \
 	libc.o ebcdic.o sclp.o entry.o stage2.lds
@@ -61,20 +70,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 	     sclp_stage3.o kdump.o entry.o stage3.lds
 
 %.exec:	%.o
-	STAGE=$$( \
-		echo $@ | awk ' \
-			match($$0,/[0-9]+b*/){ \
-				print substr($$0,RSTART,RLENGTH) \
-			}' \
-	); \
-	case $$STAGE in \
-		0) SFLAGS="-Wl,-Ttext,0";; \
-		1) SFLAGS="-Wl,-Ttext,0x18";; \
-		1b) SFLAGS="-Wl,-Ttext,0xE000";; \
-		2) SFLAGS="-Wl,-T,stage2.lds";; \
-		3) SFLAGS="-Wl,-T,stage3.lds";; \
-	esac; \
-	$(LINK) $$SFLAGS $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
+	$(LINK) -Wl,-T,$(filter %.lds,$^) $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 
 %.bin:	%.exec
 	$(OBJCOPY) -O binary $< $@

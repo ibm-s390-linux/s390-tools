@@ -14,6 +14,9 @@
 #include "lib/zt_common.h"
 #include "linux_layout.h"
 
+#define STAGE0_LOAD_ADDRESS		_AC(0x0, UL)
+
+#define STAGE1_LOAD_ADDRESS		_AC(0x18, UL)
 #define STAGE1B_LOAD_ADDRESS		_AC(0xe000, UL)
 
 #define STAGE2_DESC			_AC(0x78, UL)
