@@ -78,7 +78,6 @@ systemd/ttyrun-getty@.service
 tape390/tape390_crypt
 tape390/tape390_display
 tunedasd/src/tunedasd
-vmconvert/vmconvert
 vmcp/vmcp
 vmur/vmur
 zconf/chp/chchp

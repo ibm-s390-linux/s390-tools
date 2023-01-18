@@ -9,11 +9,11 @@ include common.mak
 # TOOLS: Tools that can have a dependency to base libraries or libraries
 #
 BASELIB_DIRS = libutil libseckey
-LIB_DIRS = libvtoc libzds libdasd libvmdump libccw libvmcp libekmfweb \
+LIB_DIRS = libvtoc libzds libdasd libccw libvmcp libekmfweb \
 	   libkmipclient libcpumf libap libpv
 TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   tape390 osasnmpd qetharp ip_watcher qethconf scripts zconf \
-	   vmconvert vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
+	   vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
 	   ziomon iucvterm hyptop cmsfs-fuse qethqoat zfcpdump zdsfs cpumf \
 	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
 	   genprotimg lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools pvattest

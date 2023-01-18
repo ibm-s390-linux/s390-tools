@@ -364,10 +364,6 @@ $(rootdir)/libzds/libzds.a: $(rootdir)/libzds
 	$(MAKE) -C $(rootdir)/libzds/ libzds.a
 .PHONY: $(rootdir)/libzds
 
-$(rootdir)/libvmdump/libvmdump.a: $(rootdir)/libvmdump
-	$(MAKE) -C $(rootdir)/libvmdump/ libvmdump.a
-.PHONY: $(rootdir)/libvmdump
-
 $(rootdir)/libvmcp/libvmcp.a: $(rootdir)/libvmcp
 	$(MAKE) -C $(rootdir)/libvmcp/ libvmcp.a
 .PHONY: $(rootdir)/libvmcp

@@ -98,11 +98,6 @@ Package contents
  * tunedasd:
    Adjust tunable parameters on DASD devices.
 
- * vmconvert:
-   Convert system dumps created by the z/VM VMDUMP command into dumps with
-   LKCD format. These LKCD dumps can then be analyzed with the dump analysis
-   tool lcrash.
-
  * vmcp:
    Send commands from Linux as a z/VM guest to the z/VM control program (CP).
    Call vmcp with the CP command as an argument. The response of z/VM is
