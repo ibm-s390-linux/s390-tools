@@ -88,8 +88,6 @@ SECTIONS
   }
   __stack_end = .;
 
-  .note.gnu.build-id : { *(.note.gnu.build-id) }
-
   /* Sections to be discarded */
   /DISCARD/ : {
     *(.eh_frame)
