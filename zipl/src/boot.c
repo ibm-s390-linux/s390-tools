@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "lib/util_libc.h"
+#include "boot/loaders_layout.h"
 
 #include "stage3.h"
 
@@ -29,15 +30,13 @@
 #define DATA_SIZE(x)	((size_t) (&_binary_##x##_bin_end - &_binary_##x##_bin_start))
 #define DATA_ADDR(x)	(&_binary_##x##_bin_start)
 
-#define STAGE2_MAX_SIZE		0x3000
-#define STAGE1B_LOAD_ADDR	0xe000
 #define CCW_FLAG_CC		0x40
 #define CCW_FLAG_SLI		0x20
 #define FBA_BLK_SIZE		512
 
 static struct boot_ccw0 tic_to_stage1b = {
 	.cmd = 0x08, /* tic */
-	.address_lo = STAGE1B_LOAD_ADDR,
+	.address_lo = STAGE1B_LOAD_ADDRESS,
 };
 
 /* Check sizes of internal objects. Return 0 if everything is correct,
@@ -133,8 +132,7 @@ boot_init_fba_stage0(struct boot_fba_stage0 *stage0,
 	for (i = 0; i < stage1b_count; i++) {
 		stage0->locdata[i].blocknr =
 			(uint32_t) stage1b_list[i].linear.block;
-		stage0->locread[i].read.address_lo =
-			STAGE1B_LOAD_ADDR + i * FBA_BLK_SIZE;
+		stage0->locread[i].read.address_lo = STAGE1B_LOAD_ADDRESS + i * FBA_BLK_SIZE;
 	}
 	/* Terminate CCW chain: Tic to stage 1b */
 	memcpy(&stage0->locread[i], &tic_to_stage1b, sizeof(tic_to_stage1b));
@@ -178,7 +176,7 @@ boot_init_eckd_stage1(struct boot_eckd_stage1 *stage1,
 			((stage1b_list[i].chs.cyl >> 12) & 0xfff0);
 		stage1->seek[i].sec = stage1b_list[i].chs.sec;
 		stage1->ssrt[i].read.address_lo =
-			STAGE1B_LOAD_ADDR + i * stage1b_list[i].chs.size;
+			STAGE1B_LOAD_ADDRESS + i * stage1b_list[i].chs.size;
 		stage1->ssrt[i].read.flags = CCW_FLAG_CC | CCW_FLAG_SLI;
 	}
 	/* Terminate CCW chain: Tic to stage 1b */
