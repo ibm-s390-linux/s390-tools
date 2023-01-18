@@ -146,6 +146,20 @@ then \
 fi
 
 #
+# Test for linker option
+#
+# $1: Linker option
+#
+# Returns the linker option if available and nothing otherwise
+#
+define test_linker_flag
+$(shell printf "int main(void) {return 0;}\n" | \
+        ( $(CC) "-Wl,$1" -o /dev/null -x c - ) >/dev/null 2>&1 && printf -- '-Wl,%s' "$1")
+endef
+
+NO_WARN_RWX_SEGMENTS_LDFLAGS := $(call test_linker_flag,"--no-warn-rwx-segments")
+
+#
 # Support alternate install root
 #
 # INSTALLDIR: Finally install s390-tools to INSTALLDIR. This can be used
