@@ -19,7 +19,10 @@ FILES	= fba0.bin fba1b.bin fba2.bin \
 	  tape0.bin \
 	  eckd2dump_sv.bin tape2dump.bin fba2dump.bin eckd2dump_mv.bin
 
-all: data.o data.h tape0.bin stage3.bin
+all: .loaders tape0.bin stage3.bin
+
+.loaders: $(FILES)
+	touch .loaders
 
 # Prevent make from using some default rules...
 %:	%.S
@@ -75,16 +78,9 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 %.bin:	%.exec
 	$(OBJCOPY) -O binary $< $@
 
-data.o: $(FILES)
-	$(LINK) $(NO_PIE_LDFLAGS) -static -nostdlib -Wl,--relocatable -Wl,--format,binary -o data.o $(FILES)
-
-data.h: data.o
-	rm -f data.h
-	$(NM) data.o | while read ADDR TYPE SYMBOL ; do \
-				echo "extern char $$SYMBOL;" >>data.h; done
 
 clean:
-	rm -f -- *.o *.exec *.bin $(FILES) data.o data.h tape0.bin *.xxx *.yyy \
-	      stage3.bin *.lds .*.lds.d
+	rm -f -- *.o *.exec *.bin $(FILES) tape0.bin *.xxx *.yyy \
+	      stage3.bin *.lds .*.lds.d .loaders
 
 .PHONY: all clean

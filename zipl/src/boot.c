@@ -21,14 +21,49 @@
 
 #include "stage3.h"
 
-#include "../boot/data.h"
 #include "boot.h"
 #include "bootmap.h"
 #include "error.h"
 #include "misc.h"
 
-#define DATA_SIZE(x)	((size_t) (&_binary_##x##_bin_end - &_binary_##x##_bin_start))
-#define DATA_ADDR(x)	(&_binary_##x##_bin_start)
+/* Import a binary file */
+/* clang-format off */
+#define DATA_NAME(SYM, SUFFIX) _binary_##SYM##_bin##SUFFIX
+#define DATA_SIZE(SYM)	       ((size_t)(&DATA_NAME(SYM, _end) - &DATA_NAME(SYM, _start)))
+#define DATA_ADDR(SYM)	       (&DATA_NAME(SYM, _start))
+#define BIN_FILE_PATH(FILE_NAME) STRINGIFY(BUILD_PATH) "/" STRINGIFY(FILE_NAME) ".bin"
+#define IMPORT_DATA(SYM)						\
+	extern const uint8_t DATA_NAME(SYM, _start);			\
+	extern const uint8_t DATA_NAME(SYM, _end);			\
+	asm(".section \".rodata\", \"a\", @progbits\n"			\
+	    ".balign 4\n"						\
+	    ".global " STRINGIFY(DATA_NAME(SYM, _start)) "\n"		\
+	    STRINGIFY(DATA_NAME(SYM, _start)) ":\n"			\
+	    ".incbin \"" BIN_FILE_PATH(SYM) "\"\n"			\
+	    ".global " STRINGIFY(DATA_NAME(SYM, _end)) "\n"		\
+	    STRINGIFY(DATA_NAME(SYM, _end)) ":\n"			\
+	    ".balign 4\n"						\
+	    ".previous\n")
+/* clang-format on */
+
+/* Stage 0 Loader */
+IMPORT_DATA(eckd0_cdl);
+IMPORT_DATA(eckd0_ldl);
+IMPORT_DATA(fba0);
+IMPORT_DATA(tape0);
+/* Stage 1 Loader */
+IMPORT_DATA(eckd1);
+/* Stage 1b Loader */
+IMPORT_DATA(eckd1b);
+IMPORT_DATA(fba1b);
+/* Stage 2 Loader */
+IMPORT_DATA(eckd2);
+IMPORT_DATA(fba2);
+/* Stage 2 Dump Loader */
+IMPORT_DATA(eckd2dump_mv);
+IMPORT_DATA(eckd2dump_sv);
+IMPORT_DATA(fba2dump);
+IMPORT_DATA(tape2dump);
 
 #define CCW_FLAG_CC		0x40
 #define CCW_FLAG_SLI		0x20
