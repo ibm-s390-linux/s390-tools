@@ -2,6 +2,7 @@
 include ../../common.mak
 
 ZDEVDIR := 95zdev
+ZDEVKDUMPDIR := 95zdev-kdump
 
 # HAVE_DRACUT
 #
@@ -19,5 +20,9 @@ install:
 	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)
 	$(INSTALL) -m 755 $(ZDEVDIR)/module-setup.sh \
 		$(ZDEVDIR)/parse-zdev.sh \
+		$(ZDEVDIR)/zdev-lib.sh \
 		$(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)/
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(ZDEVKDUMPDIR)
+	$(INSTALL) -m 755 $(ZDEVKDUMPDIR)/module-setup.sh \
+		$(DESTDIR)$(DRACUTMODDIR)/$(ZDEVKDUMPDIR)/
 endif

@@ -19,6 +19,12 @@ check() {
     # Ensure that we're running on s390
     [ "$_arch" = "s390" -o "$_arch" = "s390x" ] || return 1
 
+    source "$moddir/zdev-lib.sh"
+
+    # Leave kdump device configuration to module zdev-kdump to
+    # ensure a minimal device footprint
+    is_kdump && return 1
+
     # Ensure that required tools are available
     require_binaries chzdev lszdev /lib/s390-tools/zdev_id || return 1
 
