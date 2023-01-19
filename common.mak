@@ -261,7 +261,7 @@ else
 	NO_PIE_LDFLAGS :=
 endif
 
-# Overwrite implicite makefile rules for having nice compile output
+# Overwrite implicit makefile rules for having nice compile output
 %.o: %.c
 ifeq ("${C}","1")
 	$(CHECKTOOL) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
@@ -418,4 +418,3 @@ clean_dep:
 
 clean: clean_echo clean_gcov clean_dep
 endif
-
