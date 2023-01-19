@@ -107,5 +107,19 @@ install() {
 
     rm -f "$_tempfile"
 
+    # these are purely generated udev rules so we have to glob expand
+    # within $initdir and strip the $initdir prefix for mark_hostonly
+    local -a _array
+    local _nullglob
+    _nullglob=$(shopt -p nullglob)
+    shopt -u nullglob
+    readarray -t _array < \
+              <(ls -1 "$initdir"/etc/udev/rules.d/41-*.rules 2> /dev/null)
+    [[ ${#_array[@]} -gt 0 ]] && mark_hostonly "${_array[@]#$initdir}"
+    readarray -t _array < \
+              <(ls -1 "$initdir"/etc/modprobe.d/s390x-*.conf 2> /dev/null)
+    [[ ${#_array[@]} -gt 0 ]] && mark_hostonly "${_array[@]#$initdir}"
+    $_nullglob
+
     return 0
 }
