@@ -50,8 +50,18 @@ install() {
 
     # Obtain early + root device configuration
     _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
-    chzdev --export "$_tempfile" --persistent --by-path / --quiet \
-	   --type 2>/dev/null
+    function check_zdev() {
+        local _dev=$1
+        local _devsysfs _bdevpath
+        _devsysfs=$(
+            cd -P /sys/dev/block/"$_dev" && echo "$PWD"
+                 )
+        _bdevpath=/dev/${_devsysfs##*/}
+        chzdev --export - --persistent --by-node "$_bdevpath" --quiet \
+               --type 2>/dev/null >> "$_tempfile"
+    }
+    for_each_host_dev_and_slaves_all check_zdev
+
     chzdev --export - --persistent --by-attrib "zdev:early=1" --quiet \
 	   --type 2>/dev/null >> "$_tempfile"
 
