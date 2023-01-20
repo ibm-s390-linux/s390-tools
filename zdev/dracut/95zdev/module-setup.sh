@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright IBM Corp. 2016, 2017
+# Copyright IBM Corp. 2016, 2023
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -10,7 +10,7 @@
 #   This module installs configuration files (udev rules and modprobe.conf
 #   files) required to enable the root device on s390. It will only work when
 #   the root device was configured using the chzdev tool. In addition,
-#   a hook is installed to parse rd.zdev= kernel parameters.
+#   hooks are installed to parse rd.zdev= and rd.zfcp= kernel parameters.
 #
 
 # called by dracut
@@ -31,6 +31,7 @@ check() {
     # Ensure that required tools are available
     require_binaries chzdev lszdev /lib/s390-tools/zdev_id || return 1
     require_binaries sed || return 1
+    require_binaries grep sort uniq || return 1
 
     return 0
 }
@@ -38,6 +39,20 @@ check() {
 # called by dracut
 depends() {
     return 0
+}
+
+# called by dracut and (conditionally) locally by install()
+# Generate rd.zfcp dracut cmdline options for each zfcp-attached
+# SCSI disk in dracut's device dependency graph (to mount the root-fs,
+# or to access the kdump target). With "dracut --print-cmdline", dracut
+# prints the list. With "dracut --hostonly-cmdline" [the case where
+# install() calls cmdline()], dracut stores the list inside the generated
+# initrd.
+cmdline() {
+    # shellcheck disable=SC2154
+    if [[ $hostonly ]]; then
+        for_each_host_dev_and_slaves_all zdev_check_dev | sort | uniq
+    fi
 }
 
 # called by dracut
@@ -55,14 +70,25 @@ install() {
 
     # Ensure that required tools are available
     inst_multiple chzdev lszdev vmcp /lib/s390-tools/zdev_id
+    inst_multiple grep
 
     # Hook to parse zdev kernel parameter
     inst_hook cmdline 95 "$moddir/parse-zdev.sh"
+    # Hook to parse zfcp dracut cmdline parameter
+    inst_hook cmdline 95 "$moddir/parse-zfcp.sh"
 
     # Rule to automatically enable devices when running in DPM
     inst_rules "81-dpm.rules"
 
     # Obtain early + root device configuration
+
+    # shellcheck disable=SC2154
+    if [[ $hostonly_cmdline == "yes" ]]; then
+        local _rdsomedev
+        for _rdsomedev in $(cmdline); do
+            printf "%s\n" "$_rdsomedev" >> "${initdir:?}/etc/cmdline.d/94zdev.conf"
+        done
+    fi
 
     # If enabled, add the host-specific config of required devices into initrd
     # shellcheck disable=SC2154
