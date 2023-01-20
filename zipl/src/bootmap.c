@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -1711,7 +1712,6 @@ static int bootmap_create_device_ngdump(struct job_data *job,
 					struct install_set *bis,
 					int program_table_id)
 {
-	char mount_point[] = "/tmp/zipl-dump-mount-point-XXXXXX";
 	struct disk_info *info;
 	int rc;
 
@@ -1723,12 +1723,23 @@ static int bootmap_create_device_ngdump(struct job_data *job,
 		return -1;
 	if (check_dump_device(job, info, bis->device))
 		return -1;
-	/* Create a mount point directory */
-	if (mkdtemp(mount_point) == NULL) {
+
+	bis->dump_mount_point = misc_make_path("/tmp",
+					       DUMP_TEMP_MOUNT_POINT_NAME);
+	if (!bis->dump_mount_point) {
 		error_reason(strerror(errno));
-		error_text("Could not create mount point '%s'", mount_point);
+		error_text("Could not make path for '%s'",
+			   DUMP_TEMP_MOUNT_POINT_NAME);
 		return -1;
 	}
+	/* Create a mount point directory */
+	if (mkdtemp(bis->dump_mount_point) == NULL) {
+		error_reason(strerror(errno));
+		error_text("Could not create mount point '%s'",
+			   bis->dump_mount_point);
+		return -1;
+	}
+	bis->dump_tmp_dir_created = 1;
 	if (!dry_run) {
 		char *cmd = NULL;
 		util_asprintf(&cmd, "mkfs.%s -qF %s >/dev/null",
@@ -1742,33 +1753,27 @@ static int bootmap_create_device_ngdump(struct job_data *job,
 			error_reason(strerror(errno));
 			error_text("Could not format partition '%s':",
 				   job->data.dump.device);
-			goto out_rmdir;
+			return -1;
 		}
 	}
 	/*
 	 * Mount partition where bootmap file and also a dump file will
 	 * be stored.
 	 */
-	if (mount(job->data.dump.device, mount_point, NGDUMP_FSTYPE, 0, NULL)) {
+	if (mount(job->data.dump.device, bis->dump_mount_point,
+		  NGDUMP_FSTYPE, 0, NULL)) {
 		error_reason(strerror(errno));
 		error_text("Could not mount partition '%s':",
 			   job->data.dump.device);
-		goto out_rmdir;
+		return -1;
 	}
-	if (bootmap_create_file(job, mount_point, bis, program_table_id))
-		goto out_umount;
-	if (ngdump_create_meta(mount_point))
-		goto out_umount;
-	/* Cleanup */
-	umount(mount_point);
-	rmdir(mount_point);
+	bis->dump_mounted = 1;
+	if (bootmap_create_file(job, bis->dump_mount_point,
+				bis, program_table_id))
+		return -1;
+	if (ngdump_create_meta(bis->dump_mount_point))
+		return -1;
 	return 0;
-
-out_umount:
-	umount(mount_point);
-out_rmdir:
-	rmdir(mount_point);
-	return -1;
 }
 
 
@@ -1835,6 +1840,9 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 	return rc;
 }
 
+/**
+ * Release all resources accumulated along the installation process
+ */
 void free_bootloader(struct install_set *bis)
 {
 	int i, j;
@@ -1853,4 +1861,13 @@ void free_bootloader(struct install_set *bis)
 	free(bis->filename);
 	misc_free_temp_dev(bis->device);
 	disk_free_info(bis->info);
+	if (bis->dump_mount_point) {
+		if (bis->dump_mounted && umount(bis->dump_mount_point))
+			warn("Could not umount dump device at %s",
+			     bis->dump_mount_point);
+		if (bis->dump_tmp_dir_created && rmdir(bis->dump_mount_point))
+			warn("Could not remove directory %s",
+			     bis->dump_mount_point);
+		free(bis->dump_mount_point);
+	}
 }

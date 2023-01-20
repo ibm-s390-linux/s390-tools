@@ -74,6 +74,9 @@ struct install_set {
 	int fd;
 	char *device;
 	char *filename;
+	char *dump_mount_point;
+	unsigned int dump_tmp_dir_created:1;
+	unsigned int dump_mounted:1;
 	struct disk_info *info;
 	disk_blockptr_t scsi_dump_sb_blockptr;
 };
