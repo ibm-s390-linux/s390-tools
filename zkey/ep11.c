@@ -35,7 +35,7 @@
  * Definitions for the EP11 library
  */
 #define EP11_LIBRARY_NAME	"libep11.so"
-#define EP11_LIBRARY_VERSION	3
+#define EP11_LIBRARY_VERSION	4
 #define EP11_WEB_PAGE		"http://www.ibm.com/security/cryptocards"
 
 /**
