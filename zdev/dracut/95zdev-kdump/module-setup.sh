@@ -8,7 +8,8 @@
 #
 # 95zdev-kdump/module_setup.sh
 #   This module installs configuration files (udev rules and modprobe.conf
-#   files) required to enable the kdump target on s390.
+#   files) required to enable the kdump target on s390. In addition,
+#   a hook is installed to parse rd.zfcp= kernel parameters.
 #
 
 # called by dracut
@@ -26,6 +27,7 @@ check() {
 
     # Ensure that required tools are available
     require_binaries chzdev lszdev || return 1
+    require_binaries grep sort uniq || return 1
 
     return 0
 }
@@ -33,6 +35,19 @@ check() {
 # called by dracut
 depends() {
     return 0
+}
+
+# called by dracut and (conditionally) locally by install()
+# Generate rd.zfcp dracut cmdline options for each zfcp-attached
+# SCSI disk in dracut's device dependency graph (to mount the root-fs,
+# or to access the kdump target). With "dracut --print-cmdline", dracut
+# prints the list. With "dracut --hostonly-cmdline", dracut stores the
+# list inside the generated initrd.
+cmdline() {
+    # shellcheck disable=SC2154
+    if [[ $hostonly ]]; then
+        for_each_host_dev_and_slaves_all zdev_check_dev | sort | uniq
+    fi
 }
 
 # called by dracut
@@ -51,7 +66,21 @@ install() {
     # installing avoids error messages from zdev site udev rule processing
     inst_multiple -o /lib/s390-tools/zdev_id
 
+    # Ensure that required tools are available
+    inst_multiple chzdev grep
+
+    # Hook to parse zfcp dracut cmdline parameter
+    inst_hook cmdline 95 "$moddir/../95zdev/parse-zfcp.sh"
+
     # Obtain kdump target device configuration
+
+    # shellcheck disable=SC2154
+    if [[ $hostonly_cmdline == "yes" ]]; then
+        local _rdsomedev
+        for _rdsomedev in $(cmdline); do
+            printf "%s\n" "$_rdsomedev" >> "${initdir:?}/etc/cmdline.d/94zdev.conf"
+        done
+    fi
 
     _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
 
