@@ -274,6 +274,7 @@ ALL_STEPS="\
   collect_sysfs\
   collect_procfs\
   collect_configfiles\
+  collect_initrd_configfiles\
   collect_cmdsout\
   collect_hyptop\
   collect_vmcmdsout\
@@ -381,11 +382,15 @@ CONFIGFILES="\
   /boot/loader/entries/*.conf\
   /boot/zipl/active_devices.txt\
   /boot/zipl/config\
+  /conf/\
   /etc/*.conf\
   /etc/*release\
   /etc/anacrontab\
   /etc/apparmor.d\
   /etc/auto.*\
+  /etc/cmdline\
+  /etc/cmdline.d\
+  /etc/conf.d\
   /etc/cron.*\
   /etc/crontab\
   /etc/crypttab\
@@ -432,9 +437,10 @@ CONFIGFILES="\
   /lib/modprobe.d\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
   /lib/systemd/system/docker.service\
+  /lib/udev/rules.d\
   /usr/lib/modprobe.d\
   /usr/lib/modules-load.d/*.conf\
-  /usr/lib/systemd/system\
+  /usr/lib/systemd/system/\
   /usr/local/lib/modprobe.d\
   /usr/local/lib/modules-load.d/*.conf\
   /run/modprobe.d\
@@ -903,6 +909,89 @@ collect_configfiles() {
 	for file_name in ${CONFIGFILES}; do
 		call_collect_file "${file_name}"
 	done
+}
+
+########################################
+collect_initrd_configfiles() {
+	local file_name
+	local rd rdbase rdreldir rdextract mypopd noglob mycat patterns=""
+
+	pr_collect "initrd config files"
+	cd "${WORKPATH}" || return
+	mypopd="$OLDPWD" # (pushd alternative)
+	# prevent expansion of glob special characters such as '*'
+	noglob=$(set +o | grep -F noglob)
+	set -o noglob
+	# prepare relative configfiles paths
+	for file_name in ${CONFIGFILES}; do
+	    # strip leading slash to make path relative as in initrd
+	    file_name=${file_name#/}
+	    # in contrast to call_collect_file(), cpio extract with patterns
+	    # does not recurse, but cpio wildcards match slash, so add suffix;
+	    # otherwise e.g. /lib/udev/rules.d or /etc/multipath only extracts
+	    # just that directory without any of its content
+	    file_name="${file_name}*"
+	    patterns="$patterns ${file_name}"
+	done
+	patterns="$patterns squash-root.img"
+	$noglob
+	# iterate over initrds
+	for rd in /boot/initr* /boot/zipl/initr* /var/lib/kdump/initr*; do
+	    [ -f "$rd" ] || continue # (nullglob alternative)
+	    rdbase=${rd##*/} # basename
+	    rdreldir=${rd%/*} # dirname
+	    rdreldir=${rdreldir#/} # strip leading slash to make path relative
+	    mkdir -p "${rdreldir}"
+	    cd "${rdreldir}" || break # (pushd alternative)
+	    if type lsinitrd >/dev/null 2>&1; then
+		lsinitrd "${rd}" > "${rdbase}.lsinitrd"
+	    fi
+	    if type lsinitramfs >/dev/null 2>&1; then
+		lsinitramfs -l "${rd}" > "${rdbase}.lsinitramfs"
+	    fi
+	    cd - || break # change to $OLDPWD (popd alternative)
+	    rdextract=${rd#/}
+	    mkdir -p "${rdextract}"
+	    cd "${rdextract}" || break # (pushd alternative)
+	    case $(file "${rd}") in
+		*cpio*) mycat="cat" ;;
+		*gzip*) mycat="zcat" ;;
+		*XZ*) mycat="xzcat" ;;
+		*Zstandard*) mycat="zstdcat" ;;
+		*bzip2*) mycat="bzcat" ;;
+		*LZMA*) mycat="lzcat" ;;
+		*)
+		    # change to $OLDPWD (popd alternative)
+		    cd - || { cd "$mypopd" || return; return; }
+		    continue
+		    ;;
+	    esac
+	    # prevent expansion of glob special characters such as '*'
+	    noglob=$(set +o | grep -F noglob)
+	    set -o noglob
+	    # we expect no early-initrd stuff on s390 so extract directly.
+	    # globbing is turned off and we want word split on $patterns:
+	    # shellcheck disable=SC2086
+	    "$mycat" "${rd}" | cpio --extract --no-absolute-filenames \
+				    --make-directories \
+				    --preserve-modification-time $patterns
+	    $noglob
+	    if [ ! -f "squash-root.img" ]; then
+		cd - || break # change to $OLDPWD (popd alternative)
+		continue
+	    fi
+	    # prevent expansion of glob special characters such as '*'
+	    noglob=$(set +o | grep -F noglob)
+	    set -o noglob
+	    # globbing is turned off and we want word split on $patterns:
+	    # shellcheck disable=SC2086
+	    unsquashfs -no-progress -dest "squashfs-root" "squash-root.img" \
+		       $patterns
+	    $noglob
+	    rm -f "squash-root.img"
+	    cd - || break # change to $OLDPWD (popd alternative)
+	done
+	cd "$mypopd" || return
 }
 
 ########################################
