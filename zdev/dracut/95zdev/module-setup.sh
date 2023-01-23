@@ -13,6 +13,7 @@
 #   a hook is installed to parse rd.zdev= kernel parameters.
 #
 
+# called by dracut
 check() {
     local _arch
     _arch=$(uname -m)
@@ -33,10 +34,12 @@ check() {
     return 0
 }
 
+# called by dracut
 depends() {
     return 0
 }
 
+# called by dracut
 installkernel() {
     # Add modules for all device types supported by chzdev (required for
     # auto-configuration)
@@ -44,6 +47,7 @@ installkernel() {
 	     dasd_diag_mod zfcp
 }
 
+# called by dracut
 install() {
     local _tempfile
 
