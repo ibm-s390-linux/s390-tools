@@ -30,6 +30,7 @@ check() {
 
     # Ensure that required tools are available
     require_binaries chzdev lszdev /lib/s390-tools/zdev_id || return 1
+    require_binaries sed || return 1
 
     return 0
 }
@@ -75,10 +76,13 @@ install() {
             cd -P /sys/dev/block/"$_dev" && echo "$PWD"
                  )
         _bdevpath=/dev/${_devsysfs##*/}
-        chzdev --export - --persistent --by-node "$_bdevpath" --quiet \
-               --type 2>/dev/null >> "$_tempfile"
+        chzdev --export - --active --by-node "$_bdevpath" --quiet \
+               2>/dev/null >> "$_tempfile"
+               #--type # needs a change in chzdev to not have subsequent
+                       # import bail out on unknown type properties
     }
     for_each_host_dev_and_slaves_all check_zdev
+    sed -i -e 's/^\[active /\[persistent /' "$_tempfile"
 
     chzdev --export - --persistent --by-attrib "zdev:early=1" --quiet \
 	   --type 2>/dev/null >> "$_tempfile"
