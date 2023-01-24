@@ -12,7 +12,10 @@ MAKECMDGOALS ?=
 ifeq ($(COMMON_INCLUDED),false)
 COMMON_INCLUDED := true
 
-HOST_ARCH ?= $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
+# 'BUILD_ARCH' is the architecture of the machine where the build takes place
+BUILD_ARCH := $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
+# 'HOST_ARCH' is the architecture of the machine that will run the compiled output
+HOST_ARCH ?= $(BUILD_ARCH)
 
 # Global definitions
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
@@ -29,9 +32,9 @@ rootdir= $(dir $(filter %common.mak,$(MAKEFILE_LIST)))
 export S390_TEST_LIB_PATH=$(rootdir)/s390-tools-testsuite/lib
 
 #
-# For cross compiles specify CROSS_COMPILE= on the commandline:
+# For cross compiles specify HOST_ARCH= and CROSS_COMPILE= on the commandline:
 #
-# $ make CROSS_COMPILE="s390x-5.1.0-"
+# $ make HOST_ARCH=s390x CROSS_COMPILE="s390x-linux-gnu-"
 #
 
 CROSS_COMPILE   =
@@ -78,18 +81,35 @@ define cmd_define_and_export
 	export $(strip $(1))
 endef
 
-$(eval $(call cmd_define_and_export,     AS,"  AS      ",$(CROSS_COMPILE)as))
-$(eval $(call cmd_define_and_export,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
-$(eval $(call cmd_define_and_export,   LINK,"  LINK    ",$(CC)))
-$(eval $(call cmd_define_and_export, HOSTCC,"  HOSTCC  ",gcc))
-$(eval $(call cmd_define_and_export,    CXX,"  CXX     ",$(CROSS_COMPILE)g++))
-$(eval $(call cmd_define_and_export, LINKXX,"  LINKXX  ",$(CXX)))
-$(eval $(call cmd_define_and_export,    CPP,"  CPP     ",$(CROSS_COMPILE)gcc -E))
-$(eval $(call cmd_define_and_export,     AR,"  AR      ",$(CROSS_COMPILE)ar))
-$(eval $(call cmd_define_and_export,     NM,"  NM      ",$(CROSS_COMPILE)nm))
-$(eval $(call cmd_define_and_export,  STRIP,"  STRIP   ",$(CROSS_COMPILE)strip))
-$(eval $(call cmd_define_and_export,OBJCOPY,"  OBJCOPY ",$(CROSS_COMPILE)objcopy))
-$(eval $(call cmd_define_and_export,OBJDUMP,"  OBJDUMP ",$(CROSS_COMPILE)objdump))
+define define_toolchain_variables
+	$(eval $(call cmd_define_and_export,     AS$(1),"  AS$(1)       ",$(2)as))
+	$(eval $(call cmd_define_and_export,     CC$(1),"  CC$(1)       ",$(2)gcc))
+	$(eval $(call cmd_define_and_export,   LINK$(1),"  LINK$(1)     ",$$(CC$(1))))
+	$(eval $(call cmd_define_and_export,    CXX$(1),"  CXX$(1)      ",$(2)g++))
+	$(eval $(call cmd_define_and_export, LINKXX$(1),"  LINKXX$(1)   ",$$(CXX$(1))))
+	$(eval $(call cmd_define_and_export,    CPP$(1),"  CPP$(1)      ",$(2)gcc -E))
+	$(eval $(call cmd_define_and_export,     AR$(1),"  AR$(1)       ",$(2)ar))
+	$(eval $(call cmd_define_and_export,     NM$(1),"  NM$(1)       ",$(2)nm))
+	$(eval $(call cmd_define_and_export,   STRIP$(1),"  STRIP$(1)    ",$(2)strip))
+	$(eval $(call cmd_define_and_export,OBJCOPY$(1),"  OBJCOPY$(1)  ",$(2)objcopy))
+	$(eval $(call cmd_define_and_export,OBJDUMP$(1),"  OBJDUMP$(1)  ",$(2)objdump))
+	$(eval PKG_CONFIG$(1) = pkg-config)
+	$(eval export PKG_CONFIG$(1))
+endef
+
+# If the host architecture is not the same as the build architecture
+# 'CROSS_COMPILE=...' is always required (except for the '*clean' targets).
+ifneq ($(HOST_ARCH),$(BUILD_ARCH))
+  ifeq ($(CROSS_COMPILE),)
+    # `make clean` and similar must always work!
+    ifeq ($(filter %clean,$(MAKECMDGOALS)),)
+      $(error Please specify CROSS_COMPILE=... and try it again!)
+    endif
+  endif
+endif
+
+$(call define_toolchain_variables,_FOR_BUILD,)
+$(call define_toolchain_variables,,$(CROSS_COMPILE))
 
 $(eval $(call cmd_define,RUNTEST,"  RUNTEST ",$(S390_TEST_LIB_PATH)/s390_runtest))
 $(eval $(call cmd_define,    CAT,"  CAT     ",cat))
@@ -97,9 +117,6 @@ $(eval $(call cmd_define,    SED,"  SED     ",sed))
 $(eval $(call cmd_define,   GZIP,"  GZIP    ",gzip))
 $(eval $(call cmd_define,     MV,"  MV      ",mv))
 $(eval $(call cmd_define,  PERLC,"  PERLC   ",perl -c))
-
-PKG_CONFIG = pkg-config
-export PKG_CONFIG
 
 CHECK           = sparse
 CHECK_SILENT   := $(CHECK)
@@ -269,10 +286,10 @@ ZFCPDUMP_INITRD	= zfcpdump-initrd
 ZFCPDUMP_FLAVOR	= zfcpdump
 export ZFCPDUMP_DIR ZFCPDUMP_IMAGE ZFCPDUMP_INITRD ZFCPDUMP_FLAVOR
 
-CFLAGS		?= $(DEFAULT_CFLAGS) $(OPT_FLAGS)
-HOSTCFLAGS	?= $(DEFAULT_CFLAGS) $(OPT_FLAGS)
-CPPFLAGS	?= $(DEFAULT_CPPFLAGS)
-LDFLAGS		?= $(DEFAULT_LDFLAGS)
+CFLAGS		 ?= $(DEFAULT_CFLAGS) $(OPT_FLAGS)
+CFLAGS_FOR_BUILD ?= $(DEFAULT_CFLAGS) $(OPT_FLAGS)
+CPPFLAGS	 ?= $(DEFAULT_CPPFLAGS)
+LDFLAGS		 ?= $(DEFAULT_LDFLAGS)
 
 ALL_CFLAGS	= -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 			-DS390_TOOLS_LIBDIR=$(TOOLS_LIBDIR) \

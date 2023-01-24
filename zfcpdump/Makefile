@@ -27,7 +27,7 @@ check_dep:
 all: check_dep $(ZFCPDUMP_INITRD) scripts
 
 cpioinit: cpioinit.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
+	$(CC_FOR_BUILD) $(CFLAGS_FOR_BUILD) -o $@ $^
 
 zfcpdump_part: zfcpdump.o zfcpdump_part.o
 	$(LINK) $(ALL_LDFLAGS) $^ -static -o $@

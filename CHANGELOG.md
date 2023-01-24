@@ -16,6 +16,12 @@ Release history for s390-tools (MIT version)
     `CROSS_COMPILE` is set
   - rename Makefile variable `ARCH` to `HOST_ARCH`. `HOST_ARCH` is the
     architecture that will run the produced (executable) objects
+  - add the Makefile variable `BUILD_ARCH`. `BUILD_ARCH` is the
+    architecture of the build system. For each Makefile variable like
+    `CC`, `LINK`, `CPP`, ... there is a suffixed version of it - e.g.
+    `CC_FOR_BUILD`. This is useful for cross compiling, and this naming
+    convention is very similar to the Meson convention (see
+    https://mesonbuild.com/Reference-tables.html#environment-variables-per-machine).
 
   Bug Fixes:
 
