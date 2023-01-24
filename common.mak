@@ -12,6 +12,8 @@ MAKECMDGOALS ?=
 ifeq ($(COMMON_INCLUDED),false)
 COMMON_INCLUDED := true
 
+HOST_ARCH ?= $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
+
 # Global definitions
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
