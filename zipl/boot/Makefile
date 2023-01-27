@@ -77,37 +77,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 	$(LINK) $$SFLAGS $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 
 %.bin:	%.exec
-	$(OBJCOPY) -O binary \
-		--only-section=.stage2.head \
-		--only-section=.text.dummy \
-		--only-section=.text.start \
-		--only-section=.text \
-		--only-section=.ex_table \
-		--only-section=.data \
-		--only-section=.rodata.str1.2 \
-		--only-section=.rodata.cst8 \
-		--only-section=.rodata \
-		--only-section=.stage2dump.tail \
-		--only-section=.eckd2dump_mv.tail \
-		--only-section=.fixup \
-		$< $@
-
-stage3.bin:	stage3.exec
-	$(OBJCOPY) -O binary \
-		--only-section=.stage2.head \
-		--only-section=.text.dummy \
-		--only-section=.text.start \
-		--only-section=.text \
-		--only-section=.ex_table \
-		--only-section=.data \
-		--only-section=.rodata.str1.2 \
-		--only-section=.rodata.cst8 \
-		--only-section=.rodata \
-		--only-section=.stage2dump.tail \
-		--only-section=.eckd2dump_mv.tail \
-		--only-section=.fixup \
-		--only-section=.sb.trailer \
-		$< $@
+	$(OBJCOPY) -O binary $< $@
 
 data.o: $(FILES)
 	$(LINK) $(NO_PIE_LDFLAGS) -static -nostdlib -Wl,--relocatable -Wl,--format,binary -o data.o $(FILES)
