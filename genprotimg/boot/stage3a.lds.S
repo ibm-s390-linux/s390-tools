@@ -23,8 +23,6 @@ ENTRY(_init)
 
 SECTIONS
 {
-	. = 0x0;
-
 	. = HEAP_ADDRESS;
 	__heap_start = .;
 	.heap : {
@@ -46,7 +44,7 @@ SECTIONS
 	. = STAGE3A_INIT_ENTRY;
 	__text_init_start = .;
 	.text : {
-		stage3a_init.o(.text.init)
+		*(.text.init)
 		__text_init_stop = ABSOLUTE(.);
 		/* Text size of text_init must be smaller than 'PARMAREA - IMAGE_ENTRY',
 		 * otherwise the text data could be overwritten by the original zipl stage3
@@ -56,8 +54,8 @@ SECTIONS
 		. = 0x1000;
 		ASSERT(ABSOLUTE(.) == STAGE3A_ENTRY,
 		       "Text section doesn't conform to the described memory layout");
-		head.o(.text.start)
-		*(.text)
+		*(.text.start)
+		*(.text .text.*)
 	}
 
 	.ex_table ALIGN(16) : {
@@ -74,7 +72,7 @@ SECTIONS
 
 	.rodata ALIGN(16) : {
 		*(.rodata)
-		*(.rodata.*)
+		*(.rodata*)
 	}
 
 	.data ALIGN(16) : {
@@ -93,6 +91,7 @@ SECTIONS
 	/* Sections to be discarded */
 	/DISCARD/ : {
 		*(.eh_frame)
+		*(.interp)
 		*(.note.GNU-stack)
 	}
 }

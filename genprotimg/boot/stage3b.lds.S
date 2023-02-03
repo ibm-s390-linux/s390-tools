@@ -21,8 +21,6 @@ ENTRY(_start)
 
 SECTIONS
 {
-	. = 0x0;
-
 	. = HEAP_ADDRESS;
 	__heap_start = .;
 	.heap : {
@@ -34,8 +32,8 @@ SECTIONS
 
 	. = STAGE3B_ENTRY;
 	.text : {
-		head.o(.text.start)
-		*(.text)
+		*(.text.start)
+		*(.text .text.*)
 	}
 
 	.ex_table ALIGN(16) : {
@@ -52,7 +50,7 @@ SECTIONS
 
 	.rodata ALIGN(16) : {
 		*(.rodata)
-		*(.rodata.*)
+		*(.rodata*)
 	}
 
 	.data ALIGN(16) : {
@@ -77,6 +75,7 @@ SECTIONS
 	/* Sections to be discarded */
 	/DISCARD/ : {
 		*(.eh_frame)
+		*(.interp)
 		*(.note.GNU-stack)
 	}
 }
