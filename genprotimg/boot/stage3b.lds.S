@@ -72,6 +72,8 @@ SECTIONS
 	}
 	__stack_end = .;
 
+  	ASSERT(. <= IMAGE_ENTRY, "stage3b size must be smaller than 0x10000 bytes")
+
 	/* Sections to be discarded */
 	/DISCARD/ : {
 		*(.eh_frame)
