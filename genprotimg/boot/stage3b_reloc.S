@@ -53,3 +53,8 @@ stage3b_start:
 	.incbin	"stage3b.bin"
 stage3b_end:
 .previous
+
+/* The code doesn't require an executable stack */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif

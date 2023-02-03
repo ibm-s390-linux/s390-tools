@@ -83,5 +83,6 @@ SECTIONS
 	/* Sections to be discarded */
 	/DISCARD/ : {
 		*(.eh_frame)
+		*(.note.GNU-stack)
 	}
 }

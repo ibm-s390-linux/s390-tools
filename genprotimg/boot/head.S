@@ -29,3 +29,8 @@ _start:
 	brasl	%r14, initialize
 .Lstack: .long STACK_ADDRESS + STACK_SIZE - STACK_FRAME_OVERHEAD
 .previous
+
+/* The code doesn't require an executable stack */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif

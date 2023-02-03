@@ -26,3 +26,8 @@ _init:
 	br	%r1
 .Lstage3a_entry: .long STAGE3A_ENTRY
 .previous
+
+/* The code doesn't require an executable stack */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif
