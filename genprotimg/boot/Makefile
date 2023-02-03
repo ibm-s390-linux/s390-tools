@@ -82,14 +82,8 @@ stage3b_reloc.elf:
 	$(LINK) $$SFLAGS $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 	@chmod a-x $@
 
-%.bin:	%.elf
-	$(OBJCOPY) -O binary \
-		--only-section=.text* \
-		--only-section=.ex_table* \
-		--only-section=.fixup* \
-		--only-section=.data*  \
-		--only-section=.rodata* \
-		$< $@
+%.bin: %.elf
+	$(OBJCOPY) -O binary $< $@
 	@chmod a-x $@
 
 clean:
