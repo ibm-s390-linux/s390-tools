@@ -22,8 +22,8 @@
 
 .org 0x0
 .section .text.start
-.globl stage3b_reloc_start
-stage3b_reloc_start:
+.globl _start
+_start:
 	/* Might be called after a diag308 so better set
 	 * architecture and addressing mode
 	 */
