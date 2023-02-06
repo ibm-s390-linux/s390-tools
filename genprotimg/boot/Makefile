@@ -79,7 +79,7 @@ stage3b_reloc.elf:
 		stage3b) SFLAGS="-Wl,-T,stage3b.lds";; \
 		stage3b_reloc) SFLAGS="-Wl,-estage3b_reloc_start,-Ttext,0";; \
 	esac; \
-	$(LINK) $$SFLAGS $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -m64 -static -nostdlib $(filter %.o, $^) -o $@
+	$(LINK) $$SFLAGS $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 	@chmod a-x $@
 
 %.bin:	%.elf

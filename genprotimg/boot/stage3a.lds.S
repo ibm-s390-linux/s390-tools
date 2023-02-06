@@ -90,12 +90,6 @@ SECTIONS
 		ASSERT(ABSOLUTE(.) < 0x13000, "Data section doesn't conform to the described memory layout");
 	}
 
-	/* List this explicitly as otherwise .note.gnu.build-id will be
-	 * put at 0x0 */
-	.notes : {
-		*(.note.*)
-	}
-
 	/* Sections to be discarded */
 	/DISCARD/ : {
 		*(.eh_frame)

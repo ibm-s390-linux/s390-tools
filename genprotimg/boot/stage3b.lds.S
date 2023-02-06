@@ -74,12 +74,6 @@ SECTIONS
 	}
 	__stack_end = .;
 
-	/* List this explicitly as otherwise .note.gnu.build-id will be
-	 * put at 0x0 */
-	.notes : {
-		*(.note.*)
-	}
-
 	/* Sections to be discarded */
 	/DISCARD/ : {
 		*(.eh_frame)
