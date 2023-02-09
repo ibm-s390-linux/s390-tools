@@ -144,6 +144,19 @@ static struct attrib zfcp_tattr_port_scan_backoff = {
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 4294967295)),
 };
 
+static struct attrib zfcp_tattr_ber_stop = {
+	.name = "ber_stop",
+	.title = "Stop FCP devices on bit-error threshold",
+	.desc =
+	"Control the automatic shutdown of FCP devices for FCP channels\n"
+	"that report a bit-error count in excess of its threshold:\n"
+	"  0: Stop on bit-error threshold is disabled\n"
+	"  1: Stop on bit-error threshold is enabled\n",
+	.nounload = 1,
+	.defval = "1",
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+};
+
 /*
  * ZFCP methods.
  */
@@ -171,6 +184,7 @@ static void all_bools_to_num(struct setting_list *list)
 
 	util_list_iterate(&list->list, s) {
 		if (s->attrib == &zfcp_tattr_allow_lun_scan ||
+		    s->attrib == &zfcp_tattr_ber_stop ||
 		    s->attrib == &zfcp_tattr_dif ||
 		    s->attrib == &zfcp_tattr_dix ||
 		    s->attrib == &zfcp_tattr_datarouter ||
@@ -313,6 +327,7 @@ struct devtype zfcp_devtype = {
 		&zfcp_tattr_no_auto_port_rescan,
 		&zfcp_tattr_port_scan_ratelimit,
 		&zfcp_tattr_port_scan_backoff,
+		&zfcp_tattr_ber_stop,
 	),
 	.unknown_type_attribs	= 1,
 
