@@ -346,6 +346,7 @@ static struct attrib zfcp_lun_attr_scsi_queue_depth = {
 	"of a SCSI device. Note that storage servers typically limit the\n"
 	"total number of outstanding SCSI commands of all SCSI devices\n"
 	"accessed from all attached hosts.\n",
+	.defval = "32",
 	.accept = ACCEPT_ARRAY(ACCEPT_NUM_GE(1)),
 };
 
