@@ -953,30 +953,10 @@ static int add_segment_program(struct install_set *bis,
 
 #define DUMP_PARAM_MAX_LEN	896
 
-static char *
-create_dump_parmline(const char* parmline, const char* root_dev,
-		     uint64_t mem, int max_cpus)
-{
-	char* result;
-
-	result = misc_malloc(DUMP_PARAM_MAX_LEN);
-	if (!result)
-		return NULL;
-	snprintf(result, DUMP_PARAM_MAX_LEN, "%s%sroot=%s dump_mem=%lld "
-		 "possible_cpus=%d cgroup_disable=memory ",
-		 parmline ? parmline : "", parmline ? " " : "", root_dev,
-		 (unsigned long long) mem, max_cpus);
-	result[DUMP_PARAM_MAX_LEN - 1] = 0;
-	return result;
-}
-
-
 static int
-get_dump_parmline(char *partition, char *parameters,
-		  struct disk_info *target_info,
-		  struct job_target_data *target, char **result)
+check_dump_device_late(char *partition, struct disk_info *target_info,
+		       struct job_target_data *target)
 {
-	char* buffer;
 	struct disk_info* info;
 	int rc;
 
@@ -999,15 +979,7 @@ get_dump_parmline(char *partition, char *parameters,
 		disk_free_info(info);
 		return -1;
 	}
-	if (is_ngdump_enabled(partition, target))
-		buffer = misc_strdup(parameters);
-	else
-		buffer = create_dump_parmline(parameters, "/dev/ram0",
-					      info->partnum, 1);
 	disk_free_info(info);
-	if (buffer == NULL)
-		return -1;
-	*result = buffer;
 	return 0;
 }
 
@@ -1025,10 +997,10 @@ static int add_dump_program(struct install_set *bis, struct job_dump_data *dump,
 	ipl.common = dump->common;
 
 	/* Get file system dump parmline */
-	rc = get_dump_parmline(dump->device, dump->common.parmline,
-			       bis->info, target, &ipl.common.parmline);
+	rc = check_dump_device_late(dump->device, bis->info, target);
 	if (rc)
 		return rc;
+	ipl.common.parmline = dump->common.parmline;
 	ipl.common.parm_addr = dump->common.parm_addr;
 	return add_ipl_program(bis, NULL, false, NULL, &ipl, program,
 			       verbose, 1, type, target, SECURE_BOOT_DISABLED,

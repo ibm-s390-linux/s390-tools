@@ -30,6 +30,8 @@
 #include "zipl.h"
 #include "envblk.h"
 
+#define DEFAULT_DUMP_PARMLINE "root=/dev/ram0 possible_cpus=1 cgroup_disable=memory"
+
 const char *blsdir;
 
 /* Command line options */
@@ -891,6 +893,7 @@ check_job_dump_images(struct job_dump_data* dump, char* name)
 		dump->common.ramdisk_addr = UNSPECIFIED_ADDRESS;
 	}
 
+	dump->common.parmline = misc_strdup(DEFAULT_DUMP_PARMLINE);
 	dump->common.parm_addr = UNSPECIFIED_ADDRESS;
 	return finalize_common_address_data(&dump->common, name);
 }
