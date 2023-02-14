@@ -14,6 +14,8 @@ Release history for s390-tools (MIT version)
   - Add `PKG_CONFIG` Makefile variable to select pkg-config program;
     default `pkg-config` or `$(CROSS_COMPILE)pkg-config` if
     `CROSS_COMPILE` is set
+  - rename Makefile variable `ARCH` to `HOST_ARCH`. `HOST_ARCH` is the
+    architecture that will run the produced (executable) objects
 
   Bug Fixes:
 

@@ -38,11 +38,11 @@ zkey-ekmfweb.so: zkey-ekmfweb.o plugin-utils.o properties.o pkey.o cca.o \
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-libekmfweb.dep:
-	$(MAKE) -C $(rootdir)/libekmfweb/ TOPDIR=$(TOPDIR) ARCH=$(ARCH) install
+	$(MAKE) -C $(rootdir)/libekmfweb/ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) install
 	touch install-libekmfweb.dep
 
 libekmfweb.dep:
-	$(MAKE) -C $(rootdir)/libekmfweb/ TOPDIR=$(TOPDIR) ARCH=$(ARCH) all
+	$(MAKE) -C $(rootdir)/libekmfweb/ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) all
 	touch libekmfweb.dep
 
 install: all install-libekmfweb.dep zkey-ekmfweb.so

@@ -1,4 +1,4 @@
-ARCH := $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
+HOST_ARCH := $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
 
 # Include common definitions
 include common.mak
@@ -49,15 +49,15 @@ endif
 
 $(TOOL_DIRS): $(LIB_DIRS)
 	$(foreach goal,$(MAKECMDGOALS), \
-		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
+		$(MAKE) -C $@ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) $(goal) ;)
 .PHONY: $(TOOL_DIRS)
 
 $(LIB_DIRS): $(BASELIB_DIRS)
 	$(foreach goal,$(MAKECMDGOALS), \
-		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
+		$(MAKE) -C $@ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) $(goal) ;)
 .PHONY: $(LIB_DIRS)
 
 $(BASELIB_DIRS):
 	$(foreach goal,$(MAKECMDGOALS), \
-		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
+		$(MAKE) -C $@ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) $(goal) ;)
 .PHONY: $(BASELIB_DIRS)

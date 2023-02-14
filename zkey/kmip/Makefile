@@ -39,11 +39,11 @@ zkey-kmip.so: zkey-kmip.o plugin-utils.o properties.o pkey.o cca.o ep11.o \
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-libkmipclient.dep:
-	$(MAKE) -C $(rootdir)/libkmipclient/ TOPDIR=$(TOPDIR) ARCH=$(ARCH) install
+	$(MAKE) -C $(rootdir)/libkmipclient/ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) install
 	touch install-libkmipclient.dep
 
 libkmipclient.dep:
-	$(MAKE) -C $(rootdir)/libkmipclient/ TOPDIR=$(TOPDIR) ARCH=$(ARCH) all
+	$(MAKE) -C $(rootdir)/libkmipclient/ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) all
 	touch libkmipclient.dep
 
 install: all install-libkmipclient.dep zkey-kmip.so

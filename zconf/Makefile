@@ -59,7 +59,7 @@ endif
 
 $(SUB_DIRS):
 	$(foreach goal,$(MAKECMDGOALS), \
-		$(MAKE) -C $@ TOPDIR=$(TOPDIR) ARCH=$(ARCH) $(goal) ;)
+		$(MAKE) -C $@ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) $(goal) ;)
 .PHONY: $(SUB_DIRS)
 
 .PHONY: all install clean install-scripts install-manpages install-usrsbin-scripts
