@@ -90,6 +90,7 @@ List of all individuals having contributed content to s390-tools
 - Mikhail Zaslonko
 - Nikita Dubrovskii
 - Niklas Schnelle
+- Nikolay Gueorguiev
 - Peter Oberparleiter
 - Peter Tiedemann
 - Philipp Kern

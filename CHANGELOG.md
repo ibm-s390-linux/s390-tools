@@ -1,15 +1,24 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2022-xx-xx)__
+* __v2.26.0 (2023-02-14)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.2
 
-  Add new tools / libraries:
+  Remove tools / libraries:
+  - Remove vmconvert and libvmdump in favor of vmdump file support in zdump
 
   Changes of existing tools:
+  - ipl_tools: Add support for list-directed IPL from ECKD DASD
+  - lszcrypt: Display hardware filtering support capability
+  - vmur: Remove option -c for dump file conversion (See zdump changes)
+  - zdev: Add zfcp ber_stop parameter handling
+  - zdump: Add vmdump dfi for vmdump format to elf format
+  - zkey: Support EP11 host library version
 
   Bug Fixes:
+  - zipl: Move dump parmline processing and verification
+  - zipl/genprotimg: Various build improvements
 
 * __v2.25.0 (2022-12-08)__
 
