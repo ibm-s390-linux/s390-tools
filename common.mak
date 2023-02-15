@@ -1,5 +1,16 @@
-ifndef $(COMMON_INCLUDED)
-COMMON_INCLUDED = true
+COMMON_INCLUDED ?= false
+V ?= 0
+W ?= 0
+G ?= 0
+C ?= 0
+D ?= 0
+ASAN ?= 0
+ENABLE_WERROR ?= 0
+OPT_FLAGS ?=
+MAKECMDGOALS ?=
+
+ifeq ($(COMMON_INCLUDED),false)
+COMMON_INCLUDED := true
 
 # Global definitions
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
