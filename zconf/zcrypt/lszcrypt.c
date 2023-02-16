@@ -614,6 +614,8 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 static void show_subdevice(struct util_rec *rec, const char *grp_dev,
 			   const char *sub_dev)
 {
+	char type[16], t = '\0';
+
 	if (!util_path_is_dir("%s/%s", grp_dev, sub_dev))
 		errx(EXIT_FAILURE, "Error - cryptographic device %s/%s does not exist.", grp_dev, sub_dev);
 
@@ -630,6 +632,14 @@ static void show_subdevice(struct util_rec *rec, const char *grp_dev,
 		return;
 
 	util_rec_set(rec, "card", sub_dev);
+	if (util_file_read_line(type, sizeof(type), "%s/type", grp_dev) == 0)
+		t = type[strlen(type) - 1];
+
+	if ((t == 'A' && !l.showaccel) ||
+	    (t == 'C' && !l.showcca) ||
+	    (t == 'P' && !l.showep11))
+		return;
+
 	read_subdev_rec_default(rec, grp_dev, sub_dev);
 	read_subdev_rec_verbose(rec, grp_dev, sub_dev);
 
