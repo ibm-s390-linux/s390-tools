@@ -853,12 +853,12 @@ static void show_devices_all(void)
 /*
  * Show devices specified on commandline
  */
-static void show_devices_argv(char *argv[])
+static void show_devices_argv(int argc, char **argv)
 {
+	int id, dom, argidx, devidx, n, dev_cnt, sub_cnt;
 	struct util_rec *rec = util_rec_new_wide("-");
-	struct dirent **dev_vec, **subdev_vec;
 	char *ap, *grp_dev, *path, *card, *sub_dev;
-	int id, dom, i, n, dev_cnt, sub_cnt;
+	struct dirent **dev_vec, **subdev_vec;
 
 	/* check if ap driver is available */
 	ap = util_path_sysfs("bus/ap");
@@ -870,10 +870,10 @@ static void show_devices_argv(char *argv[])
 	define_rec_verbose(rec);
 
 	util_rec_print_hdr(rec);
-	for (i = 0; argv[i] != NULL; i++) {
+	for (argidx = 0; argidx < argc; argidx++) {
 		id = -1;
 		dom = -1;
-		if (sscanf(argv[i], "%x.%x", &id, &dom) >= 1) {
+		if (sscanf(argv[argidx], "%x.%x", &id, &dom) >= 1) {
 			/* at least the id field was valid */
 			if (id >= 0 && dom >= 0) {	/* single subdevice */
 				util_asprintf(&sub_dev, "%02x.%04x", id, dom);
@@ -889,7 +889,7 @@ static void show_devices_argv(char *argv[])
 			}
 			continue;
 		}
-		if (sscanf(argv[i]+1, "%x", &dom) == 1) {
+		if (sscanf(argv[argidx] + 1, "%x", &dom) == 1) {
 			/* list specific domains of all adapters */
 			path = util_path_sysfs("devices/ap/");
 			dev_cnt = util_scandir(&dev_vec, alphasort, path,
@@ -897,9 +897,9 @@ static void show_devices_argv(char *argv[])
 			if (dev_cnt < 1)
 				errx(EXIT_FAILURE, "No crypto card devices found.");
 			free(path);
-			for (i = 0; i < dev_cnt; i++) {
+			for (devidx = 0; devidx < dev_cnt; devidx++) {
 				path = util_path_sysfs("devices/ap/%s",
-						       dev_vec[i]->d_name);
+						       dev_vec[devidx]->d_name);
 				sub_cnt = util_scandir(&subdev_vec, alphasort,
 						       path,
 						       "[0-9a-fA-F]+.%04x",
@@ -1023,6 +1023,6 @@ int main(int argc, char **argv)
 	if (optind == argc)
 		show_devices_all();
 	else
-		show_devices_argv(&argv[optind]);
+		show_devices_argv((argc - optind), &argv[optind]);
 	return EXIT_SUCCESS;
 }
