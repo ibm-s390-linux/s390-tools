@@ -101,6 +101,10 @@ else
 	DEFAULT_CFLAGS += -O3
 endif
 
+ifeq ("${ENABLE_WERROR}", "1")
+	DEFAULT_CFLAGS += -Werror
+endif
+
 DEFAULT_CPPFLAGS = -D_GNU_SOURCE
 DEFAULT_LDFLAGS = -rdynamic
 
@@ -302,12 +306,13 @@ help:
 	@echo '  clean    Delete all generated files'
 	@echo ''
 	@echo 'OPTIONS'
-	@echo '  D=1      Build with debugging option "-Og"'
-	@echo '  C=1      Build with check tool defined with "CHECK=" (default=sparse)'
-	@echo '  G=1      Build with gcov to collect code coverage data'
-	@echo '  V=1      Generate verbose build output'
-	@echo '  W=1      Build with higher warning level'
-	@echo '  ASAN=1   Build with address sanitizer'
+	@echo '  D=1      	 Build with debugging option "-Og"'
+	@echo '  C=1      	 Build with check tool defined with "CHECK=" (default=sparse)'
+	@echo '  G=1      	 Build with gcov to collect code coverage data'
+	@echo '  V=1      	 Generate verbose build output'
+	@echo '  W=1		 Build with higher warning level'
+	@echo '  ASAN=1   	 Build with address sanitizer'
+	@echo '  ENABLE_WERROR=1 Build with -Werror'
 	@echo ''
 	@echo 'EXAMPLES'
 	@echo '  # make clean all D=1 W=1 -j'

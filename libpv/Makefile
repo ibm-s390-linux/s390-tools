@@ -28,7 +28,6 @@ WARNINGS := -Wall -Wextra -Wshadow \
 	    -Wno-long-long -Wuninitialized -Wconversion -Wstrict-prototypes \
 	    -Wpointer-arith -Wno-error=inline \
 	    -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable \
-	    -Werror \
 	    $(NULL)
 
 ALL_CFLAGS += -std=gnu11 \
