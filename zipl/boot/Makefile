@@ -56,8 +56,9 @@ eckd1b.exec fba1b.exec: \
 	stage1b.lds
 
 eckd2dump_sv.exec: \
-	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o \
-	libc.o ebcdic.o sclp.o entry.o stage2.lds
+	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o eckd2dump_zlib.o \
+	zlib/deflate.o zlib/deftree.o zlib/dfltcc.o zlib/dfltcc_deflate.o \
+	libc.o ebcdic.o sclp.o entry.o eckd2dump_sv.lds
 eckd2dump_mv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_mv.o \
 	libc.o ebcdic.o sclp.o entry.o stage2.lds
@@ -88,6 +89,6 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 
 
 clean:
-	rm -f -- *.o *.exec *.bin *.lds .*.lds.d .loaders *.debug
+	rm -f -- ./**/*.o *.o *.exec *.bin *.lds .*.lds.d .loaders *.debug
 
 .PHONY: all clean
