@@ -174,6 +174,20 @@ static OSSL_FUNC_keymgmt_settable_params_fn
 					sk_prov_keymgmt_rsa_pss_settable_params;
 static OSSL_FUNC_keymgmt_settable_params_fn
 					sk_prov_keymgmt_ec_settable_params;
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+static OSSL_FUNC_keymgmt_export_types_ex_fn
+					sk_prov_keymgmt_rsa_export_types_ex;
+static OSSL_FUNC_keymgmt_export_types_ex_fn
+					sk_prov_keymgmt_rsa_pss_export_types_ex;
+static OSSL_FUNC_keymgmt_export_types_ex_fn
+					sk_prov_keymgmt_ec_export_types_ex;
+static OSSL_FUNC_keymgmt_import_types_ex_fn
+					sk_prov_keymgmt_rsa_import_types_ex;
+static OSSL_FUNC_keymgmt_import_types_ex_fn
+					sk_prov_keymgmt_rsa_pss_import_types_ex;
+static OSSL_FUNC_keymgmt_import_types_ex_fn
+					sk_prov_keymgmt_ec_import_types_ex;
+#else
 static OSSL_FUNC_keymgmt_export_types_fn
 					sk_prov_keymgmt_rsa_export_types;
 static OSSL_FUNC_keymgmt_export_types_fn
@@ -185,6 +199,7 @@ static OSSL_FUNC_keymgmt_import_types_fn
 static OSSL_FUNC_keymgmt_import_types_fn
 					sk_prov_keymgmt_rsa_pss_import_types;
 static OSSL_FUNC_keymgmt_import_types_fn	sk_prov_keymgmt_ec_import_types;
+#endif
 
 static OSSL_FUNC_keyexch_newctx_fn		sk_prov_keyexch_ec_newctx;
 static OSSL_FUNC_keyexch_dupctx_fn		sk_prov_keyexch_ec_dupctx;
@@ -2947,14 +2962,14 @@ static const OSSL_PARAM sk_prov_imexport_types[] = {
 	OSSL_PARAM_END
 };
 
-static const OSSL_PARAM *sk_prov_keymgmt_export_types(int selection,
-						      int pkey_type)
+static const OSSL_PARAM *sk_prov_keymgmt_export_types(
+						struct sk_prov_ctx *provctx,
+						int selection,
+						int pkey_type)
 {
 	OSSL_FUNC_keymgmt_export_types_fn *default_export_types_fn;
 	const OSSL_PARAM *default_parms = NULL, *params;
-	struct sk_prov_ctx *provctx;
 
-	provctx = OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
 	if (provctx == NULL)
 		return NULL;
 
@@ -2982,14 +2997,14 @@ static const OSSL_PARAM *sk_prov_keymgmt_export_types(int selection,
 					   sk_prov_imexport_types);
 }
 
-static const OSSL_PARAM *sk_prov_keymgmt_import_types(int selection,
-						      int pkey_type)
+static const OSSL_PARAM *sk_prov_keymgmt_import_types(
+						struct sk_prov_ctx *provctx,
+						int selection,
+						int pkey_type)
 {
 	OSSL_FUNC_keymgmt_import_types_fn *default_import_types_fn;
 	const OSSL_PARAM *default_parms = NULL, *params;
-	struct sk_prov_ctx *provctx;
 
-	provctx = OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
 	if (provctx == NULL)
 		return NULL;
 
@@ -3337,15 +3352,39 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_settable_params(void *vprovctx)
 	return sk_prov_keymgmt_settable_params(provctx, EVP_PKEY_RSA);
 }
 
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_export_types_ex(void *vprovctx,
+							     int selection)
+{
+	struct sk_prov_ctx *provctx = vprovctx;
+
+	return sk_prov_keymgmt_export_types(provctx, selection, EVP_PKEY_RSA);
+}
+
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_import_types_ex(void *vprovctx,
+							     int selection)
+{
+	struct sk_prov_ctx *provctx = vprovctx;
+
+	return sk_prov_keymgmt_import_types(provctx, selection, EVP_PKEY_RSA);
+}
+#else
 static const OSSL_PARAM *sk_prov_keymgmt_rsa_export_types(int selection)
 {
-	return sk_prov_keymgmt_export_types(selection, EVP_PKEY_RSA);
+	struct sk_prov_ctx *provctx =
+		OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
+
+	return sk_prov_keymgmt_export_types(provctx, selection, EVP_PKEY_RSA);
 }
 
 static const OSSL_PARAM *sk_prov_keymgmt_rsa_import_types(int selection)
 {
-	return sk_prov_keymgmt_import_types(selection, EVP_PKEY_RSA);
+	struct sk_prov_ctx *provctx =
+		OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
+
+	return sk_prov_keymgmt_import_types(provctx, selection, EVP_PKEY_RSA);
 }
+#endif
 
 static void *sk_prov_keymgmt_rsa_gen_init(void *vprovctx, int selection,
 					  const OSSL_PARAM params[])
@@ -3407,15 +3446,43 @@ static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_settable_params(void *vprovctx)
 	return sk_prov_keymgmt_settable_params(provctx, EVP_PKEY_RSA_PSS);
 }
 
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_export_types_ex(void *vprovctx,
+								 int selection)
+{
+	struct sk_prov_ctx *provctx = vprovctx;
+
+	return sk_prov_keymgmt_export_types(provctx, selection,
+					    EVP_PKEY_RSA_PSS);
+}
+
+static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_import_types_ex(void *vprovctx,
+								 int selection)
+{
+	struct sk_prov_ctx *provctx = vprovctx;
+
+	return sk_prov_keymgmt_import_types(provctx, selection,
+					    EVP_PKEY_RSA_PSS);
+}
+#else
 static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_export_types(int selection)
 {
-	return sk_prov_keymgmt_export_types(selection, EVP_PKEY_RSA_PSS);
+	struct sk_prov_ctx *provctx =
+		OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
+
+	return sk_prov_keymgmt_export_types(provctx, selection,
+					    EVP_PKEY_RSA_PSS);
 }
 
 static const OSSL_PARAM *sk_prov_keymgmt_rsa_pss_import_types(int selection)
 {
-	return sk_prov_keymgmt_import_types(selection, EVP_PKEY_RSA_PSS);
+	struct sk_prov_ctx *provctx =
+		OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
+
+	return sk_prov_keymgmt_import_types(provctx, selection,
+					    EVP_PKEY_RSA_PSS);
 }
+#endif
 
 static void *sk_prov_keymgmt_rsa_pss_gen_init(void *vprovctx, int selection,
 					      const OSSL_PARAM params[])
@@ -3490,15 +3557,39 @@ static const OSSL_PARAM *sk_prov_keymgmt_ec_settable_params(void *vprovctx)
 	return sk_prov_keymgmt_settable_params(provctx, EVP_PKEY_EC);
 }
 
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+static const OSSL_PARAM *sk_prov_keymgmt_ec_export_types_ex(void *vprovctx,
+							    int selection)
+{
+	struct sk_prov_ctx *provctx = vprovctx;
+
+	return sk_prov_keymgmt_export_types(provctx, selection, EVP_PKEY_EC);
+}
+
+static const OSSL_PARAM *sk_prov_keymgmt_ec_import_types_ex(void *vprovctx,
+							    int selection)
+{
+	struct sk_prov_ctx *provctx = vprovctx;
+
+	return sk_prov_keymgmt_import_types(provctx, selection, EVP_PKEY_EC);
+}
+#else
 static const OSSL_PARAM *sk_prov_keymgmt_ec_export_types(int selection)
 {
-	return sk_prov_keymgmt_export_types(selection, EVP_PKEY_EC);
+	struct sk_prov_ctx *provctx =
+		OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
+
+	return sk_prov_keymgmt_export_types(provctx, selection, EVP_PKEY_EC);
 }
 
 static const OSSL_PARAM *sk_prov_keymgmt_ec_import_types(int selection)
 {
-	return sk_prov_keymgmt_import_types(selection, EVP_PKEY_EC);
+	struct sk_prov_ctx *provctx =
+		OSSL_PROVIDER_get0_provider_ctx(sk_prov_securekey_provider);
+
+	return sk_prov_keymgmt_import_types(provctx, selection, EVP_PKEY_EC);
 }
+#endif
 
 static void *sk_prov_keymgmt_ec_gen_init(void *vprovctx, int selection,
 					 const OSSL_PARAM params[])
@@ -4648,11 +4739,21 @@ static const OSSL_DISPATCH sk_prov_rsa_keymgmt_functions[] = {
 
 	/* Import and export routines */
 	{ OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))sk_prov_keymgmt_export },
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX,
+			(void (*)(void))sk_prov_keymgmt_rsa_export_types_ex },
+#else
 	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES,
 			(void (*)(void))sk_prov_keymgmt_rsa_export_types },
+#endif
 	{ OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))sk_prov_keymgmt_import },
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES_EX,
+			(void (*)(void))sk_prov_keymgmt_rsa_import_types_ex },
+#else
 	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES,
 			(void (*)(void))sk_prov_keymgmt_rsa_import_types },
+#endif
 	/* No copy function, OpenSSL will use export/import to copy instead */
 
 	{ 0, NULL }
@@ -4697,11 +4798,21 @@ static const OSSL_DISPATCH sk_prov_rsapss_keymgmt_functions[] = {
 
 	/* Import and export routines */
 	{ OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))sk_prov_keymgmt_export },
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX,
+		(void (*)(void))sk_prov_keymgmt_rsa_pss_export_types_ex },
+#else
 	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES,
 			(void (*)(void))sk_prov_keymgmt_rsa_pss_export_types },
+#endif
 	{ OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))sk_prov_keymgmt_import },
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES_EX,
+		(void (*)(void))sk_prov_keymgmt_rsa_pss_import_types_ex },
+#else
 	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES,
 			(void (*)(void))sk_prov_keymgmt_rsa_pss_import_types },
+#endif
 	/* No copy function, OpenSSL will use export/import to copy instead */
 
 	{ 0, NULL }
@@ -4746,11 +4857,21 @@ static const OSSL_DISPATCH sk_prov_ec_keymgmt_functions[] = {
 
 	/* Import and export routines */
 	{ OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))sk_prov_keymgmt_export },
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX,
+			(void (*)(void))sk_prov_keymgmt_ec_export_types_ex },
+#else
 	{ OSSL_FUNC_KEYMGMT_EXPORT_TYPES,
 			(void (*)(void))sk_prov_keymgmt_ec_export_types },
+#endif
 	{ OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))sk_prov_keymgmt_import },
+#ifdef OSSL_FUNC_KEYMGMT_EXPORT_TYPES_EX
+	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES_EX,
+			(void (*)(void))sk_prov_keymgmt_ec_import_types_ex },
+#else
 	{ OSSL_FUNC_KEYMGMT_IMPORT_TYPES,
 			(void (*)(void))sk_prov_keymgmt_ec_import_types },
+#endif
 	/* No copy function, OpenSSL will use export/import to copy instead */
 
 	{ 0, NULL }
