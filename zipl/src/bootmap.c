@@ -947,7 +947,8 @@ static int add_segment_program(struct install_set *bis,
 
 static int
 check_dump_device_late(char *partition, struct disk_info *target_info,
-		       struct job_target_data *target)
+		       struct job_target_data *target,
+		       struct job_data *job)
 {
 	struct disk_info* info;
 	int rc;
@@ -959,8 +960,10 @@ check_dump_device_late(char *partition, struct disk_info *target_info,
 			   partition);
 		return rc;
 	}
-	if ((info->type != disk_type_scsi) || (info->partnum == 0)) {
-		error_reason("Device '%s' is not a SCSI partition",
+	if ((job->is_ldipl_dump && info->type != disk_type_eckd_cdl) ||
+	    (!job->is_ldipl_dump && info->type != disk_type_scsi) ||
+	    info->partnum == 0) {
+		error_reason("Device '%s' is not a SCSI or DASD partition",
 			     partition);
 		disk_free_info(info);
 		return -1;
@@ -975,12 +978,13 @@ check_dump_device_late(char *partition, struct disk_info *target_info,
 	return 0;
 }
 
-static int add_dump_program(struct install_set *bis, struct job_dump_data *dump,
+static int add_dump_program(struct install_set *bis, struct job_data *job,
 			    disk_blockptr_t *program, int verbose,
 			    component_header_type type,
-			    struct job_target_data *target,
 			    int program_table_id)
 {
+	struct job_dump_data *dump = &job->data.dump;
+	struct job_target_data *target = &job->target;
 	struct job_ipl_data ipl;
 	int rc;
 
@@ -989,7 +993,7 @@ static int add_dump_program(struct install_set *bis, struct job_dump_data *dump,
 	ipl.common = dump->common;
 
 	/* Get file system dump parmline */
-	rc = check_dump_device_late(dump->device, bis->info, target);
+	rc = check_dump_device_late(dump->device, bis->info, target, job);
 	if (rc)
 		return rc;
 	ipl.common.parmline = dump->common.parmline;
@@ -1065,9 +1069,9 @@ static int build_program_table(struct job_data *job,
 				printf("Adding dump section '%s' (default)\n",
 				       job->name);
 		}
-		rc = add_dump_program(bis, &job->data.dump, &table[0],
+		rc = add_dump_program(bis, job, &table[0],
 				      verbose || job->command_line,
-				      COMPONENT_HEADER_DUMP, &job->target,
+				      COMPONENT_HEADER_DUMP,
 				      program_table_id);
 		break;
 	case job_menu:
@@ -1389,11 +1393,17 @@ static int disk_is_appropriate(const struct job_data *job,
 		error_reason("Secure boot forced for improper disk type");
 		return 0;
 	}
+	if (job->id == job_dump_partition &&
+	    job->is_ldipl_dump &&
+	    info->type != disk_type_eckd_cdl) {
+		error_reason("List-directed dump not support on DASD with LDL format");
+		return 0;
+	}
 	return 1;
 }
 
 static int
-check_dump_device(const struct job_data *job, const struct disk_info *info,
+check_dump_device(struct job_data *job, const struct disk_info *info,
 		  const char *device)
 {
 	int rc, part_ext;
@@ -1406,6 +1416,9 @@ check_dump_device(const struct job_data *job, const struct disk_info *info,
 	}
 	if (!disk_is_appropriate(job, info))
 		return -1;
+
+	if (is_ngdump_enabled(job))
+		return 0;
 
 	rc = util_part_search(device, info->geo.start,
 			      info->phy_blocks, info->phy_block_size, &part_ext);

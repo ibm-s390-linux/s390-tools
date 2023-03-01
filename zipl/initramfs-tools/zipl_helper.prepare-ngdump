@@ -55,6 +55,10 @@ function create_initrd()
 
 device=$(readlink -f $1)
 dryrun=$2
+
+type=$(lsblk -dno type "$device")
+[ "$type" != "part" ] && { echo "$device with type $type is not a partition." >&2; exit 1; }
+
 disk_path=$(create_dumpfs $device)
 kernel_version=$(get_kernel_version)
 kernel=$(get_kernel_image "$kernel_version")

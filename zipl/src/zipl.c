@@ -172,8 +172,9 @@ main(int argc, char* argv[])
 	/* Do it */
 	switch (job->id) {
 	case job_dump_partition:
-		if (disk_is_tape(job->data.dump.device) ||
-		    !disk_is_scsi(job->data.dump.device, &job->target)) {
+		if (!is_ngdump_enabled(job) &&
+		    (disk_is_tape(job->data.dump.device) ||
+		     !disk_is_scsi(job->data.dump.device, &job->target))) {
 			rc = install_dump(job->data.dump.device, &job->target,
 					  job->data.dump.mem);
 			break;
@@ -185,10 +186,16 @@ main(int argc, char* argv[])
 			rc = -1;
 			break;
 		}
-		if (is_ngdump_enabled(job))
+		if (is_ngdump_enabled(job)) {
+			if (disk_is_eckd_ldl(job->data.dump.device, &job->target)) {
+				error_reason("List-directed dump on ECKD with LDL not supported");
+				rc = -1;
+				break;
+			}
 			rc = check_job_images_ngdump(&job->data.dump, job->name);
-		else
+		} else {
 			rc = check_job_dump_images(&job->data.dump, job->name);
+		}
 		if (rc != 0)
 			break;
 		/* Fall through. */
