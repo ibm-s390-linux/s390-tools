@@ -160,7 +160,10 @@ void df_s390_dumper_read(struct zg_fh *fh, int blk_size,
 			dumper->size = STAGE2_DUMPER_SIZE_V1;
 		break;
 	case 2:
-		dumper->size = STAGE2_DUMPER_SIZE_V2;
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT, 7) == 0)
+			dumper->size = STAGE2_DUMPER_SIZE_ZLIB;
+		else
+			dumper->size = STAGE2_DUMPER_SIZE_V2;
 		break;
 	case 3:
 	default:
