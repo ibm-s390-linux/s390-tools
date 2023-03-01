@@ -14,10 +14,12 @@
 #include "dfo.h"
 #include "output.h"
 
+#define BUFFER_SIZE	(1 * MIB)
+
 int write_dump(FILE *stream)
 {
 	const u64 output_size = dfo_size();
-	char buf[8UL * PAGE_SIZE];
+	char *buf = zg_alloc(BUFFER_SIZE);
 	u64 written = 0;
 
 	if (!dfi_feat_copy())
@@ -31,7 +33,7 @@ int write_dump(FILE *stream)
 		size_t rc;
 		u64 cnt;
 
-		cnt = dfo_read(buf, sizeof(buf));
+		cnt = dfo_read(buf, BUFFER_SIZE);
 		rc = fwrite(buf, cnt, 1, stream);
 		if (rc != 1 && ferror(stream))
 			ERR_EXIT("Error: Write failed");
@@ -40,5 +42,6 @@ int write_dump(FILE *stream)
 	};
 	STDERR("\n");
 	STDERR("Success: Dump has been copied\n");
+	zg_free(buf);
 	return 0;
 }
