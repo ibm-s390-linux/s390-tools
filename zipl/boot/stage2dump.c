@@ -216,7 +216,7 @@ static void df_s390_dump_init(void)
 	dh->hdr_size = DF_S390_HDR_SIZE;
 	dh->page_size = PAGE_SIZE;
 	dh->dump_level = 4;
-	dh->version = 1;
+	dh->version = 2;
 	dh->mem_start = 0;
 	dh->arch = DF_S390_ARCH_64;
 	dh->build_arch = DF_S390_ARCH_64;

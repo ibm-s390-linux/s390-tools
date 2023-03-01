@@ -21,7 +21,7 @@
 /*
  * Magic number at start of dump record
  */
-const uint64_t __section(.stage2.head) magic = 0x5845434b44363401ULL; /* "XECKD64", version 1 */
+const uint64_t __section(.stage2.head) magic = 0x5845434b44363402ULL; /* "XECKD64", version 2 */
 
 /*
  * Get device characteristics from zipl parameter block
