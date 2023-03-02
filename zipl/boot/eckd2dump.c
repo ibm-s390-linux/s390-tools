@@ -447,25 +447,23 @@ void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count)
 }
 
 /*
- * Write dump segment with the header to DASD and return the next free
- * block number
+ * Write len/device.blk_size blocks of data at start address starting from
+ * given block and return the next free block number. The len value must be
+ * a multiple of a block size (4096 bytes).
  */
-unsigned long write_dump_segment(unsigned long blk,
-				 struct df_s390_dump_segm_hdr *segm)
+unsigned long write_addr_range(unsigned long blk, unsigned long start, unsigned long len)
 {
 	unsigned long addr, start_blk, blk_count, zero_page;
 
-	/* Write the dump segment header itself (1 page) */
-	zero_page = get_zeroed_page();
-	writeblock(blk, (unsigned long)segm, m2b(PAGE_SIZE), zero_page);
-	free_page(zero_page);
-	blk += m2b(PAGE_SIZE);
-	/* Write the dump segment */
-	addr = segm->start;
+	/* Verify the range is a multiple of a block size */
+	if (len % device.blk_size)
+		panic(EINTERNAL, "Invalid address range: [%016x, %016x]",
+		      start, start + len);
+	addr = start;
 	start_blk = blk;
-	while (addr < segm->start + segm->len) {
+	while (addr < start + len) {
 		/* Remaining blocks to write */
-		blk_count = m2b(segm->len) - (blk - start_blk);
+		blk_count = m2b(len) - (blk - start_blk);
 		blk_count = MIN(blk_count, eckd_blk_max);
 		zero_page = get_zeroed_page();
 		writeblock(blk, addr, blk_count, zero_page);
@@ -475,6 +473,25 @@ unsigned long write_dump_segment(unsigned long blk,
 		addr += b2m(blk_count);
 	}
 	return blk;
+}
+
+/*
+ * Write dump segment with the header to DASD and return the next free
+ * block number
+ */
+unsigned long write_dump_segment(unsigned long blk,
+				 struct df_s390_dump_segm_hdr *segm)
+{
+	unsigned long zero_page;
+
+	/* Write the dump segment header itself (1 page) */
+	zero_page = get_zeroed_page();
+	writeblock(blk, (unsigned long)segm,
+		   m2b(sizeof(struct df_s390_dump_segm_hdr)), zero_page);
+	free_page(zero_page);
+	blk += m2b(PAGE_SIZE);
+	/* Write the dump segment */
+	return write_addr_range(blk, segm->start, segm->len);
 }
 
 /*
