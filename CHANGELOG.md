@@ -8,6 +8,7 @@ Release history for s390-tools (MIT version)
   Add new tools / libraries:
 
   Changes of existing tools:
+  - dbginfo.sh: rework crypto data collection
 
   Bug Fixes:
 

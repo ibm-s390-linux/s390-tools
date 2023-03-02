@@ -409,6 +409,7 @@ CONFIGFILES="\
   /etc/multipath\
   /etc/network\
   /etc/networks\
+  /etc/opencryptoki/*.conf\
   /etc/pam.d\
   /etc/profile\
   /etc/profile.d\
@@ -513,13 +514,20 @@ CMDS="${CMDS}\
 
 # crypto specific commands
 CMDS="${CMDS}\
-  :cat /var/lib/opencryptoki/pk_config_data\
+  :ep11info -D\
+  :ep11info -H\
+  :ep11info -M\
   :icainfo\
   :icastats\
   :ivp.e # IBM CCA package install check\
   :ls -al /usr/lib64/opencryptoki/stdll\
   :lszcrypt -VV\
-  :pkcsconf -mlist\
+  :pkcsconf -i\
+  :pkcsconf -s\
+  :pkcsconf -l\
+  :pkcsconf -t\
+  :pkcsconf -m\
+  :systemctl status pkcsslotd\
   "
 
 # product / distro specific commands
