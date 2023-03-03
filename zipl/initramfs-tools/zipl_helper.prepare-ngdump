@@ -55,9 +55,22 @@ function create_initrd()
 
 device=$(readlink -f $1)
 dryrun=$2
+dasd=
 
 type=$(lsblk -dno type "$device")
 [ "$type" != "part" ] && { echo "$device with type $type is not a partition." >&2; exit 1; }
+
+case "${device##*/}" in
+	dasd*)
+		dasd=$(dasdview -i "$1"|sed -n 's/busid\s*:\s*\([0-9a-fA-F.]\)/dasd=\1/p')
+		;;
+	nvme*)
+		;;
+	*)
+		echo "Unsupported device $device." >&2
+		exit 1
+		;;
+esac
 
 disk_path=$(create_dumpfs $device)
 kernel_version=$(get_kernel_version)
@@ -79,6 +92,6 @@ create_initrd "$disk_path" "$kernel_version" "$initrd"
 
 echo "kernel=$kernel"
 echo "initrd=$initrd"
-echo "cmdline=reset_devices cgroup_disable=memory nokaslr numa=off irqpoll nr_cpus=1"
+echo "cmdline=reset_devices cgroup_disable=memory nokaslr numa=off irqpoll nr_cpus=1 $dasd"
 
 exit 0
