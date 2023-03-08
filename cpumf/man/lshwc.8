@@ -88,12 +88,6 @@ Include the MT_Diagnostic counter set.
 Include the problem counter set.
 .IP a
 Include all known counter sets (default).
-.SH "Concurrency with perf tool"
-The \*c tool and the linux
-.B perf
-tool use the same hardware and cannot be used concurrently.
-Both tools print an error message and abort when they
-detect this situation.
 .SH "EXAMPLES"
 The first example enables the basic and problem counter sets on CPU 0 and 1.
 Two read operations are performed and a summary line is printed for each
