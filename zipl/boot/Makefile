@@ -10,7 +10,7 @@ ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g $(INCLUDE_PARMS) \
 	  -fno-delete-null-pointer-checks -fno-stack-protector \
 	  -fexec-charset=IBM1047 -m64 -mpacked-stack \
 	  -mstack-size=4096 -mstack-guard=128 -msoft-float \
-	  -W -Wall -Wformat-security -fno-sanitize=all
+	  -W -Wall -Wformat-security -fno-sanitize=all -Wno-array-bounds
 ALL_LDFLAGS += -fno-sanitize=all
 
 FILES	= fba0.bin fba1b.bin fba2.bin \
