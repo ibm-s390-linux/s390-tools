@@ -776,6 +776,10 @@ int SK_UTIL_build_ecdsa_signature(const unsigned char *raw_sig,
 	bn_s = NULL;
 
 	der_len = i2d_ECDSA_SIG(ec_sig, NULL);
+	if (der_len <= 0) {
+		rc = -EIO;
+		goto out;
+	}
 
 	if (sig == NULL) {
 		*sig_len = der_len;
@@ -788,12 +792,13 @@ int SK_UTIL_build_ecdsa_signature(const unsigned char *raw_sig,
 
 	memset(sig, 0, *sig_len);
 	der = sig;
-	*sig_len = i2d_ECDSA_SIG(ec_sig, &der);
-
-	if (*sig_len == 0) {
+	der_len = i2d_ECDSA_SIG(ec_sig, &der);
+	if (der_len <= 0) {
 		rc = -EIO;
 		goto out;
 	}
+
+	*sig_len = der_len;
 
 out:
 	if (ec_sig != NULL)
