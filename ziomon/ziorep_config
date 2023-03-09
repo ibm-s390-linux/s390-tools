@@ -124,6 +124,7 @@ sub get_device_data
 				$devices{$hctl}{dev}  = glob_last("block\:sd*");
 			}
 			$devices{$hctl}{sg_mm}   = get_line("generic", "dev");
+			next if !defined $devices{$hctl}{dev};
 			$c_src = $devices{$hctl}{dev};
 			$devices{$hctl}{dev}  =~ s/.*(sd[a-z0-9]+)\Z/$1/
 						unless(!$devices{$hctl}{dev});
