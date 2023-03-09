@@ -123,11 +123,11 @@ sub get_device_data
 			} else {
 				$devices{$hctl}{dev}  = glob_last("block\:sd*");
 			}
+			$devices{$hctl}{sg_mm}   = get_line("generic", "dev");
 			$c_src = $devices{$hctl}{dev};
 			$devices{$hctl}{dev}  =~ s/.*(sd[a-z0-9]+)\Z/$1/
 						unless(!$devices{$hctl}{dev});
 			$devices{$hctl}{mm}   = get_line("dev");
-			$devices{$hctl}{sg_mm}   = get_line("generic", "dev");
 			$devices{$hctl}{mp_dev} = glob_last("holders", "dm*");
 			$devices{$hctl}{mp_dev} =~ s/.*\/(.+)\Z/$1/
 						unless (!$devices{$hctl}{mp_dev});
