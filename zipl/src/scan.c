@@ -1873,8 +1873,10 @@ void scan_update_bls_path(struct scan_token *scan)
 			if (misc_check_readable_file(file)) {
 				misc_asprintf(&img_value, "%s%s",
 					      target_value, file);
-				if (misc_check_readable_file(img_value))
+				if (misc_check_readable_file(img_value)) {
+					free(img_value);
 					continue;
+				}
 
 				/*
 				 * when file has stripped the load address part,
