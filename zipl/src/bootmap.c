@@ -511,9 +511,6 @@ extract_signature(const char *filename, void **ret_signature,
 	memcpy(signature, buffer + size - signature_size - sizeof(*file_sig),
 	       signature_size);
 
-	*ret_signature = signature;
-	sig_head->length = signature_size;
-
 	switch (file_sig->id_type) {
 	case PKEY_ID_PKCS7:
 		sig_head->format = PKCS7_FORMAT;
@@ -522,8 +519,12 @@ extract_signature(const char *filename, void **ret_signature,
 		error_text("Unsupported signature type %02x",
 			   file_sig->id_type);
 		signature_size = 0;
+		free(signature);
 		goto out;
 	}
+
+	sig_head->length = signature_size;
+	*ret_signature = signature;
 	/* return size of signature and corresponding header */
 	signature_size += sizeof(*file_sig);
 out:
