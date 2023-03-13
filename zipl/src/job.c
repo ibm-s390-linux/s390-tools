@@ -787,6 +787,7 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section,
 		}
 		if (size < MAX_COMMAND_LINE_SIZE + sizeof(uint64_t)) {
 			error_text_section("Image file", section, common->image);
+			free(buffer);
 			return -1;
 		}
 
@@ -799,8 +800,11 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section,
 			error_text("The length of the parameters line "
 				   "(%d bytes) exceeds the allowed maximum "
 				   "(%d bytes) in section '%s'", len, max_parm_size, section);
+			free(buffer);
 			return -1;
 		}
+		free(buffer);
+		buffer = NULL;
 	}
 skip_image:
 	if (common->ramdisk != NULL) {
