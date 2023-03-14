@@ -451,7 +451,8 @@ void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count)
  * given block and return the next free block number. The len value must be
  * a multiple of a block size (4096 bytes).
  */
-unsigned long write_addr_range(unsigned long blk, unsigned long start, unsigned long len)
+unsigned long write_addr_range(unsigned long blk, unsigned long start,
+			       unsigned long len, int print_progress)
 {
 	unsigned long addr, start_blk, blk_count, zero_page;
 
@@ -468,8 +469,9 @@ unsigned long write_addr_range(unsigned long blk, unsigned long start, unsigned 
 		zero_page = get_zeroed_page();
 		writeblock(blk, addr, blk_count, zero_page);
 		free_page(zero_page);
-		progress_print(addr);
 		blk += blk_count;
+		if (print_progress)
+			progress_print(addr);
 		addr += b2m(blk_count);
 	}
 	return blk;
@@ -491,7 +493,7 @@ unsigned long write_dump_segment(unsigned long blk,
 	free_page(zero_page);
 	blk += m2b(PAGE_SIZE);
 	/* Write the dump segment */
-	return write_addr_range(blk, segm->start, segm->len);
+	return write_addr_range(blk, segm->start, segm->len, PRINT_PROGRESS);
 }
 
 /*

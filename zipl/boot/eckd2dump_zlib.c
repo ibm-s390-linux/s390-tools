@@ -79,7 +79,7 @@ static int compress_write_next_chunk(unsigned long addr, unsigned long len,
 		 * notify the caller.
 		 */
 		if (rc != Z_OK) {
-			*blk = write_addr_range(start_blk, addr, len);
+			*blk = write_addr_range(start_blk, addr, len, NO_PROGRESS);
 			return COMPRESSION_ERROR;
 		}
 		if (strm->avail_out == 0) {
@@ -90,11 +90,11 @@ static int compress_write_next_chunk(unsigned long addr, unsigned long len,
 			 */
 			if (strm->total_out >= strm->total_in &&
 			    *blk == start_blk) {
-				*blk = write_addr_range(start_blk, addr, len);
+				*blk = write_addr_range(start_blk, addr, len, NO_PROGRESS);
 				return UNCOMPRESSED;
 			}
 			*blk = write_addr_range(*blk, (unsigned long)zlib_out_buf,
-						zlib_buf_size);
+						zlib_buf_size, NO_PROGRESS);
 			strm->next_out = (void *)zlib_out_buf;
 			strm->avail_out = zlib_buf_size;
 		}
@@ -104,7 +104,7 @@ static int compress_write_next_chunk(unsigned long addr, unsigned long len,
 		strm->avail_in = 0;
 		rc = zlib_deflate(strm, Z_FINISH);
 		len = ROUND_UP(zlib_buf_size - strm->avail_out, PAGE_SIZE);
-		*blk = write_addr_range(*blk, (unsigned long)zlib_out_buf, len);
+		*blk = write_addr_range(*blk, (unsigned long)zlib_out_buf, len, NO_PROGRESS);
 		if (strm->avail_out == 0) {
 			strm->next_out = zlib_out_buf;
 			strm->avail_out = zlib_buf_size;
@@ -165,6 +165,7 @@ unsigned long write_compressed_dump_segment(unsigned long blk,
 		if (rc == UNCOMPRESSED || rc == COMPRESSION_ERROR)
 			segm->entry_offset[i] |= DUMP_SEGM_ENTRY_UNCOMPRESSED;
 		offset += blk - start_blk;
+		/* Print progress after each compressed chunk written */
 		progress_print(segm->start + i * chunk_size);
 	}
 	/* Compression successful, store compressed size in the segment header */

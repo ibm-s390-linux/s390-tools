@@ -51,6 +51,9 @@ void writeblock(unsigned long blk, unsigned long addr, unsigned long blk_count,
 void readblock(unsigned long blk, unsigned long addr, unsigned long blk_count);
 unsigned long write_dump_segment(unsigned long blk,
 				 struct df_s390_dump_segm_hdr *segm);
-unsigned long write_addr_range(unsigned long blk, unsigned long addr, unsigned long len);
+#define NO_PROGRESS		0
+#define PRINT_PROGRESS		1
+unsigned long write_addr_range(unsigned long blk, unsigned long addr,
+			       unsigned long len, int print_progress);
 
 #endif /* ECKD2DUMP_H */
