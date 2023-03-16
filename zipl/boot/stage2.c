@@ -148,4 +148,4 @@ void panic_notify(unsigned long UNUSED(reason))
 {
 }
 
-uint64_t __section(.stage2.head) stage2_head;
+const uint64_t __section(.stage2.head) stage2_head;

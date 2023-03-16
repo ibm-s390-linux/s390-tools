@@ -21,7 +21,7 @@
 /*
  * Magic number at start of dump record
  */
-uint64_t __section(.stage2.head) magic = 0x584d554c54363401ULL; /* XMULT64, version 1 */
+const uint64_t __section(.stage2.head) magic = 0x584d554c54363401ULL; /* XMULT64, version 1 */
 
 /*
  * Parameter format for ECKD MV dumper (13 bytes):
