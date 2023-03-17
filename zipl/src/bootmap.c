@@ -119,8 +119,6 @@ void bootmap_store_blockptr(void *buffer, disk_blockptr_t *ptr,
 	}
 }
 
-#define PROGRAM_TABLE_BLOCK_SIZE	512
-
 /* Calculate the maximum number of entries in the program table. INFO
  * specifies the type of disk. */
 static int

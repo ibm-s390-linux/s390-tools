@@ -38,7 +38,7 @@ struct disk_blockptr_linear {
 	int blockct;
 };
 
-/* Pointer to a block on disk */
+/* This represents in-memory pointer to a block on disk */
 typedef union {
 	struct disk_blockptr_chs chs;
 	struct disk_blockptr_linear linear;

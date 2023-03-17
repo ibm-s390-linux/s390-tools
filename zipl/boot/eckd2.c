@@ -29,10 +29,10 @@ int is_zero_block(void *data)
 	return blockptr->cyl  || blockptr->head || blockptr->sec;
 }
 
-void * load_direct(disk_blockptr_t *data, struct subchannel_id subchannel_id,
-	    void *load_addr)
+void *load_direct(union disk_blockptr *data, struct subchannel_id subchannel_id,
+		  void *load_addr)
 {
-	struct eckd_blockptr_legacy *blockptr = &data->eckd;
+	struct eckd_blockptr_legacy *blockptr = &data->eckd_legacy;
 	struct ccw1 *ccws;
 	unsigned long record_size;
 	struct seek_arg seek_addr;

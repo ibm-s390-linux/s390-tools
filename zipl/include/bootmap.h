@@ -21,6 +21,7 @@
 
 #define BOOTMAP_HEADER_VERSION  1
 
+#define PROGRAM_TABLE_BLOCK_SIZE  512
 #define SIGNATURE_MAGIC  "~Module signature appended~\n"
 #define	PKCS7_FORMAT 0x01
 

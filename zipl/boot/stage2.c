@@ -18,7 +18,7 @@
 #include "boot/loaders_layout.h"
 #include "stage2.h"
 
-static int is_null_descriptor(disk_blockptr_t *address)
+static int is_null_descriptor(union disk_blockptr *address)
 {
 	unsigned long long *value = (unsigned long long *)address;
 
@@ -28,13 +28,12 @@ static int is_null_descriptor(disk_blockptr_t *address)
 static void *load_blocklist(struct component_entry *descriptor_address,
 			    struct subchannel_id subchannel_id, void *load_address)
 {
-	disk_blockptr_t *indirect_blocks, *indirect_blockspace,
-		*start_addr;
+	union disk_blockptr *indirect_blocks, *indirect_blockspace, *start_addr;
 	unsigned long length;
 	long long nr_descr;
 
 	/* start address to load first indirect blocks */
-	start_addr = (disk_blockptr_t *)&descriptor_address->data;
+	start_addr = (union disk_blockptr *)&descriptor_address->data;
 	/* get a free page to store indirect blocks in */
 	indirect_blockspace = (void *)get_zeroed_page();
 
@@ -90,7 +89,7 @@ void __noreturn start(void)
 	struct subchannel_id subchannel_id;
 	void *load_address;
 	struct component_entry *entry;
-	disk_blockptr_t *blockptr;
+	union disk_blockptr *blockptr;
 	uint64_t load_psw;
 	void *load_page;
 	int config_nr;
@@ -106,14 +105,14 @@ void __noreturn start(void)
 	set_device(subchannel_id, ENABLED);
 
 	load_page = (void *)get_zeroed_page();
-	load_address = (disk_blockptr_t *) load_page;
+	load_address = (union disk_blockptr *) load_page;
 
 	/* load blockpointer list to load address */
-	load_direct((disk_blockptr_t *)&stage2_descr, subchannel_id,
+	load_direct((union disk_blockptr *)&stage2_descr, subchannel_id,
 		    load_address);
 
-	blockptr = (disk_blockptr_t *)(load_address +
-					     sizeof(disk_blockptr_t));
+	blockptr = (union disk_blockptr *)(load_address +
+					   sizeof(union disk_blockptr));
 
 	load_direct(&blockptr[config_nr], subchannel_id, load_address);
 

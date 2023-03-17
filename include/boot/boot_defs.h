@@ -195,13 +195,23 @@ struct boot_info_bp_dump {
 	uint8_t		unused[16];
 } __packed;
 
+/* This represents on-disk pointer to a block on disk */
+union disk_blockptr {
+	struct eckd_blockptr_legacy eckd_legacy;
+	struct eckd_blockptr eckd;
+	struct linear_blockptr linear;
+};
+
 struct boot_info_bp_ipl {
-	union {
-		struct eckd_blockptr_legacy eckd_legacy;
-		struct eckd_blockptr eckd;
-		struct linear_blockptr lin;
-	} bm_ptr;
+	union disk_blockptr bm_ptr;
 	uint8_t		unused[16];
+} __packed;
+
+struct disk_program_table {
+	uint32_t magic;
+	uint32_t version;
+	uint64_t unused;
+	union disk_blockptr component_table[0];
 } __packed;
 
 struct boot_info {

@@ -45,31 +45,8 @@ static inline unsigned long blk_cnt(int size, struct disk_info *info)
 	return (size + info->phy_block_size - 1) / info->phy_block_size;
 }
 
-/* Types of SCSI disk layouts */
-enum scsi_layout {
-	scsi_layout_pcbios,
-	scsi_layout_sun,
-	scsi_layout_sgi,
-	scsi_layout_unknown
-};
-
 /* From linux/fs.h */
 #define BLKFLSBUF	_IO(0x12, 97)
-
-
-/* Determine SCSI disk layout from the specified BOOTBLOCK. */
-static enum scsi_layout
-get_scsi_layout(unsigned char* bootblock)
-{
-	if ((bootblock[510] == 0x55) && (bootblock[511] == 0xaa))
-		return scsi_layout_pcbios;
-	else if ((bootblock[508] == 0xda) && (bootblock[509] == 0xbe))
-		return scsi_layout_sun;
-	else if ((bootblock[0] == 0x0b) && (bootblock[1] == 0xe5) &&
-		 (bootblock[2] == 0xa9) && (bootblock[3] == 0x41))
-		return scsi_layout_sgi;
-	return scsi_layout_unknown;
-}
 
 static int
 overwrite_partition_start(int fd, struct disk_info* info, int mv_dump_magic);
