@@ -17,6 +17,13 @@ BUILD_ARCH := $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 
 # 'HOST_ARCH' is the architecture of the machine that will run the compiled output
 HOST_ARCH ?= $(BUILD_ARCH)
 
+# The `*clean` targets are mutually exclusive to all other targets
+ifneq ($(filter %clean,$(MAKECMDGOALS)),)
+  ifneq ($(MAKECMDGOALS),$(filter %clean,$(MAKECMDGOALS)))
+    $(error The *clean targets are mutually exclusive to all other targets)
+  endif
+endif
+
 # Global definitions
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
