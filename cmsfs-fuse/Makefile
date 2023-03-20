@@ -22,13 +22,8 @@ check_dep:
 
 all: check_dep cmsfs-fuse
 
-ifneq ($(shell sh -c 'command -v pkg-config'),)
 FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
 FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
-else
-FUSE_CFLAGS = -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse3
-FUSE_LDLIBS = -lfuse3
-endif
 ALL_CFLAGS += -DHAVE_SETXATTR $(FUSE_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) -lm
 

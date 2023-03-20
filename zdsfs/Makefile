@@ -39,17 +39,10 @@ check_dep:
 		"curl-devel or libcurl-dev", \
 		"HAVE_CURL=0")
 
-ifneq ($(shell sh -c 'command -v pkg-config'),)
 FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
 FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
 CURL_CFLAGS = $(shell pkg-config --silence-errors --cflags libcurl)
 CURL_LDLIBS = $(shell pkg-config --silence-errors --libs libcurl)
-else
-FUSE_CFLAGS = -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse3
-FUSE_LDLIBS = -lfuse3
-CURL_CFLAGS = -I/usr/include/s390x-linux-gnu/curl
-CURL_LDLIBS = -lcurl
-endif
 ALL_CPPFLAGS += -DSYSFS
 ALL_CFLAGS += -DHAVE_SETXATTR -pthread $(FUSE_CFLAGS) $(CURL_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) $(CURL_LDLIBS) -lpthread -lrt -lm

@@ -16,13 +16,8 @@ check_dep:
 
 BUILDTARGET = check_dep
 
-ifneq ($(shell sh -c 'command -v pkg-config'),)
 CURL_CFLAGS = $(shell pkg-config --silence-errors --cflags libcurl)
 CURL_LDLIBS = $(shell pkg-config --silence-errors --libs libcurl)
-else
-CURL_CFLAGS = -I/usr/include/s390x-linux-gnu/curl
-CURL_LDLIBS = -lcurl
-endif # shell
 
 endif # HAVE_CURL
 

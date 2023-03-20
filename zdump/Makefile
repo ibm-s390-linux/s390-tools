@@ -79,17 +79,10 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  ngdump.o dt_ngdump.o dfi_ngdump.o dfi_vmdump.o \
 	  pv_utils.o
 
-ifneq ($(shell sh -c 'command -v pkg-config'),)
 GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
 GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
 LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
 LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
-else
-GLIB2_CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
-GLIB2_LIBS := -lglib-2.0
-LIBCRYPTO_CFLAGS :=
-LIBCRYPTO_LIBS := -lcrypto
-endif
 
 LIBPV = $(rootdir)/libpv/libpv.a
 LIBPV_CFLAGS := -DOPENSSL_API_COMPAT=0x10100000L \
@@ -101,12 +94,9 @@ LIBPV_LIBS := $(GLIB2_LIBS) $(LIBCRYPTO_LIBS)
 ifeq ("$(HAVE_FUSE)","0")
 FUSE_CFLAGS = -DHAVE_FUSE=0 -D_FILE_OFFSET_BITS=64
 FUSE_LDLIBS =
-else ifneq ($(shell sh -c 'command -v pkg-config'),)
+else
 FUSE_CFLAGS = -DHAVE_FUSE=1 $(shell pkg-config --silence-errors --cflags fuse3)
 FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
-else
-FUSE_CFLAGS = -DHAVE_FUSE=1 -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse3
-FUSE_LDLIBS = -lfuse3
 endif
 LDLIBS += -lz $(FUSE_LDLIBS) $(LIBPV_LIBS)
 ALL_CFLAGS += $(FUSE_CFLAGS) $(LIBPV_CFLAGS)

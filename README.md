@@ -325,8 +325,8 @@ This table lists additional build or install options:
 | initramfs-tools  | `HAVE_INITRAMFS`             | zdev, zipl               |
 |                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev                     |
 
-The s390-tools build process uses "pkg-config" if available and hard-coded
-compiler and linker options otherwise.
+The s390-tools build process uses "pkg-config" and therefore it must be
+available.
 
 Build and runtime requirements for specific tools
 -------------------------------------------------

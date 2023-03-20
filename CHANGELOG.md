@@ -10,6 +10,7 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
   - dbginfo.sh: rework crypto data collection
   - dbginfo.sh: add nstat for network and SNMP stats
+  - `pkg-config` is now mandatory for the build process
 
   Bug Fixes:
 

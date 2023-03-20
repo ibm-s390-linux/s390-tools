@@ -5,21 +5,12 @@ include ../common.mak
 
 LIB := libpv.a
 
-ifneq ($(shell sh -c 'command -v pkg-config'),)
 GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
 GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
 LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
 LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
 LIBCURL_CFLAGS := $(shell pkg-config --silence-errors --cflags libcurl)
 LIBCURL_LIBS := $(shell pkg-config --silence-errors --libs libcurl)
-else
-GLIB2_CFLAGS := -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
-GLIB2_LIBS := -lglib-2.0
-LIBCRYPTO_CFLAGS :=
-LIBCRYPTO_LIBS := -lcrypto
-LIBCURL_CFLAGS := -I/usr/include/s390x-linux-gnu
-LIBCURL_LIBS := -lcurl
-endif
 LDLIBS += $(GLIB2_LIBS) $(LIBCRYPTO_LIBS) $(LIBCURL_LIBS)
 
 WARNINGS := -Wall -Wextra -Wshadow \
