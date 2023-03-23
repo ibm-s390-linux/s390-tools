@@ -9,7 +9,7 @@
 # 95zdev-kdump/module_setup.sh
 #   This module installs configuration files (udev rules and modprobe.conf
 #   files) required to enable the kdump target on s390. In addition,
-#   a hook is installed to parse rd.zfcp= kernel parameters.
+#   hooks are installed to parse rd.zfcp= and rd.dasd= kernel parameters.
 #
 
 # called by dracut
@@ -71,6 +71,12 @@ install() {
 
     # Hook to parse zfcp dracut cmdline parameter
     inst_hook cmdline 95 "$moddir/../95zdev/parse-zfcp.sh"
+    # Hook to parse dasd dracut cmdline parameter
+    #  Must be the first one to use chzdev so dasd_mod is not yet loaded.
+    inst_hook cmdline 94 "$moddir/../95zdev/parse-dasd.sh"
+    inst_multiple /lib/s390-tools/zdev-from-dasd_mod.dasd
+
+    inst_rules "59-dasd.rules"
 
     # Obtain kdump target device configuration
 

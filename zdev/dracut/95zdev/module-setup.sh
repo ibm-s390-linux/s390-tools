@@ -10,7 +10,8 @@
 #   This module installs configuration files (udev rules and modprobe.conf
 #   files) required to enable the root device on s390. It will only work when
 #   the root device was configured using the chzdev tool. In addition,
-#   hooks are installed to parse rd.zdev= and rd.zfcp= kernel parameters.
+#   hooks are installed to parse rd.zdev= and rd.zfcp= and rd.dasd=
+#   kernel parameters.
 #
 
 # called by dracut
@@ -76,9 +77,15 @@ install() {
     inst_hook cmdline 95 "$moddir/parse-zdev.sh"
     # Hook to parse zfcp dracut cmdline parameter
     inst_hook cmdline 95 "$moddir/parse-zfcp.sh"
+    # Hook to parse dasd dracut cmdline parameter
+    #  Must be the first one to use chzdev so dasd_mod is not yet loaded.
+    inst_hook cmdline 94 "$moddir/parse-dasd.sh"
+    inst_multiple /lib/s390-tools/zdev-from-dasd_mod.dasd
 
     # Rule to automatically enable devices when running in DPM
     inst_rules "81-dpm.rules"
+
+    inst_rules "59-dasd.rules"
 
     # Obtain early + root device configuration
 

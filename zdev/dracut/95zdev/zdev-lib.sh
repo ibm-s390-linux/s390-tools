@@ -37,15 +37,16 @@ zdev_zfcp_auto_lun_scan_active() {
     return 1
 }
 
-# zdev_check_dev() can be extended for other device types such as DASD or PCIe
+# zdev_check_dev() can be extended for other device types such as PCIe
 zdev_check_dev() {
     local _dev=$1
     local _devsysfs _devtype _subsystem _driver
     local _intlun _fcplun _scsitarget _wwpn _hbaid
+    local _busid _arg
     _devsysfs=$(
         cd -P /sys/dev/block/"$_dev" 2> /dev/null && echo "$PWD"
              )
-    # This is roughly what systemd's udev-builtin-path_id does for zfcp:
+    # This is roughly what systemd's udev-builtin-path_id does:
     while [[ -n "$_devsysfs" ]]; do
         # ascend to parent: strip last path part
         _devsysfs=${_devsysfs%/*}
@@ -95,6 +96,13 @@ zdev_check_dev() {
                 else
                     printf " rd.zfcp=%s\n" "$_hbaid"
                 fi
+                break
+            fi
+            # check for DASD device bus-ID
+            if [[ "${_driver##*/}" == dasd-* ]]; then
+                _busid=${_devsysfs##*/}
+                _arg=$(/lib/s390-tools/zdev-to-dasd_mod.dasd "active" "$_busid")
+                printf " rd.dasd=%s\n" "$_arg"
                 break
             fi
         fi
