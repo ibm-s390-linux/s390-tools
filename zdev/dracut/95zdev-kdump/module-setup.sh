@@ -22,7 +22,7 @@ check() {
     source "${moddir:?}/../95zdev/zdev-lib.sh"
 
     # Ensure this module is only included when building kdump initrd
-    is_kdump || return 1
+    zdev_is_kdump || return 1
 
     # Ensure that required tools are available
     require_binaries chzdev || return 1

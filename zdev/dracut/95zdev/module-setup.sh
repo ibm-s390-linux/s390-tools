@@ -25,7 +25,7 @@ check() {
 
     # Leave kdump device configuration to module zdev-kdump to
     # ensure a minimal device footprint
-    is_kdump && return 1
+    zdev_is_kdump && return 1
 
     # Ensure that required tools are available
     require_binaries chzdev lszdev /lib/s390-tools/zdev_id || return 1
