@@ -10,7 +10,7 @@
 #
 # shellcheck shell=bash
 
-is_kdump() {
+zdev_is_kdump() {
     # https://src.fedoraproject.org/rpms/kexec-tools/c/4eedcae5e1540690a3761857fe2e692774c44960
     # https://src.fedoraproject.org/rpms/kexec-tools/blob/rawhide/f/mkdumprd
     # https://src.fedoraproject.org/rpms/kexec-tools/blob/rawhide/f/dracut-module-setup.sh
