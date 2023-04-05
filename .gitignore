@@ -9,6 +9,9 @@
 tags
 TAGS
 
+# clangd cache (https://clangd.llvm.org/design/indexing#backgroundindex)
+.cache/
+
 # Ignore coverage data
 *.gcda
 *.gcno
