@@ -229,7 +229,7 @@ static void tr_static_init(void)
     /* The static distance tree is trivial: */
     for (n = 0; n < D_CODES; n++) {
         static_dtree[n].Len = 5;
-        static_dtree[n].Code = bitrev32((u32)n) >> (32 - 5);
+        static_dtree[n].Code = bi_reverse((unsigned)n, 5);
     }
     static_init_done = 1;
 }
@@ -465,7 +465,7 @@ static void gen_codes(
         int len = tree[n].Len;
         if (len == 0) continue;
         /* Now reverse the bits */
-        tree[n].Code = bitrev32((u32)(next_code[len]++)) >> (32 - len);
+        tree[n].Code = (ush)bi_reverse(next_code[len]++, len);
 
         Tracecv(tree != static_ltree, (stderr,"\nn %3d %c l %2d c %4x (%x) ",
              n, (isgraph(n) ? n : ' '), len, tree[n].Code, next_code[len]-1));

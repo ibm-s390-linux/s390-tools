@@ -15,7 +15,7 @@ char *oesc_msg(
 #ifdef STATIC
         return NULL; /* Ignore for pre-boot decompressor */
 #else
-        sprintf(buf, "Operation-Ending-Supplemental Code is 0x%.2X", oesc);
+        snprintf(buf, 64, "Operation-Ending-Supplemental Code is 0x%.2X", oesc);
         return buf;
 #endif
     }

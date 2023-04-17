@@ -17,11 +17,6 @@ int dfltcc_can_deflate(
     deflate_state *state = (deflate_state *)strm->state;
     struct dfltcc_deflate_state *dfltcc_state = GET_DFLTCC_DEFLATE_STATE(state);
 
-    /* Check for kernel dfltcc command line parameter */
-    if (zlib_dfltcc_support == ZLIB_DFLTCC_DISABLED ||
-            zlib_dfltcc_support == ZLIB_DFLTCC_INFLATE_ONLY)
-        return 0;
-
     /* Unsupported compression settings */
     if (!dfltcc_are_params_ok(state->level, state->w_bits, state->strategy,
                               dfltcc_state->level_mask))
@@ -35,7 +30,6 @@ int dfltcc_can_deflate(
 
     return 1;
 }
-EXPORT_SYMBOL(dfltcc_can_deflate);
 
 void dfltcc_reset_deflate_state(z_streamp strm) {
     deflate_state *state = (deflate_state *)strm->state;
@@ -44,15 +38,11 @@ void dfltcc_reset_deflate_state(z_streamp strm) {
     dfltcc_reset_state(&dfltcc_state->common);
 
     /* Initialize tuning parameters */
-    if (zlib_dfltcc_support == ZLIB_DFLTCC_FULL_DEBUG)
-        dfltcc_state->level_mask = DFLTCC_LEVEL_MASK_DEBUG;
-    else
-        dfltcc_state->level_mask = DFLTCC_LEVEL_MASK;
+    dfltcc_state->level_mask = DFLTCC_LEVEL_MASK;
     dfltcc_state->block_size = DFLTCC_BLOCK_SIZE;
     dfltcc_state->block_threshold = DFLTCC_FIRST_FHT_BLOCK_SIZE;
     dfltcc_state->dht_threshold = DFLTCC_DHT_MIN_SAMPLE_SIZE;
 }
-EXPORT_SYMBOL(dfltcc_reset_deflate_state);
 
 static void dfltcc_gdht(
     z_streamp strm
@@ -308,4 +298,3 @@ again:
         goto again; /* deflate() must use all input or all output */
     return 1;
 }
-EXPORT_SYMBOL(dfltcc_deflate);

@@ -4,6 +4,7 @@
 
 #include "defutil.h"
 #include <stdint.h>
+#include <assert.h>
 
 /*
  * Tuning parameters.
@@ -114,8 +115,7 @@ void dfltcc_reset_state(struct dfltcc_state *dfltcc_state);
 
 static inline int is_dfltcc_enabled(void)
 {
-return (zlib_dfltcc_support != ZLIB_DFLTCC_DISABLED &&
-        test_facility(DFLTCC_FACILITY));
+    return 1;	/* Consider DFLTCC facility always enabled */
 }
 
 #define DEFLATE_DFLTCC_ENABLED() is_dfltcc_enabled()

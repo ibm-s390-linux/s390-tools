@@ -1136,8 +1136,8 @@ int zlib_deflate_workspacesize(int windowBits, int memLevel)
         windowBits = -windowBits;
 
     /* Since the return value is typically passed to vmalloc() unchecked... */
-    BUG_ON(memLevel < 1 || memLevel > MAX_MEM_LEVEL || windowBits < 9 ||
-							windowBits > 15);
+    if (memLevel < 1 || memLevel > MAX_MEM_LEVEL || windowBits < 9 || windowBits > 15)
+	return 0;
 
     return sizeof(deflate_workspace)
         + zlib_deflate_window_memsize(windowBits)

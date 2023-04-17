@@ -2,6 +2,7 @@
 #define DEFUTIL_H
 
 #include "zlib/zutil.h"
+#include "../libc.h"
 
 #define Assert(err, str) 
 #define Trace(dummy) 
@@ -9,7 +10,9 @@
 #define Tracecv(err, dummy) 
 #define Tracevv(dummy) 
 
-
+#define PAGE_SIZE		4096
+#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
+#define max(a, b)		MAX(a, b)
 
 #define LENGTH_CODES 29
 /* number of length codes, not counting the special END_BLOCK code */
