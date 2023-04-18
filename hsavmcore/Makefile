@@ -22,16 +22,16 @@ else # HAVE_FUSE
 #
 # FUSE
 #
-FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
+FUSE_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs fuse3)
 
 #
 # systemd
 #
 ifneq (${HAVE_SYSTEMD},0)
   ifeq ($(call check_header_prereq,"systemd/sd-daemon.h"),yes)
-    SYSTEMD_CFLAGS = $(shell pkg-config --silence-errors --cflags libsystemd)
-    SYSTEMD_LDLIBS = $(shell pkg-config --silence-errors --libs libsystemd)
+    SYSTEMD_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags libsystemd)
+    SYSTEMD_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs libsystemd)
     ALL_CPPFLAGS += -DHAVE_SYSTEMD
   else
     $(warning "systemd support disabled")

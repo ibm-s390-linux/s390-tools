@@ -16,8 +16,8 @@ check_dep:
 
 BUILDTARGET = check_dep
 
-CURL_CFLAGS = $(shell pkg-config --silence-errors --cflags libcurl)
-CURL_LDLIBS = $(shell pkg-config --silence-errors --libs libcurl)
+CURL_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
+CURL_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
 
 endif # HAVE_CURL
 

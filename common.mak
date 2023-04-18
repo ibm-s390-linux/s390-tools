@@ -87,6 +87,8 @@ $(eval $(call cmd_define,   GZIP,"  GZIP    ",gzip))
 $(eval $(call cmd_define,     MV,"  MV      ",mv))
 $(eval $(call cmd_define,  PERLC,"  PERLC   ",perl -c))
 
+PKG_CONFIG = pkg-config
+
 CHECK           = sparse
 CHECK_SILENT   := $(CHECK)
 CHECKTOOL       = $(call echocmd,"  CHECK   ",/$@)$(CHECK_SILENT)

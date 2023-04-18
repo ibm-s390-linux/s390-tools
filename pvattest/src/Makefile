@@ -28,12 +28,12 @@ $(BIN_PROGRAM)_SRCS := \
 
 $(BIN_PROGRAM)_OBJS := $($(BIN_PROGRAM)_SRCS:.c=.o)
 
-GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
-GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
-LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
-LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
-LIBCURL_CFLAGS := $(shell pkg-config --silence-errors --cflags libcurl)
-LIBCURL_LIBS := $(shell pkg-config --silence-errors --libs libcurl)
+GLIB2_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags glib-2.0)
+GLIB2_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs glib-2.0)
+LIBCRYPTO_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcrypto)
+LIBCRYPTO_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
+LIBCURL_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
+LIBCURL_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
 
 ALL_CFLAGS += -std=gnu11 \
 	      -DPKGDATADIR=$(PKGDATADIR) \

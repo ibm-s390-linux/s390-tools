@@ -36,12 +36,12 @@ ALL_CPPFLAGS += $(INCLUDE_PARMS)
 LDLIBS += $(GLIB2_LIBS) $(LIBCRYPTO_LIBS) $(LIBCURL_LIBS)
 
 
-GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
-GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
-LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
-LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
-LIBCURL_CFLAGS := $(shell pkg-config --silence-errors --cflags libcurl)
-LIBCURL_LIBS := $(shell pkg-config --silence-errors --libs libcurl)
+GLIB2_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags glib-2.0)
+GLIB2_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs glib-2.0)
+LIBCRYPTO_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcrypto)
+LIBCRYPTO_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
+LIBCURL_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
+LIBCURL_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
 
 BUILD_TARGETS := skip-$(bin_PROGRAM)
 INSTALL_TARGETS := skip-$(bin_PROGRAM)

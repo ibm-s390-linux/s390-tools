@@ -19,8 +19,8 @@ check_dep:
 		"fuse3-devel or libfuse3-dev", \
 		"HAVE_FUSE=0")
 
-FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
+FUSE_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs fuse3)
 ALL_CFLAGS += -DFUSE_USE_VERSION=30 -D_LARGEFILE_SOURCE $(FUSE_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) -lpthread -lrt -ldl -lm
 

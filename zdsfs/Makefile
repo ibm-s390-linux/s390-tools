@@ -39,10 +39,10 @@ check_dep:
 		"curl-devel or libcurl-dev", \
 		"HAVE_CURL=0")
 
-FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
-CURL_CFLAGS = $(shell pkg-config --silence-errors --cflags libcurl)
-CURL_LDLIBS = $(shell pkg-config --silence-errors --libs libcurl)
+FUSE_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs fuse3)
+CURL_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
+CURL_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
 ALL_CPPFLAGS += -DSYSFS
 ALL_CFLAGS += -DHAVE_SETXATTR -pthread $(FUSE_CFLAGS) $(CURL_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) $(CURL_LDLIBS) -lpthread -lrt -lm

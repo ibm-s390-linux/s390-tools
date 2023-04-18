@@ -79,10 +79,10 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  ngdump.o dt_ngdump.o dfi_ngdump.o dfi_vmdump.o \
 	  pv_utils.o
 
-GLIB2_CFLAGS := $(shell pkg-config --silence-errors --cflags glib-2.0)
-GLIB2_LIBS := $(shell pkg-config --silence-errors --libs glib-2.0)
-LIBCRYPTO_CFLAGS := $(shell pkg-config --silence-errors --cflags libcrypto)
-LIBCRYPTO_LIBS := $(shell pkg-config --silence-errors --libs libcrypto)
+GLIB2_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags glib-2.0)
+GLIB2_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs glib-2.0)
+LIBCRYPTO_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcrypto)
+LIBCRYPTO_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
 
 LIBPV = $(rootdir)/libpv/libpv.a
 LIBPV_CFLAGS := -DOPENSSL_API_COMPAT=0x10100000L \
@@ -95,8 +95,8 @@ ifeq ("$(HAVE_FUSE)","0")
 FUSE_CFLAGS = -DHAVE_FUSE=0 -D_FILE_OFFSET_BITS=64
 FUSE_LDLIBS =
 else
-FUSE_CFLAGS = -DHAVE_FUSE=1 $(shell pkg-config --silence-errors --cflags fuse3)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
+FUSE_CFLAGS = -DHAVE_FUSE=1 $(shell $(PKG_CONFIG) --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs fuse3)
 endif
 LDLIBS += -lz $(FUSE_LDLIBS) $(LIBPV_LIBS)
 ALL_CFLAGS += $(FUSE_CFLAGS) $(LIBPV_CFLAGS)

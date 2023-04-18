@@ -22,8 +22,8 @@ check_dep:
 
 all: check_dep cmsfs-fuse
 
-FUSE_CFLAGS = $(shell pkg-config --silence-errors --cflags fuse3)
-FUSE_LDLIBS = $(shell pkg-config --silence-errors --libs fuse3)
+FUSE_CFLAGS = $(shell $(PKG_CONFIG) --silence-errors --cflags fuse3)
+FUSE_LDLIBS = $(shell $(PKG_CONFIG) --silence-errors --libs fuse3)
 ALL_CFLAGS += -DHAVE_SETXATTR $(FUSE_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) -lm
 
