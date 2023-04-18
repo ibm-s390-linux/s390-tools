@@ -543,13 +543,6 @@ check_remaining_filesize(size_t filesize, size_t signature_size,
 	}
 }
 
-static int is_last_table(struct install_set *bis, int table_id)
-{
-	assert(bis->nr_tables > 0 && bis->nr_tables <= NR_PROGRAM_TABLES);
-
-	return table_id == bis->nr_tables - 1;
-}
-
 static int add_ipl_program(struct install_set *bis, char *filename,
 		bool add_envblk, struct job_envblk_data *envblk,
 		struct job_ipl_data *ipl, disk_blockptr_t *program,
@@ -1010,6 +1003,7 @@ static int add_dump_program(struct install_set *bis, struct job_dump_data *dump,
 /**
  * Build a program table from job data and set pointer to program table
  * block upon success
+ * PROGRAM_TABLE_ID: offset of the program table in the array (@bis->tables)
  */
 static int build_program_table(struct job_data *job,
 			       struct install_set *bis, int program_table_id)
@@ -1429,20 +1423,6 @@ check_dump_device(const struct job_data *job, const struct disk_info *info,
 }
 
 /**
- * Set actual number of "similar" program tables to be installed
- */
-static void set_nr_tables(struct job_data *job, struct install_set *bis)
-{
-	assert(bis->nr_tables == 0);
-
-	if (bis->info->type == disk_type_eckd_cdl &&
-	    (job->id == job_ipl || job->id == job_menu))
-		bis->nr_tables = NR_PROGRAM_TABLES;
-	else
-		bis->nr_tables = 1;
-}
-
-/**
  * Prepare resources to build a program table
  */
 static int prepare_build_program_table_device(struct job_data *job,
@@ -1519,19 +1499,26 @@ static int prepare_build_program_table_device(struct job_data *job,
 			   bis->filename);
 		return -1;
 	}
-	set_nr_tables(job, bis);
 	return 0;
 }
 
-static int bootmap_create_device(struct job_data *job, struct install_set *bis,
-				 int program_table_id)
+/**
+ * Called when making a dump on a raw SCSI partition
+ */
+static int prepare_bootloader_device(struct job_data *job,
+				     struct install_set *bis)
 {
 	if (prepare_build_program_table_device(job, bis))
 		return -1;
-	if (build_program_table(job, bis, program_table_id))
+	/*
+	 * build a single program table at offset 1,
+	 * see comment before install_bootloader() for details
+	 */
+	bis->print_details = 1;
+	if (build_program_table(job, bis, BLKPTR_FORMAT_ID))
 		return -1;
 	/* Install stage 2 loader to bootmap if necessary */
-	if (bootmap_install_stages(job, bis, program_table_id)) {
+	if (bootmap_install_stages(job, bis, BLKPTR_FORMAT_ID)) {
 		error_text("Could not install loader stages to bootmap");
 		return -1;
 	}
@@ -1598,7 +1585,6 @@ static int prepare_build_program_table_file(struct job_data *job,
 		error_text("Could not write to file '%s'", bis->filename);
 		return -1;
 	}
-	set_nr_tables(job, bis);
 	return 0;
 }
 
@@ -1623,8 +1609,11 @@ static int finalize_create_file(char *bootmap_dir, struct install_set *bis)
 	return 0;
 }
 
-static int bootmap_create_file(struct job_data *job, char *bootmap_dir,
-			       struct install_set *bis, int program_table_id)
+/*
+ * PROGRAM_TABLE_ID: offset of the program table in the array (@bis->tables)
+ */
+static int bootmap_create_file(struct job_data *job, struct install_set *bis,
+			       char *bootmap_dir, int program_table_id)
 {
 	if (prepare_build_program_table_file(job, bootmap_dir, bis))
 		return -1;
@@ -1636,8 +1625,6 @@ static int bootmap_create_file(struct job_data *job, char *bootmap_dir,
 			   bis->filename);
 		return -1;
 	}
-	if (!dry_run && is_last_table(bis, program_table_id))
-		return finalize_create_file(bootmap_dir, bis);
 	return 0;
 }
 
@@ -1675,14 +1662,13 @@ ngdump_create_meta(const char *path)
 	return 0;
 }
 
-static int bootmap_create_device_ngdump(struct job_data *job,
-					struct install_set *bis,
-					int program_table_id)
+static int prepare_bootloader_ngdump(struct job_data *job,
+				     struct install_set *bis)
 {
 	struct disk_info *info;
+	char *bootmap_dir;
 	int rc;
 
-	assert(program_table_id == 0);
 	/* Retrieve target device information */
 	if (disk_get_info(job->data.dump.device, &job->target, &info))
 		return -1;
@@ -1735,29 +1721,47 @@ static int bootmap_create_device_ngdump(struct job_data *job,
 		return -1;
 	}
 	bis->dump_mounted = 1;
-	if (bootmap_create_file(job, bis->dump_mount_point,
-				bis, program_table_id))
+	bootmap_dir = bis->dump_mount_point;
+	/*
+	 * Build a single program table for List-Directed IPL
+	 * See comments before install_bootloader() for details
+	 */
+	bis->print_details = 1;
+	if (bootmap_create_file(job, bis, bootmap_dir, BLKPTR_FORMAT_ID))
 		return -1;
-	if (ngdump_create_meta(bis->dump_mount_point))
+	if (!dry_run && finalize_create_file(bootmap_dir, bis))
 		return -1;
-	return 0;
+	return ngdump_create_meta(bootmap_dir);
 }
 
-
-static int
-bootmap_create(struct job_data *job, struct install_set *bis,
-	       int program_table_id)
+/**
+ * Build one or two program tables for CCW-type and(or) for List-Direceted IPL
+ * at respective offsets in the array BIS->tables. See the comment before
+ * install_bootloader() for details
+ */
+static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 {
-	if (job->id == job_dump_partition) {
-		if (is_ngdump_enabled(job->data.dump.device, &job->target))
-			return bootmap_create_device_ngdump(job, bis,
-							    program_table_id);
-		else
-			return bootmap_create_device(job, bis,
-						     program_table_id);
-	} else
-		return bootmap_create_file(job, job->target.bootmap_dir,
-					   bis, program_table_id);
+	char *bootmap_dir = job->target.bootmap_dir;
+
+	/*
+	 * Build a program table for List-Directed IPL from
+	 * SCSI or ECKD DASD
+	 */
+	bis->print_details = 1;
+	if (bootmap_create_file(job, bis, bootmap_dir, BLKPTR_FORMAT_ID))
+		return -1;
+	if (bis->info->type == disk_type_scsi)
+		/* only one table to be installed per device */
+		return dry_run ? 0 : finalize_create_file(bootmap_dir, bis);
+	/*
+	 * Build one more program table for CCW-type IPL from
+	 * ECKD DASD
+	 */
+	bis->skip_prepare = 1;
+	bis->print_details = 0;
+	if (bootmap_create_file(job, bis, bootmap_dir, LEGACY_BLKPTR_FORMAT_ID))
+		return -1;
+	return dry_run ? 0 : finalize_create_file(bootmap_dir, bis);
 }
 
 /**
@@ -1791,22 +1795,19 @@ static int init_bis(struct job_data *job, struct install_set *bis)
  */
 int prepare_bootloader(struct job_data *job, struct install_set *bis)
 {
-	int i;
-	int rc;
-
 	secure_boot_supported = check_secure_boot_support();
 
-	rc = init_bis(job, bis);
-	if (rc)
-		return rc;
-	for (i = 0;; i++) {
-		bis->skip_prepare = i > 0;
-		bis->print_details = i > 0 ? is_last_table(bis, i) : 0;
-		rc = bootmap_create(job, bis, i);
-		if (rc || is_last_table(bis, i))
-			break;
+	if (init_bis(job, bis))
+		return -1;
+	if (job->id == job_dump_partition) {
+		if (is_ngdump_enabled(job->data.dump.device, &job->target))
+			return prepare_bootloader_ngdump(job, bis);
+		else
+			return prepare_bootloader_device(job, bis);
+	} else {
+		return prepare_bootloader_ipl(job, bis);
 	}
-	return rc;
+	return -1;
 }
 
 /**

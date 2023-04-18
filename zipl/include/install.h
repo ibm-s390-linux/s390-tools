@@ -61,7 +61,6 @@ struct program_table {
 struct install_set {
 	struct program_table tables[NR_PROGRAM_TABLES];
 	struct program_component *components[NR_PROGRAM_COMPONENTS];
-	int nr_tables; /* number of "similar" program tables to be installed */
 	int nr_menu_entries;
 	int fd;
 	char *device;

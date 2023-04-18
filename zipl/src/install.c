@@ -335,6 +335,7 @@ int install_bootloader_ipl(struct program_table *tables,
 	switch (info->type) {
 	case disk_type_scsi:
 		/* List-Directed IPL */
+		pt = &tables[BLKPTR_FORMAT_ID];
 		rc = install_scsi(fd, &pt->table, info, NULL);
 		break;
 	case disk_type_fba:
@@ -368,7 +369,7 @@ int install_bootloader_ipl(struct program_table *tables,
 	return rc;
 }
 
-/*
+/**
  * Install a program table for List-Directed dump
  * See the comment before install_bootloader() for details
  */
@@ -402,18 +403,13 @@ static int install_bootloader_dump(struct program_table *tables,
  * Install a "compatible" boot record referring one, or two "similar"
  * program tables.
  *
- * The picture below shows which program table is used for IPL
- * of specified type from disk of specified type.
- * E.g. program table "0" is used for CCW-type IPL from ECKD DASD,
- * LD-IPL from DASD FBA is unsupported (respectively, only one program
- * table "0" is used), etc.
- *
- *                            CCW-IPL   LD-IPL
- *
- * SCSI                          X        0
- * DASD FBA                      0        X
- * ECKD DASD LDL                 0        X
- * ECKD DASD CDL                 0        1
+ * For compatibility reasons zIPL installs multiple "similar"
+ * program tables which differ only in block pointers format.
+ * Each such table is identified by an offset in the array BIS->tables
+ * of in-memory program table representations built by prepare_bootloader().
+ * The common rule is that tables built for CCW-type IPL are placed
+ * at offset 0, and tables built for List-Directed IPL are placed at
+ * offset 1. The same works for dumps.
  */
 int install_bootloader(struct job_data *job, struct install_set *bis)
 {
