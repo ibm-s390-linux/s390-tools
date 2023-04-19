@@ -460,7 +460,7 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 	if (job->id == job_dump_partition) {
 		rc = install_bootloader_dump(bis->tables, info,
 					     scsi_dump_sb_blockptr,
-					     is_ngdump_enabled(job->data.dump.device, &job->target),
+					     is_ngdump_enabled(job),
 					     fd);
 	} else {
 		rc = install_bootloader_ipl(bis->tables, info, fd);

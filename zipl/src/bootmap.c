@@ -1800,7 +1800,7 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 	if (init_bis(job, bis))
 		return -1;
 	if (job->id == job_dump_partition) {
-		if (is_ngdump_enabled(job->data.dump.device, &job->target))
+		if (is_ngdump_enabled(job))
 			return prepare_bootloader_ngdump(job, bis);
 		else
 			return prepare_bootloader_device(job, bis);

@@ -2020,7 +2020,7 @@ job_get(int argc, char* argv[], struct job_data** data)
 }
 
 bool
-is_ngdump_enabled(const char* device, struct job_target_data* target)
+is_ngdump_enabled(struct job_data *job)
 {
-	return disk_is_nvme(device, target);
+	return disk_is_nvme(job->data.dump.device, &job->target);
 }
