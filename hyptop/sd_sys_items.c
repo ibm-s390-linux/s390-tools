@@ -208,6 +208,18 @@ static s64 l_sys_cpu_info_diff_s64(struct sd_sys_item *item, struct sd_sys *sys)
 	return rc;
 }
 
+static u64 l_sys_smt_util(struct sd_sys_item *item, struct sd_sys *sys)
+{
+	u64 core_us, thr_us, mgm_us;
+	(void)item;
+
+	core_us = sd_sys_item_u64(sys, &sd_sys_item_core_diff);
+	thr_us = sd_sys_item_u64(sys, &sd_sys_item_thread_diff);
+	mgm_us = sd_sys_item_u64(sys, &sd_sys_item_mgm_diff);
+
+	return ht_calculate_smt_util(core_us, thr_us, mgm_us, sys->threads_per_core);
+}
+
 /*
  * System item definitions
  */
@@ -275,6 +287,13 @@ struct sd_sys_item sd_sys_item_thread_diff = {
 	.type	= SD_TYPE_U64,
 	.desc	= "Thread time per second",
 	.fn_u64	= l_sys_cpu_info_diff_u64,
+};
+
+struct sd_sys_item sd_sys_item_smt_diff = {
+	.table_col = TABLE_COL_TIME_DIFF_SUM(table_col_unit_perc, 'S', "smt"),
+	.type	= SD_TYPE_U64,
+	.desc	= "Real CPU SMT utilization",
+	.fn_u64	= l_sys_smt_util,
 };
 
 struct sd_sys_item sd_sys_item_mgm_diff = {

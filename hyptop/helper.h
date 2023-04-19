@@ -21,6 +21,7 @@
 #include "lib/zt_common.h"
 
 #define G0(x) MAX(0, (s64) (x))
+#define SMT_FACTOR_DEFAULT 1.3
 
 /*
  * Helper Prototypes
@@ -34,6 +35,7 @@ extern void ht_ebcdic_to_ascii(char *in, char *out, size_t len);
 extern char *ht_mount_point_get(const char *fs_type);
 extern u64 ht_ext_tod_2_us(void *tod_ext);
 extern void ht_print_time(void);
+extern s64 ht_calculate_smt_util(u64 core_us, u64 thr_us, u64 mgm_us, int thread_per_core);
 
 /*
  * Memory alloc functions

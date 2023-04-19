@@ -200,6 +200,7 @@ struct sd_cpu {
 	struct sd_cpu_info	*d_cur;
 	struct sd_cpu_info	*d_prev;
 	u16			cnt;
+	int			threads_per_core;
 	enum sd_cpu_state	state;
 };
 
@@ -230,6 +231,11 @@ static inline void sd_cpu_state_set(struct sd_cpu *cpu, enum sd_cpu_state state)
 static inline void sd_cpu_cpu_time_us_set(struct sd_cpu *cpu, u64 value)
 {
 	cpu->d_cur->cpu_time_us = value;
+}
+
+static inline void sd_cpu_threads_per_core_set(struct sd_cpu *cpu, int value)
+{
+	cpu->threads_per_core = value;
 }
 
 static inline void sd_cpu_thread_time_us_set(struct sd_cpu *cpu, u64 value)
@@ -335,6 +341,7 @@ extern struct sd_cpu_item sd_cpu_item_state;
 extern struct sd_cpu_item sd_cpu_item_cpu_diff;
 extern struct sd_cpu_item sd_cpu_item_core_diff;
 extern struct sd_cpu_item sd_cpu_item_thread_diff;
+extern struct sd_cpu_item sd_cpu_item_smt_diff;
 extern struct sd_cpu_item sd_cpu_item_mgm_diff;
 extern struct sd_cpu_item sd_cpu_item_wait_diff;
 extern struct sd_cpu_item sd_cpu_item_steal_diff;
@@ -398,6 +405,7 @@ static inline char *sd_sys_item_str(struct sd_sys *sys,
 extern struct sd_sys_item sd_sys_item_cpu_cnt;
 extern struct sd_sys_item sd_sys_item_core_cnt;
 extern struct sd_sys_item sd_sys_item_thread_cnt;
+extern struct sd_sys_item sd_sys_item_smt_diff;
 extern struct sd_sys_item sd_sys_item_cpu_oper_cnt;
 extern struct sd_sys_item sd_sys_item_cpu_deconf_cnt;
 extern struct sd_sys_item sd_sys_item_cpu_stop_cnt;

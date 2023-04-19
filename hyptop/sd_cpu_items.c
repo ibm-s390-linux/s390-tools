@@ -98,6 +98,18 @@ static u64 l_cpu_item_64(struct sd_cpu_item *item, struct sd_cpu *cpu)
 		return l_cpu_info_u64(cpu->d_cur, item->offset) / cpu->cnt;
 }
 
+static u64 l_cpu_smt_util(struct sd_cpu_item *item, struct sd_cpu *cpu)
+{
+	u64 core_us, thr_us, mgm_us;
+	(void)item;
+
+	core_us = sd_cpu_item_u64(&sd_cpu_item_core_diff, cpu);
+	thr_us = sd_cpu_item_u64(&sd_cpu_item_thread_diff, cpu);
+	mgm_us = sd_cpu_item_u64(&sd_cpu_item_mgm_diff, cpu);
+
+	return ht_calculate_smt_util(core_us, thr_us, mgm_us, cpu->threads_per_core);
+}
+
 /*
  * CPU item definitions
  */
@@ -137,6 +149,13 @@ struct sd_cpu_item sd_cpu_item_thread_diff = {
 	.offset = SD_CPU_INFO_OFFSET(thread_time_us),
 	.desc	= "Thread time per second",
 	.fn_u64	= l_cpu_diff_u64,
+};
+
+struct sd_cpu_item sd_cpu_item_smt_diff = {
+	.table_col = TABLE_COL_TIME_DIFF_SUM(table_col_unit_perc, 'S', "smt"),
+	.type	= SD_TYPE_U64,
+	.desc	= "Real CPU SMT utilization",
+	.fn_u64	= l_cpu_smt_util,
 };
 
 struct sd_cpu_item sd_cpu_item_mgm_diff = {

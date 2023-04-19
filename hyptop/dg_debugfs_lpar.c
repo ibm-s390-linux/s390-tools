@@ -116,6 +116,7 @@ static void l_sd_cpu_fill(struct sd_cpu *cpu, struct l_x_cpu_info *cpu_info,
 			  int threads)
 {
 	sd_cpu_cpu_time_us_set(cpu, cpu_info->lp_time);
+	sd_cpu_threads_per_core_set(cpu, threads);
 	if (threads > 1)
 		sd_cpu_thread_time_us_set(cpu,
 			cpu_info->lp_time * threads - cpu_info->mt_idle_time);
@@ -297,6 +298,7 @@ static struct sd_sys_item *l_sys_item_vec[] = {
 	&sd_sys_item_thread_cnt,
 	&sd_sys_item_core_diff,
 	&sd_sys_item_thread_diff,
+	&sd_sys_item_smt_diff,
 	&sd_sys_item_mgm_diff,
 	&sd_sys_item_core,
 	&sd_sys_item_thread,
@@ -326,6 +328,7 @@ static struct sd_cpu_item *l_cpu_item_vec[] = {
 	&sd_cpu_item_type,
 	&sd_cpu_item_core_diff,
 	&sd_cpu_item_thread_diff,
+	&sd_cpu_item_smt_diff,
 	&sd_cpu_item_mgm_diff,
 	&sd_cpu_item_core,
 	&sd_cpu_item_thread,

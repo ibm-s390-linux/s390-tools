@@ -391,3 +391,24 @@ void hyptop_helper_init(void)
 	if (l_iconv_ebcdic_ascii == (iconv_t) -1)
 		ERR_EXIT("Could not initialize iconv\n");
 }
+
+/*
+ * Calculate real SMT utilization
+ * @core_us: core utilization in us
+ * @thr_us: thread utilization in us
+ * @mgm_us: management utilization in us
+ * @thread_per_core: SMT thread count per core
+ */
+s64 ht_calculate_smt_util(u64 core_us, u64 thr_us, u64 mgm_us, int thread_per_core)
+{
+	s64 component1, component2, smt_us;
+	double smt_factor = SMT_FACTOR_DEFAULT;
+
+	component1 = G0(thread_per_core * core_us - thr_us);
+	if (thread_per_core > 1)
+		component1 /= smt_factor;
+	component2 = G0(thr_us - core_us);
+	smt_us = component1 + component2 + mgm_us;
+
+	return smt_us;
+}
