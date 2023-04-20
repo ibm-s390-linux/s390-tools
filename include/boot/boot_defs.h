@@ -85,7 +85,8 @@ enum blkptr_format_id {
 	 * this is the "new" format which serves only List-Directed IPL,
 	 * but is also suitable for CCW-type IPL.
 	 */
-	BLKPTR_FORMAT_ID
+	BLKPTR_FORMAT_ID,
+	NR_BLKPTR_FORMATS
 };
 
 /*

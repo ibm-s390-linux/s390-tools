@@ -1200,7 +1200,7 @@ static int install_stages_dasd_fba(int fd, char *filename,
 	void *stage2_data;
 
 	switch (program_table_id) {
-	case PROGRAM_TABLE_0:
+	case LEGACY_BLKPTR_FORMAT_ID:
 		/*
 		 * This program table is used for CCW-type IPL (see comments
 		 * for install_bootloader()).
@@ -1221,7 +1221,7 @@ static int install_stages_dasd_fba(int fd, char *filename,
 			return -1;
 		free(stage2_list);
 		break;
-	case PROGRAM_TABLE_1:
+	case BLKPTR_FORMAT_ID:
 		/*
 		 * This program table is not used when booting from DASD FBA
 		 * (see comments for install_bootloader()
@@ -1249,7 +1249,7 @@ static int install_stages_eckd_dasd(int fd, char *filename,
 	void *stage2b_data;
 
 	switch (program_table_id) {
-	case PROGRAM_TABLE_0:
+	case LEGACY_BLKPTR_FORMAT_ID:
 		/*
 		 * This program table is used for CCW-type IPL.
 		 * Add stage2 loader
@@ -1270,7 +1270,7 @@ static int install_stages_eckd_dasd(int fd, char *filename,
 			return -1;
 		free(stage2b_list);
 		break;
-	case PROGRAM_TABLE_1:
+	case BLKPTR_FORMAT_ID:
 		/*
 		 * This program table is used for List-Directed IPL,
 		 * which doesn't invoke stage2 loader.

@@ -328,7 +328,7 @@ int install_bootloader_ipl(struct program_table *tables,
 			   struct disk_info *info,
 			   int fd)
 {
-	struct program_table *pt = &tables[PROGRAM_TABLE_0];
+	struct program_table *pt = &tables[LEGACY_BLKPTR_FORMAT_ID];
 
 	int rc = -1;
 
@@ -357,7 +357,7 @@ int install_bootloader_ipl(struct program_table *tables,
 		if (rc)
 			break;
 		/* install one more table for List-Directed IPL */
-		pt = &tables[PROGRAM_TABLE_1];
+		pt = &tables[BLKPTR_FORMAT_ID];
 		rc = install_eckd_cdl_ld(fd, pt->stage1b_list, info);
 		break;
 	case disk_type_diag:
@@ -378,7 +378,7 @@ static int install_bootloader_dump(struct program_table *tables,
 				   int ngdump_enabled,
 				   int fd)
 {
-	struct program_table *pt = &tables[PROGRAM_TABLE_1];
+	struct program_table *pt = &tables[BLKPTR_FORMAT_ID];
 	int rc = -1;
 
 	switch (info->type) {

@@ -17,15 +17,7 @@
 #include "zipl.h"
 #include "boot/boot_defs.h"
 
-/*
- * For compatibility reasons zIPL can build multiple "similar"
- * program tables, which differ only in block pointers format
- */
-enum program_table_id {
-	PROGRAM_TABLE_0,
-	PROGRAM_TABLE_1,
-	NR_PROGRAM_TABLES
-};
+#define NR_PROGRAM_TABLES NR_BLKPTR_FORMATS
 
 enum program_component_id {
 	COMPONENT_ID_HEAP_AREA,
