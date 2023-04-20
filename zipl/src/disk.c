@@ -841,7 +841,7 @@ disk_get_type_name(disk_type_t type)
 }
 
 /* Return IPL types supported for a given disk TYPE */
-char *disk_get_ipl_type(disk_type_t type)
+char *disk_get_ipl_type(disk_type_t type, int is_dump)
 {
 	switch (type) {
 	case disk_type_scsi:
@@ -850,7 +850,7 @@ char *disk_get_ipl_type(disk_type_t type)
 	case disk_type_eckd_ldl:
 		return "CCW-";
 	case disk_type_eckd_cdl:
-		return "CCW- and LD-";
+		return is_dump ? "LD-" : "CCW- and LD-";
 	default:
 		return "";
 	}

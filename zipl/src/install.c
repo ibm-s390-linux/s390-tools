@@ -345,8 +345,10 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 	int fd, rc;
 
 	/* Inform user about what we're up to */
-	printf("Preparing boot device for %sIPL: ",
-	       disk_get_ipl_type(info->type));
+	printf("Preparing boot device for %s%s: ",
+	       disk_get_ipl_type(info->type,
+				 job->id == job_dump_partition),
+	       job->id == job_dump_partition ? "dump" : "IPL");
 	if (info->name) {
 		printf("%s", info->name);
 		if (info->devno >= 0)
