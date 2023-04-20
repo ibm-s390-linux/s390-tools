@@ -112,7 +112,7 @@ update_scsi_mbr(void* bootblock, disk_blockptr_t* table,
 	mbr->version_id = DISK_LAYOUT_ID;
 	bootmap_store_blockptr(&mbr->program_table_pointer, table, info,
 			       0 /* this argument is ignored for scsi */);
-	if (scsi_dump_sb_blockptr->linear.block != 0) {
+	if (scsi_dump_sb_blockptr && scsi_dump_sb_blockptr->linear.block != 0) {
 		/* Write dump boot_info */
 		param.block = scsi_dump_sb_blockptr->linear.block *
 			      scsi_dump_sb_blockptr->linear.size;
@@ -319,6 +319,86 @@ static int install_eckd_cdl_ld(int fd, disk_blockptr_t *br,
 }
 
 /**
+ * Install program tables for CCW-type and(or) List-Directed IPL
+ * See the comment before install_bootloader() for details.
+ *
+ * TABLES: array of the program tables to be installed
+ */
+int install_bootloader_ipl(struct program_table *tables,
+			   struct disk_info *info,
+			   int fd)
+{
+	struct program_table *pt = &tables[PROGRAM_TABLE_0];
+
+	int rc = -1;
+
+	switch (info->type) {
+	case disk_type_scsi:
+		/* List-Directed IPL */
+		rc = install_scsi(fd, &pt->table, info, NULL);
+		break;
+	case disk_type_fba:
+		rc = install_fba_ccw(fd,
+				     &pt->table,
+				     pt->stage1b_list,
+				     pt->stage1b_count, info);
+		break;
+	case disk_type_eckd_ldl:
+		rc = install_eckd_ldl_ccw(fd,
+					  &pt->table,
+					  pt->stage1b_list,
+					  pt->stage1b_count, info);
+		break;
+	case disk_type_eckd_cdl:
+		rc = install_eckd_cdl_ccw(fd,
+					  &pt->table,
+					  pt->stage1b_list,
+					  pt->stage1b_count, info);
+		if (rc)
+			break;
+		/* install one more table for List-Directed IPL */
+		pt = &tables[PROGRAM_TABLE_1];
+		rc = install_eckd_cdl_ld(fd, pt->stage1b_list, info);
+		break;
+	case disk_type_diag:
+		error_reason("Inappropriarte device type (%d) for IPL",
+			     info->type);
+		break;
+	}
+	return rc;
+}
+
+/*
+ * Install a program table for List-Directed dump
+ * See the comment before install_bootloader() for details
+ */
+static int install_bootloader_dump(struct program_table *tables,
+				   struct disk_info *info,
+				   disk_blockptr_t *scsi_dump_sb_blockptr,
+				   int ngdump_enabled,
+				   int fd)
+{
+	struct program_table *pt = &tables[PROGRAM_TABLE_1];
+	int rc = -1;
+
+	switch (info->type) {
+	case disk_type_scsi:
+		rc = install_scsi(fd, &pt->table, info, scsi_dump_sb_blockptr);
+		if (rc == 0 && !ngdump_enabled)
+			rc = overwrite_partition_start(fd, info, 0);
+		break;
+	case disk_type_eckd_cdl:
+		rc = install_eckd_cdl_ld(fd, pt->stage1b_list, info);
+		break;
+	default:
+		error_reason("Inappropriarte device type (%d) for List-Directed dump",
+			     info->type);
+		break;
+	}
+	return rc;
+}
+
+/**
  * Install a "compatible" boot record referring one, or two "similar"
  * program tables.
  *
@@ -338,12 +418,12 @@ static int install_eckd_cdl_ld(int fd, disk_blockptr_t *br,
 int install_bootloader(struct job_data *job, struct install_set *bis)
 {
 	disk_blockptr_t *scsi_dump_sb_blockptr = &bis->scsi_dump_sb_blockptr;
-	struct program_table *pt0 = &bis->tables[PROGRAM_TABLE_0];
-	struct program_table *pt1 = &bis->tables[PROGRAM_TABLE_1];
 	struct disk_info *info = bis->info;
 	char *device = bis->device;
 	int fd, rc;
 
+	if (!info)
+		return 0;
 	/* Inform user about what we're up to */
 	printf("Preparing boot device for %s%s: ",
 	       disk_get_ipl_type(info->type,
@@ -381,39 +461,13 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 	 * for CCW-type IPL and (or) for List-Directed IPL (see the
 	 * picture in comments above)
 	 */
-	rc = -1;
-	switch (info->type) {
-	case disk_type_scsi:
-		rc = install_scsi(fd, &pt0->table, info,
-				  scsi_dump_sb_blockptr);
-		if (rc == 0 && job->id == job_dump_partition &&
-		    !is_ngdump_enabled(device, &job->target))
-			rc = overwrite_partition_start(fd, info, 0);
-		break;
-	case disk_type_fba:
-		rc = install_fba_ccw(fd,
-				     &pt0->table,
-				     pt0->stage1b_list,
-				     pt0->stage1b_count, info);
-		break;
-	case disk_type_eckd_ldl:
-		rc = install_eckd_ldl_ccw(fd,
-					  &pt0->table,
-					  pt0->stage1b_list,
-					  pt0->stage1b_count, info);
-		break;
-	case disk_type_eckd_cdl:
-		rc = install_eckd_cdl_ccw(fd,
-					  &pt0->table,
-					  pt0->stage1b_list,
-					  pt0->stage1b_count, info);
-		if (rc)
-			break;
-		rc = install_eckd_cdl_ld(fd, pt1->stage1b_list, info);
-		break;
-	case disk_type_diag:
-		/* Should not happen */
-		break;
+	if (job->id == job_dump_partition) {
+		rc = install_bootloader_dump(bis->tables, info,
+					     scsi_dump_sb_blockptr,
+					     is_ngdump_enabled(job->data.dump.device, &job->target),
+					     fd);
+	} else {
+		rc = install_bootloader_ipl(bis->tables, info, fd);
 	}
 
 	if (fsync(fd))
