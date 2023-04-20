@@ -509,6 +509,19 @@ disk_is_scsi(const char* device, struct job_target_data* target)
 	return rc;
 }
 
+int disk_is_eckd_ldl(const char *device, struct job_target_data *target)
+{
+	struct disk_info *info;
+	int rc = 0;
+
+	if (disk_get_info(device, target, &info) == -1)
+		return 0;
+	if (info->type == disk_type_eckd_ldl)
+		rc = 1;
+	disk_free_info(info);
+	return rc;
+}
+
 int
 disk_is_nvme(const char* device, struct job_target_data* target)
 {
