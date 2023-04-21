@@ -3,7 +3,7 @@
  *
  * Stand-alone kdump support (stage 3)
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -14,7 +14,7 @@
 #include "libc.h"
 #include "sclp_stage3.h"
 #include "stage3.h"
-
+#include "boot/os_info.h"
 
 /*
  * Copy memory from HSA and exit in case of an error
@@ -54,7 +54,7 @@ static void kdump_stage3_scsi(unsigned long *base, unsigned long *size)
 	} else {
 		os_info = (void *) os_info_addr;
 	}
-	os_info_check(os_info);
+	kdump_os_info_check(os_info);
 	crash_base = os_info->crashkernel_addr;
 	crash_size = os_info->crashkernel_size;
 	crash_end = crash_base + crash_size;
