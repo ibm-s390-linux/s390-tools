@@ -21,10 +21,6 @@
 #define IPL_MAX_SUPPORTED_VERSION	0
 #define IPL_PARM_BLOCK_VERSION		0x1
 
-/* IPL Types */
-#define IPL_TYPE_PV			0x5
-
-
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
@@ -42,6 +38,16 @@ struct ipl_pb_hdr {
 	uint32_t len;
 	uint8_t  pbt;
 } __packed;
+
+/* IPL Parameter Block types */
+enum ipl_pbt {
+	IPL_PBT_FCP = 0,
+	IPL_PBT_SCP_DATA = 1,
+	IPL_PBT_CCW = 2,
+	IPL_PBT_ECKD = 3,
+	IPL_PBT_NVME = 4,
+	IPL_PBT_PV = 5,
+};
 
 /* IPL Parameter Block 0 with common fields */
 struct ipl_pb0_common {

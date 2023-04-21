@@ -59,7 +59,7 @@ static gint pv_ipib_init(IplParameterBlock *ipib, GSList *comps,
 	ipib_size = MAX(ipl_pl_hdr_size + blk0_len, (uint32_t)PAGE_SIZE);
 	g_assert(pv_ipib_get_size(comps_length) == ipib_size);
 
-	pv->pbt = IPL_TYPE_PV;
+	pv->pbt = IPL_PBT_PV;
 	pv->len = GUINT32_TO_BE(blk0_len);
 	pv->num_comp = GUINT32_TO_BE(comps_length);
 	/* both values will be overwritten during the IPL process by

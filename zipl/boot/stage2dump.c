@@ -17,6 +17,8 @@
 #include "libc.h"
 #include "sclp.h"
 #include "stage2dump.h"
+#include "boot/ipl.h"
+#include "boot/os_info.h"
 
 #define CPU_ADDRESS_MAX	1000
 #define MACHINE_HAS_VX	machine_has_vx
@@ -25,14 +27,6 @@
  * Static globals
  */
 static uint8_t machine_has_vx;
-
-/*
- * IPL info in lowcore
- */
-struct ipib_info {
-	unsigned long	ipib;
-	uint32_t	ipib_csum;
-};
 
 /*
  * Tail parameters
@@ -395,17 +389,41 @@ static void store_status(void)
  */
 static __noreturn void dump_exit(unsigned long code)
 {
-	struct ipib_info *ipib_info = (struct ipib_info *)&S390_lowcore.ipib;
-	uint32_t ipib_len, csum;
+	struct ipl_parameter_block *ipib = (struct ipl_parameter_block *)S390_lowcore.ipib;
+	const struct os_info *os_info = (struct os_info *)S390_lowcore.os_info;
+	const struct os_info_entry *os_info_entry = NULL;
+	unsigned long os_info_flags = 0;
+	uint32_t csum;
 
-	if (!ipib_info->ipib)
+	if (!ipib)
 		libc_stop(code);
-	ipib_len = *((uint32_t *) ipib_info->ipib);
-	csum = csum_partial((void *) ipib_info->ipib, ipib_len, 0);
-	if (ipib_info->ipib_csum != csum)
+	csum = csum_partial(ipib, ipib->hdr.len, 0);
+	/* Verify ipib checksum against the value stored in lowcore */
+	if (csum != S390_lowcore.ipib_checksum)
 		libc_stop(code);
-	diag308(DIAG308_SET, (void *) ipib_info->ipib);
-	diag308(DIAG308_LOAD_CLEAR, NULL);
+	diag308(DIAG308_SET, ipib);
+	/*
+	 * Check os_info flags entry for REIPL_CLEAR flag and make
+	 * diag308 call with a proper subcode.
+	 * Verify the bit flags field size before accessing it.
+	 */
+	if (os_info_check(os_info) == 0) {
+		os_info_entry = &os_info->entry[OS_INFO_FLAGS_ENTRY];
+		if (os_info_entry_is_valid(os_info_entry) &&
+		    os_info_entry->size >= OS_INFO_FLAGS_ENTRY_SIZE)
+			os_info_flags = *((unsigned long *)os_info_entry->addr);
+		else
+			printf("Warning: os_info flags entry is missing or corrupted");
+	} else {
+		printf("Warning: os_info is missing or corrupted");
+	}
+	if (os_info_flags & OS_INFO_FLAG_REIPL_CLEAR)
+		diag308(DIAG308_LOAD_CLEAR, NULL);
+	/* Use special diag308 subcode for CCW normal ipl */
+	if (ipib->pb0_hdr.pbt == IPL_PBT_CCW)
+		diag308(DIAG308_LOAD_NORMAL_DUMP, NULL);
+	else
+		diag308(DIAG308_LOAD_NORMAL, NULL);
 	__builtin_unreachable();
 }
 
