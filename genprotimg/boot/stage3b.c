@@ -12,10 +12,11 @@
 
 #include "lib/zt_common.h"
 #include "boot/psw.h"
+#include "boot/error.h"
+#include "boot/s390.h"
 #include "boot/linux_layout.h"
 #include "boot/loaders_layout.h"
 #include "sclp.h"
-#include "error.h"
 
 
 static volatile struct stage3b_args __section(".loader_parms") loader_parms;

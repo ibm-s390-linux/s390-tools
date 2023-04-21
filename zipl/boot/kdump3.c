@@ -9,11 +9,11 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include "error.h"
 #include "kdump.h"
 #include "libc.h"
 #include "sclp_stage3.h"
 #include "stage3.h"
+#include "boot/error.h"
 #include "boot/os_info.h"
 
 /*

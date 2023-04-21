@@ -11,8 +11,8 @@
 
 #include "lib/zt_common.h"
 #include "boot/boot_defs.h"
+#include "boot/error.h"
 
-#include "error.h"
 #include "fba.h"
 #include "stage2dump.h"
 

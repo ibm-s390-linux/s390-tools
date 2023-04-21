@@ -1,6 +1,6 @@
 include ../../common.mak
 
-ALL_CPPFLAGS += -I../include -I../boot
+ALL_CPPFLAGS += -I../include
 
 libs =	$(rootdir)/libdasd/libdasd.a \
 	$(rootdir)/libutil/libutil.a

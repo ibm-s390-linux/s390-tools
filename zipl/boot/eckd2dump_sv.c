@@ -11,9 +11,9 @@
 
 #include "lib/zt_common.h"
 #include "boot/boot_defs.h"
+#include "boot/error.h"
 
 #include "eckd2dump.h"
-#include "error.h"
 #include "stage2dump.h"
 
 /*

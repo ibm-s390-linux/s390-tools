@@ -11,9 +11,10 @@
 #include "stage3a.h"
 
 #include "lib/zt_common.h"
+#include "boot/error.h"
+#include "boot/s390.h"
 #include "boot/ipl.h"
 #include "sclp.h"
-#include "error.h"
 
 
 static volatile struct stage3a_args __section(".loader_parms") loader_parms;

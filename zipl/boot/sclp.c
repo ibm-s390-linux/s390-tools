@@ -10,7 +10,7 @@
  */
 
 #include "libc.h"
-#include "error.h"
+#include "boot/error.h"
 #include "boot/s390.h"
 #include "sclp.h"
 #include "ebcdic.h"

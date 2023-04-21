@@ -10,9 +10,9 @@
  */
 
 #include "lib/zt_common.h"
+#include "boot/error.h"
 
 #include "eckd2dump.h"
-#include "error.h"
 #include "stage2dump.h"
 
 #define MVDUMP_TOOL_SIZE	0x3000	/* Size of dump record */

@@ -11,7 +11,7 @@
 
 #include "cio.h"
 #include "eckd2dump.h"
-#include "error.h"
+#include "boot/error.h"
 #include "boot/s390.h"
 #include "stage2dump.h"
 

@@ -20,7 +20,6 @@
 #include "lib/zt_common.h"
 
 #include "disk.h"
-#include "error.h"
 #include "tunedasd.h"
 
 static const struct util_prg prg = {

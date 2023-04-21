@@ -13,7 +13,7 @@
 #ifndef FBA_H
 #define FBA_H
 
-#include "error.h"
+#include "boot/error.h"
 #include "libc.h"
 #include "stage2.h"
 

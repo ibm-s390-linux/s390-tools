@@ -11,9 +11,9 @@
 
 #include "lib/zt_common.h"
 
-#include "error.h"
 #include "libc.h"
 #include "menu.h"
+#include "boot/error.h"
 #include "boot/s390.h"
 #include "boot/loaders_layout.h"
 #include "stage2.h"

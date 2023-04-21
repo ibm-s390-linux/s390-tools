@@ -10,8 +10,8 @@
  */
 
 #include "cio.h"
-#include "error.h"
 #include "libc.h"
+#include "boot/error.h"
 #include "boot/s390.h"
 
 static unsigned long initial_lpm = 0x00;

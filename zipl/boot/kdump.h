@@ -13,6 +13,7 @@
 #ifndef KDUMP_H
 #define KDUMP_H
 
+#include "libc.h"
 #include "boot/os_info.h"
 
 #define OS_INFO_VERSION_MAJOR_SUPPORTED	1

@@ -9,10 +9,10 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include "error.h"
 #include "kdump.h"
 #include "libc.h"
 #include "menu.h"
+#include "boot/error.h"
 #include "boot/s390.h"
 #include "boot/os_info.h"
 

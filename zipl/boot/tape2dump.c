@@ -11,11 +11,11 @@
 
 #include "libc.h"
 #include "lib/zt_common.h"
+#include "boot/error.h"
 #include "boot/loaders_layout.h"
 #include "boot/s390.h"
 
 #include "cio.h"
-#include "error.h"
 #include "stage2dump.h"
 
 #define BLK_SIZE	0x8000 /* We write 32 KB at a time */

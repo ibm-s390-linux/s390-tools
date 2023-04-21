@@ -34,10 +34,10 @@
 /* Secure IPL error */
 #define ESECUREBOOT		0x00004512
 
-/* kdump: No operating system information was found */
+/* os_info error: No operating system information was found */
 #define EOS_INFO_MISSING	0x00004520
 
-/* kdump: The checksum of the operating system information is incorrect */
+/* os_info error: The checksum of the operating system information is incorrect */
 #define EOS_INFO_CSUM_FAILED	0x00004521
 
 /* kdump: The major version of the operating system information is too high */

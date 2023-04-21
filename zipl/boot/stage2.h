@@ -22,9 +22,9 @@
 #include "boot/boot_defs.h"
 
 #include "libc.h"
+#include "boot/error.h"
 #include "boot/s390.h"
 #include "cio.h"
-#include "error.h"
 
 struct stage2_descr {
 	uint8_t reserved[16];

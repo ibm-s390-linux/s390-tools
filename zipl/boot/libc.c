@@ -13,9 +13,9 @@
 
 #include <stdarg.h>
 
+#include "boot/error.h"
 #include "boot/s390.h"
 
-#include "error.h"
 #include "sclp.h"
 #include "ebcdic.h"
 
