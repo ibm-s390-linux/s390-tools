@@ -321,7 +321,7 @@ static int add_component_file_range(struct install_set *bis,
 	size_t size;
 	int rc;
 
-	if (program_table_id)
+	if (bis->skip_prepare)
 		/* skip the preparation work */
 		goto write_segment_table;
 	if (add_files) {
@@ -402,7 +402,7 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 	disk_blockptr_t segment;
 	int rc;
 
-	if (program_table_id)
+	if (bis->skip_prepare)
 		/* skip the preparation work */
 		goto write_segment_table;
 	/* Write buffer */
@@ -1449,12 +1449,11 @@ static void set_nr_tables(struct job_data *job, struct install_set *bis)
  * Prepare resources to build a program table
  */
 static int prepare_build_program_table_device(struct job_data *job,
-					      struct install_set *bis,
-					      int program_table_id)
+					      struct install_set *bis)
 {
 	ulong unused_size;
 
-	if (program_table_id)
+	if (bis->skip_prepare)
 		/* skip the preparation work */
 		return 0;
 	/* Get full path of bootmap file */
@@ -1530,7 +1529,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 static int bootmap_create_device(struct job_data *job, struct install_set *bis,
 				 int program_table_id)
 {
-	if (prepare_build_program_table_device(job, bis, program_table_id))
+	if (prepare_build_program_table_device(job, bis))
 		return -1;
 	if (build_program_table(job, bis, program_table_id))
 		return -1;
@@ -1547,10 +1546,9 @@ static int bootmap_create_device(struct job_data *job, struct install_set *bis,
  */
 static int prepare_build_program_table_file(struct job_data *job,
 					    char *bootmap_dir,
-					    struct install_set *bis,
-					    int program_table_id)
+					    struct install_set *bis)
 {
-	if (program_table_id)
+	if (bis->skip_prepare)
 		/* skip the preparation work */
 		return 0;
 	/* Create temporary bootmap file */
@@ -1631,8 +1629,7 @@ static int finalize_create_file(char *bootmap_dir, struct install_set *bis)
 static int bootmap_create_file(struct job_data *job, char *bootmap_dir,
 			       struct install_set *bis, int program_table_id)
 {
-	if (prepare_build_program_table_file(job, bootmap_dir, bis,
-					     program_table_id))
+	if (prepare_build_program_table_file(job, bootmap_dir, bis))
 		return -1;
 	if (build_program_table(job, bis, program_table_id))
 		return -1;
@@ -1806,6 +1803,7 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 	if (rc)
 		return rc;
 	for (i = 0;; i++) {
+		bis->skip_prepare = i > 0;
 		rc = bootmap_create(job, bis, i);
 		if (rc || is_last_table(bis, i))
 			break;
