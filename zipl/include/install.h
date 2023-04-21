@@ -70,6 +70,7 @@ struct install_set {
 	unsigned int dump_tmp_dir_created:1;
 	unsigned int dump_mounted:1;
 	unsigned int skip_prepare:1;
+	unsigned int print_details:1;
 	struct disk_info *info;
 	disk_blockptr_t scsi_dump_sb_blockptr;
 };

@@ -557,7 +557,6 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		struct job_target_data *target, int is_secure,
 		int menu_idx, int program_table_id)
 {
-	int last_table = is_last_table(bis, program_table_id);
 	struct signature_header sig_head;
 	size_t ramdisk_size, image_size;
 	size_t stage3_params_size;
@@ -589,7 +588,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	stats.st_size = 0;
 	if (ipl->common.ramdisk != NULL) {
 		/* Add ramdisk */
-		if (verbose && last_table)
+		if (verbose && bis->print_details)
 			printf("  initial ramdisk...: %s\n", ipl->common.ramdisk);
 		/* Get ramdisk file size */
 		if (stat(ipl->common.ramdisk, &stats)) {
@@ -647,7 +646,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	if (signature_size &&
 	    (is_secure == SECURE_BOOT_ENABLED ||
 	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
-		if (verbose && last_table)
+		if (verbose && bis->print_details)
 			printf("  signature for.....: %s\n", ZIPL_STAGE3_PATH);
 
 		rc = add_component_buffer(bis, signature, sig_head.length,
@@ -717,14 +716,14 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	offset += sizeof(struct component_entry);
 
 	/* Add kernel image */
-	if (verbose && last_table)
+	if (verbose && bis->print_details)
 		printf("  kernel image......: %s\n", ipl->common.image);
 
 	signature_size = extract_signature(ipl->common.image, &signature, &sig_head);
 	if (signature_size &&
 	    (is_secure == SECURE_BOOT_ENABLED ||
 	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
-		if (verbose && last_table)
+		if (verbose && bis->print_details)
 			printf("  signature for.....: %s\n", ipl->common.image);
 
 		rc = add_component_buffer(bis, signature, sig_head.length,
@@ -767,7 +766,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 
 	/* Add kernel parmline */
 	if (ipl->common.parmline != NULL) {
-		if (verbose && last_table)
+		if (verbose && bis->print_details)
 			printf("  kernel parmline...: '%s'\n", ipl->common.parmline);
 		rc = add_component_buffer(bis, ipl->common.parmline,
 					  strlen(ipl->common.parmline) + 1,
@@ -791,7 +790,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		    (is_secure == SECURE_BOOT_ENABLED ||
 		     (is_secure == SECURE_BOOT_AUTO &&
 		      secure_boot_supported))) {
-			if (verbose && last_table) {
+			if (verbose && bis->print_details) {
 				printf("  signature for.....: %s\n",
 				       ipl->common.ramdisk);
 			}
@@ -884,7 +883,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		}
 		offset += sizeof(struct component_entry);
 	}
-	if (verbose && last_table)
+	if (verbose && bis->print_details)
 		print_components(bis, menu_idx);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
@@ -907,7 +906,6 @@ static int add_segment_program(struct install_set *bis,
 			       struct job_target_data *target,
 			       int program_table_id)
 {
-	int last_table = is_last_table(bis, program_table_id);
 	void *table;
 	int offset;
 	int rc;
@@ -921,7 +919,7 @@ static int add_segment_program(struct install_set *bis,
 	create_component_header(VOID_ADD(table, offset), type);
 	offset += sizeof(struct component_header);
 	/* Add segment file */
-	if (verbose && last_table)
+	if (verbose && bis->print_details)
 		printf("  segment file......: %s\n", segment->segment);
 
 	rc = add_component_file(bis, segment->segment, segment->segment_addr, 0,
@@ -936,7 +934,7 @@ static int add_segment_program(struct install_set *bis,
 	}
 	offset += sizeof(struct component_entry);
 	/* Print component addresses */
-	if (verbose && last_table)
+	if (verbose && bis->print_details)
 		print_components(bis, 0 /* menu_idx */);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
@@ -1016,7 +1014,6 @@ static int add_dump_program(struct install_set *bis, struct job_dump_data *dump,
 static int build_program_table(struct job_data *job,
 			       struct install_set *bis, int program_table_id)
 {
-	int last_table = is_last_table(bis, program_table_id);
 	int entries, component_header;
 	disk_blockptr_t *table;
 	int is_secure;
@@ -1034,7 +1031,7 @@ static int build_program_table(struct job_data *job,
 	/* Add programs */
 	switch (job->id) {
 	case job_ipl:
-		if (last_table) {
+		if (bis->print_details) {
 			if (job->command_line)
 				printf("Adding IPL section\n");
 			else
@@ -1053,7 +1050,7 @@ static int build_program_table(struct job_data *job,
 				     program_table_id);
 		break;
 	case job_segment:
-		if (last_table) {
+		if (bis->print_details) {
 			if (job->command_line)
 				printf("Adding segment load section\n");
 			else
@@ -1067,7 +1064,7 @@ static int build_program_table(struct job_data *job,
 		break;
 	case job_dump_partition:
 		/* Only useful for a partition dump that uses a dump kernel*/
-		if (last_table) {
+		if (bis->print_details) {
 			if (job->command_line)
 				printf("Adding dump section\n");
 			else
@@ -1080,20 +1077,20 @@ static int build_program_table(struct job_data *job,
 				      program_table_id);
 		break;
 	case job_menu:
-		if (last_table)
+		if (bis->print_details)
 			printf("Building menu '%s'\n", job->name);
 		rc = 0;
 		for (i=0; i < job->data.menu.num; i++) {
 			switch (job->data.menu.entry[i].id) {
 			case job_ipl:
-				if (last_table &&
+				if (bis->print_details &&
 				    job->data.menu.entry[i].data.ipl.common.ignore) {
 					printf("Skipping #%d: IPL section '%s' (missing files)\n",
 					       job->data.menu.entry[i].pos,
 					       job->data.menu.entry[i].name);
 					break;
 				}
-				if (last_table)
+				if (bis->print_details)
 					printf("Adding #%d: IPL section '%s'%s",
 					       job->data.menu.entry[i].pos,
 					       job->data.menu.entry[i].name,
@@ -1103,12 +1100,12 @@ static int build_program_table(struct job_data *job,
 				if (job->data.menu.entry[i].data.ipl.is_kdump) {
 					component_header =
 						COMPONENT_HEADER_DUMP;
-					if (last_table)
+					if (bis->print_details)
 						printf(" (kdump)\n");
 				} else {
 					component_header =
 						COMPONENT_HEADER_IPL;
-					if (last_table)
+					if (bis->print_details)
 						printf("\n");
 				}
 				if (job->is_secure != SECURE_BOOT_UNDEFINED)
@@ -1151,7 +1148,7 @@ static int build_program_table(struct job_data *job,
 		rc = -1;
 		break;
 	}
-	if (job->envblk.buf && verbose && last_table)
+	if (job->envblk.buf && verbose && bis->print_details)
 		envblk_print(job->envblk.buf, job->envblk.size);
 
 	if (rc == 0) {
@@ -1804,6 +1801,7 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 		return rc;
 	for (i = 0;; i++) {
 		bis->skip_prepare = i > 0;
+		bis->print_details = i > 0 ? is_last_table(bis, i) : 0;
 		rc = bootmap_create(job, bis, i);
 		if (rc || is_last_table(bis, i))
 			break;
