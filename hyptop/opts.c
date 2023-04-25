@@ -39,6 +39,7 @@ static char HELP_TEXT[] =
 "-t, --cpu_types TYPE[,..]       CPU types used for time calculations\n"
 "-b, --batch_mode                Use batch mode (no curses)\n"
 "-d, --delay SECONDS             Delay time between screen updates\n"
+"-m, --smt_factor FACTOR         Machine generation dependent SMT speedup factor.\n"
 "-n, --iterations NUMBER         Number of iterations before ending\n";
 
 /*
@@ -48,6 +49,7 @@ static void l_init_defaults(void)
 {
 	g.prog_name = PROG_NAME;
 	g.o.delay_s = HYPTOP_OPT_DEFAULT_DELAY;
+	g.o.smt_factor = HYPTOP_OPT_DEFAULT_SMT_SCALE;
 	g.w.cur = &win_sys_list;
 	g.o.cur_win = &win_sys_list;
 }
@@ -106,6 +108,20 @@ static void l_delay_set(char *delay_string)
 		ERR_EXIT("The delay value \"%s\" is invalid\n", delay_string);
 	g.o.delay_s = secs;
 	g.o.delay_us = 0;
+}
+
+/*
+ * Set SMT factor option
+ */
+static void l_factor_set(char *value_string)
+{
+	double factor;
+
+	if (sscanf(value_string, "%lf", &factor) != 1)
+		ERR_EXIT("The SMT factor \"%s\" is invalid\n", value_string);
+	if (factor <= 0)
+		ERR_EXIT("The SMT factor \"%s\" is <= 0\n", value_string);
+	g.o.smt_factor = factor;
 }
 
 /*
@@ -299,6 +315,7 @@ void opts_parse(int argc, char *argv[])
 		{ "help",        no_argument,       NULL, 'h'},
 		{ "batch_mode",  no_argument,       NULL, 'b'},
 		{ "delay",       required_argument, NULL, 'd'},
+		{ "smt_factor",  required_argument, NULL, 'm'},
 		{ "window",      required_argument, NULL, 'w'},
 		{ "sys",         required_argument, NULL, 's'},
 		{ "iterations",  required_argument, NULL, 'n'},
@@ -307,7 +324,7 @@ void opts_parse(int argc, char *argv[])
 		{ "cpu_types",   required_argument, NULL, 't'},
 		{ NULL,          0,                 NULL, 0  }
 	};
-	static const char option_string[] = "vhbd:w:s:n:f:t:S:";
+	static const char option_string[] = "vhbd:m:w:s:n:f:t:S:";
 
 	l_init_defaults();
 	while (1) {
@@ -327,6 +344,9 @@ void opts_parse(int argc, char *argv[])
 			break;
 		case 'd':
 			l_delay_set(optarg);
+			break;
+		case 'm':
+			l_factor_set(optarg);
 			break;
 		case 'w':
 			l_window_set(optarg);

@@ -22,6 +22,7 @@
 #include "table.h"
 
 #define HYPTOP_OPT_DEFAULT_DELAY	2
+#define HYPTOP_OPT_DEFAULT_SMT_SCALE	1.3
 #define HYPTOP_MAX_WIN_DEPTH		4
 #define HYPTOP_MAX_LINE			512
 #define PROG_NAME			"hyptop"
@@ -60,6 +61,8 @@ struct hyptop_opts {
 
 	int				delay_s;
 	int				delay_us;
+
+	double				smt_factor;
 };
 
 /*

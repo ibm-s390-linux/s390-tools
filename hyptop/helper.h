@@ -21,7 +21,6 @@
 #include "lib/zt_common.h"
 
 #define G0(x) MAX(0, (s64) (x))
-#define SMT_FACTOR_DEFAULT 1.3
 
 /*
  * Helper Prototypes

@@ -402,7 +402,7 @@ void hyptop_helper_init(void)
 s64 ht_calculate_smt_util(u64 core_us, u64 thr_us, u64 mgm_us, int thread_per_core)
 {
 	s64 component1, component2, smt_us;
-	double smt_factor = SMT_FACTOR_DEFAULT;
+	double smt_factor = g.o.smt_factor;
 
 	component1 = G0(thread_per_core * core_us - thr_us);
 	if (thread_per_core > 1)
