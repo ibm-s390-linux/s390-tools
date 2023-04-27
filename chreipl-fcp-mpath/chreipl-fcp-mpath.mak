@@ -74,7 +74,7 @@ ALL_PANDOCFLAGS	 = --preserve-tabs --tab-stop=8 --strip-comments	\
 		   -M date="$(shell date +'%Y-%m-%d')"			\
 		   $(PANDOCFLAGS)
 
-$(eval $(call cmd_define, PANDOC,"  PANDOC  ",pandoc))
+$(eval $(call cmd_define_and_export, PANDOC,"  PANDOC  ",pandoc))
 
 %.html : ALL_PANDOCFLAGS += -t html
 %.html : %.md

@@ -41,8 +41,10 @@ CROSS_COMPILE   =
 #
 #  $ make CC=gcc-4.8
 #
-# The "cmd_define" macro wraps the command definition so that the commands
-# can be user supplied and are still pretty-printed for the build process.
+# The "cmd_define_and_export" macro wraps the command definition so that
+# the commands can be user supplied and are still pretty-printed for the
+# build process. In addition, the command variable gets exported so it
+# can be used by sub-makes.
 #
 # The macro is called with the following parameters:
 #
@@ -52,13 +54,14 @@ CROSS_COMPILE   =
 #
 # The Example below...
 #
-#  $(eval $(call cmd_define,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
+#  $(eval $(call cmd_define_and_export,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
 #
 # ... produces the following code:
 #
 #  CC              = $(CROSS_COMPILE)gcc
 #  CC_SILENT      := $(CC)
 #  override CC     = $(call echocmd,"  CC      ",/$@)$(CC_SILENT)
+#  export CC
 #
 # The "strip" make function is used for the first parameter to allow blanks,
 # which improves readability.
@@ -70,18 +73,24 @@ define cmd_define
 	override $(strip $(1))	 = $$(call echocmd,$(2),/$$@)$$($(strip $(1))_SILENT)
 endef
 
-$(eval $(call cmd_define,     AS,"  AS      ",$(CROSS_COMPILE)as))
-$(eval $(call cmd_define,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
-$(eval $(call cmd_define,   LINK,"  LINK    ",$(CC)))
-$(eval $(call cmd_define, HOSTCC,"  HOSTCC  ",gcc))
-$(eval $(call cmd_define,    CXX,"  CXX     ",$(CROSS_COMPILE)g++))
-$(eval $(call cmd_define, LINKXX,"  LINKXX  ",$(CXX)))
-$(eval $(call cmd_define,    CPP,"  CPP     ",$(CROSS_COMPILE)gcc -E))
-$(eval $(call cmd_define,     AR,"  AR      ",$(CROSS_COMPILE)ar))
-$(eval $(call cmd_define,     NM,"  NM      ",$(CROSS_COMPILE)nm))
-$(eval $(call cmd_define,  STRIP,"  STRIP   ",$(CROSS_COMPILE)strip))
-$(eval $(call cmd_define,OBJCOPY,"  OBJCOPY ",$(CROSS_COMPILE)objcopy))
-$(eval $(call cmd_define,OBJDUMP,"  OBJDUMP ",$(CROSS_COMPILE)objdump))
+define cmd_define_and_export
+	$(call cmd_define,$(1),$(2),$(3))
+	export $(strip $(1))
+endef
+
+$(eval $(call cmd_define_and_export,     AS,"  AS      ",$(CROSS_COMPILE)as))
+$(eval $(call cmd_define_and_export,     CC,"  CC      ",$(CROSS_COMPILE)gcc))
+$(eval $(call cmd_define_and_export,   LINK,"  LINK    ",$(CC)))
+$(eval $(call cmd_define_and_export, HOSTCC,"  HOSTCC  ",gcc))
+$(eval $(call cmd_define_and_export,    CXX,"  CXX     ",$(CROSS_COMPILE)g++))
+$(eval $(call cmd_define_and_export, LINKXX,"  LINKXX  ",$(CXX)))
+$(eval $(call cmd_define_and_export,    CPP,"  CPP     ",$(CROSS_COMPILE)gcc -E))
+$(eval $(call cmd_define_and_export,     AR,"  AR      ",$(CROSS_COMPILE)ar))
+$(eval $(call cmd_define_and_export,     NM,"  NM      ",$(CROSS_COMPILE)nm))
+$(eval $(call cmd_define_and_export,  STRIP,"  STRIP   ",$(CROSS_COMPILE)strip))
+$(eval $(call cmd_define_and_export,OBJCOPY,"  OBJCOPY ",$(CROSS_COMPILE)objcopy))
+$(eval $(call cmd_define_and_export,OBJDUMP,"  OBJDUMP ",$(CROSS_COMPILE)objdump))
+
 $(eval $(call cmd_define,RUNTEST,"  RUNTEST ",$(S390_TEST_LIB_PATH)/s390_runtest))
 $(eval $(call cmd_define,    CAT,"  CAT     ",cat))
 $(eval $(call cmd_define,    SED,"  SED     ",sed))
@@ -90,6 +99,7 @@ $(eval $(call cmd_define,     MV,"  MV      ",mv))
 $(eval $(call cmd_define,  PERLC,"  PERLC   ",perl -c))
 
 PKG_CONFIG = pkg-config
+export PKG_CONFIG
 
 CHECK           = sparse
 CHECK_SILENT   := $(CHECK)
@@ -290,7 +300,7 @@ ALL_CFLAGS := $(filter-out -O%,$(ALL_CFLAGS)) --coverage
 ALL_CXXFLAGS := $(filter-out -O%,$(ALL_CXXFLAGS)) --coverage
 ALL_LDFLAGS += --coverage
 endif
-export AS LD CC CPP AR NM STRIP OBJCOPY OBJDUMP INSTALL CFLAGS CXXFLAGS \
+export INSTALL CFLAGS CXXFLAGS \
        LDFLAGS CPPFLAGS ALL_CFLAGS ALL_CXXFLAGS ALL_LDFLAGS ALL_CPPFLAGS
 
 ifneq ($(shell $(CC_SILENT) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
