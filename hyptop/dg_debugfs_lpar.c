@@ -311,6 +311,7 @@ static struct sd_sys_item *l_sys_item_vec[] = {
 static struct sd_sys_item *l_sys_item_enable_vec[] = {
 	&sd_sys_item_core_cnt,
 	&sd_sys_item_core_diff,
+	&sd_sys_item_thread_diff,
 	&sd_sys_item_mgm_diff,
 	&sd_sys_item_core,
 	&sd_sys_item_mgm,
@@ -339,6 +340,7 @@ static struct sd_cpu_item *l_cpu_item_vec[] = {
 static struct sd_cpu_item *l_cpu_item_enable_vec[] = {
 	&sd_cpu_item_type,
 	&sd_cpu_item_core_diff,
+	&sd_cpu_item_thread_diff,
 	&sd_cpu_item_mgm_diff,
 	NULL,
 };
