@@ -575,6 +575,7 @@ NETWORK_CMDS="ip -br a\
   :netstat -pantu\
   :netstat -s\
   :nm-tool\
+  :nstat -az\
   :openssl engine\
   :route -n\
   "
