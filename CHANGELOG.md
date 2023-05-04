@@ -9,6 +9,7 @@ Release history for s390-tools (MIT version)
 
   Add new tools / libraries:
   - rust/pv: Library for pv tools written in rust
+  - rust/pvsecret: Tool to manage UV-secrets
 
   Changes of existing tools:
   - genprotimg: add support for add-secret requests
