@@ -19,9 +19,13 @@
 
 #define OS_INFO_MAGIC			0x4f53494e464f535aULL /* OSINFOSZ */
 #define OS_INFO_CSUM_SIZE		(sizeof(struct os_info) - offsetof(struct os_info, version_major))
+#define OS_INFO_FLAGS_ENTRY_SIZE	(sizeof(unsigned long))
 
 #define OS_INFO_VMCOREINFO		0
 #define OS_INFO_REIPL_BLOCK		1
+#define OS_INFO_FLAGS_ENTRY		2
+
+#define OS_INFO_FLAG_REIPL_CLEAR	(1UL << 0)
 
 struct os_info_entry {
 	uint64_t addr;
@@ -36,8 +40,8 @@ struct os_info {
 	uint16_t version_minor;
 	uint64_t crashkernel_addr;
 	uint64_t crashkernel_size;
-	struct os_info_entry entry[2];
-	uint8_t reserved[4024];
+	struct os_info_entry entry[3];
+	uint8_t reserved[4004];
 } __packed;
 
 /*
