@@ -1,0 +1,4 @@
+*.key
+*.crt
+*.crl
+gen_venv/*

@@ -8,6 +8,7 @@ Release history for s390-tools (MIT version)
   s390-tools now supports tools written in rust!
 
   Add new tools / libraries:
+  - rust/pv: Library for pv tools written in rust
 
   Changes of existing tools:
   - genprotimg: add support for add-secret requests

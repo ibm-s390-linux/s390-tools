@@ -1,0 +1,12 @@
+[package]
+name = "openssl_extensions"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+foreign-types = "0.3"
+libc = {version = "0.2", features = [ "extra_traits"] }
+log = { version = "0.4", features = ["std", "release_max_level_debug"] }
+openssl = "0.10"
+openssl-sys = "0.9"
