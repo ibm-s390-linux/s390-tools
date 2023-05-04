@@ -8,6 +8,12 @@ insert_final_newline = true
 charset = utf-8
 indent_style = tab
 tab_width = 8
+trim_trailing_whitespace = true
+
+[*.rs]
+indent_style = space
+indent_size = 4
+tab_width = 4
 
 [*.sh]
 shell_variant = bash  # used by `shfmt`

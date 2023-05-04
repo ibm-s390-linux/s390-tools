@@ -5,6 +5,8 @@ Release history for s390-tools (MIT version)
 
   For Linux kernel version: 6.x
 
+  s390-tools now supports tools written in rust!
+
   Add new tools / libraries:
 
   Changes of existing tools:

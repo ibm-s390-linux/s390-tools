@@ -15,6 +15,11 @@ The package also contains the following files:
 Package contents
 ----------------
 
+ * rust:
+   all s390-tools that are written in rust and require external crates.
+   Disable the compilation of all tools in `rust/` using HAVE_CARGO=0
+   See the `rust/README.md` for Details
+
  * dasdfmt:
    Low-level format ECKD DASDs with the classical Linux disk layout or the new
    z/OS compatible disk layout.
@@ -324,6 +329,7 @@ This table lists additional build or install options:
 |                  |                              | zipl                     |
 | initramfs-tools  | `HAVE_INITRAMFS`             | zdev, zipl               |
 |                  | `ZDEV_ALWAYS_UPDATE_INITRD`  | zdev                     |
+| rust             | `HAVE_CARGO`                 | rust/*                   |
 
 The s390-tools build process uses "pkg-config" and therefore it must be
 available.

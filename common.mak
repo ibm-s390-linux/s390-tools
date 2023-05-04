@@ -8,6 +8,8 @@ ASAN ?= 0
 ENABLE_WERROR ?= 0
 OPT_FLAGS ?=
 MAKECMDGOALS ?=
+CARGO ?= cargo
+CARGOFLAGS ?=
 
 ifeq ($(COMMON_INCLUDED),false)
 COMMON_INCLUDED := true
@@ -89,17 +91,17 @@ define cmd_define_and_export
 endef
 
 define define_toolchain_variables
-	$(eval $(call cmd_define_and_export,     AS$(1),"  AS$(1)       ",$(2)as))
-	$(eval $(call cmd_define_and_export,     CC$(1),"  CC$(1)       ",$(2)gcc))
-	$(eval $(call cmd_define_and_export,   LINK$(1),"  LINK$(1)     ",$$(CC$(1))))
-	$(eval $(call cmd_define_and_export,    CXX$(1),"  CXX$(1)      ",$(2)g++))
-	$(eval $(call cmd_define_and_export, LINKXX$(1),"  LINKXX$(1)   ",$$(CXX$(1))))
-	$(eval $(call cmd_define_and_export,    CPP$(1),"  CPP$(1)      ",$(2)gcc -E))
-	$(eval $(call cmd_define_and_export,     AR$(1),"  AR$(1)       ",$(2)ar))
-	$(eval $(call cmd_define_and_export,     NM$(1),"  NM$(1)       ",$(2)nm))
-	$(eval $(call cmd_define_and_export,   STRIP$(1),"  STRIP$(1)    ",$(2)strip))
-	$(eval $(call cmd_define_and_export,OBJCOPY$(1),"  OBJCOPY$(1)  ",$(2)objcopy))
-	$(eval $(call cmd_define_and_export,OBJDUMP$(1),"  OBJDUMP$(1)  ",$(2)objdump))
+	$(eval $(call cmd_define_and_export,     AS$(1),"  AS$(1)          ",$(2)as))
+	$(eval $(call cmd_define_and_export,     CC$(1),"  CC$(1)          ",$(2)gcc))
+	$(eval $(call cmd_define_and_export,   LINK$(1),"  LINK$(1)        ",$$(CC$(1))))
+	$(eval $(call cmd_define_and_export,    CXX$(1),"  CXX$(1)         ",$(2)g++))
+	$(eval $(call cmd_define_and_export, LINKXX$(1),"  LINKXX$(1)      ",$$(CXX$(1))))
+	$(eval $(call cmd_define_and_export,    CPP$(1),"  CPP$(1)         ",$(2)gcc -E))
+	$(eval $(call cmd_define_and_export,     AR$(1),"  AR$(1)          ",$(2)ar))
+	$(eval $(call cmd_define_and_export,     NM$(1),"  NM$(1)          ",$(2)nm))
+	$(eval $(call cmd_define_and_export,  STRIP$(1),"  STRIP$(1)       ",$(2)strip))
+	$(eval $(call cmd_define_and_export,OBJCOPY$(1),"  OBJCOPY$(1)     ",$(2)objcopy))
+	$(eval $(call cmd_define_and_export,OBJDUMP$(1),"  OBJDUMP$(1)     ",$(2)objdump))
 	$(eval PKG_CONFIG$(1) = pkg-config)
 	$(eval export PKG_CONFIG$(1))
 endef
@@ -118,12 +120,16 @@ endif
 $(call define_toolchain_variables,_FOR_BUILD,)
 $(call define_toolchain_variables,,$(CROSS_COMPILE))
 
-$(eval $(call cmd_define,RUNTEST,"  RUNTEST  ",$(S390_TEST_LIB_PATH)/s390_runtest))
-$(eval $(call cmd_define,    CAT,"  CAT      ",cat))
-$(eval $(call cmd_define,    SED,"  SED      ",sed))
-$(eval $(call cmd_define,   GZIP,"  GZIP     ",gzip))
-$(eval $(call cmd_define,     MV,"  MV       ",mv))
-$(eval $(call cmd_define,  PERLC,"  PERLC    ",perl -c))
+
+$(eval $(call cmd_define,    RUNTEST,"  RUNTEST     ",$(S390_TEST_LIB_PATH)/s390_runtest))
+$(eval $(call cmd_define,        CAT,"  CAT         ",cat))
+$(eval $(call cmd_define,        SED,"  SED         ",sed))
+$(eval $(call cmd_define,       GZIP,"  GZIP        ",gzip))
+$(eval $(call cmd_define,         MV,"  MV          ",mv))
+$(eval $(call cmd_define,      PERLC,"  PERLC       ",perl -c))
+$(eval $(call cmd_define,CARGO_BUILD,"  CARGO BUILD ",$(CARGO) build))
+$(eval $(call cmd_define,CARGO_TEST, "  CARGO TEST  ",$(CARGO) test))
+$(eval $(call cmd_define,CARGO_CLEAN,"  CARGO CLEAN ",$(CARGO) clean))
 
 CHECK           = sparse
 CHECK_SILENT   := $(CHECK)
@@ -133,8 +139,10 @@ SKIP            = echo           "  SKIP    $(call reldir) due to"
 
 INSTALL         = install
 CP              = cp
+ALL_CARGOFLAGS := $(CARGOFLAGS)
 ifneq ("${V}","1")
 	MAKEFLAGS += --quiet
+	ALL_CARGOFLAGS += --quiet
 	echocmd=echo $1$(call reldir)$2;
 	RUNTEST += > /dev/null 2>&1
 else
@@ -397,6 +405,11 @@ else
 	$(error Please install either 'compiledb' or 'bear')
 endif
 
+# Prints the s390-tools release string
+version:
+	$(info $(S390_TOOLS_RELEASE))
+.PHONY: version
+
 # Automatic dependency generation
 #
 # Create ".o.d" dependency files with the -MM compile option for all ".c" and
@@ -507,7 +520,7 @@ install_echo:
 install: install_echo install_dirs
 
 clean_echo:
-	$(call echocmd,"  CLEAN   ")
+	$(call echocmd,"  CLEAN       ")
 clean_gcov:
 	rm -f -- *.gcda *.gcno *.gcov
 clean_dep:
