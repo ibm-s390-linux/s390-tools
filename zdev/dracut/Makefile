@@ -23,6 +23,7 @@ install:
 		$(ZDEVDIR)/zdev-lib.sh \
 		$(ZDEVDIR)/parse-zfcp.sh \
 		$(ZDEVDIR)/parse-dasd.sh \
+		$(ZDEVDIR)/retain-zdev.sh \
 		$(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)/
 	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(ZDEVKDUMPDIR)
 	$(INSTALL) -m 755 $(ZDEVKDUMPDIR)/module-setup.sh \

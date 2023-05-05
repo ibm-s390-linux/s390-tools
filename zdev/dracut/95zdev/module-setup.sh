@@ -82,6 +82,8 @@ install() {
     inst_hook cmdline 94 "$moddir/parse-dasd.sh"
     inst_multiple /lib/s390-tools/zdev-from-dasd_mod.dasd
 
+    inst_hook pre-pivot 95 "$moddir/retain-zdev.sh"
+
     # Rule to automatically enable devices when running in DPM
     inst_rules "81-dpm.rules"
 
