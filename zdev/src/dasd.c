@@ -344,6 +344,68 @@ static struct attrib dasd_attr_fc_security = {
 	.readonly = 1,
 };
 
+static struct attrib dasd_attr_aq_mask = {
+	.name = "aq_mask",
+	.title = "Specify autoquiesce triggers",
+	.desc =
+	"Use the aq_mask attribute to automatically quiesce a device and block\n"
+	"new I/O after certain events.\n"
+	"\n"
+	"The value is a bitmask in decimal or hexadecimal format where each set bit\n"
+	"indicates that the associated event shown in the table below triggers an\n"
+	"autoquiesce.\n"
+	"  Bit 0 is not used.\n"
+	"  1 - 0x02 - A terminal I/O error occurred\n"
+	"  2 - 0x04 - No active channel paths remain for the device\n"
+	"  3 - 0x08 - A state change interrupt occurred\n"
+	"  4 - 0x10 - The device is PPRC suspended\n"
+	"  5 - 0x20 - No space is left on an ESE device\n"
+	"  6 - 0x40 – The number of timeouts specified in aq_timeouts is reached\n"
+	"  7 - 0x80 - I/O was not started because of an error in the start function\n"
+	"\n"
+	"For example bits 1,3 and 5 set (0010 1010) lead to an integer value of 42\n"
+	"or 0x2A.\n"
+	"An integer value of 0 turns off the autoquiesce function.\n",
+	.order_cmp = ccw_online_only_order_cmp,
+	.check = ccw_online_only_check,
+	.defval = "0",
+	/*
+	 * Currently only 8 bits are defined and the max value is 255.
+	 * This needs to be adjusted if more bits are defined.
+	 */
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 255)),
+};
+
+static struct attrib dasd_attr_aq_requeue = {
+	.name = "aq_requeue",
+	.title = "Control I/O requeing during autoquiesce",
+	.desc =
+	"Use the aq_requeue attribute to control whether outstanding I/O\n"
+	"operations to the blocklayer should be automatically requeued after\n"
+	"an autoquiesce event.\n"
+	"Valid values are 1 for requeuing, or 0 for no requeueing.\n"
+	"Requeing the I/O requests to the blocklayer might benefit I/O\n"
+	"in case of a copy_pair swap operation.\n",
+	.order_cmp = ccw_online_only_order_cmp,
+	.check = ccw_online_only_check,
+	.defval = "0",
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+};
+
+static struct attrib dasd_attr_aq_timeouts = {
+	.name = "aq_timeouts",
+	.title = "Specify timeout retry threshold",
+	.desc =
+	"Specify the number of sequential timeout events for an I/O operation\n"
+	"before an autoquiesce is triggered on a device.\n"
+	"This requires that the corresponding trigger bit 6 is set\n"
+	"in the aq_mask attribute.\n",
+	.order_cmp = ccw_online_only_order_cmp,
+	.check = ccw_online_only_check,
+	.defval = "32768",
+	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 32768)),
+};
+
 /*
  * DASD subtype methods.
  */
@@ -725,6 +787,9 @@ struct subtype dasd_subtype_eckd = {
 		&dasd_attr_safe_offline,
 		&dasd_attr_fc_security,
 		&dasd_attr_copy_pair,
+		&dasd_attr_aq_mask,
+		&dasd_attr_aq_requeue,
+		&dasd_attr_aq_timeouts,
 		&internal_attr_early,
 	),
 	.unknown_dev_attribs	= 1,
