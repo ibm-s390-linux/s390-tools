@@ -22,8 +22,7 @@ DISTRELEASE        = build-$(shell date +%Y%m%d)
 S390_TOOLS_RELEASE = $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)
 export S390_TOOLS_RELEASE
 
-reldir = $(subst $(shell cd -P $(dir $(filter %common.mak,$(MAKEFILE_LIST))); \
-	 pwd)/,,$(CURDIR))
+reldir = $(subst $(realpath $(dir $(filter %common.mak,$(MAKEFILE_LIST))))/,,$(CURDIR))
 rootdir= $(dir $(filter %common.mak,$(MAKEFILE_LIST)))
 export S390_TEST_LIB_PATH=$(rootdir)/s390-tools-testsuite/lib
 
