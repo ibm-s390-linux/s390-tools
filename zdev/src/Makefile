@@ -106,11 +106,12 @@ libs =	$(rootdir)/libap/libap.a \
 chzdev: $(chzdev_objects) $(libs)
 lszdev: $(lszdev_objects) $(libs)
 
-install: chzdev zdev_id
+install: chzdev zdev_id zdev-to-dasd_mod.dasd
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c chzdev $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c lszdev $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c zdev_id $(DESTDIR)$(TOOLS_LIBDIR)
+	$(INSTALL) -c zdev-to-dasd_mod.dasd $(DESTDIR)$(TOOLS_LIBDIR)
 ifeq ($(HAVE_DRACUT),1)
 	$(INSTALL) -m 755 zdev-root-update.dracut \
 		$(DESTDIR)$(TOOLS_LIBDIR)/zdev-root-update

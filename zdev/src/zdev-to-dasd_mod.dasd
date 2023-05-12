@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# Copyright IBM Corp. 2023
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# zdev-to-dasd_mod.dasd
+#   Converts zdev configuration into the syntax of the kernel module parameter
+#   dasd_mod.dasd. Only DASD options with non-default values are emitted. The
+#   result string occurs on stdout. It represents one device-specification for
+#   the given DASD device bus-ID.
+#
+
+function usage() {
+    echo "usage: ${0##*/} active|persistent <DASD device bus-ID>" 1>&2
+    exit 1
+}
+
+[[ $# -eq 2 ]] || usage
+
+[[ "$1" == active ]] || [[ "$1" == persistent ]] || usage
+
+_selection="--${1}"
+_busid="$2"
+
+while read -r _line; do
+    case "$_line" in
+        "readonly=1") _attrs="${_attrs:+${_attrs}:}ro" ;;
+        "use_diag=1") _attrs="${_attrs:+${_attrs}:}diag" ;;
+        "raw_track_access=1") _attrs="${_attrs:+${_attrs}:}raw" ;;
+        "erplog=1") _attrs="${_attrs:+${_attrs}:}erplog" ;;
+        "failfast=1") _attrs="${_attrs:+${_attrs}:}failfast" ;;
+    esac
+done < <(chzdev dasd "$_busid" "$_selection" --export - --quiet)
+[[ -n "$_attrs" ]] && _attrs="($_attrs)"
+printf "%s%s\n" "$_busid" "$_attrs"
