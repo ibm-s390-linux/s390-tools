@@ -442,6 +442,7 @@ CONFIGFILES="\
   /run/udev/chreiplzfcpmp-ipl-volume-id\
   /run/udev/rules.d\
   /run/zdev_id.env\
+  /run/zdev.*\
   "
 
 ########################################
