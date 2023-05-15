@@ -518,7 +518,7 @@ CMDS="${CMDS}\
   :ep11info -H\
   :ep11info -M\
   :icainfo\
-  :icastats\
+  :icastats --all\
   :ivp.e # IBM CCA package install check\
   :ls -al /usr/lib64/opencryptoki/stdll\
   :lszcrypt -VV\
