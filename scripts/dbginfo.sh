@@ -394,6 +394,7 @@ CONFIGFILES="\
   /etc/cron.*\
   /etc/crontab\
   /etc/crypttab\
+  /etc/dasd.*\
   /etc/default\
   /etc/depmod.d\
   /etc/dnf/dnf.conf\
@@ -434,6 +435,7 @@ CONFIGFILES="\
   /etc/systemd\
   /etc/udev*\
   /etc/xinet.d\
+  /etc/zfcp.*\
   /lib/modprobe.d\
   $(find /lib/modules -name modules.dep 2>/dev/null)\
   /lib/systemd/system/docker.service\
