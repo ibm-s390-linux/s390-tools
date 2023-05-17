@@ -1,10 +1,16 @@
 .\" chzcrypt.8
 .\"
-.\" Copyright 2020 IBM Corp.
+.\" Copyright 2020, 2023 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH CHZCRYPT 8 "OCT 2020" "s390-tools"
+.\" use
+.\"   groff -man -Tutf8 chzcrypt.8
+.\" or
+.\"   nroff -man chzcrypt.8
+.\" to process this source
+.\"
+.TH CHZCRYPT 8 "MAY 2023" "s390-tools"
 .SH NAME
 chzcrypt \- modify zcrypt configuration
 .SH SYNOPSIS
@@ -46,8 +52,8 @@ chzcrypt \- modify zcrypt configuration
 .SH DESCRIPTION
 The
 .B chzcrypt
-command is used to configure cryptographic devices managed by zcrypt and
-modify zcrypt's AP bus attributes.
+command is used to configure cryptographic devices managed by zcrypt
+and modify zcrypt's AP bus attributes.
 
 Attributes may vary depending on the kernel
 version.
@@ -70,19 +76,6 @@ Set the given cryptographic card device(s) config on ('configured').
 .B --config-off
 Set the given cryptographic card device(s) config off ('deconfigured').
 .TP 8
-.B <device id>
-Specifies a cryptographic device which will be set either online or
-offline or configured on or off. For online and offline the device can
-either be a card device or a queue device. A queue device can only get
-switched online when the providing card is online.
-.br
-For config on/off the device needs to be a card device. A card or
-queue device cannot get switched online if the card is in deconfigured
-state.
-.br
-Please note that the card device and queue device representation are both
-in hexadecimal notation.
-.TP 8
 .B -p, --poll-thread-enable
 Enable zcrypt's poll thread.
 .TP 8
@@ -94,15 +87,28 @@ Set configuration timer for re-scanning the AP bus to
 .I <timeout>
 seconds.
 .TP 8
+.B --se-associate <association-index> <queue-device>
+Associate the given queue device with the given association
+index. This command is only valid within an Secure Execution guest
+with AP pass-through support enabled.
+.TP 8
+.B --se-bind <queue-device>
+Bind the given queue device. This command is only valid within an
+Secure Execution guest with AP pass-through support enabled.
+.TP 8
+.B --se-unbind <queue-device>
+Unbind the given queue device. This command is only valid within an
+Secure Execution guest with AP pass-through support enabled.
+.TP 8
 .BI "-t, --poll-timeout" " <poll_timeout>"
 Set poll timer to run poll tasklet all
 .I <poll_timeout>
 nanoseconds.
 .TP 8
 .BI "-q, --default-domain" " <domain>"
-Set the new default domain of the AP bus to <domain>.
-The number of available domains can be retrieved with the lszcrypt
-command ('-d' option).
+Set the new default domain of the AP bus to <domain>. The number of
+available domains can be retrieved with the lszcrypt command ('-d'
+option).
 .TP 8
 .B -V, --verbose
 Print verbose messages.
@@ -112,6 +118,22 @@ Print help text and exit.
 .TP 8
 .B -v, --version
 Print version information and exit.
+.TP 8
+.B <device id>
+Specifies a cryptographic device which will be set either online or
+offline or configured on or off. For online and offline the device can
+either be a card device or a queue device. A queue device can only get
+switched online when the providing card is online.
+.br
+For config on/off the device needs to be a card device. A card or
+queue device cannot get switched online if the card is in deconfigured
+state.
+.br
+Please note that the card device and queue device representation are
+both in hexadecimal notation.
+.TP 8
+.B <queue-device>
+An APQN queue device given as xy.abcd as it is listed by lszcrypt -V.
 .SH EXAMPLES
 .TP
 .B chzcrypt -e 0 1 12
@@ -131,8 +153,8 @@ Set all available crypto cards to config on, be verbose.
 Switch the two crypto cards 1 and 3 to deconfigured, be verbose.
 .TP
 .B chzcrypt -c 60 -n
-Will set configuration timer for re-scanning the AP bus to 60 seconds and
-disable zcrypt's poll thread.
+Will set configuration timer for re-scanning the AP bus to 60 seconds
+and disable zcrypt's poll thread.
 .TP
 .B chzcrypt -q 67
 Will set the default domain to 67.
@@ -144,5 +166,11 @@ chzcrypt exits with an appropriate message. Even more config on/off
 may require support from a hypervisor like KVM or zVM and may fail if
 the Linux kernel is unable to perform the SCLP command. Check syslog
 on failure.
+.TP
+Bind, associate and unbind command on an queue device are only
+available and valid within an Secure Execution environment with AP
+pass-through enabled and a Linux kernel providing the low level sysfs
+API. If these conditions are not fulfilled, the command will fail with
+an appropriate error messages.
 .SH SEE ALSO
 \fBlszcrypt\fR(8)

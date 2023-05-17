@@ -1,7 +1,7 @@
 /*
  * chzcrypt - Tool to modify zcrypt configuration
  *
- * Copyright IBM Corp. 2008, 2020
+ * Copyright IBM Corp. 2008, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -28,6 +28,12 @@
 
 #include "misc.h"
 
+/* max seconds the se-association command will wait for completion */
+#define MAX_ASSOC_POLL_TIME_IN_S  30
+
+/* max seconds the se-unbind command will wait for unbind complete */
+#define MAX_UNBIND_POLL_TIME_IN_S  30
+
 /*
  * Private data
  */
@@ -45,7 +51,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2020,
+			.pub_last = 2023,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -57,6 +63,9 @@ static const struct util_prg prg = {
 
 #define OPT_CONFIG_ON  0x80
 #define OPT_CONFIG_OFF 0x81
+#define OPT_SE_ASSOC   0x82
+#define OPT_SE_BIND    0x83
+#define OPT_SE_UNBIND  0x84
 
 static struct util_opt opt_vec[] = {
 	{
@@ -115,6 +124,22 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "verbose", no_argument, NULL, 'V'},
 		.desc = "Print verbose messages",
+	},
+	{
+		.option = { "se-associate", required_argument, NULL, OPT_SE_ASSOC},
+		.argument = "assoc_idx",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "SE guest with AP support only: Associate the given queue device",
+	},
+	{
+		.option = { "se-bind", no_argument, NULL, OPT_SE_BIND},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "SE guest with AP support only: Bind the given queue device",
+	},
+	{
+		.option = { "se-unbind", no_argument, NULL, OPT_SE_UNBIND},
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "SE guest with AP support only: Unbind the given queue device",
 	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
@@ -336,6 +361,186 @@ next:
 	}
 }
 
+static void se_assoc(const char *assoc_idx, const char *dev)
+{
+	int i, idx, rc, ap, dom, loop;
+	char *dev_path, *attr;
+	char buf[256];
+
+	if (!ap_bus_has_SB_support())
+		errx(EXIT_FAILURE, "Error - AP bus: SE bind support is not available.");
+
+	if (sscanf(dev, "%02x.%04x", &ap, &dom) != 2)
+		errx(EXIT_FAILURE, "Error - Can't parse queue device '%s' as xy.abcd.",
+		     dev);
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x",
+				   ap, ap, dom);
+	if (!util_path_is_dir(dev_path))
+		errx(EXIT_FAILURE, "Error - Queue device %s does not exist.",
+		     dev);
+
+	if (sscanf(assoc_idx, "%i", &idx) != 1)
+		errx(EXIT_FAILURE, "Error - Can't parse association index '%s' as number.",
+		     assoc_idx);
+	if (idx < 0 || idx > 0xFFFF)
+		errx(EXIT_FAILURE, "Error - Association index needs to be in range [0...%d].",
+		     0xffff);
+
+	attr = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x/se_associate",
+			       ap, ap, dom);
+	if (!util_path_is_writable(attr))
+		errx(EXIT_FAILURE, "Error - Can't write to %s (errno '%s').",
+		     attr, strerror(errno));
+
+	/* read se_associate attribute and check for 'unassociated' */
+	rc = util_file_read_line(buf, sizeof(buf), attr);
+	if (rc)
+		errx(EXIT_FAILURE, "Error - Failure reading from %s (errno '%s').",
+		     attr, strerror(errno));
+	if (strcmp(buf, "unassociated"))
+		errx(EXIT_FAILURE,
+		     "Error - Queue device %s is NOT in 'unassociated' state (state '%s' found).",
+		     dev, buf);
+
+	/* write assocition index to the se_associate attribute */
+	rc = util_file_write_l(idx, 10, attr);
+	if (rc)
+		errx(EXIT_FAILURE, "Error - Failure writing to %s (errno '%s').",
+		     attr, strerror(errno));
+
+	/* loop up to MAX_ASSOC_POLL_TIME_IN_S seconds for completion */
+	for (loop = 0; loop < 2 * MAX_ASSOC_POLL_TIME_IN_S; usleep(500000), loop++) {
+		rc = util_file_read_line(buf, sizeof(buf), attr);
+		if (rc)
+			errx(EXIT_FAILURE, "Error - Failure reading from %s (errno '%s').",
+			     attr, strerror(errno));
+		if (!strncmp(buf, "associated", strlen("associated")))
+			break;
+		if (!strcmp(buf, "unassociated"))
+			errx(EXIT_FAILURE,
+			     "Error - Failure associating queue device %s (state '%s' found).",
+			     dev, buf);
+	}
+	if (loop >= 2 * MAX_ASSOC_POLL_TIME_IN_S)
+		errx(EXIT_FAILURE,
+		     "Error - Failure associating queue device %s (timeout after %d s).",
+		     dev, MAX_ASSOC_POLL_TIME_IN_S);
+
+	if (sscanf(buf, "associated %d", &i) != 1 || idx != i)
+		errx(EXIT_FAILURE,
+		     "Error - Failure associating queue device %s (state '%s' found).",
+		     dev, buf);
+
+	verbose("Queue device %s successful associated with index %d.\n",
+		dev, idx);
+
+	free(dev_path);
+	free(attr);
+}
+
+static void se_bind(const char *dev)
+{
+	char *dev_path, *attr;
+	int rc, ap, dom;
+	char buf[256];
+
+	if (!ap_bus_has_SB_support())
+		errx(EXIT_FAILURE, "Error - AP bus: SE bind support is not available.");
+
+	if (sscanf(dev, "%02x.%04x", &ap, &dom) != 2)
+		errx(EXIT_FAILURE, "Error - Can't parse queue device '%s' as xy.abcd.",
+		     dev);
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x",
+				   ap, ap, dom);
+	if (!util_path_is_dir(dev_path))
+		errx(EXIT_FAILURE, "Error - Queue device %s does not exist.",
+		     dev);
+
+	attr = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x/se_bind",
+			       ap, ap, dom);
+	if (!util_path_is_writable(attr))
+		errx(EXIT_FAILURE, "Error - Can't write to %s (errno '%s').",
+		     attr, strerror(errno));
+
+	/* read se_bind attribute and check for 'unboud' */
+	rc = util_file_read_line(buf, sizeof(buf), attr);
+	if (rc)
+		errx(EXIT_FAILURE, "Error - Failure reading from %s (errno '%s').",
+		     attr, strerror(errno));
+	if (strcmp(buf, "unbound"))
+		errx(EXIT_FAILURE,
+		     "Error - Queue device %s is NOT in 'unbound' state (state '%s' found).",
+		     dev, buf);
+
+	/* write se_bind attribute, check for 'bound' afterwards */
+	rc = util_file_write_l(1, 10, attr);
+	if (rc)
+		errx(EXIT_FAILURE, "Error - Failure writing to %s (errno '%s').",
+		     attr, strerror(errno));
+	rc = util_file_read_line(buf, sizeof(buf), attr);
+	if (rc)
+		errx(EXIT_FAILURE, "Error - Failure reading from %s (errno '%s').",
+		     attr, strerror(errno));
+	if (strcmp(buf, "bound"))
+		errx(EXIT_FAILURE, "Error - Failure binding queue device %s (state '%s' found).",
+		     dev, buf);
+
+	verbose("Queue device %s successful bound.\n", dev);
+
+	free(dev_path);
+	free(attr);
+}
+
+static void se_unbind(const char *dev)
+{
+	int rc, ap, dom, loop;
+	char *dev_path, *attr;
+	char buf[256];
+
+	if (!ap_bus_has_SB_support())
+		errx(EXIT_FAILURE, "Error - AP bus: SE bind support is not available.");
+
+	if (sscanf(dev, "%02x.%04x", &ap, &dom) != 2)
+		errx(EXIT_FAILURE, "Error - Can't parse queue device '%s' as xy.abcd.",
+		     dev);
+	dev_path = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x",
+				   ap, ap, dom);
+	if (!util_path_is_dir(dev_path))
+		errx(EXIT_FAILURE, "Error - Queue device %s does not exist.",
+		     dev);
+
+	attr = util_path_sysfs("bus/ap/devices/card%02x/%02x.%04x/se_bind",
+			       ap, ap, dom);
+	if (!util_path_is_writable(attr))
+		errx(EXIT_FAILURE, "Error - Can't write to %s (errno '%s').",
+		     attr, strerror(errno));
+
+	/* write se_bind attribute */
+	rc = util_file_write_l(0, 10, attr);
+	if (rc)
+		errx(EXIT_FAILURE, "Error - Failure writing to %s (errno '%s').",
+		     attr, strerror(errno));
+
+	/* loop up to MAX_UNBIND_POLL_TIME_IN_S seconds for completion */
+	for (loop = 0; loop < 2 * MAX_UNBIND_POLL_TIME_IN_S; usleep(500000), loop++) {
+		rc = util_file_read_line(buf, sizeof(buf), attr);
+		if (rc)
+			errx(EXIT_FAILURE, "Error - Failure reading from %s (errno '%s').",
+			     attr, strerror(errno));
+		if (!strcmp(buf, "unbound"))
+			break;
+	}
+	if (loop >= 2 * MAX_UNBIND_POLL_TIME_IN_S)
+		errx(EXIT_FAILURE,
+		     "Error - Failure unbinding queue device %s (timeout after %d s).",
+		     dev, MAX_UNBIND_POLL_TIME_IN_S);
+
+	verbose("Queue device %s successful unbound.\n", dev);
+
+	free(dev_path);
+	free(attr);
+}
+
 /*
  * Print invalid commandline error message and then exit with error code
  */
@@ -389,10 +594,10 @@ static void print_adapter_id_help(void)
 	printf("DEVICE_IDS\n");
 	printf("  List of cryptographic device ids separated by blanks which will be set\n");
 	printf("  online/offline. Must be used in conjunction with the enable or disable option.\n");
-
 	printf("  DEVICE_ID could either be card device id ('<card-id>') or queue device id\n");
-	printf("  '<card-id>.<domain-id>').\n");
-	printf("  \n");
+	printf("  '<card-id>.<domain-id>').\n\n");
+	printf("QUEUE_DEVICE:\n");
+	printf("  An APQN queue device given as xy.abcd as it is listed by lszcrypt -V.\n\n");
 	printf("EXAMPLE:\n");
 	printf("  Disable the cryptographic device with card id '02' (inclusive all queues).\n");
 	printf("  #>chzcrypt -d 02\n");
@@ -407,13 +612,14 @@ static void print_adapter_id_help(void)
  */
 int main(int argc, char *argv[])
 {
+	const char *default_domain = NULL, *config = NULL, *config_text = NULL;
 	const char *online = NULL, *online_text = NULL, *poll_thread = NULL;
 	const char *config_time = NULL, *poll_timeout = NULL;
-	const char *default_domain = NULL, *config = NULL, *config_text = NULL;
+	const char *queue_device = NULL, *assoc_idx = NULL;
+	int c, i, j, action = 0;
 	char *path, *dev_list;
-	bool all = false, actionset = false;
+	bool all = false;
 	size_t len;
-	int c, i, j;
 
 	for (i=0; i < argc; i++)
 		for (j=2; j < (int) strlen(argv[i]); j++)
@@ -428,12 +634,12 @@ int main(int argc, char *argv[])
 			break;
 		switch (c) {
 		case 'e':
-			actionset = true;
+			action = c;
 			online = "1";
 			online_text = "online";
 			break;
 		case 'd':
-			actionset = true;
+			action = c;
 			online = "0";
 			online_text = "offline";
 			break;
@@ -441,23 +647,23 @@ int main(int argc, char *argv[])
 			all = true;
 			break;
 		case 'p':
-			actionset = true;
+			action = c;
 			poll_thread = "1";
 			break;
 		case 'n':
-			actionset = true;
+			action = c;
 			poll_thread = "0";
 			break;
 		case 'c':
-			actionset = true;
+			action = c;
 			config_time = optarg;
 			break;
 		case 't':
-			actionset = true;
+			action = c;
 			poll_timeout = optarg;
 			break;
 		case 'q':
-			actionset = true;
+			action = c;
 			default_domain = optarg;
 			break;
 		case 'V':
@@ -472,21 +678,31 @@ int main(int argc, char *argv[])
 			util_prg_print_version();
 			return EXIT_SUCCESS;
 		case OPT_CONFIG_ON:
-			actionset = true;
+			action = c;
 			config = "1";
 			config_text = "config on";
 			break;
 		case OPT_CONFIG_OFF:
-			actionset = true;
+			action = c;
 			config = "0";
 			config_text = "config off";
+			break;
+		case OPT_SE_ASSOC:
+			action = c;
+			assoc_idx = optarg;
+			break;
+		case OPT_SE_BIND:
+			action = c;
+			break;
+		case OPT_SE_UNBIND:
+			action = c;
 			break;
 		default:
 			util_opt_print_parse_error(c, argv);
 			return EXIT_FAILURE;
 		}
 	}
-	if (!actionset)
+	if (!action)
 		invalid_cmdline_exit("Error - missing argument.\n");
 	path = util_path_sysfs("bus/ap");
 	if (!util_path_is_dir(path))
@@ -508,6 +724,32 @@ int main(int argc, char *argv[])
 		default_domain_set(default_domain);
 		return EXIT_SUCCESS;
 	}
+
+	if (action == OPT_SE_ASSOC) {
+		if (optind >= argc)
+			errx(EXIT_FAILURE,
+			     "Error - The --se-associate needs a queue device given.");
+		queue_device = argv[optind];
+		se_assoc(assoc_idx, queue_device);
+		return EXIT_SUCCESS;
+	}
+	if (action == OPT_SE_BIND) {
+		if (optind >= argc)
+			errx(EXIT_FAILURE,
+			     "Error - The --se-bind needs a queue device given.");
+		queue_device = argv[optind];
+		se_bind(queue_device);
+		return EXIT_SUCCESS;
+	}
+	if (action == OPT_SE_UNBIND) {
+		if (optind >= argc)
+			errx(EXIT_FAILURE,
+			     "Error - The --se-unbind needs a queue device given.");
+		queue_device = argv[optind];
+		se_unbind(queue_device);
+		return EXIT_SUCCESS;
+	}
+
 	if (all)
 		dev_list_all(&dev_list, &len);
 	else
