@@ -1,7 +1,7 @@
 /**
  * lszcrypt - Display zcrypt devices and configuration settings
  *
- * Copyright IBM Corp. 2008, 2022
+ * Copyright IBM Corp. 2008, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -55,7 +55,7 @@ static struct lszcrypt_l {
 #define MASK_COPRO	    0x10000000
 #define MASK_ACCEL	    0x08000000
 #define MASK_EP11	    0x04000000
-#define MASK_HSL            0x01000000
+#define MASK_HSL	    0x01000000
 
 /*
  * Classification
@@ -85,6 +85,8 @@ static struct fac_bits_s {
 	{ 0x00400000, 'R' }, /* bit 9, restricted function set */
 };
 
+#define EXTRACT_BS_BITS(f) (((f) & 0x0000c000UL) >> 14)
+
 /*
  * Program configuration
  */
@@ -95,7 +97,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2008,
-			.pub_last = 2020,
+			.pub_last = 2023,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -169,8 +171,9 @@ static struct util_opt opt_vec[] = {
 static void show_bus(void)
 {
 	long domain, max_domain, config_time, value;
-	unsigned long long poll_timeout;
 	const char *poll_thread, *ap_interrupts;
+	unsigned long long poll_timeout;
+	char features[256];
 	char *ap;
 
 	/* check if ap driver is available */
@@ -178,6 +181,10 @@ static void show_bus(void)
 	if (!util_path_is_dir(ap))
 		errx(EXIT_FAILURE, "Crypto device driver not available.");
 
+	if (util_path_is_readable("%s/features", ap))
+		util_file_read_line(features, sizeof(features), "%s/features", ap);
+	else
+		features[0] = '\0';
 	util_file_read_l(&domain, 10, "%s/ap_domain", ap);
 	util_file_read_l(&max_domain, 10, "%s/ap_max_domain_id", ap);
 	util_file_read_l(&config_time, 10, "%s/config_time", ap);
@@ -192,6 +199,8 @@ static void show_bus(void)
 		ap_interrupts = "enabled";
 	else
 		ap_interrupts = "disabled";
+	if (features[0])
+		printf("features: %s\n", features);
 	printf("ap_domain=0x%lx\n", domain);
 	printf("ap_max_domain_id=0x%lx\n", max_domain);
 	if (util_path_is_reg_file("%s/ap_interrupts", ap))
@@ -374,23 +383,15 @@ next:
 }
 
 /*
- * Show capability
+ * Show card capability
  */
-static void show_capability(const char *id_str)
+static void show_card_capability(int id)
 {
 	unsigned long func_val;
-	long hwtype, id, max_msg_size;
-	char *p, *ap, *dev, card[16], cbuf[256];
+	long hwtype, max_msg_size;
+	char *dev, card[16], cbuf[256];
 
-	/* check if ap driver is available */
-	ap = util_path_sysfs("bus/ap");
-	if (!util_path_is_dir(ap))
-		errx(EXIT_FAILURE, "Crypto device driver not available.");
-
-	id = strtol(id_str, &p, 0);
-	if (id < 0 || id > 255 || p == id_str || *p != '\0')
-		errx(EXIT_FAILURE, "Error - '%s' is an invalid cryptographic device id.", id_str);
-	snprintf(card, sizeof(card), "card%02lx", id);
+	snprintf(card, sizeof(card), "card%02x", id);
 	dev = util_path_sysfs("devices/ap/%s", card);
 	if (!util_path_is_dir(dev))
 		errx(EXIT_FAILURE, "Error - cryptographic device %s does not exist.", card);
@@ -463,6 +464,78 @@ static void show_capability(const char *id_str)
 		printf("Detailed capability information for %s (hardware type %ld) is not available.\n",
 		       card, hwtype);
 		break;
+	}
+
+	free(dev);
+}
+
+/*
+ * Show queue capability
+ */
+static void show_queue_capability(int id, int dom)
+{
+	char *dev, card[16], queue[16], buf[256];
+
+	snprintf(card, sizeof(card), "card%02x", id);
+	snprintf(queue, sizeof(queue), "%02x.%04x", id, dom);
+	dev = util_path_sysfs("devices/ap/%s/%s", card, queue);
+	if (!util_path_is_dir(dev))
+		errx(EXIT_FAILURE, "Error - cryptographic queue device %02x.%04x does not exist.",
+		     id, dom);
+
+	printf("queue %02x.%04x capabilities:\n", id, dom);
+
+	if (util_path_is_reg_file("%s/se_bind", dev)) {
+		util_file_read_line(buf, sizeof(buf), "%s/se_bind", dev);
+		printf("SE bind state: %s\n", buf);
+	}
+	if (util_path_is_reg_file("%s/se_associate", dev)) {
+		util_file_read_line(buf, sizeof(buf), "%s/se_associate", dev);
+		printf("SE association state: %s\n", buf);
+	}
+	if (util_path_is_reg_file("%s/mkvps", dev)) {
+		char *mkvps = util_path_sysfs("devices/ap/%s/%s/mkvps", card, queue);
+		FILE *f = fopen(mkvps, "r");
+
+		if (!f)
+			errx(EXIT_FAILURE, "Error - failed to open sysfs file %s.",
+			     mkvps);
+		while (fgets(buf, sizeof(buf), f)) {
+			if (strstr(buf, "WK CUR") ||
+			    strstr(buf, "AES CUR") ||
+			    strstr(buf, "APKA CUR") ||
+			    strstr(buf, "ASYM CUR"))
+				printf("MK %s", buf); /* no newline here */
+		}
+		fclose(f);
+		free(mkvps);
+	}
+
+	free(dev);
+}
+
+/*
+ * Show capability
+ */
+static void show_capability(const char *id_str)
+{
+	char *p, *ap;
+	int id, dom;
+
+	/* check if ap driver is available */
+	ap = util_path_sysfs("bus/ap");
+	if (!util_path_is_dir(ap))
+		errx(EXIT_FAILURE, "Crypto device driver not available.");
+
+	if (sscanf(id_str, "%x.%x", &id, &dom) == 2) {
+		show_queue_capability(id, dom);
+	} else {
+		id = strtol(id_str, &p, 0);
+		if (id < 0 || id > 255 || p == id_str || *p != '\0')
+			errx(EXIT_FAILURE,
+			     "Error - '%s' is an invalid cryptographic device id.",
+			     id_str);
+		show_card_capability(id);
 	}
 }
 
@@ -601,11 +674,33 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 	util_file_read_l(&depth, 10, "%s/depth", grp_dev);
 	util_rec_set(rec, "depth", "%02d", depth + 1);
 
-	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
+	if (util_path_is_readable("%s/%s/ap_functions", grp_dev, sub_dev))
+		util_file_read_ul(&facility, 16, "%s/%s/ap_functions", grp_dev, sub_dev);
+	else
+		util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
 	for (i = 0; i < MAX_FAC_BITS; i++)
 		buf[i] = facility & fac_bits[i].mask ? fac_bits[i].c : '-';
 	buf[i] = '\0';
 	util_rec_set(rec, "facility", buf);
+
+	if (ap_bus_has_SB_support()) {
+		switch (EXTRACT_BS_BITS(facility)) {
+		case 0:
+			util_rec_set(rec, "sestat", "usable");
+			break;
+		case 1:
+			util_rec_set(rec, "sestat", "bound");
+			break;
+		case 2:
+			util_rec_set(rec, "sestat", "unbound");
+			break;
+		case 3:
+			util_rec_set(rec, "sestat", "illicit");
+			break;
+		default:
+			util_rec_set(rec, "sestat", "-");
+		}
+	}
 }
 
 /*
@@ -750,6 +845,9 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 
 	i = read_driver(grp_dev, NULL, buf, sizeof(buf));
 	util_rec_set(rec, "driver", i > 0 ? buf : "-no-driver-");
+
+	if (ap_bus_has_SB_support())
+		util_rec_set(rec, "sestat", "-");
 }
 
 /*
@@ -818,6 +916,8 @@ static void define_rec_verbose(struct util_rec *rec)
 	util_rec_def(rec, "depth", UTIL_REC_ALIGN_RIGHT, 6, "QDEPTH");
 	util_rec_def(rec, "facility", UTIL_REC_ALIGN_LEFT, 10, "FUNCTIONS");
 	util_rec_def(rec, "driver", UTIL_REC_ALIGN_LEFT, 11, "DRIVER");
+	if (ap_bus_has_SB_support())
+		util_rec_def(rec, "sestat", UTIL_REC_ALIGN_LEFT, 11, "SESTAT");
 }
 
 /*

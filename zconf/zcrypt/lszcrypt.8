@@ -1,6 +1,6 @@
 .\" lszcrypt.8
 .\"
-.\" Copyright IBM Corp. 2019, 2022
+.\" Copyright IBM Corp. 2019, 2023
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -10,7 +10,7 @@
 .\"   nroff -man lszcrypt.8
 .\" to process this source
 .\"
-.TH LSZCRYPT 8 "FEB 2022" "s390-tools"
+.TH LSZCRYPT 8 "MAY 2023" "s390-tools"
 .SH NAME
 lszcrypt \- display zcrypt device and configuration information
 .SH SYNOPSIS
@@ -24,7 +24,7 @@ lszcrypt \- display zcrypt device and configuration information
 .TP
 .B lszcrypt
 .B -c
-<card-id>
+<device-id>
 .TP
 .B lszcrypt -b
 .TP
@@ -41,43 +41,60 @@ lszcrypt \- display zcrypt device and configuration information
 .SH DESCRIPTION
 The
 .B lszcrypt
-command is used to display information about cryptographic devices managed by
-zcrypt and the AP bus attributes of zcrypt. Displayed information depends on the
-kernel version.
+command is used to display information about cryptographic devices
+managed by zcrypt and the AP bus attributes of zcrypt. Displayed
+information depends on the kernel version.
 .B lszcrypt
 requires that sysfs is mounted.
 .P
 The following information can be displayed for each cryptographic
 device: card ID, domain ID, card type (symbolic), mode, online status,
-hardware card type (numeric), installed function facilities, card capability,
-hardware queue depth, request count, number of requests in hardware queue, and
-the number of outstanding requests.
-The following AP bus attributes can be displayed: AP domain, Max AP domain,
-configuration timer, poll thread status, poll timeout, and AP interrupt
-status.
+hardware card type (numeric), installed function facilities, card
+capability, hardware queue depth, request count, number of requests in
+hardware queue, and the number of outstanding requests. The following
+AP bus attributes can be displayed: AP domain, Max AP domain,
+configuration timer, poll thread status, poll timeout, and AP
+interrupt status.
 .SH OPTIONS
 .TP 8
 .B -V, --verbose
-The verbose level for cryptographic device information.
-With this verbose level additional information like hardware card type,
-hardware queue depth, pending requests count, installed function
-facilities and driver binding is displayed.
+The verbose level for cryptographic device information.  With this
+verbose level additional information like hardware card type, hardware
+queue depth, pending requests count, installed function facilities and
+driver binding is displayed.
 .TP 8
 .B <device-id>
-Specifies a cryptographic device to display. A cryptographic device can be
-either a card device or a queue device. If no devices are specified information
-about all available devices is displayed.
+Specifies a cryptographic device to display. A cryptographic device
+can be either a card device or a queue device. If no devices are
+specified information about all available devices is displayed.
 Please note that the card device representation and the queue device
 are both in hexadecimal notation.
 .TP 8
 .B -b, --bus
 Displays the AP bus attributes and exits.
+
+There is also a list of AP bus features shown here:
+.RS
+.IP "o" 3
+APSC - Extended TAPQ (Test AP Queue) support.
+.IP "o"
+APXA - Support for more than 16 domains per card.
+.IP "o"
+QACT - QACT support for toleration of new unknown crypto cards.
+.IP "o"
+RC8A - Firmware reports 0x8A instead of 0x42 on some error conditions.
+.IP "o"
+APSB - AP bus has Secure Execution AP pass-through support.
+.RE
 .TP 8
-.B -c, --capability <card-id>
-Shows the capabilities of a cryptographic card device of hardware type 6 or
-higher. The card device id value may be given as decimal or hex value (with
-a leading 0x). The capabilities of a cryptographic card device depend on
-the card type and the installed function facilities.  A cryptographic card
+.B -c, --capability <device-id>
+Shows the capabilities of a cryptographic card or queue device of
+hardware type 6 or higher. A card device id value may be given as
+decimal or hex value (with a leading 0x), a queue device needs to be
+given as xy.abcd (as it is displayed by lszcrypt).
+
+The capabilities of a cryptographic card device depend on the card
+type and the installed function facilities. A cryptographic card
 device can provide one or more of the following capabilities:
 .RS
 .IP "o" 3
@@ -94,14 +111,25 @@ Long RNG
 
 .RS 8
 The CCA Secure Key capability may be limited by a hypervisor
-layer. The remarks 'full function set' or 'restricted function set' may
-reflect this. For details about these limitations please check the
+layer. The remarks 'full function set' or 'restricted function set'
+may reflect this. For details about these limitations please check the
 hypervisor documentation.
+.RE
+
+.RS 8
+The capabilities of a cryptographic queue device may vary depending
+on some state or environment. However if a queue device is given here,
+and the runtime environment is a KVM guest in Secure Execution mode
+with AP pass-through support, then the AP queue bind state and AP
+queue association state is shown here.  Furthermore the state(s) and
+mkvp(s) (Master Key Verification Pattern) of the current master WK
+(Wrapping Key - EP11 mode) or current master AES, APKA and ASYM (CCA
+mode) are shown here.
 .RE
 .TP 8
 .B -d, --domains
-Shows the usage and control domains of the cryptographic devices.
-The displayed domains of the cryptographic device depends on the initial
+Shows the usage and control domains of the cryptographic devices. The
+displayed domains of the cryptographic device depends on the initial
 cryptographic configuration.
 .RS
 .IP "o" 3
@@ -140,18 +168,20 @@ Here is an explanation of the columns displayed. Please note that some
 of the columns show up in verbose mode only.
 .TP
 .B CARD.DOM
-The crypto card number in hexadecimal for a crypto card line or
-the crypto card number and the domain id both in hex separated by a single
+The crypto card number in hexadecimal for a crypto card line or the
+crypto card number and the domain id both in hex separated by a single
 dot for a queue line.
 .TP
 .B TYPE and HWTYPE
-The HWTYPE is a numeric value showing which type of hardware the zcrypt
-device driver presumes that this crypto card is. The currently known values
-are 7=CEX3C, 8=CEX3A, 10=CEX4, 11=CEX5, 12=CEX6, 13=CEX7 and 14=CEX8.
+The HWTYPE is a numeric value showing which type of hardware the
+zcrypt device driver presumes that this crypto card is. The currently
+known values are 7=CEX3C, 8=CEX3A, 10=CEX4, 11=CEX5, 12=CEX6, 13=CEX7
+and 14=CEX8.
 .br
-The TYPE is a human readable value showing the hardware type and the basic
-function type (A=Accelerator, C=CCA Coprocessor, P=EP11 Coprocessor). So
-for example CEX6P means a CEX6 card in EP11 Coprocessor mode.
+The TYPE is a human readable value showing the hardware type and the
+basic function type (A=Accelerator, C=CCA Coprocessor, P=EP11
+Coprocessor). So for example CEX6P means a CEX6 card in EP11
+Coprocessor mode.
 .TP
 .B MODE
 A crypto card can be configured to run into one of 3 modes:
@@ -170,13 +200,13 @@ online/offline state is kept by the zcrypt device driver and can be
 switched on or off with the help of the chzcrypt application.
 .br
 A crypto card can also be 'configured' or 'deconfigured'. This state
-may be adjusted on the HMC or SE. The chzcrypt application can also
-trigger this state with the --config-on and --config-off options.
+may be adjusted on the HMC. The chzcrypt application can also trigger
+this state with the --config-on and --config-off options.
 .br
 lszcrypt shows 'online' when a card or queue is available for
 cryptographic operations. 'offline' is displayed when a card or queue
 is switched to (software) offline. If a card is 'deconfigured' via
-HMC, SE or chzcrypt the field shows 'deconfig'.
+HMC or chzcrypt the field shows 'deconfig'.
 .br
 A crypto card may also reach a 'checkstopped' state. lszcrypt shows
 this as 'chkstop'.
@@ -184,21 +214,22 @@ this as 'chkstop'.
 If a queue is not bound to a device driver there is no detailed
 information available and thus the status shows only '-'.
 .br
-If a queue is bound to the vfio-ap device driver it is up to this driver
-to give some status information and what exactly this means. So lszcrypt
-shows the text retrieved from the underlying sysfs attribute here.
+If a queue is bound to the vfio-ap device driver it is up to this
+driver to give some status information and what exactly this means. So
+lszcrypt shows the text retrieved from the underlying sysfs attribute
+here.
 .TP
 .B REQUESTS
-This is the counter value of successful processed requests on card or queue
-level. Successful here means the request was processed without any failure
-in the whole processing chain.
+This is the counter value of successful processed requests on card or
+queue level. Successful here means the request was processed without
+any failure in the whole processing chain.
 .TP
 .B PENDING
-The underlying firmware and hardware layer usually provide some queuing
-space for requests. When this queue is already filled up, the zcrypt device
-driver maintains a software queue of pending requests. The sum of these
-both values is displayed here and shows the amount of requests waiting for
-processing on card or queue level.
+The underlying firmware and hardware layer usually provide some
+queuing space for requests. When this queue is already filled up, the
+zcrypt device driver maintains a software queue of pending
+requests. The sum of these both values is displayed here and shows the
+amount of requests waiting for processing on card or queue level.
 .TP
 .B FUNCTIONS
 This column shows firmware and hardware function details:
@@ -224,48 +255,64 @@ F - Full function support (opposed to restricted function support, see below).
 .br
 R - Restricted function support. The F and R flag both reflect if a
 hypervisor is somehow restricting this crypto resource in a virtual
-environment. Dependent on the hypervisor configuration the crypto requests
-may be filtered by the hypervisor to allow only a subset of functions
-within the virtual runtime environment. For example a shared CCA
-Coprocessor may be restricted by the hypervisor to allow only clear key
-operations within the guests.
+environment. Dependent on the hypervisor configuration the crypto
+requests may be filtered by the hypervisor to allow only a subset of
+functions within the virtual runtime environment. For example a shared
+CCA Coprocessor may be restricted by the hypervisor to allow only
+clear key operations within the guests.
 .TP
 .B DRIVER
 .br
 Shows which card or queue device driver currently handles this crypto
 resource. Currently known drivers are cex4card/cex4queue (CEX4-CEX8
 hardware), cex2card/cex2cqueue (CEX2C and CEX3C hardware),
-cex2acard/cex2aqueue (CEX2A and CEX3A hardware) and vfio_ap (queue reserved
-for use by kvm hypervisor for kvm guests and not accessible to host
-applications). It is also valid to have no driver handling a queue which is
-shown as a -no-driver- entry.
+cex2acard/cex2aqueue (CEX2A and CEX3A hardware) and vfio_ap (queue
+reserved for use by KVM hypervisor for KVM guests and not accessible
+to host applications). It is also valid to have no driver handling a
+queue which is shown as a -no-driver- entry.
+.TP
+.B SESTAT
+.br
+Shows the state of the BS bits associated with every AP queue within a
+Secure Execution guest when AP Pass-through support is available:
+.br
+usable - AP queue is usable for crypto load.
+.br
+bound - AP queue is bound but not yet associated.
+.br
+unbound - AP queue is unbound and needs to get bound to this Secure
+Execution guest.
+.br
+illicit - AP queue is not available for this Secure Execution guest.
 .SH NOTES
-Use only one of the mode filtering options --accelonly, --ccaonly, --ep11only.
-Same with card/queue filtering: Use only one of --cardonly, --queueonly.
-However, one of the mode filtering options and one of the card/queue filtering
-can be combined.
+Use only one of the mode filtering options --accelonly, --ccaonly,
+--ep11only.  Same with card/queue filtering: Use only one of
+--cardonly, --queueonly.  However, one of the mode filtering options
+and one of the card/queue filtering can be combined.
 .SH EXAMPLES
 .TP
 .B lszcrypt
-Displays the card/domain ID, card type (short name), mode (long name), online
-status and request count of all available cryptographic devices.
+Displays the card/domain ID, card type (short name), mode (long name),
+online status and request count of all available cryptographic
+devices.
 .TP
 .B lszcrypt  1 3 5
-Displays the card/domain ID, card type, mode, online status and request count
-for cryptographic devices 1, 3, and 5.
+Displays the card/domain ID, card type, mode, online status and
+request count for cryptographic devices 1, 3, and 5.
 .TP
 .B lszcrypt -V 3 7 11
-Displays the card/domain ID, card type, mode, online status, request count,
-number of requests in the hardware queue, number of outstanding requests and
-installed function facilities for cryptographic devices 3, 7 and 17 (0x11).
+Displays the card/domain ID, card type, mode, online status, request
+count, number of requests in the hardware queue, number of outstanding
+requests and installed function facilities for cryptographic devices
+3, 7 and 17 (0x11).
 .TP
 .B lszcrypt  10.0038
-Displays information of the cryptographic device '10.0038' respectively card
-id 16 (0x10) with domain 56 (0x38).
+Displays information of the cryptographic device '10.0038'
+respectively card id 16 (0x10) with domain 56 (0x38).
 .TP
 .B lszcrypt  .0038
-Displays information of all available queue devices (potentially multiple
-adapters) with domain 56 (0x38).
+Displays information of all available queue devices (potentially
+multiple adapters) with domain 56 (0x38).
 .TP
 .B lszcrypt -b
 Displays AP bus information.
