@@ -8,6 +8,7 @@ Release history for s390-tools (MIT version)
   Add new tools / libraries:
 
   Changes of existing tools:
+  - add support for architectures other than s390x for `genprotimg`
 
   Bug Fixes:
 
