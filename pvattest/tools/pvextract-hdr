@@ -14,7 +14,7 @@ set -o pipefail
 set -o nounset
 set -e
 
-XDUMP='od -A x -t x2z -v'
+XDUMP='od -A x -t x2z -v --endian=big'
 
 def_output='sehdr.bin'
 def_skip=0x14
