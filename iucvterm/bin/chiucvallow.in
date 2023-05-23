@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # z/VM IUCV HVC device driver -- Edit z/VM user ID filter
 #
