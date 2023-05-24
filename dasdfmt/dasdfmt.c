@@ -1230,7 +1230,7 @@ static void dasdfmt_find_start(unsigned int cylinders, unsigned int heads,
 	format_params->start_unit = first;
 }
 
-static void dasdfmt_release_space(void)
+static int dasdfmt_release_space(void)
 {
 	format_data_t r = {
 		.start_unit = 0,
@@ -1240,12 +1240,21 @@ static void dasdfmt_release_space(void)
 	int err = 0;
 
 	if (!g.ese || g.no_discard)
-		return;
+		return 0;
 
 	printf("Releasing space for the entire device...\n");
 	err = dasd_release_space(g.dev_node, &r);
-	if (err)
+	/*
+	 * Warn or Error on failing RAS depending on QUICK mode set explicitly or automatically
+	 */
+	if (err && !g.mode_specified) {
+		warnx("Could not release space. Falling back to full format.");
+		return 1;
+	} else if (err && g.mode_specified) {
 		error("Could not release space: %s", strerror(err));
+	}
+
+	return 0;
 }
 
 static void dasdfmt_prepare_and_format(unsigned int cylinders, unsigned int heads,
@@ -1445,8 +1454,12 @@ static void do_format_dasd(volume_label_t *vlabel, format_data_t *p,
 			dasdfmt_prepare_and_format(cylinders, heads, p);
 			break;
 		case QUICK:
-			dasdfmt_release_space();
-			dasdfmt_quick_format(cylinders, heads, p);
+			if (dasdfmt_release_space()) {
+				p->stop_unit  = (cylinders * heads) - 1;
+				dasdfmt_prepare_and_format(cylinders, heads, p);
+			} else {
+				dasdfmt_quick_format(cylinders, heads, p);
+			}
 			break;
 		case EXPAND:
 			dasdfmt_expand_format(cylinders, heads, p);
