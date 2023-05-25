@@ -3,7 +3,7 @@
  *
  * Dump tool for channel-attached tape devices
  *
- * Copyright IBM Corp. 2013, 2017
+ * Copyright IBM Corp. 2013, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -14,6 +14,7 @@
 #include "boot/error.h"
 #include "boot/loaders_layout.h"
 #include "boot/s390.h"
+#include "dump/s390_dump.h"
 
 #include "cio.h"
 #include "stage2dump.h"

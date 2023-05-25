@@ -3,11 +3,13 @@
  *
  * Common ECKD dump I/O functions
  *
- * Copyright IBM Corp. 2013, 2018
+ * Copyright IBM Corp. 2013, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
  */
+
+#include "dump/s390_dump.h"
 
 #include "cio.h"
 #include "eckd2dump.h"

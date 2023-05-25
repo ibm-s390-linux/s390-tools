@@ -3,7 +3,7 @@
  *
  * Single-volume ECKD DASD dump tool
  *
- * Copyright IBM Corp. 2013, 2018
+ * Copyright IBM Corp. 2013, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -12,6 +12,7 @@
 #include "lib/zt_common.h"
 #include "boot/boot_defs.h"
 #include "boot/error.h"
+#include "dump/s390_dump.h"
 
 #include "eckd2dump.h"
 #include "stage2dump.h"

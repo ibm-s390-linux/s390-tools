@@ -3,7 +3,7 @@
  *
  * Common functions for stand-alone dump tools
  *
- * Copyright IBM Corp. 2013, 2018
+ * Copyright IBM Corp. 2013, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -13,6 +13,7 @@
 
 #include "lib/zt_common.h"
 #include "boot/error.h"
+#include "dump/s390_dump.h"
 
 #include "libc.h"
 #include "sclp.h"
