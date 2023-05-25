@@ -276,9 +276,7 @@ static bool check_setpossible(void)
 	if (!get_cpus(CPUS_KERNELMAX, cpubuf, sizeof(cpubuf)))
 		return false;
 	max_possible_cpus = getnumber(cpubuf, '\0') + 1;
-	check = calloc(max_possible_cpus, sizeof(*check));
-	if (!check)
-		err(EXIT_FAILURE, "Maximum CPUs %u", max_possible_cpus);
+	check = util_zalloc(max_possible_cpus * sizeof(*check));
 	if (!get_cpus(CPUS_POSSIBLE, cpubuf, sizeof(cpubuf))) {
 		free(check);
 		return false;
@@ -533,13 +531,8 @@ static int do_read(int ioctlfd)
 	struct s390_hwctr_read *read;
 	int rc;
 
-	if (!ioctlbuffer) {
-		ioctlbuffer = malloc(ioctlbuffer_len);
-		if (!ioctlbuffer) {
-			warn("ioctl S390_HWCTR_START");
-			return -ENOMEM;
-		}
-	}
+	if (!ioctlbuffer)
+		ioctlbuffer = util_malloc(ioctlbuffer_len);
 	read = (struct s390_hwctr_read *)ioctlbuffer;
 	rc = ioctl(ioctlfd, S390_HWCTR_READ, read);
 	if (!rc)
