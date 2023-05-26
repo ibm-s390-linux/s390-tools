@@ -252,13 +252,19 @@ static int do_print(int s, enum ctr_e ctr)
 }
 
 
-static int become_daemon(void)
+static int become_daemon(int *startup_pipe)
 {
+	int child_initialized = 0, fd;
+	int pipefds[2];
 	FILE *f;
-	int fd;
 
 	/* syslog */
 	openlog("cpacfstatsd", 0, LOG_DAEMON);
+
+	if (pipe(pipefds) != 0) {
+		eprint("pipe() failed, errno=%d [%s]\n", errno, strerror(errno));
+		return -1;
+	}
 
 	/*
 	 * fork and terminate parent
@@ -276,8 +282,22 @@ static int become_daemon(void)
 	case 0:   /* child */
 		break;
 	default:  /* parent */
+		(void)close(pipefds[1]);
+		if (read(pipefds[0], &child_initialized, sizeof(child_initialized)) !=
+		    sizeof(child_initialized)) {
+			eprint("Couldn't read from PIPE, errno=%d [%s]\n", errno, strerror(errno));
+			(void)close(pipefds[0]);
+			_exit(EXIT_FAILURE);
+		}
+		(void)close(pipefds[0]);
+		if (!child_initialized)
+			_exit(EXIT_FAILURE);
 		_exit(0);
 	}
+
+	/* Executed within the child context only */
+	(void)close(pipefds[0]);
+	*startup_pipe = pipefds[1];
 
 	if (chdir("/") != 0) {
 		eprint("Chdir('/') failed, errno=%d [%s]\n",
@@ -418,7 +438,7 @@ int eprint(const char *format, ...)
 
 int main(int argc, char *argv[])
 {
-	int rc, sfd, foreground = 0;
+	int rc, sfd, foreground = 0, startup_pipe = -1, initialized = 0;
 	struct sigaction act;
 
 	if (argc > 1) {
@@ -459,22 +479,22 @@ int main(int argc, char *argv[])
 	}
 
 	if (!foreground) {
-		if (become_daemon() != 0) {
+		if (become_daemon(&startup_pipe) != 0) {
 			eprint("Couldn't daemonize\n");
-			return EXIT_FAILURE;
+			goto error;
 		}
 	}
 
 	if (perf_init() != 0) {
 		eprint("Couldn't initialize perf lib\n");
-		return EXIT_FAILURE;
+		goto error;
 	}
 	atexit(perf_close);
 
 	sfd = open_socket(SERVER);
 	if (sfd < 0) {
 		eprint("Couldn't initialize server socket\n");
-		return EXIT_FAILURE;
+		goto error;
 	}
 	atexit(remove_sock);
 
@@ -484,17 +504,27 @@ int main(int argc, char *argv[])
 	if (sigaction(SIGINT, &act, 0) != 0) {
 		eprint("Couldn't establish signal handler for SIGINT, errno=%d [%s]\n",
 		       errno, strerror(errno));
-		return EXIT_FAILURE;
+		goto error;
 	}
 	if (sigaction(SIGTERM, &act, 0) != 0) {
 		eprint("Couldn't establish signal handler for SIGTERM, errno=%d [%s]\n",
 		       errno, strerror(errno));
-		return EXIT_FAILURE;
+		goto error;
 	}
 	/* Ignore SIGPIPE such that we see EPIPE as return from write. */
 	signal(SIGPIPE, SIG_IGN);
 
 	eprint("Running\n");
+	initialized = 1;
+	/* `startup_pipe` has been initialized, so we know we are
+	 * running in daemon mode. Let's write to the pipe so that the
+	 * parent knows that the initialization is complete.
+	 */
+	if (startup_pipe != -1 &&
+	    write(startup_pipe, &initialized, sizeof(initialized)) != sizeof(initialized))
+		goto error;
+	(void)close(startup_pipe);
+	startup_pipe = -1;
 
 	while (!stopsig) {
 		enum ctr_e ctr;
@@ -507,7 +537,7 @@ int main(int argc, char *argv[])
 				continue;
 			eprint("Accept() failure, errno=%d [%s]\n",
 			       errno, strerror(errno));
-			return EXIT_FAILURE;
+			goto error;
 		}
 
 		rc = recv_query(s, &ctr, &cmd);
@@ -542,4 +572,14 @@ int main(int argc, char *argv[])
 	remove_pidfile();
 
 	return 0;
+
+error:
+	if (startup_pipe != -1) {
+		/* Notify the parent process that there was an error */
+		if (write(startup_pipe, &initialized, sizeof(initialized)) != sizeof(initialized))
+			eprint("Couldn't write to PIPE, errno=%d [%s]\n", errno, strerror(errno));
+		(void)close(startup_pipe);
+	}
+
+	return EXIT_FAILURE;
 }
