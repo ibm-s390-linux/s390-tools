@@ -97,7 +97,7 @@ static int do_send_pai(int s, int user)
 {
 	int ctr, state, i, maxctr, rc = 0;
 	uint64_t value;
-	
+
 	if (user) {
 		ctr = PAI_USER;
 		maxctr = NUM_PAI_USER;
@@ -265,7 +265,7 @@ static int become_daemon(void)
 	 * Reasons:
 	 * - opens new command line prompt
 	 * - the child process is guaranteed not to be the process group leader
-	 *   nessecarry for setsid.
+	 *   necessary for setsid.
 	 */
 
 	switch (fork()) {
@@ -454,7 +454,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (check_pidfile() != 0) {
-		eprint("Stalled pid file or daemon allready running, terminating\n");
+		eprint("Stalled pid file or daemon already running, terminating\n");
 		return EXIT_FAILURE;
 	}
 
