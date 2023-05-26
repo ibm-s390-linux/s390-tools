@@ -17,6 +17,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "dump/s390_dump.h"
+
 #include "df_s390.h"
 
 /*

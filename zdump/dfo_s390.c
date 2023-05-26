@@ -17,6 +17,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "dump/s390_dump.h"
+
 #include "df_s390.h"
 #include "dfi_mem_chunk.h"
 #include "dfo_mem_chunk.h"
@@ -69,7 +71,7 @@ static void cpu2lc_32(void *lc_32, struct dfi_cpu *cpu_64)
 /*
  * Convert timeval to s390 TOD clock
  */
-static void timeval2tod(u64 *tod, struct timeval *xtime)
+static void timeval2tod(uint64_t *tod, struct timeval *xtime)
 {
 	u64 us = xtime->tv_sec * 1000000 + xtime->tv_usec;
 	*tod = (us << 12);

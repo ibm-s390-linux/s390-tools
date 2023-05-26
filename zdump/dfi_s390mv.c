@@ -24,6 +24,7 @@
 
 #include "lib/util_file.h"
 #include "lib/util_path.h"
+#include "dump/s390_dump.h"
 
 #include "zgetdump.h"
 #include "dt.h"

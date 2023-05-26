@@ -22,6 +22,7 @@
 #define DF_S390_HDR_SIZE	0x1000
 #define DF_S390_EM_SIZE		16
 #define DF_S390_EM_MAGIC	0x44554d505f454e44ULL
+#define DF_S390_EM_STR		"DUMP_END"
 #define DF_S390_CPU_MAX		512
 #define DF_S390_MAGIC_BLK_ECKD	3
 
@@ -67,8 +68,11 @@ struct df_s390_hdr {
  *  End marker: Should be at the end of every valid s390 crash dump
  */
 struct df_s390_em {
-	uint64_t	magic;
-	uint64_t	tod;
+	union {
+		uint64_t magic;
+		char str[8];
+	};
+	uint64_t tod;
 } __packed __aligned(16);
 
 /*
@@ -78,6 +82,7 @@ struct df_s390_dump_segm_hdr {
 	uint64_t start;
 	uint64_t len;
 	uint64_t stop_marker;
-};
+	uint8_t reserved[0x1000 - 24];
+} __packed;
 
 #endif /* S390_DUMP_H */

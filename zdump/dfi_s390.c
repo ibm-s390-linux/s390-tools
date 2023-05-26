@@ -20,6 +20,7 @@
 #include <errno.h>
 
 #include "lib/util_log.h"
+#include "dump/s390_dump.h"
 
 #include "zgetdump.h"
 #include "zg.h"

@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "dump/s390_dump.h"
+
 #include "zgetdump.h"
 #include "df_s390.h"
 #include "dfi.h"

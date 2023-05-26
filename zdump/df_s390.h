@@ -13,73 +13,10 @@
 #define DF_S390_H
 
 #include "lib/zt_common.h"
+#include "dump/s390_dump.h"
 
 #include "dt.h"
 #include "zg.h"
-
-#define DF_S390_MAGIC		0xa8190173618f23fdULL
-#define DF_S390_MAGIC_EXT	0xa8190173618f23feULL
-#define DF_S390_HDR_SIZE	0x1000
-#define DF_S390_EM_SIZE		16
-#define DF_S390_EM_STR		"DUMP_END"
-#define DF_S390_CPU_MAX		512
-#define DF_S390_MAGIC_BLK_ECKD	3
-
-/*
- * Architecture of dumped system
- */
-enum df_s390_arch {
-	DF_S390_ARCH_32	= 1,
-	DF_S390_ARCH_64	= 2,
-};
-
-/*
- * s390 dump header format
- */
-struct df_s390_hdr {
-	u64	magic;				/* 0x000 */
-	u32	version;			/* 0x008 */
-	u32	hdr_size;			/* 0x00c */
-	u32	dump_level;			/* 0x010 */
-	u32	page_size;			/* 0x014 */
-	u64	mem_size;			/* 0x018 */
-	u64	mem_start;			/* 0x020 */
-	u64	mem_end;			/* 0x028 */
-	u32	num_pages;			/* 0x030 */
-	u32	pad;				/* 0x034 */
-	u64	tod;				/* 0x038 */
-	u64	cpu_id;				/* 0x040 */
-	u32	arch;				/* 0x048 */
-	u32	volnr;				/* 0x04c */
-	u32	build_arch;			/* 0x050 */
-	u64	mem_size_real;			/* 0x054 */
-	u8	mvdump;				/* 0x05c */
-	u16	cpu_cnt;			/* 0x05d */
-	u16	real_cpu_cnt;			/* 0x05f */
-	u8	end_pad1[0x200-0x061];		/* 0x061 */
-	u64	mvdump_sign;			/* 0x200 */
-	u64	mvdump_zipl_time;		/* 0x208 */
-	u8	end_pad2[0x800-0x210];		/* 0x210 */
-	u32	lc_vec[DF_S390_CPU_MAX];	/* 0x800 */
-} __packed;
-
-/*
- *  End marker: Should be at the end of every valid s390 crash dump.
- */
-struct df_s390_em {
-	char	str[8];
-	u64	tod;
-} __packed;
-
-/*
- * Segment header for s390 extended dump format
- */
-struct df_s390_dump_segm_hdr {
-	u64	start;
-	u64	len;
-	u64	stop_marker;
-	u8	reserved[0x1000 - 24];
-} __packed;
 
 /*
  * Convert DFI arch to s390 arch
