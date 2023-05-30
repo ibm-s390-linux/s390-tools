@@ -513,7 +513,8 @@ int main(int argc, char *argv[])
 		rc = recv_query(s, &ctr, &cmd);
 		if (rc != 0) {
 			eprint("Recv_query() failed, ignoring\n");
-			goto cleanup;
+			close(s);
+			continue;
 		}
 
 		if (cmd == ENABLE)
@@ -527,11 +528,9 @@ int main(int argc, char *argv[])
 		else {
 			eprint("Received unknown command %d, ignoring\n",
 			       (int) cmd);
-			goto cleanup;
+			close(s);
+			continue;
 		}
-
-cleanup:
-		close(s);
 	}
 
 	if (stopsig == SIGTERM)
