@@ -1,30 +1,36 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.27.0 (2023-05-30)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.3
 
   Changes of existing tools:
-  - dbginfo.sh: rework crypto data collection
-  - dbginfo.sh: add nstat for network and SNMP stats
-  - `pkg-config` is now mandatory for the build process
-  - Add `PKG_CONFIG` Makefile variable to select pkg-config program;
-    default `pkg-config` or `$(CROSS_COMPILE)pkg-config` if
-    `CROSS_COMPILE` is set
-  - rename Makefile variable `ARCH` to `HOST_ARCH`. `HOST_ARCH` is the
-    architecture that will run the produced (executable) objects
-  - add the Makefile variable `BUILD_ARCH`. `BUILD_ARCH` is the
-    architecture of the build system. For each Makefile variable like
-    `CC`, `LINK`, `CPP`, ... there is a suffixed version of it - e.g.
-    `CC_FOR_BUILD`. This is useful for cross compiling, and this naming
-    convention is very similar to the Meson convention (see
-    https://mesonbuild.com/Reference-tables.html#environment-variables-per-machine).
-  - add support for architectures other than s390x for `pvattest`
+   - s390-tools cross-compile and non-s390x support:
+      - `pkg-config` is now mandatory for the build process
+      - Add `PKG_CONFIG` Makefile variable to select pkg-config program;
+        default `pkg-config` or `$(CROSS_COMPILE)pkg-config` if
+        `CROSS_COMPILE` is set
+      - Rename Makefile variable `ARCH` to `HOST_ARCH`. `HOST_ARCH` is the
+        architecture that will run the produced (executable) objects
+      - Add the Makefile variable `BUILD_ARCH`. `BUILD_ARCH` is the
+        architecture of the build system. For each Makefile variable like
+        `CC`, `LINK`, `CPP`, ... there is a suffixed version of it - e.g.
+        `CC_FOR_BUILD`. This is useful for cross compiling, and this naming
+        convention is very similar to the Meson convention (see
+        https://mesonbuild.com/Reference-tables.html#environment-variables-per-machine).
+      - Limit build targets for non-s390x architectures (pvattest)
+  - dasdfmt: Fall back to full format if space release fails
+  - dbginfo.sh: Add nstat for network and SNMP stats
+  - dbginfo.sh: Rework crypto data collection
+  - hyptop: Show thread util by default
+  - zipl: Add support for list-directed IPL dump from ECKD DASD
 
   Bug Fixes:
+  - lszcrypt: Fix argument parsing
+  - zdev/dracut: Fix out-of-memory (OOM) situations in the kdump crashkernel environment
+  - ziomon/ziorep_config: Fix for SCSI devices of type disk without block dev
+  - pvextract-hdr: Fix parsing issues on little-endian systems
 
 * __v2.26.0 (2023-02-14)__
 

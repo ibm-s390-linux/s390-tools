@@ -28,7 +28,7 @@ endif
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
 VERSION            = 2
-RELEASE            = 26
+RELEASE            = 27
 PATCHLEVEL         = 0
 DISTRELEASE        = build-$(shell date +%Y%m%d)
 S390_TOOLS_RELEASE = $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)
