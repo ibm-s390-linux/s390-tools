@@ -121,7 +121,7 @@ secure_boot_enabled()
 		rc = pl_hdr->version <= IPL_MAX_SUPPORTED_VERSION &&
 			!!(pl_hdr->flags & IPL_FLAG_SECURE);
 		break;
-	case DIAG308_RC_NO_CONF:
+	case DIAG308_RC_NOCONFIG:
 		rc = 0;
 		break;
 	default:

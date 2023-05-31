@@ -405,7 +405,7 @@ static __noreturn void dump_exit(unsigned long code)
 	if (ipib_info->ipib_csum != csum)
 		libc_stop(code);
 	diag308(DIAG308_SET, (void *) ipib_info->ipib);
-	diag308(DIAG308_IPL, NULL);
+	diag308(DIAG308_LOAD_CLEAR, NULL);
 	__builtin_unreachable();
 }
 

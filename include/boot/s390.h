@@ -285,18 +285,21 @@ static __always_inline void __ctl_set_bit(unsigned int cr, unsigned int bit)
  * DIAG 308 support
  */
 enum diag308_subcode {
-	DIAG308_REL_HSA	  = 2,
-	DIAG308_IPL	  = 3,
-	DIAG308_DUMP	  = 4,
-	DIAG308_SET	  = 5,
-	DIAG308_STORE	  = 6,
+	DIAG308_CLEAR_RESET = 0,
+	DIAG308_LOAD_NORMAL_RESET = 1,
+	DIAG308_REL_HSA = 2,
+	DIAG308_LOAD_CLEAR = 3,
+	DIAG308_LOAD_NORMAL_DUMP = 4,
+	DIAG308_SET = 5,
+	DIAG308_STORE = 6,
+	DIAG308_LOAD_NORMAL = 7,
 	DIAG308_SET_PV	  = 8,
 	DIAG308_UNPACK_PV = 10,
 };
 
 enum diag308_rc {
 	DIAG308_RC_OK	      = 0x0001,
-	DIAG308_RC_NO_CONF    = 0x0102,
+	DIAG308_RC_NOCONFIG   = 0x0102,
 };
 
 static __always_inline unsigned long diag308(unsigned long subcode, void *addr)
