@@ -72,6 +72,7 @@ struct job_dump_data {
 	struct job_common_ipl_data common;
 	char* device;
 	uint64_t mem;
+	bool no_compress;
 };
 
 struct job_mvdump_data {
@@ -86,7 +87,6 @@ struct job_ipl_tape_data {
 	struct job_common_ipl_data common;
 	char* device;
 };
-
 
 union job_menu_entry_data {
 	struct job_ipl_data ipl;

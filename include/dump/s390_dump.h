@@ -40,7 +40,8 @@ enum df_s390_arch {
  */
 struct stage2dump_parm_tail {
 	char		reserved[6];
-	uint16_t	mvdump_force;
+	uint8_t		no_compress;
+	uint8_t		mvdump_force;
 	uint64_t	mem_upper_limit;
 } __packed;
 

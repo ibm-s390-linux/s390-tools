@@ -225,7 +225,12 @@ static void df_s390_dump_init(void)
 	dh->tod = get_tod_clock();
 	dh->volnr = 0;
 	dh->zlib_version_s390 = 0;
-	if (test_facility(DFLTCC_FACILITY)) {
+	/*
+	 * Ignore compression if --no-compress attribute has been specified
+	 * or DFLTCC facility not available.
+	 */
+	if (test_facility(DFLTCC_FACILITY) &&
+	    parm_tail.no_compress == 0) {
 		dh->zlib_version_s390 = 1; /* Indicate interlnal Zlib version */
 		dh->zlib_entry_size = DUMP_SEGM_ZLIB_ENTSIZE;
 	}
@@ -458,6 +463,8 @@ void __noreturn start(void)
 	df_s390_dump_init();
 	printf("zIPL v%s dump tool (64 bit)", RELEASE_STRING);
 	printf("Dumping 64 bit OS");
+	if (parm_tail.no_compress)
+		printf("Dump compression prevented by the --no-compress attribute");
 	mem_and_cpu_init();
 	store_status();
 	dt_dump_mem();

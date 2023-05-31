@@ -50,6 +50,7 @@ static struct option options[] = {
 	{ "parmfile",		required_argument,	NULL, 'p'},
 	{ "parameters",		required_argument,	NULL, 'P'},
 	{ "dumpto",		required_argument,	NULL, 'd'},
+	{ "no-compress",	no_argument,		NULL, 0xb1},
 	{ "dumptofs",		required_argument,	NULL, 'D'},
 	{ "mvdump",		required_argument,	NULL, 'M'},
 	{ "segment",		required_argument,	NULL, 's'},
@@ -93,6 +94,7 @@ struct command_line {
 	int add_files;
 	int dry_run;
 	int force;
+	int no_compress;
 	int is_secure;
 	int is_ldipl_dump;
 	enum scan_section_type type;
@@ -288,6 +290,9 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 			break;
 		case 0xb0:
 			cmdline.is_ldipl_dump = 1;
+			break;
+		case 0xb1:
+			cmdline.no_compress = 1;
 			break;
 		case 1:
 			/* Non-option is interpreted as section name */
@@ -1984,6 +1989,7 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->noninteractive = cmdline.noninteractive;
 	job->verbose = cmdline.verbose;
 	job->add_files = cmdline.add_files;
+	job->data.dump.no_compress = cmdline.no_compress;
 	job->data.mvdump.force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
 	job->is_secure =  SECURE_BOOT_UNDEFINED;

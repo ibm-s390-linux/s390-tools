@@ -120,8 +120,8 @@ int install_tapeloader(const char* device, const char* image,
 		       const char* parmline, const char* ramdisk,
 		       address_t image_addr, address_t parm_addr,
 		       address_t initrd_addr);
-int install_dump(const char* device, struct job_target_data* target,
-		 uint64_t mem);
+int install_dump(const char *device, struct job_target_data *target,
+		 uint64_t mem, bool no_compress);
 int install_mvdump(char* const device[], struct job_target_data* target,
 		   int device_count, uint64_t mem, uint8_t force);
 

@@ -535,7 +535,7 @@ boot_get_eckd_dump_stage2(void **data, size_t *size,
 	if (buffer == NULL)
 		return -1;
 	memcpy(buffer, DATA_ADDR(eckd2dump_sv), DATA_SIZE(eckd2dump_sv));
-	/* Write mem size to end of dump record */
+	/* Write mem size and no-compression indicator to end of dump record */
 	offset = DATA_SIZE(eckd2dump_sv) - sizeof(struct stage2dump_parm_tail);
 	memcpy(VOID_ADD(buffer, offset), stage2dump_parms,
 	       sizeof(struct stage2dump_parm_tail));

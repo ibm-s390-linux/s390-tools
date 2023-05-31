@@ -291,6 +291,12 @@ This option has been removed, use --dumpto instead.
 Install a List-directed dump record instead of a CCW-type dump.
 
 .TP
+.BR "\-\-no-compress"
+Do not use zlib compression for a CCW-type dump.
+Zlib compression is used by default for CCW-type single-volume DASD standalone
+dump when the DFLTCC facility is available on the system.
+
+.TP
 .BR "\-M <DUMPLIST[,SIZE]>" " or " "--mvdump=<DUMPLIST[,SIZE]>"
 Install a multi-volume dump record on each device associated with one of the
 partitions listed in file DUMPLIST.

@@ -73,6 +73,7 @@ static const char* usage_text[] = {
 "-d, --dumpto DUMPDEV[,SIZE]     Install a system dump record on tape device",
 "                                or disk partition DUMPDEV",
 "    --ldipl-dump                Install a List-directed dump",
+"    --no-compress               Do not use zlib compression for DASD dump",
 "-M, --mvdump DEVLIST[,SIZE]     Install a multi-volume dump record on each",
 "                                disk partition listed in file DEVLIST",
 "-f, --force                     Disable sanity check while producing a",
@@ -176,7 +177,7 @@ main(int argc, char* argv[])
 		    (disk_is_tape(job->data.dump.device) ||
 		     !disk_is_scsi(job->data.dump.device, &job->target))) {
 			rc = install_dump(job->data.dump.device, &job->target,
-					  job->data.dump.mem);
+					  job->data.dump.mem, job->data.dump.no_compress);
 			break;
 		}
 		/* Dump to a raw SCSI partition */

@@ -1040,7 +1040,8 @@ install_dump_tape(int fd, const struct stage2dump_parm_tail *stage2dump_parms)
 
 
 int
-install_dump(const char* device, struct job_target_data* target, uint64_t mem)
+install_dump(const char *device, struct job_target_data *target, uint64_t mem,
+	     bool no_compress)
 {
 	struct stage2dump_parm_tail stage2dump_parms = {0};
 	struct disk_info* info;
@@ -1050,6 +1051,7 @@ install_dump(const char* device, struct job_target_data* target, uint64_t mem)
 	int rc;
 
 	stage2dump_parms.mem_upper_limit = mem;
+	stage2dump_parms.no_compress = no_compress;
 	fd = misc_open_exclusive(device);
 	if (fd == -1) {
 		error_text("Could not open dump device '%s'", device);
