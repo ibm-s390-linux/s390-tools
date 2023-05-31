@@ -95,7 +95,7 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 	/* Check for mandatory arguments */
 	if (args->allow_dump == PV_TRUE && !args->cust_comm_key_path) {
 		g_set_error(err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
-			    _("Option '--allow-dump' requires the '--comm-key' option.\nUse 'genprotimg "
+			    _("Option '--enable-dump' requires the '--comm-key' option.\nUse 'genprotimg "
 			      "--help' for more information"));
 		return -1;
 	}
