@@ -228,6 +228,14 @@ static gint pv_img_set_psw_addr(PvImage *img, const gchar *psw_addr_s,
 	return 0;
 }
 
+static void pv_img_set_control_flag(uint64_t *flags, const PvTristate option, const uint64_t flag)
+{
+	if (option == PV_TRUE)
+		*flags |= flag;
+	else if (option == PV_FALSE)
+		*flags &= ~flag;
+}
+
 static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
 				     const gchar *scf_s,
 				     PvTristate allow_dump,
@@ -235,6 +243,7 @@ static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
 {
 	uint64_t flags;
 
+	/* Set plain control flags */
 	if (pcf_s) {
 		if (hex_str_toull(pcf_s, &flags, err) < 0)
 			return -1;
@@ -242,22 +251,17 @@ static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
 		img->pcf = flags;
 	}
 
+	pv_img_set_control_flag(&img->pcf, allow_dump, PV_PCF_ALLOW_DUMPING);
+	pv_img_set_control_flag(&img->pcf, allow_pckmo,
+				PV_PCF_PCKM_ECC | PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA);
+
+	/* Set secret control flags */
 	if (scf_s) {
 		if (hex_str_toull(scf_s, &flags, err) < 0)
 			return -1;
 
 		img->scf = flags;
 	}
-
-	if (allow_dump == PV_TRUE)
-		img->pcf |= PV_PCF_ALLOW_DUMPING;
-	else if (allow_dump == PV_FALSE)
-		img->pcf &= ~PV_PCF_ALLOW_DUMPING;
-
-	if (allow_pckmo == PV_TRUE)
-		img->pcf |= PV_PCF_PCKM_ECC | PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA;
-	else if (allow_pckmo == PV_FALSE)
-		img->pcf &= ~(PV_PCF_PCKM_ECC | PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA);
 
 	return 0;
 }
