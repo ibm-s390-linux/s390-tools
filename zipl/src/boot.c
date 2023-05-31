@@ -19,6 +19,7 @@
 #include "lib/util_libc.h"
 #include "boot/loaders_layout.h"
 
+#include "stage2dump.h"
 #include "stage3.h"
 
 #include "boot.h"
@@ -504,17 +505,19 @@ boot_get_eckd_stage2(void** data, size_t* size, struct job_data* job)
 
 
 int
-boot_get_tape_dump(void** data, size_t* size, uint64_t mem)
+boot_get_tape_dump(void **data, size_t *size,
+		   const struct stage2dump_parm_tail *stage2dump_parms)
 {
-	void* buffer;
+	void *buffer;
+	size_t offset;
 
 	buffer = misc_malloc(DATA_SIZE(tape2dump));
 	if (buffer == NULL)
 		return -1;
 	memcpy(buffer, DATA_ADDR(tape2dump), DATA_SIZE(tape2dump));
 	/* Write mem size to end of dump record */
-	memcpy(VOID_ADD(buffer, DATA_SIZE(tape2dump) - sizeof(mem)), &mem,
-	       sizeof(mem));
+	offset = DATA_SIZE(tape2dump) - sizeof(struct stage2dump_parm_tail);
+	memcpy(VOID_ADD(buffer, offset), stage2dump_parms, sizeof(struct stage2dump_parm_tail));
 	*data = buffer;
 	*size = DATA_SIZE(tape2dump);
 	return 0;
@@ -522,42 +525,47 @@ boot_get_tape_dump(void** data, size_t* size, uint64_t mem)
 
 
 int
-boot_get_eckd_dump_stage2(void** data, size_t* size, uint64_t mem)
+boot_get_eckd_dump_stage2(void **data, size_t *size,
+			  const struct stage2dump_parm_tail *stage2dump_parms)
 {
-	void* buffer;
+	void *buffer;
+	size_t offset;
 
 	buffer = misc_malloc(DATA_SIZE(eckd2dump_sv));
 	if (buffer == NULL)
 		return -1;
 	memcpy(buffer, DATA_ADDR(eckd2dump_sv), DATA_SIZE(eckd2dump_sv));
 	/* Write mem size to end of dump record */
-	memcpy(VOID_ADD(buffer, DATA_SIZE(eckd2dump_sv) - sizeof(mem)),
-	       &mem, sizeof(mem));
+	offset = DATA_SIZE(eckd2dump_sv) - sizeof(struct stage2dump_parm_tail);
+	memcpy(VOID_ADD(buffer, offset), stage2dump_parms,
+	       sizeof(struct stage2dump_parm_tail));
 	*data = buffer;
 	*size = DATA_SIZE(eckd2dump_sv);
 	return 0;
 }
 
 int
-boot_get_eckd_mvdump_stage2(void** data, size_t* size, uint64_t mem,
-			    uint8_t force, struct mvdump_parm_table parm)
+boot_get_eckd_mvdump_stage2(void **data, size_t *size,
+			    const struct stage2dump_parm_tail *stage2dump_parms,
+			    const struct mvdump_parm_table *mv_parm_table)
 {
-	void* buffer;
+	void *buffer;
+	size_t offset;
 
 	buffer = misc_malloc(DATA_SIZE(eckd2dump_mv));
 	if (buffer == NULL)
 		return -1;
 	memcpy(buffer, DATA_ADDR(eckd2dump_mv), DATA_SIZE(eckd2dump_mv));
-	/* Write mem size and force indicator (as specified by zipl -M)
-	 * to end of dump record, right before 512-byte parameter table */
-	memcpy(VOID_ADD(buffer, DATA_SIZE(eckd2dump_mv) - sizeof(mem) -
-			sizeof(struct mvdump_parm_table)), &mem, sizeof(mem));
-	memcpy(VOID_ADD(buffer, DATA_SIZE(eckd2dump_mv) - sizeof(mem) -
-			sizeof(force) - sizeof(struct mvdump_parm_table)),
-	       &force, sizeof(force));
-	memcpy(VOID_ADD(buffer, DATA_SIZE(eckd2dump_mv) -
-			sizeof(struct mvdump_parm_table)), &parm,
+	/*
+	 * Write stage2 dump parameters to end of dump record, right before
+	 * 512-byte parameter table
+	 */
+	offset = DATA_SIZE(eckd2dump_mv) - sizeof(struct mvdump_parm_table);
+	memcpy(VOID_ADD(buffer, offset), mv_parm_table,
 	       sizeof(struct mvdump_parm_table));
+	offset = offset - sizeof(struct stage2dump_parm_tail);
+	memcpy(VOID_ADD(buffer, offset), stage2dump_parms,
+	       sizeof(struct stage2dump_parm_tail));
 	*data = buffer;
 	*size = DATA_SIZE(eckd2dump_mv);
 	return 0;
@@ -565,17 +573,20 @@ boot_get_eckd_mvdump_stage2(void** data, size_t* size, uint64_t mem,
 
 
 int
-boot_get_fba_dump_stage2(void** data, size_t* size, uint64_t mem)
+boot_get_fba_dump_stage2(void **data, size_t *size,
+			 const struct stage2dump_parm_tail *stage2dump_parms)
 {
-	void* buffer;
+	void *buffer;
+	size_t offset;
 
 	buffer = misc_malloc(DATA_SIZE(fba2dump));
 	if (buffer == NULL)
 		return -1;
 	memcpy(buffer, DATA_ADDR(fba2dump), DATA_SIZE(fba2dump));
 	/* Write mem size to end of dump record */
-	memcpy(VOID_ADD(buffer, DATA_SIZE(fba2dump) - sizeof(mem)),
-	       &mem, sizeof(mem));
+	offset = DATA_SIZE(fba2dump) - sizeof(struct stage2dump_parm_tail);
+	memcpy(VOID_ADD(buffer, offset), stage2dump_parms,
+	       sizeof(struct stage2dump_parm_tail));
 	*data = buffer;
 	*size = DATA_SIZE(fba2dump);
 	return 0;

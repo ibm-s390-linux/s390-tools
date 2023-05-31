@@ -16,6 +16,7 @@
 
 #include "boot/boot_defs.h"
 #include "lib/zt_common.h"
+#include "dump/s390_dump.h"
 
 #include "disk.h"
 #include "job.h"
@@ -185,12 +186,16 @@ int boot_get_stage3_parms(void **buffer, size_t *bytecount, address_t parm_addr,
 			  address_t envblk_addr, size_t envblk_len);
 int boot_get_tape_ipl(void** data, size_t* size, address_t parm_addr,
 		      address_t initrd_addr, address_t image_addr);
-int boot_get_tape_dump(void** data, size_t* size, uint64_t mem);
-int boot_get_eckd_dump_stage2(void** data, size_t* size, uint64_t mem);
+int boot_get_tape_dump(void **data, size_t *size,
+		       const struct stage2dump_parm_tail *stage2dump_parms);
+int boot_get_eckd_dump_stage2(void **data, size_t *size,
+			      const struct stage2dump_parm_tail *stage2dump_parms);
 int boot_get_eckd_ld_ipl_br(void **br_ptr, size_t *size_ptr,
 			    disk_blockptr_t *table, struct disk_info *info);
-int boot_get_eckd_mvdump_stage2(void** data, size_t* size, uint64_t mem,
-				uint8_t force, struct mvdump_parm_table);
-int boot_get_fba_dump_stage2(void** data, size_t* size, uint64_t mem);
+int boot_get_eckd_mvdump_stage2(void **data, size_t *size,
+				const struct stage2dump_parm_tail *stage2dump_parms,
+				const struct mvdump_parm_table *mv_parm_table);
+int boot_get_fba_dump_stage2(void **data, size_t *size,
+			     const struct stage2dump_parm_tail *stage2dump_parms);
 
 #endif /* BOOT_H */

@@ -791,7 +791,8 @@ static void eckd_dump_store_param(struct eckd_dump_param *param,
 	param->bpt = info->geo.sectors;
 }
 
-static int install_svdump_eckd_ldl(int fd, struct disk_info *info, uint64_t mem)
+static int install_svdump_eckd_ldl(int fd, struct disk_info *info,
+				   const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	disk_blockptr_t *stage2_list, *stage1b_list;
 	blocknum_t stage2_count, stage1b_count;
@@ -802,7 +803,7 @@ static int install_svdump_eckd_ldl(int fd, struct disk_info *info, uint64_t mem)
 	void *stage2;
 	int rc = -1;
 
-	if (boot_get_eckd_dump_stage2(&stage2, &stage2_size, mem))
+	if (boot_get_eckd_dump_stage2(&stage2, &stage2_size, stage2dump_parms))
 		goto out;
 	if (blk_cnt(stage2_size, info) > STAGE2_BLK_CNT_MAX) {
 		error_reason("ECKD dump record is too large");
@@ -901,13 +902,14 @@ out:
 }
 
 static int
-install_svdump_eckd_cdl(int fd, struct disk_info *info, uint64_t mem)
+install_svdump_eckd_cdl(int fd, struct disk_info *info,
+			const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	size_t stage2_size;
 	void *stage2;
 	int rc;
 
-	if (boot_get_eckd_dump_stage2(&stage2, &stage2_size, mem))
+	if (boot_get_eckd_dump_stage2(&stage2, &stage2_size, stage2dump_parms))
 		return -1;
 	rc = install_dump_eckd_cdl(fd, info, stage2, stage2_size, 0, 0);
 	free(stage2);
@@ -915,18 +917,20 @@ install_svdump_eckd_cdl(int fd, struct disk_info *info, uint64_t mem)
 }
 
 static int
-install_mvdump_eckd_cdl(int fd, struct disk_info *info, uint64_t mem,
-			uint8_t force, struct mvdump_parm_table parm)
+install_mvdump_eckd_cdl(int fd, struct disk_info *info,
+			const struct stage2dump_parm_tail *stage2dump_parms,
+			const struct mvdump_parm_table *mv_parm_table)
 {
 	size_t stage2_size;
 	void *stage2;
 	int rc;
 
 	/* Write stage 2 + parameter block */
-	if (boot_get_eckd_mvdump_stage2(&stage2, &stage2_size, mem,
-					force, parm))
+	if (boot_get_eckd_mvdump_stage2(&stage2, &stage2_size, stage2dump_parms,
+					mv_parm_table))
 		return -1;
-	rc = install_dump_eckd_cdl(fd, info, stage2, stage2_size, 1, force);
+	rc = install_dump_eckd_cdl(fd, info, stage2, stage2_size, 1,
+				   stage2dump_parms->mvdump_force);
 	free(stage2);
 	return rc;
 }
@@ -960,7 +964,8 @@ out:
 }
 
 static int
-install_svdump_fba(int fd, struct disk_info *info, uint64_t mem)
+install_svdump_fba(int fd, struct disk_info *info,
+		   const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	blocknum_t stage1b_count, stage2_count, blk;
 	disk_blockptr_t *stage1b_list, *stage2_list;
@@ -974,7 +979,7 @@ install_svdump_fba(int fd, struct disk_info *info, uint64_t mem)
 	if (overwrite_partition_start(fd, info, 0))
 		goto out;
 	/* Install stage 2 at end of partition */
-	if (boot_get_fba_dump_stage2(&stage2, &stage2_size, mem))
+	if (boot_get_fba_dump_stage2(&stage2, &stage2_size, stage2dump_parms))
 		goto out;
 	if (blk_cnt(stage2_size, info) > STAGE2_BLK_CNT_MAX) {
 		error_reason("FBA dump record is too large");
@@ -1017,13 +1022,13 @@ out:
 }
 
 static int
-install_dump_tape(int fd, uint64_t mem)
+install_dump_tape(int fd, const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	void* buffer;
 	size_t size;
 	int rc;
 
-	rc = boot_get_tape_dump(&buffer, &size, mem);
+	rc = boot_get_tape_dump(&buffer, &size, stage2dump_parms);
 	if (rc)
 		return rc;
 	rc = DRY_RUN_FUNC(misc_write(fd, buffer, size));
@@ -1037,12 +1042,14 @@ install_dump_tape(int fd, uint64_t mem)
 int
 install_dump(const char* device, struct job_target_data* target, uint64_t mem)
 {
+	struct stage2dump_parm_tail stage2dump_parms = {0};
 	struct disk_info* info;
 	char* tempdev;
 	uint64_t part_size;
 	int fd;
 	int rc;
 
+	stage2dump_parms.mem_upper_limit = mem;
 	fd = misc_open_exclusive(device);
 	if (fd == -1) {
 		error_text("Could not open dump device '%s'", device);
@@ -1060,7 +1067,7 @@ install_dump(const char* device, struct job_target_data* target, uint64_t mem)
 		}
 		if (verbose)
 			printf("Installing tape dump record\n");
-		rc = install_dump_tape(fd, mem);
+		rc = install_dump_tape(fd, &stage2dump_parms);
 		if (rc) {
 			error_text("Could not install dump record on tape "
 				   "device '%s'", device);
@@ -1128,11 +1135,11 @@ install_dump(const char* device, struct job_target_data* target, uint64_t mem)
 			       disk_get_type_name(info->type));
 		}
 		if (info->type == disk_type_eckd_ldl)
-			rc = install_svdump_eckd_ldl(fd, info, mem);
+			rc = install_svdump_eckd_ldl(fd, info, &stage2dump_parms);
 		else if (info->type == disk_type_eckd_cdl)
-			rc = install_svdump_eckd_cdl(fd, info, mem);
+			rc = install_svdump_eckd_cdl(fd, info, &stage2dump_parms);
 		else
-			rc = install_svdump_fba(fd, info, mem);
+			rc = install_svdump_fba(fd, info, &stage2dump_parms);
 		break;
 	case disk_type_scsi:
 		error_reason("%s: Unsupported disk type '%s' (try --dumptofs)",
@@ -1160,16 +1167,19 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 	       uint64_t mem, uint8_t force)
 {
 	struct disk_info* info[MAX_DUMP_VOLUMES] = {0};
-	struct mvdump_parm_table parm;
+	struct stage2dump_parm_tail stage2dump_parms = {0};
+	struct mvdump_parm_table mvdump_parms;
 	char* tempdev;
 	uint64_t total_size = 0;
 	int rc = 0, i, j, fd;
 	struct timeval time;
 
-	memset(&parm, 0, sizeof(struct mvdump_parm_table));
+	stage2dump_parms.mvdump_force = force;
+	stage2dump_parms.mem_upper_limit = mem;
+	memset(&mvdump_parms, 0, sizeof(struct mvdump_parm_table));
 	gettimeofday(&time, NULL);
-	parm.num_param = count;
-	parm.timestamp = (time.tv_sec << 20) + time.tv_usec;
+	mvdump_parms.num_param = count;
+	mvdump_parms.timestamp = (time.tv_sec << 20) + time.tv_usec;
 	for (i = 0; i < count; i++) {
 		int dummy, ssid;
 		char busid[16];
@@ -1223,13 +1233,13 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 			rc = -1;
 			goto out;
 		}
-		parm.param[i].start_blk = info[i]->geo.start;
-		parm.param[i].end_blk = info[i]->geo.start +
+		mvdump_parms.param[i].start_blk = info[i]->geo.start;
+		mvdump_parms.param[i].end_blk = info[i]->geo.start +
 					info[i]->phy_blocks - 1;
-		parm.param[i].bpt = info[i]->geo.sectors;
-		parm.param[i].num_heads = info[i]->geo.heads;
-		parm.param[i].blocksize = info[i]->phy_block_size >> 8;
-		parm.param[i].devno = info[i]->devno;
+		mvdump_parms.param[i].bpt = info[i]->geo.sectors;
+		mvdump_parms.param[i].num_heads = info[i]->geo.heads;
+		mvdump_parms.param[i].blocksize = info[i]->phy_block_size >> 8;
+		mvdump_parms.param[i].devno = info[i]->devno;
 		if (util_sys_get_dev_addr(device[i], busid) != 0) {
 			error_text("Could not find bus-ID for '%s'", device[i]);
 			rc = -1;
@@ -1240,7 +1250,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 			rc = -1;
 			goto out;
 		}
-		parm.ssid[i] = ssid;
+		mvdump_parms.ssid[i] = ssid;
 	}
 	if (verbose) {
 		for (i = 0; i < count; i++) {
@@ -1281,7 +1291,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		if (verbose)
 			printf("Installing dump record on target partition "
 			       "'%s'\n", device[i]);
-		rc = install_mvdump_eckd_cdl(fd, info[i], mem, force, parm);
+		rc = install_mvdump_eckd_cdl(fd, info[i], &stage2dump_parms, &mvdump_parms);
 		misc_free_temp_dev(tempdev);
 
 		if (fsync(fd))

@@ -36,6 +36,15 @@ enum df_s390_arch {
 };
 
 /*
+ * zipl parameters passed at tail of dump tools
+ */
+struct stage2dump_parm_tail {
+	char		reserved[6];
+	uint16_t	mvdump_force;
+	uint64_t	mem_upper_limit;
+} __packed;
+
+/*
  * s390 dump header format
  */
 struct df_s390_hdr {

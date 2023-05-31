@@ -20,15 +20,6 @@
 #define ROUND_UP(x, a)			ROUND_DOWN((x) + (typeof(x))(a) - 1, a)
 #define IS_ALIGNED(x, a)		~((x) & ((typeof(x))(a) - 1))
 
-/*
- * zipl parameters passed at tail of dump tools
- */
-struct stage2dump_parm_tail {
-	char		reserved[6];
-	uint16_t	mvdump_force;
-	uint64_t	mem_upper_limit;
-} __packed;
-
 extern struct stage2dump_parm_tail __section(.stage2dump.tail) parm_tail;
 
 /*
