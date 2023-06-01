@@ -45,9 +45,8 @@ counter set authorization control" checkbox.
 - The daemon requires root privileges to interact with the performance
 ioctls of the kernel.
 
-CPU hotplug is not recognized by the daemon. When adding or removing a CPU,
-restart the daemon to ensure correct summing of the per-CPU performance
-counters.
+CPU hotplug is recognized by the daemon. When adding or removing a CPU,
+the daemon ensures correct summing of the per-CPU performance counters.
 
 The starting daemon first checks for any stale pid file
 \%/run/cpacfstatsd.pid. If this file exists, and the process ID in the
