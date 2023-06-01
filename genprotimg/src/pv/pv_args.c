@@ -62,11 +62,12 @@ static gint pv_args_set_defaults(PvArgs *args, GError **err G_GNUC_UNUSED)
 
 static gint pv_args_validate_options(PvArgs *args, GError **err)
 {
+	const PvControlFlagsArgs *cf_args = &args->cf_args;
 	PvComponentType KERNEL = PV_COMP_TYPE_KERNEL;
 
 	/* Check for mutually exclusive arguments */
-	if (args->pcf && !(args->allow_pckmo == PV_NOT_SET &&
-			   args->allow_dump == PV_NOT_SET)) {
+	if (cf_args->pcf &&
+	    !(cf_args->enable_pckmo == PV_NOT_SET && cf_args->enable_dump == PV_NOT_SET)) {
 		g_set_error(
 			err, PV_PARSE_ERROR, PV_PARSE_ERROR_SYNTAX,
 			_("The '--x-pcf' option cannot be used with the '--(enable|disable)-pckmo' or"
@@ -93,7 +94,7 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 	}
 
 	/* Check for mandatory arguments */
-	if (args->allow_dump == PV_TRUE && !args->cust_comm_key_path) {
+	if (cf_args->enable_dump == PV_TRUE && !args->cust_comm_key_path) {
 		g_set_error(err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
 			    _("Option '--enable-dump' requires the '--comm-key' option.\nUse 'genprotimg "
 			      "--help' for more information"));
@@ -178,11 +179,11 @@ static gboolean cb_set_string_option(const gchar *option, const gchar *value,
 	if (g_str_equal(option, "--x-header-key"))
 		args_option = &args->cust_root_key_path;
 	if (g_str_equal(option, "--x-pcf"))
-		args_option = &args->pcf;
+		args_option = &args->cf_args.pcf;
 	if (g_str_equal(option, "--x-psw"))
 		args_option = &args->psw_addr;
 	if (g_str_equal(option, "--x-scf"))
-		args_option = &args->scf;
+		args_option = &args->cf_args.scf;
 
 	if (!args_option) {
 		g_set_error(err, PV_PARSE_ERROR, PV_PARSE_ERROR_SYNTAX,
@@ -217,20 +218,20 @@ static gboolean cb_remaining_values(const gchar *option G_GNUC_UNUSED,
 }
 
 #define MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, VALUE) (cb_##FLAG##_##VALUE)
-#define DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, VALUE)                                        \
-	static gboolean MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, VALUE)(                         \
-		const gchar *option G_GNUC_UNUSED, const gchar *value G_GNUC_UNUSED,     \
-		PvArgs *args, GError **err)                                              \
-	{                                                                                \
-		if (!(args->allow_##FLAG == PV_NOT_SET ||                                \
-		      args->allow_##FLAG == VALUE)) {                                    \
-			g_set_error(err, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,          \
-				    "'--enable-" #FLAG "' and '--disable-" #FLAG         \
-				    "' are mutually exclusive");                         \
-			return FALSE;                                                    \
-		}                                                                        \
-		args->allow_##FLAG = VALUE;                                              \
-		return TRUE;                                                             \
+#define DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, VALUE)                                                  \
+	static gboolean MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, VALUE)(const gchar *option G_GNUC_UNUSED, \
+								const gchar *value G_GNUC_UNUSED,  \
+								PvArgs *args, GError **err)        \
+	{                                                                                          \
+		if (!(args->cf_args.enable_##FLAG == PV_NOT_SET ||                                 \
+		      args->cf_args.enable_##FLAG == VALUE)) {                                     \
+			g_set_error(err, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,                    \
+				    "'--enable-" #FLAG "' and '--disable-" #FLAG                   \
+				    "' are mutually exclusive");                                   \
+			return FALSE;                                                              \
+		}                                                                                  \
+		args->cf_args.enable_##FLAG = VALUE;                                               \
+		return TRUE;                                                                       \
 	}
 
 #define DEFINE_MUT_EXCL_BOOL_FLAG_CBS(FLAG)                                    \
@@ -486,8 +487,10 @@ PvArgs *pv_args_new(void)
 	g_autoptr(PvArgs) args = g_new0(PvArgs, 1);
 
 	args->unused_values = g_ptr_array_new_with_free_func(g_free);
-	args->allow_dump = PV_NOT_SET;
-	args->allow_pckmo = PV_NOT_SET;
+	/* `args->cf_args` is implicitly initialized with zeros since
+	 * `g_new0` is used. So there is no reason to explicitly
+	 * initialize the values as PV_NOT_SET == 0.
+	 */
 	return g_steal_pointer(&args);
 }
 
@@ -496,8 +499,8 @@ void pv_args_free(PvArgs *args)
 	if (!args)
 		return;
 
-	g_free(args->pcf);
-	g_free(args->scf);
+	g_free(args->cf_args.pcf);
+	g_free(args->cf_args.scf);
 	g_free(args->psw_addr);
 	g_free(args->cust_root_key_path);
 	g_free(args->cust_comm_key_path);

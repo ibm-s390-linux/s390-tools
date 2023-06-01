@@ -236,28 +236,25 @@ static void pv_img_set_control_flag(uint64_t *flags, const PvTristate option, co
 		*flags &= ~flag;
 }
 
-static gint pv_img_set_control_flags(PvImage *img, const gchar *pcf_s,
-				     const gchar *scf_s,
-				     PvTristate allow_dump,
-				     PvTristate allow_pckmo, GError **err)
+static gint pv_img_set_control_flags(PvImage *img, const PvControlFlagsArgs *cf_args, GError **err)
 {
 	uint64_t flags;
 
 	/* Set plain control flags */
-	if (pcf_s) {
-		if (hex_str_toull(pcf_s, &flags, err) < 0)
+	if (cf_args->pcf) {
+		if (hex_str_toull(cf_args->pcf, &flags, err) < 0)
 			return -1;
 
 		img->pcf = flags;
 	}
 
-	pv_img_set_control_flag(&img->pcf, allow_dump, PV_PCF_ALLOW_DUMPING);
-	pv_img_set_control_flag(&img->pcf, allow_pckmo,
+	pv_img_set_control_flag(&img->pcf, cf_args->enable_dump, PV_PCF_ALLOW_DUMPING);
+	pv_img_set_control_flag(&img->pcf, cf_args->enable_pckmo,
 				PV_PCF_PCKM_ECC | PV_PCF_PCKMO_AES | PV_PCF_PCKMO_DEA_TDEA);
 
 	/* Set secret control flags */
-	if (scf_s) {
-		if (hex_str_toull(scf_s, &flags, err) < 0)
+	if (cf_args->scf) {
+		if (hex_str_toull(cf_args->scf, &flags, err) < 0)
 			return -1;
 
 		img->scf = flags;
@@ -614,9 +611,7 @@ PvImage *pv_img_new(PvArgs *args, const gchar *stage3a_path, GError **err)
 		return NULL;
 
 	/* set the control flags: PCF and SCF */
-	if (pv_img_set_control_flags(ret, args->pcf, args->scf,
-				     args->allow_dump, args->allow_pckmo,
-				     err) < 0)
+	if (pv_img_set_control_flags(ret, &args->cf_args, err) < 0)
 		return NULL;
 
 	/* read in the keys */
