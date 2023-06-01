@@ -496,10 +496,8 @@ int perf_init(void)
 		num -= 2;
 	}
 
-	if (num == 0) {
+	if (num == 0)
 		eprint("No crypto counters supported!\n");
-		return -1;
-	}
 
 	if (perf_load_counter_data())
 		return -1;
