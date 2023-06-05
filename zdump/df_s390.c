@@ -102,6 +102,8 @@ void df_s390_hdr_add(struct df_s390_hdr *hdr)
 	if ((hdr->version >= 5 || hdr->magic == DF_S390_MAGIC_EXT) &&
 	    hdr->real_cpu_cnt)
 		dfi_attr_real_cpu_cnt_set(hdr->real_cpu_cnt);
+	if (!hdr->mvdump && hdr->zlib_version_s390 && hdr->zlib_entry_size)
+		dfi_attr_zlib_info_set(hdr->zlib_version_s390, hdr->zlib_entry_size);
 }
 
 /*

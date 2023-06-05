@@ -74,6 +74,8 @@ struct attr {
 	struct new_utsname	*utsname;
 	char			*dump_method;
 	u64			*file_size;
+	u8			*zlib_version;
+	u32			*zlib_entsize;
 };
 
 /*
@@ -146,6 +148,11 @@ void dfi_info_print(void)
 	if (l.attr.file_size)
 		STDERR("  Dump file size.....: %lld MB\n",
 		       TO_MIB(*l.attr.file_size));
+	if (g.opts.verbose && l.attr.zlib_version && l.attr.zlib_entsize) {
+		STDERR("  Zlib version.......: %lld\n", *l.attr.zlib_version);
+		STDERR("  Zlib compression unit: %lld MB\n",
+		       TO_MIB(*l.attr.zlib_entsize));
+	}
 	if (dfi_mem_range())
 		dfi_mem_map_print(g.opts.verbose);
 	if (l.dfi->info_dump) {
@@ -426,6 +433,26 @@ u64 *dfi_attr_file_size(void)
 	return l.attr.file_size;
 }
 
+/*
+ * Attribute: Zlib version and zlib entry size
+ */
+void dfi_attr_zlib_info_set(u8 version, u32 entry_size)
+{
+	l.attr.zlib_version = zg_alloc(sizeof(*l.attr.zlib_version));
+	*l.attr.zlib_version = version;
+	l.attr.zlib_entsize = zg_alloc(sizeof(*l.attr.zlib_entsize));
+	*l.attr.zlib_entsize = entry_size;
+}
+
+u8 *dfi_attr_zlib_version(void)
+{
+	return l.attr.zlib_version;
+}
+
+u32 *dfi_attr_zlib_entsize(void)
+{
+	return l.attr.zlib_entsize;
+}
 
 /*
  * Attribute: Build architecture

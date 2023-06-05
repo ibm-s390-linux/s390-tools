@@ -182,6 +182,10 @@ u64 *dfi_attr_mem_size_real(void);
 void dfi_attr_file_size_set(u64 dump_size);
 u64 *dfi_attr_file_size(void);
 
+void dfi_attr_zlib_info_set(u8 version, u32 entry_size);
+u8 *dfi_attr_zlib_version(void);
+u32 *dfi_attr_zlib_entsize(void);
+
 void dfi_attr_vol_nr_set(unsigned int vol_nr);
 unsigned int *dfi_attr_vol_nr(void);
 
