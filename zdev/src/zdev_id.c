@@ -213,9 +213,16 @@ out:
 static void write_zdev_site_id(int site_id)
 {
 	FILE *fd;
-	int rc;
+	int tmpfd, rc;
+	const char zdev_id_file[] = ZDEV_SITE_ID_FILE;
+	char zdev_id_tmpfile[] = ZDEV_SITE_ID_FILE "-XXXXXX";
 
-	fd = fopen(ZDEV_SITE_ID_FILE, "w");
+	tmpfd = mkstemp(zdev_id_tmpfile);
+	if (tmpfd == -1)
+		goto err;
+
+	/* Open the temp file to use with fprintf */
+	fd = fdopen(tmpfd, "w");
 	if (!fd)
 		goto err;
 
@@ -231,6 +238,12 @@ static void write_zdev_site_id(int site_id)
 
 	if (fclose(fd))
 		goto err;
+
+	/* Rename the temporary file to ZDEV_SITE_ID_FILE*/
+	if (rename(zdev_id_tmpfile, zdev_id_file) == -1) {
+		remove(zdev_id_tmpfile);
+		goto err;
+	}
 
 	return;
 err:
