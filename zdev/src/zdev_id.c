@@ -213,16 +213,28 @@ out:
 static void write_zdev_site_id(int site_id)
 {
 	FILE *fd;
+	int rc;
 
 	fd = fopen(ZDEV_SITE_ID_FILE, "w");
 	if (!fd)
-		err(1, "Could not write to zdev_site_id file");
-	if (site_id == SITE_FALLBACK)
-		fprintf(fd, "ZDEV_SITE_ID=\n");
-	else
-		fprintf(fd, "ZDEV_SITE_ID=%d\n", site_id);
+		goto err;
 
-	fclose(fd);
+	if (site_id == SITE_FALLBACK)
+		rc = fprintf(fd, "ZDEV_SITE_ID=\"\"\n");
+	else
+		rc = fprintf(fd, "ZDEV_SITE_ID=%d\n", site_id);
+
+	if (rc < 0) {
+		fclose(fd);
+		goto err;
+	}
+
+	if (fclose(fd))
+		goto err;
+
+	return;
+err:
+	err(1, "Could not write to zdev_site_id file");
 }
 
 /* Read the loadparm and extract the current site_id.
@@ -265,7 +277,7 @@ static void process_loadparm(const char *filename)
 out:
 	write_zdev_site_id(site_id);
 	if (site_id == SITE_FALLBACK)
-		printf("ZDEV_SITE_ID=\n");
+		printf("ZDEV_SITE_ID=\"\"\n");
 	else
 		printf("ZDEV_SITE_ID=%d\n", site_id);
 }
