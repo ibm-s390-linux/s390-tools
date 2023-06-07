@@ -31,11 +31,6 @@ function create_dumpfs()
 	echo "$disk_path"
 }
 
-device=$(readlink -f $1)
-disk_path=/dev/disk/by-partuuid/$(blkid -o value -s PARTUUID "$device")
-
-[ -e "$disk_path" ] || { echo "Couldn't find disk by PARTUUID." >&2; exit 1; }
-
 function get_kernel_version()
 {
 	local version=$(uname -r)
