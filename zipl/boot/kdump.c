@@ -21,7 +21,7 @@ void kdump_failed(unsigned long reason)
 	panic(reason, "Dump failed: Check disabled wait code");
 }
 
-void kdump_os_info_check(struct os_info *os_info)
+void kdump_os_info_check(const struct os_info *os_info)
 {
 	if (os_info == NULL)
 		kdump_failed(EOS_INFO_MISSING);

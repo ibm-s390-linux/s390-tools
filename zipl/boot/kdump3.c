@@ -35,7 +35,7 @@ static void copy_from_hsa(unsigned long dst, unsigned long src, int cnt)
 static void kdump_stage3_scsi(unsigned long *base, unsigned long *size)
 {
 	unsigned long os_info_addr, crash_base, crash_size, crash_end, hsa_page;
-	struct os_info *os_info;
+	const struct os_info *os_info;
 	unsigned long hsa_size;
 
 	hsa_page = get_zeroed_page();

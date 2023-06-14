@@ -17,7 +17,7 @@
 
 #define OS_INFO_VERSION_MAJOR_SUPPORTED	1
 
-void kdump_os_info_check(struct os_info *os_info);
+void kdump_os_info_check(const struct os_info *os_info);
 void kdump_failed(unsigned long reason);
 
 #endif /* KDUMP_H */

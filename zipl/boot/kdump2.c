@@ -26,7 +26,7 @@
  */
 void kdump_stage2(unsigned long config_nr)
 {
-	struct os_info *os_info = (struct os_info *)S390_lowcore.os_info;
+	const struct os_info *os_info = (struct os_info *)S390_lowcore.os_info;
 	unsigned long crash_size;
 	void *crash_base;
 
