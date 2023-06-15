@@ -23,17 +23,11 @@ void kdump_failed(unsigned long reason)
 
 void kdump_os_info_check(const struct os_info *os_info)
 {
-	if (os_info == NULL)
-		kdump_failed(EOS_INFO_MISSING);
-	if (((unsigned long) os_info) % PAGE_SIZE)
-		kdump_failed(EOS_INFO_MISSING);
-	if (!page_is_valid((unsigned long) os_info))
-		kdump_failed(EOS_INFO_MISSING);
-	if (os_info->magic != OS_INFO_MAGIC)
-		kdump_failed(EOS_INFO_MISSING);
-	if (csum_partial(&os_info->version_major, OS_INFO_CSUM_SIZE, 0) !=
-	    os_info->csum)
-		kdump_failed(EOS_INFO_CSUM_FAILED);
+	int rc;
+
+	rc = os_info_check(os_info);
+	if (rc < 0)
+		kdump_failed(-rc);
 	if (os_info->version_major > OS_INFO_VERSION_MAJOR_SUPPORTED)
 		kdump_failed(EOS_INFO_VERSION);
 	if (os_info->crashkernel_addr == 0)
