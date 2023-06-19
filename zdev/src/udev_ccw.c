@@ -295,6 +295,7 @@ static exit_code_t udev_ccw_write_device_legacy(struct device *dev, bool autocon
 	}
 	fprintf(fd, "GOTO=\"%s\"\n", end_label);
 	fprintf(fd, "\n");
+	fprintf(fd, "LABEL=\"%s\"\n", cfg_label);
 
 	write_attr_to_file(fd, state, id);
 
