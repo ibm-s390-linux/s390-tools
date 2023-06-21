@@ -13,7 +13,6 @@
 #include <glib.h>
 #include <stdint.h>
 
-#include "boot/s390.h"
 #include "include/pv_hdr_def.h"
 #include "utils/crypto.h"
 #include "utils/buffer.h"

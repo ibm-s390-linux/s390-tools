@@ -10,8 +10,8 @@
 #ifndef PV_UTILS_ALIGN_H
 #define PV_UTILS_ALIGN_H
 
-#include "boot/s390.h"
 #include "lib/zt_common.h"
+#include "boot/page.h"
 
 #define IS_ALIGNED(addr, size) (!(addr & (size - 1)))
 

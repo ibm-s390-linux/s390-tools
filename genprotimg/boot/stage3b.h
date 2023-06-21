@@ -21,7 +21,7 @@
 
 #include <stdint.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 
 /* Must not have any padding included */
 struct memblob {

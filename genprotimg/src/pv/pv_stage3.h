@@ -15,7 +15,6 @@
 #include <stdint.h>
 
 #include "boot/ipl.h"
-#include "boot/s390.h"
 #include "boot/stage3b.h"
 #include "utils/buffer.h"
 

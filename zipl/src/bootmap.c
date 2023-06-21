@@ -25,7 +25,6 @@
 #include "lib/util_libc.h"
 #include "lib/util_part.h"
 #include "lib/util_path.h"
-#include "boot/s390.h"
 #include "stage3.h"
 
 #include "boot.h"

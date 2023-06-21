@@ -1,7 +1,8 @@
 /*
  * s390 related definitions and functions.
+ * Should only be used for code targeting s390 (bootloader code)
  *
- * Copyright IBM Corp. 2013, 2020
+ * Copyright IBM Corp. 2013, 2023
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -12,13 +13,13 @@
 
 #include "lib/zt_common.h"
 #include "boot/sigp.h"
+#include "boot/psw.h"
+#include "boot/page.h"
 
 #define __LC_IPLDEV		0x0c6c
 #define __LC_OS_INFO		0x0e18
 
 #define LOWCORE_SIZE		_AC(0x2000, UL)
-
-#define PAGE_SIZE		_AC(4096, UL)
 
 /* Minimum size of a stack frame in bytes */
 #define STACK_FRAME_OVERHEAD	_AC(160, U)
@@ -26,15 +27,8 @@
 /* Facilities */
 #define UNPACK_FACILITY		_AC(161, U)
 
-#define PSW32_ADDR_MASK   _AC(0x000000007fffffff, UL)
-#define PSW_MASK_BA	  _AC(0x0000000080000000, UL)
-#define PSW_MASK_EA	  _AC(0x0000000100000000, UL)
-#define PSW_MASK_BIT_12	  _AC(0x0008000000000000, UL)
-#define PSW_LOAD	  _AC(0x0008000080000000, UL)
-#define PSW_DISABLED_WAIT _AC(0x000a000000000000, UL)
-
-
 #ifndef __ASSEMBLER__
+#include <stdint.h>
 
 /*
  * Helper macro for exception table entries
@@ -45,16 +39,6 @@
 	".long	(" #_fault ")\n"	\
 	".long	(" #_target ")\n"	\
 	".previous\n"
-
-struct psw_t {
-	uint64_t mask;
-	uint64_t addr;
-} __aligned(8);
-
-struct psw32_t {
-	uint32_t mask;
-	uint32_t addr;
-} __aligned(8);
 
 void load_wait_psw(uint64_t, struct psw_t *);
 

@@ -15,7 +15,7 @@
 #include <openssl/evp.h>
 #include <stdint.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "utils/buffer.h"
 
 #include "pv_args.h"

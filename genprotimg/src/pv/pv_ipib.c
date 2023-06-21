@@ -13,7 +13,6 @@
 #include <stdio.h>
 
 #include "boot/ipl.h"
-#include "boot/s390.h"
 #include "common.h"
 #include "include/pv_hdr_def.h"
 #include "lib/zt_common.h"

@@ -11,7 +11,7 @@
 #define IPL_H
 
 #include "lib/zt_common.h"
-#include "s390.h"
+#include "page.h"
 
 #define IPL_FLAG_SECURE		 0x40
 

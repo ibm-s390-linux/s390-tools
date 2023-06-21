@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "boot/s390.h"
+#include "boot/page.h"
 #include "common.h"
 #include "include/pv_crypto_def.h"
 #include "pv/pv_error.h"

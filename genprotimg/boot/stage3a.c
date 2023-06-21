@@ -11,7 +11,6 @@
 #include "stage3a.h"
 
 #include "lib/zt_common.h"
-#include "boot/s390.h"
 #include "boot/ipl.h"
 #include "sclp.h"
 #include "error.h"

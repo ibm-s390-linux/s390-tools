@@ -8,7 +8,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  *
  */
-#include "boot/s390.h" /* for PAGE_SIZE */
+#include "boot/page.h"
 
 #define ZIPL_ENVBLK_SIGNATURE  "# zIPL Environment Block\n"
 #define ENVBLK_DEFAULT_IMPORT_SOURCE   "/etc/ziplenv"

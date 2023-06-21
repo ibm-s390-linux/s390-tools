@@ -13,7 +13,7 @@
 
 #include <openssl/sha.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "libpv/crypto.h"
 #include "libpv/macros.h"
 

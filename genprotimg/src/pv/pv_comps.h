@@ -14,7 +14,7 @@
 #include <openssl/evp.h>
 #include <stdint.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "boot/stage3b.h"
 #include "utils/buffer.h"
 

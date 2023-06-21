@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "boot/stage3a.h"
 #include "common.h"
 #include "include/pv_crypto_def.h"

@@ -15,7 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "boot/s390.h"
 #include "common.h"
 #include "utils/align.h"
 #include "utils/buffer.h"

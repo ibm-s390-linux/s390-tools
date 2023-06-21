@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "include/pv_crypto_def.h"
 #include "utils/buffer.h"
 #include "utils/crypto.h"

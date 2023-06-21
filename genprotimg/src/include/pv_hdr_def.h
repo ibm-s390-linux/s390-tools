@@ -12,7 +12,7 @@
 
 #include <openssl/sha.h>
 
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "lib/zt_common.h"
 #include "utils/crypto.h"
 

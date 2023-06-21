@@ -11,7 +11,7 @@
 #include "stage3b.h"
 
 #include "lib/zt_common.h"
-#include "boot/s390.h"
+#include "boot/psw.h"
 #include "boot/linux_layout.h"
 #include "boot/loaders_layout.h"
 #include "sclp.h"

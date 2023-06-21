@@ -13,7 +13,6 @@
 #include <glib/gi18n.h>
 
 #include "boot/linux_layout.h"
-#include "boot/s390.h"
 #include "lib/zt_common.h"
 
 static const gchar tool_name[] = "genprotimg";
