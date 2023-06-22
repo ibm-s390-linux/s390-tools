@@ -788,6 +788,8 @@ check_common_ipl_data(struct job_common_ipl_data *common, const char *section,
 				rc = 0;
 				goto skip_image;
 			}
+			fprintf(stderr, "Section '%s': Could not read image file '%s'\n",
+				section, common->image);
 			return rc;
 		}
 		if (size < MAX_COMMAND_LINE_SIZE + sizeof(uint64_t)) {
@@ -822,6 +824,8 @@ skip_image:
 				common->ignore = true;
 				rc = 0;
 			} else {
+				fprintf(stderr, "Section '%s': Missing ramdisk file '%s'\n",
+					section, common->ramdisk);
 				return rc;
 			}
 		}
