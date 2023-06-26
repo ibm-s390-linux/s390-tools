@@ -323,7 +323,7 @@ static void json_print_virtual_counter_answer(int s, int ctr,
 				pai_str[paictr], space, paictr + 1);
 			if (paistate < 0) {
 				printf("\"error\":%d}", paistate);
-				/* Protocol does not send furter counters. */
+				/* Protocol does not send further counters. */
 				return;
 			}
 			printf("\"value\":%"PRIu64"}", paivalue);
@@ -420,7 +420,7 @@ static void json_print_answer(int s, int ctr, int state, uint64_t value)
 		printf("\"value\":%"PRIu64"}", value);
 	}
 }
-		
+
 
 int eprint(const char *format, ...)
 {

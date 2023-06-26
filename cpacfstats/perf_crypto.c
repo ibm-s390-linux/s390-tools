@@ -371,7 +371,7 @@ static int addallcpus(void)
 			errno, strerror(errno));
 		return -1;
 	}
-		
+
 	while (!feof(fp)) {
 		/* scan all intervals of online cpus */
 		scanned = fscanf(fp, "%u-%u", &start, &end);
@@ -414,7 +414,7 @@ static void *hotplughandler(void *UNUSED(unused))
 	struct udev *hotplug;
 	struct udev_monitor *monitor;
 	struct pollfd item;
-	
+
 	hotplug = udev_new();
 	if (!hotplug) {
 		eprint("Failed to create hotplug device\n");
