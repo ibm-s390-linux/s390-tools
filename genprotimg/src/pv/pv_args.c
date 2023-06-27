@@ -238,29 +238,27 @@ static gboolean cb_remaining_values(const gchar *option G_GNUC_UNUSED,
 	DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, PV_TRUE)                            \
 	DEFINE_MUT_EXCL_BOOL_FLAG_CB(FLAG, PV_FALSE)
 
-#define MUT_EXCL_BOOL_FLAG(FLAG, ENABLE_DESC, DISABLE_DESC)                    \
-	{                                                                      \
-		.long_name = "enable-" #FLAG,                                  \
-		.short_name = 0,                                               \
-		.flags = G_OPTION_FLAG_NO_ARG,                                 \
-		.arg = G_OPTION_ARG_CALLBACK,                                  \
-		.arg_data = MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, PV_TRUE),         \
-		.description = ENABLE_DESC,                                    \
-	},                                                                     \
-	{                                                                      \
-		.long_name = "disable-" #FLAG,                                 \
-		.short_name = 0,                                               \
-		.flags = G_OPTION_FLAG_NO_ARG,                                 \
-		.arg = G_OPTION_ARG_CALLBACK,                                  \
-		.arg_data = MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, PV_FALSE),        \
-		.description = DISABLE_DESC,                                   \
+#define MUT_EXCL_BOOL_FLAG(NAME, FLAG, ENABLE_DESC, DISABLE_DESC)                                  \
+	{                                                                                          \
+		.long_name = "enable-" #NAME,                                                      \
+		.short_name = 0,                                                                   \
+		.flags = G_OPTION_FLAG_NO_ARG,                                                     \
+		.arg = G_OPTION_ARG_CALLBACK,                                                      \
+		.arg_data = MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, PV_TRUE),                             \
+		.description = ENABLE_DESC,                                                        \
+	},                                                                                         \
+	{                                                                                          \
+		.long_name = "disable-" #NAME, .short_name = 0, .flags = G_OPTION_FLAG_NO_ARG,     \
+		.arg = G_OPTION_ARG_CALLBACK,                                                      \
+		.arg_data = MUT_EXCL_BOOL_FLAG_CB_NAME(FLAG, PV_FALSE),                            \
+		.description = DISABLE_DESC,                                                       \
 	}
 
 #define INDENT "                                   "
 
 /* Define the callbacks for mutually exclusive command line flags */
-DEFINE_MUT_EXCL_BOOL_FLAG_CBS(dump)
-DEFINE_MUT_EXCL_BOOL_FLAG_CBS(pckmo)
+DEFINE_MUT_EXCL_BOOL_FLAG_CBS(dump);
+DEFINE_MUT_EXCL_BOOL_FLAG_CBS(pckmo);
 
 gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 			   GError **err)
@@ -326,17 +324,15 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .description = _("Use the kernel parameters stored in PARMFILE\n" INDENT
 				   "(optional)."),
 		  .arg_description = _("PARMFILE") },
-		MUT_EXCL_BOOL_FLAG(
-			dump,
-			_("Enable PV guest dumps (optional). This option\n" INDENT
-			  "requires the '--comm-key' option."),
-			_("Disable PV guest dumps (default).")),
-		MUT_EXCL_BOOL_FLAG(
-			pckmo,
-			_("Enable the support for the DEA, TDEA, AES, and\n" INDENT
-			  "ECC PCKMO key encryption functions (default)."),
-			_("Disable the support for the DEA, TDEA, AES, and\n" INDENT
-			  "ECC PCKMO key encryption functions (optional).")),
+		MUT_EXCL_BOOL_FLAG(dump, dump,
+				   _("Enable PV guest dumps (optional). This option\n" INDENT
+				     "requires the '--comm-key' option."),
+				   _("Disable PV guest dumps (default).")),
+		MUT_EXCL_BOOL_FLAG(pckmo, pckmo,
+				   _("Enable the support for the DEA, TDEA, AES, and\n" INDENT
+				     "ECC PCKMO key encryption functions (default)."),
+				   _("Disable the support for the DEA, TDEA, AES, and\n" INDENT
+				     "ECC PCKMO key encryption functions (optional).")),
 		{ .long_name = "comm-key",
 		  .short_name = 0,
 		  .flags = G_OPTION_FLAG_FILENAME,
