@@ -97,11 +97,12 @@ Do not use for a production image unless you verified
 the host-key document before. Optional.
 .TP
 \fB\-\-comm\-key\fR=\fI\,FILE\/\fR
-Specifies the encryption key you want to use for the PV guest dump. Use a
-secure, random, plaintext AES-256 GCM key. Optional.
+Specifies the customer communication key (CCK). This key is used among
+other things for the PV guest dump encryption. Use a secure, random,
+plaintext AES-256 GCM key. Optional.
 .TP
 \fB\-\-enable\-dump\fR
-Enable PV guest dumps. Requires the \fB\-\-comm-key\fR option. Optional.
+Enable PV guest dumps. Requires the \fB\-\-comm\-key\fR option. Optional.
 .TP
 \fB\-\-disable\-dump\fR
 Disable PV guest dumps. This is the default.

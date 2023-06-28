@@ -339,9 +339,8 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .arg = G_OPTION_ARG_CALLBACK,
 		  .arg_data = cb_set_string_option,
 		  .description = _(
-			  "FILE contains the key with which you encrypt\n" INDENT
-			  "the PV guest dump (optional). Required by\n" INDENT
-			  "the '--enable-dump' option."),
+			  "FILE contains the customer communication key\n" INDENT
+			  "(CCK) (optional)."),
 		  .arg_description = _("FILE") },
 		{ .long_name = "crl",
 		  .short_name = 0,
