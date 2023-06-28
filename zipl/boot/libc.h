@@ -15,6 +15,7 @@
 #include <stddef.h>
 
 #include "lib/zt_common.h"
+#include "boot/psw.h"
 
 #define EPERM		 1	/* Operation not permitted */
 #define ENOENT		 2	/* No such file or directory */
@@ -65,6 +66,7 @@ void __noreturn start(void);
 void pgm_check_handler(void);
 void pgm_check_handler_fn(void);
 void panic_notify(unsigned long reason);
+void load_wait_psw(uint64_t, struct psw_t *);
 
 #define panic(reason, ...)			\
 	do {					\

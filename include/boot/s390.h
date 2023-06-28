@@ -40,8 +40,6 @@
 	".long	(" #_target ")\n"	\
 	".previous\n"
 
-void load_wait_psw(uint64_t, struct psw_t *);
-
 struct subchannel_id {
 	uint32_t cssid:8;
 	uint32_t:4;
