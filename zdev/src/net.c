@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+
 #include "devnode.h"
 #include "misc.h"
 #include "net.h"
@@ -55,7 +57,8 @@ static bool add_devnodes_from_link(struct util_list *list,
 	cb_data.prefix_len = strlen(prefix);
 	cb_data.result = false;
 	path = path_get_sys_class("net", devnode->name);
-	path_for_each(path, add_linked_cb, &cb_data);
+	if (util_path_exists(path))
+		path_for_each(path, add_linked_cb, &cb_data);
 	free(path);
 
 	return cb_data.result;
