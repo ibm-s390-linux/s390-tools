@@ -1316,6 +1316,8 @@ create_package() {
 	local rc_tar
 	pr_syslog_stdout ${step_num} "Finalizing: Creating archive with collected data"
 	cd "${WORKDIR_BASE}"
+	# get a copy of the script used
+	cp -p $0 "${WORKDIR_CURRENT}"
 
 	touch "${WORKARCHIVE}"
 	chmod 0600 "${WORKARCHIVE}"
