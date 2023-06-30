@@ -603,7 +603,7 @@ exit_code_t select_by_node(struct select_opts *select,
 
 	devnode = devnode_from_node(path, err);
 	if (!devnode)
-		return EXIT_RUNTIME_ERROR;
+		return EXIT_DEVICE_NOT_FOUND;
 
 	rc = select_by_devnode(select, selected, config, scope, only_dt,
 			       only_st, devnode, path, err);
