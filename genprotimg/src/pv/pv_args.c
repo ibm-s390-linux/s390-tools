@@ -280,7 +280,7 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .arg_data = &args->host_keys,
 		  .description =
 			_("FILE specifies a host-key document. At least\n" INDENT
-			  "one is required Specify this option multiple times\n" INDENT
+			  "one is required. Specify this option multiple times\n" INDENT
 			  "to enable the image to run on more than one host."),
 		  .arg_description = _("FILE") },
 		{ .long_name = "cert",
