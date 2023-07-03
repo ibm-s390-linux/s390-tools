@@ -329,12 +329,11 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 			dump,
 			_("Enable PV guest dumps (optional). This option\n" INDENT
 			  "requires the '--comm-key' option."),
-			_("Disable PV guest dumps (default) (optional).")),
+			_("Disable PV guest dumps (default).")),
 		MUT_EXCL_BOOL_FLAG(
 			pckmo,
 			_("Enable the support for the DEA, TDEA, AES, and\n" INDENT
-			  "ECC PCKMO key encryption functions (default)\n" INDENT
-			  "(optional)."),
+			  "ECC PCKMO key encryption functions (default)."),
 			_("Disable the support for the DEA, TDEA, AES, and\n" INDENT
 			  "ECC PCKMO key encryption functions (optional).")),
 		{ .long_name = "comm-key",
