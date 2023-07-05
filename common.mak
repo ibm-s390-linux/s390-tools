@@ -212,7 +212,7 @@ fi
 #
 define test_linker_flag
 $(shell printf ".globl _start\n_start:\nnop\n" | \
-        ( $(CC) "-Wl,$1" -o /dev/null -nostdlib -x assembler -) >/dev/null 2>&1 && printf -- '-Wl,%s' "$1")
+        ( $(LINK) "-Wl,$1" -o /dev/null -nostdlib -x assembler -) >/dev/null 2>&1 && printf -- '-Wl,%s' "$1")
 endef
 
 NO_WARN_RWX_SEGMENTS_LDFLAGS := $(call test_linker_flag,"--no-warn-rwx-segments")
