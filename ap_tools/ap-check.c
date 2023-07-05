@@ -787,6 +787,14 @@ static int ap_check_handle_get_attributes(struct ap_check_anchor *anc)
 	char buf[80];
 	char *path;
 	FILE *f;
+	int rc;
+
+	rc = ap_get_lock_callout();
+	if (rc) {
+		fprintf(stderr, "Failed to acquire configuration lock %d\n", rc);
+		return -1;
+	}
+	anc->cleanup_lock = true;
 
 	path = path_get_vfio_ap_attr(anc->uuid, "matrix");
 	f = fopen(path, "r");
