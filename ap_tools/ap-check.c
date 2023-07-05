@@ -434,14 +434,23 @@ static int check_other_mdev_sysfs_cb(const char *path, const char *filename,
 	    strcasecmp(filename, cbdata->uuid) == 0)
 		return 0;
 
-	dev2 = vfio_ap_device_new();
+	/*
+	 * Read the 'matrix' attribute to get the list of queues for the active
+	 * device.  If the sysfs attribute is unreadable, assume the device is
+	 * being destroyed and skip it.
+	 */
 	matrix_path = path_get_vfio_ap_attr(filename, "matrix");
 	f = fopen(matrix_path, "r");
+	free(matrix_path);
+	if (!f)
+		return 0;
+
+	dev2 = vfio_ap_device_new();
+
 	while (fgets(buf, sizeof(buf), f))
 		vfio_ap_parse_matrix(dev2, buf);
 	vfio_ap_sort_matrix_results(dev2);
 	fclose(f);
-	free(matrix_path);
 
 	/* Look for conflicts between target device and this device */
 	rc = find_apqn_conflicts(filename, dev->adapters, dev->domains,
@@ -796,20 +805,30 @@ static int ap_check_handle_get_attributes(struct ap_check_anchor *anc)
 	}
 	anc->cleanup_lock = true;
 
+	/*
+	 * Read the 'matrix' and 'control_domains' attributes to get the
+	 * current attributes of the active device.  If either of these sysfs
+	 * attributes is unreadable, assume the device is being destroyed
+	 * and return nothing.
+	 */
 	path = path_get_vfio_ap_attr(anc->uuid, "matrix");
 	f = fopen(path, "r");
+	free(path);
+	if (!f)
+		return 0;
 	while (fgets(buf, sizeof(buf), f))
 		vfio_ap_parse_matrix(dev, buf);
 	vfio_ap_sort_matrix_results(dev);
 	fclose(f);
-	free(path);
 
 	path = path_get_vfio_ap_attr(anc->uuid, "control_domains");
 	f = fopen(path, "r");
+	free(path);
+	if (!f)
+		return 0;
 	while (fgets(buf, sizeof(buf), f))
 		vfio_ap_parse_control(dev, buf);
 	fclose(f);
-	free(path);
 
 	printf("[{");
 
