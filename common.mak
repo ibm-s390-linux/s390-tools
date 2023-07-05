@@ -211,8 +211,8 @@ fi
 # Returns the linker option if available and nothing otherwise
 #
 define test_linker_flag
-$(shell printf "int main(void) {return 0;}\n" | \
-        ( $(CC) "-Wl,$1" -o /dev/null -x c - ) >/dev/null 2>&1 && printf -- '-Wl,%s' "$1")
+$(shell printf ".globl _start\n_start:\nnop\n" | \
+        ( $(CC) "-Wl,$1" -o /dev/null -nostdlib -x assembler -) >/dev/null 2>&1 && printf -- '-Wl,%s' "$1")
 endef
 
 NO_WARN_RWX_SEGMENTS_LDFLAGS := $(call test_linker_flag,"--no-warn-rwx-segments")
