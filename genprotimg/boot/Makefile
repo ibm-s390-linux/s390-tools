@@ -1,6 +1,9 @@
 # Common definitions
 include ../../common.mak
 
+FILES := stage3a.bin stage3b.bin stage3b_reloc.bin
+
+ifeq ($(HOST_ARCH),s390x)
 ZIPL_DIR := $(rootdir)/zipl
 ZIPL_BOOT_DIR := $(ZIPL_DIR)/boot
 PKGDATADIR := $(DESTDIR)$(TOOLS_DATADIR)/genprotimg
@@ -19,17 +22,12 @@ ALL_CFLAGS := $(NO_PIE_CFLAGS) -Os -g \
 	-Wall -Wformat-security -Wextra \
 	-Wno-array-bounds
 
-FILES := stage3a.bin stage3b.bin stage3b_reloc.bin
-
 ZIPL_SRCS_C := libc.c ebcdic.c ebcdic_conv.c sclp.c
 ZIPL_SRCS_ASM := entry.S
 
 ZIPL_OBJS_C := $(ZIPL_SRCS_C:%.c=%.o)
 ZIPL_OBJS_ASM := $(ZIPL_SRCS_ASM:%.S=%.o)
 ZIPL_OBJS := $(ZIPL_OBJS_C) $(ZIPL_OBJS_ASM)
-
-
-all: $(FILES)
 
 # Prevent make from using some default rules...
 %:	%.S
@@ -85,6 +83,21 @@ install: stage3a.bin stage3b_reloc.bin
 	$(INSTALL) -d -m 755 "$(PKGDATADIR)"
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3a.bin "$(PKGDATADIR)"
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3b_reloc.bin "$(PKGDATADIR)"
+
+else
+# Don't generate the dependency files (see `common.mak` for the
+# `-include $(dependencies_c)` statement).
+.PHONY: $(dependencies_c)
+
+$(FILES):
+	echo "  SKIP    $@ due to HOST_ARCH != s390x"
+
+install:
+	echo "  SKIP    Bootloader installation due to HOST_ARCH != s390x"
+endif
+
+.DEFAULT_GOAL := all
+all: $(FILES)
 
 clean:
 	rm -f *.o *.elf *.bin *.map .*.d *.lds
