@@ -12,8 +12,6 @@ all: all-recursive
 
 install: all install-recursive
 	$(INSTALL) -d -m 755 "$(PKGDATADIR)"
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 boot/stage3a.bin "$(PKGDATADIR)"
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 boot/stage3b_reloc.bin "$(PKGDATADIR)"
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 samples/check_hostkeydoc "$(PKGDATADIR)"
 
 clean: clean-recursive

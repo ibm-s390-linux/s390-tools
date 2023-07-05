@@ -3,6 +3,7 @@ include ../../common.mak
 
 ZIPL_DIR := $(rootdir)/zipl
 ZIPL_BOOT_DIR := $(ZIPL_DIR)/boot
+PKGDATADIR := $(DESTDIR)$(TOOLS_DATADIR)/genprotimg
 
 INCLUDE_PATHS := $(ZIPL_BOOT_DIR) $(ZIPL_DIR)/include $(rootdir)/include
 INCLUDE_PARMS := $(addprefix -I,$(INCLUDE_PATHS))
@@ -79,6 +80,11 @@ stage3b.elf: head.o $(ZIPL_OBJS)
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
 	@chmod a-x $@
+
+install: stage3a.bin stage3b_reloc.bin
+	$(INSTALL) -d -m 755 "$(PKGDATADIR)"
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3a.bin "$(PKGDATADIR)"
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3b_reloc.bin "$(PKGDATADIR)"
 
 clean:
 	rm -f *.o *.elf *.bin *.map .*.d *.lds
