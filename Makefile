@@ -18,7 +18,8 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   genprotimg lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools pvattest
 else
 BASELIB_DIRS =
-LIB_DIRS = genprotimg libpv
+LIB_DIRS = libpv
+TOOL_DIRS = genprotimg pvattest
 endif
 
 SUB_DIRS = $(BASELIB_DIRS) $(LIB_DIRS) $(TOOL_DIRS)
