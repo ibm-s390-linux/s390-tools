@@ -85,7 +85,6 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 
 
 clean:
-	rm -f -- *.o *.exec *.bin $(FILES) tape0.bin *.xxx *.yyy \
-	      stage3.bin *.lds .*.lds.d .loaders *.debug
+	rm -f -- *.o *.exec *.bin *.lds .*.lds.d .loaders *.debug
 
 .PHONY: all clean
