@@ -1,17 +1,24 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.28.0 (2023-07-11)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.4
 
   Changes of existing tools:
-  - add support for architectures other than s390x for `genprotimg`
+  - chzcrypt: Support for SE AP pass-through support
+  - genprotimg: Add support for non-s390x architectures
+  - lszcrypt: Support for SE AP pass-through support
+  - zdev: Add support for autoquiesce related sysfs attributes
 
   Bug Fixes:
-
+  - ap_tools/ap-check: Handle missing 'matrix' and 'control_domains' attrs
+  - ap_tools/ap-check: Hold ap config file lock over get attributes
+  - s390-tools: Fix build for ppc64le
+  - zdev: Add missing label in the udev-rules
+  - zdev: Add proper value input for the ZDEV_SITE_ID key
+  - zdev: Use rename-file to avoid any symlinks created
+  - zipl/dump: fix ngdump dracut helper script
 
 * __v2.27.0 (2023-05-30)__
 
