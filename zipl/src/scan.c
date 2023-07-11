@@ -838,8 +838,8 @@ static int sort_bls_fields(struct misc_file_buffer *file, char *filename)
 {
 	bool is_title = false;
 	size_t title_len = 0;
+	size_t title_off = 0;
 	int nr_titles = 0;
-	size_t title_off;
 	char *title;
 	int current;
 	size_t len;
