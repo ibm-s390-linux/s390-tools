@@ -231,7 +231,7 @@ static action_t get_action(struct options *opts)
 /* Determine the site information from the device */
 static char *get_site_from_pers(struct device *dev)
 {
-	int site, i, num = 0;
+	int site = 0, i, num = 0;
 
 	for (i = 0; i < NUM_SITES; i++) {
 		if (dev->site_specific[i].exists) {
