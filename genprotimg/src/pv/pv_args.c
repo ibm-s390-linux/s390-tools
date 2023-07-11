@@ -75,6 +75,13 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 		return -1;
 	}
 
+	if (cf_args->scf && !(cf_args->enable_cck_extension_secret_enforcement == PV_NOT_SET)) {
+		g_set_error(
+			err, PV_PARSE_ERROR, PV_PARSE_ERROR_SYNTAX,
+			_("The '--x-scf' option cannot be used with the '--(enable|disable)-extension-secret-required' flags.\nUse 'genprotimg --help' for more information"));
+		return -1;
+	}
+
 	/* Check for unused arguments */
 	if (args->unused_values->len > 0) {
 		g_autofree gchar *unused = NULL;
@@ -98,6 +105,14 @@ static gint pv_args_validate_options(PvArgs *args, GError **err)
 		g_set_error(err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
 			    _("Option '--enable-dump' requires the '--comm-key' option.\nUse 'genprotimg "
 			      "--help' for more information"));
+		return -1;
+	}
+	if (cf_args->enable_cck_extension_secret_enforcement == PV_TRUE &&
+	    !args->cust_comm_key_path) {
+		g_set_error(
+			err, PV_PARSE_ERROR, PR_PARSE_ERROR_MISSING_ARGUMENT,
+			_("Option '--enable-cck-extension-secret' requires the '--comm-key' option.\nUse 'genprotimg "
+			  "--help' for more information"));
 		return -1;
 	}
 
@@ -254,11 +269,12 @@ static gboolean cb_remaining_values(const gchar *option G_GNUC_UNUSED,
 		.description = DISABLE_DESC,                                                       \
 	}
 
-#define INDENT "                                   "
+#define INDENT "                                     "
 
 /* Define the callbacks for mutually exclusive command line flags */
 DEFINE_MUT_EXCL_BOOL_FLAG_CBS(dump);
 DEFINE_MUT_EXCL_BOOL_FLAG_CBS(pckmo);
+DEFINE_MUT_EXCL_BOOL_FLAG_CBS(cck_extension_secret_enforcement);
 
 gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 			   GError **err)
@@ -328,6 +344,14 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 				   _("Enable PV guest dumps (optional). This option\n" INDENT
 				     "requires the '--comm-key' option."),
 				   _("Disable PV guest dumps (default).")),
+		MUT_EXCL_BOOL_FLAG(
+			cck-extension-secret, cck_extension_secret_enforcement,
+			_("Add-secret requests must provide an extension\n" INDENT
+			  "secret that matches the CCK-derived extension\n" INDENT
+			  "secret (optional). This option requires the\n" INDENT
+			  "'--comm-key' option."),
+			_("Add-secret requests don't have to provide\n" INDENT
+			  "the CCK-derived extension secret (default).")),
 		MUT_EXCL_BOOL_FLAG(pckmo, pckmo,
 				   _("Enable the support for the DEA, TDEA, AES, and\n" INDENT
 				     "ECC PCKMO key encryption functions (default)."),
@@ -445,6 +469,8 @@ gint pv_args_parse_options(PvArgs *args, gint *argc, gchar **argv[],
 		  .arg_data = cb_set_string_option,
 		  .description = _("Specify the secret control flags\n" INDENT
 				   "as a hexadecimal value.\n" INDENT
+				   "Optional; mutually exclusive with\n" INDENT
+				   "'--(enable|disable)-cck-extension-secret';\n" INDENT
 				   "Optional; default: '0x0'."),
 		  .arg_description = _("VALUE") },
 		{ 0 },

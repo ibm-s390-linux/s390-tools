@@ -8,6 +8,7 @@ Release history for s390-tools (MIT version)
   Add new tools / libraries:
 
   Changes of existing tools:
+  - genprotimg: add support for add-secret requests
 
   Bug Fixes:
 

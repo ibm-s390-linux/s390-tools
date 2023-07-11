@@ -260,6 +260,8 @@ static gint pv_img_set_control_flags(PvImage *img, const PvControlFlagsArgs *cf_
 		img->scf = flags;
 	}
 
+	pv_img_set_control_flag(&img->scf, cf_args->enable_cck_extension_secret_enforcement,
+				PV_SCF_CCK_EXTENSION_SECRET_ENFORCMENT);
 	return 0;
 }
 

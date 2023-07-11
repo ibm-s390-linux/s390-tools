@@ -33,6 +33,8 @@ STATIC_ASSERT(PV_NOT_SET == 0)
 typedef struct {
 	gchar *pcf;
 	gchar *scf;
+	/* Add-secret requests do require CCK-extension secrets */
+	PvTristate enable_cck_extension_secret_enforcement;
 	PvTristate enable_dump;
 	PvTristate enable_pckmo;
 } PvControlFlagsArgs;

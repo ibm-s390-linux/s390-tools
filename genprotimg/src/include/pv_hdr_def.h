@@ -34,6 +34,10 @@
 #define PV_PCF_PCKMO_AES	__PV_BIT(57) /* PCKMO encrypt-AES-key functions allowed */
 #define PV_PCF_PCKM_ECC	__PV_BIT(58) /* PCKMO encrypt-ECC-key functions allowed */
 
+/* Secret control flags */
+#define PV_SCF_CCK_EXTENSION_SECRET_ENFORCMENT                                                     \
+	__PV_BIT(1) /* All add-secret requests must provide an extension secret */
+
 /* maxima for the PV version 1 */
 #define PV_V1_IPIB_MAX_SIZE	PAGE_SIZE
 #define PV_V1_PV_HDR_MAX_SIZE	(2 * PAGE_SIZE)
