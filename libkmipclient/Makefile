@@ -121,7 +121,7 @@ install-libkmipclient.so.$(VERSION): libkmipclient.so.$(VERSION)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERSION)
 	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERM)
 	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so
-	$(INSTALL) -d -m 770 $(DESTDIR)$(USRINCLUDEDIR)/kmipclient
+	$(INSTALL) -d -m 755 $(DESTDIR)$(USRINCLUDEDIR)/kmipclient
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(rootdir)include/kmipclient/kmipclient.h $(DESTDIR)$(USRINCLUDEDIR)/kmipclient
 
 install: all $(INSTALL_TARGETS)
