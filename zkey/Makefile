@@ -117,7 +117,7 @@ install-zkey-cryptsetup: zkey-cryptsetup
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zkey-cryptsetup $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -m 644 -c zkey-cryptsetup.1 $(DESTDIR)$(MANDIR)/man1
 
-install: all install-common $(INSTALL_TARGETS) $(SUB_DIRS)
+install: install-common $(INSTALL_TARGETS) $(SUB_DIRS)
 
 clean: $(SUB_DIRS)
 	rm -f *.o zkey zkey-cryptsetup detect-libcryptsetup.dep \

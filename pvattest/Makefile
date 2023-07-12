@@ -9,7 +9,7 @@ RECURSIVE_TARGETS := all-recursive clean-recursive install-recursive
 
 all: all-recursive
 
-install: all install-recursive
+install: install-recursive
 
 clean: clean-recursive
 

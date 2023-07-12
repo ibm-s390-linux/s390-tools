@@ -13,8 +13,7 @@ RECURSIVE_TARGETS = all-recursive install-recursive clean-recursive \
 
 
 all: all-recursive
-check: check-recursive
-install: all install-recursive
+install: install-recursive
 clean: clean-recursive
 
 

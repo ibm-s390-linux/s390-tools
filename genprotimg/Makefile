@@ -10,7 +10,7 @@ RECURSIVE_TARGETS := all-recursive install-recursive clean-recursive
 
 all: all-recursive
 
-install: all install-recursive
+install: install-recursive
 	$(INSTALL) -d -m 755 "$(PKGDATADIR)"
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 samples/check_hostkeydoc "$(PKGDATADIR)"
 
