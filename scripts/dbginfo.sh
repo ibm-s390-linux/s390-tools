@@ -262,6 +262,7 @@ readonly OUTPUT_FILE_OVS="${WORKPATH}network.out"
 readonly OUTPUT_FILE_ISW="${WORKPATH}installed_sw.out"
 readonly OUTPUT_FILE_TC="${WORKPATH}network.out"
 readonly OUTPUT_FILE_VMCMD="${WORKPATH}zvm_runtime.out"
+readonly OUTPUT_FILE_UDEVDB="${WORKPATH}udevdb.out"
 # Base file names for different output files - no extension !
 readonly OUTPUT_FILE_KUBERNETES="${WORKPATH}kubernetes"
 readonly OUTPUT_FILE_OSAOAT="${WORKPATH}network"
@@ -556,6 +557,7 @@ CMDS="${CMDS}\
    >> '${OUTPUT_FILE_JOURNALCTL}'\
   :lsof >> '${OUTPUT_FILE_LSOF}'\
   :rpm -qa | sort >> '${OUTPUT_FILE_ISW}'\
+  :udevadm info --export-db >> '${OUTPUT_FILE_UDEVDB}'\
   "
 
 ########################################
