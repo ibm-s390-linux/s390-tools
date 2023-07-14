@@ -470,9 +470,10 @@ unsigned long write_addr_range(unsigned long blk, unsigned long start,
 		writeblock(blk, addr, blk_count, zero_page);
 		free_page(zero_page);
 		blk += blk_count;
+		addr += b2m(blk_count);
+		total_dump_size += b2m(blk_count);
 		if (print_progress)
 			progress_print(addr);
-		addr += b2m(blk_count);
 	}
 	return blk;
 }

@@ -269,7 +269,6 @@ static unsigned long write_volume(unsigned long addr,
 		/* Reserve one block for the next segment header */
 		if (free_space)
 			free_space -= b2m(1);
-		total_dump_size += dump_segm->len;
 		/* Check if no more dump segments follow */
 		if (dump_segm->stop_marker) {
 			/* Write end marker */

@@ -60,14 +60,14 @@ static unsigned long dt_dump_mem_non_compressed(unsigned long addr,
 	while (addr < end) {
 		addr = find_dump_segment(addr, end, 0, dump_segm);
 		blk = write_dump_segment(blk, dump_segm);
-		total_dump_size += dump_segm->len;
 		if (dump_segm->stop_marker) {
 			addr = end;
+			if (dump_segm->start + dump_segm->len < end)
+				progress_print(addr);
 			break;
 		}
 	}
 	free_page(__pa(dump_segm));
-	progress_print(addr);
 	return blk;
 }
 
@@ -88,7 +88,6 @@ static unsigned long dt_dump_mem_compressed(unsigned long addr,
 	dump_segm->start = addr;
 	dump_segm->len = ZLIB_WORKSPACE_LIMIT;
 	blk = write_dump_segment(blk, dump_segm);
-	total_dump_size += dump_segm->len;
 	addr += dump_segm->len;
 	/* Initialize zlib workarea, return value 0 is expected */
 	if (zlib_workarea_init(dump_segm->start, &strm)) {
@@ -118,16 +117,15 @@ static unsigned long dt_dump_mem_compressed(unsigned long addr,
 		addr = find_dump_segment(addr, end, DUMP_SEGM_ZLIB_MAXLEN,
 					 dump_segm);
 		blk = write_compressed_dump_segment(blk, dump_segm, &strm);
-		total_dump_size += dump_segm->size_on_disk ?
-			b2m(dump_segm->size_on_disk) : dump_segm->len;
 		if (dump_segm->stop_marker) {
 			addr = end;
+			if (dump_segm->start + dump_segm->len < end)
+				progress_print(addr);
 			break;
 		}
 	}
 	zlib_deflateEnd(&strm);
 	free_page(__pa(dump_segm));
-	progress_print(addr);
 	return blk;
 }
 
@@ -157,5 +155,6 @@ void dt_dump_mem(void)
 	page = get_zeroed_page();
 	df_s390_em_page_init(page);
 	writeblock(blk, page, 1, 0);
+	blk++;
 	free_page(page);
 }

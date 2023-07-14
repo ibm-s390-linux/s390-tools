@@ -206,13 +206,14 @@ void dt_dump_mem(void)
 	setup_idrc_compression();
 	ccw_write_tapemark();
 
+	total_dump_size = 0;
 	ccw_write_block((unsigned long) dump_hdr, DF_S390_HDR_SIZE, 0);
 	for (addr = 0; addr < dump_hdr->mem_size; addr += BLK_SIZE) {
 		ccw_write_block(addr, BLK_SIZE, page);
-		progress_print(addr);
-		progress_print_disp(addr);
+		total_dump_size += BLK_SIZE;
+		progress_print(addr + BLK_SIZE);
+		progress_print_disp(addr + BLK_SIZE);
 	}
-	progress_print(addr);
 	df_s390_em_page_init(page);
 	ccw_write_block(page, sizeof(struct df_s390_em), 0);
 	free_page(page);

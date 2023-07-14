@@ -39,7 +39,6 @@ extern unsigned long total_dump_size;
  */
 void create_ida_list(unsigned long *list, int len, unsigned long addr,
 		     unsigned long zero_page);
-void init_progress_print(void);
 void progress_print(unsigned long addr);
 void df_s390_em_page_init(unsigned long page);
 void pgm_check_handler(void);

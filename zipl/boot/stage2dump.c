@@ -74,7 +74,6 @@ void progress_print(unsigned long addr)
 	}
 	if (time < next && addr != dump_hdr->mem_size)
 		return;
-
 	printf("%08lu / %08lu MB (Dump file size %08lu MB)", addr >> 20,
 	       dump_hdr->mem_size >> 20, total_dump_size >> 20);
 	next = time + delta;

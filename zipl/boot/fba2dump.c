@@ -153,9 +153,10 @@ unsigned long write_dump_segment_fba(unsigned long blk,
 		zero_page = get_zeroed_page();
 		writeblock_fba(blk, addr, blk_count, zero_page);
 		free_page(zero_page);
-		progress_print(addr);
 		blk += blk_count;
 		addr += b2m(blk_count);
+		total_dump_size += b2m(blk_count);
+		progress_print(addr);
 	}
 	return blk;
 }
@@ -207,7 +208,6 @@ void dt_dump_mem(void)
 	while (addr < end) {
 		addr = find_dump_segment(addr, end, 0, dump_segm);
 		blk = write_dump_segment_fba(blk, dump_segm);
-		total_dump_size += dump_segm->len;
 		if (dump_segm->stop_marker) {
 			addr = end;
 			break;

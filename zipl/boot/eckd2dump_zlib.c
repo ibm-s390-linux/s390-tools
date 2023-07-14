@@ -166,7 +166,7 @@ unsigned long write_compressed_dump_segment(unsigned long blk,
 			segm->entry_offset[i] |= DUMP_SEGM_ENTRY_UNCOMPRESSED;
 		offset += blk - start_blk;
 		/* Print progress after each compressed chunk written */
-		progress_print(segm->start + i * chunk_size);
+		progress_print(segm->start + i * chunk_size + len);
 	}
 	/* Compression successful, store compressed size in the segment header */
 	segm->size_on_disk = (uint32_t)offset;
