@@ -19,6 +19,7 @@ TAGS
 #
 # Ignore generated executables and other generated files
 #
+**/.detect-openssl.dep.c
 ap_tools/ap-check
 cmsfs-fuse/cmsfs-fuse
 cpacfstats/cpacfstats
@@ -50,8 +51,8 @@ iucvterm/src/iucvconn
 iucvterm/src/iucvtty
 iucvterm/src/ttyrun
 iucvterm/test/test_afiucv
-libap/check-dep-lock
 libap/check-dep-json
+libap/check-dep-lock
 libekmfweb/check-dep-libekmfweb
 libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
@@ -96,6 +97,7 @@ zdev/src/chzdev
 zdev/src/chzdev_usage.c
 zdev/src/lszdev
 zdev/src/lszdev_usage.c
+zdev/src/zdev_id
 zdsfs/zdsfs
 zdump/.check_dep_fuse
 zdump/.check_dep_zgetdump
@@ -115,7 +117,6 @@ zipl/boot/*.exec
 zipl/boot/.loaders
 zipl/boot/data.h
 zipl/src/chreipl_helper.device-mapper
-zdev/src/zdev_id
 zipl/src/zipl
 zipl/src/zipl-editenv
 zipl/src/zipl_helper.device-mapper
@@ -129,4 +130,3 @@ zkey/kmip/zkey-kmip.so
 zkey/zkey
 zkey/zkey-cryptsetup
 zpcictl/zpcictl
-**/.detect-openssl.dep.c
