@@ -310,13 +310,14 @@ build options:
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 | openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
-|                |                    | libkmipclient, pvattest, zgetdump     |
+|                |                    | libkmipclient, pvattest, zgetdump,    |
+|                |                    | rust/pvsecret,                        |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
 |                |                    | libkmipclient                         |
 | glib2          | `HAVE_GLIB2`       | genprotimg, pvattest, zgetdump        |
 | libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient,|
-|                |                    | pvattest                              |
+|                |                    | pvattest, rust/pvsecret,              |
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 | libudev        | `HAVE_LIBUDEV`     | cpacfstatsd                           |
@@ -339,6 +340,14 @@ Build and runtime requirements for specific tools
 
 In the following more details on the build an runtime requirements of
 the different tools are provided:
+
+* rust/pvsecret:
+  For building pvsecret you need OpenSSL version 1.1.1 or newer
+  installed (openssl-devel.rpm). Also required is cargo and libcurl.
+  Tip: you may skip the pvsecret build by adding
+  `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_CARGO=0`.
+
+  The runtime requirements are: openssl-libs (>= 1.1.1).
 
 * dbginfo.sh:
   The tar package is required to archive collected data.
