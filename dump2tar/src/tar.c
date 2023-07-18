@@ -23,9 +23,16 @@
 
 #define BLOCKSIZE	512
 
+#if __has_attribute(nonstring)
+#  define __nonstring	__attribute__ ((nonstring))
+#else
+#  define __nonstring
+#endif
+
+
 /* Basic TAR header */
 struct tar_header {
-	char name[100];
+	char name[100] __nonstring;
 	char mode[8];
 	char uid[8];
 	char gid[8];
@@ -33,7 +40,7 @@ struct tar_header {
 	char mtime[12];
 	char chksum[8];
 	char typeflag;
-	char linkname[100];
+	char linkname[100] __nonstring;
 	char magic[6];
 	char version[2];
 	char uname[32];
@@ -78,7 +85,7 @@ static void set_time(char *dest, size_t len, time_t value)
 #define SET_TIME_FIELD(obj, name, value) \
 	set_time((obj)->name, sizeof((obj)->name), (time_t) (value))
 #define SET_STR_FIELD(obj, name, value) \
-	util_strlcpy((obj)->name, (value), sizeof((obj)->name))
+	strncpy((obj)->name, (value), sizeof((obj)->name))
 
 /* Initialize the tar file @header with the provided data */
 static void init_header(struct tar_header *header, const char *filename,
