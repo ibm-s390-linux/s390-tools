@@ -4,8 +4,7 @@ include ../../common.mak
 ALL_CPPFLAGS += -I../include -I../boot \
 	    -DZFCPDUMP_IMAGE="STRINGIFY($(ZFCPDUMP_DIR)/$(ZFCPDUMP_IMAGE))" \
 	    -DZFCPDUMP_INITRD="STRINGIFY($(ZFCPDUMP_DIR)/$(ZFCPDUMP_INITRD))" \
-	    -D_FILE_OFFSET_BITS=64 $(NO_PIE_CFLAGS) -DBUILD_PATH="../boot"
-ALL_LDFLAGS += -Wl,-z,noexecstack $(NO_PIE_LDFLAGS)
+	    -D_FILE_OFFSET_BITS=64 -DBUILD_PATH="../boot"
 
 libs =  $(rootdir)/libutil/libutil.a \
 	$(rootdir)/libvtoc/libvtoc.a \
