@@ -118,12 +118,12 @@ endif
 $(call define_toolchain_variables,_FOR_BUILD,)
 $(call define_toolchain_variables,,$(CROSS_COMPILE))
 
-$(eval $(call cmd_define,RUNTEST,"  RUNTEST ",$(S390_TEST_LIB_PATH)/s390_runtest))
-$(eval $(call cmd_define,    CAT,"  CAT     ",cat))
-$(eval $(call cmd_define,    SED,"  SED     ",sed))
-$(eval $(call cmd_define,   GZIP,"  GZIP    ",gzip))
-$(eval $(call cmd_define,     MV,"  MV      ",mv))
-$(eval $(call cmd_define,  PERLC,"  PERLC   ",perl -c))
+$(eval $(call cmd_define,RUNTEST,"  RUNTEST  ",$(S390_TEST_LIB_PATH)/s390_runtest))
+$(eval $(call cmd_define,    CAT,"  CAT      ",cat))
+$(eval $(call cmd_define,    SED,"  SED      ",sed))
+$(eval $(call cmd_define,   GZIP,"  GZIP     ",gzip))
+$(eval $(call cmd_define,     MV,"  MV       ",mv))
+$(eval $(call cmd_define,  PERLC,"  PERLC    ",perl -c))
 
 CHECK           = sparse
 CHECK_SILENT   := $(CHECK)

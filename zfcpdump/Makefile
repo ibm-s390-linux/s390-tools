@@ -1,6 +1,6 @@
 include ../common.mak
 
-CPIOINIT  = $(call echocmd,"  CPIOINI ",/$@)./cpioinit
+CPIOINIT  = $(call echocmd,"  CPIOINI  ",/$@)./cpioinit
 INSTALL_SCRIPTS = 10-zfcpdump.install
 
 ALL_CFLAGS += -fno-sanitize=all
