@@ -8,6 +8,7 @@
 # 95zdev/zdev-lib.sh
 #   Common shell library functionality for 95zdev and 95zdev-kdump.
 #
+# shellcheck shell=bash
 
 is_kdump() {
     # https://src.fedoraproject.org/rpms/kexec-tools/c/4eedcae5e1540690a3761857fe2e692774c44960
