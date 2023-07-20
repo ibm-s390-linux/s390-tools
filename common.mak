@@ -360,6 +360,7 @@ help:
 	@echo '  all      Build all tools (default target)'
 	@echo '  install  Install tools'
 	@echo '  clean    Delete all generated files'
+	@echo '  compdb   Generate compile_commands.json for clangd'
 	@echo ''
 	@echo 'OPTIONS'
 	@echo '  D=1      	 Build with debugging option "-Og"'
@@ -374,6 +375,27 @@ help:
 	@echo '  # make clean all D=1 W=1 -j'
 	@echo '  # make C=1 CHECK=smatch'
 .PHONY: help
+
+
+# 'compile_commands.json' generation
+#
+# Create the compilation database 'compile_commands.json'. See
+# https://clang.llvm.org/docs/JSONCompilationDatabase.html for details.
+#
+.PHONY: compdb
+compdb:
+	$(MAKE) clean
+ifneq ($(shell command -v compiledb),)
+	compiledb $(MAKE)
+else ifneq ($(shell command -v bear),)
+  ifeq ($(shell bear --help|grep -- '-- ...'),)
+	bear $(MAKE)
+  else
+	bear -- $(MAKE)
+  endif
+else
+	$(error Please install either 'compiledb' or 'bear')
+endif
 
 # Automatic dependency generation
 #

@@ -9,6 +9,10 @@
 tags
 TAGS
 
+# compile_commands.json
+# (https://clang.llvm.org/docs/JSONCompilationDatabase.html)
+compile_commands.json
+
 # clangd cache (https://clangd.llvm.org/design/indexing#backgroundindex)
 .cache/
 
