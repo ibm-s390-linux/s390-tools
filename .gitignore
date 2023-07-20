@@ -24,6 +24,7 @@ compile_commands.json
 # Ignore generated executables and other generated files
 #
 **/.detect-openssl.dep.c
+*.debug
 ap_tools/ap-check
 cmsfs-fuse/cmsfs-fuse
 cpacfstats/cpacfstats

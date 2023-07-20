@@ -2,6 +2,7 @@
 include ../../common.mak
 
 FILES := stage3a.bin stage3b.bin stage3b_reloc.bin
+DEBUG_FILES := $(addsuffix .debug,$(FILES))
 
 ifeq ($(HOST_ARCH),s390x)
 ZIPL_DIR := $(rootdir)/zipl
@@ -75,6 +76,9 @@ stage3b.elf: head.o $(ZIPL_OBJS)
 	$(LINK) $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,-T,$< -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 	@chmod a-x $@
 
+%.bin.debug: %.elf
+	$(OBJCOPY) --only-keep-debug $< $@
+
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
 	@chmod a-x $@
@@ -89,7 +93,7 @@ else
 # `-include $(dependencies_c)` statement).
 .PHONY: $(dependencies_c)
 
-$(FILES):
+$(FILES) $(DEBUG_FILES):
 	echo "  SKIP    $@ due to HOST_ARCH != s390x"
 
 install:
@@ -97,9 +101,9 @@ install:
 endif
 
 .DEFAULT_GOAL := all
-all: $(FILES)
+all: $(FILES) $(DEBUG_FILES)
 
 clean:
-	rm -f *.o *.elf *.bin *.map .*.d *.lds
+	rm -f -- *.o *.elf *.bin *.map .*.d *.lds *.debug
 
 .PHONY: all clean

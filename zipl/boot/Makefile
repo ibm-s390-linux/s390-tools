@@ -13,15 +13,17 @@ ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g $(INCLUDE_PARMS) \
 	  -W -Wall -Wformat-security -fno-sanitize=all -Wno-array-bounds
 ALL_LDFLAGS += -fno-sanitize=all
 
-FILES	= fba0.bin fba1b.bin fba2.bin \
+INC_FILES := fba0.bin fba1b.bin fba2.bin \
 	  eckd0_ldl.bin eckd0_cdl.bin \
 	  eckd1.bin eckd1b.bin eckd2.bin \
 	  tape0.bin \
 	  eckd2dump_sv.bin tape2dump.bin fba2dump.bin eckd2dump_mv.bin
+FILES := $(INC_FILES) stage3.bin
+DEBUG_FILES := $(addsuffix .debug,$(FILES))
 
-all: .loaders tape0.bin stage3.bin
+all: .loaders $(FILES) $(DEBUG_FILES)
 
-.loaders: $(FILES)
+.loaders: $(INC_FILES)
 	touch .loaders
 
 # Prevent make from using some default rules...
@@ -75,12 +77,15 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 %.exec:	%.o
 	$(LINK) -Wl,-T,$(filter %.lds,$^) $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 
+%.bin.debug: %.exec
+	$(OBJCOPY) --only-keep-debug $< $@
+
 %.bin:	%.exec
 	$(OBJCOPY) -O binary $< $@
 
 
 clean:
 	rm -f -- *.o *.exec *.bin $(FILES) tape0.bin *.xxx *.yyy \
-	      stage3.bin *.lds .*.lds.d .loaders
+	      stage3.bin *.lds .*.lds.d .loaders *.debug
 
 .PHONY: all clean
