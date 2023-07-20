@@ -519,6 +519,7 @@ show_devices()
 		else
 			echo "$UNIT_PATH failed"
 			echo "-"
+			echo "- -"
 		fi
 
 		if $SHOW_ATTRIBUTES && [ $SHOW_MORE_ATTRS -ge 1 ]; then
