@@ -3398,7 +3398,9 @@ static int _keystore_perform_reencipher(struct keystore *keystore,
 				      "CURRENT master key", name);
 				if (!selected &&
 				    !is_ep11_aes_key(secure_key,
-						     secure_key_size))
+						     secure_key_size) &&
+				    !is_ep11_aes_key_with_header(secure_key,
+							secure_key_size))
 					print_msg_for_cca_envvars(
 							"secure AES key");
 			}

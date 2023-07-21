@@ -5278,9 +5278,11 @@ static int _ep11_unwrap_key_rsa(struct plugin_handle *ph,
 	m_UnwrapKey_t dll_m_UnwrapKey;
 	const unsigned char *key_blob;
 	struct ep11keytoken *ep11key;
+	struct ep11kblob_header *hdr;
 	CK_MECHANISM mech = { 0 };
 	CK_BYTE csum[7] = { 0 };
 	CK_BBOOL ck_true = true;
+	int pkey_fd, rc;
 	CK_RV rv;
 
 	CK_ATTRIBUTE template[] = {
@@ -5306,7 +5308,8 @@ static int _ep11_unwrap_key_rsa(struct plugin_handle *ph,
 	pr_verbose(&ph->pd, "Wrap hashing algorithm: %d",
 		   ph->profile->wrap_hashing_algo);
 
-	if (*unwrapped_key_len < sizeof(struct ep11keytoken)) {
+	if (*unwrapped_key_len < sizeof(struct ep11kblob_header) +
+						sizeof(struct ep11keytoken)) {
 		_set_error(ph, "Key buffer is too small");
 		return -EINVAL;
 	}
@@ -5381,19 +5384,68 @@ static int _ep11_unwrap_key_rsa(struct plugin_handle *ph,
 		  256 * 256 * csum[csum_len - 3] +
 		  256 * 256 * 256 * csum[csum_len - 4];
 
-	/* Setup the EP11 token header */
-	ep11key = (struct ep11keytoken *)unwrapped_key;
-	memset(&ep11key->session, 0, sizeof(ep11key->session));
-	ep11key->head.type = TOKEN_TYPE_NON_CCA;
-	ep11key->head.length = *unwrapped_key_len;
-	ep11key->head.version = TOKEN_VERSION_EP11_AES;
-	ep11key->head.keybitlen = bit_len;
+	/* Prepend and setup the EP11 token header */
+	hdr = (struct ep11kblob_header *)unwrapped_key;
+	ep11key = (struct ep11keytoken *)
+			(unwrapped_key + sizeof(struct ep11kblob_header));
+	memmove(ep11key, unwrapped_key, *unwrapped_key_len);
+	*unwrapped_key_len += sizeof(struct ep11kblob_header);
+	memset(hdr, 0, sizeof(struct ep11kblob_header));
+	hdr->type = TOKEN_TYPE_NON_CCA;
+	hdr->hver = 0;
+	hdr->len = *unwrapped_key_len;
+	hdr->version = TOKEN_VERSION_EP11_AES_WITH_HEADER;
+	hdr->bitlen = bit_len;
 
-	pr_verbose(&ph->pd, "unwrapped bit length: %u",
-		   ep11key->head.keybitlen);
+	pr_verbose(&ph->pd, "unwrapped bit length: %u", hdr->bitlen);
 
 	/* return full length, blob is already zero padded */
-	*unwrapped_key_len = sizeof(struct ep11keytoken);
+	*unwrapped_key_len =
+		sizeof(struct ep11kblob_header) + sizeof(struct ep11keytoken);
+
+	/*
+	 * Check if the pkey module supports keys of type
+	 * TOKEN_VERSION_EP11_AES_WITH_HEADER, older kernels may not support
+	 * such keys. If it does not support such keys, convert the key to
+	 * TOKEN_VERSION_EP11_AES type, if its session field is all zero
+	 * (i.e. the key is not session bound).
+	 */
+	pkey_fd = open_pkey_device(ph->pd.verbose);
+	if (pkey_fd < 0) {
+		_set_error(ph, "Failed to open pkey device");
+		return -EIO;
+	}
+
+	rc = validate_secure_key(pkey_fd, unwrapped_key, *unwrapped_key_len,
+				 NULL, NULL, NULL, ph->pd.verbose);
+	close(pkey_fd);
+	if (rc == -EINVAL || rc == -ENODEV) {
+		pr_verbose(&ph->pd, "The pkey kernel module does not support "
+			   "PKEY_TYPE_EP11_AES, fall back to PKEY_TYPE_EP11");
+
+		if (is_ep11_key_session_bound(unwrapped_key,
+					      *unwrapped_key_len)) {
+			_set_error(ph, "The unwrapped key is session bound. "
+				   "Kernel support is required for such keys");
+			return -EIO;
+		}
+
+		key_blob_len = hdr->len;
+		*unwrapped_key_len -= sizeof(struct ep11kblob_header);
+		memmove(unwrapped_key,
+			unwrapped_key + sizeof(struct ep11kblob_header),
+			*unwrapped_key_len);
+		ep11key = (struct ep11keytoken *)unwrapped_key;
+		memset(&ep11key->session, 0, sizeof(ep11key->session));
+		ep11key->head.type = TOKEN_TYPE_NON_CCA;
+		ep11key->head.len = key_blob_len -
+						sizeof(struct ep11kblob_header);
+		ep11key->head.version = TOKEN_VERSION_EP11_AES;
+		ep11key->head.bitlen = bit_len;
+	} else if (rc != 0) {
+		_set_error(ph, "Failed to validate unwrapped key");
+		return rc;
+	}
 
 	return 0;
 }

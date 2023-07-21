@@ -365,8 +365,9 @@ int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
  * @param[in] target    the target handle to use for the re-encipher operation
  * @param[in] card      the card that corresponds to the target handle
  * @param[in] domain    the domain that corresponds to the target handle
- * @param[in/out] ep11key the EP11 key token to reencipher. The re-enciphered
- *                      secure key will be returned in this buffer.
+ * @param[in/out] ep11key_blob the EP11 key token to reencipher. The
+ *                      re-enciphered secure key will be returned in this
+ *                      buffer.
  * @param[in] ep11key_size the size of the secure key
  * @param[in] verbose   if true, verbose messages are printed
  *
@@ -374,21 +375,29 @@ int select_ep11_apqn_by_mkvp(struct ep11_lib *ep11, u8 *mkvp,
  */
 static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target,
 			      unsigned int card, unsigned int domain,
-			      struct ep11keytoken *ep11key,
+			      u8 *ep11key_blob,
 			      unsigned int ep11key_size, bool verbose)
 {
+	struct ep11kblob_header *hdr = (struct ep11kblob_header *)ep11key_blob;
+	struct ep11keytoken *ep11key;
 	CK_BYTE resp[MAX_BLOBSIZE];
 	CK_BYTE req[MAX_BLOBSIZE];
-	char ep11_token_header[sizeof(ep11key->head)];
+	char ep11_token_header[sizeof(ep11key->head)] = { 0 };
 	struct XCPadmresp lrb;
 	struct XCPadmresp rb;
+	bool with_header;
 	size_t resp_len;
 	size_t blob_len;
 	long req_len;
 	CK_RV rv;
 	int rc;
 
-	blob_len = ep11key->head.length;
+	with_header = is_ep11_aes_key_with_header(ep11key_blob, ep11key_size);
+	ep11key = (struct ep11keytoken *)(with_header ?
+				ep11key_blob + sizeof(struct ep11kblob_header) :
+				ep11key_blob);
+	blob_len = with_header ? hdr->len - sizeof(struct ep11kblob_header) :
+				 ep11key->head.len;
 	if (blob_len > ep11key_size) {
 		pr_verbose(verbose, "Blob length larger than secure key size");
 		return -EINVAL;
@@ -397,9 +406,14 @@ static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target,
 	rb.domain = domain;
 	lrb.domain = domain;
 
-	/* The token header is an overlay over the (all zero) session field */
-	memcpy(ep11_token_header, ep11key, sizeof(ep11_token_header));
-	memset(ep11key->session, 0, sizeof(ep11key->session));
+	if (!with_header) {
+		/*
+		 * The token header is an overlay over the (all zero) session
+		 * field
+		 */
+		memcpy(ep11_token_header, ep11key, sizeof(ep11_token_header));
+		memset(ep11key->session, 0, sizeof(ep11key->session));
+	}
 
 	resp_len = sizeof(resp);
 	req_len = ep11->dll_xcpa_cmdblock(req, sizeof(req), XCP_ADM_REENCRYPT,
@@ -446,7 +460,8 @@ static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target,
 	}
 
 	memcpy(ep11key, lrb.payload, blob_len);
-	memcpy(ep11key, ep11_token_header, sizeof(ep11_token_header));
+	if (!with_header)
+		memcpy(ep11key, ep11_token_header, sizeof(ep11_token_header));
 
 	return 0;
 }
@@ -469,7 +484,6 @@ int reencipher_ep11_key(struct ep11_lib *ep11, target_t target,
 			unsigned int card, unsigned int domain, u8 *secure_key,
 			unsigned int secure_key_size, bool verbose)
 {
-	struct ep11keytoken *ep11key = (struct ep11keytoken *)secure_key;
 	CK_IBM_DOMAIN_INFO dinf;
 	CK_ULONG dinf_len = sizeof(dinf);
 	CK_RV rv;
@@ -493,17 +507,21 @@ int reencipher_ep11_key(struct ep11_lib *ep11, target_t target,
 		return -ENODEV;
 	}
 
-	rc = ep11_adm_reencrypt(ep11, target, card, domain, ep11key,
+	rc = ep11_adm_reencrypt(ep11, target, card, domain, secure_key,
 				secure_key_size, verbose);
 	if (rc != 0)
 		return rc;
 
 	if (is_xts_key(secure_key, secure_key_size)) {
-		secure_key += EP11_KEY_SIZE;
-		secure_key_size -= EP11_KEY_SIZE;
-		ep11key = (struct ep11keytoken *)secure_key;
+		if (is_ep11_aes_key_with_header(secure_key, secure_key_size)) {
+			secure_key += EP11_AES_KEY_SIZE;
+			secure_key_size -= EP11_AES_KEY_SIZE;
+		} else {
+			secure_key += EP11_KEY_SIZE;
+			secure_key_size -= EP11_KEY_SIZE;
+		}
 
-		rc = ep11_adm_reencrypt(ep11, target, card, domain, ep11key,
+		rc = ep11_adm_reencrypt(ep11, target, card, domain, secure_key,
 					secure_key_size, verbose);
 		if (rc != 0)
 			return rc;

@@ -1968,7 +1968,9 @@ static int command_reencipher_file(void)
 				      "master key has failed\n");
 				if (!selected &&
 				    !is_ep11_aes_key(secure_key,
-						     secure_key_size))
+						     secure_key_size) &&
+				    !is_ep11_aes_key_with_header(secure_key,
+							secure_key_size))
 					print_msg_for_cca_envvars(
 							"secure AES key");
 			}
@@ -1993,7 +1995,9 @@ static int command_reencipher_file(void)
 				      "master key has failed\n");
 				if (!selected &&
 				    !is_ep11_aes_key(secure_key,
-						     secure_key_size))
+						     secure_key_size) &&
+				    !is_ep11_aes_key_with_header(secure_key,
+							secure_key_size))
 					print_msg_for_cca_envvars(
 							"secure AES key");
 			}

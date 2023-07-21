@@ -858,7 +858,7 @@ static enum pkey_key_type key_type_to_pkey_type(const char *key_type)
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return PKEY_TYPE_CCA_CIPHER;
 	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
-		return PKEY_TYPE_EP11;
+		return PKEY_TYPE_EP11_AES;
 
 	return 0;
 }
@@ -879,6 +879,8 @@ static size_t key_size_for_type(enum pkey_key_type type)
 		return AESCIPHER_KEY_SIZE;
 	case PKEY_TYPE_EP11:
 		return EP11_KEY_SIZE;
+	case PKEY_TYPE_EP11_AES:
+		return EP11_AES_KEY_SIZE;
 	default:
 		return 0;
 	}
@@ -924,6 +926,7 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 		return -ENOTSUP;
 	}
 
+retry:
 	genseck2.size = keybits_to_keysize(keybits);
 	if (genseck2.size == 0) {
 		warnx("Invalid value for '--keybits'/'-c': '%lu'", keybits);
@@ -957,9 +960,32 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 	genseck2.keylen = size;
 
 	rc = pkey_genseck2(pkey_fd, &genseck2, verbose);
+	if (rc == -EINVAL && genseck2.type == PKEY_TYPE_EP11_AES) {
+		/*
+		 * Older kernels may not support gensek2 with key type
+		 * PKEY_TYPE_EP11_AES, retry with PKEY_TYPE_EP11.
+		 */
+		pr_verbose(verbose,
+			   "ioctl PKEY_GENSECK2 does not support "
+			   "PKEY_TYPE_EP11_AES, fall back to PKEY_TYPE_EP11");
+
+		genseck2.type = PKEY_TYPE_EP11;
+		free(genseck2.apqns);
+		genseck2.apqns = NULL;
+		genseck2.apqn_entries = 0;
+		free(secure_key);
+		goto retry;
+	}
 	if (rc != 0) {
 		warnx("Failed to generate a secure key: %s", strerror(-rc));
 		goto out;
+	}
+	if (rc == 0 && genseck2.type == PKEY_TYPE_EP11) {
+		if (is_ep11_key_session_bound(secure_key, size)) {
+			warnx("The generated key is session bound. Kernel "
+			      "support is required for such keys");
+			goto out;
+		}
 	}
 
 	if (xts) {
@@ -1062,6 +1088,7 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 		return -ENOTSUP;
 	}
 
+retry:
 	clr2seck2.size = keybits_to_keysize(HALF_KEYSIZE_FOR_XTS(
 						clear_key_size * 8, xts));
 	if (clr2seck2.size == 0) {
@@ -1096,9 +1123,32 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 	clr2seck2.keylen = size;
 
 	rc = pkey_clr2seck2(pkey_fd, &clr2seck2, verbose);
+	if (rc == -EINVAL && clr2seck2.type == PKEY_TYPE_EP11_AES) {
+		/*
+		 * Older kernels may not support clr2seck2 with key type
+		 * PKEY_TYPE_EP11_AES, retry with PKEY_TYPE_EP11.
+		 */
+		pr_verbose(verbose,
+			   "ioctl PKEY_CLR2SECK2 does not support "
+			   "PKEY_TYPE_EP11_AES, fall back to PKEY_TYPE_EP11");
+
+		clr2seck2.type = PKEY_TYPE_EP11;
+		free(clr2seck2.apqns);
+		clr2seck2.apqns = NULL;
+		clr2seck2.apqn_entries = 0;
+		free(secure_key);
+		goto retry;
+	}
 	if (rc != 0) {
 		warnx("Failed to generate a secure key: %s", strerror(-rc));
 		goto out;
+	}
+	if (rc == 0 && clr2seck2.type == PKEY_TYPE_EP11) {
+		if (is_ep11_key_session_bound(secure_key, size)) {
+			warnx("The generated key is session bound. Kernel "
+			      "support is required for such keys");
+			goto out;
+		}
 	}
 
 	if (xts) {
@@ -1486,6 +1536,8 @@ int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
 	struct ep11keytoken *ep11key = (struct ep11keytoken *)key;
+	struct ep11keytoken *ep11key2 =
+		(struct ep11keytoken *)(key + sizeof(struct ep11kblob_header));
 
 	util_assert(key != NULL, "Internal error: secure_key is NULL");
 	util_assert(mkvp != NULL, "Internal error: mkvp is NULL");
@@ -1497,6 +1549,8 @@ int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 		memcpy(mkvp, &cipherkey->kvp, sizeof(cipherkey->kvp));
 	else if (is_ep11_aes_key(key, key_size))
 		memcpy(mkvp, &ep11key->wkvp, sizeof(ep11key->wkvp));
+	else if (is_ep11_aes_key_with_header(key, key_size))
+		memcpy(mkvp, &ep11key2->wkvp, sizeof(ep11key2->wkvp));
 	else
 		return -EINVAL;
 
@@ -1593,15 +1647,76 @@ bool is_ep11_aes_key(const u8 *key, size_t key_size)
 
 	if (ep11key->head.type != TOKEN_TYPE_NON_CCA)
 		return false;
+	if (ep11key->head.hver != 0)
+		return false;
 	if (ep11key->head.version != TOKEN_VERSION_EP11_AES)
 		return false;
-	if (ep11key->head.length > key_size)
+	if (ep11key->head.len > key_size)
 		return false;
 
 	if (ep11key->version != 0x1234)
 		return false;
 
 	return true;
+}
+
+/**
+ * Check if the specified key is a EP11 AES key token with external header.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is an EP11 AES token with external header type
+ */
+bool is_ep11_aes_key_with_header(const u8 *key, size_t key_size)
+{
+	struct ep11kblob_header *header = (struct ep11kblob_header *)key;
+	struct ep11keytoken *ep11key =
+		(struct ep11keytoken *)(key + sizeof(struct ep11kblob_header));
+
+	if (key == NULL || key_size < EP11_AES_KEY_SIZE)
+		return false;
+
+	if (header->type != TOKEN_TYPE_NON_CCA)
+		return false;
+	if (header->hver != 0)
+		return false;
+	if (header->version != TOKEN_VERSION_EP11_AES_WITH_HEADER)
+		return false;
+	if (header->len > key_size)
+		return false;
+
+	if (ep11key->version != 0x1234)
+		return false;
+
+	return true;
+}
+
+/**
+ * Check if the specified EP11 AES key is session bound.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is an EP11 AES token type
+ */
+bool is_ep11_key_session_bound(const u8 *key, size_t key_size)
+{
+	struct ep11keytoken *ep11key;
+
+	if (is_ep11_aes_key(key, key_size)) {
+		ep11key = (struct ep11keytoken *)key;
+		return memcmp(ep11key->session + sizeof(ep11key->head),
+			      ZERO_SESSION, sizeof(ep11key->session) -
+					sizeof(ep11key->head)) != 0;
+	} else if (is_ep11_aes_key_with_header(key, key_size)) {
+		ep11key = (struct ep11keytoken *)
+				(key + sizeof(struct ep11kblob_header));
+		return memcmp(ep11key->session, ZERO_SESSION,
+			      sizeof(ep11key->session)) != 0;
+	} else {
+		return false;
+	}
 }
 
 /**
@@ -1629,6 +1744,11 @@ bool is_xts_key(const u8 *key, size_t key_size)
 		    is_ep11_aes_key(key + EP11_KEY_SIZE,
 					  key_size - EP11_KEY_SIZE))
 			return true;
+	} else if (is_ep11_aes_key_with_header(key, key_size)) {
+		if (key_size == 2 * EP11_AES_KEY_SIZE &&
+		    is_ep11_aes_key_with_header(key + EP11_AES_KEY_SIZE,
+						key_size - EP11_AES_KEY_SIZE))
+			return true;
 	}
 
 	return false;
@@ -1650,6 +1770,7 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 	struct aesdatakeytoken *datakey = (struct aesdatakeytoken *)key;
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
 	struct ep11keytoken *ep11key = (struct ep11keytoken *)key;
+	struct ep11kblob_header *hdr = (struct ep11kblob_header *)key;
 
 	util_assert(bitsize != NULL, "Internal error: bitsize is NULL");
 
@@ -1672,10 +1793,17 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 				*bitsize += cipherkey->pl - 384;
 		}
 	} else if (is_ep11_aes_key(key, key_size)) {
-		*bitsize = ep11key->head.keybitlen;
+		*bitsize = ep11key->head.bitlen;
 		if (key_size == 2 * EP11_KEY_SIZE) {
 			ep11key = (struct ep11keytoken *)(key + EP11_KEY_SIZE);
-			*bitsize += ep11key->head.keybitlen;
+			*bitsize += ep11key->head.bitlen;
+		}
+	} else if (is_ep11_aes_key_with_header(key, key_size)) {
+		*bitsize = hdr->bitlen;
+		if (key_size == 2 * EP11_AES_KEY_SIZE) {
+			hdr = (struct ep11kblob_header *)
+						(key + EP11_AES_KEY_SIZE);
+			*bitsize += hdr->bitlen;
 		}
 	} else {
 		return -EINVAL;
@@ -1699,6 +1827,8 @@ const char *get_key_type(const u8 *key, size_t key_size)
 	if (is_cca_aes_cipher_key(key, key_size))
 		return KEY_TYPE_CCA_AESCIPHER;
 	if (is_ep11_aes_key(key, key_size))
+		return KEY_TYPE_EP11_AES;
+	if (is_ep11_aes_key_with_header(key, key_size))
 		return KEY_TYPE_EP11_AES;
 	return NULL;
 }
@@ -2016,7 +2146,8 @@ int reencipher_secure_key(struct ext_lib *lib, u8 *secure_key,
 		return rc;
 	}
 
-	if (is_ep11_aes_key(secure_key, secure_key_size)) {
+	if (is_ep11_aes_key(secure_key, secure_key_size) ||
+	    is_ep11_aes_key_with_header(secure_key, secure_key_size)) {
 		/* EP11 secure key: need the EP11 host library */
 		if (lib->ep11->lib_ep11 == NULL) {
 			rc = load_ep11_library(lib->ep11, verbose);

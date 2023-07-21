@@ -2175,7 +2175,7 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	else if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		key_size = AESCIPHER_KEY_SIZE;
 	else if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
-		key_size = EP11_KEY_SIZE;
+		key_size = EP11_AES_KEY_SIZE;
 	else
 		return -ENOTSUP;
 
@@ -2247,6 +2247,9 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	pr_verbose(verbose, "Keyblob #1: %lu bytes:'", key_blob_size);
 	if (verbose)
 		util_hexdump_grp(stderr, NULL, key_blob, 4, key_blob_size, 0);
+
+	if (is_ep11_aes_key(key_blob, key_blob_size))
+		key_size = EP11_KEY_SIZE;
 
 	/* Save ID and label of 1st key */
 	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_ID :
@@ -3132,6 +3135,8 @@ int import_kms_key(struct kms_info *kms_info, const char *key1_id,
 		key_size =  AESCIPHER_KEY_SIZE;
 	else if (is_ep11_aes_key(key_blob, key_blob_size))
 		key_size =  EP11_KEY_SIZE;
+	else if (is_ep11_aes_key_with_header(key_blob, key_blob_size))
+		key_size =  EP11_AES_KEY_SIZE;
 
 	if (key_size == 0 || key_blob_size > key_size) {
 		pr_verbose(verbose, "Key '%s' has an unknown or unsupported "
@@ -3366,6 +3371,8 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		key_size =  AESCIPHER_KEY_SIZE;
 	else if (is_ep11_aes_key(key_blob, key_blob_size))
 		key_size =  EP11_KEY_SIZE;
+	else if (is_ep11_aes_key_with_header(key_blob, key_blob_size))
+		key_size =  EP11_AES_KEY_SIZE;
 
 	if (key_size == 0 || key_blob_size > key_size) {
 		pr_verbose(verbose, "Key '%s' has an unknown or unsupported "

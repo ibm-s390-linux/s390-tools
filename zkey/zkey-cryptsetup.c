@@ -1673,7 +1673,10 @@ static int reencipher_prepare(int token)
 				warnx("Failed to re-encipher the secure volume "
 				      "key for device '%s'\n", g.pos_arg);
 				if (!selected &&
-				    !is_ep11_aes_key((u8 *)key, securekeysize))
+				    !is_ep11_aes_key((u8 *)key,
+						     securekeysize) &&
+				    !is_ep11_aes_key_with_header((u8 *)key,
+								securekeysize))
 					print_msg_for_cca_envvars(
 						"secure AES volume key");
 				rc = -EINVAL;
@@ -1696,7 +1699,10 @@ static int reencipher_prepare(int token)
 				warnx("Failed to re-encipher the secure volume "
 				      "key for device '%s'\n", g.pos_arg);
 				if (!selected &&
-				    !is_ep11_aes_key((u8 *)key, securekeysize))
+				    !is_ep11_aes_key((u8 *)key,
+						     securekeysize) &&
+				    !is_ep11_aes_key_with_header((u8 *)key,
+								securekeysize))
 					print_msg_for_cca_envvars(
 						"secure AES volume key");
 				rc = -EINVAL;
@@ -1836,7 +1842,10 @@ static int reencipher_complete(int token)
 				warnx("Failed to re-encipher the secure volume "
 				      "key for device '%s'\n", g.pos_arg);
 				if (!selected &&
-				    !is_ep11_aes_key((u8 *)key, securekeysize))
+				    !is_ep11_aes_key((u8 *)key,
+						     securekeysize) &&
+				    !is_ep11_aes_key_with_header((u8 *)key,
+								securekeysize))
 					print_msg_for_cca_envvars(
 						"secure AES volume key");
 				rc = -EINVAL;
