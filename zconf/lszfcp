@@ -372,18 +372,28 @@ show_devices()
 		SCSI_DEVICE_LIST=`ls -d $SYSFS/devices/css0/*/*/host[0-9]*/*/`
 	fi
 
-	declare -a ZFCP_UNIT_ARRAY
+	declare -A ZFCP_UNIT_DICT
 	if $SHOW_EXTENDED; then
-		ZFCP_UNIT_ARRAY=( $SYSFS/devices/css[0-9]*/[0-9d]*/[0-9]*/0x*/0x* )
-		# remember original array size since array becomes sparse below
-		# so the array length seems to reduce but we still need to
-		# iterate the original indexe range to find all existing entries
-		ZFCP_UNIT_ARRAY_LENGTH="${#ZFCP_UNIT_ARRAY[@]}"
+		ZFCP_UNITS=false
+		for UNIT_PATH in "$SYSFS"/devices/css[0-9]*/[0-9d]*/[0-9]*/0x*/0x*; do
+			if [ "$UNIT_PATH" = "$SYSFS/devices/css[0-9]*/[0-9d]*/[0-9]*/0x*/0x*" ]; then
+				break # no match (as seen without nullglob)
+			else
+				ZFCP_UNITS=true
+			fi
+			STRIPPED_PATH=${UNIT_PATH}
+			L=${UNIT_PATH##*/}
+			STRIPPED_PATH=${STRIPPED_PATH%/*}
+			W=${STRIPPED_PATH##*/}
+			STRIPPED_PATH=${STRIPPED_PATH%/*}
+			A=${STRIPPED_PATH##*/}
+			ZFCP_UNIT_DICT["$A/$W/$L"]=${UNIT_PATH}
+		done
 	else
-		ZFCP_UNIT_ARRAY_LENGTH=0
+		ZFCP_UNITS=false
 	fi
 
-	if [ -z "$SCSI_DEVICE_LIST" ] && [ "$ZFCP_UNIT_ARRAY_LENGTH" -eq 0 ]; then
+	if [ -z "$SCSI_DEVICE_LIST" ] && ! "$ZFCP_UNITS"; then
 		if $SHOW_EXTENDED; then
 			echo "Error: No zfcp-attached SCSI devices found."
 		else
@@ -396,24 +406,9 @@ show_devices()
 		read WWPN < $SCSI_DEVICE_PATH/wwpn
 		read LUN < $SCSI_DEVICE_PATH/fcp_lun
 
-		# loop is NOP without $SHOW_EXTENDED.
-		# remove from ZFCP_UNIT_ARRAY if SCSI device exists
-		ZFCP_UNIT_PATH=""
-		for ((i=0; i < "$ZFCP_UNIT_ARRAY_LENGTH"; i++)); do
-			UNIT_PATH="${ZFCP_UNIT_ARRAY[i]}"
-			[ -z "$UNIT_PATH" ] && continue # skip unset elements
-			STRIPPED_PATH=$UNIT_PATH
-			L=${UNIT_PATH##*/}
-			STRIPPED_PATH=${STRIPPED_PATH%/*}
-			W=${STRIPPED_PATH##*/}
-			STRIPPED_PATH=${STRIPPED_PATH%/*}
-			A=${STRIPPED_PATH##*/}
-			if [ "$A/$W/$L" = "$ADAPTER/$WWPN/$LUN" ]; then
-				ZFCP_UNIT_PATH="$UNIT_PATH"
-				unset "ZFCP_UNIT_ARRAY[i]"
-				break # minor optimization, still O(n)
-			fi
-		done
+		ZFCP_UNIT_PATH="${ZFCP_UNIT_DICT[$ADAPTER/$WWPN/$LUN]}"
+		# remove from ZFCP_UNIT_DICT if SCSI device exists
+		unset "ZFCP_UNIT_DICT[$ADAPTER/$WWPN/$LUN]"
 
 		[ $LUN != ${PAR_LUN:-$LUN} ] && continue
 		[ $WWPN != ${PAR_WWPN:-$WWPN} ] && continue
@@ -426,7 +421,7 @@ show_devices()
 			[ "$SDEVSTATE" != "running" ] \
 				&& SDEVMARKER="$SDEVMARKER NotRunning"
 		else
-			# build manually because ZFCP_UNIT_ARRAY loop was NOP
+			# build manually because ZFCP_UNIT_DICT is not used
 			ZFCP_UNIT_PATH=$SYSFS/devices/css[0-9]*/[0-9d]*/$ADAPTER/$WWPN/$LUN
 		fi
 
@@ -510,8 +505,8 @@ show_devices()
 		fi
 	done
 
-	# what's left in ZFCP_UNIT_ARRAY are now units without SCSI device
-	for UNIT_PATH in "${ZFCP_UNIT_ARRAY[@]}"; do
+	# what's left in ZFCP_UNIT_DICT are now units without SCSI device
+	for UNIT_PATH in "${ZFCP_UNIT_DICT[@]}"; do
 		STRIPPED_PATH=$UNIT_PATH
 		LUN=${UNIT_PATH##*/}
 		STRIPPED_PATH=${STRIPPED_PATH%/*}
