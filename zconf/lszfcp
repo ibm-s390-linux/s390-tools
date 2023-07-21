@@ -219,6 +219,8 @@ $(readlink -e $HOST_PATH)/-"
 				HOSTMARKER=" failed"
 			elif [ "$AVAILABILITY" != "good" ]; then
 				HOSTMARKER=" NotAvailable"
+			elif [ "$PORT_STATE" != "Online" ]; then
+				HOSTMARKER=" NotOnline"
 			fi
 		fi
 		if [ $VERBOSITY -eq 0 ]; then
