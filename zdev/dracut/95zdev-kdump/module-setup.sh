@@ -16,9 +16,10 @@ check() {
     local _arch=${DRACUT_ARCH:-$(uname -m)}
 
     # Ensure that we're running on s390
-    [ "$_arch" = "s390" -o "$_arch" = "s390x" ] || return 1
+    [ "$_arch" = "s390" ] || [ "$_arch" = "s390x" ] || return 1
 
-    source "$moddir/../95zdev/zdev-lib.sh"
+    # shellcheck source=/dev/null
+    source "${moddir:?}/../95zdev/zdev-lib.sh"
 
     # Ensure this module is only included when building kdump initrd
     is_kdump || return 1
@@ -60,7 +61,7 @@ install() {
     # many zFCP LUNs
     inst_dir /etc/modprobe.d
     chzdev zfcp --type "allow_lun_scan=0" --persistent \
-           --base "/etc=$initdir/etc" --yes --quiet --no-root-update \
+           --base "/etc=${initdir:?}/etc" --yes --quiet --no-root-update \
            --force >/dev/null
     # drop /etc/zfcp.conf from dracut module 95zfcp
     echo "rd.zfcp.conf=0" > "$initdir/etc/cmdline.d/00-no-zfcp-conf.conf"
@@ -89,13 +90,14 @@ install() {
     # these are purely generated udev rules so we have to glob expand
     # within $initdir and strip the $initdir prefix for mark_hostonly
     local -a _array
+    # shellcheck disable=SC2155
     local _nullglob=$(shopt -p nullglob)
     shopt -u nullglob
     readarray -t _array < \
-	      <(ls -1 $initdir/etc/udev/rules.d/41-*.rules 2> /dev/null)
+              <(ls -1 "$initdir"/etc/udev/rules.d/41-*.rules 2> /dev/null)
     [[ ${#_array[@]} -gt 0 ]] && mark_hostonly "${_array[@]#$initdir}"
     readarray -t _array < \
-	      <(ls -1 $initdir/etc/modprobe.d/s390x-*.conf 2> /dev/null)
+              <(ls -1 "$initdir"/etc/modprobe.d/s390x-*.conf 2> /dev/null)
     [[ ${#_array[@]} -gt 0 ]] && mark_hostonly "${_array[@]#$initdir}"
     $_nullglob
 
