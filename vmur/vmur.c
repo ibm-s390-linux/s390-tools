@@ -838,7 +838,7 @@ static void parse_opts_receive(struct vmur *info, int argc, char *argv[])
 
 	if (info->stdout_specified && info->file_name_specified)
 		ERR_EXIT("File name not allowed, when --stdout specified!\n");
-	if (info->blocked_specified + info->text_specified)
+	if (info->blocked_specified + info->text_specified > 1)
 		ERR_EXIT("Conflicting options: -b and -t are mutually "
 			 "exclusive.\n");
 	if (!info->spool_class_specified)
