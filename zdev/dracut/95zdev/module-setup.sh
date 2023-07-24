@@ -19,6 +19,7 @@ check() {
     # Ensure that we're running on s390
     [ "$_arch" = "s390" -o "$_arch" = "s390x" ] || return 1
 
+    # shellcheck disable=SC2154 source=/dev/null
     source "$moddir/zdev-lib.sh"
 
     # Leave kdump device configuration to module zdev-kdump to
