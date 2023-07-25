@@ -14,13 +14,14 @@
 #
 
 check() {
-    local _arch=$(uname -m)
+    local _arch
+    _arch=$(uname -m)
 
     # Ensure that we're running on s390
-    [ "$_arch" = "s390" -o "$_arch" = "s390x" ] || return 1
+    [ "$_arch" = "s390" ] || [ "$_arch" = "s390x" ] || return 1
 
-    # shellcheck disable=SC2154 source=/dev/null
-    source "$moddir/zdev-lib.sh"
+    # shellcheck source=/dev/null
+    source "${moddir:?}/zdev-lib.sh"
 
     # Leave kdump device configuration to module zdev-kdump to
     # ensure a minimal device footprint
@@ -80,7 +81,7 @@ install() {
     done
 
     # Apply via --import to prevent other devices from being configured
-    chzdev --import "$_tempfile" --persistent --base "/etc=$initdir/etc" \
+    chzdev --import "$_tempfile" --persistent --base "/etc=${initdir:?}/etc" \
            --yes --quiet --no-root-update --force >/dev/null
     # Apply site-specific configurations via --import
     for (( site=0; site<10; site++ ))
