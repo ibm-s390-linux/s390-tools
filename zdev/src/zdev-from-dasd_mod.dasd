@@ -1,0 +1,87 @@
+#
+# Copyright IBM Corp. 2023
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# zdev-from-dasd_mod.dasd
+#   Shell library, which can be sourced by other POSIX compatible shell scripts.
+#   Provide helper function parsing its stdin based on the syntax of kernel
+#   device driver parameter dasd_mod.dasd= and invoking chzdev to produce
+#   corresponding persistent device configurations. The helper function
+#   takes one argument, which is either "globals" or "ranges". For a
+#   complete configuration, call the function twice, first with "globals"
+#   and then with "ranges".
+#
+# shellcheck shell=sh
+
+# It would be possible to pass the collected rd.dasd options via
+# modprobe.d. However, it is still required to parse the options to handle
+# cio_ignore. That in turn ensures devices get sensed. Sensing is in turn
+# required for automatically loading the device drivers via modalias and
+# for the dasd device driver to find devices it can probe (set online). So
+# go all the way and parse the rd.dasd options. For device bus-IDs, use
+# chzdev, which not only handles cio_ignore transparently, but also
+# generates persistent configuration that can be transferred from initrd to
+# another root files system such as in a distro installer environment.
+
+zdev_dasd_base_args="--no-settle --yes --no-root-update --force"
+
+zdev_parse_dasd_list() {
+    sed 's/,/\n/g' | while read -r _zdev_dasditem; do
+        unset _zdev_dasd_range _zdev_dasd_features _zdev_dasd_attrs
+        case $_zdev_dasditem in
+            autodetect|probeonly|nopav|nofcx)
+                [ "$1" = "globals" ] || continue
+                # Autodetect can of course only enable devices that are not
+                # in the cio_ignore list.
+                # Intentionally do not dynamically configure now, but only
+                # generate a modprobe.d file, which configures the device
+                # later during kernel module load.
+                echo "rd.dasd ...,${_zdev_dasditem},... :"
+                # shellcheck disable=SC2086
+                chzdev dasd --type "${_zdev_dasditem}=1" --persistent \
+                       $zdev_dasd_base_args
+                ;;
+            "") continue ;; # empty range
+            *)  # currently no support for a device-spec "ipldev", only devbusid
+                [ "$1" = "ranges" ] || continue
+                SAVED_IFS="$IFS"
+                IFS='('
+                read -r _zdev_dasd_range _zdev_dasd_features <<EOF
+$_zdev_dasditem
+EOF
+                IFS="$SAVED_IFS"
+                if [ "${_zdev_dasd_features%%*)}" != "" ]; then
+                    warn "rd.dasd: Missing closing parenthesis at features of DASD range $_zdev_dasd_range: ($_zdev_dasd_features"
+                fi
+                if [ -n "$_zdev_dasd_features" ]; then
+                    _zdev_dasd_features="${_zdev_dasd_features%)}"
+                    _zdev_dasd_features=$(echo "$_zdev_dasd_features" | sed 's/:/\n/g')
+                    while read -r _zdev_dasd_feature; do
+                        case $_zdev_dasd_feature in
+                            ro) _zdev_dasd_attrs="$_zdev_dasd_attrs readonly=1" ;;
+                            diag) _zdev_dasd_attrs="$_zdev_dasd_attrs use_diag=1" ;;
+                            raw) _zdev_dasd_attrs="$_zdev_dasd_attrs raw_track_access=1" ;;
+                            erplog|failfast) _zdev_dasd_attrs="$_zdev_dasd_attrs ${_zdev_dasd_feature}=1" ;;
+                            *)
+                                warn "rd.dasd: Unknown DASD feature for device range $_zdev_dasd_range: $_zdev_dasd_feature"
+                                ;;
+                        esac
+                    done <<EOF
+$_zdev_dasd_features
+EOF
+                fi
+                # Without dynamic (active) config zdev cannot infer
+                # the actual dasd type (eckd, fba) so configure for both.
+                echo "rd.dasd ...,${_zdev_dasditem},... :"
+                # shellcheck disable=SC2086
+                chzdev dasd-eckd --enable --persistent "$_zdev_dasd_range" $_zdev_dasd_attrs \
+                       $zdev_dasd_base_args
+                # shellcheck disable=SC2086
+                chzdev dasd-fba --enable --persistent "$_zdev_dasd_range" $_zdev_dasd_attrs \
+                       $zdev_dasd_base_args
+                ;;
+        esac
+    done # input redir w/ process substitution causes syntax error in dracut env
+}
