@@ -109,11 +109,11 @@ static int dumper_read_validate_fba(int size, struct df_s390_dumper *dumper)
  */
 static int dumper_read_fba(void)
 {
-	if (dumper_read_validate_fba(DF_S390_DUMPER_SIZE_V3, &l.dumper) == 0)
+	if (dumper_read_validate_fba(STAGE2_DUMPER_SIZE_V3, &l.dumper) == 0)
 		return 0;
-	if (dumper_read_validate_fba(DF_S390_DUMPER_SIZE_V2, &l.dumper) == 0)
+	if (dumper_read_validate_fba(STAGE2_DUMPER_SIZE_V2, &l.dumper) == 0)
 		return 0;
-	if (dumper_read_validate_fba(DF_S390_DUMPER_SIZE_V1, &l.dumper) == 0)
+	if (dumper_read_validate_fba(STAGE2_DUMPER_SIZE_V1, &l.dumper) == 0)
 		return 0;
 	return -ENODEV;
 }

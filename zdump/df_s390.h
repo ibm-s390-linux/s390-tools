@@ -14,6 +14,7 @@
 
 #include "lib/zt_common.h"
 #include "dump/s390_dump.h"
+#include "boot/loaders_layout.h"
 
 #include "dt.h"
 #include "zg.h"
@@ -34,9 +35,6 @@ static inline enum dfi_arch df_s390_to_dfi_arch(enum df_s390_arch df_s390_arch)
 	return df_s390_arch == DF_S390_ARCH_64 ? DFI_ARCH_64 : DFI_ARCH_32;
 }
 
-#define DF_S390_DUMPER_SIZE_V1		0x1000
-#define DF_S390_DUMPER_SIZE_V2		0x2000
-#define DF_S390_DUMPER_SIZE_V3		0x3000
 #define DF_S390_DUMPER_MAGIC32		"ZECKD31"
 #define DF_S390_DUMPER_MAGIC64		"ZECKD64"
 #define DF_S390_DUMPER_MAGIC_EXT	"XECKD64"

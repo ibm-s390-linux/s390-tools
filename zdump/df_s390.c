@@ -155,16 +155,16 @@ void df_s390_dumper_read(struct zg_fh *fh, int blk_size,
 	case 1:
 		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT, 7) == 0 ||
 		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7) == 0)
-			dumper->size = DF_S390_DUMPER_SIZE_V3;
+			dumper->size = STAGE2_DUMPER_SIZE_V3;
 		else
-			dumper->size = DF_S390_DUMPER_SIZE_V1;
+			dumper->size = STAGE2_DUMPER_SIZE_V1;
 		break;
 	case 2:
-		dumper->size = DF_S390_DUMPER_SIZE_V2;
+		dumper->size = STAGE2_DUMPER_SIZE_V2;
 		break;
 	case 3:
 	default:
-		dumper->size = DF_S390_DUMPER_SIZE_V3;
+		dumper->size = STAGE2_DUMPER_SIZE_V3;
 	}
 	/* Read force and mem fields in the end of the dumper */
 	bytes_to_read = sizeof(dumper->force) + sizeof(dumper->mem);
