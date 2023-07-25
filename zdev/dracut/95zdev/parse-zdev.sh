@@ -37,6 +37,7 @@ for zdev_arg in $(getargs rd.zdev); do
 done
 
 if [ $zdev_auto -eq 1 ] ; then
+    # shellcheck disable=SC2086
     chzdev --import "$zdev_fw_file" $zdev_base_args
 
     # Get information about DPM environment
@@ -50,7 +51,7 @@ if [ $zdev_auto -eq 1 ] ; then
       # work for PCI devices defined before boot because there is no coldplug
       # trigger for /sys/bus/pci/slots
       for slot in /sys/bus/pci/slots/* ; do
-        read power < "$slot/power"
+        read -r power < "$slot/power"
         if [ "$power" = "0" ] ; then
             echo 1 > "$slot/power"
         fi
