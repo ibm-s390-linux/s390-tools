@@ -13,6 +13,7 @@ ConditionPathIsReadWrite=/sys/firmware/cpi
 Conflicts=shutdown.target
 DefaultDependencies=no
 Description=Apply Control Program Identification (CPI)
+Requires=sysinit.target
 
 [Service]
 Type=oneshot
