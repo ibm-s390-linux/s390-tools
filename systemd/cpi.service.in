@@ -7,11 +7,12 @@
 #
 
 [Unit]
-Description=Apply Control Program Identification (CPI)
-DefaultDependencies=no
-Conflicts=shutdown.target
 After=sysinit.target
+Before=shutdown.target
 ConditionPathIsReadWrite=/sys/firmware/cpi
+Conflicts=shutdown.target
+DefaultDependencies=no
+Description=Apply Control Program Identification (CPI)
 
 [Service]
 Type=oneshot
