@@ -257,14 +257,45 @@ err_exit:
 }
 #endif /* PVATTEST_COMPILE_PERFORM */
 
+static int fprint_verify_result(FILE *stream, const enum verify_output_format fmt,
+				GBytes *config_uid, GBytes *additional_data)
+{
+	switch (fmt) {
+	case VERIFY_FMT_HUMAN:
+		if (fprintf(stream, _("Attestation measurement verified\n")) < 0)
+			return -1;
+		if (fprintf(stream, _("Config UID:\n")) < 0)
+			return -1;
+		if (pvattest_hexdump(stream, config_uid, 0x10L, "0x", FALSE) < 0)
+			return -1;
+		if (fprintf(stream, _("\n")) < 0)
+			return -1;
+
+		if (additional_data) {
+			if (fprintf(stream, _("Additional Data:\n")) < 0)
+				return -1;
+			if (pvattest_hexdump(stream, additional_data, 0x60L, "0x", FALSE) < 0)
+				return -1;
+			if (fprintf(stream, _("\n")) < 0)
+				return -1;
+		}
+		break;
+	default:
+		g_assert_not_reached();
+		break;
+	}
+	return 0;
+}
+
 #define __PVATTEST_VERIFY_ERROR_MSG _("Attestation measurement verification failed")
-static int do_verify(pvattest_verify_config_t *verify_config)
+static int do_verify(const pvattest_verify_config_t *verify_config, const int appl_log_lvl)
 {
 	g_autoptr(GBytes) user_data = NULL, uv_measurement = NULL, additional_data = NULL,
 			  image_hdr = NULL, calc_measurement = NULL, config_uid = NULL,
 			  meas_key = NULL, arp_key = NULL, nonce = NULL, serialized_arcb = NULL;
 	g_autofree att_meas_ctx_t *measurement_hdr = NULL;
 	g_autoptr(exchange_format_ctx_t) input_ctx = NULL;
+	const char *err_prefix = __PVATTEST_VERIFY_ERROR_MSG;
 	g_autoptr(GError) error = NULL;
 	gboolean rc;
 
@@ -322,21 +353,20 @@ static int do_verify(pvattest_verify_config_t *verify_config)
 		return PVATTEST_EXIT_MEASURE_NOT_VERIFIED;
 	}
 
-	pvattest_log_info(_("Attestation measurement verified"));
-	pvattest_log_info(_("Config UID:"));
-	pvattest_log_bytes(g_bytes_get_data(config_uid, NULL), g_bytes_get_size(config_uid), 16L,
-			   "", FALSE, PVATTEST_LOG_LVL_INFO);
-
-	if (additional_data) {
-		pvattest_log_info(_("\nAdditional Data:"));
-		pvattest_log_bytes(g_bytes_get_data(additional_data, NULL),
-				   g_bytes_get_size(additional_data), 16L, "", FALSE,
-				   PVATTEST_LOG_LVL_INFO);
+	/* Write human-readable output to stdout */
+	if (appl_log_lvl >= PVATTEST_LOG_LVL_INFO) {
+		if (fprint_verify_result(stdout, VERIFY_FMT_HUMAN, config_uid, additional_data) <
+		    0) {
+			g_set_error(&error, PV_GLIB_HELPER_ERROR, PV_GLIB_HELPER_FILE_ERROR,
+				    "stdout: %s", g_strerror(errno));
+			err_prefix = "Failed to write output";
+			goto err_exit;
+		}
 	}
 	return EXIT_SUCCESS;
 
 err_exit:
-	pvattest_log_GError(__PVATTEST_VERIFY_ERROR_MSG, error);
+	pvattest_log_GError(err_prefix, error);
 	return EXIT_FAILURE;
 }
 
@@ -389,7 +419,7 @@ int main(int argc, char *argv[])
 		break;
 #endif /* PVATTEST_COMPILE_PERFORM */
 	case PVATTEST_SUBC_VERIFY:
-		rc = do_verify(&config->verify);
+		rc = do_verify(&config->verify, appl_log_lvl);
 		break;
 	default:
 		g_return_val_if_reached(EXIT_FAILURE);

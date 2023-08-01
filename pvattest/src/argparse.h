@@ -58,6 +58,10 @@ typedef struct {
 	char *user_data_path; /* default NULL */
 } pvattest_perform_config_t;
 
+enum verify_output_format {
+	VERIFY_FMT_HUMAN,
+};
+
 typedef struct {
 	char *input_path;
 	char *hdr_path;
