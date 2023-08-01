@@ -49,8 +49,10 @@ static pvattest_config_t pvattest_config = {
 	},
 	.verify = {
 		.input_path = NULL,
+		.output_path = NULL,
 		.hdr_path = NULL,
 		.arp_key_in_path = NULL,
+		.output_fmt = VERIFY_FMT_YAML,
 	},
 };
 typedef gboolean (*verify_options_fn_t)(GError **);
@@ -329,11 +331,34 @@ static gboolean hex_str_toull(const char *nptr, uint64_t *dst, GError **error)
 		.description = "Use FILE to specify the user data.\n", .arg_description = "FILE", \
 	}
 
+#define _entry__verify_format(__indent)                                                            \
+	{                                                                                          \
+		.long_name = "format", .short_name = 0, .flags = G_OPTION_FLAG_NONE,               \
+		.arg = G_OPTION_ARG_CALLBACK, .arg_data = &set_verify_output_format,               \
+		.description = "Define the output format.\n" __indent                              \
+			       "Defaults to 'yaml'. (possible values: 'yaml')\n",                  \
+		.arg_description = "FORMAT",                                                       \
+	}
+
 static gboolean increase_log_lvl(G_GNUC_UNUSED const char *option_name,
 				 G_GNUC_UNUSED const char *value, G_GNUC_UNUSED void *data,
 				 G_GNUC_UNUSED GError **error)
 {
 	pvattest_log_increase_log_lvl(&pvattest_config.general.log_level);
+	return TRUE;
+}
+
+static gboolean set_verify_output_format(const char *option_name, const char *value,
+					 G_GNUC_UNUSED void *data, GError **error)
+{
+	if (!g_strcmp0(value, "yaml")) {
+		pvattest_config.verify.output_fmt = VERIFY_FMT_YAML;
+	} else {
+		g_set_error(error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
+			    _("Found value '%s' for option '%s', but only 'yaml' is allowed."),
+			    value, option_name);
+		return FALSE;
+	}
 	return TRUE;
 }
 
@@ -445,13 +470,16 @@ static gboolean verify_perform(GError **error)
 }
 
 /************************* VERIFY OPTIONS ************************************/
-#define verify_indent "                       "
+#define verify_indent "                        "
 
 static GOptionEntry verify_options[] = {
 	_entry_input(&pvattest_config.verify.input_path, "attestation result", verify_indent),
+	_entry_output(&pvattest_config.verify.output_path,
+		      "verification result.\n" verify_indent "(optional)", verify_indent),
 	_entry_guest_hdr(&pvattest_config.verify.hdr_path, verify_indent),
 	_entry_att_prot_key_load(&pvattest_config.verify.arp_key_in_path, verify_indent),
 	_entry_verbose(verify_indent),
+	_entry__verify_format(verify_indent),
 	{ NULL },
 };
 
@@ -631,6 +659,7 @@ static void pvattest_parse_clear_verify_config(pvattest_verify_config_t *config)
 	if (!config)
 		return;
 	g_free(config->input_path);
+	g_free(config->output_path);
 	g_free(config->hdr_path);
 	g_free(config->arp_key_in_path);
 }

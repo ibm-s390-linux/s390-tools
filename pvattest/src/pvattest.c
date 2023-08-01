@@ -280,6 +280,24 @@ static int fprint_verify_result(FILE *stream, const enum verify_output_format fm
 				return -1;
 		}
 		break;
+	case VERIFY_FMT_YAML:
+		if (fprintf(stream, "cuid: ") < 0)
+			return -1;
+		if (pvattest_hexdump(stream, config_uid, 0L, "'0x", FALSE) < 0)
+			return -1;
+		if (fprintf(stream, _("'\n")) < 0)
+			return -1;
+
+		if (additional_data) {
+			if (fprintf(stream, "add: ") < 0)
+				return -1;
+
+			if (pvattest_hexdump(stream, additional_data, 0x0L, "'0x", FALSE) < 0)
+				return -1;
+			if (fprintf(stream, _("'\n")) < 0)
+				return -1;
+		}
+		break;
 	default:
 		g_assert_not_reached();
 		break;
@@ -359,6 +377,23 @@ static int do_verify(const pvattest_verify_config_t *verify_config, const int ap
 		    0) {
 			g_set_error(&error, PV_GLIB_HELPER_ERROR, PV_GLIB_HELPER_FILE_ERROR,
 				    "stdout: %s", g_strerror(errno));
+			err_prefix = "Failed to write output";
+			goto err_exit;
+		}
+	}
+
+	/* Write to file */
+	if (verify_config->output_path) {
+		g_autoptr(FILE) output = pv_file_open(verify_config->output_path, "wx", &error);
+
+		if (!output) {
+			err_prefix = "Failed to write output";
+			goto err_exit;
+		}
+		if (fprint_verify_result(output, verify_config->output_fmt, config_uid,
+					 additional_data) < 0) {
+			g_set_error(&error, PV_GLIB_HELPER_ERROR, PV_GLIB_HELPER_FILE_ERROR,
+				    "'%s': %s", verify_config->output_path, g_strerror(errno));
 			err_prefix = "Failed to write output";
 			goto err_exit;
 		}

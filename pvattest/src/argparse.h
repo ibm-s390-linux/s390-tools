@@ -60,10 +60,13 @@ typedef struct {
 
 enum verify_output_format {
 	VERIFY_FMT_HUMAN,
+	VERIFY_FMT_YAML,
 };
 
 typedef struct {
 	char *input_path;
+	char *output_path;
+	enum verify_output_format output_fmt;
 	char *hdr_path;
 	char *arp_key_in_path;
 } pvattest_verify_config_t;

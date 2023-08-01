@@ -14,6 +14,7 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
   - genprotimg: add support for add-secret requests
   - dbginfo.sh: global IFS variable
+  - pvattest: add yaml-output for verify command
 
   Bug Fixes:
 

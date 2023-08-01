@@ -24,12 +24,27 @@ Show help options
 \fBFILE\fP specifies the attestation result as input.
 .TP
 .B
+\fB-o\fP, \fB--ouput\fP=\fBFILE\fP
+\fBFILE\fP specifies the output for the verification result.
+.TP
+.B
 \fB--hdr\fP=\fBFILE\fP
 Specify the header of the guest image. Exactly one is required.
 .TP
 .B
 \fB-a\fP, \fB--arpk\fP=\fBFILE\fP
 Use \fBFILE\fP to specify the GCM-AES256 key to decrypt the attestation request. Delete this key after verification.
+.TP
+.B
+\fB--format\fP=\fByaml\fP
+Define the output format.
+Default value: 'yaml'
+
+Possible values:
+.RS 4
+- \fByaml\fP: Use YAML format
+.RE
+
 .TP
 .B
 \fB-V\fP, \fB--verbose\fP
