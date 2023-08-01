@@ -455,7 +455,7 @@ static void print_entry(const char *name, GBytes *data, const gboolean print_dat
 	fprintf(stream, _("%s (%#lx bytes)"), name, g_bytes_get_size(data));
 	if (print_data) {
 		fprintf(stream, ":\n");
-		pvattest_hexdump(stream, data, 16, "      ");
+		pvattest_hexdump(stream, data, 16, "      ", TRUE);
 	}
 	fprintf(stream, "\n");
 }

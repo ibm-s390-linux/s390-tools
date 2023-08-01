@@ -60,8 +60,8 @@ void pvattest_log_plain_logger(const char *log_domain, GLogLevelFlags level, con
 	}
 void pvattest_log_bytes(const void *data, size_t size, size_t width, const char *prefix,
 			gboolean beautify, GLogLevelFlags log_lvl) PV_NONNULL(1);
-void pvattest_hexdump(FILE *stream, GBytes *bytes, const size_t width, const char *prefix)
-	PV_NONNULL(1, 2);
+void pvattest_hexdump(FILE *stream, GBytes *bytes, const size_t width, const char *prefix,
+		      const gboolean beautify) PV_NONNULL(1, 2);
 void pvattest_log_GError(const char *info, GError *error) PV_NONNULL(1);
 
 #endif /* PVATTEST_LOG_H */
