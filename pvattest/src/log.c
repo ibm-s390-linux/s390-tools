@@ -159,20 +159,26 @@ void pvattest_log_bytes(const void *data, size_t size, size_t width, const char 
 	g_log(PVATTEST_BYTES_LOG_DOMAIN, log_lvl, "\n");
 }
 
-void pvattest_hexdump(const void *data, size_t size, size_t width, const char *prefix, FILE *stream)
+void pvattest_hexdump(FILE *stream, GBytes *bytes, const size_t width, const char *prefix)
 {
-	const uint8_t *data_b = data;
+	const uint8_t *data;
+	size_t size;
 
-	pv_wrapped_g_assert(data);
+	pv_wrapped_g_assert(bytes);
 	pv_wrapped_g_assert(stream);
+
+	data = g_bytes_get_data(bytes, &size);
+	pv_wrapped_g_assert(data);
 
 	fprintf(stream, "%s0x0000  ", prefix);
 	for (size_t i = 0; i < size; i++) {
-		fprintf(stream, "%02x", data_b[i]);
+		fprintf(stream, "%02x", data[i]);
 		if (i % 2 == 1)
 			fprintf(stream, " ");
 		if (i == size - 1)
 			break;
+		if (width == 0)
+			continue;
 		if (i % width == width - 1)
 			fprintf(stream, "\n%s0x%04lx  ", prefix, i + 1);
 	}
