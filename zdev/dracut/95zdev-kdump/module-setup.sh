@@ -46,6 +46,10 @@ installkernel() {
 install() {
     local _tempfile
 
+    # zdev_id is not functionally required for kdump but optionally
+    # installing avoids error messages from zdev site udev rule processing
+    inst_multiple -o /lib/s390-tools/zdev_id
+
     # Obtain kdump target device configuration
 
     _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
