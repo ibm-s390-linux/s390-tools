@@ -14,6 +14,8 @@ CARGOFLAGS ?=
 ifeq ($(COMMON_INCLUDED),false)
 COMMON_INCLUDED := true
 
+override SHELL := /bin/bash
+
 # 'BUILD_ARCH' is the architecture of the machine where the build takes place
 BUILD_ARCH := $(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
 # 'HOST_ARCH' is the architecture of the machine that will run the compiled output

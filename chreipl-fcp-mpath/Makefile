@@ -17,7 +17,6 @@
 #   GNU awk:
 #     - gawk
 
-override SHELL		:= /bin/bash
 override .SHELLFLAGS	:= -O globstar -O nullglob -O extglob -c
 
 # Include common s390-tools definitions

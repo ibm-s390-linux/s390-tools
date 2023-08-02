@@ -1,5 +1,4 @@
 include ../common.mak
-SHELL := /bin/bash
 HAVE_CARGO ?= 1
 HAVE_OPENSSL ?= 1
 HAVE_LIBCURL ?= 1
