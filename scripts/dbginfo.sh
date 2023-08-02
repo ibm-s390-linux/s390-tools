@@ -20,6 +20,7 @@ readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
 readonly DOCKER=$(if type docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 readonly DUMP2TAR_OK=$(if type dump2tar >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 readonly HW="$(uname -i 2>/dev/null)"
+readonly IFS_ORI="${IFS}"
 # retrieve and split kernel version
 readonly KERNEL_BASE="$(uname -r 2>/dev/null)"
 readonly KERNEL_VERSION=$(echo ${KERNEL_BASE} | cut -d'.' -f1 )
@@ -688,29 +689,27 @@ KVM_CMDS="virsh version\
 ########################################
 collect_cmdsout() {
 	local cmd
-	local ifs_orig="${IFS}"
 
 	pr_collect_output "command"
 
 	IFS=:
 	for cmd in ${CMDS}; do
-		IFS=${ifs_orig} call_run_command "${cmd}" "${OUTPUT_FILE_CMD}"
+		IFS=${IFS_ORI} call_run_command "${cmd}" "${OUTPUT_FILE_CMD}"
 	done
-	IFS="${ifs_orig}"
+	IFS="${IFS_ORI}"
 }
 
 ########################################
 collect_network() {
 	local cmd
-	local ifs_orig="${IFS}"
 
 	pr_collect_output "network"
 
 	IFS=:
 	for cmd in ${NETWORK_CMDS}; do
-		IFS=${ifs_orig} call_run_command "${cmd}" "${OUTPUT_FILE_NETWORK}"
+		IFS=${IFS_ORI} call_run_command "${cmd}" "${OUTPUT_FILE_NETWORK}"
 	done
-	IFS="${ifs_orig}"
+	IFS="${IFS_ORI}"
 }
 
 ########################################
@@ -720,7 +719,6 @@ collect_vmcmdsout() {
 	local vm_cmds
 	local vm_userid
 	local module_loaded=1
-	local ifs_orig="${IFS}"
 	local cp_buffer_size
 	local rc_buffer_check
 
@@ -747,7 +745,7 @@ collect_vmcmdsout() {
 
 		IFS=:
 		for vm_command in ${vm_cmds}; do
-			IFS="${ifs_orig}"
+			IFS="${IFS_ORI}"
 			# initialize buffer values for automatic resizing
 			cp_buffer_size=2
 			rc_buffer_check=2
@@ -761,7 +759,7 @@ collect_vmcmdsout() {
 				"${OUTPUT_FILE_VMCMD}"
 			IFS=:
 		done
-		IFS="${ifs_orig}"
+		IFS="${IFS_ORI}"
 
 		if test ${module_loaded} -eq 0 && test "x${cp_command}" = "xhcp"; then
 			rmmod cpint
@@ -1028,9 +1026,9 @@ collect_ovs() {
 		pr_collect_output "OpenVSwitch"
 		IFS=:
 		for ovscmd in ${ovscmds}; do
-			IFS=${ifs_orig} call_run_command "${ovscmd}" "${OUTPUT_FILE_OVS}"
+			IFS=${IFS_ORI} call_run_command "${ovscmd}" "${OUTPUT_FILE_OVS}"
 		done
-		IFS="${ifs_orig}"
+		IFS="${IFS_ORI}"
 
 		for bridge in ${ovs-vsctl list-br}; do
 			ovsbrcmds="ovs-ofctl show ${bridge}\
@@ -1039,9 +1037,9 @@ collect_ovs() {
 				  "
 			IFS=:
 			for ovsbrcmd in ${ovsbrcmds}; do
-				IFS=${ifs_orig} call_run_command "${ovsbrcmd}" "${OUTPUT_FILE_OVS}"
+				IFS=${IFS_ORI} call_run_command "${ovsbrcmd}" "${OUTPUT_FILE_OVS}"
 			done
-			IFS="${ifs_orig}"
+			IFS="${IFS_ORI}"
 		done
 	else
 		pr_skip "OpenVSwitch: ovs-vsctl not available"
@@ -1066,12 +1064,11 @@ collect_container() {
 		pr_syslog_stdout " docker ..."
 		container_list=$(docker ps -qa)
 		network_list=$(docker network ls -q)
-		ifs_orig="${IFS}"
 		IFS=:
 		for item in ${DOCKER_CMDS}; do
-			IFS=${ifs_orig} call_run_command "${item}" "${OUTPUT_FILE_DOCKER}"
+			IFS=${IFS_ORI} call_run_command "${item}" "${OUTPUT_FILE_DOCKER}"
 		done
-		IFS="${ifs_orig}"
+		IFS="${IFS_ORI}"
 
 		if test -n "${container_list}"; then
 			for item in ${container_list}; do
@@ -1092,12 +1089,11 @@ collect_container() {
 		pr_syslog_stdout " Kubernetes ..."
 		container_list=$(kubectl top pod | grep -v "MEMORY(bytes)" | cut -d' ' -f1)
 
-		ifs_orig="${IFS}"
 		IFS=:
 		for item in ${KUBERNETES_CMDS}; do
-			IFS=${ifs_orig} call_run_command "${item}" "${OUTPUT_FILE_KUBERNETES}.out"
+			IFS=${IFS_ORI} call_run_command "${item}" "${OUTPUT_FILE_KUBERNETES}.out"
 		done
-		IFS="${ifs_orig}"
+		IFS="${IFS_ORI}"
 		if test -n "${container_list}"; then
 			for item in ${container_list}; do
 				call_run_command "kubectl logs --tail=${KUBERNETES_LOG_LINES} ${item}"\
@@ -1130,7 +1126,6 @@ collect_nvme() {
 ########################################
 collect_kvm() {
 	local cmd
-	local ifs_orig="${IFS}"
 	local domain_list
 	local domain
 
@@ -1139,9 +1134,9 @@ collect_kvm() {
 		pr_collect_output "KVM"
 		IFS=:
 		for cmd in ${KVM_CMDS}; do
-			IFS=${ifs_orig} call_run_command "${cmd}" "${OUTPUT_FILE_KVM}"
+			IFS=${IFS_ORI} call_run_command "${cmd}" "${OUTPUT_FILE_KVM}"
 		done
-		IFS="${ifs_orig}"
+		IFS="${IFS_ORI}"
 
 		# domain/guest specific commands
 		domain_list=$(virsh list --all --name)
