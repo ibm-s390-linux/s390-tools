@@ -1,22 +1,31 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.29.0 (2023-08-04)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.5
 
-  s390-tools now supports tools written in rust!
+  General:
+  - s390-tools now supports tools written in Rust.
+  - Add `compdb` Makefile target to create 'compile_commands.json' to LSP
+    backends in IDEs and editors
 
   Add new tools / libraries:
   - rust/pv: Library for pv tools written in rust
   - rust/pvsecret: Tool to manage UV-secrets
 
   Changes of existing tools:
-  - genprotimg: add support for add-secret requests
-  - dbginfo.sh: global IFS variable
-  - pvattest: add yaml-output for verify command
+  - dbginfo.sh: Global IFS variable
+  - genprotimg: Add support for add-secret requests
+  - genprotimg: Build debuginfo files for bootloader
+  - hyptop: Add real SMT utilization field
+  - hyptop: Allow users to set speedup factor
+  - pvattest: Add yaml-output for verify command
+  - zipl: Build debuginfo files for bootloader
 
   Bug Fixes:
+  - dump2tar: Fix truncated paths
+  - zdev/dracut: fix kdump build to integrate with site support
 
 * __v2.28.0 (2023-07-11)__
 
