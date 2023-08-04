@@ -76,12 +76,15 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 
 %.exec:	%.o
 	$(LINK) -Wl,-T,$(filter %.lds,$^) $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
+	@chmod a-x $@
 
 %.bin.debug: %.exec
 	$(OBJCOPY) --only-keep-debug $< $@
+	@chmod a-x $@
 
 %.bin:	%.exec
 	$(OBJCOPY) -O binary $< $@
+	@chmod a-x $@
 
 
 clean:

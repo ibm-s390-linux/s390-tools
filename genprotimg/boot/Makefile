@@ -79,6 +79,7 @@ stage3b.elf: head.o $(ZIPL_OBJS)
 
 %.bin.debug: %.elf
 	$(OBJCOPY) --only-keep-debug $< $@
+	@chmod a-x $@
 
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
