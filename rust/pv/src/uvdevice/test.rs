@@ -61,7 +61,6 @@ impl IoctlCtx {
 
 pub mod mock_libc {
     use super::*;
-    use std::mem::transmute;
 
     pub unsafe fn ioctl(
         fd: ::libc::c_int,
@@ -75,7 +74,7 @@ pub mod mock_libc {
         assert_eq!(cmd, ctx.exp_cmd, "IOCTL cmd mismatch");
         assert_eq!(fd, 17, "IOCTL fd mismatch");
 
-        let data_ref: &mut ffi::uvio_ioctl_cb = transmute(data);
+        let data_ref: &mut ffi::uvio_ioctl_cb = &mut *data;
 
         (ctx.modify)(data_ref)
     }
@@ -194,11 +193,7 @@ fn ioctl_write_data() {
     get_lock(&IOCTL_MTX).exp_cmd(TEST_CMD).set_mdfy(move |cb| {
         cb.set_rc(1).addr_eq(data_addr).size_eq(32);
         unsafe {
-            ::libc::memset(
-                (*cb).argument_addr as *mut ::libc::c_void,
-                0x42,
-                cmd_data_len,
-            );
+            ::libc::memset(cb.argument_addr as *mut ::libc::c_void, 0x42, cmd_data_len);
         }
         0
     });
@@ -223,7 +218,7 @@ fn ioctl_read_data() {
     get_lock(&IOCTL_MTX).exp_cmd(TEST_CMD).set_mdfy(move |cb| {
         cb.set_rc(1).addr_eq(data_addr).size_eq(32);
         unsafe {
-            let data = std::slice::from_raw_parts((*cb).argument_addr as *const u8, cmd_data_len);
+            let data = std::slice::from_raw_parts(cb.argument_addr as *const u8, cmd_data_len);
             assert_eq!(data, data_exp);
         }
         0

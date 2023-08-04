@@ -527,15 +527,15 @@ mod tests {
     fn parse_hex() {
         let s = "123456acbef0";
         let exp = vec![0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
-        assert_eq!(super::parse_hex(&s), exp);
+        assert_eq!(super::parse_hex(s), exp);
 
         let s = "00123456acbef0";
         let exp = vec![0, 0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
-        assert_eq!(super::parse_hex(&s), exp);
+        assert_eq!(super::parse_hex(s), exp);
 
         let s = "00123456acbef0ii90";
         let exp = vec![0, 0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
-        assert_eq!(super::parse_hex(&s), exp);
+        assert_eq!(super::parse_hex(s), exp);
     }
 
     #[test]
@@ -653,6 +653,6 @@ mod tests {
         assert!(super::memeq(&a, &a.clone()));
         assert!(!super::memeq(&b, &a));
         assert!(!super::memeq(&b, &c));
-        assert!(!super::memeq(&b, &vec![]));
+        assert!(!super::memeq(&b, &[]));
     }
 }
