@@ -79,7 +79,7 @@ pub enum Error {
     InvSecretList(#[source] std::io::Error),
 
     #[cfg(feature = "uvsecret")]
-    #[error("Input does not contain an Add Secret Request")]
+    #[error("Input does not contain an add-secret request")]
     NoAsrcb,
 
     // errors from other crates

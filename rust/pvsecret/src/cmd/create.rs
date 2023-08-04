@@ -29,7 +29,7 @@ fn write_out<D: AsRef<[u8]>>(path: &str, data: D, ctx: &str) -> pv::Result<()> {
     Ok(())
 }
 
-/// Prepare an Add Secret Request
+/// Prepare an add-secret request
 pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     if pv_guest_bit_set() {
         warn!("The system seems to be a Secure Execution guest");
@@ -55,15 +55,15 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     let rq = ReqEncrCtx::random(SymKeyType::Aes256).context("Failed to generate random input")?;
     let ser_asrbc = asrcb.encrypt(&rq)?;
     warn!("Successfully generated the request");
-    write_out(&opt.output, ser_asrbc, "Add Secret Request")?;
+    write_out(&opt.output, ser_asrbc, "add-secret request")?;
     info!("Successfully wrote the request to '{}'", &opt.output);
 
     write_secret(&opt.secret, &asrcb)
 }
 
-/// Set-up the `Add Secret Request` from command-line arguments
+/// Set-up the `add-secret request` from command-line arguments
 fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
-    debug!("Build Add Secret Request");
+    debug!("Build add-secret request");
 
     let secret = match &opt.secret {
         AddSecretType::Meta => GuestSecret::Null,

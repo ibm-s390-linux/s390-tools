@@ -5,7 +5,7 @@
 #![cfg(feature = "uvsecret")]
 //! Provides functionality to manage the UV secret store.
 //!
-//! Provides functionality to build `Add Secret` requests.
+//! Provides functionality to build `add-secret` requests.
 //! Also provides interfaces, to dispatch `Add Secret`, `Lock Secret Store`,
 //! and `List Secrets` requests,
 #[cfg(feature = "request")]

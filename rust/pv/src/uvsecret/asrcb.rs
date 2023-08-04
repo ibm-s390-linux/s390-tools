@@ -149,9 +149,9 @@ impl AddSecretMagic {
     }
 }
 
-/// Add Secret Request Control Block
+/// Add-secret request Control Block
 ///
-/// An ASRCB wraps a secret to transport is securely to the Ultravisor.
+/// An ASRCB wraps a secret to transport it securely to the Ultravisor.
 ///
 /// Layout:
 ///```none
@@ -185,7 +185,7 @@ pub struct AddSecretRequest {
 }
 
 impl AddSecretRequest {
-    /// Create a new Add Secret request.
+    /// Create a new add-secret request.
     ///
     /// The request has no extension secret, no configuration UID, no host-keys,
     /// and no user data

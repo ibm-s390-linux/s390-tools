@@ -97,7 +97,7 @@ pub struct CreateSecretOpt {
     // FLAGS
     // each flag must conflict with `flags`
     // `flags` is hidden in the help menu
-    /// Manually set the Add Secret Request flags.
+    /// Manually set the add-secret request flags.
     ///
     /// No validity checks made. Hidden in user documentation.
     #[arg(long, hide(true))]

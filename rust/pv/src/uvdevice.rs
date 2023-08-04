@@ -162,7 +162,7 @@ impl UvDevice {
     pub const LIST_SECRET_NR: u8 = ffi::UVIO_IOCTL_LIST_SECRETS_NR;
     /// IOCTL number for the lock ksecret UVC
     pub const LOCK_SECRET_NR: u8 = ffi::UVIO_IOCTL_LOCK_SECRETS_NR;
-    /// Maximum length for addsecret requests
+    /// Maximum length for add-secret requests
     pub const ADD_SECRET_MAX_LEN: usize = ffi::UVIO_ADD_SECRET_MAX_LEN;
     /// Size of the buffer for list secret requests
     pub const LIST_SECRETS_LEN: usize = ffi::UVIO_LIST_SECRETS_LEN;

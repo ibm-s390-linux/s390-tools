@@ -126,7 +126,7 @@ pub mod request {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "uvsecret")] {
-            /// Functionalities for creating Add Secret requests
+            /// Functionalities for creating add-secret requests
             pub mod uvsecret {
                 #[cfg(feature = "request")]
                 pub use crate::uvsecret::{
