@@ -68,7 +68,7 @@ clean:
 	$(foreach target,$(CARGO_TARGETS),\
 		$(CARGO_CLEAN) --manifest-path=$(target)/Cargo.toml ${ALL_CARGOFLAGS} ;)
 	$(foreach target,$(PV_TARGETS),\
-		$(CARGO_CLEAN) --manifest-path=$(target)/Cargo.toml ${CARGOFLAGS} ;)
+		$(CARGO_CLEAN) --manifest-path=$(target)/Cargo.toml ${ALL_CARGOFLAGS} ;)
 	$(RM) -- .check-dep-pvtools .detect-openssl.dep.c .check-cargo
 
 rust-test: .check-cargo .no-cross-compile
