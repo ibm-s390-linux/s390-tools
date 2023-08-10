@@ -1,0 +1,80 @@
+.\" lspai.8
+.\"
+.\"
+.\" Copyright IBM Corp. 2021
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\" ----------------------------------------------------------------------
+.ds c \fBlspai\fP
+.
+.TH \*c "8" "August 2023" "s390-tools" "CPU-MF management programs"
+.
+.SH NAME
+\*c \- list Processor Activity Instrumentation (PAI) counters
+.
+.SH SYNOPSIS
+\*c
+.RB [ \-n ]
+.RB [ \-t
+.IR "\ TYPE" ]
+.br
+\*c
+.BR \-h | \-\-help
+.br
+\*c
+.BR \-v | \-\-version
+.
+.
+.SH DESCRIPTION
+\*c displays the Processor Activity Instrumentation (PAI) counters
+for Linux on IBM Z.
+The output is a human-readable list of available PAI counter
+names and numbers.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Displays help information, then exits.
+.
+.TP
+.BR \-v ", " \-\-version
+Displays version information, then exits.
+.
+.TP
+.BR \-t ", " \-\-type "\ TYPE"
+Specifies the PAI counter set to list.
+Valid counter set values are
+.I crypto
+and
+.IR nnpa .
+By default, the command lists all available PAI counter sets.
+NNPA refers to the Neural Network Processing Assist facility counter set.
+Crypto refers to the Cryptografic Processing Assist facility counter set.
+.
+.TP
+.BR \-n ", " \-\-numeric
+Shows the PAI counter sets sorted by counter number.
+Default sort order is PAI counter name.
+.
+.SH "EXAMPLE"
+The \*c invocation lists all PAI Neural Network Processing Assist Facility
+(NNPA) counters in numeric order:
+.nf
+# lspai -t nnpa -n
+RAW     NAME			DESCRIPTION
+13:6144 NNPA_ALL		Counter 0 / PAI NNPA counter set
+13:6145 NNPA_ADD		Counter 1 / PAI NNPA counter set
+13:6146 NNPA_SUB		Counter 2 / PAI NNPA counter set
+13:6147 NNPA_MUL		Counter 3 / PAI NNPA counter set
+\&...
+.fi
+The first column shows the raw event number suitable for
+.IR perf "(8)"
+raw event specification.
+The second column shows the PAI NNPA counter name,
+suitable for
+.IR perf "(8)"
+event specification by name.
+The third gives a short explanation, if available.
+.SH "SEE ALSO"
+.BR pai (8)
+.BR lscpumf (8)

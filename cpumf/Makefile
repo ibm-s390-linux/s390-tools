@@ -1,7 +1,7 @@
 include ../common.mak
 
-BIN_FILES = lscpumf chcpumf lshwc pai
-MAN_FILES = lscpumf.8 chcpumf.8 lshwc.8 pai.8
+BIN_FILES = lscpumf chcpumf lshwc pai lspai
+MAN_FILES = lscpumf.8 chcpumf.8 lshwc.8 pai.8 lspai.8
 
 all: $(BIN_FILES)
 
@@ -11,6 +11,7 @@ lscpumf: lscpumf.o $(libs)
 chcpumf: chcpumf.o $(libs)
 lshwc: lshwc.o $(libs)
 pai: pai.o $(libs)
+lspai: lspai.o $(libs)
 
 install: all install-man
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man8
