@@ -404,11 +404,11 @@ s64 ht_calculate_smt_util(u64 core_us, u64 thr_us, u64 mgm_us, int thread_per_co
 	s64 component1, component2, smt_us;
 	double smt_factor = g.o.smt_factor;
 
-	component1 = G0(thread_per_core * core_us - thr_us);
+	component1 = thread_per_core * core_us - thr_us;
 	if (thread_per_core > 1)
 		component1 /= smt_factor;
-	component2 = G0(thr_us - core_us);
-	smt_us = component1 + component2 + mgm_us;
+	component2 = thr_us - core_us;
+	smt_us = G0(component1 + component2 + mgm_us);
 
 	return smt_us;
 }
