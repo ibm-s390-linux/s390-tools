@@ -13,6 +13,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "site.h"
 #include "zdev_id.h"
 
 #define	SYSINFO		"/proc/sysinfo"
@@ -20,7 +21,6 @@
 #define LOADPARM	"/sys/firmware/ipl/loadparm"
 #define IPL_DEV_ID	"/sys/firmware/ipl/device"
 #define IPL_DEV_TYPE	"/sys/firmware/ipl/ipl_type"
-#define SITE_FALLBACK	10
 
 #define	WHITESPACE	" \t\n"
 
