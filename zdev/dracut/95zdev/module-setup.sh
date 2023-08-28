@@ -62,6 +62,11 @@ install() {
     inst_rules "81-dpm.rules"
 
     # Obtain early + root device configuration
+
+    # If enabled, add the host-specific config of required devices into initrd
+    # shellcheck disable=SC2154
+    [[ $hostonly ]] || return 0
+
     _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
     function check_zdev() {
         local _dev=$1
