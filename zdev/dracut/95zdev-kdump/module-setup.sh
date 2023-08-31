@@ -81,6 +81,11 @@ install() {
     for_each_host_dev_and_slaves_all check_zdev
     sed -i -e 's/^\[active /\[persistent /' "$_tempfile"
 
+    # in addition to active devices above, also add persistent config
+    # of devices the user marked for early initrd use
+    chzdev --export - --persistent --by-attrib "zdev:early=1" --quiet \
+           --type 2>/dev/null >> "$_tempfile"
+
     ddebug < "$_tempfile"
 
     # Apply via --import to prevent other devices from being configured
