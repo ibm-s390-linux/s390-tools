@@ -86,11 +86,26 @@ install() {
     chzdev --export - --persistent --by-attrib "zdev:early=1" --quiet \
            --type 2>/dev/null >> "$_tempfile"
 
+    # site support
+    # Obtain early device configuration for site-specific settings
+    for (( site=0; site<10; site++ ))
+    do
+    chzdev --export - --persistent --by-attrib "zdev:early=1" --site $site \
+           --quiet 2>/dev/null >> "$_tempfile"
+    done
+
     ddebug < "$_tempfile"
 
     # Apply via --import to prevent other devices from being configured
     chzdev --import "$_tempfile" --persistent --base "/etc=$initdir/etc" \
            --yes --no-root-update --force 2>&1 | ddebug
+
+    # Apply site-specific configurations via --import
+    for (( site=0; site<10; site++ ))
+    do
+    chzdev --import "$_tempfile" --persistent --base "/etc=$initdir/etc" \
+           --site $site --yes --no-root-update --force 2>&1 | ddebug
+    done
 
     lszdev --configured --persistent --info \
            --base "/etc=$initdir/etc" 2>&1 | ddebug
