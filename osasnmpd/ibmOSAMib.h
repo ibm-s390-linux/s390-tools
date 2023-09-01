@@ -16,7 +16,7 @@
 
 /* we may use header_generic and header_simple_table from the util_funcs module */
 
-config_require(util_funcs)
+config_require(util_funcs);
 
 
 /* function prototypes */
