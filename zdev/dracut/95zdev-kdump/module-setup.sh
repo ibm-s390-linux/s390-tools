@@ -25,7 +25,7 @@ check() {
     zdev_is_kdump || return 1
 
     # Ensure that required tools are available
-    require_binaries chzdev || return 1
+    require_binaries chzdev lszdev || return 1
 
     return 0
 }
@@ -61,8 +61,8 @@ install() {
     # many zFCP LUNs
     inst_dir /etc/modprobe.d
     chzdev zfcp --type "allow_lun_scan=0" --persistent \
-           --base "/etc=${initdir:?}/etc" --yes --quiet --no-root-update \
-           --force >/dev/null
+           --base "/etc=${initdir:?}/etc" --yes --no-root-update \
+           --force 2>&1 | ddebug
     # drop /etc/zfcp.conf from dracut module 95zfcp
     echo "rd.zfcp.conf=0" > "$initdir/etc/cmdline.d/00-no-zfcp-conf.conf"
     # => only activate individual zfcp paths found as required below
@@ -81,9 +81,14 @@ install() {
     for_each_host_dev_and_slaves_all check_zdev
     sed -i -e 's/^\[active /\[persistent /' "$_tempfile"
 
+    ddebug < "$_tempfile"
+
     # Apply via --import to prevent other devices from being configured
     chzdev --import "$_tempfile" --persistent --base "/etc=$initdir/etc" \
-           --yes --quiet --no-root-update --force >/dev/null
+           --yes --no-root-update --force 2>&1 | ddebug
+
+    lszdev --configured --persistent --info \
+           --base "/etc=$initdir/etc" 2>&1 | ddebug
 
     rm -f "$_tempfile"
 
