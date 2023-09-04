@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn from_se_image_hdr() {
         let bin_hdr = get_test_asset!("exp/secure_guest.hdr");
-        let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(bin_hdr.clone())).unwrap();
+        let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(*bin_hdr)).unwrap();
         assert_eq!(hdr_tags, EXP_HDR);
     }
 
@@ -220,7 +220,7 @@ mod tests {
         ));
 
         // mess up magic
-        let mut bin_hdr_copy = bin_hdr.clone();
+        let mut bin_hdr_copy = *bin_hdr;
         bin_hdr_copy.swap(0, 1);
         assert!(matches!(
             BootHdrTags::from_se_image(&mut Cursor::new(bin_hdr_copy)),

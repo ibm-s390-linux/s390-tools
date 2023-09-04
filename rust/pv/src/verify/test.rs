@@ -26,7 +26,7 @@ fn verify_sign_error(exp_raw: libc::c_int, obs: Error) {
 }
 fn verify_sign_error_slice(exp_raw: &[libc::c_int], obs: Error) {
     if exp_raw
-        .into_iter()
+        .iter()
         .filter(|e| match &obs {
             Error::HkdVerify(ty) => match ty {
                 IbmSignInvalid(err, _d) => &&err.as_raw() == e,
@@ -51,7 +51,7 @@ fn store_setup() {
     let ibm_str = get_cert_asset_path_string("ibm.crt");
     let inter_str = get_cert_asset_path_string("inter.crt");
 
-    let store = helper::store_setup(&None, &vec![], &vec![ibm_str, inter_str]);
+    let store = helper::store_setup(&None, &[], &[ibm_str, inter_str]);
     assert!(store.is_ok());
 }
 
@@ -63,7 +63,7 @@ fn verify_chain_online() {
 
     let mock_inter = mock_endpt("inter_ca.crl");
 
-    let mut store = helper::store_setup(&Some(root_crt), &vec![], &vec![]).unwrap();
+    let mut store = helper::store_setup(&Some(root_crt), &[], &[]).unwrap();
     download_crls_into_store(&mut store, slice::from_ref(&ibm_crt)).unwrap();
     let store = store.build();
 
@@ -71,8 +71,8 @@ fn verify_chain_online() {
 
     let mut sk = Stack::<X509>::new().unwrap();
     sk.push(inter_crt).unwrap();
-    verify_chain(&store, &sk, &vec![ibm_crt.clone()]).unwrap();
-    assert!(verify_chain(&store, &sk, &vec!(ibm_crt)).is_ok());
+    verify_chain(&store, &sk, &[ibm_crt.clone()]).unwrap();
+    assert!(verify_chain(&store, &sk, &[ibm_crt]).is_ok());
 }
 
 #[test]
@@ -82,13 +82,13 @@ fn verify_chain_offline() {
     let inter_crt = load_gen_cert("inter_ca.crt");
     let root_crt = get_cert_asset_path_string("root_ca.chained.crt");
 
-    let store = helper::store_setup(&Some(root_crt), &vec![inter_crl], &vec![])
+    let store = helper::store_setup(&Some(root_crt), &[inter_crl], &[])
         .unwrap()
         .build();
 
     let mut sk = Stack::<X509>::new().unwrap();
     sk.push(inter_crt).unwrap();
-    assert!(verify_chain(&store, &sk, &vec![ibm_crt]).is_ok());
+    assert!(verify_chain(&store, &sk, &[ibm_crt]).is_ok());
 }
 
 #[test]
@@ -107,8 +107,8 @@ fn verify_online() {
     let inter_crl = get_cert_asset_path_string("inter_ca.crl");
     let ibm_crl = get_cert_asset_path_string("ibm.crl");
     let verifier = CertVerifier::new(
-        &vec![ibm_crt, inter_crt],
-        &vec![ibm_crl, inter_crl],
+        &[ibm_crt, inter_crt],
+        &[ibm_crl, inter_crl],
         &Some(root_crt),
         false,
     )
@@ -148,8 +148,8 @@ fn verify_offline() {
     let hkd = load_gen_cert("host.crt");
 
     let verifier = CertVerifier::new(
-        &vec![ibm_crt, inter_crt],
-        &vec![ibm_crl, inter_crl],
+        &[ibm_crt, inter_crt],
+        &[ibm_crl, inter_crl],
         &Some(root_crt),
         true,
     )
@@ -186,25 +186,20 @@ fn verifier_new() {
     let ibm_rev_crt = get_cert_asset_path_string("ibm_rev.crt");
 
     // To many signing keys
-    let verifier = CertVerifier::new(
-        &vec![ibm_crt.clone(), ibm_rev_crt.clone()],
-        &vec![],
-        &None,
-        true,
-    );
+    let verifier = CertVerifier::new(&[ibm_crt.clone(), ibm_rev_crt.clone()], &[], &None, true);
     assert!(matches!(verifier, Err(Error::HkdVerify(ManyIbmSignKeys))));
 
     // no CRL for each X509
     let verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_crt.clone()],
-        &vec![inter_crl.clone()],
-        &Some(root_crt.clone()),
+        &[inter_crt.clone(), ibm_crt.clone()],
+        &[inter_crl.clone()],
+        &Some(root_crt),
         false,
     );
     verify_sign_error(3, verifier.unwrap_err());
     let verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_crt.clone()],
-        &vec![],
+        &[inter_crt.clone(), ibm_crt.clone()],
+        &[],
         &Some(root_chn_crt.clone()),
         false,
     );
@@ -212,8 +207,8 @@ fn verifier_new() {
 
     // wrong intermediate (or ibm key)
     let verifier = CertVerifier::new(
-        &vec![inter_fake_crt, ibm_crt.clone()],
-        &vec![inter_fake_crl],
+        &[inter_fake_crt, ibm_crt.clone()],
+        &[inter_fake_crl],
         &Some(root_chn_crt.clone()),
         true,
     );
@@ -222,8 +217,8 @@ fn verifier_new() {
 
     //wrong root ca
     let verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_crt.clone()],
-        &vec![inter_crl.clone()],
+        &[inter_crt.clone(), ibm_crt.clone()],
+        &[inter_crl.clone()],
         &None,
         true,
     );
@@ -231,33 +226,28 @@ fn verifier_new() {
 
     //correct signing key + intermediate cert
     let _verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_crt.clone()],
-        &vec![inter_crl.clone()],
+        &[inter_crt.clone(), ibm_crt.clone()],
+        &[inter_crl.clone()],
         &Some(root_chn_crt.clone()),
         false,
     )
     .unwrap();
 
     // no intermediate key
-    let verifier = CertVerifier::new(
-        &vec![ibm_crt.clone()],
-        &vec![],
-        &Some(root_chn_crt.clone()),
-        false,
-    );
+    let verifier = CertVerifier::new(&[ibm_crt], &[], &Some(root_chn_crt.clone()), false);
     verify_sign_error(20, verifier.unwrap_err());
 
     //Ibm Sign outdated
     let verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_early_crt.clone()],
-        &vec![inter_crl.clone()],
+        &[inter_crt.clone(), ibm_early_crt],
+        &[inter_crl.clone()],
         &Some(root_chn_crt.clone()),
         false,
     );
     assert!(matches!(verifier, Err(Error::HkdVerify(NoIbmSignKey))));
     let verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_late_crt.clone()],
-        &vec![inter_crl.clone()],
+        &[inter_crt.clone(), ibm_late_crt],
+        &[inter_crl.clone()],
         &Some(root_chn_crt.clone()),
         false,
     );
@@ -265,9 +255,9 @@ fn verifier_new() {
 
     // revoked
     let verifier = CertVerifier::new(
-        &vec![inter_crt.clone(), ibm_rev_crt.clone()],
-        &vec![inter_crl.clone()],
-        &Some(root_chn_crt.clone()),
+        &[inter_crt, ibm_rev_crt],
+        &[inter_crl],
+        &Some(root_chn_crt),
         false,
     );
     verify_sign_error(23, verifier.unwrap_err());

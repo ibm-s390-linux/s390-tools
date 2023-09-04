@@ -117,7 +117,7 @@ impl Display for SecretEntry {
         writeln!(f, "{} {}:", self.index, stype_str(self.stype.get()))?;
         write!(f, "  ")?;
         for b in self.id {
-            write!(f, "{:02x}", b)?;
+            write!(f, "{b:02x}")?;
         }
         Ok(())
     }

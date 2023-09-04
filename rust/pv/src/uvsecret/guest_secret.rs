@@ -105,7 +105,7 @@ mod test {
             0xef, 0xc7, 0x3c, 0x62,
         ];
         let name = "association secret".to_string();
-        let secret = GuestSecret::association("association secret", secret_value.clone()).unwrap();
+        let secret = GuestSecret::association("association secret", secret_value).unwrap();
         let exp = GuestSecret::Association {
             name,
             id: exp_id,

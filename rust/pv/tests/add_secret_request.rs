@@ -18,7 +18,7 @@ use pv::{
 const TAGS: BootHdrTags = BootHdrTags::new([1; 64], [2; 64], [3; 64], [4; 16]);
 const CUID: ConfigUid = [0x42u8; 16];
 const ASSOC_SECRET: [u8; 32] = [0x11; 32];
-const ASSOC_ID: &'static str = "add_secret_request";
+const ASSOC_ID: &str = "add_secret_request";
 
 fn create_asrcb(
     guest_secret: GuestSecret,
@@ -38,7 +38,7 @@ fn create_asrcb(
     };
 
     asrcb.add_hostkey(hkd);
-    Ok(asrcb.encrypt(ctx)?)
+    asrcb.encrypt(ctx)
 }
 
 fn get_crypto() -> (PKey<Public>, ReqEncrCtx) {
@@ -63,17 +63,10 @@ where
 {
     let (host_key, ctx) = get_crypto();
     let cuid = match cuid {
-        true => Some(CUID.into()),
+        true => Some(CUID),
         false => None,
     };
-    create_asrcb(
-        guest_secret,
-        ext_secret.into(),
-        flags,
-        cuid.into(),
-        host_key,
-        &ctx,
-    )
+    create_asrcb(guest_secret, ext_secret.into(), flags, cuid, host_key, &ctx)
 }
 
 fn association() -> GuestSecret {
@@ -156,7 +149,7 @@ fn null_none_default_cuid_seven() {
     let mut asrcb =
         AddSecretRequest::new(AddSecretVersion::One, GuestSecret::Null, TAGS, no_flag());
     (0..7).for_each(|_| asrcb.add_hostkey(hkd.clone()));
-    asrcb.set_cuid(CUID.into());
+    asrcb.set_cuid(CUID);
     let asrcb = asrcb.encrypt(&ctx).unwrap();
 
     let exp = get_test_asset!("exp/asrcb/null_none_default_cuid_seven");

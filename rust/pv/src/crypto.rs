@@ -315,7 +315,7 @@ mod tests {
         ];
 
         let res = encrypt_aes(
-            &&SymKey::Aes256(aes_gcm_key.into()),
+            &SymKey::Aes256(aes_gcm_key.into()),
             &aes_gcm_iv,
             &aes_gcm_plain,
         )

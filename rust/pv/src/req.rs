@@ -451,7 +451,7 @@ mod tests {
         let ks = vec![
             Keyslot::new(host_key.clone()),
             Keyslot::new(host_key.clone()),
-            Keyslot::new(host_key.clone()),
+            Keyslot::new(host_key),
         ];
         let mut aad = Vec::<Aad>::new();
         ks.iter().for_each(|ks| aad.push(Aad::Ks(ks)));
