@@ -51,7 +51,6 @@ detect-openssl-version.dep:
 	mv $(TMPFILE) $@
 
 CURL_CONFIG ?= curl-config
-XML2_CONFIG ?= xml2-config
 
 check-dep-libkmipclient: detect-openssl-version.dep
 	$(call check_dep, \
@@ -59,7 +58,7 @@ check-dep-libkmipclient: detect-openssl-version.dep
 		"detect-openssl-version.dep", \
 		"openssl-devel version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
-		-I. -lcrypto -DOPENSSL_SUPPRESS_DEPRECATED)
+		-I. `$(PKG_CONFIG) --cflags --libs libcrypto` -DOPENSSL_SUPPRESS_DEPRECATED)
 	$(call check_dep, \
 		"libkmipclient", \
 		"json-c/json.h", \
@@ -70,13 +69,13 @@ check-dep-libkmipclient: detect-openssl-version.dep
 		"libxml/tree.h", \
 		"libxml2-devel", \
 		"HAVE_LIBXML2=0", \
-		`$(XML2_CONFIG) --cflags` `$(XML2_CONFIG) --libs`)
+		`$(PKG_CONFIG) --cflags --libs libxml-2.0`)
 	$(call check_dep, \
 		"libkmipclient", \
 		"curl/curl.h", \
 		"libcurl-devel", \
 		"HAVE_LIBCURL=0" \
-		`$(CURL_CONFIG) --cflags` `$(CURL_CONFIG) --libs`)
+		`$(PKG_CONFIG) --cflags --libs libcurl`)
 	$(CURL_CONFIG) --ssl-backends | grep OpenSSL >/dev/null 2>&1 || { echo "Error: libcurl is not built with the OpenSSL backend"; exit 1; }
 	touch check-dep-libkmipclient
 
@@ -107,8 +106,8 @@ tls.o: check-dep-libkmipclient tls.c kmip.h utils.h $(rootdir)include/kmipclient
 names.o: check-dep-libkmipclient names.c names.h utils.h $(rootdir)include/kmipclient/kmipclient.h
 utils.o: check-dep-libkmipclient utils.c names.h utils.h $(rootdir)include/kmipclient/kmipclient.h
 
-libkmipclient.so.$(VERSION): ALL_CFLAGS += -fPIC `$(XML2_CONFIG) --cflags` `$(CURL_CONFIG) --cflags`
-libkmipclient.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl `$(XML2_CONFIG) --libs` `$(CURL_CONFIG) --libs`
+libkmipclient.so.$(VERSION): ALL_CFLAGS += -fPIC `$(PKG_CONFIG) --cflags json-c libcrypto libssl libxml-2.0 libcurl`
+libkmipclient.so.$(VERSION): LDLIBS = `$(PKG_CONFIG) --libs json-c libcrypto libssl libxml-2.0 libcurl`
 libkmipclient.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libkmipclient.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,libkmipclient.so.$(VERM)
 libkmipclient.so.$(VERSION): kmip.o request.o response.o attribute.o key.o ttlv.o json.o \

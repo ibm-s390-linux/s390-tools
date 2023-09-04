@@ -55,7 +55,7 @@ check-dep-libekmfweb: detect-openssl-version.dep
 		"detect-openssl-version.dep", \
 		"openssl-devel version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
-		-I. -lcrypto -DOPENSSL_SUPPRESS_DEPRECATED)
+		-I. `$(PKG_CONFIG) --cflags --libs libcrypto` -DOPENSSL_SUPPRESS_DEPRECATED)
 	$(call check_dep, \
 		"libekmfweb", \
 		"json-c/json.h", \
@@ -66,7 +66,7 @@ check-dep-libekmfweb: detect-openssl-version.dep
 		"curl/curl.h", \
 		"libcurl-devel", \
 		"HAVE_LIBCURL=0" \
-		`$(CURL_CONFIG) --cflags` `$(CURL_CONFIG) --libs`)
+		`$(PKG_CONFIG) --cflags --libs libcurl`)
 	$(CURL_CONFIG) --ssl-backends | grep OpenSSL >/dev/null 2>&1 || { echo "Error: libcurl is not built with the OpenSSL backend"; exit 1; }
 	touch check-dep-libekmfweb
 
@@ -85,8 +85,8 @@ ekmfweb.o: check-dep-libekmfweb ekmfweb.c utilities.h cca.h $(rootdir)include/ek
 utilities.o: check-dep-libekmfweb utilities.c utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 cca.o: check-dep-libekmfweb cca.c cca.h utilities.h $(rootdir)include/ekmfweb/ekmfweb.h
 
-libekmfweb.so.$(VERSION): ALL_CFLAGS += -fPIC `$(CURL_CONFIG) --cflags`
-libekmfweb.so.$(VERSION): LDLIBS = -ljson-c -lcrypto -lssl `$(CURL_CONFIG) --libs` -ldl
+libekmfweb.so.$(VERSION): ALL_CFLAGS += -fPIC `$(PKG_CONFIG) --cflags json-c libcurl libcrypto libssl`
+libekmfweb.so.$(VERSION): LDLIBS = `$(PKG_CONFIG) --libs json-c libcurl libcrypto libssl` -ldl
 libekmfweb.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libekmfweb.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,libekmfweb.so.$(VERM)
 libekmfweb.so.$(VERSION): ekmfweb.o utilities.o cca.o $(libs)
