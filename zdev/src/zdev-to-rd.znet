@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# Copyright IBM Corp. 2023
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# zdev-to-rd.znet
+#   Converts zdev configuration into the syntax of the dracut cmdline option
+#   rd.znet. Only znet options with non-default values are emitted. The
+#   result string occurs on stdout. It represents one device-specification for
+#   the given network interface name.
+#
+
+function usage() {
+    echo "usage: ${0##*/} active|persistent <network interface name>" 1>&2
+    exit 1
+}
+
+[[ $# -eq 2 ]] || usage
+
+[[ "$1" == active ]] || [[ "$1" == persistent ]] || usage
+
+_selection="--${1}"
+_ifname="$2"
+
+while read -r _line; do
+    case "$_line" in
+        \#*) ;;
+        \[*)
+            SAVED_IFS="$IFS"
+            IFS="${IFS}:]"
+            # shellcheck disable=SC2086
+            set -- $_line
+            shift # skip "[..." prefix
+            _nettype="$1"
+            shift # skip nettype
+            IFS="," # comma-separated subchannel list
+            _subchannels="$*"
+            IFS="$SAVED_IFS"
+            ;;
+        "online=1") ;;
+        zdev:early=*) ;;
+        *)
+            _attrs="${_attrs},${_line}"
+            ;;
+    esac
+done < <(chzdev --by-interface "$_ifname" "$_selection" --export - --quiet)
+printf "%s,%s%s\n" "$_nettype" "$_subchannels" "$_attrs"
