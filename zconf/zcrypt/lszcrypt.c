@@ -486,12 +486,16 @@ static void show_queue_capability(int id, int dom)
 	printf("queue %02x.%04x capabilities:\n", id, dom);
 
 	if (util_path_is_reg_file("%s/se_bind", dev)) {
-		util_file_read_line(buf, sizeof(buf), "%s/se_bind", dev);
-		printf("SE bind state: %s\n", buf);
+		if (util_file_read_line(buf, sizeof(buf), "%s/se_bind", dev))
+			printf("SE bind state: error\n");
+		else
+			printf("SE bind state: %s\n", buf);
 	}
 	if (util_path_is_reg_file("%s/se_associate", dev)) {
-		util_file_read_line(buf, sizeof(buf), "%s/se_associate", dev);
-		printf("SE association state: %s\n", buf);
+		if (util_file_read_line(buf, sizeof(buf), "%s/se_associate", dev))
+			printf("SE association state: error\n");
+		else
+			printf("SE association state: %s\n", buf);
 	}
 	if (util_path_is_reg_file("%s/mkvps", dev)) {
 		char *mkvps = util_path_sysfs("devices/ap/%s/%s/mkvps", card, queue);
@@ -674,16 +678,21 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 	util_file_read_l(&depth, 10, "%s/depth", grp_dev);
 	util_rec_set(rec, "depth", "%02d", depth + 1);
 
-	if (util_path_is_readable("%s/%s/ap_functions", grp_dev, sub_dev))
-		util_file_read_ul(&facility, 16, "%s/%s/ap_functions", grp_dev, sub_dev);
-	else
-		util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
+	if (util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev))
+		errx(EXIT_FAILURE,
+		     "Error - Read of sysfs attribute %s/ap_functions failed.",
+		     grp_dev);
 	for (i = 0; i < MAX_FAC_BITS; i++)
 		buf[i] = facility & fac_bits[i].mask ? fac_bits[i].c : '-';
 	buf[i] = '\0';
 	util_rec_set(rec, "facility", buf);
 
 	if (ap_bus_has_SB_support()) {
+		if (util_file_read_ul(&facility, 16, "%s/%s/ap_functions",
+				      grp_dev, sub_dev)) {
+			util_rec_set(rec, "sestat", "error");
+			return;
+		}
 		switch (EXTRACT_BS_BITS(facility)) {
 		case 0:
 			util_rec_set(rec, "sestat", "usable");
