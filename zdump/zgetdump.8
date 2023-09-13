@@ -194,6 +194,7 @@ The following dump formats are supported for the source dump only:
 .TP
 .BR "s390_ext"
 This dump format is IBM zSystems specific and is used for DASD dumps only.
+Starting with s390_ext format version 2, dumps also support zlib compression.
 .TP
 .BR "vmdump"
 Dumps with this format are created by the z/VM vmdump command
@@ -277,7 +278,16 @@ tool (see man zipl).
 .TP
 .BR "Dump file size"
 Actual size of dump file on disk in megabytes. "Dump file size" may differ from
-the "dump memory range" because of zero memory chunks.
+the "dump memory range" because of zero memory chunks or dump compression.
+.TP
+.BR "Zlib version"
+The version of zlib used for compressed dumps.
+.TP
+.BR "Zlib compression unit"
+Size of the input data chunks that has been used for the dump zlib compression
+by the dump tool. Every chunk of data is compressed separately and can be
+decompressed independently, allowing zgetdump to make fast read seeks.
+.br
 .TP
 .BR "Memory map"
 Available memory chunks in the dump. Some dump tools create multiple memory
