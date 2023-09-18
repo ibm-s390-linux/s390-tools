@@ -413,13 +413,16 @@ static struct attrib qeth_attr_isolation = {
 
 static struct attrib qeth_attr_performance_stats = {
 	.name = "performance_stats",
-	.title = "Control performance statistics collection",
+	.title = "Reset the statistic values",
 	.desc =
-	"Control the collection of QETH performance statistics data:\n"
-	"  0: Performance statistics data is not collected\n"
-	"  1: Performance statistics data is collected\n",
-	.defval = "0",
+	"Write '1' to this attribute to reset the statistic values to 0.\n"
+	"Use the ethtool command to display the statistics.\n",
+	/* read will always return 1 */
+	.defval = "1",
+	/* writing 0 is possible, but has no effect */
 	.accept = ACCEPT_ARRAY(ACCEPT_RANGE(0, 1)),
+	.activeonly = 1,
+	.rewrite = 1,
 	.st_data = QETH_DATA(layer_any, group_none),
 };
 
