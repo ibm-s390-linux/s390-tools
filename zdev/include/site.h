@@ -25,4 +25,7 @@
 #define NUM_USER_SITES (NUM_SITES - 1)
 #define SITE_FALLBACK NUM_USER_SITES
 
+/* Helper to find the availability of site-configuration */
+#define dev_site_configured(dev, x) (dev->site_specific[(x)].exists && \
+				     !dev->site_specific[(x)].deconfigured)
 #endif /* SITE_H */

@@ -338,8 +338,7 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 
 	dev_state_copy(&dev->site_specific[global_site_id], &dev->persistent);
 	for (i = 0; i < NUM_SITES; i++) {
-		configured += dev->site_specific[i].exists;
-		configured -= dev->site_specific[i].deconfigured;
+		configured += dev_site_configured(dev, i) ? 1 : 0;
 	}
 
 	/*
@@ -388,8 +387,7 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	fprintf(fd, "LABEL=\"%s\"\n", cfg_label);
 	/* site comparison block */
 	for (i = 0; i < NUM_USER_SITES; i++) {
-		if (dev->site_specific[i].exists &&
-		    !dev->site_specific[i].deconfigured) {
+		if (dev_site_configured(dev, i)) {
 			fprintf(fd, "ENV{ZDEV_SITE_ID}==\"%d\",GOTO=\"%s_site%d\"\n", i,
 				cfg_label, i);
 		}
@@ -399,8 +397,7 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	 * If we have a generic configuration available, then use that setting as a
 	 * fail-over incase of no site-id information in LOADPARM
 	 */
-	if (dev->site_specific[SITE_FALLBACK].exists &&
-	    !dev->site_specific[SITE_FALLBACK].deconfigured)
+	if (dev_site_configured(dev, SITE_FALLBACK))
 		fprintf(fd, "GOTO=\"%s_site_fb\"\n", cfg_label);
 	else
 		fprintf(fd, "GOTO=\"%s\"\n", end_label);
@@ -408,8 +405,7 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 
 	/* Write the site blocks for all the available configurations */
 	for (i = 0; i < NUM_USER_SITES; i++) {
-		if (dev->site_specific[i].exists &&
-		    !dev->site_specific[i].deconfigured) {
+		if (dev_site_configured(dev, i)) {
 			fprintf(fd, "# site_start_%d\n", i);
 			fprintf(fd, "LABEL=\"%s_site%d\"\n", cfg_label, i);
 
@@ -420,8 +416,7 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 			fprintf(fd, "\n");
 		}
 	}
-	if (dev->site_specific[SITE_FALLBACK].exists &&
-	    !dev->site_specific[SITE_FALLBACK].deconfigured) {
+	if (dev_site_configured(dev, SITE_FALLBACK)) {
 		fprintf(fd, "# site_start_fb\n");
 		fprintf(fd, "LABEL=\"%s_site_fb\"\n", cfg_label);
 
