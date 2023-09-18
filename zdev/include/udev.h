@@ -34,7 +34,6 @@ void udev_add_internal_from_entry(struct setting_list *list,
 				  struct util_udev_entry_node *entry,
 				  struct attrib **attribs);
 
-exit_code_t udev_write_site_rule(void);
 bool is_legacy_rule(struct util_udev_file *file);
 
 #endif /* UDEV_H */

@@ -25,6 +25,7 @@
 #include "setting.h"
 #include "udev.h"
 #include "udev_ccw.h"
+#include "zdev_id.h"
 
 #define SITE_FALLBACK_SUFFIX	"fb"
 
@@ -323,7 +324,7 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	char *path, *cfg_label = NULL, *end_label = NULL;
 	exit_code_t rc = EXIT_OK;
 	FILE *fd;
-	int i, configured = 0;
+	int i, configured = 0, site_configured = 0;
 
 	/*
 	 * Remove the previous file; The new udev rule will be created based on the
@@ -340,6 +341,8 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	for (i = 0; i < NUM_SITES; i++) {
 		configured += dev_site_configured(dev, i) ? 1 : 0;
 	}
+	site_configured = configured - (dev_site_configured(dev, SITE_FALLBACK) ?
+					1 : 0);
 
 	/*
 	 * If there is no configuration settings available, do not create the new
@@ -385,6 +388,20 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	fprintf(fd, "\n");
 
 	fprintf(fd, "LABEL=\"%s\"\n", cfg_label);
+
+	/*
+	 * Determine the ZDEV_SITE_ID here. If ZDEV_SITE_ID_FILE available,
+	 * simply import the content. If not, execute zdev_id and import the
+	 * output of the same.
+	 */
+	if (site_configured) {
+		fprintf(fd, "# Determine ZDEV_SITE_ID to continue\n");
+		fprintf(fd, "TEST==\"%s\",IMPORT{file}=\"%s\"\n",
+			ZDEV_SITE_ID_FILE, ZDEV_SITE_ID_FILE);
+		fprintf(fd, "TEST!=\"%s\",IMPORT{program}=\"%s/zdev_id\"\n\n",
+			ZDEV_SITE_ID_FILE, TOOLS_LIBDIR);
+	}
+
 	/* site comparison block */
 	for (i = 0; i < NUM_USER_SITES; i++) {
 		if (dev_site_configured(dev, i)) {
@@ -392,6 +409,14 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 				cfg_label, i);
 		}
 	}
+
+	/*
+	 * If no site configurations are available, then we need to make sure that
+	 * the udev-rule stays as compact as possible. We do not want to add any
+	 * extra labels on it.
+	 */
+	if (!site_configured)
+		goto fallback;
 
 	/*
 	 * If we have a generic configuration available, then use that setting as a
@@ -416,10 +441,12 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 			fprintf(fd, "\n");
 		}
 	}
+
+fallback:
 	if (dev_site_configured(dev, SITE_FALLBACK)) {
 		fprintf(fd, "# site_start_fb\n");
-		fprintf(fd, "LABEL=\"%s_site_fb\"\n", cfg_label);
-
+		if (site_configured)
+			fprintf(fd, "LABEL=\"%s_site_fb\"\n", cfg_label);
 		write_attr_to_file(fd, &dev->site_specific[i], id);
 		/* Write udev rule epilog. */
 		fprintf(fd, "GOTO=\"%s\"\n", end_label);
@@ -434,9 +461,6 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	if (misc_fclose(fd))
 		warn("Could not close file %s: %s\n", path, strerror(errno));
 
-	rc = udev_write_site_rule();
-	if (rc)
-		goto out;
 out:
 	free(end_label);
 	free(cfg_label);

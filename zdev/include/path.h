@@ -18,7 +18,6 @@
 #define	MODPROBE_PREFIX		"s390x"
 #define UDEV_PREFIX		"41"
 #define	UDEV_SUFFIX		".rules"
-#define ZDEV_PREFIX		"40"
 
 #define	PATH_MODPROBE_CONF	"/etc/modprobe.d"
 #define PATH_MODPROBE		"/sbin/modprobe"
@@ -66,7 +65,6 @@ char *path_get_zfcp_lun_dev(struct zfcp_lun_devid *);
 char *path_get_zfcp_port_dev(struct zfcp_lun_devid *);
 char *path_get_scsi_hctl_dev(const char *);
 char *path_get_bus_attr(const char *, const char *);
-char *path_get_zdev_rule(const char *name);
 
 exit_code_t path_for_each(const char *,
 			  exit_code_t (*callback)(const char *, const char *,
