@@ -860,7 +860,7 @@ static int get_physical_device(struct physical_device *pd, dev_t dev,
 				   target_entry_new(makedev(major, minor), target));
 		table_free(table);
 		/* Convert fs_start to offset on parent target */
-		start -= target->start;
+		start += target->start;
 	}
 }
 
