@@ -49,6 +49,7 @@
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "lib/dasd_base.h"
 #include "lib/util_base.h"
@@ -84,16 +85,16 @@ struct target {
 	struct util_list_node list;
 };
 
-struct target_entry {
-	dev_t device;
-	struct target *target;
-	struct util_list_node list;
+/* "extended" device */
+struct ext_dev {
+	dev_t dev;
+	unsigned long fs_off; /* file system start */
 };
 
-struct physical_device {
-	dev_t device;
-	unsigned long offset;
-	struct util_list *target_list;
+struct dmpath_entry {
+	struct ext_dev dev;
+	struct target *target;
+	struct util_list_node list;
 };
 
 struct device_characteristics {
@@ -104,6 +105,31 @@ struct device_characteristics {
 	struct hd_geometry geo;
 };
 
+struct physical_device {
+	unsigned long offset;
+	struct util_list *dmpath;
+	struct device_characteristics dc;
+};
+
+enum driver_id {
+	DM_DRIVER_ID,
+	LAST_DRIVER_ID
+};
+
+enum util_id {
+	ZIPL_UTIL_ID,
+	CHREIPL_UTIL_ID,
+	LAST_UTIL_ID
+};
+
+struct helper {
+	int util_id;
+	int driver_id;
+	const char *name;
+	int (*check_usage)(int argc, char *argv[]);
+	int (*print_params)(char *argv[], struct helper *h);
+};
+
 /* From include/linux/fs.h */
 #define BDEVNAME_SIZE 32
 
@@ -111,8 +137,6 @@ struct device_characteristics {
 #define SECTOR_SIZE 512
 #define DASD_PARTN_MASK 0x03
 #define SCSI_PARTN_MASK 0x0f
-
-#define CHREIPL_HELPER "chreipl_helper.device-mapper"
 
 /* Internal constants */
 enum dev_type {
@@ -126,6 +150,14 @@ enum target_type {
 	TARGET_TYPE_LINEAR = 0,
 	TARGET_TYPE_MIRROR,
 	TARGET_TYPE_MULTIPATH
+};
+
+enum lookup_result {
+	DM_LOOKUP_ERROR,
+	DM_EMPTY_TABLE,
+	DM_NO_TARGET,
+	DM_SINGLE_TARGET,
+	DM_MULTIPLE_TARGETS
 };
 
 static void get_type_name(char *name, unsigned short type)
@@ -217,56 +249,57 @@ static unsigned long target_get_start(struct target *target)
 {
 	struct target_data *td = util_list_start(target->data);
 
-	return td->start;
+	return target->start + td->start;
 }
 
-static void target_get_major_minor(struct target *target, unsigned int *major,
-				   unsigned int *minor)
+/*
+ * Return the first device from those that constitute the logical TARGET
+ */
+static dev_t first_device_by_target_data(struct target *target)
 {
 	struct target_data *td = util_list_start(target->data);
 
-	*major = major(td->device);
-	*minor = minor(td->device);
+	return td->device;
 }
 
-static struct target_entry *target_entry_new(dev_t dev, struct target *target)
+static struct dmpath_entry *dmpath_entry_new(struct ext_dev *dev,
+					     struct target *target)
 {
-	struct target_entry *te = util_malloc(sizeof(struct target_entry));
+	struct dmpath_entry *de = util_malloc(sizeof(struct dmpath_entry));
 
-	te->device = dev;
-	te->target = target;
-
-	return te;
+	de->dev = *dev;
+	de->target = target;
+	return de;
 }
 
-static void target_entry_free(struct target_entry *entry)
+static void dmpath_entry_free(struct dmpath_entry *entry)
 {
 	target_free(entry->target);
 	free(entry);
 }
 
-static struct target_entry *target_list_get_first_by_type(struct util_list *target_list,
-							  unsigned short type)
+static void dmpath_free(struct util_list *dmpath)
 {
-	struct target_entry *te;
+	struct dmpath_entry *de, *n;
 
-	util_list_iterate(target_list, te) {
+	util_list_iterate_safe(dmpath, de, n) {
+		util_list_remove(dmpath, de);
+		dmpath_entry_free(de);
+	}
+	util_list_free(dmpath);
+}
+
+static struct dmpath_entry *dmpath_get_first_by_type(struct util_list *dmpath,
+						     unsigned short type)
+{
+	struct dmpath_entry *te;
+
+	util_list_iterate(dmpath, te) {
 		if (te->target->type == type)
 			return te;
 	}
 
 	return NULL;
-}
-
-static void target_list_free(struct util_list *target_list)
-{
-	struct target_entry *te, *n;
-
-	util_list_iterate_safe(target_list, te, n) {
-		util_list_remove(target_list, te);
-		target_entry_free(te);
-	}
-	util_list_free(target_list);
 }
 
 static void get_device_name(char *devname, dev_t dev)
@@ -454,11 +487,10 @@ static struct util_list *get_mirror_data(const char *devname, char *args)
 	long nlogs, ndevs, nfeats, base_offset = -1;
 
 	SKIP_TOKEN_OR_GOTO(args, out); /* log_type */
-
 	NEXT_INT_TOKEN_OR_GOTO(nlogs, out); /* #log_args */
 	SKIP_NEXT_TOKENS_OR_GOTO(nlogs, out); /* log_args* */
-
 	NEXT_INT_TOKEN_OR_GOTO(ndevs, out);
+
 	for (; ndevs > 0; ndevs--) {
 		unsigned int major, minor;
 		long offset;
@@ -690,6 +722,8 @@ static void table_free(struct util_list *table)
 {
 	struct target *target, *n;
 
+	if (!table)
+		return;
 	util_list_iterate_safe(table, target, n) {
 		util_list_remove(table, target);
 		target_free(target);
@@ -697,6 +731,10 @@ static void table_free(struct util_list *table)
 	util_list_free(table);
 }
 
+/**
+ * Remove all targets which don't maintain bytes in the interval
+ * [start,start+length-1] from the TABLE
+ */
 static void filter_table(struct util_list *table, unsigned int start,
 			 unsigned int length)
 {
@@ -711,23 +749,22 @@ static void filter_table(struct util_list *table, unsigned int start,
 	}
 }
 
-/*
+/**
  * Return list of target devices
  */
-static struct util_list *get_table(dev_t dev)
+static int get_table(dev_t dev, struct util_list **table)
 {
 	char devname[BDEVNAME_SIZE];
-	struct util_list *table;
 	char *line = NULL;
 	size_t n = 0;
 	FILE *fp;
 
-	table = util_list_new(struct target, list);
+	*table = util_list_new(struct target, list);
 
 	fp = exec_cmd_and_get_out_stream("dmsetup table -j %u -m %u 2>/dev/null",
 					 major(dev), minor(dev));
 	if (fp == NULL)
-		return table;
+		return 0;
 
 	get_device_name(devname, dev);
 	while (getline(&line, &n, fp) != -1) {
@@ -742,7 +779,6 @@ static struct util_list *get_table(dev_t dev)
 			    devname);
 			goto out;
 		}
-
 		if (strcmp(type, "linear") == 0) {
 			data = get_linear_data(devname, args);
 			ttype = TARGET_TYPE_LINEAR;
@@ -761,20 +797,17 @@ static struct util_list *get_table(dev_t dev)
 		free(args);
 		if (data == NULL)
 			goto out;
-		util_list_add_tail(table, target_new(start, length, ttype, data));
+		util_list_add_tail(*table, target_new(start, length, ttype, data));
 	}
-
 	free(line);
 	pclose(fp);
-
-	return table;
-
+	return 0;
 out:
 	free(line);
 	pclose(fp);
-	table_free(table);
-
-	return NULL;
+	table_free(*table);
+	*table = NULL;
+	return -1;
 }
 
 static bool is_dasd(unsigned short type)
@@ -783,88 +816,137 @@ static bool is_dasd(unsigned short type)
 		(type == DEV_TYPE_FBA);
 }
 
-static int get_physical_device(struct physical_device *pd, dev_t dev,
-			       const char *directory)
+/**
+ * Remove TARGET from TABLE and add it to DMPATH
+ */
+static void target_move(struct target *target, struct ext_dev *dev,
+			struct util_list **table,
+			struct util_list *dmpath)
 {
-	struct util_list *target_list = NULL;
-	struct util_list *table = NULL;
-	unsigned int start, length;
-	struct target *target;
-
-	table = get_table(dev);
-	if (table == NULL || util_list_is_empty(table)) {
-		char devname[BDEVNAME_SIZE];
-
-		get_device_name(devname, dev);
-		ERR("Could not retrieve device-mapper information for device "
-		    "'%s'\n", devname);
-
-		if (table != NULL)
-			table_free(table);
-
-		return -1;
-	}
-
-	target = util_list_start(table);
-
-	/* Filesystem must be on a single dm target */
-	if (util_list_next(table, target) != NULL) {
-		ERR("Unsupported setup: Directory '%s' is located on a "
-		    "multi-target device-mapper device\n", directory);
-		table_free(table);
-
-		return -1;
-	}
-	util_list_remove(table, target);
-	table_free(table);
-
-	target_list = util_list_new(struct target_entry, list);
-
-	util_list_add_head(target_list, target_entry_new(dev, target));
-	start = target->start;
-	length = target->length;
-	while (true) {
-		unsigned int major, minor;
-
-		/* Convert fs_start to offset on parent dm device */
-		start += target_get_start(target);
-		target_get_major_minor(target, &major, &minor);
-		table = get_table(makedev(major, minor));
-		/* Found non-dm device */
-		if (table == NULL || util_list_is_empty(table)) {
-			pd->device = makedev(major, minor);
-			pd->offset = start;
-			pd->target_list = target_list;
-
-			if (table != NULL)
-				table_free(table);
-
-			return 0;
-		}
-		/* Get target in parent table which contains filesystem.
-		 * We are interested only in targets between
-		 * [start,start+length-1].
-		 */
-		filter_table(table, start, length);
-		target = util_list_start(table);
-		if (target == NULL || util_list_next(table, target) != NULL) {
-			ERR("Unsupported setup: Could not map directory '%s' "
-			    "to a single physical device\n", directory);
-			table_free(table);
-			target_list_free(target_list);
-
-			return -1;
-		}
-		util_list_remove(table, target);
-		util_list_add_head(target_list,
-				   target_entry_new(makedev(major, minor), target));
-		table_free(table);
-		/* Convert fs_start to offset on parent target */
-		start += target->start;
-	}
+	util_list_remove(*table, target);
+	table_free(*table);
+	*table = NULL;
+	util_list_add_head(dmpath, dmpath_entry_new(dev, target));
 }
 
-static int get_major_minor(dev_t *dev, const char *filename)
+/**
+ * Look for a TARGET in a device-mapper's TABLE on the parent level by DEVICE
+ */
+static int lookup_parent(dev_t device, struct util_list **table,
+			 struct target **target,
+			 void (*filter_table_fn)(struct util_list *table,
+						 unsigned int start,
+						 unsigned int len),
+			 unsigned int start, unsigned int len)
+{
+	if (get_table(device, table))
+		return DM_LOOKUP_ERROR;
+	if (*table == NULL || util_list_is_empty(*table))
+		return DM_EMPTY_TABLE;
+	/* optionally apply filter to the table */
+	if (filter_table_fn)
+		filter_table_fn(*table, start, len);
+	*target = util_list_start(*table);
+	if (*target == NULL)
+		return DM_NO_TARGET;
+	if (util_list_next(*table, *target) != NULL)
+		return DM_MULTIPLE_TARGETS;
+	return DM_SINGLE_TARGET;
+}
+
+/**
+ * Starting from DEVICE go upward the device tree and find the topmost
+ * device, which is not a logical device managed by device-mapper driver.
+ *
+ * On success: return the whole path traveled. Data of the topmost target
+ * in that path consists of non-dm devices.
+ * FS_START contains file system offset on the topmost dm-device.
+ *
+ * BOTTOM: the logical device at the lowest level from which the ascent
+ * begins.
+ */
+static struct util_list *dmpath_walk(struct ext_dev *bottom, const char *dir,
+				     unsigned long *fs_start)
+{
+	struct util_list *dmpath = util_list_new(struct dmpath_entry, list);
+	struct util_list *table = NULL;
+	struct ext_dev top = *bottom;
+	char devname[BDEVNAME_SIZE];
+	struct target *target;
+	unsigned int length;
+	int ret;
+
+	ret = lookup_parent(top.dev, &table, &target, NULL, 0, 0);
+	switch (ret) {
+	case DM_LOOKUP_ERROR:
+		goto error;
+	case DM_EMPTY_TABLE:
+		get_device_name(devname, top.dev);
+		ERR("Could not retrieve device-mapper information for device "
+		    "'%s'\n", devname);
+		goto error;
+	case DM_NO_TARGET:
+		/* impossible: table is not empty and no filter was applied */
+		assert(0);
+		goto error;
+	case DM_MULTIPLE_TARGETS:
+		ERR("Unsupported setup: Directory '%s' is located on a "
+		    "multi-target device-mapper device\n", dir);
+		goto error;
+	case DM_SINGLE_TARGET:
+		break;
+	}
+	length = target->length;
+
+	while (true) {
+		target_move(target, &top, &table, dmpath);
+		/*
+		 * Go to the upper level.
+		 * First, select the first device from those that constitute
+		 * the logical target (which is the "point of branching" in
+		 * the device tree).
+		 */
+		top.dev = first_device_by_target_data(target);
+		top.fs_off += target_get_start(target);
+		/*
+		 * look for a target maintaining bytes in the interval
+		 * [fs_off, fs_off+length - 1] on the parent level
+		 */
+		ret = lookup_parent(top.dev, &table, &target,
+				    filter_table, top.fs_off, length);
+		switch (ret) {
+		case DM_LOOKUP_ERROR:
+			goto error;
+		case DM_EMPTY_TABLE:
+			/* Found non-dm device */
+			table_free(table);
+			*fs_start = top.fs_off;
+			return dmpath;
+		case DM_NO_TARGET:
+			/* break through */
+		case DM_MULTIPLE_TARGETS:
+			ERR("Unsupported setup: Could not map directory '%s' "
+			    "to a single physical device\n", dir);
+			goto error;
+		case DM_SINGLE_TARGET:
+			break;
+		}
+	}
+ error:
+	table_free(table);
+	dmpath_free(dmpath);
+	return NULL;
+}
+
+static int get_physical_device(struct physical_device *pd, struct ext_dev *dev,
+			       const char *dir)
+{
+	pd->dmpath = dmpath_walk(dev, dir, &pd->offset);
+
+	return pd->dmpath == NULL ? -1 : 0;
+}
+
+static int device_by_filename(dev_t *dev, const char *filename)
 {
 	struct stat buf;
 
@@ -873,51 +955,43 @@ static int get_major_minor(dev_t *dev, const char *filename)
 		return -1;
 	}
 	*dev = buf.st_dev;
-
 	return 0;
 }
 
-static int get_physical_device_dir(struct physical_device *pd,
-				   const char *directory)
+static struct dmpath_entry *get_top_entry(struct physical_device *pd)
 {
-	dev_t dev;
-
-	if (get_major_minor(&dev, directory) != 0)
-		return -1;
-
-	return get_physical_device(pd, dev, directory);
+	return util_list_start(pd->dmpath);
 }
 
-static int get_target_base(dev_t *base, dev_t bottom, unsigned int length,
-			   struct util_list *target_list)
+/**
+ * Find the topmost entry in the DMPATH, which provides access to
+ * the boot sectors
+ */
+static struct dmpath_entry *find_base_entry(struct util_list *dmpath,
+					    unsigned int nr_boot_sectors)
 {
-	struct target_entry *te, *tm;
-	dev_t top = bottom;
+	struct dmpath_entry *te, *tm, *top;
 
-	util_list_iterate(target_list, te) {
-		if ((te->target->start != 0) ||
-		    (target_get_start(te->target) != 0) ||
-		    (te->target->length < length)) {
+	top = util_list_start(dmpath);
+
+	util_list_iterate(dmpath, te) {
+		if (target_get_start(te->target) != 0 ||
+		    te->target->length < nr_boot_sectors)
 			break;
-		}
-		top = te->device;
+		top = te;
 	}
-
 	/* Check for mirroring between base device and fs device */
-	for (tm = te; tm != NULL; tm = util_list_next(target_list, tm)) {
+	for (tm = te; tm != NULL; tm = util_list_next(dmpath, tm)) {
 		if (tm->target->type == TARGET_TYPE_MIRROR) {
 			char name[BDEVNAME_SIZE];
 
-			get_device_name(name, tm->device);
+			get_device_name(name, tm->dev.dev);
 			ERR("Unsupported setup: Block 0 is not mirrored in "
 			    "device '%s'\n", name);
-			return -1;
+			return NULL;
 		}
 	}
-
-	*base = top;
-
-	return 0;
+	return top;
 }
 
 static inline dev_t get_partition_base(unsigned short type, dev_t dev)
@@ -929,138 +1003,252 @@ static inline dev_t get_partition_base(unsigned short type, dev_t dev)
 static int extract_major_minor_from_cmdline(char *argv[], unsigned int *major,
 					    unsigned int *minor)
 {
-	if (sscanf(argv[1], "%u:%u", major, minor) != 2) {
+	if (sscanf(argv[1], "%u:%u", major, minor) != 2)
 		return -1;
-	}
-
 	return 0;
 }
 
-static bool toolname_is_chreipl_helper(const char *toolname)
+static bool toolname_is(const char *toolname, const char *what)
 {
-	int clen = strlen(CHREIPL_HELPER);
+	int wlen = strlen(what);
 	int tlen = strlen(toolname);
 
-	if (tlen < clen)
+	if (tlen < wlen)
 		return false;
 
-	return strcmp(toolname + tlen - clen, CHREIPL_HELPER) == 0;
+	return strcmp(toolname + tlen - wlen, what) == 0;
 }
 
-static void print_usage(const char *toolname)
+static void print_usage_zipl_helper(const char *toolname)
 {
 	fprintf(stderr, "%s <major:minor of target device>", toolname);
-	if (!toolname_is_chreipl_helper(toolname))
-		fprintf(stderr, " or <target directory>");
-	fprintf(stderr, "\n");
+	fprintf(stderr, " or <target directory>\n");
+}
+
+static void print_usage_chreipl_helper(const char *toolname)
+{
+	fprintf(stderr, "%s <major:minor of target device>\n", toolname);
+}
+
+/**
+ * Complete the PD structure and assign the base device
+ */
+static int complete_physical_device(struct physical_device *pd, dev_t *base_dev)
+{
+	struct device_characteristics *dc = &pd->dc;
+	struct dmpath_entry *top_entry, *base_entry;
+	dev_t top_dev;
+
+	top_entry = get_top_entry(pd);
+	top_dev = first_device_by_target_data(top_entry->target);
+
+	/* Retrieve parameters of the topmost device */
+	if (get_dev_characteristics(dc, top_dev) != 0)
+		return -1;
+
+	if (dc->partstart > 0) {
+		/*
+		 * The topmost found device is a partition.
+		 * Since just a part of the physical device is mapped, only
+		 * the physical device can provide access to the boot record
+		 */
+		struct device_characteristics ndc = {0};
+		struct dmpath_entry *mirror;
+
+		/* Check for mirror */
+		mirror = dmpath_get_first_by_type(pd->dmpath,
+						  TARGET_TYPE_MIRROR);
+		if (mirror != NULL) {
+			char name[BDEVNAME_SIZE];
+
+			get_device_name(name, mirror->dev.dev);
+			/* IPL records are not mirrored */
+			ERR("Unsupported setup: Block 0 is not mirrored in "
+			    "device '%s'\n", name);
+			return -1;
+		}
+		base_entry = top_entry;
+		*base_dev = get_partition_base(dc->type, top_dev);
+		/* Complete the filesystem offset */
+		pd->offset += (dc->partstart * (dc->blocksize / SECTOR_SIZE));
+		dc->partstart = 0;
+		/* Update device geometry */
+		get_dev_characteristics(&ndc, *base_dev);
+		dc->geo = ndc.geo;
+	} else {
+		/*
+		 * All of the device is mapped, so the base device is the
+		 * top most dm device which provides access to boot sectors
+		 */
+		base_entry = find_base_entry(pd->dmpath, dc->bootsectors);
+		if (!base_entry)
+			return -1;
+		*base_dev = base_entry->dev.dev;
+	}
+	/* Check for valid offset of filesystem */
+	if ((pd->offset % (dc->blocksize / SECTOR_SIZE)) != 0) {
+		ERR("File system not aligned on physical block size\n");
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Print a set of zipl parameters for a base device.
+ *
+ * BASE: physical or logical device, which provides access to boot sectors
+ * FS_START: offset (in sectors) of the first block managed by the file system
+ */
+static void base_dev_to_params(dev_t base, struct device_characteristics *dc,
+			       unsigned long fs_start)
+{
+	char type_name[8];
+
+	printf("targetbase=%u:%u\n", major(base), minor(base));
+	get_type_name(type_name, dc->type);
+	printf("targettype=%s\n", type_name);
+	if (dc->geo.cylinders != 0 &&
+	    dc->geo.heads != 0 &&
+	    dc->geo.sectors != 0) {
+		printf("targetgeometry=%d,%d,%d\n",
+		       dc->geo.cylinders,
+		       dc->geo.heads,
+		       dc->geo.sectors);
+	}
+	printf("targetblocksize=%d\n", dc->blocksize);
+	printf("targetoffset=%lu\n",
+	       fs_start / (dc->blocksize / SECTOR_SIZE));
+}
+
+/**
+ * Print parameters for logical device DEV required by zipl
+ * tool to install IPL records on its's physical components.
+ *
+ * DEV: a logical device managed by device-mapper driver
+ */
+static int dm_dev_to_zipl_params(struct ext_dev *dev, char *dir)
+{
+	struct physical_device pd = {0};
+	dev_t base_dev;
+
+	if (get_physical_device(&pd, dev, dir))
+		return -1;
+	if (complete_physical_device(&pd, &base_dev))
+		goto error;
+	base_dev_to_params(base_dev, &pd.dc, pd.offset);
+	dmpath_free(pd.dmpath);
+	return 0;
+error:
+	dmpath_free(pd.dmpath);
+	return -1;
+}
+
+static int dm_dev_to_chreipl_params(dev_t dev, char *dir)
+{
+	struct physical_device pd = {0};
+	struct ext_dev xdev = {dev, 0};
+	dev_t top_dev;
+
+	if (get_physical_device(&pd, &xdev, dir))
+		return -1;
+	top_dev = get_top_entry(&pd)->dev.dev;
+	printf("%u:%u\n", major(top_dev), minor(top_dev));
+	dmpath_free(pd.dmpath);
+	return 0;
+}
+
+static int handle_device_mapper(dev_t dev, int util_id, char *name)
+{
+	struct ext_dev xdev = {dev, 0};
+
+	switch (util_id) {
+	case CHREIPL_UTIL_ID:
+		return dm_dev_to_chreipl_params(dev, name);
+	case ZIPL_UTIL_ID:
+		return dm_dev_to_zipl_params(&xdev, name);
+	default:
+		ERR("Unsupported utility %d\n", util_id);
+		return -1;
+	}
+}
+
+static int print_params_device_mapper(char *argv[], struct helper *h)
+{
+	unsigned int major, minor;
+	char *name = argv[1];
+	dev_t dev;
+
+	if (extract_major_minor_from_cmdline(argv, &major, &minor) == 0)
+		dev = makedev(major, minor);
+	else if (device_by_filename(&dev, name))
+		return -1;
+	return handle_device_mapper(dev, h->util_id, name);
+}
+
+static int check_usage_zipl_helper(int argc, char *argv[])
+{
+	if (argc <= 1) {
+		print_usage_zipl_helper(argv[0]);
+		return -1;
+	}
+	return 0;
+}
+
+static int check_usage_chreipl_helper(int argc, char *argv[])
+{
+	unsigned int major, minor;
+
+	if (argc <= 1 ||
+	    extract_major_minor_from_cmdline(argv, &major, &minor)) {
+		print_usage_chreipl_helper(argv[0]);
+		return -1;
+	}
+	return 0;
+}
+
+static struct helper helpers[LAST_DRIVER_ID][LAST_UTIL_ID] = {
+	[DM_DRIVER_ID][ZIPL_UTIL_ID] = {
+		. util_id = ZIPL_UTIL_ID,
+		. driver_id = DM_DRIVER_ID,
+		. name = "zipl_helper.device-mapper",
+		. check_usage = check_usage_zipl_helper,
+		. print_params = print_params_device_mapper
+	},
+	[DM_DRIVER_ID][CHREIPL_UTIL_ID] = {
+		. util_id = CHREIPL_UTIL_ID,
+		. driver_id = DM_DRIVER_ID,
+		. name = "chreipl_helper.device-mapper",
+		. check_usage = check_usage_chreipl_helper,
+		. print_params = print_params_device_mapper
+	},
+};
+
+static struct helper *helper_by_toolname(const char *toolname)
+{
+	int i, j;
+
+	for (i = 0; i < LAST_DRIVER_ID; i++)
+		for (j = 0; j < LAST_UTIL_ID; j++)
+			if (toolname_is(toolname, helpers[i][j].name))
+				return &helpers[i][j];
+	return NULL;
 }
 
 int main(int argc, char *argv[])
 {
-	struct device_characteristics dc = {0};
-	const char *toolname = argv[0];
-	struct physical_device pd;
-	unsigned int major, minor;
-	char *directory = NULL;
-	char type_name[8];
-	dev_t base;
-	int res;
+	struct helper *h;
 
-	if (argc <= 1)
-		goto usage;
+	h = helper_by_toolname(argv[0]);
+	assert(h != NULL);
+
+	if (h->check_usage(argc, argv))
+		exit(EXIT_FAILURE);
 
 	if (setlocale(LC_ALL, "C") == NULL) {
 		ERR("Could not use standard locale\n");
 		exit(EXIT_FAILURE);
 	}
-
-	if (toolname_is_chreipl_helper(toolname)) {
-		if (extract_major_minor_from_cmdline(argv, &major, &minor) != 0)
-			goto usage;
-
-		if (get_physical_device(&pd, makedev(major, minor), argv[1]) != 0)
-			exit(EXIT_FAILURE);
-
-		printf("%u:%u\n", major(pd.device), minor(pd.device));
-		target_list_free(pd.target_list);
-		exit(EXIT_SUCCESS);
-	}
-
-	directory = argv[1];
-	if (extract_major_minor_from_cmdline(argv, &major, &minor) == 0)
-		res = get_physical_device(&pd, makedev(major, minor), directory);
-	else
-		res = get_physical_device_dir(&pd, directory);
-
-	if (res != 0)
+	if (h->print_params(argv, h))
 		exit(EXIT_FAILURE);
-
-	if (get_dev_characteristics(&dc, pd.device) != 0)
-		goto error;
-
-	/* Handle partitions */
-	if (dc.partstart > 0) {
-		struct device_characteristics ndc = {0};
-		struct target_entry *mirror;
-
-		/* Only the partition of the physical device is mapped so only
-		 * the physical device can provide access to the boot record
-		 */
-		base = get_partition_base(dc.type, pd.device);
-		/* Check for mirror */
-		mirror = target_list_get_first_by_type(pd.target_list,
-						       TARGET_TYPE_MIRROR);
-		if (mirror != NULL) {
-			char name[BDEVNAME_SIZE];
-
-			get_device_name(name, mirror->device);
-			/* IPL records are not mirrored */
-			ERR("Unsupported setup: Block 0 is not mirrored in "
-			    "device '%s'\n", name);
-			goto error;
-		}
-		/* Adjust filesystem offset */
-		pd.offset += (dc.partstart * (dc.blocksize / SECTOR_SIZE));
-		dc.partstart = 0;
-		/* Update device geometry */
-		get_dev_characteristics(&ndc, base);
-		dc.geo = ndc.geo;
-	} else {
-		/* All of the device is mapped, so the base device is the
-		 * top most dm device which provides access to boot sectors
-		 */
-		if (get_target_base(&base, pd.device, dc.bootsectors,
-				    pd.target_list) != 0)
-			goto error;
-	}
-
-	/* Check for valid offset of filesystem */
-	if ((pd.offset % (dc.blocksize / SECTOR_SIZE)) != 0) {
-		ERR("File system not aligned on physical block size\n");
-		goto error;
-	}
-
-	target_list_free(pd.target_list);
-
-	/* Print resulting information */
-	printf("targetbase=%u:%u\n", major(base), minor(base));
-	get_type_name(type_name, dc.type);
-	printf("targettype=%s\n", type_name);
-	if (dc.geo.cylinders != 0 && dc.geo.heads != 0 && dc.geo.sectors != 0) {
-		printf("targetgeometry=%d,%d,%d\n",
-		       dc.geo.cylinders, dc.geo.heads, dc.geo.sectors);
-	}
-	printf("targetblocksize=%d\n", dc.blocksize);
-	printf("targetoffset=%lu\n", (pd.offset / (dc.blocksize / SECTOR_SIZE)));
-
 	exit(EXIT_SUCCESS);
-
-error:
-	if (pd.target_list != NULL)
-		target_list_free(pd.target_list);
-	exit(EXIT_FAILURE);
-
-usage:
-	print_usage(toolname);
-	exit(EXIT_FAILURE);
 }
