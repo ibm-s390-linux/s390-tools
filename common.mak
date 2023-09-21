@@ -93,19 +93,19 @@ define cmd_define_and_export
 endef
 
 define define_toolchain_variables
-	$(eval $(call cmd_define_and_export,     AS$(1),"  AS$(1)          ",$(2)as))
-	$(eval $(call cmd_define_and_export,     CC$(1),"  CC$(1)          ",$(2)gcc))
-	$(eval $(call cmd_define_and_export,   LINK$(1),"  LINK$(1)        ",$$(CC$(1))))
-	$(eval $(call cmd_define_and_export,    CXX$(1),"  CXX$(1)         ",$(2)g++))
-	$(eval $(call cmd_define_and_export, LINKXX$(1),"  LINKXX$(1)      ",$$(CXX$(1))))
-	$(eval $(call cmd_define_and_export,    CPP$(1),"  CPP$(1)         ",$(2)gcc -E))
-	$(eval $(call cmd_define_and_export,     AR$(1),"  AR$(1)          ",$(2)ar))
-	$(eval $(call cmd_define_and_export,     NM$(1),"  NM$(1)          ",$(2)nm))
-	$(eval $(call cmd_define_and_export,  STRIP$(1),"  STRIP$(1)       ",$(2)strip))
-	$(eval $(call cmd_define_and_export,OBJCOPY$(1),"  OBJCOPY$(1)     ",$(2)objcopy))
-	$(eval $(call cmd_define_and_export,OBJDUMP$(1),"  OBJDUMP$(1)     ",$(2)objdump))
-	$(eval PKG_CONFIG$(1) = pkg-config)
-	$(eval export PKG_CONFIG$(1))
+	$(call cmd_define_and_export,     AS$(1),"  AS$(1)          ",$(2)as)
+	$(call cmd_define_and_export,     CC$(1),"  CC$(1)          ",$(2)gcc)
+	$(call cmd_define_and_export,   LINK$(1),"  LINK$(1)        ",$$(CC$(1)))
+	$(call cmd_define_and_export,    CXX$(1),"  CXX$(1)         ",$(2)g++)
+	$(call cmd_define_and_export, LINKXX$(1),"  LINKXX$(1)      ",$$(CXX$(1)))
+	$(call cmd_define_and_export,    CPP$(1),"  CPP$(1)         ",$(2)gcc -E)
+	$(call cmd_define_and_export,     AR$(1),"  AR$(1)          ",$(2)ar)
+	$(call cmd_define_and_export,     NM$(1),"  NM$(1)          ",$(2)nm)
+	$(call cmd_define_and_export,  STRIP$(1),"  STRIP$(1)       ",$(2)strip)
+	$(call cmd_define_and_export,OBJCOPY$(1),"  OBJCOPY$(1)     ",$(2)objcopy)
+	$(call cmd_define_and_export,OBJDUMP$(1),"  OBJDUMP$(1)     ",$(2)objdump)
+	PKG_CONFIG$(1) = pkg-config
+	export PKG_CONFIG$(1)
 endef
 
 # If the host architecture is not the same as the build architecture
@@ -119,8 +119,8 @@ ifneq ($(HOST_ARCH),$(BUILD_ARCH))
   endif
 endif
 
-$(call define_toolchain_variables,_FOR_BUILD,)
-$(call define_toolchain_variables,,$(CROSS_COMPILE))
+$(eval $(call define_toolchain_variables,_FOR_BUILD,))
+$(eval $(call define_toolchain_variables,,$(CROSS_COMPILE)))
 
 
 $(eval $(call cmd_define,    RUNTEST,"  RUNTEST     ",$(S390_TEST_LIB_PATH)/s390_runtest))
