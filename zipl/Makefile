@@ -6,6 +6,7 @@ all:
 	$(MAKE) -C src
 
 install: all
+	$(MAKE) -C boot install
 	$(MAKE) -C src install
 	$(MAKE) -C man install
 	$(MAKE) -C dracut install

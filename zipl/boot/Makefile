@@ -26,6 +26,10 @@ all: .loaders $(FILES) $(DEBUG_FILES)
 .loaders: $(INC_FILES)
 	touch .loaders
 
+install: stage3.bin
+	$(INSTALL) -d -m 755 "$(DESTDIR)$(TOOLS_LIBDIR)"
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3.bin "$(DESTDIR)$(TOOLS_LIBDIR)"
+
 # Prevent make from using some default rules...
 %:	%.S
 
