@@ -2,9 +2,9 @@
 #ifndef DFLTCC_H
 #define DFLTCC_H
 
-#include "defutil.h"
 #include <stdint.h>
-#include <assert.h>
+#include "lib/zt_common.h"
+#include "defutil.h"
 
 /*
  * Tuning parameters.
@@ -28,7 +28,7 @@ struct dfltcc_qaf_param {
     char reserved2[6];
 };
 
-static_assert(sizeof(struct dfltcc_qaf_param) == 32);
+STATIC_ASSERT(sizeof(struct dfltcc_qaf_param) == 32);
 
 #define DFLTCC_FMT0 0
 
@@ -80,7 +80,7 @@ struct dfltcc_param_v0 {
     uint8_t csb[1152];
 };
 
-static_assert(sizeof(struct dfltcc_param_v0) == 1536);
+STATIC_ASSERT(sizeof(struct dfltcc_param_v0) == 1536);
 
 #define CVT_CRC32 0
 #define CVT_ADLER32 1

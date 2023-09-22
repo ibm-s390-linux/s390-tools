@@ -115,7 +115,7 @@ typedef struct deflate_workspace {
 
 #ifdef CONFIG_ZLIB_DFLTCC
 /* dfltcc_state must be doubleword aligned for DFLTCC call */
-static_assert(offsetof(struct deflate_workspace, dfltcc_memory) % 8 == 0);
+STATIC_ASSERT(offsetof(struct deflate_workspace, dfltcc_memory) % 8 == 0);
 #endif
 
 /* Values for max_lazy_match, good_match and max_chain_length, depending on
