@@ -15,16 +15,17 @@ ifneq (${HAVE_CARGO},0)
 
 	BUILD_TARGETS = $(CARGO_TARGETS)
 	INSTALL_TARGETS := install-rust-tools install-man
-	CARGO_TEST_TARGETS = $(addsuffix, _test, $(CARGO_TARGETS))
+	CARGO_TEST_TARGETS = $(addsuffix .test, $(CARGO_TARGETS))
 
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
 	PV_TARGETS := pvsecret
 
-	PV_BUILD_TARGETS = $(PV_TARGETS)
-	CARGO_TEST_TARGETS += $(addsuffix, _test, $(PV_TARGETS)) pv
+	PV_BUILD_TARGETS := $(PV_TARGETS)
+	CARGO_TEST_TARGETS += $(addsuffix .test,pv $(PV_TARGETS))
 endif #LIBCURL
 endif #OPENSSL
+	TEST_TARGETS := $(addsuffix _build,$(CARGO_TEST_TARGETS))
 endif #CARGO
 
 BUILD_TARGETS += $(PV_BUILD_TARGETS)
@@ -39,18 +40,15 @@ endif
 $(BUILD_TARGETS) rust-test: CC = $(CC_SILENT)
 $(BUILD_TARGETS) rust-test: AR = $(AR_SILENT)
 
-$(CARGO_TARGETS): .check-cargo .no-cross-compile
-	$(CARGO_BUILD) --manifest-path=$@/Cargo.toml $(ALL_CARGOFLAGS)
-.PHONY: $(CARGO_TARGETS)
+$(PV_TARGETS): .check-dep-pvtools
+$(PV_TARGETS) $(CARGO_TARGETS): .check-cargo .no-cross-compile
+	$(CARGO_BUILD) --bin $@ $(ALL_CARGOFLAGS)
+.PHONY: $(PV_TARGETS) $(CARGO_TARGETS)
 
-
-$(CARGO_TEST_TARGETS): .check-cargo .no-cross-compile
-	$(CARGO_TEST) --manifest-path=$@/Cargo.toml --all-features $(CARGOFLAGS)
-.PHONY: $(CARGO_TEST_TARGETS)
-
-$(PV_TARGETS): .check-cargo .no-cross-compile .check-dep-pvtools
-	$(CARGO_BUILD) --manifest-path=$@/Cargo.toml $(ALL_CARGOFLAGS)
-.PHONY: $(PV_TARGETS)
+$(TEST_TARGETS): ALL_CARGOFLAGS += --no-run
+$(CARGO_TEST_TARGETS) $(TEST_TARGETS): .check-cargo .no-cross-compile
+	$(CARGO_TEST) --package $(basename $@) --all-features $(ALL_CARGOFLAGS)
+.PHONY: $(TEST_TARGETS) $(CARGO_TEST_TARGETS)
 
 skip-build:
 	echo "  SKIP    rust-tools due to unresolved dependencies"
@@ -65,22 +63,17 @@ print-rust-targets:
 	echo $(BUILD_TARGETS)
 
 clean:
-	$(foreach target,$(CARGO_TARGETS),\
-		$(CARGO_CLEAN) --manifest-path=$(target)/Cargo.toml ${ALL_CARGOFLAGS} ;)
-	$(foreach target,$(PV_TARGETS),\
-		$(CARGO_CLEAN) --manifest-path=$(target)/Cargo.toml ${ALL_CARGOFLAGS} ;)
+	$(CARGO_CLEAN) ${ALL_CARGOFLAGS}
 	$(RM) -- .check-dep-pvtools .detect-openssl.dep.c .check-cargo
 
-rust-test: .check-cargo .no-cross-compile
-	$(foreach target,$(CARGO_TEST_TARGETS),\
-		$(CARGO_TEST) --manifest-path=$(target)/Cargo.toml --all-features ${ALL_CARGOFLAGS} ;)
+rust-test: $(CARGO_TEST_TARGETS)
 
 install-rust-tools: $(BUILD_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
 	$(foreach target,$(CARGO_TARGETS),\
-		$(INSTALL) $(target)/target/release/$(target) $(DESTDIR)$(USRBINDIR);)
+		$(INSTALL) target/release/$(target) $(DESTDIR)$(USRBINDIR);)
 	$(foreach target,$(PV_TARGETS),\
-		$(INSTALL) $(target)/target/release/$(target) $(DESTDIR)$(USRBINDIR);)
+		$(INSTALL) target/release/$(target) $(DESTDIR)$(USRBINDIR);)
 
 install-man:
 	$(foreach target,$(CARGO_TARGETS),\
@@ -118,13 +111,13 @@ endif
 
 .check-dep-pvtools: .detect-openssl.dep.c
 	$(call check_dep, \
-		"$(BIN_PROGRAM)", \
+		"Rust-pv", \
 		$^, \
 		"openssl-devel / libssl-dev version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
 		"-I.")
 	$(call check_dep, \
-		"$(BIN_PROGRAM)", \
+		"Rust-pv", \
 		"curl/curl.h", \
 		"libcurl-devel", \
 		"HAVE_LIBCURL=0")

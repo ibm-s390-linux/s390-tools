@@ -1,8 +1,8 @@
 [package]
 name = "pv"
 version = "0.9.0"
-edition = "2021"
-license = "MIT"
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 libc = "0.2"
@@ -30,7 +30,3 @@ lazy_static = "1"
 default = []
 request = ["dep:openssl", "dep:curl", "dep:openssl_extensions", "dep:serde", "dep:clap"]
 uvsecret = ["dep:byteorder", "dep:serde"]
-
-[profile.release]
-lto = true
-panic = "abort" # release builds now do not clean up stack after panics. .1 Mb

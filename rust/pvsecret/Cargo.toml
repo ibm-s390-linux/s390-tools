@@ -1,8 +1,8 @@
 [package]
 name = "pvsecret"
 version = "0.9.0"
-edition = "2021"
-license = "MIT"
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 anyhow = { version = "1", features = ["std"] }
@@ -12,7 +12,3 @@ serde_yaml = "0.9"
 
 pv = { path = "../pv", features = ["uvsecret", "request"] }
 utils = { path = "../utils" }
-
-[profile.release]
-lto = true
-panic = "abort" # release builds now do not clean up stack after panics. .1 Mb

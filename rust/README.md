@@ -81,11 +81,27 @@ is a start, but can change over time.
 Dependencies used by the crates listed above can be used, too.
 
 ### Add new tool
-To add a new tool issue `cargo new <TOOLNAME>` in the `rust` directory.
+To add a new tool issue `cargo new $TOOLNAME` in the `rust` directory.
 
 Add the tool to the _s390-tools_ build system:
 ```Makefile
-CARGO_TARGETS := TOOLNAME
+CARGO_TARGETS := $TOOLNAME
+```
+Add the library to the _s390-tools_ test list:
+```Makefile
+CARGO_TEST_TARGETS := $LIBNAME
+```
+
+Add the tool/library to the cargo workspace:
+```toml
+[workspace]
+members = [
+	"pv",
+	"pvsecret",
+	"$TOOLNAME",
+	"$LIBNAME"
+	"utils",
+]
 ```
 
 ### Versions
