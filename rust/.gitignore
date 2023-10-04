@@ -9,6 +9,3 @@ target/
 # Generated during make build can be removed at any point
 .check-dep-pvtools
 .check-cargo
-
-# Ignore lock files by default
-Cargo.lock
