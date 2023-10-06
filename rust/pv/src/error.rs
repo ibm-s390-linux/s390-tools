@@ -46,8 +46,8 @@ pub enum Error {
 // used in macros
 #[doc(hidden)]
 impl Error {
-    pub const CRL: &str = "CRL";
-    pub const CERT: &str = "certificate";
+    pub const CRL: &'static str = "CRL";
+    pub const CERT: &'static str = "certificate";
 }
 
 /// Error cases for verifying host-key documents
