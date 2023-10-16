@@ -386,6 +386,24 @@ the different tools are provided:
   - Packages: blktrace, multipath-tools, sg3-utils
   - Tools: rsync, tar, lsscsi
 
+* zipl
+  For CCW-type DASD dump, zlib compression can be used to compress the dump
+  data before writing it to the DASD partition. It can benefit from
+  s390 on-chip compression accelerator (DFLTCC) and provide a faster dumping
+  process, hence lower system downtime.
+  The zlib version integrated with zipl (zipl/boot/zlib) is based on the Linux
+  kernel zlib (kernel version 6.3) which represents zlib version 1.1.3 with a
+  limited number of functions and a number of updates on top including s390
+  hardware compression (DFLTCC) support. Also, all memory allocations are
+  performed in advance, which aligns with zipl requirements.
+  The CCW-type standalone dumper is built as a single binary and must be
+  loaded to stage2 during boot. Hence, all required zlib functions must be
+  integrated into it, and its size is restricted. To limit the size, only
+  deflate-related parts are integrated (no decompression is required during
+  dumping).
+  Removing the inflate modules and function prototypes are the only major
+  modifications made to the kernel version of zlib.
+
 * zgetdump
   For building zgetdump you need OpenSSL version 1.1.0 or newer
   installed (openssl-devel.rpm). Also required is glib2
