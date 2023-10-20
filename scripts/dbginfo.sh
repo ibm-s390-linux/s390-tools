@@ -1395,7 +1395,7 @@ pr_log_stdout() {
 pr_syslog_stdout() {
 	echo "$@" >&8
 	echo
-	echo "$(date +%H:%M:%S.%N) - $@"
+	echo "$(date +%H:%M:%S.%N) - " "$@"
 	logger -t "${SCRIPTNAME}" "$@"
 }
 
@@ -1408,13 +1408,13 @@ pr_collect_output() {
 ########################################
 # print "Collecting ..." like fs
 pr_collect() {
-	pr_syslog_stdout ${step_num} "Collecting" $@
+	pr_syslog_stdout ${step_num} "Collecting" "$@"
 }
 
 ########################################
 # print "Skipping ..." info with reason
 pr_skip() {
-	pr_syslog_stdout ${step_num} "Skip" $@
+	pr_syslog_stdout ${step_num} "Skip" "$@"
 }
 
 ###############################################################################
