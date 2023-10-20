@@ -684,7 +684,26 @@ gint pv_img_add_component(PvImage *img, const PvArg *arg, GError **err)
 {
 	g_autoptr(PvComponent) comp = NULL;
 
-	comp = pv_component_new_file(arg->type, arg->path, err);
+	switch (arg->type) {
+	case PV_COMP_TYPE_INITRD:
+	case PV_COMP_TYPE_KERNEL:
+	case PV_COMP_TYPE_STAGE3B:
+		comp = pv_component_new_file(arg->type, arg->path, err);
+		break;
+	case PV_COMP_TYPE_CMDLINE: {
+		g_autoptr(PvBuffer) buf = NULL;
+		g_autofree char *data = NULL;
+		gsize length;
+
+		if (!g_file_get_contents(arg->path, &data, &length, err))
+			return -1;
+
+		/* Add one for the null terminator */
+		buf = pv_buffer_take(g_steal_pointer(&data), length + 1);
+		comp = pv_component_new_buf(arg->type, buf, err);
+	} break;
+	}
+
 	if (!comp)
 		return -1;
 

@@ -26,6 +26,15 @@ PvBuffer *pv_buffer_alloc(gsize size)
 	return ret;
 }
 
+PvBuffer *pv_buffer_take(char *data, gsize size)
+{
+	PvBuffer *ret = g_new0(PvBuffer, 1);
+
+	ret->data = data;
+	ret->size = size;
+	return ret;
+}
+
 PvBuffer *pv_buffer_dup(const PvBuffer *buf, gboolean page_aligned)
 {
 	PvBuffer *ret;

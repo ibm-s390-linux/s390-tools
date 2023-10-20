@@ -21,6 +21,10 @@ typedef struct PvBuffer {
 } PvBuffer;
 
 PvBuffer *pv_buffer_alloc(gsize size);
+/* After this call @data belongs to the PvBuffer and must no longer be modified
+ * by the caller.
+ */
+PvBuffer *pv_buffer_take(char *data, gsize size);
 void pv_buffer_free(PvBuffer *buf);
 void pv_buffer_clear(PvBuffer **buf);
 gint pv_buffer_write(const PvBuffer *buf, FILE *file, GError **err);
