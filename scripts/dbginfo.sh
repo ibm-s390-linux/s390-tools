@@ -910,7 +910,8 @@ collect_osaoat() {
 	local network_device
 
 	network_devices=$(lsqeth 2>/dev/null | grep "Device name" \
-		     | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g')
+		     | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g' \
+		     | sed 's/[()]//g' )
 	if type qethqoat >/dev/null; then
 		if test -n "${network_devices}"; then
 			pr_collect_output "osa oat"
