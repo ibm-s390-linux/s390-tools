@@ -23,4 +23,6 @@ int util_lockfile_parent_lock(char *lockfile, int retries);
 int util_lockfile_release(char *lockfile);
 int util_lockfile_parent_release(char *lockfile);
 
+int util_lockfile_peek_owner(char *lockfile, int *pid);
+
 #endif /** LIB_UTIL_LOCKFILE_H @} */

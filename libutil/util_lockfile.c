@@ -299,3 +299,35 @@ int util_lockfile_parent_release(char *lockfile)
 {
 	return do_lockfile_release(lockfile, getppid());
 }
+
+/**
+ * Return the pid that owns the specified lockfile.
+ *
+ * @param[in]      lockfile   Path to the lock file
+ * @param[in,out]  pid        Buffer to place owning pid
+ *
+ * @retval         0          pid provided in buffer
+ * @retval         !=0        Error, no pid provided
+ */
+int util_lockfile_peek_owner(char *lockfile, int *pid)
+{
+	char buf[BUFSIZE];
+	int fd, len;
+
+	if (!lockfile || !pid)
+		return UTIL_LOCKFILE_ERR;
+
+	/* Open lockfile, read the owning pid if it exists */
+	fd = open(lockfile, O_RDONLY);
+	if (fd < 0)
+		return UTIL_LOCKFILE_ERR;
+
+	len = read(fd, buf, sizeof(buf));
+	close(fd);
+	if (len <= 0)
+		return UTIL_LOCKFILE_ERR;
+	buf[len] = 0;
+	*pid = atoi(buf);
+
+	return 0;
+}
