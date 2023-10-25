@@ -89,6 +89,7 @@ void ap_list_remove_all(struct util_list *list);
 /* Lock Functions */
 int ap_get_lock(void);
 int ap_get_lock_callout(void);
+int ap_try_lock_callout(void);
 int ap_release_lock(void);
 int ap_release_lock_callout(void);
 

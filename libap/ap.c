@@ -723,6 +723,34 @@ int ap_get_lock_callout(void)
 }
 
 /**
+ * Attempt to acquire the ap config lock using the Parent Process ID without
+ * waiting/retries.  Detect if the attempt was rejected because the lock is
+ * already held by the Parent Process ID.
+ *
+ * @retval         0          Lock acquired on behalf of parent process
+ * @retval         1          Lock not obtained, already held by parent
+ * @retval         != 0       Lock was not obtained, other error
+ */
+int ap_try_lock_callout(void)
+{
+	int pid, ppid, rc;
+
+	if (util_lockfile_parent_lock(AP_LOCKFILE, 0)) {
+		/* Lock is already held, let's peek at the owner */
+		ppid = getppid();
+		rc = util_lockfile_peek_owner(AP_LOCKFILE, &pid);
+		if (rc || pid != ppid) {
+			/* We didn't get the lock, unknown or other owner */
+			return 2;
+		}
+		/* Signify that the lock is already held by the caller */
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
  * Release the ap config lock
  *
  * @retval         0          Lock successfully released or file didn't exist

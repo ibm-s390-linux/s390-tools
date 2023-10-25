@@ -798,12 +798,34 @@ static int ap_check_handle_get_attributes(struct ap_check_anchor *anc)
 	FILE *f;
 	int rc;
 
-	rc = ap_get_lock_callout();
-	if (rc) {
-		fprintf(stderr, "Failed to acquire configuration lock %d\n", rc);
-		return -1;
+	/*
+	 * For the get-attributes callout, we are typically called without the
+	 * callout lock held.  However, there is a particular scenario (define
+	 * of an active mdev) where we may or may not be called with the lock
+	 * already held on behalf of mdevctl, depending on the mdevctl version.
+	 * Let's test for lock ownership first and, if already owned by the
+	 * parent (mdevctl) proceed rather than waiting on the file lock.
+	 */
+	rc = ap_try_lock_callout();
+	switch (rc) {
+	case 0:
+		/* Lock acquired */
+		anc->cleanup_lock = true;
+		break;
+	case 1:
+		/* Lock held by parent -- trust the lock will remain held */
+		break;
+	default:
+		/* Lock not acquired or held by parent -- do a normal obtain */
+		rc = ap_get_lock_callout();
+		if (rc) {
+			fprintf(stderr,
+				"Failed to acquire configuration lock %d\n",
+				rc);
+			return -1;
+		}
+		anc->cleanup_lock = true;
 	}
-	anc->cleanup_lock = true;
 
 	/*
 	 * Read the 'matrix' and 'control_domains' attributes to get the
