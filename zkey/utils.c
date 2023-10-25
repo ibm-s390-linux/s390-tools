@@ -49,7 +49,7 @@
  */
 int sysfs_is_card_online(unsigned int card, enum card_type cardtype)
 {
-	long int online;
+	long int online, config, chkstop;
 	char *dev_path;
 	char type[20];
 	int rc = 1;
@@ -64,6 +64,16 @@ int sysfs_is_card_online(unsigned int card, enum card_type cardtype)
 		goto out;
 	}
 	if (online == 0) {
+		rc = 0;
+		goto out;
+	}
+	if (util_file_read_l(&config, 10, "%s/config", dev_path) == 0 &&
+	    config == 0) {
+		rc = 0;
+		goto out;
+	}
+	if (util_file_read_l(&chkstop, 10, "%s/chkstop", dev_path) == 0 &&
+	    chkstop != 0) {
 		rc = 0;
 		goto out;
 	}
@@ -111,7 +121,7 @@ out:
 int sysfs_is_apqn_online(unsigned int card, unsigned int domain,
 			 enum card_type cardtype)
 {
-	long int online;
+	long int online, config, chkstop;
 	char *dev_path;
 	int rc = 1;
 
@@ -130,6 +140,16 @@ int sysfs_is_apqn_online(unsigned int card, unsigned int domain,
 		goto out;
 	}
 	if (online == 0) {
+		rc = 0;
+		goto out;
+	}
+	if (util_file_read_l(&config, 10, "%s/config", dev_path) == 0 &&
+	    config == 0) {
+		rc = 0;
+		goto out;
+	}
+	if (util_file_read_l(&chkstop, 10, "%s/chkstop", dev_path) == 0 &&
+	    chkstop != 0) {
 		rc = 0;
 		goto out;
 	}
