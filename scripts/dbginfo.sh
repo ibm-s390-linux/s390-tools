@@ -960,6 +960,8 @@ collect_ethtool() {
 					"${OUTPUT_FILE_ETHTOOL}"
 				call_run_command "ethtool -T ${network_device}" \
 					"${OUTPUT_FILE_ETHTOOL}"
+				call_run_command "ethtool --module-info ${network_device}" \
+					"${OUTPUT_FILE_ETHTOOL}"
 			done
 		else
 			pr_skip "ethtool: no devices"
