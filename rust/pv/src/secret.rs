@@ -34,8 +34,8 @@ impl Zeroize for Vec<u8> {
             // * Vec allocated at least capacity elements continuously
             // * dst points always to a valid location
             unsafe {
+                std::ptr::write_volatile(dst, 0);
                 dst = dst.add(1);
-                std::ptr::write_volatile(dst, 0)
             }
         }
         std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
