@@ -19,10 +19,10 @@ help:
 .br
      \fBfdasd\fR {-h|-v}
 .SH DESCRIPTION
-\fBfdasd\fR writes a partition table to a cdl (compatible disk layout) 
+\fBfdasd\fR writes a partition table to a cdl (compatible disk layout)
 formatted DASD, in the form of
 a VTOC (volume table of contents) for usage with Linux for S/390
-or zSeries. If fdasd detects a valid \fBVOL1\fR volume label, it 
+or zSeries. If fdasd detects a valid \fBVOL1\fR volume label, it
 will use it, otherwise it asks to write a new one.
 .br
 
@@ -34,25 +34,25 @@ will use it, otherwise it asks to write a new one.
 Print usage information, then exit.
 
 .TP
-\fB-v\fR or \fB--version\fR 
+\fB-v\fR or \fB--version\fR
 Print version information, then exit.
 
 .TP
-\fB-s\fR or \fB--silent\fR  
+\fB-s\fR or \fB--silent\fR
 Suppress messages in non-interactive mode.
 
 .TP
-\fB-r\fR or \fB--verbose\fR  
+\fB-r\fR or \fB--verbose\fR
 Provide more verbose output.
 
 .TP
-\fB-a\fR or \fB--auto\fR  
-Automatically create a partition using the entire disk in non-interactive 
+\fB-a\fR or \fB--auto\fR
+Automatically create a partition using the entire disk in non-interactive
 mode.
 
 .TP
 \fB-k\fR or \fB--keep_volser\fR
-Keeps the volume serial when writing the volume label. 
+Keeps the volume serial when writing the volume label.
 .br
 This is useful, if the volume serial has been written before and should not
 be overwritten. This option is only applicable in non-interactive mode.
@@ -61,24 +61,24 @@ be overwritten. This option is only applicable in non-interactive mode.
 \fB-l\fR \fIvolser\fR or \fB--label\fR \fIvolser\fR
 Specify the volume serial.
 .br
-\fIvolser\fR is interpreted as ASCII string and is automatically converted to 
+\fIvolser\fR is interpreted as ASCII string and is automatically converted to
 uppercase, padded with blanks and finally converted to EBCDIC to be written
 to disk. This option is only applicable in non-interactive mode.
 .br
 
-Do not use the following reserved volume serial: SCRTCH, PRIVAT, MIGRAT, 
-or Lnnnnn (L with five digit number); These are used as keywords by 
+Do not use the following reserved volume serial: SCRTCH, PRIVAT, MIGRAT,
+or Lnnnnn (L with five digit number); These are used as keywords by
 other operating systems (OS/390).
 .br
 
-A volume serial is 1 through 6 alphanumeric characters or one of the 
-following special characters: $, #, @, %. All other characters are simply 
-ignored. 
+A volume serial is 1 through 6 alphanumeric characters or one of the
+following special characters: $, #, @, %. All other characters are simply
+ignored.
 .br
-Try to avoid using special characters in the volume serial. 
-This may cause problems accessing a disk by volser. 
-In case you really have to use special characters, make sure you are using 
-quotes. In addition there is a special handling for the '$' sign. 
+Try to avoid using special characters in the volume serial.
+This may cause problems accessing a disk by volser.
+In case you really have to use special characters, make sure you are using
+quotes. In addition there is a special handling for the '$' sign.
 Please specify it using '\\$' if necessary.
 .br
 
@@ -124,14 +124,14 @@ partitions that use the entire disk:
 .br
 
 .TP
-\fB-i\fR or \fB--volser\fR 
+\fB-i\fR or \fB--volser\fR
 Print the volume serial, then exit.
 
 .TP
-\fB-p\fR or \fB--table\fR 
-Print partition table, then exit. 
+\fB-p\fR or \fB--table\fR
+Print partition table, then exit.
 .br
-In combination with the -s option fdasd will display a short version of the 
+In combination with the -s option fdasd will display a short version of the
 partition table.
 
 .TP
@@ -179,7 +179,7 @@ In case your are not using the device file system, please specify:
 .br
 
 where \fIx\fR is one or more lowercase letter(s) or any other device
-node specification configured by udev for kernel 2.6 or higher. 
+node specification configured by udev for kernel 2.6 or higher.
 
 .SH SEE ALSO
 .BR dasdfmt (8)
