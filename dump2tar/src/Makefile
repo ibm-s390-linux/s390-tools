@@ -1,7 +1,7 @@
 # Common definitions
 include ../../common.mak
 
-ALL_CPPFLAGS += -I../include -std=gnu99 -Wno-unused-parameter
+ALL_CPPFLAGS += -I../include -Wno-unused-parameter
 LDLIBS  += -lpthread -lrt
 ifneq ($(HAVE_ZLIB),0)
 ALL_CPPFLAGS += -DHAVE_ZLIB

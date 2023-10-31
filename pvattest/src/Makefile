@@ -35,8 +35,7 @@ LIBCRYPTO_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
 LIBCURL_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
 LIBCURL_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
 
-ALL_CFLAGS += -std=gnu11 \
-	      -DPKGDATADIR=$(PKGDATADIR) \
+ALL_CFLAGS += -DPKGDATADIR=$(PKGDATADIR) \
 	      -DOPENSSL_API_COMPAT=0x10101000L \
 	      $(GLIB2_CFLAGS) \
 	      $(LIBCRYPTO_CFLAGS) \

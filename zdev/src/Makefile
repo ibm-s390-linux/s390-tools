@@ -1,8 +1,7 @@
 # Common definitions
 include ../../common.mak
 
-ALL_CPPFLAGS += -I ../include -std=gnu99 -Wno-unused-parameter \
-	-Wno-missing-field-initializers
+ALL_CPPFLAGS += -I ../include -Wno-unused-parameter -Wno-missing-field-initializers
 
 # Adding ZDEV_ALWAYS_UPDATE_INITRD=1 option will update the initial RAM-disk
 # without the user interaction upon the modification of a persistent device

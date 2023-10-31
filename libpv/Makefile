@@ -21,8 +21,7 @@ WARNINGS := -Wall -Wextra -Wshadow \
 	    -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable \
 	    $(NULL)
 
-ALL_CFLAGS += -std=gnu11 \
-	      -DOPENSSL_API_COMPAT=0x10101000L \
+ALL_CFLAGS += -DOPENSSL_API_COMPAT=0x10101000L \
 	      $(GLIB2_CFLAGS) \
 	      $(LIBCRYPTO_CFLAGS) \
 	      $(LIBCURL_CFLAGS) \
