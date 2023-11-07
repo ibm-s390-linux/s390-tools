@@ -945,6 +945,11 @@ static struct util_opt opt_vec[] = {
 		.desc = "Report file contents"
 	},
 	{
+		.option = { "realtime", required_argument, NULL, 'R' },
+		.argument = "PRIO",
+		.desc = "Collect data with this RT SCHED_FIFO priority"
+	},
+	{
 		.option = { "interval", required_argument, NULL, 'i' },
 		.argument = "NUMBER",
 		.desc = "Specifies interval between read operations in milliseconds"
@@ -1007,6 +1012,19 @@ static unsigned long check_mapsize(unsigned long n)
 	return cnt == 1 ? n : 0;
 }
 
+static void setprio(const char *prio)
+{
+	struct sched_param param;
+	char *endstr;
+
+	memset(&param, 0, sizeof(param));
+	param.sched_priority = strtoul(prio, &endstr, 0);
+	if (*endstr)
+		errno = EINVAL;
+	if (*endstr || sched_setscheduler(0, SCHED_FIFO, &param))
+		err(EXIT_FAILURE, "Could not set realtime priority");
+}
+
 int main(int argc, char **argv)
 {
 	bool crypto_record = false, report = false;
@@ -1060,6 +1078,9 @@ int main(int argc, char **argv)
 		case 'n':
 			record_cpus_nnpa(optarg);
 			nnpa_record = true;
+			break;
+		case 'R':
+			setprio(optarg);
 			break;
 		case 'r':
 			report = true;

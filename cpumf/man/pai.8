@@ -18,6 +18,8 @@
 .IR size ]
 .RB [ \-i | \-\-interval
 .IR ms ]
+.RB [ \-R | \-\-realtime
+.IR prio ]
 .BR  \-c | \-\-crypto [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
 .br
 \*c
@@ -25,6 +27,8 @@
 .IR size ]
 .RB [ \-i | \-\-interval
 .IR ms ]
+.RB [ \-R | \-\-realtime
+.IR prio ]
 .BR  \-n | \-\-nnpa [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
 .br
 \*c
@@ -190,6 +194,14 @@ The default size is 512 pages.
 The ring buffer is created with the
 .IR mmap (2)
 system call.
+.
+.TP
+.BR \-R ", " \-\-realtime "\ prio"
+Collect data using the RT SCHED_FIFO priority specified by
+.BR prio .
+Valid values are integers in the range 1 (low) to 99 (high).
+Use this option when gathering data from multiple CPUs
+to prevent data loss.
 .
 .SH ARGUMENT
 The command line options determine how command line
