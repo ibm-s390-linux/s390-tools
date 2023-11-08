@@ -88,7 +88,7 @@ install() {
         done
     fi
 
-    _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
+    _tempfile=$(mktemp --tmpdir="${DRACUT_TMPDIR}" dracut-zdev.XXXXXX)
 
     # work with systems that are not based on chzdev persistent config
     local _configuration="--active"
