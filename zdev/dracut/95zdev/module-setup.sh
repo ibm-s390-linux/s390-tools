@@ -103,7 +103,7 @@ install() {
     # shellcheck disable=SC2154
     [[ $hostonly ]] || return 0
 
-    _tempfile=$(mktemp --tmpdir dracut-zdev.XXXXXX)
+    _tempfile=$(mktemp --tmpdir="${DRACUT_TMPDIR}" dracut-zdev.XXXXXX)
     function check_zdev() {
         local _dev=$1
         local _devsysfs _bdevpath
