@@ -311,13 +311,13 @@ int util_file_read_i(int *val, int base, const char *fmt, ...)
 		return -1;
 	switch (base) {
 	case 8:
-		count = sscanf(buf, "%do", val);
+		count = sscanf(buf, "%o", val);
 		break;
 	case 10:
-		count = sscanf(buf, "%dd", val);
+		count = sscanf(buf, "%d", val);
 		break;
 	case 16:
-		count = sscanf(buf, "%dx", val);
+		count = sscanf(buf, "%x", val);
 		break;
 	default:
 		util_panic("Invalid base: %d\n", base);
@@ -425,13 +425,13 @@ int util_file_read_ui(unsigned int *val, int base, const char *fmt, ...)
 		return -1;
 	switch (base) {
 	case 8:
-		count = sscanf(buf, "%uo", val);
+		count = sscanf(buf, "%o", val);
 		break;
 	case 10:
-		count = sscanf(buf, "%uu", val);
+		count = sscanf(buf, "%u", val);
 		break;
 	case 16:
-		count = sscanf(buf, "%ux", val);
+		count = sscanf(buf, "%x", val);
 		break;
 	default:
 		util_panic("Invalid base: %d\n", base);
