@@ -9,7 +9,7 @@ include common.mak
 ifeq ($(HOST_ARCH),s390x)
 BASELIB_DIRS = libutil libseckey
 LIB_DIRS = libvtoc libzds libdasd libccw libvmcp libekmfweb \
-	   libkmipclient libcpumf libap libpv
+	   libkmipclient libcpumf libap libpv libzpci
 TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   tape390 osasnmpd qetharp ip_watcher qethconf scripts zconf \
 	   vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \

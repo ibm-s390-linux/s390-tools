@@ -504,6 +504,10 @@ $(rootdir)/libpv/libpv.a: $(rootdir)/libpv
 	$(MAKE) -C $(rootdir)/libpv libpv.a
 .PHONY: $(rootdir)/libpv
 
+$(rootdir)/libzpci/libzpci.a: $(rootdir)/libzpci
+	$(MAKE) -C $(rootdir)/libzpci libzpci.a
+.PHONY: $(rootdir)/libzpci
+
 $(rootdir)/zipl/boot/.loaders:
 	$(MAKE) -C $(rootdir)/zipl/boot/ .loaders
 
