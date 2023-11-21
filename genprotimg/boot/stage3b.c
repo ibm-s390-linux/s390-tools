@@ -61,13 +61,17 @@ void __noreturn start(void)
 	if (cmdline->size > get_kernel_cmdline_size())
 		panic(EINTERNAL, "Command line is too large\n");
 
-	/* move the kernel cmdline */
-	memmove((void *)COMMAND_LINE,
-		(void *)cmdline->src,
-		cmdline->size);
+	if (cmdline->size > 0) {
+		/* make sure the cmdline is a null-terminated string */
+		if (((char *)cmdline->src)[cmdline->size - 1] != '\0')
+			panic(EINTERNAL, "Command line needs to be null-terminated\n");
+
+		/* move the kernel cmdline */
+		memmove((void *)COMMAND_LINE, (void *)cmdline->src, cmdline->size);
+	}
 	/* the initrd does not need to be moved */
 
-	if (initrd->size != 0) {
+	if (initrd->size > 0) {
 		/* copy initrd start address and size into new kernel space */
 		*(unsigned long long *)INITRD_START = initrd->src;
 		*(unsigned long long *)INITRD_SIZE = initrd->size;
