@@ -5,8 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-foreign-types = "0.3"
-libc = {version = "0.2", features = [ "extra_traits"] }
-log = { version = "0.4", features = ["std", "release_max_level_debug"] }
-openssl = "0.10"
-openssl-sys = "0.9"
+foreign-types = "0.3.1"
+libc = {version = "0.2.49", features = [ "extra_traits"] }
+log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
+openssl = "0.10.49"
+openssl-sys = "0.9.85"
