@@ -27,6 +27,7 @@ check() {
 
     # Ensure that required tools are available
     require_binaries chzdev lszdev || return 1
+    require_binaries sed || return 1
     require_binaries grep sort uniq || return 1
 
     return 0
