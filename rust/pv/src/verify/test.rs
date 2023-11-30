@@ -14,7 +14,9 @@ use crate::test_utils::*;
 pub fn mock_endpt(res: &str) -> mockito::Mock {
     let res_path = get_cert_asset_path(res);
 
-    mockito::mock("GET", format!("/crl/{res}").as_str())
+    let mut server = mockito::Server::new();
+    server
+        .mock("GET", format!("/crl/{res}").as_str())
         .with_header("content-type", "application/pkix-crl")
         .with_body_from_file(res_path)
         .create()
