@@ -1,0 +1,174 @@
+.\" pvapconfig.1
+.\"
+.\" Copyright 2023 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" use
+.\"   groff -man -Tutf8 pvapconfig.1
+.\" or
+.\"   nroff -man pvapconfig.1
+.\" to process this source
+.\"
+.TH PVAPCONFIG 1 "DEC 2023" "s390-tools"
+.SH NAME
+pvapconfig \- automatic configure APQNs within an SE KVM guest.
+.SH SYNOPSIS
+.TP 9
+.B pvapconfig [OPTIONS]
+.SH DESCRIPTION
+pvapconfig is a tool for automatically configuring the APQNs within an
+Secure Execution KVM guest with AP pass-through support. Based on a
+given AP configuration it tries to find matching APQNs and binds and
+associates them with the given secret(s).
+
+Here is a description of pvapconfig's process:
+.TP 3
+1. Check AP bus: Support for AP bus needs to be available and the AP
+bus needs to support APSB. APSB is only available within an KVM SE
+guest with AP pass-through support.
+.TP 3
+2. Check Ultravisor: UV support needs to be available and the UV needs
+to support the
+.I list secrets
+feature.
+.TP 3
+3. Read in and validate the AP configuration file. By default if not
+overwritten by the --config option the AP configuration is read from
+.I /etc/pvapconfig.yaml
+and syntactically verified. See section CONFIGFILE for details about
+the syntax and semantic of the configuration file.
+.TP 3
+4. Fetch the list of association secrets from the UV. Actually the
+index of the secret and the secret id for each entry is collected. The
+secret value is NOT fetched as it is NOT accessible but only usable
+within the UV firmware.
+.TP 3
+5. Gather all APQNs available within this KVM SE guest. Collect
+information about each APQN like online states, crypto card serial
+numbers and master key verification patterns (MKVP).
+.TP 3
+6. Go through all AP config entries. For each AP config entry try to
+find an APQN which is already configured (bound/associated) to
+satisfy this config entry. If such a match is found, the AP config
+entry is assumed to be fulfilled and marked as done.
+.TP 3
+7. All remaining APQNs which do not already satisfy an AP config entry
+are now examined for their bind and association state and maybe reset
+to unbound state.
+.TP 3
+8. Go through all AP config entries which are still not
+fulfilled. For each such AP config entry try to search for an APQN
+which would match to this entry and then prepare this APQN (bind,
+maybe associate). If successful, mark the AP config entry as done.
+.TP 3
+9. Evaluation of the applied AP config entries. Applied means the AP
+config entry has been fulfilled either in step 6 or in step 8. With
+the strict option given ALL AP config entries need to apply otherwise
+an error message is printed and pvapconfig returns with exit failure.
+If the strict option is not given, it is enough to satisfy at least one
+AP config entry from the configuration and pvapconfig will return
+successfully.
+.SH OPTIONS
+.TP 8
+.B -c, --config <configfile>
+Use <configfile> as the AP config file for pvapconfig. If pvapconfig
+is run without this option the default configuration file
+/etc/pvapconfig.yaml is used.
+.TP 8
+.B -h, --help
+Print pvapconfig usage information and exit.
+.TP 8
+.B -n, --dry-run
+Do not bind, unbind or associate APQNs but only process the
+configuration and the available APQNs and secrets and simulate the
+bind, unbind or associate action on the chosen APQN. Use it together
+with the verbose option to see which actions pvapconfig would do if
+unleashed.
+.TP 8
+.B -s, --strict
+All AP config entries need to be satisfied to have pvapconfig
+terminate with success. Without this option one applied AP config
+entry is enough to meet the expectations.
+.TP 8
+.B -v, --verbose
+Print out informational messages about what pvapconfig is actually
+doing.
+.TP 8
+.B -V, --version
+Print version information and exit.
+.SH CONFIGFILE
+The pvapconfig yaml configuration file consists of a list of AP config
+entries. Each entry may hold this information:
+.TP 2
+- mode: AP queue mode information, required, either "EP11" or "Accel".
+.TP 2
+- mkvp: AP queue Master Key Verification Pattern (MKVP), required for
+EP11, hex string optional prepented with 0x. The MKVP hex string value
+may hold either 16 bytes (32 hex characters) or 32 bytes (64 hex
+characters) but only the leftmost 16 bytes hold MKVP information and
+thus the rest is ignored.
+.TP 2
+- serialnr: Crypto Card Serial Number, string, optional for EP11,
+ignored for Accel. As this is a real ASCII string uppercase and
+lowercase character(s) count different.
+.TP 2
+- mingen: Card Minimal Generation, string "CEX4", "CEX5", "CEX6",
+"CEX7" or "CEX8" for Accelerator, string "CEC8" for EP11, optional. If
+given specifies the minimal accepted Crypto card generation.
+.TP 2
+- secretid: Secret id, hex string with optional 0x prepented, required
+for EP11, ignored for Accel. Details see the following text.
+.TP 2
+- name: ASCII string, optional, but see details below.
+.TP 2
+- description: Description of this AP config entry, string, ignored,
+  just for convenience for the reader or editor of the configuration.
+.PP
+The secret id uniquely identifies an association secret. However, it
+is a clumsy hex string of 64 characters which represent the readable
+sha256 value over the secret's name. So pvapconfig can use the name
+instead and calculate the secret id from the name. So the rule is:
+.TP 2
+- If name and secretid is given, the secretid needs to match to the
+sha256 hash over the given name for this AP config entry.
+.TP 2
+- If only name is given then the secretid is calculated with a sha256
+  hash over the given name.
+.TP 2
+- If only the secretid is given, there is nothing more to do but
+verify that the value is a hex string with 64 characters.
+.SH LOCKING
+Pvapconfig needs to have a consistent view of the AP resources
+during lifetime. There must not run multiple instances of pvapconfig
+or any manipulations of the AP resources in parallel. To prevent the
+execution of multiple pvapconfig instances the lock file
+/run/lock/pvapconfig.lock is established. A second instance of
+pvapconfig will detect this lock file and terminated with an error
+message. If for any reason this file still exists as a leftover from a
+previous pvapconfig crash for example, it needs to get removed by
+hand. The lock file contains the process id of the pvapconfig process
+which created this file.
+.SH RETURN VALUE
+.TP 8
+.B 0 - Successful termination.
+At least one AP config entry has been applied or at least one APQN has
+been found in a state matching to one AP config entry. If strict
+option is given, ALL AP config entries have been applied. An AP config
+entry is applied either by configuring the APQN accordingly or an APQN
+has been found which already fulfills the constrains.
+.RE
+.TP 8
+.B 1 - Failure.
+Either some kind of failure happened during processing the
+configuration or the configuration could not get applied
+successful. In all cases pvapconfig prints out a message to standard
+error with details about the failure. Also pvapconfig does NOT reset
+the APQNs to the state found at the startup when failing to apply the
+configuration.
+.SH NOTES
+For more information and details see the IBM documentation about
+Confidential Computing "Introducing IBM Secure Execution for Linux"
+available at https://www.ibm.com/docs/.
+.SH SEE ALSO
+\fBpvsecret\fR(1), \fBlszcrypt\fR(8), \fBchzcrypt\fR(8)

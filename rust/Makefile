@@ -19,7 +19,7 @@ ifneq (${HAVE_CARGO},0)
 
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
-	PV_TARGETS := pvsecret
+	PV_TARGETS := pvsecret pvapconfig
 
 	PV_BUILD_TARGETS := $(PV_TARGETS)
 	CARGO_TEST_TARGETS += $(addsuffix .test,pv $(PV_TARGETS))
