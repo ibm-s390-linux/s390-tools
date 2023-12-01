@@ -1,15 +1,32 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.30.0 (2023-12-01)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.6
 
   Add new tools / libraries:
+  - lspai: Tool to display PAI counter sets
+  - s390-tools: Provide a ShellCheck configuration
 
-  Changes of existing tools:
+  Changes of existing tools / libraries:
+  - cpumf/pai: Add command line option for realtime scheduling
+  - dbginfo.sh: enhance ethtool collection for ROCE
+  - libutil/util_lockfile: add routine to return owning pid of file lock
+  - lszcrypt: Improve lszcrypt output on SE guests
+  - rust: Use a single workspace for all rust tools
+  - zdev: limit the derivation of ZDEV_SITE_ID
+  - zdump/df_s390: Update 'zgetdump -i' output with zlib info
+  - zdump/dfi_s390: Support reading compressed s390_ext dumps
+  - zipl/boot: Integrate zlib compression to single volume DASD dumper
+  - zipl/boot: compile the bootloaders only if HOST_ARCH is s390x
+  - zipl: Add --no-compress option to zipl command
+  - zkey: Also check for deconfigured and check-stopped cards
 
   Bug Fixes:
+  - ap_tools/ap-check: handle get-attributes between pre and post event
+  - libutil: fix util_file_read_*() using wrong format specifiers
+  - rust/pv: fix Invalid write of size 1
 
 * __v2.29.0 (2023-08-04)__
 

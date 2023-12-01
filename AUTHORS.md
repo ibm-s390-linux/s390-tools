@@ -27,6 +27,7 @@ List of all individuals having contributed content to s390-tools
 - Eberhard Pasch
 - Eduard Shishkin
 - Einar Lueck
+- Eric Farman
 - Eric Sandeen
 - Erwin Vicari
 - Eugene Crosser
@@ -56,6 +57,7 @@ List of all individuals having contributed content to s390-tools
 - Horst Hummel
 - Ingo Franzki
 - Ingo Tuchscherer
+- Jakub Čajka
 - Jan Glauber
 - Jan Höppner
 - Jan Willeke
@@ -124,6 +126,7 @@ List of all individuals having contributed content to s390-tools
 - Thomas Richter
 - Thomas Spatzier
 - Thomas Weber
+- Thorsten Winkler
 - Tuan Hoang
 - Ursula Braun
 - Utz Bacher
