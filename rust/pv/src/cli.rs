@@ -2,13 +2,12 @@
 //
 // Copyright IBM Corp. 2023
 
+use crate::misc::{create_file, open_file};
 use crate::Result;
 use clap::{ArgGroup, Args, ValueHint};
 use std::io::{Read, Write};
 
 /// CLI Argument collection for handling certificates.
-///
-#[doc = requires_feat!(request)]
 #[derive(Args, Debug, PartialEq, Eq, Default)]
 #[command(
     group(ArgGroup::new("pv_verify").required(true).args(["no_verify", "certs"])),
@@ -103,37 +102,25 @@ impl CertificateOptions {
 }
 
 /// stdout
-#[cfg(feature = "request")]
 pub const STDOUT: &str = "-";
 /// stdin
-#[cfg(feature = "request")]
 pub const STDIN: &str = "-";
 
 /// Converts an argument value into a Writer.
-///
-/// # Errors
-/// No Error will occur but function must match a signature
-///
-#[cfg(feature = "request")]
 pub fn get_writer_from_cli_file_arg(path: &str) -> Result<Box<dyn Write>> {
     if path == STDOUT {
         Ok(Box::new(std::io::stdout()))
     } else {
-        Ok(Box::new(crate::misc::create_file(path)?))
+        Ok(Box::new(create_file(path)?))
     }
 }
 
 /// Converts an argument value into a Reader.
-///
-/// # Errors
-/// No Error will occur but function must match a signature
-///
-#[cfg(feature = "request")]
 pub fn get_reader_from_cli_file_arg(path: &str) -> Result<Box<dyn Read>> {
     if path == STDIN {
         Ok(Box::new(std::io::stdin()))
     } else {
-        Ok(Box::new(crate::misc::open_file(path)?))
+        Ok(Box::new(open_file(path)?))
     }
 }
 

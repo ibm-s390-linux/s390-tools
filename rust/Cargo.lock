@@ -774,10 +774,9 @@ dependencies = [
 
 [[package]]
 name = "pv"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "byteorder",
- "cfg-if",
  "clap",
  "curl",
  "lazy_static",
@@ -786,9 +785,27 @@ dependencies = [
  "mockito",
  "openssl",
  "openssl_extensions",
+ "pv_core",
  "serde",
  "serde_test",
  "thiserror",
+ "utils",
+ "zerocopy",
+]
+
+[[package]]
+name = "pv_core"
+version = "0.9.1"
+dependencies = [
+ "byteorder",
+ "lazy_static",
+ "libc",
+ "log",
+ "mockito",
+ "serde",
+ "serde_test",
+ "thiserror",
+ "utils",
  "zerocopy",
 ]
 

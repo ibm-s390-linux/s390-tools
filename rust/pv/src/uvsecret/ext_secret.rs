@@ -2,11 +2,9 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::{request::Secret, requires_feat};
+use crate::request::Secret;
 
 /// Extension Secret for [`crate::request::uvsecret::AddSecretRequest`]
-///
-#[doc = requires_feat!(reqsecret)]
 #[derive(Debug, Clone)]
 pub enum ExtSecret {
     /// A bytepattern that must be equal for each request targeting the same SE-guest instance

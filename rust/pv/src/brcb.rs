@@ -8,10 +8,9 @@ use std::{
 };
 
 // (SE) boot request control block aka SE header
-use crate::{
-    assert_size, request::MagicValue, requires_feat, static_assert, Error, Result, PAGESIZE,
-};
+use crate::{assert_size, static_assert, Error, Result, PAGESIZE};
 use log::debug;
+use pv_core::request::MagicValue;
 use zerocopy::{AsBytes, BigEndian, FromBytes, U32, U64};
 
 /// Struct containing all SE-header tags.
@@ -22,7 +21,6 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, U32, U64};
 /// Tweak List Digest (tld)
 /// SE Header Tag (seht)
 ///
-#[doc = requires_feat!(request)]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes, PartialEq, Eq)]
 pub struct BootHdrTags {

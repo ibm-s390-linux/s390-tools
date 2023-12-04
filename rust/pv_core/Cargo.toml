@@ -1,0 +1,21 @@
+[package]
+name = "pv_core"
+version = "0.9.1"
+edition.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = "0.2.49"
+log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
+thiserror = "1.0.33"
+utils = {path = "../utils"}
+zerocopy = "0.6"
+serde = { version = "1.0.139", features = ["derive"]}
+byteorder = "1.3"
+
+[dev-dependencies]
+serde_test = "1"
+mockito = {version = "1", default-features = false }
+lazy_static = "1.1"

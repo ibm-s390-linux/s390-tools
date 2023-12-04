@@ -10,5 +10,5 @@ clap = { version ="4", features = ["derive", "wrap_help"]}
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 serde_yaml = "0.9"
 
-pv = { path = "../pv", features = ["uvsecret", "request"] }
+pv = { path = "../pv" }
 utils = { path = "../utils" }

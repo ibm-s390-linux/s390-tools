@@ -1,32 +1,25 @@
 [package]
 name = "pv"
-version = "0.9.0"
+version = "0.9.1"
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+byteorder = "1.3"
+clap = { version ="4", features = ["derive", "wrap_help"] }
+curl = "0.4.7"
 libc = "0.2.49"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
+openssl = "0.10.49"
+serde = { version = "1.0.139", features = ["derive"]  }
 thiserror = "1.0.33"
+utils = {path = "../utils"}
 zerocopy = "0.6"
-cfg-if = "1.0.0"
 
-# dependencies for request feature
-clap = { version ="4", features = ["derive", "wrap_help"], optional = true }
-curl = { version ="0.4.7", optional = true }
-openssl = {version = "0.10.49", optional = true }
-openssl_extensions = { path = "openssl_extensions", optional = true }
-serde = { version = "1.0.139", features = ["derive"], optional = true  }
-
-# misc optional dependencies
-byteorder = {version = "1.3", optional = true }
+openssl_extensions = { path = "openssl_extensions" }
+pv_core = { path = "../pv_core" }
 
 [dev-dependencies]
 mockito = {version = "1", default-features = false }
 serde_test = "1"
 lazy_static = "1.1"
-
-[features]
-default = []
-request = ["dep:openssl", "dep:curl", "dep:openssl_extensions", "dep:serde", "dep:clap"]
-uvsecret = ["dep:byteorder", "dep:serde"]

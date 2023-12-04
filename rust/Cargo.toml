@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	"pv",
+	"pv_core",
 	"pvapconfig",
 	"pvsecret",
 	"utils",

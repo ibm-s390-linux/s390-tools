@@ -2,7 +2,13 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::{assert_size, misc::to_u16, uv::ListCmd, uvdevice::UvCmd, Error, Result};
+use crate::{
+    assert_size,
+    misc::to_u16,
+    request::{uvsecret::AddSecretMagic, MagicValue},
+    uv::{uv_ioctl, UvCmd, UvDevice},
+    Error, Result, PAGESIZE,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Serialize, Serializer};
 use std::{
@@ -13,11 +19,119 @@ use std::{
 };
 use zerocopy::{AsBytes, FromBytes, U16, U32};
 
-use super::ser_gsid;
-
-/// List of secrets used to parse the [`crate::uv::ListCmd`] result
+/// _List Secrets_ Ultravisor command.
 ///
-/// Requires the `uvsecret` feature.
+/// The List Secrets Ultravisor call is used to list the
+/// secrets that are in the secret store for the current SE-guest.
+pub struct ListCmd(Vec<u8>);
+impl ListCmd {
+    fn with_size(size: usize) -> Self {
+        Self(vec![0; size])
+    }
+
+    /// Create a new list secrets command with a one page capacity
+    pub fn new() -> Self {
+        Self::with_size(PAGESIZE)
+    }
+}
+
+impl Default for ListCmd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UvCmd for ListCmd {
+    fn data(&mut self) -> Option<&mut [u8]> {
+        Some(self.0.as_mut_slice())
+    }
+
+    fn cmd(&self) -> u64 {
+        uv_ioctl(UvDevice::LIST_SECRET_NR)
+    }
+
+    fn rc_fmt(&self, _rc: u16, _rrc: u16) -> Option<&'static str> {
+        None
+    }
+}
+
+/// _Add Secret_ Ultravisor command.
+///
+/// The Add Secret Ultravisor-call is used to add a secret
+/// to the secret store for the current SE-guest.
+pub struct AddCmd(Vec<u8>);
+
+impl AddCmd {
+    /// Create a new Add Secret command using the provided data.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided data does not start with the
+    /// ['crate::AddSecretRequest'] magic Value.
+    pub fn new<R: Read>(bin_add_secret_req: &mut R) -> Result<Self> {
+        let mut data = Vec::with_capacity(PAGESIZE);
+        bin_add_secret_req.read_to_end(&mut data)?;
+
+        if !AddSecretMagic::starts_with_magic(&data[..6]) {
+            return Err(Error::NoAsrcb);
+        }
+        Ok(Self(data))
+    }
+}
+
+impl UvCmd for AddCmd {
+    fn data(&mut self) -> Option<&mut [u8]> {
+        Some(&mut self.0)
+    }
+
+    fn cmd(&self) -> u64 {
+        uv_ioctl(UvDevice::ADD_SECRET_NR)
+    }
+
+    fn rc_fmt(&self, rc: u16, _rrc: u16) -> Option<&'static str> {
+        match rc {
+            0x0101 => Some("not allowed to modify the secret store"),
+            0x0102 => Some("secret store locked"),
+            0x0103 => Some("access exception when accessing request control block"),
+            0x0104 => Some("unsupported add secret version"),
+            0x0105 => Some("invalid request size"),
+            0x0106 => Some("invalid number of host-keys"),
+            0x0107 => Some("unsupported flags specified"),
+            0x0108 => Some("unable to decrypt the request"),
+            0x0109 => Some("unsupported secret provided"),
+            0x010a => Some("invalid length for the specified secret"),
+            0x010b => Some("secret store full"),
+            0x010c => Some("unable to add secret"),
+            0x010d => Some("dump in progress, try again later"),
+            _ => None,
+        }
+    }
+}
+
+/// _Lock Secret Store_ Ultravisor command.
+///
+/// The Lock Secret Store Ultravisor-call is used to block
+/// all changes to the secret store. Upon successful
+/// completion of a Lock Secret Store Ultravisor-call, any
+/// request to modify the secret store will fail.
+pub struct LockCmd;
+impl UvCmd for LockCmd {
+    fn cmd(&self) -> u64 {
+        uv_ioctl(UvDevice::LOCK_SECRET_NR)
+    }
+
+    fn rc_fmt(&self, rc: u16, _rrc: u16) -> Option<&'static str> {
+        match rc {
+            0x0101 => Some("not allowed to modify the secret store"),
+            0x0102 => Some("secret store already locked"),
+            _ => None,
+        }
+    }
+}
+
+/// List of secrets used to parse the [`crate::uv::ListCmd`] result.
+///
+/// The list should not hold more than 0xffffffff elements
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct SecretList {
     total_num_secrets: usize,
@@ -51,8 +165,10 @@ impl FromIterator<SecretEntry> for SecretList {
 }
 
 impl SecretList {
-    #[doc(hidden)]
-    /// For testing purposes.
+    /// Creates a new SecretList.
+    ///
+    /// The content of this list will very liekly not represent the status of the guest in the
+    /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
     pub fn new(total_num_secrets: u16, secrets: Vec<SecretEntry>) -> Self {
         Self {
             total_num_secrets: total_num_secrets as usize,
@@ -72,12 +188,12 @@ impl SecretList {
         self.secrets.len()
     }
 
-    /// Check for is_empty of this [`SecretList`].
+    /// Returns `true` if the [`SecretList`] contains no [`SecretEntry`].
     pub fn is_empty(&self) -> bool {
         self.secrets.is_empty()
     }
 
-    /// Reports the number of secrets stored in UV
+    /// Reports the number of secrets stored in UV.
     ///
     /// This number may be not equal to the provided number of [`SecretEntry`]
     pub fn total_num_secrets(&self) -> usize {
@@ -199,6 +315,20 @@ impl From<ListableSecretType> for U16<BigEndian> {
     }
 }
 
+#[doc(hidden)]
+pub const SECRET_ID_SIZE: usize = 32;
+
+#[doc(hidden)]
+pub fn ser_gsid<S>(id: &[u8; SECRET_ID_SIZE], ser: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut s = String::with_capacity(32 * 2 + 2);
+    s.push_str("0x");
+    let s = id.iter().fold(s, |acc, e| acc + &format!("{e:02x}"));
+    ser.serialize_str(&s)
+}
+
 /// A secret in a [`SecretList`]
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Serialize)]
@@ -212,15 +342,17 @@ pub struct SecretEntry {
     #[serde(skip)]
     res_8: u64,
     #[serde(serialize_with = "ser_gsid")]
-    id: [u8; 32],
+    id: [u8; SECRET_ID_SIZE],
 }
 assert_size!(SecretEntry, SecretEntry::STRUCT_SIZE);
 
 impl SecretEntry {
     const STRUCT_SIZE: usize = 0x30;
 
-    #[doc(hidden)]
-    /// For testing purposes.
+    /// Create a new entry for a [`SecretList`].
+    ///
+    /// The content of this entry will very liekly not represent the status of the guest in the
+    /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
     pub fn new(index: u16, stype: ListableSecretType, id: [u8; 32], secret_len: u32) -> Self {
         Self {
             index: index.into(),
@@ -261,6 +393,7 @@ impl Display for SecretEntry {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use std::io::{BufReader, BufWriter, Cursor};
 

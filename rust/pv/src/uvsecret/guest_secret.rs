@@ -4,18 +4,16 @@
 
 #[allow(unused_imports)] //used for more convenient docstring
 use super::asrcb::AddSecretRequest;
-use super::{ser_gsid, SECRET_ID_SIZE};
 use crate::{
     request::{hash, openssl::MessageDigest, random_array, Secret},
-    requires_feat, Result,
+    Result,
 };
+use pv_core::for_pv::{ser_gsid, SECRET_ID_SIZE};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
 const SECRET_SIZE: usize = 32;
 /// A Secret to be added in [`AddSecretRequest`]
-///
-#[doc = requires_feat!(reqsecret)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GuestSecret {
     /// No guest secret

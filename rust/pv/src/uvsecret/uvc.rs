@@ -2,13 +2,12 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::AddSecretMagic;
 use crate::{
-    request::MagicValue,
     requires_feat,
     uv::{uv_ioctl, UvCmd, UvDevice},
     Error, Result, PAGESIZE,
 };
+use pv_core::request::{uvsecret::AddSecretMagic, MagicValue};
 use std::io::Read;
 use std::usize;
 

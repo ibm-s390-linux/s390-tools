@@ -2,8 +2,6 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::{AddSecretMagic, UserDataType};
-use crate::requires_feat;
 use crate::{
     assert_size,
     misc::Flags,
@@ -14,10 +12,14 @@ use crate::{
             Md,
         },
         uvsecret::{ExtSecret, GuestSecret},
-        Aad, BootHdrTags, Keyslot, ReqEncrCtx, Request, RequestVersion, Secret,
+        Aad, BootHdrTags, Keyslot, ReqEncrCtx, Request, Secret,
     },
     uv::{ConfigUid, UvFlags},
     Result,
+};
+use pv_core::request::{
+    uvsecret::{AddSecretMagic, UserDataType},
+    RequestVersion,
 };
 use zerocopy::AsBytes;
 
@@ -96,8 +98,6 @@ impl ReqConfData {
 }
 
 /// Flags for [`AddSecretRequest`]
-///
-#[doc = requires_feat!(reqsecret)]
 #[derive(Default, Clone, Copy, Debug)]
 pub struct AddSecretFlags(UvFlags);
 impl AddSecretFlags {
@@ -123,8 +123,6 @@ impl From<AddSecretFlags> for UvFlags {
 }
 
 /// Versions for [`AddSecretRequest`]
-///
-#[doc = requires_feat!(reqsecret)]
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddSecretVersion {
@@ -140,12 +138,6 @@ pub enum AddSecretVersion {
 impl From<AddSecretVersion> for RequestVersion {
     fn from(val: AddSecretVersion) -> Self {
         val as RequestVersion
-    }
-}
-
-impl AddSecretMagic {
-    fn get(&self) -> crate::request::RequestMagic {
-        self.as_bytes().try_into().unwrap()
     }
 }
 
@@ -173,8 +165,6 @@ impl AddSecretMagic {
 /// |                   AES GCM Tag (16)                          |
 /// |_____________________________________________________________|
 ///```
-///
-#[doc = requires_feat!(reqsecret)]
 #[derive(Clone, Debug)]
 pub struct AddSecretRequest {
     magic: AddSecretMagic,
@@ -249,7 +239,11 @@ impl AddSecretRequest {
         self.keyslots.iter().for_each(|k| aad.push(Aad::Ks(k)));
         aad.push(Aad::Plain(&secr_auth));
 
-        ctx.build_aad(self.version.into(), &aad, conf_len, self.magic.get())
+        ctx.build_aad(self.version.into(), &aad, conf_len, self.magic())
+    }
+
+    fn magic(&self) -> crate::request::RequestMagic {
+        self.magic.as_bytes().try_into().unwrap()
     }
 
     #[doc(hidden)]

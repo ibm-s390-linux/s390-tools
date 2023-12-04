@@ -4,8 +4,7 @@
 
 use crate::misc::to_u32;
 use crate::request::{
-    derive_key, encrypt_aes, encrypt_aes_gcm, gen_ec_key, random_array, RequestMagic,
-    RequestVersion, SymKey, SymKeyType,
+    derive_key, encrypt_aes, encrypt_aes_gcm, gen_ec_key, random_array, SymKey, SymKeyType,
 };
 use crate::{Error, Result};
 use openssl::bn::{BigNum, BigNumContext};
@@ -13,6 +12,7 @@ use openssl::ec::{EcGroupRef, EcPointRef};
 use openssl::error::ErrorStack;
 use openssl::hash::{hash, MessageDigest};
 use openssl::pkey::{PKey, PKeyRef, Private, Public};
+use pv_core::request::{RequestMagic, RequestVersion};
 use std::convert::TryInto;
 use zerocopy::{AsBytes, BigEndian, FromBytes, U32};
 
@@ -215,10 +215,11 @@ impl ReqEncrCtx {
             }
         }
 
-        let rql = to_u32(auth_data.len() + encr_size + 16)
-            .ok_or_else(|| Error::Specification("Configured request size to large".to_string()))?;
+        let rql = to_u32(auth_data.len() + encr_size + 16).ok_or_else(|| {
+            pv_core::Error::Specification("Configured request size to large".to_string())
+        })?;
         let sea = to_u32(encr_size)
-            .ok_or_else(|| Error::Specification("Encrypted size to large".to_string()))?;
+            .ok_or_else(|| pv_core::Error::Specification("Encrypted size to large".to_string()))?;
 
         let req_hdr = RequestHdr::new(version, rql, self.iv, nks, sea, magic);
         // copy request header to the start of the request

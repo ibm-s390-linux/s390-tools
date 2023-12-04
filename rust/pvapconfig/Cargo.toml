@@ -11,7 +11,7 @@ clap = { version ="4.1", features = ["derive", "wrap_help"]}
 lazy_static = "1.1"
 openssl = { version = "0.10" }
 openssl-sys = { version = "0.9" }
-pv = { path = "../pv", features = ["uvsecret", "request"] }
+pv = { path = "../pv" }
 rand = "0.8"
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }

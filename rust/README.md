@@ -25,16 +25,18 @@ Tip: You can use `make version` to get the version string.
 
 ## Internal Libraries
 * __utils__ _Library for rust tools that bundles common stuff for the 390-tools_
-	* currently only provides a macro to get the `S390_TOOLS_RELEASE` string
+	* provides a macro to get the `S390_TOOLS_RELEASE` string
+	* provides macros for compile time assertions
+
+* __pv_core__ _Library for pv tools, providing uvdevice access and utilities to send, receive and interpret various UV-calls._
 
 * __pv__ _Library for pv tools, providing uvdevice access, encryption utilities, and utilities for generating UV-request_
-	* requires openssl and libcurl for the feature `request`; use `HAVE_<OPENSSL|CURL>=0` to
-	  disable build that use pv with the request feature.
-
+	* requires openssl and libcurl
+	* reexports ann symbols from __pv_core__
+	* if no encryption utilities required, use __pv_core__
 
 ## Tools
 * __pvsecret__ _Manage secrets for IBM Secure Execution guests_
-	* requires pv with the `request` feature
 
 ## Writing new tools
 We encourage to use Rust for new tools. However, for some use cases it makes

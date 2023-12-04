@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
-
-#![cfg(all(feature = "request", feature = "uvsecret"))]
 use pv::{
     get_test_asset,
     request::{

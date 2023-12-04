@@ -7,9 +7,11 @@ use crate::FileAccessErrorType;
 use crate::{Error, Result};
 use libc::c_ulong;
 use log::debug;
-use std::convert::TryInto;
-use std::fs::File;
-use std::os::unix::prelude::{AsRawFd, RawFd};
+use std::{
+    convert::TryInto,
+    fs::File,
+    os::unix::prelude::{AsRawFd, RawFd},
+};
 
 #[cfg(not(test))]
 use ::libc::ioctl;
@@ -22,6 +24,7 @@ mod ffi;
 mod info;
 mod test;
 pub use ffi::uv_ioctl;
+pub mod secret;
 
 pub use info::UvDeviceInfo;
 #[allow(dead_code)] //TODO rm when pv learns attestation
