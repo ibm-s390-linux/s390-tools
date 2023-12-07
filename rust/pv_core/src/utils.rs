@@ -335,20 +335,6 @@ usize_to_ui! {
 #[doc = r"u16"]
 => u16, to_u16}
 
-/// Test if both slices contain the exact same bytes.
-///
-/// Do not use this to compare cryptographic values (i.e. hashes)
-pub fn memeq(lhs: &[u8], rhs: &[u8]) -> bool {
-    let size = lhs.len();
-
-    size == rhs.len()
-        && unsafe {
-            let l = lhs as *const _ as _;
-            let r = rhs as *const _ as _;
-            (l as usize) == (r as usize) || libc::memcmp(l, r, size) == 0
-        }
-}
-
 /// Converts the hexstring into a byte vector.
 ///
 /// Stops if the end or until a non hex chat is found
@@ -572,18 +558,5 @@ mod tests {
             ],
             try_parse_u128("00112233445566778899aabbccddeeff", "").unwrap()
         );
-    }
-
-    #[test]
-    fn memeq() {
-        let a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-        let b = [1, 2, 3, 4, 5, 6, 7, 8, 9, 1];
-        let c = [0, 0, 1, 2, 3, 4];
-
-        assert!(super::memeq(&a, &a));
-        assert!(super::memeq(&a, &a.clone()));
-        assert!(!super::memeq(&b, &a));
-        assert!(!super::memeq(&b, &c));
-        assert!(!super::memeq(&b, &[]));
     }
 }

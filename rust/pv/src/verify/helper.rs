@@ -3,7 +3,7 @@
 // Copyright IBM Corp. 2023
 
 use crate::error::bail_hkd_verify;
-use crate::misc::{memeq, read_crls};
+use crate::misc::read_crls;
 use crate::HkdVerifyErrorType::*;
 use crate::{Error, Result};
 use curl::easy::{Easy2, Handler, WriteError};
@@ -219,7 +219,7 @@ fn name_data_eq(entries: &X509NameRef, nid: Nid, rhs: &[u8]) -> bool {
     let mut it = entries.entries_by_nid(nid);
     match it.next() {
         None => false,
-        Some(entry) => memeq(entry.data().as_slice(), rhs),
+        Some(entry) => entry.data().as_slice() == rhs,
     }
 }
 
@@ -376,11 +376,12 @@ fn check_x509_name_equal(lhs: &X509NameRef, rhs: &X509NameRef) -> Result<()> {
     }
 
     for l in lhs.entries() {
-        let ldata = l.data().as_slice();
-
         // search for the matching value in the rhs names
         // found none? -> names are not equal
-        if !rhs.entries().any(|r| memeq(ldata, r.data().as_slice())) {
+        if !rhs
+            .entries()
+            .any(|r| l.data().as_slice() == r.data().as_slice())
+        {
             bail_hkd_verify!(IssuerMismatch);
         }
     }
