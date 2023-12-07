@@ -105,7 +105,10 @@ ifneq ("$(HAVE_FUSE)","0")
 OBJECTS += zfuse.o
 endif
 
-libs = $(rootdir)/libutil/libutil.a $(LIBPV)
+libs = $(rootdir)/libutil/libutil.a \
+       $(rootdir)/libvtoc/libvtoc.a \
+       $(rootdir)/libdasd/libdasd.a \
+       $(LIBPV)
 
 all: $(BUILD_TARGETS)
 

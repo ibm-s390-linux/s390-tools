@@ -27,10 +27,8 @@ static int dt_ngdump_init(void)
 	char *part_path = NULL;
 	int rc;
 
-	l.part_num = ngdump_get_dump_part(g.fh);
+	l.part_num = ngdump_get_dump_part(g.fh, &part_path);
 	if (l.part_num <= 0)
-		return -1;
-	if (ngdump_get_disk_part_path(g.fh->path, l.part_num, &part_path) < 0)
 		return -1;
 	rc = ngdump_read_meta_from_device(part_path, &l.meta);
 	free(part_path);

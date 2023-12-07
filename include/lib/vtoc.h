@@ -40,6 +40,7 @@
 #define LV_COMPAT_CYL 0xFFFE
 
 #define VTOC_ERROR "VTOC error:"
+#define MAX_VTOC_ENTRIES 9 /* max number of VTOC labels for cdl formatted DASD */
 
 typedef struct ttr 
 {
