@@ -5,13 +5,13 @@
 use std::{marker::PhantomData, ptr};
 
 use foreign_types::{ForeignType, ForeignTypeRef};
-use libc::c_int;
 use openssl::{
     error::ErrorStack,
     stack::Stackable,
     x509::{X509Crl, X509CrlRef},
 };
 use openssl_sys::BIO_new_mem_buf;
+use std::ffi::c_int;
 
 pub struct StackableX509Crl(*mut openssl_sys::X509_CRL);
 

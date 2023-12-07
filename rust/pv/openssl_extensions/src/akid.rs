@@ -5,15 +5,15 @@
 use std::fmt;
 
 use foreign_types::{foreign_type, ForeignType, ForeignTypeRef};
-use libc::c_int;
 use openssl::x509::{X509CrlRef, X509Ref};
+use std::ffi::c_int;
 
 mod ffi {
     extern "C" {
         pub fn X509_check_akid(
             issuer: *const openssl_sys::X509,
             akid: *const openssl_sys::AUTHORITY_KEYID,
-        ) -> ::libc::c_int;
+        ) -> super::c_int;
     }
 }
 

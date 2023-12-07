@@ -30,7 +30,7 @@ mod ffi {
         pub fn X509_STORE_add_crl(
             xs: *mut openssl_sys::X509_STORE,
             x: *mut openssl_sys::X509_CRL,
-        ) -> libc::c_int;
+        ) -> std::ffi::c_int;
     }
 }
 

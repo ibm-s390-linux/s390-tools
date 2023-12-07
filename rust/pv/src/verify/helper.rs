@@ -7,7 +7,6 @@ use crate::misc::read_crls;
 use crate::HkdVerifyErrorType::*;
 use crate::{Error, Result};
 use curl::easy::{Easy2, Handler, WriteError};
-use libc::c_int;
 use log::debug;
 use openssl::{
     asn1::{Asn1Time, Asn1TimeRef},
@@ -26,9 +25,7 @@ use openssl_extensions::{
     akid::{AkidCheckResult, AkidExtension},
     crl::X509StoreExtension,
 };
-use std::cmp::Ordering;
-use std::time::Duration;
-use std::usize;
+use std::{cmp::Ordering, ffi::c_int, time::Duration, usize};
 
 /// Minimum security level for the keys/certificates used to establish a chain of
 /// trust (see https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html

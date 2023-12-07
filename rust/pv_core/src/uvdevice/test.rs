@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 use std::{
+    ffi::{c_int, c_ulong},
     os::unix::prelude::FromRawFd,
     sync::{Mutex, MutexGuard},
 };
@@ -28,18 +29,18 @@ fn get_lock<T>(m: &'static Mutex<T>) -> MutexGuard<'static, T> {
 
 struct IoctlCtx {
     modify: Box<dyn FnMut(&mut ffi::uvio_ioctl_cb) -> i32 + Send + Sync>,
-    exp_cmd: ::libc::c_ulong,
+    exp_cmd: c_ulong,
     called: bool,
 }
 
 impl IoctlCtx {
-    pub fn exp_cmd(&mut self, cmd: ::libc::c_ulong) -> &mut Self {
+    pub fn exp_cmd(&mut self, cmd: c_ulong) -> &mut Self {
         self.exp_cmd = cmd;
         self
     }
     pub fn set_mdfy<F>(&mut self, mdfy: F) -> &mut Self
     where
-        F: FnMut(&mut ffi::uvio_ioctl_cb) -> ::libc::c_int + 'static + Send + Sync,
+        F: FnMut(&mut ffi::uvio_ioctl_cb) -> c_int + 'static + Send + Sync,
     {
         self.modify = Box::new(mdfy);
         self
@@ -62,11 +63,7 @@ impl IoctlCtx {
 pub mod mock_libc {
     use super::*;
 
-    pub unsafe fn ioctl(
-        fd: ::libc::c_int,
-        cmd: ::libc::c_ulong,
-        data: *mut ffi::uvio_ioctl_cb,
-    ) -> ::libc::c_int {
+    pub unsafe fn ioctl(fd: c_int, cmd: c_ulong, data: *mut ffi::uvio_ioctl_cb) -> c_int {
         let mut ctx = get_lock(&IOCTL_MTX);
         assert!(!ctx.called, "IOCTL called more than once");
         ctx.called = true;

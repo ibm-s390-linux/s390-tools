@@ -5,10 +5,10 @@
 #![allow(non_camel_case_types)]
 use crate::FileAccessErrorType;
 use crate::{Error, Result};
-use libc::c_ulong;
 use log::debug;
 use std::{
     convert::TryInto,
+    ffi::c_ulong,
     fs::File,
     os::unix::prelude::{AsRawFd, RawFd},
 };

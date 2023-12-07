@@ -8,6 +8,7 @@ use super::{helper, helper::*, *};
 use crate::{Error, HkdVerifyErrorType::*};
 use core::slice;
 use openssl::stack::Stack;
+use std::ffi::c_int;
 
 use crate::test_utils::*;
 
@@ -23,10 +24,10 @@ pub fn mock_endpt(res: &str) -> mockito::Mock {
 }
 
 #[track_caller]
-fn verify_sign_error(exp_raw: libc::c_int, obs: Error) {
+fn verify_sign_error(exp_raw: c_int, obs: Error) {
     verify_sign_error_slice(&[exp_raw], obs)
 }
-fn verify_sign_error_slice(exp_raw: &[libc::c_int], obs: Error) {
+fn verify_sign_error_slice(exp_raw: &[c_int], obs: Error) {
     if exp_raw
         .iter()
         .filter(|e| match &obs {
