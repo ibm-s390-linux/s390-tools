@@ -16,6 +16,7 @@
 #include <openssl/ssl.h>
 
 #include <json-c/json.h>
+#include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <curl/curl.h>
 
