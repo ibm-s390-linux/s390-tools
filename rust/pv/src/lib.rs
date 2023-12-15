@@ -70,7 +70,7 @@ pub mod uv {
     };
     #[cfg(feature = "uvsecret")]
     pub use crate::uvsecret::{
-        secret_list::SecretList,
+        secret_list::{ListableSecretType, SecretEntry, SecretList},
         uvc::{AddCmd, ListCmd, LockCmd},
     };
 }
