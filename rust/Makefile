@@ -37,8 +37,8 @@ endif
 
 # the cc crate uses these variables to compile c code. It does not open a shell
 # to call the compiler, so no echo etc. allowed here, just a path to a program
-$(BUILD_TARGETS) rust-test: CC = $(CC_SILENT)
-$(BUILD_TARGETS) rust-test: AR = $(AR_SILENT)
+$(BUILD_TARGETS) $(TEST_TARGETS) rust-test: CC = $(CC_SILENT)
+$(BUILD_TARGETS) $(TEST_TARGETS) rust-test: AR = $(AR_SILENT)
 
 $(PV_TARGETS): .check-dep-pvtools
 $(PV_TARGETS) $(CARGO_TARGETS): .check-cargo .no-cross-compile
