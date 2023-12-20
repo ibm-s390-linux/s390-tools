@@ -7,46 +7,30 @@
 use super::{helper, helper::*, *};
 use crate::{Error, HkdVerifyErrorType::*};
 use core::slice;
+use once_cell::sync::OnceCell;
 use openssl::stack::Stack;
-use std::ffi::c_int;
+use std::sync::Mutex;
 
 use crate::test_utils::*;
 
 pub fn mock_endpt(res: &str) -> mockito::Mock {
+    static MOCK_SERVER: OnceCell<Mutex<mockito::Server>> = OnceCell::new();
+
     let res_path = get_cert_asset_path(res);
 
-    let mut server = mockito::Server::new();
-    server
+    MOCK_SERVER
+        .get_or_init(|| mockito::Server::new_with_port(1234).into())
+        .lock()
+        .expect("COULD NOT GET THE MOCK_SERVER LOCK")
         .mock("GET", format!("/crl/{res}").as_str())
         .with_header("content-type", "application/pkix-crl")
         .with_body_from_file(res_path)
         .create()
 }
 
-#[track_caller]
-fn verify_sign_error(exp_raw: c_int, obs: Error) {
-    verify_sign_error_slice(&[exp_raw], obs)
-}
-fn verify_sign_error_slice(exp_raw: &[c_int], obs: Error) {
-    if exp_raw
-        .iter()
-        .filter(|e| match &obs {
-            Error::HkdVerify(ty) => match ty {
-                IbmSignInvalid(err, _d) => &&err.as_raw() == e,
-                _ => false,
-            },
-            e => panic!("Unexpected error type: {e:?}"),
-        })
-        .count()
-        == 0
-    {
-        panic!("Error {obs:?} did not match one of the expected {exp_raw:?}");
-    }
-}
-impl std::fmt::Debug for CertVerifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("CertVerifier")
-    }
+#[test]
+fn mockito_server_available() {
+    let _mock = mock_endpt("ibm.crt");
 }
 
 #[test]
@@ -173,97 +157,6 @@ fn verify_offline() {
         verifier.verify(&hkd_exp),
         Err(Error::HkdVerify(AfterValidity))
     ));
-}
-
-#[test]
-fn verifier_new() {
-    let root_chn_crt = get_cert_asset_path_string("root_ca.chained.crt");
-    let root_crt = get_cert_asset_path_string("root_ca.crt");
-    let inter_crt = get_cert_asset_path_string("inter_ca.crt");
-    let inter_fake_crt = get_cert_asset_path_string("fake_inter_ca.crt");
-    let inter_fake_crl = get_cert_asset_path_string("fake_inter_ca.crl");
-    let inter_crl = get_cert_asset_path_string("inter_ca.crl");
-    let ibm_crt = get_cert_asset_path_string("ibm.crt");
-    let ibm_early_crt = get_cert_asset_path_string("ibm_outdated_early.crl");
-    let ibm_late_crt = get_cert_asset_path_string("ibm_outdated_late.crl");
-    let ibm_rev_crt = get_cert_asset_path_string("ibm_rev.crt");
-
-    // To many signing keys
-    let verifier = CertVerifier::new(&[ibm_crt.clone(), ibm_rev_crt.clone()], &[], &None, true);
-    assert!(matches!(verifier, Err(Error::HkdVerify(ManyIbmSignKeys))));
-
-    // no CRL for each X509
-    let verifier = CertVerifier::new(
-        &[inter_crt.clone(), ibm_crt.clone()],
-        &[inter_crl.clone()],
-        &Some(root_crt),
-        false,
-    );
-    verify_sign_error(3, verifier.unwrap_err());
-    let verifier = CertVerifier::new(
-        &[inter_crt.clone(), ibm_crt.clone()],
-        &[],
-        &Some(root_chn_crt.clone()),
-        false,
-    );
-    verify_sign_error(3, verifier.unwrap_err());
-
-    // wrong intermediate (or ibm key)
-    let verifier = CertVerifier::new(
-        &[inter_fake_crt, ibm_crt.clone()],
-        &[inter_fake_crl],
-        &Some(root_chn_crt.clone()),
-        true,
-    );
-    //Depending on the OpenSSL version different error codes can appear
-    verify_sign_error_slice(&[20, 30], verifier.unwrap_err());
-
-    //wrong root ca
-    let verifier = CertVerifier::new(
-        &[inter_crt.clone(), ibm_crt.clone()],
-        &[inter_crl.clone()],
-        &None,
-        true,
-    );
-    verify_sign_error(20, verifier.unwrap_err());
-
-    //correct signing key + intermediate cert
-    let _verifier = CertVerifier::new(
-        &[inter_crt.clone(), ibm_crt.clone()],
-        &[inter_crl.clone()],
-        &Some(root_chn_crt.clone()),
-        false,
-    )
-    .unwrap();
-
-    // no intermediate key
-    let verifier = CertVerifier::new(&[ibm_crt], &[], &Some(root_chn_crt.clone()), false);
-    verify_sign_error(20, verifier.unwrap_err());
-
-    //Ibm Sign outdated
-    let verifier = CertVerifier::new(
-        &[inter_crt.clone(), ibm_early_crt],
-        &[inter_crl.clone()],
-        &Some(root_chn_crt.clone()),
-        false,
-    );
-    assert!(matches!(verifier, Err(Error::HkdVerify(NoIbmSignKey))));
-    let verifier = CertVerifier::new(
-        &[inter_crt.clone(), ibm_late_crt],
-        &[inter_crl.clone()],
-        &Some(root_chn_crt.clone()),
-        false,
-    );
-    assert!(matches!(verifier, Err(Error::HkdVerify(NoIbmSignKey))));
-
-    // revoked
-    let verifier = CertVerifier::new(
-        &[inter_crt, ibm_rev_crt],
-        &[inter_crl],
-        &Some(root_chn_crt),
-        false,
-    );
-    verify_sign_error(23, verifier.unwrap_err());
 }
 
 #[test]

@@ -45,6 +45,12 @@ pub struct CertVerifier {
     offline: bool,
 }
 
+impl std::fmt::Debug for CertVerifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CertVerifier")
+    }
+}
+
 impl HkdVerifier for CertVerifier {
     /// This function verifies a host-key
     /// document. To do so multiple steps are required:

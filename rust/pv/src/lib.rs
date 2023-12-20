@@ -66,7 +66,7 @@ pub mod request {
     pub use crate::crypto::{Aes256Key, SymKey, SymKeyType};
     pub use crate::req::{Aad, Encrypt, Keyslot, ReqEncrCtx, Request};
     pub use crate::secret::{Secret, Zeroize};
-    pub use crate::verify::HkdVerifier;
+    pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};
 
     /// Reexports some useful OpenSSL symbols
     pub mod openssl {
