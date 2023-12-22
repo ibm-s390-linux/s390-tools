@@ -32,6 +32,7 @@ Release history for s390-tools (MIT version)
   - zipl/boot: compile the bootloaders only if HOST_ARCH is s390x
   - zipl: Add --no-compress option to zipl command
   - zkey: Also check for deconfigured and check-stopped cards
+  - dbginfo.sh: fix relative path on script copy
 
   Bug Fixes:
   - ap_tools/ap-check: handle get-attributes between pre and post event

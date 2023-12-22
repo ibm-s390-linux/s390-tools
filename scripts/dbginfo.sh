@@ -15,6 +15,7 @@ export LC_ALL
 ########################################
 # Global used variables
 readonly SCRIPTNAME="${0##*/}" # general name of this script
+readonly STARTDIR="$(pwd)" # save calling directory
 #
 readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
 readonly DOCKER=$(if type docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
@@ -1411,10 +1412,11 @@ environment_setup() {
 create_package() {
 	local rc_tar
 	pr_syslog_stdout ${step_num} "Finalizing: Creating archive with collected data"
+	# get a copy of the script used - enabled for relative path calls
+	cd "${STARTDIR}"
+	cp -p "${BASH_SOURCE[0]}" "${WORKPATH}"
+	# create the archive
 	cd "${WORKDIR_BASE}"
-	# get a copy of the script used
-	cp -p $0 "${WORKDIR_CURRENT}"
-
 	touch "${WORKARCHIVE}"
 	chmod 0600 "${WORKARCHIVE}"
 	tar -czf "${WORKARCHIVE}" "${WORKDIR_CURRENT}"
