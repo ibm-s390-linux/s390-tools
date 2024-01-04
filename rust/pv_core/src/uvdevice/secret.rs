@@ -17,7 +17,7 @@ use std::{
     slice::Iter,
     vec::IntoIter,
 };
-use zerocopy::{AsBytes, FromBytes, U16, U32};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
 
 /// _List Secrets_ Ultravisor command.
 ///
@@ -331,7 +331,7 @@ where
 
 /// A secret in a [`SecretList`]
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq, AsBytes, FromBytes, Serialize)]
+#[derive(Debug, PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Serialize)]
 pub struct SecretEntry {
     #[serde(serialize_with = "ser_u16")]
     index: U16<BigEndian>,

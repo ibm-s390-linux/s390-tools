@@ -11,7 +11,7 @@ libc = "0.2.49"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 thiserror = "1.0.33"
 utils = {path = "../utils"}
-zerocopy = "0.6"
+zerocopy = {version = "0.7", features = ["derive"]}
 serde = { version = "1.0.139", features = ["derive"]}
 byteorder = "1.3"
 

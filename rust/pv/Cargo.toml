@@ -13,7 +13,7 @@ openssl = "0.10.49"
 serde = { version = "1.0.139", features = ["derive"]  }
 thiserror = "1.0.33"
 utils = {path = "../utils"}
-zerocopy = "0.6"
+zerocopy = { version="0.7", features = ["derive"] }
 
 openssl_extensions = { path = "openssl_extensions" }
 pv_core = { path = "../pv_core" }

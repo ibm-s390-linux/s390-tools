@@ -11,7 +11,7 @@ use std::{
 use crate::{assert_size, static_assert, Error, Result, PAGESIZE};
 use log::debug;
 use pv_core::request::MagicValue;
-use zerocopy::{AsBytes, BigEndian, FromBytes, U32, U64};
+use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
 
 /// Struct containing all SE-header tags.
 ///
@@ -142,7 +142,7 @@ impl BootHdrTags {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, FromBytes)]
+#[derive(Debug, Clone, FromBytes, FromZeroes)]
 struct BootHdrHead {
     magic: U64<BigEndian>,
     version: U32<BigEndian>,

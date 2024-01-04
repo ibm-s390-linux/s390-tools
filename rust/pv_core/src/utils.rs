@@ -10,7 +10,7 @@ use std::{
     io::{Read, Write},
     path::Path,
 };
-use zerocopy::{AsBytes, BigEndian, FromBytes, U64};
+use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U64};
 
 /// Trait that describes bitflags, represented by `T`.
 pub trait Flags<T>: From<T> + for<'a> From<&'a T> {
@@ -32,7 +32,7 @@ pub trait Flags<T>: From<T> + for<'a> From<&'a T> {
 ///
 /// Wraps an u64 to set/get individual bits
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, AsBytes, FromBytes)]
+#[derive(Debug, Clone, Copy, Default, AsBytes, FromZeroes, FromBytes)]
 pub struct Msb0Flags64(U64<BigEndian>);
 impl Flags<u64> for Msb0Flags64 {
     #[track_caller]
@@ -74,7 +74,7 @@ impl From<&u64> for Msb0Flags64 {
 ///
 /// Wraps an u64 to set/get individual bits
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, AsBytes, FromBytes)]
+#[derive(Debug, Clone, Copy, Default, AsBytes, FromZeroes, FromBytes)]
 pub struct Lsb0Flags64(U64<BigEndian>);
 impl Flags<u64> for Lsb0Flags64 {
     #[track_caller]

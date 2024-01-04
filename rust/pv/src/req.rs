@@ -14,7 +14,7 @@ use openssl::hash::{hash, MessageDigest};
 use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
 use std::convert::TryInto;
-use zerocopy::{AsBytes, BigEndian, FromBytes, U32};
+use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
 
 /// Encrypt a _secret_ using self and a given private key.
 pub trait Encrypt {
@@ -310,7 +310,7 @@ ecdh_from!(Public);
 /// Representation of the shared parts of the request header.
 /// Used by [`ReqEncrCtx`]
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 struct RequestHdr {
     magic: [u8; 8],
     rqvn: U32<BigEndian>,

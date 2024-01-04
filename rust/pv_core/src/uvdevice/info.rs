@@ -9,7 +9,7 @@ use crate::{
     Result,
 };
 use std::fmt::Display;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{AsBytes, FromZeroes};
 
 /// Information of supported functions by the uvdevice
 ///
