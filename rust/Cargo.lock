@@ -816,7 +816,7 @@ dependencies = [
  "lazy_static",
  "openssl",
  "openssl-sys",
- "pv",
+ "pv_core",
  "rand",
  "regex",
  "serde",

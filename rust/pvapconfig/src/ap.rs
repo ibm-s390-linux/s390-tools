@@ -368,7 +368,7 @@ impl ApqnList {
                 'P' => ApqnMode::Ep11,
                 _ => panic!("Code inconsistence between regex RE_CARD_TYPE and evaluation code."),
             };
-            if pv::misc::pv_guest_bit_set() {
+            if pv_core::misc::pv_guest_bit_set() {
                 // the UV blocks requests to CCA cards within SE guest with
                 // AP pass-through support. However, filter out CCA cards as these
                 // cards cause hangs during information gathering.
@@ -401,7 +401,7 @@ impl ApqnList {
                 // is not bound, temporarily bind it here until the info has
                 // been retrieved.
                 let mut tempbound = false;
-                if pv::misc::pv_guest_bit_set() {
+                if pv_core::misc::pv_guest_bit_set() {
                     let cbs = match get_apqn_bind_state(card, dom) {
                         Ok(bs) => bs,
                         Err(err) => {
@@ -748,7 +748,7 @@ mod tests {
             // if we are inside a secure execution guest the
             // apsb check should succeed. Outside an SE guest
             // the check should fail.
-            if pv::misc::pv_guest_bit_set() {
+            if pv_core::misc::pv_guest_bit_set() {
                 assert!(ap_bus_has_apsb_support().is_ok());
             } else {
                 assert!(ap_bus_has_apsb_support().is_err());

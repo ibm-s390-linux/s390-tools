@@ -5,7 +5,7 @@
 //! UV related functions for pvapconfig
 //
 
-use pv::uv::{ListCmd, SecretList, UvDevice, UvcSuccess};
+use pv_core::uv::{ListCmd, SecretList, UvDevice, UvcSuccess};
 use regex::Regex;
 use std::path::Path;
 
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn test_has_list_secrets_facility() {
         let r = has_list_secrets_facility();
-        if pv::misc::pv_guest_bit_set() {
+        if pv_core::misc::pv_guest_bit_set() {
             assert!(r.is_ok());
         } else {
             assert!(r.is_err());
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_list_secrets() {
         let r = gather_secrets();
-        if pv::misc::pv_guest_bit_set() {
+        if pv_core::misc::pv_guest_bit_set() {
             assert!(r.is_ok());
         } else {
             assert!(r.is_err());

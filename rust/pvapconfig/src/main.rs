@@ -16,7 +16,7 @@ use ap::{Apqn, ApqnList};
 use cli::ARGS;
 use config::{ApConfigEntry, ApConfigList};
 use helper::{LockFile, PATH_PVAPCONFIG_LOCK};
-use pv::uv::{ListableSecretType, SecretList};
+use pv_core::uv::{ListableSecretType, SecretList};
 use std::process::ExitCode;
 use utils::release_string;
 
@@ -81,7 +81,7 @@ fn main() -> ExitCode {
 
     // UV check
     info!("Checking UV support and environment...\n");
-    if !pv::misc::pv_guest_bit_set() {
+    if !pv_core::misc::pv_guest_bit_set() {
         println_and_exit_failure!("Failure: this is not a SE guest.");
     }
     let r = uv::has_list_secrets_facility();
@@ -455,7 +455,7 @@ mod tests {
 
     use super::*;
     use helper::hexstring_to_u8;
-    use pv::uv::SecretEntry;
+    use pv_core::uv::SecretEntry;
 
     // This is more or less only a test for the do_ap_config() function
     // However, this is THE main functionality of the whole application.
