@@ -774,7 +774,7 @@ dependencies = [
 
 [[package]]
 name = "pv"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "byteorder",
  "clap",
@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "pv_core"
-version = "0.9.1"
+version = "1.0.0"
 dependencies = [
  "byteorder",
  "lazy_static",
