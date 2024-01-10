@@ -449,6 +449,11 @@ static void evt_show(__u64 evtnum, const char *evtsel, struct pai_event_out *ev)
 		       ev->u.s_comm.tid);
 		break;
 
+	case PERF_RECORD_SWITCH:
+		printf("cs-%s",
+		       (ev->misc & PERF_RECORD_MISC_SWITCH_OUT) ? "out" : "in");
+		break;
+
 	case PERF_RECORD_SWITCH_CPU_WIDE:
 		if (ev->misc & PERF_RECORD_MISC_SWITCH_OUT) {
 			short p = PERF_RECORD_MISC_SWITCH_OUT_PREEMPT;
@@ -549,6 +554,9 @@ static int evt_scan(char *fn, unsigned char *buf, size_t len,
 				offset -= sizeof(__u64);
 			break;
 
+		case PERF_RECORD_SWITCH:
+			break;
+
 		case PERF_RECORD_SWITCH_CPU_WIDE:
 			memcpy(&ev.u, buf + offset, sizeof(ev.u.s_cs));
 			offset += sizeof(ev.u.s_cs);
@@ -583,7 +591,7 @@ static int evt_scan(char *fn, unsigned char *buf, size_t len,
 			break;
 
 		default:
-			printf("unknown header-type %d ", hdr->type);
+			printf("unknown header-type %d\n", hdr->type);
 			offset += hdr->size - sizeof(*hdr);
 			goto bypass;
 		}
