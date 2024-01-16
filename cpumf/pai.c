@@ -320,7 +320,7 @@ static void readmap(int fd)
  * ring buffer per event, sleep some short time and always read all
  * ring buffer for new contents.
  */
-static void collect(unsigned long cnt)
+static int collect(unsigned long cnt)
 {
 	fd_set r_fds, e_fds, a_fds;
 	struct pai_event *p;
@@ -328,6 +328,7 @@ static void collect(unsigned long cnt)
 	int rc, max_fd;
 
 	do {
+		rc = -1;
 		max_fd = -1;
 		tv.tv_sec = read_interval / 1000;
 		tv.tv_usec = (1000 * read_interval) % 1000000;
@@ -357,6 +358,7 @@ static void collect(unsigned long cnt)
 			}
 		}
 	} while (rc != -1 && --cnt > 0);
+	return rc;
 }
 
 static void lookup_event(__u64 evtnum, __u16 ctr, __u64 value)
@@ -1123,12 +1125,12 @@ int main(int argc, char **argv)
 		ev_install(group);
 		ev_enable();
 
-		collect(loop_count);
+		ch = collect(loop_count);
 
 		ev_disable();
 		ev_deinstall();
 		ev_dealloc();
-		return EXIT_SUCCESS;
+		return ch < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 	}
 
 	/* Must be reporting */
