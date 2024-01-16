@@ -25,7 +25,7 @@ int get_numcpus()
 
 	for (i = 0; ; i++) {
 		/* check whether file exists and is readable */
-		sprintf(path, "/sys/devices/system/cpu/cpu%d/online", i);
+		sprintf(path, "/sys/devices/system/cpu/cpu%d", i);
 		if (access(path, R_OK) == 0)
 			number++;
 		else
@@ -45,11 +45,13 @@ int get_num_online_cpus()
 	int status = 0;
 	int value_of_onlinefile, rc;
 
-	for (i = 0; i <= get_numcpus(); i++) {
+	for (i = 0; i < get_numcpus(); i++) {
 		/* check wether file exists and is readable */
 		sprintf(path, "/sys/devices/system/cpu/cpu%d/online", i);
-		if (access(path, R_OK) != 0)
+		if (access(path, R_OK) != 0) {
+			status++;
 			continue;
+		}
 		filp = fopen(path, "r");
 		if (!filp)
 			cpuplugd_exit("Cannot open cpu online file: "
@@ -101,10 +103,8 @@ int hotplug(int cpuid)
 				      cpuid);
 			return -1;
 		}
-	} else {
-		cpuplugd_error("hotplugging cpu with id %d failed\n", cpuid);
-		return -1;
 	}
+	cpuplugd_debug("cpu with id %d cannot be hotplugged\n", cpuid);
 	return -1;
 }
 
@@ -135,9 +135,8 @@ int hotunplug(int cpuid)
 		fclose(filp);
 		if (state == 0)
 			return 1;
-	} else {
-		cpuplugd_error("unplugging cpu with id %d failed\n", cpuid);
 	}
+	cpuplugd_debug("cpu with id %d cannot be hotunplugged\n", cpuid);
 	return retval;
 }
 
@@ -163,6 +162,8 @@ int is_online(int cpuid)
 				retval = 0;
 		}
 		fclose(filp);
+	} else {
+		retval = 1;
 	}
 	return retval;
 }
