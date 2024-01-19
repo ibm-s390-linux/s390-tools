@@ -3,7 +3,7 @@
 // Copyright IBM Corp. 2023
 
 #![allow(non_camel_case_types)]
-use crate::file_acc_error;
+use crate::FileAccessErrorType;
 use crate::{Error, Result};
 use libc::c_ulong;
 use log::debug;
@@ -178,7 +178,11 @@ impl UvDevice {
                 .read(true)
                 .write(true)
                 .open(UvDevice::PATH)
-                .map_err(|e| file_acc_error!(Open, UvDevice::PATH, e))?,
+                .map_err(|e| Error::FileAccess {
+                    ty: FileAccessErrorType::Open,
+                    path: (UvDevice::PATH).to_string(),
+                    source: e,
+                })?,
         ))
     }
 

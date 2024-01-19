@@ -3,7 +3,6 @@
 // Copyright IBM Corp. 2023
 
 use crate::Result;
-use crate::{create_buffered_file, open_buffered_file};
 use clap::{ArgGroup, Args, ValueHint};
 use std::io::{Read, Write};
 
@@ -120,7 +119,7 @@ pub fn get_writer_from_cli_file_arg(path: &str) -> Result<Box<dyn Write>> {
     if path == STDOUT {
         Ok(Box::new(std::io::stdout()))
     } else {
-        Ok(Box::new(create_buffered_file!(path)))
+        Ok(Box::new(crate::misc::create_file(path)?))
     }
 }
 
@@ -134,7 +133,7 @@ pub fn get_reader_from_cli_file_arg(path: &str) -> Result<Box<dyn Read>> {
     if path == STDIN {
         Ok(Box::new(std::io::stdin()))
     } else {
-        Ok(Box::new(open_buffered_file!(path)))
+        Ok(Box::new(crate::misc::open_file(path)?))
     }
 }
 

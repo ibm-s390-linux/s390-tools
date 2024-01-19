@@ -7,10 +7,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, info, trace, warn};
 use pv::{
     misc::{
-        get_writer_from_cli_file_arg, parse_hex, pv_guest_bit_set, read_certs, read_exact_file,
-        read_file, try_parse_u128, try_parse_u64,
+        get_writer_from_cli_file_arg, open_file, parse_hex, pv_guest_bit_set, read_certs,
+        read_exact_file, read_file, try_parse_u128, try_parse_u64, write,
     },
-    open_buffered_file,
     request::{
         openssl::pkey::{PKey, Public},
         uvsecret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret},
@@ -21,11 +20,8 @@ use pv::{
 use serde_yaml::Value;
 
 fn write_out<D: AsRef<[u8]>>(path: &str, data: D, ctx: &str) -> pv::Result<()> {
-    let mut wr = match get_writer_from_cli_file_arg(path) {
-        Ok(it) => it,
-        Err(err) => return Err(err),
-    };
-    pv::misc::write(&mut wr, data, path, ctx)?;
+    let mut wr = get_writer_from_cli_file_arg(path)?;
+    write(&mut wr, data, path, ctx)?;
     Ok(())
 }
 
@@ -89,7 +85,7 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
     });
     debug!("FLAGS: {flags:x?}");
 
-    let mut se_hdr = open_buffered_file!(&opt.hdr);
+    let mut se_hdr = open_file(&opt.hdr)?;
     let mut asrcb = AddSecretRequest::new(
         AddSecretVersion::One,
         secret,

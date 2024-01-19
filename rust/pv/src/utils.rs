@@ -3,7 +3,7 @@
 // Copyright IBM Corp. 2023
 
 use crate::{
-    error::{bail_spec, file_error, path_to_str},
+    error::{bail_spec, file_error, path_to_str, FileAccessErrorType},
     Error, FileIoErrorType, Result,
 };
 
@@ -11,8 +11,11 @@ use crate::{
 use openssl::x509::X509Crl;
 #[cfg(feature = "request")]
 use openssl::x509::X509;
-use std::io::{Read, Write};
-use std::path::Path;
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 use zerocopy::{AsBytes, BigEndian, FromBytes, U64};
 
 /// Asserts a constant expression evaluates to `true`.
@@ -213,6 +216,32 @@ pub fn try_parse_u64(hex_str: &str, ctx: &str) -> Result<u64> {
         ));
     }
     Ok(u64::from_str_radix(hex_str, 16)?)
+}
+
+/// Open a file.
+///
+/// Wraps [`File::open`]
+///
+/// * `path` - Path to file
+pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
+    File::open(&path).map_err(|e| Error::FileAccess {
+        ty: FileAccessErrorType::Open,
+        path: path_to_str!(path).to_string(),
+        source: e,
+    })
+}
+
+/// Create a file.
+///
+/// Wraps [`File::create`]
+///
+/// * `path` - Path to file
+pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
+    File::create(&path).map_err(|e| Error::FileAccess {
+        ty: FileAccessErrorType::Create,
+        path: path_to_str!(path).to_string(),
+        source: e,
+    })
 }
 
 /// Read exactly COUNT bytes into the buffer.

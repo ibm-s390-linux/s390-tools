@@ -85,8 +85,9 @@ pub mod misc {
     };
     pub use crate::log::PvLogger;
     pub use crate::utils::{
-        memeq, parse_hex, pv_guest_bit_set, read, read_exact_file, read_file, to_u16, to_u32,
-        try_parse_u128, try_parse_u64, write, write_file, Flags, Lsb0Flags64, Msb0Flags64,
+        create_file, memeq, open_file, parse_hex, pv_guest_bit_set, read, read_exact_file,
+        read_file, to_u16, to_u32, try_parse_u128, try_parse_u64, write, write_file, Flags,
+        Lsb0Flags64, Msb0Flags64,
     };
     #[cfg(feature = "request")]
     pub use crate::utils::{read_certs, read_crls};
@@ -167,40 +168,4 @@ pub mod request {
 /// Produces `pv-crate <version>`
 pub const fn crate_info() -> &'static str {
     concat!(env!("CARGO_PKG_NAME"), "-crate ", env!("CARGO_PKG_VERSION"))
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! file_acc_error {
-    ($ty: tt, $path:expr, $src: expr) => {
-        $crate::Error::FileAccess {
-            ty: $crate::FileAccessErrorType::$ty,
-            path: $path.to_string(),
-            source: $src,
-        }
-    };
-}
-
-#[macro_export]
-/// Create a file wrapped in a [BufWriter]
-///
-/// [BufWriter]: std::io#BufWriter
-macro_rules! create_buffered_file {
-    ($path: expr) => {
-        std::io::BufWriter::new(
-            std::fs::File::create($path).map_err(|e| $crate::file_acc_error!(Create, $path, e))?,
-        )
-    };
-}
-
-#[macro_export]
-/// Open a file wrapped in a [BufReader]
-///
-/// [BufReader]: std::io#BufReader
-macro_rules! open_buffered_file {
-    ($path: expr) => {
-        std::io::BufReader::new(
-            std::fs::File::open($path).map_err(|e| $crate::file_acc_error!(Open, $path, e))?,
-        )
-    };
 }
