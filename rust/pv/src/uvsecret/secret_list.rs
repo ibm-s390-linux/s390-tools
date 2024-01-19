@@ -163,6 +163,8 @@ pub enum ListableSecretType {
     Unknown(u16),
 }
 impl ListableSecretType {
+    const RESERVED_0: u16 = 0x0000;
+    const NULL: u16 = 0x0001;
     const ASSOCIATION: u16 = 0x0002;
 }
 
@@ -179,8 +181,8 @@ impl Display for ListableSecretType {
 impl From<U16<BigEndian>> for ListableSecretType {
     fn from(value: U16<BigEndian>) -> Self {
         match value.get() {
-            0x0000 => Self::Invalid(0),
-            0x0001 => Self::Invalid(1),
+            Self::RESERVED_0 => Self::Invalid(Self::RESERVED_0),
+            Self::NULL => Self::Invalid(Self::NULL),
             Self::ASSOCIATION => ListableSecretType::Association,
             n => Self::Unknown(n),
         }
