@@ -80,7 +80,7 @@ pub fn sysfs_read_i32(fname: &str) -> Result<i32, Box<dyn Error>> {
 
 /// Write an i32 value into a sysfs file
 pub fn sysfs_write_i32(fname: &str, value: i32) -> Result<(), Box<dyn Error>> {
-    return sysfs_write_string(fname, &value.to_string());
+    sysfs_write_string(fname, &value.to_string())
 }
 
 /// For a given (sysfs) directory construct a list of all subdirs

@@ -546,7 +546,7 @@ pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState, String> {
 /// On success () is returned, on failure an error string
 /// is returned. Does NOT print any error messages.
 /// # Panics
-/// Panics if a desired bind state other than Bund or Unbound is given.
+/// Panics if a desired bind state other than Bound or Unbound is given.
 pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> Result<(), String> {
     let path = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
@@ -789,7 +789,7 @@ mod tests {
                             _ => panic!("ApqnInfo attached onto Ep11 APQN is NOT ApqnInfoEp11 ?!?"),
                         };
                         // fail if no serialnr
-                        assert!(i.serialnr.len() > 0);
+                        assert!(!i.serialnr.is_empty());
                         // mkvp is either empty (no WK set) or has exact 32 characters
                         assert!(i.mkvp.is_empty() || i.mkvp.len() == 32);
                     }
@@ -802,7 +802,7 @@ mod tests {
                             _ => panic!("ApqnInfo attached onto Cca APQN is NOT ApqnInfoCca ?!?"),
                         };
                         // fail if no serialnr
-                        assert!(i.serialnr.len() > 0);
+                        assert!(!i.serialnr.is_empty());
                         // aes mkvp is either empty (no MK set) or exact 16 characters
                         assert!(i.mkvp_aes.is_empty() || i.mkvp_aes.len() == 16);
                         // apka mkvp is either empty (no MK set) or exact 16 characters

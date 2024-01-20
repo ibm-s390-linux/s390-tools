@@ -351,7 +351,7 @@ mod tests {
         for yaml in GOOD_CONFIGS {
             let f = write_yaml_config_to_temp_file(yaml).unwrap();
             let config = ApConfigList::read_and_validate_yaml_file(&f).unwrap();
-            assert!(config.len() > 0);
+            assert!(!config.is_empty());
             fs::remove_file(&f).ok();
         }
     }

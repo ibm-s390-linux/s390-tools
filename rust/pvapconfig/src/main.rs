@@ -182,7 +182,7 @@ fn main() -> ExitCode {
 /// This is the real algorithm which is trying to apply the
 /// AP configuration read from the config file to the existing
 /// APQNs with the info from the list of secrets from the UV.
-/// Returns the nr of AP config entries which are fullfilled
+/// Returns the nr of AP config entries which are fulfilled
 /// after the function ended.
 /// apqns needs to be mutable as the function does a resort
 /// but content stays the same.
@@ -242,7 +242,7 @@ fn do_ap_config(
                         continue;
                     }
                     // This APQN matches to the current AP config entry and is already bound.
-                    // So this AP config entry is satisfied: mark this config enty as done
+                    // So this AP config entry is satisfied: mark this config entry as done
                     // and mark this APQN as used.
                     info!("Accelerator APQN {apqn} already satisfies AP config entry {cistr}.\n");
                     apconfig_done[ci] = true;
@@ -277,7 +277,7 @@ fn do_ap_config(
                     }
                     // This APQN matches to the current AP config entry and is already
                     // associated with the right secret id. So this AP config entry is
-                    // satisfied: mark this config enty as done and mark this APQN as used.
+                    // satisfied: mark this config entry as done and mark this APQN as used.
                     info!("EP11 APQN {apqn} already satisfies AP config entry {cistr}.\n");
                     apconfig_done[ci] = true;
                     apqn_done[ai] = true;
@@ -314,7 +314,7 @@ fn do_ap_config(
     }
 
     // Step 3:
-    // Go through all remaining AP config entries and try to fullfill each
+    // Go through all remaining AP config entries and try to fulfill each
     // by searching for an APQN which would match to this config entry and
     // then prepare this APQN (bind, maybe associate).
     for (ci, apc) in apconfig.iter().enumerate() {
@@ -461,68 +461,68 @@ mod tests {
     // However, this is THE main functionality of the whole application.
 
     fn make_test_apqns() -> Vec<Apqn> {
-        let mut v = Vec::new();
-        v.push(ap::Apqn {
-            name: String::from("10.0007"),
-            card: 16,
-            domain: 7,
-            gen: 8,
-            mode: ap::ApqnMode::Accel,
-            info: Option::Some(ap::ApqnInfo::Accel(ap::ApqnInfoAccel {})),
-        });
-        v.push(ap::Apqn {
-            name: String::from("11.0008"),
-            card: 17,
-            domain: 8,
-            gen: 8,
-            mode: ap::ApqnMode::Ep11,
-            info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
-                serialnr: String::from("93AADFK719460083"),
-                mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
-            })),
-        });
-        v.push(ap::Apqn {
-            name: String::from("12.0009"),
-            card: 18,
-            domain: 9,
-            gen: 8,
-            mode: ap::ApqnMode::Ep11,
-            info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
-                serialnr: String::from("93AADHZU42082261"),
-                mkvp: String::from("4a27bb66520ac85f6073a7f678d262c0"),
-            })),
-        });
-        v.push(ap::Apqn {
-            name: String::from("12.000a"),
-            card: 18,
-            domain: 10,
-            gen: 8,
-            mode: ap::ApqnMode::Ep11,
-            info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
-                serialnr: String::from("93AADHZU42082261"),
-                mkvp: String::from("383d2a9ab781f35343554c5b3d9337cd"),
-            })),
-        });
-        v.push(ap::Apqn {
-            name: String::from("13.000d"),
-            card: 19,
-            domain: 13,
-            gen: 8,
-            mode: ap::ApqnMode::Ep11,
-            info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
-                serialnr: String::from("87HU397G150TZGR"),
-                mkvp: String::new(),
-            })),
-        });
-        v.push(ap::Apqn {
-            name: String::from("13.000f"),
-            card: 19,
-            domain: 15,
-            gen: 8,
-            mode: ap::ApqnMode::Ep11,
-            info: Option::None,
-        });
-        return v;
+        vec![
+            ap::Apqn {
+                name: String::from("10.0007"),
+                card: 16,
+                domain: 7,
+                gen: 8,
+                mode: ap::ApqnMode::Accel,
+                info: Option::Some(ap::ApqnInfo::Accel(ap::ApqnInfoAccel {})),
+            },
+            ap::Apqn {
+                name: String::from("11.0008"),
+                card: 17,
+                domain: 8,
+                gen: 8,
+                mode: ap::ApqnMode::Ep11,
+                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                    serialnr: String::from("93AADFK719460083"),
+                    mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
+                })),
+            },
+            ap::Apqn {
+                name: String::from("12.0009"),
+                card: 18,
+                domain: 9,
+                gen: 8,
+                mode: ap::ApqnMode::Ep11,
+                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                    serialnr: String::from("93AADHZU42082261"),
+                    mkvp: String::from("4a27bb66520ac85f6073a7f678d262c0"),
+                })),
+            },
+            ap::Apqn {
+                name: String::from("12.000a"),
+                card: 18,
+                domain: 10,
+                gen: 8,
+                mode: ap::ApqnMode::Ep11,
+                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                    serialnr: String::from("93AADHZU42082261"),
+                    mkvp: String::from("383d2a9ab781f35343554c5b3d9337cd"),
+                })),
+            },
+            ap::Apqn {
+                name: String::from("13.000d"),
+                card: 19,
+                domain: 13,
+                gen: 8,
+                mode: ap::ApqnMode::Ep11,
+                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                    serialnr: String::from("87HU397G150TZGR"),
+                    mkvp: String::new(),
+                })),
+            },
+            ap::Apqn {
+                name: String::from("13.000f"),
+                card: 19,
+                domain: 15,
+                gen: 8,
+                mode: ap::ApqnMode::Ep11,
+                info: Option::None,
+            },
+        ]
     }
 
     fn make_assoc_secretentry(idx: u16, hexidstr: &str) -> SecretEntry {
@@ -533,75 +533,75 @@ mod tests {
     }
 
     fn make_test_secrets() -> Vec<SecretEntry> {
-        let mut v: Vec<SecretEntry> = Vec::new();
-        v.push(make_assoc_secretentry(
-            33,
-            "3333333333333333333333333333333333333333333333333333333333333333",
-        ));
-        v.push(make_assoc_secretentry(
-            13,
-            "bc9d46c052bc3574454c5715757274629a283767ed237922cfb8651c0e77320a",
-        ));
-        v.push(make_assoc_secretentry(
-            44,
-            "4444444444444444444444444444444444444444444444444444444444444444",
-        ));
-        v.push(make_assoc_secretentry(
-            15,
-            "06cdbbac76a595b481110d108154bc05ebbf900a0f16e36a24045998934fb1e9",
-        ));
-        v.push(make_assoc_secretentry(
-            17,
-            "6831af07f8c8e7309a3ace9f3b5554d34e3eaa4a27a08fdee469e367c3fa3e9e",
-        ));
-        return v;
+        vec![
+            make_assoc_secretentry(
+                33,
+                "3333333333333333333333333333333333333333333333333333333333333333",
+            ),
+            make_assoc_secretentry(
+                13,
+                "bc9d46c052bc3574454c5715757274629a283767ed237922cfb8651c0e77320a",
+            ),
+            make_assoc_secretentry(
+                44,
+                "4444444444444444444444444444444444444444444444444444444444444444",
+            ),
+            make_assoc_secretentry(
+                15,
+                "06cdbbac76a595b481110d108154bc05ebbf900a0f16e36a24045998934fb1e9",
+            ),
+            make_assoc_secretentry(
+                17,
+                "6831af07f8c8e7309a3ace9f3b5554d34e3eaa4a27a08fdee469e367c3fa3e9e",
+            ),
+        ]
     }
 
     fn make_test_apconfigs() -> Vec<ApConfigEntry> {
-        let mut v: Vec<ApConfigEntry> = Vec::new();
-        v.push(config::ApConfigEntry {
-            name: String::from("test_1"),
-            description: String::from("test_1"),
-            mode: String::from("accel"),
-            mkvp: String::from(""),
-            serialnr: String::from(""),
-            mingen: String::from("cex8"),
-            secretid: String::from(""),
-        });
-        v.push(config::ApConfigEntry {
-            name: String::from("test_2"),
-            description: String::from("test_2"),
-            mode: String::from("ep11"),
-            mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
-            serialnr: String::from("93AADFK719460083"),
-            mingen: String::from("cex8"),
-            secretid: String::from(
-                "bc9d46c052bc3574454c5715757274629a283767ed237922cfb8651c0e77320a",
-            ),
-        });
-        v.push(config::ApConfigEntry {
-            name: String::from("test_3"),
-            description: String::from("test_3"),
-            mode: String::from("ep11"),
-            mkvp: String::from("4a27bb66520ac85f6073a7f678d262c0"),
-            serialnr: String::from(""),
-            mingen: String::from("cex8"),
-            secretid: String::from(
-                "06cdbbac76a595b481110d108154bc05ebbf900a0f16e36a24045998934fb1e9",
-            ),
-        });
-        v.push(config::ApConfigEntry {
-            name: String::from("test_4"),
-            description: String::from("test_4"),
-            mode: String::from("ep11"),
-            mkvp: String::from("8be1eaf5c44e2fa8b18804551b604b1b"),
-            serialnr: String::from(""),
-            mingen: String::from("cex8"),
-            secretid: String::from(
-                "6831af07f8c8e7309a3ace9f3b5554d34e3eaa4a27a08fdee469e367c3fa3e9e",
-            ),
-        });
-        return v;
+        vec![
+            config::ApConfigEntry {
+                name: String::from("test_1"),
+                description: String::from("test_1"),
+                mode: String::from("accel"),
+                mkvp: String::from(""),
+                serialnr: String::from(""),
+                mingen: String::from("cex8"),
+                secretid: String::from(""),
+            },
+            config::ApConfigEntry {
+                name: String::from("test_2"),
+                description: String::from("test_2"),
+                mode: String::from("ep11"),
+                mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
+                serialnr: String::from("93AADFK719460083"),
+                mingen: String::from("cex8"),
+                secretid: String::from(
+                    "bc9d46c052bc3574454c5715757274629a283767ed237922cfb8651c0e77320a",
+                ),
+            },
+            config::ApConfigEntry {
+                name: String::from("test_3"),
+                description: String::from("test_3"),
+                mode: String::from("ep11"),
+                mkvp: String::from("4a27bb66520ac85f6073a7f678d262c0"),
+                serialnr: String::from(""),
+                mingen: String::from("cex8"),
+                secretid: String::from(
+                    "06cdbbac76a595b481110d108154bc05ebbf900a0f16e36a24045998934fb1e9",
+                ),
+            },
+            config::ApConfigEntry {
+                name: String::from("test_4"),
+                description: String::from("test_4"),
+                mode: String::from("ep11"),
+                mkvp: String::from("8be1eaf5c44e2fa8b18804551b604b1b"),
+                serialnr: String::from(""),
+                mingen: String::from("cex8"),
+                secretid: String::from(
+                    "6831af07f8c8e7309a3ace9f3b5554d34e3eaa4a27a08fdee469e367c3fa3e9e",
+                ),
+            },
+        ]
     }
 
     #[test]

@@ -21,7 +21,7 @@ pub struct Cli {
     #[arg(short = 'n', long = "dry-run")]
     pub dryrun: bool,
 
-    /// Enforce strict match: All config entries need to be fullfilled.
+    /// Enforce strict match: All config entries need to be fulfilled.
     ///
     /// By default it is enough to successfully apply at least one config entry.
     /// With the strict flag enabled, all config entries within a config file
