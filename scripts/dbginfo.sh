@@ -52,6 +52,14 @@ if test "x${PROCESSORVERSION}" = "xFF" || test "x${PROCESSORVERSION}" = "xff"; t
 else
 	RUNTIME_ENVIRONMENT="LPAR"
 fi
+# check for Dynamic Partition Mode
+readonly DPM_UUID=$(grep "LPAR UUID" /proc/sysinfo | \
+	sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
+if test "${#DPM_UUID}" -eq 0; then
+	DPM_MODE="NO"
+else
+	DPM_MODE="YES"
+fi
 readonly SYSTEMHOSTNAME="$(hostname -s 2>/dev/null)" # hostname of system being analysed
 readonly TERMINAL="$(tty 2>/dev/null)"
 # timeout seconds TOS / kill timeout TOKS
@@ -156,7 +164,7 @@ print_check() {
 	cat <<EOF
 
 Hardware platform     = ${HW}
-Runtime environment   = ${RUNTIME_ENVIRONMENT}
+Runtime environment   = ${RUNTIME_ENVIRONMENT} - DPM: ${DPM_MODE}
 $(cat /proc/sysinfo | grep 'Name')
 Kernel version        = ${KERNEL_INFO}
 OS version / distro   = ${OS_NAME}
@@ -1531,7 +1539,7 @@ trap emergency_exit SIGHUP SIGINT SIGTERM
 
 pr_log_stdout ""
 pr_log_stdout "Hardware platform     = ${HW}"
-pr_log_stdout "Runtime environment   = ${RUNTIME_ENVIRONMENT}"
+pr_log_stdout "Runtime environment   = ${RUNTIME_ENVIRONMENT} - DPM: ${DPM_MODE}"
 pr_log_stdout "Kernel version        = ${KERNEL_INFO} (${KERNEL_BASE})"
 pr_log_stdout "OS version / distro   = ${OS_NAME}"
 pr_log_stdout "Date and time of info = ${DATETIME}"

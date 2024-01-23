@@ -1,13 +1,16 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.xx.x (2024-xx-xx)__
 
   For Linux kernel version: 6.x
 
   Add new tools / libraries:
 
   Changes of existing tools:
+  - dbginfo.sh: update man page and copyright
+  - dbginfo.sh: fix relative path on script copy
+  - dbginfo.sh: check for Dynamic Partition Mode
 
   Bug Fixes:
 
