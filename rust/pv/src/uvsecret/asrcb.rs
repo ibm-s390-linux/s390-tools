@@ -150,6 +150,7 @@ impl From<AddSecretVersion> for RequestVersion {
 /// _______________________________________________________________
 /// |                   generic header (48)
 /// |     ---------------------------------------------------     |
+/// |  Plaintext Add-Secret flags (8)                             |
 /// |  SE header tags: PLD(64) ALD(64) TLD(64) HeaderTag(16)      |
 /// |  Configuration unique ID(16) (Attestation)                  |
 /// |       Optional, defaults to 0                               |
