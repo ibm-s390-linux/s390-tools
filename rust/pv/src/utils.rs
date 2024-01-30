@@ -2,14 +2,16 @@
 //
 // Copyright IBM Corp. 2023
 use crate::{Error, Result};
-use openssl::x509::X509Crl;
-use openssl::x509::X509;
+use openssl::{
+    pkey::{PKey, Private},
+    x509::{X509Crl, X509},
+};
 
 /// Read all CRLs from the buffer and parse them into a vector.
 ///
 /// # Errors
 ///
-/// This function will return an error if the underlying openssl implementation cannot parse `buf`
+/// This function will return an error if the underlying OpenSSL implementation cannot parse `buf`
 /// as `DER` or `PEM`.
 pub fn read_crls(buf: &[u8]) -> Result<Vec<X509Crl>> {
     use openssl_extensions::crl::StackableX509Crl;
@@ -23,8 +25,8 @@ pub fn read_crls(buf: &[u8]) -> Result<Vec<X509Crl>> {
 ///
 /// # Errors
 ///
-/// This function will return an error if the underlying openssl implementation cannot parse `buf`
-/// as `DER` or `PEM`.
+/// This function will return an error if the underlying OpenSSL implementation cannot parse `buf`
+
 pub fn read_certs(buf: &[u8]) -> Result<Vec<X509>> {
     X509::from_der(buf)
         .map(|crt| vec![crt])
@@ -32,9 +34,21 @@ pub fn read_certs(buf: &[u8]) -> Result<Vec<X509>> {
         .map_err(Error::Crypto)
 }
 
+/// Read+parse the first key from the buffer.
+///
+/// # Errors
+///
+/// This function will return an error if the underlying OpenSSL implementation cannot parse `buf`
+/// as `DER` or `PEM`.
+pub fn read_private_key(buf: &[u8]) -> Result<PKey<Private>> {
+    PKey::private_key_from_der(buf)
+        .or_else(|_| PKey::private_key_from_pem(buf))
+        .map_err(Error::Crypto)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::*;
+    use crate::{get_test_asset, test_utils::*};
 
     #[test]
     fn read_crls() {
@@ -54,5 +68,19 @@ mod tests {
         assert_eq!(super::read_certs(&crt).unwrap().len(), 1);
         assert_eq!(super::read_certs(&crt_der).unwrap().len(), 1);
         assert_eq!(super::read_certs(&fail).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn read_private_key() {
+        let key = get_test_asset!("keys/rsa3072key.pem");
+        let key = super::read_private_key(key).unwrap();
+        assert_eq!(key.rsa().unwrap().size(), 384);
+    }
+
+    #[test]
+    fn read_private_key_fail() {
+        let key = get_test_asset!("exp/secure_guest.hdr");
+        let key = super::read_private_key(key);
+        assert!(key.is_err());
     }
 }

@@ -48,7 +48,7 @@ pub mod misc {
         get_reader_from_cli_file_arg, get_writer_from_cli_file_arg, CertificateOptions, STDIN,
         STDOUT,
     };
-    pub use crate::utils::{read_certs, read_crls};
+    pub use crate::utils::{read_certs, read_crls, read_private_key};
     pub use pv_core::misc::*;
     pub use pv_core::PvLogger;
 }
