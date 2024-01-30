@@ -30,15 +30,15 @@ pub struct CertificateOptions {
     /// Disable the host-key document verification.
     ///
     /// Does not require the host-key documents to be valid.
-    /// Do not use for a production request unless you verified the host-key document before.
+    /// Do not use for a production request unless you verified the host-key document beforehand.
     #[arg(long)]
     pub no_verify: bool,
 
-    /// Use FILE as a certificate to verify the host-key(s).
+    /// Use FILE as a certificate to verify the host key or keys.
     ///
     /// The certificates are used to establish a chain of trust for the verification
     /// of the host-key documents. Specify this option twice to specify the IBM Z signing key and
-    /// the intermediate CA certificate (signed by the rootCA).
+    /// the intermediate CA certificate (signed by the root CA).
     #[arg(
         short= 'C',
         long = "cert",
@@ -52,7 +52,7 @@ pub struct CertificateOptions {
 
     /// Use FILE as a certificate revocation list.
     ///
-    /// That list is used to check whether a certificate of the chain of
+    /// The list is used to check whether a certificate of the chain of
     /// trust is revoked. Specify this option multiple times to use multiple CRLs.
     #[arg(
         long = "crl",
@@ -70,7 +70,7 @@ pub struct CertificateOptions {
 
     /// Use FILE as the root-CA certificate for the verification.
     ///
-    /// If omitted, the system wide root CAs installed on the system are used.
+    /// If omitted, the system wide-root CAs installed on the system are used.
     /// Use this only if you trust the specified certificate.
     #[arg(long, requires("certs"))]
     pub root_ca: Option<String>,

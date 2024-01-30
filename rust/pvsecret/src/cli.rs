@@ -117,10 +117,14 @@ pub struct CreateSecretOpt {
 
 #[derive(Subcommand, Debug)]
 pub enum AddSecretType {
+    /// Create a meta secret.
+    ///
     /// Use a meta secret to carry flags to the ultravisor without having to provide an actual
     /// secret value. Meta secrets do not appear in the list of secrets.
     Meta,
 
+    /// Create an association secret.
+    ///
     /// Use an association secret to connect a trusted I/O device to a guest. The `pvapconfig` tool
     /// provides more information about association secrets.
     Association {
@@ -132,7 +136,7 @@ pub enum AddSecretType {
 
         ///Print the hashed name to stdout.
         ///
-        ///The hashed name will not be written to `NAME.yaml`
+        ///The hashed name is not written to `NAME.yaml`
         #[arg(long)]
         stdout: bool,
 
@@ -196,7 +200,7 @@ pub enum Command {
     /// the use case depending on the secret type.
     Create(Box<CreateSecretOpt>),
 
-    /// Repeat an add-secret request (s390x only).
+    /// Perform an add-secret request (s390x only).
     ///
     /// Perform an add-secret request using a previously generated add-secret request. Only
     /// available on s390x.
