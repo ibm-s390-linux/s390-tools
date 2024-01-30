@@ -240,11 +240,7 @@ impl AddSecretRequest {
         self.keyslots.iter().for_each(|k| aad.push(Aad::Ks(k)));
         aad.push(Aad::Plain(&secr_auth));
 
-        ctx.build_aad(self.version.into(), &aad, conf_len, self.magic())
-    }
-
-    fn magic(&self) -> crate::request::RequestMagic {
-        self.magic.as_bytes().try_into().unwrap()
+        ctx.build_aad(self.version.into(), &aad, conf_len, self.magic.get())
     }
 
     #[doc(hidden)]

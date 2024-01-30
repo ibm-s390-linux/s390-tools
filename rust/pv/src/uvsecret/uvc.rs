@@ -63,7 +63,7 @@ impl AddCmd {
         let mut data = Vec::with_capacity(PAGESIZE);
         bin_add_secret_req.read_to_end(&mut data)?;
 
-        if !AddSecretMagic::starts_with_magic(&data[..6]) {
+        if !AddSecretMagic::starts_with_magic(&data) {
             return Err(Error::NoAsrcb);
         }
         Ok(Self(data))

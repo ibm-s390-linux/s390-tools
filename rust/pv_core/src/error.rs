@@ -44,6 +44,9 @@ pub enum Error {
     #[error("Input does not contain an add-secret request")]
     NoAsrcb,
 
+    #[error("Input contains unsupported user-data type: {0:#06x}")]
+    UnsupportedUserData(u16),
+
     // errors from other crates
     #[error(transparent)]
     Io(#[from] std::io::Error),
