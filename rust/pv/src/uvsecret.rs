@@ -10,3 +10,4 @@
 pub mod asrcb;
 pub mod ext_secret;
 pub mod guest_secret;
+pub mod user_data;

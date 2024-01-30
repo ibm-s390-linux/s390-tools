@@ -21,6 +21,7 @@ use std::convert::TryInto;
 /// An AES256-key that will purge itself out of the memory when going out of scope
 ///
 pub type Aes256Key = Secret<[u8; 32]>;
+pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
 
 /// Types of symmetric keys, to specify during construction.
 ///
@@ -182,7 +183,7 @@ pub fn encrypt_aes(key: &SymKey, iv: &[u8], conf: &[u8]) -> Result<Vec<u8>> {
 ///
 /// This function will return an error if the data could not be encrypted by OpenSSL.
 pub fn encrypt_aes_gcm(key: &SymKey, iv: &[u8], aad: &[u8], conf: &[u8]) -> Result<Vec<u8>> {
-    let mut tag = vec![0xff; 16];
+    let mut tag = vec![0xff; AES_256_GCM_TAG_SIZE];
     let encr = match key {
         SymKey::Aes256(key) => encrypt_aead(
             Cipher::aes_256_gcm(),

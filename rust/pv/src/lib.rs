@@ -65,7 +65,7 @@ pub mod request {
     pub use crate::crypto::{hash, hkdf_rfc_5869};
     pub use crate::crypto::{sign_msg, verify_signature};
     pub use crate::crypto::{Aes256Key, SymKey, SymKeyType};
-    pub use crate::req::{Aad, Encrypt, Keyslot, ReqEncrCtx, Request};
+    pub use crate::req::{Aad, BinReqValues, Encrypt, Keyslot, ReqEncrCtx, Request};
     pub use crate::secret::{Secret, Zeroize};
     pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};
 
@@ -83,6 +83,7 @@ pub mod request {
             asrcb::{AddSecretFlags, AddSecretRequest, AddSecretVersion},
             ext_secret::ExtSecret,
             guest_secret::GuestSecret,
+            user_data::verify_asrcb_and_get_user_data,
         };
         pub use pv_core::request::uvsecret::AddSecretMagic;
         pub use pv_core::request::uvsecret::UserDataType;

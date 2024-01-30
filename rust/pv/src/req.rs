@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
+use crate::crypto::AES_256_GCM_TAG_SIZE;
 use crate::misc::to_u32;
 use crate::request::{
     derive_key, encrypt_aes, encrypt_aes_gcm, gen_ec_key, random_array, SymKey, SymKeyType,
@@ -14,6 +15,8 @@ use openssl::hash::{hash, MessageDigest};
 use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
 use std::convert::TryInto;
+use std::mem::size_of;
+use utils::assert_size;
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
 
 /// Encrypt a _secret_ using self and a given private key.
@@ -322,6 +325,7 @@ struct RequestHdr {
     reserved28: u32,
     sea: U32<BigEndian>,
 }
+assert_size!(RequestHdr, 48);
 
 impl RequestHdr {
     fn new(rqvn: u32, rql: u32, iv: [u8; 12], nks: u8, sea: u32, magic: Option<[u8; 8]>) -> Self {
@@ -378,6 +382,67 @@ pub trait Request {
     ///
     /// Must be called at least once, otherwise {`Request::encrypt`} will fail
     fn add_hostkey(&mut self, hostkey: PKey<Public>);
+}
+
+/// A struct to represent some parts of a binary/encrypted request.
+#[derive(Debug)]
+#[allow(unused)]
+#[allow(clippy::len_without_is_empty)]
+pub struct BinReqValues<'a> {
+    iv: &'a [u8],
+    aad: &'a [u8],
+    req_dep_aad: &'a [u8],
+    encr: &'a [u8],
+    tag: &'a [u8],
+    version: u32,
+    len: usize,
+}
+impl<'a> BinReqValues<'a> {
+    pub(crate) const TAG_LEN: usize = AES_256_GCM_TAG_SIZE;
+
+    /// Get the locations from this request.
+    ///
+    /// Does minimal sanity test, just tests to prevent panics.
+    /// `req` may be larger than the actual request.
+    pub fn get(req: &'a [u8]) -> Result<Self> {
+        let hdr = RequestHdr::read_from_prefix(req).ok_or(Error::BinRequestSmall)?;
+        let rql = hdr.rql.get() as usize;
+        let sea = hdr.sea.get() as usize;
+
+        if rql < req.len() || sea + Self::TAG_LEN > rql {
+            return Err(Error::BinRequestSmall);
+        }
+        let aad_size = rql - sea - Self::TAG_LEN;
+        if aad_size < size_of::<RequestHdr>() {
+            return Err(Error::BinRequestSmall);
+        }
+
+        let iv = &req[0x10..0x1c];
+        let aad = &req[..aad_size];
+        let req_dep_aad = &req[size_of::<RequestHdr>()..aad_size];
+        let encr = &req[aad_size..(aad_size + sea)];
+        let tag = &req[rql - Self::TAG_LEN..];
+
+        Ok(Self {
+            iv,
+            aad,
+            req_dep_aad,
+            encr,
+            tag,
+            version: hdr.rqvn.get(),
+            len: rql,
+        })
+    }
+
+    /// Returns the version of this [`BinReqValues`].
+    pub fn version(&self) -> u32 {
+        self.version
+    }
+
+    /// Returns the length of this [`BinReqValues`].
+    pub fn len(&self) -> usize {
+        self.len
+    }
 }
 
 #[cfg(test)]

@@ -67,6 +67,13 @@ impl AddSecretMagic {
         let kind = UserDataType::try_from(kind)?;
         Ok(Self::from(kind))
     }
+
+    /// Returns the [`UserDataType`] of this [`AddSecretMagic`].
+    pub fn kind(&self) -> UserDataType {
+        // Panic: Will never panic. The value is cheched during construcion of the object for
+        // beeing one of the enum values.
+        self.kind.get().try_into().unwrap()
+    }
 }
 
 /// Types of (non architectured) user data for an add-secret request

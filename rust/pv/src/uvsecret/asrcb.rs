@@ -176,6 +176,10 @@ pub struct AddSecretRequest {
 }
 
 impl AddSecretRequest {
+    #[allow(unused)]
+    /// Offset of the user-data in the add-secret request in bytes
+    pub(super) const V1_USER_DATA_OFFS: usize = 0x218;
+
     /// Create a new add-secret request.
     ///
     /// The request has no extension secret, no configuration UID, no host-keys,

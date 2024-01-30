@@ -5,7 +5,10 @@ use pv::{
     get_test_asset,
     request::{
         openssl::pkey::{PKey, Public},
-        uvsecret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret},
+        uvsecret::{
+            verify_asrcb_and_get_user_data, AddSecretFlags, AddSecretRequest, AddSecretVersion,
+            ExtSecret, GuestSecret,
+        },
         BootHdrTags, ReqEncrCtx, Request, SymKey,
     },
     test_utils::get_test_keys,
@@ -152,4 +155,13 @@ fn null_none_default_cuid_seven() {
 
     let exp = get_test_asset!("exp/asrcb/null_none_default_cuid_seven");
     assert_eq!(asrcb, exp);
+}
+
+#[test]
+fn verify_no_user_data() {
+    let req = get_test_asset!("exp/asrcb/null_none_default_ncuid_one");
+    assert!(matches!(
+        verify_asrcb_and_get_user_data(req.to_vec(), None),
+        Ok(None)
+    ))
 }

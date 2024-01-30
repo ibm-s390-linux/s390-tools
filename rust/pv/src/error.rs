@@ -38,6 +38,36 @@ pub enum Error {
     #[error("Verifying signatures is only supported for EC and RSA keys")]
     UnsupportedVerificationKey,
 
+    #[error("Provided binary request is too small")]
+    BinRequestSmall,
+
+    #[error("No Config UID found: {0}")]
+    NoCuid(String),
+
+    // errors from request types
+    #[error("Customer Communication Key must be 32 bytes long")]
+    CckSize,
+
+    #[error("Invalid {0} user-data for signing provided. Max {} bytes allowed", .0.max())]
+    AsrcbInvSgnUserData(UserDataType),
+
+    #[error("Unsupported user data signing key provided. Only EC(secp521r1) and RSA(2048 & 3072 bit) are supported")]
+    BinAsrcbUnsupportedUserDataSgnKey,
+
+    #[error("No user-key for verification provided and user-data is signed")]
+    BinAsrcbNoUserDataSgnKey,
+
+    #[error("Input does not contain an add-secret request version 1")]
+    BinAsrcbInvVersion,
+
+    #[error("Provided user-data key type ({key}) does not match with the user-data ({kind})")]
+    AsrcbUserDataKeyMismatch { key: String, kind: UserDataType },
+
+    #[error(
+        "The user-defined request signature could not be verified with the provided certificate"
+    )]
+    AsrcbUserDataSgnFail,
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),
@@ -96,3 +126,5 @@ macro_rules! bail_hkd_verify {
     };
 }
 pub(crate) use bail_hkd_verify;
+
+use crate::request::uvsecret::UserDataType;
