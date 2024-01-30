@@ -84,7 +84,7 @@ pub struct CreateSecretOpt {
 
     /// Use the content of FILE as the Configuration Unique ID.
     ///
-    /// The file must contain exactly 128 bit of data, a hex string, or a yaml with a `cuid` entry.
+    /// The file must contain exactly 128 bit of data or a yaml with a `cuid` entry.
     /// If specified, the value must match the Config-UID from the attestation result of that
     /// guest. If not specified, the CUID will be ignored by the Ultravisor during the verification
     /// of the request.
