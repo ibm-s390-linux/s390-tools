@@ -63,6 +63,7 @@ pub mod request {
     pub use crate::crypto::random_array;
     pub use crate::crypto::{encrypt_aes, encrypt_aes_gcm, gen_ec_key};
     pub use crate::crypto::{hash, hkdf_rfc_5869};
+    pub use crate::crypto::{sign_msg, verify_signature};
     pub use crate::crypto::{Aes256Key, SymKey, SymKeyType};
     pub use crate::req::{Aad, Encrypt, Keyslot, ReqEncrCtx, Request};
     pub use crate::secret::{Secret, Zeroize};

@@ -32,6 +32,12 @@ pub enum Error {
     #[error("Internal (unexpected) error: {0}, caused by {1}")]
     InternalSsl(&'static str, #[source] openssl::error::ErrorStack),
 
+    #[error("Signing is only supported for EC and RSA keys")]
+    UnsupportedSigningKey,
+
+    #[error("Verifying signatures is only supported for EC and RSA keys")]
+    UnsupportedVerificationKey,
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),

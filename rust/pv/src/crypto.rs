@@ -3,15 +3,17 @@
 // Copyright IBM Corp. 2023
 
 use crate::{error::Result, secret::Secret, Error};
-use openssl::rand::rand_bytes;
 use openssl::{
     derive::Deriver,
     ec::{EcGroup, EcKey},
     hash::{DigestBytes, MessageDigest},
     md::MdRef,
     nid::Nid,
-    pkey::{Id, PKey, Private, Public},
+    pkey::{HasPublic, Id, PKey, PKeyRef, Private, Public},
     pkey_ctx::{HkdfMode, PkeyCtx},
+    rand::rand_bytes,
+    rsa::Padding,
+    sign::{Signer, Verifier},
     symm::{encrypt, encrypt_aead, Cipher},
 };
 use std::convert::TryInto;
@@ -209,10 +211,100 @@ pub fn hash(t: MessageDigest, data: &[u8]) -> Result<DigestBytes> {
     openssl::hash::hash(t, data).map_err(Error::Crypto)
 }
 
+/// Calculate a digital signature scheme.
+///
+/// Calculates the digital signature of the provided message using the signing key. [`Id::EC`],
+/// and [`Id::RSA`] keys are supported. For [`Id::RSA`] [`Padding::PKCS1_PSS`] is used.
+///
+/// # Errors
+///
+/// This function will return an error if OpenSSL could not compute the signature.
+pub fn sign_msg(skey: &PKeyRef<Private>, dgst: MessageDigest, msg: &[u8]) -> Result<Vec<u8>> {
+    match skey.id() {
+        Id::EC => {
+            let mut sgn = Signer::new(dgst, skey)?;
+            sgn.sign_oneshot_to_vec(msg).map_err(Error::Crypto)
+        }
+        Id::RSA => {
+            let mut sgn = Signer::new(dgst, skey)?;
+            sgn.set_rsa_padding(Padding::PKCS1_PSS)?;
+            sgn.sign_oneshot_to_vec(msg).map_err(Error::Crypto)
+        }
+        _ => Err(Error::UnsupportedSigningKey),
+    }
+}
+
+/// Verify the digital signature of a message.
+///
+/// Verifies the digital signature of the provided message using the signing key.
+/// [`Id::EC`] and [`Id::RSA`] keys are supported. For [`Id::RSA`] [`Padding::PKCS1_PSS`] is used.
+///
+/// # Returns
+/// true if signature could be verified, false otherwise
+///
+/// # Errors
+///
+/// This function will return an error if OpenSSL could not compute the signature.
+pub fn verify_signature<T: HasPublic>(
+    skey: &PKeyRef<T>,
+    dgst: MessageDigest,
+    msg: &[u8],
+    sign: &[u8],
+) -> Result<bool> {
+    match skey.id() {
+        Id::EC => {
+            let mut ctx = Verifier::new(dgst, skey)?;
+            ctx.update(msg)?;
+            ctx.verify(sign).map_err(Error::Crypto)
+        }
+        Id::RSA => {
+            let mut ctx = Verifier::new(dgst, skey)?;
+            ctx.set_rsa_padding(Padding::PKCS1_PSS)?;
+            ctx.verify_oneshot(sign, msg).map_err(Error::Crypto)
+        }
+        _ => Err(Error::UnsupportedVerificationKey),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::*;
+    use crate::{get_test_asset, test_utils::*};
+
+    #[test]
+    fn sign_ec() {
+        let (ec_key, _) = get_test_keys();
+
+        let data = "sample".as_bytes();
+        let sign = sign_msg(&ec_key, MessageDigest::sha512(), data).unwrap();
+        assert!(sign.len() <= 139 && sign.len() >= 137);
+
+        assert!(verify_signature(&ec_key, MessageDigest::sha512(), data, &sign).unwrap());
+    }
+
+    #[test]
+    fn sign_rsa_2048() {
+        let keypair = get_test_asset!("keys/rsa2048key.pem");
+        let keypair = PKey::private_key_from_pem(keypair).unwrap();
+
+        let data = "sample".as_bytes();
+        let sign = sign_msg(&keypair, MessageDigest::sha512(), data).unwrap();
+        assert_eq!(256, sign.len());
+
+        assert!(verify_signature(&keypair, MessageDigest::sha512(), data, &sign).unwrap());
+    }
+
+    #[test]
+    fn sign_rsa_3072() {
+        let keypair = get_test_asset!("keys/rsa3072key.pem");
+        let keypair = PKey::private_key_from_pem(keypair).unwrap();
+
+        let data = "sample".as_bytes();
+        let sign = sign_msg(&keypair, MessageDigest::sha512(), data).unwrap();
+        assert_eq!(384, sign.len());
+
+        assert!(verify_signature(&keypair, MessageDigest::sha512(), data, &sign).unwrap());
+    }
 
     #[test]
     fn derive_key() {
