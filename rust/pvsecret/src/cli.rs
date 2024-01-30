@@ -4,7 +4,6 @@
 
 use clap::{ArgGroup, Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
 use pv::misc::CertificateOptions;
-#[cfg(target_arch = "s390x")]
 use pv::misc::STDOUT;
 
 /// Manage secrets for IBM Secure Execution guests.
@@ -113,6 +112,31 @@ pub struct CreateSecretOpt {
         value_delimiter = ','
     )]
     pub flags: Vec<CreateSecretFlags>,
+
+    /// Use the content of FILE as user-data.
+    ///
+    /// Passes user data defined in <FILE> through the add-secret request  to the ultravisor. The
+    /// user data can be up to 512 bytes of arbitrary data, and the maximum size depends on the
+    /// size of the user-signing key:
+    /// - No key: user data can be 512 bytes.
+    /// - EC or RSA 2048 keys: user data can be 256 bytes.
+    /// - RSA 3072 key: user data can be 128 bytes.
+    ///
+    /// The firmware ignores this data, but the request tag protects the user-data. Optional. No
+    /// user-data by default.
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    pub user_data: Option<String>,
+
+    /// Use the content of FILE as user signing key.
+    ///
+    /// Adds a signature calculated from the key in <FILE> to the add-secret request. The
+    /// file must be in DER or PEM format containing a private key. Supported are RSA 2048 &
+    /// 3072-bit and EC(secp521r1) keys. The firmware ignores the content, but the request tag protects the
+    /// signature. The user-signing key signs the request. The location of the signature is filled
+    /// with zeros during the signature calculation. The request tag also secures the signature.
+    /// See man pvsecret verify for more details. Optional. No signature by default.
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    pub user_sign_key: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -189,6 +213,30 @@ pub struct ListSecretOpt {
     pub format: ListSecretOutputType,
 }
 
+#[derive(Args, Debug)]
+pub struct VerifyOpt {
+    /// Specify the request to be checked.
+    #[arg(value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    pub input: String,
+
+    /// Certificate containing a public key used to verify the user data signature.
+    ///
+    /// Specifies a public key used to verify the user-data signature. The file must be a X509
+    /// certificate in DSA or PEM format. The certificate must hold the public EC, RSA 2048, or RSA
+    /// 3072 key corresponding to the private user-key used during `create`. No chain of trust is
+    /// established. Ensuring that the certificate can be trusted is the responsibility of  the
+    /// user. The EC key must use the NIST/SECG curve over a 521 bit prime field (secp521r1).
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    pub user_cert: Option<String>,
+
+    /// Store the result in FILE
+    ///
+    /// If the request contained abirtary user-data the output contains this user-data with padded
+    /// zeros if available.
+    #[arg(short, long, value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath,)]
+    pub output: String,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Create a new add-secret request.
@@ -217,6 +265,13 @@ pub enum Command {
     /// Lists the IDs of all non-null secrets currently stored in the ultravisor for the currently
     /// running IBM Secure Execution guest. Only available on s390x.
     List(ListSecretOpt),
+
+    /// Verify that an add-secret request is sane.
+    ///
+    /// Verifies that the given request is an add-secret request by testing for some values to be
+    /// present. If the request contains signed user-data, the signature is verified with the
+    /// provided key. Outputs the arbitrary user-data.
+    Verify(VerifyOpt),
 
     /// Print version information and exit.
     #[command(aliases(["--version"]), hide(true))]

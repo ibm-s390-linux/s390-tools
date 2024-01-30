@@ -45,6 +45,11 @@ Lock the secret-store (s390x only)
 List all ultravisor secrets (s390x only)
 </ul>
 
+- **verify**
+<ul>
+Verify that an add-secret request is sane
+</ul>
+
 ## Options
 
 `-v`, `--verbose`
@@ -180,9 +185,9 @@ all requests.
 <ul>
 Use HEXSTRING as the Configuration Unique ID. Must be a hex 128-bit unsigned big
 endian number string. Leading zeros must be provided. If specified, the value
-must match with the Config-UID from the attestation result of that guest.  If
-not specified, the CUID will be ignored by the ultravisor during the
-verification of the request.
+must match with the Config-UID from the attestation result of that guest. If not
+specified, the CUID will be ignored by the ultravisor during the verification of
+the request.
 </ul>
 
 
@@ -201,6 +206,37 @@ of the request.
 Flags for the add-secret request
     Possible values:
         - **disable-dump**: Disables host-initiated dumping for the target guest instance
+</ul>
+
+
+`--user-data <FILE>`
+<ul>
+Use the content of FILE as user-data. Passes user data defined in <FILE> through
+the add-secret request to the ultravisor. The user data can be up to 512 bytes
+of arbitrary data, and the maximum size depends on the size of the user-signing
+key:
+
+ - No key: user data can be 512 bytes.
+
+ - EC(secp521r1) or RSA 2048 keys: user data can be 256 bytes.
+
+ - RSA 3072 key: user data can be 128 bytes.
+
+The firmware ignores this data, but the request tag protects the user-data.
+Optional. No user-data by default.
+</ul>
+
+
+`--user-sign-key <FILE>`
+<ul>
+Use the content of FILE as user signing key. Adds a signature defined calculated
+from the key in <FILE> to the add-secret request. The file must be in DER or PEM
+format containing a private key. Supported are RSA 2048 & 3072-bit and
+EC(secp521r1) keys. The firmware ignores the content, but the request tag
+protects the signature. The user-signing key signs the request. The location of
+the signature is filled with zeros during the signature calculation. The request
+tag also secures the signature. See man pvsecret verify for more details.
+Optional. No signature by default.
 </ul>
 
 
@@ -300,4 +336,74 @@ Define the output format of the list
         - **human**: Human-focused, non-parsable output format
         - **yaml**: Use yaml format
         - **bin**: Use the format the ultravisor uses to pass the list
+</ul>
+
+
+## pvsecret verify
+### Synopsis
+`pvsecret verify [OPTIONS] <FILE>`
+### Description
+Verifies that the given request is an Add-Secret request by testing for some
+values to be present. If the request contains signed user-data, the signature
+is verified with the provided key. Outputs the arbitrary user-data. All data in
+the request is in big endian. `verify` checks the following:
+
+ - The first 6 bytes of the request are equal to: `B6173 7263 624d | asrcbM`
+ - The sizes in the request header are sane and do not point out of the file
+ - The request version is supported by the binary
+ - If user-data contains a signature, verify the signature using a public key
+
+The content of bytes 6&7 of the request define which kind of user-data the
+request contains.
+ - **0x0000** `no user-data (512 bytes zero)`
+ - **0x0001** `512 bytes user-data`
+ - **0x0002** `265 bytes user-data| 139 bytes ecdsa signature | 5 bytes reserved
+| 2 bytes signature size | ...`
+ - **0x0003** `256 bytes user-data | 256 bytes rsa2048 signature`
+ - **0x0004** `128 bytes user-data | 384 bytes rsa3072 signature`
+
+The actual user-data may be less than the capacity. If less data was provided
+during `create` zeros are appended.
+For type 2-4 The signature is calculated as follows:
+1) The request is generated with the user-data in place and zeros for the
+signature data.
+2) The signature is calculated for the request. The signature signs the
+authenticated data and the encrypted data, but not the request tag. I.e. the
+signature signs the whole request but the last 16 bytes a,d with the signature
+bytes set to zero.
+3) The signature is inserted to its location in the request.
+4) The request GCM tag is calculated.
+
+The verification process works as follows:
+1) copy the signature to a buffer
+2) overwrite the signature with zeros
+3) verify the signature of the request but the last 16 bytes
+
+### Arguments
+
+`<FILE>`
+<ul>
+Specify the request to be checked
+</ul>
+
+
+### Options
+
+`--user-cert <FILE>`
+<ul>
+Certificate containing a public key used to verify the user data signature.
+Specifies a public key used to verify the user-data signature. The file must be
+a X509 certificate in DSA or PEM format. The certificate must hold the public
+EC, RSA 2048, or RSA 3072 key corresponding to the private user-key used during
+`create`. No chain of trust is established. Ensuring that the certificate can be
+trusted is the responsibility of the user. The EC key must use the NIST/SECG
+curve over a 521 bit prime field (secp521r1).
+</ul>
+
+
+`-o`, `--output <FILE>`
+<ul>
+Store the result in FILE If the request contained abirtary user-data the output
+contains this user-data with padded zeros if available.
+    Default value: '-'
 </ul>

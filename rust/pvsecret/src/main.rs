@@ -25,6 +25,7 @@ const FEATURES: &[&str] = &[
     "+lock",
     #[cfg(target_arch = "s390x")]
     "+list",
+    "+verify",
 ];
 
 fn print_error(e: anyhow::Error, verbosity: u8) -> ExitCode {
@@ -116,6 +117,7 @@ fn main() -> ExitCode {
         Command::Lock => not_supported(),
         Command::Create(opt) => cmd::create(opt),
         Command::Version => print_version(cli.verbose),
+        Command::Verify(opt) => cmd::verify(opt),
     };
 
     match res {

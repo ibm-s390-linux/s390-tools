@@ -8,7 +8,7 @@ use log::{debug, info, trace, warn};
 use pv::{
     misc::{
         get_writer_from_cli_file_arg, open_file, parse_hex, pv_guest_bit_set, read_certs,
-        read_exact_file, read_file, try_parse_u128, try_parse_u64, write,
+        read_exact_file, read_file, read_private_key, try_parse_u128, try_parse_u64, write,
     },
     request::{
         openssl::pkey::{PKey, Public},
@@ -106,6 +106,27 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
         asrcb.set_ext_secret(ExtSecret::Derived(read_exact_file(path, "CCK")?.into()))?;
     }
 
+    // add user data
+    let user_data = opt
+        .user_data
+        .as_ref()
+        .map(|p| read_file(p, "user-data"))
+        .transpose()?;
+    if user_data.as_ref().is_some_and(|data| data.is_empty()) {
+        warn!("Added empty user-data file.");
+    }
+
+    let user_key = opt
+        .user_sign_key
+        .as_ref()
+        .map(|p| read_file(p, "User-signing key"))
+        .transpose()?
+        .map(|buf| read_private_key(&buf))
+        .transpose()?;
+
+    if user_data.is_some() || user_key.is_some() {
+        asrcb.set_user_data(user_data.unwrap_or_default(), user_key)?;
+    }
     Ok(asrcb)
 }
 
@@ -140,7 +161,7 @@ fn try_from_val(val: Value) -> anyhow::Result<ConfigUid> {
     .ok_or(anyhow!("No 'cuid' entry found"))?;
     let cuid = cuid
         .strip_prefix("0x")
-        .ok_or(anyhow!("Value starts not with 0x".to_string()))?
+        .ok_or(anyhow!("CUID value starts not with 0x".to_string()))?
         .to_owned();
     if cuid.len() != ::std::mem::size_of::<ConfigUid>() * 2 {
         return Err(anyhow!(format!("len invalid ({})", cuid.len())));
