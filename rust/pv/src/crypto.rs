@@ -14,7 +14,7 @@ use openssl::{
     rand::rand_bytes,
     rsa::Padding,
     sign::{Signer, Verifier},
-    symm::{encrypt, encrypt_aead, Cipher},
+    symm::{encrypt_aead, Cipher},
 };
 use std::{convert::TryInto, ops::Range};
 
@@ -147,23 +147,6 @@ pub fn gen_ec_key() -> Result<PKey<Private>> {
     let group = EcGroup::from_curve_name(Nid::SECP521R1)?;
     let key: EcKey<Private> = EcKey::generate(&group)?;
     PKey::from_ec_key(key).map_err(Error::Crypto)
-}
-
-/// Encrypt confidential Data with a symmetric key.
-///
-/// * `key` - symmetric key used for encryption
-/// * `iv` - initialisation vector
-/// * `conf` - data to be encrypted
-///
-/// # Errors
-///
-/// This function will return an error if the data could not be encrypted by OpenSSL.
-pub fn encrypt_aes(key: &SymKey, iv: &[u8], conf: &[u8]) -> Result<Vec<u8>> {
-    match key {
-        SymKey::Aes256(key) => {
-            encrypt(Cipher::aes_256_gcm(), key.value(), Some(iv), conf).map_err(Error::Crypto)
-        }
-    }
 }
 
 /// Encrypt confidential Data with a symmetric key and provida a gcm tag.
@@ -388,34 +371,6 @@ mod tests {
             &SymKey::Aes256(aes_gcm_key.into()),
             &aes_gcm_iv,
             &aes_gcm_aad,
-            &aes_gcm_plain,
-        )
-        .unwrap();
-        assert_eq!(res, aes_gcm_res);
-    }
-
-    #[test]
-    fn encrypt_aes_256() {
-        let aes_gcm_key = [
-            0xee, 0xbc, 0x1f, 0x57, 0x48, 0x7f, 0x51, 0x92, 0x1c, 0x04, 0x65, 0x66, 0x5f, 0x8a,
-            0xe6, 0xd1, 0x65, 0x8b, 0xb2, 0x6d, 0xe6, 0xf8, 0xa0, 0x69, 0xa3, 0x52, 0x02, 0x93,
-            0xa5, 0x72, 0x07, 0x8f,
-        ];
-        let aes_gcm_iv = [
-            0x99, 0xaa, 0x3e, 0x68, 0xed, 0x81, 0x73, 0xa0, 0xee, 0xd0, 0x66, 0x84,
-        ];
-        let aes_gcm_plain = [
-            0xf5, 0x6e, 0x87, 0x05, 0x5b, 0xc3, 0x2d, 0x0e, 0xeb, 0x31, 0xb2, 0xea, 0xcc, 0x2b,
-            0xf2, 0xa5,
-        ];
-        let aes_gcm_res = vec![
-            0xf7, 0x26, 0x44, 0x13, 0xa8, 0x4c, 0x0e, 0x7c, 0xd5, 0x36, 0x86, 0x7e, 0xb9, 0xf2,
-            0x17, 0x36,
-        ];
-
-        let res = encrypt_aes(
-            &SymKey::Aes256(aes_gcm_key.into()),
-            &aes_gcm_iv,
             &aes_gcm_plain,
         )
         .unwrap();

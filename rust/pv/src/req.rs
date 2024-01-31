@@ -4,9 +4,7 @@
 
 use crate::crypto::AES_256_GCM_TAG_SIZE;
 use crate::misc::to_u32;
-use crate::request::{
-    derive_key, encrypt_aes, encrypt_aes_gcm, gen_ec_key, random_array, SymKey, SymKeyType,
-};
+use crate::request::{derive_key, encrypt_aes_gcm, gen_ec_key, random_array, SymKey, SymKeyType};
 use crate::{Error, Result};
 use openssl::bn::{BigNum, BigNumContext};
 use openssl::ec::{EcGroupRef, EcPointRef};
@@ -238,17 +236,6 @@ impl ReqEncrCtx {
     /// Very unlikely.
     pub fn key_coords(&self) -> Result<EcdhPubkeyCoord> {
         self.priv_key.as_ref().try_into().map_err(Error::Crypto)
-    }
-
-    /// Encrypt confidential Data with  this encryption context.
-    ///
-    /// * `conf` - data to be encrypted
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the data could not be encrypted by OpenSSL.
-    pub fn encrypt(&self, conf: &[u8]) -> Result<Vec<u8>> {
-        encrypt_aes(&self.prot_key, &self.iv, conf)
     }
 
     /// Encrypt confidential Data with this encryption context and provide a gcm tag.
