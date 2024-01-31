@@ -198,8 +198,8 @@ impl Drop for LockFile {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use pv_core::misc::TemporaryDirectory;
 
     // Only very simple tests
 
@@ -245,28 +245,35 @@ mod tests {
     }
     #[test]
     fn test_sysfs_write_i32() {
-        const TEST_PATH: &str = "/tmp/test_sysfs_write_i32";
-        let mut file = File::create(TEST_PATH).unwrap();
+        let temp_dir =
+            TemporaryDirectory::new("pvtests").expect("creating a temporary directory should work");
+        let test_path = temp_dir.path().join("test");
+        let test_path = test_path.as_os_str().to_str().expect("should work");
+        let mut file = File::create(test_path).unwrap();
         let _ = file.write_all(b"XYZ");
         drop(file);
-        let r = sysfs_read_i32(TEST_PATH);
+        let r = sysfs_read_i32(test_path);
         assert!(r.is_err());
-        let r = sysfs_write_i32(TEST_PATH, 999);
+        let r = sysfs_write_i32(test_path, 999);
         assert!(r.is_ok());
-        let r = sysfs_read_i32(TEST_PATH);
+        let r = sysfs_read_i32(test_path);
         assert!(r.is_ok());
         let v = r.unwrap();
         assert!(v == 999);
-        let _ = fs::remove_file(TEST_PATH);
     }
     #[test]
     fn test_lockfile() {
-        let r1 = LockFile::try_lock(PATH_PVAPCONFIG_LOCK);
+        let temp_dir =
+            TemporaryDirectory::new("pvtests").expect("creating a temporary directory should work");
+        let file_path = temp_dir.path().join("my.lock");
+        let file_path_str = file_path.to_str().expect("should work");
+
+        let r1 = LockFile::try_lock(file_path_str);
         assert!(r1.is_ok());
-        let r2 = LockFile::try_lock(PATH_PVAPCONFIG_LOCK);
+        let r2 = LockFile::try_lock(file_path_str);
         assert!(r2.is_err());
         drop(r1);
-        let r3 = LockFile::try_lock(PATH_PVAPCONFIG_LOCK);
+        let r3 = LockFile::try_lock(file_path_str);
         assert!(r3.is_ok());
     }
 }
