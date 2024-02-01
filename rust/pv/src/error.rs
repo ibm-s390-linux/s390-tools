@@ -19,7 +19,7 @@ pub enum Error {
     #[error("No host-key provided")]
     NoHostkey,
 
-    #[error("To many host-keys provided")]
+    #[error("Too many host-keys provided")]
     ManyHostkeys,
 
     #[error("Cannot load {ty}  from {path}")]
