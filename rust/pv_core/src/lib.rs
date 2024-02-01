@@ -15,6 +15,7 @@
 mod error;
 mod log;
 mod macros;
+mod tmpfile;
 mod utils;
 mod uvdevice;
 mod uvsecret;
@@ -29,6 +30,8 @@ pub mod misc {
     pub use crate::utils::{parse_hex, to_u16, to_u32, try_parse_u128, try_parse_u64};
     pub use crate::utils::{read, write};
     pub use crate::utils::{Flags, Lsb0Flags64, Msb0Flags64};
+
+    pub use crate::tmpfile::TemporaryDirectory;
 }
 
 /// Definitions and functions for interacting with the Ultravisor
