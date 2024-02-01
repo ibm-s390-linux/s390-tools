@@ -16,7 +16,7 @@ use openssl::{
     sign::{Signer, Verifier},
     symm::{encrypt, encrypt_aead, Cipher},
 };
-use std::convert::TryInto;
+use std::{convert::TryInto, ops::Range};
 
 /// An AES256-key that will purge itself out of the memory when going out of scope
 ///
@@ -182,7 +182,12 @@ pub fn encrypt_aes(key: &SymKey, iv: &[u8], conf: &[u8]) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// This function will return an error if the data could not be encrypted by OpenSSL.
-pub fn encrypt_aes_gcm(key: &SymKey, iv: &[u8], aad: &[u8], conf: &[u8]) -> Result<Vec<u8>> {
+pub fn encrypt_aes_gcm(
+    key: &SymKey,
+    iv: &[u8],
+    aad: &[u8],
+    conf: &[u8],
+) -> Result<(Vec<u8>, Range<usize>, Range<usize>, Range<usize>)> {
     let mut tag = vec![0xff; AES_256_GCM_TAG_SIZE];
     let encr = match key {
         SymKey::Aes256(key) => encrypt_aead(
@@ -195,12 +200,24 @@ pub fn encrypt_aes_gcm(key: &SymKey, iv: &[u8], aad: &[u8], conf: &[u8]) -> Resu
         )?,
     };
 
-    let mut res = vec![0; aad.len() + encr.len() + 16];
-    res[0..aad.len()].copy_from_slice(aad);
-    res[aad.len()..aad.len() + encr.len()].copy_from_slice(&encr);
-    res[aad.len() + encr.len()..aad.len() + encr.len() + 16].copy_from_slice(&tag);
+    let mut res = vec![0; aad.len() + encr.len() + tag.len()];
+    let aad_range = Range {
+        start: 0,
+        end: aad.len(),
+    };
+    let encr_range = Range {
+        start: aad.len(),
+        end: aad.len() + encr.len(),
+    };
+    let tag_range = Range {
+        start: aad.len() + encr.len(),
+        end: aad.len() + encr.len() + tag.len(),
+    };
 
-    Ok(res)
+    res[aad_range.clone()].copy_from_slice(aad);
+    res[encr_range.clone()].copy_from_slice(&encr);
+    res[tag_range.clone()].copy_from_slice(&tag);
+    Ok((res, aad_range, encr_range, tag_range))
 }
 
 /// Calculate the hash of a slice.
@@ -367,7 +384,7 @@ mod tests {
             0xee, 0x62, 0x98, 0xf7, 0x7e, 0x0c,
         ];
 
-        let res = encrypt_aes_gcm(
+        let (res, ..) = encrypt_aes_gcm(
             &SymKey::Aes256(aes_gcm_key.into()),
             &aes_gcm_iv,
             &aes_gcm_aad,

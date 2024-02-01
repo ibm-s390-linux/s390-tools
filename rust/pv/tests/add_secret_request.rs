@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
+use openssl::{
+    ec::{EcGroup, EcKey},
+    nid::Nid,
+    pkey::Private,
+};
 use pv::{
     get_test_asset,
     request::{
@@ -84,6 +89,93 @@ fn ext_derived() -> ExtSecret {
 
 fn no_flag() -> AddSecretFlags {
     AddSecretFlags::default()
+}
+
+fn create_signed_asrcb(skey: PKey<Private>, user_data: Vec<u8>) -> Vec<u8> {
+    let (host_key, ctx) = get_crypto();
+    let mut asrcb =
+        AddSecretRequest::new(AddSecretVersion::One, GuestSecret::Null, TAGS, no_flag());
+
+    asrcb.add_hostkey(host_key);
+    asrcb.set_user_data(user_data, Some(skey)).unwrap();
+    asrcb.encrypt(&ctx).unwrap()
+}
+
+#[test]
+fn null_none_default_ncuid_one_user_unsgn() {
+    let user_data_orig = vec![0x56; 0x183];
+    let (host_key, ctx) = get_crypto();
+    let mut asrcb =
+        AddSecretRequest::new(AddSecretVersion::One, GuestSecret::Null, TAGS, no_flag());
+
+    asrcb.add_hostkey(host_key);
+    asrcb.set_user_data(user_data_orig.clone(), None).unwrap();
+    let asrcb = asrcb.encrypt(&ctx).unwrap();
+
+    let user_data = verify_asrcb_and_get_user_data(asrcb, None).unwrap();
+
+    assert_eq!(
+        user_data_orig.as_slice(),
+        &user_data.as_ref().unwrap()[..user_data_orig.len()]
+    );
+}
+#[test]
+fn null_none_default_ncuid_one_user_ec() {
+    let (usr_sgn_key, _) = get_test_keys();
+
+    let usr_vrfy_key = usr_sgn_key.ec_key().unwrap();
+    let usr_vrfy_key = usr_vrfy_key.public_key();
+    let usr_vrfy_key = PKey::from_ec_key(
+        EcKey::from_public_key(
+            &EcGroup::from_curve_name(Nid::SECP521R1).unwrap(),
+            usr_vrfy_key,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let user_data_orig = vec![0x56; 0x100];
+    let asrcb = create_signed_asrcb(usr_sgn_key, user_data_orig.clone());
+
+    let user_data = verify_asrcb_and_get_user_data(asrcb, Some(usr_vrfy_key)).unwrap();
+    assert_eq!(
+        user_data_orig.as_slice(),
+        &user_data.as_ref().unwrap()[..user_data_orig.len()]
+    );
+}
+
+#[test]
+fn null_none_default_ncuid_one_user_rsa2048() {
+    let usr_sgn_key = get_test_asset!("keys/rsa2048key.pem");
+    let usr_sgn_key = PKey::private_key_from_pem(usr_sgn_key).unwrap();
+    let user_data_orig = vec![0x56; 0x100];
+    let asrcb = create_signed_asrcb(usr_sgn_key, user_data_orig.clone());
+
+    let usr_vrfy_key = get_test_asset!("keys/rsa2048key.pub.pem");
+    let usr_vrfy_key = PKey::public_key_from_pem(usr_vrfy_key).unwrap();
+
+    let user_data = verify_asrcb_and_get_user_data(asrcb, Some(usr_vrfy_key)).unwrap();
+    assert_eq!(
+        user_data_orig.as_slice(),
+        &user_data.as_ref().unwrap()[..user_data_orig.len()]
+    );
+}
+
+#[test]
+fn null_none_default_ncuid_one_user_rsa3072() {
+    let usr_sgn_key = get_test_asset!("keys/rsa3072key.pem");
+    let usr_sgn_key = PKey::private_key_from_pem(usr_sgn_key).unwrap();
+    let user_data_orig = vec![0x56; 0x80];
+    let asrcb = create_signed_asrcb(usr_sgn_key, user_data_orig.clone());
+
+    let usr_vrfy_key = get_test_asset!("keys/rsa3072key.pub.pem");
+    let usr_vrfy_key = PKey::public_key_from_pem(usr_vrfy_key).unwrap();
+
+    let user_data = verify_asrcb_and_get_user_data(asrcb, Some(usr_vrfy_key)).unwrap();
+    assert_eq!(
+        user_data_orig.as_slice(),
+        &user_data.as_ref().unwrap()[..user_data_orig.len()]
+    );
 }
 
 #[test]

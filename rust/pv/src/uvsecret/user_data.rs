@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::{
     crypto::{sign_msg, verify_signature},
     req::BinReqValues,
@@ -491,7 +490,7 @@ mod test {
             res_192,
         } = buf_ec;
         assert_eq!(data, &[0x11u8; 256]);
-        assert_ne!(signature, &[0u8; 139]);
+        assert_ne!(signature, &[0x11u8; 139]);
         assert_eq!(res_18b, &[0u8; 5]);
         assert!(sgn_size.get() <= 139);
         assert_eq!(res_192, &[0u8; 110]);

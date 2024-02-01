@@ -2,13 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
+use super::user_data::UserData;
 use crate::{
     assert_size,
     misc::Flags,
     request::{
         hkdf_rfc_5869,
         openssl::{
-            pkey::{PKey, Public},
+            pkey::{PKey, Private, Public},
             Md,
         },
         uvsecret::{ExtSecret, GuestSecret},
@@ -17,10 +18,7 @@ use crate::{
     uv::{ConfigUid, UvFlags},
     Result,
 };
-use pv_core::request::{
-    uvsecret::{AddSecretMagic, UserDataType},
-    RequestVersion,
-};
+use pv_core::request::RequestVersion;
 use zerocopy::AsBytes;
 
 /// Internal wrapper for Guest Secret, so that we can dump it in the form the UV wants it to be
@@ -54,6 +52,7 @@ impl From<GuestSecret> for BinGuestSecret {
     }
 }
 
+/// Authenticated data w/o user data
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes)]
 struct ReqAuthData {
@@ -61,9 +60,8 @@ struct ReqAuthData {
     boot_tags: BootHdrTags,
     cuid: ConfigUid,
     reserved90: [u8; 0x100],
-    prog_res190: [u8; 0x200],
 }
-assert_size!(ReqAuthData, 0x3e8);
+assert_size!(ReqAuthData, 0x1e8);
 
 impl ReqAuthData {
     fn new<F: Into<UvFlags>>(boot_tags: BootHdrTags, flags: F) -> Self {
@@ -72,7 +70,6 @@ impl ReqAuthData {
             boot_tags,
             cuid: [0; 0x10],
             reserved90: [0; 0x100],
-            prog_res190: [0; 0x200],
         }
     }
 }
@@ -168,15 +165,14 @@ impl From<AddSecretVersion> for RequestVersion {
 ///```
 #[derive(Clone, Debug)]
 pub struct AddSecretRequest {
-    magic: AddSecretMagic,
     version: AddSecretVersion,
     aad: ReqAuthData,
     keyslots: Vec<Keyslot>,
     conf: ReqConfData,
+    user_data: UserData,
 }
 
 impl AddSecretRequest {
-    #[allow(unused)]
     /// Offset of the user-data in the add-secret request in bytes
     pub(super) const V1_USER_DATA_OFFS: usize = 0x218;
 
@@ -199,7 +195,7 @@ impl AddSecretRequest {
             aad: ReqAuthData::new(boot_tags, flags),
             keyslots: vec![],
             version,
-            magic: UserDataType::Null.into(),
+            user_data: UserData::Null,
         }
     }
 
@@ -233,18 +229,41 @@ impl AddSecretRequest {
         &self.conf.secret.0
     }
 
+    /// Add user-data to the Add-Secret request
+    ///
+    /// (Signed) user-data is a non-architectual feature. It allows to add arbitrary
+    /// data (message) to the request, that is signed optionally with an user defined key.
+    /// Allowed keys are:
+    /// - no key (up to 512 bytes of message)
+    /// - EC SECP521R1 (up to 256 byte message)
+    /// - RSA 2048 bit (up to 256 byte message)
+    /// - RSA 3072 bit (up to 128 byte message)
+    ///
+    /// The signature can be verified during the verification of the secret-request  on the target machine.
+    pub fn set_user_data(&mut self, msg: Vec<u8>, skey: Option<PKey<Private>>) -> Result<()> {
+        self.user_data = UserData::new(skey, msg)?;
+        Ok(())
+    }
+
     /// compiles the authenticated area of this request
     fn aad(&self, ctx: &ReqEncrCtx, conf_len: usize) -> Result<Vec<u8>> {
         let cust_pub_key = ctx.key_coords()?;
         let secr_auth = self.conf.secret.dump_auth();
+        let user_data = self.user_data.data();
 
-        let mut aad: Vec<Aad> = Vec::with_capacity(3 + self.keyslots.len());
+        let mut aad: Vec<Aad> = Vec::with_capacity(5 + self.keyslots.len());
         aad.push(Aad::Plain(self.aad.as_bytes()));
+        if let Some(data) = user_data.0 {
+            aad.push(Aad::Plain(data));
+        }
+        if let Some(data) = &user_data.1 {
+            aad.push(Aad::Plain(data));
+        }
         aad.push(Aad::Plain(cust_pub_key.as_ref()));
         self.keyslots.iter().for_each(|k| aad.push(Aad::Ks(k)));
         aad.push(Aad::Plain(&secr_auth));
 
-        ctx.build_aad(self.version.into(), &aad, conf_len, self.magic.get())
+        ctx.build_aad(self.version.into(), &aad, conf_len, self.user_data.magic())
     }
 
     #[doc(hidden)]
@@ -263,13 +282,41 @@ impl AddSecretRequest {
         res.append(&mut vec![0x24; 32]);
         Ok(res)
     }
+
+    /// encrypt data, sign request with user-provided signing key, insert signature into aad,
+    /// calculate request tag
+    fn encrypt_with_signed_user_data(&self, ctx: &ReqEncrCtx) -> Result<Vec<u8>> {
+        //encrypt data w/o aead
+        let conf = self.conf.to_bytes();
+        let aad = self.aad(ctx, conf.value().len())?;
+        let (mut buf, aad_range, encr_range, _) = ctx.encrypt_aead(&aad, conf.value())?;
+
+        drop(aad);
+
+        // sign aad+encrypted data (w/o tag) with user signning key
+        // add signature to authenticated data starting with USER_DATA_OFFS
+        self.user_data.sign(
+            &mut buf[aad_range.start..encr_range.end],
+            Self::V1_USER_DATA_OFFS,
+        )?;
+
+        // encrypt again with signed data
+        buf[encr_range.clone()].copy_from_slice(conf.value());
+        ctx.encrypt_aead(&buf[aad_range], &buf[encr_range])
+            .map(|(buf, ..)| buf)
+    }
 }
 
 impl Request for AddSecretRequest {
     fn encrypt(&self, ctx: &ReqEncrCtx) -> Result<Vec<u8>> {
-        let conf = self.conf.to_bytes();
-        let aad = self.aad(ctx, conf.value().len())?;
-        ctx.encrypt_aead(&aad, conf.value())
+        match self.user_data {
+            UserData::Null | UserData::Unsigned(_) => {
+                let conf = self.conf.to_bytes();
+                let aad = self.aad(ctx, conf.value().len())?;
+                ctx.encrypt_aead(&aad, conf.value()).map(|(buf, ..)| buf)
+            }
+            _ => self.encrypt_with_signed_user_data(ctx),
+        }
     }
 
     fn add_hostkey(&mut self, hostkey: PKey<Public>) {
