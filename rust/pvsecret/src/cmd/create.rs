@@ -191,7 +191,7 @@ fn read_and_verify_hkds(
             return Err(anyhow!(msg));
         }
         if certs.len() > 1 {
-            warn!("The host key document in '{hkd}' contains more than one certificate!")
+            warn!("The host key document in '{hkd}' contains more than one certificate! Only the first certificate will be used.")
         }
 
         // len is >= 1 -> unwrap will succeed
