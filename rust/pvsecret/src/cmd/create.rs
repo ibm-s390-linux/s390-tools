@@ -183,11 +183,18 @@ fn read_and_verify_hkds(
         let certs = read_certs(&hk).with_context(|| {
             format!("The provided Host Key Document in '{hkd}' is not in PEM or DER format")
         })?;
-        if certs.len() != 1 {
+        if certs.is_empty() {
+            let msg = format!(
+                "The provided host key document in {} contains no certificate!",
+                hkd
+            );
+            return Err(anyhow!(msg));
+        }
+        if certs.len() > 1 {
             warn!("The host key document in '{hkd}' contains more than one certificate!")
         }
 
-        // len is 1 -> unwrap will succeed
+        // len is >= 1 -> unwrap will succeed
         let c = certs.first().unwrap();
         verifier.verify(c)?;
         res.push(c.public_key()?);
