@@ -625,34 +625,6 @@ The persistent configuration is put into effect when the system boots, or
 when a device becomes available, or when a device driver is loaded.
 .PP
 .
-.OD site "s" "SITE-ID"
-Apply the persistent configuration to the specified site only.
-
-This option can be used to configure the device in such a way that, the
-same configuration can be used on multiple different sites with different
-device hardwares, without any modification. With the site information, we
-can add different configurations which are specific to different sites. Where
-each site represents different systems or different hardware devices which
-are even located in different locations.
-For example, having
-the configuration of main-site or failover-site in the same place, but these
-configurations used only on the respective sites. Currently a user can define
-10 different configurations for 10 different sites with
-.I SITE-ID
-0 to 9.
-
-The configuration settings is put into effect only on the system with the
-site number which is mentioned in
-.I SITE-ID.
-
-This parameter is only effective only for persistent configurations and for
-dasd device-types.
-
-.B Example:
-.CL chzdev -ep 0.0.f001 --site 3
-
-.PP
-.
 .OD quiet "q" ""
 Print only minimal run-time information.
 .PP
@@ -686,6 +658,34 @@ values for that list.
 
 .B Note:
 Some attributes are mandatory and cannot be removed.
+.PP
+.
+.OD site "s" "SITE-ID"
+Apply the persistent configuration to the specified site only.
+
+This option can be used to configure the device in such a way that, the
+same configuration can be used on multiple different sites with different
+device hardwares, without any modification. With the site information, we
+can add different configurations which are specific to different sites. Where
+each site represents different systems or different hardware devices which
+are even located in different locations.
+For example, having
+the configuration of main-site or failover-site in the same place, but these
+configurations used only on the respective sites. Currently a user can define
+10 different configurations for 10 different sites with
+.I SITE-ID
+0 to 9.
+
+The configuration settings is put into effect only on the system with the
+site number which is mentioned in
+.I SITE-ID.
+
+This parameter is only effective only for persistent configurations and for
+dasd device-types.
+
+.B Example:
+.CL chzdev -ep 0.0.f001 --site 3
+
 .PP
 .
 .OD type "t" ""
