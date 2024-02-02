@@ -1,18 +1,30 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2024-xx-xx)__
+* __v2.31.0 (2024-02-02)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.7
+
+  General:
+  - common.mak: Set default C/C++ standard to gnu11/gnu++11
 
   Add new tools / libraries:
+  - pvapconfig: Tool to automatically configure APQNs in SE KVM guests
+  - s390-tools: Provide pre-commit configuration
 
   Changes of existing tools:
-  - dbginfo.sh: update man page and copyright
-  - dbginfo.sh: fix relative path on script copy
-  - dbginfo.sh: check for Dynamic Partition Mode
+  - cpuplugd: Adjust to CPU 0 being no longer hotpluggable
+  - dbginfo.sh: Check for Dynamic Partition Mode
+  - dbginfo.sh: Update man page and copyright
+  - rust/pv: Add user-data signing and verifying
+  - rust/pvsecret: Add user defined signatures and verifications
+  - zdev/dracut: Consolidate device configuration
 
   Bug Fixes:
+  - dbginfo.sh: Fix relative path on script copy
+  - libkmipclient: Fix build with libxml2-2.12.0
+  - pvsecret: Fix panic if empty file is used as host key document
+  - rust/pv: Fix 'elided_lifetimes_in_associated_constant' warning
 
 * __v2.30.0 (2023-12-01)__
 

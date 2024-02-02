@@ -36,6 +36,7 @@ List of all individuals having contributed content to s390-tools
 - Farhan Ali
 - Fedor Loshakov
 - Felix Beck
+- Finn Callies
 - Frank Blaschka
 - Frank Heimes
 - Frank Munzert
@@ -127,6 +128,7 @@ List of all individuals having contributed content to s390-tools
 - Thomas Spatzier
 - Thomas Weber
 - Thorsten Winkler
+- Tobias Huschle
 - Tuan Hoang
 - Ursula Braun
 - Utz Bacher
@@ -137,3 +139,4 @@ List of all individuals having contributed content to s390-tools
 - Volker Sameske
 - Wenjia Zhang
 - Wolfgang Taphorn
+- Yaakov Selkowitz
