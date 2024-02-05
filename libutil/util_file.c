@@ -110,7 +110,8 @@ static int file_puts(const char *str, const char *path)
 	}
 	rc = 0;
 out_fclose:
-	fclose(fp);
+	if (fclose(fp))
+		return -1;
 	return rc;
 }
 
