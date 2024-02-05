@@ -127,6 +127,7 @@ do {							\
 int __util_vsprintf(const char *func, const char *file, int line,
 		    char *str, const char *fmt, va_list ap);
 char *util_strcat_realloc(char *str1, const char *str2);
+void util_concatf(char **str1, const char *fmt, ...);
 void util_str_toupper(char *str);
 
 char *util_strstrip(char *s);

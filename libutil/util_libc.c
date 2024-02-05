@@ -140,6 +140,26 @@ char *util_strcat_realloc(char *str1, const char *str2)
 }
 
 /**
+ *  Concatenate a string with the result of a format string expansion
+ *
+ *  @param[in, out]  str1  Pointer to pointer to first string
+ *  @param[in]       fmt   Format string for generation of the second string
+ *  @param[in]       ...   Parameters for format string
+ */
+void util_concatf(char **str1, const char *fmt, ...)
+{
+	va_list args;
+	char *str2;
+
+	va_start(args, fmt);
+	util_vasprintf(&str2, fmt, args);
+	va_end(args);
+
+	*str1 = util_strcat_realloc(*str1, str2);
+	free(str2);
+}
+
+/**
  * Convert string to uppercase
  *
  * String \a str is converted to uppercase

@@ -40,6 +40,14 @@ int main(void)
 	fprintf(stderr, "result = \"%s\"\n", str);
 	free(str);
 
+	/* Use util_concatf() for string concatenation */
+	fprintf(stderr, "Try to concatenate \"list\" plus comma-separated list of numbers 1 to 3: ");
+	str = NULL;
+	util_concatf(&str, "list:");
+	for (int i = 1; i <= 3; i++)
+		util_concatf(&str, "%s%d", (i > 1 ? "," : ""), i);
+	fprintf(stderr, "result = %s\n", str); /* list:part1,part2,part3 */
+
 	/* One byte allocation should work */
 	fprintf(stderr, "Try to allocate 1 byte: ");
 	ptr = util_malloc(1);
