@@ -1,0 +1,739 @@
+.\" Copyright 2024 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.TH chpstat 8 "" s390-tools chpstat
+
+
+.SH NAME
+chpstat - Display channel-path statistics
+
+
+.SH SYNOPSIS
+.B chpstat
+.RI [ OPTIONS ]
+.RI [ ACTIONS ]
+.RI [ CHPIDS ]
+
+
+.SH DESCRIPTION
+Use
+.B chpstat
+to view channel-path statistics such as utilization and throughput,
+and to query and control the status of the channel-path statistics function.
+.br
+
+When run without further options, data for all channel-paths is displayed
+repeatedly with a 5 second delay in table format. You can limit output to
+specific channel-paths by listing the associated CHPIDs on the command line.
+.br
+
+Note: Channel-path statistics are only available on systems running in an
+LPAR or DPM partition.
+.br
+
+.SS "Output options"
+
+Without options,
+.B chpstat
+displays performance statistics data in table format. Use options
+.BR \-\-columns ", " \-\-all " and " \-\-cmg
+to change the list of columns to display.
+.br
+
+You can use option
+.B \-\-format
+to select a machine-readable list output format (JSON, key-value pairs, or
+comma-separated values), and option
+.B \-\-keys
+to restrict output to only a specific set of data keys.
+.br
+
+Additional options can be used to display the raw source data used for
+calculating channel-path statistics:
+.br
+
+.IP \(bu 3
+.B Characteristics:
+Static data describing base characteristics of a channel-path.
+.br
+
+Use option
+.B \-\-chars
+to view characteristics data.
+.PP
+.IP \(bu 3
+.B Utilization:
+Raw data about a channel-paths current utilization. This data is updated
+regularly at model-dependent intervals that typically last a few seconds
+(see key "interval").
+
+Use option
+.B \-\-util
+to view raw utilization data.
+.PP
+.IP \(bu 3
+.B Metrics:
+Performance statistics derived from utilization and characteristics data.
+.br
+
+Note: Metrics data is calculated as averages over all utilization update
+intervals that fall within the selected chpstat update interval.
+.br
+
+Use option
+.B \-\-metrics
+to view metrics data.
+.PP
+
+.SS Authorization
+
+A special authorization setting needs to be enabled for a system to be able
+to access channel-path statistics data.
+
+.B Classic mode LPAR
+
+.IP 1. 3
+Logon on to the Hardware Management Console (HMC)
+.PP
+.IP 2. 3
+Select the target LPAR
+.PP
+.IP 3. 3
+Start "Customize Activation Profiles" HMC Task
+.PP
+.IP 4. 3
+Enable "Security/Global performance data control" setting
+.PP
+
+Note: The LPAR needs to be deactivated/re-activated for the change to
+become effective.
+
+.B DPM Partition
+.IP 1. 3
+Logon on to the Hardware Management Console (HMC)
+.PP
+.IP 2. 3
+Select the target partition
+.PP
+.IP 3. 3
+Start "Partition Details" HMC Task
+.PP
+.IP 4. 3
+Enable "Controls/Access global performance data" setting
+.PP
+.IP 5. 3
+Press "Apply" - the change will be active immediately
+.PP
+
+.SS "Channel-Measurement Groups"
+
+A Channel-Measurement Group (CMG) is a number associated with each channel-path
+that determines the type of available statistics data for that channel-path.
+
+
+.SH ACTIONS
+.BR \-s ", " \-\-status
+.br
+.RS
+Show channel-path statistics status
+
+Possible status values are:
+.IP \(bu 3
+.B enabled:
+Statistics facility is active
+.PP
+.IP \(bu 3
+.B disabled:
+Statistics facility is inactive
+.PP
+.IP \(bu 3
+.B unsupported:
+Statistics facility is not supported.
+.br
+
+Note that channel-path statistics are only available when running in LPAR or
+DPM partition.
+.PP
+.RE
+
+.BR \-e ", " \-\-enable
+.br
+.RS
+Enable channel-path statistics
+.br
+
+After booting Linux, the channel-path statistics facility starts in disabled
+state. Use option
+.B \-\-enable
+to enable it.
+.RE
+
+.BR \-d ", " \-\-disable
+.br
+.RS
+Disable channel-path statistics
+.RE
+
+.BR \-l ", " \-\-list\-columns
+.br
+.RS
+List available table columns
+.br
+
+Use this option to get a list of available table column names and associated
+short description. A comma-separated list of column names can be used with
+option
+.B \-\-columns
+to select the columns to display in table output format.
+.RE
+
+.BR \-L ", " \-\-list\-keys
+.br
+.RS
+List available data keys
+.br
+
+Use this option to get a list of available keys that can be used with option
+.B \-\-keys
+to select data pairs to display in machine-readable output format.
+.RE
+
+.BR \-h ", " \-\-help
+.br
+.RS
+Print usage information, then exit
+.RE
+
+.BR \-v ", " \-\-version
+.br
+.RS
+Print version information, then exit
+.RE
+
+
+.SH OPTIONS
+.BR \-n ", " \-\-iterations
+.I NUM
+.br
+.RS
+Display NUM reports before ending
+.br
+
+By default,
+.B chpstat
+shows output repeatedly until interrupted. Use option
+.B \-\-iterations
+to specify how many times output should be updated before exiting. A value of
+0 indicates an unlimited number of iterations.
+.RE
+
+.BR \-i ", " \-\-interval
+.I NUM
+.br
+.RS
+Pause NUM seconds between display
+.br
+
+Use this option to specify the number of seconds to wait between output updates.
+Valid values are between 1 and 2140.
+
+Note: It is recommended to use interval values of at least the model-dependent
+statistics update interval (see key "interval").
+.br
+.RE
+
+.BR \-c ", " \-\-columns
+.IR  COL ,..
+.br
+.RS
+Select table columns to show in table output format
+.br
+
+To get a list of available columns, use option
+.BR \-\-list\-columns .
+If a channel-path does not provide data for a selected column, the
+corresponding table field is set to '\-'.
+.RE
+
+.BR \-k ", " \-\-keys
+.IR  KEY ,..
+.br
+.RS
+Select keys to show in machine-readable output format
+.br
+
+Use this option to select the data to show in machine-readable output
+format. To get a list of available keys, use option
+.BR \-\-list\-keys .
+If a channel-path does not provide data for a selected key, the
+corresponding value is set to "".
+.RE
+
+.BR \-a ", " \-\-all
+.br
+.RS
+Show all table columns and key data
+.br
+
+Use this option to select all supported columns and keys for output.
+.RE
+
+.BR \-\-scale
+.I UNIT
+.br
+.RS
+Scale BPS values by UNIT
+
+Use this option to specify a value by which bytes-per-seconds (BPS) values -
+such as read and write throughput - are scaled in table output format. Accepted
+values are:
+
+.IP \(bu 3
+.B auto:
+Scale automatically to fit value into each column. This is the default.
+.PP
+.IP \(bu 3
+.IR number :
+Scale by
+.I number
+.PP
+.IP \(bu 3
+.B K:
+Scale by 1024 (KiB)
+.PP
+.IP \(bu 3
+.B M:
+Scale by 1,048,576 (MiB)
+.PP
+.IP \(bu 3
+.B G:
+Scale by 1,073,741,824 (GiB)
+.PP
+.IP \(bu 3
+.B T:
+Scale by 1,099,511,627,776 (TiB)
+.PP
+.RE
+
+.BR \-\-cmg
+.IR CMG ,..
+.br
+.RS
+Show data for specified CMGs only
+.br
+
+Use this option to limit output to CHPIDs with the specified
+Channel-Measurement-Groups (CMG). This option also selects table columns
+suitable for the specified CMGs.
+.RE
+
+.BR \-\-format
+.I FORMAT
+.br
+.RS
+Show data in specified FORMAT
+
+Use this option to show output in a machine-readable format.
+.I FORMAT
+can be either of:
+
+.IP \(bu 3
+.B json:
+Single JavaScript Object Notation (JSON) data structure
+
+Data for all iterations is formatted as one JSON data structure formatted
+in multiple lines to make them more readable by humans.
+.br
+
+See section "OUTPUT FORMAT" for more details.
+.br
+.PP
+.IP \(bu 3
+.B json\-seq:
+Sequence of JSON data structures
+
+Data for each iteration is formatted as separate JSON data structure prefixed
+with an ASCII Record Separator character (0x1e) and suffixed with an ASCII Line
+Feed character (0x0a) in accordance with RFC7464.
+.br
+
+See section "OUTPUT FORMAT" for more details.
+.br
+.PP
+.IP \(bu 3
+.B pairs:
+Textual key=value pairs
+
+By default, keys have a prefix that makes them unique across one tool
+invocation. This prefix can be removed by specifying option
+.BR \-\-no\-prefix .
+.PP
+.IP \(bu 3
+.B csv:
+Comma-Separated-Value (CSV) list
+.br
+
+All values are quoted with double-quotes and separated by commas. The first
+line of output contains a list of headings. Subsequent lines each represent
+data for one CHPID in one iteration.
+.PP
+.RE
+
+.BR \-\-chars
+.br
+.RS
+List channel-path measurement characteristics
+
+Use this option to display static data describing base characteristics of a
+channel-path. This option implies a machine-readable format.
+.RE
+
+.BR \-\-util
+.br
+.RS
+List unprocessed utilization data
+
+Use this option to display raw channel-path utilization data that is updated
+regularly by firmware at model-dependent intervals that typically last a few
+seconds (see key "interval"). This option implies machine-readable output
+format.
+.RE
+
+.BR \-\-metrics
+.br
+.RS
+List performance metrics
+.br
+
+Use this option to display performance statistics data derived from utilization
+and characteristics data. This option implies machine-readable output format.
+.br
+
+Note: Metrics data is calculated as averages over all utilization update
+intervals that fall within the selected chpstat update interval.
+.RE
+
+.BR \-\-no\-ansi
+.br
+.RS
+Do not use ANSI terminal codes in output
+.br
+
+When specified, this option suppresses the use of ANSI terminal control
+characters in table output format. Such characters are used to clear the
+screen, and to invert the colors for table heading display. Use this option
+when an output terminal does not support these control characters.
+.RE
+
+.BR \-\-no\-prefix
+.br
+.RS
+Hide key prefix in pairs output format
+
+By default, keys that are shown in the "pairs" machine-readable output format
+have a prefix that makes them unique across a tool invocation. Use option
+.B \-\-no\-prefix
+to remove this prefix.
+.RE
+
+
+.SH "OUTPUT FORMAT"
+This section contains additional information for some of the supported
+output formats.
+
+.SS json
+
+JSON output consists of a top-level object with the following properties
+(key-value pairs):
+
+.IP \(bu 3
+.BR meta :
+Tool meta-data including API level, version, host name, and time of invocation
+.PP
+.IP \(bu 3
+.BR chpstat :
+Channel-path statistics data
+.PP
+
+Note: For a given API level, the output format is guaranteed to remain
+compatible, that is:
+
+.IP \(bu 3
+required child-objects are not removed
+.PP
+.IP \(bu 3
+format and contents of existing objects and properties are retained
+.PP
+.IP \(bu 3
+new child-objects and properties may be added
+.PP
+
+Channel-path statistics data is stored as an array of iteration objects under
+the "chpstat" property in the top-level object.
+
+Each iteration object contains a property named "channel_paths" the value of
+which consists of an array of objects representing data for one channel-path
+during one iteration. Objects for a single channel-path contain further
+child-objects that group related properties together.
+.br
+
+The following object properties are required and will always be part of
+JSON output:
+
+.IP \(bu 3
+For iteration objects: "iteration", "time", "time_epoch", and "channel_paths"
+.br
+.PP
+
+.IP \(bu 3
+For channel-path objects: "chpid", "type", "cmg", "shared"
+.br
+.PP
+
+All other properties are optional and will be omitted from JSON output if the
+associated value is unavailable. If option
+.BR --all
+is specified, unavailable properties are also listed as either empty strings or
+negative values, depending on the value type.
+
+Example JSON output for single iteration and channel-path with all properties:
+.br
+
+{
+.br
+  "meta": {
+.br
+    "api_level": 1,
+.br
+    "version": "2.32.0",
+.br
+    "host": "localhost",
+.br
+    "time_epoch": 1714663282,
+.br
+    "time": "2024-05-02 17:21:22+0200"
+.br
+  },
+.br
+  "chpstat": [
+.br
+    {
+.br
+      "iteration": 0,
+.br
+      "time_epoch": 1714663282,
+.br
+      "time": "2024-05-02 17:21:22+0200",
+.br
+      "channel_paths": [
+.br
+        {
+.br
+          "chpid": "0.00",
+.br
+          "type": 0,
+.br
+          "cmg": 0,
+.br
+          "shared": 0,
+.br
+          "speed": "",
+.br
+          "characteristics": {
+.br
+            "max_bus_cycles": 0,
+.br
+            "max_channel_work_units": 0,
+.br
+            "max_write_data_units": 0,
+.br
+            "max_read_data_units": 0,
+.br
+            "data_unit_size": 0,
+.br
+            "data_unit_size_cpc": 0,
+.br
+            "msg_unit_size": 0,
+.br
+            "msg_unit_size_cpc": 0,
+.br
+          },
+.br
+          "utilization": {
+.br
+            "timestamp": 0,
+.br
+            "bus_cycles_cpc": 0,
+.br
+            "channel_work_units_cpc": 0,
+.br
+            "channel_work_units": 0,
+.br
+            "data_units_written_cpc": 0,
+.br
+            "data_units_written": 0,
+.br
+            "data_units_read_cpc": 0,
+.br
+            "data_units_read": 0,
+.br
+            "total_ficon_ops_cpc": 0,
+.br
+            "total_deferred_ficon_ops_cpc": 0,
+.br
+            "sum_ficon_ops_cpc": 0,
+.br
+            "total_hpf_ops_cpc": 0,
+.br
+            "total_deferred_hpf_ops_cpc": 0,
+.br
+            "sum_hpf_ops_cpc": 0,
+.br
+            "channel_path_busy_time_cpc": 0,
+.br
+            "channel_path_busy_time": 0,
+.br
+            "msg_units_sent": 0,
+.br
+            "msg_units_sent_cpc": 0,
+.br
+            "unsuccessful_attempts_to_send": 0,
+.br
+            "unavailable_receive_buffers": 0,
+.br
+            "unavailable_receive_buffers_cpc": 0,
+.br
+            "data_units_sent": 0,
+.br
+            "data_units_sent_cpc": 0,
+.br
+          },
+.br
+          "metrics": {
+.br
+            "interval": 0.0,
+.br
+            "util_total": 0.0,
+.br
+            "util_part": 0.0,
+.br
+            "util_bus": 0.0,
+.br
+            "read_total": 0.0,
+.br
+            "read_part": 0.0,
+.br
+            "write_total": 0.0,
+.br
+            "write_part": 0.0,
+.br
+            "ficon_rate": 0.0,
+.br
+            "ficon_active": 0.0,
+.br
+            "ficon_defer": 0.0,
+.br
+            "hpf_rate": 0.0,
+.br
+            "hpf_active": 0.0,
+.br
+            "hpf_defer": 0.0,
+.br
+            "msg_rate_part": 0.0,
+.br
+            "msg_rate_total": 0.0,
+.br
+            "msg_size_part": 0.0,
+.br
+            "msg_size_total": 0.0,
+.br
+            "send_fail_part": 0.0,
+.br
+            "rcv_fail_part": 0.0,
+.br
+            "rcv_fail_total": 0.0,
+.br
+          }
+.br
+        }
+.br
+      ]
+.br
+    }
+.br
+  ]
+.br
+}
+.br
+
+
+.SS json\-seq
+
+The json\-seq output format is a variation of the JSON output format described
+above with the following differences:
+
+.IP \(bu 3
+Output consists of a sequence of top-level JSON objects, each contained in
+single line with no indentation
+.br
+
+.IP \(bu 3
+Each top-level object is prefixed by an ASCII Record Separator character (0x1e)
+and suffixed with an ASCII Line Feed character (0x0a) in accordance with
+RFC7464
+.br
+.PP
+
+.IP \(bu 3
+The first object contains tool meta-data properties defined in the previous
+section
+.br
+.PP
+
+.IP \(bu 3
+Subsequent objects each represent channel-path statistics data for one iteration
+.br
+.PP
+
+
+.SH "EXIT CODES"
+.TP
+.B 0
+Program finished successfully
+.PP
+.TP
+.B 1
+Usage error
+.PP
+.TP
+.B 2
+A run\-time error occurred
+.PP
+
+
+.SH EXAMPLES
+Display current channel-path statistics status in JSON format:
+.RS 4
+$
+.B chpstat \-\-status \-\-format json
+.br
+.RE
+.PP
+.
+Determine the model-dependent update interval for CHPID 0.f0:
+.RS 4
+$
+.B chpstat \-\-keys interval \-n 1 \-\-no\-prefix 0.f0 \-\-format pairs
+.br
+.RE
+.PP
+.
+Collect partition write throughput statistics for 1 hour in CSV format:
+.RS 4
+$
+.B chpstat \-n 60 \-i 60 \-\-format csv \-\-key time,chpid,write_part
+.br
+
+
+.SH "SEE ALSO"
+.BR lschp "(8), " chchp (8)

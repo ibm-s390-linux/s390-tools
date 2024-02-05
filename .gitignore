@@ -92,6 +92,7 @@ vmcp/vmcp
 vmur/vmur
 zconf/chp/chchp
 zconf/chp/lschp
+zconf/chp/chpstat/chpstat
 zconf/css/lscss
 zconf/qeth/lsqeth
 zconf/scm/lsscm

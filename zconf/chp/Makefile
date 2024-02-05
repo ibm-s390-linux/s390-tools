@@ -1,6 +1,7 @@
 include ../../common.mak
 
-all: chchp lschp
+all: chchp lschp chpstat
+	$(MAKE) -C chpstat all
 
 libs =	$(rootdir)/libutil/libutil.a
 
@@ -14,8 +15,10 @@ install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -m 644 -c chchp.8 $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -m 644 -c lschp.8 $(DESTDIR)$(MANDIR)/man8
+	$(MAKE) -C chpstat install
 
 clean:
 	rm -f *.o chchp lschp
+	$(MAKE) -C chpstat clean
 
 .PHONY: all install clean
