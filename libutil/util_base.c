@@ -27,7 +27,7 @@ void util_hexdump_grp(FILE *fh, const char *tag, const void *data, int grp,
 
 	for (i = 0; i < count; i++) {
 		if (first) {
-			fprintf(fh, "%*s", indent, " ");
+			fprintf(fh, "%*s", indent, "");
 			if (tag)
 				fprintf(fh, "%s: ", tag);
 			fprintf(fh, "%08x: ", i);
