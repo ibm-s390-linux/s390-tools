@@ -111,7 +111,7 @@ const char *util_rec_fld_get_key(struct util_rec_fld *fld)
 /**
  * Create a new record with "wide" output format
  *
- * @param[in] hdr_sep  Header separator
+ * @param[in] hdr_sep  Header separator or %NULL for no separator
  *
  * @returns   Pointer to the created record
  */
@@ -121,7 +121,7 @@ struct util_rec *util_rec_new_wide(const char *hdr_sep)
 
 	rec->list = util_list_new(struct util_rec_fld, node);
 	rec->fmt.type = REC_FMT_WIDE;
-	rec->fmt.d.wide_p.hdr_sep = util_strdup(hdr_sep);
+	rec->fmt.d.wide_p.hdr_sep = hdr_sep ? util_strdup(hdr_sep) : NULL;
 	rec->fmt.d.wide_p.argz_sep = ',';
 	rec->fmt.indent = 0;
 	return rec;
@@ -249,7 +249,7 @@ static void rec_free_wide(struct util_rec *rec)
 /**
  * Create a new record with "long" output format
  *
- * @param[in] hdr_sep   Header separator
+ * @param[in] hdr_sep   Header separator or %NULL for no separator
  * @param[in] col_sep   Column separator
  * @param[in] key       Primary key of record
  * @param[in] key_size  Width of left column i.e. keys
@@ -264,7 +264,7 @@ struct util_rec *util_rec_new_long(const char *hdr_sep, const char *col_sep,
 
 	rec->list = util_list_new(struct util_rec_fld, node);
 	rec->fmt.type = REC_FMT_LONG;
-	rec->fmt.d.long_p.hdr_sep = util_strdup(hdr_sep);
+	rec->fmt.d.long_p.hdr_sep = hdr_sep ? util_strdup(hdr_sep) : NULL;
 	rec->fmt.d.long_p.col_sep = util_strdup(col_sep);
 	rec->fmt.d.long_p.key = util_strdup(key);
 	rec->fmt.d.long_p.key_size = key_size;
