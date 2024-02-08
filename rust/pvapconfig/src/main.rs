@@ -607,13 +607,11 @@ mod tests {
     #[test]
     fn test_do_ap_config_invocation_1() {
         let test_apqns = make_test_apqns();
-        let mut apqns: Vec<Apqn> = Vec::new();
-        apqns.push(test_apqns[0].clone());
+        let apqns: Vec<Apqn> = vec![test_apqns[0].clone()];
         let secrets: Vec<SecretEntry> = Vec::new();
         let secretlist = SecretList::new(secrets.len() as u16, secrets);
         let test_apconfigs = make_test_apconfigs();
-        let mut apconfig: Vec<ApConfigEntry> = Vec::new();
-        apconfig.push(test_apconfigs[0].clone());
+        let apconfig: Vec<ApConfigEntry> = vec![test_apconfigs[0].clone()];
         let apcfglist = ApConfigList::from_apconfigentry_vec(apconfig);
         let mut apqnlist = ApqnList::from_apqn_vec(apqns);
         let r = do_ap_config(&mut apqnlist, &secretlist, &apcfglist, true);
@@ -625,16 +623,12 @@ mod tests {
     #[test]
     fn test_do_ap_config_invocation_2() {
         let test_apqns = make_test_apqns();
-        let mut apqns: Vec<Apqn> = Vec::new();
-        apqns.push(test_apqns[1].clone());
+        let apqns: Vec<Apqn> = vec![test_apqns[1].clone()];
         let mut secrets = make_test_secrets();
-        while secrets.len() > 2 {
-            secrets.pop();
-        }
+        secrets.truncate(2);
         let secretlist = SecretList::new(secrets.len() as u16, secrets);
         let test_apconfigs = make_test_apconfigs();
-        let mut apconfig: Vec<ApConfigEntry> = Vec::new();
-        apconfig.push(test_apconfigs[1].clone());
+        let apconfig: Vec<ApConfigEntry> = vec![test_apconfigs[1].clone()];
         let apcfglist = ApConfigList::from_apconfigentry_vec(apconfig);
         let mut apqnlist = ApqnList::from_apqn_vec(apqns);
         let r = do_ap_config(&mut apqnlist, &secretlist, &apcfglist, true);
