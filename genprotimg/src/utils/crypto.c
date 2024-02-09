@@ -1826,14 +1826,12 @@ static gint __encrypt_decrypt_bio(const struct cipher_parms *parms, BIO *b_in,
 		g_assert(out_len >= 0);
 
 		num_bytes_written = BIO_write(b_out, out_buf, out_len);
-		if (num_bytes_written < 0) {
+		if (num_bytes_written != out_len) {
 			g_set_error(err, PV_CRYPTO_ERROR,
 				    PV_CRYPTO_ERROR_INTERNAL,
 				    _("Failed to write"));
 			return -1;
 		}
-		g_assert(num_bytes_written == out_len);
-
 		tmp_size_out += (guint)num_bytes_written;
 
 		/* Set new tweak value. Please keep in mind that the
