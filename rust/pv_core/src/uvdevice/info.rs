@@ -72,9 +72,7 @@ impl From<uvio_uvdev_info> for UvDeviceInfo {
 }
 
 impl UvCmd for uvio_uvdev_info {
-    fn cmd(&self) -> u64 {
-        uv_ioctl(UvDevice::INFO_NR)
-    }
+    const UV_IOCTL_NR: u8 = UvDevice::INFO_NR;
 
     fn data(&mut self) -> Option<&mut [u8]> {
         Some(self.as_bytes_mut())

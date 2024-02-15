@@ -83,15 +83,20 @@ fn rc_fmt<C: UvCmd>(rc: u16, rrc: u16, cmd: &mut C) -> &'static str {
 
 /// Ultravisor Command.
 pub trait UvCmd {
+    /// The UV IOCTL number of the UV call
+    const UV_IOCTL_NR: u8;
     /// Returns the uvdevice IOCTL command that his command uses.
     ///
     /// # Returns
     /// The IOCTL cmd for this UvCmd usually sth like `uv_ioctl!(CMD_NR)`
-    fn cmd(&self) -> u64;
+    fn cmd(&self) -> u64 {
+        uv_ioctl(Self::UV_IOCTL_NR)
+    }
     /// Converts UV return codes into human readable error messages
     ///
     /// no need to handle `0x0000, 0x0001, 0x0002, 0x0005, 0x0030, 0x0031, 0x0032, 0x0100`
     fn rc_fmt(&self, rc: u16, rrc: u16) -> Option<&'static str>;
+
     /// Returns data used by this command if available.
     fn data(&mut self) -> Option<&mut [u8]> {
         None

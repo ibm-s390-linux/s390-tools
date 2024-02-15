@@ -107,6 +107,8 @@ impl ffi::uvio_ioctl_cb {
 const TEST_CMD: u64 = 17;
 struct TestCmd(Option<Vec<u8>>);
 impl UvCmd for TestCmd {
+    const UV_IOCTL_NR: u8 = 42;
+
     fn cmd(&self) -> u64 {
         TEST_CMD
     }

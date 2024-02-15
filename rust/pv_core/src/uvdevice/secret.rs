@@ -42,12 +42,10 @@ impl Default for ListCmd {
 }
 
 impl UvCmd for ListCmd {
+    const UV_IOCTL_NR: u8 = UvDevice::LIST_SECRET_NR;
+
     fn data(&mut self) -> Option<&mut [u8]> {
         Some(self.0.as_mut_slice())
-    }
-
-    fn cmd(&self) -> u64 {
-        uv_ioctl(UvDevice::LIST_SECRET_NR)
     }
 
     fn rc_fmt(&self, _rc: u16, _rrc: u16) -> Option<&'static str> {
@@ -80,12 +78,10 @@ impl AddCmd {
 }
 
 impl UvCmd for AddCmd {
+    const UV_IOCTL_NR: u8 = UvDevice::ADD_SECRET_NR;
+
     fn data(&mut self) -> Option<&mut [u8]> {
         Some(&mut self.0)
-    }
-
-    fn cmd(&self) -> u64 {
-        uv_ioctl(UvDevice::ADD_SECRET_NR)
     }
 
     fn rc_fmt(&self, rc: u16, _rrc: u16) -> Option<&'static str> {
@@ -116,9 +112,7 @@ impl UvCmd for AddCmd {
 /// request to modify the secret store will fail.
 pub struct LockCmd;
 impl UvCmd for LockCmd {
-    fn cmd(&self) -> u64 {
-        uv_ioctl(UvDevice::LOCK_SECRET_NR)
-    }
+    const UV_IOCTL_NR: u8 = UvDevice::LOCK_SECRET_NR;
 
     fn rc_fmt(&self, rc: u16, _rrc: u16) -> Option<&'static str> {
         match rc {
