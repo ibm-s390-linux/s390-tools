@@ -25,6 +25,7 @@ mod info;
 mod test;
 pub use ffi::uv_ioctl;
 pub mod secret;
+pub mod secret_list;
 
 pub use info::UvDeviceInfo;
 #[allow(dead_code)] //TODO rm when pv learns attestation
