@@ -528,8 +528,8 @@ mod tests {
     fn make_assoc_secretentry(idx: u16, hexidstr: &str) -> SecretEntry {
         let id = hexstring_to_u8(hexidstr);
         let idlen: u32 = id.len().try_into().unwrap();
-        let idarray = <&[u8; 32]>::try_from(id.as_slice()).unwrap();
-        SecretEntry::new(idx, ListableSecretType::Association, *idarray, idlen)
+        let idarray: [u8; 32] = id.try_into().unwrap();
+        SecretEntry::new(idx, ListableSecretType::Association, idarray.into(), idlen)
     }
 
     fn make_test_secrets() -> Vec<SecretEntry> {

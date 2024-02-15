@@ -35,11 +35,7 @@ const PAGESIZE: usize = 0x1000;
 
 /// Definitions and functions for interacting with the Ultravisor
 pub mod uv {
-    pub use pv_core::uv::{
-        uv_ioctl, ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess,
-    };
-    pub use pv_core::uv::{AddCmd, ListCmd, LockCmd};
-    pub use pv_core::uv::{ListableSecretType, SecretEntry, SecretList};
+    pub use pv_core::uv::*;
 }
 
 /// Miscellaneous functions and definitions

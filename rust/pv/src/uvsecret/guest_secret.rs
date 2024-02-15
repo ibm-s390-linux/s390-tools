@@ -8,13 +8,14 @@ use crate::{
     request::{hash, openssl::MessageDigest, random_array, Secret},
     Result,
 };
-use pv_core::for_pv::{ser_gsid, SECRET_ID_SIZE};
+use pv_core::uv::SecretId;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
 const SECRET_SIZE: usize = 32;
+
 /// A Secret to be added in [`AddSecretRequest`]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GuestSecret {
     /// No guest secret
     Null,
@@ -24,10 +25,9 @@ pub enum GuestSecret {
     Association {
         /// Name of the secret
         name: String,
-        #[serde(serialize_with = "ser_gsid", deserialize_with = "de_gsid")]
         /// SHA256 hash of [`GuestSecret::Association::name`]
-        id: [u8; SECRET_ID_SIZE],
-        /// Confidential actual assocuiation secret (32 bytes)
+        id: SecretId,
+        /// Confidential actual association secret (32 bytes)
         #[serde(skip)]
         secret: Secret<[u8; SECRET_SIZE]>,
     },
@@ -46,7 +46,10 @@ impl GuestSecret {
     where
         O: Into<Option<[u8; SECRET_SIZE]>>,
     {
-        let id = hash(MessageDigest::sha256(), name.as_bytes())?.to_vec();
+        let id: [u8; SecretId::ID_SIZE] = hash(MessageDigest::sha256(), name.as_bytes())?
+            .to_vec()
+            .try_into()
+            .unwrap();
         let secret = match secret.into() {
             Some(s) => s,
             None => random_array()?,
@@ -54,38 +57,10 @@ impl GuestSecret {
 
         Ok(GuestSecret::Association {
             name: name.to_string(),
-            id: id.try_into().unwrap(),
+            id: id.into(),
             secret: secret.into(),
         })
     }
-}
-fn de_gsid<'de, D>(de: D) -> Result<[u8; 32], D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct FieldVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for FieldVisitor {
-        type Value = [u8; SECRET_ID_SIZE];
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a `32 bytes long hexstring` prepended with 0x")
-        }
-        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            if s.len() != SECRET_ID_SIZE * 2 + 2 {
-                return Err(serde::de::Error::invalid_length(s.len(), &self));
-            }
-            let nb = s.strip_prefix("0x").ok_or_else(|| {
-                serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self)
-            })?;
-            crate::misc::parse_hex(nb)
-                .try_into()
-                .map_err(|_| serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self))
-        }
-    }
-    de.deserialize_identifier(FieldVisitor)
 }
 
 #[cfg(test)]
@@ -106,7 +81,7 @@ mod test {
         let secret = GuestSecret::association("association secret", secret_value).unwrap();
         let exp = GuestSecret::Association {
             name,
-            id: exp_id,
+            id: exp_id.into(),
             secret: secret_value.into(),
         };
         assert_eq!(secret, exp);
@@ -121,7 +96,7 @@ mod test {
         ];
         let asc = GuestSecret::Association {
             name: "test123".to_string(),
-            id,
+            id: id.into(),
             secret: [0; 32].into(),
         };
 

@@ -3,7 +3,7 @@
 // Copyright IBM Corp. 2024
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::{
     fmt::Display,
     io::{Cursor, Read, Seek, Write},
@@ -14,6 +14,64 @@ use utils::assert_size;
 use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
 
 use crate::{misc::to_u16, uv::ListCmd, uvdevice::UvCmd, Error, Result};
+
+/// The 32 byte long ID of an UV secret
+///
+/// (de)serializes itself in/from a hex-string
+#[repr(C)]
+#[derive(PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Debug, Clone)]
+pub struct SecretId([u8; Self::ID_SIZE]);
+assert_size!(SecretId, SecretId::ID_SIZE);
+
+impl SecretId {
+    /// Size in bytes of the [`SecretId`]
+    pub const ID_SIZE: usize = 32;
+
+    /// Create a [`SecretId`] forom a buffer.
+    pub fn from(buf: [u8; Self::ID_SIZE]) -> Self {
+        buf.into()
+    }
+}
+
+impl Serialize for SecretId {
+    fn serialize<S>(&self, ser: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        //calls Display at one point
+        ser.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for SecretId {
+    fn deserialize<D>(de: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        de_gsid(de).map(|id| id.into())
+    }
+}
+
+impl Display for SecretId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::with_capacity(32 * 2 + 2);
+        s.push_str("0x");
+        let s = self.0.iter().fold(s, |acc, e| acc + &format!("{e:02x}"));
+        write!(f, "{s}")
+    }
+}
+
+impl From<[u8; SecretId::ID_SIZE]> for SecretId {
+    fn from(value: [u8; SecretId::ID_SIZE]) -> Self {
+        Self(value)
+    }
+}
+
+impl AsRef<[u8]> for SecretId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 /// A secret in a [`SecretList`]
 #[repr(C)]
@@ -27,8 +85,7 @@ pub struct SecretEntry {
     len: U32<BigEndian>,
     #[serde(skip)]
     res_8: u64,
-    #[serde(serialize_with = "ser_gsid")]
-    id: [u8; SECRET_ID_SIZE],
+    id: SecretId,
 }
 assert_size!(SecretEntry, SecretEntry::STRUCT_SIZE);
 
@@ -39,7 +96,7 @@ impl SecretEntry {
     ///
     /// The content of this entry will very liekly not represent the status of the guest in the
     /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
-    pub fn new(index: u16, stype: ListableSecretType, id: [u8; 32], secret_len: u32) -> Self {
+    pub fn new(index: u16, stype: ListableSecretType, id: SecretId, secret_len: u32) -> Self {
         Self {
             index: index.into(),
             stype: stype.into(),
@@ -60,8 +117,16 @@ impl SecretEntry {
     }
 
     /// Returns a reference to the id of this [`SecretEntry`].
+    ///
+    /// The slice is guaranteed to be 32 bytes long.
+    /// ```rust
+    /// # use pv_core::uv::SecretEntry;
+    /// # use zerocopy::FromZeroes;
+    /// # let secr = SecretEntry::new_zeroed();
+    /// # assert_eq!(secr.id().len(), 32);
+    /// ```
     pub fn id(&self) -> &[u8] {
-        &self.id
+        self.id.as_ref()
     }
 }
 
@@ -70,7 +135,7 @@ impl Display for SecretEntry {
         let stype: ListableSecretType = self.stype.into();
         writeln!(f, "{} {}:", self.index, stype)?;
         write!(f, "  ")?;
-        for b in self.id {
+        for b in self.id.as_ref() {
             write!(f, "{b:02x}")?;
         }
         Ok(())
@@ -263,22 +328,39 @@ impl From<ListableSecretType> for U16<BigEndian> {
     }
 }
 
-#[doc(hidden)]
-pub const SECRET_ID_SIZE: usize = 32;
-
-#[doc(hidden)]
-pub fn ser_gsid<S>(id: &[u8; SECRET_ID_SIZE], ser: S) -> Result<S::Ok, S::Error>
+fn de_gsid<'de, D>(de: D) -> Result<[u8; 32], D::Error>
 where
-    S: serde::Serializer,
+    D: serde::Deserializer<'de>,
 {
-    let mut s = String::with_capacity(32 * 2 + 2);
-    s.push_str("0x");
-    let s = id.iter().fold(s, |acc, e| acc + &format!("{e:02x}"));
-    ser.serialize_str(&s)
+    struct FieldVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+        type Value = [u8; SecretId::ID_SIZE];
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a `32 bytes long hexstring` prepended with 0x")
+        }
+        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            if s.len() != SecretId::ID_SIZE * 2 + 2 {
+                return Err(serde::de::Error::invalid_length(s.len(), &self));
+            }
+            let nb = s.strip_prefix("0x").ok_or_else(|| {
+                serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self)
+            })?;
+            crate::misc::parse_hex(nb)
+                .try_into()
+                .map_err(|_| serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self))
+        }
+    }
+    de.deserialize_identifier(FieldVisitor)
 }
 
 #[cfg(test)]
 mod test {
+
+    use serde_test::{assert_ser_tokens, assert_tokens, Token};
 
     use super::*;
     use std::io::{BufReader, BufWriter, Cursor};
@@ -299,7 +381,7 @@ mod test {
             stype: 2.into(),
             len: 32.into(),
             res_8: 0,
-            id: [0; 32],
+            id: SecretId::from([0; 32]),
         };
 
         assert_eq!(s.as_bytes(), EXP);
@@ -328,7 +410,7 @@ mod test {
                 stype: 2.into(),
                 len: 32.into(),
                 res_8: 0,
-                id: [0; 32],
+                id: SecretId::from([0; 32]),
             }],
         };
 
@@ -360,7 +442,7 @@ mod test {
                 stype: 2.into(),
                 len: 32.into(),
                 res_8: 0,
-                id: [0; 32],
+                id: SecretId::from([0; 32]),
             }],
         };
 
@@ -371,5 +453,44 @@ mod test {
         }
         println!("list: {sl:?}");
         assert_eq!(buf, EXP);
+    }
+
+    #[test]
+    fn secret_entry_ser() {
+        let entry = SecretEntry::new_zeroed();
+
+        assert_ser_tokens(
+            &entry,
+            &[
+                Token::Struct {
+                    name: "SecretEntry",
+                    len: (4),
+                },
+                Token::String("index"),
+                Token::U16(0),
+                Token::String("stype"),
+                Token::U16(0),
+                Token::String("len"),
+                Token::U32(0),
+                Token::String("id"),
+                Token::String("0x0000000000000000000000000000000000000000000000000000000000000000"),
+                Token::StructEnd,
+            ],
+        )
+    }
+
+    #[test]
+    fn secret_id_serde() {
+        let id = SecretId::from([
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+            0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67,
+            0x89, 0xab, 0xcd, 0xef,
+        ]);
+        assert_tokens(
+            &id,
+            &[Token::String(
+                "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            )],
+        )
     }
 }

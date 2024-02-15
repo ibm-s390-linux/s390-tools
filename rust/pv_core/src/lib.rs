@@ -37,7 +37,7 @@ pub mod misc {
 /// Definitions and functions for interacting with the Ultravisor
 pub mod uv {
     pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd};
-    pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretList};
+    pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretId, SecretList};
     pub use crate::uvdevice::{
         uv_ioctl, ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess,
     };
@@ -84,10 +84,3 @@ pub const fn crate_info() -> &'static str {
 const PAGESIZE: usize = 0x1000;
 use ::utils::assert_size;
 use ::utils::static_assert;
-
-#[doc(hidden)]
-/// stuff pv_core and pv share. Not intended for other users
-pub mod for_pv {
-    pub use crate::uvdevice::secret_list::ser_gsid;
-    pub use crate::uvdevice::secret_list::SECRET_ID_SIZE;
-}

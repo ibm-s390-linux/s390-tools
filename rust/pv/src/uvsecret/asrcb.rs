@@ -23,7 +23,7 @@ use pv_core::request::RequestVersion;
 use zerocopy::AsBytes;
 
 /// Internal wrapper for Guest Secret, so that we can dump it in the form the UV wants it to be
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct BinGuestSecret(GuestSecret);
 impl BinGuestSecret {
     /// Reference to the confidential data
@@ -40,7 +40,7 @@ impl BinGuestSecret {
                 let mut buf = vec![0; 48];
                 buf[3] = 2;
                 buf[7] = 0x20;
-                buf[16..48].copy_from_slice(id.as_slice());
+                buf[16..48].copy_from_slice(id.as_ref());
                 buf
             }
         }
@@ -75,7 +75,7 @@ impl ReqAuthData {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ReqConfData {
     secret: BinGuestSecret,
     extension_secret: Secret<[u8; 32]>,
@@ -164,7 +164,7 @@ impl From<AddSecretVersion> for RequestVersion {
 /// |                   AES GCM Tag (16)                          |
 /// |_____________________________________________________________|
 ///```
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AddSecretRequest {
     version: AddSecretVersion,
     aad: ReqAuthData,
@@ -348,7 +348,7 @@ mod test {
     fn guest_secret_bin_ap() {
         let gs: BinGuestSecret = GuestSecret::Association {
             name: "test".to_string(),
-            id: [1; 32],
+            id: [1; 32].into(),
             secret: [2; 32].into(),
         }
         .into();
