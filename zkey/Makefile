@@ -92,9 +92,11 @@ keystore.o: keystore.c keystore.h properties.h pkey.h cca.h ep11.h utils.h
 zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h \
 			ep11.h misc.h utils.h
 kms.o: kms.c kms.h kms-plugin.h utils.h pkey.h
+pvsecrets.o: pvsecrets.h
 
 zkey: LDLIBS = -ldl -lcrypto
-zkey: zkey.o pkey.o cca.o ep11.o properties.o keystore.o utils.o kms.o $(libs)
+zkey: zkey.o pkey.o cca.o ep11.o properties.o keystore.o utils.o kms.o \
+			pvsecrets.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c -lcrypto
