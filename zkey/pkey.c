@@ -1,7 +1,7 @@
 /*
  * zkey - Generate, re-encipher, and validate secure keys
  *
- * Copyright IBM Corp. 2018
+ * Copyright IBM Corp. 2018, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -26,6 +26,7 @@
 #include "lib/util_panic.h"
 
 #include "pkey.h"
+#include "pvsecrets.h"
 #include "utils.h"
 
 #ifndef AF_ALG
@@ -1720,6 +1721,38 @@ bool is_ep11_key_session_bound(const u8 *key, size_t key_size)
 }
 
 /**
+ * Check if the specified key is a PVSECRET-AES key token.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is a PVSECRET token type
+ */
+bool is_pvsecret_aes_key(const u8 *key, size_t key_size)
+{
+	struct pvsecrettoken *pvsecret = (struct pvsecrettoken *)key;
+
+	if (key == NULL || key_size < PVSECRET_KEY_SIZE)
+		return false;
+
+	if (pvsecret->hdr.type != TOKEN_TYPE_NON_CCA)
+		return false;
+	if (pvsecret->hdr.version != TOKEN_VERSION_PVSECRET)
+		return false;
+
+	switch (pvsecret->secret_type) {
+	case UV_SECRET_TYPE_AES_128:
+	case UV_SECRET_TYPE_AES_192:
+	case UV_SECRET_TYPE_AES_256:
+	case UV_SECRET_TYPE_AES_XTS_128:
+	case UV_SECRET_TYPE_AES_XTS_256:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
  * Check if the specified key is an XTS type key
  *
  * @param[in] key           the secure key token
@@ -1729,6 +1762,8 @@ bool is_ep11_key_session_bound(const u8 *key, size_t key_size)
  */
 bool is_xts_key(const u8 *key, size_t key_size)
 {
+	struct pvsecrettoken *pvsecret = (struct pvsecrettoken *)key;
+
 	if (is_cca_aes_data_key(key, key_size)) {
 		if (key_size == 2 * AESDATA_KEY_SIZE &&
 		    is_cca_aes_data_key(key + AESDATA_KEY_SIZE,
@@ -1749,7 +1784,37 @@ bool is_xts_key(const u8 *key, size_t key_size)
 		    is_ep11_aes_key_with_header(key + EP11_AES_KEY_SIZE,
 						key_size - EP11_AES_KEY_SIZE))
 			return true;
+	} else if (is_pvsecret_aes_key(key, key_size)) {
+		switch (pvsecret->secret_type) {
+		case UV_SECRET_TYPE_AES_XTS_128:
+		case UV_SECRET_TYPE_AES_XTS_256:
+			return true;
+		default:
+			return false;
+		}
 	}
+
+	return false;
+}
+
+/**
+ * Check if the specified key is a secure key type (i.e. requires a crypto card)
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is a secure key type
+ */
+bool is_secure_key(const u8 *key, size_t key_size)
+{
+	if (is_cca_aes_data_key(key, key_size))
+		return true;
+	if (is_cca_aes_cipher_key(key, key_size))
+		return true;
+	if (is_ep11_aes_key(key, key_size))
+		return true;
+	if (is_ep11_aes_key_with_header(key, key_size))
+		return true;
 
 	return false;
 }
@@ -1771,6 +1836,7 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
 	struct ep11keytoken *ep11key = (struct ep11keytoken *)key;
 	struct ep11kblob_header *hdr = (struct ep11kblob_header *)key;
+	struct pvsecrettoken *pvsecret = (struct pvsecrettoken *)key;
 
 	util_assert(bitsize != NULL, "Internal error: bitsize is NULL");
 
@@ -1805,6 +1871,26 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 						(key + EP11_AES_KEY_SIZE);
 			*bitsize += hdr->bitlen;
 		}
+	} else if (is_pvsecret_aes_key(key, key_size)) {
+		switch (pvsecret->secret_type) {
+		case UV_SECRET_TYPE_AES_128:
+			*bitsize = 128;
+			break;
+		case UV_SECRET_TYPE_AES_192:
+			*bitsize = 192;
+			break;
+		case UV_SECRET_TYPE_AES_256:
+			*bitsize = 256;
+			break;
+		case UV_SECRET_TYPE_AES_XTS_128:
+			*bitsize = 128 * 2;
+			break;
+		case UV_SECRET_TYPE_AES_XTS_256:
+			*bitsize = 256 * 2;
+			break;
+		default:
+			return -EINVAL;
+		}
 	} else {
 		return -EINVAL;
 	}
@@ -1830,7 +1916,29 @@ const char *get_key_type(const u8 *key, size_t key_size)
 		return KEY_TYPE_EP11_AES;
 	if (is_ep11_aes_key_with_header(key, key_size))
 		return KEY_TYPE_EP11_AES;
+	if (is_pvsecret_aes_key(key, key_size))
+		return KEY_TYPE_PVSECRET_AES;
+
 	return NULL;
+}
+
+/**
+ * Returns true if the key type is a secure key type
+ *
+ * @param[in] key_type       the type of the key
+ *
+ * @returns true if the key type is a secure key type, false otherwise
+ */
+bool is_secure_key_type(const char *key_type)
+{
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+		return true;
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		return true;
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return true;
+
+	return false;
 }
 
 /**

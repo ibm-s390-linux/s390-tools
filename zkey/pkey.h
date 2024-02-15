@@ -4,7 +4,7 @@
  * This header file defines the interface to the pkey kernel module.
  * It defines a set of IOCTL commands with its associated structures.
  *
- * Copyright IBM Corp. 2017, 2018
+ * Copyright IBM Corp. 2017, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -41,6 +41,8 @@ struct tokenheader {
 #define TOKEN_VERSION_EP11_AES		0x03
 #define TOKEN_VERSION_EP11_AES_WITH_HEADER	0x06
 #define TOKEN_VERSION_EP11_ECC_WITH_HEADER	0x07
+/* 0x08 is reserved for internal use */
+#define TOKEN_VERSION_PVSECRET		0x09
 
 struct aesdatakeytoken {
 	u8  type;     /* TOKEN_TYPE_INTERNAL (0x01) for internal key token */
@@ -116,6 +118,15 @@ struct ep11keytoken {
 	u8  padding[64];
 } __packed;
 
+#define UV_SECRET_ID_LEN		32
+
+struct pvsecrettoken {
+	struct tokenheader hdr;
+	u16 secret_type; /* the secret type as the UV told us */
+	u16 secret_len; /* length in bytes of the secret */
+	u8 secretid[UV_SECRET_ID_LEN]; /* the secret id for this secret */
+} __packed;
+
 #define ZERO_SESSION							\
 	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
@@ -124,21 +135,26 @@ struct ep11keytoken {
 #define EP11_KEY_SIZE		sizeof(struct ep11keytoken)
 #define EP11_AES_KEY_SIZE	(sizeof(struct ep11kblob_header) +	\
 					sizeof(struct ep11keytoken))
+#define PVSECRET_KEY_SIZE	sizeof(struct pvsecrettoken)
 
 /* MAX/MIN from zt_common.h produces warnings for variable length arrays */
 #define _MIN(a, b)  ((a) < (b) ? (a) : (b))
 #define _MAX(a, b)  ((a) > (b) ? (a) : (b))
 
 #define MAX_SECURE_KEY_SIZE	_MAX(					\
-				     _MAX(EP11_KEY_SIZE,		\
-					  EP11_AES_KEY_SIZE),		\
-				     _MAX(AESDATA_KEY_SIZE,		\
-					  AESCIPHER_KEY_SIZE))
+				     _MAX(				\
+					  _MAX(EP11_KEY_SIZE,		\
+					       EP11_AES_KEY_SIZE),	\
+					  _MAX(AESDATA_KEY_SIZE,	\
+					       AESCIPHER_KEY_SIZE)),	\
+				     PVSECRET_KEY_SIZE)
 #define MIN_SECURE_KEY_SIZE	_MIN(					\
-				     _MIN(EP11_KEY_SIZE,		\
-					  EP11_AES_KEY_SIZE),		\
-				     _MIN(AESDATA_KEY_SIZE,		\
-					  AESCIPHER_KEY_SIZE))
+				     _MIN(				\
+					  _MIN(EP11_KEY_SIZE,		\
+					       EP11_AES_KEY_SIZE),	\
+					  _MIN(AESDATA_KEY_SIZE,	\
+					       AESCIPHER_KEY_SIZE)),	\
+				     PVSECRET_KEY_SIZE)
 
 struct pkey_seckey {
 	u8  seckey[AESDATA_KEY_SIZE];  /* the secure key blob */
@@ -285,6 +301,7 @@ struct pkey_apqns4keytype {
 #define KEY_TYPE_CCA_AESDATA        "CCA-AESDATA"
 #define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"
 #define KEY_TYPE_EP11_AES           "EP11-AES"
+#define KEY_TYPE_PVSECRET_AES       "PVSECRET-AES"
 
 #define DEFAULT_KEYBITS             256
 #define PAES_BLOCK_SIZE             16
@@ -342,9 +359,12 @@ bool is_cca_aes_cipher_key(const u8 *key, size_t key_size);
 bool is_ep11_aes_key(const u8 *key, size_t key_size);
 bool is_ep11_aes_key_with_header(const u8 *key, size_t key_size);
 bool is_ep11_key_session_bound(const u8 *key, size_t key_size);
+bool is_pvsecret_aes_key(const u8 *key, size_t key_size);
 bool is_xts_key(const u8 *key, size_t key_size);
+bool is_secure_key(const u8 *key, size_t key_size);
 int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize);
 const char *get_key_type(const u8 *key, size_t key_size);
+bool is_secure_key_type(const char *key_type);
 int get_min_card_level_for_keytype(const char *key_type);
 const struct fw_version *get_min_fw_version_for_keytype(const char *key_type);
 enum card_type get_card_type_for_keytype(const char *key_type);

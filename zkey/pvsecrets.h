@@ -15,6 +15,8 @@
 
 #include "lib/zt_common.h"
 
+#include "pkey.h"
+
 /*
  * Definitions for the /dev/uv kernel module interface
  */
@@ -59,8 +61,6 @@ struct uvio_ioctl_cb {
 #define UV_SECRET_TYPE_ECDSA_P521	0x13
 #define UV_SECRET_TYPE_EDDSA_ED25519	0x14
 #define UV_SECRET_TYPE_EDDSA_ED448	0x15
-
-#define UV_SECRET_ID_LEN		32
 
 #define UVIO_LIST_SECRETS_MAX_LEN	0x8000
 

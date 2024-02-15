@@ -3,7 +3,7 @@
  *
  * Keystore handling functions
  *
- * Copyright IBM Corp. 2018, 2020
+ * Copyright IBM Corp. 2018, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -359,6 +359,8 @@ static int _keystore_valid_key_type(const char *key_type)
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
 		return 1;
 	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return 1;
+	if (strcasecmp(key_type, KEY_TYPE_PVSECRET_AES) == 0)
 		return 1;
 
 	return 0;
