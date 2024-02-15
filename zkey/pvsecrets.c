@@ -552,3 +552,129 @@ int pvsecrets_list(int uv_fd, bool all, bool hex, const char *type_filter,
 
 	return rc;
 }
+
+struct build_secret_key_blob_data {
+	unsigned char id[UV_SECRET_ID_LEN];
+	char name[UV_SECRET_ID_LEN];
+	struct pvsecrettoken token;
+	bool found;
+};
+
+/**
+ * Callback used to generate a pvsecrets key blob for a specific secret ID.
+ * Called for each secret.
+ *
+ * @param idx                the index of the secret
+ * @param type               the type of the secret
+ * @param id                 the ID of the secret
+ * @param cb_private         callback private data
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int pvsecrets_build_key_blob_cb(u16 UNUSED(idx), u16 type, u32 len,
+				       const u8 id[UV_SECRET_ID_LEN],
+				       void *cb_private)
+{
+	struct build_secret_key_blob_data *build_blob_data = cb_private;
+
+	if (build_blob_data->found)
+		return 0;
+
+	if (memcmp(id, build_blob_data->name, UV_SECRET_ID_LEN) != 0 &&
+	    memcmp(id, build_blob_data->id, UV_SECRET_ID_LEN) != 0)
+		return 0;
+
+	memset(&build_blob_data->token, 0, sizeof(build_blob_data->token));
+	build_blob_data->token.hdr.type = TOKEN_TYPE_NON_CCA;
+	build_blob_data->token.hdr.version = TOKEN_VERSION_PVSECRET;
+	build_blob_data->token.secret_type = type;
+	build_blob_data->token.secret_len = len;
+	memcpy(build_blob_data->token.secretid, id, UV_SECRET_ID_LEN);
+
+	build_blob_data->found = true;
+
+	return 0;
+}
+
+/**
+ * Imports a protected virtualization secure key from the UV and adds it to the
+ * key store
+ *
+ * @param keystore        the key store
+ * @param uv_fd           the file descriptor of the ultravisor device
+ * @param secret_id       the secret id as 32 byte hex string. Can be NULL if
+ *                        secret_name is non-NULL.
+ * @param secret_name     the secret name. Can be NULL if secret_id is non-NULL.
+ * @param name            the name of the key in the repository
+ * @param description     textual description of the key (optional, can be NULL)
+ * @param volumes         a comma separated list of volumes associated with this
+ *                        key (optional, can be NULL)
+ * @param volume_type     the type of volume
+ * @param sector_size     the sector size to use with dm-crypt. It must be a
+ *                        power of two and in range 512 - 4096 bytes. 0 means
+ *                        that the sector size is not specified and the system
+ *                        default is used.
+ * @param gen_passphrase  if true, generate a (dummy) passphrase for LUKS2
+ * @param passphrase_file the file name of a file containing a passphrase
+ *                        for LUKS2 (optional, can be NULL)
+ * @param verbose         if true, verbose messages are printed
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int pvsecrets_import(struct keystore *keystore, int uv_fd,
+		     const char *secret_id, const char *secret_name,
+		     const char *name, const char *description,
+		     const char *volumes, const char *volume_type,
+		     long sector_size, bool gen_passphrase,
+		     const char *passphrase_file, bool verbose)
+{
+	struct build_secret_key_blob_data build_blob_data = { 0 };
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(uv_fd != -1, "Internal error: uv_fd is -1");
+	util_assert(secret_id != NULL || secret_name != NULL,
+		    "Internal error: secret_id and secrest_name is NULL");
+	util_assert(name != NULL, "Internal error: name is NULL");
+
+	rc = get_secret_id_from_hex_or_name(secret_id, secret_name,
+					    build_blob_data.id,
+					    build_blob_data.name);
+	if (rc < 0)
+		return rc;
+	if (rc > 0)
+		return -EINVAL;
+
+	rc = uv_list_secrets(uv_fd, pvsecrets_build_key_blob_cb,
+			     &build_blob_data, verbose);
+	if (rc != 0) {
+		warnx("Failed to import the pvsecret with %s '%s': %s",
+		      secret_id != NULL ? "id" : "name",
+		      secret_id != NULL ? secret_id : secret_name,
+		      strerror(-rc));
+		return rc;
+	}
+
+	if (!build_blob_data.found) {
+		warnx("The pvsecret with %s '%s' does not exist",
+		      secret_id != NULL ? "id" : "name",
+		      secret_id != NULL ? secret_id : secret_name);
+		return -ENOENT;
+	}
+
+	if (!is_pvsecret_type_supported(build_blob_data.token.secret_type)) {
+		warnx("The type of the pvsecret with %s '%s' is not supported "
+		      "by zkey: %s", secret_id != NULL ? "id" : "name",
+		      secret_id != NULL ? secret_id : secret_name,
+		      get_pvsecret_type_name(
+					build_blob_data.token.secret_type));
+		return -EINVAL;
+	}
+
+	rc = keystore_import(keystore, (unsigned char *)&build_blob_data.token,
+			     sizeof(build_blob_data.token), name, description,
+			     volumes, NULL, false, sector_size, volume_type,
+			     gen_passphrase, passphrase_file, NULL);
+
+	return rc;
+}

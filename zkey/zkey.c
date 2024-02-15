@@ -145,6 +145,7 @@ static struct zkey_globals {
 #define COMMAND_KMS_REFRESH	"refresh"
 #define COMMAND_PVSECRETS	"pvsecrets"
 #define COMMAND_PVSECRETS_LIST	"list"
+#define COMMAND_PVSECRETS_IMPORT "import"
 
 #define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
 
@@ -1234,6 +1235,103 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
 	},
 	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "pvsecret-id", required_argument, NULL, 'I'},
+		.argument = "PVSECRET-ID",
+		.desc = "ID of the protected virtualization (PV) secret to "
+			"import. Either '--pvsecret-id/-I' or "
+			"'--pvsecret-name/-e' can be specified, but not both.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "pvsecret-name", required_argument, NULL, 'e'},
+		.argument = "PVSECRET-NAME",
+		.desc = "Name of the protected virtualization (PV) secret to "
+			"import. Either '--pvsecret-name/-e' or "
+			"'--pvsecret-id/-I' can be specified, but not both. "
+			"If the '--pvsecret-name/-e' option is specified, but "
+			"the '--name/-N' option is omitted, then the imported "
+			"protected virtualisation secret will be named the "
+			"same as the pvsecret name.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "name", required_argument, NULL, 'N'},
+		.argument = "NAME",
+		.desc = "Name of the imported protected virtualisation secret "
+			"in the repository. If the '--name/-N' option is "
+			"omitted, but the '--pvsecret-name/-e' is specified, "
+			"then the imported protected virtualisation secret "
+			"will be named the same as the pvsecret name.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "description", required_argument, NULL, 'd'},
+		.argument = "DESCRIPTION",
+		.desc = "Textual description of the protected virtualisation "
+			"secret in the repository",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "volumes", required_argument, NULL, 'l'},
+		.argument = "VOLUME:DMNAME[,...]",
+		.desc = "Comma-separated pairs of volume and device-mapper "
+			"names that are associated with the protected "
+			"virtualisation secret in the repository",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "sector-size", required_argument, NULL, 'S'},
+		.argument = "512|4096",
+		.desc = "The sector size used with dm-crypt. It must be a power "
+			"of two and in range 512 - 4096 bytes. If this option "
+			"is omitted, the system default sector size (512) is "
+			"used",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+#ifdef HAVE_LUKS2_SUPPORT
+	{
+		.option = { "volume-type", required_argument, NULL, 't'},
+		.argument = "type",
+		.desc = "The type of the associated volume(s). Possible values "
+			"are 'plain' and 'luks2'. When this option is omitted, "
+			"the default is 'luks2'",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+#endif
+	{
+		.option = { "gen-dummy-passphrase", 0, NULL,
+						OPT_GEN_DUMMY_PASSPHRASE},
+		.desc = "Generate a dummy passphrase and associate it with the "
+			"protected virtualisation secret used to encrypt LUKS2 "
+			"volume(s). The LUKS2 passphrase is of less or no "
+			"relevance for the security of the volume(s), when an "
+			"protected virtualisation secret is used to encrypt "
+			"the volume(s), and can therefore be stored insecurely "
+			"inside the secure key repository.",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	{
+		.option = { "set-dummy-passphrase", required_argument, NULL,
+						OPT_SET_DUMMY_PASSPHRASE},
+		.argument = "passphrase-file",
+		.desc = "Set a dummy passphrase to be associated with the "
+			"protected virtualisation secret used to encrypt LUKS2 "
+			"volume(s). The LUKS2 passphrase is of less or no "
+			"relevance for the security of the volume(s), when a "
+			"protected virtualisation secret is used to encrypt "
+			"the volume(s), and can therefore be stored insecurely "
+			"inside the secure key repository.",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
+	},
+	/***********************************************************/
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
@@ -1339,6 +1437,7 @@ static int command_kms_list(void);
 static int command_kms_import(void);
 static int command_kms_refresh(void);
 static int command_pvsecrets_list(void);
+static int command_pvsecrets_import(void);
 
 static struct zkey_command zkey_kms_commands[] = {
 	{
@@ -1467,6 +1566,19 @@ static struct zkey_command zkey_pvsecrets_commands[] = {
 			     "running in a secure execution guest. Only the "
 			     "'root' user is allowed to perform this command",
 		.has_options = 1,
+		.need_uv_device = 1,
+	},
+	{
+		.command = COMMAND_PVSECRETS_IMPORT,
+		.abbrev_len = 2,
+		.function = command_pvsecrets_import,
+		.short_desc = "Imports a protected virtualization (PV) secret",
+		.long_desc = "Imports a protected virtualization (PV) secret "
+			      "into the repository. This command is only "
+			      "available when running in a secure execution "
+			      "guest.",
+		.has_options = 1,
+		.need_keystore = 1,
 		.need_uv_device = 1,
 	},
 	{ .command = NULL }
@@ -3002,6 +3114,51 @@ static int command_pvsecrets_list(void)
 
 	rc = pvsecrets_list(g.uv_fd, g.all, g.hex, g.secret_type, g.secret_id,
 			    g.secret_name, g.verbose);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'pvsecrets import'.
+ *
+ * Import a protected virtualization secret into the repository
+ */
+static int command_pvsecrets_import(void)
+{
+	int rc;
+
+	if (g.secret_id == NULL && g.secret_name == NULL) {
+		misc_print_required_parm("--pvsecret-id/-I or "
+					 "--pvsecret-name/-e");
+		return EXIT_FAILURE;
+	}
+	if (g.secret_id != NULL && g.secret_name != NULL) {
+		warnx("Either '--pvsecret-id/-I' or '--pvsecret-name/-e' can "
+		      "be specified, but not both");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+	if (g.secret_name == NULL && g.name == NULL) {
+		misc_print_required_parm("--name/-N");
+		return EXIT_FAILURE;
+	}
+
+	if (g.sector_size < 0)
+		g.sector_size = 0;
+
+	if (g.gen_passphrase && g.passphrase_file != NULL) {
+		warnx("Either '--gen-dummy-passphrase' or "
+		      "'--set-dummy-passphrase' can be specified, but not "
+		      "both");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+
+	rc = pvsecrets_import(g.keystore, g.uv_fd, g.secret_id, g.secret_name,
+			      g.name != NULL ? g.name : g.secret_name,
+			      g.description, g.volumes, g.volume_type,
+			      g.sector_size, g.gen_passphrase,
+			      g.passphrase_file, g.verbose);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

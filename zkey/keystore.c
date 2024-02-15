@@ -2259,9 +2259,11 @@ out_free_key_filenames:
 }
 
 /**
- * Imports a secure key from a file and adds it to the key store
+ * Imports a secure key from a buffer and adds it to the key store
  *
  * @param[in] keystore    the key store
+ * @param[in] secure_key  the buffer containing the key
+ * @param[in] secure_key_size   the size of the key
  * @param[in] name        the name of the key
  * @param[in] description textual description of the key (optional, can be NULL)
  * @param[in] volumes     a comma separated list of volumes associated with this
@@ -2274,7 +2276,6 @@ out_free_key_filenames:
  *                        of two and in range 512 - 4096 bytes. 0 means that
  *                        the sector size is not specified and the system
  *                        default is used.
- * @param[in] import_file The name of a secure key containing the key to import
  * @param[in] volume_type the type of volume
  * @param[in] gen_passphrase if true, generate a (dummy) passphrase for LUKS2
  * @param[in] passphrase_file the file name of a file containing a passphrase
@@ -2283,25 +2284,23 @@ out_free_key_filenames:
  *
  * @returns 0 for success or a negative errno in case of an error
  */
-int keystore_import_key(struct keystore *keystore, const char *name,
-			const char *description, const char *volumes,
-			const char *apqns, bool noapqncheck, size_t sector_size,
-			const char *import_file, const char *volume_type,
-			bool gen_passphrase, const char *passphrase_file,
-			struct ext_lib *lib)
+int keystore_import(struct keystore *keystore, unsigned char *secure_key,
+		    size_t secure_key_size, const char *name,
+		    const char *description, const char *volumes,
+		    const char *apqns, bool noapqncheck, size_t sector_size,
+		    const char *volume_type, bool gen_passphrase,
+		    const char *passphrase_file, struct ext_lib *lib)
 {
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
-	size_t secure_key_size;
 	const char *key_type;
 	u8 mkvp[MKVP_LENGTH];
 	int selected = 1;
-	u8 *secure_key;
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
-	util_assert(import_file != NULL, "Internal error: import_file is NULL");
+	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 
 	rc = _keystore_get_key_filenames(keystore, name, &file_names);
 	if (rc != 0)
@@ -2311,19 +2310,21 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
-	secure_key = read_secure_key(import_file, &secure_key_size,
-				     keystore->verbose);
-	if (secure_key == NULL) {
-		rc = -ENOENT;
-		goto out_free_key_filenames;
-	}
-
 	key_type = get_key_type(secure_key, secure_key_size);
 	if (key_type == NULL) {
 		warnx("Key '%s' is not a valid secure key", name);
-		free(secure_key);
 		rc = -EINVAL;
 		goto out_free_key_filenames;
+	}
+
+	if (!is_secure_key(secure_key, secure_key_size)) {
+		if (apqns != NULL) {
+			warnx("No APQNs can be associated with keys of type %s",
+			      key_type);
+			rc = -EINVAL;
+			goto out_free_props;
+		}
+		goto write_key;
 	}
 
 	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
@@ -2331,7 +2332,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	if (rc != 0) {
 		warnx("Failed to get the master key verification pattern: %s",
 		      strerror(-rc));
-		goto out_free_key;
+		goto out_free_props;
 	}
 
 	rc = cross_check_apqns(apqns, mkvp,
@@ -2340,17 +2341,17 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			       get_card_type_for_keytype(key_type),
 			       true, keystore->verbose);
 	if (rc == -EINVAL)
-		goto out_free_key;
+		goto out_free_props;
 	if (rc != 0 && rc != -ENOTSUP && noapqncheck == 0) {
 		warnx("Your master key setup is improper");
-		goto out_free_key;
+		goto out_free_props;
 	}
 
 	if (is_cca_aes_cipher_key(secure_key, secure_key_size)) {
 		if (lib->cca->lib_csulcca == NULL) {
 			rc = load_cca_library(lib->cca, keystore->verbose);
 			if (rc != 0)
-				goto out_free_key;
+				goto out_free_props;
 		}
 
 		rc = select_cca_adapter_by_mkvp(lib->cca, mkvp, apqns,
@@ -2365,7 +2366,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			warnx("No APQN found that is suitable for "
 			      "working with the secure AES key '%s'", name);
 			rc = 0;
-			goto out_free_key;
+			goto out_free_props;
 		}
 
 		rc = restrict_key_export(lib->cca, secure_key, secure_key_size,
@@ -2375,7 +2376,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			      "key: %s", strerror(-rc));
 			if (!selected)
 				print_msg_for_cca_envvars("secure AES key");
-			goto out_free_key;
+			goto out_free_props;
 		}
 
 		rc = check_aes_cipher_key(secure_key, secure_key_size);
@@ -2386,15 +2387,14 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			if (!prompt_for_yes(keystore->verbose)) {
 				warnx("Operation aborted");
 				rc = -ECANCELED;
-				goto out_free_key;
+				goto out_free_props;
 			}
 		}
 	}
 
+write_key:
 	rc = write_secure_key(file_names.skey_filename, secure_key,
 			      secure_key_size, keystore->verbose);
-	free(secure_key);
-	secure_key = NULL;
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2414,9 +2414,6 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 		   "Successfully imported a secure key in '%s' and key info in '%s'",
 		   file_names.skey_filename, file_names.info_filename);
 
-out_free_key:
-	if (secure_key != NULL)
-		free(secure_key);
 out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
@@ -2431,6 +2428,59 @@ out_free_key_filenames:
 	return rc;
 }
 
+/**
+ * Imports a secure key from a file and adds it to the key store
+ *
+ * @param[in] keystore    the key store
+ * @param[in] name        the name of the key
+ * @param[in] description textual description of the key (optional, can be NULL)
+ * @param[in] volumes     a comma separated list of volumes associated with this
+ *                        key (optional, can be NULL)
+ * @param[in] apqns       a comma separated list of APQNs associated with this
+ *                        key (optional, can be NULL)
+ * @param[in] noapqncheck if true, the specified APQN(s) are not checked for
+ *                        existence and type.
+ * @param[in] sector_size the sector size to use with dm-crypt. It must be a
+ *                        power of two and in range 512 - 4096 bytes. 0 means
+ *                        that the sector size is not specified and the system
+ *                        default is used.
+ * @param[in] import_file The name of a secure key containing the key to import
+ * @param[in] volume_type the type of volume
+ * @param[in] gen_passphrase if true, generate a (dummy) passphrase for LUKS2
+ * @param[in] passphrase_file the file name of a file containing a passphrase
+ *                        for LUKS2 (optional, can be NULL)
+ * @param[in] lib         the external library struct
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_import_key(struct keystore *keystore, const char *name,
+			const char *description, const char *volumes,
+			const char *apqns, bool noapqncheck, size_t sector_size,
+			const char *import_file, const char *volume_type,
+			bool gen_passphrase, const char *passphrase_file,
+			struct ext_lib *lib)
+{
+	size_t secure_key_size;
+	u8 *secure_key;
+	int rc;
+
+	util_assert(import_file != NULL, "Internal error: import_file is NULL");
+
+	secure_key = read_secure_key(import_file, &secure_key_size,
+				     keystore->verbose);
+	if (secure_key == NULL)
+		return -ENOENT;
+
+	rc = keystore_import(keystore, secure_key, secure_key_size, name,
+			     description, volumes, apqns, noapqncheck,
+			     sector_size, volume_type, gen_passphrase,
+			     passphrase_file, lib);
+
+	if (secure_key != NULL)
+		free(secure_key);
+
+	return rc;
+}
 
 /**
  * Changes properties of a key in the keystore.

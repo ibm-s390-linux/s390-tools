@@ -3,7 +3,7 @@
  *
  * Keystore handling functions
  *
- * Copyright IBM Corp. 2018, 2020
+ * Copyright IBM Corp. 2018, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -64,6 +64,13 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 			      bool gen_passphrase, const char *passphrase_file,
 			      struct kms_option *kms_options,
 			      size_t num_kms_options);
+
+int keystore_import(struct keystore *keystore, unsigned char *secure_key,
+		    size_t secure_key_size, const char *name,
+		    const char *description, const char *volumes,
+		    const char *apqns, bool noapqncheck, size_t sector_size,
+		    const char *volume_type, bool gen_passphrase,
+		    const char *passphrase_file, struct ext_lib *lib);
 
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,

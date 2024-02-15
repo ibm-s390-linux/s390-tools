@@ -1208,6 +1208,64 @@ are supported by the \fBzkey\fP tool. To list all pvsecret types, specify the
 This command is only available when running in a secure execution guest.
 Only the \fBroot\fP user is allowed to perform this command.
 .
+.SS "Import protected virtualization secrets into the repository"
+.
+.B zkey pvsecrets
+.BR import | im
+.RB [ \-\-pvsecret\-id | \-I
+.IR pvsecret\-id ]
+.RB [ \-\-pvsecret\-name | \-e
+.IR pvsecret\-name ]
+.B \-\-name | \-N
+.IR key\-name
+.RB [ \-\-description | \-d
+.IR description ]
+.RB [ \-\-volumes | \-l
+.IR volume1:dmname1[,volume2:dmname2[,...]] ]
+.RB [ \-\-sector\-size | \-S
+.IR bytes ]
+.RB [ \-\-volume\-type | \-t
+.IR type ]
+.RB [ \-\-gen\-dummy\-passphrase ]
+.RB [ \-\-set\-dummy\-passphrase
+.IR passphrase\-file ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B pvsecrets import
+command to import a protected virtualization (PV) secret into the repository.
+Either the \fB\-\-pvsecret\-id\fP option or the \fB\-\-pvsecret\-name\fP
+option can be specified. If the pvsecret name is specified, then the
+\fB\-\-name\fP option can be omitted. The name of the protected virtualization
+secret key object in the repository will then be the same as the pvsecret name.
+.PP
+You can use the YAML file that was created when using the \fBpvsecret create\fP
+command for adding the protected virtualization secret:
+\fB\-\-pvsecret\-id "$(yq .id \fP\fIYAML\-FILE\fP\fB)"\fP or
+\fB\-\-pvsecret\-name "$(yq .name \fP\fIYAML\-FILE\fP\fB)"\fP.
+You might have to install the \fByq\fP package first.
+.PP
+A protected virtualization secret key object does not contain the key material,
+but only a reference (i.e. the secret ID) to the key in the ultravisor.
+When such a protected virtualization secret key object is used with
+\fBdm\-crypt\fP and the \fBPAES\fP kernel cipher, the key material (i.e. a
+protected key) is retrieved from the ultravisor and the crypto operation is
+performed with it.
+.PP
+When importing a protected virtualization secret in a key repository,
+additional information can be associated with it using the
+.B \-\-description
+,
+.B \-\-volumes
+, or the
+.B \-\-sector\-size
+options. APQNs can not be associated, because protected virtualization secrets
+do not require a crypto card.
+.PP
+This command is only available when running in a secure execution guest.
+Only the \fBroot\fP user is allowed to perform this command.
+.
 .
 .
 .
@@ -2114,6 +2172,82 @@ the protected virtualization secret:
 You might have to install the \fByq\fP package first.
 Either the \fB\-\-pvsecret\-id\fP option or the \fB\-\-pvsecret\-name\fP option
 can be specified, but not both.
+.
+.
+.
+.SS "Options for the pvsecrets import command"
+.TP
+.BR \-I ", " \-\-pvsecret\-id\~\fIpvsecret\-id\fP
+ID of the protected virtualization (PV) secret to import. The pvsecret ID is a
+32 byte hex string, optionally prefixed by \fB0x\fP. You can use the YAML file
+that was created when using the \fBpvsecret create\fP command for adding the
+protected virtualization secret:
+\fB\-\-pvsecret\-id "$(yq .id \fP\fIYAML\-FILE\fP\fB)"\fP.
+You might have to install the \fByq\fP package first.
+Either the \fB\-\-pvsecret\-id\fP option or the \fB\-\-pvsecret\-name\fP option
+can be specified, but not both.
+.TP
+.BR \-e ", " \-\-pvsecret\-name\~\fIpvsecret\-name\fP
+Name of the protected virtualization (PV) secret to import. You can use the YAML
+file that was created when using the \fBpvsecret create\fP command for adding
+the protected virtualization secret:
+\fB\-\-pvsecret\-name "$(yq .name \fP\fIYAML\-FILE\fP\fB)"\fP.
+You might have to install the \fByq\fP package first.
+Either the \fB\-\-pvsecret\-id\fP option or the \fB\-\-pvsecret\-name\fP option
+can be specified, but not both. If the \fB\-\-pvsecret\-name\fP option is
+specified, then the \fB\-\-name\fP option can be omitted. The name of the
+protected virtualization secret key object in the repository will then be the
+same as the pvsecret name.
+.TP
+.BR \-N ", " \-\-name\~\fIkey\-name\fP
+Specifies the name of the protected virtualization secret key object in the key
+repository. If the \fB\-\-pvsecret\-name\fP option is specified, then the
+\fB\-\-name\fP option can be omitted. The name of the protected virtualization
+secret in the repository will then be the same as the pvsecret name.
+.TP
+.BR \-d ", " \-\-description\~\fIdescription\fP
+Specifies a textual description for the protected virtualization secret in the
+key repository.
+.TP
+.BR \-l ", " \-\-volumes\~\fIvolume1:dmname1[,volume2:dmname2[,...]]\fP
+Specifies a comma-separated list of volumes (block devices) which are
+associated with the protected virtualization secret in the repository. These
+volumes are to be encrypted using \fBdm\-crypt\fP with the protected
+virtualization secret. The volume association also contains the device-mapper
+name, separated by a colon, used with \fBdm\-crypt\fP. A specific volume can
+only be associated with a single key.
+.TP
+.BR \-S ", " \-\-sector\-size\~\fIbytes\fP
+Specifies the sector size in bytes used with \fBdm\-crypt\fP. It must be a power
+of two and in the range of 512 to 4096 bytes. If omitted, the system default
+sector size is used.
+.TP
+.BR \-t ", " \-\-volume\-type\~\fItype\fP
+Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
+Possible values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is
+used. This option is only available if
+.B zkey
+has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
+the default volume type is \fBplain\fP.
+.TP
+.BR \-\-gen\-dummy\-passphrase
+Generate a dummy passphrase randomly and associate it with the protected
+virtualization secret used to encrypt LUKS2 volume(s). The LUKS2 passphrase is
+of less or no relevance for the security of the volume(s), when a protected
+virtualization secret is used to encrypt the volume(s), and can therefore be
+stored insecurely inside the key repository. If for a certain usage the
+passphrase is of relevance for security, then do not use this option. This
+option can only be specified for keys with a volume type of \fBluks2\fP.
+.TP
+.BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
+Set a dummy passphrase that is read from the specified file and associate it
+with the protected virtualization secret used to encrypt LUKS2 volume(s).
+The LUKS2 passphrase is of less or no relevance for the security of the
+volume(s), when an protected virtualization secret is used to encrypt the
+volume(s), and can therefore be stored insecurely inside the key repository.
+If for a certain usage the passphrase is of relevance for security, then do
+not use this option. This option can only be specified for keys with a volume
+type of \fBluks2\fP.
 .
 .
 .

@@ -16,6 +16,7 @@
 #include "lib/zt_common.h"
 
 #include "pkey.h"
+#include "keystore.h"
 
 /*
  * Definitions for the /dev/uv kernel module interface
@@ -89,5 +90,11 @@ int uv_open_device(bool verbose);
 int pvsecrets_list(int uv_fd, bool all, bool hex, const char *type_filter,
 		   const char *secret_id, const char *secret_name,
 		   bool verbose);
+int pvsecrets_import(struct keystore *keystore, int uv_fd,
+		     const char *secret_id, const char *secret_name,
+		     const char *name, const char *description,
+		     const char *volumes, const char *volume_type,
+		     long sector_size, bool gen_passphrase,
+		     const char *passphrase_file, bool verbose);
 
 #endif
