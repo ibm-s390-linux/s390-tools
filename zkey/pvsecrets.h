@@ -86,4 +86,8 @@ struct uvio_list_secrets {
 
 int uv_open_device(bool verbose);
 
+int pvsecrets_list(int uv_fd, bool all, bool hex, const char *type_filter,
+		   const char *secret_id, const char *secret_name,
+		   bool verbose);
+
 #endif

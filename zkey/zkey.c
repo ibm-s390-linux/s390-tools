@@ -1,7 +1,7 @@
 /*
  * zkey - Generate, re-encipher, and validate secure keys
  *
- * Copyright IBM Corp. 2017, 2020
+ * Copyright IBM Corp. 2017, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -34,6 +34,7 @@
 #include "pkey.h"
 #include "utils.h"
 #include "kms.h"
+#include "pvsecrets.h"
 
 /*
  * Program configuration
@@ -46,7 +47,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2017,
-			.pub_last = 2020,
+			.pub_last = 2024,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -93,10 +94,16 @@ static struct zkey_globals {
 	bool open;
 	bool format;
 	bool refresh_properties;
+	bool all;
+	bool hex;
+	char *secret_type;
+	char *secret_id;
+	char *secret_name;
 	struct ext_lib lib;
 	struct cca_lib cca;
 	struct ep11_lib ep11;
 	int pkey_fd;
+	int uv_fd;
 	struct keystore *keystore;
 	struct kms_info kms_info;
 	int first_kms_option;
@@ -104,6 +111,7 @@ static struct zkey_globals {
 	size_t num_kms_options;
 } g = {
 	.pkey_fd = -1,
+	.uv_fd = -1,
 	.sector_size = -1,
 	.lib.cca = &g.cca,
 	.lib.ep11 = &g.ep11,
@@ -135,6 +143,8 @@ static struct zkey_globals {
 #define COMMAND_KMS_LIST	"list"
 #define COMMAND_KMS_IMPORT	"import"
 #define COMMAND_KMS_REFRESH	"refresh"
+#define COMMAND_PVSECRETS	"pvsecrets"
+#define COMMAND_PVSECRETS_LIST	"list"
 
 #define OPT_COMMAND_PLACEHOLDER	"PLACEHOLDER"
 
@@ -1182,6 +1192,48 @@ static struct util_opt opt_vec[] = {
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
+	},
+	{
+		.option = {"all", 0, NULL, 'A'},
+		.desc = "List all protected virtualization (PV) secret types, "
+			"not only those that can be used with zkey.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
+	},
+	{
+		.option = {"hex", 0, NULL, 'H'},
+		.desc = "Show all protected virtualization (PV) secret IDs in "
+			"hex, even if the ID contains only printable "
+			"characters.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
+	},
+	{
+		.option = { "pvsecret-type", required_argument, NULL, 'T'},
+		.argument = "PVSECRET-TYPE",
+		.desc = "Type of the protected virtualization (PV) secret to "
+			"list. If omitted, all pvsecret types are listed.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
+	},
+	{
+		.option = { "pvsecret-id", required_argument, NULL, 'I'},
+		.argument = "PVSECRET-ID",
+		.desc = "ID of the protected virtualization (PV) secret to "
+			"list. Either '--pvsecret-id/-I' or "
+			"'--pvsecret-name/-e' can be specified, but not both.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
+	},
+	{
+		.option = { "pvsecret-name", required_argument, NULL, 'e'},
+		.argument = "PVSECRET-NAME",
+		.desc = "Name of the protected virtualization (PV) secret to "
+			"list. Either '--pvsecret-name/-e' or "
+			"'--pvsecret-id/-I' can be specified, but not both.",
+		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_LIST,
+	},
+	/***********************************************************/
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
 	OPT_PLACEHOLDER,
@@ -1249,6 +1301,7 @@ struct zkey_command {
 	int need_cca_library;
 	int need_ep11_library;
 	int need_pkey_device;
+	int need_uv_device;
 	char *short_desc;
 	char *long_desc;
 	int has_options;
@@ -1285,6 +1338,7 @@ static int command_kms_reencipher(void);
 static int command_kms_list(void);
 static int command_kms_import(void);
 static int command_kms_refresh(void);
+static int command_pvsecrets_list(void);
 
 static struct zkey_command zkey_kms_commands[] = {
 	{
@@ -1398,6 +1452,22 @@ static struct zkey_command zkey_kms_commands[] = {
 		.has_options = 1,
 		.use_kms_plugin = 1,
 		.need_kms_login = 1,
+	},
+	{ .command = NULL }
+};
+
+static struct zkey_command zkey_pvsecrets_commands[] = {
+	{
+		.command = COMMAND_PVSECRETS_LIST,
+		.abbrev_len = 2,
+		.function = command_pvsecrets_list,
+		.short_desc = "Lists protected virtualization (PV) secrets",
+		.long_desc = "Lists available protected virtualization (PV) "
+			     "secrets. This command is only available when "
+			     "running in a secure execution guest. Only the "
+			     "'root' user is allowed to perform this command",
+		.has_options = 1,
+		.need_uv_device = 1,
 	},
 	{ .command = NULL }
 };
@@ -1564,6 +1634,21 @@ static struct zkey_command zkey_commands[] = {
 			     "(KMS) support.",
 		.has_options = 1,
 		.sub_commands = zkey_kms_commands,
+	},
+	{
+		.command = COMMAND_PVSECRETS,
+		.abbrev_len = 2,
+		.short_desc = "Protected virtualization (PV) support",
+		.long_desc = "Provides subcommands for working with protected "
+			     "virtualization (PV) secrets. Protected "
+			     "virtualization secrets can be made available to "
+			     "a secure execution guest and can be used only "
+			     "within that guest. Thus, these subcommands are "
+			     "only available when running in a secure "
+			     "execution guest. Only the 'root' user is allowed "
+			     "to perform these subcommands.",
+		.has_options = 1,
+		.sub_commands = zkey_pvsecrets_commands,
 	},
 	{ .command = NULL }
 };
@@ -2899,6 +2984,28 @@ static int command_kms_refresh(void)
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+/*
+ * Command handler for 'pvsecrets list'.
+ *
+ * Lists available protected virtualization secrets
+ */
+static int command_pvsecrets_list(void)
+{
+	int rc;
+
+	if (g.secret_id != NULL && g.secret_name != NULL) {
+		warnx("Either '--pvsecret-id/-I' or '--pvsecret-name/-e' can "
+		      "be specified, but not both");
+		util_prg_print_parse_error();
+		return EXIT_FAILURE;
+	}
+
+	rc = pvsecrets_list(g.uv_fd, g.all, g.hex, g.secret_type, g.secret_id,
+			    g.secret_name, g.verbose);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 /**
  * Opens the keystore. The keystore directory is either the
  * default directory or as specified in an environment variable
@@ -3234,6 +3341,21 @@ int main(int argc, char *argv[])
 		case OPT_REMOVE_DUMMY_PASSPHRASE:
 			g.remove_passphrase = 1;
 			break;
+		case 'A':
+			g.all = 1;
+			break;
+		case 'H':
+			g.hex = 1;
+			break;
+		case 'T':
+			g.secret_type = optarg;
+			break;
+		case 'I':
+			g.secret_id = optarg;
+			break;
+		case 'e':
+			g.secret_name = optarg;
+			break;
 		case 'h':
 			print_help(command, sub_command);
 			return EXIT_SUCCESS;
@@ -3294,6 +3416,13 @@ int main(int argc, char *argv[])
 			goto out;
 		}
 	}
+	if (cmd->need_uv_device) {
+		g.uv_fd = uv_open_device(g.verbose);
+		if (g.uv_fd == -1) {
+			rc = EXIT_FAILURE;
+			goto out;
+		}
+	}
 
 	if (g.kms_info.plugin_lib != NULL) {
 		rc = init_kms_plugin(&g.kms_info, g.verbose);
@@ -3323,6 +3452,8 @@ out:
 		dlclose(g.ep11.lib_ep11);
 	if (g.pkey_fd >= 0)
 		close(g.pkey_fd);
+	if (g.uv_fd >= 0)
+		close(g.uv_fd);
 	if (g.keystore)
 		keystore_free(g.keystore);
 	if (g.kms_options != NULL)

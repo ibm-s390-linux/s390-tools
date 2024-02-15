@@ -1,8 +1,8 @@
-.\" Copyright IBM Corp. 2017, 2020
+.\" Copyright IBM Corp. 2017, 2024
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH ZKEY 1 "July 2020" "s390-tools"
+.TH ZKEY 1 "February 2024" "s390-tools"
 .SH NAME
 zkey \- Manage secure AES keys
 .
@@ -1162,6 +1162,54 @@ fails. Use option \fB\-\-no\-volume\-check\fP to omit the volume check, and
 refresh the keys even if the associated volume(s) do not exist.
 .
 .
+.SH COMMANDS FOR PROTECTED VIRTUALIZATION
+.
+Use the \fBpvsecrets\fP command to work with protected virtualization (PV)
+secrets. Protected virtualization secrets can be made available to a secure
+execution guest and can be used only within that guest.
+The \fBpvsecrets\fP command provides subcommands for protected
+virtualization specific operations. Use \fBzkey pvsecrets \-\-help\fP to show
+the available subcommands. These subcommands only work when running in a
+secure execution guest. Only the \fBroot\fP user is allowed to perform these
+subcommands.
+.
+.SS "List available protected virtualization secrets"
+.
+.B zkey pvsecrets
+.BR list | li
+.RB [ \-\-all | \-A ]
+.RB [ \-\-hex | \-H ]
+.RB [ \-\-pvsecret\-type | \-T
+.IR pvsecret\-type ]
+.RB [ \-\-pvsecret\-id | \-I
+.IR pvsecret\-id ]
+.RB [ \-\-pvsecret\-name | \-e
+.IR pvsecret\-name ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B pvsecrets list
+command to display a list of protected virtualization (PV) secrets. It displays
+the pvsecret ID as hex string of 32 bytes or as printable name enclosed in
+single quotes (\fB'\fP), if the pvsecret ID consists of only printable
+characters. Specify the \fB\-\-hex\fP option to list all pvsecret IDs as hex
+string. The
+.B pvsecrets list
+command also shows the pvsecret type of each secret.
+.PP
+You can filter the list of pvsecrets by pvsecret ID, pvsecret name and pvsecret
+type. Either the \fB\-\-pvsecret\-id\fP option or the
+\fB\-\-pvsecret\-name\fP option can be specified. By default the
+\fBpvsecrets list\fP command displays only those pvsecrets with types that
+are supported by the \fBzkey\fP tool. To list all pvsecret types, specify the
+\fB\-\-all\fP option.
+.PP
+This command is only available when running in a secure execution guest.
+Only the \fBroot\fP user is allowed to perform this command.
+.
+.
+.
 .
 .SH OPTIONS
 .SS "Options for the generate command"
@@ -2027,6 +2075,45 @@ Do not check if the volume(s) associated with the secure key(s) to be refreshed
 are available, or are already associated with other secure keys in the
 repository. This option only has an effect when specified together with option
 \fB\-\-refresh\-properties\fP.
+.
+.
+.
+.SS "Options for the pvsecrets list command"
+.TP
+.BR \-A ", " \-\-all
+List all protected virtualization (PV) secret types, not only those that can be
+used with zkey.
+.TP
+.BR \-H ", " \-\-hex
+Show all protected virtualization (PV) secret IDs in hex, even if the ID
+contains only printable characters.
+.TP
+.BR \-T ", " \-\-pvsecret\-type\~\fIpvsecret\-type\fP
+Type of the protected virtualization (PV) secret to list. If omitted, all
+secret types are listed. Possible values are: \fBPLAIN\-TEXT\fP, \fBAES\-128\fP,
+\fBAES\-192\fP, \fBAES\-256\fP, \fBAES\-XTS\-128\fP, \fBAES\-XTS\-256\fP,
+\fBHMAC\-SHA\-256\fP, \fBHMAC\-SHA\-512\fP, \fBECDSA\-P256\fP,
+\fBECDSA\-P384\fP, \fBECDSA\-P521\fP, \fBEDDSA\-ED25519\fP, and
+\fBEDDSA\-ED448\fP.
+.TP
+.BR \-I ", " \-\-pvsecret\-id\~\fIpvsecret\-id\fP
+ID of the protected virtualization (PV) secret to list. The pvsecret ID is a 32
+byte hex string, optionally prefixed by \fB0x\fP. You can use the YAML file that
+was created when using the \fBpvsecret create\fP command for adding the
+protected virtualization secret:
+\fB\-\-pvsecret\-id "$(yq .id \fP\fIYAML\-FILE\fP\fB)"\fP.
+You might have to install the \fByq\fP package first.
+Either the \fB\-\-pvsecret\-id\fP option or the \fB\-\-pvsecret\-name\fP option
+can be specified, but not both.
+.TP
+.BR \-e ", " \-\-pvsecret\-name\~\fIpvsecret\-name\fP
+Name of the protected virtualization (PV) secret to list. You can use the YAML
+file that was created when using the \fBpvsecret create\fP command for adding
+the protected virtualization secret:
+\fB\-\-pvsecret\-name "$(yq .name \fP\fIYAML\-FILE\fP\fB)"\fP.
+You might have to install the \fByq\fP package first.
+Either the \fB\-\-pvsecret\-id\fP option or the \fB\-\-pvsecret\-name\fP option
+can be specified, but not both.
 .
 .
 .
