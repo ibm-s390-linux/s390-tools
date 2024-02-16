@@ -8,11 +8,14 @@ use crate::{
     request::{hash, openssl::MessageDigest, random_array, Secret},
     Result,
 };
-use pv_core::uv::SecretId;
+use byteorder::BigEndian;
+use pv_core::uv::{ListableSecretType, SecretId};
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
+use std::{convert::TryInto, fmt::Display};
+use utils::assert_size;
+use zerocopy::{AsBytes, U16, U32};
 
-const SECRET_SIZE: usize = 32;
+const ASSOC_SECRET_SIZE: usize = 32;
 
 /// A Secret to be added in [`AddSecretRequest`]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -29,7 +32,7 @@ pub enum GuestSecret {
         id: SecretId,
         /// Confidential actual association secret (32 bytes)
         #[serde(skip)]
-        secret: Secret<[u8; SECRET_SIZE]>,
+        secret: Secret<[u8; ASSOC_SECRET_SIZE]>,
     },
 }
 
@@ -44,7 +47,7 @@ impl GuestSecret {
     /// This function will return an error if OpenSSL cannot create a hash.
     pub fn association<O>(name: &str, secret: O) -> Result<GuestSecret>
     where
-        O: Into<Option<[u8; SECRET_SIZE]>>,
+        O: Into<Option<[u8; ASSOC_SECRET_SIZE]>>,
     {
         let id: [u8; SecretId::ID_SIZE] = hash(MessageDigest::sha256(), name.as_bytes())?
             .to_vec()
@@ -59,6 +62,101 @@ impl GuestSecret {
             name: name.to_string(),
             id: id.into(),
             secret: secret.into(),
+        })
+    }
+
+    /// Reference to the confidential data
+    pub(crate) fn confidential(&self) -> &[u8] {
+        match &self {
+            GuestSecret::Null => &[],
+            GuestSecret::Association { secret, .. } => secret.value().as_slice(),
+        }
+    }
+    /// Creates the non-confidential part of the secret ad-hoc
+    pub(crate) fn auth(&self) -> SecretAuth {
+        match &self {
+            GuestSecret::Null => SecretAuth::Null,
+            //Panic:  every non null secret type is listable -> no panic
+            listable => {
+                SecretAuth::Listable(ListableSecretHdr::from_guest_secret(listable).unwrap())
+            }
+        }
+    }
+
+    /// Returns the UV type ID
+    fn kind(&self) -> u16 {
+        match self {
+            // Null is not listable, but the ListableSecretType provides the type constant (1)
+            GuestSecret::Null => ListableSecretType::NULL,
+            GuestSecret::Association { .. } => ListableSecretType::ASSOCIATION,
+        }
+    }
+
+    /// Size of the secret value
+    fn secret_len(&self) -> u32 {
+        match self {
+            GuestSecret::Null => 0,
+            GuestSecret::Association { secret, .. } => secret.value().len() as u32,
+        }
+    }
+
+    /// Returns the ID of the secret type (if any)
+    fn id(&self) -> Option<SecretId> {
+        match self {
+            GuestSecret::Null => None,
+            GuestSecret::Association { id, .. } => Some(id.to_owned()),
+        }
+    }
+}
+
+impl Display for GuestSecret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GuestSecret::Null => write!(f, "Meta"),
+            gs => {
+                let kind: U16<BigEndian> = gs.kind().into();
+                let st: ListableSecretType = kind.into();
+                write!(f, "{st}")
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SecretAuth {
+    Null,
+    Listable(ListableSecretHdr),
+}
+
+impl SecretAuth {
+    pub fn get(&self) -> &[u8] {
+        match self {
+            SecretAuth::Null => &[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            SecretAuth::Listable(h) => h.as_bytes(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, AsBytes)]
+pub(crate) struct ListableSecretHdr {
+    res0: u16,
+    kind: U16<BigEndian>,
+    secret_len: U32<BigEndian>,
+    res8: u64,
+    id: SecretId,
+}
+assert_size!(ListableSecretHdr, 0x30);
+
+impl ListableSecretHdr {
+    fn from_guest_secret(gs: &GuestSecret) -> Option<Self> {
+        let id = gs.id()?;
+        Some(Self {
+            res0: 0,
+            kind: gs.kind().into(),
+            secret_len: gs.secret_len().into(),
+            res8: 0,
+            id,
         })
     }
 }
@@ -115,5 +213,30 @@ mod test {
                 Token::StructVariantEnd,
             ],
         );
+    }
+
+    #[test]
+    fn guest_secret_bin_null() {
+        let gs = GuestSecret::Null;
+        let gs_bytes = gs.auth();
+        let exp = vec![0u8, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+        assert_eq!(exp, gs_bytes.get());
+        assert_eq!(&Vec::<u8>::new(), gs.confidential())
+    }
+
+    #[test]
+    fn guest_secret_bin_ap() {
+        let gs = GuestSecret::Association {
+            name: "test".to_string(),
+            id: [1; 32].into(),
+            secret: [2; 32].into(),
+        };
+        let gs_bytes_auth = gs.auth();
+        let mut exp = vec![0u8, 0, 0, 2, 0, 0, 0, 0x20, 0, 0, 0, 0, 0, 0, 0, 0];
+        exp.extend([1; 32]);
+
+        assert_eq!(exp, gs_bytes_auth.get());
+        assert_eq!(&[2; 32], gs.confidential());
     }
 }

@@ -22,37 +22,6 @@ use crate::{
 use pv_core::request::RequestVersion;
 use zerocopy::AsBytes;
 
-/// Internal wrapper for Guest Secret, so that we can dump it in the form the UV wants it to be
-#[derive(Debug)]
-struct BinGuestSecret(GuestSecret);
-impl BinGuestSecret {
-    /// Reference to the confidential data
-    fn confidential(&self) -> &[u8] {
-        match &self.0 {
-            GuestSecret::Null => &[],
-            GuestSecret::Association { secret, .. } => secret.value().as_slice(),
-        }
-    }
-    fn dump_auth(&self) -> Vec<u8> {
-        match &self.0 {
-            GuestSecret::Null => vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            GuestSecret::Association { id, .. } => {
-                let mut buf = vec![0; 48];
-                buf[3] = 2;
-                buf[7] = 0x20;
-                buf[16..48].copy_from_slice(id.as_ref());
-                buf
-            }
-        }
-    }
-}
-
-impl From<GuestSecret> for BinGuestSecret {
-    fn from(secret: GuestSecret) -> Self {
-        BinGuestSecret(secret)
-    }
-}
-
 /// Authenticated data w/o user data
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes)]
@@ -77,7 +46,7 @@ impl ReqAuthData {
 
 #[derive(Debug)]
 struct ReqConfData {
-    secret: BinGuestSecret,
+    secret: GuestSecret,
     extension_secret: Secret<[u8; 32]>,
 }
 
@@ -191,7 +160,7 @@ impl AddSecretRequest {
         AddSecretRequest {
             conf: ReqConfData {
                 extension_secret: Secret::new([0; 32]),
-                secret: secret.into(),
+                secret,
             },
             aad: ReqAuthData::new(boot_tags, flags),
             keyslots: vec![],
@@ -227,7 +196,7 @@ impl AddSecretRequest {
 
     /// Returns a reference to the guest secret of this [`AddSecretRequest`].
     pub fn guest_secret(&self) -> &GuestSecret {
-        &self.conf.secret.0
+        &self.conf.secret
     }
 
     /// Add user-data to the Add-Secret request
@@ -249,7 +218,7 @@ impl AddSecretRequest {
     /// compiles the authenticated area of this request
     fn aad(&self, ctx: &ReqEncrCtx, conf_len: usize) -> Result<Vec<u8>> {
         let cust_pub_key = ctx.key_coords()?;
-        let secr_auth = self.conf.secret.dump_auth();
+        let secr_auth = self.conf.secret.auth();
         let user_data = self.user_data.data();
 
         let mut aad: Vec<Aad> = Vec::with_capacity(5 + self.keyslots.len());
@@ -262,7 +231,7 @@ impl AddSecretRequest {
         }
         aad.push(Aad::Plain(cust_pub_key.as_ref()));
         self.keyslots.iter().for_each(|k| aad.push(Aad::Ks(k)));
-        aad.push(Aad::Plain(&secr_auth));
+        aad.push(Aad::Plain(secr_auth.get()));
 
         ctx.build_aad(self.version.into(), &aad, conf_len, self.user_data.magic())
     }
@@ -327,36 +296,5 @@ impl Request for AddSecretRequest {
 
     fn add_hostkey(&mut self, hostkey: PKey<Public>) {
         self.keyslots.push(Keyslot::new(hostkey))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn guest_secret_bin_null() {
-        let gs: BinGuestSecret = GuestSecret::Null.into();
-        let gs_bytes = gs.dump_auth();
-        let exp = vec![0u8, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-        assert_eq!(exp, gs_bytes);
-        assert_eq!(&Vec::<u8>::new(), gs.confidential())
-    }
-
-    #[test]
-    fn guest_secret_bin_ap() {
-        let gs: BinGuestSecret = GuestSecret::Association {
-            name: "test".to_string(),
-            id: [1; 32].into(),
-            secret: [2; 32].into(),
-        }
-        .into();
-        let gs_bytes_auth = gs.dump_auth();
-        let mut exp = vec![0u8, 0, 0, 2, 0, 0, 0, 0x20, 0, 0, 0, 0, 0, 0, 0, 0];
-        exp.extend([1; 32]);
-
-        assert_eq!(exp, gs_bytes_auth);
-        assert_eq!(&[2; 32], gs.confidential());
     }
 }

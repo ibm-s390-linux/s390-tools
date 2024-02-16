@@ -291,10 +291,13 @@ pub enum ListableSecretType {
     /// Unknown secret type
     Unknown(u16),
 }
+
 impl ListableSecretType {
     const RESERVED_0: u16 = 0x0000;
-    const NULL: u16 = 0x0001;
-    const ASSOCIATION: u16 = 0x0002;
+    /// UV type id for a null secret
+    pub const NULL: u16 = 0x0001;
+    /// UV type id for an association secret
+    pub const ASSOCIATION: u16 = 0x0002;
 }
 
 impl Display for ListableSecretType {
