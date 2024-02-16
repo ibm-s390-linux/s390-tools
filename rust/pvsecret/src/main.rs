@@ -17,16 +17,7 @@ use crate::cli::validate_cli;
 
 static LOGGER: PvLogger = PvLogger;
 static EXIT_LOGGER: u8 = 3;
-const FEATURES: &[&str] = &[
-    "+create",
-    #[cfg(target_arch = "s390x")]
-    "+add",
-    #[cfg(target_arch = "s390x")]
-    "+lock",
-    #[cfg(target_arch = "s390x")]
-    "+list",
-    "+verify",
-];
+const FEATURES: &[&[&str]] = &[cmd::CMD_FN, cmd::UV_CMD_FN];
 
 fn print_error(e: anyhow::Error, verbosity: u8) -> ExitCode {
     if verbosity > 0 {
@@ -57,7 +48,7 @@ fn print_version(verbosity: u8) -> anyhow::Result<()> {
         release_string!()
     );
     if verbosity > 0 {
-        FEATURES.iter().for_each(|f| print!("{f} "));
+        FEATURES.concat().iter().for_each(|f| print!("{f} "));
         println!("(compiled)");
         println!(
             "\n{}-crate {}",
@@ -67,12 +58,6 @@ fn print_version(verbosity: u8) -> anyhow::Result<()> {
         println!("{}", pv::crate_info());
     }
     Ok(())
-}
-
-#[cfg(not(target_arch = "s390x"))]
-fn not_supported() -> anyhow::Result<()> {
-    use anyhow::bail;
-    bail!("Command only available on s390x")
 }
 
 fn main() -> ExitCode {
@@ -102,19 +87,9 @@ fn main() -> ExitCode {
 
     // perform the command selected by the user
     let res = match &cli.cmd {
-        #[cfg(target_arch = "s390x")]
         Command::Add(opt) => cmd::add(opt),
-        #[cfg(target_arch = "s390x")]
         Command::List(opt) => cmd::list(opt),
-        #[cfg(target_arch = "s390x")]
         Command::Lock => cmd::lock(),
-
-        #[cfg(not(target_arch = "s390x"))]
-        Command::Add(_) => not_supported(),
-        #[cfg(not(target_arch = "s390x"))]
-        Command::List(_) => not_supported(),
-        #[cfg(not(target_arch = "s390x"))]
-        Command::Lock => not_supported(),
         Command::Create(opt) => cmd::create(opt),
         Command::Version => print_version(cli.verbose),
         Command::Verify(opt) => cmd::verify(opt),
