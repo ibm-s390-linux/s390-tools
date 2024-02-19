@@ -149,6 +149,31 @@ pub fn gen_ec_key() -> Result<PKey<Private>> {
     PKey::from_ec_key(key).map_err(Error::Crypto)
 }
 
+/// Result type for [`encrypt_aes_gcm`].
+pub struct AesGcmResult {
+    /// The result.
+    ///
+    /// [`Vec<u8>`] with the following content:
+    /// 1. `aad`
+    /// 2. `encr(conf)`
+    /// 3. `aes gcm tag`
+    pub buf: Vec<u8>,
+    /// The position of the authenticated data in [`Self::buf`]
+    pub aad_range: Range<usize>,
+    /// The position of the encrypted data in [`Self::buf`]
+    pub encr_range: Range<usize>,
+    /// The position of the tag in [`Self::buf`]
+    pub tag_range: Range<usize>,
+}
+
+impl AesGcmResult {
+    /// Deconstruct the result to just the resulting data w/o ranges.
+    pub fn data(self) -> Vec<u8> {
+        let Self { buf, .. } = self;
+        buf
+    }
+}
+
 /// Encrypt confidential Data with a symmetric key and provida a gcm tag.
 ///
 /// * `key` - symmetric key used for encryption
@@ -156,21 +181,10 @@ pub fn gen_ec_key() -> Result<PKey<Private>> {
 /// * `aad` - additional authentic data
 /// * `conf` - data to be encrypted
 ///
-/// # Returns
-/// [`Vec<u8>`] with the following content:
-/// 1. `aad`
-/// 2. `encr(conf)`
-/// 3. `aes gcm tag`
-///
 /// # Errors
 ///
 /// This function will return an error if the data could not be encrypted by OpenSSL.
-pub fn encrypt_aes_gcm(
-    key: &SymKey,
-    iv: &[u8],
-    aad: &[u8],
-    conf: &[u8],
-) -> Result<(Vec<u8>, Range<usize>, Range<usize>, Range<usize>)> {
+pub fn encrypt_aes_gcm(key: &SymKey, iv: &[u8], aad: &[u8], conf: &[u8]) -> Result<AesGcmResult> {
     let mut tag = vec![0xff; AES_256_GCM_TAG_SIZE];
     let encr = match key {
         SymKey::Aes256(key) => encrypt_aead(
@@ -183,7 +197,7 @@ pub fn encrypt_aes_gcm(
         )?,
     };
 
-    let mut res = vec![0; aad.len() + encr.len() + tag.len()];
+    let mut buf = vec![0; aad.len() + encr.len() + tag.len()];
     let aad_range = Range {
         start: 0,
         end: aad.len(),
@@ -197,10 +211,15 @@ pub fn encrypt_aes_gcm(
         end: aad.len() + encr.len() + tag.len(),
     };
 
-    res[aad_range.clone()].copy_from_slice(aad);
-    res[encr_range.clone()].copy_from_slice(&encr);
-    res[tag_range.clone()].copy_from_slice(&tag);
-    Ok((res, aad_range, encr_range, tag_range))
+    buf[aad_range.clone()].copy_from_slice(aad);
+    buf[encr_range.clone()].copy_from_slice(&encr);
+    buf[tag_range.clone()].copy_from_slice(&tag);
+    Ok(AesGcmResult {
+        buf,
+        aad_range,
+        encr_range,
+        tag_range,
+    })
 }
 
 /// Calculate the hash of a slice.
@@ -367,13 +386,14 @@ mod tests {
             0xee, 0x62, 0x98, 0xf7, 0x7e, 0x0c,
         ];
 
-        let (res, ..) = encrypt_aes_gcm(
+        let res = encrypt_aes_gcm(
             &SymKey::Aes256(aes_gcm_key.into()),
             &aes_gcm_iv,
             &aes_gcm_aad,
             &aes_gcm_plain,
         )
-        .unwrap();
+        .unwrap()
+        .data();
         assert_eq!(res, aes_gcm_res);
     }
 }

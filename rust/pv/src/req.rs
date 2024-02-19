@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::crypto::AES_256_GCM_TAG_SIZE;
+use crate::crypto::{AesGcmResult, AES_256_GCM_TAG_SIZE};
 use crate::misc::to_u32;
 use crate::request::{derive_key, encrypt_aes_gcm, gen_ec_key, random_array, SymKey, SymKeyType};
 use crate::{Error, Result};
@@ -14,7 +14,6 @@ use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
 use std::convert::TryInto;
 use std::mem::size_of;
-use std::ops::Range;
 use utils::assert_size;
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
 
@@ -96,7 +95,8 @@ impl Encrypt for Keyslot {
         to: &mut Vec<u8>,
     ) -> Result<()> {
         let derived_key = derive_key(priv_key, &self.0)?;
-        let (mut wrpk_and_kst, ..) = encrypt_aes_gcm(&derived_key.into(), &[0; 12], &[], prot_key)?;
+        let mut wrpk_and_kst =
+            encrypt_aes_gcm(&derived_key.into(), &[0; 12], &[], prot_key)?.data();
         let phk: EcdhPubkeyCoord = self.0.as_ref().try_into()?;
 
         to.reserve(80);
@@ -252,11 +252,7 @@ impl ReqEncrCtx {
     /// # Errors
     ///
     /// This function will return an error if the data could not be encrypted by OpenSSL.
-    pub fn encrypt_aead(
-        &self,
-        aad: &[u8],
-        conf: &[u8],
-    ) -> Result<(Vec<u8>, Range<usize>, Range<usize>, Range<usize>)> {
+    pub fn encrypt_aead(&self, aad: &[u8], conf: &[u8]) -> Result<AesGcmResult> {
         encrypt_aes_gcm(&self.prot_key, &self.iv, aad, conf)
     }
 }

@@ -5,6 +5,7 @@
 use super::user_data::UserData;
 use crate::{
     assert_size,
+    crypto::AesGcmResult,
     misc::Flags,
     request::{
         hkdf_rfc_5869,
@@ -289,7 +290,12 @@ impl AddSecretRequest {
         //encrypt data w/o aead
         let conf = self.conf.to_bytes();
         let aad = self.aad(ctx, conf.value().len())?;
-        let (mut buf, aad_range, encr_range, _) = ctx.encrypt_aead(&aad, conf.value())?;
+        let AesGcmResult {
+            mut buf,
+            aad_range,
+            encr_range,
+            ..
+        } = ctx.encrypt_aead(&aad, conf.value())?;
 
         drop(aad);
 
@@ -303,7 +309,7 @@ impl AddSecretRequest {
         // encrypt again with signed data
         buf[encr_range.clone()].copy_from_slice(conf.value());
         ctx.encrypt_aead(&buf[aad_range], &buf[encr_range])
-            .map(|(buf, ..)| buf)
+            .map(|res| res.data())
     }
 }
 
@@ -313,7 +319,7 @@ impl Request for AddSecretRequest {
             UserData::Null | UserData::Unsigned(_) => {
                 let conf = self.conf.to_bytes();
                 let aad = self.aad(ctx, conf.value().len())?;
-                ctx.encrypt_aead(&aad, conf.value()).map(|(buf, ..)| buf)
+                ctx.encrypt_aead(&aad, conf.value()).map(|res| res.data())
             }
             _ => self.encrypt_with_signed_user_data(ctx),
         }
