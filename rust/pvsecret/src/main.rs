@@ -45,6 +45,7 @@ fn main() -> ExitCode {
         Command::Create(opt) => cmd::create(opt),
         Command::Version => Ok(print_version!("2024", log_level; FEATURES.concat())),
         Command::Verify(opt) => cmd::verify(opt),
+        Command::Retrieve(opt) => cmd::retr(opt),
     };
 
     match res {

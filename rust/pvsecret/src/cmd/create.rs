@@ -4,7 +4,6 @@
 
 use std::path::Path;
 
-use crate::cli::{AddSecretType, CreateSecretFlags, CreateSecretOpt};
 use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
 use pv::{
@@ -22,6 +21,8 @@ use pv::{
 use serde_yaml::Value;
 use utils::get_writer_from_cli_file_arg;
 
+use crate::cli::{AddSecretType, CreateSecretFlags, CreateSecretOpt, RetrieveableSecretInpKind};
+
 fn write_out<P, D>(path: &P, data: D, ctx: &str) -> pv::Result<()>
 where
     P: AsRef<Path>,
@@ -30,6 +31,23 @@ where
     let mut wr = get_writer_from_cli_file_arg(path.as_ref())?;
     write(&mut wr, data, path, ctx)?;
     Ok(())
+}
+
+fn retrievable(name: &str, secret: &str, kind: &RetrieveableSecretInpKind) -> Result<GuestSecret> {
+    let secret_data = read_file(secret, &format!("retrievable {kind}"))?.into();
+
+    match kind {
+        RetrieveableSecretInpKind::Plain => GuestSecret::plaintext(name, secret_data),
+        RetrieveableSecretInpKind::Aes => GuestSecret::aes(name, secret_data),
+        RetrieveableSecretInpKind::AesXts => GuestSecret::aes_xts(name, secret_data),
+        RetrieveableSecretInpKind::HmacSha => GuestSecret::hmac_sha(name, secret_data),
+        RetrieveableSecretInpKind::Ec => GuestSecret::ec(
+            name,
+            read_private_key(secret_data.value())
+                .with_context(|| format!("Cannot read {secret} as {kind} from PEM or DER"))?,
+        ),
+    }
+    .map_err(Error::from)
 }
 
 /// Prepare an add-secret request
@@ -88,6 +106,9 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
             input_secret: None,
             ..
         } => GuestSecret::association(name, None)?,
+        AddSecretType::Retrievable {
+            name, secret, kind, ..
+        } => retrievable(name, secret, kind)?,
     };
     trace!("AddSecret: {secret:x?}");
 
@@ -136,7 +157,9 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
         .as_ref()
         .map(|p| read_file(p, "User-signing key"))
         .transpose()?
-        .map(|buf| read_private_key(&buf))
+        .map(|buf| {
+            read_private_key(&buf).context("Cannot read {secret} as private key from PEM or DER")
+        })
         .transpose()?;
 
     if user_data.is_some() || user_key.is_some() {
@@ -257,6 +280,9 @@ fn write_secret<P: AsRef<Path>>(
             if let Some(path) = output_secret {
                 write_out(path, guest_secret.confidential(), "Association secret")?
             }
+        }
+        AddSecretType::Retrievable { name, stdout, .. } => {
+            write_yaml(name, guest_secret, stdout, outp_path)?
         }
         _ => (),
     };

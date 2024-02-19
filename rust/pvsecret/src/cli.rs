@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
 
+use std::fmt::Display;
+
+use clap::error::ErrorKind::ValueValidation;
 use clap::{ArgGroup, Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
 use utils::{CertificateOptions, DeprecatedVerbosityOptions, STDOUT};
 
@@ -177,6 +180,72 @@ pub enum AddSecretType {
         #[arg(long, value_name = "SECRET-FILE", value_hint = ValueHint::FilePath,)]
         output_secret: Option<String>,
     },
+
+    /// Create a retrievable secret.
+    ///
+    /// A retrievable secret is stored in the  per-guest storage of the Ultravisor. A SE-guest can
+    /// retrieve the secret at runtime and use it. All retrievable secrets, but the plaintext
+    /// secret, are retrieved as wrapped/protected key objects and only usable inside the current,
+    /// running SE-guest instance.
+    #[command(visible_alias = "retr")]
+    Retrievable {
+        /// String that identifies the new secret.
+        ///
+        /// The actual secret is set with '--secret'. The name is saved in `NAME.yaml` with
+        /// white-spaces mapped to `_`.
+        name: String,
+
+        /// Print the hashed name to stdout.
+        ///
+        /// The hashed name is not written to `NAME.yaml`
+        #[arg(long)]
+        stdout: bool,
+
+        /// Use SECRET-FILE as retrievable secret
+        #[arg(long, value_name = "SECRET-FILE", value_hint = ValueHint::FilePath)]
+        secret: String,
+
+        /// Specify the secret type.
+        ///
+        /// Limitations to the input data apply depending on the secret type.
+        #[arg(long = "type", value_name = "TYPE")]
+        kind: RetrieveableSecretInpKind,
+    },
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum RetrieveableSecretInpKind {
+    /// A plaintext secret.
+    /// Can be any file up to 8190 bytes long
+    Plain,
+    /// An AES key.
+    /// Must be a plain byte file 128, 192, or 256 bit long.
+    Aes,
+    /// An AES-XTS key.
+    /// Must be a plain byte file 512, or 1024 bit long.
+    AesXts,
+    /// A HMAC-SHA key.
+    /// Must be a plain byte file 512, or 1024 bit long.
+    HmacSha,
+    /// An elliptic curve private key.
+    /// Must be a PEM or DER file.
+    Ec,
+}
+
+impl Display for RetrieveableSecretInpKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Plain => "PLAINTEXT",
+                Self::Aes => "AES KEY",
+                Self::AesXts => "AES-XTS KEY",
+                Self::HmacSha => "HMAC-SHA KEY",
+                Self::Ec => "EC PRIVATE KEY",
+            }
+        )
+    }
 }
 
 // all members s390x only
@@ -238,6 +307,56 @@ pub struct VerifyOpt {
     pub output: String,
 }
 
+// all members s390x only
+#[derive(Args, Debug)]
+pub struct RetrSecretOptions {
+    /// Specify the secret ID to be retrieved.
+    ///
+    /// Input type depends on '--inform'. If `yaml` (default) is specified, it must be a yaml
+    /// created by the create subcommand of this tool. If `hex` is specified, it must be a hex
+    /// 32-byte unsigned big endian number string. Leading zeros are required.
+    #[cfg(target_arch = "s390x")]
+    #[arg(value_name = "ID", value_hint = ValueHint::FilePath)]
+    pub input: String,
+
+    /// Specify the output path to place the secret value
+    #[cfg(target_arch = "s390x")]
+    #[arg(short, long, value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath)]
+    pub output: String,
+
+    /// Define input type for the Secret ID
+    #[cfg(target_arch = "s390x")]
+    #[arg(long, value_enum, default_value_t)]
+    pub inform: RetrInpFmt,
+
+    /// Define the output format for the retrieved secret
+    #[cfg(target_arch = "s390x")]
+    #[arg(long, value_enum, default_value_t)]
+    pub outform: RetrOutFmt,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
+pub enum RetrInpFmt {
+    /// Use a yaml file
+    #[default]
+    Yaml,
+    /// Use a hex string.
+    Hex,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
+pub enum RetrOutFmt {
+    /// Write the secret as PEM.
+    ///
+    /// File starts with `-----BEGIN IBM PROTECTED KEY----` and `-----BEGIN
+    /// PLAINTEXT SECRET-----` for plaintext secrets it contains one header
+    /// line with the type information and the base64 protected key
+    #[default]
+    Pem,
+    /// Write the secret in binary.
+    Bin,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Create a new add-secret request.
@@ -274,6 +393,10 @@ pub enum Command {
     /// provided key. Outputs the arbitrary user-data.
     Verify(VerifyOpt),
 
+    /// Retrieve a secret from the UV secret store (s390x only).
+    #[command(visible_alias = "retr")]
+    Retrieve(RetrSecretOptions),
+
     /// Print version information and exit.
     #[command(aliases(["--version"]), hide(true))]
     Version,
@@ -294,13 +417,13 @@ pub fn validate_cli(cli: &CliOptions) -> Result<(), clap::Error> {
             }
             if secret_out == &Some(format!("{name}.yaml")) {
                 return Err(CliOptions::command().error(
-                    clap::error::ErrorKind::ValueValidation,
+                    ValueValidation,
                     format!("Secret output file and the secret name '{name}.yaml' are the same."),
                 ));
             }
             if format!("{name}.yaml") == opt.output {
                 return Err(CliOptions::command().error(
-                    clap::error::ErrorKind::ValueValidation,
+                    ValueValidation,
                     format!(
                         "output file and the secret name '{}' are the same.",
                         &opt.output

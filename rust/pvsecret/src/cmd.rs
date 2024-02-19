@@ -16,6 +16,8 @@ mod add;
 mod list;
 #[cfg(target_arch = "s390x")]
 mod lock;
+#[cfg(target_arch = "s390x")]
+mod retr;
 
 // Commands (directly) related to UVCs are only available on s389x
 #[cfg(target_arch = "s390x")]
@@ -24,12 +26,13 @@ mod uv_cmd {
     pub use add::add;
     pub use list::list;
     pub use lock::lock;
+    pub use retr::retr;
     pub const UV_CMD_FN: &[&str] = &["+add", "+lock", "+list"];
 }
 
 #[cfg(not(target_arch = "s390x"))]
 mod uv_cmd {
-    use crate::cli::{AddSecretOpt, ListSecretOpt};
+    use crate::cli::{AddSecretOpt, ListSecretOpt, RetrSecretOptions};
     use anyhow::{bail, Result};
     macro_rules! not_supp {
         ($name: ident $( ,$opt: ty )?) => {
@@ -40,6 +43,7 @@ mod uv_cmd {
     }
     not_supp!(add, AddSecretOpt);
     not_supp!(list, ListSecretOpt);
+    not_supp!(retr, RetrSecretOptions);
     not_supp!(lock);
     pub const UV_CMD_FN: &[&str] = &[];
 }
