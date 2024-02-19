@@ -922,7 +922,7 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 
 	genseck2.type = key_type_to_pkey_type(key_type);
 	if (genseck2.type == 0) {
-		warnx("Key-type not supported; %s", key_type);
+		warnx("Key-type not supported: %s", key_type);
 		return -ENOTSUP;
 	}
 
@@ -1084,7 +1084,7 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 
 	clr2seck2.type = key_type_to_pkey_type(key_type);
 	if (clr2seck2.type == 0) {
-		warnx("Key-type not supported; %s", key_type);
+		warnx("Key-type not supported: %s", key_type);
 		return -ENOTSUP;
 	}
 
