@@ -402,6 +402,9 @@ additional information can be associated with a secure key using the
 .B \-\-sector\-size
 options.
 .PP
+Keys of type \fBPVSECRET\-AES\fP do not use a cryptographic adapter, thus APQNs
+can not be associated with them.
+.PP
 .B Note:
 The \fBimport\fP command requires the CCA host library (libcsulcca.so)
 to be installed when secure keys of type \fBCCA\-AESCIPHER\fP are imported.
@@ -563,6 +566,10 @@ change the APQN association. KMS-bound secure AES keys are always bound to the
 APQNs that are associated with the key management system plugin.
 Other associated information is also changed in the key management system when
 changed using the change command.
+.PP
+For keys of type \fBPVSECRET\-AES\fP you can not change or set the APQN
+association. These keys do not use a cryptographic adapter, thus APQNs can not
+be associated with them.
 .PP
 .B Note:
 The secure key itself cannot be changed, only information about the secure

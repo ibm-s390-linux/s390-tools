@@ -2001,6 +2001,11 @@ static int command_generate(void)
 		return command_generate_repository();
 	if (g.key_type == NULL)
 		g.key_type = KEY_TYPE_CCA_AESDATA;
+	if (!is_secure_key_type(g.key_type)) {
+		warnx("Keys of type '%s' can not be generated. Use 'zkey "
+		      "pvsecret import' instead", g.key_type);
+		return -EXIT_FAILURE;
+	}
 	if (g.pos_arg != NULL) {
 		if (g.volumes != NULL) {
 			warnx("Option '--volumes|-l' is not valid for "

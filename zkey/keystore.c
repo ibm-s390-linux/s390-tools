@@ -2009,6 +2009,12 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 		return -EINVAL;
 	}
 
+	if (!is_secure_key_type(key_type)) {
+		warnx("Keys of type %s can not be generated. Use 'zkey "
+		      "pvsecret import' instead", key_type);
+		return -EINVAL;
+	}
+
 	rc = _keystore_get_key_filenames(keystore, name, &file_names);
 	if (rc != 0)
 		goto out_free_key_filenames;
@@ -2535,9 +2541,9 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	const char *null_ptr = NULL;
 	char *upd_volumes = NULL;
 	size_t secure_key_size;
+	u8 *secure_key = NULL;
 	u8 mkvp[MKVP_LENGTH];
 	char sect_size[30];
-	u8 *secure_key;
 	bool kms_bound;
 	int rc;
 
@@ -2589,13 +2595,6 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 		}
 
-		rc = _keystore_change_association(key_props, PROP_NAME_APQNS,
-						  apqns, "APQN",
-						  _keystore_apqn_check,
-						  &apqn_check);
-		if (rc != 0)
-			goto out;
-
 		secure_key = read_secure_key(file_names.skey_filename,
 					     &secure_key_size,
 					     keystore->verbose);
@@ -2604,11 +2603,24 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 		}
 
+		if (!is_secure_key(secure_key, secure_key_size)) {
+			warnx("No APQNs can be associated with keys of type %s",
+			      get_key_type(secure_key, secure_key_size));
+			rc = -EINVAL;
+			goto out;
+		}
+
+		rc = _keystore_change_association(key_props, PROP_NAME_APQNS,
+						  apqns, "APQN",
+						  _keystore_apqn_check,
+						  &apqn_check);
+		if (rc != 0)
+			goto out;
+
 		rc = get_master_key_verification_pattern(secure_key,
 							 secure_key_size,
 							 mkvp,
 							 keystore->verbose);
-		free(secure_key);
 		if (rc)
 			goto out;
 
@@ -2742,6 +2754,8 @@ out:
 		free(upd_volumes);
 	if (upd_volume_type != NULL)
 		free(upd_volume_type);
+	if (secure_key != NULL)
+		free(secure_key);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to change key '%s': %s",
