@@ -3055,19 +3055,25 @@ static void _keystore_print_record(struct util_rec *rec,
 	util_rec_set(rec, REC_XTS, is_xts ? "Yes" : "No");
 	util_rec_set(rec, REC_KEY_TYPE, key_type);
 	if (validation) {
-		if (valid)
-			util_rec_set(rec, REC_MASTERKEY,
-				     "%s master key (MKVP: %s)",
-				     is_old_mk ? "OLD" : "CURRENT",
-				     printable_mkvp(
-					 get_card_type_for_keytype(key_type),
-					 mkvp));
-		else
-			util_rec_set(rec, REC_MASTERKEY,
-				     "(unknown, MKVP: %s)",
-				     printable_mkvp(
-					 get_card_type_for_keytype(key_type),
-					 mkvp));
+		if (mkvp != NULL) {
+			if (valid)
+				util_rec_set(rec, REC_MASTERKEY,
+					     "%s master key (MKVP: %s)",
+					     is_old_mk ? "OLD" : "CURRENT",
+					     printable_mkvp(
+						 get_card_type_for_keytype(
+								     key_type),
+						 mkvp));
+			else
+				util_rec_set(rec, REC_MASTERKEY,
+					     "(unknown, MKVP: %s)",
+					     printable_mkvp(
+						 get_card_type_for_keytype(
+								      key_type),
+						 mkvp));
+		} else {
+			util_rec_set(rec, REC_MASTERKEY, "(none)");
+		}
 	}
 	if (volumes_argz != NULL)
 		util_rec_set_argz(rec, REC_VOLUMES, volumes_argz,
@@ -3294,17 +3300,22 @@ static int _keystore_process_validate(struct keystore *keystore,
 		valid = 1;
 	}
 
-	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 mkvp, keystore->verbose);
-	if (rc != 0)
-		goto out;
+	if (is_secure_key(secure_key, secure_key_size)) {
+		rc = get_master_key_verification_pattern(secure_key,
+							 secure_key_size,
+							 mkvp,
+							 keystore->verbose);
+		if (rc != 0)
+			goto out;
+	}
 
 	_keystore_print_record(info->rec, name, properties, 1,
 			       file_names->skey_filename, secure_key_size,
 			       is_xts_key(secure_key, secure_key_size),
 			       clear_key_bitsize, valid, is_old_mk,
 			       _keystore_reencipher_key_exists(file_names),
-			       mkvp,
+			       is_secure_key(secure_key, secure_key_size) ?
+								mkvp : NULL,
 			       _keystore_passphrase_file_exists(file_names) ?
 					file_names->pass_filename : NULL);
 
@@ -3316,7 +3327,8 @@ static int _keystore_process_validate(struct keystore *keystore,
 				    "master key\n", 0);
 		info->num_warnings++;
 	}
-	if (info->noapqncheck == 0)
+	if (info->noapqncheck == 0 &&
+	    is_secure_key(secure_key, secure_key_size))
 		if (_keystore_display_apqn_status(keystore, properties,
 						  mkvp) != 0)
 			info->num_warnings++;

@@ -209,7 +209,9 @@ It also displays the attributes of the secure key, such as key sizes, whether
 it is a secure key that can be used for the XTS cipher mode, the master key
 register (CURRENT or OLD) with which the secure key is enciphered, and other key
 attributes. For further information about master key registers, see the
-\fBreencipher\fP command.
+\fBreencipher\fP command. Keys of type \fBPVSECRET\-AES\fP do not use a
+cryptographic adapter, thus no master key information is displayed for such
+keys.
 .PP
 The secure key can either be contained in a file in the file system, or in a
 secure key repository. To validate a secure key contained in a file, specify
@@ -1599,8 +1601,8 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
 Specifies the key type of the secure key. Possible values are
-\fBCCA\-AESDATA\fP, \fBCCA\-AESCIPHER\fP, and \fBEP11\-AES\fP. Only keys with
-the specified key type are listed.
+\fBCCA\-AESDATA\fP, \fBCCA\-AESCIPHER\fP, \fBEP11\-AES\fP, and
+\fBPVSECRET\-AES\fP. Only keys with the specified key type are listed.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-L ", " \-\-local\fP

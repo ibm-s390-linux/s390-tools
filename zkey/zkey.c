@@ -558,9 +558,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "key-type", required_argument, NULL, 'K'},
 		.argument = "type",
 		.desc = "The type of the key. Possible values are '"
-			KEY_TYPE_CCA_AESDATA"', '"KEY_TYPE_CCA_AESCIPHER"' "
-			"and '"KEY_TYPE_EP11_AES"'. Use this option to list "
-			"all keys with the specified key type.",
+			KEY_TYPE_CCA_AESDATA "', '" KEY_TYPE_CCA_AESCIPHER
+			"', '" KEY_TYPE_EP11_AES "', and '"
+			KEY_TYPE_PVSECRET_AES "'. Use this option to list all "
+			"keys with the specified key type.",
 		.command = COMMAND_LIST,
 	},
 	{
@@ -2345,13 +2346,16 @@ static int command_validate_file(void)
 		goto out;
 	}
 
-	rc = get_master_key_verification_pattern(secure_key, secure_key_size,
-						 mkvp, g.verbose);
-	if (rc != 0) {
-		warnx("Failed to get the master key verification pattern: %s",
-		      strerror(-rc));
-		rc = EXIT_FAILURE;
-		goto out;
+	if (is_secure_key(secure_key, secure_key_size)) {
+		rc = get_master_key_verification_pattern(secure_key,
+							 secure_key_size,
+							 mkvp, g.verbose);
+		if (rc != 0) {
+			warnx("Failed to get the master key verification "
+			      "pattern: %s", strerror(-rc));
+			rc = EXIT_FAILURE;
+			goto out;
+		}
 	}
 
 	key_type = get_key_type(secure_key, secure_key_size);
@@ -2363,25 +2367,30 @@ static int command_validate_file(void)
 	printf("  Clear key size:        %lu bits\n", clear_key_size);
 	printf("  XTS type key:          %s\n",
 	       is_xts_key(secure_key, secure_key_size) ? "Yes" : "No");
-	printf("  Enciphered with:       %s master key (MKVP: %s)\n",
-	       is_old_mk ? "OLD" : "CURRENT",
-	       printable_mkvp(get_card_type_for_keytype(key_type), mkvp));
+	if (is_secure_key(secure_key, secure_key_size)) {
+		printf("  Enciphered with:       %s master key (MKVP: %s)\n",
+		       is_old_mk ? "OLD" : "CURRENT",
+		       printable_mkvp(get_card_type_for_keytype(key_type),
+				      mkvp));
+	}
 	printf("  Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       vp);
 	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       &vp[VERIFICATION_PATTERN_LEN / 2]);
 
-	rc = cross_check_apqns(NULL, mkvp,
-			       get_min_card_level_for_keytype(key_type),
-			       get_min_fw_version_for_keytype(key_type),
-			       get_card_type_for_keytype(key_type),
-			       true, g.verbose);
-	if (rc == -EINVAL)
-		return EXIT_FAILURE;
-	if (rc != 0 && rc != -ENOTSUP) {
-		warnx("Your master key setup is improper");
-		rc = EXIT_FAILURE;
-		goto out;
+	if (is_secure_key(secure_key, secure_key_size)) {
+		rc = cross_check_apqns(NULL, mkvp,
+				       get_min_card_level_for_keytype(key_type),
+				       get_min_fw_version_for_keytype(key_type),
+				       get_card_type_for_keytype(key_type),
+				       true, g.verbose);
+		if (rc == -EINVAL)
+			return EXIT_FAILURE;
+		if (rc != 0 && rc != -ENOTSUP) {
+			warnx("Your master key setup is improper");
+			rc = EXIT_FAILURE;
+			goto out;
+		}
 	}
 
 out:

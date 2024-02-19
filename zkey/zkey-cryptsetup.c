@@ -1346,8 +1346,7 @@ static int check_keysize_and_cipher_mode(const u8 *key, size_t keysize)
 	}
 
 	if (strncmp(crypt_get_cipher_mode(g.cd), "xts", 3) == 0) {
-		if (keysize < 2 * MIN_SECURE_KEY_SIZE ||
-		    (key != NULL && !is_xts_key(key, keysize))) {
+		if (key != NULL && !is_xts_key(key, keysize)) {
 			warnx("The volume key size %lu is not valid for the "
 			      "cipher mode '%s'", keysize,
 			      crypt_get_cipher_mode(g.cd));
@@ -1539,8 +1538,9 @@ static int validate_keyslot(int keyslot, char **key, size_t *keysize,
 		rc = -EINVAL;
 		goto out;
 	}
-	pr_verbose("Volume key is currently enciphered with %s master key",
-		   is_old ? "OLD" : "CURRENT");
+	if (is_secure_key((u8 *)vkey, vkeysize - ikeysize))
+		pr_verbose("Volume key is currently enciphered with %s "
+			   "master key", is_old ? "OLD" : "CURRENT");
 
 	if (key != NULL)
 		*key = vkey;
@@ -2023,12 +2023,14 @@ static int command_validate(void)
 			vp_tok_avail = 1;
 	}
 
-	rc = get_master_key_verification_pattern((u8 *)key, seckeysize,
-						 mkvp, g.verbose);
-	if (rc != 0) {
-		warnx("Failed to get the master key verification pattern: %s",
-		      strerror(-rc));
-		goto out;
+	if (is_secure_key((u8 *)key, seckeysize)) {
+		rc = get_master_key_verification_pattern((u8 *)key, seckeysize,
+							 mkvp, g.verbose);
+		if (rc != 0) {
+			warnx("Failed to get the master key verification "
+			      "pattern: %s", strerror(-rc));
+			goto out;
+		}
 	}
 
 	key_type = get_key_type((u8 *)key, seckeysize);
@@ -2041,15 +2043,19 @@ static int command_validate(void)
 	printf("  Key type:              %s\n", key_type);
 	if (is_valid) {
 		printf("  Clear key size:        %lu bits\n", clear_keysize);
-		printf("  Enciphered with:       %s master key (MKVP: "
-		       "%s)\n", is_old_mk ? "OLD" : "CURRENT",
-		       printable_mkvp(get_card_type_for_keytype(key_type),
-				      mkvp));
+		if (is_secure_key((u8 *)key, seckeysize)) {
+			printf("  Enciphered with:       %s master key (MKVP: "
+			       "%s)\n", is_old_mk ? "OLD" : "CURRENT",
+			       printable_mkvp(get_card_type_for_keytype(
+							key_type), mkvp));
+		}
 	} else {
 		printf("  Clear key size:        (unknown)\n");
-		printf("  Enciphered with:       (unknown, MKVP: %s)\n",
-		       printable_mkvp(get_card_type_for_keytype(key_type),
-				      mkvp));
+		if (is_secure_key((u8 *)key, seckeysize)) {
+			printf("  Enciphered with:       (unknown, MKVP: %s)\n",
+			       printable_mkvp(get_card_type_for_keytype(
+							key_type), mkvp));
+		}
 	}
 	if (vp_tok_avail)
 		print_verification_pattern(vp_tok.verification_pattern);
@@ -2065,7 +2071,7 @@ static int command_validate(void)
 	if (!is_valid)
 		printf("\nATTENTION: The secure volume key is not valid.\n");
 
-	if (is_old_mk)
+	if (is_secure_key((u8 *)key, seckeysize) && is_old_mk)
 		util_print_indented("\nWARNING: The secure volume key is "
 				    "currently enciphered with the OLD "
 				    "master key. To mitigate the danger of "
@@ -2195,7 +2201,8 @@ static int command_setkey(void)
 		goto out;
 	}
 
-	if (is_old_mk) {
+	if (is_secure_key(newkey, newkey_size - integrity_keysize) &&
+	    is_old_mk) {
 		util_asprintf(&msg, "The secure key in file '%s' is "
 			      "enciphered with the master key in the OLD "
 			      "master key register. Do you want to set this "

@@ -68,7 +68,9 @@ It also displays the attributes of the secure key, such as key size, whether
 it is a secure key that can be used for the XTS cipher mode, and the master key
 register (CURRENT or OLD) with which the secure key is enciphered.
 For further information about master key registers, see the
-\fBreencipher\fP command.
+\fBreencipher\fP command. Keys of type \fBPVSECRET\-AES\fP do not use a
+cryptographic adapter, thus no master key information is displayed for such
+keys.
 .PP
 To open a key slot contained in the LUKS2 header of the volume, a passphrase is
 required. You are prompted for the passphrase, unless option

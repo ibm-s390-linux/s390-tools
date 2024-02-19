@@ -1287,33 +1287,43 @@ int validate_secure_key(int pkey_fd,
 {
 	struct pkey_verifykey2 verifykey2;
 	struct pkey_apqn *list = NULL;
+	bool xts, valid, securekey;
 	u32 i, list_entries = 0;
-	bool xts, valid;
-	u32 flags;
+	u32 flags = 0;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 
-	xts = is_xts_key(secure_key, secure_key_size);
+	securekey = is_secure_key(secure_key, secure_key_size);
+	xts = securekey ? is_xts_key(secure_key, secure_key_size) : false;
 
-	flags = PKEY_FLAGS_MATCH_CUR_MKVP;
-	if (is_cca_aes_data_key(secure_key, secure_key_size) ||
-	    is_cca_aes_cipher_key(secure_key, secure_key_size))
-		flags |= PKEY_FLAGS_MATCH_ALT_MKVP;
+	if (securekey) {
+		flags = PKEY_FLAGS_MATCH_CUR_MKVP;
+		if (is_cca_aes_data_key(secure_key, secure_key_size) ||
+		    is_cca_aes_cipher_key(secure_key, secure_key_size))
+			flags |= PKEY_FLAGS_MATCH_ALT_MKVP;
 
-	rc = build_apqn_list_for_key(pkey_fd, secure_key,
-				     HALF_KEYSIZE_FOR_XTS(secure_key_size, xts),
-				     flags, apqns, &list, &list_entries,
-				     verbose);
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to build a list of APQNs that can "
-			   "validate this secure key: %s", strerror(-rc));
-		return rc;
+		rc = build_apqn_list_for_key(pkey_fd, secure_key,
+					     HALF_KEYSIZE_FOR_XTS(
+							secure_key_size, xts),
+					     flags, apqns, &list, &list_entries,
+					     verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to build a list of APQNs "
+					    "that can validate this secure "
+					    "key: %s", strerror(-rc));
+			return rc;
+		}
+	} else {
+		list = util_malloc(sizeof(struct pkey_apqn));
+		list[0].card = 0;
+		list[0].domain = 0;
+		list_entries = 1;
 	}
 
 	if (is_old_mk != NULL)
-		*is_old_mk = true;
+		*is_old_mk = securekey ? true : false;
 	if (clear_key_bitsize != NULL)
 		*clear_key_bitsize = 0;
 
@@ -1333,7 +1343,7 @@ int validate_secure_key(int pkey_fd,
 			continue;
 		}
 
-		if (is_xts_key(secure_key, secure_key_size)) {
+		if (xts) {
 			rc = validate_secure_xts_key(pkey_fd, &list[i],
 						     secure_key,
 						     secure_key_size,
@@ -1358,7 +1368,7 @@ int validate_secure_key(int pkey_fd,
 		 * If at least one of the APQNs have a matching current MK,
 		 * then don't report OLD, even if some match the old MK.
 		 */
-		if (is_old_mk &&
+		if (securekey && is_old_mk &&
 		    (verifykey2.flags & PKEY_FLAGS_MATCH_CUR_MKVP))
 			*is_old_mk = false;
 	}
