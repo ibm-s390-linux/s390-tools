@@ -2471,7 +2471,7 @@ static int command_convert_file(void)
 
 	if (g.name != NULL) {
 		warnx("Option '--name|-N' is not valid for "
-		      "re-enciphering a key outside of the repository");
+		      "converting a key outside of the repository");
 		util_prg_print_parse_error();
 		return EXIT_FAILURE;
 	}
@@ -2503,6 +2503,15 @@ static int command_convert_file(void)
 	secure_key = read_secure_key(g.pos_arg, &secure_key_size, g.verbose);
 	if (secure_key == NULL)
 		return EXIT_FAILURE;
+
+	if (!is_cca_aes_data_key(secure_key, secure_key_size)) {
+		warnx("Only secure keys of type %s can "
+		      "be converted. The secure key '%s' is of type %s",
+		      KEY_TYPE_CCA_AESDATA, g.pos_arg,
+		      get_key_type(secure_key, secure_key_size));
+		rc = EXIT_FAILURE;
+		goto out;
+	}
 
 	rc = validate_secure_key(g.pkey_fd, secure_key, secure_key_size, NULL,
 				 &is_old_mk, NULL, g.verbose);
