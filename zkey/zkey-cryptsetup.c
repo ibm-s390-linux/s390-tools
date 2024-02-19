@@ -2,7 +2,7 @@
  * zkey-cryptsetup - Re-encipher or validate volume keys of volumes
  * encrypted with LUKS2 and the paes cipher.
  *
- * Copyright IBM Corp. 2018
+ * Copyright IBM Corp. 2018, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -82,7 +82,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2018,
-			.pub_last = 2018,
+			.pub_last = 2024,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -1609,13 +1609,21 @@ static int reencipher_prepare(int token)
 	if (rc < 0)
 		goto out;
 
+	securekeysize = keysize - integrity_keysize;
+
+	if (!is_secure_key((u8 *)key, securekeysize)) {
+		warnx("The volume key of device '%s' is of type %s and can "
+		      "not be re-enciphered", g.pos_arg,
+		      get_key_type((u8 *)key, securekeysize));
+		rc = -EINVAL;
+		goto out;
+	}
+
 	reenc_tok.original_keyslot = rc;
 
 	rc = ensure_is_active_keylot(reenc_tok.original_keyslot);
 	if (rc != 0)
 		goto out;
-
-	securekeysize = keysize - integrity_keysize;
 
 	rc = generate_key_verification_pattern((u8 *)key, securekeysize,
 					       reenc_tok.verification_pattern,

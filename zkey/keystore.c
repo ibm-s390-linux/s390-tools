@@ -3567,6 +3567,15 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 		goto out;
 	}
 
+	if (!is_secure_key(secure_key, secure_key_size)) {
+		warnx("Key '%s' is of type %s and can not be re-enciphered, "
+		      "skipping", name, get_key_type(secure_key,
+						     secure_key_size));
+		info->num_skipped++;
+		rc = 0;
+		goto out;
+	}
+
 	apqns = properties_get(properties, PROP_NAME_APQNS);
 	if (apqns != NULL)
 		apqn_list = str_list_split(apqns);

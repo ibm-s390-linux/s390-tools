@@ -2118,6 +2118,13 @@ static int command_reencipher_file(void)
 	if (secure_key == NULL)
 		return EXIT_FAILURE;
 
+	if (!is_secure_key(secure_key, secure_key_size)) {
+		warnx("A key of type %s can not be re-enciphered",
+		      get_key_type(secure_key, secure_key_size));
+		rc = EXIT_FAILURE;
+		goto out;
+	}
+
 	rc = validate_secure_key(g.pkey_fd, secure_key, secure_key_size, NULL,
 				 &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {

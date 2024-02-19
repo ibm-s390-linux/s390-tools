@@ -266,6 +266,10 @@ command to re-encipher an existing secure key with a new master key.
 A secure key must be re-enciphered when the master key of the CCA or EP11
 cryptographic adapter changes.
 .PP
+Keys of type \fBPVSECRET\-AES\fP can not be re-enciphered. These keys do not
+use a cryptographic adapter, thus they do not need to be re-enciphered when the
+master of a cryptographic adapter changes.
+.PP
 The CCA cryptographic adapter has three different registers to store
 master keys:
 .RS 2

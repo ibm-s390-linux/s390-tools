@@ -1,8 +1,8 @@
-.\" Copyright IBM Corp. 2018
+.\" Copyright IBM Corp. 2018, 2024
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
-.TH ZKEY\-CRYPTSETUP 1 "May 2018" "s390-tools"
+.TH ZKEY\-CRYPTSETUP 1 "February 2024" "s390-tools"
 .SH NAME
 zkey\-cryptsetup \- Manage secure AES volume keys of volumes encrypted with
 \fBLUKS2\fP and the \fBpaes\fP cipher
@@ -114,6 +114,10 @@ command to re-encipher a secure AES volume key of a volume encrypted with
 \fBLUKS2\fP and the \fBpaes\fP cipher. A secure AES volume key must be
 re-enciphered when the master key of the cryptographic adapter in CCA or EP11
 coprocessor mode changes.
+.PP
+Volume keys of type \fBPVSECRET\-AES\fP can not be re-enciphered. These keys do
+not use a cryptographic adapter, thus they do not need to be re-enciphered when
+the master key of a cryptographic adapter changes.
 .PP
 The cryptographic adapter in CCA coprocessor mode has three different registers
 to store master keys:
