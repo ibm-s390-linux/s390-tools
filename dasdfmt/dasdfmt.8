@@ -118,16 +118,16 @@ Specify the \fImode\fR to be used to format the device. Valid modes are:
 .IP full
 Format the entire disk with the specified blocksize. (default)
 .IP quick
-Format the first two tracks and write label and partition information. Use this
-option only if you are sure that the target DASD already contains a regular
-format with the specified blocksize. A blocksize can optionally be specified
-using \fB-b\fR (\fB--blocksize\fR).
+Format the first two tracks and write label and partition information.
 .br
-For thin-provisioned DASD ESE volumes, quick is the default mode. A full space
-release then precedes the formatting step. If this space release fails, dasdfmt
-falls back to a full-format  mode. Formatting stops if the space release fails
-and quick mode was specified explicitly using \fB-M\fR. Specify the
-\fB--no-discard\fR option to omit the space release.
+Use this option for DASD ESE volumes to take the benefits of thin provisioning.
+In this case, a full space release precedes the formatting step. If this space
+release fails, then the formatting also fails. Specify the \fB--no-discard\fR
+option to omit the space release.
+.br
+For non-ESE volumes use this option only if you are sure that the target DASD
+already contains a regular format with the specified blocksize. A blocksize can
+optionally be specified using \fB-b\fR (\fB--blocksize\fR).
 
 .IP expand
 Format all unformatted tracks at the end of the target DASD. This mode assumes
