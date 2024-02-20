@@ -10,8 +10,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
-    #[cfg_attr(debug_assertions, error("Ultravisor: '{msg}' ({rc:#06x},{rrc:#06x})"))]
-    #[cfg_attr(not(debug_assertions), error("Ultravisor: '{msg}' ({rc:#06x})"))]
+    #[error("Ultravisor: '{msg}' ({rc:#06x},{rrc:#06x})")]
     Uv {
         rc: u16,
         rrc: u16,
