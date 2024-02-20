@@ -161,21 +161,6 @@ impl UvDevice {
     const RC_MORE_DATA: u16 = 0x0100;
     const PATH: &'static str = "/dev/uv";
 
-    /// IOCTL number for the info UVC
-    pub const INFO_NR: u8 = ffi::UVIO_IOCTL_UVDEV_INFO_NR;
-    /// IOCTL number for the attestation UVC
-    pub const ATTESTATION_NR: u8 = ffi::UVIO_IOCTL_ATT_NR;
-    /// IOCTL number for the add secret UVC
-    pub const ADD_SECRET_NR: u8 = ffi::UVIO_IOCTL_ADD_SECRET_NR;
-    /// IOCTL number for the list secret UVC
-    pub const LIST_SECRET_NR: u8 = ffi::UVIO_IOCTL_LIST_SECRETS_NR;
-    /// IOCTL number for the lock ksecret UVC
-    pub const LOCK_SECRET_NR: u8 = ffi::UVIO_IOCTL_LOCK_SECRETS_NR;
-    /// Maximum length for add-secret requests
-    pub const ADD_SECRET_MAX_LEN: usize = ffi::UVIO_ADD_SECRET_MAX_LEN;
-    /// Size of the buffer for list secret requests
-    pub const LIST_SECRETS_LEN: usize = ffi::UVIO_LIST_SECRETS_LEN;
-
     /// Open the uvdevice located at `/dev/uv`
     ///
     /// # Errors

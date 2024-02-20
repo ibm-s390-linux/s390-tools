@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::ffi::uvio_uvdev_info;
+use super::ffi::{self, uvio_uvdev_info};
 use crate::{
     misc::{Flags, Lsb0Flags64},
     uv::{uv_ioctl, UvCmd, UvDevice},
@@ -50,7 +50,7 @@ impl UvDeviceInfo {
             Ok(_) => Ok(cmd.into()),
             Err(crate::Error::Io(e)) if e.raw_os_error() == Some(libc::ENOTTY) => {
                 let mut supp_uvio_cmds = Lsb0Flags64::default();
-                supp_uvio_cmds.set_bit(UvDevice::ATTESTATION_NR);
+                supp_uvio_cmds.set_bit(ffi::UVIO_IOCTL_ATT_NR);
 
                 Ok(Self {
                     supp_uvio_cmds,
@@ -72,7 +72,7 @@ impl From<uvio_uvdev_info> for UvDeviceInfo {
 }
 
 impl UvCmd for uvio_uvdev_info {
-    const UV_IOCTL_NR: u8 = UvDevice::INFO_NR;
+    const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_UVDEV_INFO_NR;
 
     fn data(&mut self) -> Option<&mut [u8]> {
         Some(self.as_bytes_mut())
@@ -85,11 +85,11 @@ impl UvCmd for uvio_uvdev_info {
 
 fn nr_as_string(nr: u8) -> Option<&'static str> {
     match nr {
-        UvDevice::INFO_NR => Some("Info"),
-        UvDevice::ATTESTATION_NR => Some("Attestation"),
-        UvDevice::ADD_SECRET_NR => Some("Add Secret"),
-        UvDevice::LIST_SECRET_NR => Some("List Secrets"),
-        UvDevice::LOCK_SECRET_NR => Some("Lock Secret Store"),
+        ffi::UVIO_IOCTL_UVDEV_INFO_NR => Some("Info"),
+        ffi::UVIO_IOCTL_ATT_NR => Some("Attestation"),
+        ffi::UVIO_IOCTL_ADD_SECRET_NR => Some("Add Secret"),
+        ffi::UVIO_IOCTL_LIST_SECRETS_NR => Some("List Secrets"),
+        ffi::UVIO_IOCTL_LOCK_SECRETS_NR => Some("Lock Secret Store"),
         _ => None,
     }
 }

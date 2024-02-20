@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
+use super::ffi;
 use crate::{
     assert_size,
     misc::to_u16,
@@ -42,7 +43,7 @@ impl Default for ListCmd {
 }
 
 impl UvCmd for ListCmd {
-    const UV_IOCTL_NR: u8 = UvDevice::LIST_SECRET_NR;
+    const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_LIST_SECRETS_NR;
 
     fn data(&mut self) -> Option<&mut [u8]> {
         Some(self.0.as_mut_slice())
@@ -70,6 +71,10 @@ impl AddCmd {
         let mut data = Vec::with_capacity(PAGESIZE);
         bin_add_secret_req.read_to_end(&mut data)?;
 
+        if data.len() > ffi::UVIO_ADD_SECRET_MAX_LEN {
+            return Err(Error::AscrbLarge);
+        }
+
         if !AddSecretMagic::starts_with_magic(&data[..6]) {
             return Err(Error::NoAsrcb);
         }
@@ -78,7 +83,7 @@ impl AddCmd {
 }
 
 impl UvCmd for AddCmd {
-    const UV_IOCTL_NR: u8 = UvDevice::ADD_SECRET_NR;
+    const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_ADD_SECRET_NR;
 
     fn data(&mut self) -> Option<&mut [u8]> {
         Some(&mut self.0)
@@ -112,7 +117,7 @@ impl UvCmd for AddCmd {
 /// request to modify the secret store will fail.
 pub struct LockCmd;
 impl UvCmd for LockCmd {
-    const UV_IOCTL_NR: u8 = UvDevice::LOCK_SECRET_NR;
+    const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_LOCK_SECRETS_NR;
 
     fn rc_fmt(&self, rc: u16, _rrc: u16) -> Option<&'static str> {
         match rc {

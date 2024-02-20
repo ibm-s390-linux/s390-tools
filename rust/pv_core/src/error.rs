@@ -44,6 +44,9 @@ pub enum Error {
     #[error("Input does not contain an add-secret request")]
     NoAsrcb,
 
+    #[error("Input add-secret request is larger than 8k")]
+    AscrbLarge,
+
     #[error("Input contains unsupported user-data type: {0:#06x}")]
     UnsupportedUserData(u16),
 
