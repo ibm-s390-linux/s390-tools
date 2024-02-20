@@ -346,6 +346,45 @@ int install_bootloader_ipl(struct program_table *tables,
 	return rc;
 }
 
+/*
+ * Check if CCW dump tool is installed on the disk and destroy it by
+ * clearing the first block.
+ */
+static int clear_ccw_dumper(const struct disk_info *info, int fd)
+{
+	char dumper_magic[DF_S390_DUMPER_MAGIC_SIZE];
+	void *buffer;
+	int rc;
+
+	/* Read the CCW dumper magic at the start of block 3 */
+	if (misc_seek(fd, ECKD_CDL_DUMP_REC * info->phy_block_size))
+		return -1;
+	rc = misc_read(fd, dumper_magic, sizeof(dumper_magic));
+	if (rc) {
+		error_text("Could not read CCW dump record");
+		return rc;
+	}
+	/*
+	 * Check if the dump tool is present and clear its first block with zeroes.
+	 */
+	if (strncmp(dumper_magic, DF_S390_DUMPER_MAGIC32, sizeof(dumper_magic)) == 0 ||
+	    strncmp(dumper_magic, DF_S390_DUMPER_MAGIC64, sizeof(dumper_magic)) == 0 ||
+	    strncmp(dumper_magic, DF_S390_DUMPER_MAGIC_EXT, sizeof(dumper_magic)) == 0 ||
+	    strncmp(dumper_magic, DF_S390_DUMPER_MAGIC_MV, sizeof(dumper_magic)) == 0 ||
+	    strncmp(dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, sizeof(dumper_magic)) == 0) {
+		if (misc_seek(fd, ECKD_CDL_DUMP_REC * info->phy_block_size))
+			return -1;
+		buffer = misc_calloc(1, info->phy_block_size);
+		if (buffer == NULL)
+			return -1;
+		rc = DRY_RUN_FUNC(misc_write(fd, buffer, info->phy_block_size));
+		free(buffer);
+		if (rc)
+			error_text("Could not clear CCW dumper");
+	}
+	return rc;
+}
+
 /**
  * Install a program table for List-Directed dump
  * See the comment before install_bootloader() for details
@@ -367,6 +406,9 @@ static int install_bootloader_dump(struct program_table *tables,
 		break;
 	case disk_type_eckd_cdl:
 		rc = install_eckd_cdl_ld(fd, pt->stage1b_list, info);
+		/* Clear CCW dumper upon successful List-Directed ECKD dump tool installation */
+		if (rc == 0)
+			rc = clear_ccw_dumper(info, fd);
 		break;
 	default:
 		error_reason("Inappropriarte device type (%d) for List-Directed dump",
