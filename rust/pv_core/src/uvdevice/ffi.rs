@@ -2,6 +2,13 @@
 //
 // Copyright IBM Corp. 2023
 
+// This file is a rustified copy of linux/arch/s390/include/uapi/asm/uvdevice.h
+// There might be things that are not needed here but nontheless defined in that header.
+// Those two files should be in sync -> there might be unused/dead code.
+//
+// The `UVIO_IOCTL_*` and `UVIO_SUPP_*` macros
+#![allow(dead_code)]
+
 use std::mem::size_of;
 
 use crate::{assert_size, static_assert};
@@ -11,9 +18,8 @@ pub const UVIO_ATT_ARCB_MAX_LEN: usize = 0x100000;
 pub const UVIO_ATT_MEASUREMENT_MAX_LEN: usize = 0x8000;
 pub const UVIO_ATT_ADDITIONAL_MAX_LEN: usize = 0x8000;
 pub const UVIO_ADD_SECRET_MAX_LEN: usize = 0x100000;
-#[allow(unused)]
-// here for completeness
 pub const UVIO_LIST_SECRETS_LEN: usize = 0x1000;
+pub const UVIO_RETR_SECRET_MAX_LEN: usize = 0x2000;
 
 // equal to ascii 'u'
 pub const UVIO_TYPE_UVC: u8 = 117u8;
@@ -23,6 +29,7 @@ pub const UVIO_IOCTL_ATT_NR: u8 = 1;
 pub const UVIO_IOCTL_ADD_SECRET_NR: u8 = 2;
 pub const UVIO_IOCTL_LIST_SECRETS_NR: u8 = 3;
 pub const UVIO_IOCTL_LOCK_SECRETS_NR: u8 = 4;
+pub const UVIO_IOCTL_RETR_SECRET_NR: u8 = 5;
 
 /// Uvdevice IOCTL control block
 /// Programs can use this struct to communicate with the uvdevice via IOCTLs
