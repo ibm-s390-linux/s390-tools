@@ -37,6 +37,7 @@ Tip: You can use `make version` to get the version string.
 
 ## Tools
 * __pvsecret__ _Manage secrets for IBM Secure Execution guests_
+* __pvapconfig__ _automatic configure APQNs within an SE KVM guest_
 
 ## Writing new tools
 We encourage to use Rust for new tools. However, for some use cases it makes
