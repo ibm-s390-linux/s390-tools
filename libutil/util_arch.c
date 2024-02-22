@@ -90,10 +90,10 @@ const char *util_arch_machine_type_to_str(int type)
 	case UTIL_ARCH_MACHINE_TYPE_Z14_ZR1:
 		return "IBM z14 ZR1";
 	case UTIL_ARCH_MACHINE_TYPE_Z15:
-		return "IBM z15";
 	case UTIL_ARCH_MACHINE_TYPE_Z15_T02:
-		return "IBM z15 Model T02";
+		return "IBM z15";
 	case UTIL_ARCH_MACHINE_TYPE_Z16:
+	case UTIL_ARCH_MACHINE_TYPE_Z16_A02:
 		return "IBM z16";
 	default:
 		return "Unknown machine type";
@@ -111,6 +111,7 @@ unsigned long util_arch_hsa_maxsize(void)
 	case UTIL_ARCH_MACHINE_TYPE_Z15:
 	case UTIL_ARCH_MACHINE_TYPE_Z15_T02:
 	case UTIL_ARCH_MACHINE_TYPE_Z16:
+	case UTIL_ARCH_MACHINE_TYPE_Z16_A02:
 		return HSA_SIZE_512M;
 	default:
 		return HSA_SIZE_32M;
