@@ -6,10 +6,16 @@
 mod error;
 mod macros;
 mod utils;
+mod uvattest;
 mod uvdevice;
 mod uvsecret;
 
 pub use error::{Error, FileAccessErrorType, FileIoErrorType, Result};
+
+/// Functionalities for reading attestation requests
+pub mod attest {
+    pub use crate::uvattest::{AttestationMagic, AttestationMeasAlg};
+}
 
 /// Miscellaneous functions and definitions
 pub mod misc {
@@ -25,6 +31,7 @@ pub mod misc {
 /// For detailed Information on how to send Ultravisor Commands see [`crate::uv::UvDevice`] and
 /// [`crate::uv::UvCmd`]
 pub mod uv {
+    pub use crate::uvdevice::attest::AttestationCmd;
     pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd};
     pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretId, SecretList};
     pub use crate::uvdevice::{ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess};

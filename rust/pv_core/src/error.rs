@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
 
 /// Result type for this crate
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -48,6 +48,18 @@ pub enum Error {
 
     #[error("Input contains unsupported user-data type: {0:#06x}")]
     UnsupportedUserData(u16),
+
+    #[error("The input has not the correct format: {field} is too large. Maximal size {max_size}")]
+    AttDataSizeLarge { field: &'static str, max_size: u32 },
+
+    #[error("The input has not the correct format: {field} is too small. Minimal size {min_size}")]
+    AttDataSizeSmall { field: &'static str, min_size: u32 },
+
+    #[error("The attestation request has an unknown algorithm type (.0)")]
+    BinArcbInvAlgorithm(u32),
+
+    #[error("The attestation request does not specify a measurement size or measurement data.")]
+    BinArcbNoMeasurement,
 
     // errors from other crates
     #[error(transparent)]

@@ -24,11 +24,13 @@ mod ffi;
 mod info;
 mod test;
 pub(crate) use ffi::uv_ioctl;
+pub mod attest;
 pub mod secret;
 pub mod secret_list;
 
 pub use info::UvDeviceInfo;
-#[allow(dead_code)] //TODO rm when pv learns attestation
+
+/// User data for the attestation UVC
 pub type AttestationUserData = [u8; ffi::UVIO_ATT_USER_DATA_LEN];
 
 ///Configuration Unique Id of the Secure Execution guest
