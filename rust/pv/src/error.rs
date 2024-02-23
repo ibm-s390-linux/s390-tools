@@ -50,6 +50,9 @@ pub enum Error {
     #[error("Customer Communication Key must be 32 bytes long")]
     CckSize,
 
+    #[error("Decryption failed. Probably due to a GCM tag mismatch.")]
+    GcmTagMismatch,
+
     #[error("Invalid {0} user-data for signing provided. Max {} bytes allowed", .0.max())]
     AsrcbInvSgnUserData(UserDataType),
 

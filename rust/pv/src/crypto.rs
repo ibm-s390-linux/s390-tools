@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
 
 use crate::{confidential::Confidential, error::Result, Error};
 use openssl::{
@@ -14,7 +14,7 @@ use openssl::{
     rand::rand_bytes,
     rsa::Padding,
     sign::{Signer, Verifier},
-    symm::{encrypt_aead, Cipher},
+    symm::{decrypt_aead, encrypt_aead, Cipher},
 };
 use std::{convert::TryInto, ops::Range};
 
@@ -22,6 +22,11 @@ use std::{convert::TryInto, ops::Range};
 ///
 pub type Aes256Key = Confidential<[u8; 32]>;
 pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
+
+#[allow(dead_code)]
+pub(crate) const SHA_256_HASH_SIZE: u32 = 32;
+#[allow(dead_code)]
+pub(crate) type Sha256Hash = [u8; SHA_256_HASH_SIZE as usize];
 
 /// Types of symmetric keys, to specify during construction.
 ///
@@ -218,15 +223,68 @@ pub(crate) fn encrypt_aes_gcm(
     })
 }
 
+/// Decrypt encrypted data with a symmetric key compare the GCM-tag.
+///
+/// * `key` - symmetric key used for encryption
+/// * `iv` - initialisation vector
+/// * `aad` - additional authenticated data
+/// * `encr` - encrypted data
+/// * `tag` - GCM-tag to compare with
+///
+/// # Returns
+/// [`Vec<u8>`] with the decrypted data
+///
+/// # Errors
+///
+/// This function will return an error if the data could not be encrypted by OpenSSL.
+#[allow(unused)]
+pub(crate) fn decrypt_aes_gcm(
+    key: &SymKey,
+    iv: &[u8],
+    aad: &[u8],
+    encr: &[u8],
+    tag: &[u8],
+) -> Result<Confidential<Vec<u8>>> {
+    let decr = match key {
+        SymKey::Aes256(key) => {
+            decrypt_aead(Cipher::aes_256_gcm(), key.value(), Some(iv), aad, encr, tag)
+        }
+    }
+    .map_err(|ssl_err| {
+        // Empty error-stack -> no internal ssl error but decryption failed.
+        // Very likely due to a tag mismatch.
+        if ssl_err.errors().is_empty() {
+            Error::GcmTagMismatch
+        } else {
+            Error::Crypto(ssl_err)
+        }
+    })?;
+    Ok(decr.into())
+}
+
 /// Calculate the hash of a slice.
 ///
 /// # Errors
 ///
 /// This function will return an error if OpenSSL could not compute the hash.
-pub fn hash(t: MessageDigest, data: &[u8]) -> Result<DigestBytes> {
+pub(crate) fn hash(t: MessageDigest, data: &[u8]) -> Result<DigestBytes> {
     openssl::hash::hash(t, data).map_err(Error::Crypto)
 }
 
+/// Calculate the HMAC of the given message.
+#[allow(unused)]
+pub(crate) fn calculate_hmac(
+    hmac_key: &PKeyRef<Private>,
+    dgst: MessageDigest,
+    msg: &[u8],
+) -> Result<Vec<u8>> {
+    match hmac_key.id() {
+        Id::HMAC => Signer::new(dgst, hmac_key)?
+            .sign_oneshot_to_vec(msg)
+            .map_err(Error::Crypto),
+        _ => Err(Error::UnsupportedSigningKey),
+    }
+}
 /// Calculate a digital signature scheme.
 ///
 /// Calculates the digital signature of the provided message using the signing key. [`Id::EC`],
@@ -362,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn encrypt_aes_256_gcm() {
+    fn encrypt_decrypt_aes_256_gcm() {
         let aes_gcm_key = [
             0xee, 0xbc, 0x1f, 0x57, 0x48, 0x7f, 0x51, 0x92, 0x1c, 0x04, 0x65, 0x66, 0x5f, 0x8a,
             0xe6, 0xd1, 0x65, 0x8b, 0xb2, 0x6d, 0xe6, 0xf8, 0xa0, 0x69, 0xa3, 0x52, 0x02, 0x93,
@@ -371,10 +429,10 @@ mod tests {
         let aes_gcm_iv = [
             0x99, 0xaa, 0x3e, 0x68, 0xed, 0x81, 0x73, 0xa0, 0xee, 0xd0, 0x66, 0x84,
         ];
-        let aes_gcm_plain = [
+        let aes_gcm_plain = Confidential::new(vec![
             0xf5, 0x6e, 0x87, 0x05, 0x5b, 0xc3, 0x2d, 0x0e, 0xeb, 0x31, 0xb2, 0xea, 0xcc, 0x2b,
             0xf2, 0xa5,
-        ];
+        ]);
         let aes_gcm_aad = [
             0x4d, 0x23, 0xc3, 0xce, 0xc3, 0x34, 0xb4, 0x9b, 0xdb, 0x37, 0x0c, 0x43, 0x7f, 0xec,
             0x78, 0xde,
@@ -385,15 +443,46 @@ mod tests {
             0xb9, 0xf2, 0x17, 0x36, 0x67, 0xba, 0x05, 0x10, 0x26, 0x2a, 0xe4, 0x87, 0xd7, 0x37,
             0xee, 0x62, 0x98, 0xf7, 0x7e, 0x0c,
         ];
+        let key = SymKey::Aes256(aes_gcm_key.into());
 
-        let res = encrypt_aes_gcm(
-            &SymKey::Aes256(aes_gcm_key.into()),
+        let AesGcmResult {
+            buf,
+            aad_range,
+            encr_range,
+            tag_range,
+        } = encrypt_aes_gcm(&key, &aes_gcm_iv, &aes_gcm_aad, aes_gcm_plain.value()).unwrap();
+        assert_eq!(buf, aes_gcm_res);
+
+        let conf = decrypt_aes_gcm(
+            &key,
             &aes_gcm_iv,
-            &aes_gcm_aad,
-            &aes_gcm_plain,
+            &buf[aad_range],
+            &buf[encr_range],
+            &buf[tag_range],
         )
-        .unwrap()
-        .data();
-        assert_eq!(res, aes_gcm_res);
+        .unwrap();
+        assert_eq!(conf, aes_gcm_plain);
+    }
+
+    #[test]
+    fn hmac_sha512_rfc_4868() {
+        /* use a  test vector with key=64bytes of RFC 4868:
+         * https://www.rfc-editor.org/rfc/rfc4868.html#section-2.7.2.3
+         */
+        let key = [0xb; 64];
+        let data = [0x48, 0x69, 0x20, 0x54, 0x68, 0x65, 0x72, 0x65];
+
+        let exp = vec![
+            0x63, 0x7e, 0xdc, 0x6e, 0x01, 0xdc, 0xe7, 0xe6, 0x74, 0x2a, 0x99, 0x45, 0x1a, 0xae,
+            0x82, 0xdf, 0x23, 0xda, 0x3e, 0x92, 0x43, 0x9e, 0x59, 0x0e, 0x43, 0xe7, 0x61, 0xb3,
+            0x3e, 0x91, 0x0f, 0xb8, 0xac, 0x28, 0x78, 0xeb, 0xd5, 0x80, 0x3f, 0x6f, 0x0b, 0x61,
+            0xdb, 0xce, 0x5e, 0x25, 0x1f, 0xf8, 0x78, 0x9a, 0x47, 0x22, 0xc1, 0xbe, 0x65, 0xae,
+            0xa4, 0x5f, 0xd4, 0x64, 0xe8, 0x9f, 0x8f, 0x5b,
+        ];
+        let pkey = PKey::hmac(&key).unwrap();
+
+        let hmac = calculate_hmac(&pkey, MessageDigest::sha512(), &data).unwrap();
+
+        assert_eq!(hmac, exp);
     }
 }
