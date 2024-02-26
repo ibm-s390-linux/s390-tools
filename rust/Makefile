@@ -19,7 +19,7 @@ ifneq (${HAVE_CARGO},0)
 
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
-	PV_TARGETS := pvsecret pvapconfig
+	PV_TARGETS := pvsecret pvapconfig pvattest
 
 	PV_BUILD_TARGETS := $(PV_TARGETS)
 	CARGO_TEST_TARGETS += $(addsuffix .test,pv $(PV_TARGETS))
@@ -58,6 +58,8 @@ skip-pv-build:
 
 all: $(BUILD_TARGETS)
 install: $(INSTALL_TARGETS)
+	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvattest/tools/pvextract-hdr "$(DESTDIR)$(USRBINDIR)"
 
 print-rust-targets:
 	echo $(BUILD_TARGETS)
@@ -76,6 +78,7 @@ install-rust-tools: $(BUILD_TARGETS)
 		$(INSTALL) target/release/$(target) $(DESTDIR)$(USRBINDIR);)
 
 install-man:
+	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	$(foreach target,$(CARGO_TARGETS),\
 		$(INSTALL) -m 644 $(target)/man/*.1 -t $(DESTDIR)$(MANDIR)/man1;)
 	$(foreach target,$(PV_TARGETS),\

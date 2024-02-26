@@ -1,4 +1,4 @@
-s390-tools
+3t90-tools
 ==========
 
 The s390-tools package contains the source tree of a set of user space
@@ -19,6 +19,12 @@ Package contents
    all s390-tools that are written in rust and require external crates.
    Disable the compilation of all tools in `rust/` using HAVE_CARGO=0
    See the `rust/README.md` for Details
+   - pvattest:
+     Create, perform, and verify IBM Secure Execution attestation measurements.
+   - pvapconfig:
+     Automatic configure APQNs within an SE KVM guest
+   - pvsecret:
+     Manage secrets for IBM Secure Execution guests
 
  * dasdfmt:
    Low-level format ECKD DASDs with the classical Linux disk layout or the new
@@ -38,10 +44,7 @@ Package contents
  * genprotimg:
    Create a protected virtualization image.
 
- * pvattest:
-   Create, perform, and verify protected virtualization attestation measurements.
-
- * udev rules:
+  * udev rules:
    - 59-dasd.rules: rules for unique DASD device nodes created in /dev/disk/.
    - 57-osasnmpd.rules: udev rules for osasnmpd.
    - 60-readahead.rules: udev rules to set increased "default max readahead".
@@ -360,12 +363,11 @@ the different tools are provided:
 
   The runtime requirements are: openssl-libs (>= 1.1.0) and glib2.
 
-* pvattest:
+* rust/pvattest:
   For building pvattest you need OpenSSL version 1.1.1 or newer
-  installed (openssl-devel.rpm). Also required is glib2.56 or newer
-  (glib2-devel.rpm) and libcurl.
+  installed (openssl-devel.rpm). Also required is cargo and libcurl.
   Tip: you may skip the pvattest build by adding
-  `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_GLIB2=0`.
+  `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_CARGO=0`.
 
   The runtime requirements are: openssl-libs (>= 1.1.1) and
   glib2.56 or newer.
