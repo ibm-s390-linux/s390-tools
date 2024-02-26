@@ -85,6 +85,25 @@ pub enum Error {
     #[error("Invalid input size ({0}) for boot hdr")]
     InvBootHdrSize(usize),
 
+    #[error("Input does not contain an attestation request")]
+    NoArcb,
+
+    #[error("The attestation request has an unknown version (.0)")]
+    BinArcbInvVersion(u32),
+
+    #[error(
+        "The attestation request encrypted sice is to0 small (.0). Request probably tampered with."
+    )]
+    BinArcbSeaSmall(u32),
+
+    #[error("The input is missing the Configuration UID entry. It is probably not an attestation response")]
+    AttExCuidMissing,
+
+    #[error(
+        "Attestation flags indicating that the additional data contains {0}, but no data was provided."
+    )]
+    AddDataMissing(&'static str),
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),

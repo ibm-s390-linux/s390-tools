@@ -20,12 +20,27 @@
 //!
 //! ## Lock
 //! [`uv::UvDevice`] and [`uv::LockCmd`]
+//!
+//! # Attestation
+//!
+//! This crate provides functionalities for creating, performing, and verifying Attestation
+//! measurements for _IBM Secure Execution for Linux_. See:
+//!
+//! ## Create
+//! [`attest::AttestationRequest`]
+//!
+//! ## Perform
+//! [`uv::UvDevice`] and [`uv::AttestationCmd`]
+//!
+//! # Verify
+//! [`attest::AttestationItems`], [`attest::AttestationMeasurement`]
 mod brcb;
 mod confidential;
 mod crypto;
 mod error;
 mod req;
 mod utils;
+mod uvattest;
 mod uvsecret;
 mod verify;
 
@@ -45,6 +60,17 @@ pub mod uv {
     pub use pv_core::uv::*;
 }
 
+/// Functionalities for creating attestation requests
+pub mod attest {
+    pub use crate::uvattest::{
+        additional::AdditionalData,
+        arcb::{AttestationAuthenticated, AttestationRequest},
+        arcb::{AttestationFlags, AttestationVersion},
+        attest::{AttestationItems, AttestationMeasurement},
+    };
+    pub use pv_core::attest::*;
+}
+
 /// Miscellaneous functions and definitions
 pub mod misc {
     pub use crate::utils::read_certs;
@@ -53,6 +79,8 @@ pub mod misc {
 
 pub use crate::error::HkdVerifyErrorType;
 pub use error::{Error, Result};
+pub use pv_core::Error as PvCoreError;
+pub use pv_core::{FileAccessErrorType, FileIoErrorType};
 
 /// Functionalities to build UV requests
 pub mod request {

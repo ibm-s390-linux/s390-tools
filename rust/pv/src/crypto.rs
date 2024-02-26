@@ -237,7 +237,6 @@ pub(crate) fn encrypt_aes_gcm(
 /// # Errors
 ///
 /// This function will return an error if the data could not be encrypted by OpenSSL.
-#[allow(unused)]
 pub(crate) fn decrypt_aes_gcm(
     key: &SymKey,
     iv: &[u8],
@@ -272,7 +271,6 @@ pub(crate) fn hash(t: MessageDigest, data: &[u8]) -> Result<DigestBytes> {
 }
 
 /// Calculate the HMAC of the given message.
-#[allow(unused)]
 pub(crate) fn calculate_hmac(
     hmac_key: &PKeyRef<Private>,
     dgst: MessageDigest,

@@ -4,10 +4,11 @@
 
 use crate::assert_size;
 use crate::crypto::{
-    derive_key, encrypt_aes_gcm, gen_ec_key, random_array, AesGcmResult, SymKey, SymKeyType,
-    AES_256_GCM_TAG_SIZE,
+    decrypt_aes_gcm, derive_key, encrypt_aes_gcm, gen_ec_key, random_array, AesGcmResult, SymKey,
+    SymKeyType, AES_256_GCM_TAG_SIZE,
 };
 use crate::misc::to_u32;
+use crate::request::Confidential;
 use crate::{Error, Result};
 use openssl::bn::{BigNum, BigNumContext};
 use openssl::ec::{EcGroupRef, EcPointRef};
@@ -256,6 +257,11 @@ impl ReqEncrCtx {
     pub(crate) fn encrypt_aead(&self, aad: &[u8], conf: &[u8]) -> Result<AesGcmResult> {
         encrypt_aes_gcm(&self.prot_key, &self.iv, aad, conf)
     }
+
+    /// Returns a reference to the request protection key of this [`ReqEncrCtx`].
+    pub fn prot_key(&self) -> &SymKey {
+        &self.prot_key
+    }
 }
 
 #[repr(C)]
@@ -375,7 +381,6 @@ pub trait Request {
 
 /// A struct to represent some parts of a binary/encrypted request.
 #[derive(Debug)]
-#[allow(unused)]
 #[allow(clippy::len_without_is_empty)]
 pub struct BinReqValues<'a> {
     iv: &'a [u8],
@@ -431,6 +436,28 @@ impl<'a> BinReqValues<'a> {
     /// Returns the length of this [`BinReqValues`].
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Returns the size of the encrypted area
+    pub fn sea(&self) -> u32 {
+        self.encr.len() as u32
+    }
+
+    /// Decrypts the encrypted area with the provided key
+    pub fn decrypt(&self, key: &SymKey) -> Result<Confidential<Vec<u8>>> {
+        decrypt_aes_gcm(key, self.iv, self.aad, self.encr, self.tag)
+    }
+
+    /// Returns a reference to the request dependent authenticated area of this [`BinReqValues`]
+    /// already interpreted.
+    ///
+    /// If target struct is larger than the request dependend-aad None is returned. See
+    /// [`FromBytes::ref_from_prefix`]
+    pub fn req_dep_aad<T>(&self) -> Option<&T>
+    where
+        T: FromBytes + Sized,
+    {
+        T::ref_from_prefix(self.req_dep_aad)
     }
 }
 
