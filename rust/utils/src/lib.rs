@@ -4,6 +4,7 @@
 //!
 //! Copyright IBM Corp. 2023, 2024
 mod cli;
+mod hexslice;
 mod log;
 mod tmpfile;
 
@@ -11,6 +12,7 @@ pub use crate::cli::CertificateOptions;
 pub use crate::cli::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg};
 pub use crate::cli::{print_cli_error, print_error};
 pub use crate::cli::{STDIN, STDOUT};
+pub use crate::hexslice::HexSlice;
 pub use crate::log::PvLogger;
 pub use crate::tmpfile::TemporaryDirectory;
 

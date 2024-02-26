@@ -9,3 +9,4 @@ clap = { version ="4.1", features = ["derive", "wrap_help"] }
 libc = "0.2.49"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 pv = { path = "../pv" }
+serde = { version = "1.0.139"}

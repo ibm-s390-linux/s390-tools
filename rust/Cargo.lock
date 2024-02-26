@@ -688,6 +688,7 @@ dependencies = [
  "libc",
  "log",
  "pv",
+ "serde",
 ]
 
 [[package]]
