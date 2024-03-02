@@ -204,9 +204,16 @@ main(int argc, char* argv[])
 	case job_segment:
 	case job_menu:
 		rc = prepare_bootloader(job, &bis);
-		if (rc)
+		if (rc) {
+			free_bootloader(&bis);
 			break;
+		}
 		rc = install_bootloader(job, &bis);
+		if (rc) {
+			free_bootloader(&bis);
+			break;
+		}
+		rc = post_install_bootloader(job, &bis);
 		free_bootloader(&bis);
 		break;
 	case job_ipl_tape:

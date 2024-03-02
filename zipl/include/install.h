@@ -73,8 +73,9 @@ struct install_set {
 	int fd;
 	char *device;
 	char *filename;
-	char *dump_mount_point;
-	unsigned int dump_tmp_dir_created:1;
+	char *bootmap_dir;
+	unsigned int tmp_filename_created:1;
+	unsigned int bootmap_dir_created:1;
 	unsigned int dump_mounted:1;
 	unsigned int skip_prepare:1;
 	unsigned int print_details:1;
@@ -115,6 +116,7 @@ static inline struct program_component *get_component(struct install_set *bis,
 
 int prepare_bootloader(struct job_data *job, struct install_set *bis);
 int install_bootloader(struct job_data *job, struct install_set *bis);
+int post_install_bootloader(struct job_data *job, struct install_set *bis);
 void free_bootloader(struct install_set *bis);
 int install_tapeloader(const char* device, const char* image,
 		       const char* parmline, const char* ramdisk,

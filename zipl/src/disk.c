@@ -576,17 +576,16 @@ disk_get_info_from_file(const char* filename, struct job_target_data* target,
 	return rc;
 }
 
-
-void
-disk_free_info(struct disk_info* info)
+void disk_free_info(struct disk_info *info)
 {
+	if (!info)
+		return;
 	if (info->name)
 		free(info->name);
 	if (info->drv_name)
 		free(info->drv_name);
 	free(info);
 }
-
 
 /* Retrieve the physical blocknumber (block on disk) of the specified logical
  * block (block in file). FD provides the file descriptor, LOGICAL is the

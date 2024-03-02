@@ -1466,6 +1466,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 				   bis->filename);
 			return -1;
 		}
+		bis->tmp_filename_created = 1;
 	}
 	/* Retrieve target device information */
 	if (disk_get_info(bis->filename, &job->target, &bis->info))
@@ -1539,14 +1540,14 @@ static int prepare_bootloader_device(struct job_data *job,
  * Prepare resources to build a program table
  */
 static int prepare_build_program_table_file(struct job_data *job,
-					    char *bootmap_dir,
 					    struct install_set *bis)
 {
 	if (bis->skip_prepare)
 		/* skip the preparation work */
 		return 0;
 	/* Create temporary bootmap file */
-	bis->filename = misc_make_path(bootmap_dir, BOOTMAP_TEMPLATE_FILENAME);
+	bis->filename = misc_make_path(bis->bootmap_dir,
+				       BOOTMAP_TEMPLATE_FILENAME);
 	if (!bis->filename)
 		return -1;
 	bis->fd = mkstemp(bis->filename);
@@ -1555,6 +1556,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 		error_text("Could not create file '%s':", bis->filename);
 		return -1;
 	}
+	bis->tmp_filename_created = 1;
 	/* Retrieve target device information. Note that we have to
 	 * call disk_get_info_from_file() to also get the file system
 	 * block size. */
@@ -1581,7 +1583,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 					 bis->info))
 			return -1;
 	}
-	printf("Building bootmap in '%s'%s\n", bootmap_dir,
+	printf("Building bootmap in '%s'%s\n", bis->bootmap_dir,
 	       job->add_files ? " (files will be added to bootmap file)"
 	       : "");
 	/* Initialize bootmap header */
@@ -1601,11 +1603,11 @@ static int prepare_build_program_table_file(struct job_data *job,
 /**
  * Rename to final bootmap name
  */
-static int finalize_create_file(char *bootmap_dir, struct install_set *bis)
+static int finalize_create_file(struct install_set *bis)
 {
 	char *final_name;
 
-	final_name = misc_make_path(bootmap_dir, BOOTMAP_FILENAME);
+	final_name = misc_make_path(bis->bootmap_dir, BOOTMAP_FILENAME);
 	if (!final_name)
 		return -1;
 	if (rename(bis->filename, final_name)) {
@@ -1615,6 +1617,11 @@ static int finalize_create_file(char *bootmap_dir, struct install_set *bis)
 		free(final_name);
 		return -1;
 	}
+	/*
+	 * The temporary object with @bis->filename has been removed
+	 * from the semantic volume
+	 */
+	bis->tmp_filename_created = 0;
 	free(final_name);
 	return 0;
 }
@@ -1623,9 +1630,9 @@ static int finalize_create_file(char *bootmap_dir, struct install_set *bis)
  * PROGRAM_TABLE_ID: offset of the program table in the array (@bis->tables)
  */
 static int bootmap_create_file(struct job_data *job, struct install_set *bis,
-			       char *bootmap_dir, int program_table_id)
+			       int program_table_id)
 {
-	if (prepare_build_program_table_file(job, bootmap_dir, bis))
+	if (prepare_build_program_table_file(job, bis))
 		return -1;
 	if (build_program_table(job, bis, program_table_id))
 		return -1;
@@ -1638,8 +1645,12 @@ static int bootmap_create_file(struct job_data *job, struct install_set *bis,
 	return 0;
 }
 
-static int
-ngdump_create_meta(const char *path)
+/**
+ * Create a file with the short name "ngdump.meta" in the directory PATH.
+ * This file is required for NGDump stand-alone dumper, it's read/written
+ * by the dumper when it starts.
+ */
+static int ngdump_create_meta(const char *path)
 {
 	char *filename = NULL;
 	FILE *fp;
@@ -1676,7 +1687,6 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 				     struct install_set *bis)
 {
 	struct disk_info *info;
-	char *bootmap_dir;
 
 	/* Retrieve target device information */
 	if (disk_get_info(job->data.dump.device, &job->target, &info))
@@ -1686,27 +1696,27 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	if (check_dump_device(job, info, bis->device))
 		return -1;
 
-	bis->dump_mount_point = misc_make_path("/tmp",
-					       DUMP_TEMP_MOUNT_POINT_NAME);
-	if (!bis->dump_mount_point) {
+	bis->bootmap_dir = misc_make_path("/tmp",
+					  DUMP_TEMP_MOUNT_POINT_NAME);
+	if (!bis->bootmap_dir) {
 		error_reason(strerror(errno));
 		error_text("Could not make path for '%s'",
 			   DUMP_TEMP_MOUNT_POINT_NAME);
 		return -1;
 	}
 	/* Create a mount point directory */
-	if (mkdtemp(bis->dump_mount_point) == NULL) {
+	if (mkdtemp(bis->bootmap_dir) == NULL) {
 		error_reason(strerror(errno));
 		error_text("Could not create mount point '%s'",
-			   bis->dump_mount_point);
+			   bis->bootmap_dir);
 		return -1;
 	}
-	bis->dump_tmp_dir_created = 1;
+	bis->bootmap_dir_created = 1;
 	/*
 	 * Mount partition where bootmap file and also a dump file will
 	 * be stored.
 	 */
-	if (mount(job->data.dump.device, bis->dump_mount_point,
+	if (mount(job->data.dump.device, bis->bootmap_dir,
 		  NGDUMP_FSTYPE, 0, NULL)) {
 		error_reason(strerror(errno));
 		error_text("Could not mount partition '%s':",
@@ -1714,17 +1724,14 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 		return -1;
 	}
 	bis->dump_mounted = 1;
-	bootmap_dir = bis->dump_mount_point;
 	/*
 	 * Build a single program table for List-Directed IPL
 	 * See comments before install_bootloader() for details
 	 */
 	bis->print_details = 1;
-	if (bootmap_create_file(job, bis, bootmap_dir, BLKPTR_FORMAT_ID))
+	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID))
 		return -1;
-	if (!dry_run && finalize_create_file(bootmap_dir, bis))
-		return -1;
-	return ngdump_create_meta(bootmap_dir);
+	return ngdump_create_meta(bis->bootmap_dir);
 }
 
 /**
@@ -1734,27 +1741,28 @@ static int prepare_bootloader_ngdump(struct job_data *job,
  */
 static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 {
-	char *bootmap_dir = job->target.bootmap_dir;
-
+	bis->bootmap_dir = misc_strdup(job->target.bootmap_dir);
+	if (!bis->bootmap_dir)
+		return -1;
 	/*
 	 * Build a program table for List-Directed IPL from
 	 * SCSI or ECKD DASD
 	 */
 	bis->print_details = 1;
-	if (bootmap_create_file(job, bis, bootmap_dir, BLKPTR_FORMAT_ID))
+	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID))
 		return -1;
 	if (bis->info->type == disk_type_scsi)
 		/* only one table to be installed per device */
-		return dry_run ? 0 : finalize_create_file(bootmap_dir, bis);
+		return 0;
 	/*
 	 * Build one more program table for CCW-type IPL from
 	 * ECKD DASD
 	 */
 	bis->skip_prepare = 1;
 	bis->print_details = 0;
-	if (bootmap_create_file(job, bis, bootmap_dir, LEGACY_BLKPTR_FORMAT_ID))
+	if (bootmap_create_file(job, bis, LEGACY_BLKPTR_FORMAT_ID))
 		return -1;
-	return dry_run ? 0 : finalize_create_file(bootmap_dir, bis);
+	return 0;
 }
 
 /**
@@ -1800,7 +1808,22 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 	} else {
 		return prepare_bootloader_ipl(job, bis);
 	}
-	return -1;
+}
+
+/**
+ * Do whatever needed after successful boot records installation
+ * but before releasing all the captured resources
+ */
+int post_install_bootloader(struct job_data *job, struct install_set *bis)
+{
+	if (job->id == job_dump_partition) {
+		if (is_ngdump_enabled(job))
+			return dry_run ? 0 : finalize_create_file(bis);
+		else
+			return 0;
+	} else {
+		return dry_run ? 0 : finalize_create_file(bis);
+	}
 }
 
 /**
@@ -1819,18 +1842,17 @@ void free_bootloader(struct install_set *bis)
 	}
 	if (bis->fd > 0)
 		close(bis->fd);
-	if (dry_run)
+	if (bis->tmp_filename_created)
 		misc_free_temp_file(bis->filename);
 	free(bis->filename);
 	misc_free_temp_dev(bis->device);
 	disk_free_info(bis->info);
-	if (bis->dump_mount_point) {
-		if (bis->dump_mounted && umount(bis->dump_mount_point))
-			warn("Could not umount dump device at %s",
-			     bis->dump_mount_point);
-		if (bis->dump_tmp_dir_created && rmdir(bis->dump_mount_point))
-			warn("Could not remove directory %s",
-			     bis->dump_mount_point);
-		free(bis->dump_mount_point);
-	}
+
+	if (bis->dump_mounted && umount(bis->bootmap_dir))
+		warn("Could not umount dump device at %s",
+		     bis->bootmap_dir);
+	if (bis->bootmap_dir_created && rmdir(bis->bootmap_dir))
+		warn("Could not remove directory %s",
+		     bis->bootmap_dir);
+	free(bis->bootmap_dir);
 }
