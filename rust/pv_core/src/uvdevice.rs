@@ -25,6 +25,7 @@ mod info;
 mod test;
 pub(crate) use ffi::uv_ioctl;
 pub mod attest;
+pub mod retr_secret;
 pub mod secret;
 pub mod secret_list;
 

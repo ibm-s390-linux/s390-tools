@@ -2,9 +2,14 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::assert_size;
-use crate::{misc::to_u16, uv::ListCmd, uvdevice::UvCmd, Error, Result};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use crate::{
+    assert_size,
+    misc::to_u16,
+    uv::{AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, ListCmd, RetrievableSecret},
+    uvdevice::UvCmd,
+    Error, Result,
+};
+use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     fmt::Display,
@@ -18,7 +23,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
 ///
 /// (de)serializes itself in/from a hex-string
 #[repr(C)]
-#[derive(PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Debug, Clone)]
+#[derive(PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Debug, Clone, Default)]
 pub struct SecretId([u8; Self::ID_SIZE]);
 assert_size!(SecretId, SecretId::ID_SIZE);
 
@@ -94,11 +99,11 @@ impl SecretEntry {
     /// Create a new entry for a [`SecretList`].
     ///
     /// The content of this entry will very likely not represent the status of the guest in the
-    /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
+    /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encouraged.
     pub fn new(index: u16, stype: ListableSecretType, id: SecretId, secret_len: u32) -> Self {
         Self {
             index: index.into(),
-            stype: stype.into(),
+            stype: U16::new(stype.into()),
             len: secret_len.into(),
             res_8: 0,
             id,
@@ -117,7 +122,7 @@ impl SecretEntry {
 
     /// Returns the secret type of this [`SecretEntry`].
     pub fn stype(&self) -> ListableSecretType {
-        self.stype.into()
+        self.stype.get().into()
     }
 
     /// Returns a reference to the id of this [`SecretEntry`].
@@ -146,7 +151,7 @@ impl SecretEntry {
 
 impl Display for SecretEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let stype: ListableSecretType = self.stype.into();
+        let stype: ListableSecretType = self.stype.get().into();
         writeln!(f, "{} {}:", self.index, stype)?;
         write!(f, "  ")?;
         for b in self.id.as_ref() {
@@ -298,51 +303,115 @@ fn ser_u16<S: Serializer>(v: &U16<BigEndian>, ser: S) -> Result<S::Ok, S::Error>
 pub enum ListableSecretType {
     /// Association Secret
     Association,
+    /// Retrievable key
+    Retrievable(RetrievableSecret),
+
     /// Invalid secret type, that should never appear in a list
     ///
     /// 0 is reserved
-    /// 1 is Null secret, with no id and not listable
+    /// 1 is Null secret, with no id and not list-able
     Invalid(u16),
     /// Unknown secret type
     Unknown(u16),
 }
 
 impl ListableSecretType {
-    /// UV type id for an association secret
-    pub const ASSOCIATION: u16 = 0x0002;
-    /// UV type id for a null secret
-    pub const NULL: u16 = 0x0001;
     const RESERVED_0: u16 = 0x0000;
+    /// UV secret-type id for a null secret
+    pub const NULL: u16 = 0x0001;
+    /// UV secret-type id for an association secret
+    pub const ASSOCIATION: u16 = 0x0002;
+    /// UV secret-type id for a plain text secret
+    pub const PLAINTEXT: u16 = 0x0003;
+    /// UV secret-type id for an aes-128-key secret
+    pub const AES_128_KEY: u16 = 0x0004;
+    /// UV secret-type id for an aes-192-key secret
+    pub const AES_192_KEY: u16 = 0x0005;
+    /// UV secret-type id for an aes-256-key secret
+    pub const AES_256_KEY: u16 = 0x0006;
+    /// UV secret-type id for an aes-xts-128-key secret
+    pub const AES_128_XTS_KEY: u16 = 0x0007;
+    /// UV secret-type id for an aes-xts-256-key secret
+    pub const AES_256_XTS_KEY: u16 = 0x0008;
+    /// UV secret-type id for an hmac-sha-256-key secret
+    pub const HMAC_SHA_256_KEY: u16 = 0x0009;
+    /// UV secret-type id for an hmac-sha-512-key secret
+    pub const HMAC_SHA_512_KEY: u16 = 0x000a;
+    // 0x000b - 0x0010 reserved
+    /// UV secret-type id for an ecdsa-p256-private-key secret
+    pub const ECDSA_P256_KEY: u16 = 0x0011;
+    /// UV secret-type id for an ecdsa-p384-private-key secret
+    pub const ECDSA_P384_KEY: u16 = 0x0012;
+    /// UV secret-type id for an ecdsa-p521-private-key secret
+    pub const ECDSA_P521_KEY: u16 = 0x0013;
+    /// UV secret-type id for an ed25519-private-key secret
+    pub const ECDSA_ED25519_KEY: u16 = 0x0014;
+    /// UV secret-type id for an ed448-private-key secret
+    pub const ECDSA_ED448_KEY: u16 = 0x0015;
 }
 
 impl Display for ListableSecretType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Association => write!(f, "Association"),
-            Self::Invalid(n) => write!(f, "Invalid({n})"),
-            Self::Unknown(n) => write!(f, "Unknown({n})"),
+            Self::Invalid(n) => write!(f, "Invalid(0x{n:04x})"),
+            Self::Unknown(n) => write!(f, "Unknown(0x{n:04x})"),
+            Self::Retrievable(r) => write!(f, "{r}"),
         }
     }
 }
 
-impl From<U16<BigEndian>> for ListableSecretType {
-    fn from(value: U16<BigEndian>) -> Self {
-        match value.get() {
+impl<O: ByteOrder> From<U16<O>> for ListableSecretType {
+    fn from(value: U16<O>) -> Self {
+        value.get().into()
+    }
+}
+
+impl From<u16> for ListableSecretType {
+    fn from(value: u16) -> Self {
+        match value {
             Self::RESERVED_0 => Self::Invalid(Self::RESERVED_0),
             Self::NULL => Self::Invalid(Self::NULL),
             Self::ASSOCIATION => Self::Association,
+            Self::PLAINTEXT => Self::Retrievable(RetrievableSecret::PlainText),
+            Self::AES_128_KEY => Self::Retrievable(RetrievableSecret::Aes(AesSizes::Bits128)),
+            Self::AES_192_KEY => Self::Retrievable(RetrievableSecret::Aes(AesSizes::Bits192)),
+            Self::AES_256_KEY => Self::Retrievable(RetrievableSecret::Aes(AesSizes::Bits256)),
+            Self::AES_128_XTS_KEY => {
+                Self::Retrievable(RetrievableSecret::AesXts(AesXtsSizes::Bits128))
+            }
+            Self::AES_256_XTS_KEY => {
+                Self::Retrievable(RetrievableSecret::AesXts(AesXtsSizes::Bits256))
+            }
+            Self::HMAC_SHA_256_KEY => {
+                Self::Retrievable(RetrievableSecret::HmacSha(HmacShaSizes::Sha256))
+            }
+            Self::HMAC_SHA_512_KEY => {
+                Self::Retrievable(RetrievableSecret::HmacSha(HmacShaSizes::Sha512))
+            }
+            Self::ECDSA_P256_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Secp256R1)),
+            Self::ECDSA_P384_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Secp384R1)),
+            Self::ECDSA_P521_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Secp521R1)),
+            Self::ECDSA_ED25519_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Ed25519)),
+            Self::ECDSA_ED448_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Ed448)),
             n => Self::Unknown(n),
         }
     }
 }
 
-impl From<ListableSecretType> for U16<BigEndian> {
+impl<O: ByteOrder> From<ListableSecretType> for U16<O> {
+    fn from(value: ListableSecretType) -> Self {
+        Self::new(value.into())
+    }
+}
+
+impl From<ListableSecretType> for u16 {
     fn from(value: ListableSecretType) -> Self {
         match value {
             ListableSecretType::Association => ListableSecretType::ASSOCIATION,
             ListableSecretType::Invalid(n) | ListableSecretType::Unknown(n) => n,
+            ListableSecretType::Retrievable(r) => (&r).into(),
         }
-        .into()
     }
 }
 
@@ -363,8 +432,8 @@ where
         where
             E: serde::de::Error,
         {
-            if s.len() != SecretId::ID_SIZE * 2 + 2 {
-                return Err(serde::de::Error::invalid_length(s.len(), &self));
+            if s.len() != SecretId::ID_SIZE * 2 + "0x".len() {
+                return Err(serde::de::Error::invalid_length(s.len() - 2, &self));
             }
             let nb = s.strip_prefix("0x").ok_or_else(|| {
                 serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self)
@@ -385,7 +454,6 @@ mod test {
 
     use super::*;
     use std::io::{BufReader, BufWriter, Cursor};
-
     #[test]
     fn dump_secret_entry() {
         const EXP: &[u8] = &[
@@ -514,6 +582,49 @@ mod test {
             &[Token::String(
                 "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             )],
+        )
+    }
+
+    #[test]
+    fn secret_list_ser() {
+        let list = SecretList {
+            total_num_secrets: 0x112,
+            secrets: vec![SecretEntry {
+                index: 1.into(),
+                stype: 2.into(),
+                len: 32.into(),
+                res_8: 0,
+                id: SecretId::from([0; 32]),
+            }],
+        };
+
+        assert_ser_tokens(
+            &list,
+            &[
+                Token::Struct {
+                    name: "SecretList",
+                    len: 2,
+                },
+                Token::String("total_num_secrets"),
+                Token::U64(0x112),
+                Token::String("secrets"),
+                Token::Seq { len: Some(1) },
+                Token::Struct {
+                    name: "SecretEntry",
+                    len: (4),
+                },
+                Token::String("index"),
+                Token::U16(1),
+                Token::String("stype"),
+                Token::U16(2),
+                Token::String("len"),
+                Token::U32(32),
+                Token::String("id"),
+                Token::String("0x0000000000000000000000000000000000000000000000000000000000000000"),
+                Token::StructEnd,
+                Token::SeqEnd,
+                Token::StructEnd,
+            ],
         )
     }
 }
