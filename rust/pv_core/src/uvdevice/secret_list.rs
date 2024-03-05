@@ -110,6 +110,11 @@ impl SecretEntry {
         self.index.get()
     }
 
+    /// Returns the index of this [`SecretEntry`] in BE.
+    pub(crate) fn index_be(&self) -> &U16<BigEndian> {
+        &self.index
+    }
+
     /// Returns the secret type of this [`SecretEntry`].
     pub fn stype(&self) -> ListableSecretType {
         self.stype.into()
@@ -126,6 +131,16 @@ impl SecretEntry {
     /// ```
     pub fn id(&self) -> &[u8] {
         self.id.as_ref()
+    }
+
+    /// Get the id as [`SecretId`] reference
+    pub(crate) fn secret_id(&self) -> &SecretId {
+        &self.id
+    }
+
+    /// Returns the secret size of this [`SecretEntry`].
+    pub fn secret_size(&self) -> u32 {
+        self.len.get()
     }
 }
 

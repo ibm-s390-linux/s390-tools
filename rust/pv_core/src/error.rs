@@ -4,6 +4,8 @@
 
 use std::path::PathBuf;
 
+use crate::uv::SecretId;
+
 /// Result type for this crate
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -69,6 +71,11 @@ pub enum Error {
 
     #[error("The attestation request does not specify a measurement size or measurement data.")]
     BinArcbNoMeasurement,
+
+    #[error(
+        "The secret with the ID {id} cannot be retrieved. The requested size is too large ({size})"
+    )]
+    InvalidRetrievableSecretType { id: SecretId, size: usize },
 
     // errors from other crates
     #[error(transparent)]

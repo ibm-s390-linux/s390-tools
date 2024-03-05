@@ -3,8 +3,15 @@
 // Copyright IBM Corp. 2023
 
 use super::ffi;
-use crate::{request::MagicValue, uv::UvCmd, uvsecret::AddSecretMagic, Error, Result, PAGESIZE};
-use std::io::Read;
+use crate::{
+    request::{Confidential, MagicValue},
+    uv::{SecretEntry, UvCmd},
+    uvsecret::AddSecretMagic,
+    Error, Result, PAGESIZE,
+};
+use log::debug;
+use std::{io::Read, mem::size_of_val};
+use zerocopy::AsBytes;
 
 /// _List Secrets_ Ultravisor command.
 ///
@@ -114,5 +121,91 @@ impl UvCmd for LockCmd {
             0x0102 => Some("secret store already locked"),
             _ => None,
         }
+    }
+}
+
+/// Retrieve a secret value from UV store
+#[derive(Debug)]
+pub struct RetrieveCmd {
+    entry: SecretEntry,
+    key: Confidential<Vec<u8>>,
+}
+
+impl RetrieveCmd {
+    /// Maximum size of a retrieved key (=2 pages)
+    pub const MAX_SIZE: usize = ffi::UVIO_RETR_SECRET_MAX_LEN;
+
+    /// Create a retrieve-secret UVC from a [`SecretEntry`].
+    ///
+    /// This uses the index of the secret entry for the UVC.
+    pub fn from_entry(entry: SecretEntry) -> Result<Self> {
+        entry.try_into()
+    }
+
+    /// Transform a [`RetrieveCmd`] into a key-vector.
+    ///
+    /// Only makes sense to call after a successful UVC execution.
+    pub fn into_key(self) -> Confidential<Vec<u8>> {
+        self.key
+    }
+
+    /// Get the secret entry
+    ///
+    /// Get the secret entry that is used as metadata to retrieve the secret
+    pub fn meta_data(&self) -> &SecretEntry {
+        &self.entry
+    }
+}
+
+impl TryFrom<SecretEntry> for RetrieveCmd {
+    type Error = Error;
+
+    fn try_from(entry: SecretEntry) -> Result<Self> {
+        let len = entry.secret_size() as usize;
+
+        // Next to impossible if the secret entry is a valid response from UV
+        if len > Self::MAX_SIZE {
+            return Err(Error::InvalidRetrievableSecretType {
+                id: entry.secret_id().to_owned(),
+                size: len,
+            });
+        }
+
+        // Ensure that an u16 fits into the buffer.
+        let size = std::cmp::max(size_of_val(&entry.index()), len);
+        debug!("Create a buf with {} elements", size);
+        let mut buf = vec![0; size];
+        // The IOCTL expects the secret index in the first two bytes of the buffer. They will be
+        // overwritten in the response
+        entry.index_be().write_to_prefix(&mut buf).unwrap();
+        Ok(Self {
+            entry,
+            key: buf.into(),
+        })
+    }
+}
+
+impl UvCmd for RetrieveCmd {
+    const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_RETR_SECRET_NR;
+
+    fn rc_fmt(&self, rc: u16, _: u16) -> Option<&'static str> {
+        match rc {
+            // should not appear (TM), software creates request from a list item
+            0x0009 => Some("the allocated buffer is to small to store the secret"),
+            // should not appear (TM), kernel allocates the memory
+            0x0102 => {
+                Some("access exception recognized when accessing retrieved secret storage area")
+            }
+            // should not appear (TM), software creates request from a list item
+            0x010f => Some("the Secret Store is empty"),
+            // should not appear (TM), software creates request from a list item
+            0x0110 => Some("the Secret Store does not contain a secret with the specified index"),
+            0x0111 => Some("the secret is not retrievable"),
+            _ => None,
+        }
+    }
+
+    fn data(&mut self) -> Option<&mut [u8]> {
+        Some(self.key.value_mut())
     }
 }

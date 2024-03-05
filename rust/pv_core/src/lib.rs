@@ -32,7 +32,7 @@ pub mod misc {
 /// [`crate::uv::UvCmd`]
 pub mod uv {
     pub use crate::uvdevice::attest::AttestationCmd;
-    pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd};
+    pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd, RetrieveCmd};
     pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretId, SecretList};
     pub use crate::uvdevice::{ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess};
 }
