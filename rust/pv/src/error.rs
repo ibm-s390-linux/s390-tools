@@ -109,6 +109,14 @@ pub enum Error {
     #[error("An ASCII string was expected, but non-ASCII characters were received.")]
     NonAscii,
 
+    #[error("Incorrect {what} for a {kind}. Is: {value}; expected: {exp}")]
+    RetrInvKey {
+        what: &'static str,
+        kind: String,
+        value: String,
+        exp: String,
+    },
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),

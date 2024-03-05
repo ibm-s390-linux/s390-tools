@@ -104,7 +104,12 @@ pub mod request {
 
     /// Reexports some useful OpenSSL symbols
     pub mod openssl {
-        pub use openssl::{error::ErrorStack, hash::DigestBytes, pkey, x509};
+        pub use openssl::{error::ErrorStack, hash::DigestBytes, nid::Nid, pkey, x509};
+        // rust-OpenSSL does not define these NIDs
+        #[allow(missing_docs)]
+        pub const NID_ED25519: Nid = Nid::from_raw(openssl_sys::NID_ED25519);
+        #[allow(missing_docs)]
+        pub const NID_ED448: Nid = Nid::from_raw(openssl_sys::NID_ED448);
     }
 
     pub use pv_core::request::*;
@@ -118,6 +123,7 @@ pub mod secret {
         asrcb::{AddSecretFlags, AddSecretRequest, AddSecretVersion},
         ext_secret::ExtSecret,
         guest_secret::GuestSecret,
+        retr_secret::{IbmProtectedKey, RetrievedSecret},
         user_data::verify_asrcb_and_get_user_data,
     };
 }

@@ -29,7 +29,6 @@ pub type Aes256XtsKey = Confidential<[u8; SymKeyType::AES_256_XTS_KEY_LEN]>;
 
 /// SHA-512 digest length (in bytes)
 pub const SHA_512_HASH_LEN: usize = 64;
-
 #[allow(dead_code)]
 pub(crate) const SHA_256_HASH_LEN: u32 = 32;
 #[allow(dead_code)]
@@ -60,6 +59,8 @@ impl SymKeyType {
     pub const AES_256_XTS_KEY_LEN: usize = 64;
     /// AES256-XTS tweak length (in bytes)
     pub const AES_256_XTS_TWEAK_LEN: usize = 16;
+    /// AES256 GCM Block length
+    pub const AES_256_GCM_BLOCK_LEN: usize = 16;
 
     /// Returns the tag length of the [`SymKeyType`] if it is an AEAD key
     pub const fn tag_len(&self) -> Option<usize> {
