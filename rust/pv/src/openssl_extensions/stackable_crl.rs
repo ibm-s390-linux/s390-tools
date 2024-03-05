@@ -2,16 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
-use std::{marker::PhantomData, ptr};
-
+use crate::openssl_extensions::bio::BioMemSlice;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use openssl::{
     error::ErrorStack,
     stack::Stackable,
     x509::{X509Crl, X509CrlRef},
 };
-use openssl_sys::BIO_new_mem_buf;
-use std::ffi::c_int;
+use std::ptr;
 
 #[derive(Debug)]
 pub struct StackableX509Crl(*mut openssl_sys::X509_CRL);
@@ -62,44 +60,11 @@ impl Stackable for StackableX509Crl {
     type StackType = openssl_sys::stack_st_X509_CRL;
 }
 
-pub struct MemBioSlice<'a>(*mut openssl_sys::BIO, PhantomData<&'a [u8]>);
-impl Drop for MemBioSlice<'_> {
-    fn drop(&mut self) {
-        unsafe {
-            openssl_sys::BIO_free_all(self.0);
-        }
-    }
-}
-
-impl<'a> MemBioSlice<'a> {
-    pub fn new(buf: &'a [u8]) -> Result<MemBioSlice<'a>, ErrorStack> {
-        openssl_sys::init();
-
-        assert!(buf.len() <= c_int::MAX as usize);
-        let bio = unsafe {
-            {
-                let r = BIO_new_mem_buf(buf.as_ptr() as *const _, buf.len() as c_int);
-                if r.is_null() {
-                    Err(ErrorStack::get())
-                } else {
-                    Ok(r)
-                }
-            }?
-        };
-
-        Ok(MemBioSlice(bio, PhantomData))
-    }
-
-    pub fn as_ptr(&self) -> *mut openssl_sys::BIO {
-        self.0
-    }
-}
-
 impl StackableX509Crl {
     pub fn stack_from_pem(pem: &[u8]) -> Result<Vec<X509Crl>, ErrorStack> {
         unsafe {
             openssl_sys::init();
-            let bio = MemBioSlice::new(pem)?;
+            let bio = BioMemSlice::new(pem)?;
 
             let mut crls = vec![];
             loop {

@@ -37,6 +37,7 @@ mod brcb;
 mod crypto;
 mod error;
 mod openssl_extensions;
+mod pem_utils;
 mod req;
 mod utils;
 mod uvattest;
@@ -69,6 +70,11 @@ pub mod attest {
         },
         attest::{AttestationItems, AttestationMeasurement},
     };
+}
+
+/// Definitions and functions to write objects in PEM format
+pub mod pem {
+    pub use crate::pem_utils::Pem;
 }
 
 /// Miscellaneous functions and definitions

@@ -106,6 +106,9 @@ pub enum Error {
     )]
     AddDataMissing(&'static str),
 
+    #[error("An ASCII string was expected, but non-ASCII characters were received.")]
+    NonAscii,
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),

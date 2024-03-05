@@ -6,8 +6,10 @@
 
 /// Extensions to the rust-openssl crate
 mod akid;
+mod bio;
 mod crl;
 mod stackable_crl;
 
 pub use akid::*;
+pub use bio::*;
 pub use crl::*;
