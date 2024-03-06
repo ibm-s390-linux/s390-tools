@@ -25,6 +25,7 @@
 #include <sys/types.h>
 
 #include "lib/util_base.h"
+#include "lib/util_file.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
 #include "lib/util_path.h"
@@ -4202,6 +4203,7 @@ struct crypt_info {
 	size_t tries;
 	bool open;
 	bool format;
+	int fips;
 	char **volume_filter;
 	int (*process_func)(struct keystore *keystore,
 			    const char *volume,
@@ -4319,16 +4321,22 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			 * Using the default Argon2i options might cause out-of-memory
 			 * errors when multiple LUKS2 volumes are opened automatically
 			 * via /etc/crypttab
+			 * In case the system runs in FIPS mode, use PBKDF2
+			 * instead, because Argon2i might be disabled by a
+			 * policy when FIPS mode is active.
 			 */
 			util_asprintf(&cmd,
 				      "cryptsetup luksFormat %s%s--type luks2 "
 				      "--master-key-file '%s' --key-size %lu "
-				      "--cipher %s --pbkdf argon2i --pbkdf-memory 32 "
-				      "--pbkdf-force-iterations 4 %s%s%s",
+				      "--cipher %s --pbkdf %s %s%s%s",
 				      info->batch_mode ? "-q " : "",
 				      keystore->verbose ? "-v " : "",
 				      key_file_name, key_file_size * 8,
-				      cipher_spec, common_len > 0 ?
+				      cipher_spec,
+				      info->fips ? "pbkdf2" :
+						"argon2i --pbkdf-memory 32 "
+						"--pbkdf-force-iterations 4",
+				      common_len > 0 ?
 						common_passphrase_options : "",
 				      sector_size > 0 ? temp : "", volume);
 
@@ -4604,6 +4612,8 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 		warnx("Invalid volume-type specified");
 		return -EINVAL;
 	}
+
+	util_file_read_i(&info.fips, 10, "/proc/sys/crypto/fips_enabled");
 
 	info.execute = execute;
 	info.open = open;

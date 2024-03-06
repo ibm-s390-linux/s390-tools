@@ -734,10 +734,12 @@ type, this is the default. If specified for the plain volume type, then no
 command is generated.
 .P
 For LUKS2 volumes, the generated \fBcryptsetup luksFormat\fP contains
-options \fB-\-pbkdf argon2i \-\-pbkdf\-memory 32 \-\-pbkdf\-force\-iterations 4
-\fP for low memory and time requirements. Using the default \fBArgon2i\fP
+options \fB-\-pbkdf argon2i \-\-pbkdf\-memory 32 \-\-pbkdf\-force\-iterations
+4\fP for low memory and time requirements. Using the default \fBArgon2i\fP
 options might cause out-of-memory errors when multiple encrypted volumes are
-unlocked automatically at boot through /etc/crypttab. Because PAES uses secure
+unlocked automatically at boot through \fB/etc/crypttab\fP. In case the system
+runs in FIPS mode, \fB-\-pbkdf pbkdf2\fP is used instead, because \fBArgon2i\fP
+might be disabled by a policy when FIPS mode is active. Because PAES uses secure
 AES keys as volume keys, the security of the key derivation function used to encrypt
 the volume key in the LUKS key slots is of less relevance.
 .P
