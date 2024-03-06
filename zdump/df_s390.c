@@ -153,14 +153,17 @@ void df_s390_dumper_read(struct zg_fh *fh, int blk_size,
 		dumper->version = 0;
 	switch (dumper->version) {
 	case 1:
-		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT, 7) == 0 ||
-		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7) == 0)
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT,
+			    DF_S390_DUMPER_MAGIC_SIZE) == 0 ||
+		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV_EXT,
+			    DF_S390_DUMPER_MAGIC_SIZE) == 0)
 			dumper->size = STAGE2_DUMPER_SIZE_V3;
 		else
 			dumper->size = STAGE2_DUMPER_SIZE_V1;
 		break;
 	case 2:
-		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT, 7) == 0)
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT,
+			    DF_S390_DUMPER_MAGIC_SIZE) == 0)
 			dumper->size = STAGE2_DUMPER_SIZE_ZLIB;
 		else
 			dumper->size = STAGE2_DUMPER_SIZE_V2;

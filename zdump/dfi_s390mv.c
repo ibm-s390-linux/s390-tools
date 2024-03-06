@@ -73,8 +73,8 @@ static struct {
 	struct df_s390_dumper	dumper;
 	int			dump_incomplete;
 	bool extended;
-	u64 magic_number;	/* Reference value to compare with */
-	char dumper_magic[7];	/* Reference value to compare with */
+	u64 magic_number;				/* Reference value to compare with */
+	char dumper_magic[DF_S390_DUMPER_MAGIC_SIZE];	/* Reference value to compare with */
 } l;
 
 /*
@@ -273,7 +273,7 @@ static void vol_init(struct vol *vol, struct vol_parm *vol_parm, int ssid,
 		l.dump_incomplete = 1;
 	}
 
-	if (strncmp(vol->dumper.magic, l.dumper_magic, 7) != 0) {
+	if (strncmp(vol->dumper.magic, l.dumper_magic, DF_S390_DUMPER_MAGIC_SIZE) != 0) {
 		vol->sign = SIGN_INVALID;
 		l.dump_incomplete = 1;
 	}
@@ -507,7 +507,7 @@ static int mv_dumper_read(void)
 		     ZG_CHECK_NONE) == -1)
 		return -ENODEV;
 	df_s390_dumper_read(g.fh, l.blk_size, &l.dumper);
-	if (strncmp(l.dumper.magic, l.dumper_magic, 7) != 0)
+	if (strncmp(l.dumper.magic, l.dumper_magic, DF_S390_DUMPER_MAGIC_SIZE) != 0)
 		return -ENODEV;
 	table_read(g.fh, l.blk_size, &l.table);
 	return 0;
@@ -567,10 +567,12 @@ static void set_magic_numbers(void)
 {
 	if (l.extended) {
 		l.magic_number = DF_S390_MAGIC_EXT;
-		memcpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, 7);
+		memcpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT,
+		       DF_S390_DUMPER_MAGIC_SIZE);
 	} else {
 		l.magic_number = DF_S390_MAGIC;
-		memcpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV, 7);
+		memcpy(l.dumper_magic, DF_S390_DUMPER_MAGIC_MV,
+		       DF_S390_DUMPER_MAGIC_SIZE);
 	}
 }
 
