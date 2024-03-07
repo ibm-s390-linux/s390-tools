@@ -17,7 +17,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-/// CLI Argument collection for handling certificates.
+/// CLI Argument collection for handling host-keys, IBM signing keys, and certificates.
 #[derive(Args, Debug, PartialEq, Eq, Default)]
 #[command(
     group(ArgGroup::new("pv_verify").required(true).args(["no_verify", "certs"])),

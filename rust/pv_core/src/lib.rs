@@ -1,17 +1,9 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
 #![deny(missing_docs)]
 #![allow(unused)]
-//! pv_core - basic library for pv-tools
-//!
-//! This library is intened to be used by tools and libraries that
-//! are used for creating and managing IBM Secure Execution guests.
-//! `pv_core` provides abstraction layers for secure memory management,
-//! and accessing the uvdevice.
-//!
-//! It does not provide any cryptographic operations through OpenSSL.
-//! For this use `pv` which reexports all symbos from this crate.
+#![doc = include_str!("../README.md")]
 mod error;
 mod macros;
 mod utils;
@@ -30,6 +22,9 @@ pub mod misc {
 }
 
 /// Definitions and functions for interacting with the Ultravisor
+///
+/// For detailed Information on how to send Ultravisor Commands see [`crate::uv::UvDevice`] and
+/// [`crate::uv::UvCmd`]
 pub mod uv {
     pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd};
     pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretId, SecretList};

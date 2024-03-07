@@ -60,7 +60,7 @@ pub fn load_gen_cert(asset_path: &'static str) -> X509 {
     cert.pop().unwrap()
 }
 
-/// TEST ONLY! Load the crl found in the asset path
+/// TEST ONLY! Load the CRL found in the asset path
 ///
 /// panic on errors
 pub fn load_gen_crl(asset_path: &'static str) -> X509Crl {
@@ -73,7 +73,7 @@ pub fn load_gen_crl(asset_path: &'static str) -> X509Crl {
 
 /// TEST ONLY! Get a fixed private/public pair and a fixed public key
 ///
-/// Intened for TESTING only. All parts of the key including the private key are checked in git and
+/// Intended for TESTING only. All parts of the key including the private key are checked in git and
 /// visible for the public
 pub fn get_test_keys() -> (PKey<Private>, PKey<Public>) {
     let pub_key = get_test_asset!("keys/public_cust.bin");

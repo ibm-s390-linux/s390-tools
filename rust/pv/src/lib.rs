@@ -3,15 +3,23 @@
 // Copyright IBM Corp. 2023, 2024
 
 #![deny(missing_docs)]
-//! pv - library for pv-tools
+#![doc = include_str!("../README.md")]
+//! # Manage guest secret store
 //!
-//! This library is intened to be used by tools and libraries that
-//! are used for creating and managing IBM Secure Execution guests.
-//! `pv` provides abstraction layers for encryption, secure memory management,
-//!  and accessing the uvdevice.
+//! This crate provides functionalities for creating add-secret requests. Also provides support for
+//! sending those requests, list all stored secrets, and lock the secret store.
 //!
-//! If you do not need any OpenSSL features use `pv_core`.
-//! This crate reexports all symbols from `pv_core`
+//! ## Create
+//! [`secret::AddSecretRequest`]
+//!
+//! ## Add
+//! [`uv::UvDevice`] and [`uv::AddCmd`]
+//!
+//! ## List
+//! [`uv::UvDevice`] and [`uv::ListCmd`]
+//!
+//! ## Lock
+//! [`uv::UvDevice`] and [`uv::LockCmd`]
 mod brcb;
 mod confidential;
 mod crypto;

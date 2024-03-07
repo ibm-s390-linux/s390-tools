@@ -99,7 +99,8 @@ pub trait UvCmd {
     }
     /// Converts UV return codes into human readable error messages
     ///
-    /// no need to handle `0x0000, 0x0001, 0x0002, 0x0005, 0x0030, 0x0031, 0x0032, 0x0100`
+    /// # Note for implementations
+    /// No need to handle `0x0000, 0x0001, 0x0002, 0x0005, 0x0030, 0x0031, 0x0032, 0x0100`
     fn rc_fmt(&self, rc: u16, rrc: u16) -> Option<&'static str>;
 
     /// Returns data used by this command if available.
@@ -158,7 +159,31 @@ pub enum UvcSuccess {
     RC_MORE_DATA = UvDevice::RC_MORE_DATA,
 }
 
-/// The UvDevice is a (virtual) device on s390 machines to send Ultravisor commands from userspace.
+/// The UvDevice is a (virtual) device on s390 machines to send Ultravisor commands(UVCs) from userspace.
+///
+/// On s390 machines with Ultravisor enabled (Secure Execution guest & hosts) the device at
+/// `/dev/uv` will accept ioctls.
+///
+/// # Example
+///
+/// Use a implementation of [`UvCmd`] to send a specific Ultravisor cammand to the uvevice to
+/// forward to Firmware.
+///
+/// ```rust,no_run
+/// # use pv_core::uv::UvDevice;
+/// # use pv_core::uv::AddCmd;
+/// # use std::fs::File;
+/// # fn main() -> pv_core::Result<()> {
+/// let mut file = File::open("request")?;
+/// let uv = UvDevice::open()?;
+/// let mut cmd = AddCmd::new(&mut file)?;
+/// uv.send_cmd(&mut cmd)?;
+/// # Ok(())
+/// # }
+/// // do something with the result
+///
+///
+/// ```
 pub struct UvDevice(File);
 
 impl UvDevice {

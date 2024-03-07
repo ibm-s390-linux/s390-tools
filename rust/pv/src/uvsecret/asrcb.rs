@@ -217,7 +217,7 @@ impl AddSecretRequest {
         Ok(())
     }
 
-    /// compiles the authenticated area of this request
+    /// Compiles the authenticated area of this request
     fn aad(&self, ctx: &ReqEncrCtx, conf_len: usize) -> Result<Vec<u8>> {
         let cust_pub_key = ctx.key_coords()?;
         let secr_auth = self.conf.secret.auth();
@@ -255,7 +255,7 @@ impl AddSecretRequest {
         Ok(res)
     }
 
-    /// encrypt data, sign request with user-provided signing key, insert signature into aad,
+    /// Encrypts data, sign request with user-provided signing key, insert signature into aad,
     /// calculate request tag
     fn encrypt_with_signed_user_data(&self, ctx: &ReqEncrCtx) -> Result<Vec<u8>> {
         //encrypt data w/o aead
