@@ -47,6 +47,9 @@ struct keystore {
 #define PROP_NAME_KMS_XTS_KEY2_ID	"kms-xts-key2-id"
 #define PROP_NAME_KMS_XTS_KEY2_LABEL	"kms-xts-key2-label"
 
+#define KEY_TYPE_FILTER_AES		"AES"
+#define KEY_TYPE_FILTER_HMAC		"HMAC"
+
 struct keystore *keystore_new(const char *directory,
 			      struct kms_info *kms_info, bool verbose);
 

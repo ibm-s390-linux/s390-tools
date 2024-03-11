@@ -950,6 +950,12 @@ static int _keystore_match_key_type_property(struct properties *properties,
 	type = _keystore_get_key_type(properties);
 	if (strcasecmp(type, key_type) == 0)
 		rc = 1;
+	else if (strcasecmp(key_type, KEY_TYPE_FILTER_AES) == 0 &&
+		 is_aes_key_type(type))
+		rc = 1;
+	else if (strcasecmp(key_type, KEY_TYPE_FILTER_HMAC) == 0 &&
+		 is_hmac_key_type(type))
+		rc = 1;
 
 	free(type);
 	return rc;
@@ -1020,6 +1026,9 @@ typedef int (*process_key_t)(struct keystore *keystore,
  *                           NULL means no APQN filter.
  * @param[in] volume_type    If not NULL, specifies the volume type.
  * @param[in] key_type       The key type. NULL means no key type filter.
+ *                           In addition to the KEY_TYPE_nnn types, the special
+ *                           filter types KEY_TYPE_FILTER_nnn can be specified.
+ *                           This matches to the respective group of key types.
  * @param[in] local          if true, only local keys are processed
  * @param[in] kms_bound      if true, only KMS-bound keys are processed
  * @param[in] process_func   the callback function called for a matching key
@@ -4968,7 +4977,8 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 	info.process_func = _keystore_process_cryptsetup;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					volume_type, NULL, false, false,
+					volume_type, KEY_TYPE_FILTER_AES,
+					false, false,
 					_keystore_process_crypt, &info);
 
 	str_list_free_string_array(info.volume_filter);
@@ -5029,7 +5039,8 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 	info.process_func = _keystore_process_crypttab;
 
 	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
-					volume_type, NULL, false, false,
+					volume_type, KEY_TYPE_FILTER_AES,
+					false, false,
 					_keystore_process_crypt, &info);
 
 	str_list_free_string_array(info.volume_filter);

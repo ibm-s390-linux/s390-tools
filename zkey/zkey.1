@@ -709,8 +709,8 @@ then created as a local key.
 Use the
 .B crypttab
 command to generate crypttab entries using the \fBplain\fP or \fBLUKS2\fP
-\fBdm\-crypt\fP mode for volumes that are associated with secure keys contained
-in the secure key repository. Specify the
+\fBdm\-crypt\fP mode for volumes that are associated with secure AES keys
+contained in the secure key repository. Specify the
 .B \-\-volumes
 option to limit the list
 of volumes where crypttab entries are generated for. You can use wildcards.
@@ -763,7 +763,7 @@ Use the
 .B cryptsetup
 command to generate \fBcryptsetup plainOpen\fP, \fBcryptsetup luksOpen\fP, or
 \fBcryptsetup luksFormat\fP commands for volumes that are associated with
-secure keys contained in the secure key repository. Specify the
+secure AES keys contained in the secure key repository. Specify the
 .B \-\-volumes
 option to limit the list
 of volumes where cryptsetup commands are generated for. You can use wildcards.
