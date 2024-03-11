@@ -32,11 +32,6 @@
 #define NGDUMP_META_VERSION	1
 #define NGDUMP_META_FILENAME	"ngdump.meta"
 
-enum ngdump_disk_type {
-	NG_TYPE_DASD,
-	NG_TYPE_NVME,
-};
-
 static const char *const ngtype2str[] = {
 	[NG_TYPE_DASD] = "DASD",
 	[NG_TYPE_NVME] = "NVME"
@@ -474,8 +469,8 @@ static int ngdump_get_eckd_part_num(struct zg_fh *zg_fh)
  * This function composes the absolute partition device node name
  * based on the device name, device type and the partition number.
  */
-static int ngdump_get_part_path(const char *disk_path, int part_num,
-				enum ngdump_disk_type ng_type, char **part_path)
+int ngdump_get_part_path(const char *disk_path, int part_num,
+			 enum ngdump_disk_type ng_type, char **part_path)
 {
 	char *real_path;
 

@@ -20,7 +20,14 @@ struct ngdump_meta {
 	const char *sha256sum;
 };
 
+enum ngdump_disk_type {
+	NG_TYPE_DASD,
+	NG_TYPE_NVME,
+};
+
 int ngdump_read_meta_from_device(const char *device, struct ngdump_meta *meta);
 int ngdump_get_dump_part(struct zg_fh *zg_fh, char **part_path);
+int ngdump_get_part_path(const char *disk_path, int part_num,
+			 enum ngdump_disk_type ng_type, char **part_path);
 
 #endif /* ZGETDUMP_NGDUMP_H */
