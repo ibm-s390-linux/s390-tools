@@ -735,6 +735,13 @@ options
 and
 .B \-\-keyfile\-size
 to control which part of the key file is used as passphrase.
+.PP
+.B Note:
+Use the
+.B integritytab
+command to generate integritytab entries for volumes using the \fBintegrity\fP
+volume type that are associated with secure HMAC keys contained in the
+secure key repository.
 .
 .SS "Generate cryptsetup commands for volumes associated with secure AES keys"
 .
@@ -811,6 +818,88 @@ To avoid cryptsetup confirmation questions, you can specify the
 .B \-\-batch\-mode
 option. These options are passed to the generated command(s) and behave in the
 same way as with \fBcryptsetup\fP.
+.PP
+.B Note:
+Use the
+.B integritysetup
+command to generate \fBintegritysetup format\fP and \fBintegritysetup open\fP
+commands for volumes using the \fBintegrity\fP volume type that are associated
+with secure HMAC keys contained in the
+secure key repository.
+.
+.SS "Generate integritytab entries for volumes associated with secure HMAC keys"
+.
+.B zkey
+.BR integritytab | integrityt
+.RB [ \-\-volumes | \-l
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B integritytab
+command to generate integritytab entries using \fBdm\-integrity\fP for volumes
+that are associated with secure HMAC keys contained in the secure key
+repository. Only HMAC keys with a volume type of \fBintegrity\fP are considered.
+Specify the
+.B \-\-volumes
+option to limit the list
+of volumes where integritytab entries are generated for. You can use wildcards.
+When wildcards are used you must quote the value.
+The device-mapper name of an associated volume can be omitted; if it is
+specified then only those volumes with the specified volume and device-mapper
+name are selected.
+.PP
+.B Note:
+Use the
+.B crypttab
+command to generate crypttab entries for volumes using the \fBplain\fP or
+\fBluks2\fP volume type that are associated with secure AES keys contained in
+the secure key repository.
+.
+.SS "Generate integritysetup commands for volumes associated with secure HMAC keys"
+.
+.B zkey
+.BR integritysetup | integritys
+.RB [ \-\-volumes | \-l
+.IR volume1[:dmname1][,volume2[:dmname2][,...]] ]
+.RB [ \-\-run | \-r ]
+.RB [ \-\-open ]
+.RB [ \-\-batch\-mode | \-q ]
+.RB [ \-\-verbose | \-V ]
+.
+.PP
+Use the
+.B integritysetup
+command to generate \fBintegritysetup format\fP, or \fBintegritysetup open\fP
+commands for volumes that are associated with secure HMAC keys contained in the
+secure key repository. Only HMAC keys with a volume type of \fBintegrity\fP are
+considered. Specify the
+.B \-\-volumes
+option to limit the list
+of volumes where integritysetup commands are generated for. You can use
+wildcards. When wildcards are used you must quote the value.
+The device-mapper name of an associated volume can be omitted; if it is
+specified then only those volumes with the specified volume and device-mapper
+name are selected.
+Specify the
+.B \-\-run
+option to run the generated integritysetup commands. Specify the
+.B \-\-open
+to generate \fBintegritysetup open\fP commands. By default \fBintegritysetup
+format\fP commands are generated.
+To avoid integritysetup confirmation questions, you can specify the
+.B \-\-batch\-mode
+option. These option is passed to the generated command(s) and behave in the
+same way as with \fBintegritysetup\fP.
+.PP
+.B Note:
+Use the
+.B cryptsetup
+command to generate\fBcryptsetup plainOpen\fP, \fBcryptsetup luksOpen\fP, or
+\fBcryptsetup luksFormat\fP commands for volumes using the \fBplain\fP or
+\fBluks2\fP volume types that are associated with secure AES keys contained in
+the secure key repository.
 .
 .SS "Convert existing AES or HMAC secure keys from one key type to another type"
 .
@@ -1962,6 +2051,52 @@ This option is passed to the generated command(s) for LUKS2 volumes.
 .BR \-q ", " \-\-batch\-mode
 Suppress cryptsetup confirmation questions. This option is passed to the
 generated cryptsetup command(s).
+.
+.
+.
+.SS "Options for the integritytab command"
+.TP
+.BR \-l ", " \-\-volumes\~\fIvolume1[:dmname1][,volume2[:dmname2][,...]]\fP
+Specifies a comma-separated list of volumes (block devices) which are
+associated with secure HMAC keys in the repository. Only HMAC keys with a
+volume type of \fBintegrity\fP are considered.
+The volume association also contains the device-mapper name, separated by a
+colon, used with \fBdm\-integrity\fP. You can omit the device-mapper name; if
+it is specified then only those keys are selected that are associated with the
+specified volume and device-mapper name. You can use wildcards to specify
+the volumes and device-mapper names.
+When wildcards are used you must quote the value.
+This option is only used for secure keys contained in the secure key repository.
+.
+.
+.
+.SS "Options for the integritysetup command"
+.TP
+.BR \-l ", " \-\-volumes\~\fIvolume1[:dmname1][,volume2[:dmname2][,...]]\fP
+Specifies a comma-separated list of volumes (block devices) which are
+associated with secure HMAC keys in the repository. Only HMAC keys with a
+volume type of \fBintegrity\fP are considered.
+The volume association also contains the device-mapper name, separated by a
+colon, used with \fBdm\-integrity\fP. You can omit the device-mapper name; if
+it is specified then only those keys are selected that are associated with the
+specified volume and device-mapper name. You can use wildcards to specify
+the volumes and device-mapper names.
+When wildcards are used you must quote the value.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-r ", " \-\-run
+Runs the generated integritysetup commands. When one of the integritysetup
+commands fail, no further integritysetup commands are run, and zkey ends with
+an error.
+This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-open
+Generates \fBintegritysetup open\fP commands. By default \fBintegritysetup
+format\fP commands are generated.
+.TP
+.BR \-q ", " \-\-batch\-mode
+Suppress integritysetup confirmation questions. This option is passed to the
+generated integritysetup command(s).
 .
 .
 .

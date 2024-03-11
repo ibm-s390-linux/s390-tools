@@ -4543,8 +4543,8 @@ static int _keystore_execute_cmd(const char *cmd,
 	return rc;
 }
 
-
 struct crypt_info {
+	bool integrity;
 	bool execute;
 	bool batch_mode;
 	const char *keyfile;
@@ -4786,6 +4786,104 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 }
 
 /**
+ * Processing function for the integritysetup function. Builds a integritysetup
+ * command line and optionally executes it.
+ *
+ * @param[in] keystore   the keystore (not used here)
+ * @param[in] volume     the volume to mount
+ * @param[in] dmname     the device mapper name
+ * @param[in] cipher_spec the cipher specification
+ * @param[in] key_file_name the key file name
+ * @param[in] key_file_size the size of the key file in bytes
+ * @param[in] sector_size    the sector size in bytes or 0 if not specified
+ * @param[in] volume_type the volume type
+ * @param[in] passphrase_file the passphrase file name (can be NULL)
+ * @param[in] info       processing info
+ *
+ * @returns 0 if successful, a negative errno value otherwise
+ */
+static int _keystore_process_integritysetup(struct keystore *keystore,
+					    const char *volume,
+					    const char *dmname,
+					    const char *cipher_spec,
+					    const char *key_file_name,
+					    size_t key_file_size,
+					    size_t sector_size,
+					    const char *volume_type,
+					    const char *UNUSED(passphrase_file),
+					    struct crypt_info *info)
+{
+	char temp[100];
+	int rc = 0;
+	char *cmd;
+
+	if (strcasecmp(volume_type, VOLUME_TYPE_INTEGRITY) != 0)
+		return 0;
+
+	sprintf(temp, "--sector-size %lu ", sector_size);
+
+	util_asprintf(&cmd,
+		      "integritysetup %s %s%s--integrity %s "
+		      "--integrity-key-file '%s' --integrity-key-size %lu "
+		      "%s%s%s%s",
+		      info->open ? "open" : "format",
+		      info->batch_mode ? "-q " : "",
+		      keystore->verbose ? "-v " : "",
+		      cipher_spec, key_file_name, key_file_size,
+		      sector_size > 0 && !info->open ? temp : "",
+		      volume, info->open ? " " : "",
+		      info->open ? dmname : "");
+
+	if (info->execute) {
+		printf("Executing: %s\n", cmd);
+		rc = _keystore_execute_cmd(cmd, "integritysetup");
+	} else {
+		printf("%s\n", cmd);
+	}
+
+	free(cmd);
+	return rc;
+}
+
+/**
+ * Processing function for the integritytab function. Builds a integritytab
+ * entry and prints it.
+ *
+ * @param[in] keystore   the keystore (not used here)
+ * @param[in] volume     the volume to mount
+ * @param[in] dmname     the device mapper name
+ * @param[in] cipher_spec the cipher specification
+ * @param[in] key_file_name the key file name
+ * @param[in] key_file_size the size of the key file in bytes
+ * @param[in] sector_size the sector size in bytes or 0 if not specified
+ * @param[in] volume_type the volume type
+ * @param[in] passphrase_file the passphrase file name (can be NULL)
+ * @param[in] info       processing info (not used here)
+ *
+ * @returns 0 if successful, a negative errno value otherwise
+ */
+
+static int _keystore_process_integritytab(struct keystore *UNUSED(keystore),
+					  const char *volume,
+					  const char *dmname,
+					  const char *cipher_spec,
+					  const char *key_file_name,
+					  size_t UNUSED(key_file_size),
+					  size_t UNUSED(sector_size),
+					  const char *volume_type,
+					  const char *UNUSED(passphrase_file),
+					  struct crypt_info *UNUSED(info))
+{
+	if (strcasecmp(volume_type, VOLUME_TYPE_INTEGRITY) != 0)
+		return 0;
+
+	printf("%s\t%s\t%s\tintegrity-algorithm=%s\n", volume, dmname,
+	       key_file_name, cipher_spec);
+
+	return 0;
+}
+
+/**
  * Builds a cipher specification for cryptsetup/crypttab
  *
  * @param properties    the key properties
@@ -4821,6 +4919,39 @@ out:
 }
 
 /**
+ * Builds a hmac specification for integritysetup/integritytab
+ *
+ * @param properties    the key properties
+ *
+ * @returns the hmac spec string (must be freed by the caller)
+ */
+static char *_keystore_build_hmac_spec(struct properties *properties,
+				       size_t bitsize)
+{
+	char *cipher_spec = NULL;
+	char *cipher = NULL;
+	char *digest = NULL;
+
+	cipher = properties_get(properties, PROP_NAME_CIPHER);
+	if (cipher == NULL)
+		goto out;
+
+	digest = properties_get(properties, PROP_NAME_DIGEST);
+	if (digest == NULL)
+		goto out;
+
+	util_asprintf(&cipher_spec, "%s-%s%u", cipher, digest, bitsize / 2);
+
+out:
+	if (cipher != NULL)
+		free(cipher);
+	if (digest != NULL)
+		free(digest);
+
+	return cipher_spec;
+}
+
+/**
  * Processing function for the cryptsetup and crypttab functions.
  * Extracts the required information and calls the secondary processing function
  * contained in struct crypt_info.
@@ -4847,6 +4978,7 @@ static int _keystore_process_crypt(struct keystore *keystore,
 	size_t sector_size = 0;
 	char *volumes = NULL;
 	u8 *secure_key = NULL;
+	size_t bitsize = 0;
 	char *dmname;
 	char *temp;
 	int rc = 0;
@@ -4859,9 +4991,16 @@ static int _keystore_process_crypt(struct keystore *keystore,
 	if (secure_key == NULL)
 		return -EIO;
 
-	cipher_spec = _keystore_build_cipher_spec(properties,
-						  is_xts_key(secure_key,
-							     secure_key_size));
+	if (info->integrity) {
+		rc = get_key_bit_size(secure_key, secure_key_size, &bitsize);
+		if (rc != 0)
+			goto out;
+		cipher_spec = _keystore_build_hmac_spec(properties, bitsize);
+	} else {
+		cipher_spec = _keystore_build_cipher_spec(properties,
+							  is_xts_key(secure_key,
+							      secure_key_size));
+	}
 	if (cipher_spec == NULL) {
 		rc = -EINVAL;
 		goto out;
@@ -4965,6 +5104,7 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 
 	util_file_read_i(&info.fips, 10, "/proc/sys/crypto/fips_enabled");
 
+	info.integrity = false;
 	info.execute = execute;
 	info.open = open;
 	info.format = format;
@@ -5031,6 +5171,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 		return -EINVAL;
 	}
 
+	info.integrity = false;
 	info.keyfile = keyfile;
 	info.keyfile_offset = keyfile_offset;
 	info.keyfile_size = keyfile_size;
@@ -5050,6 +5191,105 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 			   strerror(-rc));
 	else
 		pr_verbose(keystore, "Successfully generated crypttab entries");
+
+	return rc;
+}
+
+/**
+ * Generates integritysetup commands for one or multiple volumes.
+ *
+ * @param[in] keystore       the key store
+ * @param[in] volume_filter  the volume filter. Can contain wild cards, and
+ *                           multiple volume filters separated by commas.
+ *                           The ':dm-name' part of the volume is optional
+ *                           for the volume filter. If not specified, the filter
+ *                           checks the volume part only.
+ * @param[in] execute        If TRUE the integritysetup command is executed,
+ *                           otherwise it is printed to stdout
+ * @param[in] batch_mode     If TRUE, suppress integritysetup confirmation
+ *                           questions
+ * @param[in] open           If TRUE, generate integritysetup open commands
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_integritysetup(struct keystore *keystore,
+			    const char *volume_filter,
+			    bool execute, bool batch_mode, bool open)
+{
+	struct crypt_info info = { 0 };
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+
+	if (volume_filter == NULL)
+		volume_filter = "*";
+
+	info.integrity = true;
+	info.execute = execute;
+	info.open = open;
+	info.batch_mode = batch_mode;
+	info.volume_filter = str_list_split(volume_filter);
+	info.process_func = _keystore_process_integritysetup;
+
+	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
+					VOLUME_TYPE_INTEGRITY,
+					KEY_TYPE_FILTER_HMAC,
+					false, false,
+					_keystore_process_crypt, &info);
+
+	str_list_free_string_array(info.volume_filter);
+
+	if (rc < 0)
+		pr_verbose(keystore, "Integritysetup failed with: %s",
+			   strerror(-rc));
+	else if (rc > 0)
+		pr_verbose(keystore, "Integritysetup failed with: %d", rc);
+	else
+		pr_verbose(keystore,
+			   "Successfully generated integritysetup commands");
+
+	return rc;
+}
+
+/**
+ * Generates integritytab entries for one or multiple volumes.
+ *
+ * @param[in] keystore       the key store
+ * @param[in] volume_filter  the volume filter. Can contain wild cards, and
+ *                           multiple volume filters separated by commas.
+ *                           The ':dm-name' part of the volume is optional
+ *                           for the volume filter. If not specified, the filter
+ *                           checks the volume part only.
+ *
+ * @returns 0 for success or a negative errno in case of an error
+ */
+int keystore_integritytab(struct keystore *keystore, const char *volume_filter)
+{
+	struct crypt_info info = { 0 };
+	int rc;
+
+	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+
+	if (volume_filter == NULL)
+		volume_filter = "*";
+
+	info.integrity = true;
+	info.volume_filter = str_list_split(volume_filter);
+	info.process_func = _keystore_process_integritytab;
+
+	rc = _keystore_process_filtered(keystore, NULL, volume_filter, NULL,
+					VOLUME_TYPE_INTEGRITY,
+					KEY_TYPE_FILTER_HMAC,
+					false, false,
+					_keystore_process_crypt, &info);
+
+	str_list_free_string_array(info.volume_filter);
+
+	if (rc != 0)
+		pr_verbose(keystore, "Integritysetup failed with: %s",
+			   strerror(-rc));
+	else
+		pr_verbose(keystore,
+			   "Successfully generated integritysetup entries");
 
 	return rc;
 }

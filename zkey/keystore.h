@@ -130,6 +130,12 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 		      const char *volume_type, const char *keyfile,
 		      size_t keyfile_offset, size_t keyfile_size, size_t tries);
 
+int keystore_integritysetup(struct keystore *keystore,
+			    const char *volume_filter,
+			    bool execute, bool batch_mode, bool open);
+
+int keystore_integritytab(struct keystore *keystore, const char *volume_filter);
+
 int keystore_convert_key(struct keystore *keystore, const char *name,
 			 const char *key_type, bool noapqncheck, bool quiet,
 			 bool exportable, int pkey_fd, struct ext_lib *lib);

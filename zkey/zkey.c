@@ -134,6 +134,8 @@ static struct zkey_globals {
 #define COMMAND_COPY		"copy  "
 #define COMMAND_CRYPTTAB	"crypttab"
 #define COMMAND_CRYPTSETUP	"cryptsetup"
+#define COMMAND_INTEGRITYTAB	"integritytab"
+#define COMMAND_INTEGRITYSETUP	"integritysetup"
 #define COMMAND_CONVERT		"convert"
 #define COMMAND_KMS		"kms"
 #define COMMAND_KMS_PLUGINS	"plugins"
@@ -158,7 +160,7 @@ static struct zkey_globals {
 	.command = OPT_COMMAND_PLACEHOLDER,		\
 }
 
-#define ZKEY_COMMAND_MAX_LEN	10
+#define ZKEY_COMMAND_MAX_LEN	15
 
 #define ENVVAR_ZKEY_REPOSITORY	"ZKEY_REPOSITORY"
 #define DEFAULT_KEYSTORE	"/etc/zkey/repository"
@@ -973,6 +975,62 @@ static struct util_opt opt_vec[] = {
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "OPTIONS",
+		.command = COMMAND_INTEGRITYTAB,
+	},
+	{
+		.option = { "volumes", required_argument, NULL, 'l'},
+		.argument = "VOLUME[:DMNAME][,...]",
+		.desc = "Comma-separated pairs of volume and device-mapper "
+			"names that are associated with the secure HMAC key in "
+			"the repository. Use this option to select the volumes "
+			"for which a integritytab entry is to be generated. "
+			"The device-mapper name (DMNAME) is optional. If "
+			"specified, only those volumes are selected where "
+			"both, the volume and the device-mapper name matches",
+		.command = COMMAND_INTEGRITYTAB,
+	},
+	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_INTEGRITYSETUP,
+	},
+	{
+		.option = { "volumes", required_argument, NULL, 'l'},
+		.argument = "VOLUME[:DMNAME][,...]",
+		.desc = "Comma-separated pairs of volume and device-mapper "
+			"names that are associated with the secure HMAC key in "
+			"the repository. Use this option to select the volumes "
+			"for which a integritysetup command is to be generated "
+			"or run. The device-mapper name (DMNAME) is optional. "
+			"If specified, only those volumes are selected where "
+			"both, the volume and the device-mapper name matches",
+		.command = COMMAND_INTEGRITYSETUP,
+	},
+	{
+		.option = {"run", 0, NULL, 'r'},
+		.desc = "Runs the generated integritysetup command",
+		.command = COMMAND_INTEGRITYSETUP,
+	},
+	{
+		.option = {"batch-mode", 0, NULL, 'q'},
+		.desc = "Suppresses integritysetup confirmation questions. "
+			"This option is passed to the generated integritysetup "
+			"command(s)",
+		.command = COMMAND_INTEGRITYSETUP,
+	},
+	{
+		.option = {"open", 0, NULL, OPT_CRYPTSETUP_OPEN},
+		.desc = "Generates 'integritysetup open' commands. If this "
+			"option is not specified, 'integritysetup format' "
+			"commands are generated",
+		.command = COMMAND_INTEGRITYSETUP,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
 		.command = COMMAND_CONVERT,
 	},
 	{
@@ -1465,6 +1523,8 @@ static int command_rename(void);
 static int command_copy(void);
 static int command_crypttab(void);
 static int command_cryptsetup(void);
+static int command_integritytab(void);
+static int command_integritysetup(void);
 static int command_convert(void);
 static int command_kms_plugins(void);
 static int command_kms_bind(void);
@@ -1758,6 +1818,26 @@ static struct zkey_command zkey_commands[] = {
 		.function = command_cryptsetup,
 		.short_desc = "Generate or run cryptsetup commands",
 		.long_desc = "Generate or run cryptsetup commands for "
+			     "selected volumes",
+		.has_options = 1,
+		.need_keystore = 1,
+	},
+	{
+		.command = COMMAND_INTEGRITYTAB,
+		.abbrev_len = 10,
+		.function = command_integritytab,
+		.short_desc = "Generate integritytab entries",
+		.long_desc = "Generate integritytab entries for selected "
+			     "volumes",
+		.has_options = 1,
+		.need_keystore = 1,
+	},
+	{
+		.command = COMMAND_INTEGRITYSETUP,
+		.abbrev_len = 10,
+		.function = command_integritysetup,
+		.short_desc = "Generate or run integritysetup commands",
+		.long_desc = "Generate or run integritysetup commands for "
 			     "selected volumes",
 		.has_options = 1,
 		.need_keystore = 1,
@@ -2748,6 +2828,35 @@ static int command_cryptsetup(void)
 	rc = keystore_cryptsetup(g.keystore, g.volumes, g.run, g.volume_type,
 				 g.keyfile, g.keyfile_offset, g.keyfile_size,
 				 g.tries, g.batch_mode, g.open, g.format);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'integritytab'.
+ *
+ * Generates integritytab entries for selected volumes
+ */
+static int command_integritytab(void)
+{
+	int rc;
+
+	rc = keystore_integritytab(g.keystore, g.volumes);
+
+	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+/*
+ * Command handler for 'integritysetup'.
+ *
+ * Generates and runs integritysetup commands for selected volumes
+ */
+static int command_integritysetup(void)
+{
+	int rc;
+
+	rc = keystore_integritysetup(g.keystore, g.volumes, g.run,
+				     g.batch_mode, g.open);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
