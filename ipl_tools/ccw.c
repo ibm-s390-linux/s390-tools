@@ -9,13 +9,35 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#include "lib/util_path.h"
 #include "ipl_tools.h"
+
+/*
+ * Look up for the device in /sys/devices/ hierarchy.
+ *
+ * path must be PATH_MAX large and the value will be replaced in place
+ */
+static int device_sysfs_path(const char *device, char *path, const size_t path_size)
+{
+	assert(device);
+	assert(path);
+	assert(path_size == PATH_MAX);
+	char *buf = util_path_sysfs("block/%s/device", device);
+
+	if (!realpath(buf, path)) {
+		free(buf);
+		return -1;
+	}
+	free(buf);
+	return 0;
+}
 
 /*
  * Check if the specified device number is a valid device number
@@ -77,11 +99,9 @@ out_fclose:
  */
 static int ccw_busid_get_sysfs_new(const char *device, char *busid)
 {
-	char path[PATH_MAX], buf[4096];
+	char path[PATH_MAX] = { '\0' };
 
-	memset(buf, 0, sizeof(buf));
-	snprintf(path, sizeof(path), "/sys/block/%s/device", device);
-	if (realpath(path, buf) == NULL)
+	if (device_sysfs_path(device, path, sizeof(path)) != 0)
 		return -1;
 
 	/*
@@ -89,7 +109,7 @@ static int ccw_busid_get_sysfs_new(const char *device, char *busid)
 	 * /sys/devices/css0/0.0.0119/0.0.3f19/block/dasda
 	 * /sys/devices/css0/0.0.0000/0.0.0000/virtio0/block/vda
 	 */
-	if (sscanf(buf, "/sys/devices/css0/%*[0-9a-f.]/%[0-9a-f.]", busid) != 1)
+	if (sscanf(path, "/sys/devices/css0/%*[0-9a-f.]/%[0-9a-f.]", busid) != 1)
 		return -1;
 	return 0;
 }
