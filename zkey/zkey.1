@@ -51,10 +51,14 @@ a textual description of the key, can be associated with a secure key.
 You can associate a secure key with one or multiple cryptographic adapters
 (APQNs) that are set up with the same CCA or EP11 master key.
 You can also associate a secure key with one or multiple volumes
-(block devices), which are encrypted using \fBdm\-crypt\fP with the secure key.
-The volume association also contains the device-mapper name, separated by a
-colon, used with \fBdm\-crypt\fP. A specific volume can only be associated with
-one secure key.
+(block devices), which are encrypted using \fBdm\-crypt\fP or are integrity
+protected using \fBdm\-integrity\fP with the secure key. The volume association
+also contains the device-mapper name, separated by a colon, used with
+\fBdm\-crypt\fP or \fBdm\-integrity\fP. A specific volume can only be associated
+with one secure key. Keys of type AES are used for disk encryption, while keys
+of type HMAC are used for integrity protection. Combined encryption and
+integrity protetion is possible with \fBLUKS2\fP. Here, the same volume can be
+associated to an AES-type key and an HMAC-type key.
 .PP
 The generated secure key is saved in a file, and contains an AES secure key with
 a length of 128, 192, or 256 bits, or two concatenated AES secure keys with a
@@ -1358,6 +1362,9 @@ encrypted using \fBdm\-crypt\fP with the secure AES key. The volume association
 also contains the device-mapper name, separated by a colon, used with
 \fBdm\-crypt\fP.
 A specific volume can only be associated with a single secure key.
+For combined encryption and integrity protection of a volume associate the same
+volume to an AES-type key and an HMAC-type key. Both keys must use the
+\fBluks2\fP volume type.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
@@ -1535,6 +1542,9 @@ integrity protected using \fBdm\-integrity\fP with the secure HMAC key. The
 volume association also contains the device-mapper name, separated by a colon,
 used with \fBdm\-crypt\fP or \fBdm\-integrity\fP.
 A specific volume can only be associated with a single secure key.
+For combined encryption and integrity protection of a volume associate the same
+volume to an AES-type key and an HMAC-type key. Both keys must use the
+\fBluks2\fP volume type.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fIcard1.domain1[,card2.domain2[,...]]\fP
@@ -1699,6 +1709,9 @@ To remove a volume from the associated volumes, prefix the volume with a
 You cannot mix \fI+\fP and \fI\-\fP in one specification. You can either add or
 remove (or set) the associations with one command.
 A specific volume can only be associated with a single secure key.
+For combined encryption and integrity protection of a volume associate the same
+volume to an AES-type key and an HMAC-type key. Both keys must use the
+\fBluks2\fP volume type.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-a ", " \-\-apqns\~\fI[+|\-]card1.domain1[,card2.domain2[,...]]\fP
@@ -2226,7 +2239,9 @@ virtualization secret, or are to be integrity protected using
 \fBdm\-integrity\fP with the protected virtualization secret. The volume
 association also contains the device-mapper name, separated by a colon, used
 with \fBdm\-crypt\fP or \fBdm\-integrity\fP. A specific volume can only be
-associated with a single key.
+associated with a single key. For combined encryption and integrity protection
+of a volume associate the same volume to an AES-type key and an HMAC-type key.
+Both keys must use the \fBluks2\fP volume type.
 .TP
 .BR \-S ", " \-\-sector\-size\~\fIbytes\fP
 Specifies the sector size in bytes used with \fBdm\-crypt\fP or

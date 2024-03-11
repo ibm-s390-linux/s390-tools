@@ -1239,8 +1239,11 @@ struct volume_check {
 	struct keystore *keystore;
 	const char *name;
 	const char *volume;
+	const char *key_type;
+	const char *volume_type;
 	bool set;
 	bool nocheck;
+	unsigned int num_combined;
 };
 
 /**
@@ -1258,21 +1261,92 @@ struct volume_check {
  */
 static int _keystore_volume_check_process(struct keystore *UNUSED(keystore),
 					  const char *name,
-					  struct properties *UNUSED(properties),
+					  struct properties *properties,
 					  struct key_filenames
 							  *UNUSED(file_names),
 					  void *private)
 {
 	struct volume_check *info = (struct volume_check *)private;
+	char *key_type, *volume_type;
+	int rc = 0;
+
+	key_type = _keystore_get_key_type(properties);
+	volume_type = _keystore_get_volume_type(properties);
 
 	if (info->set) {
 		if (strcmp(name, info->name) == 0)
-			return 0;
+			goto out;
+	}
+
+	if (is_hmac_key_type(info->key_type) &&
+	    strcasecmp(info->volume_type, VOLUME_TYPE_LUKS2) == 0) {
+		/* HMAC key with LUKS2: accept up to one AES key with LUKS2 */
+		if (!is_aes_key_type(key_type)) {
+			warnx("Key '%s' is already associated with volume '%s'",
+			      name, info->volume);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) != 0) {
+			warnx("Key '%s' is already associated with volume "
+			      "'%s' but the volume type not LUKS2", name,
+			      info->volume);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (info->num_combined > 0) {
+			warnx("More than one AES key is already associated "
+			      "with volume '%s'", info->volume);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		info->num_combined++;
+		goto out;
+	}
+
+	if (is_aes_key_type(info->key_type) &&
+	    strcasecmp(info->volume_type, VOLUME_TYPE_LUKS2) == 0) {
+		/* AES key with LUKS2: accept up to one HMAC key with LUKS2 */
+		if (!is_hmac_key_type(key_type)) {
+			warnx("Key '%s' is already associated with volume '%s'",
+			      name, info->volume);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) != 0) {
+			warnx("Key '%s' is already associated with volume "
+			      "'%s' but the volume type not LUKS2", name,
+			      info->volume);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (info->num_combined > 0) {
+			warnx("More than one HMAC key is already associated "
+			      "with volume '%s'", info->volume);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		info->num_combined++;
+		goto out;
 	}
 
 	warnx("Key '%s' is already associated with volume '%s'", name,
 	      info->volume);
-	return -EINVAL;
+	rc = -EINVAL;
+
+out:
+	if (key_type != NULL)
+		free(key_type);
+	if (volume_type != NULL)
+		free(volume_type);
+
+	return rc;
 }
 
 /**
@@ -1841,6 +1915,15 @@ static int _keystore_create_info_props(struct keystore *keystore,
 
 	*props = NULL;
 
+	if (volume_type == NULL)
+		volume_type = is_hmac_key_type(key_type) ?
+					DEFAULT_INTERITY_VOLUME_TYPE :
+					DEFAULT_VOLUME_TYPE;
+	if (!_keystore_valid_volume_type(key_type, volume_type)) {
+		warnx("Invalid volume-type specified");
+		return -EINVAL;
+	}
+
 	key_props = properties_new();
 	if (is_aes_key_type(key_type))
 		rc = _keystore_set_default_aes_properties(key_props);
@@ -1864,6 +1947,8 @@ static int _keystore_create_info_props(struct keystore *keystore,
 		goto out;
 	}
 
+	vol_check.key_type = key_type;
+	vol_check.volume_type = volume_type;
 	rc = _keystore_change_association(key_props, PROP_NAME_VOLUMES,
 					  volumes != NULL ? volumes : "",
 					  "volume", _keystore_volume_check,
@@ -1891,15 +1976,6 @@ static int _keystore_create_info_props(struct keystore *keystore,
 		goto out;
 	}
 
-	if (volume_type == NULL)
-		volume_type = is_hmac_key_type(key_type) ?
-					DEFAULT_INTERITY_VOLUME_TYPE :
-					DEFAULT_VOLUME_TYPE;
-	if (!_keystore_valid_volume_type(key_type, volume_type)) {
-		warnx("Invalid volume-type specified");
-		rc = -EINVAL;
-		goto out;
-	}
 	rc = properties_set2(key_props, PROP_NAME_VOLUME_TYPE, volume_type,
 			     true);
 	if (rc != 0) {
@@ -2615,7 +2691,9 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	const char **passphrase_upd = NULL;
 	char *apqns_prop, *key_type = NULL;
 	char *upd_volume_type = NULL;
+	char *old_volume_type = NULL;
 	const char *null_ptr = NULL;
+	char *prop_volumes = NULL;
 	char *upd_volumes = NULL;
 	size_t secure_key_size;
 	u8 *secure_key = NULL;
@@ -2650,6 +2728,15 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	}
 
 	key_type = _keystore_get_key_type(key_props);
+	old_volume_type = _keystore_get_volume_type(key_props);
+
+	if (volume_type != NULL) {
+		if (!_keystore_valid_volume_type(key_type, volume_type)) {
+			warnx("Invalid volume-type specified");
+			rc = -EINVAL;
+			goto out;
+		}
+	}
 
 	if (description != NULL) {
 		rc = properties_set(key_props, PROP_NAME_DESCRIPTION,
@@ -2661,6 +2748,10 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	}
 
 	if (volumes != NULL) {
+		vol_check.key_type = key_type;
+		vol_check.volume_type = volume_type != NULL ?
+						volume_type : old_volume_type;
+
 		rc = _keystore_change_association(key_props, PROP_NAME_VOLUMES,
 						  volumes, "volume",
 						  _keystore_volume_check,
@@ -2745,6 +2836,23 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			rc = -EINVAL;
 			goto out;
 		}
+
+		prop_volumes = properties_get(key_props, PROP_NAME_VOLUMES);
+
+		vol_check.volume = prop_volumes;
+		vol_check.key_type = key_type;
+		vol_check.volume_type = volume_type;
+		vol_check.set = true;
+		vol_check.nocheck = false;
+		vol_check.num_combined = 0;
+
+		rc = _keystore_process_filtered(keystore, NULL, prop_volumes,
+						NULL, NULL, NULL, false, false,
+						_keystore_volume_check_process,
+						&vol_check);
+		free(prop_volumes);
+		if (rc != 0)
+			goto out;
 
 		rc = properties_set2(key_props, PROP_NAME_VOLUME_TYPE,
 				     volume_type, true);
@@ -2840,6 +2948,8 @@ out:
 		free(secure_key);
 	if (key_type != NULL)
 		free(key_type);
+	if (old_volume_type != NULL)
+		free(old_volume_type);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to change key '%s': %s",
@@ -3899,8 +4009,10 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	struct key_filenames file_names = { 0 };
 	struct key_filenames new_names = { 0 };
 	struct properties *key_prop = NULL;
+	char *volume_type = NULL;
 	size_t secure_key_size;
 	bool kms_bound = false;
+	char *key_type = NULL;
 	u8 *secure_key;
 	int rc;
 
@@ -3939,6 +4051,9 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
+	key_type = _keystore_get_key_type(key_prop);
+	volume_type = _keystore_get_volume_type(key_prop);
+
 	secure_key = read_secure_key(file_names.skey_filename,
 				     &secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
@@ -3965,6 +4080,9 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 		goto out;
 
 	if (volumes != NULL) {
+		vol_check.key_type = key_type;
+		vol_check.volume_type = volume_type;
+
 		rc = _keystore_change_association(key_prop, PROP_NAME_VOLUMES,
 						  volumes,
 						  "volume",
@@ -4036,6 +4154,10 @@ out:
 	_keystore_free_key_filenames(&new_names);
 	if (key_prop != NULL)
 		properties_free(key_prop);
+	if (key_type != NULL)
+		free(key_type);
+	if (volume_type != NULL)
+		free(volume_type);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to copy key '%s'to '%s': %s",
@@ -5836,6 +5958,8 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 	}
 
 	if (volumes != NULL) {
+		vol_check.key_type = key_type;
+		vol_check.volume_type = volume_type;
 		rc = _keystore_change_association(properties, PROP_NAME_VOLUMES,
 						  volumes, "volume",
 						  _keystore_volume_check,
