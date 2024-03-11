@@ -57,7 +57,9 @@ struct key_filenames {
 
 #define VOLUME_TYPE_PLAIN	"plain"
 #define VOLUME_TYPE_LUKS2	"luks2"
+#define VOLUME_TYPE_INTEGRITY	"integrity"
 #define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_LUKS2
+#define DEFAULT_INTERITY_VOLUME_TYPE	VOLUME_TYPE_INTEGRITY
 
 #define REC_KEY			"Key"
 #define REC_DESCRIPTION		"Description"
@@ -292,16 +294,30 @@ static int _keystore_valid_sector_size(size_t sector_size)
 /**
  *  Checks if the volume type is supported.
  *
+ * @param[in] key_type      the key type of the key associated to the volume,
+ *                          or NULL if the volume type is to be checked
+ *                          independent of the key type.
  * @param[in] volume_type   the volume type
  *
  * @returns 1 if the volume type is valid, 0 otherwise
  */
-static int _keystore_valid_volume_type(const char *volume_type)
+static int _keystore_valid_volume_type(const char *key_type,
+				       const char *volume_type)
 {
-	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0)
-		return 1;
-	if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0)
-		return 1;
+	if (key_type == NULL || is_aes_key_type(key_type)) {
+		if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0)
+			return 1;
+		if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0)
+			return 1;
+	};
+
+	if (key_type == NULL || is_hmac_key_type(key_type)) {
+		if (strcasecmp(volume_type, VOLUME_TYPE_INTEGRITY) == 0)
+			return 1;
+		if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0)
+			return 1;
+	}
+
 	return 0;
 }
 
@@ -1863,8 +1879,10 @@ static int _keystore_create_info_props(struct keystore *keystore,
 	}
 
 	if (volume_type == NULL)
-		volume_type = DEFAULT_VOLUME_TYPE;
-	if (!_keystore_valid_volume_type(volume_type)) {
+		volume_type = is_hmac_key_type(key_type) ?
+					DEFAULT_INTERITY_VOLUME_TYPE :
+					DEFAULT_VOLUME_TYPE;
+	if (!_keystore_valid_volume_type(key_type, volume_type)) {
 		warnx("Invalid volume-type specified");
 		rc = -EINVAL;
 		goto out;
@@ -2582,8 +2600,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
 	const char **passphrase_upd = NULL;
+	char *apqns_prop, *key_type = NULL;
 	char *upd_volume_type = NULL;
-	char *apqns_prop, *key_type;
 	const char *null_ptr = NULL;
 	char *upd_volumes = NULL;
 	size_t secure_key_size;
@@ -2617,6 +2635,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		if (rc != 0)
 			goto out;
 	}
+
+	key_type = _keystore_get_key_type(key_props);
 
 	if (description != NULL) {
 		rc = properties_set(key_props, PROP_NAME_DESCRIPTION,
@@ -2676,14 +2696,12 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 
 		apqns_prop = properties_get(key_props, PROP_NAME_APQNS);
-		key_type = properties_get(key_props, PROP_NAME_KEY_TYPE);
 		rc = cross_check_apqns(apqns_prop, mkvp,
 				       get_min_card_level_for_keytype(key_type),
 				       get_min_fw_version_for_keytype(key_type),
 				       get_card_type_for_keytype(key_type),
 				       true, keystore->verbose);
 		free(apqns_prop);
-		free(key_type);
 		if (rc == -ENOTSUP)
 			rc = 0;
 		if (rc != 0 && noapqncheck == 0) {
@@ -2709,7 +2727,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	}
 
 	if (volume_type != NULL) {
-		if (!_keystore_valid_volume_type(volume_type)) {
+		if (!_keystore_valid_volume_type(key_type, volume_type)) {
 			warnx("Invalid volume-type specified");
 			rc = -EINVAL;
 			goto out;
@@ -2807,6 +2825,8 @@ out:
 		free(upd_volume_type);
 	if (secure_key != NULL)
 		free(secure_key);
+	if (key_type != NULL)
+		free(key_type);
 
 	if (rc != 0)
 		pr_verbose(keystore, "Failed to change key '%s': %s",
@@ -2921,6 +2941,13 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 		      "crypttab entries and 'cryptsetup plainOpen' commands to "
 		      "use the new name.", newname);
 	_keystore_msg_for_volumes(msg, key_props, VOLUME_TYPE_PLAIN);
+	free(msg);
+
+	util_asprintf(&msg, "The following volumes are associated with the "
+		      "renamed key '%s'. You should adjust the corresponding "
+		      "integritytab entries and 'integritysetup open' commands "
+		      "to use the new name.", newname);
+	_keystore_msg_for_volumes(msg, key_props, VOLUME_TYPE_INTEGRITY);
 	free(msg);
 
 	if (_keystore_passphrase_file_exists(&new_names)) {
@@ -4083,6 +4110,7 @@ static int _keystore_prompt_for_remove(struct keystore *keystore,
 	util_asprintf(&msg, "When you remove key '%s' the following volumes "
 		      "will no longer be usable:", name);
 	_keystore_msg_for_volumes(msg, key_prop, VOLUME_TYPE_PLAIN);
+	_keystore_msg_for_volumes(msg, key_prop, VOLUME_TYPE_INTEGRITY);
 	free(msg);
 
 	printf("%s: Remove key '%s' [y/N]? ", program_invocation_short_name,
@@ -4282,7 +4310,7 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 
 	if (volume_type != NULL &&
-	    !_keystore_valid_volume_type(volume_type)) {
+	    !_keystore_valid_volume_type(NULL, volume_type)) {
 		warnx("Invalid volume-type specified");
 		return -EINVAL;
 	}
@@ -4754,7 +4782,7 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
 		volume_filter = "*";
 
 	if (volume_type != NULL &&
-	    !_keystore_valid_volume_type(volume_type)) {
+	    !_keystore_valid_volume_type(NULL, volume_type)) {
 		warnx("Invalid volume-type specified");
 		return -EINVAL;
 	}
@@ -4821,7 +4849,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 		volume_filter = "*";
 
 	if (volume_type != NULL &&
-	    !_keystore_valid_volume_type(volume_type)) {
+	    !_keystore_valid_volume_type(NULL, volume_type)) {
 		warnx("Invalid volume-type specified");
 		return -EINVAL;
 	}
@@ -5683,7 +5711,7 @@ int keystore_import_kms_keys(struct keystore *keystore,
 	}
 
 	if (volume_type != NULL &&
-	    !_keystore_valid_volume_type(volume_type)) {
+	    !_keystore_valid_volume_type(NULL, volume_type)) {
 		warnx("Invalid volume-type specified");
 		return -EINVAL;
 	}
@@ -5820,7 +5848,7 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 	}
 
 	if (volume_type != NULL) {
-		if (!_keystore_valid_volume_type(volume_type)) {
+		if (!_keystore_valid_volume_type(key_type, volume_type)) {
 			warnx("Invalid volume-type specified");
 			rc = -EINVAL;
 			goto out;
@@ -5927,7 +5955,7 @@ int keystore_refresh_kms_keys(struct keystore *keystore,
 	}
 
 	if (volume_type != NULL &&
-	    !_keystore_valid_volume_type(volume_type)) {
+	    !_keystore_valid_volume_type(NULL, volume_type)) {
 		warnx("Invalid volume-type specified");
 		return -EINVAL;
 	}

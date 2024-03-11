@@ -271,8 +271,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. When this option is omitted, "
-			"the default is 'luks2'",
+			"for AES keys are 'plain' and 'luks2', and 'integrity' "
+			"and 'luks2' for HMAC keys. When this option is omitted, "
+			"the default is 'luks2' for AES keys and 'integrity' "
+			"for HMAC keys.",
 		.command = COMMAND_GENERATE,
 	},
 	{
@@ -491,8 +493,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. When this option is omitted, "
-			"the default is 'luks2'",
+			"for AES keys are 'plain' and 'luks2', and 'integrity' "
+			"and 'luks2' for HMAC keys. When this option is omitted, "
+			"the default is 'luks2' for AES keys and 'integrity' "
+			"for HMAC keys.",
 		.command = COMMAND_IMPORT,
 	},
 	{
@@ -585,8 +589,9 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. Use this option to list all "
-			"keys with the specified volumes type.",
+			"are 'plain', 'luks2', and 'integrity'. Use this "
+			"option to list all keys with the specified volumes "
+			"type.",
 		.command = COMMAND_LIST,
 	},
 	{
@@ -692,7 +697,8 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'",
+			"for AES keys are 'plain' and 'luks2', and 'integrity' "
+			"and 'luks2' for HMAC keys.",
 		.command = COMMAND_CHANGE,
 	},
 	{
@@ -1102,8 +1108,9 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. Use this option to list all "
-			"keys with the specified volumes type.",
+			"are 'plain', 'luks2', and 'integrity'. Use this "
+			"option to list all keys with the specified volumes "
+			"type.",
 			.command = COMMAND_KMS " " COMMAND_KMS_LIST,
 	},
 	/***********************************************************/
@@ -1144,8 +1151,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. Use this option to import "
-			"all keys with the specified volumes type.",
+			"for AES keys are 'plain' and 'luks2', and 'integrity' "
+			"and 'luks2' for HMAC keys. When this option is omitted, "
+			"the default is 'luks2' for AES keys and 'integrity' "
+			"for HMAC keys.",
 		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
 	},
 	{
@@ -1194,7 +1203,8 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. Use this option to refresh "
+			"for AES keys are 'plain' and 'luks2', and 'integrity' "
+			"and 'luks2' for HMAC keys. Use this option to refresh "
 			"all keys with the specified volumes type.",
 		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
 	},
@@ -1327,8 +1337,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
 		.desc = "The type of the associated volume(s). Possible values "
-			"are 'plain' and 'luks2'. When this option is omitted, "
-			"the default is 'luks2'",
+			"for AES keys are 'plain' and 'luks2', and 'integrity' "
+			"and 'luks2' for HMAC keys. When this option is omitted, "
+			"the default is 'luks2' for AES keys and 'integrity' "
+			"for HMAC keys.",
 		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
 	},
 	{

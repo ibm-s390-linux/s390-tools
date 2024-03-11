@@ -1384,9 +1384,10 @@ sector size is used.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
-Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
-Possible values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is
-used.
+Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys. If omitted,
+\fBluks2\fP is used for AES keys, and \fBintegrity\fP for HMAC keys.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
@@ -1557,8 +1558,9 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP. If
-omitted, \fBluks2\fP is used.
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys. If omitted,
+\fBluks2\fP is used for AES keys, and \fBintegrity\fP for HMAC keys.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-gen\-dummy\-passphrase
@@ -1624,8 +1626,9 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP. Only keys
-with the specified volume type are listed.
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys.
+Only keys with the specified volume type are listed.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
@@ -1725,7 +1728,8 @@ This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP.
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-gen\-dummy\-passphrase
@@ -2049,7 +2053,8 @@ When wildcards are used you must quote the value.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP. Only keys
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys. Only keys
 with the specified volume type are listed.
 .
 .
@@ -2081,7 +2086,8 @@ When wildcards are used you must quote the value.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP. Only keys
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys. Only keys
 with the specified volume type are imported.
 .TP
 .BR \-q ", " \-\-batch\-mode
@@ -2117,7 +2123,8 @@ When wildcards are used you must quote the value.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP. Only keys
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys. Only keys
 with the specified volume type are refreshed.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
@@ -2228,7 +2235,9 @@ bytes. If omitted, the system default sector size is used.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
-\fBdm\-integrity\fP. Possible values are \fBplain\fP and \fBluks2\fP. If
+\fBdm\-integrity\fP. Possible values for AES keys are \fBplain\fP and
+\fBluks2\fP, and \fBintegrity\fP and \fBluks2\fP for HMAC keys. If omitted,
+\fBluks2\fP is used for AES keys, and \fBintegrity\fP for HMAC keys. If
 omitted, \fBluks2\fP is used.
 .TP
 .BR \-\-gen\-dummy\-passphrase
