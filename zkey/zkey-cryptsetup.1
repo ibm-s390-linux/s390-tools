@@ -4,8 +4,9 @@
 .\"
 .TH ZKEY\-CRYPTSETUP 1 "February 2024" "s390-tools"
 .SH NAME
-zkey\-cryptsetup \- Manage secure AES volume keys of volumes encrypted with
-\fBLUKS2\fP and the \fBpaes\fP cipher
+zkey\-cryptsetup \- Manage secure AES or HMAC volume keys of volumes encrypted
+with \fBLUKS2\fP and the \fBpaes\fP cipher, and optionally integrity protected
+with the \fBphmac\fP cipher.
 .
 .
 .SH SYNOPSIS
@@ -25,9 +26,10 @@ zkey\-cryptsetup \- Manage secure AES volume keys of volumes encrypted with
 .
 .
 .SH DESCRIPTION
-Use \fBzkey\-cryptsetup\fP to validate and re-encipher secure AES
-volume keys of volumes encrypted with \fBLUKS2\fP and the \fBpaes\fP cipher.
-These secure AES volume keys are enciphered with a master key of an IBM
+Use \fBzkey\-cryptsetup\fP to validate and re-encipher secure AES or HMAC
+volume keys of volumes encrypted with \fBLUKS2\fP and the \fBpaes\fP cipher,
+and optionally integrity protected with the \fBphmac\fP cipher.
+These secure AES or HMAC volume keys are enciphered with a master key of an IBM
 cryptographic adapter in CCA or EP11 coprocessor mode.
 .PP
 To encrypt a volume using \fBLUKS2\fP and the \fBpaes\fP cipher, generate a
@@ -43,7 +45,7 @@ see the corresponding man pages.
 .SH COMMANDS
 .
 .
-.SS "Validate secure AES volume keys"
+.SS "Validate secure AES or HMAC volume keys"
 .
 .B zkey\-cryptsetup
 .BR validate | val
@@ -61,16 +63,18 @@ see the corresponding man pages.
 .PP
 Use the
 .B validate
-command to validate a secure AES volume key of a volume encrypted with
-\fBLUKS2\fP and the \fBpaes\fP cipher.
+command to validate a secure AES or HMAC volume key of a volume encrypted with
+\fBLUKS2\fP and the \fBpaes\fP cipher, and optionally integrity protected with
+the \fBphmac\fP cipher.
 It checks if the LUKS2 header of the volume contains a valid secure key.
 It also displays the attributes of the secure key, such as key size, whether
 it is a secure key that can be used for the XTS cipher mode, and the master key
-register (CURRENT or OLD) with which the secure key is enciphered.
+register (CURRENT or OLD) with which the secure key is enciphered. The same
+appplies to a secure integrity key, if present.
 For further information about master key registers, see the
-\fBreencipher\fP command. Keys of type \fBPVSECRET\-AES\fP do not use a
-cryptographic adapter, thus no master key information is displayed for such
-keys.
+\fBreencipher\fP command. Keys of type \fBPVSECRET\-AES\fP and
+\fBPVSECRET\-HMAC\fP do not use a cryptographic adapter, thus no master key
+information is displayed for such keys.
 .PP
 To open a key slot contained in the LUKS2 header of the volume, a passphrase is
 required. You are prompted for the passphrase, unless option
@@ -87,7 +91,7 @@ and
 to control which part of the key file is used as passphrase. These options
 behave in the same way as with \fBcryptsetup\fP.
 .
-.SS "Re-encipher secure AES volume keys"
+.SS "Re-encipher secure AES or HMAC volume keys"
 .
 .PP
 .B zkey\-cryptsetup
@@ -112,14 +116,16 @@ behave in the same way as with \fBcryptsetup\fP.
 .PP
 Use the
 .B reencipher
-command to re-encipher a secure AES volume key of a volume encrypted with
-\fBLUKS2\fP and the \fBpaes\fP cipher. A secure AES volume key must be
+command to re-encipher a secure AES or HMAC volume key of a volume encrypted
+with \fBLUKS2\fP and the \fBpaes\fP cipher, and optionally integrity protected
+with the \fBphmac\fP cipher. A secure AES or HMAC volume key must be
 re-enciphered when the master key of the cryptographic adapter in CCA or EP11
 coprocessor mode changes.
 .PP
-Volume keys of type \fBPVSECRET\-AES\fP can not be re-enciphered. These keys do
-not use a cryptographic adapter, thus they do not need to be re-enciphered when
-the master key of a cryptographic adapter changes.
+Volume keys of type \fBPVSECRET\-AES\fP and \fBPVSECRET\-HMAC\fP can not be
+re-enciphered. These keys do not use a cryptographic adapter, thus they do not
+need to be re-enciphered when the master key of a cryptographic adapter
+changes.
 .PP
 The cryptographic adapter in CCA coprocessor mode has three different registers
 to store master keys:
@@ -172,7 +178,8 @@ If for this case the \fBNEW\fP register does not contain a valid master key,
 then the re-encipher operation fails.
 .PP
 Re-enciphering a secure volume key of a volume encrypted with
-\fBLUKS2\fP and the \fBpaes\fP cipher can be performed \fBin-place\fP, or in
+\fBLUKS2\fP and the \fBpaes\fP cipher, and optionally integrity protected with
+the \fBphmac\fP cipher, can be performed \fBin-place\fP, or in
 \fBstaged\fP mode.
 .PP
 \fB"In-place"\fP immediately replaces the secure volume key in the LUKS2
@@ -214,15 +221,15 @@ behave in the same way as with \fBcryptsetup\fP.
 .PP
 The
 .B reencipher
-command creates a new key slot with the re-enciphered secure AES volume key.
-The new key slot uses
+command creates a new key slot with the re-enciphered secure AES or HMAC volume
+key. The new key slot uses
 .B PBKDF2
 as password based key derivation function. LUKS2 volumes typically default to
 .B Argon2i
 as password based key derivation function,
 but this might cause out-of-memory errors when multiple encrypted volumes are
-unlocked automatically at boot through /etc/crypttab. Because PAES
-uses secure AES keys as volume keys, the security of the key derivation
+unlocked automatically at boot through /etc/crypttab. Because PAES and PHMAC
+uses secure AES or HMAC keys as volume keys, the security of the key derivation
 function used to encrypt the volume key in the LUKS key slots is of less
 relevance.
 .PP
@@ -235,7 +242,7 @@ downloads, see: \fIhttp://www.ibm.com/security/cryptocards\fP
 .
 .
 .
-.SS "Set a verification pattern of the secure AES volume key"
+.SS "Set a verification pattern of the secure AES or HMAC volume key"
 .
 .B zkey\-cryptsetup
 .BR setvp | setv
@@ -253,9 +260,11 @@ downloads, see: \fIhttp://www.ibm.com/security/cryptocards\fP
 .PP
 Use the
 .B setvp
-command to set a verification pattern of the secure AES volume key of a volume
-encrypted with \fBLUKS2\fP and the \fBpaes\fP cipher. The verification pattern
-identifies the effective key used to encrypt the volume's data.
+command to set a verification pattern of the secure AES or HMAC volume key of a
+volume encrypted with \fBLUKS2\fP and the \fBpaes\fP cipher, and optionally
+integrity protected with the \fBphmac\fP cipher. The verification pattern
+identifies the effective key used to encrypt or integrity protect the volume's
+data.
 The verification pattern is stored in a token named
 \fBpaes\-verification\-pattern\fP in the LUKS2 header.
 .PP
@@ -280,7 +289,7 @@ behave in the same way as with \fBcryptsetup\fP.
 .
 .
 .
-.SS "Set a new secure AES volume key for a volume"
+.SS "Set a new secure AES or HMAC volume key for a volume"
 .
 .B zkey\-cryptsetup
 .BR setkey | setk
@@ -302,11 +311,12 @@ behave in the same way as with \fBcryptsetup\fP.
 Use the
 .B setkey
 command to set a new secure AES volume key for a volume encrypted with
-\fBLUKS2\fP and the \fBpaes\fP cipher. Use this command to recover from an
-invalid secure AES volume key contained in the LUKS2 header.
-A secure AES volume key contained in the LUKS2 header can become invalid when
-the CCA or EP11 master key is changed without re-enciphering the secure volume
-key.
+\fBLUKS2\fP and the \fBpaes\fP cipher, and optionally integrity protected with
+the \fBphmac\fP cipher. Use this command to recover from an invalid secure AES
+or HMAC volume key contained in the LUKS2 header.
+A secure AES or HMAC volume key contained in the LUKS2 header can become invalid
+when the CCA or EP11 master key is changed without re-enciphering the secure
+volume key.
 .PP
 You can recover the secure volume key only if you have a copy of the secure key
 in a file, and this copy was re-enciphered when the CCA or EP11 master key has
@@ -355,7 +365,7 @@ relevance.
 .
 .
 .
-.SS "Convert a clear-key LUKS2 volume to use a secure AES volume key"
+.SS "Convert a clear-key LUKS2 volume to use a secure AES or HMAC volume key"
 .
 .B zkey\-cryptsetup
 .BR convert | conv
@@ -377,7 +387,8 @@ relevance.
 Use the
 .B convert
 command to convert a clear-key \fBLUKS2\fP volume to use a secure volume key
-and the \fBpaes\fP cipher. You must provide a secure volume key that uses
+and the \fBpaes\fP cipher, optionally integrity protected with the
+\fBphmac\fP cipher. You must provide a secure volume key that uses
 the exact same effective key as the current volume key. The volume must not be
 open when a conversion is performed, otherwise it fails.
 .PP
@@ -469,8 +480,8 @@ Suppresses all confirmation questions. Use with care!
 .SS "Options for the setkey command"
 .TP
 .BR \-m ", " \-\-volume\-key\-file\~\fIfile\-name\fP
-Specifies the name of a file containing the secure AES key that is set as the
-new volume key.
+Specifies the name of a file containing the secure AES key (and optionally a
+secure HMAC key) that is set as the new volume key.
 .TP
 .BR \-\-master\-key\-file\~\fIfile\-name\fP
 Alias for the

@@ -73,7 +73,8 @@ static void misc_print_required_parms(const char *parm_name1,
  */
 static const struct util_prg prg = {
 	.desc = "Manage secure volume keys of volumes encrypted with LUKS2 and "
-		"the 'paes' cipher",
+		"the 'paes' cipher, and optionally integrity protected with "
+		"the 'phmac' cipher.",
 	.command_args = "COMMAND DEVICE",
 	.args = "",
 	.copyright_vec = {
@@ -234,7 +235,8 @@ static struct util_opt opt_vec[] = {
 		.option = {"volume-key-file", required_argument, NULL, 'm'},
 		.argument = "FILE-NAME",
 		.desc = "Specifies the name of a file containing the secure "
-			"AES key that is set as new volume key",
+			"AES key (and optionally a secure HMAC key) that "
+			"is set as new volume key",
 		.command = COMMAND_SETKEY,
 	},
 	{
@@ -332,7 +334,9 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.need_pkey_device = 1,
 		.short_desc = "Re-encipher a secure volume key",
 		.long_desc = "Re-encipher a secure volume key of a volume "
-			     "encrypted with LUKS2 and the 'paes' cipher",
+			     "encrypted with LUKS2 and the 'paes' cipher, and "
+			     "optionally integrity protected with the 'phmac' "
+			     "cipher",
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
@@ -345,7 +349,9 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.need_pkey_device = 1,
 		.short_desc = "Validate a secure volume key",
 		.long_desc = "Validate a secure volume key of a volume "
-			     "encrypted with LUKS2 and the 'paes' cipher",
+			     "encrypted with LUKS2 and the 'paes' cipher, and "
+			     "optionally integrity protected with the 'phmac' "
+			     "cipher",
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
@@ -358,9 +364,10 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.need_pkey_device = 1,
 		.short_desc = "Set a verification pattern of the secure volume "
 			      "key",
-		.long_desc = "Set a verification pattern of the secure AES "
+		.long_desc = "Set a verification pattern of the secure "
 			     "volume key of a volume encrypted with LUKS2 and "
-			     "the 'paes' cipher",
+			     "the 'paes' cipher, and optionally integrity "
+			     "protected with the 'phmac' cipher",
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
@@ -372,8 +379,10 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.function = command_setkey,
 		.need_pkey_device = 1,
 		.short_desc = "Set a new secure volume key",
-		.long_desc = "Set a new secure AES volume key for a volume "
-			     "encrypted with LUKS2 and the 'paes' cipher",
+		.long_desc = "Set a new secure volume key for a volume "
+			     "encrypted with LUKS2 and the 'paes' cipher, and "
+			     "optionally integrity protected with the 'phmac' "
+			     "cipher",
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
@@ -388,7 +397,8 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 			      "secure volume key",
 		.long_desc = "Convert a LUKS2 volume that uses a clear volume "
 			     "key and the 'aes' cipher to use a secure volume "
-			     "key and the 'paes' cipher",
+			     "key and the 'paes' cipher, optionally integrity "
+			     "protected with the 'phmac' cipher",
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
@@ -1754,7 +1764,7 @@ static int reencipher_prepare(int token)
 		if (rc != 0) {
 			if (rc == -ENODEV) {
 				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure AES volume "
+				      "re-enciphering the secure volume "
 				      "key from the OLD to the CURRENT master "
 				      "key.");
 			} else {
@@ -1766,7 +1776,7 @@ static int reencipher_prepare(int token)
 				    !is_ep11_aes_key_with_header((u8 *)key,
 								securekeysize))
 					print_msg_for_cca_envvars(
-						"secure AES volume key");
+						"secure volume key");
 				rc = -EINVAL;
 			}
 			goto out;
@@ -1780,7 +1790,7 @@ static int reencipher_prepare(int token)
 		if (rc != 0) {
 			if (rc == -ENODEV) {
 				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure AES volume "
+				      "re-enciphering the secure volume "
 				      "key from the CURRENT to the NEW master "
 				      "key.");
 			} else {
@@ -1792,7 +1802,7 @@ static int reencipher_prepare(int token)
 				    !is_ep11_aes_key_with_header((u8 *)key,
 								securekeysize))
 					print_msg_for_cca_envvars(
-						"secure AES volume key");
+						"secure volume key");
 				rc = -EINVAL;
 			}
 			goto out;
@@ -1923,7 +1933,7 @@ static int reencipher_complete(int token)
 		if (rc != 0) {
 			if (rc == -ENODEV) {
 				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure AES volume "
+				      "re-enciphering the secure volume "
 				      "key from the OLD to the CURRENT master "
 				      "key.");
 			} else {
@@ -1935,7 +1945,7 @@ static int reencipher_complete(int token)
 				    !is_ep11_aes_key_with_header((u8 *)key,
 								securekeysize))
 					print_msg_for_cca_envvars(
-						"secure AES volume key");
+						"secure volume key");
 				rc = -EINVAL;
 			}
 			goto out;

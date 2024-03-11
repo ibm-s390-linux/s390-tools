@@ -29,6 +29,7 @@ struct keystore {
 #define PROP_NAME_KEY_TYPE		"key-type"
 #define PROP_NAME_CIPHER		"cipher"
 #define PROP_NAME_IV_MODE		"iv-mode"
+#define PROP_NAME_DIGEST		"digest"
 #define PROP_NAME_DESCRIPTION		"description"
 #define PROP_NAME_VOLUMES		"volumes"
 #define PROP_NAME_APQNS			"apqns"

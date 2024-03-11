@@ -1864,6 +1864,35 @@ bool is_pvsecret_aes_key(const u8 *key, size_t key_size)
 }
 
 /**
+ * Check if the specified key is a PVSECRET-HMAC key token.
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is a PVSECRET token type
+ */
+bool is_pvsecret_hmac_key(const u8 *key, size_t key_size)
+{
+	struct pvsecrettoken *pvsecret = (struct pvsecrettoken *)key;
+
+	if (key == NULL || key_size < PVSECRET_KEY_SIZE)
+		return false;
+
+	if (pvsecret->hdr.type != TOKEN_TYPE_NON_CCA)
+		return false;
+	if (pvsecret->hdr.version != TOKEN_VERSION_PVSECRET)
+		return false;
+
+	switch (pvsecret->secret_type) {
+	case UV_SECRET_TYPE_HMAC_SHA_256:
+	case UV_SECRET_TYPE_HMAC_SHA_512:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
  * Check if the specified key is an XTS type key
  *
  * @param[in] key           the secure key token
@@ -1925,6 +1954,46 @@ bool is_secure_key(const u8 *key, size_t key_size)
 	if (is_ep11_aes_key(key, key_size))
 		return true;
 	if (is_ep11_aes_key_with_header(key, key_size))
+		return true;
+
+	return false;
+}
+
+/**
+ * Check if the specified key is an AES key type
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is a secure key type
+ */
+bool is_aes_key(const u8 *key, size_t key_size)
+{
+	if (is_cca_aes_data_key(key, key_size))
+		return true;
+	if (is_cca_aes_cipher_key(key, key_size))
+		return true;
+	if (is_ep11_aes_key(key, key_size))
+		return true;
+	if (is_ep11_aes_key_with_header(key, key_size))
+		return true;
+	if (is_pvsecret_aes_key(key, key_size))
+		return true;
+
+	return false;
+}
+
+/**
+ * Check if the specified key is an HMAC key type
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ *
+ * @returns true if the key is a secure key type
+ */
+bool is_hmac_key(const u8 *key, size_t key_size)
+{
+	if (is_pvsecret_hmac_key(key, key_size))
 		return true;
 
 	return false;
@@ -2002,6 +2071,17 @@ int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize)
 		default:
 			return -EINVAL;
 		}
+	} else if (is_pvsecret_hmac_key(key, key_size)) {
+		switch (pvsecret->secret_type) {
+		case UV_SECRET_TYPE_HMAC_SHA_256:
+			*bitsize = 512;
+			break;
+		case UV_SECRET_TYPE_HMAC_SHA_512:
+			*bitsize = 1024;
+			break;
+		default:
+			return -EINVAL;
+		}
 	} else {
 		return -EINVAL;
 	}
@@ -2029,6 +2109,8 @@ const char *get_key_type(const u8 *key, size_t key_size)
 		return KEY_TYPE_EP11_AES;
 	if (is_pvsecret_aes_key(key, key_size))
 		return KEY_TYPE_PVSECRET_AES;
+	if (is_pvsecret_hmac_key(key, key_size))
+		return KEY_TYPE_PVSECRET_HMAC;
 
 	return NULL;
 }
@@ -2047,6 +2129,42 @@ bool is_secure_key_type(const char *key_type)
 	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
 		return true;
 	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return true;
+
+	return false;
+}
+
+/**
+ * Returns true if the key type is an AES key type
+ *
+ * @param[in] key_type       the type of the key
+ *
+ * @returns true if the key type is an AES key type, false otherwise
+ */
+bool is_aes_key_type(const char *key_type)
+{
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESCIPHER) == 0)
+		return true;
+	if (strcasecmp(key_type, KEY_TYPE_CCA_AESDATA) == 0)
+		return true;
+	if (strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+		return true;
+	if (strcasecmp(key_type, KEY_TYPE_PVSECRET_AES) == 0)
+		return true;
+
+	return false;
+}
+
+/**
+ * Returns true if the key type is a HMAC key type
+ *
+ * @param[in] key_type       the type of the key
+ *
+ * @returns true if the key type is a HMAC key type, false otherwise
+ */
+bool is_hmac_key_type(const char *key_type)
+{
+	if (strcasecmp(key_type, KEY_TYPE_PVSECRET_HMAC) == 0)
 		return true;
 
 	return false;

@@ -302,6 +302,7 @@ struct pkey_apqns4keytype {
 #define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"
 #define KEY_TYPE_EP11_AES           "EP11-AES"
 #define KEY_TYPE_PVSECRET_AES       "PVSECRET-AES"
+#define KEY_TYPE_PVSECRET_HMAC      "PVSECRET-HMAC"
 
 #define DEFAULT_KEYBITS             256
 #define PAES_BLOCK_SIZE             16
@@ -367,11 +368,16 @@ bool is_ep11_aes_key(const u8 *key, size_t key_size);
 bool is_ep11_aes_key_with_header(const u8 *key, size_t key_size);
 bool is_ep11_key_session_bound(const u8 *key, size_t key_size);
 bool is_pvsecret_aes_key(const u8 *key, size_t key_size);
+bool is_pvsecret_hmac_key(const u8 *key, size_t key_size);
 bool is_xts_key(const u8 *key, size_t key_size);
 bool is_secure_key(const u8 *key, size_t key_size);
+bool is_aes_key(const u8 *key, size_t key_size);
+bool is_hmac_key(const u8 *key, size_t key_size);
 int get_key_bit_size(const u8 *key, size_t key_size, size_t *bitsize);
 const char *get_key_type(const u8 *key, size_t key_size);
 bool is_secure_key_type(const char *key_type);
+bool is_aes_key_type(const char *key_type);
+bool is_hmac_key_type(const char *key_type);
 int get_min_card_level_for_keytype(const char *key_type);
 const struct fw_version *get_min_fw_version_for_keytype(const char *key_type);
 enum card_type get_card_type_for_keytype(const char *key_type);

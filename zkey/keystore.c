@@ -357,6 +357,8 @@ static int _keystore_valid_key_type(const char *key_type)
 		return 1;
 	if (strcasecmp(key_type, KEY_TYPE_PVSECRET_AES) == 0)
 		return 1;
+	if (strcasecmp(key_type, KEY_TYPE_PVSECRET_HMAC) == 0)
+		return 1;
 
 	return 0;
 }
@@ -1588,12 +1590,12 @@ static int _keystore_set_timestamp_property(struct properties *properties,
 }
 
 /**
- * Sets the default properties of a key, such as key-type, cipher-name, and
- * IV-mode
+ * Sets the default properties of an AES key, such as cipher-name, IV-mode,
+ * and timestamps
  *
  * @param[in] key_props   the properties object
  */
-static int _keystore_set_default_properties(struct properties *key_props)
+static int _keystore_set_default_aes_properties(struct properties *key_props)
 {
 	int rc;
 
@@ -1602,6 +1604,32 @@ static int _keystore_set_default_properties(struct properties *key_props)
 		return rc;
 
 	rc = properties_set(key_props, PROP_NAME_IV_MODE, "plain64");
+	if (rc != 0)
+		return rc;
+
+	rc = _keystore_set_timestamp_property(key_props,
+					      PROP_NAME_CREATION_TIME);
+	if (rc != 0)
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Sets the default properties of an HMAC key, such as cipher-name and
+ * timestmmps
+ *
+ * @param[in] key_props   the properties object
+ */
+static int _keystore_set_default_hmac_properties(struct properties *key_props)
+{
+	int rc;
+
+	rc = properties_set(key_props, PROP_NAME_CIPHER, "phmac");
+	if (rc != 0)
+		return rc;
+
+	rc = properties_set(key_props, PROP_NAME_DIGEST, "sha");
 	if (rc != 0)
 		return rc;
 
@@ -1785,7 +1813,12 @@ static int _keystore_create_info_props(struct keystore *keystore,
 	*props = NULL;
 
 	key_props = properties_new();
-	rc = _keystore_set_default_properties(key_props);
+	if (is_aes_key_type(key_type))
+		rc = _keystore_set_default_aes_properties(key_props);
+	else if (is_hmac_key_type(key_type))
+		rc = _keystore_set_default_hmac_properties(key_props);
+	else
+		rc = -EINVAL;
 	if (rc != 0)
 		goto out;
 

@@ -40,7 +40,7 @@
  * Program configuration
  */
 static const struct util_prg prg = {
-	.desc = "Manage secure AES keys",
+	.desc = "Manage secure AES and HMAC keys",
 	.command_args = "COMMAND [SECURE-KEY-FILE]",
 	.args = "",
 	.copyright_vec = {
@@ -196,31 +196,33 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "keybits", required_argument, NULL, 'k'},
 		.argument = "SIZE",
-		.desc = "Size of the AES key to be generated in bits. "
-			"Valid sizes are 128, 192, and 256 bits. Secure keys "
-			"for use with the XTS cipher mode can only use keys "
-			" of 128 or 256 bits. Default is 256 bits",
+		.desc = "Size of the AES or HMAC key to be generated in bits. "
+			"Valid sizes for AES keys are 128, 192, and 256 bits. "
+			"Secure keys for use with the XTS cipher mode can only "
+			"use keys  of 128 or 256 bits. Valid sizes for HMAC "
+			"keys are 256 and 512 bits. Default is 256 bits",
 		.command = COMMAND_GENERATE,
 	},
 	{
 		.option = { "clearkey", required_argument, NULL, 'c'},
 		.argument = "CLEAR-KEY-FILE",
-		.desc = "Name of a file containing the clear AES key in "
-			"binary. If option --keybits/-k is omitted, then the "
-			"size of the CLEAR-KEY-FILE determines the size "
-			"of the AES key. If option --keybits/-k is specified, "
-			"then the size of the CLEAR-KEY-FILE must match the "
-			"specified key size. Valid file sizes are 16, 24, or "
-			"32 bytes, and 32, or 64 bytes for keys to be used "
-			"with XTS mode ciphers",
+		.desc = "Name of a file containing the clear AES or HMAC key "
+			"in binary. If option --keybits/-k is omitted, then "
+			"the size of the CLEAR-KEY-FILE determines the size "
+			"of the AES or HMAC key. If option --keybits/-k is "
+			"specified, then the size of the CLEAR-KEY-FILE must "
+			"match the specified key size. Valid file sizes for "
+			"AES keys are 16, 24, or 32 bytes, and 32, or 64 bytes "
+			"for keys to be used with XTS mode ciphers. For HMAC "
+			"keys, valid file sizes are 32 or 64 bytes",
 		.command = COMMAND_GENERATE,
 	},
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository. If "
+		.desc = "Name of the secure key in the repository. If "
 			"option --name/-N is specified, then the generated "
-			"secure AES key is stored in the repository. Parameter "
+			"secure key is stored in the repository. Parameter "
 			"SECURE-KEY-FILE is not used when option --name/-N is "
 			"specified",
 		.command = COMMAND_GENERATE,
@@ -228,7 +230,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "description", required_argument, NULL, 'd'},
 		.argument = "DESCRIPTION",
-		.desc = "Textual description of the secure AES key in the "
+		.desc = "Textual description of the secure key in the "
 			"repository",
 		.command = COMMAND_GENERATE,
 	},
@@ -236,7 +238,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME:DMNAME[,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the repository",
 		.command = COMMAND_GENERATE,
 	},
@@ -244,7 +246,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "apqns", required_argument, NULL, 'a'},
 		.argument = "CARD.DOMAIN[,...]",
 		.desc = "Comma-separated pairs of crypto cards and domains "
-			"that are associated with the secure AES key in the "
+			"that are associated with the secure key in the "
 			"repository",
 		.command = COMMAND_GENERATE,
 	},
@@ -252,17 +254,17 @@ static struct util_opt opt_vec[] = {
 		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
 		.desc = "Do not check if the specified APQN(s) are available. "
 			"Use this option to associate APQN(s) with a secure "
-			"AES key that are currently not available.",
+			"key that are currently not available.",
 		.command = COMMAND_GENERATE,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
 		.argument = "bytes",
-		.desc = "The sector size used with dm-crypt. It must be a power "
-			"of two and in range 512 - 4096 bytes. If this option "
-			"is omitted, the system default sector size (512) is "
-			"used",
+		.desc = "The sector size used with dm-crypt or dm-integrity. "
+			"It must be a power of two and in range 512 - 4096 "
+			"bytes. If this option is omitted, the system default "
+			"sector size (512) is used",
 		.command = COMMAND_GENERATE,
 	},
 	{
@@ -354,14 +356,14 @@ static struct util_opt opt_vec[] = {
 	},
 	{
 		.option = {"to-new", 0, NULL, 'n'},
-		.desc = "Re-enciphers a secure AES key that is currently "
+		.desc = "Re-enciphers a secure key that is currently "
 			"enciphered with the master key in the CURRENT "
 			"register with the master key in the NEW register",
 		.command = COMMAND_REENCIPHER,
 	},
 	{
 		.option = {"from-old", 0, NULL, 'o'},
-		.desc = "Re-enciphers a secure AES key that is currently "
+		.desc = "Re-enciphers a secure key that is currently "
 			"enciphered with the master key in the OLD register "
 			"with the master key in the CURRENT register",
 		.command = COMMAND_REENCIPHER,
@@ -375,14 +377,14 @@ static struct util_opt opt_vec[] = {
 	},
 	{
 		.option = {"in-place", 0, NULL, 'i'},
-		.desc = "Forces an in-place re-enchipering of a secure AES "
+		.desc = "Forces an in-place re-enchipering of a secure "
 			"key. Re-enciphering from OLD to CURRENT is performed "
 			"in-place per default",
 		.command = COMMAND_REENCIPHER,
 	},
 	{
 		.option = {"staged", 0, NULL, 's'},
-		.desc = "Forces that the re-enciphering of a secure AES key is "
+		.desc = "Forces that the re-enciphering of a secure key is "
 			"performed in staged mode. Re-enciphering from CURRENT "
 			"to NEW is performed in staged mode per default",
 		.command = COMMAND_REENCIPHER,
@@ -390,7 +392,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES keys in the repository that "
+		.desc = "Name of the secure keys in the repository that "
 			"are to be re-enciphered. You can use wild-cards to "
 			"select the keys to re-encipher.",
 		.command = COMMAND_REENCIPHER,
@@ -399,7 +401,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "apqns", required_argument, NULL, 'a'},
 		.argument = "CARD.DOMAIN[,...]",
 		.desc = "Comma-separated pairs of crypto cards and domains "
-			"that are associated with the secure AES key in the "
+			"that are associated with the secure key in the "
 			"repository. Use this option to re-encipher all keys "
 			"associated with specific crypto cards",
 		.command = COMMAND_REENCIPHER,
@@ -413,7 +415,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES keys in the repository that "
+		.desc = "Name of the secure keys in the repository that "
 			"are to be validated. You can use wild-cards to select "
 			"the keys to validate.",
 		.command = COMMAND_VALIDATE,
@@ -422,7 +424,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "apqns", required_argument, NULL, 'a'},
 		.argument = "CARD.DOMAIN[,...]",
 		.desc = "Comma-separated pairs of crypto cards and domains "
-			"that are associated with the secure AES key in the "
+			"that are associated with the secure key in the "
 			"repository. Use this option to validate all keys "
 			"associated with specific crypto cards",
 		.command = COMMAND_VALIDATE,
@@ -442,13 +444,13 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the imported secure AES key in the repository",
+		.desc = "Name of the imported secure key in the repository",
 		.command = COMMAND_IMPORT,
 	},
 	{
 		.option = { "description", required_argument, NULL, 'd'},
 		.argument = "DESCRIPTION",
-		.desc = "Textual description of the secure AES key in the "
+		.desc = "Textual description of the secure key in the "
 			"repository",
 		.command = COMMAND_IMPORT,
 	},
@@ -456,7 +458,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME:DMNAME[,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the repository",
 		.command = COMMAND_IMPORT,
 	},
@@ -464,7 +466,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "apqns", required_argument, NULL, 'a'},
 		.argument = "CARD.DOMAIN[,...]",
 		.desc = "Comma-separated pairs of crypto cards and domains "
-			"that are associated with the secure AES key in the "
+			"that are associated with the secure key in the "
 			"repository",
 		.command = COMMAND_IMPORT,
 	},
@@ -472,17 +474,17 @@ static struct util_opt opt_vec[] = {
 		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
 		.desc = "Do not check if the specified APQN(s) are available. "
 			"Use this option to associate APQN(s) with a secure "
-			"AES key that are currently not available.",
+			"key that are currently not available.",
 		.command = COMMAND_IMPORT,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
 		.argument = "512|4096",
-		.desc = "The sector size used with dm-crypt. It must be power "
-			"of two and in range 512 - 4096 bytes. If this option "
-			"is omitted, the system default sector size (512) is "
-			"used",
+		.desc = "The sector size used with dm-crypt or dm-integrity. "
+			"It must be a power of two and in range 512 - 4096 "
+			"bytes. If this option is omitted, the system default "
+			"sector size (512) is used",
 		.command = COMMAND_IMPORT,
 	},
 	{
@@ -540,7 +542,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository that is "
+		.desc = "Name of the secure key in the repository that is "
 			"to be exported",
 		.command = COMMAND_EXPORT,
 	},
@@ -553,7 +555,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES keys in the repository that "
+		.desc = "Name of the secure keys in the repository that "
 			"are to be listed. You can use wild-cards to select "
 			"the keys to list.",
 		.command = COMMAND_LIST,
@@ -562,7 +564,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME[:DMNAME][,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the repository. Use this option to list all keys "
 			"associated with specific volumes. The device-mapper "
 			"name (DMNAME) is optional. If specified, only those "
@@ -574,7 +576,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "apqns", required_argument, NULL, 'a'},
 		.argument = "CARD.DOMAIN[,...]",
 		.desc = "Comma-separated pairs of crypto cards and domains "
-			"that are associated with the secure AES key in the "
+			"that are associated with the secure key in the "
 			"repository. Use this option to list all keys "
 			"associated with specific crypto cards",
 		.command = COMMAND_LIST,
@@ -592,9 +594,9 @@ static struct util_opt opt_vec[] = {
 		.argument = "type",
 		.desc = "The type of the key. Possible values are '"
 			KEY_TYPE_CCA_AESDATA "', '" KEY_TYPE_CCA_AESCIPHER
-			"', '" KEY_TYPE_EP11_AES "', and '"
-			KEY_TYPE_PVSECRET_AES "'. Use this option to list all "
-			"keys with the specified key type.",
+			"', '" KEY_TYPE_EP11_AES "', '" KEY_TYPE_PVSECRET_AES
+			"', and '" KEY_TYPE_PVSECRET_HMAC " . Use this option "
+			"to list all keys with the specified key type.",
 		.command = COMMAND_LIST,
 	},
 	{
@@ -618,7 +620,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository that is "
+		.desc = "Name of the secure key in the repository that is "
 			"to be removed",
 		.command = COMMAND_REMOVE,
 	},
@@ -636,14 +638,14 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository that is "
+		.desc = "Name of the secure key in the repository that is "
 			"to be changed",
 		.command = COMMAND_CHANGE,
 	},
 	{
 		.option = { "description", required_argument, NULL, 'd'},
 		.argument = "DESCRIPTION",
-		.desc = "Textual description of the secure AES key in the "
+		.desc = "Textual description of the secure key in the "
 			"repository",
 		.command = COMMAND_CHANGE,
 	},
@@ -651,7 +653,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "[+|-]VOLUME:DMNAME[,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the repository. To add pairs of volume and device-"
 			"mapper names to the key specify '+VOLUME:DMNAME[,...]'. "
 			"To remove pairs of volume and device-mapper names "
@@ -662,7 +664,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "apqns", required_argument, NULL, 'a'},
 		.argument = "[+|-]CARD.DOMAIN[,...]",
 		.desc = "Comma-separated pairs of crypto cards and domains "
-			"that are associated with the secure AES key in the "
+			"that are associated with the secure key in the "
 			"repository. To add pairs of crypto cards and domains "
 			"to the key specify '+CARD.DOMAIN[,...]'. To remove "
 			"pairs of crypto cards and domains from the key "
@@ -673,16 +675,17 @@ static struct util_opt opt_vec[] = {
 		.option = {"no-apqn-check", 0, NULL, OPT_NO_APQN_CHECK},
 		.desc = "Do not check if the specified APQN(s) are available. "
 			"Use this option to associate APQN(s) with a secure "
-			"AES key that are currently not available.",
+			"key that are currently not available.",
 		.command = COMMAND_CHANGE,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
 		.argument = "0|512|4096",
-		.desc = "The sector size used with dm-crypt. It must be power "
-			"of two and in range 512 - 4096 bytes. Specify 0 to "
-			"use the system default sector size (512)",
+		.desc = "The sector size used with dm-crypt or dm-integrity. "
+			"It must be a power of two and in range 512 - 4096 "
+			"bytes. If this option is omitted, the system default "
+			"sector size (512) is used",
 		.command = COMMAND_CHANGE,
 	},
 	{
@@ -740,14 +743,14 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository that is "
+		.desc = "Name of the secure key in the repository that is "
 			"to be renamed",
 		.command = COMMAND_RENAME,
 	},
 	{
 		.option = { "new-name", required_argument, NULL, 'w'},
 		.argument = "NEW-NAME",
-		.desc = "New name of the secure AES key in the repository",
+		.desc = "New name of the secure key in the repository",
 		.command = COMMAND_RENAME,
 	},
 	/***********************************************************/
@@ -759,21 +762,21 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository that is "
+		.desc = "Name of the secure key in the repository that is "
 			"to be copied",
 		.command = COMMAND_COPY,
 	},
 	{
 		.option = { "new-name", required_argument, NULL, 'w'},
 		.argument = "NEW-NAME",
-		.desc = "New name of the secure AES key in the repository",
+		.desc = "New name of the secure key in the repository",
 		.command = COMMAND_COPY,
 	},
 	{
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME:DMNAME[,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the copied secure AES "
+			"names that are associated with the copied secure "
 			"key in the repository. If option '--volumes/-l' is "
 			"omitted, no volumes are associated with the copied "
 			"key, because only one key can be associated to a "
@@ -969,7 +972,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES key in the repository that is "
+		.desc = "Name of the secure key in the repository that is "
 			"to be converted",
 		.command = COMMAND_CONVERT,
 	},
@@ -1070,7 +1073,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "label", required_argument, NULL, 'B'},
 		.argument = "LABEL",
-		.desc = "Label of the secure AES keys as known by the KMS that "
+		.desc = "Label of the secure keys as known by the KMS that "
 			"are to be listed. You can use wildcards to select "
 			"the keys to be listed.",
 		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
@@ -1078,7 +1081,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES keys as known by zkey that "
+		.desc = "Name of the secure keys as known by zkey that "
 			"are to be listed. You can use wildcards to select "
 			"the keys to be listed.",
 		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
@@ -1087,7 +1090,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME[:DMNAME][,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the KMS. Use this option to list all keys "
 			"associated with specific volumes. The device-mapper "
 			"name (DMNAME) is optional. If specified, only those "
@@ -1112,7 +1115,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "label", required_argument, NULL, 'B'},
 		.argument = "LABEL",
-		.desc = "Label of the secure AES keys as known by the KMS that "
+		.desc = "Label of the secure keys as known by the KMS that "
 			"are to be imported. You can use wildcards to select "
 			"the keys to be imported.",
 		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
@@ -1120,7 +1123,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES keys as known by zkey that "
+		.desc = "Name of the secure keys as known by zkey that "
 			"are to be imported. You can use wildcards to select "
 			"the keys to be imported.",
 		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
@@ -1129,7 +1132,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME[:DMNAME][,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the KMS. Use this option to import all keys "
 			"associated with specific volumes. The device-mapper "
 			"name (DMNAME) is optional. If specified, only those "
@@ -1170,7 +1173,7 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "name", required_argument, NULL, 'N'},
 		.argument = "NAME",
-		.desc = "Name of the secure AES keys in the repository that "
+		.desc = "Name of the secure keys in the repository that "
 			"are to be refreshed. You can use wildcards to select "
 			"the keys to be refreshed.",
 		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
@@ -1179,7 +1182,7 @@ static struct util_opt opt_vec[] = {
 		.option = { "volumes", required_argument, NULL, 'l'},
 		.argument = "VOLUME[:DMNAME][,...]",
 		.desc = "Comma-separated pairs of volume and device-mapper "
-			"names that are associated with the secure AES key in "
+			"names that are associated with the secure key in "
 			"the repository. Use this option to refresh all keys "
 			"associated with specific volumes. The device-mapper "
 			"name (DMNAME) is optional. If specified, only those "
@@ -1206,7 +1209,7 @@ static struct util_opt opt_vec[] = {
 	},
 	{
 		.option = {"refresh-properties", 0, NULL, 'P'},
-		.desc = "Also refresh the properties of the secure AES key "
+		.desc = "Also refresh the properties of the secure key "
 			"and update them with the values from the KMS.",
 		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
 	},
@@ -1314,10 +1317,10 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "sector-size", required_argument, NULL, 'S'},
 		.argument = "512|4096",
-		.desc = "The sector size used with dm-crypt. It must be a power "
-			"of two and in range 512 - 4096 bytes. If this option "
-			"is omitted, the system default sector size (512) is "
-			"used",
+		.desc = "The sector size used with dm-crypt or dm-integrity. "
+			"It must be a power of two and in range 512 - 4096 "
+			"bytes. If this option is omitted, the system default "
+			"sector size (512) is used",
 		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
 	},
 	{
@@ -1614,8 +1617,8 @@ static struct zkey_command zkey_commands[] = {
 		.abbrev_len = 3,
 		.function = command_generate,
 		.need_pkey_device = 1,
-		.short_desc = "Generate a secure AES key",
-		.long_desc = "Generate a secure AES key either by "
+		.short_desc = "Generate a secure AES or HMAC key",
+		.long_desc = "Generate a secure AES or HMAC key either by "
 			     "random or from a specified clear key and store "
 			     "it either into SECURE-KEY-FILE or into the "
 			     "repository",
@@ -1633,8 +1636,8 @@ static struct zkey_command zkey_commands[] = {
 		.function = command_reencipher,
 		/* Will load the CCA or EP11 library on demand */
 		.need_pkey_device = 1,
-		.short_desc = "Re-encipher an existing secure AES key",
-		.long_desc = "Re-encipher an existing secure AES "
+		.short_desc = "Re-encipher an existing secure key",
+		.long_desc = "Re-encipher an existing secure "
 			     "key that is either contained in SECURE-KEY-FILE "
 			     "or is stored in the repository with another "
 			     "master key",
@@ -1647,8 +1650,8 @@ static struct zkey_command zkey_commands[] = {
 		.abbrev_len = 3,
 		.function = command_validate,
 		.need_pkey_device = 1,
-		.short_desc = "Validate an existing secure AES key",
-		.long_desc = "Validate an existing secure AES key that is "
+		.short_desc = "Validate an existing secure key",
+		.long_desc = "Validate an existing secure key that is "
 			     "either contained in SECURE-KEY-FILE or is stored "
 			     "in the repository and print information about "
 			     "the key",
@@ -1660,8 +1663,8 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_IMPORT,
 		.abbrev_len = 2,
 		.function = command_import,
-		.short_desc = "Import a secure AES key",
-		.long_desc = "Import a secure AES key from a file into the "
+		.short_desc = "Import a secure key",
+		.long_desc = "Import a secure key from a file into the "
 			     "repository",
 		.has_options = 1,
 		.pos_arg = "SECURE-KEY-FILE",
@@ -1671,8 +1674,8 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_EXPORT,
 		.abbrev_len = 2,
 		.function = command_export,
-		.short_desc = "Export a secure AES key",
-		.long_desc = "Export a secure AES key from the repository to "
+		.short_desc = "Export a secure key",
+		.long_desc = "Export a secure key from the repository to "
 			     "a file",
 		.has_options = 1,
 		.pos_arg = "SECURE-KEY-FILE",
@@ -1683,7 +1686,7 @@ static struct zkey_command zkey_commands[] = {
 		.abbrev_len = 2,
 		.function = command_list,
 		.short_desc = "List keys in the repository",
-		.long_desc = "List secure AES key in the repository",
+		.long_desc = "List secure keys in the repository",
 		.has_options = 1,
 		.need_keystore = 1,
 	},
@@ -1691,8 +1694,8 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_REMOVE,
 		.abbrev_len = 3,
 		.function = command_remove,
-		.short_desc = "Remove a secure AES key",
-		.long_desc = "Remove a secure AES key from the repository",
+		.short_desc = "Remove a secure key",
+		.long_desc = "Remove a secure key from the repository",
 		.has_options = 1,
 		.need_keystore = 1,
 		.use_kms_plugin = 1,
@@ -1702,8 +1705,8 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_CHANGE,
 		.abbrev_len = 2,
 		.function = command_change,
-		.short_desc = "Change a secure AES key",
-		.long_desc = "Change the properties of a secure AES key in "
+		.short_desc = "Change a secure key",
+		.long_desc = "Change the properties of a secure key in "
 			     "the repository",
 		.has_options = 1,
 		.need_keystore = 1,
@@ -1713,8 +1716,8 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_RENAME,
 		.abbrev_len = 3,
 		.function = command_rename,
-		.short_desc = "Rename a secure AES key",
-		.long_desc = "Rename a secure AES key in the repository",
+		.short_desc = "Rename a secure key",
+		.long_desc = "Rename a secure key in the repository",
 		.has_options = 1,
 		.need_keystore = 1,
 		.use_kms_plugin = 1,
@@ -1723,8 +1726,8 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_COPY,
 		.abbrev_len = 2,
 		.function = command_copy,
-		.short_desc = "Copy a secure AES key",
-		.long_desc = "Copy a secure AES key in the repository",
+		.short_desc = "Copy a secure key",
+		.long_desc = "Copy a secure key in the repository",
 		.has_options = 1,
 		.need_keystore = 1,
 	},
@@ -1753,8 +1756,8 @@ static struct zkey_command zkey_commands[] = {
 		.function = command_convert,
 		.need_cca_library = 1,
 		.need_pkey_device = 1,
-		.short_desc = "Convert a secure AES key",
-		.long_desc = "Convert an existing secure AES key that is "
+		.short_desc = "Convert a secure key",
+		.long_desc = "Convert an existing secure key that is "
 			     "either contained in SECURE-KEY-FILE or is stored "
 			     "in the repository from one key type to another "
 			     "type.",
@@ -2233,7 +2236,7 @@ static int command_reencipher_file(void)
 		if (rc != 0) {
 			if (rc == -ENODEV) {
 				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure AES volume "
+				      "re-enciphering the secure volume "
 				      "key");
 			} else {
 				warnx("Re-encipher from OLD to CURRENT "
@@ -2244,7 +2247,7 @@ static int command_reencipher_file(void)
 				    !is_ep11_aes_key_with_header(secure_key,
 							secure_key_size))
 					print_msg_for_cca_envvars(
-							"secure AES key");
+							"secure key");
 			}
 			rc = EXIT_FAILURE;
 			goto out;
@@ -2260,7 +2263,7 @@ static int command_reencipher_file(void)
 		if (rc != 0) {
 			if (rc == -ENODEV) {
 				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure AES volume "
+				      "re-enciphering the secure volume "
 				      "key and has the NEW master key loaded");
 			} else {
 				warnx("Re-encipher from CURRENT to NEW "
@@ -2271,7 +2274,7 @@ static int command_reencipher_file(void)
 				    !is_ep11_aes_key_with_header(secure_key,
 							secure_key_size))
 					print_msg_for_cca_envvars(
-							"secure AES key");
+							"secure key");
 			}
 			rc = EXIT_FAILURE;
 			goto out;
@@ -2846,7 +2849,7 @@ static int command_convert_file(void)
 	}
 	if (rc != 0) {
 		warnx("No APQN found that is suitable for "
-		      "converting the secure AES key in file '%s'", g.pos_arg);
+		      "converting the secure key in file '%s'", g.pos_arg);
 		rc = EXIT_FAILURE;
 		goto out;
 	}
@@ -2873,7 +2876,7 @@ static int command_convert_file(void)
 		warnx("Converting the secure key from %s to %s has failed",
 		      get_key_type(secure_key, secure_key_size), g.key_type);
 		if (!selected)
-			print_msg_for_cca_envvars("secure AES key");
+			print_msg_for_cca_envvars("secure key");
 		rc = EXIT_FAILURE;
 		goto out;
 	}
@@ -2885,7 +2888,7 @@ static int command_convert_file(void)
 			warnx("Export restricting the converted secure key "
 			      "has failed");
 			if (!selected)
-				print_msg_for_cca_envvars("secure AES key");
+				print_msg_for_cca_envvars("secure key");
 			rc = EXIT_FAILURE;
 			goto out;
 		}
