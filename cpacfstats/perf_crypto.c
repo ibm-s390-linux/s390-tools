@@ -52,8 +52,8 @@ static struct pmf_data {
 
 struct percpucounter {
 	int                   ctr_fds[ALL_COUNTER];
-	int                   pai_user[NUM_PAI_USER];
-	int                   pai_kernel[NUM_PAI_KERNEL];
+	int                   pai_user[MAX_NUM_PAI];
+	int                   pai_kernel[MAX_NUM_PAI];
 	unsigned int          cpunum;
 	struct percpucounter *next;
 };
@@ -84,10 +84,10 @@ static struct percpucounter *allocpercpucounter(unsigned int cpunum)
 
 		for (i = 0; i < ALL_COUNTER; ++i)
 			ppc->ctr_fds[i] = -1;
-		for (i = 0; i < NUM_PAI_USER; ++i)
+		for (i = 0; i < MAX_NUM_PAI; ++i) {
 			ppc->pai_user[i] = -1;
-		for (i = 0; i < NUM_PAI_KERNEL; ++i)
 			ppc->pai_kernel[i] = -1;
+		}
 		ppc->cpunum = cpunum;
 		ppc->next = NULL;
 	}
@@ -100,10 +100,10 @@ static void freepercpucounter(struct percpucounter *pcpu)
 
 	for (i = 0; i < ALL_COUNTER; ++i)
 		(void)close(pcpu->ctr_fds[i]);
-	for (i = 0; i < NUM_PAI_USER; ++i)
+	for (i = 0; i < MAX_NUM_PAI; ++i) {
 		(void)close(pcpu->pai_user[i]);
-	for (i = 0; i < NUM_PAI_KERNEL; ++i)
 		(void)close(pcpu->pai_kernel[i]);
+	}
 	free(pcpu);
 }
 
@@ -225,7 +225,7 @@ static int perf_event_encode(int *pmutype, int *eventid,
 	return 0;
 }
 
-static int activatecpu(unsigned int cpu)
+static int activatecpu(unsigned int cpu, unsigned int *supported_counters)
 {
 	struct perf_event_attr pfm_event;
 	struct percpucounter *ppc;
@@ -273,7 +273,10 @@ static int activatecpu(unsigned int cpu)
 	   (ctr_state[PAI_USER] == UNSUPPORTED) ==
 	   (ctr_state[PAI_KERNEL] == UNSUPPORTED) */
 	if (ctr_state[PAI_USER] != UNSUPPORTED) {
-		for (i = 1; i <= NUM_PAI_USER; ++i) {
+		for (i = 1; i <= MAX_NUM_PAI; ++i) {
+			if (is_user_space(i - 1) != KERNEL_AND_USER_COUNTER ||
+			    supported_counters[i - 1] != 1)
+				continue;
 			memset(&pfm_event, 0, sizeof(pfm_event));
 			pfm_event.size = sizeof(pfm_event);
 			pfm_event.type = paipmutype;
@@ -307,7 +310,14 @@ static int activatecpu(unsigned int cpu)
 				ppc->pai_kernel[i - 1] = fd;
 			}
 		}
-		for (; i <= NUM_PAI_KERNEL; ++i) {
+		/*
+		 * i can start at the index of the first PAI counter
+		 * for which kernel space is needed
+		 */
+		for (i = FIRST_KERNEL_ONLY_COUNTER; i <= MAX_NUM_PAI; ++i) {
+			if (is_user_space(i - 1) == SUPPRESS_COUNTER ||
+			    supported_counters[i - 1] != 1)
+				continue;
 			memset(&pfm_event, 0, sizeof(pfm_event));
 			pfm_event.size = sizeof(pfm_event);
 			pfm_event.type = paipmutype;
@@ -348,10 +358,10 @@ static void deactivatecpu(unsigned int cpunum)
 	if (pcpu != NULL) {
 		for (i = 0; i < ALL_COUNTER; ++i)
 			(void)close(pcpu->ctr_fds[i]);
-		for (i = 0; i < NUM_PAI_USER; ++i)
+		for (i = 0; i < MAX_NUM_PAI; ++i) {
 			(void)close(pcpu->pai_user[i]);
-		for (i = 0; i < NUM_PAI_KERNEL; ++i)
 			(void)close(pcpu->pai_kernel[i]);
+		}
 		free(pcpu);
 		if (enabledcounter)
 			hotplugdetected = 1;
@@ -359,7 +369,7 @@ static void deactivatecpu(unsigned int cpunum)
 	pthread_mutex_unlock(&rootmux);
 }
 
-static int addallcpus(void)
+static int addallcpus(unsigned int *supported_counters)
 {
 	unsigned int start, end;
 	int scanned, rc = 0;
@@ -379,7 +389,7 @@ static int addallcpus(void)
 		if (scanned == 1)
 			end = start;
 		for (; start <= end; ++start) {
-			if (activatecpu(start)) {
+			if (activatecpu(start, supported_counters)) {
 				rc = -1;
 				goto out;
 			}
@@ -409,7 +419,7 @@ static int perf_load_counter_data(void)
 	return res;
 }
 
-static void *hotplughandler(void *UNUSED(unused))
+static void *hotplughandler(void *supported_counters)
 {
 	struct udev *hotplug;
 	struct udev_monitor *monitor;
@@ -452,7 +462,7 @@ static void *hotplughandler(void *UNUSED(unused))
 		path = udev_device_get_devpath(dev);
 		if (sscanf(path, "/devices/system/cpu/cpu%u", &cpunum) != 1)
 			continue;
-		if (on && activatecpu(cpunum))
+		if (on && activatecpu(cpunum, (unsigned int *) supported_counters))
 			eprint("Failed to attach to hotplugged CPU %u\n", cpunum);
 		if (off)
 			deactivatecpu(cpunum);
@@ -462,11 +472,18 @@ static void *hotplughandler(void *UNUSED(unused))
 	return NULL;
 }
 
-int perf_init(void)
+int perf_init(unsigned int *supported_counters)
 {
-	int ecc_supported, i, num;
+	static const char *cpum_cf[] = {
+		"DEA_FUNCTIONS",
+		"AES_FUNCTIONS",
+		"SHA_FUNCTIONS",
+		"PRNG_FUNCTIONS",
+		"ECC_FUNCTION_COUNT"
+	};
 	unsigned long maxfd;
 	struct rlimit rlim;
+	int i, num;
 	FILE *f;
 
 	/*  initialize performance monitoring library */
@@ -478,16 +495,18 @@ int perf_init(void)
 	/* We currently support all cpumf counters plus two virtual
 	 * counters for PAI. */
 	num = ALL_COUNTER + 2;
-	/* Check if ECC is supported on current hardware */
-	ecc_supported = perf_counter_supported("cpum_cf", "ECC_FUNCTION_COUNT");
 
 	if (!cpumf_authorized()) {
 		for (i = 0; i < ALL_COUNTER; ++i)
 			ctr_state[i] = UNSUPPORTED;
 		num -= ALL_COUNTER;
-	} else if (!ecc_supported) {
-		ctr_state[ECC_FUNCTIONS] = UNSUPPORTED;
-		--num;
+	} else {
+		for (i = 0; i < ALL_COUNTER; i++) {
+			if (!perf_counter_supported("cpum_cf", cpum_cf[i])) {
+				ctr_state[i] = UNSUPPORTED;
+				num--;
+			}
+		}
 	}
 
 	if (!perf_counter_supported("pai_crypto", "CRYPTO_ALL")) {
@@ -523,11 +542,12 @@ int perf_init(void)
 		return -1;
 	}
 
-	if (pthread_create(&hotplugthread, NULL, hotplughandler, NULL)) {
+	if (pthread_create(&hotplugthread, NULL, hotplughandler,
+			   supported_counters)) {
 		eprint("Failed to start hotplug handler thread\n");
 		return -1;
 	}
-	return addallcpus();
+	return addallcpus(supported_counters);
 }
 
 
@@ -552,11 +572,14 @@ void perf_close(void)
 }
 
 
-static int enable_array(int *arr, int size)
+static int enable_array(int *arr, int user, unsigned int *supported_counters)
 {
 	int i, ec, rc = 0;
 
-	for (i = 0; i < size; ++i) {
+	for (i = 0; i < MAX_NUM_PAI; ++i) {
+		if ((user && is_user_space(i) != KERNEL_AND_USER_COUNTER) ||
+		    supported_counters[i] != 1 || is_user_space(i) == SUPPRESS_COUNTER)
+			continue;
 		ec = ioctl(arr[i], PERF_EVENT_IOC_ENABLE, 0);
 		if (ec < 0) {
 			eprint("Ioctl(PERF_EVENT_IOC_ENABLE) failed with errno=%d [%s]\n",
@@ -568,14 +591,14 @@ static int enable_array(int *arr, int size)
 }
 
 
-int perf_enable_ctr(enum ctr_e ctr)
+int perf_enable_ctr(enum ctr_e ctr, unsigned int *supported_counters)
 {
 	struct percpucounter *pcpu;
 	int ec, rc = 0;
 
 	if (ctr == ALL_COUNTER) {
 		for (ctr = 0; ctr < ALL_COUNTER; ctr++) {
-			rc = perf_enable_ctr(ctr);
+			rc = perf_enable_ctr(ctr, supported_counters);
 			if (rc != 0)
 				return rc;
 		}
@@ -593,7 +616,7 @@ int perf_enable_ctr(enum ctr_e ctr)
 		endforeachcpu();
 	} else if (ctr == PAI_USER) {
 		foreachcpu(pcpu) {
-			ec = enable_array(pcpu->pai_user, NUM_PAI_USER);
+			ec = enable_array(pcpu->pai_user, 1, supported_counters);
 			if (ec < 0)
 				rc = -1;
 		}
@@ -602,7 +625,7 @@ int perf_enable_ctr(enum ctr_e ctr)
 		endforeachcpu();
 	} else if (ctr == PAI_KERNEL) {
 		foreachcpu(pcpu) {
-			ec = enable_array(pcpu->pai_kernel, NUM_PAI_KERNEL);
+			ec = enable_array(pcpu->pai_kernel, 0, supported_counters);
 			if (ec < 0)
 				rc = -1;
 		}
@@ -617,11 +640,14 @@ int perf_enable_ctr(enum ctr_e ctr)
 }
 
 
-static int disable_array(int *arr, int size)
+static int disable_array(int *arr, int user, unsigned int *supported_counters)
 {
 	int i, ec, rc = 0;
 
-	for (i = 0; i < size; ++i) {
+	for (i = 0; i < MAX_NUM_PAI; ++i) {
+		if ((user && is_user_space(i) != KERNEL_AND_USER_COUNTER) ||
+		    supported_counters[i] != 1 || is_user_space(i) == SUPPRESS_COUNTER)
+			continue;
 		ec = ioctl(arr[i], PERF_EVENT_IOC_DISABLE, 0);
 		if (ec < 0) {
 			eprint("Ioctl(PERF_EVENT_IOC_DISABLE) failed with errno=%d [%s]\n",
@@ -633,14 +659,14 @@ static int disable_array(int *arr, int size)
 }
 
 
-int perf_disable_ctr(enum ctr_e ctr)
+int perf_disable_ctr(enum ctr_e ctr, unsigned int *supported_counters)
 {
 	struct percpucounter *pcpu;
 	int ec, rc = 0;
 
 	if (ctr == ALL_COUNTER) {
 		for (ctr = 0; ctr < ALL_COUNTER; ctr++) {
-			rc = perf_disable_ctr(ctr);
+			rc = perf_disable_ctr(ctr, supported_counters);
 			if (rc != 0)
 				return rc;
 		}
@@ -660,7 +686,7 @@ int perf_disable_ctr(enum ctr_e ctr)
 		endforeachcpu();
 	} else if (ctr == PAI_USER) {
 		foreachcpu(pcpu) {
-			ec = disable_array(pcpu->pai_user, NUM_PAI_USER);
+			ec = disable_array(pcpu->pai_user, 1, supported_counters);
 			if (ec < 0)
 				rc = -1;
 		}
@@ -671,7 +697,7 @@ int perf_disable_ctr(enum ctr_e ctr)
 		endforeachcpu();
 	} else if (ctr == PAI_KERNEL) {
 		foreachcpu(pcpu) {
-			ec = disable_array(pcpu->pai_kernel, NUM_PAI_KERNEL);
+			ec = disable_array(pcpu->pai_kernel, 0, supported_counters);
 			if (ec < 0)
 				rc = -1;
 		}
@@ -688,11 +714,14 @@ int perf_disable_ctr(enum ctr_e ctr)
 }
 
 
-static int reset_array(int *arr, int size)
+static int reset_array(int *arr, int user, unsigned int *supported_counters)
 {
 	int ec, rc = 0, i;
 
-	for (i = 0; i < size; ++i) {
+	for (i = 0; i < MAX_NUM_PAI; ++i) {
+		if ((user && is_user_space(i) != KERNEL_AND_USER_COUNTER) ||
+		    supported_counters[i] != 1 || is_user_space(i) == SUPPRESS_COUNTER)
+			continue;
 		ec = ioctl(arr[i], PERF_EVENT_IOC_RESET, 0);
 		if (ec < 0) {
 			eprint("Ioctl(PERF_EVENT_IOC_RESET) failed with errno=%d [%s]\n",
@@ -704,14 +733,15 @@ static int reset_array(int *arr, int size)
 }
 
 
-int perf_reset_ctr(enum ctr_e ctr, uint64_t *value)
+int perf_reset_ctr(enum ctr_e ctr, uint64_t *value, unsigned int
+				   *supported_counters)
 {
 	struct percpucounter *pcpu;
 	int ec, rc = 0;
 
 	if (ctr == ALL_COUNTER) {
 		for (ctr = 0; ctr < ALL_COUNTER; ctr++) {
-			rc = perf_reset_ctr(ctr, value);
+			rc = perf_reset_ctr(ctr, value, supported_counters);
 			if (rc != 0)
 				return rc;
 		}
@@ -727,14 +757,14 @@ int perf_reset_ctr(enum ctr_e ctr, uint64_t *value)
 		endforeachcpu();
 	} else if (ctr == PAI_USER) {
 		foreachcpu(pcpu) {
-			ec = reset_array(pcpu->pai_user, NUM_PAI_USER);
+			ec = reset_array(pcpu->pai_user, 1, supported_counters);
 			if (ec < 0)
 				rc = -1;
 		}
 		endforeachcpu();
 	} else if (ctr == PAI_KERNEL) {
 		foreachcpu(pcpu) {
-			ec = reset_array(pcpu->pai_kernel, NUM_PAI_KERNEL);
+			ec = reset_array(pcpu->pai_kernel, 0, supported_counters);
 			if (ec < 0)
 				rc = -1;
 		}
@@ -743,12 +773,13 @@ int perf_reset_ctr(enum ctr_e ctr, uint64_t *value)
 		rc = -1;
 	}
 	if (rc == 0)
-		rc = perf_read_ctr(ctr, value);
+		rc = perf_read_ctr(ctr, value, supported_counters);
 	return rc;
 }
 
 
-int perf_read_ctr(enum ctr_e ctr, uint64_t *value)
+int perf_read_ctr(enum ctr_e ctr, uint64_t *value, unsigned int
+				  *supported_counters)
 {
 	struct percpucounter *pcpu;
 	int ec, rc = 0;
@@ -761,11 +792,26 @@ int perf_read_ctr(enum ctr_e ctr, uint64_t *value)
 		return 0;
 	}
 	if (ctr == PAI_USER) {
-		*value = NUM_PAI_USER;
+		int c = 0;
+
+		for (int i = 0; i < MAX_NUM_PAI; i++) {
+			if (is_user_space(i) == KERNEL_AND_USER_COUNTER &&
+			    supported_counters[i] == 1)
+				c++;
+		}
+
+		*value = c;
 		return 0;
 	}
 	if (ctr == PAI_KERNEL) {
-		*value = NUM_PAI_KERNEL;
+		int c = 0;
+
+		for (int i = 0; i < MAX_NUM_PAI; i++) {
+			if (supported_counters[i] == 1)
+				c++;
+		}
+
+		*value = c;
 		return 0;
 	}
 	if (ctr >= ALL_COUNTER)
@@ -802,14 +848,15 @@ int perf_ctr_state(enum ctr_e ctr) {
 int perf_read_pai_ctr(unsigned int ctrnum, int user, uint64_t *value)
 {
 	struct percpucounter *pcpu;
-	unsigned int maxctr;
 	int *arr, ec, rc = 0;
 	uint64_t val;
 
 	*value = 0;
-	maxctr = user ? NUM_PAI_USER : NUM_PAI_KERNEL;
-	if (ctrnum >= maxctr)
+
+	if (is_user_space(ctrnum) == SUPPRESS_COUNTER ||
+	    (user && is_user_space(ctrnum) == KERNEL_ONLY_COUNTER))
 		return -1;
+
 	foreachcpu(pcpu) {
 		arr = user ? pcpu->pai_user : pcpu->pai_kernel;
 		ec = read(arr[ctrnum], &val, sizeof(val));

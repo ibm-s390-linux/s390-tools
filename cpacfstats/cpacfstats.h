@@ -20,12 +20,22 @@
 #define DEFAULT_RECV_TIMEOUT  (30 * 1000)
 
 /*
- * Number of PAI counters for user space.  This excludes PCKMO since
- * this instruction is privileged.
+ * Number of PAI counters. Contains all counters regardless of kernel or user
+ * space
  */
-#define NUM_PAI_USER     143
-/* Number of PAI counters for kernel space.  Contains all counters. */
-#define NUM_PAI_KERNEL   156
+#define MAX_NUM_PAI 		156
+
+/*
+ * This is the sysfs directory from which cpacfstatsd daemon application loads
+ * the available PAI counters
+ */
+#define SYSFS_PAI_COUNTER		"/sys/bus/event_source/devices/pai_crypto/events/"
+
+/*
+ * Note that this is the first kernel only counter in the 1-based list of the
+ * architecture and NOT from the 0-based list in the cpacfstats code!
+ */
+#define FIRST_KERNEL_ONLY_COUNTER		144
 
 int eprint(const char *format, ...);
 
@@ -65,6 +75,12 @@ enum state_e {
 	DISABLED = 0,
 	ENABLED,
 	UNSUPPORTED
+};
+
+enum counter_type {
+	SUPPRESS_COUNTER = 0,
+	KERNEL_AND_USER_COUNTER,
+	KERNEL_ONLY_COUNTER,
 };
 
 /*
@@ -122,15 +138,23 @@ int recv_msg(int sfd, struct msg *m, int timeout);
 
 /* perf_crypto.c */
 
-int  perf_init(void);
+int  perf_init(unsigned int *supported_counters);
 void perf_stop(void);
 void perf_close(void);
-int  perf_enable_ctr(enum ctr_e ctr);
-int  perf_disable_ctr(enum ctr_e ctr);
-int  perf_reset_ctr(enum ctr_e ctr, uint64_t *value);
-int  perf_read_ctr(enum ctr_e ctr, uint64_t *value);
+int  perf_enable_ctr(enum ctr_e ctr, unsigned int *supported_counters);
+int  perf_disable_ctr(enum ctr_e ctr, unsigned int *supported_counters);
+int  perf_reset_ctr(enum ctr_e ctr, uint64_t *value, unsigned int
+					*supported_counters);
+int  perf_read_ctr(enum ctr_e ctr, uint64_t *value, unsigned int
+				   *supported_counters);
 int  perf_ecc_supported(void);
 int  perf_ctr_state(enum ctr_e ctr);
 int  perf_read_pai_ctr(unsigned int ctrnum, int user, uint64_t *value);
+
+/* cpacfstats_common.c */
+
+enum counter_type is_user_space(unsigned int ctr);
+const char *get_ctr_name(unsigned int ctr);
+unsigned int get_num_user_space_ctrs(void);
 
 #endif

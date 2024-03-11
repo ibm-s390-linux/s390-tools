@@ -24,11 +24,51 @@
 #include <sys/stat.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <limits.h>
 
 #include "lib/zt_common.h"
+#include "lib/util_file.h"
 #include "cpacfstats.h"
 
 static volatile int stopsig;
+
+/*
+ * This list contains the counter numbers sorted by instruction
+ */
+static const unsigned int pai_idx[] = {
+	// KM
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+	// KMC
+	16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+	// KMA
+	29, 30, 31, 32, 33, 34,
+	// KMF
+	35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
+	// KMCTR
+	47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
+	// KMO
+	59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+	// KIMD
+	71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+	// KLMD
+	81, 82, 83, 84, 85, 86, 87, 88, 89,
+	// KMAC
+	90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101,
+	// PCC
+	102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
+	114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124,
+	// PRNO
+	125, 126, 127,
+	// KDSA
+	128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139,
+	140, 141, 142,
+	// PCKMO
+	143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153,
+	// Reserved
+	154, 155
+};
 
 static const char *const name = "cpacfstatsd";
 
@@ -93,34 +133,35 @@ static int send_answer(int s, int ctr, int state, uint64_t value)
  * Note that the PAI counters are 0-based, not 1 based as in PoP!
  * Sending ends with the first error.
  */
-static int do_send_pai(int s, int user)
+static int do_send_pai(int s, int user, unsigned int *counter)
 {
-	int ctr, state, i, maxctr, rc = 0;
+	int ctr, state, i, rc = 0;
+	unsigned int current_ctr;
 	uint64_t value;
 
-	if (user) {
-		ctr = PAI_USER;
-		maxctr = NUM_PAI_USER;
-	} else {
-		ctr = PAI_KERNEL;
-		maxctr = NUM_PAI_KERNEL;
-	}
+	ctr = user ? PAI_USER : PAI_KERNEL;
+
 	state = perf_ctr_state(ctr);
 	if (state != ENABLED)
 		return rc;
-	for (i = 0; i < maxctr; ++i) {
-		rc = perf_read_pai_ctr(i, user, &value);
+	for (i = 0; i < MAX_NUM_PAI; ++i) {
+		current_ctr = pai_idx[i];
+		if ((user && is_user_space(current_ctr) != KERNEL_AND_USER_COUNTER) ||
+		    (!user && is_user_space(current_ctr) == SUPPRESS_COUNTER) ||
+		    counter[current_ctr] != 1)
+			continue;
+		rc = perf_read_pai_ctr(current_ctr, user, &value);
 		if (rc != 0) {
-			send_answer(s, i, rc, 0);
+			send_answer(s, current_ctr, rc, 0);
 			break;
 		}
-		send_answer(s, i, state, value);
+		send_answer(s, current_ctr, state, value);
 	}
 	return rc;
 }
 
 
-static int do_enable(int s, enum ctr_e ctr)
+static int do_enable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	uint64_t value = 0;
 	int i, rc = 0;
@@ -132,7 +173,7 @@ static int do_enable(int s, enum ctr_e ctr)
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			state = perf_ctr_state(i);
 			if (state == DISABLED) {
-				rc = perf_enable_ctr(i);
+				rc = perf_enable_ctr(i, supported_counters);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
@@ -140,7 +181,7 @@ static int do_enable(int s, enum ctr_e ctr)
 				state = ENABLED;
 			}
 			if (state != UNSUPPORTED) {
-				rc = perf_read_ctr(i, &value);
+				rc = perf_read_ctr(i, &value, supported_counters);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
@@ -148,20 +189,20 @@ static int do_enable(int s, enum ctr_e ctr)
 			}
 			send_answer(s, i, state, value);
 			if (i == PAI_USER)
-				rc = do_send_pai(s, 1);
+				rc = do_send_pai(s, 1, supported_counters);
 			if (i == PAI_KERNEL)
-				rc = do_send_pai(s, 0);
+				rc = do_send_pai(s, 0, supported_counters);
 		}
 	}
 	if (rc == 0) {
-		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value, NULL);
 		send_answer(s, HOTPLUG_DETECTED, rc, value);
 	}
 	return rc;
 }
 
 
-static int do_disable(int s, enum ctr_e ctr)
+static int do_disable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	int i, rc = 0;
 	uint64_t value;
@@ -171,7 +212,7 @@ static int do_disable(int s, enum ctr_e ctr)
 			continue;
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			if (perf_ctr_state(i) == ENABLED) {
-				rc = perf_disable_ctr(i);
+				rc = perf_disable_ctr(i, supported_counters);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
@@ -181,14 +222,14 @@ static int do_disable(int s, enum ctr_e ctr)
 		}
 	}
 	if (rc == 0) {
-		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value, NULL);
 		send_answer(s, HOTPLUG_DETECTED, rc, value);
 	}
 	return rc;
 }
 
 
-static int do_reset(int s, enum ctr_e ctr)
+static int do_reset(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	int i, rc = 0, state;
 	uint64_t value;
@@ -199,7 +240,7 @@ static int do_reset(int s, enum ctr_e ctr)
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			state = perf_ctr_state(i);
 			if (state == ENABLED) {
-				rc = perf_reset_ctr(i, &value);
+				rc = perf_reset_ctr(i, &value, supported_counters);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
@@ -207,20 +248,20 @@ static int do_reset(int s, enum ctr_e ctr)
 			}
 			send_answer(s, i, state, value);
 			if (i == PAI_USER)
-				rc = do_send_pai(s, 1);
+				rc = do_send_pai(s, 1, supported_counters);
 			if (i == PAI_KERNEL)
-				rc = do_send_pai(s, 0);
+				rc = do_send_pai(s, 0, supported_counters);
 		}
 	}
 	if (rc == 0) {
-		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value, NULL);
 		send_answer(s, HOTPLUG_DETECTED, rc, value);
 	}
 	return rc;
 }
 
 
-static int do_print(int s, enum ctr_e ctr)
+static int do_print(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	int i, rc = 0, state;
 	uint64_t value = 0;
@@ -231,7 +272,7 @@ static int do_print(int s, enum ctr_e ctr)
 		if (i == (int) ctr || ctr == ALL_COUNTER) {
 			state = perf_ctr_state(i);
 			if (state == ENABLED) {
-				rc = perf_read_ctr(i, &value);
+				rc = perf_read_ctr(i, &value, supported_counters);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
 					break;
@@ -239,13 +280,13 @@ static int do_print(int s, enum ctr_e ctr)
 			}
 			send_answer(s, i, state, value);
 			if (i == PAI_USER)
-				rc = do_send_pai(s, 1);
+				rc = do_send_pai(s, 1, supported_counters);
 			if (i == PAI_KERNEL)
-				rc = do_send_pai(s, 0);
+				rc = do_send_pai(s, 0, supported_counters);
 		}
 	}
 	if (rc == 0) {
-		rc = perf_read_ctr(HOTPLUG_DETECTED, &value);
+		rc = perf_read_ctr(HOTPLUG_DETECTED, &value, NULL);
 		send_answer(s, HOTPLUG_DETECTED, rc, value);
 	}
 	return rc;
@@ -436,9 +477,44 @@ int eprint(const char *format, ...)
 }
 
 
+/*
+ * returns -1 on error
+ * returns X where X is the found counters in dir
+ *
+ * the supplied array supported_counters[] is filled in this function with the
+ * available PAI counters found in SYSFS_PAI_COUNTER
+ */
+static void supported_functions(unsigned int supported_counters[])
+{
+	const char *dir = SYSFS_PAI_COUNTER;
+	struct dirent *dp = NULL;
+	char filepath[PATH_MAX];
+	unsigned int num;
+	DIR *dfd = NULL;
+
+	dfd = opendir(dir);
+	if (dfd == NULL)
+		return;
+
+	while ((dp = readdir(dfd)) != NULL) {
+		if ((strcmp(dp->d_name, ".") != 0) &&
+		    (strcmp(dp->d_name, "..") != 0)) {
+			snprintf(filepath, sizeof(filepath), "%s%s", dir, dp->d_name);
+			if (util_file_read_va(filepath, "event=0x10%x", &num) != 1)
+				continue;
+			if (num > 0 && num <= MAX_NUM_PAI)
+				supported_counters[num - 1] = 1;
+		}
+	}
+
+	closedir(dfd);
+	return;
+}
+
 int main(int argc, char *argv[])
 {
 	int rc, sfd, foreground = 0, startup_pipe = -1, initialized = 0;
+	unsigned int supported_counters[MAX_NUM_PAI] = { 0 };
 	struct sigaction act;
 
 	if (argc > 1) {
@@ -485,7 +561,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (perf_init() != 0) {
+	supported_functions(supported_counters);
+
+	if (perf_init(supported_counters) != 0) {
 		eprint("Couldn't initialize perf lib\n");
 		goto error;
 	}
@@ -548,13 +626,13 @@ int main(int argc, char *argv[])
 		}
 
 		if (cmd == ENABLE)
-			rc = do_enable(s, ctr);
+			rc = do_enable(s, ctr, supported_counters);
 		else if (cmd == DISABLE)
-			rc = do_disable(s, ctr);
+			rc = do_disable(s, ctr, supported_counters);
 		else if (cmd == RESET)
-			rc = do_reset(s, ctr);
+			rc = do_reset(s, ctr, supported_counters);
 		else if (cmd == PRINT)
-			rc = do_print(s, ctr);
+			rc = do_print(s, ctr, supported_counters);
 		else {
 			eprint("Received unknown command %d, ignoring\n",
 			       (int) cmd);
