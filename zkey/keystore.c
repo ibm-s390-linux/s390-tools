@@ -277,10 +277,17 @@ static int _keystore_set_file_permission(struct keystore *keystore,
  *  Checks if the sector size is power of two and in range 512 - 4096 bytes.
  *
  * @param[in] sector_size   the sector size
+ * @param[in] key_type      the type of the key, or NULL if the sector size is
+ *                          to be checked independent of the key type.
+ * @param[in] volume_type   the type of associated volume, or NULL if the
+ *                          sector size is to be checked independent of the
+ *                          volume type.
  *
  * @returns 1 if the sector size is valid, 0 otherwise
  */
-static int _keystore_valid_sector_size(size_t sector_size)
+static int _keystore_valid_sector_size(size_t sector_size,
+				       const char *key_type,
+				       const char *volume_type)
 {
 	if (sector_size == 0)
 		return 1;
@@ -288,6 +295,15 @@ static int _keystore_valid_sector_size(size_t sector_size)
 		return 0;
 	if (sector_size & (sector_size - 1))
 		return 0;
+
+	/* Can not set the sector size for volume type LUKS2 on a HMAC key */
+	if (sector_size != 0 &&
+	    key_type != NULL &&
+	    is_hmac_key_type(key_type) &&
+	    volume_type != NULL &&
+	    strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0)
+		return 0;
+
 	return 1;
 }
 
@@ -1963,7 +1979,7 @@ static int _keystore_create_info_props(struct keystore *keystore,
 	if (rc != 0)
 		goto out;
 
-	if (!_keystore_valid_sector_size(sector_size)) {
+	if (!_keystore_valid_sector_size(sector_size, key_type, volume_type)) {
 		warnx("Invalid sector-size specified");
 		rc = -EINVAL;
 		goto out;
@@ -2815,7 +2831,10 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	}
 
 	if (sector_size >= 0) {
-		if (!_keystore_valid_sector_size(sector_size)) {
+		if (!_keystore_valid_sector_size(sector_size, key_type,
+						 volume_type != NULL ?
+							volume_type :
+							old_volume_type)) {
 			warnx("Invalid sector-size specified");
 			rc = -EINVAL;
 			goto out;
@@ -2874,6 +2893,19 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 				goto out;
 
 			passphrase_upd = &null_ptr;
+		}
+
+		/*
+		 * Reset sector-size to zero if changed to anything but
+		 * INTEGTRITY on a HMAC key.
+		 */
+		if (strcasecmp(volume_type, VOLUME_TYPE_INTEGRITY) != 0 &&
+		    is_hmac_key_type(key_type)) {
+			sector_size = 0;
+			rc = properties_set(key_props, PROP_NAME_SECTOR_SIZE,
+					    "0");
+			if (rc != 0)
+				goto out;
 		}
 	}
 
@@ -5969,7 +6001,8 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 	}
 
 	if (sector_size >= 0) {
-		if (!_keystore_valid_sector_size(sector_size)) {
+		if (!_keystore_valid_sector_size(sector_size, key_type,
+						 volume_type)) {
 			warnx("Invalid sector-size specified");
 			rc = -EINVAL;
 			goto out;

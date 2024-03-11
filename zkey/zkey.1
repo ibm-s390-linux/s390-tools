@@ -1388,6 +1388,10 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the sector size in bytes used with \fBdm\-crypt\fP. It must be a power
 of two and in the range of 512 to 4096 bytes. If omitted, the system default
 sector size is used.
+You can only set a sector size for an HMAC key of a volume of type
+\fBintegrity\fP. For an HMAC key that is used for combined encryption and
+integrity protection (volume type \fBluks2\fP), set the sector size for the
+corresponding AES key instead.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
@@ -1564,6 +1568,10 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the sector size in bytes used with \fBdm\-crypt\fP or
 \fBdm\-integrity\fP. It must be a power of two and in the range of 512 to 4096
 bytes. If omitted, the system default sector size is used.
+You can only set a sector size for an HMAC key of a volume of type
+\fBintegrity\fP. For an HMAC key that is used for combined encryption and
+integrity protection (volume type \fBluks2\fP), set the sector size for the
+corresponding AES key instead.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
@@ -1737,6 +1745,10 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the sector size in bytes used with \fBdm\-crypt\fP or
 \fBdm\-integrity\fP. It must be a power of two and in the range of 512 to 4096
 ytes. Specify \fI0\fP to set the sector size to the system default.
+You can only set a sector size for an HMAC key of a volume of type
+\fBintegrity\fP. For an HMAC key that is used for combined encryption and
+integrity protection (volume type \fBluks2\fP), set the sector size for the
+corresponding AES key instead.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
@@ -2247,6 +2259,10 @@ Both keys must use the \fBluks2\fP volume type.
 Specifies the sector size in bytes used with \fBdm\-crypt\fP or
 \fBdm\-integrity\fP. It must be a power of two and in the range of 512 to 4096
 bytes. If omitted, the system default sector size is used.
+You can only set a sector size for an HMAC key of a volume of type
+\fBintegrity\fP. For an HMAC key that is used for combined encryption and
+integrity protection (volume type \fBluks2\fP), set the sector size for the
+corresponding AES key instead.
 .TP
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP or
