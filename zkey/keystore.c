@@ -1727,7 +1727,7 @@ static int _keystore_set_passphrase(struct keystore *keystore,
 				    struct properties *properties,
 				    bool prompt)
 {
-	char *volume_type;
+	char *volume_type, *key_type;
 	int rc;
 
 	if (_keystore_passphrase_file_exists((struct key_filenames *)filenames)
@@ -1755,6 +1755,19 @@ static int _keystore_set_passphrase(struct keystore *keystore,
 		return -EINVAL;
 	}
 	free(volume_type);
+
+	key_type = _keystore_get_key_type(properties);
+	if (key_type == NULL) {
+		pr_verbose(keystore, "No key type available");
+		return -EINVAL;
+	}
+	if (!is_aes_key_type(key_type)) {
+		warnx("The LUKS2 dummy passphrase can only be set for AES-type "
+		      "keys");
+		free(key_type);
+		return -EINVAL;
+	}
+	free(key_type);
 
 	if (passphrase_file != NULL) {
 		rc = copy_file(passphrase_file, filenames->pass_filename, 0);

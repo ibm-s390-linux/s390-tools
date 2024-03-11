@@ -1752,9 +1752,9 @@ is of less or no relevance for the security of the volume(s), when an secure
 AES key is used to encrypt the volume(s), and can therefore be stored insecurely
 inside the secure key repository. If for a certain usage the passphrase is of
 relevance for security, then do not use this option. This option can only be
-specified for keys with a volume type of \fBluks2\fP. When there is already a
-dummy passphrase associated with the key, you must first remove the dummy
-passphrase with option \fB\-\-remove\-dummy\-passphrase\fP before you can
+specified for AES-type keys with a volume type of \fBluks2\fP. When there is
+already a dummy passphrase associated with the key, you must first remove the
+dummy passphrase with option \fB\-\-remove\-dummy\-passphrase\fP before you can
 associate a new dummy passphrase.
 This option is only used for secure keys contained in the secure key repository.
 .TP
@@ -2247,7 +2247,8 @@ of less or no relevance for the security of the volume(s), when a protected
 virtualization secret is used to encrypt the volume(s), and can therefore be
 stored insecurely inside the key repository. If for a certain usage the
 passphrase is of relevance for security, then do not use this option. This
-option can only be specified for keys with a volume type of \fBluks2\fP.
+option can only be specified for AES-type keys with a volume type of
+\fBluks2\fP.
 .TP
 .BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
 Set a dummy passphrase that is read from the specified file and associate it
@@ -2256,8 +2257,8 @@ The LUKS2 passphrase is of less or no relevance for the security of the
 volume(s), when an protected virtualization secret is used to encrypt the
 volume(s), and can therefore be stored insecurely inside the key repository.
 If for a certain usage the passphrase is of relevance for security, then do
-not use this option. This option can only be specified for keys with a volume
-type of \fBluks2\fP.
+not use this option. This option can only be specified for AES-type keys with
+a volume type of \fBluks2\fP.
 .
 .
 .
