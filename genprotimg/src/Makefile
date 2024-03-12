@@ -3,7 +3,7 @@ include ../../common.mak
 
 bin_PROGRAM = genprotimg
 
-PKGDATADIR ?= "$(DESTDIR)$(TOOLS_DATADIR)/genprotimg"
+PKGDATADIR ?= "$(TOOLS_DATADIR)/genprotimg"
 SRC_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 TOP_SRCDIR := $(SRC_DIR)/../
 ROOT_DIR = $(TOP_SRC_DIR)/../../
