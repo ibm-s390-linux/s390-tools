@@ -1,19 +1,24 @@
 include ../common.mak
 
 ifneq (${HAVE_OPENSSL},0)
-	BUILD_TARGETS += zkey
-	INSTALL_TARGETS += install-zkey
-	ifneq (${HAVE_JSONC},0)
-		ifneq (${HAVE_LIBCURL},0)
-			SUB_DIRS += ekmfweb
-			ifneq (${HAVE_LIBXML2},0)
-				SUB_DIRS += kmip
+	ifneq (${HAVE_CRYPTSETUP2},0)
+		BUILD_TARGETS += zkey
+		INSTALL_TARGETS += install-zkey
+		ifneq (${HAVE_JSONC},0)
+			ifneq (${HAVE_LIBCURL},0)
+				SUB_DIRS += ekmfweb
+				ifneq (${HAVE_LIBXML2},0)
+					SUB_DIRS += kmip
+				endif
 			endif
 		endif
+	else
+		BUILD_TARGETS += zkey-skip-cryptsetup2
+		INSTALL_TARGETS += zkey-skip-cryptsetup2
 	endif
 else
-	BUILD_TARGETS += zkey-skip
-	INSTALL_TARGETS += zkey-skip
+	BUILD_TARGETS += zkey-skip-openssl
+	INSTALL_TARGETS += zkey-skip-openssl
 endif
 
 ifneq (${HAVE_CRYPTSETUP2},0)
@@ -21,7 +26,6 @@ ifneq (${HAVE_CRYPTSETUP2},0)
 		ifneq (${HAVE_OPENSSL},0)
 			BUILD_TARGETS += zkey-cryptsetup
 			INSTALL_TARGETS += install-zkey-cryptsetup
-			ALL_CPPFLAGS += -DHAVE_LUKS2_SUPPORT
 		else
 			BUILD_TARGETS += zkey-cryptsetup-skip-openssl
 			INSTALL_TARGETS += zkey-cryptsetup-skip-openssl
@@ -42,26 +46,33 @@ ALL_CFLAGS += -DKMS_PLUGIN_LOCATION=\"$(ZKEYKMSPLUGINDIR)\" \
 
 detect-libcryptsetup.dep:
 	echo "#include <libcryptsetup.h>" > detect-libcryptsetup.dep
-	echo "#ifndef CRYPT_LUKS2" >> detect-libcryptsetup.dep
-	echo "  #error libcryptsetup version 2.0.3 is required" >> detect-libcryptsetup.dep
+	echo "#ifndef CRYPT_REQUIREMENT_INLINE_HW_TAGS" >> detect-libcryptsetup.dep
+	echo "  #error libcryptsetup version 2.8.2 is required" >> detect-libcryptsetup.dep
 	echo "#endif" >> detect-libcryptsetup.dep
 	echo "int i = CRYPT_SLOT_UNBOUND;" >> detect-libcryptsetup.dep
+	echo "int test(void) { return crypt_reencrypt_init_by_keyslot_context(NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL); }" >> detect-libcryptsetup.dep
 
-check-dep-zkey:
+check-dep-zkey: detect-libcryptsetup.dep
 	$(call check_dep, \
 		"zkey", \
 		"openssl/evp.h", \
 		"openssl-devel", \
 		"HAVE_OPENSSL=0")
+	$(call check_dep, \
+		"zkey", \
+		"detect-libcryptsetup.dep", \
+		"cryptsetup-devel version 2.8.2", \
+		"HAVE_CRYPTSETUP2=0", \
+		-I. -lcryptsetup)
 	touch check-dep-zkey
 
 check-dep-zkey-cryptsetup: detect-libcryptsetup.dep
 	$(call check_dep, \
 		"zkey-cryptsetup", \
 		"detect-libcryptsetup.dep", \
-		"cryptsetup-devel version 2.0.3", \
+		"cryptsetup-devel version 2.8.2", \
 		"HAVE_CRYPTSETUP2=0", \
-		"-I.")
+		-I. -lcryptsetup)
 	$(call check_dep, \
 		"zkey-cryptsetup", \
 		"json-c/json.h", \
@@ -69,8 +80,11 @@ check-dep-zkey-cryptsetup: detect-libcryptsetup.dep
 		"HAVE_JSONC=0")
 	touch check-dep-zkey-cryptsetup
 
-zkey-skip:
+zkey-skip-openssl:
 	echo "  SKIP    zkey due to HAVE_OPENSSL=0"
+
+zkey-skip-cryptsetup2:
+	echo "  SKIP    zkey due to HAVE_CRYPTSETUP2=0"
 
 zkey-cryptsetup-skip-cryptsetup2:
 	echo "  SKIP    zkey-cryptsetup due to HAVE_CRYPTSETUP2=0"
@@ -83,13 +97,14 @@ zkey-cryptsetup-skip-openssl:
 
 all: $(BUILD_TARGETS) $(SUB_DIRS)
 
-zkey.o: zkey.c pkey.h cca.h ep11.h misc.h
+zkey.o: check-dep-zkey zkey.c pkey.h cca.h ep11.h misc.h
 pkey.o: pkey.c pkey.h cca.h ep11.h utils.h
 cca.o: cca.c cca.h pkey.h ep11.h utils.h
 ep11.o: ep11.c ep11.h pkey.h cca.h utils.h
 utils.o: utils.h pkey.h cca.h ep11.h
 properties.o: check-dep-zkey properties.c properties.h
-keystore.o: keystore.c keystore.h properties.h pkey.h cca.h ep11.h utils.h
+keystore.o: check-dep-zkey keystore.c keystore.h properties.h pkey.h cca.h \
+			ep11.h utils.h
 zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h \
 			ep11.h misc.h utils.h
 kms.o: kms.c kms.h kms-plugin.h utils.h pkey.h
@@ -139,6 +154,6 @@ $(SUB_DIRS):
 		$(MAKE) -C $@ TOPDIR=$(TOPDIR) HOST_ARCH=$(HOST_ARCH) $(goal) ;)
 .PHONY: $(SUB_DIRS)
 
-.PHONY: all install clean zkey-skip zkey-cryptsetup-skip-cryptsetup2 \
-	zkey-cryptsetup-skip-jsonc install-common install-zkey \
-	install-zkey-cryptsetup
+.PHONY: all install clean zkey-skip-cryptsetup2 zkey-skip-openssl \
+	zkey-cryptsetup-skip-cryptsetup2 zkey-cryptsetup-skip-jsonc \
+	install-common install-zkey install-zkey-cryptsetup

@@ -265,7 +265,6 @@ static struct util_opt opt_vec[] = {
 			"used",
 		.command = COMMAND_GENERATE,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -274,7 +273,6 @@ static struct util_opt opt_vec[] = {
 			"the default is 'luks2'",
 		.command = COMMAND_GENERATE,
 	},
-#endif
 	{
 		.option = { "key-type", required_argument, NULL, 'K'},
 		.argument = "type",
@@ -487,7 +485,6 @@ static struct util_opt opt_vec[] = {
 			"used",
 		.command = COMMAND_IMPORT,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -496,7 +493,6 @@ static struct util_opt opt_vec[] = {
 			"the default is 'luks2'",
 		.command = COMMAND_IMPORT,
 	},
-#endif
 	{
 		.option = { "gen-dummy-passphrase", 0, NULL,
 						OPT_GEN_DUMMY_PASSPHRASE},
@@ -583,7 +579,6 @@ static struct util_opt opt_vec[] = {
 			"associated with specific crypto cards",
 		.command = COMMAND_LIST,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -592,7 +587,6 @@ static struct util_opt opt_vec[] = {
 			"keys with the specified volumes type.",
 		.command = COMMAND_LIST,
 	},
-#endif
 	{
 		.option = { "key-type", required_argument, NULL, 'K'},
 		.argument = "type",
@@ -691,7 +685,6 @@ static struct util_opt opt_vec[] = {
 			"use the system default sector size (512)",
 		.command = COMMAND_CHANGE,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -699,7 +692,6 @@ static struct util_opt opt_vec[] = {
 			"are 'plain' and 'luks2'",
 		.command = COMMAND_CHANGE,
 	},
-#endif
 	{
 		.option = { "gen-dummy-passphrase", 0, NULL,
 						OPT_GEN_DUMMY_PASSPHRASE},
@@ -815,7 +807,6 @@ static struct util_opt opt_vec[] = {
 			"volume and the device-mapper name matches",
 		.command = COMMAND_CRYPTTAB,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -872,7 +863,6 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_CRYPTTAB,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
-#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -891,7 +881,6 @@ static struct util_opt opt_vec[] = {
 			"both, the volume and the device-mapper name matches",
 		.command = COMMAND_CRYPTSETUP,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -901,13 +890,11 @@ static struct util_opt opt_vec[] = {
 			"entry is to be generated",
 		.command = COMMAND_CRYPTSETUP,
 	},
-#endif
 	{
 		.option = {"run", 0, NULL, 'r'},
 		.desc = "Runs the generated cryptsetup command",
 		.command = COMMAND_CRYPTSETUP,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = {"key-file", required_argument, NULL,
 			   OPT_CRYPTSETUP_KEYFILE},
@@ -951,7 +938,6 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_CRYPTSETUP,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
-#endif
 	{
 		.option = {"batch-mode", 0, NULL, 'q'},
 		.desc = "Suppresses cryptsetup confirmation questions. "
@@ -959,7 +945,6 @@ static struct util_opt opt_vec[] = {
 			"command(s)",
 		.command = COMMAND_CRYPTSETUP,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = {"open", 0, NULL, OPT_CRYPTSETUP_OPEN},
 		.desc = "Generates luksOpen or plainOpen commands. For the "
@@ -975,7 +960,6 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_CRYPTSETUP,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
-#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1111,7 +1095,6 @@ static struct util_opt opt_vec[] = {
 			"mapper name matches.",
 		.command = COMMAND_KMS " " COMMAND_KMS_LIST,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -1120,7 +1103,6 @@ static struct util_opt opt_vec[] = {
 			"keys with the specified volumes type.",
 			.command = COMMAND_KMS " " COMMAND_KMS_LIST,
 	},
-#endif
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
@@ -1155,7 +1137,6 @@ static struct util_opt opt_vec[] = {
 			"mapper name matches.",
 		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -1164,7 +1145,6 @@ static struct util_opt opt_vec[] = {
 			"all keys with the specified volumes type.",
 		.command = COMMAND_KMS " " COMMAND_KMS_IMPORT,
 	},
-#endif
 	{
 		.option = {"batch-mode", 0, NULL, 'q'},
 		.desc = "Suppresses alternate name questions. When importing a "
@@ -1207,7 +1187,6 @@ static struct util_opt opt_vec[] = {
 			"device-mapper name matches",
 		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -1216,7 +1195,6 @@ static struct util_opt opt_vec[] = {
 			"all keys with the specified volumes type.",
 		.command = COMMAND_KMS " " COMMAND_KMS_REFRESH,
 	},
-#endif
 	{
 		.option = { "key-type", required_argument, NULL, 'K'},
 		.argument = "type",
@@ -1342,7 +1320,6 @@ static struct util_opt opt_vec[] = {
 			"used",
 		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
 	},
-#ifdef HAVE_LUKS2_SUPPORT
 	{
 		.option = { "volume-type", required_argument, NULL, 't'},
 		.argument = "type",
@@ -1351,7 +1328,6 @@ static struct util_opt opt_vec[] = {
 			"the default is 'luks2'",
 		.command = COMMAND_PVSECRETS " " COMMAND_PVSECRETS_IMPORT,
 	},
-#endif
 	{
 		.option = { "gen-dummy-passphrase", 0, NULL,
 						OPT_GEN_DUMMY_PASSPHRASE},
@@ -3517,11 +3493,9 @@ int main(int argc, char *argv[])
 				return EXIT_FAILURE;
 			}
 			break;
-#ifdef HAVE_LUKS2_SUPPORT
 		case 't':
 			g.volume_type = optarg;
 			break;
-#endif
 		case 'w':
 			g.newname = optarg;
 			break;
@@ -3537,7 +3511,6 @@ int main(int argc, char *argv[])
 		case 'V':
 			g.verbose = 1;
 			break;
-#ifdef HAVE_LUKS2_SUPPORT
 		case OPT_CRYPTSETUP_KEYFILE:
 			g.keyfile = optarg;
 			break;
@@ -3575,18 +3548,15 @@ int main(int argc, char *argv[])
 				return EXIT_FAILURE;
 			}
 			break;
-#endif
 		case 'q':
 			g.batch_mode = 1;
 			break;
-#ifdef HAVE_LUKS2_SUPPORT
 		case OPT_CRYPTSETUP_OPEN:
 			g.open = 1;
 			break;
 		case OPT_CRYPTSETUP_FORMAT:
 			g.format = 1;
 			break;
-#endif
 		case 'L':
 			g.local = 1;
 			break;

@@ -57,11 +57,7 @@ struct key_filenames {
 
 #define VOLUME_TYPE_PLAIN	"plain"
 #define VOLUME_TYPE_LUKS2	"luks2"
-#ifdef HAVE_LUKS2_SUPPORT
-	#define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_LUKS2
-#else
-	#define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_PLAIN
-#endif
+#define DEFAULT_VOLUME_TYPE	VOLUME_TYPE_LUKS2
 
 #define REC_KEY			"Key"
 #define REC_DESCRIPTION		"Description"
@@ -304,10 +300,8 @@ static int _keystore_valid_volume_type(const char *volume_type)
 {
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0)
 		return 1;
-#ifdef HAVE_LUKS2_SUPPORT
 	if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0)
 		return 1;
-#endif
 	return 0;
 }
 
@@ -4438,7 +4432,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			 */
 			util_asprintf(&cmd,
 				      "cryptsetup luksFormat %s%s--type luks2 "
-				      "--master-key-file '%s' --key-size %lu "
+				      "--volume-key-file '%s' --key-size %lu "
 				      "--cipher %s --pbkdf %s %s%s%s",
 				      info->batch_mode ? "-q " : "",
 				      keystore->verbose ? "-v " : "",
@@ -5005,7 +4999,7 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		      "the secure AES volume key of type CCA-AESDATA. To "
 		      "change the secure AES volume key in the LUKS2 header, "
 		      "run command 'zkey-cryptsetup setkey <device> "
-		      "--master-key-file %s':", name,
+		      "--volume-key-file %s':", name,
 		      file_names.skey_filename);
 	_keystore_msg_for_volumes(temp, properties, VOLUME_TYPE_LUKS2);
 	free(temp);
@@ -5824,7 +5818,7 @@ out:
 			      "encrypted with key '%s'. To update the secure "
 			      "AES volume key in the LUKS2 header, run command "
 			      "'zkey-cryptsetup setkey <device> "
-			      "--master-key-file %s':", name,
+			      "--volume-key-file %s':", name,
 			      file_names->skey_filename);
 		_keystore_msg_for_volumes(msg, properties, VOLUME_TYPE_LUKS2);
 		free(msg);

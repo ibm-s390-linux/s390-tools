@@ -517,11 +517,11 @@ the different tools are provided:
 
 * zkey:
   For building the zkey tools you need openssl version 0.9.7 or newer installed
-  (openssl-devel.rpm). Also required are cryptsetup version 2.0.3 or newer
+  (openssl-devel.rpm). Also required are cryptsetup version 2.8.2 or newer
   (cryptsetup-devel.rpm), and json-c version 0.12 or newer (json-c-devel.rpm).
-  Tip: you may skip the zkey build by adding `HAVE_OPENSSL=0`, and you may
-  may skip the zkey-cryptsetup build by adding `HAVE_CRYPTSETUP2=0`, or
-  `HAVE_JSONC=0` to the make invocation.
+  Tip: you may skip the zkey build by adding `HAVE_OPENSSL=0` or
+  `HAVE_CRYPTSETUP2=0`, and you may skip the zkey-cryptsetup build
+  by adding `HAVE_JSONC=0` to the make invocation.
   A new group 'zkeyadm' needs to be created and all users intending to use the
   tool must be added to this group. The owner of the default key repository
   '/etc/zkey/repository' must be set to group 'zkeyadm' with write permission

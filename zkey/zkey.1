@@ -729,10 +729,7 @@ options
 .B \-\-keyfile\-offset
 and
 .B \-\-keyfile\-size
-to control which part of the key file is used as passphrase. These options are
-passed to the generated crypttab entries and are only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+to control which part of the key file is used as passphrase.
 .
 .SS "Generate cryptsetup commands for volumes associated with secure AES keys"
 .
@@ -804,11 +801,8 @@ options
 .B \-\-keyfile\-offset
 and
 .B \-\-keyfile\-size
-to control which part of the key file is used as passphrase. These options are
-only available if
-.B zkey
-has been compiled with LUKS2 support enabled. To avoid cryptsetup confirmation
-questions, you can specify the
+to control which part of the key file is used as passphrase.
+To avoid cryptsetup confirmation questions, you can specify the
 .B \-\-batch\-mode
 option. These options are passed to the generated command(s) and behave in the
 same way as with \fBcryptsetup\fP.
@@ -871,7 +865,7 @@ to re-generate the crypttab entries.
 .P
 Associated volumes of type \fBLUKS2\fP still contain the secure AES volume key
 of the original type. To change the secure AES volume key in the LUKS2 header,
-run command \fBzkey\-cryptsetup setkey <device> \-\-master\-key\-file
+run command \fBzkey\-cryptsetup setkey <device> \-\-volume\-key\-file
 <converted\-key>\fP for each associated volume.
 .
 .P
@@ -1392,10 +1386,6 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is
 used.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
-the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
@@ -1566,10 +1556,6 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is
 used.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
-the default volume type is \fBplain\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-gen\-dummy\-passphrase
@@ -1637,9 +1623,6 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. Only keys with the specified
 volume type are listed.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
@@ -1739,9 +1722,6 @@ This option is only used for secure keys contained in the secure key repository.
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-gen\-dummy\-passphrase
@@ -1845,28 +1825,20 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. Only keys with the specified
 volume type are selected to generate crypttab entries for.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-key\-file\~\fIfile\-name\fP
 Reads the passphrase from the specified file. If this option is omitted, and
 no dummy passphrase is associated with the secure key, then you are prompted to
 enter the passphrase interactively during system startup.
-This option is passed to the generated crypttab entries for LUKS2 volumes, and
-is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+This option is passed to the generated crypttab entries for LUKS2 volumes.
 .TP
 .BR \-\-keyfile\-offset\~\fIbytes\fP
 Specifies the number of bytes to skip before starting to read in the file
 specified with option \fB\-\-key\-file\fP. If omitted, the file is read
 from the beginning. When option \fB\-\-key\-file\fP is not specified, this
 option is ignored. This option is passed to the generated crypttab entries
-for LUKS2 volumes, and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled. Not all distributions support the
+for LUKS2 volumes. Not all distributions support the
 .B keyfile\-offset
 option in crypttab entries.
 .TP
@@ -1876,9 +1848,7 @@ specified with option \fB\-\-key\-file\fP. If omitted, the file is read
 until the end. When \fB\-\-keyfile\-offset\fP is also specified, reading starts
 at the offset. When option \fB\-\-key\-file\fP is not specified, this option is
 ignored. This option is passed to the generated crypttab entries for LUKS2
-volumes, and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled. Not all distributions support the
+volumes. Not all distributions support the
 .B keyfile\-size
 option in crypttab entries.
 .TP
@@ -1887,9 +1857,7 @@ Specifies how often the interactive input of the passphrase can be re-entered
 during system startup. The default is 3 times. When option \fB\-\-key\-file\fP
 is specified, this option is ignored, and the passphrase is read only once from
 the file. This option is passed to the generated crypttab entries for LUKS2
-volumes, and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+volumes.
 .
 .
 .
@@ -1910,9 +1878,6 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. Only keys with the specified
 volume type are selected to generate cryptsetup commands for.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-r ", " \-\-run
@@ -1925,55 +1890,40 @@ Generates \fBcryptsetup luksOpen\fP or \fBcryptsetup plainOpen\fP commands.
 For a plain volume type, this is the default. This option can not be specified
 together with the
 .BR \-\-format
-option, and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+option.
 .TP
 .BR \-\-format
 Generates \fBcryptsetup luksFormat\fP commands. For a LUKS2 volume type, this
 is the default. If specified for a plain volume type, then no command is
 generated. This option can not be specified together with the
 .BR \-\-open
-option, and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+option.
 .TP
 .BR \-\-key\-file\~\fIfile\-name\fP
 Reads the passphrase from the specified file. If this option is omitted, and
 no dummy passphrase is associated with the secure key, or if the file\-name is
 \fI\-\fP (a dash), then you are prompted to enter the passphrase interactively.
-This option is passed to the generated command(s) for LUKS2 volumes, and is
-only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+This option is passed to the generated command(s) for LUKS2 volumes.
 .TP
 .BR \-\-keyfile\-offset\~\fIbytes\fP
 Specifies the number of bytes to skip before starting to read in the file
 specified with option \fB\-\-key\-file\fP. If omitted, the file is read
 from the beginning. When option \fB\-\-key\-file\fP is not specified, this
 option is ignored. This option is passed to the generated command(s)
-for LUKS2 volumes, and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+for LUKS2 volumes.
 .TP
 .BR \-\-keyfile\-size\~\fIbytes\fP
 Specifies the number of bytes to be read from the beginning of the file
 specified with option \fB\-\-key\-file\fP. If omitted, the file is read
 until the end. When \fB\-\-keyfile\-offset\fP is also specified, reading starts
 at the offset. When option \fB\-\-key\-file\fP is not specified, this option is
-ignored. This option is passed to the generated command(s) for LUKS2 volumes,
-and is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+ignored. This option is passed to the generated command(s) for LUKS2 volumes.
 .TP
 .BR \-\-tries\~\fInumber\fP
 Specifies how often the interactive input of the passphrase can be re-entered.
 The default is 3 times. When option \fB\-\-key\-file\fP is specified, this
 option is ignored, and the passphrase is read only once from the file.
-This option is passed to the generated command(s) for LUKS2 volumes, and is
-only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
+This option is passed to the generated command(s) for LUKS2 volumes.
 .TP
 .BR \-q ", " \-\-batch\-mode
 Suppress cryptsetup confirmation questions. This option is passed to the
@@ -2096,9 +2046,6 @@ When wildcards are used you must quote the value.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. Only keys with the specified
 volume type are listed.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 .
 .
 .
@@ -2131,9 +2078,6 @@ When wildcards are used you must quote the value.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. Only keys with the specified
 volume type are imported.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 .TP
 .BR \-q ", " \-\-batch\-mode
 Suppress prompts to skip or to enter an alternate name, if a secure key with the
@@ -2170,9 +2114,6 @@ When wildcards are used you must quote the value.
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. Only keys with the specified
 volume type are refreshed.
-This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled.
 .TP
 .BR \-K ", " \-\-key\-type\~\fItype\fP
 Specifies the key type of the secure key. Possible values are
@@ -2281,10 +2222,7 @@ sector size is used.
 .BR \-t ", " \-\-volume\-type\~\fItype\fP
 Specifies the volume type of the associated volumes used with \fBdm\-crypt\fP.
 Possible values are \fBplain\fP and \fBluks2\fP. If omitted, \fBluks2\fP is
-used. This option is only available if
-.B zkey
-has been compiled with LUKS2 support enabled. If LUKS2 support is not enabled,
-the default volume type is \fBplain\fP.
+used.
 .TP
 .BR \-\-gen\-dummy\-passphrase
 Generate a dummy passphrase randomly and associate it with the protected
