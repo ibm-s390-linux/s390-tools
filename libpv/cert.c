@@ -857,7 +857,7 @@ static gboolean x509_name_data_by_nid_equal(X509_NAME *name, int nid, const char
 
 /* Checks whether the subject of @cert is a IBM signing key subject. For this we
  * must check that the subject is equal to: 'C = US, ST = New York, L =
- * Poughkeepsie, O = International Business Machines Corporation, CN =
+ * Poughkeepsie or Armonk, O = International Business Machines Corporation, CN =
  * International Business Machines Corporation' and the organization unit (OUT)
  * must end with the suffix ' Key Signing Service'.
  */
@@ -879,7 +879,10 @@ static gboolean has_ibm_signing_subject(X509 *cert)
 	if (!x509_name_data_by_nid_equal(subject, NID_stateOrProvinceName, PV_IBM_Z_SUBJECT_STATE))
 		return FALSE;
 
-	if (!x509_name_data_by_nid_equal(subject, NID_localityName, PV_IBM_Z_SUBJECT_LOCALITY_NAME))
+	if (!(x509_name_data_by_nid_equal(subject, NID_localityName,
+					  PV_IBM_Z_SUBJECT_LOCALITY_NAME_POUGHKEEPSIE) ||
+	      x509_name_data_by_nid_equal(subject, NID_localityName,
+					  PV_IBM_Z_SUBJECT_LOCALITY_NAME_ARMONK)))
 		return FALSE;
 
 	if (!x509_name_data_by_nid_equal(subject, NID_organizationName,
@@ -1085,10 +1088,9 @@ static int check_signature_algo_match(const EVP_PKEY *pkey, const X509 *subject,
 
 /* It's almost the same as X509_check_issed from OpenSSL does except that we
  * don't check the key usage of the potential issuer. This means we check:
- * 1. issuer_name(cert) == subject_name(issuer)
- * 2. Check whether the akid(cert) (if available) matches the issuer skid
- * 3. Check that the cert algrithm matches the subject algorithm
- * 4. Verify the signature of certificate @cert is using the public key of
+ * 1. Check whether the akid(cert) (if available) matches the issuer skid
+ * 2. Check that the cert algrithm matches the subject algorithm
+ * 3. Verify the signature of certificate @cert is using the public key of
  *    @issuer.
  */
 static int check_host_key_issued(X509 *cert, X509 *issuer, GError **error)
@@ -1096,19 +1098,6 @@ static int check_host_key_issued(X509 *cert, X509 *issuer, GError **error)
 	const X509_NAME *issuer_subject = X509_get_subject_name(issuer);
 	const X509_NAME *cert_issuer = X509_get_issuer_name(cert);
 	g_autoptr(AUTHORITY_KEYID) akid = NULL;
-
-	/* We cannot use X509_NAME_cmp() because it considers the order of the
-	 * X509_NAME_Entries.
-	 */
-	if (!own_X509_NAME_equal(issuer_subject, cert_issuer)) {
-		g_autofree char *issuer_subject_str = pv_X509_NAME_oneline(issuer_subject);
-		g_autofree char *cert_issuer_str = pv_X509_NAME_oneline(cert_issuer);
-
-		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_CERT_SUBJECT_ISSUER_MISMATCH,
-			    _("Subject issuer mismatch:\n'%s'\n'%s'"), issuer_subject_str,
-			    cert_issuer_str);
-		return -1;
-	}
 
 	akid = X509_get_ext_d2i(cert, NID_authority_key_identifier, NULL, NULL);
 	if (akid && X509_check_akid(issuer, akid) != X509_V_OK) {
@@ -1286,21 +1275,10 @@ int pv_verify_cert(X509_STORE_CTX *ctx, X509 *cert, GError **error)
 	return 0;
 }
 
-/* Verify that: subject(issuer) == issuer(crl) and SKID(issuer) == AKID(crl) */
+/* Verify that SKID(issuer) == AKID(crl) */
 static int check_crl_issuer(X509_CRL *crl, X509 *issuer, GError **error)
 {
-	const X509_NAME *crl_issuer = X509_CRL_get_issuer(crl);
-	const X509_NAME *issuer_subject = X509_get_subject_name(issuer);
-	AUTHORITY_KEYID *akid = NULL;
-
-	if (!own_X509_NAME_equal(issuer_subject, crl_issuer)) {
-		g_autofree char *issuer_subject_str = pv_X509_NAME_oneline(issuer_subject);
-		g_autofree char *crl_issuer_str = pv_X509_NAME_oneline(crl_issuer);
-
-		g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_CRL_SUBJECT_ISSUER_MISMATCH,
-			    _("issuer mismatch:\n%s\n%s"), issuer_subject_str, crl_issuer_str);
-		return -1;
-	}
+	g_autoptr(AUTHORITY_KEYID) akid = NULL;
 
 	/* If AKID(@crl) is specified it must match with SKID(@issuer) */
 	akid = X509_CRL_get_ext_d2i(crl, NID_authority_key_identifier, NULL, NULL);
@@ -1325,7 +1303,6 @@ int pv_verify_crl(X509_CRL *crl, X509 *cert, int verify_flags, GError **error)
 		return -1;
 	}
 
-	/* check that the @crl issuer matches with the subject name of @cert*/
 	if (check_crl_issuer(crl, cert, error) < 0)
 		return -1;
 
@@ -1393,6 +1370,93 @@ int pv_check_chain_parameters(const STACK_OF_X509 *chain, GError **error)
 	return 0;
 }
 
+/** Replace locality 'Armonk' with 'Pougkeepsie'. If Armonk was not set return
+ *  `NULL`.
+ */
+static X509_NAME *x509_armonk_locality_fixup(const X509_NAME *name)
+{
+	g_autoptr(X509_NAME) ret = NULL;
+	int pos;
+
+	/* Check if ``L=Armonk`` */
+	if (!x509_name_data_by_nid_equal((X509_NAME *)name, NID_localityName,
+					 PV_IBM_Z_SUBJECT_LOCALITY_NAME_ARMONK))
+		return NULL;
+
+	ret = X509_NAME_dup(name);
+	if (!ret)
+		g_abort();
+
+	pos = X509_NAME_get_index_by_NID(ret, NID_localityName, -1);
+	if (pos == -1)
+		return NULL;
+
+	X509_NAME_ENTRY_free(X509_NAME_delete_entry(ret, pos));
+
+	/* Create a new name entry at the same position as before */
+	if (X509_NAME_add_entry_by_NID(
+		    ret, NID_localityName, MBSTRING_UTF8,
+		    (const unsigned char *)&PV_IBM_Z_SUBJECT_LOCALITY_NAME_POUGHKEEPSIE,
+		    sizeof(PV_IBM_Z_SUBJECT_LOCALITY_NAME_POUGHKEEPSIE) - 1, pos, 0) != 1)
+		return NULL;
+
+	return g_steal_pointer(&ret);
+}
+
+/* This function contains work-arounds for some known subject(CRT)<->issuer(CRL)
+ * issues.
+ */
+static STACK_OF_X509_CRL *quirk_X509_STORE_ctx_get1_crls(X509_STORE_CTX *ctx,
+							 const X509_NAME *subject, GError **err)
+{
+	g_autoptr(X509_NAME) fixed_subject = NULL;
+	g_autoptr(STACK_OF_X509_CRL) ret = NULL;
+
+	ret = pv_X509_STORE_CTX_get1_crls(ctx, subject);
+	if (ret && sk_X509_CRL_num(ret) > 0)
+		return g_steal_pointer(&ret);
+
+	/* Workaround to fix the mismatch between issuer name of the * IBM
+	 * signing CRLs and the IBM signing key subject name. Locality name has
+	 * changed from Poughkeepsie to Armonk.
+	 */
+	fixed_subject = x509_armonk_locality_fixup(subject);
+	/* Was the locality replaced? */
+	if (fixed_subject) {
+		X509_NAME *tmp;
+
+		sk_X509_CRL_free(ret);
+		ret = pv_X509_STORE_CTX_get1_crls(ctx, fixed_subject);
+		if (ret && sk_X509_CRL_num(ret) > 0)
+			return g_steal_pointer(&ret);
+
+		/* Workaround to fix the ordering mismatch between issuer name
+		 * of the IBM signing CRLs and the IBM signing key subject name.
+		 */
+		tmp = fixed_subject;
+		fixed_subject = pv_c2b_name(fixed_subject);
+		X509_NAME_free(tmp);
+		sk_X509_CRL_free(ret);
+		ret = pv_X509_STORE_CTX_get1_crls(ctx, fixed_subject);
+		if (ret && sk_X509_CRL_num(ret) > 0)
+			return g_steal_pointer(&ret);
+		X509_NAME_free(fixed_subject);
+		fixed_subject = NULL;
+	}
+
+	/* Workaround to fix the ordering mismatch between issuer name of the
+	 * IBM signing CRLs and the IBM signing key subject name.
+	 */
+	fixed_subject = pv_c2b_name(subject);
+	sk_X509_CRL_free(ret);
+	ret = pv_X509_STORE_CTX_get1_crls(ctx, fixed_subject);
+	if (ret && sk_X509_CRL_num(ret) > 0)
+		return g_steal_pointer(&ret);
+
+	g_set_error(err, PV_CERT_ERROR, PV_CERT_ERROR_NO_CRL, _("no CRL found"));
+	return NULL;
+}
+
 /* Given a certificate @cert try to find valid revocation lists in @ctx. If no
  * valid CRL was found NULL is returned.
  */
@@ -1412,21 +1476,9 @@ STACK_OF_X509_CRL *pv_store_ctx_find_valid_crls(X509_STORE_CTX *ctx, X509 *cert,
 		return NULL;
 	}
 
-	ret = pv_X509_STORE_CTX_get1_crls(ctx, subject);
-	if (!ret) {
-		/* Workaround to fix the mismatch between issuer name of the
-		 * IBM Z signing CRLs and the IBM Z signing key subject name.
-		 */
-		g_autoptr(X509_NAME) broken_subject = pv_c2b_name(subject);
-
-		ret = pv_X509_STORE_CTX_get1_crls(ctx, broken_subject);
-		if (!ret) {
-			g_set_error(error, PV_CERT_ERROR, PV_CERT_ERROR_NO_CRL, _("no CRL found"));
-			g_info("ERROR: %s", (*error)->message);
-			return NULL;
-		}
-	}
-
+	ret = quirk_X509_STORE_ctx_get1_crls(ctx, subject, error);
+	if (!ret)
+		return NULL;
 	/* Filter out non-valid CRLs for @cert */
 	for (int i = 0; i < sk_X509_CRL_num(ret); i++) {
 		X509_CRL *crl = sk_X509_CRL_value(ret, i);

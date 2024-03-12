@@ -16,7 +16,8 @@
 
 #define PV_IBM_Z_SUBJECT_COMMON_NAME "International Business Machines Corporation"
 #define PV_IBM_Z_SUBJECT_COUNTRY_NAME "US"
-#define PV_IBM_Z_SUBJECT_LOCALITY_NAME "Poughkeepsie"
+#define PV_IBM_Z_SUBJECT_LOCALITY_NAME_POUGHKEEPSIE "Poughkeepsie"
+#define PV_IBM_Z_SUBJECT_LOCALITY_NAME_ARMONK "Armonk"
 #define PV_IBM_Z_SUBJECT_ORGANIZATIONAL_UNIT_NAME_SUFFIX "Key Signing Service"
 #define PV_IBM_Z_SUBJECT_ORGANIZATION_NAME "International Business Machines Corporation"
 #define PV_IBM_Z_SUBJECT_STATE "New York"
