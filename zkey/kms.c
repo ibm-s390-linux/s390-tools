@@ -3445,8 +3445,12 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",
 			      strerror(-rc));
-			warnx("Make sure that kernel module 'paes_s390' is "
-			      "loaded and that the 'paes' cipher is available");
+			warnx("Make sure that kernel module '%s' is loaded and "
+			      "that the '%s' cipher is available",
+			      is_aes_key(key_blob, key_blob_size) ?
+						"paes_s390" : "phmac_s390",
+			      is_aes_key(key_blob, key_blob_size) ?
+						"paes" : "phmac");
 			goto out;
 		}
 

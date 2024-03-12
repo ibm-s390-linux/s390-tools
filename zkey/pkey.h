@@ -307,6 +307,9 @@ struct pkey_apqns4keytype {
 #define DEFAULT_KEYBITS             256
 #define PAES_BLOCK_SIZE             16
 #define ENC_ZERO_LEN                (2 * PAES_BLOCK_SIZE)
+#define SHA_256_HASH_SIZE           32
+#define SHA_512_HASH_SIZE           64
+#define MAC_ZERO_LEN                SHA_512_HASH_SIZE
 #define VERIFICATION_PATTERN_LEN    (2 * ENC_ZERO_LEN + 1)
 
 #define MKVP_LENGTH		16

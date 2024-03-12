@@ -1624,6 +1624,128 @@ out:
 }
 
 /**
+ * Generate a key verification pattern of a secure HMAC key by MACing the all
+ * zero message with the secure key using the AF_ALG interface
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ * @param[in] vp            buffer where the verification pattern is returned
+ * @param[in] vp_len        the size of the buffer
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int generate_hmac_key_verification_pattern(const u8 *key,
+						  size_t key_size,
+						  char *vp, size_t vp_len,
+						  bool verbose)
+{
+	int tfmfd = -1, opfd = -1, rc = 0, retry_count = 0;
+	char null_msg[MAC_ZERO_LEN];
+	char mac_zero[MAC_ZERO_LEN];
+	size_t i, bitsize;
+	int len;
+
+	struct sockaddr_alg sa = {
+		.salg_family = AF_ALG,
+		.salg_type = "hash",
+	};
+
+	if (vp_len < VERIFICATION_PATTERN_LEN) {
+		rc = -EMSGSIZE;
+		goto out;
+	}
+
+	rc = get_key_bit_size(key, key_size, &bitsize);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the key size");
+		goto out;
+	}
+	snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "phmac(sha%lu)",
+		 bitsize / 2);
+
+	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
+	if (tfmfd < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to open an AF_ALG socket");
+		goto out;
+	}
+
+	if (bind(tfmfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to bind the AF_ALG socket, "
+			   "salg_name='%s' ", sa.salg_name);
+		goto out;
+	}
+
+retry_setkey:
+	if (setsockopt(tfmfd, SOL_ALG, ALG_SET_KEY, key,
+		       key_size) < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to set the key: %s",
+			   strerror(-rc));
+
+		/*
+		 * After a master key change, it can happen that the setkey
+		 * operation returns EINVAL or EAGAIN, although the key is
+		 * valid. This is a temporary situation and the operation will
+		 * succeed, once the firmware has completed some internal
+		 * processing related with the master key change.
+		 * Delay 1 second and retry up to 10 times.
+		 */
+		if ((rc == -EINVAL || rc == -EAGAIN) && retry_count < 10) {
+			pr_verbose(verbose, "Retrying after 1 second...");
+			retry_count++;
+			sleep(1);
+			goto retry_setkey;
+		}
+		goto out;
+	}
+	rc = 0;
+
+	opfd = accept(tfmfd, NULL, NULL);
+	if (opfd < 0) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to accept on the AF_ALG socket");
+		goto out;
+	}
+
+	memset(null_msg, 0, sizeof(null_msg));
+
+	len = send(opfd, &null_msg, sizeof(null_msg), 0);
+	if (len != MAC_ZERO_LEN) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to send to the AF_ALG socket");
+		goto out;
+	}
+
+	len = read(opfd, mac_zero, sizeof(mac_zero));
+	if (len < SHA_256_HASH_SIZE) {
+		rc = -errno;
+		pr_verbose(verbose, "Failed to receive from the AF_ALG socket");
+		goto out;
+	}
+
+	memset(vp, 0, vp_len);
+	for (i = 0; i < SHA_256_HASH_SIZE; i++)
+		sprintf(&vp[i * 2], "%02x", mac_zero[i]);
+
+	pr_verbose(verbose, "Key verification pattern:  %s", vp);
+
+out:
+	if (opfd != -1)
+		close(opfd);
+	if (tfmfd != -1)
+		close(tfmfd);
+
+	if (rc != 0)
+		pr_verbose(verbose, "Failed to generate the key verification "
+			   "pattern: %s", strerror(-rc));
+
+	return rc;
+}
+
+/**
  * Generate a key verification pattern of a secure key by encrypting the all
  * zero message with the secure key using the AF_ALG interface
  *
@@ -1638,8 +1760,17 @@ out:
 int generate_key_verification_pattern(const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose)
 {
-	return generate_aes_key_verification_pattern(key, key_size, vp, vp_len,
-						     NULL, verbose);
+	if (is_aes_key(key, key_size))
+		return generate_aes_key_verification_pattern(key, key_size,
+							     vp, vp_len,
+							     NULL, verbose);
+	if (is_hmac_key(key, key_size))
+		return generate_hmac_key_verification_pattern(key, key_size,
+							      vp, vp_len,
+							      verbose);
+
+	pr_verbose(verbose, "Neither an AES nor an HMAC key");
+	return -EINVAL;
 }
 
 int get_master_key_verification_pattern(const u8 *key, size_t key_size,
