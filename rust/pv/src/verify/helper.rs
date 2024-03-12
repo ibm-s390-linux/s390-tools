@@ -11,7 +11,7 @@ use openssl::{
     error::ErrorStack,
     nid::Nid,
     ssl::SslFiletype,
-    stack::{Stack, Stackable},
+    stack::Stack,
     x509::{
         store::{File, X509Lookup, X509StoreBuilder, X509StoreRef},
         verify::{X509VerifyFlags, X509VerifyParam},
@@ -20,6 +20,7 @@ use openssl::{
     },
 };
 use openssl_extensions::akid::{AkidCheckResult, AkidExtension};
+use std::str::from_utf8;
 use std::{cmp::Ordering, ffi::c_int, usize};
 
 /// Minimum security level for the keys/certificates used to establish a chain of
@@ -34,7 +35,6 @@ const SECURITY_CHAIN_MAX_LEN: c_int = 2;
 /// verifies that the HKD
 /// * has enough security bits
 /// * is inside its validity period
-/// * issuer name is the subject name of the [`sign_key`]
 /// * the Authority Key ID matches the Signing Key ID of the  [`sign_key`]
 pub fn verify_hkd_options(hkd: &X509Ref, sign_key: &X509Ref) -> Result<()> {
     let hk_pkey = hkd.public_key()?;
@@ -47,9 +47,6 @@ pub fn verify_hkd_options(hkd: &X509Ref, sign_key: &X509Ref) -> Result<()> {
     //try_... rust-openssl
     // verify that the hkd is still valid
     check_validity_period(hkd.not_before(), hkd.not_after())?;
-
-    // check if hkd.issuer_name == issuer.subject
-    check_x509_name_equal(sign_key.subject_name(), hkd.issuer_name())?;
 
     // verify that the AKID of the hkd matches the SKID of the issuer
     if let Some(akid) = hkd.akid() {
@@ -70,9 +67,6 @@ pub fn verify_crl(crl: &X509CrlRef, issuer: &X509Ref) -> Option<()> {
             return None;
         }
     }
-
-    check_x509_name_equal(crl.issuer_name(), issuer.subject_name()).ok()?;
-
     match crl.verify(issuer.public_key().ok()?.as_ref()).ok()? {
         true => Some(()),
         false => None,
@@ -191,7 +185,8 @@ pub fn extract_ibm_sign_key(certs: Vec<X509>) -> Result<(X509, Stack<X509>)> {
 //Asn1StringRef::as_slice aka ASN1_STRING_get0_data gives a string without \0 delimiter
 const IBM_Z_COMMON_NAME: &[u8; 43usize] = b"International Business Machines Corporation";
 const IBM_Z_COUNTRY_NAME: &[u8; 2usize] = b"US";
-const IBM_Z_LOCALITY_NAME: &[u8; 12usize] = b"Poughkeepsie";
+const IBM_Z_LOCALITY_NAME_POUGHKEEPSIE: &[u8; 12usize] = b"Poughkeepsie";
+const IBM_Z_LOCALITY_NAME_ARMONK: &[u8; 6usize] = b"Armonk";
 const IBM_Z_ORGANIZATIONAL_UNIT_NAME_SUFFIX: &str = "Key Signing Service";
 const IBM_Z_ORGANIZATION_NAME: &[u8; 43usize] = b"International Business Machines Corporation";
 const IBM_Z_STATE: &[u8; 8usize] = b"New York";
@@ -210,7 +205,8 @@ fn is_ibm_signing_cert(cert: &X509) -> bool {
     if subj.entries().count() != IMB_Z_ENTRY_COUNT
         || !name_data_eq(subj, Nid::COUNTRYNAME, IBM_Z_COUNTRY_NAME)
         || !name_data_eq(subj, Nid::STATEORPROVINCENAME, IBM_Z_STATE)
-        || !name_data_eq(subj, Nid::LOCALITYNAME, IBM_Z_LOCALITY_NAME)
+        || !(name_data_eq(subj, Nid::LOCALITYNAME, IBM_Z_LOCALITY_NAME_POUGHKEEPSIE)
+            || name_data_eq(subj, Nid::LOCALITYNAME, IBM_Z_LOCALITY_NAME_ARMONK))
         || !name_data_eq(subj, Nid::ORGANIZATIONNAME, IBM_Z_ORGANIZATION_NAME)
         || !name_data_eq(subj, Nid::COMMONNAME, IBM_Z_COMMON_NAME)
     {
@@ -354,24 +350,6 @@ fn check_validity_period(not_before: &Asn1TimeRef, not_after: &Asn1TimeRef) -> R
     }
 }
 
-fn check_x509_name_equal(lhs: &X509NameRef, rhs: &X509NameRef) -> Result<()> {
-    if lhs.entries().count() != rhs.entries().count() {
-        bail_hkd_verify!(IssuerMismatch);
-    }
-
-    for l in lhs.entries() {
-        // search for the matching value in the rhs names
-        // found none? -> names are not equal
-        if !rhs
-            .entries()
-            .any(|r| l.data().as_slice() == r.data().as_slice())
-        {
-            bail_hkd_verify!(IssuerMismatch);
-        }
-    }
-    Ok(())
-}
-
 const NIDS_CORRECT_ORDER: [Nid; 6] = [
     Nid::COUNTRYNAME,
     Nid::ORGANIZATIONNAME,
@@ -394,13 +372,28 @@ pub fn reorder_x509_names(subject: &X509NameRef) -> std::result::Result<X509Name
     Ok(correct_subj.build())
 }
 
-pub fn stack_err_hlp<T: Stackable>(
-    e: ErrorStack,
-) -> std::result::Result<Stack<T>, openssl::error::ErrorStack> {
-    match e.errors().len() {
-        0 => Stack::<T>::new(),
-        _ => Err(e),
+/**
+* Workaround for potential locality mismatches between CRLs and Certs
+* # Return
+* fixed subject or none if locality was not Armonk or any OpenSSL error
+*/
+pub fn armonk_locality_fixup(subject: &X509NameRef) -> Option<X509Name> {
+    if !name_data_eq(subject, Nid::LOCALITYNAME, IBM_Z_LOCALITY_NAME_ARMONK) {
+        return None;
     }
+
+    let mut ret = X509Name::builder().ok()?;
+    for entry in subject.entries() {
+        match entry.object().nid() {
+            nid @ Nid::LOCALITYNAME => ret
+                .append_entry_by_nid(nid, from_utf8(IBM_Z_LOCALITY_NAME_POUGHKEEPSIE).ok()?)
+                .ok()?,
+            _ => {
+                ret.append_entry(entry).ok()?;
+            }
+        }
+    }
+    Some(ret.build())
 }
 
 #[cfg(test)]
@@ -433,20 +426,6 @@ mod test {
         assert!(matches!(
             super::check_validity_period(&yesterday, &yesterday),
             Err(Error::HkdVerify(AfterValidity))
-        ));
-    }
-
-    #[test]
-    fn x509_name_equal() {
-        let sign_crt = load_gen_cert("ibm.crt");
-        let hkd = load_gen_cert("host.crt");
-        let other = load_gen_cert("inter_ca.crt");
-
-        assert!(super::check_x509_name_equal(sign_crt.subject_name(), hkd.issuer_name()).is_ok(),);
-
-        assert!(matches!(
-            super::check_x509_name_equal(other.subject_name(), hkd.subject_name()),
-            Err(Error::HkdVerify(IssuerMismatch))
         ));
     }
 

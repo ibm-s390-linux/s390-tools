@@ -3,10 +3,11 @@
 // Copyright IBM Corp. 2023
 
 use core::slice;
-use log::debug;
+use log::{debug, trace};
+use openssl::error::ErrorStack;
 use openssl::stack::Stack;
 use openssl::x509::store::X509Store;
-use openssl::x509::{CrlStatus, X509Ref, X509StoreContext, X509};
+use openssl::x509::{CrlStatus, X509NameRef, X509Ref, X509StoreContext, X509StoreContextRef, X509};
 use openssl_extensions::crl::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
 
 #[cfg(not(test))]
@@ -86,8 +87,8 @@ impl HkdVerifier for CertVerifier {
         if verified_crls.is_empty() {
             bail_hkd_verify!(NoCrl);
         }
-        for crl in &verified_crls {
-            match crl.get_by_cert(&hkd.to_owned()) {
+        for crl in verified_crls {
+            match crl.get_by_serial(hkd.serial_number()) {
                 CrlStatus::NotRevoked => (),
                 _ => bail_hkd_verify!(HdkRevoked),
             }
@@ -98,21 +99,54 @@ impl HkdVerifier for CertVerifier {
 }
 
 impl CertVerifier {
+    fn quirk_crls(
+        ctx: &mut X509StoreContextRef,
+        subject: &X509NameRef,
+    ) -> Result<Stack<StackableX509Crl>, ErrorStack> {
+        match ctx.crls(subject) {
+            Ok(ret) if !ret.is_empty() => return Ok(ret),
+            _ => (),
+        }
+
+        // Armonk/Poughkeepsie fixup
+        trace!("quirk_crls: Try Locality");
+        if let Some(locality_subject) = helper::armonk_locality_fixup(subject) {
+            match ctx.crls(&locality_subject) {
+                Ok(ret) if !ret.is_empty() => return Ok(ret),
+                _ => (),
+            }
+
+            // reorder
+            trace!("quirk_crls: Try Locality+Reorder");
+            if let Ok(locality_ordered_subject) = helper::reorder_x509_names(&locality_subject) {
+                match ctx.crls(&locality_ordered_subject) {
+                    Ok(ret) if !ret.is_empty() => return Ok(ret),
+                    _ => (),
+                }
+            }
+        }
+
+        // reorder unchanged loaciliy subject
+        trace!("quirk_crls: Try Reorder");
+        if let Ok(ordered_subject) = helper::reorder_x509_names(subject) {
+            match ctx.crls(&ordered_subject) {
+                Ok(ret) if !ret.is_empty() => return Ok(ret),
+                _ => (),
+            }
+        }
+        // nothing found, return empty stack
+        Stack::new()
+    }
+
     ///Download the CLRs that a HKD refers to.
     pub fn hkd_crls(&self, hkd: &X509Ref) -> Result<Stack<StackableX509Crl>> {
         let mut ctx = X509StoreContext::new()?;
         // Unfortunately we cannot use a dedicated function here and have to use a closure (E0434)
         // Otherwise, we cannot refer to self
+        // Search for local CRLs
         let mut crls = ctx.init_opt(&self.store, None, None, |ctx| {
             let subject = self.ibm_z_sign_key.subject_name();
-            match ctx.crls(subject) {
-                Ok(crls) => Ok(crls),
-                _ => {
-                    // reorder the name and try again
-                    let broken_subj = helper::reorder_x509_names(subject)?;
-                    ctx.crls(&broken_subj).or_else(helper::stack_err_hlp)
-                }
-            }
+            Self::quirk_crls(ctx, subject)
         })?;
 
         if !self.offline {

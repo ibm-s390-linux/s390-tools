@@ -74,16 +74,15 @@ fn dist_points() {
     assert_eq!(res, exp);
 }
 
-fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str) {
+fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str, hkd: &'static str) {
     let root_crt = get_cert_asset_path_string("root_ca.chained.crt");
     let inter_crt = get_cert_asset_path_string("inter_ca.crt");
     let inter_crl = get_cert_asset_path_string("inter_ca.crl");
     let ibm_crt = get_cert_asset_path_string(ibm_crt);
     let ibm_crl = get_cert_asset_path_string(ibm_crl);
     let hkd_revoked = load_gen_cert("host_rev.crt");
-    let hkd_inv = load_gen_cert("host_invalid_signing_key.crt");
     let hkd_exp = load_gen_cert("host_crt_expired.crt");
-    let hkd = load_gen_cert("host.crt");
+    let hkd = load_gen_cert(hkd);
 
     let crls = &[ibm_crl, inter_crl];
     let verifier = CertVerifier::new(
@@ -103,11 +102,6 @@ fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str) {
     ));
 
     assert!(matches!(
-        verifier.verify(&hkd_inv),
-        Err(Error::HkdVerify(IssuerMismatch))
-    ));
-
-    assert!(matches!(
         verifier.verify(&hkd_exp),
         Err(Error::HkdVerify(AfterValidity))
     ));
@@ -115,10 +109,40 @@ fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str) {
 
 #[test]
 fn verify_online() {
-    verify(false, "ibm.crt", "ibm.crl")
+    verify(false, "ibm.crt", "ibm.crl", "host.crt")
 }
 
 #[test]
 fn verify_offline() {
-    verify(true, "ibm.crt", "ibm.crl")
+    verify(true, "ibm.crt", "ibm.crl", "host.crt")
+}
+
+#[test]
+fn verify_armonk_crt_online() {
+    verify(false, "ibm_armonk.crt", "ibm.crl", "host.crt")
+}
+
+#[test]
+fn verify_armonk_crt_offline() {
+    verify(true, "ibm_armonk.crt", "ibm.crl", "host.crt")
+}
+
+#[test]
+fn verify_armonk_crl_online() {
+    verify(false, "ibm_armonk.crt", "ibm_armonk.crl", "host.crt")
+}
+
+#[test]
+fn verify_armonk_crl_offline() {
+    verify(true, "ibm_armonk.crt", "ibm_armonk.crl", "host.crt")
+}
+
+#[test]
+fn verify_armonk_hkd_online() {
+    verify(false, "ibm_armonk.crt", "ibm_armonk.crl", "host_armonk.crt")
+}
+
+#[test]
+fn verify_armonk_hkd_offline() {
+    verify(true, "ibm_armonk.crt", "ibm_armonk.crl", "host_armonk.crt")
 }
