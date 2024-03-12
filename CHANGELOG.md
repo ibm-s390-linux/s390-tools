@@ -10,6 +10,7 @@ Release history for s390-tools (MIT version)
   Changes of existing tools:
 
   Bug Fixes:
+  - dbginfo.sh: dash compatible copy sequence
 
 * __v2.31.0 (2024-02-02)__
 
