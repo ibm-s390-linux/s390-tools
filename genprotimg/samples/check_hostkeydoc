@@ -229,24 +229,22 @@ CRL_FILE=
 CA_FILE=
 CHECK_DEFAULT_ISSUER=1
 
-args=$(getopt -qu "dr:c:h" $*)
-if [ $? = 0 ]
-then
-    set -- $args
-    while [ $1 != "" ]
-    do
-        case $1 in
-            -d) CHECK_DEFAULT_ISSUER=0; shift;;
-            -r) CRL_FILE=$2; shift 2;;
-            -c) CA_FILE=$2; shift 2;;
-            -h) usage $0; exit 0;;
-            --) shift; break;;
-        esac
-    done
-else
-    usage $0 >&2
-    exit 1
-fi
+while getopts 'dr:c:h' opt; do
+    case $opt in
+    d) CHECK_DEFAULT_ISSUER=0 ;;
+    r) CRL_FILE=$OPTARG ;;
+    c) CA_FILE=$OPTARG ;;
+    h)
+        usage "$0"
+        exit 0
+        ;;
+    ?)
+        usage "$0"
+        exit 1
+        ;;
+    esac
+done
+shift "$((OPTIND - 1))"
 
 if [ $# -ne 2  ]
 then
