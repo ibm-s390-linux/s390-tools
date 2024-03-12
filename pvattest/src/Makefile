@@ -1,10 +1,7 @@
 include ../../common.mak
 
 BIN_PROGRAM = pvattest
-PKGDATADIR ?= "$(DESTDIR)$(TOOLS_DATADIR)/$(BIN_PROGRAM)"
-
 SRC_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-PVATTESTDIR := $(rootdir)/pvattest
 INCLUDE_PATHS = "$(SRC_DIR)" "$(rootdir)/include"
 INCLUDE_PARMS = $(addprefix -I,$(INCLUDE_PATHS))
 
@@ -35,8 +32,7 @@ LIBCRYPTO_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
 LIBCURL_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
 LIBCURL_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
 
-ALL_CFLAGS += -DPKGDATADIR=$(PKGDATADIR) \
-	      -DOPENSSL_API_COMPAT=0x10101000L \
+ALL_CFLAGS += -DOPENSSL_API_COMPAT=0x10101000L \
 	      $(GLIB2_CFLAGS) \
 	      $(LIBCRYPTO_CFLAGS) \
 	      $(LIBCURL_CFLAGS) \
