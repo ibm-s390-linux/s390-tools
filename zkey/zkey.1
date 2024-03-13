@@ -801,6 +801,18 @@ might be disabled by a policy when FIPS mode is active. Because PAES uses secure
 AES keys as volume keys, the security of the key derivation function used to
 encrypt the volume key in the LUKS key slots is of less relevance.
 .P
+For combined encryption and integrity protection of a volume, the same volume
+must be assigned to an AES-type key and an HMAC-type key. Both keys must use the
+\fBluks2\fP volume type. For such a volume, the generated \fBcryptsetup
+luksFormat\fP command contains the \fB\-\-integrity\fP option to enable
+integrity protection. An additional command is generated prior to the
+\fBcryptsetup luksFormat\fP command to concatenate the encryption key and the
+integrity key to each other into a temporary file. This temporary file is then
+used with the \fBcryptsetup luksFormat\fP command as volume key. When the
+\fP\-\-run\fP option is specified, the temporary file is removed automatically
+after running the commands, otherwise a command to remove the temporary file is
+generated, too.
+.P
 For LUKS2 volumes, a passphrase is required. You are prompted for the
 passphrase when running the generated commands, unless option
 .B \-\-key\-file

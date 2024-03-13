@@ -89,6 +89,8 @@ struct key_filenames {
 
 static int _keystore_kms_key_unbind(struct keystore *keystore,
 				    struct properties *properties);
+static char *_keystore_build_hmac_spec(struct properties *properties,
+				       size_t bitsize);
 
 /**
  * Gets the file names of the .skey and .info and .renc files for a named
@@ -4543,6 +4545,55 @@ static int _keystore_execute_cmd(const char *cmd,
 	return rc;
 }
 
+struct find_integrity_key_info {
+	bool found;
+	char *integrity_spec;
+	char *integrity_key_name;
+	size_t integrity_key_size;
+};
+
+static int _keystore_find_integrity_key_cb(struct keystore *keystore,
+					   const char *UNUSED(name),
+					   struct properties *properties,
+					   struct key_filenames *file_names,
+					   void *private)
+{
+	struct find_integrity_key_info *find_info = private;
+	size_t secure_key_size;
+	u8 *secure_key = NULL;
+	size_t bitsize = 0;
+	int rc;
+
+	if (find_info->found)
+		return 0;
+
+	secure_key = read_secure_key(file_names->skey_filename,
+				     &secure_key_size, keystore->verbose);
+	if (secure_key == NULL)
+		return -EIO;
+
+	rc = get_key_bit_size(secure_key, secure_key_size, &bitsize);
+	if (rc != 0)
+		goto out;
+
+	find_info->integrity_spec = _keystore_build_hmac_spec(properties,
+							      bitsize);
+	if (find_info->integrity_spec == NULL) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	find_info->integrity_key_name = util_strdup(file_names->skey_filename);
+	find_info->integrity_key_size = secure_key_size;
+
+	find_info->found = true;
+
+out:
+	if (secure_key != NULL)
+		free(secure_key);
+	return rc;
+}
+
 struct crypt_info {
 	bool integrity;
 	bool execute;
@@ -4595,13 +4646,17 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 					const char *passphrase_file,
 					struct crypt_info *info)
 {
+	struct find_integrity_key_info find_info = { 0 };
 	char *keyfile_opt = NULL, *offset_opt = NULL;
 	char *size_opt = NULL, *tries_opt = NULL;
 	char *common_passphrase_options;
+	char *integrity_opts = NULL;
+	char *combined_key = NULL;
 	size_t common_len;
+	char *cmd = NULL;
 	char temp[100];
+	char *tmpdir;
 	int rc = 0;
-	char *cmd;
 
 	sprintf(temp, "--sector-size %lu ", sector_size);
 
@@ -4665,6 +4720,57 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 				printf("%s\n", cmd);
 			}
 		} else {
+			rc = _keystore_process_filtered(keystore,
+							NULL, volume, NULL,
+							VOLUME_TYPE_LUKS2,
+							KEY_TYPE_FILTER_HMAC,
+							false, false,
+						_keystore_find_integrity_key_cb,
+							&find_info);
+			if (rc != 0)
+				goto out;
+			if (find_info.found) {
+				util_asprintf(&integrity_opts,
+					      "--integrity %s "
+					      "--integrity-key-size %lu ",
+					      find_info.integrity_spec,
+					      find_info.integrity_key_size * 8);
+
+				/*
+				 * The volume key for a volume with combined
+				 * encryption and integrity protection is built
+				 * by concatenating the integrity key to the
+				 * encryption key. The size of the volume key
+				 * specified by --key-size is however just the
+				 * encryption key size in bits.
+				 */
+
+				tmpdir = secure_getenv("TMPDIR");
+				util_asprintf(&combined_key,
+					      "%s/luks2-integrity-%s.skey",
+					      tmpdir != NULL ? tmpdir : "/tmp",
+					      dmname);
+
+				util_asprintf(&cmd, "cat '%s' '%s' > '%s'",
+					      key_file_name,
+					      find_info.integrity_key_name,
+					      combined_key);
+
+				if (info->execute) {
+					printf("Executing: %s\n", cmd);
+					rc = _keystore_execute_cmd(cmd, "cat");
+				} else {
+					printf("%s\n", cmd);
+				}
+
+				free(cmd);
+				cmd = NULL;
+				if (rc != 0)
+					goto out;
+
+				key_file_name = combined_key;
+			}
+
 			/*
 			 * Use Argon2i as key derivation function for LUKS2
 			 * volumes, but with options for low memory and time requirements.
@@ -4678,7 +4784,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			util_asprintf(&cmd,
 				      "cryptsetup luksFormat %s%s--type luks2 "
 				      "--volume-key-file '%s' --key-size %lu "
-				      "--cipher %s --pbkdf %s %s%s%s",
+				      "--cipher %s --pbkdf %s %s%s%s%s",
 				      info->batch_mode ? "-q " : "",
 				      keystore->verbose ? "-v " : "",
 				      key_file_name, key_file_size * 8,
@@ -4686,6 +4792,8 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 				      info->fips ? "pbkdf2" :
 						"argon2i --pbkdf-memory 32 "
 						"--pbkdf-force-iterations 4",
+				      integrity_opts != NULL ?
+						integrity_opts : "",
 				      common_len > 0 ?
 						common_passphrase_options : "",
 				      sector_size > 0 ? temp : "", volume);
@@ -4698,8 +4806,16 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			}
 
 			free(cmd);
+			cmd = NULL;
 			if (rc != 0)
-				return rc;
+				goto out;
+
+			if (combined_key != NULL && !info->execute) {
+				util_asprintf(&cmd, "rm '%s' -f", combined_key);
+				printf("%s\n", cmd);
+				free(cmd);
+				cmd = NULL;
+			}
 
 			util_asprintf(&cmd,
 				      "zkey-cryptsetup setvp %s %s%s", volume,
@@ -4716,7 +4832,20 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			}
 		}
 	} else {
-		return -EINVAL;
+		rc = -EINVAL;
+	}
+
+out:
+	if (find_info.integrity_spec != NULL)
+		free(find_info.integrity_spec);
+	if (find_info.integrity_key_name != NULL)
+		free(find_info.integrity_key_name);
+	if (integrity_opts != NULL)
+		free(integrity_opts);
+	if (combined_key != NULL) {
+		if (info->execute)
+			remove(combined_key);
+		free(combined_key);
 	}
 
 	free(common_passphrase_options);
