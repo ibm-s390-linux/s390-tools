@@ -48,10 +48,14 @@ impl UvDeviceInfo {
         let mut cmd = uvio_uvdev_info::new_zeroed();
         match uv.send_cmd(&mut cmd) {
             Ok(_) => Ok(cmd.into()),
-            Err(crate::Error::Io(e)) if e.raw_os_error() == Some(libc::ENOTTY) => Ok(Self {
-                supp_uvio_cmds: (UvDevice::ATTESTATION_NR as u64).into(),
+            Err(crate::Error::Io(e)) if e.raw_os_error() == Some(libc::ENOTTY) => {
+            let mut supp_uvio_cmds : Lsb0Flags64 = 0u64.into();
+            supp_uvio_cmds.set_bit(UvDevice::ATTESTATION_NR);
+
+            Ok(Self {
+                supp_uvio_cmds: supp_uvio_cmds,
                 supp_uv_cmds: None,
-            }),
+            })},
             Err(e) => Err(e),
         }
     }
