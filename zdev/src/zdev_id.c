@@ -226,6 +226,11 @@ static void write_zdev_site_id(int site_id)
 	if (!fd)
 		goto err;
 
+	if (fprintf(fd, CHZDEV_HEADER "\n") < 0) {
+		fclose(fd);
+		goto err;
+	}
+
 	if (site_id == SITE_FALLBACK)
 		rc = fprintf(fd, "ZDEV_SITE_ID=\"\"\n");
 	else
