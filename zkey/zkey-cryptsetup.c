@@ -48,20 +48,24 @@
 
 #define PAES_VP_TOKEN_NAME          "paes-verification-pattern"
 #define PAES_VP_TOKEN_VP            "verification-pattern"
+#define PAES_VP_TOKEN_INT_VP        "integrity-verification-pattern"
 
 #define PAES_REENC_TOKEN_NAME       "paes-reencipher"
 #define PAES_REENC_TOKEN_VP         "verification-pattern"
+#define PAES_REENC_TOKEN_INT_VP     "integrity-verification-pattern"
 #define PAES_REENC_TOKEN_ORG_SLOT   "original-keyslot"
 #define PAES_REENC_TOKEN_UNB_SLOT   "unbound-keyslot"
 
 struct reencipher_token {
 	char verification_pattern[VERIFICATION_PATTERN_LEN];
+	char int_verification_pattern[VERIFICATION_PATTERN_LEN];
 	unsigned int original_keyslot;
 	unsigned int unbound_keyslot;
 };
 
 struct vp_token {
 	char verification_pattern[VERIFICATION_PATTERN_LEN];
+	char int_verification_pattern[VERIFICATION_PATTERN_LEN];
 };
 
 __attribute__ ((unused))
@@ -998,10 +1002,13 @@ static int get_reencipher_token(struct crypt_device *cd, int token,
 {
 	json_object *jobj_org_keyslot = NULL;
 	json_object *jobj_unb_keyslot = NULL;
+	json_object *jobj_int_vp = NULL;
 	json_object *json_token = NULL;
 	json_object *jobj_vp = NULL;
 	const char *temp;
 	int rc;
+
+	memset(info, 0, sizeof(*info));
 
 	rc = get_token(cd, token, &json_token);
 	if (rc != 0)
@@ -1025,6 +1032,22 @@ static int get_reencipher_token(struct crypt_device *cd, int token,
 		sizeof(info->verification_pattern));
 	info->verification_pattern[
 			sizeof(info->verification_pattern) - 1] = '\0';
+
+	/* integrity-verification-pattern is optional */
+	if (json_object_object_get_ex(json_token, PAES_REENC_TOKEN_INT_VP,
+				      &jobj_int_vp)) {
+		temp = json_object_get_string(jobj_int_vp);
+		if (temp == NULL) {
+			warnx("The re-encipher token is incomplete, '%s' is "
+			      "missing", PAES_REENC_TOKEN_INT_VP);
+			rc = -EINVAL;
+			goto out;
+		}
+		strncpy(info->int_verification_pattern, temp,
+			sizeof(info->int_verification_pattern));
+		info->int_verification_pattern[
+			sizeof(info->int_verification_pattern) - 1] = '\0';
+	}
 
 	if (!json_object_object_get_ex(json_token, PAES_REENC_TOKEN_ORG_SLOT,
 				       &jobj_org_keyslot)) {
@@ -1059,8 +1082,10 @@ static int get_reencipher_token(struct crypt_device *cd, int token,
 	}
 
 	pr_verbose("Re-encipher token: original-keyslot: %d, unbound-keyslot: "
-		   "%d, verification-pattern: %s", info->original_keyslot,
-		   info->unbound_keyslot, info->verification_pattern);
+		   "%d, verification-pattern: %s, "
+		   "integrity-verification-pattern: %s", info->original_keyslot,
+		   info->unbound_keyslot, info->verification_pattern,
+		   info->int_verification_pattern);
 
 	rc = 0;
 
@@ -1085,8 +1110,10 @@ static int put_reencipher_token(struct crypt_device *cd, int token,
 	int rc;
 
 	pr_verbose("Re-encipher token: original-keyslot: %d, unbound-keyslot: "
-		   "%d, verification-pattern: %s", info->original_keyslot,
-		   info->unbound_keyslot, info->verification_pattern);
+		   "%d, verification-pattern: %s, "
+		   "integrity-verification-pattern: %s", info->original_keyslot,
+		   info->unbound_keyslot, info->verification_pattern,
+		   info->int_verification_pattern);
 
 	jobj = json_object_new_object();
 	json_object_object_add(jobj, "type",
@@ -1100,6 +1127,10 @@ static int put_reencipher_token(struct crypt_device *cd, int token,
 	json_object_object_add(jobj, PAES_REENC_TOKEN_VP,
 			       json_object_new_string(
 					info->verification_pattern));
+	if (strlen(info->int_verification_pattern) > 0)
+		json_object_object_add(jobj, PAES_REENC_TOKEN_INT_VP,
+				       json_object_new_string(
+					     info->int_verification_pattern));
 	json_object_object_add(jobj, PAES_REENC_TOKEN_ORG_SLOT,
 			       json_object_new_int64(info->original_keyslot));
 	json_object_object_add(jobj, PAES_REENC_TOKEN_UNB_SLOT,
@@ -1128,10 +1159,13 @@ static int put_reencipher_token(struct crypt_device *cd, int token,
 static int get_vp_token(struct crypt_device *cd, int token,
 			struct vp_token *info)
 {
+	json_object *jobj_int_vp = NULL;
 	json_object *json_token = NULL;
 	json_object *jobj_vp = NULL;
 	const char *temp;
 	int rc;
+
+	memset(info, 0, sizeof(*info));
 
 	rc = get_token(cd, token, &json_token);
 	if (rc != 0)
@@ -1158,6 +1192,25 @@ static int get_vp_token(struct crypt_device *cd, int token,
 
 	pr_verbose("Verification-pattern: %s", info->verification_pattern);
 
+	/* integrity-verification-pattern is optional */
+	if (json_object_object_get_ex(json_token, PAES_VP_TOKEN_INT_VP,
+				      &jobj_int_vp)) {
+		temp = json_object_get_string(jobj_int_vp);
+		if (temp == NULL) {
+			warnx("The verification-pattern token is incomplete, "
+			      "'%s' is missing", PAES_VP_TOKEN_INT_VP);
+			rc = -EINVAL;
+			goto out;
+		}
+		strncpy(info->int_verification_pattern, temp,
+			sizeof(info->int_verification_pattern));
+		info->int_verification_pattern[
+			sizeof(info->int_verification_pattern) - 1] = '\0';
+
+		pr_verbose("Integrity-verification-pattern: %s",
+			   info->int_verification_pattern);
+	}
+
 out:
 	if (json_token != NULL)
 		json_object_put(json_token);
@@ -1175,6 +1228,8 @@ static int put_vp_token(struct crypt_device *cd, int token,
 	int rc;
 
 	pr_verbose("Verification-pattern: %s", info->verification_pattern);
+	pr_verbose("Integrity-verification-pattern: %s",
+		   info->int_verification_pattern);
 
 	jobj = json_object_new_object();
 	json_object_object_add(jobj, "type",
@@ -1186,6 +1241,11 @@ static int put_vp_token(struct crypt_device *cd, int token,
 	json_object_object_add(jobj, PAES_VP_TOKEN_VP,
 			       json_object_new_string(
 					info->verification_pattern));
+
+	if (strlen(info->int_verification_pattern) > 0)
+		json_object_object_add(jobj, PAES_VP_TOKEN_INT_VP,
+				       json_object_new_string(
+					     info->int_verification_pattern));
 
 	rc = crypt_token_json_set(cd, token >= 0 ? token : CRYPT_ANY_TOKEN,
 				  json_object_to_json_string_ext(jobj,
