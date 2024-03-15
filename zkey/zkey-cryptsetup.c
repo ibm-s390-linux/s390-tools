@@ -1503,7 +1503,7 @@ static int check_keysize_and_cipher_mode(const u8 *key, size_t keysize)
  * be 0). The size of the secure key is keysize minus integrity_keysize.
  */
 static int open_keyslot(int keyslot, u8 **key, size_t *keysize,
-			size_t *integrity_keysize,
+			size_t *integrity_keysize, char **integrity_spec,
 			char **password, size_t *password_len,
 			    const char *prompt, bool no_keysize_check)
 {
@@ -1611,6 +1611,9 @@ static int open_keyslot(int keyslot, u8 **key, size_t *keysize,
 		*keysize = vkeysize;
 	if (integrity_keysize != NULL)
 		*integrity_keysize = ip.integrity_key_size;
+	if (integrity_spec != NULL)
+		*integrity_spec = ip.integrity != NULL ?
+					util_strdup(ip.integrity) : NULL;
 	if (password != NULL)
 		*password = pw;
 	else
@@ -1628,6 +1631,14 @@ out:
 	return rc;
 }
 
+static int is_integrity_phmac(const char *integrity_spec,
+			      size_t integrity_key_size)
+{
+	if (integrity_spec == NULL || integrity_key_size == 0)
+		return 0;
+
+	return (strncmp(integrity_spec, "phmac(", 6) == 0);
+}
 
 /*
  * Validate and get a secure key from a key slot. Optionally returns the key
@@ -1640,36 +1651,70 @@ out:
  * be 0). The size of the secure key is keysize minus integrity_keysize.
  */
 static int validate_keyslot(int keyslot, u8 **key, size_t *keysize,
-			    size_t *intgrity_keysize,
+			    size_t *intgrity_keysize, char **integrity_spec,
 			    char **password, size_t *password_len,
 			    int *is_old_mk, size_t *clear_keysize,
-			    const char *prompt, const char *invalid_msg)
+			    int *is_integrity_old_mk,
+			    size_t *clear_integrity_keysize,
+			    const char *prompt, const char *invalid_msg,
+			    const char *invalid_msg_integrity)
 {
-	size_t vkeysize = 0, ikeysize = 0;
-	u8 *vkey = NULL;
-	int rc, is_old;
+	size_t vkeysize = 0, ikeysize = 0, ekeysize;
+	int rc, is_old, is_integrity_old = 0;
+	u8 *vkey = NULL, *ikey = NULL;
+	char *integrity = NULL;
+	int is_phmac_integrity;
 
-	rc = open_keyslot(keyslot, &vkey, &vkeysize, &ikeysize,
+	rc = open_keyslot(keyslot, &vkey, &vkeysize, &ikeysize, &integrity,
 			  password, password_len, prompt, false);
 	if (rc < 0)
 		return rc;
 
 	keyslot = rc;
 
-	rc = validate_secure_key(g.pkey_fd, vkey, vkeysize - ikeysize,
-				 clear_keysize, &is_old, NULL, g.verbose);
+	is_phmac_integrity = is_integrity_phmac(integrity, ikeysize);
+
+	ekeysize = vkeysize - ikeysize;
+	if (is_phmac_integrity)
+		ikey = vkey + ekeysize;
+
+	rc = validate_secure_key(g.pkey_fd, vkey, ekeysize, clear_keysize,
+				 &is_old, NULL, g.verbose);
 	if (rc != 0) {
 		if (invalid_msg != NULL)
 			warnx("%s", invalid_msg);
 		else
-			warnx("The secure volume key of device '%s' is not "
+			warnx("The secure encryption key of device '%s' is not "
 			      "valid", g.pos_arg);
 		rc = -EINVAL;
 		goto out;
 	}
 	if (is_secure_key(vkey, vkeysize - ikeysize))
-		pr_verbose("Volume key is currently enciphered with %s "
+		pr_verbose("Encryption key is currently enciphered with %s "
 			   "master key", is_old ? "OLD" : "CURRENT");
+
+	if (is_phmac_integrity) {
+		rc = validate_secure_key(g.pkey_fd, ikey, ikeysize,
+					 clear_integrity_keysize,
+					 &is_integrity_old, NULL, g.verbose);
+		if (rc != 0) {
+			if (invalid_msg_integrity != NULL)
+				warnx("%s", invalid_msg_integrity);
+			else
+				warnx("The secure integrity key of device '%s' "
+				      "is not valid", g.pos_arg);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (is_secure_key(ikey, ikeysize))
+			pr_verbose("Integrity key is currently enciphered with "
+				   "%s master key", is_integrity_old ?
+							"OLD" : "CURRENT");
+	} else {
+		if (clear_integrity_keysize != NULL)
+			*clear_integrity_keysize = 0;
+	}
 
 	if (key != NULL)
 		*key = vkey;
@@ -1682,11 +1727,19 @@ static int validate_keyslot(int keyslot, u8 **key, size_t *keysize,
 		*intgrity_keysize = ikeysize;
 	if (is_old_mk != NULL)
 		*is_old_mk = is_old;
+	if (is_integrity_old_mk != NULL)
+		*is_integrity_old_mk = is_integrity_old;
+	if (integrity_spec != NULL) {
+		*integrity_spec = integrity;
+		integrity = NULL;
+	}
 
 	rc = keyslot;
 
 out:
 	secure_free(vkey, vkeysize);
+	if (integrity != NULL)
+		free(integrity);
 
 	return rc;
 }
@@ -1753,8 +1806,9 @@ static int reencipher_prepare(int token)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = validate_keyslot(CRYPT_ANY_SLOT, &key, &keysize,
-			      &integrity_keysize, &password, &password_len,
-			      &is_old_mk, NULL, prompt, NULL);
+			      &integrity_keysize, NULL,
+			      &password, &password_len,
+			      &is_old_mk, NULL, NULL, NULL, prompt, NULL, NULL);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -1952,9 +2006,10 @@ static int reencipher_complete(int token)
 	util_asprintf(&prompt, "Enter passphrase for key slot %d of '%s': ",
 		      tok.original_keyslot, g.pos_arg);
 	rc = validate_keyslot(tok.unbound_keyslot, &key, &keysize,
-			      &integrity_keysize, &password, &password_len,
-			      &is_old_mk, NULL,
-			      prompt, msg);
+			      &integrity_keysize, NULL,
+			      &password, &password_len,
+			      &is_old_mk, NULL, NULL, NULL,
+			      prompt, msg, NULL);
 	free(msg);
 	free(prompt);
 	if (rc < 0)
@@ -2110,10 +2165,47 @@ static int command_reencipher(void)
 
 static void print_verification_pattern(const char *vp)
 {
-	printf("  Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,
+	printf("    Verification pattern:  %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       vp);
-	printf("                         %.*s\n", VERIFICATION_PATTERN_LEN / 2,
+	printf("                           %.*s\n", VERIFICATION_PATTERN_LEN / 2,
 	       &vp[VERIFICATION_PATTERN_LEN / 2]);
+}
+
+static void print_validation_status(const char *heading, int is_valid,
+				    u8 *key, size_t seckeysize,
+				    size_t clear_keysize, const char *key_type,
+				    u8 mkvp[MKVP_LENGTH], int is_old_mk,
+				    const char *vp)
+{
+	printf("  %s:\n", heading);
+	printf("    Status:                %s\n",
+	       is_valid ? "Valid" : "Invalid");
+	printf("    Secure key size:       %lu bytes\n", seckeysize);
+	printf("    XTS type key:          %s\n",
+	       is_xts_key(key, seckeysize) ? "Yes" : "No");
+	printf("    Key type:              %s\n", key_type);
+	if (is_valid) {
+		printf("    Clear key size:        %lu bits\n", clear_keysize);
+		if (is_secure_key(key, seckeysize)) {
+			printf("    Enciphered with:       %s master key "
+			       "(MKVP: %s)\n", is_old_mk ? "OLD" : "CURRENT",
+			       printable_mkvp(get_card_type_for_keytype(
+							key_type), mkvp));
+		}
+	} else {
+		printf("    Clear key size:        (unknown)\n");
+		if (is_secure_key(key, seckeysize)) {
+			printf("    Enciphered with:       (unknown, "
+			       "MKVP: %s)\n",
+			       printable_mkvp(get_card_type_for_keytype(
+							key_type), mkvp));
+		}
+	}
+
+	if (vp != NULL && strlen(vp) > 0)
+		print_verification_pattern(vp);
+	else
+		printf("    Verification pattern:  Not available\n");
 }
 
 /*
@@ -2125,23 +2217,30 @@ static void print_verification_pattern(const char *vp)
 static int command_validate(void)
 {
 	int reenc_pending = 0, vp_tok_avail = 0, is_valid = 0, is_old_mk = 0;
+	int is_old_integrity_mk = 0, is_phmac_integrity = 0;
+	const char *key_type, *integrity_key_type = NULL;
+	u8 *key = NULL, *integrity_key = NULL;
 	struct reencipher_token reenc_tok;
+	u8 integrity_mkvp[MKVP_LENGTH];
+	size_t clear_integrity_keysize;
 	size_t integrity_keysize = 0;
+	char *integrity_spec = NULL;
+	int is_integrity_valid = 0;
 	struct vp_token vp_tok;
-	const char *key_type;
 	u8 mkvp[MKVP_LENGTH];
 	size_t clear_keysize;
 	size_t keysize = 0;
 	size_t seckeysize;
-	u8 *key = NULL;
+	const char *vp;
 	char *prompt;
 	char *msg;
 	int token;
 	int rc;
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
-	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, &integrity_keysize,
-			  NULL, NULL, prompt, false);
+	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize,
+			  &integrity_keysize, &integrity_spec, NULL, NULL,
+			  prompt, false);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -2150,11 +2249,23 @@ static int command_validate(void)
 	if (rc != 0)
 		goto out;
 
+	is_phmac_integrity = is_integrity_phmac(integrity_spec,
+						integrity_keysize);
 	seckeysize = keysize - integrity_keysize;
 
 	rc = validate_secure_key(g.pkey_fd, key, seckeysize,
 				 &clear_keysize, &is_old_mk, NULL, g.verbose);
 	is_valid = (rc == 0);
+
+	if (is_phmac_integrity) {
+		integrity_key = key + seckeysize;
+
+		rc = validate_secure_key(g.pkey_fd, integrity_key,
+					 integrity_keysize,
+					 &clear_integrity_keysize,
+					 &is_old_integrity_mk, NULL, g.verbose);
+		is_integrity_valid = (rc == 0);
+	}
 
 	token = find_token(g.cd, PAES_REENC_TOKEN_NAME);
 	if (token >= 0) {
@@ -2180,37 +2291,47 @@ static int command_validate(void)
 		}
 	}
 
-	key_type = get_key_type(key, seckeysize);
-
-	printf("Validation of secure volume key of device '%s':\n", g.pos_arg);
-	printf("  Status:                %s\n", is_valid ? "Valid" : "Invalid");
-	printf("  Secure key size:       %lu bytes\n", seckeysize);
-	printf("  XTS type key:          %s\n",
-	       is_xts_key(key, seckeysize) ? "Yes" : "No");
-	printf("  Key type:              %s\n", key_type);
-	if (is_valid) {
-		printf("  Clear key size:        %lu bits\n", clear_keysize);
-		if (is_secure_key(key, seckeysize)) {
-			printf("  Enciphered with:       %s master key (MKVP: "
-			       "%s)\n", is_old_mk ? "OLD" : "CURRENT",
-			       printable_mkvp(get_card_type_for_keytype(
-							key_type), mkvp));
-		}
-	} else {
-		printf("  Clear key size:        (unknown)\n");
-		if (is_secure_key(key, seckeysize)) {
-			printf("  Enciphered with:       (unknown, MKVP: %s)\n",
-			       printable_mkvp(get_card_type_for_keytype(
-							key_type), mkvp));
+	if (is_phmac_integrity &&
+	    is_secure_key(integrity_key, integrity_keysize)) {
+		rc = get_master_key_verification_pattern(integrity_key,
+							 integrity_keysize,
+							 integrity_mkvp,
+							 g.verbose);
+		if (rc != 0) {
+			warnx("Failed to get the master key verification "
+			      "pattern: %s", strerror(-rc));
+			goto out;
 		}
 	}
-	if (vp_tok_avail)
-		print_verification_pattern(vp_tok.verification_pattern);
-	else if (reenc_pending)
-		print_verification_pattern(reenc_tok.verification_pattern);
-	else
-		printf("  Verification pattern:  Not available\n");
 
+	key_type = get_key_type(key, seckeysize);
+	if (is_phmac_integrity)
+		integrity_key_type = get_key_type(integrity_key,
+						  integrity_keysize);
+
+	printf("Validation of secure volume key of device '%s':\n", g.pos_arg);
+	vp = vp_tok_avail ? vp_tok.verification_pattern :
+				reenc_pending ?
+					reenc_tok.verification_pattern : NULL;
+	print_validation_status("Encryption key", is_valid, key, seckeysize,
+				clear_keysize, key_type, mkvp, is_old_mk, vp);
+
+	if (is_phmac_integrity) {
+		vp = vp_tok_avail ? vp_tok.int_verification_pattern :
+				reenc_pending ?
+					reenc_tok.int_verification_pattern :
+					NULL;
+
+		print_validation_status("Integrity key", is_integrity_valid,
+					integrity_key, integrity_keysize,
+					clear_integrity_keysize,
+					integrity_key_type, integrity_mkvp,
+					is_old_integrity_mk, vp);
+	}
+
+	if (is_phmac_integrity)
+		is_valid &= is_integrity_valid;
+	is_old_mk |= is_old_integrity_mk;
 
 	if (reenc_pending)
 		printf("  Volume key re-enciphering is pending\n");
@@ -2239,6 +2360,8 @@ static int command_validate(void)
 
 out:
 	secure_free(key, keysize);
+	if (integrity_spec != NULL)
+		free(integrity_spec);
 
 	return rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -2260,8 +2383,8 @@ static int command_setvp(void)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = validate_keyslot(CRYPT_ANY_SLOT, &key, &keysize,
-			      &integrity_keysize, NULL, NULL, NULL, NULL,
-			      prompt, NULL);
+			      &integrity_keysize, NULL, NULL, NULL, NULL, NULL,
+			      NULL, NULL, prompt, NULL, NULL);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -2366,7 +2489,7 @@ static int command_setkey(void)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, &integrity_keysize,
-			  &password, &password_len, prompt, false);
+			  NULL, &password, &password_len, prompt, false);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -2575,7 +2698,7 @@ static int command_convert(void)
 
 	/* Get current (clear) volume key from LUKS2 header */
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
-	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, NULL,
+	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, NULL, NULL,
 			  &password, &password_len, prompt, true);
 	free(prompt);
 	if (rc < 0)
