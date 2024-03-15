@@ -2373,9 +2373,12 @@ out:
  */
 static int command_setvp(void)
 {
-	size_t integrity_keysize = 0;
+	size_t integrity_keysize = 0, seckeysize;
+	char *integrity_spec = NULL;
 	struct vp_token vp_tok;
+	int is_phmac_integrity;
 	size_t keysize = 0;
+	u8 *integrity_key;
 	u8 *key = NULL;
 	char *prompt;
 	int token;
@@ -2383,8 +2386,8 @@ static int command_setvp(void)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = validate_keyslot(CRYPT_ANY_SLOT, &key, &keysize,
-			      &integrity_keysize, NULL, NULL, NULL, NULL, NULL,
-			      NULL, NULL, prompt, NULL, NULL);
+			      &integrity_keysize, &integrity_spec, NULL, NULL,
+			      NULL, NULL, NULL, NULL, prompt, NULL, NULL);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -2395,7 +2398,11 @@ static int command_setvp(void)
 
 	token = find_token(g.cd, PAES_VP_TOKEN_NAME);
 
-	rc = generate_key_verification_pattern(key, keysize - integrity_keysize,
+	is_phmac_integrity = is_integrity_phmac(integrity_spec,
+						integrity_keysize);
+	seckeysize = keysize - integrity_keysize;
+
+	rc = generate_key_verification_pattern(key, seckeysize,
 					       vp_tok.verification_pattern,
 					    sizeof(vp_tok.verification_pattern),
 					       g.verbose);
@@ -2407,6 +2414,23 @@ static int command_setvp(void)
 		goto out;
 	}
 
+	if (is_phmac_integrity) {
+		integrity_key = key + seckeysize;
+
+		rc = generate_key_verification_pattern(integrity_key,
+						       integrity_keysize,
+					vp_tok.int_verification_pattern,
+					sizeof(vp_tok.int_verification_pattern),
+						       g.verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'phmac_s390' is "
+			      "loaded and that the 'phmac' cipher is available");
+			goto out;
+		}
+	}
+
 	rc = put_vp_token(g.cd, token, &vp_tok);
 	if (rc < 0)
 		goto out;
@@ -2415,6 +2439,8 @@ static int command_setvp(void)
 
 out:
 	secure_free(key, keysize);
+	if (integrity_spec != NULL)
+		free(integrity_spec);
 
 	return rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
