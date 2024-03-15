@@ -2453,13 +2453,15 @@ out:
 static int command_setkey(void)
 {
 	struct crypt_params_integrity ip = { 0 };
+	char int_vp[VERIFICATION_PATTERN_LEN];
 	char vp[VERIFICATION_PATTERN_LEN];
+	size_t keysize = 0, newekey_size;
 	size_t integrity_keysize = 0;
 	size_t password_len = 0;
 	struct vp_token vp_tok;
 	size_t newkey_size = 0;
+	int is_phmac_integrity;
 	char *password = NULL;
-	size_t keysize = 0;
 	u8 *newkey = NULL;
 	u8 *key = NULL;
 	int is_old_mk;
@@ -2482,26 +2484,32 @@ static int command_setkey(void)
 	if (rc == 0)
 		integrity_keysize = ip.integrity_key_size;
 
-	rc = check_keysize_and_cipher_mode(newkey,
-					   newkey_size - integrity_keysize);
+	is_phmac_integrity = is_integrity_phmac(ip.integrity,
+						integrity_keysize);
+	newekey_size = newkey_size - integrity_keysize;
+
+	rc = check_keysize_and_cipher_mode(newkey, newekey_size);
 	if (rc != 0)
 		goto out;
 
-	rc = validate_secure_key(g.pkey_fd, newkey,
-				 newkey_size - integrity_keysize, NULL,
+	rc = validate_secure_key(g.pkey_fd, newkey, newekey_size, NULL,
 				 &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {
-		warnx("The secure key in file '%s' is not valid",
+		warnx("The %s key%s in file '%s' is not valid",
+		      is_phmac_integrity ? "encryption" : "secure",
+		      is_phmac_integrity ? " part" : "",
 		      g.volume_key_file);
 		goto out;
 	}
 
-	if (is_secure_key(newkey, newkey_size - integrity_keysize) &&
+	if (is_secure_key(newkey, newekey_size) &&
 	    is_old_mk) {
-		util_asprintf(&msg, "The secure key in file '%s' is "
+		util_asprintf(&msg, "The %s key%s in file '%s' is "
 			      "enciphered with the master key in the OLD "
 			      "master key register. Do you want to set this "
 			      "key as the new volume key anyway [y/N]?",
+			      is_phmac_integrity ? "encryption" : "secure",
+			      is_phmac_integrity ? " part" : "",
 			      g.volume_key_file);
 		util_print_indented(msg, 0);
 		free(msg);
@@ -2513,6 +2521,34 @@ static int command_setkey(void)
 		}
 	}
 
+	if (is_phmac_integrity) {
+		rc = validate_secure_key(g.pkey_fd, newkey + newekey_size,
+					 integrity_keysize, NULL,
+					 &is_old_mk, NULL, g.verbose);
+		if (rc != 0) {
+			warnx("The integrity key part in file '%s' is not "
+			      "valid", g.volume_key_file);
+			goto out;
+		}
+
+		if (is_secure_key(newkey + newekey_size, integrity_keysize) &&
+		    is_old_mk) {
+			util_asprintf(&msg, "The integrity key part in file "
+				      "'%s' is enciphered with the master key "
+				      "in the OLD master key register. Do you "
+				      "want to set this key as the new volume "
+				      "key anyway [y/N]?", g.volume_key_file);
+			util_print_indented(msg, 0);
+			free(msg);
+
+			if (!_prompt_for_yes()) {
+				warnx("Device '%s' is left unchanged", g.pos_arg);
+				rc = -EINVAL;
+				goto out;
+			}
+		}
+	}
+
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, &integrity_keysize,
 			  NULL, &password, &password_len, prompt, false);
@@ -2520,16 +2556,17 @@ static int command_setkey(void)
 	if (rc < 0)
 		goto out;
 
-	if (keysize - integrity_keysize == newkey_size - integrity_keysize &&
-	    memcmp(newkey, key, keysize - integrity_keysize) == 0) {
+	if (keysize == newkey_size &&
+	    memcmp(newkey, key, newkey_size) == 0) {
 		warnx("The secure key in file '%s' is equal to the current "
 		      "volume key, setkey is ignored", g.volume_key_file);
 		rc = 0;
 		goto out;
 	}
 	if (integrity_keysize > 0 &&
-	    memcmp(newkey + newkey_size - integrity_keysize,
-		   key + keysize - integrity_keysize, integrity_keysize) != 0) {
+	    !is_phmac_integrity &&
+	    memcmp(newkey + newekey_size, key + newekey_size,
+		   integrity_keysize) != 0) {
 		warnx("The secure key in file '%s' contains a different "
 		      "integrity key (i.e. the last %lu bytes of the key) than "
 		      "the current volume key.", g.volume_key_file,
@@ -2538,8 +2575,7 @@ static int command_setkey(void)
 		goto out;
 	}
 
-	rc = generate_key_verification_pattern(newkey,
-					       newkey_size - integrity_keysize,
+	rc = generate_key_verification_pattern(newkey, newekey_size,
 					       vp, sizeof(vp), g.verbose);
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
@@ -2547,6 +2583,21 @@ static int command_setkey(void)
 		warnx("Make sure that kernel module 'paes_s390' is loaded and "
 		      "that the 'paes' cipher is available");
 		goto out;
+	}
+
+	if (is_phmac_integrity) {
+		rc = generate_key_verification_pattern(newkey + newekey_size,
+						       integrity_keysize,
+						       int_vp, sizeof(int_vp),
+						       g.verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'phmac_s390' is "
+			      "loaded and that the 'phmac' cipher is "
+			      "available");
+			goto out;
+		}
 	}
 
 	token = find_token(g.cd, PAES_VP_TOKEN_NAME);
@@ -2558,7 +2609,9 @@ static int command_setkey(void)
 			goto out;
 		}
 
-		if (strcmp(vp_tok.verification_pattern, vp) != 0) {
+		if (strcmp(vp_tok.verification_pattern, vp) != 0 ||
+		    (is_phmac_integrity &&
+		     strcmp(vp_tok.int_verification_pattern, int_vp) != 0)) {
 			warnx("The verification patterns of the new and old "
 			      "volume keys do not match");
 			rc = -EINVAL;
@@ -2607,8 +2660,13 @@ static int command_setkey(void)
 	if (rc < 0)
 		goto out;
 
+	memset(&vp_tok, 0, sizeof(vp_tok));
 	memcpy(vp_tok.verification_pattern, vp,
 	       sizeof(vp_tok.verification_pattern));
+	if (is_phmac_integrity)
+		memcpy(vp_tok.int_verification_pattern, int_vp,
+		       sizeof(vp_tok.int_verification_pattern));
+
 	rc = put_vp_token(g.cd, token, &vp_tok);
 	if (rc < 0)
 		goto out;
