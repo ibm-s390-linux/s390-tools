@@ -121,7 +121,7 @@ canonical_dn()
     OUTPUT=$4
 
     openssl $OBJTYPE -in $OBJ -$DNTYPE -noout -nameopt multiline \
-        | sort | grep -v $DNTYPE= > $OUTPUT
+        | LC_ALL=C sort | grep -v $DNTYPE= > $OUTPUT
 }
 
 default_issuer()
@@ -130,8 +130,8 @@ default_issuer()
     commonName                = International Business Machines Corporation
     countryName               = US
     localityName              = Poughkeepsie
-    organizationalUnitName    = Key Signing Service
     organizationName          = International Business Machines Corporation
+    organizationalUnitName    = Key Signing Service
     stateOrProvinceName       = New York
 EOF
 }
