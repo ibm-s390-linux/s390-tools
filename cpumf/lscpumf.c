@@ -3473,6 +3473,7 @@ static struct counters *get_counter(int ctrset, size_t *len)
 			read_ccerror(cp, *len);
 			break;
 		case UTIL_ARCH_MACHINE_TYPE_Z16:
+		case UTIL_ARCH_MACHINE_TYPE_Z16_A02:
 			cp = cpumcf_z16_counters;
 			*len = ARRAY_SIZE(cpumcf_z16_counters);
 		}
