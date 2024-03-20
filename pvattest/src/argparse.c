@@ -192,13 +192,13 @@ static gboolean hex_str_toull(const char *nptr, uint64_t *dst, GError **error)
 	}
 
 /* NOTE REQUIRED */
-#define _entry_root_ca(__arg_data, __indent)                                              \
-	{                                                                                 \
-		.long_name = "root-ca", .short_name = 0, .flags = G_OPTION_FLAG_NONE,     \
-		.arg = G_OPTION_ARG_FILENAME_ARRAY, .arg_data = __arg_data,               \
-		.description = "Use FILE as the trusted root CA instead the\n" __indent   \
-			       "root CAs that are installed on the system (optional).\n", \
-		.arg_description = "FILE",                                                \
+#define _entry_root_ca(__arg_data, __indent)                                                       \
+	{                                                                                          \
+		.long_name = "root-ca", .short_name = 0, .flags = G_OPTION_FLAG_NONE,              \
+		.arg = G_OPTION_ARG_FILENAME, .arg_data = __arg_data,                              \
+		.description = "Use FILE as the trusted root CA instead the\n" __indent            \
+			       "root CAs that are installed on the system (optional).\n",          \
+		.arg_description = "FILE",                                                         \
 	}
 
 /* NOTE REQUIRED */
