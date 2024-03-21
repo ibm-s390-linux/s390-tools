@@ -4,13 +4,10 @@ import os.path
 from enum import Enum
 
 from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric import rsa
-
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.x509.oid import NameOID
 
 ONE_DAY = datetime.timedelta(1, 0, 0)
 
@@ -25,7 +22,9 @@ def createRSAKeyPair(size=4096):
     )
 
 
-def createCRL(pkey, issuer, serial_numbers=None, last_update=None, next_update=None):
+def createCRL(
+    pkey, issuer, serial_numbers=None, last_update=None, next_update=None, authid=True
+):
     serial_numbers = [333] if serial_numbers is None else serial_numbers
     builder = x509.CertificateRevocationListBuilder()
     builder = builder.issuer_name(issuer)
@@ -43,50 +42,15 @@ def createCRL(pkey, issuer, serial_numbers=None, last_update=None, next_update=N
             .build(default_backend())
         )
         builder = builder.add_revoked_certificate(revoked_cert)
-    crl = builder.sign(
-        private_key=pkey, algorithm=hashes.SHA256(), backend=default_backend()
-    )
-    return crl
-
-
-def createRootCA(pkey, subject):
-    issuer = subject
-    ca = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer)
-        .public_key(pkey.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=365 * 365)
-        )
-        .add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
-            critical=True,
-            # Sign our certificate with our private key
-        )
-        .add_extension(
-            x509.KeyUsage(
-                digital_signature=False,
-                key_encipherment=False,
-                content_commitment=False,
-                data_encipherment=False,
-                key_agreement=False,
-                encipher_only=False,
-                decipher_only=False,
-                key_cert_sign=True,
-                crl_sign=True,
-            ),
-            critical=True,
-        )
-        .add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(pkey.public_key()),
+    if authid:
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(pkey.public_key()),
             critical=False,
         )
-        .sign(pkey, hashes.SHA512(), default_backend())
+    crl = builder.sign(
+        private_key=pkey, algorithm=hashes.SHA512(), backend=default_backend()
     )
-    return ca
+    return crl
 
 
 class CertType(Enum):
@@ -200,9 +164,7 @@ def createCert(
                 critical=True,
             )
             .add_extension(
-                x509.ExtendedKeyUsage(
-                    [x509.oid.ExtendedKeyUsageOID.CODE_SIGNING]
-                ),
+                x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.CODE_SIGNING]),
                 critical=False,
             )
         )
@@ -254,8 +216,7 @@ def getPrivKey(path, create_priv_key):
 
 
 if __name__ == "__main__":
-    MOCKUP_CRL_DIST = "http://127.0.0.1:1234/crl/"
-
+    MOCKUP_CRL_DIST = ""
 
     # create root CA
     root_ca_subject = x509.Name(
@@ -310,7 +271,13 @@ if __name__ == "__main__":
         t=CertType.ROOT_CA,
     )
 
-    fake_root_ca_crt = createRootCA(fake_root_ca_pkey, fake_root_ca_subject)
+    fake_root_ca_crt = createCert(
+        pkey=fake_root_ca_pkey,
+        subject=fake_root_ca_subject,
+        issuer_pkey=fake_root_ca_pkey,
+        crl_uri=None,
+        t=CertType.ROOT_CA,
+    )
 
     # create intermediate CA
     inter_ca_pkey = getPrivKey("inter_ca.key", createRSAKeyPair)
@@ -354,7 +321,7 @@ if __name__ == "__main__":
 
     # create ibm certificate
     ibm_pkey = getPrivKey("ibm.key", createRSAKeyPair)
-    ibm_subject = x509.Name(
+    ibm_subject_poughkeepsie = x509.Name(
         [
             x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
             x509.NameAttribute(
@@ -371,9 +338,35 @@ if __name__ == "__main__":
             ),
         ]
     )
-    ibm_crt = createCert(
+    ibm_pougkeepsie_crt = createCert(
         pkey=ibm_pkey,
-        subject=ibm_subject,
+        subject=ibm_subject_poughkeepsie,
+        issuer_crt=inter_ca_crt,
+        issuer_pkey=inter_ca_pkey,
+        crl_uri=MOCKUP_CRL_DIST + "inter_ca.crl",
+        t=CertType.SIGNING_CERT,
+    )
+
+    ibm_subject_armonk = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
+            x509.NameAttribute(
+                NameOID.ORGANIZATION_NAME,
+                u"International Business Machines Corporation",
+            ),
+            x509.NameAttribute(
+                NameOID.COMMON_NAME, u"International Business Machines Corporation"
+            ),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"New York"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, u"Armonk"),
+            x509.NameAttribute(
+                NameOID.ORGANIZATIONAL_UNIT_NAME, u"IBM Z Host Key Signing Service"
+            ),
+        ]
+    )
+    ibm_armonk_crt = createCert(
+        pkey=ibm_pkey,
+        subject=ibm_subject_armonk,
         issuer_crt=inter_ca_crt,
         issuer_pkey=inter_ca_pkey,
         crl_uri=MOCKUP_CRL_DIST + "inter_ca.crl",
@@ -381,7 +374,7 @@ if __name__ == "__main__":
     )
     ibm_expired_crt = createCert(
         pkey=ibm_pkey,
-        subject=ibm_subject,
+        subject=ibm_subject_poughkeepsie,
         issuer_crt=inter_ca_crt,
         issuer_pkey=inter_ca_pkey,
         crl_uri=MOCKUP_CRL_DIST + "inter_ca.crl",
@@ -390,11 +383,11 @@ if __name__ == "__main__":
         not_after=datetime.datetime.today() - 1 * 365 * ONE_DAY,
     )
 
-    #create revoked ibm certificate
+    # create revoked ibm certificate
     ibm_rev_pkey = getPrivKey("ibm.key", createRSAKeyPair)
     ibm_rev_crt = createCert(
         pkey=ibm_rev_pkey,
-        subject=ibm_subject,
+        subject=ibm_subject_poughkeepsie,
         issuer_crt=inter_ca_crt,
         issuer_pkey=inter_ca_pkey,
         crl_uri=MOCKUP_CRL_DIST + "inter_ca.crl",
@@ -402,7 +395,9 @@ if __name__ == "__main__":
     )
 
     # create inter CLRs
-    inter_ca_crl = createCRL(inter_ca_pkey, inter_ca_subject, [444, ibm_rev_crt.serial_number])
+    inter_ca_crl = createCRL(
+        inter_ca_pkey, inter_ca_subject, [444, ibm_rev_crt.serial_number]
+    )
     inter_ca_invalid_signer_crl = createCRL(root_ca_pkey, inter_ca_subject, [444])
     inter_ca_invalid_date_crl = createCRL(
         inter_ca_pkey,
@@ -431,7 +426,9 @@ if __name__ == "__main__":
             ),
         ]
     )
-    ibm_wrong_subject_crl = createCRL(ibm_wrong_subject_pkey, ibm_wrong_subject_subject, [555])
+    ibm_wrong_subject_crl = createCRL(
+        ibm_wrong_subject_pkey, ibm_wrong_subject_subject, [555]
+    )
     ibm_wrong_subject_crt = createCert(
         pkey=ibm_wrong_subject_pkey,
         subject=ibm_wrong_subject_subject,
@@ -469,7 +466,6 @@ if __name__ == "__main__":
         t=CertType.SIGNING_CERT,
     )
 
-
     def host_subj():
         return x509.Name(
             [
@@ -487,14 +483,13 @@ if __name__ == "__main__":
             ]
         )
 
-
     # create host certificate
     host_pkey = getPrivKey("host.key", createEcKeyPair)
     host_subject = host_subj()
     host_crt = createCert(
         pkey=host_pkey,
         subject=host_subject,
-        issuer_crt=ibm_crt,
+        issuer_crt=ibm_pougkeepsie_crt,
         issuer_pkey=ibm_pkey,
         crl_uri=MOCKUP_CRL_DIST + "ibm.crl",
         t=CertType.HOST_CERT,
@@ -502,7 +497,7 @@ if __name__ == "__main__":
     host_crt_expired = createCert(
         pkey=host_pkey,
         subject=host_subject,
-        issuer_crt=ibm_crt,
+        issuer_crt=ibm_pougkeepsie_crt,
         issuer_pkey=ibm_pkey,
         crl_uri=MOCKUP_CRL_DIST + "ibm.crl",
         t=CertType.HOST_CERT,
@@ -512,7 +507,7 @@ if __name__ == "__main__":
     host_uri_na_crt = createCert(
         pkey=host_pkey,
         subject=host_subject,
-        issuer_crt=ibm_crt,
+        issuer_crt=ibm_pougkeepsie_crt,
         issuer_pkey=ibm_pkey,
         crl_uri=MOCKUP_CRL_DIST + "notavailable",
         t=CertType.HOST_CERT,
@@ -523,7 +518,7 @@ if __name__ == "__main__":
     host_crt = createCert(
         pkey=host_pkey,
         subject=host_subject,
-        issuer_crt=ibm_crt,
+        issuer_crt=ibm_pougkeepsie_crt,
         issuer_pkey=ibm_pkey,
         crl_uri=MOCKUP_CRL_DIST + "ibm.crl",
         t=CertType.HOST_CERT,
@@ -534,35 +529,48 @@ if __name__ == "__main__":
     host_rev_crt = createCert(
         pkey=host_rev_pkey,
         subject=host_rev_subject,
-        issuer_crt=ibm_crt,
+        issuer_crt=ibm_pougkeepsie_crt,
         issuer_pkey=ibm_pkey,
         crl_uri=MOCKUP_CRL_DIST + "ibm.crl",
         t=CertType.HOST_CERT,
     )
 
     # some IBM revocation lists
-    ibm_crl = createCRL(ibm_pkey, ibm_subject, [555, host_rev_crt.serial_number])
+    ibm_poughkeepsie_crl = createCRL(
+        ibm_pkey, ibm_subject_poughkeepsie, [555, host_rev_crt.serial_number]
+    )
+    ibm_armonk_crl = createCRL(
+        ibm_pkey, ibm_subject_armonk, [555, host_rev_crt.serial_number]
+    )
+
     ibm_outdated_early_crl = createCRL(
         ibm_pkey,
-        ibm_subject,
+        ibm_subject_poughkeepsie,
         [],
         last_update=datetime.datetime.today() + 1000 * 365 * ONE_DAY,
         next_update=datetime.datetime.today() + 1001 * 365 * ONE_DAY,
     )
     ibm_outdated_late_crl = createCRL(
         ibm_pkey,
-        ibm_subject,
+        ibm_subject_poughkeepsie,
         [],
         last_update=datetime.datetime.today() - 2 * 365 * ONE_DAY,
         next_update=datetime.datetime.today() - 1 * 365 * ONE_DAY,
     )
-    ibm_wrong_issuer_crl = createCRL(ibm_pkey, inter_ca_subject, [])
+    ibm_wrong_issuer_priv_key_crl = createCRL(
+        ibm_pkey, inter_ca_subject, [], authid=False
+    )
     ibm_invalid_hash_crl = createCRL(
-        inter_ca_pkey, ibm_subject, [555, host_crt.serial_number]
+        inter_ca_pkey,
+        ibm_subject_poughkeepsie,
+        [555, host_crt.serial_number],
+        authid=False,
     )
 
     # create host certificate issued by a non-valid signing key
-    host_invalid_signing_key_pkey = getPrivKey("host_invalid_signing_key.key", createEcKeyPair)
+    host_invalid_signing_key_pkey = getPrivKey(
+        "host_invalid_signing_key.key", createEcKeyPair
+    )
     host_invalid_signing_key_subject = x509.Name(
         [
             x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
@@ -606,12 +614,36 @@ if __name__ == "__main__":
     host2_crt = createCert(
         pkey=host2_pkey,
         subject=host2_subject,
-        issuer_crt=ibm_crt,
+        issuer_crt=ibm_pougkeepsie_crt,
         issuer_pkey=ibm_pkey,
         crl_uri=MOCKUP_CRL_DIST + "ibm.crl",
         t=CertType.HOST_CERT,
     )
 
+    host_armonk_pkey = getPrivKey("host.key", createEcKeyPair)
+    host_armonk_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
+            x509.NameAttribute(
+                NameOID.ORGANIZATION_NAME,
+                u"International Business Machines Corporation",
+            ),
+            x509.NameAttribute(
+                NameOID.COMMON_NAME, u"International Business Machines Corporation"
+            ),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"New York"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, u"Armonk"),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u"IBM Z Host Key"),
+        ]
+    )
+    host_armonk_crt = createCert(
+        pkey=host_armonk_pkey,
+        subject=host_armonk_subject,
+        issuer_crt=ibm_armonk_crt,
+        issuer_pkey=ibm_pkey,
+        crl_uri=MOCKUP_CRL_DIST + "ibm_armonk.crl",
+        t=CertType.HOST_CERT,
+    )
 
     fake_host_pkey = getPrivKey("fake_host.key", createEcKeyPair)
     fake_host_subject = x509.Name(
@@ -637,7 +669,7 @@ if __name__ == "__main__":
         crl_uri=MOCKUP_CRL_DIST + "fake_ibm.crt",
         t=CertType.HOST_CERT,
     )
-    #TODO DER chain
+    # TODO DER chain
 
     # store CA
     with open("root_ca.crt", "wb") as f:
@@ -673,22 +705,26 @@ if __name__ == "__main__":
 
     # store IBM
     with open("ibm.crt", "wb") as f:
-        f.write(ibm_crt.public_bytes(serialization.Encoding.PEM))
+        f.write(ibm_pougkeepsie_crt.public_bytes(serialization.Encoding.PEM))
+    with open("ibm_armonk.crt", "wb") as f:
+        f.write(ibm_armonk_crt.public_bytes(serialization.Encoding.PEM))
     with open("ibm_rev.crt", "wb") as f:
         f.write(ibm_rev_crt.public_bytes(serialization.Encoding.PEM))
     with open("ibm_expired.crt", "wb") as f:
         f.write(ibm_expired_crt.public_bytes(serialization.Encoding.PEM))
     with open("ibm.crl", "wb") as f:
-        f.write(ibm_crl.public_bytes(serialization.Encoding.PEM))
+        f.write(ibm_poughkeepsie_crl.public_bytes(serialization.Encoding.PEM))
+    with open("ibm_armonk.crl", "wb") as f:
+        f.write(ibm_armonk_crl.public_bytes(serialization.Encoding.PEM))
     with open("ibm.chained.crt", "wb") as f:
-        f.write(ibm_crl.public_bytes(serialization.Encoding.PEM))
-        f.write(ibm_crt.public_bytes(serialization.Encoding.PEM))
+        f.write(ibm_poughkeepsie_crl.public_bytes(serialization.Encoding.PEM))
+        f.write(ibm_pougkeepsie_crt.public_bytes(serialization.Encoding.PEM))
     with open("ibm_outdated_early.crl", "wb") as f:
         f.write(ibm_outdated_early_crl.public_bytes(serialization.Encoding.PEM))
     with open("ibm_outdated_late.crl", "wb") as f:
         f.write(ibm_outdated_late_crl.public_bytes(serialization.Encoding.PEM))
     with open("ibm_wrong_issuer.crl", "wb") as f:
-        f.write(ibm_wrong_issuer_crl.public_bytes(serialization.Encoding.PEM))
+        f.write(ibm_wrong_issuer_priv_key_crl.public_bytes(serialization.Encoding.PEM))
     with open("ibm_invalid_hash.crl", "wb") as f:
         f.write(ibm_invalid_hash_crl.public_bytes(serialization.Encoding.PEM))
     with open("ibm_wrong_subject.crt", "wb") as f:
@@ -719,6 +755,10 @@ if __name__ == "__main__":
     with open("host2.crt", "wb") as f:
         f.write(host2_crt.public_bytes(serialization.Encoding.PEM))
 
+    # store host_armonk
+    with open("host_armonk.crt", "wb") as f:
+        f.write(host_armonk_crt.public_bytes(serialization.Encoding.PEM))
+
     # store fake host
     with open("fake_host.crt", "wb") as f:
         f.write(fake_host_crt.public_bytes(serialization.Encoding.PEM))
@@ -728,6 +768,6 @@ if __name__ == "__main__":
 
     # store a DER cert and crl
     with open("der.crt", "wb") as f:
-        f.write(ibm_crt.public_bytes(serialization.Encoding.DER))
+        f.write(ibm_pougkeepsie_crt.public_bytes(serialization.Encoding.DER))
     with open("der.crl", "wb") as f:
-        f.write(ibm_crl.public_bytes(serialization.Encoding.DER))
+        f.write(ibm_poughkeepsie_crl.public_bytes(serialization.Encoding.DER))

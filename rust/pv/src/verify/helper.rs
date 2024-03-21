@@ -3,10 +3,8 @@
 // Copyright IBM Corp. 2023
 
 use crate::error::bail_hkd_verify;
-use crate::misc::read_crls;
 use crate::HkdVerifyErrorType::*;
 use crate::{Error, Result};
-use curl::easy::{Easy2, Handler, WriteError};
 use log::debug;
 use openssl::{
     asn1::{Asn1Time, Asn1TimeRef},
@@ -15,17 +13,14 @@ use openssl::{
     ssl::SslFiletype,
     stack::{Stack, Stackable},
     x509::{
-        store::{File, X509Lookup, X509StoreBuilder, X509StoreBuilderRef, X509StoreRef},
+        store::{File, X509Lookup, X509StoreBuilder, X509StoreRef},
         verify::{X509VerifyFlags, X509VerifyParam},
-        X509Crl, X509CrlRef, X509Name, X509NameRef, X509PurposeId, X509Ref, X509StoreContext,
+        X509CrlRef, X509Name, X509NameRef, X509PurposeId, X509Ref, X509StoreContext,
         X509StoreContextRef, X509VerifyResult, X509,
     },
 };
-use openssl_extensions::{
-    akid::{AkidCheckResult, AkidExtension},
-    crl::X509StoreExtension,
-};
-use std::{cmp::Ordering, ffi::c_int, time::Duration, usize};
+use openssl_extensions::akid::{AkidCheckResult, AkidExtension};
+use std::{cmp::Ordering, ffi::c_int, usize};
 
 /// Minimum security level for the keys/certificates used to establish a chain of
 /// trust (see https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html
@@ -192,17 +187,6 @@ pub fn extract_ibm_sign_key(certs: Vec<X509>) -> Result<(X509, Stack<X509>)> {
     Ok((ibm_z_sign_key, chain))
 }
 
-/// for all certs load the first CRL specified into our store
-pub fn download_crls_into_store(store: &mut X509StoreBuilderRef, crts: &[X509]) -> Result<()> {
-    for crt in crts {
-        debug!("Download crls for {crt:?}");
-        if let Some(crl) = download_first_crl_from_x509(crt)? {
-            crl.iter().try_for_each(|c| store.add_crl(c))?;
-        }
-    }
-    Ok(())
-}
-
 // Name Entry values of an IBM Z key signing cert
 //Asn1StringRef::as_slice aka ASN1_STRING_get0_data gives a string without \0 delimiter
 const IBM_Z_COMMON_NAME: &[u8; 43usize] = b"International Business Machines Corporation";
@@ -319,14 +303,17 @@ pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
     res
 }
 
-const CRL_TIMEOUT_MAX: Duration = Duration::from_secs(3);
-
 /// Searches for CRL Distribution points and downloads the CRL. Stops after the first successful
 /// download.
 ///
 /// Error if sth bad(=unexpected) happens (not bad: crl not available at link, unexpected format)
 /// Other  issues are mapped to Ok(None)
-pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<X509Crl>>> {
+#[cfg(not(test))]
+pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl::x509::X509Crl>>> {
+    use crate::misc::read_crls;
+    use curl::easy::{Easy2, Handler, WriteError};
+    use std::time::Duration;
+    const CRL_TIMEOUT_MAX: Duration = Duration::from_secs(3);
     struct Buf(Vec<u8>);
 
     impl Handler for Buf {
@@ -420,8 +407,6 @@ pub fn stack_err_hlp<T: Stackable>(
 /// tests for some private functions
 mod test {
 
-    use openssl_extensions::x509_crl_eq;
-
     use super::*;
     use crate::test_utils::*;
     use std::time::{Duration, SystemTime};
@@ -496,21 +481,5 @@ mod test {
             Err(Error::HkdVerify(NoIbmSignKey))
         ));
         assert!(super::get_ibm_z_sign_key(&[ibm_crt, no_sign_crt]).is_ok(),);
-    }
-
-    #[test]
-    fn download_first_crl_from_x509() {
-        let ibm_crt = load_gen_cert("ibm.crt");
-        let inter_crl = load_gen_crl("inter_ca.crl");
-        let _m_inter = super::super::test::mock_endpt("inter_ca.crl");
-
-        let crl_d = super::download_first_crl_from_x509(&ibm_crt)
-            .unwrap()
-            .unwrap();
-        assert_eq!(crl_d.len(), 1);
-        assert!(x509_crl_eq(
-            crl_d.first().unwrap().as_ref(),
-            inter_crl.as_ref()
-        ));
     }
 }

@@ -7,8 +7,12 @@ use log::debug;
 use openssl::stack::Stack;
 use openssl::x509::store::X509Store;
 use openssl::x509::{CrlStatus, X509Ref, X509StoreContext, X509};
-use openssl_extensions::crl::StackableX509Crl;
-use openssl_extensions::crl::X509StoreContextExtension;
+use openssl_extensions::crl::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
+
+#[cfg(not(test))]
+use helper::download_first_crl_from_x509;
+#[cfg(test)]
+use test::download_first_crl_from_x509;
 
 use crate::error::bail_hkd_verify;
 use crate::misc::{read_certs, read_file};
@@ -113,7 +117,7 @@ impl CertVerifier {
 
         if !self.offline {
             // Try to download a CRL if defined in the HKD
-            if let Some(crl) = helper::download_first_crl_from_x509(hkd)? {
+            if let Some(crl) = download_first_crl_from_x509(hkd)? {
                 crl.into_iter().try_for_each(|c| crls.push(c.into()))?;
             }
         }
@@ -143,7 +147,11 @@ impl CertVerifier {
         for path in cert_paths {
             let mut crt = read_certs(&read_file(path, "certificate")?)?;
             if !offline {
-                helper::download_crls_into_store(&mut store, &crt)?;
+                for c in &crt {
+                    if let Some(crl) = download_first_crl_from_x509(c)? {
+                        crl.iter().try_for_each(|c| store.add_crl(c))?;
+                    }
+                }
             }
             untr_certs.append(&mut crt);
         }
