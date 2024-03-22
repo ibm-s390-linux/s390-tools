@@ -13,14 +13,17 @@ use openssl::{
 use openssl_sys::BIO_new_mem_buf;
 use std::ffi::c_int;
 
+#[derive(Debug)]
 pub struct StackableX509Crl(*mut openssl_sys::X509_CRL);
 
 impl ForeignType for StackableX509Crl {
     type CType = openssl_sys::X509_CRL;
     type Ref = X509CrlRef;
+
     unsafe fn from_ptr(ptr: *mut openssl_sys::X509_CRL) -> StackableX509Crl {
         StackableX509Crl(ptr)
     }
+
     fn as_ptr(&self) -> *mut openssl_sys::X509_CRL {
         self.0
     }
@@ -32,6 +35,7 @@ impl Drop for StackableX509Crl {
 }
 impl ::std::ops::Deref for StackableX509Crl {
     type Target = X509CrlRef;
+
     fn deref(&self) -> &X509CrlRef {
         unsafe { ForeignTypeRef::from_ptr(self.0) }
     }
@@ -71,7 +75,7 @@ impl<'a> MemBioSlice<'a> {
     pub fn new(buf: &'a [u8]) -> Result<MemBioSlice<'a>, ErrorStack> {
         openssl_sys::init();
 
-        assert!(buf.len() <= c_int::max_value() as usize);
+        assert!(buf.len() <= c_int::MAX as usize);
         let bio = unsafe {
             {
                 let r = BIO_new_mem_buf(buf.as_ptr() as *const _, buf.len() as c_int);

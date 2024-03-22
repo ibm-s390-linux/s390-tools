@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
-
-pub use crate::stackable_crl::*;
+pub use crate::openssl_extensions::stackable_crl::*;
 use foreign_types::{ForeignType, ForeignTypeRef};
 use openssl::{
     error::ErrorStack,
@@ -22,7 +21,6 @@ pub fn opt_to_ptr<T: ForeignTypeRef>(o: Option<&T>) -> *mut T::CType {
 
 mod ffi {
     extern "C" {
-        #[cfg(ossl110)]
         pub fn X509_STORE_CTX_get1_crls(
             ctx: *mut openssl_sys::X509_STORE_CTX,
             nm: *mut openssl_sys::X509_NAME,
@@ -62,11 +60,8 @@ pub trait X509StoreContextExtension {
         with_context: F,
     ) -> Result<T, ErrorStack>
     where
-        F: FnOnce(&mut X509StoreContextRef) -> std::result::Result<T, ErrorStack>;
-    fn crls(
-        &mut self,
-        subj: &X509NameRef,
-    ) -> std::result::Result<Stack<StackableX509Crl>, ErrorStack>;
+        F: FnOnce(&mut X509StoreContextRef) -> Result<T, ErrorStack>;
+    fn crls(&mut self, subj: &X509NameRef) -> Result<Stack<StackableX509Crl>, ErrorStack>;
 }
 
 impl X509StoreContextExtension for X509StoreContextRef {
@@ -78,7 +73,7 @@ impl X509StoreContextExtension for X509StoreContextRef {
         with_context: F,
     ) -> Result<T, ErrorStack>
     where
-        F: FnOnce(&mut X509StoreContextRef) -> std::result::Result<T, ErrorStack>,
+        F: FnOnce(&mut X509StoreContextRef) -> Result<T, ErrorStack>,
     {
         struct Cleanup<'a>(&'a mut X509StoreContextRef);
 
@@ -108,12 +103,9 @@ impl X509StoreContextExtension for X509StoreContextRef {
         let cleanup = Cleanup(self);
         with_context(cleanup.0)
     }
+
     /// Get all Certificate Revocation Lists with the subject currently stored
-    #[cfg(ossl110)]
-    fn crls(
-        &mut self,
-        subj: &X509NameRef,
-    ) -> std::result::Result<Stack<StackableX509Crl>, ErrorStack> {
+    fn crls(&mut self, subj: &X509NameRef) -> Result<Stack<StackableX509Crl>, ErrorStack> {
         unsafe {
             {
                 let r = ffi::X509_STORE_CTX_get1_crls(self.as_ptr(), subj.as_ptr());

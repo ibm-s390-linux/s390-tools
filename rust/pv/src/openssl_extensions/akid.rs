@@ -39,21 +39,16 @@ impl fmt::Debug for AkidCheckResult {
 }
 
 impl AkidCheckResult {
+    pub const OK: AkidCheckResult = AkidCheckResult(openssl_sys::X509_V_OK);
+
     /// Creates an `AkidCheckResult` from a raw error number.
     unsafe fn from_raw(err: c_int) -> AkidCheckResult {
         AkidCheckResult(err)
     }
-
-    pub const OK: AkidCheckResult = AkidCheckResult(openssl_sys::X509_V_OK);
-    pub const ERR_AKID_ISSUER_SERIAL_MISMATCH: AkidCheckResult =
-        AkidCheckResult(openssl_sys::X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH);
-    pub const ERR_AKID_SKID_MISMATCH: AkidCheckResult =
-        AkidCheckResult(openssl_sys::X509_V_ERR_AKID_SKID_MISMATCH);
 }
 
 impl AkidRef {
-    ///Check if the `Akid` matches the issuer
-    ///
+    /// Check if the `Akid` matches the issuer
     pub fn check(&self, issuer: &X509Ref) -> AkidCheckResult {
         unsafe {
             let res = ffi::X509_check_akid(issuer.as_ptr(), self.as_ptr());

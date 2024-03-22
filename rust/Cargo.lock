@@ -378,17 +378,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "openssl_extensions"
-version = "0.1.0"
-dependencies = [
- "foreign-types",
- "libc",
- "log",
- "openssl",
- "openssl-sys",
-]
-
-[[package]]
 name = "pkg-config"
 version = "0.3.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -415,9 +404,10 @@ version = "1.0.0"
 dependencies = [
  "byteorder",
  "curl",
+ "foreign-types",
  "log",
  "openssl",
- "openssl_extensions",
+ "openssl-sys",
  "pv_core",
  "serde",
  "serde_test",

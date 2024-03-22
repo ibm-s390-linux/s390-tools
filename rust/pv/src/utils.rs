@@ -14,7 +14,7 @@ use openssl::{
 /// This function will return an error if the underlying OpenSSL implementation cannot parse `buf`
 /// as `DER` or `PEM`.
 pub fn read_crls(buf: &[u8]) -> Result<Vec<X509Crl>> {
-    use openssl_extensions::crl::StackableX509Crl;
+    use crate::openssl_extensions::StackableX509Crl;
     X509Crl::from_der(buf)
         .map(|crl| vec![crl])
         .or_else(|_| StackableX509Crl::stack_from_pem(buf))

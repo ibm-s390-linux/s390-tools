@@ -3,6 +3,7 @@
 // Copyright IBM Corp. 2023
 
 use crate::error::bail_hkd_verify;
+use crate::openssl_extensions::{AkidCheckResult, AkidExtension};
 use crate::HkdVerifyErrorType::*;
 use crate::{Error, Result};
 use log::debug;
@@ -19,7 +20,6 @@ use openssl::{
         X509StoreContextRef, X509VerifyResult, X509,
     },
 };
-use openssl_extensions::akid::{AkidCheckResult, AkidExtension};
 use std::path::Path;
 use std::str::from_utf8;
 use std::{cmp::Ordering, ffi::c_int};

@@ -38,6 +38,7 @@ mod brcb;
 mod confidential;
 mod crypto;
 mod error;
+mod openssl_extensions;
 mod req;
 mod utils;
 mod uvattest;

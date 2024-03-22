@@ -2,13 +2,13 @@
 //
 // Copyright IBM Corp. 2023
 
+use crate::openssl_extensions::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
 use core::slice;
 use log::{debug, trace};
 use openssl::error::ErrorStack;
 use openssl::stack::Stack;
 use openssl::x509::store::X509Store;
 use openssl::x509::{CrlStatus, X509NameRef, X509Ref, X509StoreContext, X509StoreContextRef, X509};
-use openssl_extensions::crl::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
 use std::path::Path;
 
 #[cfg(not(test))]
