@@ -391,7 +391,8 @@ static void dev_from_part_nvme(char *dev_name)
 static int set_reipl_type(const char *dev_name)
 {
 	if (strncmp(dev_name, "dasd", strlen("dasd")) == 0 ||
-	    strncmp(dev_name, "vd", strlen("vd")) == 0)
+	    strncmp(dev_name, "vd", strlen("vd")) == 0 ||
+	    ccw_is_virtio_device(dev_name) == 0)
 		l.reipl_type = REIPL_CCW;
 	else if (strncmp(dev_name, "sd", strlen("sd")) == 0)
 		l.reipl_type = REIPL_FCP;

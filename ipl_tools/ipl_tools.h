@@ -87,6 +87,7 @@ int nvme_is_device(char *fid_str, char *nsid_str);
  * CCW
  */
 extern int ccw_is_device(const char *devno);
+extern int ccw_is_virtio_device(const char *device);
 extern void ccw_busid_get(const char *device, char *devno);
 
 /*
