@@ -1,15 +1,15 @@
 /*
- * zdev - Information regarding site-specific configurations used for
- * zdev tools.
+ * zdev - Minimal header file containing generic definitions utilized by
+ * zdev-tools.
  *
- * Copyright IBM Corp. 2023
+ * Copyright IBM Corp. 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#ifndef SITE_H
-#define SITE_H
+#ifndef ZDEV_H
+#define ZDEV_H
 
 /**
  * Currently zdev supports 10 sites. Which means, zdev support 10 different
@@ -28,4 +28,4 @@
 /* Helper to find the availability of site-configuration */
 #define dev_site_configured(dev, x) (dev->site_specific[(x)].exists && \
 				     !dev->site_specific[(x)].deconfigured)
-#endif /* SITE_H */
+#endif /* ZDEV_H */

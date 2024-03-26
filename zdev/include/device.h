@@ -15,7 +15,7 @@
 #include "exit_code.h"
 #include "hash.h"
 #include "misc.h"
-#include "site.h"
+#include "zdev.h"
 
 struct subtype;
 struct setting_list;

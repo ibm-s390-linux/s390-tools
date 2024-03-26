@@ -13,7 +13,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "site.h"
+#include "zdev.h"
 #include "zdev_id.h"
 
 #define	SYSINFO		"/proc/sysinfo"
