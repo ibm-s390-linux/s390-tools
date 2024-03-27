@@ -1744,6 +1744,108 @@ out:
 	return rc;
 }
 
+static int reencipher_key(u8 *key, size_t securekeysize,
+			  int fromold, int tonew, int is_old_mk,
+			  int is_integrity_key)
+{
+	bool selected;
+	char *msg;
+	int rc;
+
+	if (!fromold && !tonew) {
+		/* Autodetect reencipher mode */
+		if (is_old_mk) {
+			fromold = 1;
+			util_asprintf(&msg, "The secure %s key of device '%s' "
+				      "is enciphered with the OLD master key "
+				      "and is being re-enciphered with the "
+				      "CURRENT master key.",
+				      is_integrity_key ?
+						"integrity" : "encryption",
+				      g.pos_arg);
+			util_print_indented(msg, 0);
+			free(msg);
+		} else {
+			tonew = 1;
+			util_asprintf(&msg, "The secure %s key of device '%s' "
+				      "is enciphered with the CURRENT master "
+				      "key and is being re-enciphered with the "
+				      "NEW master key.",
+				      is_integrity_key ?
+						"integrity" : "encryption",
+				      g.pos_arg);
+			util_print_indented(msg, 0);
+			free(msg);
+		}
+	}
+
+	if (fromold) {
+		rc = reencipher_secure_key(&g.lib, key, securekeysize,
+					   NULL, REENCIPHER_OLD_TO_CURRENT,
+					   &selected, g.verbose);
+		if (rc != 0) {
+			if (rc == -ENODEV) {
+				warnx("No APQN found that is suitable for "
+				      "re-enciphering the secure %s key from "
+				      "the OLD to the CURRENT master key.",
+				      is_integrity_key ?
+						"integrity" : "encryption");
+			} else {
+				warnx("Failed to re-encipher the secure %s key "
+				      "for device '%s'\n",
+				      is_integrity_key ?
+						"integrity" : "encryption",
+				      g.pos_arg);
+				if (!selected &&
+				    !is_ep11_aes_key(key, securekeysize) &&
+				    !is_ep11_aes_key_with_header(key,
+								securekeysize))
+					is_integrity_key ?
+						print_msg_for_cca_envvars(
+							"secure volume key") :
+						print_msg_for_cca_envvars(
+							"secure integrity key");
+				rc = -EINVAL;
+			}
+			return rc;
+		}
+	}
+
+	if (tonew) {
+		rc = reencipher_secure_key(&g.lib, key, securekeysize,
+					   NULL, REENCIPHER_CURRENT_TO_NEW,
+					   &selected, g.verbose);
+		if (rc != 0) {
+			if (rc == -ENODEV) {
+				warnx("No APQN found that is suitable for "
+				      "re-enciphering the secure %s key from "
+				      "the CURRENT to the NEW master key.",
+				      is_integrity_key ?
+						"integrity" : "encryption");
+			} else {
+				warnx("Failed to re-encipher the secure %s key "
+				      "for device '%s'\n",
+				      is_integrity_key ?
+						"integrity" : "encryption",
+				      g.pos_arg);
+				if (!selected &&
+				    !is_ep11_aes_key(key, securekeysize) &&
+				    !is_ep11_aes_key_with_header(key,
+								 securekeysize))
+					is_integrity_key ?
+						print_msg_for_cca_envvars(
+							"secure volume key") :
+						print_msg_for_cca_envvars(
+							"secure integrity key");
+				rc = -EINVAL;
+			}
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Return the number of active key slots in a LUKS2 volume.
  */
@@ -1772,25 +1874,27 @@ static int count_active_keyslots(struct crypt_device *cd)
  */
 static int reencipher_prepare(int token)
 {
+	int is_old_mk, is_integrity_old_mk;
 	struct reencipher_token reenc_tok;
 	size_t integrity_keysize = 0;
+	char *integrity_spec = NULL;
+	u8 *integrity_key = NULL;
+	int is_phmac_integrity;
 	struct vp_token vp_tok;
 	char *password = NULL;
 	size_t securekeysize;
 	size_t password_len;
 	u8 *key = NULL;
 	size_t keysize;
-	int is_old_mk;
-	bool selected;
 	char *prompt;
 	char *msg;
 	int rc;
 
 	if (token >= 0) {
 		util_asprintf(&msg, "Staged volume key re-enciphering is "
-			      "already initiated for device '%s'. Do you want to "
-			      "cancel the pending re-enciphering and start a "
-			      "new re-enciphering process [y/N]?", g.pos_arg);
+			      "already initiated for device '%s'. Do you want "
+			      "to cancel the pending re-enciphering and start "
+			      "a new re-enciphering process [y/N]?", g.pos_arg);
 		util_print_indented(msg, 0);
 		free(msg);
 
@@ -1806,21 +1910,43 @@ static int reencipher_prepare(int token)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = validate_keyslot(CRYPT_ANY_SLOT, &key, &keysize,
-			      &integrity_keysize, NULL,
+			      &integrity_keysize, &integrity_spec,
 			      &password, &password_len,
-			      &is_old_mk, NULL, NULL, NULL, prompt, NULL, NULL);
+			      &is_old_mk, NULL, &is_integrity_old_mk, NULL,
+			      prompt, NULL, NULL);
 	free(prompt);
 	if (rc < 0)
 		goto out;
 
+	is_phmac_integrity = is_integrity_phmac(integrity_spec,
+						integrity_keysize);
 	securekeysize = keysize - integrity_keysize;
 
-	if (!is_secure_key(key, securekeysize)) {
+	if (!is_secure_key(key, securekeysize) && !is_phmac_integrity) {
 		warnx("The volume key of device '%s' is of type %s and can "
 		      "not be re-enciphered", g.pos_arg,
 		      get_key_type(key, securekeysize));
 		rc = -EINVAL;
 		goto out;
+	}
+
+	if (is_phmac_integrity) {
+		integrity_key = key + securekeysize;
+
+		if (!is_secure_key(key, securekeysize) &&
+		    !is_secure_key(integrity_key, integrity_keysize)) {
+			util_asprintf(&msg, "The encryption key of device '%s' "
+				      "is of type %s, and the integrity key is "
+				      "of type %s. Both key types can not be "
+				      "re-enciphered", g.pos_arg,
+				      get_key_type(key, securekeysize),
+				      get_key_type(integrity_key,
+						   integrity_keysize));
+			util_print_indented(msg, 0);
+			free(msg);
+			rc = -EINVAL;
+			goto out;
+		}
 	}
 
 	reenc_tok.original_keyslot = rc;
@@ -1843,82 +1969,46 @@ static int reencipher_prepare(int token)
 
 	memcpy(vp_tok.verification_pattern, reenc_tok.verification_pattern,
 	       sizeof(vp_tok.verification_pattern));
+
+	if (is_phmac_integrity) {
+		rc = generate_key_verification_pattern(integrity_key,
+						       integrity_keysize,
+				     reenc_tok.int_verification_pattern,
+				     sizeof(reenc_tok.int_verification_pattern),
+						       g.verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'phmac_s390' is "
+			      "loaded and that the 'phmac' cipher is "
+			      "available");
+			goto out;
+		}
+
+		memcpy(vp_tok.int_verification_pattern,
+		       reenc_tok.int_verification_pattern,
+		       sizeof(vp_tok.int_verification_pattern));
+	}
+
 	token = find_token(g.cd, PAES_VP_TOKEN_NAME);
 	rc = put_vp_token(g.cd, token, &vp_tok);
 	if (rc < 0)
 		goto out;
 
-	if (!g.fromold && !g.tonew) {
-		/* Autodetect reencipher mode */
-		if (is_old_mk) {
-			g.fromold = 1;
-			util_asprintf(&msg, "The secure volume key of device "
-				      "'%s' is enciphered with the OLD "
-				      "master key and is being re-enciphered "
-				      "with the CURRENT master key.",
-				      g.pos_arg);
-			util_print_indented(msg, 0);
-			free(msg);
-		} else {
-			g.tonew = 1;
-			util_asprintf(&msg, "The secure volume key of device "
-				      "'%s' is enciphered with the CURRENT "
-				      "master key and is being re-enciphered "
-				      "with the NEW master key.",
-				      g.pos_arg);
-			util_print_indented(msg, 0);
-			free(msg);
-		}
+	if (is_secure_key(key, securekeysize)) {
+		rc = reencipher_key(key, securekeysize, g.fromold, g.tonew,
+				    is_old_mk, 0);
+		if (rc != 0)
+			goto out;
 	}
 
-	if (g.fromold) {
-		rc = reencipher_secure_key(&g.lib, key, securekeysize,
-					   NULL, REENCIPHER_OLD_TO_CURRENT,
-					   &selected, g.verbose);
-		if (rc != 0) {
-			if (rc == -ENODEV) {
-				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure volume "
-				      "key from the OLD to the CURRENT master "
-				      "key.");
-			} else {
-				warnx("Failed to re-encipher the secure volume "
-				      "key for device '%s'\n", g.pos_arg);
-				if (!selected &&
-				    !is_ep11_aes_key(key, securekeysize) &&
-				    !is_ep11_aes_key_with_header(key,
-								securekeysize))
-					print_msg_for_cca_envvars(
-						"secure volume key");
-				rc = -EINVAL;
-			}
+	if (is_phmac_integrity &&
+	    is_secure_key(integrity_key, integrity_keysize)) {
+		rc = reencipher_key(integrity_key, integrity_keysize,
+				    g.fromold, g.tonew,
+				    is_old_mk, 1);
+		if (rc != 0)
 			goto out;
-		}
-	}
-
-	if (g.tonew) {
-		rc = reencipher_secure_key(&g.lib, key, securekeysize,
-					   NULL, REENCIPHER_CURRENT_TO_NEW,
-					   &selected, g.verbose);
-		if (rc != 0) {
-			if (rc == -ENODEV) {
-				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure volume "
-				      "key from the CURRENT to the NEW master "
-				      "key.");
-			} else {
-				warnx("Failed to re-encipher the secure volume "
-				      "key for device '%s'\n", g.pos_arg);
-				if (!selected &&
-				    !is_ep11_aes_key(key, securekeysize) &&
-				    !is_ep11_aes_key_with_header(key,
-								 securekeysize))
-					print_msg_for_cca_envvars(
-						"secure volume key");
-				rc = -EINVAL;
-			}
-			goto out;
-		}
 	}
 
 	rc = crypt_keyslot_add_by_key(g.cd, CRYPT_ANY_SLOT, (char *)key,
@@ -1978,16 +2068,18 @@ out:
  */
 static int reencipher_complete(int token)
 {
+	int is_old_mk, is_integrity_old_mk;
 	char vp[VERIFICATION_PATTERN_LEN];
 	size_t integrity_keysize = 0;
 	struct reencipher_token tok;
+	char *integrity_spec = NULL;
+	u8 *integrity_key = NULL;
+	int is_phmac_integrity;
 	char *password = NULL;
 	size_t securekeysize;
 	size_t password_len;
 	u8 *key = NULL;
 	size_t keysize;
-	int is_old_mk;
-	bool selected;
 	char *prompt;
 	char *msg;
 	int rc;
@@ -2006,9 +2098,9 @@ static int reencipher_complete(int token)
 	util_asprintf(&prompt, "Enter passphrase for key slot %d of '%s': ",
 		      tok.original_keyslot, g.pos_arg);
 	rc = validate_keyslot(tok.unbound_keyslot, &key, &keysize,
-			      &integrity_keysize, NULL,
+			      &integrity_keysize, &integrity_spec,
 			      &password, &password_len,
-			      &is_old_mk, NULL, NULL, NULL,
+			      &is_old_mk, NULL, &is_integrity_old_mk, NULL,
 			      prompt, msg, NULL);
 	free(msg);
 	free(prompt);
@@ -2019,9 +2111,13 @@ static int reencipher_complete(int token)
 	if (rc != 0)
 		goto out;
 
+	is_phmac_integrity = is_integrity_phmac(integrity_spec,
+						integrity_keysize);
 	securekeysize = keysize - integrity_keysize;
+	if (is_phmac_integrity)
+		integrity_key = key + securekeysize;
 
-	if (is_old_mk) {
+	if (is_old_mk || is_integrity_old_mk) {
 		util_asprintf(&msg, "The re-enciphered secure volume key "
 			      "of device '%s' is enciphered with the "
 			      "master key from the OLD master key register. "
@@ -2040,27 +2136,17 @@ static int reencipher_complete(int token)
 			goto out;
 		}
 
-		rc = reencipher_secure_key(&g.lib, key, securekeysize,
-					   NULL, REENCIPHER_OLD_TO_CURRENT,
-					   &selected, g.verbose);
-		if (rc != 0) {
-			if (rc == -ENODEV) {
-				warnx("No APQN found that is suitable for "
-				      "re-enciphering the secure volume "
-				      "key from the OLD to the CURRENT master "
-				      "key.");
-			} else {
-				warnx("Failed to re-encipher the secure volume "
-				      "key for device '%s'\n", g.pos_arg);
-				if (!selected &&
-				    !is_ep11_aes_key(key, securekeysize) &&
-				    !is_ep11_aes_key_with_header(key,
-								securekeysize))
-					print_msg_for_cca_envvars(
-						"secure volume key");
-				rc = -EINVAL;
-			}
-			goto out;
+		if (is_old_mk) {
+			rc = reencipher_key(key, securekeysize, 1, 0, 1, 0);
+			if (rc != 0)
+				goto out;
+		}
+
+		if (is_integrity_old_mk) {
+			rc = reencipher_key(integrity_key, integrity_keysize,
+					    1, 0, 1, 1);
+			if (rc != 0)
+				goto out;
 		}
 
 		rc = crypt_keyslot_destroy(g.cd, tok.unbound_keyslot);
@@ -2095,10 +2181,31 @@ static int reencipher_complete(int token)
 	}
 
 	if (strcmp(tok.verification_pattern, vp) != 0) {
-		warnx("The verification patterns of the new and old volume "
+		warnx("The verification patterns of the new and old encryption "
 		      "keys do not match");
 		rc = -EINVAL;
 		goto out;
+	}
+
+	if (is_phmac_integrity) {
+		rc = generate_key_verification_pattern(integrity_key,
+						       integrity_keysize, vp,
+						       sizeof(vp), g.verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'phmac_s390' is "
+			      "loaded and that the 'phmac' cipher is "
+			      "available");
+			goto out;
+		}
+
+		if (strcmp(tok.int_verification_pattern, vp) != 0) {
+			warnx("The verification patterns of the new and old "
+			      "integrity keys do not match");
+			rc = -EINVAL;
+			goto out;
+		}
 	}
 
 	util_asprintf(&msg, "Re-enciphering has completed successfully for "
