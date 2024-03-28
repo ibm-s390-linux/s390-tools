@@ -768,7 +768,7 @@ static X509_NAME *x509_armonk_locality_fixup(const X509_NAME *name)
 					 PV_IBM_Z_SUBJECT_LOCALITY_NAME_ARMONK))
 		return NULL;
 
-	ret = X509_NAME_dup(name);
+	ret = X509_NAME_dup((X509_NAME *)name);
 	if (!ret)
 		g_abort();
 
