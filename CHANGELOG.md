@@ -1,16 +1,22 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2024-xx-xx)__
+* __v2.32.0 (2024-04-03)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.8
 
   Changes of existing tools:
+  - cpumf/lscpumf: add support for machine type 3932
+  - genprotimg, pvattest, and pvsecret accept IBM signing key with Armonk as
+    subject locality
+  - zdump/zipl: Support for List-Directed dump from ECKD DASD
+  - zkey: Detect FIPS mode and generate PBKDF for luksFormat according to it
 
   Bug Fixes:
   - dbginfo.sh: dash compatible copy sequence
+  - rust/pv_core: Fix UvDeviceInfo::get() method
+  - zipl/src: Fix leak of files if run with a broken configuration
+  - zkey: Fix convert command to accept only keys of type CCA-AESDATA
 
 * __v2.31.0 (2024-02-02)__
 
