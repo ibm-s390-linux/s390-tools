@@ -9,6 +9,8 @@ pub const UVIO_ATT_ARCB_MAX_LEN: usize = 0x100000;
 pub const UVIO_ATT_MEASUREMENT_MAX_LEN: usize = 0x8000;
 pub const UVIO_ATT_ADDITIONAL_MAX_LEN: usize = 0x8000;
 pub const UVIO_ADD_SECRET_MAX_LEN: usize = 0x100000;
+#[allow(unused)]
+// here for completeness
 pub const UVIO_LIST_SECRETS_LEN: usize = 0x1000;
 
 // equal to ascii 'u'

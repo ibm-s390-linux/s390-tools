@@ -2,20 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::{assert_size, static_assert};
+use crate::assert_size;
 use crate::{
-    misc::to_u16,
     request::{MagicValue, RequestMagic},
-    uv::{ListCmd, UvCmd},
     Error, Result,
 };
 use byteorder::{BigEndian, ByteOrder};
-use std::{
-    fmt::Display,
-    io::{Cursor, Read, Seek, Write},
-    mem::size_of,
-};
-use zerocopy::{AsBytes, FromBytes, U16, U32};
+use std::{fmt::Display, mem::size_of};
+use zerocopy::{AsBytes, U16};
 
 /// The magic value used to identify an add-secret request`]
 ///

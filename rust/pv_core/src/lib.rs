@@ -2,7 +2,6 @@
 //
 // Copyright IBM Corp. 2023, 2024
 #![deny(missing_docs)]
-#![allow(unused)]
 #![doc = include_str!("../README.md")]
 mod error;
 mod macros;

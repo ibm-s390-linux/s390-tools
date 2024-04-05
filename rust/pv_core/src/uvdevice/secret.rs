@@ -3,23 +3,8 @@
 // Copyright IBM Corp. 2023
 
 use super::ffi;
-use crate::{
-    assert_size,
-    misc::to_u16,
-    request::MagicValue,
-    uv::{UvCmd, UvDevice},
-    uvsecret::AddSecretMagic,
-    Error, Result, PAGESIZE,
-};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde::{Serialize, Serializer};
-use std::{
-    fmt::Display,
-    io::{Cursor, Read, Seek, Write},
-    slice::Iter,
-    vec::IntoIter,
-};
-use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
+use crate::{request::MagicValue, uv::UvCmd, uvsecret::AddSecretMagic, Error, Result, PAGESIZE};
+use std::io::Read;
 
 /// _List Secrets_ Ultravisor command.
 ///
