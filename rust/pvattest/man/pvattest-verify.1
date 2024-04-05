@@ -1,0 +1,124 @@
+.\" Copyright 2024 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+
+.TH pvattest-verify 1 "2024-05-15" "s390-tools" "Attestation Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvattest verify\fP - Verify an attestation response
+\fB
+.SH SYNOPSIS
+.nf
+.fam C
+pvattest verify [OPTIONS] --input <FILE> --hdr <FILE> --arpk <FILE>
+.fam C
+.fi
+.SH DESCRIPTION
+Verify that a previously generated attestation measurement of an IBM Secure
+Execution guest is as expected. Only verify attestation requests in a trusted
+environment, such as your workstation. Input must contain the response as
+produced by ’pvattest perform’. The protection key must be the one that was
+used to create the request by ’pvattest create’. Shred the protection key
+after the verification. The header must be the IBM Secure Execution header of
+the image that was attested during ’pvattest perform’
+.SH OPTIONS
+.PP
+\-i, \-\-input <FILE>
+.RS 4
+Specify the attestation request to be verified.
+.RE
+.RE
+.PP
+\-o, \-\-output <FILE>
+.RS 4
+Specify the output for the verification result.
+.RE
+.RE
+.PP
+\-\-hdr <FILE>
+.RS 4
+Specifies the header of the guest image. Can be an IBM Secure Execution image
+created by genprotimg or an extracted IBM Secure Execution header. The header
+must start at a page boundary.
+.RE
+.RE
+.PP
+\-\-arpk <FILE>
+.RS 4
+Use FILE as the protection key to decrypt the request Do not publish this key,
+otherwise your attestation is compromised. Delete this key after verification.
+.RE
+.RE
+.PP
+\-\-format <FORMAT>
+.RS 4
+Define the output format.
+[default: 'yaml']
+
+Possible values:
+.RS 4
+- \fByaml\fP: Use yaml format.
+
+.RE
+.RE
+.PP
+\-u, \-\-user-data <FILE>
+.RS 4
+Write the user data to the FILE if any. Writes the user data, if the response
+contains any, to FILE The user-data is part of the attestation measurement. If
+the user-data is written to FILE the user-data was part of the measurement and
+verified. Emits a warning if the response contains no user-data
+.RE
+.RE
+.PP
+\-v, \-\-verbose
+.RS 4
+Provide more detailed output.
+.RE
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Print help (see a summary with '-h').
+.RE
+.RE
+
+.SH EXIT STATUS
+.TP 8
+.B 0 - Attestation Verified
+Attesatation measurement verified successfully. Measured guest is in Secure Execution mode.
+.RE
+
+.TP 8
+.B 1 - Program Error
+Something went wrong during the local calculation or receiving of the measurement value. Refer to the error message.
+.RE
+
+.TP 8
+.B 2 - Attestation NOT Verified
+Attesation measurement calculation does not match the received value. Measured guest is very likely not in Secure Execution mode.
+.RE
+.SH EXAMPLES
+To verify a measurement in 'measurement.bin' with the protection key 'arp.kep' and SE-guest header 'se_guest.hdr'.
+.PP
+.nf
+.fam C
+       $ pvattest verify --input attresp.bin --arpk arp.key --hdr se_guest.hdr
+
+.fam T
+.fi
+If the verification was successful the program exists with zero.
+If the verification failed it exists with 2 and prints the following to stderr:
+.PP
+.nf
+.fam C
+        ERROR: Attestation measurement verification failed:
+               Calculated and received attestation measurement are not the same.
+
+.fam T
+.fi
+.SH "SEE ALSO"
+.sp
+\fBpvattest\fR(1)

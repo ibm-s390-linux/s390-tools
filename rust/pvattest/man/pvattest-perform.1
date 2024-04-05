@@ -1,0 +1,71 @@
+.\" Copyright 2024 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+
+.TH pvattest-perform 1 "2024-05-15" "s390-tools" "Attestation Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvattest perform\fP - Send the attestation request to the Ultravisor
+\fB
+.SH SYNOPSIS
+.nf
+.fam C
+pvattest perform [OPTIONS] [INPUT] [OUTPUT]
+.fam C
+.fi
+.SH DESCRIPTION
+Run a measurement of this system through ’/dev/uv’. This device must be
+accessible and the attestation Ultravisor facility must be present. The input
+must be an attestation request created with ’pvattest create’. Output will
+contain the original request and the response from the Ultravisor.
+.SH OPTIONS
+.PP
+<INPUT>
+.RS 4
+Specify the request to be sent.
+.RE
+.RE
+.PP
+<OUTPUT>
+.RS 4
+Write the result to FILE.
+.RE
+.RE
+
+.PP
+\-u, \-\-user-data <File>
+.RS 4
+Provide up to 256 bytes of user input User-data is arbitrary user-defined data
+appended to the Attestation measurement. It is verified during the Attestation
+measurement verification. May be any arbitrary data, as long as it is less or
+equal to 256 bytes
+.RE
+.RE
+.PP
+\-v, \-\-verbose
+.RS 4
+Provide more detailed output.
+.RE
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Print help (see a summary with '-h').
+.RE
+.RE
+
+.SH EXAMPLES
+Perform an attestation measurement with the attestation request 'attreq.bin' and write the output to 'attresp.bin'.
+.PP
+.nf
+.fam C
+       $ pvattest perform attreq.bin attresp.bin
+
+
+.fam T
+.fi
+.SH "SEE ALSO"
+.sp
+\fBpvattest\fR(1)
