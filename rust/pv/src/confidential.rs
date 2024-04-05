@@ -48,7 +48,7 @@ impl Zeroize for Vec<u8> {
 /// Will never leak its wrapped value during [`Debug`]
 ///
 /// ```rust
-/// use pv::request::Confidential;
+/// use s390_pv::request::Confidential;
 /// fn foo(value: Confidential<[u8; 2]>) {
 ///     println!("value: {value:?}");
 /// }

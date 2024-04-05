@@ -1,6 +1,6 @@
 [package]
 name = "utils"
-version = "0.1.0"
+version = "0.10.0"
 edition.workspace = true
 license.workspace = true
 
@@ -8,5 +8,5 @@ license.workspace = true
 clap = { version ="4.1", features = ["derive", "wrap_help"] }
 libc = "0.2.49"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
-pv = { path = "../pv" }
+pv = { path = "../pv", package = "s390_pv" }
 serde = { version = "1.0.139"}

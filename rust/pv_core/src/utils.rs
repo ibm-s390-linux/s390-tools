@@ -119,7 +119,7 @@ impl From<&u64> for Lsb0Flags64 {
 /// * `ctx` - Error context string in case of an error
 /// ```rust
 /// # use std::error::Error;
-/// # use pv_core::misc::try_parse_u128;
+/// # use s390_pv_core::misc::try_parse_u128;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let hex = "11223344556677889900aabbccddeeff";
 /// try_parse_u128(&hex, "The test")?;
@@ -155,7 +155,7 @@ pub fn try_parse_u128(hex_str: &str, ctx: &str) -> Result<[u8; 16]> {
 /// * `ctx` - Error context string in case of an error
 /// ```rust
 /// # use std::error::Error;
-/// # use pv_core::misc::try_parse_u64;
+/// # use s390_pv_core::misc::try_parse_u64;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let hex = "1234567890abcdef";
 /// try_parse_u64(&hex, "The test")?;

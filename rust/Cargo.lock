@@ -399,46 +399,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "pv"
-version = "1.0.0"
-dependencies = [
- "byteorder",
- "curl",
- "foreign-types",
- "log",
- "openssl",
- "openssl-sys",
- "pv_core",
- "serde",
- "serde_test",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "pv_core"
-version = "1.0.0"
-dependencies = [
- "byteorder",
- "lazy_static",
- "libc",
- "log",
- "serde",
- "serde_test",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
 name = "pvapconfig"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "clap",
  "lazy_static",
  "openssl",
- "pv_core",
  "rand",
  "regex",
+ "s390_pv_core",
  "serde",
  "serde_yaml",
  "utils",
@@ -446,12 +415,12 @@ dependencies = [
 
 [[package]]
 name = "pvsecret"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "clap",
  "log",
- "pv",
+ "s390_pv",
  "serde_yaml",
  "utils",
 ]
@@ -543,6 +512,37 @@ name = "ryu"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f91339c0467de62360649f8d3e185ca8de4224ff281f66000de5eb2a77a79041"
+
+[[package]]
+name = "s390_pv"
+version = "0.10.0"
+dependencies = [
+ "byteorder",
+ "curl",
+ "foreign-types",
+ "log",
+ "openssl",
+ "openssl-sys",
+ "s390_pv_core",
+ "serde",
+ "serde_test",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
+name = "s390_pv_core"
+version = "0.10.0"
+dependencies = [
+ "byteorder",
+ "lazy_static",
+ "libc",
+ "log",
+ "serde",
+ "serde_test",
+ "thiserror",
+ "zerocopy",
+]
 
 [[package]]
 name = "schannel"
@@ -672,12 +672,12 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils"
-version = "0.1.0"
+version = "0.10.0"
 dependencies = [
  "clap",
  "libc",
  "log",
- "pv",
+ "s390_pv",
  "serde",
 ]
 

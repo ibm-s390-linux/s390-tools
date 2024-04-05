@@ -10,8 +10,8 @@ use zerocopy::U32;
 ///
 /// The magic value is ASCII:
 /// ```rust
-/// # use pv_core::attest::AttestationMagic;
-/// # use pv_core::request::MagicValue;
+/// # use s390_pv_core::attest::AttestationMagic;
+/// # use s390_pv_core::request::MagicValue;
 /// # fn main() {
 /// # let magic = &
 /// [0u8; 8]

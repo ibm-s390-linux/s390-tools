@@ -27,9 +27,9 @@ use zerocopy::{AsBytes, FromZeroes};
 /// # Example
 ///
 /// ```rust,no_run
-/// # use pv_core::uv::UvDevice;
-/// # use pv_core::uv::AttestationCmd;
-/// # fn main() -> pv_core::Result<()> {
+/// # use s390_pv_core::uv::UvDevice;
+/// # use s390_pv_core::uv::AttestationCmd;
+/// # fn main() -> s390_pv_core::Result<()> {
 /// let arcb = std::fs::read("arcb")?.into();
 /// let user_data = vec![0, 1, 2, 3];
 /// // Hard-coded example

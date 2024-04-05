@@ -2,9 +2,9 @@
 //
 // Copyright IBM Corp. 2023
 
-use pv::request::CertVerifier;
-use pv::test_utils::*;
-use pv::{Error, HkdVerifyErrorType::*};
+use s390_pv::request::CertVerifier;
+use s390_pv::test_utils::*;
+use s390_pv::{Error, HkdVerifyErrorType::*};
 use std::ffi::c_int;
 
 #[track_caller]

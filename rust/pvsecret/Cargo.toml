@@ -1,6 +1,6 @@
 [package]
 name = "pvsecret"
-version = "0.9.0"
+version = "0.10.0"
 edition.workspace = true
 license.workspace = true
 
@@ -10,5 +10,5 @@ clap = { version ="4.1", features = ["derive", "wrap_help"]}
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 serde_yaml = "0.9"
 
-pv = { path = "../pv" }
-utils = { path = "../utils" }
+pv = { path = "../pv" , package = "s390_pv" }
+utils = { path = "../utils"}

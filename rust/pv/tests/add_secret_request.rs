@@ -6,7 +6,7 @@ use openssl::{
     nid::Nid,
     pkey::Private,
 };
-use pv::{
+use s390_pv::{
     get_test_asset,
     request::{
         openssl::pkey::{PKey, Public},

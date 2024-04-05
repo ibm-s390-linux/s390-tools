@@ -52,14 +52,14 @@ use crate::{
 /// Create an Attestation request with default flags (= use a nonce)
 ///
 /// ```rust,no_run
-/// use pv::attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion};
-/// use pv::request::{SymKeyType, Request, ReqEncrCtx};
-/// # fn main() -> pv::Result<()> {
+/// # use s390_pv::attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion};
+/// # use s390_pv::request::{SymKeyType, Request, ReqEncrCtx};
+/// # fn main() -> s390_pv::Result<()> {
 /// let att_version = AttestationVersion::One;
 /// let meas_alg = AttestationMeasAlg::HmacSha512;
 /// let mut arcb = AttestationRequest::new(att_version, meas_alg, AttestationFlags::default())?;
 /// // read-in hostkey document(s). Not verified for brevity.
-/// let hkd = pv::misc::read_certs(&std::fs::read("host-key-document.crt")?)?;
+/// let hkd = s390_pv::misc::read_certs(&std::fs::read("host-key-document.crt")?)?;
 /// // IBM issued HKD certificates typically have one X509
 /// let hkd = hkd.first().unwrap().public_key()?;
 /// arcb.add_hostkey(hkd);

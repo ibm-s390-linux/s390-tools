@@ -119,7 +119,7 @@ impl SecretEntry {
     ///
     /// The slice is guaranteed to be 32 bytes long.
     /// ```rust
-    /// # use pv_core::uv::SecretEntry;
+    /// # use s390_pv_core::uv::SecretEntry;
     /// # use zerocopy::FromZeroes;
     /// # let secr = SecretEntry::new_zeroed();
     /// # assert_eq!(secr.id().len(), 32);

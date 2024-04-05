@@ -15,8 +15,8 @@ use zerocopy::{AsBytes, U16};
 ///
 /// The magic value is ASCII:
 /// ```rust
-/// # use pv_core::secret::AddSecretMagic;
-/// # use pv_core::request::MagicValue;
+/// # use s390_pv_core::secret::AddSecretMagic;
+/// # use s390_pv_core::request::MagicValue;
 /// # fn main() {
 /// # let magic =
 /// b"asrcbM"

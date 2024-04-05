@@ -173,10 +173,10 @@ pub enum UvcSuccess {
 /// forward to Firmware.
 ///
 /// ```rust,no_run
-/// # use pv_core::uv::UvDevice;
-/// # use pv_core::uv::AddCmd;
+/// # use s390_pv_core::uv::UvDevice;
+/// # use s390_pv_core::uv::AddCmd;
 /// # use std::fs::File;
-/// # fn main() -> pv_core::Result<()> {
+/// # fn main() -> s390_pv_core::Result<()> {
 /// let mut file = File::open("request")?;
 /// let uv = UvDevice::open()?;
 /// let mut cmd = AddCmd::new(&mut file)?;

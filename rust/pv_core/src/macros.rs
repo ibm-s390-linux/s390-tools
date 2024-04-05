@@ -38,7 +38,7 @@ macro_rules! static_assert {
 ///
 /// # Example
 /// ```rust
-/// # use pv_core::assert_size;
+/// # use s390_pv_core::assert_size;
 /// # fn main() {}
 /// #[repr(C)]
 /// struct c_struct {
