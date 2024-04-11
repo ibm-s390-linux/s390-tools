@@ -18,7 +18,11 @@
 #define UTIL_LOCKFILE_ERR	   4 /* Other, unexpected error conditions */
 
 int util_lockfile_lock(char *lockfile, int retries);
+int util_lockfile_lock_cw(char *lockfile, int retries, unsigned int waitinc,
+			  unsigned int maxwait);
 int util_lockfile_parent_lock(char *lockfile, int retries);
+int util_lockfile_parent_lock_cw(char *lockfile, int retries,
+				 unsigned int waitinc, unsigned int maxwait);
 
 int util_lockfile_release(char *lockfile);
 int util_lockfile_parent_release(char *lockfile);

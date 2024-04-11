@@ -25,8 +25,8 @@
 #include "lib/util_panic.h"
 
 #define WAITPID 120 /* Time to wait for pid to be written */
-#define WAITINC 5   /* Additional time to wait each retry */
-#define MAXWAIT 60  /* Maximum wait between retries */
+#define DEF_WAITINC_US 5000000   /* Additional time to wait each retry */
+#define DEF_MAXWAIT_US 60000000  /* Maximum wait between retries */
 #define BUFSIZE 40  /* Buffer must be large enough to fit pid string */
 
 /**
@@ -133,15 +133,20 @@ static int handle_stale_lock(char *lockfile)
  *
  * @param[in]      lockfile   Path to the lock file
  * @param[in]      retries    Number of times to retry if lock fails initially
+ * @param[in]      waitinc    How many micro-seconds to extend wait time before
+ *                            additional retry
+ * @param[in]      maxwait    Maximum wait time before retry
  * @param[in]      pid        PID to use for lock ownership
  *
  * @retval         0          Lock created with PID as owner
  * @retval         !=0        Lock was not created
  */
-static int do_lockfile_lock(char *lockfile, unsigned int retries, int pid)
+static int do_lockfile_lock(char *lockfile, unsigned int retries, int pid,
+			    unsigned int waitinc, unsigned int maxwait)
 {
-	int fd, plen, len, rc = 0, snooze = 0;
 	unsigned int tries = retries + 1;
+	int fd, plen, len, rc = 0;
+	unsigned int snooze = 0;
 	char buf[BUFSIZE];
 	char *tpath;
 
@@ -190,9 +195,9 @@ static int do_lockfile_lock(char *lockfile, unsigned int retries, int pid)
 		if (rc != 0) {
 			tries--;
 			if (tries > 0) {
-				snooze += WAITINC;
-				snooze = (snooze > MAXWAIT) ? MAXWAIT : snooze;
-				sleep(snooze);
+				snooze += waitinc;
+				snooze = (snooze > maxwait) ? maxwait : snooze;
+				usleep(snooze);
 			}
 		}
 	} while (tries > 0);
@@ -255,7 +260,27 @@ static int do_lockfile_release(char *lockfile, int pid)
  */
 int util_lockfile_lock(char *lockfile, int retries)
 {
-	return do_lockfile_lock(lockfile, retries, getpid());
+	return do_lockfile_lock(lockfile, retries, getpid(), DEF_WAITINC_US,
+				DEF_MAXWAIT_US);
+}
+
+/**
+ * Attempt to create a lockfile owned by this process at the specified path
+ * using a custom wait/retry time.
+ *
+ * @param[in]      lockfile   Path to the lock file
+ * @param[in]      retries    Number of times to retry if lock fails initially
+ * @param[in]      waitinc    How many micro-seconds to extend wait time before
+ *                            additional retry
+ * @param[in]      maxwait    Maximum wait time before retry
+ *
+ * @retval         0          Lock created
+ * @retval         !=0        Lock was not created
+ */
+int util_lockfile_lock_cw(char *lockfile, int retries, unsigned int waitinc,
+			  unsigned int maxwait)
+{
+	return do_lockfile_lock(lockfile, retries, getpid(), waitinc, maxwait);
 }
 
 /**
@@ -270,7 +295,27 @@ int util_lockfile_lock(char *lockfile, int retries)
  */
 int util_lockfile_parent_lock(char *lockfile, int retries)
 {
-	return do_lockfile_lock(lockfile, retries, getppid());
+	return do_lockfile_lock(lockfile, retries, getppid(), DEF_WAITINC_US,
+				DEF_MAXWAIT_US);
+}
+
+/**
+ * Attempt to create a lockfile owned by the parent of this process at the
+ * specified path using a custom wait/retry time.
+ *
+ * @param[in]      lockfile   Path to the lock file
+ * @param[in]      retries    Number of times to retry if lock fails initially
+ * @param[in]      waitinc    How many micro-seconds to extend wait time before
+ *                            additional retry
+ * @param[in]      maxwait    Maximum wait time before retry
+ *
+ * @retval         0          Lock created
+ * @retval         !=0        Lock was not created
+ */
+int util_lockfile_parent_lock_cw(char *lockfile, int retries,
+				 unsigned int waitinc, unsigned int maxwait)
+{
+	return do_lockfile_lock(lockfile, retries, getppid(), waitinc, maxwait);
 }
 
 /**
