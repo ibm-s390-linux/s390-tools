@@ -226,7 +226,8 @@ static void print_virtual_counter_answer(int s,
 		if (paictr > MAX_NUM_PAI)
 			eprint("Pai counter number too big: %d\n", paictr);
 		else if (!paiprintnonzero || paivalue > 0)
-			printf("  %-45s: %lu\n", get_ctr_name(paictr), paivalue);
+			printf("  (%3d) %-45s: %lu\n", paictr + 1,
+			       get_ctr_name(paictr), paivalue);
 	}
 }
 
