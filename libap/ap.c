@@ -11,12 +11,15 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #ifdef HAVE_JSONC
 #include <json-c/json.h>
@@ -698,6 +701,20 @@ void ap_list_remove_all(struct util_list *list)
 	}
 }
 
+static unsigned int random_delay(void)
+{
+	static bool libap_seed = true;
+	struct timeval t;
+
+	if (libap_seed) {
+		gettimeofday(&t, NULL);
+		srand((unsigned int)((t.tv_sec + t.tv_usec) % UINT_MAX));
+		libap_seed = false;
+	}
+
+	return AP_LOCK_DELAY_US + (rand() % AP_LOCK_VARIANCE_US);
+}
+
 /**
  * Acquire the ap config lock using this Process ID
  *
@@ -707,7 +724,9 @@ void ap_list_remove_all(struct util_list *list)
  */
 int ap_get_lock(void)
 {
-	return util_lockfile_lock(AP_LOCKFILE, AP_LOCK_RETRIES);
+	unsigned int delay = random_delay();
+
+	return util_lockfile_lock_cw(AP_LOCKFILE, AP_LOCK_RETRIES, delay, delay);
 }
 
 /**
@@ -719,7 +738,10 @@ int ap_get_lock(void)
  */
 int ap_get_lock_callout(void)
 {
-	return util_lockfile_parent_lock(AP_LOCKFILE, AP_LOCK_RETRIES);
+	unsigned int delay = random_delay();
+
+	return util_lockfile_parent_lock_cw(AP_LOCKFILE, AP_LOCK_RETRIES, delay,
+					    delay);
 }
 
 /**

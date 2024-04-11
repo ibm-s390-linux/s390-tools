@@ -21,7 +21,9 @@
 #define AP_UDEV_FILE "/etc/udev/rules.d/41-ap.rules"
 #define AP_LOCKFILE "/run/lock/s390apconfig.lock"
 
-#define AP_LOCK_RETRIES 15
+#define AP_LOCK_RETRIES 3000
+#define AP_LOCK_DELAY_US 30000 /* wait at least 30ms between lock retries */
+#define AP_LOCK_VARIANCE_US 3000  /* or as much as 33ms */
 
 /* apmask and aqmask are each represented as 67 character strings with:
  *  '0x' leading characters
