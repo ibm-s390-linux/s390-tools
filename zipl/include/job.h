@@ -122,6 +122,8 @@ struct job_data {
 		struct job_ipl_tape_data ipl_tape;
 		struct job_mvdump_data mvdump;
 	} data;
+	int dump_mounted;
+	int bootmap_dir_created;
 	int noninteractive;
 	int verbose;
 	int add_files;

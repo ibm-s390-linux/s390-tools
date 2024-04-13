@@ -1546,7 +1546,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 		/* skip the preparation work */
 		return 0;
 	/* Create temporary bootmap file */
-	bis->filename = misc_make_path(bis->bootmap_dir,
+	bis->filename = misc_make_path(job->target.bootmap_dir,
 				       BOOTMAP_TEMPLATE_FILENAME);
 	if (!bis->filename)
 		return -1;
@@ -1583,7 +1583,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 					 bis->info))
 			return -1;
 	}
-	printf("Building bootmap in '%s'%s\n", bis->bootmap_dir,
+	printf("Building bootmap in '%s'%s\n", job->target.bootmap_dir,
 	       job->add_files ? " (files will be added to bootmap file)"
 	       : "");
 	/* Initialize bootmap header */
@@ -1603,11 +1603,11 @@ static int prepare_build_program_table_file(struct job_data *job,
 /**
  * Rename to final bootmap name
  */
-static int finalize_create_file(struct install_set *bis)
+static int finalize_create_file(struct job_data *job, struct install_set *bis)
 {
 	char *final_name;
 
-	final_name = misc_make_path(bis->bootmap_dir, BOOTMAP_FILENAME);
+	final_name = misc_make_path(job->target.bootmap_dir, BOOTMAP_FILENAME);
 	if (!final_name)
 		return -1;
 	if (rename(bis->filename, final_name)) {
@@ -1696,34 +1696,35 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	if (check_dump_device(job, info, bis->device))
 		return -1;
 
-	bis->bootmap_dir = misc_make_path("/tmp",
-					  DUMP_TEMP_MOUNT_POINT_NAME);
-	if (!bis->bootmap_dir) {
+	assert(!job->target.bootmap_dir);
+	job->target.bootmap_dir = misc_make_path("/tmp",
+						 DUMP_TEMP_MOUNT_POINT_NAME);
+	if (!job->target.bootmap_dir) {
 		error_reason(strerror(errno));
 		error_text("Could not make path for '%s'",
 			   DUMP_TEMP_MOUNT_POINT_NAME);
 		return -1;
 	}
 	/* Create a mount point directory */
-	if (mkdtemp(bis->bootmap_dir) == NULL) {
+	if (!mkdtemp(job->target.bootmap_dir)) {
 		error_reason(strerror(errno));
 		error_text("Could not create mount point '%s'",
-			   bis->bootmap_dir);
+			   job->target.bootmap_dir);
 		return -1;
 	}
-	bis->bootmap_dir_created = 1;
+	job->bootmap_dir_created = 1;
 	/*
 	 * Mount partition where bootmap file and also a dump file will
 	 * be stored.
 	 */
-	if (mount(job->data.dump.device, bis->bootmap_dir,
+	if (mount(job->data.dump.device, job->target.bootmap_dir,
 		  NGDUMP_FSTYPE, 0, NULL)) {
 		error_reason(strerror(errno));
 		error_text("Could not mount partition '%s':",
 			   job->data.dump.device);
 		return -1;
 	}
-	bis->dump_mounted = 1;
+	job->dump_mounted = 1;
 	/*
 	 * Build a single program table for List-Directed IPL
 	 * See comments before install_bootloader() for details
@@ -1731,7 +1732,7 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	bis->print_details = 1;
 	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID))
 		return -1;
-	return ngdump_create_meta(bis->bootmap_dir);
+	return ngdump_create_meta(job->target.bootmap_dir);
 }
 
 /**
@@ -1741,9 +1742,6 @@ static int prepare_bootloader_ngdump(struct job_data *job,
  */
 static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 {
-	bis->bootmap_dir = misc_strdup(job->target.bootmap_dir);
-	if (!bis->bootmap_dir)
-		return -1;
 	/*
 	 * Build a program table for List-Directed IPL from
 	 * SCSI or ECKD DASD
@@ -1818,11 +1816,11 @@ int post_install_bootloader(struct job_data *job, struct install_set *bis)
 {
 	if (job->id == job_dump_partition) {
 		if (is_ngdump_enabled(job))
-			return dry_run ? 0 : finalize_create_file(bis);
+			return dry_run ? 0 : finalize_create_file(job, bis);
 		else
 			return 0;
 	} else {
-		return dry_run ? 0 : finalize_create_file(bis);
+		return dry_run ? 0 : finalize_create_file(job, bis);
 	}
 }
 
@@ -1847,12 +1845,4 @@ void free_bootloader(struct install_set *bis)
 	free(bis->filename);
 	misc_free_temp_dev(bis->device);
 	disk_free_info(bis->info);
-
-	if (bis->dump_mounted && umount(bis->bootmap_dir))
-		warn("Could not umount dump device at %s",
-		     bis->bootmap_dir);
-	if (bis->bootmap_dir_created && rmdir(bis->bootmap_dir))
-		warn("Could not remove directory %s",
-		     bis->bootmap_dir);
-	free(bis->bootmap_dir);
 }

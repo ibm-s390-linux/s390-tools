@@ -18,6 +18,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/mount.h>
 #include <unistd.h>
 #include <assert.h>
 
@@ -372,6 +373,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 static void
 free_target_data(struct job_target_data* data)
 {
+	free(data->bootmap_dir);
 	free(data->targetbase);
 }
 
@@ -459,7 +461,12 @@ void
 job_free(struct job_data* job)
 {
 
-	free(job->target.bootmap_dir);
+	if (job->dump_mounted && umount(job->target.bootmap_dir))
+		fprintf(stderr, "Could not umount dump device at %s",
+			job->target.bootmap_dir);
+	if (job->bootmap_dir_created && rmdir(job->target.bootmap_dir))
+		fprintf(stderr, "Could not remove directory %s",
+			job->target.bootmap_dir);
 	free_target_data(&job->target);
 	free_envblk_data(&job->envblk);
 	free(job->name);
