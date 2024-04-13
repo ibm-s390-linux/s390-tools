@@ -246,15 +246,9 @@ disk_get_info(const char* device, struct job_target_data* target,
 	    (!stat(script_file, &script_stats))) {
 		data->source = source_script;
 		/* Run targetbase script */
-		if (target->bootmap_dir == NULL) {
-			/* happens in case of partition dump */
-			misc_asprintf(&ppn_cmd, "%s %d:%d",
-				      script_file, major(stats.st_rdev),
-				      minor(stats.st_rdev));
-		} else {
-			misc_asprintf(&ppn_cmd, "%s %s",
-				      script_file, target->bootmap_dir);
-		}
+		misc_asprintf(&ppn_cmd, "%s %d:%d",
+			      script_file, major(stats.st_rdev),
+			      minor(stats.st_rdev));
 		printf("Run %s\n", ppn_cmd);
 		fh = popen(ppn_cmd, "r");
 		if (fh == NULL) {
