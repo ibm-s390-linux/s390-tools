@@ -432,6 +432,7 @@ name = "pv_core"
 version = "1.0.0"
 dependencies = [
  "byteorder",
+ "lazy_static",
  "libc",
  "log",
  "serde",
