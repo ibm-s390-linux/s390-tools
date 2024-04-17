@@ -16,5 +16,6 @@ int dfi_vmcoreinfo_offset(unsigned long *offs, const char *sym);
 int dfi_vmcoreinfo_size(unsigned long *size, const char *sym);
 int dfi_vmcoreinfo_length(unsigned long *len, const char *sym);
 int dfi_vmcoreinfo_val(unsigned long *val, const char *sym);
+u64 dfi_vm_vtop(u64 vaddr);
 
 #endif /* DFI_VMCOREINFO_H */

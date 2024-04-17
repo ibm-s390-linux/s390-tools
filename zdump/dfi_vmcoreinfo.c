@@ -30,12 +30,21 @@
 
 #define LC_OS_INFO		0xe18
 
+struct vm_info {
+	u64	identity_base;
+	u64	kaslr_offset;
+	u64	kaslr_offset_phys;
+	u64	amode31_start;
+	u64	amode31_end;
+};
+
 /*
  * File local static data
  */
 static struct {
 	char		*vmcoreinfo;
 	struct os_info	*os_info;
+	struct vm_info  *vm_info;
 } l;
 
 static u32 os_info_csum(struct os_info *os_info)
@@ -53,6 +62,7 @@ static struct os_info *os_info_get(void)
 
 	if (dfi_mem_virt_read(LC_OS_INFO, &addr, sizeof(addr)))
 		return NULL;
+	util_log_print(UTIL_LOG_DEBUG, "DFI osinfo addr: 0x%016lx\n", addr);
 	if (addr % 0x1000)
 		return NULL;
 	if (dfi_mem_virt_read(addr, &os_info, sizeof(os_info)))
@@ -61,7 +71,44 @@ static struct os_info *os_info_get(void)
 		return NULL;
 	if (os_info.csum != os_info_csum(&os_info))
 		return NULL;
+
+	util_log_print(UTIL_LOG_DEBUG, "DFI found valid osinfo!\n");
 	return &os_info;
+}
+
+static struct vm_info *vm_info_get(void)
+{
+	static struct vm_info vm_info = { 0 };
+
+	util_log_print(UTIL_LOG_TRACE, "DFI read vm_info\n");
+
+	vm_info.identity_base = l.os_info->entry[OS_INFO_IDENTITY_BASE].val;
+	if (vm_info.identity_base == 0)
+		return NULL;
+	vm_info.kaslr_offset = l.os_info->entry[OS_INFO_KASLR_OFFSET].val;
+	vm_info.kaslr_offset_phys = l.os_info->entry[OS_INFO_KASLR_OFF_PHYS].val;
+	vm_info.amode31_start = l.os_info->entry[OS_INFO_AMODE31_START].val;
+	vm_info.amode31_end = l.os_info->entry[OS_INFO_AMODE31_END].val;
+
+	return &vm_info;
+}
+
+/*
+ * Convert virual address in the dump to the physical address using
+ * vm_info data derived from os_info
+ */
+u64 dfi_vm_vtop(u64 vaddr)
+{
+	if (!l.vm_info)
+		return vaddr;
+	if (vaddr < LOWCORE_SIZE)
+		return vaddr;
+	if ((vaddr < l.vm_info->amode31_end) &&
+	    (vaddr >= l.vm_info->amode31_start))
+		return vaddr;
+	if (vaddr < l.vm_info->kaslr_offset)
+		return vaddr - l.vm_info->identity_base;
+	return vaddr - l.vm_info->kaslr_offset + l.vm_info->kaslr_offset_phys;
 }
 
 /*
@@ -76,6 +123,8 @@ void dfi_vmcoreinfo_init(void)
 	util_log_print(UTIL_LOG_TRACE, "DFI vmcoreinfo initialization\n");
 
 	l.os_info = os_info_get();
+	if (l.os_info)
+		l.vm_info = vm_info_get();
 
 	if (l.os_info && l.os_info->entry[OS_INFO_VMCOREINFO].size) {
 		util_log_print(UTIL_LOG_DEBUG, "DFI found valid osinfo\n");
@@ -157,6 +206,7 @@ static int vmcoreinfo_item_ulong(unsigned long *val, const char *fmt,
 	int rc;
 
 	rc = vmcoreinfo_item(str, sizeof(str), fmt, sym);
+	util_log_print(UTIL_LOG_DEBUG, "DFI vmcoreinfo symbol %s : %s\n", sym, str);
 	if (rc)
 		return rc;
 	*val = strtoul(str, NULL, base);

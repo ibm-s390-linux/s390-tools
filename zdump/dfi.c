@@ -695,6 +695,8 @@ static void kdump_select_prod_init(void)
 	unsigned long prefix, ptr, count, tv_sec, i;
 	struct timeval timeval;
 
+	util_log_print(UTIL_LOG_TRACE, "DFI kdump production system dump initialization\n");
+
 	if (g.opts.select_specified && !l.kdump_base)
 		ERR_EXIT("The \"--select\" option is not possible with this "
 			 "dump");
@@ -712,9 +714,10 @@ static void kdump_select_prod_init(void)
 	}
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 	for (i = 0; i < count; i++) {
-		if (dfi_mem_virt_read(ptr + i * sizeof(long), &prefix,
+		if (dfi_mem_virt_read(dfi_vm_vtop(ptr) + i * sizeof(long), &prefix,
 				      sizeof(prefix)))
 			continue;
+		prefix = dfi_vm_vtop(prefix);
 		if (prefix == 0)
 			continue;
 		if (prefix % 0x1000)
@@ -736,7 +739,7 @@ static void utsname_init(void)
 
 	if (dfi_vmcoreinfo_symbol(&ptr, "init_uts_ns"))
 		return;
-	if (dfi_mem_virt_read(ptr, buf, sizeof(buf)))
+	if (dfi_mem_virt_read(dfi_vm_vtop(ptr), buf, sizeof(buf)))
 		return;
 	utsname = memchr(buf, 'L', sizeof(buf) - sizeof(*utsname));
 	if (!utsname)

@@ -439,6 +439,10 @@ void dfi_mem_unmap(u64 start, u64 size)
 	struct dfi_mem_chunk *mem_chunk, *tmp;
 	u64 end = start + size - 1;
 
+	util_log_print(UTIL_LOG_TRACE,
+		       "DFI mem unmap  start 0x%016lx, size 0x%016lx\n",
+		       start, size);
+
 	util_list_iterate_safe(&l.mem_virt.chunk_list, mem_chunk, tmp) {
 		/*
 		 * Chunk not hit?
@@ -504,6 +508,10 @@ void dfi_mem_unmap(u64 start, u64 size)
  */
 void dfi_mem_map(u64 start, u64 size, u64 start_phys)
 {
+	util_log_print(UTIL_LOG_TRACE,
+		       "DFI mem map  start 0x%016lx, size 0x%016lx, base 0x%016lx\n",
+		       start, size, start_phys);
+
 	if (mem_range_mapped(start, size)) {
 		dfi_mem_map_print(false);
 		ABORT("Map request for already mapped region (%llx/%llx/%llx)",
