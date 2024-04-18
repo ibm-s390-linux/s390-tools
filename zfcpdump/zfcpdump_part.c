@@ -166,9 +166,9 @@ static int copy_table_init(int fd, struct copy_table_entry *table)
 			return -1;
 		if (phdr.p_type != PT_LOAD)
 			continue;
-		if (phdr.p_vaddr != 0)
+		if (phdr.p_paddr != 0)
 			continue;
-		/* 1st entry is the HSA (vaddr = 0) */
+		/* 1st entry is the HSA (paddr = 0) */
 		table[0].off  = phdr.p_offset;
 		table[0].size = get_hsa_size();
 		/* 2nd entry defines area from 2nd page to HSA start */
