@@ -20,7 +20,7 @@ readonly FULLPATHSCRIPT="$(readlink -f "${0}")"
 readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
 readonly DOCKER=$(if type docker >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 readonly DUMP2TAR_OK=$(if type dump2tar >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
-readonly HW="$(uname -i 2>/dev/null)"
+readonly HW="$(uname -m 2>/dev/null)"
 readonly IFS_ORI="${IFS}"
 # retrieve and split kernel version
 readonly KERNEL_BASE="$(uname -r 2>/dev/null)"
