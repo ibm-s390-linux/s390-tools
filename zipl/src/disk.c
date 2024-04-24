@@ -116,8 +116,8 @@ read_block_by_offset(int fd, int blksize, uint64_t offset, char *buffer)
 	return 0;
 }
 
-static int
-determine_virtblk_type(struct disk_info *data, struct stat *stats)
+static int determine_virtblk_type(struct disk_info *data,
+				  const struct stat *stats)
 {
 	char *device;
 	char *buffer;
@@ -187,171 +187,97 @@ out_err:
 	return rc;
 }
 
-int
-disk_get_info(const char* device, struct job_target_data* target,
-	      struct disk_info** info)
+static int set_target_parameters(FILE *fh, struct job_target_data *td)
 {
-	struct stat stats;
-	struct stat script_stats;
-	struct util_proc_part_entry part_entry;
-	struct util_proc_dev_entry dev_entry;
-	struct dasd_information dasd_info;
-	struct disk_info *data;
-	int fd;
-	long devsize;
-	FILE *fh;
-	const char *script_pre = util_libdir_path("/zipl_helper.");
-	char *script_file = NULL;
-	char *ppn_cmd = NULL;
+	int checkparm = 0;
 	char buffer[80];
 	char value[40];
+
+	while (fgets(buffer, 80, fh)) {
+		if (sscanf(buffer, "targetbase=%s", value) == 1) {
+			td->targetbase = misc_strdup(value);
+			checkparm++;
+		}
+		if (sscanf(buffer, "targettype=%s", value) == 1) {
+			type_from_target(value, &td->targettype);
+			checkparm++;
+		}
+		if (sscanf(buffer, "targetgeometry=%s", value) == 1) {
+			td->targetcylinders =
+				atoi(strtok(value, ","));
+			td->targetheads = atoi(strtok(NULL, ","));
+			td->targetsectors = atoi(strtok(NULL, ","));
+			checkparm++;
+		}
+		if (sscanf(buffer, "targetblocksize=%s", value) == 1) {
+			td->targetblocksize = atoi(value);
+			checkparm++;
+		}
+		if (sscanf(buffer, "targetoffset=%s", value) == 1) {
+			td->targetoffset = atol(value);
+			checkparm++;
+		}
+	}
+	if ((!disk_is_eckd(td->targettype) && checkparm < 4) ||
+	    (disk_is_eckd(td->targettype) && checkparm != 5)) {
+		error_reason("Target parameters missing from script");
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Set disk info using ready target parameters provided either by
+ * user, or by script
+ */
+static int disk_set_info_by_hint(struct job_target_data *td,
+				 struct disk_info *data, int fd)
+{
 	int majnum, minnum;
-	int checkparm;
+	struct stat stats;
 
-	/* Get file information */
-	if (stat(device, &stats)) {
-		error_reason(strerror(errno));
-		return -1;
-	}
-	/* Open device file */
-	fd = open(device, O_RDONLY);
-	if (fd == -1) {
-		error_reason(strerror(errno));
-		return -1;
-	}
-	/* Get memory for result */
-	data = (struct disk_info *) misc_malloc(sizeof(struct disk_info));
-	if (data == NULL) {
-		close(fd);
-		return -1;
-	}
-	memset((void *) data, 0, sizeof(struct disk_info));
-	/* Try to get device driver name */
-	if (util_proc_dev_get_entry(stats.st_rdev, 1, &dev_entry) == 0) {
-		data->drv_name = misc_strdup(dev_entry.name);
-		util_proc_dev_free_entry(&dev_entry);
-	} else {
-		fprintf(stderr, "Warning: Could not determine driver name for "
-			"major %d from /proc/devices\n", major(stats.st_rdev));
-		fprintf(stderr, "Warning: Preparing a logical device for boot "
-			"might fail\n");
-	}
-	data->source = source_user;
-	/* Check if targetbase script is available */
-	if (data->drv_name)
-		misc_asprintf(&script_file, "%s%s", script_pre, data->drv_name);
-	else
-		misc_asprintf(&script_file, "%s", script_pre);
-	if ((target->targetbase == NULL) &&
-	    (!stat(script_file, &script_stats))) {
-		data->source = source_script;
-		/* Run targetbase script */
-		misc_asprintf(&ppn_cmd, "%s %d:%d",
-			      script_file, major(stats.st_rdev),
-			      minor(stats.st_rdev));
-		printf("Run %s\n", ppn_cmd);
-		fh = popen(ppn_cmd, "r");
-		if (fh == NULL) {
-			error_reason("Failed to run popen(%s,\"r\",)");
-			goto out_close;
-		}
-		checkparm = 0;
-		while (fgets(buffer, 80, fh) != NULL) {
-			if (sscanf(buffer, "targetbase=%s", value) == 1) {
-				target->targetbase = misc_strdup(value);
-				checkparm++;
-			}
-			if (sscanf(buffer, "targettype=%s", value) == 1) {
-				type_from_target(value, &target->targettype);
-				checkparm++;
-			}
-			if (sscanf(buffer, "targetgeometry=%s", value) == 1) {
-				target->targetcylinders =
-					atoi(strtok(value, ","));
-				target->targetheads = atoi(strtok(NULL, ","));
-				target->targetsectors = atoi(strtok(NULL, ","));
-				checkparm++;
-			}
-			if (sscanf(buffer, "targetblocksize=%s", value) == 1) {
-				target->targetblocksize = atoi(value);
-				checkparm++;
-			}
-			if (sscanf(buffer, "targetoffset=%s", value) == 1) {
-				target->targetoffset = atol(value);
-				checkparm++;
-			}
-		}
-		switch (pclose(fh)) {
-		case 0 :
-			/* success */
-			break;
-		case -1 :
-			error_reason("Failed to run pclose");
-			goto out_close;
-		default :
-			error_reason("Script could not determine target "
-				     "parameters");
-			goto out_close;
-		}
-		if ((!disk_is_eckd(target->targettype) && checkparm < 4) ||
-		    (disk_is_eckd(target->targettype) && checkparm != 5)) {
-			error_reason("Target parameters missing from script");
-			goto out_close;
-		}
-	}
+	data->devno = -1;
+	data->phy_block_size = td->targetblocksize;
+	data->type = td->targettype;
+	data->partnum = 0;
 
-	/* Get disk geometry. Note: geo.start contains a sector number
-	 * offset measured in physical blocks, not sectors (512 bytes) */
-	if (target->targetbase != NULL) {
-		data->geo.heads     = target->targetheads;
-		data->geo.sectors   = target->targetsectors;
-		data->geo.cylinders = target->targetcylinders;
-		data->geo.start     = target->targetoffset;
+	if (sscanf(td->targetbase, "%d:%d", &majnum, &minnum) == 2) {
+		data->device = makedev(majnum, minnum);
+		data->targetbase = defined_as_device;
+		data->partnum = minor(stats.st_rdev) - minnum;
 	} else {
-		data->source = source_auto;
-		if (ioctl(fd, HDIO_GETGEO, &data->geo)) {
-			error_reason("Could not get disk geometry");
-			goto out_close;
+		if (stat(td->targetbase, &stats)) {
+			error_reason(strerror(errno));
+			error_text("Could not get information for "
+				   "file '%s'", td->targetbase);
+			return -1;
 		}
+		if (!S_ISBLK(stats.st_mode)) {
+			error_reason("Target base device '%s' is not "
+				     "a block device",
+				     td->targetbase);
+			return -1;
+		}
+		data->device = stats.st_rdev;
+		data->targetbase = defined_as_name;
 	}
-	if ((data->source == source_user) || (data->source == source_script)) {
-		data->devno = -1;
-		data->phy_block_size = target->targetblocksize;
-		data->type = target->targettype;
-		data->partnum = 0;
-		/* Get file information */
-		if (sscanf(target->targetbase, "%d:%d", &majnum, &minnum)
-		    == 2) {
-			data->device = makedev(majnum, minnum);
-			data->targetbase = defined_as_device;
-			data->partnum = minor(stats.st_rdev) - minnum;
-		}
-		else {
-			if (stat(target->targetbase, &stats)) {
-				error_reason(strerror(errno));
-				error_text("Could not get information for "
-					   "file '%s'", target->targetbase);
-				goto out_close;
-			}
-			if (!S_ISBLK(stats.st_mode)) {
-				error_reason("Target base device '%s' is not "
-					     "a block device",
-					     target->targetbase);
-				goto out_close;
-			}
-			data->device = stats.st_rdev;
-			data->targetbase = defined_as_name;
-		}
-		if (data->type == disk_type_scsi &&
-		    ioctl(fd, NVME_IOCTL_ID) >= 0)
-			data->is_nvme = 1;
-		goto type_determined;
-	}
+	if (data->type == disk_type_scsi && ioctl(fd, NVME_IOCTL_ID) >= 0)
+		data->is_nvme = 1;
+	return 0;
+}
+
+/**
+ * Calculate target parameters in the case when no hints were provided
+ */
+static int disk_set_info_auto(struct disk_info *data,
+			      const struct stat *stats, int fd)
+{
+	struct dasd_information dasd_info;
+
 	if (ioctl(fd, BLKSSZGET, &data->phy_block_size)) {
 		error_reason("Could not get blocksize");
-		goto out_close;
+		return -1;
 	}
-	/* Determine disk type */
 	if (!data->drv_name) {
 		/* Driver name cannot be read */
 		if (ioctl(fd, BIODASDINFO, &dasd_info)) {
@@ -359,39 +285,39 @@ disk_get_info(const char* device, struct job_target_data* target,
 			if (data->geo.start) {
 				/* SCSI partition */
 				data->type = disk_type_scsi;
-				data->partnum = stats.st_rdev & SCSI_PARTN_MASK;
-				data->device = stats.st_rdev & ~SCSI_PARTN_MASK;
+				data->partnum = stats->st_rdev & SCSI_PARTN_MASK;
+				data->device = stats->st_rdev & ~SCSI_PARTN_MASK;
 			} else {
 				/* SCSI disk */
 				data->type = disk_type_scsi;
 				data->partnum = 0;
-				data->device = stats.st_rdev;
+				data->device = stats->st_rdev;
 			}
 		} else {
 			/* DASD */
 			data->devno = dasd_info.devno;
 			if (disk_determine_dasd_type(data, dasd_info))
-				goto out_close;
-			data->partnum = stats.st_rdev & DASD_PARTN_MASK;
-			data->device = stats.st_rdev & ~DASD_PARTN_MASK;
+				return -1;
+			data->partnum = stats->st_rdev & DASD_PARTN_MASK;
+			data->device = stats->st_rdev & ~DASD_PARTN_MASK;
 		}
 	} else if (strcmp(data->drv_name, "dasd") == 0) {
 		/* Driver name is 'dasd' */
 		if (ioctl(fd, BIODASDINFO, &dasd_info)) {
 			error_reason("Could not determine DASD type");
-			goto out_close;
+			return -1;
 		}
 		data->devno = dasd_info.devno;
 		if (disk_determine_dasd_type(data, dasd_info))
-			goto out_close;
-		data->partnum = stats.st_rdev & DASD_PARTN_MASK;
-		data->device = stats.st_rdev & ~DASD_PARTN_MASK;
+			return -1;
+		data->partnum = stats->st_rdev & DASD_PARTN_MASK;
+		data->device = stats->st_rdev & ~DASD_PARTN_MASK;
 	} else if (strcmp(data->drv_name, "sd") == 0) {
 		/* Driver name is 'sd' */
 		data->devno = -1;
 		data->type = disk_type_scsi;
-		data->partnum = stats.st_rdev & SCSI_PARTN_MASK;
-		data->device = stats.st_rdev & ~SCSI_PARTN_MASK;
+		data->partnum = stats->st_rdev & SCSI_PARTN_MASK;
+		data->device = stats->st_rdev & ~SCSI_PARTN_MASK;
 
 	} else if (strcmp(data->drv_name, "virtblk") == 0) {
 
@@ -400,10 +326,10 @@ disk_get_info(const char* device, struct job_target_data* target,
 		if (ioctl(fd, BLKSSZGET, &data->phy_block_size) != 0)
 			perror("Could not retrieve blocksize information.");
 
-		if (determine_virtblk_type(data, &stats)) {
+		if (determine_virtblk_type(data, stats)) {
 			error_reason("Virtblk device type not clearly "
 				     "determined.");
-			goto out_close;
+			return -1;
 		}
 	/* NVMe path, driver name is 'blkext' */
 	} else if (strcmp(data->drv_name, "blkext") == 0 &&
@@ -412,66 +338,268 @@ disk_get_info(const char* device, struct job_target_data* target,
 		data->type = disk_type_scsi;
 		data->is_nvme = 1;
 
-		if (util_sys_dev_is_partition(stats.st_rdev)) {
-			if (util_sys_get_base_dev(stats.st_rdev, &data->device))
-				goto out_close;
-			data->partnum = util_sys_get_partnum(stats.st_rdev);
+		if (util_sys_dev_is_partition(stats->st_rdev)) {
+			if (util_sys_get_base_dev(stats->st_rdev, &data->device))
+				return -1;
+			data->partnum = util_sys_get_partnum(stats->st_rdev);
 			if (data->partnum == -1)
-				goto out_close;
+				return -1;
 		} else {
-			data->device = stats.st_rdev;
+			data->device = stats->st_rdev;
 			data->partnum = 0;
 		}
 	} else {
 		/* Driver name is unknown */
 		error_reason("Unsupported device driver '%s'", data->drv_name);
-		goto out_close;
+		return -1;
 	}
+	return 0;
+}
 
-type_determined:
+/**
+ * Evaluate and set source type
+ */
+static void set_source_type(struct job_target_data *td,
+			    const char *drv_name, char **script_file)
+{
+	const char *script_prefix = util_libdir_path("zipl_helper.");
+	struct stat script_stats;
+
+	if (td->source == source_user) {
+		/* do not reset user-specified target parameters */
+		return;
+	}
+	/* Check if targetbase script is available */
+	if (drv_name)
+		misc_asprintf(script_file, "%s%s", script_prefix,
+			      drv_name);
+	else
+		misc_asprintf(script_file, "%s", script_prefix);
+	if (!stat(*script_file, &script_stats)) {
+		/* target parameters to be evaluated by script */
+		td->source = source_script;
+		return;
+	}
+	td->source = source_auto;
+}
+
+static void set_driver_name(struct disk_info *info, dev_t device)
+{
+	struct util_proc_dev_entry dev_entry;
+
+	if (info->drv_name)
+		/* already set */
+		return;
+	if (util_proc_dev_get_entry(device, 1, &dev_entry) == 0) {
+		info->drv_name = misc_strdup(dev_entry.name);
+		util_proc_dev_free_entry(&dev_entry);
+	} else {
+		fprintf(stderr, "Warning: Could not determine driver name for "
+			"major %d from /proc/devices\n", major(device));
+		fprintf(stderr, "Warning: Preparing a logical device for boot "
+			"might fail\n");
+	}
+}
+
+static int run_targetbase_script(struct job_target_data *td,
+				 char *script_file, struct stat *stats)
+{
+	char *ppn_cmd = NULL;
+	FILE *fh;
+
+	misc_asprintf(&ppn_cmd, "%s %d:%d", script_file,
+		      major(stats->st_rdev), minor(stats->st_rdev));
+	printf("Run %s\n", ppn_cmd);
+	fh = popen(ppn_cmd, "r");
+	free(ppn_cmd);
+
+	if (!fh) {
+		error_reason("Failed to run popen(%s,\"r\",)");
+		return -1;
+	}
+	/* translate the script output to target parameters */
+	if (set_target_parameters(fh, td)) {
+		pclose(fh);
+		return -1;
+	}
+	switch (pclose(fh)) {
+	case 0:
+		/* success */
+		return 0;
+	case -1:
+		error_reason("Failed to run pclose");
+		return -1;
+	default:
+		error_reason("Script could not determine target "
+			     "parameters");
+		return -1;
+	}
+}
+
+/**
+ * Set disk geometry using target parameters provided either by
+ * user, or by script.
+ *
+ * Note: geo.start contains a sector number offset measured in
+ * physical blocks, not sectors (512 bytes)
+ */
+static int disk_set_geometry_by_hint(struct job_target_data *td,
+				     struct disk_info *data)
+{
+	data->geo.heads = td->targetheads;
+	data->geo.sectors = td->targetsectors;
+	data->geo.cylinders = td->targetcylinders;
+	data->geo.start = td->targetoffset;
+
+	return 0;
+}
+
+static int disk_set_geometry_auto(int fd, struct disk_info *info)
+{
+	if (ioctl(fd, HDIO_GETGEO, &info->geo)) {
+		error_reason("Could not get disk geometry");
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * The final step of setting disk info.
+ * Common for all source types
+ *
+ * DATA: disk info to be completed
+ * Pre-condition: disk type is already known and set at DATA->type
+ */
+static int disk_set_info_complete(struct job_target_data *td,
+				  struct disk_info *data,
+				  struct stat *stats, int fd)
+{
+	struct util_proc_part_entry part_entry;
+	long devsize;
+
 	/* Get size of device in sectors (512 byte) */
 	if (ioctl(fd, BLKGETSIZE, &devsize)) {
 		error_reason("Could not get device size");
-		goto out_close;
+		return -1;
 	}
-
 	/* Check for valid CHS geometry data. */
 	if (disk_is_eckd(data->type) && (data->geo.cylinders == 0 ||
 	    data->geo.heads == 0 || data->geo.sectors == 0)) {
 		error_reason("Invalid disk geometry (CHS=%d/%d/%d)",
 			     data->geo.cylinders, data->geo.heads,
 			     data->geo.sectors);
-		goto out_close;
+		return -1;
 	}
 	/* Convert device size to size in physical blocks */
 	data->phy_blocks = devsize / (data->phy_block_size / 512);
-	/* Adjust start on SCSI according to block_size. device-mapper devices are skipped */
-	if (data->type == disk_type_scsi && target->targetbase == NULL)
-		data->geo.start = data->geo.start / (data->phy_block_size / 512);
+	/*
+	 * Adjust start on SCSI according to block_size.
+	 * device-mapper devices, which are evaluated only
+	 * in "source_script" mode, are skipped
+	 */
+	if (data->type == disk_type_scsi && td->source == source_auto)
+		data->geo.start =
+			data->geo.start / (data->phy_block_size / 512);
 	if (data->partnum != 0)
-		data->partition = stats.st_rdev;
+		data->partition = stats->st_rdev;
 	/* Try to get device name */
 	if (util_proc_part_get_entry(data->device, &part_entry) == 0) {
 		data->name = misc_strdup(part_entry.name);
 		util_proc_part_free_entry(&part_entry);
 		if (data->name == NULL)
-			goto out_close;
+			return -1;
 	}
-	/* There is no easy way to find out whether there is a file system
-	 * on this device, so we set the respective block size to an invalid
-	 * value. */
+	/* Initialize file system block size with invalid value */
 	data->fs_block_size = -1;
+	return 0;
+}
+
+/**
+ * Prepare INFO required to perform IPL installation on the physical
+ * disk where the logical DEVICE is located.
+ * Preparation is performed in 2 steps:
+ *
+ * 1. Find out a physical "base" disk where the logical DEVICE is
+ *    located. Calculate "target" parameters (type, geometry, physical
+ *    block size, data offset, etc);
+ * 2. Complete INFO by the found base disk and target parameters.
+ *
+ * TD: optionally contains target parameters specified by user via
+ * config file, or special "target options" of zipl tool.
+ * If target parameters were specified by user, then the step 1 above
+ * is skipped.
+ *
+ * DEVICE: logical, or physical device, optionally formated with a
+ * file system.
+ */
+int disk_get_info(const char *device, struct job_target_data *td,
+		  struct disk_info **info)
+{
+	char *script_file = NULL;
+	struct disk_info *data;
+	struct stat stats;
+	int fd;
+
+	if (stat(device, &stats)) {
+		error_reason(strerror(errno));
+		return -1;
+	}
+	fd = open(device, O_RDONLY);
+	if (fd == -1) {
+		error_reason(strerror(errno));
+		return -1;
+	}
+	data = (struct disk_info *)misc_malloc(sizeof(struct disk_info));
+	if (!data)
+		goto error;
+	memset((void *)data, 0, sizeof(struct disk_info));
+	set_driver_name(data, stats.st_rdev);
+	set_source_type(td, data->drv_name, &script_file);
+	switch (td->source) {
+	case source_script:
+		if (run_targetbase_script(td, script_file, &stats))
+			goto error;
+		/* target parameters were set by the script output */
+		assert(target_parameters_are_set(td));
+
+		if (disk_set_geometry_by_hint(td, data))
+			goto error;
+		if (disk_set_info_by_hint(td, data, fd))
+			goto error;
+		break;
+	case source_user:
+		/*
+		 * target parameters were specified by user via
+		 * "target" options
+		 */
+		assert(target_parameters_are_set(td));
+
+		if (disk_set_geometry_by_hint(td, data))
+			goto error;
+		if (disk_set_info_by_hint(td, data, fd))
+			goto error;
+		break;
+	case source_auto:
+		/* no ready target parameters are available */
+		if (disk_set_geometry_auto(fd, data))
+			goto error;
+		if (disk_set_info_auto(data, &stats, fd))
+			goto error;
+		break;
+	default:
+		assert(0);
+	}
+	if (disk_set_info_complete(td, data, &stats, fd))
+		goto error;
+	free(script_file);
 	close(fd);
 	*info = data;
-	free(script_file);
 	return 0;
-out_close:
-	close(fd);
-	free(ppn_cmd);
+error:
 	free(script_file);
+	close(fd);
 	free(data);
 	return -1;
-
 }
 
 int
@@ -860,11 +988,10 @@ disk_is_large_volume(struct disk_info* info)
 
 
 /* Print textual representation of INFO contents. */
-void
-disk_print_info(struct disk_info* info)
+void disk_print_info(struct disk_info *info, int source)
 {
 	char footnote[4] = "";
-	if ((info->source == source_user) || (info->source == source_script))
+	if (source == source_user || source == source_script)
 		strcpy(footnote, " *)");
 
 	printf("  Device..........................: ");
@@ -892,7 +1019,7 @@ disk_print_info(struct disk_info* info)
 	     (info->type == disk_type_diag) ||
 	     (info->type == disk_type_eckd_ldl) ||
 	     (info->type == disk_type_eckd_cdl)) &&
-	     (info->source == source_auto)) {
+	     (source == source_auto)) {
 		printf("  DASD device number..............: %04x\n",
 		       info->devno);
 	}
@@ -923,9 +1050,9 @@ disk_print_info(struct disk_info* info)
 	       info->phy_block_size, footnote);
 	printf("  Device size in physical blocks..: %ld\n",
 	       (long) info->phy_blocks);
-	if (info->source == source_user)
+	if (source == source_user)
 		printf("  *) Data provided by user.\n");
-	if (info->source == source_script)
+	if (source == source_script)
 		printf("  *) Data provided by script.\n");
 }
 

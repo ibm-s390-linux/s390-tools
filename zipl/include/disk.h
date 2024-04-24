@@ -53,13 +53,6 @@ typedef enum {
 	disk_type_eckd_cdl,
 } disk_type_t;
 
-/* Disk information source */
-typedef enum {
-	source_auto,
-	source_user,
-	source_script
-} source_t;
-
 /* targetbase definition */
 typedef enum {
 	defined_as_device,
@@ -79,7 +72,6 @@ struct disk_info {
 	struct hd_geometry geo;
 	char* name;
 	char* drv_name;
-	source_t source;
 	definition_t targetbase;
 	int is_nvme;
 };
@@ -121,7 +113,7 @@ blocknum_t disk_write_block_buffer_align(int fd, int fd_is_basedisk,
 					 struct disk_info *info, int align,
 					 off_t *offset);
 void disk_print_devt(dev_t d);
-void disk_print_info(struct disk_info* info);
+void disk_print_info(struct disk_info *info, int source);
 int disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info);
 blocknum_t disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 				  struct disk_info* info);

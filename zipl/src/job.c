@@ -1367,6 +1367,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 				scan_keyword_targetbase]);
 			if (job->target.targetbase == NULL)
 				return -1;
+			job->target.source = source_user;
 		}
 		if (data[(int) scan_keyword_targettype] != NULL) {
 			if (type_from_target(
@@ -1618,6 +1619,7 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 						scan[i].content.keyword.value);
 					if (job->target.targetbase == NULL)
 						return -1;
+					job->target.source = source_user;
 					break;
 				case scan_keyword_targettype:
 					if (type_from_target(

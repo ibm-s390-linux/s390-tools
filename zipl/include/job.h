@@ -30,6 +30,14 @@ enum job_id {
 	job_mvdump = 8,
 };
 
+/* target information source */
+typedef enum {
+	source_unknown = 0,
+	source_auto = 1,
+	source_user = 2,
+	source_script = 3
+} source_t;
+
 struct job_target_data {
 	char* bootmap_dir;
 	char* targetbase;
@@ -39,6 +47,7 @@ struct job_target_data {
 	int targetsectors;
 	int targetblocksize;
 	blocknum_t targetoffset;
+	source_t source;
 };
 
 struct job_common_ipl_data {
@@ -133,6 +142,13 @@ struct job_data {
 	int is_ldipl_dump;
 };
 
+/**
+ * Return true, if target parameters for the base disk are set
+ */
+static inline int target_parameters_are_set(struct job_target_data *td)
+{
+	return td->targetbase != NULL;
+}
 
 int job_get(int argc, char* argv[], struct job_data** data);
 void job_free(struct job_data* job);

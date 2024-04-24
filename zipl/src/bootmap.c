@@ -1406,7 +1406,8 @@ check_dump_device(struct job_data *job, const struct disk_info *info,
 	int rc, part_ext;
 
 	/* Check for supported disk and driver types */
-	if ((info->source == source_auto) && (info->type == disk_type_diag)) {
+	if (job->target.source == source_auto &&
+	    info->type == disk_type_diag) {
 		error_reason("Unsupported disk type (%s)",
 			     disk_get_type_name(info->type));
 		return -1;
@@ -1474,7 +1475,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 
 	if (verbose) {
 		printf("Target device information\n");
-		disk_print_info(bis->info);
+		disk_print_info(bis->info, job->target.source);
 	}
 	if (misc_temp_dev(bis->info->device, 1, &bis->device))
 		return -1;
@@ -1563,7 +1564,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 	if (disk_get_info_from_file(bis->filename, &job->target, &bis->info))
 		return -1;
 	/* Check for supported disk and driver types */
-	if (bis->info->source == source_auto &&
+	if (job->target.source == source_auto &&
 	    bis->info->type == disk_type_diag) {
 		error_reason("Unsupported disk type (%s)",
 			     disk_get_type_name(bis->info->type));
@@ -1573,7 +1574,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 		return -1;
 	if (verbose) {
 		printf("Target device information\n");
-		disk_print_info(bis->info);
+		disk_print_info(bis->info, job->target.source);
 	}
 	if (misc_temp_dev(bis->info->device, 1, &bis->device))
 		return -1;

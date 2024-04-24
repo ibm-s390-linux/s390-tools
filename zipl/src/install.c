@@ -1140,7 +1140,7 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 	}
 	if (verbose) {
 		printf("Target device information\n");
-		disk_print_info(info);
+		disk_print_info(info, target->source);
 	}
 	rc = misc_temp_dev(info->device, 1, &tempdev);
 	if (rc) {
@@ -1299,7 +1299,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 	if (verbose) {
 		for (i = 0; i < count; i++) {
 			printf("Multi-volume dump target %d:\n", i + 1);
-			disk_print_info(info[i]);
+			disk_print_info(info[i], target->source);
 			printf("-------------------------------------------\n");
 		}
 	}
