@@ -9,20 +9,17 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stddef.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <time.h>
 
-#include "lib/util_base.h"
 #include "lib/util_libc.h"
 #include "lib/util_opt.h"
 #include "lib/util_path.h"
 #include "lib/util_prg.h"
-#include "lib/util_proc.h"
-#include "lib/util_rec.h"
 #include "lib/util_scandir.h"
 #include "lib/util_sys.h"
+#include "lib/pci_sclp.h"
 
 #include "zpcictl.h"
 
@@ -224,25 +221,6 @@ static void sysfs_write_value(struct zpci_device *pdev, const char *attr,
 	free(path);
 }
 
-static void sysfs_report_error(struct zpci_report_error *report, char *slot)
-{
-	size_t r_size;
-	char *path;
-	FILE *fp;
-
-	r_size = sizeof(*report);
-
-	path = util_path_sysfs("bus/pci/devices/%s/report_error", slot);
-	fp = fopen(path, "w");
-	if (!fp)
-		fopen_err(path);
-	if (fwrite(report, 1, r_size, fp) != r_size)
-		fwrite_err(fp, path);
-	if (fclose(fp))
-		fclose_err(path);
-	free(path);
-}
-
 static void get_device_node(struct zpci_device *pdev)
 {
 	struct dirent **de_vec;
@@ -326,26 +304,22 @@ static void get_device_info(struct zpci_device *pdev, char *dev)
  */
 static void sclp_issue_action(struct zpci_device *pdev, int action)
 {
-	struct zpci_report_error report = {
-		.header = { 0 },
-		.data = { 0 }
-	};
 	char *sdata = NULL;
-
-	report.header.version = 1;
-	report.header.action = action;
-	report.header.length = offsetof(struct zpci_report_error_data, log_data);
-	report.data.timestamp = (__u64)time(NULL);
-	report.data.err_log_id = 0x4713;
+	int length = 0;
+	int ret;
 
 	if (pdev->class == PCI_CLASS_NVME)
 		sdata = collect_smart_data(pdev);
 	if (sdata) {
-		report.header.length += util_strlcpy(report.data.log_data, sdata,
-						     sizeof(report.data.log_data));
-		free(sdata);
+		/* Account for and ensure '\0' byte */
+		length = MIN((int)strlen(sdata) + 1, SCLP_ERRNOTIFY_DATA_SIZE);
+		sdata[length - 1] = '\0';
 	}
-	sysfs_report_error(&report, pdev->slot);
+	ret = zpci_sclp_issue_action(pdev->slot, action,
+				     sdata, length, SCLP_ERRNOTIFY_ID_ZPCICTL);
+	free(sdata);
+	if (ret < 0)
+		warn("Could not issue SCLP action");
 }
 
 /*

@@ -4,7 +4,7 @@ lib = libzpci.a
 
 all: $(lib)
 
-objects = pci_list.o
+objects = pci_list.o pci_sclp.o
 
 examples := $(patsubst %.c,%,$(wildcard *_example.c))
 

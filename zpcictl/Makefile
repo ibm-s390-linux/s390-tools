@@ -2,7 +2,7 @@ include ../common.mak
 
 all: zpcictl
 
-libs =	$(rootdir)/libutil/libutil.a
+libs =	$(rootdir)/libzpci/libzpci.a $(rootdir)/libutil/libutil.a
 
 zpcictl: zpcictl.o $(libs)
 
