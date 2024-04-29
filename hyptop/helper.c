@@ -25,6 +25,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "lib/util_fmt.h"
+#include "lib/util_libc.h"
+
 #include "helper.h"
 #include "hyptop.h"
 #include "sd.h"
@@ -400,4 +403,41 @@ s64 ht_calculate_smt_util(u64 core_us, u64 thr_us, u64 mgm_us, int thread_per_co
 	smt_us = G0(component1 + component2 + mgm_us);
 
 	return smt_us;
+}
+
+/*
+ * Add two new key value pairs containing the current time as UNIX epoch and formatted string to a
+ * structured output object.
+ */
+void ht_fmt_time(void)
+{
+	struct timeval tv;
+	struct tm *tm;
+	char str[30];
+
+	gettimeofday(&tv, NULL);
+	tm = localtime(&tv.tv_sec);
+	if (!tm)
+		return;
+	util_fmt_pair(FMT_PERSIST, "time_epoch", "%lld", mktime(tm));
+	strftime(str, sizeof(str), "%F %T%z", tm);
+	util_fmt_pair(FMT_PERSIST | FMT_QUOTE, "time", "%s", str);
+}
+
+/*
+ * Add a new object for available CPU types to a structured output object.
+ */
+void ht_fmt_cpu_types(void)
+{
+	struct sd_cpu_type *cpu_type;
+	int i;
+
+	util_fmt_obj_start(FMT_DEFAULT, "cputypes");
+	sd_cpu_type_iterate(cpu_type, i) {
+		char *cpu_type_str = sd_cpu_type_id(cpu_type);
+		util_str_tolower(cpu_type_str);
+		util_fmt_pair(FMT_PERSIST, cpu_type_str, "%i",
+			      sd_cpu_type_cpu_cnt(cpu_type));
+	}
+	util_fmt_obj_end(); /* cpus{} */
 }

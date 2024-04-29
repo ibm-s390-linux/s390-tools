@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <termios.h>
 
+#include "lib/util_fmt.h"
+
 #include "helper.h"
 #include "nav_desc.h"
 #include "table.h"
@@ -52,6 +54,8 @@ struct hyptop_win_opts {
 struct hyptop_opts {
 	unsigned int			win_specified;
 	unsigned int			batch_mode_specified;
+	unsigned int			format_specified;
+	enum util_fmt_t			format;
 	unsigned int			iterations_specified;
 	unsigned int			iterations;
 	unsigned int			iterations_act;

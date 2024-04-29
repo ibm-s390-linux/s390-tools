@@ -67,6 +67,12 @@ void ht_print_scroll_bar(int row_cnt, int row_start, int row_bar_start,
 			 int can_scroll_down, int with_boder);
 
 /*
+ * util_fmt helper functions
+ */
+void ht_fmt_time(void);
+void ht_fmt_cpu_types(void);
+
+/*
  * Error Macros
  */
 #define ERR_MSG(x...) \

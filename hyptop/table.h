@@ -390,6 +390,9 @@ extern struct table_row *table_row_alloc(struct table *t);
 extern void table_scroll_down(struct table *t, enum table_scroll_unit unit);
 extern void table_scroll_up(struct table *t, enum table_scroll_unit unit);
 
+extern void table_fmt_start(void);
+extern void table_fmt_end(void);
+
 /*
  * Entry add functions
  */

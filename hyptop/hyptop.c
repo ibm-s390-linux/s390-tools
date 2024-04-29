@@ -18,6 +18,8 @@
 #include <sys/types.h>
 #include <time.h>
 
+#include "lib/util_fmt.h"
+
 #include "dg_debugfs.h"
 #include "helper.h"
 #include "hyptop.h"
@@ -219,6 +221,22 @@ static void l_term_check(void)
 }
 
 /*
+ * Init util_fmt if --format is specified on the command line.
+ */
+static void l_fmt_init(void)
+{
+	unsigned int flags = FMT_WARN;
+
+	if (!g.o.format_specified)
+		return;
+	if (g.o.format == FMT_CSV)
+		flags |= FMT_QUOTEALL;
+	if (g.o.format == FMT_JSON || g.o.format == FMT_JSONSEQ)
+		flags |= FMT_HANDLEINT;
+	util_fmt_init(stdout, g.o.format, flags, 1);
+}
+
+/*
  * Init curses
  */
 static void l_term_init(void)
@@ -359,6 +377,7 @@ void __noreturn hyptop_exit(int rc)
 int main(int argc, char *argv[])
 {
 	opts_parse(argc, argv);
+	l_fmt_init();
 	hyptop_helper_init();
 	sd_init();
 	l_dg_init();

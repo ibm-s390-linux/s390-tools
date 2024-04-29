@@ -194,7 +194,8 @@ static void l_table_update_term(struct hyptop_win *win)
 {
 	(void) win;
 
-	ht_print_head(l_sys_id);
+	if (!g.o.format_specified)
+		ht_print_head(l_sys_id);
 	table_print(l_t);
 }
 
@@ -300,6 +301,7 @@ static void l_run(struct hyptop_win *win)
 
 	/* Reformat table when entering window */
 	table_rebuild(l_t);
+	table_fmt_start();
 	while (1) {
 		if (l_table_create()) {
 			if (g.o.batch_mode_specified)

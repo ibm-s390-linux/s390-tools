@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
+#include "lib/util_fmt.h"
 #include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
@@ -20,6 +21,7 @@
 #include "hyptop.h"
 #include "opts.h"
 #include "sd.h"
+#include "table.h"
 
 static const char l_copyright_str[] = "Copyright IBM Corp. 2010, 2017";
 
@@ -39,9 +41,15 @@ static char HELP_TEXT[] =
 "-S, --sort LETTER               Sort field for current window\n"
 "-t, --cpu_types TYPE[,..]       CPU types used for time calculations\n"
 "-b, --batch_mode                Use batch mode (no curses)\n"
+"    --format FORMAT             Output format (" FMT_TYPE_NAMES "), implies -b\n"
 "-d, --delay SECONDS             Delay time between screen updates\n"
 "-m, --smt_factor FACTOR         Machine generation dependent SMT speedup factor.\n"
 "-n, --iterations NUMBER         Number of iterations before ending\n";
+
+/*
+ * Options with long-name only
+ */
+#define OPT_FORMAT	256 /* --format */
 
 /*
  * Initialize default settings
@@ -289,6 +297,23 @@ static void l_batch_mode_set(void)
 }
 
 /*
+ * Set the "--format" option
+ */
+static void l_format_set(const char *str)
+{
+	enum util_fmt_t fmt;
+
+	if (!util_fmt_name_to_type(str, &fmt)) {
+		ERR_EXIT("Unknown format '%s', supported formats: "
+			 FMT_TYPE_NAMES "\n", str);
+	}
+
+	l_batch_mode_set();
+	g.o.format_specified = 1;
+	g.o.format = fmt;
+}
+
+/*
  * Make option consisteny checks at end of command line parsing
  */
 static void l_parse_finish(void)
@@ -323,6 +348,7 @@ void opts_parse(int argc, char *argv[])
 		{ "fields",      required_argument, NULL, 'f'},
 		{ "sort_field",  required_argument, NULL, 'S'},
 		{ "cpu_types",   required_argument, NULL, 't'},
+		{ "format",      required_argument, NULL, OPT_FORMAT },
 		{ NULL,          0,                 NULL, 0  }
 	};
 	static const char option_string[] = "vhbd:m:w:s:n:f:t:S:";
@@ -366,6 +392,9 @@ void opts_parse(int argc, char *argv[])
 			break;
 		case 'S':
 			l_sort_field_set(optarg);
+			break;
+		case OPT_FORMAT:
+			l_format_set(optarg);
 			break;
 		default:
 			l_std_usage_exit();
@@ -432,8 +461,11 @@ void opts_iterations_next(void)
 {
 	if (g.o.iterations_specified) {
 		g.o.iterations_act++;
-		if (g.o.iterations_act >= g.o.iterations)
+		if (g.o.iterations_act >= g.o.iterations) {
+			if (g.o.format_specified)
+				table_fmt_end();
 			hyptop_exit(0);
+		}
 	}
 }
 

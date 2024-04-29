@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_fmt.h"
 #include "lib/util_libc.h"
 
 #include "helper.h"
@@ -956,14 +957,85 @@ static void l_table_print_all(struct table *t)
 }
 
 /*
+ * Print one table row as structured output
+ *
+ * Note: column filtering and sorting is explicitly ignored because the
+ * assumption is that these operations can be trivially performed by the
+ * consumer.
+ */
+static void l_row_print_formatted(struct table *t, struct table_row *row)
+{
+	struct table_col *col;
+	int col_nr;
+
+	table_col_iterate(t, col, col_nr) {
+		unsigned int flags = 0;
+		struct table_entry *e = &row->entries[col_nr];
+
+		if (row == t->row_last && col_nr == 0)
+			continue;
+		if (table_col_needs_quotes(col))
+			flags = FMT_QUOTE;
+		util_fmt_pair(flags, col->head, "%s", e->str);
+	}
+}
+
+/*
+ * Print table as structured output
+ */
+static void l_table_print_all_formatted(struct table *t)
+{
+	struct table_row *row;
+
+	util_fmt_obj_start(FMT_ROW, "iteration");
+	util_fmt_pair(FMT_PERSIST, "iteration", "%u", g.o.iterations_act);
+	ht_fmt_time();
+	ht_fmt_cpu_types();
+	if (strcmp(g.o.cur_win->id, "sys_list") == 0)
+		util_fmt_obj_start(FMT_LIST, "systems");
+	else
+		util_fmt_obj_start(FMT_LIST, "cpus");
+	util_list_iterate(&t->row_list, row) {
+		util_fmt_obj_start(FMT_ROW, "entry");
+		l_row_print_formatted(t, row);
+		util_fmt_obj_end(); /* entry */
+	}
+	util_fmt_obj_end(); /* systems[] */
+	util_fmt_obj_start(FMT_DEFAULT, "summary");
+	l_row_print_formatted(t, t->row_last);
+	util_fmt_obj_end(); /* summary{} */
+	util_fmt_obj_end(); /* iteration */
+}
+
+void table_fmt_start(void)
+{
+	if (!g.o.format_specified)
+		return;
+	if (g.o.format != FMT_JSONSEQ)
+		util_fmt_obj_start(FMT_LIST, "hyptop");
+}
+
+void table_fmt_end(void)
+{
+	if (!g.o.format_specified)
+		return;
+	if (g.o.format != FMT_JSONSEQ)
+		util_fmt_obj_end(); /* hyptop[] */
+}
+
+/*
  * Print table to screen
  */
 void table_print(struct table *t)
 {
-	if (g.o.batch_mode_specified)
-		l_table_print_all(t);
-	else
+	if (g.o.batch_mode_specified) {
+		if (!g.o.format_specified)
+			l_table_print_all(t);
+		else
+			l_table_print_all_formatted(t);
+	} else {
 		l_table_print_curses(t);
+	}
 }
 
 /*
