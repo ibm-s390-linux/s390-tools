@@ -296,7 +296,6 @@ static void l_update_term_curses(void)
 static void l_update_term_batch(void)
 {
 	g.w.cur->update_term(g.w.cur);
-	printf("\n");
 }
 
 /*

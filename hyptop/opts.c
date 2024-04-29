@@ -435,8 +435,5 @@ void opts_iterations_next(void)
 		if (g.o.iterations_act >= g.o.iterations)
 			hyptop_exit(0);
 	}
-	if (g.o.batch_mode_specified)
-		printf("---------------------------------------------------"
-		       "----------------------------\n");
 }
 

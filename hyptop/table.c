@@ -950,6 +950,9 @@ static void l_table_print_all(struct table *t)
 		hyptop_print_nl();
 	}
 	l_row_print(t, t->row_last);
+	hyptop_print_nl();
+	hyptop_printf("------------------------------------------------------"
+		      "-------------------------\n");
 }
 
 /*
