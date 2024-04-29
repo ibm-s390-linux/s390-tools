@@ -31,11 +31,11 @@ endif
 # Global definitions
 # The variable "DISTRELEASE" should be overwritten in rpm spec files with:
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
-VERSION            = 2
-RELEASE            = 32
-PATCHLEVEL         = 0
-DISTRELEASE        = build-$(shell date +%Y%m%d)
-S390_TOOLS_RELEASE = $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)
+VERSION            := 2
+RELEASE            := 32
+PATCHLEVEL         := 0
+DISTRELEASE        := build-$(shell date +%Y%m%d)
+S390_TOOLS_RELEASE := $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)
 export S390_TOOLS_RELEASE
 
 reldir = $(subst $(realpath $(dir $(filter %common.mak,$(MAKEFILE_LIST))))/,,$(CURDIR))
@@ -293,8 +293,8 @@ INSTDIRS        = $(USRSBINDIR) $(USRBINDIR) $(BINDIR) $(LIBDIR) $(MANDIR) \
 			$(ZFCPDUMP_DIR) $(SYSTEMDSYSTEMUNITDIR) \
 			$(USRLIB64DIR) $(USRINCLUDEDIR) $(ZKEYKMSPLUGINDIR) \
 			$(SOINSTALLDIR) $(USRLIBDIR)
-OWNER           = $(shell id -un)
-GROUP		= $(shell id -gn)
+OWNER           := $(shell id -un)
+GROUP		:= $(shell id -gn)
 export INSTALLDIR BINDIR LIBDIR USRLIBDIR USRLIB64DIR MANDIR OWNER GROUP
 
 # Special defines for zfcpdump
