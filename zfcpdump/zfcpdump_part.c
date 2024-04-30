@@ -22,6 +22,7 @@
 #include <linux/hdreg.h>
 #include <linux/reboot.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
@@ -40,7 +41,6 @@
 #include "zfcpdump.h"
 
 #define COPY_BUF_SIZE		0x10000UL
-#define COPY_TABLE_ENTRY_COUNT	4
 
 /*
  * Copy table entry
@@ -48,6 +48,13 @@
 struct copy_table_entry {
 	unsigned long size;
 	unsigned long off;
+	bool hsa;
+};
+
+struct copy_table {
+	int cnt;
+	int max;
+	struct copy_table_entry *entry;
 };
 
 /*
@@ -137,14 +144,82 @@ static int csum_update(int fd)
 	return 0;
 }
 
-/*
- * Initialize copy table to copy HSA first
- */
-static int copy_table_init(int fd, struct copy_table_entry *table)
+static int cmp_ct_entries(const void *_entry1, const void *_entry2)
 {
+	const struct copy_table_entry *entry1 = (const struct copy_table_entry *)_entry1;
+	const struct copy_table_entry *entry2 = (const struct copy_table_entry *)_entry2;
+
+	/* Sort copy table entries by their file offset in ascending order */
+
+	if (entry1->off <= entry2->off)
+		return -1;
+	else if (entry1->off > entry2->off)
+		return 1;
+	else
+		return 0;
+}
+
+static inline void copy_table_add_entry(struct copy_table *table, unsigned long off,
+					unsigned long size, bool hsa)
+{
+	const int i = table->cnt;
+	table->entry[i].off = off;
+	table->entry[i].size = size;
+	table->entry[i].hsa = hsa;
+	table->cnt++;
+}
+
+static void copy_table_add_non_hsa_file_regions(struct copy_table *table)
+{
+	const int hsa_entry_count = table->cnt;
+	unsigned long off, size;
+	int i;
+	/*
+	 * We write the front page of /proc/vmcore at the end of the dump processing.
+	 * This ensures that the dump stays invalid until all data
+	 * is written. It is guaranteed that a copy table entry for file offset 0
+	 * never covers HSA memory and at least of size of a single page because
+	 * HSA memory is always page aligned.
+	 */
+	off = PAGE_SIZE;
+	size = table->entry[0].off - off;
+	if (size > 0)
+		copy_table_add_entry(table, off, size, false);
+	/*
+	 * Add copy table entries covering non-HSA file regions located before
+	 * each copy table entry covering a HSA file region. Start with the second
+	 * HSA copy table entry.
+	 */
+	for (i = 1; i < hsa_entry_count; i++) {
+		off = table->entry[i - 1].off + table->entry[i - 1].size;
+		size = table->entry[i].off - off;
+		if (size > 0)
+			copy_table_add_entry(table, off, size, false);
+	}
+	/*
+	 * Add a copy table entry that covers the end of /proc/vmcore which is
+	 * not covered by a copy table entry for HSA.
+	 */
+	i = hsa_entry_count - 1;
+	off = table->entry[i].off + table->entry[i].size;
+	if (off < g.vmcore_size) {
+		size = g.vmcore_size - off;
+		copy_table_add_entry(table, off, size, false);
+	}
+	/*
+	 * Add a copy table entry covering the front page of /proc/vmcore which
+	 * is not covered by HSA as the last entry.
+	 */
+	copy_table_add_entry(table, 0, PAGE_SIZE, false);
+}
+
+static int copy_table_init(int fd, struct copy_table *table)
+{
+	const unsigned long hsa_size = get_hsa_size();
+	unsigned long off, size;
+	int i, max_table_size;
 	Elf64_Ehdr ehdr;
 	Elf64_Phdr phdr;
-	int i;
 
 	g.vmcore_size = lseek(fd, (off_t) 0, SEEK_END);
 	lseek(fd, 0L, SEEK_SET);
@@ -160,44 +235,65 @@ static int copy_table_init(int fd, struct copy_table_entry *table)
 		PRINT_ERR("Only 64 bit core dump files are supported\n");
 		return -1;
 	}
-	/* Find first memory chunk to determine HSA size */
+	/*
+	 * Each ELF LOAD segment may contain at most one HSA file region which will
+	 * result in exactly one HSA copy table entry. Furthermore, this will result
+	 * in at most 1 extra non-HSA copy table entry preceding the HSA copy
+	 * table entry apart from the first and the last HSA copy table entries
+	 * which will result in 2 non-HSA copy table entries.
+	 *
+	 *                            /proc/vmcore
+	 *  -------------------------------------------------------------------
+	 * | page sized | non-HSA  | HSA      | non-HSA  | HSA      | non-HSA  |
+	 * | non-HSA    | region 2 | region 1 | region 3 | region 2 | region 4 |
+	 * | region 1   |          |          |          |          |          |
+	 *  -------------------------------------------------------------------
+	 */
+	table->cnt = 0;
+	table->max = ehdr.e_phnum * 2 + 2;
+	max_table_size = table->max * sizeof(struct copy_table_entry);
+	table->entry = malloc(max_table_size);
+	if (!table->entry) {
+		PRINT_ERR("Memory allocation of %d byte(s) failed\n", max_table_size);
+		return -1;
+	}
+	/*
+	 * First add all HSA file regions to copy table.
+	 * Each ELF LOAD segment may contain at most one HSA segment.
+	 */
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		if (read(fd, &phdr, sizeof(phdr)) < 0)
 			return -1;
 		if (phdr.p_type != PT_LOAD)
 			continue;
-		if (phdr.p_paddr != 0)
+		PRINT_TRACE("ELF LOAD segment: p_offset=0x%016lx p_filesz=0x%016lx p_paddr=0x%016lx p_vaddr=0x%016lx\n",
+			    phdr.p_offset, phdr.p_filesz, phdr.p_paddr, phdr.p_vaddr);
+		if (phdr.p_paddr >= hsa_size)
 			continue;
-		/* 1st entry is the HSA (paddr = 0) */
-		table[0].off  = phdr.p_offset;
-		table[0].size = get_hsa_size();
-		/* 2nd entry defines area from 2nd page to HSA start */
-		table[1].off  = PAGE_SIZE;
-		table[1].size = table[0].off - PAGE_SIZE;
-		/*
-		 * 3rd entry defines area from HSA end to end of file.
-		 */
-		table[2].off  = table[0].off + table[0].size;
-		table[2].size = g.vmcore_size - table[2].off;
-		/*
-		 * We write the last page at the end of the dump processing.
-		 * This ensures that the dump stays invalid until all data
-		 * is written. We can use one page because it is ensured that
-		 * the HSA starts page aligned.
-		 */
-		table[3].off  = 0;
-		table[3].size = PAGE_SIZE;
-		return 0;
+		off = phdr.p_offset;
+		size = MIN(phdr.p_filesz, hsa_size - phdr.p_paddr);
+		if (size > 0)
+			copy_table_add_entry(table, off, size, true);
 	}
-	PRINT_ERR("Could not find HSA ELF load section\n");
-	return -1;
+	if (table->cnt == 0) {
+		PRINT_ERR("Could not find ELF LOAD segments containing HSA\n");
+		return -1;
+	}
+	/* Sort all HSA copy table entries by their file offset */
+	qsort(table->entry, table->cnt, sizeof(struct copy_table_entry), cmp_ct_entries);
+	/*
+	 * Add copy table entries which cover all of /proc/vmcore not covered
+	 * by HSA copy table entries added above.
+	 */
+	copy_table_add_non_hsa_file_regions(table);
+	return 0;
 }
 
 /*
  * Copy one copy table entry form /proc/vmcore to dump partition
  */
 static int copy_table_entry_write(int fdin, int fdout,
-				  struct copy_table_entry *entry,
+				  const struct copy_table_entry *entry,
 				  unsigned long offset)
 {
 	unsigned long buf_size, bytes_left, off;
@@ -228,14 +324,11 @@ static int copy_table_entry_write(int fdin, int fdout,
 	return 0;
 }
 
-/*
- * Copy dump using mmap (copy HSA first)
- */
 static int copy_dump(const char *in, const char *out, unsigned long offset)
 {
-	struct copy_table_entry table[COPY_TABLE_ENTRY_COUNT];
+	struct copy_table table = { 0 };
 	char busy_str[] = "zfcpdump busy";
-	int fdout, fdin, i, rc = -1;
+	int fdout, fdin, i, rc = -1, hsa_released = 0;
 
 	fdin = open(in, O_RDONLY);
 	if (fdin < 0) {
@@ -261,14 +354,24 @@ static int copy_dump(const char *in, const char *out, unsigned long offset)
 		goto out_close_fdin;
 	if (csum_update(fdout))
 		goto out_close_fdin;
-	if (copy_table_init(fdin, table))
+	if (copy_table_init(fdin, &table))
 		goto out_close_fdin;
 	show_progress(0);
-	for (i = 0; i < COPY_TABLE_ENTRY_COUNT; i++) {
-		if (copy_table_entry_write(fdin, fdout, &table[i], offset))
-			goto out_close_fdout;
-		if (i == 0) /* 0 is the HSA */
+	for (i = 0; i < table.cnt; i++) {
+		PRINT_TRACE("Write copy table entry %d: off=0x%016lx size=0x%016lx hsa=%d\n",
+			    i, table.entry[i].off, table.entry[i].size, table.entry[i].hsa ? 1 : 0);
+		if (!hsa_released && !table.entry[i].hsa) {
+			/*
+			 * First encountered non-HSA copy table entry guarantees
+			 * that no more HSA memory copy table entries will appear
+			 * and, therefore, HSA memory can be finally released.
+			 */
+			PRINT_TRACE("Release HSA memory\n");
 			release_hsa();
+			hsa_released = 1;
+		}
+		if (copy_table_entry_write(fdin, fdout, &table.entry[i], offset))
+			goto out_close_fdout;
 	}
 	rc = 0;
 out_close_fdout:
@@ -276,7 +379,10 @@ out_close_fdout:
 		rc = -1;
 	fsync(fdout);
 	close(fdout);
+	free(table.entry);
 out_close_fdin:
+	if (!hsa_released)
+		release_hsa();
 	close(fdin);
 	return rc;
 }
