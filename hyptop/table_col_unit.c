@@ -63,7 +63,7 @@ static int l_unit_raw(struct table_col *col, struct table_entry *e)
  */
 static int l_str(struct table_col *col, struct table_entry *e)
 {
-	(void) col;
+	col->p->needs_quotes = 1;
 	return strlen(e->str);
 }
 
@@ -226,6 +226,8 @@ static int l_unit_hm_u64(char *str, u64 v1, int negative)
 
 static int l_unit_hm(struct table_col *col, struct table_entry *e)
 {
+	col->p->needs_quotes = 1;
+
 	if (!e->set)
 		return snprintf(e->str, sizeof(e->str), L_COL_NOT_SET_STR);
 
@@ -272,6 +274,8 @@ static int l_unit_dhm_u64(char *str, u64 v1, int negative)
 
 static int l_unit_dhm(struct table_col *col, struct table_entry *e)
 {
+	col->p->needs_quotes = 1;
+
 	if (!e->set)
 		return snprintf(e->str, sizeof(e->str), L_COL_NOT_SET_STR);
 

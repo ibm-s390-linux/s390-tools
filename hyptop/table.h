@@ -106,6 +106,7 @@ struct table_col_priv {
 	char		head_char[2];
 	char		head_last[TABLE_HEADING_SIZE];
 	int		rsort;
+	int		needs_quotes;
 };
 
 /*
@@ -133,6 +134,11 @@ struct table_col {
 static inline int table_col_enabled(struct table_col *col)
 {
 	return col->p->enabled;
+}
+
+static inline int table_col_needs_quotes(struct table_col *col)
+{
+	return col->p->needs_quotes;
 }
 
 /*
