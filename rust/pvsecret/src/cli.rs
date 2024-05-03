@@ -119,7 +119,7 @@ pub struct CreateSecretOpt {
     /// user data can be up to 512 bytes of arbitrary data, and the maximum size depends on the
     /// size of the user-signing key:
     /// - No key: user data can be 512 bytes.
-    /// - EC or RSA 2048 keys: user data can be 256 bytes.
+    /// - EC(secp521r1) or RSA 2048 keys: user data can be 256 bytes.
     /// - RSA 3072 key: user data can be 128 bytes.
     ///
     /// The firmware ignores this data, but the request tag protects the user-data. Optional. No

@@ -1,5 +1,5 @@
 <!--
-Copyright 2023 IBM Corp.
+Copyright 2023, 2024 IBM Corp.
 s390-tools is free software; you can redistribute it and/or modify
 it under the terms of the MIT license. See LICENSE for details.
 -->
@@ -61,6 +61,12 @@ Provide more detailed output
 `--version`
 <ul>
 Print version information and exit
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help
 </ul>
 
 
@@ -196,8 +202,8 @@ the request.
 Use the content of FILE as the Configuration Unique ID. The file must contain
 exactly 128 bit of data or a yaml with a `cuid` entry. If specified, the value
 must match the Config-UID from the attestation result of that guest. If not
-specified, the CUID will be ignored by the Ultravisor during the verification
-of the request.
+specified, the CUID will be ignored by the Ultravisor during the verification of
+the request.
 </ul>
 
 
@@ -229,14 +235,20 @@ Optional. No user-data by default.
 
 `--user-sign-key <FILE>`
 <ul>
-Use the content of FILE as user signing key. Adds a signature defined calculated
-from the key in <FILE> to the add-secret request. The file must be in DER or PEM
+Use the content of FILE as user signing key. Adds a signature calculated from
+the key in <FILE> to the add-secret request. The file must be in DER or PEM
 format containing a private key. Supported are RSA 2048 & 3072-bit and
 EC(secp521r1) keys. The firmware ignores the content, but the request tag
 protects the signature. The user-signing key signs the request. The location of
 the signature is filled with zeros during the signature calculation. The request
 tag also secures the signature. See man pvsecret verify for more details.
 Optional. No signature by default.
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help
 </ul>
 
 
@@ -284,6 +296,12 @@ specified
 Save the generated secret as plaintext in FILE. The generated secret can be used
 to generate add-secret requests for a different guest with the same secret using
 --input-secret. Destroy the secret when it is not used anymore.
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help
 </ul>
 
 
@@ -336,6 +354,12 @@ Define the output format of the list
         - **human**: Human-focused, non-parsable output format
         - **yaml**: Use yaml format
         - **bin**: Use the format the ultravisor uses to pass the list
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help
 </ul>
 
 
@@ -406,4 +430,10 @@ curve over a 521 bit prime field (secp521r1).
 Store the result in FILE If the request contained abirtary user-data the output
 contains this user-data with padded zeros if available.
     Default value: '-'
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help
 </ul>
