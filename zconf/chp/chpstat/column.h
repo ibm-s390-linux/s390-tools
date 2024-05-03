@@ -41,6 +41,10 @@ enum column_id_t {
 	COL_SEND_FAIL_PART,
 	COL_RCV_FAIL_PART,
 	COL_RCV_FAIL_TOTAL,
+	COL_DPU_ID,
+	COL_DPU_UTIL_PART,
+	COL_DPU_UTIL_TOTAL,
+	COL_DPU_UTIL,
 	/* Special value indicating no column. */
 	COL_END
 };

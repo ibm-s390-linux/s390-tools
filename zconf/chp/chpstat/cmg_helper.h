@@ -47,6 +47,10 @@
 	_pr_u32((a), (n), (v), STRINGIFY(field), COL_NONE, CMG_NUMBER, \
 		(s)->field)
 
+#define pr_cond_u32_col(a, n, v, s, field, c) \
+	_pr_u32((a), (n), (v), STRINGIFY(field), (c), CMG_NUMBER, \
+		(s)->field)
+
 #define pr_cue_u32(a, n, s, field) \
 	pr_cond_u32(a, n, cue_valid(s, field), s, field)
 

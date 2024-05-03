@@ -541,6 +541,8 @@ Example JSON output for single iteration and channel-path with all properties:
 .br
           "characteristics": {
 .br
+            "dpu_id": 0,
+.br
             "max_bus_cycles": 0,
 .br
             "max_channel_work_units": 0,
@@ -556,6 +558,8 @@ Example JSON output for single iteration and channel-path with all properties:
             "msg_unit_size": 0,
 .br
             "msg_unit_size_cpc": 0,
+.br
+            "dpu_num_cores": 0
 .br
           },
 .br
@@ -607,6 +611,10 @@ Example JSON output for single iteration and channel-path with all properties:
 .br
             "data_units_sent_cpc": 0,
 .br
+            "dpu_channel_exec_time_cpc": 0,
+.br
+            "dpu_exec_time_cpc": 0
+.br
           },
 .br
           "metrics": {
@@ -652,6 +660,12 @@ Example JSON output for single iteration and channel-path with all properties:
             "rcv_fail_part": 0.0,
 .br
             "rcv_fail_total": 0.0,
+.br
+            "dpu_util": 0.0,
+.br
+            "dpu_util_total": 0.0,
+.br
+            "dpu_util_part": 0.0
 .br
           }
 .br

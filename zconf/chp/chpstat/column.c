@@ -40,6 +40,8 @@
 #define HDR1_MSGSZ_GROUP	"MSG-SIZE"
 #define HDR1_MSG_RCVF_SINGLE	"RFAIL"
 #define HDR1_MSG_RCVF_GROUP	"RECEIVE-FAIL"
+#define HDR1_DPU_UTIL_SINGLE	"DPU"
+#define HDR1_DPU_UTIL_GROUP	"DPU UTILIZATION(%)"
 
 static struct column_t columns[] = {
 	{
@@ -302,6 +304,46 @@ static struct column_t columns[] = {
 		HDR1_MSG_RCVF_GROUP,
 		0,
 	},
+	{
+		COL_DPU_ID,
+		"dpu_id",
+		COL_OTHER,
+		"DPU ID associated with channel-path",
+		"ID",
+		HDR1_DPU_UTIL_SINGLE,
+		HDR1_DPU_UTIL_GROUP,
+		0,
+	},
+	{
+		COL_DPU_UTIL,
+		"dpu_util",
+		COL_PERCENT,
+		"Full DPU utilization in %",
+		"FULL",
+		HDR1_DPU_UTIL_SINGLE,
+		HDR1_DPU_UTIL_GROUP,
+		0,
+	},
+	{
+		COL_DPU_UTIL_PART,
+		"dpu_util_part",
+		COL_PERCENT,
+		"Partition channel-path DPU utilization in %",
+		"PART",
+		HDR1_DPU_UTIL_SINGLE,
+		HDR1_DPU_UTIL_GROUP,
+		0,
+	},
+	{
+		COL_DPU_UTIL_TOTAL,
+		"dpu_util_total",
+		COL_PERCENT,
+		"Total channel-path DPU utilization in %",
+		"TOTAL",
+		HDR1_DPU_UTIL_SINGLE,
+		HDR1_DPU_UTIL_GROUP,
+		0,
+	},
 };
 
 /* Columns selected by default. */
@@ -314,6 +356,7 @@ static const int default_columns[] = {
 	COL_UTIL_PART,
 	COL_UTIL_TOTAL,
 	COL_UTIL_BUS,
+	COL_DPU_ID,
 	COL_READ_PART,
 	COL_READ_TOTAL,
 	COL_WRITE_PART,
