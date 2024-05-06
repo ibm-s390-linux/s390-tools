@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
 #include <sys/stat.h>
@@ -294,32 +293,38 @@ static int copy_table_init(int fd, struct copy_table *table)
  */
 static int copy_table_entry_write(int fdin, int fdout,
 				  const struct copy_table_entry *entry,
-				  unsigned long offset)
+				  unsigned long disk_offset)
 {
-	unsigned long buf_size, bytes_left, off;
-	void *map;
+	static unsigned char buf[COPY_BUF_SIZE];
+	unsigned long bytes_left, count;
+	ssize_t bytes_read, bytes_written;
 
-	if (entry->size == 0)
-		return 0;
-	off = entry->off;
 	bytes_left = entry->size;
-	if (lseek(fdout, entry->off + offset, SEEK_SET) < 0)
+	if (bytes_left == 0)
+		return 0;
+	if (lseek(fdin, entry->off, SEEK_SET) < 0)
 		return -1;
+	if (lseek(fdout, disk_offset + entry->off, SEEK_SET) < 0)
+		return -1;
+	PRINT_TRACE("Write dump: vmcore offset=0x%016lx disk offset=0x%016lx bytes=0x%016lx\n",
+		    entry->off, disk_offset + entry->off, bytes_left);
 	while (bytes_left > 0) {
-		buf_size = MIN(COPY_BUF_SIZE, bytes_left);
-		map = mmap(0, buf_size, PROT_READ, MAP_SHARED, fdin, off);
-		if (map == (void *)-1) {
-			PRINT_PERR("Mapping failed\n");
+		count = MIN(COPY_BUF_SIZE, bytes_left);
+		bytes_read = read(fdin, buf, count);
+		if (bytes_read < 0) {
+			PRINT_PERR("Read from /proc/vmcore failed: offset=0x%016lx bytes=0x%016lx\n",
+				   entry->off + entry->size - bytes_left, count);
 			return -1;
 		}
-		if (write(fdout, map, buf_size) < 0) {
-			PRINT_PERR("Write to partition failed\n");
+		bytes_written = write(fdout, buf, bytes_read);
+		if (bytes_written < 0) {
+			PRINT_PERR("Write to partition failed: offset=0x%016lx bytes=0x%016lx\n",
+				   disk_offset + entry->off + entry->size - bytes_left,
+				   bytes_read);
 			return -1;
 		}
-		munmap(map, buf_size);
-		bytes_left -= buf_size;
-		off += buf_size;
-		show_progress(buf_size);
+		bytes_left -= bytes_written;
+		show_progress(bytes_written);
 	}
 	return 0;
 }
