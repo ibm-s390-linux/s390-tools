@@ -58,6 +58,8 @@ struct os_info {
 	uint8_t reserved[3804];
 } __packed;
 
+STATIC_ASSERT(sizeof(struct os_info) == 4096)
+
 /*
  * Return 0 in case of valid os_info
  * Return -EOS_INFO_MISSING if os_info address is not page aligned or page is
