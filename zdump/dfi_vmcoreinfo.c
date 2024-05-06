@@ -20,6 +20,8 @@
 #include "dfi_mem_chunk.h"
 #include "dfi_vmcoreinfo.h"
 
+#include "boot/os_info.h"
+
 #ifdef __s390x__
 #define LC_VMCORE_INFO		0xe0c
 #else
@@ -27,26 +29,6 @@
 #endif
 
 #define LC_OS_INFO		0xe18
-#define OS_INFO_MAGIC		0x4f53494e464f535aULL /* OSINFOSZ */
-
-struct os_info {
-	u64	magic;
-	u32	csum;
-	u16	version_major;
-	u16	version_minor;
-	u64	crashkernel_addr;
-	u64	crashkernel_size;
-	u64	vmcoreinfo_addr;
-	u64	vmcoreinfo_size;
-	u32	vmcoreinfo_csum;
-	u64	reipl_block_addr;
-	u64	reipl_block_size;
-	u32	reipl_block_csum;
-	u64	init_fn_addr;
-	u64	init_fn_size;
-	u32	init_fn_csum;
-	u8	reserved[4004];
-} __packed;
 
 /*
  * File local static data
@@ -95,10 +77,10 @@ void dfi_vmcoreinfo_init(void)
 
 	l.os_info = os_info_get();
 
-	if (l.os_info && l.os_info->vmcoreinfo_size) {
+	if (l.os_info && l.os_info->entry[OS_INFO_VMCOREINFO].size) {
 		util_log_print(UTIL_LOG_DEBUG, "DFI found valid osinfo\n");
-		addr = l.os_info->vmcoreinfo_addr;
-		size = l.os_info->vmcoreinfo_size;
+		addr = l.os_info->entry[OS_INFO_VMCOREINFO].addr;
+		size = l.os_info->entry[OS_INFO_VMCOREINFO].size;
 	} else {
 		if (dfi_mem_virt_read(LC_VMCORE_INFO, &addr, sizeof(addr)))
 			return;
