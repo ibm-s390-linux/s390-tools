@@ -14,22 +14,6 @@
  * the glib version is supported
  */
 #include "libpv/glib-helper.h"
-
 #include <glib/gi18n.h>
-
-#include "libpv/openssl-compat.h"
-#include "libpv/macros.h"
-
-/** pv_init:
- *
- * Must be called before any libpv call.
- */
-int pv_init(void);
-
-/** pv_cleanup:
- *
- * Must be called when done with using libpv.
- */
-void pv_cleanup(void);
 
 #endif /* LIBPV_COMMON_H */

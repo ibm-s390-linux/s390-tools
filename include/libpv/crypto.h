@@ -15,6 +15,7 @@
 #include <openssl/evp.h>
 
 #include "libpv/common.h"
+#define PV_NONNULL(...)
 
 typedef struct pv_cipher_parms {
 	const EVP_CIPHER *cipher;
@@ -25,17 +26,6 @@ typedef struct pv_cipher_parms {
 		GBytes *tweak;
 	};
 } PvCipherParms;
-
-typedef union {
-	struct {
-		uint8_t x[80];
-		uint8_t y[80];
-	};
-	uint8_t data[160];
-} PvEcdhPubKey;
-G_STATIC_ASSERT(sizeof(PvEcdhPubKey) == 160);
-
-typedef GSList PvEvpKeyList;
 
 enum PvCryptoMode {
 	PV_ENCRYPT,
@@ -60,42 +50,6 @@ char *pv_get_openssl_errors(void);
  * Returns: 0 in case of success, -1 otherwise.
  */
 int pv_BIO_reset(BIO *b);
-
-/**
- * pv_generate_rand_data:
- * @size: number of generated random bytes using a crypographically secure pseudo random generator
- * @error: return location for a #GError
- *
- * Creates a new #GBytes with @size random bytes using a cryptographically
- * secure pseudo random generator.
- *
- * Returns: (nullable) (transfer full): a new #GBytes, or %NULL in case of an error
- */
-GBytes *pv_generate_rand_data(size_t size, GError **error);
-
-/**
- * pv_generate_key:
- * @cipher: specifies the OpenSSL cipher for which a cryptographically secure key should be generated
- * @error: return location for a #GError
- *
- * Creates a random key for @cipher using a cryptographically secure pseudo
- * random generator.
- *
- * Returns: (nullable) (transfer full): a new #GBytes, or %NULL in case of an error
- */
-GBytes *pv_generate_key(const EVP_CIPHER *cipher, GError **error) PV_NONNULL(1);
-
-/**
- * pv_generate_iv:
- * @cipher: specifies the OpenSSL cipher for which a cryptographically secure IV should be generated
- * @error: return location for a #GError
- *
- * Creates a random IV for @cipher using a cryptographically secure pseudo
- * random generator.
- *
- * Returns: (nullable) (transfer full): a new #GBytes, or %NULL in case of an error
- */
-GBytes *pv_generate_iv(const EVP_CIPHER *cipher, GError **error) PV_NONNULL(1);
 
 /* Symmetric en/decryption functions */
 
@@ -135,7 +89,7 @@ int64_t pv_gcm_decrypt(GBytes *cipher, GBytes *aad, GBytes *tag, const PvCipherP
  * @derived_key_len: size of the output key
  * @key: input key
  * @salt: salt for the extraction
- * @info: infor for the expansion
+ * @info: info for the expansion
  * @md: EVP mode of operation
  * @error: return location for a #GError
  *
@@ -147,54 +101,15 @@ int64_t pv_gcm_decrypt(GBytes *cipher, GBytes *aad, GBytes *tag, const PvCipherP
 GBytes *pv_hkdf_extract_and_expand(size_t derived_key_len, GBytes *key, GBytes *salt, GBytes *info,
 				   const EVP_MD *md, GError **error) PV_NONNULL(2, 3, 4, 5);
 
-/** pv_generate_ec_key:
- *
- * @nid: Numerical identifier of the curve
- * @error: return location for a #GError
- *
- * Returns: (nullable) (transfer full): new random key based on the given curve
- */
-EVP_PKEY *pv_generate_ec_key(int nid, GError **error);
-
-/** pv_evp_pkey_to_ecdh_pub_key:
- *
- * @key: input key in EVP_PKEY format
- * @error: return location for a #GError
- *
- * Returns: the public part of the input @key in ECDH format.
- */
-PvEcdhPubKey *pv_evp_pkey_to_ecdh_pub_key(EVP_PKEY *key, GError **error) PV_NONNULL(1);
-
-/** pv_derive_exchange_key:
- * @cust: Customer Key
- * @host: Host key
- * @error: return location for a #GError
- *
- * Returns: (nullable) (transfer full): Shared Secret of @cust and @host
- */
-GBytes *pv_derive_exchange_key(EVP_PKEY *cust, EVP_PKEY *host, GError **error) PV_NONNULL(1, 2);
-
 GQuark pv_crypto_error_quark(void);
 #define PV_CRYPTO_ERROR pv_crypto_error_quark()
 typedef enum {
-	PV_CRYPTO_ERROR_DERIVE,
 	PV_CRYPTO_ERROR_HKDF_FAIL,
 	PV_CRYPTO_ERROR_INTERNAL,
-	PV_CRYPTO_ERROR_INVALID_KEY_SIZE,
-	PV_CRYPTO_ERROR_KEYGENERATION,
-	PV_CRYPTO_ERROR_RANDOMIZATION,
-	PV_CRYPTO_ERROR_READ_FILE,
 	PV_CRYPTO_ERROR_NO_MATCH_TAG,
 } PvCryptoErrors;
 
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(ASN1_INTEGER, ASN1_INTEGER_free)
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(ASN1_OCTET_STRING, ASN1_OCTET_STRING_free)
 WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(BIO, BIO_free_all)
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(BIGNUM, BN_free)
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(BN_CTX, BN_CTX_free)
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(EC_GROUP, EC_GROUP_free)
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(EC_KEY, EC_KEY_free)
-WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(EC_POINT, EC_POINT_free)
 WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(EVP_CIPHER_CTX, EVP_CIPHER_CTX_free)
 WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(EVP_PKEY, EVP_PKEY_free)
 WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(EVP_PKEY_CTX, EVP_PKEY_CTX_free)

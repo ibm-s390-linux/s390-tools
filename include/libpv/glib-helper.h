@@ -28,8 +28,6 @@
 #include <gmodule.h>
 #include <stdio.h>
 
-#include "libpv/macros.h"
-
 #ifdef __clang__
 #define WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(...)                                                 \
 	DO_PRAGMA(clang diagnostic push)                                                           \
@@ -39,6 +37,8 @@
 #else
 #define WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(...) G_DEFINE_AUTOPTR_CLEANUP_FUNC(__VA_ARGS__)
 #endif
+
+#define DO_PRAGMA(x) _Pragma(#x)
 
 #define pv_wrapped_g_assert(__expr) g_assert(__expr)
 

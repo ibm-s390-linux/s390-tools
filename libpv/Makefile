@@ -9,10 +9,7 @@ GLIB2_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags glib-2.0)
 GLIB2_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs glib-2.0)
 LIBCRYPTO_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcrypto)
 LIBCRYPTO_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
-LIBCURL_CFLAGS := $(shell $(PKG_CONFIG) --silence-errors --cflags libcurl)
-LIBCURL_LIBS := $(shell $(PKG_CONFIG) --silence-errors --libs libcurl)
-LDLIBS += $(GLIB2_LIBS) $(LIBCRYPTO_LIBS) $(LIBCURL_LIBS)
-
+LDLIBS += $(GLIB2_LIBS) $(LIBCRYPTO_LIBS)
 WARNINGS := -Wall -Wextra -Wshadow \
 	    -Wcast-align -Wwrite-strings -Wmissing-prototypes \
 	    -Wmissing-declarations -Wredundant-decls -Wnested-externs \
@@ -24,16 +21,13 @@ WARNINGS := -Wall -Wextra -Wshadow \
 ALL_CFLAGS += -DOPENSSL_API_COMPAT=0x10101000L \
 	      $(GLIB2_CFLAGS) \
 	      $(LIBCRYPTO_CFLAGS) \
-	      $(LIBCURL_CFLAGS) \
 	      $(WARNINGS) \
 	      $(NULL)
 
 BUILD_TARGETS := skip-$(LIB)
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_GLIB2},0)
-ifneq (${HAVE_LIBCURL},0)
 BUILD_TARGETS := $(LIB)
-endif
 endif
 endif
 
@@ -82,9 +76,4 @@ skip-$(LIB):
 		"openssl-devel / libssl-dev version >= 1.1.1", \
 		"HAVE_OPENSSL=0", \
 		"-I.")
-	$(call check_dep, \
-		"$(LIB)", \
-		"curl/curl.h", \
-		"libcurl-devel", \
-		"HAVE_LIBCURL=0")
 	touch $@
