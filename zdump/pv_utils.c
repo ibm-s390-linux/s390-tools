@@ -24,8 +24,8 @@
 
 #include "lib/zt_common.h"
 #include "lib/util_log.h"
+#include "libpv/common.h"
 #include "libpv/crypto.h"
-#include "libpv/se-hdr.h"
 #include "pv_defs.h"
 
 WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(Elf64_Phdr, free)
@@ -36,6 +36,7 @@ WRAPPED_G_DEFINE_AUTOPTR_CLEANUP_FUNC(Elf64_Phdr, free)
 #define PV_DUMP_V1_HKDF_LEN  32
 #define PV_DUMP_V1_HKDF_FUN  EVP_sha512()
 #define PV_DUMP_V1_CIPHER    EVP_aes_256_gcm()
+#define PV_CCK_V1_SIZE	     32
 
 static gboolean u64_checked_add(u64 *res, u64 lhs, u64 rhs)
 {
@@ -108,7 +109,7 @@ GBytes *pv_derive_dump_key_v1(const pv_dump_completion_data_v1_t *cpl_data, GByt
 {
 	g_autoptr(GBytes) salt = NULL, info = NULL;
 	size_t cck_size;
-	size_t exp_cck_size = sizeof_field(struct pv_hdr_encrypted, cust_comm_key);
+	size_t exp_cck_size = PV_CCK_V1_SIZE;
 
 	assert(cpl_data->aad.version == PV_COMPL_DATA_VERSION_1);
 
