@@ -346,11 +346,19 @@ int dfi_s390_init_gen(bool extended)
 	l.extended = extended;
 	if (read_s390_hdr() != 0)
 		return -ENODEV;
-	zg_ioctl(g.fh, BLKSSZGET, &l.blk_size, "BLKSSZGET", ZG_CHECK);
-	if (!extended)
+	if (!extended) {
 		rc = mem_chunks_add();
-	else
+	} else {
+		/* Dumps in s390_ext format can reside on DASD partition only */
+		if (zg_type(g.fh) != ZG_TYPE_DASD_PART)
+			return -ENODEV;
+		/*
+		 * A device block size is required for a decompression of
+		 * s390_ext dump with compressed dump segments.
+		 */
+		zg_ioctl(g.fh, BLKSSZGET, &l.blk_size, "BLKSSZGET", ZG_CHECK);
 		rc = mem_chunks_add_ext();
+	}
 	if (rc)
 		return rc;
 	rc = df_s390_cpu_info_add(&l.hdr, l.hdr.mem_size);
