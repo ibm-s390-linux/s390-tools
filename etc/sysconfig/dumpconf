@@ -31,11 +31,11 @@
 #
 # Dump on ECKD device (DASD)
 #
-#ON_PANIC=dump
-#DUMP_TYPE=eckd
-#DEVICE=0.0.1004
-#BOOTPROG=0
-#BR_CHR=auto
+# ON_PANIC=dump
+# DUMP_TYPE=eckd
+# DEVICE=0.0.1004
+# BOOTPROG=0
+# BR_CHR=auto
 
 #
 # Dump on fcp device (SCSI Disk)
