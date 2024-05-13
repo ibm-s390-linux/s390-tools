@@ -50,7 +50,7 @@ check_environment()
 
 	if [ "$(cat /proc/filesystems|grep sysfs)" = "" ]; then
 		pr_error "no sysfs found"
-		exit 1 
+		exit 1
 	fi
 
 	SYSFSDIR=$(cat /proc/mounts|awk '$3=="sysfs"{print $2; exit}')
@@ -184,7 +184,8 @@ verify_ccw_dump_device()
 #------------------------------------------------------------------------------
 # Helper function to check a device string.
 #------------------------------------------------------------------------------
-function CheckDeviceString() {
+check_device_string()
+{
 	local X
 
 	X=$(
@@ -222,7 +223,7 @@ function CheckDeviceString() {
 
 setup_ccw_device()
 {
-	DEV="$(CheckDeviceString $DEVICE)"
+	DEV="$(check_device_string $DEVICE)"
 	if [ "$DEV" != "" ]; then
 		echo $DEV > $1/ccw/device
 	else
@@ -234,7 +235,7 @@ setup_ccw_device()
 
 setup_eckd_device()
 {
-	DEV="$(CheckDeviceString $DEVICE)"
+	DEV="$(check_device_string $DEVICE)"
 	if [ "$DEV" != "" ]; then
 		echo $DEV > $1/eckd/device
 	else
@@ -256,7 +257,7 @@ setup_eckd_device()
 
 setup_fcp_device()
 {
-	DEV="$(CheckDeviceString $DEVICE)"
+	DEV="$(check_device_string $DEVICE)"
 	if [ "$DEV" != "" ]; then
 		echo $DEV > $1/fcp/device
 	else
