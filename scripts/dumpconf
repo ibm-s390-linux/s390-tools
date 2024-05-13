@@ -253,6 +253,13 @@ setup_eckd_device()
 		pr_error "ERROR: Invalid BR_CHR '$BR_CHR'." $ERRMSG
 		return
 	fi
+	if [ -e $1/eckd/scp_data ]; then
+		echo -n "$SCP_DATA" > $1/eckd/scp_data 2>/dev/null || RETVAL=1
+		if [ $RETVAL -eq 1 ]; then
+			pr_error "ERROR: Invalid SCP_DATA '$SCP_DATA'." $ERRMSG
+			return
+		fi
+	fi
 }
 
 setup_fcp_device()
@@ -285,6 +292,13 @@ setup_fcp_device()
 		pr_error "ERROR: Invalid BR_LBA '$BR_LBA'." $ERRMSG
 		return
 	fi
+	if [ -e $1/fcp/scp_data ]; then
+		echo -n "$SCP_DATA" > $1/fcp/scp_data 2>/dev/null || RETVAL=1
+		if [ $RETVAL -eq 1 ]; then
+			pr_error "ERROR: Invalid SCP_DATA '$SCP_DATA'." $ERRMSG
+			return
+		fi
+	fi
 }
 
 setup_nss_device()
@@ -313,6 +327,13 @@ setup_nvme_device()
 	if [ $RETVAL -eq 1 ]; then
 		pr_error "ERROR: Invalid BR_LBA '$BR_LBA'." $ERRMSG
 		return
+	fi
+	if [ -e $1/nvme/scp_data ]; then
+		echo -n "$SCP_DATA" > $1/nvme/scp_data 2>/dev/null || RETVAL=1
+		if [ $RETVAL -eq 1 ]; then
+			pr_error "ERROR: Invalid SCP_DATA '$SCP_DATA'." $ERRMSG
+			return
+		fi
 	fi
 }
 
@@ -429,6 +450,10 @@ print_fcp_device()
 	pr_info "bootprog: $BOOTPROG"
 	BR_LBA=$(cat $1/fcp/br_lba) || RETVAL=1
 	pr_info "br_lba..: $BR_LBA"
+	if [ -e $1/fcp/scp_data ]; then
+		SCP_DATA=$(cat $1/fcp/scp_data) || RETVAL=1
+		pr_info "scp_data: $SCP_DATA"
+	fi
 }
 
 print_ccw_device()
@@ -445,6 +470,10 @@ print_eckd_device()
 	pr_info "br_chr..: $BR_CHR"
 	BOOTPROG=$(cat $1/eckd/bootprog) || RETVAL=1
 	pr_info "bootprog: $BOOTPROG"
+	if [ -e $1/eckd/scp_data ]; then
+		SCP_DATA=$(cat $1/eckd/scp_data) || RETVAL=1
+		pr_info "scp_data: $SCP_DATA"
+	fi
 }
 
 print_nvme_device()
@@ -457,6 +486,10 @@ print_nvme_device()
 	pr_info "bootprog: $BOOTPROG"
 	BR_LBA=$(cat $1/nvme/br_lba) || RETVAL=1
 	pr_info "br_lba..: $BR_LBA"
+	if [ -e $1/nvme/scp_data ]; then
+		SCP_DATA=$(cat $1/nvme/scp_data) || RETVAL=1
+		pr_info "scp_data: $SCP_DATA"
+	fi
 }
 
 print_nss_name()
