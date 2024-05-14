@@ -15,28 +15,28 @@ tunedasd \- A tool to adjust tunable parameters on DASD devices
 is a tool to adjust tunable parameters on DASD devices.
 It can be used to modify the status of the device and to adjust
 some performance relevant settings.
-The DEVICE is the node of the device (e.g. '/dev/dasda') or a list of 
+The DEVICE is the node of the device (e.g. '/dev/dasda') or a list of
 devices separated by a space character.
 Following functions are supported:
 .IP "     -"
-Get and reset the performance statistics profile per device. 
+Get and reset the performance statistics profile per device.
 .IP "     -"
 Get and set the caching mode of the storage server.
-This is only available for ECKD devices, because it is implemented using 
+This is only available for ECKD devices, because it is implemented using
 ECKD Channel Program commands.
 .IP "     -"
 Reserve/Release/Unconditional Reserve a device.
-This is only available for ECKD devices, because it is based on 
+This is only available for ECKD devices, because it is based on
 the Control Unit functions.
 .P
-If 
+If
 .B tunedasd
 is called without parameter, it prints a short usage information and exits.
 .SH OPTIONS
 .TP
 .BR "\-v" " or " "\-\-version"
 Print version information, then exit.
-.TP   
+.TP
 .SH COMMANDS
 .TP
 .BR "\-h" " or " "\-\-help"
@@ -44,48 +44,48 @@ Print usage information, then exit.
 .TP
 .BR "\-g" " or " "\-\-get_cache"
 Get current storage server caching behavior.
-.TP   
+.TP
 .BR "\-c" " or " "\-\-cache" " <behavior> "
 Define caching behavior on storage server.
-The following caching behaviors are currently supported by modern 
+The following caching behaviors are currently supported by modern
 Enterprise Storage Servers (ESS):
 .br
-.IP "          \(bu" 12 
-.I normal 
+.IP "          \(bu" 12
+.I normal
 ('Normal Cache replacement'),
-.IP "          \(bu" 12 
-.I bypass 
+.IP "          \(bu" 12
+.I bypass
 (Bypass Cache),
-.IP "          \(bu" 12 
+.IP "          \(bu" 12
 .I inhibit
 (Inhibit Cache Loading),
-.IP "          \(bu" 12 
+.IP "          \(bu" 12
 .I sequential
 (Sequential Access),
-.IP "          \(bu" 12 
-.I prestage 
+.IP "          \(bu" 12
+.I prestage
 (Sequential Prestage),
-.IP "          \(bu" 12 
+.IP "          \(bu" 12
 .I record
 (Record Access)
 .IP "" 7
 More details about caching can be found in the 'Storage Control Reference' of the attached storage server.
-.TP   
+.TP
 .BR "\-n" " or " "\-\-no_cyl" " <n> "
 Number of cylinders to be cached (only valid together with --cache).
-.TP   
+.TP
 .BR "\-S" " or " "\-\-reserve"
 Reserve device.
-.TP   
+.TP
 .BR "\-L" " or " "\-\-release"
 Release device.
-.TP   
+.TP
 .BR "\-O" " or " "\-\-slock"
-Unconditional reserve device.   
+Unconditional reserve device.
 .br
-.B Note: 
+.B Note:
 Use with care, this breaks an existing reserve.
-.TP   
+.TP
 .BR "\-\-enable-stats"
 Enable performance statistics globally.
 .br
@@ -99,10 +99,10 @@ Disable performance statistics globally.
 .BR "\-P" " or " "\-\-profile"
 Print profile info of device.
 .br
-.B Note: 
+.B Note:
 Profile info must be available and enabled in the kernel to get valid results
 out of the profile commands. Enable statistics via \fB--enable-stats\fR.
-.TP   
+.TP
 .BR "\-Q" " or " "\-\-query_reserve"
 Query the current reserve status of the device.
 The following states are defined:
@@ -129,37 +129,37 @@ Print single profile item data row (without header).
 .br
 Following rows are supported:
 .br
-.IP "          \(bu" 12 
-.I reqs 
+.IP "          \(bu" 12
+.I reqs
 (# of dasd I/O requests),
-.IP "          \(bu" 12 
-.I sects 
+.IP "          \(bu" 12
+.I sects
 (# of 512Byte sectors),
-.IP "          \(bu" 12 
-.I sizes 
+.IP "          \(bu" 12
+.I sizes
 (Histogram of sizes),
-.IP "          \(bu" 12 
-.I total 
+.IP "          \(bu" 12
+.I total
 (Histogram of I/O times),
-.IP "          \(bu" 12 
-.I totsect 
+.IP "          \(bu" 12
+.I totsect
 (Histogram of I/O times per sector),
-.IP "          \(bu" 12 
-.I start 
+.IP "          \(bu" 12
+.I start
 (Histogram of I/O time till ssch),
-.IP "          \(bu" 12 
-.I irq 
+.IP "          \(bu" 12
+.I irq
 (istogram of I/O time between ssch and irq),
-.IP "          \(bu" 12 
-.I irqsect 
+.IP "          \(bu" 12
+.I irqsect
 (istogram of I/O time between ssch and irq per sector),
-.IP "          \(bu" 12 
-.I end 
+.IP "          \(bu" 12
+.I end
 (Histogram of I/O time between irq and end),
-.IP "          \(bu" 12 
-.I queue 
+.IP "          \(bu" 12
+.I queue
 (# of req in chanq at enqueuing)
-.TP   
+.TP
 .BR "\-R" " or " "\-\-reset_prof"
 Reset profile info of device.
 .TP
@@ -185,16 +185,16 @@ succeed.
 .\"
 .\".TP
 .\".BR "\-o" " or " "\-\-online"
-.\"Set the device online using the sysfs interface. 
+.\"Set the device online using the sysfs interface.
 
 .SH EXAMPLE
-1. Scenario: Get profile info for a device.  
+1. Scenario: Get profile info for a device.
 .br
 
        tunedasd -P /dev/dasdc
        tunedasd -PI irq /dev/dasdc
 
-.br	
+.br
 2. Scenario: Set device caching mode to 1 cylinder 'prestage'.
 .br
 
@@ -213,6 +213,6 @@ succeed.
        tunedasd -s 0.0.9700,0.0.9740 /dev/dasdc
 .br
 .SH "SEE ALSO"
-.BR dasdview (8), 
-.BR dasdfmt (8), 
+.BR dasdview (8),
+.BR dasdfmt (8),
 .BR fdasd (8)
