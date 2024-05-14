@@ -48,20 +48,20 @@ The store type (either label or hash) specifies how the KEK in <value> is to be 
 human readable strings and hence more user friendly than hashes,
 the default store type is label.
 .br
-The -k option can only be specified, if the tape medium is at load point.
+The \-k option can only be specified, if the tape medium is at load point.
 .br
-While processing the -k option, the tape medium is initialized and all
+While processing the \-k option, the tape medium is initialized and all
 data eventually contained on the tape medium is lost.
 To avoid inadvertent data loss a prompt message is issued asking the user
 whether he or she really wants to proceed.
 .br
-The -k option can be specified maximal twice, because on the tape medium
+The \-k option can be specified maximal twice, because on the tape medium
 maximal two EEDKs (External Encrypted Data Keys) can be stored.
 If specified once, two identical EEDKs are stored.
 .br
 <char> is a character separating the KEK in <value> from the store type
 (either label or hash). This
-delimiter can be specified with the -d option as explained below.
+delimiter can be specified with the \-d option as explained below.
 
 .TP
 .BR "\-d <char>" " or " "\-\-delimiter=<char>
@@ -87,7 +87,7 @@ mount non-encrypted tape and write data with the
 .B "default"
 KEKs:
 .br
-tape390_crypt -e on /dev/ntibm0
+tape390_crypt \-e on /dev/ntibm0
 .br
 tar cfz /dev/ntibm0 /data
 
@@ -97,7 +97,7 @@ mount non-encrypted tape and write data with
 .B "specific"
 KEKs:
 .br
-tape390_crypt -k my_first_key -k my_second_key:hash /dev/ntibm0
+tape390_crypt \-k my_first_key \-k my_second_key:hash /dev/ntibm0
 .br
 tar cfz /dev/ntibm0 /data
 
@@ -105,4 +105,4 @@ tar cfz /dev/ntibm0 /data
 .br
 mount tape and display current encryption status:
 .br
-tape390_crypt -q /dev/ntibm0
+tape390_crypt \-q /dev/ntibm0

@@ -11,17 +11,17 @@ device.
 .SH SYNOPSIS
 .TP 16
 .B tape390_display
-.RB [ -b | --blink ]
+.RB [ \-b | \-\-blink ]
 .br
-.RB [ -h | --help ]
+.RB [ \-h | \-\-help ]
 .br
-.RB [ -l | --load ]
+.RB [ \-l | \-\-load ]
 .br
-.RB [ -t <type>| --type <type>]
+.RB [ \-t <type>| \-\-type <type>]
 .br
-.RB [ -q | --quiet ]
+.RB [ \-q | \-\-quiet ]
 .br
-.RB [ -v | --version ]
+.RB [ \-v | \-\-version ]
 .br
 .IR message1
 .RB [
@@ -42,28 +42,28 @@ Spaces and shell-sensitive characters have to be quoted.
 
 .SH OPTIONS
 .TP 8
-\fB-h\fR or \fB--help\fR
+\fB\-h\fR or \fB\-\-help\fR
 Print help text.
 
 .TP
-\fB-b\fR or \fB--blink\fR
+\fB\-b\fR or \fB\-\-blink\fR
 Display \fImessage1\fR repeatedly for 2 seconds at half-second intervals.
 This option is ignored if two messages are specified on command line.
 
 .TP
-\fB-l\fR or \fB--load\fR
+\fB\-l\fR or \fB\-\-load\fR
 If this option is given the display request will cause a load request to be
 sent to the automatic tape loader (if installed). The next indexed tape will
 then be loaded if the loader is in 'system' mode. Otherwise the request is
 ignored.
 
 .TP
-\fB-q\fR or \fB--quiet\fR
+\fB\-q\fR or \fB\-\-quiet\fR
 This option causes the command to run in quiet mode which will suppress
 all warning messages.
 
 .TP
-\fB-t\fR \fItype\fR or \fB--type\fR \fItype\fR
+\fB\-t\fR \fItype\fR or \fB\-\-type\fR \fItype\fR
 Set the type of the message to be displayed. This influences how long
 the message(s) stay on the display. Available types are:
 
@@ -94,7 +94,7 @@ into the drive.
 .RE
 
 .TP
-\fB-v\fR or \fB--version\fR
+\fB\-v\fR or \fB\-\-version\fR
 Print the S/390 tools package version, the utility version and exit.
 
 .TP 8
@@ -115,7 +115,7 @@ The tape device on which the message(s) will be displayed, e.g.:
 .br
 
 .SH EXAMPLES
-\fBtape390_display --blink --type unload "TESTING" /dev/ntibm\fR\fI0\fR
+\fBtape390_display \-\-blink \-\-type unload "TESTING" /dev/ntibm\fR\fI0\fR
 .RS
 Let the message TESTING blink on the display of the tape unit until the
 tape is removed (or another message is given). If there is no tape in the
@@ -127,13 +127,13 @@ This will display the messages BACKUP and COMPLETE each for 2 seconds
 until the tape is moved, ejected or (if there isn't a tape in the
 device) inserted.
 .RE
-\fBtape390_display --type reload "UNLOAD" "LOAD" /dev/ntibm\fR\fI0\fR
+\fBtape390_display \-\-type reload "UNLOAD" "LOAD" /dev/ntibm\fR\fI0\fR
 .RS
 The UNLOAD message will be displayed if there is a tape inserted and as
 long as the tape isn't removed. After that the LOAD message is displayed
 until a tape is inserted. If there is no tape inserted when the command
 .RE
-\fBtape390_display --load --type load "LOADING" /dev/ntibm\fR\fI0\fR
+\fBtape390_display \-\-load \-\-type load "LOADING" /dev/ntibm\fR\fI0\fR
 .RS
 Causes the device to display the message LOADING until a tape is inserted
 and to instruct the automatic stacker to load the next tape (if the mode
