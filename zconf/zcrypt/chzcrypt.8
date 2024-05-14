@@ -16,39 +16,39 @@ chzcrypt \- modify zcrypt configuration
 .SH SYNOPSIS
 .TP 9
 .B chzcrypt
-.B -e
+.B \-e
 .RB "|"
-.B -d
-.RB "( " -a " | "
+.B \-d
+.RB "( " \-a " | "
 .I <device id>
 [...] )
 .TP
 .B chzcrypt
-.B --config-on
+.B \-\-config\-on
 .RB "|"
-.B --config-off
-.RB "( " -a " | "
+.B \-\-config\-off
+.RB "( " \-a " | "
 .I <device id>
 [...] )
 .TP
 .B chzcrypt
-.RB "[ " -p " | " -n " ] [ " -t
+.RB "[ " \-p " | " \-n " ] [ " \-t
 .I <timeout>
 ]
 .TP
 .B chzcrypt
-.RB "[ " -c
+.RB "[ " \-c
 .I <timeout>
 ]
 .TP
 .B chzcrypt
-.RB "[ " -q
+.RB "[ " \-q
 .I <domain>
 ]
 .TP
-.B chzcrypt -h
+.B chzcrypt \-h
 .TP
-.B chzcrypt -v
+.B chzcrypt \-v
 .SH DESCRIPTION
 The
 .B chzcrypt
@@ -61,62 +61,62 @@ version.
 requires that the sysfs filesystem is mounted.
 .SH OPTIONS
 .TP 8
-.B -e, --enable
+.B \-e, \-\-enable
 Set the given cryptographic device(s) online.
 .TP 8
-.B -d, --disable
+.B \-d, \-\-disable
 Set the given cryptographic device(s) offline.
 .TP 8
-.B -a, --all
+.B \-a, \-\-all
 Set all available cryptographic device(s) online or offline.
 .TP 8
-.B --config-on
+.B \-\-config\-on
 Set the given cryptographic card device(s) config on ('configured').
 .TP 8
-.B --config-off
+.B \-\-config\-off
 Set the given cryptographic card device(s) config off ('deconfigured').
 .TP 8
-.B -p, --poll-thread-enable
+.B \-p, \-\-poll\-thread\-enable
 Enable zcrypt's poll thread.
 .TP 8
-.B -n, --poll-thread-disable
+.B \-n, \-\-poll\-thread\-disable
 Disable zcrypt's poll thread.
 .TP 8
-.BI "-c, --config-time" " <timeout>"
+.BI "\-c, \-\-config\-time" " <timeout>"
 Set configuration timer for re-scanning the AP bus to
 .I <timeout>
 seconds.
 .TP 8
-.B --se-associate <association-index> <queue-device>
+.B \-\-se\-associate <association-index> <queue-device>
 Associate the given queue device with the given association
 index. This command is only valid within an Secure Execution guest
 with AP pass-through support enabled.
 .TP 8
-.B --se-bind <queue-device>
+.B \-\-se\-bind <queue-device>
 Bind the given queue device. This command is only valid within an
 Secure Execution guest with AP pass-through support enabled.
 .TP 8
-.B --se-unbind <queue-device>
+.B \-\-se\-unbind <queue-device>
 Unbind the given queue device. This command is only valid within an
 Secure Execution guest with AP pass-through support enabled.
 .TP 8
-.BI "-t, --poll-timeout" " <poll_timeout>"
+.BI "\-t, \-\-poll\-timeout" " <poll_timeout>"
 Set poll timer to run poll tasklet all
 .I <poll_timeout>
 nanoseconds.
 .TP 8
-.BI "-q, --default-domain" " <domain>"
+.BI "\-q, \-\-default\-domain" " <domain>"
 Set the new default domain of the AP bus to <domain>. The number of
-available domains can be retrieved with the lszcrypt command ('-d'
+available domains can be retrieved with the lszcrypt command ('\-d'
 option).
 .TP 8
-.B -V, --verbose
+.B \-V, \-\-verbose
 Print verbose messages.
 .TP 8
-.B -h, --help
+.B \-h, \-\-help
 Print help text and exit.
 .TP 8
-.B -v, --version
+.B \-v, \-\-version
 Print version information and exit.
 .TP 8
 .B <device id>
@@ -133,30 +133,30 @@ Please note that the card device and queue device representation are
 both in hexadecimal notation.
 .TP 8
 .B <queue-device>
-An APQN queue device given as xy.abcd as it is listed by lszcrypt -V.
+An APQN queue device given as xy.abcd as it is listed by lszcrypt \-V.
 .SH EXAMPLES
 .TP
-.B chzcrypt -e 0 1 12
+.B chzcrypt \-e 0 1 12
 Will set the cryptographic card devices 0, 1 and 12 online.
 .TP
-.B chzcrypt -e 10.0038
+.B chzcrypt \-e 10.0038
 Will set the cryptographic device '10.0038' respectively card id 16
 (0x10) with domain 56 (0x38) online.
 .TP
-.B chzcrypt -d -a
+.B chzcrypt \-d \-a
 Will set all available cryptographic devices offline.
 .TP
-.B chzcrypt --config-on -a -V
+.B chzcrypt \-\-config\-on \-a \-V
 Set all available crypto cards to config on, be verbose.
 .TP
-.B chzcrypt -V --config-off card01 card03
+.B chzcrypt \-V \-\-config\-off card01 card03
 Switch the two crypto cards 1 and 3 to deconfigured, be verbose.
 .TP
-.B chzcrypt -c 60 -n
+.B chzcrypt \-c 60 \-n
 Will set configuration timer for re-scanning the AP bus to 60 seconds
 and disable zcrypt's poll thread.
 .TP
-.B chzcrypt -q 67
+.B chzcrypt \-q 67
 Will set the default domain to 67.
 .SH NOTES
 Support for crypto cards to get switched config on or off requires a
