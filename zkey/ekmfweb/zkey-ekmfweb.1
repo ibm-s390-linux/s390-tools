@@ -176,7 +176,7 @@ information is also updated for the key in EKMF Web.
 You cannot change the associated cryptographic adapters (APQNs) of a key that
 is bound to EKMF Web, because it inherits the APQN association from the EKMF
 Web plugin. To change the APQNs associated with the EKMF Web plugin, use the
-\fBzkey kms configure\fP command with the \fB--apqns\fP option. This also
+\fBzkey kms configure\fP command with the \fB\-\-apqns\fP option. This also
 changes the APQN associations of all secure keys in the secure key repository,
 that are bound to the EKMF Web plugin.
 .
@@ -367,8 +367,8 @@ by zkey. For registration, the template for identity keys is used.
 Specifies the label tags for generating a secure key in EKMF Web, in the form
 \fB<tag>=<value>(,<tag>=<value>)*[,]\fP with tags as defined by the key
 template. Use the \fBzkey kms info\fP command to display the key templates used
-by zkey. For XTS type keys the two templates for \fBXTS-Key1\fP and
-\fBXTS-Key2\fP are used. For non-XTS type keys, the template for \fBNon-XTS\fP
+by zkey. For XTS type keys the two templates for \fBXTS\-Key1\fP and
+\fBXTS\-Key2\fP are used. For non-XTS type keys, the template for \fBNon\-XTS\fP
 keys is used.
 .
 .SS "Options for the zkey remove command"
@@ -446,7 +446,7 @@ and the label tags 'ENV=TEST' and 'APP=LINUX' for the identity key.
 .B zkey kms info
 Displays information about the EKMF Web plugin and its configuration.
 .TP
-.B zkey kms reencipher --staged
+.B zkey kms reencipher \-\-staged
 Re-enciphers the EKMF Plugin's identity key with a new CCA master key in staged
 mode
 .TP
@@ -456,7 +456,7 @@ Generates a secure AES key in EKMF Web using the label tags 'ENV=TEST' and
 and associates it with block device '/dev/dasdc1' and device-mapper name
 \&'encvol'.
 .TP
-.B zkey generate \-\-name seckey \-\-xts \-\-volumes /dev/dasdc1:encvol \-\-volume-type luks2 \-\-label\-tags \(dqENV=TEST,APP=LINUX\(dq
+.B zkey generate \-\-name seckey \-\-xts \-\-volumes /dev/dasdc1:encvol \-\-volume\-type luks2 \-\-label\-tags \(dqENV=TEST,APP=LINUX\(dq
 Generates a secure AES key for the XTS cipher mode in EKMF Web using the label
 tags 'ENV=TEST' and 'APP=LINUX' and stores it in the secure key repository
 using the name 'seckey' and associates it with block device '/dev/dasdc1' and
