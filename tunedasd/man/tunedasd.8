@@ -101,7 +101,7 @@ Print profile info of device.
 .br
 .B Note:
 Profile info must be available and enabled in the kernel to get valid results
-out of the profile commands. Enable statistics via \fB--enable-stats\fR.
+out of the profile commands. Enable statistics via \fB\-\-enable\-stats\fR.
 .TP
 .BR "\-Q" " or " "\-\-query_reserve"
 Query the current reserve status of the device.
@@ -191,26 +191,26 @@ succeed.
 1. Scenario: Get profile info for a device.
 .br
 
-       tunedasd -P /dev/dasdc
-       tunedasd -PI irq /dev/dasdc
+       tunedasd \-P /dev/dasdc
+       tunedasd \-PI irq /dev/dasdc
 
 .br
 2. Scenario: Set device caching mode to 1 cylinder 'prestage'.
 .br
 
-       tunedasd -c prestage -n 1 /dev/dasdc
+       tunedasd \-c prestage \-n 1 /dev/dasdc
 
 .br
 3. Scenario: Reset failed channel path with CHPID 45
 .br
 
-       tunedasd -p 45 /dev/dasdc
+       tunedasd \-p 45 /dev/dasdc
 
 .br
 4. Scenario: Swap copy pair 0.0.9700 and 0.0.9740
 .br
 
-       tunedasd -s 0.0.9700,0.0.9740 /dev/dasdc
+       tunedasd \-s 0.0.9700,0.0.9740 /dev/dasdc
 .br
 .SH "SEE ALSO"
 .BR dasdview (8),
