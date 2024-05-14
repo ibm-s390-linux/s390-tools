@@ -13,7 +13,7 @@ zdsfs \- File system for z/OS data set access
 \fBzdsfs\fP \fI<devices>\fR \fI<mountpoint>\fR [\fI<options>\fR]
 .SS unmounting:
 .TP
-\fBfusermount\fP -u \fI<mountpoint>\fR
+\fBfusermount\fP \-u \fI<mountpoint>\fR
 
 .SH DESCRIPTION
 
@@ -58,7 +58,7 @@ read, and seek. Because the actual size of the data in each track is not
 always known, zdsfs does not support mmap. Seek operations read the
 whole data set to the given offset. The performance of seek
 operations to previous offsets can be improved by buffering seek
-offsets, see option `-o seekbuffers'.
+offsets, see option `\-o seekbuffers'.
 
 A further consequence of the unknown exact data size is that zdsfs
 cannot provide exact file sizes. As a heuristic, the given file sizes
@@ -66,7 +66,7 @@ are the maximum possible data sizes, based on the number and size of
 the extents that belong to each data set. When the actual end of the
 data is reached during read, the usual end of file (EOF) is returned.
 To ensure that the EOF is passed to the user correctly, the option
-`-o direct_io' is set by zdsfs implicitly.
+`\-o direct_io' is set by zdsfs implicitly.
 
 Incomplete multi-volume data sets are not detected if only the first
 volume (device) of the data set is present.
@@ -77,7 +77,7 @@ volume (device) of the data set is present.
 .TP
 \fB<devices>\fR One or more DASD device nodes, where node specifications are
 separated by blanks. The device nodes can be specified explicitly with
-the command or with the -l option and a file.
+the command or with the \-l option and a file.
 .TP
 \fB<mountpoint>\fR The mount point for the specified DASD.
 .TP
@@ -200,19 +200,19 @@ individual data sets use a data set config file.
 \fB\-o\fR codepage_from=\fI<n>\fR
 Override EBCDIC CP1047 as the default code-page for the source. Must
 be combined with \fB\-o\fR codepage_to=\fI<n>\fR. Overrides settings
-in a data set config file. Issue iconv -l for a list of valid
+in a data set config file. Issue iconv \-l for a list of valid
 specifications for <n>.
 
 .TP
 \fB\-o\fR codepage_to=\fI<n>\fR
 Override UTF-8 as the default code-page for the target. Must be
 combined with \fB\-o\fR codepage_from=\fI<n>\fR. Overrides settings
-in a data set configu file. Issue iconv -l for a list of valid
+in a data set configu file. Issue iconv \-l for a list of valid
 specifications for <n>.
 
 .SS "Applicable FUSE options (version 2.8):"
 This is a selected subset of all FUSE options. Use the zdsfs
-\fB\--help\fR option to print a full list.
+\fB\-\-help\fR option to print a full list.
 
 .TP
 \fB\-d\fR or \fB\-o\fR debug
@@ -355,7 +355,7 @@ that begin with the leading characters.
 .br
 An explicit specification of source and target code-page overrides the default conversion tables
 The code-page specifications must be separated by a comma.
-Issue iconv -l for a list of valid code-page specifications.
+Issue iconv \-l for a list of valid code-page specifications.
 
 .PP
 
@@ -382,31 +382,31 @@ To mount the z/OS disk with space for 4 tracks and keeping the record
 descriptor words in the byte stream, enter:
 .br
 
-  # zdsfs -o rdw -o tracks=4 /dev/dasde /mnt
+  # zdsfs \-o rdw \-o tracks=4 /dev/dasde /mnt
 
 .br
 
 To unmount the z/OS disk mounted on /mnt enter:
 .br
 
-  # fusermount -u /mnt
+  # fusermount \-u /mnt
 
 To list all extended attributes of file FOOBAR.TEST.TXT
 assuming the z/OS disk was mounted on /mnt:
 
-  # getfattr -d /mnt/FOOBAR.TEST.TXT
+  # getfattr \-d /mnt/FOOBAR.TEST.TXT
 .br
 
 To mount the z/OS disk using the z/OSMF REST services for coordinated
 read access:
 
- # ./zdsfs -o restapi -o restserver=zos1.server.tld/zosmf /dev/dasde /mnt/
+ # ./zdsfs \-o restapi \-o restserver=zos1.server.tld/zosmf /dev/dasde /mnt/
 
 .br
 To mount the z/OS disk and enable code-page conversion for all data
 sets using a custom source and target code page:
 
-  # ./zdsfs -o codepage_from=CP037 -o codepage_to=ISO-8859-1 /dev/dasde /mnt/
+  # ./zdsfs \-o codepage_from=CP037 \-o codepage_to=ISO\-8859\-1 /dev/dasde /mnt/
 
 
 .SH SEE ALSO
