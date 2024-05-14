@@ -12,10 +12,10 @@ tape390_crypt \- encryption support for zSeries tape devices.
 [OPTION] [DEVICE]
 
 .SH DESCRIPTION
-.B tape390_crypt 
+.B tape390_crypt
 exploits encryption features available in zSeries tape devices.
 It can be used to enable or disable tape encryption and to set
-KEK (Key Encrypting Key) labels.	
+KEK (Key Encrypting Key) labels.
 
 .SH OPTIONS
 .TP
@@ -28,38 +28,38 @@ Print version information, then exit.
 
 .TP
 .BR "\-q" " or " "\-\-query"
-Print current encryption status of the specified tape device and of the 
+Print current encryption status of the specified tape device and of the
 loaded medium.
-If encryption is on and the medium is encrypted , 
+If encryption is on and the medium is encrypted ,
 additional information on the encryption keys is displayed.
 
 .TP
-.BR "\-e " { "on" | "off" } " " or " \-\-encryption=" { "on" | "off" } 
+.BR "\-e " { "on" | "off" } " " or " \-\-encryption=" { "on" | "off" }
 sets tape encryption on or off.
 
 .TP
 .BR "\-k <value>" [ "<char>label" | "<char>hash" ] " " or " \-\-key=<value>" [ "<char>label" | "<char>hash" ]
 sets tape encryption keys.
-.br 
+.br
 <value> specifies the KEK
 (Key Encrypting Key), which can be maximal 64 characters long.
 .br
 The store type (either label or hash) specifies how the KEK in <value> is to be stored on the tape medium. Since labels are
-human readable strings and hence more user friendly than hashes, 
+human readable strings and hence more user friendly than hashes,
 the default store type is label.
 .br
 The -k option can only be specified, if the tape medium is at load point.
 .br
 While processing the -k option, the tape medium is initialized and all
-data eventually contained on the tape medium is lost. 
-To avoid inadvertent data loss a prompt message is issued asking the user 
-whether he or she really wants to proceed. 
+data eventually contained on the tape medium is lost.
+To avoid inadvertent data loss a prompt message is issued asking the user
+whether he or she really wants to proceed.
 .br
 The -k option can be specified maximal twice, because on the tape medium
-maximal two EEDKs (External Encrypted Data Keys) can be stored. 
+maximal two EEDKs (External Encrypted Data Keys) can be stored.
 If specified once, two identical EEDKs are stored.
 .br
-<char> is a character separating the KEK in <value> from the store type 
+<char> is a character separating the KEK in <value> from the store type
 (either label or hash). This
 delimiter can be specified with the -d option as explained below.
 
@@ -68,11 +68,11 @@ delimiter can be specified with the -d option as explained below.
 specifies the character which separates the KEK
 in  <value> from the store type (either label or hash).
 The default delimiter is : (colon).
-The \-d option can only be specified together with the \-k option. 
+The \-d option can only be specified together with the \-k option.
 
 .TP
 .BR "\-f " " or " "\-\-force
-specifies that no prompt message is to be issued before writing the KEK   
+specifies that no prompt message is to be issued before writing the KEK
 information and initializing the tape medium.
 The \-f option can only be specified together with the \-k option.
 
@@ -81,19 +81,19 @@ The \-f option can only be specified together with the \-k option.
 specifies the device node of the tape device.
 
 .SH EXAMPLES
-1. Scenario: 
+1. Scenario:
 .br
-mount non-encrypted tape and write data with the 
-.B "default" 
+mount non-encrypted tape and write data with the
+.B "default"
 KEKs:
 .br
 tape390_crypt -e on /dev/ntibm0
 .br
 tar cfz /dev/ntibm0 /data
 
-2. Scenario: 
+2. Scenario:
 .br
-mount non-encrypted tape and write data with 
+mount non-encrypted tape and write data with
 .B "specific"
 KEKs:
 .br
@@ -101,7 +101,7 @@ tape390_crypt -k my_first_key -k my_second_key:hash /dev/ntibm0
 .br
 tar cfz /dev/ntibm0 /data
 
-3. Scenario: 
+3. Scenario:
 .br
 mount tape and display current encryption status:
 .br
