@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
 
 use std::{
     io::{Read, Seek, SeekFrom::Current},
@@ -20,15 +20,32 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
 /// Tweak List Digest (tld)
 /// SE Header Tag (tag)
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, AsBytes, PartialEq, Eq, FromBytes, FromZeroes)]
 pub struct BootHdrTags {
     pld: [u8; BootHdrHead::DIGEST_SIZE],
     ald: [u8; BootHdrHead::DIGEST_SIZE],
     tld: [u8; BootHdrHead::DIGEST_SIZE],
     tag: [u8; BootHdrHead::TAG_SIZE],
 }
+assert_size!(BootHdrTags, 0xd0);
 
-/// Magiv value for a SE-(boot)header
+impl AsRef<[u8]> for BootHdrTags {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl TryFrom<Vec<u8>> for BootHdrTags {
+    type Error = Error;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::ref_from(&value)
+            .ok_or_else(|| Error::InvBootHdrSize(value.len()))
+            .copied()
+    }
+}
+
+/// Magic value for a SE-(boot)header
 pub struct BootHdrMagic;
 impl MagicValue<8> for BootHdrMagic {
     const MAGIC: [u8; 8] = [0x49, 0x42, 0x4d, 0x53, 0x65, 0x63, 0x45, 0x78];
@@ -46,9 +63,9 @@ impl BootHdrTags {
         Self { ald, tld, pld, tag }
     }
 
-    /// returns false if no hdr found, true otherwise
-    /// in the very unlikel case an IO error can appear
-    /// when seeking to the beginning of  the header
+    /// Returns `false` if no hdr found, `true` otherwise.
+    /// In the very unlikely case an IO error can appear
+    /// when seeking to the beginning of the header.
     fn seek_se_hdr_start<R>(img: &mut R) -> Result<bool>
     where
         R: Read + Seek,
@@ -100,21 +117,27 @@ impl BootHdrTags {
         let mut hdr = vec![0u8; size_of::<BootHdrHead>()];
         img.read_exact(&mut hdr)?;
 
+        // Very unlikely - seek_se_hdr_start should point to a header or error-out
+        if !BootHdrMagic::starts_with_magic(&hdr) {
+            debug!("Inv magic");
+            return Err(Error::InvBootHdr);
+        }
+
         let hdr_head = match BootHdrHead::read_from_prefix(hdr.as_mut_slice()) {
             Some(hdr) => hdr,
             None => {
-                debug!("Boot hdr is to small");
+                debug!("Boot hdr is too small");
                 return Err(Error::InvBootHdr);
             }
         };
 
-        //Some sanity checks
-        if !BootHdrMagic::starts_with_magic(&hdr) || hdr_head.version.get() != 0x100 {
-            debug!("Inv magic or size");
+        // Some sanity checks
+        if hdr_head.version.get() != 0x100 {
+            debug!("Unsupported hdr-version: {:0>4x}", hdr_head.version.get());
             return Err(Error::InvBootHdr);
         }
 
-        //go to the Bot header tag
+        // go to the Boot header tag
         img.seek(Current(
             hdr_head.size.get() as i64
                 - size_of::<BootHdrHead>() as i64
@@ -218,7 +241,7 @@ mod tests {
             Err(Error::InvBootHdr)
         ));
 
-        //header is at a non expected position
+        // header is at a non expected position
         let mut img = vec![0u8; PAGESIZE];
         img[0x008..0x288].copy_from_slice(bin_hdr);
         assert!(matches!(
@@ -234,5 +257,25 @@ mod tests {
         img[0x12000..0x12280].copy_from_slice(bin_hdr);
         let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(img)).unwrap();
         assert_eq!(hdr_tags, EXP_HDR);
+    }
+
+    #[test]
+    fn tags_convert_u8() {
+        let bin_hdr = get_test_asset!("exp/secure_guest.hdr");
+        let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(*bin_hdr)).unwrap();
+        let ser: &[u8] = hdr_tags.as_ref();
+        let mut ser = ser.to_vec();
+
+        let der: BootHdrTags = ser.clone().try_into().unwrap();
+        assert_eq!(hdr_tags, der);
+
+        ser.pop();
+        let der: Result<BootHdrTags> = ser.clone().try_into();
+        assert!(matches!(der, Err(Error::InvBootHdrSize(_))));
+
+        ser.push(17);
+        ser.push(17);
+        let der: Result<BootHdrTags> = ser.clone().try_into();
+        assert!(matches!(der, Err(Error::InvBootHdrSize(_))));
     }
 }

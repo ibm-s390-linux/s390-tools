@@ -79,6 +79,9 @@ pub enum Error {
     #[error("The provided host key document in {0} contains no certificate!")]
     NoHkdInFile(String),
 
+    #[error("Invalid input size ({0}) for boot hdr")]
+    InvBootHdrSize(usize),
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),
