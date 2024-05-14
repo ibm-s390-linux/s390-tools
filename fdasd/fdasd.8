@@ -8,16 +8,16 @@ fdasd \- partitioning tool.
 .SH SYNOPSIS
 interactive mode:
 .br
-     \fBfdasd\fR [-s] [-r] [-C] \fIdevice\fR
+     \fBfdasd\fR [\-s] [\-r] [\-C] \fIdevice\fR
 .br
 command line mode:
 .br
-     \fBfdasd\fR [-s] [-r] [-C] {-a[-k|-l \fIvolser\fR]|-i|-p|-c \fIconf_file\fR}
+     \fBfdasd\fR [\-s] [\-r] [\-C] {\-a[\-k|\-l \fIvolser\fR]|\-i|\-p|\-c \fIconf_file\fR}
 [-f \fI[type,blocksize]\fR] \fIdevice\fR
 .br
 help:
 .br
-     \fBfdasd\fR {-h|-v}
+     \fBfdasd\fR {\-h|\-v}
 .SH DESCRIPTION
 \fBfdasd\fR writes a partition table to a cdl (compatible disk layout)
 formatted DASD, in the form of
@@ -30,35 +30,35 @@ will use it, otherwise it asks to write a new one.
 \fBfdasd\fR can result in loss of data.
 .SH OPTIONS
 .TP
-\fB-h\fR or \fB--help\fR
+\fB\-h\fR or \fB\-\-help\fR
 Print usage information, then exit.
 
 .TP
-\fB-v\fR or \fB--version\fR
+\fB\-v\fR or \fB\-\-version\fR
 Print version information, then exit.
 
 .TP
-\fB-s\fR or \fB--silent\fR
+\fB\-s\fR or \fB\-\-silent\fR
 Suppress messages in non-interactive mode.
 
 .TP
-\fB-r\fR or \fB--verbose\fR
+\fB\-r\fR or \fB\-\-verbose\fR
 Provide more verbose output.
 
 .TP
-\fB-a\fR or \fB--auto\fR
+\fB\-a\fR or \fB\-\-auto\fR
 Automatically create a partition using the entire disk in non-interactive
 mode.
 
 .TP
-\fB-k\fR or \fB--keep_volser\fR
+\fB\-k\fR or \fB\-\-keep_volser\fR
 Keeps the Volume Serial Number when writing the Volume Label.
 .br
 This is useful if the volume already has a Serial Number that should not be
 overwritten. This option is only applicable in non-interactive mode.
 
 .TP
-\fB-l\fR \fIvolser\fR or \fB--label\fR \fIvolser\fR
+\fB\-l\fR \fIvolser\fR or \fB\-\-label\fR \fIvolser\fR
 Specify the volume serial.
 .br
 \fIvolser\fR is interpreted as ASCII string and is automatically converted to
@@ -82,14 +82,14 @@ quotes. In addition there is a special handling for the '$' sign.
 Please specify it using '\\$' if necessary.
 .br
 
-e.g. -l 'a@b\\$c#' to get A@B$C#
+e.g. \-l 'a@b\\$c#' to get A@B$C#
 .br
 
 Omitting this parameter causes fdasd to ask for it in case it is needed.
 .br
 
 .TP
-\fB-c\fR \fIconf_file\fR or \fB--config\fR \fIconf_file\fR
+\fB\-c\fR \fIconf_file\fR or \fB\-\-config\fR \fIconf_file\fR
 Use this option to create multiple partitions according to
 specifications in a configuration file, \fIconf_file\fR.
 .br
@@ -124,37 +124,37 @@ partitions that use the entire disk:
 .br
 
 .TP
-\fB-i\fR or \fB--volser\fR
+\fB\-i\fR or \fB\-\-volser\fR
 Print the volume serial, then exit.
 
 .TP
-\fB-p\fR or \fB--table\fR
+\fB\-p\fR or \fB\-\-table\fR
 Print partition table, then exit.
 .br
-In combination with the -s option fdasd will display a short version of the
+In combination with the \-s option fdasd will display a short version of the
 partition table.
 
 .TP
-\fB-C\fR or \fB--check_host_count\fR
+\fB\-C\fR or \fB\-\-check_host_count\fR
 Force fdasd to check the host access open count to ensure the device
 is not online on another operating system instance
 
 .TP
-\fB-f\fR \fI[type,blocksize]\fR or \fB--force\fR \fI[type,blocksize]\fR
+\fB\-f\fR \fI[type,blocksize]\fR or \fB\-\-force\fR \fI[type,blocksize]\fR
 Force fdasd to work on non DASD devices.
 .br
 If fdasd is to be used on a block device that is neither a native DASD
 nor exposes the proper disk geometry of a DASD of type 3390,
-then the --force option can be used to assume the geometry of a
+then the \-\-force option can be used to assume the geometry of a
 given device type. The default device type is 3390 and the default
 block size is 4096. An optional argument of <device type>,<blocksize>
 can be used to specify type and blocksize explicitly. For example:
 
--f
+\-f
 
 has the same effect as
 
--f3390,4096 or --force=3390,4096
+\-f3390,4096 or \-\-force=3390,4096
 
 Valid device types are: 3390, 3380, 9345
 .br
