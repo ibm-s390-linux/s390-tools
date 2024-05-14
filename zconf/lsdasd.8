@@ -10,56 +10,56 @@ lsdasd \- list channel attached direct access storage devices (DASD).
 .SH SYNOPSIS
 .TP 8
 .B lsdasd
-.RB [ -h ]
+.RB [ \-h ]
 .TP 8
 .B lsdasd
-.RB [ -a ]
-.RB [ -b ]
-.RB [ -s ]
-.RB [ -v ]
-.RB [ -l ]
-.RB [ -c ]
-.RB [ -u ]
-.RB [ --version ]
-.RI [ <bus-ID> " [" <bus-ID> "] ...]]"
+.RB [ \-a ]
+.RB [ \-b ]
+.RB [ \-s ]
+.RB [ \-v ]
+.RB [ \-l ]
+.RB [ \-c ]
+.RB [ \-u ]
+.RB [ \-\-version ]
+.RI [ <bus\-ID> " [" <bus\-ID> "] ...]]"
 
 .SH DESCRIPTION
 The lsdasd command provides an overview of available DASD devices.
 
 .SH OPTIONS
 .TP 8
-.BR -h | --help
+.BR \-h | \-\-help
 Print help text.
 .TP
-.BR -s | --short
+.BR \-s | \-\-short
 Suppresses leading "0.0." for bus IDs.
 .TP
-.BR -a | --offline
+.BR \-a | \-\-offline
 Include all (offline) devices.
 .TP
-.BR -b | --base
+.BR \-b | \-\-base
 Include only base devices.
 .TP
-.BR -c | --compat
+.BR \-c | \-\-compat
 Old output of lsdasd for compatibility.
 .TP
-.BR -l | --long
+.BR \-l | \-\-long
 Extended output of lsdasd including UID and attributes.
 .TP
-.BR -u | --uid
+.BR \-u | \-\-uid
 Output includes and is sorted by UID.
 .TP
-.BR -H | --host-acces
+.BR \-H | \-\-host\-acces
 Show information about all hosts using this device.
 .TP
-.BR -v | --verbose
+.BR \-v | \-\-verbose
 Only for compatibility (and maybe future) use. This option currently does
 nothing.
 .TP
-\fB--version\fR
+\fB\-\-version\fR
 Print the version of the s390-tools package and the command.
 .TP
-\fB<bus-ID>\fR =
+\fB<bus\-ID>\fR =
 Bus ID of the device(s) that should be displayed.
 
 .SH EXAMPLES
