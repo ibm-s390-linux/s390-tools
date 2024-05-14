@@ -34,7 +34,7 @@ to support the
 feature.
 .TP 3
 3. Read in and validate the AP configuration file. By default if not
-overwritten by the --config option the AP configuration is read from
+overwritten by the \-\-config option the AP configuration is read from
 .I /etc/pvapconfig.yaml
 and syntactically verified. See section CONFIGFILE for details about
 the syntax and semantic of the configuration file.
@@ -71,31 +71,31 @@ AP config entry from the configuration and pvapconfig will return
 successfully.
 .SH OPTIONS
 .TP 8
-.B -c, --config <configfile>
+.B \-c, \-\-config <configfile>
 Use <configfile> as the AP config file for pvapconfig. If pvapconfig
 is run without this option the default configuration file
 /etc/pvapconfig.yaml is used.
 .TP 8
-.B -h, --help
+.B \-h, \-\-help
 Print pvapconfig usage information and exit.
 .TP 8
-.B -n, --dry-run
+.B \-n, \-\-dry\-run
 Do not bind, unbind or associate APQNs but only process the
 configuration and the available APQNs and secrets and simulate the
 bind, unbind or associate action on the chosen APQN. Use it together
 with the verbose option to see which actions pvapconfig would do if
 unleashed.
 .TP 8
-.B -s, --strict
+.B \-s, \-\-strict
 All AP config entries need to be satisfied to have pvapconfig
 terminate with success. Without this option one applied AP config
 entry is enough to meet the expectations.
 .TP 8
-.B -v, --verbose
+.B \-v, \-\-verbose
 Print out informational messages about what pvapconfig is actually
 doing.
 .TP 8
-.B -V, --version
+.B \-V, \-\-version
 Print version information and exit.
 .SH CONFIGFILE
 The pvapconfig yaml configuration file consists of a list of AP config
