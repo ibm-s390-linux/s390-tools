@@ -10,18 +10,18 @@ dasdstat \- read or modify the statistics of the DASD device driver.
 .SH SYNOPSIS
 .TP 8
 .B dasdstat
-.RB [ -h ]
+.RB [ \-h ]
 .TP 8
 .B dasdstat
-.RB [ -e ]
-.RB [ -d ]
-.RB [ -r ]
-.RB [ -i ]
-.RB [ -l ]
-.RB [ -c ]
-.RB [ -w ]
-.RB [ -V ]
-.RB [ -v ]
+.RB [ \-e ]
+.RB [ \-d ]
+.RB [ \-r ]
+.RB [ \-i ]
+.RB [ \-l ]
+.RB [ \-c ]
+.RB [ \-w ]
+.RB [ \-V ]
+.RB [ \-v ]
 .RI [ <statistic> " [" <statistic> "] ...]]"
 
 .SH DESCRIPTION
@@ -41,35 +41,35 @@ available statistics.
 
 .SH OPTIONS
 .TP 8
-.BR -h | --help
+.BR \-h | \-\-help
 Print help text.
 .TP
-.BR -e | --enable
+.BR \-e | \-\-enable
 Enable the statistics.
 .TP
-.BR -d | --disable
+.BR \-d | \-\-disable
 Disable the statistics.
 .TP
-.BR -r | --reset
+.BR \-r | \-\-reset
 Reset the statistics.
 .TP
-.BR -i | --directory
+.BR \-i | \-\-directory
 Specify the directory in which the statistics can be found.
 .TP
-.BR -l | --long
+.BR \-l | \-\-long
 Print more detailed information, e.g differentiate between read and
 write requests.
 .TP
-.BR -c | --columns " \fI<number>\fR"
+.BR \-c | \-\-columns " \fI<number>\fR"
 Format the output in a table with the given number of columns.
 .TP
-.BR -w | --column-width " \fI<width>\fR"
+.BR \-w | \-\-column\-width " \fI<width>\fR"
 Set the minimum width of the columns in the output table.
 .TP
-.BR -V | --verbose
+.BR \-V | \-\-verbose
 Print more verbose information.
 .TP
-.BR -v | --version
+.BR \-v | \-\-version
 Print the version of the s390-tools package and the command.
 .TP
 \fB<statistic>\fR =
@@ -81,12 +81,12 @@ Name of a statistic that the command should work on.
 Print a statistics table for each enabled statistic.
 .RE
 
-\fBdasdstat -e\fR
+\fBdasdstat \-e\fR
 .RS
 Enable all DASD statistics.
 .RE
 
-\fBdasdstat -l dasda 0.0.1800 0.0.18fe 0.0.18ff\fR
+\fBdasdstat \-l dasda 0.0.1800 0.0.18fe 0.0.18ff\fR
 .RS
 Print a detailed statistics table for DASD block device dasda and CCW
 devices 0.0.1800, 0.0.18fe and 0.0.18ff. A typical scenario for this
