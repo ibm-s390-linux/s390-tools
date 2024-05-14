@@ -40,7 +40,7 @@ You can optionally specify the device IDs of the devices to be monitored.
 The card device representation and the queue device are both in hexadecimal
 notation.
 .PP
-Use the \fB\-\-no-apqn\fP option to omit the performance measurement data of
+Use the \fB\-\-no\-apqn\fP option to omit the performance measurement data of
 the queues. If the system does not support obtaining cryptographic
 performance measurement data on the queue devices, only the card devices
 are monitored.
@@ -60,7 +60,7 @@ Average duration of the operations.
 .RE
 .PP
 The sum of all operations is displayed in a separate \fBtotals\fP line.
-Use the \fB\-\-only-totals\fP option to omit the individual counters and
+Use the \fB\-\-only\-totals\fP option to omit the individual counters and
 display the totals only. Use the \fB\-\-no\-totals\fP option to omit the
 totals.
 .PP
@@ -86,8 +86,8 @@ node is not available, you might have to load kernel module \fBchsc_sch\fP using
 .BR DEVICE_ID
 Specifies a cryptographic device for which statistics are displayed.
 A device ID can either be a card device ID
-(\fI<card-id>\fP) or a queue device (APQN) ID (\fI<card-id>.<domain-id>\fP).
-To filter all devices by domain,  provide \fI.<domain-id>\fP.
+(\fI<card\-id>\fP) or a queue device (APQN) ID (\fI<card\-id>.<domain\-id>\fP).
+To filter all devices by domain,  provide \fI.<domain\-id>\fP.
 If no IDs are given, statistics are displayed for all available devices.
 .
 .TP
@@ -113,12 +113,12 @@ future.
 .IP "\(bu" 2
 \fBTABLE:\fP Displays the statistics in a human readable simple table format.
 The individual counters are omitted, and only the totals are displayed.
-This output format implies option \fB\-\-only-totals\fP.
+This output format implies option \fB\-\-only\-totals\fP.
 .IP "\(bu" 2
 \fBCSV:\fP Displays the statistics in comma-separated values format. The values
 are separated with a semicolon. The individual counters are omitted, and only
 the totals are displayed. This output format implies option
-\fB\-\-only-totals\fP.
+\fB\-\-only\-totals\fP.
 .RE
 .
 .TP
@@ -156,7 +156,7 @@ Displays all cards devices and queue devices (APQNs), not only those that are
 available to the Linux instance. Using this option additional cryptographic
 devices that are available in the CEC, but not available to the Linux system
 are also monitored.
-This option cannot be specified together with option \fB\-\-only-online\fP.
+This option cannot be specified together with option \fB\-\-only\-online\fP.
 .
 .TP
 .BR \-O ", " \-\-only\-online
@@ -184,7 +184,7 @@ Displays version information and exits.
 .B All
 All operations on the adapter
 .TP
-.B RSA Key-gen
+.B RSA Key\-gen
 RSA-key-generation operations (also included in \fBAll\fP).
 .RE
 .PP
@@ -225,7 +225,7 @@ Symmetric-key functions that return partial or incremental results.
 .B Symm. Complete
 Symmetric-key functions that return a complete or final result.
 .TP
-.B  Asym. Key-gen
+.B  Asym. Key\-gen
 asymmetric-key generation function.
 .RE
 .PP
@@ -237,15 +237,15 @@ asymmetric-key generation function.
 .B  zcryptstats 02
 Display statistics for all cryptographic devices with card ID \fB02\fP.
 .TP
-.B zcryptstats 02.0005 --interval 5
+.B zcryptstats 02.0005 \-\-interval 5
 Display statistics for cryptographic devices with card ID \fB02\fP and domain
 ID \fB0005\fP in a 5 second interval.
 .TP
-.B zcryptstats .0005 --count 10
+.B zcryptstats .0005 \-\-count 10
 Display statistics for cryptographic devices with domain ID \fB0005\fP with the
 default interval time of 10 seconds, for 10 intervals.
 .TP
-.B  zcryptstats 02 --output JSON
+.B  zcryptstats 02 \-\-output JSON
 Display statistics for all cryptographic devices with card ID \fB02\fP in
 \fBJSON\fP output format.
 .TP
