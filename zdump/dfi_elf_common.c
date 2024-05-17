@@ -30,10 +30,6 @@ int pt_load_add(const struct zg_fh *fh, const Elf64_Phdr *phdr, void **data,
 		__func__, phdr->p_paddr, phdr->p_vaddr, phdr->p_offset, phdr->p_filesz,
 		phdr->p_memsz);
 
-	if (phdr->p_paddr != phdr->p_vaddr) {
-		STDERR("Dump file \"%s\" is a user space core dump\n", fh->path);
-		return -EINVAL;
-	}
 	if (phdr->p_memsz == 0)
 		return -EINVAL;
 	if (phdr->p_offset + phdr->p_filesz > zg_size(fh))
