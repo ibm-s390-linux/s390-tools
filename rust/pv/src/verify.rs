@@ -29,14 +29,15 @@ mod test;
 pub trait HkdVerifier {
     /// Checks if the given host-key document can be trusted.
     ///
-    /// #Errors
+    /// # Errors
     ///
-    /// This function will return an error if the Hostkey cannot be trusted.
-    /// Refer to the concrete Error type for the specific reason.
+    /// This function will return an error if the host-key document cannot be
+    /// trusted. Refer to the concrete Error type for the specific reason.
     fn verify(&self, hkd: &X509Ref) -> Result<()>;
 }
 
-/// A "verifier" that does not verify and accepts all given host-keys as valid.
+/// A verifier that does not verify and accepts all given host-keys as valid.
+#[derive(Debug)]
 pub struct NoVerifyHkd;
 impl HkdVerifier for NoVerifyHkd {
     fn verify(&self, _hkd: &X509Ref) -> Result<()> {
@@ -44,7 +45,7 @@ impl HkdVerifier for NoVerifyHkd {
     }
 }
 
-/// A Verifier that checks the host-key document against a chain of trust.
+/// A verifier that checks the host-key document against a chain of trust.
 pub struct CertVerifier {
     store: X509Store,
     ibm_z_sign_key: X509,
@@ -68,15 +69,15 @@ impl HkdVerifier for CertVerifier {
     fn verify(&self, hkd: &X509Ref) -> Result<()> {
         helper::verify_hkd_options(hkd, &self.ibm_z_sign_key)?;
 
-        // verify that the hkd was signed with the key of the IBM signing key
+        // verify that the HKD was signed with the key of the IBM signing key
         if !hkd.verify(self.ibm_z_sign_key.public_key()?.as_ref())? {
             bail_hkd_verify!(Signature);
         }
 
-        // Find matching crl for sign key in the store or download them
+        // Find matching CRL for sign key in the store or download them
         let crls = self.hkd_crls(hkd)?;
 
-        // Verify that the CLRs are still valid
+        // Verify that the CRLs are still valid
         let mut verified_crls = Vec::with_capacity(crls.len());
         for crl in &crls {
             if helper::verify_crl(crl, &self.ibm_z_sign_key).is_some() {
@@ -84,7 +85,7 @@ impl HkdVerifier for CertVerifier {
             }
         }
 
-        // Test if hkd was revoked (min1 required)
+        // Test if HKD was revoked (min1 required)
         if verified_crls.is_empty() {
             bail_hkd_verify!(NoCrl);
         }
@@ -127,7 +128,7 @@ impl CertVerifier {
             }
         }
 
-        // reorder unchanged loaciliy subject
+        // reorder unchanged locality subject
         trace!("quirk_crls: Try Reorder");
         if let Ok(ordered_subject) = helper::reorder_x509_names(subject) {
             match ctx.crls(&ordered_subject) {
@@ -139,7 +140,7 @@ impl CertVerifier {
         Stack::new()
     }
 
-    ///Download the CLRs that a HKD refers to.
+    /// Download the CRLs that a HKD refers to.
     pub fn hkd_crls(&self, hkd: &X509Ref) -> Result<Stack<StackableX509Crl>> {
         let mut ctx = X509StoreContext::new()?;
         // Unfortunately we cannot use a dedicated function here and have to use a closure (E0434)
@@ -168,6 +169,7 @@ impl CertVerifier {
     /// * `root_ca_path` - Path to the root of trust
     /// * `offline` - if set to true the verification process will not try to download CRLs from the
     /// internet.
+    ///
     /// # Errors
     ///
     /// This function will return an error if the chain of trust could not be established.

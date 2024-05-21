@@ -11,7 +11,7 @@ use byteorder::{BigEndian, ByteOrder};
 use std::{fmt::Display, mem::size_of};
 use zerocopy::{AsBytes, U16};
 
-/// The magic value used to identify an add-secret request`]
+/// The magic value used to identify an ['crate:AddSecretRequest']
 ///
 /// The magic value is ASCII:
 /// ```rust
@@ -78,11 +78,11 @@ pub enum UserDataType {
     Null = 0x0000,
     /// Arbitrary user data (max 512 bytes)
     Unsigned = 0x0001,
-    /// User data message signed with an Ec key, (max 256 byte)
+    /// User data message signed with an EC key, (max 256 byte)
     SgnEcSECP521R1 = 0x0002,
-    /// User data message signature with a Rsa key of 2048 bit size, (max 256 byte)
+    /// User data message signature with a RSA key of 2048 bit size, (max 256 byte)
     SgnRsa2048 = 0x0003,
-    /// User data message signature with a Rsa key of 3072 bit size, (max 128 byte)
+    /// User data message signature with a RSA key of 3072 bit size, (max 128 byte)
     SgnRsa3072 = 0x0004,
 }
 

@@ -33,7 +33,7 @@ pub use info::UvDeviceInfo;
 /// User data for the attestation UVC
 pub type AttestationUserData = [u8; ffi::UVIO_ATT_USER_DATA_LEN];
 
-///Configuration Unique Id of the Secure Execution guest
+/// Configuration Unique Id of the Secure Execution guest
 pub type ConfigUid = [u8; ffi::UVIO_ATT_UID_LEN];
 
 /// Bitflags as used by the Ultravisor in MSB0 ordering
@@ -61,7 +61,7 @@ fn ioctl_raw(raw_fd: RawFd, cmd: c_ulong, cb: &mut IoctlCb) -> Result<()> {
     debug!("ioctl resulted with {cb:?}");
     match rc {
         0 => Ok(()),
-        //NOTE io::Error handles all errnos ioctl uses
+        // NOTE io::Error handles all errnos ioctl uses
         _ => Err(std::io::Error::last_os_error().into()),
     }
 }
@@ -84,24 +84,25 @@ fn rc_fmt<C: UvCmd>(rc: u16, rrc: u16, cmd: &mut C) -> &'static str {
 }
 
 /// Ultravisor Command.
-
 ///
 /// Implementers provide information on the specific Ultravisor command metadata and content.
 /// API users do not need to interact directly with any functions provided by this trait and refer
-/// to the specialized access and tweaking functionalities of the specivic command.
+/// to the specialized access and tweaking functionalities of the specific command.
 pub trait UvCmd {
     /// The UV IOCTL number of the UV call
     const UV_IOCTL_NR: u8;
     /// Returns the uvdevice IOCTL command that his command uses.
     ///
     /// # Returns
-    /// The IOCTL cmd for this UvCmd usually sth like `uv_ioctl!(CMD_NR)`
+    ///
+    /// The IOCTL cmd for this UvCmd usually something like `uv_ioctl!(CMD_NR)`
     fn cmd(&self) -> u64 {
         uv_ioctl(Self::UV_IOCTL_NR)
     }
     /// Converts UV return codes into human readable error messages
     ///
     /// # Note for implementations
+    ///
     /// No need to handle `0x0000, 0x0001, 0x0002, 0x0005, 0x0030, 0x0031, 0x0032, 0x0100`
     fn rc_fmt(&self, rc: u16, rrc: u16) -> Option<&'static str>;
 
@@ -168,7 +169,7 @@ pub enum UvcSuccess {
 ///
 /// # Example
 ///
-/// Use a implementation of [`UvCmd`] to send a specific Ultravisor cammand to the uvevice to
+/// Use a implementation of [`UvCmd`] to send a specific Ultravisor command to the uvdevice to
 /// forward to Firmware.
 ///
 /// ```rust,no_run
@@ -215,12 +216,15 @@ impl UvDevice {
     /// Send an Ultravisor Command via this uvdevice.
     ///
     /// This works by sending an IOCTL to the uvdevice.
+    ///
     /// # Errors
     ///
     /// This function will return an error if the IOCTL fails or the Ultravisor does not report
     /// a success.
+    ///
     /// # Returns
-    /// [`UvcSuccess`] if the UVC ececuted successfully
+    ///
+    /// [`UvcSuccess`] if the UVC executed successfully
     pub fn send_cmd<C: UvCmd>(&self, cmd: &mut C) -> Result<UvcSuccess> {
         let mut cb = IoctlCb::new(cmd.data())?;
         ioctl_raw(self.0.as_raw_fd(), cmd.cmd(), &mut cb)?;

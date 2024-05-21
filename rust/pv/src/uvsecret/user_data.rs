@@ -116,7 +116,7 @@ impl UserData {
     ///
     /// Verifies that the provided data + signature fits into 512 bytes
     ///
-    /// #Error
+    /// # Error
     /// An error is reported if the provided data and the signature would not fit into 512 bytes
     /// An error is reported if the key is not of type RSA (2048|3072) or EC(specp521r1)
     pub(super) fn new(sign_key: Option<PKey<Private>>, data: Vec<u8>) -> Result<Self> {
@@ -245,7 +245,7 @@ fn check_key_format(kind: UserDataType, key: &PKeyRef<Public>) -> Result<()> {
 ///
 /// Extracrted user-data if available
 ///
-/// #Errors
+/// # Errors
 ///
 /// returns an error if
 /// - No sound add-secret request presented
@@ -316,6 +316,7 @@ impl VerifiedUserData {
     /// Overwrites the signature in the buf with zeros.
     ///
     /// #Panics
+    ///
     /// Panics it provided buffer is smaller that 512 bytes or kind is Null or Unsigned
     fn new(buf: &mut [u8], kind: UserDataType) -> Self {
         assert!(buf.len() >= 0x200);

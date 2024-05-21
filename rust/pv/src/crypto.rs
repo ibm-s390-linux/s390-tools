@@ -19,7 +19,6 @@ use openssl::{
 use std::{convert::TryInto, ops::Range};
 
 /// An AES256-key that will purge itself out of the memory when going out of scope
-///
 pub type Aes256Key = Confidential<[u8; 32]>;
 pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
 
@@ -29,7 +28,6 @@ pub(crate) const SHA_256_HASH_SIZE: u32 = 32;
 pub(crate) type Sha256Hash = [u8; SHA_256_HASH_SIZE as usize];
 
 /// Types of symmetric keys, to specify during construction.
-///
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymKeyType {
@@ -38,7 +36,6 @@ pub enum SymKeyType {
 }
 
 /// Types of symmetric keys
-///
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymKey {
@@ -464,9 +461,8 @@ mod tests {
 
     #[test]
     fn hmac_sha512_rfc_4868() {
-        /* use a  test vector with key=64bytes of RFC 4868:
-         * https://www.rfc-editor.org/rfc/rfc4868.html#section-2.7.2.3
-         */
+        // use a  test vector with key=64bytes of RFC 4868:
+        // https://www.rfc-editor.org/rfc/rfc4868.html#section-2.7.2.3
         let key = [0xb; 64];
         let data = [0x48, 0x69, 0x20, 0x54, 0x68, 0x65, 0x72, 0x65];
 

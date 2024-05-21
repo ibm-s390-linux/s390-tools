@@ -84,7 +84,8 @@ pub const UVIO_ATT_UID_LEN: usize = 0x10;
 ///
 /// If the Retrieve Attestation Measurement UV facility is not present,
 /// UV will return invalid command rc.
-/// Obviously all numbers are in BIG-endian!
+///
+/// All numbers are in big-endian!
 #[repr(C)]
 #[derive(Debug, AsBytes, FromZeroes, FromBytes)]
 pub struct uvio_attest {

@@ -33,7 +33,7 @@ const SECURITY_BITS_ARRAY: [u32; 6] = [0, 80, 112, 128, 192, 256];
 const SECURITY_BITS: u32 = SECURITY_BITS_ARRAY[SECURITY_LEVEL];
 const SECURITY_CHAIN_MAX_LEN: c_int = 2;
 
-/// verifies that the HKD
+/// Verifies that the HKD
 /// * has enough security bits
 /// * is inside its validity period
 /// * the Authority Key ID matches the Signing Key ID of the  [`sign_key`]
@@ -45,8 +45,8 @@ pub fn verify_hkd_options(hkd: &X509Ref, sign_key: &X509Ref) -> Result<()> {
         return Err(Error::HkdVerify(SecurityBits(security_bits, SECURITY_BITS)));
     }
     // TODO rust-openssl fix X509::not.after/before() impl to return Option& not panic on nullptr from C?
-    //try_... rust-openssl
-    // verify that the hkd is still valid
+    // try_... rust-openssl
+    // verify that the HKD is still valid
     check_validity_period(hkd.not_before(), hkd.not_after())?;
 
     // verify that the AKID of the hkd matches the SKID of the issuer
@@ -303,8 +303,8 @@ pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
 /// Searches for CRL Distribution points and downloads the CRL. Stops after the first successful
 /// download.
 ///
-/// Error if sth bad(=unexpected) happens (not bad: crl not available at link, unexpected format)
-/// Other  issues are mapped to Ok(None)
+/// Error if something bad(=unexpected) happens (not bad: CRL not available at link, unexpected format)
+/// Other issues are mapped to Ok(None)
 #[cfg(not(test))]
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl::x509::X509Crl>>> {
     use crate::utils::read_crls;

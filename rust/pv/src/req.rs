@@ -89,7 +89,9 @@ impl Keyslot {
 impl Encrypt for Keyslot {
     /// Encrypts the given request protection key `prot_key`.
     ///
-    /// The AES256 encryption key is derived from `self` as public key, and `priv_key` as private key.
+    /// The AES256 encryption key is derived from `self` as public key, and `priv_key` as private
+    /// key.
+    ///
     /// # Returns
     /// The encrypted Keyslot.
     ///
@@ -151,7 +153,7 @@ impl ReqEncrCtx {
             prot_key,
         })
     }
-    ///
+
     /// Create a new encryption context with random input values.
     ///
     /// # Errors
@@ -204,7 +206,7 @@ impl ReqEncrCtx {
         }?;
         let mut auth_data: Vec<u8> = Vec::with_capacity(2048);
 
-        //reserve space for the request header
+        // reserve space for the request header
         auth_data.resize(std::mem::size_of::<RequestHdr>(), 0);
 
         for a in aad {
@@ -231,7 +233,7 @@ impl ReqEncrCtx {
         Ok(auth_data)
     }
 
-    /// get the public coordinates from the private key (Customer private key)
+    /// Get the public coordinates from the private key (Customer private key)
     /// # Errors
     ///
     /// This function will return an error if the public key could not be extracted by OpenSSL.
@@ -240,7 +242,7 @@ impl ReqEncrCtx {
         self.priv_key.as_ref().try_into().map_err(Error::Crypto)
     }
 
-    /// Encrypt confidential Data with this encryption context and provide a gcm tag.
+    /// Encrypt confidential Data with this encryption context and provide a GCM tag.
     ///
     /// * `aad` - additional authentic data
     /// * `conf` - data to be encrypted
@@ -273,8 +275,8 @@ impl AsRef<[u8]> for EcdhPubkeyCoord {
     }
 }
 
-/// Get the pub ecdh coordinates in the format the Ultravisor expects it:
-/// The two coordinates are pdadded to 80 bytes each.
+/// Get the pub ECDH coordinates in the format the Ultravisor expects it:
+/// The two coordinates are padded to 80 bytes each.
 fn get_pub_ecdh_points(pkey: &EcPointRef, grp: &EcGroupRef) -> Result<[u8; 160], ErrorStack> {
     const ECDH_PUB_KEY_COORD_POINT_SIZE: i32 = 0x50;
     let mut x = BigNum::new()?;
@@ -290,6 +292,7 @@ macro_rules! ecdh_from {
     ($type: ty) => {
         impl TryFrom<&PKeyRef<$type>> for EcdhPubkeyCoord {
             type Error = ErrorStack;
+
             fn try_from(key: &PKeyRef<$type>) -> Result<Self, Self::Error> {
                 let k = key.ec_key()?;
                 k.check_key()?;
@@ -348,9 +351,9 @@ impl RequestHdr {
 /// `ReqEncrCtx` when implementing `encrypt`. A hostkey should be represented by [`Keyslot`] during
 /// encryption.
 ///
-/// An UV request consists of an authenticated area (AAD), an encrypted area (Encr) and a 16 byte tag.
-/// The AAD contains a general header and Request type defined data (including Keyslots).
-/// It is encrypted with an Request protection key (symmetric). This key is encrypted with a
+/// An UV request consists of an authenticated area (AAD), an encrypted area (Encr) and a 16 byte
+/// tag. The AAD contains a general header and Request type defined data (including Keyslots). It
+/// is encrypted with an Request protection key (symmetric). This key is encrypted with a
 /// (generated) private key and the public key of the host system (Host key)
 /// ```none
 ///  _______________________________________________________________
@@ -364,7 +367,7 @@ impl RequestHdr {
 ///  |     ----------------------------------------------------    |
 ///  |                   AES GCM Tag (16)                          |
 ///  |_____________________________________________________________|
-///```
+/// ```
 pub trait Request {
     /// Encrypt the request into its binary format
     ///
@@ -451,7 +454,7 @@ impl<'a> BinReqValues<'a> {
     /// Returns a reference to the request dependent authenticated area of this [`BinReqValues`]
     /// already interpreted.
     ///
-    /// If target struct is larger than the request dependend-aad None is returned. See
+    /// If target struct is larger than the request depended-AAD None is returned. See
     /// [`FromBytes::ref_from_prefix`]
     pub fn req_dep_aad<T>(&self) -> Option<&T>
     where
@@ -489,15 +492,15 @@ mod tests {
             .unwrap();
 
         let mut aad_exp = vec![
-            0x12, 0x34, 0x56, 0x89, 0xab, 0xcd, 0xef, 0, //progr
+            0x12, 0x34, 0x56, 0x89, 0xab, 0xcd, 0xef, 0, // progr
             0, 0, 2, 0, // vers
-            0, 0, 0, 168, //size
+            0, 0, 0, 168, // size
             0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, // iv
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //res
-            1, //nks
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // res
+            1, // nks
             0, 0, 0, 0, // res
             0, 0, 0, 16, // sea
-            0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, //aad
+            0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, // aad
         ];
         aad_exp.extend_from_slice(get_test_asset!("exp/keyslot.bin"));
         assert_eq!(&aad, &aad_exp);
@@ -548,12 +551,12 @@ mod tests {
         let hdr = RequestHdr::new(0x200, 22, [0x11; 12], 15, 44, None);
         let hdr_bin = hdr.as_bytes();
         let hdr_bin_exp = [
-            0u8, 0, 0, 0, 0, 0, 0, 0, //magic
+            0u8, 0, 0, 0, 0, 0, 0, 0, // magic
             0, 0, 2, 0, // vers
-            0, 0, 0, 22, //size
+            0, 0, 0, 22, // size
             0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, // iv
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //res
-            15, //nks
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // res
+            15, // nks
             0, 0, 0, 0, // res
             0, 0, 0, 44, // sea
         ];
@@ -565,12 +568,12 @@ mod tests {
         let mut hdr = RequestHdr::new(0x200, 0x1234, [0x11; 12], 15, 44, Some(TEST_MAGIC));
         let hdr_bin = hdr.as_bytes_mut();
         let hdr_bin_exp = [
-            0x12, 0x34, 0x56, 0x89, 0xab, 0xcd, 0xef, 0, //magic
+            0x12, 0x34, 0x56, 0x89, 0xab, 0xcd, 0xef, 0, // magic
             0, 0, 2, 0, // vers
             0, 0, 0x12, 0x34, //size
             0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, // iv
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //res
-            15, //nks
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // res
+            15, // nks
             0, 0, 0, 0, // res
             0, 0, 0, 44, // sea
         ];

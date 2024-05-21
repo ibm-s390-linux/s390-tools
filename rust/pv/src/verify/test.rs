@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::test_utils::*;
 
-//mock function
+// Mock function
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<X509Crl>>> {
     fn mock_download<P: AsRef<Path>>(path: P) -> Result<Vec<X509Crl>> {
         read_crls(&std::fs::read(path)?)

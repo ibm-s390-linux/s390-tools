@@ -43,7 +43,7 @@ pub enum Error {
     #[error("Provided binary request is too small")]
     BinRequestSmall,
 
-    #[error("No Config UID found: {0}")]
+    #[error("No Configuration UID found: {0}")]
     NoCuid(String),
 
     // errors from request types
@@ -118,12 +118,11 @@ pub enum Error {
 // used in macros
 #[doc(hidden)]
 impl Error {
-    pub const CRL: &'static str = "CRL";
     pub const CERT: &'static str = "certificate";
+    pub const CRL: &'static str = "CRL";
 }
 
 /// Error cases for verifying host-key documents
-///
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
 #[non_exhaustive]

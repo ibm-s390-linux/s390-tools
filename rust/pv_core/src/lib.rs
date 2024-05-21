@@ -39,14 +39,14 @@ pub mod uv {
 
 /// Functionalities to verify UV requests
 pub mod request {
-    /// Version number of the request in system-endian
+    /// Version number of the request in system endianness
     pub type RequestVersion = u32;
     /// Request magic value
     ///
     /// The first 8 byte of a request providing an identifier of the request type
     /// for programs
     pub type RequestMagic = [u8; 8];
-    /// A `MagicValue` is a bytepattern, that indicates if a byte slice contains the specified
+    /// A `MagicValue` is a byte pattern, that indicates if a byte slice contains the specified
     /// (binary) data.
     pub trait MagicValue<const N: usize> {
         /// Magic value as byte array

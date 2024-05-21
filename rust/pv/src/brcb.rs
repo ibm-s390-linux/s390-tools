@@ -18,7 +18,7 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
 /// Page List Digest (pld)
 /// Address List Digest (ald)
 /// Tweak List Digest (tld)
-/// SE Header Tag (tag)
+/// SE-Header Tag (tag)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes, PartialEq, Eq, FromBytes, FromZeroes)]
 pub struct BootHdrTags {
@@ -52,7 +52,7 @@ impl MagicValue<8> for BootHdrMagic {
 }
 
 impl BootHdrTags {
-    /// Returns a reference to the SE-hdr tag of this [`BootHdrTags`].
+    /// Returns a reference to the SE-header tag of this [`BootHdrTags`].
     pub fn tag(&self) -> &[u8; 16] {
         &self.tag
     }
@@ -63,7 +63,7 @@ impl BootHdrTags {
         Self { ald, tld, pld, tag }
     }
 
-    /// Returns `false` if no hdr found, `true` otherwise.
+    /// Returns `false` if no SE-header found, `true` otherwise.
     /// In the very unlikely case an IO error can appear
     /// when seeking to the beginning of the header.
     fn seek_se_hdr_start<R>(img: &mut R) -> Result<bool>
