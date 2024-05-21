@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
+
+use crate::secret::UserDataType;
 
 /// Result type for this crate
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -68,6 +70,15 @@ pub enum Error {
     )]
     AsrcbUserDataSgnFail,
 
+    #[error("The provided Host Key Document in '{hkd}' is not in PEM or DER format")]
+    HkdNotPemOrDer {
+        hkd: String,
+        source: openssl::error::ErrorStack,
+    },
+
+    #[error("The provided host key document in {0} contains no certificate!")]
+    NoHkdInFile(String),
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),
@@ -97,7 +108,7 @@ pub enum HkdVerifyErrorType {
     #[error("No valid CRL found")]
     NoCrl,
     #[error("Host-key document is revoked.")]
-    HdkRevoked,
+    HkdRevoked,
     #[error("Not enough bits of security. ({0}, {1} expected)")]
     SecurityBits(u32, u32),
     #[error("Authority Key Id mismatch")]
@@ -126,5 +137,3 @@ macro_rules! bail_hkd_verify {
     };
 }
 pub(crate) use bail_hkd_verify;
-
-use crate::request::uvsecret::UserDataType;

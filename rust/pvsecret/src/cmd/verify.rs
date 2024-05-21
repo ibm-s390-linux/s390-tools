@@ -1,14 +1,12 @@
+use crate::cli::VerifyOpt;
 use anyhow::{anyhow, Context, Result};
 use log::warn;
+use pv::misc::{read_certs, read_file};
 use pv::{
-    misc::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg, read_certs, read_file},
-    request::{
-        openssl::pkey::{PKey, Public},
-        uvsecret::verify_asrcb_and_get_user_data,
-    },
+    request::openssl::pkey::{PKey, Public},
+    secret::verify_asrcb_and_get_user_data,
 };
-
-use crate::cli::VerifyOpt;
+use utils::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg};
 
 /// read the content of a DER or PEM x509 and return the public key
 fn read_sgn_key(path: &str) -> Result<PKey<Public>> {

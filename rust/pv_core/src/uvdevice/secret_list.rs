@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2024
 
+use crate::assert_size;
+use crate::{misc::to_u16, uv::ListCmd, uvdevice::UvCmd, Error, Result};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
@@ -10,10 +12,7 @@ use std::{
     slice::Iter,
     vec::IntoIter,
 };
-use utils::assert_size;
 use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
-
-use crate::{misc::to_u16, uv::ListCmd, uvdevice::UvCmd, Error, Result};
 
 /// The 32 byte long ID of an UV secret
 ///
@@ -94,7 +93,7 @@ impl SecretEntry {
 
     /// Create a new entry for a [`SecretList`].
     ///
-    /// The content of this entry will very liekly not represent the status of the guest in the
+    /// The content of this entry will very likely not represent the status of the guest in the
     /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
     pub fn new(index: u16, stype: ListableSecretType, id: SecretId, secret_len: u32) -> Self {
         Self {
@@ -180,7 +179,7 @@ impl FromIterator<SecretEntry> for SecretList {
 impl SecretList {
     /// Creates a new SecretList.
     ///
-    /// The content of this list will very liekly not represent the status of the guest in the
+    /// The content of this list will very likely not represent the status of the guest in the
     /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
     pub fn new(total_num_secrets: u16, secrets: Vec<SecretEntry>) -> Self {
         Self {

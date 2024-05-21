@@ -5,19 +5,17 @@
 use super::user_data::UserData;
 use crate::{
     assert_size,
-    crypto::AesGcmResult,
+    crypto::{hkdf_rfc_5869, AesGcmResult},
     misc::Flags,
-    request::{
-        hkdf_rfc_5869,
-        openssl::{
-            pkey::{PKey, Private, Public},
-            Md,
-        },
-        uvsecret::{ExtSecret, GuestSecret},
-        Aad, BootHdrTags, Keyslot, ReqEncrCtx, Request, Secret,
-    },
+    req::{Aad, Keyslot, ReqEncrCtx},
+    request::{BootHdrTags, Confidential, Request},
+    secret::{ExtSecret, GuestSecret},
     uv::{ConfigUid, UvFlags},
     Result,
+};
+use openssl::{
+    md::Md,
+    pkey::{PKey, Private, Public},
 };
 use pv_core::request::RequestVersion;
 use zerocopy::AsBytes;
@@ -47,11 +45,11 @@ impl ReqAuthData {
 #[derive(Debug)]
 struct ReqConfData {
     secret: GuestSecret,
-    extension_secret: Secret<[u8; 32]>,
+    extension_secret: Confidential<[u8; 32]>,
 }
 
 impl ReqConfData {
-    fn to_bytes(&self) -> Secret<Vec<u8>> {
+    fn to_bytes(&self) -> Confidential<Vec<u8>> {
         let secret = self.secret.confidential();
 
         let mut v = vec![0; secret.len() + 32];
@@ -110,7 +108,7 @@ impl From<AddSecretVersion> for RequestVersion {
 
 /// Add-secret request Control Block
 ///
-/// An ASRCB wraps a secret to transport it securely to the Ultravisor.
+/// An ASRCB wraps a secret to securely transport it to the Ultravisor.
 ///
 /// Layout:
 ///```none
@@ -159,7 +157,7 @@ impl AddSecretRequest {
     ) -> Self {
         AddSecretRequest {
             conf: ReqConfData {
-                extension_secret: Secret::new([0; 32]),
+                extension_secret: Confidential::new([0; 32]),
                 secret,
             },
             aad: ReqAuthData::new(boot_tags, flags),
@@ -186,7 +184,7 @@ impl AddSecretRequest {
             ExtSecret::Derived(cck) => hkdf_rfc_5869(
                 Md::sha512(),
                 cck.value(),
-                self.aad.boot_tags.seht(),
+                self.aad.boot_tags.tag(),
                 DER_EXT_SECRET_INFO,
             )?
             .into(),
@@ -210,8 +208,12 @@ impl AddSecretRequest {
     /// - RSA 3072 bit (up to 128 byte message)
     ///
     /// The signature can be verified during the verification of the secret-request  on the target machine.
-    pub fn set_user_data(&mut self, msg: Vec<u8>, skey: Option<PKey<Private>>) -> Result<()> {
-        self.user_data = UserData::new(skey, msg)?;
+    pub fn set_user_data<T: Into<Vec<u8>>>(
+        &mut self,
+        msg: T,
+        skey: Option<PKey<Private>>,
+    ) -> Result<()> {
+        self.user_data = UserData::new(skey, msg.into())?;
         Ok(())
     }
 

@@ -44,5 +44,6 @@ impl Log for PvLogger {
             }
         }
     }
+
     fn flush(&self) {}
 }

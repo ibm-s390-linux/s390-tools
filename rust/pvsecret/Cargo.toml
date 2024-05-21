@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 anyhow = { version = "1.0.70", features = ["std"] }
-clap = { version ="4", features = ["derive", "wrap_help"]}
+clap = { version ="4.1", features = ["derive", "wrap_help"]}
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 serde_yaml = "0.9"
 

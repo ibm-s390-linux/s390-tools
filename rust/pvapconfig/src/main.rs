@@ -18,7 +18,7 @@ use config::{ApConfigEntry, ApConfigList};
 use helper::{LockFile, PATH_PVAPCONFIG_LOCK};
 use pv_core::uv::{ListableSecretType, SecretList};
 use std::process::ExitCode;
-use utils::release_string;
+use utils::print_version;
 
 /// Simple macro for
 ///   if Cli::verbose() {
@@ -58,11 +58,7 @@ macro_rules! on_error_print_and_exit {
 fn main() -> ExitCode {
     // handle version option
     if cli::ARGS.version {
-        println!(
-            "{} version {}\nCopyright IBM Corp. 2023",
-            env!("CARGO_PKG_NAME"),
-            release_string!()
-        );
+        print_version!(0, "2023");
         return ExitCode::SUCCESS;
     }
 

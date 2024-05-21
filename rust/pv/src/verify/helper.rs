@@ -20,8 +20,9 @@ use openssl::{
     },
 };
 use openssl_extensions::akid::{AkidCheckResult, AkidExtension};
+use std::path::Path;
 use std::str::from_utf8;
-use std::{cmp::Ordering, ffi::c_int, usize};
+use std::{cmp::Ordering, ffi::c_int};
 
 /// Minimum security level for the keys/certificates used to establish a chain of
 /// trust (see https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html
@@ -75,9 +76,9 @@ pub fn verify_crl(crl: &X509CrlRef, issuer: &X509Ref) -> Option<()> {
 
 /// Setup the x509Store such that it can be used it for verifying certificates
 pub fn store_setup(
-    root_ca_path: &Option<String>,
-    crl_paths: &[String],
-    cert_w_crl_paths: &[String],
+    root_ca_path: Option<&Path>,
+    crl_paths: &[&Path],
+    cert_w_crl_paths: &[&Path],
 ) -> Result<X509StoreBuilder> {
     let mut x509store = X509StoreBuilder::new()?;
 
@@ -88,7 +89,7 @@ pub fn store_setup(
 
     for crl in crl_paths {
         load_crl_to_store(&mut x509store, crl, true).map_err(|source| Error::X509Load {
-            path: crl.to_owned(),
+            path: crl.display().to_string(),
             ty: Error::CRL,
             source,
         })?;
@@ -96,7 +97,7 @@ pub fn store_setup(
 
     for crl in cert_w_crl_paths {
         load_crl_to_store(&mut x509store, crl, false).map_err(|source| Error::X509Load {
-            path: crl.to_owned(),
+            path: crl.display().to_string(),
             ty: Error::CRL,
             source,
         })?;
@@ -235,7 +236,7 @@ fn get_ibm_z_sign_key(certs: &[X509]) -> Result<X509> {
     }
 }
 
-fn load_root_ca(path: &str, x509_store: &mut X509StoreBuilder) -> Result<()> {
+fn load_root_ca(path: &Path, x509_store: &mut X509StoreBuilder) -> Result<()> {
     let lu = x509_store.add_lookup(X509Lookup::<File>::file())?;
 
     // Try to load cert as PEM file
@@ -249,7 +250,7 @@ fn load_root_ca(path: &str, x509_store: &mut X509StoreBuilder) -> Result<()> {
             .load_cert_file(path, SslFiletype::ASN1)
             .map(|_| ())
             .map_err(|source| Error::X509Load {
-                path: path.to_string(),
+                path: path.display().to_string(),
                 ty: Error::CERT,
                 source,
             }),
@@ -258,7 +259,7 @@ fn load_root_ca(path: &str, x509_store: &mut X509StoreBuilder) -> Result<()> {
 
 fn load_crl_to_store(
     x509_store: &mut X509StoreBuilder,
-    path: &str,
+    path: &Path,
     err_out_empty_crl: bool,
 ) -> std::result::Result<(), openssl::error::ErrorStack> {
     let lu = x509_store.add_lookup(X509Lookup::<File>::file())?;
@@ -306,7 +307,7 @@ pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
 /// Other  issues are mapped to Ok(None)
 #[cfg(not(test))]
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl::x509::X509Crl>>> {
-    use crate::misc::read_crls;
+    use crate::utils::read_crls;
     use curl::easy::{Easy2, Handler, WriteError};
     use std::time::Duration;
     const CRL_TIMEOUT_MAX: Duration = Duration::from_secs(3);

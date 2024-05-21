@@ -5,10 +5,8 @@
 use crate::cli::{ListSecretOpt, ListSecretOutputType};
 use anyhow::{Context, Result};
 use log::warn;
-use pv::{
-    misc::{get_writer_from_cli_file_arg, STDOUT},
-    uv::{ListCmd, SecretList, UvDevice, UvcSuccess},
-};
+use pv::uv::{ListCmd, SecretList, UvDevice, UvcSuccess};
+use utils::{get_writer_from_cli_file_arg, STDOUT};
 
 /// Do a List Secrets UVC
 pub fn list(opt: &ListSecretOpt) -> Result<()> {

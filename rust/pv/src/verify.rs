@@ -9,6 +9,7 @@ use openssl::stack::Stack;
 use openssl::x509::store::X509Store;
 use openssl::x509::{CrlStatus, X509NameRef, X509Ref, X509StoreContext, X509StoreContextRef, X509};
 use openssl_extensions::crl::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
+use std::path::Path;
 
 #[cfg(not(test))]
 use helper::download_first_crl_from_x509;
@@ -90,7 +91,7 @@ impl HkdVerifier for CertVerifier {
         for crl in verified_crls {
             match crl.get_by_serial(hkd.serial_number()) {
                 CrlStatus::NotRevoked => (),
-                _ => bail_hkd_verify!(HdkRevoked),
+                _ => bail_hkd_verify!(HkdRevoked),
             }
         }
         debug!("HKD: verified");
@@ -162,7 +163,7 @@ impl CertVerifier {
 impl CertVerifier {
     /// Create a `CertVerifier`.
     ///
-    /// * `cert_paths` - Paths to Cerificates for the chain of trust
+    /// * `cert_paths` - Paths to certificates for the chain of trust
     /// * `crl_paths` - Paths to certificate revocation lists for the chain of trust
     /// * `root_ca_path` - Path to the root of trust
     /// * `offline` - if set to true the verification process will not try to download CRLs from the
@@ -171,9 +172,9 @@ impl CertVerifier {
     ///
     /// This function will return an error if the chain of trust could not be established.
     pub fn new(
-        cert_paths: &[String],
-        crl_paths: &[String],
-        root_ca_path: &Option<String>,
+        cert_paths: &[&Path],
+        crl_paths: &[&Path],
+        root_ca_path: Option<&Path>,
         offline: bool,
     ) -> Result<Self> {
         let mut store = helper::store_setup(root_ca_path, crl_paths, cert_paths)?;

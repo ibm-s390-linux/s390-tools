@@ -8,9 +8,8 @@ use std::{
 };
 
 // (SE) boot request control block aka SE header
-use crate::{assert_size, static_assert, Error, Result, PAGESIZE};
+use crate::{assert_size, request::MagicValue, static_assert, Error, Result, PAGESIZE};
 use log::debug;
-use pv_core::request::MagicValue;
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
 
 /// Struct containing all SE-header tags.
@@ -19,15 +18,14 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
 /// Page List Digest (pld)
 /// Address List Digest (ald)
 /// Tweak List Digest (tld)
-/// SE Header Tag (seht)
-///
+/// SE Header Tag (tag)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AsBytes, PartialEq, Eq)]
 pub struct BootHdrTags {
     pld: [u8; BootHdrHead::DIGEST_SIZE],
     ald: [u8; BootHdrHead::DIGEST_SIZE],
     tld: [u8; BootHdrHead::DIGEST_SIZE],
-    seht: [u8; BootHdrHead::SEHT_SIZE],
+    tag: [u8; BootHdrHead::TAG_SIZE],
 }
 
 /// Magiv value for a SE-(boot)header
@@ -38,19 +36,14 @@ impl MagicValue<8> for BootHdrMagic {
 
 impl BootHdrTags {
     /// Returns a reference to the SE-hdr tag of this [`BootHdrTags`].
-    pub fn seht(&self) -> &[u8; 16] {
-        &self.seht
+    pub fn tag(&self) -> &[u8; 16] {
+        &self.tag
     }
 
     /// Creates a new [`BootHdrTags`]. Useful for writing tests.
     #[doc(hidden)]
-    pub const fn new(pld: [u8; 64], ald: [u8; 64], tld: [u8; 64], seht: [u8; 16]) -> Self {
-        Self {
-            ald,
-            tld,
-            pld,
-            seht,
-        }
+    pub const fn new(pld: [u8; 64], ald: [u8; 64], tld: [u8; 64], tag: [u8; 16]) -> Self {
+        Self { ald, tld, pld, tag }
     }
 
     /// returns false if no hdr found, true otherwise
@@ -93,8 +86,8 @@ impl BootHdrTags {
     ///
     /// # Errors
     ///
-    /// This function will return an error if `hdr` is not at least as long as the header specifies
-    /// in bytes 12-15 or the first 8 bytes do not contain the magic value.
+    /// This function will return an error if the header could not be found in
+    /// `img` or is invalid.
     pub fn from_se_image<R>(img: &mut R) -> Result<Self>
     where
         R: Read + Seek,
@@ -125,18 +118,18 @@ impl BootHdrTags {
         img.seek(Current(
             hdr_head.size.get() as i64
                 - size_of::<BootHdrHead>() as i64
-                - BootHdrHead::SEHT_SIZE as i64,
+                - BootHdrHead::TAG_SIZE as i64,
         ))?;
 
         // read in the tag
-        let mut seht = [0u8; BootHdrHead::SEHT_SIZE];
-        img.read_exact(seht.as_mut_slice())?;
+        let mut tag = [0u8; BootHdrHead::TAG_SIZE];
+        img.read_exact(tag.as_mut_slice())?;
 
         Ok(BootHdrTags {
             pld: hdr_head.pld,
             ald: hdr_head.ald,
             tld: hdr_head.tld,
-            seht,
+            tag,
         })
     }
 }
@@ -161,7 +154,7 @@ struct BootHdrHead {
 assert_size!(BootHdrHead, 0x1A0);
 impl BootHdrHead {
     const DIGEST_SIZE: usize = 0x40;
-    const SEHT_SIZE: usize = 0x10;
+    const TAG_SIZE: usize = 0x10;
 }
 
 #[cfg(test)]
@@ -194,7 +187,7 @@ mod tests {
             0x8f, 0x9b, 0xe0, 0xa5, 0x49, 0xd8, 0xd7, 0xa9, 0x4a, 0xe7, 0x20, 0xe5, 0xc0, 0x76,
             0x0a, 0x82, 0x5d, 0x47, 0x9f, 0xe6, 0x7a, 0xf5,
         ],
-        seht: [
+        tag: [
             0x92, 0x30, 0x9d, 0x45, 0x89, 0xb9, 0xa8, 0x5b, 0x42, 0x7f, 0x87, 0x53, 0x17, 0x1d,
             0x15, 0x20,
         ],

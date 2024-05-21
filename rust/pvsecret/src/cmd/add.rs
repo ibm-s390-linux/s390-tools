@@ -5,8 +5,8 @@
 use crate::cli::AddSecretOpt;
 use anyhow::{Context, Result};
 use log::warn;
-use pv::misc::get_reader_from_cli_file_arg;
 use pv::uv::{AddCmd, UvDevice};
+use utils::get_reader_from_cli_file_arg;
 
 /// Do an Add Secret UVC
 pub fn add(opt: &AddSecretOpt) -> Result<()> {

@@ -8,19 +8,16 @@
 //! This library is intened to be used by tools and libraries that
 //! are used for creating and managing IBM Secure Execution guests.
 //! `pv_core` provides abstraction layers for secure memory management,
-//! logging, and accessing the uvdevice.
+//! and accessing the uvdevice.
 //!
 //! It does not provide any cryptographic operations through OpenSSL.
 //! For this use `pv` which reexports all symbos from this crate.
 mod error;
-mod log;
 mod macros;
-mod tmpfile;
 mod utils;
 mod uvdevice;
 mod uvsecret;
 
-pub use crate::log::PvLogger;
 pub use error::{Error, FileAccessErrorType, FileIoErrorType, Result};
 
 /// Miscellaneous functions and definitions
@@ -30,27 +27,17 @@ pub mod misc {
     pub use crate::utils::{parse_hex, to_u16, to_u32, try_parse_u128, try_parse_u64};
     pub use crate::utils::{read, write};
     pub use crate::utils::{Flags, Lsb0Flags64, Msb0Flags64};
-
-    pub use crate::tmpfile::TemporaryDirectory;
 }
 
 /// Definitions and functions for interacting with the Ultravisor
 pub mod uv {
     pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd};
     pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretId, SecretList};
-    pub use crate::uvdevice::{
-        uv_ioctl, ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess,
-    };
+    pub use crate::uvdevice::{ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess};
 }
 
 /// Functionalities to verify UV requests
 pub mod request {
-    /// Functionalities for reading add-secret requests
-    pub mod uvsecret {
-        pub use crate::uvsecret::AddSecretMagic;
-        pub use crate::uvsecret::UserDataType;
-    }
-
     /// Version number of the request in system-endian
     pub type RequestVersion = u32;
     /// Request magic value
@@ -73,14 +60,11 @@ pub mod request {
     }
 }
 
-/// Provides cargo version Info about this crate.
-///
-/// Produces `pv_core-crate <version>`
-pub const fn crate_info() -> &'static str {
-    concat!(env!("CARGO_PKG_NAME"), "-crate ", env!("CARGO_PKG_VERSION"))
+/// Functionalities for reading add-secret requests
+pub mod secret {
+    pub use crate::uvsecret::AddSecretMagic;
+    pub use crate::uvsecret::UserDataType;
 }
 
 // Internal definitions/ imports
 const PAGESIZE: usize = 0x1000;
-use ::utils::assert_size;
-use ::utils::static_assert;

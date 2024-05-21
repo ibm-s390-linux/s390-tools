@@ -6,8 +6,9 @@ use super::ffi;
 use crate::{
     assert_size,
     misc::to_u16,
-    request::{uvsecret::AddSecretMagic, MagicValue},
-    uv::{uv_ioctl, UvCmd, UvDevice},
+    request::MagicValue,
+    uv::{UvCmd, UvDevice},
+    uvsecret::AddSecretMagic,
     Error, Result, PAGESIZE,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};

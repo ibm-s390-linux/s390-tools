@@ -107,7 +107,7 @@ impl uvio_attest {
 }
 
 /// corresponds to the UV_IOCTL macro
-pub const fn uv_ioctl(nr: u8) -> u64 {
+pub(crate) const fn uv_ioctl(nr: u8) -> u64 {
     iowr(UVIO_TYPE_UVC, nr, std::mem::size_of::<uvio_ioctl_cb>())
 }
 static_assert!(uv_ioctl(UVIO_IOCTL_ATT_NR) == 0xc0407501);

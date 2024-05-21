@@ -5,7 +5,7 @@
 #![cfg(test)]
 
 use super::{helper, helper::*, *};
-use crate::{misc::read_crls, Error, HkdVerifyErrorType::*};
+use crate::{utils::read_crls, Error, HkdVerifyErrorType::*};
 use openssl::{stack::Stack, x509::X509Crl};
 use std::path::Path;
 
@@ -33,31 +33,31 @@ pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<X509Crl
 
 #[test]
 fn store_setup() {
-    let ibm_str = get_cert_asset_path_string("ibm.crt");
-    let inter_str = get_cert_asset_path_string("inter.crt");
+    let ibm_path = get_cert_asset_path("ibm.crt");
+    let inter_path = get_cert_asset_path("inter.crt");
 
-    let store = helper::store_setup(&None, &[], &[ibm_str, inter_str]);
+    let store = helper::store_setup(None, &[], &[&ibm_path, &inter_path]);
     assert!(store.is_ok());
 }
 
 #[test]
 fn verify_chain_online() {
-    let ibm_crt = get_cert_asset_path_string("ibm.crt");
-    let inter_crt = get_cert_asset_path_string("inter_ca.crt");
-    let root_crt = get_cert_asset_path_string("root_ca.chained.crt");
+    let ibm_crt = get_cert_asset_path("ibm.crt");
+    let inter_crt = get_cert_asset_path("inter_ca.crt");
+    let root_crt = get_cert_asset_path("root_ca.chained.crt");
 
-    let ret = CertVerifier::new(&[ibm_crt, inter_crt], &[], &root_crt.into(), false);
+    let ret = CertVerifier::new(&[&ibm_crt, &inter_crt], &[], Some(&root_crt), false);
     assert!(ret.is_ok(), "CertVerifier::new failed: {ret:?}");
 }
 
 #[test]
 fn verify_chain_offline() {
     let ibm_crt = load_gen_cert("ibm.crt");
-    let inter_crl = get_cert_asset_path_string("inter_ca.crl");
+    let inter_crl = get_cert_asset_path("inter_ca.crl");
     let inter_crt = load_gen_cert("inter_ca.crt");
-    let root_crt = get_cert_asset_path_string("root_ca.chained.crt");
+    let root_crt = get_cert_asset_path("root_ca.chained.crt");
 
-    let store = helper::store_setup(&Some(root_crt), &[inter_crl], &[])
+    let store = helper::store_setup(Some(&root_crt), &[&inter_crl], &[])
         .unwrap()
         .build();
 
@@ -75,20 +75,20 @@ fn dist_points() {
 }
 
 fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str, hkd: &'static str) {
-    let root_crt = get_cert_asset_path_string("root_ca.chained.crt");
-    let inter_crt = get_cert_asset_path_string("inter_ca.crt");
-    let inter_crl = get_cert_asset_path_string("inter_ca.crl");
-    let ibm_crt = get_cert_asset_path_string(ibm_crt);
-    let ibm_crl = get_cert_asset_path_string(ibm_crl);
+    let root_crt = get_cert_asset_path("root_ca.chained.crt");
+    let inter_crt = get_cert_asset_path("inter_ca.crt");
+    let inter_crl = get_cert_asset_path("inter_ca.crl");
+    let ibm_crt = get_cert_asset_path(ibm_crt);
+    let ibm_crl = get_cert_asset_path(ibm_crl);
     let hkd_revoked = load_gen_cert("host_rev.crt");
     let hkd_exp = load_gen_cert("host_crt_expired.crt");
     let hkd = load_gen_cert(hkd);
 
-    let crls = &[ibm_crl, inter_crl];
+    let crls = &[ibm_crl.as_path(), inter_crl.as_path()];
     let verifier = CertVerifier::new(
-        &[ibm_crt, inter_crt],
+        &[&ibm_crt, &inter_crt],
         if offline { crls } else { &[] },
-        &Some(root_crt),
+        Some(&root_crt),
         offline,
     )
     .unwrap();
@@ -98,7 +98,7 @@ fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str, hkd: &'st
 
     assert!(matches!(
         verifier.verify(&hkd_revoked),
-        Err(Error::HkdVerify(HdkRevoked))
+        Err(Error::HkdVerify(HkdRevoked))
     ));
 
     assert!(matches!(

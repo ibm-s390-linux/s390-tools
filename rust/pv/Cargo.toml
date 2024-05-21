@@ -6,17 +6,15 @@ license.workspace = true
 
 [dependencies]
 byteorder = "1.3"
-clap = { version ="4", features = ["derive", "wrap_help"] }
-curl = "0.4.7"
+curl = "0.4.44"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
-openssl = "0.10.49"
+openssl = "0.10.57"
 serde = { version = "1.0.139", features = ["derive"]  }
 thiserror = "1.0.33"
-utils = {path = "../utils"}
 zerocopy = { version="0.7", features = ["derive"] }
 
 openssl_extensions = { path = "openssl_extensions" }
 pv_core = { path = "../pv_core" }
 
 [dev-dependencies]
-serde_test = "1"
+serde_test = "1.0.139"

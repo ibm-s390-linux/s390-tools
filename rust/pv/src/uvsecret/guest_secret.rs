@@ -4,15 +4,17 @@
 
 #[allow(unused_imports)] //used for more convenient docstring
 use super::asrcb::AddSecretRequest;
+use crate::assert_size;
 use crate::{
-    request::{hash, openssl::MessageDigest, random_array, Secret},
+    crypto::{hash, random_array},
+    request::Confidential,
     Result,
 };
 use byteorder::BigEndian;
+use openssl::hash::MessageDigest;
 use pv_core::uv::{ListableSecretType, SecretId};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt::Display};
-use utils::assert_size;
 use zerocopy::{AsBytes, U16, U32};
 
 const ASSOC_SECRET_SIZE: usize = 32;
@@ -32,7 +34,7 @@ pub enum GuestSecret {
         id: SecretId,
         /// Confidential actual association secret (32 bytes)
         #[serde(skip)]
-        secret: Secret<[u8; ASSOC_SECRET_SIZE]>,
+        secret: Confidential<[u8; ASSOC_SECRET_SIZE]>,
     },
 }
 
@@ -166,7 +168,6 @@ mod test {
     use super::*;
     use serde_test::{assert_tokens, Token};
 
-    //todo test GuestSecret::association
     #[test]
     fn association() {
         let secret_value = [0x11; 32];

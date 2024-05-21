@@ -23,7 +23,7 @@ use test::mock_libc::ioctl;
 mod ffi;
 mod info;
 mod test;
-pub use ffi::uv_ioctl;
+pub(crate) use ffi::uv_ioctl;
 pub mod secret;
 pub mod secret_list;
 
@@ -82,6 +82,11 @@ fn rc_fmt<C: UvCmd>(rc: u16, rrc: u16, cmd: &mut C) -> &'static str {
 }
 
 /// Ultravisor Command.
+
+///
+/// Implementers provide information on the specific Ultravisor command metadata and content.
+/// API users do not need to interact directly with any functions provided by this trait and refer
+/// to the specialized access and tweaking functionalities of the specivic command.
 pub trait UvCmd {
     /// The UV IOCTL number of the UV call
     const UV_IOCTL_NR: u8;

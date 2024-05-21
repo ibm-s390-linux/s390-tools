@@ -10,11 +10,11 @@ use pv::{
     get_test_asset,
     request::{
         openssl::pkey::{PKey, Public},
-        uvsecret::{
-            verify_asrcb_and_get_user_data, AddSecretFlags, AddSecretRequest, AddSecretVersion,
-            ExtSecret, GuestSecret,
-        },
         BootHdrTags, ReqEncrCtx, Request, SymKey,
+    },
+    secret::{
+        verify_asrcb_and_get_user_data, AddSecretFlags, AddSecretRequest, AddSecretVersion,
+        ExtSecret, GuestSecret,
     },
     test_utils::get_test_keys,
     uv::ConfigUid,

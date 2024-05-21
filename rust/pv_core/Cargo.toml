@@ -10,11 +10,10 @@ license.workspace = true
 libc = "0.2.49"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 thiserror = "1.0.33"
-utils = {path = "../utils"}
 zerocopy = {version = "0.7", features = ["derive"]}
 serde = { version = "1.0.139", features = ["derive"]}
 byteorder = "1.3"
 
 [dev-dependencies]
-lazy_static = "1.4.0"
-serde_test = "1"
+serde_test = "1.0.139"
+lazy_static = "1.1"

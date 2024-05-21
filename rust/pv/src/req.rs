@@ -2,9 +2,12 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::crypto::{AesGcmResult, AES_256_GCM_TAG_SIZE};
+use crate::assert_size;
+use crate::crypto::{
+    derive_key, encrypt_aes_gcm, gen_ec_key, random_array, AesGcmResult, SymKey, SymKeyType,
+    AES_256_GCM_TAG_SIZE,
+};
 use crate::misc::to_u32;
-use crate::request::{derive_key, encrypt_aes_gcm, gen_ec_key, random_array, SymKey, SymKeyType};
 use crate::{Error, Result};
 use openssl::bn::{BigNum, BigNumContext};
 use openssl::ec::{EcGroupRef, EcPointRef};
@@ -14,7 +17,6 @@ use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
 use std::convert::TryInto;
 use std::mem::size_of;
-use utils::assert_size;
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
 
 /// Encrypt a _secret_ using self and a given private key.
@@ -27,7 +29,7 @@ pub trait Encrypt {
     /// # Errors
     ///
     /// This function will return an error if OpenSSL could not encrypt the secret.
-    fn encrypt(&self, secret: &[u8], priv_key: &PKey<Private>) -> Result<Vec<u8>> {
+    fn encrypt(&self, secret: &[u8], priv_key: &PKeyRef<Private>) -> Result<Vec<u8>> {
         let mut res = Vec::with_capacity(80);
         self.encrypt_to(secret, priv_key, &mut res)?;
         Ok(res)
@@ -42,7 +44,12 @@ pub trait Encrypt {
     /// # Errors
     ///
     /// This function will return an error if OpenSSL could not encrypt the secret.
-    fn encrypt_to(&self, secret: &[u8], priv_key: &PKey<Private>, to: &mut Vec<u8>) -> Result<()>;
+    fn encrypt_to(
+        &self,
+        secret: &[u8],
+        priv_key: &PKeyRef<Private>,
+        to: &mut Vec<u8>,
+    ) -> Result<()>;
 }
 
 /// Types of Authenticated Data
@@ -91,7 +98,7 @@ impl Encrypt for Keyslot {
     fn encrypt_to(
         &self,
         prot_key: &[u8],
-        priv_key: &PKey<Private>,
+        priv_key: &PKeyRef<Private>,
         to: &mut Vec<u8>,
     ) -> Result<()> {
         let derived_key = derive_key(priv_key, &self.0)?;
@@ -106,7 +113,7 @@ impl Encrypt for Keyslot {
     }
 }
 
-/// Context used to mange the encryption of requests.
+/// Context used to manage the encryption of requests.
 /// Intended to be used by [`Request`] implementations
 #[derive(Debug)]
 pub struct ReqEncrCtx {
@@ -154,12 +161,6 @@ impl ReqEncrCtx {
             SymKeyType::Aes256 => Self::new_aes_256(None, None, None),
         }
     }
-
-    ///Panics if data does not fit into bin_aad+offs
-    // #[track_caller]
-    // pub fn copy_to_bin_aad(_bin_aad: &mut [u8], _aad_offs: usize, _data: &[u8]) {
-    //     todo!();
-    // }
 
     /// Build the authenticated data for a request.
     /// # Returns
@@ -252,7 +253,7 @@ impl ReqEncrCtx {
     /// # Errors
     ///
     /// This function will return an error if the data could not be encrypted by OpenSSL.
-    pub fn encrypt_aead(&self, aad: &[u8], conf: &[u8]) -> Result<AesGcmResult> {
+    pub(crate) fn encrypt_aead(&self, aad: &[u8], conf: &[u8]) -> Result<AesGcmResult> {
         encrypt_aes_gcm(&self.prot_key, &self.iv, aad, conf)
     }
 }

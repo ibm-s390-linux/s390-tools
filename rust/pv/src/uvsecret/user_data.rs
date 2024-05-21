@@ -1,23 +1,16 @@
+use crate::assert_size;
 use crate::{
     crypto::{sign_msg, verify_signature},
     req::BinReqValues,
     request::{
-        openssl::{
-            pkey::{PKey, Private},
-            MessageDigest,
-        },
-        uvsecret::{AddSecretRequest, AddSecretVersion},
+        openssl::pkey::{HasParams, HasPublic, Id, PKey, PKeyRef, Private, Public},
         RequestMagic,
     },
+    secret::{AddSecretMagic, AddSecretRequest, AddSecretVersion, UserDataType},
     Error, Result,
 };
-use openssl::{
-    nid::Nid,
-    pkey::{HasParams, HasPublic, Id, PKeyRef, Public},
-};
-use pv_core::request::uvsecret::AddSecretMagic;
-use pv_core::request::uvsecret::UserDataType;
-use utils::assert_size;
+use openssl::hash::MessageDigest;
+use openssl::nid::Nid;
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 /// User data.

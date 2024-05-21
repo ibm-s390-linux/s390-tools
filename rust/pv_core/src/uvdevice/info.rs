@@ -5,7 +5,7 @@
 use super::ffi::{self, uvio_uvdev_info};
 use crate::{
     misc::{Flags, Lsb0Flags64},
-    uv::{uv_ioctl, UvCmd, UvDevice},
+    uv::{UvCmd, UvDevice},
     Result,
 };
 use std::fmt::Display;
@@ -22,8 +22,8 @@ use zerocopy::{AsBytes, FromZeroes};
 /// If the bit is set in both, `supp_uvio_cmds` and `supp_uv_cmds`,
 /// the uvdevice and the Ultravisor support that call.
 ///
-/// Note that bit 0 ([`UvDevice::INFO_NR`]) is always zero for `supp_uv_cmds`
-/// as there is no corresponding UV-call.
+/// Note that bit 0 is always zero for `supp_uv_cmds`
+/// as there is no corresponding Info UV-call.
 ///
 #[derive(Debug)]
 pub struct UvDeviceInfo {
@@ -38,7 +38,7 @@ impl UvDeviceInfo {
     ///
     /// This function will return an error if the ioctl fails and the error code is not
     /// [`libc::ENOTTY`].
-    /// `ENOTTY` is most likely because the uvdevice does not support the info IOCTL.
+    /// `ENOTTY` is most likely because older uvdevices does not support the info IOCTL.
     /// In that case one can safely assume that the device only supports the Attestation IOCTL.
     /// Therefore this is what this function returns IOCTL support for Attestation and _Data not
     /// available_ for the UV Attestation facility.

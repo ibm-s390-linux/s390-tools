@@ -39,12 +39,6 @@ pub fn get_cert_asset_path<P: AsRef<Path>>(path: P) -> PathBuf {
     p
 }
 
-pub fn get_cert_asset_path_string(path: &'static str) -> String {
-    get_cert_asset_path(path)
-        .into_os_string()
-        .into_string()
-        .unwrap()
-}
 /// TEST ONLY! Load an cert
 ///
 /// panic on errors

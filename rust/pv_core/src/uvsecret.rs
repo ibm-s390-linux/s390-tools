@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
+use crate::{assert_size, static_assert};
 use crate::{
     misc::to_u16,
     request::{MagicValue, RequestMagic},
@@ -14,14 +15,13 @@ use std::{
     io::{Cursor, Read, Seek, Write},
     mem::size_of,
 };
-use utils::{assert_size, static_assert};
 use zerocopy::{AsBytes, FromBytes, U16, U32};
 
 /// The magic value used to identify an add-secret request`]
 ///
 /// The magic value is ASCII:
 /// ```rust
-/// # use pv_core::request::uvsecret::AddSecretMagic;
+/// # use pv_core::secret::AddSecretMagic;
 /// # use pv_core::request::MagicValue;
 /// # fn main() {
 /// # let magic =
@@ -56,7 +56,7 @@ impl AddSecretMagic {
 
     /// Try to convert from a byte slice.
     ///
-    /// Retuns [`None`] if the byte slice does not contain a valid magic value variant.
+    /// Returns [`None`] if the byte slice does not contain a valid magic value variant.
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         if !Self::starts_with_magic(bytes) || bytes.len() < size_of::<AddSecretMagic>() {
             return Err(Error::NoAsrcb);
@@ -70,8 +70,8 @@ impl AddSecretMagic {
 
     /// Returns the [`UserDataType`] of this [`AddSecretMagic`].
     pub fn kind(&self) -> UserDataType {
-        // Panic: Will never panic. The value is cheched during construcion of the object for
-        // beeing one of the enum values.
+        // Panic: Will never panic. The value is checked during construction of
+        // the object for being one of the enum values.
         self.kind.get().try_into().unwrap()
     }
 }
@@ -153,10 +153,8 @@ impl From<UserDataType> for AddSecretMagic {
 #[cfg(test)]
 mod test {
     use crate::{
-        request::{
-            uvsecret::{AddSecretMagic, UserDataType},
-            MagicValue,
-        },
+        request::MagicValue,
+        secret::{AddSecretMagic, UserDataType},
         Error,
     };
 

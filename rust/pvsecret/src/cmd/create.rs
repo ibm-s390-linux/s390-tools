@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright IBM Corp. 2023
+// Copyright IBM Corp. 2023, 2024
 
 use crate::cli::{AddSecretType, CreateSecretFlags, CreateSecretOpt};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
 use pv::{
     misc::{
-        get_writer_from_cli_file_arg, open_file, parse_hex, pv_guest_bit_set, read_certs,
-        read_exact_file, read_file, read_private_key, try_parse_u128, try_parse_u64, write,
+        open_file, parse_hex, pv_guest_bit_set, read_exact_file, read_file, try_parse_u128,
+        try_parse_u64, write,
     },
     request::{
-        openssl::pkey::{PKey, Public},
-        uvsecret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret},
-        BootHdrTags, HkdVerifier, ReqEncrCtx, Request, SymKeyType,
+        openssl::pkey::{PKey, Private},
+        BootHdrTags, ReqEncrCtx, Request, SymKeyType,
     },
+    secret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret},
     uv::ConfigUid,
 };
 use serde_yaml::Value;
+use utils::get_writer_from_cli_file_arg;
 
 fn write_out<D: AsRef<[u8]>>(path: &str, data: D, ctx: &str) -> pv::Result<()> {
     let mut wr = get_writer_from_cli_file_arg(path)?;
@@ -40,8 +41,8 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     debug!("Generated Add-secret request");
 
     // Add host-key documents
-    let verifier = opt.certificate_args.verifier()?;
-    read_and_verify_hkds(&opt.certificate_args.host_key_documents, verifier)?
+    opt.certificate_args
+        .get_verified_hkds("secret")?
         .into_iter()
         .for_each(|k| asrcb.add_hostkey(k));
 
@@ -55,6 +56,13 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     info!("Successfully wrote the request to '{}'", &opt.output);
 
     write_secret(&opt.secret, &asrcb)
+}
+
+/// Read+parse the first key from the buffer.
+fn read_private_key(buf: &[u8]) -> Result<PKey<Private>> {
+    PKey::private_key_from_der(buf)
+        .or_else(|_| PKey::private_key_from_pem(buf))
+        .map_err(Error::new)
 }
 
 /// Set-up the `add-secret request` from command-line arguments
@@ -191,38 +199,6 @@ fn read_cuid(asrcb: &mut AddSecretRequest, opt: &CreateSecretOpt) -> Result<()> 
     Ok(())
 }
 
-/// reads HKDs into memory, verifies them with the provided HKD verifier.
-/// returns list of public keys or Err
-/// Aborts on first error
-fn read_and_verify_hkds(
-    hkds: &Vec<String>,
-    verifier: Box<dyn HkdVerifier>,
-) -> Result<Vec<PKey<Public>>> {
-    let mut res = Vec::with_capacity(hkds.len());
-    for hkd in hkds {
-        let hk = read_file(hkd, "host-key document")?;
-        let certs = read_certs(&hk).with_context(|| {
-            format!("The provided Host Key Document in '{hkd}' is not in PEM or DER format")
-        })?;
-        if certs.is_empty() {
-            let msg = format!(
-                "The provided host key document in {} contains no certificate!",
-                hkd
-            );
-            return Err(anyhow!(msg));
-        }
-        if certs.len() > 1 {
-            warn!("The host key document in '{hkd}' contains more than one certificate! Only the first certificate will be used.")
-        }
-
-        // len is >= 1 -> unwrap will succeed
-        let c = certs.first().unwrap();
-        verifier.verify(c)?;
-        res.push(c.public_key()?);
-        info!("Use host-key document at '{hkd}'");
-    }
-    Ok(res)
-}
 /// Write the generated secret (if any) to the specified output stream
 fn write_secret(secret: &AddSecretType, asrcb: &AddSecretRequest) -> Result<()> {
     if let AddSecretType::Association {
@@ -261,4 +237,22 @@ fn write_secret(secret: &AddSecretType, asrcb: &AddSecretRequest) -> Result<()> 
         }
     };
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn read_private_key() {
+        let key = include_bytes!("../../../pv/tests/assets/keys/rsa3072key.pem");
+        let key = super::read_private_key(key).unwrap();
+        assert_eq!(key.rsa().unwrap().size(), 384);
+    }
+
+    #[test]
+    fn read_private_key_fail() {
+        let key = include_bytes!("create.rs");
+        let key = super::read_private_key(key);
+        assert!(key.is_err());
+    }
 }

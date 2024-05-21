@@ -199,7 +199,7 @@ impl Drop for LockFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pv_core::misc::TemporaryDirectory;
+    use utils::TemporaryDirectory;
 
     // Only very simple tests
 

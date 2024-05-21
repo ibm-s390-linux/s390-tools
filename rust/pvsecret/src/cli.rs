@@ -3,8 +3,7 @@
 // Copyright IBM Corp. 2023
 
 use clap::{ArgGroup, Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
-use pv::misc::CertificateOptions;
-use pv::misc::STDOUT;
+use utils::{CertificateOptions, STDOUT};
 
 /// Manage secrets for IBM Secure Execution guests.
 ///

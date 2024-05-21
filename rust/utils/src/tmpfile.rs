@@ -44,7 +44,7 @@ impl TemporaryDirectory {
     /// An error is returned if the temporary directory could not be created.
     pub fn new<P: AsRef<Path>>(prefix: P) -> Result<Self, std::io::Error> {
         let mut template = prefix.as_ref().to_owned();
-        let mut template_os_string = template.as_mut_os_string();
+        let template_os_string = template.as_mut_os_string();
         template_os_string.push("XXXXXX");
 
         let temp_dir = mkdtemp(template_os_string)?;
@@ -64,7 +64,7 @@ impl TemporaryDirectory {
     }
 
     /// Removes the created temporary directory and it's contents.
-    pub fn close(mut self) -> std::io::Result<()> {
+    pub fn close(self) -> std::io::Result<()> {
         let ret = std::fs::remove_dir_all(&self.path);
         self.forget();
         ret
@@ -85,8 +85,6 @@ impl Drop for TemporaryDirectory {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::{mkdtemp, TemporaryDirectory};
 
     #[test]
@@ -97,15 +95,15 @@ mod tests {
 
         let template = "yayXXXXXX";
 
-        let err = mkdtemp(template_inv_not_last_characters).expect_err("invalid template");
-        let err = mkdtemp(template_inv_too_less_x).expect_err("invalid template");
-        let err =
+        let _err = mkdtemp(template_inv_not_last_characters).expect_err("invalid template");
+        let _err = mkdtemp(template_inv_too_less_x).expect_err("invalid template");
+        let _err =
             mkdtemp(template_inv_path_does_not_exist).expect_err("path does not exist template");
 
         let path = mkdtemp(template).expect("mkdtemp should work");
         assert!(path.exists());
         assert!(path.as_os_str().to_str().expect("works").starts_with("yay"));
-        std::fs::remove_dir(path);
+        std::fs::remove_dir(path).unwrap();
     }
 
     #[test]
@@ -115,7 +113,7 @@ mod tests {
         assert!(path.exists());
 
         // Test that close removes the directory
-        temp_dir.close();
+        temp_dir.close().unwrap();
         assert!(!path.exists());
     }
 
@@ -139,7 +137,7 @@ mod tests {
         assert!(path.as_os_str().to_str().expect("works").starts_with("yay"));
 
         // Test that close() removes the directory
-        temp_dir.close();
+        temp_dir.close().unwrap();
         assert!(!path.exists());
     }
 
