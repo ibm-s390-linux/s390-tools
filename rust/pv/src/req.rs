@@ -503,7 +503,7 @@ mod tests {
         let (_, host_key) = get_test_keys();
         let ctx = ReqEncrCtx::new_aes_256(Some([0x11; 12]), None, None).unwrap();
 
-        let ks = vec![
+        let ks = [
             Keyslot::new(host_key.clone()),
             Keyslot::new(host_key.clone()),
             Keyslot::new(host_key),
