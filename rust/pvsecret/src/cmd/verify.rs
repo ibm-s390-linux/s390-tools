@@ -13,7 +13,7 @@ use crate::cli::VerifyOpt;
 /// read the content of a DER or PEM x509 and return the public key
 fn read_sgn_key(path: &str) -> Result<PKey<Public>> {
     read_certs(&read_file(path, "user-signing key")?)?
-        .get(0)
+        .first()
         .ok_or(anyhow!("File does not contain a X509 certificate"))?
         .public_key()
         .map_err(anyhow::Error::new)
