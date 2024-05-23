@@ -13,21 +13,25 @@ objects = misc.o error.o scan.o job.o boot.o bootmap.o fs-map.o disk.o \
 	  bootmap_header.o envblk.o install.o zipl.o
 
 zipl_helpers = $(basename $(wildcard zipl_helper.*.c))
+zipl_helpers += zipl_helper.md
 chreipl_helpers = $(subst zipl_,chreipl_, $(zipl_helpers))
 
-all: zipl zipl-editenv $(chreipl_helpers)
+all: zipl zipl-editenv zipl_helper.md $(chreipl_helpers)
 
 boot.o: ../boot/.loaders
 zipl: $(objects) $(libs)
 
 zipl_helper.device-mapper: $(rootdir)/libdasd/libdasd.a \
 	$(rootdir)/libvtoc/libvtoc.a \
-	$(libs) zipl_helper.device-mapper.o
+	$(libs) misc.o error.o zipl_helper.device-mapper.o
 
 zipl-editenv: $(libs) misc.o error.o fs-map.o bootmap_header.o \
 	envblk.o zipl-editenv.o
 
-chreipl_helper.%: zipl_helper.%
+zipl_helper.md: zipl_helper.device-mapper
+	ln -f -s $< $@
+
+chreipl_helper.%: zipl_helper.device-mapper
 	ln -f -s $< $@
 
 install: all

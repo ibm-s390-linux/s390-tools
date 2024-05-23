@@ -32,11 +32,27 @@
  * major:minor parameters are printed. Otherwise, the script exits with an
  * error message and a non-zero return code.
  *
+ * 3. Usage: zipl_helper.md <target directory> or
+ *                          <major:minor of target md device>
+ *
+ * This tool identifies the set of all physical devices that the specified
+ * logical target md-device is composed of and for each such component
+ * prints target parameters needed to install a boot record on respective
+ * disk. Only RAID1 md-setups are supported. All physical devices in the md
+ * RAID1 setup must have identical type and geometry and equal file system
+ * offsets from the beginning of the disk.
+ *
+ * 4. Usage: chreipl_helper.md <major:minor of target md device>
+ *
+ * This tool identifies single (random) physical device from the set of
+ * raid devices that the specified target md-device is composed of and
+ * prints the pair major:minor of respective physical disk.
  */
 
 #include <errno.h>
 #include <limits.h>
 #include <linux/limits.h>
+#include <linux/raid/md_u.h>
 #include <locale.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -46,9 +62,11 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
 
+#include "misc.h"
 #include "lib/dasd_base.h"
 #include "lib/util_base.h"
 #include "lib/util_file.h"
@@ -112,8 +130,21 @@ struct physical_device {
 	struct dmpath_entry *mirror;
 };
 
+struct mdstat {
+	char *version;
+	char *raid_level;
+	char *state;
+	unsigned long raid_devices;
+	unsigned long total_devices;
+	unsigned long active_devices;
+	unsigned long working_devices;
+	unsigned long failed_devices;
+	unsigned long spare_devices;
+};
+
 enum driver_id {
 	DM_DRIVER_ID,
+	MD_DRIVER_ID,
 	LAST_DRIVER_ID
 };
 
@@ -139,6 +170,9 @@ struct helper {
 #define DASD_PARTN_MASK 0x03
 #define SCSI_PARTN_MASK 0x0f
 
+#define MD_MAJOR 9
+#define DEVICE_MAPPER_MAJOR 253
+
 /* Internal constants */
 enum dev_type {
 	DEV_TYPE_CDL = 0,
@@ -160,6 +194,11 @@ enum lookup_result {
 	DM_SINGLE_TARGET,
 	DM_MULTIPLE_TARGETS
 };
+
+static int is_device_mapper(unsigned int major)
+{
+	return major == DEVICE_MAPPER_MAJOR;
+}
 
 static void get_type_name(char *name, unsigned short type)
 {
@@ -1234,6 +1273,399 @@ static int handle_device_mapper(dev_t dev, int util_id, char *name)
 	}
 }
 
+/**
+ * In the file stream FP find the first line formatted as
+ * 'W : STRVAL' and coincided in W with the specified keyword KW.
+ * Store the string value in STR
+ */
+static int kw_to_str(char **line, size_t *n, FILE *fp,
+		     const char *kw, char **str)
+{
+	char *w = NULL;
+	int ret = -1;
+
+	while (getline(line, n, fp) != -1) {
+		if (sscanf(*line, "%ms : %m[a-zA-Z,0-9. ]",
+			   &w, str) >= 2 &&
+		    strcmp(w, kw) == 0) {
+			ret = 0;
+			break;
+		}
+	}
+	free(w);
+	if (ret)
+		ERR("Unrecognized %s\n", kw);
+	return ret;
+}
+
+/**
+ * In the file stream FP find the first line formatted as
+ * 'W1 W2 : STRVAL' and coincided in W1 and W2 with the specified
+ * keywords KW1 and KW2. Store the string value in STR.
+ */
+static int kw_pair_to_str(char **line, size_t *n, FILE *fp,
+			  const char *kw1, const char *kw2,
+			  char **str)
+{
+	char *w1 = NULL;
+	char *w2 = NULL;
+	int ret = -1;
+
+	while (getline(line, n, fp) != -1) {
+		if (sscanf(*line, "%ms %ms : %m[a-zA-Z,0-9. ]",
+			   &w1, &w2, str) >= 3 &&
+		    strcmp(w1, kw1) == 0 &&
+		    strcmp(w2, kw2) == 0) {
+			ret = 0;
+			break;
+		}
+	}
+	free(w1);
+	free(w2);
+	if (ret)
+		ERR("Unrecognized %s %s\n", kw1, kw1);
+	return ret;
+}
+
+/**
+ * In the file stream FP find the first line formatted as
+ * 'W1 W2 : NUMVAL' and coincided in W1 and W2 with the specified
+ * keywords KW1 and KW2. Store the numerical value in VAL.
+ */
+static int kw_pair_to_ulong_silent(char **line, size_t *n, FILE *fp,
+				   const char *kw1, const char *kw2,
+				   unsigned long *val)
+{
+	char *w1 = NULL;
+	char *w2 = NULL;
+	int ret = -1;
+
+	while (getline(line, n, fp) != -1) {
+		if (sscanf(*line, "%ms %ms : %lu", &w1, &w2, val) >= 3 &&
+		    strcmp(w1, kw1) == 0 &&
+		    strcmp(w2, kw2) == 0) {
+			ret = 0;
+			break;
+		}
+	}
+	free(w1);
+	free(w2);
+	return ret;
+}
+
+static int kw_pair_to_ulong(char **line, size_t *n, FILE *fp,
+			    const char *kw1, const char *kw2,
+			    unsigned long *value)
+{
+	if (kw_pair_to_ulong_silent(line, n, fp, kw1, kw2, value)) {
+		ERR("Unrecognized %s %s\n", kw1, kw2);
+		return -1;
+	}
+	return 0;
+}
+
+static int get_components_header(char **line, size_t *n, FILE *fp)
+{
+	while (getline(line, n, fp) != -1) {
+		if (strstr(*line, "Number") &&
+		    strstr(*line, "Major") &&
+		    strstr(*line, "Minor") &&
+		    strstr(*line, "RaidDevice") &&
+		    strstr(*line, "State")) {
+			return 0;
+		}
+	}
+	return -1;
+}
+
+static int md_get_component(char **line, size_t *n, FILE *fp, int nr_expected,
+			    unsigned int *major, unsigned int *minor)
+{
+	int nr_found, raid_dev;
+
+	while (getline(line, n, fp) != -1) {
+		if (sscanf(*line, "%d %u %u %d",
+			   &nr_found, major, minor, &raid_dev) >= 4 &&
+		    nr_expected == raid_dev) {
+			return 0;
+		}
+	}
+	ERR("Unrecognized %d component\n", nr_expected);
+	return -1;
+}
+
+/**
+ * Parse the output of "mdadm --examine MAJOR:MINOR" command, where
+ * MAJOR and MINOR specify a physical component of some logical md device.
+ * Find out how much space (in sectors) is reserved for md-metadata
+ * (typically superblock and bitmap) at the beginning of that component.
+ */
+static int md_get_data_offset(unsigned long major, unsigned long minor,
+			      unsigned long *data_offset)
+{
+	char *line = NULL;
+	size_t n = 0;
+	FILE *fp;
+
+	fp = exec_cmd_and_get_out_stream("mdadm --examine %lu:%lu",
+					 major, minor);
+	if (fp == NULL)
+		return -1;
+	if (kw_pair_to_ulong_silent(&line, &n, fp,
+				    "Data", "Offset", data_offset))
+		*data_offset = 0;
+	free(line);
+	pclose(fp);
+	return 0;
+}
+
+static void md_print_bad_status(struct mdstat *md, const char *devname)
+{
+	fprintf(stderr, "Raid Devices: %lu\n", md->raid_devices);
+	fprintf(stderr, "Active Devices: %lu\n", md->active_devices);
+	fprintf(stderr, "Working Devices: %lu\n", md->working_devices);
+	fprintf(stderr, "%s: RAID inconsistent (some its components are not active or working).\n",
+		devname);
+}
+
+static int devname_by_device(dev_t device, char **devname)
+{
+	struct util_proc_part_entry entry;
+
+	if (util_proc_part_get_entry(device, &entry))
+		return -1;
+
+	*devname = misc_make_path("/dev", entry.name);
+	util_proc_part_free_entry(&entry);
+	return *devname ? 0 : -1;
+}
+
+static int check_md(dev_t dev, int *is_md_device)
+{
+	mdu_array_info_t array;
+	char *devname = NULL;
+	int fd;
+
+	if (major(dev) == MD_MAJOR) {
+		*is_md_device = 1;
+		return 0;
+	}
+	if (devname_by_device(dev, &devname))
+		return -1;
+	fd = open(devname, O_RDONLY);
+	free(devname);
+	if (fd == -1)
+		return -1;
+	if (ioctl(fd, GET_ARRAY_INFO, &array) >= 0)
+		*is_md_device = 1;
+	else
+		*is_md_device = 0;
+	close(fd);
+	return 0;
+}
+
+/**
+ * Print one set of zipl parameters for a raid component specified
+ * by MAJOR and MINOR.
+ *
+ * FS_START_MD: file system start on the md-device in sector units
+ */
+static int md_mirror_to_params(unsigned int major, unsigned int minor,
+			       unsigned long partstart_md, int util_id)
+{
+	struct device_characteristics dc;
+	unsigned long data_start_md;
+	unsigned long partstart_phy;
+	unsigned long fs_start_base;
+	int is_md_device;
+	dev_t base;
+	dev_t dev;
+	int ret;
+
+	dev = makedev(major, minor);
+
+	if (check_md(dev, &is_md_device)) {
+		ERR("Failed to get md-status for (%d:%d)\n",
+		    major, minor);
+		return -1;
+	}
+	if (is_md_device) {
+		ERR("Unsupported configuration: nested md devices\n");
+		return -1;
+	}
+	if (is_device_mapper(major)) {
+		char *name;
+
+		misc_asprintf(&name, "%d:%d", major, minor);
+
+		fail_on_dm_mirrors = 1;
+		ret = handle_device_mapper(dev, util_id, name);
+		free(name);
+		return ret;
+	}
+	/*
+	 * find space reserved for md-metadata at the beginning
+	 * of the physical device
+	 */
+	if (md_get_data_offset(major, minor, &data_start_md))
+		return -1;
+	/*
+	 * find parameters of the physical device
+	 */
+	if (get_dev_characteristics(&dc, dev))
+		return -1;
+	partstart_phy = dc.partstart * (dc.blocksize / SECTOR_SIZE);
+
+	if (data_start_md && partstart_phy < dc.bootsectors) {
+		ERR("Unsupported configuration: md metadata locate at boot area\n");
+		return -1;
+	}
+	if (partstart_phy > 0) {
+		base = get_partition_base(dc.type, dev);
+		/* Update device geometry */
+		get_dev_characteristics(&dc, base);
+	} else {
+		base = dev;
+	}
+	if (util_id == CHREIPL_UTIL_ID) {
+		printf("%u:%u\n", major(base), minor(base));
+		return 0;
+	}
+	fs_start_base = partstart_md + data_start_md + partstart_phy;
+	if (fs_start_base % (dc.blocksize / SECTOR_SIZE)) {
+		ERR("File system is not aligned on physical block size\n");
+		return -1;
+	}
+	base_dev_to_params(base, &dc, fs_start_base);
+	return 0;
+}
+
+/**
+ * If STATE contains THIS property, then issue an error message
+ * with the proposed FIXUP
+ */
+static int error_on(const char *state, const char *this, const char *fixup,
+		    const char *devname)
+{
+	if (strstr(state, this)) {
+		fprintf(stderr, "%s: Inconsistent RAID state ('%s'). %s.\n",
+			devname, this, fixup);
+		return -1;
+	}
+	return 0;
+}
+
+static int check_md_state(struct mdstat *md, const char *devname)
+{
+	if (error_on(md->state, "recovering", "Complete its recovery", devname))
+		return -1;
+	if (error_on(md->state, "degraded", "Restore its redundancy", devname))
+		return -1;
+	if (error_on(md->state, "dirty", "Bring it into clean state\n", devname))
+		return -1;
+
+	if (md->raid_devices != md->active_devices ||
+	    md->raid_devices > md->working_devices) {
+		md_print_bad_status(md, devname);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Parse the output of "mdadm --detail" command issued for logical
+ * device DEV.
+ *
+ * Identify the set of physical devices that DEVNAME is composed of.
+ *
+ * If util_id is ZIPL_UTIL_ID:
+ *   Calculate and print (to the standerd output) target parameters
+ *   for each identified component.
+ *
+ * If util_id is CHREIPL_UTIL_ID:
+ *   Print the pair major:minor of one (random) identified component.
+ */
+static int md_dev_to_params(dev_t dev, const char *devname, int util_id)
+{
+	struct mdstat md = {0};
+	char *line = NULL;
+	long partstart_md;
+	unsigned long i;
+	int ret = -1;
+	size_t n = 0;
+	FILE *fp;
+
+	fp = exec_cmd_and_get_out_stream("mdadm --detail %s", devname);
+	if (fp == NULL)
+		goto out;
+
+	if (kw_to_str(&line, &n, fp, "Version", &md.version) ||
+	    kw_pair_to_str(&line, &n, fp, "Raid", "Level", &md.raid_level) ||
+	    kw_pair_to_ulong(&line, &n, fp, "Raid", "Devices",
+			     &md.raid_devices) ||
+	    kw_pair_to_ulong(&line, &n, fp, "Total", "Devices",
+			     &md.total_devices) ||
+	    kw_to_str(&line, &n, fp, "State", &md.state) ||
+	    kw_pair_to_ulong(&line, &n, fp, "Active", "Devices",
+			     &md.active_devices) ||
+	    kw_pair_to_ulong(&line, &n, fp, "Working", "Devices",
+			     &md.working_devices) ||
+	    kw_pair_to_ulong(&line, &n, fp, "Failed", "Devices",
+			     &md.failed_devices) ||
+	    kw_pair_to_ulong(&line, &n, fp, "Spare", "Devices",
+			     &md.spare_devices))
+		goto out;
+	/* check raid level */
+	if (strcmp(md.raid_level, "raid1") != 0) {
+		ERR("%s: Unsupported raid level %s\n", devname, md.raid_level);
+		goto out;
+	}
+	/* check that raid is healthy */
+	if (check_md_state(&md, devname))
+		goto out;
+
+	/* Handle the case when DEV is a partition */
+
+	partstart_md = get_partition_start(major(dev), minor(dev));
+	if (partstart_md < 0) {
+		fprintf(stderr, "Could not determine partition start for '%s'\n",
+			devname);
+		goto out;
+	}
+	/* get information about raid components */
+
+	if (get_components_header(&line, &n, fp)) {
+		fprintf(stderr, "Could not get raid components info for %s\n",
+			devname);
+		goto out;
+	}
+	for (i = 0; i < md.raid_devices; i++) {
+		unsigned int major, minor;
+
+		if (md_get_component(&line, &n, fp, i, &major, &minor))
+			goto out;
+		if (md_mirror_to_params(major, minor, partstart_md, util_id))
+			goto out;
+		if (util_id == CHREIPL_UTIL_ID)
+			/* chreipl accepts only one base disk */
+			break;
+	}
+	ret = 0;
+ out:
+	free(md.raid_level);
+	free(md.version);
+	free(md.state);
+	free(line);
+	pclose(fp);
+	return ret;
+}
+
+static int devname_by_major_minor(unsigned int major, unsigned int minor,
+				  char **devname)
+{
+	return devname_by_device(makedev(major, minor), devname);
+}
+
 static int print_params_device_mapper(char *argv[], struct helper *h)
 {
 	unsigned int major, minor;
@@ -1245,6 +1677,38 @@ static int print_params_device_mapper(char *argv[], struct helper *h)
 	else if (device_by_filename(&dev, name))
 		return -1;
 	return handle_device_mapper(dev, h->util_id, name);
+}
+
+int print_params_md(char *argv[], struct helper *h)
+{
+	unsigned int major, minor;
+	char *devname;
+	dev_t dev;
+	int ret;
+
+	if (h->util_id != CHREIPL_UTIL_ID && h->util_id != ZIPL_UTIL_ID) {
+		fprintf(stderr, "Unsupported utility %d\n", h->util_id);
+		return -1;
+	}
+	if (extract_major_minor_from_cmdline(argv, &major, &minor) == 0) {
+		if (devname_by_major_minor(major, minor, &devname)) {
+			fprintf(stderr, "Could not resolve %u:%u to device name\n",
+				major, minor);
+			return -1;
+		}
+		dev = makedev(major, minor);
+	} else {
+		if (device_by_filename(&dev, argv[1]))
+			return -1;
+		if (devname_by_device(dev, &devname)) {
+			fprintf(stderr, "Directory %s is not over any block device\n",
+			    argv[1]);
+			return -1;
+		}
+	}
+	ret = md_dev_to_params(dev, devname, h->util_id);
+	free(devname);
+	return ret;
 }
 
 static int check_usage_zipl_helper(int argc, char *argv[])
@@ -1276,6 +1740,13 @@ static struct helper helpers[LAST_DRIVER_ID][LAST_UTIL_ID] = {
 		. check_usage = check_usage_zipl_helper,
 		. print_params = print_params_device_mapper
 	},
+	[MD_DRIVER_ID][ZIPL_UTIL_ID] = {
+		. util_id = ZIPL_UTIL_ID,
+		. driver_id = MD_DRIVER_ID,
+		. name = "zipl_helper.md",
+		. check_usage = check_usage_zipl_helper,
+		. print_params = print_params_md
+	},
 	[DM_DRIVER_ID][CHREIPL_UTIL_ID] = {
 		. util_id = CHREIPL_UTIL_ID,
 		. driver_id = DM_DRIVER_ID,
@@ -1283,6 +1754,13 @@ static struct helper helpers[LAST_DRIVER_ID][LAST_UTIL_ID] = {
 		. check_usage = check_usage_chreipl_helper,
 		. print_params = print_params_device_mapper
 	},
+	[MD_DRIVER_ID][CHREIPL_UTIL_ID] = {
+		. util_id = CHREIPL_UTIL_ID,
+		. driver_id = MD_DRIVER_ID,
+		. name = "chreipl_helper.md",
+		. check_usage = check_usage_chreipl_helper,
+		. print_params = print_params_md
+	}
 };
 
 static struct helper *helper_by_toolname(const char *toolname)
@@ -1307,7 +1785,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 
 	if (setlocale(LC_ALL, "C") == NULL) {
-		ERR("Could not use standard locale\n");
+		fprintf(stderr, "Could not use standard locale\n");
 		exit(EXIT_FAILURE);
 	}
 	if (h->print_params(argv, h))
