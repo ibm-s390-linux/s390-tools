@@ -82,6 +82,8 @@
 	fprintf(stderr, "Error: " __VA_ARGS__)
 
 static bool fail_on_dm_mirrors;
+static struct target_ops *target_ops_by_type(int target_type);
+static struct target_ops *find_target_ops(char *id);
 
 struct target_status {
 	char *path;
@@ -101,6 +103,13 @@ struct target {
 	unsigned short type;
 	struct util_list *data;
 	struct util_list_node list;
+};
+
+struct target_ops {
+	int type;
+	const char *id;
+	int (*check_target_status)(const char *devname);
+	struct util_list *(*get_target_data)(const char *devname, char *args);
 };
 
 /* "extended" device */
@@ -184,7 +193,9 @@ enum dev_type {
 enum target_type {
 	TARGET_TYPE_LINEAR = 0,
 	TARGET_TYPE_MIRROR,
-	TARGET_TYPE_MULTIPATH
+	TARGET_TYPE_MULTIPATH,
+	TARGET_TYPE_RAID,
+	LAST_TARGET_TYPE
 };
 
 enum lookup_result {
@@ -194,6 +205,31 @@ enum lookup_result {
 	DM_SINGLE_TARGET,
 	DM_MULTIPLE_TARGETS
 };
+
+/**
+ * Issue an error message about THIS bad property followed by the FIXUP
+ */
+static void print_bad_raid_state(const char *this, const char *fixup,
+				 const char *devname)
+{
+	fprintf(stderr, "%s: Inconsistent RAID state (%s)\n",
+		devname, this);
+	fprintf(stderr, "%s\n",
+		fixup ? fixup : "Bring it into consistent state first");
+}
+
+/**
+ * If STATE contains THIS property, then fail with the proposed FIXUP
+ */
+static int error_on(const char *state, const char *this, const char *fixup,
+		    const char *devname)
+{
+	if (strstr(state, this)) {
+		print_bad_raid_state(this, fixup, devname);
+		return -1;
+	}
+	return 0;
+}
 
 static int is_device_mapper(unsigned int major)
 {
@@ -540,11 +576,8 @@ static int check_mirror_status(const char *devname)
 
 		for (i = 0; i < cnt; i++) {
 			if (status[i] != 'A') {
-				fprintf(stderr,
-					"%s: Raid inconsistent(some mirrors are not 'alive and in-sync').\n",
-					devname);
-				fprintf(stderr,
-					"Bring it into consistent state first.\n");
+				print_bad_raid_state("some mirrors are not 'alive and in-sync'",
+						     NULL, devname);
 				goto out;
 			}
 		}
@@ -556,7 +589,10 @@ out:
 	return ret;
 }
 
-/*
+/**
+ * The 'mirror' dm target is deprecated. Users are recommended to use 'raid'
+ * target of 'raid1' type instead.
+ *
  * There is no kernel documentation for the mirror target. Parameters obtained
  * from Linux sources: drivers/md/dm-log.c and drivers/md/dm-raid1.c
  *
@@ -605,6 +641,116 @@ out2:
 	target_data_list_free(data);
 
 	return NULL;
+}
+
+/**
+ * Kernel documentation for 'raid' target:
+ * https://www.kernel.org/doc/Documentation/device-mapper/dm-raid.txt
+ *
+ * The target is named "raid" and it accepts the following parameters:
+ *
+ *  <raid_type> <#raid_params> <raid_params> \
+ *  <#raid_devs> <metadata_dev0> <dev0> [.. <metadata_devN> <devN>]
+ */
+struct util_list *get_raid_data(const char *devname, char *args)
+{
+	struct util_list *data = util_list_new(struct target_data, list);
+	long nparm, ndevs;
+	char *type;
+
+	STR_TOKEN_OR_GOTO(args, type, out);
+	if (strcmp(type, "raid1") != 0) {
+		ERR("Unsupported raid type %s (only 'raid1' is supported)\n",
+		    type);
+		goto out;
+	}
+	NEXT_INT_TOKEN_OR_GOTO(nparm, out); /* #raid_params */
+	SKIP_NEXT_TOKENS_OR_GOTO(nparm, out); /* raid_params */
+	NEXT_INT_TOKEN_OR_GOTO(ndevs, out);
+
+	for (; ndevs > 0; ndevs--) {
+		unsigned int major, minor;
+		char *name;
+
+		SKIP_NEXT_TOKEN_OR_GOTO(out); /* metadata device */
+		NEXT_STR_TOKEN_OR_GOTO(name, out); /* data device */
+		if (sscanf(name, "%u:%u", &major, &minor) < 2)
+			goto out;
+		util_list_add_tail(data,
+				   target_data_new(major, minor,
+						   0 /* offset */));
+	}
+	return data;
+out:
+	ERR("Unrecognized device-mapper table format for device '%s'\n",
+	    devname);
+	target_data_list_free(data);
+	return NULL;
+}
+
+/**
+ * From https://www.kernel.org/doc/Documentation/device-mapper/dm-raid.txt
+ * Status output:
+ *
+ * <s> <l> raid \
+ * <raid_type> <#devices> <health_chars> \
+ * <sync_ratio> <sync_action> <mismatch_cnt>
+ */
+static int check_raid_status(const char *devname)
+{
+	char *line = NULL;
+	size_t n = 0;
+	int ret = -1;
+	FILE *fp;
+
+	fp = exec_cmd_and_get_out_stream("dmsetup status /dev/%s 2>/dev/null",
+					 devname);
+	if (fp == NULL) {
+		ERR("Failed to get raid status\n");
+		return -1;
+	}
+	while (getline(&line, &n, fp) != -1) {
+		char *status = NULL;
+		char *token = NULL;
+		long cnt;
+		int i;
+
+		/* Sample output (single line):
+		 *
+		 * 0 43261952 raid \
+		 * raid1 2 AA \
+		 * 43261952/43261952 \
+		 * idle 0 0 -
+		 */
+		STR_TOKEN_OR_GOTO(line, token, out);
+		SKIP_NEXT_TOKEN_OR_GOTO(out); /* length */
+		NEXT_STR_TOKEN_OR_GOTO(token, out); /* type */
+		if (strcmp(token, "raid") != 0) {
+			ERR("Unrecognized status for 'raid' target\n");
+			goto out;
+		}
+		NEXT_STR_TOKEN_OR_GOTO(token, out); /* type */
+		if (strcmp(token, "raid1") != 0) {
+			ERR("Unrecognized type (%s) of 'raid' target. Only 'raid1' is supported\n",
+			    token);
+			goto out;
+		}
+		NEXT_INT_TOKEN_OR_GOTO(cnt, out); /* #nr_mirrors */
+		NEXT_STR_TOKEN_OR_GOTO(status, out); /* status buffer */
+
+		for (i = 0; i < cnt; i++) {
+			if (status[i] != 'A') {
+				print_bad_raid_state("some mirrors are not 'alive and in-sync'",
+						     NULL, devname);
+				goto out;
+			}
+		}
+	}
+	ret = 0;
+out:
+	free(line);
+	pclose(fp);
+	return ret;
 }
 
 static struct target_status *target_status_new(const char *path, char status)
@@ -855,7 +1001,7 @@ static int get_table(dev_t dev, struct util_list **table)
 		char *type = NULL, *args = NULL;
 		struct util_list *data = NULL;
 		unsigned long start, length;
-		unsigned short ttype;
+		struct target_ops *tops;
 
 		if (sscanf(line, "%lu %lu %ms %m[a-zA-Z0-9_: -]",
 			   &start, &length, &type, &args) < 4) {
@@ -863,25 +1009,19 @@ static int get_table(dev_t dev, struct util_list **table)
 			    devname);
 			goto out;
 		}
-		if (strcmp(type, "linear") == 0) {
-			data = get_linear_data(devname, args);
-			ttype = TARGET_TYPE_LINEAR;
-		} else if (strcmp(type, "mirror") == 0) {
-			data = get_mirror_data(devname, args);
-			ttype = TARGET_TYPE_MIRROR;
-		} else if (strcmp(type, "multipath") == 0) {
-			data = get_multipath_data(devname, args);
-			ttype = TARGET_TYPE_MULTIPATH;
-		} else {
+		tops = find_target_ops(type);
+		if (!tops) {
 			ERR("Unsupported setup: Unsupported device-mapper "
 			    "target type '%s' for device '%s'\n",
 			    type, devname);
 		}
+		data = tops->get_target_data(devname, args);
 		free(type);
 		free(args);
 		if (data == NULL)
 			goto out;
-		util_list_add_tail(*table, target_new(start, length, ttype, data));
+		util_list_add_tail(*table,
+				   target_new(start, length, tops->type, data));
 	}
 	free(line);
 	pclose(fp);
@@ -938,6 +1078,11 @@ static int lookup_parent(dev_t device, struct util_list **table,
 	return DM_SINGLE_TARGET;
 }
 
+static int target_is_mirrored(struct target *t)
+{
+	return t->type == TARGET_TYPE_MIRROR || t->type == TARGET_TYPE_RAID;
+}
+
 /**
  * Starting from DEVICE go upward the device tree and find the topmost
  * device, which is not a logical device managed by device-mapper driver.
@@ -988,7 +1133,7 @@ static struct util_list *dmpath_walk(struct ext_dev *bottom, const char *dir,
 
 		target_move(target, &top, &table, dmpath);
 		de = util_list_start(dmpath);
-		if (de->target->type == TARGET_TYPE_MIRROR) {
+		if (target_is_mirrored(de->target)) {
 			if (*mirror || fail_on_dm_mirrors) {
 				ERR("Unsupported setup: Nested mirrors");
 				goto error;
@@ -1217,13 +1362,17 @@ static int dm_dev_to_zipl_params(struct ext_dev *dev, char *dir)
 	base_dev_to_params(base_dev, &pd.dc, pd.offset);
 
 	if (pd.mirror) {
-		/* check mirror status */
-		struct target *mt = pd.mirror->target;
-		struct target_data *mtd = util_list_start(mt->data);
 		char devname[BDEVNAME_SIZE];
+		struct target_data *mtd;
+		struct target_ops *tops;
+		struct target *mt;
 
+		mt = pd.mirror->target;
+		mtd = util_list_start(mt->data);
+		tops = target_ops_by_type(mt->type);
 		get_device_name(devname, pd.mirror->dev.dev);
-		if (check_mirror_status(devname))
+
+		if (tops->check_target_status(devname))
 			goto error;
 		/* Print also parameters for other mirrors */
 
@@ -1419,13 +1568,12 @@ static int md_get_data_offset(unsigned long major, unsigned long minor,
 	return 0;
 }
 
-static void md_print_bad_status(struct mdstat *md, const char *devname)
+static void md_print_status(struct mdstat *md, const char *devname)
 {
-	fprintf(stderr, "Raid Devices: %lu\n", md->raid_devices);
-	fprintf(stderr, "Active Devices: %lu\n", md->active_devices);
-	fprintf(stderr, "Working Devices: %lu\n", md->working_devices);
-	fprintf(stderr, "%s: RAID inconsistent (some its components are not active or working).\n",
-		devname);
+	fprintf(stderr, "%s: Raid status:\n", devname);
+	fprintf(stderr, "  Raid Devices: %lu\n", md->raid_devices);
+	fprintf(stderr, "  Active Devices: %lu\n", md->active_devices);
+	fprintf(stderr, "  Working Devices: %lu\n", md->working_devices);
 }
 
 static int devname_by_device(dev_t device, char **devname)
@@ -1540,33 +1688,23 @@ static int md_mirror_to_params(unsigned int major, unsigned int minor,
 	return 0;
 }
 
-/**
- * If STATE contains THIS property, then issue an error message
- * with the proposed FIXUP
- */
-static int error_on(const char *state, const char *this, const char *fixup,
-		    const char *devname)
-{
-	if (strstr(state, this)) {
-		fprintf(stderr, "%s: Inconsistent RAID state ('%s'). %s.\n",
-			devname, this, fixup);
-		return -1;
-	}
-	return 0;
-}
-
 static int check_md_state(struct mdstat *md, const char *devname)
 {
-	if (error_on(md->state, "recovering", "Complete its recovery", devname))
+	if (error_on(md->state, "recovering",
+		     "Complete its recovery first", devname))
 		return -1;
-	if (error_on(md->state, "degraded", "Restore its redundancy", devname))
+	if (error_on(md->state, "degraded",
+		     "Restore its redundancy first", devname))
 		return -1;
-	if (error_on(md->state, "dirty", "Bring it into clean state\n", devname))
+	if (error_on(md->state, "dirty",
+		     "Bring it into clean state first", devname))
 		return -1;
 
 	if (md->raid_devices != md->active_devices ||
 	    md->raid_devices > md->working_devices) {
-		md_print_bad_status(md, devname);
+		md_print_status(md, devname);
+		print_bad_raid_state("some mirrors are not active or working",
+				     NULL, devname);
 		return -1;
 	}
 	return 0;
@@ -1730,6 +1868,47 @@ static int check_usage_chreipl_helper(int argc, char *argv[])
 		return -1;
 	}
 	return 0;
+}
+
+static struct target_ops target_ops[LAST_TARGET_TYPE] = {
+	[TARGET_TYPE_LINEAR] = {
+		. type = TARGET_TYPE_LINEAR,
+		. id = "linear",
+		. get_target_data = get_linear_data
+	},
+	[TARGET_TYPE_MIRROR] = {
+		. type = TARGET_TYPE_MIRROR,
+		. id = "mirror",
+		. get_target_data = get_mirror_data,
+		. check_target_status = check_mirror_status
+	},
+	[TARGET_TYPE_MULTIPATH] = {
+		. type = TARGET_TYPE_MULTIPATH,
+		. id = "multipath",
+		. get_target_data = get_multipath_data
+	},
+	[TARGET_TYPE_RAID] = {
+		. type = TARGET_TYPE_RAID,
+		. id = "raid",
+		. get_target_data = get_raid_data,
+		. check_target_status = check_raid_status
+	}
+};
+
+static struct target_ops *target_ops_by_type(int target_type)
+{
+	return &target_ops[target_type];
+}
+
+static struct target_ops *find_target_ops(char *id)
+{
+	int i;
+
+	for (i = 0; i < LAST_TARGET_TYPE; i++) {
+		if (!strcmp(id, target_ops_by_type(i)->id))
+			return target_ops_by_type(i);
+	}
+	return NULL;
 }
 
 static struct helper helpers[LAST_DRIVER_ID][LAST_UTIL_ID] = {
