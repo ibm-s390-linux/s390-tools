@@ -54,12 +54,12 @@ struct config cfg = {
 	.hotunplug = NULL,
 };
 
-int num_cpu_start, memory, cpu, reload_pending;
-long cmm_pagesize_start;
-unsigned long meminfo_size, vmstat_size, cpustat_size, varinfo_size;
-char *meminfo, *vmstat, *cpustat, *varinfo;
-double *timestamps;
 unsigned int history_max, history_current, history_prev, sym_names_count;
+unsigned long meminfo_size, vmstat_size, cpustat_size, varinfo_size;
+int num_cpu_start, memory, cpu, reload_pending, saved_polarization;
+char *meminfo, *vmstat, *cpustat, *varinfo;
+long cmm_pagesize_start;
+double *timestamps;
 
 static struct symbols symbols;
 static jmp_buf jmpenv;
@@ -77,8 +77,29 @@ static void eval_cpu_rules(void)
 {
 	double diffs[CPUSTATS], diffs_total, percent_factor;
 	char *procinfo_current, *procinfo_prev;
-	int nr_cpus, on_off;
+	int nr_cpus, on_off, polarization;
 
+	polarization = get_polarization();
+	if (polarization < 0) {
+		cpuplugd_debug("couldn't determine system polarization\n");
+		cpuplugd_debug("skipping cpu rule evaluation\n");
+		return;
+	}
+	if (saved_polarization != polarization) {
+		saved_polarization = polarization;
+		if (polarization == PLR_VERTICAL) {
+			/* revert cpu hotplug adjustments after switching from horizontal */
+			reactivate_cpus();
+		} else if (polarization == PLR_HORIZONTAL) {
+			/* reapply cpu config after switching from vertical */
+			apply_cpu_config();
+		}
+	}
+	if (polarization == PLR_VERTICAL) {
+		cpuplugd_debug("system is running vertical polarization\n");
+		cpuplugd_debug("cpuplugd won't make cpu adjustments\n");
+		return;
+	}
 	nr_cpus = get_numcpus();
 	procinfo_current = cpustat + history_current * cpustat_size;
 	procinfo_prev = cpustat + history_prev * cpustat_size;
@@ -157,7 +178,6 @@ static void eval_cpu_rules(void)
 		printf("\n");
 		printf("---------------------------------------------\n");
 	}
-
 	on_off = 0;
 	/* Evaluate the hotplug rule */
 	if (eval_term(cfg.hotplug, &symbols))

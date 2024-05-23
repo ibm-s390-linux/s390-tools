@@ -22,6 +22,9 @@ of active CPUs are reset to the values they had before the cpuplugd was started.
 This program can be used to control the number of CPUs for Linux on z/VM
 and for Linux in LPAR mode. The memory hotplug feature (CMM page pool) applies
 to Linux on z/VM only.
+
+The cpuplugd daemon stops any CPU hot-plug operations when the system switches
+to vertical polarization, thus avoiding possible performance penalties.
 .
 .SH OPTIONS
 .TP

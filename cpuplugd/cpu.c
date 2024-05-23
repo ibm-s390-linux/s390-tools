@@ -79,6 +79,23 @@ int get_num_online_cpus(void)
 }
 
 /*
+ * get_polarization() - return system polarization
+ */
+int get_polarization(void)
+{
+	int polarization;
+	char *path;
+
+	path = util_path_sysfs("devices/system/cpu/dispatching");
+	if (util_file_read_i(&polarization, NUM_BASE, path) < 0) {
+		polarization = -1;
+		cpuplugd_debug("failed to read system polarization\n");
+	}
+	free(path);
+	return polarization;
+}
+
+/*
  * is_cpu_hotpluggable() - check if cpuhotplug operations are supported
  * for the given cpu.
  */
@@ -206,8 +223,6 @@ void reactivate_cpus(void)
 	int cpuid, nc, count, i;
 	char *path;
 
-	/* suppress verbose messages on exit */
-	debug = 0;
 	/*
 	 * Only enable the number of cpus which where available at
 	 * daemon startup time by checking num_cpu_start.

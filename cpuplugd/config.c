@@ -204,6 +204,45 @@ void parse_configfile(char *file)
 	fclose(filp);
 }
 
+void apply_cpu_config(void)
+{
+	/*
+	 * Check that the initial number of cpus is not below the
+	 * minimum
+	 */
+	if (num_cpu_start < cfg.cpu_min &&
+	    get_numcpus() >= cfg.cpu_min) {
+		cpuplugd_debug("The number of online cpus is below ");
+		cpuplugd_debug("the minimum and will be increased.\n");
+		while (get_num_online_cpus() < cfg.cpu_min) {
+			if (hotplug_one_cpu())
+				break;
+		}
+	}
+	if (get_num_online_cpus() > cfg.cpu_max) {
+		cpuplugd_debug("The number of online cpus is above the maximum");
+		cpuplugd_debug(" and will be decreased.\n");
+		while (get_num_online_cpus() > cfg.cpu_max) {
+			if (hotunplug_one_cpu())
+				break;
+		}
+	}
+	if (cfg.cpu_min > get_numcpus()) {
+		/*
+		 * This check only works if nobody used the
+		 * additional_cpus in the boot parameter section
+		 */
+		cpuplugd_debug("The minimum amount of cpus is above the ");
+		cpuplugd_debug("number of available cpus.\n");
+		cpuplugd_exit("Detected %d available cpus\n", get_numcpus());
+	}
+	if (get_num_online_cpus() < cfg.cpu_min) {
+		cpuplugd_debug("Failed to set the number of online cpus to ");
+		cpuplugd_debug("the minimum. ");
+		cpuplugd_exit("Aborting.\n");
+	}
+}
+
 /*
  * Check if the required settings are found in the configuration file.
  * "Autodetect" if cpu and/or memory hotplug configuration entries
@@ -261,44 +300,23 @@ void check_config()
 	/*
 	* Save the number of online cpus and the cmm_pagesize at startup,
 	* so that we can enable exactly the same amount when the daemon ends
+	*
+	* Don't adjust cpus if system is on vertical polarization
 	*/
-	if (cpu) {
-		num_cpu_start = get_num_online_cpus();
-		cpuplugd_debug("Daemon started with %d active cpus.\n",
-			       num_cpu_start);
-		/*
-		 * Check that the initial number of cpus is not below the
-		 * minimum
-		 */
-		if (num_cpu_start < cfg.cpu_min &&
-		    get_numcpus() >= cfg.cpu_min) {
-			cpuplugd_debug("The number of online cpus is below "
-				       "the minimum and will be increased.\n");
-			while (get_num_online_cpus() < cfg.cpu_min) {
-				if (hotplug_one_cpu())
-					break;
-			}
-		}
-		if (get_num_online_cpus() > cfg.cpu_max) {
-			cpuplugd_debug("The number of online cpus is above the maximum"
-				       " and will be decreased.\n");
-			while (get_num_online_cpus() > cfg.cpu_max) {
-				if (hotunplug_one_cpu())
-					break;
-			}
-		}
-		if (cfg.cpu_min > get_numcpus())
-			/*
-			 * This check only works if nobody used the
-			 * additional_cpus in the boot parameter section
-			 */
-			cpuplugd_exit("The minimum amount of cpus is above "
-				      "the number of available cpus.\n"
-				      "Detected %d available cpus\n",
-				      get_numcpus());
-		if (get_num_online_cpus() < cfg.cpu_min)
-			cpuplugd_exit("Failed to set the number of online "
-				      "cpus to the minimum. Aborting.\n");
+	saved_polarization = get_polarization();
+	num_cpu_start = get_num_online_cpus();
+	cpuplugd_debug("Daemon started with %d active cpus.\n",
+		       num_cpu_start);
+	if (saved_polarization < 0) {
+		cpuplugd_debug("Daemon couldn't determine system polarization\n");
+		cpuplugd_debug("Starting without evaluating cpu rules\n");
+	} else if (saved_polarization == PLR_VERTICAL) {
+		cpuplugd_debug("Daemon started with vertical polarization.\n");
+		cpuplugd_debug("Cpu adjustments won't be made until system ");
+		cpuplugd_debug("is in horizontal polarization\n");
+	} else if (saved_polarization == PLR_HORIZONTAL &&
+		   cpu == 1) {
+		apply_cpu_config();
 	}
 	if (memory == 1) {
 		/*

@@ -38,6 +38,8 @@
 #define MAX_VARNAME	128
 #define MAX_LINESIZE	2048
 #define CPUSTATS	10
+#define PLR_HORIZONTAL	0
+#define PLR_VERTICAL	1
 
 /*
  *  Precedence of C operators
@@ -176,9 +178,11 @@ extern unsigned int history_max;
 extern unsigned int history_current;
 extern struct symbol_names sym_names[];
 extern unsigned int sym_names_count;
+extern int saved_polarization;
 
 int get_numcpus();
 int get_num_online_cpus();
+int get_polarization(void);
 void get_loadavg_runnable(double *loadavg, double *runnable);
 void clean_up();
 void reactivate_cpus();
@@ -204,6 +208,7 @@ void reload_daemon(void);
 int daemonize(void);
 int check_cmmfiles(void);
 void check_config();
+void apply_cpu_config(void);
 void set_cmm_pages(long size);
 int check_lpar();
 void setup_history(void);

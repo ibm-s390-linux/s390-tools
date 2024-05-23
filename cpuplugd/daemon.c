@@ -149,6 +149,8 @@ void clean_up()
 	cpuplugd_info("terminated\n");
 	remove(pid_file);
 	remove(LOCKFILE);
+	/* suppress verbose messages on exit */
+	debug = 0;
 	reactivate_cpus();
 	if (memory)
 		cleanup_cmm();
@@ -163,6 +165,8 @@ void kill_daemon(int UNUSED(a))
 	cpuplugd_info("shutting down\n");
 	remove(pid_file);
 	remove(LOCKFILE);
+	/* suppress verbose messages on exit */
+	debug = 0;
 	reactivate_cpus();
 	if (memory)
 		cleanup_cmm();
