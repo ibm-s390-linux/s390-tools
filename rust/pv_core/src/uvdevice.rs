@@ -208,7 +208,7 @@ impl UvDevice {
                 .open(UvDevice::PATH)
                 .map_err(|e| Error::FileAccess {
                     ty: FileAccessErrorType::Open,
-                    path: (UvDevice::PATH).to_string(),
+                    path: (UvDevice::PATH).into(),
                     source: e,
                 })?,
         ))

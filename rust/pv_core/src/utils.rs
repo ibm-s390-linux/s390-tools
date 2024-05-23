@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 use crate::{
-    macros::{bail_spec, file_error, path_to_str},
+    macros::{bail_spec, file_error},
     Error, FileAccessErrorType, FileIoErrorType, Result,
 };
 use std::{
@@ -187,7 +187,7 @@ pub fn try_parse_u64(hex_str: &str, ctx: &str) -> Result<u64> {
 pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
     File::open(&path).map_err(|e| Error::FileAccess {
         ty: FileAccessErrorType::Open,
-        path: path_to_str!(path).to_string(),
+        path: path.as_ref().to_path_buf(),
         source: e,
     })
 }
@@ -200,7 +200,7 @@ pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
 pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
     File::create(&path).map_err(|e| Error::FileAccess {
         ty: FileAccessErrorType::Create,
-        path: path_to_str!(path).to_string(),
+        path: path.as_ref().to_path_buf(),
         source: e,
     })
 }
@@ -226,7 +226,7 @@ pub fn read_exact_file<P: AsRef<Path>, const COUNT: usize>(
 ) -> Result<[u8; COUNT]> {
     let mut f = File::open(&path).map_err(|e| Error::FileAccess {
         ty: FileAccessErrorType::Open,
-        path: path_to_str!(path).to_string(),
+        path: path.as_ref().to_path_buf(),
         source: e,
     })?;
 
@@ -236,7 +236,7 @@ pub fn read_exact_file<P: AsRef<Path>, const COUNT: usize>(
 
     let mut buf = [0; COUNT];
     f.read_exact(&mut buf)
-        .map_err(|e| file_error!(Read, ctx, path_to_str!(path).to_string(), e))?;
+        .map_err(|e| file_error!(Read, ctx, path, e))?;
     Ok(buf)
 }
 
@@ -249,14 +249,7 @@ pub fn read_exact_file<P: AsRef<Path>, const COUNT: usize>(
 /// # Errors
 /// Passes through any kind of error `std::fs::read` produces
 pub fn read_file<P: AsRef<Path>>(path: P, ctx: &str) -> Result<Vec<u8>> {
-    std::fs::read(&path).map_err(|e| {
-        file_error!(
-            Read,
-            ctx,
-            path.as_ref().to_str().unwrap_or("no UTF-8 path"),
-            e
-        )
-    })
+    std::fs::read(&path).map_err(|e| file_error!(Read, ctx, path, e))
 }
 
 /// Reads all content from a [`std::io::Read`] and add context in case of an error
@@ -267,12 +260,12 @@ pub fn read_file<P: AsRef<Path>>(path: P, ctx: &str) -> Result<Vec<u8>> {
 ///
 /// # Errors
 /// Passes through any kind of error `std::fs::read` produces
-pub fn read<R: Read>(rd: &mut R, path: &str, ctx: &str) -> Result<Vec<u8>> {
+pub fn read<R: Read, P: AsRef<Path>>(rd: &mut R, path: P, ctx: &str) -> Result<Vec<u8>> {
     let mut buf = vec![];
     rd.read_to_end(&mut buf).map_err(|e| Error::FileIo {
         ty: FileIoErrorType::Write,
         ctx: ctx.to_string(),
-        path: path.to_string(),
+        path: path.as_ref().to_path_buf(),
         source: e,
     })?;
     Ok(buf)
@@ -286,11 +279,11 @@ pub fn read<R: Read>(rd: &mut R, path: &str, ctx: &str) -> Result<Vec<u8>> {
 ///
 /// # Errors
 /// Passes through any kind of error `std::fs::write` produces
-pub fn write_file<D: AsRef<[u8]>>(path: &str, data: D, ctx: &str) -> Result<()> {
-    std::fs::write(path, data.as_ref()).map_err(|e| Error::FileIo {
+pub fn write_file<D: AsRef<[u8]>, P: AsRef<Path>>(path: P, data: D, ctx: &str) -> Result<()> {
+    std::fs::write(path.as_ref(), data.as_ref()).map_err(|e| Error::FileIo {
         ty: FileIoErrorType::Write,
         ctx: ctx.to_string(),
-        path: path.to_string(),
+        path: path.as_ref().to_path_buf(),
         source: e,
     })
 }
@@ -303,11 +296,16 @@ pub fn write_file<D: AsRef<[u8]>>(path: &str, data: D, ctx: &str) -> Result<()> 
 ///
 /// # Errors
 /// Passes through any kind of error `std::fs::write` produces
-pub fn write<D: AsRef<[u8]>, W: Write>(wr: &mut W, data: D, path: &str, ctx: &str) -> Result<()> {
+pub fn write<D: AsRef<[u8]>, P: AsRef<Path>, W: Write>(
+    wr: &mut W,
+    data: D,
+    path: P,
+    ctx: &str,
+) -> Result<()> {
     wr.write_all(data.as_ref()).map_err(|e| Error::FileIo {
         ty: FileIoErrorType::Write,
         ctx: ctx.to_string(),
-        path: path.to_string(),
+        path: path.as_ref().to_path_buf(),
         source: e,
     })
 }

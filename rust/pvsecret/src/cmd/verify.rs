@@ -10,7 +10,7 @@ use utils::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg};
 
 /// read the content of a DER or PEM x509 and return the public key
 fn read_sgn_key(path: &str) -> Result<PKey<Public>> {
-    read_certs(&read_file(path, "user-signing key")?)?
+    read_certs(read_file(path, "user-signing key")?)?
         .first()
         .ok_or(anyhow!("File does not contain a X509 certificate"))?
         .public_key()

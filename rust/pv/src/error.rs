@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
+use std::path::PathBuf;
+
 use crate::secret::UserDataType;
 
 /// Result type for this crate
@@ -26,7 +28,7 @@ pub enum Error {
 
     #[error("Cannot load {ty}  from {path}")]
     X509Load {
-        path: String,
+        path: PathBuf,
         ty: &'static str,
         source: openssl::error::ErrorStack,
     },

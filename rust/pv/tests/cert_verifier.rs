@@ -40,9 +40,10 @@ fn verifier_new() {
     let ibm_early_crt = get_cert_asset_path("ibm_outdated_early.crl");
     let ibm_late_crt = get_cert_asset_path("ibm_outdated_late.crl");
     let ibm_rev_crt = get_cert_asset_path("ibm_rev.crt");
+    let empty: [String; 0] = [];
 
     // Too many signing keys
-    let verifier = CertVerifier::new(&[&ibm_crt, &ibm_rev_crt], &[], None, true);
+    let verifier = CertVerifier::new(&[&ibm_crt, &ibm_rev_crt], &empty, None::<String>, true);
     assert!(matches!(verifier, Err(Error::HkdVerify(ManyIbmSignKeys))));
 
     // No CRL for each X509
@@ -53,7 +54,7 @@ fn verifier_new() {
         false,
     );
     verify_sign_error(3, verifier.unwrap_err());
-    let verifier = CertVerifier::new(&[&inter_crt, &ibm_crt], &[], Some(&root_chn_crt), false);
+    let verifier = CertVerifier::new(&[&inter_crt, &ibm_crt], &empty, Some(&root_chn_crt), false);
     verify_sign_error(3, verifier.unwrap_err());
 
     // Wrong intermediate (or ibm key)
@@ -67,7 +68,7 @@ fn verifier_new() {
     verify_sign_error_slice(&[20, 30], verifier.unwrap_err());
 
     // Wrong root ca
-    let verifier = CertVerifier::new(&[&inter_crt, &ibm_crt], &[&inter_crl], None, true);
+    let verifier = CertVerifier::new(&[&inter_crt, &ibm_crt], &[&inter_crl], None::<String>, true);
     verify_sign_error(20, verifier.unwrap_err());
 
     // Correct signing key + intermediate cert
@@ -80,7 +81,7 @@ fn verifier_new() {
     .unwrap();
 
     // No intermediate key
-    let verifier = CertVerifier::new(&[&ibm_crt], &[], Some(&root_chn_crt), false);
+    let verifier = CertVerifier::new(&[&ibm_crt], &empty, Some(&root_chn_crt), false);
     verify_sign_error(20, verifier.unwrap_err());
 
     // IBM Sign outdated

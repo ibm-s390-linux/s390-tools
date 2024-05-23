@@ -14,7 +14,7 @@ use crate::test_utils::*;
 // Mock function
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<X509Crl>>> {
     fn mock_download<P: AsRef<Path>>(path: P) -> Result<Vec<X509Crl>> {
-        read_crls(&std::fs::read(path)?)
+        read_crls(std::fs::read(path)?)
     }
 
     for dist_point in x509_dist_points(cert) {
@@ -35,8 +35,9 @@ pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<X509Crl
 fn store_setup() {
     let ibm_path = get_cert_asset_path("ibm.crt");
     let inter_path = get_cert_asset_path("inter.crt");
+    let crls: [String; 0] = [];
 
-    let store = helper::store_setup(None, &[], &[&ibm_path, &inter_path]);
+    let store = helper::store_setup(None::<String>, &crls, &[&ibm_path, &inter_path]);
     assert!(store.is_ok());
 }
 
@@ -45,8 +46,9 @@ fn verify_chain_online() {
     let ibm_crt = get_cert_asset_path("ibm.crt");
     let inter_crt = get_cert_asset_path("inter_ca.crt");
     let root_crt = get_cert_asset_path("root_ca.chained.crt");
+    let crls: [String; 0] = [];
 
-    let ret = CertVerifier::new(&[&ibm_crt, &inter_crt], &[], Some(&root_crt), false);
+    let ret = CertVerifier::new(&[&ibm_crt, &inter_crt], &crls, Some(&root_crt), false);
     assert!(ret.is_ok(), "CertVerifier::new failed: {ret:?}");
 }
 
@@ -56,8 +58,9 @@ fn verify_chain_offline() {
     let inter_crl = get_cert_asset_path("inter_ca.crl");
     let inter_crt = load_gen_cert("inter_ca.crt");
     let root_crt = get_cert_asset_path("root_ca.chained.crt");
+    let certs: [String; 0] = [];
 
-    let store = helper::store_setup(Some(&root_crt), &[&inter_crl], &[])
+    let store = helper::store_setup(Some(&root_crt), &[&inter_crl], &certs)
         .unwrap()
         .build();
 
@@ -84,10 +87,10 @@ fn verify(offline: bool, ibm_crt: &'static str, ibm_crl: &'static str, hkd: &'st
     let hkd_exp = load_gen_cert("host_crt_expired.crt");
     let hkd = load_gen_cert(hkd);
 
-    let crls = &[ibm_crl.as_path(), inter_crl.as_path()];
+    let crls = [&ibm_crl, &inter_crl];
     let verifier = CertVerifier::new(
         &[&ibm_crt, &inter_crt],
-        if offline { crls } else { &[] },
+        if offline { &crls } else { &[] },
         Some(&root_crt),
         offline,
     )

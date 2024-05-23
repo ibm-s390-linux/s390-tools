@@ -173,12 +173,17 @@ impl CertVerifier {
     /// # Errors
     ///
     /// This function will return an error if the chain of trust could not be established.
-    pub fn new(
-        cert_paths: &[&Path],
-        crl_paths: &[&Path],
-        root_ca_path: Option<&Path>,
+    pub fn new<P, Q, R>(
+        cert_paths: &[P],
+        crl_paths: &[Q],
+        root_ca_path: Option<R>,
         offline: bool,
-    ) -> Result<Self> {
+    ) -> Result<Self>
+    where
+        P: AsRef<Path>,
+        Q: AsRef<Path>,
+        R: AsRef<Path>,
+    {
         let mut store = helper::store_setup(root_ca_path, crl_paths, cert_paths)?;
         let mut untr_certs = Vec::with_capacity(cert_paths.len());
         for path in cert_paths {

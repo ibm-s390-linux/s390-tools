@@ -2,19 +2,12 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-macro_rules! path_to_str {
-    ($path: expr) => {
-        $path.as_ref().to_str().unwrap_or("no UTF-8 path")
-    };
-}
-pub(crate) use path_to_str;
-
 macro_rules! file_error {
     ($ty: tt, $ctx: expr, $path:expr, $src: expr) => {
         $crate::Error::FileIo {
             ty: $crate::FileIoErrorType::$ty,
             ctx: $ctx.to_string(),
-            path: $path.to_string(),
+            path: $path.as_ref().to_path_buf(),
             source: $src,
         }
     };

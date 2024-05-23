@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
+use std::path::PathBuf;
+
 /// Result type for this crate
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -24,13 +26,13 @@ pub enum Error {
     FileIo {
         ty: FileIoErrorType,
         ctx: String,
-        path: String,
+        path: PathBuf,
         source: std::io::Error,
     },
     #[error("Cannot {ty} `{path}`")]
     FileAccess {
         ty: FileAccessErrorType,
-        path: String,
+        path: PathBuf,
         source: std::io::Error,
     },
 

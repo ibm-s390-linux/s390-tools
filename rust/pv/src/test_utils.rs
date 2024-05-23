@@ -42,7 +42,7 @@ pub fn get_cert_asset_path<P: AsRef<Path>>(path: P) -> PathBuf {
 /// TEST ONLY! Load an cert
 ///
 /// panic on errors
-pub fn get_cert_asset(path: &'static str) -> Vec<u8> {
+pub fn get_cert_asset<P: AsRef<Path>>(path: P) -> Vec<u8> {
     let p = get_cert_asset_path(path);
     fs::read(p).unwrap()
 }
@@ -50,7 +50,7 @@ pub fn get_cert_asset(path: &'static str) -> Vec<u8> {
 /// TEST ONLY! Load cert found in the asset path
 ///
 /// panic on errors
-pub fn load_gen_cert(asset_path: &'static str) -> X509 {
+pub fn load_gen_cert<P: AsRef<Path>>(asset_path: P) -> X509 {
     let buf = get_cert_asset(asset_path);
     let mut cert = X509::from_der(&buf)
         .map(|crt| vec![crt])
@@ -63,7 +63,7 @@ pub fn load_gen_cert(asset_path: &'static str) -> X509 {
 /// TEST ONLY! Load the CRL found in the asset path
 ///
 /// panic on errors
-pub fn load_gen_crl(asset_path: &'static str) -> X509Crl {
+pub fn load_gen_crl<P: AsRef<Path>>(asset_path: P) -> X509Crl {
     let buf = get_cert_asset(asset_path);
 
     X509Crl::from_der(&buf)

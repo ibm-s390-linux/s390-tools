@@ -104,9 +104,9 @@ impl CertificateOptions {
                 Ok(Box::new(NoVerifyHkd))
             }
             false => Ok(Box::new(CertVerifier::new(
-                &self.certs.iter().map(Path::new).collect::<Vec<_>>(),
-                &self.crls.iter().map(Path::new).collect::<Vec<_>>(),
-                self.root_ca.as_ref().map(Path::new),
+                &self.certs,
+                &self.crls,
+                self.root_ca.as_ref(),
                 self.offline,
             )?)),
         }
@@ -154,8 +154,8 @@ pub const STDOUT: &str = "-";
 pub const STDIN: &str = "-";
 
 /// Converts an argument value into a Writer.
-pub fn get_writer_from_cli_file_arg(path: &str) -> Result<Box<dyn Write>> {
-    if path == STDOUT {
+pub fn get_writer_from_cli_file_arg<P: AsRef<Path>>(path: P) -> Result<Box<dyn Write>> {
+    if path.as_ref() == Path::new(STDOUT) {
         Ok(Box::new(std::io::stdout()))
     } else {
         Ok(Box::new(create_file(path)?))
@@ -163,8 +163,8 @@ pub fn get_writer_from_cli_file_arg(path: &str) -> Result<Box<dyn Write>> {
 }
 
 /// Converts an argument value into a Reader.
-pub fn get_reader_from_cli_file_arg(path: &str) -> Result<Box<dyn Read>> {
-    if path == STDIN {
+pub fn get_reader_from_cli_file_arg<P: AsRef<Path>>(path: P) -> Result<Box<dyn Read>> {
+    if path.as_ref() == Path::new(STDIN) {
         Ok(Box::new(std::io::stdin()))
     } else {
         Ok(Box::new(open_file(path)?))

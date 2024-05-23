@@ -75,10 +75,10 @@ pub fn verify_crl(crl: &X509CrlRef, issuer: &X509Ref) -> Option<()> {
 }
 
 /// Setup the x509Store such that it can be used it for verifying certificates
-pub fn store_setup(
-    root_ca_path: Option<&Path>,
-    crl_paths: &[&Path],
-    cert_w_crl_paths: &[&Path],
+pub fn store_setup<P: AsRef<Path>, Q: AsRef<Path>, R: AsRef<Path>>(
+    root_ca_path: Option<P>,
+    crl_paths: &[Q],
+    cert_w_crl_paths: &[R],
 ) -> Result<X509StoreBuilder> {
     let mut x509store = X509StoreBuilder::new()?;
 
@@ -89,7 +89,7 @@ pub fn store_setup(
 
     for crl in crl_paths {
         load_crl_to_store(&mut x509store, crl, true).map_err(|source| Error::X509Load {
-            path: crl.display().to_string(),
+            path: crl.as_ref().into(),
             ty: Error::CRL,
             source,
         })?;
@@ -97,7 +97,7 @@ pub fn store_setup(
 
     for crl in cert_w_crl_paths {
         load_crl_to_store(&mut x509store, crl, false).map_err(|source| Error::X509Load {
-            path: crl.display().to_string(),
+            path: crl.as_ref().into(),
             ty: Error::CRL,
             source,
         })?;
@@ -236,35 +236,35 @@ fn get_ibm_z_sign_key(certs: &[X509]) -> Result<X509> {
     }
 }
 
-fn load_root_ca(path: &Path, x509_store: &mut X509StoreBuilder) -> Result<()> {
+fn load_root_ca<P: AsRef<Path>>(path: P, x509_store: &mut X509StoreBuilder) -> Result<()> {
     let lu = x509_store.add_lookup(X509Lookup::<File>::file())?;
 
     // Try to load cert as PEM file
-    match lu.load_cert_file(path, SslFiletype::PEM) {
+    match lu.load_cert_file(&path, SslFiletype::PEM) {
         Ok(_) => lu
-            .load_crl_file(path, SslFiletype::PEM)
+            .load_crl_file(&path, SslFiletype::PEM)
             .map(|_| ())
             .or(Ok(())),
         // Not a PEM file? try ASN1
         Err(_) => lu
-            .load_cert_file(path, SslFiletype::ASN1)
+            .load_cert_file(&path, SslFiletype::ASN1)
             .map(|_| ())
             .map_err(|source| Error::X509Load {
-                path: path.display().to_string(),
+                path: path.as_ref().into(),
                 ty: Error::CERT,
                 source,
             }),
     }
 }
 
-fn load_crl_to_store(
+fn load_crl_to_store<P: AsRef<Path>>(
     x509_store: &mut X509StoreBuilder,
-    path: &Path,
+    path: P,
     err_out_empty_crl: bool,
 ) -> std::result::Result<(), ErrorStack> {
     let lu = x509_store.add_lookup(X509Lookup::<File>::file())?;
     // Try to load cert as PEM file
-    if lu.load_crl_file(path, SslFiletype::PEM).is_err() {
+    if lu.load_crl_file(&path, SslFiletype::PEM).is_err() {
         // Not a PEM file? try read as ASN1
         let res = lu.load_crl_file(path, SslFiletype::ASN1);
         if err_out_empty_crl {
