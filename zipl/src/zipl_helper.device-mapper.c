@@ -24,8 +24,6 @@
  * - all of the device which contains the directory must be located on a single
  *   physical device (which may be mirrored or accessed through a multipath
  *   target)
- * - any mirror in the device-mapper setup must include block 0 of the
- *   physical device
  *
  * 2. Usage: chreipl_helper.device-mapper <major:minor of target device>
  *
@@ -64,6 +62,8 @@
 
 #define ERR(...) \
 	fprintf(stderr, "Error: " __VA_ARGS__)
+
+static bool fail_on_dm_mirrors;
 
 struct target_status {
 	char *path;
@@ -109,6 +109,7 @@ struct physical_device {
 	unsigned long offset;
 	struct util_list *dmpath;
 	struct device_characteristics dc;
+	struct dmpath_entry *mirror;
 };
 
 enum driver_id {
@@ -287,19 +288,6 @@ static void dmpath_free(struct util_list *dmpath)
 		dmpath_entry_free(de);
 	}
 	util_list_free(dmpath);
-}
-
-static struct dmpath_entry *dmpath_get_first_by_type(struct util_list *dmpath,
-						     unsigned short type)
-{
-	struct dmpath_entry *te;
-
-	util_list_iterate(dmpath, te) {
-		if (te->target->type == type)
-			return te;
-	}
-
-	return NULL;
 }
 
 static void get_device_name(char *devname, dev_t dev)
@@ -866,7 +854,8 @@ static int lookup_parent(dev_t device, struct util_list **table,
  * begins.
  */
 static struct util_list *dmpath_walk(struct ext_dev *bottom, const char *dir,
-				     unsigned long *fs_start)
+				     unsigned long *fs_start,
+				     struct dmpath_entry **mirror)
 {
 	struct util_list *dmpath = util_list_new(struct dmpath_entry, list);
 	struct util_list *table = NULL;
@@ -899,7 +888,18 @@ static struct util_list *dmpath_walk(struct ext_dev *bottom, const char *dir,
 	length = target->length;
 
 	while (true) {
+		struct dmpath_entry *de;
+
 		target_move(target, &top, &table, dmpath);
+		de = util_list_start(dmpath);
+		if (de->target->type == TARGET_TYPE_MIRROR) {
+			if (*mirror || fail_on_dm_mirrors) {
+				ERR("Unsupported setup: Nested mirrors");
+				goto error;
+			}
+			/* save the encountered mirror */
+			*mirror = de;
+		}
 		/*
 		 * Go to the upper level.
 		 * First, select the first device from those that constitute
@@ -941,7 +941,7 @@ static struct util_list *dmpath_walk(struct ext_dev *bottom, const char *dir,
 static int get_physical_device(struct physical_device *pd, struct ext_dev *dev,
 			       const char *dir)
 {
-	pd->dmpath = dmpath_walk(dev, dir, &pd->offset);
+	pd->dmpath = dmpath_walk(dev, dir, &pd->offset, &pd->mirror);
 
 	return pd->dmpath == NULL ? -1 : 0;
 }
@@ -970,7 +970,7 @@ static struct dmpath_entry *get_top_entry(struct physical_device *pd)
 static struct dmpath_entry *find_base_entry(struct util_list *dmpath,
 					    unsigned int nr_boot_sectors)
 {
-	struct dmpath_entry *te, *tm, *top;
+	struct dmpath_entry *te, *top;
 
 	top = util_list_start(dmpath);
 
@@ -979,17 +979,6 @@ static struct dmpath_entry *find_base_entry(struct util_list *dmpath,
 		    te->target->length < nr_boot_sectors)
 			break;
 		top = te;
-	}
-	/* Check for mirroring between base device and fs device */
-	for (tm = te; tm != NULL; tm = util_list_next(dmpath, tm)) {
-		if (tm->target->type == TARGET_TYPE_MIRROR) {
-			char name[BDEVNAME_SIZE];
-
-			get_device_name(name, tm->dev.dev);
-			ERR("Unsupported setup: Block 0 is not mirrored in "
-			    "device '%s'\n", name);
-			return NULL;
-		}
 	}
 	return top;
 }
@@ -1053,20 +1042,7 @@ static int complete_physical_device(struct physical_device *pd, dev_t *base_dev)
 		 * the physical device can provide access to the boot record
 		 */
 		struct device_characteristics ndc = {0};
-		struct dmpath_entry *mirror;
 
-		/* Check for mirror */
-		mirror = dmpath_get_first_by_type(pd->dmpath,
-						  TARGET_TYPE_MIRROR);
-		if (mirror != NULL) {
-			char name[BDEVNAME_SIZE];
-
-			get_device_name(name, mirror->dev.dev);
-			/* IPL records are not mirrored */
-			ERR("Unsupported setup: Block 0 is not mirrored in "
-			    "device '%s'\n", name);
-			return -1;
-		}
 		base_entry = top_entry;
 		*base_dev = get_partition_base(dc->type, top_dev);
 		/* Complete the filesystem offset */
@@ -1075,10 +1051,17 @@ static int complete_physical_device(struct physical_device *pd, dev_t *base_dev)
 		/* Update device geometry */
 		get_dev_characteristics(&ndc, *base_dev);
 		dc->geo = ndc.geo;
+	} else if (pd->mirror) {
+		/*
+		 * For proper handling heterogeneous mirrors it is
+		 * required for base device to be the topmost found device
+		 */
+		base_entry = util_list_start(pd->dmpath);
+		*base_dev = base_entry->dev.dev;
 	} else {
 		/*
-		 * All of the device is mapped, so the base device is the
-		 * top most dm device which provides access to boot sectors
+		 * In this case base device is the uppermost logical
+		 * device which provides access to boot sectors
 		 */
 		base_entry = find_base_entry(pd->dmpath, dc->bootsectors);
 		if (!base_entry)
@@ -1136,6 +1119,24 @@ static int dm_dev_to_zipl_params(struct ext_dev *dev, char *dir)
 	if (complete_physical_device(&pd, &base_dev))
 		goto error;
 	base_dev_to_params(base_dev, &pd.dc, pd.offset);
+
+	if (pd.mirror) {
+		/* check mirror status */
+		struct target *mt = pd.mirror->target;
+		struct target_data *mtd = util_list_start(mt->data);
+
+		/* Print also parameters for other mirrors */
+
+		fail_on_dm_mirrors = 1;
+		for (mtd = util_list_next(mt->data, mtd);
+		     mtd != NULL;
+		     mtd = util_list_next(mt->data, mtd)) {
+			struct ext_dev mirror = {mtd->device,
+						 pd.mirror->dev.fs_off};
+			if (dm_dev_to_zipl_params(&mirror, dir))
+				goto error;
+		}
+	}
 	dmpath_free(pd.dmpath);
 	return 0;
 error:
