@@ -187,6 +187,7 @@ pub enum UvcSuccess {
 ///
 ///
 /// ```
+#[derive(Debug)]
 pub struct UvDevice(File);
 
 impl UvDevice {

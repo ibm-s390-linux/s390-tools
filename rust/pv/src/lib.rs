@@ -2,7 +2,14 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-#![deny(missing_docs)]
+#![deny(
+    missing_docs,
+    missing_debug_implementations,
+    trivial_numeric_casts,
+    unstable_features,
+    unused_import_braces,
+    unused_qualifications
+)]
 #![doc = include_str!("../README.md")]
 //! # Manage guest secret store
 //!

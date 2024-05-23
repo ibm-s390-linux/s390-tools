@@ -224,8 +224,8 @@ pub fn read_exact_file<P: AsRef<Path>, const COUNT: usize>(
     path: P,
     ctx: &str,
 ) -> Result<[u8; COUNT]> {
-    let mut f = std::fs::File::open(&path).map_err(|e| Error::FileAccess {
-        ty: crate::FileAccessErrorType::Open,
+    let mut f = File::open(&path).map_err(|e| Error::FileAccess {
+        ty: FileAccessErrorType::Open,
         path: path_to_str!(path).to_string(),
         source: e,
     })?;

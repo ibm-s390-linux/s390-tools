@@ -46,6 +46,7 @@ impl TryFrom<Vec<u8>> for BootHdrTags {
 }
 
 /// Magic value for a SE-(boot)header
+#[derive(Debug)]
 pub struct BootHdrMagic;
 impl MagicValue<8> for BootHdrMagic {
     const MAGIC: [u8; 8] = [0x49, 0x42, 0x4d, 0x53, 0x65, 0x63, 0x45, 0x78];

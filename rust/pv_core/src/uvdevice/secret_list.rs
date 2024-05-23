@@ -278,7 +278,7 @@ fn ser_u16<S: Serializer>(v: &U16<BigEndian>, ser: S) -> Result<S::Ok, S::Error>
 
 /// Secret types that can appear in a [`SecretList`]
 #[non_exhaustive]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum ListableSecretType {
     /// Association Secret
     Association,

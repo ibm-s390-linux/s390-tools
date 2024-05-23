@@ -10,6 +10,7 @@ use std::io::Read;
 ///
 /// The List Secrets Ultravisor call is used to list the
 /// secrets that are in the secret store for the current SE-guest.
+#[derive(Debug)]
 pub struct ListCmd(Vec<u8>);
 impl ListCmd {
     fn with_size(size: usize) -> Self {
@@ -44,6 +45,7 @@ impl UvCmd for ListCmd {
 ///
 /// The Add Secret Ultravisor-call is used to add a secret
 /// to the secret store for the current SE-guest.
+#[derive(Debug)]
 pub struct AddCmd(Vec<u8>);
 
 impl AddCmd {
@@ -101,6 +103,7 @@ impl UvCmd for AddCmd {
 /// all changes to the secret store. Upon successful
 /// completion of a Lock Secret Store Ultravisor-call, any
 /// request to modify the secret store will fail.
+#[derive(Debug)]
 pub struct LockCmd;
 impl UvCmd for LockCmd {
     const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_LOCK_SECRETS_NR;

@@ -126,7 +126,7 @@ impl UvCmd for TestCmd {
 impl UvDevice {
     ///use some random fd for  `uvdevice` its OK, as the ioctl is mocked and never touches the passed file
     fn test_dev() -> Self {
-        UvDevice(unsafe { std::fs::File::from_raw_fd(17) })
+        UvDevice(unsafe { File::from_raw_fd(17) })
     }
 }
 

@@ -30,7 +30,7 @@ macro_rules! get_test_asset {
 }
 
 pub fn get_cert_asset_path<P: AsRef<Path>>(path: P) -> PathBuf {
-    let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     p.push("tests");
     p.push("assets");
     p.push("cert");

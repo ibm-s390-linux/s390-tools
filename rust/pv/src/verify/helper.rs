@@ -261,7 +261,7 @@ fn load_crl_to_store(
     x509_store: &mut X509StoreBuilder,
     path: &Path,
     err_out_empty_crl: bool,
-) -> std::result::Result<(), openssl::error::ErrorStack> {
+) -> std::result::Result<(), ErrorStack> {
     let lu = x509_store.add_lookup(X509Lookup::<File>::file())?;
     // Try to load cert as PEM file
     if lu.load_crl_file(path, SslFiletype::PEM).is_err() {

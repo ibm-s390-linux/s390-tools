@@ -111,7 +111,7 @@ impl StackableX509Crl {
                 );
                 if r.is_null() {
                     let err = openssl_sys::ERR_peek_last_error();
-                    if openssl_sys::ERR_GET_LIB(err) as c_int == openssl_sys::ERR_LIB_PEM
+                    if openssl_sys::ERR_GET_LIB(err) == openssl_sys::ERR_LIB_PEM
                         && openssl_sys::ERR_GET_REASON(err) == openssl_sys::PEM_R_NO_START_LINE
                     {
                         openssl_sys::ERR_clear_error();

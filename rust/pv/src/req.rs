@@ -54,6 +54,7 @@ pub trait Encrypt {
 }
 
 /// Types of Authenticated Data
+#[allow(missing_debug_implementations)]
 pub enum Aad<'a> {
     /// Authenticated Keyslot
     Ks(&'a Keyslot),
@@ -207,7 +208,7 @@ impl ReqEncrCtx {
         let mut auth_data: Vec<u8> = Vec::with_capacity(2048);
 
         // reserve space for the request header
-        auth_data.resize(std::mem::size_of::<RequestHdr>(), 0);
+        auth_data.resize(size_of::<RequestHdr>(), 0);
 
         for a in aad {
             match a {
@@ -229,7 +230,7 @@ impl ReqEncrCtx {
 
         let req_hdr = RequestHdr::new(version, rql, self.iv, nks, sea, magic);
         // copy request header to the start of the request
-        auth_data[..std::mem::size_of::<RequestHdr>()].copy_from_slice(req_hdr.as_bytes());
+        auth_data[..size_of::<RequestHdr>()].copy_from_slice(req_hdr.as_bytes());
         Ok(auth_data)
     }
 
