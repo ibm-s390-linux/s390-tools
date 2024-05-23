@@ -460,6 +460,63 @@ static struct util_list *get_linear_data(const char *devname, char *args)
 		}							\
 	} while (0)
 
+static int check_mirror_status(const char *devname)
+{
+	char *line = NULL;
+	size_t n = 0;
+	int ret = -1;
+	FILE *fp;
+
+	fp = exec_cmd_and_get_out_stream("dmsetup status /dev/%s 2>/dev/null",
+					 devname);
+	if (fp == NULL) {
+		ERR("Failed to get mirror status\n");
+		return -1;
+	}
+	while (getline(&line, &n, fp) != -1) {
+		char *status = NULL;
+		char *token = NULL;
+		long cnt;
+		int i;
+
+		/* Sample output (single line):
+		 * 0 8192000 mirror \
+		 * 2 253:3 253:7 \
+		 * 8000/8000 1 \
+		 * AA 1 \
+		 * core
+		 */
+		STR_TOKEN_OR_GOTO(line, token, out);
+		SKIP_NEXT_TOKEN_OR_GOTO(out); /* length */
+
+		NEXT_STR_TOKEN_OR_GOTO(token, out); /* type */
+		if (strcmp(token, "mirror") != 0) {
+			ERR("Unrecognized mirror status\n");
+			goto out;
+		}
+		NEXT_INT_TOKEN_OR_GOTO(cnt, out); /* #nr_mirrors */
+		SKIP_NEXT_TOKENS_OR_GOTO(cnt, out); /* mirrors */
+		SKIP_NEXT_TOKENS_OR_GOTO(2, out); /* sync_count, nr_regions */
+		NEXT_STR_TOKEN_OR_GOTO(status, out); /* status buffer */
+
+		for (i = 0; i < cnt; i++) {
+			if (status[i] != 'A') {
+				fprintf(stderr,
+					"%s: Raid inconsistent(some mirrors are not 'alive and in-sync').\n",
+					devname);
+				fprintf(stderr,
+					"Bring it into consistent state first.\n");
+				goto out;
+			}
+		}
+	}
+	ret = 0;
+out:
+	free(line);
+	pclose(fp);
+	return ret;
+}
+
 /*
  * There is no kernel documentation for the mirror target. Parameters obtained
  * from Linux sources: drivers/md/dm-log.c and drivers/md/dm-raid1.c
@@ -578,15 +635,15 @@ static struct util_list *get_multipath_status(const char *devname)
 		 *     E 0 \
 		 *     2 2 \
 		 *         8:16 F 1 \
-		 *				0 1 \
-		 *		   8:0 F 1 \
-		 *		       0 1 \
-		 *	   A 0 \
-		 *	   2 2 \
-		 *		   8:32 A 0 \
-		 *		        0 1 \
-		 *		   8:48 A 0 \
-		 *		        0 1
+		 *		0 1 \
+		 *	   8:0  F 1 \
+		 *	        0 1 \
+		 *     A 0 \
+		 *     2 2 \
+		 *	   8:32 A 0 \
+		 *	        0 1 \
+		 *	   8:48 A 0 \
+		 *	        0 1
 		 */
 		STR_TOKEN_OR_GOTO(line, token, out);
 		SKIP_NEXT_TOKEN_OR_GOTO(out); /* length */
@@ -1124,7 +1181,11 @@ static int dm_dev_to_zipl_params(struct ext_dev *dev, char *dir)
 		/* check mirror status */
 		struct target *mt = pd.mirror->target;
 		struct target_data *mtd = util_list_start(mt->data);
+		char devname[BDEVNAME_SIZE];
 
+		get_device_name(devname, pd.mirror->dev.dev);
+		if (check_mirror_status(devname))
+			goto error;
 		/* Print also parameters for other mirrors */
 
 		fail_on_dm_mirrors = 1;
