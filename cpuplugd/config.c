@@ -211,7 +211,6 @@ void parse_configfile(char *file)
  */
 void check_config()
 {
-	int cpuid;
 	int lpar_status;
 
 	lpar_status = check_lpar();
@@ -275,33 +274,17 @@ void check_config()
 		    get_numcpus() >= cfg.cpu_min) {
 			cpuplugd_debug("The number of online cpus is below "
 				       "the minimum and will be increased.\n");
-			cpuid = 0;
-			while (get_num_online_cpus() < cfg.cpu_min &&
-			       cpuid < get_numcpus()) {
-				if (is_online(cpuid) == 1) {
-					cpuid++;
-					continue;
-				}
-				cpuplugd_debug("cpu with id %d is currently offline "
-					       "and will be enabled\n", cpuid);
-				hotplug(cpuid);
-				cpuid++;
+			while (get_num_online_cpus() < cfg.cpu_min) {
+				if (hotplug_one_cpu())
+					break;
 			}
 		}
 		if (get_num_online_cpus() > cfg.cpu_max) {
 			cpuplugd_debug("The number of online cpus is above the maximum"
 				       " and will be decreased.\n");
-			cpuid = 0;
-			while (get_num_online_cpus() > cfg.cpu_max &&
-			       cpuid < get_numcpus()) {
-				if (is_online(cpuid) != 1) {
-					cpuid++;
-					continue;
-				}
-				cpuplugd_debug("cpu with id %d is currently online "
-				       "and will be disabled\n", cpuid);
-				hotunplug(cpuid);
-				cpuid++;
+			while (get_num_online_cpus() > cfg.cpu_max) {
+				if (hotunplug_one_cpu())
+					break;
 			}
 		}
 		if (cfg.cpu_min > get_numcpus())

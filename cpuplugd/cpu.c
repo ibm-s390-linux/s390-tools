@@ -12,217 +12,226 @@
 #include <limits.h>
 #include "cpuplugd.h"
 
+#define NUM_BASE		(10)
+#define CPU_OFFLINE		(0)
+#define CPU_ONLINE		(1)
+#define CPU_DECONFIGURED	(0)
+#define CPU_CONFIGURED		(1)
+#define CPU_LIST_LEN		(4096)
 
-/*
- * Return overall number of available cpus. This does not necessarily
- * mean that those are currently online
- */
-int get_numcpus()
+static int get_sysfs_attribute_cpu_count(char *path)
 {
-	int i;
-	char path[PATH_MAX];
-	int number = 0;
+	char cpu_list[CPU_LIST_LEN];
+	int number, start, end;
+	char *sub_list;
 
-	for (i = 0; ; i++) {
-		/* check whether file exists and is readable */
-		sprintf(path, "/sys/devices/system/cpu/cpu%d", i);
-		if (access(path, R_OK) == 0)
+	if (util_file_read_line(cpu_list, sizeof(cpu_list), path))
+		cpuplugd_exit("Cannot open %s file: %s\n", path, strerror(errno));
+	number = 0;
+	sub_list = strtok(cpu_list, ",");
+	while (sub_list) {
+		if (strchr(sub_list, '-')) {
+			if (sscanf(sub_list, "%d-%d", &start, &end) != 2)
+				cpuplugd_exit("Malformed content of %s: %s\n", path, sub_list);
+			number += (end - start) + 1;
+		} else {
 			number++;
-		else
-			break;
+		}
+		sub_list = strtok(NULL, ",");
 	}
 	return number;
 }
 
 /*
- * Return number of online cpus
+ * get_numcpus() - return number of present cpus by sysfs'
+ * cpu/present attribute.
+ * This number represents the total number of usable cpus,
+ * this includes offline or deconfigured cpus as well.
  */
-int get_num_online_cpus()
+int get_numcpus(void)
 {
-	FILE *filp;
-	int i;
-	char path[PATH_MAX];
-	int status = 0;
-	int value_of_onlinefile, rc;
+	int number;
+	char *path;
 
-	for (i = 0; i < get_numcpus(); i++) {
-		/* check wether file exists and is readable */
-		sprintf(path, "/sys/devices/system/cpu/cpu%d/online", i);
-		if (access(path, R_OK) != 0) {
-			status++;
-			continue;
-		}
-		filp = fopen(path, "r");
-		if (!filp)
-			cpuplugd_exit("Cannot open cpu online file: "
-				      "%s\n", strerror(errno));
-		else {
-			rc = fscanf(filp, "%d", &value_of_onlinefile);
-			if (rc != 1)
-				cpuplugd_exit("Cannot read cpu online file: "
-					      "%s\n", strerror(errno));
-			if (value_of_onlinefile == 1)
-				status++;
-		}
-		fclose(filp);
+	path = util_path_sysfs("devices/system/cpu/present");
+	number = get_sysfs_attribute_cpu_count(path);
+	free(path);
+	if (number <= 0)
+		cpuplugd_exit("number of present cpus (%d) <= 0\n", number);
+	return number;
+}
+
+/*
+ * get_num_online_cpus() - return number of online cpus
+ * by parsing sysfs cpu/online attribute
+ */
+int get_num_online_cpus(void)
+{
+	int number;
+	char *path;
+
+	path = util_path_sysfs("devices/system/cpu/online");
+	number = get_sysfs_attribute_cpu_count(path);
+	free(path);
+	if (number <= 0)
+		cpuplugd_exit("number of online cpus (%d) <= 0\n", number);
+	return number;
+}
+
+/*
+ * is_cpu_hotpluggable() - check if cpuhotplug operations are supported
+ * for the given cpu.
+ */
+static int is_cpu_hotpluggable(int cpuid)
+{
+	char *path;
+	int rc;
+
+	path = util_path_sysfs("devices/system/cpu/cpu%d/online", cpuid);
+	rc = util_path_exists(path);
+	free(path);
+	return rc;
+}
+
+/*
+ * hotplug() - perform cpu hotplug on given cpuid
+ */
+static int hotplug(int cpuid)
+{
+	char *path;
+	int rc;
+
+	path = util_path_sysfs("devices/system/cpu/cpu%d/online", cpuid);
+	rc = util_file_write_l(CPU_ONLINE, NUM_BASE, path);
+	if (rc < 0)
+		cpuplugd_debug("failed to enable cpu with id %d\n", cpuid);
+	free(path);
+	return rc;
+}
+
+/*
+ * hotunplug() - perform cpu hotunplug on given cpuid
+ */
+static int hotunplug(int cpuid)
+{
+	char *path;
+	int rc;
+
+	path = util_path_sysfs("devices/system/cpu/cpu%d/online", cpuid);
+	rc = util_file_write_l(CPU_OFFLINE, NUM_BASE, path);
+	if (rc < 0)
+		cpuplugd_debug("failed to disable cpu with id %d\n", cpuid);
+	free(path);
+	return rc;
+}
+
+/*
+ * get_cpu_attribute() - get a certain cpu's selected attribute
+ */
+static int get_cpu_attribute(int cpuid, char *attribute)
+{
+	int status;
+	char *path;
+
+	path = util_path_sysfs("devices/system/cpu/cpu%d/%s", cpuid, attribute);
+	if (util_file_read_i(&status, NUM_BASE, path) < 0) {
+		status = -1;
+		cpuplugd_debug("failed to read %s status of cpu with id %d\n", attribute, cpuid);
 	}
+	free(path);
 	return status;
 }
 
 /*
- * Enable a certain cpu
+ * hotplug_one_cpu() - perform hotplugging on the first available cpu
  */
-int hotplug(int cpuid)
+int hotplug_one_cpu(void)
 {
-	FILE *filp;
-	char path[PATH_MAX];
-	int status, rc;
+	struct dirent **cpu_dir;
+	int cpuid, count, i, rc;
+	char *path;
 
-	sprintf(path, "/sys/devices/system/cpu/cpu%d/online", cpuid);
-	if (access(path, W_OK) == 0) {
-		filp = fopen(path, "w");
-		if (!filp)
-			cpuplugd_exit("Cannot open cpu online file: %s\n",
-				      strerror(errno));
-		fprintf(filp, "1");
-		fclose(filp);
-		/*
-		 * check if the attempt to enable the cpus really worked
-		 */
-		filp = fopen(path, "r");
-		rc = fscanf(filp, "%d", &status);
-		if (rc != 1)
-			cpuplugd_exit("Cannot open cpu online file: %s\n",
-				      strerror(errno));
-		fclose(filp);
-		if (status == 1) {
-			cpuplugd_debug("cpu with id %d enabled\n", cpuid);
-			return 1;
-		} else {
-			cpuplugd_debug("failed to enable cpu with id %d\n",
-				      cpuid);
-			return -1;
+	rc = -1;
+	path = util_path_sysfs("devices/system/cpu/");
+	count = util_scandir(&cpu_dir, alphasort, path, "cpu[0-9]*");
+	for (i = 0; (i < count) && (rc != 0); i++) {
+		if (sscanf(cpu_dir[i]->d_name, "cpu%d", &cpuid) != 1)
+			cpuplugd_exit("Malformed content of %s: %s\n", path, cpu_dir[i]->d_name);
+		if (!is_cpu_hotpluggable(cpuid))
+			continue;
+		if (get_cpu_attribute(cpuid, "configure") == CPU_CONFIGURED &&
+		    get_cpu_attribute(cpuid, "online") == CPU_OFFLINE) {
+			cpuplugd_debug("cpu%d will be enabled", cpuid);
+			rc = hotplug(cpuid);
 		}
 	}
-	cpuplugd_debug("cpu with id %d cannot be hotplugged\n", cpuid);
-	return -1;
+	util_scandir_free(cpu_dir, count);
+	free(path);
+	return rc;
 }
 
 /*
- * Disable a certain cpu
+ * hotunplug_one_cpu() - perform hotunplugging on the first available cpu
  */
-int hotunplug(int cpuid)
+int hotunplug_one_cpu(void)
 {
-	FILE *filp;
-	int state, rc;
-	int retval = -1;
-	char path[PATH_MAX];
+	struct dirent **cpu_dir;
+	int cpuid, count, i, rc;
+	char *path;
 
-	state = -1;
-	sprintf(path, "/sys/devices/system/cpu/cpu%d/online", cpuid);
-	if (access(path, W_OK) == 0) {
-		filp = fopen(path, "w");
-		fprintf(filp, "0");
-		fclose(filp);
-		/*
-		 * Check if the attempt to enable the cpus really worked
-		 */
-		filp = fopen(path, "r");
-		rc = fscanf(filp, "%d", &state);
-		if (rc != 1)
-			cpuplugd_error("Failed to disable cpu with id %d\n",
-				       cpuid);
-		fclose(filp);
-		if (state == 0)
-			return 1;
-	}
-	cpuplugd_debug("cpu with id %d cannot be hotunplugged\n", cpuid);
-	return retval;
-}
-
-/*
- * Check if a certain cpu is currently online
- */
-int is_online(int cpuid)
-{
-	FILE *filp;
-	int state;
-	int retval, rc;
-	char path[PATH_MAX];
-
-	retval = -1;
-	sprintf(path, "/sys/devices/system/cpu/cpu%d/online", cpuid);
-	if (access(path, R_OK) == 0) {
-		filp = fopen(path, "r");
-		rc = fscanf(filp, "%d", &state);
-		if (rc == 1) {
-			if (state == 1)
-				retval = 1;
-			if (state == 0)
-				retval = 0;
+	rc = -1;
+	path = util_path_sysfs("devices/system/cpu/");
+	count = util_scandir(&cpu_dir, alphasort, path, "cpu[0-9]*");
+	for (i = 0; (i < count) && (rc != 0); i++) {
+		if (sscanf(cpu_dir[i]->d_name, "cpu%d", &cpuid) != 1)
+			cpuplugd_exit("Malformed content of %s: %s\n", path, cpu_dir[i]->d_name);
+		if (!is_cpu_hotpluggable(cpuid))
+			continue;
+		if (get_cpu_attribute(cpuid, "online") == CPU_ONLINE) {
+			cpuplugd_debug("cpu%d will be disabled\n", cpuid);
+			rc = hotunplug(cpuid);
 		}
-		fclose(filp);
-	} else {
-		retval = 1;
 	}
-	return retval;
+	util_scandir_free(cpu_dir, count);
+	free(path);
+	return rc;
 }
 
 /*
  * Cleanup method. If the daemon is stopped, we (re)activate all cpus
  */
-void reactivate_cpus()
+void reactivate_cpus(void)
 {
-	/*
-	 * Only enable the number of cpus which where
-	 * available at daemon startup time
-	 */
-	int cpuid, nc;
+	struct dirent **cpu_dir;
+	int cpuid, nc, count, i;
+	char *path;
 
-	cpuid = 0;
 	/* suppress verbose messages on exit */
 	debug = 0;
-       /*
-	* We check for num_cpu_start != 0 because we might want to
-	* clean up, before we queried for the number on cpus at
-	* startup
-	*/
+	/*
+	 * Only enable the number of cpus which where available at
+	 * daemon startup time by checking num_cpu_start.
+	 * We check for num_cpu_start != 0 because we might want to
+	 * clean up, before we queried for the number on cpus at
+	 * startup
+	 */
 	if (num_cpu_start == 0)
 		return;
-	while (get_num_online_cpus() != num_cpu_start && cpuid < get_numcpus()) {
+	nc = 0;
+	path = util_path_sysfs("devices/system/cpu/");
+	count = util_scandir(&cpu_dir, alphasort, path, "cpu[0-9]*");
+	for (i = 0; (i < count) && (nc != num_cpu_start); i++) {
 		nc = get_num_online_cpus();
-		if (nc == num_cpu_start)
-			return;
-		if (nc > num_cpu_start && is_online(cpuid) == 1)
+		if (sscanf(cpu_dir[i]->d_name, "cpu%d", &cpuid) != 1)
+			cpuplugd_exit("Malformed content of %s: %s\n", path, cpu_dir[i]->d_name);
+		if (nc > num_cpu_start &&
+		    get_cpu_attribute(cpuid, "online") == CPU_ONLINE)
 			hotunplug(cpuid);
-		if (nc < num_cpu_start && is_online(cpuid) == 0)
+		if (nc < num_cpu_start &&
+		    get_cpu_attribute(cpuid, "online") == CPU_OFFLINE)
 			hotplug(cpuid);
-		cpuid++;
 	}
+	util_scandir_free(cpu_dir, count);
+	free(path);
 }
 
-/*
- * In kernels > 2.6.24 cpus can be deconfigured. The following functions is used
- * to check if a certain cpus is in a deconfigured state.
- */
-int cpu_is_configured(int cpuid)
-{
-	FILE *filp;
-	int retval, state, rc;
-	char path[4096];
-
-	retval = -1;
-	sprintf(path, "/sys/devices/system/cpu/cpu%d/configure", cpuid);
-	if (access(path, R_OK) == 0) {
-		filp = fopen(path, "r");
-		rc = fscanf(filp, "%d", &state);
-		if (rc == 1) {
-			if (state == 1)
-				retval = 1;
-			if (state == 0)
-				retval = 0;
-		}
-		fclose(filp);
-	}
-	return retval;
-}

@@ -77,7 +77,7 @@ static void eval_cpu_rules(void)
 {
 	double diffs[CPUSTATS], diffs_total, percent_factor;
 	char *procinfo_current, *procinfo_prev;
-	int cpu, nr_cpus, on_off;
+	int nr_cpus, on_off;
 
 	nr_cpus = get_numcpus();
 	procinfo_current = cpustat + history_current * cpustat_size;
@@ -172,40 +172,16 @@ static void eval_cpu_rules(void)
 			cpuplugd_debug("maximum cpu limit is reached\n");
 			return;
 		}
-		/* try to find a offline cpu */
-		for (cpu = 0; cpu < nr_cpus; cpu++)
-			if (is_online(cpu) == 0 && cpu_is_configured(cpu) != 0)
-				break;
-		if (cpu < nr_cpus) {
-			cpuplugd_debug("cpu with id %d is currently offline "
-				       "and will be enabled\n", cpu);
-			if (hotplug(cpu) == -1)
-				cpuplugd_debug("unable to find a cpu which "
-					       "can be enabled\n");
-		} else {
-			/*
-			 * In case we tried to enable a cpu but this failed.
-			 * This is the case if a cpu is deconfigured
-			 */
-			cpuplugd_debug("unable to find a cpu which can "
-				       "be enabled\n");
-		}
+		if (hotplug_one_cpu())
+			cpuplugd_debug("unable to find a cpu which can be enabled\n");
 	} else if (on_off < 0) {
 		/* check cpu nr limit */
 		if (symbols.onumcpus <= cfg.cpu_min) {
 			cpuplugd_debug("minimum cpu limit is reached\n");
 			return;
 		}
-		/* try to find a online cpu */
-		for (cpu = get_numcpus() - 1; cpu >= 0; cpu--) {
-			if (is_online(cpu) != 0)
-				break;
-		}
-		if (cpu > 0) {
-			cpuplugd_debug("cpu with id %d is currently online "
-				       "and will be disabled\n", cpu);
-			hotunplug(cpu);
-		}
+		if (hotunplug_one_cpu())
+			cpuplugd_debug("unable to find a cpu which can be disabled\n");
 	}
 }
 

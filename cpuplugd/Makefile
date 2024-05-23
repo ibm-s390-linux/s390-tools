@@ -4,9 +4,11 @@ all: cpuplugd
 
 LDLIBS += -lm
 
+libs = $(rootdir)/libutil/libutil.a
+
 OBJECTS = daemon.o cpu.o info.o terms.o config.o main.o getopt.o mem.o
 
-cpuplugd: $(OBJECTS)
+cpuplugd: $(OBJECTS) $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 clean:

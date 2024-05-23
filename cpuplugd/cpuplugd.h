@@ -23,6 +23,9 @@
 #include <unistd.h>
 
 #include "lib/util_base.h"
+#include "lib/util_path.h"
+#include "lib/util_file.h"
+#include "lib/util_scandir.h"
 #include "lib/zt_common.h"
 
 #define NAME		"cpuplugd"
@@ -190,9 +193,8 @@ void proc_cpu_read(char *procinfo);
 unsigned long proc_read_size(char *path);
 char *get_var_rvalue(char *var_name);
 void cleanup_cmm(void);
-int hotplug(int cpuid);
-int hotunplug(int cpuid);
-int is_online(int cpuid);
+int hotplug_one_cpu(void);
+int hotunplug_one_cpu(void);
 long get_cmmpages_size();
 void parse_options(int argc, char **argv);
 void check_if_started_twice();
@@ -204,7 +206,6 @@ int check_cmmfiles(void);
 void check_config();
 void set_cmm_pages(long size);
 int check_lpar();
-int cpu_is_configured(int cpuid);
 void setup_history(void);
 
 
