@@ -2,7 +2,6 @@
 //
 // Copyright IBM Corp. 2023
 //
-//! Command line interface for pvapconfig
 //
 
 use clap::Parser;
@@ -11,6 +10,7 @@ use lazy_static::lazy_static;
 /// The default pvapconfig config file
 pub const PATH_DEFAULT_CONFIG_FILE: &str = "/etc/pvapconfig.yaml";
 
+/// Command line interface for pvapconfig
 #[derive(Parser, Clone)]
 pub struct Cli {
     /// Provide a custom config file (overwrites default /etc/pvapconfig.yaml).
