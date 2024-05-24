@@ -162,7 +162,8 @@ pub enum UvcSuccess {
     RC_MORE_DATA = UvDevice::RC_MORE_DATA,
 }
 
-/// The UvDevice is a (virtual) device on s390 machines to send Ultravisor commands(UVCs) from userspace.
+/// The UvDevice is a (virtual) device on s390 machines to send Ultravisor commands(UVCs) from
+/// userspace.
 ///
 /// On s390 machines with Ultravisor enabled (Secure Execution guest & hosts) the device at
 /// `/dev/uv` will accept ioctls.
@@ -184,16 +185,14 @@ pub enum UvcSuccess {
 /// # Ok(())
 /// # }
 /// // do something with the result
-///
-///
 /// ```
 #[derive(Debug)]
 pub struct UvDevice(File);
 
 impl UvDevice {
-    const RC_SUCCESS: u16 = 0x0001;
-    const RC_MORE_DATA: u16 = 0x0100;
     const PATH: &'static str = "/dev/uv";
+    const RC_MORE_DATA: u16 = 0x0100;
+    const RC_SUCCESS: u16 = 0x0001;
 
     /// Open the uvdevice located at `/dev/uv`
     ///

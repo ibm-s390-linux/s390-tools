@@ -177,7 +177,6 @@ impl ReqEncrCtx {
     /// |                Request type dependent AAD data              |
     /// |-------------------------------------------------------------|
     /// ```
-    ///
     pub fn build_aad<O>(
         &self,
         version: RequestVersion,
@@ -571,7 +570,7 @@ mod tests {
         let hdr_bin_exp = [
             0x12, 0x34, 0x56, 0x89, 0xab, 0xcd, 0xef, 0, // magic
             0, 0, 2, 0, // vers
-            0, 0, 0x12, 0x34, //size
+            0, 0, 0x12, 0x34, // size
             0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, // iv
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // res
             15, // nks

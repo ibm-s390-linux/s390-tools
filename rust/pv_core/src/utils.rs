@@ -16,15 +16,15 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U64};
 pub trait Flags<T>: From<T> + for<'a> From<&'a T> {
     /// Set the specified bit to one.
     /// # Panics
-    ///Panics if bit is >= 64
+    /// Panics if bit is >= 64
     fn set_bit(&mut self, bit: u8);
     /// Set the specified bit to zero.
     /// # Panics
-    ///Panics if bit is >= 64
+    /// Panics if bit is >= 64
     fn unset_bit(&mut self, bit: u8);
     /// Test if the specified bit is set.
     /// # Panics
-    ///Panics if bit is >= 64
+    /// Panics if bit is >= 64
     fn is_set(&self, bit: u8) -> bool;
 }
 
@@ -361,7 +361,7 @@ pub fn parse_hex(hex_str: &str) -> Vec<u8> {
 pub fn pv_guest_bit_set() -> bool {
     #[cfg(not(target_arch = "s390x"))]
     return false;
-    //s390 branch
+    // s390 branch
     let v = std::fs::read("/sys/firmware/uv/prot_virt_guest").unwrap_or_else(|_| vec![0]);
     let v: u8 = String::from_utf8_lossy(&v[..1]).parse().unwrap_or(0);
     v == 1

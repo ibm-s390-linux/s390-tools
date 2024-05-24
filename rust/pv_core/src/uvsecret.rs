@@ -23,8 +23,7 @@ use zerocopy::{AsBytes, U16};
 /// # ;
 /// # assert!(AddSecretMagic::starts_with_magic(magic));
 /// # }
-///```
-///
+/// ```
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsBytes)]
 pub struct AddSecretMagic {

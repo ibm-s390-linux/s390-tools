@@ -30,7 +30,6 @@ pub const UVIO_IOCTL_LOCK_SECRETS_NR: u8 = 4;
 /// Ultravisor.
 ///
 /// `flags` is currently unused and to be set zero
-///
 #[repr(C)]
 #[derive(Debug)]
 pub struct uvio_ioctl_cb {
@@ -89,11 +88,11 @@ pub const UVIO_ATT_UID_LEN: usize = 0x10;
 #[repr(C)]
 #[derive(Debug, AsBytes, FromZeroes, FromBytes)]
 pub struct uvio_attest {
-    pub arcb_addr: u64,                          //in
-    pub meas_addr: u64,                          //out
-    pub add_data_addr: u64,                      //out
-    pub user_data: [u8; UVIO_ATT_USER_DATA_LEN], //in
-    pub config_uid: [u8; UVIO_ATT_UID_LEN],      //out
+    pub arcb_addr: u64,                          // in
+    pub meas_addr: u64,                          // out
+    pub add_data_addr: u64,                      // out
+    pub user_data: [u8; UVIO_ATT_USER_DATA_LEN], // in
+    pub config_uid: [u8; UVIO_ATT_UID_LEN],      // out
     pub arcb_len: u32,
     pub meas_len: u32,
     pub add_data_len: u32,

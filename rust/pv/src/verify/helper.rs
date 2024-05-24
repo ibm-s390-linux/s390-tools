@@ -27,7 +27,6 @@ use std::{cmp::Ordering, ffi::c_int};
 /// Minimum security level for the keys/certificates used to establish a chain of
 /// trust (see https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html
 /// for details).
-///
 const SECURITY_LEVEL: usize = 2;
 const SECURITY_BITS_ARRAY: [u32; 6] = [0, 80, 112, 128, 192, 256];
 const SECURITY_BITS: u32 = SECURITY_BITS_ARRAY[SECURITY_LEVEL];
@@ -44,8 +43,8 @@ pub fn verify_hkd_options(hkd: &X509Ref, sign_key: &X509Ref) -> Result<()> {
     if SECURITY_BITS > 0 && SECURITY_BITS > security_bits {
         return Err(Error::HkdVerify(SecurityBits(security_bits, SECURITY_BITS)));
     }
-    // TODO rust-openssl fix X509::not.after/before() impl to return Option& not panic on nullptr from C?
-    // try_... rust-openssl
+    // TODO rust-openssl fix X509::not.after/before() impl to return Option& not panic on nullptr
+    // from C? try_... rust-openssl
     // verify that the HKD is still valid
     check_validity_period(hkd.not_before(), hkd.not_after())?;
 
@@ -183,7 +182,7 @@ pub fn extract_ibm_sign_key(certs: Vec<X509>) -> Result<(X509, Stack<X509>)> {
 }
 
 // Name Entry values of an IBM Z key signing cert
-//Asn1StringRef::as_slice aka ASN1_STRING_get0_data gives a string without \0 delimiter
+// Asn1StringRef::as_slice aka ASN1_STRING_get0_data gives a string without \0 delimiter
 const IBM_Z_COMMON_NAME: &[u8; 43usize] = b"International Business Machines Corporation";
 const IBM_Z_COUNTRY_NAME: &[u8; 2usize] = b"US";
 const IBM_Z_LOCALITY_NAME_POUGHKEEPSIE: &[u8; 12usize] = b"Poughkeepsie";
@@ -274,7 +273,7 @@ fn load_crl_to_store<P: AsRef<Path>>(
     Ok(())
 }
 
-///Run through the forest of the distribution points and find them
+/// Run through the forest of the distribution points and find them
 pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
     let mut res = Vec::<String>::with_capacity(1);
     let dps = match cert.crl_distribution_points() {
@@ -303,8 +302,8 @@ pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
 /// Searches for CRL Distribution points and downloads the CRL. Stops after the first successful
 /// download.
 ///
-/// Error if something bad(=unexpected) happens (not bad: CRL not available at link, unexpected format)
-/// Other issues are mapped to Ok(None)
+/// Error if something bad(=unexpected) happens (not bad: CRL not available at link, unexpected
+/// format) Other issues are mapped to Ok(None)
 #[cfg(not(test))]
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl::x509::X509Crl>>> {
     use crate::utils::read_crls;
@@ -359,10 +358,8 @@ const NIDS_CORRECT_ORDER: [Nid; 6] = [
     Nid::STATEORPROVINCENAME,
     Nid::COMMONNAME,
 ];
-/**
- * Workaround to fix the mismatch between issuer name of the
- * IBM Z signing CRLs and the IBM Z signing key subject name.
- */
+/// Workaround to fix the mismatch between issuer name of the
+/// IBM Z signing CRLs and the IBM Z signing key subject name.
 pub fn reorder_x509_names(subject: &X509NameRef) -> std::result::Result<X509Name, ErrorStack> {
     let mut correct_subj = X509Name::builder()?;
     for nid in NIDS_CORRECT_ORDER {
@@ -373,11 +370,9 @@ pub fn reorder_x509_names(subject: &X509NameRef) -> std::result::Result<X509Name
     Ok(correct_subj.build())
 }
 
-/**
-* Workaround for potential locality mismatches between CRLs and Certs
-* # Return
-* fixed subject or none if locality was not Armonk or any OpenSSL error
-*/
+/// Workaround for potential locality mismatches between CRLs and Certs
+/// # Return
+/// fixed subject or none if locality was not Armonk or any OpenSSL error
 pub fn armonk_locality_fixup(subject: &X509NameRef) -> Option<X509Name> {
     if !name_data_eq(subject, Nid::LOCALITYNAME, IBM_Z_LOCALITY_NAME_ARMONK) {
         return None;

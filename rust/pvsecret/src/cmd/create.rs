@@ -213,7 +213,7 @@ fn write_secret(secret: &AddSecretType, asrcb: &AddSecretRequest) -> Result<()> 
             .map(|c| if c.is_whitespace() { '_' } else { c })
             .collect();
 
-        //write non confidential data (=name+id) to a yaml
+        // write non confidential data (=name+id) to a yaml
         let secret_info = serde_yaml::to_string(asrcb.guest_secret())?;
         if stdout.to_owned() {
             println!("{secret_info}");

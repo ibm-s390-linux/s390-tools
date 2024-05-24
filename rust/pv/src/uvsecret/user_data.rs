@@ -112,6 +112,7 @@ impl UserData {
         let magic: AddSecretMagic = self.data_type().into();
         magic.get()
     }
+
     /// Creates new user data
     ///
     /// Verifies that the provided data + signature fits into 512 bytes
@@ -264,7 +265,7 @@ pub fn verify_asrcb_and_get_user_data(
         return Err(Error::BinAsrcbInvVersion);
     }
 
-    //preventing the two lines after the truncate from panicking
+    // preventing the two lines after the truncate from panicking
     let req_len = req.len();
     if asrcb.len() < req_len
         || req_len < AddSecretRequest::V1_USER_DATA_OFFS + UserData::USER_DATA_SIZE
@@ -353,7 +354,7 @@ impl VerifiedUserData {
             UserDataType::Unsigned => unreachable!(),
         };
 
-        //overwrite signature field with zeros
+        // overwrite signature field with zeros
         sgn.fill(0);
         ret
     }

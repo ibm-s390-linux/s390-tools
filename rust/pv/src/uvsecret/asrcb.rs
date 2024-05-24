@@ -111,7 +111,7 @@ impl From<AddSecretVersion> for RequestVersion {
 /// An ASRCB wraps a secret to securely transport it to the Ultravisor.
 ///
 /// Layout:
-///```none
+/// ```none
 /// _______________________________________________________________
 /// |                   generic header (48)
 /// |     ---------------------------------------------------     |
@@ -130,7 +130,7 @@ impl From<AddSecretVersion> for RequestVersion {
 /// |     ---------------------------------------------------     |
 /// |                   AES GCM Tag (16)                          |
 /// |_____________________________________________________________|
-///```
+/// ```
 #[derive(Debug)]
 pub struct AddSecretRequest {
     version: AddSecretVersion,
@@ -148,7 +148,6 @@ impl AddSecretRequest {
     ///
     /// The request has no extension secret, no configuration UID, no host-keys,
     /// and no user data
-    ///
     pub fn new(
         version: AddSecretVersion,
         secret: GuestSecret,
@@ -207,7 +206,8 @@ impl AddSecretRequest {
     /// - RSA 2048 bit (up to 256 byte message)
     /// - RSA 3072 bit (up to 128 byte message)
     ///
-    /// The signature can be verified during the verification of the secret-request  on the target machine.
+    /// The signature can be verified during the verification of the secret-request  on the target
+    /// machine.
     pub fn set_user_data<T: Into<Vec<u8>>>(
         &mut self,
         msg: T,
@@ -258,7 +258,7 @@ impl AddSecretRequest {
     /// Encrypts data, sign request with user-provided signing key, insert signature into aad,
     /// calculate request tag
     fn encrypt_with_signed_user_data(&self, ctx: &ReqEncrCtx) -> Result<Vec<u8>> {
-        //encrypt data w/o aead
+        // encrypt data w/o aead
         let conf = self.conf.to_bytes();
         let aad = self.aad(ctx, conf.value().len())?;
         let AesGcmResult {

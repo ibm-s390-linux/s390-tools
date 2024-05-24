@@ -33,7 +33,7 @@ fn main() -> ExitCode {
 
     // set up logger/std(out,err)
     if let Err(e) = LOGGER.start(cli.verbose) {
-        //should(TM) never happen
+        // should(TM) never happen
         eprintln!("Logger error: {e:?}");
         return EXIT_LOGGER.into();
     }

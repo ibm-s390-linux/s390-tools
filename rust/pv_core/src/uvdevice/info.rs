@@ -24,7 +24,6 @@ use zerocopy::{AsBytes, FromZeroes};
 ///
 /// Note that bit 0 is always zero for `supp_uv_cmds`
 /// as there is no corresponding Info UV-call.
-///
 #[derive(Debug)]
 pub struct UvDeviceInfo {
     supp_uvio_cmds: Lsb0Flags64,

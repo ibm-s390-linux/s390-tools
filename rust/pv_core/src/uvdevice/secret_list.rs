@@ -37,7 +37,7 @@ impl Serialize for SecretId {
     where
         S: Serializer,
     {
-        //calls Display at one point
+        // calls Display at one point
         ser.serialize_str(&self.to_string())
     }
 }
@@ -151,8 +151,8 @@ pub struct SecretList {
 }
 
 impl<'a> IntoIterator for &'a SecretList {
-    type Item = &'a SecretEntry;
     type IntoIter = Iter<'a, SecretEntry>;
+    type Item = &'a SecretEntry;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -160,8 +160,8 @@ impl<'a> IntoIterator for &'a SecretList {
 }
 
 impl IntoIterator for SecretList {
-    type Item = SecretEntry;
     type IntoIter = IntoIter<Self::Item>;
+    type Item = SecretEntry;
 
     fn into_iter(self) -> Self::IntoIter {
         self.secrets.into_iter()
@@ -233,11 +233,11 @@ impl SecretList {
         let num_s = r.read_u16::<BigEndian>()?;
         let total_num_secrets = r.read_u16::<BigEndian>()? as usize;
         let mut v: Vec<SecretEntry> = Vec::with_capacity(num_s as usize);
-        r.seek(std::io::SeekFrom::Current(12))?; //skip reserved bytes
+        r.seek(std::io::SeekFrom::Current(12))?; // skip reserved bytes
         let mut buf = [0u8; SecretEntry::STRUCT_SIZE];
         for _ in 0..num_s {
             r.read_exact(&mut buf)?;
-            //cannot fail. buffer has the same size as the secret entry
+            // cannot fail. buffer has the same size as the secret entry
             let secr = SecretEntry::read_from(buf.as_slice()).unwrap();
             v.push(secr);
         }
@@ -250,6 +250,7 @@ impl SecretList {
 
 impl TryFrom<ListCmd> for SecretList {
     type Error = Error;
+
     fn try_from(mut list: ListCmd) -> Result<SecretList> {
         SecretList::decode(&mut Cursor::new(list.data().unwrap())).map_err(Error::InvSecretList)
     }
@@ -292,11 +293,11 @@ pub enum ListableSecretType {
 }
 
 impl ListableSecretType {
-    const RESERVED_0: u16 = 0x0000;
-    /// UV type id for a null secret
-    pub const NULL: u16 = 0x0001;
     /// UV type id for an association secret
     pub const ASSOCIATION: u16 = 0x0002;
+    /// UV type id for a null secret
+    pub const NULL: u16 = 0x0001;
+    const RESERVED_0: u16 = 0x0000;
 }
 
 impl Display for ListableSecretType {
@@ -338,9 +339,11 @@ where
 
     impl<'de> serde::de::Visitor<'de> for FieldVisitor {
         type Value = [u8; SecretId::ID_SIZE];
+
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
             formatter.write_str("a `32 bytes long hexstring` prepended with 0x")
         }
+
         fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
         where
             E: serde::de::Error,
@@ -370,8 +373,8 @@ mod test {
     #[test]
     fn dump_secret_entry() {
         const EXP: &[u8] = &[
-            0x00, 0x01, 0x00, 0x02, //idx + type
-            0x00, 0x00, 0x00, 0x20, //len
+            0x00, 0x01, 0x00, 0x02, // idx + type
+            0x00, 0x00, 0x00, 0x20, // len
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
             // id
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -394,10 +397,11 @@ mod test {
         let buf = [
             0x00u8, 0x01, // num secr stored
             0x01, 0x12, // total num secrets
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //reserved
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, // reserved
             // secret
-            0x00, 0x01, 0x00, 0x02, //idx + type
-            0x00, 0x00, 0x00, 0x20, //len
+            0x00, 0x01, 0x00, 0x02, // idx + type
+            0x00, 0x00, 0x00, 0x20, // len
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
             // id
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -426,10 +430,11 @@ mod test {
         const EXP: &[u8] = &[
             0x00, 0x01, // num secr stored
             0x01, 0x12, // total num secrets
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //reserved
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, // reserved
             // secret
-            0x00, 0x01, 0x00, 0x02, //idx + type
-            0x00, 0x00, 0x00, 0x20, //len
+            0x00, 0x01, 0x00, 0x02, // idx + type
+            0x00, 0x00, 0x00, 0x20, // len
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
             // id
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

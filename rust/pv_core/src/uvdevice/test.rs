@@ -38,6 +38,7 @@ impl IoctlCtx {
         self.exp_cmd = cmd;
         self
     }
+
     pub fn set_mdfy<F>(&mut self, mdfy: F) -> &mut Self
     where
         F: FnMut(&mut ffi::uvio_ioctl_cb) -> c_int + 'static + Send + Sync,
@@ -45,6 +46,7 @@ impl IoctlCtx {
         self.modify = Box::new(mdfy);
         self
     }
+
     pub fn reset(&mut self) -> bool {
         let old = self.called;
         self.called = false;
@@ -86,6 +88,7 @@ impl ffi::uvio_ioctl_cb {
         );
         self
     }
+
     fn size_eq(&self, exp: u32) -> &Self {
         assert_eq!(
             self.argument_len, exp,
@@ -94,10 +97,12 @@ impl ffi::uvio_ioctl_cb {
         );
         self
     }
+
     fn set_rc(&mut self, rc: u16) -> &mut Self {
         self.uv_rc = rc;
         self
     }
+
     fn set_rrc(&mut self, rrc: u16) -> &mut Self {
         self.uv_rrc = rrc;
         self
@@ -112,9 +117,11 @@ impl UvCmd for TestCmd {
     fn cmd(&self) -> u64 {
         TEST_CMD
     }
+
     fn rc_fmt(&self, _rc: u16, _rrc: u16) -> Option<&'static str> {
         None
     }
+
     fn data(&mut self) -> Option<&mut [u8]> {
         match &mut self.0 {
             None => None,
@@ -124,7 +131,8 @@ impl UvCmd for TestCmd {
 }
 
 impl UvDevice {
-    ///use some random fd for  `uvdevice` its OK, as the ioctl is mocked and never touches the passed file
+    /// use some random fd for  `uvdevice` its OK, as the ioctl is mocked and never touches the
+    /// passed file
     fn test_dev() -> Self {
         UvDevice(unsafe { File::from_raw_fd(17) })
     }

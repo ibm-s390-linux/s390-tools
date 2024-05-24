@@ -42,7 +42,8 @@ impl ApConfigEntry {
         }
         // if name is given, calculate sha256 digest for this name
         // test for the hash calculated here can be done with openssl:
-        // echo -n "Hello" >in.bin; openssl dgst -sha256 -binary -out out.bin in.bin; hexdump -C out.bin
+        // echo -n "Hello" >in.bin; openssl dgst -sha256 -binary -out out.bin in.bin; hexdump -C
+        // out.bin
         if self.name.is_empty() {
             return Ok(());
         }

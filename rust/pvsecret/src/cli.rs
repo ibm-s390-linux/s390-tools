@@ -130,10 +130,11 @@ pub struct CreateSecretOpt {
     ///
     /// Adds a signature calculated from the key in <FILE> to the add-secret request. The
     /// file must be in DER or PEM format containing a private key. Supported are RSA 2048 &
-    /// 3072-bit and EC(secp521r1) keys. The firmware ignores the content, but the request tag protects the
-    /// signature. The user-signing key signs the request. The location of the signature is filled
-    /// with zeros during the signature calculation. The request tag also secures the signature.
-    /// See man pvsecret verify for more details. Optional. No signature by default.
+    /// 3072-bit and EC(secp521r1) keys. The firmware ignores the content, but the request tag
+    /// protects the signature. The user-signing key signs the request. The location of the
+    /// signature is filled with zeros during the signature calculation. The request tag also
+    /// secures the signature. See man pvsecret verify for more details. Optional. No signature
+    /// by default.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub user_sign_key: Option<String>,
 }
@@ -157,9 +158,9 @@ pub enum AddSecretType {
         /// white-spaces mapped to `_`.
         name: String,
 
-        ///Print the hashed name to stdout.
+        /// Print the hashed name to stdout.
         ///
-        ///The hashed name is not written to `NAME.yaml`
+        /// The hashed name is not written to `NAME.yaml`
         #[arg(long)]
         stdout: bool,
 

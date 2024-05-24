@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
-#[allow(unused_imports)] //used for more convenient docstring
+#[allow(unused_imports)] // used for more convenient docstring
 use super::asrcb::AddSecretRequest;
 use crate::assert_size;
 use crate::{
@@ -74,11 +74,12 @@ impl GuestSecret {
             GuestSecret::Association { secret, .. } => secret.value().as_slice(),
         }
     }
+
     /// Creates the non-confidential part of the secret ad-hoc
     pub(crate) fn auth(&self) -> SecretAuth {
         match &self {
             GuestSecret::Null => SecretAuth::Null,
-            //Panic:  every non null secret type is listable -> no panic
+            // Panic:  every non null secret type is listable -> no panic
             listable => {
                 SecretAuth::Listable(ListableSecretHdr::from_guest_secret(listable).unwrap())
             }
