@@ -1,5 +1,5 @@
 ---
-exclude: \.(crt|crl)$
+exclude: \.(bin|crl|crt|key)$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
