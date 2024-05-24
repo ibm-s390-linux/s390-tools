@@ -12,3 +12,10 @@ serde_yaml = "0.9"
 
 pv = { path = "../pv" , package = "s390_pv" }
 utils = { path = "../utils"}
+
+[build-dependencies]
+clap = { version ="4.1", features = ["derive", "wrap_help"]}
+clap_complete = "4.1"
+log = { version = "0.4", features = ["std", "release_max_level_debug"] }
+
+utils = { path = "../utils" }
