@@ -1,15 +1,27 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.33.0 (2024-05-27)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.9
 
   Add new tools / libraries:
+  - chpstat: New tool for displaying channel path statistics
+  - libutil: Add output format helpers(util_fmt: JSON, JSON-SEQ, CSV, text pairs)
 
-  Changes of existing tools:
+  Changes of existing tools / libraries:
+  - chzdev: Add --is-owner to identify files created by zdev
+  - dasdfmt: Change default mode to always use full-format (Note: affects ESE DASD)
+  - libap: Significantly reduce delay time between file lock retries
+  - pvattest: Rewrite from C to Rust
+  - pvattest: Support additional data & user-data
+  - rust/pv: Support for Attestation
 
   Bug Fixes:
+  - chreipl: Improve disk type detection when running under QEMU
+  - dbginfo.sh: Use POSIX option with uname
+  - s390-tools: Fix missing hyphen escapes in the man page for many tools
+  - zipl/src: Fix bugs in disk_get_info() reproducible in corner cases
 
 * __v2.32.0 (2024-04-03)__
 
