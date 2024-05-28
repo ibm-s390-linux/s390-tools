@@ -1,4 +1,4 @@
-3t90-tools
+s390-tools
 ==========
 
 The s390-tools package contains the source tree of a set of user space
@@ -44,7 +44,7 @@ Package contents
  * genprotimg:
    Create a protected virtualization image.
 
-  * udev rules:
+ * udev rules:
    - 59-dasd.rules: rules for unique DASD device nodes created in /dev/disk/.
    - 57-osasnmpd.rules: udev rules for osasnmpd.
    - 60-readahead.rules: udev rules to set increased "default max readahead".
