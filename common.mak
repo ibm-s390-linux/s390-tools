@@ -33,7 +33,7 @@ endif
 # "make DISTRELEASE=%{release}" and "make install DISTRELEASE=%{release}"
 VERSION            := 2
 RELEASE            := 33
-PATCHLEVEL         := 0
+PATCHLEVEL         := 1
 DISTRELEASE        := build-$(shell date +%Y%m%d)
 S390_TOOLS_RELEASE := $(VERSION).$(RELEASE).$(PATCHLEVEL)-$(DISTRELEASE)
 export S390_TOOLS_RELEASE
