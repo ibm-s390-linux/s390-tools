@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <json-c/json.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -27,15 +28,22 @@
 
 #include "ap-check.h"
 
+/* The supported mdevctl callout version */
+#define MDEVCTL_CAP_VERSION 2
+
 static const struct mdevctl_action mdevctl_action_table[NUM_MDEVCTL_ACTIONS] = {
 	{MDEVCTL_ACTION_DEFINE, "define"},
-	{MDEVCTL_ACTION_LIST, "list"},
 	{MDEVCTL_ACTION_MODIFY, "modify"},
 	{MDEVCTL_ACTION_START, "start"},
 	{MDEVCTL_ACTION_STOP, "stop"},
-	{MDEVCTL_ACTION_TYPES, "types"},
 	{MDEVCTL_ACTION_UNDEFINE, "undefine"},
-	{MDEVCTL_ACTION_ATTRIBUTES, "attributes"}
+	{MDEVCTL_ACTION_ATTRIBUTES, "attributes"},
+	{MDEVCTL_ACTION_CAPABILITIES, "capabilities"}
+	/*
+	 * Note: the following actions are known to exist but currently ignored:
+	 * {MDEVCTL_ACTION_LIST, "list"},
+	 * {MDEVCTL_ACTION_TYPES, "types"}
+	 */
 };
 
 static const struct mdevctl_event mdevctl_event_table[NUM_MDEVCTL_EVENTS] = {
@@ -43,6 +51,10 @@ static const struct mdevctl_event mdevctl_event_table[NUM_MDEVCTL_EVENTS] = {
 	{MDEVCTL_EVENT_POST, "post"},
 	{MDEVCTL_EVENT_GET, "get"},
 	{MDEVCTL_EVENT_LIVE, "live"}
+	/*
+	 * Note: the following events are known to exist but currently ignored:
+	 * {MDEVCTL_EVENT_NOTIFY, "notify"},
+	 */
 };
 
 /*
@@ -1007,6 +1019,122 @@ static int ap_check_handle_get_attributes(struct ap_check_anchor *anc)
 }
 
 /*
+ * If the target 'attr' is in the 's' array, add it to the 't' array.
+ */
+static void json_add_attr(json_object *t, json_object *s, const char *attr)
+{
+	size_t vlen, alen = strlen(attr);
+	const char *val;
+	json_object *o;
+	int i, num;
+
+	num = json_object_array_length(s);
+	for (i = 0; i < num; i++) {
+		o = json_object_array_get_idx(s, i);
+		val = json_object_get_string(o);
+		vlen = strlen(val);
+		if (alen == vlen && strncasecmp(attr, val, alen) == 0) {
+			json_object_array_add(t, json_object_new_string(val));
+			return;
+		}
+	}
+}
+
+/*
+ * Generate a JSON-formatted list of capability information that this script
+ * supports and return it to the caller via stdout.  An example of what the
+ * output should look like (without the newlines):
+ * {
+ *     "supports": {
+ *          "version": 2,
+ *          "actions": ["define",
+ *                      "modify",
+ *                      "start",
+ *                      "stop",
+ *                      "undefine",
+ *                      "attributes",
+ *                      "capabilities"],
+ *          "events": ["pre",
+ *                     "post",
+ *                     "get",
+ *                     "live"]
+ *     }
+ * }
+ */
+static int ap_check_handle_get_capabilities(void)
+{
+	json_object *root, *csup, *cver, *cact, *cev, *cap, *caps, *o;
+	int i, rc = 0;
+
+	root = json_object_from_fd(STDIN_FILENO);
+
+	if (!root) {
+		fprintf(stderr, "No capabilities provided\n");
+		return -1;
+	}
+
+	if (!json_object_object_get_ex(root, "provides", &csup)) {
+		fprintf(stderr, "No supported capabilities provided\n");
+		rc = -1;
+		goto out;
+	}
+
+	if (!json_object_object_get_ex(csup, "version", &cver)) {
+		fprintf(stderr, "No version provided in capabilities\n");
+		rc = -1;
+		goto out;
+	}
+
+	if (!json_object_object_get_ex(csup, "actions", &cact)) {
+		fprintf(stderr, "No actions provided in capabilities\n");
+		rc = -1;
+		goto out;
+	}
+
+	if (!json_object_object_get_ex(csup, "events", &cev)) {
+		fprintf(stderr, "No events provided in capabilities\n");
+		rc = -1;
+		goto out;
+	}
+
+	/*
+	 * Advertise the subset of supported capabilities from the list
+	 * provided on stdin.
+	 */
+
+	cap = json_object_new_object();
+	caps = json_object_new_object();
+	json_object_object_add(cap, "supports", caps);
+	/*
+	 * Currently we always advertise a fixed version, but we may need to
+	 * revisit this if we increase MDEVCTL_CAP_VERSION in the future (e.g.
+	 * how to handle ap-check having a greater supported version than
+	 * what mdevctl reports)
+	 */
+	o = json_object_new_int(MDEVCTL_CAP_VERSION);
+	json_object_object_add(caps, "version", o);
+
+	o = json_object_new_array();
+	for (i = 0; i < NUM_MDEVCTL_ACTIONS; i++)
+		json_add_attr(o, cact, mdevctl_action_table[i].action);
+	json_object_object_add(caps, "actions", o);
+
+	o = json_object_new_array();
+	for (i = 0; i < NUM_MDEVCTL_EVENTS; i++)
+		json_add_attr(o, cev, mdevctl_event_table[i].event);
+	json_object_object_add(caps, "events", o);
+
+	/* Return supported capabilities JSON on stdout */
+	printf("%s\n", json_object_to_json_string(cap));
+
+	json_object_put(cap);
+
+out:
+	json_object_put(root);
+	return rc;
+}
+
+/*
  * Determine which mdevctl action is being checked and handle accordingly.
  */
 static int ap_check_handle_action(struct ap_check_anchor *anc)
@@ -1031,8 +1159,6 @@ static int ap_check_handle_action(struct ap_check_anchor *anc)
 		case MDEVCTL_ACTION_UNDEFINE:
 			rc = ap_check_handle_undefine(anc);
 			break;
-		case MDEVCTL_ACTION_LIST:
-		case MDEVCTL_ACTION_TYPES:
 		default:
 			/* Ignore some actions including unknown ones */
 			break;
@@ -1056,6 +1182,9 @@ static int ap_check_handle_action(struct ap_check_anchor *anc)
 		switch (anc->action) {
 		case MDEVCTL_ACTION_ATTRIBUTES:
 			rc = ap_check_handle_get_attributes(anc);
+			break;
+		case MDEVCTL_ACTION_CAPABILITIES:
+			rc = ap_check_handle_get_capabilities();
 			break;
 		default:
 			/* Ignore some actions including unknown ones */
