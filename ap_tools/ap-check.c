@@ -41,7 +41,8 @@ static const struct mdevctl_action mdevctl_action_table[NUM_MDEVCTL_ACTIONS] = {
 static const struct mdevctl_event mdevctl_event_table[NUM_MDEVCTL_EVENTS] = {
 	{MDEVCTL_EVENT_PRE, "pre"},
 	{MDEVCTL_EVENT_POST, "post"},
-	{MDEVCTL_EVENT_GET, "get"}
+	{MDEVCTL_EVENT_GET, "get"},
+	{MDEVCTL_EVENT_LIVE, "live"}
 };
 
 /*
@@ -617,6 +618,73 @@ static int ap_check_active(struct ap_check_anchor *anc)
 	return rc;
 }
 
+static int ap_do_dynamic_config(struct ap_check_anchor *anc)
+{
+	char *adapters, *domains, *controls, *path, *attr;
+	int asize, dsize, csize, size;
+	int rc = 0;
+	FILE *f;
+
+	adapters = vfio_ap_device_get_adapter_mask(anc->dev, &asize);
+	domains = vfio_ap_device_get_domain_mask(anc->dev, &dsize);
+	controls = vfio_ap_device_get_control_mask(anc->dev, &csize);
+
+	if (!adapters || !domains || !controls) {
+		fprintf(stderr, "Failed to read device config\n");
+		rc = -1;
+		goto out;
+	}
+
+	/*
+	 * The 'ap_config' command takes a comma-delimited list of the 3 masks
+	 * combined.  Each mask size includes a terminating character, two of
+	 * which will be replaced by commas and the final replaced by a
+	 * newline, which ap_config seems to require at the end of the input.
+	 * Add one to ensure room for a null termination.
+	 */
+	size = asize + dsize + csize + 1;
+	attr = util_zalloc(size);
+
+	/* Use the 3 masks to generate a 'ap_config' command */
+	rc = snprintf(attr, size, "%s,%s,%s\n", adapters, domains, controls);
+
+	if (rc < size - 1) {
+		fprintf(stderr, "Error creating ap_config command\n");
+		rc = -1;
+		goto out;
+	}
+
+	/* Apply the new configuration to the active device */
+	path = path_get_vfio_ap_attr(anc->uuid, "ap_config");
+	f = fopen(path, "w");
+	if (!f) {
+		fprintf(stderr, "Error opening ap_config\n");
+		rc = -1;
+		goto out;
+	}
+	rc = fputs(attr, f);
+	fclose(f);
+
+	if (rc == EOF)
+		fprintf(stderr, "Error writing to ap_config\n");
+	else
+		rc = 0;
+
+out:
+	if (!adapters)
+		free(adapters);
+	if (!domains)
+		free(domains);
+	if (!controls)
+		free(controls);
+	if (!path)
+		free(path);
+	if (!attr)
+		free(attr);
+
+	return rc;
+}
+
 /*
  * Determine if defining the specified device is a valid operation.
  * mdevctl can reach us for a DEFINE under the following circumstances:
@@ -666,6 +734,50 @@ static int ap_check_handle_modify(struct ap_check_anchor *anc)
 	fclose(fd);
 
 	return ap_check_changes(anc);
+}
+
+/*
+ * Determine if modifying the active device is a valid operation.
+ * This is similar to STARTing a device, in that the requested modifications
+ * cannot conflict with the active configuration.  LIVE MODIFY can only be
+ * handled if the ap_config attribute is available in the vfio-ap driver.
+ */
+static int ap_check_handle_live_modify(struct ap_check_anchor *anc)
+{
+	int rc;
+
+	rc = ap_get_lock_callout();
+	if (rc) {
+		fprintf(stderr, "Failed to acquire configuration lock %d\n",
+			rc);
+		return -1;
+	}
+	anc->cleanup_lock = true;
+
+	if (vfio_ap_read_device_config(NULL, anc->dev) != 0) {
+		fprintf(stderr, "Failed to read device config\n");
+		return -1;
+	}
+
+	if (strcmp(anc->dev->type, anc->type) != 0) {
+		fprintf(stderr, "Invalid mdev_type: %s\n", anc->dev->type);
+		return -1;
+	}
+
+	if (!vfio_ap_need_dynamic_config(anc->dev)) {
+		fprintf(stderr, "vfio-ap module does not support ap_config for live modification");
+		return -1;
+	}
+
+	/* Check if the new configuration would cause conflicts */
+	rc = ap_check_active(anc);
+	if (rc)
+		return rc;
+
+	/* Attempt to perform the dynamic configuration */
+	rc = ap_do_dynamic_config(anc);
+
+	return rc;
 }
 
 /*
@@ -944,6 +1056,16 @@ static int ap_check_handle_action(struct ap_check_anchor *anc)
 		switch (anc->action) {
 		case MDEVCTL_ACTION_ATTRIBUTES:
 			rc = ap_check_handle_get_attributes(anc);
+			break;
+		default:
+			/* Ignore some actions including unknown ones */
+			break;
+		}
+		break;
+	case MDEVCTL_EVENT_LIVE:
+		switch (anc->action) {
+		case MDEVCTL_ACTION_MODIFY:
+			rc = ap_check_handle_live_modify(anc);
 			break;
 		default:
 			/* Ignore some actions including unknown ones */
