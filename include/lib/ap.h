@@ -72,6 +72,7 @@ char *path_get_ap_udev(void);
 void vfio_ap_parse_matrix(struct vfio_ap_device *dev, char *matrix);
 void vfio_ap_sort_matrix_results(struct vfio_ap_device *dev);
 void vfio_ap_parse_control(struct vfio_ap_device *dev, char *control);
+bool vfio_ap_need_dynamic_config(struct vfio_ap_device *dev);
 
 /* Functions for reading JSON device config */
 int vfio_ap_read_device_config(const char *path, struct vfio_ap_device *dev);

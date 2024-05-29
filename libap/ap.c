@@ -416,6 +416,28 @@ void vfio_ap_parse_control(struct vfio_ap_device *dev, char *control)
 	}
 }
 
+/**
+ * Determine if the specified device is currently active.  If so, see if
+ * it is enabled for dynamic configuration support.
+ *
+ * @param[in]      dev        Vfio-ap struct
+ *
+ * @retval         True       Device is active and enabled for dynamic config
+ * @retval         False      Device is not active OR no dynamic config support
+ */
+bool vfio_ap_need_dynamic_config(struct vfio_ap_device *dev)
+{
+	char *attr = path_get_vfio_ap_attr(dev->uuid, "ap_config");
+
+	if (!attr)
+		return false;
+
+	if (!util_path_is_readable(attr))
+		return false;
+
+	return true;
+}
+
 #ifdef HAVE_JSONC
 
 /**
