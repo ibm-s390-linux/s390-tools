@@ -908,7 +908,7 @@ static const struct util_opt configure_options[] = {
 			"server's certificate. For self signed EKMF Web server "
 			"certificates, this is the default. Use option "
 			"'--tls-pin-server-cert' to ensure the self signed "
-			"certificate's authenticity explicitely. CA signed "
+			"certificate's authenticity explicitly. CA signed "
 			"EKMF Web server certificates are verified by default. "
 			"This option disables the verification.",
 		.command = KMS_COMMAND_CONFIGURE,

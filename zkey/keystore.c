@@ -1382,7 +1382,7 @@ static int _keystore_lock_repository(struct keystore *keystore)
 		if (fchown(keystore->lock_fd, geteuid(),
 			   keystore->owner) != 0) {
 			rc = -errno;
-			warnx("chown faild on file '%s': %s", lock_file_name,
+			warnx("chown failed on file '%s': %s", lock_file_name,
 			      strerror(-rc));
 			return rc;
 		}

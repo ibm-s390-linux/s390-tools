@@ -283,7 +283,7 @@ static void tape390_crypt_parse_opts(struct tape390_crypt *info, int argc,
 			    "%s: No device specified.\n",prog_name);
 	if (optind + 1 < argc)
 		ERRMSG_EXIT(EXIT_MISUSE,
-			    "%s: More than one device speficied.\n",prog_name);
+			    "%s: More than one device specified.\n",prog_name);
 	strcpy(info->devname, argv[optind]);
 }
 
