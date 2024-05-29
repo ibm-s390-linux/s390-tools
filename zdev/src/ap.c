@@ -53,18 +53,18 @@ static void ap_mask_list_changes(const char *source, const char *target,
 				 struct util_list *adds, struct util_list *subs)
 {
 	int i;
-	struct ap_node *node;
+	struct vfio_ap_node *node;
 
 	for (i = 0; i <= AP_MAX_MASK_VALUE; i++) {
 		if (ap_test_bit(i, source)) {
 			if (!ap_test_bit(i, target)) {
-				node = misc_malloc(sizeof(struct ap_node));
+				node = misc_malloc(sizeof(struct vfio_ap_node));
 				node->id = i;
 				util_list_add_tail(subs, node);
 			}
 		} else {
 			if (ap_test_bit(i, target)) {
-				node = misc_malloc(sizeof(struct ap_node));
+				node = misc_malloc(sizeof(struct vfio_ap_node));
 				node->id = i;
 				util_list_add_tail(adds, node);
 			}
@@ -210,7 +210,7 @@ static bool ap_validate_mask_input(char *mask, const char *input,
 	 * Translate the mask value into a list of additions/removals for later
 	 * conflict analysis.
 	 */
-	util_list_init(adds, struct ap_node, node);
+	util_list_init(adds, struct vfio_ap_node, node);
 	ap_mask_list_changes(mask, newmask, adds, subs);
 	strcpy(mask, newmask);
 	goto out;
@@ -948,8 +948,8 @@ static exit_code_t ap_check_mask_changes(config_t config,
 	struct util_list all_ap;
 	struct util_list all_aq;
 
-	util_list_init(&all_ap, struct ap_node, node);
-	util_list_init(&all_aq, struct ap_node, node);
+	util_list_init(&all_ap, struct vfio_ap_node, node);
+	util_list_init(&all_aq, struct vfio_ap_node, node);
 
 	/* Validate the mask changes against existing vfio-ap devices */
 	if (SCOPE_ACTIVE(config) && (!util_list_is_empty(add_ap) ||
@@ -996,14 +996,14 @@ static exit_code_t ap_devtype_write_settings(struct devtype *dt,
 	exit_code_t rc = EXIT_OK;
 	/* No kernel or module parameters exist for AP device driver. */
 
-	util_list_init(&add_ap, struct ap_node, node);
-	util_list_init(&add_aq, struct ap_node, node);
-	util_list_init(&sub_ap, struct ap_node, node);
-	util_list_init(&sub_aq, struct ap_node, node);
-	util_list_init(&add_p_ap, struct ap_node, node);
-	util_list_init(&add_p_aq, struct ap_node, node);
-	util_list_init(&sub_p_ap, struct ap_node, node);
-	util_list_init(&sub_p_aq, struct ap_node, node);
+	util_list_init(&add_ap, struct vfio_ap_node, node);
+	util_list_init(&add_aq, struct vfio_ap_node, node);
+	util_list_init(&sub_ap, struct vfio_ap_node, node);
+	util_list_init(&sub_aq, struct vfio_ap_node, node);
+	util_list_init(&add_p_ap, struct vfio_ap_node, node);
+	util_list_init(&add_p_aq, struct vfio_ap_node, node);
+	util_list_init(&sub_p_ap, struct vfio_ap_node, node);
+	util_list_init(&sub_p_aq, struct vfio_ap_node, node);
 	write_ap = write_aq = write_udev = false;
 
 	rc = ap_get_lock();

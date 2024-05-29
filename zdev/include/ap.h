@@ -24,11 +24,6 @@ extern struct devtype ap_devtype;
 extern struct subtype ap_subtype;
 extern struct namespace ap_namespace;
 
-struct ap_node {
-	struct util_list_node node;
-	unsigned int id;
-};
-
 struct mdev_cb_data {
 	struct util_list *adapters;
 	struct util_list *domains;

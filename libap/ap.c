@@ -692,7 +692,7 @@ void ap_mask_to_list(char *mask, struct util_list *list)
  */
 void ap_list_remove_all(struct util_list *list)
 {
-	struct ap_node *node;
+	struct vfio_ap_node *node;
 
 	while (!util_list_is_empty(list)) {
 		node = util_list_start(list);
