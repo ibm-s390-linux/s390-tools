@@ -121,6 +121,37 @@ static void modify_device_attr(struct util_list *list, char *value)
 	vfio_ap_node_remove_dupes(list);
 }
 
+/*
+ * Pass a comma-delimited string of masks (adapters,domains,controls) and
+ * for each ON bit in these masks add the associated ID to the device
+ * lists.
+ */
+static void modify_device_ap_config(struct vfio_ap_device *dev,
+				    char *value)
+{
+	char *mask, *adapters, *domains, *controls;
+
+	mask = util_strdup(value);
+
+	adapters = strtok(mask, ",");
+	domains = strtok(NULL, ",");
+	controls = strtok(NULL, ",");
+	util_assert((!strtok(NULL, ",")) && adapters && domains && controls,
+		    "Invalid ap_config attribute encountered %s", value);
+
+	/*
+	 * ap_config overwrites the current list of adapters, domains and
+	 * control domains.  Clear the current lists before generating new ones
+	 * based upon the input mask values.
+	 */
+	ap_list_remove_all(dev->adapters);
+	ap_list_remove_all(dev->domains);
+	ap_list_remove_all(dev->controls);
+	ap_mask_to_list(adapters, dev->adapters);
+	ap_mask_to_list(domains, dev->domains);
+	ap_mask_to_list(controls, dev->controls);
+}
+
 static void load_attr_to_device(struct vfio_ap_device *dev, char *attr,
 				const char *value)
 {
@@ -132,6 +163,8 @@ static void load_attr_to_device(struct vfio_ap_device *dev, char *attr,
 		modify_device_attr(dev->domains, v);
 	else if (strcmp(attr, "assign_control_domain") == 0)
 		modify_device_attr(dev->controls, v);
+	else if (strcmp(attr, "ap_config") == 0)
+		modify_device_ap_config(dev, v);
 
 	free(v);
 }
