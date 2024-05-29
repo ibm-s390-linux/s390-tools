@@ -88,6 +88,9 @@ bool ap_read_udev_masks(char *path, char *ap, char *aq, bool *read_ap,
 			bool *read_aq);
 void ap_mask_to_list(char *mask, struct util_list *list);
 void ap_list_remove_all(struct util_list *list);
+char *vfio_ap_device_get_adapter_mask(struct vfio_ap_device *dev, int *size);
+char *vfio_ap_device_get_domain_mask(struct vfio_ap_device *dev, int *size);
+char *vfio_ap_device_get_control_mask(struct vfio_ap_device *dev, int *size);
 
 /* Lock Functions */
 int ap_get_lock(void);

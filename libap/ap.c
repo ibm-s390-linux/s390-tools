@@ -33,6 +33,9 @@
 #include "lib/util_path.h"
 #include "lib/util_udev.h"
 
+static const char default_mask[AP_MASK_SIZE] =
+	"0x0000000000000000000000000000000000000000000000000000000000000000";
+
 /*
  * Return sysfs path to a bus attribute
  * Note: caller is responsible for freeing the returned string
@@ -735,6 +738,90 @@ static unsigned int random_delay(void)
 	}
 
 	return AP_LOCK_DELAY_US + (rand() % AP_LOCK_VARIANCE_US);
+}
+
+/**
+ * Return a mask of assigned adapters for the specified vfio_ap device.
+ * Note: caller is responsible for freeing the returned string
+ *
+ * @param[in]      dev        Vfio-ap struct to get adapter mask from
+ * @param[in, out] size       Size of mask buffer returned
+ *
+ * @retval         != 0       Adapter mask (hex string)
+ * @retval         0          Failed to generate a mask
+ */
+char *vfio_ap_device_get_adapter_mask(struct vfio_ap_device *dev, int *size)
+{
+	struct vfio_ap_node *node;
+	char *mask;
+
+	if (!dev || !size)
+		return NULL;
+
+	mask = util_strdup(default_mask);
+	*size = AP_MASK_SIZE;
+
+	util_list_iterate(dev->adapters, node) {
+		ap_set_bit(node->id, mask, true);
+	}
+
+	return mask;
+}
+
+/**
+ * Return a mask of assigned domains for the specified vfio_ap device.
+ * Note: caller is responsible for freeing the returned string
+ *
+ * @param[in]      dev        Vfio-ap struct to get domain mask from
+ * @param[in, out] size       Size of mask buffer returned
+ *
+ * @retval         != 0       Domain mask (hex string)
+ * @retval         0          Failed to generate a mask
+ */
+char *vfio_ap_device_get_domain_mask(struct vfio_ap_device *dev, int *size)
+{
+	struct vfio_ap_node *node;
+	char *mask;
+
+	if (!dev || !size)
+		return NULL;
+
+	mask = util_strdup(default_mask);
+	*size = AP_MASK_SIZE;
+
+	util_list_iterate(dev->domains, node) {
+		ap_set_bit(node->id, mask, true);
+	}
+
+	return mask;
+}
+
+/**
+ * Return a mask of assigned control domains for the specified vfio_ap device.
+ * Note: caller is responsible for freeing the returned string
+ *
+ * @param[in]      dev        Vfio-ap struct to get control domain mask from
+ * @param[in, out] size       Size of mask buffer returned
+ *
+ * @retval         != 0       Control domain mask (hex string)
+ * @retval         0          Failed to generate a mask
+ */
+char *vfio_ap_device_get_control_mask(struct vfio_ap_device *dev, int *size)
+{
+	struct vfio_ap_node *node;
+	char *mask;
+
+	if (!dev || !size)
+		return NULL;
+
+	mask = util_strdup(default_mask);
+	*size = AP_MASK_SIZE;
+
+	util_list_iterate(dev->controls, node) {
+		ap_set_bit(node->id, mask, true);
+	}
+
+	return mask;
 }
 
 /**
