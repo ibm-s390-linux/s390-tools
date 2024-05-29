@@ -951,7 +951,7 @@ static void set_record_extension(struct file *f, int *record, off_t addr,
 
 	if (f->record_scan_state != RSS_DATA_BLOCK_STARTED &&
 	    f->record_scan_state != RSS_DATA_BLOCK_EXT)
-		DIE("%s: interal error\n", __func__);
+		DIE("%s: internal error\n", __func__);
 
 	BUG(*record >= f->fst->nr_records);
 

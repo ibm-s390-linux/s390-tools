@@ -196,7 +196,7 @@ int add_to_agg(struct aggr_data *agg_data, struct message *msg,
 	else if (msg->type == f_hdr->msgid_zfcpdd)
 		aggregate_zfcpdd(agg_data, msg);
 	else {
-		fprintf(stderr, "%s: Unknow msg id: %d,"
+		fprintf(stderr, "%s: Unknown msg id: %d,"
 			" discarding\n", toolname, msg->type);
 		return -1;
 	}
