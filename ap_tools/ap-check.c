@@ -596,6 +596,27 @@ out:
 	return rc;
 }
 
+static int ap_check_active(struct ap_check_anchor *anc)
+{
+	int rc, rc2;
+
+	/* Ensure device with control domains also has usage domains */
+	if (util_list_is_empty(anc->dev->domains) &&
+	    !util_list_is_empty(anc->dev->controls)) {
+		fprintf(stderr, "At least one usage domain must be specified\n");
+		return -1;
+	}
+
+	/* Check against all other active vfio-ap devices */
+	rc = check_other_mdevs_sysfs(anc);
+	/* Check against the system sysfs values for apmask/aqmask */
+	rc2 = check_sysfs_mask_conflicts(anc);
+	/* If either hit an error, reflect this */
+	rc = rc != 0 ? rc : rc2;
+
+	return rc;
+}
+
 /*
  * Determine if defining the specified device is a valid operation.
  * mdevctl can reach us for a DEFINE under the following circumstances:
@@ -665,7 +686,7 @@ static int ap_check_handle_modify(struct ap_check_anchor *anc)
  */
 static int ap_check_handle_start(struct ap_check_anchor *anc)
 {
-	int rc = 0, rc2;
+	int rc = 0;
 
 	/* Can only start a device if vfio_ap is built-in or loaded */
 	if (!util_path_is_dir(VFIO_AP_PATH)) {
@@ -694,20 +715,7 @@ static int ap_check_handle_start(struct ap_check_anchor *anc)
 		goto out;
 	}
 
-	/* Ensure device with control domains also has usage domains */
-	if (util_list_is_empty(anc->dev->domains) &&
-	    !util_list_is_empty(anc->dev->controls)) {
-		fprintf(stderr, "At least one usage domain must be specified\n");
-		rc = -1;
-		goto out;
-	}
-
-	/* Check against all other active vfio-ap devices */
-	rc = check_other_mdevs_sysfs(anc);
-	/* Check against the system sysfs values for apmask/aqmask */
-	rc2 = check_sysfs_mask_conflicts(anc);
-	/* If either hit an error, reflect this */
-	rc = rc != 0 ? rc : rc2;
+	rc = ap_check_active(anc);
 
 	/* If successful, lock must remain held until post callout */
 	if (rc == 0)
