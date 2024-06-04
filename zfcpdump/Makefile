@@ -35,7 +35,7 @@ zfcpdump_part: zfcpdump.o zfcpdump_part.o
 
 $(ZFCPDUMP_INITRD): cpioinit zfcpdump_part
 	$(CPIOINIT) zfcpdump_part > $@.tmp
-	$(GZIP) -f $@.tmp
+	$(GZIP) -f -n $@.tmp
 	$(MV) $@.tmp.gz $(ZFCPDUMP_INITRD)
 
 scripts: $(INSTALL_SCRIPTS)
