@@ -152,7 +152,6 @@ static inline int target_parameters_are_set(struct job_target_data *td)
 
 int job_get(int argc, char* argv[], struct job_data** data);
 void job_free(struct job_data* job);
-void free_target_data(struct job_target_data *td);
 int type_from_target(char *target, disk_type_t *type);
 int check_job_dump_images(struct job_dump_data* dump, char* name);
 int check_job_images_ngdump(struct job_dump_data* dump, char* name);
