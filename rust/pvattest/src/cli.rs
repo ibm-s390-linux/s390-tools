@@ -97,7 +97,7 @@ pub struct CreateAttOpt {
     /// Save the protection key as unencrypted GCM-AES256 key in FILE
     ///
     /// Do not publish this key, otherwise your attestation is compromised.
-    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub arpk: String,
 
     /// Specify-additional data for the request.
@@ -222,7 +222,7 @@ pub struct VerifyOpt {
     ///
     /// Do not publish this key, otherwise your attestation is compromised.
     /// Delete this key after verification.
-    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub arpk: String,
 
     /// Define the output format.
