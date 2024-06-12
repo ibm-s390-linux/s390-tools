@@ -163,6 +163,16 @@ pub enum UvcSuccess {
     RC_MORE_DATA = UvDevice::RC_MORE_DATA,
 }
 
+impl UvcSuccess {
+    /// Returns true if there is more data available
+    pub fn more_data(&self) -> bool {
+        match self {
+            Self::RC_SUCCESS => false,
+            Self::RC_MORE_DATA => true,
+        }
+    }
+}
+
 /// The `UvDevice` is a (virtual) device on s390 machines to send Ultravisor commands(UVCs) from
 /// userspace.
 ///

@@ -4,16 +4,16 @@
 
 use crate::{
     assert_size,
-    misc::to_u16,
     uv::{AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, ListCmd, RetrievableSecret},
     uvdevice::UvCmd,
     Error, Result,
 };
-use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     fmt::Display,
     io::{Cursor, Read, Seek, Write},
+    mem::size_of,
     slice::Iter,
     vec::IntoIter,
 };
@@ -31,7 +31,7 @@ impl SecretId {
     /// Size in bytes of the [`SecretId`]
     pub const ID_SIZE: usize = 32;
 
-    /// Create a [`SecretId`] forom a buffer.
+    /// Create a [`SecretId`] from a buffer.
     pub fn from(buf: [u8; Self::ID_SIZE]) -> Self {
         buf.into()
     }
@@ -120,7 +120,7 @@ impl SecretEntry {
         &self.index
     }
 
-    /// Returns the secret type of this [`SecretEntry`].
+    /// Returns the secret type of this [`SecretEntry`]
     pub fn stype(&self) -> ListableSecretType {
         self.stype.get().into()
     }
@@ -161,12 +161,45 @@ impl Display for SecretEntry {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, FromBytes, AsBytes, FromZeroes, Clone, PartialEq, Eq, Default, Serialize)]
+struct SecretListHdr {
+    #[serde(skip)]
+    num_secrets_stored: U16<BigEndian>,
+    #[serde(serialize_with = "ser_u16")]
+    total_num_secrets: U16<BigEndian>,
+    #[serde(skip)]
+    next_secret_idx: U16<BigEndian>,
+    #[serde(skip)]
+    reserved_06: u16,
+    #[serde(skip)]
+    reserved_08: u64,
+}
+
+impl SecretListHdr {
+    fn new(num_secrets_stored: u16, total_num_secrets: u16, next_secret_idx: u16) -> Self {
+        Self {
+            num_secrets_stored: num_secrets_stored.into(),
+            total_num_secrets: total_num_secrets.into(),
+            next_secret_idx: next_secret_idx.into(),
+            reserved_06: 0,
+            reserved_08: 0,
+        }
+    }
+}
+assert_size!(SecretListHdr, 16);
+
 /// List of secrets used to parse the [`crate::uv::ListCmd`] result.
 ///
-/// The list should not hold more than 0xffffffff elements
-#[derive(Debug, PartialEq, Eq, Serialize)]
+/// The list should ONLY be created from an UV-Call result using either:
+/// - [`TryInto::try_into`] from [`ListCmd`]
+/// - [`SecretList::decode`]
+/// Any other ways can create invalid lists that do not represent the UV secret store.
+/// The list must not hold more than [`u32::MAX`] elements
+#[derive(Debug, PartialEq, Eq, Serialize, Default)]
 pub struct SecretList {
-    total_num_secrets: usize,
+    #[serde(flatten)]
+    hdr: SecretListHdr,
     secrets: Vec<SecretEntry>,
 }
 
@@ -202,10 +235,14 @@ impl SecretList {
     /// The content of this list will very likely not represent the status of the guest in the
     /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.
     pub fn new(total_num_secrets: u16, secrets: Vec<SecretEntry>) -> Self {
-        Self {
-            total_num_secrets: total_num_secrets as usize,
+        Self::new_with_hdr(
+            SecretListHdr::new(total_num_secrets, total_num_secrets, 0),
             secrets,
-        }
+        )
+    }
+
+    fn new_with_hdr(hdr: SecretListHdr, secrets: Vec<SecretEntry>) -> Self {
+        Self { hdr, secrets }
     }
 
     /// Returns an iterator over the slice.
@@ -229,19 +266,12 @@ impl SecretList {
     ///
     /// This number may be not equal to the provided number of [`SecretEntry`]
     pub fn total_num_secrets(&self) -> usize {
-        self.total_num_secrets
+        self.hdr.total_num_secrets.get() as usize
     }
 
     /// Encodes the list in the same binary format the UV would do
     pub fn encode<T: Write>(&self, w: &mut T) -> Result<()> {
-        let num_s = to_u16(self.secrets.len()).ok_or(Error::ManySecrets)?;
-        w.write_u16::<BigEndian>(num_s)?;
-        w.write_u16::<BigEndian>(
-            self.total_num_secrets
-                .try_into()
-                .map_err(|_| Error::ManySecrets)?,
-        )?;
-        w.write_all(&[0u8; 12])?;
+        w.write_all(self.hdr.as_bytes())?;
         for secret in &self.secrets {
             w.write_all(secret.as_bytes())?;
         }
@@ -250,19 +280,20 @@ impl SecretList {
 
     /// Decodes the list from the binary format of the UV into this internal representation
     pub fn decode<R: Read + Seek>(r: &mut R) -> std::io::Result<Self> {
-        let num_s = r.read_u16::<BigEndian>()?;
-        let total_num_secrets = r.read_u16::<BigEndian>()? as usize;
-        let mut v: Vec<SecretEntry> = Vec::with_capacity(num_s as usize);
-        r.seek(std::io::SeekFrom::Current(12))?; // skip reserved bytes
+        let mut buf = [0u8; size_of::<SecretListHdr>()];
+        r.read_exact(&mut buf)?;
+        let hdr = SecretListHdr::ref_from(&buf).unwrap();
+
         let mut buf = [0u8; SecretEntry::STRUCT_SIZE];
-        for _ in 0..num_s {
+        let mut v = Vec::with_capacity(hdr.num_secrets_stored.get() as usize);
+        for _ in 0..hdr.num_secrets_stored.get() {
             r.read_exact(&mut buf)?;
             // cannot fail. buffer has the same size as the secret entry
             let secr = SecretEntry::read_from(buf.as_slice()).unwrap();
             v.push(secr);
         }
         Ok(Self {
-            total_num_secrets,
+            hdr: hdr.clone(),
             secrets: v,
         })
     }
@@ -278,7 +309,7 @@ impl TryFrom<ListCmd> for SecretList {
 
 impl Display for SecretList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Total number of secrets: {}", self.total_num_secrets)?;
+        writeln!(f, "Total number of secrets: {}", self.total_num_secrets())?;
         if !self.secrets.is_empty() {
             writeln!(f)?;
         }
@@ -481,8 +512,8 @@ mod test {
         let buf = [
             0x00u8, 0x01, // num secr stored
             0x01, 0x12, // total num secrets
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, // reserved
+            0x01, 0x01, // next valid idx
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
             // secret
             0x00, 0x01, 0x00, 0x02, // idx + type
             0x00, 0x00, 0x00, 0x20, // len
@@ -493,16 +524,16 @@ mod test {
             0x00, 0x00, 0x00, 0x00,
         ];
 
-        let exp = SecretList {
-            total_num_secrets: 0x112,
-            secrets: vec![SecretEntry {
+        let exp = SecretList::new_with_hdr(
+            SecretListHdr::new(0x001, 0x112, 0x101),
+            vec![SecretEntry {
                 index: 1.into(),
                 stype: 2.into(),
                 len: 32.into(),
                 res_8: 0,
                 id: SecretId::from([0; 32]),
             }],
-        };
+        );
 
         let mut br = BufReader::new(Cursor::new(buf));
         let sl = SecretList::decode(&mut br).unwrap();
@@ -514,8 +545,8 @@ mod test {
         const EXP: &[u8] = &[
             0x00, 0x01, // num secr stored
             0x01, 0x12, // total num secrets
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, // reserved
+            0x01, 0x01, // next valid idx
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
             // secret
             0x00, 0x01, 0x00, 0x02, // idx + type
             0x00, 0x00, 0x00, 0x20, // len
@@ -526,16 +557,16 @@ mod test {
             0x00, 0x00, 0x00, 0x00,
         ];
 
-        let sl = SecretList {
-            total_num_secrets: 0x112,
-            secrets: vec![SecretEntry {
+        let sl = SecretList::new_with_hdr(
+            SecretListHdr::new(0x001, 0x112, 0x101),
+            vec![SecretEntry {
                 index: 1.into(),
                 stype: 2.into(),
                 len: 32.into(),
                 res_8: 0,
                 id: SecretId::from([0; 32]),
             }],
-        };
+        );
 
         let mut buf = [0u8; 0x40];
         {
@@ -587,26 +618,23 @@ mod test {
 
     #[test]
     fn secret_list_ser() {
-        let list = SecretList {
-            total_num_secrets: 0x112,
-            secrets: vec![SecretEntry {
+        let list = SecretList::new_with_hdr(
+            SecretListHdr::new(0x001, 0x112, 0x101),
+            vec![SecretEntry {
                 index: 1.into(),
                 stype: 2.into(),
                 len: 32.into(),
                 res_8: 0,
                 id: SecretId::from([0; 32]),
             }],
-        };
+        );
 
         assert_ser_tokens(
             &list,
             &[
-                Token::Struct {
-                    name: "SecretList",
-                    len: 2,
-                },
+                Token::Map { len: None },
                 Token::String("total_num_secrets"),
-                Token::U64(0x112),
+                Token::U16(0x112),
                 Token::String("secrets"),
                 Token::Seq { len: Some(1) },
                 Token::Struct {
@@ -623,7 +651,7 @@ mod test {
                 Token::String("0x0000000000000000000000000000000000000000000000000000000000000000"),
                 Token::StructEnd,
                 Token::SeqEnd,
-                Token::StructEnd,
+                Token::MapEnd,
             ],
         )
     }
