@@ -24,6 +24,17 @@ impl ListCmd {
         Self(vec![0; size])
     }
 
+    /// Create a new list secrets command with `pages` capacity.
+    ///
+    /// * `pages` - number pf pages to allocate for this IOCTL
+    ///
+    /// # Panic
+    /// This function will trigger a panic if the allocation size is larger than [`usize::MAX`].
+    /// Very likely an OOM situation occurs way before this!
+    pub fn with_pages(pages: usize) -> Self {
+        Self::with_size(pages * PAGESIZE)
+    }
+
     /// Create a new list secrets command with a one page capacity
     pub fn new() -> Self {
         Self::with_size(PAGESIZE)

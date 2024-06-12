@@ -59,11 +59,13 @@ fn ioctl_raw(raw_fd: RawFd, cmd: c_ulong, cb: &mut IoctlCb) -> Result<()> {
         rc = ioctl(raw_fd, cmd, cb.as_ptr_mut());
     }
 
+    // NOTE io::Error handles all errnos ioctl uses
+    let errno = std::io::Error::last_os_error();
+
     debug!("ioctl resulted with {cb:?}");
     match rc {
         0 => Ok(()),
-        // NOTE io::Error handles all errnos ioctl uses
-        _ => Err(std::io::Error::last_os_error().into()),
+        _ => Err(errno.into()),
     }
 }
 

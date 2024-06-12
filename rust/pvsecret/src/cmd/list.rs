@@ -2,19 +2,33 @@
 //
 // Copyright IBM Corp. 2023
 
+use std::io::ErrorKind;
+
 use crate::cli::{ListSecretOpt, ListSecretOutputType};
 use anyhow::{Context, Error, Result};
-use log::warn;
-use pv::uv::{ListCmd, SecretList, UvDevice, UvcSuccess};
+use log::{info, warn};
+use pv::uv::{ListCmd, SecretList, UvDevice};
 use utils::{get_writer_from_cli_file_arg, STDOUT};
+
+const SECRET_LIST_BUF_SIZE: usize = 4;
 
 /// Do a List Secrets UVC
 pub fn list_uvc(uv: &UvDevice) -> Result<SecretList> {
-    let mut cmd = ListCmd::default();
-    match uv.send_cmd(&mut cmd)? {
-        UvcSuccess::RC_SUCCESS => (),
-        UvcSuccess::RC_MORE_DATA => warn!("There is more data available than expected"),
-    };
+    let mut cmd = ListCmd::with_pages(SECRET_LIST_BUF_SIZE);
+    let more_data = match uv.send_cmd(&mut cmd) {
+        Ok(v) => Ok(v),
+        Err(pv::PvCoreError::Io(e)) if e.kind() == ErrorKind::InvalidInput => {
+            info!("Uvdevice does not suport longer list. Fallback to one page list.");
+            cmd = ListCmd::default();
+            uv.send_cmd(&mut cmd)
+        }
+        Err(e) => Err(e),
+    }?
+    .more_data();
+    if more_data {
+        warn!("The secret list contains more data but the uvdevice cannot show all.");
+    }
+
     cmd.try_into().map_err(Error::new)
 }
 
