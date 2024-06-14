@@ -667,8 +667,7 @@ function check_free_space_mileage() {
 
 
 function check_blktrace() {
-   which blktrace >/dev/null 2>&1;
-   if [ $? -ne 0 ]; then
+   if ! command -v blktrace >/dev/null 2>&1; then
       echo "$WRP_TOOLNAME: Could not find blktrace. Please make sure that the blktrace package is installed and matches the level in the documentation.";
       exit 1;
    fi

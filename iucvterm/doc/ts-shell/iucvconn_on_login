@@ -15,7 +15,7 @@
 prog_name=`basename $0`
 guest_name=${USER:-`whoami 2>/dev/null`}
 terminal=lnxhvc0
-iucvconn=`which iucvconn 2>/dev/null`
+iucvconn=`command -v iucvconn 2>/dev/null`
 
 __error() {
 	printf "$prog_name: $@\n" >&2

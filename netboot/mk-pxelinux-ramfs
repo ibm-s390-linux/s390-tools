@@ -127,7 +127,7 @@ echo "$cmd: Copying kexec"
 # Install both binary and required shared libraries
 OLDPATH=$PATH
 PATH=$OLDPATH:/sbin:/usr/sbin
-kexec_bin=$(which kexec)
+kexec_bin=$(command -v kexec)
 kexec_sos=$(sharedobjs $kexec_bin)
 PATH=$OLDPATH
 
