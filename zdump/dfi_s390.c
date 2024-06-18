@@ -349,8 +349,13 @@ int dfi_s390_init_gen(bool extended)
 	if (!extended) {
 		rc = mem_chunks_add();
 	} else {
-		/* Dumps in s390_ext format can reside on DASD partition only */
-		if (zg_type(g.fh) != ZG_TYPE_DASD_PART)
+		/*
+		 * Dumps in s390_ext format can reside on DASD partition only.
+		 * Do not bail out on ZG_TYPE_DASD in order to support loop device
+		 * emulation in fvt-tests.
+		 */
+		if (zg_type(g.fh) != ZG_TYPE_DASD_PART &&
+		    zg_type(g.fh) != ZG_TYPE_DASD)
 			return -ENODEV;
 		/*
 		 * A device block size is required for a decompression of
