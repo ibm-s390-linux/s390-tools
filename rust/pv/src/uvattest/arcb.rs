@@ -135,27 +135,44 @@ impl AttestationRequest {
         )
     }
 
-    /// Decrypts the request and extracts the authenticated and confidential data
-    ///
-    /// Deconstructs the `arcb` and decrypts it using `arpk`
-    ///
-    /// # Error
-    ///
-    /// Returns an error if the request is malformed or the decryption failed
-    pub fn decrypt_bin(
-        arcb: &[u8],
-        arpk: &SymKey,
-    ) -> Result<(AttestationAuthenticated, AttestationConfidential)> {
+    /// Checks for magic and returns [`BinReqValues`]
+    fn bin_values(arcb: &[u8]) -> Result<BinReqValues> {
         if !AttestationMagic::starts_with_magic(arcb) {
             return Err(Error::NoArcb);
         }
 
         let values = BinReqValues::get(arcb)?;
-
         match values.version().try_into()? {
             AttestationVersion::One => (),
         };
+
+        Ok(values)
+    }
+
+    /// Returns the authenticated area of an binary attestation request.
+    ///
+    /// # Error
+    ///
+    /// Returns an error if the request is malformed.
+    pub fn auth_bin(arcb: &[u8]) -> Result<AttestationAuthenticated> {
+        let values = Self::bin_values(arcb)?;
         let auth: &AttestationAuthenticated = values.req_dep_aad().ok_or(Error::BinRequestSmall)?;
+        Ok(auth.to_owned())
+    }
+
+    /// Decrypts the request and extracts the authenticated and confidential data.
+    ///
+    /// Deconstructs the `arcb` and decrypts it using `arpk`.
+    ///
+    /// # Error
+    ///
+    /// Returns an error if the request is malformed or the decryption failed.
+    pub fn decrypt_bin(
+        arcb: &[u8],
+        arpk: &SymKey,
+    ) -> Result<(AttestationAuthenticated, AttestationConfidential)> {
+        let values = Self::bin_values(arcb)?;
+        let auth = Self::auth_bin(arcb)?;
 
         let mai = auth.mai.try_into()?;
         let keysize = match mai {
@@ -406,6 +423,15 @@ mod test {
         let exp = get_test_asset!("exp/arcb.bin");
 
         assert_eq!(request, exp);
+    }
+
+    #[test]
+    fn auth_bin() {
+        let request = mk_arcb();
+        let auth_bin = AttestationRequest::auth_bin(&request).unwrap();
+        let exp = &request[0x30..0x40];
+
+        assert_eq!(exp, auth_bin.as_bytes());
     }
 
     #[test]
