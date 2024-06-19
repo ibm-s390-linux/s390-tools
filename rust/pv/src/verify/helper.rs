@@ -302,8 +302,8 @@ pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
 /// Searches for CRL Distribution points and downloads the CRL. Stops after the first successful
 /// download.
 ///
-/// Error if something bad(=unexpected) happens (not bad: CRL not available at link, unexpected
-/// format) Other issues are mapped to Ok(None)
+/// Error if something bad(=unexpected) happens
+/// CRL not available at all URIs and unexpected format at all URIs are mapped to Ok(None)
 #[cfg(not(test))]
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl::x509::X509Crl>>> {
     use crate::utils::read_crls;
@@ -333,6 +333,7 @@ pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl
         }
         match read_crls(&handle.get_ref().0) {
             Err(_) => continue,
+            Ok(crl) if crl.is_empty() => continue,
             Ok(crl) => return Ok(Some(crl)),
         }
     }
