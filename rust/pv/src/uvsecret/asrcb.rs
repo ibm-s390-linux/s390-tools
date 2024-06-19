@@ -7,7 +7,7 @@ use crate::{
     assert_size,
     crypto::{hkdf_rfc_5869, AesGcmResult},
     misc::Flags,
-    req::{Aad, Keyslot, ReqEncrCtx},
+    req::{Aad, BinReqValues, Keyslot, ReqEncrCtx},
     request::{BootHdrTags, Confidential, Request},
     secret::{ExtSecret, GuestSecret},
     uv::{ConfigUid, UvFlags},
@@ -17,7 +17,7 @@ use openssl::{
     md::Md,
     pkey::{PKey, Private, Public},
 };
-use pv_core::request::RequestVersion;
+use pv_core::{request::RequestVersion, secret::AddSecretMagic};
 use zerocopy::AsBytes;
 
 /// Authenticated data w/o user data
@@ -281,6 +281,12 @@ impl AddSecretRequest {
         buf[encr_range.clone()].copy_from_slice(conf.value());
         ctx.encrypt_aead(&buf[aad_range], &buf[encr_range])
             .map(|res| res.data())
+    }
+
+    /// Get a copy of the add secret request tag
+    pub fn bin_tag(asrcb: &[u8]) -> Result<Vec<u8>> {
+        AddSecretMagic::try_from_bytes(asrcb)?;
+        BinReqValues::get(asrcb).map(|v| v.tag().to_vec())
     }
 }
 

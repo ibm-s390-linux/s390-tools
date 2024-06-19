@@ -506,6 +506,11 @@ impl<'a> BinReqValues<'a> {
     {
         T::ref_from_prefix(self.req_dep_aad)
     }
+
+    /// Returns a reference to the tag of this [`BinReqValues`].
+    pub(crate) fn tag(&self) -> &[u8] {
+        self.tag
+    }
 }
 
 #[cfg(test)]
