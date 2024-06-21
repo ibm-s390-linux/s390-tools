@@ -710,6 +710,14 @@ static void csv_map(struct obj_t *UNUSED(obj), unsigned int mflags,
 	free(qval);
 }
 
+static bool hide_meta_env(void)
+{
+	char *v;
+
+	v = secure_getenv("FMT_NOMETA");
+	return (v && strcmp(v, "1") == 0);
+}
+
 void util_fmt_init(FILE *fd, enum util_fmt_t type, unsigned int flags,
 		   int api_level)
 {
@@ -719,7 +727,7 @@ void util_fmt_init(FILE *fd, enum util_fmt_t type, unsigned int flags,
 	f.fileno      = fileno(fd);
 	f.hide_prefix = (flags & FMT_NOPREFIX);
 	f.hide_inval  = !(flags & FMT_KEEPINVAL);
-	f.hide_meta   = (flags & FMT_NOMETA);
+	f.hide_meta   = (flags & FMT_NOMETA) || hide_meta_env();
 	f.quote_all   = (flags & FMT_QUOTEALL);
 	f.do_filter   = (flags & FMT_FILTER);
 	f.do_warn     = (flags & FMT_WARN);
