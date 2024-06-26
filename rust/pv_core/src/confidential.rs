@@ -49,6 +49,13 @@ impl<T: Default> Zeroize for Vec<T> {
     }
 }
 
+impl Zeroize for String {
+    fn zeroize(&mut self) {
+        // SAFETY: The Vec<u8> zerorize function overwrites memory with the zero byte -> still valid UTF-8
+        unsafe { self.as_mut_vec().zeroize() };
+    }
+}
+
 /// Thin wrapper around an type implementing Zeroize.
 ///
 /// A `Confidential` represents a confidential value that must be securely overwritten during drop.
@@ -90,6 +97,16 @@ impl<C: Zeroize> Confidential<C> {
     /// or operate on slices. The old locations can and will **NOT** be zeroized.
     pub fn value_mut(&mut self) -> &mut C {
         &mut self.0
+    }
+}
+
+impl<C: Zeroize + Clone> Confidential<C> {
+    /// Consume the [`Confidential`] into its contained type as a clone.
+    ///
+    /// This disables any cleanups for the result.
+    pub fn into_inner(self) -> C {
+        // The clone is required because drop is implemented (E0509)
+        self.0.clone()
     }
 }
 
@@ -167,5 +184,12 @@ mod test {
             &[DummyStruct([0x0u32; 8]), DummyStruct([0x0u32; 8])],
             conf2.value().as_slice()
         );
+    }
+
+    #[test]
+    fn string() {
+        let mut conf = Confidential::new("test".to_string());
+        conf.zeroize();
+        assert_eq!(&[0; 4], conf.value().as_bytes());
     }
 }
