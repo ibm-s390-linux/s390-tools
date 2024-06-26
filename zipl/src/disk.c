@@ -528,6 +528,9 @@ static int disk_set_info_complete(struct job_target_data *td,
  * config file, or special "target options" of zipl tool.
  * If target parameters were specified by user, then the step 1 above
  * is skipped.
+
+ * To exclude any user assumptions about the DEVICE, this function
+ * should be called with TD pointing to a zeroed structure.
  *
  * DEVICE: logical, or physical device, optionally formated with a
  * file system.

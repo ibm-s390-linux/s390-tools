@@ -304,7 +304,6 @@ static int add_component_file_range(struct install_set *bis,
 				    address_t load_address,
 				    size_t trailer, void *component,
 				    int add_files,
-				    struct job_target_data *target,
 				    int comp_id, int menu_idx,
 				    int program_table_id)
 {
@@ -339,11 +338,28 @@ static int add_component_file_range(struct install_set *bis,
 			return -1;
 		}
 	} else {
-		/* Make sure file is on correct device */
-		rc = disk_get_info_from_file(filename, target, &file_info);
-		if (rc)
-			return -1;
-		if (file_info->device != bis->info->device) {
+		/*
+		 * Make sure that file is on target device.
+		 * For this, retrieve info of the underlying disk without
+		 * any user hints
+		 */
+		struct job_target_data tmp = {.source = source_unknown};
+
+		rc = disk_get_info_from_file(filename, &tmp, &file_info);
+		free_target_data(&tmp);
+		if (rc) {
+			/*
+			 * In some cases it is impossible to auto-detect
+			 * disk parameters (e.g. when the file is on a
+			 * mounted qcow2 image).
+			 * Skip the check with warnings.
+			 */
+			fprintf(stderr,
+				"Warning: Could not auto-detect disk parameters for %s\n",
+				filename);
+			fprintf(stderr,
+				"Warning: Preparing a logical device for boot might fail\n");
+		} else if (file_info->device != bis->info->device) {
 			disk_free_info(file_info);
 			error_reason("File is not on target device");
 			return -1;
@@ -377,12 +393,11 @@ write_segment_table:
 static int add_component_file(struct install_set *bis, const char *filename,
 			      address_t load_address, size_t trailer,
 			      void *component, int add_files,
-			      struct job_target_data *target, int comp_id,
-			      int menu_idx, int program_table_id)
+			      int comp_id, int menu_idx, int program_table_id)
 {
 	return add_component_file_range(bis, filename, NULL, load_address,
 					trailer, component, add_files,
-					target, comp_id, menu_idx,
+					comp_id, menu_idx,
 					program_table_id);
 }
 
@@ -544,8 +559,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		bool add_envblk, struct job_envblk_data *envblk,
 		struct job_ipl_data *ipl, disk_blockptr_t *program,
 		int verbose, int add_files, component_header_type type,
-		struct job_target_data *target, int is_secure,
-		int menu_idx, int program_table_id)
+		int is_secure, int menu_idx, int program_table_id)
 {
 	struct signature_header sig_head;
 	size_t ramdisk_size, image_size;
@@ -667,7 +681,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	/* Add stage 3 loader to bootmap */
 	rc = add_component_file(bis, ZIPL_STAGE3_PATH, STAGE3_LOAD_ADDRESS,
 				signature_size, VOID_ADD(table, offset), 1,
-				target, COMPONENT_ID_LOADER, menu_idx,
+				COMPONENT_ID_LOADER, menu_idx,
 				program_table_id);
 	if (rc) {
 		error_text("Could not add internal loader file '%s'",
@@ -745,7 +759,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 
 	rc = add_component_file(bis, ipl->common.image, ipl->common.image_addr,
 				signature_size, VOID_ADD(table, offset),
-				add_files, target, COMPONENT_ID_KERNEL_IMAGE,
+				add_files, COMPONENT_ID_KERNEL_IMAGE,
 				menu_idx, program_table_id);
 	if (rc) {
 		error_text("Could not add image file '%s'", ipl->common.image);
@@ -805,7 +819,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 					ipl->common.ramdisk_addr,
 					signature_size,
 					VOID_ADD(table, offset),
-					add_files, target, COMPONENT_ID_RAMDISK,
+					add_files, COMPONENT_ID_RAMDISK,
 					menu_idx, program_table_id);
 		if (rc) {
 			error_text("Could not add ramdisk '%s'",
@@ -861,7 +875,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 			rc = add_component_file_range(bis, filename, &reg,
 						      ipl->envblk_addr, 0,
 						      VOID_ADD(table, offset),
-						      0, target,
+						      0,
 						      COMPONENT_ID_ENVBLK,
 						      menu_idx,
 						      program_table_id);
@@ -893,7 +907,6 @@ static int add_segment_program(struct install_set *bis,
 			       struct job_segment_data *segment,
 			       disk_blockptr_t *program, int verbose,
 			       int add_files, component_header_type type,
-			       struct job_target_data *target,
 			       int program_table_id)
 {
 	void *table;
@@ -913,7 +926,7 @@ static int add_segment_program(struct install_set *bis,
 		printf("  segment file......: %s\n", segment->segment);
 
 	rc = add_component_file(bis, segment->segment, segment->segment_addr, 0,
-				VOID_ADD(table, offset), add_files, target,
+				VOID_ADD(table, offset), add_files,
 				COMPONENT_ID_SEGMENT_FILE, 0 /* menu_idx */,
 				program_table_id);
 	if (rc) {
@@ -996,7 +1009,7 @@ static int add_dump_program(struct install_set *bis, struct job_data *job,
 	ipl.common.parmline = dump->common.parmline;
 	ipl.common.parm_addr = dump->common.parm_addr;
 	return add_ipl_program(bis, NULL, false, NULL, &ipl, program,
-			       verbose, 1, type, target, SECURE_BOOT_DISABLED,
+			       verbose, 1, type, SECURE_BOOT_DISABLED,
 			       0 /* menu_idx */, program_table_id);
 }
 
@@ -1041,8 +1054,7 @@ static int build_program_table(struct job_data *job,
 				     true, &job->envblk, &job->data.ipl,
 				     &table[0], verbose || job->command_line,
 				     job->add_files, component_header,
-				     &job->target, job->is_secure, 0,
-				     program_table_id);
+				     job->is_secure, 0, program_table_id);
 		break;
 	case job_segment:
 		if (bis->print_details) {
@@ -1055,7 +1067,7 @@ static int build_program_table(struct job_data *job,
 		rc = add_segment_program(bis, &job->data.segment, &table[0],
 					 verbose || job->command_line,
 					 job->add_files, COMPONENT_HEADER_IPL,
-					 &job->target, program_table_id);
+					 program_table_id);
 		break;
 	case job_dump_partition:
 		/* Only useful for a partition dump that uses a dump kernel*/
@@ -1114,7 +1126,7 @@ static int build_program_table(struct job_data *job,
 					&table[job->data.menu.entry[i].pos],
 					verbose || job->command_line,
 					job->add_files, component_header,
-						     &job->target, is_secure, i,
+						     is_secure, i,
 						     program_table_id);
 				break;
 			case job_print_usage:

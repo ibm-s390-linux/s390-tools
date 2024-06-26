@@ -370,8 +370,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 }
 
 
-static void
-free_target_data(struct job_target_data* data)
+void free_target_data(struct job_target_data *data)
 {
 	free(data->bootmap_dir);
 	free(data->targetbase);
