@@ -42,7 +42,6 @@
 //! # Verify
 //! [`attest::AttestationItems`], [`attest::AttestationMeasurement`]
 mod brcb;
-mod confidential;
 mod crypto;
 mod error;
 mod openssl_extensions;
@@ -93,7 +92,6 @@ pub use pv_core::{FileAccessErrorType, FileIoErrorType};
 /// Functionalities to build UV requests
 pub mod request {
     pub use crate::brcb::BootHdrTags;
-    pub use crate::confidential::{Confidential, Zeroize};
     pub use crate::crypto::{SymKey, SymKeyType};
     pub use crate::req::{Keyslot, ReqEncrCtx, Request};
     pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};

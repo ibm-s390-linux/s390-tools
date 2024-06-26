@@ -2,7 +2,6 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use crate::{confidential::Confidential, error::Result, Error};
 use openssl::{
     derive::Deriver,
     ec::{EcGroup, EcKey},
@@ -16,7 +15,10 @@ use openssl::{
     sign::{Signer, Verifier},
     symm::{decrypt_aead, encrypt_aead, Cipher},
 };
+use pv_core::request::Confidential;
 use std::{convert::TryInto, ops::Range};
+
+use crate::{error::Result, Error};
 
 /// An AES256-GCM key that will purge itself out of the memory when going out of scope
 pub type Aes256Key = Confidential<[u8; 32]>;

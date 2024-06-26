@@ -10,6 +10,7 @@
     unused_qualifications
 )]
 #![doc = include_str!("../README.md")]
+mod confidential;
 mod error;
 mod macros;
 mod utils;
@@ -46,6 +47,7 @@ pub mod uv {
 
 /// Functionalities to verify UV requests
 pub mod request {
+    pub use crate::confidential::{Confidential, Zeroize};
     /// Version number of the request in system endianness
     pub type RequestVersion = u32;
     /// Request magic value
