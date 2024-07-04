@@ -127,6 +127,7 @@ typedef exit_code_t (*subtype_cb_t)(struct subtype *st, const char *id,
  * @device_undefine: Optional: Undefine a device
  * @add_definable_ids: Optional: Add IDs of all devices that can be defined to
  *                     specified strlist
+ * @get_ipldev_id: Optional: If subtype provides IPL device, return its ID
  */
 struct subtype {
 	/* Static data. */
@@ -222,6 +223,7 @@ struct subtype {
 	exit_code_t	(*device_undefine)(struct subtype *, struct device *);
 	void		(*add_definable_ids)(struct subtype *,
 					     struct util_list *);
+	char		*(*get_ipldev_id)(struct subtype *);
 };
 
 /* Subtype method accessor functions. */
@@ -287,6 +289,7 @@ exit_code_t subtype_detect_definable(struct subtype *, struct device *);
 exit_code_t subtype_device_define(struct subtype *, struct device *);
 exit_code_t subtype_device_undefine(struct subtype *, struct device *);
 void subtype_add_definable_ids(struct subtype *, struct util_list *);
+char *subtype_get_ipldev_id(struct subtype *);
 
 /* Subtype helper functions. */
 bool subtype_device_exists(struct subtype *st, const char *id,
@@ -308,6 +311,7 @@ struct subtype *subtype_find(const char *name);
 struct attrib *subtype_find_dev_attrib(struct subtype *st, const char *str);
 exit_code_t subtype_read_all_devices(struct subtype *st, config_t config,
 				     read_scope_t);
+bool subtypes_find_ipldev(struct subtype **st_ptr, char **id_ptr);
 bool subtypes_find_by_devnode(struct devnode *devnode,
 				  struct subtype **st_ptr, char **id_ptr);
 void subtype_devices_print_all(void);

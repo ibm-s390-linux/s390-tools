@@ -477,6 +477,26 @@ static void dasd_st_add_modules(struct subtype *st, struct device *dev,
 		strlist_add_unique(modules, DASD_DIAG_MOD_NAME);
 }
 
+static char *dasd_eckd_st_get_ipldev_id(struct subtype *st)
+{
+	char *id, *type;
+
+	/* Handle CCW-type IPL first. */
+	id = st->super->get_ipldev_id(st);
+	if (id)
+		return id;
+
+	/* Extra-handling for eckd LD-IPL. */
+	type = path_read_text_file(1, err_ignore, PATH_IPL "/ipl_type");
+	if (strcmp(type, "eckd") != 0)
+		goto out;
+	id = path_read_text_file(1, err_ignore, PATH_IPL "/ipl/device");
+
+out:
+	free(type);
+	return id;
+}
+
 /*
  * DASD methods.
  */
@@ -798,6 +818,7 @@ struct subtype dasd_subtype_eckd = {
 	.configure_persistent	= &dasd_st_configure_persistent,
 	.check_pre_configure	= &dasd_st_check_pre_configure,
 	.add_modules		= &dasd_st_add_modules,
+	.get_ipldev_id		= &dasd_eckd_st_get_ipldev_id,
 };
 
 static struct ccw_subtype_data dasd_fba_data = {

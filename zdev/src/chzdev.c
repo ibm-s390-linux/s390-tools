@@ -124,6 +124,7 @@ enum {
 	OPT_ONLINE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_OFFLINE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_FAILED		= (OPT_ANONYMOUS_BASE+__COUNTER__),
+	OPT_IPLDEV		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_BY_PATH		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_BY_NODE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_BY_INTERFACE	= (OPT_ANONYMOUS_BASE+__COUNTER__),
@@ -173,14 +174,14 @@ static struct opts_conflict conflict_list[] = {
 		      OPT_REMOVE_ALL, OPT_CONFIGURED, OPT_EXISTING, OPT_ONLINE,
 		      OPT_OFFLINE, OPT_BY_PATH, OPT_BY_NODE, OPT_BY_INTERFACE,
 		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED,
-		      OPT_DECONFIGURE_ALL, 0),
+		      OPT_IPLDEV, OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_LIST_TYPES,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_EXPORT, OPT_IMPORT, OPT_APPLY, OPT_REMOVE,
 		      OPT_REMOVE_ALL, OPT_CONFIGURED, OPT_EXISTING, OPT_ONLINE,
 		      OPT_OFFLINE, OPT_BY_PATH, OPT_BY_NODE, OPT_BY_INTERFACE,
 		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED,
-		      OPT_DECONFIGURE_ALL, 0),
+		      OPT_IPLDEV, OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_EXPORT,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_LIST_TYPES, OPT_IMPORT, OPT_APPLY, OPT_REMOVE,
@@ -197,7 +198,7 @@ static struct opts_conflict conflict_list[] = {
 		      OPT_REMOVE_ALL, OPT_CONFIGURED, OPT_EXISTING, OPT_ONLINE,
 		      OPT_OFFLINE, OPT_BY_PATH, OPT_BY_NODE, OPT_BY_INTERFACE,
 		      OPT_BY_ATTRIB, OPT_ACTIVE, OPT_PERSISTENT, OPT_FAILED,
-		      OPT_DECONFIGURE_ALL, 0),
+		      OPT_IPLDEV, OPT_DECONFIGURE_ALL, 0),
 	OPTS_CONFLICT(OPT_APPLY,
 		      OPT_DECONFIGURE, OPT_LIST_ATTRIBS, OPT_HELP_ATTRIBS,
 		      OPT_LIST_TYPES, OPT_EXPORT, OPT_IMPORT, OPT_REMOVE,
@@ -223,6 +224,7 @@ static const struct option opt_list[] = {
 	{ "online",		no_argument,	NULL, OPT_ONLINE },
 	{ "offline",		no_argument,	NULL, OPT_OFFLINE },
 	{ "failed",		no_argument,	NULL, OPT_FAILED },
+	{ "ipldev",		no_argument,	NULL, OPT_IPLDEV },
 	{ "by-path",		required_argument, NULL, OPT_BY_PATH },
 	{ "by-node",		required_argument, NULL, OPT_BY_NODE },
 	{ "by-interface",	required_argument, NULL, OPT_BY_INTERFACE },
@@ -835,6 +837,11 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		case OPT_FAILED:
 			/* --failed */
 			opts->select->failed = 1;
+			break;
+
+		case OPT_IPLDEV:
+			/* --ipldev */
+			opts->select->ipldev = 1;
 			break;
 
 		case OPT_BY_PATH:

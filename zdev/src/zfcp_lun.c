@@ -1105,6 +1105,28 @@ static exit_code_t zfcp_lun_st_detect_definable(struct subtype *st,
 	return EXIT_OK;
 }
 
+static char *zfcp_lun_st_get_ipldev_id(struct subtype *st)
+{
+	char *type, *fcp_dev, *wwpn, *lun, *id = NULL;
+
+	type = path_read_text_file(1, err_ignore, PATH_IPL "/ipl_type");
+	if (strcmp(type, "fcp") != 0)
+		goto out;
+
+	fcp_dev = path_read_text_file(1, err_ignore, PATH_IPL "/device");
+	wwpn = path_read_text_file(1, err_ignore, PATH_IPL "/wwpn");
+	lun = path_read_text_file(1, err_ignore, PATH_IPL "/lun");
+	if (fcp_dev && wwpn && lun)
+		id = misc_asprintf("%s:%s:%s", fcp_dev, wwpn, lun);
+	free(lun);
+	free(wwpn);
+	free(fcp_dev);
+
+out:
+	free(type);
+	return id;
+}
+
 /*
  * zfcp lun subtype.
  */
@@ -1168,4 +1190,6 @@ struct subtype zfcp_lun_subtype = {
 	.detect_definable	= &zfcp_lun_st_detect_definable,
 	.device_define		= &zfcp_lun_st_device_define,
 	.device_undefine	= &zfcp_lun_st_device_undefine,
+
+	.get_ipldev_id		= &zfcp_lun_st_get_ipldev_id,
 };

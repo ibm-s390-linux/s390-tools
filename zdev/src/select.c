@@ -69,7 +69,8 @@ bool select_opts_dev_specified(struct select_opts *select)
 	    !util_list_is_empty(&select->by_if) ||
 	    !util_list_is_empty(&select->by_attr) ||
 	    select->all || select->configured || select->existing ||
-	    select->online || select->offline || select->failed)
+	    select->online || select->offline || select->failed ||
+	    select->ipldev)
 		return true;
 
 	return false;
@@ -1207,6 +1208,19 @@ out:
 	return rc;
 }
 
+/* Select device that was used for IPL. */
+static void select_ipldev(struct util_list *selected)
+{
+	struct subtype *st;
+	char *id;
+
+	if (!subtypes_find_ipldev(&st, &id))
+		return;
+
+	selected_dev_list_add(selected, st->devtype, st, id, NULL, 0);
+	free(id);
+}
+
 /* Determine list of IDs of selected devices based on selection options.
  * Results are stored as list of struct selected_dev_node in SELECTED.
  * If @existing is set, only return nodes for existing devices.
@@ -1235,7 +1249,7 @@ exit_code_t select_devices(struct select_opts *select,
 	    !(util_list_is_empty(&select->by_path) &&
 	      util_list_is_empty(&select->by_node) &&
 	      util_list_is_empty(&select->by_if) &&
-	      util_list_is_empty(&select->by_attr)))
+	      util_list_is_empty(&select->by_attr) && !select->ipldev))
 		goto by_function;
 
 	/* Convert device ID specifications to enable tracking of specifications
@@ -1290,6 +1304,9 @@ by_function:
 		if (rc)
 			goto out;
 	}
+
+	if (select->ipldev)
+		select_ipldev(selected);
 
 out:
 	/* Release device ID specifications tracking list. */

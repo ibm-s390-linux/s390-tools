@@ -1827,6 +1827,27 @@ static char *ccw_st_get_active_attrib_path(struct subtype *st,
 	return path;
 }
 
+/* Return a newly allocated character string containing the IPL device ID in
+ * case of CCW IPL. */
+static char *ccw_st_get_ipldev_id(struct subtype *st)
+{
+	char *type, *id = NULL;
+
+	type = path_read_text_file(1, err_ignore, PATH_IPL "/ipl_type");
+	if (strcmp(type, "ccw") != 0)
+		goto out;
+
+	id = path_read_text_file(1, err_ignore, PATH_IPL "/device");
+	if (!ccw_st_exists_active(st, id)) {
+		free(id);
+		id = NULL;
+	}
+out:
+	free(type);
+
+	return id;
+}
+
 /* The methods of this subtype assume that @data points to a
  * struct ccw_subtype_data. */
 struct subtype ccw_subtype = {
@@ -1864,4 +1885,6 @@ struct subtype ccw_subtype = {
 	.add_devnodes		= &ccw_st_add_devnodes,
 	.resolve_devnode	= &ccw_st_resolve_devnode,
 	.get_active_attrib_path	= &ccw_st_get_active_attrib_path,
+
+	.get_ipldev_id		= &ccw_st_get_ipldev_id,
 };

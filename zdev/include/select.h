@@ -29,6 +29,7 @@ struct select_opts {
 	unsigned int online:1;
 	unsigned int offline:1;
 	unsigned int failed:1;
+	unsigned int ipldev:1;
 	struct util_list devids;	/* List of struct strlist_node */
 	struct util_list by_path;	/* List of struct strlist_node */
 	struct util_list by_node;	/* List of struct strlist_node */

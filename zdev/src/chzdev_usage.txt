@@ -21,6 +21,7 @@ SELECTION
   --existing             Select devices found in the active configuration
   --online/--offline     Select devices that are online/offline
   --failed               Select devices that are not functioning correctly
+  --ipldev               Select device used for IPL/boot
   --by-path PATH         Select device providing file system path, e.g. /usr
   --by-node NODE         Select device providing device node, e.g. /dev/sda
   --by-interface NAME    Select device providing network interface, e.g. eth0

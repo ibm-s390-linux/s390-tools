@@ -96,6 +96,30 @@ static exit_code_t devnode_cb(struct subtype *st, const char *id,
 	return rc;
 }
 
+/* Find device which was used for IPL. Note that id_ptr will point to a newly
+ * allocated string on success. */
+bool subtypes_find_ipldev(struct subtype **st_ptr, char **id_ptr)
+{
+	int i, j;
+	struct devtype *dt;
+	struct subtype *st;
+	char *id;
+
+	for (i = 0; (dt = devtypes[i]); i++) {
+		for (j = 0; (st = dt->subtypes[j]); j++) {
+			id = subtype_get_ipldev_id(st);
+			if (id) {
+				*st_ptr = st;
+				*id_ptr = id;
+
+				return true;
+			}
+		}
+	}
+
+	return  false;
+}
+
 /* Find a device which provides the specified devnode. Note that id_ptr will
  * point to a newly allocated string on success. */
 bool subtypes_find_by_devnode(struct devnode *devnode, struct subtype **st_ptr,
@@ -518,6 +542,16 @@ void subtype_add_definable_ids(struct subtype *st, struct util_list *ids)
 
 	if (super)
 		super->add_definable_ids(st, ids);
+}
+
+char *subtype_get_ipldev_id(struct subtype *st)
+{
+	struct subtype *super = super_get(st, get_ipldev_id, 0);
+
+	if (super)
+		return super->get_ipldev_id(st);
+
+	return NULL;
 }
 
 /*

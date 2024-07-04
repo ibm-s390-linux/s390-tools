@@ -23,6 +23,7 @@
 #define PATH_MODPROBE		"/sbin/modprobe"
 #define PATH_CCW_BUS		"/sys/bus/ccw"
 #define PATH_CCWGROUP_BUS	"/sys/bus/ccwgroup"
+#define PATH_IPL		"/sys/firmware/ipl"
 #define PATH_UDEV_RULES		"/etc/udev/rules.d"
 #define PATH_UDEV_RULES_VOLATILE "/run/udev/rules.d"
 #define	PATH_PROC		"/proc"
