@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "devtype.h"
+#include "lib/util_libc.h"
 #include "misc.h"
 #include "path.h"
 #include "zfcp.h"
@@ -403,4 +404,21 @@ char *path_get_scsi_hctl_dev(const char *hctl)
 char *path_get_bus_attr(const char *bus, const char *attr)
 {
 	return path_get("/sys/bus/%s/%s", bus, attr);
+}
+
+/* Read text file from adjusted path. */
+char *path_read_text_file(int chomp, err_t err, char *fmt, ...)
+{
+	char *path, *path2, *text;
+	va_list args;
+
+	va_start(args, fmt);
+	util_vasprintf(&path, fmt, args);
+	va_end(args);
+	path2 = path_get(path);
+	text = misc_read_text_file(path2, chomp, err);
+	free(path2);
+	free(path);
+
+	return text;
 }

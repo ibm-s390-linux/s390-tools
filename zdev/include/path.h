@@ -65,6 +65,7 @@ char *path_get_zfcp_lun_dev(struct zfcp_lun_devid *);
 char *path_get_zfcp_port_dev(struct zfcp_lun_devid *);
 char *path_get_scsi_hctl_dev(const char *);
 char *path_get_bus_attr(const char *, const char *);
+char *path_read_text_file(int chomp, err_t err, char *fmt, ...);
 
 exit_code_t path_for_each(const char *,
 			  exit_code_t (*callback)(const char *, const char *,
