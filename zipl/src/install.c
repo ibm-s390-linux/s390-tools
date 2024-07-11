@@ -434,11 +434,14 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 {
 	disk_blockptr_t *scsi_dump_sb_blockptr = &bis->scsi_dump_sb_blockptr;
 	struct disk_info *info = bis->info;
-	char *device = bis->device;
-	int fd, rc;
+	char footnote[4];
+	int rc;
+	int i;
 
 	if (!info)
 		return 0;
+
+	prepare_footnote_ptr(job->target.source, footnote);
 	/* Inform user about what we're up to */
 	printf("Preparing boot device for %s%s: ",
 	       disk_get_ipl_type(info->type,
@@ -455,40 +458,58 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 		disk_print_devt(info->device);
 		printf(".\n");
 	}
-	/* Open device file */
-	fd = open(device, O_RDWR);
-	if (fd == -1) {
-		error_reason(strerror(errno));
-		error_text("Could not open temporary device file '%s'",
-			   device);
-		return -1;
-	}
-	/* Ensure that potential cache inconsistencies between disk and
-	 * partition are resolved by flushing the corresponding buffers. */
-	if (!dry_run) {
-		if (ioctl(fd, BLKFLSBUF)) {
-			fprintf(stderr, "Warning: Could not flush disk "
-				"caches.\n");
-		}
-	}
-	/*
-	 * Depending on disk type, install one or two program tables
-	 * for CCW-type IPL and (or) for List-Directed IPL (see the
-	 * picture in comments above)
-	 */
-	if (job->id == job_dump_partition) {
-		rc = install_bootloader_dump(bis->tables, info,
-					     scsi_dump_sb_blockptr,
-					     is_ngdump_enabled(job),
-					     fd);
-	} else {
-		rc = install_bootloader_ipl(bis->tables, info, fd);
-	}
+	/* Install independently on each physical target base */
 
-	if (fsync(fd))
-		error_text("Could not sync device file '%s'", device);
-	if (close(fd))
-		error_text("Could not close device file '%s'", device);
+	for (i = 0; i < job_get_nr_targets(job); i++) {
+		int fd;
+
+		if (verbose) {
+			printf("Installing on base disk: ");
+			disk_print_devname(info->basedisks[i]);
+			printf("%s.\n", footnote);
+		}
+		/* Open device file */
+		fd = open(bis->basetmp[i], O_RDWR);
+		if (fd == -1) {
+			error_reason(strerror(errno));
+			error_text("Could not open temporary device file '%s'",
+				   bis->basetmp[i]);
+			return -1;
+		}
+		/* Ensure that potential cache inconsistencies between disk and
+		 * partition are resolved by flushing the corresponding buffers.
+		 */
+		if (!dry_run) {
+			if (ioctl(fd, BLKFLSBUF)) {
+				fprintf(stderr, "Warning: Could not flush disk "
+					"caches.\n");
+			}
+		}
+		/*
+		 * Depending on disk type, install one or two program tables
+		 * for CCW-type IPL and (or) for List-Directed IPL (see the
+		 * picture in comments above)
+		 */
+		if (job->id == job_dump_partition) {
+			rc = install_bootloader_dump(bis->tables, info,
+						     scsi_dump_sb_blockptr,
+						     is_ngdump_enabled(job),
+						     fd);
+		} else {
+			rc = install_bootloader_ipl(bis->tables, info,
+						    fd);
+		}
+		if (fsync(fd))
+			error_text("Could not sync device file '%s'",
+				   bis->basetmp[i]);
+		if (close(fd))
+			error_text("Could not close device file '%s'",
+				   bis->basetmp[i]);
+		if (rc)
+			break;
+	}
+	if (verbose)
+		print_footnote_ref(job->target.source, "");
 
 	if (!dry_run && rc == 0) {
 		if (info->devno >= 0)

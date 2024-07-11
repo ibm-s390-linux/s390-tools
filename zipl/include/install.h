@@ -71,7 +71,7 @@ struct install_set {
 	struct program_component *components[NR_PROGRAM_COMPONENTS];
 	int nr_menu_entries;
 	int fd;
-	char *device;
+	char *basetmp[MAX_TARGETS];
 	char *filename;
 	unsigned int tmp_filename_created:1;
 	unsigned int skip_prepare:1;

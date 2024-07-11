@@ -1489,9 +1489,9 @@ static int prepare_build_program_table_device(struct job_data *job,
 		printf("Target device information\n");
 		disk_print_info(bis->info, job->target.source);
 	}
-	if (misc_temp_dev(bis->info->device, 1, &bis->device))
+	if (misc_temp_dev(bis->info->device, 1, &bis->basetmp[0]))
 		return -1;
-	if (check_dump_device(job, bis->info, bis->device))
+	if (check_dump_device(job, bis->info, bis->basetmp[0]))
 		return -1;
 	printf("Building bootmap directly on partition '%s'%s\n",
 	       bis->filename,
@@ -1555,6 +1555,8 @@ static int prepare_bootloader_device(struct job_data *job,
 static int prepare_build_program_table_file(struct job_data *job,
 					    struct install_set *bis)
 {
+	int i;
+
 	if (bis->skip_prepare)
 		/* skip the preparation work */
 		return 0;
@@ -1588,8 +1590,12 @@ static int prepare_build_program_table_file(struct job_data *job,
 		printf("Target device information\n");
 		disk_print_info(bis->info, job->target.source);
 	}
-	if (misc_temp_dev(bis->info->device, 1, &bis->device))
-		return -1;
+	for (i = 0; i < job_get_nr_targets(job); i++) {
+		if (misc_temp_dev(bis->info->basedisks[i],
+				  1,
+				  &bis->basetmp[i]))
+			return -1;
+	}
 	/* Check configuration number limits */
 	if (job->id == job_menu) {
 		if (check_menu_positions(&job->data.menu, job->name,
@@ -1704,9 +1710,9 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	/* Retrieve target device information */
 	if (disk_get_info(job->data.dump.device, &job->target, &info))
 		return -1;
-	if (misc_temp_dev(info->device, 1, &bis->device))
+	if (misc_temp_dev(info->device, 1, &bis->basetmp[0]))
 		return -1;
-	if (check_dump_device(job, info, bis->device))
+	if (check_dump_device(job, info, bis->basetmp[0]))
 		return -1;
 
 	assert(!job->target.bootmap_dir);
@@ -1856,6 +1862,9 @@ void free_bootloader(struct install_set *bis)
 	if (bis->tmp_filename_created)
 		misc_free_temp_file(bis->filename);
 	free(bis->filename);
-	misc_free_temp_dev(bis->device);
+	for (i = 0; i < MAX_TARGETS; i++) {
+		if (bis->basetmp[i])
+			misc_free_temp_dev(bis->basetmp[i]);
+	}
 	disk_free_info(bis->info);
 }

@@ -18,7 +18,6 @@
 #include "disk.h"
 #include "zipl.h"
 
-
 enum job_id {
 	job_print_usage = 1,
 	job_print_version = 2,
@@ -30,6 +29,21 @@ enum job_id {
 	job_mvdump = 8,
 };
 
+/*
+ * Set of parameters per physical disk, which are provided
+ * either by user, or by helper script
+ */
+struct target {
+	char *targetbase;
+	disk_type_t targettype;
+	int targetcylinders;
+	int targetheads;
+	int targetsectors;
+	int targetblocksize;
+	blocknum_t targetoffset;
+	int check_params;
+};
+
 /* target information source */
 typedef enum {
 	source_unknown = 0,
@@ -39,15 +53,19 @@ typedef enum {
 } source_t;
 
 struct job_target_data {
-	char* bootmap_dir;
-	char* targetbase;
-	disk_type_t targettype;
-	int targetcylinders;
-	int targetheads;
-	int targetsectors;
-	int targetblocksize;
-	blocknum_t targetoffset;
+	char *bootmap_dir;
+	int nr_targets;
+	struct target targets[MAX_TARGETS];
 	source_t source;
+};
+
+enum target_params {
+	TARGET_BASE,
+	TARGET_TYPE,
+	TARGET_GEOMETRY,
+	TARGET_BLOCKSIZE,
+	TARGET_OFFSET,
+	LAST_TARGET_PARAM
 };
 
 struct job_common_ipl_data {
@@ -142,12 +160,94 @@ struct job_data {
 	int is_ldipl_dump;
 };
 
+static inline struct target *target_at(struct job_target_data *data,
+				       int index)
+{
+	return index >= MAX_TARGETS ? NULL : &data->targets[index];
+}
+
+static inline char *get_targetbase(struct job_target_data *data, int index)
+{
+	return target_at(data, index)->targetbase;
+}
+
+static inline void set_targetbase(struct job_target_data *data, int index,
+				  char *value)
+{
+	target_at(data, index)->targetbase = value;
+}
+
+static inline disk_type_t get_targettype(struct job_target_data *data,
+					 int index)
+{
+	return target_at(data, index)->targettype;
+}
+
+int set_targettype(struct job_target_data *data, int index, char *value);
+
+static inline char *job_get_targetbase(struct job_data *job)
+{
+	return get_targetbase(&job->target, 0);
+}
+
+static inline void job_set_targetbase(struct job_data *job, char *value)
+{
+	set_targetbase(&job->target, 0, value);
+}
+
+static inline int job_get_nr_targets(struct job_data *job)
+{
+	return job->target.nr_targets;
+}
+
+static inline void job_set_nr_targets(struct job_data *job, int value)
+{
+	job->target.nr_targets = value;
+}
+
+static inline disk_type_t job_get_targettype(struct job_data *job)
+{
+	return get_targettype(&job->target, 0);
+}
+
+int job_set_targettype(struct job_data *job, char *value);
+
+#define define_target_param_ops(_TYPE_, _PARAM_)		        \
+static inline _TYPE_ get_target##_PARAM_(struct job_target_data *data,  \
+					 int index)			\
+{									\
+	return target_at(data, index)->target##_PARAM_;			\
+}									\
+									\
+static inline void set_target##_PARAM_(struct job_target_data *data,	\
+				       int index, _TYPE_ value)		\
+{									\
+	target_at(data, index)->target##_PARAM_ = value;		\
+}									\
+									\
+static inline _TYPE_ job_get_target##_PARAM_(struct job_data *job)	\
+{									\
+	return get_target##_PARAM_(&job->target, 0);			\
+}									\
+									\
+static inline void job_set_target##_PARAM_(struct job_data *job,        \
+					   _TYPE_ value)		\
+{									\
+	set_target##_PARAM_(&job->target, 0, value);			\
+}
+
+define_target_param_ops(int, cylinders)
+define_target_param_ops(int, heads)
+define_target_param_ops(int, sectors)
+define_target_param_ops(int, blocksize)
+define_target_param_ops(blocknum_t, offset)
+
 /**
- * Return true, if target parameters for the base disk are set
+ * Return true, if target parameters are set at least for one target base disk
  */
 static inline int target_parameters_are_set(struct job_target_data *td)
 {
-	return td->targetbase != NULL;
+	return get_targetbase(td, 0) != NULL;
 }
 
 int job_get(int argc, char* argv[], struct job_data** data);

@@ -56,13 +56,14 @@ typedef enum {
 /* targetbase definition */
 typedef enum {
 	defined_as_device,
-	defined_as_name
+	defined_as_name,
+	undefined
 } definition_t;
 
 /* Disk information type */
 struct disk_info {
 	disk_type_t type;
-	dev_t device;
+	dev_t device; /* logical device for bootmap creation */
 	dev_t partition;
 	int devno;
 	int partnum;
@@ -72,8 +73,11 @@ struct disk_info {
 	struct hd_geometry geo;
 	char* name;
 	char* drv_name;
-	definition_t targetbase;
+	definition_t targetbase_def;
 	int is_nvme;
+	dev_t basedisks[MAX_TARGETS]; /* array of physical disks for
+				       * bootstrap blocks recording
+				       */
 };
 
 struct file_range {
@@ -113,6 +117,9 @@ blocknum_t disk_write_block_buffer_align(int fd, int fd_is_basedisk,
 					 struct disk_info *info, int align,
 					 off_t *offset);
 void disk_print_devt(dev_t d);
+void disk_print_devname(dev_t d);
+void prepare_footnote_ptr(int source, char *ptr);
+void print_footnote_ref(int source, const char *prefix);
 void disk_print_info(struct disk_info *info, int source);
 int disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info);
 blocknum_t disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
@@ -122,7 +129,6 @@ blocknum_t disk_get_blocklist_from_file(const char* filename,
 					disk_blockptr_t** blocklist,
 					struct disk_info* pinfo);
 int disk_check_subchannel_set(int devno, dev_t device, char* dev_name);
-void disk_print_geo(struct disk_info *data);
 int fs_map(int fd, uint64_t offset, blocknum_t *mapped, int fs_block_size);
 
 #endif /* not DISK_H */

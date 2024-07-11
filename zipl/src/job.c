@@ -369,11 +369,13 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 	return 0;
 }
 
-
 void free_target_data(struct job_target_data *data)
 {
+	int i;
+
 	free(data->bootmap_dir);
-	free(data->targetbase);
+	for (i = 0; i < data->nr_targets; i++)
+		free(get_targetbase(data, i));
 }
 
 static void
@@ -1345,6 +1347,27 @@ type_from_target(char *target, disk_type_t *type)
 	}
 }
 
+int set_targettype(struct job_target_data *data, int index, char *value)
+{
+	return type_from_target(value,
+				&target_at(data, index)->targettype);
+}
+
+int job_set_targettype(struct job_data *job, char *value)
+{
+	return set_targettype(&job->target, 0, value);
+}
+
+static int job_set_target(struct job_data *job, char *value)
+{
+	job_set_targetbase(job, value);
+	if (!job_get_targetbase(job))
+		return -1;
+	job_set_nr_targets(job, 1);
+	job->target.source = source_user;
+	return 0;
+}
+
 static int
 get_job_from_section_data(char* data[], struct job_data* job, char* section)
 {
@@ -1361,32 +1384,28 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 			return -1;
 		/* Fill in target */
 		if (data[(int) scan_keyword_targetbase] != NULL) {
-			job->target.targetbase =
-				misc_strdup(data[(int)
-				scan_keyword_targetbase]);
-			if (job->target.targetbase == NULL)
+			if (job_set_target(job, misc_strdup(data[(int)
+					   scan_keyword_targetbase])))
 				return -1;
-			job->target.source = source_user;
 		}
 		if (data[(int) scan_keyword_targettype] != NULL) {
-			if (type_from_target(
-				data[(int) scan_keyword_targettype],
-				&job->target.targettype))
+			if (job_set_targettype(job,
+				data[(int) scan_keyword_targettype]))
 				return -1;
 		}
 		if (data[(int) scan_keyword_targetgeometry] != NULL) {
-			job->target.targetcylinders =
+			job_set_targetcylinders(job,
 				atoi(strtok(data[(int)
-				scan_keyword_targetgeometry], ","));
-			job->target.targetheads = atoi(strtok(NULL, ","));
-			job->target.targetsectors = atoi(strtok(NULL, ","));
+				scan_keyword_targetgeometry], ",")));
+			job_set_targetheads(job, atoi(strtok(NULL, ",")));
+			job_set_targetsectors(job, atoi(strtok(NULL, ",")));
 		}
 		if (data[(int) scan_keyword_targetblocksize] != NULL)
-			job->target.targetblocksize =
-				atoi(data[(int) scan_keyword_targetblocksize]);
+			job_set_targetblocksize(job,
+				atoi(data[(int) scan_keyword_targetblocksize]));
 		if (data[(int) scan_keyword_targetoffset] != NULL)
-			job->target.targetoffset =
-				atol(data[(int) scan_keyword_targetoffset]);
+			job_set_targetoffset(job,
+				atol(data[(int) scan_keyword_targetoffset]));
 		/* Fill in name and address of image file */
 
 		job->data.ipl.common.image = misc_strdup(
@@ -1614,37 +1633,32 @@ get_menu_job(struct scan_token* scan, char* menu, struct job_data* job)
 						return -1;
 					break;
 				case scan_keyword_targetbase:
-					job->target.targetbase = misc_strdup(
-						scan[i].content.keyword.value);
-					if (job->target.targetbase == NULL)
+					if (job_set_target(job,	misc_strdup(
+						scan[i].content.keyword.value)))
 						return -1;
-					job->target.source = source_user;
 					break;
 				case scan_keyword_targettype:
-					if (type_from_target(
-						scan[i].content.keyword.value,
-						&job->target.targettype))
+					if (job_set_targettype(job,
+						scan[i].content.keyword.value))
 						return -1;
 					break;
 				case scan_keyword_targetgeometry:
-					job->target.targetcylinders =
+					job_set_targetcylinders(job,
 						atoi(strtok(
 						scan[i].content.keyword.value,
-						","));
-					job->target.targetheads =
-						atoi(strtok(NULL, ","));
-					job->target.targetsectors =
-						atoi(strtok(NULL, ","));
+						",")));
+					job_set_targetheads(job,
+						atoi(strtok(NULL, ",")));
+					job_set_targetsectors(job,
+						atoi(strtok(NULL, ",")));
 					break;
 				case scan_keyword_targetblocksize:
-					job->target.targetblocksize =
-						atoi(
-						scan[i].content.keyword.value);
+					job_set_targetblocksize(job, atoi(
+						scan[i].content.keyword.value));
 					break;
 				case scan_keyword_targetoffset:
-					job->target.targetoffset =
-						atol(
-						scan[i].content.keyword.value);
+					job_set_targetoffset(job, atol(
+						scan[i].content.keyword.value));
 					break;
 				default:
 					/* Should not happen */

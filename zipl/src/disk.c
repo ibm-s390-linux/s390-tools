@@ -187,43 +187,134 @@ out_err:
 	return rc;
 }
 
+/**
+ * Process a script output represented by FH and consisting
+ * of pairs 'key=value' (each such pair is on a separate line).
+ * Check its consistency and set the extracted target parameters
+ * to the array of "targets" at TD.
+ *
+ * NOTE: this function defines specifications on valid output of
+ * zipl helper scripts. See zipl-support-for-mirrored-devices.txt
+ * for details. Before modifying this function, make sure that it
+ * won't lead to format change.
+ */
 static int set_target_parameters(FILE *fh, struct job_target_data *td)
 {
-	int checkparm = 0;
+	int idx[LAST_TARGET_PARAM] = {0};
+	struct target *t;
 	char buffer[80];
 	char value[40];
+	char *error;
+	int i;
 
+	/**
+	 * Process a stream of 'key=value' pairs and distribute
+	 * them into groups.
+	 * The i-th occurrence of some "key" in the stream means
+	 * that the respective pair belongs to the group #i
+	 */
+	error = "Exceeded the maximum number of base disks";
 	while (fgets(buffer, 80, fh)) {
 		if (sscanf(buffer, "targetbase=%s", value) == 1) {
-			td->targetbase = misc_strdup(value);
-			checkparm++;
+			t = target_at(td, idx[TARGET_BASE]++);
+			if (!t)
+				goto error;
+			t->targetbase = misc_strdup(value);
+			goto found;
 		}
 		if (sscanf(buffer, "targettype=%s", value) == 1) {
-			type_from_target(value, &td->targettype);
-			checkparm++;
+			t = target_at(td, idx[TARGET_TYPE]++);
+			if (!t)
+				goto error;
+			type_from_target(value,	&t->targettype);
+			goto found;
 		}
 		if (sscanf(buffer, "targetgeometry=%s", value) == 1) {
-			td->targetcylinders =
-				atoi(strtok(value, ","));
-			td->targetheads = atoi(strtok(NULL, ","));
-			td->targetsectors = atoi(strtok(NULL, ","));
-			checkparm++;
+			t = target_at(td, idx[TARGET_GEOMETRY]++);
+			if (!t)
+				goto error;
+			t->targetcylinders = atoi(strtok(value, ","));
+			t->targetheads = atoi(strtok(NULL, ","));
+			t->targetsectors = atoi(strtok(NULL, ","));
+			goto found;
 		}
 		if (sscanf(buffer, "targetblocksize=%s", value) == 1) {
-			td->targetblocksize = atoi(value);
-			checkparm++;
+			t = target_at(td, idx[TARGET_BLOCKSIZE]++);
+			if (!t)
+				goto error;
+			t->targetblocksize = atoi(value);
+			goto found;
 		}
 		if (sscanf(buffer, "targetoffset=%s", value) == 1) {
-			td->targetoffset = atol(value);
-			checkparm++;
+			t = target_at(td, idx[TARGET_OFFSET]++);
+			if (!t)
+				goto error;
+			t->targetoffset = atol(value);
+			goto found;
 		}
+		continue;
+found:
+		t->check_params++;
 	}
-	if ((!disk_is_eckd(td->targettype) && checkparm < 4) ||
-	    (disk_is_eckd(td->targettype) && checkparm != 5)) {
-		error_reason("Target parameters missing from script");
-		return -1;
+	/* Check for consistency */
+	error = "Inconsistent script output";
+	/*
+	 * First, calculate total number of groups
+	 */
+	td->nr_targets = 0;
+	for (i = 0; i < MAX_TARGETS; i++) {
+		t = target_at(td, i);
+		if (t->check_params == 0)
+			break;
+		td->nr_targets++;
+	}
+	if (!td->nr_targets)
+		/* No keywords found in the stream */
+		goto error;
+	/*
+	 * Each group has to include targetbase, targettype,
+	 * targetblocksize and targetoffset.
+	 */
+	if (td->nr_targets != idx[TARGET_BASE] ||
+	    td->nr_targets != idx[TARGET_TYPE] ||
+	    td->nr_targets != idx[TARGET_BLOCKSIZE] ||
+	    td->nr_targets != idx[TARGET_OFFSET])
+		goto error;
+	/*
+	 * In addition, any group of "ECKD" type has to include
+	 * targetgeometry
+	 */
+	for (i = 0; i < td->nr_targets; i++) {
+		t = target_at(td, i);
+		assert(t->check_params >= 4);
+		if (disk_is_eckd(t->targettype) && t->check_params != 5)
+			goto error;
 	}
 	return 0;
+error:
+	error_reason("%s", error);
+	return -1;
+}
+
+static void print_base_disk_params(struct job_target_data *td, int index)
+{
+	disk_type_t type = get_targettype(td, index);
+
+	if (!verbose)
+		return;
+	{
+		fprintf(stderr, "Base disk '%s':\n", get_targetbase(td, index));
+		fprintf(stderr, "  layout........: %s\n", disk_get_type_name(type));
+	}
+	if (disk_is_eckd(type)) {
+		fprintf(stderr, "  heads.........: %u\n", get_targetheads(td, index));
+		fprintf(stderr, "  sectors.......: %u\n", get_targetsectors(td, index));
+		fprintf(stderr, "  cylinders.....: %u\n", get_targetcylinders(td, index));
+	}
+	{
+		fprintf(stderr, "  start.........: %lu\n", get_targetoffset(td, index));
+		fprintf(stderr, "  blksize.......: %u\n", get_targetblocksize(td, index));
+	}
 }
 
 /**
@@ -235,31 +326,57 @@ static int disk_set_info_by_hint(struct job_target_data *td,
 {
 	int majnum, minnum;
 	struct stat stats;
-
+	int i;
+	/*
+	 * Currently multiple base disks with different parameters
+	 * are not supported
+	 */
 	data->devno = -1;
-	data->phy_block_size = td->targetblocksize;
-	data->type = td->targettype;
-	data->partnum = 0;
+	data->phy_block_size = get_targetblocksize(td, 0);
+	data->type = get_targettype(td, 0);
 
-	if (sscanf(td->targetbase, "%d:%d", &majnum, &minnum) == 2) {
-		data->device = makedev(majnum, minnum);
-		data->targetbase = defined_as_device;
-		data->partnum = minor(stats.st_rdev) - minnum;
-	} else {
-		if (stat(td->targetbase, &stats)) {
-			error_reason(strerror(errno));
-			error_text("Could not get information for "
-				   "file '%s'", td->targetbase);
+	assert(td->nr_targets != 0);
+	for (i = 1; i < td->nr_targets; i++) {
+		if (data->type != get_targettype(td, i) ||
+		    data->phy_block_size != get_targetblocksize(td, i)) {
+			print_base_disk_params(td, 0);
+			print_base_disk_params(td, i);
+			error_reason("Inconsistent base disk geometry in target device");
 			return -1;
 		}
-		if (!S_ISBLK(stats.st_mode)) {
-			error_reason("Target base device '%s' is not "
-				     "a block device",
-				     td->targetbase);
+	}
+	data->partnum = 0;
+	data->targetbase_def = undefined;
+
+	for (i = 0; i < td->nr_targets; i++) {
+		definition_t defined_as;
+
+		if (sscanf(get_targetbase(td, i),
+			   "%d:%d", &majnum, &minnum) == 2) {
+			data->basedisks[i] = makedev(majnum, minnum);
+			defined_as = defined_as_device;
+		} else {
+			if (stat(get_targetbase(td, i), &stats)) {
+				error_reason(strerror(errno));
+				error_text("Could not get information for "
+					   "file '%s'", get_targetbase(td, i));
+				return -1;
+			}
+			if (!S_ISBLK(stats.st_mode)) {
+				error_reason("Target base device '%s' is not "
+					     "a block device",
+					     get_targetbase(td, i));
+				return -1;
+			}
+			data->basedisks[i] = stats.st_rdev;
+			defined_as = defined_as_name;
+		}
+		if (data->targetbase_def != undefined &&
+		    data->targetbase_def != defined_as) {
+			error_reason("Target base disks are defined by different ways");
 			return -1;
 		}
-		data->device = stats.st_rdev;
-		data->targetbase = defined_as_name;
+		data->targetbase_def = defined_as;
 	}
 	if (data->type == disk_type_scsi && ioctl(fd, NVME_IOCTL_ID) >= 0)
 		data->is_nvme = 1;
@@ -446,11 +563,28 @@ static int run_targetbase_script(struct job_target_data *td,
 static int disk_set_geometry_by_hint(struct job_target_data *td,
 				     struct disk_info *data)
 {
-	data->geo.heads = td->targetheads;
-	data->geo.sectors = td->targetsectors;
-	data->geo.cylinders = td->targetcylinders;
-	data->geo.start = td->targetoffset;
+	int i;
+	/*
+	 * Currently multiple base disks with different parameters
+	 * are not supported
+	 */
+	data->geo.heads = get_targetheads(td, 0);
+	data->geo.sectors = get_targetsectors(td, 0);
+	data->geo.cylinders = get_targetcylinders(td, 0);
+	data->geo.start = get_targetoffset(td, 0);
 
+	assert(td->nr_targets != 0);
+	for (i = 1; i < td->nr_targets; i++) {
+		if (data->geo.heads     != get_targetheads(td, i) ||
+		    data->geo.sectors   != get_targetsectors(td, i) ||
+		    data->geo.cylinders != get_targetcylinders(td, i) ||
+		    data->geo.start     != get_targetoffset(td, i)) {
+			print_base_disk_params(td, 0);
+			print_base_disk_params(td, i);
+			error_reason("Inconsistent base disk geometry in target device");
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -515,14 +649,16 @@ static int disk_set_info_complete(struct job_target_data *td,
 }
 
 /**
- * Prepare INFO required to perform IPL installation on the physical
- * disk where the logical DEVICE is located.
+ * Prepare INFO required to perform IPL installation on physical disks
+ * participating in the logical DEVICE.
  * Preparation is performed in 2 steps:
  *
- * 1. Find out a physical "base" disk where the logical DEVICE is
- *    located. Calculate "target" parameters (type, geometry, physical
- *    block size, data offset, etc);
- * 2. Complete INFO by the found base disk and target parameters.
+ * 1. Find out a set of physical "base" disks participating in the
+ *    logical DEVICE. For each found disk calculate "target" parameters
+ *    (type, geometry, physical block size, data offset, etc) and store
+ *    it in the array of "targets" of TD;
+ * 2. Complete INFO using the found base disks and calculated target
+ *    parameters.
  *
  * TD: optionally contains target parameters specified by user via
  * config file, or special "target options" of zipl tool.
@@ -569,6 +705,7 @@ int disk_get_info(const char *device, struct job_target_data *td,
 			goto error;
 		if (disk_set_info_by_hint(td, data, fd))
 			goto error;
+		data->device = stats.st_rdev;
 		break;
 	case source_user:
 		/*
@@ -581,6 +718,12 @@ int disk_get_info(const char *device, struct job_target_data *td,
 			goto error;
 		if (disk_set_info_by_hint(td, data, fd))
 			goto error;
+		/*
+		 * multiple base disks are not supported
+		 * with this source type
+		 */
+		assert(td->nr_targets == 1);
+		data->device = data->basedisks[0];
 		break;
 	case source_auto:
 		/* no ready target parameters are available */
@@ -588,6 +731,12 @@ int disk_get_info(const char *device, struct job_target_data *td,
 			goto error;
 		if (disk_set_info_auto(data, &stats, fd))
 			goto error;
+		/*
+		 * multiple base disks are not supported
+		 * with this source type
+		 */
+		data->basedisks[0] = data->device;
+		td->nr_targets = 1;
 		break;
 	default:
 		assert(0);
@@ -943,6 +1092,33 @@ disk_print_devt(dev_t d)
 	printf("%02x:%02x", major(d), minor(d));
 }
 
+void disk_print_devname(dev_t dev)
+{
+	struct util_proc_part_entry part_entry;
+
+	if (!util_proc_part_get_entry(dev, &part_entry)) {
+		printf("%s", part_entry.name);
+		util_proc_part_free_entry(&part_entry);
+	} else {
+		disk_print_devt(dev);
+	}
+}
+
+void prepare_footnote_ptr(int source, char *ptr)
+{
+	if (source == source_user || source == source_script)
+		strcpy(ptr, " *)");
+	else
+		strcpy(ptr, "");
+}
+
+void print_footnote_ref(int source, const char *prefix)
+{
+	if (source == source_user)
+		printf("%s*) Data provided by user.\n", prefix);
+	else if (source == source_script)
+		printf("%s*) Data provided by script.\n", prefix);
+}
 
 /* Return a name for a given disk TYPE. */
 char *
@@ -994,12 +1170,11 @@ disk_is_large_volume(struct disk_info* info)
 void disk_print_info(struct disk_info *info, int source)
 {
 	char footnote[4] = "";
-	if (source == source_user || source == source_script)
-		strcpy(footnote, " *)");
 
+	prepare_footnote_ptr(source, footnote);
 	printf("  Device..........................: ");
 	disk_print_devt(info->device);
-	if (info->targetbase == defined_as_device)
+	if (info->targetbase_def == defined_as_device)
 		printf("%s", footnote);
 	printf("\n");
 	if (info->partnum != 0) {
@@ -1010,7 +1185,7 @@ void disk_print_info(struct disk_info *info, int source)
 	if (info->name) {
 		printf("  Device name.....................: %s",
 		       info->name);
-		if (info->targetbase == defined_as_name)
+		if (info->targetbase_def == defined_as_name)
 			printf("%s", footnote);
 		printf("\n");
 	}
@@ -1053,21 +1228,7 @@ void disk_print_info(struct disk_info *info, int source)
 	       info->phy_block_size, footnote);
 	printf("  Device size in physical blocks..: %ld\n",
 	       (long) info->phy_blocks);
-	if (source == source_user)
-		printf("  *) Data provided by user.\n");
-	if (source == source_script)
-		printf("  *) Data provided by script.\n");
-}
-
-/* Print textual representation of geo structure. */
-void
-disk_print_geo(struct disk_info *data)
-{
-		printf("  geo.heads.........:%u\n", data->geo.heads);
-		printf("  geo.sectors.......:%u\n", data->geo.sectors);
-		printf("  geo.cylinders.....:%u\n", data->geo.cylinders);
-		printf("  geo.start.........:%lu\n", data->geo.start);
-		printf("  blksize...........:%u\n", data->phy_block_size);
+	print_footnote_ref(source, "  ");
 }
 
 /* Check whether a block is a zero block which identifies a hole in a file.
