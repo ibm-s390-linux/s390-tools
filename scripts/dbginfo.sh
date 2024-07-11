@@ -259,6 +259,7 @@ readonly LOGFILE="${WORKPATH}dbginfo.log"
 readonly OUTPUT_FILE_BRIDGE="${WORKPATH}network.out"
 readonly OUTPUT_FILE_CMD="${WORKPATH}runtime.out"
 readonly OUTPUT_FILE_COREDUMPCTL="${WORKPATH}coredump.out" # separate file needed
+readonly OUTPUT_FILE_DASD="${WORKPATH}dasd.out"
 readonly OUTPUT_FILE_DOCKER="${WORKPATH}docker_runtime.out"
 readonly OUTPUT_FILE_ETHTOOL="${WORKPATH}network.out"
 readonly OUTPUT_FILE_HYPTOP="${WORKPATH}runtime.out"
@@ -296,6 +297,7 @@ ALL_STEPS="\
   collect_kvm\
   collect_container\
   collect_nvme\
+  collect_dasd\
   collect_logfiles\
   post_processing\
   create_package\
@@ -491,7 +493,7 @@ CMDS="uname -a\
 # Z device subsystem commands (first commands in non alphabetical order)
 CMDS="${CMDS}\
   :lschp\
-  :lscss\
+  :lscss --vpm\
   :lszdev\
   :find /dev -print0 | sort -z | xargs -0 -n 10 ls -ld\
   :lspci -t\
@@ -1230,6 +1232,26 @@ collect_nvme() {
 		done
 	else
 		pr_skip "nvme: not available"
+	fi
+}
+
+########################################
+collect_dasd() {
+	local device
+
+	if type dasdview >/dev/null; then
+		pr_collect_output "DASD storage"
+		call_run_command "lsdasd" "${OUTPUT_FILE_DASD}" # duplicate as file header
+		for device in /dev/dasd*; do
+			if [ -b $device ]; then
+				call_run_command "dasdview -i $device" "${OUTPUT_FILE_DASD}"
+				call_run_command "dasdview -t info $device" "${OUTPUT_FILE_DASD}"
+			else
+				echo "$device is no block device" >> ${OUTPUT_FILE_DASD}
+			fi
+		done
+	else
+		pr_skip "dasdview: not available"
 	fi
 }
 
