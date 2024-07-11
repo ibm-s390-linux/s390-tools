@@ -119,6 +119,7 @@ pub struct ApqnInfoEp11 {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ApqnInfoCca {
     pub serialnr: String,
     pub mkvp_aes: String,  // may be an empty string if no MK set
@@ -129,6 +130,7 @@ pub struct ApqnInfoCca {
 pub enum ApqnInfo {
     Accel(ApqnInfoAccel),
     Ep11(ApqnInfoEp11),
+    #[allow(dead_code)]
     Cca(ApqnInfoCca),
 }
 
@@ -262,6 +264,7 @@ impl ApqnInfo {
 
 #[derive(Debug, Clone)]
 pub struct Apqn {
+    #[allow(dead_code)]
     pub name: String,
     pub card: u32,
     pub domain: u32,
