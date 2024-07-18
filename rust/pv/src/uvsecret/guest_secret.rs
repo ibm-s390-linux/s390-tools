@@ -68,7 +68,7 @@ impl GuestSecret {
     }
 
     /// Reference to the confidential data
-    pub(crate) fn confidential(&self) -> &[u8] {
+    pub fn confidential(&self) -> &[u8] {
         match &self {
             Self::Null => &[],
             Self::Association { secret, .. } => secret.value().as_slice(),

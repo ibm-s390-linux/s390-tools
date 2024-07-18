@@ -62,7 +62,7 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     write_out(&opt.output, ser_asrbc, "add-secret request")?;
     info!("Successfully wrote the request to '{}'", &opt.output);
 
-    write_secret(&opt.secret, &asrcb, &opt.output)
+    write_secret(&opt.secret, asrcb.guest_secret(), &opt.output)
 }
 
 /// Read+parse the first key from the buffer.
@@ -206,54 +206,59 @@ fn read_cuid(asrcb: &mut AddSecretRequest, opt: &CreateSecretOpt) -> Result<()> 
     Ok(())
 }
 
+// Write non confidential data (=name+id) to a yaml stdout
+fn write_yaml<P: AsRef<Path>>(
+    name: &str,
+    guest_secret: &GuestSecret,
+    stdout: &bool,
+    outp_path: P,
+) -> Result<()> {
+    debug!("Non-confidential secret information: {guest_secret:x?}");
+
+    let secret_info = serde_yaml::to_string(guest_secret)?;
+    if stdout.to_owned() {
+        println!("{secret_info}");
+        return Ok(());
+    }
+
+    let gen_name: String = name
+        .chars()
+        .map(|c| if c.is_whitespace() { '_' } else { c })
+        .collect();
+    let mut yaml_path = outp_path
+        .as_ref()
+        .parent()
+        .with_context(|| format!("Cannot open directory of {:?}", outp_path.as_ref()))?
+        .to_owned();
+    yaml_path.push(gen_name);
+    yaml_path.set_extension("yaml");
+    write_out(&yaml_path, secret_info, "secret information")?;
+    warn!(
+        "Successfully wrote secret info to '{}'",
+        yaml_path.display().to_string()
+    );
+    Ok(())
+}
+
 /// Write the generated secret (if any) to the specified output stream
 fn write_secret<P: AsRef<Path>>(
     secret: &AddSecretType,
-    asrcb: &AddSecretRequest,
+    guest_secret: &GuestSecret,
     outp_path: P,
 ) -> Result<()> {
-    if let AddSecretType::Association {
-        name,
-        stdout,
-        output_secret: secret_out,
-        ..
-    } = secret
-    {
-        let gen_name: String = name
-            .chars()
-            .map(|c| if c.is_whitespace() { '_' } else { c })
-            .collect();
-        let mut gen_path = outp_path
-            .as_ref()
-            .parent()
-            .with_context(|| format!("Cannot open directory of {:?}", outp_path.as_ref()))?
-            .to_owned();
-        gen_path.push(format!("{gen_name}.yaml"));
-
-        // write non confidential data (=name+id) to a yaml
-        let secret_info = serde_yaml::to_string(asrcb.guest_secret())?;
-        if stdout.to_owned() {
-            println!("{secret_info}");
-        } else {
-            write_out(&gen_path, secret_info, "association secret info")?;
-            debug!(
-                "Non-confidential secret information: {:x?}",
-                asrcb.guest_secret()
-            );
-            warn!(
-                "Successfully wrote association info to '{}'",
-                gen_path.display()
-            );
-        }
-
-        if let Some(path) = secret_out {
-            if let GuestSecret::Association { secret, .. } = asrcb.guest_secret() {
-                write_out(path, secret.value(), "Association secret")?
-            } else {
-                unreachable!("The secret type has to be `association` at this point (bug)!")
+    match secret {
+        AddSecretType::Association {
+            name,
+            stdout,
+            output_secret,
+            ..
+        } => {
+            write_yaml(name, guest_secret, stdout, outp_path)?;
+            if let Some(path) = output_secret {
+                write_out(path, guest_secret.confidential(), "Association secret")?
             }
-            info!("Successfully wrote generated association secret to '{path}'");
         }
+        _ => (),
     };
     Ok(())
 }
