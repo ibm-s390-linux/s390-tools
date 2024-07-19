@@ -89,7 +89,7 @@ int kmip_decode_xml(const xmlNode *xml, struct kmip_node *parent,
 	} else {
 		n->type = kmip_type_by_name_or_hex(type_attr);
 		if (n->type == 0) {
-			kmip_debug(debug, "Unknown 'type' in JSON object: '%s'",
+			kmip_debug(debug, "Unknown 'type' in XML object: '%s'",
 				   type_attr);
 			rc = -EBADMSG;
 			goto out;
@@ -361,7 +361,7 @@ int kmip_encode_xml(const struct kmip_node *node, xmlNode **xml, bool debug)
 		while (element != NULL) {
 			rc = kmip_encode_xml(element, &elem_xml, debug);
 			if (rc != 0) {
-				kmip_debug(debug, "kmip_encode_json failed");
+				kmip_debug(debug, "kmip_encode_xml failed");
 				goto out;
 			}
 			if (xmlAddChild(ret_xml, elem_xml) == NULL) {
