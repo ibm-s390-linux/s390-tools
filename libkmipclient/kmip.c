@@ -1084,8 +1084,6 @@ int kmip_connection_new(const struct kmip_conn_config *config,
 			return -EINVAL;
 		}
 		break;
-
-		break;
 	default:
 		kmip_debug(debug, "Invalid encoding: %d", config->encoding);
 		return -EINVAL;
