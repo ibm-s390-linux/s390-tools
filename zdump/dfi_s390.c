@@ -350,18 +350,13 @@ int dfi_s390_init_gen(bool extended)
 		rc = mem_chunks_add();
 	} else {
 		/*
-		 * Dumps in s390_ext format can reside on DASD partition only.
-		 * Do not bail out on ZG_TYPE_DASD in order to support loop device
-		 * emulation in fvt-tests.
-		 */
-		if (zg_type(g.fh) != ZG_TYPE_DASD_PART &&
-		    zg_type(g.fh) != ZG_TYPE_DASD)
-			return -ENODEV;
-		/*
 		 * A device block size is required for a decompression of
 		 * s390_ext dump with compressed dump segments.
+		 * Since dumps in s390_ext format can reside on DASD partition
+		 * only, bail out upon ioctl error on BLKSSZGET.
 		 */
-		zg_ioctl(g.fh, BLKSSZGET, &l.blk_size, "BLKSSZGET", ZG_CHECK);
+		if (zg_ioctl(g.fh, BLKSSZGET, &l.blk_size, "BLKSSZGET", ZG_CHECK_NONE))
+			return -ENODEV;
 		rc = mem_chunks_add_ext();
 	}
 	if (rc)
