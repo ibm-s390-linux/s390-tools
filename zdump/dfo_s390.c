@@ -30,6 +30,7 @@
 static struct {
 	struct df_s390_hdr	hdr;
 	struct df_s390_em	em;
+	u64 dfi_max_end;	// Max end address among processed DFI memory chunks
 } l;
 
 /*
@@ -159,19 +160,48 @@ static void add_cpu_to_dfo(struct dfi_cpu *cpu)
 }
 
 /*
- * Add memory chunk to dump layout
+ * Add memory chunk to DFO dump layout.
+ * The function is supposed to be called in a loop for each DFI mem chunk in the list.
+ * DFI memory chunk list is considered to be sorted by start address, thus the
+ * input memory chunk coming last has a priority for DFO.
  */
 static void add_mem_chunk_to_dfo(struct dfi_mem_chunk *mem_chunk)
 {
-	struct dfi_mem_chunk *mem_chunk_prev = dfi_mem_chunk_prev(mem_chunk);
+	const u64 dfo_current_memsz = dfo_chunk_dump_size() - DF_S390_HDR_SIZE;
 
-	if (mem_chunk_prev && (mem_chunk_prev->end + 1 != mem_chunk->start))
-		dfo_chunk_add(mem_chunk_prev->end + 1 + DF_S390_HDR_SIZE,
-			      mem_chunk->start - mem_chunk_prev->end - 1,
+	/*
+	 * Consider memory holes and filtered memory pages filling the missing
+	 * areas with zeroes for s390 output format. Keep in mind that dfi_mem_chunks
+	 * can overlap for VR-kernel dumps.
+	 * If no dfi_mem_chunk with zero start address registered, add
+	 * zero DFO memory chunk first.
+	 *
+	 * See the diagram of resulting dfo_s390 for several cases of input memory
+	 * chunks layout below:
+	 *
+	 *	DFI		DFO(s390)
+	 *	---------------------------------
+	 *	aaaa....	HDR|aa|bb|cc|cc
+	 *	..bbbb..
+	 *	....cccc
+	 *	---------------------------------
+	 *	..aa....	HDR|00|aa|00|bb
+	 *	......bb
+	 *	---------------------------------
+	 *	aaaaaaaa	HDR|aa|bb|aa|cc
+	 *	..bb....
+	 *	......cc
+	 */
+	if (l.dfi_max_end < mem_chunk->start &&
+	    mem_chunk->start - l.dfi_max_end > 1)
+		dfo_chunk_add(dfo_chunk_dump_size(),
+			      mem_chunk->start - dfo_current_memsz,
 			      NULL, dfo_chunk_zero_fn);
 
 	dfo_chunk_add(mem_chunk->start + DF_S390_HDR_SIZE, mem_chunk->size,
 		      mem_chunk, dfo_chunk_mem_fn);
+
+	l.dfi_max_end = MAX(mem_chunk->end, l.dfi_max_end);
 }
 
 /*
@@ -187,7 +217,7 @@ static void dump_chunks_init(void)
 		add_mem_chunk_to_dfo(mem_chunk);
 	dfi_cpu_iterate(cpu)
 		add_cpu_to_dfo(cpu);
-	dfo_chunk_add(dfi_mem_range() + DF_S390_HDR_SIZE,
+	dfo_chunk_add(l.hdr.mem_size + DF_S390_HDR_SIZE,
 		      DF_S390_EM_SIZE,
 		      &l.em, dfo_chunk_buf_fn);
 }
@@ -209,7 +239,8 @@ static void df_s390_dump_init(void)
 	else
 		dh->version = 5;
 	dh->mem_start = 0;
-	dh->mem_size = dh->mem_end = dfi_mem_range();
+	dh->mem_end = dfi_mem_end();
+	dh->mem_size = dh->mem_end + 1;
 	dh->num_pages = dh->mem_size / PAGE_SIZE;
 	dh->arch = df_s390_from_dfi_arch(dfi_arch());
 	if (dfi_attr_build_arch())

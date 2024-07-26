@@ -6,6 +6,7 @@
  */
 
 #include <string.h>
+#include "lib/util_log.h"
 
 #include "zg.h"
 #include "dfi_mem_chunk.h"
@@ -27,6 +28,10 @@ void dfo_chunk_add(u64 start, u64 size, void *data, dfo_chunk_read_fn read_fn)
 {
 	struct dfo_chunk *dfo_chunk;
 
+	util_log_print(UTIL_LOG_DEBUG, "DFO add chunk start=0x%lx, size=0x%lx\n", start, size);
+
+	if (size == 0)
+		return;
 	dfo_chunk = zg_alloc(sizeof(*dfo_chunk));
 	dfo_chunk->start = start;
 	dfo_chunk->end = start + size - 1;

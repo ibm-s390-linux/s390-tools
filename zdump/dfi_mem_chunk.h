@@ -43,6 +43,7 @@ void dfi_mem_chunk_add(u64 start, u64 size, void *data,
 		       dfi_mem_chunk_read_fn read_fn,
 		       dfi_mem_chunk_free_fn free_fn);
 u64 dfi_mem_range(void);
+u64 dfi_mem_end(void);
 int dfi_mem_range_valid(u64 addr, u64 len);
 unsigned int dfi_mem_chunk_cnt(void);
 struct dfi_mem_chunk *dfi_mem_chunk_first(void);
@@ -54,6 +55,7 @@ struct dfi_mem_chunk *dfi_mem_chunk_find(u64 addr);
 struct util_list *dfi_mem_chunk_list(void);
 #define dfi_mem_chunk_iterate(mem_chunk) \
 	util_list_iterate(dfi_mem_chunk_list(), mem_chunk)
+void dfi_mem_chunk_sort(void);
 
 int dfi_mem_virt_read(u64 addr, void *buf, size_t cnt);
 int dfi_mem_phys_read(u64 addr, void *buf, size_t cnt);

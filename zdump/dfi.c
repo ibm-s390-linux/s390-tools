@@ -809,6 +809,8 @@ int dfi_init(void)
 		l.dfi = dfi;
 		g.fh = dfi_dump_open(g.opts.device);
 		rc = dfi->init();
+		if (rc == 0)
+			dfi_mem_chunk_sort();
 		if (rc == 0 && dfi_feat_seek()) {
 			kdump_init();
 			dfi_vmcoreinfo_init();

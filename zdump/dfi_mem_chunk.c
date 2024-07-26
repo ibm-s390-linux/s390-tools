@@ -325,6 +325,14 @@ void dfi_mem_chunk_read_zero(struct dfi_mem_chunk *UNUSED(mem_chunk),
 }
 
 /*
+ * Sort memory chunks by start value
+ */
+void dfi_mem_chunk_sort(void)
+{
+	util_list_sort(&l.mem_virt.chunk_list, mem_chunk_cmp_fn, NULL);
+}
+
+/*
  * Return mem_chunk list head
  */
 struct util_list *dfi_mem_chunk_list(void)
@@ -348,6 +356,14 @@ u64 dfi_mem_range(void)
 	if (l.mem_virt.start_addr == U64_MAX)
 		return 0;
 	return l.mem_virt.end_addr - l.mem_virt.start_addr + 1;
+}
+
+/*
+ * Return maximum memory address
+ */
+u64 dfi_mem_end(void)
+{
+	return l.mem_virt.end_addr;
 }
 
 /*
