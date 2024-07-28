@@ -5,7 +5,7 @@
 #
 # Script to list the FCP, SCSI and multipath configuration
 #
-# Copyright IBM Corp. 2008, 2017
+# Copyright IBM Corp. 2008, 2024
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -130,8 +130,8 @@ sub get_device_data
 						unless(!$devices{$hctl}{dev});
 			$devices{$hctl}{mm}   = get_line("dev");
 			$devices{$hctl}{mp_dev} = glob_last("holders", "dm*");
-			$devices{$hctl}{mp_dev} =~ s/.*\/(.+)\Z/$1/
-						unless (!$devices{$hctl}{mp_dev});
+			next if !defined $devices{$hctl}{mp_dev};
+			$devices{$hctl}{mp_dev} =~ s/.*\/(.+)\Z/$1/;
 			$c_src = catdir($base_dir, "sys", "block",
 					$devices{$hctl}{mp_dev});
 			$devices{$hctl}{mp_dev_mm} = get_line("dev");
@@ -297,7 +297,7 @@ sub mapper_report
 		      "=====================================================\n";
 	}
 	foreach my $hctl (sort keys %devices) {
-		next if (! $devices{$hctl}{mp_dev});
+		next if (!defined $devices{$hctl}{mp_dev});
 		next if (@$adapters && "@$adapters" !~ /\b$devices{$hctl}{hba_id}\b/);
 		next if (@$ports && "@$ports" !~ /\b$devices{$hctl}{wwpn}\b/);
 		next if (@$s_devs && "@$s_devs" !~ /\b$devices{$hctl}{dev}\b/);
@@ -391,7 +391,7 @@ MSG
 
 sub version {
 	print "$PROGRAM_NAME: version %S390_TOOLS_VERSION%\n";
-	print "Copyright IBM Corp. 2008, 2017\n";
+	print "Copyright IBM Corp. 2008, 2024\n";
 }
 
 sub unpack_config
