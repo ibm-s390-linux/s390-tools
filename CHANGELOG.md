@@ -1,15 +1,23 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.34.0 (2024-08-01)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.10
 
   Changes of existing tools:
+  - ap_tools/ap-check: Add support for vfio-ap dynamic configuration
+  - dbginfo.sh: Update/Add additional DASD data collection
+  - dumpconf: Add new parameter 'SCP_DATA' for SCSI/NVMe/ECKD dump devices
+  - libutil: Make formatted meta-data configurable
+  - s390-tools: Replace 'which' with built-in 'command -v'
+  - zdump/dfi_elf: Support core dumps of vr-kernels
 
   Bug Fixes:
+  - chzdev: Fix warning about failed ATTR writes by udev
+  - rust/pv: Try again if first CRL-URI is invalid
+  - rust/pvattest: Add short option for --arpk
+  - zdump: Fix 'zgetdump -i' ioctl error on s390 formatted dump file
 
 * __v2.33.1 (2024-05-28)__
 
