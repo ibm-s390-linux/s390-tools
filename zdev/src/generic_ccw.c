@@ -8,6 +8,7 @@
  */
 
 #include <string.h>
+#include <libgen.h>
 
 #include "lib/util_path.h"
 

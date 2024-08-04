@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <libgen.h>
 
 #include "lib/ccw.h"
 #include "lib/util_base.h"
