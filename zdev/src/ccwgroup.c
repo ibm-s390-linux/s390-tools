@@ -7,6 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
