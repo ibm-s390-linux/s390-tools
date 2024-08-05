@@ -92,7 +92,8 @@ macro_rules! retr_constructor {
 }
 
 impl GuestSecret {
-    fn name_to_id(name: &str) -> Result<SecretId> {
+    /// Hashes the name with sha256
+    pub fn name_to_id(name: &str) -> Result<SecretId> {
         let id: [u8; SecretId::ID_SIZE] = hash(MessageDigest::sha256(), name.as_bytes())?
             .to_vec()
             .try_into()
@@ -134,6 +135,19 @@ impl GuestSecret {
                       | #[doc = r"HMAC-SHA Key"] => Confidential<Vec<u8>>, hmac_sha);
     retr_constructor!(#[doc = r"This function will return an error if  OpenSSL cannot create a hash or the curve is invalid"]
                       | #[doc = r"EC PRIVATE Key"] => PKey<Private>, ec);
+
+    /// Use the name as ID, do not hash it
+    pub fn no_hash_name(&mut self) {
+        match self {
+            Self::Null => (),
+            Self::Association {
+                name, ref mut id, ..
+            }
+            | Self::Retrievable {
+                name, ref mut id, ..
+            } => id.clone_from(&SecretId::from_string(name)),
+        }
+    }
 
     /// Reference to the confidential data
     pub fn confidential(&self) -> &[u8] {

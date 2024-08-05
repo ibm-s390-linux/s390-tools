@@ -94,7 +94,7 @@ fn read_private_key(buf: &[u8]) -> Result<PKey<Private>> {
 fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
     debug!("Build add-secret request");
 
-    let secret = match &opt.secret {
+    let mut secret = match &opt.secret {
         AddSecretType::Meta => GuestSecret::Null,
         AddSecretType::Association {
             name,
@@ -111,6 +111,8 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
         } => retrievable(name, secret, kind)?,
     };
     trace!("AddSecret: {secret:x?}");
+
+    opt.use_name.then(|| secret.no_hash_name());
 
     let mut flags = match &opt.pcf {
         Some(v) => (&try_parse_u64(v, "pcf")?).into(),

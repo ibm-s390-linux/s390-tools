@@ -141,6 +141,12 @@ pub struct CreateSecretOpt {
     /// by default.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub user_sign_key: Option<String>,
+
+    /// Do not hash the name, use it directly as secret ID.
+    ///
+    /// Ignored for meta-secrets.
+    #[arg(long)]
+    pub use_name: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -342,6 +348,8 @@ pub enum RetrInpFmt {
     Yaml,
     /// Use a hex string.
     Hex,
+    /// Use a name-string. Will hash it if no secret with the name found.
+    Name,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]

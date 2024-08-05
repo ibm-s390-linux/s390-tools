@@ -17,12 +17,17 @@ use utils::get_writer_from_cli_file_arg;
 fn retrieve(id: &SecretId) -> Result<RetrievedSecret> {
     let uv = UvDevice::open()?;
     let secrets = list_uvc(&uv)?;
-    let secret = secrets
-        .into_iter()
-        .find(|s| s.id() == id.as_ref())
+    let secret = match secrets.find(id) {
+        Some(s) => s,
+        // hash it + try again if it is ASCII-representable
+        None => match id.as_ascii() {
+            Some(s) => secrets.find(&GuestSecret::name_to_id(s)?),
+            None => None,
+        }
         .ok_or(anyhow!(
             "The UV secret-store has no secret with the ID {id}"
-        ))?;
+        ))?,
+    };
 
     info!("Try to retrieve secret at index: {}", secret.index());
     debug!("Try to retrieve: {secret:?}");
@@ -43,6 +48,7 @@ pub fn retr(opt: &RetrSecretOptions) -> Result<()> {
         RetrInpFmt::Hex => {
             serde_yaml::from_str(&opt.input).context("Cannot parse SecretId information")?
         }
+        RetrInpFmt::Name => SecretId::from_string(&opt.input),
     };
 
     let retr_secret =

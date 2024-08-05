@@ -11,7 +11,9 @@ use crate::{
 use byteorder::{BigEndian, ByteOrder};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
-    fmt::Display,
+    cmp::min,
+    ffi::CStr,
+    fmt::{Debug, Display, LowerHex, UpperHex},
     io::{Cursor, Read, Seek, Write},
     mem::size_of,
     slice::Iter,
@@ -35,6 +37,33 @@ impl SecretId {
     pub fn from(buf: [u8; Self::ID_SIZE]) -> Self {
         buf.into()
     }
+
+    /// Create a Id from a string
+    ///
+    /// Uses the first 31 bytes from `name` as id
+    /// Does not hash anything. Byte 32 is the NUL char
+    pub fn from_string(name: &str) -> Self {
+        let len = min(name.len(), Self::ID_SIZE - 1);
+        let mut res = Self::default();
+        res.0[0..len].copy_from_slice(&name.as_bytes()[0..len]);
+        res
+    }
+
+    /// Tries to represent the Id as printable-ASCII string
+    pub fn as_ascii(&self) -> Option<&str> {
+        if let Ok(t) = CStr::from_bytes_until_nul(&self.0) {
+            if let Ok(t) = t.to_str() {
+                if !t.is_empty()
+                    && t.chars()
+                        .all(|c| c.is_ascii_whitespace() | c.is_ascii_graphic())
+                    && self.0[t.len()..].iter().all(|b| *b == 0)
+                {
+                    return Some(t);
+                }
+            }
+        };
+        None
+    }
 }
 
 impl Serialize for SecretId {
@@ -42,8 +71,8 @@ impl Serialize for SecretId {
     where
         S: Serializer,
     {
-        // calls Display at one point
-        ser.serialize_str(&self.to_string())
+        // calls LowerHex at one point
+        ser.serialize_str(&format!("{self:#x}"))
     }
 }
 
@@ -56,12 +85,36 @@ impl<'de> Deserialize<'de> for SecretId {
     }
 }
 
+impl UpperHex for SecretId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "0x")?;
+        }
+        for b in self.0 {
+            write!(f, "{b:02X}")?;
+        }
+        Ok(())
+    }
+}
+
+impl LowerHex for SecretId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "0x")?;
+        }
+        for b in self.0 {
+            write!(f, "{b:02x}")?;
+        }
+        Ok(())
+    }
+}
+
 impl Display for SecretId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut s = String::with_capacity(32 * 2 + 2);
-        s.push_str("0x");
-        let s = self.0.iter().fold(s, |acc, e| acc + &format!("{e:02x}"));
-        write!(f, "{s}")
+        if let Some(s) = self.as_ascii() {
+            write!(f, "{s} | ")?;
+        }
+        write!(f, "{self:#x}")
     }
 }
 
@@ -79,7 +132,7 @@ impl AsRef<[u8]> for SecretId {
 
 /// A secret in a [`SecretList`]
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Serialize)]
 pub struct SecretEntry {
     #[serde(serialize_with = "ser_u16")]
     index: U16<BigEndian>,
@@ -153,11 +206,7 @@ impl Display for SecretEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let stype: ListableSecretType = self.stype.get().into();
         writeln!(f, "{} {}:", self.index, stype)?;
-        write!(f, "  ")?;
-        for b in self.id.as_ref() {
-            write!(f, "{b:02x}")?;
-        }
-        Ok(())
+        write!(f, " {}", self.id)
     }
 }
 
@@ -267,6 +316,11 @@ impl SecretList {
     /// This number may be not equal to the provided number of [`SecretEntry`]
     pub fn total_num_secrets(&self) -> usize {
         self.hdr.total_num_secrets.get() as usize
+    }
+
+    /// Find the first [`SecretEntry`] that has the provided [`SecretId`]
+    pub fn find(&self, id: &SecretId) -> Option<SecretEntry> {
+        self.iter().find(|e| e.id() == id.as_ref()).cloned()
     }
 
     /// Encodes the list in the same binary format the UV would do
@@ -456,7 +510,7 @@ where
         type Value = [u8; SecretId::ID_SIZE];
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a `32 bytes long hexstring` prepended with 0x")
+            formatter.write_str("a `32 bytes (=64 character) long hexstring` prepended with 0x")
         }
 
         fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
@@ -464,7 +518,10 @@ where
             E: serde::de::Error,
         {
             if s.len() != SecretId::ID_SIZE * 2 + "0x".len() {
-                return Err(serde::de::Error::invalid_length(s.len() - 2, &self));
+                return Err(serde::de::Error::invalid_length(
+                    s.len().saturating_sub("0x".len()),
+                    &self,
+                ));
             }
             let nb = s.strip_prefix("0x").ok_or_else(|| {
                 serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self)
@@ -654,5 +711,81 @@ mod test {
                 Token::MapEnd,
             ],
         )
+    }
+
+    #[test]
+    fn secret_id_display() {
+        let text = "Fancy secret ID";
+        let id = SecretId::from_string(text);
+
+        let exp =
+            "Fancy secret ID | 0x46616e6379207365637265742049440000000000000000000000000000000000";
+        assert_eq!(id.to_string(), exp);
+    }
+
+    #[test]
+    fn secret_id_long_name() {
+        let text = "the most fanciest secret ID you ever seen in the time the universe exists";
+        let id = SecretId::from_string(text);
+        let exp =
+            "the most fanciest secret ID you | 0x746865206d6f73742066616e63696573742073656372657420494420796f7500";
+        assert_eq!(id.to_string(), exp);
+    }
+
+    #[test]
+    fn secret_id_no_ascii_name() {
+        let text = [0; 32];
+        let id = SecretId::from(text);
+
+        let exp = "0x0000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(id.to_string(), exp);
+    }
+
+    #[test]
+    fn secret_id_no_ascii_name2() {
+        let text = [
+            0x25, 0x55, 3, 4, 50, 0, 6, 0, 8, 0, 0, 0, 0, 0, 0, 0, 90, 0, 0xa, 0, 0, 0, 0, 0xf, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+        let id = SecretId::from(text);
+        assert_eq!(id.as_ascii(), None);
+    }
+
+    #[test]
+    fn secret_id_no_ascii_name3() {
+        let text = [
+            0x25, 0x55, 0, 4, 50, 0, 6, 0, 8, 0, 0, 0, 0, 0, 0, 0, 90, 0, 0xa, 0, 0, 0, 0, 0xf, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+        let id = SecretId::from(text);
+        assert_eq!(id.as_ascii(), None);
+    }
+
+    #[test]
+    fn secret_id_hex() {
+        let id_str = "Nice Test 123";
+        let id = SecretId::from_string(id_str);
+
+        let s = format!("{id:#x}");
+        assert_eq!(
+            s,
+            "0x4e69636520546573742031323300000000000000000000000000000000000000"
+        );
+        let s = format!("{id:x}");
+        assert_eq!(
+            s,
+            "4e69636520546573742031323300000000000000000000000000000000000000"
+        );
+        let s = format!("{id:#X}");
+        assert_eq!(
+            s,
+            "0x4E69636520546573742031323300000000000000000000000000000000000000"
+        );
+
+        let s = format!("{id:X}");
+        assert_eq!(
+            s,
+            "4E69636520546573742031323300000000000000000000000000000000000000"
+        );
     }
 }
