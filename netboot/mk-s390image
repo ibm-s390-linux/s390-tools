@@ -119,9 +119,9 @@ dobuild()
 	# append ramdisk if specified
 	if [ "$ramdisk" != "" ]
 	then
-		ramdisk_size=$(du -b $ramdisk | cut -f1)
-		kernel_size=$(du -b $kernel | cut -f1)
-		ramdisk_offset=$(du -b $image | cut -f1)
+		ramdisk_size=$(du -b -L $ramdisk | cut -f1)
+		kernel_size=$(du -b -L $kernel | cut -f1)
+		ramdisk_offset=$(du -b -L $image | cut -f1)
 		cat $ramdisk >> $image
 		binval=$(mktemp)
 		dec2be64 $ramdisk_offset > $binval
@@ -135,7 +135,7 @@ dobuild()
 	# set cmdline
 	if [ "$parmfile" != "" ]
 	then
-		parmfile_size=$(du -b $parmfile | cut -f1)
+		parmfile_size=$(du -b -L $parmfile | cut -f1)
 		if [ $parmfile_size -le $MAX_PARMFILE_SIZE ]
 		then
 			# Clear any previous parameters
