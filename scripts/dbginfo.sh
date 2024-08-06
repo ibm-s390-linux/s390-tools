@@ -328,6 +328,8 @@ PROCFILES="\
   /proc/mounts\
   /proc/net/vlan\
   /proc/net/bonding\
+  /proc/net/sockstat\
+  /proc/net/sockstat6\
   /proc/net/softnet_stat\
   /proc/partitions\
   /proc/qeth\
