@@ -23,7 +23,7 @@
  * Number of PAI counters. Contains all counters regardless of kernel or user
  * space
  */
-#define MAX_NUM_PAI 		156
+#define MAX_NUM_PAI 		172
 
 /*
  * This is the sysfs directory from which cpacfstatsd daemon application loads

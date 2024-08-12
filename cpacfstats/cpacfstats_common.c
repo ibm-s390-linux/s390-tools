@@ -192,7 +192,27 @@ const struct pai_counter pai[] = {
 	[152] = {"PCKMO ECC Ed25519", KERNEL_ONLY_COUNTER},
 	[153] = {"PCKMO ECC Ed448", KERNEL_ONLY_COUNTER},
 	[154] = {"Reserved 1", KERNEL_ONLY_COUNTER},
-	[155] = {"Reserved 2", KERNEL_ONLY_COUNTER}
+	[155] = {"Reserved 2", KERNEL_ONLY_COUNTER},
+	[156] = {"KM AES-XTS (full) 128bit", KERNEL_AND_USER_COUNTER},
+	[157] = {"KM AES-XTS (full) 256bit", KERNEL_AND_USER_COUNTER},
+	[158] = {"KM AES-XTS (full) 128bit protected key",
+		 KERNEL_AND_USER_COUNTER},
+	[159] = {"KM AES-XTS (full) 256bit protected key",
+		 KERNEL_AND_USER_COUNTER},
+	[160] = {"KMAC HMAC SHA 224", KERNEL_AND_USER_COUNTER},
+	[161] = {"KMAC HMAC SHA 256", KERNEL_AND_USER_COUNTER},
+	[162] = {"KMAC HMAC SHA 384", KERNEL_AND_USER_COUNTER},
+	[163] = {"KMAC HMAC SHA 512", KERNEL_AND_USER_COUNTER},
+	[164] = {"KMAC HMAC SHA 224 protected key", KERNEL_AND_USER_COUNTER},
+	[165] = {"KMAC HMAC SHA 256 protected key", KERNEL_AND_USER_COUNTER},
+	[166] = {"KMAC HMAC SHA 384 protected key", KERNEL_AND_USER_COUNTER},
+	[167] = {"KMAC HMAC SHA 512 protected key", KERNEL_AND_USER_COUNTER},
+	[168] = {"PCKMO HMAC 512 protected key", KERNEL_ONLY_COUNTER},
+	[169] = {"PCKMO HMAC 1024 protected key", KERNEL_ONLY_COUNTER},
+	[170] = {"PCKMO AES-XTS 128bit double key protected key",
+		 KERNEL_ONLY_COUNTER},
+	[171] = {"PCKMO AES-XTS 256bit double key protected key",
+		 KERNEL_ONLY_COUNTER}
 };
 
 /*
