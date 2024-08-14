@@ -108,7 +108,6 @@ static int recv_query(int s, enum ctr_e *ctr, enum cmd_e *cmd)
 	return rc;
 }
 
-
 static int send_answer(int s, int ctr, int state, uint64_t value)
 {
 	struct msg m;
@@ -123,7 +122,6 @@ static int send_answer(int s, int ctr, int state, uint64_t value)
 
 	return send_msg(s, &m, DEFAULT_SEND_TIMEOUT);
 }
-
 
 /*
  * Print according to protocol for PAI:
@@ -159,7 +157,6 @@ static int do_send_pai(int s, int user, unsigned int *counter)
 	}
 	return rc;
 }
-
 
 static int do_enable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
@@ -201,7 +198,6 @@ static int do_enable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 	return rc;
 }
 
-
 static int do_disable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	int i, rc = 0;
@@ -227,7 +223,6 @@ static int do_disable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 	}
 	return rc;
 }
-
 
 static int do_reset(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
@@ -260,7 +255,6 @@ static int do_reset(int s, enum ctr_e ctr, unsigned int *supported_counters)
 	return rc;
 }
 
-
 static int do_print(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	int i, rc = 0, state;
@@ -291,7 +285,6 @@ static int do_print(int s, enum ctr_e ctr, unsigned int *supported_counters)
 	}
 	return rc;
 }
-
 
 static int become_daemon(int *startup_pipe)
 {
@@ -385,7 +378,6 @@ static int become_daemon(int *startup_pipe)
 	return 0;
 }
 
-
 static void remove_sock(void)
 {
 	remove(SOCKET_FILE);
@@ -447,13 +439,11 @@ static void remove_pidfile(void)
 	remove(PID_FILE);
 }
 
-
 void signalhandler(int sig)
 {
 	perf_stop();
 	stopsig = sig;
 }
-
 
 int eprint(const char *format, ...)
 {
@@ -475,7 +465,6 @@ int eprint(const char *format, ...)
 
 	return n;
 }
-
 
 /*
  * returns -1 on error
