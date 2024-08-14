@@ -1,15 +1,32 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.41.0 (2026-02-16)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.19
 
   Changes of existing tools:
+  - chreipl: Make --bootparms work for ECKD re-IPL
+  - cpacfstats: Add 'unauthorized' state to CPU-MF counters
+  - cpictl: Detect RHCOS using VARIANT_ID
+  - hsci: Automatically set appropriate MTU for HSCI
+  - libutil: Add util_readlink() and util_readlinkat() helpers
+  - libutil: Add util_startswith() to util_str
+  - libutil: Add utility parsing functions
+  - lschp: Add support for structured output (--format)
+  - lsreipl: Suppress 'clear' output if not supported
+  - pvimg: Add '--format text' support to 'pvimg info'
+  - pvimg: Add '--print-schema <FORMAT>' option to 'pvimg info'
+  - pvimg: Add '--show-secrets' flag to 'pvimg info'
+  - pvimg: Provide improved JSON output to 'pvimg info --format json'
+  - pvinfo: Improve User experience on non-SE enabled systems
+  - zipl/ngdump: Ensure ext4 file system is used on dump partition
+  - zkey: Add support for integrity protected disks using HMAC keys
 
   Bug Fixes:
+  - cpumf/pai: Handle different size of perf_event_attr
+  - lscss: Fix memory leak
+  - zipl: Fix dump job on tape devices
 
 * __v2.40.0 (2025-12-11)__
 

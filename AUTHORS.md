@@ -10,6 +10,7 @@ List of all individuals having contributed content to s390-tools
 - Annu Sharma
 - Antoinette Kaschner
 - Arnd Bergmann
+- Aswin Karuvally
 - Axel Wirbser
 - Balint Reczey
 - Benjamin Block
@@ -25,6 +26,7 @@ List of all individuals having contributed content to s390-tools
 - Dan Horak
 - Dan Horák
 - Daniel S. Haischt
+- Dean Doyle
 - Despina Papadopoulou
 - Dimitri John Ledkov
 - Eberhard Pasch
@@ -154,7 +156,9 @@ List of all individuals having contributed content to s390-tools
 - Vasily Gorbik
 - Viktor Mihajlovski
 - Vineeth Vijayan
+- Volkan Unal
 - Volker Sameske
 - Wenjia Zhang
+- Wisdom Erhimwionsobo
 - Wolfgang Taphorn
 - Yaakov Selkowitz
