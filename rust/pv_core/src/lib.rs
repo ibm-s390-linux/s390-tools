@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023, 2024
-#![deny(
-    missing_docs,
+#![deny(missing_docs)]
+#![warn(
     missing_debug_implementations,
     trivial_numeric_casts,
     unstable_features,
