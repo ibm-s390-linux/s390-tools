@@ -352,6 +352,10 @@ interaction is possible.
 Provide more verbose output.
 
 .TP
+.B "\-\-debug"
+Provide output debugging information.
+
+.TP
 .BR "\-a" " or " "\-\-add-files"
 Copy all specified files to the bootmap file instead of just referencing them.
 This option allows specifying files in a boot configuration which are not

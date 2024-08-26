@@ -60,6 +60,7 @@ static struct option options[] = {
 	{ "noninteractive",	no_argument,		NULL, 'n'},
 	{ "version",		no_argument,		NULL, 'v'},
 	{ "verbose",		no_argument,		NULL, 'V'},
+	{ "debug",		no_argument,		NULL, 0xb2},
 	{ "add-files",		no_argument,		NULL, 'a'},
 	{ "tape",		required_argument,	NULL, 'T'},
 	{ "dry-run",		no_argument,		NULL, '0'},
@@ -129,6 +130,16 @@ set_secure_ipl(char *keyword, int *is_secure)
 		return -1;
 	}
 	return 0;
+}
+
+static void set_verbosity_level(struct command_line *cmdline, int level)
+{
+	/*
+	 * In case of multiple verbosity levels specified by user
+	 * the highest one will take place
+	 */
+	if (cmdline->verbose < level)
+		cmdline->verbose = level;
 }
 
 static int
@@ -278,7 +289,7 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 			cmdline.version = 1;
 			break;
 		case 'V':
-			cmdline.verbose = 1;
+			set_verbosity_level(&cmdline, VERBOSITY_EXTENDED);
 			break;
 		case 'a':
 			cmdline.add_files = 1;
@@ -294,6 +305,9 @@ get_command_line(int argc, char* argv[], struct command_line* line)
 			break;
 		case 0xb1:
 			cmdline.no_compress = 1;
+			break;
+		case 0xb2:
+			set_verbosity_level(&cmdline, VERBOSITY_DEBUG);
 			break;
 		case 1:
 			/* Non-option is interpreted as section name */

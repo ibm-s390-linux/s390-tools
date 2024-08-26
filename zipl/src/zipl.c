@@ -30,7 +30,7 @@
 
 
 /* Flag deciding the level of verbosity */
-int verbose = 0;
+int verbose = VERBOSITY_STANDARD;
 
 /* Flag deciding whether confirmation questions are asked */
 int interactive = 1;
@@ -81,6 +81,7 @@ static const char* usage_text[] = {
 "-m, --menu MENU                 Install multi-boot configuration MENU",
 "-n, --noninteractive            Answer all confirmation questions with 'yes'",
 "-V, --verbose                   Provide more verbose output",
+"    --debug                     Provide output debugging information",
 "-a, --add-files                 Add all referenced files to bootmap file",
 "    --dry-run                   Simulate run but don't modify IPL records",
 "-S, --secure SWITCH             Control the zIPL secure boot support.",

@@ -66,4 +66,24 @@ extern int verbose;
 extern int interactive;
 extern int dry_run;
 
+/* Verbosity levels/classes */
+#define VERBOSITY_STANDARD 0
+#define VERBOSITY_EXTENDED 1
+#define VERBOSITY_DEBUG    2
+
+/*
+ * Macro for messages with assigned verbosity classes
+ *
+ * NOTE: Verbosity levels/classes 3 and higher are "reserved". To implement
+ * them, make "--debug" zipl option accept arguments.
+ */
+#define pr_class(class_id, ...)		\
+do {					\
+	if (verbose >= (class_id))	\
+		printf(__VA_ARGS__);	\
+} while (0)
+
+#define pr_verbose(...) pr_class(VERBOSITY_EXTENDED, __VA_ARGS__)
+#define pr_debug(...)   pr_class(VERBOSITY_DEBUG, __VA_ARGS__)
+
 #endif /* not ZIPL_H */
