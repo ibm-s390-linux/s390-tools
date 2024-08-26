@@ -14,5 +14,6 @@ SECTIONS
     *(.eh_frame)
     *(.interp)
     *(.note.GNU-stack)
+    *(.note.package)
   }
 }
