@@ -298,6 +298,47 @@ create_component_header(void* buffer, component_header_type type)
 	header->type = (uint8_t) type;
 }
 
+/*
+ * Not precise check that the file FILENAME locates on specified physical DISK.
+ *
+ * Try to auto-detect parameters of the disk which the file locates on
+ * and compare found device-ID with DISK.
+ * Return 0, if auto-detection succeeded, and it is proven that the
+ * file does NOT locate on DISK. Otherwise, return 1.
+ */
+static int file_is_on_disk(const char *filename, dev_t disk)
+{
+	/*
+	 * Retrieve info of the underlying disk without any user hints
+	 */
+	struct job_target_data tmp = {.source = source_unknown};
+	struct disk_info *info;
+	int rc;
+
+	rc = disk_get_info_from_file(filename, &tmp, &info);
+	free_target_data(&tmp);
+	if (rc) {
+		/*
+		 * In some cases it is impossible to auto-detect
+		 * disk parameters (e.g. when the file is on a
+		 * mounted qcow2 image).
+		 * Skip the check with warnings.
+		 */
+		fprintf(stderr,
+			"Warning: Could not auto-detect disk parameters for %s\n",
+			filename);
+		fprintf(stderr,
+			"Warning: Preparing a logical device for boot might fail\n");
+		return 1;
+	}
+	if (info->device != disk) {
+		disk_free_info(info);
+		return 0;
+	}
+	disk_free_info(info);
+	return 1;
+}
+
 static int add_component_file_range(struct install_set *bis,
 				    const char *filename,
 				    struct file_range *reg,
@@ -311,7 +352,6 @@ static int add_component_file_range(struct install_set *bis,
 	struct component_loc *location = &pc->loc;
 	disk_blockptr_t **list = &pc->list;
 	blocknum_t *count = &pc->count;
-	struct disk_info* file_info;
 	disk_blockptr_t segment;
 	char* buffer;
 	size_t size;
@@ -338,36 +378,13 @@ static int add_component_file_range(struct install_set *bis,
 			return -1;
 		}
 	} else {
-		/*
-		 * Make sure that file is on target device.
-		 * For this, retrieve info of the underlying disk without
-		 * any user hints
-		 */
-		struct job_target_data tmp = {.source = source_unknown};
-
-		rc = disk_get_info_from_file(filename, &tmp, &file_info);
-		free_target_data(&tmp);
-		if (rc) {
-			/*
-			 * In some cases it is impossible to auto-detect
-			 * disk parameters (e.g. when the file is on a
-			 * mounted qcow2 image).
-			 * Skip the check with warnings.
-			 */
-			fprintf(stderr,
-				"Warning: Could not auto-detect disk parameters for %s\n",
-				filename);
-			fprintf(stderr,
-				"Warning: Preparing a logical device for boot might fail\n");
-		} else if (file_info->device != bis->info->device) {
-			disk_free_info(file_info);
+		if (!file_is_on_disk(filename, bis->info->device)) {
 			error_reason("File is not on target device");
 			return -1;
 		}
 		/* Get block list from existing file */
 		*count = disk_get_blocklist_from_file(filename, reg,
-						      list, file_info);
-		disk_free_info(file_info);
+						      list, bis->info);
 		if (*count == 0)
 			return -1;
 		*count -= DIV_ROUND_UP(trailer, bis->info->phy_block_size);
