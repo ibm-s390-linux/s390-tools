@@ -19,7 +19,7 @@
  * device-mapper table for this device conforms to the following rules:
  * - directory is located on a device consisting of a single device-mapper
  *   target
- * - only linear, mirror and multipath targets are supported
+ * - only linear, multipath, mirror and raid targets are supported
  * - supported physical device types are DASD and SCSI devices
  * - all of the device which contains the directory must be located on a single
  *   physical device (which may be mirrored or accessed through a multipath
@@ -1179,6 +1179,11 @@ static struct util_list *dmpath_walk(struct ext_dev *bottom, const char *dir,
 	return NULL;
 }
 
+/*
+ * In case of success PD contains a dmpath. The topmost target of that
+ * dmpath is a dm-device. So, any callers who don't expect it, should
+ * complete the resolution process by themselves
+ */
 static int get_physical_device(struct physical_device *pd, struct ext_dev *dev,
 			       const char *dir)
 {
@@ -1401,7 +1406,13 @@ static int dm_dev_to_chreipl_params(dev_t dev, char *dir)
 
 	if (get_physical_device(&pd, &xdev, dir))
 		return -1;
-	top_dev = get_top_entry(&pd)->dev.dev;
+	/*
+	 * chreipl(8) utility doesn't expect dm-device at the
+	 * chreipl_helper output. So, complete the resolution
+	 * process (see the comment to get_physical_device)
+	 */
+	top_dev = first_device_by_target_data(get_top_entry(&pd)->target);
+
 	printf("%u:%u\n", major(top_dev), minor(top_dev));
 	dmpath_free(pd.dmpath);
 	return 0;
