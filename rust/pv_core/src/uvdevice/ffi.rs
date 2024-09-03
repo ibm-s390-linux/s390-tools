@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2023
 
+use std::mem::size_of;
+
 use crate::{assert_size, static_assert};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
@@ -103,7 +105,7 @@ assert_size!(uvio_attest, 0x138);
 
 /// corresponds to the UV_IOCTL macro
 pub(crate) const fn uv_ioctl(nr: u8) -> u64 {
-    iowr(UVIO_TYPE_UVC, nr, std::mem::size_of::<uvio_ioctl_cb>())
+    iowr(UVIO_TYPE_UVC, nr, size_of::<uvio_ioctl_cb>())
 }
 static_assert!(uv_ioctl(UVIO_IOCTL_ATT_NR) == 0xc0407501);
 
