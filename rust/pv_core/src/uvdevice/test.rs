@@ -6,7 +6,6 @@
 
 use std::{
     ffi::{c_int, c_ulong},
-    os::unix::prelude::FromRawFd,
     sync::{Mutex, MutexGuard},
 };
 
@@ -65,13 +64,12 @@ impl IoctlCtx {
 pub mod mock_libc {
     use super::*;
 
-    pub unsafe fn ioctl(fd: c_int, cmd: c_ulong, data: *mut ffi::uvio_ioctl_cb) -> c_int {
+    pub unsafe fn ioctl(_fd: c_int, cmd: c_ulong, data: *mut ffi::uvio_ioctl_cb) -> c_int {
         let mut ctx = get_lock(&IOCTL_MTX);
         assert!(!ctx.called, "IOCTL called more than once");
         ctx.called = true;
 
         assert_eq!(cmd, ctx.exp_cmd, "IOCTL cmd mismatch");
-        assert_eq!(fd, 17, "IOCTL fd mismatch");
 
         let data_ref: &mut ffi::uvio_ioctl_cb = &mut *data;
 
@@ -131,10 +129,10 @@ impl UvCmd for TestCmd {
 }
 
 impl UvDevice {
-    /// use some random fd for  `uvdevice` its OK, as the ioctl is mocked and never touches the
+    /// Use this file as backing file for  `uvdevice`. This is OK, as the ioctl is mocked and never touches the
     /// passed file
     fn test_dev() -> Self {
-        UvDevice(unsafe { File::from_raw_fd(17) })
+        Self(File::open(".").unwrap())
     }
 }
 
