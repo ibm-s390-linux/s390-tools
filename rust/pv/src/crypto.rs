@@ -18,7 +18,7 @@ use openssl::{
 };
 use std::{convert::TryInto, ops::Range};
 
-/// An AES256-key that will purge itself out of the memory when going out of scope
+/// An AES256-GCM key that will purge itself out of the memory when going out of scope
 pub type Aes256Key = Confidential<[u8; 32]>;
 pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
 
@@ -31,7 +31,7 @@ pub(crate) type Sha256Hash = [u8; SHA_256_HASH_SIZE as usize];
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymKeyType {
-    /// AES 256 key (32 bytes)
+    /// AES 256 GCM key (32 bytes)
     Aes256,
 }
 
@@ -39,7 +39,7 @@ pub enum SymKeyType {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymKey {
-    /// AES 256 key (32 bytes)
+    /// AES 256 GCM key (32 bytes)
     Aes256(Aes256Key),
 }
 
