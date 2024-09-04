@@ -5,8 +5,9 @@ newline_style = "Unix"
 # when they become stable.
 #
 # They are kept here since they are useful to run from time to time.
-#format_code_in_doc_comments = true
-#reorder_impl_items = true
 #comment_width = 100
-#wrap_comments = true
+#format_code_in_doc_comments = true
+#group_imports = "StdExternalCrate"
 #normalize_comments = true
+#reorder_impl_items = true
+#wrap_comments = true
