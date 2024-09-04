@@ -37,12 +37,39 @@ pub struct TemporaryDirectory {
 }
 
 impl TemporaryDirectory {
-    /// Creates a temporary directory using `prefix` as directory prefix.
+    /// Creates a temporary directory in the current working directory using
+    /// 'tmp.' as directory prefix.
     ///
     /// # Errors
     ///
-    /// An error is returned if the temporary directory could not be created.
-    pub fn new<P: AsRef<Path>>(prefix: P) -> Result<Self, std::io::Error> {
+    /// This function will return an error if the temporary directory could not
+    /// be created.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use utils::TemporaryDirectory;
+    /// let temp = TemporaryDirectory::new().unwrap();
+    /// ```
+    pub fn new() -> Result<Self, std::io::Error> {
+        Self::with_prefix("tmp.")
+    }
+
+    /// Creates a temporary directory in the current working directory using
+    /// `prefix` as directory prefix.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the temporary directory could not
+    /// created.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use utils::TemporaryDirectory;
+    /// let temp = TemporaryDirectory::with_prefix("test").unwrap();
+    /// ```
+    pub fn with_prefix<P: AsRef<Path>>(prefix: P) -> Result<Self, std::io::Error> {
         let mut template = prefix.as_ref().to_owned();
         let template_os_string = template.as_mut_os_string();
         template_os_string.push("XXXXXX");
@@ -53,17 +80,24 @@ impl TemporaryDirectory {
         })
     }
 
-    /// Returns the path of the created temporary directory.
+    /// Returns a reference to the path of the created temporary directory.
     pub fn path(&self) -> &Path {
         self.path.as_ref()
     }
 
+    /// Takes ownership and releases the memory and makes sure no destructor is
+    /// called and therefore the temporary directory will not be removed.
     fn forget(mut self) {
         self.path = PathBuf::new().into_boxed_path();
         std::mem::forget(self);
     }
 
     /// Removes the created temporary directory and it's contents.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the temporary directory could not
+    /// removed.
     pub fn close(self) -> std::io::Result<()> {
         let ret = std::fs::remove_dir_all(&self.path);
         self.forget();
@@ -107,8 +141,17 @@ mod tests {
     }
 
     #[test]
-    fn temporary_directory_empty_name_test() {
-        let temp_dir = TemporaryDirectory::new("").expect("should work");
+    fn temporary_directory_resides_in_cwd() {
+        let temp_dir = TemporaryDirectory::new().expect("should work");
+        let path = temp_dir.path().to_owned();
+        let cwd = std::env::current_dir().unwrap();
+
+        assert_eq!(path.canonicalize().unwrap().parent().unwrap(), cwd);
+    }
+
+    #[test]
+    fn temporary_directory_close_test() {
+        let temp_dir = TemporaryDirectory::new().expect("should work");
         let path = temp_dir.path().to_owned();
         assert!(path.exists());
 
@@ -119,7 +162,7 @@ mod tests {
 
     #[test]
     fn temporary_directory_drop_test() {
-        let temp_dir = TemporaryDirectory::new("").expect("should work");
+        let temp_dir = TemporaryDirectory::new().expect("should work");
         let path = temp_dir.path().to_owned();
         assert!(path.exists());
 
@@ -129,21 +172,31 @@ mod tests {
     }
 
     #[test]
-    fn temporary_directory_close_test() {
-        let temp_dir = TemporaryDirectory::new("yay").expect("should work");
+    fn temporary_directory_prefix_test() {
+        let prefix = "yay";
+        let temp_dir = TemporaryDirectory::with_prefix(prefix).expect("should work");
 
         let path = temp_dir.path().to_owned();
         assert!(path.exists());
-        assert!(path.as_os_str().to_str().expect("works").starts_with("yay"));
+        assert!(path
+            .as_os_str()
+            .to_str()
+            .expect("works")
+            .starts_with(prefix));
+    }
 
-        // Test that close() removes the directory
-        temp_dir.close().unwrap();
-        assert!(!path.exists());
+    #[test]
+    fn temporary_directory_empty_prefix_test() {
+        let temp_dir = TemporaryDirectory::with_prefix("").expect("should work");
+        let path = temp_dir.path().to_owned();
+        assert!(path.exists());
+        // Path consists only of the rendered template.
+        assert_eq!(path.as_os_str().len(), "XXXXXX".len());
     }
 
     #[test]
     fn temporary_directory_as_ref_test() {
-        let temp_dir = TemporaryDirectory::new("").expect("should work");
+        let temp_dir = TemporaryDirectory::new().expect("should work");
 
         assert_eq!(temp_dir.path(), temp_dir.as_ref());
     }

@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn test_sysfs_write_i32() {
         let temp_dir =
-            TemporaryDirectory::new("pvtests").expect("creating a temporary directory should work");
+            TemporaryDirectory::new().expect("creating a temporary directory should work");
         let test_path = temp_dir.path().join("test");
         let test_path = test_path.as_os_str().to_str().expect("should work");
         let mut file = File::create(test_path).unwrap();
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn test_lockfile() {
         let temp_dir =
-            TemporaryDirectory::new("pvtests").expect("creating a temporary directory should work");
+            TemporaryDirectory::new().expect("creating a temporary directory should work");
         let file_path = temp_dir.path().join("my.lock");
         let file_path_str = file_path.to_str().expect("should work");
 
