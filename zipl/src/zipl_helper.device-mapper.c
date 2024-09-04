@@ -1364,6 +1364,11 @@ static int dm_dev_to_zipl_params(struct ext_dev *dev, char *dir)
 		return -1;
 	if (complete_physical_device(&pd, &base_dev))
 		goto error;
+	if (pd.offset < pd.dc.bootsectors) {
+		ERR("Unsupported setup: data starts at boot area on (%u:%u)\n",
+		    major(base_dev), minor(base_dev));
+		return -1;
+	}
 	base_dev_to_params(base_dev, &pd.dc, pd.offset);
 
 	if (pd.mirror) {

@@ -971,9 +971,18 @@ check_dump_device_late(char *partition, struct disk_info *target_info,
 		return rc;
 	}
 	if ((job->is_ldipl_dump && info->type != disk_type_eckd_cdl) ||
-	    (!job->is_ldipl_dump && info->type != disk_type_scsi) ||
-	    info->partnum == 0) {
-		error_reason("Device '%s' is not a SCSI or DASD partition",
+	    (!job->is_ldipl_dump && info->type != disk_type_scsi)) {
+		error_reason("Device '%s' is not of SCSI or DASD-CDL type",
+			     partition);
+		disk_free_info(info);
+		return -1;
+	}
+	/*
+	 * Check that data starts beyong the boot area on the base disk.
+	 * In case of source_script the check is performed by the script
+	 */
+	if (target->source == source_auto && info->partnum == 0) {
+		error_reason("Device '%s' is not a partition",
 			     partition);
 		disk_free_info(info);
 		return -1;
@@ -1489,7 +1498,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 		printf("Target device information\n");
 		disk_print_info(bis->info, job->target.source);
 	}
-	if (misc_temp_dev(bis->info->device, 1, &bis->basetmp[0]))
+	if (misc_temp_dev(bis->info->basedisks[0], 1, &bis->basetmp[0]))
 		return -1;
 	if (check_dump_device(job, bis->info, bis->basetmp[0]))
 		return -1;
@@ -1710,7 +1719,7 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	/* Retrieve target device information */
 	if (disk_get_info(job->data.dump.device, &job->target, &info))
 		return -1;
-	if (misc_temp_dev(info->device, 1, &bis->basetmp[0]))
+	if (misc_temp_dev(info->basedisks[0], 1, &bis->basetmp[0]))
 		return -1;
 	if (check_dump_device(job, info, bis->basetmp[0]))
 		return -1;
