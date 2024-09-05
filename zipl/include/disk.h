@@ -53,6 +53,11 @@ typedef enum {
 	disk_type_eckd_cdl,
 } disk_type_t;
 
+struct disk_ext_type {
+	disk_type_t type;
+	bool is_nvme;
+};
+
 /* targetbase definition */
 typedef enum {
 	defined_as_device,
@@ -87,12 +92,15 @@ struct file_range {
 
 struct job_target_data;
 
-int disk_get_info(const char* device, struct job_target_data* target,
-		  struct disk_info** info);
-int disk_is_tape(const char* device);
-int disk_is_scsi(const char* device, struct job_target_data* target);
-int disk_is_eckd_ldl(const char* device, struct job_target_data* target);
-int disk_is_nvme(const char* device, struct job_target_data* target);
+int disk_get_info(const char *device, struct job_target_data *target,
+		  struct disk_info **info);
+int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type);
+int disk_is_tape(const char *device);
+int disk_type_is_scsi(struct disk_ext_type *ext_type);
+int disk_type_is_eckd_ldl(struct disk_ext_type *ext_type);
+int disk_type_is_nvme(struct disk_ext_type *ext_type);
+int disk_type_is_eckd(disk_type_t type);
+
 int disk_get_info_from_file(const char* filename,
 			    struct job_target_data* target,
 			    struct disk_info** info);

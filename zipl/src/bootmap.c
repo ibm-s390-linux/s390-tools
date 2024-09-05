@@ -1436,7 +1436,7 @@ check_dump_device(struct job_data *job, const struct disk_info *info,
 	if (!disk_is_appropriate(job, info))
 		return -1;
 
-	if (is_ngdump_enabled(job))
+	if (job_dump_is_ngdump(job))
 		return 0;
 
 	rc = util_part_search(device, info->geo.start,
@@ -1827,7 +1827,7 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 	if (init_bis(job, bis))
 		return -1;
 	if (job->id == job_dump_partition) {
-		if (is_ngdump_enabled(job))
+		if (job_dump_is_ngdump(job))
 			return prepare_bootloader_ngdump(job, bis);
 		else
 			return prepare_bootloader_device(job, bis);
@@ -1843,7 +1843,7 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
 int post_install_bootloader(struct job_data *job, struct install_set *bis)
 {
 	if (job->id == job_dump_partition) {
-		if (is_ngdump_enabled(job))
+		if (job_dump_is_ngdump(job))
 			return dry_run ? 0 : finalize_create_file(job, bis);
 		else
 			return 0;

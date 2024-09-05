@@ -92,14 +92,6 @@ disk_determine_dasd_type(struct disk_info *data,
 	return 0;
 }
 
-/* Return non-zero for ECKD type. */
-static int
-disk_is_eckd(disk_type_t type)
-{
-	return (type == disk_type_eckd_ldl ||
-		type == disk_type_eckd_cdl);
-}
-
 static int
 read_block_by_offset(int fd, int blksize, uint64_t offset, char *buffer)
 {
@@ -287,7 +279,7 @@ found:
 	for (i = 0; i < td->nr_targets; i++) {
 		t = target_at(td, i);
 		assert(t->check_params >= 4);
-		if (disk_is_eckd(t->targettype) && t->check_params != 5)
+		if (disk_type_is_eckd(t->targettype) && t->check_params != 5)
 			goto error;
 	}
 	return 0;
@@ -306,7 +298,7 @@ static void print_base_disk_params(struct job_target_data *td, int index)
 		fprintf(stderr, "Base disk '%s':\n", get_targetbase(td, index));
 		fprintf(stderr, "  layout........: %s\n", disk_get_type_name(type));
 	}
-	if (disk_is_eckd(type)) {
+	if (disk_type_is_eckd(type)) {
 		fprintf(stderr, "  heads.........: %u\n", get_targetheads(td, index));
 		fprintf(stderr, "  sectors.......: %u\n", get_targetsectors(td, index));
 		fprintf(stderr, "  cylinders.....: %u\n", get_targetcylinders(td, index));
@@ -617,7 +609,7 @@ static int disk_set_info_complete(struct job_target_data *td,
 		return -1;
 	}
 	/* Check for valid CHS geometry data. */
-	if (disk_is_eckd(data->type) && (data->geo.cylinders == 0 ||
+	if (disk_type_is_eckd(data->type) && (data->geo.cylinders == 0 ||
 	    data->geo.heads == 0 || data->geo.sectors == 0)) {
 		error_reason("Invalid disk geometry (CHS=%d/%d/%d)",
 			     data->geo.cylinders, data->geo.heads,
@@ -769,45 +761,48 @@ disk_is_tape(const char* device)
 	return rc;
 }
 
-int
-disk_is_scsi(const char* device, struct job_target_data* target)
+/**
+ * Get "extended type" of base disk by logical DEVICE
+ *
+ * This function may fail for various reasons. E.g. in case when
+ * DEVICE is not eligible for boot record installation (not a
+ * partition, etc). In case of success the resulted disk type is
+ * stored in EXT_TYPE.
+ */
+int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type)
 {
-	struct disk_info* info;
-	int rc = 0;
-
-	if (disk_get_info(device, target, &info) == -1)
-		return 0;
-	if (info->type == disk_type_scsi)
-		rc = 1;
-	disk_free_info(info);
-	return rc;
-}
-
-int disk_is_eckd_ldl(const char *device, struct job_target_data *target)
-{
+	struct job_target_data tmp = {.source = source_unknown};
 	struct disk_info *info;
-	int rc = 0;
 
-	if (disk_get_info(device, target, &info) == -1)
-		return 0;
-	if (info->type == disk_type_eckd_ldl)
-		rc = 1;
+	if (disk_get_info(device, &tmp, &info))
+		return -1;
+	ext_type->type = info->type;
+	ext_type->is_nvme = info->is_nvme;
+
 	disk_free_info(info);
-	return rc;
+	free_target_data(&tmp);
+	return 0;
 }
 
-int
-disk_is_nvme(const char* device, struct job_target_data* target)
+int disk_type_is_scsi(struct disk_ext_type *ext_type)
 {
-	struct disk_info* info;
-	int rc = 0;
+	return ext_type->type == disk_type_scsi;
+}
 
-	if (disk_get_info(device, target, &info) == -1)
-		return 0;
-	if (info->type == disk_type_scsi && info->is_nvme)
-		rc = 1;
-	disk_free_info(info);
-	return rc;
+int disk_type_is_eckd_ldl(struct disk_ext_type *ext_type)
+{
+	return ext_type->type == disk_type_eckd_ldl;
+}
+
+int disk_type_is_nvme(struct disk_ext_type *ext_type)
+{
+	return ext_type->is_nvme;
+}
+
+int disk_type_is_eckd(disk_type_t type)
+{
+	return (type == disk_type_eckd_ldl ||
+		type == disk_type_eckd_cdl);
 }
 
 int
@@ -1205,7 +1200,7 @@ void disk_print_info(struct disk_info *info, int source)
 	       (info->partnum != 0) ? "partition" : "device");
 	printf("  Disk layout.....................: %s%s\n",
 	       disk_get_type_name(info->type), footnote);
-	if (disk_is_eckd(info->type)) {
+	if (disk_type_is_eckd(info->type)) {
 		printf("  Geometry - heads................: %d%s\n",
 		       info->geo.heads, footnote);
 		printf("  Geometry - sectors..............: %d%s\n",

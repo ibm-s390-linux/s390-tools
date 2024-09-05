@@ -99,6 +99,7 @@ struct job_dump_data {
 	struct job_common_ipl_data common;
 	char* device;
 	uint64_t mem;
+	bool is_ngdump;
 	bool no_compress;
 };
 
@@ -256,6 +257,8 @@ void free_target_data(struct job_target_data *td);
 int type_from_target(char *target, disk_type_t *type);
 int check_job_dump_images(struct job_dump_data* dump, char* name);
 int check_job_images_ngdump(struct job_dump_data* dump, char* name);
-bool is_ngdump_enabled(struct job_data *job);
+void job_dump_check_set_ngdump(struct job_data *job,
+			       struct disk_ext_type *ext_type);
+bool job_dump_is_ngdump(struct job_data *job);
 
 #endif /* not JOB_H */

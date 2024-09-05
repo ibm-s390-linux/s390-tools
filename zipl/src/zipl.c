@@ -128,6 +128,7 @@ check_for_root(void)
 int
 main(int argc, char* argv[])
 {
+	struct disk_ext_type ext_type = {0};
 	struct install_set bis;
 	struct job_data* job;
 	int rc;
@@ -173,9 +174,13 @@ main(int argc, char* argv[])
 	/* Do it */
 	switch (job->id) {
 	case job_dump_partition:
-		if (!is_ngdump_enabled(job) &&
+		rc = disk_get_ext_type(job->data.dump.device, &ext_type);
+		if (rc)
+			break;
+		job_dump_check_set_ngdump(job, &ext_type);
+		if (!job_dump_is_ngdump(job) &&
 		    (disk_is_tape(job->data.dump.device) ||
-		     !disk_is_scsi(job->data.dump.device, &job->target))) {
+		     !disk_type_is_scsi(&ext_type))) {
 			rc = install_dump(job->data.dump.device, &job->target,
 					  job->data.dump.mem, job->data.dump.no_compress);
 			break;
@@ -187,8 +192,8 @@ main(int argc, char* argv[])
 			rc = -1;
 			break;
 		}
-		if (is_ngdump_enabled(job)) {
-			if (disk_is_eckd_ldl(job->data.dump.device, &job->target)) {
+		if (job_dump_is_ngdump(job)) {
+			if (disk_type_is_eckd_ldl(&ext_type)) {
 				error_reason("List-directed dump on ECKD with LDL not supported");
 				rc = -1;
 				break;

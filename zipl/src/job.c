@@ -2057,10 +2057,18 @@ job_get(int argc, char* argv[], struct job_data** data)
 	return rc;
 }
 
-bool
-is_ngdump_enabled(struct job_data *job)
+void job_dump_check_set_ngdump(struct job_data *job,
+			       struct disk_ext_type *ext_type)
 {
-	if (job->is_ldipl_dump)
-		return true;
-	return disk_is_nvme(job->data.dump.device, &job->target);
+	assert(job->id == job_dump_partition);
+
+	if (job->is_ldipl_dump || disk_type_is_nvme(ext_type))
+		job->data.dump.is_ngdump = true;
+}
+
+bool job_dump_is_ngdump(struct job_data *job)
+{
+	assert(job->id == job_dump_partition);
+
+	return job->data.dump.is_ngdump;
 }
