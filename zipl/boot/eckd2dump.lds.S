@@ -17,8 +17,8 @@
  *
  * 0x78			Stage 2 description parameters
  * 0x2018		Stage 2 entry point
- * 0x4ff0		Stage 2 multi-volume dump parameters (eckd2dump_mv)
- * 0x5000		Multi-volume dump parameters table (eckd2dump_mv)
+ * 0x5ff0		Stage 2 multi-volume dump parameters (eckd2dump_mv)
+ * 0x6000		Multi-volume dump parameters table (eckd2dump_mv)
  * 0x9ff0		Stage 2 single volume dump parameters (eckd2dump_sv)
  */
 

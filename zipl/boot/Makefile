@@ -57,7 +57,7 @@ eckd2dump_sv.lds: eckd2dump.lds.S
 	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x9ff0 \
 	-P -C -o $@ $<
 eckd2dump_mv.lds: eckd2dump.lds.S
-	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x4ff0 \
+	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x5ff0 \
 	-D ECKD2DUMP_MV -P -C -o $@ $<
 stage2.lds: stage2.lds.S
 	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x4ff0 \
