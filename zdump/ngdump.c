@@ -435,6 +435,13 @@ static int ngdump_get_eckd_part_num(struct zg_fh *zg_fh)
 	if (!is_vol1(vl.vollbl))
 		return -1;
 	/* Read Master Boot Record and check its magic */
+	if (vl.br.cc == 0x4040 && vl.br.hh == 0x4040 &&
+	    vl.br.b == 0x40) {
+		util_log_print(UTIL_LOG_TRACE,
+			       "%s: No boot record pointer found in volume label\n",
+			       __func__);
+		return -1;
+	}
 	blk = cchhb2blk(&vl.br, &geo);
 	if (blk == 0)
 		return -1;
