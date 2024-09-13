@@ -124,9 +124,11 @@ zipl/boot/*.exec
 zipl/boot/.loaders
 zipl/boot/data.h
 zipl/src/chreipl_helper.device-mapper
+zipl/src/chreipl_helper.md
 zipl/src/zipl
 zipl/src/zipl-editenv
 zipl/src/zipl_helper.device-mapper
+zipl/src/zipl_helper.md
 zkey/check-dep-zkey
 zkey/check-dep-zkey-cryptsetup
 zkey/detect-libcryptsetup.dep
