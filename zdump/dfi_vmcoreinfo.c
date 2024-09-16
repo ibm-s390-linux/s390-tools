@@ -82,11 +82,11 @@ static struct vm_info *vm_info_get(void)
 
 	util_log_print(UTIL_LOG_TRACE, "DFI read vm_info\n");
 
-	vm_info.identity_base = l.os_info->entry[OS_INFO_IDENTITY_BASE].val;
-	if (vm_info.identity_base == 0)
-		return NULL;
 	vm_info.kaslr_offset = l.os_info->entry[OS_INFO_KASLR_OFFSET].val;
+	if (vm_info.kaslr_offset == 0)
+		return NULL;
 	vm_info.kaslr_offset_phys = l.os_info->entry[OS_INFO_KASLR_OFF_PHYS].val;
+	vm_info.identity_base = l.os_info->entry[OS_INFO_IDENTITY_BASE].val;
 	vm_info.amode31_start = l.os_info->entry[OS_INFO_AMODE31_START].val;
 	vm_info.amode31_end = l.os_info->entry[OS_INFO_AMODE31_END].val;
 
