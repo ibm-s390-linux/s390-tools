@@ -19,7 +19,13 @@ ifneq (${HAVE_CARGO},0)
 
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
-	PV_TARGETS := pvsecret pvapconfig pvattest
+	PV_TARGETS := pvsecret pvattest
+
+ifeq ($(HOST_ARCH),s390x)
+	PV_TARGETS += pvapconfig
+else
+	BUILD_TARGETS += skip-pvapconfig
+endif #HOSTARCH
 
 	PV_BUILD_TARGETS := $(PV_TARGETS)
 	CARGO_TEST_TARGETS += $(addsuffix .test,pv $(PV_TARGETS))
@@ -55,6 +61,9 @@ skip-build:
 
 skip-pv-build:
 	echo "  SKIP    rust-pv-tools due to unresolved dependencies"
+
+skip-pvapconfig:
+	echo "  SKIP    pvapconfig due to unsupported architecture (s390x only)"
 
 all: $(BUILD_TARGETS)
 install: $(INSTALL_TARGETS)
