@@ -1366,7 +1366,7 @@ estimate_scsi_dump_size(struct job_data *job, struct disk_info *info, ulong *dum
 }
 
 /**
- * Check that disk is appropriate for the JOB
+ * Check that disk with retrieved INFO is appropriate for the JOB
  */
 static int disk_is_appropriate(const struct job_data *job,
 			       const struct disk_info *info)
@@ -1377,6 +1377,14 @@ static int disk_is_appropriate(const struct job_data *job,
 		error_reason("Secure boot forced for improper disk type");
 		return 0;
 	}
+	/* common checks */
+	if (job->target.source == source_auto &&
+	    info->type == disk_type_diag) {
+		error_reason("Unsupported disk type (%s)",
+			     disk_get_type_name(info->type));
+		return -1;
+	}
+	/* job-specific checks */
 	if (job->id == job_dump_partition) {
 		if (job->is_ldipl_dump && info->type != disk_type_eckd_cdl) {
 			error_reason("Inappropriate dump device (not DASD-CDL)");
@@ -1404,19 +1412,10 @@ check_dump_device(struct job_data *job, const struct disk_info *info,
 {
 	int rc, part_ext;
 
-	/* Check for supported disk and driver types */
-	if (job->target.source == source_auto &&
-	    info->type == disk_type_diag) {
-		error_reason("Unsupported disk type (%s)",
-			     disk_get_type_name(info->type));
-		return -1;
-	}
 	if (!disk_is_appropriate(job, info))
 		return -1;
-
 	if (job_dump_is_ngdump(job))
 		return 0;
-
 	rc = util_part_search(device, info->geo.start,
 			      info->phy_blocks, info->phy_block_size, &part_ext);
 	if (rc <= 0 || part_ext) {
@@ -1564,13 +1563,6 @@ static int prepare_build_program_table_file(struct job_data *job,
 	 * block size. */
 	if (disk_get_info_from_file(bis->filename, &job->target, &bis->info))
 		return -1;
-	/* Check for supported disk and driver types */
-	if (job->target.source == source_auto &&
-	    bis->info->type == disk_type_diag) {
-		error_reason("Unsupported disk type (%s)",
-			     disk_get_type_name(bis->info->type));
-		return -1;
-	}
 	if (!disk_is_appropriate(job, bis->info))
 		return -1;
 	if (verbose) {
