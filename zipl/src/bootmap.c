@@ -969,44 +969,7 @@ static int add_segment_program(struct install_set *bis,
 	return rc;
 }
 
-
 #define DUMP_PARAM_MAX_LEN	896
-
-static int
-check_dump_device_late(char *partition, struct disk_info *target_info,
-		       struct job_target_data *target,
-		       struct job_data *job)
-{
-	struct disk_info* info;
-	int rc;
-
-	/* Get information about partition */
-	rc = disk_get_info(partition, target, &info);
-	if (rc) {
-		error_text("Could not get information for dump partition '%s'",
-			   partition);
-		return rc;
-	}
-	if ((job->is_ldipl_dump && info->type != disk_type_eckd_cdl) ||
-	    (!job->is_ldipl_dump && info->type != disk_type_scsi)) {
-		error_reason("Device '%s' is not of SCSI or DASD-CDL type",
-			     partition);
-		disk_free_info(info);
-		return -1;
-	}
-	/*
-	 * Check that data starts beyong the boot area on the base disk.
-	 * In case of source_script the check is performed by the script
-	 */
-	if (target->source == source_auto && info->partnum == 0) {
-		error_reason("Device '%s' is not a partition",
-			     partition);
-		disk_free_info(info);
-		return -1;
-	}
-	disk_free_info(info);
-	return 0;
-}
 
 static int add_dump_program(struct install_set *bis, struct job_data *job,
 			    disk_blockptr_t *program, int verbose,
@@ -1014,18 +977,12 @@ static int add_dump_program(struct install_set *bis, struct job_data *job,
 			    int program_table_id)
 {
 	struct job_dump_data *dump = &job->data.dump;
-	struct job_target_data *target = &job->target;
 	struct job_ipl_data ipl;
-	int rc;
 
 	/* Convert fs dump job to IPL job */
 	memset(&ipl, 0, sizeof(ipl));
 	ipl.common = dump->common;
 
-	/* Get file system dump parmline */
-	rc = check_dump_device_late(dump->device, bis->info, target, job);
-	if (rc)
-		return rc;
 	ipl.common.parmline = dump->common.parmline;
 	ipl.common.parm_addr = dump->common.parm_addr;
 	return add_ipl_program(bis, NULL, false, NULL, &ipl, program,
@@ -1422,11 +1379,23 @@ static int disk_is_appropriate(const struct job_data *job,
 		error_reason("Secure boot forced for improper disk type");
 		return 0;
 	}
-	if (job->id == job_dump_partition &&
-	    job->is_ldipl_dump &&
-	    info->type != disk_type_eckd_cdl) {
-		error_reason("List-directed dump not support on DASD with LDL format");
-		return 0;
+	if (job->id == job_dump_partition) {
+		if (job->is_ldipl_dump && info->type != disk_type_eckd_cdl) {
+			error_reason("Inappropriate dump device (not DASD-CDL)");
+			return 0;
+		}
+		if (!job->is_ldipl_dump && info->type != disk_type_scsi) {
+			error_reason("Inappropriate dump device (not SCSI)");
+			return 0;
+		}
+		/* Check that data starts beyond the boot area on the base disk.
+		 * In case of source_script the check is performed by the script
+		 */
+		if (job->target.source == source_auto && info->partnum == 0) {
+			error_reason("Dump device %s is not a partition",
+				     job->data.dump.device);
+			return 0;
+		}
 	}
 	return 1;
 }
