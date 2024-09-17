@@ -1004,12 +1004,6 @@ check_dump_device_late(char *partition, struct disk_info *target_info,
 		disk_free_info(info);
 		return -1;
 	}
-	if (info->device != target_info->device) {
-		error_reason("Target directory is not on same device as "
-			     "'%s'", partition);
-		disk_free_info(info);
-		return -1;
-	}
 	disk_free_info(info);
 	return 0;
 }
