@@ -1442,30 +1442,18 @@ static int prepare_build_program_table_device(struct job_data *job,
 	if (bis->skip_prepare)
 		/* skip the preparation work */
 		return 0;
+	if (dry_run) {
+		error_text("Option '--dry-run' is not implemented for this type of dump");
+		return -1;
+	}
 	/* Get full path of bootmap file */
-	if (!dry_run) {
-		bis->filename = misc_strdup(job->data.dump.device);
-		if (!bis->filename)
-			return -1;
-		bis->fd = misc_open_exclusive(bis->filename);
-		if (bis->fd == -1) {
-			error_text("Could not open file '%s'", bis->filename);
-			return -1;
-		}
-	} else {
-		bis->filename = misc_make_path(job->target.bootmap_dir,
-					       BOOTMAP_TEMPLATE_FILENAME);
-		if (!bis->filename)
-			return -1;
-		/* Create temporary bootmap file */
-		bis->fd = mkstemp(bis->filename);
-		if (bis->fd == -1) {
-			error_reason(strerror(errno));
-			error_text("Could not create file '%s':",
-				   bis->filename);
-			return -1;
-		}
-		bis->tmp_filename_created = 1;
+	bis->filename = misc_strdup(job->data.dump.device);
+	if (!bis->filename)
+		return -1;
+	bis->fd = misc_open_exclusive(bis->filename);
+	if (bis->fd == -1) {
+		error_text("Could not open file '%s'", bis->filename);
+		return -1;
 	}
 	/* Retrieve target device information */
 	if (disk_get_info(bis->filename, &job->target, &bis->info))

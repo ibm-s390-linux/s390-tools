@@ -181,6 +181,11 @@ main(int argc, char* argv[])
 		if (!job_dump_is_ngdump(job) &&
 		    (disk_is_tape(job->data.dump.device) ||
 		     !disk_type_is_scsi(&ext_type))) {
+			if (dry_run) {
+				error_text("Option '--dry-run' is not implemented for this type of dump");
+				rc = -1;
+				break;
+			}
 			rc = install_dump(job->data.dump.device, &job->target,
 					  job->data.dump.mem, job->data.dump.no_compress);
 			break;
