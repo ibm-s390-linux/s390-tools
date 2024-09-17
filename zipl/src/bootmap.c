@@ -971,20 +971,18 @@ static int add_segment_program(struct install_set *bis,
 
 #define DUMP_PARAM_MAX_LEN	896
 
-static int add_dump_program(struct install_set *bis, struct job_data *job,
+static int add_dump_program(struct install_set *bis,
+			    const struct job_dump_data *dump,
 			    disk_blockptr_t *program, int verbose,
 			    component_header_type type,
 			    int program_table_id)
 {
-	struct job_dump_data *dump = &job->data.dump;
 	struct job_ipl_data ipl;
 
 	/* Convert fs dump job to IPL job */
 	memset(&ipl, 0, sizeof(ipl));
 	ipl.common = dump->common;
 
-	ipl.common.parmline = dump->common.parmline;
-	ipl.common.parm_addr = dump->common.parm_addr;
 	return add_ipl_program(bis, NULL, false, NULL, &ipl, program,
 			       verbose, 1, type, SECURE_BOOT_DISABLED,
 			       0 /* menu_idx */, program_table_id);
@@ -1055,7 +1053,7 @@ static int build_program_table(struct job_data *job,
 				printf("Adding dump section '%s' (default)\n",
 				       job->name);
 		}
-		rc = add_dump_program(bis, job, &table[0],
+		rc = add_dump_program(bis, &job->data.dump, &table[0],
 				      verbose || job->command_line,
 				      COMPONENT_HEADER_DUMP,
 				      program_table_id);
