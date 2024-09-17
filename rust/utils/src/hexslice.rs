@@ -38,11 +38,17 @@ impl<'a> Serialize for HexSlice<'a> {
 
 impl std::fmt::Display for HexSlice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if f.alternate() {
+        if f.alternate() && !f.sign_minus() {
             write!(f, "0x")?;
         }
         for byte in self.0 {
+            if f.sign_minus() && f.alternate() {
+                write!(f, "0x")?;
+            }
             write!(f, "{:0>2x}", byte)?;
+            if f.sign_minus() {
+                write!(f, " ")?;
+            }
         }
         Ok(())
     }
@@ -52,4 +58,12 @@ impl AsRef<[u8]> for HexSlice<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0
     }
+}
+
+#[test]
+fn display() {
+    let hex = HexSlice::from(&[0; 8]);
+    let exp = "00 00 00 00 00 00 00 00 ";
+
+    assert_eq!(exp, format!("{hex:-}"));
 }
