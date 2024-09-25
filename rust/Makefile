@@ -74,7 +74,9 @@ print-rust-targets:
 	echo $(BUILD_TARGETS)
 
 clean:
+ifneq (${HAVE_CARGO},0)
 	$(CARGO_CLEAN) ${ALL_CARGOFLAGS}
+endif # CARGO
 	$(RM) -- .check-dep-pvtools .detect-openssl.dep.c .check-cargo
 
 rust-test: $(CARGO_TEST_TARGETS)
