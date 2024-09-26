@@ -1,0 +1,215 @@
+.\" Copyright 2024, 2024 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+
+.TH CPACFINFO 1 "AUG 2024" "s390-tools"
+.SH NAME
+.B cpacfinfo
+\- tool to provide information about CPACF
+
+.SH SYNOPSIS
+.B cpacfinfo
+[OPTIONS] [<INS>,...] [--format <FORMAT>]
+
+.SH DESCRIPTION
+.B cpacfinfo
+is able to provide information about the MSA levels supported by the system as well as which
+CPACF instructions and functions are available.
+
+.SH OPTIONS
+.TP 8
+.B \-m/\-\-msa
+Displays which MSA levels are enabled and how many functions of the ones introduced by
+this level are available. Can be combined with
+.B \-f/\-\-functions
+to list all functions under the corresponding MSA level. Can be combined with
+.B \-i/\-\-instructions
+to provide only specific instructions. Can be combined with
+.B \-a/\-\-available -n/\-\-not-available
+to filter the displayed function. Ignores option
+.B \-q/\-\-quiet.
+Can be combined with
+.B \-\-format
+to convert to JSON format.
+
+.TP 8
+.B \-f/\-\-functions
+Displays subfunctions of CPACF instructions. Can be combined with
+.B \-a/\-\-available
+and
+.B \-n/\-\-not-available
+to filter what functions are displayed. By default
+.B \-f/\-\-functions
+will only provide information about available functions. Therefore
+.B cpacfinfo \-f/\-\-functions
+and
+.B cpacfinfo \-f/\-\-functions \-\-available
+show the same output. Use options
+.B \-f/\-\-functions \-a/\-\-available \-n/\-\-not-available
+together to show information about every function known by the tool. Additionally
+.B cpacfinfo
+shows available functions not known to the tool as "UNKNOWN".
+
+.TP 8
+.B \-i/\-\-instructions <INS>,...
+Restricts output of CPACF instructions to be listed.
+Multiple instructions can be supplied separated by "," to only show the supplied
+instructions in the output. Other options like
+.B \-\-quiet \-f/\-\-functions \-m/\-\-msa
+or filters like
+.B \-a/\-\-available \-n/\-\-not-available
+can still be used to further limit output.
+
+.nr PI 2n
+Possible values for
+.B <INS>
+:
+.RS
+.IP \[bu] 2
+.B km
+:    introduced with MSA
+
+.IP \[bu] 2
+.B kmc
+:   introduced with MSA
+
+.IP \[bu] 2
+.B kimd
+:  introduced with MSA
+
+.IP \[bu] 2
+.B klmd
+:  introduced with MSA
+
+.IP \[bu] 2
+.B kmac
+:  introduced with MSA
+
+.IP \[bu] 2
+.B pckmo
+: introduced with MSA 3
+
+.IP \[bu] 2
+.B kmf
+:   introduced with MSA 4
+
+.IP \[bu] 2
+.B kmctr
+: introduced with MSA 4
+
+.IP \[bu] 2
+.B kmo
+:   introduced with MSA 4
+
+.IP \[bu] 2
+.B pcc
+:   introduced with MSA 4
+
+.IP \[bu] 2
+.B prno
+:  introduced with MSA 5
+
+.IP \[bu] 2
+.B kma
+:   introduced with MSA 8
+
+.IP \[bu] 2
+.B kdsa
+:  introduced with MSA 9
+.RE
+
+.TP 8
+.B \-a/\-\-available
+Displays the CPACF subfunctions available on the system.
+.B cpacfinfo \-f/\-\-functions
+is the same as
+.B cpacfinfo \-f/\-\-functions \-a/\-\-available
+. If
+.B -n/\-\-not-available
+is specified no available functions are shown. To get available as well as functions not available use
+.B cpacfinfo \-f/\-\-functions \-a/\-\-available \-n/\-\-not-available.
+
+.TP 8
+.B \-n/\-\-not-available
+Displays the CPACF subfunctions known by the tool that are not-available on the system.
+Depending on the Hardware not all MSA levels might be available which can be checked
+with the
+.B \-m/\-\-msa
+option. In such cases it might not be obvious which functions of which instructions are available.
+This option together with the
+.B \-a/\-\-available
+option shows all possible functions.
+
+.TP 8
+.B \-q/\-\-quiet
+Suppresses the output of the Query Authentication Information.
+By default
+.B cpacfinfo
+outputs the Query Authentication Information for every
+Instruction. To keep outputs of other options clean and minimal this can be disabled
+with this option.
+On machines that do not provide /sys/devices/system/cpu/cpacf/ output will always look like this
+option is supplied.
+
+.TP 8
+.B \-\-format <FORMAT>
+Format output in the specified format. [default: 'human']
+
+If option
+.B \-m/\-\-msa
+is specified the JSON output will equal to
+.B cpacfinfo -m
+without any other specified options. If
+.B \-m/\-\-msa
+is NOT specified the JSON output will equal to
+.B cpacfinfo -f
+without any other specified options.
+
+.nr PI 2n
+Possible values for
+.B <FORMAT>
+:
+.RS
+.IP \[bu] 2
+.B human
+: Use human readable format.
+
+.IP \[bu] 2
+.B json
+:  Use JSON format.
+.RE
+
+.TP 8
+.B \-v/\-\-version
+Print version information and exit.
+
+.TP 8
+.B \-h/\-\-help
+Print help (see a summary with \-h')
+
+.SH Query Authentication Information
+The Query Authentication Information is available since MSA 13 and if it is available
+.B cpacfinfo
+will display it by default. Query Authentication Information is available for every CPACF
+instruction and contains the following:
+.nr PI 2n
+.RS
+.IP \[bu] 2
+.B Format
+:       This format specifies how the binary blob read from sysfs is to be parsed and says nothing
+about the Query Authentication Information itself.
+
+.IP \[bu] 2
+.B Hash length
+:  The hash length specifies the length of the hash in bytes.
+
+.IP \[bu] 2
+.B IFCL version
+: The IFCL version specifies the instruction's firmware code level.
+
+.IP \[bu] 2
+.B Hash
+:         The hash of the firmware code level of the corresponding instruction.
+.RE
+

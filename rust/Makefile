@@ -17,6 +17,12 @@ ifneq (${HAVE_CARGO},0)
 	INSTALL_TARGETS := install-rust-tools install-man
 	CARGO_TEST_TARGETS = $(addsuffix .test, $(CARGO_TARGETS))
 
+ifeq ($(HOST_ARCH),s390x)
+	CARGO_TARGETS += cpacfinfo
+else
+	BUILD_TARGETS += skip-cpacfinfo
+endif #HOSTARCH
+
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
 	PV_TARGETS := pvsecret pvattest
@@ -64,6 +70,9 @@ skip-pv-build:
 
 skip-pvapconfig:
 	echo "  SKIP    pvapconfig due to unsupported architecture (s390x only)"
+
+skip-cpacfinfo:
+	echo "  SKIP    cpacfinfo due to unsupported architecture (s390x only)"
 
 all: $(BUILD_TARGETS)
 install: $(INSTALL_TARGETS)

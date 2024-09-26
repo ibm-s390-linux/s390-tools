@@ -1,5 +1,6 @@
 [workspace]
 members = [
+	"cpacfinfo",
 	"pv",
 	"pv_core",
 	"pvapconfig",
