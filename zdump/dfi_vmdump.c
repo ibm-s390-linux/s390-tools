@@ -201,7 +201,7 @@ static void vmdump64big_init(void)
 
 		zg_read(g.fh, bm_index_page, sizeof(bm_index_page), ZG_CHECK);
 		l.memory_start_record += PAGE_SIZE;
-		for (i = 0; i < PAGE_SIZE; i++) {
+		for (i = 0; i < 8 * PAGE_SIZE; i++) {
 			if (test_page_bit(bm_index_page, i)) {
 				u8 bm_page[PAGE_SIZE];
 
