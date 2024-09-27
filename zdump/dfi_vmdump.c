@@ -41,6 +41,9 @@ static struct {
 	struct vmd_fir_other_64 *fir_other;
 
 	u64 memory_start_record;
+	u64 index_pages_count;
+	u64 bitkey_pages_count;
+	u64 stored_pages_count;
 	u8 *bitmap;
 } l;
 
@@ -74,9 +77,12 @@ static void vmdump64big_debug(void)
 	u8 albk_id[sizeof(ALBK_MAGIC)];
 	struct timeval time;
 
+	util_log_print(UTIL_LOG_DEBUG, "Index Pages  : %lu\n", l.index_pages_count);
+	util_log_print(UTIL_LOG_DEBUG, "Bit-Key Pages: %lu\n", l.bitkey_pages_count);
 	util_log_print(UTIL_LOG_DEBUG, "Memory Offset: %#lx\n", l.memory_start_record);
-	util_log_print(UTIL_LOG_DEBUG, "Dumped Pages: %d\n",
+	util_log_print(UTIL_LOG_DEBUG, "Total Pages  : %lu\n",
 		       l.asibk_new.storage_size_def_store / PAGE_SIZE);
+	util_log_print(UTIL_LOG_DEBUG, "Stored Pages : %lu\n", l.stored_pages_count);
 
 	/* adsr */
 	vmdump_tod_to_timeval(l.adsr.tod, &time);
@@ -201,18 +207,22 @@ static void vmdump64big_init(void)
 
 		zg_read(g.fh, bm_index_page, sizeof(bm_index_page), ZG_CHECK);
 		l.memory_start_record += PAGE_SIZE;
+		l.index_pages_count++;
 		for (i = 0; i < 8 * PAGE_SIZE; i++) {
 			if (test_page_bit(bm_index_page, i)) {
 				u8 bm_page[PAGE_SIZE];
 
 				zg_read(g.fh, bm_page, sizeof(bm_page), ZG_CHECK);
 				l.memory_start_record += PAGE_SIZE;
+				l.bitkey_pages_count++;
 				for (unsigned int j = 0; j < PAGE_SIZE; j++) {
 					if (page_num / 8 >= bitmap_sz)
 						ERR_EXIT("Dump file inconsistent,"
 							 " corrupted bitmap detected");
-					if (test_bitmap_key_page(bm_page, j))
+					if (test_bitmap_key_page(bm_page, j)) {
 						set_page_bit(l.bitmap, page_num);
+						l.stored_pages_count++;
+					}
 					page_num++;
 					if (page_num == nr_dumped_pages)
 						goto out;
@@ -221,6 +231,7 @@ static void vmdump64big_init(void)
 				page_num += PAGE_SIZE; /* Empty page */
 			}
 		}
+
 	} while (page_num < nr_dumped_pages);
 
 out:
