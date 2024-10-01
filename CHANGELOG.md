@@ -1,15 +1,27 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.35.0 (2024-10-01)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.11
 
   Add new tools / libraries:
 
   Changes of existing tools:
+  - cpacfstats: Add support for FULL XTS (MSA 10) and HMAC (MSA 11) PAI counter
+  - cpuplugd: Make cpuplugd compatible with hiperdispatch
+  - dbginfo.sh: Add network sockstat info
+  - pvapconfig: s390x exclusive build
+  - zdev: Add option to select IPL device
+  - zdump/dfo_s390: Support s390 DFO for vr-kernel dumps
+  - zipl: Add support of mirror devices
 
   Bug Fixes:
+  - (genprotimg|zipl)/boot: discard .note.package ELF section to save memory
+  - netboot/mk-s390image: Fix size when argument is a symlink
+  - ziorep_config: Fix warning message when multipath device is not there.
+  - zipl: Fix problems when target parameters are specified by user
+  - zipl: Fix segfault when creating device-based dumps with '--dry-run'
 
 * __v2.34.0 (2024-08-01)__
 
