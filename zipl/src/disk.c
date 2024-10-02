@@ -22,8 +22,10 @@
 #include <sys/vfs.h>
 #include <unistd.h>
 #include <linux/fs.h>
+#include <linux/major.h>
 #include <linux/fiemap.h>
 #include <linux/nvme_ioctl.h>
+#include <linux/raid/md_u.h>
 #include <assert.h>
 
 #include "lib/util_proc.h"
@@ -34,12 +36,6 @@
 #include "install.h"
 #include "job.h"
 #include "misc.h"
-
-/* from linux/fs.h */
-#define FIBMAP			_IO(0x00,1)
-#define FIGETBSZ		_IO(0x00,2)
-#define BLKGETSIZE		_IO(0x12,96)
-#define BLKSSZGET		_IO(0x12,104)
 
 /* from linux/hdregs.h */
 #define HDIO_GETGEO		0x0301
@@ -492,7 +488,7 @@ static void set_source_type(struct job_target_data *td,
 	td->source = source_auto;
 }
 
-static void set_driver_name(struct disk_info *info, dev_t device)
+static void set_driver_name(int fd, struct disk_info *info, dev_t device)
 {
 	struct util_proc_dev_entry dev_entry;
 
@@ -500,7 +496,14 @@ static void set_driver_name(struct disk_info *info, dev_t device)
 		/* already set */
 		return;
 	if (util_proc_dev_get_entry(device, 1, &dev_entry) == 0) {
-		info->drv_name = misc_strdup(dev_entry.name);
+		mdu_array_info_t array;
+
+		if (strcmp(dev_entry.name, "blkext") == 0 &&
+		    ioctl(fd, GET_ARRAY_INFO, &array) >= 0)
+			/* it is actually an md-partition */
+			info->drv_name = misc_strdup("md");
+		else
+			info->drv_name = misc_strdup(dev_entry.name);
 		util_proc_dev_free_entry(&dev_entry);
 	} else {
 		fprintf(stderr, "Warning: Could not determine driver name for "
@@ -684,7 +687,7 @@ int disk_get_info(const char *device, struct job_target_data *td,
 	if (!data)
 		goto error;
 	memset((void *)data, 0, sizeof(struct disk_info));
-	set_driver_name(data, stats.st_rdev);
+	set_driver_name(fd, data, stats.st_rdev);
 	set_source_type(td, data->drv_name, &script_file);
 	switch (td->source) {
 	case source_script:
