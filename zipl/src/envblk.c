@@ -56,14 +56,14 @@ void envblk_create_blank(char *envblk, int envblk_len)
 
 /**
  * Find out environment block location.
- * FD: bootmap file descriptor.
+ * MFD: bootmap file descriptor.
  * On success the searched location is saved in variable pointed out by OFF
  */
-int envblk_offset_get(int fd, off_t *off)
+int envblk_offset_get(struct misc_fd *mfd, off_t *off)
 {
 	struct bootmap_header bh;
 
-	if (bootmap_header_read(fd, &bh)) {
+	if (bootmap_header_read(mfd, &bh)) {
 		error_reason("Could not read bootmap_header");
 		return -1;
 	}
@@ -73,20 +73,20 @@ int envblk_offset_get(int fd, off_t *off)
 
 /**
  * Save environment block location specified by OFF
- * FD: bootmap file descriptor.
+ * MFD: bootmap file descriptor.
  * On success the location is saved in the bootmap header.
  */
-int envblk_offset_set(int fd, off_t off)
+int envblk_offset_set(struct misc_fd *mfd, off_t off)
 {
 	struct bootmap_header bh;
 
-	if (bootmap_header_read(fd, &bh)) {
+	if (bootmap_header_read(mfd, &bh)) {
 		error_reason("Could not read bootmap header");
 		return -1;
 	}
 	bh.envblk_offset = off;
 
-	if (bootmap_header_write(fd, &bh)) {
+	if (bootmap_header_write(mfd, &bh)) {
 		error_reason("Could not write bootmap header");
 		return -1;
 	}
@@ -95,12 +95,12 @@ int envblk_offset_set(int fd, off_t off)
 
 /**
  * Find out environment block size.
- * FD: bootmap file descriptor.
+ * MFD: bootmap file descriptor.
  * On success the searched size is stored in RESULT
  */
-int envblk_size_get(int fd, int *result)
+int envblk_size_get(struct misc_fd *mfd, int *result)
 {
-	if (ioctl(fd, FIGETBSZ, result) == -1) {
+	if (ioctl(mfd->fd, FIGETBSZ, result) == -1) {
 		error_reason(strerror(errno));
 		return -1;
 	}

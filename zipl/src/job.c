@@ -1959,7 +1959,7 @@ get_job_from_config_file(struct command_line* cmdline, struct job_data* job)
 static int get_job_envblk_data(struct job_data *job, char *import_hint)
 {
 	struct job_envblk_data *data = &job->envblk;
-	int fd;
+	struct misc_fd mfd = {0};
 
 	switch (job->id) {
 	case job_ipl:
@@ -1968,18 +1968,18 @@ static int get_job_envblk_data(struct job_data *job, char *import_hint)
 	default:
 		return 0;
 	}
-	fd = open(job->target.bootmap_dir, O_RDONLY);
-	if (fd < 0) {
+	mfd.fd = open(job->target.bootmap_dir, O_RDONLY);
+	if (mfd.fd < 0) {
 		error_reason(strerror(errno));
 		error_text("Could not open bootmap dir");
 		return -1;
 	}
-	if (envblk_size_get(fd, &data->size)) {
-		close(fd);
+	if (envblk_size_get(&mfd, &data->size)) {
+		close(mfd.fd);
 		error_text("Could not get environment block size");
 		return -1;
 	}
-	close(fd);
+	close(mfd.fd);
 	data->buf = misc_malloc(data->size);
 	if (data->buf == NULL) {
 		error_text("Could not allocate environment block");

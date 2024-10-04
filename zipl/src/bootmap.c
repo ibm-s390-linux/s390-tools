@@ -181,7 +181,7 @@ check_secure_boot_support(void)
  * of segment table blocks to the file identified by file descriptor FD. Upon
  * success, return 0 and set SECTION_POINTER to point to the first block in
  * the resulting segment table. Return non-zero otherwise. */
-static int add_segment_table(int fd, disk_blockptr_t *list, blocknum_t count,
+static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list, blocknum_t count,
 			     disk_blockptr_t *segment_pointer,
 			     struct disk_info *info, int program_table_id)
 {
@@ -220,7 +220,7 @@ static int add_segment_table(int fd, disk_blockptr_t *list, blocknum_t count,
 		bootmap_store_blockptr(VOID_ADD(buffer, offset * pointer_size),
 				       &next, info,
 				       program_table_id);
-		rc = disk_write_block_aligned(fd, buffer, info->phy_block_size,
+		rc = disk_write_block_aligned(mfd, buffer, info->phy_block_size,
 					      &next, info);
 		if (rc) {
 			free(buffer);
@@ -233,7 +233,7 @@ static int add_segment_table(int fd, disk_blockptr_t *list, blocknum_t count,
 }
 
 
-static int add_program_table(int fd, disk_blockptr_t *table, int entries,
+static int add_program_table(struct misc_fd *mfd, disk_blockptr_t *table, int entries,
 			     disk_blockptr_t *pointer, struct disk_info *info,
 			     int program_table_id)
 {
@@ -255,7 +255,7 @@ static int add_program_table(int fd, disk_blockptr_t *table, int entries,
 		offset += get_blockptr_size(info);
 	}
 	/* Write program table */
-	rc = disk_write_block_aligned(fd, block, PROGRAM_TABLE_BLOCK_SIZE,
+	rc = disk_write_block_aligned(mfd, block, PROGRAM_TABLE_BLOCK_SIZE,
 				      pointer, info);
 	free(block);
 	return rc;
@@ -371,7 +371,7 @@ static int add_component_file_range(struct install_set *bis,
 		}
 		size -= trailer;
 		/* Write buffer */
-		*count = disk_write_block_buffer(bis->fd, 0, buffer,
+		*count = disk_write_block_buffer(&bis->mfd, 0, buffer,
 						 size, list, bis->info);
 		free(buffer);
 		if (*count == 0) {
@@ -398,7 +398,7 @@ static int add_component_file_range(struct install_set *bis,
 write_segment_table:
 	assert(*list != NULL);
 	assert(*count != 0);
-	rc = add_segment_table(bis->fd, *list, *count, &segment, bis->info,
+	rc = add_segment_table(&bis->mfd, *list, *count, &segment, bis->info,
 			       program_table_id);
 	if (rc == 0)
 		create_component_entry(component, &segment,
@@ -436,7 +436,7 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 		/* skip the preparation work */
 		goto write_segment_table;
 	/* Write buffer */
-	*count = disk_write_block_buffer_align(bis->fd, 0, buffer, size, list,
+	*count = disk_write_block_buffer_align(&bis->mfd, 0, buffer, size, list,
 					       bis->info, align, offset);
 	if (*count == 0) {
 		error_text("Could not write to bootmap file");
@@ -456,7 +456,7 @@ write_segment_table:
 	assert(*list != NULL);
 	assert(*count != 0);
 
-	rc = add_segment_table(bis->fd, *list, *count, &segment, bis->info,
+	rc = add_segment_table(&bis->mfd, *list, *count, &segment, bis->info,
 			       program_table_id);
 	if (rc == 0)
 		create_component_entry(component, &segment,
@@ -851,7 +851,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		/*
 		 * finally add environment block
 		 */
-		rc = envblk_offset_get(bis->fd, &envblk_off);
+		rc = envblk_offset_get(&bis->mfd, &envblk_off);
 		if (rc) {
 			free(table);
 			return rc;
@@ -879,7 +879,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 			 * store environment block location
 			 * in the bootmap header
 			 */
-			rc = envblk_offset_set(bis->fd, envblk_off);
+			rc = envblk_offset_set(&bis->mfd, envblk_off);
 			if (rc) {
 				error_text("Could not store environment block location");
 				free(table);
@@ -914,7 +914,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 			       (STAGE3_ENTRY | PSW_LOAD),
 			       bis->info, program_table_id);
 	/* Write component table */
-	rc = disk_write_block_aligned(bis->fd, table,
+	rc = disk_write_block_aligned(&bis->mfd, table,
 				      bis->info->phy_block_size,
 				      program, bis->info);
 	free(table);
@@ -963,7 +963,7 @@ static int add_segment_program(struct install_set *bis,
 			       (component_data)(uint64_t)PSW_DISABLED_WAIT,
 			       bis->info, program_table_id);
 	/* Write component table */
-	rc = disk_write_block_aligned(bis->fd, table,
+	rc = disk_write_block_aligned(&bis->mfd, table,
 				      bis->info->phy_block_size,
 				      program, bis->info);
 	free(table);
@@ -1139,7 +1139,7 @@ static int build_program_table(struct job_data *job,
 
 		/* Add program table block */
 		pointer = &bis->tables[program_table_id].table;
-		rc = add_program_table(bis->fd, table, entries,
+		rc = add_program_table(&bis->mfd, table, entries,
 				       pointer, bis->info,
 				       program_table_id);
 	}
@@ -1151,7 +1151,7 @@ static int build_program_table(struct job_data *job,
 /* Write block of zeroes to the bootmap file FD and store the resulting
  * block pointer in BLOCK. Return zero on success, non-zero otherwise. */
 static int
-write_empty_block(int fd, disk_blockptr_t* block, struct disk_info* info)
+write_empty_block(struct misc_fd *mfd, disk_blockptr_t *block, struct disk_info *info)
 {
 	void* buffer;
 	int rc;
@@ -1160,14 +1160,14 @@ write_empty_block(int fd, disk_blockptr_t* block, struct disk_info* info)
 	if (buffer == NULL)
 		return -1;
 	memset(buffer, 0, info->phy_block_size);
-	rc = disk_write_block_aligned(fd, buffer, info->phy_block_size, block,
+	rc = disk_write_block_aligned(mfd, buffer, info->phy_block_size, block,
 				      info);
 	free(buffer);
 	return rc;
 }
 
 
-static int install_stages_dasd_fba(int fd, char *filename,
+static int install_stages_dasd_fba(struct misc_fd *mfd, char *filename,
 				   struct job_data *job,
 				   struct disk_info *info,
 				   disk_blockptr_t **stage1b_list,
@@ -1188,7 +1188,7 @@ static int install_stages_dasd_fba(int fd, char *filename,
 		 */
 		if (boot_get_fba_stage2(&stage2_data, &stage2_size, job))
 			return -1;
-		stage2_count = disk_write_block_buffer(fd, 0, stage2_data,
+		stage2_count = disk_write_block_buffer(mfd, 0, stage2_data,
 						       stage2_size,
 						       &stage2_list, info);
 		free(stage2_data);
@@ -1196,7 +1196,7 @@ static int install_stages_dasd_fba(int fd, char *filename,
 			error_text("Could not write to file '%s'", filename);
 			return -1;
 		}
-		if (install_fba_stage1b(fd, stage1b_list, stage1b_count,
+		if (install_fba_stage1b(mfd, stage1b_list, stage1b_count,
 					stage2_list, stage2_count, info))
 			return -1;
 		free(stage2_list);
@@ -1215,7 +1215,7 @@ static int install_stages_dasd_fba(int fd, char *filename,
 	return 0;
 }
 
-static int install_stages_eckd_dasd(int fd, char *filename,
+static int install_stages_eckd_dasd(struct misc_fd *mfd, char *filename,
 				    struct job_data *job,
 				    struct disk_info *info,
 				    disk_blockptr_t *program_table,
@@ -1236,7 +1236,7 @@ static int install_stages_eckd_dasd(int fd, char *filename,
 		 */
 		if (boot_get_eckd_stage2(&stage2b_data, &stage2b_size, job))
 			return -1;
-		stage2b_count = disk_write_block_buffer(fd, 0, stage2b_data,
+		stage2b_count = disk_write_block_buffer(mfd, 0, stage2b_data,
 							stage2b_size,
 							&stage2b_list,
 							info);
@@ -1245,7 +1245,7 @@ static int install_stages_eckd_dasd(int fd, char *filename,
 			error_text("Could not write to file '%s'", filename);
 			return -1;
 		}
-		if (install_eckd_stage1b(fd, stage1b_list, stage1b_count,
+		if (install_eckd_stage1b(mfd, stage1b_list, stage1b_count,
 					 stage2b_list, stage2b_count, info))
 			return -1;
 		free(stage2b_list);
@@ -1260,7 +1260,7 @@ static int install_stages_eckd_dasd(int fd, char *filename,
 		if (boot_get_eckd_ld_ipl_br(&stage2b_data, &stage2b_size,
 					    program_table, info))
 			return -1;
-		stage2b_count = disk_write_block_buffer(fd, 0, stage2b_data,
+		stage2b_count = disk_write_block_buffer(mfd, 0, stage2b_data,
 							stage2b_size,
 							stage1b_list,
 							info);
@@ -1285,7 +1285,7 @@ static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
 
 	switch (bis->info->type) {
 	case disk_type_fba:
-		rc = install_stages_dasd_fba(bis->fd, bis->filename, job,
+		rc = install_stages_dasd_fba(&bis->mfd, bis->filename, job,
 					     bis->info,
 					     &pt->stage1b_list,
 					     &pt->stage1b_count,
@@ -1293,7 +1293,7 @@ static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
 		break;
 	case disk_type_eckd_ldl:
 	case disk_type_eckd_cdl:
-		rc = install_stages_eckd_dasd(bis->fd, bis->filename, job,
+		rc = install_stages_eckd_dasd(&bis->mfd, bis->filename, job,
 					      bis->info,
 					      &pt->table,
 					      &pt->stage1b_list,
@@ -1310,7 +1310,7 @@ static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
 }
 
 static int
-bootmap_write_scsi_superblock(int fd, struct disk_info *info,
+bootmap_write_scsi_superblock(struct misc_fd *mfd, struct disk_info *info,
 			      disk_blockptr_t *scsi_dump_sb_blockptr,
 			      ulong dump_size)
 {
@@ -1327,7 +1327,7 @@ bootmap_write_scsi_superblock(int fd, struct disk_info *info,
 	scsi_sb.csum_size = SCSI_DUMP_SB_CSUM_SIZE;
 	/* Set seed because otherwise csum over zero block is 0 */
 	scsi_sb.csum = SCSI_DUMP_SB_SEED;
-	return disk_write_block_aligned(fd, &scsi_sb,
+	return disk_write_block_aligned(mfd, &scsi_sb,
 					sizeof(scsi_sb),
 					scsi_dump_sb_blockptr, info);
 }
@@ -1451,8 +1451,8 @@ static int prepare_build_program_table_device(struct job_data *job,
 	bis->filename = misc_strdup(job->data.dump.device);
 	if (!bis->filename)
 		return -1;
-	bis->fd = misc_open_exclusive(bis->filename);
-	if (bis->fd == -1) {
+	bis->mfd.fd = misc_open_exclusive(bis->filename);
+	if (bis->mfd.fd == -1) {
 		error_text("Could not open file '%s'", bis->filename);
 		return -1;
 	}
@@ -1476,22 +1476,22 @@ static int prepare_build_program_table_device(struct job_data *job,
 	   to expected size before end of disk */
 	if (estimate_scsi_dump_size(job, bis->info, &unused_size))
 		return -1;
-	if (lseek(bis->fd, unused_size, SEEK_SET) < 0)
+	if (lseek(bis->mfd.fd, unused_size, SEEK_SET) < 0)
 		return -1;
 
 	/* Initialize bootmap header */
-	if (bootmap_header_init(bis->fd)) {
+	if (bootmap_header_init(&bis->mfd)) {
 		error_text("Could not init bootmap header at '%s'",
 			   bis->filename);
 		return -1;
 	}
 	/* Write empty block to be read in place of holes in files */
-	if (write_empty_block(bis->fd, &empty_block, bis->info)) {
+	if (write_empty_block(&bis->mfd, &empty_block, bis->info)) {
 		error_text("Could not write to file '%s'",
 			   bis->filename);
 		return -1;
 	}
-	if (bootmap_write_scsi_superblock(bis->fd, bis->info,
+	if (bootmap_write_scsi_superblock(&bis->mfd, bis->info,
 					  &bis->scsi_dump_sb_blockptr,
 					  unused_size)) {
 		error_text("Could not write SCSI superblock to file '%s'",
@@ -1540,8 +1540,8 @@ static int prepare_build_program_table_file(struct job_data *job,
 				       BOOTMAP_TEMPLATE_FILENAME);
 	if (!bis->filename)
 		return -1;
-	bis->fd = mkstemp(bis->filename);
-	if (bis->fd == -1) {
+	bis->mfd.fd = mkstemp(bis->filename);
+	if (bis->mfd.fd == -1) {
 		error_reason(strerror(errno));
 		error_text("Could not create file '%s':", bis->filename);
 		return -1;
@@ -1574,13 +1574,13 @@ static int prepare_build_program_table_file(struct job_data *job,
 	       job->add_files ? " (files will be added to bootmap file)"
 	       : "");
 	/* Initialize bootmap header */
-	if (bootmap_header_init(bis->fd)) {
+	if (bootmap_header_init(&bis->mfd)) {
 		error_text("Could not init bootmap header at '%s'",
 			   bis->filename);
 		return -1;
 	}
 	/* Write empty block to be read in place of holes in files */
-	if (write_empty_block(bis->fd, &empty_block, bis->info)) {
+	if (write_empty_block(&bis->mfd, &empty_block, bis->info)) {
 		error_text("Could not write to file '%s'", bis->filename);
 		return -1;
 	}
@@ -1825,8 +1825,8 @@ void free_bootloader(struct install_set *bis)
 			free(get_component(bis, i, j)->list);
 		free(bis->components[i]);
 	}
-	if (bis->fd > 0)
-		close(bis->fd);
+	if (bis->mfd.fd > 0)
+		close(bis->mfd.fd);
 	if (bis->tmp_filename_created)
 		misc_free_temp_file(bis->filename);
 	free(bis->filename);

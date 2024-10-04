@@ -404,6 +404,26 @@ misc_write(int fd, const void* data, size_t count)
 	return 0;
 }
 
+/**
+ * Instead of writing, upadte only current position in the file
+ */
+static int misc_simulate_write(int fd, size_t count)
+{
+	if (lseek(fd, count, SEEK_CUR) == (off_t)-1) {
+		error_reason(strerror(errno));
+		error_text("Could not update position in the file");
+		return -1;
+	}
+	return 0;
+}
+
+int misc_write_or_simulate(struct misc_fd *mfd, const void *data, size_t count)
+{
+	return mfd->simulate_write ?
+		misc_simulate_write(mfd->fd, count) :
+		misc_write(mfd->fd, data, count);
+}
+
 int misc_seek(int fd, off_t off)
 {
 	if (lseek(fd, off, SEEK_SET) == off)

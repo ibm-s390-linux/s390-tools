@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include "misc.h"
 #include "zipl.h"
 #include "lib/vtoc.h"
 
@@ -113,13 +114,13 @@ int disk_head_from_blocknum(blocknum_t blocknum, struct disk_info* info);
 int disk_sec_from_blocknum(blocknum_t blocknum, struct disk_info* info);
 void disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
 				 struct disk_info* info);
-int disk_write_block_aligned(int fd, const void* data, size_t bytecount,
-	  		     disk_blockptr_t* block, struct disk_info* info);
-blocknum_t disk_write_block_buffer(int fd, int fd_is_basedisk,
+int disk_write_block_aligned(struct misc_fd *mfd, const void *data, size_t bytecount,
+			     disk_blockptr_t *block, struct disk_info *info);
+blocknum_t disk_write_block_buffer(struct misc_fd *fd, int fd_is_basedisk,
 				   const void* buffer, size_t bytecount,
 				   disk_blockptr_t** blocklist,
 				   struct disk_info *info);
-blocknum_t disk_write_block_buffer_align(int fd, int fd_is_basedisk,
+blocknum_t disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk,
 					 const void *buffer, size_t bytecount,
 					 disk_blockptr_t **blocklist,
 					 struct disk_info *info, int align,

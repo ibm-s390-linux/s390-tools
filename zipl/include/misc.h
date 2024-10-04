@@ -24,6 +24,10 @@ struct misc_file_buffer {
 	size_t length;
 };
 
+struct misc_fd {
+	int fd;
+	unsigned int simulate_write:1;
+};
 
 void* misc_malloc(size_t size);
 int misc_asprintf(char **out, const char *fmt, ...);
@@ -36,6 +40,7 @@ int misc_read_file(const char* filename, char** buffer, size_t* size,
 int misc_read_special_file(const char* filename, char** buffer, size_t* size,
 			   int nil_terminate);
 int misc_write(int fd, const void* data, size_t count);
+int misc_write_or_simulate(struct misc_fd *mfd, const void *data, size_t count);
 int misc_pwrite(int fd, void *buf, size_t size, off_t off);
 int misc_seek(int fd, off_t off);
 int misc_get_file_buffer(const char* filename,

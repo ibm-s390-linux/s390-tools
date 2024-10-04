@@ -14,6 +14,7 @@
 
 #include "disk.h"
 #include "job.h"
+#include "misc.h"
 #include "zipl.h"
 #include "boot/boot_defs.h"
 
@@ -70,7 +71,7 @@ struct install_set {
 	struct program_table tables[NR_PROGRAM_TABLES];
 	struct program_component *components[NR_PROGRAM_COMPONENTS];
 	int nr_menu_entries;
-	int fd;
+	struct misc_fd mfd;
 	char *basetmp[MAX_TARGETS];
 	char *filename;
 	unsigned int tmp_filename_created:1;
@@ -124,10 +125,10 @@ int install_dump(const char *device, struct job_target_data *target,
 int install_mvdump(char* const device[], struct job_target_data* target,
 		   int device_count, uint64_t mem, uint8_t force);
 
-int install_fba_stage1b(int fd, disk_blockptr_t **stage1b_list,
+int install_fba_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 			blocknum_t *stage1b_count, disk_blockptr_t *stage2_list,
 			blocknum_t stage2_count, struct disk_info *info);
-int install_eckd_stage1b(int fd, disk_blockptr_t **stage1b_list,
+int install_eckd_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 			 blocknum_t *stage1b_count,
 			 disk_blockptr_t *stage2_list,
 			 blocknum_t stage2_count, struct disk_info *info);

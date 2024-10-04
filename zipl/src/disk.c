@@ -978,8 +978,8 @@ disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
  * otherwise. On success OFFSET contains offset of the first written byte
  */
 static int
-disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
-			      size_t bytecount, disk_blockptr_t* block,
+disk_write_block_aligned_base(struct misc_fd *mfd, int is_base_disk, const void *data,
+			      size_t bytecount, disk_blockptr_t *block,
 			      struct disk_info *info, int align, off_t *offset)
 {
 	blocknum_t current_block;
@@ -989,7 +989,7 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 	if (align == 0)
 		align = info->phy_block_size;
 
-	current_pos = lseek(fd, 0, SEEK_CUR);
+	current_pos = lseek(mfd->fd, 0, SEEK_CUR);
 	if (current_pos == -1) {
 		error_text(strerror(errno));
 		return -1;
@@ -997,7 +997,7 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 	/* Ensure block alignment of current file pos */
 
 	if (current_pos % align != 0) {
-		current_pos = lseek(fd, align - current_pos % align, SEEK_CUR);
+		current_pos = lseek(mfd->fd, align - current_pos % align, SEEK_CUR);
 		if (current_pos == -1) {
 	       		error_text(strerror(errno));
 			return -1;
@@ -1008,11 +1008,11 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 	if (bytecount > (size_t)info->phy_block_size)
 		bytecount = info->phy_block_size;
 	/* Write data block */
-	if (misc_write(fd, data, bytecount))
+	if (misc_write_or_simulate(mfd, data, bytecount))
 		return -1;
 	if (block != NULL) {
 		/* Store block pointer */
-		if (disk_get_blocknum(fd, is_base_disk, current_block,
+		if (disk_get_blocknum(mfd->fd, is_base_disk, current_block,
 				      &blocknum, info))
 			return -1;
 		disk_blockptr_from_blocknum(block, blocknum, info);
@@ -1022,10 +1022,10 @@ disk_write_block_aligned_base(int fd, int is_base_disk, const void* data,
 	return 0;
 }
 
-int disk_write_block_aligned(int fd, const void *data, size_t bytecount,
+int disk_write_block_aligned(struct misc_fd *mfd, const void *data, size_t bytecount,
 			     disk_blockptr_t *block, struct disk_info *info)
 {
-	return disk_write_block_aligned_base(fd, 0, data, bytecount, block,
+	return disk_write_block_aligned_base(mfd, 0, data, bytecount, block,
 					     info, info->phy_block_size, NULL);
 }
 
@@ -1039,7 +1039,7 @@ int disk_write_block_aligned(int fd, const void *data, size_t bytecount,
  * otherwise.
  */
 blocknum_t
-disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
+disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk, const void *buffer,
 			      size_t bytecount, disk_blockptr_t **blocklist,
 			      struct disk_info *info, int align, off_t *offset)
 {
@@ -1054,7 +1054,7 @@ disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
 	*blocklist = (disk_blockptr_t *)util_zalloc(sizeof(disk_blockptr_t) *
 						    count);
 	if (*blocklist == NULL) {
-		close(fd);
+		close(mfd->fd);
 		return 0;
 	}
 	/* Build list */
@@ -1062,7 +1062,7 @@ disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
 		chunk_size = bytecount - written;
 		if (chunk_size > (size_t) info->phy_block_size)
 			chunk_size = info->phy_block_size;
-		rc = disk_write_block_aligned_base(fd, fd_is_basedisk,
+		rc = disk_write_block_aligned_base(mfd, fd_is_basedisk,
 					VOID_ADD(buffer, written),
 					chunk_size, &(*blocklist)[i],
 					info,
@@ -1077,11 +1077,11 @@ disk_write_block_buffer_align(int fd, int fd_is_basedisk, const void *buffer,
 }
 
 blocknum_t
-disk_write_block_buffer(int fd, int fd_is_basedisk, const void *buffer,
+disk_write_block_buffer(struct misc_fd *mfd, int fd_is_basedisk, const void *buffer,
 			size_t bytecount, disk_blockptr_t **blocklist,
 			struct disk_info *info)
 {
-	return disk_write_block_buffer_align(fd, fd_is_basedisk, buffer,
+	return disk_write_block_buffer_align(mfd, fd_is_basedisk, buffer,
 					     bytecount, blocklist, info,
 					     info->phy_block_size, NULL);
 }

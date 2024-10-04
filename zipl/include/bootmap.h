@@ -49,9 +49,9 @@ struct file_signature {
 
 #define PKEY_ID_PKCS7 0x02
 
-int bootmap_header_init(int fd);
-int bootmap_header_read(int fd, struct bootmap_header *bh);
-int bootmap_header_write(int fd, struct bootmap_header *bh);
+int bootmap_header_init(struct misc_fd *mfd);
+int bootmap_header_read(struct misc_fd *mfd, struct bootmap_header *bh);
+int bootmap_header_write(struct misc_fd *mfd, struct bootmap_header *bh);
 void bootmap_store_blockptr(void *buffer, disk_blockptr_t *ptr,
 			    struct disk_info *info, int fid);
 

@@ -60,7 +60,7 @@ enum op_id {
 static char *op_desc[LAST_OP_ID] = {"invalid", "set", "unset", "reset", "list"};
 
 struct zipl_envblk {
-	int fd;
+	struct misc_fd mfd;
 	char *buf;
 	off_t offset;
 	int size;
@@ -75,7 +75,7 @@ static char *opcode2desc(enum op_id opcode)
 static void zipl_envblk_init(struct zipl_envblk *zeb)
 {
 	memset(zeb, 0, sizeof(*zeb));
-	zeb->fd = -1;
+	zeb->mfd.fd = -1;
 }
 
 static int do_list(char *envblk, unsigned int envblk_size)
@@ -104,7 +104,7 @@ static int envblk_update(struct zipl_envblk *zeb)
 	char *dev_name;
 	int dev_fd;
 
-	if (fstat(zeb->fd, &info))
+	if (fstat(zeb->mfd.fd, &info))
 		return -1;
 
 	if (util_proc_part_get_entry(info.st_dev, &part_entry) != 0)
@@ -125,7 +125,7 @@ static int envblk_update(struct zipl_envblk *zeb)
 	/*
 	 * det disk address of the environment block
 	 */
-	if (fs_map(zeb->fd, zeb->offset, &blknr, zeb->size) != 0)
+	if (fs_map(zeb->mfd.fd, zeb->offset, &blknr, zeb->size) != 0)
 		goto error_close;
 
 	if (lseek64(dev_fd, blknr * (uint64_t)zeb->size, SEEK_SET) < 0) {
@@ -156,11 +156,11 @@ static int envblk_close(struct zipl_envblk *zeb)
 		free(zeb->buf);
 		zeb->buf = NULL;
 	}
-	if (zeb->fd < 0)
+	if (zeb->mfd.fd < 0)
 		return 0;
 
-	if (close(zeb->fd) == 0) {
-		zeb->fd = -1;
+	if (close(zeb->mfd.fd) == 0) {
+		zeb->mfd.fd = -1;
 		return 0;
 	}
 	return -1;
@@ -175,7 +175,7 @@ static int envblk_open(struct zipl_envblk *zeb)
 {
 	char *bootmap_file;
 
-	if (zeb->fd >= 0)
+	if (zeb->mfd.fd >= 0)
 		/*  it was opened before */
 		return 0;
 	bootmap_file =
@@ -185,8 +185,8 @@ static int envblk_open(struct zipl_envblk *zeb)
 		error_reason("Could not make path for bootmap file");
 		return -1;
 	}
-	zeb->fd = open(bootmap_file, O_RDONLY);
-	if (zeb->fd < 0) {
+	zeb->mfd.fd = open(bootmap_file, O_RDONLY);
+	if (zeb->mfd.fd < 0) {
 		error_reason("Could not open bootmap file %s: %s",
 			     bootmap_file, strerror(errno));
 		free(bootmap_file);
@@ -196,11 +196,11 @@ static int envblk_open(struct zipl_envblk *zeb)
 	if (verbose)
 		printf("Processing bootmap file at %s\n", bootmap_file);
 
-	if (envblk_size_get(zeb->fd, &zeb->size)) {
+	if (envblk_size_get(&zeb->mfd, &zeb->size)) {
 		error_reason("Could not get environment block size");
 		goto error;
 	}
-	if (envblk_offset_get(zeb->fd, &zeb->offset)) {
+	if (envblk_offset_get(&zeb->mfd, &zeb->offset)) {
 		error_reason("Could not get environment block location");
 		goto error;
 	}
@@ -209,9 +209,9 @@ static int envblk_open(struct zipl_envblk *zeb)
 		goto error;
 	}
 	/* reopen for direct operations */
-	close(zeb->fd);
-	zeb->fd = open(bootmap_file, O_RDWR | O_DIRECT);
-	if (zeb->fd < 0) {
+	close(zeb->mfd.fd);
+	zeb->mfd.fd = open(bootmap_file, O_RDWR | O_DIRECT);
+	if (zeb->mfd.fd < 0) {
 		error_reason("Could not open environment block at %s",
 			     bootmap_file);
 		goto error;
@@ -224,11 +224,11 @@ static int envblk_open(struct zipl_envblk *zeb)
 		error_reason("Could not allocate aligned memory region");
 		goto error;
 	}
-	if (lseek(zeb->fd, zeb->offset, SEEK_SET) < 0) {
+	if (lseek(zeb->mfd.fd, zeb->offset, SEEK_SET) < 0) {
 		error_reason(strerror(errno));
 		goto error;
 	}
-	if (read(zeb->fd, zeb->buf, zeb->size) != zeb->size) {
+	if (read(zeb->mfd.fd, zeb->buf, zeb->size) != zeb->size) {
 		error_reason("Could not read environment block");
 		goto error;
 	}

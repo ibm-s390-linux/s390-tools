@@ -34,9 +34,9 @@ static inline size_t get_name_len(const char *p, const char *pname)
 	return p ? strlen(pname) - strlen(p) : strlen(pname);
 }
 
-int envblk_offset_get(int fd, off_t *off);
-int envblk_offset_set(int fd, off_t off);
-int envblk_size_get(int fd, int *size);
+int envblk_offset_get(struct misc_fd *mfd, off_t *off);
+int envblk_offset_set(struct misc_fd *mfd, off_t off);
+int envblk_size_get(struct misc_fd *mfd, int *size);
 int envblk_check_name(const char *name, int len);
 int envblk_import(char *from, char *to, int size);
 char *envblk_next_line(char *s, const char *end);
