@@ -1443,16 +1443,11 @@ static int prepare_build_program_table_device(struct job_data *job,
 	if (bis->skip_prepare)
 		/* skip the preparation work */
 		return 0;
-	if (dry_run) {
-		error_text("Option '--dry-run' is not implemented for this type of dump");
-		return -1;
-	}
 	/* Get full path of bootmap file */
 	bis->filename = misc_strdup(job->data.dump.device);
 	if (!bis->filename)
 		return -1;
-	bis->mfd.fd = misc_open_exclusive(bis->filename);
-	if (bis->mfd.fd == -1) {
+	if (misc_open_device(bis->filename, &bis->mfd, dry_run) == -1) {
 		error_text("Could not open file '%s'", bis->filename);
 		return -1;
 	}
