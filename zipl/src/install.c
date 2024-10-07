@@ -552,6 +552,9 @@ ask_for_confirmation(const char* fmt, ...)
 	/* Always assume positive answer in non-interactive mode */
 	if (!interactive)
 		return 0;
+	if (dry_run)
+		/* nothing to confirm */
+		return 0;
 	/* Print question */
 	va_start(args, fmt);
 	vprintf(fmt, args);
@@ -1169,8 +1172,7 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 		disk_free_info(info);
 		return -1;
 	}
-	mfd.fd = open(tempdev, O_RDWR);
-	if (mfd.fd == -1) {
+	if (misc_open_device(tempdev, &mfd, dry_run) == -1) {
 		error_text("Could not open temporary device node '%s'",
 			   tempdev);
 		misc_free_temp_dev(tempdev);
