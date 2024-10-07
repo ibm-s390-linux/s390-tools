@@ -11,12 +11,12 @@
 
 #include "lib/zt_common.h"
 #include "boot/error.h"
+#include "boot/loaders_layout.h"
 #include "dump/s390_dump.h"
 
 #include "eckd2dump.h"
 #include "stage2dump.h"
 
-#define MVDUMP_TOOL_SIZE	0x3000	/* Size of dump record */
 #define MAX_DUMP_VOLUMES	32	/* Up to 32 dump volumes possible */
 
 /*
@@ -205,10 +205,10 @@ static void check_volume(void)
 	 * Check whether parameter table on dump device has a valid
 	 * time stamp. The parameter table is located right behind
 	 * the dump tool, the corresponding block number is:
-	 *   MAGIC_BLK_ECKD + (MVDUMP_TOOL_SIZE / blocksize)
+	 *   MAGIC_BLK_ECKD + (STAGE2_DUMPER_SIZE_MV / blocksize)
 	 */
 	mvdump_table_new = (void *) page;
-	readblock(DF_S390_MAGIC_BLK_ECKD + m2b(MVDUMP_TOOL_SIZE),
+	readblock(DF_S390_MAGIC_BLK_ECKD + m2b(STAGE2_DUMPER_SIZE_MV),
 		  __pa(mvdump_table_new), 1);
 	/*
 	 * Check if time stamps match
