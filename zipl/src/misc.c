@@ -101,6 +101,35 @@ misc_open_exclusive(const char* filename)
 	return fd;
 }
 
+/**
+ * Open file FILENAME for write simulation
+ */
+int misc_open_simulate(const char *filename, struct misc_fd *mfd)
+{
+	/*
+	 * In write simulation mode actual data are not written to the file,
+	 * so open it as read-only
+	 */
+	mfd->fd = open(filename, O_RDONLY);
+	mfd->simulate_write = 1;
+	if (mfd->fd == -1)
+		error_reason(strerror(errno));
+	return mfd->fd;
+}
+
+int misc_open_device(const char *filename, struct misc_fd *mfd, int simulate)
+{
+	if (simulate) {
+		/*
+		 * open the file for "write simulation", when actual
+		 * data are not written, and only current position in
+		 * the file is updated
+		 */
+		return misc_open_simulate(filename, mfd);
+	}
+	mfd->fd = misc_open_exclusive(filename);
+	return mfd->fd;
+}
 
 /* Read COUNT bytes of data from file identified by file descriptor FD to
  * memory at location BUFFER. Return 0 when all bytes were successfully read,
