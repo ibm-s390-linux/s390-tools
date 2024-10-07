@@ -1,14 +1,14 @@
 /*
- * Memory layout of stage 2 for single volume dasd
- * dump tool with compression support
+ * Memory layout of stage 2 for ECKD DASD dump tool
+ * (single volume and multi volume)
  * ===============================================
  *
  * General memory layout
  * ---------------------
  *
  * 0x0000-0x1fff	Lowcore
- * 0x2000-0x9fff	Sections (load): head, text, data, rodata, rodata.str
- * 0xa000-0xafff	Sections: bss
+ * 0x2000-0xafff	Sections (load): head, text, data, rodata, rodata.str,
+ *			stage2dump.tail, eckd2dump_mv.tail, bss
  * 0xb000-0xdfff	Memory allocation (heap)
  * 0xe000-0xffff	Stack
  *
@@ -17,7 +17,9 @@
  *
  * 0x78			Stage 2 description parameters
  * 0x2018		Stage 2 entry point
- * 0x9ff8		Max mem dump parameter
+ * 0x4ff0		Stage 2 multi-volume dump parameters (eckd2dump_mv)
+ * 0x5000		Multi-volume dump parameters table (eckd2dump_mv)
+ * 0x9ff0		Stage 2 single volume dump parameters (eckd2dump_sv)
  */
 
 #include "boot/loaders_layout.h"
@@ -39,17 +41,18 @@ SECTIONS
   __ex_table_stop = .;
   .rodata : {*(.rodata) }
   .data : { *(.data) }
-  __stage2_params = .;
 
-  . = 0x9ff0;
+  . = STAGE2DUMP_TAIL_ADDRESS;
   .stage2dump.tail : { *(.stage2dump.tail) }
-
-  . = 0xa000;
+#ifdef ECKD2DUMP_MV
+  . = ECKD2DUMP_MV_TAIL_ADDRESS;
+  .eckd2dump_mv.tail : { *(.eckd2dump_mv.tail) }
+#endif
   __bss_start = .;
   .bss : { *(.bss) }
   __bss_stop = .;
 
-  . = ECKD2DUMP_SV_HEAP_ADDRESS;
+  . = ECKD2DUMP_HEAP_ADDRESS;
   __heap_start = .;
   .heap : {
     . += STAGE2_HEAP_SIZE;
@@ -58,11 +61,11 @@ SECTIONS
   }
   __heap_stop = .;
 
-  . = ECKD2DUMP_SV_STACK_ADDRESS;
+  . = ECKD2DUMP_STACK_ADDRESS;
   __stack_start = .;
   .stack : {
-    . += ECKD2DUMP_SV_STACK_SIZE;
-    ASSERT(__stack_end - __stack_start == ECKD2DUMP_SV_STACK_SIZE,
+    . += ECKD2DUMP_STACK_SIZE;
+    ASSERT(__stack_end - __stack_start == ECKD2DUMP_STACK_SIZE,
            "Stack section doesn't conform to the described memory layout");
   }
   __stack_end = .;

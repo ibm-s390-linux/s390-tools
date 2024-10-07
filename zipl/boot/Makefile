@@ -53,6 +53,15 @@ endif
 
 %.lds: %.lds.S
 	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -P -C -o $@ $<
+eckd2dump_sv.lds: eckd2dump.lds.S
+	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x9ff0 \
+	-P -C -o $@ $<
+eckd2dump_mv.lds: eckd2dump.lds.S
+	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x4ff0 \
+	-D ECKD2DUMP_MV -P -C -o $@ $<
+stage2.lds: stage2.lds.S
+	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x4ff0 \
+	-P -C -o $@ $<
 
 fba0.exec eckd0_ldl.exec eckd0_cdl.exec tape0.exec: \
 	stage0.lds
@@ -69,7 +78,7 @@ eckd2dump_sv.exec: \
 	libc.o ebcdic.o sclp.o entry.o eckd2dump_sv.lds
 eckd2dump_mv.exec: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_mv.o \
-	libc.o ebcdic.o sclp.o entry.o stage2.lds
+	libc.o ebcdic.o sclp.o entry.o eckd2dump_mv.lds
 fba2dump.exec: \
 	head.o stage2dump.o cio.o fba2dump.o \
 	libc.o ebcdic.o sclp.o entry.o stage2.lds
