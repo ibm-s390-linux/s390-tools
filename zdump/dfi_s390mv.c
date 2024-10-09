@@ -211,7 +211,9 @@ static void check_vol_table(struct vol *vol)
 static void vol_read(struct vol *vol)
 {
 	zg_ioctl(vol->fh, BLKFLSBUF, NULL, "BLKFLSBUF", ZG_CHECK);
-	df_s390_dumper_read(vol->fh, vol->blk_size, &vol->dumper);
+	if (df_s390_dumper_read(vol->fh, vol->blk_size, &vol->dumper))
+		ERR_EXIT("No dump tool found on the multi-volume dump device '%s'",
+			 vol->bus_id);
 	check_vol_table(vol);
 	zg_seek(vol->fh, vol->part_off, ZG_CHECK);
 	zg_read(vol->fh, &vol->hdr, DF_S390_HDR_SIZE, ZG_CHECK);
@@ -506,7 +508,8 @@ static int mv_dumper_read(void)
 	if (zg_ioctl(g.fh, BLKSSZGET, &l.blk_size, "BLKSSZGET",
 		     ZG_CHECK_NONE) == -1)
 		return -ENODEV;
-	df_s390_dumper_read(g.fh, l.blk_size, &l.dumper);
+	if (df_s390_dumper_read(g.fh, l.blk_size, &l.dumper))
+		return -ENODEV;
 	if (strncmp(l.dumper.magic, l.dumper_magic, DF_S390_DUMPER_MAGIC_SIZE) != 0)
 		return -ENODEV;
 	table_read(g.fh, l.blk_size, &l.table);

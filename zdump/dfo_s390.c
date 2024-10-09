@@ -234,10 +234,7 @@ static void df_s390_dump_init(void)
 	dh->hdr_size = DF_S390_HDR_SIZE;
 	dh->page_size = PAGE_SIZE;
 	dh->dump_level = 4;
-	if (dfi_cpu_content() == DFI_CPU_CONTENT_NONE)
-		dh->version = 4;
-	else
-		dh->version = 5;
+	dh->version = 5;
 	dh->mem_start = 0;
 	dh->mem_end = dfi_mem_end();
 	dh->mem_size = dh->mem_end + 1;
@@ -246,6 +243,8 @@ static void df_s390_dump_init(void)
 	if (dfi_attr_build_arch())
 		dh->build_arch = df_s390_from_dfi_arch(*dfi_attr_build_arch());
 	dh->cpu_cnt = dfi_cpu_cnt();
+	if (dfi_cpu_content() == DFI_CPU_CONTENT_NONE)
+		dh->cpu_cnt = 0;
 	if (dfi_attr_real_cpu_cnt())
 		dh->real_cpu_cnt = *dfi_attr_real_cpu_cnt();
 	if (dfi_attr_cpu_id())

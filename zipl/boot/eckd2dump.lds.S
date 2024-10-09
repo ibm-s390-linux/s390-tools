@@ -49,7 +49,7 @@ SECTIONS
     ASSERT(__stage2dump_tail_end - __stage2_head == STAGE2_DUMPER_SIZE_MV,
            "MV dumper size doesn't conform to the described memory layout");
 #else
-    ASSERT(__stage2dump_tail_end - __stage2_head == STAGE2_DUMPER_SIZE_ZLIB,
+    ASSERT(__stage2dump_tail_end - __stage2_head == STAGE2_DUMPER_SIZE_SV_ZLIB,
            "SV dumper size doesn't conform to the described memory layout");
 #endif
   }

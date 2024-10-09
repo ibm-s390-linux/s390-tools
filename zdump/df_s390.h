@@ -53,8 +53,8 @@ extern void df_s390_hdr_add(struct df_s390_hdr *hdr);
 extern void df_s390_em_add(struct df_s390_em *em);
 extern int df_s390_cpu_info_add(struct df_s390_hdr *hdr, u64 addr_max);
 extern int df_s390_em_verify(struct df_s390_em *em, struct df_s390_hdr *hdr);
-extern void df_s390_dumper_read(struct zg_fh *fh, int32_t blk_size,
-				struct df_s390_dumper *dumper);
+extern int df_s390_dumper_read(struct zg_fh *fh, int32_t blk_size,
+			       struct df_s390_dumper *dumper);
 
 /*
  * DASD dt and dfi functions

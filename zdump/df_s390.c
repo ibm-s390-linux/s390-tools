@@ -44,11 +44,12 @@ int df_s390_cpu_info_add(struct df_s390_hdr *hdr, u64 addr_max)
 	unsigned int i;
 	int rc;
 
-	if (hdr->version < 5 && hdr->magic == DF_S390_MAGIC) {
+	if (hdr->cpu_cnt == 0) {
 		/* No Prefix registers in header */
-		hdr->cpu_cnt = 0;
 		dfi_cpu_info_init(DFI_CPU_CONTENT_NONE);
-	} else if (check_addr_max(hdr, addr_max) != 0) {
+		return 0;
+	}
+	if (check_addr_max(hdr, addr_max) != 0) {
 		/* Only lowcore pointers available */
 		dfi_cpu_info_init(DFI_CPU_CONTENT_LC);
 	} else {
@@ -93,14 +94,11 @@ void df_s390_hdr_add(struct df_s390_hdr *hdr)
 	dfi_arch_set(df_s390_to_dfi_arch(hdr->arch));
 	if (hdr->cpu_id)
 		dfi_attr_cpu_id_set(hdr->cpu_id);
-	if ((hdr->version >= 2 || hdr->magic == DF_S390_MAGIC_EXT) &&
-	    hdr->build_arch)
+	if (hdr->build_arch)
 		dfi_attr_build_arch_set(df_s390_to_dfi_arch(hdr->build_arch));
-	if ((hdr->version >= 3 || hdr->magic == DF_S390_MAGIC_EXT) &&
-	    hdr->mem_size_real)
+	if (hdr->mem_size_real)
 		dfi_attr_mem_size_real_set(hdr->mem_size_real);
-	if ((hdr->version >= 5 || hdr->magic == DF_S390_MAGIC_EXT) &&
-	    hdr->real_cpu_cnt)
+	if (hdr->real_cpu_cnt)
 		dfi_attr_real_cpu_cnt_set(hdr->real_cpu_cnt);
 	if (!hdr->mvdump && hdr->zlib_version_s390 && hdr->zlib_entry_size)
 		dfi_attr_zlib_info_set(hdr->zlib_version_s390, hdr->zlib_entry_size);
@@ -134,50 +132,56 @@ int df_s390_em_verify(struct df_s390_em *em, struct df_s390_hdr *hdr)
 /*
  * Read s390 dump tool from DASD with given block size
  */
-void df_s390_dumper_read(struct zg_fh *fh, int blk_size,
-			 struct df_s390_dumper *dumper)
+int df_s390_dumper_read(struct zg_fh *fh, int blk_size,
+			struct df_s390_dumper *dumper)
 {
 	int bytes_to_read, offset = DF_S390_MAGIC_BLK_ECKD * blk_size;
 
 	/*
-	 * First read 3 fields at the start of the dumper. The magic number,
-	 * version and one extra field for the old dumper case (no magic
-	 * number, checking for specific assembler instructions).
+	 * First read 2 fields at the start of the dumper. The magic number
+	 * and the version.
 	 */
-	bytes_to_read = offsetof(struct df_s390_dumper, force);
+	bytes_to_read = offsetof(struct df_s390_dumper, size);
 	zg_seek(fh, offset, ZG_CHECK);
 	zg_read(fh, dumper, bytes_to_read, ZG_CHECK);
-	if (memcmp(dumper->magic, OLD_DUMPER_HEX_INSTR1, 4) == 0 &&
-	    memcmp(&dumper->size, OLD_DUMPER_HEX_INSTR2, 2) == 0)
-		/* We found basr r13,0 (old dumper) */
-		dumper->version = 0;
+	dumper->size = 0;
 	switch (dumper->version) {
+	/*
+	 * Versions 1 and 2 refer to the newer extended DASD dumpers
+	 * while version 5 refers to the old (non-extended) DASD dump-tools
+	 * we still support (either single-volume or multi-volume).
+	 * Magic numbers for SV and MV dumpers apply as well.
+	 * Pick a dumper size based on the Version and Magic combination.
+	 */
 	case 1:
 		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT,
 			    DF_S390_DUMPER_MAGIC_SIZE) == 0 ||
 		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV_EXT,
 			    DF_S390_DUMPER_MAGIC_SIZE) == 0)
-			dumper->size = STAGE2_DUMPER_SIZE_V3;
-		else
-			dumper->size = STAGE2_DUMPER_SIZE_V1;
+			dumper->size = STAGE2_DUMPER_SIZE_SV;
 		break;
 	case 2:
 		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_EXT,
 			    DF_S390_DUMPER_MAGIC_SIZE) == 0)
-			dumper->size = STAGE2_DUMPER_SIZE_ZLIB;
+			dumper->size = STAGE2_DUMPER_SIZE_SV_ZLIB;
 		else if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV_EXT,
 				 DF_S390_DUMPER_MAGIC_SIZE) == 0)
 			dumper->size = STAGE2_DUMPER_SIZE_MV;
-		else
-			dumper->size = STAGE2_DUMPER_SIZE_V2;
 		break;
-	case 3:
-	default:
-		dumper->size = STAGE2_DUMPER_SIZE_V3;
+	case 5:
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC64,
+			    DF_S390_DUMPER_MAGIC_SIZE) == 0 ||
+		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV,
+			    DF_S390_DUMPER_MAGIC_SIZE) == 0)
+			dumper->size = STAGE2_DUMPER_SIZE_SV;
+		break;
 	}
+	if (dumper->size == 0)
+		return -1;
 	/* Read force and mem fields in the end of the dumper */
 	bytes_to_read = sizeof(dumper->force) + sizeof(dumper->mem);
 	offset += dumper->size - bytes_to_read;
 	zg_seek(fh, offset, ZG_CHECK);
 	zg_read(fh, &dumper->force, bytes_to_read, ZG_CHECK);
+	return 0;
 }
