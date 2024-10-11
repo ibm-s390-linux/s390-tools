@@ -693,21 +693,25 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 			util_rec_set(rec, "sestat", "error");
 			return;
 		}
-		switch (EXTRACT_BS_BITS(facility)) {
-		case 0:
-			util_rec_set(rec, "sestat", "usable");
-			break;
-		case 1:
-			util_rec_set(rec, "sestat", "bound");
-			break;
-		case 2:
-			util_rec_set(rec, "sestat", "unbound");
-			break;
-		case 3:
-			util_rec_set(rec, "sestat", "illicit");
-			break;
-		default:
-			util_rec_set(rec, "sestat", "-");
+		if (facility) {
+			switch (EXTRACT_BS_BITS(facility)) {
+			case 0:
+				util_rec_set(rec, "sestat", "usable");
+				break;
+			case 1:
+				util_rec_set(rec, "sestat", "bound");
+				break;
+			case 2:
+				util_rec_set(rec, "sestat", "unbound");
+				break;
+			case 3:
+				util_rec_set(rec, "sestat", "illicit");
+				break;
+			default:
+				util_rec_set(rec, "sestat", "-");
+			}
+		} else {
+			util_rec_set(rec, "sestat", "invalid");
 		}
 	}
 }
