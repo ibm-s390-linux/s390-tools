@@ -82,6 +82,14 @@ impl SymKey {
             Self::Aes256Xts(key) => key.value(),
         }
     }
+
+    /// Return the key type of this [`SymKey`].
+    pub fn key_type(&self) -> SymKeyType {
+        match self {
+            Self::Aes256(_) => SymKeyType::Aes256,
+            Self::Aes256Xts(_) => SymKeyType::Aes256Xts,
+        }
+    }
 }
 
 impl From<Aes256Key> for SymKey {
@@ -510,6 +518,18 @@ mod tests {
         assert_eq!(
             <SymKeyType as Into<Nid>>::into(SymKeyType::Aes256Xts),
             Nid::AES_256_XTS
+        );
+    }
+
+    #[test]
+    fn key_type() {
+        assert_eq!(
+            SymKey::random(SymKeyType::Aes256).unwrap().key_type(),
+            SymKeyType::Aes256
+        );
+        assert_eq!(
+            SymKey::random(SymKeyType::Aes256Xts).unwrap().key_type(),
+            SymKeyType::Aes256Xts
         );
     }
 }
