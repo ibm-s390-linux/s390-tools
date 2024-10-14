@@ -11,9 +11,10 @@ use crate::misc::to_u32;
 use crate::request::Confidential;
 use crate::{Error, Result};
 use openssl::bn::{BigNum, BigNumContext};
-use openssl::ec::{EcGroupRef, EcPointRef};
+use openssl::ec::{EcGroup, EcGroupRef, EcKey, EcPointRef};
 use openssl::error::ErrorStack;
 use openssl::hash::{hash, MessageDigest};
+use openssl::nid::Nid;
 use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
 use std::convert::TryInto;
@@ -289,6 +290,19 @@ fn get_pub_ecdh_points(pkey: &EcPointRef, grp: &EcGroupRef) -> Result<[u8; 160],
     Ok(coord.try_into().unwrap())
 }
 
+impl TryFrom<EcdhPubkeyCoord> for PKey<Public> {
+    type Error = ErrorStack;
+
+    fn try_from(value: EcdhPubkeyCoord) -> Result<Self, Self::Error> {
+        let ecdh = value.as_ref();
+        let grp = EcGroup::from_curve_name(Nid::SECP521R1)?;
+        let x = BigNum::from_slice(&ecdh[..ECDH_PUB_KEY_COORD_POINT_SIZE])?;
+        let y = BigNum::from_slice(&ecdh[ECDH_PUB_KEY_COORD_POINT_SIZE..])?;
+        let ec_key = EcKey::from_public_key_affine_coordinates(&grp, &x, &y)?;
+        PKey::from_ec_key(ec_key)
+    }
+}
+
 macro_rules! ecdh_from {
     ($type: ty) => {
         impl TryFrom<&PKeyRef<$type>> for EcdhPubkeyCoord {
@@ -301,6 +315,15 @@ macro_rules! ecdh_from {
                 let pub_key = k.public_key();
                 let coord = get_pub_ecdh_points(pub_key, grp)?;
                 Ok(EcdhPubkeyCoord(coord))
+            }
+        }
+
+        impl TryFrom<PKey<$type>> for EcdhPubkeyCoord {
+            type Error = ErrorStack;
+
+            fn try_from(key: PKey<$type>) -> Result<Self, Self::Error> {
+                let key_ref = key.as_ref();
+                key_ref.try_into()
             }
         }
     };
@@ -467,12 +490,13 @@ impl<'a> BinReqValues<'a> {
 
 #[cfg(test)]
 mod tests {
+    use openssl::ec::EcGroup;
+    use openssl::nid::Nid;
+
     use super::*;
     use crate::get_test_asset;
     use crate::request::SymKey;
     use crate::test_utils::*;
-    use openssl::ec::EcGroup;
-    use openssl::nid::Nid;
 
     static TEST_MAGIC: [u8; 8] = 0x12345689abcdef00u64.to_be_bytes();
 
@@ -610,5 +634,28 @@ mod tests {
         let points = super::get_pub_ecdh_points(points, &grp).unwrap();
 
         assert_eq!(&points, pub_key);
+    }
+
+    #[test]
+    fn conversion_ecdh_and_vice_versa() {
+        let (_, cust_pub) = get_test_keys();
+        let phk: EcdhPubkeyCoord = cust_pub.clone().try_into().unwrap();
+
+        assert_eq!(
+            phk.as_ref(),
+            &[
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 118, 136, 28, 216, 75, 139, 109, 231,
+                18, 60, 126, 144, 14, 223, 120, 231, 247, 182, 132, 153, 145, 70, 177, 38, 59, 168,
+                184, 108, 132, 71, 240, 138, 182, 212, 105, 194, 177, 40, 237, 158, 28, 53, 1, 88,
+                5, 172, 211, 211, 2, 51, 211, 145, 34, 247, 226, 248, 170, 28, 43, 20, 123, 120,
+                131, 180, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 195, 69, 86, 194, 92,
+                249, 47, 41, 206, 102, 189, 68, 17, 77, 107, 123, 60, 120, 225, 58, 63, 144, 189,
+                185, 0, 64, 246, 135, 110, 82, 98, 247, 120, 166, 26, 147, 125, 27, 52, 128, 46,
+                178, 87, 227, 78, 6, 114, 221, 95, 42, 52, 122, 221, 170, 40, 32, 53, 9, 42, 112,
+                195, 92, 46, 121, 115
+            ]
+        );
+        let cust_pub_back: PKey<Public> = phk.try_into().unwrap();
+        assert!(cust_pub.public_eq(&cust_pub_back));
     }
 }
