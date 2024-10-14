@@ -41,6 +41,15 @@ pub enum SymKeyType {
     Aes256Xts,
 }
 
+impl From<SymKeyType> for Nid {
+    fn from(value: SymKeyType) -> Self {
+        match value {
+            SymKeyType::Aes256 => Self::AES_256_GCM,
+            SymKeyType::Aes256Xts => Self::AES_256_XTS,
+        }
+    }
+}
+
 /// Types of symmetric keys
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -490,5 +499,17 @@ mod tests {
         let hmac = calculate_hmac(&pkey, MessageDigest::sha512(), &data).unwrap();
 
         assert_eq!(hmac, exp);
+    }
+
+    #[test]
+    fn from_symkeytype() {
+        assert_eq!(
+            <SymKeyType as Into<Nid>>::into(SymKeyType::Aes256),
+            Nid::AES_256_GCM
+        );
+        assert_eq!(
+            <SymKeyType as Into<Nid>>::into(SymKeyType::Aes256Xts),
+            Nid::AES_256_XTS
+        );
     }
 }
