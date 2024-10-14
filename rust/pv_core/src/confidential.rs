@@ -4,6 +4,8 @@
 
 use std::fmt::Debug;
 
+use crate::Error;
+
 /// Trait for securely zeroizing  memory.
 ///
 /// To be used with [`Confidential`]
@@ -170,6 +172,27 @@ impl<C: Zeroize> Drop for Confidential<C> {
     }
 }
 
+impl<const N: usize> TryFrom<Confidential<Vec<u8>>> for Confidential<[u8; N]> {
+    type Error = Error;
+
+    fn try_from(value: Confidential<Vec<u8>>) -> Result<Self, Self::Error> {
+        let len = value.0.len();
+        if len == N {
+            Ok(Self::new(
+                TryInto::<[u8; N]>::try_into(value.0.clone()).unwrap(),
+            ))
+        } else {
+            Err(Error::LengthMismatch(len, N))
+        }
+    }
+}
+
+impl<const N: usize> From<Confidential<[u8; N]>> for Confidential<Vec<u8>> {
+    fn from(value: Confidential<[u8; N]>) -> Self {
+        Self::new(value.0.to_vec())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -220,5 +243,29 @@ mod test {
         let mut conf = Confidential::new("test".to_string());
         conf.zeroize();
         assert_eq!(&[0; 4], conf.value().as_bytes());
+    }
+
+    #[test]
+    fn try_from_conf_vec_into_conf_array() {
+        let _: Confidential<[u8; 0]> = Confidential::new(vec![])
+            .try_into()
+            .expect("should not fail");
+        let data = vec![0x12u8; 100];
+        let arr: Confidential<[u8; 100]> = Confidential::new(data.clone())
+            .try_into()
+            .expect("should not fail");
+        assert_eq!(arr.value(), data.as_slice());
+
+        let result: Result<Confidential<[u8; 101]>, Error> =
+            Confidential::new(data.clone()).try_into();
+        assert!(matches!(result, Err(Error::LengthMismatch(100, 101))));
+    }
+
+    #[test]
+    fn try_from_conf_array_into_conf_vec() {
+        let _: Confidential<Vec<u8>> = Confidential::new([]).into();
+        let data = [0x12u8; 100];
+        let vec: Confidential<Vec<u8>> = Confidential::new(data).into();
+        assert_eq!(vec.value(), data.as_slice());
     }
 }
