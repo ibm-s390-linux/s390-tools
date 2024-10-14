@@ -275,16 +275,17 @@ impl AsRef<[u8]> for EcdhPubkeyCoord {
     }
 }
 
+const ECDH_PUB_KEY_COORD_POINT_SIZE: usize = 0x50;
+
 /// Get the pub ECDH coordinates in the format the Ultravisor expects it:
 /// The two coordinates are padded to 80 bytes each.
 fn get_pub_ecdh_points(pkey: &EcPointRef, grp: &EcGroupRef) -> Result<[u8; 160], ErrorStack> {
-    const ECDH_PUB_KEY_COORD_POINT_SIZE: i32 = 0x50;
     let mut x = BigNum::new()?;
     let mut y = BigNum::new()?;
     let mut bn_ctx = BigNumContext::new()?;
     pkey.affine_coordinates(grp, &mut x, &mut y, &mut bn_ctx)?;
-    let mut coord: Vec<u8> = x.to_vec_padded(ECDH_PUB_KEY_COORD_POINT_SIZE)?;
-    coord.append(&mut y.to_vec_padded(ECDH_PUB_KEY_COORD_POINT_SIZE)?);
+    let mut coord: Vec<u8> = x.to_vec_padded(ECDH_PUB_KEY_COORD_POINT_SIZE as i32)?;
+    coord.append(&mut y.to_vec_padded(ECDH_PUB_KEY_COORD_POINT_SIZE as i32)?);
     Ok(coord.try_into().unwrap())
 }
 
