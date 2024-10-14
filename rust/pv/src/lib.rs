@@ -85,8 +85,8 @@ pub use pv_core::{FileAccessErrorType, FileIoErrorType};
 pub mod request {
     pub use crate::brcb::BootHdrTags;
     pub use crate::crypto::{
-        derive_aes256_gcm_key, gen_ec_key, random_array, Aes256GcmKey, Aes256XtsKey, SymKey,
-        SymKeyType,
+        decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
+        AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey, SymKeyType,
     };
     pub use crate::req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request};
     pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};

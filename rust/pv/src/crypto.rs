@@ -16,22 +16,25 @@ use openssl::{
     rand::rand_bytes,
     rsa::Padding,
     sign::{Signer, Verifier},
-    symm::{decrypt_aead, encrypt_aead, Cipher},
+    symm::{decrypt_aead as openssl_decrypt_aead, encrypt_aead as openssl_encrypt_aead, Cipher},
 };
 use pv_core::request::Confidential;
 
 use crate::{error::Result, Error};
 
 /// An AES256-GCM key that will purge itself out of the memory when going out of scope
-pub type Aes256GcmKey = Confidential<[u8; 32]>;
+pub type Aes256GcmKey = Confidential<[u8; SymKeyType::AES_256_GCM_KEY_LEN]>;
 /// An AES256-XTS key that will purge itself out of the memory when going out of scope
-pub type Aes256XtsKey = Confidential<[u8; 64]>;
-pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
+pub type Aes256XtsKey = Confidential<[u8; SymKeyType::AES_256_XTS_KEY_LEN]>;
+
+/// SHA-512 digest length (in bytes)
+#[allow(unused)]
+pub const SHA_512_HASH_LEN: usize = 64;
 
 #[allow(dead_code)]
-pub(crate) const SHA_256_HASH_SIZE: u32 = 32;
+pub(crate) const SHA_256_HASH_LEN: u32 = 32;
 #[allow(dead_code)]
-pub(crate) type Sha256Hash = [u8; SHA_256_HASH_SIZE as usize];
+pub(crate) type Sha256Hash = [u8; SHA_256_HASH_LEN as usize];
 
 /// Types of symmetric keys, to specify during construction.
 #[non_exhaustive]
@@ -48,6 +51,29 @@ impl SymKeyType {
     #[allow(non_upper_case_globals)]
     /// AES 256 GCM key (32 bytes)
     pub const Aes256: Self = Self::Aes256Gcm;
+    /// AES256-GCM key length (in bytes)
+    pub const AES_256_GCM_KEY_LEN: usize = 32;
+    /// AES256-GCM IV length (in bytes)
+    pub const AES_256_GCM_IV_LEN: usize = 12;
+    /// AES256-GCM tag size (in bytes)
+    pub const AES_256_GCM_TAG_LEN: usize = 16;
+    /// AES256-XTS key length (in bytes)
+    pub const AES_256_XTS_KEY_LEN: usize = 64;
+    /// AES256-XTS tweak length (in bytes)
+    pub const AES_256_XTS_TWEAK_LEN: usize = 16;
+
+    /// Returns the tag length of the [`SymKeyType`] if it is an AEAD key
+    pub const fn tag_len(&self) -> Option<usize> {
+        match self {
+            SymKeyType::Aes256Gcm => Some(Self::AES_256_GCM_TAG_LEN),
+            SymKeyType::Aes256Xts => None,
+        }
+    }
+
+    /// Returns true if the [`SymKeyType`] is an AEAD key
+    pub const fn is_aead(&self) -> bool {
+        self.tag_len().is_some()
+    }
 }
 
 impl Display for SymKeyType {
@@ -186,30 +212,119 @@ pub fn gen_ec_key(nid: Nid) -> Result<PKey<Private>> {
 }
 
 /// Result type for an AES encryption in GCM mode..
-#[derive(Debug)]
-pub(crate) struct AesGcmResult {
+#[derive(PartialEq, Eq, Debug)]
+pub struct AeadEncryptionResult {
     /// The result.
     ///
     /// [`Vec<u8>`] with the following content:
     /// 1. `aad`
     /// 2. `encr(conf)`
     /// 3. `aes gcm tag`
-    pub buf: Vec<u8>,
+    pub(crate) buf: Vec<u8>,
     /// The position of the authenticated data in [`Self::buf`]
-    pub aad_range: Range<usize>,
+    pub(crate) aad_range: Range<usize>,
     /// The position of the encrypted data in [`Self::buf`]
-    pub encr_range: Range<usize>,
+    pub(crate) encr_range: Range<usize>,
     /// The position of the tag in [`Self::buf`]
-    #[allow(unused)]
-    // here for completeness
-    pub tag_range: Range<usize>,
+    pub(crate) tag_range: Range<usize>,
 }
 
-impl AesGcmResult {
+/// Result type for an AES decryption in GCM mode..
+#[derive(PartialEq, Eq, Debug)]
+pub struct AeadDecryptionResult {
+    /// The result.
+    ///
+    /// [`Vec<u8>`] with the following content:
+    /// 1. `aad`
+    /// 2. `decr(conf)`
+    /// 3. `aes gcm tag`
+    buf: Confidential<Vec<u8>>,
+    /// The position of the authenticated data in [`Self::buf`]
+    aad_range: Range<usize>,
+    /// The position of the authenticated data in [`Self::buf`]
+    data_range: Range<usize>,
+    /// The position of the tag in [`Self::buf`]
+    tag_range: Range<usize>,
+}
+
+impl AeadEncryptionResult {
     /// Deconstruct the result to just the resulting data w/o ranges.
-    pub(crate) fn data(self) -> Vec<u8> {
+    pub fn into_buf(self) -> Vec<u8> {
         let Self { buf, .. } = self;
         buf
+    }
+
+    /// Deconstruct the result into all parts: additional authenticated data,
+    /// cipher data, and tag.
+    #[allow(unused)]
+    // here for completeness
+    pub(crate) fn into_parts(self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let Self {
+            buf,
+            aad_range,
+            encr_range,
+            tag_range,
+        } = self;
+
+        (
+            buf[aad_range].to_vec(),
+            buf[encr_range].to_vec(),
+            buf[tag_range].to_vec(),
+        )
+    }
+
+    /// Deconstruct the result to the resulting ciphered data w/o ranges.
+    #[allow(unused)]
+    // here for completeness
+    pub(crate) fn into_cipher(self) -> Vec<u8> {
+        let Self {
+            buf,
+            aad_range: _,
+            encr_range,
+            ..
+        } = self;
+
+        buf[encr_range].to_vec()
+    }
+}
+
+impl AeadDecryptionResult {
+    /// Deconstruct the result to just the resulting data w/o ranges.
+    pub fn into_buf(self) -> Confidential<Vec<u8>> {
+        let Self { buf, .. } = self;
+        buf
+    }
+
+    /// Deconstruct the result into all parts: additional data, plain data, and tag.
+    #[allow(unused)]
+    // here for completeness
+    pub(crate) fn into_parts(self) -> (Vec<u8>, Confidential<Vec<u8>>, Vec<u8>) {
+        let Self {
+            buf,
+            aad_range,
+            data_range,
+            tag_range,
+        } = self;
+
+        (
+            buf.value()[aad_range].to_vec(),
+            Confidential::new(buf.value()[data_range].to_vec()),
+            buf.value()[tag_range].to_vec(),
+        )
+    }
+
+    /// Deconstruct the result to the resulting data w/o ranges.
+    #[allow(unused)]
+    // here for completeness
+    pub(crate) fn into_plain(self) -> Confidential<Vec<u8>> {
+        let Self {
+            buf,
+            aad_range: _,
+            data_range,
+            ..
+        } = self;
+
+        Confidential::new(buf.value()[data_range].to_vec())
     }
 }
 
@@ -219,28 +334,23 @@ impl AesGcmResult {
 /// * `iv` - initialisation vector
 /// * `aad` - additional authentic data
 /// * `conf` - data to be encrypted
+/// * `tag_len` - length of the authentication tag to generate (in bytes)
 ///
 /// # Errors
 ///
 /// This function will return an error if the data could not be encrypted by OpenSSL.
-pub(crate) fn encrypt_aes_gcm(
+pub fn encrypt_aead(
     key: &SymKey,
     iv: &[u8],
     aad: &[u8],
     conf: &[u8],
-) -> Result<AesGcmResult> {
-    let mut tag = vec![0xff; AES_256_GCM_TAG_SIZE];
-    let encr = match key {
-        SymKey::Aes256(key) => encrypt_aead(
-            Cipher::aes_256_gcm(),
-            key.value(),
-            Some(iv),
-            aad,
-            conf,
-            &mut tag,
-        )?,
-        SymKey::Aes256Xts(_) => return Err(Error::NoAeadKey),
-    };
+) -> Result<AeadEncryptionResult> {
+    let tag_len = key.key_type().tag_len().ok_or_else(|| Error::NoAeadKey)?;
+
+    let nid = key.key_type().into();
+    let cipher = Cipher::from_nid(nid).ok_or(Error::UnsupportedCipher(nid))?;
+    let mut tag = vec![0x0u8; tag_len];
+    let encr = openssl_encrypt_aead(cipher, key.value(), Some(iv), aad, conf, &mut tag)?;
 
     let mut buf = vec![0; aad.len() + encr.len() + tag.len()];
     let aad_range = Range {
@@ -259,7 +369,7 @@ pub(crate) fn encrypt_aes_gcm(
     buf[aad_range.clone()].copy_from_slice(aad);
     buf[encr_range.clone()].copy_from_slice(&encr);
     buf[tag_range.clone()].copy_from_slice(&tag);
-    Ok(AesGcmResult {
+    Ok(AeadEncryptionResult {
         buf,
         aad_range,
         encr_range,
@@ -281,29 +391,53 @@ pub(crate) fn encrypt_aes_gcm(
 /// # Errors
 ///
 /// This function will return an error if the data could not be encrypted by OpenSSL.
-pub(crate) fn decrypt_aes_gcm(
+pub fn decrypt_aead(
     key: &SymKey,
     iv: &[u8],
     aad: &[u8],
     encr: &[u8],
     tag: &[u8],
-) -> Result<Confidential<Vec<u8>>> {
-    let decr = match key {
-        SymKey::Aes256(key) => {
-            decrypt_aead(Cipher::aes_256_gcm(), key.value(), Some(iv), aad, encr, tag)
-        }
+) -> Result<AeadDecryptionResult> {
+    match key {
+        SymKey::Aes256(_) => {}
         SymKey::Aes256Xts(_) => return Err(Error::NoAeadKey),
-    }
-    .map_err(|ssl_err| {
-        // Empty error-stack -> no internal ssl error but decryption failed.
-        // Very likely due to a tag mismatch.
-        if ssl_err.errors().is_empty() {
-            Error::GcmTagMismatch
-        } else {
-            Error::Crypto(ssl_err)
-        }
-    })?;
-    Ok(decr.into())
+    };
+    let nid = key.key_type().into();
+    let cipher = Cipher::from_nid(nid).ok_or(Error::UnsupportedCipher(nid))?;
+    let decr =
+        openssl_decrypt_aead(cipher, key.value(), Some(iv), aad, encr, tag).map_err(|ssl_err| {
+            // Empty error-stack -> no internal ssl error but decryption failed.
+            // Very likely due to a tag mismatch.
+            if ssl_err.errors().is_empty() {
+                Error::GcmTagMismatch
+            } else {
+                Error::Crypto(ssl_err)
+            }
+        })?;
+    let mut conf = Confidential::new(vec![0; aad.len() + decr.len() + tag.len()]);
+    let aad_range = Range {
+        start: 0,
+        end: aad.len(),
+    };
+    let data_range = Range {
+        start: aad.len(),
+        end: aad.len() + decr.len(),
+    };
+    let tag_range = Range {
+        start: aad.len() + decr.len(),
+        end: aad.len() + decr.len() + tag.len(),
+    };
+
+    let buf = conf.value_mut();
+    buf[aad_range.clone()].copy_from_slice(aad);
+    buf[data_range.clone()].copy_from_slice(&decr);
+    buf[tag_range.clone()].copy_from_slice(tag);
+    Ok(AeadDecryptionResult {
+        buf: conf,
+        aad_range,
+        data_range,
+        tag_range,
+    })
 }
 
 /// Calculate the hash of a slice.
@@ -480,23 +614,26 @@ mod tests {
             0x4d, 0x23, 0xc3, 0xce, 0xc3, 0x34, 0xb4, 0x9b, 0xdb, 0x37, 0x0c, 0x43, 0x7f, 0xec,
             0x78, 0xde,
         ];
-        let aes_gcm_res = vec![
-            0x4d, 0x23, 0xc3, 0xce, 0xc3, 0x34, 0xb4, 0x9b, 0xdb, 0x37, 0x0c, 0x43, 0x7f, 0xec,
-            0x78, 0xde, 0xf7, 0x26, 0x44, 0x13, 0xa8, 0x4c, 0x0e, 0x7c, 0xd5, 0x36, 0x86, 0x7e,
-            0xb9, 0xf2, 0x17, 0x36, 0x67, 0xba, 0x05, 0x10, 0x26, 0x2a, 0xe4, 0x87, 0xd7, 0x37,
-            0xee, 0x62, 0x98, 0xf7, 0x7e, 0x0c,
+        let aes_gcm_ciphertext = [
+            0xf7, 0x26, 0x44, 0x13, 0xa8, 0x4c, 0x0e, 0x7c, 0xd5, 0x36, 0x86, 0x7e, 0xb9, 0xf2,
+            0x17, 0x36,
         ];
+        let aes_gcm_tag = [
+            0x67, 0xba, 0x05, 0x10, 0x26, 0x2a, 0xe4, 0x87, 0xd7, 0x37, 0xee, 0x62, 0x98, 0xf7,
+            0x7e, 0x0c,
+        ];
+        let aes_gcm_res = [aes_gcm_aad, aes_gcm_ciphertext, aes_gcm_tag].concat();
         let key = SymKey::Aes256(aes_gcm_key.into());
 
-        let AesGcmResult {
+        let AeadEncryptionResult {
             buf,
             aad_range,
             encr_range,
             tag_range,
-        } = encrypt_aes_gcm(&key, &aes_gcm_iv, &aes_gcm_aad, aes_gcm_plain.value()).unwrap();
+        } = encrypt_aead(&key, &aes_gcm_iv, &aes_gcm_aad, aes_gcm_plain.value()).unwrap();
         assert_eq!(buf, aes_gcm_res);
 
-        let conf = decrypt_aes_gcm(
+        let conf = decrypt_aead(
             &key,
             &aes_gcm_iv,
             &buf[aad_range],
@@ -504,7 +641,42 @@ mod tests {
             &buf[tag_range],
         )
         .unwrap();
-        assert_eq!(conf, aes_gcm_plain);
+        assert_eq!(&conf.buf.value()[conf.aad_range], &aes_gcm_aad);
+        assert_eq!(&conf.buf.value()[conf.data_range], aes_gcm_plain.value());
+        assert_eq!(&conf.buf.value()[conf.tag_range], &aes_gcm_tag);
+
+        let (aad, ciphertext, tag) =
+            encrypt_aead(&key, &aes_gcm_iv, &aes_gcm_aad, aes_gcm_plain.value())
+                .unwrap()
+                .into_parts();
+        assert_eq!(aes_gcm_aad, aad.as_slice());
+        assert_eq!(aes_gcm_ciphertext, ciphertext.as_slice());
+        assert_eq!(aes_gcm_tag, tag.as_slice());
+
+        let (aad2, plaintext, tag2) = decrypt_aead(&key, &aes_gcm_iv, &aad, &ciphertext, &tag)
+            .unwrap()
+            .into_parts();
+        assert_eq!(aes_gcm_aad, aad2.as_slice());
+        assert_eq!(aes_gcm_plain, plaintext);
+        assert_eq!(aes_gcm_tag, tag2.as_slice());
+    }
+
+    #[test]
+    fn aes_gcm_fails_wrong_keytype() {
+        let aes_gcm_iv = [
+            0x99, 0xaa, 0x3e, 0x68, 0xed, 0x81, 0x73, 0xa0, 0xee, 0xd0, 0x66, 0x84,
+        ];
+        let aes_gcm_plain = Confidential::new(vec![
+            0xf5, 0x6e, 0x87, 0x05, 0x5b, 0xc3, 0x2d, 0x0e, 0xeb, 0x31, 0xb2, 0xea, 0xcc, 0x2b,
+            0xf2, 0xa5,
+        ]);
+        let aes_gcm_aad = [
+            0x4d, 0x23, 0xc3, 0xce, 0xc3, 0x34, 0xb4, 0x9b, 0xdb, 0x37, 0x0c, 0x43, 0x7f, 0xec,
+            0x78, 0xde,
+        ];
+
+        let key = SymKey::random(SymKeyType::Aes256Xts).unwrap();
+        encrypt_aead(&key, &aes_gcm_iv, &aes_gcm_aad, aes_gcm_plain.value()).expect_err("");
     }
 
     #[test]

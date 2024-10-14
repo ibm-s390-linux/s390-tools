@@ -118,6 +118,9 @@ pub enum Error {
 
     #[error("No Authenticated Encryption with Associated Data (AEAD) key")]
     NoAeadKey,
+
+    #[error("Unsupported cipher: {:?}", .0.as_raw())]
+    UnsupportedCipher(Nid),
 }
 
 // used in macros
@@ -166,3 +169,4 @@ macro_rules! bail_hkd_verify {
     };
 }
 pub(crate) use bail_hkd_verify;
+use openssl::nid::Nid;

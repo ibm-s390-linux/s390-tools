@@ -240,7 +240,7 @@ impl Request for AttestationRequest {
     fn encrypt(&self, ctx: &ReqEncrCtx) -> Result<Vec<u8>> {
         let conf = self.conf.value().as_bytes();
         let aad = self.aad(ctx)?;
-        ctx.encrypt_aead(&aad, conf).map(|res| res.data())
+        ctx.encrypt_aead(&aad, conf).map(|res| res.into_buf())
     }
 
     fn add_hostkey(&mut self, hostkey: PKey<Public>) {
