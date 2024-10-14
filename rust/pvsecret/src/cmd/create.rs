@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
 use pv::{
     misc::{
-        open_file, parse_hex, pv_guest_bit_set, read_exact_file, read_file, try_parse_u128,
+        decode_hex, open_file, pv_guest_bit_set, read_exact_file, read_file, try_parse_u128,
         try_parse_u64, write,
     },
     request::{
@@ -174,7 +174,7 @@ fn try_from_val(val: Value) -> anyhow::Result<ConfigUid> {
     if cuid.len() != ::std::mem::size_of::<ConfigUid>() * 2 {
         return Err(anyhow!(format!("len invalid ({})", cuid.len())));
     }
-    let cuid: ConfigUid = parse_hex(&cuid)
+    let cuid: ConfigUid = decode_hex(&cuid)?
         .try_into()
         .map_err(|_| anyhow!("Cannot parse hex number".to_string()))?;
     Ok(cuid)

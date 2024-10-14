@@ -68,6 +68,12 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     ParseInt(#[from] std::num::ParseIntError),
+
+    #[error("Cannot decode hex string: Size {0} is not a multiple of two")]
+    InvHexStringSize(usize),
+
+    #[error("Cannot decode hex string")]
+    InvHexStringChar { source: std::num::ParseIntError },
 }
 
 /// Error cases for I/O operations

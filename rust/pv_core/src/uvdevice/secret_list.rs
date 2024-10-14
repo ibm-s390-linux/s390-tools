@@ -354,7 +354,8 @@ where
             let nb = s.strip_prefix("0x").ok_or_else(|| {
                 serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self)
             })?;
-            crate::misc::parse_hex(nb)
+            crate::misc::decode_hex(nb)
+                .map_err(|_| serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self))?
                 .try_into()
                 .map_err(|_| serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self))
         }

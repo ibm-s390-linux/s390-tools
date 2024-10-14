@@ -140,7 +140,7 @@ pub fn try_parse_u128(hex_str: &str, ctx: &str) -> Result<[u8; 16]> {
             "{ctx} hexstring must be 32chars long to cover all 16 bytes"
         ));
     }
-    parse_hex(hex_str).try_into().map_err(|_| {
+    decode_hex(hex_str)?.try_into().map_err(|_| {
         Error::Specification(format!(
             "{ctx} hexstring must be 32chars long to cover all 16 bytes"
         ))
@@ -335,6 +335,26 @@ usize_to_ui! {
 
 /// Converts the hexstring into a byte vector.
 ///
+/// Raises an error if a non-hex character was found or the length was not a
+/// multiple of two.
+pub fn decode_hex<S: AsRef<str>>(s: S) -> Result<Vec<u8>> {
+    let hex = s.as_ref();
+    let hex_len = hex.len();
+    if hex_len % 2 != 0 {
+        return Err(Error::InvHexStringSize(hex_len));
+    }
+
+    (0..hex_len)
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&hex[i..i + 2], 16)
+                .map_err(|err| Error::InvHexStringChar { source: err })
+        })
+        .collect()
+}
+
+/// Converts the hexstring into a byte vector.
+///
 /// Stops if the end or until a non hex chat is found
 pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     let mut hex_bytes = hex_str.as_bytes().iter().map_while(|b| match b {
@@ -476,6 +496,49 @@ mod tests {
     }
 
     #[test]
+    fn decode_hex() {
+        let s = "123456acbef0";
+        let exp = vec![0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
+        assert_eq!(super::decode_hex(s).expect("should not fail"), exp);
+
+        let s = "00123456acbef0";
+        let exp = vec![0, 0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
+        assert_eq!(super::decode_hex(s).expect("should not fail"), exp);
+
+        let s = "00123456acbef0";
+        let exp = vec![0, 0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
+        assert_eq!(super::decode_hex(s).expect("should not fail"), exp);
+
+        assert_eq!(
+            super::decode_hex("c0ffee").expect("should not fail"),
+            [0xc0, 0xff, 0xee]
+        );
+        assert_eq!(super::decode_hex("c0").expect("should not fail"), [0xc0]);
+        assert_eq!(super::decode_hex("").expect("should not fail"), []);
+
+        assert!(matches!(
+            super::decode_hex(" "),
+            Err(Error::InvHexStringSize(_))
+        ));
+        assert!(matches!(
+            super::decode_hex("coffee"),
+            Err(Error::InvHexStringChar { .. })
+        ));
+        assert!(matches!(
+            super::decode_hex(" c0a"),
+            Err(Error::InvHexStringChar { .. })
+        ));
+        assert!(matches!(
+            super::decode_hex("c0 a"),
+            Err(Error::InvHexStringChar { .. })
+        ));
+        assert!(matches!(
+            super::decode_hex("c0a"),
+            Err(Error::InvHexStringSize(_))
+        ));
+    }
+
+    #[test]
     fn to_u32() {
         assert_eq!(Some(17), super::to_u32(17));
         assert_eq!(Some(0), super::to_u32(0));
@@ -504,7 +567,7 @@ mod tests {
         ));
         assert!(matches!(
             try_parse_u128("-1223344556677889900aabbccddeeff", ""),
-            Err(Error::Specification(_))
+            Err(Error::InvHexStringChar { .. })
         ));
 
         assert!(matches!(
@@ -512,7 +575,7 @@ mod tests {
             Err(Error::Specification(_))
         ));
         assert!(matches!(
-            try_parse_u128("-0x1234", ""),
+            try_parse_u128("0x123", ""),
             Err(Error::Specification(_))
         ));
         assert!(matches!(
@@ -525,7 +588,7 @@ mod tests {
         ));
         assert!(matches!(
             try_parse_u128("0x-1223344556677889900aabbccddeeff", ""),
-            Err(Error::Specification(_))
+            Err(Error::InvHexStringChar { .. })
         ));
 
         assert_eq!(
