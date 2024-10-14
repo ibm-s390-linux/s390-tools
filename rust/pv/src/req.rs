@@ -164,6 +164,7 @@ impl ReqEncrCtx {
     pub fn random(ket_tp: SymKeyType) -> Result<Self> {
         match ket_tp {
             SymKeyType::Aes256 => Self::new_aes_256(None, None, None),
+            SymKeyType::Aes256Xts => Err(Error::NoAeadKey),
         }
     }
 

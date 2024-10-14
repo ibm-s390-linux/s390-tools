@@ -22,6 +22,8 @@ use crate::{error::Result, Error};
 
 /// An AES256-GCM key that will purge itself out of the memory when going out of scope
 pub type Aes256Key = Confidential<[u8; 32]>;
+/// An AES256-XTS key that will purge itself out of the memory when going out of scope
+pub type Aes256XtsKey = Confidential<[u8; 64]>;
 pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
 
 #[allow(dead_code)]
@@ -35,6 +37,8 @@ pub(crate) type Sha256Hash = [u8; SHA_256_HASH_SIZE as usize];
 pub enum SymKeyType {
     /// AES 256 GCM key (32 bytes)
     Aes256,
+    /// AES 256 XTS key (64 bytes)
+    Aes256Xts,
 }
 
 /// Types of symmetric keys
@@ -43,6 +47,8 @@ pub enum SymKeyType {
 pub enum SymKey {
     /// AES 256 GCM key (32 bytes)
     Aes256(Aes256Key),
+    /// AES 256 XTS key (64 bytes)
+    Aes256Xts(Aes256XtsKey),
 }
 
 impl SymKey {
@@ -56,6 +62,7 @@ impl SymKey {
     pub fn random(key_tp: SymKeyType) -> Result<Self> {
         match key_tp {
             SymKeyType::Aes256 => Ok(Self::Aes256(random_array().map(|v| v.into())?)),
+            SymKeyType::Aes256Xts => Ok(Self::Aes256Xts(random_array().map(|v| v.into())?)),
         }
     }
 
@@ -63,6 +70,7 @@ impl SymKey {
     pub fn value(&self) -> &[u8] {
         match self {
             Self::Aes256(key) => key.value(),
+            Self::Aes256Xts(key) => key.value(),
         }
     }
 }
@@ -195,6 +203,7 @@ pub(crate) fn encrypt_aes_gcm(
             conf,
             &mut tag,
         )?,
+        SymKey::Aes256Xts(_) => return Err(Error::NoAeadKey),
     };
 
     let mut buf = vec![0; aad.len() + encr.len() + tag.len()];
@@ -247,6 +256,7 @@ pub(crate) fn decrypt_aes_gcm(
         SymKey::Aes256(key) => {
             decrypt_aead(Cipher::aes_256_gcm(), key.value(), Some(iv), aad, encr, tag)
         }
+        SymKey::Aes256Xts(_) => return Err(Error::NoAeadKey),
     }
     .map_err(|ssl_err| {
         // Empty error-stack -> no internal ssl error but decryption failed.

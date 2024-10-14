@@ -115,6 +115,9 @@ pub enum Error {
     Crypto(#[from] openssl::error::ErrorStack),
     #[error(transparent)]
     Curl(#[from] curl::Error),
+
+    #[error("No Authenticated Encryption with Associated Data (AEAD) key")]
+    NoAeadKey,
 }
 
 // used in macros
