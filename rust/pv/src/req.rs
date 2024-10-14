@@ -4,8 +4,8 @@
 
 use crate::assert_size;
 use crate::crypto::{
-    decrypt_aes_gcm, derive_key, encrypt_aes_gcm, gen_ec_key, hash, random_array, AesGcmResult,
-    SymKey, SymKeyType, AES_256_GCM_TAG_SIZE,
+    decrypt_aes_gcm, derive_aes256_gcm_key, encrypt_aes_gcm, gen_ec_key, hash, random_array,
+    AesGcmResult, SymKey, SymKeyType, AES_256_GCM_TAG_SIZE,
 };
 use crate::misc::to_u32;
 use crate::request::Confidential;
@@ -106,7 +106,7 @@ impl Encrypt for Keyslot {
         priv_key: &PKeyRef<Private>,
         to: &mut Vec<u8>,
     ) -> Result<()> {
-        let derived_key = derive_key(priv_key, &self.0)?;
+        let derived_key = derive_aes256_gcm_key(priv_key, &self.0)?;
         let mut wrpk_and_kst =
             encrypt_aes_gcm(&derived_key.into(), &[0; 12], &[], prot_key)?.data();
         let phk: EcPubKeyCoord = self.0.as_ref().try_into()?;

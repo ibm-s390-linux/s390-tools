@@ -106,12 +106,12 @@ pub(crate) fn hkdf_rfc_5869<const COUNT: usize>(
     Ok(res)
 }
 
-/// Derive a symmetric key from a private and a public key.
+/// Derive a symmetric AES 256 GCM key from a private and a public key.
 ///
 /// # Errors
 ///
 /// This function will return an error if something went bad in OpenSSL.
-pub(crate) fn derive_key(k1: &PKeyRef<Private>, k2: &PKeyRef<Public>) -> Result<Aes256Key> {
+pub fn derive_aes256_gcm_key(k1: &PKeyRef<Private>, k2: &PKeyRef<Public>) -> Result<Aes256Key> {
     let mut der = Deriver::new(k1)?;
     der.set_peer(k2)?;
     let mut key = der.derive_to_vec()?;
@@ -392,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn derive_key() {
+    fn derive_aes256_gcm_key() {
         let (cust_key, host_key) = get_test_keys();
 
         let exp_key: Aes256Key = [
@@ -402,7 +402,7 @@ mod tests {
         ]
         .into();
 
-        let calc_key = super::derive_key(&cust_key, &host_key).unwrap();
+        let calc_key = super::derive_aes256_gcm_key(&cust_key, &host_key).unwrap();
 
         assert_eq!(&calc_key, &exp_key);
     }
