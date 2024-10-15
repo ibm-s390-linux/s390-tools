@@ -141,6 +141,22 @@ impl SymKey {
             Self::Aes256Xts(_) => SymKeyType::Aes256Xts,
         }
     }
+
+    /// Try to create a symmetric key using the provided data.
+    ///
+    /// * `key_tp` - type of the symmetric key
+    /// * `data`   - raw key data
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the key cannot be created, e.g.
+    /// because the provided data is too small or too large.
+    pub fn try_from_data(key_tp: SymKeyType, data: Confidential<Vec<u8>>) -> Result<Self> {
+        match key_tp {
+            SymKeyType::Aes256Gcm => Ok(Self::Aes256(data.try_into()?)),
+            SymKeyType::Aes256Xts => Ok(Self::Aes256Xts(data.try_into()?)),
+        }
+    }
 }
 
 /// Performs an hkdf according to RFC 5869.
@@ -524,7 +540,7 @@ pub(crate) fn verify_signature<T: HasPublic>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{get_test_asset, test_utils::*};
+    use crate::{get_test_asset, test_utils::*, PvCoreError};
 
     #[test]
     fn sign_ec() {
@@ -731,5 +747,20 @@ mod tests {
         assert_eq!(key.value(), &data);
         let key_aes: Aes256GcmKey = key.try_into().expect("should not fail");
         assert_eq!(key_aes.value(), &data);
+    }
+
+    #[test]
+    fn try_from_data() {
+        let data = [0x3u8; 32];
+        let key = SymKey::try_from_data(SymKeyType::Aes256Gcm, Confidential::new(data.into()))
+            .expect("should not fail");
+        assert_eq!(&data, key.value());
+        let key_aes: Aes256GcmKey = key.try_into().expect("should not fail");
+        assert_eq!(&data, key_aes.value());
+
+        assert!(matches!(
+            SymKey::try_from_data(SymKeyType::Aes256Gcm, Confidential::new([0x4u8; 33].into())),
+            Err(Error::PvCore(PvCoreError::LengthMismatch(33, 32)))
+        ));
     }
 }
