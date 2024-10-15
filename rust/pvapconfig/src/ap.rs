@@ -135,11 +135,11 @@ pub enum ApqnInfo {
 }
 
 impl ApqnInfo {
-    fn accel_info(_carddir: &str, _queuedir: &str) -> Result<ApqnInfo, String> {
-        Ok(ApqnInfo::Accel(ApqnInfoAccel {}))
+    fn accel_info(_carddir: &str, _queuedir: &str) -> Result<Self, String> {
+        Ok(Self::Accel(ApqnInfoAccel {}))
     }
 
-    fn cca_info(carddir: &str, queuedir: &str) -> Result<ApqnInfo, String> {
+    fn cca_info(carddir: &str, queuedir: &str) -> Result<Self, String> {
         let serialnr = match sysfs_read_string(&format!("{carddir}/serialnr")) {
             Ok(r) => r,
             Err(err) => {
@@ -202,14 +202,14 @@ impl ApqnInfo {
                 }
             }
         }
-        Ok(ApqnInfo::Cca(ApqnInfoCca {
+        Ok(Self::Cca(ApqnInfoCca {
             serialnr,
             mkvp_aes: aes_mkvp,
             mkvp_apka: apka_mkvp,
         }))
     }
 
-    fn ep11_info(carddir: &str, queuedir: &str) -> Result<ApqnInfo, String> {
+    fn ep11_info(carddir: &str, queuedir: &str) -> Result<Self, String> {
         let serialnr = match sysfs_read_string(&format!("{carddir}/serialnr")) {
             Ok(r) => r,
             Err(err) => {
@@ -250,14 +250,14 @@ impl ApqnInfo {
                 }
             }
         }
-        Ok(ApqnInfo::Ep11(ApqnInfoEp11 { serialnr, mkvp }))
+        Ok(Self::Ep11(ApqnInfoEp11 { serialnr, mkvp }))
     }
 
-    fn info(mode: &ApqnMode, carddir: &str, queuedir: &str) -> Result<ApqnInfo, String> {
+    fn info(mode: &ApqnMode, carddir: &str, queuedir: &str) -> Result<Self, String> {
         match mode {
-            ApqnMode::Accel => ApqnInfo::accel_info(carddir, queuedir),
-            ApqnMode::Cca => ApqnInfo::cca_info(carddir, queuedir),
-            ApqnMode::Ep11 => ApqnInfo::ep11_info(carddir, queuedir),
+            ApqnMode::Accel => Self::accel_info(carddir, queuedir),
+            ApqnMode::Cca => Self::cca_info(carddir, queuedir),
+            ApqnMode::Ep11 => Self::ep11_info(carddir, queuedir),
         }
     }
 }
@@ -302,8 +302,8 @@ pub struct ApqnList(Vec<Apqn>);
 
 impl ApqnList {
     #[cfg(test)] // only used in test code
-    pub fn from_apqn_vec(apqns: Vec<Apqn>) -> ApqnList {
-        ApqnList(apqns)
+    pub fn from_apqn_vec(apqns: Vec<Apqn>) -> Self {
+        Self(apqns)
     }
 
     #[cfg(test)] // only used in test code
@@ -335,7 +335,7 @@ impl ApqnList {
     /// static regular expression will result in calling panic.
     /// # Panics
     /// Panics if the compilation of a static regular expression fails.
-    pub fn gather_apqns() -> Option<ApqnList> {
+    pub fn gather_apqns() -> Option<Self> {
         let mut apqns: Vec<Apqn> = Vec::new();
         let re_card_type = Regex::new(RE_CARD_TYPE).unwrap();
         let re_queue_dir = Regex::new(RE_QUEUE_DIR).unwrap();
@@ -462,7 +462,7 @@ impl ApqnList {
                 });
             }
         }
-        Some(ApqnList(apqns))
+        Some(Self(apqns))
     }
 
     /// Sort this Apqnlist by card generation:

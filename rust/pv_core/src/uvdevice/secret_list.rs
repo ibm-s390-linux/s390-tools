@@ -60,8 +60,8 @@ impl Display for SecretId {
     }
 }
 
-impl From<[u8; SecretId::ID_SIZE]> for SecretId {
-    fn from(value: [u8; SecretId::ID_SIZE]) -> Self {
+impl From<[u8; Self::ID_SIZE]> for SecretId {
+    fn from(value: [u8; Self::ID_SIZE]) -> Self {
         Self(value)
     }
 }
@@ -251,8 +251,8 @@ impl SecretList {
 impl TryFrom<ListCmd> for SecretList {
     type Error = Error;
 
-    fn try_from(mut list: ListCmd) -> Result<SecretList> {
-        SecretList::decode(&mut Cursor::new(list.data().unwrap())).map_err(Error::InvSecretList)
+    fn try_from(mut list: ListCmd) -> Result<Self> {
+        Self::decode(&mut Cursor::new(list.data().unwrap())).map_err(Error::InvSecretList)
     }
 }
 
@@ -315,7 +315,7 @@ impl From<U16<BigEndian>> for ListableSecretType {
         match value.get() {
             Self::RESERVED_0 => Self::Invalid(Self::RESERVED_0),
             Self::NULL => Self::Invalid(Self::NULL),
-            Self::ASSOCIATION => ListableSecretType::Association,
+            Self::ASSOCIATION => Self::Association,
             n => Self::Unknown(n),
         }
     }

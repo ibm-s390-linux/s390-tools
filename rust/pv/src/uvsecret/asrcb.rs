@@ -33,7 +33,7 @@ assert_size!(ReqAuthData, 0x1e8);
 
 impl ReqAuthData {
     fn new<F: Into<UvFlags>>(boot_tags: BootHdrTags, flags: F) -> Self {
-        ReqAuthData {
+        Self {
             flags: flags.into(),
             boot_tags,
             cuid: [0; 0x10],
@@ -102,7 +102,7 @@ pub enum AddSecretVersion {
 
 impl From<AddSecretVersion> for RequestVersion {
     fn from(val: AddSecretVersion) -> Self {
-        val as RequestVersion
+        val as Self
     }
 }
 
@@ -154,7 +154,7 @@ impl AddSecretRequest {
         boot_tags: BootHdrTags,
         flags: AddSecretFlags,
     ) -> Self {
-        AddSecretRequest {
+        Self {
             conf: ReqConfData {
                 extension_secret: Confidential::new([0; 32]),
                 secret,

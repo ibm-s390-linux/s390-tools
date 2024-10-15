@@ -37,7 +37,7 @@ impl AttestationMeasAlg {
     /// Report the expected size for a given measurement algorithm
     pub const fn exp_size(&self) -> u32 {
         match self {
-            AttestationMeasAlg::HmacSha512 => 64,
+            Self::HmacSha512 => 64,
         }
     }
 }
@@ -46,7 +46,7 @@ impl<E: ByteOrder> TryFrom<U32<E>> for AttestationMeasAlg {
     type Error = Error;
 
     fn try_from(value: U32<E>) -> Result<Self, Self::Error> {
-        if value.get() == AttestationMeasAlg::HmacSha512 as u32 {
+        if value.get() == Self::HmacSha512 as u32 {
             Ok(Self::HmacSha512)
         } else {
             Err(Error::BinArcbInvAlgorithm(value.get()))

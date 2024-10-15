@@ -41,7 +41,7 @@ impl AddSecretMagic {
     /// Get the magic value.
     pub fn get(&self) -> RequestMagic {
         let mut res = RequestMagic::default();
-        debug_assert!(res.len() == size_of::<AddSecretMagic>());
+        debug_assert!(res.len() == size_of::<Self>());
         // Panic: does not panic, buf is 8 bytes long
         self.write_to(&mut res).unwrap();
         res
@@ -51,7 +51,7 @@ impl AddSecretMagic {
     ///
     /// Returns [`None`] if the byte slice does not contain a valid magic value variant.
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
-        if !Self::starts_with_magic(bytes) || bytes.len() < size_of::<AddSecretMagic>() {
+        if !Self::starts_with_magic(bytes) || bytes.len() < size_of::<Self>() {
             return Err(Error::NoAsrcb);
         }
 
@@ -89,11 +89,11 @@ impl UserDataType {
     /// Returns the maximum user-data size in bytes.
     pub fn max(&self) -> usize {
         match self {
-            UserDataType::Null => 0,
-            UserDataType::Unsigned => 512,
-            UserDataType::SgnEcSECP521R1 => 256,
-            UserDataType::SgnRsa2048 => 256,
-            UserDataType::SgnRsa3072 => 128,
+            Self::Null => 0,
+            Self::Unsigned => 512,
+            Self::SgnEcSECP521R1 => 256,
+            Self::SgnRsa2048 => 256,
+            Self::SgnRsa3072 => 128,
         }
     }
 }
@@ -118,16 +118,16 @@ impl TryFrom<u16> for UserDataType {
     type Error = Error;
 
     fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
-        if value == UserDataType::Null as u16 {
-            Ok(UserDataType::Null)
-        } else if value == UserDataType::Unsigned as u16 {
-            Ok(UserDataType::Unsigned)
-        } else if value == UserDataType::SgnEcSECP521R1 as u16 {
-            Ok(UserDataType::SgnEcSECP521R1)
-        } else if value == UserDataType::SgnRsa2048 as u16 {
-            Ok(UserDataType::SgnRsa2048)
-        } else if value == UserDataType::SgnRsa3072 as u16 {
-            Ok(UserDataType::SgnRsa3072)
+        if value == Self::Null as u16 {
+            Ok(Self::Null)
+        } else if value == Self::Unsigned as u16 {
+            Ok(Self::Unsigned)
+        } else if value == Self::SgnEcSECP521R1 as u16 {
+            Ok(Self::SgnEcSECP521R1)
+        } else if value == Self::SgnRsa2048 as u16 {
+            Ok(Self::SgnRsa2048)
+        } else if value == Self::SgnRsa3072 as u16 {
+            Ok(Self::SgnRsa3072)
         } else {
             Err(Error::UnsupportedUserData(value))
         }

@@ -153,8 +153,8 @@ pub struct ApConfigList(Vec<ApConfigEntry>);
 
 impl ApConfigList {
     #[cfg(test)] // only used in test code
-    pub fn from_apconfigentry_vec(apconfigs: Vec<ApConfigEntry>) -> ApConfigList {
-        ApConfigList(apconfigs)
+    pub fn from_apconfigentry_vec(apconfigs: Vec<ApConfigEntry>) -> Self {
+        Self(apconfigs)
     }
 
     pub fn iter(&self) -> Iter<'_, ApConfigEntry> {
@@ -205,10 +205,10 @@ impl ApConfigList {
     /// Read in and validate the yaml configuration from a file.
     /// Returns a Result with Ok(ApConfigList) on success
     /// or an Err(errorstring) on failure.
-    pub fn read_and_validate_yaml_file(fname: &str) -> Result<ApConfigList, String> {
-        let mut apconfig = ApConfigList::read_yaml_file(fname)?;
-        ApConfigList::validate(&mut apconfig)?;
-        Ok(ApConfigList(apconfig))
+    pub fn read_and_validate_yaml_file(fname: &str) -> Result<Self, String> {
+        let mut apconfig = Self::read_yaml_file(fname)?;
+        Self::validate(&mut apconfig)?;
+        Ok(Self(apconfig))
     }
 }
 

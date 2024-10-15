@@ -156,8 +156,8 @@ impl UserData {
     pub(super) fn sign(&self, buf: &mut [u8], user_data_offset: usize) -> Result<()> {
         // get signing info or return if no signature is required
         let signed_data = match self {
-            UserData::Null | UserData::Unsigned(_) => return Ok(()),
-            UserData::Signed(s) => s,
+            Self::Null | Self::Unsigned(_) => return Ok(()),
+            Self::Signed(s) => s,
         };
         debug_assert!(buf.len() >= USER_DATA_SIZE);
 
@@ -194,9 +194,9 @@ impl UserData {
     /// 512 bytes
     pub(super) fn data(&self) -> (Option<&[u8]>, Option<Vec<u8>>) {
         let buf = match self {
-            UserData::Null => None,
-            UserData::Unsigned(d) => Some(d),
-            UserData::Signed(SignedUserData { data, .. }) => Some(data),
+            Self::Null => None,
+            Self::Unsigned(d) => Some(d),
+            Self::Signed(SignedUserData { data, .. }) => Some(data),
         };
 
         let remaining_size = Self::USER_DATA_SIZE - buf.map(|b| b.len()).unwrap_or(0);

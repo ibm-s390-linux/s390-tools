@@ -100,18 +100,18 @@ impl AttestationCmd {
         Self::verify_size(
             exp_measurement,
             1,
-            AttestationCmd::MEASUREMENT_MAX_SIZE,
+            Self::MEASUREMENT_MAX_SIZE,
             "Expected measurement size",
         )?;
         Self::verify_size(
             exp_additional,
             0,
-            AttestationCmd::ADDITIONAL_MAX_SIZE,
+            Self::ADDITIONAL_MAX_SIZE,
             "Expected additional data size",
         )?;
-        Self::verify_slice(&arcb, AttestationCmd::ARCB_MAX_SIZE, "Attestation request")?;
+        Self::verify_slice(&arcb, Self::ARCB_MAX_SIZE, "Attestation request")?;
         if let Some(ref data) = user_data {
-            Self::verify_slice(data, AttestationCmd::USER_MAX_SIZE, "User data")?;
+            Self::verify_slice(data, Self::USER_MAX_SIZE, "User data")?;
         }
 
         let (user_len, user_data) = match user_data {

@@ -73,7 +73,7 @@ impl X509StoreContextExtension for X509StoreContextRef {
         with_context: F,
     ) -> Result<T, ErrorStack>
     where
-        F: FnOnce(&mut X509StoreContextRef) -> Result<T, ErrorStack>,
+        F: FnOnce(&mut Self) -> Result<T, ErrorStack>,
     {
         struct Cleanup<'a>(&'a mut X509StoreContextRef);
 

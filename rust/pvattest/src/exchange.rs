@@ -70,9 +70,9 @@ impl Entry {
         R: Read + Seek,
     {
         match self {
-            Entry { size, .. } if size.get() == 0 => Ok(ExpOrData::None),
-            Entry { size, offset } if offset.get() == 0 => Ok(ExpOrData::Exp(size.get())),
-            Entry { size, offset } => {
+            Self { size, .. } if size.get() == 0 => Ok(ExpOrData::None),
+            Self { size, offset } if offset.get() == 0 => Ok(ExpOrData::Exp(size.get())),
+            Self { size, offset } => {
                 reader.seek(SeekFrom::Start(offset.get() as u64))?;
                 let mut buf = vec![0; size.get() as usize];
                 reader.read_exact(&mut buf)?;
@@ -100,7 +100,7 @@ assert_size!(ExchangeFormatV1Hdr, 0x40);
 
 impl ExchangeFormatV1Hdr {
     fn new_request(arcb: &[u8], measurement: u32, additional: u32) -> Result<Self> {
-        let mut offset: u32 = size_of::<ExchangeFormatV1Hdr>() as u32;
+        let mut offset: u32 = size_of::<Self>() as u32;
         let arcb_entry = Entry::from_slice(Some(arcb), AttestationCmd::ARCB_MAX_SIZE, &mut offset);
         let measurement_entry = Entry::from_exp(Some(measurement));
         let exp_add = match additional {
@@ -132,7 +132,7 @@ impl ExchangeFormatV1Hdr {
         user: Option<&[u8]>,
         config_uid: &[u8],
     ) -> Result<Self> {
-        let mut offset: u32 = size_of::<ExchangeFormatV1Hdr>() as u32;
+        let mut offset: u32 = size_of::<Self>() as u32;
         let arcb_entry = Entry::from_slice(Some(arcb), AttestationCmd::ARCB_MAX_SIZE, &mut offset);
         let measurement_entry = Entry::from_slice(
             Some(measurement),
@@ -219,10 +219,10 @@ impl ExpOrData {
     /// calculates the (expected or real) size
     fn size(&self) -> u32 {
         match self {
-            ExpOrData::Exp(s) => *s,
+            Self::Exp(s) => *s,
             // size is max u32 large as read in before
-            ExpOrData::Data(v) => v.len() as u32,
-            ExpOrData::None => 0,
+            Self::Data(v) => v.len() as u32,
+            Self::None => 0,
         }
     }
 
@@ -231,7 +231,7 @@ impl ExpOrData {
     /// Consumes itself
     fn data(self) -> Option<Vec<u8>> {
         match self {
-            ExpOrData::Data(v) => Some(v),
+            Self::Data(v) => Some(v),
             _ => None,
         }
     }
@@ -240,8 +240,8 @@ impl ExpOrData {
 impl From<Option<u32>> for ExpOrData {
     fn from(value: Option<u32>) -> Self {
         match value {
-            Some(v) => ExpOrData::Exp(v),
-            None => ExpOrData::None,
+            Some(v) => Self::Exp(v),
+            None => Self::None,
         }
     }
 }

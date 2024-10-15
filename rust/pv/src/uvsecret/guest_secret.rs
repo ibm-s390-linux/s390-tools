@@ -47,7 +47,7 @@ impl GuestSecret {
     /// # Errors
     ///
     /// This function will return an error if OpenSSL cannot create a hash.
-    pub fn association<O>(name: &str, secret: O) -> Result<GuestSecret>
+    pub fn association<O>(name: &str, secret: O) -> Result<Self>
     where
         O: Into<Option<[u8; ASSOC_SECRET_SIZE]>>,
     {
@@ -60,7 +60,7 @@ impl GuestSecret {
             None => random_array()?,
         };
 
-        Ok(GuestSecret::Association {
+        Ok(Self::Association {
             name: name.to_string(),
             id: id.into(),
             secret: secret.into(),
@@ -70,15 +70,15 @@ impl GuestSecret {
     /// Reference to the confidential data
     pub(crate) fn confidential(&self) -> &[u8] {
         match &self {
-            GuestSecret::Null => &[],
-            GuestSecret::Association { secret, .. } => secret.value().as_slice(),
+            Self::Null => &[],
+            Self::Association { secret, .. } => secret.value().as_slice(),
         }
     }
 
     /// Creates the non-confidential part of the secret ad-hoc
     pub(crate) fn auth(&self) -> SecretAuth {
         match &self {
-            GuestSecret::Null => SecretAuth::Null,
+            Self::Null => SecretAuth::Null,
             // Panic:  every non null secret type is listable -> no panic
             listable => {
                 SecretAuth::Listable(ListableSecretHdr::from_guest_secret(listable).unwrap())
@@ -90,24 +90,24 @@ impl GuestSecret {
     fn kind(&self) -> u16 {
         match self {
             // Null is not listable, but the ListableSecretType provides the type constant (1)
-            GuestSecret::Null => ListableSecretType::NULL,
-            GuestSecret::Association { .. } => ListableSecretType::ASSOCIATION,
+            Self::Null => ListableSecretType::NULL,
+            Self::Association { .. } => ListableSecretType::ASSOCIATION,
         }
     }
 
     /// Size of the secret value
     fn secret_len(&self) -> u32 {
         match self {
-            GuestSecret::Null => 0,
-            GuestSecret::Association { secret, .. } => secret.value().len() as u32,
+            Self::Null => 0,
+            Self::Association { secret, .. } => secret.value().len() as u32,
         }
     }
 
     /// Returns the ID of the secret type (if any)
     fn id(&self) -> Option<SecretId> {
         match self {
-            GuestSecret::Null => None,
-            GuestSecret::Association { id, .. } => Some(id.to_owned()),
+            Self::Null => None,
+            Self::Association { id, .. } => Some(id.to_owned()),
         }
     }
 }
@@ -115,7 +115,7 @@ impl GuestSecret {
 impl Display for GuestSecret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GuestSecret::Null => write!(f, "Meta"),
+            Self::Null => write!(f, "Meta"),
             gs => {
                 let kind: U16<BigEndian> = gs.kind().into();
                 let st: ListableSecretType = kind.into();
@@ -134,8 +134,8 @@ pub(crate) enum SecretAuth {
 impl SecretAuth {
     pub fn get(&self) -> &[u8] {
         match self {
-            SecretAuth::Null => &[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            SecretAuth::Listable(h) => h.as_bytes(),
+            Self::Null => &[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            Self::Listable(h) => h.as_bytes(),
         }
     }
 }

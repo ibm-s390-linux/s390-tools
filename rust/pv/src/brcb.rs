@@ -149,7 +149,7 @@ impl BootHdrTags {
         let mut tag = [0u8; BootHdrHead::TAG_SIZE];
         img.read_exact(tag.as_mut_slice())?;
 
-        Ok(BootHdrTags {
+        Ok(Self {
             pld: hdr_head.pld,
             ald: hdr_head.ald,
             tld: hdr_head.tld,

@@ -181,7 +181,7 @@ impl LockFile {
             .map_err(|err| {
                 println!("Warning: could not write PID into lockfile {fname}: {err:?}.")
             });
-        Ok(LockFile { lockfile })
+        Ok(Self { lockfile })
     }
 }
 

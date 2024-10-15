@@ -204,10 +204,10 @@ impl UvDevice {
             std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(UvDevice::PATH)
+                .open(Self::PATH)
                 .map_err(|e| Error::FileAccess {
                     ty: FileAccessErrorType::Open,
-                    path: (UvDevice::PATH).into(),
+                    path: (Self::PATH).into(),
                     source: e,
                 })?,
         ))

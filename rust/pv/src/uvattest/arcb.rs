@@ -247,7 +247,7 @@ impl TryFrom<u32> for AttestationVersion {
 
 impl From<AttestationVersion> for RequestVersion {
     fn from(val: AttestationVersion) -> Self {
-        val as RequestVersion
+        val as Self
     }
 }
 

@@ -20,8 +20,8 @@ impl ForeignType for StackableX509Crl {
     type CType = openssl_sys::X509_CRL;
     type Ref = X509CrlRef;
 
-    unsafe fn from_ptr(ptr: *mut openssl_sys::X509_CRL) -> StackableX509Crl {
-        StackableX509Crl(ptr)
+    unsafe fn from_ptr(ptr: *mut openssl_sys::X509_CRL) -> Self {
+        Self(ptr)
     }
 
     fn as_ptr(&self) -> *mut openssl_sys::X509_CRL {
@@ -132,7 +132,7 @@ impl From<X509Crl> for StackableX509Crl {
     fn from(value: X509Crl) -> Self {
         unsafe {
             openssl_sys::X509_CRL_up_ref(value.as_ptr());
-            StackableX509Crl::from_ptr(value.as_ptr())
+            Self::from_ptr(value.as_ptr())
         }
     }
 }
@@ -140,7 +140,7 @@ impl From<StackableX509Crl> for X509Crl {
     fn from(value: StackableX509Crl) -> Self {
         unsafe {
             openssl_sys::X509_CRL_up_ref(value.as_ptr());
-            X509Crl::from_ptr(value.as_ptr())
+            Self::from_ptr(value.as_ptr())
         }
     }
 }

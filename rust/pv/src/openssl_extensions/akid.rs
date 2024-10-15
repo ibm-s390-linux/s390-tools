@@ -39,11 +39,11 @@ impl fmt::Debug for AkidCheckResult {
 }
 
 impl AkidCheckResult {
-    pub const OK: AkidCheckResult = AkidCheckResult(openssl_sys::X509_V_OK);
+    pub const OK: Self = Self(openssl_sys::X509_V_OK);
 
     /// Creates an `AkidCheckResult` from a raw error number.
-    unsafe fn from_raw(err: c_int) -> AkidCheckResult {
-        AkidCheckResult(err)
+    unsafe fn from_raw(err: c_int) -> Self {
+        Self(err)
     }
 }
 

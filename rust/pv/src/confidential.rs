@@ -68,7 +68,7 @@ impl<C: Zeroize> Confidential<C> {
     ///
     /// Prefer using [`Into`]
     pub fn new(v: C) -> Self {
-        Confidential(v)
+        Self(v)
     }
 
     /// Get a reference to the contained value
@@ -100,8 +100,8 @@ impl<C: Zeroize + Debug> Debug for Confidential<C> {
 }
 
 impl<C: Zeroize> From<C> for Confidential<C> {
-    fn from(v: C) -> Confidential<C> {
-        Confidential(v)
+    fn from(v: C) -> Self {
+        Self(v)
     }
 }
 

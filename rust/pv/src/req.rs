@@ -148,7 +148,7 @@ impl ReqEncrCtx {
         let prot_key = prot_key
             .into()
             .unwrap_or(SymKey::random(SymKeyType::Aes256)?);
-        Ok(ReqEncrCtx {
+        Ok(Self {
             iv,
             priv_key,
             prot_key,
