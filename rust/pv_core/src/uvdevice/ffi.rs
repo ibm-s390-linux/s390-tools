@@ -28,7 +28,7 @@ pub const UVIO_IOCTL_LOCK_SECRETS_NR: u8 = 4;
 /// Programs can use this struct to communicate with the uvdevice via IOCTLs
 /// `argument_{addr,len}` specifies in/out data depending on the request
 ///
-/// 'uv_rc' and `uv_rrc` are the response and reason response codes from the
+/// `uv_rc` and `uv_rrc` are the response and reason response codes from the
 /// Ultravisor.
 ///
 /// `flags` is currently unused and to be set zero
@@ -55,7 +55,7 @@ assert_size!(uvio_ioctl_cb, 0x40);
 /// If the bit is set in both, `supp_uvio_cmds` and `supp_uv_cmds`,
 /// the uvdevice and the Ultravisor support that call.
 ///
-/// Note that bit 0 (UVIO_IOCTL_UVDEV_INFO_NR) is always zero for `supp_uv_cmds`
+/// Note that bit 0 (`UVIO_IOCTL_UVDEV_INFO_NR`) is always zero for `supp_uv_cmds`
 /// as there is no corresponding UV-call.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
@@ -103,7 +103,7 @@ pub struct uvio_attest {
 }
 assert_size!(uvio_attest, 0x138);
 
-/// corresponds to the UV_IOCTL macro
+/// corresponds to the `UV_IOCTL` macro
 pub(crate) const fn uv_ioctl(nr: u8) -> u64 {
     iowr(UVIO_TYPE_UVC, nr, size_of::<uvio_ioctl_cb>())
 }

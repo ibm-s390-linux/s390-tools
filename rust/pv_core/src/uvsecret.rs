@@ -11,7 +11,7 @@ use byteorder::{BigEndian, ByteOrder};
 use std::{fmt::Display, mem::size_of};
 use zerocopy::{AsBytes, U16};
 
-/// The magic value used to identify an ['crate:AddSecretRequest']
+/// The magic value used to identify an [`crate:AddSecretRequest`]
 ///
 /// The magic value is ASCII:
 /// ```rust

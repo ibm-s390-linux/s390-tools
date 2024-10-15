@@ -119,7 +119,7 @@ pub fn store_setup<P: AsRef<Path>, Q: AsRef<Path>, R: AsRef<Path>>(
 }
 
 /// Verify that the given IBM signing keys can be trusted
-/// -> check the chain: IBMsignKey<-InterCA(s)<-RootCA
+/// -> check the chain: `IBMsignKey`<-InterCA(s)<-`RootCA`
 pub fn verify_chain(
     store: &X509StoreRef,
     untrusted_certs: &Stack<X509>,

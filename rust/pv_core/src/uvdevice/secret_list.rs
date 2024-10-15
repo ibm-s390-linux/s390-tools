@@ -177,7 +177,7 @@ impl FromIterator<SecretEntry> for SecretList {
 }
 
 impl SecretList {
-    /// Creates a new SecretList.
+    /// Creates a new `SecretList`.
     ///
     /// The content of this list will very likely not represent the status of the guest in the
     /// Ultravisor. Use of [`SecretList::decode`] in any non-test environments is encuraged.

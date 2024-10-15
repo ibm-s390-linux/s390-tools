@@ -95,7 +95,7 @@ pub trait UvCmd {
     ///
     /// # Returns
     ///
-    /// The IOCTL cmd for this UvCmd usually something like `uv_ioctl!(CMD_NR)`
+    /// The IOCTL cmd for this `UvCmd` usually something like `uv_ioctl!(CMD_NR)`
     fn cmd(&self) -> u64 {
         uv_ioctl(Self::UV_IOCTL_NR)
     }
@@ -162,7 +162,7 @@ pub enum UvcSuccess {
     RC_MORE_DATA = UvDevice::RC_MORE_DATA,
 }
 
-/// The UvDevice is a (virtual) device on s390 machines to send Ultravisor commands(UVCs) from
+/// The `UvDevice` is a (virtual) device on s390 machines to send Ultravisor commands(UVCs) from
 /// userspace.
 ///
 /// On s390 machines with Ultravisor enabled (Secure Execution guest & hosts) the device at

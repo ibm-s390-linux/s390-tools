@@ -242,10 +242,10 @@ impl ffi::uvio_attest {
     ///
     /// # SAFETY
     /// It is safe to call this function iff:
-    ///  - arcb.len() < u32::MAX
-    ///  - additional.len() < u32::MAX
-    ///  - user_len() <= 256
-    ///  - pointyer fit into an u64
+    ///  - `arcb.len() < u32::MAX`
+    ///  - `additional.len() < u32::MAX`
+    ///  - `user_len() <= 256`
+    ///  - pointer fits into an u64
     unsafe fn new(
         arcb: &[u8],
         measurement: &mut [u8],

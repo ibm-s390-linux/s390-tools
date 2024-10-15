@@ -11,7 +11,7 @@
     unused_qualifications
 )]
 #![doc = include_str!("../README.md")]
-//! # Manage guest secret store
+//! # Library for Protected Virtualization (PV) related tools
 //!
 //! This crate provides functionalities for creating add-secret requests. Also provides support for
 //! sending those requests, list all stored secrets, and lock the secret store.

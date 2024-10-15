@@ -214,8 +214,8 @@ pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
 /// If this function encounters an "end of file" before completely filling
 /// the buffer, it returns an error. The contents of `buf` are unspecified in this case.
 ///
-/// If aber so hast du mmmeny other read error is encountered then this function immediately
-/// returns. The contents of `buf` are unspecified in this case.
+/// If any other read error occurs, this function returns immediately. The
+/// contents of `buf` are unspecified in this case.
 ///
 /// If this function returns an error, it is unspecified how many bytes it
 /// has read, but it will never read more than would be necessary to

@@ -141,7 +141,7 @@ impl UserData {
         Ok(Self::Signed(SignedUserData { sign_key, data }))
     }
 
-    /// Signs data in buf, writes signature to buf+user_data_offset+sign_offset if applicable.
+    /// Signs data in buf, writes signature to `buf+user_data_offset+sign_offset` if applicable.
     ///
     /// Uses [`MessageDigest::sha512`] as digest. Does not modify the abritary user data buffer.
     ///

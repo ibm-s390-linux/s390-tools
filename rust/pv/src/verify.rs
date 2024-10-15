@@ -23,7 +23,7 @@ use crate::Result;
 mod helper;
 mod test;
 
-/// A HkdVerifier verifies that a host-key document(HKD) can be trusted.
+/// A `HkdVerifier` verifies that a host-key document(HKD) can be trusted.
 ///
 /// If the verification fails the HKD should not be used to create requests.
 pub trait HkdVerifier {
@@ -62,7 +62,7 @@ impl HkdVerifier for CertVerifier {
     /// This function verifies a host-key
     /// document. To do so multiple steps are required:
     ///
-    /// 1. issuer(host_key) == subject(ibm_z_sign_key)
+    /// 1. `issuer(host_key`) == `subject(ibm_z_sign_key`)
     /// 2. Signature verification
     /// 3. @hkd must not be expired
     /// 4. @hkd must not be revoked

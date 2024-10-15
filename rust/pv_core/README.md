@@ -3,7 +3,7 @@ SPDX-License-Identifier: MIT
 
 Copyright 2024 IBM Corp.
 -->
-# s390_pv_core - basic library for pv-tools
+# `s390_pv_core` - basic library for pv-tools
 
 This library is intended to be used by tools and libraries that
 are used for creating and managing [IBM Secure Execution](https://www.ibm.com/docs/en/linux-on-systems?topic=virtualization-secure-execution) guests.

@@ -54,7 +54,7 @@ impl AddCmd {
     /// # Errors
     ///
     /// This function will return an error if the provided data does not start with the
-    /// ['crate::AddSecretRequest'] magic Value.
+    /// [`crate::AddSecretRequest`] magic Value.
     pub fn new<R: Read>(bin_add_secret_req: &mut R) -> Result<Self> {
         let mut data = Vec::with_capacity(PAGESIZE);
         bin_add_secret_req.read_to_end(&mut data)?;

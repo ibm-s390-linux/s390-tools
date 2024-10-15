@@ -90,7 +90,7 @@ impl<C: Zeroize> Confidential<C> {
         &self.0
     }
 
-    /// Get an immutable reference to the contained value
+    /// Get a mutable reference to the contained value
     ///
     /// NOTE that modifications to a mutable reference can trigger reallocation.
     /// e.g. a [`Vec`] might expand if more space needed. -> preallocate enough space
