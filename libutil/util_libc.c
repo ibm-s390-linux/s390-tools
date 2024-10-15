@@ -174,6 +174,21 @@ void util_str_toupper(char *str)
 		str[i] = toupper(str[i]);
 }
 
+/**
+ * Convert string to lowercase
+ *
+ * String \a str is converted to lowercase
+ *
+ * @param[in,out] str String to convert
+ */
+void util_str_tolower(char *str)
+{
+	int i;
+
+	for (i = 0; str[i] != '\0'; i++)
+		str[i] = tolower(str[i]);
+}
+
 /*
  * Print to newly allocated string or exit in case of failure
  */

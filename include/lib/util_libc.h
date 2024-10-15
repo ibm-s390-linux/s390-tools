@@ -129,6 +129,7 @@ int __util_vsprintf(const char *func, const char *file, int line,
 char *util_strcat_realloc(char *str1, const char *str2);
 void util_concatf(char **str1, const char *fmt, ...);
 void util_str_toupper(char *str);
+void util_str_tolower(char *str);
 
 char *util_strstrip(char *s);
 size_t util_strlcpy(char *dest, const char *src, size_t size);
