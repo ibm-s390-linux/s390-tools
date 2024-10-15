@@ -162,7 +162,8 @@ static void l_cpu_add(struct sd_cpu *cpu)
 			continue;
 		l_cpu_item_add(table_row, cpu, item);
 	}
-	l_cpu_add_visual(table_row, cpu);
+	if (!g.o.format_specified)
+		l_cpu_add_visual(table_row, cpu);
 	table_row_add(l_t, table_row);
 }
 
@@ -365,9 +366,11 @@ void win_sys_init(void)
 		col_vec[i] = col;
 		col_desc_vec[i] = item->desc;
 	}
-	col_vec[i] = &l_vis_col;
-	col_desc_vec[i] = vis_str;
-	table_col_add(l_t, &l_vis_col);
+	if (!g.o.format_specified) {
+		col_vec[i] = &l_vis_col;
+		col_desc_vec[i] = vis_str;
+		table_col_add(l_t, &l_vis_col);
+	}
 
 	/* Enable fields */
 	if (win_sys.opts.fields.specified)
