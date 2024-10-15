@@ -150,7 +150,7 @@ pub fn derive_aes256_gcm_key(k1: &PKeyRef<Private>, k2: &PKeyRef<Public>) -> Res
 /// # Errors
 ///
 /// This function will return an error if the entropy source fails or is not available.
-pub(crate) fn random_array<const COUNT: usize>() -> Result<[u8; COUNT]> {
+pub fn random_array<const COUNT: usize>() -> Result<[u8; COUNT]> {
     let mut rand = [0; COUNT];
     rand_bytes(&mut rand)?;
     Ok(rand)
