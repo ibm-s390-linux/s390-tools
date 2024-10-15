@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
+#include "lib/util_libc.h"
 #include "lib/zt_common.h"
 
 #include "getopt.h"
@@ -404,7 +405,7 @@ static void l_verify_systems(struct hyptop_win *win)
 		if (sd_sys_get(sd_sys_root_get(), win->opts.sys.vec[i]))
 			continue;
 		sys_name = ht_strdup(win->opts.sys.vec[i]);
-		ht_str_to_upper(win->opts.sys.vec[i]);
+		util_str_toupper(win->opts.sys.vec[i]);
 		if (sd_sys_get(sd_sys_root_get(), win->opts.sys.vec[i])) {
 			ht_free(sys_name);
 			continue;

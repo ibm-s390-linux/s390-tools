@@ -355,17 +355,6 @@ out:
 }
 
 /*
- * Convert string to uppercase
- */
-void ht_str_to_upper(char *str)
-{
-	while (*str) {
-		*str = toupper(*str);
-		str++;
-	}
-}
-
-/*
  * Convert ext TOD to microseconds
  */
 u64 ht_ext_tod_2_us(void *tod_ext)

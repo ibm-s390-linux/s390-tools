@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
+
 #include "helper.h"
 #include "hyptop.h"
 #include "table.h"
@@ -196,8 +198,8 @@ static void l_col_headline_init(struct table *t, struct table_col *col)
 	col->p->head_char[0] = col->hotkey;
 	strcpy(col->p->head_last, ++ptr);
 	if (!t->attr_sorted_table) {
-		ht_str_to_upper(col->p->head_first);
-		ht_str_to_upper(col->p->head_last);
+		util_str_toupper(col->p->head_first);
+		util_str_toupper(col->p->head_last);
 		col->p->head_char[0] = toupper(col->p->head_char[0]);
 	}
 }
