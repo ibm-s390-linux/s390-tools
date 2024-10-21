@@ -43,6 +43,7 @@ static struct {
 	u64 memory_start_record;
 	u64 index_pages_count;
 	u64 bitkey_pages_count;
+	u64 total_pages_count;
 	u64 stored_pages_count;
 	u8 *bitmap;
 } l;
@@ -76,12 +77,20 @@ static void vmdump64big_debug(void)
 	u8 fmbk_id[sizeof(FMBK_MAGIC)];
 	u8 albk_id[sizeof(ALBK_MAGIC)];
 	struct timeval time;
+	unsigned int i;
 
+	util_log_print(UTIL_LOG_DEBUG, "Highest Defined Byte (vmcp q v storage): %#lx\n",
+		       l.asizbk.storage_size_def_store);
+	util_log_print(UTIL_LOG_DEBUG, "Requested Memory Ranges:\n");
+	for (i = 0; i < l.asizbk.range_table_entry_count; i++)
+		util_log_print(UTIL_LOG_DEBUG, "  %#lx - %#lx\n",
+			       l.asizbk.requested_range_table[i].start_addr,
+			       l.asizbk.requested_range_table[i].end_addr);
+	util_log_print(UTIL_LOG_DEBUG, "Dump Memory Size: %#lx\n", l.total_pages_count * PAGE_SIZE);
 	util_log_print(UTIL_LOG_DEBUG, "Index Pages  : %lu\n", l.index_pages_count);
 	util_log_print(UTIL_LOG_DEBUG, "Bit-Key Pages: %lu\n", l.bitkey_pages_count);
 	util_log_print(UTIL_LOG_DEBUG, "Memory Offset: %#lx\n", l.memory_start_record);
-	util_log_print(UTIL_LOG_DEBUG, "Total Pages  : %lu\n",
-		       l.asizbk.storage_size_def_store / PAGE_SIZE);
+	util_log_print(UTIL_LOG_DEBUG, "Total Pages  : %lu\n", l.total_pages_count);
 	util_log_print(UTIL_LOG_DEBUG, "Stored Pages : %lu\n", l.stored_pages_count);
 
 	/* adsr */
@@ -118,7 +127,7 @@ static void vmdump64big_debug(void)
 	util_log_print(UTIL_LOG_DEBUG, "Cpus: %d\n", l.fir.online_cpus + 1);
 	util_log_print(UTIL_LOG_DEBUG, "PSW: %#016lx %#016lx\n", l.fir.psw[0], l.fir.psw[1]);
 	util_log_print(UTIL_LOG_DEBUG, "Prefix (CPU 0): %#010x\n", l.fir.prefix);
-	for (unsigned int i = 0; i < l.fir.online_cpus; i++)
+	for (i = 0; i < l.fir.online_cpus; i++)
 		util_log_print(UTIL_LOG_DEBUG, "Prefix (CPU %i): %#010x\n", i + 1,
 			       l.fir_other[i].prefix);
 }
@@ -138,6 +147,22 @@ static void set_page_bit(u8 *bitmap, const u64 bit)
 	bitmap[bit / 8] |= (1 << (7 - (bit % 8)));
 }
 
+static u64 get_total_pages_count(void)
+{
+	unsigned int i;
+	u64 addr = 0;
+
+	for (i = 0; i < l.asizbk.range_table_entry_count; i++)
+		addr = MAX(addr, l.asizbk.requested_range_table[i].end_addr);
+	/*
+	 * Range end address points to the last byte of the page, hence +1 is required.
+	 * If range table entries are missing for some reason, use the full amount of
+	 * defined machine storage.
+	 */
+	addr = addr ? (addr + 1) : l.asizbk.storage_size_def_store;
+	return addr / PAGE_SIZE;
+}
+
 /*
  * Read VMDUMP headers, page index bit maps and page bit maps to
  * construct a list of non-zero pages with memory locations. Zeroed pages
@@ -146,7 +171,7 @@ static void set_page_bit(u8 *bitmap, const u64 bit)
  */
 static void vmdump64big_init(void)
 {
-	u64 page_num = 0, nr_dumped_pages;
+	u64 page_num = 0;
 	size_t bitmap_sz;
 	unsigned int i;
 
@@ -197,8 +222,8 @@ static void vmdump64big_init(void)
 	 * Record 10: bitmaps:
 	 * Read all bitmap pages and setup bitmap array
 	 */
-	nr_dumped_pages = l.asizbk.storage_size_def_store / PAGE_SIZE;
-	bitmap_sz = l.asizbk.storage_size_def_store / (PAGE_SIZE * 8);
+	l.total_pages_count = get_total_pages_count();
+	bitmap_sz = ROUNDUP(l.total_pages_count, 8) / 8;
 	if (!bitmap_sz)
 		ERR_EXIT("Dump file inconsistent, no bitmap detected");
 	l.bitmap = util_zalloc(bitmap_sz);
@@ -226,7 +251,7 @@ static void vmdump64big_init(void)
 						l.stored_pages_count++;
 					}
 					page_num++;
-					if (page_num == nr_dumped_pages)
+					if (page_num == l.total_pages_count)
 						goto out;
 				}
 			} else {
@@ -234,7 +259,7 @@ static void vmdump64big_init(void)
 			}
 		}
 
-	} while (page_num < nr_dumped_pages);
+	} while (page_num < l.total_pages_count);
 
 out:
 	vmdump64big_debug();
@@ -443,13 +468,12 @@ static u64 find_bitrange(u8 *bitmap, const u64 bit, const u64 max, const bool is
 
 static void mem_init(void)
 {
-	u64 nr_dumped_pages = l.asizbk.storage_size_def_store / PAGE_SIZE;
 	u64 pos, more;
 
-	for (pos = 0; pos < nr_dumped_pages;) {
+	for (pos = 0; pos < l.total_pages_count;) {
 		bool isset = test_page_bit(l.bitmap, pos);
 
-		more = find_bitrange(l.bitmap, pos, nr_dumped_pages, isset);
+		more = find_bitrange(l.bitmap, pos, l.total_pages_count, isset);
 		dfi_mem_chunk_add(pos * PAGE_SIZE, more * PAGE_SIZE, NULL,
 				  isset ? dfi_vmdump_mem_chunk_read_fn : dfi_mem_chunk_read_zero,
 				  NULL);
