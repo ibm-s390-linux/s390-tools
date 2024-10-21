@@ -471,6 +471,7 @@ CONFIGFILES="\
 CMDS="uname -a\
   :uptime\
   :timedatectl\
+  :zhypinfo\
   :last\
   :lscpu -ae\
   :lscpu -ye\
@@ -507,6 +508,7 @@ CMDS="${CMDS}\
 # block device and other scsi device commands (in non alphabetical order)
 #   command groups itself have an intentional topical grouping and order
 CMDS="${CMDS}\
+  :lsblk\
   :lsdasd\
   :lsdasd -u\
   :lvdisplay\
@@ -603,7 +605,8 @@ NETWORK_CMDS="ip -br a\
   :netstat -s\
   :nm-tool\
   :nstat -az\
-  :openssl engine\
+  :openssl engine # deprecated in OpenSSL 3.n\
+  :openssl list --providers 2>/dev/null # redirect help on older systems\
   :route -n\
   "
 
