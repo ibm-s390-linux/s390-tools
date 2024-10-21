@@ -105,21 +105,26 @@ struct vmd_albk {
 	u8 id[sizeof(ALBK_MAGIC)];
 } __packed;
 
+struct vmd_oltble {
+	u64 start_addr;
+	u64 end_addr;
+} __packed;
+
 struct vmd_asibk_64_new {
 	u8 id[8];
 	u8 as_token[8];
 	u8 spaceid[33];
 	u8 reserved1[2];
 	u8 asibk_format;
-	u8 filler1[12];
+	u8 reserved2[12];
 	u64 storage_size_with_dcss;
 	u64 storage_size_def_store;
-	u8 filler2[136];
-	u64 online_storage_table[8]; /* For "def store config" */
-	u64 fence1;
-	u64 requested_range_table[8];
-	u64 fence2;
-	u32 record_number_of_first_bit_map;
+	u8 reserved3[136];
+	u32 range_table_entry_count;
+	u32 dcss_table_entry_count;
+	struct vmd_oltble online_storage_table[8];
+	struct vmd_oltble requested_range_table[64];
+	struct vmd_oltble dcss_range_table[32];
 } __packed;
 
 struct vmd_fir_64 {
