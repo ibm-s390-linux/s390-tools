@@ -32,7 +32,7 @@ Create a new add-secret request
 
 - **add**
 <ul>
-Perform an add-secret request (s390x only)
+Submit an add-secret request to the Ultravisor (s390x only)
 </ul>
 
 - **lock**
@@ -50,23 +50,34 @@ List all ultravisor secrets (s390x only)
 Verify that an add-secret request is sane
 </ul>
 
+- **retrieve**
+<ul>
+Retrieve a secret from the UV secret store (s390x only)
+</ul>
+
 ## Options
 
 `-v`, `--verbose`
 <ul>
-Provide more detailed output
+Provide more detailed output.
+</ul>
+
+
+`-q`, `--quiet`
+<ul>
+Provide less output.
 </ul>
 
 
 `--version`
 <ul>
-Print version information and exit
+Print version information and exit.
 </ul>
 
 
 `-h`, `--help`
 <ul>
-Print help
+Print help (see a summary with '-h').
 </ul>
 
 
@@ -95,12 +106,17 @@ Create a meta secret
 Create an association secret
 </ul>
 
+- **retrievable**
+<ul>
+Create a retrievable secret
+</ul>
+
 ### Options
 
 `-k`, `--host-key-document <FILE>`
 <ul>
 Use FILE as a host-key document. Can be specified multiple times and must be
-used at least once.
+specified at least once.
 </ul>
 
 
@@ -114,7 +130,7 @@ the host-key document beforehand.
 
 `-C`, `--cert <FILE>`
 <ul>
-Use FILE as a certificate to verify the host key or keys. The certificates are
+Use FILE as a certificate to verify the host-key or keys. The certificates are
 used to establish a chain of trust for the verification of the host-key
 documents. Specify this option twice to specify the IBM Z signing key and the
 intermediate CA certificate (signed by the root CA).
@@ -123,15 +139,15 @@ intermediate CA certificate (signed by the root CA).
 
 `--crl <FILE>`
 <ul>
-Use FILE as a certificate revocation list. The list is used to check whether a
-certificate of the chain of trust is revoked. Specify this option multiple times
-to use multiple CRLs.
+Use FILE as a certificate revocation list (CRL). The list is used to check
+whether a certificate of the chain of trust is revoked. Specify this option
+multiple times to use multiple CRLs.
 </ul>
 
 
 `--offline`
 <ul>
-Make no attempt to download CRLs
+Make no attempt to download CRLs.
 </ul>
 
 
@@ -146,8 +162,7 @@ specified certificate.
 `--hdr <FILE>`
 <ul>
 Specifies the header of the guest image. Can be an IBM Secure Execution image
-created by genprotimg or an extracted IBM Secure Execution header. The header
-must start at a page boundary.
+created by 'pvimg/genprotimg' or an extracted IBM Secure Execution header.
 </ul>
 
 
@@ -162,7 +177,7 @@ behavior.
 
 `-o`, `--output <FILE>`
 <ul>
-Write the generated request to FILE
+Write the generated request to FILE.
 </ul>
 
 
@@ -209,15 +224,15 @@ the request.
 
 `--flags <FLAGS>`
 <ul>
-Flags for the add-secret request
+Flags for the add-secret request.
     Possible values:
-        - **disable-dump**: Disables host-initiated dumping for the target guest instance
+        - **disable-dump**: Disables host-initiated dumping for the target guest instance.
 </ul>
 
 
 `--user-data <FILE>`
 <ul>
-Use the content of FILE as user-data. Passes user data defined in <FILE> through
+Use the content of FILE as user-data. Passes user data defined in FILE through
 the add-secret request to the ultravisor. The user data can be up to 512 bytes
 of arbitrary data, and the maximum size depends on the size of the user-signing
 key:
@@ -236,19 +251,25 @@ Optional. No user-data by default.
 `--user-sign-key <FILE>`
 <ul>
 Use the content of FILE as user signing key. Adds a signature calculated from
-the key in <FILE> to the add-secret request. The file must be in DER or PEM
-format containing a private key. Supported are RSA 2048 & 3072-bit and
-EC(secp521r1) keys. The firmware ignores the content, but the request tag
-protects the signature. The user-signing key signs the request. The location of
-the signature is filled with zeros during the signature calculation. The request
-tag also secures the signature. See man pvsecret verify for more details.
-Optional. No signature by default.
+the key in FILE to the add-secret request. The file must be in DER or PEM format
+containing a private key. Supported are RSA 2048 & 3072-bit and EC(secp521r1)
+keys. The firmware ignores the content, but the request tag protects the
+signature. The user-signing key signs the request. The location of the signature
+is filled with zeros during the signature calculation. The request tag also
+secures the signature. See man pvsecret verify for more details. Optional. No
+signature by default.
+</ul>
+
+
+`--use-name`
+<ul>
+Do not hash the name, use it directly as secret ID. Ignored for meta-secrets.
 </ul>
 
 
 `-h`, `--help`
 <ul>
-Print help
+Print help (see a summary with '-h').
 </ul>
 
 
@@ -265,13 +286,62 @@ of secrets.
 `pvsecret create association [OPTIONS] <NAME>`
 #### Description
 Create an association secret. Use an association secret to connect a trusted I/O
-device to a guest. The `pvapconfig` tool provides more information about
+device to a guest. The 'pvapconfig' tool provides more information about
 association secrets.
 #### Arguments
 
 `<NAME>`
 <ul>
-String to identify the new secret. The actual secret is set with --input-secret.
+String that identifies the new secret. The actual secret is set with
+'--input-secret'. The name is saved in `NAME.yaml` with white-spaces mapped to
+`_`.
+</ul>
+
+
+#### Options
+
+`--stdout`
+<ul>
+Print the hashed name to stdout. The hashed name is not written to `NAME.yaml`
+</ul>
+
+
+`--input-secret <SECRET-FILE>`
+<ul>
+Path from which to read the plaintext secret. Uses a random secret if not
+specified.
+</ul>
+
+
+`--output-secret <SECRET-FILE>`
+<ul>
+Save the generated secret as plaintext in SECRET-FILE. The generated secret can
+be used to generate add-secret requests for a different guest with the same
+secret using '--input-secret'. Destroy the secret when it is not used anymore.
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help (see a summary with '-h').
+</ul>
+
+
+### pvsecret create retrievable
+#### Synopsis
+`pvsecret create retrievable [OPTIONS] --secret <SECRET-FILE> --type <TYPE> <NAME>`
+`pvsecret create retr [OPTIONS] --secret <SECRET-FILE> --type <TYPE> <NAME>`
+#### Description
+Create a retrievable secret. A retrievable secret is stored in the per-guest
+storage of the Ultravisor. A SE-guest can retrieve the secret at runtime and use
+it. All retrievable secrets, but the plaintext secret, are retrieved as
+wrapped/protected key objects and only usable inside the current, running
+SE-guest instance.
+#### Arguments
+
+`<NAME>`
+<ul>
+String that identifies the new secret. The actual secret is set with '--secret'.
 The name is saved in `NAME.yaml` with white-spaces mapped to `_`.
 </ul>
 
@@ -284,24 +354,28 @@ Print the hashed name to stdout. The hashed name is not written to `NAME.yaml`
 </ul>
 
 
-`--input-secret <FILE>`
+`--secret <SECRET-FILE>`
 <ul>
-Path from which to read the plaintext secret. Uses a random secret if not
-specified
+Use SECRET-FILE as retrievable secret.
 </ul>
 
 
-`--output-secret <FILE>`
+`--type <TYPE>`
 <ul>
-Save the generated secret as plaintext in FILE. The generated secret can be used
-to generate add-secret requests for a different guest with the same secret using
---input-secret. Destroy the secret when it is not used anymore.
+Specify the secret type. Limitations to the input data apply depending on the
+secret type.
+    Possible values:
+        - **plain**: A plaintext secret. Can be any file up to 8190 bytes long.
+        - **aes**: An AES key. Must be a plain byte file 128, 192, or 256 bit long.
+        - **aes-xts**: An AES-XTS key. Must be a plain byte file 512, or 1024 bit long.
+        - **hmac-sha**: A HMAC-SHA key. Must be a plain byte file 512, or 1024 bit long.
+        - **ec**: An elliptic curve private key. Must be a PEM or DER file.
 </ul>
 
 
 `-h`, `--help`
 <ul>
-Print help
+Print help (see a summary with '-h').
 </ul>
 
 
@@ -309,13 +383,14 @@ Print help
 ### Synopsis
 `pvsecret add <FILE>`
 ### Description
-Perform an add-secret request (s390x only). Perform an add-secret request using
-a previously generated add-secret request. Only available on s390x.
+Submit an add-secret request to the Ultravisor (s390x only). Perform an
+add-secret request using a previously generated add-secret request. Only
+available on s390x.
 ### Arguments
 
 `<FILE>`
 <ul>
-Specify the request to be sent
+Specify the request to be sent.
 </ul>
 
 
@@ -325,8 +400,8 @@ Specify the request to be sent
 `pvsecret lock`
 ### Description
 Lock the secret-store (s390x only). Lock the secret store (s390x only). After
-this command executed successfully, all add-secret requests will fail. Only
-available on s390x.
+this command executed successfully, all subsequent add-secret requests will
+fail. Only available on s390x.
 
 ## pvsecret list
 ### Synopsis
@@ -339,7 +414,7 @@ Execution guest. Only available on s390x.
 
 `<FILE>`
 <ul>
-Store the result in FILE
+Store the result in FILE.
     Default value: '-'
 </ul>
 
@@ -348,18 +423,18 @@ Store the result in FILE
 
 `--format <FORMAT>`
 <ul>
-Define the output format of the list
+Define the output format of the list.
     Default value: 'human'
     Possible values:
-        - **human**: Human-focused, non-parsable output format
-        - **yaml**: Use yaml format
-        - **bin**: Use the format the ultravisor uses to pass the list
+        - **human**: Human-focused, non-parsable output format.
+        - **yaml**: Use yaml format.
+        - **bin**: Use the format the ultravisor uses to pass the list.
 </ul>
 
 
 `-h`, `--help`
 <ul>
-Print help
+Print help (see a summary with '-h').
 </ul>
 
 
@@ -407,7 +482,7 @@ The verification process works as follows:
 
 `<FILE>`
 <ul>
-Specify the request to be checked
+Specify the request to be checked.
 </ul>
 
 
@@ -435,5 +510,58 @@ contains this user-data with padded zeros if available.
 
 `-h`, `--help`
 <ul>
-Print help
+Print help (see a summary with '-h').
+</ul>
+
+
+## pvsecret retrieve
+### Synopsis
+`pvsecret retrieve [OPTIONS] <ID>`
+`pvsecret retr [OPTIONS] <ID>`
+### Description
+Retrieve a secret from the UV secret store (s390x only)
+### Arguments
+
+`<ID>`
+<ul>
+Specify the secret ID to be retrieved. Input type depends on '--inform'. If
+`yaml` (default) is specified, it must be a yaml created by the create
+subcommand of this tool. If `hex` is specified, it must be a hex 32-byte
+unsigned big endian number string. Leading zeros are required.
+</ul>
+
+
+### Options
+
+`-o`, `--output <FILE>`
+<ul>
+Specify the output path to place the secret value.
+    Default value: '-'
+</ul>
+
+
+`--inform <INFORM>`
+<ul>
+Define input type for the Secret ID.
+    Default value: 'yaml'
+    Possible values:
+        - **yaml**: Use a yaml file.
+        - **hex**: Use a hex string.
+        - **name**: Use a name-string. Will hash it if no secret with the name found.
+</ul>
+
+
+`--outform <OUTFORM>`
+<ul>
+Define the output format for the retrieved secret.
+    Default value: 'pem'
+    Possible values:
+        - **pem**: Write the secret as PEM.
+        - **bin**: Write the secret in binary.
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help (see a summary with '-h').
 </ul>
