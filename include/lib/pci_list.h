@@ -30,6 +30,17 @@ enum zpci_pft {
 	ZPCI_PFT_ISM = 0x05
 };
 
+/*
+ * Follows RFC 2863 operational states with the
+ * numeric values from IF_OPER_* in linux/if.h:
+ */
+typedef uint8_t operstate_t;
+
+struct zpci_netdev {
+	char *name;
+	operstate_t operstate;
+};
+
 struct zpci_dev {
 	struct util_list_node entry;
 	/* PCI Domain */
@@ -57,7 +68,7 @@ struct zpci_dev {
 
 	/* Associated netdevs if any */
 	int num_netdevs;
-	char **netdevs;
+	struct zpci_netdev *netdevs;
 };
 
 struct util_list *zpci_dev_list(void);
@@ -66,5 +77,8 @@ void zpci_free_dev(struct zpci_dev *zdev);
 
 char *zpci_pci_addr(struct zpci_dev *zdev);
 const char *zpci_pft_str(struct zpci_dev *zdev);
+
+const char *zpci_operstate_str(operstate_t state);
+operstate_t zpci_operstate_from_str(const char *oper_str);
 
 #endif /* LIB_ZPCI_PCI_LIST_H */

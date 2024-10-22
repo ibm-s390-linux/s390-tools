@@ -9,6 +9,7 @@
 
 #include <err.h>
 #include <errno.h>
+#include <linux/if.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,6 +75,65 @@ char *zpci_pci_addr(struct zpci_dev *zdev)
 	return pci_addr;
 }
 
+/**
+ * Get an operationanl state value from its state name
+ *
+ * The state names follow RFC 2863 and the values match
+ * IF_OPER_* in linux/if.h.
+ *
+ * @param[in]	oper_str	The name of the operational state
+ *
+ * @return the operational state value
+ */
+operstate_t zpci_operstate_from_str(const char *oper_str)
+{
+	if (!strcmp(oper_str, "notpresent"))
+		return IF_OPER_NOTPRESENT;
+	else if (!strcmp(oper_str, "down"))
+		return IF_OPER_DOWN;
+	else if (!strcmp(oper_str, "lowerlayerdown"))
+		return IF_OPER_LOWERLAYERDOWN;
+	else if (!strcmp(oper_str, "testing"))
+		return IF_OPER_TESTING;
+	else if (!strcmp(oper_str, "dormant"))
+		return IF_OPER_DORMANT;
+	else if (!strcmp(oper_str, "up"))
+		return IF_OPER_UP;
+	else
+		return IF_OPER_UNKNOWN;
+}
+
+/**
+ * Get an operationanl state name from its value
+ *
+ * The state names follow RFC 2863 and the values match
+ * IF_OPER_* in linux/if.h.
+ *
+ * @param[in]	state	The value of the operational state
+ *
+ * @return the operational state name string representation
+ */
+const char *zpci_operstate_str(operstate_t state)
+{
+	switch (state) {
+	case IF_OPER_NOTPRESENT:
+		return "notpresent";
+	case IF_OPER_DOWN:
+		return "down";
+	case IF_OPER_LOWERLAYERDOWN:
+		return "lowerlayerdown";
+	case IF_OPER_TESTING:
+		return "testing";
+	case IF_OPER_DORMANT:
+		return "dormant";
+	case IF_OPER_UP:
+		return "up";
+	case IF_OPER_UNKNOWN:
+	default:
+		return "unknown";
+	};
+}
+
 static int zpci_populate_from_slot_dir(struct zpci_dev *zdev, const char *slot_dir,
 				       const char *slot_name)
 {
@@ -113,6 +173,7 @@ static int zpci_populate_netdevices(struct zpci_dev *zdev, const char *dev_dir)
 	struct dirent **de_vec;
 	int count, i, rc = 0;
 	char *net_dir;
+	char buf[16]; /* "lowerlayerdown" */
 
 	util_asprintf(&net_dir, "%s/net", dev_dir);
 	count = util_scandir(&de_vec, alphasort, net_dir, netdev_patt);
@@ -131,9 +192,19 @@ static int zpci_populate_netdevices(struct zpci_dev *zdev, const char *dev_dir)
 	zdev->num_netdevs = count;
 	if (!count)
 		goto out_scan_dir;
-	zdev->netdevs = util_zalloc(sizeof(char *) * zdev->num_netdevs);
-	for (i = 0; i < count; i++)
-		zdev->netdevs[i] = util_strdup(de_vec[i]->d_name);
+	zdev->netdevs = util_zalloc(sizeof(struct zpci_netdev) * zdev->num_netdevs);
+	for (i = 0; i < count; i++) {
+		zdev->netdevs[i].name = util_strdup(de_vec[i]->d_name);
+		rc = util_file_read_line(buf, sizeof(buf), "%s/%s/operstate", net_dir,
+					 zdev->netdevs[i].name);
+		if (rc) {
+			/* If operstate is not readable just set to unknown */
+			zdev->netdevs[i].operstate = IF_OPER_UNKNOWN;
+			rc = 0;
+			continue;
+		}
+		zdev->netdevs[i].operstate = zpci_operstate_from_str(buf);
+	}
 
 out_scan_dir:
 	util_scandir_free(de_vec, count);
@@ -262,7 +333,7 @@ void zpci_free_dev(struct zpci_dev *zdev)
 
 	if (zdev->num_netdevs) {
 		for (i = 0; i < zdev->num_netdevs; i++)
-			free(zdev->netdevs[i]);
+			free(zdev->netdevs[i].name);
 		free(zdev->netdevs);
 	}
 	free(zdev);

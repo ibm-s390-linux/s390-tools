@@ -20,7 +20,8 @@ static void zpci_print(struct zpci_dev *zdev)
 		if (zdev->num_netdevs) {
 			printf("netdevs: ");
 			for (i = 0; i < zdev->num_netdevs; i++) {
-				printf("%s", zdev->netdevs[i]);
+				printf("%s (%s)", zdev->netdevs[i].name,
+				       zpci_operstate_str(zdev->netdevs[i].operstate));
 				if (i + 1 < zdev->num_netdevs)
 					printf(", ");
 			}
