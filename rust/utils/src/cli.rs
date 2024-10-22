@@ -14,7 +14,7 @@ use pv::{
     Error, Result,
 };
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 /// CLI Argument collection for handling host-keys, IBM signing keys, and certificates.
@@ -35,7 +35,7 @@ pub struct CertificateOptions {
         use_value_delimiter = true,
         value_delimiter = ',',
         )]
-    pub host_key_documents: Vec<String>,
+    pub host_key_documents: Vec<PathBuf>,
 
     /// Disable the host-key document verification.
     ///
@@ -58,7 +58,7 @@ pub struct CertificateOptions {
         use_value_delimiter = true,
         value_delimiter = ',',
     )]
-    pub certs: Vec<String>,
+    pub certs: Vec<PathBuf>,
 
     /// Use FILE as a certificate revocation list.
     ///
@@ -72,7 +72,7 @@ pub struct CertificateOptions {
         use_value_delimiter = true,
         value_delimiter = ',',
     )]
-    pub crls: Vec<String>,
+    pub crls: Vec<PathBuf>,
 
     /// Make no attempt to download CRLs.
     #[arg(long, requires("certs"))]
@@ -83,7 +83,7 @@ pub struct CertificateOptions {
     /// If omitted, the system wide-root CAs installed on the system are used.
     /// Use this only if you trust the specified certificate.
     #[arg(long, requires("certs"))]
-    pub root_ca: Option<String>,
+    pub root_ca: Option<PathBuf>,
 }
 
 impl CertificateOptions {
@@ -128,21 +128,24 @@ impl CertificateOptions {
         for hkd in hkds {
             let hk = read_file(hkd, "host-key document")?;
             let certs = read_certs(&hk).map_err(|source| Error::HkdNotPemOrDer {
-                hkd: hkd.to_string(),
+                hkd: hkd.display().to_string(),
                 source,
             })?;
             if certs.is_empty() {
-                return Err(Error::NoHkdInFile(hkd.to_string()));
+                return Err(Error::NoHkdInFile(hkd.display().to_string()));
             }
             if certs.len() != 1 {
-                warn!("The host-key document in '{hkd}' contains more than one certificate!")
+                warn!(
+                    "The host-key document in '{}' contains more than one certificate!",
+                    hkd.display()
+                )
             }
 
             // Panic: len is == 1 -> unwrap will succeed/not panic
             let c = certs.first().unwrap();
             verifier.verify(c)?;
             res.push(c.public_key()?);
-            info!("Use host-key document at '{hkd}'");
+            info!("Use host-key document at '{}'", hkd.display());
         }
         Ok(res)
     }
