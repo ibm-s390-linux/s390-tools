@@ -145,7 +145,7 @@ impl ReqEncrCtx {
         S: Into<Option<SymKey>>,
     {
         let iv = iv.into().unwrap_or(random_array()?);
-        let priv_key = priv_key.into().unwrap_or(gen_ec_key()?);
+        let priv_key = priv_key.into().unwrap_or(gen_ec_key(Nid::SECP521R1)?);
         let prot_key = prot_key
             .into()
             .unwrap_or(SymKey::random(SymKeyType::Aes256)?);
