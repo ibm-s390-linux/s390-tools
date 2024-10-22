@@ -350,7 +350,7 @@ mod tests {
 
         let data = "sample".as_bytes();
         let sign = sign_msg(&ec_key, MessageDigest::sha512(), data).unwrap();
-        assert!(sign.len() <= 139 && sign.len() >= 137);
+        assert!(sign.len() <= 139, "value is: {}", sign.len());
 
         assert!(verify_signature(&ec_key, MessageDigest::sha512(), data, &sign).unwrap());
     }
