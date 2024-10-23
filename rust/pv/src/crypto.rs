@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
+use enum_dispatch::enum_dispatch;
 use openssl::{
     derive::Deriver,
     ec::{EcGroup, EcKey},
@@ -50,8 +51,14 @@ impl From<SymKeyType> for Nid {
     }
 }
 
+/// The `enum_dispatch` macros needs at least one local trait to be implemented.
+#[allow(unused)]
+#[enum_dispatch(SymKey)]
+trait SymKeyTrait {}
+
 /// Types of symmetric keys
 #[non_exhaustive]
+#[enum_dispatch()]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymKey {
     /// AES 256 GCM key (32 bytes)
@@ -89,12 +96,6 @@ impl SymKey {
             Self::Aes256(_) => SymKeyType::Aes256,
             Self::Aes256Xts(_) => SymKeyType::Aes256Xts,
         }
-    }
-}
-
-impl From<Aes256Key> for SymKey {
-    fn from(value: Aes256Key) -> Self {
-        Self::Aes256(value)
     }
 }
 
@@ -531,5 +532,14 @@ mod tests {
             SymKey::random(SymKeyType::Aes256Xts).unwrap().key_type(),
             SymKeyType::Aes256Xts
         );
+    }
+
+    #[test]
+    fn try_from_and_into() {
+        let data = [0x1u8; 32];
+        let key: SymKey = Aes256Key::new(data).into();
+        assert_eq!(key.value(), &data);
+        let key_aes: Aes256Key = key.try_into().expect("should not fail");
+        assert_eq!(key_aes.value(), &data);
     }
 }
