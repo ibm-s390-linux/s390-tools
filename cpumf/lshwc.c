@@ -1,4 +1,4 @@
-/* Copyright IBM Corp. 2021
+/* Copyright IBM Corp. 2021, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -54,6 +54,7 @@ static int cfvn, csvn, authorization;
 static unsigned long loop_count = 1;
 static unsigned char *ioctlbuffer;
 static bool allcpu;
+static char *ctrformat = "%ld";
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
 static struct ctrname {		/* List of defined counters */
@@ -337,7 +338,7 @@ static void line(char *header)
 					continue;
 				if (comma)
 					putchar(',');
-				printf("%ld", ctrname[i].ccv[h]);
+				printf(ctrformat, ctrname[i].ccv[h]);
 				comma = true;
 			}
 			putchar('\n');
@@ -352,7 +353,7 @@ static void line(char *header)
 			continue;
 		if (comma)
 			putchar(',');
-		printf("%ld", ctrname[i].total);
+		printf(ctrformat, ctrname[i].total);
 		comma = true;
 		ctrname[i].total = 0;
 		ctrname[i].hitcnt = false;
@@ -605,6 +606,14 @@ static struct util_opt opt_vec[] = {
 		.argument = "NUMBER",
 		.desc = "Specifies interval between read operations (seconds)"
 	},
+	{
+		.option = { "hex0x", no_argument, NULL, 'X' },
+		.desc = "Counter values in hexadecimal format with leading 0x"
+	},
+	{
+		.option = { "hex", no_argument, NULL, 'x' },
+		.desc = "Counter values in hexadecimal format"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -664,6 +673,12 @@ int main(int argc, char **argv)
 			read_interval = (unsigned int)strtoul(optarg, &slash, 0);
 			if (errno || *slash)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			break;
+		case 'x':
+			ctrformat = "%lx";
+			break;
+		case 'X':
+			ctrformat = "%#lx";
 			break;
 		case 'a':
 			allcpu = true;
