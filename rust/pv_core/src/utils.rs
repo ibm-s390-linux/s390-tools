@@ -72,6 +72,12 @@ impl From<&u64> for Msb0Flags64 {
     }
 }
 
+impl From<Msb0Flags64> for u64 {
+    fn from(value: Msb0Flags64) -> Self {
+        value.0.into()
+    }
+}
+
 /// Bitflags in LSB0 ordering
 ///
 /// Wraps an u64 to set/get individual bits
@@ -111,6 +117,12 @@ impl From<u64> for Lsb0Flags64 {
 impl From<&u64> for Lsb0Flags64 {
     fn from(value: &u64) -> Self {
         (*value).into()
+    }
+}
+
+impl From<Lsb0Flags64> for u64 {
+    fn from(value: Lsb0Flags64) -> Self {
+        value.0.into()
     }
 }
 
