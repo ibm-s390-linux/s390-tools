@@ -20,6 +20,13 @@
 #define S390_SYSFS_PAI_EXT	"/sys/devices/pai_ext/"
 #define S390_SYSFS_PAI_NNPA	S390_SYSFS_PAI_EXT "events/NNPA_ALL"
 
+#define CPUMF_CTRSET_NONE		0
+#define CPUMF_CTRSET_EXTENDED		1
+#define CPUMF_CTRSET_BASIC		2
+#define CPUMF_CTRSET_PROBLEM_STATE	4
+#define CPUMF_CTRSET_CRYPTO		8
+#define CPUMF_CTRSET_MT_DIAG		32
+
 /**
  * Read out the PMU type from a given file.
  *

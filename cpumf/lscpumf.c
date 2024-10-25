@@ -162,13 +162,6 @@ static struct samples {		/* Sample definition for all machines */
  * Second version number: >3    Range 448 to 495 inclusive (48 counters)
  */
 
-#define CPUMF_CTRSET_NONE               0
-#define CPUMF_CTRSET_BASIC              2
-#define CPUMF_CTRSET_PROBLEM_STATE      4
-#define CPUMF_CTRSET_CRYPTO             8
-#define CPUMF_CTRSET_EXTENDED           1
-#define CPUMF_CTRSET_MT_DIAG            32
-
 struct counters {
 	int ctrnum;
 	int ctrset;
