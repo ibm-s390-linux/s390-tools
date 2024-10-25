@@ -490,11 +490,7 @@ static bool add_countervalue(size_t idx, unsigned int cpu, unsigned long value)
 		warnx("Invalid CPU number %d", cpu);
 		return false;
 	}
-	if (!ctrname[idx].ccv)		/* Unknown counter */
-		ctrname[idx].ccv = calloc(max_possible_cpus,
-					  sizeof(unsigned long));
-	if (ctrname[idx].ccv)
-		ctrname[idx].ccv[cpu] = value;
+	ctrname[idx].ccv[cpu] = value;
 	ctrname[idx].total += value;
 	ctrname[idx].hitcnt = true;
 	return true;
@@ -756,6 +752,9 @@ int main(int argc, char **argv)
 		free(check);
 		return EXIT_FAILURE;
 	}
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(ctrname); ++i)
+		ctrname[i].ccv = util_zalloc(max_possible_cpus * sizeof(unsigned long));
 
 	if (optind >= argc) {
 		ch = do_it(NULL);
