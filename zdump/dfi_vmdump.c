@@ -36,7 +36,7 @@ static struct {
 	struct vmd_fir_basic fir_basic; /* Dump file info record */
 	struct vmd_albk albk;		/* Dump access list record */
 
-	struct vmd_asibk_64_new asibk_new;
+	struct vmd_asizbk asizbk;
 	struct vmd_fir_64 fir;
 	struct vmd_fir_other_64 *fir_other;
 
@@ -81,7 +81,7 @@ static void vmdump64big_debug(void)
 	util_log_print(UTIL_LOG_DEBUG, "Bit-Key Pages: %lu\n", l.bitkey_pages_count);
 	util_log_print(UTIL_LOG_DEBUG, "Memory Offset: %#lx\n", l.memory_start_record);
 	util_log_print(UTIL_LOG_DEBUG, "Total Pages  : %lu\n",
-		       l.asibk_new.storage_size_def_store / PAGE_SIZE);
+		       l.asizbk.storage_size_def_store / PAGE_SIZE);
 	util_log_print(UTIL_LOG_DEBUG, "Stored Pages : %lu\n", l.stored_pages_count);
 
 	/* adsr */
@@ -185,9 +185,11 @@ static void vmdump64big_init(void)
 	zg_seek(g.fh, (l.fmbk.rec_nr_access - 1) * PAGE_SIZE, SEEK_SET);
 	zg_read(g.fh, &l.albk, sizeof(l.albk), SEEK_SET);
 
-	/* Record 9: asibk */
+	/* Record 9: asizbk */
 	zg_seek(g.fh, l.fmbk.rec_nr_access * PAGE_SIZE, ZG_CHECK);
-	zg_read(g.fh, &l.asibk_new, sizeof(l.asibk_new), ZG_CHECK);
+	zg_read(g.fh, &l.asizbk, sizeof(l.asizbk), ZG_CHECK);
+	if (memcmp(l.asizbk.id, ASIZBK_MAGIC, sizeof(l.asizbk.id)))
+		ERR_EXIT("Dump file inconsistent, invalid ASIZBK record detected");
 
 	l.memory_start_record = (l.fmbk.rec_nr_access + 1) * PAGE_SIZE;
 
@@ -195,8 +197,8 @@ static void vmdump64big_init(void)
 	 * Record 10: bitmaps:
 	 * Read all bitmap pages and setup bitmap array
 	 */
-	nr_dumped_pages = l.asibk_new.storage_size_def_store / PAGE_SIZE;
-	bitmap_sz = l.asibk_new.storage_size_def_store / (PAGE_SIZE * 8);
+	nr_dumped_pages = l.asizbk.storage_size_def_store / PAGE_SIZE;
+	bitmap_sz = l.asizbk.storage_size_def_store / (PAGE_SIZE * 8);
 	if (!bitmap_sz)
 		ERR_EXIT("Dump file inconsistent, no bitmap detected");
 	l.bitmap = util_zalloc(bitmap_sz);
@@ -441,7 +443,7 @@ static u64 find_bitrange(u8 *bitmap, const u64 bit, const u64 max, const bool is
 
 static void mem_init(void)
 {
-	u64 nr_dumped_pages = l.asibk_new.storage_size_def_store / PAGE_SIZE;
+	u64 nr_dumped_pages = l.asizbk.storage_size_def_store / PAGE_SIZE;
 	u64 pos, more;
 
 	for (pos = 0; pos < nr_dumped_pages;) {

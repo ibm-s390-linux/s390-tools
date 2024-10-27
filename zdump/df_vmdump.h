@@ -38,6 +38,7 @@ const u8 ADSR_MAGIC[2] = { 0xe2, 0xd9 }; /* 'SR' EBCDIC */
 const u8 VMDUMP_MAGIC[8] = { 0xe5, 0xd4, 0xc4, 0xe4, 0xd4, 0xd7, 0x40, 0x40 }; /* 'VMDUMP  ' EBCDIC */
 const u8 FMBK_MAGIC[8] = { 0xc8, 0xc3, 0xd7, 0xc4, 0xc6, 0xd4, 0xc2, 0xd2 }; /* 'HCPDFMBK' EBCDIC */
 const u8 ALBK_MAGIC[8] = { 0xc8, 0xc3, 0xd7, 0xc4, 0xc1, 0xd3, 0xc2, 0xd2 }; /* 'HCPDALBK' EBCDIC */
+const u8 ASIZBK_MAGIC[8] = { 0xc1, 0xe2, 0xc9, 0xe9, 0xc2, 0xd2, 0x40, 0x40 };/* 'ASIZBK  ' EBCDIC */
 
 /*
  * Layout of dump symptom record . The ADSR is always the first record in
@@ -110,12 +111,12 @@ struct vmd_oltble {
 	u64 end_addr;
 } __packed;
 
-struct vmd_asibk_64_new {
-	u8 id[8];
+struct vmd_asizbk {
+	u8 id[sizeof(ASIZBK_MAGIC)];
 	u8 as_token[8];
 	u8 spaceid[33];
 	u8 reserved1[2];
-	u8 asibk_format;
+	u8 asizbk_format;
 	u8 reserved2[12];
 	u64 storage_size_with_dcss;
 	u64 storage_size_def_store;
@@ -204,6 +205,6 @@ struct vmd_fir_other_64 {
 
 #define DF_VMDUMP_HDR_SIZE                                                                         \
 	(sizeof(struct vmd_adsr) + sizeof(struct vmd_fmbk) + sizeof(struct vmd_fir_basic) +        \
-	 sizeof(struct vmd_albk) + sizeof(struct vmd_asibk_64_new) + sizeof(struct vmd_fir_64))
+	 sizeof(struct vmd_albk) + sizeof(struct vmd_asizbk) + sizeof(struct vmd_fir_64))
 
 #endif
