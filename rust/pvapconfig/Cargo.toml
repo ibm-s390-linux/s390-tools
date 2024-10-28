@@ -5,6 +5,7 @@ authors = ["Harald Freudenberger <freude@linux.ibm.com>"]
 version = "0.10.0"
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 clap = { version ="4.1", features = ["derive", "wrap_help"]}

@@ -4,6 +4,8 @@
 Please refer to the official documentation to set up a working rust environment:
 https://www.rust-lang.org/learn/get-started
 
+The minimum supported Rust version (MSRV) is 1.75.
+
 ## Building rust code
 ### s390-tools build system
 If `cargo` is installed  a simple `make` should do the job. Note that,
