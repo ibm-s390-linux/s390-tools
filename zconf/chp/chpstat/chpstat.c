@@ -448,9 +448,11 @@ static void parse_cmgs(char *arg)
 {
 	struct cmg_t *cmg_t;
 	char *name;
+	int cmg;
 
 	while ((name = strsep(&arg, ","))) {
-		cmg_t = cmg_get(atoi(name));
+		cmg = parse_int("cmg", name, 1, 255);
+		cmg_t = cmg_get(cmg);
 		if (!cmg_t)
 			errx(EXIT_USAGE, "Unsupported CMG '%s'", name);
 		cmg_t->selected = true;
