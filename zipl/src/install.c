@@ -1253,8 +1253,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		int dummy, ssid;
 		char busid[16];
 
-		mfd.fd = misc_open_exclusive(device[i]);
-		if (mfd.fd == -1) {
+		if (misc_open_device(device[i], &mfd, dry_run) == -1) {
 			error_text("Could not open dump target '%s'",
 				   device[i]);
 			rc = -1;
@@ -1332,17 +1331,17 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		total_size += info[i]->phy_block_size * info[i]->phy_blocks;
 	printf("Dump target: %d partitions with a total size of %ld MB.\n",
 	       count, (long) total_size >> 20);
-	if (interactive) {
+	if (interactive && !dry_run) {
 		printf("Warning: All information on the following "
 		       "partitions will be lost!\n");
 		for (i = 0; i < count; i++)
 			printf("   %s\n", device[i]);
-		rc = ask_for_confirmation("Do you want to continue creating "
-					  "multi-volume dump partitions "
-					  "(y/n)?");
-		if (rc)
-			goto out;
 	}
+	rc = ask_for_confirmation("Do you want to continue creating "
+				  "multi-volume dump partitions "
+				  "(y/n)?");
+	if (rc)
+		goto out;
 	for (i = 0; i < count; i++) {
 		struct misc_fd mfd = {0};
 
@@ -1351,8 +1350,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 			rc = -1;
 			goto out;
 		}
-		mfd.fd = misc_open_exclusive(tempdev);
-		if (mfd.fd == -1) {
+		if (misc_open_device(tempdev, &mfd, dry_run) == -1) {
 			error_text("Could not open temporary device node '%s'",
 				   tempdev);
 			misc_free_temp_dev(tempdev);
