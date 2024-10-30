@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_path.h"
+#include "lib/util_file.h"
 #include "lib/util_arch.h"
 
 #define	PROC_SYSINFO		"/proc/sysinfo"
@@ -107,13 +109,44 @@ const char *util_arch_machine_type_to_str(int type)
  */
 unsigned long util_arch_hsa_maxsize(void)
 {
-	switch (util_arch_machine_type()) {
-	case UTIL_ARCH_MACHINE_TYPE_Z15:
-	case UTIL_ARCH_MACHINE_TYPE_Z15_T02:
-	case UTIL_ARCH_MACHINE_TYPE_Z16:
-	case UTIL_ARCH_MACHINE_TYPE_Z16_A02:
-		return HSA_SIZE_512M;
-	default:
-		return HSA_SIZE_32M;
+	unsigned long hsa_size = 0;
+	char *path;
+	int rc;
+
+	path = util_path_sysfs("firmware/dump/dump_area_size");
+	if (util_path_exists(path)) {
+		rc = util_file_read_ul(&hsa_size, 10, path);
+		if (rc)
+			hsa_size = 0;
 	}
+	free(path);
+
+	/*
+	 * Fall back in case of failed attempt to obtain dump area size
+	 * from sysfs for some reason (e.g. no kernel support of
+	 * the sysfs attribute /sys/firmware/dump/dump_area_size).
+	 * For all machine types starting with z15 we can safely assume
+	 * at least 512M of dump area size, otherwise, only 32M can be
+	 * safely assumed.
+	 */
+	if (!hsa_size) {
+		switch (util_arch_machine_type()) {
+		case UTIL_ARCH_MACHINE_TYPE_Z10_EC:
+		case UTIL_ARCH_MACHINE_TYPE_Z10_BC:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_196:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_114:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_EC12:
+		case UTIL_ARCH_MACHINE_TYPE_ZE_BC12:
+		case UTIL_ARCH_MACHINE_TYPE_Z13:
+		case UTIL_ARCH_MACHINE_TYPE_Z13_S:
+		case UTIL_ARCH_MACHINE_TYPE_Z14:
+		case UTIL_ARCH_MACHINE_TYPE_Z14_ZR1:
+			hsa_size = HSA_SIZE_32M;
+			break;
+		default:
+			hsa_size = HSA_SIZE_512M;
+		}
+	}
+
+	return hsa_size;
 }
