@@ -4,8 +4,8 @@
 
 use crate::assert_size;
 use crate::crypto::{
-    decrypt_aes_gcm, derive_key, encrypt_aes_gcm, gen_ec_key, random_array, AesGcmResult, SymKey,
-    SymKeyType, AES_256_GCM_TAG_SIZE,
+    decrypt_aes_gcm, derive_key, encrypt_aes_gcm, gen_ec_key, hash, random_array, AesGcmResult,
+    SymKey, SymKeyType, AES_256_GCM_TAG_SIZE,
 };
 use crate::misc::to_u32;
 use crate::request::Confidential;
@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use openssl::bn::{BigNum, BigNumContext};
 use openssl::ec::{EcGroup, EcGroupRef, EcKey, EcPointRef};
 use openssl::error::ErrorStack;
-use openssl::hash::{hash, MessageDigest};
+use openssl::hash::{DigestBytes, MessageDigest};
 use openssl::nid::Nid;
 use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
@@ -109,7 +109,7 @@ impl Encrypt for Keyslot {
         let derived_key = derive_key(priv_key, &self.0)?;
         let mut wrpk_and_kst =
             encrypt_aes_gcm(&derived_key.into(), &[0; 12], &[], prot_key)?.data();
-        let phk: EcdhPubkeyCoord = self.0.as_ref().try_into()?;
+        let phk: EcPubKeyCoord = self.0.as_ref().try_into()?;
 
         to.reserve(80);
         to.extend_from_slice(&hash(MessageDigest::sha256(), phk.as_ref())?);
@@ -239,7 +239,7 @@ impl ReqEncrCtx {
     ///
     /// This function will return an error if the public key could not be extracted by OpenSSL.
     /// Very unlikely.
-    pub fn key_coords(&self) -> Result<EcdhPubkeyCoord> {
+    pub fn key_coords(&self) -> Result<EcPubKeyCoord> {
         self.priv_key.as_ref().try_into().map_err(Error::Crypto)
     }
 
@@ -267,16 +267,35 @@ impl ReqEncrCtx {
     }
 }
 
+/// Public key components of an [`openssl::ec::EcKey`] key.
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct EcdhPubkeyCoord([u8; 160]);
-impl AsRef<[u8]> for EcdhPubkeyCoord {
+pub struct EcPubKeyCoord([u8; 160]);
+impl AsRef<[u8]> for EcPubKeyCoord {
     fn as_ref(&self) -> &[u8] {
         self.0.as_slice()
     }
 }
 
 const ECDH_PUB_KEY_COORD_POINT_SIZE: usize = 0x50;
+
+impl EcPubKeyCoord {
+    /// Returns the SHA256 hash of the [`EcPubKeyCoord`].
+    ///
+    /// If [`EcPubKeyCoord`] was built from a host-key, this value is the public host-key hash.
+    pub fn sha256(&self) -> Result<DigestBytes> {
+        hash(MessageDigest::sha256(), self.as_ref())
+    }
+
+    /// Construct a [``EcPubKeyCoord]
+    ///
+    /// # Safety
+    /// This function is marked unsafe, because data not representing two EC points violates the
+    /// invariant of this struct.
+    pub unsafe fn from_data(data: [u8; 160]) -> Self {
+        EcPubKeyCoord(data)
+    }
+}
 
 /// Get the pub ECDH coordinates in the format the Ultravisor expects it:
 /// The two coordinates are padded to 80 bytes each.
@@ -290,10 +309,10 @@ fn get_pub_ecdh_points(pkey: &EcPointRef, grp: &EcGroupRef) -> Result<[u8; 160],
     Ok(coord.try_into().unwrap())
 }
 
-impl TryFrom<EcdhPubkeyCoord> for PKey<Public> {
+impl TryFrom<EcPubKeyCoord> for PKey<Public> {
     type Error = ErrorStack;
 
-    fn try_from(value: EcdhPubkeyCoord) -> Result<Self, Self::Error> {
+    fn try_from(value: EcPubKeyCoord) -> Result<Self, Self::Error> {
         let ecdh = value.as_ref();
         let grp = EcGroup::from_curve_name(Nid::SECP521R1)?;
         let x = BigNum::from_slice(&ecdh[..ECDH_PUB_KEY_COORD_POINT_SIZE])?;
@@ -305,7 +324,7 @@ impl TryFrom<EcdhPubkeyCoord> for PKey<Public> {
 
 macro_rules! ecdh_from {
     ($type: ty) => {
-        impl TryFrom<&PKeyRef<$type>> for EcdhPubkeyCoord {
+        impl TryFrom<&PKeyRef<$type>> for EcPubKeyCoord {
             type Error = ErrorStack;
 
             fn try_from(key: &PKeyRef<$type>) -> Result<Self, Self::Error> {
@@ -314,11 +333,11 @@ macro_rules! ecdh_from {
                 let grp = k.group();
                 let pub_key = k.public_key();
                 let coord = get_pub_ecdh_points(pub_key, grp)?;
-                Ok(EcdhPubkeyCoord(coord))
+                Ok(Self(coord))
             }
         }
 
-        impl TryFrom<PKey<$type>> for EcdhPubkeyCoord {
+        impl TryFrom<PKey<$type>> for EcPubKeyCoord {
             type Error = ErrorStack;
 
             fn try_from(key: PKey<$type>) -> Result<Self, Self::Error> {
@@ -490,9 +509,6 @@ impl<'a> BinReqValues<'a> {
 
 #[cfg(test)]
 mod tests {
-    use openssl::ec::EcGroup;
-    use openssl::nid::Nid;
-
     use super::*;
     use crate::get_test_asset;
     use crate::request::SymKey;
@@ -620,26 +636,33 @@ mod tests {
     }
 
     #[test]
-    fn get_pub_ecdh_points() {
+    fn ec_pub_ec_coord_from() {
         let (cust_key, _) = get_test_keys();
-
         let pub_key = get_test_asset!("keys/public_cust.bin");
-
         assert_eq!(pub_key.len(), 160);
 
-        let points = cust_key.ec_key().unwrap();
-        let points = points.public_key();
-        let grp = EcGroup::from_curve_name(Nid::SECP521R1).unwrap();
+        let ec_coord: EcPubKeyCoord = cust_key.as_ref().try_into().unwrap();
+        assert_eq!(ec_coord.as_ref(), pub_key);
+    }
 
-        let points = super::get_pub_ecdh_points(points, &grp).unwrap();
+    #[test]
+    fn ec_pub_ec_coord_hash() {
+        let exp = [
+            0x5e, 0xe9, 0x05, 0xa9, 0xbe, 0x70, 0x36, 0x68, 0x15, 0xa4, 0x56, 0x41, 0xaf, 0xae,
+            0x00, 0x97, 0x3b, 0x1f, 0x45, 0x29, 0x2f, 0x43, 0xbc, 0xd7, 0x63, 0x8e, 0xe2, 0xa7,
+            0x3f, 0xd7, 0xc4, 0x5e,
+        ];
+        let (cust_key, _) = get_test_keys();
+        let ec_coord: EcPubKeyCoord = cust_key.as_ref().try_into().unwrap();
+        let hash = ec_coord.sha256().unwrap();
 
-        assert_eq!(&points, pub_key);
+        assert_eq!(hash.as_ref(), &exp);
     }
 
     #[test]
     fn conversion_ecdh_and_vice_versa() {
         let (_, cust_pub) = get_test_keys();
-        let phk: EcdhPubkeyCoord = cust_pub.clone().try_into().unwrap();
+        let phk: EcPubKeyCoord = cust_pub.clone().try_into().unwrap();
 
         assert_eq!(
             phk.as_ref(),

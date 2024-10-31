@@ -93,12 +93,13 @@ pub use pv_core::{FileAccessErrorType, FileIoErrorType};
 pub mod request {
     pub use crate::brcb::BootHdrTags;
     pub use crate::crypto::{SymKey, SymKeyType};
-    pub use crate::req::{Keyslot, ReqEncrCtx, Request};
+    pub use crate::req::{EcPubKeyCoord, Keyslot, ReqEncrCtx, Request};
     pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};
 
     /// Reexports some useful OpenSSL symbols
     pub mod openssl {
         pub use openssl::error::ErrorStack;
+        pub use openssl::hash::DigestBytes;
         pub use openssl::pkey;
         pub use openssl::x509;
     }
