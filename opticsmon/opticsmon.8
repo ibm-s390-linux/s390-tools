@@ -1,0 +1,83 @@
+.\" Copyright IBM Corp. 2024
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.\" Macro for inserting an option description prologue.
+.\" .OD <long> [<short>] [args]
+.de OD
+.  ds args "
+.  if !'\\$3'' .as args \fI\\$3\fP
+.  if !'\\$4'' .as args \\$4
+.  if !'\\$5'' .as args \fI\\$5\fP
+.  if !'\\$6'' .as args \\$6
+.  if !'\\$7'' .as args \fI\\$7\fP
+.  PD 0
+.  if !'\\$2'' .IP "\fB\-\\$2\fP \\*[args]" 4
+.  if !'\\$1'' .IP "\fB\-\-\\$1\fP \\*[args]" 4
+.  PD
+..
+.
+.TH opticsmon 8 "Oct 2024" s390-tools zpcictl
+.
+.SH NAME
+opticsmon - Monitor optical modules for directly attached PCI based NICs
+.
+.
+.SH SYNOPSIS
+.B "opticsmon"
+.I "OPTIONS"
+.
+.
+.SH DESCRIPTION
+Use
+.B opticsmon
+to monitor the health of the optical modules of directly attached PCI based
+NICs. When executed without the \fB--daemon\fR option it will collect optical
+module data from all available PCI network interface physical functions and
+print a summary in JSON format. Add the \fB--send-report\fR option to report
+this data to the support element.
+
+
+.
+.
+.SH OPTIONS
+.SS Operation Options
+.OD daemon "d"
+Run continuously and report on link state changes and periodically
+.PP
+.
+.OD send-report "r"
+Report the optics health data to the Support Element (SE)
+.PP
+.
+.OD quiet "q"
+Be quiet and don't print optics health summary
+.PP
+.
+.OD interval "i" "seconds"
+Interval in seconds at which to collect monitoring data in the absence of link
+state changes. A value larger than 24 hours (86400 seconds) is clamped down to
+24 hours.
+.PP
+.
+.OD module-info ""
+Include a base64 encoded binary dump of the module's SFF-8636/8472/8024
+standard data for each netdev. This matches "ethtool --module-info <netdev> raw
+on".
+
+.B Example: Extract module information for the first adapter
+
+.CL
+opticsmon --module-info | jq -r '.adapters[0].netdevs[0].optics.module_info' | base64 -d | hexdump -C
+.PP
+.PP
+.
+.SS General Options
+.OD help "h" ""
+Print usage information, then exit.
+.PP
+.
+.OD version "v" ""
+Print version information, then exit.
+.PP
+

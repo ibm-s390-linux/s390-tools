@@ -1,0 +1,20 @@
+#
+# Systemd unit for mon_fsstatd (monitor z/VM guest file systems)
+#
+# Copyright IBM Corp. 2024
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+
+[Unit]
+Description=Monitor health of directly attached PCI NIC optical modules
+# Documentation=man:opticsmon
+
+[Service]
+Type=exec
+ExecStart=@usrsbin_path@/opticsmon --send-report --monitor --interval 86400
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

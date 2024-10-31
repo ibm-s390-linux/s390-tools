@@ -3,7 +3,8 @@ include ../common.mak
 SYSTEM_UNITS = ttyrun-getty@.service iucvtty-login@.service \
                cpacfstatsd.service cpuplugd.service \
                dumpconf.service cpi.service \
-               mon_fsstatd.service mon_procd.service
+               mon_fsstatd.service mon_procd.service \
+               opticsmon.service
 
 all:
 

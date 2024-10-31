@@ -20,8 +20,10 @@
 #define SCLP_ERRNOTIFY_AQ_RESET			0
 #define SCLP_ERRNOTIFY_AQ_DECONF		1
 #define SCLP_ERRNOTIFY_AQ_REPORT_ERR		2
+#define SCLP_ERRNOTIFY_AQ_OPTICS_DATA		3
 
 #define SCLP_ERRNOTIFY_ID_ZPCICTL		0x4713
+#define SCLP_ERRNOTIFY_ID_OPTICSMON		0x4714
 
 #define SCLP_ERRNOTIFY_DATA_SIZE		4054
 
@@ -31,6 +33,7 @@ struct zpci_report_error_header {
 			 * 0: Adapter Reset Request
 			 * 1: Deconfigure and repair action requested
 			 * 2: Informational Report
+			 * 3: Optics Data
 			 */
 	__u16 length;	/* Length of Subsequent Data (up to 4K – SCLP header) */
 } __packed;
