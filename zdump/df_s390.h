@@ -20,22 +20,6 @@
 #include "zg.h"
 
 /*
- * Convert DFI arch to s390 arch
- */
-static inline enum df_s390_arch df_s390_from_dfi_arch(enum dfi_arch dfi_arch)
-{
-	return dfi_arch == DFI_ARCH_64 ? DF_S390_ARCH_64 : DF_S390_ARCH_32;
-}
-
-/*
- * Convert s390 arch to DFI arch
- */
-static inline enum dfi_arch df_s390_to_dfi_arch(enum df_s390_arch df_s390_arch)
-{
-	return df_s390_arch == DF_S390_ARCH_64 ? DFI_ARCH_64 : DFI_ARCH_32;
-}
-
-/*
  * Dump tool structure
  */
 struct df_s390_dumper {

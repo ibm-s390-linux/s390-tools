@@ -111,18 +111,16 @@ static int detect_mem_chunks(int check)
 }
 
 /*
- * Return architecture of running system
+ * Verify architecture of running system
  */
-static enum dfi_arch system_arch(void)
+static void check_system_arch(void)
 {
 	struct utsname utsname;
 
 	uname(&utsname);
-	if (memcmp(utsname.machine, "s390x", 5) == 0)
-		return DFI_ARCH_64;
-	if (memcmp(utsname.machine, "s390", 4) == 0)
-		return DFI_ARCH_32;
-	return DFI_ARCH_UNKNOWN;
+	if (memcmp(utsname.machine, "s390x", 5) != 0)
+		ERR_EXIT("Dump architecture \"%s\" is not supported",
+			 utsname.machine);
 }
 
 /*
@@ -133,7 +131,8 @@ static int dfi_devmem_init(void)
 	if (strcmp(g.fh->path, "/dev/mem") != 0 &&
 	    strcmp(g.fh->path, "/dev/crash") != 0)
 		return -ENODEV;
-	dfi_arch_set(system_arch());
+
+	check_system_arch();
 	dfi_cpu_info_init(DFI_CPU_CONTENT_NONE);
 	detect_mem_chunks(0);
 	dfi_attr_dump_method_set(DFI_DUMP_METHOD_LIVE);

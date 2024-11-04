@@ -128,7 +128,6 @@ static int dt_scsi_init(void)
 		return -1;
 	if (check_boot_info(&mbr.boot_info))
 		return -1;
-	dt_arch_set(DFI_ARCH_64);
 	dt_version_set(l.sb.version);
 	return 0;
 }

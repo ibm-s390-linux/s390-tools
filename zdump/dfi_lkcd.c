@@ -312,11 +312,7 @@ static int read_lkcd_hdr(void)
 	/* Read asm header */
 	zg_seek(g.fh, l.hdr.hdr_size, ZG_CHECK);
 	zg_read(g.fh, &l.hdr_asm, sizeof(l.hdr_asm), ZG_CHECK);
-	if (strncmp(l.hdr.utsname_machine, "s390x", sizeof("s390x")) == 0)
-		dfi_arch_set(DFI_ARCH_64);
-	else if (strncmp(l.hdr.utsname_machine, "s390", sizeof("s390")) == 0)
-		dfi_arch_set(DFI_ARCH_32);
-	else
+	if (strncmp(l.hdr.utsname_machine, "s390x", sizeof("s390x")) != 0)
 		ERR_EXIT("Dump architecture \"%s\" is not supported",
 			 l.hdr.utsname_machine);
 	if (l.hdr_asm.magic == DF_LKCD_MAGIC_ASM)

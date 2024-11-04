@@ -21,7 +21,6 @@
  */
 static struct {
 	struct df_s390_dumper	dumper;
-	enum dfi_arch		dumper_arch;
 } l;
 
 /*
@@ -58,7 +57,6 @@ static int dumper_read_fba(void)
 	if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_FBA_EXT,
 		    DF_S390_DUMPER_MAGIC_SIZE) != 0)
 		return -ENODEV;
-
 	dumper->size = STAGE2_DUMPER_SIZE_SV;
 	/* Read force and mem fields in the end of the dumper */
 	bytes_to_read = sizeof(dumper->force) + sizeof(dumper->mem);
@@ -95,8 +93,6 @@ static int dt_s390sv_ext_init(void)
 {
 	if (sv_dumper_read() != 0)
 		return -ENODEV;
-	l.dumper_arch = DFI_ARCH_64;
-	dt_arch_set(l.dumper_arch);
 	dt_version_set(l.dumper.version);
 	dt_attr_mem_limit_set(l.dumper.mem);
 	return 0;

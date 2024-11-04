@@ -81,7 +81,6 @@ struct attr {
  * File local static data
  */
 static struct {
-	enum dfi_arch	arch;
 	struct attr	attr;
 	struct cpus	cpus;
 	struct dfi	*dfi;
@@ -133,7 +132,7 @@ void dfi_info_print(void)
 	if (l.attr.build_arch)
 		STDERR("  Build arch.........: %s\n",
 		       dfi_arch_str(*l.attr.build_arch));
-	STDERR("  System arch........: %s\n", dfi_arch_str(l.arch));
+	STDERR("  System arch........: %s\n", dfi_arch_str(DFI_ARCH_64));
 	if (l.cpus.cnt)
 		STDERR("  CPU count (online).: %u\n", l.cpus.cnt);
 	if (l.attr.real_cpu_cnt)
@@ -241,22 +240,6 @@ int dfi_cpu_content_fac_check(int flags)
 }
 
 /*
- * Set DFI architecture
- */
-void dfi_arch_set(enum dfi_arch arch)
-{
-	l.arch = arch;
-}
-
-/*
- * Return DFI architecture
- */
-enum dfi_arch dfi_arch(void)
-{
-	return l.arch;
-}
-
-/*
  * Return DFI CPU list
  */
 struct util_list *dfi_cpu_list(void)
@@ -298,8 +281,6 @@ const char *dfi_arch_str(enum dfi_arch arch)
 		return "s390 (32 bit)";
 	case DFI_ARCH_64:
 		return "s390x (64 bit)";
-	case DFI_ARCH_UNKNOWN:
-		return "unknown";
 	}
 	ABORT("dfi_arch_str: Invalid dfi arch: %d", arch);
 	return NULL; /* UNREACHABLE */
@@ -482,48 +463,6 @@ unsigned int *dfi_attr_real_cpu_cnt(void)
 }
 
 /*
- * Convert 32 bit CPU register set to 64 bit
- */
-static void cpu_32_to_64(struct dfi_cpu *cpu_64, struct dfi_cpu_32 *cpu_32)
-{
-	int i;
-
-	for (i = 0; i < 16; i++) {
-		cpu_64->gprs[i] = cpu_32->gprs[i];
-		cpu_64->ctrs[i] = cpu_32->ctrs[i];
-		cpu_64->acrs[i] = cpu_32->acrs[i];
-		if (i < 4)
-			cpu_64->fprs[i] = cpu_32->fprs[i];
-	}
-	cpu_64->psw[0] = cpu_32->psw[0];
-	cpu_64->psw[1] = cpu_32->psw[1];
-	cpu_64->prefix = cpu_32->prefix;
-	cpu_64->timer = cpu_32->timer;
-	cpu_64->todcmp = cpu_32->todcmp;
-}
-
-/*
- * Convert 64 bit CPU register set to 32 bit
- */
-void dfi_cpu_64_to_32(struct dfi_cpu_32 *cpu_32, struct dfi_cpu *cpu_64)
-{
-	int i;
-
-	for (i = 0; i < 16; i++) {
-		cpu_32->gprs[i] = (u32) cpu_64->gprs[i];
-		cpu_32->ctrs[i] = (u32) cpu_64->ctrs[i];
-		cpu_32->acrs[i] = (u32) cpu_64->acrs[i];
-		if (i < 4)
-			cpu_32->fprs[i] = (u32) cpu_64->fprs[i];
-	}
-	cpu_32->psw[0] = (u32) cpu_64->psw[0];
-	cpu_32->psw[1] = (u32) cpu_64->psw[1];
-	cpu_32->prefix = cpu_64->prefix;
-	cpu_32->timer = cpu_64->timer;
-	cpu_32->todcmp = cpu_64->todcmp;
-}
-
-/*
  * Copy 64 bit lowcore to internal register set
  */
 static void lc2cpu_64(struct dfi_cpu *cpu, struct dfi_lowcore_64 *lc)
@@ -555,21 +494,6 @@ static void lc2cpu_64(struct dfi_cpu *cpu, struct dfi_lowcore_64 *lc)
 }
 
 /*
- * Copy 32 bit lowcore to internal 32 bit cpu
- */
-static void lc2cpu_32(struct dfi_cpu_32 *cpu, struct dfi_lowcore_32 *lc)
-{
-	memcpy(&cpu->gprs, lc->gpregs_save_area, sizeof(cpu->gprs));
-	memcpy(&cpu->ctrs, lc->cregs_save_area, sizeof(cpu->ctrs));
-	memcpy(&cpu->acrs, lc->access_regs_save_area, sizeof(cpu->acrs));
-	memcpy(&cpu->fprs, lc->floating_pt_save_area, sizeof(cpu->fprs));
-	memcpy(&cpu->psw, lc->st_status_fixed_logout, sizeof(cpu->psw));
-	memcpy(&cpu->prefix, &lc->prefixreg_save_area, sizeof(cpu->prefix));
-	memcpy(&cpu->timer, lc->timer_save_area, sizeof(cpu->timer));
-	memcpy(&cpu->todcmp, lc->clock_comp_save_area, sizeof(cpu->todcmp));
-}
-
-/*
  * Initialize and add a new CPU with given lowcore pointer
  *
  * Note: When this function is called, the memory chunks have to be already
@@ -578,6 +502,7 @@ static void lc2cpu_32(struct dfi_cpu_32 *cpu, struct dfi_lowcore_32 *lc)
 int dfi_cpu_add_from_lc(u32 lc_addr)
 {
 	struct dfi_cpu *cpu = dfi_cpu_alloc();
+	struct dfi_lowcore_64 lc;
 
 	cpu->cpu_id = l.cpus.cnt;
 	switch (l.cpus.content) {
@@ -585,19 +510,9 @@ int dfi_cpu_add_from_lc(u32 lc_addr)
 		cpu->prefix = lc_addr;
 		break;
 	case DFI_CPU_CONTENT_ALL:
-		if (l.arch == DFI_ARCH_32) {
-			struct dfi_cpu_32 cpu_32;
-			struct dfi_lowcore_32 lc;
-			if (dfi_mem_virt_read(lc_addr, &lc, sizeof(lc)))
-				return -EINVAL;
-			lc2cpu_32(&cpu_32, &lc);
-			cpu_32_to_64(cpu, &cpu_32);
-		} else {
-			struct dfi_lowcore_64 lc;
-			if (dfi_mem_virt_read(lc_addr, &lc, sizeof(lc)))
-				return -EINVAL;
-			lc2cpu_64(cpu, &lc);
-		}
+		if (dfi_mem_virt_read(lc_addr, &lc, sizeof(lc)))
+			return -EINVAL;
+		lc2cpu_64(cpu, &lc);
 		break;
 	case DFI_CPU_CONTENT_NONE:
 		ABORT("dfi_cpu_add_from_lc() called for CONTENT_NONE");
@@ -613,8 +528,6 @@ int dfi_cpu_lc_has_vx_sa(void *_lc)
 {
 	struct dfi_lowcore_64 *lc = _lc;
 
-	if (l.arch == DFI_ARCH_32)
-		return 0;
 	if (lc->vector_save_area_addr == 0)
 		return 0;
 	if (lc->vector_save_area_addr % 1024 != 0)
@@ -700,7 +613,6 @@ static void kdump_select_prod_init(void)
 		ERR_EXIT("The \"--select\" option is not possible with this "
 			 "dump");
 	attr_init();
-	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_NONE);
 	if (dfi_vmcoreinfo_symbol(&ptr, "lowcore_ptr"))
 		return;
@@ -797,7 +709,6 @@ int dfi_init(void)
 
 	util_log_print(UTIL_LOG_TRACE, "DFI initialization\n");
 
-	l.arch = DFI_ARCH_UNKNOWN;
 	rc = dfi_mem_chunk_init();
 	if (rc)
 		return rc;

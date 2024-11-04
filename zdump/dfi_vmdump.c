@@ -488,7 +488,6 @@ static int dfi_vmdump_init(void)
 
 	vmdump64big_init();
 	dfi_attr_version_set(l.fir.fir_format);
-	dfi_arch_set(DFI_ARCH_64);
 	dfi_attr_real_cpu_cnt_set(l.fir.online_cpus + 1);
 	mem_init();
 	cpu_init();

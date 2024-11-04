@@ -26,11 +26,10 @@
  */
 static int check_addr_max(struct df_s390_hdr *hdr, u64 addr_max)
 {
-	unsigned int i, lc_size;
+	unsigned int i;
 
-	lc_size = dfi_lc_size(df_s390_to_dfi_arch(hdr->arch));
 	for (i = 0; i < hdr->cpu_cnt; i++) {
-		if (hdr->lc_vec[i] + lc_size > addr_max)
+		if (hdr->lc_vec[i] + LOWCORE_SIZE > addr_max)
 			return -1;
 	}
 	return 0;
@@ -91,11 +90,10 @@ void df_s390_hdr_add(struct df_s390_hdr *hdr)
 		dfi_attr_time_set(&timeval);
 	}
 	dfi_attr_version_set(hdr->version);
-	dfi_arch_set(df_s390_to_dfi_arch(hdr->arch));
 	if (hdr->cpu_id)
 		dfi_attr_cpu_id_set(hdr->cpu_id);
 	if (hdr->build_arch)
-		dfi_attr_build_arch_set(df_s390_to_dfi_arch(hdr->build_arch));
+		dfi_attr_build_arch_set(DFI_ARCH_64);
 	if (hdr->mem_size_real)
 		dfi_attr_mem_size_real_set(hdr->mem_size_real);
 	if (hdr->real_cpu_cnt)

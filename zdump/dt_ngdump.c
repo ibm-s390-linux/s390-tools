@@ -35,7 +35,6 @@ static int dt_ngdump_init(void)
 	if (rc)
 		return -1;
 
-	dt_arch_set(DFI_ARCH_64);
 	dt_version_set(l.meta.version);
 
 	return 0;

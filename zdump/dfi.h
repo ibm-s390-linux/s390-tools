@@ -25,7 +25,6 @@
 enum dfi_arch {
 	DFI_ARCH_32		= 0,
 	DFI_ARCH_64		= 1,
-	DFI_ARCH_UNKNOWN	= 2,
 };
 
 struct dfi_lowcore_32 {
@@ -71,14 +70,6 @@ struct dfi_lowcore_64 {
 	u64	cregs_save_area[16];		/* 0x1380 */
 	u8	pad_0x1400[0x2000-0x1400];	/* 0x1400 */
 } __packed;
-
-static inline u64 dfi_lc_size(enum dfi_arch arch)
-{
-	if (arch == DFI_ARCH_64)
-		return 0x2000;
-	else
-		return 0x1000;
-}
 
 struct dfi_vxrs {
 	u64 low;
@@ -126,8 +117,6 @@ struct dfi_cpu_32 {
 
 void dfi_cpu_64_to_32(struct dfi_cpu_32 *cpu_32, struct dfi_cpu *cpu_64);
 
-enum dfi_arch dfi_arch(void);
-void dfi_arch_set(enum dfi_arch arch);
 const char *dfi_arch_str(enum dfi_arch arch);
 
 enum dfi_cpu_content {

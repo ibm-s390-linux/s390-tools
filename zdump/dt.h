@@ -27,7 +27,6 @@ struct dt {
 
 void dt_init(void);
 void dt_info_print(void);
-void dt_arch_set(enum dfi_arch arch);
 void dt_version_set(int version);
 void dt_attr_mem_limit_set(u64 mem_limit);
 void dt_attr_force_set(int value);

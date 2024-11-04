@@ -113,17 +113,6 @@ static void dump_chunks_init(void *hdr, u64 hdr_size)
 }
 
 /*
- * ELF DFO is only supported for 64 bit (s390x)
- */
-static void ensure_s390x(void)
-{
-	if (dfi_arch() != DFI_ARCH_64)
-		ERR_EXIT("Error: The ELF dump format is only supported for "
-			 "s390x source dumps");
-	df_elf_ensure_s390x();
-}
-
-/*
  * Initialize ELF output dump format
  */
 static void dfo_elf_init(void)
@@ -133,7 +122,7 @@ static void dfo_elf_init(void)
 	void *buf, *ptr;
 	u64 hdr_off;
 
-	ensure_s390x();
+	df_elf_ensure_s390x();
 	alloc_size = HDR_BASE_SIZE + dfi_cpu_cnt() * get_max_note_size_per_cpu() +
 		     dfi_mem_chunk_cnt() * HDR_PER_MEMC_SIZE;
 	buf = zg_alloc(alloc_size);

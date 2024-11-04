@@ -111,7 +111,6 @@ static int init_kdump_hdr(struct df_kdump_hdr *hdr)
 	dfi_attr_real_cpu_cnt_set(hdr->nr_cpus);
 	dfi_attr_utsname_set(&hdr->utsname);
 	dfi_attr_time_set(&hdr->timestamp);
-	dfi_arch_set(DFI_ARCH_64);
 	dfi_mem_chunk_add(0, (unsigned long) hdr->max_mapnr * PAGE_SIZE,
 			  NULL, NULL, NULL);
 	return 0;

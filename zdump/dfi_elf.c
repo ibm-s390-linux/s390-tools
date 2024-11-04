@@ -248,7 +248,6 @@ static int dfi_elf_init(void)
 		goto free_ehdr;
 
 	df_elf_ensure_s390x();
-	dfi_arch_set(DFI_ARCH_64);
 	dfi_cpu_info_init(DFI_CPU_CONTENT_ALL);
 
 	phdrs = read_elf_phdrs(g.fh, ehdr, &phnum);

@@ -501,6 +501,8 @@ static int dfi_s390mv_ext_init(void)
 	volumes_init();
 	if (vol_online_check() != 0)
 		zg_exit(1);
+	if (l.hdr.arch != DF_S390_ARCH_64)
+		ERR_EXIT("Dump architecture is not supported!");
 	if (l.hdr.mem_size == 0)
 		return -ENODEV;
 	df_s390_hdr_add(&l.hdr);
@@ -531,7 +533,6 @@ int dt_s390mv_ext_init(void)
 	if (open_dump() != 0)
 		return -ENODEV;
 	volumes_init();
-	dt_arch_set(DFI_ARCH_64);
 	dt_version_set(l.dumper.version);
 	dt_attr_mem_limit_set(l.dumper.mem);
 	dt_attr_force_set(l.dumper.force);

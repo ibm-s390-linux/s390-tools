@@ -38,7 +38,6 @@ struct attr {
  */
 static struct {
 	int		version;
-	enum dfi_arch	arch;
 	struct attr	attr;
 	struct dt	*dt;
 } l;
@@ -74,7 +73,7 @@ void dt_info_print(void)
 	STDERR("Dump device info:\n");
 	STDERR("  Dump tool.........: %s\n", l.dt->desc);
 	STDERR("  Version...........: %d\n", l.version);
-	STDERR("  Architecture......: %s\n", dfi_arch_str(l.arch));
+	STDERR("  Architecture......: %s\n", dfi_arch_str(DFI_ARCH_64));
 	if (l.attr.dasd_type)
 		STDERR("  DASD type.........: %s\n", l.attr.dasd_type);
 
@@ -95,14 +94,6 @@ void dt_info_print(void)
 		STDERR("\n");
 		l.dt->info();
 	}
-}
-
-/*
- * Set DT architecture
- */
-void dt_arch_set(enum dfi_arch arch)
-{
-	l.arch = arch;
 }
 
 /*

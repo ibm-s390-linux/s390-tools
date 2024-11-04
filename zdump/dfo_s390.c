@@ -51,25 +51,6 @@ static void cpu2lc_64(void *lc_64, struct dfi_cpu *cpu)
 }
 
 /*
- * Copy internal register set to 32 bit lowcore
- */
-static void cpu2lc_32(void *lc_32, struct dfi_cpu *cpu_64)
-{
-	struct dfi_lowcore_32 *lc = lc_32;
-	struct dfi_cpu_32 cpu;
-
-	dfi_cpu_64_to_32(&cpu, cpu_64);
-	memcpy(lc->gpregs_save_area, &cpu.gprs, sizeof(cpu.gprs));
-	memcpy(lc->cregs_save_area, &cpu.ctrs, sizeof(cpu.ctrs));
-	memcpy(lc->access_regs_save_area, &cpu.acrs, sizeof(cpu.acrs));
-	memcpy(lc->floating_pt_save_area, &cpu.fprs, sizeof(cpu.fprs));
-	memcpy(lc->st_status_fixed_logout, &cpu.psw, sizeof(cpu.psw));
-	memcpy(&lc->prefixreg_save_area, &cpu.prefix, sizeof(cpu.prefix));
-	memcpy(lc->timer_save_area, &cpu.timer, sizeof(cpu.timer));
-	memcpy(lc->clock_comp_save_area, &cpu.todcmp, sizeof(cpu.todcmp));
-}
-
-/*
  * Convert timeval to s390 TOD clock
  */
 static void timeval2tod(uint64_t *tod, struct timeval *xtime)
@@ -106,10 +87,7 @@ static void dfo_s390_dump_chunk_lc_fn(struct dfo_chunk *dump_chunk,
 
 	if (dfi_mem_virt_read(cpu->prefix + off, &lc[off], cnt))
 		return;
-	if (dfi_arch() == DFI_ARCH_64)
-		cpu2lc_64(lc, cpu);
-	else
-		cpu2lc_32(lc, cpu);
+	cpu2lc_64(lc, cpu);
 	memcpy(buf, &lc[off], cnt);
 }
 
@@ -135,18 +113,16 @@ static void add_cpu_to_dfo(struct dfi_cpu *cpu)
 
 	if (dfi_cpu_content() != DFI_CPU_CONTENT_ALL)
 		return;
-	if (!dfi_mem_range_valid(cpu->prefix, dfi_lc_size(dfi_arch()))) {
+	if (!dfi_mem_range_valid(cpu->prefix, LOWCORE_SIZE)) {
 		STDERR("Info: Could not read CPU prefix page: %x\n",
 		       cpu->prefix);
 		return;
 	}
 	/* Add lowcore to memory */
 	dfo_chunk_add(cpu->prefix + DF_S390_HDR_SIZE,
-		      dfi_lc_size(dfi_arch()), cpu,
+		      LOWCORE_SIZE, cpu,
 		      dfo_s390_dump_chunk_lc_fn);
 	/* Add VX save area to memory */
-	if (dfi_arch() != DFI_ARCH_64)
-		return;
 	if (!dfi_cpu_content_fac_check(DFI_CPU_CONTENT_FAC_VX))
 		return;
 	if (dfi_mem_virt_read(cpu->prefix, &lc, sizeof(lc)))
@@ -239,9 +215,9 @@ static void df_s390_dump_init(void)
 	dh->mem_end = dfi_mem_end();
 	dh->mem_size = dh->mem_end + 1;
 	dh->num_pages = dh->mem_size / PAGE_SIZE;
-	dh->arch = df_s390_from_dfi_arch(dfi_arch());
+	dh->arch = DF_S390_ARCH_64;
 	if (dfi_attr_build_arch())
-		dh->build_arch = df_s390_from_dfi_arch(*dfi_attr_build_arch());
+		dh->build_arch = DF_S390_ARCH_64;
 	dh->cpu_cnt = dfi_cpu_cnt();
 	if (dfi_cpu_content() == DFI_CPU_CONTENT_NONE)
 		dh->cpu_cnt = 0;
