@@ -71,6 +71,51 @@ Use batch mode (no curses). This can be useful for sending output from hyptop
 to another program, a file, or a line mode terminal.
 In this mode no user input is accepted.
 .TP
+.BR "\-\-format=<FORMAT>"
+.RS
+Use this option to show output in a machine-readable format. FORMAT can be
+one of:
+
+.IP \(bu 3
+.B json:
+Single JavaScript Object Notation (JSON) data structure
+
+Data for all iterations is formatted as one JSON data structure in multiple
+lines to make them more readable by humans.
+.BR
+
+See section "OUTPUT FORMAT" for more details.
+.BR
+.PP
+.IP \(bu 3
+.B json\-seq:
+Sequence of JSON data structures
+
+Data for each iteration is formatted as a separate JSON data structure prefixed
+with an ASCII Record Separator character (0x1e) and suffixed with an ASCII Line
+Feed character (0x0a) in accordance with RFC7464.
+.BR
+
+See section "OUTPUT FORMAT" for more details.
+.BR
+.PP
+.IP \(bu 3
+.B pairs:
+Textual key=value pairs
+
+.PP
+.IP \(bu 3
+.B csv:
+Comma-separated-value (CSV) list
+.BR
+
+All values are enclosed in double quotation marks and separated by commas. The
+first line of output contains a list of headings. Subsequent lines each
+represent data for one system in one iteration.
+.PP
+This option implies the "\-\-batch_mode" option.
+.RE
+.TP
 .BR "\-d <SECONDS>" " or " "\-\-delay=<SECONDS>"
 Specifies the delay between screen updates.
 .TP
@@ -216,6 +261,196 @@ For the online time field, the value is the time during which at least
 one CPU has been operational.
 Operating CPUs are shown with CPU identifier "0" and stopped CPUs with "1".
 
+.SH OUTPUT FORMATS
+This section contains additional information for some of the supported
+output formats.
+
+.SS json
+
+JSON output consists of a top-level object with the following properties
+(key-value pairs):
+
+.IP \(bu 3
+.BR meta :
+Tool meta-data including API level, version, host name, and time of invocation
+.PP
+.IP \(bu 3
+.BR hyptop :
+Hypervisor performance data
+.PP
+
+Performance data is stored as an array of iteration objects under the "hyptop"
+property in the top-level object. Iteration objects contain the following properties:
+
+.IP \(bu 3
+.BR iteration :
+sequential count of the current iteration
+.PP
+.IP \(bu 3
+.BR "time" " and " "time_epoch" :
+time when the iteration was recorded, in human-readable format and as Unix
+epoch.
+.PP
+.IP \(bu 3
+.BR cputypes :
+contains the number of CPUs hyptop detected, per CPU type. Possible properties
+are
+.BR "cp" ", " "ifl" " and " "un".
+.PP
+.IP \(bu 3
+.BR systems :
+when the "sys_list" window is selected, contains an array of system objects
+that contain the performance data per system. Each system object contains a
+"system" property and properties for its performance data (see below).
+.PP
+.IP \(bu 3
+.BR cpus :
+when the "sys" window is selected, contains an array of CPU objects
+that contain the performance data per CPU of the selected system. Each CPU
+object contains a "coreid" property and properties for its performance data
+(see below).
+.PP
+.IP \(bu 3
+.BR summary :
+contains aggregated performance data over all systems in the "systems" or
+"cpus" array.
+.PP
+
+All performance data available for the platform (LPAR, z/VM) hyptop is executed
+on is shown. Selecting specific fields with \-\-fields is not supported but it
+is possible to change the units of fields. Properties for performance data are
+labeled after their respective columns.
+
+Example JSON output for a single iteration:
+.br
+
+.RS
+{
+.br
+  "meta": {
+.br
+    "api_level": 1,
+.br
+    "version": "2.35.0",
+.br
+    "host": "mylpar.local",
+.br
+    "time_epoch": 1730787834,
+.br
+    "time": "2024-11-05 07:23:54+0100"
+.br
+  },
+.br
+  "hyptop": [
+.br
+    {
+.br
+      "iteration": 0,
+.br
+      "time_epoch": 1730787834,
+.br
+      "time": "2024-11-05 07:23:54+0100",
+.br
+      "cputypes": {
+.br
+        "ifl": 124,
+.br
+        "cp": 1,
+.br
+        "un": 0
+.br
+      },
+.br
+      "systems": [
+.br
+        {
+.br
+          "system": "MYLPAR",
+.br
+          "#core": 30,
+.br
+          "#the": 60,
+.br
+          "core": 379.57,
+.br
+          "the": 382.43,
+.br
+          "smt": 294.73,
+.br
+          "mgm": 2.09,
+.br
+          "core+": "1503:13",
+.br
+          "the+": "2060:45",
+.br
+          "mgm+": "22:19",
+.br
+          "online": "18:18:09"
+.br
+        }
+.br
+      ],
+.br
+      "summary": {
+.br
+        "#core": 30,
+.br
+        "#the": 60,
+.br
+        "core": 379.57,
+.br
+        "the": 382.43,
+.br
+        "smt": 294.73,
+.br
+        "mgm": 2.09,
+.br
+        "core+": "1503:13",
+.br
+        "the+": "2060:45",
+.br
+        "mgm+": "22:19",
+.br
+        "online": "18:18:09"
+.br
+      }
+.br
+    }
+.br
+  ]
+.br
+}
+.br
+.RE
+
+.SS json\-seq
+
+The json\-seq output format is a variation of the JSON output format described
+above with the following differences:
+
+.IP \(bu 3
+Output consists of a sequence of top-level JSON objects, each contained in
+single line with no indentation
+.br
+
+.IP \(bu 3
+Each top-level object is prefixed by an ASCII Record Separator character (0x1e)
+and suffixed with an ASCII Line Feed character (0x0a) in accordance with
+RFC7464
+.br
+.PP
+
+.IP \(bu 3
+The first object contains tool meta-data properties defined in the previous
+section
+.br
+.PP
+
+.IP \(bu 3
+Subsequent objects each represent performance data for one iteration
+.br
+.PP
+
 .SH EXAMPLES
 To start hyptop with the "sys_list" window in interactive mode, enter:
 .br
@@ -257,6 +492,14 @@ for CPU time calculation, enter:
 .br
 
   # hyptop -t ifl,cp
+
+.br
+To show a single iteration of performance data as a formatted JSON object for
+system "MYLPAR" and with fields CPU time, thread time, management time and
+online time in microseconds, enter:
+.br
+
+  # hyptop -f C:us,E:us,M:us,o:us --format json -n 1 -s MYLPAR
 
 .SH ENVIRONMENT
 .TP
