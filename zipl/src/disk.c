@@ -406,7 +406,7 @@ static int disk_set_info_auto(struct disk_info *data,
 			data->partnum = stats->st_rdev & DASD_PARTN_MASK;
 			data->device = stats->st_rdev & ~DASD_PARTN_MASK;
 		}
-	} else if (strcmp(data->drv_name, "dasd") == 0) {
+	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_DASD) == 0) {
 		/* Driver name is 'dasd' */
 		if (ioctl(fd, BIODASDINFO, &dasd_info)) {
 			error_reason("Could not determine DASD type");
@@ -417,15 +417,15 @@ static int disk_set_info_auto(struct disk_info *data,
 			return -1;
 		data->partnum = stats->st_rdev & DASD_PARTN_MASK;
 		data->device = stats->st_rdev & ~DASD_PARTN_MASK;
-	} else if (strcmp(data->drv_name, "sd") == 0) {
+	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_SD) == 0) {
 		/* Driver name is 'sd' */
 		data->devno = -1;
 		data->type = disk_type_scsi;
 		data->partnum = stats->st_rdev & SCSI_PARTN_MASK;
 		data->device = stats->st_rdev & ~SCSI_PARTN_MASK;
 
-	} else if (strcmp(data->drv_name, "virtblk") == 0) {
-
+	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_VIRTBLK) == 0) {
+		/* Driver name is 'virtblk' */
 		if (ioctl(fd, HDIO_GETGEO, &data->geo) != 0)
 			perror("Could not retrieve disk geometry information.");
 		if (ioctl(fd, BLKSSZGET, &data->phy_block_size) != 0)
@@ -436,9 +436,9 @@ static int disk_set_info_auto(struct disk_info *data,
 				     "determined.");
 			return -1;
 		}
-	/* NVMe path, driver name is 'blkext' */
-	} else if (strcmp(data->drv_name, "blkext") == 0 &&
+	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_BLKEXT) == 0 &&
 		   ioctl(fd, NVME_IOCTL_ID) >= 0) {
+		/* NVMe path, driver name is 'blkext' */
 		data->devno = -1;
 		data->type = disk_type_scsi;
 		data->is_nvme = 1;
@@ -498,10 +498,13 @@ static void set_driver_name(int fd, struct disk_info *info, dev_t device)
 	if (util_proc_dev_get_entry(device, 1, &dev_entry) == 0) {
 		mdu_array_info_t array;
 
-		if (strcmp(dev_entry.name, "blkext") == 0 &&
+		if (strcmp(dev_entry.name, UTIL_PROC_DEV_ENTRY_BLKEXT) == 0 &&
 		    ioctl(fd, GET_ARRAY_INFO, &array) >= 0)
-			/* it is actually an md-partition */
-			info->drv_name = misc_strdup("md");
+			/*
+			 * Driver name is 'blkext',
+			 * it is actually an md-partition
+			 */
+			info->drv_name = misc_strdup(UTIL_PROC_DEV_ENTRY_MD);
 		else
 			info->drv_name = misc_strdup(dev_entry.name);
 		util_proc_dev_free_entry(&dev_entry);

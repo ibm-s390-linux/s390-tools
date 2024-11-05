@@ -14,7 +14,6 @@
 #include <ctype.h>
 #include <sys/types.h>
 
-
 struct util_proc_part_entry {
 	dev_t device;
 	size_t blockcount;
@@ -26,6 +25,12 @@ struct util_proc_dev_entry {
 	dev_t device;
 	char *name;
 };
+
+#define UTIL_PROC_DEV_ENTRY_DASD     "dasd"
+#define UTIL_PROC_DEV_ENTRY_VIRTBLK  "virtblk"
+#define UTIL_PROC_DEV_ENTRY_SD       "sd"
+#define UTIL_PROC_DEV_ENTRY_BLKEXT   "blkext"
+#define UTIL_PROC_DEV_ENTRY_MD       "md"
 
 int util_proc_part_get_entry(dev_t device, struct util_proc_part_entry *entry);
 void util_proc_part_free_entry(struct util_proc_part_entry *entry);
