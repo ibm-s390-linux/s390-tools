@@ -16,7 +16,9 @@
 #include "lib/util_list.h"
 #include "column.h"
 
-#define CMCB_SIZE		(5 * sizeof(u32))
+#define CMCB_SIZE		(8 * sizeof(u32))
+#define PARTIAL_CMCB_OFFSET	3
+#define PARTIAL_CMCB_SIZE	(CMCB_SIZE - PARTIAL_CMCB_OFFSET * sizeof(u32))
 #define CUE_SIZE		(8 * sizeof(u32))
 #define EXT_CUE_SIZE		(16 * sizeof(u32))
 #define METRICS_SIZE		(17 * sizeof(double))
@@ -44,6 +46,7 @@ struct util_t {
 /* CMG-specific CHPID data. */
 struct cmg_data_t {
 	cmcb_t cmcb;
+	bool full_cmcb;
 	struct util_t util_a;
 	struct util_t util_b;
 	metrics_t metrics;

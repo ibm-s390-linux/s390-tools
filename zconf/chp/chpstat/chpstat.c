@@ -702,16 +702,29 @@ err:
 
 /*
  * Read the channel-measurements characteristics block for CHPID @chpid to
- * @cmcb.
+ * @cmcb. Return %true if full CMCB was read, %false otherwise.
  */
-static void read_cmcb(int chpid, cmcb_t *cmcb)
+static bool read_cmcb(int chpid, cmcb_t *cmcb)
 {
+	bool full = false;
 	char *path;
 
 	memset(cmcb, 0, sizeof(*cmcb));
-	path = get_chpid_path(chpid, "measurement_chars");
-	read_bin(path, cmcb, sizeof(*cmcb), false);
+	path = get_chpid_path(chpid, "measurement_chars_full");
+	if (util_path_exists(path)) {
+		/* Full CMCB starts at offset 0. */
+		read_bin(path, cmcb, CMCB_SIZE, false);
+		full = true;
+	} else {
+		free(path);
+		path = get_chpid_path(chpid, "measurement_chars");
+		/* Partial CMCB contains data starting at word 3. */
+		read_bin(path, &cmcb[PARTIAL_CMCB_OFFSET],
+			 PARTIAL_CMCB_SIZE, false);
+	}
 	free(path);
+
+	return full;
 }
 
 /*
@@ -828,7 +841,7 @@ static bool select_chpid(int chpid, bool try)
 	c->shared     = read_chpid_attr_as_int(chpid, "shared", 10);
 	c->speed      = read_speed(chpid);
 	if (cmg_t->has_cmcb)
-		read_cmcb(chpid, &c->data.cmcb);
+		c->data.full_cmcb = read_cmcb(chpid, &c->data.cmcb);
 	read_util(chpid, cmg, &c->data.util_a);
 	c->data.util_b = c->data.util_a;
 	c->selected   = true;

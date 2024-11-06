@@ -22,6 +22,7 @@
 
 /* CMG 2 format Channel-Measurement-Characteristics Block (CMCB). */
 struct cmcb2_t {
+	u32 reserved[3];
 	u32 max_bus_cycles;
 	u32 max_channel_work_units;
 	u32 max_write_data_units;

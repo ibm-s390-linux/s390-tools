@@ -21,6 +21,7 @@
 
 /* CMG 3 format Channel-Measurement-Characteristics Block (CMCB). */
 struct cmcb3_t {
+	u32 reserved[3];
 	u32 data_unit_size;
 	u32 data_unit_size_cpc;
 	u32 msg_unit_size;
