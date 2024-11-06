@@ -299,7 +299,7 @@ impl TryFrom<EcdhPubkeyCoord> for PKey<Public> {
         let x = BigNum::from_slice(&ecdh[..ECDH_PUB_KEY_COORD_POINT_SIZE])?;
         let y = BigNum::from_slice(&ecdh[ECDH_PUB_KEY_COORD_POINT_SIZE..])?;
         let ec_key = EcKey::from_public_key_affine_coordinates(&grp, &x, &y)?;
-        PKey::from_ec_key(ec_key)
+        Self::from_ec_key(ec_key)
     }
 }
 
