@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
+
 use serde::Serialize;
+use std::fmt::{Display, Formatter};
 
 /// Displays/Serializes an u8-slice into a Hex-string
 ///
 /// Thin wrapper around an u8-slice.
-#[derive(Debug)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct HexSlice<'a>(&'a [u8]);
 
 impl<'a> HexSlice<'a> {
@@ -27,8 +29,9 @@ where
         Self(value.as_ref())
     }
 }
+
 impl<'a> Serialize for HexSlice<'a> {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -36,8 +39,8 @@ impl<'a> Serialize for HexSlice<'a> {
     }
 }
 
-impl std::fmt::Display for HexSlice<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for HexSlice<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if f.alternate() && !f.sign_minus() {
             write!(f, "0x")?;
         }
@@ -60,10 +63,39 @@ impl AsRef<[u8]> for HexSlice<'_> {
     }
 }
 
-#[test]
-fn display() {
-    let hex = HexSlice::from(&[0; 8]);
-    let exp = "00 00 00 00 00 00 00 00 ";
+#[cfg(test)]
+mod test {
+    use super::*;
 
-    assert_eq!(exp, format!("{hex:-}"));
+    #[test]
+    fn display_minus() {
+        let hex = HexSlice::from(&[0; 8]);
+        let exp = "00 00 00 00 00 00 00 00 ";
+
+        assert_eq!(exp, format!("{hex:-}"));
+    }
+
+    #[test]
+    fn display() {
+        let hex = HexSlice::from(&[0; 8]);
+        let exp = "0000000000000000";
+
+        assert_eq!(exp, format!("{hex}"));
+    }
+
+    #[test]
+    fn display_alternate() {
+        let hex = HexSlice::from(&[0; 8]);
+        let exp = "0x0000000000000000";
+
+        assert_eq!(exp, format!("{hex:#}"));
+    }
+
+    #[test]
+    fn display_minus_alternate() {
+        let hex = HexSlice::from(&[0; 8]);
+        let exp = "0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 ";
+
+        assert_eq!(exp, format!("{hex:-#}"));
+    }
 }
