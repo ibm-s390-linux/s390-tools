@@ -429,7 +429,7 @@ pub trait Request {
 /// A struct to represent some parts of a binary/encrypted request.
 #[derive(Debug)]
 #[allow(clippy::len_without_is_empty)]
-pub struct BinReqValues<'a> {
+pub(crate) struct BinReqValues<'a> {
     iv: &'a [u8],
     aad: &'a [u8],
     req_dep_aad: &'a [u8],
@@ -445,7 +445,7 @@ impl<'a> BinReqValues<'a> {
     ///
     /// Does minimal sanity test, just tests to prevent panics.
     /// `req` may be larger than the actual request.
-    pub fn get(req: &'a [u8]) -> Result<Self> {
+    pub(crate) fn get(req: &'a [u8]) -> Result<Self> {
         let hdr = RequestHdr::read_from_prefix(req).ok_or(Error::BinRequestSmall)?;
         let rql = hdr.rql.get() as usize;
         let sea = hdr.sea.get() as usize;
@@ -476,22 +476,22 @@ impl<'a> BinReqValues<'a> {
     }
 
     /// Returns the version of this [`BinReqValues`].
-    pub fn version(&self) -> u32 {
+    pub(crate) fn version(&self) -> u32 {
         self.version
     }
 
     /// Returns the length of this [`BinReqValues`].
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.len
     }
 
     /// Returns the size of the encrypted area
-    pub fn sea(&self) -> u32 {
+    pub(crate) fn sea(&self) -> u32 {
         self.encr.len() as u32
     }
 
     /// Decrypts the encrypted area with the provided key
-    pub fn decrypt(&self, key: &SymKey) -> Result<Confidential<Vec<u8>>> {
+    pub(crate) fn decrypt(&self, key: &SymKey) -> Result<Confidential<Vec<u8>>> {
         decrypt_aes_gcm(key, self.iv, self.aad, self.encr, self.tag)
     }
 
@@ -500,7 +500,7 @@ impl<'a> BinReqValues<'a> {
     ///
     /// If target struct is larger than the request depended-AAD None is returned. See
     /// [`FromBytes::ref_from_prefix`]
-    pub fn req_dep_aad<T>(&self) -> Option<&T>
+    pub(crate) fn req_dep_aad<T>(&self) -> Option<&T>
     where
         T: FromBytes + Sized,
     {
