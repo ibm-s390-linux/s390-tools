@@ -335,6 +335,8 @@ usize_to_ui! {
 
 /// Converts the hexstring into a byte vector.
 ///
+/// # Errors
+///
 /// Raises an error if a non-hex character was found or the length was not a
 /// multiple of two.
 pub fn decode_hex<S: AsRef<str>>(s: S) -> Result<Vec<u8>> {
