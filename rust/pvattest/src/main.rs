@@ -7,23 +7,17 @@ mod cmd;
 mod exchange;
 
 use clap::{CommandFactory, Parser};
-use cli::CliOptions;
+use cli::{CliOptions, Command};
 use log::trace;
 use std::process::ExitCode;
 use utils::{print_cli_error, print_error, print_version, PvLogger};
 
-use crate::cli::Command;
 use crate::cmd::*;
 
 static LOGGER: PvLogger = PvLogger;
 const FEATURES: &[&[&str]] = &[cmd::CMD_FN, cmd::UV_CMD_FN];
 const EXIT_CODE_ATTESTATION_FAIL: u8 = 2;
 const EXIT_CODE_LOGGER_FAIL: u8 = 3;
-
-fn print_version(verbosity: u8) -> anyhow::Result<ExitCode> {
-    print_version!(verbosity, "2024", FEATURES.concat());
-    Ok(ExitCode::SUCCESS)
-}
 
 fn main() -> ExitCode {
     let cli: CliOptions = match CliOptions::try_parse() {
@@ -32,7 +26,8 @@ fn main() -> ExitCode {
     };
 
     // set up logger/stderr
-    if let Err(e) = LOGGER.start(cli.verbosity()) {
+    let log_level = cli.verbosity.to_level_filter();
+    if let Err(e) = LOGGER.start(log_level) {
         // should(TM) never happen
         eprintln!("Logger error: {e:?}");
         return EXIT_CODE_LOGGER_FAIL.into();
@@ -45,10 +40,13 @@ fn main() -> ExitCode {
         Command::Create(opt) => create(opt),
         Command::Perform(opt) => perform(opt),
         Command::Verify(opt) => verify(opt),
-        Command::Version => print_version(cli.verbosity()),
+        Command::Version => {
+            print_version!("2024", log_level; FEATURES.concat());
+            Ok(ExitCode::SUCCESS)
+        }
     };
     match res {
         Ok(c) => c,
-        Err(e) => print_error(&e, cli.verbosity()),
+        Err(e) => print_error(&e, log_level),
     }
 }

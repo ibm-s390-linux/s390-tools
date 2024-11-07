@@ -2,8 +2,8 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use clap::{ArgGroup, Args, Command, ValueHint};
-use log::{info, warn};
+use clap::{ArgAction, ArgGroup, Args, Command, ValueHint};
+use log::{info, warn, LevelFilter};
 use pv::misc::read_file;
 use pv::{
     misc::{create_file, open_file, read_certs},
@@ -174,7 +174,7 @@ pub fn get_reader_from_cli_file_arg<P: AsRef<Path>>(path: P) -> Result<Box<dyn R
     }
 }
 
-/// Print an error that occured during CLI parsing
+/// Print an error that occurred during CLI parsing
 pub fn print_cli_error(e: clap::Error, mut cmd: Command) -> ExitCode {
     let ret = if e.use_stderr() {
         ExitCode::FAILURE
@@ -187,12 +187,12 @@ pub fn print_cli_error(e: clap::Error, mut cmd: Command) -> ExitCode {
 }
 
 /// Print an error to stderr
-pub fn print_error<E>(e: &E, verbosity: u8) -> ExitCode
+pub fn print_error<E>(e: &E, verbosity: LevelFilter) -> ExitCode
 where
     // Error trait is not required, but here to limit the usage to errors
     E: AsRef<dyn std::error::Error> + std::fmt::Debug + std::fmt::Display,
 {
-    if verbosity > 0 {
+    if verbosity > LevelFilter::Warn {
         // Debug formatter also prints the whole error stack
         // So only print it when on verbose
         eprintln!("error: {e:?}")
@@ -200,6 +200,79 @@ where
         eprintln!("error: {e}")
     };
     ExitCode::FAILURE
+}
+
+#[derive(Args, Debug, Clone, Default)]
+pub struct VerbosityOptions {
+    #[arg(
+        long,
+        short = 'v',
+        action = ArgAction::Count,
+        global = true,
+    )]
+    /// Provide more detailed output.
+    verbose: u8,
+
+    #[arg(
+        long,
+        short = 'q',
+        action = ArgAction::Count,
+        global = true,
+        conflicts_with = "verbose",
+    )]
+    /// Provide less output.
+    quiet: u8,
+}
+
+const fn to_level_filter(v: u8) -> LevelFilter {
+    match v {
+        0 => LevelFilter::Off,
+        1 => LevelFilter::Error,
+        2 => LevelFilter::Warn,
+        3 => LevelFilter::Info,
+        4 => LevelFilter::Debug,
+        5.. => LevelFilter::Trace,
+    }
+}
+
+impl VerbosityOptions {
+    fn verbosity(&self) -> u8 {
+        (LevelFilter::Warn as i16 + self.verbose as i16 - self.quiet as i16)
+            .clamp(u8::MIN.into(), u8::MAX.into()) as u8
+    }
+
+    pub fn to_level_filter(&self) -> LevelFilter {
+        to_level_filter(self.verbosity())
+    }
+}
+
+#[derive(Args, Debug, Clone, Default)]
+pub struct DeprecatedVerbosityOptions {
+    #[clap(flatten)]
+    verbosity: VerbosityOptions,
+
+    #[arg(
+        short = 'V',
+        action = ArgAction::Count,
+        global = true,
+        hide = true,
+    )]
+    /// Provide more detailed output.
+    deprecated_verbose: u8,
+}
+
+impl DeprecatedVerbosityOptions {
+    pub fn to_level_filter(&self) -> LevelFilter {
+        if self.deprecated_verbose > 0 {
+            // Use eprintln as the logger is most likely not yet initialized.
+            eprintln!("WARNING: Use of deprecated flag '-V'. Use '-v' or '--verbose' instead.")
+        }
+        to_level_filter(
+            self.verbosity
+                .verbosity()
+                .saturating_add(self.deprecated_verbose),
+        )
+    }
 }
 
 #[cfg(test)]

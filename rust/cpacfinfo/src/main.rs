@@ -113,7 +113,7 @@ fn main() -> anyhowRes<()> {
 
     /* ---- PRINT VERSION STRING ---- */
     if args.version {
-        print_version!(0, "2024");
+        print_version!("2024");
         return Ok(());
     }
 

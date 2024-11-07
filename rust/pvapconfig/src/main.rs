@@ -58,7 +58,7 @@ macro_rules! on_error_print_and_exit {
 fn main() -> ExitCode {
     // handle version option
     if cli::ARGS.version {
-        print_version!(0, "2023");
+        print_version!("2023");
         return ExitCode::SUCCESS;
     }
 

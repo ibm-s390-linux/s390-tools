@@ -8,13 +8,14 @@ mod hexslice;
 mod log;
 mod tmpfile;
 
-pub use crate::cli::CertificateOptions;
 pub use crate::cli::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg};
 pub use crate::cli::{print_cli_error, print_error};
+pub use crate::cli::{CertificateOptions, DeprecatedVerbosityOptions, VerbosityOptions};
 pub use crate::cli::{STDIN, STDOUT};
 pub use crate::hexslice::HexSlice;
 pub use crate::log::PvLogger;
 pub use crate::tmpfile::TemporaryDirectory;
+pub use ::log::LevelFilter;
 
 /// Get the s390-tools release string
 ///
@@ -41,23 +42,18 @@ macro_rules! release_string {
 }
 
 #[macro_export]
-/// Print the version to stdout
-///
-/// verbosity: integer if >0 more and more details printed
-/// feat: (optional) list of features
-/// rel_str: a string containig the release name
-macro_rules! print_version {
-    ($verbosity: expr, $year: expr $( ,$feat: expr)?) => {{
+macro_rules! __print_version {
+    ($year: expr, $verbosity: expr $( ,$feat: expr)?) => {{
         println!(
             "{} version {}\nCopyright IBM Corp. {}",
             env!("CARGO_PKG_NAME"),
             $crate::release_string!(),
             $year,
         );
-        if $verbosity > 0 {
+        if $verbosity > $crate::LevelFilter::Warn {
             $($feat.iter().for_each(|f| print!("{f} ")); println!("(compiled)");)?
         }
-        if $verbosity > 1 {
+        if $verbosity > $crate::LevelFilter::Info {
             println!(
                 "\n{}-crate {}",
                 env!("CARGO_PKG_NAME"),
@@ -67,6 +63,20 @@ macro_rules! print_version {
     }};
 }
 
+#[macro_export]
+/// Print the version to stdout
+///
+/// `verbosity` (optional): `LogLevel`
+/// `feat` (optional): list of features
+/// `rel_str`: a string containig the release name
+macro_rules! print_version {
+    ($year: expr $( ;$feat: expr)?) => {
+        $crate::__print_version!($year, $crate::LevelFilter::Warn $(, $feat)*)
+    };
+    ($year: expr, $verbosity: expr $( ;$feat: expr)?) => {
+        $crate::__print_version!($year, $verbosity $(, $feat)*)
+    };
+}
 /// Asserts a constant expression evaluates to `true`.
 ///
 /// If the expression is not evaluated to `true` the compilation will fail.

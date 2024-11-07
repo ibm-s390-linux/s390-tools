@@ -3,53 +3,24 @@
 // Copyright IBM Corp. 2024
 
 use clap::{Args, Parser, Subcommand, ValueEnum, ValueHint};
-use log::warn;
-use utils::CertificateOptions;
+use utils::{CertificateOptions, DeprecatedVerbosityOptions};
 
 /// create, perform, and verify attestation measurements
 ///
 /// Create, perform, and verify attestation measurements for IBM Secure Execution guest systems.
 #[derive(Parser, Debug)]
 pub struct CliOptions {
-    /// Provide more detailed output
-    #[arg(short='v', long, action = clap::ArgAction::Count)]
-    verbose: u8,
-
-    /// Deprecated short verbose flag (-V) form the C implementation.
-    ///
-    /// If specified a deprecation warning is emitted,
-    #[arg(short = 'V', hide = true, action = clap::ArgAction::Count)]
-    verbose_deprecated: u8,
+    #[clap(flatten)]
+    pub verbosity: DeprecatedVerbosityOptions,
 
     /// Print version information and exit
+    // Implemented for the help message only. Actual parsing happens in the
+    // version command.
     #[arg(long)]
     pub version: bool,
 
     #[command(subcommand)]
     pub cmd: Command,
-}
-
-impl CliOptions {
-    pub fn verbosity(&self) -> u8 {
-        let verbose_deprecated = self.verbose_deprecated
-            + match &self.cmd {
-                Command::Create(cmd) => cmd.verbose_deprecated,
-                Command::Perform(cmd) => cmd.verbose_deprecated,
-                Command::Verify(cmd) => cmd.verbose_deprecated,
-                Command::Version => 0,
-            };
-        if verbose_deprecated > 0 {
-            warn!("WARNING: Use of deprecated flag '-V'. Use '-v' or '--verbose' instead.")
-        }
-        verbose_deprecated
-            + self.verbose
-            + match &self.cmd {
-                Command::Create(cmd) => cmd.verbose,
-                Command::Perform(cmd) => cmd.verbose,
-                Command::Verify(cmd) => cmd.verbose,
-                Command::Version => 0,
-            }
-    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -107,16 +78,6 @@ pub struct CreateAttOpt {
     /// Optional.
     #[arg(long, value_name = "FLAGS")]
     pub add_data: Vec<AttAddFlags>,
-
-    /// Provide more detailed output.
-    #[arg(short='v', long, action = clap::ArgAction::Count)]
-    verbose: u8,
-
-    /// Deprecated short verbose flag (-V) form the C implementation.
-    ///
-    /// If specified a deprecation warning is emitted,
-    #[arg(short = 'V', hide = true, action = clap::ArgAction::Count)]
-    verbose_deprecated: u8,
 }
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
@@ -158,16 +119,6 @@ pub struct PerformAttOpt {
     /// May be any arbitrary data, as long as it is less or equal to 256 bytes
     #[arg(short, long, value_name = "File", value_hint = ValueHint::FilePath,)]
     pub user_data: Option<String>,
-
-    /// Provide more detailed output.
-    #[arg(short='v', long, action = clap::ArgAction::Count)]
-    verbose: u8,
-
-    /// Deprecated short verbose flag (-V) form the C implementation.
-    ///
-    /// If specified a deprecation warning is emitted,
-    #[arg(short = 'V', hide = true, action = clap::ArgAction::Count)]
-    verbose_deprecated: u8,
 }
 
 #[cfg(target_arch = "s390x")]
@@ -237,16 +188,6 @@ pub struct VerifyOpt {
     /// Emits a warning if the response contains no user-data
     #[arg(long, short ,value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub user_data: Option<String>,
-
-    /// Provide more detailed output.
-    #[arg(short='v', long, action = clap::ArgAction::Count)]
-    verbose: u8,
-
-    /// Deprecated short verbose flag (-V) form the C implementation.
-    ///
-    /// If specified a deprecation warning is emitted,
-    #[arg(short = 'V', hide = true, action = clap::ArgAction::Count)]
-    verbose_deprecated: u8,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]

@@ -3,18 +3,19 @@
 // Copyright IBM Corp. 2023
 
 use clap::{ArgGroup, Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
-use utils::{CertificateOptions, STDOUT};
+use utils::{CertificateOptions, DeprecatedVerbosityOptions, STDOUT};
 
 /// Manage secrets for IBM Secure Execution guests.
 ///
 /// Use to create and send add-secret requests, list the added secrets and lock the Secret Store.
 #[derive(Parser, Debug)]
 pub struct CliOptions {
-    /// Provide more detailed output.
-    #[arg(short='v', long, action = clap::ArgAction::Count, short_alias('V'))]
-    pub verbose: u8,
+    #[clap(flatten)]
+    pub verbosity: DeprecatedVerbosityOptions,
 
     /// Print version information and exit.
+    // Implemented for the help message only. Actual parsing happens in the
+    // version command.
     #[arg(long)]
     pub version: bool,
 
