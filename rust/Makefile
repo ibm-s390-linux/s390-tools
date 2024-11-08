@@ -77,7 +77,7 @@ skip-cpacfinfo:
 all: $(BUILD_TARGETS)
 install: $(INSTALL_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvattest/tools/pvextract-hdr "$(DESTDIR)$(USRBINDIR)"
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvattest/tools/pvextract-hdr $(DESTDIR)$(USRBINDIR)
 
 print-rust-targets:
 	echo $(BUILD_TARGETS)

@@ -86,9 +86,9 @@ stage3b.elf: head.o $(ZIPL_OBJS)
 	@chmod a-x $@
 
 install: stage3a.bin stage3b_reloc.bin
-	$(INSTALL) -d -m 755 "$(DESTDIR)$(PKGDATADIR)"
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3a.bin "$(DESTDIR)$(PKGDATADIR)"
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3b_reloc.bin "$(DESTDIR)$(PKGDATADIR)"
+	$(INSTALL) -d -m 755 $(DESTDIR)$(PKGDATADIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3a.bin $(DESTDIR)$(PKGDATADIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3b_reloc.bin $(DESTDIR)$(PKGDATADIR)
 
 else
 # Don't generate the dependency files (see `common.mak` for the

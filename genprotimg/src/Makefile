@@ -3,14 +3,14 @@ include ../../common.mak
 
 bin_PROGRAM = genprotimg
 
-PKGDATADIR ?= "$(TOOLS_DATADIR)/genprotimg"
+PKGDATADIR ?= $(TOOLS_DATADIR)/genprotimg
 SRC_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 TOP_SRCDIR := $(SRC_DIR)/../
 ROOT_DIR = $(TOP_SRC_DIR)/../../
 ZIPL_DIR = $(ROOT_DIR)/zipl
 LOADER_DIR = $(TOP_SRCDIR)/boot
 
-INCLUDE_PATHS = "$(SRC_DIR)" "$(TOP_SRCDIR)" "$(ROOTDIR)/include"
+INCLUDE_PATHS = $(SRC_DIR) $(TOP_SRCDIR) $(ROOTDIR)/include
 INCLUDE_PARMS = $(addprefix -I,$(INCLUDE_PATHS))
 
 WARNINGS := -Wall -Wextra -Wshadow \

@@ -96,8 +96,8 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 	@chmod a-x $@
 
 install: $(EXTERNAL_BOOTLOADERS)
-	$(INSTALL) -d -m 755 "$(DESTDIR)$(TOOLS_LIBDIR)"
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(EXTERNAL_BOOTLOADERS) "$(DESTDIR)$(TOOLS_LIBDIR)"
+	$(INSTALL) -d -m 755 $(DESTDIR)$(TOOLS_LIBDIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(EXTERNAL_BOOTLOADERS) $(DESTDIR)$(TOOLS_LIBDIR)
 else
 # Don't generate the dependency files (see `common.mak` for the
 # `-include $(dependencies_c)` statement).
