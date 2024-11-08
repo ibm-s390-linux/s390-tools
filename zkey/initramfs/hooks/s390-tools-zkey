@@ -29,7 +29,7 @@ esac
 . /usr/share/initramfs-tools/hook-functions
 
 # Add zcrypt modules
-zdev_modules="pkey paes_s390 zcrypt zcrypt_cex2a zcrypt_cex4 zcrypt_pcixcc"
+zdev_modules="uvdevice pkey pkey_cca pkey_ep11 pkey_pckmo pkey_uv pkey_sysfs paes_s390 zcrypt zcrypt_cex4"
 
 for x in $zdev_modules ; do
 	manual_add_modules ${x}
