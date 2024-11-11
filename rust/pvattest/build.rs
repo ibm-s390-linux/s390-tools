@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2024
 // it under the terms of the MIT license. See LICENSE for details.
+#![allow(missing_docs)]
 
 use clap::CommandFactory;
 use clap_complete::{generate_to, Shell};

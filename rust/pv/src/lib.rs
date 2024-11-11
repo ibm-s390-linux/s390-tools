@@ -2,14 +2,6 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-#![deny(missing_docs)]
-#![warn(
-    missing_debug_implementations,
-    trivial_numeric_casts,
-    unstable_features,
-    unused_import_braces,
-    unused_qualifications
-)]
 #![doc = include_str!("../README.md")]
 //! # Library for Protected Virtualization (PV) related tools
 //!

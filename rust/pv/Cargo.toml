@@ -10,6 +10,9 @@ repository = "https://github.com/ibm-s390-linux/s390-tools/tree/master/rust"
 categories = ["hardware-support"]
 readme = "README.md"
 
+[lints]
+workspace = true
+
 [dependencies]
 byteorder = "1.3"
 curl = "0.4.44"

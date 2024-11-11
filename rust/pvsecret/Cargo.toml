@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow = { version = "1.0.70", features = ["std"] }
 clap = { version ="4.1", features = ["derive", "wrap_help"]}

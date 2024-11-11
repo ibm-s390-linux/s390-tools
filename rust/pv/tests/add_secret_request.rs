@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
+
+#![allow(missing_docs)]
 use openssl::{
     ec::{EcGroup, EcKey},
     nid::Nid,

@@ -15,5 +15,13 @@ edition = "2021"
 license = "MIT"
 rust-version = "1.75.0"
 
+[workspace.lints.rust]
+missing_docs = "deny"
+missing_debug_implementations = "warn"
+trivial_numeric_casts = "warn"
+unstable_features = "warn"
+unused_import_braces = "warn"
+unused_qualifications = "warn"
+
 [profile.release]
 lto = true

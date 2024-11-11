@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
+#![allow(missing_docs)]
 mod cli;
 mod cmd;
 

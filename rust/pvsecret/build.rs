@@ -3,6 +3,7 @@
 // Copyright IBM Corp. 2024
 // it under the terms of the MIT license. See LICENSE for details.
 
+#![allow(missing_docs)]
 use clap_complete::{generate_to, Shell};
 use std::env;
 use std::io::Error;
