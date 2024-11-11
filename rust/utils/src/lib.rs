@@ -4,18 +4,23 @@
 //!
 //! Copyright IBM Corp. 2023, 2024
 mod cli;
+mod file;
 mod hexslice;
 mod log;
 mod tmpfile;
 
-pub use crate::cli::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg};
-pub use crate::cli::{print_cli_error, print_error};
-pub use crate::cli::{CertificateOptions, DeprecatedVerbosityOptions, VerbosityOptions};
-pub use crate::cli::{STDIN, STDOUT};
-pub use crate::hexslice::HexSlice;
-pub use crate::log::PvLogger;
-pub use crate::tmpfile::TemporaryDirectory;
 pub use ::log::LevelFilter;
+
+pub use crate::{
+    cli::{
+        get_reader_from_cli_file_arg, get_writer_from_cli_file_arg, print_cli_error, print_error,
+        CertificateOptions, DeprecatedVerbosityOptions, VerbosityOptions, STDIN, STDOUT,
+    },
+    file::{AtomicFile, AtomicFileOperation},
+    hexslice::HexSlice,
+    log::PvLogger,
+    tmpfile::TemporaryDirectory,
+};
 
 /// Get the s390-tools release string
 ///

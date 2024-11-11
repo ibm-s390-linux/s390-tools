@@ -36,6 +36,13 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("Cannot rename '{src}' to '{dst}'")]
+    FileAccessRename {
+        src: String,
+        dst: String,
+        source: std::io::Error,
+    },
+
     #[error("Cannot encode secrets (Too many secrets)")]
     ManySecrets,
 
