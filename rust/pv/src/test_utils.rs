@@ -4,6 +4,11 @@
 
 // DO NOT USE ANY OF THESE ITEMS IN PRODUCTION CODE
 // USED FOR INTERNAL UNIT AND FVT TESTING ONLY!!!
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
 use openssl::{
     bn::BigNum,
     ec::{EcGroup, EcKey},
@@ -11,10 +16,6 @@ use openssl::{
     nid::Nid,
     pkey::{PKey, Private, Public},
     x509::{X509Crl, X509},
-};
-use std::{
-    fs,
-    path::{Path, PathBuf},
 };
 
 /// TEST ONLY! Loads the specified asset into the binary at compile time.
@@ -71,11 +72,11 @@ pub fn load_gen_crl<P: AsRef<Path>>(asset_path: P) -> X509Crl {
         .unwrap()
 }
 
-/// TEST ONLY! Get a fixed private/public pair and a fixed public key
+/// TEST ONLY! Get a fixed private/public pair and a fixed host-key document
 ///
 /// Intended for TESTING only. All parts of the key including the private key are checked in git and
 /// visible for the public
-pub fn get_test_keys() -> (PKey<Private>, PKey<Public>) {
+pub fn get_test_key_and_cert() -> (PKey<Private>, X509) {
     let pub_key = get_test_asset!("keys/public_cust.bin");
     let priv_key = get_test_asset!("keys/private_cust.bin");
     let host_key = get_test_asset!("keys/host.pem.crt");
@@ -84,9 +85,18 @@ pub fn get_test_keys() -> (PKey<Private>, PKey<Public>) {
     assert_eq!(priv_key.len(), 80);
 
     let cust_key = get_keypair(pub_key, priv_key).unwrap();
-    let host_key = X509::from_pem(host_key).unwrap().public_key().unwrap();
+    let host_key = X509::from_pem(host_key).unwrap();
 
     (cust_key, host_key)
+}
+
+/// TEST ONLY! Get a fixed private/public pair and a fixed public key
+///
+/// Intended for TESTING only. All parts of the key including the private key are checked in git and
+/// visible for the public
+pub fn get_test_keys() -> (PKey<Private>, PKey<Public>) {
+    let (cust_key, host) = get_test_key_and_cert();
+    (cust_key, host.public_key().unwrap())
 }
 
 fn read_ecdh_pubkey(coords: &[u8]) -> Result<PKey<Public>, ErrorStack> {
