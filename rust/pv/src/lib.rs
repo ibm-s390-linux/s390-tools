@@ -88,7 +88,7 @@ pub mod request {
         derive_aes256_gcm_key, gen_ec_key, random_array, Aes256GcmKey, Aes256XtsKey, SymKey,
         SymKeyType,
     };
-    pub use crate::req::{EcPubKeyCoord, Keyslot, ReqEncrCtx, Request};
+    pub use crate::req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request};
     pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};
 
     /// Reexports some useful OpenSSL symbols
