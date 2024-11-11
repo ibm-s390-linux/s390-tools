@@ -152,9 +152,8 @@ impl AttestationCmd {
     /// If called before a successful attestation the data in this buffer is undefined.
     pub fn additional(&mut self) -> Option<&[u8]> {
         // truncate the add size to the UV reported size
-        match &mut self.additional {
-            Some(ref mut a) => a.truncate(self.uvio_attest.add_data_len as usize),
-            None => (),
+        if let Some(ref mut a) = &mut self.additional {
+            a.truncate(self.uvio_attest.add_data_len as usize)
         }
         self.additional.as_deref()
     }

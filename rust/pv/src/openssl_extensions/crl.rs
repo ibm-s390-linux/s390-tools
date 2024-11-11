@@ -77,7 +77,7 @@ impl X509StoreContextExtension for X509StoreContextRef {
     {
         struct Cleanup<'a>(&'a mut X509StoreContextRef);
 
-        impl<'a> Drop for Cleanup<'a> {
+        impl Drop for Cleanup<'_> {
             fn drop(&mut self) {
                 unsafe {
                     openssl_sys::X509_STORE_CTX_cleanup(self.0.as_ptr());

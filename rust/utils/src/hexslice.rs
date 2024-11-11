@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<'a> Serialize for HexSlice<'a> {
+impl Serialize for HexSlice<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

@@ -141,7 +141,7 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
 // Try to extract a Config-UId from a yaml structure
 // The cuid field can be embedded in an abritray amount of Mappings
 // The function takes the first cuid it founds (width search).
-fn try_from_val(val: Value) -> anyhow::Result<ConfigUid> {
+fn try_from_val(val: Value) -> Result<ConfigUid> {
     fn get_cuid_from_mapping(val: &Value, depth: u8) -> Option<String> {
         if depth >= 8 {
             return None;

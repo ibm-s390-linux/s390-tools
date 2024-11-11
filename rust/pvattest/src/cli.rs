@@ -122,6 +122,7 @@ pub struct PerformAttOpt {
 }
 
 #[cfg(target_arch = "s390x")]
+#[derive(Debug)]
 pub struct PerformAttOptComb<'a> {
     pub input: &'a str,
     pub output: &'a str,

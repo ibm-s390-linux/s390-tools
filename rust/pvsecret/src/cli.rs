@@ -115,7 +115,7 @@ pub struct CreateSecretOpt {
 
     /// Use the content of FILE as user-data.
     ///
-    /// Passes user data defined in <FILE> through the add-secret request  to the ultravisor. The
+    /// Passes user data defined in FILE through the add-secret request to the ultravisor. The
     /// user data can be up to 512 bytes of arbitrary data, and the maximum size depends on the
     /// size of the user-signing key:
     /// - No key: user data can be 512 bytes.
@@ -129,7 +129,7 @@ pub struct CreateSecretOpt {
 
     /// Use the content of FILE as user signing key.
     ///
-    /// Adds a signature calculated from the key in <FILE> to the add-secret request. The
+    /// Adds a signature calculated from the key in FILE to the add-secret request. The
     /// file must be in DER or PEM format containing a private key. Supported are RSA 2048 &
     /// 3072-bit and EC(secp521r1) keys. The firmware ignores the content, but the request tag
     /// protects the signature. The user-signing key signs the request. The location of the

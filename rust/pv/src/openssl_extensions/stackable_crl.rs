@@ -63,7 +63,7 @@ impl Stackable for StackableX509Crl {
 }
 
 pub struct MemBioSlice<'a>(*mut openssl_sys::BIO, PhantomData<&'a [u8]>);
-impl<'a> Drop for MemBioSlice<'a> {
+impl Drop for MemBioSlice<'_> {
     fn drop(&mut self) {
         unsafe {
             openssl_sys::BIO_free_all(self.0);

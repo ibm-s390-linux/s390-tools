@@ -16,7 +16,7 @@ use utils::{print_cli_error, print_error, print_version, PvLogger};
 use crate::cmd::*;
 
 static LOGGER: PvLogger = PvLogger;
-const FEATURES: &[&[&str]] = &[cmd::CMD_FN, cmd::UV_CMD_FN];
+const FEATURES: &[&[&str]] = &[CMD_FN, UV_CMD_FN];
 const EXIT_CODE_ATTESTATION_FAIL: u8 = 2;
 const EXIT_CODE_LOGGER_FAIL: u8 = 3;
 

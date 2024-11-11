@@ -25,7 +25,7 @@ use std::str::from_utf8;
 use std::{cmp::Ordering, ffi::c_int};
 
 /// Minimum security level for the keys/certificates used to establish a chain of
-/// trust (see https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html
+/// trust (see <https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html>
 /// for details).
 const SECURITY_LEVEL: usize = 2;
 const SECURITY_BITS_ARRAY: [u32; 6] = [0, 80, 112, 128, 192, 256];
@@ -213,7 +213,7 @@ fn is_ibm_signing_cert(cert: &X509) -> bool {
         return false;
     }
 
-    return match subj.entries_by_nid(Nid::ORGANIZATIONALUNITNAME).next() {
+    match subj.entries_by_nid(Nid::ORGANIZATIONALUNITNAME).next() {
         None => false,
         Some(entry) => match entry.data().as_utf8() {
             Err(_) => false,
@@ -221,7 +221,7 @@ fn is_ibm_signing_cert(cert: &X509) -> bool {
                 .as_bytes()
                 .ends_with(IBM_Z_ORGANIZATIONAL_UNIT_NAME_SUFFIX.as_bytes()),
         },
-    };
+    }
 }
 
 fn get_ibm_z_sign_key(certs: &[X509]) -> Result<X509> {

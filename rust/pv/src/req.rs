@@ -288,7 +288,7 @@ impl EcPubKeyCoord {
         hash(MessageDigest::sha256(), self.as_ref())
     }
 
-    /// Construct a [``EcPubKeyCoord]
+    /// Construct a [`EcPubKeyCoord`]
     ///
     /// # Safety
     /// This function is marked unsafe, because data not representing two EC points violates the

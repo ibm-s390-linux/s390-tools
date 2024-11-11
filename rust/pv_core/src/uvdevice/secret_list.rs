@@ -337,7 +337,7 @@ where
 {
     struct FieldVisitor;
 
-    impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+    impl serde::de::Visitor<'_> for FieldVisitor {
         type Value = [u8; SecretId::ID_SIZE];
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
