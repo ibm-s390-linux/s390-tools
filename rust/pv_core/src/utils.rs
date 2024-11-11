@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
-use crate::{
-    macros::{bail_spec, file_error},
-    Error, FileAccessErrorType, FileIoErrorType, Result,
-};
 use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
 };
+
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U64};
+
+use crate::{
+    macros::{bail_spec, file_error},
+    Error, FileAccessErrorType, FileIoErrorType, Result,
+};
 
 /// Trait that describes bitflags, represented by `T`.
 pub trait Flags<T>: From<T> + for<'a> From<&'a T> {
@@ -184,6 +186,10 @@ pub fn try_parse_u64(hex_str: &str, ctx: &str) -> Result<u64> {
 /// Wraps [`File::open`]
 ///
 /// * `path` - Path to file
+///
+/// # Errors
+///
+/// This function will return errors according to [`File::open`].
 pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
     File::open(&path).map_err(|e| Error::FileAccess {
         ty: FileAccessErrorType::Open,
@@ -197,6 +203,10 @@ pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
 /// Wraps [`File::create`]
 ///
 /// * `path` - Path to file
+///
+/// # Errors
+///
+/// This function will return errors according to [`File::create`].
 pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
     File::create(&path).map_err(|e| Error::FileAccess {
         ty: FileAccessErrorType::Create,
