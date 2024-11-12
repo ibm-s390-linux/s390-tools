@@ -28,7 +28,6 @@ pub type Aes256GcmKey = Confidential<[u8; SymKeyType::AES_256_GCM_KEY_LEN]>;
 pub type Aes256XtsKey = Confidential<[u8; SymKeyType::AES_256_XTS_KEY_LEN]>;
 
 /// SHA-512 digest length (in bytes)
-#[allow(unused)]
 pub const SHA_512_HASH_LEN: usize = 64;
 
 #[allow(dead_code)]

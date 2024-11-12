@@ -90,7 +90,7 @@ pub mod request {
         crypto::{
             decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
             AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey,
-            SymKeyType,
+            SymKeyType, SHA_512_HASH_LEN,
         },
         req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request},
         verify::{CertVerifier, HkdVerifier, NoVerifyHkd},
