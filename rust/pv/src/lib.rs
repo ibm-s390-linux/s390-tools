@@ -49,8 +49,7 @@ mod verify;
 #[allow(dead_code)]
 pub mod test_utils;
 
-pub use pv_core::assert_size;
-pub use pv_core::static_assert;
+pub use pv_core::{assert_size, static_assert};
 
 const PAGESIZE: usize = 0x1000;
 
@@ -61,42 +60,45 @@ pub mod uv {
 
 /// Functionalities for creating attestation requests
 pub mod attest {
+    pub use pv_core::attest::*;
+
     pub use crate::uvattest::{
         additional::AdditionalData,
-        arcb::{AttestationAuthenticated, AttestationRequest},
-        arcb::{AttestationFlags, AttestationVersion},
+        arcb::{
+            AttestationAuthenticated, AttestationFlags, AttestationRequest, AttestationVersion,
+        },
         attest::{AttestationItems, AttestationMeasurement},
     };
-    pub use pv_core::attest::*;
 }
 
 /// Miscellaneous functions and definitions
 pub mod misc {
-    pub use crate::utils::read_certs;
     pub use pv_core::misc::*;
+
+    pub use crate::utils::read_certs;
 }
 
-pub use crate::error::HkdVerifyErrorType;
 pub use error::{Error, Result};
-pub use pv_core::Error as PvCoreError;
-pub use pv_core::{FileAccessErrorType, FileIoErrorType};
+pub use pv_core::{Error as PvCoreError, FileAccessErrorType, FileIoErrorType};
+
+pub use crate::error::HkdVerifyErrorType;
 
 /// Functionalities to build UV requests
 pub mod request {
-    pub use crate::brcb::BootHdrTags;
-    pub use crate::crypto::{
-        decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
-        AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey, SymKeyType,
+    pub use crate::{
+        brcb::BootHdrTags,
+        crypto::{
+            decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
+            AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey,
+            SymKeyType,
+        },
+        req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request},
+        verify::{CertVerifier, HkdVerifier, NoVerifyHkd},
     };
-    pub use crate::req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request};
-    pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};
 
     /// Reexports some useful OpenSSL symbols
     pub mod openssl {
-        pub use openssl::error::ErrorStack;
-        pub use openssl::hash::DigestBytes;
-        pub use openssl::pkey;
-        pub use openssl::x509;
+        pub use openssl::{error::ErrorStack, hash::DigestBytes, pkey, x509};
     }
 
     pub use pv_core::request::*;
@@ -104,11 +106,12 @@ pub mod request {
 
 /// Functionalities for creating add-secret requests
 pub mod secret {
+    pub use pv_core::secret::*;
+
     pub use crate::uvsecret::{
         asrcb::{AddSecretFlags, AddSecretRequest, AddSecretVersion},
         ext_secret::ExtSecret,
         guest_secret::GuestSecret,
         user_data::verify_asrcb_and_get_user_data,
     };
-    pub use pv_core::secret::*;
 }
