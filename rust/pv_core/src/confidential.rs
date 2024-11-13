@@ -12,6 +12,35 @@ pub trait Zeroize {
     fn zeroize(&mut self);
 }
 
+macro_rules! integer_impl {
+    ($typ:ty) => {
+        impl Zeroize for $typ {
+            /// Reliably overwrites the given number with zeros,
+            /// by performing a volatile write followed by a memory barrier
+            fn zeroize(&mut self) {
+                unsafe {
+                    std::ptr::write_volatile(self as *mut $typ, <$typ>::default());
+                }
+                std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+    };
+}
+
+integer_impl!(u8);
+integer_impl!(u16);
+integer_impl!(u32);
+integer_impl!(u64);
+integer_impl!(u128);
+integer_impl!(usize);
+
+integer_impl!(i8);
+integer_impl!(i16);
+integer_impl!(i32);
+integer_impl!(i64);
+integer_impl!(i128);
+integer_impl!(isize);
+
 // Automatically impl Zeroize for u8 arrays
 impl<T: Default, const COUNT: usize> Zeroize for [T; COUNT] {
     /// Reliably overwrites the given buffer with zeros,
