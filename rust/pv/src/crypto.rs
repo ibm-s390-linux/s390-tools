@@ -22,7 +22,7 @@ use std::{convert::TryInto, ops::Range};
 use crate::{error::Result, Error};
 
 /// An AES256-GCM key that will purge itself out of the memory when going out of scope
-pub type Aes256Key = Confidential<[u8; 32]>;
+pub type Aes256GcmKey = Confidential<[u8; 32]>;
 /// An AES256-XTS key that will purge itself out of the memory when going out of scope
 pub type Aes256XtsKey = Confidential<[u8; 64]>;
 pub(crate) const AES_256_GCM_TAG_SIZE: usize = 16;
@@ -37,15 +37,22 @@ pub(crate) type Sha256Hash = [u8; SHA_256_HASH_SIZE as usize];
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymKeyType {
     /// AES 256 GCM key (32 bytes)
-    Aes256,
+    Aes256Gcm,
     /// AES 256 XTS key (64 bytes)
     Aes256Xts,
+}
+
+impl SymKeyType {
+    #[deprecated]
+    #[allow(non_upper_case_globals)]
+    /// AES 256 GCM key (32 bytes)
+    pub const Aes256: Self = Self::Aes256Gcm;
 }
 
 impl From<SymKeyType> for Nid {
     fn from(value: SymKeyType) -> Self {
         match value {
-            SymKeyType::Aes256 => Self::AES_256_GCM,
+            SymKeyType::Aes256Gcm => Self::AES_256_GCM,
             SymKeyType::Aes256Xts => Self::AES_256_XTS,
         }
     }
@@ -62,7 +69,7 @@ trait SymKeyTrait {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymKey {
     /// AES 256 GCM key (32 bytes)
-    Aes256(Aes256Key),
+    Aes256(Aes256GcmKey),
     /// AES 256 XTS key (64 bytes)
     Aes256Xts(Aes256XtsKey),
 }
@@ -77,7 +84,7 @@ impl SymKey {
     /// This function will return an error if the Key cannot be generated.
     pub fn random(key_tp: SymKeyType) -> Result<Self> {
         match key_tp {
-            SymKeyType::Aes256 => Ok(Self::Aes256(random_array().map(|v| v.into())?)),
+            SymKeyType::Aes256Gcm => Ok(Self::Aes256(random_array().map(|v| v.into())?)),
             SymKeyType::Aes256Xts => Ok(Self::Aes256Xts(random_array().map(|v| v.into())?)),
         }
     }
@@ -93,7 +100,7 @@ impl SymKey {
     /// Return the key type of this [`SymKey`].
     pub fn key_type(&self) -> SymKeyType {
         match self {
-            Self::Aes256(_) => SymKeyType::Aes256,
+            Self::Aes256(_) => SymKeyType::Aes256Gcm,
             Self::Aes256Xts(_) => SymKeyType::Aes256Xts,
         }
     }
@@ -129,7 +136,7 @@ pub(crate) fn hkdf_rfc_5869<const COUNT: usize>(
 /// # Errors
 ///
 /// This function will return an error if something went bad in OpenSSL.
-pub fn derive_aes256_gcm_key(k1: &PKeyRef<Private>, k2: &PKeyRef<Public>) -> Result<Aes256Key> {
+pub fn derive_aes256_gcm_key(k1: &PKeyRef<Private>, k2: &PKeyRef<Public>) -> Result<Aes256GcmKey> {
     let mut der = Deriver::new(k1)?;
     der.set_peer(k2)?;
     let mut key = der.derive_to_vec()?;
@@ -137,7 +144,7 @@ pub fn derive_aes256_gcm_key(k1: &PKeyRef<Private>, k2: &PKeyRef<Public>) -> Res
     let secr = Confidential::new(key);
 
     // Panic: does not panic as SHA256 digest is 32 bytes long
-    Ok(Aes256Key::new(
+    Ok(Aes256GcmKey::new(
         hash(MessageDigest::sha256(), secr.value())?
             .as_ref()
             .try_into()
@@ -413,7 +420,7 @@ mod tests {
     fn derive_aes256_gcm_key() {
         let (cust_key, host_key) = get_test_keys();
 
-        let exp_key: Aes256Key = [
+        let exp_key: Aes256GcmKey = [
             0x75, 0x32, 0x77, 0x55, 0x8f, 0x3b, 0x60, 0x3, 0x41, 0x9e, 0xf2, 0x49, 0xae, 0x3c,
             0x4b, 0x55, 0xaa, 0xd7, 0x7d, 0x9, 0xd9, 0x7f, 0xdd, 0x1f, 0xc8, 0x8f, 0xd8, 0xf0,
             0xcf, 0x22, 0xf1, 0x49,
@@ -513,7 +520,7 @@ mod tests {
     #[test]
     fn from_symkeytype() {
         assert_eq!(
-            <SymKeyType as Into<Nid>>::into(SymKeyType::Aes256),
+            <SymKeyType as Into<Nid>>::into(SymKeyType::Aes256Gcm),
             Nid::AES_256_GCM
         );
         assert_eq!(
@@ -525,8 +532,8 @@ mod tests {
     #[test]
     fn key_type() {
         assert_eq!(
-            SymKey::random(SymKeyType::Aes256).unwrap().key_type(),
-            SymKeyType::Aes256
+            SymKey::random(SymKeyType::Aes256Gcm).unwrap().key_type(),
+            SymKeyType::Aes256Gcm
         );
         assert_eq!(
             SymKey::random(SymKeyType::Aes256Xts).unwrap().key_type(),
@@ -537,9 +544,9 @@ mod tests {
     #[test]
     fn try_from_and_into() {
         let data = [0x1u8; 32];
-        let key: SymKey = Aes256Key::new(data).into();
+        let key: SymKey = Aes256GcmKey::new(data).into();
         assert_eq!(key.value(), &data);
-        let key_aes: Aes256Key = key.try_into().expect("should not fail");
+        let key_aes: Aes256GcmKey = key.try_into().expect("should not fail");
         assert_eq!(key_aes.value(), &data);
     }
 }

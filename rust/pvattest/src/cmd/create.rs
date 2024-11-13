@@ -43,7 +43,7 @@ pub fn create(opt: &CreateAttOpt) -> Result<ExitCode> {
     debug!("Added all host-keys");
 
     let encr_ctx =
-        ReqEncrCtx::random(SymKeyType::Aes256).context("Failed to generate random input")?;
+        ReqEncrCtx::random(SymKeyType::Aes256Gcm).context("Failed to generate random input")?;
     let ser_arcb = arcb.encrypt(&encr_ctx)?;
     warn!("Successfully generated the request");
 

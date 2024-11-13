@@ -55,7 +55,8 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     debug!("Added all host-keys");
 
     // build + encrypt the request
-    let rq = ReqEncrCtx::random(SymKeyType::Aes256).context("Failed to generate random input")?;
+    let rq =
+        ReqEncrCtx::random(SymKeyType::Aes256Gcm).context("Failed to generate random input")?;
     let ser_asrbc = asrcb.encrypt(&rq)?;
     warn!("Successfully generated the request");
     write_out(&opt.output, ser_asrbc, "add-secret request")?;

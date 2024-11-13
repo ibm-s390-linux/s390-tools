@@ -148,7 +148,7 @@ impl ReqEncrCtx {
         let priv_key = priv_key.into().unwrap_or(gen_ec_key(Nid::SECP521R1)?);
         let prot_key = prot_key
             .into()
-            .unwrap_or(SymKey::random(SymKeyType::Aes256)?);
+            .unwrap_or(SymKey::random(SymKeyType::Aes256Gcm)?);
         Ok(Self {
             iv,
             priv_key,
@@ -163,7 +163,7 @@ impl ReqEncrCtx {
     /// This function will return an error if OpenSSL could not generate a random value.
     pub fn random(ket_tp: SymKeyType) -> Result<Self> {
         match ket_tp {
-            SymKeyType::Aes256 => Self::new_aes_256(None, None, None),
+            SymKeyType::Aes256Gcm => Self::new_aes_256(None, None, None),
             SymKeyType::Aes256Xts => Err(Error::NoAeadKey),
         }
     }
