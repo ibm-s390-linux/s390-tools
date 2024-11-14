@@ -30,6 +30,7 @@ SECTIONS
   __stage2_desc = .;
 
   . = STAGE2_LOAD_ADDRESS;
+  __stage2_head = .;
   .stage2.head : { *(.stage2.head) }
   . = STAGE2_ENTRY;
   .text.start : {
@@ -43,7 +44,16 @@ SECTIONS
   .data : { *(.data) }
 
   . = STAGE2DUMP_TAIL_ADDRESS;
-  .stage2dump.tail : { *(.stage2dump.tail) }
+  .stage2dump.tail : { *(.stage2dump.tail)
+#ifdef ECKD2DUMP_MV
+    ASSERT(__stage2dump_tail_end - __stage2_head == STAGE2_DUMPER_SIZE_MV,
+           "MV dumper size doesn't conform to the described memory layout");
+#else
+    ASSERT(__stage2dump_tail_end - __stage2_head == STAGE2_DUMPER_SIZE_ZLIB,
+           "SV dumper size doesn't conform to the described memory layout");
+#endif
+  }
+  __stage2dump_tail_end = .;
 #ifdef ECKD2DUMP_MV
   . = ECKD2DUMP_MV_TAIL_ADDRESS;
   .eckd2dump_mv.tail : { *(.eckd2dump_mv.tail) }
