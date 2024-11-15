@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
+use std::{convert::TryInto, fmt::Display, ops::Range};
+
 use enum_dispatch::enum_dispatch;
 use openssl::{
     derive::Deriver,
@@ -17,7 +19,6 @@ use openssl::{
     symm::{decrypt_aead, encrypt_aead, Cipher},
 };
 use pv_core::request::Confidential;
-use std::{convert::TryInto, ops::Range};
 
 use crate::{error::Result, Error};
 
@@ -47,6 +48,16 @@ impl SymKeyType {
     #[allow(non_upper_case_globals)]
     /// AES 256 GCM key (32 bytes)
     pub const Aes256: Self = Self::Aes256Gcm;
+}
+
+impl Display for SymKeyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Aes256Gcm => "AES-256-GCM",
+            Self::Aes256Xts => "AES-256-XTS",
+        };
+        write!(f, "{s}")
+    }
 }
 
 impl From<SymKeyType> for Nid {
