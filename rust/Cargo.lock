@@ -459,6 +459,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "log",
+ "openssl",
  "s390_pv",
  "serde",
  "serde_yaml",

@@ -16,6 +16,7 @@ log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
 serde_yaml = "0.9"
 serde = { version = "1.0.139", features = ["derive"]}
 zerocopy = { version="0.7", features = ["derive"] }
+openssl = "0.10.57"
 
 pv = { path = "../pv", package = "s390_pv" }
 utils = { path = "../utils" }

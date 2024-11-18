@@ -21,6 +21,7 @@ fn flags(cli_flags: &[AttAddFlags]) -> AttestationFlags {
         match flag {
             AttAddFlags::PhkhImg => att_flags.set_image_phkh(),
             AttAddFlags::PhkhAtt => att_flags.set_attest_phkh(),
+            AttAddFlags::SecretStoreHash => att_flags.set_secret_store_hash(),
         }
     }
     att_flags

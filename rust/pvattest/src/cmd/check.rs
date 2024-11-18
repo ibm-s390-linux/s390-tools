@@ -3,9 +3,16 @@
 // Copyright IBM Corp. 2024
 
 mod host_key;
+mod secret_store;
 
-use self::host_key::{host_key_check, HostKeyCheck};
-use crate::{additional::AttestationResult, cli::CheckOpt, exchange::ExchangeFormatResponse};
+use self::{
+    host_key::{host_key_check, HostKeyCheck},
+    secret_store::SecretStoreCheck,
+};
+use crate::{
+    additional::AttestationResult, cli::CheckOpt, cmd::check::secret_store::secret_store_check,
+    exchange::ExchangeFormatResponse,
+};
 use anyhow::Result;
 use log::{debug, info, warn};
 use pv::{
@@ -89,6 +96,8 @@ pub struct CheckResult<'a> {
     attest_host_key: HostKeyCheck<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     user_data: Option<HexSlice<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    secret_store: Option<SecretStoreCheck<'a>>,
 }
 
 /// Perform the policy checks
@@ -107,6 +116,7 @@ pub fn check(opt: &CheckOpt) -> Result<ExitCode> {
         .unwrap();
 
     let user_data = user_data_check(opt, &att_res)?.check(&mut issues);
+    let secret_store = secret_store_check(opt, &att_res)?.check(&mut issues);
 
     let res = CheckResult {
         successful: !issues.is_empty(),
@@ -114,6 +124,7 @@ pub fn check(opt: &CheckOpt) -> Result<ExitCode> {
         image_host_key,
         attest_host_key,
         user_data,
+        secret_store,
     };
 
     debug!("res {res:?}");

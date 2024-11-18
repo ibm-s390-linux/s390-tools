@@ -99,6 +99,9 @@ pub enum AttAddFlags {
     /// Request the public host-key-hash of the key that decrypted the attestation request as
     /// additional-data.
     PhkhAtt,
+
+    /// Request a hash over all successful Add-secret requests and the lock state as additional-data.
+    SecretStoreHash,
 }
 
 // all members s390x only
@@ -255,6 +258,34 @@ pub struct CheckOpt {
     /// Check if the provided user data matches the data from the attestation response.
     #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub user_data: Option<PathBuf>,
+
+    /// Use FILE to include as successful Add-secret request.
+    ///
+    /// Checks if the Attestation response contains the hash of all specified add secret
+    /// requests-tags.
+    /// The hash is sensible to the order in which the secrets where added. This means that if the
+    /// order of adding here different from the order the add-secret requests where sent to the UV
+    /// this check will fail even though the same secrets are included in the UV secret store.
+    /// Can be specified multiple times.
+    #[arg(
+        long,
+        value_name = "FILE",
+        value_hint = ValueHint::FilePath,
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        requires("secret_store_locked"),
+        )]
+    pub secret: Vec<PathBuf>,
+
+    /// Check whether the guests secret store is locked or not.
+    ///
+    /// Compares the hash of the secret store state to the one calculated by this option and
+    /// optionally specified add-secret-requests. If the attestation response does not contain a
+    /// secret store hash, this check fails.
+    ///
+    /// Required if add-secret-requests are specified.
+    #[arg(long, value_name = "BOOL")]
+    pub secret_store_locked: Option<bool>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
