@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
-use super::arcb::AttestationFlags;
+
+use serde::Serialize;
+use std::fmt::Display;
+
 use crate::req::Keyslot;
 use crate::static_assert;
 use crate::{Error, Result};
-use serde::Serialize;
-use std::fmt::Display;
-use zerocopy::FromBytes;
+
+use super::arcb::AttestationFlags;
 
 /// Hash for additional-data stuff used for parsing [`AdditionalData`]
-pub(crate) type AttAddHash = [u8; PHKH_SIZE as usize];
 pub(super) const PHKH_SIZE: u32 = 0x20;
 static_assert!(Keyslot::PHKH_SIZE == PHKH_SIZE);
 
@@ -25,6 +26,8 @@ where
     image_phkh: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
     attestation_phkh: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unrecognized: Option<T>,
 }
 
 impl<T> Display for AdditionalData<T>
@@ -47,22 +50,22 @@ where
             Ok(())
         }
         write_field(f, "Image PHKH", &self.image_phkh)?;
-        write_field(f, "Attestation PHKH", &self.attestation_phkh)
+        write_field(f, "Attestation PHKH", &self.attestation_phkh)?;
+        write_field(f, "Unrecognized", &self.unrecognized)?;
+        Ok(())
     }
 }
 
-fn read_hash<'a>(
+fn read_value<'a>(
     data: &'a [u8],
+    size: u32,
     read: bool,
     name: &'static str,
-) -> Result<(Option<&'a AttAddHash>, &'a [u8])> {
+) -> Result<(Option<&'a [u8]>, &'a [u8])> {
+    let size = size as usize;
     match read {
-        true => {
-            let (v, data) =
-                AttAddHash::slice_from_prefix(data, 1).ok_or(Error::AddDataMissing(name))?;
-            // slice from prefix ensures that there is 1 element.
-            Ok((Some(&v[0]), data))
-        }
+        true if data.len() >= size => Ok((Some(&data[..size]), &data[size..])),
+        true => Err(Error::AddDataMissing(name)),
         false => Ok((None, data)),
     }
 }
@@ -85,6 +88,11 @@ impl<T: Serialize> AdditionalData<T> {
     pub fn attestation_public_host_key_hash(&self) -> Option<&T> {
         self.attestation_phkh.as_ref()
     }
+
+    /// Provides a reference to the data not known by this implementation.
+    pub fn unrecognized(&self) -> Option<&T> {
+        self.unrecognized.as_ref()
+    }
 }
 
 impl<'a, T: Serialize + From<&'a [u8]> + Sized> AdditionalData<T> {
@@ -93,10 +101,12 @@ impl<'a, T: Serialize + From<&'a [u8]> + Sized> AdditionalData<T> {
         let AdditionalData {
             image_phkh,
             attestation_phkh,
+            unrecognized,
         } = other;
         Self {
             image_phkh: image_phkh.map(|i| i.into()),
             attestation_phkh: attestation_phkh.map(|i| i.into()),
+            unrecognized: unrecognized.map(|i| i.into()),
         }
     }
 }
@@ -104,6 +114,7 @@ impl<'a, T: Serialize + From<&'a [u8]> + Sized> AdditionalData<T> {
 impl<'a> AdditionalData<&'a [u8]> {
     /// Create from a slice of additional-data
     ///
+    /// `data`: Unstructured additional-data
     /// `flags`: Flags indicating which additional-data field is present.
     ///
     /// # Error
@@ -111,13 +122,121 @@ impl<'a> AdditionalData<&'a [u8]> {
     /// Fails if there is a mismatch between the data and the flags. Should not happen after a
     /// successful attestation verification.
     pub fn from_slice(data: &'a [u8], flags: &AttestationFlags) -> Result<Self> {
-        let _data = data;
-        let (image_phkh, _data) = read_hash(data, flags.image_phkh(), "Image PHKH")?;
-        let (attestation_phkh, _data) = read_hash(data, flags.attest_phkh(), "Attestation PHKH")?;
+        let (image_phkh, data) = read_value(data, PHKH_SIZE, flags.image_phkh(), "Image PHKH")?;
+        let (attestation_phkh, data) =
+            read_value(data, PHKH_SIZE, flags.attest_phkh(), "Attestation PHKH")?;
+        let unrecognized = (!data.is_empty()).then_some(data);
 
         Ok(Self {
-            image_phkh: image_phkh.map(|v| v.as_slice()),
-            attestation_phkh: attestation_phkh.map(|v| v.as_slice()),
+            image_phkh,
+            attestation_phkh,
+            unrecognized,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serde_test::Token;
+
+    use super::*;
+    #[test]
+    fn ser() {
+        let add = AdditionalData {
+            image_phkh: 0_u8.into(),
+            attestation_phkh: 1_u8.into(),
+            unrecognized: 2_u8.into(),
+        };
+
+        serde_test::assert_ser_tokens(
+            &add,
+            &[
+                Token::Struct {
+                    name: "AdditionalData",
+                    len: 3,
+                },
+                Token::Str("image_phkh"),
+                Token::Some,
+                Token::U8(0),
+                Token::Str("attestation_phkh"),
+                Token::Some,
+                Token::U8(1),
+                Token::Str("unrecognized"),
+                Token::Some,
+                Token::U8(2),
+                Token::StructEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn ser_no_att() {
+        let add = AdditionalData {
+            image_phkh: 0_u8.into(),
+            attestation_phkh: None,
+            unrecognized: 2_u8.into(),
+        };
+
+        serde_test::assert_ser_tokens(
+            &add,
+            &[
+                Token::Struct {
+                    name: "AdditionalData",
+                    len: 2,
+                },
+                Token::Str("image_phkh"),
+                Token::Some,
+                Token::U8(0),
+                Token::Str("unrecognized"),
+                Token::Some,
+                Token::U8(2),
+                Token::StructEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn ser_no_unrec() {
+        let add = AdditionalData {
+            image_phkh: 0_u8.into(),
+            attestation_phkh: 1_u8.into(),
+            unrecognized: None,
+        };
+
+        serde_test::assert_ser_tokens(
+            &add,
+            &[
+                Token::Struct {
+                    name: "AdditionalData",
+                    len: 2,
+                },
+                Token::Str("image_phkh"),
+                Token::Some,
+                Token::U8(0),
+                Token::Str("attestation_phkh"),
+                Token::Some,
+                Token::U8(1),
+                Token::StructEnd,
+            ],
+        );
+    }
+    #[test]
+    fn ser_no() {
+        let add: AdditionalData<u8> = AdditionalData {
+            image_phkh: None,
+            attestation_phkh: None,
+            unrecognized: None,
+        };
+
+        serde_test::assert_ser_tokens(
+            &add,
+            &[
+                Token::Struct {
+                    name: "AdditionalData",
+                    len: 0,
+                },
+                Token::StructEnd,
+            ],
+        );
     }
 }
