@@ -22,6 +22,7 @@ fn flags(cli_flags: &[AttAddFlags]) -> AttestationFlags {
             AttAddFlags::PhkhImg => att_flags.set_image_phkh(),
             AttAddFlags::PhkhAtt => att_flags.set_attest_phkh(),
             AttAddFlags::SecretStoreHash => att_flags.set_secret_store_hash(),
+            AttAddFlags::FirmwareState => att_flags.set_firmware_state(),
         }
     }
     att_flags

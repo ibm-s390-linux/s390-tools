@@ -102,6 +102,9 @@ pub enum AttAddFlags {
 
     /// Request a hash over all successful Add-secret requests and the lock state as additional-data.
     SecretStoreHash,
+
+    /// Request the state of the firmware as additional-data.
+    FirmwareState,
 }
 
 // all members s390x only
@@ -286,6 +289,18 @@ pub struct CheckOpt {
     /// Required if add-secret-requests are specified.
     #[arg(long, value_name = "BOOL")]
     pub secret_store_locked: Option<bool>,
+
+    /// Check whether the firmware is on an IBM supported version.
+    ///
+    /// Requires internet access.
+    #[arg(long)]
+    pub firmware: bool,
+
+    /// Specify the endpoint to use for firmware version verification.
+    ///
+    /// Use an endpoint you trust. Requires the --firmware option.
+    #[arg(long, requires("firmware"), value_name = "URL", value_hint = ValueHint::Url)]
+    pub firmware_verify_url: Option<String>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
