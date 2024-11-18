@@ -17,7 +17,7 @@ use std::{fmt::Display, process::ExitCode};
 use utils::HexSlice;
 
 use crate::{
-    cli::{VerifyOpt, VerifyOutputType},
+    cli::{OutputType, VerifyOpt},
     exchange::ExchangeFormatResponse,
     EXIT_CODE_ATTESTATION_FAIL,
 };
@@ -107,7 +107,7 @@ pub fn verify(opt: &VerifyOpt) -> Result<ExitCode> {
     warn!("{pr_data}");
     if let Some(mut output) = output {
         match opt.format {
-            VerifyOutputType::Yaml => serde_yaml::to_writer(&mut output, &pr_data)?,
+            OutputType::Yaml => serde_yaml::to_writer(&mut output, &pr_data)?,
         };
     }
 

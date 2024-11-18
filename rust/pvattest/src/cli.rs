@@ -25,7 +25,7 @@ pub struct CliOptions {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Create an attestation measurement request
+    /// Create an attestation measurement request.
     ///
     /// Create attestation measurement requests to attest an IBM Secure Execution guest. Only build
     /// attestation requests in a trusted environment such as your Workstation. To avoid
@@ -33,7 +33,7 @@ pub enum Command {
     /// shred it after verification. Every 'create' will generate a new, random protection key.
     Create(Box<CreateAttOpt>),
 
-    /// Send the attestation request to the Ultravisor
+    /// Send the attestation request to the Ultravisor.
     ///
     /// Run a measurement of this system through ’/dev/uv’. This device must be accessible and the
     /// attestation Ultravisor facility must be present. The input must be an attestation request
@@ -41,7 +41,7 @@ pub enum Command {
     /// from the Ultravisor.
     Perform(PerformAttOpt),
 
-    /// Verify an attestation response
+    /// Verify an attestation response.
     ///
     /// Verify that a previously generated attestation measurement of an IBM Secure Execution guest
     /// is as expected. Only verify attestation requests in a trusted environment, such as your
@@ -71,21 +71,26 @@ pub struct CreateAttOpt {
     #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub arpk: String,
 
-    /// Specify-additional data for the request.
+    /// Specify additional data for the request.
     ///
     /// Additional data is provided by the Ultravisor and returned during the attestation request
     /// and is covered by the attestation measurement. Can be specified multiple times.
     /// Optional.
-    #[arg(long, value_name = "FLAGS")]
+    #[arg(
+        long,
+        value_name = "FLAGS",
+        use_value_delimiter = true,
+        value_delimiter = ','
+    )]
     pub add_data: Vec<AttAddFlags>,
 }
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
 pub enum AttAddFlags {
-    /// Request the public host-key-hash of the key that decrypted the SE-image as additional-data
+    /// Request the public host-key-hash of the key that decrypted the SE-image as additional-data.
     PhkhImg,
     /// Request the public host-key-hash of the key that decrypted the attestation request as
-    /// additional-data
+    /// additional-data.
     PhkhAtt,
 }
 
@@ -99,7 +104,7 @@ pub struct PerformAttOpt {
 
     /// Specify the request to be sent.
     #[cfg(target_arch = "s390x")]
-    #[arg(value_name = "INPUT", value_hint = ValueHint::FilePath,required_unless_present("input"), conflicts_with("input"))]
+    #[arg(value_name = "IN", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
     pub input_pos: Option<String>,
 
     /// Write the result to FILE.
@@ -108,7 +113,7 @@ pub struct PerformAttOpt {
     pub output: Option<String>,
 
     /// Write the result to FILE.
-    #[arg( value_name = "OUTPUT", value_hint = ValueHint::FilePath,required_unless_present("output"), conflicts_with("output"))]
+    #[arg(value_name = "OUT", value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
     #[cfg(target_arch = "s390x")]
     pub output_pos: Option<String>,
 
@@ -155,7 +160,7 @@ impl<'a> From<&'a PerformAttOpt> for PerformAttOptComb<'a> {
 
 #[derive(Args, Debug)]
 pub struct VerifyOpt {
-    /// Specify the attestation request to be verified.
+    /// Specify the attestation response to be verified.
     #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub input: String,
 
@@ -179,7 +184,7 @@ pub struct VerifyOpt {
 
     /// Define the output format.
     #[arg(long, value_enum, default_value_t)]
-    pub format: VerifyOutputType,
+    pub format: OutputType,
 
     /// Write the user data to the FILE if any.
     ///
@@ -192,7 +197,7 @@ pub struct VerifyOpt {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
-pub enum VerifyOutputType {
+pub enum OutputType {
     /// Use yaml format.
     #[default]
     Yaml,
