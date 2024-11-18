@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
+use std::path::Path;
+
 use crate::cli::{AddSecretType, CreateSecretFlags, CreateSecretOpt};
 use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
@@ -20,8 +22,12 @@ use pv::{
 use serde_yaml::Value;
 use utils::get_writer_from_cli_file_arg;
 
-fn write_out<D: AsRef<[u8]>>(path: &str, data: D, ctx: &str) -> pv::Result<()> {
-    let mut wr = get_writer_from_cli_file_arg(path)?;
+fn write_out<P, D>(path: &P, data: D, ctx: &str) -> pv::Result<()>
+where
+    P: AsRef<Path>,
+    D: AsRef<[u8]>,
+{
+    let mut wr = get_writer_from_cli_file_arg(path.as_ref())?;
     write(&mut wr, data, path, ctx)?;
     Ok(())
 }
@@ -55,7 +61,7 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     write_out(&opt.output, ser_asrbc, "add-secret request")?;
     info!("Successfully wrote the request to '{}'", &opt.output);
 
-    write_secret(&opt.secret, &asrcb)
+    write_secret(&opt.secret, &asrcb, &opt.output)
 }
 
 /// Read+parse the first key from the buffer.
@@ -200,7 +206,11 @@ fn read_cuid(asrcb: &mut AddSecretRequest, opt: &CreateSecretOpt) -> Result<()> 
 }
 
 /// Write the generated secret (if any) to the specified output stream
-fn write_secret(secret: &AddSecretType, asrcb: &AddSecretRequest) -> Result<()> {
+fn write_secret<P: AsRef<Path>>(
+    secret: &AddSecretType,
+    asrcb: &AddSecretRequest,
+    outp_path: P,
+) -> Result<()> {
     if let AddSecretType::Association {
         name,
         stdout,
@@ -208,23 +218,31 @@ fn write_secret(secret: &AddSecretType, asrcb: &AddSecretRequest) -> Result<()> 
         ..
     } = secret
     {
-        let gen_path: String = name
+        let gen_name: String = name
             .chars()
             .map(|c| if c.is_whitespace() { '_' } else { c })
             .collect();
+        let mut gen_path = outp_path
+            .as_ref()
+            .parent()
+            .with_context(|| format!("Cannot open directory of {:?}", outp_path.as_ref()))?
+            .to_owned();
+        gen_path.push(format!("{gen_name}.yaml"));
 
         // write non confidential data (=name+id) to a yaml
         let secret_info = serde_yaml::to_string(asrcb.guest_secret())?;
         if stdout.to_owned() {
             println!("{secret_info}");
         } else {
-            let secret_info_path = format!("{gen_path}.yaml");
-            write_out(&secret_info_path, secret_info, "association secret info")?;
+            write_out(&gen_path, secret_info, "association secret info")?;
             debug!(
                 "Non-confidential secret information: {:x?}",
                 asrcb.guest_secret()
             );
-            warn!("Successfully wrote association info to '{secret_info_path}'");
+            warn!(
+                "Successfully wrote association info to '{}'",
+                gen_path.display()
+            );
         }
 
         if let Some(path) = secret_out {
