@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-perform 1 "2024-05-15" "s390-tools" "Attestation Manual"
+.TH pvattest-perform 1 "2024-11-18" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -12,7 +12,7 @@
 .SH SYNOPSIS
 .nf
 .fam C
-pvattest perform [OPTIONS] [INPUT] [OUTPUT]
+pvattest perform [OPTIONS] [IN] [OUT]
 .fam C
 .fi
 .SH DESCRIPTION
@@ -22,13 +22,13 @@ must be an attestation request created with ’pvattest create’. Output will
 contain the original request and the response from the Ultravisor.
 .SH OPTIONS
 .PP
-<INPUT>
+<IN>
 .RS 4
 Specify the request to be sent.
 .RE
 .RE
 .PP
-<OUTPUT>
+<OUT>
 .RS 4
 Write the result to FILE.
 .RE
@@ -41,12 +41,6 @@ Provide up to 256 bytes of user input User-data is arbitrary user-defined data
 appended to the Attestation measurement. It is verified during the Attestation
 measurement verification. May be any arbitrary data, as long as it is less or
 equal to 256 bytes
-.RE
-.RE
-.PP
-\-v, \-\-verbose
-.RS 4
-Provide more detailed output.
 .RE
 .RE
 .PP

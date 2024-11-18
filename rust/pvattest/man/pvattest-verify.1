@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-verify 1 "2024-05-15" "s390-tools" "Attestation Manual"
+.TH pvattest-verify 1 "2024-11-18" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -27,7 +27,7 @@ the image that was attested during ’pvattest perform’
 .PP
 \-i, \-\-input <FILE>
 .RS 4
-Specify the attestation request to be verified.
+Specify the attestation response to be verified.
 .RE
 .RE
 .PP
@@ -69,13 +69,7 @@ Possible values:
 Write the user data to the FILE if any. Writes the user data, if the response
 contains any, to FILE The user-data is part of the attestation measurement. If
 the user-data is written to FILE the user-data was part of the measurement and
-verified. Emits a warning if the response contains no user-data
-.RE
-.RE
-.PP
-\-v, \-\-verbose
-.RS 4
-Provide more detailed output.
+verified. Emits a warning if the response contains no user-data.
 .RE
 .RE
 .PP

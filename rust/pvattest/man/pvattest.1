@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest 1 "2024-05-15" "s390-tools" "Attestation Manual"
+.TH pvattest 1 "2024-11-18" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -42,9 +42,9 @@ Verify an attestation response
 
 .PP
 
-\fBversion\fR
+\fBcheck\fR
 .RS 4
-Print version information and exit
+Check if the attestation result matches defined policies
 .RE
 
 .SH OPTIONS
@@ -52,6 +52,12 @@ Print version information and exit
 \-v, \-\-verbose
 .RS 4
 Provide more detailed output.
+.RE
+.RE
+.PP
+\-q, \-\-quiet
+.RS 4
+Provide less output.
 .RE
 .RE
 .PP
@@ -111,4 +117,4 @@ If the measurements do not match \fBpvattest\fP exits with code 2 and emits an e
 .fi
 .SH "SEE ALSO"
 .sp
-\fBpvattest-create\fR(1) \fBpvattest-perform\fR(1) \fBpvattest-verify\fR(1)
+\fBpvattest-create\fR(1) \fBpvattest-perform\fR(1) \fBpvattest-verify\fR(1) \fBpvattest-check\fR(1)

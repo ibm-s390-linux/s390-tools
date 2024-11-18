@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-create 1 "2024-05-15" "s390-tools" "Attestation Manual"
+.TH pvattest-create 1 "2024-11-18" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -40,7 +40,7 @@ the host-key document beforehand.
 .PP
 \-C, \-\-cert <FILE>
 .RS 4
-Use FILE as a certificate to verify the host key or keys. The certificates are
+Use FILE as a certificate to verify the host-key or keys. The certificates are
 used to establish a chain of trust for the verification of the host-key
 documents. Specify this option twice to specify the IBM Z signing key and the
 intermediate CA certificate (signed by the root CA).
@@ -84,7 +84,7 @@ this key, otherwise your attestation is compromised.
 .PP
 \-\-add-data <FLAGS>
 .RS 4
-Specify-additional data for the request. Additional data is provided by the
+Specify additional data for the request. Additional data is provided by the
 Ultravisor and returned during the attestation request and is covered by the
 attestation measurement. Can be specified multiple times. Optional.
 
@@ -94,12 +94,10 @@ Possible values:
 
 - \fBphkh-att\fP: Request the public host-key-hash of the key that decrypted the attestation request as additional-data.
 
-.RE
-.RE
-.PP
-\-v, \-\-verbose
-.RS 4
-Provide more detailed output.
+- \fBsecret-store-hash\fP: Request a hash over all successful Add-secret requests and the lock state as additional-data.
+
+- \fBfirmware-state\fP: Request the state of the firmware as additional-data.
+
 .RE
 .RE
 .PP
