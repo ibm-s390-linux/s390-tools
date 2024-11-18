@@ -10,9 +10,9 @@ use std::fmt::Display;
 use zerocopy::FromBytes;
 
 /// Hash for additional-data stuff used for parsing [`AdditionalData`]
-pub(crate) type AttAddHash = [u8; ATT_ADD_HASH_SIZE as usize];
-pub(crate) const ATT_ADD_HASH_SIZE: u32 = 0x20;
-static_assert!(Keyslot::PHKH_SIZE == ATT_ADD_HASH_SIZE);
+pub(crate) type AttAddHash = [u8; PHKH_SIZE as usize];
+pub(super) const PHKH_SIZE: u32 = 0x20;
+static_assert!(Keyslot::PHKH_SIZE == PHKH_SIZE);
 
 /// Struct describing the additional-data of an Attestation Request
 #[derive(Serialize, Debug)]

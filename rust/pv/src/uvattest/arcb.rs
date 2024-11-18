@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
-use super::{additional::ATT_ADD_HASH_SIZE, AttNonce};
+use super::{additional::PHKH_SIZE, AttNonce};
 use crate::{
     assert_size,
     attest::{AttestationMagic, AttestationMeasAlg},
@@ -310,7 +310,7 @@ static_assert!(AttestationFlags::FLAG_TO_ADD_SIZE.len() < 64);
 
 impl AttestationFlags {
     /// Maps the flag to the (maximum) required size for the additional data
-    pub(crate) const FLAG_TO_ADD_SIZE: [u32; 4] = [0, 0, ATT_ADD_HASH_SIZE, ATT_ADD_HASH_SIZE];
+    pub(crate) const FLAG_TO_ADD_SIZE: [u32; 4] = [0, 0, PHKH_SIZE, PHKH_SIZE];
 
     /// Returns the maximum size this flag requires for additional data
     pub fn expected_additional_size(&self) -> u32 {
