@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
-use super::{additional::PHKH_SIZE, AttNonce};
+
+use openssl::pkey::{PKey, Public};
+use std::mem::size_of;
+use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
+
 use crate::{
     assert_size,
     attest::{AttestationMagic, AttestationMeasAlg},
@@ -13,9 +17,11 @@ use crate::{
     uv::UvFlags,
     Error, Result,
 };
-use openssl::pkey::{PKey, Public};
-use std::mem::size_of;
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
+
+use super::{
+    additional::{FW_STATE_SIZE, PHKH_SIZE, SECRET_STORE_HASH_SIZE},
+    AttNonce,
+};
 
 #[cfg(doc)]
 use crate::{
@@ -310,7 +316,14 @@ static_assert!(AttestationFlags::FLAG_TO_ADD_SIZE.len() < 64);
 
 impl AttestationFlags {
     /// Maps the flag to the (maximum) required size for the additional data
-    pub(crate) const FLAG_TO_ADD_SIZE: [u32; 4] = [0, 0, PHKH_SIZE, PHKH_SIZE];
+    pub(crate) const FLAG_TO_ADD_SIZE: [u32; 6] = [
+        0,
+        0,
+        PHKH_SIZE,
+        PHKH_SIZE,
+        SECRET_STORE_HASH_SIZE,
+        FW_STATE_SIZE,
+    ];
 
     /// Returns the maximum size this flag requires for additional data
     pub fn expected_additional_size(&self) -> u32 {
@@ -352,6 +365,30 @@ impl AttestationFlags {
     /// Check weather the attestation public host key hash flag is on
     pub fn attest_phkh(&self) -> bool {
         self.0.is_set(3)
+    }
+
+    /// Flag 4 - request the state of the secret store
+    ///
+    /// Asks the Ultravisor to provide the hash of the added secret requests. Requires 64 bytes.
+    pub fn set_secret_store_hash(&mut self) {
+        self.0.set_bit(4);
+    }
+
+    /// Check weather the hash of the added secret requests flag is on
+    pub fn secret_store_hash(&self) -> bool {
+        self.0.is_set(4)
+    }
+
+    /// Flag 5 - request the firmware hash
+    ///
+    /// Asks the Ultravisor to provide the hash of the firmware. Requires 320 bytes.
+    pub fn set_firmware_state(&mut self) {
+        self.0.set_bit(5);
+    }
+
+    /// Check weather the hash of the added secret requests flag is on
+    pub fn firmware_state(&self) -> bool {
+        self.0.is_set(5)
     }
 }
 
