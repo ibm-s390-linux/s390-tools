@@ -139,6 +139,19 @@ impl<'a, T: Serialize + From<&'a [u8]> + Sized> AdditionalData<T> {
             unrecognized: unrecognized.map(|i| i.into()),
         }
     }
+
+    /// Create from a slice of additional-data
+    ///
+    /// `data`: Unstructured additional-data
+    /// `flags`: Flags indicating which additional-data field is present.
+    ///
+    /// # Error
+    ///
+    /// Fails if there is a mismatch between the data and the flags. Should not happen after a
+    /// successful attestation verification.
+    pub fn from_slice_sized(data: &'a [u8], flags: &AttestationFlags) -> Result<Self> {
+        AdditionalData::<&'a [u8]>::from_slice(data, flags).map(Self::from_other)
+    }
 }
 
 impl<'a> AdditionalData<&'a [u8]> {

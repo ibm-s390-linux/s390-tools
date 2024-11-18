@@ -2,11 +2,13 @@
 //
 // Copyright IBM Corp. 2024
 //
+pub mod check;
 pub mod create;
 #[cfg(target_arch = "s390x")]
 pub mod perform;
 pub mod verify;
 
+pub use check::check;
 pub use create::create;
 pub use verify::verify;
 

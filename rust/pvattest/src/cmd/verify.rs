@@ -5,70 +5,19 @@
 use anyhow::Result;
 use log::{debug, warn};
 use pv::{
-    attest::{
-        AdditionalData, AttestationFlags, AttestationItems, AttestationMeasurement,
-        AttestationRequest,
-    },
+    attest::{AttestationItems, AttestationMeasurement, AttestationRequest},
     misc::{create_file, open_file, read_exact_file, write_file},
     request::{openssl::pkey::PKey, BootHdrTags, Confidential, SymKey},
 };
-use serde::Serialize;
-use std::{fmt::Display, process::ExitCode};
+use std::process::ExitCode;
 use utils::HexSlice;
 
 use crate::{
+    additional::AttestationResult,
     cli::{OutputType, VerifyOpt},
     exchange::ExchangeFormatResponse,
     EXIT_CODE_ATTESTATION_FAIL,
 };
-
-#[derive(Serialize)]
-struct VerifyOutput<'a> {
-    cuid: HexSlice<'a>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    add: Option<HexSlice<'a>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    add_fields: Option<AdditionalData<HexSlice<'a>>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    user_data: Option<HexSlice<'a>>,
-}
-
-impl<'a> VerifyOutput<'a> {
-    fn from_exchange(resp: &'a ExchangeFormatResponse, flags: &AttestationFlags) -> Result<Self> {
-        let additional_data_fields = resp
-            .additional()
-            .map(|a| AdditionalData::from_slice(a, flags))
-            .transpose()?;
-        let user_data = resp.user().map(|u| u.into());
-
-        Ok(Self {
-            cuid: resp.config_uid().into(),
-            add: resp.additional().map(|a| a.into()),
-            add_fields: additional_data_fields.map(AdditionalData::from_other),
-            user_data,
-        })
-    }
-}
-
-impl Display for VerifyOutput<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Config UID:")?;
-        writeln!(f, "{:#}", self.cuid)?;
-        if let Some(data) = &self.add {
-            writeln!(f, "Additional-data:")?;
-            writeln!(f, "{:#}", data)?;
-        }
-        if let Some(data) = &self.add_fields {
-            writeln!(f, "Additional-data content:")?;
-            writeln!(f, "{:#}", data)?;
-        }
-        if let Some(data) = &self.user_data {
-            writeln!(f, "user-data:")?;
-            writeln!(f, "{:#}", data)?;
-        }
-        Ok(())
-    }
-}
 
 pub fn verify(opt: &VerifyOpt) -> Result<ExitCode> {
     let mut input = open_file(&opt.input)?;
@@ -102,7 +51,7 @@ pub fn verify(opt: &VerifyOpt) -> Result<ExitCode> {
     }
     warn!("Attestation measurement verified");
     // Error impossible CUID is present Attestation verified
-    let pr_data = VerifyOutput::from_exchange(&exchange, auth.flags())?;
+    let pr_data = AttestationResult::from_exchange(&exchange, auth.flags())?;
 
     warn!("{pr_data}");
     if let Some(mut output) = output {

@@ -3,6 +3,7 @@
 // Copyright IBM Corp. 2024
 
 #![allow(missing_docs)]
+mod additional;
 mod cli;
 mod cmd;
 mod exchange;
@@ -45,6 +46,7 @@ fn main() -> ExitCode {
             print_version!("2024", log_level; FEATURES.concat());
             Ok(ExitCode::SUCCESS)
         }
+        Command::Check(opt) => check(opt),
     };
     match res {
         Ok(c) => c,

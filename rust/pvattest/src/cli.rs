@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2024
 
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand, ValueEnum, ValueHint};
 use utils::{CertificateOptions, DeprecatedVerbosityOptions};
 
@@ -50,6 +52,11 @@ pub enum Command {
     /// Shred the protection key after the verification. The header must be the IBM Secure
     /// Execution header of the image that was attested during ’pvattest perform’
     Verify(VerifyOpt),
+
+    /// Check if the attestation result matches defined policies.
+    ///
+    /// After the attestation verification, check whether the attestation result complies with user-defined policies.
+    Check(CheckOpt),
 
     /// Print version information and exit.
     #[command(aliases(["--version"]), hide(true))]
@@ -191,7 +198,7 @@ pub struct VerifyOpt {
     /// Writes the user data, if the response contains any, to FILE
     /// The user-data is part of the attestation measurement. If the user-data is written to FILE
     /// the user-data was part of the measurement and verified.
-    /// Emits a warning if the response contains no user-data
+    /// Emits a warning if the response contains no user-data.
     #[arg(long, short ,value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub user_data: Option<String>,
 }
@@ -201,4 +208,74 @@ pub enum OutputType {
     /// Use yaml format.
     #[default]
     Yaml,
+}
+
+#[derive(Args, Debug)]
+pub struct CheckOpt {
+    /// Specify the attestation response to check whether the policies are validated.
+    #[arg(value_name = "IN", value_hint = ValueHint::FilePath,)]
+    pub input: PathBuf,
+
+    /// Specify the output file for the check result.
+    #[arg(value_name = "OUT", value_hint = ValueHint::FilePath,)]
+    pub output: PathBuf,
+
+    /// Define the output format.
+    #[arg(long, value_enum, default_value_t)]
+    pub format: OutputType,
+
+    /// Use FILE to check for a  host-key document.
+    ///
+    /// Verifies that the attestation response contains the host-key hash of one of the specified
+    /// host keys. The check fails if none of the host-keys match the hash in the response. This
+    /// parameter can be specified multiple times.
+    #[arg(
+        short = 'k',
+        long = "host-key-document",
+        value_name = "FILE",
+        value_hint = ValueHint::FilePath,
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        )]
+    pub host_key_documents: Vec<PathBuf>,
+
+    /// Define the host-key check policy
+    ///
+    /// By default, all host-key hashes are checked, and it is not considered a failure if a hash
+    /// is missing from the attestation response. Use this policy switch to trigger a failure if no
+    /// corresponding hash is found. Requires at least one host-key document.
+    #[arg(
+        long = "host-key-check",
+        requires("host_key_documents"),
+        use_value_delimiter = true,
+        value_delimiter = ','
+    )]
+    pub host_key_checks: Vec<HostKeyCheckPolicy>,
+
+    /// Check if the provided user data matches the data from the attestation response.
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    pub user_data: Option<PathBuf>,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum HostKeyCheckPolicy {
+    /// Check the host-key used for the attestation request.
+    ///
+    /// The check is considered failed, if no given host-key matches the hash from the attestation
+    /// host-key hash, or no attestation host-key has is in the attestation response.
+    AttKeyHash,
+    /// Check the host-key used to the boot the image.
+    ///
+    /// The check is considered failed, if no given host-key matches the hash from the boot
+    /// host-key hash, or no boot host-key has is in the attestation response.
+    BootKeyHash,
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn verify_cli() {
+        use clap::CommandFactory;
+        super::CliOptions::command().debug_assert()
+    }
 }
