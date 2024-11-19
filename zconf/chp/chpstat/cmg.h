@@ -21,7 +21,7 @@
 #define PARTIAL_CMCB_SIZE	(CMCB_SIZE - PARTIAL_CMCB_OFFSET * sizeof(u32))
 #define CUE_SIZE		(8 * sizeof(u32))
 #define EXT_CUE_SIZE		(16 * sizeof(u32))
-#define METRICS_SIZE		(17 * sizeof(double))
+#define METRICS_SIZE		(18 * sizeof(double))
 
 /* Bit-width of CUE timestamp field. */
 #define CUE_TS_WIDTH	24

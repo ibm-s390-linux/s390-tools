@@ -135,6 +135,16 @@ static struct column_t columns[] = {
 		0,
 	},
 	{
+		COL_UTIL_DATA,
+		"util_data",
+		COL_PERCENT,
+		"Data bandwidth utilization in %",
+		"DATA",
+		HDR1_UTIL_SINGLE,
+		HDR1_UTIL_GROUP,
+		0,
+	},
+	{
 		COL_READ_PART,
 		"read_part",
 		COL_BPS,

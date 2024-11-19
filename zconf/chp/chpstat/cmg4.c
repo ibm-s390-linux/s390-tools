@@ -64,6 +64,7 @@ struct metrics4_t {
 	double util_total;
 	double util_part;
 	double util_bus;
+	double util_data;
 	double read_total;
 	double read_part;
 	double write_total;
@@ -85,7 +86,7 @@ static const enum column_id_t default_column_ids[] = {
 	COL_SPEED,
 	COL_UTIL_PART,
 	COL_UTIL_TOTAL,
-	COL_UTIL_BUS,
+	COL_UTIL_DATA,
 	COL_DPU_ID,
 	COL_DPU_UTIL_PART,
 	COL_DPU_UTIL_TOTAL,
@@ -146,6 +147,7 @@ static void pr_metrics(struct cmg_pair_t **a, unsigned int *n,
 	pr_metric(a, n, metrics, util_total,   CMG_PERCENT, COL_UTIL_TOTAL);
 	pr_metric(a, n, metrics, util_part,    CMG_PERCENT, COL_UTIL_PART);
 	pr_metric(a, n, metrics, util_bus,     CMG_PERCENT, COL_UTIL_BUS);
+	pr_metric(a, n, metrics, util_data,    CMG_PERCENT, COL_UTIL_DATA);
 	pr_metric(a, n, metrics, read_total,   CMG_BPS,     COL_READ_TOTAL);
 	pr_metric(a, n, metrics, read_part,    CMG_BPS,     COL_READ_PART);
 	pr_metric(a, n, metrics, write_total,  CMG_BPS,     COL_WRITE_TOTAL);
@@ -186,6 +188,7 @@ static void init_metrics(struct metrics4_t *m)
 	m->util_total     = METRICS_INIT;
 	m->util_part      = METRICS_INIT;
 	m->util_bus       = METRICS_INIT;
+	m->util_data      = METRICS_INIT;
 	m->read_total     = METRICS_INIT;
 	m->read_part      = METRICS_INIT;
 	m->write_total    = METRICS_INIT;
@@ -203,7 +206,10 @@ static void calc_metrics(struct cmg_data_t *data, double seconds)
 	struct cmcb4_t *cmcb = get_cmcb(data);
 	struct cue4_t *a = get_cue(data, util_a);
 	struct cue4_t *b = get_cue(data, util_b);
-	double delta, max;
+	double delta, max, data_read, data_write;
+
+	data_read = METRICS_INIT;
+	data_write = METRICS_INIT;
 
 	/* util_total = 100.0 * work_units_cpc / max_work_units */
 	if (cue_valid2(a, b, channel_work_units_cpc)) {
@@ -230,6 +236,7 @@ static void calc_metrics(struct cmg_data_t *data, double seconds)
 	if (cue_valid2(a, b, data_units_read_cpc)) {
 		delta = field_delta(data_units_read_cpc, a, b);
 		m->read_total = (double)delta * cmcb->data_unit_size / seconds;
+		data_read = 100.0 * delta / cmcb->max_read_data_units / seconds;
 	}
 	/* read_part = data_units_read * unit_size / seconds */
 	if (cue_valid2(a, b, data_units_read)) {
@@ -240,12 +247,20 @@ static void calc_metrics(struct cmg_data_t *data, double seconds)
 	if (cue_valid2(a, b, data_units_written_cpc)) {
 		delta = field_delta(data_units_written_cpc, a, b);
 		m->write_total = (double)delta * cmcb->data_unit_size / seconds;
+		data_write = 100.0 * delta / cmcb->max_write_data_units /
+			     seconds;
 	}
 	/* write_part = data_units_written * unit_size / seconds */
 	if (cue_valid2(a, b, data_units_written)) {
 		delta = field_delta(data_units_written, a, b);
 		m->write_part = (double)delta * cmcb->data_unit_size / seconds;
 	}
+	/*
+	 * util_data = max (
+	 *     100.0 * data_units_read_cpc / max_read_data_units / seconds),
+	 *     100.0 * data_units_written_cpc / max_write_data_units / seconds)
+	 */
+	m->util_data = MAX(data_read, data_write);
 }
 
 /* Calculate metrics base on CMG 4 extended CUEs. */
