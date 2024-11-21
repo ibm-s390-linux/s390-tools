@@ -25,7 +25,7 @@ endif #HOSTARCH
 
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
-	PV_TARGETS := pvsecret pvattest
+	PV_TARGETS := pvsecret pvattest pvimg
 
 ifeq ($(HOST_ARCH),s390x)
 	PV_TARGETS += pvapconfig
@@ -88,6 +88,7 @@ install: $(INSTALL_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(PVIMG_PKGDATADIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvimg/tools/check_hostkeydoc $(DESTDIR)$(PVIMG_PKGDATADIR)
 	$(MAKE) -C pvimg/boot install
+	ln -sf pvimg $(DESTDIR)$(USRBINDIR)/genprotimg
 
 print-rust-targets:
 	echo $(BUILD_TARGETS)

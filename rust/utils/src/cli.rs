@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 /// CLI Argument collection for handling host-keys, IBM signing keys, and certificates.
-#[derive(Args, Debug, PartialEq, Eq, Default)]
+#[derive(Args, Debug, Clone, PartialEq, Eq, Default)]
 #[command(
     group(ArgGroup::new("pv_verify").required(true).args(["no_verify", "certs"])),
     )]

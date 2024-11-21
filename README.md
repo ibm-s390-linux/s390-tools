@@ -25,6 +25,8 @@ Package contents
      Automatic configure APQNs within an SE KVM guest
    - pvsecret:
      Manage secrets for IBM Secure Execution guests
+   - pvimg:
+     Create and inspect IBM Secure Execution images
 
  * dasdfmt:
    Low-level format ECKD DASDs with the classical Linux disk layout or the new
@@ -304,26 +306,28 @@ HAVE_FUSE=0`".
 The following table provides an overview of the used libraries and
 build options:
 
-| __LIBRARY__    | __BUILD OPTION__   | __TOOLS__                             |
-|----------------|:------------------:|:-------------------------------------:|
-| fuse3          | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump,|
-|                |                    | hsavmcore                             |
-| zlib           | `HAVE_ZLIB`        | zgetdump, dump2tar                    |
-| ncurses        | `HAVE_NCURSES`     | hyptop                                |
-| net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
-| glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
-| openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
-|                |                    | libkmipclient, zgetdump,              |
-|                |                    | rust/pvattest, rust/pvsecret,         |
-| cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
-| json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
-|                |                    | libkmipclient                         |
-| glib2          | `HAVE_GLIB2`       | genprotimg, zgetdump                  |
-| libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient,|
-|                |                    | rust/pvattest, rust/pvsecret,         |
-| libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
-| systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
-| libudev        | `HAVE_LIBUDEV`     | cpacfstatsd                           |
+| __LIBRARY__  | __BUILD OPTION__   | __TOOLS__                              |
+|--------------|:------------------:|:--------------------------------------:|
+| fuse3        | `HAVE_FUSE`        | cmsfs-fuse, zdsfs, hmcdrvfs, zgetdump, |
+|              |                    | hsavmcore                              |
+| zlib         | `HAVE_ZLIB`        | zgetdump, dump2tar                     |
+| ncurses      | `HAVE_NCURSES`     | hyptop                                 |
+| net-snmp     | `HAVE_SNMP`        | osasnmpd                               |
+| glibc-static | `HAVE_LIBC_STATIC` | zfcpdump                               |
+| openssl      | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,          |
+|              |                    | libkmipclient, zgetdump,               |
+|              |                    | rust/pvattest, rust/pvsecret,          |
+|              |                    | rust/pvimg                             |
+| cryptsetup   | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                        |
+| json-c       | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,           |
+|              |                    | libkmipclient                          |
+| glib2        | `HAVE_GLIB2`       | genprotimg, zgetdump                   |
+| libcurl      | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient, |
+|              |                    | rust/pvattest, rust/pvsecret,          |
+|              |                    | rust/pvimg                             |
+| libxml2      | `HAVE_LIBXML2`     | libkmipclient                          |
+| systemd      | `HAVE_SYSTEMD`     | hsavmcore                              |
+| libudev      | `HAVE_LIBUDEV`     | cpacfstatsd                            |
 
 This table lists additional build or install options:
 
@@ -362,6 +366,14 @@ the different tools are provided:
   `HAVE_OPENSSL=0` or `HAVE_GLIB2=0`.
 
   The runtime requirements are: openssl-libs (>= 1.1.0) and glib2.
+
+* rust/pvimg:
+  For building pvimg you need OpenSSL version 1.1.1 or newer
+  installed (openssl-devel.rpm). Also required is cargo and libcurl.
+  Tip: you may skip the pvimg build by adding
+  `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_CARGO=0`.
+
+  The runtime requirements are: openssl-libs (>= 1.1.1) and libcurl.
 
 * rust/pvattest:
   For building pvattest you need OpenSSL version 1.1.1 or newer
