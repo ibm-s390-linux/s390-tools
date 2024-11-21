@@ -40,7 +40,12 @@ endif #OPENSSL
 	TEST_TARGETS := $(addsuffix _build,$(CARGO_TEST_TARGETS))
 endif #CARGO
 
-BUILD_TARGETS += $(PV_BUILD_TARGETS)
+pvimg-bootloaders:
+	$(MAKE) -C pvimg/boot/
+.PHONY: pvimg-bootloaders
+
+BUILD_TARGETS += $(PV_BUILD_TARGETS) pvimg-bootloaders
+INSTALL_TARGETS += pvimg-bootloaders
 
 # build release targets by default
 ifeq ("${D}","0")
@@ -78,6 +83,7 @@ all: $(BUILD_TARGETS)
 install: $(INSTALL_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvattest/tools/pvextract-hdr $(DESTDIR)$(USRBINDIR)
+	$(MAKE) -C pvimg/boot install
 
 print-rust-targets:
 	echo $(BUILD_TARGETS)
@@ -86,6 +92,7 @@ clean:
 ifneq (${HAVE_CARGO},0)
 	$(CARGO_CLEAN) ${ALL_CARGOFLAGS}
 endif # CARGO
+	$(MAKE) -C pvimg/boot/ clean
 	$(RM) -- .check-dep-pvtools .detect-openssl.dep.c .check-cargo
 
 rust-test: $(CARGO_TEST_TARGETS)
