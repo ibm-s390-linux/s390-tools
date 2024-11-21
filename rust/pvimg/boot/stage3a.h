@@ -13,6 +13,8 @@
 #include "lib/zt_common.h"
 #include "boot/loaders_layout.h"
 
+#define STAGE3A_BSS_ADDRESS  _AC(0xc000, UL)
+#define STAGE3A_BSS_SIZE     _AC(0x1000, UL)
 #define STAGE3A_INIT_ENTRY   IMAGE_ENTRY
 #define STAGE3A_ENTRY	     (STAGE3A_INIT_ENTRY + _AC(0x1000, UL))
 #define STAGE3A_LOAD_ADDRESS IMAGE_LOAD_ADDRESS

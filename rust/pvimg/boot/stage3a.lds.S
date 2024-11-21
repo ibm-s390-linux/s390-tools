@@ -32,6 +32,16 @@ SECTIONS
 	}
 	__heap_stop = .;
 
+	. = STAGE3A_BSS_ADDRESS;
+	__bss_start = .;
+	.bss : {
+		*(.bss .bss.*)
+		. = ALIGN(4096);
+		ASSERT(__bss_stop - __bss_start == STAGE3A_BSS_SIZE,
+		       "Stack section doesn't conform to the described memory layout");
+	}
+	__bss_stop = .;
+
 	. = STACK_ADDRESS;
 	__stack_start = .;
 	.stack : {
@@ -62,12 +72,6 @@ SECTIONS
 		__ex_table_start = .;
 		*(.ex_table)
 		__ex_table_stop = .;
-	}
-
-	.bss ALIGN(16) : {
-		__bss_start = .;
-		*(.bss)
-		__bss_stop = .;
 	}
 
 	.rodata ALIGN(16) : {
