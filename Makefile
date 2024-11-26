@@ -15,12 +15,12 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   vmcp man mon_tools dasdinfo vmur cpuplugd ipl_tools \
 	   ziomon iucvterm hyptop cmsfs-fuse qethqoat zfcpdump zdsfs cpumf \
 	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
-	   genprotimg lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools rust
+	   lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools rust
 
 else
 BASELIB_DIRS =
 LIB_DIRS = libpv
-TOOL_DIRS = genprotimg rust
+TOOL_DIRS = rust
 endif
 
 SUB_DIRS = $(BASELIB_DIRS) $(LIB_DIRS) $(TOOL_DIRS)

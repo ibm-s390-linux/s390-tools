@@ -44,7 +44,8 @@ Package contents
    Display unique DASD ID, either UID or volser.
 
  * genprotimg:
-   Create a protected virtualization image.
+   Create an IBM Secure Execution (protected virtualization) image. The
+   genprotimg command is a symbolic link to the `pvimg create` command.
 
  * udev rules:
    - 59-dasd.rules: rules for unique DASD device nodes created in /dev/disk/.
@@ -314,17 +315,15 @@ build options:
 | ncurses      | `HAVE_NCURSES`     | hyptop                                 |
 | net-snmp     | `HAVE_SNMP`        | osasnmpd                               |
 | glibc-static | `HAVE_LIBC_STATIC` | zfcpdump                               |
-| openssl      | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,          |
-|              |                    | libkmipclient, zgetdump,               |
-|              |                    | rust/pvattest, rust/pvsecret,          |
-|              |                    | rust/pvimg                             |
+| openssl      | `HAVE_OPENSSL`     | zkey, libekmfweb, libkmipclient,       |
+|              |                    | zgetdump, rust/pvattest, rust/pvimg,   |
+|              |                    | zgetdump/pvsecret                      |
 | cryptsetup   | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                        |
 | json-c       | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,           |
 |              |                    | libkmipclient                          |
-| glib2        | `HAVE_GLIB2`       | genprotimg, zgetdump                   |
-| libcurl      | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient, |
+| glib2        | `HAVE_GLIB2`       | zgetdump                               |
+| libcurl      | `HAVE_LIBCURL`     | libekmfweb, libkmipclient, rust/pvimg, |
 |              |                    | rust/pvattest, rust/pvsecret,          |
-|              |                    | rust/pvimg                             |
 | libxml2      | `HAVE_LIBXML2`     | libkmipclient                          |
 | systemd      | `HAVE_SYSTEMD`     | hsavmcore                              |
 | libudev      | `HAVE_LIBUDEV`     | cpacfstatsd                            |
@@ -358,14 +357,6 @@ the different tools are provided:
 
 * dbginfo.sh:
   The tar package is required to archive collected data.
-
-* genprotimg:
-  For building genprotimg you need OpenSSL version 1.1.0 or newer
-  installed (openssl-devel.rpm). Also required is glib2
-  (glib2-devel.rpm). Tip: you may skip the genprotimg build by adding
-  `HAVE_OPENSSL=0` or `HAVE_GLIB2=0`.
-
-  The runtime requirements are: openssl-libs (>= 1.1.0) and glib2.
 
 * rust/pvimg:
   For building pvimg you need OpenSSL version 1.1.1 or newer

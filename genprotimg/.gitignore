@@ -1,5 +1,0 @@
-tags
-compile_commands.json
-src/.check-dep-genprotimg
-src/.detect-openssl.dep.c
-src/genprotimg
