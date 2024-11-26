@@ -313,14 +313,14 @@ build options:
 | net-snmp       | `HAVE_SNMP`        | osasnmpd                              |
 | glibc-static   | `HAVE_LIBC_STATIC` | zfcpdump                              |
 | openssl        | `HAVE_OPENSSL`     | genprotimg, zkey, libekmfweb,         |
-|                |                    | libkmipclient, pvattest, zgetdump,    |
-|                |                    | rust/pvsecret,                        |
+|                |                    | libkmipclient, zgetdump,              |
+|                |                    | rust/pvattest, rust/pvsecret,         |
 | cryptsetup     | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                       |
 | json-c         | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,          |
 |                |                    | libkmipclient                         |
-| glib2          | `HAVE_GLIB2`       | genprotimg, pvattest, zgetdump        |
+| glib2          | `HAVE_GLIB2`       | genprotimg, zgetdump                  |
 | libcurl        | `HAVE_LIBCURL`     | genprotimg, libekmfweb, libkmipclient,|
-|                |                    | pvattest, rust/pvsecret,              |
+|                |                    | rust/pvattest, rust/pvsecret,         |
 | libxml2        | `HAVE_LIBXML2`     | libkmipclient                         |
 | systemd        | `HAVE_SYSTEMD`     | hsavmcore                             |
 | libudev        | `HAVE_LIBUDEV`     | cpacfstatsd                           |
@@ -369,8 +369,7 @@ the different tools are provided:
   Tip: you may skip the pvattest build by adding
   `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_CARGO=0`.
 
-  The runtime requirements are: openssl-libs (>= 1.1.1) and
-  glib2.56 or newer.
+  The runtime requirements are: openssl-libs (>= 1.1.1) and libcurl.
 
 * osasnmpd:
   You need at least the NET-SNMP 5.1.x package (net-snmp-devel.rpm)
