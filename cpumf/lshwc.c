@@ -56,6 +56,7 @@ static unsigned char *ioctlbuffer;
 static bool allcpu;
 static char *ctrformat = "%ld";
 static bool shortname;
+static bool hideundef;
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
 static struct ctrname {		/* List of defined counters */
@@ -343,6 +344,8 @@ static void show_header(void)
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		if (!ctrname[i].hitcnt)
 			continue;
+		if (hideundef && !ctrname[i].name)
+			continue;
 		if (comma)
 			putchar(',');
 		if (shortname) {
@@ -376,6 +379,8 @@ static void line(char *header)
 			for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 				if (!ctrname[i].hitcnt)
 					continue;
+				if (hideundef && !ctrname[i].name)
+					continue;
 				if (comma)
 					putchar(',');
 				printf(ctrformat, ctrname[i].ccv[h]);
@@ -390,6 +395,8 @@ static void line(char *header)
 	comma = false;
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		if (!ctrname[i].hitcnt)
+			continue;
+		if (hideundef && !ctrname[i].name)
 			continue;
 		if (comma)
 			putchar(',');
@@ -658,6 +665,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "hex", no_argument, NULL, 'x' },
 		.desc = "Counter values in hexadecimal format"
 	},
+	{
+		.option = { "hide", no_argument, NULL, 'H' },
+		.desc = "Do not display undefined counters of a counter set"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -717,6 +728,9 @@ int main(int argc, char **argv)
 			read_interval = (unsigned int)strtoul(optarg, &slash, 0);
 			if (errno || *slash)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			break;
+		case 'H':
+			hideundef = true;
 			break;
 		case 's':
 			shortname = true;
