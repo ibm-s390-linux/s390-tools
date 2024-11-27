@@ -767,5 +767,6 @@ int main(int argc, char **argv)
 	}
 	free_counternames();
 	free(check);
+	free(ioctlbuffer);
 	return ch;
 }

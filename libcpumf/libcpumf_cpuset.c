@@ -11,14 +11,14 @@
 #include <stdbool.h>
 
 #include "lib/libcpumf.h"
+#include "lib/util_libc.h"
 
 int libcpumf_cpuset(const char *parm, cpu_set_t *mask)
 {
-	char *cp, *buffer = strdup(parm);
+	char *cp, *buffer = util_strdup(parm);
+	char *cp2 = buffer;
 	int to, from, rc;
 
-	if (!buffer)			/* Errno set to ENOMEM */
-		return -1;
 	/* Check for invalid characters, such as 11.12 instead 11-12
 	 * but allow blanks and newline. Newline is appended
 	 * when the string is taken from sysfs files, for example
@@ -26,7 +26,8 @@ int libcpumf_cpuset(const char *parm, cpu_set_t *mask)
 	 */
 	if (strspn(buffer, "0123456789-,\n ") != strlen(buffer)) {
 		errno = EINVAL;
-		return -1;
+		rc = -1;
+		goto out;
 	}
 	CPU_ZERO(mask);
 	for (; (cp = strtok(buffer, ",")); buffer = NULL) {
@@ -51,7 +52,7 @@ int libcpumf_cpuset(const char *parm, cpu_set_t *mask)
 	}
 	rc = 0;
 out:
-	free(buffer);
+	free(cp2);
 	return rc;
 }
 
