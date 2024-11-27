@@ -48,7 +48,7 @@ export S390_TEST_LIB_PATH=$(rootdir)/s390-tools-testsuite/lib
 # $ make HOST_ARCH=s390x CROSS_COMPILE="s390x-linux-gnu-"
 #
 
-CROSS_COMPILE   =
+CROSS_COMPILE ?=
 
 #
 # Commands can be overwritten on the command line with "make <VAR>=<VALUE>":
