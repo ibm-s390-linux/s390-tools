@@ -19,7 +19,7 @@ curl = "0.4.44"
 enum_dispatch = "0.3.13"
 foreign-types = "0.3.1"
 log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
-openssl = "0.10.57"
+openssl = "0.10.66"
 openssl-sys = "0.9.92"
 serde = { version = "1.0.139", features = ["derive"]  }
 thiserror = "1.0.33"
