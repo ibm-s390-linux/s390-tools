@@ -7,10 +7,11 @@ use std::{
     mem::size_of,
 };
 
-// (SE) boot request control block aka SE header
-use crate::{assert_size, request::MagicValue, static_assert, Error, Result, PAGESIZE};
 use log::debug;
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
+
+// (SE) boot request control block aka SE header
+use crate::{assert_size, request::MagicValue, static_assert, Error, Result, PAGESIZE};
 
 /// Struct containing all SE-header tags.
 ///
@@ -52,6 +53,45 @@ impl MagicValue<8> for BootHdrMagic {
     const MAGIC: [u8; 8] = [0x49, 0x42, 0x4d, 0x53, 0x65, 0x63, 0x45, 0x78];
 }
 
+/// Tries to seek to the start of the Secure Execution header.
+///
+/// Returns `false` if no Secure Execution header found, `true` otherwise.
+///
+/// # Errors
+///
+/// In the very unlikely case an IO error can appear when seeking to the
+/// beginning of the header.
+pub fn seek_se_hdr_start<R>(img: &mut R) -> Result<bool>
+where
+    R: Read + Seek,
+{
+    let max_iter: usize = 0x15;
+    const BUF_SIZE: i64 = 8;
+    static_assert!(BootHdrMagic::MAGIC.len() == BUF_SIZE as usize);
+
+    let mut buf = [0; BUF_SIZE as usize];
+    for _ in 0..max_iter {
+        match img.read_exact(&mut buf) {
+            Ok(it) => it,
+            Err(_) => return Ok(false),
+        };
+
+        if BootHdrMagic::starts_with_magic(&buf) {
+            // go back to the beginning of the header
+            img.seek(Current(-BUF_SIZE))?;
+
+            return Ok(true);
+        }
+        // goto next page start
+        // or report invalid file format if file ends "early"
+        match img.seek(Current(PAGESIZE as i64 - BUF_SIZE)) {
+            Ok(it) => it,
+            Err(_) => return Ok(false),
+        };
+    }
+    Ok(false)
+}
+
 impl BootHdrTags {
     /// Returns a reference to the SE-header tag of this [`BootHdrTags`].
     pub fn tag(&self) -> &[u8; 16] {
@@ -62,40 +102,6 @@ impl BootHdrTags {
     #[doc(hidden)]
     pub const fn new(pld: [u8; 64], ald: [u8; 64], tld: [u8; 64], tag: [u8; 16]) -> Self {
         Self { ald, tld, pld, tag }
-    }
-
-    /// Returns `false` if no SE-header found, `true` otherwise.
-    /// In the very unlikely case an IO error can appear
-    /// when seeking to the beginning of the header.
-    fn seek_se_hdr_start<R>(img: &mut R) -> Result<bool>
-    where
-        R: Read + Seek,
-    {
-        const MAX_ITER: usize = 0x15;
-        const BUF_SIZE: i64 = 8;
-        static_assert!(BootHdrMagic::MAGIC.len() == BUF_SIZE as usize);
-
-        let mut buf = [0; BUF_SIZE as usize];
-        for _ in [0; MAX_ITER] {
-            match img.read_exact(&mut buf) {
-                Ok(it) => it,
-                Err(_) => return Ok(false),
-            };
-
-            if BootHdrMagic::starts_with_magic(&buf) {
-                // go back to the beginning of the header
-                img.seek(Current(-BUF_SIZE))?;
-
-                return Ok(true);
-            }
-            // goto next page start
-            // or report invalid file format if file ends "early"
-            match img.seek(Current(PAGESIZE as i64 - BUF_SIZE)) {
-                Ok(it) => it,
-                Err(_) => return Ok(false),
-            };
-        }
-        Ok(false)
     }
 
     /// Deserializes a (SE) boot header and extracts the tags.
@@ -110,7 +116,7 @@ impl BootHdrTags {
     where
         R: Read + Seek,
     {
-        if !Self::seek_se_hdr_start(img)? {
+        if !seek_se_hdr_start(img)? {
             debug!("No boot hdr found");
             return Err(Error::InvBootHdr);
         }
@@ -186,8 +192,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use crate::get_test_asset;
-    use crate::Error;
+    use crate::{get_test_asset, Error};
 
     const EXP_HDR: BootHdrTags = BootHdrTags {
         pld: [
