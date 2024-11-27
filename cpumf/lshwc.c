@@ -55,6 +55,7 @@ static unsigned long loop_count = 1;
 static unsigned char *ioctlbuffer;
 static bool allcpu;
 static char *ctrformat = "%ld";
+static bool shortname;
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
 static struct ctrname {		/* List of defined counters */
@@ -63,6 +64,38 @@ static struct ctrname {		/* List of defined counters */
 	unsigned long total;	/* Total counter value */
 	unsigned long *ccv;	/* Per CPU counter value */
 } ctrname[MAXCTRS];
+
+static char *mk_name(int ctr, char *name)
+{
+	char ctrset[8];
+
+	if (!shortname)
+		return util_strdup(name);
+
+	switch (libcpumf_ctrset(ctr, cfvn, csvn)) {
+	case CPUMF_CTRSET_BASIC:
+		ctrset[0] = 'B';
+		break;
+	case CPUMF_CTRSET_PROBLEM_STATE:
+		ctrset[0] = 'P';
+		break;
+	case CPUMF_CTRSET_CRYPTO:
+		ctrset[0] = 'C';
+		break;
+	case CPUMF_CTRSET_EXTENDED:
+		ctrset[0] = 'E';
+		break;
+	case CPUMF_CTRSET_MT_DIAG:
+		ctrset[0] = 'M';
+		break;
+	default:
+		ctrset[0] = 'U';
+		break;
+	}
+	sprintf(ctrset, "%c%d", ctrset[0], ctr);
+
+	return util_strdup(ctrset);
+}
 
 static bool read_counternames(void)
 {
@@ -80,7 +113,7 @@ static bool read_counternames(void)
 	for (i = 0; i < count && ctr >= 0; i++) {
 		util_asprintf(&ctrpath, "%s/%s", path, namelist[i]->d_name);
 		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1)
-			ctrname[ctr].name = util_strdup(namelist[i]->d_name);
+			ctrname[ctr].name = mk_name(ctr, namelist[i]->d_name);
 		else
 			warnx("Cannot parse %s", ctrpath);
 		free(ctrpath);
@@ -312,7 +345,14 @@ static void show_header(void)
 			continue;
 		if (comma)
 			putchar(',');
-		printf("%s(%ld)", ctrname[i].name ?: "Counter", i);
+		if (shortname) {
+			if (ctrname[i].name)
+				printf("%s", ctrname[i].name);
+			else
+				printf("U%ld", i);
+		} else {
+			printf("%s(%ld)", ctrname[i].name ?: "Counter", i);
+		}
 		comma = true;
 	}
 	putchar('\n');
@@ -607,6 +647,10 @@ static struct util_opt opt_vec[] = {
 		.desc = "Specifies interval between read operations (seconds)"
 	},
 	{
+		.option = { "short", no_argument, NULL, 's' },
+		.desc = "Abbreviate counter name with counter set letter and number"
+	},
+	{
 		.option = { "hex0x", no_argument, NULL, 'X' },
 		.desc = "Counter values in hexadecimal format with leading 0x"
 	},
@@ -673,6 +717,9 @@ int main(int argc, char **argv)
 			read_interval = (unsigned int)strtoul(optarg, &slash, 0);
 			if (errno || *slash)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			break;
+		case 's':
+			shortname = true;
 			break;
 		case 'x':
 			ctrformat = "%lx";

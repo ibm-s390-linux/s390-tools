@@ -28,6 +28,19 @@
 #define CPUMF_CTRSET_MT_DIAG		32
 
 /**
+ * Return counter set a counter belongs to.
+ *
+ * Return the counter set a given counter belongs to, given the
+ * CPU Measurement facility counter version first and second number.
+ *
+ * @param[in]    ctr   Counter number
+ * @param[in]    cfvn  CPUM Counter facility first version number
+ * @param[in]    csvn  CPUM Counter facility second version number
+ * @retval       >=0   Counter set number to counter belongs to
+ */
+int libcpumf_ctrset(int ctr, int cfvn, int csvn);
+
+/**
  * Read out the PMU type from a given file.
  *
  * Return the PMU type number assigned to this PMU by the kernel. This is

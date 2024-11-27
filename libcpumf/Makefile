@@ -7,7 +7,8 @@ examples = libcpumf_example
 all: $(lib)
 examples: $(lib) $(examples)
 
-objects = libcpumf_pmutype.o libcpumf_cpuset.o libcpumf_support.o
+objects = libcpumf_pmutype.o libcpumf_cpuset.o libcpumf_support.o \
+	  libcpumf_ctrset.o
 
 $(lib): $(objects)
 
