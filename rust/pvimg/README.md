@@ -1,7 +1,7 @@
 # pvimg
 
-`pvimg create` takes a kernel, key files, optionally an initrd image, optionally a
-file containing the kernel command line parameters, and generates a single,
+`pvimg create` takes a kernel, key files, optionally an initrd image, optionally
+a file containing the kernel command line parameters, and generates a single,
 bootable image file. The generated image file consists of a concatenation of a
 plain text boot loader, the encrypted components for kernel, initrd, kernel
 command line, and the integrity-protected Secure Execution header, containing
@@ -31,7 +31,10 @@ The main idea of `pvimg create` is:
    of the components and create the header and IPIB
 6. parameterize the stub stage3a: uses the address of the IPIB and Secure
    Execution header
-8. write the final image to the specified output path.
+8. write the final image to the specified output path and generate the boot
+   image metadata at address `0xc000`. The address `0xc000` is chosen as this is
+   the `BSS` section of the stage3a loader and will therefore zeroed out as soon
+   as the stage3a is executed and has therefore no leftovers in the memory.
 
 ### Boot Loader
 
@@ -73,6 +76,7 @@ The memory layout of the bootable file looks like:
 | Start                    | End        | Use                                                                   |
 |--------------------------|------------|-----------------------------------------------------------------------|
 | 0                        | 0x7        | Short PSW, starting instruction at 0x11000                            |
+| 0x0c000                  | 0x0cfff    | Image metadata, e.g. it includes the file offset of the SE-header     |
 | 0x10000                  | 0x10012    | Branch to 0x11000                                                     |
 | 0x10013                  | 0x10fff    | Left intentionally unused                                             |
 | 0x11000                  | 0x12fff    | Stage3a                                                               |

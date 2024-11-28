@@ -86,7 +86,7 @@ pub use crate::error::HkdVerifyErrorType;
 /// Functionalities to build UV requests
 pub mod request {
     pub use crate::{
-        brcb::{seek_se_hdr_start, BootHdrTags},
+        brcb::{seek_se_hdr_start, BootHdrTags, SeImgMetaData},
         crypto::{
             decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
             AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey,

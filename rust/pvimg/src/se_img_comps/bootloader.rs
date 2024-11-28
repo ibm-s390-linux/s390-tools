@@ -15,7 +15,9 @@ use pvimg::{
     secured_comp::Interval,
 };
 
-pub use self::stage3a_defs::{STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS};
+pub use self::stage3a_defs::{
+    STAGE3A_BSS_ADDRESS, STAGE3A_BSS_SIZE, STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
+};
 use self::{
     ipl::{
         ipl_parameter_block, ipl_pb0_pv, ipl_pb0_pv_comp, ipl_pbt_IPL_PBT_PV, ipl_pl_hdr,
@@ -78,8 +80,8 @@ pub fn render_stage3a(
     let stage3a_size = stage3a.len();
     let stage3a_size_u64: u64 = stage3a_size.try_into()?;
 
-    if stage3a_size < 24 {
-        unreachable!("Bug!");
+    if stage3a_size <= 24 {
+        return Err(Error::InvalidStage3a);
     }
     let stage3a_data_addr = stage3a_addr
         .checked_add(stage3a_size_u64)
@@ -151,6 +153,7 @@ pub fn render_stage3b(
                 | ComponentKind::Ipib
                 | ComponentKind::SeHdr
                 | ComponentKind::ShortPSW
+                | ComponentKind::ImgMetaData
                 | ComponentKind::Stage3b => unreachable!(),
             }
             Ok(())
@@ -171,7 +174,9 @@ pub fn render_stage3b(
     let stage3b_args_bin_len = stage3b_args_bin.len();
 
     // Insert the stage3b arguments
-    assert!(stage3b_len > stage3b_args_bin_len);
+    if stage3b_len <= stage3b_args_bin_len {
+        return Err(Error::InvalidStage3b);
+    }
     let stage3b_parms_off = stage3b_len - stage3b_args_bin_len;
     stage3b.splice(stage3b_parms_off.., stage3b_args_bin);
 

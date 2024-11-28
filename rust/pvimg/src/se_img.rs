@@ -24,9 +24,9 @@ use pvimg::{
 };
 
 use crate::se_img_comps::{
-    create_ipib, ipib::Ipib, kernel::S390Kernel, render_stage3a, render_stage3b, sehdr::SeHdrComp,
-    shortpsw::ShortPSWComp, stage3a_path, stage3b_path, CompTweakV1, Component, ComponentKind,
-    STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
+    create_ipib, ipib::Ipib, kernel::S390Kernel, metadata::ImgMetaData, render_stage3a,
+    render_stage3b, sehdr::SeHdrComp, shortpsw::ShortPSWComp, stage3a_path, stage3b_path,
+    CompTweakV1, Component, ComponentKind, STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
 };
 
 pub struct SeHdrArgs<'a> {
@@ -408,6 +408,10 @@ impl<W: Write + Seek> SeImgBuilder<W> {
                 .ok_or(Error::UnexpectedOverflow)?,
         )?;
 
+        // Create and write Secure Execution boot image meta data right after the short PSW
+        let _metadata_img_comp =
+            self.add_metadata(ipib_img_comp.src.start, sehdr_img_comp.src.start)?;
+
         Ok(self.comps)
     }
 
@@ -438,6 +442,18 @@ impl<W: Write + Seek> SeImgBuilder<W> {
         let mut short_psw_comp =
             ShortPSWComp::new(Box::new(Cursor::new(serialize_to_bytes(&short_psw)?)));
         self.insert_nonsecure_component(&mut short_psw_comp, ShortPSWComp::OFFSET)
+    }
+
+    /// Prepare Secure Execution image metadata and write it to the file
+    fn add_metadata(&mut self, ipib_off: u64, hdr_off: u64) -> Result<Rc<ImgComponent>> {
+        let mut metadata_comp = ImgMetaData::new(ipib_off, hdr_off)?;
+
+        let metadata_img_comp =
+            self.insert_nonsecure_component(&mut metadata_comp, ImgMetaData::OFFSET)?;
+        if metadata_img_comp.src.size() > ImgMetaData::MAX_SIZE {
+            unreachable!("The metadata should never be larger than the BSS size of stage3a");
+        }
+        Ok(metadata_img_comp)
     }
 
     /// Prepare stage3b and write it to file

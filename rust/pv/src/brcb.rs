@@ -7,7 +7,7 @@ use std::{
     mem::size_of,
 };
 
-use log::debug;
+use log::{debug, warn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
 
 // (SE) boot request control block aka SE header
@@ -46,6 +46,81 @@ impl TryFrom<Vec<u8>> for BootHdrTags {
     }
 }
 
+/// Struct representing the Secure Execution boot image metadata
+#[allow(unused)]
+#[repr(packed)]
+#[derive(Debug, Clone, FromBytes, FromZeroes, AsBytes, PartialEq, Eq)]
+pub struct SeImgMetaData {
+    /// Magic value
+    magic: [u8; 8],
+    /// Secure Execution header offset in the image
+    hdr_off: U64<BigEndian>,
+    /// Version
+    version: U32<BigEndian>,
+    /// IPIB offset in the image
+    ipib_off: U64<BigEndian>,
+}
+assert_size!(SeImgMetaData, 28);
+
+impl SeImgMetaData {
+    /// Address in the Secure Execution boot image
+    pub const OFFSET: u64 = 0xc000;
+    /// V1 of the Secure Execution boot image metadata
+    const V1: u32 = 0x1;
+
+    /// Create v1 Secure Execution image metadata.
+    pub fn new_v1(hdr_off: u64, ipib_off: u64) -> Self {
+        Self {
+            magic: Self::MAGIC,
+            version: Self::V1.into(),
+            hdr_off: hdr_off.into(),
+            ipib_off: ipib_off.into(),
+        }
+    }
+
+    fn seek_start<R>(img: &mut R) -> Result<bool>
+    where
+        R: Read + Seek,
+    {
+        const BUF_SIZE: i64 = 8;
+        static_assert!(SeImgMetaData::MAGIC.len() == BUF_SIZE as usize);
+
+        let mut buf = [0; BUF_SIZE as usize];
+        match img.seek(std::io::SeekFrom::Start(Self::OFFSET)) {
+            Ok(it) => it,
+            Err(_) => return Ok(false),
+        };
+        match img.read_exact(&mut buf) {
+            Ok(it) => it,
+            Err(_) => return Ok(false),
+        }
+
+        if Self::starts_with_magic(&buf) {
+            // go back to the beginning of the metadata
+            img.seek(Current(-BUF_SIZE))?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Gets the bytes of this value.
+    #[inline(always)]
+    pub fn as_bytes(&self) -> &[u8] {
+        <Self as AsBytes>::as_bytes(self)
+    }
+
+    /// Returns the version of this [`SeImgMetaData`].
+    pub fn version(&self) -> u32 {
+        self.version.into()
+    }
+}
+
+/// Magic value for the metadata of a Secure Execution boot image
+impl MagicValue<8> for SeImgMetaData {
+    // ASCII `SeImgLnx`
+    const MAGIC: [u8; 8] = [0x53, 0x65, 0x49, 0x6d, 0x67, 0x4c, 0x6e, 0x78];
+}
+
 /// Magic value for a SE-(boot)header
 #[derive(Debug)]
 pub struct BootHdrMagic;
@@ -65,9 +140,29 @@ pub fn seek_se_hdr_start<R>(img: &mut R) -> Result<bool>
 where
     R: Read + Seek,
 {
-    let max_iter: usize = 0x15;
+    let max_iter: usize;
     const BUF_SIZE: i64 = 8;
     static_assert!(BootHdrMagic::MAGIC.len() == BUF_SIZE as usize);
+
+    let old_position = img.stream_position()?;
+    if !SeImgMetaData::seek_start(img)? {
+        // Search from the previous position.
+        img.seek(std::io::SeekFrom::Start(old_position))?;
+        max_iter = 0x15;
+    } else {
+        let mut img_metadata_bytes = vec![0u8; size_of::<SeImgMetaData>()];
+        // read in the header
+        img.read_exact(&mut img_metadata_bytes)?;
+        // Cannot fail because the buffer has the same size as SeImgMetaData.
+        let img_metadata = SeImgMetaData::ref_from(&img_metadata_bytes).unwrap();
+        let img_metadata_version = img_metadata.version();
+        if img_metadata_version != SeImgMetaData::V1 {
+            warn!("Unknown Secure Execution boot image version {img_metadata_version}");
+        }
+
+        img.seek(std::io::SeekFrom::Start(img_metadata.hdr_off.into()))?;
+        max_iter = 1;
+    }
 
     let mut buf = [0; BUF_SIZE as usize];
     for _ in 0..max_iter {
@@ -283,5 +378,18 @@ mod tests {
         ser.push(17);
         let der: Result<BootHdrTags> = ser.clone().try_into();
         assert!(matches!(der, Err(Error::InvBootHdrSize(_))));
+    }
+
+    #[test]
+    fn se_img_metadata() {
+        let metadata = SeImgMetaData::new_v1(0x14000, 0x16000);
+        let data = [
+            83, 101, 73, 109, 103, 76, 110, 120, 0, 0, 0, 0, 0, 1, 64, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+            0, 1, 96, 0,
+        ];
+        assert_eq!(metadata.as_bytes(), &data);
+        assert_eq!(SeImgMetaData::ref_from(&data), Some(&metadata));
+
+        assert_eq!(metadata.version(), SeImgMetaData::V1);
     }
 }

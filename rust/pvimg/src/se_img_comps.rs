@@ -14,8 +14,8 @@ use pv::request::random_array;
 use pvimg::{error::Result, secured_comp::ComponentTrait};
 
 use self::{
-    cmdline::Cmdline, kernel::S390Kernel, ramdisk::Ramdisk, sehdr::SeHdrComp,
-    shortpsw::ShortPSWComp, stage3a::Stage3a, stage3b::Stage3b,
+    cmdline::Cmdline, kernel::S390Kernel, metadata::ImgMetaData, ramdisk::Ramdisk,
+    sehdr::SeHdrComp, shortpsw::ShortPSWComp, stage3a::Stage3a, stage3b::Stage3b,
 };
 pub use crate::se_img_comps::bootloader::{
     create_ipib, render_stage3a, render_stage3b, stage3a_path, stage3b_path, STAGE3A_ENTRY,
@@ -28,6 +28,7 @@ mod bootloader;
 pub mod cmdline;
 pub mod ipib;
 pub mod kernel;
+pub mod metadata;
 pub mod ramdisk;
 pub mod sehdr;
 pub mod shortpsw;
@@ -115,6 +116,7 @@ pub fn check_components(components: &mut [Component]) -> Result<(), anyhow::Erro
 #[enum_dispatch(ComponentCheckTrait)]
 pub enum Component {
     ShortPSW(ShortPSWComp),
+    ImgMetaData(ImgMetaData),
     Stage3a(Stage3a),
     Kernel(S390Kernel),
     Ramdisk(Ramdisk),
@@ -137,6 +139,7 @@ impl Seek for Component {
             Self::Stage3b(obj) => obj.seek(pos),
             Self::SeHdr(obj) => obj.seek(pos),
             Self::Ipib(obj) => obj.seek(pos),
+            Self::ImgMetaData(obj) => obj.seek(pos),
         }
     }
 }
@@ -154,6 +157,7 @@ impl Read for Component {
             Self::Stage3b(obj) => obj.read(buf),
             Self::SeHdr(obj) => obj.read(buf),
             Self::Ipib(obj) => obj.read(buf),
+            Self::ImgMetaData(obj) => obj.read(buf),
         }
     }
 }
@@ -171,6 +175,7 @@ impl ComponentTrait<ComponentKind> for Component {
             Self::Stage3b(obj) => obj.secure_mode(),
             Self::SeHdr(obj) => obj.secure_mode(),
             Self::Ipib(obj) => obj.secure_mode(),
+            Self::ImgMetaData(obj) => obj.secure_mode(),
         }
     }
 
@@ -184,6 +189,7 @@ impl ComponentTrait<ComponentKind> for Component {
             Self::Stage3b(obj) => obj.kind(),
             Self::SeHdr(obj) => obj.kind(),
             Self::Ipib(obj) => obj.kind(),
+            Self::ImgMetaData(obj) => obj.kind(),
         }
     }
 }
@@ -221,6 +227,7 @@ impl Seek for CompReader {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
 pub enum ComponentKind {
     ShortPSW = 10,
+    ImgMetaData = 20,
     Stage3a = 30,
     Kernel = 40,
     Ramdisk = 50,
@@ -243,20 +250,17 @@ impl ComponentKind {
 
 impl Display for ComponentKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(
-            &match self {
-                Self::Kernel => "Linux kernel",
-                Self::Ramdisk => "ramdisk",
-                Self::Cmdline => "kernel cmdline",
-                Self::Stage3a => "stage3a",
-                Self::Stage3b => "stage3b",
-                Self::SeHdr => "Secure Execution header",
-                Self::Ipib => "IPIB",
-                Self::ShortPSW => "short PSW",
-            }
-            .to_string(),
-            f,
-        )
+        match self {
+            Self::Kernel => write!(f, "Linux kernel"),
+            Self::Ramdisk => write!(f, "ramdisk"),
+            Self::Cmdline => write!(f, "kernel cmdline"),
+            Self::Stage3a => write!(f, "stage3a"),
+            Self::Stage3b => write!(f, "stage3b"),
+            Self::SeHdr => write!(f, "Secure Execution header"),
+            Self::Ipib => write!(f, "IPIB"),
+            Self::ShortPSW => write!(f, "short PSW"),
+            Self::ImgMetaData => write!(f, "Image metadata"),
+        }
     }
 }
 
@@ -313,6 +317,7 @@ mod tests {
     fn component_kind_strategy() -> impl Strategy<Value = ComponentKind> {
         prop_oneof![
             Just(ComponentKind::ShortPSW),
+            Just(ComponentKind::ImgMetaData),
             Just(ComponentKind::Stage3a),
             Just(ComponentKind::Kernel),
             Just(ComponentKind::Ramdisk),
