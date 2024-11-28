@@ -4,6 +4,7 @@
 //!
 //! Copyright IBM Corp. 2023, 2024
 mod cli;
+mod exit_code;
 mod file;
 mod hexslice;
 mod log;
@@ -16,6 +17,7 @@ pub use crate::{
         get_reader_from_cli_file_arg, get_writer_from_cli_file_arg, print_cli_error, print_error,
         CertificateOptions, DeprecatedVerbosityOptions, VerbosityOptions, STDIN, STDOUT,
     },
+    exit_code::{docstring, ExitCodeDoc, ExitCodeTrait, ExitCodeVariantDoc},
     file::{AtomicFile, AtomicFileOperation},
     hexslice::HexSlice,
     log::PvLogger,
