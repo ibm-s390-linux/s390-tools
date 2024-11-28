@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+//
+// Copyright IBM Corp. 2024
+
 use std::{
     ffi::{CString, OsStr},
     os::unix::prelude::OsStrExt,
