@@ -124,6 +124,22 @@ pub struct CreateBootImageLegacyFlags {
     /// functions.
     #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_pckmo", group="header-flags")]
     pub disable_pckmo: Option<bool>,
+
+    /// Enable the support for the HMAC PCKMO key encryption function.
+    #[arg(long, action = clap::ArgAction::SetTrue, group="header-flags")]
+    pub enable_pckmo_hmac: Option<bool>,
+
+    /// Disable the support for the HMAC PCKMO key encryption function (default).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_pckmo_hmac", group="header-flags")]
+    pub disable_pckmo_hmac: Option<bool>,
+
+    /// Enable the support for backup target keys.
+    #[arg(long, action = clap::ArgAction::SetTrue, group="header-flags")]
+    pub enable_backup_keys: Option<bool>,
+
+    /// Disable the support for backup target keys (default).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_backup_keys", group="header-flags")]
+    pub disable_backup_keys: Option<bool>,
 }
 
 #[non_exhaustive]
@@ -450,6 +466,8 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-psw", ["--x-psw", "0x0"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("no-component-check", ["--no-component-check"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-pckmo", ["--enable-pckmo"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-pckmo-hmac", ["--enable-pckmo-hmac"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-backup-keys", ["--enable-backup-keys"])])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),

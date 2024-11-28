@@ -68,6 +68,18 @@ fn parse_flags(
             PcfV1::PckmoDeaTdea,
             PcfV1::PckmoEcc,
         ]))),
+        lf.disable_pckmo_hmac
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_disabled([PcfV1::PckmoHmac]))),
+        lf.enable_pckmo_hmac
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_enabled([PcfV1::PckmoHmac]))),
+        lf.disable_backup_keys
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_disabled([PcfV1::BackupTargetKeys]))),
+        lf.enable_backup_keys
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_enabled([PcfV1::BackupTargetKeys]))),
     ]
     .into_iter()
     .flatten()
