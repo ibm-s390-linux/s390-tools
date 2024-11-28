@@ -82,8 +82,8 @@ pub enum Error {
     #[error("Cannot decode hex string")]
     InvHexStringChar { source: std::num::ParseIntError },
 
-    #[error("Expected size {0}, found {1}")]
-    LengthMismatch(usize, usize),
+    #[error("Expected size {expected}, actual {actual}")]
+    LengthMismatch { expected: usize, actual: usize },
 }
 
 /// Error cases for I/O operations

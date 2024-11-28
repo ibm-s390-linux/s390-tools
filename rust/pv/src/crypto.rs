@@ -760,7 +760,10 @@ mod tests {
 
         assert!(matches!(
             SymKey::try_from_data(SymKeyType::Aes256Gcm, Confidential::new([0x4u8; 33].into())),
-            Err(Error::PvCore(PvCoreError::LengthMismatch(33, 32)))
+            Err(Error::PvCore(PvCoreError::LengthMismatch {
+                expected: 32,
+                actual: 33
+            }))
         ));
     }
 }

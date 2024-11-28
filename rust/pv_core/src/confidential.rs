@@ -182,7 +182,10 @@ impl<const N: usize> TryFrom<Confidential<Vec<u8>>> for Confidential<[u8; N]> {
                 TryInto::<[u8; N]>::try_into(value.0.clone()).unwrap(),
             ))
         } else {
-            Err(Error::LengthMismatch(len, N))
+            Err(Error::LengthMismatch {
+                expected: N,
+                actual: len,
+            })
         }
     }
 }
@@ -258,7 +261,13 @@ mod test {
 
         let result: Result<Confidential<[u8; 101]>, Error> =
             Confidential::new(data.clone()).try_into();
-        assert!(matches!(result, Err(Error::LengthMismatch(100, 101))));
+        assert!(matches!(
+            result,
+            Err(Error::LengthMismatch {
+                expected: 101,
+                actual: 100
+            })
+        ));
     }
 
     #[test]
