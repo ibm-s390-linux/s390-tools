@@ -71,6 +71,18 @@ struct zpci_dev {
 	struct zpci_netdev *netdevs;
 };
 
+/**
+ * Get if a PCI device is a PCI Virtual Function
+ *
+ * @param[in]	zdev	The device in question
+ *
+ * @return true if the device is a VF false otherwise
+ */
+static inline bool zpci_is_vf(struct zpci_dev *zdev)
+{
+	return !!zdev->vfn;
+}
+
 struct util_list *zpci_dev_list(void);
 void zpci_free_dev_list(struct util_list *zpci_list);
 void zpci_free_dev(struct zpci_dev *zdev);
