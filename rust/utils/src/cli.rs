@@ -25,7 +25,7 @@ use std::process::ExitCode;
 pub struct CertificateOptions {
     /// Use FILE as a host-key document.
     ///
-    /// Can be specified multiple times and must be used at least once.
+    /// Can be specified multiple times and must be specified at least once.
     #[arg(
         short = 'k',
         long = "host-key-document",
@@ -60,7 +60,7 @@ pub struct CertificateOptions {
     )]
     pub certs: Vec<PathBuf>,
 
-    /// Use FILE as a certificate revocation list.
+    /// Use FILE as a certificate revocation list (CRL).
     ///
     /// The list is used to check whether a certificate of the chain of
     /// trust is revoked. Specify this option multiple times to use multiple CRLs.
