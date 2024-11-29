@@ -1,0 +1,69 @@
+.\" Copyright 2024 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+
+.TH pvimg-info 1 "2024-12-05" "s390-tools" "Pvimg Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvimg info\fP - Print information about the IBM Secure Execution image
+\fB
+.SH SYNOPSIS
+.nf
+.fam C
+pvimg info [OPTIONS] --format <FORMAT> <INPUT>
+.fam C
+.fi
+.SH DESCRIPTION
+Note that the API and output format is experimental and subject to change.
+.SH OPTIONS
+.PP
+<INPUT>
+.RS 4
+Use INPUT as the Secure Execution image.
+.RE
+.RE
+
+.PP
+\-\-format <FORMAT>
+.RS 4
+The output format.
+
+Possible values:
+.RS 4
+\- \fBjson\fP: JSON format.
+
+.RE
+.RE
+.PP
+\-\-key <FILE>
+.RS 4
+Use the key in FILE to decrypt the Secure Execution header.
+.RE
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Print help (see a summary with \fB\-h\fR).
+.RE
+.RE
+
+.SH EXIT STATUS
+.TP 8
+.B 0 - Program finished successfully
+The command was executed successfully.
+.RE
+.TP 8
+.B 1 - Generic error
+Something went wrong during the operation. Refer to the error
+message.
+.RE
+.TP 8
+.B 2 - Usage error
+The command was used incorrectly, for example: unsupported command
+line flag, or wrong number of arguments.
+.RE
+.SH "SEE ALSO"
+.sp
+\fBpvimg\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)

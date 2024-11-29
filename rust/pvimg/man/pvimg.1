@@ -1,0 +1,87 @@
+.\" Copyright 2024 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+
+.TH pvimg 1 "2024-12-05" "s390-tools" "Pvimg Manual"
+.nh
+.ad l
+.SH NAME
+\fBpvimg\fP - Create and inspect IBM Secure Execution images
+\fB
+.SH SYNOPSIS
+.nf
+.fam C
+pvimg [OPTIONS] <COMMAND>
+.fam C
+.fi
+.SH DESCRIPTION
+Use pvimg to create an IBM Secure Execution image, which can be loaded using
+zipl or QEMU. pvimg can also be used to inspect existing Secure Execution
+images.
+.SH "PVIMG COMMANDS"
+.PP
+
+\fBpvimg-create(1)\fR
+.RS 4
+Create an IBM Secure Execution image
+.RE
+
+.PP
+
+\fBpvimg-info(1)\fR
+.RS 4
+Print information about the IBM Secure Execution image
+.RE
+
+.PP
+
+\fBpvimg-test(1)\fR
+.RS 4
+Test different aspects of an existing IBM Secure Execution image
+.RE
+
+.SH OPTIONS
+.PP
+\-v, \-\-verbose
+.RS 4
+Provide more detailed output.
+.RE
+.RE
+.PP
+\-q, \-\-quiet
+.RS 4
+Provide less output.
+.RE
+.RE
+.PP
+\-\-version
+.RS 4
+Print version information and exit.
+.RE
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Print help (see a summary with \fB\-h\fR).
+.RE
+.RE
+
+.SH EXIT STATUS
+.TP 8
+.B 0 - Program finished successfully
+The command was executed successfully.
+.RE
+.TP 8
+.B 1 - Generic error
+Something went wrong during the operation. Refer to the error
+message.
+.RE
+.TP 8
+.B 2 - Usage error
+The command was used incorrectly, for example: unsupported command
+line flag, or wrong number of arguments.
+.RE
+.SH "SEE ALSO"
+.sp
+\fBpvimg-create\fR(1) \fBpvimg-info\fR(1) \fBpvimg-test\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)
