@@ -11,6 +11,8 @@
 #ifndef LIB_UTIL_FILE_H
 #define LIB_UTIL_FILE_H
 
+#include <stdio.h>
+
 #include "lib/util_exit_code.h"
 
 int util_file_read_line(char *str, size_t size, const char *fmt, ...);
