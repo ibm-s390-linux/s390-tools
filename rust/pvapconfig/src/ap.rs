@@ -68,6 +68,7 @@ pub fn ap_bus_has_apsb_support() -> Result<(), String> {
 /// This function loops until the AP bus reports that
 /// - all AP queue devices have been constructed
 /// - and all AP device have been bound to a device driver.
+///
 /// This may take some time and even loop forever if there
 /// is something wrong with the kernel modules setup.
 /// Returns true when AP bus bindings are complete,
