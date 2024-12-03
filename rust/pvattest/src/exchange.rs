@@ -37,27 +37,20 @@ impl Entry {
     ///
     /// panics if `val` is larger than `max_size` bytes
     fn from_slice(val: Option<&[u8]>, max_size: u32, offset: &mut u32) -> Self {
-        match val {
-            Some(val) => {
-                assert!(val.len() <= max_size as usize);
-                let size = val.len() as u32;
-                let res = Self::new(size, *offset);
-                *offset += size;
-                res
-            }
-            None => Self::default(),
-        }
+        val.map_or_else(Self::default, |val| {
+            assert!(val.len() <= max_size as usize);
+            let size = val.len() as u32;
+            let res = Self::new(size, *offset);
+            *offset += size;
+            res
+        })
     }
 
     /// # Panic
     ///
     /// panics if `val` is larger than `max_size` bytes
     fn from_exp(val: Option<u32>) -> Self {
-        if let Some(val) = val {
-            Self::new(val, 0)
-        } else {
-            Self::default()
-        }
+        val.map_or_else(Self::default, |val| Self::new(val, 0))
     }
 
     fn from_none() -> Self {
@@ -239,10 +232,7 @@ impl ExpOrData {
 
 impl From<Option<u32>> for ExpOrData {
     fn from(value: Option<u32>) -> Self {
-        match value {
-            Some(v) => Self::Exp(v),
-            None => Self::None,
-        }
+        value.map_or(Self::None, Self::Exp)
     }
 }
 

@@ -56,10 +56,9 @@ impl Display for Response {
             if self.valid { "" } else { "not " }
         )?;
 
-        match &self.reason {
-            Some(r) => write!(f, "\n  Reason: {r}\n  ReferenceId: {}", self.reference_id),
-            None => Ok(()),
-        }
+        self.reason.as_ref().map_or(Ok(()), |r| {
+            write!(f, "\n  Reason: {r}\n  ReferenceId: {}", self.reference_id)
+        })
     }
 }
 
