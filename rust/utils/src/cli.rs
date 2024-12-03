@@ -209,6 +209,7 @@ pub struct VerbosityOptions {
         short = 'v',
         action = ArgAction::Count,
         global = true,
+        display_order = 999,
     )]
     /// Provide more detailed output.
     verbose: u8,
@@ -219,6 +220,7 @@ pub struct VerbosityOptions {
         action = ArgAction::Count,
         global = true,
         conflicts_with = "verbose",
+        display_order = 999,
     )]
     /// Provide less output.
     quiet: u8,
