@@ -86,14 +86,14 @@ pub struct HostKeyCheck<'a> {
 }
 
 impl<'a> HostKeyCheck<'a> {
-    pub fn new(check_enforced: bool, hash: Option<&'a Path>) -> Self {
+    pub const fn new(check_enforced: bool, hash: Option<&'a Path>) -> Self {
         Self {
             check_enforced,
             hash,
         }
     }
 
-    pub fn hide(&self) -> bool {
+    pub const fn hide(&self) -> bool {
         self.hash.is_none() && !self.check_enforced
     }
 }

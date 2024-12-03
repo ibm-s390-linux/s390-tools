@@ -5,7 +5,6 @@
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
-use std::io::Result as ioRes;
 use std::ops::Index;
 use std::result::Result;
 
@@ -217,10 +216,7 @@ pub fn query(ins: &InstructionKind, fc: u8) -> Result<Param, Error> {
     );
 
     // open file
-    let mut f = match File::open(filepath) {
-        ioRes::Ok(file) => file,
-        Err(e) => return Err(e),
-    };
+    let mut f = File::open(filepath)?;
 
     // read file
     let res = match param {
@@ -228,10 +224,7 @@ pub fn query(ins: &InstructionKind, fc: u8) -> Result<Param, Error> {
         Param::QaiParam(ref mut c) => read_file_to_buf(&mut f, c),
     };
 
-    let bytes_read = match res {
-        Ok(b) => b,
-        Err(e) => return Err(e),
-    };
+    let bytes_read = res?;
 
     match bytes_read == bytes_to_be_read {
         true => Ok(param),

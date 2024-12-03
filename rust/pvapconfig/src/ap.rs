@@ -578,10 +578,7 @@ pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> Result<(), 
                 card, dom
             ));
         }
-        let newstate = match get_apqn_bind_state(card, dom) {
-            Err(err) => return Err(err),
-            Ok(s) => s,
-        };
+        let newstate = get_apqn_bind_state(card, dom)?;
         if newstate == state {
             return Ok(());
         }
@@ -653,10 +650,7 @@ fn set_apqn_associate_state_associate(card: u32, dom: u32, idx: u16) -> Result<(
                 card, dom, idx
             ));
         }
-        let newstate = match get_apqn_associate_state(card, dom) {
-            Err(err) => return Err(err),
-            Ok(s) => s,
-        };
+        let newstate = get_apqn_associate_state(card, dom)?;
         if let AssocState::Associated(i) = newstate {
             if idx == i {
                 return Ok(());
@@ -694,10 +688,7 @@ fn set_apqn_associate_state_unbind(card: u32, dom: u32) -> Result<(), String> {
                 card, dom
             ));
         }
-        let newstate = match get_apqn_associate_state(card, dom) {
-            Err(err) => return Err(err),
-            Ok(s) => s,
-        };
+        let newstate = get_apqn_associate_state(card, dom)?;
         if newstate == AssocState::Unassociated {
             return Ok(());
         }

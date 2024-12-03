@@ -14,7 +14,7 @@ use log::trace;
 use std::process::ExitCode;
 use utils::{print_cli_error, print_error, print_version, PvLogger};
 
-use crate::cmd::*;
+use crate::cmd::{check, create, perform, verify, CMD_FN, UV_CMD_FN};
 
 static LOGGER: PvLogger = PvLogger;
 const FEATURES: &[&[&str]] = &[CMD_FN, UV_CMD_FN];

@@ -135,10 +135,7 @@ fn main() -> anyhowRes<()> {
 
     /* ---- GET INFORMATION ---- */
     // get stfle bits
-    let stfle_bits = match Stfle::new() {
-        Ok(stfle) => stfle,
-        Err(e) => return Err(e),
-    };
+    let stfle_bits = Stfle::new()?;
 
     // check stfle bits for available MSA levels
     for lvl in &mut levels {

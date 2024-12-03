@@ -577,7 +577,7 @@ anyhow!(
     ///
     /// # Error
     /// Returns an error if the [`ExchangeFormatRequest`] contains no CUID,
-    pub fn config_uid(&self) -> &ConfigUid {
+    pub const fn config_uid(&self) -> &ConfigUid {
         &self.config_uid
     }
 
