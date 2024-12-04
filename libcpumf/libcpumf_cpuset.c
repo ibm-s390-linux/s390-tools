@@ -5,12 +5,14 @@
  */
 
 #include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <limits.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "lib/libcpumf.h"
+#include "lib/util_file.h"
 #include "lib/util_libc.h"
 
 int libcpumf_cpuset(const char *parm, cpu_set_t *mask)
@@ -58,19 +60,11 @@ out:
 
 int libcpumf_cpuset_fn(const char *filename, cpu_set_t *mask)
 {
-	char *txt = NULL;
-	ssize_t ret = -1;
-	size_t len = 0;
-	FILE *fp;
+	char txt[PATH_MAX];
+	int ret = util_file_read_line(txt, sizeof(txt), "%s", filename);
 
-	fp = fopen(filename, "r");
-	if (!fp)
-		return ret;
 	/* Read out file, one line expected */
-	ret = getline(&txt, &len, fp);
-	fclose(fp);
-	if (ret > 0)
+	if (!ret)
 		ret = libcpumf_cpuset(txt, mask);
-	free(txt);
 	return ret;
 }
