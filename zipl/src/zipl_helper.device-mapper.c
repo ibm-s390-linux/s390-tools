@@ -1306,13 +1306,13 @@ static int complete_physical_device(struct physical_device *pd, dev_t *base_dev)
 		*base_dev = base_entry->dev.dev;
 	} else {
 		/*
-		 * In this case base device is the uppermost logical
+		 * In this case base device is the uppermost physical
 		 * device which provides access to boot sectors
 		 */
 		base_entry = find_base_entry(pd->dmpath, dc->bootsectors);
 		if (!base_entry)
 			return -1;
-		*base_dev = base_entry->dev.dev;
+		*base_dev = first_device_by_target_data(base_entry->target);
 	}
 	/* Check for valid offset of filesystem */
 	if ((pd->offset % (dc->blocksize / SECTOR_SIZE)) != 0) {
