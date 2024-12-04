@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+//
+// Copyright IBM Corp. 2024
+
 use crate::assert_size;
 use crate::{
     crypto::{sign_msg, verify_signature},

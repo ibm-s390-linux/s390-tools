@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+//
+// Copyright IBM Corp. 2024
+
 use crate::cli::VerifyOpt;
 use anyhow::{anyhow, Context, Result};
 use log::warn;
