@@ -248,6 +248,14 @@ pub struct GenprotimgCliOptions {
     // version command.
     #[arg(long, action = clap::ArgAction::SetTrue )]
     pub version: (),
+
+    #[arg(long, action = clap::ArgAction::HelpLong, hide(true))]
+    /// Print help (deprecated, use '--help' instead).
+    help_all: (),
+
+    #[arg(long, action = clap::ArgAction::HelpLong, hide(true))]
+    /// Print help (deprecated, use '--help' instead).
+    help_experimental: (),
 }
 
 impl GenprotimgCliOptions {
