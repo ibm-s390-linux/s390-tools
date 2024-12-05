@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-verify 1 "2024-11-18" "s390-tools" "Attestation Manual"
+.TH pvattest-verify 1 "2024-12-05" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -22,7 +22,10 @@ environment, such as your workstation. Input must contain the response as
 produced by ’pvattest perform’. The protection key must be the one that was
 used to create the request by ’pvattest create’. Shred the protection key
 after the verification. The header must be the IBM Secure Execution header of
-the image that was attested during ’pvattest perform’
+the image that was attested during ’pvattest perform’. The verify command
+solely verifies that the Attestation measurement is correct. It does not check
+for the content of additional data or user data. See `pvattest check` for policy
+checks after you verified the Attestation measurement.
 .SH OPTIONS
 .PP
 \-i, \-\-input <FILE>

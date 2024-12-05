@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-check 1 "2024-11-18" "s390-tools" "Attestation Manual"
+.TH pvattest-check 1 "2024-12-05" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -91,8 +91,8 @@ the UV secret store. Can be specified multiple times.
 .RS 4
 Check whether the guests secret store is locked or not. Compares the hash of the
 secret store state to the one calculated by this option and optionally specified
-add-secret-requests. If the attestation response does not contain a secret store
-hash, this check fails.
+add-secret-requests in the correct order. If the attestation response does not
+contain a secret store hash, this check fails.
 
 Required if add-secret-requests are specified.
 .RE
@@ -100,8 +100,7 @@ Required if add-secret-requests are specified.
 .PP
 \-\-firmware
 .RS 4
-Check whether the firmware is on an IBM supported version. Requires internet
-access.
+Check whether the firmware is supported by IBM. Requires internet access.
 .RE
 .RE
 .PP

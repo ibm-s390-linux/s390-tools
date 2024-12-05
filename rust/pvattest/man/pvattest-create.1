@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-create 1 "2024-11-18" "s390-tools" "Attestation Manual"
+.TH pvattest-create 1 "2024-12-05" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -26,7 +26,7 @@ attestation request protection key and shred it after verification. Every
 \-k, \-\-host-key-document <FILE>
 .RS 4
 Use FILE as a host-key document. Can be specified multiple times and must be
-used at least once.
+specified at least once.
 .RE
 .RE
 .PP
@@ -49,9 +49,9 @@ intermediate CA certificate (signed by the root CA).
 .PP
 \-\-crl <FILE>
 .RS 4
-Use FILE as a certificate revocation list. The list is used to check whether a
-certificate of the chain of trust is revoked. Specify this option multiple times
-to use multiple CRLs.
+Use FILE as a certificate revocation list (CRL). The list is used to check
+whether a certificate of the chain of trust is revoked. Specify this option
+multiple times to use multiple CRLs.
 .RE
 .RE
 .PP

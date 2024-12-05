@@ -71,7 +71,7 @@ protection key.
 `-k`, `--host-key-document <FILE>`
 <ul>
 Use FILE as a host-key document. Can be specified multiple times and must be
-used at least once.
+specified at least once.
 </ul>
 
 
@@ -94,9 +94,9 @@ intermediate CA certificate (signed by the root CA).
 
 `--crl <FILE>`
 <ul>
-Use FILE as a certificate revocation list. The list is used to check whether a
-certificate of the chain of trust is revoked. Specify this option multiple times
-to use multiple CRLs.
+Use FILE as a certificate revocation list (CRL). The list is used to check
+whether a certificate of the chain of trust is revoked. Specify this option
+multiple times to use multiple CRLs.
 </ul>
 
 
@@ -197,7 +197,10 @@ must contain the response as produced by ’pvattest perform’. The protection
 key must be the one that was used to create the request by ’pvattest create’.
 Shred the protection key after the verification. The header must be the IBM
 Secure Execution header of the image that was attested during ’pvattest
-perform’
+perform’. The verify command solely verifies that the Attestation measurement
+is correct. It does not check for the content of additional data or user data.
+See `pvattest check` for policy checks after you verified the Attestation
+measurement.
 ### Options
 
 `-i`, `--input <FILE>`
@@ -325,8 +328,8 @@ the UV secret store. Can be specified multiple times.
 <ul>
 Check whether the guests secret store is locked or not. Compares the hash of the
 secret store state to the one calculated by this option and optionally specified
-add-secret-requests. If the attestation response does not contain a secret store
-hash, this check fails.
+add-secret-requests in the correct order. If the attestation response does not
+contain a secret store hash, this check fails.
 
 Required if add-secret-requests are specified.
 </ul>
@@ -334,8 +337,7 @@ Required if add-secret-requests are specified.
 
 `--firmware`
 <ul>
-Check whether the firmware is on an IBM supported version. Requires internet
-access.
+Check whether the firmware is supported by IBM. Requires internet access.
 </ul>
 
 
