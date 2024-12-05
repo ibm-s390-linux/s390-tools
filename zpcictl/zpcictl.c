@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stddef.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <time.h>
@@ -333,15 +334,15 @@ static void sclp_issue_action(struct zpci_device *pdev, int action)
 
 	report.header.version = 1;
 	report.header.action = action;
-	report.header.length = sizeof(report.data);
+	report.header.length = offsetof(struct zpci_report_error_data, log_data);
 	report.data.timestamp = (__u64)time(NULL);
 	report.data.err_log_id = 0x4713;
 
 	if (pdev->class == PCI_CLASS_NVME)
 		sdata = collect_smart_data(pdev);
 	if (sdata) {
-		util_strlcpy(report.data.log_data, sdata,
-			     sizeof(report.data.log_data));
+		report.header.length += util_strlcpy(report.data.log_data, sdata,
+						     sizeof(report.data.log_data));
 		free(sdata);
 	}
 	sysfs_report_error(&report, pdev->slot);
