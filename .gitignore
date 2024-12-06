@@ -77,9 +77,8 @@ libzds/libzds.a
 lsstp/lsstp
 mon_tools/mon_fsstatd
 mon_tools/mon_procd
+opticsmon/opticsmon
 osasnmpd/osasnmpd
-pvattest/src/pvattest
-pvattest/tools/exchange_info
 qetharp/qetharp
 qethqoat/qethqoat
 systemd/cpacfstatsd.service
