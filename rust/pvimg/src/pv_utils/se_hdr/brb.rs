@@ -259,6 +259,10 @@ impl SeHdr {
             return Err(Error::InvalidSeHdr);
         }
 
+        if sehs <= common_size {
+            return Err(Error::InvalidSeHdr);
+        }
+
         data.resize(sehs, 0);
         reader.read_exact(&mut data[common_size..])?;
         Self::try_from_data(&data)
@@ -364,5 +368,24 @@ impl AeadCipherTrait for SeHdrPlain {
 
     fn aead_tag_size(&self) -> usize {
         self.data.aead_tag_size()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::SeHdr;
+    use crate::error::Error;
+
+    #[test]
+    fn test_sehdr_try_from_io() {
+        // Invalid SeHdr as `sehs` is set to 0
+        assert!(matches!(
+            SeHdr::try_from_io(Cursor::new([
+                73, 66, 77, 83, 101, 99, 69, 120, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 8
+            ])),
+            Err(Error::InvalidSeHdr)
+        ));
     }
 }
