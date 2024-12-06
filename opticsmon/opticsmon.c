@@ -280,16 +280,15 @@ void on_link_change(struct zpci_netdev *netdev, void *arg)
 	if (!ctx->zpci_list || util_list_is_empty(ctx->zpci_list))
 		zpci_list_reload(&ctx->zpci_list);
 
-reload:
+find:
 	util_list_iterate(ctx->zpci_list, zdev) {
 		for (i = 0; i < zdev->num_netdevs; i++) {
 			if (!strcmp(zdev->netdevs[i].name, netdev->name)) {
-				reloads--;
 				/* Skip data collection if operational state is
 				 * unchanged
 				 */
 				if (zdev->netdevs[i].operstate == netdev->operstate)
-					continue;
+					return;
 				/* Update operation state for VFs even though
 				 * they are skipped just for a consistent view
 				 */
@@ -297,14 +296,15 @@ reload:
 				/* Only collect optics data for PFs */
 				if (!zpci_is_vf(zdev))
 					dump_adapter_data(ctx, zdev);
+				return;
 			}
 		}
 	}
 	/* Might be a new device, reload list of devices and retry */
-	if (reloads) {
+	if (reloads > 0) {
 		zpci_list_reload(&ctx->zpci_list);
 		reloads--;
-		goto reload;
+		goto find;
 	}
 }
 
