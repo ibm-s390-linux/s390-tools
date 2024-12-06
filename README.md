@@ -19,6 +19,9 @@ Package contents
    all s390-tools that are written in rust and require external crates.
    Disable the compilation of all tools in `rust/` using HAVE_CARGO=0
    See the `rust/README.md` for Details
+   - cpacfinfo:
+     Command line interface to get information about CP Assist for
+     Cryptographic Functions (CPACF)
    - pvattest:
      Create, perform, and verify IBM Secure Execution attestation measurements.
    - pvapconfig:
@@ -317,7 +320,7 @@ build options:
 | glibc-static | `HAVE_LIBC_STATIC` | zfcpdump                               |
 | openssl      | `HAVE_OPENSSL`     | zkey, libekmfweb, libkmipclient,       |
 |              |                    | zgetdump, rust/pvattest, rust/pvimg,   |
-|              |                    | zgetdump/pvsecret                      |
+|              |                    | zgetdump/pvsecret, opticsmon           |
 | cryptsetup   | `HAVE_CRYPTSETUP2` | zkey-cryptsetup                        |
 | json-c       | `HAVE_JSONC`       | zkey-cryptsetup, libekmfweb,           |
 |              |                    | libkmipclient                          |
@@ -327,6 +330,7 @@ build options:
 | libxml2      | `HAVE_LIBXML2`     | libkmipclient                          |
 | systemd      | `HAVE_SYSTEMD`     | hsavmcore                              |
 | libudev      | `HAVE_LIBUDEV`     | cpacfstatsd                            |
+| libnl3       | `HAVE_LIBNL3`      | opticsmon                              |
 
 This table lists additional build or install options:
 
@@ -373,6 +377,12 @@ the different tools are provided:
   `HAVE_OPENSSL=0`, `HAVE_LIBCURL=0`, or `HAVE_CARGO=0`.
 
   The runtime requirements are: openssl-libs (>= 1.1.1) and libcurl.
+
+* opticsmon:
+  For building opticsmon OpenSSL and the Netlink Library Suite (libnl3) are
+  required.
+  Tip: you may skip the opticsmon build by adding
+  `HAVE_OPENSSL=0` or `HAVE_LIBNL3=0`
 
 * osasnmpd:
   You need at least the NET-SNMP 5.1.x package (net-snmp-devel.rpm)

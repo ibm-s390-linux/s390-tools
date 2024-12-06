@@ -37,10 +37,6 @@ Tip: You can use `make version` to get the version string.
 	* reexports ann symbols from __pv_core__
 	* if no encryption utilities required, use __pv_core__
 
-## Tools
-* __pvsecret__ _Manage secrets for IBM Secure Execution guests_
-* __pvapconfig__ _automatic configure APQNs within an SE KVM guest_
-
 ## Writing new tools
 We encourage to use Rust for new tools. However, for some use cases it makes
 sense to use C and C is still allowed to be used for a new tool/library.
@@ -58,6 +54,8 @@ is a start, but can change over time.
 
 * [anyhow](https://crates.io/crates/anyhow)
     * Flexible concrete Error type built on std::error::Error
+* [base64](https://crates.io/crates/base64)
+    * Encodes and decodes base64 as bytes or utf8
 * [byteorder](https://crates.io/crates/byteorder)
     * Library for reading/writing numbers in big-endian and little-endian.
 * [cfg-if](https://crates.io/crates/cfg-if)
@@ -68,6 +66,8 @@ is a start, but can change over time.
     * A simple to use, efficient, and full-featured Command Line Argument Parser
 * [curl](https://crates.io/crates/curl)
     * Rust bindings to libcurl for making HTTP requests
+* [deku](https://crates.io/crates/deku)
+    * Bit level serialization/deserialization proc-macro for structs
 * [libc](https://crates.io/crates/libc)
     * Raw FFI bindings to platform libraries like libc.
 * [log](https://crates.io/crates/log)
@@ -76,6 +76,8 @@ is a start, but can change over time.
     * OpenSSL bindings
 * [serde](https://crates.io/crates/serde)
     * A generic serialization/deserialization framework
+* [serde_jsonl](https://crates.io/crates/serde_json)
+    * A JSON serialization file format
 * [serde_yaml](https://crates.io/crates/serde_yaml)
     * YAML data format for Serde
 * [thiserror](https://crates.io/crates/thiserror)
