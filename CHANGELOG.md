@@ -1,15 +1,31 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.36.0 (2024-12-06)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.12
+
+  s390-tools: Define Rust MSRV as 1.75.0
 
   Add new tools / libraries:
+  - cpacfinfo: Tool to provide CPACF information
+  - opticsmon: Tools to monitor optical modules for directly attached PCI based NICs
+  - pvimg: Rust rewrite of genprotimg
 
   Changes of existing tools:
+  - chpstat: Add data bandwidth utilization column
+  - chpstat: Add support for full CMCB
+  - chpstat: Add support for new CMG types
+  - dbginfo.sh: add overview commands and crypto update
+  - hyptop: Support for structured output (json, json-seq, csv)
+  - lszfcp: Add missing fallback marker for non-good fc_host port_state
+  - lszfcp: Improve speed with many SCSI devices
+  - pvattest: Add attestation policy check command
+  - zipl: Add support of partitions of mirror md-devices
 
   Bug Fixes:
+  - lszcrypt: Fix wrong state showing up for removed AP queue within SE guest
+  - lszfcp: Show device names line for zfcp_units without SCSI device
 
 * __v2.35.0 (2024-10-01)__
 
