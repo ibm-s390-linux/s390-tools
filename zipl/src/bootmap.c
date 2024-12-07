@@ -299,14 +299,15 @@ create_component_header(void* buffer, component_header_type type)
 }
 
 /*
- * Not precise check that the file FILENAME locates on specified physical DISK.
+ * Not precise check that the file FILENAME locates on the physical
+ * disk specified by WHERE.
  *
  * Try to auto-detect parameters of the disk which the file locates on
  * and compare found device-ID with DISK.
  * Return 0, if auto-detection succeeded, and it is proven that the
  * file does NOT locate on DISK. Otherwise, return 1.
  */
-static int file_is_on_disk(const char *filename, dev_t disk)
+static int file_is_on_disk(const char *filename, struct disk_info *where)
 {
 	/*
 	 * Retrieve info of the underlying disk without any user hints
@@ -331,7 +332,7 @@ static int file_is_on_disk(const char *filename, dev_t disk)
 			"Warning: Preparing a logical device for boot might fail\n");
 		return 1;
 	}
-	if (info->device != disk) {
+	if (info->basedisks[0] != where->basedisks[0]) {
 		disk_free_info(info);
 		return 0;
 	}
@@ -378,7 +379,7 @@ static int add_component_file_range(struct install_set *bis,
 			return -1;
 		}
 	} else {
-		if (!file_is_on_disk(filename, bis->info->device)) {
+		if (!file_is_on_disk(filename, bis->info)) {
 			error_reason("File is not on target device");
 			return -1;
 		}
