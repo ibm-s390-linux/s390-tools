@@ -356,3 +356,34 @@ void zpci_free_dev_list(struct util_list *zpci_list)
 	}
 	util_list_free(zpci_list);
 }
+
+/**
+ * Find a PCI device given the name of a netdev
+ *
+ * This function allows finding a PCI device when only the name of one
+ * of its netdevs is known.
+ *
+ * @param[in]	zpci_list	The device list to search
+ * @param[in]	netdev_name	The name of the netdev
+ * @param[out]	netdev		Pointer to store the netdev or NULL if
+ *				only the PCI device is needed
+ *
+ * @return The PCI device if one is found NULL otherwise
+ */
+struct zpci_dev *zpci_find_by_netdev(struct util_list *zpci_list, char *netdev_name,
+				     struct zpci_netdev **netdev)
+{
+	struct zpci_dev *zdev = NULL;
+	int i;
+
+	util_list_iterate(zpci_list, zdev) {
+		for (i = 0; i < zdev->num_netdevs; i++) {
+			if (!strcmp(zdev->netdevs[i].name, netdev_name)) {
+				if (netdev)
+					*netdev = &zdev->netdevs[i];
+				return zdev;
+			}
+		}
+	}
+	return NULL;
+}

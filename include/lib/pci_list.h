@@ -93,4 +93,7 @@ const char *zpci_pft_str(struct zpci_dev *zdev);
 const char *zpci_operstate_str(operstate_t state);
 operstate_t zpci_operstate_from_str(const char *oper_str);
 
+struct zpci_dev *zpci_find_by_netdev(struct util_list *zpci_list, char *netdev_name,
+				     struct zpci_netdev **netdev);
+
 #endif /* LIB_ZPCI_PCI_LIST_H */

@@ -274,38 +274,33 @@ static int oneshot_mode(struct opticsmon_ctx *ctx)
 void on_link_change(struct zpci_netdev *netdev, void *arg)
 {
 	struct opticsmon_ctx *ctx = arg;
-	struct zpci_dev *zdev;
-	int i, reloads = 1;
+	struct zpci_netdev *found_netdev;
+	struct zpci_dev *zdev = NULL;
+	int reloads = 1;
 
-	if (!ctx->zpci_list || util_list_is_empty(ctx->zpci_list))
-		zpci_list_reload(&ctx->zpci_list);
-
-find:
-	util_list_iterate(ctx->zpci_list, zdev) {
-		for (i = 0; i < zdev->num_netdevs; i++) {
-			if (!strcmp(zdev->netdevs[i].name, netdev->name)) {
+	do {
+		if (ctx->zpci_list) {
+			zdev = zpci_find_by_netdev(ctx->zpci_list, netdev->name, &found_netdev);
+			if (zdev) {
 				/* Skip data collection if operational state is
 				 * unchanged
 				 */
-				if (zdev->netdevs[i].operstate == netdev->operstate)
+				if (found_netdev->operstate == netdev->operstate)
 					return;
 				/* Update operation state for VFs even though
 				 * they are skipped just for a consistent view
 				 */
-				zdev->netdevs[i].operstate = netdev->operstate;
+				found_netdev->operstate = netdev->operstate;
 				/* Only collect optics data for PFs */
 				if (!zpci_is_vf(zdev))
 					dump_adapter_data(ctx, zdev);
 				return;
 			}
 		}
-	}
-	/* Might be a new device, reload list of devices and retry */
-	if (reloads > 0) {
+		/* Could be uninitalized list or a new device, retry after reload  */
 		zpci_list_reload(&ctx->zpci_list);
 		reloads--;
-		goto find;
-	}
+	} while (reloads > 0);
 }
 
 #define MAX_EVENTS 8
