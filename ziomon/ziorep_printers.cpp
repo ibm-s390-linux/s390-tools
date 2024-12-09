@@ -451,10 +451,11 @@ void VirtAdapterPrinter::print_virt_adpt(FILE *fp, __u32 devno,
 		fprintf(fp, "%x,%x.%x.%04x",
 			       m_cfg->get_chpid_by_devno(devno, rc),
 			       ZIOREP_BUSID_UNPACKED(devno));
-	else
-		fprintf(fp, "%3x/%x.%x.%04x",
-			       m_cfg->get_chpid_by_devno(devno, rc),
-			       ZIOREP_BUSID_UNPACKED(devno));
+	else {
+		fprintf(fp, "%x.%x.%04x", ZIOREP_BUSID_UNPACKED(devno));
+		print_delimiter(fp);
+		fprintf(fp, "%3x", m_cfg->get_chpid_by_devno(devno, rc));
+	}
 }
 
 void VirtAdapterPrinter::print_queue_fill(FILE *fp,
@@ -548,8 +549,8 @@ void VirtAdapterPrinter::print_topline(FILE *fp)
 	if (m_csv)
 		fprintf(fp, "timestamp,aggregated,CHPID,Bus-ID,qdio utilization max %%,qdio utilization avg %%,queue full,fail erc,throughput read / MS/s,throughput write / MS/s,I/O requests read,I/O requests write\n");
 	else {
-		fprintf(fp, "CHP Bus-ID  |qdio util.%%|queu|fail|-thp in MB/s-|I/O reqs-|\n");
-		fprintf(fp, " ID            max   avg full  erc     rd    wrt   rd  wrt\n");
+		fprintf(fp, "Bus-ID  |CHP|qdio util.%%|queu|fail|-thp in MB/s-|I/O reqs-|\n");
+		fprintf(fp, "          ID   max   avg full  erc     rd    wrt   rd  wrt\n");
 	}
 }
 
