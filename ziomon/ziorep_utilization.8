@@ -1,4 +1,4 @@
-.\" Copyright 2017 IBM Corp.
+.\" Copyright 2024 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
@@ -57,6 +57,15 @@ Print a summary of the data, then exit.
 .BR "\-c" " or " "\-\-chpid"
 Only consider the specified physical adapter. Adapters must be specified in hex.
 If multiple adapters should be specified, specify each one separately.
+
+.TP
+.BR "\-f" " or " "\-\-fcp-device"
+Print a utilization report for an FCP device. If this option is specified, then
+a virtual adapter report is printed, otherwise a physical adapter report with FCP
+channel scope is printed. This parameter has no influence on CSV format report printing.
+Using the --export-csv option causes both physical and virtual adapter utilization
+reports to be printed into two separate CSV-formatted files independent of the
+--fcp-device parameter.
 
 .TP
 .BR "\-x" " or " "\-\-export-csv"
@@ -127,14 +136,23 @@ give the values for read and write requests respectively.
 
 
 .SH EXAMPLES
-Print a utilization report using
+Print a physical adapter utilization report only using
 .IR sample.log
 , considering adapters 4e and 4f only.
-Only data between 8:57 April 5, 2008, and 17:09 June 21, 2008, should be considered.
+Only data between 8:57 April 5, 2024, and 17:09 June 21, 2024, should be considered.
 Data should be aggregated to 60 second intervals.
 
-ziorep_utilization -c 4e -c 4f -i 60 -b "2008-04-05 08:57" -e "2008-06-21 17:09"
+ziorep_utilization sample.log -c 4e -c 4f -i 60 -b "2024-04-05 08:57" -e "2024-06-21 17:09"
 
+Print virtual adapter report only using sample.log. Consider adapter 4f only. Data should be
+aggregated to 3 seconds interval. Print topline after every 2nd frame.
+
+ziorep_utilization sample.log -c 4f -i 3 -t 2 --fcp-device
+
+Print both physical and virtual adapter reports using sample.log in two separate CSV-formatted
+files with the default interval. Considering adapter 4f only. Print topline after every 2nd frame.
+
+ziorep_utilization sample.log -c 4f -t 2 --export-csv
 
 .SH "SEE ALSO"
 .BR ziorep_config (8),

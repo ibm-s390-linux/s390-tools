@@ -3,7 +3,7 @@
  *
  * Utilization report program
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -49,6 +49,7 @@ struct options {
 	char*		filename;
 	bool		print_summary;
 	bool		csv_export;
+	bool		fcp_device;
 };
 
 
@@ -61,6 +62,7 @@ static void init_opts(struct options *opts)
 	opts->filename		= NULL;
 	opts->print_summary	= false;
 	opts->csv_export	= false;
+	opts->fcp_device	= false;
 }
 
 
@@ -85,6 +87,8 @@ static const char help_text[] =
     "-s, --summary           Show a summary of the data.\n"
     "-c, --chpid <chpid>     Select physical adapter in hex.\n"
     "                        E.g. '-c 32a'\n"
+    "-f, --fcp-device        Print utilization report for FCP device scope.\n"
+    "                        Otherwise for FCP channel scope.\n"
     "-x, --export-csv        Export data to files in CSV format.\n"
     "-t, --topline <num>     Repeat topline after every 'num' frames.\n"
     "                        0 for no repeat (default).\n";
@@ -99,7 +103,7 @@ static void print_help()
 static void print_version()
 {
         printf("%s: Utilization report generator version %s\n"
-               "Copyright IBM Corp. 2008, 2017\n", toolname, RELEASE_STRING);
+               "Copyright IBM Corp. 2008, 2024\n", toolname, RELEASE_STRING);
 }
 
 
@@ -121,6 +125,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 		{ "chpid",           required_argument, NULL, 'c'},
 		{ "export-csv",      no_argument,       NULL, 'x'},
 		{ "topline",         required_argument, NULL, 't'},
+		{ "fcp-device",      no_argument,       NULL, 'f'},
                 { 0,                 0,                 0,     0 }
 	};
 
@@ -130,7 +135,7 @@ static int parse_params(int argc, char **argv, struct options *opts)
 	}
 
 	assert(sizeof(long long int) == sizeof(__u64));
-	while ((c = getopt_long(argc, argv, "b:e:i:c:t:xshvV",
+	while ((c = getopt_long(argc, argv, "b:e:i:c:t:xshvVf",
 				long_options, &index)) != EOF) {
 		switch (c) {
 		case 'V':
@@ -182,6 +187,9 @@ static int parse_params(int argc, char **argv, struct options *opts)
 		case 't':
 			if (parse_topline_arg(optarg, &opts->topline))
 				return -1;
+			break;
+		case 'f':
+			opts->fcp_device = true;
 			break;
 		default:
 			fprintf(stderr, "%s: Try '%s --help' for"
@@ -297,43 +305,65 @@ static int print_reports(struct options *opts, ConfigReader &cfg)
 
 	type_flt.push_back(utilization);
 
+	// physical adapter report
 	if (opts->csv_export) {
 		fp = open_csv_output_file(opts->filename,
 					  "_util_phys_adpt.csv", &rc);
 		if (!fp)
 			goto out;
-	}
-	else
+	} else {
 		fp = stdout;
-
-	if ( (rc = print_report(fp, opts->begin, opts->end,
-				opts->interval, opts->filename, opts->topline,
-				&type_flt, dev_filt, noop_col,
-				physPrnt)) < 0 ) {
-		rc = -3;
-		goto out1;
 	}
 
-	if (rc == 0)
-		fprintf(stderr, "%s: No eligible data found.\n", toolname);
+	if (!opts->fcp_device || opts->csv_export) {
+		rc = print_report(fp, opts->begin, opts->end,
+				  opts->interval, opts->filename, opts->topline,
+				  &type_flt, dev_filt, noop_col, physPrnt);
+		if (rc < 0) {
+			rc = -3;
+			goto out1;
+		} else if (rc == 0) {
+			fprintf(stderr, "%s: No eligible data found.\n",
+				toolname);
+		}
 
+		if (!opts->csv_export)
+			fprintf(stderr,
+				"%s: The FCP channel utilization report was "
+				"printed. To print the FCP device utilization "
+				"report, use the -f/--fcp-device option.\n",
+				toolname);
+	}
+
+	// virtual adapter report
 	if (opts->csv_export) {
 		fclose(fp);
 		fp = open_csv_output_file(opts->filename,
 					  "_util_virt_adpt.csv", &rc);
 		if (!fp)
 			goto out;
-	}
-	else {
+	} else {
 		fp = stdout;
-		fputc('\n', fp);
 	}
 
-	if (print_report(fp, opts->begin, opts->end, opts->interval,
-			 opts->filename, opts->topline, NULL, dev_filt,
-			 *col, virtPrnt)) {
-		rc = -4;
-		goto out1;
+	if (opts->fcp_device || opts->csv_export) {
+		rc = print_report(fp, opts->begin, opts->end, opts->interval,
+				  opts->filename, opts->topline, NULL, dev_filt,
+				  *col, virtPrnt);
+		if (rc < 0) {
+			rc = -4;
+			goto out1;
+		} else if (rc == 0) {
+			fprintf(stderr, "%s: No eligible data found.\n",
+				toolname);
+		}
+
+		if (!opts->csv_export)
+			fprintf(stderr,
+				"%s: The FCP device utilization report was "
+				"printed. To print the FCP channel utilization "
+				"report, omit the -f/--fcp-device option.\n",
+				toolname);
 	}
 
 out1:
