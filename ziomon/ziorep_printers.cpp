@@ -3,7 +3,7 @@
  *
  * Utility classes to print framsets
  *
- * Copyright IBM Corp. 2008, 2021
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -638,9 +638,9 @@ void TrafficPrinter::print_topline_prefix1(FILE *fp)
 	switch (m_agg_crit) {
 	case none:
 		if (m_csv)
-			str = "WWPN,LUN";
+			str = "DEVBUSID,WWPN,LUN";
 		else
-			str = "       WWPN                LUN       ";
+			str = "DEVBUSID        WWPN                LUN       ";
 		break;
 	case chpid:
 		if (m_csv)
@@ -677,7 +677,7 @@ void TrafficPrinter::print_topline_prefix2(FILE *fp)
 
 	switch (m_agg_crit) {
 	case none:
-		str = "                                     ";
+		str = "                                              ";
 		break;
 	case chpid:
 		str = " ID";
@@ -705,7 +705,7 @@ void TrafficPrinter::print_topline_whitespace(FILE *fp)
 
 	switch (m_agg_crit) {
 	case none:
-		str = "                                     ";
+		str = "                                              ";
 		break;
 	case chpid:
 		str = "   ";
@@ -788,12 +788,16 @@ void TrafficPrinter::print_device_mp_mm(FILE *fp, __u32 mp_mm,
 void TrafficPrinter::print_device(FILE *fp, __u32 dev,
 				 const ConfigReader &cfg, int *rc)
 {
+	__u32 devno = cfg.get_devno_by_mm_internal(dev, rc);
+
+	print_device_devno(fp, devno);
+
 	if (m_csv)
-		fprintf(fp, "0x%016Lx,0x%016Lx",
+		fprintf(fp, ",0x%016Lx,0x%016Lx",
 			       (long long unsigned int)cfg.get_wwpn_by_mm_internal(dev, rc),
 			       (long long unsigned int)cfg.get_lun_by_mm_internal(dev, rc));
 	else
-		fprintf(fp, "0x%016Lx:0x%016Lx",
+		fprintf(fp, ":0x%016Lx:0x%016Lx",
 			       (long long unsigned int)cfg.get_wwpn_by_mm_internal(dev, rc),
 			       (long long unsigned int)cfg.get_lun_by_mm_internal(dev, rc));
 }
