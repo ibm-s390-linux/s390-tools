@@ -3,7 +3,7 @@
  *
  * Utility classes to print framsets
  *
- * Copyright IBM Corp. 2008, 2021
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -107,6 +107,8 @@ public:
 
 private:
 	void print_phys_adpt(FILE *fp, __u32 host_id,
+			     int *rc);
+	void print_pchid(FILE *fp, __u32 host_id,
 			     int *rc);
 	void print_utilization(FILE *fp, const struct abbrev_stat *stat,
 			       __u64 count, bool valid);

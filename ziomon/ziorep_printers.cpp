@@ -309,6 +309,22 @@ void PhysAdapterPrinter::print_phys_adpt(FILE *fp, __u32 host_id, int *rc)
 		fprintf(fp, "%3x", chpid);
 }
 
+void PhysAdapterPrinter::print_pchid(FILE *fp, __u32 host_id, int *rc)
+{
+	__u32 pchid = m_cfg->get_pchid_by_host_id(host_id, rc);
+
+	if (m_csv)
+		if (pchid != ZIOREP_PCHID_NA)
+			fprintf(fp, "%x", pchid);
+		else
+			fprintf(fp, "%s", "n/a");
+	else
+		if (pchid != ZIOREP_PCHID_NA)
+			fprintf(fp, "%04x", pchid);
+		else
+			fprintf(fp, "%s", "n/a ");
+}
+
 
 void PhysAdapterPrinter::print_utilization(FILE *fp,
 					  const struct abbrev_stat *stat,
@@ -361,10 +377,10 @@ void PhysAdapterPrinter::print_topline(FILE *fp)
 	if (m_csv)
 		fprintf(fp, "timestamp,aggregated,CHPID,adapter min %%,"
 			"adapter max %%,adapter avg %%,bus min %%,bus max %%,"
-			"bus avg %%,cpu min %%,cpu max %%,cpu avg %%\n");
+			"bus avg %%,cpu min %%,cpu max %%,cpu avg %%,PCHID\n");
 	else {
-		fprintf(fp, "CHP|adapter in %%-|--bus in %%---|--cpu in %%---|\n");
-		fprintf(fp, " ID min max   avg min max   avg min max   avg\n");
+		fprintf(fp, "PCH |CHP|adapter in %%-|--bus in %%---|--cpu in %%---|\n");
+		fprintf(fp, " ID   ID min max   avg min max   avg min max   avg\n");
 	}
 }
 
@@ -387,6 +403,12 @@ int PhysAdapterPrinter::print_frame(FILE *fp,
 				// print timestamp for every line in CSV mode
 				timestamp_printed = true;
 		}
+		if (!m_csv) {
+			print_pchid(fp, *i, &lrc);
+			if (lrc)
+				return -1;
+			print_delimiter(fp);
+		}
 		print_phys_adpt(fp, *i, &lrc);
 		if (lrc)
 			return -1;
@@ -402,6 +424,12 @@ int PhysAdapterPrinter::print_frame(FILE *fp,
 		print_utilization(fp, &util->stats.cpu,
 				  util->stats.count,
 				  util->valid);
+		if (m_csv) {
+			print_delimiter(fp);
+			print_pchid(fp, *i, &lrc);
+			if (lrc)
+				return -1;
+		}
 		fputc('\n', fp);
 	}
 
