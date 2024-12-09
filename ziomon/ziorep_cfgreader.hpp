@@ -3,7 +3,7 @@
  *
  * Utility classes to read and access FCP configuration information
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -38,6 +38,8 @@ public:
 
 	/// rc is only set on error!
 	__u32 get_chpid_by_host_id(__u32 h, int *rc) const;
+	/// rc is only set on error!
+	__u32 get_pchid_by_host_id(__u32 h, int *rc) const;
 	/// rc is only set on error!
 	__u32 get_chpid_by_devno(__u32 devno, int *rc) const;
 	/// rc is only set on error!
@@ -153,6 +155,8 @@ private:
 	bool cached_config_exists(const char *fname);
 
 	struct device_info {
+		// pchid, e.g. 01c0
+		__u32   pchid;
 		// chpid, e.g. 43 (hex)
 		__u32	chpid;
 

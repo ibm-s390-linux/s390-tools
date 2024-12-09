@@ -3,7 +3,7 @@
  *
  * Utility functions
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -23,6 +23,8 @@ extern "C" {
 
 
 #include <linux/types.h>
+
+#define ZIOREP_PCHID_NA		65536
 
 /**
  * Parse date provided in 'str' and store as seconds since 1970 in 'tgt'. */
@@ -82,6 +84,10 @@ int parse_topline_arg(char *str, __u64 *arg);
 
 FILE* open_csv_output_file(const char *filename, const char *extension,
 			   int *rc);
+/**
+ * Parse PCHID from string to 32-bit number
+ */
+int parse_pchid_str(const char *const pchid_str, __u32 *const pchid);
 
 /**
  * accessors for internal representation of device and subchannel bus-IDs

@@ -3,7 +3,7 @@
  *
  * Utility functions
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -552,6 +552,36 @@ FILE* open_csv_output_file(const char *filename, const char *extension,
 	return fp;
 }
 
+/**
+ * parse_pchid_str - parse PCHID from string to 32-bit number
+ * @pchid_str: PCHID string
+ * @pchid: 32-bit PCHID number
+ *
+ * Reads PCHID string, checks for corner cases, converts to 32-bit
+ * PCHID number, checks for errors, writes resulted PCHID to specified
+ * location.
+ */
+int parse_pchid_str(const char *const pchid_str, __u32 *const pchid)
+{
+	unsigned long parsed;
+	char *end;
 
+	if (strcmp(pchid_str, "n/a") == 0) {
+		parsed = ZIOREP_PCHID_NA;
+		goto out;
+	}
 
+	parsed = strtoul(pchid_str, &end, 16);
+	if (parsed > 0xffff) {
+		fprintf(stderr, "%s: PCHID %s exceeds maximum possible value for a PCHID.\n",
+			toolname, pchid_str);
+		return -1;
+	} else if (parsed == 0 && end == &pchid_str[0]) {
+		fprintf(stderr, "%s: PCHID %s could not be converted.\n", toolname, pchid_str);
+		return -1;
+	}
 
+out:
+	*pchid = (__u32)parsed;
+	return 0;
+}

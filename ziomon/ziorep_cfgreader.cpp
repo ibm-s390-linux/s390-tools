@@ -3,7 +3,7 @@
  *
  * Utility classes to read and access FCP configuration information
  *
- * Copyright IBM Corp. 2008, 2017
+ * Copyright IBM Corp. 2008, 2024
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -32,6 +32,7 @@ ConfigReader::ConfigReader(int *rc, const char *filename)
 	FILE			*fp = NULL;
 	struct device_info	 new_elem;
 	char			*line = NULL;
+	char			*cfg_pchid = NULL;
 	size_t			 line_len;
 	int			 lrc;
 	int			 line_idx = 1;
@@ -67,7 +68,8 @@ ConfigReader::ConfigReader(int *rc, const char *filename)
 		new_elem.device = (char*)malloc(lrc + 1);
 		new_elem.type = (char*)malloc(lrc + 1);
 		new_elem.multipath_device = (char*)malloc(lrc + 1);
-		lrc = sscanf(line, "%x %u:%u:%u:%u %x.%x.%x:%x.%x.%x:%Lx:%Lx %s %u %u:%u %s %u %u:%u %s",
+		cfg_pchid = (char*)malloc(lrc + 1);
+		lrc = sscanf(line, "%x %u:%u:%u:%u %x.%x.%x:%x.%x.%x:%Lx:%Lx %s %u %u:%u %s %u %u:%u %s %s",
 		       &new_elem.chpid,
 		       &new_elem.hctl_identifier.host,
 		       &new_elem.hctl_identifier.channel,
@@ -82,10 +84,13 @@ ConfigReader::ConfigReader(int *rc, const char *filename)
 		       &new_elem.mp_minor, new_elem.device,
 		       &new_elem.mm_internal,
 		       &new_elem.major, &new_elem.minor,
-		       new_elem.type);
+		       new_elem.type,
+		       cfg_pchid);
+		*rc = parse_pchid_str(cfg_pchid, &new_elem.pchid);
+		free(cfg_pchid);
 		free(line);
 		line = NULL;
-		if (lrc != 22) {
+		if (lrc != 23 || *rc != 0) {
 			fprintf(stderr, "%s: Could not parse line %d"
 				" - configuration file broken?\n", toolname, line_idx);
 			*rc = -1;
@@ -465,6 +470,14 @@ __u32 ConfigReader::get_chpid_by_host_id(__u32 host, int *rc) const
 	return 0;
 }
 
+__u32 ConfigReader::get_pchid_by_host_id(__u32 host, int *rc) const
+{
+	search_for(hctl_identifier.host, host, pchid);
+
+	host_id_not_found_error(host, rc);
+
+	return 0;
+}
 
 __u32 ConfigReader::get_chpid_by_devno(__u32 d, int *rc) const
 {
@@ -861,7 +874,7 @@ void ConfigReader::dump(FILE *fp) const
 	fprintf(fp, "dumping cfg....\n");
 	for (list<struct device_info>::const_iterator i = m_devices.begin();
 	      i != m_devices.end(); ++i) {
-		fprintf(fp, "%x %u %u:%u:%u:%u %x.%x.%04x:%x.%x.%04x:%016Lx:%016Lx %s %u:%u %s %u:%u %s\n",
+		fprintf(fp, "%x %u %u:%u:%u:%u %x.%x.%04x:%x.%x.%04x:%016Lx:%016Lx %s %u:%u %s %u:%u %s %x\n",
 		       (*i).chpid, (*i).mm_internal,
 		       (*i).hctl_identifier.host,
 		       (*i).hctl_identifier.channel,
@@ -874,7 +887,8 @@ void ConfigReader::dump(FILE *fp) const
 		       ((*i).multipath_device ? (*i).multipath_device : "n/a"), (*i).mp_major,
 		       (*i).mp_minor, (*i).device,
 		       (*i).major, (*i).minor,
-		       (*i).type);
+		       (*i).type,
+		       (*i).pchid);
 	}
 }
 
