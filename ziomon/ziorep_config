@@ -70,6 +70,7 @@ sub get_sub_ch_data
 		$c_src = catdir($base_dir, S_DIR1, $host);
 		my $sub_ch;
 		my $adapter;
+		my $chp;
 		if (-l $c_src) {
 			$sub_ch = (split("/", readlink($c_src)))[-5];
 			$adapter = (split("/", readlink($c_src)))[-4];
@@ -90,6 +91,13 @@ sub get_sub_ch_data
 								     "Offline";
 		$c_src = catdir($base_dir, S_DIR2, $sub_ch);
 		$sub_ch{$adapter}{chpid} = substr(get_line("chpids"), 0, 2);
+		$chp = "chp0." . $sub_ch{$adapter}{chpid};
+		$c_src = catdir($base_dir, S_DIR2, $chp);
+		if (-e catdir($base_dir, S_DIR2, $chp, "chid")) {
+		    $sub_ch{$adapter}{pchid} = get_line("chid");
+		} else {
+		    $sub_ch{$adapter}{pchid} = "n/a"
+		}
 	}
 }
 
@@ -215,6 +223,7 @@ sub mapping_table
 			push @out_str, $devices{$line}{mm};
 		}
 		push @out_str, $devices{$line}{type};
+		push @out_str, $sub_ch{$devices{$line}{hba_id}}{pchid};
 		print "@out_str\n";
 	}
 }
@@ -227,6 +236,11 @@ sub adapter_report
 		next if (@adapters && "@adapters" !~ /\b$a\b/);
 		my @out_str;
 		push @out_str, "Host:    $sub_ch{$a}{host}\n";
+		if ($sub_ch{$a}{pchid} eq "n/a") {
+			push @out_str, "PCHID:   there is no PCHID entry in data source\n";
+		} else {
+			push @out_str, "PCHID:   $sub_ch{$a}{pchid}\n";
+		}
 		push @out_str, "CHPID:   $sub_ch{$a}{chpid}\n";
 		push @out_str, "Adapter: $a\n";
 		push @out_str, "Sub-Ch.: $sub_ch{$a}{sub_ch}\n";
