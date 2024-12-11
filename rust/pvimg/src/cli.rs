@@ -140,6 +140,20 @@ pub struct CreateBootImageLegacyFlags {
     /// Disable the support for backup target keys (default).
     #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_backup_keys", group="header-flags")]
     pub disable_backup_keys: Option<bool>,
+
+    /// Enable encryption of the image components (default).
+    ///
+    /// The image components are: the kernel, ramdisk, and kernel command line.
+    #[arg(long, action = clap::ArgAction::SetTrue, group="header-flags")]
+    pub enable_image_encryption: Option<bool>,
+
+    /// Disable encryption of the image components.
+    ///
+    /// The image components are: the kernel, ramdisk, and kernel command line.
+    /// Use only if the components used do not contain any confidential content
+    /// (for example, secrets like non-public cryptographic keys).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_image_encryption", group="header-flags")]
+    pub disable_image_encryption: Option<bool>,
 }
 
 #[non_exhaustive]
@@ -476,6 +490,8 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-pckmo", ["--enable-pckmo"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-pckmo-hmac", ["--enable-pckmo-hmac"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-backup-keys", ["--enable-backup-keys"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-image-encryption", ["--disable-image-encryption"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"])])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),
@@ -501,6 +517,8 @@ mod test {
                                                    CliOption::new("x-pcf2", ["--x-pcf", "0x0"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-pckmo", ["--enable-pckmo"]),
                                                    CliOption::new("disable-pckmo", ["--disable-pckmo"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"]),
+                                                   CliOption::new("disable-image-encryption", ["--disable-image-encryption"])])),
         ];
 
         let mut genprotimg_valid_args = vec![

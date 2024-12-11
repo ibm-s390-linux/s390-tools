@@ -80,6 +80,12 @@ fn parse_flags(
         lf.enable_backup_keys
             .filter(|x| *x)
             .and(Some(PcfV1::all_enabled([PcfV1::BackupTargetKeys]))),
+        lf.disable_image_encryption
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_enabled([PcfV1::NoComponentEncryption]))),
+        lf.enable_image_encryption
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_disabled([PcfV1::NoComponentEncryption]))),
     ]
     .into_iter()
     .flatten()
@@ -134,6 +140,10 @@ pub fn create(opt: &CreateBootImageArgs) -> Result<OwnExitCode> {
     let user_provided_keys =
         read_user_provided_keys(opt.comm_key.as_deref(), &opt.experimental_args)?;
     let (plaintext_flags, secret_flags) = parse_flags(opt)?;
+
+    if plaintext_flags.is_set(PcfV1::NoComponentEncryption) {
+        warn!("The components encryption is disabled, make sure that the components do not contain any confidential content.");
+    }
 
     let mut components = components(&opt.component_paths)?;
     if opt.no_component_check {

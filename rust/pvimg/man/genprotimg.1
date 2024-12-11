@@ -3,11 +3,11 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH genprotimg 1 "2024-12-05" "s390-tools" "Genprotimg Manual"
+.TH genprotimg 1 "2024-12-11" "s390-tools" "Genprotimg Manual"
 .nh
 .ad l
 .SH NAME
-\fBgenprotimg\fP - Create an IBM Secure Execution image
+\fBgenprotimg\fP \- Create an IBM Secure Execution image
 \fB
 .SH SYNOPSIS
 .nf
@@ -196,6 +196,22 @@ Disable the support for backup target keys (default).
 .RE
 .RE
 .PP
+\-\-enable\-image\-encryption
+.RS 4
+Enable encryption of the image components (default). The image components are:
+the kernel, ramdisk, and kernel command line.
+.RE
+.RE
+.PP
+\-\-disable\-image\-encryption
+.RS 4
+Disable encryption of the image components. The image components are: the
+kernel, ramdisk, and kernel command line. Use only if the components used do not
+contain any confidential content (for example, secrets like non\-public
+cryptographic keys).
+.RE
+.RE
+.PP
 \-v, \-\-verbose
 .RS 4
 Provide more detailed output.
@@ -222,16 +238,16 @@ Print help (see a summary with \fB\-h\fR).
 
 .SH EXIT STATUS
 .TP 8
-.B 0 - Program finished successfully
+.B 0 \- Program finished successfully
 The command was executed successfully.
 .RE
 .TP 8
-.B 1 - Generic error
+.B 1 \- Generic error
 Something went wrong during the operation. Refer to the error
 message.
 .RE
 .TP 8
-.B 2 - Usage error
+.B 2 \- Usage error
 The command was used incorrectly, for example: unsupported command
 line flag, or wrong number of arguments.
 .RE
