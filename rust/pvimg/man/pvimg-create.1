@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvimg-create 1 "2024-12-12" "s390-tools" "Pvimg Manual"
+.TH pvimg-create 1 "2024-12-17" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
 .SH NAME
@@ -122,7 +122,7 @@ Overwrite an existing Secure Execution boot image.
 .RE
 .RE
 .PP
-\-\-comm\-key <FILE>
+\-\-cck, \-\-comm\-key <FILE>
 .RS 4
 Use the content of FILE as the customer\-communication key (CCK). The file must
 contain exactly 32 bytes of data.
@@ -132,7 +132,7 @@ contain exactly 32 bytes of data.
 \-\-enable\-dump
 .RS 4
 Enable Secure Execution guest dump support. This option requires the
-\fB\-\-comm\-key\fR option.
+\fB\-\-cck\fR option.
 .RE
 .RE
 .PP
@@ -145,8 +145,7 @@ Disable Secure Execution guest dump support (default).
 \-\-enable\-cck\-extension\-secret
 .RS 4
 Add\-secret requests must provide an extension secret that matches the
-CCK\-derived extension secret. This option requires the \fB\-\-comm\-key\fR
-option.
+CCK\-derived extension secret. This option requires the \fB\-\-cck\fR option.
 .RE
 .RE
 .PP
@@ -249,7 +248,7 @@ Generate an IBM Secure Execution image:
 
 Generate an IBM Secure Execution image with Secure Execution guest dump support:
 .PP
-.B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure-linux\/\fR \-\-enable\-dump \-\-comm\-key \fI\,comm-key\fR
+.B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure-linux\/\fR \-\-enable\-dump \-\-cck \fI\,comm-key\fR
 .SH NOTES
 .IP "1." 4
 The \fBgenprotimg\fR(1) command is a symbolic link to the \fBpvimg-create\fR(1) command.

@@ -96,8 +96,8 @@ pub struct ComponentPaths {
 #[command(group(ArgGroup::new("header-flags").multiple(true).conflicts_with_all(["x_pcf", "x_scf"])))]
 pub struct CreateBootImageLegacyFlags {
     /// Enable Secure Execution guest dump support. This option requires the
-    /// '--comm-key' option.
-    #[arg(long, action = clap::ArgAction::SetTrue, requires="comm_key", group="header-flags")]
+    /// '--cck' option.
+    #[arg(long, action = clap::ArgAction::SetTrue, requires="cck", group="header-flags")]
     pub enable_dump: Option<bool>,
 
     /// Disable Secure Execution guest dump support (default).
@@ -105,9 +105,9 @@ pub struct CreateBootImageLegacyFlags {
     pub disable_dump: Option<bool>,
 
     /// Add-secret requests must provide an extension secret that matches the
-    /// CCK-derived extension secret. This option requires the '--comm-key'
+    /// CCK-derived extension secret. This option requires the '--cck'
     /// option.
-    #[arg(long, action = clap::ArgAction::SetTrue, requires="comm_key", group="header-flags")]
+    #[arg(long, action = clap::ArgAction::SetTrue, requires="cck", group="header-flags")]
     pub enable_cck_extension_secret: Option<bool>,
 
     /// Add-secret requests don't have to provide the CCK-derived extension
@@ -328,8 +328,8 @@ pub struct CreateBootImageArgs {
     /// Use the content of FILE as the customer-communication key (CCK).
     ///
     /// The file must contain exactly 32 bytes of data.
-    #[arg(long, value_name = "FILE")]
-    pub comm_key: Option<PathBuf>,
+    #[arg(long, value_name = "FILE", visible_alias = "comm-key")]
+    pub cck: Option<PathBuf>,
 
     #[clap(flatten)]
     pub legacy_flags: CreateBootImageLegacyFlags,
@@ -481,6 +481,8 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("parmfile", ["--parmfile", "/dev/null"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"]),
                                                    CliOption::new("comm-key", ["--comm-key", "/dev/null"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"]),
+                                                   CliOption::new("comm-key", ["--cck", "/dev/null"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"]),
                                                    CliOption::new("comm-key", ["--comm-key", "/dev/null"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-pcf", ["--x-pcf", "0x0"]),
