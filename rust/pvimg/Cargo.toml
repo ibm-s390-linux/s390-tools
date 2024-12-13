@@ -9,28 +9,28 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-anyhow = { version = "1.0.70", features = ["std"] }
-clap = { version ="4.1", features = ["derive", "wrap_help"]}
+anyhow = { version = "1.0.94", features = ["std"] }
+clap = { version ="4.5", features = ["derive", "wrap_help"]}
 deku = "0.18"
 deku_derive = "0.18"
 enum_dispatch = "0.3.13"
-log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
-openssl = "0.10.66"
-serde = { version = "1.0.139", features = ["derive"]}
+log = { version = "0.4.22", features = ["std", "release_max_level_debug"] }
+openssl = "0.10.68"
+serde = { version = "1.0.216", features = ["derive"]}
 serde_json = "1.0"
-thiserror = "1.0.33"
+thiserror = "1.0.69"
 
 pv = { path = "../pv", package = "s390_pv" }
 utils = { path = "../utils" }
 
 [build-dependencies]
-anyhow = { version = "1.0.70", features = ["std"] }
-clap = { version ="4.1", features = ["derive", "wrap_help"]}
+anyhow = { version = "1.0.94", features = ["std"] }
+clap = { version ="4.5", features = ["derive", "wrap_help"]}
 clap_complete = "4.5"
-log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
+log = { version = "0.4.22", features = ["std", "release_max_level_debug"] }
 
 pv = { path = "../pv", package = "s390_pv" }
 utils = { path = "../utils" }
 
 [dev-dependencies]
-proptest = "1.3"
+proptest = "1.5"

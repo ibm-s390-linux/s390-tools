@@ -9,14 +9,14 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-anyhow = { version = "1.0.70", features = ["std"] }
+anyhow = { version = "1.0.94", features = ["std"] }
 base64 = "0.22.1"
-byteorder = "1.3"
-clap = { version ="4.1", features = ["derive", "wrap_help"]}
-curl = "0.4.44"
-log = { version = "0.4.6", features = ["std", "release_max_level_debug"] }
-openssl = "0.10.66"
-serde = { version = "1.0.139", features = ["derive"]}
+byteorder = "1.5"
+clap = { version ="4.5", features = ["derive", "wrap_help"]}
+curl = "0.4.47"
+log = { version = "0.4.22", features = ["std", "release_max_level_debug"] }
+openssl = "0.10.68"
+serde = { version = "1.0.216", features = ["derive"]}
 serde_json = "1.0"
 serde_yaml = "0.9"
 zerocopy = { version="0.7", features = ["derive"] }
@@ -25,8 +25,8 @@ pv = { path = "../pv", package = "s390_pv" }
 utils = { path = "../utils" }
 
 [build-dependencies]
-clap = { version ="4.1", features = ["derive", "wrap_help"]}
-clap_complete = "4.1"
+clap = { version ="4.5", features = ["derive", "wrap_help"]}
+clap_complete = "4.5"
 log = { version = "0.4", features = ["std", "release_max_level_debug"] }
 
 utils = { path = "../utils" }

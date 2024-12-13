@@ -8,17 +8,17 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-clap = { version ="4.1", features = ["derive", "wrap_help"]}
-lazy_static = "1.1"
-openssl = { version = "0.10.66" }
+clap = { version ="4.5", features = ["derive", "wrap_help"]}
+lazy_static = "1.5"
+openssl = { version = "0.10.68" }
 pv_core = { path = "../pv_core", package = "s390_pv_core"}
 rand = "0.8"
-regex = "1.7"
-serde = { version = "1.0.139", features = ["derive"] }
+regex = "1.11"
+serde = { version = "1.0.216", features = ["derive"] }
 serde_yaml = "0.9"
 utils = { path = "../utils" }
 
 [build-dependencies]
-clap = { version ="4.1", features = ["derive", "wrap_help"]}
-clap_complete = "4.1"
-lazy_static = "1.1"
+clap = { version ="4.5", features = ["derive", "wrap_help"]}
+clap_complete = "4.5"
+lazy_static = "1.5"
