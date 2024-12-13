@@ -37,8 +37,8 @@ pub struct CreateSecretOpt {
 
     /// Specifies the header of the guest image.
     ///
-    /// Can be an IBM Secure Execution image created by genprotimg or an extracted IBM Secure
-    /// Execution header. The header must start at a page boundary.
+    /// Can be an IBM Secure Execution image created by 'pvimg/genprotimg' or an
+    /// extracted IBM Secure Execution header.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     pub hdr: String,
 
@@ -150,12 +150,12 @@ pub enum AddSecretType {
 
     /// Create an association secret.
     ///
-    /// Use an association secret to connect a trusted I/O device to a guest. The `pvapconfig` tool
+    /// Use an association secret to connect a trusted I/O device to a guest. The 'pvapconfig' tool
     /// provides more information about association secrets.
     Association {
-        /// String to identify the new secret.
+        /// String that identifies the new secret.
         ///
-        /// The actual secret is set with --input-secret. The name is saved in `NAME.yaml` with
+        /// The actual secret is set with '--input-secret'. The name is saved in `NAME.yaml` with
         /// white-spaces mapped to `_`.
         name: String,
 
@@ -166,15 +166,15 @@ pub enum AddSecretType {
         stdout: bool,
 
         /// Path from which to read the plaintext secret. Uses a random secret if not specified.
-        #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, conflicts_with("output_secret"))]
+        #[arg(long, value_name = "SECRET-FILE", value_hint = ValueHint::FilePath, conflicts_with("output_secret"))]
         input_secret: Option<String>,
 
-        /// Save the generated secret as plaintext in FILE.
+        /// Save the generated secret as plaintext in SECRET-FILE.
         ///
         /// The generated secret can be used to generate add-secret requests for a different guest
-        /// with the same secret using --input-secret. Destroy the secret when it is not used
+        /// with the same secret using '--input-secret'. Destroy the secret when it is not used
         /// anymore.
-        #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+        #[arg(long, value_name = "SECRET-FILE", value_hint = ValueHint::FilePath,)]
         output_secret: Option<String>,
     },
 }
@@ -243,13 +243,13 @@ pub enum Command {
     /// Create a new add-secret request.
     ///
     /// Create add-secret requests for IBM Secure Execution guests. Only create these requests in a
-    /// trusted environment, such as your workstation. The `pvattest create` command creates a
+    /// trusted environment, such as your workstation. The 'pvattest create' command creates a
     /// randomly generated key to protect the request. The generated requests can then be added on
-    /// an IBM Secure Execution guest using `pvsecret add`. The guest can then use the secrets with
+    /// an IBM Secure Execution guest using 'pvsecret add'. The guest can then use the secrets with
     /// the use case depending on the secret type.
     Create(Box<CreateSecretOpt>),
 
-    /// Perform an add-secret request (s390x only).
+    /// Submit an add-secret request to the Ultravisor (s390x only).
     ///
     /// Perform an add-secret request using a previously generated add-secret request. Only
     /// available on s390x.
@@ -258,7 +258,7 @@ pub enum Command {
     /// Lock the secret-store (s390x only).
     ///
     /// Lock the secret store (s390x only). After this command executed successfully, all
-    /// add-secret requests will fail. Only available on s390x.
+    /// subsequent add-secret requests will fail. Only available on s390x.
     Lock,
 
     /// List all ultravisor secrets (s390x only).
