@@ -17,8 +17,8 @@
 #include "column.h"
 
 #define CMCB_SIZE		(8 * sizeof(u32))
-#define PARTIAL_CMCB_OFFSET	3
-#define PARTIAL_CMCB_SIZE	(CMCB_SIZE - PARTIAL_CMCB_OFFSET * sizeof(u32))
+#define PARTIAL_CMCB_OFFSET	(3 * sizeof(u32))
+#define PARTIAL_CMCB_SIZE	(CMCB_SIZE - PARTIAL_CMCB_OFFSET)
 #define CUE_SIZE		(8 * sizeof(u32))
 #define EXT_CUE_SIZE		(16 * sizeof(u32))
 #define METRICS_SIZE		(18 * sizeof(double))

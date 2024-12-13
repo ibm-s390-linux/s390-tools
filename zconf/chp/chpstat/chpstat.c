@@ -719,7 +719,7 @@ static bool read_cmcb(int chpid, cmcb_t *cmcb)
 		free(path);
 		path = get_chpid_path(chpid, "measurement_chars");
 		/* Partial CMCB contains data starting at word 3. */
-		read_bin(path, &cmcb[PARTIAL_CMCB_OFFSET],
+		read_bin(path, (char *)cmcb + PARTIAL_CMCB_OFFSET,
 			 PARTIAL_CMCB_SIZE, false);
 	}
 	free(path);
