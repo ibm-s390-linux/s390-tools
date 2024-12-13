@@ -55,7 +55,7 @@ pub enum Error {
     #[error("Decryption failed. Probably due to a GCM tag mismatch.")]
     GcmTagMismatch,
 
-    #[error("Invalid {0} user-data for signing provided. Max {} bytes allowed", .0.max())]
+    #[error("Invalid {0} user-data for signing provided. Max {max} bytes allowed", max=.0.max())]
     AsrcbInvSgnUserData(UserDataType),
 
     #[error("Unsupported user data signing key provided. Only EC(secp521r1) and RSA(2048 & 3072 bit) are supported")]
