@@ -1,1 +1,303 @@
-../../rust/pvimg/tools/check_hostkeydoc
+#!/bin/sh
+#
+# check_hostkeydoc - Verify an IBM Secure Execution host key document
+#
+# Sample script to verify that a host key document is genuine by
+# verifying the issuer, the validity date and the signature.
+# Optionally verify the full trust chain using a CA certificate.
+#
+# Sample invocation:
+#
+# ./check_hostkeydoc HKD1234.crt ibm-z-host-key-signing.crt -c DigiCertCA.crt -r ibm-z-host-key.crl
+#
+# Copyright IBM Corp. 2020
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+
+# Allocate temporary files
+ISSUER_PUBKEY_FILE=$(mktemp)
+SIGNATURE_FILE=$(mktemp)
+BODY_FILE=$(mktemp)
+ISSUER_DN_FILE=$(mktemp)
+SUBJECT_DN_FILE=$(mktemp)
+DEF_ISSUER_ARMONK_DN_FILE=$(mktemp)
+DEF_ISSUER_POUGHKEEPSIE_DN_FILE=$(mktemp)
+CANONICAL_ISSUER_DN_FILE=$(mktemp)
+CRL_SERIAL_FILE=$(mktemp)
+
+# Cleanup on exit
+cleanup()
+{
+    rm -f "$ISSUER_PUBKEY_FILE" "$SIGNATURE_FILE" "$BODY_FILE" \
+        "$ISSUER_DN_FILE" "$SUBJECT_DN_FILE" "$DEF_ISSUER_ARMONK_DN_FILE" "$DEF_ISSUER_POUGHKEEPSIE_DN_FILE" \
+        "$CANONICAL_ISSUER_DN_FILE" "$CRL_SERIAL_FILE"
+}
+trap cleanup EXIT
+
+# Enhanced error checking for bash
+if [ -n "${BASH}" ]; then
+    # shellcheck disable=SC3040
+    set -o posix
+    # shellcheck disable=SC3040
+    set -o pipefail
+    # shellcheck disable=SC3040
+    set -o nounset
+fi
+set -e
+
+# Usage
+usage()
+{
+    cat <<-EOF
+Usage: $(basename "$1") [-d] [-c CA-cert] [-r CRL] host-key-doc signing-key-cert
+
+Verify an IBM Secure Execution host key document against
+a signing key.
+
+Options:
+-d         disable default issuer check of host-key-doc
+-c CA-cert trusted CA certificate
+-r CRL     list of revoked host-key-docs
+
+Note that in order to have the full trust chain verified
+it is necessary to provide the issuing CA's certificate.
+The default issuer check may be disabled if a non-default
+signing key certificate needs to be verified against the
+CA certificate.
+
+EOF
+}
+
+check_verify_chain()
+{
+    # Verify certificate chain in case a CA certificate file/bundle
+    # was specified on the command line.
+    if [ -z "$2" ]; then
+        cat >&2 <<-EOF
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+No CA certificate specified! Skipping trust chain verification.
+Make sure that '$1' is a valid certificate.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+EOF
+    else
+        openssl verify -crl_download -crl_check "$2" &&
+            openssl verify -crl_download -crl_check -untrusted "$2" "$1" ||
+            exit 1
+    fi
+}
+
+extract_pubkey()
+{
+    openssl x509 -in "$1" -pubkey -noout >"$2"
+}
+
+extract_signature()
+{
+    # Assuming that the last field is the signature
+    SIGOFFSET=$(openssl asn1parse -in "$1" | tail -1 | cut -d : -f 1)
+
+    openssl asn1parse -in "$1" -out "$2" -strparse "$SIGOFFSET" -noout
+}
+
+extract_body()
+{
+    # Assuming that the first field is the full cert body
+    SIGOFFSET=$(openssl asn1parse -in "$1" | head -2 | tail -1 | cut -d : -f 1)
+
+    openssl asn1parse -in "$1" -out "$2" -strparse "$SIGOFFSET" -noout
+}
+
+verify_signature()
+{
+    # Assuming that the signature algorithm is SHA512 with RSA
+    openssl sha512 -verify "$1" -signature "$2" "$3"
+}
+
+canonical_dn()
+{
+    OBJTYPE=$1
+    OBJ=$2
+    DNTYPE=$3
+    OUTPUT=$4
+
+    openssl "$OBJTYPE" -in "$OBJ" -"$DNTYPE" -noout -nameopt multiline |
+        LC_ALL=C sort | grep -v "$DNTYPE"= >"$OUTPUT"
+}
+
+default_issuer_armonk()
+{
+    cat <<-EOF
+    commonName                = International Business Machines Corporation
+    countryName               = US
+    localityName              = Armonk
+    organizationName          = International Business Machines Corporation
+    organizationalUnitName    = Key Signing Service
+    stateOrProvinceName       = New York
+EOF
+}
+
+default_issuer_pougkeepsie()
+{
+    cat <<-EOF
+    commonName                = International Business Machines Corporation
+    countryName               = US
+    localityName              = Poughkeepsie
+    organizationName          = International Business Machines Corporation
+    organizationalUnitName    = Key Signing Service
+    stateOrProvinceName       = New York
+EOF
+}
+
+# As organizationalUnitName can have an arbitrary prefix but must
+# end with "Key Signing Service" let's normalize the OU name by
+# stripping off the prefix
+verify_default_issuer()
+{
+    default_issuer_pougkeepsie >"$DEF_ISSUER_POUGHKEEPSIE_DN_FILE"
+    default_issuer_armonk >"$DEF_ISSUER_ARMONK_DN_FILE"
+
+    sed "s/\(^[ ]*organizationalUnitName[ ]*=[ ]*\).*\(Key Signing Service$\)/\1\2/" \
+        "$ISSUER_DN_FILE" >"$CANONICAL_ISSUER_DN_FILE"
+
+    if ! {
+        diff "$CANONICAL_ISSUER_DN_FILE" "$DEF_ISSUER_POUGHKEEPSIE_DN_FILE" ||
+            diff "$CANONICAL_ISSUER_DN_FILE" "$DEF_ISSUER_ARMONK_DN_FILE"
+    } >/dev/null 2>&1; then
+        echo Incorrect default issuer >&2 && exit 1
+    fi
+}
+
+verify_issuer_files()
+{
+    if [ "$1" -eq 1 ]; then
+        verify_default_issuer
+    fi
+}
+
+cert_time()
+{
+    DATE=$(openssl x509 -in "$1" -"$2" -noout | sed "s/^.*=//")
+
+    date -d "$DATE" +%s
+}
+
+crl_time()
+{
+    DATE=$(openssl crl -in "$1" -"$2" -noout | sed "s/^.*=//")
+
+    date -d "$DATE" +%s
+}
+
+verify_dates()
+{
+    START="$1"
+    END="$2"
+    MSG="${3:-Certificate}"
+    NOW=$(date +%s)
+
+    if [ "$START" -le "$NOW" ] && [ "$NOW" -le "$END" ]; then
+        echo "${MSG} dates are OK"
+    else
+        echo "${MSG} date verification failed" >&2 && exit 1
+    fi
+}
+
+crl_serials()
+{
+    openssl crl -in "$1" -text -noout |
+        grep "Serial Number" >"$CRL_SERIAL_FILE"
+}
+
+check_serial()
+{
+    CERT_SERIAL=$(openssl x509 -in "$1" -noout -serial | cut -d = -f 2)
+
+    grep -q "$CERT_SERIAL" "$CRL_SERIAL_FILE"
+}
+
+check_file()
+{
+    [ -e "$1" ] ||
+        (echo "File '$1' not found" >&2 && exit 1)
+}
+
+# check args
+CRL_FILE=
+CA_FILE=
+CHECK_DEFAULT_ISSUER=1
+
+while getopts 'dr:c:h' opt; do
+    case $opt in
+    d) CHECK_DEFAULT_ISSUER=0 ;;
+    r) CRL_FILE=$OPTARG ;;
+    c) CA_FILE=$OPTARG ;;
+    h)
+        usage "$0"
+        exit 0
+        ;;
+    ?)
+        usage "$0"
+        exit 1
+        ;;
+    esac
+done
+shift "$((OPTIND - 1))"
+
+if [ $# -ne 2 ]; then
+    usage "$0" >&2
+    exit 1
+fi
+
+HKD_FILE=$1
+HKSK_FILE=$2
+
+# Check whether all specified files exist
+check_file "$HKD_FILE"
+check_file "$HKSK_FILE"
+# CA and CRL are optional arguments
+[ -n "$CA_FILE" ] && check_file "$CA_FILE"
+[ -n "$CRL_FILE" ] && check_file "$CRL_FILE"
+
+# Check trust chain
+check_verify_chain "$HKSK_FILE" "$CA_FILE"
+
+# Verify host key document signature
+printf "Checking host key document signature: "
+extract_pubkey "$HKSK_FILE" "$ISSUER_PUBKEY_FILE" &&
+    extract_signature "$HKD_FILE" "$SIGNATURE_FILE" &&
+    extract_body "$HKD_FILE" "$BODY_FILE" &&
+    verify_signature "$ISSUER_PUBKEY_FILE" "$SIGNATURE_FILE" "$BODY_FILE" ||
+    exit 1
+
+# Verify the issuer
+canonical_dn x509 "$HKD_FILE" issuer "$ISSUER_DN_FILE"
+canonical_dn x509 "$HKSK_FILE" subject "$SUBJECT_DN_FILE"
+verify_issuer_files $CHECK_DEFAULT_ISSUER
+
+# Verify dates
+verify_dates "$(cert_time "$HKD_FILE" startdate)" "$(cert_time "$HKD_FILE" enddate)"
+
+# Check CRL if specified
+if [ -n "$CRL_FILE" ]; then
+    printf "Checking CRL signature: "
+    extract_signature "$CRL_FILE" "$SIGNATURE_FILE" &&
+        extract_body "$CRL_FILE" "$BODY_FILE" &&
+        verify_signature "$ISSUER_PUBKEY_FILE" "$SIGNATURE_FILE" "$BODY_FILE" ||
+        exit 1
+
+    printf "CRL "
+    canonical_dn crl "$CRL_FILE" issuer "$ISSUER_DN_FILE"
+    canonical_dn x509 "$HKSK_FILE" subject "$SUBJECT_DN_FILE"
+    verify_issuer_files $CHECK_DEFAULT_ISSUER
+
+    verify_dates "$(crl_time "$CRL_FILE" lastupdate)" "$(crl_time "$CRL_FILE" nextupdate)" 'CRL'
+
+    crl_serials "$CRL_FILE"
+    check_serial "$HKD_FILE" &&
+        echo "Certificate is revoked, do not use it anymore!" >&2 &&
+        exit 1
+fi
+
+# We made it
+echo All checks requested for \'"$HKD_FILE"\' were successful
