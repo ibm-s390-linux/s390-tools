@@ -38,9 +38,10 @@ install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c zipl $(DESTDIR)$(BINDIR)
 	$(INSTALL) -c zipl-editenv $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 755 $(zipl_helpers) $(chreipl_helpers) \
-		$(DESTDIR)$(TOOLS_LIBDIR)
-	$(CP) --no-dereference $(chreipl_helpers) $(DESTDIR)$(TOOLS_LIBDIR)
+	$(INSTALL) -m 755 zipl_helper.device-mapper $(DESTDIR)$(TOOLS_LIBDIR)
+	ln -f -s zipl_helper.device-mapper $(DESTDIR)$(TOOLS_LIBDIR)/zipl_helper.md
+	ln -f -s zipl_helper.device-mapper $(DESTDIR)$(TOOLS_LIBDIR)/chreipl_helper.md
+	ln -f -s zipl_helper.device-mapper $(DESTDIR)$(TOOLS_LIBDIR)/chreipl_helper.device-mapper
 
 clean:
 	rm -f *.o $(zipl_helpers) $(chreipl_helpers) zipl zipl-editenv
