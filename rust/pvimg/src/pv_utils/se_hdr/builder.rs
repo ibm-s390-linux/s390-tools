@@ -230,8 +230,14 @@ mod tests {
 
         let decrypted = bin.decrypt(&prot_key).expect("BUG");
         assert_eq!(bin.common, decrypted.common);
-        assert_eq!(bin.aad(), decrypted.aad());
-        assert_ne!(&bin.data(), decrypted.data().value());
+        assert_eq!(
+            bin.aad().expect("should not fail"),
+            decrypted.aad().expect("should not fail")
+        );
+        assert_ne!(
+            &bin.data(),
+            decrypted.data().expect("should not fail").value()
+        );
         let _decrypted_hdrv1: SeHdrDataV1 = decrypted.data.try_into().expect("BUG");
     }
 

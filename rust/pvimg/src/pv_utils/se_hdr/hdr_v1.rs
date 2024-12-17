@@ -19,6 +19,7 @@ use serde::{Serialize, Serializer};
 use super::keys::phkh_v1;
 use crate::{
     error::Error,
+    misc::PAGESIZE,
     pv_utils::{
         error::Result,
         se_hdr::{
@@ -51,11 +52,14 @@ struct HdrSizesV1 {
 #[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 struct SeHdrAadV1 {
+    #[deku(assert = "*sehs <= SeHdrDataV1::MAX_SIZE.try_into().unwrap()")]
     sehs: u32,
     #[serde(serialize_with = "ser_hex")]
     iv: [u8; SymKeyType::AES_256_GCM_IV_LEN],
     res1: u32,
+    #[deku(assert = "*nks <= (*sehs).into()", update = "self.keyslots.len()")]
     nks: u64,
+    #[deku(assert = "*sea <= (*sehs).into()")]
     sea: u64,
     nep: u64,
     #[serde(serialize_with = "ser_lower_hex")]
@@ -118,6 +122,7 @@ pub struct SeHdrConfV1 {
     psw: PSW,
     #[serde(serialize_with = "ser_lower_hex")]
     scf: u64,
+    #[deku(assert_eq = "0")]
     noi: u32,
     res2: u32,
     #[deku(count = "noi")]
@@ -200,6 +205,7 @@ where
 }
 
 impl SeHdrDataV1 {
+    const MAX_SIZE: usize = 2 * PAGESIZE;
     const PCF_DEFAULT: u64 = 0x0;
     const SCF_DEFAULT: u64 = 0x0;
 
@@ -241,7 +247,14 @@ impl SeHdrDataV1 {
             tag: SeHdrTagV1::default(),
         };
         let hdr_size = ret.size()?;
-        ret.aad.sehs = hdr_size.phs.try_into()?;
+        let phs = hdr_size.phs.try_into()?;
+        if phs > Self::MAX_SIZE {
+            return Err(Error::InvalidSeHdrTooLarge {
+                given: phs,
+                maximum: Self::MAX_SIZE,
+            });
+        }
+        ret.aad.sehs = phs.try_into()?;
         ret.aad.sea = hdr_size.sea;
         Ok(ret)
     }
@@ -494,8 +507,8 @@ impl KeyExchangeTrait for SeHdrBinV1 {
 }
 
 impl AeadDataTrait for SeHdrBinV1 {
-    fn aad(&self) -> Vec<u8> {
-        serialize_to_bytes(&self.aad).unwrap()
+    fn aad(&self) -> Result<Vec<u8>> {
+        serialize_to_bytes(&self.aad)
     }
 
     fn data(&self) -> Vec<u8> {
@@ -508,12 +521,12 @@ impl AeadDataTrait for SeHdrBinV1 {
 }
 
 impl AeadPlainDataTrait for SeHdrDataV1 {
-    fn aad(&self) -> Vec<u8> {
-        serialize_to_bytes(&self.aad).unwrap()
+    fn aad(&self) -> Result<Vec<u8>> {
+        serialize_to_bytes(&self.aad)
     }
 
-    fn data(&self) -> Confidential<Vec<u8>> {
-        serialize_to_bytes(self.data.value()).unwrap().into()
+    fn data(&self) -> Result<Confidential<Vec<u8>>> {
+        Ok(serialize_to_bytes(self.data.value())?.into())
     }
 
     fn tag(&self) -> Vec<u8> {
@@ -609,5 +622,49 @@ mod tests {
         assert_eq!(meta.tld, hdr_data_v1.aad.tld);
         assert_eq!(psw, hdr_data_v1.data.value().psw);
         assert_eq!(cck.value(), hdr_data_v1.data.value().cck.value());
+    }
+
+    #[test]
+    fn max_size_sehdr_test() {
+        const MAX_HOST_KEYS: usize = 95;
+
+        let (_, host_key) = get_test_key_and_cert();
+        let pub_key = host_key.public_key().unwrap();
+        let host_keys_max: Vec<_> = (0..MAX_HOST_KEYS).map(|_| pub_key.clone()).collect();
+        let too_many_host_keys: Vec<_> = (0..MAX_HOST_KEYS + 1).map(|_| pub_key.clone()).collect();
+        let xts_key = Confidential::new([0x3; SymKeyType::AES_256_XTS_KEY_LEN]);
+        let meta = ComponentMetadataV1 {
+            ald: [0x1; SHA_512_HASH_LEN],
+            pld: [0x2; SHA_512_HASH_LEN],
+            tld: [0x3; SHA_512_HASH_LEN],
+            nep: 3,
+            key: xts_key,
+        };
+        let psw = PSW {
+            addr: 1234,
+            mask: 5678,
+        };
+
+        let mut builder = SeHdrBuilder::new(SeHdrVersion::V1, psw.clone(), meta.clone())
+            .expect("should not fail");
+        builder
+            .add_hostkeys(&host_keys_max)
+            .expect("should not fail")
+            .with_components(meta.clone())
+            .expect("should not fail");
+        let bin = builder.build().expect("should not fail");
+        assert_eq!(bin.common.version, SeHdrVersion::V1);
+        let hdr_v1: SeHdrBinV1 = bin.data.try_into().expect("should not fail");
+        assert_eq!(hdr_v1.aad.sehs, 8160);
+
+        let mut builder = SeHdrBuilder::new(SeHdrVersion::V1, psw.clone(), meta.clone())
+            .expect("should not fail");
+
+        builder
+            .add_hostkeys(&too_many_host_keys)
+            .expect("should not fail")
+            .with_components(meta)
+            .expect("should not fail");
+        assert!(matches!(builder.build(), Err(Error::InvalidSeHdr)));
     }
 }

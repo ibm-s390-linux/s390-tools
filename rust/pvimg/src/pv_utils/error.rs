@@ -30,6 +30,9 @@ pub enum Error {
     #[error("Invalid Secure Execution header")]
     InvalidSeHdr,
 
+    #[error("Secure Execution header size {given} is larger than the maximum of {maximum} bytes")]
+    InvalidSeHdrTooLarge { given: usize, maximum: usize },
+
     #[error("Invalid component metadata.")]
     InvalidComponentMetadata,
 

@@ -34,7 +34,7 @@ pub trait AeadCipherTrait {
 #[enum_dispatch]
 pub trait AeadDataTrait {
     /// Returns the authenticated associated data.
-    fn aad(&self) -> Vec<u8>;
+    fn aad(&self) -> Result<Vec<u8>>;
 
     /// Returns the encrypted data.
     fn data(&self) -> Vec<u8>;
@@ -47,10 +47,10 @@ pub trait AeadDataTrait {
 #[enum_dispatch]
 pub trait AeadPlainDataTrait {
     /// Returns the authenticated associated data.
-    fn aad(&self) -> Vec<u8>;
+    fn aad(&self) -> Result<Vec<u8>>;
 
     /// Returns the unencrypted data.
-    fn data(&self) -> Confidential<Vec<u8>>;
+    fn data(&self) -> Result<Confidential<Vec<u8>>>;
 
     /// Returns the tag data.
     fn tag(&self) -> Vec<u8>;
@@ -124,8 +124,14 @@ pub trait UvDataPlainTrait:
                 expected: self.aead_key_type().to_string(),
             });
         }
-        let aad = self.aad();
-        let unecrypted_data = self.data();
+        let aad = self.aad().map_err(|err| match err {
+            Error::Deku(_) => Error::InvalidSeHdr,
+            err => err,
+        })?;
+        let unecrypted_data = self.data().map_err(|err| match err {
+            Error::Deku(_) => Error::InvalidSeHdr,
+            err => err,
+        })?;
         let iv = self.iv();
         let result = encrypt_aead(key, iv, &aad, unecrypted_data.value())?;
         Self::C::try_from_data(&result.into_buf())
@@ -169,7 +175,7 @@ pub trait UvDataTrait: AeadDataTrait + AeadCipherTrait + KeyExchangeTrait + Clon
         }
 
         let tag_size = self.aead_tag_size();
-        let aad = self.aad();
+        let aad = self.aad()?;
         let unecrypted_data = self.data();
         let iv = self.iv();
         let tag = self.tag();
