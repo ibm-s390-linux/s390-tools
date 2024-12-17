@@ -25,6 +25,7 @@ pub struct UserProvidedKeys {
 /// Reads all user provided keys.
 pub fn read_user_provided_keys(
     cck_path: Option<&Path>,
+    hdr_key_path: Option<&Path>,
     experimental_args: &CreateBootImageExperimentalArgs,
 ) -> Result<UserProvidedKeys> {
     let components_key = {
@@ -43,7 +44,7 @@ pub fn read_user_provided_keys(
         }
     };
     let aead_key = {
-        match &experimental_args.x_header_key {
+        match hdr_key_path {
             Some(key_path) => {
                 info!(
                     "Use file '{}' as the Secure Execution header protection",

@@ -129,6 +129,14 @@ contain exactly 32 bytes of data.
 .RE
 .RE
 .PP
+\-\-hdr\-key <FILE>
+.RS 4
+Use the content of FILE as the Secure Execution header protection key. The file
+must contain exactly 32 bytes of data. If the option is not specified, the
+Secure Execution header protection key is a randomly generated key.
+.RE
+.RE
+.PP
 \-\-enable\-dump
 .RS 4
 Enable Secure Execution guest dump support. This option requires the
@@ -233,22 +241,22 @@ line flag, or wrong number of arguments.
 .RE
 .SH EXAMPLES
 These are examples of how to generate an IBM Secure Execution image in
-\fI\,/boot/secure-linux\/\fR, using the kernel file \fI\,/boot/vmlinuz\/\fR, the
+\fI\,/boot/secure\-linux\/\fR, using the kernel file \fI\,/boot/vmlinuz\/\fR, the
 initrd in \fI\,/boot/initrd.img\/\fR, the kernel parameters contained in
 \fI\,parmfile\/\fR, the intermediate CA in \fI\,DigiCertCA.crt\/\fR, the IBM Z
-signing key in \fI\,ibm-z-host-key-signing.crt\/\fR, and the host-key document
-in \fI\,host_key.crt\/\fR. An AES-256 GCM key is stored in \fI\,comm-key\/\fR,
+signing key in \fI\,ibm\-z\-host\-key\-signing.crt\/\fR, and the host-key document
+in \fI\,host_key.crt\/\fR. An AES-256 GCM key is stored in \fI\,comm\-key\/\fR,
 which is used when creating a Secure Execution image with guest dump support
 enabled in the second example.
 
 Generate an IBM Secure Execution image:
 
 .PP
-.B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure-linux\/\fR
+.B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm\-z\-host\-key\-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure\-linux\/\fR
 
 Generate an IBM Secure Execution image with Secure Execution guest dump support:
 .PP
-.B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm-z-host-key-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure-linux\/\fR \-\-enable\-dump \-\-cck \fI\,comm-key\fR
+.B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm\-z\-host\-key\-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure\-linux\/\fR \-\-enable\-dump \-\-cck \fI\,comm\-key\fR
 .SH NOTES
 .IP "1." 4
 The \fBgenprotimg\fR(1) command is a symbolic link to the \fBpvimg-create\fR(1) command.

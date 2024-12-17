@@ -192,6 +192,9 @@ pub struct InfoArgs {
     pub format: OutputFormat,
 
     /// Use the key in FILE to decrypt the Secure Execution header.
+    ///
+    /// It is the key that was specified with the command line option
+    /// '--hdr-key' at the Secure Execution image creation.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub key: Option<PathBuf>,
 }
@@ -331,6 +334,14 @@ pub struct CreateBootImageArgs {
     #[arg(long, value_name = "FILE", visible_alias = "comm-key")]
     pub cck: Option<PathBuf>,
 
+    /// Use the content of FILE as the Secure Execution header protection key.
+    ///
+    /// The file must contain exactly 32 bytes of data. If the option is not
+    /// specified, the Secure Execution header protection key is a randomly
+    /// generated key.
+    #[arg(long, value_name = "FILE", alias = "x-header-key")]
+    pub hdr_key: Option<PathBuf>,
+
     #[clap(flatten)]
     pub legacy_flags: CreateBootImageLegacyFlags,
 
@@ -351,11 +362,6 @@ pub struct CreateBootImageExperimentalArgs {
     // Hidden in user documentation.
     #[arg(long, value_name = "FILE", hide(true))]
     pub x_comp_key: Option<PathBuf>,
-
-    /// Manually set the Secure Execution header protection key (experimental option).
-    // Hidden in user documentation.
-    #[arg(long, value_name = "FILE", hide(true))]
-    pub x_header_key: Option<PathBuf>,
 
     /// Manually set the PSW address used for the Secure Execution header (experimental option).
     // Hidden in user documentation.
@@ -494,6 +500,8 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-backup-keys", ["--enable-backup-keys"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-image-encryption", ["--disable-image-encryption"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-header-key", ["--x-header-key", "/dev/null"]),])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-header-key", ["--hdr-key", "/dev/null"]),])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),
@@ -521,6 +529,7 @@ mod test {
                                                    CliOption::new("disable-pckmo", ["--disable-pckmo"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"]),
                                                    CliOption::new("disable-image-encryption", ["--disable-image-encryption"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-header-key", ["--hdr-key"]),])),
         ];
 
         let mut genprotimg_valid_args = vec![

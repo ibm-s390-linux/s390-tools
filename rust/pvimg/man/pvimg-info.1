@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvimg-info 1 "2024-12-11" "s390-tools" "Pvimg Manual"
+.TH pvimg-info 1 "2024-12-17" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
 .SH NAME
@@ -39,7 +39,9 @@ Possible values:
 .PP
 \-\-key <FILE>
 .RS 4
-Use the key in FILE to decrypt the Secure Execution header.
+Use the key in FILE to decrypt the Secure Execution header. It is the key that
+was specified with the command line option \fB\-\-hdr\-key\fR at the Secure
+Execution image creation.
 .RE
 .RE
 .PP
