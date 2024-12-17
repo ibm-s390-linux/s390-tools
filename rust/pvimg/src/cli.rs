@@ -195,8 +195,8 @@ pub struct InfoArgs {
     ///
     /// It is the key that was specified with the command line option
     /// '--hdr-key' at the Secure Execution image creation.
-    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
-    pub key: Option<PathBuf>,
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, alias = "key")]
+    pub hdr_key: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -721,6 +721,22 @@ mod test {
                     CliOption::new("image", ["/dev/null"]),
                 ],
             )),
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("hdr-key", ["--hdr-key", "/dev/null"]),
+                    CliOption::new("format", ["--format=json"]),
+                    CliOption::new("image", ["/dev/null"]),
+                ],
+            )),
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("hdr-key", ["--key", "/dev/null"]),
+                    CliOption::new("format", ["--format=json"]),
+                    CliOption::new("image", ["/dev/null"]),
+                ],
+            )),
             // separation between keyword and positional args works
             flat_map_collect(insert(
                 args.clone(),
@@ -761,7 +777,7 @@ mod test {
 
         // Test for invalid combinations
         // Input is missing
-        let mut pvimg_invalid_args = vec![vec!["pvimg", "test"]];
+        let mut pvimg_invalid_args = vec![vec!["pvimg", "info"]];
 
         for create_args in &valid_test_args {
             pvimg_valid_args.push(

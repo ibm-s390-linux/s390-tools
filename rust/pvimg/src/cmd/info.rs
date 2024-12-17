@@ -27,7 +27,7 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
 
     SeHdr::seek_sehdr(&mut input, None)?;
     let hdr = SeHdr::try_from_io(input)?;
-    if let Some(key_path) = &opt.key {
+    if let Some(key_path) = &opt.hdr_key {
         let key =
             SymKey::try_from_data(hdr.key_type(), read_file(key_path, "Reading key")?.into())?;
         serde_json::to_writer_pretty(&mut output, &hdr.decrypt(&key)?)?;
