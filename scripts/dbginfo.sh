@@ -38,6 +38,8 @@ readonly LOG_FILE_SIZE_CHECK=50  # max logfile size in MB
 readonly LOG_FILE_AGE_CHECK=7  # age in days to include for size checking
 # Mount point of the debug file system
 readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
+# Network devices
+readonly NETWORK_DEVS=$(cd /sys/class/net; ls -d */ 2>/dev/null |  sed 's/\///g')
 # distro info
 readonly OSPRETTY="$(cat /etc/os* 2>/dev/null | grep -m1 PRETTY_NAME | sed 's/\"//g')"
 readonly OS_NAME="${OSPRETTY##*=}"
@@ -1014,20 +1016,20 @@ collect_initrd_configfiles() {
 
 ########################################
 collect_osaoat() {
-	local network_devices
-	local network_device
+	local osa_devices
+	local osa_device
 
-	network_devices=$(lsqeth 2>/dev/null | grep "Device name" \
-		     | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g' \
-		     | sed 's/[()]//g' )
 	if type qethqoat >/dev/null; then
-		if test -n "${network_devices}"; then
+		osa_devices=$(lsqeth 2>/dev/null | grep "Device name" \
+			     | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g' \
+			     | sed 's/[()]//g' )
+		if test -n "${osa_devices}"; then
 			pr_collect_output "osa oat"
-			for network_device in ${network_devices}; do
-				call_run_command "qethqoat ${network_device}" \
+			for osa_device in ${osa_devices}; do
+				call_run_command "qethqoat ${osa_device}" \
 					"${OUTPUT_FILE_OSAOAT}.out" &&
-				call_run_command "qethqoat -r ${network_device}" \
-					"${OUTPUT_FILE_OSAOAT}_${network_device}.raw"
+				call_run_command "qethqoat -r ${osa_device}" \
+					"${OUTPUT_FILE_OSAOAT}_${osa_device}.raw"
 			done
 		else
 			pr_skip "osa oat: no devices"
@@ -1039,14 +1041,12 @@ collect_osaoat() {
 
 ########################################
 collect_ethtool() {
-	local network_devices
 	local network_device
 
-	network_devices=$(ls /sys/class/net 2>/dev/null)
 	if type ethtool >/dev/null; then
-		if test -n "${network_devices}"; then
+		if test -n "${NETWORK_DEVS}"; then
 			pr_collect_output "ethtool"
-			for network_device in ${network_devices}; do
+			for network_device in ${NETWORK_DEVS}; do
 				call_run_command "ethtool ${network_device}" \
 					"${OUTPUT_FILE_ETHTOOL}"
 				call_run_command "ethtool -k ${network_device}" \
@@ -1082,14 +1082,12 @@ collect_ethtool() {
 
 ########################################
 collect_tc() {
-	local network_devices
 	local network_device
 
-	network_devices=$(ls /sys/class/net 2>/dev/null)
 	if type tc >/dev/null; then
-		if test -n "${network_devices}"; then
+		if test -n "${NETWORK_DEVS}"; then
 			pr_collect_output "Trafic Control"
-			for network_device in ${network_devices}; do
+			for network_device in ${NETWORK_DEVS}; do
 				call_run_command "tc -s qdisc show dev ${network_device}" \
 					"${OUTPUT_FILE_TC}"
 			done
@@ -1103,14 +1101,12 @@ collect_tc() {
 
 ########################################
 collect_bridge() {
-	local network_devices
 	local network_device
 
-	network_devices=$(ls /sys/class/net 2>/dev/null)
 	if type bridge >/dev/null; then
-		if test -n "${network_devices}"; then
+		if test -n "${NETWORK_DEVS}"; then
 			pr_collect_output "bridge"
-			for network_device in ${network_devices}; do
+			for network_device in ${NETWORK_DEVS}; do
 				call_run_command "bridge -d link show dev ${network_device}" \
 					"${OUTPUT_FILE_BRIDGE}"
 				call_run_command "bridge -s fdb show dev ${network_device}" \
