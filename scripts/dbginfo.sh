@@ -544,6 +544,8 @@ CMDS="${CMDS}\
 
 # crypto specific commands
 CMDS="${CMDS}\
+  :cpacfinfo # for MSA 13 info\
+  :cpacfinfo -m -f -a -n\
   :ep11info -D\
   :ep11info -H\
   :ep11info -M\
