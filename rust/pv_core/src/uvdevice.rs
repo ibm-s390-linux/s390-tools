@@ -76,7 +76,7 @@ fn rc_fmt<C: UvCmd>(rc: u16, rrc: u16, cmd: &mut C) -> &'static str {
         (0x0002, _) => Some("invalid UV command"),
         (0x0005, _) => Some("request has an invalid size"),
         (0x0030, _) => Some("home address space control bit has R-bit set to one. This may be due to a corrupted host or a guest kernel bug. STOP using this guest"),
-        (0x0031, _) => Some("adress translation exception. This may be due to a corrupted host or a guest kernel bug. STOP using this guest"),
+        (0x0031, _) => Some("address translation exception. This may be due to a corrupted host or a guest kernel bug. STOP using this guest"),
         (0x0032, _) => Some("request contains virtual address translating to an invalid address. This may be due to a corrupted host or a guest kernel bug. STOP using this guest"),
         (UvDevice::RC_MORE_DATA, _) => unreachable!("This is no Error!!!!"),
         (UvDevice::RC_SUCCESS, _) => unreachable!("This is no Error!!!!"),
