@@ -138,3 +138,4 @@ zkey/kmip/zkey-kmip.so
 zkey/zkey
 zkey/zkey-cryptsetup
 zpcictl/zpcictl
+zpwr/zpwr
