@@ -1,0 +1,232 @@
+.\" Copyright 2025 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.ds c \fBzpwr\fP
+.TH zpwr 1 "Feb 2025" "s390-tools" zpwr
+.SH NAME
+zpwr \- Display power readings of a partition and central processor complex
+(CPC) on an IBM Z or LinuxONE server.
+.SH SYNOPSIS
+.sp
+.nf
+\fIzpwr\fR
+	[\-d <NUMBER> | \-\-delay=<NUMBER>] [\-c <NUMBER> | \-\-count=<NUMBER>]
+	[\-\-format=<STRING>]
+	[\-s | \-\-stream]
+	[\-v | \-\-version]
+	[\-h | \-\-help]
+.fi
+.SH DESCRIPTION
+.sp
+zpwr displays power readings of a partition and central processor complex
+(CPC) on an IBM Z or LinuxONE server.
+.sp
+Partition readings include CPU, storage and I/O power readings.  It specifies
+the number of units allocated to the configuration at the time the reading was
+taken.
+.sp
+CPC readings include total, unassigned resources and infrastructure power
+readings.
+.sp
+Power reading units are automatically presented in a human readable format,
+whereas complex formats like json, csv, json-seq, pairs display the power
+readings in microwatts.
+.sp
+CPC power readings can be retrieved only when the required authorization was
+set for the LPAR.  Enable the required authorization by setting "Global
+Performance Data" in LPAR's activation profile.
+.sp
+If the power readings cannot be retrieved, the power readings return an empty
+string or null in complex formats, and the power readings are not displayed in
+human readable format.
+.SH OPTIONS
+.PP
+\-\-format=<STRING>
+.RS 4
+Retrieve power readings in the following formats: json, csv,
+json-seq or pairs. If no format is specified in the command, the output will
+default to the human readable format.
+.sp
+When the format is json, csv, json-seq or pairs, the power readings are
+displayed in microwatts.
+.RE
+.PP
+\-d, \-\-delay
+.RS 4
+Retrieve power readings after specified delay in seconds has elapsed.
+.RE
+.PP
+\-c <NUMBER>, \-\-count=<NUMBER>
+.RS 4
+Required number of power readings.
+.sp
+The \-\-count option can only be used in conjunction with \-\-stream or
+\-\-delay option.
+.RE
+.PP
+\-s, \-\-stream
+.RS 4
+Retrieve power readings in stream mode. A new power reading will be displayed
+only after an interval has elapsed since the last power reading request.
+The interval is automatically calculated in stream mode.
+.sp
+The \-\-stream and \-\-delay options are mutually exclusive.
+.RE
+.PP
+\-v, \-\-version
+.RS 4
+Print version information.
+.RE
+.PP
+\-h, \-\-help
+.RS 4
+Print usage information.
+.RE
+.SH OUTPUT
+.B Iteration
+.RS 4
+Iteration number of the current power readings. If the power reading is
+requested before the time interval has elapsed, cached power readings might be
+returned. The iteration number helps to determine if the cached power readings
+are provided.
+.RE
+.PP
+.B Time
+.RS 4
+The time at which power readings were taken, expressed in human readable format.
+.RE
+.PP
+.B Time epoch
+.RS 4
+The time at which power readings were taken, expressed in epoch time.
+.PP
+.B sec
+.RS 4
+The number of seconds elapsed since the Unix epoch.
+.RE
+.PP
+.B nsec
+.RS 4
+The number of nanoseconds elapsed since the last full seconds.
+.RE
+.RE
+.PP
+.B Update interval
+.RS 4
+Indicates the time interval in nanoseconds after which new power readings are
+available. If the power readings is requested before the time interval has
+elapsed, cached power readings might be returned.
+.RE
+.PP
+.B CPU
+.RS 4
+CPU power reading of a partition.
+.RE
+.PP
+.B Storage
+.RS 4
+Storage power reading of a partition.
+.RE
+.PP
+.B I/O
+.RS 4
+I/O power reading of a partition.
+.RE
+.PP
+.B Total
+.RS 4
+Specifies number of units for all electrical and mechanical components of the
+system.
+.RE
+.PP
+.B Unassigned Resources
+.RS 4
+Specifies number of units for all types of resources in the standby state or
+reserved state at the time the reading was taken.
+.RE
+.PP
+.B Infrastructure
+.RS 4
+Specifies number of units for all subsystems in the CPC which do not provide
+CPU, storage or I/O resources to partitions.
+.RE
+.SH "EXAMPLES"
+1. Display power readings in human readable format.
+.nf
+.ft CW
+# zpwr
+LPAR CPU:                       140.00  W
+LPAR Storage:                     1.72  W
+LPAR I/O:                        40.00  W
+
+CPC Total:                       15.40 kW
+CPC Unassigned Resources:         7.48 kW
+CPC Infrastructure:               5.31 kW
+
+Update interval: 10.00 s
+.ft
+.fi
+.sp 1
+2. Perform two power measurements with a delay of 10 seconds and output the
+data in json format.
+.nf
+.ft CW
+# zpwr --format json --delay 10 --count 2
+{
+  "meta": {
+    "api_level": "1",
+    "version": "2.36.0-build-20250107",
+    "host": "lpar001",
+    "time_epoch": "1736316898",
+    "time": "2025-01-08 07:14:58+0100"
+  },
+  "zpwr": [
+    {
+      "iteration": "0",
+      "time": "2025-01-08 07:14:58+0100",
+      "time_epoch_sec": "1736316898",
+      "time_epoch_nsec": "10935887",
+      "update_interval": "10000000000",
+      "lpar": [
+        "cpu": "140000000",
+        "storage": "1719200",
+        "io": "40000000"
+      ],
+      "cpc": [
+        "total": "15406000000",
+        "unassigned_resources": "7578848100",
+        "infrastructure": "5283946300"
+      ]
+    },
+    {
+      "iteration": "1",
+      "time": "2025-01-08 07:15:08+0100",
+      "time_epoch_sec": "1736316908",
+      "time_epoch_nsec": "11113153",
+      "update_interval": "10000000000",
+      "lpar": [
+        "cpu": "140000000",
+        "storage": "1719200",
+        "io": "40000000"
+      ],
+      "cpc": [
+        "total": "15401000000",
+        "unassigned_resources": "7569928400",
+        "infrastructure": "5284866000"
+      ]
+    }
+  ]
+}
+.ft
+.fi
+.sp 1
+3. Display power readings in csv format and in stream mode.
+.nf
+.ft CW
+# zpwr --format csv --stream
+"iteration","time","time_epoch_sec","time_epoch_nsec","update_interval","cpu","storage","io","total","unassigned_resources","infrastructure"
+"0","2025-01-08 07:17:05+0100","1736317025","592784684","10000000000","143000000","1708200","40000000","15550000000","7659162700","5337186700"
+"1","2025-01-08 07:17:15+0100","1736317035","592937261","10000000000","143000000","1708200","40000000","15533000000","7650389100","5328960300"
+.ft
+.fi

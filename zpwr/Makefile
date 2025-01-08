@@ -15,7 +15,9 @@ zpwr: $(OBJECTS) $(rootdir)/libutil/libutil.a -lm
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
+	$(INSTALL) -d -m 755 $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 zpwr $(DESTDIR)$(USRBINDIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 man/zpwr.1 $(DESTDIR)$(MANDIR)/man1
 
 clean:
 	rm -f *.o *~ zpwr core
