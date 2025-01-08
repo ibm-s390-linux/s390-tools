@@ -330,7 +330,8 @@ pub struct CreateBootImageArgs {
 
     /// Use the content of FILE as the customer-communication key (CCK).
     ///
-    /// The file must contain exactly 32 bytes of data.
+    /// The file must contain exactly 32 bytes of data. This option used to be
+    /// called '--comm-key' in previous versions.
     #[arg(long, value_name = "FILE", visible_alias = "comm-key")]
     pub cck: Option<PathBuf>,
 
