@@ -116,7 +116,17 @@ install-man:
 	$(foreach target,$(PV_TARGETS),\
 		$(INSTALL) -m 644 $(target)/man/*.1 -t $(DESTDIR)$(MANDIR)/man1;)
 
-.PHONY: all install clean skip-build install-rust-tools print-rust-targets install-man rust-test
+install-bash-completion: $(PV_TARGETS)
+	$(INSTALL) -d -m 755 $(DESTDIR)$(BASHCOMPLETIONDIR)
+	$(foreach target,$(PV_TARGETS),\
+		$(INSTALL) $(shell find $(shell ls --sort=time --reverse --directory target/release/build/$(target)-*/out/ |tail -n1) -name '*.bash') $(DESTDIR)$(BASHCOMPLETIONDIR);)
+
+install-zsh-completion: $(PV_TARGETS)
+	$(INSTALL) -d -m 755 $(DESTDIR)$(ZSHCOMPLETIONDIR)
+	$(foreach target,$(PV_TARGETS),\
+		$(INSTALL) $(shell find $(shell ls --sort=time --reverse --directory target/release/build/$(target)-*/out/ |tail -n1) -regex '.*/_[a-zA-Z0-9]+') $(DESTDIR)$(ZSHCOMPLETIONDIR);)
+
+.PHONY: all install clean skip-build install-rust-tools print-rust-targets install-man rust-test install-bash-completion install-zsh-completion
 
 .check-cargo:
 ifeq ($(shell command -v $(CARGO)),)
