@@ -265,9 +265,10 @@ LIBDIR          = $(INSTALLDIR)/lib
 USRLIBDIR	= $(INSTALLDIR)/usr/lib
 USRLIB64DIR     = $(INSTALLDIR)/usr/lib64
 SYSCONFDIR      = $(INSTALLDIR)/etc
-MANDIR          = $(INSTALLDIR)/usr/share/man
+DATADIR         = $(INSTALLDIR)/usr/share
+MANDIR          = $(DATADIR)/man
 VARDIR          = $(INSTALLDIR)/var
-TOOLS_DATADIR   = $(INSTALLDIR)/usr/share/s390-tools
+TOOLS_DATADIR   = $(DATADIR)/s390-tools
 TOOLS_LIBDIR    = $(INSTALLDIR)/lib/s390-tools
 ZFCPDUMP_DIR    = $(TOOLS_LIBDIR)/zfcpdump
 # Systemd support files are installed only if a directory is specified
