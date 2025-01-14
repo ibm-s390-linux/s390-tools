@@ -49,37 +49,32 @@ fn parse_flags(
     args: &CreateBootImageArgs,
 ) -> Result<(PlaintextControlFlagsV1, SecretControlFlagsV1)> {
     let lf = &args.legacy_flags;
+    macro_rules! flag_disabled {
+        ($cli_flag:expr, $control_flags:expr) => {
+            $cli_flag
+                .filter(|x| *x)
+                .and(Some(ControlFlagTrait::all_disabled($control_flags)))
+        };
+    }
+    macro_rules! flag_enabled {
+        ($cli_flag:expr, $control_flags:expr) => {
+            $cli_flag
+                .filter(|x| *x)
+                .and(Some(ControlFlagTrait::all_enabled($control_flags)))
+        };
+    }
+
     let plaintext_flags: Vec<FlagData<PcfV1>> = [
-        lf.disable_dump
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled([PcfV1::AllowDumping]))),
-        lf.enable_dump
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_enabled([PcfV1::AllowDumping]))),
-        lf.disable_pckmo
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled(PlaintextControlFlagsV1::PCKMO))),
-        lf.enable_pckmo
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_enabled(PlaintextControlFlagsV1::PCKMO))),
-        lf.disable_pckmo_hmac
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled([PcfV1::PckmoHmac]))),
-        lf.enable_pckmo_hmac
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_enabled([PcfV1::PckmoHmac]))),
-        lf.disable_backup_keys
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled([PcfV1::BackupTargetKeys]))),
-        lf.enable_backup_keys
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_enabled([PcfV1::BackupTargetKeys]))),
-        lf.disable_image_encryption
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_enabled([PcfV1::NoComponentEncryption]))),
-        lf.enable_image_encryption
-            .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled([PcfV1::NoComponentEncryption]))),
+        flag_disabled!(lf.disable_dump, [PcfV1::AllowDumping]),
+        flag_enabled!(lf.enable_dump, [PcfV1::AllowDumping]),
+        flag_disabled!(lf.disable_pckmo, PlaintextControlFlagsV1::PCKMO),
+        flag_enabled!(lf.enable_pckmo, PlaintextControlFlagsV1::PCKMO),
+        flag_disabled!(lf.disable_pckmo_hmac, [PcfV1::PckmoHmac]),
+        flag_enabled!(lf.enable_pckmo_hmac, [PcfV1::PckmoHmac]),
+        flag_disabled!(lf.disable_backup_keys, [PcfV1::BackupTargetKeys]),
+        flag_enabled!(lf.enable_backup_keys, [PcfV1::BackupTargetKeys]),
+        flag_enabled!(lf.disable_image_encryption, [PcfV1::NoComponentEncryption]),
+        flag_disabled!(lf.enable_image_encryption, [PcfV1::NoComponentEncryption]),
     ]
     .into_iter()
     .flatten()
@@ -89,16 +84,14 @@ fn parse_flags(
     assert!(PlaintextControlFlagsV1::no_duplicates(&plaintext_flags));
 
     let secret_flags: Vec<FlagData<ScfV1>> = [
-        lf.disable_cck_extension_secret
-            .filter(|x| *x)
-            .and(Some(ScfV1::all_disabled([
-                ScfV1::CckExtensionSecretEnforcement,
-            ]))),
-        lf.enable_cck_extension_secret
-            .filter(|x| *x)
-            .and(Some(ScfV1::all_enabled([
-                ScfV1::CckExtensionSecretEnforcement,
-            ]))),
+        flag_disabled!(
+            lf.disable_cck_extension_secret,
+            [ScfV1::CckExtensionSecretEnforcement]
+        ),
+        flag_enabled!(
+            lf.enable_cck_extension_secret,
+            [ScfV1::CckExtensionSecretEnforcement]
+        ),
     ]
     .into_iter()
     .flatten()
