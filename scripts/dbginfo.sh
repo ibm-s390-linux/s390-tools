@@ -119,8 +119,6 @@ Options:
         -v|--version       print version information
         -c|--check         online base system information (no data collection)
 
-Please report bugs to: linux390@de.ibm.com
-
 EOF
 }
 

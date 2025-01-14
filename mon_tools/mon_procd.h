@@ -171,8 +171,6 @@ static const char help_text[] =
 	"-h, --help               Print this help, then exit\n"
 	"-v, --version            Print version information, then exit\n"
 	"-a, --attach             Run in foreground\n"
-	"-i, --interval=<seconds> Sample interval\n"
-	"\n"
-	"Please report bugs to: linux390@de.ibm.com\n";
+	"-i, --interval=<seconds> Sample interval\n";
 #endif
 
