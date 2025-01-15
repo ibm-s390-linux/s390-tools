@@ -475,6 +475,7 @@ CMDS="uname -a\
   :last\
   :lscpu -ae\
   :lscpu -ye\
+  :lscpumf -i\
   :lsmem\
   :lsmod\
   :lsshut\
