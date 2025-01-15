@@ -266,7 +266,7 @@ impl<'de> Deserialize<'de> for RetrievableSecret {
         D: serde::Deserializer<'de>,
     {
         struct RetrSecretVisitor;
-        impl<'de> serde::de::Visitor<'de> for RetrSecretVisitor {
+        impl serde::de::Visitor<'_> for RetrSecretVisitor {
             type Value = RetrievableSecret;
 
             fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {

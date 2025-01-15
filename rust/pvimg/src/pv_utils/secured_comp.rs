@@ -359,7 +359,7 @@ impl SecuredComponentBuilder {
     ) -> Result<Self> {
         let digest = MessageDigest::from_nid(digest_nid).ok_or(Error::UnsupportMessageDigest)?;
         let nid = key_type.into();
-        let cipher = Cipher::from_nid(nid).ok_or_else(|| PvError::UnsupportedCipher(nid))?;
+        let cipher = Cipher::from_nid(nid).ok_or(PvError::UnsupportedCipher(nid))?;
         let key = SymKey::random(key_type)?;
 
         Ok(Self {

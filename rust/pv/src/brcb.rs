@@ -41,7 +41,7 @@ impl TryFrom<Vec<u8>> for BootHdrTags {
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         Self::ref_from(&value)
-            .ok_or_else(|| Error::InvBootHdrSize(value.len()))
+            .ok_or(Error::InvBootHdrSize(value.len()))
             .copied()
     }
 }

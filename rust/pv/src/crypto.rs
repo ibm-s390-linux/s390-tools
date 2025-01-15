@@ -361,7 +361,7 @@ pub fn encrypt_aead(
     aad: &[u8],
     conf: &[u8],
 ) -> Result<AeadEncryptionResult> {
-    let tag_len = key.key_type().tag_len().ok_or_else(|| Error::NoAeadKey)?;
+    let tag_len = key.key_type().tag_len().ok_or(Error::NoAeadKey)?;
 
     let nid = key.key_type().into();
     let cipher = Cipher::from_nid(nid).ok_or(Error::UnsupportedCipher(nid))?;
