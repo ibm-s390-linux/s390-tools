@@ -204,7 +204,7 @@ impl ControlFlagTrait for PcfV1 {}
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ScfV1 {
     /// All add-secret requests must provide an extension secret
-    CCKExtensionSecretEnforcment = 1,
+    CckExtensionSecretEnforcement = 1,
 }
 pub type SecretControlFlagsV1 = ControlFlags<ScfV1>;
 impl ControlFlagTrait for ScfV1 {}

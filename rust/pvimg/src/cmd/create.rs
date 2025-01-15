@@ -92,12 +92,12 @@ fn parse_flags(
         lf.disable_cck_extension_secret
             .filter(|x| *x)
             .and(Some(ScfV1::all_disabled([
-                ScfV1::CCKExtensionSecretEnforcment,
+                ScfV1::CckExtensionSecretEnforcement,
             ]))),
         lf.enable_cck_extension_secret
             .filter(|x| *x)
             .and(Some(ScfV1::all_enabled([
-                ScfV1::CCKExtensionSecretEnforcment,
+                ScfV1::CckExtensionSecretEnforcement,
             ]))),
     ]
     .into_iter()
