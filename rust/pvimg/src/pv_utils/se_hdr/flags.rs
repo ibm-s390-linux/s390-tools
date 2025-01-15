@@ -169,14 +169,13 @@ pub enum PcfV1 {
     BackupTargetKeys = 62,
 }
 pub type PlaintextControlFlagsV1 = ControlFlags<PcfV1>;
+impl PlaintextControlFlagsV1 {
+    pub const PCKMO: [PcfV1; 3] = [PcfV1::PckmoAes, PcfV1::PckmoDeaTdea, PcfV1::PckmoEcc];
+}
 
 impl Default for PlaintextControlFlagsV1 {
     fn default() -> Self {
-        Self::from_flags(PcfV1::all_enabled([
-            PcfV1::PckmoAes,
-            PcfV1::PckmoDeaTdea,
-            PcfV1::PckmoEcc,
-        ]))
+        Self::from_flags(PcfV1::all_enabled(PlaintextControlFlagsV1::PCKMO))
     }
 }
 

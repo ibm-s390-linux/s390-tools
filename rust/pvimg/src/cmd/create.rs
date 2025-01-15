@@ -58,16 +58,10 @@ fn parse_flags(
             .and(Some(PcfV1::all_enabled([PcfV1::AllowDumping]))),
         lf.disable_pckmo
             .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled([
-                PcfV1::PckmoAes,
-                PcfV1::PckmoDeaTdea,
-                PcfV1::PckmoEcc,
-            ]))),
-        lf.enable_pckmo.filter(|x| *x).and(Some(PcfV1::all_enabled([
-            PcfV1::PckmoAes,
-            PcfV1::PckmoDeaTdea,
-            PcfV1::PckmoEcc,
-        ]))),
+            .and(Some(PcfV1::all_disabled(PlaintextControlFlagsV1::PCKMO))),
+        lf.enable_pckmo
+            .filter(|x| *x)
+            .and(Some(PcfV1::all_enabled(PlaintextControlFlagsV1::PCKMO))),
         lf.disable_pckmo_hmac
             .filter(|x| *x)
             .and(Some(PcfV1::all_disabled([PcfV1::PckmoHmac]))),
