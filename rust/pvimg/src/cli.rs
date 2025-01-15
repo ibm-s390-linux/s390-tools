@@ -72,6 +72,7 @@ pub fn validate_cli(opts: &CliOptions) -> Result<(), clap::error::Error> {
 
 /// CLI Argument collection for handling input components.
 #[derive(Args, Debug)]
+#[cfg_attr(test, derive(Default))]
 pub struct ComponentPaths {
     /// Use the content of FILE as a raw binary Linux kernel.
     ///
@@ -93,6 +94,7 @@ pub struct ComponentPaths {
 }
 
 #[derive(Args, Debug)]
+#[cfg_attr(test, derive(Default))]
 #[command(group(ArgGroup::new("header-flags").multiple(true).conflicts_with_all(["x_pcf", "x_scf"])))]
 pub struct CreateBootImageLegacyFlags {
     /// Enable Secure Execution guest dump support. This option requires the
@@ -306,6 +308,7 @@ impl GenprotimgCliOptions {
 }
 
 #[derive(Parser, Debug)]
+#[cfg_attr(test, derive(Default))]
 pub struct CreateBootImageArgs {
     #[clap(flatten)]
     pub component_paths: ComponentPaths,
@@ -352,6 +355,7 @@ pub struct CreateBootImageArgs {
 
 /// Experimental options
 #[derive(Args, Debug)]
+#[cfg_attr(test, derive(Default))]
 pub struct CreateBootImageExperimentalArgs {
     /// Manually set the directory used to load the Secure Execution bootloaders
     /// (stage3a and stage3b) (experimental option).

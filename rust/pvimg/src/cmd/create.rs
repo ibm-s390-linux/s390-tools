@@ -213,3 +213,25 @@ pub fn create(opt: &CreateBootImageArgs) -> Result<OwnExitCode> {
     warn!("Successfully generated the Secure Execution image.");
     Ok(OwnExitCode::Success)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::cli::CreateBootImageLegacyFlags;
+
+    #[test]
+    fn parse_flags() {
+        let args = CreateBootImageArgs {
+            legacy_flags: CreateBootImageLegacyFlags {
+                enable_dump: Some(true),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let parsed_flags = super::parse_flags(&args).expect("Failed to parse flags {args:?}");
+        let mut exp_flags = Vec::from(PlaintextControlFlagsV1::PCKMO);
+        exp_flags.push(PcfV1::AllowDumping);
+        let pcf = PlaintextControlFlagsV1::from_flags(PcfV1::all_enabled(exp_flags));
+        assert_eq!(parsed_flags.0, pcf);
+    }
+}

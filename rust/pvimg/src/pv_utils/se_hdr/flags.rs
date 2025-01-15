@@ -85,7 +85,7 @@ pub trait ControlFlagsTrait: Display {
 /// Bitflags as used by the Secure Execution in MSB0 ordering
 ///
 /// Wraps an u64 to set/get individual bits
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ControlFlags<T: ControlFlagTrait> {
     flags: Msb0Flags64,
     t: PhantomData<T>,

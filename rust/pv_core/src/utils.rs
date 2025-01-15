@@ -34,7 +34,7 @@ pub trait Flags<T>: From<T> + for<'a> From<&'a T> {
 ///
 /// Wraps an u64 to set/get individual bits
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, Clone, Copy, Default, AsBytes, FromZeroes, FromBytes, Eq, PartialEq)]
 pub struct Msb0Flags64(U64<BigEndian>);
 impl Flags<u64> for Msb0Flags64 {
     #[track_caller]
