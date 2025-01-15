@@ -55,7 +55,7 @@ fn parse_flags(
             .and(Some(PcfV1::all_disabled([PcfV1::AllowDumping]))),
         lf.enable_dump
             .filter(|x| *x)
-            .and(Some(PcfV1::all_disabled([PcfV1::AllowDumping]))),
+            .and(Some(PcfV1::all_enabled([PcfV1::AllowDumping]))),
         lf.disable_pckmo
             .filter(|x| *x)
             .and(Some(PcfV1::all_disabled([
