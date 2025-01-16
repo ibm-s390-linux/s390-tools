@@ -48,9 +48,9 @@ static inline void __noreturn start_kernel(void)
 		"       diag    %[code],%[code],0x308\n"
 		".no_diag308:\n"
 		"       sam31\n"
-		"       sr      %r1,%r1\n"
-		"       sr      %r2,%r2\n"
-		"       sigp    %r1,%r2,%[order]\n"
+		"       sr      %%r1,%%r1\n"
+		"       sr      %%r2,%%r2\n"
+		"       sigp    %%r1,%%r2,%[order]\n"
 		"       lpsw    0\n"
 		: [addr] "=&d" (addr),
 		  [code] "+&d" (code)
