@@ -1312,7 +1312,14 @@ static int complete_physical_device(struct physical_device *pd, dev_t *base_dev)
 		base_entry = find_base_entry(pd->dmpath, dc->bootsectors);
 		if (!base_entry)
 			return -1;
-		*base_dev = first_device_by_target_data(base_entry->target);
+		if (target_get_start(base_entry->target) == 0) {
+			/* base device is a dm device */
+			*base_dev = base_entry->dev.dev;
+		} else {
+			/* base device is a non-dm device */
+			*base_dev =
+				first_device_by_target_data(base_entry->target);
+		}
 	}
 	/* Check for valid offset of filesystem */
 	if ((pd->offset % (dc->blocksize / SECTOR_SIZE)) != 0) {
