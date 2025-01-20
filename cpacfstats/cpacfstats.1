@@ -46,8 +46,8 @@ All counters are initially disabled and must be switched on to measure
 CPACF activities of the system. There is a slight performance penalty with
 CPACF counters enabled.
 
-CPACF activity counters come in two flavors: CPU-MF and PAI.  CPU-MF
-counters are only available on LPARs and have to be authorized.  If
+CPACF activity counters come in two flavors: CPU-MF and PAI. CPU-MF
+counters are only available on LPARs and have to be authorized. If
 they are available, the counters
 .B des,
 .B aes,
@@ -55,14 +55,131 @@ they are available, the counters
 .B rng,
 and
 .B ecc
-are made available.  These counters can individually be activated,
-reset, printed, or deactivated.  PAI counters are a lot more detailed.
+are made available. These counters can individually be activated,
+reset, printed, or deactivated. PAI counters are a lot more detailed.
 The user interface only offers the counters
 .B pai_user
 and
 .B pai_kernel
-to count CPACF usage in user-space or kernel-space.  When printing
-these counters, detailed counters are shown.  The detailed names are:
+to count CPACF usage in user-space or kernel-space. When printing
+these counters, detailed counters are shown.
+
+A complete list of counters can be found at the end of this manpage.
+
+Note that the counters starting with PCKMO and Reserved are only
+available in the pai_kernel set. Also note that the counters are
+designed to count successful operations. In the case of KMA this
+means only complete GCM operations including final hashing are
+counted.
+
+Note: CPU-MF based CPACF performance counters are available on LPARs
+only. PAI counters are available on all hypervisors. For security
+reasons only members of the group \fIcpacfstats\fR are allowed to run
+the cpacfstats client application.
+
+Example usage scenario:
+.P
+1. Start the cpacfstatsd daemon with root privileges.
+.P
+2. Check for successful startup by using the ps and syslog commands.
+.P
+3. Enable the CPACF counters of interest. For example, enable all counters
+by issuing cpacfstats -e.
+.P
+4. Run your applications.
+.P
+5. Display counter values by using the cpacfstats command. Reset the
+cryptographic counters as required. To reset, use, for example, cpacfstats
+-r.
+.P
+6. Disable all the CPACF measurements, for example, by using cpacfstats
+-d.
+.P
+7. Shutdown the cpacfstatsd daemon by using killall cpacfstatsd.
+
+.SH OPTIONS
+.TP
+\fB\-h\fR or \fB\-\-help\fR
+Display help information for the command.
+.TP
+\fB\-v\fR or \fB\-\-version\fR
+Display version and copyright information for the command.
+.TP
+\fB\-e\fR or \fB\-\-enable\fR [counter]
+Enable one or all CPACF performance counters. The optional counter
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
+\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
+performance counters are enabled. Enabling a counter does not reset
+it. New events are added to the current counter value.
+.TP
+\fB\-d\fR or \fB\-\-disable\fR [counter]
+Disable one or all CPACF performance counters. The optional counter
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
+\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
+performance counters are disabled. Disabling a counter does not reset
+it. The counter value is preserved when a counter is disabled, and
+counting will resume using the preserved value when the counter is
+re-enabled.
+.TP
+\fB\-r\fR or \fB\-\-reset\fR [counter]
+Reset one or all CPACF performance counters. The optional counter
+argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
+\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
+performance counters are reset to 0.
+.TP
+\fB\-p\fR or \fB\-\-print\fR  [\fB\-n\fR or \fB\-\-nonzero\fR] [counter]
+Display the value of one or all CPACF performance counters. The
+optional counter argument can be one of: \fBdes\fR, \fBaes\fR,
+\fBsha\fR, \fBprng\fR, \fBecc\fR, \fBpai_user\fR, \fBpai_kernel\fR, or
+\fBall\fR. If the counter argument is omitted or if there is no
+argument, all performance counters are displayed. If the optional
+\fB\-n\fR or \fB\-\-nonzero\fR argument is given, then only PAI
+counters that have a non-zero value are printed.
+.TP
+\fB\-j\fR or \fB\-\-json\fR
+Display all activated counters in JSON format. The JSON contains an
+array of counter objects. Each object contains the property
+.B counter
+specifying either a CPU-MF counter of one of the detailed PAI counter.
+Additional properties include
+.B error
+an error number if the counter could not be read,
+.B value
+the counter value if the counter could be read,
+.B space
+for PAI counters to specify
+.B user
+or
+.B kernel
+space counter set, and
+.B counterid
+for PAI counters to specify the PAI counter number as specified in the
+Principles of Operation.
+.TP
+The default command is --print all.
+.
+.SH FILES
+.nf
+/run/cpacfstatsd_socket
+.fi
+.
+.SH RETURN VALUE
+.IP 0
+Successful program execution.
+.IP 1
+An error occurred, reasons include: invalid argument, cpacfstatsd could not
+be reached (check that the daemon is running), insufficient access rights,
+version mismatch between client and daemon, or the application is out of
+memory. The application prints a message with the details of the error and
+the errno value.
+.
+.SH NOTES
+ECC counters are only available since z15. cpacfstats will show the
+counters as \fIunsupported\fR if the hardware does not support ECC
+counters.
+.
+.SH APPENDIX
+The detailed pai counter names are:
 .RS
 .IP \(bu
 KM DES,
@@ -376,118 +493,39 @@ PCKMO ECC Ed448,
 Reserved 1, and
 .IP \(bu
 Reserved 2.
+.IP \(bu
+KM AES-XTS (full) 128bit
+.IP \(bu
+KM AES-XTS (full) 256bit
+.IP \(bu
+KM AES-XTS (full) 128bit protected key
+.IP \(bu
+KM AES-XTS (full) 256bit protected key
+.IP \(bu
+KMAC HMAC SHA 224
+.IP \(bu
+KMAC HMAC SHA 256
+.IP \(bu
+KMAC HMAC SHA 384
+.IP \(bu
+KMAC HMAC SHA 512
+.IP \(bu
+KMAC HMAC SHA 224 protected key
+.IP \(bu
+KMAC HMAC SHA 256 protected key
+.IP \(bu
+KMAC HMAC SHA 384 protected key
+.IP \(bu
+KMAC HMAC SHA 512 protected key
+.IP \(bu
+PCKMO HMAC 512 protected key
+.IP \(bu
+PCKMO HMAC 1024 protected key
+.IP \(bu
+PCKMO AES-XTS 128bit double key protected key
+.IP \(bu
+PCKMO AES-XTS 256bit double key protected key
 .RE
-Note that the counters starting with PCKMO and Reserved are only
-available in the pai_kernel set.  Also note that the counters are
-designed to count successful operations.  In the case of KMA this
-means only complete GCM operations including final hashing are
-counted.
-
-Note: CPU-MF based CPACF performance counters are available on LPARs
-only. PAI counters are available on all hypervisors. For security
-reasons only members of the group \fIcpacfstats\fR are allowed to run
-the cpacfstats client application.
-
-Example usage scenario:
-.P
-1. Start the cpacfstatsd daemon with root privileges.
-.P
-2. Check for successful startup by using the ps and syslog commands.
-.P
-3. Enable the CPACF counters of interest. For example, enable all counters
-by issuing cpacfstats -e.
-.P
-4. Run your applications.
-.P
-5. Display counter values by using the cpacfstats command. Reset the
-cryptographic counters as required. To reset, use, for example, cpacfstats
--r.
-.P
-6. Disable all the CPACF measurements, for example, by using cpacfstats
--d.
-.P
-7. Shutdown the cpacfstatsd daemon by using killall cpacfstatsd.
-
-.SH OPTIONS
-.TP
-\fB\-h\fR or \fB\-\-help\fR
-Display help information for the command.
-.TP
-\fB\-v\fR or \fB\-\-version\fR
-Display version and copyright information for the command.
-.TP
-\fB\-e\fR or \fB\-\-enable\fR [counter]
-Enable one or all CPACF performance counters. The optional counter
-argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
-\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
-performance counters are enabled. Enabling a counter does not reset
-it. New events are added to the current counter value.
-.TP
-\fB\-d\fR or \fB\-\-disable\fR [counter]
-Disable one or all CPACF performance counters. The optional counter
-argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
-\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
-performance counters are disabled. Disabling a counter does not reset
-it. The counter value is preserved when a counter is disabled, and
-counting will resume using the preserved value when the counter is
-re-enabled.
-.TP
-\fB\-r\fR or \fB\-\-reset\fR [counter]
-Reset one or all CPACF performance counters. The optional counter
-argument can be one of: \fBdes\fR, \fBaes\fR, \fBsha\fR, \fBprng\fR,
-\fBecc\fR, or \fBall\fR. If the counter argument is omitted, all
-performance counters are reset to 0.
-.TP
-\fB\-p\fR or \fB\-\-print\fR  [\fB\-n\fR or \fB\-\-nonzero\fR] [counter]
-Display the value of one or all CPACF performance counters. The
-optional counter argument can be one of: \fBdes\fR, \fBaes\fR,
-\fBsha\fR, \fBprng\fR, \fBecc\fR, \fBpai_user\fR, \fBpai_kernel\fR, or
-\fBall\fR. If the counter argument is omitted or if there is no
-argument, all performance counters are displayed.  If the optional
-\fB\-n\fR or \fB\-\-nonzero\fR argument is given, then only PAI
-counters that have a non-zero value are printed.
-.TP
-\fB\-j\fR or \fB\-\-json\fR
-Display all activated counters in JSON format.  The JSON contains an
-array of counter objects.  Each object contains the property
-.B counter
-specifying either a CPU-MF counter of one of the detailed PAI counter.
-Additional properties include
-.B error
-an error number if the counter could not be read,
-.B value
-the counter value if the counter could be read,
-.B space
-for PAI counters to specify
-.B user
-or
-.B kernel
-space counter set, and
-.B counterid
-for PAI counters to specify the PAI counter number as specified in the
-Principles of Operation.
-.TP
-The default command is --print all.
-.
-.SH FILES
-.nf
-/run/cpacfstatsd_socket
-.fi
-.
-.SH RETURN VALUE
-.IP 0
-Successful program execution.
-.IP 1
-An error occurred, reasons include: invalid argument, cpacfstatsd could not
-be reached (check that the daemon is running), insufficient access rights,
-version mismatch between client and daemon, or the application is out of
-memory. The application prints a message with the details of the error and
-the errno value.
-.
-.SH NOTES
-ECC counters are only available since z15. cpacfstats will show the
-counters as \fIunsupported\fR if the hardware does not support ECC
-counters.
 .
 .SH SEE ALSO
 .BR cpacfstatsd (8)
