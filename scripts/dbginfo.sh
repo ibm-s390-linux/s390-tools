@@ -374,6 +374,7 @@ LOGFILES="\
   /var/log/dracut.log*\
   /var/log/IBMtape.trace\
   /var/log/IBMtape.errorlog\
+  /var/log/kdump.log\
   /var/log/libvirt\
   /var/log/lin_tape.trace\
   /var/log/lin_tape.errorlog\
