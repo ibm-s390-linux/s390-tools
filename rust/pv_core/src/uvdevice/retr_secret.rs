@@ -146,7 +146,8 @@ pub enum EcCurves {
 }
 
 impl EcCurves {
-    const fn exp_size(&self) -> usize {
+    /// Returns the expected key-byte-size for this curve.
+    pub const fn exp_key_size(&self) -> usize {
         match self {
             Self::Secp256R1 => 32,
             Self::Secp384R1 => 48,
@@ -154,14 +155,6 @@ impl EcCurves {
             Self::Ed25519 => 32,
             Self::Ed448 => 64,
         }
-    }
-
-    /// Resizes the raw key to the expected size.
-    ///
-    /// See [`Vec::resize`]
-    pub fn resize_raw_key(&self, mut raw: Vec<u8>) -> Vec<u8> {
-        raw.resize(self.exp_size(), 0);
-        raw
     }
 }
 

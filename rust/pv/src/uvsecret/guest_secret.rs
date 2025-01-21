@@ -21,7 +21,7 @@ use byteorder::BigEndian;
 use openssl::{
     hash::MessageDigest,
     nid::Nid,
-    pkey::{Id, PKey, Private},
+    pkey::{Id, PKey, PKeyRef, Private},
 };
 use pv_core::static_assert;
 use serde::{Deserialize, Serialize};
@@ -61,7 +61,7 @@ pub enum GuestSecret {
         name: String,
         /// SHA256 hash of [`GuestSecret::RetrievableKey::name`]
         id: SecretId,
-        /// Confidential actual retrievable secret (32 bytes)
+        /// Confidential actual retrievable secret
         #[serde(skip)]
         secret: Confidential<Vec<u8>>,
     },
@@ -293,20 +293,26 @@ fn hmac_sha(key: Confidential<Vec<u8>>) -> Result<RetrKeyInfo> {
 
 /// Get an EC-private-key
 fn ec(key: PKey<Private>) -> Result<RetrKeyInfo> {
-    let (key, nid) = match key.id() {
-        Id::EC => {
-            let ec_key = key.ec_key()?;
-            let key = ec_key.private_key().to_vec();
-            let nid = ec_key.group().curve_name().unwrap_or(Nid::UNDEF);
-            (key, nid)
+    // reads & left-pads Edward EC keys
+    fn pad_ed_key(pkey: &PKeyRef<Private>, curve: &EcCurves) -> Result<Vec<u8>> {
+        let raw_key = pkey.raw_private_key()?;
+
+        match raw_key.len().cmp(&curve.exp_key_size()) {
+            std::cmp::Ordering::Less => {
+                let mut key = Vec::with_capacity(curve.exp_key_size());
+                key.extend_from_slice(&vec![0u8; curve.exp_key_size() - raw_key.len()]);
+                key.extend_from_slice(&raw_key);
+                Ok(key)
+            }
+            std::cmp::Ordering::Equal => Ok(raw_key),
+            std::cmp::Ordering::Greater => Err(Error::InvalSslData),
         }
-        // ED keys are not handled via the EC struct in OpenSSL.
-        id @ (Id::ED25519 | Id::ED448) => {
-            let key = key.raw_private_key()?;
-            let nid = Nid::from_raw(id.as_raw());
-            (key, nid)
-        }
-        _ => (vec![], Nid::UNDEF),
+    }
+
+    let nid = match key.id() {
+        Id::EC => key.ec_key()?.group().curve_name().unwrap_or(Nid::UNDEF),
+        id @ (Id::ED25519 | Id::ED448) => Nid::from_raw(id.as_raw()),
+        _ => Nid::UNDEF,
     };
 
     let kind = match nid {
@@ -327,7 +333,16 @@ fn ec(key: PKey<Private>) -> Result<RetrKeyInfo> {
         }
     };
 
-    let key = kind.resize_raw_key(key);
+    let key = match key.id() {
+        Id::EC => key
+            .ec_key()?
+            .private_key()
+            .to_vec_padded(kind.exp_key_size() as i32)?,
+        // ED keys are not handled via the EC struct in OpenSSL.
+        Id::ED25519 | Id::ED448 => pad_ed_key(&key, &kind)?,
+        _ => unreachable!(),
+    };
+
     Ok((RetrievableSecret::Ec(kind), key.into()))
 }
 
@@ -485,15 +500,18 @@ mod test {
     }
 
     #[track_caller]
+    fn gen_ec(nid: Nid) -> PKey<Private> {
+        let group = EcGroup::from_curve_name(nid).unwrap();
+        let key = EcKey::generate(&group).unwrap();
+        PKey::from_ec_key(key).unwrap()
+    }
+
+    #[track_caller]
     fn test_ec(grp: Nid, exp_kind: EcCurves, exp_len: usize) {
         let key = match grp {
             NID_ED25519 => PKey::generate_ed25519().unwrap(),
             NID_ED448 => PKey::generate_ed448().unwrap(),
-            nid => {
-                let group = EcGroup::from_curve_name(nid).unwrap();
-                let key = EcKey::generate(&group).unwrap();
-                PKey::from_ec_key(key).unwrap()
-            }
+            nid => gen_ec(nid),
         };
         let (kind, key) = ec(key).unwrap();
 
@@ -508,6 +526,17 @@ mod test {
         test_ec(Nid::SECP521R1, EcCurves::Secp521R1, 80);
         test_ec(NID_ED25519, EcCurves::Ed25519, 32);
         test_ec(NID_ED448, EcCurves::Ed448, 64);
+    }
+
+    #[test]
+    fn retr_ec_pad() {
+        let pkey = PKey::generate_ed448().unwrap();
+        let (_, key) = ec(pkey).unwrap();
+        assert_eq!(key.value()[..7], [0; 7]);
+
+        let pkey = gen_ec(Nid::SECP521R1);
+        let (_, key) = ec(pkey).unwrap();
+        assert_eq!(key.value()[..14], [0; 14]);
     }
 
     #[test]

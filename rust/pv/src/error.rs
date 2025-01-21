@@ -117,6 +117,9 @@ pub enum Error {
         exp: String,
     },
 
+    #[error("Invalid data from OpenSSL")]
+    InvalSslData,
+
     // errors from other crates
     #[error(transparent)]
     PvCore(#[from] pv_core::Error),
