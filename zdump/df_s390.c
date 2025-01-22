@@ -169,9 +169,7 @@ int df_s390_dumper_read(struct zg_fh *fh, int blk_size,
 			dumper->size = STAGE2_DUMPER_SIZE_MV;
 		break;
 	case 5:
-		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC64,
-			    DF_S390_DUMPER_MAGIC_SIZE) == 0 ||
-		    strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV,
+		if (strncmp(dumper->magic, DF_S390_DUMPER_MAGIC_MV,
 			    DF_S390_DUMPER_MAGIC_SIZE) == 0)
 			dumper->size = STAGE2_DUMPER_SIZE_SV;
 		break;

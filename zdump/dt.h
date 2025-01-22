@@ -38,7 +38,6 @@ void dt_attr_dasd_type_set(const char *dasd_type);
  */
 extern struct dt dt_s390mv;
 extern struct dt dt_s390mv_ext;
-extern struct dt dt_s390sv;
 extern struct dt dt_s390sv_ext;
 extern struct dt dt_scsi;
 extern struct dt dt_ngdump;

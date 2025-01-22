@@ -73,7 +73,7 @@ OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dfi_devmem.o dfo.o dfo_mem_chunk.o \
 	  dfo_elf.o dfo_s390.o \
 	  df_elf.o df_s390.o \
-	  dt.o dt_s390sv.o dt_s390sv_ext.o \
+	  dt.o dt_s390sv_ext.o \
 	  dt_s390mv.o dt_s390mv_ext.o \
 	  dt_scsi.o output.o \
 	  ngdump.o dt_ngdump.o dfi_ngdump.o dfi_vmdump.o \
