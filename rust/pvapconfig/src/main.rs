@@ -16,6 +16,7 @@ use ap::{Apqn, ApqnList};
 use cli::ARGS;
 use config::{ApConfigEntry, ApConfigList};
 use helper::{LockFile, PATH_PVAPCONFIG_LOCK};
+use pv_core::misc::encode_hex;
 use pv_core::uv::{ListableSecretType, SecretList};
 use std::process::ExitCode;
 use utils::print_version;
@@ -266,7 +267,7 @@ fn do_ap_config(
                         se.stype() == ListableSecretType::Association
                             && se.id().len() == uv::AP_ASSOC_SECRET_ID_SIZE
                             && se.index() == assoc_idx
-                            && helper::u8_to_hexstring(se.id()) == apc.secretid
+                            && encode_hex(se.id()) == apc.secretid
                     });
                     if r.is_none() {
                         continue;
@@ -353,7 +354,7 @@ fn do_ap_config(
                     let se = match secrets.iter().find(|&se| {
                         se.stype() == ListableSecretType::Association
                             && se.id().len() == uv::AP_ASSOC_SECRET_ID_SIZE
-                            && helper::u8_to_hexstring(se.id()) == apc.secretid
+                            && encode_hex(se.id()) == apc.secretid
                     }) {
                         None => {
                             eprintln!("Warning: Secret id '{}' from config entry {} not found in UV secrets list.",
@@ -450,8 +451,7 @@ fn config_and_apqn_match(apc: &ApConfigEntry, apqn: &Apqn) -> bool {
 mod tests {
 
     use super::*;
-    use helper::hexstring_to_u8;
-    use pv_core::uv::SecretEntry;
+    use pv_core::{misc::decode_hex, uv::SecretEntry};
 
     // This is more or less only a test for the do_ap_config() function
     // However, this is THE main functionality of the whole application.
@@ -522,7 +522,7 @@ mod tests {
     }
 
     fn make_assoc_secretentry(idx: u16, hexidstr: &str) -> SecretEntry {
-        let id = hexstring_to_u8(hexidstr);
+        let id = decode_hex(hexidstr).unwrap();
         let idlen: u32 = id.len().try_into().unwrap();
         let idarray: [u8; 32] = id.try_into().unwrap();
         SecretEntry::new(idx, ListableSecretType::Association, idarray.into(), idlen)

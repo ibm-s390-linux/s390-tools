@@ -14,48 +14,6 @@ use std::path::PathBuf;
 
 pub const PATH_PVAPCONFIG_LOCK: &str = "/run/lock/pvapconfig.lock";
 
-/// Convert u8 slice to (lowercase) hex string
-pub fn u8_to_hexstring(slice: &[u8]) -> String {
-    let s = String::with_capacity(2 * slice.len());
-    slice.iter().fold(s, |acc, e| acc + &format!("{e:02x}"))
-}
-
-/// Convert hexstring to u8 vector
-/// The hexstring may contain whitespaces which are ignored.
-/// If there are other characters in there or if the number
-/// of hex characters is uneven panic() is called.
-/// # Panics
-/// Panics if the given string contains characters other than
-/// hex digits and whitespace. Panics if the number of hex digits
-/// is not even.
-#[cfg(test)] // currently only used in test code
-pub fn hexstring_to_u8(hex: &str) -> Vec<u8> {
-    let mut s = String::new();
-    for c in hex.chars() {
-        if c.is_ascii_hexdigit() {
-            s.push(c);
-        } else if c.is_whitespace() {
-            // ignore
-        } else {
-            panic!("Invalid character '{c}'");
-        }
-    }
-    if s.len() % 2 == 1 {
-        panic!("Uneven # of hex characters in '{s}'");
-    }
-    let mut hex_bytes = s.as_bytes().iter().map_while(|b| match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    });
-    let mut bytes = Vec::with_capacity(s.len());
-    while let (Some(h), Some(l)) = (hex_bytes.next(), hex_bytes.next()) {
-        bytes.push(h << 4 | l)
-    }
-    bytes
-}
-
 /// Read sysfs file into string
 pub fn sysfs_read_string(fname: &str) -> Result<String, Box<dyn Error>> {
     let mut file = File::open(fname)?;
@@ -203,19 +161,6 @@ mod tests {
 
     // Only very simple tests
 
-    const TEST_BYTES: [u8; 8] = [0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef];
-    const TEST_HEXSTR: &str = "0123456789abcdef";
-
-    #[test]
-    fn test_u8_to_hexstring() {
-        let str = u8_to_hexstring(&TEST_BYTES);
-        assert!(str == TEST_HEXSTR);
-    }
-    #[test]
-    fn test_hexstring_to_u8() {
-        let bytes = hexstring_to_u8(TEST_HEXSTR);
-        assert!(bytes.as_slice() == TEST_BYTES);
-    }
     #[test]
     fn test_sysfs_read_string() {
         let r = sysfs_read_string("/proc/cpuinfo");

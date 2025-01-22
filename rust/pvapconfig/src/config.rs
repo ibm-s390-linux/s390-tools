@@ -6,6 +6,7 @@
 //
 
 use openssl::sha::sha256;
+use pv_core::misc::encode_hex;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
@@ -48,7 +49,7 @@ impl ApConfigEntry {
             return Ok(());
         }
         let hash = sha256(self.name.as_bytes());
-        let hashstr = crate::helper::u8_to_hexstring(&hash);
+        let hashstr = encode_hex(hash);
         // if there is a secretid given, this must match to the hash
         if !self.secretid.is_empty() {
             if self.secretid != hashstr {
@@ -377,15 +378,15 @@ mod tests {
     #[test]
     fn test_sha256() {
         assert!(
-            crate::helper::u8_to_hexstring(&sha256("Hello".as_bytes()))
+            encode_hex(sha256("Hello".as_bytes()))
                 == "185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969"
         );
         assert!(
-            crate::helper::u8_to_hexstring(&sha256("SECRET1".as_bytes()))
+            encode_hex(sha256("SECRET1".as_bytes()))
                 == "03153249db7ce46b0330ffb1a760b59710531af08ec4d7f8424a6870fae49360"
         );
         assert!(
-            crate::helper::u8_to_hexstring(&sha256("SECRET2".as_bytes()))
+            encode_hex(sha256("SECRET2".as_bytes()))
                 == "258499e710e0bd3bb878d6bac7e478b30f3f3e72566989f638c4143d14f6c0b6"
         );
     }

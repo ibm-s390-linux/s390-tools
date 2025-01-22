@@ -21,8 +21,9 @@ pub mod attest {
 pub mod misc {
     pub use crate::utils::pv_guest_bit_set;
     pub use crate::utils::{create_file, open_file, read_exact_file, read_file, write_file};
-    pub use crate::utils::{decode_hex, parse_hex, to_u16, to_u32, try_parse_u128, try_parse_u64};
+    pub use crate::utils::{decode_hex, encode_hex, parse_hex};
     pub use crate::utils::{read, write};
+    pub use crate::utils::{to_u16, to_u32, try_parse_u128, try_parse_u64};
     pub use crate::utils::{Flags, Lsb0Flags64, Msb0Flags64};
 }
 

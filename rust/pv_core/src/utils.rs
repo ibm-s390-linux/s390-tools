@@ -355,6 +355,15 @@ usize_to_ui! {
 #[doc = r"u16"]
 => u16, to_u16}
 
+/// Converts the u8 slice into (lowercase) hexstring
+pub fn encode_hex<S: AsRef<[u8]>>(s: S) -> String {
+    let slice = s.as_ref();
+    let string = String::with_capacity(2 * slice.len());
+    slice
+        .iter()
+        .fold(string, |acc, e| acc + &format!("{e:02x}"))
+}
+
 /// Converts the hexstring into a byte vector.
 ///
 /// # Errors
@@ -504,6 +513,14 @@ mod tests {
     fn lsb_flags_unset_panic() {
         Lsb0Flags64::default().unset_bit(64)
     }
+
+    #[test]
+    fn encode_hex() {
+        let arr = [0x12, 0x34, 0x56, 0xac, 0xbe, 0xf0];
+        let exp = "123456acbef0";
+        assert_eq!(super::encode_hex(arr), exp);
+    }
+
     #[test]
     fn parse_hex() {
         let s = "123456acbef0";
