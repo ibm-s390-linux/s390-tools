@@ -16,7 +16,7 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 	   ziomon iucvterm hyptop cmsfs-fuse qethqoat zfcpdump zdsfs cpumf \
 	   systemd hmcdrvfs cpacfstats zdev dump2tar zkey netboot etc zpcictl \
 	   lsstp hsci hsavmcore chreipl-fcp-mpath ap_tools rust opticsmon \
-	   zpwr
+	   zpwr zmemtopo
 
 else
 BASELIB_DIRS =

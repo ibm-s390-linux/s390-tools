@@ -137,5 +137,6 @@ zkey/kmip/libkmipclient.dep
 zkey/kmip/zkey-kmip.so
 zkey/zkey
 zkey/zkey-cryptsetup
+zmemtopo/zmemtopo
 zpcictl/zpcictl
 zpwr/zpwr
