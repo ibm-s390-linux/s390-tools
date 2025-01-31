@@ -6,6 +6,7 @@
 //
 
 use crate::helper::*;
+use pv_core::misc::{read_file_string, write_file};
 use regex::Regex;
 use std::fmt;
 use std::path::Path;
@@ -49,14 +50,8 @@ pub fn check_ap_bus_support() -> Result<(), String> {
 /// When APSB support is available returns Result
 /// with Ok(()) or otherwise Err(failurestring).
 pub fn ap_bus_has_apsb_support() -> Result<(), String> {
-    if !Path::new(PATH_SYS_BUS_AP_FEATURES).is_file() {
-        return Err(format!(
-            "AP bus features support missing (file {PATH_SYS_BUS_AP_FEATURES} does not exist)."
-        ));
-    }
-    let features = sysfs_read_string(PATH_SYS_BUS_AP_FEATURES).map_err(|err| {
-        format!("Failure reading AP bus features from {PATH_SYS_BUS_AP_FEATURES} ({err:?}).")
-    })?;
+    let features =
+        read_file_string(PATH_SYS_BUS_AP_FEATURES, "AP bus features").map_err(|e| e.to_string())?;
     match features.find("APSB") {
         Some(_) => Ok(()),
         None => Err("Missing AP bus feature APSB (SE AP pass-through not enabled ?).".to_string()),
@@ -79,17 +74,14 @@ pub fn ap_bus_has_apsb_support() -> Result<(), String> {
 pub fn wait_for_ap_bus_bindings_complete() -> bool {
     let mut counter = 0;
     loop {
-        match sysfs_read_string(PATH_SYS_BUS_AP_BINDINGS) {
+        match read_file_string(PATH_SYS_BUS_AP_BINDINGS, "AP bus bindings") {
             Ok(s) => {
                 if s.contains("complete") {
                     return true;
                 }
             }
             Err(err) => {
-                eprintln!(
-                    "Failure reading AP bus bindings from {} ({:?}).",
-                    PATH_SYS_BUS_AP_BINDINGS, err
-                );
+                eprintln!("{err}");
                 return false;
             }
         }
@@ -141,24 +133,11 @@ impl ApqnInfo {
     }
 
     fn cca_info(carddir: &str, queuedir: &str) -> Result<Self, String> {
-        let serialnr = match sysfs_read_string(&format!("{carddir}/serialnr")) {
-            Ok(r) => r,
-            Err(err) => {
-                return Err(format!(
-                    "Failure reading serialnr from {carddir}/serialnr: {:?}.",
-                    err
-                ))
-            }
-        };
-        let mkvps = match sysfs_read_string(&format!("{carddir}/{queuedir}/mkvps")) {
-            Ok(r) => r,
-            Err(err) => {
-                return Err(format!(
-                    "Failure reading mkvps from {carddir}/{queuedir}/mkvps: {:?}.",
-                    err
-                ))
-            }
-        };
+        let serialnr_str = read_file_string(format!("{carddir}/serialnr"), "serialnr")
+            .map_err(|e| e.to_string())?;
+        let serialnr = serialnr_str.trim().to_string();
+        let mkvps = read_file_string(format!("{carddir}/{queuedir}/mkvps"), "mkvps")
+            .map_err(|e| e.to_string())?;
         let mut aes_mkvp = String::new();
         let re_cca_aes_mkvp = Regex::new(RE_CCA_AES_MKVP).unwrap();
         if !re_cca_aes_mkvp.is_match(&mkvps) {
@@ -211,24 +190,11 @@ impl ApqnInfo {
     }
 
     fn ep11_info(carddir: &str, queuedir: &str) -> Result<Self, String> {
-        let serialnr = match sysfs_read_string(&format!("{carddir}/serialnr")) {
-            Ok(r) => r,
-            Err(err) => {
-                return Err(format!(
-                    "Failure reading serialnr from {carddir}/serialnr: {:?}.",
-                    err
-                ))
-            }
-        };
-        let mkvps = match sysfs_read_string(&format!("{carddir}/{queuedir}/mkvps")) {
-            Ok(r) => r,
-            Err(err) => {
-                return Err(format!(
-                    "Failure reading mkvps from {carddir}/{queuedir}/mkvps: {:?}.",
-                    err
-                ))
-            }
-        };
+        let serialnr_str = read_file_string(format!("{carddir}/serialnr"), "serialnr")
+            .map_err(|e| e.to_string())?;
+        let serialnr = serialnr_str.trim().to_string();
+        let mkvps = read_file_string(format!("{carddir}/{queuedir}/mkvps"), "mkvps")
+            .map_err(|e| e.to_string())?;
         let mut mkvp = String::new();
         let re_ep11_mkvp = Regex::new(RE_EP11_MKVP).unwrap();
         if !re_ep11_mkvp.is_match(&mkvps) {
@@ -353,10 +319,10 @@ impl ApqnList {
             };
         for dir in card_dirs {
             let path = format!("{PATH_SYS_DEVICES_AP}/{dir}");
-            let card_type = match sysfs_read_string(&format!("{path}/type")) {
-                Ok(r) => r,
+            let card_type = match read_file_string(format!("{path}/type"), "card type") {
+                Ok(s) => s.trim().to_string(),
                 Err(err) => {
-                    eprintln!("Failure reading card type from {} ({:?}).", path, err);
+                    eprintln!("{err}");
                     return None;
                 }
             };
@@ -391,9 +357,11 @@ impl ApqnList {
                 }
             };
             for queue_dir in queue_dirs {
-                let _online = match sysfs_read_i32(&format!("{path}/{queue_dir}/online")) {
-                    Ok(1) => true,
-                    _ => continue,
+                let ctx = "AP queue online status";
+                let Ok(Ok(1)) = read_file_string(format!("{path}/{queue_dir}/online"), ctx)
+                    .map(|s| s.trim().parse::<i32>())
+                else {
+                    continue;
                 };
                 let caps = re_queue_dir.captures(&queue_dir).unwrap();
                 let cardstr = caps.get(1).unwrap().as_str();
@@ -525,17 +493,13 @@ pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState, String> {
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    match sysfs_read_string(&path) {
-        Err(err) => Err(format!(
-            "Failure reading se_bind attribute for APQN({},{}): {:?}.",
-            card, dom, err
-        )),
-        Ok(str) => match str.as_str() {
-            "bound" => Ok(BindState::Bound),
-            "unbound" => Ok(BindState::Unbound),
-            "-" => Ok(BindState::NotSupported),
-            _ => Err(format!("Unknown bind state '{str}'.")),
-        },
+    let state_str = read_file_string(path, "se_bind attribute").map_err(|e| e.to_string())?;
+    let state = state_str.trim();
+    match state {
+        "bound" => Ok(BindState::Bound),
+        "unbound" => Ok(BindState::Unbound),
+        "-" => Ok(BindState::NotSupported),
+        _ => Err(format!("Unknown bind state '{state}'.")),
     }
 }
 
@@ -552,13 +516,14 @@ pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState, String> {
 /// # Panics
 /// Panics if a desired bind state other than Bound or Unbound is given.
 pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> Result<(), String> {
+    let ctx = "bind APQN";
     let path = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
     let r = match state {
-        BindState::Bound => sysfs_write_i32(&path, 1),
-        BindState::Unbound => sysfs_write_i32(&path, 0),
+        BindState::Bound => write_file(path, 1.to_string(), ctx),
+        BindState::Unbound => write_file(path, 0.to_string(), ctx),
         _ => panic!("set_apqn_bind_state called with invalid BindState."),
     };
     if r.is_err() {
@@ -603,26 +568,20 @@ pub fn get_apqn_associate_state(card: u32, dom: u32) -> Result<AssocState, Strin
         "{}/card{:02x}/{:02x}.{:04x}/se_associate",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    match sysfs_read_string(&path) {
-        Err(err) => Err(format!(
-            "Failure reading se_associate attribute for APQN({},{}: {:?}",
-            card, dom, err
-        )),
-        Ok(str) => {
-            if let Some(prefix) = str.strip_prefix("associated ") {
-                let value = &prefix.parse::<u16>();
-                match value {
-                    Ok(v) => Ok(AssocState::Associated(*v)),
-                    Err(_) => Err(format!("Invalid association index in '{str}'.")),
-                }
-            } else {
-                match str.as_str() {
-                    "association pending" => Ok(AssocState::AssociationPending),
-                    "unassociated" => Ok(AssocState::Unassociated),
-                    "-" => Ok(AssocState::NotSupported),
-                    _ => Err(format!("Unknown association state '{str}'.")),
-                }
-            }
+    let state_str = read_file_string(path, "se_associate attribute").map_err(|e| e.to_string())?;
+    let state = state_str.trim();
+    if let Some(prefix) = state.strip_prefix("associated ") {
+        let value = &prefix.parse::<u16>();
+        match value {
+            Ok(v) => Ok(AssocState::Associated(*v)),
+            Err(_) => Err(format!("Invalid association index in '{state}'.")),
+        }
+    } else {
+        match state {
+            "association pending" => Ok(AssocState::AssociationPending),
+            "unassociated" => Ok(AssocState::Unassociated),
+            "-" => Ok(AssocState::NotSupported),
+            _ => Err(format!("Unknown association state '{state}'.")),
         }
     }
 }
@@ -632,7 +591,7 @@ fn set_apqn_associate_state_associate(card: u32, dom: u32, idx: u16) -> Result<(
         "{}/card{:02x}/{:02x}.{:04x}/se_associate",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let r = sysfs_write_i32(&path, idx as i32);
+    let r = write_file(path, idx.to_string(), "associate APQN");
     if r.is_err() {
         return Err(format!(
             "Failure writing se_associate attribute for APQN({},{}): {:?}.",
@@ -670,7 +629,7 @@ fn set_apqn_associate_state_unbind(card: u32, dom: u32) -> Result<(), String> {
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let r = sysfs_write_i32(&bindpath, 0);
+    let r = write_file(bindpath, 0.to_string(), "unbind APQN");
     if r.is_err() {
         return Err(format!(
             "Failure writing se_bind attribute for APQN({},{}): {:?}.",

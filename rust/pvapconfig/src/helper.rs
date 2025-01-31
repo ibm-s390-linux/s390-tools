@@ -8,38 +8,11 @@
 use regex::Regex;
 use std::error::Error;
 use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
 
 pub const PATH_PVAPCONFIG_LOCK: &str = "/run/lock/pvapconfig.lock";
-
-/// Read sysfs file into string
-pub fn sysfs_read_string(fname: &str) -> Result<String, Box<dyn Error>> {
-    let mut file = File::open(fname)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
-    let trimmed_content = String::from(content.trim());
-    Ok(trimmed_content)
-}
-
-/// Write string into sysfs file
-pub fn sysfs_write_string(fname: &str, value: &str) -> Result<(), Box<dyn Error>> {
-    let mut file = OpenOptions::new().write(true).open(fname)?;
-    file.write_all(value.as_bytes())?;
-    Ok(())
-}
-
-/// Read sysfs file content and parse as i32 value
-pub fn sysfs_read_i32(fname: &str) -> Result<i32, Box<dyn Error>> {
-    let content = sysfs_read_string(fname)?;
-    Ok(content.parse::<i32>()?)
-}
-
-/// Write an i32 value into a sysfs file
-pub fn sysfs_write_i32(fname: &str, value: i32) -> Result<(), Box<dyn Error>> {
-    sysfs_write_string(fname, &value.to_string())
-}
 
 /// For a given (sysfs) directory construct a list of all subdirs
 /// and give it back as a vector of strings. If there is no subdir,
@@ -162,16 +135,6 @@ mod tests {
     // Only very simple tests
 
     #[test]
-    fn test_sysfs_read_string() {
-        let r = sysfs_read_string("/proc/cpuinfo");
-        assert!(r.is_ok());
-    }
-    #[test]
-    fn test_sysfs_read_i32() {
-        let r = sysfs_read_i32("/proc/sys/kernel/random/entropy_avail");
-        assert!(r.is_ok());
-    }
-    #[test]
     fn test_sysfs_get_list_of_subdirs() {
         let r = sysfs_get_list_of_subdirs("/proc/self");
         assert!(r.is_ok());
@@ -187,24 +150,6 @@ mod tests {
         for e in v {
             assert!(e.strip_prefix("fd").is_some());
         }
-    }
-    #[test]
-    fn test_sysfs_write_i32() {
-        let temp_dir =
-            TemporaryDirectory::new().expect("creating a temporary directory should work");
-        let test_path = temp_dir.path().join("test");
-        let test_path = test_path.as_os_str().to_str().expect("should work");
-        let mut file = File::create(test_path).unwrap();
-        let _ = file.write_all(b"XYZ");
-        drop(file);
-        let r = sysfs_read_i32(test_path);
-        assert!(r.is_err());
-        let r = sysfs_write_i32(test_path, 999);
-        assert!(r.is_ok());
-        let r = sysfs_read_i32(test_path);
-        assert!(r.is_ok());
-        let v = r.unwrap();
-        assert!(v == 999);
     }
     #[test]
     fn test_lockfile() {

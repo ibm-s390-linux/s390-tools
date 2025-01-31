@@ -5,9 +5,9 @@
 //! UV related functions for pvapconfig
 //
 
+use pv_core::misc::read_file_string;
 use pv_core::uv::{ListCmd, SecretList, UvDevice, UvcSuccess};
 use regex::Regex;
-use std::path::Path;
 
 /// The byte size of association secret of type 2 in struct SecretEntry
 pub const AP_ASSOC_SECRET_ID_SIZE: usize = 32;
@@ -25,21 +25,8 @@ const RE_UV_FAC_BIT_LIST_SECRETS: u32 = 30;
 /// Panics if the compilation of a static regular expression fails.
 /// Panics if RE_UV_FACILITIES does not match.
 pub fn has_list_secrets_facility() -> Result<(), String> {
-    if !Path::new(PATH_SYS_FW_UV_FACILITIES).is_file() {
-        return Err(format!(
-            "UV facilities sysfs attribute not found (file {} does not exist).",
-            PATH_SYS_FW_UV_FACILITIES
-        ));
-    }
-    let facstr = match crate::helper::sysfs_read_string(PATH_SYS_FW_UV_FACILITIES) {
-        Ok(s) => s,
-        Err(err) => {
-            return Err(format!(
-                "Failure reading UV facilities from {PATH_SYS_FW_UV_FACILITIES} ({:?}).",
-                err
-            ))
-        }
-    };
+    let facstr =
+        read_file_string(PATH_SYS_FW_UV_FACILITIES, "UV facilities").map_err(|e| e.to_string())?;
     let re_uv_facilities = Regex::new(RE_UV_FACILITIES).unwrap();
     if !re_uv_facilities.is_match(&facstr) {
         Err(format!("Failure parsing UV facilities entry '{facstr}'."))
