@@ -296,7 +296,7 @@ pub fn read_file<P: AsRef<Path>>(path: P, ctx: &str) -> Result<Vec<u8>> {
 pub fn read<R: Read, P: AsRef<Path>>(rd: &mut R, path: P, ctx: &str) -> Result<Vec<u8>> {
     let mut buf = vec![];
     rd.read_to_end(&mut buf).map_err(|e| Error::FileIo {
-        ty: FileIoErrorType::Write,
+        ty: FileIoErrorType::Read,
         ctx: ctx.to_string(),
         path: path.as_ref().to_path_buf(),
         source: e,
