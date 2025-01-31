@@ -11,7 +11,7 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U64};
 
 use crate::{
     macros::{bail_spec, file_error},
-    Error, FileAccessErrorType, FileIoErrorType, Result,
+    Error, FileAccessErrorType, Result,
 };
 
 /// Trait that describes bitflags, represented by `T`.
@@ -295,12 +295,8 @@ pub fn read_file<P: AsRef<Path>>(path: P, ctx: &str) -> Result<Vec<u8>> {
 /// Passes through any kind of error `std::fs::read` produces
 pub fn read<R: Read, P: AsRef<Path>>(rd: &mut R, path: P, ctx: &str) -> Result<Vec<u8>> {
     let mut buf = vec![];
-    rd.read_to_end(&mut buf).map_err(|e| Error::FileIo {
-        ty: FileIoErrorType::Read,
-        ctx: ctx.to_string(),
-        path: path.as_ref().to_path_buf(),
-        source: e,
-    })?;
+    rd.read_to_end(&mut buf)
+        .map_err(|e| file_error!(Read, ctx, path, e))?;
     Ok(buf)
 }
 
@@ -313,12 +309,7 @@ pub fn read<R: Read, P: AsRef<Path>>(rd: &mut R, path: P, ctx: &str) -> Result<V
 /// # Errors
 /// Passes through any kind of error `std::fs::write` produces
 pub fn write_file<D: AsRef<[u8]>, P: AsRef<Path>>(path: P, data: D, ctx: &str) -> Result<()> {
-    std::fs::write(path.as_ref(), data.as_ref()).map_err(|e| Error::FileIo {
-        ty: FileIoErrorType::Write,
-        ctx: ctx.to_string(),
-        path: path.as_ref().to_path_buf(),
-        source: e,
-    })
+    std::fs::write(path.as_ref(), data.as_ref()).map_err(|e| file_error!(Write, ctx, path, e))
 }
 
 /// Write content to a [`std::io::Write`] and add context in case of an error
@@ -335,12 +326,8 @@ pub fn write<D: AsRef<[u8]>, P: AsRef<Path>, W: Write>(
     path: P,
     ctx: &str,
 ) -> Result<()> {
-    wr.write_all(data.as_ref()).map_err(|e| Error::FileIo {
-        ty: FileIoErrorType::Write,
-        ctx: ctx.to_string(),
-        path: path.as_ref().to_path_buf(),
-        source: e,
-    })
+    wr.write_all(data.as_ref())
+        .map_err(|e| file_error!(Write, ctx, path, e))
 }
 
 macro_rules! usize_to_ui {
