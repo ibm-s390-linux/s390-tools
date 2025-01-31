@@ -262,6 +262,17 @@ pub fn read_exact_file<P: AsRef<Path>, const COUNT: usize>(
     Ok(buf)
 }
 
+/// Read content from a file as string and add context in case of an error
+///
+/// * `path` - Path to file
+/// * `ctx` - Error context string in case of an error
+///
+/// # Errors
+/// Passes through any kind of error `std::fs::read` produces
+pub fn read_file_string<P: AsRef<Path>>(path: P, ctx: &str) -> Result<String> {
+    std::fs::read_to_string(&path).map_err(|e| file_error!(Read, ctx, path, e))
+}
+
 /// Read content from a file and add context in case of an error
 ///
 /// * `path` - Path to file
