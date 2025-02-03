@@ -299,7 +299,8 @@ impl GenprotimgCliOptions {
         if version_count == 1 {
             CliOptions::new_version_cmd_opts()
         } else {
-            let genprotimg_opts = Self::parse();
+            let mut genprotimg_opts = Self::parse();
+            genprotimg_opts.args.overwrite = true; // backward compatibility with C- genprotimg
             genprotimg_opts.into()
         }
     }
