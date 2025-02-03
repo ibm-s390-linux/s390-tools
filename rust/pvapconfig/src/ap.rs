@@ -20,7 +20,8 @@ const PATH_SYS_BUS_AP_BINDINGS: &str = "/sys/bus/ap/bindings";
 const PATH_SYS_DEVICES_AP: &str = "/sys/devices/ap";
 
 const RE_CARD_DIR: &str = r"^card([[:xdigit:]]{2})$";
-const RE_QUEUE_DIR: &str = r"^([[:xdigit:]]{2})\.([[:xdigit:]]{4})$";
+/// Regular expression for AP queue directories
+pub const RE_QUEUE_DIR: &str = r"^([[:xdigit:]]{2})\.([[:xdigit:]]{4})$";
 const RE_CARD_TYPE: &str = r"^CEX([3-8])([ACP])$";
 const RE_EP11_MKVP: &str = r"WK\s+CUR:\s+(\S+)\s+(\S+)";
 const RE_CCA_AES_MKVP: &str = r"AES\s+CUR:\s+(\S+)\s+(\S+)";
@@ -93,36 +94,52 @@ pub fn wait_for_ap_bus_bindings_complete() -> bool {
     }
 }
 
+/// APQN mode
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApqnMode {
+    /// Accelerator mode
     Accel,
+    /// EP11 (Enterprise PKCS #11) coprocessor mode
     Ep11,
+    /// Common Cryptographic Architecture (CCA) coprocessor mode
     Cca,
 }
 
+/// Info on an APQN configured for accelerator
 #[derive(Debug, Clone)]
 pub struct ApqnInfoAccel {
     // empty
 }
 
+/// Info on an APQN configured for EP11 coprocessor
 #[derive(Debug, Clone)]
 pub struct ApqnInfoEp11 {
+    /// Serial number of the Crypto Express adapter as a case-sensitive ASCII string
     pub serialnr: String,
+    /// Master key verification pattern as hex string
     pub mkvp: String, // may be an empty string if no WK set
 }
 
+/// Info on an APQN configured for CCA coprocessor
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct ApqnInfoCca {
+    /// Serial number of the Crypto Express adapter as a case-sensitive ASCII string
     pub serialnr: String,
-    pub mkvp_aes: String,  // may be an empty string if no MK set
+    /// Master key verification pattern as hex string for AES
+    pub mkvp_aes: String, // may be an empty string if no MK set
+    /// Master key verification pattern as hex string for asymmetric public key algorithms
     pub mkvp_apka: String, // may be an empty string if no MK set
 }
 
+/// Info for an APQN's mode
 #[derive(Debug, Clone)]
 pub enum ApqnInfo {
+    /// Info on an APQN configured for accelerator
     Accel(ApqnInfoAccel),
+    /// Info on an APQN configured for EP11 coprocessor
     Ep11(ApqnInfoEp11),
+    /// Info on an APQN configured for CCA coprocessor
     #[allow(dead_code)]
     Cca(ApqnInfoCca),
 }
@@ -220,7 +237,8 @@ impl ApqnInfo {
         Ok(Self::Ep11(ApqnInfoEp11 { serialnr, mkvp }))
     }
 
-    fn info(mode: &ApqnMode, carddir: &str, queuedir: &str) -> Result<Self, String> {
+    /// Get mode-specific info
+    pub fn info(mode: &ApqnMode, carddir: &str, queuedir: &str) -> Result<Self, String> {
         match mode {
             ApqnMode::Accel => Self::accel_info(carddir, queuedir),
             ApqnMode::Cca => Self::cca_info(carddir, queuedir),
@@ -229,14 +247,21 @@ impl ApqnInfo {
     }
 }
 
+/// `Apqn` encodes an adjunct processor queue number.
 #[derive(Debug, Clone)]
 pub struct Apqn {
+    /// Name of the APQN
     #[allow(dead_code)]
     pub name: String,
+    /// Card number
     pub card: u32,
+    /// Domain number
     pub domain: u32,
+    /// CryptoExpress generation
     pub gen: u32,
+    /// Mode that adapter is configured to use
     pub mode: ApqnMode,
+    /// Mode-specific info
     pub info: Option<ApqnInfo>,
 }
 
@@ -247,45 +272,55 @@ impl fmt::Display for Apqn {
 }
 
 impl Apqn {
+    /// Read bind state of the APQN.
     pub fn bind_state(&self) -> Result<BindState, String> {
         get_apqn_bind_state(self.card, self.domain)
     }
 
+    /// Set bind state of the APQN.
     pub fn set_bind_state(&self, state: BindState) -> Result<(), String> {
         set_apqn_bind_state(self.card, self.domain, state)
     }
 
+    /// Read associate state of the APQN.
     pub fn associate_state(&self) -> Result<AssocState, String> {
         get_apqn_associate_state(self.card, self.domain)
     }
 
+    /// Set associate state of the APQN.
     pub fn set_associate_state(&self, state: AssocState) -> Result<(), String> {
         set_apqn_associate_state(self.card, self.domain, state)
     }
 }
 
 /// Wrapper object around Vector of Apqns
+#[derive(Debug)]
 pub struct ApqnList(Vec<Apqn>);
 
 impl ApqnList {
+    /// Create from APQN vector.
     #[cfg(test)] // only used in test code
     pub fn from_apqn_vec(apqns: Vec<Apqn>) -> Self {
         Self(apqns)
     }
 
+    /// Converts to an APQN vector.
     #[cfg(test)] // only used in test code
     pub fn to_apqn_vec(&self) -> Vec<Apqn> {
         self.0.clone()
     }
 
+    /// Iter over APQN list
     pub fn iter(&self) -> Iter<'_, Apqn> {
         self.0.iter()
     }
 
+    /// Length of the APQN list
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Check if APQN list is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -477,10 +512,14 @@ impl ApqnList {
     }
 }
 
-#[derive(PartialEq, Eq)]
+/// Bind state of an APQN
+#[derive(Debug, PartialEq, Eq)]
 pub enum BindState {
+    /// APQN is bound
     Bound,
+    /// APQN is unbound
     Unbound,
+    /// APQN does not support bind
     NotSupported,
 }
 
@@ -551,11 +590,16 @@ pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> Result<(), 
     }
 }
 
-#[derive(PartialEq, Eq)]
+/// Association state of an APQN
+#[derive(Debug, PartialEq, Eq)]
 pub enum AssocState {
+    /// Associated with index
     Associated(u16),
+    /// Association pending
     AssociationPending,
+    /// Not associated
     Unassociated,
+    /// APQN does not support association
     NotSupported,
 }
 
