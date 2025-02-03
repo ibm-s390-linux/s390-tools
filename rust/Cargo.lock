@@ -805,6 +805,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
+ "regex",
  "serde",
  "serde_test",
  "thiserror",

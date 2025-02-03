@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2023, 2024
 #![doc = include_str!("../README.md")]
+mod apdevice;
 mod confidential;
 mod error;
 mod macros;
@@ -70,6 +71,30 @@ pub mod request {
 pub mod secret {
     pub use crate::uvsecret::AddSecretMagic;
     pub use crate::uvsecret::UserDataType;
+}
+
+/// Functionalities for the AP bus
+pub mod ap {
+    pub use crate::apdevice::Apqn;
+    pub use crate::apdevice::RE_QUEUE_DIR;
+    pub use crate::apdevice::{get_apqn_bind_state, set_apqn_bind_state};
+    /// AP modes
+    pub mod apqn_mode {
+        pub use crate::apdevice::ApqnMode::{self, *};
+    }
+    /// AP info for each state
+    pub mod apqn_info {
+        pub use crate::apdevice::ApqnInfo::{self, *};
+        pub use crate::apdevice::{ApqnInfoAccel, ApqnInfoCca, ApqnInfoEp11};
+    }
+    /// AP bind states
+    pub mod bind_state {
+        pub use crate::apdevice::BindState::{self, *};
+    }
+    /// AP association states
+    pub mod assoc_state {
+        pub use crate::apdevice::AssocState::{self, *};
+    }
 }
 
 // Internal definitions/ imports

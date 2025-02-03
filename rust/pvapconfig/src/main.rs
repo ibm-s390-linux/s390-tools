@@ -12,10 +12,11 @@ mod config;
 mod helper;
 mod uv;
 
-use ap::{Apqn, ApqnList};
+use ap::ApqnList;
 use cli::ARGS;
 use config::{ApConfigEntry, ApConfigList};
 use helper::{LockFile, PATH_PVAPCONFIG_LOCK};
+use pv_core::ap::{self as pvap, Apqn};
 use pv_core::misc::encode_hex;
 use pv_core::uv::{ListableSecretType, SecretList};
 use std::process::ExitCode;
@@ -225,14 +226,14 @@ fn do_ap_config(
                 continue;
             }
             match apqn.mode {
-                ap::ApqnMode::Accel => {
+                pvap::apqn_mode::Accel => {
                     // check bind state of this APQN
                     let bind_state_ok = match apqn.bind_state() {
                         Err(err) => {
                             eprintln!("Warning: Failure reading APQN {apqn} bind state: {err}");
                             false
                         }
-                        Ok(ap::BindState::Bound) => true,
+                        Ok(pvap::bind_state::Bound) => true,
                         Ok(_) => false,
                     };
                     if !bind_state_ok {
@@ -247,7 +248,7 @@ fn do_ap_config(
                     resolved_entries += 1;
                     break;
                 }
-                ap::ApqnMode::Ep11 => {
+                pvap::apqn_mode::Ep11 => {
                     // check association state of this APQN
                     let (assoc_state_ok, assoc_idx) = match apqn.associate_state() {
                         Err(err) => {
@@ -256,7 +257,7 @@ fn do_ap_config(
                             );
                             (false, 0)
                         }
-                        Ok(ap::AssocState::Associated(idx)) => (true, idx),
+                        Ok(pvap::assoc_state::Associated(idx)) => (true, idx),
                         Ok(_) => (false, 0),
                     };
                     if !assoc_state_ok {
@@ -298,10 +299,10 @@ fn do_ap_config(
         }
         match apqn.bind_state() {
             Err(err) => eprintln!("Warning: Failure reading APQN {apqn} bind state: {err}"),
-            Ok(ap::BindState::Bound) => {
+            Ok(pvap::bind_state::Bound) => {
                 info!("Unbind APQN {apqn} as this bind/associate does not match to any AP config entry.\n");
                 if !ARGS.dryrun() {
-                    if let Err(err) = apqn.set_bind_state(ap::BindState::Unbound) {
+                    if let Err(err) = apqn.set_bind_state(pvap::bind_state::Unbound) {
                         return Err(format!("Failure unbinding APQN {apqn}: {err}"));
                     }
                 }
@@ -331,15 +332,15 @@ fn do_ap_config(
                 continue;
             }
             match apqn.mode {
-                ap::ApqnMode::Accel => {
+                pvap::apqn_mode::Accel => {
                     // try to bind this accelerator APQN
                     if ARGS.verbose() || fntest {
                         println!("Bind APQN {apqn} to match to AP config entry {cistr}.");
                     }
                     if !(ARGS.dryrun() || fntest) {
-                        if let Err(err) = apqn.set_bind_state(ap::BindState::Bound) {
+                        if let Err(err) = apqn.set_bind_state(pvap::bind_state::Bound) {
                             // bind failed, unbind/reset this apqn, return with failure
-                            let _ = apqn.set_bind_state(ap::BindState::Unbound);
+                            let _ = apqn.set_bind_state(pvap::bind_state::Unbound);
                             return Err(format!("Failure binding APQN {apqn}: {err}"));
                         }
                     }
@@ -348,7 +349,7 @@ fn do_ap_config(
                     resolved_entries += 1;
                     break;
                 }
-                ap::ApqnMode::Ep11 => {
+                pvap::apqn_mode::Ep11 => {
                     // EP11 needs bind and associate, but before doing this let's
                     // check out which secret index to use with the associate
                     let se = match secrets.iter().find(|&se| {
@@ -370,9 +371,9 @@ fn do_ap_config(
                         );
                     }
                     if !(ARGS.dryrun() || fntest) {
-                        if let Err(err) = apqn.set_bind_state(ap::BindState::Bound) {
+                        if let Err(err) = apqn.set_bind_state(pvap::bind_state::Bound) {
                             // bind failed, unbind/reset this apqn, return with failure
-                            let _ = apqn.set_bind_state(ap::BindState::Unbound);
+                            let _ = apqn.set_bind_state(pvap::bind_state::Unbound);
                             return Err(format!("Failure binding APQN {}: {}", apqn, err));
                         }
                     }
@@ -384,7 +385,7 @@ fn do_ap_config(
 			);
                     }
                     if !(ARGS.dryrun() || fntest) {
-                        let apas = ap::AssocState::Associated(se.index());
+                        let apas = pvap::assoc_state::Associated(se.index());
                         apqn.set_associate_state(apas)
                             .map_err(|err| format!("Failure associating APQN {apqn}: {err}"))?;
                     }
@@ -409,7 +410,7 @@ fn do_ap_config(
 /// Please note this can not happen, as mingen is already checked via RE
 /// during storing the value into mingen.
 fn config_and_apqn_match(apc: &ApConfigEntry, apqn: &Apqn) -> bool {
-    if apc.mode == config::STR_MODE_ACCEL && apqn.mode == ap::ApqnMode::Accel {
+    if apc.mode == config::STR_MODE_ACCEL && apqn.mode == pvap::apqn_mode::Accel {
         // config and apqn are accelerators
         // maybe check mingen
         if !apc.mingen.is_empty() {
@@ -419,10 +420,10 @@ fn config_and_apqn_match(apc: &ApConfigEntry, apqn: &Apqn) -> bool {
             }
         }
         return true;
-    } else if apc.mode == config::STR_MODE_EP11 && apqn.mode == ap::ApqnMode::Ep11 {
+    } else if apc.mode == config::STR_MODE_EP11 && apqn.mode == pvap::apqn_mode::Ep11 {
         // config and apqn are ep11
         let info = match &apqn.info {
-            Some(ap::ApqnInfo::Ep11(i)) => i,
+            Some(pvap::apqn_info::Ep11(i)) => i,
             _ => return false,
         };
         // maybe check mingen
@@ -458,64 +459,64 @@ mod tests {
 
     fn make_test_apqns() -> Vec<Apqn> {
         vec![
-            ap::Apqn {
+            pvap::Apqn {
                 name: String::from("10.0007"),
                 card: 16,
                 domain: 7,
                 gen: 8,
-                mode: ap::ApqnMode::Accel,
-                info: Option::Some(ap::ApqnInfo::Accel(ap::ApqnInfoAccel {})),
+                mode: pvap::apqn_mode::Accel,
+                info: Option::Some(pvap::apqn_info::Accel(pvap::apqn_info::ApqnInfoAccel {})),
             },
-            ap::Apqn {
+            pvap::Apqn {
                 name: String::from("11.0008"),
                 card: 17,
                 domain: 8,
                 gen: 8,
-                mode: ap::ApqnMode::Ep11,
-                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                mode: pvap::apqn_mode::Ep11,
+                info: Option::Some(pvap::apqn_info::Ep11(pvap::apqn_info::ApqnInfoEp11 {
                     serialnr: String::from("93AADFK719460083"),
                     mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
                 })),
             },
-            ap::Apqn {
+            pvap::Apqn {
                 name: String::from("12.0009"),
                 card: 18,
                 domain: 9,
                 gen: 8,
-                mode: ap::ApqnMode::Ep11,
-                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                mode: pvap::apqn_mode::Ep11,
+                info: Option::Some(pvap::apqn_info::Ep11(pvap::apqn_info::ApqnInfoEp11 {
                     serialnr: String::from("93AADHZU42082261"),
                     mkvp: String::from("4a27bb66520ac85f6073a7f678d262c0"),
                 })),
             },
-            ap::Apqn {
+            pvap::Apqn {
                 name: String::from("12.000a"),
                 card: 18,
                 domain: 10,
                 gen: 8,
-                mode: ap::ApqnMode::Ep11,
-                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                mode: pvap::apqn_mode::Ep11,
+                info: Option::Some(pvap::apqn_info::Ep11(pvap::apqn_info::ApqnInfoEp11 {
                     serialnr: String::from("93AADHZU42082261"),
                     mkvp: String::from("383d2a9ab781f35343554c5b3d9337cd"),
                 })),
             },
-            ap::Apqn {
+            pvap::Apqn {
                 name: String::from("13.000d"),
                 card: 19,
                 domain: 13,
                 gen: 8,
-                mode: ap::ApqnMode::Ep11,
-                info: Option::Some(ap::ApqnInfo::Ep11(ap::ApqnInfoEp11 {
+                mode: pvap::apqn_mode::Ep11,
+                info: Option::Some(pvap::apqn_info::Ep11(pvap::apqn_info::ApqnInfoEp11 {
                     serialnr: String::from("87HU397G150TZGR"),
                     mkvp: String::new(),
                 })),
             },
-            ap::Apqn {
+            pvap::Apqn {
                 name: String::from("13.000f"),
                 card: 19,
                 domain: 15,
                 gen: 8,
-                mode: ap::ApqnMode::Ep11,
+                mode: pvap::apqn_mode::Ep11,
                 info: Option::None,
             },
         ]

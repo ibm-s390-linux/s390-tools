@@ -22,6 +22,7 @@ thiserror = "2.0.11"
 zerocopy = {version = "0.7", features = ["derive"]}
 serde = { version = "1.0.217", features = ["derive"]}
 byteorder = "1.5"
+regex = "1.10"
 
 [dev-dependencies]
 serde_test = "1.0.177"
