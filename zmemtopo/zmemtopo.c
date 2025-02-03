@@ -15,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "lib/util_fmt.h"
 #include "lib/util_libc.h"
 #include "lib/util_list.h"
 #include "lib/util_opt.h"
@@ -22,6 +23,8 @@
 #include "lib/util_prg.h"
 
 #include "zmemtopo.h"
+
+#define OPT_FORMAT 256
 
 static const struct util_prg prg = {
 	.desc = "Display CEC memory topology of allocated memory increments.",
@@ -41,6 +44,11 @@ static struct util_opt opt_vec[] = {
 		.option = { "level", required_argument, NULL, 'l' },
 		.argument = "NESTING_LEVEL",
 		.desc = "Set the topology display depth to NESTING_LEVEL"
+	}, {
+		.option = { "format", required_argument, NULL, OPT_FORMAT },
+		.argument = "FORMAT",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "List data in specified FORMAT (" FMT_TYPE_NAMES ")",
 	}, {
 		.option = { "full", no_argument, NULL, 'f' },
 		.desc = "Display tree view with padded elements"
@@ -72,6 +80,9 @@ static struct zmemtopo_globals {
 	unsigned int table_view;
 	unsigned int sort_field;
 	unsigned int ascii;
+	unsigned int fmt_specified;
+	enum util_fmt_t format;
+	enum util_fmt_flags_t fmt_flags;
 } g;
 
 static void parse_nesting_level(char *arg)
@@ -98,6 +109,21 @@ static void parse_sort_field(char *arg)
 		g.sort_field = SORT_SIZE;
 	else
 		errx(EXIT_FAILURE, "%s is not a valid sort field option", arg);
+}
+
+static void parse_fmt_options(char *opt)
+{
+	if (!util_fmt_name_to_type(opt, &g.format)) {
+		errx(EXIT_FAILURE,
+		     "The format provided is not valid. Supported formats are: %s",
+		     FMT_TYPE_NAMES);
+	}
+	g.fmt_flags = FMT_HANDLEINT | FMT_KEEPINVAL;
+	if (g.format == FMT_CSV)
+		g.fmt_flags |= FMT_NOMETA | FMT_QUOTEALL;
+	else
+		g.fmt_flags |= FMT_DEFAULT;
+	g.fmt_specified = 1;
 }
 
 static void parse_args(int argc, char *argv[])
@@ -132,6 +158,9 @@ static void parse_args(int argc, char *argv[])
 		case 'i':
 			g.ascii = 1;
 			break;
+		case OPT_FORMAT:
+			parse_fmt_options(optarg);
+			break;
 		case -1:
 			break;
 		default:
@@ -146,6 +175,11 @@ static void parse_args(int argc, char *argv[])
 	if (g.table_view && (g.tree_full || g.tree_reverse)) {
 		errx(EXIT_FAILURE,
 		     "The --full and --reverse options cannot be used with the table view");
+	}
+	if (g.fmt_specified &&
+	    (g.tree_full || g.tree_reverse || g.table_view || g.ascii)) {
+		errx(EXIT_FAILURE,
+		     "The --format FORMAT option cannot be combined with human readable output modifiers");
 	}
 }
 
@@ -443,6 +477,9 @@ static void partition_list_populate(void *data, struct partitions *parts)
 		tle = (void *)p_hdr + sizeof(*p_hdr);
 		util_list_add_tail(parts->list, part);
 	}
+	p_hdr = (void *)t_hdr + t_hdr->this_part;
+	parts->this_part = p_hdr->pn;
+	memcpy(parts->tod, t_hdr->tod, sizeof(t_hdr->tod));
 }
 
 static int part_cmp_sum(void *a, void *b, void *UNUSED(data))
@@ -859,6 +896,146 @@ static void tree_print(struct partitions *parts)
 	free(tree);
 }
 
+static char *parseable_create_tod_hex(char *tod)
+{
+	size_t total_size;
+	unsigned int i;
+	char *ptr;
+	int n;
+
+	total_size = TOD_LEN * 2 + 2;
+	ptr = util_zalloc(total_size * sizeof(*ptr));
+	n = snprintf(ptr, total_size, "0x");
+	for (i = 0; i < TOD_LEN; i++)
+		n += snprintf(ptr + n, total_size, "%x", tod[i]);
+	return ptr;
+}
+
+static void parseable_generic_level(struct partition *part, unsigned int step,
+				    unsigned int level, unsigned int *level_len)
+{
+	struct topology_entry *entries;
+	unsigned int i, start, end;
+
+	if (level < g.nesting_level)
+		return;
+	entries = &part->entries[level - 1];
+	start = step * level_len[level - 1];
+	end = (step + 1) * level_len[level - 1];
+	util_fmt_obj_start(FMT_LIST, "topology");
+	for (i = start; i < end; i++) {
+		util_fmt_obj_start(FMT_ROW, NULL);
+		util_fmt_pair(FMT_DEFAULT, "level", "%u", level);
+		util_fmt_pair(FMT_DEFAULT, "entry_idx", "%u",
+			      i % level_len[level - 1]);
+		util_fmt_pair(FMT_DEFAULT, "increment_count", "%u",
+			      entries->increments[i]);
+		parseable_generic_level(part, i, level - 1, level_len);
+		util_fmt_obj_end();
+	}
+	util_fmt_obj_end();
+}
+
+static void parseable_generic(struct partitions *parts, struct view_data *vdata)
+{
+	struct stride_unit unit;
+	struct partition *cur;
+	char *tod;
+
+	unit = vdata->unit;
+	tod = parseable_create_tod_hex(parts->tod);
+	util_fmt_obj_start(FMT_DEFAULT, "zmemtopo");
+	util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "report_tod", "%s", tod);
+	util_fmt_pair(FMT_PERSIST, "report_partition_nr", "%u",
+		      parts->this_part);
+	util_fmt_pair(FMT_PERSIST, "increment_size", "%lu", unit.size);
+	util_fmt_obj_start(FMT_LIST, "partitions");
+	util_list_iterate(parts->list, cur) {
+		util_fmt_obj_start(FMT_ROW, NULL);
+		util_fmt_pair(FMT_DEFAULT, "partition_nr", "%u", cur->part_nr);
+		util_fmt_pair(FMT_QUOTE, "partition_name", "%s",
+			      cur->part_name);
+		parseable_generic_level(cur, 0, g.max_level, vdata->level_len);
+		util_fmt_obj_end();
+	}
+	util_fmt_obj_end();
+	util_fmt_obj_end();
+	free(tod);
+}
+
+static void parseable_csv_level(struct partition *part, unsigned int step,
+				unsigned int level, unsigned int this_part,
+				struct view_data *vdata, char *tod)
+{
+	struct topology_entry *entries;
+	unsigned int i, start, end;
+	struct stride_unit unit;
+
+	if (level < g.nesting_level)
+		return;
+	unit = vdata->unit;
+	entries = &part->entries[level - 1];
+	start = step * vdata->level_len[level - 1];
+	end = (step + 1) * vdata->level_len[level - 1];
+	for (i = start; i < end; i++) {
+		util_fmt_obj_start(FMT_ROW, NULL);
+		util_fmt_pair(FMT_PERSIST, "report_tod", "%s", tod);
+		util_fmt_pair(FMT_PERSIST, "report_partition_nr", "%u",
+			      this_part);
+		util_fmt_pair(FMT_PERSIST, "increment_size", "%lu", unit.size);
+		util_fmt_pair(FMT_DEFAULT, "partition_nr", "%u", part->part_nr);
+		util_fmt_pair(FMT_DEFAULT, "partition_name", "%s",
+			      part->part_name);
+		if (level == g.max_level) {
+			util_fmt_pair(FMT_DEFAULT, "parent_level", "-");
+			util_fmt_pair(FMT_DEFAULT, "parent_entry_idx", "-");
+		} else {
+			util_fmt_pair(FMT_DEFAULT, "parent_level", "%u",
+				      level + 1);
+			util_fmt_pair(FMT_DEFAULT, "parent_entry_idx", "%u",
+				      step % vdata->level_len[level]);
+		}
+		util_fmt_pair(FMT_DEFAULT, "level", "%u", level);
+		util_fmt_pair(FMT_DEFAULT, "entry_idx", "%u",
+			      i % vdata->level_len[level - 1]);
+		util_fmt_pair(FMT_DEFAULT, "increment_count", "%u",
+			      entries->increments[i]);
+		util_fmt_obj_end();
+		parseable_csv_level(part, i, level - 1, this_part, vdata, tod);
+	}
+}
+
+static void parseable_csv(struct partitions *parts, struct view_data *vdata)
+{
+	struct partition *cur;
+	char *tod;
+
+	tod = parseable_create_tod_hex(parts->tod);
+	util_fmt_obj_start(FMT_DEFAULT, NULL);
+	util_list_iterate(parts->list, cur) {
+		parseable_csv_level(cur, 0, g.max_level, parts->this_part,
+				    vdata, tod);
+	}
+	util_fmt_obj_end();
+	free(tod);
+}
+
+static void print_parseable(struct partitions *parts)
+{
+	struct view_data *vdata;
+
+	vdata = util_zalloc(sizeof(*vdata));
+	vdata->unit = determine_stride_unit();
+	partition_list_calculate_level_lengths(parts, vdata);
+	util_fmt_init(stdout, g.format, g.fmt_flags, 1);
+	if (g.format == FMT_CSV)
+		parseable_csv(parts, vdata);
+	else
+		parseable_generic(parts, vdata);
+	util_fmt_exit();
+	free(vdata);
+}
+
 int main(int argc, char *argv[])
 {
 	struct partitions *parts;
@@ -875,7 +1052,9 @@ int main(int argc, char *argv[])
 	parts = partition_list_create();
 	partition_list_populate(data, parts);
 	partition_list_sort(parts);
-	if (g.table_view)
+	if (g.fmt_specified)
+		print_parseable(parts);
+	else if (g.table_view)
 		table_print(parts);
 	else
 		tree_print(parts);

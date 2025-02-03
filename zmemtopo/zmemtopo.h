@@ -56,6 +56,8 @@ struct diag310_memtop {
 #define SCALE_GB		(SCALE_MB * 1024UL)
 #define SCALE_TB		(SCALE_GB * 1024UL)
 #define UNIT_LEN		2
+/* misc */
+#define TOD_LEN			12
 
 /* IOCTL data parsing structures */
 struct diag310_t_hdr {
@@ -109,6 +111,8 @@ struct partition {
 
 struct partitions {
 	struct util_list	*list;
+	char			tod[TOD_LEN];
+	unsigned int		this_part;
 };
 
 #endif /* ZMEMTOPO_H */
