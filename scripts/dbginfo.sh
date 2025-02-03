@@ -511,9 +511,9 @@ CMDS="${CMDS}\
 #   command groups itself have an intentional topical grouping and order
 CMDS="${CMDS}\
   :lsblk\
+  :lsblk -o +FSTYPE,UUID\
   :lsdasd\
   :lsdasd -u\
-  :lvdisplay\
   :pvpath -qa\
   :dmsetup ls\
   :dmsetup ls --tree\
@@ -540,6 +540,12 @@ CMDS="${CMDS}\
   :lszfcp -V\
   :ziorep_config -ADM\
   :lsscsi\
+  :fdisk -l\
+  :lvmconfig\
+  :lvdisplay -m\
+  :vgs -v\
+  :pvs -v\
+  :lvs -v\
   "
 
 # crypto specific commands
