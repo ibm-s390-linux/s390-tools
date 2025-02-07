@@ -16,11 +16,11 @@ readme = "README.md"
 workspace = true
 
 [dependencies]
-libc = "0.2.168"
-log = { version = "0.4.22", features = ["std", "release_max_level_debug"] }
-thiserror = "2.0.6"
+libc = "0.2.169"
+log = { version = "0.4.25", features = ["std", "release_max_level_debug"] }
+thiserror = "2.0.11"
 zerocopy = {version = "0.7", features = ["derive"]}
-serde = { version = "1.0.216", features = ["derive"]}
+serde = { version = "1.0.217", features = ["derive"]}
 byteorder = "1.5"
 
 [dev-dependencies]

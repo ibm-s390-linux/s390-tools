@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 clap = { version ="4.5", features = ["derive", "wrap_help"] }
-libc = "0.2.168"
-log = { version = "0.4.22", features = ["std", "release_max_level_debug"] }
+libc = "0.2.169"
+log = { version = "0.4.25", features = ["std", "release_max_level_debug"] }
 pv = { path = "../pv", package = "s390_pv" }
-serde = { version = "1.0.216"}
+serde = { version = "1.0.217"}

@@ -10,11 +10,11 @@ rust-version.workspace = true
 [dependencies]
 clap = { version ="4.5", features = ["derive", "wrap_help"]}
 lazy_static = "1.5"
-openssl = { version = "0.10.68" }
+openssl = { version = "0.10.70" }
 pv_core = { path = "../pv_core", package = "s390_pv_core"}
 rand = "0.8"
 regex = "1.11"
-serde = { version = "1.0.216", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
 serde_yaml = "0.9"
 utils = { path = "../utils" }
 
