@@ -1,0 +1,399 @@
+.\" Copyright 2025 IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH ZMEMTOPO 8 "2025" "s390-tools"
+.SH NAME
+zmemtopo \- Show CEC memory topology data on IBM Z
+
+.SH SYNOPSIS
+.B zmemtopo
+[OPTIONS]
+
+.SH DESCRIPTION
+.B zmemtopo
+retrieves and displays memory topology information for LPARs on IBM Z
+systems. It displays memory in uniform increments, where an increment is the
+smallest unit reported by the topology querying device. Each increment
+represents a configured chunk of memory along with its topological location.
+
+The granularity of the displayed data varies by nesting level, reflecting the
+hierarchical arrangement of memory.
+
+.SH OPTIONS
+
+.TP
+.BR "\-l <NESTING_LEVEL>" " or " "\-\-level=<NESTING_LEVEL>"
+Select the nesting level of memory topology to display. Lower levels provide
+a more detailed output. Valid values for NESTING_LEVEL are between 1 and 6, but
+some levels might not have data available to display.
+
+.TP
+.BR "\-\-format=<FORMAT>"
+Display the memory topology information in the specified format.
+Valid values for <FORMAT> are json, csv, json-seq or pairs. In parseable format
+the increment size is given in bytes.
+
+.TP
+.BR "\-f" " or " "\-\-full"
+Display the entries or nesting levels without any memory increments configured.
+Has no effect on the table format.
+
+.TP
+.BR "\-r" " or " "\-\-reverse"
+Reverses the hierarchy of the displayed tree. When "--reverse" is specified the
+direction follows nesting level to partition. Has no effect on the table format.
+
+.TP
+.BR "\-t" " or " "\-\-table"
+Display the memory topology in a table format. The table format displays a
+layout of memory topology. The size of the increments is given in a footer, and
+each increment is the same size.
+
+.TP
+.BR "\-s <FIELD>" " or " "\-\-sort=<FIELD>"
+Sort and display the data according to given FIELD value. Valid values for
+FIELD are "nr" for partition number, "lpar" for partition name, and "sum" for
+total partition increments.
+
+.TP
+.BR "\-i" " or " "\-\-ascii"
+Use only ASCII characters to render views.
+
+.TP
+.BR "\-h" " or " "\-\-help"
+Print usage information, then exit.
+
+.TP
+.BR "\-v" " or " "\-\-version"
+Print version information, then exit.
+
+.SH PREREQUISITES
+The following things are required to run zmemtopo:
+
+.IP "     -"
+The Linux kernel must have the required support to provide the memory topology
+data.
+
+.IP "     -"
+To fetch data of any other operating system instances running on the same
+hypervisor as zmemtopo, you will need additional permissions.
+
+.SH EXAMPLES
+Below are various combinations of available command line options;
+
+.IP "     -"
+Without any options zmemtopo displays the tree view with nesting level 3.
+
+$ zmemtopo
+
+.nf
+.ft CW
+LPAR/LEVEL     SIZE
+LPAR003          8G
+└LEVEL4_0        8G
+  ├LEVEL3_0      2G
+  ├LEVEL3_1      2G
+  ├LEVEL3_2      2G
+  └LEVEL3_3      2G
+LPAR005          8G
+└LEVEL4_1        8G
+  ├LEVEL3_0      2G
+  ├LEVEL3_1      2G
+  ├LEVEL3_2      2G
+  └LEVEL3_3      2G
+LPAR006          8G
+└LEVEL4_3        8G
+  ├LEVEL3_0      2G
+  ├LEVEL3_1      2G
+  ├LEVEL3_2      2G
+  └LEVEL3_3      2G
+LPAR009          8G
+└LEVEL4_3        8G
+  ├LEVEL3_0      2G
+  ├LEVEL3_1      2G
+  ├LEVEL3_2      2G
+  └LEVEL3_3      2G
+ .
+ .
+ .
+.ft
+.fi
+
+.IP "     -"
+Display table format, by default nesting level 3 is displayed.
+
+$ zmemtopo -t
+
+.nf
+.ft CW
+        LEVEL 4   0   0   0   0    1   1   1   1    2   2   2   2    3   3   3   3
+        LEVEL 3   0   1   2   3    0   1   2   3    0   1   2   3    0   1   2   3
+ NR    LPAR SUM
+  3 LPAR003   8   2   2   2   2    -   -   -   -    -   -   -   -    -   -   -   -
+  5 LPAR005   8   -   -   -   -    2   2   2   2    -   -   -   -    -   -   -   -
+  6 LPAR006   8   -   -   -   -    -   -   -   -    -   -   -   -    2   2   2   2
+  9 LPAR009   8   -   -   -   -    -   -   -   -    -   -   -   -    2   2   2   2
+ 13 LPAR013  48   -   -   -   -    -   -   -   -   12  12  12  12    -   -   -   -
+ .
+ .
+ .
+
+Increment size: 1G
+
+.ft
+.fi
+
+.IP "     -"
+Display reverse tree with nesting level 4.
+
+$ zmemtopo -r -l 4
+
+.nf
+.ft CW
+LEVEL/LPAR     SIZE
+LEVEL4_0       388G
+│ ├LPAR003       8G
+│ ├LPAR018      64G
+│ └...
+LEVEL4_1       708G
+│ ├LPAR005       8G
+│ ├LPAR029       8G
+│ └...          32G
+LEVEL4_2       224G
+│ ├LPAR013      48G
+│ ├LPAR014      20G
+│ ├LPAR019
+│ └...          32G
+LEVEL4_3      1618G
+  ├...
+  └LPAR086       2G
+
+.ft
+.fi
+
+.IP "     -"
+Display reverse full tree. Entries that have no memory increments are visible.
+
+$ zmemtopo -rf
+
+.nf
+.ft CW
+.ft
+LEVEL/LPAR      SIZE
+LEVEL4_0        388G
+│ ├LEVEL3_0      97G
+│ │ ├LPAR003      2G
+│ │ ├LPAR018     16G
+│ │ └...
+│ ├LEVEL3_1      97G
+│ │ ├LPAR003      2G
+│ │ ├LPAR018     16G
+│ │ └...
+│ ├LEVEL3_2      97G
+│ │ ├LPAR003      2G
+│ │ └...
+│ └LEVEL3_3      97G
+│   ├LPAR003      2G
+│   └...
+LEVEL4_1           -
+│ ├LEVEL3_0        -
+│ ├LEVEL3_1        -
+│ ├LEVEL3_2        -
+│ └LEVEL3_3        -
+LEVEL4_2        224G
+│ ├LEVEL3_0      56G
+│ │ ├LPAR013     12G
+│ │ └...
+│ ├LEVEL3_1      56G
+│ │ ├LPAR013     12G
+│ │ └...
+│ ├LEVEL3_2      56G
+│ │ ├LPAR013     12G
+│ │ └...
+│ └LEVEL3_3      56G
+│   ├LPAR013     12G
+│ │ └...
+LEVEL4_3       1618G
+  ├LEVEL3_0     405G
+  │ ├LPAR006      2G
+  │ ├...
+  │ └LPAR086      1G
+  ├LEVEL3_1     405G
+  │ ├LPAR006      2G
+  │ ├...
+  │ └LPAR086      1G
+  ├LEVEL3_2     404G
+  │ ├LPAR006      2G
+  │ ├...
+  │ └LPAR060     48G
+  └LEVEL3_3     404G
+    ├LPAR006      2G
+    ├...
+    └LPAR060     48G
+.ft
+.fi
+
+.IP "     -"
+Display tree with entries which have no memory increments.
+
+$ zmemtopo -f
+
+.nf
+.ft CW
+LPAR/LEVEL     SIZE
+LPAR086          2G
+├LEVEL4_0         -
+│ ├LEVEL3_0       -
+│ ├LEVEL3_1       -
+│ ├LEVEL3_2       -
+│ └LEVEL3_3       -
+├LEVEL4_1         -
+│ ├LEVEL3_0       -
+│ ├LEVEL3_1       -
+│ ├LEVEL3_2       -
+│ └LEVEL3_3       -
+├LEVEL4_2         -
+│ ├LEVEL3_0       -
+│ ├LEVEL3_1       -
+│ ├LEVEL3_2       -
+│ └LEVEL3_3       -
+└LEVEL4_3        2G
+  ├LEVEL3_0      1G
+  ├LEVEL3_1      1G
+  ├LEVEL3_2       -
+  └LEVEL3_3       -
+LPAR074          4G
+├LEVEL4_0         -
+│ ├LEVEL3_0       -
+│ ├LEVEL3_1       -
+│ ├LEVEL3_2       -
+│ └LEVEL3_3       -
+├LEVEL4_1        4G
+│ ├LEVEL3_0      1G
+│ ├LEVEL3_1      1G
+│ ├LEVEL3_2      1G
+│ └LEVEL3_3      1G
+ .
+ .
+ .
+
+.ft
+.fi
+
+.IP "     -"
+Display json format.
+
+$ zmemtopo --format=json
+
+.nf
+.ft CW
+{
+  "meta": {
+    "api_level": "1",
+    "version": "s390.tools.version",
+    "host": "host.name",
+    "time_epoch": "xxxxxxxxx",
+    "time": "YYYY-MM-DD HH:MM:SS+0T00"
+  },
+  "zmemtopo": {
+    "report_tod": "0x0e082f7f6d8da64000",
+    "report_partition_nr": 74,
+    "increment_size": 1073741824,
+    "partitions": [
+      {
+        "partition_nr": 3,
+        "partition_name": "LPAR003",
+        "topology": [
+          {
+            "level": 4,
+            "entry_idx": 0,
+            "increment_count": 8,
+            "topology": [
+              {
+                "level": 3,
+                "entry_idx": 0,
+                "increment_count": 2
+              },
+              {
+                "level": 3,
+                "entry_idx": 1,
+                "increment_count": 2
+              },
+              {
+                "level": 3,
+                "entry_idx": 2,
+                "increment_count": 2
+              },
+              {
+                "level": 3,
+                "entry_idx": 3,
+                "increment_count": 2
+              }
+            ]
+          },
+          {
+            "level": 4,
+            "entry_idx": 1,
+            "increment_count": 0,
+            "topology": [
+          .
+	  .
+	  .
+.ft
+.fi
+
+.IP "     -"
+Display csv format.
+
+$ zmemtopo --format=csv
+
+.nf
+.ft CW
+ "report_tod","report_partition_nr","increment_size","partition_nr","partition_name","parent_level","parent_entry_idx","level","entry_idx","increment_count"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","-","-","4","0","8"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","0","3","0","2"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","0","3","1","2"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","0","3","2","2"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","0","3","3","2"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","-","-","4","1","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","1","3","0","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","1","3","1","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","1","3","2","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","1","3","3","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","-","-","4","2","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","2","3","0","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","2","3","1","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","2","3","2","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","2","3","3","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","-","-","4","3","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","3","3","0","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","3","3","1","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","3","3","2","0"
+"0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","3","3","3","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","-","-","4","0","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","0","3","0","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","0","3","1","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","0","3","2","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","0","3","3","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","-","-","4","1","8"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","1","3","0","2"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","1","3","1","2"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","1","3","2","2"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","1","3","3","2"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","-","-","4","2","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","2","3","0","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","2","3","1","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","2","3","2","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","2","3","3","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","-","-","4","3","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","3","3","0","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","3","3","1","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","3","3","2","0"
+"0x0e082f818b066ce82000","74","1073741824","5","LPAR005","4","3","3","3","0"
+"0x0e082f818b066ce82000","74","1073741824","6","LPAR006","-","-","4","0","0"
+ .
+ .
+ .
+.ft
+.fi
