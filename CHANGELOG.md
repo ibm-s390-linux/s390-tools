@@ -1,15 +1,37 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.37.0 (2025-02-07)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.13
 
   Changes of existing tools:
+  - dbginfo.sh: Add details on CPU-measurement
+  - dbginfo.sh: Add new crypto command
+  - dbginfo.sh: Add overview commands and crypto update
+  - dbginfo.sh: Adding kdump info
+  - dbginfo.sh: Removing outdated email references
+  - dbginfo.sh: Rework network section
+  - dbginfo.sh: Update copyright 2nd year
+  - pvimg: Add '--(enable|disable)-image-encryption' flags to 'pvimg create'
+  - pvimg: Add '--cck <FILE>' command line option and make '--comm-key' an alias
+  - pvimg: Add '--hdr-key' command line option to 'pvimg create'
+  - pvimg: Rename '--key' into '--hdr-key' and use '--key' as an alias (for 'pvimg info')
+  - pvsecret: Add support for retrievable secrets
+  - ziorep_config: Add PCHID field to adapter report
+  - ziorep_traffic: Add DEVBUSID column to traffic report
+  - ziorep_utilization: Add --fcp-device parameter to print virtual adapter report
+  - ziorep_utilization: Add PCHID column to physical adapter report
+  - ziorep_utilization: Now prints only physical adapter report by default
+  - ziorep_utilization: Swap Bus-ID and CHPID columns in virtual adapter report
+  - zipl/boot: Increase section size for eckd_mv dumper
+  - zkey: Add support for listing and importing protected virtualization secrets
 
   Bug Fixes:
+  - chpstat: Fix invalid utilization data on older kernels
+  - opticsmon: Fix runaway loop in on_link_change()
+  - zipl: Update inline assembly for GCC 15
+  - zipl_helper.device-mapper: Add missed step in logical device resolution
 
 * __v2.36.0 (2024-12-06)__
 

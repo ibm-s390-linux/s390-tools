@@ -59,6 +59,7 @@ List of all individuals having contributed content to s390-tools
 - Horst Hummel
 - Ingo Franzki
 - Ingo Tuchscherer
+- Jakob Naucke
 - Jakub Čajka
 - Jan Glauber
 - Jan Höppner
