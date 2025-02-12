@@ -1,7 +1,6 @@
 include ../common.mak
 
-SCRIPTS = dbginfo.sh zfcpdbf zipl-switch-to-blscfg scsi_logging_level
-SCRIPTS += sclpdbf
+SCRIPTS = dbginfo.sh zfcpdbf zipl-switch-to-blscfg sclpdbf
 # Helper scripts controlled by corresponding systemd services
 SD_HELPER_SCRIPTS = cpictl dumpconf
 MAN_PAGES = dbginfo.sh.8 zfcpdbf.8 zipl-switch-to-blscfg.8

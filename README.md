@@ -128,9 +128,6 @@ Package contents
  * sclpdbf:
    Display debug data for the sclp kernel component.
 
- * scsi_logging_level:
-   Create, get or set the logging level for the SCSI logging facility.
-
  * zconf:
    Set of scripts to configure and list status information of Linux on s390
    devices.
