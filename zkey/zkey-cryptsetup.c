@@ -102,7 +102,7 @@ static struct zkey_cryptsetup_globals {
 	bool complete;
 	bool inplace;
 	bool staged;
-	char *master_key_file;
+	char *volume_key_file;
 	bool batch_mode;
 	bool debug;
 	bool verbose;
@@ -232,11 +232,18 @@ static struct util_opt opt_vec[] = {
 		.command = COMMAND_SETKEY,
 	},
 	{
-		.option = {"master-key-file", required_argument, NULL, 'm'},
+		.option = {"volume-key-file", required_argument, NULL, 'm'},
 		.argument = "FILE-NAME",
 		.desc = "Specifies the name of a file containing the secure "
 			"AES key that is set as new volume key",
 		.command = COMMAND_SETKEY,
+	},
+	{
+		.option = {"master-key-file", required_argument, NULL, 'm'},
+		.argument = "FILE-NAME",
+		.desc = "Alias for the '--volume-key-file'|'-m' option",
+		.command = COMMAND_SETKEY,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	OPT_PASSPHRASE_ENTRY(COMMAND_SETKEY),
 	{
@@ -2175,12 +2182,12 @@ static int command_setkey(void)
 	int token;
 	int rc;
 
-	if (g.master_key_file == NULL) {
-		misc_print_required_parm("--master-key-file/-m");
+	if (g.volume_key_file == NULL) {
+		misc_print_required_parm("--volume-key-file/-m");
 		return EXIT_FAILURE;
 	}
 
-	newkey = read_secure_key(g.master_key_file, &newkey_size, g.verbose);
+	newkey = read_secure_key(g.volume_key_file, &newkey_size, g.verbose);
 	if (newkey == NULL)
 		return EXIT_FAILURE;
 
@@ -2198,7 +2205,7 @@ static int command_setkey(void)
 				 &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {
 		warnx("The secure key in file '%s' is not valid",
-		      g.master_key_file);
+		      g.volume_key_file);
 		goto out;
 	}
 
@@ -2208,7 +2215,7 @@ static int command_setkey(void)
 			      "enciphered with the master key in the OLD "
 			      "master key register. Do you want to set this "
 			      "key as the new volume key anyway [y/N]?",
-			      g.master_key_file);
+			      g.volume_key_file);
 		util_print_indented(msg, 0);
 		free(msg);
 
@@ -2229,7 +2236,7 @@ static int command_setkey(void)
 	if (keysize - integrity_keysize == newkey_size - integrity_keysize &&
 	    memcmp(newkey, key, keysize - integrity_keysize) == 0) {
 		warnx("The secure key in file '%s' is equal to the current "
-		      "volume key, setkey is ignored", g.master_key_file);
+		      "volume key, setkey is ignored", g.volume_key_file);
 		rc = 0;
 		goto out;
 	}
@@ -2238,7 +2245,7 @@ static int command_setkey(void)
 		   key + keysize - integrity_keysize, integrity_keysize) != 0) {
 		warnx("The secure key in file '%s' contains a different "
 		      "integrity key (i.e. the last %lu bytes of the key) than "
-		      "the current volume key.", g.master_key_file,
+		      "the current volume key.", g.volume_key_file,
 		      integrity_keysize);
 		rc = -EINVAL;
 		goto out;
@@ -2278,7 +2285,7 @@ static int command_setkey(void)
 			      "volume if you set the wrong volume key!\n"
 			      "Are you sure that the key in file '%s' is the "
 			      "correct volume key for volume '%s' [y/N]?",
-			      g.master_key_file, g.pos_arg);
+			      g.volume_key_file, g.pos_arg);
 		util_print_indented(msg, 0);
 		free(msg);
 
@@ -2457,7 +2464,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'm':
-			g.master_key_file = optarg;
+			g.volume_key_file = optarg;
 			break;
 		case 'q':
 			g.batch_mode = true;

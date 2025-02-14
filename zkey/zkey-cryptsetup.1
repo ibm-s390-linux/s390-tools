@@ -34,7 +34,7 @@ To encrypt a volume using \fBLUKS2\fP and the \fBpaes\fP cipher, generate a
 secure AES key using \fBzkey\fP: \fB'zkey generate luks.key \-\-xts'\fP.
 Then format the device with \fBcryptsetup\fP using the just generated secure
 AES key from file luks.key: \fB'cryptsetup luksFormat <device> \-\-type luks2
-\-\-cipher paes\-xts\-plain64 \-\-master\-key\-file luks.key
+\-\-cipher paes\-xts\-plain64 \-\-volume\-key\-file luks.key
 \-\-key\-size 1024'\fP. For more details about \fBzkey\fP or \fBcryptsetup\fP
 see the corresponding man pages.
 .
@@ -285,7 +285,7 @@ behave in the same way as with \fBcryptsetup\fP.
 .B zkey\-cryptsetup
 .BR setkey | setk
 .I device
-.BR \-\-master\-key\-file | \-m
+.BR \-\-volume\-key\-file | \-m
 .IR file\-name
 .RB [ \-\-key\-file | \-d
 .IR file\-name ]
@@ -313,7 +313,7 @@ in a file, and this copy was re-enciphered when the CCA or EP11 master key has
 been changed. Thus, the copy of the secure key must be currently enciphered with
 the CCA or EP11 master key in the CURRENT or OLD master key register.
 Specify the secure key file with option
-.B \-\-master\-key\-file
+.B \-\-volume\-key\-file
 to set this secure key as the new volume key.
 .PP
 In case the LUKS2 header of the volume contains a verification pattern token,
@@ -401,9 +401,14 @@ Suppresses all confirmation questions. Use with care!
 .
 .SS "Options for the setkey command"
 .TP
-.BR \-m ", " \-\-master\-key\-file\~\fIfile\-name\fP
+.BR \-m ", " \-\-volume\-key\-file\~\fIfile\-name\fP
 Specifies the name of a file containing the secure AES key that is set as the
 new volume key.
+.TP
+.BR \-\-master\-key\-file\~\fIfile\-name\fP
+Alias for the
+.BR \-\-volume\-key\-file\~\fIfile\-name\fP
+option.
 .TP
 .BR \-q ", " \-\-batch\-mode
 Suppresses all confirmation questions. Use with care!
@@ -479,6 +484,6 @@ displays its attributes.
 Sets the verification pattern of the secure volume key of the encrypted
 volume /dev/dasdd1.
 .TP
-.B zkey\-cryptsetup setkey /dev/dasdd1 \-\-master\-key\-file seckey.key
+.B zkey\-cryptsetup setkey /dev/dasdd1 \-\-volume\-key\-file seckey.key
 Sets the secure key contained in file seckey.key as the new volume key
 for the encrypted volume /dev/dasdd1.
