@@ -1384,19 +1384,23 @@ int validate_secure_key(int pkey_fd,
 }
 
 /**
- * Generate a key verification pattern of a secure key by encrypting the all
+ * Generate a key verification pattern of a secure AES key by encrypting the all
  * zero message with the secure key using the AF_ALG interface
  *
  * @param[in] key           the secure key token
  * @param[in] key_size      the size of the secure key
  * @param[in] vp            buffer where the verification pattern is returned
  * @param[in] vp_len        the size of the buffer
+ * @param[in] cipher        the cipher to use ('cbc([p]aes)' or 'xts([p]aes)'),
+ *                          or null to determine it from the secure key.
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-int generate_key_verification_pattern(const u8 *key, size_t key_size,
-				      char *vp, size_t vp_len, bool verbose)
+int generate_aes_key_verification_pattern(const u8 *key, size_t key_size,
+					  char *vp, size_t vp_len,
+					  const char *cipher,
+					  bool verbose)
 {
 	int tfmfd = -1, opfd = -1, rc = 0, retry_count = 0;
 	char null_msg[ENC_ZERO_LEN];
@@ -1429,8 +1433,13 @@ int generate_key_verification_pattern(const u8 *key, size_t key_size,
 		goto out;
 	}
 
-	snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "%s(paes)",
-		 is_xts_key(key, key_size) ? "xts" : "cbc");
+	if (cipher != NULL) {
+		util_strlcpy((char *)sa.salg_name, cipher,
+			     sizeof(sa.salg_name));
+	} else {
+		snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "%s(paes)",
+			 is_xts_key(key, key_size) ? "xts" : "cbc");
+	}
 
 	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
 	if (tfmfd < 0) {
@@ -1539,6 +1548,25 @@ out:
 			   "pattern: %s", strerror(-rc));
 
 	return rc;
+}
+
+/**
+ * Generate a key verification pattern of a secure key by encrypting the all
+ * zero message with the secure key using the AF_ALG interface
+ *
+ * @param[in] key           the secure key token
+ * @param[in] key_size      the size of the secure key
+ * @param[in] vp            buffer where the verification pattern is returned
+ * @param[in] vp_len        the size of the buffer
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int generate_key_verification_pattern(const u8 *key, size_t key_size,
+				      char *vp, size_t vp_len, bool verbose)
+{
+	return generate_aes_key_verification_pattern(key, key_size, vp, vp_len,
+						     NULL, verbose);
 }
 
 int get_master_key_verification_pattern(const u8 *key, size_t key_size,

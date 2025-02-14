@@ -82,7 +82,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2018,
-			.pub_last = 2024,
+			.pub_last = 2025,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -125,6 +125,7 @@ static struct zkey_cryptsetup_globals {
 #define COMMAND_VALIDATE	"validate"
 #define COMMAND_SETVP		"setvp"
 #define COMMAND_SETKEY		"setkey"
+#define COMMAND_CONVERT		"convert"
 
 #define ZKEY_CRYPTSETUP_COMMAND_MAX_LEN	10
 
@@ -254,6 +255,33 @@ static struct util_opt opt_vec[] = {
 	/***********************************************************/
 	{
 		.flags = UTIL_OPT_FLAG_SECTION,
+		.desc = "OPTIONS",
+		.command = COMMAND_CONVERT,
+	},
+	{
+		.option = {"volume-key-file", required_argument, NULL, 'm'},
+		.argument = "FILE-NAME",
+		.desc = "Specifies the name of a file containing the secure "
+			"AES key that is set as new volume key",
+		.command = COMMAND_CONVERT,
+	},
+	{
+		.option = {"master-key-file", required_argument, NULL, 'm'},
+		.argument = "FILE-NAME",
+		.desc = "Alias for the '--volume-key-file'|'-m' option",
+		.command = COMMAND_CONVERT,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	OPT_PASSPHRASE_ENTRY(COMMAND_CONVERT),
+	{
+		.option = {"batch-mode", 0, NULL, 'q'},
+		.desc = "Suppresses all confirmation questions. Use with care!",
+		.command = COMMAND_CONVERT,
+	},
+
+	/***********************************************************/
+	{
+		.flags = UTIL_OPT_FLAG_SECTION,
 		.desc = "COMMON OPTIONS"
 	},
 	{
@@ -288,12 +316,14 @@ struct zkey_cryptsetup_command {
 	int has_options;
 	char *pos_arg;
 	int open_device;
+	const char *expected_cipher;
 };
 
 static int command_reencipher(void);
 static int command_validate(void);
 static int command_setvp(void);
 static int command_setkey(void);
+static int command_convert(void);
 
 static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 	{
@@ -308,6 +338,7 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
+		.expected_cipher = "paes",
 	},
 	{
 		.command = COMMAND_VALIDATE,
@@ -320,6 +351,7 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
+		.expected_cipher = "paes",
 	},
 	{
 		.command = COMMAND_SETVP,
@@ -334,6 +366,7 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
+		.expected_cipher = "paes",
 	},
 	{
 		.command = COMMAND_SETKEY,
@@ -346,6 +379,22 @@ static struct zkey_cryptsetup_command zkey_cryptsetup_commands[] = {
 		.has_options = 1,
 		.pos_arg = "DEVICE",
 		.open_device = 1,
+		.expected_cipher = "paes",
+	},
+	{
+		.command = COMMAND_CONVERT,
+		.abbrev_len = 4,
+		.function = command_convert,
+		.need_pkey_device = 1,
+		.short_desc = "Convert a clear-key LUKS2 volume to use a "
+			      "secure volume key",
+		.long_desc = "Convert a LUKS2 volume that uses a clear volume "
+			     "key and the 'aes' cipher to use a secure volume "
+			     "key and the 'paes' cipher",
+		.has_options = 1,
+		.pos_arg = "DEVICE",
+		.open_device = 1,
+		.expected_cipher = "aes",
 	},
 	{ .command = NULL }
 };
@@ -1149,7 +1198,8 @@ static int put_vp_token(struct crypt_device *cd, int token,
 /*
  * Open the LUKS2 device
  */
-static int open_device(const char *device, struct crypt_device **cd)
+static int open_device(const char *device, struct crypt_device **cd,
+		       const char *expected_cipher)
 {
 	const struct crypt_pbkdf_type pbkdf2 = {
 		.type = CRYPT_KDF_PBKDF2,
@@ -1180,9 +1230,9 @@ static int open_device(const char *device, struct crypt_device **cd)
 		goto out;
 	}
 
-	if (strcmp(crypt_get_cipher(cdev), "paes") != 0) {
-		warnx("Device '%s' is not encrypted using the 'paes' cipher",
-		      device);
+	if (strcmp(crypt_get_cipher(cdev), expected_cipher) != 0) {
+		warnx("Device '%s' is not encrypted using the '%s' cipher",
+		      device, expected_cipher);
 		rc = -EINVAL;
 		goto out;
 	}
@@ -1386,7 +1436,7 @@ static int check_keysize_and_cipher_mode(const u8 *key, size_t keysize)
 static int open_keyslot(int keyslot, char **key, size_t *keysize,
 			    size_t *integrity_keysize,
 			    char **password, size_t *password_len,
-			    const char *prompt)
+			    const char *prompt, bool no_keysize_check)
 {
 	struct crypt_params_integrity ip = { 0 };
 #ifdef HAVE_CRYPT_KEYSLOT_GET_PBKDF
@@ -1414,10 +1464,13 @@ static int open_keyslot(int keyslot, char **key, size_t *keysize,
 		pr_verbose("Integrity key size: %u", ip.integrity_key_size);
 	}
 
-	rc = check_keysize_and_cipher_mode(NULL,
-					   vkeysize - ip.integrity_key_size);
-	if (rc != 0)
-		return rc;
+	if (!no_keysize_check) {
+		rc = check_keysize_and_cipher_mode(NULL,
+						   vkeysize -
+							ip.integrity_key_size);
+		if (rc != 0)
+			return rc;
+	}
 
 	vkey = malloc(vkeysize);
 	if (vkey == NULL) {
@@ -1528,7 +1581,7 @@ static int validate_keyslot(int keyslot, char **key, size_t *keysize,
 	int rc, is_old;
 
 	rc = open_keyslot(keyslot, &vkey, &vkeysize, &ikeysize,
-			  password, password_len, prompt);
+			  password, password_len, prompt, false);
 	if (rc < 0)
 		return rc;
 
@@ -1568,6 +1621,27 @@ out:
 	secure_free(vkey, vkeysize);
 
 	return rc;
+}
+
+/*
+ * Return the number of active key slots in a LUKS2 volume.
+ */
+static int count_active_keyslots(struct crypt_device *cd)
+{
+	crypt_keyslot_info info;
+	int i, n;
+
+	for (i = 0, n = 0; ; i++) {
+		info = crypt_keyslot_status(cd, i);
+		if (info == CRYPT_SLOT_INVALID)
+			break;
+		if (info < CRYPT_SLOT_ACTIVE || info > CRYPT_SLOT_ACTIVE_LAST)
+			continue;
+
+		n++;
+	}
+
+	return n;
 }
 
 /*
@@ -2002,7 +2076,7 @@ static int command_validate(void)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, &integrity_keysize,
-			  NULL, NULL, prompt);
+			  NULL, NULL, prompt, false);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -2228,7 +2302,7 @@ static int command_setkey(void)
 
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, &integrity_keysize,
-			  &password, &password_len, prompt);
+			  &password, &password_len, prompt, false);
 	free(prompt);
 	if (rc < 0)
 		goto out;
@@ -2336,6 +2410,238 @@ out:
 	return rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+
+/*
+ * Command handler for 'convert'.
+ *
+ * Convert a LUKS2 volume that uses a clear volume key and the 'aes' cipher
+ * to use a secure volume key and the 'paes' cipher.
+ */
+static int command_convert(void)
+{
+	struct crypt_params_integrity ip_new = { 0 };
+	struct crypt_params_integrity ip = { 0 };
+	struct crypt_params_luks2 luks2 = { 0 };
+	char new_vp[VERIFICATION_PATTERN_LEN];
+	struct crypt_device *new_cd = NULL;
+	char vp[VERIFICATION_PATTERN_LEN];
+	struct vp_token vp_tok = { 0 };
+	size_t integrity_keysize = 0;
+	size_t password_len = 0;
+	size_t newekey_size = 0;
+	size_t newkey_size = 0;
+	char *password = NULL;
+	size_t ekeysize = 0;
+	size_t keysize = 0;
+	u8 *newkey = NULL;
+	int num_keyslots;
+	u8 *key = NULL;
+	int is_old_mk;
+	char *prompt;
+	int is_xts;
+	char *msg;
+	int rc;
+
+	/* Check preconditions */
+	if (strcmp(crypt_get_cipher_mode(g.cd), "xts-plain64") != 0 &&
+	    strcmp(crypt_get_cipher_mode(g.cd), "cbc-plain64") != 0) {
+		warnx("The volume uses cipher mode '%s' and thus can not be "
+		      "converted to use the 'paes' cipher",
+		      crypt_get_cipher_mode(g.cd));
+		return EXIT_FAILURE;
+	}
+
+	is_xts = (strncmp(crypt_get_cipher_mode(g.cd), "xts-", 4) == 0);
+
+	/* Read new volume key and validate it */
+	if (g.volume_key_file == NULL) {
+		misc_print_required_parm("--volume-key-file/-m");
+		return EXIT_FAILURE;
+	}
+
+	newkey = read_secure_key(g.volume_key_file, &newkey_size, g.verbose);
+	if (newkey == NULL)
+		return EXIT_FAILURE;
+
+	rc = crypt_get_integrity_info(g.cd, &ip);
+	if (rc == 0)
+		integrity_keysize = ip.integrity_key_size;
+
+	newekey_size = newkey_size - integrity_keysize;
+
+	rc = check_keysize_and_cipher_mode(newkey, newekey_size);
+	if (rc != 0)
+		goto out;
+
+	rc = validate_secure_key(g.pkey_fd, newkey, newekey_size, NULL,
+				 &is_old_mk, NULL, g.verbose);
+	if (rc != 0) {
+		warnx("The secure key in file '%s' is not valid",
+		      g.volume_key_file);
+		goto out;
+	}
+
+	if (is_secure_key(newkey, newekey_size) &&
+	    is_old_mk) {
+		util_asprintf(&msg, "The secure key in file '%s' is "
+			      "enciphered with the master key in the OLD "
+			      "master key register. Do you want to set this "
+			      "key as the new volume key anyway [y/N]?",
+			      g.volume_key_file);
+		util_print_indented(msg, 0);
+		free(msg);
+
+		if (!_prompt_for_yes()) {
+			warnx("Device '%s' is left unchanged", g.pos_arg);
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	rc = generate_key_verification_pattern(newkey, newekey_size,
+					       new_vp, sizeof(new_vp),
+					       g.verbose);
+	if (rc != 0) {
+		warnx("Failed to generate the verification pattern: %s",
+		      strerror(-rc));
+		warnx("Make sure that kernel module 'paes_s390' is loaded and "
+		      "that the 'paes' cipher is available");
+		goto out;
+	}
+
+	/* Get current (clear) volume key from LUKS2 header */
+	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
+	rc = open_keyslot(CRYPT_ANY_SLOT, (char **)&key, &keysize, NULL,
+			  &password, &password_len, prompt, true);
+	free(prompt);
+	if (rc < 0)
+		goto out;
+
+	ekeysize = keysize - integrity_keysize;
+
+	if (integrity_keysize > 0 &&
+	    memcmp(newkey + newekey_size, key + ekeysize,
+		   integrity_keysize) != 0) {
+		warnx("The secure key in file '%s' contains a different "
+		      "integrity key (i.e. the last %lu bytes of the key) than "
+		      "the current volume key.", g.volume_key_file,
+		      integrity_keysize);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = generate_aes_key_verification_pattern(key, ekeysize,
+						   vp, sizeof(vp),
+						   is_xts ?
+							"xts(aes)" : "cbc(aes)",
+						   g.verbose);
+	if (rc != 0) {
+		warnx("Failed to generate the verification pattern: %s",
+		      strerror(-rc));
+		goto out;
+	}
+
+	if (strcmp(vp, new_vp) != 0) {
+		warnx("The verification patterns of the new and old "
+		      "volume keys do not match");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	num_keyslots = count_active_keyslots(g.cd);
+	pr_verbose("Number of keyslots before conversion: %d", num_keyslots);
+
+	util_print_indented("WARNING: It is strongly recommended to take a "
+			    "LUKS header backup using 'cryptsetup "
+			    "luksHeaderBackup' before continuing. The volume "
+			    "might not be recoverable after a failing "
+			    "conversion, if you don't have a LUKS header "
+			    "backup.", 0);
+	util_asprintf(&msg, "Do you really want to convert device '%s' to "
+		      "use a secure volume key? [y/N]?", g.pos_arg);
+	util_print_indented(msg, 0);
+	free(msg);
+
+	if (!_prompt_for_yes()) {
+		warnx("Device '%s' is left unchanged", g.pos_arg);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	/* Open the device freshly for crypt_format */
+	rc = crypt_init(&new_cd, g.pos_arg);
+	if (rc != 0) {
+		warnx("Failed to open device '%s': %s", g.pos_arg,
+		      strerror(-rc));
+		goto out;
+	}
+
+	crypt_set_log_callback(new_cd, cryptsetup_log, NULL);
+
+	/* Re-format the device with the same settings, but using 'paes' */
+#ifdef CRYPT_ACTIVATE_ERROR_AS_CORRUPTION /* Indicates libcryptsetup > 2.7.5 */
+	ip_new.integrity_key_size = integrity_keysize;
+#endif
+
+	luks2.pbkdf            = crypt_get_pbkdf_type(g.cd);
+	luks2.integrity        = integrity_keysize > 0 ? ip.integrity : NULL;
+	luks2.integrity_params = integrity_keysize > 0 ? &ip_new : NULL;
+	luks2.data_alignment   = 0;
+	luks2.data_device      = NULL;
+	luks2.sector_size      = crypt_get_sector_size(g.cd);
+	luks2.label            = crypt_get_label(g.cd);
+	luks2.subsystem        = crypt_get_subsystem(g.cd);
+
+	rc = crypt_set_data_offset(new_cd, crypt_get_data_offset(g.cd));
+	if (rc != 0) {
+		warnx("Failed to set data size: %s", strerror(-rc));
+		goto out;
+	}
+	rc = crypt_format(new_cd, CRYPT_LUKS2, "paes",
+			  crypt_get_cipher_mode(g.cd), crypt_get_uuid(g.cd),
+			  (char *)newkey, newkey_size, &luks2);
+	if (rc != 0) {
+		warnx("Failed to reformat the LUKS header: %s",
+		      strerror(-rc));
+		goto out;
+	}
+
+	/* Add a key slot with the current password */
+	rc = crypt_keyslot_add_by_volume_key(new_cd, CRYPT_ANY_SLOT, NULL, 0,
+					     password, password_len);
+	if (rc != 0) {
+		warnx("Failed to add a key slotr: %s", strerror(-rc));
+		goto out;
+	}
+
+	/* Add the verification pattern token */
+	memcpy(vp_tok.verification_pattern, new_vp,
+	       sizeof(vp_tok.verification_pattern));
+
+	rc = put_vp_token(new_cd, -1, &vp_tok);
+	if (rc < 0)
+		goto out;
+
+	printf("The device '%s' has been successfully converted\n", g.pos_arg);
+	if (num_keyslots > 1) {
+		util_print_indented("\nWARNING: Before converting, the "
+				    "volume's LUKS header had multiple active "
+				    "key slots with the same key, but "
+				    "different passwords. Use 'cryptsetup "
+				    "luksAddKey' if you need more than one key "
+				    "slot.", 0);
+	}
+
+out:
+	secure_free(password, password_len);
+	secure_free(newkey, newkey_size);
+	secure_free(key, keysize);
+
+	if (new_cd != NULL)
+		crypt_free(new_cd);
+
+	return rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+}
 
 static bool is_command(struct zkey_cryptsetup_command *command, const char *str)
 {
@@ -2535,7 +2841,7 @@ int main(int argc, char *argv[])
 			goto out;
 		}
 
-		rc = open_device(g.pos_arg, &g.cd);
+		rc = open_device(g.pos_arg, &g.cd, command->expected_cipher);
 		if (rc != 0) {
 			g.cd = NULL;
 			rc = EXIT_FAILURE;

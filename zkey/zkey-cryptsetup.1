@@ -355,6 +355,73 @@ relevance.
 .
 .
 .
+.SS "Convert a clear-key LUKS2 volume to use a secure AES volume key"
+.
+.B zkey\-cryptsetup
+.BR convert | conv
+.I device
+.BR \-\-volume\-key\-file | \-m
+.IR file\-name
+.RB [ \-\-key\-file | \-d
+.IR file\-name ]
+.RB [ \-\-keyfile\-offset | \-o
+.IR bytes ]
+.RB [ \-\-keyfile\-size | \-l
+.IR bytes ]
+.RB [ \-\-tries | \-T
+.IR number ]
+.RB [ \-\-batch\-mode | \-q ]
+.RB [ \-\-verbose | \-V ]
+.RB [ \-\-debug | \-D ]
+.PP
+Use the
+.B convert
+command to convert a clear-key \fBLUKS2\fP volume to use a secure volume key
+and the \fBpaes\fP cipher. You must provide a secure volume key that uses
+the exact same effective key as the current volume key. The volume must not be
+open when a conversion is performed, otherwise it fails.
+.PP
+.B ATTENTION:
+It is strongly recommended to take a LUKS header backup using \fBcryptsetup
+luksHeaderBackup\fP before converting a volume. The volume might not be
+recoverable after a failing conversion, if you don't have a LUKS header backup.
+.PP
+Specify the secure key file with option
+.B \-\-volume\-key\-file
+to convert the volume to use this secure key as the new volume key.
+.PP
+To open a key slot contained in the LUKS2 header of the volume, a passphrase is
+required. You are prompted for the passphrase, unless option
+.B \-\-key\-file
+is specified. Option
+.B \-\-tries
+specifies how often a passphrase can be re-entered. When option
+.B \-\-key\-file
+is specified, the passphrase is read from the specified file. You can specify
+options
+.B \-\-keyfile\-offset
+and
+.B \-\-keyfile\-size
+to control which part of the key file is used as passphrase. These options
+behave in the same way the same as with \fBcryptsetup\fP.
+.PP
+The
+.B convert
+command creates a new key slot with the specified secure AES volume key.
+The new key slot uses the same password based key derivation function as
+the key slot that is used to open the volume. LUKS2 volumes typically default to
+.B Argon2i
+as password based key derivation function,
+but this might cause out-of-memory errors when multiple encrypted volumes are
+unlocked automatically at boot through /etc/crypttab. Because PAES
+uses secure AES keys as volume keys, the security of the key derivation
+function used to encrypt the volume key in the LUKS key slots is of less
+relevance. Use \fBcryptsetup luksConvertKey --pbkdf pbkdf2\fP to convert
+the key slot(s) to use \fBPBKDF2\fP as password based key derivation function
+after the conversion.
+.
+.
+.
 .
 .SH OPTIONS
 .
@@ -404,6 +471,22 @@ Suppresses all confirmation questions. Use with care!
 .BR \-m ", " \-\-volume\-key\-file\~\fIfile\-name\fP
 Specifies the name of a file containing the secure AES key that is set as the
 new volume key.
+.TP
+.BR \-\-master\-key\-file\~\fIfile\-name\fP
+Alias for the
+.BR \-\-volume\-key\-file\~\fIfile\-name\fP
+option.
+.TP
+.BR \-q ", " \-\-batch\-mode
+Suppresses all confirmation questions. Use with care!
+.
+.
+.
+.SS "Options for the convert command"
+.TP
+.BR \-m ", " \-\-volume\-key\-file\~\fIfile\-name\fP
+Specifies the name of a file containing the secure AES key that is used as
+volume key for the converted volume.
 .TP
 .BR \-\-master\-key\-file\~\fIfile\-name\fP
 Alias for the
