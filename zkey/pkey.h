@@ -362,6 +362,12 @@ int generate_aes_key_verification_pattern(const u8 *key, size_t key_size,
 					  const char *cipher,
 					  bool verbose);
 
+int generate_hmac_key_verification_pattern(const u8 *key,
+					   size_t key_size,
+					   char *vp, size_t vp_len,
+					   const char *cipher,
+					   bool verbose);
+
 int get_master_key_verification_pattern(const u8 *key, size_t key_size,
 					u8 *mkvp, bool verbose);
 

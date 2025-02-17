@@ -106,6 +106,7 @@ static struct zkey_cryptsetup_globals {
 	bool inplace;
 	bool staged;
 	char *volume_key_file;
+	long long integrity_key_size;
 	bool batch_mode;
 	bool debug;
 	bool verbose;
@@ -266,7 +267,8 @@ static struct util_opt opt_vec[] = {
 		.option = {"volume-key-file", required_argument, NULL, 'm'},
 		.argument = "FILE-NAME",
 		.desc = "Specifies the name of a file containing the secure "
-			"AES key that is set as new volume key",
+			"AES key (and optionally a secure HMAC key) that is "
+			"set as new volume key",
 		.command = COMMAND_CONVERT,
 	},
 	{
@@ -275,6 +277,16 @@ static struct util_opt opt_vec[] = {
 		.desc = "Alias for the '--volume-key-file'|'-m' option",
 		.command = COMMAND_CONVERT,
 		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"integrity-key-size", required_argument, NULL, 'I'},
+		.argument = "BYTES",
+		.desc = "Size of the secure integrity key part of the volume "
+			"key in bytes. Specifying this option implies that "
+			"the integrity key part of the volume key is a secure "
+			"HMAC key. For using a clear integrity key, do not "
+			"specify this option.",
+		.command = COMMAND_CONVERT,
 	},
 	OPT_PASSPHRASE_ENTRY(COMMAND_CONVERT),
 	{
@@ -2798,16 +2810,23 @@ out:
 static int command_convert(void)
 {
 	struct crypt_params_integrity ip_new = { 0 };
+	char new_int_vp[VERIFICATION_PATTERN_LEN];
 	struct crypt_params_integrity ip = { 0 };
 	struct crypt_params_luks2 luks2 = { 0 };
+	char int_vp[VERIFICATION_PATTERN_LEN];
 	char new_vp[VERIFICATION_PATTERN_LEN];
 	struct crypt_device *new_cd = NULL;
 	char vp[VERIFICATION_PATTERN_LEN];
 	struct vp_token vp_tok = { 0 };
+	const char *hmac_vp_alg = NULL;
 	size_t integrity_keysize = 0;
+	char integrity_alg[200];
+	size_t hmac_keysize = 0;
 	size_t password_len = 0;
 	size_t newekey_size = 0;
+	size_t newikey_size = 0;
 	size_t newkey_size = 0;
+	int is_phmac_integrity;
 	char *password = NULL;
 	size_t ekeysize = 0;
 	size_t keysize = 0;
@@ -2845,26 +2864,78 @@ static int command_convert(void)
 	if (rc == 0)
 		integrity_keysize = ip.integrity_key_size;
 
-	newekey_size = newkey_size - integrity_keysize;
+	is_phmac_integrity = (g.integrity_key_size > 0);
+
+	newikey_size = is_phmac_integrity ?
+			(size_t)g.integrity_key_size : integrity_keysize;
+	newekey_size = newkey_size - newikey_size;
 
 	rc = check_keysize_and_cipher_mode(newkey, newekey_size);
 	if (rc != 0)
 		goto out;
 
+	if (is_phmac_integrity) {
+		if (strcmp(ip.integrity, "hmac(sha224)") != 0 &&
+		    strcmp(ip.integrity, "hmac(sha256)") != 0 &&
+		    strcmp(ip.integrity, "hmac(sha384)") != 0 &&
+		    strcmp(ip.integrity, "hmac(sha512)") != 0) {
+			warnx("The volume uses integrity algorithm '%s' and "
+			      "thus can not be converted to use the 'phmac' "
+			      "cipher", ip.integrity);
+			rc = -EINVAL;
+			goto out;
+		}
+
+		if (is_pvsecret_hmac_key(newkey + newekey_size, newikey_size)) {
+			switch (hmac_keysize) {
+			case 512:
+				if (strcmp(ip.integrity, "hmac(sha224)") != 0 &&
+				    strcmp(ip.integrity, "hmac(sha256)") != 0) {
+					warnx("The secure integrity key only "
+					      "supports 'hmac(sha224)' or "
+					      "'hmac(sha256)' as integrity "
+					      "algorithm, but the volume uses"
+					      "'%s'", ip.integrity);
+					rc = -EINVAL;
+					goto out;
+				}
+				break;
+			case 1024:
+				if (strcmp(ip.integrity, "hmac(sha384)") != 0 &&
+				    strcmp(ip.integrity, "hmac(sha512)") != 0) {
+					warnx("The secure integrity key only "
+					      "supports 'hmac(sha384)' or "
+					      "'hmac(sha512)' as integrity "
+					      "algorithm, but the volume uses"
+					      "'%s'", ip.integrity);
+					rc = -EINVAL;
+					goto out;
+				}
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
 	rc = validate_secure_key(g.pkey_fd, newkey, newekey_size, NULL,
 				 &is_old_mk, NULL, g.verbose);
 	if (rc != 0) {
-		warnx("The secure key in file '%s' is not valid",
+		warnx("The %s key%s in file '%s' is not valid",
+		      is_phmac_integrity ? "encryption" : "secure",
+		      is_phmac_integrity ? " part" : "",
 		      g.volume_key_file);
 		goto out;
 	}
 
 	if (is_secure_key(newkey, newekey_size) &&
 	    is_old_mk) {
-		util_asprintf(&msg, "The secure key in file '%s' is "
+		util_asprintf(&msg, "The %s key%s in file '%s' is "
 			      "enciphered with the master key in the OLD "
 			      "master key register. Do you want to set this "
 			      "key as the new volume key anyway [y/N]?",
+			      is_phmac_integrity ? "encryption" : "secure",
+			      is_phmac_integrity ? " part" : "",
 			      g.volume_key_file);
 		util_print_indented(msg, 0);
 		free(msg);
@@ -2873,6 +2944,35 @@ static int command_convert(void)
 			warnx("Device '%s' is left unchanged", g.pos_arg);
 			rc = -EINVAL;
 			goto out;
+		}
+	}
+
+	if (is_phmac_integrity) {
+		rc = validate_secure_key(g.pkey_fd, newkey + newekey_size,
+					 newikey_size, NULL,
+					 &is_old_mk, NULL, g.verbose);
+		if (rc != 0) {
+			warnx("The integrity key part in file '%s' is not "
+			      "valid", g.volume_key_file);
+			goto out;
+		}
+
+		if (is_secure_key(newkey + newekey_size, newikey_size) &&
+		    is_old_mk) {
+			util_asprintf(&msg, "The integrity key part in file "
+				      "'%s' is enciphered with the master key "
+				      "in the OLD master key register. Do you "
+				      "want to set this key as the new volume "
+				      "key anyway [y/N]?", g.volume_key_file);
+			util_print_indented(msg, 0);
+			free(msg);
+
+			if (!_prompt_for_yes()) {
+				warnx("Device '%s' is left unchanged",
+				      g.pos_arg);
+				rc = -EINVAL;
+				goto out;
+			}
 		}
 	}
 
@@ -2887,6 +2987,22 @@ static int command_convert(void)
 		goto out;
 	}
 
+	if (is_phmac_integrity) {
+		rc = generate_key_verification_pattern(newkey + newekey_size,
+						       newikey_size,
+						       new_int_vp,
+						       sizeof(new_int_vp),
+						       g.verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			warnx("Make sure that kernel module 'phmac_s390' is "
+			      "loaded and that the 'phmac' cipher is "
+			      "available");
+			goto out;
+		}
+	}
+
 	/* Get current (clear) volume key from LUKS2 header */
 	util_asprintf(&prompt, "Enter passphrase for '%s': ", g.pos_arg);
 	rc = open_keyslot(CRYPT_ANY_SLOT, &key, &keysize, NULL, NULL,
@@ -2897,13 +3013,13 @@ static int command_convert(void)
 
 	ekeysize = keysize - integrity_keysize;
 
-	if (integrity_keysize > 0 &&
+	if (newikey_size > 0 && !is_phmac_integrity &&
 	    memcmp(newkey + newekey_size, key + ekeysize,
-		   integrity_keysize) != 0) {
+			    newikey_size) != 0) {
 		warnx("The secure key in file '%s' contains a different "
 		      "integrity key (i.e. the last %lu bytes of the key) than "
 		      "the current volume key.", g.volume_key_file,
-		      integrity_keysize);
+		      newikey_size);
 		rc = -EINVAL;
 		goto out;
 	}
@@ -2919,7 +3035,29 @@ static int command_convert(void)
 		goto out;
 	}
 
-	if (strcmp(vp, new_vp) != 0) {
+	if (is_phmac_integrity) {
+		if (strcmp(ip.integrity, "hmac(sha224)") == 0 ||
+		    strcmp(ip.integrity, "hmac(sha256") == 0)
+			hmac_vp_alg = "hmac(sha256)";
+		else if (strcmp(ip.integrity, "hmac(sha384)") == 0 ||
+			 strcmp(ip.integrity, "hmac(sha512)") != 0)
+			hmac_vp_alg = "hmac(sha512)";
+
+		rc = generate_hmac_key_verification_pattern(key + ekeysize,
+							    integrity_keysize,
+							    int_vp,
+							    sizeof(int_vp),
+							    hmac_vp_alg,
+							    g.verbose);
+		if (rc != 0) {
+			warnx("Failed to generate the verification pattern: %s",
+			      strerror(-rc));
+			goto out;
+		}
+	}
+
+	if (strcmp(vp, new_vp) != 0 ||
+	    (is_phmac_integrity && strcmp(int_vp, new_int_vp) != 0)) {
 		warnx("The verification patterns of the new and old "
 		      "volume keys do not match");
 		rc = -EINVAL;
@@ -2958,11 +3096,14 @@ static int command_convert(void)
 
 	/* Re-format the device with the same settings, but using 'paes' */
 #ifdef CRYPT_ACTIVATE_ERROR_AS_CORRUPTION /* Indicates libcryptsetup > 2.7.5 */
-	ip_new.integrity_key_size = integrity_keysize;
+	ip_new.integrity_key_size = newikey_size;
 #endif
 
+	snprintf(integrity_alg, sizeof(integrity_alg), "%s%s",
+		 is_phmac_integrity ? "p" : "", ip.integrity);
+
 	luks2.pbkdf            = crypt_get_pbkdf_type(g.cd);
-	luks2.integrity        = integrity_keysize > 0 ? ip.integrity : NULL;
+	luks2.integrity        = integrity_keysize > 0 ? integrity_alg : NULL;
 	luks2.integrity_params = integrity_keysize > 0 ? &ip_new : NULL;
 	luks2.data_alignment   = 0;
 	luks2.data_device      = NULL;
@@ -2995,6 +3136,9 @@ static int command_convert(void)
 	/* Add the verification pattern token */
 	memcpy(vp_tok.verification_pattern, new_vp,
 	       sizeof(vp_tok.verification_pattern));
+	if (is_phmac_integrity)
+		memcpy(vp_tok.int_verification_pattern, new_int_vp,
+		       sizeof(vp_tok.int_verification_pattern));
 
 	rc = put_vp_token(new_cd, -1, &vp_tok);
 	if (rc < 0)
@@ -3149,6 +3293,18 @@ int main(int argc, char *argv[])
 			break;
 		case 'm':
 			g.volume_key_file = optarg;
+			break;
+		case 'I':
+			g.integrity_key_size = strtoll(optarg, &endp, 0);
+			if (*optarg == '\0' || *endp != '\0' ||
+			    g.integrity_key_size <= 0 ||
+			    (g.integrity_key_size == LLONG_MAX &&
+			     errno == ERANGE)) {
+				warnx("Invalid value for '--integrity-key-size'"
+				      "|'-I': '%s'", optarg);
+				util_prg_print_parse_error();
+				return EXIT_FAILURE;
+			}
 			break;
 		case 'q':
 			g.batch_mode = true;

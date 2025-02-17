@@ -1635,10 +1635,11 @@ out:
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-static int generate_hmac_key_verification_pattern(const u8 *key,
-						  size_t key_size,
-						  char *vp, size_t vp_len,
-						  bool verbose)
+int generate_hmac_key_verification_pattern(const u8 *key,
+					   size_t key_size,
+					   char *vp, size_t vp_len,
+					   const char *cipher,
+					   bool verbose)
 {
 	int tfmfd = -1, opfd = -1, rc = 0, retry_count = 0;
 	char null_msg[MAC_ZERO_LEN];
@@ -1656,13 +1657,18 @@ static int generate_hmac_key_verification_pattern(const u8 *key,
 		goto out;
 	}
 
-	rc = get_key_bit_size(key, key_size, &bitsize);
-	if (rc != 0) {
-		pr_verbose(verbose, "Failed to get the key size");
-		goto out;
+	if (cipher != NULL) {
+		util_strlcpy((char *)sa.salg_name, cipher,
+			     sizeof(sa.salg_name));
+	} else {
+		rc = get_key_bit_size(key, key_size, &bitsize);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to get the key size");
+			goto out;
+		}
+		snprintf((char *)sa.salg_name, sizeof(sa.salg_name),
+			 "phmac(sha%lu)", bitsize / 2);
 	}
-	snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "phmac(sha%lu)",
-		 bitsize / 2);
 
 	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
 	if (tfmfd < 0) {
@@ -1767,7 +1773,7 @@ int generate_key_verification_pattern(const u8 *key, size_t key_size,
 	if (is_hmac_key(key, key_size))
 		return generate_hmac_key_verification_pattern(key, key_size,
 							      vp, vp_len,
-							      verbose);
+							      NULL, verbose);
 
 	pr_verbose(verbose, "Neither an AES nor an HMAC key");
 	return -EINVAL;

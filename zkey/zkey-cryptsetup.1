@@ -372,6 +372,8 @@ relevance.
 .I device
 .BR \-\-volume\-key\-file | \-m
 .IR file\-name
+.RB [ \-\-integrity\-key\-size | \-I
+.IR bytes ]
 .RB [ \-\-key\-file | \-d
 .IR file\-name ]
 .RB [ \-\-keyfile\-offset | \-o
@@ -400,6 +402,13 @@ recoverable after a failing conversion, if you don't have a LUKS header backup.
 Specify the secure key file with option
 .B \-\-volume\-key\-file
 to convert the volume to use this secure key as the new volume key.
+When the volume uses integrity protection, and you want to also use a secure
+integrity key, then concatenate the secure AES encryption key and the secure
+HMAC key, and specify the result as volume key. You must then also specify the
+size of the secure HMAC key in bytes using the
+.B \-\-integrity\-key\-size
+option. This will then convert the integrity algorithm to use the \fBphmac\fP
+cipher.
 .PP
 To open a key slot contained in the LUKS2 header of the volume, a passphrase is
 required. You are prompted for the passphrase, unless option
@@ -503,6 +512,9 @@ volume key for the converted volume.
 Alias for the
 .BR \-\-volume\-key\-file\~\fIfile\-name\fP
 option.
+.TP
+.BR \-I ", " \-\-integrity\-key\-size\~\fIbytes\fP
+Specifies the size of the secure HMAC key part in bytes.
 .TP
 .BR \-q ", " \-\-batch\-mode
 Suppresses all confirmation questions. Use with care!
