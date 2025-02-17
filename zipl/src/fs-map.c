@@ -96,7 +96,7 @@ int fs_map(int fd, uint64_t offset, blocknum_t *mapped,
 		/* FIEMAP failed, fall back to FIBMAP */
 		block = offset / fs_block_size;
 		if (ioctl(fd, FIBMAP, &block)) {
-			error_reason("Could not get file mapping");
+			error_reason(FS_MAP_ERROR);
 			free(fiemap);
 			return -1;
 		}

@@ -25,7 +25,9 @@
 
 #define BOOTMAP_FILENAME		"bootmap"
 #define BOOTMAP_TEMPLATE_FILENAME	"bootmap_temp.XXXXXX"
+#define DUMP_TEMP_MOUNT_POINT_DIR	"/tmp"
 #define DUMP_TEMP_MOUNT_POINT_NAME	"zipl-dump-mount-point-XXXXXX"
+#define DUMP_META_FILE_NAME		"ngdump.meta"
 
 #define DEFAULTBOOT_SECTION		"defaultboot"
 

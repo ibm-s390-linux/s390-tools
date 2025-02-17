@@ -261,5 +261,6 @@ int check_job_images_ngdump(struct job_dump_data* dump, char* name);
 void job_dump_check_set_ngdump(struct job_data *job,
 			       struct disk_ext_type *ext_type);
 bool job_dump_is_ngdump(struct job_data *job);
+void ngdump_delete_meta(const char *path);
 
 #endif /* not JOB_H */

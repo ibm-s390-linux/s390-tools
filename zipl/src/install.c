@@ -1119,8 +1119,9 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 
 	stage2dump_parms.mem_upper_limit = mem;
 	stage2dump_parms.no_compress = no_compress;
-	mfd.fd = misc_open_exclusive(device);
-	if (mfd.fd == -1) {
+
+	/* Check if @device is a tape device */
+	if (misc_open_device(device, &mfd, 0) == -1) {
 		error_text("Could not open dump device '%s'", device);
 		return -1;
 	}

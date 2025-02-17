@@ -811,20 +811,15 @@ int disk_type_is_eckd(disk_type_t type)
 		type == disk_type_eckd_cdl);
 }
 
-int
-disk_get_info_from_file(const char* filename, struct job_target_data* target,
-			struct disk_info** info)
+/**
+ * Retrieve and set block size of the file system which contains FILENAME
+ */
+int disk_info_set_fs_block(const char *filename, struct disk_info *info)
 {
-	struct stat stats;
-	char* device;
 	int blocksize;
 	int fd;
 	int rc;
 
-	if (stat(filename, &stats)) {
-		error_reason(strerror(errno));
-		return -1;
-	}
 	/* Retrieve file system block size */
 	fd = open(filename, O_RDONLY);
 	if (fd == -1) {
@@ -838,17 +833,33 @@ disk_get_info_from_file(const char* filename, struct job_target_data* target,
 			     filename);
 		return -1;
 	}
-	/* Create temporary device file */
-	rc = misc_temp_dev(stats.st_dev, 1, &device);
-	if (rc)
+	info->fs_block_size = blocksize;
+	return 0;
+}
+
+/**
+ * Retrieve disk info of the device which contains FILENAME
+ * and set the filesystem block size
+ */
+int disk_get_info_from_file(const char *filename,
+			    struct job_target_data *target,
+			    struct disk_info **info)
+{
+	struct stat stats;
+	char *device;
+
+	if (stat(filename, &stats)) {
+		error_reason(strerror(errno));
 		return -1;
-	/* Get device info */
-	rc = disk_get_info(device, target, info);
-	if (rc == 0)
-		(*info)->fs_block_size = blocksize;
-	/* Clean up */
+	}
+	if (misc_temp_dev(stats.st_dev, 1, &device))
+		return -1;
+	if (disk_get_info(device, target, info)) {
+		misc_free_temp_dev(device);
+		return -1;
+	}
 	misc_free_temp_dev(device);
-	return rc;
+	return disk_info_set_fs_block(filename, *info);
 }
 
 void disk_free_info(struct disk_info *info)

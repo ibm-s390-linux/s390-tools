@@ -82,3 +82,8 @@ error_print(void)
 	else
 		fprintf(stderr, "Error: An unspecified error occurred\n");
 }
+
+int is_error(const char *this)
+{
+	return strcmp(error_reason_string, this) == 0;
+}

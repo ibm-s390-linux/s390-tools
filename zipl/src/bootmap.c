@@ -1542,11 +1542,39 @@ static int prepare_build_program_table_file(struct job_data *job,
 		return -1;
 	}
 	bis->tmp_filename_created = 1;
-	/* Retrieve target device information. Note that we have to
-	 * call disk_get_info_from_file() to also get the file system
-	 * block size. */
-	if (disk_get_info_from_file(bis->filename, &job->target, &bis->info))
-		return -1;
+	/*
+	 * Retrieve target device information and
+	 * complete the info with the file system block size
+	 */
+	if (job->id == job_dump_partition && dry_run) {
+		/*
+		 * ngdump job in dry-run mode.
+		 *
+		 * The dump device has read-only status.
+		 * The bootmap and the meta-file to be created
+		 * directly at the temporary mount point wthout
+		 * mounting anything to it (thus, the mentioned
+		 * files to be actually created in the "proxy"
+		 * file system.
+		 *
+		 * Retrieve info from the dump device
+		 * Retrieve file system block size from the proxy
+		 * file system
+		 */
+		if (disk_get_info(job->data.dump.device,
+				  &job->target, &bis->info))
+			return -1;
+		if (disk_info_set_fs_block(bis->filename, bis->info))
+			return -1;
+	} else {
+		/*
+		 * ngdump or ipl job.
+		 */
+		if (disk_get_info_from_file(bis->filename,
+					    &job->target,
+					    &bis->info))
+			return -1;
+	}
 	if (!disk_is_appropriate(job, bis->info))
 		return -1;
 	if (verbose) {
@@ -1627,8 +1655,17 @@ static int bootmap_create_file(struct job_data *job, struct install_set *bis,
 	return 0;
 }
 
+void ngdump_delete_meta(const char *dir)
+{
+	char *filename = NULL;
+
+	filename = misc_make_path(dir, DUMP_META_FILE_NAME);
+	unlink(filename);
+	free(filename);
+}
+
 /**
- * Create a file with the short name "ngdump.meta" in the directory PATH.
+ * Create a file with the short name DUMP_META_FILE_NAME in the directory PATH.
  * This file is required for NGDump stand-alone dumper, it's read/written
  * by the dumper when it starts.
  */
@@ -1638,13 +1675,13 @@ static int ngdump_create_meta(const char *path)
 	FILE *fp;
 	int rc;
 
-	util_asprintf(&filename, "%s/ngdump.meta", path);
+	filename = misc_make_path(path, DUMP_META_FILE_NAME);
 
 	fp = fopen(filename, "w");
 	if (!fp) {
-		free(filename);
 		error_reason(strerror(errno));
 		error_text("Could not create file '%s'", filename);
+		free(filename);
 		return -1;
 	}
 	free(filename);
@@ -1665,6 +1702,40 @@ static int ngdump_create_meta(const char *path)
 	return 0;
 }
 
+static int ngdump_mount_device(struct job_data *job)
+{
+	if (dry_run)
+		/*
+		 * the bootmap and the meta-file to be stored
+		 * directly at the temporary mount point without
+		 * mounting any partition
+		 */
+		return 0;
+	/*
+	 * the bootmap and the meta-file to be stored on the
+	 * formatted and mounted dump partition
+	 */
+	if (mount(job->data.dump.device, job->target.bootmap_dir,
+		  NGDUMP_FSTYPE, 0, NULL)) {
+		error_reason(strerror(errno));
+		error_text("Could not mount partition '%s':",
+			   job->data.dump.device);
+		return -1;
+	}
+	job->dump_mounted = 1;
+	return 0;
+}
+
+static char *ngdump_dir(void)
+{
+	return getenv("TMPDIR") ? : DUMP_TEMP_MOUNT_POINT_DIR;
+}
+
+static char *build_mount_point_pathname(void)
+{
+	return misc_make_path(ngdump_dir(), DUMP_TEMP_MOUNT_POINT_NAME);
+}
+
 static int prepare_bootloader_ngdump(struct job_data *job,
 				     struct install_set *bis)
 {
@@ -1679,8 +1750,7 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 		return -1;
 
 	assert(!job->target.bootmap_dir);
-	job->target.bootmap_dir = misc_make_path("/tmp",
-						 DUMP_TEMP_MOUNT_POINT_NAME);
+	job->target.bootmap_dir = build_mount_point_pathname();
 	if (!job->target.bootmap_dir) {
 		error_reason(strerror(errno));
 		error_text("Could not make path for '%s'",
@@ -1695,25 +1765,20 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 		return -1;
 	}
 	job->bootmap_dir_created = 1;
-	/*
-	 * Mount partition where bootmap file and also a dump file will
-	 * be stored.
-	 */
-	if (mount(job->data.dump.device, job->target.bootmap_dir,
-		  NGDUMP_FSTYPE, 0, NULL)) {
-		error_reason(strerror(errno));
-		error_text("Could not mount partition '%s':",
-			   job->data.dump.device);
+	if (ngdump_mount_device(job))
 		return -1;
-	}
-	job->dump_mounted = 1;
 	/*
 	 * Build a single program table for List-Directed IPL
 	 * See comments before install_bootloader() for details
 	 */
 	bis->print_details = 1;
-	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID))
+	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID)) {
+		if (dry_run && is_error(FS_MAP_ERROR))
+			fprintf(stderr,
+				"'%s' doesn't satisfy the requirements. Set TMPDIR properly\n",
+				ngdump_dir());
 		return -1;
+	}
 	return ngdump_create_meta(job->target.bootmap_dir);
 }
 

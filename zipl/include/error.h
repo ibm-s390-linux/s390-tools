@@ -20,5 +20,6 @@ void error_text(const char* fmt, ...);
 void error_clear_reason(void);
 void error_clear_text(void);
 void error_print(void);
+int is_error(const char *this);
 
 #endif /* not ERROR_H */

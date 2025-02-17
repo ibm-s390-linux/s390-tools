@@ -459,17 +459,24 @@ free_mvdump_data(struct job_mvdump_data* data)
 		free(data->device[i]);
 }
 
-
-void
-job_free(struct job_data* job)
+void job_free(struct job_data *job)
 {
-
-	if (job->dump_mounted && umount(job->target.bootmap_dir))
-		fprintf(stderr, "Could not umount dump device at %s",
-			job->target.bootmap_dir);
-	if (job->bootmap_dir_created && rmdir(job->target.bootmap_dir))
-		fprintf(stderr, "Could not remove directory %s",
-			job->target.bootmap_dir);
+	if (job->dump_mounted && umount(job->target.bootmap_dir)) {
+		fprintf(stderr,
+			"Could not umount dump device at %s(%s)\n",
+			job->target.bootmap_dir,
+			strerror(errno));
+	}
+	if (job->bootmap_dir_created) {
+		/* remove the meta-file created in dry-run mode */
+		ngdump_delete_meta(job->target.bootmap_dir);
+		if (rmdir(job->target.bootmap_dir)) {
+			fprintf(stderr,
+				"Could not remove directory %s(%s)\n",
+				job->target.bootmap_dir,
+				strerror(errno));
+		}
+	}
 	free_target_data(&job->target);
 	free_envblk_data(&job->envblk);
 	free(job->name);

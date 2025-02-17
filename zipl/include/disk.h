@@ -19,6 +19,8 @@
 #include "zipl.h"
 #include "lib/vtoc.h"
 
+#define FS_MAP_ERROR    "Could not get file mapping"
+
 
 /* Type for representing disk block numbers */
 typedef uint64_t blocknum_t;
@@ -102,6 +104,7 @@ int disk_type_is_eckd_ldl(struct disk_ext_type *ext_type);
 int disk_type_is_nvme(struct disk_ext_type *ext_type);
 int disk_type_is_eckd(disk_type_t type);
 
+int disk_info_set_fs_block(const char *filename, struct disk_info *info);
 int disk_get_info_from_file(const char* filename,
 			    struct job_target_data* target,
 			    struct disk_info** info);

@@ -88,8 +88,7 @@ misc_strdup(const char* s)
 
 
 /* Open file exclusive */
-int
-misc_open_exclusive(const char* filename)
+static int misc_open_exclusive(const char *filename)
 {
 	int fd;
 
@@ -104,7 +103,7 @@ misc_open_exclusive(const char* filename)
 /**
  * Open file FILENAME for write simulation
  */
-int misc_open_simulate(const char *filename, struct misc_fd *mfd)
+static int misc_open_simulate(const char *filename, struct misc_fd *mfd)
 {
 	/*
 	 * In write simulation mode actual data are not written to the file,
@@ -301,7 +300,7 @@ misc_get_char(struct misc_file_buffer* file, off_t readahead)
 
 
 char*
-misc_make_path(char* dirname, char* filename)
+misc_make_path(const char *dirname, char *filename)
 {
 	char* result;
 	size_t len;

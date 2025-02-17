@@ -366,6 +366,13 @@ error-checking is still done.
 Note that when working with tapes, the current device position will be changed
 even when specifying this option.
 
+When working with ngdumps, the directory specified by the shell environment
+variable TMPDIR is used for simulating the dump job. This directory should
+belong to a "real" file system managing disk space addresses (like ext4, or
+xfs), and have enough free space (matching the size of the specified dump
+device). If TMPDIR is not set, then "/tmp" is used, which can lead to errors,
+e.g. in case when it belongs to tmpfs.
+
 .TP
 .BR "\-f" " or " "\-\-force"
 Omit validity checking while producing a multi-volume dump.
