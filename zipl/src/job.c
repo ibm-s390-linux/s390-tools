@@ -389,6 +389,8 @@ free_common_ipl_data(struct job_common_ipl_data *common)
 {
 	free(common->image);
 	free(common->parmline);
+	if (common->ramdisk_created)
+		unlink(common->ramdisk);
 	free(common->ramdisk);
 }
 
@@ -967,6 +969,7 @@ check_job_images_ngdump(struct job_dump_data* dump, char *name)
 			value = NULL;
 		} else if (strcmp(param, "initrd") == 0) {
 			dump->common.ramdisk = value;
+			dump->common.ramdisk_created = true;
 			value = NULL;
 		} else if (strcmp(param, "cmdline") == 0) {
 			dump->common.parmline = value;

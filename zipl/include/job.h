@@ -77,6 +77,7 @@ struct job_common_ipl_data {
 	address_t ramdisk_addr;
 	bool optional;
 	bool ignore;
+	bool ramdisk_created;
 };
 
 struct job_ipl_data {
