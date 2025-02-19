@@ -59,6 +59,7 @@ void print_fcp(int show_ipl, int dump)
 	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/fcp/clear");
+	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
 
 	if (dump)
 		printf("%-12s fcp_dump\n", get_ipl_banner(show_ipl));
@@ -81,9 +82,12 @@ void print_fcp(int show_ipl, int dump)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
 	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	if (access(path_secure_boot, R_OK) == 0)
+		print_fw_str("Secure boot: %s\n", "ipl", "secure");
 	free(path_bootparms);
 	free(path_loadparm);
 	free(path_reipl_clear);
+	free(path_secure_boot);
 }
 
 void print_nvme(int show_ipl, int dump)
@@ -93,6 +97,7 @@ void print_nvme(int show_ipl, int dump)
 	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/nvme/clear");
+	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
 
 	if (dump)
 		printf("%-12s nvme_dump\n", get_ipl_banner(show_ipl));
@@ -114,9 +119,12 @@ void print_nvme(int show_ipl, int dump)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
 	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	if (access(path_secure_boot, R_OK) == 0)
+		print_fw_str("Secure boot: %s\n", "ipl", "secure");
 	free(path_bootparms);
 	free(path_loadparm);
 	free(path_reipl_clear);
+	free(path_secure_boot);
 }
 
 void print_ccw(int show_ipl)
@@ -150,6 +158,7 @@ void print_eckd(int show_ipl, const char *name)
 	char *dir = show_ipl ? "ipl" : "reipl/eckd";
 	char loadparm[9], loadparm_path[PATH_MAX];
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
+	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
 
 	printf("%-12s %s\n", get_ipl_banner(show_ipl), name);
 
@@ -166,7 +175,10 @@ void print_eckd(int show_ipl, const char *name)
 	}
 	if (!show_ipl)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	if (access(path_secure_boot, R_OK) == 0)
+		print_fw_str("Secure boot: %s\n", "ipl", "secure");
 	free(path_loadparm);
+	free(path_secure_boot);
 }
 
 static void parse_lsreipl_options(int argc, char *argv[])
