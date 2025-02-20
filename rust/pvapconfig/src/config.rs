@@ -150,6 +150,7 @@ impl ApConfigEntry {
 }
 
 /// Wrapper object around Vector of ApConfigEntry
+#[derive(Default)]
 pub struct ApConfigList(Vec<ApConfigEntry>);
 
 impl ApConfigList {

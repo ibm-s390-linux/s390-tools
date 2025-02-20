@@ -29,6 +29,10 @@ pub struct Cli {
     #[arg(long = "strict")]
     pub strict: bool,
 
+    /// Unbind all available APQNs.
+    #[arg(long, conflicts_with_all = ["config", "strict"])]
+    pub unbind: bool,
+
     /// Provide more detailed output.
     #[arg(short, long)]
     pub verbose: bool,

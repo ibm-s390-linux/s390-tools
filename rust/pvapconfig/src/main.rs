@@ -86,42 +86,48 @@ fn main() -> ExitCode {
     on_error_print_and_exit!(r);
     info!("UV support and environment is ok.\n");
 
-    // read configuration
-    let configfile: &str = match &cli::ARGS.config {
-        Some(f) => f,
-        _ => cli::PATH_DEFAULT_CONFIG_FILE,
-    };
-    info!(
-        "Reading AP configuration entries from file '{}'...\n",
-        configfile
-    );
-    let apconfig: ApConfigList = match ApConfigList::read_and_validate_yaml_file(configfile) {
-        Ok(apcfg) => apcfg,
-        Err(err) => println_and_exit_failure!("{}", err),
-    };
-    if apconfig.is_empty() {
-        println!(
-            "No AP configuration entries in config file '{}': Nothing to do.",
+    let mut apconfig: ApConfigList = Default::default();
+    if !cli::ARGS.unbind {
+        // read configuration
+        let configfile: &str = match &cli::ARGS.config {
+            Some(f) => f,
+            _ => cli::PATH_DEFAULT_CONFIG_FILE,
+        };
+        info!(
+            "Reading AP configuration entries from file '{}'...\n",
             configfile
         );
-        return ExitCode::SUCCESS;
-    }
-    info!("Found {} AP configuration entries.\n", apconfig.len());
+        apconfig = match ApConfigList::read_and_validate_yaml_file(configfile) {
+            Ok(apcfg) => apcfg,
+            Err(err) => println_and_exit_failure!("{}", err),
+        };
+        if apconfig.is_empty() {
+            println!(
+                "No AP configuration entries in config file '{}': Nothing to do.",
+                configfile
+            );
+            return ExitCode::SUCCESS;
+        }
+        info!("Found {} AP configuration entries.\n", apconfig.len());
+    };
 
     // get list of secrets from UV
-    info!("Fetching list of secrets from UV...\n");
-    let secrets: SecretList = match uv::gather_secrets() {
-        Err(e) => println_and_exit_failure!("{}", e),
-        Ok(los) => los,
-    };
-    info!("Fetched {} Secret entries from UV.\n", secrets.len());
+    let mut secrets = SecretList::new(0, Vec::new());
+    if !cli::ARGS.unbind {
+        info!("Fetching list of secrets from UV...\n");
+        secrets = match uv::gather_secrets() {
+            Err(e) => println_and_exit_failure!("{}", e),
+            Ok(los) => los,
+        };
+        info!("Fetched {} Secret entries from UV.\n", secrets.len());
+    }
 
     // Warning if no UV secrets given but AP config entries require it
     let non_accel_apc = apconfig
         .iter()
         .filter(|apc| apc.mode != config::STR_MODE_ACCEL)
         .count();
-    if non_accel_apc > 0 && secrets.is_empty() {
+    if !cli::ARGS.unbind && non_accel_apc > 0 && secrets.is_empty() {
         println!(
             "Warning: No UV Secrets given but at least one AP config entry requires a Secret."
         );
@@ -153,7 +159,7 @@ fn main() -> ExitCode {
         Ok(n) => n,
     };
 
-    if n == 0 {
+    if !cli::ARGS.unbind && n == 0 {
         println_and_exit_failure!(
             "None out of {} AP config entries could be applied.",
             apconfig.len()
@@ -166,11 +172,13 @@ fn main() -> ExitCode {
         );
     }
 
-    info!(
-        "Successfully applied {} out of {} AP config entries.\n",
-        n,
-        apconfig.len()
-    );
+    if !cli::ARGS.unbind {
+        info!(
+            "Successfully applied {} out of {} AP config entries.\n",
+            n,
+            apconfig.len()
+        );
+    }
 
     ExitCode::SUCCESS
 }
