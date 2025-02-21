@@ -115,7 +115,7 @@ struct target_ops {
 /* "extended" device */
 struct ext_dev {
 	dev_t dev;
-	unsigned long fs_off; /* file system start */
+	unsigned long fs_off; /* file system start in sector units */
 };
 
 struct dmpath_entry {
@@ -1204,9 +1204,19 @@ static int device_by_filename(dev_t *dev, const char *filename)
 	return 0;
 }
 
-static struct dmpath_entry *get_top_entry(struct physical_device *pd)
+static struct dmpath_entry *get_top_entry(const struct physical_device *pd)
 {
 	return util_list_start(pd->dmpath);
+}
+
+/**
+ * Get topmost non-dm device
+ */
+static void get_topmost_device(const struct physical_device *pd,
+			       struct ext_dev *top_dev)
+{
+	top_dev->dev = first_device_by_target_data(get_top_entry(pd)->target);
+	top_dev->fs_off = pd->offset;
 }
 
 /**
@@ -1356,6 +1366,7 @@ static void base_dev_to_params(dev_t base, struct device_characteristics *dc,
 	       fs_start / (dc->blocksize / SECTOR_SIZE));
 }
 
+static int check_handle_md(struct ext_dev *dev, int *is_md_dev, int util_id);
 /**
  * Print parameters for logical device DEV required by zipl
  * tool to install IPL records on its's physical components.
@@ -1365,10 +1376,22 @@ static void base_dev_to_params(dev_t base, struct device_characteristics *dc,
 static int dm_dev_to_zipl_params(struct ext_dev *dev, char *dir)
 {
 	struct physical_device pd = {0};
+	struct ext_dev top_dev;
+	int top_dev_is_md;
 	dev_t base_dev;
 
 	if (get_physical_device(&pd, dev, dir))
 		return -1;
+	get_topmost_device(&pd, &top_dev);
+	if (check_handle_md(&top_dev, &top_dev_is_md, ZIPL_UTIL_ID))
+		return -1;
+	if (top_dev_is_md) {
+		if (pd.mirror) {
+			ERR("Unsupported setup: dm-mirror over md-devices\n");
+			return -1;
+		}
+		return 0;
+	}
 	if (complete_physical_device(&pd, &base_dev))
 		goto error;
 	if (pd.offset < pd.dc.bootsectors) {
@@ -1410,35 +1433,35 @@ error:
 	return -1;
 }
 
-static int dm_dev_to_chreipl_params(dev_t dev, char *dir)
+static int dm_dev_to_chreipl_params(struct ext_dev *dev, char *dir)
 {
 	struct physical_device pd = {0};
-	struct ext_dev xdev = {dev, 0};
-	dev_t top_dev;
+	struct ext_dev top_dev;
+	int top_dev_is_md;
 
-	if (get_physical_device(&pd, &xdev, dir))
+	if (get_physical_device(&pd, dev, dir))
 		return -1;
 	/*
 	 * chreipl(8) utility doesn't expect dm-device at the
 	 * chreipl_helper output. So, complete the resolution
 	 * process (see the comment to get_physical_device)
 	 */
-	top_dev = first_device_by_target_data(get_top_entry(&pd)->target);
-
-	printf("%u:%u\n", major(top_dev), minor(top_dev));
+	get_topmost_device(&pd, &top_dev);
 	dmpath_free(pd.dmpath);
+	if (check_handle_md(&top_dev, &top_dev_is_md, CHREIPL_UTIL_ID))
+		return -1;
+	if (!top_dev_is_md)
+		printf("%u:%u\n", major(top_dev.dev), minor(top_dev.dev));
 	return 0;
 }
 
-static int handle_device_mapper(dev_t dev, int util_id, char *name)
+static int handle_device_mapper(struct ext_dev *dev, int util_id, char *name)
 {
-	struct ext_dev xdev = {dev, 0};
-
 	switch (util_id) {
 	case CHREIPL_UTIL_ID:
 		return dm_dev_to_chreipl_params(dev, name);
 	case ZIPL_UTIL_ID:
-		return dm_dev_to_zipl_params(&xdev, name);
+		return dm_dev_to_zipl_params(dev, name);
 	default:
 		ERR("Unsupported utility %d\n", util_id);
 		return -1;
@@ -1613,6 +1636,7 @@ static int devname_by_device(dev_t device, char **devname)
 
 static int check_md(dev_t dev, int *is_md_device)
 {
+	struct util_proc_dev_entry pde;
 	mdu_array_info_t array;
 	char *devname = NULL;
 	int fd;
@@ -1621,6 +1645,17 @@ static int check_md(dev_t dev, int *is_md_device)
 		*is_md_device = 1;
 		return 0;
 	}
+	/*
+	 * check if @dev is an md-partition
+	 */
+	if (util_proc_dev_get_entry(dev, 1, &pde) != 0)
+		return -1;
+	if (strcmp(pde.name, UTIL_PROC_DEV_ENTRY_BLKEXT)) {
+		util_proc_dev_free_entry(&pde);
+		*is_md_device = 0;
+		return 0;
+	}
+	util_proc_dev_free_entry(&pde);
 	if (devname_by_device(dev, &devname))
 		return -1;
 	fd = open(devname, O_RDONLY);
@@ -1642,7 +1677,7 @@ static int check_md(dev_t dev, int *is_md_device)
  * FS_START_MD: file system start on the md-device in sector units
  */
 static int md_mirror_to_params(unsigned int major, unsigned int minor,
-			       unsigned long partstart_md, int util_id)
+			       unsigned long fs_start_md, int util_id)
 {
 	struct device_characteristics dc;
 	unsigned long data_start_md;
@@ -1654,6 +1689,12 @@ static int md_mirror_to_params(unsigned int major, unsigned int minor,
 	int ret;
 
 	dev = makedev(major, minor);
+	/*
+	 * find space reserved for md-metadata at the beginning
+	 * of the physical device
+	 */
+	if (md_get_data_offset(major, minor, &data_start_md))
+		return -1;
 
 	if (check_md(dev, &is_md_device)) {
 		ERR("Failed to get md-status for (%d:%d)\n",
@@ -1665,21 +1706,16 @@ static int md_mirror_to_params(unsigned int major, unsigned int minor,
 		return -1;
 	}
 	if (is_device_mapper(major)) {
+		struct ext_dev xdev = {dev, data_start_md + fs_start_md};
 		char *name;
 
 		misc_asprintf(&name, "%d:%d", major, minor);
 
 		fail_on_dm_mirrors = 1;
-		ret = handle_device_mapper(dev, util_id, name);
+		ret = handle_device_mapper(&xdev, util_id, name);
 		free(name);
 		return ret;
 	}
-	/*
-	 * find space reserved for md-metadata at the beginning
-	 * of the physical device
-	 */
-	if (md_get_data_offset(major, minor, &data_start_md))
-		return -1;
 	/*
 	 * find parameters of the physical device
 	 */
@@ -1702,7 +1738,7 @@ static int md_mirror_to_params(unsigned int major, unsigned int minor,
 		printf("%u:%u\n", major(base), minor(base));
 		return 0;
 	}
-	fs_start_base = partstart_md + data_start_md + partstart_phy;
+	fs_start_base = fs_start_md + data_start_md + partstart_phy;
 	if (fs_start_base % (dc.blocksize / SECTOR_SIZE)) {
 		ERR("File system is not aligned on physical block size\n");
 		return -1;
@@ -1746,7 +1782,8 @@ static int check_md_state(struct mdstat *md, const char *devname)
  * If util_id is CHREIPL_UTIL_ID:
  *   Print the pair major:minor of one (random) identified component.
  */
-static int md_dev_to_params(dev_t dev, const char *devname, int util_id)
+static int md_dev_to_params(struct ext_dev *dev, const char *devname,
+			    int util_id)
 {
 	struct mdstat md = {0};
 	char *line = NULL;
@@ -1787,7 +1824,7 @@ static int md_dev_to_params(dev_t dev, const char *devname, int util_id)
 
 	/* Handle the case when DEV is a partition */
 
-	partstart_md = get_partition_start(major(dev), minor(dev));
+	partstart_md = get_partition_start(major(dev->dev), minor(dev->dev));
 	if (partstart_md < 0) {
 		fprintf(stderr, "Could not determine partition start for '%s'\n",
 			devname);
@@ -1805,7 +1842,8 @@ static int md_dev_to_params(dev_t dev, const char *devname, int util_id)
 
 		if (md_get_component(&line, &n, fp, i, &major, &minor))
 			goto out;
-		if (md_mirror_to_params(major, minor, partstart_md, util_id))
+		if (md_mirror_to_params(major, minor,
+					partstart_md + dev->fs_off, util_id))
 			goto out;
 		if (util_id == CHREIPL_UTIL_ID)
 			/* chreipl accepts only one base disk */
@@ -1830,21 +1868,21 @@ static int devname_by_major_minor(unsigned int major, unsigned int minor,
 static int print_params_device_mapper(char *argv[], struct helper *h)
 {
 	unsigned int major, minor;
+	struct ext_dev dev = {0};
 	char *name = argv[1];
-	dev_t dev;
 
 	if (extract_major_minor_from_cmdline(argv, &major, &minor) == 0)
-		dev = makedev(major, minor);
-	else if (device_by_filename(&dev, name))
+		dev.dev = makedev(major, minor);
+	else if (device_by_filename(&dev.dev, name))
 		return -1;
-	return handle_device_mapper(dev, h->util_id, name);
+	return handle_device_mapper(&dev, h->util_id, name);
 }
 
 int print_params_md(char *argv[], struct helper *h)
 {
 	unsigned int major, minor;
+	struct ext_dev dev = {0};
 	char *devname;
-	dev_t dev;
 	int ret;
 
 	if (h->util_id != CHREIPL_UTIL_ID && h->util_id != ZIPL_UTIL_ID) {
@@ -1857,18 +1895,45 @@ int print_params_md(char *argv[], struct helper *h)
 				major, minor);
 			return -1;
 		}
-		dev = makedev(major, minor);
+		dev.dev = makedev(major, minor);
 	} else {
-		if (device_by_filename(&dev, argv[1]))
+		if (device_by_filename(&dev.dev, argv[1]))
 			return -1;
-		if (devname_by_device(dev, &devname)) {
+		if (devname_by_device(dev.dev, &devname)) {
 			fprintf(stderr, "Directory %s is not over any block device\n",
 			    argv[1]);
 			return -1;
 		}
 	}
-	ret = md_dev_to_params(dev, devname, h->util_id);
+	ret = md_dev_to_params(&dev, devname, h->util_id);
 	free(devname);
+	return ret;
+}
+
+/*
+ * Check if DEV is an MD-device.
+ * If yes, then resolve DEV to the set of underlying base disks
+ * and print parameters for each of them.
+ */
+static int check_handle_md(struct ext_dev *dev, int *is_md_dev, int util_id)
+{
+	char *dev_name = NULL;
+	int ret;
+
+	ret = check_md(dev->dev, is_md_dev);
+	if (ret) {
+		ERR("Failed to get md-status for device %lu", dev->dev);
+		return -1;
+	}
+	if (!*is_md_dev)
+		return 0;
+	ret = devname_by_device(dev->dev, &dev_name);
+	if (ret) {
+		ERR("Could not get device name of device %lu\n", dev->dev);
+		return -1;
+	}
+	ret = md_dev_to_params(dev, dev_name, util_id);
+	free(dev_name);
 	return ret;
 }
 
