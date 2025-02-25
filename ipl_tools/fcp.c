@@ -46,7 +46,6 @@ void fcp_wwpn_get(const char *device, char *wwpn)
 	fclose(fh);
 }
 
-
 /*
  * Return the lun of a device
  */

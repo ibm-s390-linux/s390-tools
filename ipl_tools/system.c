@@ -137,4 +137,3 @@ int write_str_errno(char *string, char *file)
 	close(fh);
 	return 0;
 }
-
