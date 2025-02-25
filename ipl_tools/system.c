@@ -9,7 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include "lib/util_libc.h"
+#include "lib/util_path.h"
 #include "ipl_tools.h"
 
 /*
@@ -84,7 +84,7 @@ void read_fw_str(char *string, const char *file, size_t len)
 {
 	char *path;
 
-	util_asprintf(&path, "/sys/firmware/%s", file);
+	path = util_path_sysfs("firmware/%s", file);
 	read_str(string, path, len);
 	free(path);
 }

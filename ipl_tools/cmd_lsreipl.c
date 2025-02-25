@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/util_path.h"
 #include "ipl_tools.h"
 
 static struct {
@@ -42,24 +43,22 @@ static const char *get_ipl_banner(int show_ipl)
 void print_nss(int show_ipl)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/nss";
-	char *path_bootparms = show_ipl ? "/sys/firmware/ipl/parm" :
-		"/sys/firmware/reipl/nss/parm";
+	char *path_bootparms = util_path_sysfs("firmware/%s/parm", dir);
 
 	printf("%-12s nss\n", get_ipl_banner(show_ipl));
 	print_fw_str("Name:        %s\n", dir, "name");
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "parm");
+	free(path_bootparms);
 }
 
 void print_fcp(int show_ipl, int dump)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/fcp";
-	char *path_bootparms = show_ipl ? "/sys/firmware/ipl/scp_data" :
-		"/sys/firmware/reipl/fcp/scp_data";
-	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
-		"/sys/firmware/reipl/fcp/loadparm";
 	char loadparm[9], loadparm_path[PATH_MAX];
-	char *path_reipl_clear = "/sys/firmware/reipl/fcp/clear";
+	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
+	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
+	char *path_reipl_clear = util_path_sysfs("firmware/reipl/fcp/clear");
 
 	if (dump)
 		printf("%-12s fcp_dump\n", get_ipl_banner(show_ipl));
@@ -82,17 +81,18 @@ void print_fcp(int show_ipl, int dump)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
 	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	free(path_bootparms);
+	free(path_loadparm);
+	free(path_reipl_clear);
 }
 
 void print_nvme(int show_ipl, int dump)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/nvme";
-	char *path_bootparms = show_ipl ? "/sys/firmware/ipl/scp_data" :
-		"/sys/firmware/reipl/nvme/scp_data";
-	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
-		"/sys/firmware/reipl/nvme/loadparm";
 	char loadparm[9], loadparm_path[PATH_MAX];
-	char *path_reipl_clear = "/sys/firmware/reipl/nvme/clear";
+	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
+	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
+	char *path_reipl_clear = util_path_sysfs("firmware/reipl/nvme/clear");
 
 	if (dump)
 		printf("%-12s nvme_dump\n", get_ipl_banner(show_ipl));
@@ -114,17 +114,18 @@ void print_nvme(int show_ipl, int dump)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
 	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	free(path_bootparms);
+	free(path_loadparm);
+	free(path_reipl_clear);
 }
 
 void print_ccw(int show_ipl)
 {
 	char loadparm[9], loadparm_path[PATH_MAX];
 	char *dir = show_ipl ? "ipl" : "reipl/ccw";
-	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
-		"/sys/firmware/reipl/ccw/loadparm";
-	char *path_bootparms = show_ipl ? "/sys/firmware/ipl/parm" :
-		"/sys/firmware/reipl/ccw/parm";
-	char *path_reipl_clear = "/sys/firmware/reipl/ccw/clear";
+	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
+	char *path_bootparms = util_path_sysfs("firmware/%s/parm", dir);
+	char *path_reipl_clear = util_path_sysfs("firmware/reipl/ccw/clear");
 
 	printf("%-12s ccw\n", get_ipl_banner(show_ipl));
 	print_fw_str("Device:      %s\n", dir, "device");
@@ -139,14 +140,16 @@ void print_ccw(int show_ipl)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "parm");
 	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	free(path_loadparm);
+	free(path_bootparms);
+	free(path_reipl_clear);
 }
 
 void print_eckd(int show_ipl, const char *name)
 {
-	char *path_loadparm = show_ipl ? "/sys/firmware/ipl/loadparm" :
-		"/sys/firmware/reipl/eckd/loadparm";
 	char *dir = show_ipl ? "ipl" : "reipl/eckd";
 	char loadparm[9], loadparm_path[PATH_MAX];
+	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 
 	printf("%-12s %s\n", get_ipl_banner(show_ipl), name);
 
@@ -163,6 +166,7 @@ void print_eckd(int show_ipl, const char *name)
 	}
 	if (!show_ipl)
 		print_fw_str("clear:       %s\n", dir, "clear");
+	free(path_loadparm);
 }
 
 static void parse_lsreipl_options(int argc, char *argv[])
