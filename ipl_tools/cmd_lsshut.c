@@ -9,6 +9,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
+#include "lib/util_path.h"
 #include "ipl_tools.h"
 
 static const char *const usage_lsshut =
@@ -80,12 +81,17 @@ static void print_kdump(void)
 {
 	struct stat sb;
 	char tmp[1024];
+	char *path;
 
-	if (stat("/sys/kernel/kexec_crash_loaded", &sb) != 0)
+	path = util_path_sysfs("kernel/kexec_crash_loaded");
+	if (stat(path, &sb) != 0) {
+		free(path);
 		return;
-	read_str(tmp, "/sys/kernel/kexec_crash_loaded", sizeof(tmp));
+	}
+	read_str(tmp, path, sizeof(tmp));
 	if (strncmp(tmp, "1", 1) == 0)
 		printf("kdump,");
+	free(path);
 }
 
 static void shutdown_trigger_print(struct shutdown_trigger *trigger)
