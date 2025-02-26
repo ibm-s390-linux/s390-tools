@@ -368,6 +368,7 @@ LOGFILES="\
   /var/log/anaconda.*\
   /var/log/audit\
   /var/log/boot*\
+  /var/log/crash/*/vmcore-dmesg.txt\
   /var/log/cron*\
   /var/log/dmesg*\
   /var/log/dnf.*\
@@ -401,6 +402,7 @@ CONFIGFILES="\
   /etc/*release\
   /etc/anacrontab\
   /etc/apparmor.d\
+  /etc/audit\
   /etc/auto.*\
   /etc/cmdline\
   /etc/cmdline.d\
@@ -441,6 +443,7 @@ CONFIGFILES="\
   /etc/rc.local\
   /etc/resolv.*\
   /etc/rsyslog.d\
+  /etc/selinux\
   /etc/ssl/openssl.conf\
   /etc/ssl/openssl.cnf\
   /etc/sysconfig\
@@ -472,6 +475,10 @@ CONFIGFILES="\
 CMDS="uname -a\
   :uptime\
   :timedatectl\
+  :chronyc sources\
+  :chronyc sourcestats\
+  :chronyc ntpdata\
+  :chronyc tracking\
   :zhypinfo\
   :last\
   :lscpu -ae\
