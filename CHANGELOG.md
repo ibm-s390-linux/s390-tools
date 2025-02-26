@@ -1,15 +1,67 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.38.0 (2025-06-25)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.14 / 6.15
 
-  Add new tools / libraries:
+  Add new tools:
+  - udev: New rule to set newly hotplugged CPUs online
+  - zmemtopo: Display memory topology information
+  - zpwr: Display power readings of a partition and CPC
 
-  Changes of existing tools:
+  Removed tools / features:
+  - check_hostkeydoc: Remove installation target
+  - scsi_logging_level: Delete SCSI logging script (available in sg3_utils)
+  - zdump: Drop build_arch for s390 DASD dumps
+  - zdump: Drop non-extended multi-volume DASD dump support
+  - zdump: Drop support of 32-bit dump architecture
+  - zdump: Drop support of non-extended single volume DASD dumpers
+  - zdump: Drop support of obsolete dumps and dumpers
+
+  Changes of existing tools / libraries:
+  - Various man-pages fixes
+  - check_hostkeydoc: Add deprecation warning
+  - check_hostkeydoc: Move to scripts directory
+  - cpuplugd: Allow cpu hotplugging on systems without polarization
+  - dbginfo.sh: Add Ubuntu snap tool
+  - dbginfo.sh: Add missing config data and logs
+  - dbginfo.sh: Reworking the container section
+  - dbginfo.sh: Update for network commands
+  - dbginfo.sh: Updating info for disks and lvm
+  - libutil: Add machine type definition for machines 9175 and 9176
+  - lscpumf: Add support for IBM z17 counter sets
+  - lshwc: Add command line flag for run time
+  - lshwc: Add flags to display counter values in hex
+  - lshwc: Add output '--format' option
+  - lshwc: Add support for delta counter value display
+  - lspai: Add output '--format' option
+  - lsreipl: Add secure boot state to output
+  - lswhc: Add short names to lshwc output
+  - pv_tools: Add Bash and Zsh completions
+  - pvapconfig: Add '--unbind' option
+  - pvimg/boot: Print error messages from stage3a bootloader
+  - pvimg: Add support for CCK update
+  - pvsecret: Add support for CCK update
+  - pvsecret: Allow retrieving secrets by index & warn for duplicated entries
+  - pvsecret: Deny adding secrets with duplicated secret IDs
+  - zdev: Add support for virtio devices
+  - zipl: Enhance mirror support
+  - zipl: Implement '--dry-run' option for all dump jobs
+  - zipl_helper.device-mapper: Support mirrors over NVMe devices
+  - zkey/dracut: Add a dracut config file for zkey
+  - zkey/initramfs: Update initramfs hook to correct drivers and include zkey plugins
+  - zkey: Add support for converting a clear-key LUKS2 volume to use a secure key
 
   Bug Fixes:
+  - chpstat: Add missing CMG 5 data fields
+  - chpstat: Fix DPU utilization calculation
+  - libutil/util_file: Handle over-read in util_file_read_fd()
+  - pvattest: Fix successful 'check' evaluation
+  - pvsecret: Fix some edge cases for plaintext keys
+  - zipl_helper.device-mapper: Fix imprecise is_device_mapper() predicate
+  - zkey: Fix EP11 secure key reencipher function
+  - zpcictl: Fix command line parsing for invalid options
 
 * __v2.37.0 (2025-02-07)__
 

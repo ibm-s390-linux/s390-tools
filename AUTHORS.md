@@ -43,6 +43,7 @@ List of all individuals having contributed content to s390-tools
 - Frank Munzert
 - Frank Pavlic
 - Fritz Elfert
+- Gautam Gala
 - Gerald Schaefer
 - Gerhard Tonn
 - Graham Inggs
@@ -63,6 +64,7 @@ List of all individuals having contributed content to s390-tools
 - Jakub Čajka
 - Jan Glauber
 - Jan Höppner
+- Jan Polensky
 - Jan Willeke
 - Jason J. Herne
 - Javier Martinez Canillas
@@ -70,6 +72,7 @@ List of all individuals having contributed content to s390-tools
 - Jens Remus
 - Jochen Roehrig
 - Joern Siglen
+- Jörn Siglen
 - Juergen Christ
 - Julian Wiedmann
 - Karsten Graul
@@ -97,6 +100,7 @@ List of all individuals having contributed content to s390-tools
 - Nikita Dubrovskii
 - Niklas Schnelle
 - Nikolay Gueorguiev
+- Peter Jin
 - Peter Oberparleiter
 - Peter Tiedemann
 - Philipp Kern
@@ -112,6 +116,8 @@ List of all individuals having contributed content to s390-tools
 - Sebastian Ott
 - Sertonix
 - Seshagiri N. Ippili
+- Shalini Chellathurai Saroja
+- Siglen
 - Simon Sturm
 - Stefan Bader
 - Stefan Haberland
@@ -121,6 +127,7 @@ List of all individuals having contributed content to s390-tools
 - Steffen Eiden
 - Steffen Maier
 - Steffen Thoss
+- Sumanth Korikkar
 - Susanne Wintenberger
 - Sven Schnelle
 - Sven Schuetz
