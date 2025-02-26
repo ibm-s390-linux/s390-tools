@@ -10,6 +10,7 @@
  */
 
 #include "lib/util_libc.h"
+#include "lib/util_path.h"
 #include "ipl_tools.h"
 
 /*
@@ -18,11 +19,14 @@
  */
 int fcp_is_device(const char *devno)
 {
-	char path[PATH_MAX];
+	char *path;
 
-	snprintf(path, sizeof(path), "/sys/bus/ccw/drivers/zfcp/%s", devno);
-	if (chdir(path) != 0)
+	path = util_path_sysfs("bus/ccw/drivers/zfcp/%s", devno);
+	if (chdir(path) != 0) {
+		free(path);
 		return 0;
+	}
+	free(path);
 	return 1;
 }
 
@@ -31,11 +35,12 @@ int fcp_is_device(const char *devno)
  */
 void fcp_wwpn_get(const char *device, char *wwpn)
 {
-	char path[PATH_MAX], buf[20];
+	char buf[20];
+	char *path;
 	FILE *fh;
 	int rc;
 
-	snprintf(path, sizeof(path), "/sys/block/%s/device/wwpn", device);
+	path = util_path_sysfs("block/%s/device/wwpn", device);
 	fh = fopen(path, "r");
 	if (fh == NULL)
 		ERR_EXIT_ERRNO("Could not open \"%s\"", path);
@@ -44,6 +49,7 @@ void fcp_wwpn_get(const char *device, char *wwpn)
 		ERR_EXIT("Could not lookup WWPN \"%s\"", path);
 	util_strlcpy(wwpn, buf, 20);
 	fclose(fh);
+	free(path);
 }
 
 /*
@@ -51,11 +57,12 @@ void fcp_wwpn_get(const char *device, char *wwpn)
  */
 void fcp_lun_get(const char *device, char *lun)
 {
-	char path[PATH_MAX], buf[20];
+	char buf[20];
+	char *path;
 	FILE *fh;
 	int rc;
 
-	snprintf(path, sizeof(path), "/sys/block/%s/device/fcp_lun", device);
+	path = util_path_sysfs("block/%s/device/fcp_lun", device);
 	fh = fopen(path, "r");
 	if (fh == NULL)
 		ERR_EXIT_ERRNO("Could not open \"%s\"", path);
@@ -64,6 +71,7 @@ void fcp_lun_get(const char *device, char *lun)
 		ERR_EXIT("Could not lookup LUN \"%s\"", path);
 	util_strlcpy(lun, buf, 20);
 	fclose(fh);
+	free(path);
 }
 
 /*
@@ -71,11 +79,12 @@ void fcp_lun_get(const char *device, char *lun)
  */
 void fcp_busid_get(const char *device, char *devno)
 {
-	char buf[4096], path[PATH_MAX];
+	char buf[4096];
+	char *path;
 	FILE *fh;
 	int rc;
 
-	snprintf(path, sizeof(path), "/sys/block/%s/device/hba_id", device);
+	path = util_path_sysfs("block/%s/device/hba_id", device);
 	fh = fopen(path, "r");
 	if (fh == NULL)
 		ERR_EXIT_ERRNO("Could not open \"%s\"", path);
@@ -84,4 +93,5 @@ void fcp_busid_get(const char *device, char *devno)
 		ERR_EXIT("Could not find device \"%s\"", path);
 	strcpy(devno, buf);
 	fclose(fh);
+	free(path);
 }

@@ -106,17 +106,19 @@ void print_fw_str(const char *fmt, const char *dir, const char *file)
  */
 void write_str(char *string, char *file)
 {
-	char path[PATH_MAX], value[4096];
+	char value[4096];
+	char *path;
 	int fh;
 
+	path = util_path_sysfs("firmware/%s", file);
 	snprintf(value, sizeof(value), "%s\n", string);
-	snprintf(path, sizeof(path), "/sys/firmware/%s", file);
 	fh = open(path, O_WRONLY);
 	if (fh < 0)
 		ERR_EXIT_ERRNO("Could not open \"%s\"", file);
 	if (write(fh, value, strlen(value)) < 0)
 		ERR_EXIT_ERRNO("Could not set \"%s\"", file);
 	close(fh);
+	free(path);
 }
 
 /*
@@ -124,16 +126,18 @@ void write_str(char *string, char *file)
  */
 int write_str_errno(char *string, char *file)
 {
-	char path[PATH_MAX], value[4096];
+	char value[4096];
+	char *path;
 	int fh;
 
+	path = util_path_sysfs("firmware/%s", file);
 	snprintf(value, sizeof(value), "%s\n", string);
-	snprintf(path, sizeof(path), "/sys/firmware/%s", file);
 	fh = open(path, O_WRONLY);
 	if (fh < 0)
 		return errno;
 	if (write(fh, value, strlen(value)) < 0)
 		return errno;
 	close(fh);
+	free(path);
 	return 0;
 }

@@ -15,6 +15,7 @@
 
 #include "lib/util_libc.h"
 #include "lib/zt_common.h"
+#include "lib/util_path.h"
 
 #include "ipl_tools.h"
 #include "proc.h"
@@ -719,11 +720,12 @@ static void parse_chreipl_options(int argc, char *argv[])
 
 static void check_exists(const char *path, const char *attr)
 {
-	char fpath[PATH_MAX];
+	char *fpath;
 
-	snprintf(fpath, sizeof(fpath), "/sys/firmware/%s", path);
+	fpath = util_path_sysfs("firmware/%s", path);
 	if (access(fpath, F_OK) != 0)
 		ERR_EXIT("System does not allow one to set %s", attr);
+	free(fpath);
 }
 
 static void write_str_optional(char *string, char *file, int exit_on_fail,
@@ -920,13 +922,14 @@ static void chreipl_nss(void)
 
 static void chreipl_node(void)
 {
-	char path[PATH_MAX];
+	char *path;
 
 	if (!l.dev_set)
 		ERR_EXIT("No device node specified");
-	snprintf(path, sizeof(path), "/sys/block/%s/device", l.dev);
+	path = util_path_sysfs("block/%s/device", l.dev);
 	if (chdir(path) != 0)
 		ERR_EXIT("Could not find device \"%s\"", l.dev);
+	free(path);
 
 	switch (l.reipl_type) {
 	case REIPL_CCW:

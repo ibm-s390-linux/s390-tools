@@ -16,6 +16,7 @@
 
 #include "lib/util_libc.h"
 #include "lib/util_file.h"
+#include "lib/util_path.h"
 #include "ipl_tools.h"
 
 static void nvme_dev_from_bdev(char *dev_name)
@@ -31,8 +32,9 @@ static void nvme_dev_from_bdev(char *dev_name)
  */
 void nvme_fid_get(const char *device, char *fid)
 {
-	char path[PATH_MAX], buf[FID_MAX_LEN];
 	char nvme_dev[NVME_DEV_MAX_LEN];
+	char buf[FID_MAX_LEN];
+	char *path;
 
 	/*
 	 * An NVMe may present multiple namespaces and thus block devices, even
@@ -42,24 +44,27 @@ void nvme_fid_get(const char *device, char *fid)
 	util_strlcpy(nvme_dev, device, sizeof(nvme_dev));
 	nvme_dev_from_bdev(nvme_dev);
 
-	snprintf(path, PATH_MAX, "/sys/class/nvme/%s/device/function_id", nvme_dev);
+	path = util_path_sysfs("class/nvme/%s/device/function_id", nvme_dev);
 	if (util_file_read_line(buf, FID_MAX_LEN, path))
 		ERR_EXIT_ERRNO("Could not read from \"%s\"", path);
 
 	util_strlcpy(fid, buf, FID_MAX_LEN);
+	free(path);
 }
 /*
  * Return the nsid of a device
  */
 void nvme_nsid_get(const char *device, char *nsid)
 {
-	char path[PATH_MAX], buf[FID_MAX_LEN];
+	char buf[FID_MAX_LEN];
+	char *path;
 
-	snprintf(path, PATH_MAX, "/sys/block/%s/nsid", device);
+	path = util_path_sysfs("block/%s/nsid", device);
 	if (util_file_read_line(buf, FID_MAX_LEN, path))
 		ERR_EXIT_ERRNO("Could not read from \"%s\"", path);
 
 	util_strlcpy(nsid, buf, FID_MAX_LEN);
+	free(path);
 }
 
 static int next_entry(DIR *dir, char *in_path, char *out_path,
@@ -93,13 +98,14 @@ static int next_entry(DIR *dir, char *in_path, char *out_path,
 
 static int nvme_getdev_by_fid(char *fidstr, char *devpath)
 {
-	char temp_path[PATH_MAX+19], real_path[PATH_MAX];
-	char *sys_path = "/sys/class/nvme";
+	char temp_path[PATH_MAX + 19], real_path[PATH_MAX];
 	u_int64_t target_fid, curfid;
+	char *sys_path;
 	DIR *dir;
 	char *end;
 	int rc = -1;
 
+	sys_path = util_path_sysfs("class/nvme");
 	target_fid = strtoul(fidstr, &end, 16);
 	if (*end)
 		ERR_EXIT("Invalid function_id given %s", fidstr);
@@ -126,6 +132,7 @@ static int nvme_getdev_by_fid(char *fidstr, char *devpath)
 	}
 
 	closedir(dir);
+	free(sys_path);
 	return rc;
 }
 

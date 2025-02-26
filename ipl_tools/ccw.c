@@ -49,19 +49,19 @@ static int device_sysfs_path(const char *device, char *path, const size_t path_s
  */
 int ccw_is_device(const char *busid)
 {
-	char path[PATH_MAX];
+	static const char *const driver_paths[] = { "dasd-eckd", "virtio_ccw", "dasd-fba" };
+	char *path;
+	size_t i;
 
-	snprintf(path, sizeof(path),
-		 "/sys/bus/ccw/drivers/dasd-eckd/%s", busid);
-	if (access(path, R_OK) == 0)
-		return 1;
-	snprintf(path, sizeof(path),
-		 "/sys/bus/ccw/drivers/virtio_ccw/%s", busid);
-	if (access(path, R_OK) == 0)
-		return 1;
-	snprintf(path, sizeof(path), "/sys/bus/ccw/drivers/dasd-fba/%s", busid);
-	if (access(path, R_OK) == 0)
-		return 1;
+	for (i = 0; i < ARRAY_SIZE(driver_paths); i++) {
+		path = util_path_sysfs("bus/ccw/drivers/%s/%s", driver_paths[i], busid);
+		if (access(path, R_OK) == 0) {
+			free(path);
+			return 1;
+		}
+		free(path);
+	}
+
 	return 0;
 }
 
@@ -72,6 +72,7 @@ int ccw_is_virtio_device(const char *device)
 {
 	char path[PATH_MAX] = { '\0' };
 	unsigned virtio = 0;
+	char *path_pattern;
 
 	if (device_sysfs_path(device, path, sizeof(path)) != 0)
 		return -1;
@@ -80,8 +81,12 @@ int ccw_is_virtio_device(const char *device)
 	 * The output has the following format:
 	 * /sys/devices/css0/0.0.0000/0.0.0000/virtio0/block/vda
 	 */
-	if (sscanf(path, "/sys/devices/css0/%*[0-9a-f.]/%*[0-9a-f.]/virtio%u", &virtio) != 1)
+	path_pattern = util_path_sysfs("devices/css0/%%*[0-9a-f.]/%%*[0-9a-f.]/virtio%%u");
+	if (sscanf(path, path_pattern, &virtio) != 1) {
+		free(path_pattern);
 		return -1;
+	}
+	free(path_pattern);
 	return 0;
 }
 
@@ -91,6 +96,7 @@ int ccw_is_virtio_device(const char *device)
 void ccw_busid_get(const char *device, char *busid)
 {
 	char path[PATH_MAX] = { '\0' };
+	char *path_pattern;
 
 	if (device_sysfs_path(device, path, sizeof(path)) != 0)
 		ERR_EXIT("Could not lookup device number for \"%s\"", device);
@@ -100,7 +106,12 @@ void ccw_busid_get(const char *device, char *busid)
 	 * /sys/devices/css0/0.0.0119/0.0.3f19/block/dasda
 	 * /sys/devices/css0/0.0.0000/0.0.0000/virtio0/block/vda
 	 */
-	if (sscanf(path, "/sys/devices/css0/%*[0-9a-f.]/%[0-9a-f.]", busid) != 1)
+	path_pattern = util_path_sysfs("devices/css0/%%*[0-9a-f.]/%%[0-9a-f.]");
+	if (sscanf(path, path_pattern, busid) != 1) {
+		free(path_pattern);
 		ERR_EXIT("Could not lookup device number for \"%s\"", device);
+	}
+	free(path_pattern);
+
 	return;
 }
