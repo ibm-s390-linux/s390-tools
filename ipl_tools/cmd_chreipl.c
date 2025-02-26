@@ -739,7 +739,7 @@ static void write_str_optional(char *string, char *file, int exit_on_fail,
  * IMPLEMENTATION:
  *
  * "cio_ignore --is-ignored <busid>" returns 0 if the device is ignored,
- * 1 for internal errrors, and 2 if the device is not ignored.
+ * 1 for internal errors, and 2 if the device is not ignored.
  *
  * We get the "cio_ignore" exit status by the return code of the system()
  * function via WEXITSTATUS().
