@@ -368,7 +368,7 @@ secret type.
         - **plain**: A plaintext secret. Can be any file up to 8190 bytes long.
         - **aes**: An AES key. Must be a plain byte file 128, 192, or 256 bit long.
         - **aes-xts**: An AES-XTS key. Must be a plain byte file 512, or 1024 bit long.
-        - **hmac-sha**: A HMAC-SHA key. Must be a plain byte file 512, or 1024 bit long.
+        - **hmac-sha**: A HMAC-SHA key. Must be a plain byte file 512, or 1024 bit long. Special care is required when creating HMAC-SHA keys. For more Information refer to the DESCRIPTION section of the man file.
         - **ec**: An elliptic curve private key. Must be a PEM or DER file.
 </ul>
 

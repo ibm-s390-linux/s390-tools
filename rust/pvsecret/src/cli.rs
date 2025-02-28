@@ -231,7 +231,8 @@ pub enum RetrieveableSecretInpKind {
     /// Must be a plain byte file 512, or 1024 bit long.
     AesXts,
     /// A HMAC-SHA key.
-    /// Must be a plain byte file 512, or 1024 bit long.
+    /// Must be a plain byte file 512, or 1024 bit long. Special care is required when creating
+    /// HMAC-SHA keys. For more Information refer to the DESCRIPTION section of the man file.
     HmacSha,
     /// An elliptic curve private key.
     /// Must be a PEM or DER file.
