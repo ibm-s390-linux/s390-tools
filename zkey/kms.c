@@ -745,7 +745,7 @@ static int remove_directory_recursively(const char *directory)
 
 	if (rmdir(directory) != 0) {
 		rc = -errno;
-		warnx("Failed to remove '%s': %s", filename, strerror(-rc));
+		warnx("Failed to remove '%s': %s", directory, strerror(-rc));
 		goto out;
 	}
 
