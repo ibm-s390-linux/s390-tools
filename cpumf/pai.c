@@ -735,8 +735,8 @@ static int add_events(int type)
 	}
 
 	if (rc) {
-		free(pmuname);
 		warnx("failed building event list for %s", pmuname);
+		free(pmuname);
 	}
 	return rc;
 }
