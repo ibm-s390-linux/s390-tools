@@ -2448,7 +2448,7 @@ int set_kms_key_properties(struct kms_info *kms_info,
 		ADD_KMS_PROPS(kms_props, num_kms_props,
 			      KMS_KEY_PROP_SECTOR_SIZE, sector_size);
 	if (passphrase_file != NULL) {
-		/* *passphrase_file is NULL to remove the propoerty */
+		/* *passphrase_file is NULL to remove the property */
 		if (*passphrase_file != NULL) {
 			passphrase =
 				read_passphrase_as_base64(*passphrase_file,
@@ -2797,7 +2797,7 @@ static int _process_kms_keys_cb(const char *key_id, const char *key_label,
  * @param[in] name_filter     the name filter. Can contain wild cards.
  *                            NULL means no name filter.
  * @param[in] volume_filter   the volume filter. Can contain wild cards, and
- *                            mutliple volume filters separated by commas.
+ *                            multiple volume filters separated by commas.
  *                            If the filter does not contain the ':dm-name'
  *                            part, then the volumes are matched without the
  *                            dm-name part. If the filter contains the
@@ -2989,7 +2989,7 @@ static int _list_kms_keys_cb(const char *UNUSED(key1_id),
  * @param[in] name_filter     the name filter. Can contain wild cards.
  *                            NULL means no name filter.
  * @param[in] volume_filter   the volume filter. Can contain wild cards, and
- *                            mutliple volume filters separated by commas.
+ *                            multiple volume filters separated by commas.
  *                            If the filter does not contain the ':dm-name'
  *                            part, then the volumes are matched without the
  *                            dm-name part. If the filter contains the
