@@ -59,6 +59,14 @@ Release history for s390-tools (MIT version)
   - chpstat: Add support for full CMCB
   - chpstat: Add support for new CMG types
   - dbginfo.sh: add overview commands and crypto update
+  - genprotimg:
+    1. genprotimg is now a symbolic link to the new tool `pvimg create`
+    2. Breaking API changes in genprotimg:
+       1. An existing output file is no longer silently overwritten; to revert
+          to the old behavior use the `--overwrite` option.
+       2. The Linux kernel component is now checked to determine whether it is a
+          binary s390x kernel. To disable this behavior use the
+          `--no-component-check` option.
   - hyptop: Support for structured output (json, json-seq, csv)
   - lszfcp: Add missing fallback marker for non-good fc_host port_state
   - lszfcp: Improve speed with many SCSI devices
