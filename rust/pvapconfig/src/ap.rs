@@ -250,6 +250,90 @@ pub struct Apqn {
     pub info: Option<ApqnInfo>,
 }
 
+impl TryFrom<&str> for Apqn {
+    type Error = String;
+
+    /// Create an `Apqn` struct from a CARD.DOMAIN-formatted APQN
+    /// string, such as `28.0014`. Will not populate `info` upon
+    /// failure to read it. Other failures to read required information
+    /// are treated as an Error.
+    /// # Panics
+    /// Panics if the compilation of a static regular expression fails
+    /// or a regex capture that is already format-checked does not
+    /// parse, e.g. when the capture `([[:xdigit:]]{2})` does not
+    /// parse as hex string.
+    fn try_from(name: &str) -> Result<Self, String> {
+        let re_card_type = Regex::new(RE_CARD_TYPE).unwrap();
+        let re_queue_dir = Regex::new(RE_QUEUE_DIR).unwrap();
+
+        let caps = re_queue_dir
+            .captures(name)
+            .ok_or_else(|| format!("Failure parsing queue string '{name}'."))?;
+        let cardstr = caps.get(1).unwrap().as_str();
+        let card = u32::from_str_radix(cardstr, 16).unwrap();
+        let domstr = caps.get(2).unwrap().as_str();
+        let domain = u32::from_str_radix(domstr, 16).unwrap();
+
+        let path = format!("{PATH_SYS_DEVICES_AP}/card{cardstr}");
+        let card_type = read_file_string(format!("{path}/type"), "card type")
+            .map(|s| s.trim().to_string())
+            .map_err(|e| e.to_string())?;
+        let caps = re_card_type
+            .captures(&card_type)
+            .ok_or_else(|| format!("Failure parsing card type string '{card_type}'."))?;
+        let gen = caps.get(1).unwrap().as_str().parse::<u32>().unwrap();
+        let mode = match caps.get(2).unwrap().as_str().parse::<char>().unwrap() {
+            'A' => ApqnMode::Accel,
+            'C' => ApqnMode::Cca,
+            'P' => ApqnMode::Ep11,
+            _ => unreachable!("Code inconsistency between regex RE_CARD_TYPE and evaluation code."),
+        };
+        // the UV blocks requests to CCA cards within SE guest with AP
+        // pass-through support. However, filter out CCA cards as
+        // these cards cause hangs during information gathering.
+        if mode == ApqnMode::Cca && pv_core::misc::pv_guest_bit_set() {
+            return Err(format!(
+                "CCA card {cardstr} cannot be used with Secure Execution, as this combination is unsupported."
+            ));
+        }
+
+        match read_file_string(format!("{path}/{name}/online"), "AP queue online status")
+            .map(|s| s.trim().parse::<i32>())
+        {
+            Ok(Ok(1)) => {}
+            _ => return Err(format!("{name} is offline.")),
+        }
+        // For the MKVP and serialnr to fetch from the APQN within a SE
+        // guest the APQN needs to be bound to the guest. So if the APQN
+        // is not bound, temporarily bind it here until the info has
+        // been retrieved.
+        let mut tempbound = false;
+        if pv_core::misc::pv_guest_bit_set() {
+            let cbs = get_apqn_bind_state(card, domain)
+                .map_err(|e| format!("Failure reading APQN {name} bind state: {e}"))?;
+            if cbs == BindState::Unbound {
+                set_apqn_bind_state(card, domain, BindState::Bound)
+                    .map_err(|e| format!("Failure temporarily binding APQN {name}: {e}"))?;
+                tempbound = true;
+            }
+        }
+        let info = ApqnInfo::info(&mode, &path, name).ok();
+        if tempbound {
+            set_apqn_bind_state(card, domain, BindState::Unbound)
+                .map_err(|e| format!("Failure unbinding temporarily bound APQN {name}: {e}"))?;
+        }
+
+        Ok(Apqn {
+            name: name.to_string(),
+            card,
+            domain,
+            gen,
+            mode,
+            info,
+        })
+    }
+}
+
 impl fmt::Display for Apqn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({},{})", self.card, self.domain)
@@ -313,19 +397,12 @@ impl ApqnList {
     /// Scan AP bus devices in sysfs and construct the Apqnlist.
     ///
     /// The list is a vector of struct Apqn for each APQN found in sysfs
-    /// which is online and the card type matches to the regular expression
-    /// RE_CARD_TYPE.
+    /// that this struct can be created from.
     /// On success a vector of struct Apqn is returned. This list may be
     /// empty if there are no APQNs available or do not match to the conditions.
     /// On failure None is returned.
-    /// Fatal errors which should never happened like unable to compile a
-    /// static regular expression will result in calling panic.
-    /// # Panics
-    /// Panics if the compilation of a static regular expression fails.
     pub fn gather_apqns() -> Option<Self> {
         let mut apqns: Vec<Apqn> = Vec::new();
-        let re_card_type = Regex::new(RE_CARD_TYPE).unwrap();
-        let re_queue_dir = Regex::new(RE_QUEUE_DIR).unwrap();
         let card_dirs =
             match sysfs_get_list_of_subdirs_matching_regex(PATH_SYS_DEVICES_AP, RE_CARD_DIR) {
                 Ok(r) => r,
@@ -339,33 +416,6 @@ impl ApqnList {
             };
         for dir in card_dirs {
             let path = format!("{PATH_SYS_DEVICES_AP}/{dir}");
-            let card_type = match read_file_string(format!("{path}/type"), "card type") {
-                Ok(s) => s.trim().to_string(),
-                Err(err) => {
-                    eprintln!("{err}");
-                    return None;
-                }
-            };
-            if !re_card_type.is_match(&card_type) {
-                eprintln!("Failure parsing card type string '{}'.", card_type);
-                return None;
-            }
-            let caps = re_card_type.captures(&card_type).unwrap();
-            let gen = caps.get(1).unwrap().as_str().parse::<u32>().unwrap();
-            let mode = match caps.get(2).unwrap().as_str().parse::<char>().unwrap() {
-                'A' => ApqnMode::Accel,
-                'C' => ApqnMode::Cca,
-                'P' => ApqnMode::Ep11,
-                _ => panic!("Code inconsistence between regex RE_CARD_TYPE and evaluation code."),
-            };
-            if pv_core::misc::pv_guest_bit_set() {
-                // the UV blocks requests to CCA cards within SE guest with
-                // AP pass-through support. However, filter out CCA cards as these
-                // cards cause hangs during information gathering.
-                if mode == ApqnMode::Cca {
-                    continue;
-                }
-            }
             let queue_dirs = match sysfs_get_list_of_subdirs_matching_regex(&path, RE_QUEUE_DIR) {
                 Ok(r) => r,
                 Err(err) => {
@@ -377,71 +427,18 @@ impl ApqnList {
                 }
             };
             for queue_dir in queue_dirs {
-                let ctx = "AP queue online status";
-                let Ok(Ok(1)) = read_file_string(format!("{path}/{queue_dir}/online"), ctx)
-                    .map(|s| s.trim().parse::<i32>())
-                else {
-                    continue;
-                };
-                let caps = re_queue_dir.captures(&queue_dir).unwrap();
-                let cardstr = caps.get(1).unwrap().as_str();
-                let card = u32::from_str_radix(cardstr, 16).unwrap();
-                let domstr = caps.get(2).unwrap().as_str();
-                let dom = u32::from_str_radix(domstr, 16).unwrap();
-                // For the mpvk and serialnr to fetch from the APQN within a SE
-                // guest the APQN needs to be bound to the guest. So if the APQN
-                // is not bound, temporarily bind it here until the info has
-                // been retrieved.
-                let mut tempbound = false;
-                if pv_core::misc::pv_guest_bit_set() {
-                    let cbs = match get_apqn_bind_state(card, dom) {
-                        Ok(bs) => bs,
-                        Err(err) => {
-                            eprintln!(
-                                "Error: Failure reading APQN ({},{}) bind state: {}",
-                                card, dom, err
-                            );
-                            BindState::NotSupported
-                        }
-                    };
-                    if cbs == BindState::Unbound {
-                        let r = set_apqn_bind_state(card, dom, BindState::Bound);
-                        if r.is_err() {
-                            eprintln!(
-                                "Warning: Failure to temp. bind APQN ({},{}): {}",
-                                card,
-                                dom,
-                                r.unwrap_err()
-                            );
-                            continue;
-                        } else {
-                            tempbound = true;
-                        }
-                    };
-                };
-                let info = match ApqnInfo::info(&mode, &path, &queue_dir) {
-                    Err(err) => {
-                        // print the error but continue with info set to None
-                        eprintln!(
-                            "Warning: Failure to gather info for APQN ({},{}): {}",
-                            card, dom, err
-                        );
-                        None
-                    }
-                    Ok(i) => Some(i),
-                };
-                if tempbound {
-                    let r = set_apqn_bind_state(card, dom, BindState::Unbound);
-                    if r.is_err() {
-                        eprintln!(
-                            "Warning: Failure to unbind temp. bound APQN ({},{}): {}",
-                            card,
-                            dom,
-                            r.unwrap_err()
-                        );
+                let apqn: Apqn = match (&queue_dir as &str).try_into() {
+                    Ok(apqn) => apqn,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        continue;
                     }
                 };
-                if let Some(ApqnInfo::Cca(ref cca_info)) = info {
+                // Warn about non-fatal errors
+                if apqn.info.is_none() {
+                    eprintln!("Warning: Failure gathering info for APQN {queue_dir}");
+                }
+                if let Some(ApqnInfo::Cca(ref cca_info)) = apqn.info {
                     if cca_info.mkvp_aes.is_empty() {
                         eprintln!("Warning: APQN {queue_dir} has no valid AES master key set.");
                     }
@@ -449,19 +446,12 @@ impl ApqnList {
                         eprintln!("Warning: APQN {queue_dir} has no valid APKA master key set.");
                     }
                 }
-                if let Some(ApqnInfo::Ep11(ref ep11_info)) = info {
+                if let Some(ApqnInfo::Ep11(ref ep11_info)) = apqn.info {
                     if ep11_info.mkvp.is_empty() {
                         eprintln!("Warning: APQN {queue_dir} has no valid wrapping key set.");
                     }
                 }
-                apqns.push(Apqn {
-                    name: queue_dir.clone(),
-                    card,
-                    domain: dom,
-                    gen,
-                    mode: mode.clone(),
-                    info,
-                });
+                apqns.push(apqn);
             }
         }
         Some(Self(apqns))
