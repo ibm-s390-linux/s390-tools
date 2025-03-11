@@ -164,13 +164,7 @@ impl ApqnInfo {
             ));
         } else {
             let caps = re_cca_aes_mkvp.captures(&mkvps).unwrap();
-            let valid = caps.get(1).unwrap().as_str().to_lowercase();
-            if valid != "valid" {
-                eprintln!(
-                    "Warning: APQN {} has no valid AES master key set.",
-                    queuedir
-                );
-            } else {
+            if caps.get(1).unwrap().as_str().to_lowercase() == "valid" {
                 aes_mkvp = caps.get(2).unwrap().as_str().to_lowercase();
                 if aes_mkvp.starts_with("0x") {
                     aes_mkvp = String::from(&aes_mkvp[2..]);
@@ -186,13 +180,7 @@ impl ApqnInfo {
             ));
         } else {
             let caps = re_cca_apka_mkvp.captures(&mkvps).unwrap();
-            let valid = caps.get(1).unwrap().as_str().to_lowercase();
-            if valid != "valid" {
-                eprintln!(
-                    "Warning: APQN {} has no valid APKA master key set.",
-                    queuedir
-                );
-            } else {
+            if caps.get(1).unwrap().as_str().to_lowercase() == "valid" {
                 apka_mkvp = caps.get(2).unwrap().as_str().to_lowercase();
                 if apka_mkvp.starts_with("0x") {
                     apka_mkvp = String::from(&apka_mkvp[2..]);
@@ -221,10 +209,7 @@ impl ApqnInfo {
             ));
         } else {
             let caps = re_ep11_mkvp.captures(&mkvps).unwrap();
-            let valid = caps.get(1).unwrap().as_str().to_lowercase();
-            if valid != "valid" {
-                eprintln!("Warning: APQN {} has no valid wrapping key set.", queuedir);
-            } else {
+            if caps.get(1).unwrap().as_str().to_lowercase() == "valid" {
                 mkvp = caps.get(2).unwrap().as_str().to_lowercase();
                 if mkvp.starts_with("0x") {
                     mkvp = String::from(&mkvp[2..]);
@@ -456,6 +441,19 @@ impl ApqnList {
                         );
                     }
                 };
+                if let Some(ApqnInfo::Cca(ref cca_info)) = info {
+                    if cca_info.mkvp_aes.is_empty() {
+                        eprintln!("Warning: APQN {queue_dir} has no valid AES master key set.");
+                    }
+                    if cca_info.mkvp_apka.is_empty() {
+                        eprintln!("Warning: APQN {queue_dir} has no valid APKA master key set.");
+                    }
+                }
+                if let Some(ApqnInfo::Ep11(ref ep11_info)) = info {
+                    if ep11_info.mkvp.is_empty() {
+                        eprintln!("Warning: APQN {queue_dir} has no valid wrapping key set.");
+                    }
+                }
                 apqns.push(Apqn {
                     name: queue_dir.clone(),
                     card,
