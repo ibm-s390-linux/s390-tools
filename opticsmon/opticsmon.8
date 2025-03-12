@@ -16,6 +16,19 @@
 .  if !'\\$1'' .IP "\fB\-\-\\$1\fP \\*[args]" 4
 .  PD
 ..
+.\" Macro for inserting code line.
+.\" .CL <text>
+.de CL
+.  ds pfont \fP
+.  nh
+.  na
+.  ft CW
+\\$*
+.  ft \\*[pfont]
+.  ad
+.  hy
+.  br
+..
 .
 .TH opticsmon 8 "Oct 2024" s390-tools zpcictl
 .
@@ -67,8 +80,7 @@ on".
 
 .B Example: Extract module information for the first adapter
 
-.CL
-opticsmon --module-info | jq -r '.adapters[0].netdevs[0].optics.module_info' | base64 -d | hexdump -C
+.CL opticsmon --module-info | jq -r '.adapters[0].netdevs[0].optics.module_info' | base64 -d | hexdump -C
 .PP
 .PP
 .
