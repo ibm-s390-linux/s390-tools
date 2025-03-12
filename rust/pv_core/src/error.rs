@@ -77,6 +77,36 @@ pub enum Error {
     )]
     InvalidRetrievableSecretType { id: SecretId, size: usize },
 
+    #[error("Unknown bind state '{0}'.")]
+    UnknownBindState(String),
+
+    #[error("Unknown association state '{0}'.")]
+    UnknownAssocState(String),
+
+    #[error(
+        "APQN({card:02x},{domain:04x}) is associated with {actual} but it should be {desired}."
+    )]
+    WrongAssocState {
+        card: u32,
+        domain: u32,
+        desired: u16,
+        actual: u16,
+    },
+
+    #[error("Timeout on {0}.")]
+    Timeout(String),
+
+    #[error(
+        "CCA card {0:02x} cannot be used with Secure Execution, as this combination is unsupported"
+    )]
+    CcaSeIncompatible(u32),
+
+    #[error("APQN({card:02x}{domain:04x}) is offline.")]
+    ApOffline { card: u32, domain: u32 },
+
+    #[error("Failure parsing {subject} '{content}'.")]
+    ParseError { subject: String, content: String },
+
     // errors from other crates
     #[error(transparent)]
     Io(#[from] std::io::Error),

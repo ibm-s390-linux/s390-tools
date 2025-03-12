@@ -6,7 +6,10 @@
 //
 
 use crate::helper::*;
-use pv_core::misc::{read_file_string, write_file};
+use pv_core::{
+    misc::{read_file_string, write_file},
+    Error,
+};
 use regex::Regex;
 use std::fmt;
 use std::path::Path;
@@ -144,24 +147,28 @@ pub enum ApqnInfo {
     Cca(ApqnInfoCca),
 }
 
+macro_rules! parse_error {
+    ($subject:expr, $content:expr) => {
+        Error::ParseError {
+            subject: $subject,
+            content: $content,
+        }
+    };
+}
+
 impl ApqnInfo {
-    fn accel_info(_carddir: &str, _queuedir: &str) -> Result<Self, String> {
+    fn accel_info(_carddir: &str, _queuedir: &str) -> pv_core::Result<Self> {
         Ok(Self::Accel(ApqnInfoAccel {}))
     }
 
-    fn cca_info(carddir: &str, queuedir: &str) -> Result<Self, String> {
-        let serialnr_str = read_file_string(format!("{carddir}/serialnr"), "serialnr")
-            .map_err(|e| e.to_string())?;
+    fn cca_info(carddir: &str, queuedir: &str) -> pv_core::Result<Self> {
+        let serialnr_str = read_file_string(format!("{carddir}/serialnr"), "serialnr")?;
         let serialnr = serialnr_str.trim().to_string();
-        let mkvps = read_file_string(format!("{carddir}/{queuedir}/mkvps"), "mkvps")
-            .map_err(|e| e.to_string())?;
+        let mkvps = read_file_string(format!("{carddir}/{queuedir}/mkvps"), "mkvps")?;
         let mut aes_mkvp = String::new();
         let re_cca_aes_mkvp = Regex::new(RE_CCA_AES_MKVP).unwrap();
         if !re_cca_aes_mkvp.is_match(&mkvps) {
-            return Err(format!(
-                "APQN {} failure parsing mkvps string '{}'.",
-                queuedir, mkvps
-            ));
+            return Err(parse_error!(format!("APQN {queuedir} MKVPs"), mkvps));
         } else {
             let caps = re_cca_aes_mkvp.captures(&mkvps).unwrap();
             if caps.get(1).unwrap().as_str().to_lowercase() == "valid" {
@@ -174,10 +181,7 @@ impl ApqnInfo {
         let mut apka_mkvp = String::new();
         let re_cca_apka_mkvp = Regex::new(RE_CCA_APKA_MKVP).unwrap();
         if !re_cca_apka_mkvp.is_match(&mkvps) {
-            return Err(format!(
-                "APQN {} failure parsing mkvps string '{}'.",
-                queuedir, mkvps
-            ));
+            return Err(parse_error!(format!("APQN {queuedir} MKVPs"), mkvps));
         } else {
             let caps = re_cca_apka_mkvp.captures(&mkvps).unwrap();
             if caps.get(1).unwrap().as_str().to_lowercase() == "valid" {
@@ -194,19 +198,14 @@ impl ApqnInfo {
         }))
     }
 
-    fn ep11_info(carddir: &str, queuedir: &str) -> Result<Self, String> {
-        let serialnr_str = read_file_string(format!("{carddir}/serialnr"), "serialnr")
-            .map_err(|e| e.to_string())?;
+    fn ep11_info(carddir: &str, queuedir: &str) -> pv_core::Result<Self> {
+        let serialnr_str = read_file_string(format!("{carddir}/serialnr"), "serialnr")?;
         let serialnr = serialnr_str.trim().to_string();
-        let mkvps = read_file_string(format!("{carddir}/{queuedir}/mkvps"), "mkvps")
-            .map_err(|e| e.to_string())?;
+        let mkvps = read_file_string(format!("{carddir}/{queuedir}/mkvps"), "mkvps")?;
         let mut mkvp = String::new();
         let re_ep11_mkvp = Regex::new(RE_EP11_MKVP).unwrap();
         if !re_ep11_mkvp.is_match(&mkvps) {
-            return Err(format!(
-                "APQN {} failure parsing mkvps string '{}'.",
-                queuedir, mkvps
-            ));
+            return Err(parse_error!(format!("APQN {queuedir} MKVPs"), mkvps));
         } else {
             let caps = re_ep11_mkvp.captures(&mkvps).unwrap();
             if caps.get(1).unwrap().as_str().to_lowercase() == "valid" {
@@ -223,7 +222,7 @@ impl ApqnInfo {
     }
 
     /// Get mode-specific info
-    pub fn info(mode: &ApqnMode, carddir: &str, queuedir: &str) -> Result<Self, String> {
+    pub fn info(mode: &ApqnMode, carddir: &str, queuedir: &str) -> pv_core::Result<Self> {
         match mode {
             ApqnMode::Accel => Self::accel_info(carddir, queuedir),
             ApqnMode::Cca => Self::cca_info(carddir, queuedir),
@@ -251,7 +250,7 @@ pub struct Apqn {
 }
 
 impl TryFrom<&str> for Apqn {
-    type Error = String;
+    type Error = Error;
 
     /// Create an `Apqn` struct from a CARD.DOMAIN-formatted APQN
     /// string, such as `28.0014`. Will not populate `info` upon
@@ -262,25 +261,24 @@ impl TryFrom<&str> for Apqn {
     /// or a regex capture that is already format-checked does not
     /// parse, e.g. when the capture `([[:xdigit:]]{2})` does not
     /// parse as hex string.
-    fn try_from(name: &str) -> Result<Self, String> {
+    fn try_from(name: &str) -> pv_core::Result<Self> {
         let re_card_type = Regex::new(RE_CARD_TYPE).unwrap();
         let re_queue_dir = Regex::new(RE_QUEUE_DIR).unwrap();
 
         let caps = re_queue_dir
             .captures(name)
-            .ok_or_else(|| format!("Failure parsing queue string '{name}'."))?;
+            .ok_or_else(|| parse_error!("queue".to_string(), name.to_string()))?;
         let cardstr = caps.get(1).unwrap().as_str();
         let card = u32::from_str_radix(cardstr, 16).unwrap();
         let domstr = caps.get(2).unwrap().as_str();
         let domain = u32::from_str_radix(domstr, 16).unwrap();
 
         let path = format!("{PATH_SYS_DEVICES_AP}/card{cardstr}");
-        let card_type = read_file_string(format!("{path}/type"), "card type")
-            .map(|s| s.trim().to_string())
-            .map_err(|e| e.to_string())?;
+        let card_type =
+            read_file_string(format!("{path}/type"), "card type").map(|s| s.trim().to_string())?;
         let caps = re_card_type
             .captures(&card_type)
-            .ok_or_else(|| format!("Failure parsing card type string '{card_type}'."))?;
+            .ok_or_else(|| parse_error!("card type".to_string(), card_type.to_string()))?;
         let gen = caps.get(1).unwrap().as_str().parse::<u32>().unwrap();
         let mode = match caps.get(2).unwrap().as_str().parse::<char>().unwrap() {
             'A' => ApqnMode::Accel,
@@ -292,16 +290,14 @@ impl TryFrom<&str> for Apqn {
         // pass-through support. However, filter out CCA cards as
         // these cards cause hangs during information gathering.
         if mode == ApqnMode::Cca && pv_core::misc::pv_guest_bit_set() {
-            return Err(format!(
-                "CCA card {cardstr} cannot be used with Secure Execution, as this combination is unsupported."
-            ));
+            return Err(Error::CcaSeIncompatible(card));
         }
 
         match read_file_string(format!("{path}/{name}/online"), "AP queue online status")
             .map(|s| s.trim().parse::<i32>())
         {
             Ok(Ok(1)) => {}
-            _ => return Err(format!("{name} is offline.")),
+            _ => return Err(Error::ApOffline { card, domain }),
         }
         // For the MKVP and serialnr to fetch from the APQN within a SE
         // guest the APQN needs to be bound to the guest. So if the APQN
@@ -309,18 +305,15 @@ impl TryFrom<&str> for Apqn {
         // been retrieved.
         let mut tempbound = false;
         if pv_core::misc::pv_guest_bit_set() {
-            let cbs = get_apqn_bind_state(card, domain)
-                .map_err(|e| format!("Failure reading APQN {name} bind state: {e}"))?;
+            let cbs = get_apqn_bind_state(card, domain)?;
             if cbs == BindState::Unbound {
-                set_apqn_bind_state(card, domain, BindState::Bound)
-                    .map_err(|e| format!("Failure temporarily binding APQN {name}: {e}"))?;
+                set_apqn_bind_state(card, domain, BindState::Bound)?;
                 tempbound = true;
             }
         }
         let info = ApqnInfo::info(&mode, &path, name).ok();
         if tempbound {
-            set_apqn_bind_state(card, domain, BindState::Unbound)
-                .map_err(|e| format!("Failure unbinding temporarily bound APQN {name}: {e}"))?;
+            set_apqn_bind_state(card, domain, BindState::Unbound)?;
         }
 
         Ok(Apqn {
@@ -342,22 +335,22 @@ impl fmt::Display for Apqn {
 
 impl Apqn {
     /// Read bind state of the APQN.
-    pub fn bind_state(&self) -> Result<BindState, String> {
+    pub fn bind_state(&self) -> pv_core::Result<BindState> {
         get_apqn_bind_state(self.card, self.domain)
     }
 
     /// Set bind state of the APQN.
-    pub fn set_bind_state(&self, state: BindState) -> Result<(), String> {
+    pub fn set_bind_state(&self, state: BindState) -> pv_core::Result<()> {
         set_apqn_bind_state(self.card, self.domain, state)
     }
 
     /// Read associate state of the APQN.
-    pub fn associate_state(&self) -> Result<AssocState, String> {
+    pub fn associate_state(&self) -> pv_core::Result<AssocState> {
         get_apqn_associate_state(self.card, self.domain)
     }
 
     /// Set associate state of the APQN.
-    pub fn set_associate_state(&self, state: AssocState) -> Result<(), String> {
+    pub fn set_associate_state(&self, state: AssocState) -> pv_core::Result<()> {
         set_apqn_associate_state(self.card, self.domain, state)
     }
 }
@@ -515,18 +508,18 @@ pub enum BindState {
 ///
 /// Returns a BindState enum as defined above or on failure
 /// an error string. Does NOT print any error messages.
-pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState, String> {
+pub fn get_apqn_bind_state(card: u32, dom: u32) -> pv_core::Result<BindState> {
     let path = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let state_str = read_file_string(path, "se_bind attribute").map_err(|e| e.to_string())?;
+    let state_str = read_file_string(path, "se_bind attribute")?;
     let state = state_str.trim();
     match state {
         "bound" => Ok(BindState::Bound),
         "unbound" => Ok(BindState::Unbound),
         "-" => Ok(BindState::NotSupported),
-        _ => Err(format!("Unknown bind state '{state}'.")),
+        _ => Err(Error::UnknownBindState(state.to_string())),
     }
 }
 
@@ -542,34 +535,25 @@ pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState, String> {
 /// is returned. Does NOT print any error messages.
 /// # Panics
 /// Panics if a desired bind state other than Bound or Unbound is given.
-pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> Result<(), String> {
+pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> pv_core::Result<()> {
     let ctx = "bind APQN";
     let path = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let r = match state {
+    match state {
         BindState::Bound => write_file(path, 1.to_string(), ctx),
         BindState::Unbound => write_file(path, 0.to_string(), ctx),
         _ => panic!("set_apqn_bind_state called with invalid BindState."),
-    };
-    if r.is_err() {
-        return Err(format!(
-            "Failure writing se_bind attribute for APQN({},{}): {:?}.",
-            card,
-            dom,
-            r.unwrap_err()
-        ));
-    }
+    }?;
     let mut ms: u64 = 0;
     loop {
         thread::sleep(time::Duration::from_millis(SYS_BUS_AP_BIND_POLL_MS));
         ms += SYS_BUS_AP_BIND_POLL_MS;
         if ms >= SYS_BUS_AP_BIND_TIMEOUT_MS {
-            break Err(format!(
-                "Timeout setting APQN({},{}) bind state.",
-                card, dom
-            ));
+            break Err(Error::Timeout(format!(
+                "setting APQN({card},{dom}) bind state"
+            )));
         }
         let newstate = get_apqn_bind_state(card, dom)?;
         if newstate == state {
@@ -595,90 +579,68 @@ pub enum AssocState {
 ///
 /// Returns an AssocState enum as defined above or on failure
 /// an error string. Does NOT print any error messages.
-pub fn get_apqn_associate_state(card: u32, dom: u32) -> Result<AssocState, String> {
+pub fn get_apqn_associate_state(card: u32, dom: u32) -> pv_core::Result<AssocState> {
     let path = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_associate",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let state_str = read_file_string(path, "se_associate attribute").map_err(|e| e.to_string())?;
+    let state_str = read_file_string(path, "se_associate attribute")?;
     let state = state_str.trim();
-    if let Some(prefix) = state.strip_prefix("associated ") {
-        let value = &prefix.parse::<u16>();
-        match value {
-            Ok(v) => Ok(AssocState::Associated(*v)),
-            Err(_) => Err(format!("Invalid association index in '{state}'.")),
-        }
-    } else {
-        match state {
+    match state.strip_prefix("associated ") {
+        Some(prefix) => Ok(AssocState::Associated(prefix.parse()?)),
+        _ => match state {
             "association pending" => Ok(AssocState::AssociationPending),
             "unassociated" => Ok(AssocState::Unassociated),
             "-" => Ok(AssocState::NotSupported),
-            _ => Err(format!("Unknown association state '{state}'.")),
-        }
+            _ => Err(Error::UnknownAssocState(state.to_string())),
+        },
     }
 }
 
-fn set_apqn_associate_state_associate(card: u32, dom: u32, idx: u16) -> Result<(), String> {
+fn set_apqn_associate_state_associate(card: u32, dom: u32, idx: u16) -> pv_core::Result<()> {
     let path = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_associate",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let r = write_file(path, idx.to_string(), "associate APQN");
-    if r.is_err() {
-        return Err(format!(
-            "Failure writing se_associate attribute for APQN({},{}): {:?}.",
-            card,
-            dom,
-            r.unwrap_err()
-        ));
-    }
+    write_file(path, idx.to_string(), "associate APQN")?;
     let mut ms: u64 = 0;
     loop {
         thread::sleep(time::Duration::from_millis(SYS_BUS_AP_ASSOC_POLL_MS));
         ms += SYS_BUS_AP_ASSOC_POLL_MS;
         if ms >= SYS_BUS_AP_ASSOC_TIMEOUT_MS {
-            break Err(format!(
-                "Timeout setting APQN({},{}) association idx {} state.",
-                card, dom, idx
-            ));
+            break Err(Error::Timeout(format!(
+                "setting APQN({card},{dom}) association index {idx} state",
+            )));
         }
-        let newstate = get_apqn_associate_state(card, dom)?;
-        if let AssocState::Associated(i) = newstate {
-            if idx == i {
-                return Ok(());
-            } else {
-                return Err(format!(
-                    "Failure: APQN({},{}) is associated with {} but it should be {}.",
-                    card, dom, i, idx
-                ));
+        match get_apqn_associate_state(card, dom)? {
+            AssocState::Associated(i) if i == idx => return Ok(()),
+            AssocState::Associated(i) => {
+                return Err(Error::WrongAssocState {
+                    card,
+                    domain: dom,
+                    desired: idx,
+                    actual: i,
+                })
             }
+            _ => {}
         }
     }
 }
 
-fn set_apqn_associate_state_unbind(card: u32, dom: u32) -> Result<(), String> {
+fn set_apqn_associate_state_unbind(card: u32, dom: u32) -> pv_core::Result<()> {
     let bindpath = format!(
         "{}/card{:02x}/{:02x}.{:04x}/se_bind",
         PATH_SYS_DEVICES_AP, card, card, dom
     );
-    let r = write_file(bindpath, 0.to_string(), "unbind APQN");
-    if r.is_err() {
-        return Err(format!(
-            "Failure writing se_bind attribute for APQN({},{}): {:?}.",
-            card,
-            dom,
-            r.unwrap_err()
-        ));
-    }
+    write_file(bindpath, 0.to_string(), "unbind APQN")?;
     let mut ms: u64 = 0;
     loop {
         thread::sleep(time::Duration::from_millis(SYS_BUS_AP_ASSOC_POLL_MS));
         ms += SYS_BUS_AP_ASSOC_POLL_MS;
         if ms >= SYS_BUS_AP_ASSOC_TIMEOUT_MS {
-            break Err(format!(
-                "Timeout setting APQN({},{}) association unbind state.",
-                card, dom
-            ));
+            break Err(Error::Timeout(format!(
+                "setting APQN({card},{dom}) association unbind state",
+            )));
         }
         let newstate = get_apqn_associate_state(card, dom)?;
         if newstate == AssocState::Unassociated {
@@ -703,7 +665,7 @@ fn set_apqn_associate_state_unbind(card: u32, dom: u32) -> Result<(), String> {
 /// # Panics
 /// Panics if a desired bind state other than Associated or
 /// Unassociated is given.
-pub fn set_apqn_associate_state(card: u32, dom: u32, state: AssocState) -> Result<(), String> {
+pub fn set_apqn_associate_state(card: u32, dom: u32, state: AssocState) -> pv_core::Result<()> {
     match state {
         AssocState::Associated(idx) => set_apqn_associate_state_associate(card, dom, idx),
         AssocState::Unassociated => set_apqn_associate_state_unbind(card, dom),
