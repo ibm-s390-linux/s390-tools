@@ -1,14 +1,13 @@
-.\" Copyright 2024 IBM Corp.
+.\" Copyright 2024, 2025 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-perform 1 "2024-11-18" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-PERFORM" "1" "2025-03-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
-\fBpvattest perform\fP - Send the attestation request to the Ultravisor
-\fB
+pvattest-perform \- Send the attestation request to the Ultravisor
 .SH SYNOPSIS
 .nf
 .fam C
@@ -35,9 +34,9 @@ Write the result to FILE.
 .RE
 
 .PP
-\-u, \-\-user-data <File>
+\-u, \-\-user\-data <File>
 .RS 4
-Provide up to 256 bytes of user input User-data is arbitrary user-defined data
+Provide up to 256 bytes of user input User\-data is arbitrary user\-defined data
 appended to the Attestation measurement. It is verified during the Attestation
 measurement verification. May be any arbitrary data, as long as it is less or
 equal to 256 bytes
@@ -46,7 +45,7 @@ equal to 256 bytes
 .PP
 \-h, \-\-help
 .RS 4
-Print help (see a summary with '-h').
+Print help (see a summary with \fB\-h\fR).
 .RE
 .RE
 

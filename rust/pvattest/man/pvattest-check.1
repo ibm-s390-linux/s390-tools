@@ -1,14 +1,13 @@
-.\" Copyright 2024 IBM Corp.
+.\" Copyright 2024, 2025 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-check 1 "2024-12-05" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-CHECK" "1" "2025-03-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
-\fBpvattest check\fP - Check if the attestation result matches defined policies
-\fB
+pvattest-check \- Check if the attestation result matches defined policies
 .SH SYNOPSIS
 .nf
 .fam C
@@ -17,7 +16,7 @@ pvattest check [OPTIONS] <IN> <OUT>
 .fi
 .SH DESCRIPTION
 After the attestation verification, check whether the attestation result
-complies with user-defined policies.
+complies with user\-defined policies.
 .SH OPTIONS
 .PP
 <IN>
@@ -40,37 +39,37 @@ Define the output format.
 
 Possible values:
 .RS 4
-- \fByaml\fP: Use yaml format.
+\- \fByaml\fP: Use yaml format.
 
 .RE
 .RE
 .PP
-\-k, \-\-host-key-document <FILE>
+\-k, \-\-host\-key\-document <FILE>
 .RS 4
-Use FILE to check for a host-key document. Verifies that the attestation
-response contains the host-key hash of one of the specified host keys. The check
-fails if none of the host-keys match the hash in the response. This parameter
-can be specified multiple times.
+Use FILE to check for a host\-key document. Verifies that the attestation
+response contains the host\-key hash of one of the specified host keys. The
+check fails if none of the host\-keys match the hash in the response. This
+parameter can be specified multiple times.
 .RE
 .RE
 .PP
-\-\-host-key-check <HOST_KEY_CHECKS>
+\-\-host\-key\-check <HOST_KEY_CHECKS>
 .RS 4
-Define the host-key check policy By default, all host-key hashes are checked,
+Define the host\-key check policy By default, all host\-key hashes are checked,
 and it is not considered a failure if a hash is missing from the attestation
 response. Use this policy switch to trigger a failure if no corresponding hash
-is found. Requires at least one host-key document.
+is found. Requires at least one host\-key document.
 
 Possible values:
 .RS 4
-- \fBatt-key-hash\fP: Check the host-key used for the attestation request.
+\- \fBatt-key-hash\fP: Check the host-key used for the attestation request.
 
-- \fBboot-key-hash\fP: Check the host-key used to the boot the image.
+\- \fBboot-key-hash\fP: Check the host-key used to the boot the image.
 
 .RE
 .RE
 .PP
-\-u, \-\-user-data <FILE>
+\-u, \-\-user\-data <FILE>
 .RS 4
 Check if the provided user data matches the data from the attestation response.
 .RE
@@ -78,23 +77,23 @@ Check if the provided user data matches the data from the attestation response.
 .PP
 \-\-secret <FILE>
 .RS 4
-Use FILE to include as successful Add-secret request. Checks if the Attestation
-response contains the hash of all specified add secret requests-tags. The hash
+Use FILE to include as successful Add\-secret request. Checks if the Attestation
+response contains the hash of all specified add secret requests\-tags. The hash
 is sensible to the order in which the secrets where added. This means that if
-the order of adding here different from the order the add-secret requests where
+the order of adding here different from the order the add\-secret requests where
 sent to the UV this check will fail even though the same secrets are included in
 the UV secret store. Can be specified multiple times.
 .RE
 .RE
 .PP
-\-\-secret-store-locked <BOOL>
+\-\-secret\-store\-locked <BOOL>
 .RS 4
 Check whether the guests secret store is locked or not. Compares the hash of the
 secret store state to the one calculated by this option and optionally specified
-add-secret-requests in the correct order. If the attestation response does not
+add\-secret\-requests in the correct order. If the attestation response does not
 contain a secret store hash, this check fails.
 
-Required if add-secret-requests are specified.
+Required if add\-secret\-requests are specified.
 .RE
 .RE
 .PP
@@ -104,16 +103,16 @@ Check whether the firmware is supported by IBM. Requires internet access.
 .RE
 .RE
 .PP
-\-\-firmware-verify-url <URL>
+\-\-firmware\-verify\-url <URL>
 .RS 4
 Specify the endpoint to use for firmware version verification. Use an endpoint
-you trust. Requires the \fB--firmware\fR option.
+you trust. Requires the \-\-firmware option.
 .RE
 .RE
 .PP
 \-h, \-\-help
 .RS 4
-Print help (see a summary with '-h').
+Print help (see a summary with \fB\-h\fR).
 .RE
 .RE
 

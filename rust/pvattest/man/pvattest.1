@@ -1,14 +1,13 @@
-.\" Copyright 2024 IBM Corp.
+.\" Copyright 2024, 2025 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest 1 "2024-11-18" "s390-tools" "Attestation Manual"
+.TH "PVATTEST" "1" "2025-03-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
-\fBpvattest\fP - create, perform, and verify attestation measurements
-\fB
+pvattest \- create, perform, and verify attestation measurements
 .SH SYNOPSIS
 .nf
 .fam C
@@ -21,28 +20,28 @@ guest systems.
 .SH "PVATTEST COMMANDS"
 .PP
 
-\fBcreate\fR
+\fBpvattest-create(1)\fR
 .RS 4
 Create an attestation measurement request
 .RE
 
 .PP
 
-\fBperform\fR
+\fBpvattest-perform(1)\fR
 .RS 4
 Send the attestation request to the Ultravisor
 .RE
 
 .PP
 
-\fBverify\fR
+\fBpvattest-verify(1)\fR
 .RS 4
 Verify an attestation response
 .RE
 
 .PP
 
-\fBcheck\fR
+\fBpvattest-check(1)\fR
 .RS 4
 Check if the attestation result matches defined policies
 .RE
@@ -69,7 +68,7 @@ Print version information and exit.
 .PP
 \-h, \-\-help
 .RS 4
-Print help (see a summary with '-h').
+Print help (see a summary with \fB\-h\fR).
 .RE
 .RE
 

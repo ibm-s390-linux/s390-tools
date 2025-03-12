@@ -1,14 +1,13 @@
-.\" Copyright 2024 IBM Corp.
+.\" Copyright 2024, 2025 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-verify 1 "2024-12-05" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-VERIFY" "1" "2025-03-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
-\fBpvattest verify\fP - Verify an attestation response
-\fB
+pvattest-verify \- Verify an attestation response
 .SH SYNOPSIS
 .nf
 .fam C
@@ -62,23 +61,23 @@ Define the output format.
 
 Possible values:
 .RS 4
-- \fByaml\fP: Use yaml format.
+\- \fByaml\fP: Use yaml format.
 
 .RE
 .RE
 .PP
-\-u, \-\-user-data <FILE>
+\-u, \-\-user\-data <FILE>
 .RS 4
 Write the user data to the FILE if any. Writes the user data, if the response
-contains any, to FILE The user-data is part of the attestation measurement. If
-the user-data is written to FILE the user-data was part of the measurement and
-verified. Emits a warning if the response contains no user-data.
+contains any, to FILE The user\-data is part of the attestation measurement. If
+the user\-data is written to FILE the user\-data was part of the measurement and
+verified. Emits a warning if the response contains no user\-data.
 .RE
 .RE
 .PP
 \-h, \-\-help
 .RS 4
-Print help (see a summary with '-h').
+Print help (see a summary with \fB\-h\fR).
 .RE
 .RE
 

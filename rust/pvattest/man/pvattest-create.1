@@ -1,14 +1,13 @@
-.\" Copyright 2024 IBM Corp.
+.\" Copyright 2024, 2025 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH pvattest-create 1 "2024-12-05" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-CREATE" "1" "2025-03-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
-\fBpvattest create\fP - Create an attestation measurement request
-\fB
+pvattest-create \- Create an attestation measurement request
 .SH SYNOPSIS
 .nf
 .fam C
@@ -20,28 +19,28 @@ Create attestation measurement requests to attest an IBM Secure Execution guest.
 Only build attestation requests in a trusted environment such as your
 Workstation. To avoid compromising the attestation do not publish the
 attestation request protection key and shred it after verification. Every
-'create' will generate a new, random protection key.
+\fBcreate\fR will generate a new, random protection key.
 .SH OPTIONS
 .PP
-\-k, \-\-host-key-document <FILE>
+\-k, \-\-host\-key\-document <FILE>
 .RS 4
-Use FILE as a host-key document. Can be specified multiple times and must be
+Use FILE as a host\-key document. Can be specified multiple times and must be
 specified at least once.
 .RE
 .RE
 .PP
-\-\-no-verify
+\-\-no\-verify
 .RS 4
-Disable the host-key document verification. Does not require the host-key
+Disable the host\-key document verification. Does not require the host\-key
 documents to be valid. Do not use for a production request unless you verified
-the host-key document beforehand.
+the host\-key document beforehand.
 .RE
 .RE
 .PP
 \-C, \-\-cert <FILE>
 .RS 4
-Use FILE as a certificate to verify the host-key or keys. The certificates are
-used to establish a chain of trust for the verification of the host-key
+Use FILE as a certificate to verify the host\-key or keys. The certificates are
+used to establish a chain of trust for the verification of the host\-key
 documents. Specify this option twice to specify the IBM Z signing key and the
 intermediate CA certificate (signed by the root CA).
 .RE
@@ -61,11 +60,11 @@ Make no attempt to download CRLs.
 .RE
 .RE
 .PP
-\-\-root-ca <ROOT_CA>
+\-\-root\-ca <ROOT_CA>
 .RS 4
-Use FILE as the root-CA certificate for the verification. If omitted, the system
-wide-root CAs installed on the system are used. Use this only if you trust the
-specified certificate.
+Use FILE as the root\-CA certificate for the verification. If omitted, the
+system wide\-root CAs installed on the system are used. Use this only if you
+trust the specified certificate.
 .RE
 .RE
 .PP
@@ -77,12 +76,12 @@ Write the generated request to FILE.
 .PP
 \-a, \-\-arpk <FILE>
 .RS 4
-Save the protection key as unencrypted GCM-AES256 key in FILE Do not publish
+Save the protection key as unencrypted GCM\-AES256 key in FILE Do not publish
 this key, otherwise your attestation is compromised.
 .RE
 .RE
 .PP
-\-\-add-data <FLAGS>
+\-\-add\-data <FLAGS>
 .RS 4
 Specify additional data for the request. Additional data is provided by the
 Ultravisor and returned during the attestation request and is covered by the
@@ -90,20 +89,20 @@ attestation measurement. Can be specified multiple times. Optional.
 
 Possible values:
 .RS 4
-- \fBphkh-img\fP: Request the public host-key-hash of the key that decrypted the SE-image as additional-data.
+\- \fBphkh-img\fP: Request the public host-key-hash of the key that decrypted the SE-image as additional-data.
 
-- \fBphkh-att\fP: Request the public host-key-hash of the key that decrypted the attestation request as additional-data.
+\- \fBphkh-att\fP: Request the public host-key-hash of the key that decrypted the attestation request as additional-data.
 
-- \fBsecret-store-hash\fP: Request a hash over all successful Add-secret requests and the lock state as additional-data.
+\- \fBsecret-store-hash\fP: Request a hash over all successful Add-secret requests and the lock state as additional-data.
 
-- \fBfirmware-state\fP: Request the state of the firmware as additional-data.
+\- \fBfirmware-state\fP: Request the state of the firmware as additional-data.
 
 .RE
 .RE
 .PP
 \-h, \-\-help
 .RS 4
-Print help (see a summary with '-h').
+Print help (see a summary with \fB\-h\fR).
 .RE
 .RE
 
