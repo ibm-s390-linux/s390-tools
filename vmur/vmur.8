@@ -89,23 +89,18 @@ The file to be read is identified by its spoolid,
 a 4-digit decimal number.
 Use the 'vmur list' command to display information
 about files in the z/VM reader queue.
-.SP
 .SH receive options
-.SP
 The following command options are supported by \fBreceive\fR:
-.SP
 .IP "" 0
 \fB-f or --force\fR
 .IP "" 2
 Specifies that outfile is to be overwritten without displaying any
 confirmation message.
-.SP
 .IP "" 0
 \fB-H or --hold\fR
 .IP "" 2
 Specifies that the reader file to be received shall remain in the reader queue
 after processing. If omitted, the reader file is purged.
-.SP
 .IP "" 0
 \fB-C or --class\fR
 .IP "" 2
@@ -114,13 +109,11 @@ value is a 1-character alphanumeric field whose values can be A through Z, 0
 through 9, or asterisk (*).
 
 If you omit this option, the asterisk (*) is used to receive files of any class.
-.SP
 .IP "" 0
 \fB-d or --device\fR
 .IP "" 2
 Specifies the device node of the virtual reader device.
 If omitted, /dev/vmrdr-0.0.000c is assumed.
-.SP
 .IP "" 0
 \fB-t or --text\fR
 .IP "" 2
@@ -129,7 +122,6 @@ received. Character sets IBM037 and ISO-8859-1 are used for the conversion.
 An ASCII line feed character (0x0a) is inserted for each 80-byte input
 record read from the z/VM reader. Trailing EBCDIC blanks (0x40) in the
 input records are stripped.
-.SP
 .IP "" 0
 \fB-b or --blocked\fR
 .IP "" 2
@@ -146,7 +138,6 @@ The receive function's output can be piped to
 using the appropriate character sets, for example:
 .IP "" 2
 # vmur re 7 -b 0x25,0x40 -O | iconv -f EBCDIC-US -t ISO-8859-1 > file
-.SP
 .IP "" 0
 \fB-c or --convert\fR
 .IP "" 2
@@ -158,24 +149,19 @@ Use
 .BR zgetdump (8)
 to convert VMDUMP files to a format
 appropriate for further analysis with crash.
-.SP
 .IP "" 0
 \fB-O or --stdout\fR
 .IP "" 2
 Specifies that the reader file's contents are written to
 standard output.
-.SP
 .SH receive arguments
-.SP
 The following command arguments are supported by \fBreceive\fR:
-.SP
 .IP "" 0
 \fBspoolid\fR
 .IP "" 2
 Denotes the spoolid, which identifies a z/VM spool file.
 .br
 spoolid is mandatory and must be a decimal number in the range 0-9999.
-.SP
 .IP "" 0
 \fBoutfile\fR
 .IP "" 2
@@ -188,9 +174,7 @@ to be received
 are taken to build output file name name.type.
 If the spool file to be received is an unnamed file, an error message
 is issued.
-.SP
 .SH receive example
-.SP
 Receive the z/VM console of your Linux guest machine. In the 'vmur list' output
 this is an unnamed file with identifier
 CON in the right part of the CLASS column.
@@ -199,7 +183,6 @@ Assume its spoolid is 1234.
 # vmur re -t 1234 linux_console
 .PD
 .IP "" 0
-.SP
 .SH punch or print
 .SS Write file to punch or printer queue
 .IP "" 0
@@ -217,11 +200,8 @@ Use \fBpunch/print\fR when you want to write a file to the z/VM punch or
 printer queue.
 Specify the --rdr option if you want the file to be transferred to the z/VM
 reader queue.
-.SP
 .SH punch/print options
-.SP
 The following command options are supported by \fBpunch/print\fR:
-.SP
 .IP "" 0
 \fB-f or --force\fR
 .IP "" 2
@@ -230,33 +210,28 @@ Specifies to automatically convert Linux input file name (or
 file name and type without any error message.
 Invalid characters are replaced by _(underscore) and both <name> and <type>
 are truncated to a length of maximal 8 characters.
-.SP
 .IP "" 0
 \fB-r or --rdr\fR
 .IP "" 2
 Specifies that the punch or printer file
 is to be transferred to a reader.
-.SP
 .IP "" 0
 \fB-d or --device\fR
 .IP "" 2
 Specifies the device node of the virtual punch or printer device.
 If omitted, /dev/vmpun-0.0.000d is assumed for punch,
 and /dev/vmprt-0.0.000e for printer.
-.SP
 .IP "" 0
 \fB-C or --class\fR
 .IP "" 2
 Specifies the spool file class assigned to the spool files created on this punch
 or print.  The class value is a 1-character alphanumeric field whose values can be
 A through Z and 0 through 9.
-.SP
 .IP "" 0
 \fB--form\fR
 .IP "" 2
 Specifies the form to be assigned to the spool files on this punch or print.
 The value is a 1- to 8-character value.
-.SP
 .IP "" 0
 \fB--dest\fR
 .IP "" 2
@@ -268,7 +243,6 @@ SPOOL command, the default is OFF.  OFF is the initial setting of the
 destination value for virtual devices.   Specify ANY to indicate that the
 resulting spool file can be processed on any CP output device that meets other
 selection criteria, regardless of the device's DEST setting.
-.SP
 .IP "" 0
 \fB--dist\fR
 .IP "" 2
@@ -278,7 +252,6 @@ appears on the separator page.
 
 If OFF or an asterisk (*) is specified, the distribution code of the spool file
 is reset to the distribution code in the system directory.
-.SP
 .IP "" 0
 \fB-t or --text\fR
 .IP "" 2
@@ -289,7 +262,6 @@ and pad each input line with trailing blanks to fill up the unit
 device record. The unit device record length is 80 for a punch and 132
 for a printer. If an input line length exceeds 80 or 132 for punch
 or print, respectively, an error message is issued.
-.SP
 .IP "" 0
 \fB-b or --blocked\fR
 .IP "" 2
@@ -308,7 +280,6 @@ If a line exceeds the record length, an error is printed.
 output can be piped to punch or print, for example:
 .IP "" 2
 # iconv xyz -f ISO-8859-1 -t EBCDIC-US | vmur pun -b 0x25,0x40 -N abc
-.SP
 .IP "" 0
 \fB-u or --user\fR
 .IP "" 2
@@ -321,7 +292,6 @@ The user option
 is only valid, if the -r option has been specified.
 If user is omitted, the data is transferred
 to your own machine's reader.
-.SP
 .IP "" 0
 \fB-n or --node\fR
 .IP "" 2
@@ -333,7 +303,6 @@ The node option
 is only valid, if the -u option has been specified.
 If node is omitted, the data is transferred to the specified user
 at your local z/VM system.
-.SP
 .IP "" 0
 \fB-N or --name\fR
 .IP "" 2
@@ -358,25 +327,19 @@ name rules (e.g. longer than 8 chars).
 .IP "" 4
 - If the Linux input file name is also omitted (that is data is read
 from standard input), then an error message is issued.
-.SP
 .SH punch/print arguments
-.SP
 The following command arguments are supported by \fBpunch/print\fR:
-.SP
 .IP "" 0
 \fBfile\fR
 .IP "" 2
 Specifies the Linux file data to be punched or printed.
 If file is omitted, the data is read from standard input.
-.SP
 .SH punch/print example
-.SP
 Punch parmfile and transfer it to the reader queue.
 .IP "" 2
 $ vmur pun -r /boot/parmfile
 .PD
 .IP "" 0
-.SP
 .SH list
 .SS List file(s) on spool file queue
 .IP "" 0
@@ -388,11 +351,8 @@ Minimum abbreviation: li
 .PP
 Use \fBlist\fR when you want to display information about files on a
 z/VM spool file queue.
-.SP
 .SH list options
-.SP
 The following command option is supported by \fBlist\fR:
-.SP
 .IP "" 0
 \fB-q or --queue\fR
 .IP "" 2
@@ -400,11 +360,8 @@ Specifies the z/VM spool file queue to be listed. Possible values are rdr
 (reader file queue), pun (punch file queue), and prt (printer file queue).
 .br
 If omitted, the reader file queue is assumed.
-.SP
 .SH list arguments
-.SP
 The following command argument is supported by \fBlist\fR:
-.SP
 .IP "" 0
 \fBspoolid\fR
 .IP "" 2
@@ -412,7 +369,6 @@ Identifies the z/VM spool file to be listed.
 If omitted, all spool files on the specified queue are listed
 .PD
 .IP "" 0
-.SP
 .SH purge
 .SS Purge file(s) on spool file queue
 .IP "" 0
@@ -427,17 +383,13 @@ spool files to remove with the class, form, or dest options and the
 spoolid argument.  If these are omitted, all spool files on the specified
 queue are purged.
 \fB
-.SP
 .SH purge options
-.SP
 The following command options are supported by \fBpurge\fR:
-.SP
 .IP "" 0
 \fB-f or --force\fR
 .IP "" 2
 Specifies to purge the specified spool file(s) without displaying any
 confirmation message.
-.SP
 .IP "" 0
 \fB-q or --queue\fR
 .IP "" 2
@@ -446,37 +398,30 @@ Possible values are rdr
 (reader file queue), pun (punch file queue), and prt (printer file queue).
 .br
 If omitted, the reader file queue is assumed.
-.SP
 .IP "" 0
 \fB-C or --class\fR
 .IP "" 2
 Specifies a spool file class.  All the files of the specified class are purged.
 The class value is a 1-character alphanumeric field whose values ca be A through
 Z, 0 through 9.
-.SP
 .IP "" 0
 \fB--form\fR
 .IP "" 2
 Specifies a form name.  All the files with the specified form name are purged.
 The form name is a 1- to 8-character value.
-.SP
 .IP "" 0
 \fB--dest\fR
 .IP "" 2
 Specifies a destination value.  All the files with the specified destination
 value are purged.  The destination is a 1- to 8-character value.
-.SP
 .SH purge arguments
-.SP
 The following command argument is supported by \fBpurge\fR:
-.SP
 .IP "" 0
 \fBspoolid\fR
 .IP "" 2
 Identifies the z/VM spool file to be purged.
 .PD
 .IP "" 0
-.SP
 .SH order
 .SS Order file on spool file queue
 .IP "" 0
@@ -488,11 +433,8 @@ Minimum abbreviation: or
 .PP
 Use \fBorder\fR when you want to place a spool file on top of a
 z/VM spool file queue.
-.SP
 .SH order options
-.SP
 The following command option is supported by \fBorder\fR:
-.SP
 .IP "" 0
 \fB-q or --queue\fR
 .IP "" 2
@@ -500,11 +442,8 @@ Specifies the z/VM spool file queue you want to order. Possible values are rdr
 (reader file queue), pun (punch file queue), and prt (printer file queue).
 .br
 If omitted, the reader file queue is assumed.
-.SP
 .SH order arguments
-.SP
 The following command argument is supported by \fBorder\fR:
-.SP
 .IP "" 0
 \fBspoolid\fR
 .IP "" 2
