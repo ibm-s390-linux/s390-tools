@@ -104,7 +104,7 @@ entries. Each entry may hold this information:
 - mode: AP queue mode information, required, either "EP11" or "Accel".
 .TP 2
 - mkvp: AP queue Master Key Verification Pattern (MKVP), required for
-EP11, hex string optional prepented with 0x. The MKVP hex string value
+EP11, hex string optional prepended with 0x. The MKVP hex string value
 may hold either 16 bytes (32 hex characters) or 32 bytes (64 hex
 characters) but only the leftmost 16 bytes hold MKVP information and
 thus the rest is ignored.
@@ -117,7 +117,7 @@ lowercase character(s) count different.
 "CEX7" or "CEX8" for Accelerator, string "CEC8" for EP11, optional. If
 given specifies the minimal accepted Crypto card generation.
 .TP 2
-- secretid: Secret id, hex string with optional 0x prepented, required
+- secretid: Secret id, hex string with optional 0x prepended, required
 for EP11, ignored for Accel. Details see the following text.
 .TP 2
 - name: ASCII string, optional, but see details below.
