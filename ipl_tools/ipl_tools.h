@@ -53,8 +53,6 @@ extern void print_eckd(int show_ipl, const char *name);
 extern int is_lpar(void);
 extern int is_root(void);
 
-extern void strlow(char *s);
-
 extern void write_str(char *string, char *file);
 extern int write_str_errno(char *string, char *file);
 extern void read_str(char *string, const char *file, size_t len);

@@ -47,17 +47,6 @@ int is_root(void)
 }
 
 /*
- * Convert a string to lower case
- */
-void strlow(char *s)
-{
-	while (*s) {
-		*s = tolower(*s);
-		s++;
-	}
-}
-
-/*
  * Read a string from a particular file
  */
 void read_str(char *string, const char *path, size_t len)
