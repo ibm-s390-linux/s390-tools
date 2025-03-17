@@ -86,44 +86,14 @@ int ccw_is_virtio_device(const char *device)
 }
 
 /*
- * Return CCW Bus ID (old sysfs)
+ * Return CCW Bus ID
  */
-static int ccw_busid_get_sysfs_old(const char *device, char *busid)
-{
-	char path[PATH_MAX];
-	char buf[4096];
-	int rc = 0;
-	FILE *fh;
-
-	snprintf(path, sizeof(path), "/sys/block/%s/uevent", device);
-	fh = fopen(path, "r");
-	if (fh == NULL)
-		return -1;
-	/*
-	 * The uevent file contains an entry like this:
-	 * PHYSDEVPATH=/devices/css0/0.0.206a/0.0.7e78
-	 */
-	while (fscanf(fh, "%s", buf) >= 0) {
-		if (strstr(buf, "PHYSDEVPATH") != NULL) {
-			strcpy(busid, strrchr(buf, '/') + 1);
-			goto out_fclose;
-		}
-	}
-	rc = -1;
-out_fclose:
-	fclose(fh);
-	return rc;
-}
-
-/*
- * Return CCW Bus ID (new sysfs)
- */
-static int ccw_busid_get_sysfs_new(const char *device, char *busid)
+void ccw_busid_get(const char *device, char *busid)
 {
 	char path[PATH_MAX] = { '\0' };
 
 	if (device_sysfs_path(device, path, sizeof(path)) != 0)
-		return -1;
+		ERR_EXIT("Could not lookup device number for \"%s\"", device);
 
 	/*
 	 * The output has the following format:
@@ -131,25 +101,6 @@ static int ccw_busid_get_sysfs_new(const char *device, char *busid)
 	 * /sys/devices/css0/0.0.0000/0.0.0000/virtio0/block/vda
 	 */
 	if (sscanf(path, "/sys/devices/css0/%*[0-9a-f.]/%[0-9a-f.]", busid) != 1)
-		return -1;
-	return 0;
-}
-
-/*
- * Return the device number for a device
- * dasda can be found in /sys/block/dasda/uevent or in a
- * symbolic link in the same directory. the first file only
- * contains the relevant information if we run on a kernel with
- * has the following kernel option enabled:
- * CONFIG_SYSFS_DEPRECATED
- *
- * This does not work when booting from tape
- */
-void ccw_busid_get(const char *device, char *busid)
-{
-	if (ccw_busid_get_sysfs_old(device, busid) == 0)
-		return;
-	if (ccw_busid_get_sysfs_new(device, busid) == 0)
-		return;
-	ERR_EXIT("Could not lookup device number for \"%s\"", device);
+		ERR_EXIT("Could not lookup device number for \"%s\"", device);
+	return;
 }
