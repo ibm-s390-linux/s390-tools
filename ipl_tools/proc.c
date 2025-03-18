@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "ipl_tools.h"
 #include "proc.h"

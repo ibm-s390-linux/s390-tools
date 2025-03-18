@@ -12,7 +12,6 @@
 #ifndef PROC_H
 #define PROC_H
 
-#include <ctype.h>
 #include <sys/types.h>
 
 struct proc_part_entry {
