@@ -12,7 +12,6 @@
 #ifndef IPL_TOOLS_H
 #define IPL_TOOLS_H
 
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
