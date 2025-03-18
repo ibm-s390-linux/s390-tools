@@ -1094,16 +1094,16 @@ collect_tc() {
 
 	if type tc >/dev/null; then
 		if test -n "${NETWORK_DEVS}"; then
-			pr_collect_output "Trafic Control"
+			pr_collect_output "Traffic Control"
 			for network_device in ${NETWORK_DEVS}; do
 				call_run_command "tc -s qdisc show dev ${network_device}" \
 					"${OUTPUT_FILE_TC}"
 			done
 		else
-			pr_skip "Trafic Control: no devices"
+			pr_skip "Traffic Control: no devices"
 		fi
 	else
-		pr_skip "Trafic Control: tc not available"
+		pr_skip "Traffic Control: tc not available"
 	fi
 }
 
