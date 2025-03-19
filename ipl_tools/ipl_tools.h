@@ -54,8 +54,7 @@ extern int is_root(void);
 
 extern void write_str(char *string, char *file);
 extern int write_str_errno(char *string, char *file);
-extern void read_str(char *string, const char *file, size_t len);
-extern void read_fw_str(char *string, const char *file, size_t len);
+char *read_fw_str(const char *file);
 extern void print_fw_str(const char *fmt, const char *dir, const char *file);
 
 extern void __noreturn print_version_exit(void);

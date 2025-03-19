@@ -55,11 +55,12 @@ void print_nss(int show_ipl)
 void print_fcp(int show_ipl, int dump)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/fcp";
-	char loadparm[9], loadparm_path[PATH_MAX];
+	char loadparm_path[PATH_MAX];
 	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/fcp/clear");
 	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
+	char *loadparm;
 
 	if (dump)
 		printf("%-12s fcp_dump\n", get_ipl_banner(show_ipl));
@@ -73,10 +74,11 @@ void print_fcp(int show_ipl, int dump)
 	print_fw_str("br_lba:      %s\n", dir, "br_lba");
 	if (access(path_loadparm, R_OK) == 0) {
 		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		read_fw_str(loadparm, loadparm_path, sizeof(loadparm));
+		loadparm = read_fw_str(loadparm_path);
 		if (strcmp(loadparm, "        ") == 0)
 			loadparm[0] = 0;
 		printf("Loadparm:    \"%s\"\n", loadparm);
+		free(loadparm);
 	}
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
@@ -93,11 +95,12 @@ void print_fcp(int show_ipl, int dump)
 void print_nvme(int show_ipl, int dump)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/nvme";
-	char loadparm[9], loadparm_path[PATH_MAX];
+	char loadparm_path[PATH_MAX];
 	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/nvme/clear");
 	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
+	char *loadparm;
 
 	if (dump)
 		printf("%-12s nvme_dump\n", get_ipl_banner(show_ipl));
@@ -110,10 +113,11 @@ void print_nvme(int show_ipl, int dump)
 	print_fw_str("br_lba:      %s\n", dir, "br_lba");
 	if (access(path_loadparm, R_OK) == 0) {
 		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		read_fw_str(loadparm, loadparm_path, sizeof(loadparm));
+		loadparm = read_fw_str(loadparm_path);
 		if (strcmp(loadparm, "        ") == 0)
 			loadparm[0] = 0;
 		printf("Loadparm:    \"%s\"\n", loadparm);
+		free(loadparm);
 	}
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "scp_data");
@@ -129,20 +133,22 @@ void print_nvme(int show_ipl, int dump)
 
 void print_ccw(int show_ipl)
 {
-	char loadparm[9], loadparm_path[PATH_MAX];
+	char loadparm_path[PATH_MAX];
 	char *dir = show_ipl ? "ipl" : "reipl/ccw";
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_bootparms = util_path_sysfs("firmware/%s/parm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/ccw/clear");
+	char *loadparm;
 
 	printf("%-12s ccw\n", get_ipl_banner(show_ipl));
 	print_fw_str("Device:      %s\n", dir, "device");
 	if (access(path_loadparm, R_OK) == 0) {
 		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		read_fw_str(loadparm, loadparm_path, sizeof(loadparm));
+		loadparm = read_fw_str(loadparm_path);
 		if (strcmp(loadparm, "        ") == 0)
 			loadparm[0] = 0;
 		printf("Loadparm:    \"%s\"\n", loadparm);
+		free(loadparm);
 	}
 	if (access(path_bootparms, R_OK) == 0)
 		print_fw_str("Bootparms:   \"%s\"\n", dir, "parm");
@@ -156,9 +162,10 @@ void print_ccw(int show_ipl)
 void print_eckd(int show_ipl, const char *name)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/eckd";
-	char loadparm[9], loadparm_path[PATH_MAX];
+	char loadparm_path[PATH_MAX];
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
+	char *loadparm;
 
 	printf("%-12s %s\n", get_ipl_banner(show_ipl), name);
 
@@ -168,10 +175,11 @@ void print_eckd(int show_ipl, const char *name)
 	print_fw_str("Bootparm:    \"%s\"\n", dir, "scp_data");
 	if (access(path_loadparm, R_OK) == 0) {
 		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		read_fw_str(loadparm, loadparm_path, sizeof(loadparm));
+		loadparm = read_fw_str(loadparm_path);
 		if (strcmp(loadparm, "        ") == 0)
 			loadparm[0] = 0;
 		printf("Loadparm:    \"%s\"\n", loadparm);
+		free(loadparm);
 	}
 	if (!show_ipl)
 		print_fw_str("clear:       %s\n", dir, "clear");
@@ -212,16 +220,14 @@ static void parse_lsreipl_options(int argc, char *argv[])
 
 void cmd_lsreipl(int argc, char *argv[])
 {
-	char reipl_type_str[1024];
+	char *reipl_type_str;
 
 	parse_lsreipl_options(argc, argv);
 
 	if (l.ipl_set)
-		read_fw_str(reipl_type_str, "ipl/ipl_type",
-			    sizeof(reipl_type_str));
+		reipl_type_str = read_fw_str("ipl/ipl_type");
 	else
-		read_fw_str(reipl_type_str, "reipl/reipl_type",
-			    sizeof(reipl_type_str));
+		reipl_type_str = read_fw_str("reipl/reipl_type");
 
 	if (strcmp(reipl_type_str, "fcp") == 0)
 		print_fcp(l.ipl_set, 0);
@@ -241,5 +247,6 @@ void cmd_lsreipl(int argc, char *argv[])
 	else
 		printf("%s: %s (unknown)\n", get_ipl_banner(l.ipl_set),
 		       reipl_type_str);
+	free(reipl_type_str);
 	exit(0);
 }

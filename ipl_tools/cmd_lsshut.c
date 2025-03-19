@@ -10,6 +10,7 @@
  */
 
 #include "lib/util_path.h"
+#include "lib/util_file.h"
 #include "ipl_tools.h"
 
 static const char *const usage_lsshut =
@@ -61,12 +62,13 @@ static void parse_lsshut_options(int argc, char *argv[])
  */
 static void read_vmcmd(char *str, const char *path)
 {
-	char buf[128], tmp[512];
 	char *ptr_old, *ptr;
+	char tmp[512];
+	char *buf;
 
 	*str = 0;
+	buf = read_fw_str(path);
 	ptr_old = ptr = buf;
-	read_fw_str(buf, path, sizeof(buf));
 	while ((ptr = strchr(ptr_old, '\n'))) {
 		*ptr = 0;
 		sprintf(tmp, "\"%s\",", ptr_old);
@@ -75,28 +77,31 @@ static void read_vmcmd(char *str, const char *path)
 	}
 	sprintf(tmp, "\"%s\"", ptr_old);
 	strcat(str, tmp);
+	free(buf);
 }
 
 static void print_kdump(void)
 {
 	struct stat sb;
-	char tmp[1024];
 	char *path;
+	char *tmp;
 
 	path = util_path_sysfs("kernel/kexec_crash_loaded");
 	if (stat(path, &sb) != 0) {
 		free(path);
 		return;
 	}
-	read_str(tmp, path, sizeof(tmp));
+	tmp = util_file_read_text_file(path, 1);
 	if (strncmp(tmp, "1", 1) == 0)
 		printf("kdump,");
 	free(path);
+	free(tmp);
 }
 
 static void shutdown_trigger_print(struct shutdown_trigger *trigger)
 {
-	char tmp[1024], cmd[1024], path[PATH_MAX];
+	char cmd[1024], path[PATH_MAX];
+	char *tmp;
 
 	sprintf(path, "shutdown_actions/%s", trigger->name_sysfs);
 
@@ -105,7 +110,7 @@ static void shutdown_trigger_print(struct shutdown_trigger *trigger)
 	if ((trigger == &shutdown_trigger_panic ||
 	     trigger == &shutdown_trigger_restart))
 		print_kdump();
-	read_fw_str(tmp, path, sizeof(tmp));
+	tmp = read_fw_str(path);
 	if (strncmp(tmp, "vmcmd", strlen("vmcmd")) == 0) {
 		sprintf(path, "vmcmd/%s", trigger->name_sysfs);
 		read_vmcmd(cmd, path);
@@ -113,6 +118,7 @@ static void shutdown_trigger_print(struct shutdown_trigger *trigger)
 	} else {
 		printf("%s\n", tmp);
 	}
+	free(tmp);
 }
 
 void cmd_lsshut(int argc, char *argv[])

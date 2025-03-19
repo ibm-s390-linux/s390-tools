@@ -10,6 +10,7 @@
  */
 
 #include "lib/util_path.h"
+#include "lib/util_file.h"
 #include "ipl_tools.h"
 
 /*
@@ -47,35 +48,17 @@ int is_root(void)
 }
 
 /*
- * Read a string from a particular file
- */
-void read_str(char *string, const char *path, size_t len)
-{
-	size_t rc;
-	FILE *fh;
-
-	fh = fopen(path, "rb");
-	if (fh == NULL)
-		ERR_EXIT_ERRNO("Could not open \"%s\"", path);
-	rc = fread(string, 1, len - 1, fh);
-	if (rc == 0 && ferror(fh))
-		ERR_EXIT_ERRNO("Could not read \"%s\"", path);
-	fclose(fh);
-	string[rc] = 0;
-	if (string[strlen(string) - 1] == '\n')
-		string[strlen(string) - 1] = 0;
-}
-
-/*
  * Read a string from a particular /sys/firmware file
  */
-void read_fw_str(char *string, const char *file, size_t len)
+char *read_fw_str(const char *file)
 {
+	char *string;
 	char *path;
 
 	path = util_path_sysfs("firmware/%s", file);
-	read_str(string, path, len);
+	string = util_file_read_text_file(path, 1);
 	free(path);
+	return string;
 }
 
 /*
@@ -83,11 +66,13 @@ void read_fw_str(char *string, const char *file, size_t len)
  */
 void print_fw_str(const char *fmt, const char *dir, const char *file)
 {
-	char path[PATH_MAX], str[4096];
+	char path[PATH_MAX];
+	char *str;
 
 	snprintf(path, sizeof(path), "%s/%s", dir, file);
-	read_fw_str(str, path, sizeof(str));
+	str = read_fw_str(path);
 	printf(fmt, str);
+	free(str);
 }
 
 /*
