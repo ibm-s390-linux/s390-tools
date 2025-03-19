@@ -314,8 +314,7 @@ void check_config()
 		cpuplugd_debug("Daemon started with vertical polarization.\n");
 		cpuplugd_debug("Cpu adjustments won't be made until system ");
 		cpuplugd_debug("is in horizontal polarization\n");
-	} else if (saved_polarization == PLR_HORIZONTAL &&
-		   cpu == 1) {
+	} else if (cpu == 1) {
 		apply_cpu_config();
 	}
 	if (memory == 1) {

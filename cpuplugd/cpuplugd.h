@@ -40,6 +40,7 @@
 #define CPUSTATS	10
 #define PLR_HORIZONTAL	0
 #define PLR_VERTICAL	1
+#define PLR_NONE	2
 
 /*
  *  Precedence of C operators

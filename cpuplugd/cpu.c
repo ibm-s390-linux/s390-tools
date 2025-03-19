@@ -87,6 +87,8 @@ int get_polarization(void)
 	char *path;
 
 	path = util_path_sysfs("devices/system/cpu/dispatching");
+	if (!util_path_exists(path))
+		return PLR_NONE;
 	if (util_file_read_i(&polarization, NUM_BASE, path) < 0) {
 		polarization = -1;
 		cpuplugd_debug("failed to read system polarization\n");
