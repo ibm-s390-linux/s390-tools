@@ -616,14 +616,16 @@ NETWORK_CMDS="ip -br a\
   :ip route list table all\
   :ip rule list\
   :ipcs -a\
-  :iptables -L\
+  :iptables -L # about to be replaced by nftables\
   :lsqeth\
   :netstat -pantu\
   :netstat -s\
+  :nft list tables # is replacing iptables\
   :nm-tool\
   :nstat -az\
   :openssl engine # deprecated in OpenSSL 3.n\
   :openssl list --providers 2>/dev/null # redirect help on older systems\
+  :opticsmon --module-info\
   :route -n\
   "
 
