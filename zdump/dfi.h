@@ -248,7 +248,6 @@ extern u64 dfi_live_dump_magic;
  * Supported DFI dump formats
  */
 extern struct dfi dfi_s390tape;
-extern struct dfi dfi_s390mv;
 extern struct dfi dfi_s390mv_ext;
 extern struct dfi dfi_s390;
 extern struct dfi dfi_s390_ext;

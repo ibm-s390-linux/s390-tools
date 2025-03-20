@@ -368,7 +368,6 @@ static int clear_ccw_dumper(const struct disk_info *info, int fd)
 	 * Check if the dump tool is present and clear its first block with zeroes.
 	 */
 	if (strncmp(dumper_magic, DF_S390_DUMPER_MAGIC_EXT, sizeof(dumper_magic)) == 0 ||
-	    strncmp(dumper_magic, DF_S390_DUMPER_MAGIC_MV, sizeof(dumper_magic)) == 0 ||
 	    strncmp(dumper_magic, DF_S390_DUMPER_MAGIC_MV_EXT, sizeof(dumper_magic)) == 0) {
 		if (misc_seek(fd, ECKD_CDL_DUMP_REC * info->phy_block_size))
 			return -1;

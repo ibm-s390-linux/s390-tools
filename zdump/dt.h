@@ -36,7 +36,6 @@ void dt_attr_dasd_type_set(const char *dasd_type);
 /*
  * Supported s390 dumpers
  */
-extern struct dt dt_s390mv;
 extern struct dt dt_s390mv_ext;
 extern struct dt dt_s390sv_ext;
 extern struct dt dt_scsi;

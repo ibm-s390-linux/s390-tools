@@ -67,14 +67,12 @@ endif
 OBJECTS = zgetdump.o opts.o zg.o zg_error.o zg_print.o \
 	  dfi.o dfi_mem_chunk.o dfi_vmcoreinfo.o \
 	  dfi_lkcd.o dfi_elf.o dfi_elf_common.o dfi_pv_elf.o \
-	  dfi_s390.o dfi_s390_ext.o\
-	  dfi_s390mv.o dfi_s390mv_ext.o \
+	  dfi_s390.o dfi_s390_ext.o dfi_s390mv_ext.o \
 	  dfi_s390tape.o dfi_kdump.o \
 	  dfi_devmem.o dfo.o dfo_mem_chunk.o \
 	  dfo_elf.o dfo_s390.o \
 	  df_elf.o df_s390.o \
-	  dt.o dt_s390sv_ext.o \
-	  dt_s390mv.o dt_s390mv_ext.o \
+	  dt.o dt_s390sv_ext.o dt_s390mv_ext.o \
 	  dt_scsi.o output.o \
 	  ngdump.o dt_ngdump.o dfi_ngdump.o dfi_vmdump.o \
 	  pv_utils.o

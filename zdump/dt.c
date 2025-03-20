@@ -18,7 +18,6 @@
  */
 static struct dt *dt_vec[] = {
 	&dt_s390mv_ext,
-	&dt_s390mv,
 	&dt_s390sv_ext,
 	&dt_scsi,
 	&dt_ngdump,

@@ -59,11 +59,9 @@ extern int df_s390_dumper_read(struct zg_fh *fh, int32_t blk_size,
 /*
  * DASD dt and dfi functions
  */
-extern int dt_s390mv_init_gen(bool extended);
+extern int dt_s390mv_ext_init(void);
 extern void dt_s390mv_info(void);
 
 extern int dfi_s390_init_gen(bool extended);
-extern int dfi_s390mv_init_gen(bool extended);
-extern void dfi_s390mv_info(void);
 
 #endif /* DF_S390_H */

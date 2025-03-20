@@ -30,7 +30,6 @@ static struct dfi *dfi_vec[] = {
 	&dfi_s390tape,
 	&dfi_devmem,
 	&dfi_s390mv_ext,
-	&dfi_s390mv,
 	&dfi_s390_ext,
 	&dfi_s390,
 	&dfi_lkcd,

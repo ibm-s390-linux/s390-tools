@@ -3,7 +3,7 @@
  *
  * S390x multi-volume DASD dump tool
  *
- * Copyright IBM Corp. 2001, 2018
+ * Copyright IBM Corp. 2001, 2025
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -11,14 +11,6 @@
 
 #include "dt.h"
 #include "df_s390.h"
-
-/*
- * Initialize s390 multi-volume dump tool (extedend) for -d option
- */
-static int dt_s390mv_ext_init(void)
-{
-	return dt_s390mv_init_gen(DUMP_EXTENDED);
-}
 
 /*
  * Dump Tool (extedned) operations
