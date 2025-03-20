@@ -17,3 +17,4 @@ pub use flags::{
     ControlFlagTrait, ControlFlagsTrait, FlagData, PcfV1, PlaintextControlFlagsV1, ScfV1,
     SecretControlFlagsV1,
 };
+pub use hdr_v1::SeHdrAadV1;

@@ -74,13 +74,13 @@ impl TryFrom<EcPubKeyCoordV1> for PKey<Public> {
 pub struct BinaryKeySlotV1 {
     #[serde(serialize_with = "ser_hex")]
     /// Public host key hash
-    pub(crate) phkh: [u8; 32],
+    pub phkh: [u8; 32],
     /// Wrapper key
     #[serde(serialize_with = "ser_hex")]
-    pub(crate) wrpk: [u8; 32],
+    pub wrpk: [u8; 32],
     /// Tag
     #[serde(serialize_with = "ser_hex")]
-    pub(crate) kst: [u8; 16],
+    pub kst: [u8; 16],
 }
 static_assert!(size_of::<BinaryKeySlotV1>() == 80);
 

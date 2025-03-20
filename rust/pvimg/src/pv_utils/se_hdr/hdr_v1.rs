@@ -51,28 +51,28 @@ struct HdrSizesV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
-struct SeHdrAadV1 {
+pub struct SeHdrAadV1 {
     #[deku(assert = "*sehs <= SeHdrDataV1::MAX_SIZE.try_into().unwrap()")]
-    sehs: u32,
+    pub sehs: u32,
     #[serde(serialize_with = "ser_hex")]
-    iv: [u8; SymKeyType::AES_256_GCM_IV_LEN],
+    pub iv: [u8; SymKeyType::AES_256_GCM_IV_LEN],
     res1: u32,
     #[deku(assert = "*nks <= (*sehs).into()", update = "self.keyslots.len()")]
-    nks: u64,
+    pub nks: u64,
     #[deku(assert = "*sea <= (*sehs).into()")]
-    sea: u64,
-    nep: u64,
+    pub sea: u64,
+    pub nep: u64,
     #[serde(serialize_with = "ser_lower_hex")]
-    pcf: u64,
-    cust_pub_key: EcPubKeyCoordV1,
+    pub pcf: u64,
+    pub cust_pub_key: EcPubKeyCoordV1,
     #[serde(serialize_with = "ser_hex")]
-    pld: [u8; SHA_512_HASH_LEN],
+    pub pld: [u8; SHA_512_HASH_LEN],
     #[serde(serialize_with = "ser_hex")]
-    ald: [u8; SHA_512_HASH_LEN],
+    pub ald: [u8; SHA_512_HASH_LEN],
     #[serde(serialize_with = "ser_hex")]
-    tld: [u8; SHA_512_HASH_LEN],
+    pub tld: [u8; SHA_512_HASH_LEN],
     #[deku(count = "nks")]
-    keyslots: Vec<BinaryKeySlotV1>,
+    pub keyslots: Vec<BinaryKeySlotV1>,
 }
 
 impl SeHdrAadV1 {
@@ -121,7 +121,7 @@ pub struct SeHdrConfV1 {
     xts: Aes256XtsKey,
     psw: PSW,
     #[serde(serialize_with = "ser_lower_hex")]
-    scf: u64,
+    pub scf: u64,
     #[deku(assert_eq = "0")]
     noi: u32,
     res2: u32,
@@ -160,13 +160,13 @@ fn ser_confidential_confv1<S: Serializer>(
 #[deku(endian = "big")]
 pub struct SeHdrDataV1 {
     #[serde(flatten)]
-    aad: SeHdrAadV1,
+    pub aad: SeHdrAadV1,
     #[serde(flatten, serialize_with = "ser_confidential_confv1")]
     #[deku(
         reader = "confidential_read_sehdrconf_v1(deku::reader)",
         writer = "confidential_write_sehdrconf_v1(data, deku::writer)"
     )]
-    data: Confidential<SeHdrConfV1>,
+    pub data: Confidential<SeHdrConfV1>,
     #[serde(flatten)]
     tag: SeHdrTagV1,
 }
@@ -443,7 +443,7 @@ impl SeHdrPubBuilderTrait for SeHdrDataV1 {
 #[deku(endian = "big")]
 pub struct SeHdrBinV1 {
     #[serde(flatten)]
-    aad: SeHdrAadV1,
+    pub aad: SeHdrAadV1,
     #[serde(serialize_with = "ser_hex")]
     #[deku(bytes_read = "aad.sea")]
     pub data: Vec<u8>,

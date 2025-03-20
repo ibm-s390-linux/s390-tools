@@ -85,10 +85,10 @@ impl SeHdrCommon {
 pub struct SeHdr {
     /// Common Secure Execution header part
     #[serde(flatten)]
-    pub(crate) common: SeHdrCommon,
+    pub common: SeHdrCommon,
     #[serde(flatten)]
     #[deku(ctx = "common.version")]
-    pub(crate) data: SeHdrVersioned,
+    pub data: SeHdrVersioned,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize)]
@@ -96,10 +96,10 @@ pub struct SeHdr {
 /// Plain data Secure Execution header structure
 pub struct SeHdrPlain {
     #[serde(flatten)]
-    pub(crate) common: SeHdrCommon,
+    pub common: SeHdrCommon,
     #[serde(flatten)]
     #[deku(ctx = "common.version")]
-    pub(crate) data: SeHdrData,
+    pub data: SeHdrData,
 }
 
 #[enum_dispatch(AeadCipherTrait, AeadDataTrait, KeyExchangeTrait)]
