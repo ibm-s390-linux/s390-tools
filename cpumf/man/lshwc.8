@@ -7,14 +7,14 @@
 .\" ----------------------------------------------------------------------
 .ds c \fBlshwc\fP
 .
-.TH \*c "8" "May 2022" "s390-tools" "CPU-MF management programs"
+.TH \*c "8" "Mar 2025" "s390-tools" "CPU-MF management programs"
 .
 .SH NAME
 lshwc \- extract CPU Measurement Facilities counter sets
 .
 .SH SYNOPSIS
 \*c
-.RB [ \-a ]
+.RB [ \-a ][ \-H][ \-s ][ \-x ][ \-X]
 .RB [ \-l
 .IR count ]
 .RB [ \-i
@@ -59,6 +59,45 @@ The default is 60 seconds.
 .TP
 .BR \-l ", " \-\-loop \fI\ count\fP
 Performs the specified number of read operations.
+.
+.TP
+.BR \-H ", " \-\-hide
+Do not display values of undefined counters.
+.
+.TP
+.BR \-s ", " \-\-short
+Displays counter names as short names in the heading.
+A short name consists of
+a letter for the counter set followed by a number.
+For example,
+this flag displays counter number 0 in the basic counter
+set as
+.B B0
+instead of
+.BR Cycles .
+Valid counter set letters are:
+.RS
+.IP B
+Basic counter set
+.IP P
+Problem state counter set
+.IP C
+Crypto counter set
+.IP E
+Extended counter set
+.IP M
+MT-Diagnostic counter set
+.IP U
+Undefined counter.
+.RE
+.
+.TP
+.BR \-x ", " \-\-hex
+Displays counter values as hexadecimal values.
+.
+.TP
+.BR \-X ", " \-\-hex0x
+Displays counter values as hexadecimal values with a leading 0x prefix.
 .
 .TP
 \fR[\fIcpulist\fR][:\fIsets\fR]\fP
