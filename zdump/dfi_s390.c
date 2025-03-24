@@ -200,6 +200,8 @@ static int read_s390_hdr(void)
 		return -ENODEV;
 	if (l.hdr.arch != DF_S390_ARCH_64)
 		ERR_EXIT("Dump architecture is not supported!");
+	if (l.hdr.build_arch && l.hdr.build_arch != DF_S390_ARCH_64)
+		ERR_EXIT("Dump-tool build architecture is not supported!");
 	if (l.hdr.cpu_cnt > DF_S390_CPU_MAX)
 		return -ENODEV;
 	if (l.hdr.zlib_version_s390 && l.hdr.version != 2)

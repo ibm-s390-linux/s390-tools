@@ -181,9 +181,6 @@ unsigned int *dfi_attr_vol_nr(void);
 void dfi_attr_version_set(unsigned int dfi_version);
 unsigned int *dfi_attr_dfi_version(void);
 
-void dfi_attr_build_arch_set(enum dfi_arch build_arch);
-enum dfi_arch *dfi_attr_build_arch(void);
-
 void dfi_attr_real_cpu_cnt_set(u32 real_cpu_cnt);
 u32 *dfi_attr_real_cpu_cnt(void);
 

@@ -67,7 +67,6 @@ struct attr {
 	struct timeval		*time_end;
 	u64			*cpu_id;
 	u64			*mem_size_real;
-	enum dfi_arch		*build_arch;
 	unsigned int		*vol_nr;
 	u32			*real_cpu_cnt;
 	struct new_utsname	*utsname;
@@ -129,9 +128,6 @@ void dfi_info_print(void)
 	}
 	if (l.attr.vol_nr)
 		STDERR("  Volume number......: %u\n", *l.attr.vol_nr);
-	if (l.attr.build_arch)
-		STDERR("  Build arch.........: %s\n",
-		       dfi_arch_str(*l.attr.build_arch));
 	STDERR("  System arch........: %s\n", dfi_arch_str(DFI_ARCH_64));
 	if (l.cpus.cnt)
 		STDERR("  CPU count (online).: %u\n", l.cpus.cnt);
@@ -432,20 +428,6 @@ u8 *dfi_attr_zlib_version(void)
 u32 *dfi_attr_zlib_entsize(void)
 {
 	return l.attr.zlib_entsize;
-}
-
-/*
- * Attribute: Build architecture
- */
-void dfi_attr_build_arch_set(enum dfi_arch build_arch)
-{
-	l.attr.build_arch = zg_alloc(sizeof(*l.attr.build_arch));
-	*l.attr.build_arch = build_arch;
-}
-
-enum dfi_arch *dfi_attr_build_arch(void)
-{
-	return l.attr.build_arch;
 }
 
 /*

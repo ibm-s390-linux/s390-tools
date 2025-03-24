@@ -216,8 +216,6 @@ static void df_s390_dump_init(void)
 	dh->mem_size = dh->mem_end + 1;
 	dh->num_pages = dh->mem_size / PAGE_SIZE;
 	dh->arch = DF_S390_ARCH_64;
-	if (dfi_attr_build_arch())
-		dh->build_arch = DF_S390_ARCH_64;
 	dh->cpu_cnt = dfi_cpu_cnt();
 	if (dfi_cpu_content() == DFI_CPU_CONTENT_NONE)
 		dh->cpu_cnt = 0;

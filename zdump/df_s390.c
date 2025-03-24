@@ -92,8 +92,6 @@ void df_s390_hdr_add(struct df_s390_hdr *hdr)
 	dfi_attr_version_set(hdr->version);
 	if (hdr->cpu_id)
 		dfi_attr_cpu_id_set(hdr->cpu_id);
-	if (hdr->build_arch)
-		dfi_attr_build_arch_set(DFI_ARCH_64);
 	if (hdr->mem_size_real)
 		dfi_attr_mem_size_real_set(hdr->mem_size_real);
 	if (hdr->real_cpu_cnt)

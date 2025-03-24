@@ -503,6 +503,8 @@ static int dfi_s390mv_ext_init(void)
 		zg_exit(1);
 	if (l.hdr.arch != DF_S390_ARCH_64)
 		ERR_EXIT("Dump architecture is not supported!");
+	if (l.hdr.build_arch && l.hdr.build_arch != DF_S390_ARCH_64)
+		ERR_EXIT("Dump-tool build architecture is not supported!");
 	if (l.hdr.mem_size == 0)
 		return -ENODEV;
 	df_s390_hdr_add(&l.hdr);
