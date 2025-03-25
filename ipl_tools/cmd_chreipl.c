@@ -12,19 +12,24 @@
 
 #include <ctype.h>
 #include <sys/sysmacros.h>
+#include <sys/ioctl.h>
 
 #include "lib/util_libc.h"
+#include "lib/util_proc.h"
 #include "lib/zt_common.h"
 #include "lib/util_path.h"
 
 #include "ipl_tools.h"
 #include "proc.h"
+#include <linux/raid/md_u.h>
 
 #define BOOTPARMS_NSS_MAX	56
 #define BOOTPARMS_CCW_MAX	64
 #define BOOTPARMS_FCP_MAX	3452
 
 #define OPT_BRCHR		0x80
+
+#define MD_MAJOR		9
 
 enum target_type {
 	TT_CCW,
@@ -415,15 +420,38 @@ static int set_reipl_type(const char *dev_name)
 	return 0;
 }
 
-static int get_chreipl_helper_cmd(dev_t dev, char cmd[PATH_MAX])
+static int is_md_device(const char *dev_name)
 {
-	char *chreipl_helper;
+	char abs_dev_name[PATH_MAX];
+	mdu_array_info_t array;
+	int is_md_device = 0;
+	int fd;
+
+	if (snprintf(abs_dev_name, PATH_MAX, "/dev/%s", dev_name) >= PATH_MAX)
+		return 0;
+	fd = open(abs_dev_name, O_RDONLY);
+	if (fd == -1)
+		return 0;
+	if (ioctl(fd, GET_ARRAY_INFO, &array) >= 0)
+		is_md_device = 1;
+	close(fd);
+	return is_md_device;
+}
+
+static int get_chreipl_helper_cmd(dev_t dev, char *dev_name, char cmd[PATH_MAX])
+{
 	struct proc_dev_entry pde;
+	char *chreipl_helper;
+	char *driver_name;
 
 	if (proc_dev_get_entry(dev, 1, &pde) != 0)
 		return -1;
+	driver_name = pde.name;
+	if (strcmp(driver_name, UTIL_PROC_DEV_ENTRY_BLKEXT) == 0 &&
+	    is_md_device(dev_name))
+		driver_name = UTIL_PROC_DEV_ENTRY_MD;
 	util_asprintf(&chreipl_helper,
-		      "%s/%s.%s", TOOLS_LIBDIR, "chreipl_helper", pde.name);
+		      "%s/%s.%s", TOOLS_LIBDIR, "chreipl_helper", driver_name);
 	if (access(chreipl_helper, X_OK) != 0) {
 		proc_dev_free_entry(&pde);
 		free(chreipl_helper);
@@ -438,7 +466,7 @@ static int get_chreipl_helper_cmd(dev_t dev, char cmd[PATH_MAX])
 /*
  * Use chreipl_helper (E.g. for device mapper devices)
  */
-static int set_reipl_type_helper(int maj, int min)
+static int set_reipl_type_helper(int maj, int min, char *dev_name)
 {
 	char helper_cmd[PATH_MAX], buf[4096];
 	struct proc_part_entry ppe;
@@ -446,7 +474,7 @@ static int set_reipl_type_helper(int maj, int min)
 	dev_t dev;
 	FILE *fh;
 
-	if (get_chreipl_helper_cmd(makedev(maj, min), helper_cmd) != 0)
+	if (get_chreipl_helper_cmd(makedev(maj, min), dev_name, helper_cmd) != 0)
 		return -1;
 	fh = popen(helper_cmd, "r");
 	if (fh == NULL)
@@ -500,7 +528,7 @@ static void parse_node_args(char *nargv[], int nargc)
 		ERR_EXIT("Invalid device node \"%s\" specified", path);
 	if (set_reipl_type(ppe.name) == 0)
 		goto out;
-	if (set_reipl_type_helper(major(dev), minor(dev)) == 0)
+	if (set_reipl_type_helper(major(dev), minor(dev), ppe.name) == 0)
 		goto out;
 	ERR_EXIT("Unsupported device node \"%s\" specified", path);
 out:
