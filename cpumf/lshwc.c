@@ -57,6 +57,7 @@ static bool allcpu;
 static char *ctrformat = "%ld";
 static bool shortname;
 static bool hideundef;
+static bool delta, firstread;
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
 static struct ctrname {		/* List of defined counters */
@@ -64,6 +65,7 @@ static struct ctrname {		/* List of defined counters */
 	bool hitcnt;		/* Counter number read from ioctl() */
 	unsigned long total;	/* Total counter value */
 	unsigned long *ccv;	/* Per CPU counter value */
+	unsigned long *ccvprv;	/* Per CPU counter value (previous read) */
 } ctrname[MAXCTRS];
 
 static char *mk_name(int ctr, char *name)
@@ -129,6 +131,7 @@ static void free_counternames(void)
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		free(ctrname[i].name);
 		free(ctrname[i].ccv);
+		free(ctrname[i].ccvprv);
 	}
 }
 
@@ -391,7 +394,7 @@ static void line(char *header)
 	}
 
 	/* Print total count of all CPUs */
-	printf("%sTotal,", header);
+	printf("%s%s,", header, delta && !firstread ? "Delta" : "Total");
 	comma = false;
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		if (!ctrname[i].hitcnt)
@@ -490,7 +493,18 @@ static bool add_countervalue(size_t idx, unsigned int cpu, unsigned long value)
 		warnx("Invalid CPU number %d", cpu);
 		return false;
 	}
-	ctrname[idx].ccv[cpu] = value;
+	if (delta) {
+		if (firstread) {
+			ctrname[idx].ccvprv[cpu] = value;
+			ctrname[idx].ccv[cpu] = value;
+		} else {
+			ctrname[idx].ccv[cpu] = value - ctrname[idx].ccvprv[cpu];
+			ctrname[idx].ccvprv[cpu] = value;
+			value = ctrname[idx].ccv[cpu];
+		}
+	} else {
+		ctrname[idx].ccv[cpu] = value;
+	}
 	ctrname[idx].total += value;
 	ctrname[idx].hitcnt = true;
 	return true;
@@ -538,6 +552,7 @@ static int test_read(struct s390_hwctr_read *read)
 		}
 	}
 	show();
+	firstread = false;
 	return 0;
 }
 
@@ -665,6 +680,10 @@ static struct util_opt opt_vec[] = {
 		.option = { "hide", no_argument, NULL, 'H' },
 		.desc = "Do not display undefined counters of a counter set"
 	},
+	{
+		.option = { "delta", no_argument, NULL, 'd' },
+		.desc = "Display delta counter values"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -740,6 +759,10 @@ int main(int argc, char **argv)
 		case 'a':
 			allcpu = true;
 			break;
+		case 'd':
+			delta = true;
+			firstread = true;
+			break;
 		}
 	}
 
@@ -753,8 +776,10 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(ctrname); ++i)
+	for (unsigned int i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		ctrname[i].ccv = util_zalloc(max_possible_cpus * sizeof(unsigned long));
+		ctrname[i].ccvprv = util_zalloc(max_possible_cpus * sizeof(unsigned long));
+	}
 
 	if (optind >= argc) {
 		ch = do_it(NULL);

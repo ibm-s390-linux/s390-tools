@@ -14,7 +14,7 @@ lshwc \- extract CPU Measurement Facilities counter sets
 .
 .SH SYNOPSIS
 \*c
-.RB [ \-a ][ \-H][ \-s ][ \-x ][ \-X]
+.RB [ \-a ][ \-d][ \-H][ \-s ][ \-x ][ \-X]
 .RB [ \-l
 .IR count ]
 .RB [ \-i
@@ -49,6 +49,13 @@ Displays version information, then exits.
 .BR \-a ", " \-\-allcpu
 Displays counter values from each CPU.
 The default is a total summary line of all counters from all CPUs.
+.
+.TP
+.BR \-d ", " \-\-delta
+Displays counter values in form of deltas.
+Each counter value shows the increment to the previous output line.
+Without this flag the total value of each counter is displayed.
+See Examples.
 .
 .TP
 .BR \-i ", " \-\-interval \fI\ seconds\fP
@@ -160,6 +167,26 @@ Date,Time,CPU,PROBLEM_STATE_CPU_CYCLES(32),PROBLEM_STATE_INSTRUCTIONS(33)
 2021-04-01,11:56:47,CPU0,3207071426,1489122591
 2021-04-01,11:56:47,CPU1,3225092021,1489278312
 2021-04-01,11:56:47,Total,6432163447,2978400903
+.ft
+.fi
+.sp 1
+This example shows the counter values of the basic counter set
+using delta output format.
+.nf
+.ft CW
+.sp 1
+# lshwc -d -l 10 -i 5 -s :b
+Date,Time,CPU,B0,B1,B2,B3,B4,B5
+2025-03-26,10:34:19,Total,208075,117287,1950,50548,1082,49609
+2025-03-26,10:34:24,Delta,85800055,70353492,590286,13228290,364034,12945804
+2025-03-26,10:34:29,Delta,70654751,60656797,483047,10838672,305703,10570868
+2025-03-26,10:34:34,Delta,81043162,69476160,587141,13228161,376662,12868298
+2025-03-26,10:34:39,Delta,73434017,62675417,524857,11787256,333966,11543649
+2025-03-26,10:34:44,Delta,68367967,58452919,506712,11370740,310785,10589883
+2025-03-26,10:34:49,Delta,70351947,57607764,507675,11433377,312433,10676243
+2025-03-26,10:34:54,Delta,77154817,65371168,562153,12671030,349750,12311061
+2025-03-26,10:34:59,Delta,88871882,75441201,655310,14875963,392530,13773130
+2025-03-26,10:35:04,Delta,83763472,71730813,609260,13643680,366992,12672405
 .ft
 .fi
 .SH "SEE ALSO"
