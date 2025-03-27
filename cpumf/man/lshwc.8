@@ -14,11 +14,13 @@ lshwc \- extract CPU Measurement Facilities counter sets
 .
 .SH SYNOPSIS
 \*c
-.RB [ \-a ][ \-d][ \-H][ \-s ][ \-x ][ \-X]
+.RB [ \-a ][ \-d ][ \-H ][ \-s ][ \-x ][ \-X ]
 .RB [ \-l
 .IR count ]
 .RB [ \-i
 .IR interval ]
+.RB [ \-t
+.IR time ]
 \fR[\fIcpulist\fR][:\fIsets\fR]\fP
 .br
 \*c
@@ -96,6 +98,23 @@ Extended counter set
 MT-Diagnostic counter set
 .IP U
 Undefined counter.
+.RE
+.
+.TP
+.BR \-t ", " \-\-time
+Specifies the runtime in form of days, hours, minutes or seconds.
+This option can be specified multiple times and the runtime adds up.
+Time is a number followed by one of the letters
+.RS
+.IP d
+Specifies number as days.
+.IP h
+Specifies number as hours.
+.IP m
+Specifies number as minutes.
+.IP s
+Specifies number as seconds. This is the default when no
+letter follows the number.
 .RE
 .
 .TP

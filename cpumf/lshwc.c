@@ -51,7 +51,7 @@
 
 static unsigned int read_interval = IOCTLSLEEP;
 static int cfvn, csvn, authorization;
-static unsigned long loop_count = 1;
+static unsigned long loop_count = 1, timeout;
 static unsigned char *ioctlbuffer;
 static bool allcpu;
 static char *ctrformat = "%ld";
@@ -684,6 +684,11 @@ static struct util_opt opt_vec[] = {
 		.option = { "delta", no_argument, NULL, 'd' },
 		.desc = "Display delta counter values"
 	},
+	{
+		.option = { "timeout", required_argument, NULL, 't' },
+		.argument = "NUMBER",
+		.desc = "run time in s (seconds) m (minutes) h (hours) and d (days)"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -713,6 +718,7 @@ static void have_support(void)
 
 int main(int argc, char **argv)
 {
+	unsigned long no;
 	char *slash;
 	int ch;
 
@@ -763,8 +769,37 @@ int main(int argc, char **argv)
 			delta = true;
 			firstread = true;
 			break;
+		case 't':
+			errno = 0;
+			no = strtoul(optarg, &slash, 0);
+			if (errno)
+				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			switch (*slash) {
+			case 's':
+			case '\0':
+				timeout += no;
+				break;
+			case 'm':
+				timeout += no * 60;
+				break;
+			case 'h':
+				timeout += no * 60 * 60;
+				break;
+			case 'd':
+				timeout += no * 60 * 60 * 24;
+				break;
+			default:
+				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+				break;
+			}
+			break;
 		}
 	}
+
+	if (timeout && timeout < read_interval)
+		read_interval = timeout;
+	/* If no timeout specified, simply add zero */
+	loop_count += timeout / read_interval;
 
 	have_support();
 	if (!libcpumf_cpumcf_info(&cfvn, &csvn, &authorization))
