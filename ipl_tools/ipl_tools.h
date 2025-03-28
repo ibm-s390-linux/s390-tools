@@ -35,38 +35,38 @@ extern struct globals {
 /*
  * Commands
  */
-extern void cmd_lsshut(int argc, char *argv[]);
-extern void cmd_chshut(int argc, char *argv[]);
-extern void cmd_lsreipl(int argc, char *argv[]);
-extern void cmd_chreipl(int argc, char *argv[]);
+void cmd_lsshut(int argc, char *argv[]);
+void cmd_chshut(int argc, char *argv[]);
+void cmd_lsreipl(int argc, char *argv[]);
+void cmd_chreipl(int argc, char *argv[]);
 
-extern void print_ccw(int show_ipl);
-extern void print_fcp(int show_ipl, int dump);
-extern void print_nvme(int show_ipl, int dump);
-extern void print_nss(int show_ipl);
-extern void print_eckd(int show_ipl, const char *name);
+void print_ccw(int show_ipl);
+void print_fcp(int show_ipl, int dump);
+void print_nvme(int show_ipl, int dump);
+void print_nss(int show_ipl);
+void print_eckd(int show_ipl, const char *name);
 
 /*
  * Helper
  */
-extern int is_lpar(void);
-extern int is_root(void);
+int is_lpar(void);
+int is_root(void);
 
-extern void write_str(char *string, char *file);
-extern int write_str_errno(char *string, char *file);
+void write_str(char *string, char *file);
+int write_str_errno(char *string, char *file);
 char *read_fw_str(const char *file);
-extern void print_fw_str(const char *fmt, const char *dir, const char *file);
+void print_fw_str(const char *fmt, const char *dir, const char *file);
 
-extern void __noreturn print_version_exit(void);
-extern void __noreturn print_help_hint_exit(void);
+void __noreturn print_version_exit(void);
+void __noreturn print_help_hint_exit(void);
 
 /*
  * FCP
  */
-extern int fcp_is_device(const char *devno);
-extern void fcp_lun_get(const char *device, char *lun);
-extern void fcp_wwpn_get(const char *device, char *wwpn);
-extern void fcp_busid_get(const char *device, char *devno);
+int fcp_is_device(const char *devno);
+void fcp_lun_get(const char *device, char *lun);
+void fcp_wwpn_get(const char *device, char *wwpn);
+void fcp_busid_get(const char *device, char *devno);
 
 /*
  * NVME
@@ -75,16 +75,16 @@ extern void fcp_busid_get(const char *device, char *devno);
 #define NVME_DEV_MAX_LEN	15	/* "nvme" + u32 in decimal + null */
 #define NVME_PATH_MAX	(PATH_MAX + NAME_MAX + 1)
 
-extern void nvme_fid_get(const char *device, char *fid);
-extern void nvme_nsid_get(const char *device, char *nsid);
+void nvme_fid_get(const char *device, char *fid);
+void nvme_nsid_get(const char *device, char *nsid);
 int nvme_is_device(char *fid_str, char *nsid_str);
 
 /*
  * CCW
  */
-extern int ccw_is_device(const char *devno);
-extern int ccw_is_virtio_device(const char *device);
-extern void ccw_busid_get(const char *device, char *devno);
+int ccw_is_device(const char *devno);
+int ccw_is_virtio_device(const char *device);
+void ccw_busid_get(const char *device, char *devno);
 
 /*
  * Shutdown trigger
