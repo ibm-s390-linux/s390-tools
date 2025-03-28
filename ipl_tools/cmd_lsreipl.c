@@ -10,6 +10,9 @@
  */
 
 #include "lib/util_path.h"
+#include "lib/util_file.h"
+#include "lib/util_libc.h"
+
 #include "ipl_tools.h"
 
 static struct {
@@ -55,7 +58,6 @@ void print_nss(int show_ipl)
 void print_fcp(int show_ipl, int dump)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/fcp";
-	char loadparm_path[PATH_MAX];
 	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/fcp/clear");
@@ -73,10 +75,8 @@ void print_fcp(int show_ipl, int dump)
 	print_fw_str("bootprog:    %s\n", dir, "bootprog");
 	print_fw_str("br_lba:      %s\n", dir, "br_lba");
 	if (access(path_loadparm, R_OK) == 0) {
-		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		loadparm = read_fw_str(loadparm_path);
-		if (strcmp(loadparm, "        ") == 0)
-			loadparm[0] = 0;
+		loadparm = util_file_read_text_file(path_loadparm, 1);
+		util_strstrip(loadparm);
 		printf("Loadparm:    \"%s\"\n", loadparm);
 		free(loadparm);
 	}
@@ -95,7 +95,6 @@ void print_fcp(int show_ipl, int dump)
 void print_nvme(int show_ipl, int dump)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/nvme";
-	char loadparm_path[PATH_MAX];
 	char *path_bootparms = util_path_sysfs("firmware/%s/scp_data", dir);
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_reipl_clear = util_path_sysfs("firmware/reipl/nvme/clear");
@@ -112,10 +111,8 @@ void print_nvme(int show_ipl, int dump)
 	print_fw_str("bootprog:    %s\n", dir, "bootprog");
 	print_fw_str("br_lba:      %s\n", dir, "br_lba");
 	if (access(path_loadparm, R_OK) == 0) {
-		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		loadparm = read_fw_str(loadparm_path);
-		if (strcmp(loadparm, "        ") == 0)
-			loadparm[0] = 0;
+		loadparm = util_file_read_text_file(path_loadparm, 1);
+		util_strstrip(loadparm);
 		printf("Loadparm:    \"%s\"\n", loadparm);
 		free(loadparm);
 	}
@@ -133,7 +130,6 @@ void print_nvme(int show_ipl, int dump)
 
 void print_ccw(int show_ipl)
 {
-	char loadparm_path[PATH_MAX];
 	char *dir = show_ipl ? "ipl" : "reipl/ccw";
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_bootparms = util_path_sysfs("firmware/%s/parm", dir);
@@ -143,10 +139,8 @@ void print_ccw(int show_ipl)
 	printf("%-12s ccw\n", get_ipl_banner(show_ipl));
 	print_fw_str("Device:      %s\n", dir, "device");
 	if (access(path_loadparm, R_OK) == 0) {
-		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		loadparm = read_fw_str(loadparm_path);
-		if (strcmp(loadparm, "        ") == 0)
-			loadparm[0] = 0;
+		loadparm = util_file_read_text_file(path_loadparm, 1);
+		util_strstrip(loadparm);
 		printf("Loadparm:    \"%s\"\n", loadparm);
 		free(loadparm);
 	}
@@ -162,7 +156,6 @@ void print_ccw(int show_ipl)
 void print_eckd(int show_ipl, const char *name)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/eckd";
-	char loadparm_path[PATH_MAX];
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
 	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
 	char *loadparm;
@@ -174,10 +167,8 @@ void print_eckd(int show_ipl, const char *name)
 	print_fw_str("br_chr:      %s\n", dir, "br_chr");
 	print_fw_str("Bootparm:    \"%s\"\n", dir, "scp_data");
 	if (access(path_loadparm, R_OK) == 0) {
-		sprintf(loadparm_path, "%s/%s", dir, "loadparm");
-		loadparm = read_fw_str(loadparm_path);
-		if (strcmp(loadparm, "        ") == 0)
-			loadparm[0] = 0;
+		loadparm = util_file_read_text_file(path_loadparm, 1);
+		util_strstrip(loadparm);
 		printf("Loadparm:    \"%s\"\n", loadparm);
 		free(loadparm);
 	}
