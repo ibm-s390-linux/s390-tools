@@ -91,7 +91,6 @@ static int get_cca_version(struct cca_lib *cca, bool verbose)
 	long return_code, reason_code;
 	long version_data_length;
 	long exit_data_len = 0;
-	char date[20];
 
 	util_assert(cca != NULL, "Internal error: cca is NULL");
 
@@ -111,8 +110,8 @@ static int get_cca_version(struct cca_lib *cca, bool verbose)
 	version_data[sizeof(version_data) - 1] = '\0';
 	pr_verbose(verbose, "CCA Version string: %s", version_data);
 
-	if (sscanf((char *)version_data, "%u.%u.%uz%s", &cca->version.ver,
-		   &cca->version.rel, &cca->version.mod, date) != 4) {
+	if (sscanf((char *)version_data, "%u.%u.%u", &cca->version.ver,
+		   &cca->version.rel, &cca->version.mod) != 3) {
 		warnx("CCA library version is invalid: %s", version_data);
 		return -EINVAL;
 	}
@@ -536,7 +535,7 @@ static int get_cca_adapter_version(struct cca_lib *cca,
 
 	pr_verbose(verbose, "CCA firmware version string: %s", version_data);
 
-	if (sscanf((char *)version_data, "%u.%u.%uz", &version->ver,
+	if (sscanf((char *)version_data, "%u.%u.%u", &version->ver,
 		   &version->rel, &version->mod) != 3) {
 		warnx("CCA formware version is invalid: %s", version_data);
 		return -EINVAL;
