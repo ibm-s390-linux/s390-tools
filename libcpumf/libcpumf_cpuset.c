@@ -14,6 +14,7 @@
 #include "lib/libcpumf.h"
 #include "lib/util_file.h"
 #include "lib/util_libc.h"
+#include "lib/util_path.h"
 
 int libcpumf_cpuset(const char *parm, cpu_set_t *mask)
 {
@@ -60,9 +61,11 @@ out:
 
 int libcpumf_cpuset_fn(const char *filename, cpu_set_t *mask)
 {
+	char *path = util_path_sysfs(filename);
 	char txt[PATH_MAX];
-	int ret = util_file_read_line(txt, sizeof(txt), "%s", filename);
+	int ret = util_file_read_line(txt, sizeof(txt), "%s", path);
 
+	free(path);
 	/* Read out file, one line expected */
 	if (!ret)
 		ret = libcpumf_cpuset(txt, mask);
