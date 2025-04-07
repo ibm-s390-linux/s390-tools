@@ -16,11 +16,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include "lib/util_opt.h"
-#include "lib/util_prg.h"
-#include "lib/util_base.h"
-
 #include "lib/libcpumf.h"
+#include "lib/util_base.h"
+#include "lib/util_opt.h"
+#include "lib/util_path.h"
+#include "lib/util_prg.h"
 
 static unsigned int verbose;
 static unsigned long min_sdb, max_sdb;
@@ -88,21 +88,22 @@ static long parse_buffersize(char *string)
 static int write_sfb(unsigned int min, unsigned int max)
 {
 	int rc = EXIT_SUCCESS;
-	char text[64];
+	char text[64], *path;
 	size_t len;
 	FILE *fp;
 
-	fp = fopen(S390_CPUMSF_BUFFERSZ, "w");
+	path = util_path_sysfs(S390_CPUMSF_BUFFERSZ);
+	fp = fopen(path, "w");
 	if (!fp)
-		err(EXIT_FAILURE, S390_CPUMSF_BUFFERSZ);
+		err(EXIT_FAILURE, "%s", path);
 	snprintf(text, sizeof(text), "%u,%u", min, max);
 	len = strlen(text) + 1;
 	if (fwrite(text, 1, len, fp) != len) {
-		warn(S390_CPUMSF_BUFFERSZ);
+		warn("%s", path);
 		rc = EXIT_FAILURE;
 	}
 	if (fclose(fp)) {
-		warn(S390_CPUMSF_BUFFERSZ);
+		warn("%s", path);
 		rc = EXIT_FAILURE;
 	}
 	if (verbose && rc != EXIT_FAILURE)
@@ -110,6 +111,7 @@ static int write_sfb(unsigned int min, unsigned int max)
 		      "    Minimum:%7d sample-data-blocks\n"
 		      "    Maximum:%7d sample-data-blocks\n",
 		      min, max);
+	free(path);
 	return rc;
 }
 

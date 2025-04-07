@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 
 #include "lib/libcpumf.h"
+#include "lib/util_path.h"
 
 #define	SERVICELEVEL	"/proc/service_levels"
 
@@ -129,14 +130,17 @@ bool libcpumf_have_sfb(void)
 bool libcpumf_sfb_info(unsigned long *min, unsigned long *max)
 {
 	int rc = false;
+	char *path;
 	FILE *fp;
 
-	fp = fopen(S390_CPUMSF_BUFFERSZ, "r");
+	path = util_path_sysfs(S390_CPUMSF_BUFFERSZ);
+	fp = fopen(path, "r");
 	if (!fp)
-		err(EXIT_FAILURE, "%s", S390_CPUMSF_BUFFERSZ);
+		err(EXIT_FAILURE, "%s", path);
 	if (fscanf(fp, "%lu,%lu", min, max) == 2)
 		rc = true;
 	fclose(fp);
+	free(path);
 	return rc;
 }
 
