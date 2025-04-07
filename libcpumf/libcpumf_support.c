@@ -144,23 +144,28 @@ bool libcpumf_sfb_info(unsigned long *min, unsigned long *max)
 	return rc;
 }
 
+static bool libcpumf_have_pai_sysfs(char *p)
+{
+	char *path;
+	bool ret;
+
+	path = util_path_sysfs(p);
+	ret = util_path_exists(path);
+	free(path);
+	return ret;
+}
+
 bool libcpumf_have_pai_crypto(void)
 {
-	struct stat statbuf;
-
-	return (stat(S390_SYSFS_PAI_CRYPTO, &statbuf) == -1) ? false : true;
+	return libcpumf_have_pai_sysfs(S390_SYSFS_PAI_CRYPTO);
 }
 
 bool libcpumf_have_pai_ext(void)
 {
-	struct stat statbuf;
-
-	return (stat(S390_SYSFS_PAI_EXT, &statbuf) == -1) ? false : true;
+	return libcpumf_have_pai_sysfs(S390_SYSFS_PAI_EXT);
 }
 
 bool libcpumf_have_pai_nnpa(void)
 {
-	struct stat statbuf;
-
-	return (stat(S390_SYSFS_PAI_NNPA, &statbuf) == -1) ? false : true;
+	return libcpumf_have_pai_sysfs(S390_SYSFS_PAI_NNPA);
 }

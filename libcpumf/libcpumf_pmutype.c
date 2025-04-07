@@ -1,4 +1,4 @@
-/* Copyright IBM Corp. 2022
+/* Copyright IBM Corp. 2022, 2025
  *
  * s390-tools is free software; you can redistribute it and/or modify
  * it under the terms of the MIT license. See LICENSE for details.
@@ -18,16 +18,13 @@
 
 int libcpumf_pmutype(const char *dirname)
 {
+	int ret = -1;
 	FILE *file;
 	char *fn;
-	int ret;
 
-	ret = asprintf(&fn, "%s/type", dirname);
-	if (ret == -1)		/* No memory, errno set */
-		return ret;
+	fn = util_path_sysfs("%s/type", dirname);
 	file = fopen(fn, "r");
 	free(fn);
-	ret = -1;		/* Errno set on file open error */
 	if (file) {
 		/* Read out a single number from that file */
 		if (fscanf(file, "%u", &ret) != 1)

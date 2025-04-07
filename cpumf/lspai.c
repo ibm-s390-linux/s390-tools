@@ -243,7 +243,7 @@ static void make_painode(enum pai_types t)
 	node->base = pai_type_base(t);
 
 	/* Read PMU type number. */
-	path = util_path_sysfs(PAI_PATH, node->sysfs_name);
+	util_asprintf(&path, PAI_PATH, node->sysfs_name);
 	node->pmu = libcpumf_pmutype(path);
 	if (node->pmu < 0)
 		errx(EXIT_FAILURE, "Cannot open %s", path);
