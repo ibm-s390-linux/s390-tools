@@ -16,6 +16,7 @@
 
 #include "lib/util_libc.h"
 #include "lib/util_proc.h"
+#include "lib/util_base.h"
 #include "lib/zt_common.h"
 #include "lib/util_path.h"
 
@@ -451,7 +452,7 @@ static int get_chreipl_helper_cmd(dev_t dev, char *dev_name, char cmd[PATH_MAX])
 	    is_md_device(dev_name))
 		driver_name = UTIL_PROC_DEV_ENTRY_MD;
 	util_asprintf(&chreipl_helper,
-		      "%s/%s.%s", TOOLS_LIBDIR, "chreipl_helper", driver_name);
+		      "%s.%s", util_libdir_path("chreipl_helper"), driver_name);
 	if (access(chreipl_helper, X_OK) != 0) {
 		proc_dev_free_entry(&pde);
 		free(chreipl_helper);
