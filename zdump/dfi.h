@@ -27,28 +27,6 @@ enum dfi_arch {
 	DFI_ARCH_64		= 1,
 };
 
-struct dfi_lowcore_32 {
-	u8	pad_0x0000[0x0084 - 0x0000];	/* 0x0000 */
-	u16	cpu_addr;			/* 0x0084 */
-	u8	pad_0x0086[0x00d4 - 0x0086];	/* 0x0086 */
-	u32	extended_save_area_addr;	/* 0x00d4 */
-	u32	timer_save_area[2];		/* 0x00d8 */
-	u32	clock_comp_save_area[2];	/* 0x00e0 */
-	u32	mcck_interruption_code[2];	/* 0x00e8 */
-	u8	pad_0x00f0[0x00f4-0x00f0];	/* 0x00f0 */
-	u32	external_damage_code;		/* 0x00f4 */
-	u32	failing_storage_address;	/* 0x00f8 */
-	u8	pad_0x00fc[0x0100-0x00fc];	/* 0x00fc */
-	u32	st_status_fixed_logout[2];	/* 0x0100 */
-	u32	prefixreg_save_area;		/* 0x0108 */
-	u8	pad_0x0110[0x0120-0x010c];	/* 0x010c */
-	u32	access_regs_save_area[16];	/* 0x0120 */
-	u32	floating_pt_save_area[8];	/* 0x0160 */
-	u32	gpregs_save_area[16];		/* 0x0180 */
-	u32	cregs_save_area[16];		/* 0x01c0 */
-	u8	pad_0x0200[0x1000 - 0x0200];	/* 0x0200 */
-};
-
 struct dfi_lowcore_64 {
 	u8	pad_0x0000[0x0084 - 0x0000];	/* 0x0000 */
 	u16	cpu_addr;			/* 0x0084 */
@@ -101,21 +79,6 @@ struct dfi_cpu {
 	};
 	u16		cpu_id;
 };
-
-struct dfi_cpu_32 {
-	u32		gprs[16];
-	u32		ctrs[16];
-	u32		acrs[16];
-	u64		fprs[4];
-	u32		psw[2];
-	u32		prefix;
-	u64		timer;
-	u64		todcmp;
-	u64		vxrs_low[16];
-	struct dfi_vxrs	vxrs_high[16];
-};
-
-void dfi_cpu_64_to_32(struct dfi_cpu_32 *cpu_32, struct dfi_cpu *cpu_64);
 
 const char *dfi_arch_str(enum dfi_arch arch);
 
