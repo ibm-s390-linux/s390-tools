@@ -1,0 +1,9 @@
+#
+#
+#         Name: /etc/sysconfig/vmlink (sysconfig script, shell sourced)
+#
+
+# starting address for VMLINK automounter script
+VMLINK_STARTINGADDR=9000
+
+
