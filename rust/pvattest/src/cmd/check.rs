@@ -129,7 +129,7 @@ pub fn check(opt: &CheckOpt) -> Result<ExitCode> {
     firmware_check.check(&mut issues);
 
     let res = CheckResult {
-        successful: !issues.is_empty(),
+        successful: issues.is_empty(),
         issues,
         image_host_key,
         attest_host_key,
