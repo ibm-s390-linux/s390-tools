@@ -31,6 +31,7 @@ struct util_proc_dev_entry {
 #define UTIL_PROC_DEV_ENTRY_SD       "sd"
 #define UTIL_PROC_DEV_ENTRY_BLKEXT   "blkext"
 #define UTIL_PROC_DEV_ENTRY_MD       "md"
+#define UTIL_PROC_DEV_ENTRY_DM       "device-mapper"
 
 int util_proc_part_get_entry(dev_t device, struct util_proc_part_entry *entry);
 void util_proc_part_free_entry(struct util_proc_part_entry *entry);

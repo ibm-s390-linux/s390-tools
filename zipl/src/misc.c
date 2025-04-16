@@ -18,6 +18,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <unistd.h>
 
 #include "error.h"
@@ -662,4 +663,14 @@ void misc_ascii_to_ebcdic(unsigned char *from, unsigned char *to)
 		*from = ascebc[*from];
 }
 
-
+/**
+ *  zipl-specific response on failed util_proc_dev_get_entry()
+ */
+void misc_warn_on_failed_pdge(dev_t device)
+{
+	fprintf(stderr,
+		"Warning: Could not determine driver name for major %d from /proc/devices\n",
+		major(device));
+	fprintf(stderr,
+		"Warning: Preparing a logical device for boot might fail\n");
+}

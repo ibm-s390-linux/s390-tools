@@ -180,7 +180,6 @@ struct helper {
 #define SCSI_PARTN_MASK 0x0f
 
 #define MD_MAJOR 9
-#define DEVICE_MAPPER_MAJOR 253
 
 /* Internal constants */
 enum dev_type {
@@ -231,9 +230,19 @@ static int error_on(const char *state, const char *this, const char *fixup,
 	return 0;
 }
 
-static int is_device_mapper(unsigned int major)
+static int is_device_mapper(dev_t device)
 {
-	return major == DEVICE_MAPPER_MAJOR;
+	struct util_proc_dev_entry pde;
+	int result = 0;
+
+	if (util_proc_dev_get_entry(device, 1, &pde) == 0) {
+		if (strcmp(pde.name, UTIL_PROC_DEV_ENTRY_DM) == 0)
+			result = 1;
+		util_proc_dev_free_entry(&pde);
+	} else {
+		misc_warn_on_failed_pdge(device);
+	}
+	return result;
 }
 
 static void get_type_name(char *name, unsigned short type)
@@ -1705,7 +1714,7 @@ static int md_mirror_to_params(unsigned int major, unsigned int minor,
 		ERR("Unsupported configuration: nested md devices\n");
 		return -1;
 	}
-	if (is_device_mapper(major)) {
+	if (is_device_mapper(dev)) {
 		struct ext_dev xdev = {dev, data_start_md + fs_start_md};
 		char *name;
 

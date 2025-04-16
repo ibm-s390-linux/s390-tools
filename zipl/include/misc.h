@@ -58,6 +58,7 @@ int misc_check_writable_device(const char* devno, int blockdev, int chardev);
 void misc_ebcdic_to_ascii(unsigned char *from, unsigned char *to);
 void misc_ascii_to_ebcdic(unsigned char *from, unsigned char *to);
 unsigned int misc_check_secure_boot(void);
+void misc_warn_on_failed_pdge(dev_t device);
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #endif /* not MISC_H */

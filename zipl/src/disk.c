@@ -509,10 +509,7 @@ static void set_driver_name(int fd, struct disk_info *info, dev_t device)
 			info->drv_name = misc_strdup(dev_entry.name);
 		util_proc_dev_free_entry(&dev_entry);
 	} else {
-		fprintf(stderr, "Warning: Could not determine driver name for "
-			"major %d from /proc/devices\n", major(device));
-		fprintf(stderr, "Warning: Preparing a logical device for boot "
-			"might fail\n");
+		misc_warn_on_failed_pdge(device);
 	}
 }
 
