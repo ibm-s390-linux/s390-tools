@@ -53,6 +53,7 @@
 #include <limits.h>
 #include <linux/limits.h>
 #include <linux/raid/md_u.h>
+#include <linux/nvme_ioctl.h>
 #include <locale.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -74,6 +75,7 @@
 #include "lib/util_list.h"
 #include "lib/util_path.h"
 #include "lib/util_proc.h"
+#include "lib/util_sys.h"
 
 #define WARN(...) \
 	fprintf(stderr, "Warning: " __VA_ARGS__)
@@ -126,6 +128,7 @@ struct dmpath_entry {
 
 struct device_characteristics {
 	unsigned short type;
+	unsigned int is_nvme:1;
 	unsigned int blocksize;
 	unsigned long bootsectors;
 	unsigned long partstart;
@@ -424,6 +427,30 @@ static long get_partition_start(unsigned int major, unsigned int minor)
 	return val;
 }
 
+static int check_nvme(struct device_characteristics *dc, dev_t dev,
+		      const char *devname)
+{
+	struct util_proc_dev_entry dev_entry;
+	int fd;
+
+	if (util_proc_dev_get_entry(dev, 1, &dev_entry) == 0) {
+		if (strcmp(dev_entry.name, UTIL_PROC_DEV_ENTRY_BLKEXT) == 0) {
+			fd = open(devname, O_RDONLY);
+			if (fd == -1) {
+				ERR("Could not open %s\n", devname);
+				util_proc_dev_free_entry(&dev_entry);
+				return -1;
+			}
+			dc->is_nvme = (ioctl(fd, NVME_IOCTL_ID) >= 0);
+			close(fd);
+		}
+		util_proc_dev_free_entry(&dev_entry);
+	} else {
+		misc_warn_on_failed_pdge(dev);
+	}
+	return 0;
+}
+
 static int get_dev_characteristics(struct device_characteristics *dc, dev_t dev)
 {
 	char devname[PATH_MAX];
@@ -441,6 +468,8 @@ static int get_dev_characteristics(struct device_characteristics *dc, dev_t dev)
 	if (dasd_get_info(devname, &info) != 0) {
 		/* Assume SCSI if dasdinfo failed */
 		dc->type = DEV_TYPE_SCSI;
+		if (check_nvme(dc, dev, devname))
+			goto err;
 		/* First block contains IPL records */
 		dc->bootsectors = dc->blocksize / SECTOR_SIZE;
 	} else {
@@ -1248,10 +1277,18 @@ static struct dmpath_entry *find_base_entry(struct util_list *dmpath,
 	return top;
 }
 
-static inline dev_t get_partition_base(unsigned short type, dev_t dev)
+/**
+ * Resolve a partition represented by DEV to a base disk.
+ * Store the result in BASE.
+ */
+static int get_partition_base(struct device_characteristics *dc,
+			      dev_t dev, dev_t *base)
 {
-	return makedev(major(dev), minor(dev) &
-		       (is_dasd(type) ? ~DASD_PARTN_MASK : ~SCSI_PARTN_MASK));
+	if (dc->is_nvme)
+		return util_sys_get_base_dev(dev, base);
+	*base = makedev(major(dev), minor(dev) &
+			(is_dasd(dc->type) ? ~DASD_PARTN_MASK : ~SCSI_PARTN_MASK));
+	return 0;
 }
 
 static int extract_major_minor_from_cmdline(char *argv[], unsigned int *major,
@@ -1309,7 +1346,10 @@ static int complete_physical_device(struct physical_device *pd, dev_t *base_dev)
 		struct device_characteristics ndc = {0};
 
 		base_entry = top_entry;
-		*base_dev = get_partition_base(dc->type, top_dev);
+		if (get_partition_base(dc, top_dev, base_dev)) {
+			ERR("Failed to get base device for %lu", top_dev);
+			return -1;
+		}
 		/* Complete the filesystem offset */
 		pd->offset += (dc->partstart * (dc->blocksize / SECTOR_SIZE));
 		dc->partstart = 0;
@@ -1737,7 +1777,10 @@ static int md_mirror_to_params(unsigned int major, unsigned int minor,
 		return -1;
 	}
 	if (partstart_phy > 0) {
-		base = get_partition_base(dc.type, dev);
+		if (get_partition_base(&dc, dev, &base)) {
+			ERR("Failed to get base device for %lu", dev);
+			return -1;
+		}
 		/* Update device geometry */
 		get_dev_characteristics(&dc, base);
 	} else {
