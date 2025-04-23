@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::user_data::UserData;
+use super::{guest_secret::ListableSecretHdr, user_data::UserData};
 use crate::{
     assert_size,
     crypto::{hkdf_rfc_5869, AeadEncryptionResult},
@@ -17,7 +17,7 @@ use openssl::{
     md::Md,
     pkey::{PKey, Private, Public},
 };
-use pv_core::{request::RequestVersion, secret::AddSecretMagic};
+use pv_core::{request::RequestVersion, secret::AddSecretMagic, uv::SecretId};
 use zerocopy::AsBytes;
 
 /// Authenticated data w/o user data
@@ -281,6 +281,13 @@ impl AddSecretRequest {
         buf[encr_range.clone()].copy_from_slice(conf.value());
         ctx.encrypt_aead(&buf[aad_range], &buf[encr_range])
             .map(|res| res.into_buf())
+    }
+
+    /// Get a copy of the secret ID if any
+    pub fn bin_id(asrcb: &[u8]) -> Result<Option<SecretId>> {
+        AddSecretMagic::try_from_bytes(asrcb)?;
+        BinReqValues::get(asrcb)
+            .map(|req| req.req_dep_aad::<ListableSecretHdr>().map(|a| a.id.clone()))
     }
 
     /// Get a copy of the add secret request tag

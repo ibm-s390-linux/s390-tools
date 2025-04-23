@@ -26,7 +26,7 @@ use openssl::{
 use pv_core::static_assert;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use zerocopy::{AsBytes, U16, U32};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
 
 const ASSOC_SECRET_SIZE: usize = 32;
 /// Maximum size of a plain-text secret payload (8190)
@@ -380,13 +380,13 @@ impl SecretAuth {
 }
 
 #[repr(C)]
-#[derive(Debug, AsBytes)]
+#[derive(Debug, AsBytes, FromZeroes, FromBytes)]
 pub(crate) struct ListableSecretHdr {
     res0: u16,
     kind: U16<BigEndian>,
     secret_len: U32<BigEndian>,
     res8: u64,
-    id: SecretId,
+    pub(crate) id: SecretId,
 }
 assert_size!(ListableSecretHdr, 0x30);
 
