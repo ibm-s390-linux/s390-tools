@@ -351,6 +351,8 @@ pub enum RetrInpFmt {
     Hex,
     /// Use a name-string. Will hash it if no secret with the name found.
     Name,
+    /// Use the secret-index (base 10) instead of the secret-ID
+    Idx,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
