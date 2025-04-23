@@ -616,6 +616,10 @@ char *util_file_read_fd(FILE *fd, int chomp)
 	if (util_file_read_fd_buf(fd, (void **) &buffer, &done))
 		return NULL;
 
+	/* Prevent over-read if buffer is larger than amount of read characters */
+	if (buffer)
+		done = MIN(done, strnlen(buffer, done));
+
 	/* Check if this is a text file at all (required to filter out
 	 * binary sysfs attributes).
 	 */
