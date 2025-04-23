@@ -2,26 +2,50 @@
 //
 // Copyright IBM Corp. 2024
 
-use super::list::list_uvc;
-use crate::cli::{RetrInpFmt, RetrOutFmt, RetrSecretOptions};
+use std::collections::VecDeque;
+
 use anyhow::{anyhow, bail, Context, Result};
-use log::{debug, info};
+use log::{debug, info, warn};
 use pv::{
     misc::open_file,
     misc::write,
     secret::{GuestSecret, RetrievedSecret},
-    uv::{RetrieveCmd, SecretId, UvDevice},
+    uv::{RetrieveCmd, SecretEntry, SecretId, SecretList, UvDevice},
 };
 use utils::get_writer_from_cli_file_arg;
+
+use super::list::list_uvc;
+use crate::cli::{RetrInpFmt, RetrOutFmt, RetrSecretOptions};
+
+fn find_secret_by_id(secrets: &SecretList, id: &SecretId) -> Option<SecretEntry> {
+    let mut secrets: VecDeque<_> = secrets
+        .into_iter()
+        .filter(|s| s.id() == id.as_ref())
+        .collect();
+    let secret = secrets.pop_front();
+
+    if !secrets.is_empty() {
+        warn!(
+            "There are multiple secrets in the secret store with that id. Indices: {}",
+            secrets
+                .iter()
+                .fold(format!("{}", secret.unwrap().index()), |acc, e| {
+                    format!("{acc}, {}", e.index())
+                })
+        );
+    }
+    secret.cloned()
+}
 
 fn retrieve(id: &SecretId) -> Result<RetrievedSecret> {
     let uv = UvDevice::open()?;
     let secrets = list_uvc(&uv)?;
-    let secret = match secrets.find(id) {
+
+    let secret = match find_secret_by_id(&secrets, id) {
         Some(s) => s,
         // hash it + try again if it is ASCII-representable
         None => match id.as_ascii() {
-            Some(s) => secrets.find(&GuestSecret::name_to_id(s)?),
+            Some(s) => find_secret_by_id(&secrets, &GuestSecret::name_to_id(s)?),
             None => None,
         }
         .ok_or(anyhow!(
