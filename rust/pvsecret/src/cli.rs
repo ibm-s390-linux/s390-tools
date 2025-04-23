@@ -262,6 +262,13 @@ pub struct AddSecretOpt {
     #[arg(value_name = "FILE", value_hint = ValueHint::FilePath,)]
     #[cfg(target_arch = "s390x")]
     pub input: String,
+
+    /// Force the addition of add-secret requests.
+    ///
+    /// Add an add-secret request even if there is already a secret with the same ID in the secret
+    /// store.
+    #[arg(short, long)]
+    pub force: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
