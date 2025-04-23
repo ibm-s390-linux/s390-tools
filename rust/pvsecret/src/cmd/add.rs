@@ -19,7 +19,7 @@ pub fn add(opt: &AddSecretOpt) -> Result<()> {
         AddCmd::new(&mut rd_in).context(format!("Processing input file {}", opt.input))?;
 
     if let Some(id) = AddSecretRequest::bin_id(cmd.data().unwrap())? {
-        if !list_uvc(&uv)?.iter().any(|e| e.id() == id.as_ref()) {
+        if list_uvc(&uv)?.iter().any(|e| e.id() == id.as_ref()) {
             warn!("There is already a secret in the secret store with that id. Adding the secret anyways.");
         }
     }

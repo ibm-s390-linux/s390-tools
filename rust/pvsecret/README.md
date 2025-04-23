@@ -526,8 +526,11 @@ Retrieve a secret from the UV secret store (s390x only)
 <ul>
 Specify the secret ID to be retrieved. Input type depends on '--inform'. If
 `yaml` (default) is specified, it must be a yaml created by the create
-subcommand of this tool. If `hex` is specified, it must be a hex 32-byte
-unsigned big endian number string. Leading zeros are required.
+subcommand of this tool. If `hex` is specified, it must be a 32 byte handle
+encodes in hexadecimal. Leading zeros are required. If there are multiple
+secrets in the store with the same Id there are no guarantees on which specific
+secret is retrieved. Use --inform=idx to make sure a specific secret is
+retrieved.
 </ul>
 
 
@@ -548,6 +551,7 @@ Define input type for the Secret ID.
         - **yaml**: Use a yaml file.
         - **hex**: Use a hex string.
         - **name**: Use a name-string. Will hash it if no secret with the name found.
+        - **idx**: Use the secret-index (base 10) instead of the secret-ID.
 </ul>
 
 

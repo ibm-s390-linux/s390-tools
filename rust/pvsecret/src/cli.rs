@@ -320,8 +320,10 @@ pub struct RetrSecretOptions {
     /// Specify the secret ID to be retrieved.
     ///
     /// Input type depends on '--inform'. If `yaml` (default) is specified, it must be a yaml
-    /// created by the create subcommand of this tool. If `hex` is specified, it must be a hex
-    /// 32-byte unsigned big endian number string. Leading zeros are required.
+    /// created by the create subcommand of this tool. If `hex` is specified, it must be a 32 byte
+    /// handle encodes in hexadecimal. Leading zeros are required. If there are multiple secrets in
+    /// the store with the same Id there are no guarantees on which specific secret is retrieved.
+    /// Use --inform=idx to make sure a specific secret is retrieved.
     #[cfg(target_arch = "s390x")]
     #[arg(value_name = "ID", value_hint = ValueHint::FilePath)]
     pub input: String,
