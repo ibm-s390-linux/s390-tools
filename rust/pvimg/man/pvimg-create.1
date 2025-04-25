@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVIMG-CREATE" "1" "2024-12-19" "s390-tools" "Pvimg Manual"
+.TH "PVIMG-CREATE" "1" "2025-04-24" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
 .SH NAME
@@ -139,7 +139,7 @@ Secure Execution header protection key is a randomly generated key.
 \-\-enable\-dump
 .RS 4
 Enable Secure Execution guest dump support. This option requires the
-\fB\-\-cck\fR option.
+\fB\-\-cck\fR or \fB\-\-enable\-cck\-update\fR option.
 .RE
 .RE
 .PP
@@ -160,6 +160,19 @@ CCK\-derived extension secret. This option requires the \fB\-\-cck\fR option.
 .RS 4
 Add\-secret requests don't have to provide the CCK\-derived extension secret
 (default).
+.RE
+.RE
+.PP
+\-\-enable\-cck\-update
+.RS 4
+Enable CCK update support. Requires z17 or up. This option cannot be
+used in conjunction with the \fB\-\-enable\-cck\-extension\-secret\fR option.
+.RE
+.RE
+.PP
+\-\-disable\-cck\-update
+.RS 4
+Disable CCK update support (default).
 .RE
 .RE
 .PP

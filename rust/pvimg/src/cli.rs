@@ -95,11 +95,13 @@ pub struct ComponentPaths {
 
 #[derive(Args, Debug)]
 #[cfg_attr(test, derive(Default))]
-#[command(group(ArgGroup::new("header-flags").multiple(true).conflicts_with_all(["x_pcf", "x_scf"])))]
+#[command(
+    group(ArgGroup::new("header-flags").multiple(true).conflicts_with_all(["x_pcf", "x_scf"])),
+    group(ArgGroup::new("cck-available").multiple(true)))]
 pub struct CreateBootImageLegacyFlags {
     /// Enable Secure Execution guest dump support. This option requires the
-    /// '--cck' option.
-    #[arg(long, action = clap::ArgAction::SetTrue, requires="cck", group="header-flags")]
+    /// '--cck' or '--enable-cck-update' option.
+    #[arg(long, action = clap::ArgAction::SetTrue, requires = "cck-available", group="header-flags")]
     pub enable_dump: Option<bool>,
 
     /// Disable Secure Execution guest dump support (default).
@@ -116,6 +118,15 @@ pub struct CreateBootImageLegacyFlags {
     /// secret (default).
     #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_cck_extension_secret", group="header-flags")]
     pub disable_cck_extension_secret: Option<bool>,
+
+    /// Enable CCK update support. Requires z17 or up. This option cannot be
+    /// used in conjunction with the '--enable-cck-extension-secret' option.
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_cck_extension_secret", group="cck-available", group="header-flags")]
+    pub enable_cck_update: Option<bool>,
+
+    /// Disable CCK update support (default).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with="enable_cck_update", group="header-flags")]
+    pub disable_cck_update: Option<bool>,
 
     /// Enable the support for the DEA, TDEA, AES, and ECC PCKMO key encryption
     /// functions (default).
@@ -335,7 +346,12 @@ pub struct CreateBootImageArgs {
     ///
     /// The file must contain exactly 32 bytes of data. This option used to be
     /// called '--comm-key' in previous versions.
-    #[arg(long, value_name = "FILE", visible_alias = "comm-key")]
+    #[arg(
+        long,
+        value_name = "FILE",
+        group = "cck-available",
+        visible_alias = "comm-key"
+    )]
     pub cck: Option<PathBuf>,
 
     /// Use the content of FILE as the Secure Execution header protection key.
@@ -495,7 +511,8 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"]),
                                                    CliOption::new("comm-key", ["--cck", "/dev/null"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"]),
-                                                   CliOption::new("comm-key", ["--comm-key", "/dev/null"])])),
+                                                   CliOption::new("comm-key", ["--comm-key", "/dev/null"]),
+                                                   CliOption::new("enable-cck-update", ["--enable-cck-update"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-pcf", ["--x-pcf", "0x0"]),
                                                    CliOption::new("x-scf", ["--x-scf", "0x0"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-psw", ["--x-psw", "0x0"])])),
@@ -507,6 +524,9 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-header-key", ["--x-header-key", "/dev/null"]),])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-header-key", ["--hdr-key", "/dev/null"]),])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-cck-update", ["--enable-cck-update"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-cck-update", ["--disable-cck-update"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("multiple-cck", ["--disable-cck-update", "--cck", "/dev/null"])])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),
@@ -514,7 +534,7 @@ mod test {
             flat_map_collect(remove(mvcanv.clone(), "hkd")),
             flat_map_collect(remove(mvcanv, "output")),
 
-            // missing `--comm-key`
+            // missing both `--cck' and `--enable-cck-update'
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"])])),
 
             // -v and -q cannot be combined
@@ -535,6 +555,9 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"]),
                                                    CliOption::new("disable-image-encryption", ["--disable-image-encryption"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-header-key", ["--hdr-key"]),])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("extension", ["--enable-cck-extension-secret"]),
+                                                   CliOption::new("update", ["--enable-cck-update"])])),
+
         ];
 
         let mut genprotimg_valid_args = vec![

@@ -92,6 +92,8 @@ fn parse_flags(
             lf.enable_cck_extension_secret,
             [ScfV1::CckExtensionSecretEnforcement]
         ),
+        flag_disabled!(lf.disable_cck_update, [ScfV1::CckUpdateAllowed]),
+        flag_enabled!(lf.enable_cck_update, [ScfV1::CckUpdateAllowed]),
     ]
     .into_iter()
     .flatten()
@@ -217,14 +219,18 @@ mod test {
         let args = CreateBootImageArgs {
             legacy_flags: CreateBootImageLegacyFlags {
                 enable_dump: Some(true),
+                enable_cck_update: Some(true),
                 ..Default::default()
             },
             ..Default::default()
         };
         let parsed_flags = super::parse_flags(&args).expect("Failed to parse flags {args:?}");
-        let mut exp_flags = Vec::from(PlaintextControlFlagsV1::PCKMO);
-        exp_flags.push(PcfV1::AllowDumping);
-        let pcf = PlaintextControlFlagsV1::from_flags(PcfV1::all_enabled(exp_flags));
+        let mut exp_pcf = Vec::from(PlaintextControlFlagsV1::PCKMO);
+        exp_pcf.push(PcfV1::AllowDumping);
+        let pcf = PlaintextControlFlagsV1::from_flags(PcfV1::all_enabled(exp_pcf));
         assert_eq!(parsed_flags.0, pcf);
+        let exp_scf = vec![ScfV1::CckUpdateAllowed];
+        let scf = SecretControlFlagsV1::from_flags(ScfV1::all_enabled(exp_scf));
+        assert_eq!(parsed_flags.1, scf);
     }
 }
