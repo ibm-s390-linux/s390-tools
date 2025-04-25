@@ -29,6 +29,7 @@ use zerocopy::{BigEndian, KnownLayout};
 use zerocopy::{FromBytes, Immutable, IntoBytes, U16, U32};
 
 const ASSOC_SECRET_SIZE: usize = 32;
+const CCK_SIZE: usize = 32;
 /// Maximum size of a plain-text secret payload (8190)
 pub(crate) const MAX_SIZE_PLAIN_PAYLOAD: usize = RetrieveCmd::MAX_SIZE - 2;
 static_assert!(MAX_SIZE_PLAIN_PAYLOAD == 8190);
@@ -64,6 +65,14 @@ pub enum GuestSecret {
         /// Confidential actual retrievable secret
         #[serde(skip)]
         secret: Confidential<Vec<u8>>,
+    },
+    /// CCK update
+    ///
+    /// Create CCK updates using [`GuestSecret::update_cck`]
+    UpdateCck {
+        /// Confidential actual CCK (32 bytes)
+        #[serde(skip)]
+        secret: Confidential<[u8; CCK_SIZE]>,
     },
 }
 
@@ -136,10 +145,19 @@ impl GuestSecret {
     retr_constructor!(#[doc = r"This function will return an error if  OpenSSL cannot create a hash or the curve is invalid"]
                       | #[doc = r"EC PRIVATE Key"] => PKey<Private>, ec);
 
+    /// Create a new [`GuestSecret::UpdateCck`].
+    ///
+    /// * `secret` - New CCK.
+    pub fn update_cck(secret: [u8; CCK_SIZE]) -> Self {
+        Self::UpdateCck {
+            secret: secret.into(),
+        }
+    }
+
     /// Use the name as ID, do not hash it
     pub fn no_hash_name(&mut self) {
         match self {
-            Self::Null => (),
+            Self::Null | Self::UpdateCck { .. } => (),
             Self::Association {
                 name, ref mut id, ..
             }
@@ -155,6 +173,7 @@ impl GuestSecret {
             Self::Null => &[],
             Self::Association { secret, .. } => secret.value().as_slice(),
             Self::Retrievable { secret, .. } => secret.value(),
+            Self::UpdateCck { secret, .. } => secret.value(),
         }
     }
 
@@ -162,7 +181,8 @@ impl GuestSecret {
     pub(crate) fn auth(&self) -> SecretAuth {
         match &self {
             Self::Null => SecretAuth::Null,
-            // Panic: every non null secret type is list-able -> no panic
+            Self::UpdateCck { .. } => SecretAuth::UpdateCck,
+            // Panic: other secret types are list-able -> no panic
             listable => {
                 SecretAuth::Listable(ListableSecretHdr::from_guest_secret(listable).unwrap())
             }
@@ -176,6 +196,7 @@ impl GuestSecret {
             Self::Null => ListableSecretType::NULL,
             Self::Association { .. } => ListableSecretType::ASSOCIATION,
             Self::Retrievable { kind, .. } => kind.into(),
+            Self::UpdateCck { .. } => ListableSecretType::UPDATE_CCK,
         }
     }
 
@@ -185,13 +206,14 @@ impl GuestSecret {
             Self::Null => 0,
             Self::Association { secret, .. } => secret.value().len() as u32,
             Self::Retrievable { secret, .. } => secret.value().len() as u32,
+            Self::UpdateCck { secret } => secret.value().len() as u32,
         }
     }
 
     /// Returns the ID of the secret type (if any)
     fn id(&self) -> Option<SecretId> {
         match self {
-            Self::Null => None,
+            Self::Null | Self::UpdateCck { .. } => None,
             Self::Association { id, .. } | Self::Retrievable { id, .. } => Some(id.to_owned()),
         }
     }
@@ -368,15 +390,18 @@ impl Display for GuestSecret {
 pub(crate) enum SecretAuth {
     Null,
     Listable(ListableSecretHdr),
+    UpdateCck,
 }
 
 impl SecretAuth {
     const NULL_HDR: NullSecretHdr = NullSecretHdr::new();
+    const UPDATE_CCK_HDR: UpdateCckHdr = UpdateCckHdr::new();
 
     pub fn get(&self) -> &[u8] {
         match self {
             Self::Null => Self::NULL_HDR.as_bytes(),
             Self::Listable(h) => h.as_bytes(),
+            Self::UpdateCck => Self::UPDATE_CCK_HDR.as_bytes(),
         }
     }
 }
@@ -422,6 +447,29 @@ impl ListableSecretHdr {
             res8: 0,
             id: gs.id()?,
         })
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, IntoBytes, Default, Immutable)]
+struct UpdateCckHdr {
+    res0: u16,
+    kind: U16<BigEndian>,
+    secret_len: U32<BigEndian>,
+    res8: u64,
+    res10: [u8; 0x20],
+}
+assert_size!(UpdateCckHdr, 0x30);
+
+impl UpdateCckHdr {
+    const fn new() -> Self {
+        Self {
+            res0: 0,
+            kind: U16::new(ListableSecretType::UPDATE_CCK),
+            secret_len: U32::new(CCK_SIZE as u32),
+            res8: 0,
+            res10: [0; 0x20],
+        }
     }
 }
 
@@ -483,6 +531,16 @@ mod test {
     retr_test!(retr_aes_xts_256, aes_xts, 64, AesXts(AesXtsSizes::Bits256));
     retr_test!(retr_aes_hmac_256, hmac_sha, 64, HmacSha(HmacSizes::Sha256));
     retr_test!(retr_aes_hmac_512, hmac_sha, 128, HmacSha(HmacSizes::Sha512));
+
+    #[test]
+    fn update_cck() {
+        let new_cck = [11; 32];
+        let req = GuestSecret::update_cck(new_cck);
+        let exp = GuestSecret::UpdateCck {
+            secret: new_cck.into(),
+        };
+        assert_eq!(req, exp);
+    }
 
     #[test]
     fn plaintext_no_pad() {
@@ -626,6 +684,24 @@ mod test {
     }
 
     #[test]
+    fn update_cck_parse() {
+        let cck = GuestSecret::UpdateCck {
+            secret: [0; 32].into(),
+        };
+        assert_tokens(
+            &cck,
+            &[
+                Token::StructVariant {
+                    name: "GuestSecret",
+                    variant: "UpdateCck",
+                    len: 0,
+                },
+                Token::StructVariantEnd,
+            ],
+        )
+    }
+
+    #[test]
     fn guest_secret_bin_null() {
         let gs = GuestSecret::Null;
         let gs_bytes = gs.auth();
@@ -664,6 +740,19 @@ mod test {
         exp.extend([1; 32]);
 
         assert_eq!(exp, gs_bytes_auth);
+        assert_eq!(&[2; 32], gs.confidential());
+    }
+
+    #[test]
+    fn guest_secret_bin_cck() {
+        let gs = GuestSecret::UpdateCck {
+            secret: [2; 32].into(),
+        };
+        let gs_bytes_auth = gs.auth();
+        let mut exp = vec![0u8, 0, 0, 0x16, 0, 0, 0, 0x20];
+        exp.extend([0; 40]);
+
+        assert_eq!(exp, gs_bytes_auth.get());
         assert_eq!(&[2; 32], gs.confidential());
     }
 }

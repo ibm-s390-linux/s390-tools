@@ -398,6 +398,7 @@ pub enum ListableSecretType {
     ///
     /// 0 is reserved
     /// 1 is Null secret, with no id and not list-able
+    /// 21 is Update CCK secret, with no id and not list-able
     Invalid(u16),
     /// Unknown secret type
     Unknown(u16),
@@ -436,6 +437,8 @@ impl ListableSecretType {
     pub const ECDSA_ED25519_KEY: u16 = 0x0014;
     /// UV secret-type id for an ed448-private-key secret
     pub const ECDSA_ED448_KEY: u16 = 0x0015;
+    /// UV secret-type id for a new customer communication key
+    pub const UPDATE_CCK: u16 = 0x0016;
 }
 
 impl Display for ListableSecretType {
@@ -482,6 +485,7 @@ impl From<u16> for ListableSecretType {
             Self::ECDSA_P521_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Secp521R1)),
             Self::ECDSA_ED25519_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Ed25519)),
             Self::ECDSA_ED448_KEY => Self::Retrievable(RetrievableSecret::Ec(EcCurves::Ed448)),
+            Self::UPDATE_CCK => Self::Invalid(Self::UPDATE_CCK),
             n => Self::Unknown(n),
         }
     }

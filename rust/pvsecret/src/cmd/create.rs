@@ -109,6 +109,9 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
         AddSecretType::Retrievable {
             name, secret, kind, ..
         } => retrievable(name, secret, kind)?,
+        AddSecretType::UpdateCck { secret } => {
+            GuestSecret::update_cck(read_exact_file(secret, "CCK file")?)
+        }
     };
     trace!("AddSecret: {secret:x?}");
 

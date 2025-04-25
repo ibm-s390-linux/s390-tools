@@ -217,6 +217,16 @@ pub enum AddSecretType {
         #[arg(long = "type", value_name = "TYPE")]
         kind: RetrieveableSecretInpKind,
     },
+
+    /// Update customer communication key.
+    ///
+    /// Insert a customer communication key into a guest.
+    #[command(visible_alias = "cck")]
+    UpdateCck {
+        /// Use CCK-FILE as new CCK.
+        #[arg(long, value_name = "CCK-FILE", value_hint = ValueHint::FilePath)]
+        secret: String,
+    },
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -474,6 +484,7 @@ mod test {
             vec!["pvsecret", "add"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "meta"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "association", "name" ],
+            vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "update-cck", "--secret", "abc"],
             // verify that arguments stay backwards compatible
             vec!["pvsecret", "create", "-k", "abc,cdef", "--hdr", "abc", "-o", "abc", "-C", "uuu,ggg", "--crl", "yyy,hhh", "--root-ca", "tttt",
                  "--extension-secret", "fff", "--cuid", "cuid", "--flags", "disable-dump", "meta"],
@@ -501,6 +512,7 @@ mod test {
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "--cuid", "abc", "--cuid_hex", "9",  "null"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "association"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "association", "name", "--output-secret", "secret", "--input-secret", "secret"],
+            vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "update-cck"],
             ];
         for arg in valid_args {
             let res = CliOptions::try_parse_from(&arg);
