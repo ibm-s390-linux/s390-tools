@@ -43,6 +43,7 @@ readonly NETWORK_DEVS=$(cd /sys/class/net; ls -d */ 2>/dev/null |  sed 's/\///g'
 # distro info
 readonly OSPRETTY="$(cat /etc/os* 2>/dev/null | grep -m1 PRETTY_NAME | sed 's/\"//g')"
 readonly OS_NAME="${OSPRETTY##*=}"
+readonly PODMAN=$(if type podman >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 # The processor ID for the first processor
 readonly PROCESSORID="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
 	sed 's/.*identification[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
@@ -169,7 +170,7 @@ $(cat /proc/sysinfo | grep 'Name')
 Kernel version        = ${KERNEL_INFO}
 OS version / distro   = ${OS_NAME}
 KVM host              = ${KVM}
-container host        Kubernetes: ${KUBERNETES} - docker: ${DOCKER}
+container host        Kubernetes: ${KUBERNETES} - docker: ${DOCKER} - podman: ${PODMAN}
 
 Current user          = $(whoami) (must be root for data collection)
 Date and time         = $(date)
@@ -269,6 +270,7 @@ readonly OUTPUT_FILE_LSOF="${WORKPATH}open_files.out"
 readonly OUTPUT_FILE_NETWORK="${WORKPATH}network.out"
 readonly OUTPUT_FILE_NVME="${WORKPATH}runtime.out"
 readonly OUTPUT_FILE_OVS="${WORKPATH}network.out"
+readonly OUTPUT_FILE_PODMAN="${WORKPATH}podman_runtime.out"
 readonly OUTPUT_FILE_ISW="${WORKPATH}installed_sw.out"
 readonly OUTPUT_FILE_TC="${WORKPATH}network.out"
 readonly OUTPUT_FILE_VMCMD="${WORKPATH}zvm_runtime.out"
@@ -407,6 +409,7 @@ CONFIGFILES="\
   /etc/cmdline\
   /etc/cmdline.d\
   /etc/conf.d\
+  /etc/containers\
   /etc/cron.*\
   /etc/crontab\
   /etc/crypttab\
@@ -637,6 +640,17 @@ DOCKER_CMDS="docker version\
   :docker ps -a\
   :docker stats --no-stream\
   :systemctl status docker.service\
+  "
+########################################
+PODMAN_CMDS="podman version\
+  :podman info\
+  :podman images\
+  :podman network ls\
+  :podman ps -a\
+  :podman stats --no-stream\
+  :podman pod stats -a --no-stream\
+  :ls -l /var/lib/containers/storage/overlay/* # list of files is sufficent\
+  :ls -l /var/log/crio/pods/*/*\
   "
 
 ########################################
@@ -1179,43 +1193,37 @@ collect_ovs() {
 ########################################
 collect_container() {
 	local container_list
-	local network_list
 	local item
 
 	# check if container environment exists
-	if test "x${DOCKER}" = "xYES" || test "x${KUBERNETES}" = "xYES"; then
+	if test "x${DOCKER}" = "xYES" || test "x${KUBERNETES}" = "xYES" || test "x${PODMAN}" = "xYES"; then
 		pr_collect_output "container host"
 	else
 		pr_skip "container host: not found"
 	fi
 
 	# for docker command exists
-	if [ "x${DOCKER}" = "xYES" ]; then
+	if test  "x${DOCKER}" = "xYES"; then
 		pr_syslog_stdout " docker ..."
-		container_list=$(docker ps -qa)
-		network_list=$(docker network ls -q)
 		IFS=:
 		for item in ${DOCKER_CMDS}; do
 			IFS=${IFS_ORI} call_run_command "${item}" "${OUTPUT_FILE_DOCKER}"
 		done
 		IFS="${IFS_ORI}"
+	fi
 
-		if test -n "${container_list}"; then
-			for item in ${container_list}; do
-				call_run_command "docker inspect ${item}" "${OUTPUT_FILE_DOCKER}"
-			done
-		fi
-
-		if test -n "${network_list}"; then
-			for item in ${network_list}; do
-				call_run_command "docker network inspect ${item}" \
-					"${OUTPUT_FILE_DOCKER}"
-			done
-		fi
+	# for podman command exists
+	if test  "x${PODMAN}" = "xYES"; then
+		pr_syslog_stdout " podman ..."
+		IFS=:
+		for item in ${PODMAN_CMDS}; do
+			IFS=${IFS_ORI} call_run_command "${item}" "${OUTPUT_FILE_PODMAN}"
+		done
+		IFS="${IFS_ORI}"
 	fi
 
 	# for kubectl command exists
-	if [ "x${KUBERNETES}" = "xYES" ]; then
+	if test "x${KUBERNETES}" = "xYES"; then
 		pr_syslog_stdout " Kubernetes ..."
 		container_list=$(kubectl top pod | grep -v "MEMORY(bytes)" | cut -d' ' -f1)
 
