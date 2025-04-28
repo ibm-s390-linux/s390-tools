@@ -371,10 +371,33 @@ pub(crate) enum SecretAuth {
 }
 
 impl SecretAuth {
+    const NULL_HDR: NullSecretHdr = NullSecretHdr::new();
+
     pub fn get(&self) -> &[u8] {
         match self {
-            Self::Null => &[0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            Self::Null => Self::NULL_HDR.as_bytes(),
             Self::Listable(h) => h.as_bytes(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, Immutable, KnownLayout)]
+struct NullSecretHdr {
+    res0: u16,
+    kind: U16<BigEndian>,
+    secret_len: U32<BigEndian>,
+    res8: u64,
+}
+assert_size!(NullSecretHdr, 0x10);
+
+impl NullSecretHdr {
+    const fn new() -> Self {
+        Self {
+            res0: 0,
+            kind: U16::new(ListableSecretType::NULL),
+            secret_len: U32::ZERO,
+            res8: 0,
         }
     }
 }
