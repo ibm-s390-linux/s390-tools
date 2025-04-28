@@ -7,9 +7,9 @@ use crate::{
     request::{MagicValue, RequestMagic},
     Error, Result,
 };
-use byteorder::{BigEndian, ByteOrder};
+use byteorder::ByteOrder;
 use std::{fmt::Display, mem::size_of};
-use zerocopy::{AsBytes, U16};
+use zerocopy::{BigEndian, Immutable, IntoBytes, U16};
 
 /// The magic value used to identify an `AddSecretRequest`.
 ///
@@ -25,7 +25,7 @@ use zerocopy::{AsBytes, U16};
 /// # }
 /// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AsBytes)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoBytes, Immutable)]
 pub struct AddSecretMagic {
     magic: [u8; 6], // [0x61, 0x73, 0x72, 0x63, 0x62, 0x4D]
     kind: U16<BigEndian>,
@@ -56,7 +56,7 @@ impl AddSecretMagic {
         }
 
         // Panic: Will not panic, bytes is at least 8 elements long
-        let kind = BigEndian::read_u16(&bytes[6..8]);
+        let kind = byteorder::BigEndian::read_u16(&bytes[6..8]);
         let kind = UserDataType::try_from(kind)?;
         Ok(Self::from(kind))
     }

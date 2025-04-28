@@ -8,7 +8,7 @@ use std::{
 };
 
 use log::{debug, warn};
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32, U64};
 
 // (SE) boot request control block aka SE header
 use crate::{assert_size, request::MagicValue, static_assert, Error, Result, PAGESIZE};
@@ -21,7 +21,7 @@ use crate::{assert_size, request::MagicValue, static_assert, Error, Result, PAGE
 /// Tweak List Digest (tld)
 /// SE-Header Tag (tag)
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes, PartialEq, Eq, FromBytes, FromZeroes)]
+#[derive(Debug, Clone, Copy, IntoBytes, PartialEq, Eq, FromBytes, Immutable, KnownLayout)]
 pub struct BootHdrTags {
     pld: [u8; BootHdrHead::DIGEST_SIZE],
     ald: [u8; BootHdrHead::DIGEST_SIZE],
@@ -40,8 +40,8 @@ impl TryFrom<Vec<u8>> for BootHdrTags {
     type Error = Error;
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        Self::ref_from(&value)
-            .ok_or(Error::InvBootHdrSize(value.len()))
+        Self::ref_from_bytes(&value)
+            .map_err(|_| Error::InvBootHdrSize(value.len()))
             .copied()
     }
 }
@@ -49,7 +49,7 @@ impl TryFrom<Vec<u8>> for BootHdrTags {
 /// Struct representing the Secure Execution boot image metadata
 #[allow(unused)]
 #[repr(packed)]
-#[derive(Debug, Clone, FromBytes, FromZeroes, AsBytes, PartialEq, Eq)]
+#[derive(Debug, Clone, FromBytes, IntoBytes, PartialEq, Eq, Immutable, KnownLayout)]
 pub struct SeImgMetaData {
     /// Magic value
     magic: [u8; 8],
@@ -106,7 +106,7 @@ impl SeImgMetaData {
     /// Gets the bytes of this value.
     #[inline(always)]
     pub fn as_bytes(&self) -> &[u8] {
-        <Self as AsBytes>::as_bytes(self)
+        <Self as IntoBytes>::as_bytes(self)
     }
 
     /// Returns the version of this [`SeImgMetaData`].
@@ -154,7 +154,7 @@ where
         // read in the header
         img.read_exact(&mut img_metadata_bytes)?;
         // Cannot fail because the buffer has the same size as SeImgMetaData.
-        let img_metadata = SeImgMetaData::ref_from(&img_metadata_bytes).unwrap();
+        let img_metadata = SeImgMetaData::ref_from_bytes(&img_metadata_bytes).unwrap();
         let img_metadata_version = img_metadata.version();
         if img_metadata_version != SeImgMetaData::V1 {
             warn!("Unknown Secure Execution boot image version {img_metadata_version}");
@@ -226,8 +226,8 @@ impl BootHdrTags {
         }
 
         let hdr_head = match BootHdrHead::read_from_prefix(hdr.as_mut_slice()) {
-            Some(hdr) => hdr,
-            None => {
+            Ok((hdr, _)) => hdr,
+            Err(_) => {
                 debug!("Boot hdr is too small");
                 return Err(Error::InvBootHdr);
             }
@@ -260,7 +260,7 @@ impl BootHdrTags {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, FromBytes, FromZeroes)]
+#[derive(Debug, Clone, FromBytes)]
 struct BootHdrHead {
     magic: U64<BigEndian>,
     version: U32<BigEndian>,
@@ -388,7 +388,7 @@ mod tests {
             0, 1, 96, 0,
         ];
         assert_eq!(metadata.as_bytes(), &data);
-        assert_eq!(SeImgMetaData::ref_from(&data), Some(&metadata));
+        assert_eq!(SeImgMetaData::ref_from_bytes(&data), Ok(&metadata));
 
         assert_eq!(metadata.version(), SeImgMetaData::V1);
     }

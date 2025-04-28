@@ -18,11 +18,11 @@ use openssl::{
     pkey::{PKey, Private, Public},
 };
 use pv_core::{request::RequestVersion, secret::AddSecretMagic, uv::SecretId};
-use zerocopy::AsBytes;
+use zerocopy::{Immutable, IntoBytes};
 
 /// Authenticated data w/o user data
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AsBytes)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable)]
 struct ReqAuthData {
     flags: UvFlags,
     boot_tags: BootHdrTags,

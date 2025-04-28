@@ -9,7 +9,6 @@ use std::ops::Index;
 use std::result::Result;
 
 use zerocopy::FromBytes;
-use zerocopy::FromZeroes;
 
 use crate::msa::InstructionKind;
 use crate::msa::QueryAuthInfo;
@@ -33,7 +32,7 @@ pub const QAI_PARAM_SIZE_IN_BYTES: usize = 256;
 /// Query authentication information format identifier
 const FORMAT_0: u8 = 0;
 
-#[derive(FromBytes, FromZeroes)]
+#[derive(FromBytes)]
 #[repr(C)]
 struct QaiFmt0 {
     res00: [u8; 6],
@@ -175,7 +174,7 @@ pub fn check_sysfs() -> bool {
 ///     -----------------------------------------------------------------
 fn parse_qai_format_0(qai: &mut QueryAuthInfo, param: &[u8]) {
     // parse param to temporary struct to ease further conversion
-    let tmp = QaiFmt0::read_from_prefix(param).expect("programming error");
+    let (tmp, _) = QaiFmt0::read_from_prefix(param).expect("programming error");
 
     // parse from temporary struct
     qai.hash_len = tmp.hash_length;

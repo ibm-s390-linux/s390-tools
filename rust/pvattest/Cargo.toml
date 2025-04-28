@@ -19,7 +19,7 @@ openssl = "0.10.70"
 serde = { version = "1.0.217", features = ["derive"]}
 serde_json = "1.0"
 serde_yaml = "0.9"
-zerocopy = { version="0.7", features = ["derive"] }
+zerocopy = { version="0.8", features = ["derive"] }
 
 pv = { path = "../pv", package = "s390_pv" }
 utils = { path = "../utils" }

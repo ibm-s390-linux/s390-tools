@@ -12,7 +12,7 @@
 use std::mem::size_of;
 
 use crate::{assert_size, static_assert};
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub const UVIO_ATT_ARCB_MAX_LEN: usize = 0x100000;
 pub const UVIO_ATT_MEASUREMENT_MAX_LEN: usize = 0x8000;
@@ -65,7 +65,7 @@ assert_size!(uvio_ioctl_cb, 0x40);
 /// Note that bit 0 (`UVIO_IOCTL_UVDEV_INFO_NR`) is always zero for `supp_uv_cmds`
 /// as there is no corresponding UV-call.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes)]
 pub struct uvio_uvdev_info {
     pub supp_uvio_cmds: u64,
     pub supp_uv_cmds: u64,
@@ -95,7 +95,7 @@ pub const UVIO_ATT_UID_LEN: usize = 0x10;
 ///
 /// All numbers are in big-endian!
 #[repr(C)]
-#[derive(Debug, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, IntoBytes, FromBytes)]
 pub struct uvio_attest {
     pub arcb_addr: u64,                          // in
     pub meas_addr: u64,                          // out

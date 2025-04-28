@@ -23,7 +23,7 @@ openssl = "0.10.70"
 openssl-sys = "0.9.105"
 serde = { version = "1.0.217", features = ["derive"]  }
 thiserror = "2.0.11"
-zerocopy = { version="0.7", features = ["derive"] }
+zerocopy = { version="0.8", features = ["derive"] }
 
 pv_core = { path = "../pv_core", package = "s390_pv_core", version = "0.11.0" }
 

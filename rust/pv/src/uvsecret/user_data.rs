@@ -15,7 +15,7 @@ use crate::{
 };
 use openssl::hash::MessageDigest;
 use openssl::nid::Nid;
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
+use zerocopy::{BigEndian, FromBytes, IntoBytes, KnownLayout, U16};
 
 /// User data.
 ///
@@ -59,7 +59,7 @@ pub(super) enum UserData {
 }
 
 #[repr(C)]
-#[derive(Debug, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout)]
 struct EcUserData {
     data: [u8; 256],
     signature: [u8; EC_SIGN_MAX_SIZE],
@@ -175,7 +175,7 @@ impl UserData {
         // insert signature
         if let UserDataType::SgnEcSECP521R1 = self.data_type() {
             // Panic: will not panic buffer is 512+ bytes long
-            let buf_ec = EcUserData::mut_from_prefix(&mut buf[user_data_offset..]).unwrap();
+            let (buf_ec, _) = EcUserData::mut_from_prefix(&mut buf[user_data_offset..]).unwrap();
             buf_ec.set_signature(&sgn);
         } else {
             // Panic: will not panic buffer is 512+ bytes long
@@ -328,12 +328,15 @@ impl VerifiedUserData {
 
         let (ret, sgn) = match kind {
             UserDataType::SgnEcSECP521R1 => {
-                let EcUserData {
-                    data,
-                    signature,
-                    sgn_size,
-                    ..
-                } = EcUserData::mut_from_prefix(buf).unwrap();
+                let (
+                    EcUserData {
+                        data,
+                        signature,
+                        sgn_size,
+                        ..
+                    },
+                    _,
+                ) = EcUserData::mut_from_prefix(buf).unwrap();
                 let data_len: usize = data.len();
                 let data = data.to_vec();
                 let mut signature = signature.to_vec();
@@ -480,7 +483,7 @@ mod test {
         buf[..0x80].copy_from_slice(data);
 
         user_data.sign(&mut buf, 0).unwrap();
-        let buf_ec = EcUserData::mut_from(&mut buf).unwrap();
+        let buf_ec = EcUserData::mut_from_bytes(&mut buf).unwrap();
         let EcUserData {
             data,
             signature,

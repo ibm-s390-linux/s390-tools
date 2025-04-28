@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U64};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, U64};
 
 use crate::{
     macros::{bail_spec, file_error},
@@ -34,7 +34,7 @@ pub trait Flags<T>: From<T> + for<'a> From<&'a T> {
 ///
 /// Wraps an u64 to set/get individual bits
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, AsBytes, FromZeroes, FromBytes, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, IntoBytes, FromBytes, Eq, PartialEq, Immutable)]
 pub struct Msb0Flags64(U64<BigEndian>);
 impl Flags<u64> for Msb0Flags64 {
     #[track_caller]
@@ -82,7 +82,7 @@ impl From<Msb0Flags64> for u64 {
 ///
 /// Wraps an u64 to set/get individual bits
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, Clone, Copy, Default, IntoBytes, FromBytes, Immutable)]
 pub struct Lsb0Flags64(U64<BigEndian>);
 impl Flags<u64> for Lsb0Flags64 {
     #[track_caller]

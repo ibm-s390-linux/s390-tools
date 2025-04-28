@@ -2,18 +2,18 @@
 //
 // Copyright IBM Corp. 2024
 use anyhow::{anyhow, bail, Error, Result};
-use byteorder::ByteOrder;
 use pv::{assert_size, request::MagicValue, uv::AttestationCmd, uv::ConfigUid};
 use std::{
     io::{ErrorKind, Read, Seek, SeekFrom, Write},
     mem::size_of,
 };
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32, U64};
+use zerocopy::ByteOrder;
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32, U64};
 
 const INV_EXCHANGE_FMT_ERROR_TEXT: &str = "The input has not the correct format:";
 
 #[repr(C)]
-#[derive(Debug, AsBytes, PartialEq, Eq, Default, FromZeroes, FromBytes)]
+#[derive(Debug, IntoBytes, PartialEq, Eq, Default, FromBytes, Immutable, KnownLayout)]
 struct Entry {
     size: U32<BigEndian>,
     offset: U32<BigEndian>,
@@ -76,7 +76,7 @@ impl Entry {
 }
 
 #[repr(C)]
-#[derive(Debug, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, IntoBytes, FromBytes, Immutable, KnownLayout)]
 struct ExchangeFormatV1Hdr {
     magic: U64<BigEndian>,
     version: U32<BigEndian>,
@@ -352,8 +352,8 @@ impl ExchangeFormatRequest {
             bail!("{INV_EXCHANGE_FMT_ERROR_TEXT} Does not start with the magic value.",);
         }
 
-        let hdr = ExchangeFormatV1Hdr::ref_from(buf.as_slice())
-            .ok_or(anyhow!("{INV_EXCHANGE_FMT_ERROR_TEXT} Invalid Header."))?;
+        let hdr = ExchangeFormatV1Hdr::ref_from_bytes(buf.as_slice())
+            .map_err(|_| anyhow!("{INV_EXCHANGE_FMT_ERROR_TEXT} Invalid Header."))?;
 
         match TryInto::<ExchangeFormatVersion>::try_into(hdr.version)? {
             ExchangeFormatVersion::One => (),
@@ -515,8 +515,8 @@ impl ExchangeFormatResponse {
             bail!("{INV_EXCHANGE_FMT_ERROR_TEXT} Does not start with the magic value.");
         }
 
-        let hdr = ExchangeFormatV1Hdr::ref_from(buf.as_slice())
-            .ok_or(anyhow!("{INV_EXCHANGE_FMT_ERROR_TEXT} Invalid Header."))?;
+        let hdr = ExchangeFormatV1Hdr::ref_from_bytes(buf.as_slice())
+            .map_err(|_| anyhow!("{INV_EXCHANGE_FMT_ERROR_TEXT} Invalid Header."))?;
 
         match TryInto::<ExchangeFormatVersion>::try_into(hdr.version)? {
             ExchangeFormatVersion::One => (),

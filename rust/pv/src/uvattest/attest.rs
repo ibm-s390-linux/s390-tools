@@ -12,7 +12,7 @@ use openssl::{
     pkey::{PKeyRef, Private},
 };
 use std::mem::size_of;
-use zerocopy::{AsBytes, BigEndian, U16, U32};
+use zerocopy::{BigEndian, IntoBytes, U16, U32};
 
 #[cfg(doc)]
 use crate::attest::AttestationRequest;

@@ -17,7 +17,6 @@ use crate::{
     },
     Error, Result,
 };
-use byteorder::BigEndian;
 use openssl::{
     hash::MessageDigest,
     nid::Nid,
@@ -26,7 +25,8 @@ use openssl::{
 use pv_core::static_assert;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
+use zerocopy::{BigEndian, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, U16, U32};
 
 const ASSOC_SECRET_SIZE: usize = 32;
 /// Maximum size of a plain-text secret payload (8190)
@@ -380,7 +380,7 @@ impl SecretAuth {
 }
 
 #[repr(C)]
-#[derive(Debug, AsBytes, FromZeroes, FromBytes)]
+#[derive(Debug, IntoBytes, FromBytes, Immutable, KnownLayout)]
 pub(crate) struct ListableSecretHdr {
     res0: u16,
     kind: U16<BigEndian>,

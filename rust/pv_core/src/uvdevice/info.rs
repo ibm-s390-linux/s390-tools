@@ -9,7 +9,7 @@ use crate::{
     Result,
 };
 use std::fmt::Display;
-use zerocopy::{AsBytes, FromZeroes};
+use zerocopy::{FromZeros, IntoBytes};
 
 /// Information of supported functions by the uvdevice
 ///
@@ -74,7 +74,7 @@ impl UvCmd for uvio_uvdev_info {
     const UV_IOCTL_NR: u8 = ffi::UVIO_IOCTL_UVDEV_INFO_NR;
 
     fn data(&mut self) -> Option<&mut [u8]> {
-        Some(self.as_bytes_mut())
+        Some(self.as_mut_bytes())
     }
 
     fn rc_fmt(&self, _: u16, _: u16) -> Option<&'static str> {

@@ -8,7 +8,6 @@ use crate::{
     uvdevice::UvCmd,
     Error, Result,
 };
-use byteorder::{BigEndian, ByteOrder};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     cmp::min,
@@ -19,13 +18,14 @@ use std::{
     slice::Iter,
     vec::IntoIter,
 };
-use zerocopy::{AsBytes, FromBytes, FromZeroes, U16, U32};
+use zerocopy::{BigEndian, ByteOrder};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, U16, U32};
 
 /// The 32 byte long ID of an UV secret
 ///
 /// (de)serializes itself in/from a hex-string
 #[repr(C)]
-#[derive(PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Debug, Clone, Default)]
+#[derive(PartialEq, Eq, IntoBytes, FromBytes, Debug, Clone, Default, Immutable, KnownLayout)]
 pub struct SecretId([u8; Self::ID_SIZE]);
 assert_size!(SecretId, SecretId::ID_SIZE);
 
@@ -132,7 +132,7 @@ impl AsRef<[u8]> for SecretId {
 
 /// A secret in a [`SecretList`]
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, Eq, AsBytes, FromZeroes, FromBytes, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, IntoBytes, FromBytes, Serialize, Immutable)]
 pub struct SecretEntry {
     #[serde(serialize_with = "ser_u16")]
     index: U16<BigEndian>,
@@ -183,7 +183,7 @@ impl SecretEntry {
     /// The slice is guaranteed to be 32 bytes long.
     /// ```rust
     /// # use s390_pv_core::uv::SecretEntry;
-    /// # use zerocopy::FromZeroes;
+    /// # use zerocopy::FromZeros;
     /// # let secr = SecretEntry::new_zeroed();
     /// # assert_eq!(secr.id().len(), 32);
     /// ```
@@ -211,7 +211,9 @@ impl Display for SecretEntry {
 }
 
 #[repr(C)]
-#[derive(Debug, FromBytes, AsBytes, FromZeroes, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(
+    Debug, FromBytes, IntoBytes, Clone, PartialEq, Eq, Default, Serialize, Immutable, KnownLayout,
+)]
 struct SecretListHdr {
     #[serde(skip)]
     num_secrets_stored: U16<BigEndian>,
@@ -325,7 +327,8 @@ impl SecretList {
 
     /// Encodes the list in the same binary format the UV would do
     pub fn encode<T: Write>(&self, w: &mut T) -> Result<()> {
-        w.write_all(self.hdr.as_bytes())?;
+        let hdr = self.hdr.as_bytes();
+        w.write_all(hdr)?;
         for secret in &self.secrets {
             w.write_all(secret.as_bytes())?;
         }
@@ -336,14 +339,14 @@ impl SecretList {
     pub fn decode<R: Read + Seek>(r: &mut R) -> std::io::Result<Self> {
         let mut buf = [0u8; size_of::<SecretListHdr>()];
         r.read_exact(&mut buf)?;
-        let hdr = SecretListHdr::ref_from(&buf).unwrap();
+        let hdr = SecretListHdr::ref_from_bytes(&buf).unwrap();
 
         let mut buf = [0u8; SecretEntry::STRUCT_SIZE];
         let mut v = Vec::with_capacity(hdr.num_secrets_stored.get() as usize);
         for _ in 0..hdr.num_secrets_stored.get() {
             r.read_exact(&mut buf)?;
             // cannot fail. buffer has the same size as the secret entry
-            let secr = SecretEntry::read_from(buf.as_slice()).unwrap();
+            let secr = SecretEntry::read_from_bytes(buf.as_slice()).unwrap();
             v.push(secr);
         }
         Ok(Self {
@@ -538,10 +541,13 @@ where
 #[cfg(test)]
 mod test {
 
+    use std::io::{BufReader, BufWriter, Cursor};
+
     use serde_test::{assert_ser_tokens, assert_tokens, Token};
+    use zerocopy::FromZeros;
 
     use super::*;
-    use std::io::{BufReader, BufWriter, Cursor};
+
     #[test]
     fn dump_secret_entry() {
         const EXP: &[u8] = &[

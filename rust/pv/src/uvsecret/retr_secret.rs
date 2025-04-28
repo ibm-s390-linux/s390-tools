@@ -4,12 +4,12 @@
 
 use crate::{pem::Pem, uvsecret::guest_secret::MAX_SIZE_PLAIN_PAYLOAD, Result};
 
-use byteorder::BigEndian;
 use log::warn;
 use pv_core::{
     request::Confidential,
     uv::{ListableSecretType, RetrievableSecret, RetrieveCmd},
 };
+use zerocopy::BigEndian;
 use zerocopy::{FromBytes, U16};
 
 /// An IBM Protected Key
@@ -76,6 +76,7 @@ impl From<RetrieveCmd> for RetrievedSecret {
                 // minimum size
                 let len = U16::<BigEndian>::read_from_prefix(key.value())
                     .unwrap_or_default()
+                    .0
                     .get() as usize;
 
                 // Test if the plain text secret has a size:

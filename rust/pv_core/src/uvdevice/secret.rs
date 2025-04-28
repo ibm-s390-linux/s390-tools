@@ -11,7 +11,7 @@ use crate::{
 };
 use log::debug;
 use std::{io::Read, mem::size_of_val};
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 /// _List Secrets_ Ultravisor command.
 ///

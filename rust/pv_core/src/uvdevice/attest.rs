@@ -4,7 +4,7 @@
 use super::{ffi, AttestationUserData, ConfigUid, UvCmd};
 use crate::{Error, Result};
 use std::ptr;
-use zerocopy::{AsBytes, FromZeroes};
+use zerocopy::{FromZeros, IntoBytes};
 
 /// _Retrieve Attestation Measurement_ UVC
 ///
@@ -222,7 +222,7 @@ impl UvCmd for AttestationCmd {
     }
 
     fn data(&mut self) -> Option<&mut [u8]> {
-        Some(self.uvio_attest.as_bytes_mut())
+        Some(self.uvio_attest.as_mut_bytes())
     }
 }
 

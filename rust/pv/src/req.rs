@@ -12,7 +12,7 @@ use openssl::{
     pkey::{PKey, PKeyRef, Private, Public},
 };
 use pv_core::request::{RequestMagic, RequestVersion};
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32};
 
 use crate::{
     assert_size,
@@ -358,7 +358,7 @@ ecdh_from!(Public);
 /// Representation of the shared parts of the request header.
 /// Used by [`ReqEncrCtx`]
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, Immutable)]
 struct RequestHdr {
     magic: [u8; 8],
     rqvn: U32<BigEndian>,
@@ -449,7 +449,7 @@ impl<'a> BinReqValues<'a> {
     /// Does minimal sanity test, just tests to prevent panics.
     /// `req` may be larger than the actual request.
     pub(crate) fn get(req: &'a [u8]) -> Result<Self> {
-        let hdr = RequestHdr::read_from_prefix(req).ok_or(Error::BinRequestSmall)?;
+        let (hdr, _) = RequestHdr::read_from_prefix(req).map_err(|_| Error::BinRequestSmall)?;
         let rql = hdr.rql.get() as usize;
         let sea = hdr.sea.get() as usize;
 
@@ -506,9 +506,9 @@ impl<'a> BinReqValues<'a> {
     /// [`FromBytes::ref_from_prefix`]
     pub(crate) fn req_dep_aad<T>(&self) -> Option<&T>
     where
-        T: FromBytes + Sized,
+        T: FromBytes + Sized + Immutable + KnownLayout,
     {
-        T::ref_from_prefix(self.req_dep_aad)
+        T::ref_from_prefix(self.req_dep_aad).map(|s| s.0).ok()
     }
 
     /// Returns a reference to the tag of this [`BinReqValues`].
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn req_hdr2() {
         let mut hdr = RequestHdr::new(0x200, 0x1234, [0x11; 12], 15, 44, Some(TEST_MAGIC));
-        let hdr_bin = hdr.as_bytes_mut();
+        let hdr_bin = hdr.as_mut_bytes();
         let hdr_bin_exp = [
             0x12, 0x34, 0x56, 0x89, 0xab, 0xcd, 0xef, 0, // magic
             0, 0, 2, 0, // vers

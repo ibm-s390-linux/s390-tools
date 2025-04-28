@@ -3,8 +3,8 @@
 // Copyright IBM Corp. 2024
 
 use crate::{request::MagicValue, Error};
-use byteorder::{BigEndian, ByteOrder};
 use zerocopy::U32;
+use zerocopy::{BigEndian, ByteOrder};
 
 /// The magic value used to identify an attestation request
 ///

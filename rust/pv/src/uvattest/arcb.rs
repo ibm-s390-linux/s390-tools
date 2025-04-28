@@ -4,7 +4,7 @@
 
 use openssl::pkey::{PKey, Public};
 use std::mem::size_of;
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U32};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32};
 
 use crate::{
     assert_size,
@@ -276,7 +276,7 @@ impl From<AttestationVersion> for RequestVersion {
 
 /// Authenticated additional Data of an [`AttestationRequest`]
 #[repr(C)]
-#[derive(Debug, AsBytes, FromZeroes, FromBytes, Clone, Copy)]
+#[derive(Debug, IntoBytes, FromBytes, Clone, Copy, Immutable, KnownLayout)]
 pub struct AttestationAuthenticated {
     flags: AttestationFlags,
     mai: U32<BigEndian>,
@@ -310,7 +310,7 @@ impl AttestationAuthenticated {
 
 /// Attestation flags
 #[repr(C)]
-#[derive(Default, Debug, AsBytes, FromZeroes, FromBytes, Clone, Copy)]
+#[derive(Default, Debug, IntoBytes, FromBytes, Clone, Copy, Immutable)]
 pub struct AttestationFlags(UvFlags);
 static_assert!(AttestationFlags::FLAG_TO_ADD_SIZE.len() < 64);
 
@@ -393,7 +393,7 @@ impl AttestationFlags {
 }
 
 #[repr(C)]
-#[derive(Debug, AsBytes)]
+#[derive(Debug, IntoBytes, Immutable)]
 struct ReqConfData {
     meas_key: [u8; 64],
     nonce: AttNonce,
