@@ -45,8 +45,10 @@ cp -p /usr/lib/udev/rules.d/81-dpm.rules "$DESTDIR/usr/lib/udev/rules.d/"
 _tempfile=$(mktemp --tmpdir initramfs-zdev.XXXXXX)
 
 # Obtain early + root device configuration
-chzdev --export "$_tempfile" --persistent --by-path / \
-       --by-attrib "zdev:early=1" --quiet --type 2>/dev/null
+chzdev --export - --active --by-path / --quiet 2>/dev/null |
+	sed -e 's/active/persistent/g' > "$_tempfile"
+chzdev --export - --persistent --by-path / --by-attrib "zdev:early=1" \
+	--quiet --type 2>/dev/null >>"$_tempfile"
 
 # Apply via --import to prevent other devices from being configured.
 # Rename the resulting cio-ignore rule to ensure that it does not override
