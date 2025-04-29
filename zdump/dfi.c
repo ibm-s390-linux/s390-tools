@@ -108,10 +108,37 @@ static void date_print(void)
 }
 
 /*
+ * Obtain online cpu count based on the lowcore_ptr entries
+ */
+static unsigned int lowcore_cpu_count(void)
+{
+	unsigned long *cpu_lowcore;
+	unsigned long ptr, length;
+	unsigned int i, count = 0;
+
+	if (dfi_vmcoreinfo_symbol(&ptr, "lowcore_ptr"))
+		return 0;
+	if (dfi_vmcoreinfo_length(&length, "lowcore_ptr") || length == 0)
+		return 0;
+	cpu_lowcore = zg_alloc(length * sizeof(*cpu_lowcore));
+	if (dfi_mem_virt_read(dfi_vm_vtop(ptr), cpu_lowcore, length * sizeof(*cpu_lowcore)) == 0) {
+		for (i = 0; i < length; i++) {
+			if (cpu_lowcore[i])
+				count++;
+		}
+		util_log_print(UTIL_LOG_INFO, "DFI lowcore_ptr entries count: %lu\n", count);
+	}
+	zg_free(cpu_lowcore);
+	return count;
+}
+
+/*
  * Print dump information (--info option)
  */
 void dfi_info_print(void)
 {
+	const unsigned int online_cpu_cnt = l.cpus.cnt ? l.cpus.cnt : lowcore_cpu_count();
+
 	STDERR("General dump info:\n");
 	STDERR("  Dump format........: %s\n", l.dfi->name);
 	if (l.attr.dfi_version)
@@ -129,8 +156,8 @@ void dfi_info_print(void)
 	if (l.attr.vol_nr)
 		STDERR("  Volume number......: %u\n", *l.attr.vol_nr);
 	STDERR("  System arch........: %s\n", dfi_arch_str(DFI_ARCH_64));
-	if (l.cpus.cnt)
-		STDERR("  CPU count (online).: %u\n", l.cpus.cnt);
+	if (online_cpu_cnt)
+		STDERR("  CPU count (online).: %u\n", online_cpu_cnt);
 	if (l.attr.real_cpu_cnt)
 		STDERR("  CPU count (real)...: %u\n", *l.attr.real_cpu_cnt);
 	if (dfi_mem_range())
