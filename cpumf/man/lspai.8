@@ -14,6 +14,8 @@ lspai \- list Processor Activity Instrumentation (PAI) counters
 .
 .SH SYNOPSIS
 \*c
+.RB [ \-\-format
+.IR FORMAT ]
 .RB [ \-n ]
 .RB [ \-t
 .IR "\ TYPE" ]
@@ -55,6 +57,12 @@ Crypto refers to the Cryptografic Processing Assist facility counter set.
 Shows the PAI counter sets sorted by counter number.
 Default sort order is PAI counter name.
 .
+.TP
+.BI \-\-format "\ FORMAT"
+Retrieve output in one of the following formats:
+JSON, csv, json-seq or pairs.
+If no format is specified,
+the output defaults to a human-readable format.
 .SH "EXAMPLE"
 The \*c invocation lists all PAI Neural Network Processing Assist Facility
 (NNPA) counters in numeric order:

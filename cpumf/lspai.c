@@ -19,18 +19,26 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "lib/util_opt.h"
-#include "lib/util_prg.h"
 #include "lib/util_base.h"
-#include "lib/util_path.h"
-#include "lib/util_scandir.h"
-#include "lib/util_libc.h"
 #include "lib/util_file.h"
+#include "lib/util_fmt.h"
+#include "lib/util_libc.h"
 #include "lib/util_list.h"
+#include "lib/util_opt.h"
+#include "lib/util_path.h"
+#include "lib/util_prg.h"
+#include "lib/util_scandir.h"
 #include "lib/libcpumf.h"
 
+#define	OPT_FORMAT		256	/* --format XXX option */
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS"),
+	{
+		.option = { "format", required_argument, NULL, OPT_FORMAT },
+		.argument = "FORMAT",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "List counters in specified FORMAT (" FMT_TYPE_NAMES ")"
+	},
 	{
 		.option = { "numeric", no_argument, NULL, 'n' },
 		.desc = "Sort PAI counters by counter number"
@@ -58,6 +66,7 @@ static const struct util_prg prg = {
 };
 
 static bool numsort;		/* If true sort counter numerically */
+static int output_format = -1;	/* Generate style if >= 0 */
 
 #define PAI_PATH	"/bus/event_source/devices/%s"
 
@@ -190,11 +199,43 @@ static void read_counternames(struct pai_node *node)
 		qsort(node->ctrlist, more, sizeof(*node->ctrlist), pai_ctrcmp);
 }
 
+static void show_format(enum util_fmt_t fmt)
+{
+	struct pai_node *node;
+
+	util_fmt_init(stdout, fmt, FMT_HANDLEINT, 1);
+	util_fmt_obj_start(FMT_DEFAULT, NULL);
+	util_list_iterate(&pai_list, node) {
+		util_fmt_obj_start(FMT_DEFAULT, "pmu");
+		util_fmt_pair(FMT_PERSIST, "base", "%d",  node->base);
+		util_fmt_pair(FMT_PERSIST, "type", "%d",  node->pmu);
+		util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "pmu-name", "%s", node->sysfs_name);
+		util_fmt_obj_start(FMT_LIST, "counters");
+		for (int i = 0; i < node->ctridx; ++i) {
+			util_fmt_obj_start(FMT_ROW, "counter");
+			util_fmt_pair(FMT_QUOTE, "name", "%s", node->ctrlist[i].name);
+			util_fmt_pair(FMT_DEFAULT, "config", "%d", node->ctrlist[i].nr);
+			util_fmt_pair(FMT_DEFAULT, "number", "%d",
+				      node->ctrlist[i].nr - node->base);
+			util_fmt_obj_end();
+		}
+		util_fmt_obj_end();		/* Counters */
+		util_fmt_obj_end();		/* PMU */
+	}
+	util_fmt_obj_end();
+	util_fmt_exit();
+}
+
 static void show_painode(void)
 {
 	struct pai_node *node;
 	int indent = 0;
 	int offset = 0;
+
+	if (output_format != -1) {
+		show_format(output_format);
+		return;
+	}
 
 	util_list_iterate(&pai_list, node) {
 		for (int i = 0; i < node->ctridx; ++i)
@@ -305,6 +346,7 @@ static void check_type_name(const char *type)
 
 int main(int argc, char **argv)
 {
+	enum util_fmt_t fmt;
 	int ch;
 
 	util_list_init(&pai_list, struct pai_node, node);
@@ -328,6 +370,11 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			check_type_name(optarg);
+			break;
+		case OPT_FORMAT:
+			if (!util_fmt_name_to_type(optarg, &fmt))
+				errx(EXIT_FAILURE, "Supported formats:" FMT_TYPE_NAMES);
+			output_format = fmt;
 			break;
 		}
 	}
