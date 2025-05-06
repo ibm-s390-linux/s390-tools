@@ -14,7 +14,7 @@ ifneq (${HAVE_CARGO},0)
 	CARGO_TARGETS :=
 
 	BUILD_TARGETS = $(CARGO_TARGETS)
-	INSTALL_TARGETS := install-rust-tools install-man
+	INSTALL_TARGETS := install-rust-tools install-man install-shell-completions
 	CARGO_TEST_TARGETS = $(addsuffix .test, $(CARGO_TARGETS))
 
 ifeq ($(HOST_ARCH),s390x)
@@ -116,6 +116,8 @@ install-man:
 	$(foreach target,$(PV_TARGETS),\
 		$(INSTALL) -m 644 $(target)/man/*.1 -t $(DESTDIR)$(MANDIR)/man1;)
 
+install-shell-completions: install-bash-completion install-zsh-completion
+
 install-bash-completion: $(PV_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(BASHCOMPLETIONDIR)
 	$(foreach target,$(PV_TARGETS),\
@@ -126,7 +128,7 @@ install-zsh-completion: $(PV_TARGETS)
 	$(foreach target,$(PV_TARGETS),\
 		$(INSTALL) -m 0644 --preserve-timestamps -- $(shell find $(shell ls --sort=time --reverse --directory target/release/build/$(target)-*/out/ |tail -n1) -regex '.*/_[a-zA-Z0-9]+') $(DESTDIR)$(ZSHCOMPLETIONDIR);)
 
-.PHONY: all install clean skip-build install-rust-tools print-rust-targets install-man rust-test install-bash-completion install-zsh-completion
+.PHONY: all install clean skip-build install-rust-tools print-rust-targets install-man rust-test install-bash-completion install-zsh-completion install-shell-completions
 
 .check-cargo:
 ifeq ($(shell command -v $(CARGO)),)
