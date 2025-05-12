@@ -144,6 +144,7 @@ static int envblk_update(struct zipl_envblk *zeb)
 	util_proc_part_free_entry(&part_entry);
 	return 0;
 error_close:
+	fsync(dev_fd);
 	close(dev_fd);
 error:
 	util_proc_part_free_entry(&part_entry);

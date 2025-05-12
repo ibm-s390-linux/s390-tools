@@ -784,6 +784,7 @@ install_tapeloader(const char* device, const char* image, const char* parmline,
 		error_text("Could not rewind tape device '%s' to tape", device);
 		rc = -1;
 	}
+	fsync(fd);
 	close(fd);
 	return rc;
 }

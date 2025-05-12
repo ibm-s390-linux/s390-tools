@@ -760,6 +760,7 @@ disk_is_tape(const char* device)
 		return 0;
 	if (rewind_tape(fd) == 0)
 		rc = 1;
+	fsync(fd);
 	close(fd);
 	return rc;
 }
