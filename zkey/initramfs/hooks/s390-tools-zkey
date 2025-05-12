@@ -29,7 +29,7 @@ esac
 . /usr/share/initramfs-tools/hook-functions
 
 # Add zcrypt modules
-zdev_modules="uvdevice pkey pkey_cca pkey_ep11 pkey_pckmo pkey_uv pkey_sysfs paes_s390 zcrypt zcrypt_cex4"
+zdev_modules="uvdevice pkey pkey_cca pkey_ep11 pkey_pckmo pkey_uv paes_s390 zcrypt zcrypt_cex4"
 
 for x in $zdev_modules ; do
 	manual_add_modules ${x}
@@ -40,6 +40,8 @@ copy_exec /sbin/chzcrypt
 copy_exec /sbin/lszcrypt
 copy_exec /usr/bin/zkey
 copy_exec /usr/bin/zkey-cryptsetup
+copy_exec /usr/lib64/zkey/zkey-ekmfweb.so
+copy_exec /usr/lib64/zkey/zkey-kmip.so
 
 mkdir -p "${DESTDIR}/etc"
 cp -a /etc/zkey "${DESTDIR}/etc/"
