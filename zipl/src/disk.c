@@ -1064,7 +1064,7 @@ disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk, const voi
 						    count);
 
 	if (*blocklist == NULL) {
-		close(mfd->fd);
+		misc_close(mfd);
 		return 0;
 	}
 	/* Build list */

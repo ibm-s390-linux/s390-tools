@@ -131,6 +131,23 @@ int misc_open_device(const char *filename, struct misc_fd *mfd, int simulate)
 	return mfd->fd;
 }
 
+int misc_close(struct misc_fd *mfd)
+{
+	while (fsync(mfd->fd) != 0) {
+		if (errno == EINTR)
+			continue;
+		if (errno != EBADF)
+			error_reason(strerror(errno));
+		break;
+	}
+	if (close(mfd->fd) == 0) {
+		mfd->fd = -1;
+		return 0;
+	}
+	error_reason(strerror(errno));
+	return -1;
+}
+
 /* Read COUNT bytes of data from file identified by file descriptor FD to
  * memory at location BUFFER. Return 0 when all bytes were successfully read,
  * non-zero otherwise. */

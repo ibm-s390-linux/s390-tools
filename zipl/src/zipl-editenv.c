@@ -160,11 +160,7 @@ static int envblk_close(struct zipl_envblk *zeb)
 	if (zeb->mfd.fd < 0)
 		return 0;
 
-	if (close(zeb->mfd.fd) == 0) {
-		zeb->mfd.fd = -1;
-		return 0;
-	}
-	return -1;
+	return misc_close(&zeb->mfd);
 }
 
 /**
