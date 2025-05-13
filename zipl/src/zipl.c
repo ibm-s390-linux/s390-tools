@@ -244,10 +244,6 @@ main(int argc, char* argv[])
 	}
 	switch (rc) {
 	case 0: /* Operation completed successfully */
-		if (verbose)
-			printf("Syncing disks...\n");
-		if (!dry_run)
-			sync();
 		printf("Done.\n");
 		break;
 	case -2: /* Operation canceled by user */
