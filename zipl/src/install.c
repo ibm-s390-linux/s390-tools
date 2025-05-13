@@ -291,7 +291,7 @@ static int install_eckd_cdl_ld(int fd, disk_blockptr_t *br,
 		return -1;
 	rc = DRY_RUN_FUNC(misc_write(fd, &vl, sizeof(vl)));
 	if (rc)
-		error_text("Could not update volume lablel 'vol1'");
+		error_text("Could not update volume label 'vol1'");
 	return 0;
 }
 
@@ -784,6 +784,7 @@ install_tapeloader(const char* device, const char* image, const char* parmline,
 		error_text("Could not rewind tape device '%s' to tape", device);
 		rc = -1;
 	}
+	fsync(fd);
 	close(fd);
 	return rc;
 }
@@ -1129,7 +1130,7 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 					  "continue creating a dump "
  					  "tape (y/n) ?", device);
 		if (rc) {
-			close(mfd.fd);
+			misc_close(&mfd);
 			return rc;
 		}
 		if (verbose)
@@ -1144,10 +1145,10 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 				       "tape device '%s'.\n", device);
 			}
 		}
-		close(mfd.fd);
+		misc_close(&mfd);
 		return rc;
 	}
-	close(mfd.fd);
+	misc_close(&mfd);
 	/* This is a disk device */
 	rc = disk_get_info(device, target, &info);
 	if (rc) {
@@ -1220,9 +1221,7 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 	}
 	misc_free_temp_dev(tempdev);
 	disk_free_info(info);
-	if (fsync(mfd.fd))
-		error_text("Could not sync device file '%s'", device);
-	if (close(mfd.fd))
+	if (misc_close(&mfd) != 0)
 		error_text("Could not close device file '%s'", device);
 	return rc;
 }
@@ -1261,11 +1260,13 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 			/* Rewind worked - this is a tape */
 			error_text("Dump target '%s' is a tape device",
 				   device[i]);
-			close(mfd.fd);
+			misc_close(&mfd);
+			;
 			rc = -1;
 			goto out;
 		}
-		close(mfd.fd);
+		misc_close(&mfd);
+		;
 		/* This is a disk device */
 		rc = disk_get_info(device[i], target, &info[i]);
 		if (rc) {
@@ -1361,9 +1362,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		rc = install_mvdump_eckd_cdl(&mfd, info[i], &stage2dump_parms, &mvdump_parms);
 		misc_free_temp_dev(tempdev);
 
-		if (fsync(mfd.fd))
-			error_text("Could not sync device file '%s'", device);
-		if (close(mfd.fd))
+		if (misc_close(&mfd) != 0)
 			error_text("Could not close device file '%s'", device);
 
 		if (rc)
