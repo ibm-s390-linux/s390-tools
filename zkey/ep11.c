@@ -403,6 +403,9 @@ static int ep11_adm_reencrypt(struct ep11_lib *ep11, target_t target,
 		return -EINVAL;
 	}
 
+	memset(&rb, 0, sizeof(rb));
+	memset(&lrb, 0, sizeof(lrb));
+
 	rb.domain = domain;
 	lrb.domain = domain;
 

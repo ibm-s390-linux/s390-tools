@@ -1501,6 +1501,9 @@ int SK_EP11_reencipher_key(const struct sk_ext_ep11_lib *ep11_lib,
 		return -ENODEV;
 	}
 
+	memset(&rb, 0, sizeof(rb));
+	memset(&lrb, 0, sizeof(lrb));
+
 	rb.domain = domain;
 	lrb.domain = domain;
 
