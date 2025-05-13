@@ -434,7 +434,7 @@ misc_write(int fd, const void* data, size_t count)
 }
 
 /**
- * Instead of writing, upadte only current position in the file
+ * Instead of writing, update only current position in the file
  */
 static int misc_simulate_write(int fd, size_t count)
 {

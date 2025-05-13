@@ -663,7 +663,7 @@ static int disk_set_info_complete(struct job_target_data *td,
  * To exclude any user assumptions about the DEVICE, this function
  * should be called with TD pointing to a zeroed structure.
  *
- * DEVICE: logical, or physical device, optionally formated with a
+ * DEVICE: logical, or physical device, optionally formatted with a
  * file system.
  */
 int disk_get_info(const char *device, struct job_target_data *td,
@@ -1061,6 +1061,7 @@ disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk, const voi
 	count = (bytecount + info->phy_block_size - 1) / info->phy_block_size;
 	*blocklist = (disk_blockptr_t *)util_zalloc(sizeof(disk_blockptr_t) *
 						    count);
+
 	if (*blocklist == NULL) {
 		close(mfd->fd);
 		return 0;

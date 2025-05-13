@@ -291,7 +291,7 @@ static int install_eckd_cdl_ld(int fd, disk_blockptr_t *br,
 		return -1;
 	rc = DRY_RUN_FUNC(misc_write(fd, &vl, sizeof(vl)));
 	if (rc)
-		error_text("Could not update volume lablel 'vol1'");
+		error_text("Could not update volume label 'vol1'");
 	return 0;
 }
 
