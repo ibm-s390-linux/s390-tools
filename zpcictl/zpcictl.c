@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <time.h>
@@ -136,6 +137,13 @@ static void fwrite_err(FILE *fp, char *path)
 	if (fclose(fp))
 		fclose_err(path);
 	free(path);
+	exit(EXIT_FAILURE);
+}
+
+static void missing_option_err(void)
+{
+	warnx("No option specified");
+	util_prg_print_parse_error();
 	exit(EXIT_FAILURE);
 }
 
@@ -357,15 +365,20 @@ static void sclp_report_error(struct zpci_device *pdev)
 	sclp_issue_action(pdev, SCLP_ERRNOTIFY_AQ_REPORT_ERR);
 }
 
-static void parse_cmdline(int argc, char *argv[], struct options *opts)
+static bool parse_cmdline(int argc, char *argv[], struct options *opts)
 {
+	bool opt_specified = false;
 	int cmd;
 
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
-	do {
+	while (1) {
 		cmd = util_opt_getopt_long(argc, argv);
+		if (cmd == -1)
+			break;
+
+		opt_specified = true;
 
 		switch (cmd) {
 		case OPT_RESET:
@@ -387,16 +400,13 @@ static void parse_cmdline(int argc, char *argv[], struct options *opts)
 		case 'v':
 			util_prg_print_version();
 			exit(EXIT_SUCCESS);
-		case -1:
-			/* End of options string */
-			if (argc == 1) {
-				errx(EXIT_FAILURE,
-				     "Use '%s --help' for more information",
-				     argv[0]);
-			}
-			break;
+		default:
+			util_opt_print_parse_error(cmd, argv);
+			exit(EXIT_FAILURE);
 		}
-	} while (cmd != -1);
+	}
+
+	return opt_specified;
 }
 
 int main(int argc, char *argv[])
@@ -404,7 +414,8 @@ int main(int argc, char *argv[])
 	struct zpci_device pdev = { 0 };
 	struct options opts = { 0 };
 
-	parse_cmdline(argc, argv, &opts);
+	if (!parse_cmdline(argc, argv, &opts))
+		missing_option_err();
 
 	if (optind >= argc)
 		errx(EXIT_FAILURE, "No device specified");
