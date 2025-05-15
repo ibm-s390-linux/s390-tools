@@ -115,6 +115,7 @@ install-man:
 		$(INSTALL) -m 644 $(target)/man/*.1 -t $(DESTDIR)$(MANDIR)/man1;)
 	$(foreach target,$(PV_TARGETS),\
 		$(INSTALL) -m 644 $(target)/man/*.1 -t $(DESTDIR)$(MANDIR)/man1;)
+	ln -sf pvimg-create.1 $(DESTDIR)$(MANDIR)/man1/genprotimg.1
 
 install-shell-completions: install-bash-completion install-zsh-completion
 
