@@ -282,6 +282,18 @@ The \fBgenprotimg\fR(1) command is a symbolic link to the \fBpvimg-create\fR(1) 
 An ELF file cannot be used as a Linux kernel image.
 .IP "3." 4
 Remember to re-run \fBzipl\fR after updating an IBM Secure Execution image.
+.IP "4." 4
+With \fBgenprotimg\fR version \fB2.36.0\fR two breaking API changes were
+introduced:
+.RS
+.IP "1." 4
+An existing output file is no longer silently overwritten; to revert to the old
+behavior use the \fB\-\-overwrite\fR option.
+.IP "2." 4
+The Linux kernel component is now checked to determine whether it is a binary
+s390x kernel. To disable this behavior use the \fB\-\-no\-component\-check\fR
+option.
+.RE
 .SH "SEE ALSO"
 .sp
 \fBpvimg-create\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)
