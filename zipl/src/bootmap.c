@@ -1617,6 +1617,11 @@ static int finalize_create_file(struct job_data *job, struct install_set *bis)
 {
 	char *final_name;
 
+	/*
+	 * Sync the file before rename
+	 */
+	if (misc_fsync(&bis->mfd, bis->filename))
+		return -1;
 	final_name = misc_make_path(job->target.bootmap_dir, BOOTMAP_FILENAME);
 	if (!final_name)
 		return -1;
@@ -1632,6 +1637,18 @@ static int finalize_create_file(struct job_data *job, struct install_set *bis)
 	 * from the semantic volume
 	 */
 	bis->tmp_filename_created = 0;
+	/*
+	 * Sync meta-data and the parent directory of the new object.
+	 * For this, sync the whole file system, using the descriptor
+	 * obtained for the file with the old name.
+	 */
+	if (syncfs(bis->mfd.fd)) {
+		error_reason(strerror(errno));
+		error_text("Could not sync fs containing '%s'",
+			   final_name);
+		free(final_name);
+		return -1;
+	}
 	free(final_name);
 	return 0;
 }
@@ -1698,7 +1715,11 @@ static int ngdump_create_meta(const char *path)
 	rc = fclose(fp);
 	if (rc < 0)
 		return -1;
-
+	/*
+	 * In case of dry-run the meta-file will be removed.
+	 * Otherwise it will be written to disk when unmounting
+	 * the ngdump.
+	 */
 	return 0;
 }
 
@@ -1861,13 +1882,15 @@ int prepare_bootloader(struct job_data *job, struct install_set *bis)
  */
 int post_install_bootloader(struct job_data *job, struct install_set *bis)
 {
+	if (dry_run)
+		return 0;
 	if (job->id == job_dump_partition) {
 		if (job_dump_is_ngdump(job))
-			return dry_run ? 0 : finalize_create_file(job, bis);
+			return finalize_create_file(job, bis);
 		else
-			return 0;
+			return misc_fsync(&bis->mfd, bis->filename);
 	} else {
-		return dry_run ? 0 : finalize_create_file(job, bis);
+		return finalize_create_file(job, bis);
 	}
 }
 

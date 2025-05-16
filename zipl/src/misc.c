@@ -131,6 +131,16 @@ int misc_open_device(const char *filename, struct misc_fd *mfd, int simulate)
 	return mfd->fd;
 }
 
+int misc_fsync(struct misc_fd *mfd, const char *filename)
+{
+	if (fsync(mfd->fd)) {
+		error_reason(strerror(errno));
+		error_text("Could not sync file '%s'", filename);
+		return -1;
+	}
+	return 0;
+}
+
 /* Read COUNT bytes of data from file identified by file descriptor FD to
  * memory at location BUFFER. Return 0 when all bytes were successfully read,
  * non-zero otherwise. */

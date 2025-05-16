@@ -784,6 +784,8 @@ install_tapeloader(const char* device, const char* image, const char* parmline,
 		error_text("Could not rewind tape device '%s' to tape", device);
 		rc = -1;
 	}
+	if (!dry_run && fsync(fd))
+		error_text("Could not sync device file '%s'", device);
 	close(fd);
 	return rc;
 }
@@ -1139,7 +1141,7 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 			error_text("Could not install dump record on tape "
 				   "device '%s'", device);
 		} else {
-			if (verbose) {
+			if (!misc_fsync(&mfd, device) && verbose) {
 				printf("Dump record successfully installed on "
 				       "tape device '%s'.\n", device);
 			}

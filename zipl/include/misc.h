@@ -34,6 +34,7 @@ int misc_asprintf(char **out, const char *fmt, ...);
 void* misc_calloc(size_t n, size_t size);
 char* misc_strdup(const char* s);
 int misc_open_device(const char *filename, struct misc_fd *mfd, int simulate);
+int misc_fsync(struct misc_fd *mfd, const char *filename);
 int misc_read(int fd, void* buffer, size_t count);
 int misc_read_file(const char* filename, char** buffer, size_t* size,
 		   int nil_terminate);
