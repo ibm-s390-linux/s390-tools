@@ -32,6 +32,9 @@ declare TYPE
 declare NAME
 declare SYSPLEX
 
+declare PV_GUEST
+declare -i CPI_PERMIT="$CPI_PERMIT_ON_PVGUEST"
+
 declare -i DRYRUN=0
 
 # Exit codes
@@ -40,6 +43,7 @@ readonly EXIT_FAILURE=1
 readonly EXIT_ARG_TOO_LONG=3
 readonly EXIT_INVALID_CHARS=4
 readonly EXIT_INVALID_ARGS=5
+readonly EXIT_NO_PERMIT_CPI=6
 
 # Distro-IDs as supported by SE/HMC firmware
 readonly DISTRO_GENERIC=0
@@ -69,6 +73,10 @@ Configure the Control-Program-Information (CPI) settings.
   -S, --sysplex SYSPLEX  Set and commit the sysplex name to SYSPLEX
   -T, --type TYPE        Set and commit OS type to TYPE
   -v, --version          Print version information, then exit
+  --permit-cpi           Permit to send Control-Program Identification data of
+                         protected virtualization guest to the host (must be
+                         specified before any commit option). See also the
+                         important note.
   --commit               Ignore all other options and commit any uncommitted
                          values
   --dry-run              Do not actually set or commit anything, but show what
@@ -77,7 +85,17 @@ Configure the Control-Program-Information (CPI) settings.
                          uncommitted) values
 
 Environment variables used for the --defaults option:
-  CPI_SYSTEM_TYPE, CPI_SYSTEM_LEVEL, CPI_SYSTEM_NAME, CPI_SYSPLEX_NAME
+  CPI_SYSTEM_TYPE, CPI_SYSTEM_LEVEL, CPI_SYSTEM_NAME, CPI_SYSPLEX_NAME,
+  CPI_PERMIT_ON_PVGUEST (See also the important note.)
+
+Important: Set CPI_PERMIT_ON_PVGUEST=1 or use --permit_cpi option only if you
+trust the host system. Enabling these options allows the host to receive
+potentially sensitive Control-Program Identification (CPI) data from the
+protected virtualization guest, including:
+- system_type
+- system_level
+- sysplex_name
+- system_name
 
 Available bits for the --set-bit option:
   kvm: Indicate that system is a KVM host
@@ -124,6 +142,19 @@ fail_with()
 
 cpi_commit()
 {
+	# Commit Control-Program Identification changes on protected
+	# virtualization guests only if it is permitted by the guest. This
+	# prevents leakage of potentially sensitive information to untrusted
+	# hosts.
+	if [[ -f "/sys/firmware/uv/prot_virt_guest" ]]; then
+		read -r PV_GUEST < "/sys/firmware/uv/prot_virt_guest"
+		if [[ "$PV_GUEST" -eq 1 ]]; then
+			if [[ -z "$CPI_PERMIT" ]] || [[ "$CPI_PERMIT" -ne 1 ]]; then
+				echo "Sending CPI data from secure execution Linux guests is disabled. Use --permit-cpi to enable CPI data." >&2
+				exit "$EXIT_NO_PERMIT_CPI"
+			fi
+		fi
+	fi
 	echo 1 > "$CPI_SET" 2> /dev/null
 }
 
@@ -404,7 +435,7 @@ if [ $# -le 0 ]; then
 	print_parse_error_and_exit
 fi
 
-opts=$(getopt -o b:ehL:N:S:T:v -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,show,version -n $PRG -- "$@")
+opts=$(getopt -o b:ehL:N:S:T:v -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,permit-cpi,show,version -n "$PRG" -- "$@")
 if [ $? -ne 0 ]; then
 	print_parse_error_and_exit
 fi
@@ -472,6 +503,10 @@ while [ -n $1 ]; do
 	--show)
 		cpi_show
 		exit $EXIT_SUCCESS
+		;;
+	--permit-cpi)
+		CPI_PERMIT=1
+		shift
 		;;
 	--commit)
 		cpi_commit

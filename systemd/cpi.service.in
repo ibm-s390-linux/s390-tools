@@ -37,6 +37,7 @@ EnvironmentFile=@sysconf_path@/sysconfig/cpi
 # Environment=CPI_SYSPLEX_NAME=
 # Environment=CPI_SYSTEM_LEVEL=
 # Environment=CPI_SYSTEM_TYPE=LINUX
+# Environment=CPI_PERMIT_ON_PVGUEST=
 
 #
 # Sending data to the HMC/SE

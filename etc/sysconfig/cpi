@@ -18,3 +18,17 @@ CPI_SYSTEM_NAME=""
 # CPI sysplex name
 #
 CPI_SYSPLEX_NAME=""
+
+#
+# CPI permit on protected virtualization guests
+#
+# Important: Set CPI_PERMIT_ON_PVGUEST=1 only if you trust the host system.
+# Enabling these options allows the host to receive potentially sensitive
+# Control-Program Identification (CPI) data from the protected virtualization
+# guest, including:
+# - system_type
+# - system_level
+# - sysplex_name
+# - system_name
+#
+CPI_PERMIT_ON_PVGUEST=
