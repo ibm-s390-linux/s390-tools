@@ -14,13 +14,15 @@ lshwc \- extract CPU Measurement Facilities counter sets
 .
 .SH SYNOPSIS
 \*c
-.RB [ \-a ][ \-d ][ \-H ][ \-s ][ \-x ][ \-X ]
+.RB [ \-a ][ \-d ][ \-H ][ \-s ][ \-x ][ \-X ][ \-q ]
 .RB [ \-l
 .IR count ]
 .RB [ \-i
 .IR interval ]
 .RB [ \-t
 .IR time ]
+.RB [ \-f
+.IR format ]
 \fR[\fIcpulist\fR][:\fIsets\fR]\fP
 .br
 \*c
@@ -128,6 +130,49 @@ Displays counter values as hexadecimal values.
 Displays counter values as hexadecimal values with a leading 0x prefix.
 .
 .TP
+.BR \-q
+Apply quoting to every output element, regardless of content or format.
+.
+.TP
+.BR \-f ", " \-\-format \fI\ format\fP
+Retrieve output in one of the following formats:
+JSON, CSV, JSON-SEQ or PAIRS.
+If no format is specified, the output defaults to CSV.
+.
+.SS JSON Output Structure
+The JSON output contains two top-level objects:
+.B "meta"
+and
+.B "lshwc"
+
+.TP
+.B meta
+General metadata such as API version, host, and timestamp.
+
+.TP
+.B lshwc
+Measurement data and configuration.
+
+.RS
+.IP \fBcpumcf info\fP
+CPU Measurement Counter Facility information.
+.IP \fBmeasurements\fP
+An array of objects, each representing a CPU or "total". 
+Each object includes:
+.RS
+.IP \fBcpu\fP
+CPU identifier, such as 0, 1 or "delta" or "total".
+.IP \fBdate_time\fP
+Timestamp in ISO 8601 format.
+.IP \fBtime_epoch\fP
+The number of seconds since the epoch: 1970-01-01 00:00:00 UTC.
+.IP \fBcounters\fP
+An array of counter objects, each containing \fBname\fP (if available), \fBid\fP,
+and \fBvalue\fP.
+.RE
+.RE
+.
+.TP
 \fR[\fIcpulist\fR][:\fIsets\fR]\fP
 A comma-separated list of CPUs.
 Each CPU can optionally be followed by characters that specify the counter set.
@@ -208,6 +253,101 @@ Date,Time,CPU,B0,B1,B2,B3,B4,B5
 2025-03-26,10:34:54,Delta,77154817,65371168,562153,12671030,349750,12311061
 2025-03-26,10:34:59,Delta,88871882,75441201,655310,14875963,392530,13773130
 2025-03-26,10:35:04,Delta,83763472,71730813,609260,13643680,366992,12672405
+.ft
+.fi
+.sp 1
+This example shows the counter values of the problem state counter set with
+CPU 3 selected.
+.nf
+.ft CW
+.sp 1
+# lshwc -l2 -a 3:P -H --format json
+{
+  "meta": {
+    "api_level": 1,
+    "version": "2.37.0-build-20250616",
+    "host": "b46lp08.lnxne.boe",
+    "time_epoch": 1750094646,
+    "time": "2025-06-16 19:24:06+0200"
+  },
+  "lshwc": {
+    "cpumcf info": {
+      "counter first": 3,
+      "counter second": 8,
+      "authorization": 47
+    },
+    "measurements": [
+      {
+        "date_time": "2025-06-16 19:24:06+0200",
+        "time_epoch": 1750094646,
+        "cpu": 3,
+        "counters": [
+          {
+            "name": "problem_state_cpu_cycles",
+            "id": 32,
+            "value": 0
+          },
+          {
+            "name": "problem_state_instructions",
+            "id": 33,
+            "value": 0
+          }
+        ]
+      },
+      {
+        "date_time": "2025-06-16 19:24:06+0200",
+        "time_epoch": 1750094646,
+        "cpu": "total",
+        "counters": [
+          {
+            "name": "problem_state_cpu_cycles",
+            "id": 32,
+            "value": 0
+          },
+          {
+            "name": "problem_state_instructions",
+            "id": 33,
+            "value": 0
+          }
+        ]
+      },
+      {
+        "date_time": "2025-06-16 19:25:06+0200",
+        "time_epoch": 1750094706,
+        "cpu": 3,
+        "counters": [
+          {
+            "name": "problem_state_cpu_cycles",
+            "id": 32,
+            "value": 0
+          },
+          {
+            "name": "problem_state_instructions",
+            "id": 33,
+            "value": 0
+          }
+        ]
+      },
+      {
+        "date_time": "2025-06-16 19:25:06+0200",
+        "time_epoch": 1750094706,
+        "cpu": "total",
+        "counters": [
+          {
+            "name": "problem_state_cpu_cycles",
+            "id": 32,
+            "value": 0
+          },
+          {
+            "name": "problem_state_instructions",
+            "id": 33,
+            "value": 0
+          }
+        ]
+      }
+    ]
+  }
+}
 .ft
 .fi
 .SH "SEE ALSO"

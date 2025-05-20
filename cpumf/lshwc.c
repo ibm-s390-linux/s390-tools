@@ -39,6 +39,7 @@
 #include "lib/util_scandir.h"
 #include "lib/util_libc.h"
 #include "lib/util_file.h"
+#include "lib/util_fmt.h"
 #include "lib/libcpumf.h"
 
 #include "lshwc.h"
@@ -58,15 +59,51 @@ static char *ctrformat = "%ld";
 static bool shortname;
 static bool hideundef;
 static bool delta, firstread;
+static int output_format = FMT_CSV;
+static bool quote_all;
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
 static struct ctrname {		/* List of defined counters */
 	char *name;		/* Counter name */
+	char *label;		/* Output name */
 	bool hitcnt;		/* Counter number read from ioctl() */
 	unsigned long total;	/* Total counter value */
 	unsigned long *ccv;	/* Per CPU counter value */
 	unsigned long *ccvprv;	/* Per CPU counter value (previous read) */
 } ctrname[MAXCTRS];
+
+struct time_formats {
+	char epoch[32];
+	char date_time[32];
+	char date[16];
+	char time[16];
+};
+
+static void mk_labels(void)
+{
+	char label[64];
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(ctrname); ++i) {
+		if (shortname) {
+			if (ctrname[i].name)
+				snprintf(label, sizeof(label), "%s", ctrname[i].name);
+			else
+				snprintf(label, sizeof(label), "U%ld", i);
+		} else {
+			if (output_format == FMT_CSV)
+				snprintf(label, sizeof(label), "%s(%ld)",
+					 ctrname[i].name ?: "Counter", i);
+			else if (ctrname[i].name)
+				snprintf(label, sizeof(label), "%s", ctrname[i].name);
+			else
+				label[0] = 0;
+		}
+		if (output_format != FMT_CSV)
+			util_str_tolower(label);
+		ctrname[i].label = util_strdup(label);
+	}
+}
 
 static char *mk_name(int ctr, char *name)
 {
@@ -130,6 +167,7 @@ static void free_counternames(void)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		free(ctrname[i].name);
+		free(ctrname[i].label);
 		free(ctrname[i].ccv);
 		free(ctrname[i].ccvprv);
 	}
@@ -336,90 +374,111 @@ static bool check_setpossible(void)
 	return true;
 }
 
-static void show_header(void)
+static void safe_strtime(char *dest, size_t size, const char *fmt, const struct tm *tm)
 {
-	static bool header;
-	bool comma = false;
-
-	if (header)
-		return;			/* Printed already */
-	printf("Date,Time,CPU,");	/* Print counter name and number */
-	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
-		if (!ctrname[i].hitcnt)
-			continue;
-		if (hideundef && !ctrname[i].name)
-			continue;
-		if (comma)
-			putchar(',');
-		if (shortname) {
-			if (ctrname[i].name)
-				printf("%s", ctrname[i].name);
-			else
-				printf("U%ld", i);
-		} else {
-			printf("%s(%ld)", ctrname[i].name ?: "Counter", i);
-		}
-		comma = true;
-	}
-	putchar('\n');
-	header = true;
+	if (!strftime(dest, size, fmt, tm))
+		dest[0] = 0;
 }
 
-static void line(char *header)
+static void generate_timestamp(struct time_formats *date)
 {
-	bool comma;
+	time_t now = time(NULL);
+	struct tm *now_tm = localtime(&now);
 
-	show_header();
-	if (allcpu) {
-		for (unsigned int h = 0; h < max_possible_cpus; ++h) {
-			char txt[16];
+	safe_strtime(date->date_time, sizeof(date->date_time), "%F %T%z", now_tm);
+	safe_strtime(date->date, sizeof(date->date), "%F", now_tm);
+	safe_strtime(date->time, sizeof(date->time), "%T", now_tm);
+	safe_strtime(date->epoch, sizeof(date->epoch), "%s", now_tm);
+}
 
-			if (!check[h].cpu_hit)
-				continue;
-			comma = false;
-			snprintf(txt, sizeof(txt), "CPU%d,", h);
-			printf("%s%s", header, txt);
-			for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
-				if (!ctrname[i].hitcnt)
-					continue;
-				if (hideundef && !ctrname[i].name)
-					continue;
-				if (comma)
-					putchar(',');
-				printf(ctrformat, ctrname[i].ccv[h]);
-				comma = true;
-			}
-			putchar('\n');
-		}
+static void output_times(struct time_formats date)
+{
+	if (output_format == FMT_CSV) {
+		util_fmt_pair(FMT_PERSIST, "Date", "%s", date.date);
+		util_fmt_pair(FMT_PERSIST, "Time", "%s", date.time);
+	} else {
+		util_fmt_pair(FMT_PERSIST | FMT_QUOTE, "date_time", "%s", date.date_time);
+		util_fmt_pair(FMT_PERSIST, "time_epoch", "%s", date.epoch);
 	}
+}
 
-	/* Print total count of all CPUs */
-	printf("%s%s,", header, delta && !firstread ? "Delta" : "Total");
-	comma = false;
+static void prepare_counter(size_t id, unsigned long value)
+{
+	if (output_format == FMT_CSV) {
+		util_fmt_pair(FMT_PERSIST, ctrname[id].label, ctrformat, value);
+	} else {
+		util_fmt_obj_start(FMT_ROW, NULL);
+		if (strlen(ctrname[id].label))
+			util_fmt_pair(FMT_PERSIST | FMT_QUOTE, "name", ctrname[id].label);
+		util_fmt_pair(FMT_PERSIST, "id", ctrformat, id);
+		util_fmt_pair(FMT_PERSIST, "value", ctrformat, value);
+		util_fmt_obj_end();
+	}
+}
+
+static void output_per_cpu(struct time_formats date)
+{
+	for (unsigned int h = 0; h < max_possible_cpus; ++h) {
+		if (!check[h].cpu_hit)
+			continue;
+
+		char txt[16];
+
+		snprintf(txt, sizeof(txt), "CPU%d", h);
+		util_fmt_obj_start(FMT_ROW, "cpu_%d", h);
+		output_times(date);
+		if (output_format == FMT_CSV) {
+			util_fmt_pair(FMT_PERSIST, "CPU", "CPU%d", h);
+		} else {
+			util_fmt_pair(FMT_PERSIST, "cpu", "%d", h);
+			util_fmt_obj_start(FMT_LIST, "counters");
+		}
+		for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
+			if (!ctrname[i].hitcnt)
+				continue;
+			if (hideundef && !ctrname[i].name)
+				continue;
+			prepare_counter(i, ctrname[i].ccv[h]);
+		}
+		if (output_format != FMT_CSV)
+			util_fmt_obj_end();
+		util_fmt_obj_end();
+	}
+}
+
+static void output_total(struct time_formats date)
+{
+	util_fmt_obj_start(FMT_ROW, "total");
+	output_times(date);
+	if (output_format == FMT_CSV) {
+		util_fmt_pair(FMT_PERSIST, "CPU", "%s", delta && !firstread ? "Delta" : "Total");
+	} else {
+		util_fmt_pair(FMT_PERSIST | FMT_QUOTE, "cpu", "%s",
+			      delta && !firstread ? "delta" : "total");
+		util_fmt_obj_start(FMT_LIST, "counters");
+	}
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
 		if (!ctrname[i].hitcnt)
 			continue;
 		if (hideundef && !ctrname[i].name)
 			continue;
-		if (comma)
-			putchar(',');
-		printf(ctrformat, ctrname[i].total);
-		comma = true;
+		prepare_counter(i, ctrname[i].total);
 		ctrname[i].total = 0;
 		ctrname[i].hitcnt = false;
 	}
-	putchar('\n');
+	if (output_format != FMT_CSV)
+		util_fmt_obj_end();
+	util_fmt_obj_end();
 }
 
-static void show(void)
+static void show_format(void)
 {
-	time_t now = time(NULL);
-	struct tm *now_tm;
-	char now_text[32];
+	struct time_formats now;
 
-	now_tm = localtime(&now);
-	strftime(now_text, sizeof(now_text), "%F,%T,", now_tm);
-	line(now_text);
+	generate_timestamp(&now);
+	if (allcpu)
+		output_per_cpu(now);
+	output_total(now);
 }
 
 /* Return Counter set size numbers (in counters) */
@@ -551,7 +610,7 @@ static int test_read(struct s390_hwctr_read *read)
 			}
 		}
 	}
-	show();
+	show_format();
 	firstread = false;
 	return 0;
 }
@@ -615,6 +674,7 @@ static void do_sleep(void)
 static int do_it(char *s)
 {
 	struct s390_hwctr_start start;
+	unsigned int flags = FMT_WARN;
 	int ioctlfd;
 	int rc;
 
@@ -634,6 +694,24 @@ static int do_it(char *s)
 		return EXIT_FAILURE;
 	}
 
+	if (output_format == FMT_CSV)
+		flags |= FMT_NOMETA;
+	if (output_format == FMT_JSON || output_format == FMT_JSONSEQ)
+		flags |= FMT_HANDLEINT;
+	if (quote_all)
+		flags |= FMT_QUOTEALL;
+
+	mk_labels();
+	util_fmt_init(stdout, output_format, flags, 1);
+	util_fmt_obj_start(FMT_DEFAULT, "lshwc");
+	if (output_format == FMT_JSON || output_format == FMT_JSONSEQ) {
+		util_fmt_obj_start(FMT_ROW, "cpumcf info");
+		util_fmt_pair(FMT_PERSIST, "counter first", "%d", cfvn);
+		util_fmt_pair(FMT_PERSIST, "counter second", "%d", csvn);
+		util_fmt_pair(FMT_PERSIST, "authorization", "%d", authorization);
+		util_fmt_obj_end();
+	}
+	util_fmt_obj_start(FMT_LIST, "measurements");
 	for (unsigned long i = 0; !rc && i < loop_count; ++i) {
 		rc = do_read(ioctlfd);
 		if (rc) {
@@ -643,6 +721,9 @@ static int do_it(char *s)
 		if (read_interval && i + 1 < loop_count)
 			do_sleep();
 	}
+	util_fmt_obj_end();
+	util_fmt_obj_end();
+	util_fmt_exit();
 	rc = do_stop(ioctlfd);
 	close(ioctlfd);
 	return rc ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -689,6 +770,15 @@ static struct util_opt opt_vec[] = {
 		.argument = "NUMBER",
 		.desc = "run time in s (seconds) m (minutes) h (hours) and d (days)"
 	},
+	{
+		.option = { "quote-all", no_argument, NULL, 'q' },
+		.desc = "Apply quoting to all output elements"
+	},
+	{
+		.option = { "format", required_argument, NULL, 'f' },
+		.argument = "FORMAT",
+		.desc = "List counters in specified FORMAT (" FMT_TYPE_NAMES ")"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -718,6 +808,7 @@ static void have_support(void)
 
 int main(int argc, char **argv)
 {
+	enum util_fmt_t fmt;
 	unsigned long no;
 	char *slash;
 	int ch;
@@ -792,6 +883,14 @@ int main(int argc, char **argv)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
 				break;
 			}
+			break;
+		case 'q':
+			quote_all = true;
+			break;
+		case 'f':
+			if (!util_fmt_name_to_type(optarg, &fmt))
+				errx(EXIT_FAILURE, "Supported formats:" FMT_TYPE_NAMES);
+			output_format = fmt;
 			break;
 		}
 	}
