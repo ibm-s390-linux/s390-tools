@@ -25,13 +25,14 @@ DEF_ISSUER_ARMONK_DN_FILE=$(mktemp)
 DEF_ISSUER_POUGHKEEPSIE_DN_FILE=$(mktemp)
 CANONICAL_ISSUER_DN_FILE=$(mktemp)
 CRL_SERIAL_FILE=$(mktemp)
+CRL_ISSUER_FILE=$(mktemp)
 
 # Cleanup on exit
 cleanup()
 {
     rm -f "$ISSUER_PUBKEY_FILE" "$SIGNATURE_FILE" "$BODY_FILE" \
         "$ISSUER_DN_FILE" "$SUBJECT_DN_FILE" "$DEF_ISSUER_ARMONK_DN_FILE" "$DEF_ISSUER_POUGHKEEPSIE_DN_FILE" \
-        "$CANONICAL_ISSUER_DN_FILE" "$CRL_SERIAL_FILE"
+        "$CANONICAL_ISSUER_DN_FILE" "$CRL_SERIAL_FILE" "$CRL_ISSUER_FILE"
 }
 trap cleanup EXIT
 
@@ -69,6 +70,21 @@ CA certificate.
 EOF
 }
 
+curl_crl_by_crt()
+{
+	CRT="$1"
+	OFFSET=$2
+	CRL_URL="$(openssl x509 -noout -text -in "$CRT" \
+                |grep 'URI:http.*\.crl' | sed -n "$OFFSET"p | xargs)"
+
+	# no CRL at this offset
+	if [ -z "$CRL_URL" ];
+	then
+		return 5
+	fi
+	curl --silent --output "${CRL_ISSUER_FILE}" -- "${CRL_URL#URI:}"
+}
+
 check_verify_chain()
 {
     # Verify certificate chain in case a CA certificate file/bundle
@@ -81,9 +97,38 @@ Make sure that '$1' is a valid certificate.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 EOF
     else
-        openssl verify -crl_download -crl_check "$2" &&
-            openssl verify -crl_download -crl_check -untrusted "$2" "$1" ||
-            exit 1
+        openssl verify -crl_download -crl_check "$2" || exit 1
+
+        if ! stderr=$(openssl verify -crl_download -crl_check -untrusted "$2" "$1" 3>&2 2>&1 1>&3 3>&-); then
+	    if ! printf '%s' "${stderr}" | grep -q 'max resp len exceeded'; then
+                printf '%s\n' "${stderr}"
+                exit 1
+            fi
+	# Turn off exit-on-error locally to be able to retry on invalid URIs
+	set +e
+	off=0;
+	# Search for a CRL in the CRT. If the first link does not work try
+	# again with the next one until either no more URIS are available or a
+	# CRL was found.
+    	while [ $off -le 10 ]; do
+	    i=$(( i + 1 ))
+
+	    CRL=curl_crl_by_crt "$3" $i
+	    SUCCESS=$?
+	    # No more CRLS available
+	    if [ $SUCCESS -eq 5 ]; then
+		    exit 1
+	    fi
+	    # URI was invalid/not reachable
+	    if [ $SUCCESS -ne 0 ]; then
+		    continue;
+	    fi
+	    # Found one
+	    break
+	done
+        openssl verify -CRLfile "${CRL_ISSUER_FILE}" -crl_check -untrusted "$2" "$1" || exit 1
+        fi
+	set -e
     fi
 }
 
@@ -260,7 +305,7 @@ check_file "$HKSK_FILE"
 [ -n "$CRL_FILE" ] && check_file "$CRL_FILE"
 
 # Check trust chain
-check_verify_chain "$HKSK_FILE" "$CA_FILE"
+check_verify_chain "$HKSK_FILE" "$CA_FILE" "$HKSK_FILE"
 
 # Verify host key document signature
 printf "Checking host key document signature: "
