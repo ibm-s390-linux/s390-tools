@@ -1,0 +1,101 @@
+#!/bin/sh
+#
+#         Name: /etc/auto.vmlink
+#
+# AUTOVMLINK package, program script for the automounter
+# Rushal Verma <rusrushal13@gmail.com>
+# 2018-Aug-02 (Thursday, 19:42)
+#
+# Use this script as the program called by the automounter
+# for DASD which may be off-line when Linux is rebooted.
+# It will handle an automounter point (an automounter directory)
+# for which sub-directories represent mainframe disk I/O addresses.
+#
+
+# random check
+if [ "$*" = "*" ] ; then exit 1 ; fi
+
+DATENOW=`date "+# VMLINK %Y-%m-%d %H:%M:%S $*"`
+logger "$DATENOW"
+
+# arbitrary address
+SLOT=9000
+
+# conditionally source the config file
+if [ -r /etc/sysconfig/vmlink ] ; then . /etc/sysconfig/vmlink ; fi
+if [ ! -z "$VMLINK_STARTINGADDR" ] ; then SLOT=$VMLINK_STARTINGADDR ; fi
+
+# finding a slot which is not linked any I/O address
+while true ; do
+
+  vmcp q v $SLOT 1> /dev/null 2> /dev/null ; RC=$?
+
+  # if exit code is not 0
+  if [ $RC -ne 0 ] ; then break ; fi
+
+  # update the address  
+  SLOT=`expr $SLOT + 1`
+done
+
+logger "$SLOT"
+
+KEY=$1
+logger "$KEY"
+
+# parsing the key given into vmid, address and partition
+VMID=`echo $KEY | awk -F. '{print $1}'`
+ADDR=`echo $KEY | awk -F. '{print $2}'`
+PARTITION=`echo $KEY | awk -F. '{print $3}'`
+
+# link the given key to the address which is empty
+LINKED=`vmcp link $VMID $ADDR $SLOT` ; RC=$?
+logger "$LINKED"
+if [ $RC -ne 0 ] ; then 
+  logger "auto.vmlink: exiting because link to the $SLOT address didn't happen"
+  exit 32
+fi
+
+# just wait for sometime to come it online
+sync ; sleep 1 ; sync
+
+# vary the disk online
+echo 1 > /sys/bus/ccw/devices/0.0.$SLOT/online ; RC=$?
+if [ $RC -ne 0 ] ; then 
+  # trying out different way
+  chccwdev -e 0.0.$SLOT 1> /dev/null 2> /dev/null
+  if [ $? -ne 0 ] ; then
+    chzdev --enable dasd $SLOT 1> /dev/null 2> /dev/null ; fi
+  if [ $? -ne 0 ] ; then 
+    logger "auto.vmlink: exiting because control file was never created"
+    exit 32
+  fi
+fi
+
+# just wait for more time to edit the control file
+sync ; sleep 2 ; sync
+
+# find the block name assigned to it
+NAME=`ls -d /sys/bus/ccw/devices/0.0.$SLOT/block* | head -1`
+if [ -h "$NAME" ] ; then
+  NAME=`ls -ld $NAME | xargs -n 1 | tail -1 | xargs basename`
+elif [ -d "$NAME" ] ; then
+  NAME=`ls $NAME | head -1`
+fi
+
+if [ ! -d $KEY ] ; then mkdir -p -m 555 $KEY ; else rm -rf $KEY/* ; fi
+
+# mount the block name to a random directory
+mount -o ro /dev/${NAME}${PARTITION} $KEY ; RC=$?
+
+if [ $RC -ne 0 ] ; then
+  PARTITION=1
+  mount -o ro /dev/${NAME}${PARTITION} $KEY ; RC="$?"
+fi
+
+if [ $RC -ne 0 ] ; then 
+  logger "auto.vmlink: failed to mount, check kernel messages(using dmesg | less)"
+fi
+
+exit
+
+
