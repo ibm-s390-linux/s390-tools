@@ -127,6 +127,7 @@ static void pr_chars(struct cmg_pair_t **a, unsigned int *n,
 	pr_u32(a, n, cmcb, max_channel_work_units);
 	pr_u32(a, n, cmcb, max_write_data_units);
 	pr_u32(a, n, cmcb, max_read_data_units);
+	pr_u32(a, n, cmcb, dpu_num_cores);
 	pr_u32(a, n, cmcb, data_unit_size);
 }
 
@@ -151,6 +152,8 @@ static void pr_ext_cue(struct cmg_pair_t **a, unsigned int *n,
 	struct ext_cue5_t *ext_cue = get_ext_cue(data, util_b);
 	bool v = data->util_b.extended;
 
+	pr_cond_u32(a, n, v, ext_cue, dpu_channel_exec_time_cpc);
+	pr_cond_u32(a, n, v, ext_cue, dpu_exec_time_cpc);
 	pr_cond_u32(a, n, v, ext_cue, total_ficon_ops_cpc);
 	pr_cond_u32(a, n, v, ext_cue, total_deferred_ficon_ops_cpc);
 	pr_cond_u64(a, n, v, ext_cue, sum_ficon_ops_cpc);
