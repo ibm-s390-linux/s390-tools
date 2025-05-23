@@ -264,7 +264,7 @@ static void calc_metrics(struct cmg_data_t *data, double seconds)
 }
 
 /* Calculate metrics base on CMG 4 extended CUEs. */
-static void calc_ext_metrics(struct cmg_data_t *data, double seconds)
+static void calc_ext_metrics(struct cmg_data_t *data, u32 ticks)
 {
 	struct metrics4_t *m = get_metrics(data);
 	struct ext_cue4_t *ext_a = get_ext_cue(data, util_a);
@@ -283,11 +283,11 @@ static void calc_ext_metrics(struct cmg_data_t *data, double seconds)
 
 	/* dpu_util = dpu_exec_time_cpc / (t * dpu_num_cores) */
 	delta = field_delta(dpu_exec_time_cpc, ext_a, ext_b);
-	m->dpu_util = delta / (seconds * cmcb->dpu_num_cores);
+	m->dpu_util = delta / ((double)ticks * cmcb->dpu_num_cores);
 
 	/* dpu_util_total = dpu_channel_exec_time_cpc / (t * dpu_num_cores) */
 	delta = field_delta(dpu_channel_exec_time_cpc, ext_a, ext_b);
-	m->dpu_util_total = delta / (seconds * cmcb->dpu_num_cores);
+	m->dpu_util_total = delta / ((double)ticks * cmcb->dpu_num_cores);
 
 	/* dpu_util_part = dpu_util_total * channel_work_units /
 	 *                                  channel_work_units_cpc */
@@ -297,6 +297,8 @@ static void calc_ext_metrics(struct cmg_data_t *data, double seconds)
 		delta2 = field_delta(channel_work_units_cpc, a, b);
 		if (delta2 != 0.0)
 			m->dpu_util_part = m->dpu_util_total * delta / delta2;
+		else
+			m->dpu_util_part = 0.0;
 	}
 }
 
@@ -318,7 +320,7 @@ static void update_metrics(struct cmg_data_t *data)
 	m->interval = tick_to_s(ticks);
 
 	calc_metrics(data, m->interval);
-	calc_ext_metrics(data, m->interval);
+	calc_ext_metrics(data, ticks);
 }
 
 /* Object defining this CMG. */
