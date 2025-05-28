@@ -42,5 +42,6 @@ int devnode_cmp(struct devnode *, struct devnode *);
 int devnode_add_block_from_sysfs(struct util_list *, const char *);
 int devnode_add_net_from_sysfs(struct util_list *, const char *);
 char *devnode_readlink(struct devnode *);
+char *devnode_get_virtio_dir(const char *ccw_path);
 
 #endif /* DEVNODE_H */

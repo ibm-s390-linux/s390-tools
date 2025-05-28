@@ -1757,8 +1757,10 @@ static void ccw_st_add_devnodes(struct subtype *st, const char *id,
 	char *path;
 
 	path = ccw_get_dev_path(data->ccwdrv, id);
-	if (path)
+	if (path) {
 		devnode_add_block_from_sysfs(devnodes, path);
+		devnode_add_net_from_sysfs(devnodes, path);
+	}
 	free(path);
 }
 

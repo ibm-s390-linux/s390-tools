@@ -42,6 +42,9 @@ chzdev_objects += lcs.o lcs_auto.o
 # AP devtype
 chzdev_objects += ap.o
 
+# virtio devtype
+chzdev_objects += virtio.o
+
 # Generic CCW devtype
 chzdev_objects += generic_ccw.o
 
@@ -74,6 +77,9 @@ lszdev_objects += lcs.o lcs_auto.o
 
 # AP devtype
 lszdev_objects += ap.o
+
+# virtio devtype
+lszdev_objects += virtio.o
 
 # Generic CCW devtype
 lszdev_objects += generic_ccw.o

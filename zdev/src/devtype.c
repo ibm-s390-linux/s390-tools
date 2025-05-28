@@ -26,6 +26,7 @@
 #include "select.h"
 #include "setting.h"
 #include "subtype.h"
+#include "virtio.h"
 #include "zfcp.h"
 #include "ap.h"
 
@@ -37,6 +38,7 @@ struct devtype *devtypes[] = {
 	&ctc_devtype,
 	&lcs_devtype,
 	&ap_devtype,
+	&virtio_devtype,
 	&generic_ccw_devtype,	/* Generic types should come last. */
 	NULL
 };

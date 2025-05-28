@@ -21,6 +21,36 @@
 #include "misc.h"
 #include "path.h"
 
+struct virtio_cb_data {
+	char *virtio_name;
+};
+
+static exit_code_t add_virtio_cb(const char *path, const char *filename, void *data)
+{
+	struct virtio_cb_data *cb_data = data;
+
+	if (starts_with(filename, "virtio")) {
+		cb_data->virtio_name = misc_strdup(path);
+		return EXIT_RUNTIME_ERROR;
+	}
+
+	return EXIT_OK;
+}
+
+/*
+ * Given path like /sys/bus/ccw/devices/0.0.0001, get virtio subdirectory
+ * like "virtio4", NULL if not found.
+ */
+char *devnode_get_virtio_dir(const char *ccw_path)
+{
+	struct virtio_cb_data cb_data = {};
+
+	if (util_path_is_dir(ccw_path))
+		path_for_each(ccw_path, add_virtio_cb, &cb_data);
+
+	return cb_data.virtio_name;
+}
+
 /* Create a newly allocated devnode object from the specified data. */
 struct devnode *devnode_new(devnode_t type, unsigned int major,
 			    unsigned int minor, const char *name)
@@ -244,7 +274,7 @@ static exit_code_t add_block_cb(const char *path, const char *filename,
 int devnode_add_block_from_sysfs(struct util_list *list, const char *path)
 {
 	struct add_cb_data cb_data;
-	char *blkpath;
+	char *blkpath, *virtio_path;
 
 	cb_data.list = list;
 	cb_data.num = 0;
@@ -254,6 +284,15 @@ int devnode_add_block_from_sysfs(struct util_list *list, const char *path)
 	if (util_path_is_dir(blkpath))
 		path_for_each(blkpath, add_block_cb, &cb_data);
 	free(blkpath);
+
+	virtio_path = devnode_get_virtio_dir(path);
+	if (virtio_path) {
+		blkpath = misc_asprintf("%s/block", virtio_path);
+		if (util_path_is_dir(blkpath))
+			path_for_each(blkpath, add_block_cb, &cb_data);
+		free(blkpath);
+		free(virtio_path);
+	}
 
 	return cb_data.num;
 }
@@ -278,7 +317,7 @@ static exit_code_t add_net_cb(const char *path, const char *filename,
 int devnode_add_net_from_sysfs(struct util_list *list, const char *path)
 {
 	struct add_cb_data cb_data;
-	char *netpath;
+	char *netpath, *virtio_path;
 
 	cb_data.list = list;
 	cb_data.num = 0;
@@ -288,6 +327,15 @@ int devnode_add_net_from_sysfs(struct util_list *list, const char *path)
 	if (util_path_is_dir(netpath))
 		path_for_each(netpath, add_net_cb, &cb_data);
 	free(netpath);
+
+	virtio_path = devnode_get_virtio_dir(path);
+	if (virtio_path) {
+		netpath = misc_asprintf("%s/net", virtio_path);
+		if (util_path_is_dir(netpath))
+			path_for_each(netpath, add_net_cb, &cb_data);
+		free(netpath);
+		free(virtio_path);
+	}
 
 	return cb_data.num;
 }
