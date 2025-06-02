@@ -2,7 +2,7 @@
 exclude: \.(bin|crl|crt|key)$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.1.0
+    rev: v6.0.0
     hooks:
       - id: check-merge-conflict
       - id: end-of-file-fixer
@@ -24,7 +24,7 @@ repos:
         minimum_pre_commit_version: "2.9.0"
         types_or: [c++, c]
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.1
+    rev: v2.4.1
     hooks:
       - id: codespell
         exclude_types: ['rust']
