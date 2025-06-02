@@ -238,7 +238,7 @@ pub enum RetrieveableSecretInpKind {
     /// Must be a plain byte file 128, 192, or 256 bit long.
     Aes,
     /// An AES-XTS key.
-    /// Must be a plain byte file 512, or 1024 bit long.
+    /// Must be a plain byte file 256, or 512 bit long.
     AesXts,
     /// A HMAC-SHA key.
     /// Must be a plain byte file 512, or 1024 bit long. Special care is required when creating
