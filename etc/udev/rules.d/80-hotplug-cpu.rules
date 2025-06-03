@@ -1,0 +1,4 @@
+#
+# Rules to set online a newly hotplugged cpu on s390x
+#
+SUBSYSTEM=="cpu", ACTION=="add", CONST{arch}=="s390*", ATTR{configure}=="1", TEST=="online", ATTR{online}!="1", ATTR{online}="1"
