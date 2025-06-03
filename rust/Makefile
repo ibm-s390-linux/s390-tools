@@ -86,7 +86,6 @@ install: $(INSTALL_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvattest/tools/pvextract-hdr $(DESTDIR)$(USRBINDIR)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(PVIMG_PKGDATADIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 pvimg/tools/check_hostkeydoc $(DESTDIR)$(PVIMG_PKGDATADIR)
 	$(MAKE) -C pvimg/boot install
 	ln -sf pvimg $(DESTDIR)$(USRBINDIR)/genprotimg
 

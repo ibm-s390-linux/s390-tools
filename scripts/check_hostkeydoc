@@ -53,8 +53,13 @@ usage()
     cat <<-EOF
 Usage: $(basename "$1") [-d] [-c CA-cert] [-r CRL] host-key-doc signing-key-cert
 
-Verify an IBM Secure Execution host key document against
-a signing key.
+Verify an IBM Secure Execution host key document against a signing key. Use for
+resolving issues only. Use the built-in functions from pvimg, pvsecret, or
+pvattest directly to verify the host-key documents. This script should only be
+used as a last resort for when the distribution provided binaries have
+unresolved issues regarding the host-key verification. In that case ensure the
+latest version of this script is used.
+Find the latest version here https://github.com/ibm-s390-linux/s390-tools
 
 Options:
 -d         disable default issuer check of host-key-doc
@@ -296,6 +301,10 @@ fi
 
 HKD_FILE=$1
 HKSK_FILE=$2
+
+printf "DEPRECATED SCRIPT. Use pvimg, pvattest, or pvsecret directly.\n"
+printf "This script is intended for resolving issues only.\n"
+printf "This script may be inaccessible in the future.\n"
 
 # Check whether all specified files exist
 check_file "$HKD_FILE"
