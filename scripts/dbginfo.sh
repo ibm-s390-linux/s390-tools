@@ -597,6 +597,7 @@ CMDS="${CMDS}\
 # commands with separate output file
 CMDS="${CMDS}\
   :apt list >> '${OUTPUT_FILE_ISW}'\
+  :snap list --all >> '${OUTPUT_FILE_ISW}'\
   :coredumpctl && coredumpctl info -o ${OUTPUT_FILE_COREDUMPCTL}\
   :journalctl --all --no-pager --lines=100000 --output=short-precise\
    >> '${OUTPUT_FILE_JOURNALCTL}'\
