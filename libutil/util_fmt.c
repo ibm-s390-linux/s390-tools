@@ -307,9 +307,13 @@ static void add_key(const char *name, bool persist)
 	key.persist = persist;
 	util_add_array(&f.keys, &f.num_keys, key);
 	if (f.type == FMT_CSV) {
-		hdr = csv_quote(name);
-		util_rec_def(f.csv_rec, name, UTIL_REC_ALIGN_LEFT, 0, hdr);
-		free(hdr);
+		if (f.quote_all) {
+			hdr = csv_quote(name);
+			util_rec_def(f.csv_rec, name, UTIL_REC_ALIGN_LEFT, 0, hdr);
+			free(hdr);
+		} else {
+			util_rec_def(f.csv_rec, name, UTIL_REC_ALIGN_LEFT, 0, name);
+		}
 		util_rec_set(f.csv_rec, name, "\"\"");
 		f.csv_hdr = true;
 	}
