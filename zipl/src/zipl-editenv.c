@@ -144,6 +144,7 @@ static int envblk_update(struct zipl_envblk *zeb)
 	util_proc_part_free_entry(&part_entry);
 	return 0;
 error_close:
+	fsync(dev_fd);
 	close(dev_fd);
 error:
 	util_proc_part_free_entry(&part_entry);
@@ -159,11 +160,7 @@ static int envblk_close(struct zipl_envblk *zeb)
 	if (zeb->mfd.fd < 0)
 		return 0;
 
-	if (close(zeb->mfd.fd) == 0) {
-		zeb->mfd.fd = -1;
-		return 0;
-	}
-	return -1;
+	return misc_close(&zeb->mfd);
 }
 
 /**
