@@ -39,6 +39,7 @@ readonly EXIT_SUCCESS=0
 readonly EXIT_FAILURE=1
 readonly EXIT_ARG_TOO_LONG=3
 readonly EXIT_INVALID_CHARS=4
+readonly EXIT_INVALID_ARGS=5
 
 # Distro-IDs as supported by SE/HMC firmware
 readonly DISTRO_GENERIC=0
@@ -489,6 +490,11 @@ while [ -n $1 ]; do
 		;;
 	esac
 done
+
+# Unparsed options are not supported
+if [ $# -ne 0 ]; then
+	fail_with "$PRG: Invalid command-line option: $*" $EXIT_INVALID_ARGS
+fi
 
 # Print settings for --dry-run or commit them to sysfs otherwise
 
