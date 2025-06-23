@@ -239,7 +239,7 @@ fn extend_to_multiple(mut key: Vec<u8>, multiple: usize) -> Confidential<Vec<u8>
 /// ```
 fn plaintext(inp: Confidential<Vec<u8>>) -> Result<RetrKeyInfo> {
     let key_len = inp.value().len();
-    if key_len > RetrieveCmd::MAX_SIZE {
+    if key_len > MAX_SIZE_PLAIN_PAYLOAD {
         return Err(Error::RetrInvKey {
             what: "key size",
             value: key_len.to_string(),

@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::{pem::Pem, uvsecret::guest_secret::MAX_SIZE_PLAIN_PAYLOAD, Result};
+use crate::{crypto::SymKeyType, pem::Pem, uvsecret::guest_secret::MAX_SIZE_PLAIN_PAYLOAD, Result};
 
 use log::warn;
 use pv_core::{
@@ -81,10 +81,11 @@ impl From<RetrieveCmd> for RetrievedSecret {
 
                 // Test if the plain text secret has a size:
                 // 1. len <= 8190
-                // 2. first two bytes are max 15 less than buffer-size+2
+                // 2. first two bytes are max 15 less than buffer-size+2 i.e. smaller than the
+                //    block length
                 // 3. bytes after len + 2 are zero
                 match len <= MAX_SIZE_PLAIN_PAYLOAD
-                    && key.value().len() - (len + 2) < 15
+                    && key.value().len() - (len + 2) < SymKeyType::AES_256_GCM_BLOCK_LEN
                     && key.value()[len + 2..].iter().all(|c| *c == 0)
                 {
                     false => Self::Plaintext(key),
