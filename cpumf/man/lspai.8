@@ -30,6 +30,7 @@
 .IR SECONDS ]
 .RB [ \-l
 .IR COUNT ]
+.RB [ \-x ][ \-X ]
 .RI [ CPULIST ]
 .br
 \*c
@@ -48,6 +49,8 @@ and numbers in various formats.
 If
 .I CPULIST
 is specified or any of the options
+.BR \-x ,
+.BR \-X ,
 .B \-l
 or
 .BR \-i,
@@ -105,6 +108,14 @@ The default is 60 seconds.
 .BR \-l ", " \-\-loop \fI\ COUNT\fP
 Performs the specified number of read operations.
 The default is one.
+.
+.TP
+.BR \-x ", " \-\-hex
+Displays counter values as hexadecimal values.
+.
+.TP
+.BR \-X ", " \-\-hex0x
+Displays counter values as hexadecimal values with a leading 0x prefix.
 .
 .SH "EXAMPLE"
 The \*c invocation lists all PAI Neural Network Processing Assist Facility

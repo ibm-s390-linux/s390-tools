@@ -69,6 +69,14 @@ static struct util_opt opt_vec[] = {
 		.argument = "TYPE",
 		.desc = "Type of PAI counters to show: crypto, nnpa"
 	},
+	{
+		.option = { "hex0x", no_argument, NULL, 'X' },
+		.desc = "Counter values in hexadecimal format with leading 0x"
+	},
+	{
+		.option = { "hex", no_argument, NULL, 'x' },
+		.desc = "Counter values in hexadecimal format"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -658,6 +666,14 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			check_type_name(optarg);
+			break;
+		case 'x':
+			list_only = false;
+			ctrformat = "%lx";
+			break;
+		case 'X':
+			list_only = false;
+			ctrformat = "%#lx";
 			break;
 		case OPT_FORMAT:
 			if (!util_fmt_name_to_type(optarg, &fmt))
