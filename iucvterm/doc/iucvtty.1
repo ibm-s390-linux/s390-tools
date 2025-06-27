@@ -94,7 +94,7 @@ additional options.
 .SH EXAMPLES
 To allow remote logins using the terminal identifier "lnxterm":
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 iucvtty lnxterm
@@ -104,7 +104,7 @@ iucvtty lnxterm
 
 To only allow users from LNXSYS01 to connect to terminal "lnxterm":
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 iucvtty -a LNXSYS01 lnxterm
@@ -115,7 +115,7 @@ iucvtty -a LNXSYS01 lnxterm
 To only allow users from LNXSYS10 through LNXSYS19 to connect to terminal
 "lnxterm":
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 iucvtty -a "LNXSYS1[0-9]" lnxterm
@@ -125,7 +125,7 @@ iucvtty -a "LNXSYS1[0-9]" lnxterm
 
 To use \fB/sbin/sulogin\fP instead of \fB/bin/login\fP for terminal "suterm":
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 iucvtty suterm -- /sbin/sulogin
@@ -136,7 +136,7 @@ iucvtty suterm -- /sbin/sulogin
 An entry in \fB/etc/inittab\fP to facilitate user logins on terminal "lnxterm"
 with \fB/bin/login\fP could be:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 t1:2345:respawn:/usr/bin/iucvtty lnxterm
@@ -147,7 +147,7 @@ t1:2345:respawn:/usr/bin/iucvtty lnxterm
 An entry in \fB/etc/inittab\fP to facilitate user logins on terminal "suterm"
 with \fB/sbin/sulogin\fP in single user mode could be:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 s1:S:respawn:/usr/bin/iucvtty suterm -- /sbin/sulogin

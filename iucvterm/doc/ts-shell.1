@@ -79,7 +79,7 @@ users".
 
 The output for "list" authorization is a list of z/VM guest virtual machines,
 for example:
-.ft CW
+.ft CR
 .in +0.25i
 .nf
 
@@ -94,7 +94,7 @@ guest5
 .ft
 The output for "regex" authorization is a list of one or more
 regular expressions, for example:
-.ft CW
+.ft CR
 .in +0.25i
 .nf
 
@@ -109,7 +109,7 @@ Regular expressions for your authorization:
 If \fBts-shell\fP is configured to connect to particular z/VM guest virtual
 machines only, the output for "regex" authorization is followed by a list of
 the user IDs that match at least one of the regular expressions:
-.ft CW
+.ft CR
 .in +0.25i
 .nf
 
@@ -139,7 +139,7 @@ To change the default terminal identifier, use the \fBterminal\fP command.
 
 In the following example, a user opens a terminal connection to the Linux
 instance in z/VM guest virtual machine LNXSYS01:
-.ft CW
+.ft CR
 .in +0.25i
 .nf
 
@@ -164,7 +164,7 @@ If \fBterminal\fP is called with the \fIidentifier\fP being specified,
 If \fIidentifier\fP is not specified, the current default terminal identifier
 is displayed:
 
-.ft CW
+.ft CR
 .in +0.25i
 .nf
 user@ts-shell> terminal
@@ -212,7 +212,7 @@ guest virtual machines.
 A typical \fBIUCV\fP authorization statement in the z/VM directory entry of the
 terminal server z/VM guest virtual machine might be:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 IUCV ANY
@@ -301,7 +301,7 @@ instance.
 
 For example, to create a list of all z/VM guest virtual machines with names that
 start with "LINUX" and are followed by digits, use:
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 
@@ -373,7 +373,7 @@ group name and prefixed with "@".
 
 Here is an example of a Linux user and group authorization:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 alice  =  list:guest01,guest02
@@ -395,7 +395,7 @@ name on a separate line.
 .PP
 The following example shows the usage of the \fIfile:\fP prefix:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 @testgrp = file:/etc/iucvterm/auth/test-systems.list
@@ -427,7 +427,7 @@ To authorize user bob for all z/VM guest virtual machines with names that
 start with "lnx" and are followed with at least three but not more than five
 alphanumeric characters, use:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 bob = regex:lnx\\w{3,5}
@@ -441,7 +441,7 @@ test or production environment: authorize all users in the "testgrp" group for
 all systems in the test environment; and respectively, authorize all users in
 the "prodgrp" group for all systems in the production environment:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 @testgrp = regex:test\\w+
@@ -461,7 +461,7 @@ of the other type are ignored.
 
 Example:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 @users = list:guest01,guest03,guest05
@@ -484,7 +484,7 @@ To use the \fBts-shell\fP as the login shell for Linux users, follow these steps
 Add the path of the \fBts-shell\fP program to the \fI/etc/shells\fP file that
 contains the list of valid login shells:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 echo $(which ts-shell) >> /etc/shells
@@ -498,7 +498,7 @@ Change the login shell of a particular Linux user using the
 .BR chsh (1)
 program:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 chsh -s $(which ts-shell) alice

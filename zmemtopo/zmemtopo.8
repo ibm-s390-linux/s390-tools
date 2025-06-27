@@ -88,7 +88,7 @@ Without any options zmemtopo displays the tree view with nesting level 3.
 $ zmemtopo
 
 .nf
-.ft CW
+.ft CR
 LPAR/LEVEL     SIZE
 LPAR003          8G
 └LEVEL4_0        8G
@@ -126,7 +126,7 @@ Display table format, by default nesting level 3 is displayed.
 $ zmemtopo -t
 
 .nf
-.ft CW
+.ft CR
         LEVEL 4   0   0   0   0    1   1   1   1    2   2   2   2    3   3   3   3
         LEVEL 3   0   1   2   3    0   1   2   3    0   1   2   3    0   1   2   3
  NR    LPAR SUM
@@ -150,7 +150,7 @@ Display reverse tree with nesting level 4.
 $ zmemtopo -r -l 4
 
 .nf
-.ft CW
+.ft CR
 LEVEL/LPAR     SIZE
 LEVEL4_0       388G
 │ ├LPAR003       8G
@@ -178,7 +178,7 @@ Display reverse full tree. Entries that have no memory increments are visible.
 $ zmemtopo -rf
 
 .nf
-.ft CW
+.ft CR
 .ft
 LEVEL/LPAR      SIZE
 LEVEL4_0        388G
@@ -240,7 +240,7 @@ Display tree with entries which have no memory increments.
 $ zmemtopo -f
 
 .nf
-.ft CW
+.ft CR
 LPAR/LEVEL     SIZE
 LPAR086          2G
 ├LEVEL4_0         -
@@ -287,7 +287,7 @@ Display json format.
 $ zmemtopo --format=json
 
 .nf
-.ft CW
+.ft CR
 {
   "meta": {
     "api_level": "1",
@@ -349,7 +349,7 @@ Display csv format.
 $ zmemtopo --format=csv
 
 .nf
-.ft CW
+.ft CR
  "report_tod","report_partition_nr","increment_size","partition_nr","partition_name","parent_level","parent_entry_idx","level","entry_idx","increment_count"
 "0x0e082f818b066ce82000","74","1073741824","3","LPAR003","-","-","4","0","8"
 "0x0e082f818b066ce82000","74","1073741824","3","LPAR003","4","0","3","0","2"

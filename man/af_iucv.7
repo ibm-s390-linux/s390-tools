@@ -89,7 +89,7 @@ Socket communication with applications utilizing CMS AF_IUCV support
 An AF_IUCV socket is represented by the following format:
 .PP
 .RS 8
-.ft CW
+.ft CR
 .nf
 #define AF_IUCV    32
 
@@ -290,7 +290,7 @@ It must not match any z/VM user ID in your environment.
 To set an identifier, issue a command like this:
 .PP
 .RS 8
-.ft CW
+.ft CR
 echo \fIidentifier\fP > /sys/devices/qeth/\fI<bus-ID>\fP/hsuid
 .ft
 .RE
@@ -303,7 +303,7 @@ For example, to use "MYHOST01" to bind AF_IUCV sockets to the
 HiperSockets device with bus-ID 0.0.8000, run:
 .PP
 .RS 8
-.ft CW
+.ft CR
 .nf
 echo "MYHOST01" > /sys/devices/qeth/0.0.8000/hsuid
 .fi
@@ -366,7 +366,7 @@ z/VM guest virtual machine with a maximum of 10\^000 outstanding messages for ea
 incoming connection. Your z/VM guest virtual machine is permitted to connect to
 all other z/VM guest virtual machines. The total number of connections for your
 z/VM guest virtual machine cannot exceed 100.
-.ft CW
+.ft CR
 .in +0.25i
 .nf
 

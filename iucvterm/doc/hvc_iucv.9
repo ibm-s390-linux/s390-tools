@@ -66,7 +66,7 @@ terminal application
 To connect to the first z/VM IUCV HVC terminal device on the z/VM guest virtual
 machine "LNX1234", run:
 .PP
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 iucvconn LNX1234 lnxhvc0
@@ -215,7 +215,7 @@ For each HVC terminal device, a \fBgetty\fP program must be started.
 To configure and start \fBgetty\fP on a HVC terminal, open
 .BR /etc/inittab (5),
 and add a new entry similar to this one:
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 
@@ -261,7 +261,7 @@ IUCV HVC terminal:
 .IP "1." 4
 To display the current terminal name, issue the command:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 user@host:~$ echo $TERM
@@ -275,7 +275,7 @@ To connect to a z/VM IUCV HVC terminal, run
 .BR iucvconn (1)
 and log in as usual:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 user@host:~$ iucvconn MYLNX01 lnxhvc0
@@ -289,7 +289,7 @@ user@MYLNX01:~$
 To assign the terminal name from step 1. to the terminal environment variable,
 issue the following command:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 user@MYLNX01:~$ export TERM=xterm
@@ -304,7 +304,7 @@ environment variable.
 .PP
 For getty programs, a sample terminal environment configuration might look like:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 h0:2345:respawn:/sbin/agetty -L 9600 hvc0 linux
