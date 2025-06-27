@@ -456,7 +456,7 @@ Identifies the z/VM spool file to be ordered.
 .IP "1." 3
 Start z/VM console spooling by issuing:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # vmcp sp cons start
@@ -471,7 +471,7 @@ Close the console file and transfer it to the reader queue, find the spool ID
 behind the \f(CWFILE\fP keyword in the corresponding CP message.
 In the example below, the spool ID is 398:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # vmcp sp cons clo \(rs* rdr
@@ -484,7 +484,7 @@ RDR FILE 0398 SENT FROM LINUX025 CON WAS 0398 RECS 1872
 Read and save the spool file on the Linux file system in the
 current working directory:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # vmur re -t 398 linux_cons
@@ -496,7 +496,7 @@ current working directory:
 .IP "1." 3
 Send parmfile to the z/VM punch queue and transfer it to the reader queue:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # vmur pun -r /boot/parmfile
@@ -509,7 +509,7 @@ Reader file with spoolid 0465 created.
 Send the Linux kernel image to the z/VM punch queue and
 transfer it to reader queue:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # vmur pun -r /boot/vmlinuz -N image
@@ -522,7 +522,7 @@ Reader file with spoolid 0466 created.
 Move the Linux kernel image to the first and parmfile to
 the second position in the reader queue:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # vmur or 465
@@ -534,7 +534,7 @@ the second position in the reader queue:
 .IP "4."
 Prepare re-IPL from the z/VM reader and reboot:
 
-.ft CW
+.ft CR
 .in +0.25in
 .nf
 # chreipl ccw 0.0.000c

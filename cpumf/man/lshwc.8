@@ -206,7 +206,7 @@ Two read operations are performed and a summary line is printed for each
 read operation.
 .sp 1
 .nf
-.ft CW
+.ft CR
 # lshwc -l2 0-1:BP
 Date,Time,CPU,CPU_CYCLES(0),INSTRUCTIONS(1),L1I_DIR_WRITES(2),L1I_PENALTY_CYCLES(3),L1D_DIR_WRITES(4),
 	L1D_PENALTY_CYCLES(5),PROBLEM_STATE_CPU_CYCLES(32),PROBLEM_STATE_INSTRUCTIONS(33)
@@ -220,7 +220,7 @@ Date,Time,CPU,CPU_CYCLES(0),INSTRUCTIONS(1),L1I_DIR_WRITES(2),L1I_PENALTY_CYCLES
 This example shows the counter values of the problem state counter set per CPU.
 CPU 0 and CPU 1 are selected.
 .nf
-.ft CW
+.ft CR
 .sp 1
 # lshwc -l3 -a 0-1:P
 Date,Time,CPU,PROBLEM_STATE_CPU_CYCLES(32),PROBLEM_STATE_INSTRUCTIONS(33)
@@ -239,7 +239,7 @@ Date,Time,CPU,PROBLEM_STATE_CPU_CYCLES(32),PROBLEM_STATE_INSTRUCTIONS(33)
 This example shows the counter values of the basic counter set
 using delta output format.
 .nf
-.ft CW
+.ft CR
 .sp 1
 # lshwc -d -l 10 -i 5 -s :b
 Date,Time,CPU,B0,B1,B2,B3,B4,B5
@@ -259,7 +259,7 @@ Date,Time,CPU,B0,B1,B2,B3,B4,B5
 This example shows the counter values of the problem state counter set with
 CPU 3 selected.
 .nf
-.ft CW
+.ft CR
 .sp 1
 # lshwc -l2 -a 3:P -H --format json
 {

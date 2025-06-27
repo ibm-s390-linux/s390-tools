@@ -154,7 +154,7 @@ CPU, storage or I/O resources to partitions.
 .SH "EXAMPLES"
 1. Display power readings in human readable format.
 .nf
-.ft CW
+.ft CR
 # zpwr
 LPAR CPU:                       140.00  W
 LPAR Storage:                     1.72  W
@@ -171,7 +171,7 @@ Update interval: 10.00 s
 2. Perform two power measurements with a delay of 10 seconds and output the
 data in json format.
 .nf
-.ft CW
+.ft CR
 # zpwr --format json --delay 10 --count 2
 {
   "meta": {
@@ -223,7 +223,7 @@ data in json format.
 .sp 1
 3. Display power readings in csv format and in stream mode.
 .nf
-.ft CW
+.ft CR
 # zpwr --format csv --stream
 "iteration","time","time_epoch_sec","time_epoch_nsec","update_interval","cpu","storage","io","total","unassigned_resources","infrastructure"
 "0","2025-01-08 07:17:05+0100","1736317025","592784684","10000000000","143000000","1708200","40000000","15550000000","7659162700","5337186700"
