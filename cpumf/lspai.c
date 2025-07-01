@@ -65,6 +65,10 @@ static struct util_opt opt_vec[] = {
 		.desc = "Sort PAI counters by counter number"
 	},
 	{
+		.option = { "short", no_argument, NULL, 's' },
+		.desc = "Abbreviate counter name with counter set letter and number"
+	},
+	{
 		.option = { "type", required_argument, NULL, 't' },
 		.argument = "TYPE",
 		.desc = "Type of PAI counters to show: crypto, nnpa"
@@ -95,6 +99,7 @@ static const struct util_prg prg = {
 };
 
 static bool numsort;		/* If true sort counter numerically */
+static bool shortname;		/* Use abbreviated counter names */
 static int output_format = -1;	/* Generate style if >= 0 */
 static unsigned int max_cpus;	/* # of CPUs to read counter values from */
 static unsigned int max_fds;	/* # of file descriptor to read counter values */
@@ -153,6 +158,20 @@ static unsigned long pai_type_base(enum pai_types t)
 		break;
 	}
 	return 0;
+}
+
+/* Return character for this counter set. */
+static char pai_type_char(enum pai_types t)
+{
+	switch (t) {
+	case pai_type_crypto:
+		return 'C';
+	case pai_type_nnpa:
+		return 'N';
+	case pai_type_max:
+		break;
+	}
+	return 'U';
 }
 
 /* Test PAI counter name from command line option. */
@@ -259,6 +278,10 @@ static void format_painode(enum util_fmt_t fmt)
 		for (int i = 0; i < node->ctridx; ++i) {
 			util_fmt_obj_start(FMT_ROW, "counter");
 			util_fmt_pair(FMT_QUOTE, "name", "%s", node->ctrlist[i].name);
+			if (shortname)
+				util_fmt_pair(FMT_QUOTE, "name", "%c%d",
+					      pai_type_char(node->type),
+					      node->ctrlist[i].nr - node->base);
 			util_fmt_pair(FMT_DEFAULT, "config", "%d", node->ctrlist[i].nr);
 			util_fmt_pair(FMT_DEFAULT, "id", "%d", node->ctrlist[i].nr - node->base);
 			util_fmt_obj_end();
@@ -380,8 +403,13 @@ static void line_header(void)
 		for (int i = 0; i < node->ctridx; ++i) {
 			if (comma)
 				putchar(',');
-			printf("%s(%ld)", node->ctrlist[i].name ?: node->name_uc,
-			       node->ctrlist[i].nr - node->base);
+			if (shortname) {
+				printf("%c%ld", pai_type_char(node->type),
+				       node->ctrlist[i].nr - node->base);
+			} else {
+				printf("%s(%ld)", node->ctrlist[i].name ?: node->name_uc,
+				       node->ctrlist[i].nr - node->base);
+			}
 			comma = true;
 		}
 	}
@@ -433,6 +461,10 @@ static void format_line_out(time_t now, char *now_text)
 		for (int i = 0; i < node->ctridx; ++i) {
 			util_fmt_obj_start(FMT_ROW, "counter");
 			util_fmt_pair(FMT_QUOTE, "name", "%s", node->ctrlist[i].name);
+			if (shortname)
+				util_fmt_pair(FMT_QUOTE, "shortname", "%c%d",
+					      pai_type_char(node->type),
+					      node->ctrlist[i].nr - node->base);
 			util_fmt_pair(FMT_DEFAULT, "config", "%d", node->ctrlist[i].nr);
 			util_fmt_pair(FMT_DEFAULT, "id", "%d", node->ctrlist[i].nr - node->base);
 			util_fmt_pair(FMT_DEFAULT, "value", ctrformat, node->ctrlist[i].total);
@@ -663,6 +695,10 @@ int main(int argc, char **argv)
 			break;
 		case 'n':
 			numsort = true;
+			break;
+		case 's':
+			list_only = false;
+			shortname = true;
 			break;
 		case 't':
 			check_type_name(optarg);

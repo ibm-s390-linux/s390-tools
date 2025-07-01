@@ -30,7 +30,7 @@
 .IR SECONDS ]
 .RB [ \-l
 .IR COUNT ]
-.RB [ \-x ][ \-X ]
+.RB [ \-s ][ \-x ][ \-X ]
 .RI [ CPULIST ]
 .br
 \*c
@@ -49,6 +49,7 @@ and numbers in various formats.
 If
 .I CPULIST
 is specified or any of the options
+.BR \-s ,
 .BR \-x ,
 .BR \-X ,
 .B \-l
@@ -74,6 +75,25 @@ Displays help information, then exits.
 .TP
 .BR \-v ", " \-\-version
 Displays version information, then exits.
+.
+.TP
+.BR \-s ", " \-\-short
+Displays counter names as short names in the heading.
+A short name consists of
+a letter for the counter set followed by a number.
+For example,
+this flag displays counter number 0 in the PAI crypto counter
+set as
+.B C0
+instead of
+.BR CRYPTO_ALL .
+Valid counter set letters are:
+.RS
+.IP C
+PAI crypto counter set
+.IP N
+PAI NNPA counter set
+.RE
 .
 .TP
 .BR \-t ", "  \-\-type "\ \fITYPE\fP"
