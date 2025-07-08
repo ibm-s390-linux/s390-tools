@@ -15,6 +15,7 @@ install-man: $(MANS)
 	  msection=`echo $$man |sed 's/.*\.\([1-9]\)$$/man\1/'` ; \
 	  $(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 -D $$man $(DESTDIR)$(MANDIR)/$$msection/$$man ; \
 	done
+	ln -f -s chiucvallow.8 $(DESTDIR)$(MANDIR)/man8/lsiucvallow.8
 
 clean:
 
