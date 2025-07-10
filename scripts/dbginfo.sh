@@ -1372,17 +1372,18 @@ call_run_command() {
 	# extract the raw_command and set cmd_type, as some shell might split into
 	# several lines restrict the cmd echo to the first line only
 	local raw_cmd=$(echo "${cmd}" | head -1 | sed -ne 's/^\([^[:space:]]*\).*$/\1/p')
-	local cmd_type=$(type ${raw_cmd} | cut -d' ' -sf4,5)
+	local cmd_type=$(type -t ${raw_cmd})
 
 	echo "#######################################################" >> "${logfile}"
-	echo "${USER}@${SYSTEMHOSTNAME:-localhost}> ${cmd}" >> "${logfile}"
+	echo "${SYSTEMHOSTNAME:-localhost}> ${cmd}" >> "${logfile}"
 
 	# check calling command type
-	if [ "X${cmd_type}" = "Xshell builtin" ]; then
-		# command is a builtin (no use of timeout possible)
+	if [ "X${cmd_type}" = "Xbuiltin" ]; then
+		# command is a builtin (use of timeout not possible)
 		eval "${cmd}" >> ${logfile} 2>&1
 		rc=$?
-	elif [ "X${cmd_type}" != "Xnot found" ]; then
+	elif [ "X${cmd_type}" != "X" ]; then
+		# command was found and has a type
 		if [ "x${TIMEOUT_OK}" = "xYES" ]; then
 			eval timeout -k ${TOKS} ${TOS} "${cmd}" >> ${logfile} 2>&1
 
@@ -1393,18 +1394,23 @@ call_run_command() {
 			rc=$?
 		fi
 	else
-		echo "${SCRIPTNAME}: Warning: Command \"${raw_cmd}\" not available" >> "${logfile}"
+		echo "Command \"${raw_cmd}\" not available" >> "${logfile}"
 		echo >> "${logfile}"
 		return 1
 	fi
 
-	# log a warning on rc not 0 and define return
-	if [ ${rc} ]; then
+	# add return code or new line and log a warning if rc is not 0 and define return
+	if [ ${rc} -eq 0 ]; then
 		echo >> "${logfile}"
 		return 0
+	elif [ "x${TIMEOUT_OK}" = "xYES" ] && [ ${rc} -eq 124 ]; then
+		echo "Warning: \"${cmd}\" cancelled by timeout"
+		echo "-> command cancelled by timeout" >> "${logfile}"
+		return 1
 	else
 		echo "${SCRIPTNAME}: Warning: Command \"${cmd}\" failed" >> "${logfile}"
-		echo >> "${logfile}"
+		echo "rc=${rc}" >> "${logfile}"
+		echo "Warning: Command \"${cmd}\" ended with ${rc}"
 		return 1
 	fi
 }
