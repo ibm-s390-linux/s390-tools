@@ -71,7 +71,6 @@ List of all individuals having contributed content to s390-tools
 - Jean-Baptiste Joret
 - Jens Remus
 - Jochen Roehrig
-- Joern Siglen
 - Jörn Siglen
 - Juergen Christ
 - Julian Wiedmann
