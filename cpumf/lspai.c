@@ -33,6 +33,7 @@
 #include "lib/util_path.h"
 #include "lib/util_prg.h"
 #include "lib/util_scandir.h"
+#include "lib/util_str.h"
 #include "lib/libcpumf.h"
 
 #define STR_SUB(x) #x
@@ -50,6 +51,11 @@ static struct util_opt opt_vec[] = {
 	{
 		.option = { "delta", no_argument, NULL, 'd' },
 		.desc = "Display delta counter values"
+	},
+	{
+		.option = { "counters", required_argument, NULL, 'c' },
+		.argument = "LIST",
+		.desc = "Specify comma separated list of counters to display"
 	},
 	{
 		.option = { "format", required_argument, NULL, OPT_FORMAT },
@@ -117,6 +123,7 @@ static unsigned long loops;	/* # loops */
 static unsigned long read_interval = DEFAULT_LOOP_INTERVAL;
 static cpu_set_t cpu_online_mask;
 static char *ctrformat = "%ld";	/* Default counter output format */
+static char *ctrlist;		/* Comma separated list of counter to extract */
 
 #define PAI_PATH	"/bus/event_source/devices/%s"
 
@@ -237,6 +244,31 @@ static char *str2uc(const char *s)
 	return old_uc;
 }
 
+/* Return true if the counter is in the ctrlist. An empty ctrlist
+ * disables all counters.
+ */
+static bool ctr_in_list(char *name)
+{
+	char *token;
+	char *list;
+
+	if (!ctrlist)		/* No --counters means all counters */
+		return true;
+
+	list = util_strdup(ctrlist);
+	token = strtok(list, ",");
+	while (token) {
+		if (strcmp(token, name) == 0) {
+			free(list);
+			return true;
+		}
+		token = strtok(NULL, ",");
+	}
+
+	free(list);
+	return false;
+}
+
 /* Read counter names and assigned event number from sysfs file tree.
  * Exit when sysfs directory can not be scanned.
  */
@@ -244,7 +276,7 @@ static void read_counternames(struct pai_node *node)
 {
 	int i, more = 0, ctr = 0, count = 0;
 	struct dirent **namelist = NULL;
-	char *path, *ctrpath;
+	char *path, *ctrpath, sname[128];
 
 	/* Read counter names and assigned event number. */
 	path = util_path_sysfs(PAI_PATH "/events", node->sysfs_name);
@@ -257,6 +289,12 @@ static void read_counternames(struct pai_node *node)
 	for (i = 0; i < count && ctr >= 0; i++) {
 		util_asprintf(&ctrpath, "%s/%s", path, namelist[i]->d_name);
 		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1) {
+			snprintf(sname, sizeof(sname), "%c%ld",
+				 pai_type_char(node->type), ctr - node->base);
+			if (!ctr_in_list(sname) && !ctr_in_list(namelist[i]->d_name)) {
+				/* Counter not listed in --counters option */
+				continue;
+			}
 			node->ctrlist[node->ctridx].data = NULL;
 			node->ctrlist[node->ctridx].name = util_strdup(namelist[i]->d_name);
 			node->ctrlist[node->ctridx++].nr = ctr;
@@ -492,6 +530,8 @@ static void format_line_out(time_t now, char *now_text)
 		util_fmt_obj_start(FMT_LIST, "measurements");
 	}
 	util_list_iterate(&pai_list, node) {
+		if (!node->ctridx)	/* Counter set not selected */
+			continue;
 		util_fmt_obj_start(FMT_DEFAULT, "entry");
 		util_fmt_pair(FMT_PERSIST, "iteration", "%d", called++);
 		util_fmt_pair(FMT_PERSIST, "time_epoch", "%d", now);
@@ -783,6 +823,11 @@ int main(int argc, char **argv)
 				errx(EXIT_FAILURE, "Supported formats:" FMT_TYPE_NAMES);
 			output_format = fmt;
 			break;
+		case 'c':
+			ctrlist = util_strdup(optarg);
+			util_str_rm_whitespace(optarg, ctrlist);
+			util_str_toupper(ctrlist);
+			break;
 		}
 	}
 
@@ -832,5 +877,6 @@ int main(int argc, char **argv)
 	else
 		list_painode();
 	free_painode();
+	free(ctrlist);
 	return ch;
 }

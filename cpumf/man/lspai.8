@@ -30,7 +30,9 @@
 .IR SECONDS ]
 .RB [ \-l
 .IR COUNT ]
-.RB [ \-s ][ \-x ][ \-X ]
+.RB [ \-s ][ \-x ][ \-x ]
+.RB [ \-c
+.IR LIST ]
 .RI [ CPULIST ]
 .br
 \*c
@@ -88,6 +90,13 @@ The default is a total summary line of all counters from all CPUs.
 Displays counter values in form of deltas.
 Each counter value shows the increment to the previous output line.
 Without this flag the total value of each counter is displayed.
+.
+.TP
+.BR \-c ", " \-\-counters \fI\ LIST\fP
+Specify a comma separated list of counter names to
+be printed.
+If a counter name does not match any valid counter
+name, it is omitted.
 .
 .TP
 .BR \-s ", " \-\-short
