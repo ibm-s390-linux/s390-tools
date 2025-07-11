@@ -26,7 +26,7 @@
 .RB [ \-n ]
 .RB [ \-t
 .IR "\ TYPE" ]
-.RB [ \-d ][ \-i
+.RB [ \-a ][ \-d ][ \-i
 .IR SECONDS ]
 .RB [ \-l
 .IR COUNT ]
@@ -49,6 +49,7 @@ and numbers in various formats.
 If
 .I CPULIST
 is specified or any of the options
+.BR \-a ,
 .BR \-d ,
 .BR \-s ,
 .BR \-x ,
@@ -76,6 +77,11 @@ Displays help information, then exits.
 .TP
 .BR \-v ", " \-\-version
 Displays version information, then exits.
+.
+.TP
+.BR \-a ", " \-\-allcpu
+Displays counter values from each CPU.
+The default is a total summary line of all counters from all CPUs.
 .
 .TP
 .BR \-d ", " \-\-delta
