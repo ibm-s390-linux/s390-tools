@@ -44,6 +44,10 @@
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS"),
 	{
+		.option = { "delta", no_argument, NULL, 'd' },
+		.desc = "Display delta counter values"
+	},
+	{
 		.option = { "format", required_argument, NULL, OPT_FORMAT },
 		.argument = "FORMAT",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
@@ -100,6 +104,7 @@ static const struct util_prg prg = {
 
 static bool numsort;		/* If true sort counter numerically */
 static bool shortname;		/* Use abbreviated counter names */
+static bool delta, firstread;	/* Display delta values */
 static int output_format = -1;	/* Generate style if >= 0 */
 static unsigned int max_cpus;	/* # of CPUs to read counter values from */
 static unsigned int max_fds;	/* # of file descriptor to read counter values */
@@ -121,6 +126,8 @@ static int pai_types_show;
 struct pai_cpudata {		/* Event data per CPU */
 	int fd;			/* Event file descriptor */
 	int cpu;		/* CPU number */
+	unsigned long value;	/* Event value */
+	unsigned long prev_value;	/* Previous value for deltas */
 };
 
 struct pai_ctrname {		/* List of defined counters */
@@ -247,7 +254,6 @@ static void read_counternames(struct pai_node *node)
 		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1) {
 			node->ctrlist[node->ctridx].data = NULL;
 			node->ctrlist[node->ctridx].name = util_strdup(namelist[i]->d_name);
-			node->ctrlist[node->ctridx].total = 0;
 			node->ctrlist[node->ctridx++].nr = ctr;
 			more++;
 			max_fds++;
@@ -426,7 +432,7 @@ static void line_out(char *header)
 	line_header();
 
 	/* Print total count of all CPUs */
-	printf("%s,%s,", header, "Total");
+	printf("%s,%s,", header, delta && !firstread ? "Delta" : "Total");
 	comma = false;
 	util_list_iterate(&pai_list, node) {
 		for (int i = 0; i < node->ctridx; ++i) {
@@ -434,7 +440,6 @@ static void line_out(char *header)
 				putchar(',');
 			printf(ctrformat, node->ctrlist[i].total);
 			comma = true;
-			node->ctrlist[i].total = 0;
 		}
 	}
 	putchar('\n');
@@ -456,7 +461,8 @@ static void format_line_out(time_t now, char *now_text)
 		util_fmt_pair(FMT_PERSIST, "iteration", "%d", called++);
 		util_fmt_pair(FMT_PERSIST, "time_epoch", "%d", now);
 		util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "time", "%s", now_text);
-		util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "cpu", "total");
+		util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "cpu",
+			      (delta && !firstread) ? "delta" : "total");
 		util_fmt_obj_start(FMT_LIST, "counters");
 		for (int i = 0; i < node->ctridx; ++i) {
 			util_fmt_obj_start(FMT_ROW, "counter");
@@ -509,10 +515,17 @@ static void read_painode(void)
 
 	util_list_iterate(&pai_list, node) {
 		for (int i = 0; i < node->ctridx; ++i) {
+			node->ctrlist[i].total = 0;
 			for (size_t j = 0; j < max_cpus; ++j) {
 				data = &node->ctrlist[i].data[j];
 				value = event_read(data->fd);
-				node->ctrlist[i].total += value;
+				if (delta) {
+					data->value = value - data->prev_value;
+					data->prev_value = value;
+				} else {
+					data->value = value;
+				}
+				node->ctrlist[i].total += data->value;
 			}
 		}
 	}
@@ -525,6 +538,7 @@ static void wait_painode(void)
 		show_values();
 		if (i + 1 < loops)
 			sleep(read_interval);
+		firstread = false;
 	}
 	format_line_end();
 }
@@ -575,6 +589,8 @@ static void event_painode(void)
 				if (CPU_ISSET(j, &cpu_online_mask)) {
 					data->cpu = j;
 					data->fd = event_add(j, i, node);
+					data->value = 0;
+					data->prev_value = 0;
 					++data;
 				}
 			}
@@ -670,6 +686,11 @@ int main(int argc, char **argv)
 		default:
 			util_opt_print_parse_error(ch, argv);
 			return EXIT_FAILURE;
+		case 'd':
+			delta = true;
+			firstread = true;
+			list_only = false;
+			break;
 		case 'h':
 			util_prg_print_help();
 			util_opt_print_help();

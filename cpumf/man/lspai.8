@@ -26,7 +26,7 @@
 .RB [ \-n ]
 .RB [ \-t
 .IR "\ TYPE" ]
-.RB [ \-i
+.RB [ \-d ][ \-i
 .IR SECONDS ]
 .RB [ \-l
 .IR COUNT ]
@@ -49,6 +49,7 @@ and numbers in various formats.
 If
 .I CPULIST
 is specified or any of the options
+.BR \-d ,
 .BR \-s ,
 .BR \-x ,
 .BR \-X ,
@@ -75,6 +76,12 @@ Displays help information, then exits.
 .TP
 .BR \-v ", " \-\-version
 Displays version information, then exits.
+.
+.TP
+.BR \-d ", " \-\-delta
+Displays counter values in form of deltas.
+Each counter value shows the increment to the previous output line.
+Without this flag the total value of each counter is displayed.
 .
 .TP
 .BR \-s ", " \-\-short
@@ -181,6 +188,32 @@ NNPA_2GFRAME(26),NNPA_ACCESSEXCEPT(27)
 2025-05-13,08:18:41,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 2025-05-13,08:18:43,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 2025-05-13,08:18:45,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#
+.fi
+.sp 1
+This \*c example displays the value of PAI crypto counter number 7.
+It is field number 116 in the output.
+This counter is incremented after \*c is started and
+the table shows the delta values for PAI crypto counter 7.
+.nf
+# lspai -d -s -i 5 -l3 -t crypto | \
+awk -F , '{ print $1 ","  $2 "," $3 ","  $4 "," $116; }'
+Date,Time,CPU,C0,C7
+2025-06-24,13:02:24,Total,0,0
+2025-06-24,13:02:29,Delta,77122286,77122284
+2025-06-24,13:02:34,Delta,92574403,92574403
+#
+.fi
+.sp 1
+The following table shows the total value for PAI crypto counter 7
+after \*c is started.
+.nf
+# lspai -s -i 5 -l3 -t crypto | \
+awk -F , '{ print $1 ","  $2 "," $3 ","  $4 "," $116; }'
+Date,Time,CPU,C0,C7
+2025-06-24,13:03:01,Total,0,0
+2025-06-24,13:03:06,Total,72550754,72566121
+2025-06-24,13:03:11,Total,164633982,164650377
 #
 .fi
 .SH "SEE ALSO"
