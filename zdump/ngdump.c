@@ -42,11 +42,19 @@ static int read_meta_from_file(const char *filename, struct ngdump_meta *meta)
 	FILE *fp = NULL;
 	char *line = NULL;
 
+	util_log_print(UTIL_LOG_TRACE,
+		       "%s: Reading meta file \"%s\"\n",
+		       __func__, filename);
+
 	memset(meta, 0, sizeof(*meta));
 
 	fp = fopen(filename, "r");
-	if (!fp)
+	if (!fp) {
+		util_log_print(UTIL_LOG_TRACE,
+			       "%s: Could not open \"%s\" (%s)\n",
+			       __func__, filename, strerror(errno));
 		return -1;
+	}
 
 	while (fscanf(fp, "%m[^\n]\n", &line) == 1) {
 		char *ptr, *param = NULL, *value = NULL;
@@ -154,8 +162,11 @@ static int validate_meta(const char *mount_point, struct ngdump_meta *meta)
 	 * that the given partition is a valid NGDump partition but with no
 	 * dump present.
 	 */
-	if (!meta->file)
+	if (!meta->file) {
+		util_log_print(UTIL_LOG_TRACE,
+			       "%s: No dump file present\n", __func__);
 		return 0;
+	}
 	if (!meta->sha256sum) {
 		warnx("Invalid NGDump SHA256 checksum");
 		return -1;
@@ -189,13 +200,18 @@ int ngdump_read_meta_from_device(const char *device, struct ngdump_meta *meta)
 
 	/* Create a mount point directory */
 	if (mkdtemp(mount_point) == NULL) {
+		warnx("Could not create directory \"%s\"", mount_point);
 		rc = -1;
 		goto out;
 	}
 
 	rc = mount(device, mount_point, NGDUMP_FSTYPE, MS_RDONLY, NULL);
-	if (rc)
+	if (rc) {
+		util_log_print(UTIL_LOG_TRACE,
+			       "%s: Could not mount \"%s\" (%s)\n",
+			       __func__, device, strerror(errno));
 		goto out_rmdir;
+	}
 
 	util_asprintf(&filename, "%s/%s", mount_point, NGDUMP_META_FILENAME);
 

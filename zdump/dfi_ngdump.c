@@ -36,8 +36,10 @@ static int open_dump_file(void)
 	mount_point = util_strdup("/tmp/zdump-ngdump-XXXXXX");
 
 	/* Create a mount point directory */
-	if (mkdtemp(mount_point) == NULL)
+	if (mkdtemp(mount_point) == NULL) {
+		warnx("Could not create directory \"%s\"", mount_point);
 		goto fail_free;
+	}
 
 	if (mount(l.device, mount_point, NGDUMP_FSTYPE, MS_RDONLY, NULL)) {
 		warnx("Could not mount \"%s\" (%s)", l.device, strerror(errno));
