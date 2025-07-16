@@ -570,6 +570,109 @@ function check_for_regular_devices() {
    ddebug "done";
 }
 
+function check_corresponding_regular_device_symlink()
+{
+   local j=$1;
+   local corr_dev=$2;
+   local line;
+
+   ddebug "   regular device found: $corr_dev";
+   checked_devs[${#checked_devs[@]}]=${WRP_DEVICES[$j]};
+   WRP_DEVICES[j]="";
+   clean_devices;
+   ddebug "   add ${checked_devs[${#checked_devs[@]}-1]}";
+   line=$(lsscsi -g | grep -w "${corr_dev%%[0-9]*}" | awk '{print $1}');
+   line=${line#[*};
+   WRP_HOST_ADAPTERS[${#WRP_HOST_ADAPTERS[@]}]="host${line%%:*}";
+   WRP_LUNS[${#WRP_LUNS[@]}]=${line%%]*};
+}
+
+function check_corresponding_multipath_device_symlink()
+{
+   local j=$1;
+   local corr_dev=$2;
+   local corr_dev_mpath;
+   local mp_arr=();
+   local line;
+   local tmp;
+   local k;
+
+   # maybe multipath is not even installed?!?
+   if [ -e /sbin/multipath ]; then
+      # read multipath output into an array
+      while IFS= read -r line
+      do
+         mp_arr[${#mp_arr[@]}]=$line;
+      done < <(/sbin/multipath -l);
+   fi
+
+   # get corresponding device name from lsblk, remove trailing digits and '-part' suffix (if present)
+   corr_dev_mpath=$(lsblk "${corr_dev}" | awk 'NR==2 {print $1}' | sed 's/[0-9]*$//' | sed 's/-part//');
+   # search for matching multipath entry
+   for (( k=0; k<${#mp_arr[@]}; ++k )); do
+      # skip lines starting with '[', ' ', or '_'
+      if [ "${mp_arr[$k]:0:1}" != "[" ] && [ "${mp_arr[$k]:0:1}" != " " ] && [ "${mp_arr[$k]:0:1}" != "_" ]; then
+         # extract device name from mp_arr
+         tmp=$(echo "${mp_arr[$k]}" | awk '{print $1}');
+         if [ "${tmp}" == "${corr_dev_mpath}" ]; then
+            ddebug "   multipath device found: ${corr_dev}";
+            WRP_DEVICES[j]="";
+            clean_devices;
+            (( k+=2 )); # skip next two lines (usually header/info)
+            # loop through lines that start with non-alphanumeric characters
+            while [[ "${mp_arr[$k]:0:1}" =~ [^0-9a-zA-Z] ]] && [ $k -lt ${#mp_arr[@]} ]; do
+               # check if line contains a SCSI device identifier pattern like h:c:t:l
+               if [ "$(echo "${mp_arr[$k]}" | grep -ce "[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}")" -ne 0 ]; then
+                  # extract the SCSI identifier
+                  line="$(echo "${mp_arr[$k]}" | sed 's/[^0-9]*\([0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}:[0-9]\{1,\}\)/\1/')";
+                  # add corresponding /dev/ entry to checked_devs array
+                  checked_devs[${#checked_devs[@]}]=$(echo "$line" | awk '{print "/dev/"$2}');
+                  ddebug "      add ${checked_devs[${#checked_devs[@]}-1]}";
+                  # extract and store host adapter and LUN info
+                  WRP_HOST_ADAPTERS[${#WRP_HOST_ADAPTERS[@]}]="host${line%%:*}";
+                  WRP_LUNS[${#WRP_LUNS[@]}]=$(echo "$line" | awk '{print $1}');
+               fi
+               (( k++ ));
+            done;
+            break;
+         fi
+      fi
+   done
+}
+
+function check_for_symlink_devices() {
+   local i;
+   local j;
+   local symlnk_arr=();
+   local line;
+   local corr_dev;
+
+   [ ${#WRP_DEVICES[@]} -eq 0 ] && return;
+
+   # persistent storage symlinks from /dev/disk/
+   while IFS= read -r line
+   do
+      symlnk_arr[${#symlnk_arr[@]}]=$line;
+   done < <(find /dev/disk/ -type l);
+
+   ddebug "check for symlink devices...";
+   for (( i=0; i<${#symlnk_arr[@]}; ++i )); do
+      for (( j=0; j<${#WRP_DEVICES[@]}; ++j )); do
+         if [ "$(basename "${symlnk_arr[$i]}")" == "$(basename "${WRP_DEVICES[$j]}")" ]; then
+            ddebug "   symlink device found at: ${symlnk_arr[$i]}";
+            # find corresponding device for the symlink
+            corr_dev=$(readlink -f "${symlnk_arr[i]}");
+            if [ "${corr_dev:0:7}" == "/dev/sd" ]; then
+               check_corresponding_regular_device_symlink "$j" "${corr_dev}";
+            else
+               check_corresponding_multipath_device_symlink "$j" "${corr_dev}";
+            fi
+         fi
+      done
+   done
+   ddebug "done";
+}
+
 
 function determine_host_adapters() {
    local error=0;
@@ -585,7 +688,9 @@ function determine_host_adapters() {
    if [ $s_dev_ratio -ge 50 ]; then
       check_for_regular_devices;
       check_for_multipath_devices;
+      check_for_symlink_devices;
    else
+      check_for_symlink_devices;
       check_for_multipath_devices;
       check_for_regular_devices;
    fi
