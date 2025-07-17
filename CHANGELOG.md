@@ -1,15 +1,37 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.39.0 (2025-10-14)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 6.16 / 6.17
 
   Changes of existing tools:
+  - chpstat: Add options to select IEC units for scaling (SI units are default)
+  - chzdev: Introduce --no-module-load option
+  - cpi: Disable CPI for SEL guests by default
+  - dbginfo.sh: Enhance logging on timeout triggered
+  - iucvterm: Install symlink for lsiucvallow.8 man page
+  - lshwc: Add command line flag to specify individual counters
+  - lspai: Add command line flag for delta values
+  - lspai: Add command line flag for short counter names
+  - lspai: Add command line flag to specify individual counters
+  - lspai: Add command line flags for all cpus
+  - lspai: Add command line flags for hexadecimal output
+  - man: Use CR for constant width font
+  - pvimg: Add '--image-key' option
+  - zdev: Allow dynamic control of module load
+  - zipl/boot: Fix EBCDIC code page 500 conversion and decrease size by 200 bytes
+  - zipl: Add support of heterogeneous mirrors (remove technical limitations
+    on mirrored targets, thus allowing mirrored devices consist of partitions
+    at different offsets on disks of different types and geometry).
+  - zkey: Add support for generating and importing exportable secure keys
 
   Bug Fixes:
+  - chpstat: Fix scaling of DPU utilization calculation
+  - zdev/dracut: Prevent loading of unused kernel modules
+  - zdev: Fix double device configuration on DPM systems
+  - zdev: Fix double device configuration with rd.dasd
+  - zipl_helper.device-mapper: Fix segfault in an error path
 
 * __v2.38.0 (2025-06-25)__
 
