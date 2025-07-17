@@ -174,7 +174,8 @@ main(int argc, char* argv[])
 	/* Do it */
 	switch (job->id) {
 	case job_dump_partition:
-		rc = disk_get_ext_type(job->data.dump.device, &ext_type);
+		rc = disk_get_ext_type(job->data.dump.device, &ext_type,
+				       0 /* disk index */);
 		if (rc)
 			break;
 		job_dump_check_set_ngdump(job, &ext_type);

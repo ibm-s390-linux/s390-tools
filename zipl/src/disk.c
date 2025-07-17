@@ -104,9 +104,10 @@ read_block_by_offset(int fd, int blksize, uint64_t offset, char *buffer)
 	return 0;
 }
 
-static int determine_virtblk_type(struct disk_info *data,
+static int determine_virtblk_type(struct device_info *dev_info,
 				  const struct stat *stats)
 {
+	struct disk_info *data = &dev_info->base[0];
 	char *device;
 	char *buffer;
 	int fd, rc, shift, sb;
@@ -131,9 +132,9 @@ static int determine_virtblk_type(struct disk_info *data,
 	if (data->geo.heads == 15) {
 		/* assume DASD */
 		data->partnum = stats->st_rdev & DASD_PARTN_MASK;
-		data->device = stats->st_rdev & ~DASD_PARTN_MASK;
+		dev_info->device = stats->st_rdev & ~DASD_PARTN_MASK;
 
-		rc = misc_temp_dev(data->device, 1, &device);
+		rc = misc_temp_dev(dev_info->device, 1, &device);
 		if (rc)
 			goto out_err;
 
@@ -167,7 +168,7 @@ static int determine_virtblk_type(struct disk_info *data,
 	} else {
 		data->type = disk_type_scsi;
 		data->partnum = stats->st_rdev & SCSI_PARTN_MASK;
-		data->device = stats->st_rdev & ~SCSI_PARTN_MASK;
+		dev_info->device = stats->st_rdev & ~SCSI_PARTN_MASK;
 	}
 
 out_err:
@@ -309,40 +310,40 @@ static void print_base_disk_params(struct job_target_data *td, int index)
  * Set disk info using ready target parameters provided either by
  * user, or by script
  */
-static int disk_set_info_by_hint(struct job_target_data *td,
-				 struct disk_info *data, int fd)
+static int device_set_info_by_hint(struct job_target_data *td,
+				   struct device_info *data, int fd)
 {
 	int majnum, minnum;
 	struct stat stats;
 	int i;
-	/*
-	 * Currently multiple base disks with different parameters
-	 * are not supported
-	 */
-	data->devno = -1;
-	data->phy_block_size = get_targetblocksize(td, 0);
-	data->type = get_targettype(td, 0);
 
 	assert(td->nr_targets != 0);
-	for (i = 1; i < td->nr_targets; i++) {
-		if (data->type != get_targettype(td, i) ||
-		    data->phy_block_size != get_targetblocksize(td, i)) {
+	/* set devno, type, phy_block_size */
+	for (i = 0; i < td->nr_targets; i++) {
+		data->base[i].devno = -1;
+		data->base[i].type = get_targettype(td, i);
+		data->base[i].phy_block_size = get_targetblocksize(td, i);
+
+		if (data->base[0].type !=
+		    data->base[i].type ||
+		    data->base[0].phy_block_size !=
+		    data->base[i].phy_block_size) {
+			/*
+			 * Currently multiple base disks with different
+			 * parameters are not supported
+			 */
 			print_base_disk_params(td, 0);
 			print_base_disk_params(td, i);
 			error_reason("Inconsistent base disk geometry in target device");
 			return -1;
 		}
 	}
-	data->partnum = 0;
-	data->targetbase_def = undefined;
-
+	/* set disk, targetbase_def, partnum, is_nvme */
 	for (i = 0; i < td->nr_targets; i++) {
-		definition_t defined_as;
-
 		if (sscanf(get_targetbase(td, i),
 			   "%d:%d", &majnum, &minnum) == 2) {
-			data->basedisks[i] = makedev(majnum, minnum);
-			defined_as = defined_as_device;
+			data->base[i].disk = makedev(majnum, minnum);
+			data->base[i].targetbase_def = defined_as_device;
 		} else {
 			if (stat(get_targetbase(td, i), &stats)) {
 				error_reason(strerror(errno));
@@ -356,47 +357,51 @@ static int disk_set_info_by_hint(struct job_target_data *td,
 					     get_targetbase(td, i));
 				return -1;
 			}
-			data->basedisks[i] = stats.st_rdev;
-			defined_as = defined_as_name;
+			data->base[i].disk = stats.st_rdev;
+			data->base[i].targetbase_def = defined_as_name;
 		}
-		if (data->targetbase_def != undefined &&
-		    data->targetbase_def != defined_as) {
+		if (data->base[i].targetbase_def !=
+		    data->base[0].targetbase_def) {
 			error_reason("Target base disks are defined by different ways");
 			return -1;
 		}
-		data->targetbase_def = defined_as;
+		data->base[i].partnum = 0;
+		if (data->base[i].type == disk_type_scsi &&
+		    ioctl(fd, NVME_IOCTL_ID) >= 0)
+			data->base[i].is_nvme = 1;
 	}
-	if (data->type == disk_type_scsi && ioctl(fd, NVME_IOCTL_ID) >= 0)
-		data->is_nvme = 1;
 	return 0;
 }
 
 /**
  * Calculate target parameters in the case when no hints were provided
  */
-static int disk_set_info_auto(struct disk_info *data,
+static int disk_set_info_auto(struct device_info *dev_info,
 			      const struct stat *stats, int fd)
 {
+	struct disk_info *data = &dev_info->base[0];
 	struct dasd_information dasd_info;
 
 	if (ioctl(fd, BLKSSZGET, &data->phy_block_size)) {
 		error_reason("Could not get blocksize");
 		return -1;
 	}
-	if (!data->drv_name) {
+	if (!dev_info->drv_name) {
 		/* Driver name cannot be read */
 		if (ioctl(fd, BIODASDINFO, &dasd_info)) {
 			data->devno = -1;
 			if (data->geo.start) {
 				/* SCSI partition */
 				data->type = disk_type_scsi;
-				data->partnum = stats->st_rdev & SCSI_PARTN_MASK;
-				data->device = stats->st_rdev & ~SCSI_PARTN_MASK;
+				data->partnum =
+					stats->st_rdev & SCSI_PARTN_MASK;
+				dev_info->device =
+					stats->st_rdev & ~SCSI_PARTN_MASK;
 			} else {
 				/* SCSI disk */
 				data->type = disk_type_scsi;
 				data->partnum = 0;
-				data->device = stats->st_rdev;
+				dev_info->device = stats->st_rdev;
 			}
 		} else {
 			/* DASD */
@@ -404,9 +409,9 @@ static int disk_set_info_auto(struct disk_info *data,
 			if (disk_determine_dasd_type(data, dasd_info))
 				return -1;
 			data->partnum = stats->st_rdev & DASD_PARTN_MASK;
-			data->device = stats->st_rdev & ~DASD_PARTN_MASK;
+			dev_info->device = stats->st_rdev & ~DASD_PARTN_MASK;
 		}
-	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_DASD) == 0) {
+	} else if (strcmp(dev_info->drv_name, UTIL_PROC_DEV_ENTRY_DASD) == 0) {
 		/* Driver name is 'dasd' */
 		if (ioctl(fd, BIODASDINFO, &dasd_info)) {
 			error_reason("Could not determine DASD type");
@@ -416,27 +421,29 @@ static int disk_set_info_auto(struct disk_info *data,
 		if (disk_determine_dasd_type(data, dasd_info))
 			return -1;
 		data->partnum = stats->st_rdev & DASD_PARTN_MASK;
-		data->device = stats->st_rdev & ~DASD_PARTN_MASK;
-	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_SD) == 0) {
+		dev_info->device = stats->st_rdev & ~DASD_PARTN_MASK;
+	} else if (strcmp(dev_info->drv_name, UTIL_PROC_DEV_ENTRY_SD) == 0) {
 		/* Driver name is 'sd' */
 		data->devno = -1;
 		data->type = disk_type_scsi;
 		data->partnum = stats->st_rdev & SCSI_PARTN_MASK;
-		data->device = stats->st_rdev & ~SCSI_PARTN_MASK;
+		dev_info->device = stats->st_rdev & ~SCSI_PARTN_MASK;
 
-	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_VIRTBLK) == 0) {
+	} else if (strcmp(dev_info->drv_name,
+			  UTIL_PROC_DEV_ENTRY_VIRTBLK) == 0) {
 		/* Driver name is 'virtblk' */
 		if (ioctl(fd, HDIO_GETGEO, &data->geo) != 0)
 			perror("Could not retrieve disk geometry information.");
 		if (ioctl(fd, BLKSSZGET, &data->phy_block_size) != 0)
 			perror("Could not retrieve blocksize information.");
 
-		if (determine_virtblk_type(data, stats)) {
+		if (determine_virtblk_type(dev_info, stats)) {
 			error_reason("Virtblk device type not clearly "
 				     "determined.");
 			return -1;
 		}
-	} else if (strcmp(data->drv_name, UTIL_PROC_DEV_ENTRY_BLKEXT) == 0 &&
+	} else if (strcmp(dev_info->drv_name,
+			  UTIL_PROC_DEV_ENTRY_BLKEXT) == 0 &&
 		   ioctl(fd, NVME_IOCTL_ID) >= 0) {
 		/* NVMe path, driver name is 'blkext' */
 		data->devno = -1;
@@ -444,18 +451,20 @@ static int disk_set_info_auto(struct disk_info *data,
 		data->is_nvme = 1;
 
 		if (util_sys_dev_is_partition(stats->st_rdev)) {
-			if (util_sys_get_base_dev(stats->st_rdev, &data->device))
+			if (util_sys_get_base_dev(stats->st_rdev,
+						  &dev_info->device))
 				return -1;
 			data->partnum = util_sys_get_partnum(stats->st_rdev);
 			if (data->partnum == -1)
 				return -1;
 		} else {
-			data->device = stats->st_rdev;
+			dev_info->device = stats->st_rdev;
 			data->partnum = 0;
 		}
 	} else {
 		/* Driver name is unknown */
-		error_reason("Unsupported device driver '%s'", data->drv_name);
+		error_reason("Unsupported device driver '%s'",
+			     dev_info->drv_name);
 		return -1;
 	}
 	return 0;
@@ -488,7 +497,7 @@ static void set_source_type(struct job_target_data *td,
 	td->source = source_auto;
 }
 
-static void set_driver_name(int fd, struct disk_info *info, dev_t device)
+static void set_driver_name(int fd, struct device_info *info, dev_t device)
 {
 	struct util_proc_dev_entry dev_entry;
 
@@ -555,25 +564,26 @@ static int run_targetbase_script(struct job_target_data *td,
  * Note: geo.start contains a sector number offset measured in
  * physical blocks, not sectors (512 bytes)
  */
-static int disk_set_geometry_by_hint(struct job_target_data *td,
-				     struct disk_info *data)
+static int device_set_geometry_by_hint(struct job_target_data *td,
+				       struct device_info *data)
 {
 	int i;
-	/*
-	 * Currently multiple base disks with different parameters
-	 * are not supported
-	 */
-	data->geo.heads = get_targetheads(td, 0);
-	data->geo.sectors = get_targetsectors(td, 0);
-	data->geo.cylinders = get_targetcylinders(td, 0);
-	data->geo.start = get_targetoffset(td, 0);
 
 	assert(td->nr_targets != 0);
-	for (i = 1; i < td->nr_targets; i++) {
-		if (data->geo.heads     != get_targetheads(td, i) ||
-		    data->geo.sectors   != get_targetsectors(td, i) ||
-		    data->geo.cylinders != get_targetcylinders(td, i) ||
-		    data->geo.start     != get_targetoffset(td, i)) {
+	for (i = 0; i < td->nr_targets; i++) {
+		data->base[i].geo.heads = get_targetheads(td, i);
+		data->base[i].geo.sectors = get_targetsectors(td, i);
+		data->base[i].geo.cylinders = get_targetcylinders(td, i);
+		data->base[i].geo.start = get_targetoffset(td, i);
+
+		if (data->base[i].geo.heads != data->base[0].geo.heads ||
+		    data->base[i].geo.sectors != data->base[0].geo.sectors ||
+		    data->base[i].geo.cylinders != data->base[0].geo.cylinders ||
+		    data->base[i].geo.start != data->base[0].geo.start) {
+			/*
+			 * Currently multiple base disks with different
+			 * parameters are not supported
+			 */
 			print_base_disk_params(td, 0);
 			print_base_disk_params(td, i);
 			error_reason("Inconsistent base disk geometry in target device");
@@ -600,9 +610,10 @@ static int disk_set_geometry_auto(int fd, struct disk_info *info)
  * Pre-condition: disk type is already known and set at DATA->type
  */
 static int disk_set_info_complete(struct job_target_data *td,
-				  struct disk_info *data,
+				  struct device_info *dev_info,
 				  struct stat *stats, int fd)
 {
+	struct disk_info *data = &dev_info->base[0];
 	struct util_proc_part_entry part_entry;
 	long devsize;
 
@@ -632,14 +643,14 @@ static int disk_set_info_complete(struct job_target_data *td,
 	if (data->partnum != 0)
 		data->partition = stats->st_rdev;
 	/* Try to get device name */
-	if (util_proc_part_get_entry(data->device, &part_entry) == 0) {
-		data->name = misc_strdup(part_entry.name);
+	if (util_proc_part_get_entry(dev_info->device, &part_entry) == 0) {
+		dev_info->name = misc_strdup(part_entry.name);
 		util_proc_part_free_entry(&part_entry);
-		if (data->name == NULL)
+		if (!dev_info->name)
 			return -1;
 	}
 	/* Initialize file system block size with invalid value */
-	data->fs_block_size = -1;
+	dev_info->fs_block_size = -1;
 	return 0;
 }
 
@@ -666,11 +677,11 @@ static int disk_set_info_complete(struct job_target_data *td,
  * DEVICE: logical, or physical device, optionally formatted with a
  * file system.
  */
-int disk_get_info(const char *device, struct job_target_data *td,
-		  struct disk_info **info)
+int device_get_info(const char *device, struct job_target_data *td,
+		    struct device_info **info)
 {
 	char *script_file = NULL;
-	struct disk_info *data;
+	struct device_info *data;
 	struct stat stats;
 	int fd;
 
@@ -683,10 +694,10 @@ int disk_get_info(const char *device, struct job_target_data *td,
 		error_reason(strerror(errno));
 		return -1;
 	}
-	data = (struct disk_info *)misc_malloc(sizeof(struct disk_info));
+	data = (struct device_info *)misc_malloc(sizeof(struct device_info));
 	if (!data)
 		goto error;
-	memset((void *)data, 0, sizeof(struct disk_info));
+	memset((void *)data, 0, sizeof(struct device_info));
 	set_driver_name(fd, data, stats.st_rdev);
 	set_source_type(td, data->drv_name, &script_file);
 	switch (td->source) {
@@ -696,9 +707,9 @@ int disk_get_info(const char *device, struct job_target_data *td,
 		/* target parameters were set by the script output */
 		assert(target_parameters_are_set(td));
 
-		if (disk_set_geometry_by_hint(td, data))
+		if (device_set_geometry_by_hint(td, data))
 			goto error;
-		if (disk_set_info_by_hint(td, data, fd))
+		if (device_set_info_by_hint(td, data, fd))
 			goto error;
 		data->device = stats.st_rdev;
 		break;
@@ -709,20 +720,20 @@ int disk_get_info(const char *device, struct job_target_data *td,
 		 */
 		assert(target_parameters_are_set(td));
 
-		if (disk_set_geometry_by_hint(td, data))
+		if (device_set_geometry_by_hint(td, data))
 			goto error;
-		if (disk_set_info_by_hint(td, data, fd))
+		if (device_set_info_by_hint(td, data, fd))
 			goto error;
 		/*
 		 * multiple base disks are not supported
 		 * with this source type
 		 */
 		assert(td->nr_targets == 1);
-		data->device = data->basedisks[0];
+		data->device = data->base[0].disk;
 		break;
 	case source_auto:
 		/* no ready target parameters are available */
-		if (disk_set_geometry_auto(fd, data))
+		if (disk_set_geometry_auto(fd, &data->base[0]))
 			goto error;
 		if (disk_set_info_auto(data, &stats, fd))
 			goto error;
@@ -730,7 +741,7 @@ int disk_get_info(const char *device, struct job_target_data *td,
 		 * multiple base disks are not supported
 		 * with this source type
 		 */
-		data->basedisks[0] = data->device;
+		data->base[0].disk = data->device;
 		td->nr_targets = 1;
 		break;
 	default:
@@ -772,17 +783,20 @@ disk_is_tape(const char* device)
  * partition, etc). In case of success the resulted disk type is
  * stored in EXT_TYPE.
  */
-int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type)
+int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type,
+		      int disk_idx)
 {
 	struct job_target_data tmp = {.source = source_unknown};
+	struct device_info *dev_info;
 	struct disk_info *info;
 
-	if (disk_get_info(device, &tmp, &info))
+	if (device_get_info(device, &tmp, &dev_info))
 		return -1;
+	info = &dev_info->base[disk_idx];
 	ext_type->type = info->type;
 	ext_type->is_nvme = info->is_nvme;
 
-	disk_free_info(info);
+	device_free_info(dev_info);
 	free_target_data(&tmp);
 	return 0;
 }
@@ -811,7 +825,7 @@ int disk_type_is_eckd(disk_type_t type)
 /**
  * Retrieve and set block size of the file system which contains FILENAME
  */
-int disk_info_set_fs_block(const char *filename, struct disk_info *info)
+int device_info_set_fs_block(const char *filename, struct device_info *dinfo)
 {
 	int blocksize;
 	int fd;
@@ -830,7 +844,7 @@ int disk_info_set_fs_block(const char *filename, struct disk_info *info)
 			     filename);
 		return -1;
 	}
-	info->fs_block_size = blocksize;
+	dinfo->fs_block_size = blocksize;
 	return 0;
 }
 
@@ -838,9 +852,9 @@ int disk_info_set_fs_block(const char *filename, struct disk_info *info)
  * Retrieve disk info of the device which contains FILENAME
  * and set the filesystem block size
  */
-int disk_get_info_from_file(const char *filename,
-			    struct job_target_data *target,
-			    struct disk_info **info)
+int device_get_info_from_file(const char *filename,
+			      struct job_target_data *target,
+			      struct device_info **info)
 {
 	struct stat stats;
 	char *device;
@@ -851,15 +865,15 @@ int disk_get_info_from_file(const char *filename,
 	}
 	if (misc_temp_dev(stats.st_dev, 1, &device))
 		return -1;
-	if (disk_get_info(device, target, info)) {
+	if (device_get_info(device, target, info)) {
 		misc_free_temp_dev(device);
 		return -1;
 	}
 	misc_free_temp_dev(device);
-	return disk_info_set_fs_block(filename, *info);
+	return device_info_set_fs_block(filename, *info);
 }
 
-void disk_free_info(struct disk_info *info)
+void device_free_info(struct device_info *info)
 {
 	if (!info)
 		return;
@@ -877,28 +891,29 @@ void disk_free_info(struct disk_info *info)
  * otherwise. */
 static int
 disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
-		  blocknum_t* physical, struct disk_info* info)
+		  blocknum_t *physical, int fs_block_size,
+		  struct disk_info *disk_info)
 {
 	blocknum_t phy_per_fs;
 	blocknum_t mapped;
 	int subblock;
 
 	/* No file system: partition or raw disk */
-	if (info->fs_block_size == -1) {
+	if (fs_block_size == -1) {
 		if (fd_is_basedisk)
 			*physical = logical;
 		else
-			*physical = logical + info->geo.start;
+			*physical = logical + disk_info->geo.start;
 		return 0;
 	}
 	/*
 	 * Get mapping in file system blocks
 	 */
-	phy_per_fs = info->fs_block_size / info->phy_block_size;
+	phy_per_fs = fs_block_size / disk_info->phy_block_size;
 	subblock = logical % phy_per_fs;
 
-	if (fs_map(fd, logical * info->phy_block_size,
-		   &mapped, info->fs_block_size) != 0)
+	if (fs_map(fd, logical * disk_info->phy_block_size,
+		   &mapped, fs_block_size) != 0)
 		return -1;
 	if (mapped == 0) {
 		/* This is a hole in the file */
@@ -907,7 +922,7 @@ disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 		/* Convert file system block to physical */
 		*physical = mapped * phy_per_fs + subblock;
 		/* Add partition start */
-		*physical += info->geo.start;
+		*physical += disk_info->geo.start;
 	}
 	return 0;
 }
@@ -916,7 +931,7 @@ disk_get_blocknum(int fd, int fd_is_basedisk, blocknum_t logical,
 /* Return the cylinder on which the block number BLOCKNUM is stored on the
  * CHS device identified by INFO. */
 int
-disk_cyl_from_blocknum(blocknum_t blocknum, struct disk_info* info)
+disk_cyl_from_blocknum(blocknum_t blocknum, struct disk_info *info)
 {
 	return blocknum / (info->geo.heads * info->geo.sectors);
 }
@@ -925,7 +940,7 @@ disk_cyl_from_blocknum(blocknum_t blocknum, struct disk_info* info)
 /* Return the head on which the block number BLOCKNUM is stored on the
  * CHS device identified by INFO. */
 int
-disk_head_from_blocknum(blocknum_t blocknum, struct disk_info* info)
+disk_head_from_blocknum(blocknum_t blocknum, struct disk_info *info)
 {
 	return (blocknum / info->geo.sectors) % info->geo.heads;
 }
@@ -934,7 +949,7 @@ disk_head_from_blocknum(blocknum_t blocknum, struct disk_info* info)
 /* Return the sector on which the block number BLOCKNUM is stored on the
  * CHS device identified by INFO. */
 int
-disk_sec_from_blocknum(blocknum_t blocknum, struct disk_info* info)
+disk_sec_from_blocknum(blocknum_t blocknum, struct disk_info *info)
 {
 	return blocknum % info->geo.sectors + 1;
 }
@@ -945,7 +960,7 @@ disk_sec_from_blocknum(blocknum_t blocknum, struct disk_info* info)
  * layout. */
 void
 disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
-			    struct disk_info* info)
+			    struct disk_info *info)
 {
 	switch (info->type) {
 	case disk_type_scsi:
@@ -986,8 +1001,9 @@ disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
  * otherwise. On success OFFSET contains offset of the first written byte
  */
 static int
-disk_write_block_aligned_base(struct misc_fd *mfd, int is_base_disk, const void *data,
-			      size_t bytecount, disk_blockptr_t *block,
+disk_write_block_aligned_base(struct misc_fd *mfd, int is_base_disk,
+			      const void *data, size_t bytecount,
+			      disk_blockptr_t *block, int fs_block_size,
 			      struct disk_info *info, int align, off_t *offset)
 {
 	blocknum_t current_block;
@@ -1021,7 +1037,7 @@ disk_write_block_aligned_base(struct misc_fd *mfd, int is_base_disk, const void 
 	if (block != NULL) {
 		/* Store block pointer */
 		if (disk_get_blocknum(mfd->fd, is_base_disk, current_block,
-				      &blocknum, info))
+				      &blocknum, fs_block_size, info))
 			return -1;
 		disk_blockptr_from_blocknum(block, blocknum, info);
 	}
@@ -1030,11 +1046,13 @@ disk_write_block_aligned_base(struct misc_fd *mfd, int is_base_disk, const void 
 	return 0;
 }
 
-int disk_write_block_aligned(struct misc_fd *mfd, const void *data, size_t bytecount,
-			     disk_blockptr_t *block, struct disk_info *info)
+int disk_write_block_aligned(struct misc_fd *mfd, const void *data,
+			     size_t bytecount, disk_blockptr_t *block,
+			     int fs_block_size, struct disk_info *info)
 {
 	return disk_write_block_aligned_base(mfd, 0, data, bytecount, block,
-					     info, info->phy_block_size, NULL);
+					     fs_block_size, info,
+					     info->phy_block_size, NULL);
 }
 
 /**
@@ -1047,8 +1065,9 @@ int disk_write_block_aligned(struct misc_fd *mfd, const void *data, size_t bytec
  * otherwise.
  */
 blocknum_t
-disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk, const void *buffer,
-			      size_t bytecount, disk_blockptr_t **blocklist,
+disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk,
+			      const void *buffer, size_t bytecount,
+			      disk_blockptr_t **blocklist, int fs_block_size,
 			      struct disk_info *info, int align, off_t *offset)
 {
 	blocknum_t count;
@@ -1074,6 +1093,7 @@ disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk, const voi
 		rc = disk_write_block_aligned_base(mfd, fd_is_basedisk,
 					VOID_ADD(buffer, written),
 					chunk_size, &(*blocklist)[i],
+					fs_block_size,
 					info,
 					i == 0 ? align : info->phy_block_size,
 					&pos);
@@ -1086,12 +1106,14 @@ disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk, const voi
 }
 
 blocknum_t
-disk_write_block_buffer(struct misc_fd *mfd, int fd_is_basedisk, const void *buffer,
-			size_t bytecount, disk_blockptr_t **blocklist,
+disk_write_block_buffer(struct misc_fd *mfd, int fd_is_basedisk,
+			const void *buffer, size_t bytecount,
+			disk_blockptr_t **blocklist, int fs_block_size,
 			struct disk_info *info)
 {
 	return disk_write_block_buffer_align(mfd, fd_is_basedisk, buffer,
-					     bytecount, blocklist, info,
+					     bytecount, blocklist,
+					     fs_block_size, info,
 					     info->phy_block_size, NULL);
 }
 
@@ -1168,7 +1190,7 @@ char *disk_get_ipl_type(disk_type_t type, int is_dump)
 
 /* Return non-zero for ECKD large volumes. */
 int
-disk_is_large_volume(struct disk_info* info)
+disk_is_large_volume(struct disk_info *info)
 {
 	return (info->type == disk_type_eckd_ldl ||
 		info->type == disk_type_eckd_cdl) &&
@@ -1177,13 +1199,14 @@ disk_is_large_volume(struct disk_info* info)
 
 
 /* Print textual representation of INFO contents. */
-void disk_print_info(struct disk_info *info, int source)
+void device_print_info(struct device_info *this, int source)
 {
+	struct disk_info *info = &this->base[0];
 	char footnote[4] = "";
 
 	prepare_footnote_ptr(source, footnote);
 	printf("  Device..........................: ");
-	disk_print_devt(info->device);
+	disk_print_devt(this->device);
 	if (info->targetbase_def == defined_as_device)
 		printf("%s", footnote);
 	printf("\n");
@@ -1192,16 +1215,16 @@ void disk_print_info(struct disk_info *info, int source)
 		disk_print_devt(info->partition);
 		printf("\n");
 	}
-	if (info->name) {
+	if (this->name) {
 		printf("  Device name.....................: %s",
-		       info->name);
+		       this->name);
 		if (info->targetbase_def == defined_as_name)
 			printf("%s", footnote);
 		printf("\n");
 	}
-	if (info->drv_name) {
+	if (this->drv_name) {
 		printf("  Device driver name..............: %s\n",
-		       info->drv_name);
+		       this->drv_name);
 	}
 	if (((info->type == disk_type_fba) ||
 	     (info->type == disk_type_diag) ||
@@ -1231,9 +1254,9 @@ void disk_print_info(struct disk_info *info, int source)
 	}
 	printf("  Geometry - start................: %ld%s\n",
 	       info->geo.start, footnote);
-	if (info->fs_block_size >= 0)
+	if (this->fs_block_size >= 0)
 		printf("  File system block size..........: %d\n",
-		       info->fs_block_size);
+		       this->fs_block_size);
 	printf("  Physical block size.............: %d%s\n",
 	       info->phy_block_size, footnote);
 	printf("  Device size in physical blocks..: %ld\n",
@@ -1244,7 +1267,7 @@ void disk_print_info(struct disk_info *info, int source)
 /* Check whether a block is a zero block which identifies a hole in a file.
  * Return non-zero if BLOCK is a zero block, 0 otherwise. */
 int
-disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info)
+disk_is_zero_block(disk_blockptr_t *block, struct disk_info *info)
 {
 	switch (info->type) {
 	case disk_type_scsi:
@@ -1270,7 +1293,7 @@ disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info)
  * blocks can be merged, 0 otherwise. */
 static int
 can_merge_blocks(disk_blockptr_t* first, disk_blockptr_t* second,
-		 struct disk_info* info)
+		 struct disk_info *info)
 {
 	int max_count;
 
@@ -1316,7 +1339,7 @@ can_merge_blocks(disk_blockptr_t* first, disk_blockptr_t* second,
  * type. */
 static void
 merge_blocks(disk_blockptr_t* first, disk_blockptr_t* second,
-	     struct disk_info* info)
+	     struct disk_info *info)
 {
 	switch (info->type) {
 	case disk_type_scsi:
@@ -1339,7 +1362,7 @@ merge_blocks(disk_blockptr_t* first, disk_blockptr_t* second,
  * number of elements in the list. */
 blocknum_t
 disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
-		       struct disk_info* info)
+		       struct disk_info *info)
 {
 	blocknum_t i;
 	blocknum_t last;
@@ -1366,8 +1389,8 @@ disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
  */
 blocknum_t
 disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
-			     disk_blockptr_t **blocklist,
-			     struct disk_info* info)
+			     disk_blockptr_t **blocklist, int fs_block_size,
+			     struct disk_info *info)
 {
 	struct stat stats;
 	int fd;
@@ -1420,7 +1443,8 @@ disk_get_blocklist_from_file(const char *filename, struct file_range *reg,
 	}
 	/* Build list */
 	for (i = 0; i < blk_count; i++) {
-		if (disk_get_blocknum(fd, 0, blk_off + i, &blocknum, info)) {
+		if (disk_get_blocknum(fd, 0, blk_off + i, &blocknum,
+				      fs_block_size, info)) {
 			close(fd);
 			return 0;
 		}

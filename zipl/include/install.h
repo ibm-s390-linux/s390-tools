@@ -77,7 +77,7 @@ struct install_set {
 	unsigned int tmp_filename_created:1;
 	unsigned int skip_prepare:1;
 	unsigned int print_details:1;
-	struct disk_info *info;
+	struct device_info *info;
 	disk_blockptr_t scsi_dump_sb_blockptr;
 };
 
@@ -127,11 +127,13 @@ int install_mvdump(char* const device[], struct job_target_data* target,
 
 int install_fba_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 			blocknum_t *stage1b_count, disk_blockptr_t *stage2_list,
-			blocknum_t stage2_count, struct disk_info *info);
+			blocknum_t stage2_count, int fs_block_size,
+			struct disk_info *info);
 int install_eckd_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 			 blocknum_t *stage1b_count,
 			 disk_blockptr_t *stage2_list,
-			 blocknum_t stage2_count, struct disk_info *info);
+			 blocknum_t stage2_count, int fs_block_size,
+			 struct disk_info *info);
 int rewind_tape(int fd);
 
 #endif /* INSTALL_H */

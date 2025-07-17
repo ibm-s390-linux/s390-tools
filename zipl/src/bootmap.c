@@ -45,7 +45,7 @@ static bool secure_boot_supported;
 
 /* Get size of a bootmap block pointer for disk with given INFO. */
 static int
-get_blockptr_size(struct disk_info* info)
+get_blockptr_size(struct disk_info *info)
 {
 	switch (info->type) {
 	case disk_type_scsi:
@@ -69,8 +69,7 @@ get_blockptr_size(struct disk_info* info)
  * defined by FORMAT_ID (relevant only for ECKD disk types)
  */
 void bootmap_store_blockptr(void *buffer, disk_blockptr_t *ptr,
-			    struct disk_info *info,
-			    int format_id)
+			    struct disk_info *info, int format_id)
 {
 	struct eckd_blockptr_legacy *eckd_legacy;
 	struct eckd_blockptr *eckd;
@@ -121,7 +120,7 @@ void bootmap_store_blockptr(void *buffer, disk_blockptr_t *ptr,
 /* Calculate the maximum number of entries in the program table. INFO
  * specifies the type of disk. */
 static int
-get_program_table_size(struct disk_info* info)
+get_program_table_size(struct disk_info *info)
 {
 	return PROGRAM_TABLE_BLOCK_SIZE / get_blockptr_size(info) - 1;
 }
@@ -130,7 +129,7 @@ get_program_table_size(struct disk_info* info)
 
 static int
 check_menu_positions(struct job_menu_data* menu, char* name,
-		     struct disk_info* info)
+		     struct disk_info *info)
 {
 	int i;
 
@@ -181,9 +180,10 @@ check_secure_boot_support(void)
  * of segment table blocks to the file identified by file descriptor FD. Upon
  * success, return 0 and set SECTION_POINTER to point to the first block in
  * the resulting segment table. Return non-zero otherwise. */
-static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list, blocknum_t count,
-			     disk_blockptr_t *segment_pointer,
-			     struct disk_info *info, int program_table_id)
+static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list,
+			     blocknum_t count, disk_blockptr_t *segment_pointer,
+			     int fs_block_size, struct disk_info *info,
+			     int program_table_id)
 {
 	disk_blockptr_t next;
 	void* buffer;
@@ -221,7 +221,7 @@ static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list, blocknu
 				       &next, info,
 				       program_table_id);
 		rc = disk_write_block_aligned(mfd, buffer, info->phy_block_size,
-					      &next, info);
+					      &next, fs_block_size, info);
 		if (rc) {
 			free(buffer);
 			return rc;
@@ -233,8 +233,9 @@ static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list, blocknu
 }
 
 
-static int add_program_table(struct misc_fd *mfd, disk_blockptr_t *table, int entries,
-			     disk_blockptr_t *pointer, struct disk_info *info,
+static int add_program_table(struct misc_fd *mfd, disk_blockptr_t *table,
+			     int entries, disk_blockptr_t *pointer,
+			     int fs_block_size, struct disk_info *info,
 			     int program_table_id)
 {
 	void* block;
@@ -256,7 +257,7 @@ static int add_program_table(struct misc_fd *mfd, disk_blockptr_t *table, int en
 	}
 	/* Write program table */
 	rc = disk_write_block_aligned(mfd, block, PROGRAM_TABLE_BLOCK_SIZE,
-				      pointer, info);
+				      pointer, fs_block_size, info);
 	free(block);
 	return rc;
 }
@@ -307,16 +308,16 @@ create_component_header(void* buffer, component_header_type type)
  * Return 0, if auto-detection succeeded, and it is proven that the
  * file does NOT locate on DISK. Otherwise, return 1.
  */
-static int file_is_on_disk(const char *filename, struct disk_info *where)
+static int file_is_on_device(const char *filename, struct device_info *where)
 {
 	/*
 	 * Retrieve info of the underlying disk without any user hints
 	 */
 	struct job_target_data tmp = {.source = source_unknown};
-	struct disk_info *info;
+	struct device_info *info;
 	int rc;
 
-	rc = disk_get_info_from_file(filename, &tmp, &info);
+	rc = device_get_info_from_file(filename, &tmp, &info);
 	free_target_data(&tmp);
 	if (rc) {
 		/*
@@ -332,11 +333,11 @@ static int file_is_on_disk(const char *filename, struct disk_info *where)
 			"Warning: Preparing a logical device for boot might fail\n");
 		return 1;
 	}
-	if (info->basedisks[0] != where->basedisks[0]) {
-		disk_free_info(info);
+	if (info->base[0].disk != where->base[0].disk) {
+		device_free_info(info);
 		return 0;
 	}
-	disk_free_info(info);
+	device_free_info(info);
 	return 1;
 }
 
@@ -350,6 +351,7 @@ static int add_component_file_range(struct install_set *bis,
 				    int program_table_id)
 {
 	struct program_component *pc = get_component(bis, comp_id, menu_idx);
+	struct disk_info *info = &bis->info->base[0];
 	struct component_loc *location = &pc->loc;
 	disk_blockptr_t **list = &pc->list;
 	blocknum_t *count = &pc->count;
@@ -372,39 +374,44 @@ static int add_component_file_range(struct install_set *bis,
 		size -= trailer;
 		/* Write buffer */
 		*count = disk_write_block_buffer(&bis->mfd, 0, buffer,
-						 size, list, bis->info);
+						 size, list,
+						 bis->info->fs_block_size,
+						 info);
 		free(buffer);
 		if (*count == 0) {
 			error_text("Could not write to bootmap file");
 			return -1;
 		}
 	} else {
-		if (!file_is_on_disk(filename, bis->info)) {
+		if (!file_is_on_device(filename, bis->info)) {
 			error_reason("File is not on target device");
 			return -1;
 		}
 		/* Get block list from existing file */
 		*count = disk_get_blocklist_from_file(filename, reg,
-						      list, bis->info);
+						      list,
+						      bis->info->fs_block_size,
+						      info);
 		if (*count == 0)
 			return -1;
-		*count -= DIV_ROUND_UP(trailer, bis->info->phy_block_size);
+		*count -= DIV_ROUND_UP(trailer, info->phy_block_size);
 	}
 	/* Fill in component location */
 	location->addr = load_address;
-	location->size = *count * bis->info->phy_block_size;
+	location->size = *count * info->phy_block_size;
 	/* Try to compact list */
-	*count = disk_compact_blocklist(*list, *count, bis->info);
+	*count = disk_compact_blocklist(*list, *count, info);
 write_segment_table:
 	assert(*list != NULL);
 	assert(*count != 0);
-	rc = add_segment_table(&bis->mfd, *list, *count, &segment, bis->info,
+	rc = add_segment_table(&bis->mfd, *list, *count, &segment,
+			       bis->info->fs_block_size, info,
 			       program_table_id);
 	if (rc == 0)
 		create_component_entry(component, &segment,
 				       component_type_by_id(comp_id),
 				       (component_data)load_address,
-				       bis->info, program_table_id);
+				       info, program_table_id);
 	return rc;
 }
 
@@ -426,6 +433,7 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 				      int program_table_id)
 {
 	struct program_component *pc = get_component(bis, comp_id, menu_idx);
+	struct disk_info *info = &bis->info->base[0];
 	struct component_loc *location = &pc->loc;
 	disk_blockptr_t **list = &pc->list;
 	blocknum_t *count = &pc->count;
@@ -437,7 +445,8 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 		goto write_segment_table;
 	/* Write buffer */
 	*count = disk_write_block_buffer_align(&bis->mfd, 0, buffer, size, list,
-					       bis->info, align, offset);
+					       bis->info->fs_block_size,
+					       info, align, offset);
 	if (*count == 0) {
 		error_text("Could not write to bootmap file");
 		return -1;
@@ -445,23 +454,24 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 	if (component_type_by_id(comp_id) == COMPONENT_TYPE_LOAD) {
 		/* Fill in component location */
 		location->addr = data.load_address;
-		location->size = *count * bis->info->phy_block_size;
+		location->size = *count * info->phy_block_size;
 	} else {
 		location->addr = 0;
 		location->size = 0;
 	}
 	/* Try to compact list */
-	*count = disk_compact_blocklist(*list, *count, bis->info);
+	*count = disk_compact_blocklist(*list, *count, info);
 write_segment_table:
 	assert(*list != NULL);
 	assert(*count != 0);
 
-	rc = add_segment_table(&bis->mfd, *list, *count, &segment, bis->info,
+	rc = add_segment_table(&bis->mfd, *list, *count, &segment,
+			       bis->info->fs_block_size, info,
 			       program_table_id);
 	if (rc == 0)
 		create_component_entry(component, &segment,
 				       component_type_by_id(comp_id),
-				       data, bis->info, program_table_id);
+				       data, info, program_table_id);
 	return rc;
 }
 
@@ -470,8 +480,10 @@ static int add_component_buffer(struct install_set *bis, void *buffer,
 				void *component, int comp_id, int menu_idx,
 				int program_table_id)
 {
+	struct disk_info *info = &bis->info->base[0];
+
 	return add_component_buffer_align(bis, buffer, size, data, component,
-					  bis->info->phy_block_size, NULL,
+					  info->phy_block_size, NULL,
 					  comp_id, menu_idx, program_table_id);
 }
 
@@ -579,6 +591,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		int verbose, int add_files, component_header_type type,
 		int is_secure, int menu_idx, int program_table_id)
 {
+	struct disk_info *info = &bis->info->base[0];
 	struct signature_header sig_head;
 	size_t ramdisk_size, image_size;
 	size_t stage3_params_size;
@@ -593,7 +606,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	int rc;
 
 	memset(&sig_head, 0, sizeof(sig_head));
-	table = util_zalloc(bis->info->phy_block_size);
+	table = util_zalloc(info->phy_block_size);
 	if (table == NULL)
 		return -1;
 	/* Create component table */
@@ -622,7 +635,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		}
 	}
 	ramdisk_size = stats.st_size;
-	if (bis->info->type == disk_type_scsi) {
+	if (info->type == disk_type_scsi) {
 		flags |= STAGE3_FLAG_SCSI;
 		/*
 		 * Add dummy components for stage 3 heap and stack to block the
@@ -715,7 +728,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 				   ramdisk_size,
 				   ipl->is_kdump ? IMAGE_ENTRY_KDUMP :
 				   IMAGE_ENTRY,
-				   (bis->info->type == disk_type_scsi) ? 0 : 1,
+				   (info->type == disk_type_scsi) ? 0 : 1,
 				   flags, ipl->common.image_addr, image_size,
 				   ipl->envblk_addr,
 				   add_envblk ? envblk->size : 0);
@@ -760,7 +773,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		}
 		offset += sizeof(struct component_entry);
 		free(signature);
-		check_remaining_filesize(image_size, signature_size, bis->info,
+		check_remaining_filesize(image_size, signature_size, info,
 					 ipl->common.image);
 	} else if (is_secure == SECURE_BOOT_ENABLED) {
 		/*
@@ -830,8 +843,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 			offset += sizeof(struct component_entry);
 			free(signature);
 			check_remaining_filesize(ramdisk_size, signature_size,
-						 bis->info,
-						 ipl->common.ramdisk);
+						 info, ipl->common.ramdisk);
 		}
 		rc = add_component_file(bis, ipl->common.ramdisk,
 					ipl->common.ramdisk_addr,
@@ -912,11 +924,11 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 			       COMPONENT_TYPE_EXECUTE,
 			       (component_data) (uint64_t)
 			       (STAGE3_ENTRY | PSW_LOAD),
-			       bis->info, program_table_id);
+			       info, program_table_id);
 	/* Write component table */
 	rc = disk_write_block_aligned(&bis->mfd, table,
-				      bis->info->phy_block_size,
-				      program, bis->info);
+				      info->phy_block_size, program,
+				      bis->info->fs_block_size, info);
 	free(table);
 	return rc;
 }
@@ -927,11 +939,12 @@ static int add_segment_program(struct install_set *bis,
 			       int add_files, component_header_type type,
 			       int program_table_id)
 {
+	struct disk_info *info = &bis->info->base[0];
 	void *table;
 	int offset;
 	int rc;
 
-	table = util_zalloc(bis->info->phy_block_size);
+	table = util_zalloc(info->phy_block_size);
 	if (table == NULL)
 		return -1;
 	/* Create component table */
@@ -961,11 +974,11 @@ static int add_segment_program(struct install_set *bis,
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       COMPONENT_TYPE_EXECUTE,
 			       (component_data)(uint64_t)PSW_DISABLED_WAIT,
-			       bis->info, program_table_id);
+			       info, program_table_id);
 	/* Write component table */
 	rc = disk_write_block_aligned(&bis->mfd, table,
-				      bis->info->phy_block_size,
-				      program, bis->info);
+				      info->phy_block_size, program,
+				      bis->info->fs_block_size, info);
 	free(table);
 	return rc;
 }
@@ -998,13 +1011,14 @@ static int add_dump_program(struct install_set *bis,
 static int build_program_table(struct job_data *job,
 			       struct install_set *bis, int program_table_id)
 {
+	struct disk_info *info = &bis->info->base[0];
 	int entries, component_header;
 	disk_blockptr_t *table;
 	int is_secure;
 	int i;
 	int rc;
 
-	entries = get_program_table_size(bis->info);
+	entries = get_program_table_size(info);
 	/* Get some memory for the program table */
 	table = (disk_blockptr_t *) misc_malloc(sizeof(disk_blockptr_t) *
 						entries);
@@ -1140,7 +1154,7 @@ static int build_program_table(struct job_data *job,
 		/* Add program table block */
 		pointer = &bis->tables[program_table_id].table;
 		rc = add_program_table(&bis->mfd, table, entries,
-				       pointer, bis->info,
+				       pointer, bis->info->fs_block_size, info,
 				       program_table_id);
 	}
 	free(table);
@@ -1151,7 +1165,8 @@ static int build_program_table(struct job_data *job,
 /* Write block of zeroes to the bootmap file FD and store the resulting
  * block pointer in BLOCK. Return zero on success, non-zero otherwise. */
 static int
-write_empty_block(struct misc_fd *mfd, disk_blockptr_t *block, struct disk_info *info)
+write_empty_block(struct misc_fd *mfd, disk_blockptr_t *block,
+		  int fs_block_size, struct disk_info *info)
 {
 	void* buffer;
 	int rc;
@@ -1161,7 +1176,7 @@ write_empty_block(struct misc_fd *mfd, disk_blockptr_t *block, struct disk_info 
 		return -1;
 	memset(buffer, 0, info->phy_block_size);
 	rc = disk_write_block_aligned(mfd, buffer, info->phy_block_size, block,
-				      info);
+				      fs_block_size, info);
 	free(buffer);
 	return rc;
 }
@@ -1169,6 +1184,7 @@ write_empty_block(struct misc_fd *mfd, disk_blockptr_t *block, struct disk_info 
 
 static int install_stages_dasd_fba(struct misc_fd *mfd, char *filename,
 				   struct job_data *job,
+				   int fs_block_size,
 				   struct disk_info *info,
 				   disk_blockptr_t **stage1b_list,
 				   blocknum_t *stage1b_count,
@@ -1190,14 +1206,17 @@ static int install_stages_dasd_fba(struct misc_fd *mfd, char *filename,
 			return -1;
 		stage2_count = disk_write_block_buffer(mfd, 0, stage2_data,
 						       stage2_size,
-						       &stage2_list, info);
+						       &stage2_list,
+						       fs_block_size,
+						       info);
 		free(stage2_data);
 		if (stage2_count == 0) {
 			error_text("Could not write to file '%s'", filename);
 			return -1;
 		}
 		if (install_fba_stage1b(mfd, stage1b_list, stage1b_count,
-					stage2_list, stage2_count, info))
+					stage2_list, stage2_count,
+					fs_block_size, info))
 			return -1;
 		free(stage2_list);
 		break;
@@ -1217,6 +1236,7 @@ static int install_stages_dasd_fba(struct misc_fd *mfd, char *filename,
 
 static int install_stages_eckd_dasd(struct misc_fd *mfd, char *filename,
 				    struct job_data *job,
+				    int fs_block_size,
 				    struct disk_info *info,
 				    disk_blockptr_t *program_table,
 				    disk_blockptr_t **stage1b_list,
@@ -1239,6 +1259,7 @@ static int install_stages_eckd_dasd(struct misc_fd *mfd, char *filename,
 		stage2b_count = disk_write_block_buffer(mfd, 0, stage2b_data,
 							stage2b_size,
 							&stage2b_list,
+							fs_block_size,
 							info);
 		free(stage2b_data);
 		if (stage2b_count == 0) {
@@ -1246,7 +1267,8 @@ static int install_stages_eckd_dasd(struct misc_fd *mfd, char *filename,
 			return -1;
 		}
 		if (install_eckd_stage1b(mfd, stage1b_list, stage1b_count,
-					 stage2b_list, stage2b_count, info))
+					 stage2b_list, stage2b_count,
+					 fs_block_size, info))
 			return -1;
 		free(stage2b_list);
 		break;
@@ -1263,6 +1285,7 @@ static int install_stages_eckd_dasd(struct misc_fd *mfd, char *filename,
 		stage2b_count = disk_write_block_buffer(mfd, 0, stage2b_data,
 							stage2b_size,
 							stage1b_list,
+							fs_block_size,
 							info);
 		free(stage2b_data);
 		if (stage2b_count == 0) {
@@ -1281,12 +1304,14 @@ static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
 				  int program_table_id)
 {
 	struct program_table *pt = &bis->tables[program_table_id];
+	struct disk_info *info = &bis->info->base[0];
 	int rc = 0;
 
-	switch (bis->info->type) {
+	switch (info->type) {
 	case disk_type_fba:
 		rc = install_stages_dasd_fba(&bis->mfd, bis->filename, job,
-					     bis->info,
+					     bis->info->fs_block_size,
+					     info,
 					     &pt->stage1b_list,
 					     &pt->stage1b_count,
 					     program_table_id);
@@ -1294,7 +1319,8 @@ static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
 	case disk_type_eckd_ldl:
 	case disk_type_eckd_cdl:
 		rc = install_stages_eckd_dasd(&bis->mfd, bis->filename, job,
-					      bis->info,
+					      bis->info->fs_block_size,
+					      info,
 					      &pt->table,
 					      &pt->stage1b_list,
 					      &pt->stage1b_count,
@@ -1310,7 +1336,8 @@ static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
 }
 
 static int
-bootmap_write_scsi_superblock(struct misc_fd *mfd, struct disk_info *info,
+bootmap_write_scsi_superblock(struct misc_fd *mfd, int fs_block_size,
+			      struct disk_info *info,
 			      disk_blockptr_t *scsi_dump_sb_blockptr,
 			      ulong dump_size)
 {
@@ -1327,9 +1354,9 @@ bootmap_write_scsi_superblock(struct misc_fd *mfd, struct disk_info *info,
 	scsi_sb.csum_size = SCSI_DUMP_SB_CSUM_SIZE;
 	/* Set seed because otherwise csum over zero block is 0 */
 	scsi_sb.csum = SCSI_DUMP_SB_SEED;
-	return disk_write_block_aligned(mfd, &scsi_sb,
-					sizeof(scsi_sb),
-					scsi_dump_sb_blockptr, info);
+	return disk_write_block_aligned(mfd, &scsi_sb, sizeof(scsi_sb),
+					scsi_dump_sb_blockptr, fs_block_size,
+					info);
 }
 
 
@@ -1438,6 +1465,7 @@ check_dump_device(struct job_data *job, const struct disk_info *info,
 static int prepare_build_program_table_device(struct job_data *job,
 					      struct install_set *bis)
 {
+	struct disk_info *info;
 	ulong unused_size;
 
 	if (bis->skip_prepare)
@@ -1452,16 +1480,17 @@ static int prepare_build_program_table_device(struct job_data *job,
 		return -1;
 	}
 	/* Retrieve target device information */
-	if (disk_get_info(bis->filename, &job->target, &bis->info))
+	if (device_get_info(bis->filename, &job->target, &bis->info))
 		return -1;
 
 	if (verbose) {
 		printf("Target device information\n");
-		disk_print_info(bis->info, job->target.source);
+		device_print_info(bis->info, job->target.source);
 	}
-	if (misc_temp_dev(bis->info->basedisks[0], 1, &bis->basetmp[0]))
+	info = &bis->info->base[0];
+	if (misc_temp_dev(info->disk, 1, &bis->basetmp[0]))
 		return -1;
-	if (check_dump_device(job, bis->info, bis->basetmp[0]))
+	if (check_dump_device(job, info, bis->basetmp[0]))
 		return -1;
 	printf("Building bootmap directly on partition '%s'%s\n",
 	       bis->filename,
@@ -1469,7 +1498,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 	       : "");
 	/* For partition dump set raw partition offset
 	   to expected size before end of disk */
-	if (estimate_scsi_dump_size(job, bis->info, &unused_size))
+	if (estimate_scsi_dump_size(job, info, &unused_size))
 		return -1;
 	if (lseek(bis->mfd.fd, unused_size, SEEK_SET) < 0)
 		return -1;
@@ -1481,12 +1510,14 @@ static int prepare_build_program_table_device(struct job_data *job,
 		return -1;
 	}
 	/* Write empty block to be read in place of holes in files */
-	if (write_empty_block(&bis->mfd, &empty_block, bis->info)) {
+	if (write_empty_block(&bis->mfd, &empty_block,
+			      bis->info->fs_block_size, info)) {
 		error_text("Could not write to file '%s'",
 			   bis->filename);
 		return -1;
 	}
-	if (bootmap_write_scsi_superblock(&bis->mfd, bis->info,
+	if (bootmap_write_scsi_superblock(&bis->mfd,
+					  bis->info->fs_block_size, info,
 					  &bis->scsi_dump_sb_blockptr,
 					  unused_size)) {
 		error_text("Could not write SCSI superblock to file '%s'",
@@ -1525,6 +1556,7 @@ static int prepare_bootloader_device(struct job_data *job,
 static int prepare_build_program_table_file(struct job_data *job,
 					    struct install_set *bis)
 {
+	struct disk_info *info;
 	int i;
 
 	if (bis->skip_prepare)
@@ -1561,36 +1593,36 @@ static int prepare_build_program_table_file(struct job_data *job,
 		 * Retrieve file system block size from the proxy
 		 * file system
 		 */
-		if (disk_get_info(job->data.dump.device,
-				  &job->target, &bis->info))
+		if (device_get_info(job->data.dump.device,
+				    &job->target, &bis->info))
 			return -1;
-		if (disk_info_set_fs_block(bis->filename, bis->info))
+		if (device_info_set_fs_block(bis->filename, bis->info))
 			return -1;
 	} else {
 		/*
 		 * ngdump or ipl job.
 		 */
-		if (disk_get_info_from_file(bis->filename,
-					    &job->target,
-					    &bis->info))
+		if (device_get_info_from_file(bis->filename,
+					      &job->target,
+					      &bis->info))
 			return -1;
 	}
-	if (!disk_is_appropriate(job, bis->info))
+	info = &bis->info->base[0];
+
+	if (!disk_is_appropriate(job, info))
 		return -1;
 	if (verbose) {
 		printf("Target device information\n");
-		disk_print_info(bis->info, job->target.source);
+		device_print_info(bis->info, job->target.source);
 	}
 	for (i = 0; i < job_get_nr_targets(job); i++) {
-		if (misc_temp_dev(bis->info->basedisks[i],
-				  1,
-				  &bis->basetmp[i]))
+		if (misc_temp_dev(bis->info->base[i].disk, 1, &bis->basetmp[i]))
 			return -1;
 	}
 	/* Check configuration number limits */
 	if (job->id == job_menu) {
 		if (check_menu_positions(&job->data.menu, job->name,
-					 bis->info))
+					 info))
 			return -1;
 	}
 	printf("Building bootmap in '%s'%s\n", job->target.bootmap_dir,
@@ -1603,7 +1635,8 @@ static int prepare_build_program_table_file(struct job_data *job,
 		return -1;
 	}
 	/* Write empty block to be read in place of holes in files */
-	if (write_empty_block(&bis->mfd, &empty_block, bis->info)) {
+	if (write_empty_block(&bis->mfd, &empty_block,
+			      bis->info->fs_block_size, info)) {
 		error_text("Could not write to file '%s'", bis->filename);
 		return -1;
 	}
@@ -1760,12 +1793,14 @@ static char *build_mount_point_pathname(void)
 static int prepare_bootloader_ngdump(struct job_data *job,
 				     struct install_set *bis)
 {
+	struct device_info *dev_info;
 	struct disk_info *info;
 
 	/* Retrieve target device information */
-	if (disk_get_info(job->data.dump.device, &job->target, &info))
+	if (device_get_info(job->data.dump.device, &job->target, &dev_info))
 		return -1;
-	if (misc_temp_dev(info->basedisks[0], 1, &bis->basetmp[0]))
+	info = &dev_info->base[0];
+	if (misc_temp_dev(info->disk, 1, &bis->basetmp[0]))
 		return -1;
 	if (check_dump_device(job, info, bis->basetmp[0]))
 		return -1;
@@ -1810,6 +1845,8 @@ static int prepare_bootloader_ngdump(struct job_data *job,
  */
 static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 {
+	struct disk_info *info;
+
 	/*
 	 * Build a program table for List-Directed IPL from
 	 * SCSI or ECKD DASD
@@ -1817,7 +1854,9 @@ static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 	bis->print_details = 1;
 	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID))
 		return -1;
-	if (bis->info->type == disk_type_scsi)
+
+	info = &bis->info->base[0];
+	if (info->type == disk_type_scsi)
 		/* only one table to be installed per device */
 		return 0;
 	/*
@@ -1917,5 +1956,5 @@ void free_bootloader(struct install_set *bis)
 		if (bis->basetmp[i])
 			misc_free_temp_dev(bis->basetmp[i]);
 	}
-	disk_free_info(bis->info);
+	device_free_info(bis->info);
 }

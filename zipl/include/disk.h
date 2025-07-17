@@ -68,24 +68,33 @@ typedef enum {
 	undefined
 } definition_t;
 
-/* Disk information type */
+/* Physical disk information type */
 struct disk_info {
+	dev_t disk;
 	disk_type_t type;
-	dev_t device; /* logical device for bootmap creation */
 	dev_t partition;
 	int devno;
 	int partnum;
 	int phy_block_size;
-	int fs_block_size;
 	uint64_t phy_blocks;
 	struct hd_geometry geo;
-	char* name;
-	char* drv_name;
 	definition_t targetbase_def;
 	int is_nvme;
-	dev_t basedisks[MAX_TARGETS]; /* array of physical disks for
-				       * bootstrap blocks recording
-				       */
+};
+
+/* Logical device information type */
+struct device_info {
+	dev_t device; /* logical device for bootmap creation */
+	char *name; /* name of the logical device as retrieved
+		     *  from "/proc/partitions"
+		     */
+	char *drv_name; /* name of the driver managing the logical device
+			 * as retrieved from "/proc/devices", or evaluated
+			 */
+	int fs_block_size;
+	struct disk_info base[MAX_TARGETS]; /* array of physical disks for
+					     * bootstrap blocks recording
+					     */
 };
 
 struct file_range {
@@ -95,51 +104,55 @@ struct file_range {
 
 struct job_target_data;
 
-int disk_get_info(const char *device, struct job_target_data *target,
-		  struct disk_info **info);
-int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type);
+int device_get_info(const char *device, struct job_target_data *target,
+		    struct device_info **info);
+int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type,
+		      int disk_id);
 int disk_is_tape(const char *device);
 int disk_type_is_scsi(struct disk_ext_type *ext_type);
 int disk_type_is_eckd_ldl(struct disk_ext_type *ext_type);
 int disk_type_is_nvme(struct disk_ext_type *ext_type);
 int disk_type_is_eckd(disk_type_t type);
 
-int disk_info_set_fs_block(const char *filename, struct disk_info *info);
-int disk_get_info_from_file(const char* filename,
-			    struct job_target_data* target,
-			    struct disk_info** info);
-void disk_free_info(struct disk_info* info);
-char* disk_get_type_name(disk_type_t type);
+int device_info_set_fs_block(const char *filename, struct device_info *info);
+int device_get_info_from_file(const char *filename,
+			      struct job_target_data *target,
+			      struct device_info **info);
+void device_free_info(struct device_info *info);
+char *disk_get_type_name(disk_type_t type);
 char *disk_get_ipl_type(disk_type_t type, int is_dump);
 int disk_is_large_volume(struct disk_info* info);
 int disk_cyl_from_blocknum(blocknum_t blocknum, struct disk_info* info);
 int disk_head_from_blocknum(blocknum_t blocknum, struct disk_info* info);
 int disk_sec_from_blocknum(blocknum_t blocknum, struct disk_info* info);
 void disk_blockptr_from_blocknum(disk_blockptr_t* ptr, blocknum_t blocknum,
-				 struct disk_info* info);
-int disk_write_block_aligned(struct misc_fd *mfd, const void *data, size_t bytecount,
-			     disk_blockptr_t *block, struct disk_info *info);
+				 struct disk_info *info);
+int disk_write_block_aligned(struct misc_fd *mfd, const void *data,
+			     size_t bytecount, disk_blockptr_t *block,
+			     int fs_block_size, struct disk_info *info);
 blocknum_t disk_write_block_buffer(struct misc_fd *fd, int fd_is_basedisk,
 				   const void* buffer, size_t bytecount,
 				   disk_blockptr_t** blocklist,
-				   struct disk_info *info);
+				   int fs_block_size, struct disk_info *info);
 blocknum_t disk_write_block_buffer_align(struct misc_fd *mfd, int fd_is_basedisk,
 					 const void *buffer, size_t bytecount,
 					 disk_blockptr_t **blocklist,
+					 int fs_block_size,
 					 struct disk_info *info, int align,
 					 off_t *offset);
 void disk_print_devt(dev_t d);
 void disk_print_devname(dev_t d);
 void prepare_footnote_ptr(int source, char *ptr);
 void print_footnote_ref(int source, const char *prefix);
-void disk_print_info(struct disk_info *info, int source);
-int disk_is_zero_block(disk_blockptr_t* block, struct disk_info* info);
+void device_print_info(struct device_info *info, int source);
+int disk_is_zero_block(disk_blockptr_t *block, struct disk_info *info);
 blocknum_t disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
-				  struct disk_info* info);
+				  struct disk_info *info);
 blocknum_t disk_get_blocklist_from_file(const char* filename,
 					struct file_range *reg,
-					disk_blockptr_t** blocklist,
-					struct disk_info* pinfo);
+					disk_blockptr_t **blocklist,
+					int fs_block_size,
+					struct disk_info *info);
 int disk_check_subchannel_set(int devno, dev_t device, char* dev_name);
 int fs_map(int fd, uint64_t offset, blocknum_t *mapped, int fs_block_size);
 

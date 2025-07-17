@@ -172,7 +172,8 @@ install_fba_ccw(int fd, disk_blockptr_t *program_table,
 int
 install_eckd_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 		     blocknum_t *stage1b_count, disk_blockptr_t *stage2_list,
-		     blocknum_t stage2_count, struct disk_info *info)
+		     blocknum_t stage2_count, int fs_block_size,
+		     struct disk_info *info)
 {
 	struct boot_eckd_stage1b *stage1b;
 	int stage1b_size, rc = -1;
@@ -187,7 +188,8 @@ install_eckd_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 	if (boot_init_eckd_stage1b(stage1b, stage2_list, stage2_count))
 		goto out_free_stage1b;
 	*stage1b_count = disk_write_block_buffer(mfd, 1, stage1b, stage1b_size,
-						 stage1b_list, info);
+						 stage1b_list, fs_block_size,
+						 info);
 	if (*stage1b_count == 0)
 		goto out_free_stage1b;
 	rc = 0;
@@ -430,7 +432,7 @@ static int install_bootloader_dump(struct program_table *tables,
 int install_bootloader(struct job_data *job, struct install_set *bis)
 {
 	disk_blockptr_t *scsi_dump_sb_blockptr = &bis->scsi_dump_sb_blockptr;
-	struct disk_info *info = bis->info;
+	struct disk_info *info = &bis->info->base[0];
 	char footnote[4];
 	int rc;
 	int i;
@@ -444,15 +446,15 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 	       disk_get_ipl_type(info->type,
 				 job->id == job_dump_partition),
 	       job->id == job_dump_partition ? "dump" : "IPL");
-	if (info->name) {
-		printf("%s", info->name);
+	if (bis->info->name) {
+		printf("%s", bis->info->name);
 		if (info->devno >= 0)
 			printf(" (%04x)", info->devno);
 		printf(".\n");
 	} else if (info->devno >= 0) {
 		printf("%04x.\n", info->devno);
 	} else {
-		disk_print_devt(info->device);
+		disk_print_devt(bis->info->device);
 		printf(".\n");
 	}
 	/* Install independently on each physical target base */
@@ -462,7 +464,7 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 
 		if (verbose) {
 			printf("Installing on base disk: ");
-			disk_print_devname(info->basedisks[i]);
+			disk_print_devname(bis->info->base[i].disk);
 			printf("%s.\n", footnote);
 		}
 		/* Open device file */
@@ -488,12 +490,14 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 		 * picture in comments above)
 		 */
 		if (job->id == job_dump_partition) {
-			rc = install_bootloader_dump(bis->tables, info,
+			rc = install_bootloader_dump(bis->tables,
+						     &bis->info->base[i],
 						     scsi_dump_sb_blockptr,
 						     job_dump_is_ngdump(job),
 						     fd);
 		} else {
-			rc = install_bootloader_ipl(bis->tables, info,
+			rc = install_bootloader_ipl(bis->tables,
+						    &bis->info->base[i],
 						    fd);
 		}
 		if (fsync(fd))
@@ -512,13 +516,16 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 		if (info->devno >= 0)
 			syslog(LOG_INFO, "Boot loader written to %s (%04x) - "
 			       "%02x:%02x",
-			       (info->name ? info->name : "-"), info->devno,
-			       major(info->device), minor(info->device));
+			       (bis->info->name ? bis->info->name : "-"),
+			       info->devno,
+			       major(bis->info->device),
+			       minor(bis->info->device));
 		else
 			syslog(LOG_INFO, "Boot loader written to %s - "
 			       "%02x:%02x",
-			       (info->name ? info->name : "-"),
-			       major(info->device), minor(info->device));
+			       (bis->info->name ? bis->info->name : "-"),
+			       major(bis->info->device),
+			       minor(bis->info->device));
 	}
 	return rc;
 }
@@ -793,7 +800,7 @@ install_tapeloader(const char* device, const char* image, const char* parmline,
 /* Write 64k null bytes with dump signature at offset 512 to
  * start of dump partition */
 static int
-overwrite_partition_start(int fd, struct disk_info* info, int mv_dump_magic)
+overwrite_partition_start(int fd, struct disk_info *info, int mv_dump_magic)
 {
 	int rc;
 	unsigned int bytes = 65536;
@@ -826,7 +833,7 @@ overwrite_partition_start(int fd, struct disk_info* info, int mv_dump_magic)
  * Force block size of 4KiB because otherwise there is not enough space
  * to write the dump tool.
  */
-static int check_eckd_dump_partition(struct disk_info* info)
+static int check_eckd_dump_partition(struct disk_info *info)
 {
 	unsigned long long end_blk = info->geo.start + info->phy_blocks - 1;
 
@@ -856,8 +863,10 @@ static void eckd_dump_store_param(struct eckd_dump_param *param,
 	param->bpt = info->geo.sectors;
 }
 
-static int install_svdump_eckd_ldl(struct misc_fd *mfd, struct disk_info *info,
-				   const struct stage2dump_parm_tail *stage2dump_parms)
+static int
+install_svdump_eckd_ldl(struct misc_fd *mfd, int fs_block_size,
+			struct disk_info *info,
+			const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	disk_blockptr_t *stage2_list, *stage1b_list;
 	blocknum_t stage2_count, stage1b_count;
@@ -880,11 +889,13 @@ static int install_svdump_eckd_ldl(struct misc_fd *mfd, struct disk_info *info,
 	if (misc_seek(mfd->fd, info->geo.start * info->phy_block_size))
 		goto out_free_stage2;
 	stage2_count = disk_write_block_buffer(mfd, 1, stage2, stage2_size,
-					       &stage2_list, info);
+					       &stage2_list,
+					       fs_block_size, info);
 	if (stage2_count == 0)
 		goto out_free_stage2_list;
 	if (install_eckd_stage1b(mfd, &stage1b_list, &stage1b_count,
-				 stage2_list, stage2_count, info))
+				 stage2_list, stage2_count, fs_block_size,
+				 info))
 		goto out_free_stage2_list;
 	/* Install stage 0 - afterwards we are at stage 1 position*/
 	boot_init_eckd_ldl_stage0(&stage0);
@@ -911,8 +922,9 @@ out:
 	return rc;
 }
 
-static int install_dump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
-				 void *stage2, size_t stage2_size, int mvdump,
+static int install_dump_eckd_cdl(struct misc_fd *mfd, int fs_block_size,
+				 struct disk_info *info, void *stage2,
+				 size_t stage2_size, int mvdump,
 				 int force)
 {
 	blocknum_t count, stage2_count, stage1b_count;
@@ -936,12 +948,14 @@ static int install_dump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
 	if (misc_seek(mfd->fd, ECKD_CDL_DUMP_REC * info->phy_block_size))
 		goto out;
 	stage2_count = disk_write_block_buffer(mfd, 1, stage2, stage2_size,
-					       &stage2_list, info);
+					       &stage2_list, fs_block_size,
+					       info);
 	if (stage2_count == 0)
 		goto out;
 	/* Install stage 1b behind stage 2*/
 	if (install_eckd_stage1b(mfd, &stage1b_list, &stage1b_count,
-				 stage2_list, stage2_count, info))
+				 stage2_list, stage2_count, fs_block_size,
+				 info))
 		goto out_free_stage2_list;
 	/* Install stage 0 */
 	boot_init_eckd_cdl_stage0(&stage0_cdl);
@@ -968,7 +982,8 @@ out:
 }
 
 static int
-install_svdump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
+install_svdump_eckd_cdl(struct misc_fd *mfd, int fs_block_size,
+			struct disk_info *info,
 			const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	size_t stage2_size;
@@ -977,13 +992,15 @@ install_svdump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
 
 	if (boot_get_eckd_dump_stage2(&stage2, &stage2_size, stage2dump_parms))
 		return -1;
-	rc = install_dump_eckd_cdl(mfd, info, stage2, stage2_size, 0, 0);
+	rc = install_dump_eckd_cdl(mfd, fs_block_size,
+				   info, stage2, stage2_size, 0, 0);
 	free(stage2);
 	return rc;
 }
 
 static int
-install_mvdump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
+install_mvdump_eckd_cdl(struct misc_fd *mfd, int fs_block_size,
+			struct disk_info *info,
 			const struct stage2dump_parm_tail *stage2dump_parms,
 			const struct mvdump_parm_table *mv_parm_table)
 {
@@ -995,7 +1012,8 @@ install_mvdump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
 	if (boot_get_eckd_mvdump_stage2(&stage2, &stage2_size, stage2dump_parms,
 					mv_parm_table))
 		return -1;
-	rc = install_dump_eckd_cdl(mfd, info, stage2, stage2_size, 1,
+	rc = install_dump_eckd_cdl(mfd, fs_block_size, info, stage2,
+				   stage2_size, 1,
 				   stage2dump_parms->mvdump_force);
 	free(stage2);
 	return rc;
@@ -1004,7 +1022,8 @@ install_mvdump_eckd_cdl(struct misc_fd *mfd, struct disk_info *info,
 int
 install_fba_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 		    blocknum_t *stage1b_count, disk_blockptr_t *stage2_list,
-		    blocknum_t stage2_count, struct disk_info *info)
+		    blocknum_t stage2_count, int fs_block_size,
+		    struct disk_info *info)
 {
 	struct boot_fba_stage1b *stage1b;
 	int stage1b_size, rc = -1;
@@ -1019,7 +1038,8 @@ install_fba_stage1b(struct misc_fd *mfd, disk_blockptr_t **stage1b_list,
 	if (boot_init_fba_stage1b(stage1b, stage2_list, stage2_count))
 		goto out_free_stage1b;
 	*stage1b_count = disk_write_block_buffer(mfd, 1, stage1b, stage1b_size,
-						 stage1b_list, info);
+						 stage1b_list, fs_block_size,
+						 info);
 	if (*stage1b_count == 0)
 		goto out_free_stage1b;
 	rc = 0;
@@ -1030,7 +1050,8 @@ out:
 }
 
 static int
-install_svdump_fba(struct misc_fd *mfd, struct disk_info *info,
+install_svdump_fba(struct misc_fd *mfd, int fs_block_size,
+		   struct disk_info *info,
 		   const struct stage2dump_parm_tail *stage2dump_parms)
 {
 	blocknum_t stage1b_count, stage2_count, blk;
@@ -1055,7 +1076,8 @@ install_svdump_fba(struct misc_fd *mfd, struct disk_info *info,
 	if (misc_seek(mfd->fd, blk * info->phy_block_size))
 		goto out_free_stage2;
 	stage2_count = disk_write_block_buffer(mfd, 1, stage2, stage2_size,
-					       &stage2_list, info);
+					       &stage2_list, fs_block_size,
+					       info);
 	if (stage2_count == 0)
 		goto out_free_stage2;
 	/* Install stage 1b in front of stage 2 */
@@ -1063,7 +1085,7 @@ install_svdump_fba(struct misc_fd *mfd, struct disk_info *info,
 	if (misc_seek(mfd->fd, blk * info->phy_block_size))
 		goto out_free_stage2_list;
 	if (install_fba_stage1b(mfd, &stage1b_list, &stage1b_count,
-				stage2_list, stage2_count, info))
+				stage2_list, stage2_count, fs_block_size, info))
 		goto out_free_stage2_list;
 	/* Install stage 0/1 fill in dump partition parameter */
 	if (boot_init_fba_stage0(&stage0, stage1b_list, stage1b_count))
@@ -1111,7 +1133,8 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 {
 	struct stage2dump_parm_tail stage2dump_parms = {0};
 	struct misc_fd mfd = {0};
-	struct disk_info* info;
+	struct device_info *dev_info;
+	struct disk_info *info;
 	uint64_t part_size;
 	char *tempdev;
 	int rc;
@@ -1151,32 +1174,33 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 	}
 	close(mfd.fd);
 	/* This is a disk device */
-	rc = disk_get_info(device, target, &info);
+	rc = device_get_info(device, target, &dev_info);
 	if (rc) {
 		error_text("Could not get information for dump target "
 			   "'%s'", device);
 		return rc;
 	}
+	info = &dev_info->base[0];
 	if (info->partnum == 0) {
 		error_reason("Dump target '%s' is not a disk partition",
 			     device);
-		disk_free_info(info);
+		device_free_info(dev_info);
 		return -1;
 	}
 	if (verbose) {
 		printf("Target device information\n");
-		disk_print_info(info, target->source);
+		device_print_info(dev_info, target->source);
 	}
-	rc = misc_temp_dev(info->device, 1, &tempdev);
+	rc = misc_temp_dev(dev_info->device, 1, &tempdev);
 	if (rc) {
-		disk_free_info(info);
+		device_free_info(dev_info);
 		return -1;
 	}
 	if (misc_open_device(tempdev, &mfd, dry_run) == -1) {
 		error_text("Could not open temporary device node '%s'",
 			   tempdev);
 		misc_free_temp_dev(tempdev);
-		disk_free_info(info);
+		device_free_info(dev_info);
 		return -1;
 	}
 	switch (info->type) {
@@ -1203,11 +1227,16 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 			       disk_get_type_name(info->type));
 		}
 		if (info->type == disk_type_eckd_ldl)
-			rc = install_svdump_eckd_ldl(&mfd, info, &stage2dump_parms);
+			rc = install_svdump_eckd_ldl(&mfd,
+						     dev_info->fs_block_size,
+						     info, &stage2dump_parms);
 		else if (info->type == disk_type_eckd_cdl)
-			rc = install_svdump_eckd_cdl(&mfd, info, &stage2dump_parms);
+			rc = install_svdump_eckd_cdl(&mfd,
+						     dev_info->fs_block_size,
+						     info, &stage2dump_parms);
 		else
-			rc = install_svdump_fba(&mfd, info, &stage2dump_parms);
+			rc = install_svdump_fba(&mfd, dev_info->fs_block_size,
+						info, &stage2dump_parms);
 		break;
 	case disk_type_scsi:
 		error_reason("%s: Unsupported disk type '%s' (try --dumptofs)",
@@ -1221,7 +1250,7 @@ install_dump(const char *device, struct job_target_data *target, uint64_t mem,
 		break;
 	}
 	misc_free_temp_dev(tempdev);
-	disk_free_info(info);
+	device_free_info(dev_info);
 	if (fsync(mfd.fd))
 		error_text("Could not sync device file '%s'", device);
 	if (close(mfd.fd))
@@ -1234,8 +1263,9 @@ int
 install_mvdump(char* const device[], struct job_target_data* target, int count,
 	       uint64_t mem, uint8_t force)
 {
-	struct disk_info *info[MAX_DUMP_VOLUMES] = {0};
+	struct device_info *dev_info[MAX_DUMP_VOLUMES] = {0};
 	struct stage2dump_parm_tail stage2dump_parms = {0};
+	struct disk_info *info[MAX_DUMP_VOLUMES] = {0};
 	struct mvdump_parm_table mvdump_parms;
 	uint64_t total_size = 0;
 	struct timeval time;
@@ -1269,12 +1299,13 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		}
 		close(mfd.fd);
 		/* This is a disk device */
-		rc = disk_get_info(device[i], target, &info[i]);
+		rc = device_get_info(device[i], target, &dev_info[i]);
 		if (rc) {
 			error_text("Could not get information for dump target "
 				   "'%s'", device[i]);
 			goto out;
 		}
+		info[i] = &dev_info[i]->base[0];
 		if (info[i]->partnum == 0) {
 			error_reason("Dump target '%s' is not a disk partition",
 				     device[i]);
@@ -1323,7 +1354,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 	if (verbose) {
 		for (i = 0; i < count; i++) {
 			printf("Multi-volume dump target %d:\n", i + 1);
-			disk_print_info(info[i], target->source);
+			device_print_info(dev_info[i], target->source);
 			printf("-------------------------------------------\n");
 		}
 	}
@@ -1345,7 +1376,7 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 	for (i = 0; i < count; i++) {
 		struct misc_fd mfd = {0};
 
-		rc = misc_temp_dev(info[i]->device, 1, &tempdev);
+		rc = misc_temp_dev(dev_info[i]->device, 1, &tempdev);
 		if (rc) {
 			rc = -1;
 			goto out;
@@ -1360,7 +1391,9 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 		if (verbose)
 			printf("Installing dump record on target partition "
 			       "'%s'\n", device[i]);
-		rc = install_mvdump_eckd_cdl(&mfd, info[i], &stage2dump_parms, &mvdump_parms);
+		rc = install_mvdump_eckd_cdl(&mfd, dev_info[i]->fs_block_size,
+					     info[i], &stage2dump_parms,
+					     &mvdump_parms);
 		misc_free_temp_dev(tempdev);
 
 		if (fsync(mfd.fd))
@@ -1374,6 +1407,6 @@ install_mvdump(char* const device[], struct job_target_data* target, int count,
 out:
 	for (i = 0; i < count; i++)
 		if (info[i] != NULL)
-			disk_free_info(info[i]);
+			device_free_info(dev_info[i]);
 	return rc;
 }
