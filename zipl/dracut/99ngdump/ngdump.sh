@@ -66,7 +66,8 @@ makedumpfile -f -E --message-level 7 -d 31 "$VMCORE" "$MNTDIR/$DUMP"
 # Create a file containing meta information for zgetdump
 #
 save_meta
-
+[ $? -eq 0 ] || { bail_out "Could not update $META"; }
+save_logs
 cleanup
 
 exit 0
