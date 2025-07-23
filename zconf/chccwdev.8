@@ -101,9 +101,8 @@ Example: "0192" becomes "0.0.0192".
 .SH EXAMPLES
 \fBchccwdev --online 0.0.0192,0.0.0195-0.0.0198\fR
 .RS
-After completing all outstanding I/O requests for the devices with bus
-ID 0.0.0192, 0.0.0195, 0.0.0196, 0.0.0197 and 0.0.0198, tries to set
-the  device offline.
+Tries to set the devices with the bus ID 0.0.0192, 0.0.0195, 0.0.0196, 0.0.0197
+and 0.0.0198 online.
 .RE
 .P
 .B chccwdev --attribute readonly=1 --attribute online=1 0.0.0192
@@ -121,9 +120,9 @@ measurement block facility.
 .P
 .B chccwdev --safeoffline 0.0.0192,0.0.0195-0.0.0198
 .RS
-Will  try  to  set  the  devices with bus ID 0.0.0192, 0.0.0195,
-0.0.0196, 0.0.0197 and 0.0.0198 offline and finish all outstanding I/O
-requests before.
+After completing all outstanding I/O requests for the devices with bus
+ID 0.0.0192, 0.0.0195, 0.0.0196, 0.0.0197 and 0.0.0198, tries to set
+the devices offline.
 .RE
 
 .SH AUTHOR
