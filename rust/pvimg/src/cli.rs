@@ -535,6 +535,7 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-cck-update", ["--enable-cck-update"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-cck-update", ["--disable-cck-update"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("multiple-cck", ["--disable-cck-update", "--cck", "/dev/null"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-comp-key", ["--x-comp-key", "/dev/null"])])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),
@@ -566,6 +567,9 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("extension", ["--enable-cck-extension-secret"]),
                                                    CliOption::new("update", ["--enable-cck-update"])])),
 
+            // Image component key cannot be provided multiple times
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-comp-key", ["--x-comp-key", "/dev/null"]),
+                                                       CliOption::new("x-comp-key2", ["--x-comp-key", "/dev/null"])])),
         ];
 
         let mut genprotimg_valid_args = vec![
