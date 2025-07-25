@@ -93,6 +93,31 @@ pub struct ComponentPaths {
     pub parmfile: Option<PathBuf>,
 }
 
+/// CLI Argument collection for handling user-provided keys.
+#[derive(Args, Debug)]
+#[cfg_attr(test, derive(Default))]
+pub struct UserKeys {
+    /// Use the content of FILE as the customer-communication key (CCK).
+    ///
+    /// The file must contain exactly 32 bytes of data. In previous versions,
+    /// this option was called '--comm-key'.
+    #[arg(
+        long,
+        value_name = "FILE",
+        group = "cck-available",
+        visible_alias = "comm-key"
+    )]
+    pub cck: Option<PathBuf>,
+
+    /// Use the content of FILE as the Secure Execution header protection key.
+    ///
+    /// The file must contain exactly 32 bytes of data. If the option is not
+    /// specified, the Secure Execution header protection key is a randomly
+    /// generated key.
+    #[arg(long, value_name = "FILE", alias = "x-header-key")]
+    pub hdr_key: Option<PathBuf>,
+}
+
 #[derive(Args, Debug)]
 #[cfg_attr(test, derive(Default))]
 #[command(
@@ -342,25 +367,8 @@ pub struct CreateBootImageArgs {
     #[arg(long)]
     pub overwrite: bool,
 
-    /// Use the content of FILE as the customer-communication key (CCK).
-    ///
-    /// The file must contain exactly 32 bytes of data. In previous versions,
-    /// this option was called '--comm-key'.
-    #[arg(
-        long,
-        value_name = "FILE",
-        group = "cck-available",
-        visible_alias = "comm-key"
-    )]
-    pub cck: Option<PathBuf>,
-
-    /// Use the content of FILE as the Secure Execution header protection key.
-    ///
-    /// The file must contain exactly 32 bytes of data. If the option is not
-    /// specified, the Secure Execution header protection key is a randomly
-    /// generated key.
-    #[arg(long, value_name = "FILE", alias = "x-header-key")]
-    pub hdr_key: Option<PathBuf>,
+    #[clap(flatten)]
+    pub keys: UserKeys,
 
     #[clap(flatten)]
     pub legacy_flags: CreateBootImageLegacyFlags,

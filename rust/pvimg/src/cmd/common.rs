@@ -2,13 +2,13 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use log::info;
 use pv::{misc::read_file, request::Confidential};
 
-use crate::cli::CreateBootImageExperimentalArgs;
+use crate::cli::{CreateBootImageExperimentalArgs, UserKeys};
 
 #[macro_export]
 /// Makes it easier to
@@ -24,8 +24,7 @@ pub struct UserProvidedKeys {
 
 /// Reads all user provided keys.
 pub fn read_user_provided_keys(
-    cck_path: Option<&Path>,
-    hdr_key_path: Option<&Path>,
+    keys: &UserKeys,
     experimental_args: &CreateBootImageExperimentalArgs,
 ) -> Result<UserProvidedKeys> {
     let components_key = {
@@ -44,7 +43,7 @@ pub fn read_user_provided_keys(
         }
     };
     let aead_key = {
-        match hdr_key_path {
+        match &keys.hdr_key {
             Some(key_path) => {
                 info!(
                     "Use file '{}' as the Secure Execution header protection",
@@ -63,7 +62,7 @@ pub fn read_user_provided_keys(
     };
 
     let cck = {
-        match cck_path {
+        match &keys.cck {
             Some(key_path) => {
                 info!(
                     "Use file '{}' as the customer communication key (CCK)",
