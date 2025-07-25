@@ -1,9 +1,9 @@
-.\" Copyright 2024 IBM Corp.
+.\" Copyright 2024, 2025 IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVIMG-CREATE" "1" "2025-04-24" "s390-tools" "Pvimg Manual"
+.TH "PVIMG-CREATE" "1" "2025-07-25" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
 .SH NAME
@@ -11,23 +11,23 @@ pvimg-create \- Create an IBM Secure Execution image
 .SH SYNOPSIS
 .nf
 .fam C
-pvimg create [OPTIONS] --kernel <FILE> --output <FILE> --host-key-document <FILE> <--no-verify|--cert <FILE>>
+pvimg create [OPTIONS] \-\-kernel <FILE> \-\-output <FILE> \-\-host\-key\-document <FILE> <\-\-no\-verify|\-\-cert <FILE>>
 .fam C
 .fi
 .SH DESCRIPTION
 .PP
 Use \fBpvimg\fR to generate a single bootable image file with encrypted and
-integrity-protected parts. The command requires a kernel image, a host-key
-document, certificates for the host-key document verification, and an output
+integrity\-protected parts. The command requires a kernel image, a host\-key
+document, certificates for the host\-key document verification, and an output
 file name. Optionally, specify an initial RAM filesystem, and a file containing
 the kernel parameters. If the command should be run offline, use the
 \fB\-\-offline\fR option and specify the certificate revocation lists (CRLs) by
 using the \fB\-\-crl\fR option. Should special circumstances require it, you can
 optionally specify your own keys for the encryption by using the experimental
-options. For all certificates, CRLs, and host-key documents, both the PEM and
+options. For all certificates, CRLs, and host\-key documents, both the PEM and
 DER input formats are supported. In the resulting image file, a plain text boot
 loader, the encrypted components for kernel, initial RAM disk, kernel
-parameters, and the encrypted and integrity-protected header are concatenated.
+parameters, and the encrypted and integrity\-protected header are concatenated.
 The header contains metadata necessary for running the guest in protected mode.
 .PP
 Use this image file as a kernel image for zipl or for a direct kernel boot using
@@ -124,7 +124,8 @@ Overwrite an existing Secure Execution boot image.
 \-\-cck, \-\-comm\-key <FILE>
 .RS 4
 Use the content of FILE as the customer\-communication key (CCK). The file must
-contain exactly 32 bytes of data.
+contain exactly 32 bytes of data. In previous versions, this option was called
+\fB\-\-comm\-key\fR.
 .RE
 .RE
 .PP
@@ -133,6 +134,13 @@ contain exactly 32 bytes of data.
 Use the content of FILE as the Secure Execution header protection key. The file
 must contain exactly 32 bytes of data. If the option is not specified, the
 Secure Execution header protection key is a randomly generated key.
+.RE
+.RE
+.PP
+\-\-image\-key <FILE>
+.RS 4
+Use the content of FILE as the image encryption key. The file must contain
+exactly 64 bytes of data.
 .RE
 .RE
 .PP
@@ -165,8 +173,8 @@ Add\-secret requests don't have to provide the CCK\-derived extension secret
 .PP
 \-\-enable\-cck\-update
 .RS 4
-Enable CCK update support. Requires z17 or up. This option cannot be
-used in conjunction with the \fB\-\-enable\-cck\-extension\-secret\fR option.
+Enable CCK update support. Requires z17 or up. This option cannot be used in
+conjunction with the \fB\-\-enable\-cck\-extension\-secret\fR option.
 .RE
 .RE
 .PP
@@ -256,8 +264,8 @@ These are examples of how to generate an IBM Secure Execution image in
 \fI\,/boot/secure\-linux\/\fR, using the kernel file \fI\,/boot/vmlinuz\/\fR, the
 initrd in \fI\,/boot/initrd.img\/\fR, the kernel parameters contained in
 \fI\,parmfile\/\fR, the intermediate CA in \fI\,DigiCertCA.crt\/\fR, the IBM Z
-signing key in \fI\,ibm\-z\-host\-key\-signing.crt\/\fR, and the host-key document
-in \fI\,host_key.crt\/\fR. An AES-256 GCM key is stored in \fI\,comm\-key\/\fR,
+signing key in \fI\,ibm\-z\-host\-key\-signing.crt\/\fR, and the host\-key document
+in \fI\,host_key.crt\/\fR. An AES\-256 GCM key is stored in \fI\,comm\-key\/\fR,
 which is used when creating a Secure Execution image with guest dump support
 enabled in the second example.
 
@@ -271,11 +279,11 @@ Generate an IBM Secure Execution image with Secure Execution guest dump support:
 .B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm\-z\-host\-key\-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure\-linux\/\fR \-\-enable\-dump \-\-cck \fI\,comm\-key\fR
 .SH NOTES
 .IP "1." 4
-The \fBgenprotimg\fR(1) command is a symbolic link to the \fBpvimg-create\fR(1) command.
+The \fBgenprotimg\fR(1) command is a symbolic link to the \fBpvimg\-create\fR(1) command.
 .IP "2." 4
 An ELF file cannot be used as a Linux kernel image.
 .IP "3." 4
-Remember to re-run \fBzipl\fR after updating an IBM Secure Execution image.
+Remember to re\-run \fBzipl\fR after updating an IBM Secure Execution image.
 .SH "SEE ALSO"
 .sp
 \fBpvimg\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)
