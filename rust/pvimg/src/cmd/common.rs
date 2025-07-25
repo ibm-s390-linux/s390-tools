@@ -8,7 +8,7 @@ use anyhow::Result;
 use log::info;
 use pv::{misc::read_file, request::Confidential};
 
-use crate::cli::{CreateBootImageExperimentalArgs, UserKeys};
+use crate::cli::UserKeys;
 
 #[macro_export]
 /// Makes it easier to
@@ -23,12 +23,9 @@ pub struct UserProvidedKeys {
 }
 
 /// Reads all user provided keys.
-pub fn read_user_provided_keys(
-    keys: &UserKeys,
-    experimental_args: &CreateBootImageExperimentalArgs,
-) -> Result<UserProvidedKeys> {
+pub fn read_user_provided_keys(keys: &UserKeys) -> Result<UserProvidedKeys> {
     let components_key = {
-        match &experimental_args.x_comp_key {
+        match &keys.image_key {
             Some(key_path) => {
                 info!(
                     "Use file '{}' as the image components protection key",

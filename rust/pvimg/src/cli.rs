@@ -116,6 +116,17 @@ pub struct UserKeys {
     /// generated key.
     #[arg(long, value_name = "FILE", alias = "x-header-key")]
     pub hdr_key: Option<PathBuf>,
+
+    /// Use the content of FILE as the image encryption key.
+    ///
+    /// The file must contain exactly 64 bytes of data.
+    #[arg(
+        long,
+        value_name = "FILE",
+        conflicts_with = "disable_image_encryption",
+        alias = "x-comp-key"
+    )]
+    pub image_key: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -387,11 +398,6 @@ pub struct CreateBootImageExperimentalArgs {
     #[arg(long, value_name = "DIR", hide(true))]
     pub x_bootloader_directory: Option<PathBuf>,
 
-    /// Manually set the image components encryption key (experimental option).
-    // Hidden in user documentation.
-    #[arg(long, value_name = "FILE", hide(true))]
-    pub x_comp_key: Option<PathBuf>,
-
     /// Manually set the PSW address used for the Secure Execution header (experimental option).
     // Hidden in user documentation.
     #[arg(long, value_name = "ADDRESS", hide(true))]
@@ -536,6 +542,9 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-cck-update", ["--disable-cck-update"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("multiple-cck", ["--disable-cck-update", "--cck", "/dev/null"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-comp-key", ["--x-comp-key", "/dev/null"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("image-key", ["--image-key", "/dev/null"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"]),
+                                                       CliOption::new("image-key", ["--image-key", "/dev/null"])])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),
@@ -570,6 +579,13 @@ mod test {
             // Image component key cannot be provided multiple times
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-comp-key", ["--x-comp-key", "/dev/null"]),
                                                        CliOption::new("x-comp-key2", ["--x-comp-key", "/dev/null"])])),
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("x-comp-key", ["--x-comp-key", "/dev/null"]),
+                                                       CliOption::new("image-key", ["--image-key", "/dev/null"])])),
+
+            // Disable image encryption and providing an image-key is mutually
+            // exclusive.
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-image-encryption", ["--disable-image-encryption"]),
+                                                       CliOption::new("image-key", ["--image-key", "/dev/null"])])),
         ];
 
         let mut genprotimg_valid_args = vec![

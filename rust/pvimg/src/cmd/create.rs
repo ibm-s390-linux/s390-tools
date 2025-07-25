@@ -126,7 +126,7 @@ pub fn create(opt: &CreateBootImageArgs) -> Result<OwnExitCode> {
     let verified_host_keys = opt
         .certificate_args
         .get_verified_hkds("Secure Execution image")?;
-    let user_provided_keys = read_user_provided_keys(&opt.keys, &opt.experimental_args)?;
+    let user_provided_keys = read_user_provided_keys(&opt.keys)?;
     let (plaintext_flags, secret_flags) = parse_flags(opt)?;
 
     if plaintext_flags.is_set(PcfV1::NoComponentEncryption) {
