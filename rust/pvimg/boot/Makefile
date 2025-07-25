@@ -7,7 +7,7 @@ DEBUG_FILES := $(addsuffix .debug,$(FILES))
 ifeq ($(HOST_ARCH),s390x)
 ZIPL_DIR := $(rootdir)/zipl
 ZIPL_BOOT_DIR := $(ZIPL_DIR)/boot
-PKGDATADIR := $(TOOLS_DATADIR)/pvimg
+PVIMG_PKGDATADIR ?= $(TOOLS_DATADIR)/pvimg
 
 INCLUDE_PATHS := $(ZIPL_BOOT_DIR) $(ZIPL_DIR)/include $(rootdir)/include
 INCLUDE_PARMS := $(addprefix -I,$(INCLUDE_PATHS))
@@ -86,9 +86,9 @@ stage3b.elf: head.o $(ZIPL_OBJS)
 	@chmod a-x $@
 
 install: stage3a.bin stage3b_reloc.bin
-	$(INSTALL) -d -m 755 $(DESTDIR)$(PKGDATADIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3a.bin $(DESTDIR)$(PKGDATADIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3b_reloc.bin $(DESTDIR)$(PKGDATADIR)
+	$(INSTALL) -d -m 755 $(DESTDIR)$(PVIMG_PKGDATADIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3a.bin $(DESTDIR)$(PVIMG_PKGDATADIR)
+	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 stage3b_reloc.bin $(DESTDIR)$(PVIMG_PKGDATADIR)
 
 else
 # Don't generate the dependency files (see `common.mak` for the
