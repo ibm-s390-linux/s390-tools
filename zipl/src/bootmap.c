@@ -480,6 +480,14 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 		error_text("Could not write to bootmap file");
 		return -1;
 	}
+	if (!bis->comp_reg[comp_id].offset) {
+		/*
+		 * save component offset and size
+		 */
+		assert(offset && *offset);
+		bis->comp_reg[comp_id].offset = *offset;
+		bis->comp_reg[comp_id].len = size;
+	}
 	if (component_type_by_id(comp_id) == COMPONENT_TYPE_LOAD) {
 		/* Fill in component location */
 		location->addr = data.load_address;
@@ -510,9 +518,26 @@ static int add_component_buffer(struct install_set *bis, void *buffer,
 				int mirror_id, int program_table_id)
 {
 	struct disk_info *info = &bis->info->base[mirror_id];
+	loff_t offset;
 
+	if (bis->comp_reg[comp_id].offset > 0) {
+		/*
+		 * The component data has been already written to the
+		 * bootmap. Refer the respective region in the bootmap
+		 * file.
+		 */
+		return add_component_file_range(bis,
+						bis->filename /* bootmap */,
+						&bis->comp_reg[comp_id],
+						data.load_address,
+						0 /*trailer */,
+						component,
+						0 /* do not add file data*/,
+						comp_id, menu_idx, mirror_id,
+						program_table_id);
+	}
 	return add_component_buffer_align(bis, buffer, size, data, component,
-					  info->phy_block_size, NULL,
+					  info->phy_block_size, &offset,
 					  comp_id, menu_idx, mirror_id,
 					  program_table_id);
 }
