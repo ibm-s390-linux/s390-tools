@@ -82,10 +82,13 @@ sub get_sub_ch_data
 		$sub_ch{$adapter}{host}  = $host;
 		$sub_ch{$adapter}{speed} = get_line("speed");
 		$sub_ch{$adapter}{name}  = get_line("port_name");
+		$sub_ch{$adapter}{id}    = get_line("port_id");
 		$sub_ch{$adapter}{pname} = get_line("permanent_port_name");
 		$sub_ch{$adapter}{type}  = get_line("port_type");
 		$c_src = catdir($base_dir, S_DIR2, $sub_ch, $adapter);
 		$sub_ch{$adapter}{lic}   = get_line("lic_version");
+		$sub_ch{$adapter}{faild} = get_line("failed") == 0 ? "No" :
+	                                                             "Yes";
 		$sub_ch{$adapter}{gen}   = get_line("card_version");
 		$sub_ch{$adapter}{state} = get_line("online") == 1 ? "Online" :
 								     "Offline";
@@ -245,12 +248,14 @@ sub adapter_report
 		push @out_str, "Adapter: $a\n";
 		push @out_str, "Sub-Ch.: $sub_ch{$a}{sub_ch}\n";
 		push @out_str, "Name:    $sub_ch{$a}{name}\n";
+		push @out_str, "Port-Id: $sub_ch{$a}{id}\n";
 		push @out_str, "P-Name:  $sub_ch{$a}{pname}\n";
 		push @out_str, "Version: $sub_ch{$a}{gen}\n";
 		push @out_str, "LIC:     $sub_ch{$a}{lic}\n";
 		push @out_str, "Type:    $sub_ch{$a}{type}\n";
 		push @out_str, "Speed:   $sub_ch{$a}{speed}\n";
 		push @out_str, "State:   $sub_ch{$a}{state}\n";
+		push @out_str, "Failed:  $sub_ch{$a}{faild}\n";
 		print @out_str, "\n";
 	}
 }
