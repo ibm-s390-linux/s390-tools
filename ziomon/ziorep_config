@@ -303,6 +303,7 @@ sub mapper_report
 {
 	my $adapters = shift;
 	my $ports = shift;
+	my $luns = shift;
 	my $s_devs = shift;
 	my $m_devs = shift;
 	my @out_str;
@@ -312,18 +313,20 @@ sub mapper_report
 		return;
 	}
 	if ($_[0]) {
-		print "adapter  remote_port        scsi_dev multipath_device\n",
-		      "=====================================================\n";
+		print "adapter  remote_port        LUN                scsi_dev multipath_device\n",
+		      "========================================================================\n";
 	}
 	foreach my $hctl (sort keys %devices) {
 		next if (!defined $devices{$hctl}{mp_dev});
 		next if (@$adapters && "@$adapters" !~ /\b$devices{$hctl}{hba_id}\b/);
 		next if (@$ports && "@$ports" !~ /\b$devices{$hctl}{wwpn}\b/);
+		next if (@$luns && "@$luns" !~ /\b$devices{$hctl}{lun}\b/);
 		next if (@$s_devs && "@$s_devs" !~ /\b$devices{$hctl}{dev}\b/);
 		next if (@$m_devs && "@$m_devs" !~ /\b$mapper_dev{$devices{$hctl}{mp_dev_mm}}\b/);
 		my @line_str;
 		push @line_str, $devices{$hctl}{hba_id};
 		push @line_str, $devices{$hctl}{wwpn};
+		push @line_str, $devices{$hctl}{lun};
 		push @line_str, "/dev/".$devices{$hctl}{dev};
 		push @line_str, "/dev/mapper/".$mapper_dev{$devices{$hctl}{mp_dev_mm}};
 		push @out_str, "@line_str\n";
@@ -510,6 +513,6 @@ if ($device_rep) {
 }
 
 if ($map_rep) {
-	mapper_report(\@adapter, \@port, \@s_dev, \@m_dev, $header);
+	mapper_report(\@adapter, \@port, \@lun, \@s_dev, \@m_dev, $header);
 }
 
