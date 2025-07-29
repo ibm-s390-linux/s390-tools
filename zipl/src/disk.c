@@ -107,10 +107,10 @@ read_block_by_offset(int fd, int blksize, uint64_t offset, char *buffer)
 static int determine_virtblk_type(struct device_info *dev_info,
 				  const struct stat *stats)
 {
-	struct disk_info *data = &dev_info->base[0];
+	struct disk_info *data = &dev_info->base[FIRST_MIRROR_ID];
+	int fd, rc, shift, sb;
 	char *device;
 	char *buffer;
-	int fd, rc, shift, sb;
 
 	rc = 0;
 	buffer = (char *) malloc(data->phy_block_size);
@@ -196,6 +196,8 @@ static int set_target_parameters(FILE *fh, struct job_target_data *td)
 	char *error;
 	int i;
 
+	/* reset array of target parameters */
+	memset(td->targets, 0, sizeof(td->targets));
 	/**
 	 * Process a stream of 'key=value' pairs and distribute
 	 * them into groups.
@@ -379,7 +381,7 @@ static int device_set_info_by_hint(struct job_target_data *td,
 static int disk_set_info_auto(struct device_info *dev_info,
 			      const struct stat *stats, int fd)
 {
-	struct disk_info *data = &dev_info->base[0];
+	struct disk_info *data = &dev_info->base[FIRST_MIRROR_ID];
 	struct dasd_information dasd_info;
 
 	if (ioctl(fd, BLKSSZGET, &data->phy_block_size)) {
@@ -610,11 +612,9 @@ static int disk_set_geometry_auto(int fd, struct disk_info *info)
  * Pre-condition: disk type is already known and set at DATA->type
  */
 static int disk_set_info_complete(struct job_target_data *td,
-				  struct device_info *dev_info,
+				  struct disk_info *data,
 				  struct stat *stats, int fd)
 {
-	struct disk_info *data = &dev_info->base[0];
-	struct util_proc_part_entry part_entry;
 	long devsize;
 
 	/* Get size of device in sectors (512 byte) */
@@ -642,6 +642,13 @@ static int disk_set_info_complete(struct job_target_data *td,
 			data->geo.start / (data->phy_block_size / 512);
 	if (data->partnum != 0)
 		data->partition = stats->st_rdev;
+	return 0;
+}
+
+static int device_set_info_complete(struct device_info *dev_info)
+{
+	struct util_proc_part_entry part_entry;
+
 	/* Try to get device name */
 	if (util_proc_part_get_entry(dev_info->device, &part_entry) == 0) {
 		dev_info->name = misc_strdup(part_entry.name);
@@ -684,6 +691,7 @@ int device_get_info(const char *device, struct job_target_data *td,
 	struct device_info *data;
 	struct stat stats;
 	int fd;
+	int i;
 
 	if (stat(device, &stats)) {
 		error_reason(strerror(errno));
@@ -729,11 +737,11 @@ int device_get_info(const char *device, struct job_target_data *td,
 		 * with this source type
 		 */
 		assert(td->nr_targets == 1);
-		data->device = data->base[0].disk;
+		data->device = data->base[FIRST_MIRROR_ID].disk;
 		break;
 	case source_auto:
 		/* no ready target parameters are available */
-		if (disk_set_geometry_auto(fd, &data->base[0]))
+		if (disk_set_geometry_auto(fd, &data->base[FIRST_MIRROR_ID]))
 			goto error;
 		if (disk_set_info_auto(data, &stats, fd))
 			goto error;
@@ -741,13 +749,17 @@ int device_get_info(const char *device, struct job_target_data *td,
 		 * multiple base disks are not supported
 		 * with this source type
 		 */
-		data->base[0].disk = data->device;
+		data->base[FIRST_MIRROR_ID].disk = data->device;
 		td->nr_targets = 1;
 		break;
 	default:
 		assert(0);
 	}
-	if (disk_set_info_complete(td, data, &stats, fd))
+	for (i = 0; i < td->nr_targets; i++) {
+		if (disk_set_info_complete(td, &data->base[i], &stats, fd))
+			goto error;
+	}
+	if (device_set_info_complete(data))
 		goto error;
 	free(script_file);
 	close(fd);
@@ -1201,7 +1213,7 @@ disk_is_large_volume(struct disk_info *info)
 /* Print textual representation of INFO contents. */
 void device_print_info(struct device_info *this, int source)
 {
-	struct disk_info *info = &this->base[0];
+	struct disk_info *info = &this->base[FIRST_MIRROR_ID];
 	char footnote[4] = "";
 
 	prepare_footnote_ptr(source, footnote);

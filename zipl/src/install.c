@@ -432,47 +432,39 @@ static int install_bootloader_dump(struct program_table *tables,
 int install_bootloader(struct job_data *job, struct install_set *bis)
 {
 	disk_blockptr_t *scsi_dump_sb_blockptr = &bis->scsi_dump_sb_blockptr;
-	struct disk_info *info = &bis->info->base[0];
 	char footnote[4];
 	int rc;
 	int i;
 
-	if (!info)
+	if (!bis->info)
 		return 0;
 
 	prepare_footnote_ptr(job->target.source, footnote);
 	/* Inform user about what we're up to */
-	printf("Preparing boot device for %s%s: ",
-	       disk_get_ipl_type(info->type,
-				 job->id == job_dump_partition),
-	       job->id == job_dump_partition ? "dump" : "IPL");
-	if (bis->info->name) {
+	printf("Preparing boot device: ");
+	if (bis->info->name)
 		printf("%s", bis->info->name);
-		if (info->devno >= 0)
-			printf(" (%04x)", info->devno);
-		printf(".\n");
-	} else if (info->devno >= 0) {
-		printf("%04x.\n", info->devno);
-	} else {
+	else
 		disk_print_devt(bis->info->device);
-		printf(".\n");
-	}
-	/* Install independently on each physical target base */
+	printf(".\n");
 
+	/* Install independently on each physical target base */
 	for (i = 0; i < job_get_nr_targets(job); i++) {
+		struct disk_info *info;
 		int fd;
 
+		info = &bis->info->base[i];
 		if (verbose) {
 			printf("Installing on base disk: ");
-			disk_print_devname(bis->info->base[i].disk);
+			disk_print_devname(info->disk);
 			printf("%s.\n", footnote);
 		}
 		/* Open device file */
-		fd = open(bis->basetmp[i], O_RDWR);
+		fd = open(bis->mirrors[i].basetmp, O_RDWR);
 		if (fd == -1) {
 			error_reason(strerror(errno));
 			error_text("Could not open temporary device file '%s'",
-				   bis->basetmp[i]);
+				   bis->mirrors[i].basetmp);
 			return -1;
 		}
 		/* Ensure that potential cache inconsistencies between disk and
@@ -490,43 +482,41 @@ int install_bootloader(struct job_data *job, struct install_set *bis)
 		 * picture in comments above)
 		 */
 		if (job->id == job_dump_partition) {
-			rc = install_bootloader_dump(bis->tables,
-						     &bis->info->base[i],
+			rc = install_bootloader_dump(bis->mirrors[i].tables,
+						     info,
 						     scsi_dump_sb_blockptr,
 						     job_dump_is_ngdump(job),
 						     fd);
 		} else {
-			rc = install_bootloader_ipl(bis->tables,
-						    &bis->info->base[i],
+			rc = install_bootloader_ipl(bis->mirrors[i].tables,
+						    info,
 						    fd);
 		}
 		if (fsync(fd))
 			error_text("Could not sync device file '%s'",
-				   bis->basetmp[i]);
+				   bis->mirrors[i].basetmp);
 		if (close(fd))
 			error_text("Could not close device file '%s'",
-				   bis->basetmp[i]);
+				   bis->mirrors[i].basetmp);
 		if (rc)
 			break;
+		if (!dry_run && rc == 0) {
+			if (info->devno >= 0)
+				syslog(LOG_INFO, "Boot loader written to %s (%04x) - %02x:%02x",
+				       (bis->info->name ? bis->info->name : "-"),
+				       info->devno,
+				       major(bis->info->device),
+				       minor(bis->info->device));
+			else
+				syslog(LOG_INFO, "Boot loader written to %s - %02x:%02x",
+				       (bis->info->name ? bis->info->name : "-"),
+				       major(bis->info->device),
+				       minor(bis->info->device));
+		}
 	}
 	if (verbose)
 		print_footnote_ref(job->target.source, "");
 
-	if (!dry_run && rc == 0) {
-		if (info->devno >= 0)
-			syslog(LOG_INFO, "Boot loader written to %s (%04x) - "
-			       "%02x:%02x",
-			       (bis->info->name ? bis->info->name : "-"),
-			       info->devno,
-			       major(bis->info->device),
-			       minor(bis->info->device));
-		else
-			syslog(LOG_INFO, "Boot loader written to %s - "
-			       "%02x:%02x",
-			       (bis->info->name ? bis->info->name : "-"),
-			       major(bis->info->device),
-			       minor(bis->info->device));
-	}
 	return rc;
 }
 

@@ -66,17 +66,23 @@ struct program_table {
 	blocknum_t stage1b_count;
 };
 
-/* Bootloader Installation Set */
-struct install_set {
+/* A part of Bootloader Installation Set specific for an individual mirror */
+struct install_set_mirror {
 	struct program_table tables[NR_PROGRAM_TABLES];
 	struct program_component *components[NR_PROGRAM_COMPONENTS];
+	char *basetmp;
+	unsigned int print_details:1;
+	unsigned int skip_prepare_blocklist:1;
+};
+
+/* Bootloader Installation Set */
+struct install_set {
 	int nr_menu_entries;
 	struct misc_fd mfd;
-	char *basetmp[MAX_TARGETS];
+	struct install_set_mirror mirrors[MAX_TARGETS];
 	char *filename;
+	unsigned int skip_prepare_device:1;
 	unsigned int tmp_filename_created:1;
-	unsigned int skip_prepare:1;
-	unsigned int print_details:1;
 	struct device_info *info;
 	disk_blockptr_t scsi_dump_sb_blockptr;
 };
@@ -107,15 +113,16 @@ static inline const char *component_desc_by_id(enum program_component_id id)
 }
 
 static inline struct program_component *get_component(struct install_set *bis,
+						      int mirror_id,
 						      int i, int j)
 {
-	return bis->components[i] + j;
+	return bis->mirrors[mirror_id].components[i] + j;
 }
 
 int prepare_bootloader(struct job_data *job, struct install_set *bis);
 int install_bootloader(struct job_data *job, struct install_set *bis);
 int post_install_bootloader(struct job_data *job, struct install_set *bis);
-void free_bootloader(struct install_set *bis);
+void free_bootloader(struct install_set *bis, struct job_data *job);
 int install_tapeloader(const char* device, const char* image,
 		       const char* parmline, const char* ramdisk,
 		       address_t image_addr, address_t parm_addr,

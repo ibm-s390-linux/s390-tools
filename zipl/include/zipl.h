@@ -44,6 +44,7 @@
 
 #define MAX_DUMP_VOLUMES		32
 #define MAX_TARGETS			32
+#define FIRST_MIRROR_ID                 0
 
 #define SECURE_BOOT_UNDEFINED	       -1
 #define SECURE_BOOT_DISABLED		0

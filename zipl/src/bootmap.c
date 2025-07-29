@@ -38,7 +38,7 @@
 #define NGDUMP_FSTYPE	"ext4"
 
 /* Pointer to dedicated empty block in bootmap. */
-static disk_blockptr_t empty_block;
+static disk_blockptr_t empty_blocks[MAX_TARGETS];
 
 /* State of secure boot in the system */
 static bool secure_boot_supported;
@@ -183,7 +183,7 @@ check_secure_boot_support(void)
 static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list,
 			     blocknum_t count, disk_blockptr_t *segment_pointer,
 			     int fs_block_size, struct disk_info *info,
-			     int program_table_id)
+			     int mirror_id, int program_table_id)
 {
 	disk_blockptr_t next;
 	void* buffer;
@@ -206,7 +206,7 @@ static int add_segment_table(struct misc_fd *mfd, disk_blockptr_t *list,
 		if (disk_is_zero_block(&list[count-1], info))
 			bootmap_store_blockptr(
 				       VOID_ADD(buffer, offset * pointer_size),
-				       &empty_block, info,
+				       &empty_blocks[mirror_id], info,
 				       program_table_id);
 		else
 			bootmap_store_blockptr(
@@ -348,10 +348,12 @@ static int add_component_file_range(struct install_set *bis,
 				    size_t trailer, void *component,
 				    int add_files,
 				    int comp_id, int menu_idx,
+				    int mirror_id,
 				    int program_table_id)
 {
-	struct program_component *pc = get_component(bis, comp_id, menu_idx);
-	struct disk_info *info = &bis->info->base[0];
+	struct program_component *pc = get_component(bis, mirror_id,
+						     comp_id, menu_idx);
+	struct disk_info *info = &bis->info->base[mirror_id];
 	struct component_loc *location = &pc->loc;
 	disk_blockptr_t **list = &pc->list;
 	blocknum_t *count = &pc->count;
@@ -360,7 +362,8 @@ static int add_component_file_range(struct install_set *bis,
 	size_t size;
 	int rc;
 
-	if (bis->skip_prepare)
+	if (bis->skip_prepare_device &&
+	    bis->mirrors[mirror_id].skip_prepare_blocklist)
 		/* skip the preparation work */
 		goto write_segment_table;
 	if (add_files) {
@@ -406,7 +409,7 @@ write_segment_table:
 	assert(*count != 0);
 	rc = add_segment_table(&bis->mfd, *list, *count, &segment,
 			       bis->info->fs_block_size, info,
-			       program_table_id);
+			       mirror_id, program_table_id);
 	if (rc == 0)
 		create_component_entry(component, &segment,
 				       component_type_by_id(comp_id),
@@ -417,12 +420,12 @@ write_segment_table:
 
 static int add_component_file(struct install_set *bis, const char *filename,
 			      address_t load_address, size_t trailer,
-			      void *component, int add_files,
-			      int comp_id, int menu_idx, int program_table_id)
+			      void *component, int add_files, int comp_id,
+			      int menu_idx, int mirror_id, int program_table_id)
 {
 	return add_component_file_range(bis, filename, NULL, load_address,
 					trailer, component, add_files,
-					comp_id, menu_idx,
+					comp_id, menu_idx, mirror_id,
 					program_table_id);
 }
 
@@ -430,17 +433,19 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 				      size_t size, component_data data,
 				      void *component, int align,
 				      off_t *offset, int comp_id, int menu_idx,
-				      int program_table_id)
+				      int mirror_id, int program_table_id)
 {
-	struct program_component *pc = get_component(bis, comp_id, menu_idx);
-	struct disk_info *info = &bis->info->base[0];
+	struct program_component *pc = get_component(bis, mirror_id,
+						     comp_id, menu_idx);
+	struct disk_info *info = &bis->info->base[mirror_id];
 	struct component_loc *location = &pc->loc;
 	disk_blockptr_t **list = &pc->list;
 	blocknum_t *count = &pc->count;
 	disk_blockptr_t segment;
 	int rc;
 
-	if (bis->skip_prepare)
+	if (bis->skip_prepare_device &&
+	    bis->mirrors[mirror_id].skip_prepare_blocklist)
 		/* skip the preparation work */
 		goto write_segment_table;
 	/* Write buffer */
@@ -467,7 +472,7 @@ write_segment_table:
 
 	rc = add_segment_table(&bis->mfd, *list, *count, &segment,
 			       bis->info->fs_block_size, info,
-			       program_table_id);
+			       mirror_id, program_table_id);
 	if (rc == 0)
 		create_component_entry(component, &segment,
 				       component_type_by_id(comp_id),
@@ -478,18 +483,19 @@ write_segment_table:
 static int add_component_buffer(struct install_set *bis, void *buffer,
 				size_t size, component_data data,
 				void *component, int comp_id, int menu_idx,
-				int program_table_id)
+				int mirror_id, int program_table_id)
 {
-	struct disk_info *info = &bis->info->base[0];
+	struct disk_info *info = &bis->info->base[mirror_id];
 
 	return add_component_buffer_align(bis, buffer, size, data, component,
 					  info->phy_block_size, NULL,
-					  comp_id, menu_idx, program_table_id);
+					  comp_id, menu_idx, mirror_id,
+					  program_table_id);
 }
 
 static int add_dummy_buffer(struct install_set *bis, size_t size,
 			    address_t addr, void *component, int comp_id,
-			    int menu_idx, int program_table_id)
+			    int menu_idx, int mirror_id, int program_table_id)
 {
 	char *buffer;
 	int rc = 0;
@@ -502,13 +508,15 @@ static int add_dummy_buffer(struct install_set *bis, size_t size,
 	rc = add_component_buffer(bis, buffer, size,
 				  (component_data)(uint64_t)addr,
 				  component, comp_id, menu_idx,
+				  mirror_id,
 				  program_table_id);
 	free(buffer);
 	return rc;
 }
 
 
-static void print_components(struct install_set *bis, int menu_idx)
+static void print_components(struct install_set *bis,
+			     int mirror_id, int menu_idx)
 {
 	const char *padding = "................";
 	int i;
@@ -516,7 +524,8 @@ static void print_components(struct install_set *bis, int menu_idx)
 	printf("  component address:\n");
 	/* Process all available components */
 	for (i = 0; i < NR_PROGRAM_COMPONENTS; i++) {
-		struct program_component *pc = get_component(bis, i, menu_idx);
+		struct program_component *pc = get_component(bis, mirror_id,
+							     i, menu_idx);
 
 		if (pc->loc.size == 0)
 			continue;
@@ -589,9 +598,10 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		bool add_envblk, struct job_envblk_data *envblk,
 		struct job_ipl_data *ipl, disk_blockptr_t *program,
 		int verbose, int add_files, component_header_type type,
-		int is_secure, int menu_idx, int program_table_id)
+		int is_secure, int menu_idx, int mirror_id,
+		int program_table_id)
 {
-	struct disk_info *info = &bis->info->base[0];
+	struct disk_info *info = &bis->info->base[mirror_id];
 	struct signature_header sig_head;
 	size_t ramdisk_size, image_size;
 	size_t stage3_params_size;
@@ -623,7 +633,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	stats.st_size = 0;
 	if (ipl->common.ramdisk != NULL) {
 		/* Add ramdisk */
-		if (verbose && bis->print_details)
+		if (verbose && bis->mirrors[mirror_id].print_details)
 			printf("  initial ramdisk...: %s\n", ipl->common.ramdisk);
 		/* Get ramdisk file size */
 		if (stat(ipl->common.ramdisk, &stats)) {
@@ -645,7 +655,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 				      STAGE3_HEAP_ADDRESS,
 				      VOID_ADD(table, offset),
 				      COMPONENT_ID_HEAP_AREA,
-				      menu_idx, program_table_id);
+				      menu_idx, mirror_id, program_table_id);
 		if (rc) {
 			error_text("Could not add stage3 HEAP dummy");
 			free(table);
@@ -656,7 +666,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 				      STAGE3_STACK_ADDRESS,
 				      VOID_ADD(table, offset),
 				      COMPONENT_ID_STACK_AREA,
-				      menu_idx, program_table_id);
+				      menu_idx, mirror_id, program_table_id);
 		if (rc) {
 			error_text("Could not add stage3 STACK dummy");
 			free(table);
@@ -681,14 +691,15 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	if (signature_size &&
 	    (is_secure == SECURE_BOOT_ENABLED ||
 	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
-		if (verbose && bis->print_details)
+		if (verbose && bis->mirrors[mirror_id].print_details)
 			printf("  signature for.....: %s\n", ZIPL_STAGE3_PATH);
 
 		rc = add_component_buffer(bis, signature, sig_head.length,
 					  (component_data)sig_head,
 					  VOID_ADD(table, offset),
 					  COMPONENT_ID_LOADER_SIGNATURE,
-					  menu_idx, program_table_id);
+					  menu_idx, mirror_id,
+					  program_table_id);
 		if (rc) {
 			error_text("Could not add stage3 signature");
 			free(table);
@@ -712,7 +723,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	/* Add stage 3 loader to bootmap */
 	rc = add_component_file(bis, ZIPL_STAGE3_PATH, STAGE3_LOAD_ADDRESS,
 				signature_size, VOID_ADD(table, offset), 1,
-				COMPONENT_ID_LOADER, menu_idx,
+				COMPONENT_ID_LOADER, menu_idx, mirror_id,
 				program_table_id);
 	if (rc) {
 		error_text("Could not add internal loader file '%s'",
@@ -741,7 +752,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 				  STAGE3_PARAMS_ADDRESS,
 				  VOID_ADD(table, offset),
 				  COMPONENT_ID_PARAMETERS,
-				  menu_idx, program_table_id);
+				  menu_idx, mirror_id, program_table_id);
 	free(stage3_params);
 	if (rc) {
 		error_text("Could not add parameters");
@@ -751,21 +762,22 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	offset += sizeof(struct component_entry);
 
 	/* Add kernel image */
-	if (verbose && bis->print_details)
+	if (verbose && bis->mirrors[mirror_id].print_details)
 		printf("  kernel image......: %s\n", ipl->common.image);
 
 	signature_size = extract_signature(ipl->common.image, &signature, &sig_head);
 	if (signature_size &&
 	    (is_secure == SECURE_BOOT_ENABLED ||
 	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
-		if (verbose && bis->print_details)
+		if (verbose && bis->mirrors[mirror_id].print_details)
 			printf("  signature for.....: %s\n", ipl->common.image);
 
 		rc = add_component_buffer(bis, signature, sig_head.length,
 					  (component_data)sig_head,
 					  VOID_ADD(table, offset),
 					  COMPONENT_ID_IMAGE_SIGNATURE,
-					  menu_idx, program_table_id);
+					  menu_idx, mirror_id,
+					  program_table_id);
 		if (rc) {
 			error_text("Could not add image signature");
 			free(table);
@@ -791,7 +803,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	rc = add_component_file(bis, ipl->common.image, ipl->common.image_addr,
 				signature_size, VOID_ADD(table, offset),
 				add_files, COMPONENT_ID_KERNEL_IMAGE,
-				menu_idx, program_table_id);
+				menu_idx, mirror_id, program_table_id);
 	if (rc) {
 		error_text("Could not add image file '%s'", ipl->common.image);
 		free(table);
@@ -801,14 +813,15 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 
 	/* Add kernel parmline */
 	if (ipl->common.parmline != NULL) {
-		if (verbose && bis->print_details)
+		if (verbose && bis->mirrors[mirror_id].print_details)
 			printf("  kernel parmline...: '%s'\n", ipl->common.parmline);
 		rc = add_component_buffer(bis, ipl->common.parmline,
 					  strlen(ipl->common.parmline) + 1,
 					  (component_data)ipl->common.parm_addr,
 					  VOID_ADD(table, offset),
 					  COMPONENT_ID_PARMLINE,
-					  menu_idx, program_table_id);
+					  menu_idx, mirror_id,
+					  program_table_id);
 		if (rc) {
 			error_text("Could not add parmline '%s'",
 				   ipl->common.parmline);
@@ -825,7 +838,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		    (is_secure == SECURE_BOOT_ENABLED ||
 		     (is_secure == SECURE_BOOT_AUTO &&
 		      secure_boot_supported))) {
-			if (verbose && bis->print_details) {
+			if (verbose && bis->mirrors[mirror_id].print_details) {
 				printf("  signature for.....: %s\n",
 				       ipl->common.ramdisk);
 			}
@@ -834,7 +847,8 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 						  (component_data)sig_head,
 						  VOID_ADD(table, offset),
 						 COMPONENT_ID_RAMDISK_SIGNATURE,
-						  menu_idx, program_table_id);
+						  menu_idx, mirror_id,
+						  program_table_id);
 			if (rc) {
 				error_text("Could not add ramdisk signature");
 				free(table);
@@ -850,7 +864,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 					signature_size,
 					VOID_ADD(table, offset),
 					add_files, COMPONENT_ID_RAMDISK,
-					menu_idx, program_table_id);
+					menu_idx, mirror_id, program_table_id);
 		if (rc) {
 			error_text("Could not add ramdisk '%s'",
 				   ipl->common.ramdisk);
@@ -880,7 +894,8 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 					       VOID_ADD(table, offset),
 					       bis->info->fs_block_size,
 					       &envblk_off, COMPONENT_ID_ENVBLK,
-					       menu_idx, program_table_id);
+					       menu_idx, mirror_id,
+					       program_table_id);
 			if (rc) {
 				error_text("Could not add environment block");
 				free(table);
@@ -907,7 +922,7 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 						      VOID_ADD(table, offset),
 						      0,
 						      COMPONENT_ID_ENVBLK,
-						      menu_idx,
+						      menu_idx, mirror_id,
 						      program_table_id);
 			if (rc) {
 				error_text("Could not add environment block");
@@ -917,8 +932,8 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		}
 		offset += sizeof(struct component_entry);
 	}
-	if (verbose && bis->print_details)
-		print_components(bis, menu_idx);
+	if (verbose && bis->mirrors[mirror_id].print_details)
+		print_components(bis, mirror_id, menu_idx);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       COMPONENT_TYPE_EXECUTE,
@@ -937,9 +952,9 @@ static int add_segment_program(struct install_set *bis,
 			       struct job_segment_data *segment,
 			       disk_blockptr_t *program, int verbose,
 			       int add_files, component_header_type type,
-			       int program_table_id)
+			       int mirror_id, int program_table_id)
 {
-	struct disk_info *info = &bis->info->base[0];
+	struct disk_info *info = &bis->info->base[mirror_id];
 	void *table;
 	int offset;
 	int rc;
@@ -953,13 +968,13 @@ static int add_segment_program(struct install_set *bis,
 	create_component_header(VOID_ADD(table, offset), type);
 	offset += sizeof(struct component_header);
 	/* Add segment file */
-	if (verbose && bis->print_details)
+	if (verbose && bis->mirrors[mirror_id].print_details)
 		printf("  segment file......: %s\n", segment->segment);
 
 	rc = add_component_file(bis, segment->segment, segment->segment_addr, 0,
 				VOID_ADD(table, offset), add_files,
 				COMPONENT_ID_SEGMENT_FILE, 0 /* menu_idx */,
-				program_table_id);
+				mirror_id, program_table_id);
 	if (rc) {
 		error_text("Could not add segment file '%s'",
 			   segment->segment);
@@ -968,8 +983,8 @@ static int add_segment_program(struct install_set *bis,
 	}
 	offset += sizeof(struct component_entry);
 	/* Print component addresses */
-	if (verbose && bis->print_details)
-		print_components(bis, 0 /* menu_idx */);
+	if (verbose && bis->mirrors[mirror_id].print_details)
+		print_components(bis, mirror_id, 0 /* menu_idx */);
 	/* Terminate component table */
 	create_component_entry(VOID_ADD(table, offset), NULL,
 			       COMPONENT_TYPE_EXECUTE,
@@ -999,7 +1014,8 @@ static int add_dump_program(struct install_set *bis,
 
 	return add_ipl_program(bis, NULL, false, NULL, &ipl, program,
 			       verbose, 1, type, SECURE_BOOT_DISABLED,
-			       0 /* menu_idx */, program_table_id);
+			       0 /* menu_idx */, 0 /* mirror id */,
+			       program_table_id);
 }
 
 
@@ -1008,10 +1024,10 @@ static int add_dump_program(struct install_set *bis,
  * block upon success
  * PROGRAM_TABLE_ID: offset of the program table in the array (@bis->tables)
  */
-static int build_program_table(struct job_data *job,
-			       struct install_set *bis, int program_table_id)
+static int build_program_table(struct job_data *job, struct install_set *bis,
+			       int mirror_id, int program_table_id)
 {
-	struct disk_info *info = &bis->info->base[0];
+	struct disk_info *info = &bis->info->base[mirror_id];
 	int entries, component_header;
 	disk_blockptr_t *table;
 	int is_secure;
@@ -1029,7 +1045,7 @@ static int build_program_table(struct job_data *job,
 	/* Add programs */
 	switch (job->id) {
 	case job_ipl:
-		if (bis->print_details) {
+		if (bis->mirrors[mirror_id].print_details) {
 			if (job->command_line)
 				printf("Adding IPL section\n");
 			else
@@ -1044,10 +1060,11 @@ static int build_program_table(struct job_data *job,
 				     true, &job->envblk, &job->data.ipl,
 				     &table[0], verbose || job->command_line,
 				     job->add_files, component_header,
-				     job->is_secure, 0, program_table_id);
+				     job->is_secure, 0, mirror_id,
+				     program_table_id);
 		break;
 	case job_segment:
-		if (bis->print_details) {
+		if (bis->mirrors[mirror_id].print_details) {
 			if (job->command_line)
 				printf("Adding segment load section\n");
 			else
@@ -1057,11 +1074,11 @@ static int build_program_table(struct job_data *job,
 		rc = add_segment_program(bis, &job->data.segment, &table[0],
 					 verbose || job->command_line,
 					 job->add_files, COMPONENT_HEADER_IPL,
-					 program_table_id);
+					 mirror_id, program_table_id);
 		break;
 	case job_dump_partition:
 		/* Only useful for a partition dump that uses a dump kernel*/
-		if (bis->print_details) {
+		if (bis->mirrors[mirror_id].print_details) {
 			if (job->command_line)
 				printf("Adding dump section\n");
 			else
@@ -1074,20 +1091,20 @@ static int build_program_table(struct job_data *job,
 				      program_table_id);
 		break;
 	case job_menu:
-		if (bis->print_details)
+		if (bis->mirrors[mirror_id].print_details)
 			printf("Building menu '%s'\n", job->name);
 		rc = 0;
 		for (i=0; i < job->data.menu.num; i++) {
 			switch (job->data.menu.entry[i].id) {
 			case job_ipl:
-				if (bis->print_details &&
+				if (bis->mirrors[mirror_id].print_details &&
 				    job->data.menu.entry[i].data.ipl.common.ignore) {
 					printf("Skipping #%d: IPL section '%s' (missing files)\n",
 					       job->data.menu.entry[i].pos,
 					       job->data.menu.entry[i].name);
 					break;
 				}
-				if (bis->print_details)
+				if (bis->mirrors[mirror_id].print_details)
 					printf("Adding #%d: IPL section '%s'%s",
 					       job->data.menu.entry[i].pos,
 					       job->data.menu.entry[i].name,
@@ -1097,12 +1114,12 @@ static int build_program_table(struct job_data *job,
 				if (job->data.menu.entry[i].data.ipl.is_kdump) {
 					component_header =
 						COMPONENT_HEADER_DUMP;
-					if (bis->print_details)
+					if (bis->mirrors[mirror_id].print_details)
 						printf(" (kdump)\n");
 				} else {
 					component_header =
 						COMPONENT_HEADER_IPL;
-					if (bis->print_details)
+					if (bis->mirrors[mirror_id].print_details)
 						printf("\n");
 				}
 				if (job->is_secure != SECURE_BOOT_UNDEFINED)
@@ -1117,6 +1134,7 @@ static int build_program_table(struct job_data *job,
 					verbose || job->command_line,
 					job->add_files, component_header,
 						     is_secure, i,
+						     mirror_id,
 						     program_table_id);
 				break;
 			case job_print_usage:
@@ -1145,14 +1163,15 @@ static int build_program_table(struct job_data *job,
 		rc = -1;
 		break;
 	}
-	if (job->envblk.buf && verbose && bis->print_details)
+	if (job->envblk.buf && verbose &&
+	    bis->mirrors[mirror_id].print_details)
 		envblk_print(job->envblk.buf, job->envblk.size);
 
 	if (rc == 0) {
 		disk_blockptr_t *pointer;
 
 		/* Add program table block */
-		pointer = &bis->tables[program_table_id].table;
+		pointer = &bis->mirrors[mirror_id].tables[program_table_id].table;
 		rc = add_program_table(&bis->mfd, table, entries,
 				       pointer, bis->info->fs_block_size, info,
 				       program_table_id);
@@ -1301,11 +1320,14 @@ static int install_stages_eckd_dasd(struct misc_fd *mfd, char *filename,
 }
 
 static int bootmap_install_stages(struct job_data *job, struct install_set *bis,
-				  int program_table_id)
+				  int mirror_id, int program_table_id)
 {
-	struct program_table *pt = &bis->tables[program_table_id];
-	struct disk_info *info = &bis->info->base[0];
+	struct program_table *pt;
+	struct disk_info *info;
 	int rc = 0;
+
+	pt = &bis->mirrors[mirror_id].tables[program_table_id];
+	info = &bis->info->base[mirror_id];
 
 	switch (info->type) {
 	case disk_type_fba:
@@ -1468,7 +1490,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 	struct disk_info *info;
 	ulong unused_size;
 
-	if (bis->skip_prepare)
+	if (bis->skip_prepare_device)
 		/* skip the preparation work */
 		return 0;
 	/* Get full path of bootmap file */
@@ -1487,10 +1509,13 @@ static int prepare_build_program_table_device(struct job_data *job,
 		printf("Target device information\n");
 		device_print_info(bis->info, job->target.source);
 	}
-	info = &bis->info->base[0];
-	if (misc_temp_dev(info->disk, 1, &bis->basetmp[0]))
+	/* Mirrored dump devices are not supported */
+	info = &bis->info->base[FIRST_MIRROR_ID];
+	if (misc_temp_dev(info->disk, 1,
+			  &bis->mirrors[FIRST_MIRROR_ID].basetmp))
 		return -1;
-	if (check_dump_device(job, info, bis->basetmp[0]))
+	if (check_dump_device(job, info,
+			      bis->mirrors[FIRST_MIRROR_ID].basetmp))
 		return -1;
 	printf("Building bootmap directly on partition '%s'%s\n",
 	       bis->filename,
@@ -1510,7 +1535,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 		return -1;
 	}
 	/* Write empty block to be read in place of holes in files */
-	if (write_empty_block(&bis->mfd, &empty_block,
+	if (write_empty_block(&bis->mfd, &empty_blocks[FIRST_MIRROR_ID],
 			      bis->info->fs_block_size, info)) {
 		error_text("Could not write to file '%s'",
 			   bis->filename);
@@ -1539,11 +1564,13 @@ static int prepare_bootloader_device(struct job_data *job,
 	 * build a single program table at offset 1,
 	 * see comment before install_bootloader() for details
 	 */
-	bis->print_details = 1;
-	if (build_program_table(job, bis, BLKPTR_FORMAT_ID))
+	bis->mirrors[FIRST_MIRROR_ID].print_details = 1;
+	if (build_program_table(job, bis,
+				FIRST_MIRROR_ID, BLKPTR_FORMAT_ID))
 		return -1;
 	/* Install stage 2 loader to bootmap if necessary */
-	if (bootmap_install_stages(job, bis, BLKPTR_FORMAT_ID)) {
+	if (bootmap_install_stages(job, bis,
+				   FIRST_MIRROR_ID, BLKPTR_FORMAT_ID)) {
 		error_text("Could not install loader stages to bootmap");
 		return -1;
 	}
@@ -1556,10 +1583,9 @@ static int prepare_bootloader_device(struct job_data *job,
 static int prepare_build_program_table_file(struct job_data *job,
 					    struct install_set *bis)
 {
-	struct disk_info *info;
 	int i;
 
-	if (bis->skip_prepare)
+	if (bis->skip_prepare_device)
 		/* skip the preparation work */
 		return 0;
 	/* Create temporary bootmap file */
@@ -1607,23 +1633,28 @@ static int prepare_build_program_table_file(struct job_data *job,
 					      &bis->info))
 			return -1;
 	}
-	info = &bis->info->base[0];
-
-	if (!disk_is_appropriate(job, info))
-		return -1;
+	for (i = 0; i < job_get_nr_targets(job); i++) {
+		if (!disk_is_appropriate(job, &bis->info->base[i]))
+			return -1;
+	}
 	if (verbose) {
 		printf("Target device information\n");
 		device_print_info(bis->info, job->target.source);
 	}
 	for (i = 0; i < job_get_nr_targets(job); i++) {
-		if (misc_temp_dev(bis->info->base[i].disk, 1, &bis->basetmp[i]))
+		if (misc_temp_dev(bis->info->base[i].disk,
+				  1 /* block device */,
+				  &bis->mirrors[i].basetmp))
 			return -1;
 	}
 	/* Check configuration number limits */
 	if (job->id == job_menu) {
-		if (check_menu_positions(&job->data.menu, job->name,
-					 info))
-			return -1;
+		for (i = 0; i < job_get_nr_targets(job); i++) {
+			if (check_menu_positions(&job->data.menu,
+						 job->name,
+						 &bis->info->base[i]))
+				return -1;
+		}
 	}
 	printf("Building bootmap in '%s'%s\n", job->target.bootmap_dir,
 	       job->add_files ? " (files will be added to bootmap file)"
@@ -1635,10 +1666,14 @@ static int prepare_build_program_table_file(struct job_data *job,
 		return -1;
 	}
 	/* Write empty block to be read in place of holes in files */
-	if (write_empty_block(&bis->mfd, &empty_block,
-			      bis->info->fs_block_size, info)) {
-		error_text("Could not write to file '%s'", bis->filename);
-		return -1;
+	for (i = 0; i < job_get_nr_targets(job); i++) {
+		if (write_empty_block(&bis->mfd,
+				      &empty_blocks[i],
+				      bis->info->fs_block_size,
+				      &bis->info->base[i])) {
+			error_text("Could not write to file '%s'", bis->filename);
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -1690,14 +1725,14 @@ static int finalize_create_file(struct job_data *job, struct install_set *bis)
  * PROGRAM_TABLE_ID: offset of the program table in the array (@bis->tables)
  */
 static int bootmap_create_file(struct job_data *job, struct install_set *bis,
-			       int program_table_id)
+			       int mirror_id, int program_table_id)
 {
 	if (prepare_build_program_table_file(job, bis))
 		return -1;
-	if (build_program_table(job, bis, program_table_id))
+	if (build_program_table(job, bis, mirror_id, program_table_id))
 		return -1;
 	/* Install stage 2 loader to bootmap if necessary */
-	if (bootmap_install_stages(job, bis, program_table_id)) {
+	if (bootmap_install_stages(job, bis, mirror_id, program_table_id)) {
 		error_text("Could not install loader stages to file '%s'",
 			   bis->filename);
 		return -1;
@@ -1799,10 +1834,13 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	/* Retrieve target device information */
 	if (device_get_info(job->data.dump.device, &job->target, &dev_info))
 		return -1;
-	info = &dev_info->base[0];
-	if (misc_temp_dev(info->disk, 1, &bis->basetmp[0]))
+	info = &dev_info->base[FIRST_MIRROR_ID];
+
+	if (misc_temp_dev(info->disk, 1,
+			  &bis->mirrors[FIRST_MIRROR_ID].basetmp))
 		return -1;
-	if (check_dump_device(job, info, bis->basetmp[0]))
+	if (check_dump_device(job, info,
+			      bis->mirrors[FIRST_MIRROR_ID].basetmp))
 		return -1;
 
 	assert(!job->target.bootmap_dir);
@@ -1827,8 +1865,9 @@ static int prepare_bootloader_ngdump(struct job_data *job,
 	 * Build a single program table for List-Directed IPL
 	 * See comments before install_bootloader() for details
 	 */
-	bis->print_details = 1;
-	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID)) {
+	bis->mirrors[FIRST_MIRROR_ID].print_details = 1;
+	if (bootmap_create_file(job, bis,
+				FIRST_MIRROR_ID, BLKPTR_FORMAT_ID)) {
 		if (dry_run && is_error(FS_MAP_ERROR))
 			fprintf(stderr,
 				"'%s' doesn't satisfy the requirements. Set TMPDIR properly\n",
@@ -1843,7 +1882,9 @@ static int prepare_bootloader_ngdump(struct job_data *job,
  * at respective offsets in the array BIS->tables. See the comment before
  * install_bootloader() for details
  */
-static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
+static int prepare_bootloader_ipl_mirror(struct job_data *job,
+					 struct install_set *bis,
+					 int mirror_id)
 {
 	struct disk_info *info;
 
@@ -1851,11 +1892,15 @@ static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 	 * Build a program table for List-Directed IPL from
 	 * SCSI or ECKD DASD
 	 */
-	bis->print_details = 1;
-	if (bootmap_create_file(job, bis, BLKPTR_FORMAT_ID))
+	bis->mirrors[mirror_id].print_details = 1;
+	if (bootmap_create_file(job, bis, mirror_id, BLKPTR_FORMAT_ID))
 		return -1;
 
-	info = &bis->info->base[0];
+	bis->skip_prepare_device = 1;
+	bis->mirrors[mirror_id].skip_prepare_blocklist = 1;
+	bis->mirrors[mirror_id].print_details = 0;
+
+	info = &bis->info->base[mirror_id];
 	if (info->type == disk_type_scsi)
 		/* only one table to be installed per device */
 		return 0;
@@ -1863,10 +1908,22 @@ static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
 	 * Build one more program table for CCW-type IPL from
 	 * ECKD DASD
 	 */
-	bis->skip_prepare = 1;
-	bis->print_details = 0;
-	if (bootmap_create_file(job, bis, LEGACY_BLKPTR_FORMAT_ID))
+	if (bootmap_create_file(job, bis, mirror_id, LEGACY_BLKPTR_FORMAT_ID))
 		return -1;
+	return 0;
+}
+
+static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
+{
+	int i;
+
+	if (prepare_bootloader_ipl_mirror(job, bis, FIRST_MIRROR_ID))
+		return -1;
+	/* also, prepare other mirrors, if any */
+	for (i = FIRST_MIRROR_ID + 1; i < job_get_nr_targets(job); i++) {
+		if (prepare_bootloader_ipl_mirror(job, bis, i))
+			return -1;
+	}
 	return 0;
 }
 
@@ -1875,7 +1932,7 @@ static int prepare_bootloader_ipl(struct job_data *job, struct install_set *bis)
  */
 static int init_bis(struct job_data *job, struct install_set *bis)
 {
-	int i;
+	int i, j;
 
 	memset(bis, 0, sizeof(*bis));
 	bis->nr_menu_entries = 1;
@@ -1884,12 +1941,14 @@ static int init_bis(struct job_data *job, struct install_set *bis)
 	/*
 	 * allocate "matrix" of program components
 	 */
-	for (i = 0; i < NR_PROGRAM_COMPONENTS; i++) {
-		bis->components[i] =
-			util_zalloc(sizeof(struct program_component) *
-				    bis->nr_menu_entries);
-		if (!bis->components[i])
-			return -1;
+	for (i = 0; i < MAX_TARGETS; i++) {
+		for (j = 0; j < NR_PROGRAM_COMPONENTS; j++) {
+			bis->mirrors[i].components[j] =
+				util_zalloc(sizeof(struct program_component) *
+					    bis->nr_menu_entries);
+			if (!bis->mirrors[i].components[j])
+				return -1;
+		}
 	}
 	return 0;
 }
@@ -1936,25 +1995,25 @@ int post_install_bootloader(struct job_data *job, struct install_set *bis)
 /**
  * Release all resources accumulated along the installation process
  */
-void free_bootloader(struct install_set *bis)
+void free_bootloader(struct install_set *bis, struct job_data *job)
 {
-	int i, j;
+	int i, j, k;
 
-	for (i = 0; i < NR_PROGRAM_TABLES; i++)
-		free(bis->tables[i].stage1b_list);
-	for (i = 0; i < NR_PROGRAM_COMPONENTS; i++) {
-		for (j = 0; j < bis->nr_menu_entries; j++)
-			free(get_component(bis, i, j)->list);
-		free(bis->components[i]);
+	for (k = 0; k < job_get_nr_targets(job); k++) {
+		for (i = 0; i < NR_PROGRAM_TABLES; i++)
+			free(bis->mirrors[k].tables[i].stage1b_list);
+		for (i = 0; i < NR_PROGRAM_COMPONENTS; i++) {
+			for (j = 0; j < bis->nr_menu_entries; j++)
+				free(get_component(bis, k, i, j)->list);
+			free(bis->mirrors[k].components[i]);
+		}
+		if (bis->mirrors[k].basetmp)
+			misc_free_temp_dev(bis->mirrors[k].basetmp);
 	}
 	if (bis->mfd.fd > 0)
 		close(bis->mfd.fd);
 	if (bis->tmp_filename_created)
 		misc_free_temp_file(bis->filename);
 	free(bis->filename);
-	for (i = 0; i < MAX_TARGETS; i++) {
-		if (bis->basetmp[i])
-			misc_free_temp_dev(bis->basetmp[i]);
-	}
 	device_free_info(bis->info);
 }
