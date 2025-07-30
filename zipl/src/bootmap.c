@@ -1507,7 +1507,7 @@ static int prepare_build_program_table_device(struct job_data *job,
 
 	if (verbose) {
 		printf("Target device information\n");
-		device_print_info(bis->info, job->target.source);
+		device_print_info(bis->info, &job->target);
 	}
 	/* Mirrored dump devices are not supported */
 	info = &bis->info->base[FIRST_MIRROR_ID];
@@ -1639,7 +1639,7 @@ static int prepare_build_program_table_file(struct job_data *job,
 	}
 	if (verbose) {
 		printf("Target device information\n");
-		device_print_info(bis->info, job->target.source);
+		device_print_info(bis->info, &job->target);
 	}
 	for (i = 0; i < job_get_nr_targets(job); i++) {
 		if (misc_temp_dev(bis->info->base[i].disk,

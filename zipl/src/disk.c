@@ -287,27 +287,6 @@ error:
 	return -1;
 }
 
-static void print_base_disk_params(struct job_target_data *td, int index)
-{
-	disk_type_t type = get_targettype(td, index);
-
-	if (!verbose)
-		return;
-	{
-		fprintf(stderr, "Base disk '%s':\n", get_targetbase(td, index));
-		fprintf(stderr, "  layout........: %s\n", disk_get_type_name(type));
-	}
-	if (disk_type_is_eckd(type)) {
-		fprintf(stderr, "  heads.........: %u\n", get_targetheads(td, index));
-		fprintf(stderr, "  sectors.......: %u\n", get_targetsectors(td, index));
-		fprintf(stderr, "  cylinders.....: %u\n", get_targetcylinders(td, index));
-	}
-	{
-		fprintf(stderr, "  start.........: %lu\n", get_targetoffset(td, index));
-		fprintf(stderr, "  blksize.......: %u\n", get_targetblocksize(td, index));
-	}
-}
-
 /**
  * Set disk info using ready target parameters provided either by
  * user, or by script
@@ -326,22 +305,6 @@ static int device_set_info_by_hint(struct job_target_data *td,
 		data->base[i].type = get_targettype(td, i);
 		data->base[i].phy_block_size = get_targetblocksize(td, i);
 
-		if (data->base[0].type !=
-		    data->base[i].type ||
-		    data->base[0].phy_block_size !=
-		    data->base[i].phy_block_size) {
-			/*
-			 * Currently multiple base disks with different
-			 * parameters are not supported
-			 */
-			print_base_disk_params(td, 0);
-			print_base_disk_params(td, i);
-			error_reason("Inconsistent base disk geometry in target device");
-			return -1;
-		}
-	}
-	/* set disk, targetbase_def, partnum, is_nvme */
-	for (i = 0; i < td->nr_targets; i++) {
 		if (sscanf(get_targetbase(td, i),
 			   "%d:%d", &majnum, &minnum) == 2) {
 			data->base[i].disk = makedev(majnum, minnum);
@@ -577,20 +540,6 @@ static int device_set_geometry_by_hint(struct job_target_data *td,
 		data->base[i].geo.sectors = get_targetsectors(td, i);
 		data->base[i].geo.cylinders = get_targetcylinders(td, i);
 		data->base[i].geo.start = get_targetoffset(td, i);
-
-		if (data->base[i].geo.heads != data->base[0].geo.heads ||
-		    data->base[i].geo.sectors != data->base[0].geo.sectors ||
-		    data->base[i].geo.cylinders != data->base[0].geo.cylinders ||
-		    data->base[i].geo.start != data->base[0].geo.start) {
-			/*
-			 * Currently multiple base disks with different
-			 * parameters are not supported
-			 */
-			print_base_disk_params(td, 0);
-			print_base_disk_params(td, i);
-			error_reason("Inconsistent base disk geometry in target device");
-			return -1;
-		}
 	}
 	return 0;
 }
@@ -1209,71 +1158,82 @@ disk_is_large_volume(struct disk_info *info)
 		info->geo.cylinders == 0xfffe;
 }
 
-
-/* Print textual representation of INFO contents. */
-void device_print_info(struct device_info *this, int source)
+static void disk_print_info(struct disk_info *info, int source)
 {
-	struct disk_info *info = &this->base[FIRST_MIRROR_ID];
+	const char *prefix = "    ";
 	char footnote[4] = "";
 
 	prepare_footnote_ptr(source, footnote);
-	printf("  Device..........................: ");
-	disk_print_devt(this->device);
+	printf("%sDisk............................: ", prefix);
+	disk_print_devt(info->disk);
 	if (info->targetbase_def == defined_as_device)
 		printf("%s", footnote);
 	printf("\n");
 	if (info->partnum != 0) {
-		printf("  Partition.......................: ");
+		printf("%sPartition.......................: ", prefix);
 		disk_print_devt(info->partition);
 		printf("\n");
-	}
-	if (this->name) {
-		printf("  Device name.....................: %s",
-		       this->name);
-		if (info->targetbase_def == defined_as_name)
-			printf("%s", footnote);
-		printf("\n");
-	}
-	if (this->drv_name) {
-		printf("  Device driver name..............: %s\n",
-		       this->drv_name);
 	}
 	if (((info->type == disk_type_fba) ||
 	     (info->type == disk_type_diag) ||
 	     (info->type == disk_type_eckd_ldl) ||
 	     (info->type == disk_type_eckd_cdl)) &&
 	     (source == source_auto)) {
-		printf("  DASD device number..............: %04x\n",
-		       info->devno);
+		printf("%sDASD device number..............: %04x\n",
+		       prefix, info->devno);
 	}
-	printf("  Type............................: disk %s\n",
-	       (info->partnum != 0) ? "partition" : "device");
-	printf("  Disk layout.....................: %s%s\n",
-	       disk_get_type_name(info->type), footnote);
+	printf("%sType............................: disk %s\n",
+	       prefix, (info->partnum != 0) ? "partition" : "device");
+	printf("%sDisk layout.....................: %s%s\n",
+	       prefix, disk_get_type_name(info->type), footnote);
 	if (disk_type_is_eckd(info->type)) {
-		printf("  Geometry - heads................: %d%s\n",
-		       info->geo.heads, footnote);
-		printf("  Geometry - sectors..............: %d%s\n",
-		       info->geo.sectors, footnote);
+		printf("%sGeometry - heads................: %d%s\n",
+		       prefix, info->geo.heads, footnote);
+		printf("%sGeometry - sectors..............: %d%s\n",
+		       prefix, info->geo.sectors, footnote);
 		if (disk_is_large_volume(info)) {
 			/* ECKD large volume. There is not enough information
 			 * available in INFO to calculate disk cylinder size. */
-			printf("  Geometry - cylinders............: > 65534\n");
+			printf("%sGeometry - cylinders............: > 65534\n",
+			       prefix);
 		} else {
-			printf("  Geometry - cylinders............: %d%s\n",
-			       info->geo.cylinders, footnote);
+			printf("%sGeometry - cylinders............: %d%s\n",
+			       prefix, info->geo.cylinders, footnote);
 		}
 	}
-	printf("  Geometry - start................: %ld%s\n",
-	       info->geo.start, footnote);
+	printf("%sGeometry - start................: %ld%s\n",
+	       prefix, info->geo.start, footnote);
+	printf("%sPhysical block size.............: %d%s\n",
+	       prefix, info->phy_block_size, footnote);
+	printf("%sDisk size in physical blocks....: %ld\n",
+	       prefix, (long)info->phy_blocks);
+	print_footnote_ref(source, prefix);
+}
+
+void device_print_info(struct device_info *this, struct job_target_data *td)
+{
+	int i;
+
+	printf("  Device............................: ");
+	disk_print_devt(this->device);
+	printf("\n");
+
+	if (this->name) {
+		printf("  Device name.......................: %s",
+		       this->name);
+		printf("\n");
+	}
+	if (this->drv_name) {
+		printf("  Device driver name................: %s\n",
+		       this->drv_name);
+	}
 	if (this->fs_block_size >= 0)
-		printf("  File system block size..........: %d\n",
+		printf("  File system block size............: %d\n",
 		       this->fs_block_size);
-	printf("  Physical block size.............: %d%s\n",
-	       info->phy_block_size, footnote);
-	printf("  Device size in physical blocks..: %ld\n",
-	       (long) info->phy_blocks);
-	print_footnote_ref(source, "  ");
+	for (i = 0; i < td->nr_targets; i++) {
+		printf("  Base %d:\n", i + 1);
+		disk_print_info(&this->base[i], td->source);
+	}
 }
 
 /* Check whether a block is a zero block which identifies a hole in a file.

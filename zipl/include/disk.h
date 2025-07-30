@@ -144,7 +144,7 @@ void disk_print_devt(dev_t d);
 void disk_print_devname(dev_t d);
 void prepare_footnote_ptr(int source, char *ptr);
 void print_footnote_ref(int source, const char *prefix);
-void device_print_info(struct device_info *info, int source);
+void device_print_info(struct device_info *info, struct job_target_data *td);
 int disk_is_zero_block(disk_blockptr_t *block, struct disk_info *info);
 blocknum_t disk_compact_blocklist(disk_blockptr_t* list, blocknum_t count,
 				  struct disk_info *info);
