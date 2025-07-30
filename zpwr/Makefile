@@ -10,8 +10,9 @@ include ../common.mak
 all: zpwr
 
 OBJECTS = zpwr.o
+LDLIBS += -lm
 
-zpwr: $(OBJECTS) $(rootdir)/libutil/libutil.a -lm
+zpwr: $(OBJECTS) $(rootdir)/libutil/libutil.a
 
 install: all
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)
