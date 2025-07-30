@@ -303,7 +303,8 @@ struct component_footer component_footers[NR_PROGRAM_COMPONENTS] = {
 	},
 	[COMPONENT_ID_ENVBLK] = {
 		.type = COMPONENT_TYPE_LOAD,
-		.desc = "environment blk"
+		.desc = "environment blk",
+		.fs_block_aligned = 1
 	},
 	[COMPONENT_ID_SEGMENT_FILE] = {
 		.type  = COMPONENT_TYPE_EXECUTE,

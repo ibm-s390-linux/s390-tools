@@ -453,11 +453,10 @@ static int add_component_file(struct install_set *bis, const char *filename,
 					program_table_id);
 }
 
-static int add_component_buffer_align(struct install_set *bis, void *buffer,
-				      size_t size, component_data data,
-				      void *component, int align,
-				      off_t *offset, int comp_id, int menu_idx,
-				      int mirror_id, int program_table_id)
+static int add_component_buffer_base(struct install_set *bis, void *buffer,
+				     size_t size, component_data data,
+				     void *component, int comp_id, int menu_idx,
+				     int mirror_id, int program_table_id)
 {
 	struct program_component *pc = get_component(bis, mirror_id,
 						     comp_id, menu_idx);
@@ -466,7 +465,13 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 	disk_blockptr_t **list = &pc->list;
 	blocknum_t *count = &pc->count;
 	disk_blockptr_t segment;
+	loff_t offset;
+	int align;
 	int rc;
+
+	align = fs_block_aligned_by_id(comp_id) ?
+		bis->info->fs_block_size :
+		info->phy_block_size;
 
 	if (bis->skip_prepare_device &&
 	    bis->mirrors[mirror_id].skip_prepare_blocklist)
@@ -475,7 +480,7 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 	/* Write buffer */
 	*count = disk_write_block_buffer_align(&bis->mfd, 0, buffer, size, list,
 					       bis->info->fs_block_size,
-					       info, align, offset);
+					       info, align, &offset);
 	if (*count == 0) {
 		error_text("Could not write to bootmap file");
 		return -1;
@@ -484,8 +489,8 @@ static int add_component_buffer_align(struct install_set *bis, void *buffer,
 		/*
 		 * save component offset and size
 		 */
-		assert(offset && *offset);
-		bis->comp_reg[comp_id].offset = *offset;
+		assert(offset > 0);
+		bis->comp_reg[comp_id].offset = offset;
 		bis->comp_reg[comp_id].len = size;
 	}
 	if (component_type_by_id(comp_id) == COMPONENT_TYPE_LOAD) {
@@ -517,9 +522,6 @@ static int add_component_buffer(struct install_set *bis, void *buffer,
 				void *component, int comp_id, int menu_idx,
 				int mirror_id, int program_table_id)
 {
-	struct disk_info *info = &bis->info->base[mirror_id];
-	loff_t offset;
-
 	if (bis->comp_reg[comp_id].offset > 0) {
 		/*
 		 * The component data has been already written to the
@@ -536,10 +538,9 @@ static int add_component_buffer(struct install_set *bis, void *buffer,
 						comp_id, menu_idx, mirror_id,
 						program_table_id);
 	}
-	return add_component_buffer_align(bis, buffer, size, data, component,
-					  info->phy_block_size, &offset,
-					  comp_id, menu_idx, mirror_id,
-					  program_table_id);
+	return add_component_buffer_base(bis, buffer, size, data, component,
+					 comp_id, menu_idx, mirror_id,
+					 program_table_id);
 }
 
 static int add_dummy_buffer(struct install_set *bis, size_t size,
@@ -643,12 +644,13 @@ check_remaining_filesize(size_t filesize, size_t signature_size,
 	}
 }
 
-static int add_ipl_program(struct install_set *bis, char *filename,
-		bool add_envblk, struct job_envblk_data *envblk,
-		struct job_ipl_data *ipl, disk_blockptr_t *program,
-		int verbose, int add_files, component_header_type type,
-		int is_secure, int menu_idx, int mirror_id,
-		int program_table_id)
+static int add_ipl_program(struct install_set *bis, bool add_envblk,
+			   struct job_envblk_data *envblk,
+			   struct job_ipl_data *ipl, disk_blockptr_t *program,
+			   int verbose, int add_files,
+			   component_header_type type, int is_secure,
+			   int menu_idx, int mirror_id,
+			   int program_table_id)
 {
 	struct disk_info *info = &bis->info->base[mirror_id];
 	struct signature_header sig_head;
@@ -659,7 +661,6 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 	uint64_t flags = 0;
 	void *stage3_params;
 	struct stat stats;
-	off_t envblk_off;
 	void *signature;
 	void *table;
 	int rc;
@@ -926,55 +927,33 @@ static int add_ipl_program(struct install_set *bis, char *filename,
 		/*
 		 * finally add environment block
 		 */
-		rc = envblk_offset_get(&bis->mfd, &envblk_off);
+		int save_location = !bis->comp_reg[COMPONENT_ID_ENVBLK].offset;
+
+		rc = add_component_buffer(bis,
+					  envblk->buf, envblk->size,
+					  (component_data)ipl->envblk_addr,
+					  VOID_ADD(table, offset),
+					  COMPONENT_ID_ENVBLK,
+					  menu_idx, mirror_id,
+					  program_table_id);
 		if (rc) {
+			error_text("Could not add environment block");
 			free(table);
 			return rc;
 		}
-		if (envblk_off == 0) {
+		if (save_location) {
 			/*
-			 * write with fs_block_size alignment to make sure
-			 * that the logical environment block will get to
-			 * single file system block
+			 * store environment block location in the bootmap
+			 * header for future operations performed by
+			 * zipl-editenv(8) tool
 			 */
-			rc = add_component_buffer_align(bis,
-					       envblk->buf, envblk->size,
-					       (component_data)ipl->envblk_addr,
-					       VOID_ADD(table, offset),
-					       bis->info->fs_block_size,
-					       &envblk_off, COMPONENT_ID_ENVBLK,
-					       menu_idx, mirror_id,
-					       program_table_id);
-			if (rc) {
-				error_text("Could not add environment block");
-				free(table);
-				return rc;
-			}
-			assert(envblk_off % bis->info->fs_block_size == 0);
-			/*
-			 * store environment block location
-			 * in the bootmap header
-			 */
-			rc = envblk_offset_set(&bis->mfd, envblk_off);
+			assert(bis->comp_reg[COMPONENT_ID_ENVBLK].offset > 0 &&
+			       bis->comp_reg[COMPONENT_ID_ENVBLK].offset %
+			       bis->info->fs_block_size == 0);
+			rc = envblk_offset_set(&bis->mfd,
+				bis->comp_reg[COMPONENT_ID_ENVBLK].offset);
 			if (rc) {
 				error_text("Could not store environment block location");
-				free(table);
-				return rc;
-			}
-		} else {
-			struct file_range reg;
-
-			reg.offset = envblk_off;
-			reg.len = envblk->size;
-			rc = add_component_file_range(bis, filename, &reg,
-						      ipl->envblk_addr, 0,
-						      VOID_ADD(table, offset),
-						      0,
-						      COMPONENT_ID_ENVBLK,
-						      menu_idx, mirror_id,
-						      program_table_id);
-			if (rc) {
-				error_text("Could not add environment block");
 				free(table);
 				return rc;
 			}
@@ -1061,7 +1040,7 @@ static int add_dump_program(struct install_set *bis,
 	memset(&ipl, 0, sizeof(ipl));
 	ipl.common = dump->common;
 
-	return add_ipl_program(bis, NULL, false, NULL, &ipl, program,
+	return add_ipl_program(bis, false, NULL, &ipl, program,
 			       verbose, 1, type, SECURE_BOOT_DISABLED,
 			       0 /* menu_idx */, 0 /* mirror id */,
 			       program_table_id);
@@ -1105,7 +1084,7 @@ static int build_program_table(struct job_data *job, struct install_set *bis,
 			component_header = COMPONENT_HEADER_DUMP;
 		else
 			component_header = COMPONENT_HEADER_IPL;
-		rc = add_ipl_program(bis, bis->filename,
+		rc = add_ipl_program(bis,
 				     true, &job->envblk, &job->data.ipl,
 				     &table[0], verbose || job->command_line,
 				     job->add_files, component_header,
@@ -1176,7 +1155,7 @@ static int build_program_table(struct job_data *job, struct install_set *bis,
 				else
 					is_secure =
 					      job->data.menu.entry[i].is_secure;
-				rc = add_ipl_program(bis, bis->filename,
+				rc = add_ipl_program(bis,
 					true, &job->envblk,
 					&job->data.menu.entry[i].data.ipl,
 					&table[job->data.menu.entry[i].pos],

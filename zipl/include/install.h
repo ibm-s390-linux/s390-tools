@@ -52,6 +52,11 @@ struct component_loc {
 struct component_footer {
 	component_type type;
 	const char *desc;
+	int fs_block_aligned; /* if true, then the component should
+			       * be aligned to fs_block_size boundary
+			       * in the bootmap file. Otherwise, to
+			       * phy_block_size boundary.
+			       */
 };
 
 struct program_component {
@@ -111,6 +116,11 @@ static inline component_type component_type_by_id(enum program_component_id id)
 static inline const char *component_desc_by_id(enum program_component_id id)
 {
 	return component_footers[id].desc;
+}
+
+static inline int fs_block_aligned_by_id(enum program_component_id id)
+{
+	return component_footers[id].fs_block_aligned;
 }
 
 static inline struct program_component *get_component(struct install_set *bis,
