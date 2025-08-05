@@ -17,7 +17,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
+#include <linux/perf_event.h>
 
 #include "lib/util_base.h"
 #include "lib/util_file.h"
@@ -30,7 +35,11 @@
 #include "lib/util_scandir.h"
 #include "lib/libcpumf.h"
 
+#define STR_SUB(x) #x
+#define STR(x)	   STR_SUB(x)
+
 #define OPT_FORMAT		256	/* --format XXX option */
+#define DEFAULT_LOOP_INTERVAL	60	/* loop interval in seconds */
 
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS"),
@@ -39,6 +48,17 @@ static struct util_opt opt_vec[] = {
 		.argument = "FORMAT",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 		.desc = "List counters in specified FORMAT (" FMT_TYPE_NAMES ")"
+	},
+	{
+		.option = { "loops", required_argument, NULL, 'l' },
+		.argument = "COUNT",
+		.desc = "Number of read operations"
+	},
+	{
+		.option = { "interval", required_argument, NULL, 'i' },
+		.argument = "SECONDS",
+		.desc = "Time to wait between loop iterations (default "
+			STR(DEFAULT_LOOP_INTERVAL) "s)"
 	},
 	{
 		.option = { "numeric", no_argument, NULL, 'n' },
@@ -60,7 +80,7 @@ static const struct util_prg prg = {
 		{
 			.owner = "IBM Corp.",
 			.pub_first = 2023,
-			.pub_last = 2023,
+			.pub_last = 2025,
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
@@ -68,6 +88,12 @@ static const struct util_prg prg = {
 
 static bool numsort;		/* If true sort counter numerically */
 static int output_format = -1;	/* Generate style if >= 0 */
+static unsigned int max_cpus;	/* # of CPUs to read counter values from */
+static unsigned int max_fds;	/* # of file descriptor to read counter values */
+static unsigned long loops;	/* # loops */
+static unsigned long read_interval = DEFAULT_LOOP_INTERVAL;
+static cpu_set_t cpu_online_mask;
+static char *ctrformat = "%ld";	/* Default counter output format */
 
 #define PAI_PATH	"/bus/event_source/devices/%s"
 
@@ -79,9 +105,16 @@ enum pai_types {		/* Bit mask for supported PAI counters */
 
 static int pai_types_show;
 
+struct pai_cpudata {		/* Event data per CPU */
+	int fd;			/* Event file descriptor */
+	int cpu;		/* CPU number */
+};
+
 struct pai_ctrname {		/* List of defined counters */
 	char *name;		/* Counter name */
 	unsigned long nr;	/* Counter number */
+	unsigned long total;	/* Total count on all CPus */
+	struct pai_cpudata *data; /* Counter data per CPU */
 };
 
 struct pai_node {		/* Head for PAI counter sets */
@@ -185,9 +218,12 @@ static void read_counternames(struct pai_node *node)
 	for (i = 0; i < count && ctr >= 0; i++) {
 		util_asprintf(&ctrpath, "%s/%s", path, namelist[i]->d_name);
 		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1) {
+			node->ctrlist[node->ctridx].data = NULL;
 			node->ctrlist[node->ctridx].name = util_strdup(namelist[i]->d_name);
+			node->ctrlist[node->ctridx].total = 0;
 			node->ctrlist[node->ctridx++].nr = ctr;
 			more++;
+			max_fds++;
 		} else {
 			warnx("Cannot parse %s", ctrpath);
 		}
@@ -216,8 +252,7 @@ static void format_painode(enum util_fmt_t fmt)
 			util_fmt_obj_start(FMT_ROW, "counter");
 			util_fmt_pair(FMT_QUOTE, "name", "%s", node->ctrlist[i].name);
 			util_fmt_pair(FMT_DEFAULT, "config", "%d", node->ctrlist[i].nr);
-			util_fmt_pair(FMT_DEFAULT, "number", "%d",
-				      node->ctrlist[i].nr - node->base);
+			util_fmt_pair(FMT_DEFAULT, "id", "%d", node->ctrlist[i].nr - node->base);
 			util_fmt_obj_end();
 		}
 		util_fmt_obj_end();		/* Counters */
@@ -265,8 +300,10 @@ static void free_painode(void)
 
 	util_list_iterate_safe(&pai_list, node, next) {
 		free(node->name_uc);
-		for (int i = 0; i < node->ctridx; ++i)
+		for (int i = 0; i < node->ctridx; ++i) {
 			free(node->ctrlist[i].name);
+			free(node->ctrlist[i].data);
+		}
 		free(node->ctrlist);
 		free(node);
 	}
@@ -309,6 +346,209 @@ static void sort_painode(void)
 	util_list_sort(&pai_list, painode_cmp, NULL);
 }
 
+/* Read counter value. */
+static unsigned long event_read(int fd)
+{
+	unsigned long count;
+	int rc;
+
+	rc = read(fd, &count, sizeof(count));
+	if (rc != sizeof(count))
+		err(EXIT_FAILURE, "Failed to read counter value");
+	return count;
+}
+
+/* Write header. */
+static void line_header(void)
+{
+	struct pai_node *node;
+	static bool header;
+	bool comma = false;
+
+	if (header)
+		return;		  /* Printed already */
+	printf("Date,Time,CPU,"); /* Print counter name and number */
+	util_list_iterate(&pai_list, node) {
+		for (int i = 0; i < node->ctridx; ++i) {
+			if (comma)
+				putchar(',');
+			printf("%s(%ld)", node->ctrlist[i].name ?: node->name_uc,
+			       node->ctrlist[i].nr - node->base);
+			comma = true;
+		}
+	}
+	putchar('\n');
+	header = true;
+}
+
+/* Write an output line. */
+static void line_out(char *header)
+{
+	struct pai_node *node;
+	bool comma;
+
+	line_header();
+
+	/* Print total count of all CPUs */
+	printf("%s,%s,", header, "Total");
+	comma = false;
+	util_list_iterate(&pai_list, node) {
+		for (int i = 0; i < node->ctridx; ++i) {
+			if (comma)
+				putchar(',');
+			printf(ctrformat, node->ctrlist[i].total);
+			comma = true;
+			node->ctrlist[i].total = 0;
+		}
+	}
+	putchar('\n');
+}
+
+/* Write a formatted line. */
+static void format_line_out(time_t now, char *now_text)
+{
+	static unsigned int called;
+	struct pai_node *node;
+
+	if (!called) {
+		util_fmt_init(stdout, output_format, FMT_DEFAULT | FMT_HANDLEINT, 1);
+		util_fmt_obj_start(FMT_DEFAULT, NULL);
+		util_fmt_obj_start(FMT_LIST, "measurements");
+	}
+	util_list_iterate(&pai_list, node) {
+		util_fmt_obj_start(FMT_DEFAULT, "entry");
+		util_fmt_pair(FMT_PERSIST, "iteration", "%d", called++);
+		util_fmt_pair(FMT_PERSIST, "time_epoch", "%d", now);
+		util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "time", "%s", now_text);
+		util_fmt_pair(FMT_QUOTE | FMT_PERSIST, "cpu", "total");
+		util_fmt_obj_start(FMT_LIST, "counters");
+		for (int i = 0; i < node->ctridx; ++i) {
+			util_fmt_obj_start(FMT_ROW, "counter");
+			util_fmt_pair(FMT_QUOTE, "name", "%s", node->ctrlist[i].name);
+			util_fmt_pair(FMT_DEFAULT, "config", "%d", node->ctrlist[i].nr);
+			util_fmt_pair(FMT_DEFAULT, "id", "%d", node->ctrlist[i].nr - node->base);
+			util_fmt_pair(FMT_DEFAULT, "value", ctrformat, node->ctrlist[i].total);
+			util_fmt_obj_end();
+		}
+		util_fmt_obj_end(); /* Counters */
+		util_fmt_obj_end(); /* Entry */
+	}
+}
+
+/* Terminate formatted output. */
+static void format_line_end(void)
+{
+	util_fmt_obj_end(); /* Iteration */
+	util_fmt_obj_end(); /* Default */
+	util_fmt_exit();
+}
+
+/* Display counter values. */
+static void show_values(void)
+{
+	time_t now = time(NULL);
+	struct tm *now_tm;
+	char now_text[32];
+
+	now_tm = localtime(&now);
+	if (output_format != -1) {
+		strftime(now_text, sizeof(now_text), "%F %T%z", now_tm);
+		format_line_out(now, now_text);
+	} else {
+		strftime(now_text, sizeof(now_text), "%F,%T", now_tm);
+		line_out(now_text);
+	}
+}
+
+/* Read each counter value. */
+static void read_painode(void)
+{
+	struct pai_cpudata *data;
+	struct pai_node *node;
+	unsigned long value;
+
+	util_list_iterate(&pai_list, node) {
+		for (int i = 0; i < node->ctridx; ++i) {
+			for (size_t j = 0; j < max_cpus; ++j) {
+				data = &node->ctrlist[i].data[j];
+				value = event_read(data->fd);
+				node->ctrlist[i].total += value;
+			}
+		}
+	}
+}
+
+static void wait_painode(void)
+{
+	for (unsigned long i = 0; i < loops; ++i) {
+		read_painode();
+		show_values();
+		if (i + 1 < loops)
+			sleep(read_interval);
+	}
+	format_line_end();
+}
+
+/* Install one event. */
+static int event_add(int cpu, int idx, struct pai_node *node)
+{
+	struct perf_event_attr attr;
+	int fd;
+
+	memset(&attr, 0, sizeof(attr));
+	attr.size = sizeof(attr);
+	attr.config = node->ctrlist[idx].nr;
+	attr.type = node->pmu;
+	fd = perf_event_open(&attr, -1, cpu, -1, 0);
+	if (fd == -1)
+		err(EXIT_FAILURE, "Failed to open perf event: file descriptor not available");
+	return fd;
+}
+
+/* Increase number of file descriptors this process can open. */
+static void event_fdlimit(void)
+{
+	unsigned int needed = 3 + max_fds * max_cpus;
+	struct rlimit rlimit;
+
+	if (getrlimit(RLIMIT_NOFILE, &rlimit) == -1)
+		err(EXIT_FAILURE, "Failed to read RLIMIT_NOFILE");
+	if (needed > rlimit.rlim_cur)
+		rlimit.rlim_cur = needed;
+	if (setrlimit(RLIMIT_NOFILE, &rlimit) == -1)
+		err(EXIT_FAILURE, "Failed to set RLIMIT_NOFILE");
+}
+
+/* Install all events and iterate over requested read operations. */
+static void event_painode(void)
+{
+	size_t pai_cpudata_sz = sizeof(struct pai_cpudata) * max_cpus;
+	struct pai_cpudata *data;
+	struct pai_node *node;
+
+	event_fdlimit();
+	util_list_iterate(&pai_list, node) {
+		for (int i = 0; i < node->ctridx; ++i) {
+			node->ctrlist[i].data = util_malloc(pai_cpudata_sz);
+			data = node->ctrlist[i].data;
+			for (unsigned int j = 0; j < CPU_SETSIZE; ++j) {
+				if (CPU_ISSET(j, &cpu_online_mask)) {
+					data->cpu = j;
+					data->fd = event_add(j, i, node);
+					++data;
+				}
+			}
+		}
+	}
+	wait_painode();
+	util_list_iterate(&pai_list, node) {
+		for (int i = 0; i < node->ctridx; ++i) {
+			for (unsigned int j = 0; j < max_cpus; ++j)
+				close(node->ctrlist[i].data[j].fd);
+		}
+	}
+}
+
 /* Check for hardware support and return false if not available. */
 static bool have_support(enum pai_types t)
 {
@@ -345,9 +585,40 @@ static void check_type_name(const char *type)
 		errx(EXIT_FAILURE, "Invalid argument for -t %s", type);
 }
 
+/*
+ * Get list of specified CPUs from command line. Check if these CPUs
+ * exist and are online. Ignore those CPUs which are not available and
+ * issue one warning when CPUs have been specified but are not online.
+ */
+static void get_cpulist(char *parm)
+{
+	bool warned = false;
+	cpu_set_t cpulist;
+	int i, rc;
+
+	CPU_ZERO(&cpulist);
+	rc = libcpumf_cpuset(parm, &cpulist);
+	if (rc)
+		err(EXIT_FAILURE, "Cannot parse cpulist %s", parm);
+	for (i = 0; i < CPU_SETSIZE; ++i) {
+		if (CPU_ISSET(i, &cpulist) && !CPU_ISSET(i, &cpu_online_mask)) {
+			if (!warned) {
+				warnx("some CPU(s) are offline, ignored");
+				warned = true;
+			}
+		}
+		if (!CPU_ISSET(i, &cpulist) && CPU_ISSET(i, &cpu_online_mask))
+			CPU_CLR(i, &cpu_online_mask);
+	}
+}
+
 int main(int argc, char **argv)
 {
+	bool list_only = true;
 	enum util_fmt_t fmt;
+	bool i_flag = false;
+	bool l_flag = false;
+	char *endchar;
 	int ch;
 
 	util_list_init(&pai_list, struct pai_node, node);
@@ -366,6 +637,22 @@ int main(int argc, char **argv)
 		case 'v':
 			util_prg_print_version();
 			return EXIT_SUCCESS;
+		case 'i':
+			i_flag = true;
+			list_only = false;
+			errno = 0;
+			read_interval = strtoul(optarg, &endchar, 0);
+			if (errno || *endchar)
+				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			break;
+		case 'l':
+			l_flag = true;
+			list_only = false;
+			errno = 0;
+			loops = strtoul(optarg, &endchar, 0);
+			if (errno || *endchar)
+				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			break;
 		case 'n':
 			numsort = true;
 			break;
@@ -380,7 +667,33 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/* Nothing specified, show all PAI counters */
+	if (i_flag && !l_flag) {
+		util_prg_print_help();
+		util_opt_print_help();
+		return EXIT_FAILURE;
+	}
+
+	/*
+	 * Read currently online CPUs and create a bit mask.
+	 * This bitmap of online CPUs is used to check command line parameter
+	 * for valid CPUs
+	 * When any of the flags which set variable list_only to false have
+	 * be specified, lets also show the counter value, not just list them.
+	 */
+	if (optind < argc) /* List of CPUs on command line */
+		list_only = false;
+	if (!list_only) { /* Show counter values */
+		ch = libcpumf_cpuset_fn(S390_CPUS_ONLINE, &cpu_online_mask);
+		if (ch)
+			err(EXIT_FAILURE, "Cannot read file /sys/" S390_CPUS_ONLINE);
+		while (optind < argc)
+			get_cpulist(argv[optind++]);
+		max_cpus = CPU_COUNT(&cpu_online_mask);
+		if (!loops)
+			loops = 1;
+	}
+
+	/* Nothing specified, use all PAI counters */
 	if (!pai_types_show)
 		pai_types_show = (1 << pai_type_crypto) | (1 << pai_type_nnpa);
 
@@ -394,7 +707,11 @@ int main(int argc, char **argv)
 		}
 	}
 	sort_painode();
-	list_painode();
+	ch = EXIT_SUCCESS;
+	if (!list_only)
+		event_painode();
+	else
+		list_painode();
 	free_painode();
 	return ch;
 }

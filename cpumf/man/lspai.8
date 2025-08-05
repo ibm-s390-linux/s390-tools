@@ -10,7 +10,7 @@
 .TH \*c "8" "August 2023" "s390-tools" "CPU-MF management programs"
 .
 .SH NAME
-lspai \- list Processor Activity Instrumentation (PAI) counters
+\*c \- list Processor Activity Instrumentation (PAI) counters and values
 .
 .SH SYNOPSIS
 \*c
@@ -21,6 +21,18 @@ lspai \- list Processor Activity Instrumentation (PAI) counters
 .IR "\ TYPE" ]
 .br
 \*c
+.RB [ \-\-format
+.IR FORMAT ]
+.RB [ \-n ]
+.RB [ \-t
+.IR "\ TYPE" ]
+.RB [ \-i
+.IR SECONDS ]
+.RB [ \-l
+.IR COUNT ]
+.RI [ CPULIST ]
+.br
+\*c
 .BR \-h | \-\-help
 .br
 \*c
@@ -28,10 +40,29 @@ lspai \- list Processor Activity Instrumentation (PAI) counters
 .
 .
 .SH DESCRIPTION
+On the first line
 \*c displays the Processor Activity Instrumentation (PAI) counters
 for Linux on IBM Z.
-The output is a human-readable list of available PAI counter
-names and numbers.
+The output lists the available PAI counter names
+and numbers in various formats.
+If
+.I CPULIST
+is specified or any of the options
+.B \-l
+or
+.BR \-i,
+are present on the command line,
+\*c command extracts counter values from the
+specified PAI counter sets.
+Counter sets can be specified and extracted for individual CPUs.
+By default the output is a comma-separated list of values.
+Each line starts with a timestamp
+followed by the extracted counter values.
+A header line shows each counter name and the
+counter number in parenthesis.
+For other formats, use the
+.B \-\-format
+option.
 .SH OPTIONS
 .TP
 .BR \-h ", " \-\-help
@@ -42,7 +73,7 @@ Displays help information, then exits.
 Displays version information, then exits.
 .
 .TP
-.BR \-t ", " \-\-type "\ TYPE"
+.BR \-t ", "  \-\-type "\ \fITYPE\fP"
 Specifies the PAI counter set to list.
 Valid counter set values are
 .I crypto
@@ -63,6 +94,18 @@ Retrieve output in one of the following formats:
 JSON, csv, json-seq or pairs.
 If no format is specified,
 the output defaults to a human-readable format.
+.
+.TP
+.BR \-i ", " \-\-interval \fI\ SECONDS\fP
+Specifies a time interval, in seconds,
+that the command waits between read operations.
+The default is 60 seconds.
+.
+.TP
+.BR \-l ", " \-\-loop \fI\ COUNT\fP
+Performs the specified number of read operations.
+The default is one.
+.
 .SH "EXAMPLE"
 The \*c invocation lists all PAI Neural Network Processing Assist Facility
 (NNPA) counters in numeric order:
@@ -83,6 +126,32 @@ suitable for
 .IR perf "(8)"
 event specification by name.
 The third gives a short explanation, if available.
+.sp 1
+The \*c invocation displays all PAI Neural Network Processing Assist Facility
+(NNPA) counters values.
+Ten iterations with a two second delay in between
+is printed on the screen.
+.nf
+# lspai -i 2 -l 10 -t nnpa -n
+Date,Time,CPU,NNPA_ALL(0),NNPA_ADD(1),NNPA_SUB(2),NNPA_MUL(3),NNPA_DIV(4),
+NNPA_MIN(5),NNPA_MAX(6),NNPA_LOG(7),NNPA_EXP(8),NNPA_IBM_RESERVED_9(9),
+NNPA_RELU(10),NNPA_TANH(11),NNPA_SIGMOID(12),NNPA_SOFTMAX(13),NNPA_BATCHNORM(14),
+NNPA_MAXPOOL2D(15),NNPA_AVGPOOL2D(16),NNPA_LSTMACT(17),NNPA_GRUACT(18),
+NNPA_CONVOLUTION(19),NNPA_MATMUL_OP(20),NNPA_MATMUL_OP_BCAST23(21),
+NNPA_SMALLBATCH(22),NNPA_LARGEDIM(23),NNPA_SMALLTENSOR(24),NNPA_1MFRAME(25),
+NNPA_2GFRAME(26),NNPA_ACCESSEXCEPT(27)
+2025-05-13,08:18:27,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:29,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:31,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:33,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:35,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:37,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:39,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:41,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:43,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2025-05-13,08:18:45,Total,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#
+.fi
 .SH "SEE ALSO"
 .BR pai (8)
 .BR lscpumf (8)
