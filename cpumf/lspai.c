@@ -226,7 +226,7 @@ static void show_format(enum util_fmt_t fmt)
 	util_fmt_exit();
 }
 
-static void show_painode(void)
+static void list_painode(void)
 {
 	struct pai_node *node;
 	int indent = 0;
@@ -393,7 +393,7 @@ int main(int argc, char **argv)
 		}
 	}
 	sort_painode();
-	show_painode();
+	list_painode();
 	free_painode();
 	return ch;
 }
