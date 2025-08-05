@@ -199,7 +199,7 @@ static void read_counternames(struct pai_node *node)
 		qsort(node->ctrlist, more, sizeof(*node->ctrlist), pai_ctrcmp);
 }
 
-static void show_format(enum util_fmt_t fmt)
+static void format_painode(enum util_fmt_t fmt)
 {
 	struct pai_node *node;
 
@@ -233,7 +233,7 @@ static void list_painode(void)
 	int offset = 0;
 
 	if (output_format != -1) {
-		show_format(output_format);
+		format_painode(output_format);
 		return;
 	}
 
