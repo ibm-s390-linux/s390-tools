@@ -115,7 +115,7 @@ bool libcpumf_have_cpumcf(void);
  *
  * @param[out]   min       Minimum supported sampling interval
  * @param[out]   max       Maximum supported sampling interval
- * @param[out]   speed     Current CPU speed, number of CPU cylces per
+ * @param[out]   speed     Current CPU speed, number of CPU cycles per
  *                         microsecond
  * @param[out]   basic_sz  Basic sample size in bytes
  * @param[out]   diag_sz   Diagnostic sample size in bytes
