@@ -9,6 +9,8 @@
 
 #include <sched.h>
 #include <stdbool.h>
+#include <asm/unistd.h>
+#include <linux/perf_event.h>
 
 #define	S390_CPUMF_CF		"devices/cpum_cf/"
 #define	S390_CPUMF_CFDIAG	"devices/cpum_cf_diag/"
@@ -182,4 +184,22 @@ bool libcpumf_have_pai_ext(void);
  * @retval       false    PAI_NNPA counter Facility is not available
  */
 bool libcpumf_have_pai_nnpa(void);
+
+/**
+ * Wrapper for the perf_event_open syscall used to configure performance events.
+ * This function simplifies usage of perf_event_open and provides a consistent
+ * interface for libcpumf internals.
+ *
+ * @param hw_event   Pointer to perf_event_attr structure describing the event
+ * @param pid        Target process ID (0 for current process)
+ * @param cpu        Target CPU (-1 for all CPUs)
+ * @param group_fd   File descriptor of event group leader, or -1 if none
+ * @param flags      Additional flags (usually 0)
+ *
+ * @return           File descriptor for the opened event on success
+ * @return           -1 on failure, errno is set appropriately
+ */
+
+long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd,
+		     unsigned long flags);
 #endif

@@ -169,3 +169,9 @@ bool libcpumf_have_pai_nnpa(void)
 {
 	return libcpumf_have_pai_sysfs(S390_SYSFS_PAI_NNPA);
 }
+
+long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd,
+		     unsigned long flags)
+{
+	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+}

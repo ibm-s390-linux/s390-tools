@@ -59,14 +59,6 @@ static struct util_list list_pai_event;
 static struct util_list list_pmu_event;
 static bool summary;
 
-/* System call to perf_event_open(2) */
-static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-			    int cpu, int group_fd, unsigned long flags)
-{
-	return syscall(__NR_perf_event_open, hw_event, pid, cpu,
-		       group_fd, flags);
-}
-
 static void ev_dealloc(void)
 {
 	struct pai_event *next, *p;

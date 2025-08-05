@@ -30,6 +30,7 @@
 #include <libudev.h>
 
 #include "cpacfstats.h"
+#include "lib/libcpumf.h"
 #include "../include/lib/zt_common.h"
 
 /* correlation between counter and perf counter string */
@@ -121,16 +122,6 @@ static struct percpucounter *findcpu(unsigned int cpunum, int unlinkflag)
 		walk = walk->next;
 	}
 	return NULL;
-}
-
-static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-			    int cpu, int group_fd, unsigned long flags)
-{
-	int ret;
-
-	ret = syscall(__NR_perf_event_open, hw_event, pid, cpu,
-		group_fd, flags);
-	return ret;
 }
 
 static int perf_supported(void)

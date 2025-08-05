@@ -22,7 +22,7 @@ ALL_CPPFLAGS += -DVERSION=$(VERSION)
 all:		check_dep cpacfstats cpacfstatsd
 
 cpacfstatsd:	cpacfstatsd.o stats_sock.o perf_crypto.o cpacfstats_common.o \
-				$(rootdir)/libutil/libutil.a
+			$(rootdir)/libcpumf/libcpumf.a $(rootdir)/libutil/libutil.a
 		$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -ludev -lpthread -o $@
 
 cpacfstats:	cpacfstats.o stats_sock.o cpacfstats_common.o
