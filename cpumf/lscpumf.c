@@ -39,7 +39,7 @@
 static bool actions[ACTION_SAMPLE + 1];	/* Specified command line options */
 
 /* This defines the number of pages a Sample Data Buffer Table (SDBT) can hold
- * as payload data. Each SDBT is one PAGE (4096 bytes) and continas 512 eight
+ * as payload data. Each SDBT is one PAGE (4096 bytes) and contains 512 eight
  * byte data pointers to Sample Data Buffers (SDB). The last entry of a SDBT
  * points to another SDBT and can not store payload.
  */
@@ -139,7 +139,7 @@ static struct samples {		/* Sample definition for all machines */
  * The CPU Measurement facility has a first and second version number.
  *
  * The first version number governs basic counter set and the
- * problem state counter set. Currently used are first verion numbers 1 and 3.
+ * problem state counter set. Currently used are first version numbers 1 and 3.
  * The counter numbers are identifical for version number 1 and 3, but
  * have different purpose and description.
  *
@@ -627,7 +627,7 @@ static struct counters cpumcf_z10_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1D_L3_LOCAL_WRITES",
 		.desc = "A directory write to the Level-1 D-Cache directory"
-			"\n\t\twhere the installtion cache line was source from"
+			"\n\t\twhere the installation cache line was source from"
 			"\n\t\tthe Level-3 cache that is on the same book as the"
 			"\n\t\tData cache (Local L2 cache)",
 	},
@@ -1916,7 +1916,7 @@ static struct counters cpumcf_z14_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1I_ONCHIP_L3_SOURCED_WRITES",
 		.desc = "A directory write to the Level-1 Instruction cache"
-			"\n\t\tdirectory where the returned cache ine was sourced"
+			"\n\t\tdirectory where the returned cache line was sourced"
 			"\n\t\tfrom an On-Chip Level-3 cache without intervention",
 	},
 	{
@@ -1924,7 +1924,7 @@ static struct counters cpumcf_z14_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1I_ONCHIP_MEMORY_SOURCED_WRITES",
 		.desc = "A directory write to the Level-1 Instruction cache"
-			"\n\t\tdirectory where the returned cache ine was sourced"
+			"\n\t\tdirectory where the returned cache line was sourced"
 			"\n\t\tfrom On-Chip memory",
 	},
 	{
@@ -1932,7 +1932,7 @@ static struct counters cpumcf_z14_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1I_ONCHIP_L3_SOURCED_WRITES_IV",
 		.desc = "A directory write to the Level-1 Instruction cache"
-			"\n\t\tdirectory where the returned cache ine was sourced"
+			"\n\t\tdirectory where the returned cache line was sourced"
 			"\n\t\tfrom an On-Chip Level-3 cache with intervention",
 	},
 	{
@@ -2342,7 +2342,7 @@ static struct counters cpumcf_z15_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1I_ONCHIP_L3_SOURCED_WRITES",
 		.desc = "A directory write to the Level-1 Instruction cache"
-			"\n\t\tdirectory where the returned cache ine was sourced"
+			"\n\t\tdirectory where the returned cache line was sourced"
 			"\n\t\tfrom an On-Chip Level-3 cache without intervention",
 	},
 	{
@@ -2350,7 +2350,7 @@ static struct counters cpumcf_z15_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1I_ONCHIP_MEMORY_SOURCED_WRITES",
 		.desc = "A directory write to the Level-1 Instruction cache"
-			"\n\t\tdirectory where the returned cache ine was sourced"
+			"\n\t\tdirectory where the returned cache line was sourced"
 			"\n\t\tfrom On-Chip memory",
 	},
 	{
@@ -2358,7 +2358,7 @@ static struct counters cpumcf_z15_counters[] = {
 		.ctrset = CPUMF_CTRSET_EXTENDED,
 		.name = "L1I_ONCHIP_L3_SOURCED_WRITES_IV",
 		.desc = "A directory write to the Level-1 Instruction cache"
-			"\n\t\tdirectory where the returned cache ine was sourced"
+			"\n\t\tdirectory where the returned cache line was sourced"
 			"\n\t\tfrom an On-Chip Level-3 cache with intervention",
 	},
 	{
