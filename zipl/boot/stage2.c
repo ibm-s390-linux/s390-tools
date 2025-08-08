@@ -18,6 +18,8 @@
 #include "boot/loaders_layout.h"
 #include "stage2.h"
 
+static const uint64_t __used __section(.stage2.head) stage2_head;
+
 static int is_null_descriptor(union disk_blockptr *address)
 {
 	unsigned long long *value = (unsigned long long *)address;
@@ -146,5 +148,3 @@ void __noreturn start(void)
 void panic_notify(unsigned long UNUSED(reason))
 {
 }
-
-const uint64_t __used __section(.stage2.head) stage2_head;

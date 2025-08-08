@@ -24,7 +24,7 @@
 /*
  * Magic number at start of dump record
  */
-const uint64_t __used __section(.stage2.head) magic = 0x5844464241363401ULL; /* XDFBA64, version 1 */
+static const uint64_t __used __section(.stage2.head) magic = 0x5844464241363401ULL; /* XDFBA64, version 1 */
 
 /*
  * FBA dump device partition specification
