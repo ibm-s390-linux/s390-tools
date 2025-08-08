@@ -147,4 +147,4 @@ void panic_notify(unsigned long UNUSED(reason))
 {
 }
 
-const uint64_t __section(.stage2.head) stage2_head;
+const uint64_t __used __section(.stage2.head) stage2_head;

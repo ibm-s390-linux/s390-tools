@@ -38,10 +38,10 @@ struct tape_head {
 	uint64_t	ccw2;
 } __packed;
 
-const struct tape_head __section(.stage2.head) tape_head = {
-	.psw	= PSW_LOAD | STAGE2_ENTRY, /* Start code at 0x2018 */
-	.ccw1	= 0x0700000060000001ULL, /* Rewind ccw */
-	.ccw2	= 0x0200200020003000ULL, /* CCW to load dump tool to 0x2000 */
+const struct tape_head __used __section(.stage2.head) tape_head = {
+	.psw = PSW_LOAD | STAGE2_ENTRY, /* Start code at 0x2018 */
+	.ccw1 = 0x0700000060000001ULL,	/* Rewind ccw */
+	.ccw2 = 0x0200200020003000ULL,	/* CCW to load dump tool to 0x2000 */
 };
 
 /*
