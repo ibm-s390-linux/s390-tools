@@ -350,13 +350,17 @@ static void calc_ext_metrics(struct cmg_data_t *data, double seconds, u32 ticks)
 	if (cmcb->dpu_num_cores == 0)
 		return;
 
-	/* dpu_util = dpu_exec_time_cpc / (t * dpu_num_cores) */
+	/* dpu_util = 100 * dpu_exec_time_cpc / (t * dpu_num_cores) */
 	delta = field_delta(dpu_exec_time_cpc, ext_a, ext_b);
-	m->dpu_util = delta / ((double)ticks * cmcb->dpu_num_cores);
+	m->dpu_util = 100.0 * delta / ((double)ticks * cmcb->dpu_num_cores);
 
-	/* dpu_util_total = dpu_channel_exec_time_cpc / (t * dpu_num_cores) */
+	/*
+	 * dpu_util_total = 100 * dpu_channel_exec_time_cpc /
+	 *                        (t * dpu_num_cores)
+	 */
 	delta = field_delta(dpu_channel_exec_time_cpc, ext_a, ext_b);
-	m->dpu_util_total = delta / ((double)ticks * cmcb->dpu_num_cores);
+	m->dpu_util_total = 100.0 * delta /
+			    ((double)ticks * cmcb->dpu_num_cores);
 
 	/* dpu_util_part = dpu_util_total * channel_work_units /
 	 *                                  channel_work_units_cpc */
