@@ -119,7 +119,7 @@ ziomon/ziomon_zfcpdd
 ziomon/ziorep_traffic
 ziomon/ziorep_utilization
 zipl/boot/*.bin
-zipl/boot/*.exec
+zipl/boot/*.elf
 zipl/boot/.loaders
 zipl/boot/data.h
 zipl/src/chreipl_helper.device-mapper

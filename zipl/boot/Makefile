@@ -6,9 +6,9 @@ EMBEDDED_BOOTLOADERS := fba0.bin fba1b.bin fba2.bin \
 	  eckd1.bin eckd1b.bin eckd2.bin \
 	  tape0.bin \
 	  eckd2dump_sv.bin tape2dump.bin fba2dump.bin eckd2dump_mv.bin
-DEBUG_EMBEDDED_BOOTLOADERS := $(addsuffix .debug,$(EMBEDDED_BOOTLOADERS))
+DEBUG_EMBEDDED_BOOTLOADERS := $(addsuffix .debug.elf,$(EMBEDDED_BOOTLOADERS))
 EXTERNAL_BOOTLOADERS := stage3.bin
-DEBUG_EXTERNAL_BOOTLOADERS := $(addsuffix .debug,$(EXTERNAL_BOOTLOADERS))
+DEBUG_EXTERNAL_BOOTLOADERS := $(addsuffix .debug.elf,$(EXTERNAL_BOOTLOADERS))
 
 .loaders: $(EMBEDDED_BOOTLOADERS) $(DEBUG_EMBEDDED_BOOTLOADERS)
 	touch .loaders
@@ -17,7 +17,7 @@ DEBUG_EXTERNAL_BOOTLOADERS := $(addsuffix .debug,$(EXTERNAL_BOOTLOADERS))
 all: .loaders $(EXTERNAL_BOOTLOADERS) $(DEBUG_EXTERNAL_BOOTLOADERS)
 
 clean:
-	rm -f -- ./**/*.o *.o *.exec *.bin *.lds .*.lds.d .loaders *.debug
+	rm -f -- ./**/*.o *.o *.elf *.bin *.lds .*.lds.d .loaders *.debug.elf
 
 .PHONY: all clean
 
@@ -63,44 +63,44 @@ stage2.lds: stage2.lds.S
 	$(CPP) -Wp,-MD,.$@.d,-MT,$@ $(INCLUDE_PARMS) -D STAGE2DUMP_TAIL_ADDRESS=0x4ff0 \
 	-P -C -o $@ $<
 
-fba0.exec eckd0_ldl.exec eckd0_cdl.exec tape0.exec: \
+fba0.elf eckd0_ldl.elf eckd0_cdl.elf tape0.elf: \
 	stage0.lds
 
-eckd1.exec: \
+eckd1.elf: \
 	stage1.lds
 
-eckd1b.exec fba1b.exec: \
+eckd1b.elf fba1b.elf: \
 	stage1b.lds
 
-eckd2dump_sv.exec: \
+eckd2dump_sv.elf: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_sv.o eckd2dump_zlib.o \
 	zlib/deflate.o zlib/deftree.o zlib/dfltcc.o zlib/dfltcc_deflate.o \
 	libc.o ebcdic.o sclp.o entry.o eckd2dump_sv.lds
-eckd2dump_mv.exec: \
+eckd2dump_mv.elf: \
 	head.o stage2dump.o cio.o eckd2dump.o eckd2dump_mv.o \
 	libc.o ebcdic.o sclp.o entry.o eckd2dump_mv.lds
-fba2dump.exec: \
+fba2dump.elf: \
 	head.o stage2dump.o cio.o fba2dump.o \
 	libc.o ebcdic.o sclp.o entry.o stage2.lds
-tape2dump.exec: \
+tape2dump.elf: \
 	head.o stage2dump.o cio.o tape2dump.o \
 	libc.o ebcdic.o sclp.o entry.o stage2.lds
-eckd2.exec: head.o stage2.o cio.o eckd2.o libc.o ebcdic.o menu.o sclp.o \
+eckd2.elf: head.o stage2.o cio.o eckd2.o libc.o ebcdic.o menu.o sclp.o \
 	    kdump2.o kdump.o entry.o stage2.lds
-fba2.exec: head.o stage2.o cio.o fba2.o libc.o ebcdic.o menu.o sclp.o \
+fba2.elf: head.o stage2.o cio.o fba2.o libc.o ebcdic.o menu.o sclp.o \
 	   kdump2.o kdump.o entry.o stage2.lds
-stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
+stage3.elf: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 	     sclp_stage3.o kdump.o entry.o stage3.lds
 
-%.exec:	%.o
+%.elf:	%.o
 	$(LINK) -Wl,-T,$(filter %.lds,$^) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 	@chmod a-x $@
 
-%.bin.debug: %.exec
+%.bin.debug.elf: %.elf
 	$(OBJCOPY) --only-keep-debug $< $@
 	@chmod a-x $@
 
-%.bin:	%.exec
+%.bin:	%.elf
 	$(OBJCOPY) -O binary $< $@
 	@chmod a-x $@
 
