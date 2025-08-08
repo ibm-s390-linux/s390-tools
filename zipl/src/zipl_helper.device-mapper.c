@@ -1045,6 +1045,8 @@ static int get_table(dev_t dev, struct util_list **table)
 			   &start, &length, &type, &args) < 4) {
 			ERR("Unrecognized device-mapper table format for device '%s'\n",
 			    devname);
+			free(type);
+			free(args);
 			goto out;
 		}
 		tops = find_target_ops(type);
@@ -1052,6 +1054,9 @@ static int get_table(dev_t dev, struct util_list **table)
 			ERR("Unsupported setup: Unsupported device-mapper "
 			    "target type '%s' for device '%s'\n",
 			    type, devname);
+			free(type);
+			free(args);
+			goto out;
 		}
 		data = tops->get_target_data(devname, args);
 		free(type);
