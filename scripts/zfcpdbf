@@ -641,8 +641,15 @@ sub _print_hba_id2
 	print "SRB D_ID       : 0x", substr($rec, 16, 8), "\n";
 	print "SRB LUN        : 0x", substr($rec, 24, 16), "\n";
 	print "SRB q-design.  : 0x", substr($rec, 40, 16), "\n";
+	print "SRB length     : 0x", substr($rec, 56, 8), "\n";
+	print "SRB res1       : 0x", substr($rec, 64, 8), "\n";
+	print "SRB res2       : 0x", substr($rec, 72, 2), "\n";
+	print "SRB class      : 0x", substr($rec, 74, 8), "\n";
+	print "SRB res3       : 0x", substr($rec, 82, 2), "\n";
+	print "SRB S_ID       : 0x", substr($rec, 84, 8), "\n";
+	print "SRB res4       : ", payload_format(substr($rec, 92, 40));
 
-	print "SRB length     : ", $payload_length, "\n" if ($payload_length);
+	print "SRB pay length : ", $payload_length, "\n" if ($payload_length);
 	print_payload($payload_length, $pay_rec, "SRB info")
 	    if ($payload_length);
 }
