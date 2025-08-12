@@ -4,7 +4,7 @@
 
 use std::{
     ffi::{CString, OsStr},
-    fs::{File, OpenOptions},
+    fs::{rename, File, OpenOptions},
     io::{self, Seek, SeekFrom, Write},
     os::unix::{ffi::OsStrExt, fs::OpenOptionsExt},
     path::Path,
@@ -218,17 +218,16 @@ impl TempPath {
     }
 
     fn persist(self, operation: AtomicFileOperation) -> Result<()> {
-        let options = match operation {
-            AtomicFileOperation::Replace => 0,
-            AtomicFileOperation::NoReplace => libc::RENAME_NOREPLACE,
-        };
-
-        renameat2(&self.temp_path, &self.path, options).map_err(|e| {
-            PvCoreError::FileAccessRename {
-                src: self.temp_path.as_ref().to_str().unwrap().to_string(),
-                dst: self.path.as_ref().to_str().unwrap().to_string(),
-                source: e,
+        if let Ok(true) = self.path.try_exists() {
+            if operation == AtomicFileOperation::NoReplace {
+                return Err(Error::Io(io::Error::from(io::ErrorKind::AlreadyExists)));
             }
+        }
+
+        rename(&self.temp_path, &self.path).map_err(|e| PvCoreError::FileAccessRename {
+            src: self.temp_path.as_ref().to_str().unwrap().to_string(),
+            dst: self.path.as_ref().to_str().unwrap().to_string(),
+            source: e,
         })?;
         self.forget();
         Ok(())
