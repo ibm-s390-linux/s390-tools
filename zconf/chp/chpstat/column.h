@@ -66,6 +66,7 @@ struct column_t {
 	const char *hdr1_single;
 	char *hdr1_group;
 	unsigned int width;
+	unsigned int pad;
 };
 
 #define column_for_each(c) \

@@ -53,6 +53,7 @@ static struct column_t columns[] = {
 		HDR1_CHP_SINGLE,
 		HDR1_CHP_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_TYPE,
@@ -62,6 +63,7 @@ static struct column_t columns[] = {
 		"TYP",
 		HDR1_CHP_SINGLE,
 		HDR1_CHP_GROUP,
+		0,
 		0,
 	},
 	{
@@ -73,6 +75,7 @@ static struct column_t columns[] = {
 		HDR1_CHP_SINGLE,
 		HDR1_CHP_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_SPEED,
@@ -82,6 +85,7 @@ static struct column_t columns[] = {
 		"SPEED",
 		HDR1_CHP_SINGLE,
 		HDR1_CHP_GROUP,
+		0,
 		0,
 	},
 	{
@@ -93,6 +97,7 @@ static struct column_t columns[] = {
 		HDR1_CHP_SINGLE,
 		HDR1_CHP_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_INTERVAL,
@@ -103,6 +108,7 @@ static struct column_t columns[] = {
 		HDR1_CHP_SINGLE,
 		HDR1_CHP_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_UTIL_PART,
@@ -112,6 +118,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_UTIL_SINGLE,
 		HDR1_UTIL_GROUP,
+		5,
 		0,
 	},
 	{
@@ -122,6 +129,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_UTIL_SINGLE,
 		HDR1_UTIL_GROUP,
+		5,
 		0,
 	},
 	{
@@ -133,6 +141,7 @@ static struct column_t columns[] = {
 		HDR1_UTIL_SINGLE,
 		HDR1_UTIL_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_UTIL_DATA,
@@ -143,6 +152,7 @@ static struct column_t columns[] = {
 		HDR1_UTIL_SINGLE,
 		HDR1_UTIL_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_READ_PART,
@@ -152,6 +162,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_READ_SINGLE,
 		HDR1_READ_GROUP,
+		5,
 		0,
 	},
 	{
@@ -162,6 +173,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_READ_SINGLE,
 		HDR1_READ_GROUP,
+		5,
 		0,
 	},
 	{
@@ -172,6 +184,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_WRITE_SINGLE,
 		HDR1_WRITE_GROUP,
+		5,
 		0,
 	},
 	{
@@ -182,6 +195,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_WRITE_SINGLE,
 		HDR1_WRITE_GROUP,
+		5,
 		0,
 	},
 	{
@@ -193,6 +207,7 @@ static struct column_t columns[] = {
 		HDR1_FICON_SINGLE,
 		HDR1_FICON_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_FICON_ACTIVE,
@@ -202,6 +217,7 @@ static struct column_t columns[] = {
 		"ACTV",
 		HDR1_FICON_SINGLE,
 		HDR1_FICON_GROUP,
+		0,
 		0,
 	},
 	{
@@ -213,6 +229,7 @@ static struct column_t columns[] = {
 		HDR1_FICON_SINGLE,
 		HDR1_FICON_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_HPF_RATE,
@@ -222,6 +239,7 @@ static struct column_t columns[] = {
 		"RATE",
 		HDR1_HPF_SINGLE,
 		HDR1_HPF_GROUP,
+		0,
 		0,
 	},
 	{
@@ -233,6 +251,7 @@ static struct column_t columns[] = {
 		HDR1_HPF_SINGLE,
 		HDR1_HPF_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_HPF_DEFER,
@@ -243,6 +262,7 @@ static struct column_t columns[] = {
 		HDR1_HPF_SINGLE,
 		HDR1_HPF_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_MSG_RATE_PART,
@@ -252,6 +272,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_MSGR_SINGLE,
 		HDR1_MSGR_GROUP,
+		5,
 		0,
 	},
 	{
@@ -262,6 +283,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_MSGR_SINGLE,
 		HDR1_MSGR_GROUP,
+		5,
 		0,
 	},
 	{
@@ -272,6 +294,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_MSGSZ_SINGLE,
 		HDR1_MSGSZ_GROUP,
+		5,
 		0,
 	},
 	{
@@ -282,6 +305,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_MSGSZ_SINGLE,
 		HDR1_MSGSZ_GROUP,
+		5,
 		0,
 	},
 	{
@@ -293,6 +317,7 @@ static struct column_t columns[] = {
 		"SNDFAIL",
 		"SNDFAIL",
 		0,
+		0,
 	},
 	{
 		COL_RCV_FAIL_PART,
@@ -302,6 +327,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_MSG_RCVF_SINGLE,
 		HDR1_MSG_RCVF_GROUP,
+		5,
 		0,
 	},
 	{
@@ -312,6 +338,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_MSG_RCVF_SINGLE,
 		HDR1_MSG_RCVF_GROUP,
+		5,
 		0,
 	},
 	{
@@ -323,6 +350,7 @@ static struct column_t columns[] = {
 		HDR1_DPU_UTIL_SINGLE,
 		HDR1_DPU_UTIL_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_DPU_UTIL,
@@ -333,6 +361,7 @@ static struct column_t columns[] = {
 		HDR1_DPU_UTIL_SINGLE,
 		HDR1_DPU_UTIL_GROUP,
 		0,
+		0,
 	},
 	{
 		COL_DPU_UTIL_PART,
@@ -342,6 +371,7 @@ static struct column_t columns[] = {
 		"PART",
 		HDR1_DPU_UTIL_SINGLE,
 		HDR1_DPU_UTIL_GROUP,
+		5,
 		0,
 	},
 	{
@@ -352,6 +382,7 @@ static struct column_t columns[] = {
 		"TOTAL",
 		HDR1_DPU_UTIL_SINGLE,
 		HDR1_DPU_UTIL_GROUP,
+		5,
 		0,
 	},
 };

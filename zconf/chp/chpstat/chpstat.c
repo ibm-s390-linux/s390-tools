@@ -1278,7 +1278,7 @@ static struct util_rec *define_table(void)
 	rec = util_rec_new_wide(NULL);
 	column_for_each_selected(col) {
 		util_rec_def(rec, col->name, UTIL_REC_ALIGN_RIGHT,
-			     (int)col->width, "");
+			     (int)col->width + (int)col->pad, "");
 	}
 
 	return rec;
@@ -1539,11 +1539,15 @@ static void print_table_header(void)
 {
 	struct column_t *col;
 	unsigned int i, next_i, num, width, hdr_width;
+	const char *last_hdr1 = NULL;
 
 	/* Print first header line and update column width based on heading. */
 	for (i = 0; (col = column_get_by_index(i, true)); i = next_i) {
-		if (i > 0)
-			printf(" ");
+		if (last_hdr1 && strcmp(last_hdr1, col->hdr1_group) != 0) {
+			col->pad = 1;
+			printf("%*s", col->pad + 1, "");
+		}
+		last_hdr1 = col->hdr1_group;
 		get_hdr_group_size(i, &num, &width);
 		if (num == 1) {
 			/* Update column width in case heading is wider. */
@@ -1571,7 +1575,7 @@ static void print_table_header(void)
 	i = 0;
 	column_for_each_selected(col) {
 		if (i++ > 0)
-			printf(" ");
+			printf("%*s", col->pad + 1, "");
 		printf("%*s", col->width, col->hdr2);
 	}
 	printf("\n");
@@ -1678,7 +1682,7 @@ static void calc_column_widths(void)
 		col->width = MAX(col->width, width);
 		/* Double space between groups. */
 		if (last_hdr1 && strcmp(last_hdr1, col->hdr1_group) != 0)
-			col->width++;
+			col->pad++;
 		last_hdr1 = col->hdr1_group;
 	}
 }
