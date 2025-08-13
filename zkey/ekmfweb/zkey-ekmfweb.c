@@ -3937,7 +3937,7 @@ static int _restrict_key(struct plugin_handle *ph, unsigned char *key_blob,
 		return rc;
 	}
 
-	rc = check_aes_cipher_key(key_blob, key_blob_length);
+	rc = check_aes_cipher_key(key_blob, key_blob_length, false);
 	if (rc != 0) {
 		warnx("The secure key retrieved from EKMF Web might not be "
 		      "secure");

@@ -121,6 +121,12 @@ typedef struct {
 
 #define CKR_OK			0x00000000
 
+#define XCP_BLOB_EXTRACTABLE		0x00000001
+#define XCP_BLOB_DECRYPT		0x00000400
+#define XCP_BLOB_ENCRYPT		0x00000800
+#define XCP_BLOB_WRAP_W_TRUSTED		0x00040000
+#define XCP_BLOB_PROTKEY_EXTRACTABLE	0x00200000
+
 typedef int (*m_init_t) (void);
 typedef int (*m_add_module_t) (XCP_Module_t module, target_t *target);
 typedef int (*m_rm_module_t) (XCP_Module_t module, target_t target);

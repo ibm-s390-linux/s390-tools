@@ -313,6 +313,35 @@ static enum pkey_key_size keybits_to_keysize(u32 keybits)
 	}
 }
 
+static u32 flags_for_pkey_type(enum pkey_key_type type, bool exportable,
+			       bool wrap_with_trusted)
+{
+	u32 flags = 0;
+
+	if (!exportable)
+		return 0;
+
+	switch (type) {
+	case PKEY_TYPE_CCA_CIPHER:
+		flags = PKEY_KEYGEN_XPRT_SYM | PKEY_KEYGEN_XPRT_UASY |
+			PKEY_KEYGEN_XPRT_AASY | PKEY_KEYGEN_XPRT_RAW |
+			PKEY_KEYGEN_XPRT_CPAC | PKEY_KEYGEN_XPRT_DES |
+			PKEY_KEYGEN_XPRT_AES | PKEY_KEYGEN_XPRT_RSA;
+		break;
+	case PKEY_TYPE_EP11:
+	case PKEY_TYPE_EP11_AES:
+		flags = XCP_BLOB_EXTRACTABLE | XCP_BLOB_DECRYPT |
+			XCP_BLOB_ENCRYPT | XCP_BLOB_PROTKEY_EXTRACTABLE;
+		if (wrap_with_trusted)
+			flags |= XCP_BLOB_WRAP_W_TRUSTED;
+		break;
+	default:
+		break;
+	}
+
+	return flags;
+}
+
 /*
  * Wrapper for the PKEY_GENSECK/PKEY_GENSECK2 IOCTL to generate a secure
  * key of any type by random. If the newer PKEY_GENSECK2 IOCTL is not supported
@@ -887,6 +916,16 @@ static size_t key_size_for_type(enum pkey_key_type type)
 	}
 }
 
+static void print_error_for_ep11_exportable(void)
+{
+	util_print_indented("Generating an exportable key of type "
+			    KEY_TYPE_EP11_AES " requires that access control "
+			    "point (ACP) 'XCP_CPB_ALLOW_COMBINED_EXTRACT' is "
+			    "'ON' on all used APQNs. This access control point "
+			    "is only supported on newer EP11 firmware levels.",
+			    0);
+}
+
 /**
  * Generate a secure key by random
  *
@@ -897,13 +936,17 @@ static size_t key_size_for_type(enum pkey_key_type type)
  * @param[in] key_type      the type of the key
  * @param[in] apqns         a zero terminated array of pointers to APQN-strings,
  *                          or NULL for AUTOSELECT
+ * @param[in] exportable    if true the key shall be exportable
+ * @param[in] wrap_with_trusted  if true the key shall be wrapable with a
+ *                          trusted KEK only
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
  */
 int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			       size_t keybits, bool xts, const char *key_type,
-			       const char **apqns, bool verbose)
+			       const char **apqns, bool exportable,
+			       bool wrap_with_trusted, bool verbose)
 {
 	struct pkey_genseck2 genseck2;
 	size_t secure_key_size, size;
@@ -960,6 +1003,9 @@ retry:
 	genseck2.key = secure_key;
 	genseck2.keylen = size;
 
+	genseck2.keygenflags = flags_for_pkey_type(genseck2.type, exportable,
+						   wrap_with_trusted);
+
 	rc = pkey_genseck2(pkey_fd, &genseck2, verbose);
 	if (rc == -EINVAL && genseck2.type == PKEY_TYPE_EP11_AES) {
 		/*
@@ -979,6 +1025,9 @@ retry:
 	}
 	if (rc != 0) {
 		warnx("Failed to generate a secure key: %s", strerror(-rc));
+		if (exportable &&
+		    strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+			print_error_for_ep11_exportable();
 		goto out;
 	}
 	if (rc == 0 && genseck2.type == PKEY_TYPE_EP11) {
@@ -1016,10 +1065,17 @@ retry:
 		genseck2.key = secure_key + size;
 		genseck2.keylen = size;
 
+		genseck2.keygenflags = flags_for_pkey_type(genseck2.type,
+							   exportable,
+							   wrap_with_trusted);
+
 		rc = pkey_genseck2(pkey_fd, &genseck2, verbose);
 		if (rc != 0) {
 			warnx("Failed to generate a secure key: %s",
 			      strerror(-rc));
+			if (exportable &&
+			    strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+				print_error_for_ep11_exportable();
 			goto out;
 		}
 	}
@@ -1048,6 +1104,9 @@ out:
  * @param[in] key_type      the type of the key
  * @param[in] apqns         a zero terminated array of pointers to APQN-strings,
  *                          or NULL for AUTOSELECT
+ * @param[in] exportable    if true the key shall be exportable
+ * @param[in] wrap_with_trusted  if true the key shall be wrapable with a
+ *                        trusted KEK only
  * @param[in] verbose       if true, verbose messages are printed
  *
  * @returns 0 on success, a negative errno in case of an error
@@ -1055,7 +1114,8 @@ out:
 int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      size_t keybits, bool xts,
 			      const char *clearkeyfile, const char *key_type,
-			      const char **apqns, bool verbose)
+			      const char **apqns, bool exportable,
+			      bool wrap_with_trusted, bool verbose)
 {
 	struct pkey_clr2seck2 clr2seck2;
 	size_t secure_key_size;
@@ -1123,6 +1183,9 @@ retry:
 	clr2seck2.key = secure_key;
 	clr2seck2.keylen = size;
 
+	clr2seck2.keygenflags = flags_for_pkey_type(clr2seck2.type, exportable,
+						    wrap_with_trusted);
+
 	rc = pkey_clr2seck2(pkey_fd, &clr2seck2, verbose);
 	if (rc == -EINVAL && clr2seck2.type == PKEY_TYPE_EP11_AES) {
 		/*
@@ -1142,6 +1205,9 @@ retry:
 	}
 	if (rc != 0) {
 		warnx("Failed to generate a secure key: %s", strerror(-rc));
+		if (exportable &&
+		    strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+			print_error_for_ep11_exportable();
 		goto out;
 	}
 	if (rc == 0 && clr2seck2.type == PKEY_TYPE_EP11) {
@@ -1182,10 +1248,17 @@ retry:
 		clr2seck2.key = secure_key + size;
 		clr2seck2.keylen = size;
 
+		clr2seck2.keygenflags = flags_for_pkey_type(clr2seck2.type,
+							    exportable,
+							    wrap_with_trusted);
+
 		rc = pkey_clr2seck2(pkey_fd, &clr2seck2, verbose);
 		if (rc != 0) {
 			warnx("Failed to generate a secure key: %s",
 			      strerror(-rc));
+			if (exportable &&
+			    strcasecmp(key_type, KEY_TYPE_EP11_AES) == 0)
+				print_error_for_ep11_exportable();
 			goto out;
 		}
 	}
@@ -2044,10 +2117,11 @@ enum card_type get_card_type_for_keytype(const char *key_type)
  *
  * @param[in] key           the secure key token
  * @param[in] key_size      the size of the secure key
+ * @param[in] exportable    if true the key shall be exportable
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-int check_aes_cipher_key(const u8 *key, size_t key_size)
+int check_aes_cipher_key(const u8 *key, size_t key_size, bool exportable)
 {
 	struct aescipherkeytoken *cipherkey = (struct aescipherkeytoken *)key;
 	bool mismatch = false;
@@ -2072,22 +2146,22 @@ int check_aes_cipher_key(const u8 *key, size_t key_size)
 		mismatch = true;
 	}
 
-	if (cipherkey->kmf1 & 0x8000) {
+	if (!exportable && (cipherkey->kmf1 & 0x8000)) {
 		printf("WARNING: The secure key can be exported using a "
 		       "symmetric key\n");
 		mismatch = true;
 	}
-	if (cipherkey->kmf1 & 0x4000) {
+	if (!exportable && (cipherkey->kmf1 & 0x4000)) {
 		printf("WARNING: The secure key can be exported using an "
 		       "unauthenticated asymmetric key\n");
 		mismatch = true;
 	}
-	if (cipherkey->kmf1 & 0x2000) {
+	if (!exportable && (cipherkey->kmf1 & 0x2000)) {
 		printf("WARNING: The secure key can be exported using an "
 		       "authenticated asymmetric key\n");
 		mismatch = true;
 	}
-	if (cipherkey->kmf1 & 0x1000) {
+	if (!exportable && (cipherkey->kmf1 & 0x1000)) {
 		printf("WARNING: The secure key can be exported using a RAW "
 		       "key\n");
 		mismatch = true;
@@ -2097,17 +2171,17 @@ int check_aes_cipher_key(const u8 *key, size_t key_size)
 		       "CPACF protected key\n");
 		mismatch = true;
 	}
-	if ((cipherkey->kmf1 & 0x0080) == 0) {
+	if (!exportable && (cipherkey->kmf1 & 0x0080) == 0) {
 		printf("WARNING: The secure key can be exported using a DES "
 		       "key\n");
 		mismatch = true;
 	}
-	if ((cipherkey->kmf1 & 0x0040) == 0) {
+	if (!exportable && (cipherkey->kmf1 & 0x0040) == 0) {
 		printf("WARNING: The secure key can be exported using an AES "
 		       "key\n");
 		mismatch = true;
 	}
-	if ((cipherkey->kmf1 & 0x0008) == 0) {
+	if (!exportable && (cipherkey->kmf1 & 0x0008) == 0) {
 		printf("WARNING: The secure key can be exported using an RSA "
 		       "key\n");
 		mismatch = true;
@@ -2161,7 +2235,7 @@ int check_aes_cipher_key(const u8 *key, size_t key_size)
 		       "value\n");
 		mismatch = true;
 	}
-	if ((cipherkey->kmf3 & 0x00FF) == 0x0012)	{
+	if (!exportable && (cipherkey->kmf3 & 0x00FF) == 0x0012)	{
 		printf("WARNING: The secure key was converted from a CCA "
 		       "key-token that had no export control attributes\n");
 		mismatch = true;

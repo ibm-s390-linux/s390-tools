@@ -674,7 +674,7 @@ int pvsecrets_import(struct keystore *keystore, int uv_fd,
 	rc = keystore_import(keystore, (unsigned char *)&build_blob_data.token,
 			     sizeof(build_blob_data.token), name, description,
 			     volumes, NULL, false, sector_size, volume_type,
-			     gen_passphrase, passphrase_file, NULL);
+			     gen_passphrase, passphrase_file, false, NULL);
 
 	return rc;
 }

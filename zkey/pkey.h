@@ -330,12 +330,14 @@ int open_pkey_device(bool verbose);
 
 int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			       size_t keybits, bool xts, const char *key_type,
-			       const char **apqns, bool verbose);
+			       const char **apqns, bool exportable,
+			       bool wrap_with_trusted, bool verbose);
 
 int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      size_t keybits, bool xts,
 			      const char *clearkeyfile, const char *key_type,
-			      const char **apqns, bool verbose);
+			      const char **apqns, bool exportable,
+			      bool wrap_with_trusted, bool verbose);
 
 u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 		    bool verbose);
@@ -373,7 +375,7 @@ bool is_secure_key_type(const char *key_type);
 int get_min_card_level_for_keytype(const char *key_type);
 const struct fw_version *get_min_fw_version_for_keytype(const char *key_type);
 enum card_type get_card_type_for_keytype(const char *key_type);
-int check_aes_cipher_key(const u8 *key, size_t key_size);
+int check_aes_cipher_key(const u8 *key, size_t key_size, bool exportable);
 
 enum reencipher_method {
 	REENCIPHER_OLD_TO_CURRENT = 1,

@@ -55,7 +55,8 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 			  size_t sector_size, size_t keybits, bool xts,
 			  const char *clear_key_file, const char *volume_type,
 			  const char *key_type, bool gen_passphrase,
-			  const char *passphrase_file, int pkey_fd);
+			  const char *passphrase_file, bool exportable,
+			  bool wrap_with_trusted, int pkey_fd);
 
 int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 			      const char *description, const char *volumes,
@@ -70,14 +71,15 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 		    const char *description, const char *volumes,
 		    const char *apqns, bool noapqncheck, size_t sector_size,
 		    const char *volume_type, bool gen_passphrase,
-		    const char *passphrase_file, struct ext_lib *lib);
+		    const char *passphrase_file, bool exportable,
+		    struct ext_lib *lib);
 
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type,
 			bool gen_passphrase, const char *passphrase_file,
-			struct ext_lib *lib);
+			bool exportable, struct ext_lib *lib);
 
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
@@ -126,7 +128,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
 
 int keystore_convert_key(struct keystore *keystore, const char *name,
 			 const char *key_type, bool noapqncheck, bool quiet,
-			 int pkey_fd, struct ext_lib *lib);
+			 bool exportable, int pkey_fd, struct ext_lib *lib);
 
 int keystore_kms_keys_set_property(struct keystore *keystore,
 				   const char *key_type,

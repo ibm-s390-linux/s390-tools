@@ -1983,6 +1983,9 @@ out:
  * @param[in] gen_passphrase if true, generate a (dummy) passphrase for LUKS2
  * @param[in] passphrase_file the file name of a file containing a passphrase
  *                        for LUKS2 (optional, can be NULL)
+ * @param[in] exportable  if true the key shall be exportable
+ * @param[in] wrap_with_trusted  if true the key shall be wrapable with a
+ *                        trusted KEK only
  * @param[in] pkey_fd     the file descriptor of /dev/pkey
  *
  * @returns 0 for success or a negative errno in case of an error
@@ -1993,7 +1996,8 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 			  size_t sector_size, size_t keybits, bool xts,
 			  const char *clear_key_file, const char *volume_type,
 			  const char *key_type, bool gen_passphrase,
-			  const char *passphrase_file, int pkey_fd)
+			  const char *passphrase_file, bool exportable,
+			  bool wrap_with_trusted, int pkey_fd)
 {
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
@@ -2043,6 +2047,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 						file_names.skey_filename,
 						keybits, xts, key_type,
 						(const char **)apqn_list,
+						exportable, wrap_with_trusted,
 						keystore->verbose);
 	else
 		rc = generate_secure_key_clear(pkey_fd,
@@ -2050,6 +2055,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 					       keybits, xts, clear_key_file,
 					       key_type,
 					       (const char **)apqn_list,
+					       exportable, wrap_with_trusted,
 					       keystore->verbose);
 	if (rc != 0)
 		goto out_free_props;
@@ -2286,6 +2292,7 @@ out_free_key_filenames:
  * @param[in] gen_passphrase if true, generate a (dummy) passphrase for LUKS2
  * @param[in] passphrase_file the file name of a file containing a passphrase
  *                        for LUKS2 (optional, can be NULL)
+ * @param[in] exportable  if true the key shall be exportable
  * @param[in] lib         the external library struct
  *
  * @returns 0 for success or a negative errno in case of an error
@@ -2295,7 +2302,8 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 		    const char *description, const char *volumes,
 		    const char *apqns, bool noapqncheck, size_t sector_size,
 		    const char *volume_type, bool gen_passphrase,
-		    const char *passphrase_file, struct ext_lib *lib)
+		    const char *passphrase_file, bool exportable,
+		    struct ext_lib *lib)
 {
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
@@ -2375,17 +2383,22 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 			goto out_free_props;
 		}
 
-		rc = restrict_key_export(lib->cca, secure_key, secure_key_size,
-					 keystore->verbose);
-		if (rc != 0) {
-			warnx("Failed to export-restrict the imported secure "
-			      "key: %s", strerror(-rc));
-			if (!selected)
-				print_msg_for_cca_envvars("secure AES key");
-			goto out_free_props;
+		if (!exportable) {
+			rc = restrict_key_export(lib->cca, secure_key,
+						 secure_key_size,
+						 keystore->verbose);
+			if (rc != 0) {
+				warnx("Failed to export-restrict the imported "
+				      "secure key: %s", strerror(-rc));
+				if (!selected)
+					print_msg_for_cca_envvars("secure AES "
+								  "key");
+				goto out_free_props;
+			}
 		}
 
-		rc = check_aes_cipher_key(secure_key, secure_key_size);
+		rc = check_aes_cipher_key(secure_key, secure_key_size,
+					  exportable);
 		if (rc != 0) {
 			warnx("The secure key to import might not be secure");
 			printf("%s: Do you want to import it anyway [y/N]? ",
@@ -2455,6 +2468,7 @@ out_free_key_filenames:
  * @param[in] gen_passphrase if true, generate a (dummy) passphrase for LUKS2
  * @param[in] passphrase_file the file name of a file containing a passphrase
  *                        for LUKS2 (optional, can be NULL)
+ * @param[in] exportable  if true the key shall be exportable
  * @param[in] lib         the external library struct
  *
  * @returns 0 for success or a negative errno in case of an error
@@ -2464,7 +2478,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type,
 			bool gen_passphrase, const char *passphrase_file,
-			struct ext_lib *lib)
+			bool exportable, struct ext_lib *lib)
 {
 	size_t secure_key_size;
 	u8 *secure_key;
@@ -2480,7 +2494,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	rc = keystore_import(keystore, secure_key, secure_key_size, name,
 			     description, volumes, apqns, noapqncheck,
 			     sector_size, volume_type, gen_passphrase,
-			     passphrase_file, lib);
+			     passphrase_file, exportable, lib);
 
 	if (secure_key != NULL)
 		free(secure_key);
@@ -4797,6 +4811,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
  * @param[in] key_type     the type of the key to convert it to
  * @param[in] noapqncheck  if true, the specified APQN(s) are not checked for
  *                         existence and type.
+ * @param[in] exportable   if true the key shall be exportable
  * @param[in] pkey_fd      the file descriptor of /dev/pkey
  * @param[in] lib          the external library struct
  *
@@ -4804,7 +4819,7 @@ int keystore_crypttab(struct keystore *keystore, const char *volume_filter,
  */
 int keystore_convert_key(struct keystore *keystore, const char *name,
 			 const char *key_type, bool noapqncheck, bool quiet,
-			 int pkey_fd, struct ext_lib *lib)
+			 bool exportable, int pkey_fd, struct ext_lib *lib)
 {
 	struct key_filenames file_names = { 0 };
 	u8 output_key[2 * MAX_SECURE_KEY_SIZE];
@@ -4941,14 +4956,16 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
-	rc = restrict_key_export(lib->cca, output_key, output_key_size,
-				 keystore->verbose);
-	if (rc != 0) {
-		warnx("Export restricting the converted secure key '%s' has "
-		      "failed", name);
-		if (!selected)
-			print_msg_for_cca_envvars("secure AES key");
-		goto out;
+	if (!exportable) {
+		rc = restrict_key_export(lib->cca, output_key, output_key_size,
+					 keystore->verbose);
+		if (rc != 0) {
+			warnx("Export restricting the converted secure key "
+			      "'%s' has failed", name);
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
+			goto out;
+		}
 	}
 
 	rc = properties_set2(properties, PROP_NAME_KEY_TYPE, key_type, true);

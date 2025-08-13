@@ -83,6 +83,8 @@ static struct zkey_globals {
 	bool gen_passphrase;
 	char *passphrase_file;
 	bool remove_passphrase;
+	bool exportable;
+	bool wrap_with_trusted;
 	bool kms_bound;
 	bool run;
 	bool batch_mode;
@@ -173,6 +175,8 @@ static struct zkey_globals {
 #define OPT_GEN_DUMMY_PASSPHRASE	265
 #define OPT_SET_DUMMY_PASSPHRASE	266
 #define OPT_REMOVE_DUMMY_PASSPHRASE	267
+#define OPT_EXPORTABLE			268
+#define OPT_WRAP_WITH_TRUSTED		269
 
 /*
  * Configuration of command line options
@@ -312,6 +316,28 @@ static struct util_opt opt_vec[] = {
 			"stored insecurely inside the secure key repository.",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 		.command = COMMAND_GENERATE,
+	},
+	{
+		.option = {"exportable", 0, NULL, OPT_EXPORTABLE},
+		.desc = "Generate a secure AES key that is not export "
+			"restricted. Exportable keys can be exported by means "
+			"of wrapping them with a key encryption key (KEK). By "
+			"default keys of type " KEY_TYPE_CCA_AESCIPHER " and "
+			KEY_TYPE_EP11_AES " are export restricted, and thus can "
+			"not be wrapped by a KEK. Keys of type "
+			KEY_TYPE_CCA_AESDATA " are always exportable, and can "
+			"not be export restricted.",
+		.command = COMMAND_GENERATE,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+	},
+	{
+		.option = {"wrap-with-trusted", 0, NULL, OPT_WRAP_WITH_TRUSTED},
+		.desc = "Generate a secure AES key that can only be wrapped "
+			"with a trusted key encryption key (KEK). This option "
+			"is only valid for keys of type " KEY_TYPE_EP11_AES
+			" and only if option '--exportable' is also specified.",
+		.command = COMMAND_GENERATE,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	/***********************************************************/
 	{
@@ -495,6 +521,19 @@ static struct util_opt opt_vec[] = {
 			"stored insecurely inside the secure key repository.",
 		.flags = UTIL_OPT_FLAG_NOSHORT,
 		.command = COMMAND_IMPORT,
+	},
+	{
+		.option = {"exportable", 0, NULL, OPT_EXPORTABLE},
+		.desc = "Allow to import a secure AES key that is not export "
+			"restricted. Exportable keys can be exported by means "
+			"of wrapping them with a key encryption key (KEK). By "
+			"default keys of type " KEY_TYPE_CCA_AESCIPHER " and "
+			KEY_TYPE_EP11_AES " are export restricted, and thus can "
+			"not be wrapped by a KEK. Keys of type "
+			KEY_TYPE_CCA_AESDATA " are always exportable, and can "
+			"not be export restricted.",
+		.command = COMMAND_IMPORT,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	/***********************************************************/
 	{
@@ -968,6 +1007,14 @@ static struct util_opt opt_vec[] = {
 		.desc = "Do not prompt for a confirmation when converting a "
 			"key",
 		.command = COMMAND_CONVERT,
+	},
+	{
+		.option = {"exportable", 0, NULL, OPT_EXPORTABLE},
+		.desc = "Convert to an secure AES key that is not export "
+			"restricted. Exportable keys can be exported by means "
+			"of wrapping them with a key encryption key (KEK).",
+		.command = COMMAND_CONVERT,
+		.flags = UTIL_OPT_FLAG_NOSHORT,
 	},
 	/***********************************************************/
 	{
@@ -1891,7 +1938,8 @@ static int command_generate_clear(void)
 	rc = generate_secure_key_clear(g.pkey_fd, g.pos_arg,
 				       g.keybits, g.xts,
 				       g.clearkeyfile, g.key_type,
-				       NULL, g.verbose);
+				       NULL, g.exportable, g.wrap_with_trusted,
+				       g.verbose);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1907,7 +1955,8 @@ static int command_generate_random(void)
 
 	rc = generate_secure_key_random(g.pkey_fd, g.pos_arg,
 					g.keybits, g.xts, g.key_type,
-					NULL, g.verbose);
+					NULL, g.exportable, g.wrap_with_trusted,
+					g.verbose);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -1948,6 +1997,17 @@ static int command_generate_repository(void)
 			return EXIT_FAILURE;
 		}
 
+		if (g.exportable) {
+			warnx("Option '--exportable' is not supported for "
+			      "generating a key in a KMS-bound repository");
+			return EXIT_FAILURE;
+		}
+		if (g.wrap_with_trusted) {
+			warnx("Option '--wrap-with-trusted' is not supported "
+			      "for generating a key in a KMS-bound repository");
+			return EXIT_FAILURE;
+		}
+
 		rc = perform_kms_login(&g.kms_info, g.verbose);
 		if (rc != 0)
 			rc = EXIT_FAILURE;
@@ -1966,11 +2026,25 @@ static int command_generate_repository(void)
 	if (g.key_type == NULL)
 		g.key_type = KEY_TYPE_CCA_AESDATA;
 
+	if (g.wrap_with_trusted) {
+		if (!g.exportable) {
+			warnx("Option '--wrap-with-trusted' is only valid "
+			      "together with the '--exportable' option");
+			return EXIT_FAILURE;
+		}
+		if (strcasecmp(g.key_type, KEY_TYPE_EP11_AES) != 0) {
+			warnx("Option '--wrap-with-trusted' is only valid for "
+			      "keys of type '%s'", KEY_TYPE_EP11_AES);
+			return EXIT_FAILURE;
+		}
+	}
+
 	rc = keystore_generate_key(g.keystore, g.name, g.description, g.volumes,
 				   g.apqns, g.noapqncheck, g.sector_size,
 				   g.keybits, g.xts, g.clearkeyfile,
 				   g.volume_type, g.key_type, g.gen_passphrase,
-				   g.passphrase_file, g.pkey_fd);
+				   g.passphrase_file, g.exportable,
+				   g.wrap_with_trusted, g.pkey_fd);
 
 out:
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -2006,6 +2080,18 @@ static int command_generate(void)
 		warnx("Keys of type '%s' can not be generated. Use 'zkey "
 		      "pvsecret import' instead", g.key_type);
 		return -EXIT_FAILURE;
+	}
+	if (g.wrap_with_trusted) {
+		if (!g.exportable) {
+			warnx("Option '--wrap-with-trusted' is only valid "
+			      "together with the '--exportable' option");
+			return EXIT_FAILURE;
+		}
+		if (strcasecmp(g.key_type, KEY_TYPE_EP11_AES) != 0) {
+			warnx("Option '--wrap-with-trusted' is only valid for "
+			      "keys of type '%s'", KEY_TYPE_EP11_AES);
+			return EXIT_FAILURE;
+		}
 	}
 	if (g.pos_arg != NULL) {
 		if (g.volumes != NULL) {
@@ -2463,7 +2549,7 @@ static int command_import(void)
 	rc = keystore_import_key(g.keystore, g.name, g.description, g.volumes,
 				 g.apqns, g.noapqncheck, g.sector_size,
 				 g.pos_arg, g.volume_type, g.gen_passphrase,
-				 g.passphrase_file, &g.lib);
+				 g.passphrase_file, g.exportable, &g.lib);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -2816,14 +2902,17 @@ static int command_convert_file(void)
 		goto out;
 	}
 
-	rc = restrict_key_export(&g.cca, output_key, output_key_size,
-				 g.verbose);
-	if (rc != 0) {
-		warnx("Export restricting the converted secure key has failed");
-		if (!selected)
-			print_msg_for_cca_envvars("secure AES key");
-		rc = EXIT_FAILURE;
-		goto out;
+	if (!g.exportable) {
+		rc = restrict_key_export(&g.cca, output_key, output_key_size,
+					 g.verbose);
+		if (rc != 0) {
+			warnx("Export restricting the converted secure key "
+			      "has failed");
+			if (!selected)
+				print_msg_for_cca_envvars("secure AES key");
+			rc = EXIT_FAILURE;
+			goto out;
+		}
 	}
 
 	pr_verbose("Secure key was converted successfully");
@@ -2853,7 +2942,7 @@ static int command_convert_repository(void)
 	}
 
 	rc = keystore_convert_key(g.keystore, g.name, g.key_type, g.noapqncheck,
-				  g.force, g.pkey_fd, &g.lib);
+				  g.force, g.exportable, g.pkey_fd, &g.lib);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -3518,6 +3607,12 @@ int main(int argc, char *argv[])
 			break;
 		case OPT_REMOVE_DUMMY_PASSPHRASE:
 			g.remove_passphrase = 1;
+			break;
+		case OPT_EXPORTABLE:
+			g.exportable = 1;
+			break;
+		case OPT_WRAP_WITH_TRUSTED:
+			g.wrap_with_trusted = 1;
 			break;
 		case 'A':
 			g.all = 1;
