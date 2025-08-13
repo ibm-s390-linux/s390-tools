@@ -1941,7 +1941,7 @@ static int command_generate_repository(void)
 		}
 
 		if (g.clearkeyfile != NULL) {
-			warnx("Option '----clearkey|-c' is not valid for "
+			warnx("Option '--clearkey|-c' is not valid for "
 			      "generating a key in a KMS-bound repository, "
 			      "unless option '--local|-L' is also specified");
 			util_prg_print_parse_error();
