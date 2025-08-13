@@ -66,7 +66,7 @@ impl<F> AsMut<F> for AtomicFile<F> {
 }
 
 /// Enum used for more verbosity.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum AtomicFileOperation {
     /// Replace existing file
     Replace,
