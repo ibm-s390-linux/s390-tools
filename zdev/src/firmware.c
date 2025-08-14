@@ -29,6 +29,7 @@
 #include "export.h"
 #include "firmware.h"
 #include "misc.h"
+#include "path.h"
 #include "qeth.h"
 #include "subtype.h"
 #include "zfcp_host.h"
@@ -142,6 +143,13 @@ struct fw_qeth {
 	struct fw_iodevid data_id;
 	char settings[];
 } __packed;
+
+/* Dasd types definitions for rd.dasd parser */
+enum dasd_type {
+	DASD_NO_DEVICE,
+	DASD_ECKD,
+	DASD_NO_ECKD,
+};
 
 /* Emit a warning that refers to a position in a firmware file. */
 static void fwwarn(struct fw_file *f, const char *fmt, ...)
@@ -491,13 +499,49 @@ static struct device *add_device(struct fw_file *f, struct subtype *st,
 	return dev;
 }
 
+/* Return the device-type of the provided device-id by analysing modalias */
+static enum dasd_type is_eckd(const char *id)
+{
+	const char * const eckd_type[] = { "3390", "3380", "9345" };
+	size_t i;
+	char *device_path, *buffer;
+	int rc = DASD_NO_ECKD;
+
+	/* Remove the device-id from the blacklist */
+	ccw_unblacklist_id(id);
+
+	/* Do a cio_settle before trying to read the modalias */
+	cio_settle(1);
+
+	device_path = path_get_ccw_device(NULL, id);
+	/* Read the modalias value */
+	buffer = path_read_text_file(1, err_ignore, "%s/modalias",
+				     device_path);
+	if (!buffer) {
+		rc = DASD_NO_DEVICE;
+		goto out;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(eckd_type); i++) {
+		if (strstr(buffer, eckd_type[i])) {
+			rc = DASD_ECKD;
+			goto out;
+		}
+	}
+
+out:
+	free(buffer);
+	free(device_path);
+	return rc;
+}
+
 /* Parse a DASD device entry. */
 static void parse_dasd(struct fw_file *f, struct fw_dehdr *de, config_t config,
 		       struct util_list *objects)
 {
 	struct fw_dasd *dasd = (struct fw_dasd *) de;
 	struct ccw_devid devid;
-	struct device *dev_eckd, *dev_fba;
+	struct device *dev_eckd = NULL, *dev_fba = NULL;
 	char *id;
 
 	if (!check_de_size(f, de, sizeof(struct fw_dasd)))
@@ -508,8 +552,22 @@ static void parse_dasd(struct fw_file *f, struct fw_dehdr *de, config_t config,
 	/* Could be either dasd_eckd or dasd_fba - add both entries */
 	io_to_ccw(&devid, &dasd->id);
 	id = ccw_devid_to_str(&devid);
-	dev_eckd = add_device(f, &dasd_subtype_eckd, id, config, objects);
-	dev_fba = add_device(f, &dasd_subtype_fba, id, config, objects);
+
+	switch (is_eckd(id)) {
+	case DASD_ECKD:
+		dev_eckd = add_device(f, &dasd_subtype_eckd, id, config,
+				      objects);
+		break;
+	case DASD_NO_ECKD:
+		dev_fba = add_device(f, &dasd_subtype_fba, id, config, objects);
+		break;
+	case DASD_NO_DEVICE:
+		fwwarn(f, "DASD device %s does not exist", id);
+		break;
+	default:
+		break;
+	}
+
 	free(id);
 
 	if (dasd->hdr.len > sizeof(struct fw_dasd)) {
