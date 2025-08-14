@@ -1302,11 +1302,28 @@ collect_kvm() {
 
 		# domain/guest specific commands
 		domain_list=$(virsh list --all --name)
+		path="/machine/sclp/s390-sclp-event-facility/sclpcpi"
+		props="timestamp\
+			system_name\
+			system_type\
+			system_level\
+			sysplex_name"
 		if test -n "${domain_list}"; then
 			for domain in ${domain_list}; do
 				call_run_command "virsh dominfo ${domain}" "${OUTPUT_FILE_KVM}"
 				call_run_command "virsh domblklist ${domain}" "${OUTPUT_FILE_KVM}"
 				call_run_command "virsh domstats ${domain}" "${OUTPUT_FILE_KVM}"
+				for prop in ${props}; do
+					qm=$(printf '{
+						"execute": "qom-get",
+						"arguments": {
+							"path": "%s",
+							"property": "%s"
+							}
+						}' "${path}" "${prop}")
+					call_run_command "virsh qemu-monitor-command ${domain} \
+						--pretty '${qm}'" "${OUTPUT_FILE_KVM}"
+				done
 			done
 		else
 			echo "no KVM domains found" | tee -a ${OUTPUT_FILE_KVM}
