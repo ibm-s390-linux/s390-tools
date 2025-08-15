@@ -1200,7 +1200,7 @@ scan_check_target_data(char* keyword[], int* line)
 		return -1;
 	case target_type_scsi:
 	case target_type_fba:
-		if ((keyword[(int) scan_keyword_targetgeometry] == 0))
+		if (keyword[(int) scan_keyword_targetgeometry] == 0)
 			break;
 		if (line != NULL)
 			error_reason("Line %d: keyword "
