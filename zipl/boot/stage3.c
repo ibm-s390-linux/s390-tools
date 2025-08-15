@@ -525,8 +525,12 @@ void start(void)
 	*(unsigned long long *)INITRD_START = _stage3_parms.initrd_addr;
 	*(unsigned long long *)INITRD_SIZE = _stage3_parms.initrd_len;
 
-	/* store address of new kernel to 0 to be able to start it */
-	*(unsigned long long *)0 = _stage3_parms.load_psw;
+	/*
+	 * store address of new kernel to 0 to be able to start it.
+	 * -fno-delete-null-pointer-checks allows us to dereference 0 here,
+	 * which otherwise would be an UB.
+	 */
+	*(volatile unsigned long long *)0 = _stage3_parms.load_psw;
 
 	kdump_stage3();
 
