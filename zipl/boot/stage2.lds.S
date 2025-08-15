@@ -32,22 +32,22 @@ SECTIONS
   . = STAGE2_LOAD_ADDRESS;
   .stage2.head : { *(.stage2.head) }
   . = STAGE2_ENTRY;
-  .text.start : {
+  .text : {
     *(.text.start)
+    *(.text .text.*)
   }
-  .text : { *(.text) }
   __ex_table_start = .;
   .ex_table : { *(.ex_table) }
   __ex_table_stop = .;
-  .rodata : {*(.rodata) }
-  .data : { *(.data) }
+  .rodata : { *(.rodata .rodata.*) }
+  .data : { *(.data .data.*) }
   __stage2_params = .;
 
   . = STAGE2DUMP_TAIL_ADDRESS;
   .stage2dump.tail : { *(.stage2dump.tail) }
 
   __bss_start = .;
-  .bss : { *(.bss) }
+  .bss : { *(.bss .bss.*) }
   __bss_stop = .;
 
   . = STAGE2_HEAP_ADDRESS;

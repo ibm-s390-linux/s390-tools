@@ -34,26 +34,29 @@ SECTIONS
   _stage3_parms = .;
 
   . = STAGE3_ENTRY;
-  .text.start : { *(.text.start) }
-  .text : { *(.text) }
+  .text : {
+    *(.text.start)
+    *(.text .text.*)
+  }
   __ex_table_start = .;
   .ex_table : { *(.ex_table) }
   __ex_table_stop = .;
 
   __bss_start = .;
-  .bss : { *(.bss) }
+  .bss : { *(.bss .bss.*) }
   __bss_stop = .;
-  .rodata : {*(.rodata) }
-  .data : { *(.data) }
+  .rodata : {*(.rodata .rodata.*) }
+  .data : { *(.data .data.*) }
 
   /* Trailer needed for Secure Boot */
-  . = COMMAND_LINE_EXTRA - 32;
+  . = COMMAND_LINE_EXTRA - SIZEOF(.sb.trailer);
   .sb.trailer : {
     QUAD(0x0000c00000000000)
     QUAD(STAGE3_ENTRY + PSW_LOAD)
     QUAD(STAGE3_ENTRY)
     QUAD(0x000000207a49504c)
   }
+  ASSERT(SIZEOF(.sb.trailer) == 32, "Invalid .sb.trailer size")
 
   . = COMMAND_LINE_EXTRA;
   .cmdline_extra : {

@@ -33,15 +33,15 @@ SECTIONS
   __stage2_head = .;
   .stage2.head : { *(.stage2.head) }
   . = STAGE2_ENTRY;
-  .text.start : {
+  .text : {
     *(.text.start)
+    *(.text .text.*)
   }
-  .text : { *(.text) }
   __ex_table_start = .;
   .ex_table : { *(.ex_table) }
   __ex_table_stop = .;
-  .rodata : {*(.rodata) }
-  .data : { *(.data) }
+  .rodata : {*(.rodata .rodata.*) }
+  .data : { *(.data .data.*) }
 
   . = STAGE2DUMP_TAIL_ADDRESS;
   .stage2dump.tail : { *(.stage2dump.tail)
@@ -59,7 +59,7 @@ SECTIONS
   .eckd2dump_mv.tail : { *(.eckd2dump_mv.tail) }
 #endif
   __bss_start = .;
-  .bss : { *(.bss) }
+  .bss : { *(.bss .bss.*) }
   __bss_stop = .;
 
   . = ECKD2DUMP_HEAP_ADDRESS;
