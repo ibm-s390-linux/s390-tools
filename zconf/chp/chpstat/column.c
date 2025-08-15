@@ -486,7 +486,7 @@ void column_update_bps_suffix(bool auto_scale, char suffix_char)
 	if (auto_scale)
 		util_asprintf(&str, "(B/s)");
 	else if (suffix_char)
-		util_asprintf(&str, "(%ciB/s)", suffix_char);
+		util_asprintf(&str, "(%cB/s)", suffix_char);
 	else
 		str = util_strdup("(*)");
 

@@ -459,6 +459,30 @@ static void parse_cmgs(char *arg)
 	}
 }
 
+static bool suffix_to_unit(char *arg, unsigned long *unit_ptr, char *suffix_ptr)
+{
+	const char *suffixes = "KMGT";
+	unsigned long unit, base;
+	size_t len = strlen(arg);
+	char suffix;
+	int i;
+
+	if (len != 1)
+		return false;
+	suffix = (char)toupper(*arg);
+	base = UNIT_DEC;
+	unit = base;
+	for (i = 0; suffixes[i]; i++) {
+		if (suffix == suffixes[i]) {
+			*unit_ptr = unit;
+			*suffix_ptr = suffix;
+			return true;
+		}
+		unit *= base;
+	}
+	return false;
+}
+
 /*
  * Parse a scale unit value in @arg and return the resulting scaling factor.
  */
@@ -467,22 +491,8 @@ static unsigned long parse_unit(char *arg)
 	unsigned long unit;
 	char *endptr;
 
-	if (strlen(arg) == 1) {
-		opts.unit_suffix = (char)toupper(*arg);
-		switch (opts.unit_suffix) {
-		case 'K':
-			return UNIT_BIN;
-		case 'M':
-			return UNIT_BIN * UNIT_BIN;
-		case 'G':
-			return UNIT_BIN * UNIT_BIN * UNIT_BIN;
-		case 'T':
-			return UNIT_BIN * UNIT_BIN * UNIT_BIN * UNIT_BIN;
-		default:
-			break;
-		}
-	}
-	opts.unit_suffix = 0;
+	if (suffix_to_unit(arg, &unit, &opts.unit_suffix))
+		return unit;
 	if (strcmp(arg, "auto") == 0)
 		return UNIT_AUTO;
 	/* Parse as number. */
@@ -1355,7 +1365,7 @@ static void add_pair_value(struct util_rec *table, struct column_t *col,
 		suffix = scale_auto(pair, UNIT_DEC);
 	} else if (pair->unit == CMG_BPS) {
 		if (opts.unit == UNIT_AUTO)
-			suffix = scale_auto(pair, UNIT_BIN);
+			suffix = scale_auto(pair, UNIT_DEC);
 		else
 			scale_fixed(pair, opts.unit);
 	}
