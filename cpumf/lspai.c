@@ -30,7 +30,8 @@
 #include "lib/util_scandir.h"
 #include "lib/libcpumf.h"
 
-#define	OPT_FORMAT		256	/* --format XXX option */
+#define OPT_FORMAT		256	/* --format XXX option */
+
 static struct util_opt opt_vec[] = {
 	UTIL_OPT_SECTION("OPTIONS"),
 	{
