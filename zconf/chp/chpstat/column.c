@@ -478,13 +478,15 @@ void column_select_all(void)
 		column_select(col);
 }
 
-void column_update_bps_suffix(bool auto_scale, char suffix_char)
+void column_update_bps_suffix(bool auto_scale, bool iec, char suffix_char)
 {
 	struct column_t *col;
 	char *str;
 
 	if (auto_scale)
 		util_asprintf(&str, "(B/s)");
+	else if (suffix_char && iec)
+		util_asprintf(&str, "(%ciB/s)", suffix_char);
 	else if (suffix_char)
 		util_asprintf(&str, "(%cB/s)", suffix_char);
 	else

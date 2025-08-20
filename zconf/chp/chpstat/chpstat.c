@@ -265,6 +265,7 @@ static struct {
 	unsigned long unit;
 	char unit_suffix;
 	bool unit_specified;
+	bool unit_iec;
 } opts;
 
 /* Per CHPID run-time data. */
@@ -336,6 +337,7 @@ static void init_opts(void)
 	opts.unit           = UNIT_AUTO;
 	opts.unit_suffix    = 0;
 	opts.unit_specified = false;
+	opts.unit_iec       = false;
 }
 
 /*
@@ -459,23 +461,30 @@ static void parse_cmgs(char *arg)
 	}
 }
 
-static bool suffix_to_unit(char *arg, unsigned long *unit_ptr, char *suffix_ptr)
+static bool suffix_to_unit(char *arg, unsigned long *unit_ptr, char *suffix_ptr,
+			   bool *iec_ptr)
 {
 	const char *suffixes = "KMGT";
 	unsigned long unit, base;
 	size_t len = strlen(arg);
 	char suffix;
+	bool iec;
 	int i;
 
-	if (len != 1)
+	if (len == 1)
+		iec = false;
+	else if (len == 2 && toupper(arg[1]) == 'I')
+		iec = true;
+	else
 		return false;
 	suffix = (char)toupper(*arg);
-	base = UNIT_DEC;
+	base = iec ? UNIT_BIN : UNIT_DEC;
 	unit = base;
 	for (i = 0; suffixes[i]; i++) {
 		if (suffix == suffixes[i]) {
 			*unit_ptr = unit;
 			*suffix_ptr = suffix;
+			*iec_ptr = iec;
 			return true;
 		}
 		unit *= base;
@@ -491,8 +500,12 @@ static unsigned long parse_unit(char *arg)
 	unsigned long unit;
 	char *endptr;
 
-	if (suffix_to_unit(arg, &unit, &opts.unit_suffix))
+	if (suffix_to_unit(arg, &unit, &opts.unit_suffix, &opts.unit_iec))
 		return unit;
+	if (strcmp(arg, "auto-iec") == 0) {
+		opts.unit_iec = true;
+		return UNIT_AUTO;
+	}
 	if (strcmp(arg, "auto") == 0)
 		return UNIT_AUTO;
 	/* Parse as number. */
@@ -1353,7 +1366,7 @@ static void scale_fixed(struct cmg_pair_t *p, unsigned long unit)
 static void add_pair_value(struct util_rec *table, struct column_t *col,
 			   struct cmg_pair_t *pair)
 {
-	char suffix = 0, str[16];
+	char suffix = 0, suffix2 = opts.unit_iec ? 'i' : 0, str[16];
 	int p;
 
 	if (!pair->valid) {
@@ -1365,23 +1378,25 @@ static void add_pair_value(struct util_rec *table, struct column_t *col,
 		suffix = scale_auto(pair, UNIT_DEC);
 	} else if (pair->unit == CMG_BPS) {
 		if (opts.unit == UNIT_AUTO)
-			suffix = scale_auto(pair, UNIT_DEC);
+			suffix = scale_auto(pair, opts.unit_iec ? UNIT_BIN : UNIT_DEC);
 		else
 			scale_fixed(pair, opts.unit);
 	}
 
 	switch (pair->type) {
 	case CMG_U32:
-		snprintf(str, sizeof(str), "%u%c", pair->value_u32, suffix);
+		snprintf(str, sizeof(str), "%u%c%c", pair->value_u32, suffix,
+			 suffix2);
 		break;
 	case CMG_U64:
-		snprintf(str, sizeof(str), "%llu%c", pair->value_u64, suffix);
+		snprintf(str, sizeof(str), "%llu%c%c", pair->value_u64, suffix,
+			 suffix2);
 		break;
 	case CMG_FLOAT:
 		/* Find highest precision that fits into @width characters. */
 		for (p = 2; p >= 0; p--) {
-			snprintf(str, sizeof(str), "%.*f%c", p,
-				 pair->value_double, suffix);
+			snprintf(str, sizeof(str), "%.*f%c%c", p,
+				 pair->value_double, suffix, suffix2);
 			if (strlen(str) <= col->width)
 				break;
 		}
@@ -1681,8 +1696,8 @@ static void calc_column_widths(void)
 				width = 4; /* "999K" */
 			} else {
 				v = MAX_BPS / (double)opts.unit;
-				snprintf(str, sizeof(str) - 1, "%.0f%c", v,
-					 opts.unit_suffix);
+				snprintf(str, sizeof(str) - 1, "%.0f%c%c", v,
+					 opts.unit_suffix, opts.unit_iec ? 'i' : 0);
 				width = strlen_u(str);
 			}
 			break;
@@ -1707,7 +1722,8 @@ static void cmd_table(void)
 
 	apply_column_selection();
 	calc_column_widths();
-	column_update_bps_suffix(opts.unit == UNIT_AUTO, opts.unit_suffix);
+	column_update_bps_suffix(opts.unit == UNIT_AUTO, opts.unit_iec,
+				 opts.unit_suffix);
 
 	printf("Collecting initial utilization data\n");
 	update_util_all(true);

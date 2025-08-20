@@ -294,6 +294,12 @@ Scale automatically to fit value into each column. To indicate the current scali
 an SI-suffix is added to each scaled number (e.g. K for 1000). This is the default.
 .PP
 .IP \(bu 3
+.B auto-iec:
+Same as
+.B auto
+but using power-of-two based IEC-suffixes (e.g. Ki for 1024).
+.PP
+.IP \(bu 3
 .IR number :
 Scale by
 .I number
@@ -313,6 +319,22 @@ Scale by 1,000,000,000 (GB)
 .IP \(bu 3
 .B T:
 Scale by 1,000,000,000,000 (TB)
+.PP
+.IP \(bu 3
+.B Ki:
+Scale by 1024 (KiB)
+.PP
+.IP \(bu 3
+.B Mi:
+Scale by 1,048,576 (MiB)
+.PP
+.IP \(bu 3
+.B Gi:
+Scale by 1,073,741,824 (GiB)
+.PP
+.IP \(bu 3
+.B Ti:
+Scale by 1,099,511,627,776 (TiB)
 .PP
 .RE
 

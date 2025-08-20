@@ -84,7 +84,7 @@ void column_select_id_list(const int *ids);
 void column_select_default(void);
 void column_select_all(void);
 
-void column_update_bps_suffix(bool auto_scale, char suffix_char);
+void column_update_bps_suffix(bool auto_scale, bool iec, char suffix_char);
 void column_exit(void);
 
 #endif /* COLUMN_H */
