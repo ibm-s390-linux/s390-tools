@@ -25,7 +25,7 @@
 # generates persistent configuration that can be transferred from initrd to
 # another root files system such as in a distro installer environment.
 
-zdev_dasd_base_args="--no-settle --yes --no-root-update --force"
+zdev_dasd_base_args="--no-settle --yes --no-root-update --no-module-load --quiet"
 
 zdev_parse_dasd_list() {
     sed 's/,/\n/g' | while read -r _zdev_dasditem; do
@@ -41,7 +41,7 @@ zdev_parse_dasd_list() {
                 echo "rd.dasd ...,${_zdev_dasditem},... :"
                 # shellcheck disable=SC2086
                 chzdev dasd --type "${_zdev_dasditem}=1" --persistent \
-                       $zdev_dasd_base_args
+                       $zdev_dasd_base_args --force
                 ;;
             "") continue ;; # empty range
             *)  # currently no support for a device-spec "ipldev", only devbusid
@@ -72,15 +72,50 @@ EOF
 $_zdev_dasd_features
 EOF
                 fi
+
                 # Without dynamic (active) config zdev cannot infer
-                # the actual dasd type (eckd, fba) so configure for both.
+                # the actual dasd type (eckd, fba). Add logic to generate the
+                # udev rules based on the availability of modalias entry.
+
                 echo "rd.dasd ...,${_zdev_dasditem},... :"
-                # shellcheck disable=SC2086
-                chzdev dasd-eckd --enable --persistent "$_zdev_dasd_range" $_zdev_dasd_attrs \
-                       $zdev_dasd_base_args
-                # shellcheck disable=SC2086
-                chzdev dasd-fba --enable --persistent "$_zdev_dasd_range" $_zdev_dasd_attrs \
-                       $zdev_dasd_base_args
+
+                # free the dev-ids from blacklist to analyse the modalias
+                echo "free $_zdev_dasd_range" > /proc/cio_ignore
+                echo 1 > /proc/cio_settle
+
+                # Now, Configure both DASD types. While doing so, ensure that
+                # module loading is suppressed and that the --force option
+                # is not used with chzdev.
+                # As a result:
+                #   - For non-existent devices, udev rules are generated for
+                #     both DASD types.
+                #   - For existing devices identified as generic-ccw, chzdev
+                #     skips generating udev rules.
+
+                for dasd_type in dasd-eckd dasd-fba; do
+                    chzdev "$dasd_type" --enable --persistent "$_zdev_dasd_range" \
+                           $_zdev_dasd_attrs $zdev_dasd_base_args 2>/dev/null \
+                           | sed -e 's/^/Non-existent /g'
+                done
+
+                # For the existing devices, configure the right dasd-type based
+                # on modalias
+                lszdev "$_zdev_dasd_range" --active --no-headings --columns \
+                       ID,attr:modalias | \
+                while read -r dev_id modalias_val; do
+                    case "$modalias_val" in
+                        # ECKD device types
+                        *3390*|*3380*|*9345*)
+                            chzdev dasd-eckd --enable --persistent "$dev_id" \
+                            $_zdev_dasd_attrs $zdev_dasd_base_args --force
+                            ;;
+                        # FBA device types
+                        *3370*|*9336*)
+                            chzdev dasd-fba --enable --persistent "$dev_id" \
+                            $_zdev_dasd_attrs $zdev_dasd_base_args --force
+                            ;;
+                    esac
+                done
                 ;;
         esac
     done # input redir w/ process substitution causes syntax error in dracut env
