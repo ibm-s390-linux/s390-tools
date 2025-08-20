@@ -747,6 +747,7 @@ KVM_CMDS="virsh version\
   :virsh nodedev-list --tree\
   :virsh pool-list\
   :virt-host-validate\
+  :kvm_stat --once --debugfs --debugfs-include-past --tracepoints\
   "
 
 ########################################
