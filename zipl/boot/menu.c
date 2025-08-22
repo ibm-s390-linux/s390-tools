@@ -68,6 +68,7 @@ static int menu_read(void)
 		} else {
 			/* no valid config retry */
 			printf(msg_econfig);
+			memset(temp_area, 0, PAGE_SIZE);
 			count = 0;
 		}
 	}
