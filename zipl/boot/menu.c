@@ -59,7 +59,7 @@ static int menu_read(void)
 		if (is_zvm())
 			for (i = 0; i < count; i++)
 				temp_area[i] = ebcdic_tolower(temp_area[i]);
-		value = ebcdic_strtoul((char *)temp_area, &endptr, 10);
+		value = ebcdic_strtoul(temp_area, &endptr, 10);
 
 		if ((endptr != temp_area) && (value < BOOT_MENU_ENTRIES - 1) &&
 		    (__stage2_params.config[value] != 0)) {
