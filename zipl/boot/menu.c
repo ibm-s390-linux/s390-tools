@@ -98,6 +98,12 @@ static int menu_list(void)
 	return 0;
 }
 
+enum param_result {
+	NUMBER_FOUND  = 0,
+	PRINT_PROMPT  = 1,
+	NOTHING_FOUND = 2,
+};
+
 /*
  * Interpret loadparm
  *
@@ -109,7 +115,7 @@ static int menu_list(void)
  *     1 - print prompt
  *     2 - nothing found
  */
-static int menu_param(unsigned long *value)
+static enum param_result menu_param(unsigned long *value)
 {
 	char loadparm[PARAM_SIZE];
 	char *endptr;
@@ -152,10 +158,10 @@ int menu(void)
 		goto boot;
 
 	rc = menu_param(&value);
-	if (rc == 0) {
+	if (rc == NUMBER_FOUND) {
 		/* got number from loadparm, boot it */
 		goto boot;
-	} else if (rc == 1 && value == 0) {
+	} else if (rc == PRINT_PROMPT && value == 0) {
 		/* keyword "prompt", show menu */
 	} else if (__stage2_params.flag == 0) {
 		/* menu disabled, boot default */

@@ -18,10 +18,6 @@
 #define PARAM_SIZE                      8
 #define TEXT_OFFSET                     4
 
-#define NUMBER_FOUND                    0
-#define PRINT_PROMPT                    1
-#define NOTHING_FOUND                   2
-
 struct boot_stage2_params {
 	uint16_t flag;
 	uint16_t timeout;
