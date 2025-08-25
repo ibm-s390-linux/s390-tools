@@ -285,8 +285,12 @@ Use this option to select all supported columns and keys for output.
 Scale BPS values by UNIT
 
 Use this option to specify a value by which bytes-per-seconds (BPS) values -
-such as read and write throughput - are scaled in table output format. Accepted
-values are:
+such as read and write throughput - are scaled in human-readable output.
+Note that scaling is not applied to values in machine-readable output format as
+produced with option
+.BR \-\-format .
+
+Accepted values are:
 
 .IP \(bu 3
 .B auto:
