@@ -28,7 +28,7 @@ static int suppress_module_load;
 /* Allow suppression of module loading. */
 void module_load_suppress(int state)
 {
-	suppress_module_load = 1;
+	suppress_module_load = state;
 }
 
 /* Check if a module is currently loaded. */
