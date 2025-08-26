@@ -109,6 +109,7 @@ struct options {
 	unsigned int quiet:1;
 	unsigned int no_settle:1;
 	unsigned int site_id;
+	unsigned int no_module_load:1;
 };
 
 /* Makefile converts chzdev_usage.txt into C file which we include here. */
@@ -156,6 +157,7 @@ enum {
 	OPT_NO_SETTLE		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_AUTO_CONF		= (OPT_ANONYMOUS_BASE+__COUNTER__),
 	OPT_SITE		= 's',
+	OPT_NO_MODULE_LOAD	= (OPT_ANONYMOUS_BASE+__COUNTER__),
 };
 
 static struct opts_conflict conflict_list[] = {
@@ -260,6 +262,7 @@ static const struct option opt_list[] = {
 	{ "quiet",		no_argument,	NULL, OPT_QUIET },
 	{ "no-settle",		no_argument,	NULL, OPT_NO_SETTLE },
 	{ "site",		required_argument, NULL, OPT_SITE },
+	{ "no-module-load",	no_argument,	NULL, OPT_NO_MODULE_LOAD },
 	{ NULL,			no_argument,	NULL, 0 },
 };
 
@@ -1016,6 +1019,11 @@ static exit_code_t parse_options(struct options *opts, int argc, char *argv[])
 		case OPT_NO_SETTLE:
 			/* --no-settle */
 			opts->no_settle = 1;
+			break;
+
+		case OPT_NO_MODULE_LOAD:
+			/* --no-module-load */
+			opts->no_module_load = 1;
 			break;
 
 		case OPT_SITE:
@@ -3177,6 +3185,7 @@ int main(int argc, char *argv[])
 	dryrun	= opts.dryrun;
 	udev_no_settle = opts.no_settle;
 	path_set_base(opts.base);
+	module_load_suppress(opts.no_module_load);
 
 	if (dryrun)
 		info("Starting dry-run, configuration will not be changed\n");

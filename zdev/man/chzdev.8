@@ -636,6 +636,15 @@ option unless chzdev is run in an environment where udev is not fully
 functional (such as in the early phase of an initial RAM disk).
 .PP
 .
+.OD no-module-load "" ""
+Do not load kernel modules during chzdev execution.
+
+In some situations \fBchzdev\fR will attempt to load kernel modules to
+complete a configuration action. This behavior may be undesirable in some
+scenarios. The \fB\-\-no-module-load\fR option suppresses kernel module loading
+during \fBchzdev\fR execution.
+.PP
+.
 .OD persistent "p" ""
 Apply changes to persistent configuration only.
 
