@@ -837,7 +837,7 @@ static int map_check(char *fn, int (*fct)(char *, unsigned char *, size_t,
 		return 0;
 	}
 
-	p = mmap(0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	p = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED) {
 		warnx("%s cannot map file", fn);
 		close(fd);
