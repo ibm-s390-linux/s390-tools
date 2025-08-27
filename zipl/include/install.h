@@ -80,6 +80,7 @@ struct install_set {
 	int nr_menu_entries;
 	struct misc_fd mfd;
 	struct install_set_mirror mirrors[MAX_TARGETS];
+	struct file_range comp_reg[NR_PROGRAM_COMPONENTS];
 	char *filename;
 	unsigned int skip_prepare_device:1;
 	unsigned int tmp_filename_created:1;

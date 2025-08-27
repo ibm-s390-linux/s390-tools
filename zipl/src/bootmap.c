@@ -376,15 +376,26 @@ static int add_component_file_range(struct install_set *bis,
 		}
 		size -= trailer;
 		/* Write buffer */
-		*count = disk_write_block_buffer(&bis->mfd, 0, buffer,
-						 size, list,
-						 bis->info->fs_block_size,
-						 info);
+		*count = disk_write_block_buffer_align(&bis->mfd,
+						       0 /* not a base disk */,
+						       buffer, size, list,
+						       bis->info->fs_block_size,
+						       info,
+						       info->phy_block_size,
+						       /*
+							* save component offset
+							*/
+						       &bis->comp_reg
+						       [comp_id].offset);
 		free(buffer);
 		if (*count == 0) {
 			error_text("Could not write to bootmap file");
 			return -1;
 		}
+		/* zero offset is occupied by bootmap header */
+		assert(bis->comp_reg[comp_id].offset > 0);
+		/* save component size */
+		bis->comp_reg[comp_id].len = size;
 	} else {
 		if (!file_is_on_device(filename, bis->info)) {
 			error_reason("File is not on target device");
@@ -423,7 +434,20 @@ static int add_component_file(struct install_set *bis, const char *filename,
 			      void *component, int add_files, int comp_id,
 			      int menu_idx, int mirror_id, int program_table_id)
 {
-	return add_component_file_range(bis, filename, NULL, load_address,
+	struct file_range *reg = NULL;
+
+	if (add_files &&
+	    bis->comp_reg[comp_id].offset > 0) {
+		/*
+		 * The file has been already written to the bootmap.
+		 * Use the respective region in the bootmap file to
+		 * add the component
+		 */
+		filename = bis->filename;
+		reg = &bis->comp_reg[comp_id];
+		add_files = 0;
+	}
+	return add_component_file_range(bis, filename, reg, load_address,
 					trailer, component, add_files,
 					comp_id, menu_idx, mirror_id,
 					program_table_id);
