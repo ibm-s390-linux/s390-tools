@@ -1,0 +1,36 @@
+Checks: >
+  bugprone-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -misc-include-cleaner,
+  -readability-braces-around-statements,
+  -readability-identifier-length,
+  -modernize-*,
+  -performance-*,
+  -portability-*,
+  -readability-implicit-bool-conversion
+
+CheckOptions:
+  - key:             readability-identifier-naming.VariableCase
+    value:           lower_case
+  - key:             readability-identifier-naming.FunctionCase
+    value:           lower_case
+  - key:             readability-identifier-naming.StructCase
+    value:           lower_case
+  - key:             readability-identifier-naming.EnumCase
+    value:           lower_case
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           UPPER_CASE
+  - key:             readability-identifier-naming.MacroDefinitionCase
+    value:           UPPER_CASE
+  - key:             bugprone-sizeof-expression.WarnOnSizeOfPointer
+    value:           true
+  - key:             misc-unused-parameters.StrictMode
+    value:           true
+
+FormatStyle: file
+UseColor: true
