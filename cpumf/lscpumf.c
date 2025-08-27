@@ -7,8 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <ctype.h>
-#include <errno.h>
+#include <err.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdio.h>
