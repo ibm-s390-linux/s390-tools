@@ -6,7 +6,6 @@
 
 /* List available Processor Assist Instrumentation (PAI) counters.  */
 
-#include <ctype.h>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
@@ -234,16 +233,6 @@ static int pai_ctrcmp(const void *p1, const void *p2)
 	return l->nr > r->nr ? 1 : -1;
 }
 
-/* Convert string to upper case. */
-static char *str2uc(const char *s)
-{
-	char *uc = util_strdup(s), *old_uc = uc;
-
-	for (; *uc; ++uc)
-		*uc = toupper(*uc);
-	return old_uc;
-}
-
 /* Return true if the counter is in the ctrlist. An empty ctrlist
  * disables all counters.
  */
@@ -397,7 +386,8 @@ static void make_painode(enum pai_types t)
 	node->type = t;
 	node->sysfs_name = pai_type_sysfs(t);
 	node->name = pai_type_name(t);
-	node->name_uc = str2uc(node->name);
+	node->name_uc = util_strdup(node->name);
+	util_str_toupper(node->name_uc);
 	node->filter_name = pai_type_filter(t);
 	node->base = pai_type_base(t);
 
