@@ -33,6 +33,7 @@
 
 #include "lib/libzds.h"
 #include "lib/util_libc.h"
+#include "lib/util_str.h"
 #include "lib/zt_common.h"
 
 #define COMP "zdsfs: "
@@ -1369,18 +1370,6 @@ static void zdsfs_process_device_file(const char *devfile)
 	free(buffer);
 }
 
-void remove_whitespace(const char *s, char *t)
-{
-	while (*s != '\0') {
-		if (!isblank(*s)) {
-			*t = *s;
-			t++;
-		}
-		s++;
-	}
-	*t = '\0';
-}
-
 static void zdsfs_process_config_file(const char *config)
 {
 	char line[MAX_LINE_LENGTH];
@@ -1403,7 +1392,7 @@ static void zdsfs_process_config_file(const char *config)
 
 		/* remove all whitespaces */
 		tmp = util_malloc(strlen(line) + 1);
-		remove_whitespace(line, tmp);
+		util_str_rm_whitespace(line, tmp);
 
 		key = strtok(tmp, delimiter);
 		if (strcmp(key, "restserver")  == 0) {
@@ -1496,7 +1485,7 @@ static int zdsfs_process_dataset_conf(const char *config)
 		linecount++;
 		/* remove all whitespaces */
 		tmp = util_malloc(strlen(line) + 1);
-		remove_whitespace(line, tmp);
+		util_str_rm_whitespace(line, tmp);
 		/* skip empty lines */
 		if (*tmp == '\n' || *tmp == '#') {
 			free(tmp);
