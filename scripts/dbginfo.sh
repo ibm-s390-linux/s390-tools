@@ -435,8 +435,10 @@ CONFIGFILES="\
   /etc/modules-load.d/*.conf\
   /etc/mtab\
   /etc/multipath\
+  /etc/netplan\
   /etc/network\
   /etc/networks\
+  /etc/NetworkManager\
   /etc/opencryptoki/*.conf\
   /etc/pam.d\
   /etc/profile\
