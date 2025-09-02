@@ -367,6 +367,9 @@ static int add_component_file_range(struct install_set *bis,
 		/* skip the preparation work */
 		goto write_segment_table;
 	if (add_files) {
+		struct file_range *comp_reg = get_component_range(bis, comp_id,
+								  menu_idx);
+
 		assert(reg == NULL); /* not implemented */
 		/* Read file to buffer */
 		rc = misc_read_file(filename, &buffer, &size, 0);
@@ -385,17 +388,16 @@ static int add_component_file_range(struct install_set *bis,
 						       /*
 							* save component offset
 							*/
-						       &bis->comp_reg
-						       [comp_id].offset);
+						       &comp_reg->offset);
 		free(buffer);
 		if (*count == 0) {
 			error_text("Could not write to bootmap file");
 			return -1;
 		}
 		/* zero offset is occupied by bootmap header */
-		assert(bis->comp_reg[comp_id].offset > 0);
+		assert(comp_reg->offset > 0);
 		/* save component size */
-		bis->comp_reg[comp_id].len = size;
+		comp_reg->len = size;
 	} else {
 		if (!file_is_on_device(filename, bis->info)) {
 			error_reason("File is not on target device");
@@ -434,20 +436,21 @@ static int add_component_file(struct install_set *bis, const char *filename,
 			      void *component, int add_files, int comp_id,
 			      int menu_idx, int mirror_id, int program_table_id)
 {
-	struct file_range *reg = NULL;
+	struct file_range *comp_reg = get_component_range(bis, comp_id,
+							  menu_idx);
 
-	if (add_files &&
-	    bis->comp_reg[comp_id].offset > 0) {
+	if (add_files && comp_reg->offset > 0) {
 		/*
 		 * The file has been already written to the bootmap.
 		 * Use the respective region in the bootmap file to
 		 * add the component
 		 */
 		filename = bis->filename;
-		reg = &bis->comp_reg[comp_id];
 		add_files = 0;
+	} else {
+		comp_reg = NULL;
 	}
-	return add_component_file_range(bis, filename, reg, load_address,
+	return add_component_file_range(bis, filename, comp_reg, load_address,
 					trailer, component, add_files,
 					comp_id, menu_idx, mirror_id,
 					program_table_id);
@@ -460,6 +463,8 @@ static int add_component_buffer_base(struct install_set *bis, void *buffer,
 {
 	struct program_component *pc = get_component(bis, mirror_id,
 						     comp_id, menu_idx);
+	struct file_range *comp_reg = get_component_range(bis, comp_id,
+							  menu_idx);
 	struct disk_info *info = &bis->info->base[mirror_id];
 	struct component_loc *location = &pc->loc;
 	disk_blockptr_t **list = &pc->list;
@@ -485,13 +490,14 @@ static int add_component_buffer_base(struct install_set *bis, void *buffer,
 		error_text("Could not write to bootmap file");
 		return -1;
 	}
-	if (!bis->comp_reg[comp_id].offset) {
+	if (!comp_reg->offset) {
 		/*
 		 * save component offset and size
 		 */
 		assert(offset > 0);
-		bis->comp_reg[comp_id].offset = offset;
-		bis->comp_reg[comp_id].len = size;
+
+		comp_reg->offset = offset;
+		comp_reg->len = size;
 	}
 	if (component_type_by_id(comp_id) == COMPONENT_TYPE_LOAD) {
 		/* Fill in component location */
@@ -517,12 +523,26 @@ write_segment_table:
 	return rc;
 }
 
+/**
+ * Generic interface for adding program components.
+ *
+ * Add a component represented by a memory BUFFER, when building a program
+ * specified by MENU_IDX in a program table specified by PROGRAM_TABLE_ID
+ * for a mirror specified by MIRROR_ID.
+ *
+ * The component's data will be stored in the bootmap file.
+ * Calling this function again for some pair (COMPONENT_ID, MENU_IDX)
+ * results in reusing component's data previously stored for that pair.
+ */
 static int add_component_buffer(struct install_set *bis, void *buffer,
 				size_t size, component_data data,
 				void *component, int comp_id, int menu_idx,
 				int mirror_id, int program_table_id)
 {
-	if (bis->comp_reg[comp_id].offset > 0) {
+	struct file_range *comp_reg = get_component_range(bis, comp_id,
+							  menu_idx);
+
+	if (comp_reg->offset > 0) {
 		/*
 		 * The component data has been already written to the
 		 * bootmap. Refer the respective region in the bootmap
@@ -530,7 +550,7 @@ static int add_component_buffer(struct install_set *bis, void *buffer,
 		 */
 		return add_component_file_range(bis,
 						bis->filename /* bootmap */,
-						&bis->comp_reg[comp_id],
+						comp_reg,
 						data.load_address,
 						0 /*trailer */,
 						component,
@@ -925,16 +945,28 @@ static int add_ipl_program(struct install_set *bis, bool add_envblk,
 	}
 	if (add_envblk == true) {
 		/*
-		 * finally add environment block
+		 * Finally add environment block.
+		 *
+		 * Environment block is a special program component.
+		 * Unlike other components, environment block is common
+		 * for all menu entries. It is always added when building
+		 * the program with zero MENU_IDX and is a subject for
+		 * further modifications with a special utility
+		 * zipl-editenv(8). So, the location of the environment
+		 * block should be stored in the bootmap header.
 		 */
-		int save_location = !bis->comp_reg[COMPONENT_ID_ENVBLK].offset;
+		struct file_range *envblk_reg = get_envblk_range(bis);
+		int save_location = !envblk_reg->offset;
 
 		rc = add_component_buffer(bis,
 					  envblk->buf, envblk->size,
 					  (component_data)ipl->envblk_addr,
 					  VOID_ADD(table, offset),
 					  COMPONENT_ID_ENVBLK,
-					  menu_idx, mirror_id,
+					  0, /* first menu entry index,
+					      * see the comment above
+					      */
+					  mirror_id,
 					  program_table_id);
 		if (rc) {
 			error_text("Could not add environment block");
@@ -944,14 +976,13 @@ static int add_ipl_program(struct install_set *bis, bool add_envblk,
 		if (save_location) {
 			/*
 			 * store environment block location in the bootmap
-			 * header for future operations performed by
-			 * zipl-editenv(8) tool
+			 * header, see the comment above.
 			 */
-			assert(bis->comp_reg[COMPONENT_ID_ENVBLK].offset > 0 &&
-			       bis->comp_reg[COMPONENT_ID_ENVBLK].offset %
+			assert(envblk_reg->offset > 0 &&
+			       envblk_reg->offset %
 			       bis->info->fs_block_size == 0);
 			rc = envblk_offset_set(&bis->mfd,
-				bis->comp_reg[COMPONENT_ID_ENVBLK].offset);
+					       envblk_reg->offset);
 			if (rc) {
 				error_text("Could not store environment block location");
 				free(table);

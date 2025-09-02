@@ -16,6 +16,7 @@
 #include "job.h"
 #include "misc.h"
 #include "zipl.h"
+#include "boot.h"
 #include "boot/boot_defs.h"
 
 #define NR_PROGRAM_TABLES NR_BLKPTR_FORMATS
@@ -85,7 +86,7 @@ struct install_set {
 	int nr_menu_entries;
 	struct misc_fd mfd;
 	struct install_set_mirror mirrors[MAX_TARGETS];
-	struct file_range comp_reg[NR_PROGRAM_COMPONENTS];
+	struct file_range comp_reg[NR_PROGRAM_COMPONENTS][BOOT_MENU_ENTRIES];
 	char *filename;
 	unsigned int skip_prepare_device:1;
 	unsigned int tmp_filename_created:1;
@@ -128,6 +129,20 @@ static inline struct program_component *get_component(struct install_set *bis,
 						      int i, int j)
 {
 	return bis->mirrors[mirror_id].components[i] + j;
+}
+
+/*
+ * Get a component as a region in the bootmap file
+ */
+static inline struct file_range *get_component_range(struct install_set *bis,
+						     int comp_id, int menu_idx)
+{
+	return &bis->comp_reg[comp_id][menu_idx];
+}
+
+static inline struct file_range *get_envblk_range(struct install_set *bis)
+{
+	return get_component_range(bis, COMPONENT_ID_ENVBLK, 0);
 }
 
 int prepare_bootloader(struct job_data *job, struct install_set *bis);
