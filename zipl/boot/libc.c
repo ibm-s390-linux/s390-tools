@@ -363,7 +363,7 @@ static char *number(char *buf, char *end, unsigned long val,
 /*
  * vsnprintf - Format string and place in a buffer
  *
- * This funcion only supports a subset of format options defined in the
+ * This function only supports a subset of format options defined in the
  * C standard, i.e.
  * specifiers:
  *	* %s (strings)
