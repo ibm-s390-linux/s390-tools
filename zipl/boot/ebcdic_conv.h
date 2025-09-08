@@ -14,6 +14,7 @@
 
 #ifndef __ASSEMBLER__
 
+void ebcdic_update_table(void);
 void ebcdic_to_ascii(unsigned char *target, const unsigned char *source,
 		     unsigned int l);
 
