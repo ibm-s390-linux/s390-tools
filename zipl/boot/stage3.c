@@ -507,6 +507,8 @@ void start(void)
 	if (secure_boot_enabled())
 		verify_secure_boot();
 
+	ebcdic_update_table();
+
 	/*
 	 * cut the kernel header
 	 */
