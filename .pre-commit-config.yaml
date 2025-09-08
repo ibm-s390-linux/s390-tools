@@ -11,6 +11,9 @@ repos:
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
         exclude_types: ['rust']
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
   - repo: local
     hooks:
       - id: git-clang-format
