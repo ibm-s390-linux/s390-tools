@@ -28,6 +28,7 @@
 #include "lib/util_libc.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
+#include "lib/util_path.h"
 #include "lib/zt_common.h"
 
 #define RD_BUFFER_SIZE 80
@@ -354,15 +355,19 @@ static int dinfo_extract_dev(dev_t *dev, char *str)
 static int dinfo_get_dev_from_blockdev(char *blockdev, dev_t *dev)
 {
 	char *readbuf = NULL;
+	char *path;
 
 	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
 	if (!readbuf) {
 		warnx("Error: Not enough memory to allocate readbuffer");
 		return -1;
 	}
-	if (util_file_read_line(readbuf, RD_BUFFER_SIZE,
-				"/sys/block/%s/dev", blockdev) < 0)
+	path = util_path_sysfs("block/%s/dev", blockdev);
+	if (util_file_read_line(readbuf, RD_BUFFER_SIZE, path) < 0) {
+		free(path);
 		return -1;
+	}
+	free(path);
 	if (dinfo_extract_dev(dev, readbuf) != 0)
 		return -1;
 
@@ -440,7 +445,7 @@ dinfo_get_blockdev_from_busid(char *busid, char **blkdev)
 
 	char *tempdir = NULL;
 	char *result = NULL;
-	char *sysfsdir = "/sys/devices/";
+	char *sysfsdir = util_path_sysfs("devices/");
 
 	/* dinfo_is_devnode needs to know the busid */
 	searchbusid = busid;
@@ -476,6 +481,7 @@ out:
 out2:
 	free(busiddir);
 	free(result);
+	free(sysfsdir);
 	return rc;
 }
 
@@ -487,6 +493,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	DIR *directory = NULL;
 	struct dirent *dir_entry = NULL;
 	int rc = 0;
+	char *path;
 
 	if (stat(devnode, &stat_buffer) != 0) {
 		warnx("Error: could not stat %s", devnode);
@@ -496,32 +503,34 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	sprintf(stat_dev, "%d:%d", major(stat_buffer.st_rdev),
 		minor(stat_buffer.st_rdev));
 
-	directory = opendir("/sys/block/");
+	path = util_path_sysfs("block/");
+	directory = opendir(path);
 	if (directory == NULL) {
-		warnx("Error: could not open directory /sys/block");
+		warnx("Error: could not open directory %s", path);
+		free(path);
 		return -1;
 	}
 
 	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
 	if (!readbuf) {
 		warnx("Error: Not enough memory to allocate readbuffer");
+		free(path);
 		return -1;
 	}
 
 	while ((dir_entry = readdir(directory)) != NULL) {
-		if (util_file_read_line(readbuf, RD_BUFFER_SIZE,
-					"/sys/block/%s/dev",
+		if (util_file_read_line(readbuf, RD_BUFFER_SIZE, "%s%s/dev", path,
 					dir_entry->d_name) < 0)
 			continue;
 
 		if (strncmp(stat_dev, readbuf,
 			    MAX(strlen(stat_dev), strlen(readbuf) - 1)) == 0) {
-			rc = snprintf(*uidfile, RD_BUFFER_SIZE,
-				      "/sys/block/%s/device/uid",
+			rc = snprintf(*uidfile, RD_BUFFER_SIZE, "%s%s/device/uid", path,
 				      dir_entry->d_name);
 			if (rc >= RD_BUFFER_SIZE) {
 				fprintf(stderr,
 					"Error: Device name was truncated\n");
+				free(path);
 				return -1;
 			}
 
@@ -530,6 +539,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 	}
 
 	closedir(directory);
+	free(path);
 	return 0;
 }
 
@@ -627,16 +637,18 @@ int main(int argc, char *argv[])
 	}
 
 	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
-	uidfile = dinfo_malloc(RD_BUFFER_SIZE);
-	if (!(readbuf && uidfile))
+	if (!readbuf)
 		exit(1);
 
 	/* try to read the uid attribute */
 	if (busid) {
-		sprintf(uidfile, "/sys/bus/ccw/devices/%s/uid", busid);
+		uidfile = util_path_sysfs("bus/ccw/devices/%s/uid", busid);
 	} else if (blockdev) {
-		sprintf(uidfile, "/sys/block/%s/device/uid", blockdev);
+		uidfile = util_path_sysfs("block/%s/device/uid", blockdev);
 	} else if (devnode) {
+		uidfile = dinfo_malloc(RD_BUFFER_SIZE);
+		if (!uidfile)
+			exit(1);
 		if (dinfo_get_uid_from_devnode(&uidfile, devnode) != 0)
 			goto error;
 	}
