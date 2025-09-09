@@ -102,6 +102,7 @@ enum param_result {
 	NUMBER_FOUND  = 0,
 	PRINT_PROMPT  = 1,
 	NOTHING_FOUND = 2,
+	SCLP_ERROR    = 3,
 };
 
 /*
@@ -114,6 +115,7 @@ enum param_result {
  *     0 - found number to boot, stored in value
  *     1 - print prompt
  *     2 - nothing found
+ *     3 - sclp error
  */
 static enum param_result menu_param(unsigned long *value)
 {
@@ -121,8 +123,12 @@ static enum param_result menu_param(unsigned long *value)
 	char *endptr;
 	int i;
 
-	if (!sclp_param(loadparm))
-		*value = ebcdic_strtoul(loadparm, &endptr, 10);
+	/* try to fetch loadparms from sclp into 'loadparm' */
+	if (sclp_param(loadparm) != 0)
+		return SCLP_ERROR;
+
+	/* parse number from loadparm */
+	*value = ebcdic_strtoul(loadparm, &endptr, 10);
 
 	/* got number, done */
 	if (endptr != loadparm)
@@ -134,39 +140,44 @@ static enum param_result menu_param(unsigned long *value)
 	while ((i < PARAM_SIZE) && ecbdic_isspace(loadparm[i]))
 		i++;
 
-	if (!strncmp(&loadparm[i], "PROMPT", 6)) {
-		*value = 0;
+	if (!strncmp(&loadparm[i], "PROMPT", 6))
 		return PRINT_PROMPT;
-	}
 
 	return NOTHING_FOUND;
 }
 
 int menu(void)
 {
-	unsigned long value = 0;
+	enum { DEFAULT_MENU_ENTRY = 0 };
+	unsigned long value = DEFAULT_MENU_ENTRY;
 	char *cmd_line_extra;
 	char endstring[15];
-	int rc;
 
 	cmd_line_extra = (char *)COMMAND_LINE_EXTRA;
 	memset(cmd_line_extra, 0, COMMAND_LINE_EXTRA_SIZE);
 
-	rc = sclp_setup(SCLP_INIT);
-	if (rc)
+	if (sclp_setup(SCLP_INIT) != 0) {
 		/* sclp setup failed boot default */
 		goto boot;
+	}
 
-	rc = menu_param(&value);
-	if (rc == NUMBER_FOUND) {
+	switch (menu_param(&value)) {
+	case NUMBER_FOUND:
 		/* got number from loadparm, boot it */
 		goto boot;
-	} else if (rc == PRINT_PROMPT && value == 0) {
-		/* keyword "prompt", show menu */
-	} else if (__stage2_params.flag == 0) {
-		/* menu disabled, boot default */
-		value = 0;
+	case PRINT_PROMPT:
+		/* print menu */
+		break;
+	case SCLP_ERROR:
+		/* failed to read from sclp, boot default */
+		printf("SCLP_ERROR\n");
 		goto boot;
+	case NOTHING_FOUND:
+		if (__stage2_params.flag == 0) {
+			/* menu disabled, boot default */
+			goto boot;
+		}
+		break;
 	}
 
 	/* print banner */
