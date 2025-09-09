@@ -23,7 +23,6 @@
 #include <unistd.h>
 
 #include "lib/dasd_base.h"
-#include "lib/util_base.h"
 #include "lib/util_file.h"
 #include "lib/util_libc.h"
 #include "lib/util_opt.h"
