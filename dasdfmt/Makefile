@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _dasdfmt
+bash-completions = dasdfmt.bash
+
+include ../common_autocomp.mak
+
 all: dasdfmt
 
 libs =	$(rootdir)/libdasd/libdasd.a \

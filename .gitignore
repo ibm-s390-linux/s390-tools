@@ -47,6 +47,8 @@ cpumf/lspai.bash
 cpumf/pai.bash
 cpuplugd/cpuplugd
 dasdfmt/dasdfmt
+dasdfmt/_dasdfmt
+dasdfmt/dasdfmt.bash
 dasdinfo/dasdinfo
 dasdview/dasdview
 dump2tar/src/dump2tar
