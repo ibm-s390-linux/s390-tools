@@ -30,6 +30,8 @@
 
 #include "lib/libcpumf.h"
 
+#include "lscpumf_cli.h"
+
 #define	ACTION_NONE	0
 #define	ACTION_INFO	1
 #define	ACTION_CNT	2
@@ -45,33 +47,6 @@ static bool actions[ACTION_SAMPLE + 1];	/* Specified command line options */
 #define	PER_SDBT_SIZE	511
 
 /* File names to read data from */
-
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "list-counters", no_argument, NULL, 'c' },
-		.desc = "Lists counters for which the LPAR is authorized.",
-	},
-	{
-		.option = { "list-all-counters", no_argument, NULL, 'C' },
-		.desc = "Lists counters regardless of LPAR authorization.",
-	},
-	{
-		.option = { "name", no_argument, NULL, 'n' },
-		.desc = "Displays counter names.",
-	},
-	{
-		.option = { "info", no_argument, NULL, 'i' },
-		.desc = "Displays detailed information.",
-	},
-	{
-		.option = { "list-sampling-events", no_argument, NULL, 's' },
-		.desc = "Lists sampling events for which the LPAR is authorized.",
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
-};
 
 static const struct util_prg prg = {
 	.desc = "List CPU Measurement facility charactertics",
@@ -4159,7 +4134,7 @@ int main(int argc, char **argv)
 	int ret;
 
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
+	util_opt_init(lscpumf_opt_vec, NULL);
 
 	ret = parse_args(argc, argv);
 	if (read_info() == EXIT_FAILURE)

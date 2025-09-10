@@ -43,6 +43,7 @@
 #include "lib/libcpumf.h"
 
 #include "lshwc.h"
+#include "lshwc_cli.h"
 
 #define CPUS_ONLINE	"/sys/devices/system/cpu/online"
 #define CPUS_POSSIBLE	"/sys/devices/system/cpu/possible"
@@ -732,67 +733,6 @@ static int do_it(char *s)
 	return rc ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "all", no_argument, NULL, 'a' },
-		.desc = "Displays all CPUs in output"
-	},
-	{
-		.option = { "loop", required_argument, NULL, 'l' },
-		.argument = "NUMBER",
-		.desc = "Specifies loop count for next read"
-	},
-	{
-		.option = { "interval", required_argument, NULL, 'i' },
-		.argument = "NUMBER",
-		.desc = "Specifies interval between read operations (seconds)"
-	},
-	{
-		.option = { "short", no_argument, NULL, 's' },
-		.desc = "Abbreviate counter name with counter set letter and number"
-	},
-	{
-		.option = { "hex0x", no_argument, NULL, 'X' },
-		.desc = "Counter values in hexadecimal format with leading 0x"
-	},
-	{
-		.option = { "hex", no_argument, NULL, 'x' },
-		.desc = "Counter values in hexadecimal format"
-	},
-	{
-		.option = { "hide", no_argument, NULL, 'H' },
-		.desc = "Do not display undefined counters of a counter set"
-	},
-	{
-		.option = { "delta", no_argument, NULL, 'd' },
-		.desc = "Display delta counter values"
-	},
-	{
-		.option = { "timeout", required_argument, NULL, 't' },
-		.argument = "NUMBER",
-		.desc = "run time in s (seconds) m (minutes) h (hours) and d (days)"
-	},
-	{
-		.option = { "quote-all", no_argument, NULL, 'q' },
-		.desc = "Apply quoting to all output elements"
-	},
-	{
-		.option = { "format", required_argument, NULL, 'f' },
-		.argument = "FORMAT",
-		.desc = "List counters in specified FORMAT (" FMT_TYPE_NAMES ")"
-	},
-	{
-		.option = { "counters", required_argument, NULL, 'c' },
-		.argument = "LIST",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-		.desc = "Specify comma separated list of counters to display"
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
-};
-
 static const struct util_prg prg = {
 	.desc = "Read CPU Measurement facility counter sets",
 	.copyright_vec = {
@@ -823,7 +763,7 @@ int main(int argc, char **argv)
 	int ch;
 
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
+	util_opt_init(lshwc_opt_vec, NULL);
 
 	while ((ch = util_opt_getopt_long(argc, argv)) != -1) {
 		switch (ch) {

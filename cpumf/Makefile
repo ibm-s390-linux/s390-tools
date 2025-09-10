@@ -3,6 +3,11 @@ include ../common.mak
 BIN_FILES = lscpumf chcpumf lshwc pai lspai
 MAN_FILES = lscpumf.8 chcpumf.8 lshwc.8 pai.8 lspai.8
 
+zsh-completions := $(addprefix _,$(BIN_FILES))
+bash-completions := $(addsuffix .bash,$(BIN_FILES))
+
+include ../common_autocomp.mak
+
 all: $(BIN_FILES)
 
 libs =	$(rootdir)/libcpumf/libcpumf.a $(rootdir)/libutil/libutil.a

@@ -40,7 +40,9 @@
 #include "lib/util_prg.h"
 #include "lib/util_scandir.h"
 #include "lib/libcpumf.h"
+
 #include "pai.h"
+#include "pai_cli.h"
 
 #define S390_EVT_PAI_CRYPTO	0x1000
 #define S390_EVT_PAI_NNPA	0x1800
@@ -925,54 +927,6 @@ static void parse_cpulist(int enr, const char *parm)
 	}
 }
 
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "crypto", optional_argument, NULL, 'c' },
-		.argument = "CPULIST[:DATA]",
-		.desc = "Collect PAI crypto counters"
-	},
-	{
-		.option = { "nnpa", optional_argument, NULL, 'n' },
-		.argument = "CPULIST[:DATA]",
-		.desc = "Collect PAI nnpa counters"
-	},
-	{
-		.option = { "mapsize", required_argument, NULL, 'm' },
-		.argument = "SIZE",
-		.desc = "Specifies number of 4KB pages for event ring buffer"
-	},
-	{
-		.option = { "report", no_argument, NULL, 'r' },
-		.desc = "Report file contents"
-	},
-	{
-		.option = { "realtime", required_argument, NULL, 'R' },
-		.argument = "PRIO",
-		.desc = "Collect data with this RT SCHED_FIFO priority"
-	},
-	{
-		.option = { "interval", required_argument, NULL, 'i' },
-		.argument = "NUMBER",
-		.desc = "Specifies interval between read operations in milliseconds"
-	},
-	{
-		.option = { "verbose", no_argument, NULL, 'V' },
-		.desc = "Verbose output"
-	},
-	{
-		.option = { "humantime", no_argument, NULL, 'H' },
-		.desc = "Human readable timestamp in seconds.nanoseconds"
-	},
-	{
-		.option = { "summary", no_argument, NULL, 'S' },
-		.desc = "Print summary of all non-zero counter values"
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
-};
-
 static const struct util_prg prg = {
 	.desc = "Record and report Processor Activity Instrumentation Facility Counters.",
 	.copyright_vec = {
@@ -1038,7 +992,7 @@ int main(int argc, char **argv)
 	util_list_init(&list_pai_event, struct pai_event, node);
 	util_list_init(&list_pmu_event, struct pmu_events, node);
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
+	util_opt_init(pai_opt_vec, NULL);
 
 	/* Read currently online CPUs and create a bit mask.
 	 * This bitmap of online CPUs is used to check command line parameter

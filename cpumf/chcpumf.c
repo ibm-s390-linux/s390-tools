@@ -21,31 +21,10 @@
 #include "lib/util_path.h"
 #include "lib/util_prg.h"
 
+#include "chcpumf_cli.h"
+
 static unsigned int verbose;
 static unsigned long min_sdb, max_sdb;
-
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "min", required_argument, NULL, 'm' },
-		.argument = "num_sdb",
-		.desc = "Specifies the initial size of the sampling buffer.\n"
-			"A sample-data-block (SDB) consumes about 4 kilobytes.",
-	},
-	{
-		.option = { "max", required_argument, NULL, 'x' },
-		.argument = "num_sdb",
-		.desc = "Specifies the maximum size of the sampling buffer.\n"
-			"A sample-data-block (SDB) consumes about 4 kilobytes.",
-	},
-	{
-		.option = { "verbose", no_argument, NULL, 'V' },
-		.desc = "Verbose, display new sample-data-block values.",
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
-};
 
 static const struct util_prg prg = {
 	.desc = "Change CPU Measurement facility charactertics",
@@ -162,7 +141,7 @@ int main(int argc, char **argv)
 	unsigned long my_min, my_max;
 
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
+	util_opt_init(chcpumf_opt_vec, NULL);
 
 	parse_args(argc, argv);
 	if (geteuid())

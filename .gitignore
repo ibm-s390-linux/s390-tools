@@ -25,6 +25,7 @@ compile_commands.json
 #
 **/.detect-openssl.dep.c
 *.debug
+*/autocompletion_generator_host
 ap_tools/ap-check
 cmsfs-fuse/cmsfs-fuse
 cpacfstats/cpacfstats
@@ -34,6 +35,16 @@ cpumf/lscpumf
 cpumf/lshwc
 cpumf/lspai
 cpumf/pai
+cpumf/_chcpumf
+cpumf/_lscpumf
+cpumf/_lshwc
+cpumf/_lspai
+cpumf/_pai
+cpumf/chcpumf.bash
+cpumf/lscpumf.bash
+cpumf/lshwc.bash
+cpumf/lspai.bash
+cpumf/pai.bash
 cpuplugd/cpuplugd
 dasdfmt/dasdfmt
 dasdinfo/dasdinfo
