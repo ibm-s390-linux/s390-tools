@@ -64,6 +64,7 @@
 #define TOOLS_BINDIR	STRINGIFY (S390_TOOLS_BINDIR)
 #define TOOLS_DATADIR	STRINGIFY (S390_TOOLS_DATADIR)
 
+#define __used __attribute__((used))
 #define __noreturn __attribute__((noreturn))
 #define __packed __attribute__((packed))
 #define __aligned(x) __attribute__((aligned(x)))
