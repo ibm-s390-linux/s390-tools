@@ -208,7 +208,7 @@ iplstart:
 	clc   0(3,%r12),.L_hdr			# if it is HDRx
 	bz    .Lagain0				# skip dataset header
 	clc   0(3,%r12),.L_eof			# if it is EOFx
-	bz    .Lagain0				# skip dateset trailer
+	bz    .Lagain0				# skip dataset trailer
 
 	st    %r2,.Lkernsize			# store size for later use
 
@@ -247,7 +247,7 @@ iplstart:
 	clc   0(3,%r4),.L_hdr			# if it is HDRx
 	bz    .Lagain1				# skip dataset header
 	clc   0(3,%r4),.L_eof			# if it is EOFx
-	bz    .Lagain1				# skip dateset trailer
+	bz    .Lagain1				# skip dataset trailer
 
 	l     %r3,MAX_COMMAND_LINE_SIZE-PARMAREA+4(%r12)
 	ltr   %r3,%r3

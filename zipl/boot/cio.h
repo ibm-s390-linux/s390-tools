@@ -93,7 +93,7 @@ struct pmcw {
 	uint32_t intparm;	/* interruption parameter */
 	uint32_t qf:1;
 	uint32_t w:1;
-	uint32_t isc:3;		/* interruption sublass */
+	uint32_t isc:3;		/* interruption subclass */
 	uint32_t res5:3;	/* reserved zeros */
 	uint32_t ena:1;		/* enabled */
 	uint32_t lm:2;		/* limit mode */

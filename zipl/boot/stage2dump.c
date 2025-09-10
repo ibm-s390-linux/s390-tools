@@ -157,7 +157,7 @@ unsigned long find_dump_segment(unsigned long start, unsigned long end,
 	unsigned long addr, limit;
 
 	memset(dump_segm, 0, sizeof(*dump_segm));
-	/* Check the input values for MB alingment */
+	/* Check the input values for MB alignment */
 	if (!IS_ALIGNED(start, MIB) || !IS_ALIGNED(max_len, MIB))
 		panic(EINTERNAL, "start or max_len not MB aligned");
 	/* Search for dump segment start */
@@ -298,7 +298,7 @@ static void copy_lowcore_64(void)
 
 	prefix = S390_lowcore.prefixreg_save_area;
 
-	/* Need memcpy because of aligment problem of members */
+	/* Need memcpy because of alignment problem of members */
 	memcpy(&cpu_cnt, real_cpu_cnt_ptr, sizeof(cpu_cnt));
 	cpu_cnt++;
 	memcpy(real_cpu_cnt_ptr, &cpu_cnt, sizeof(cpu_cnt));

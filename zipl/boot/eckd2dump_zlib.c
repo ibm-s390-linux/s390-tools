@@ -159,7 +159,7 @@ unsigned long write_compressed_dump_segment(unsigned long blk,
 		segm->entry_count++;
 		segm->entry_offset[i] = (uint32_t)offset;
 		/*
-		 * Compression was ineffective or compression error ocurred,
+		 * Compression was ineffective or compression error occurred,
 		 * data chunk has benn written uncompressed.
 		 */
 		if (rc == UNCOMPRESSED || rc == COMPRESSION_ERROR)

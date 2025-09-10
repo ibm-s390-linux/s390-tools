@@ -102,7 +102,7 @@ static unsigned long dt_dump_mem_compressed(unsigned long addr,
 	if (zlib_deflateInit2(&strm, 1, Z_DEFLATED, MAX_WBITS,
 			      DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK) {
 		/*
-		 * Could not allocate or initialyze a workarea for zlib deflate,
+		 * Could not allocate or initialize a workarea for zlib deflate,
 		 * continue dumping without compression.
 		 */
 		printf("Deflate initialization failed! Dumping without compression");

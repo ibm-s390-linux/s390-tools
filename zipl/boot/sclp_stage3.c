@@ -145,7 +145,7 @@ void sclp_hsa_copy_init(void *dest_addr)
 	__sclp_hsa_copy(sccb, dest_addr, 2, 1);
 	/* Check buffer that was filled by sclp_hsa_copy */
 	if (sccb->evbuf.event_status != 0) {
-		/* Use synchonous mode */
+		/* Use synchronous mode */
 		hsa_sync_mode = 1;
 		free_page((unsigned long) sccb);
 		return;
