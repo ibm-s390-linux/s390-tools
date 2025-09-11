@@ -5099,14 +5099,15 @@ int ekmf_generate_csr(const struct ekmf_config *config,
 		}
 	}
 
-
-	_ekmf_copy_pss_params(rsa_pss_params, &pss_params);
+	if (rsa_pss_params != NULL)
+		_ekmf_copy_pss_params(rsa_pss_params, &pss_params);
 
 	rc = SK_OPENSSL_generate_csr(key_blob, key_blob_size,
 				     subject_rdns, num_subject_rdns,
 				     subject_utf8, cert,
 				     extensions, num_extensions,
-				     digest_nid, &pss_params, &req,
+				     digest_nid, rsa_pss_params != NULL ?
+						&pss_params : NULL, &req,
 				     &ext_lib_info.ext_lib, verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "SK_OPENSSL_generate_csr failed "
@@ -5245,14 +5246,16 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 		}
 	}
 
-	_ekmf_copy_pss_params(rsa_pss_params, &pss_params);
+	if (rsa_pss_params != NULL)
+		_ekmf_copy_pss_params(rsa_pss_params, &pss_params);
 
 	rc = SK_OPENSSL_generate_ss_cert(key_blob, key_blob_size,
 					 subject_rdns, num_subject_rdns,
 					 subject_utf8, rcert,
 					 extensions, num_extensions,
 					 validity_days, digest_nid,
-					 &pss_params, &cert,
+					 rsa_pss_params != NULL ?
+						&pss_params : NULL, &cert,
 					 &ext_lib_info.ext_lib, verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "SK_OPENSSL_generate_ss_cert failed "
