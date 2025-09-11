@@ -364,12 +364,16 @@ static int dinfo_get_dev_from_blockdev(char *blockdev, dev_t *dev)
 	path = util_path_sysfs("block/%s/dev", blockdev);
 	if (util_file_read_line(readbuf, RD_BUFFER_SIZE, path) < 0) {
 		free(path);
+		free(readbuf);
 		return -1;
 	}
 	free(path);
-	if (dinfo_extract_dev(dev, readbuf) != 0)
+	if (dinfo_extract_dev(dev, readbuf) != 0) {
+		free(readbuf);
 		return -1;
+	}
 
+	free(readbuf);
 	return 0;
 }
 
