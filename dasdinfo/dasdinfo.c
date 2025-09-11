@@ -283,7 +283,7 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 	char filename[] = "dasdinfo0000";
 	mode_t mode;
 	unsigned int path;
-	int retry;
+	unsigned int retry;
 	int rc;
 	int fd;
 
@@ -294,7 +294,7 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 		if (pathname[path] == NULL)
 			continue;
 		for (retry = 0; retry < TEMP_DEV_MAX_RETRIES; retry++) {
-			sprintf(filename, "dasdinfo%04d", retry);
+			snprintf(filename, sizeof(filename), "dasdinfo%04d", retry);
 			result = dinfo_make_path(pathname[path], filename);
 			if (result == NULL)
 				return -1;
