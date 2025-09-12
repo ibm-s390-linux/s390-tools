@@ -3292,8 +3292,9 @@ int kms_configure(const kms_handle_t handle,
 					  opts.cert_digest,
 #ifdef EKMF_SUPPORTS_RSA_PSS_CERTIFICATES
 					  opts.cert_rsa_pss,
-#endif
+#else
 					  false);
+#endif
 	else
 		rc = _error_gen_csr_sscert_opts(ph, &opts);
 	if (rc != 0)
