@@ -414,6 +414,18 @@ the different tools are provided:
   dumping).
   Removing the inflate modules and function prototypes are the only major
   modifications made to the kernel version of zlib.
+  For stand-alone NVMe and list-directed DASD dump, the following tools/packages
+  are required to populate dumper's initramfs:
+  - cat
+  - cut
+  - findmnt
+  - logsave
+  - makedumpfile
+  - mount
+  - poweroff
+  - sha256sum
+  - sync
+  - umount
 
 * zgetdump
   For building zgetdump you need OpenSSL version 1.1.0 or newer
