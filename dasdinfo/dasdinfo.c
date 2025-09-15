@@ -373,8 +373,9 @@ static int
 dinfo_is_busiddir(const char *fpath, const struct stat *UNUSED(sb),
 		  int tflag, struct FTW *ftwbuf)
 {
+	enum { LINK_DIR_SIZE = 128 };
+	char linkdir[LINK_DIR_SIZE];
 	char *tempdir;
-	char linkdir[128];
 	ssize_t i;
 
 	if (tflag != FTW_D || (strncmp((fpath + ftwbuf->base), searchbusid,
@@ -387,9 +388,9 @@ dinfo_is_busiddir(const char *fpath, const struct stat *UNUSED(sb),
 	 */
 	if (asprintf(&tempdir, "%s/driver", fpath) < 0)
 		return -1;
-	i = readlink(tempdir, linkdir, 128);
+	i = readlink(tempdir, linkdir, LINK_DIR_SIZE);
 	free(tempdir);
-	if ((i < 0) || (i >= 128))
+	if (i < 0 || i >= LINK_DIR_SIZE)
 		return -1;
 	/* append '\0' because readlink returns non zero terminated string */
 	tempdir[i + 1] = '\0';
