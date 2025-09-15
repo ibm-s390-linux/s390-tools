@@ -393,7 +393,7 @@ dinfo_is_busiddir(const char *fpath, const struct stat *UNUSED(sb),
 	if (i < 0 || i >= LINK_DIR_SIZE)
 		return -1;
 	/* append '\0' because readlink returns non zero terminated string */
-	tempdir[i + 1] = '\0';
+	linkdir[i] = '\0';
 	if (strstr(linkdir, "dasd") == NULL)
 		return FTW_CONTINUE;
 	free(busiddir);
