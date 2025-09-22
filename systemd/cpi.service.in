@@ -43,5 +43,9 @@ EnvironmentFile=@sysconf_path@/sysconfig/cpi
 # Sending data to the HMC/SE
 ExecStart=@toolslib_path@/cpictl -e
 
+# On SEL guests, do not send data by default and treat the respective
+# return code as success.
+SuccessExitStatus=NOTCONFIGURED
+
 [Install]
 WantedBy=multi-user.target
