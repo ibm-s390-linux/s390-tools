@@ -23,6 +23,8 @@ lshwc \- extract CPU Measurement Facilities counter sets
 .IR time ]
 .RB [ \-f
 .IR format ]
+.RB [ \-c
+.IR list ]
 \fR[\fIcpulist\fR][:\fIsets\fR]\fP
 .br
 \*c
@@ -171,6 +173,11 @@ An array of counter objects, each containing \fBname\fP (if available), \fBid\fP
 and \fBvalue\fP.
 .RE
 .RE
+.
+.TP
+.BR \-c ", " \-\-counters \fI\ LIST\fP
+Specify a comma-separated list of counter names to be printed.
+If a counter name does not match any valid counter name, it is omitted. (Implies -H)
 .
 .TP
 \fR[\fIcpulist\fR][:\fIsets\fR]\fP

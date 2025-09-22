@@ -37,7 +37,7 @@
 #include "lib/util_base.h"
 #include "lib/util_path.h"
 #include "lib/util_scandir.h"
-#include "lib/util_libc.h"
+#include "lib/util_str.h"
 #include "lib/util_file.h"
 #include "lib/util_fmt.h"
 #include "lib/libcpumf.h"
@@ -61,6 +61,7 @@ static bool hideundef;
 static bool delta, firstread;
 static int output_format = FMT_CSV;
 static bool quote_all;
+static char *ctrlist; /* Comma separated list of counter to extract */
 
 static unsigned int max_possible_cpus;	/* No of possible CPUs */
 static struct ctrname {		/* List of defined counters */
@@ -151,6 +152,8 @@ static bool read_counternames(void)
 		return false;
 	}
 	for (i = 0; i < count && ctr >= 0; i++) {
+		if (!ctr_in_list(namelist[i]->d_name, ctrlist))
+			continue;
 		util_asprintf(&ctrpath, "%s/%s", path, namelist[i]->d_name);
 		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1)
 			ctrname[ctr].name = mk_name(ctr, namelist[i]->d_name);
@@ -779,6 +782,12 @@ static struct util_opt opt_vec[] = {
 		.argument = "FORMAT",
 		.desc = "List counters in specified FORMAT (" FMT_TYPE_NAMES ")"
 	},
+	{
+		.option = { "counters", required_argument, NULL, 'c' },
+		.argument = "LIST",
+		.flags = UTIL_OPT_FLAG_NOSHORT,
+		.desc = "Specify comma separated list of counters to display"
+	},
 	UTIL_OPT_HELP,
 	UTIL_OPT_VERSION,
 	UTIL_OPT_END
@@ -892,6 +901,12 @@ int main(int argc, char **argv)
 				errx(EXIT_FAILURE, "Supported formats:" FMT_TYPE_NAMES);
 			output_format = fmt;
 			break;
+		case 'c':
+			hideundef = true;
+			ctrlist = util_strdup(optarg);
+			util_str_rm_whitespace(optarg, ctrlist);
+			util_str_toupper(ctrlist);
+			break;
 		}
 	}
 
@@ -927,5 +942,6 @@ int main(int argc, char **argv)
 	free_counternames();
 	free(check);
 	free(ioctlbuffer);
+	free(ctrlist);
 	return ch;
 }
