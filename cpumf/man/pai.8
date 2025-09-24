@@ -15,24 +15,24 @@ pai \- record and report Processor Activity Instrumentation (PAI) counters
 .SH SYNOPSIS
 \*c
 .RB [ \-V ][ \-m | \-\-mapsize
-.IR size ]
+.IR SIZE ]
 .RB [ \-i | \-\-interval
-.IR ms ]
+.IR MS ]
 .RB [ \-R | \-\-realtime
-.IR prio ]
-.BR  \-c | \-\-crypto [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
+.IR PRIO ]
+.BR  \-c | \-\-crypto [ \fICPULIST ][: \fIDATA\fR "] [" \fILOOPS\fP ]
 .br
 \*c
 .RB [ \-V ][ \-m | \-\-mapsize
-.IR size ]
+.IR SIZE ]
 .RB [ \-i | \-\-interval
-.IR ms ]
+.IR MS ]
 .RB [ \-R | \-\-realtime
-.IR prio ]
-.BR  \-n | \-\-nnpa [ \fIcpulist ][: \fIdata\fR "] [" \fIloops\fP ]
+.IR PRIO ]
+.BR  \-n | \-\-nnpa [ \fICPULIST ][: \fIDATA\fR "] [" \fILOOPS\fP ]
 .br
 \*c
-.RB [ \-V ][ \-H | \-\-humantime ][ \-S | \-\-summary "] " \-r | \-\-report " [" \fIfiles\fP ]
+.RB [ \-V ][ \-H | \-\-humantime ][ \-S | \-\-summary "] " \-r | \-\-report " [" \fIFILES\fP ]
 .br
 \*c
 .BR \-h | \-\-help
@@ -73,7 +73,7 @@ Reporting evaluates files that are created by recording.
 
 .SH OPTIONS
 .TP
-.BR \-c ", " \-\-crypto "\fR[\fIcpulist\fR][:\fIdata\fR]"
+.BR \-c ", " \-\-crypto "\fR[\fICPULIST\fR][:\fIDATA\fR]"
 Records data for all (default) or a specified list of CPUs.
 The CPU list is a comma-separated list of CPU numbers and ranges.
 In a range, a hyphen separates the first CPU number
@@ -106,7 +106,7 @@ execution.
 .RE
 .
 .TP
-.BR \-n ", " \-\-nnpa "\fR[\fIcpulist\fR][:\fIdata\fR]"
+.BR \-n ", " \-\-nnpa "\fR[\fICPULIST\fR][:\fIDATA\fR]"
 Records data for all (default) or a specified list of CPUs.
 The CPU list is a comma-separated list of CPU numbers and ranges.
 In a range, a hyphen separates the first CPU number

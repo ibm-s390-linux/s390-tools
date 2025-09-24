@@ -17,9 +17,9 @@ chcpumf \- manage the CPU-measurement facilities support
 .SH SYNOPSIS
 .B chcpumf
 .RB [ \-m | \-\-min
-.IR num_sdb ]
+.IR NUM_SDB ]
 .RB [ \-x | \-\-max
-.IR num_sdb ]
+.IR NUM_SDB ]
 .RB [ \-V |  \-\-verbose ]
 .br
 .B chcpumf
@@ -36,14 +36,14 @@ facilities for Linux on System z.
 .
 .SH OPTIONS
 .TP
-.BR \-m ", " \-\-min " \fInum_sdb\fP"
+.BR \-m ", " \-\-min " \fINUM_SDB\fP"
 Specifies the minimum sampling facility buffer size in sample-data-blocks
 (SDB).  A sample-data-block consumes about 4 kilobytes.
 
 This is the initial buffer size when you start the sampling facility.
 .
 .TP
-.BR \-x ", " \-\-max " \fInum_sdb\fP"
+.BR \-x ", " \-\-max " \fINUM_SDB\fP"
 Specifies the maximum sampling facility buffer size in sample-data-blocks
 (SDB).  A sample-data-block consumes about 4 kilobytes.
 

@@ -16,16 +16,16 @@ lshwc \- extract CPU Measurement Facilities counter sets
 \*c
 .RB [ \-a ][ \-d ][ \-H ][ \-s ][ \-x ][ \-X ][ \-q ]
 .RB [ \-l
-.IR count ]
+.IR COUNT ]
 .RB [ \-i
-.IR interval ]
+.IR INTERVAL ]
 .RB [ \-t
-.IR time ]
+.IR TIME ]
 .RB [ \-f
-.IR format ]
+.IR FORMAT ]
 .RB [ \-c
-.IR list ]
-\fR[\fIcpulist\fR][:\fIsets\fR]\fP
+.IR LIST ]
+\fR[\fICPULIST\fR][:\fISETS\fR]\fP
 .br
 \*c
 .BR \-h | \-\-help
@@ -64,13 +64,13 @@ Without this flag the total value of each counter is displayed.
 See Examples.
 .
 .TP
-.BR \-i ", " \-\-interval \fI\ seconds\fP
+.BR \-i ", " \-\-interval \fI\ SECONDS\fP
 Specifies a time interval, in seconds,
 that the command waits between read operations.
 The default is 60 seconds.
 .
 .TP
-.BR \-l ", " \-\-loop \fI\ count\fP
+.BR \-l ", " \-\-loop \fI\ COUNT\fP
 Performs the specified number of read operations.
 .
 .TP
@@ -136,7 +136,7 @@ Displays counter values as hexadecimal values with a leading 0x prefix.
 Apply quoting to every output element, regardless of content or format.
 .
 .TP
-.BR \-f ", " \-\-format \fI\ format\fP
+.BR \-f ", " \-\-format \fI\ FORMAT\fP
 Retrieve output in one of the following formats:
 JSON, CSV, JSON-SEQ or PAIRS.
 If no format is specified, the output defaults to CSV.
@@ -180,7 +180,7 @@ Specify a comma-separated list of counter names to be printed.
 If a counter name does not match any valid counter name, it is omitted. (Implies -H)
 .
 .TP
-\fR[\fIcpulist\fR][:\fIsets\fR]\fP
+\fR[\fICPULIST\fR][:\fISETS\fR]\fP
 A comma-separated list of CPUs.
 Each CPU can optionally be followed by characters that specify the counter set.
 See below for details.
