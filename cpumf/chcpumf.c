@@ -7,7 +7,7 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <errno.h>
+#include <err.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -17,7 +17,6 @@
 #include <sys/stat.h>
 
 #include "lib/libcpumf.h"
-#include "lib/util_base.h"
 #include "lib/util_opt.h"
 #include "lib/util_path.h"
 #include "lib/util_prg.h"
