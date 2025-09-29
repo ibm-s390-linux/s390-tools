@@ -12,6 +12,7 @@
 #ifndef LIB_UTIL_LIBC_H
 #define LIB_UTIL_LIBC_H
 
+#include <fcntl.h>
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -123,6 +124,29 @@ do {							\
 	util_vsprintf(str, fmt, ap);			\
 	va_end(ap);					\
 } while (0)
+
+/**
+ * Reads the target of a symbolic link at the given path.
+ *
+ * @param[in] path   Path to the symbolic link
+ * @return           Newly allocated string with the link target, or NULL on error
+ */
+#define util_readlink(path) __util_readlinkat(__func__, __FILE__, __LINE__, AT_FDCWD, path)
+
+/**
+ * Reads the target of a symbolic link relative to a directory file descriptor.
+ *
+ * Semantics:
+ * - If path is absolute, dirfd is ignored, per readlinkat semantics.
+ * - If path is relative, it is resolved relative to dirfd.
+ *
+ * @param[in] dirfd  Directory file descriptor or AT_FDCWD
+ * @param[in] path   Path to the symbolic link
+ * @return           Newly allocated string with the link target, or NULL on error
+ */
+#define util_readlinkat(dirfd, path) __util_readlinkat(__func__, __FILE__, __LINE__, dirfd, path)
+
+char *__util_readlinkat(const char *func, const char *file, int line, int dirfd, const char *path);
 
 int __util_vsprintf(const char *func, const char *file, int line,
 		    char *str, const char *fmt, va_list ap);

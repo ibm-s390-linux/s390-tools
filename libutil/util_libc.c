@@ -10,11 +10,15 @@
  */
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "lib/util_base.h"
 #include "lib/util_libc.h"
@@ -294,4 +298,32 @@ size_t util_strlcpy(char *dest, const char *src, size_t size)
 	}
 
 	return str_len;
+}
+
+char *__util_readlinkat(const char *func, const char *file, int line, int dirfd, const char *path)
+{
+	ssize_t link_len = PATH_MAX;
+	struct stat st;
+	char *linkdir;
+	ssize_t len;
+
+	if (fstatat(dirfd, path, &st, AT_SYMLINK_NOFOLLOW) == 0 && st.st_size > 0)
+		link_len = st.st_size + 1;
+
+	linkdir = __util_malloc(func, file, line, link_len);
+
+	len = readlinkat(dirfd, path, linkdir, link_len);
+	if (len == -1) {
+		free(linkdir);
+		return NULL;
+	}
+
+	if (len >= link_len) {
+		warnx("%s: Link target too long", path);
+		free(linkdir);
+		return NULL;
+	}
+
+	linkdir[len] = '\0';
+	return __util_realloc(func, file, line, linkdir, (size_t)len + 1);
 }
