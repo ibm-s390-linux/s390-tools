@@ -13,5 +13,7 @@
 #define LIB_UTIL_STR_H
 
 void util_str_rm_whitespace(const char *src, char *dest);
+const char *util_startswith(const char *s, const char *prefix);
+const char *util_startswith_no_case(const char *s, const char *prefix);
 
 #endif /** LIB_UTIL_STR_H @} */
