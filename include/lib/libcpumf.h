@@ -202,4 +202,19 @@ bool libcpumf_have_pai_nnpa(void);
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int group_fd,
 		     unsigned long flags);
+
+/**
+ * Check if a counter name is present in a comma-separated list of counters.
+ *
+ * This function checks whether the given counter name appears in the
+ * provided list. If the list is NULL, the function assumes all counters
+ * are allowed and returns true.
+ *
+ * @param name      Name of the counter to search for
+ * @param ctrlist   Comma-separated list of counter names, or NULL
+ *
+ * @return          true if the counter is in the list or list is NULL
+ * @return          false otherwise
+ */
+bool ctr_in_list(char *name, char *ctrlist);
 #endif

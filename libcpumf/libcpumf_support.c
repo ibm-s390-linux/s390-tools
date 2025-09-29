@@ -14,6 +14,7 @@
 
 #include "lib/libcpumf.h"
 #include "lib/util_path.h"
+#include "lib/util_libc.h"
 
 #define	SERVICELEVEL	"/proc/service_levels"
 
@@ -174,4 +175,26 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu, int g
 		     unsigned long flags)
 {
 	return syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+}
+
+bool ctr_in_list(char *name, char *ctrlist)
+{
+	char *token;
+	char *list;
+
+	if (!ctrlist) /* No --counters means all counters */
+		return true;
+
+	list = util_strdup(ctrlist);
+	token = strtok(list, ",");
+	while (token) {
+		if (strcmp(token, name) == 0) {
+			free(list);
+			return true;
+		}
+		token = strtok(NULL, ",");
+	}
+
+	free(list);
+	return false;
 }

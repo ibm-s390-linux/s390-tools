@@ -233,31 +233,6 @@ static int pai_ctrcmp(const void *p1, const void *p2)
 	return l->nr > r->nr ? 1 : -1;
 }
 
-/* Return true if the counter is in the ctrlist. An empty ctrlist
- * disables all counters.
- */
-static bool ctr_in_list(char *name)
-{
-	char *token;
-	char *list;
-
-	if (!ctrlist)		/* No --counters means all counters */
-		return true;
-
-	list = util_strdup(ctrlist);
-	token = strtok(list, ",");
-	while (token) {
-		if (strcmp(token, name) == 0) {
-			free(list);
-			return true;
-		}
-		token = strtok(NULL, ",");
-	}
-
-	free(list);
-	return false;
-}
-
 /* Read counter names and assigned event number from sysfs file tree.
  * Exit when sysfs directory can not be scanned.
  */
@@ -280,7 +255,8 @@ static void read_counternames(struct pai_node *node)
 		if (util_file_read_va(ctrpath, "event=%x", &ctr) == 1) {
 			snprintf(sname, sizeof(sname), "%c%ld",
 				 pai_type_char(node->type), ctr - node->base);
-			if (!ctr_in_list(sname) && !ctr_in_list(namelist[i]->d_name)) {
+			if (!ctr_in_list(sname, ctrlist) &&
+			    !ctr_in_list(namelist[i]->d_name, ctrlist)) {
 				/* Counter not listed in --counters option */
 				continue;
 			}
