@@ -73,7 +73,7 @@ enum sch_type {
  * Private data
  */
 static struct lscss_cmd_opts {
-	/* Boolean flags to indicate wich command options are in effect */
+	/* Boolean flags to indicate which command options are in effect */
 	bool opt_short;		/* -s or --short */
 	bool opt_devtype;	/* -t or --devtype */
 	bool opt_devrange;	/* -d or --devrange */
@@ -246,7 +246,7 @@ static bool id_in_ranges_list(const char *id)
  * @param[in,out] dt   Pointer to devtype structure to be initialized
  * @parm[in]      id   String to parse
  *
- * @returns       true if the input string has been parsed successfuly;
+ * @returns       true if the input string has been parsed successfully;
  *                otherwise false
  */
 static bool parse_devtype_str(struct devtype *dt, const char *id)
