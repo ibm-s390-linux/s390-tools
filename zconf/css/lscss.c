@@ -20,7 +20,6 @@
 #include "lib/util_prg.h"
 #include "lib/util_rec.h"
 #include "lib/util_scandir.h"
-#include "lib/util_panic.h"
 
 #include "misc.h"
 
@@ -376,20 +375,17 @@ static int fill_device_info(struct util_rec *rec, char *path, char *device)
 
 static bool is_sch_vfio(char *path)
 {
-	char lnk[PATH_MAX], driver_path[PATH_MAX];
-	ssize_t rc;
+	char lnk[PATH_MAX];
+	char *driver_path;
 
 	snprintf(lnk, PATH_MAX, "%s/driver", path);
-	rc = readlink(lnk, driver_path, PATH_MAX);
-	if (rc < 0)
-		return false;
+	driver_path = util_readlink(lnk);
 
-	util_assert(rc < (PATH_MAX - 1),
-		    "Internal error: Symlink name too long");
-	driver_path[rc] = '\0';
-
-	if (strcmp(basename(driver_path), "vfio_ccw") == 0)
+	if (strcmp(basename(driver_path), "vfio_ccw") == 0) {
+		free(driver_path);
 		return true;
+	}
+	free(driver_path);
 	return false;
 }
 
