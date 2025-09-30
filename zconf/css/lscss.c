@@ -12,7 +12,6 @@
 #include <stdlib.h>
 
 #include "lib/ccw.h"
-#include "lib/util_base.h"
 #include "lib/util_file.h"
 #include "lib/util_libc.h"
 #include "lib/util_list.h"
@@ -22,7 +21,6 @@
 #include "lib/util_rec.h"
 #include "lib/util_scandir.h"
 #include "lib/util_panic.h"
-#include "lib/zt_common.h"
 
 #include "misc.h"
 
