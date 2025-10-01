@@ -1,0 +1,1 @@
+SUBSYSTEM=="block", ACTION=="add", KERNEL=="vd*[!0-9]", TEST=="queue/rotational", ATTR{queue/rotational}="0"
