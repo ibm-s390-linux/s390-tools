@@ -119,6 +119,10 @@ ifneq ($(HOST_ARCH),$(BUILD_ARCH))
   endif
 endif
 
+# *_FOR_BUILD variables define compilation configurations for binaries used
+# during the build process (e.g. autocompleteion script generators). This
+# is especially important for cross-compilation where these binaries need to
+# be executed on the build system.
 $(eval $(call define_toolchain_variables,_FOR_BUILD,))
 $(eval $(call define_toolchain_variables,,$(CROSS_COMPILE)))
 
