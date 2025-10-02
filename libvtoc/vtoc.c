@@ -1057,7 +1057,7 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 		if ((a > ext->t) &&
 			((ext->t + ext->fc*trk + ext->ft) > (a + b*trk + c)))
 		{
-			/* partition devides free space into 2 pieces */
+			/* partition divides free space into 2 pieces */
 			u_int16_t x = a + b*trk + c;
 			u_int16_t w,y;
 			u_int8_t z;
@@ -1262,7 +1262,7 @@ void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
 		}
 
 		if ((a > ext->a) && (b < ext->b)) {
-			/* partition devides free space into 2 pieces */
+			/* partition divides free space into 2 pieces */
 			vtoc_update_format7_label_add(f7, verbose, 
 						      b, ext->b);
 			ext->b = a;
