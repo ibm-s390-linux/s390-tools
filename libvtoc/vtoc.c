@@ -674,24 +674,24 @@ vtoc_init_format4_label (
         f4->DS4DEVCT.DS4DEVDB = 0x00;
         /* -- end f4->DS4DEVCT -- */
 
-	bzero(f4->DS4AMTIM, sizeof(f4->DS4AMTIM));
-	bzero(f4->DS4AMCAT, sizeof(f4->DS4AMCAT));
-	bzero(f4->DS4R2TIM, sizeof(f4->DS4R2TIM));
-	bzero(f4->res1, sizeof(f4->res1));
-	bzero(f4->DS4F6PTR, sizeof(f4->DS4F6PTR));
+	memset(f4->DS4AMTIM, 0, sizeof(f4->DS4AMTIM));
+	memset(f4->DS4AMCAT, 0, sizeof(f4->DS4AMCAT));
+	memset(f4->DS4R2TIM, 0, sizeof(f4->DS4R2TIM));
+	memset(f4->res1, 0, sizeof(f4->res1));
+	memset(f4->DS4F6PTR, 0, sizeof(f4->DS4F6PTR));
 
         /* -- begin f4lbl->DS4VTOCE -- */
 	vtoc_set_extent(&f4->DS4VTOCE, 0x01, 0x00, &lower, &upper);
         /* -- end f4lbl->DS4VTOCE -- */
 
-	bzero(f4->res2, sizeof(f4->res2));
+	memset(f4->res2, 0, sizeof(f4->res2));
 	f4->DS4EFLVL = 0x00;
-	bzero(&f4->DS4EFPTR, sizeof(f4->DS4EFPTR));
-	bzero(&f4->res3, sizeof(f4->res3));
+	memset(&f4->DS4EFPTR, 0, sizeof(f4->DS4EFPTR));
+	memset(&f4->res3, 0, sizeof(f4->res3));
 	f4->DS4DCYL = real_cylinders;
-	bzero(f4->res4, sizeof(f4->res4));
+	memset(f4->res4, 0, sizeof(f4->res4));
 	f4->DS4DEVF2 = 0x40; /* allow format 8 and 9 labels */
-	bzero(&f4->res5, sizeof(f4->res5));
+	memset(&f4->res5, 0, sizeof(f4->res5));
 }
 
 
@@ -703,7 +703,7 @@ vtoc_init_format5_label (format5_label_t *f5)
 {
 	int i;
 
-	bzero(f5, sizeof(format5_label_t));
+	memset(f5, 0, sizeof(format5_label_t));
 	for (i=0; i<4; i++) f5->DS5KEYID[i] = 0x05;
 	f5->DS5FMTID = 0xf5;
 }
@@ -717,7 +717,7 @@ vtoc_init_format7_label (format7_label_t *f7)
 {
 	int i;
 
-	bzero(f7, sizeof(format7_label_t));
+	memset(f7, 0, sizeof(format7_label_t));
 	for (i=0; i<4; i++) f7->DS7KEYID[i] = 0x07;
 	f7->DS7FMTID = 0xf7;
 }
@@ -740,7 +740,7 @@ static void vtoc_init_format_1_8_label (
 	t = time(NULL);
 	creatime = gmtime(&t);
 
-	bzero(f1->DS1DSNAM, sizeof(f1->DS1DSNAM));
+	memset(f1->DS1DSNAM, 0, sizeof(f1->DS1DSNAM));
 	sprintf(str, "PART    .NEW                                ");
 	vtoc_ebcdic_enc(str, str, 44);
 	memcpy(f1->DS1DSNAM, str, 44);
@@ -775,17 +775,17 @@ static void vtoc_init_format_1_8_label (
 	f1->DS1RKP   = 0x0000;
 	f1->DS1DSIND = 0x80; /* last volume for this dataset */
 	f1->DS1SCAL1 = 0x80;
-	bzero(&f1->DS1SCAL3, sizeof(f1->DS1SCAL3));
+	memset(&f1->DS1SCAL3, 0, sizeof(f1->DS1SCAL3));
 	vtoc_set_ttr(&f1->DS1LSTAR,
 		     0x0000,
 		     0x00);
 	f1->DS1TRBAL = 0x00;
-	bzero(&f1->res1, sizeof(f1->res1));
+	memset(&f1->res1, 0, sizeof(f1->res1));
 	memcpy(&f1->DS1EXT1,
 	       part_extent,
 	       sizeof(extent_t));
-	bzero(&f1->DS1EXT2, sizeof(extent_t));
-	bzero(&f1->DS1EXT3, sizeof(extent_t));
+	memset(&f1->DS1EXT2, 0, sizeof(extent_t));
+	memset(&f1->DS1EXT3, 0, sizeof(extent_t));
 	vtoc_set_cchhb(&f1->DS1PTRDS,
 		       0x0000, 0x0000, 0x00);
 }
@@ -954,7 +954,7 @@ vtoc_update_format5_label_add (format5_label_t *f5,
 			/* this extent precedes the new one */
 			ext->fc += (tmp->fc + (tmp->ft + ext->ft)/trk);
 			ext->ft = (tmp->ft + ext->ft) % trk;
-			bzero(tmp, sizeof(ds5ext_t));
+			memset(tmp, 0, sizeof(ds5ext_t));
 			tmp = ext;
 			if (verbose) 
 				printf("FMT5 add extent: " \
@@ -969,7 +969,7 @@ vtoc_update_format5_label_add (format5_label_t *f5,
 			ext->t = tmp->t;
 			ext->fc += (tmp->fc + (tmp->ft + ext->ft)/trk);
 			ext->ft = (tmp->ft + ext->ft) % trk;
-			bzero(tmp, sizeof(ds5ext_t));
+			memset(tmp, 0, sizeof(ds5ext_t));
 			tmp = ext;
 			if (verbose) 
 				printf("FMT5 add extent: " \
@@ -1007,7 +1007,7 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 		if ((a == ext->t) && (b == ext->fc) && (c == ext->ft))
 		{
 			/* fills up whole free space gap */
-			bzero(ext, sizeof(ds5ext_t));
+			memset(ext, 0, sizeof(ds5ext_t));
 			if (verbose) 
 				printf("FMT5 del extent: fills whole gap\n");
 			counter++;
@@ -1194,7 +1194,7 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 		if ((ext->b) == tmp->a) {
 			/* this extent precedes the new one */
 			ext->b = tmp->b;
-			bzero(tmp, sizeof(ds7ext_t));
+			memset(tmp, 0, sizeof(ds7ext_t));
 			tmp = ext;
 			if (verbose) 
 				printf("FMT7 add extent: " \
@@ -1207,7 +1207,7 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 		{
 			/* this extent succeeds the new one */
 			ext->a = tmp->a;
-			bzero(tmp, sizeof(ds7ext_t));
+			memset(tmp, 0, sizeof(ds7ext_t));
 			tmp = ext;
 			if (verbose) 
 				printf("FMT7 add extent: " \
@@ -1236,7 +1236,7 @@ void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
 
 		if ((a == ext->a) && (b == ext->b)) {
 			/* fills up whole free space gap */
-			bzero(ext, sizeof(ds7ext_t));
+			memset(ext, 0, sizeof(ds7ext_t));
 			if (verbose) 
 				printf("FMT7 del extent: fills whole gap\n");
 			counter++;
