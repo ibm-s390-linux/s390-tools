@@ -1328,7 +1328,7 @@ static void zdsfs_process_device_file(const char *devfile)
 	if (sb.st_size) {
 		size = (size_t)sb.st_size + 1;
 		buffer = malloc(size);
-		bzero(buffer, size);
+		memset(buffer, 0, size);
 		if (!buffer) {
 			fprintf(stderr, "could not allocate memory to buffer"
 				" file %s\n", devfile);
@@ -1698,7 +1698,7 @@ int main(int argc, char *argv[])
 	int rc;
 
 	timer_running = 0;
-	bzero(&zdsfsinfo, sizeof(zdsfsinfo));
+	memset(&zdsfsinfo, 0, sizeof(zdsfsinfo));
 	zdsfsinfo.keepRDW = 0;
 	zdsfsinfo.allow_inclomplete_multi_volume = 0;
 	zdsfsinfo.tracks_per_frame = 128;
