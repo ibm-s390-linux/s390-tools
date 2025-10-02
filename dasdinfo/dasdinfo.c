@@ -212,7 +212,7 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 	if (lseek(f, vlabel_start, SEEK_SET) < 0)
 		goto error_close;
 
-	bzero(vlabel, vlsize);
+	memset(vlabel, 0, vlsize);
 
 	if (read(f, vlabel, vlsize) != vlsize) {
 		warnx("Could not read volume label");
@@ -220,15 +220,15 @@ static int dinfo_read_dasd_vlabel(char *device, struct volume_label *vlabel,
 	}
 
 	if (dasd_info.FBA_layout) {
-		bzero(&tmp, vlsize);
+		memset(&tmp, 0, vlsize);
 		memcpy(&tmp, vlabel, vlsize);
 		memcpy(vlabel->vollbl, &tmp, vlsize - 4);
 	}
 
 	close(f);
 
-	bzero(readbuf, 7);
-	bzero(vollbl, 5);
+	memset(readbuf, 0, 7);
+	memset(vollbl, 0, 5);
 	strncpy(vollbl, vlabel->vollbl, 4);
 	dinfo_ebcdic_dec(vollbl, vollbl, 4);
 
@@ -334,7 +334,7 @@ static int dinfo_extract_dev(dev_t *dev, char *str)
 	char *p = NULL;
 	int ma, mi;
 
-	bzero(tmp, RD_BUFFER_SIZE);
+	memset(tmp, 0, RD_BUFFER_SIZE);
 	util_strlcpy(tmp, str, RD_BUFFER_SIZE);
 	p = strchr(tmp, ':');
 	if (p == NULL) {
