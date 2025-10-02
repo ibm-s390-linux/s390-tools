@@ -26,7 +26,7 @@ static unsigned char EBCtoASC[256] =
                                 -INP                   */
 	0x07, 0x07, 0x1C, 0x07, 0x07, 0x0A, 0x17, 0x1B,
 /* 0x28  -SA  -SFE   -SM  -CSP  -MFA   ENQ   ACK   BEL
-                     -SW                               */ 
+                     -SW                               */
 	0x07, 0x07, 0x07, 0x07, 0x07, 0x05, 0x06, 0x07,
 /* 0x30 ----  ----   SYN   -IR   -PP  -TRN  -NBS   EOT */
 	0x07, 0x07, 0x16, 0x07, 0x07, 0x07, 0x07, 0x04,
@@ -42,7 +42,7 @@ static unsigned char EBCtoASC[256] =
 	0x8D, 0xE1, 0x21, 0x24, 0x2A, 0x29, 0x3B, 0xAA,
 /* 0x60    -     /  ----     Ä  ----  ----  ----       */
 	0x2D, 0x2F, 0x07, 0x8E, 0x07, 0x07, 0x07, 0x8F,
-/* 0x68             ----     ,     %     _     >     ? */ 
+/* 0x68             ----     ,     %     _     >     ? */
 	0x80, 0xA5, 0x07, 0x2C, 0x25, 0x5F, 0x3E, 0x3F,
 /* 0x70  ---        ----  ----  ----  ----  ----  ---- */
 	0x07, 0x90, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
@@ -144,7 +144,7 @@ static char buffer[85];
 /*
  *
  */
-static void vtoc_error(enum failure why, char *s1, char *s2) 
+static void vtoc_error(enum failure why, char *s1, char *s2)
 {
 	switch (why) {
 	case unable_to_open:
@@ -172,11 +172,11 @@ static void vtoc_error(enum failure why, char *s1, char *s2)
 /*
  *
  */
-char * vtoc_ebcdic_enc (char *source, char *target, int l) 
+char * vtoc_ebcdic_enc (char *source, char *target, int l)
 {
         int i;
 
-	for (i = 0; i < l; i++) 
+	for (i = 0; i < l; i++)
 	        target[i]=ASCtoEBC[(unsigned char)(source[i])];
 
 	return target;
@@ -186,11 +186,11 @@ char * vtoc_ebcdic_enc (char *source, char *target, int l)
 /*
  *
  */
-char * vtoc_ebcdic_dec (char *source, char *target, int l) 
+char * vtoc_ebcdic_dec (char *source, char *target, int l)
 {
         int i;
 
-	for (i = 0; i < l; i++) 
+	for (i = 0; i < l; i++)
 	        target[i]=EBCtoASC[(unsigned char)(source[i])];
 
 	return target;
@@ -201,8 +201,8 @@ char * vtoc_ebcdic_dec (char *source, char *target, int l)
  *
  */
 void vtoc_set_extent (extent_t *ext, uint8_t typeind, uint8_t seqno,
-		      cchh_t *lower, cchh_t *upper) 
-{ 
+		      cchh_t *lower, cchh_t *upper)
+{
         ext->typeind = typeind;
         ext->seqno   = seqno;
         memcpy(&ext->llimit,lower,sizeof(cchh_t));
@@ -307,7 +307,7 @@ uint32_t cchh2trk (cchh_t *p, struct hd_geometry *geo) {
 /*
  *
  */
-void vtoc_set_date (labeldate_t * d, uint8_t year, uint16_t day) 
+void vtoc_set_date (labeldate_t * d, uint8_t year, uint16_t day)
 {
         d->year = year;
         d->day  = day;
@@ -320,7 +320,7 @@ void vtoc_set_date (labeldate_t * d, uint8_t year, uint16_t day)
 void vtoc_volume_label_init (volume_label_t *vlabel)
 {
 	sprintf(buffer, "%84s", " ");
-	vtoc_ebcdic_enc(buffer, buffer, 84);	
+	vtoc_ebcdic_enc(buffer, buffer, 84);
 	memcpy(vlabel, buffer, 84);
 }
 
@@ -329,7 +329,7 @@ void vtoc_volume_label_init (volume_label_t *vlabel)
  * reads the volume label from dasd
  */
 int vtoc_read_volume_label (char *device, unsigned long vlabel_start,
-			    volume_label_t *vlabel) 
+			    volume_label_t *vlabel)
 {
 	int f, rc;
 
@@ -360,7 +360,7 @@ int vtoc_read_volume_label (char *device, unsigned long vlabel_start,
  * writes the volume label to dasd
  */
 int vtoc_write_volume_label (char *device, unsigned long vlabel_start,
-			     volume_label_t *vlabel) 
+			     volume_label_t *vlabel)
 {
         int rc, f;
 
@@ -375,8 +375,8 @@ int vtoc_write_volume_label (char *device, unsigned long vlabel_start,
 			   "Could not write volume label.");
 	}
 
-	rc = write(f, vlabel, sizeof(volume_label_t)); 
-	if (rc != sizeof(volume_label_t)) 
+	rc = write(f, vlabel, sizeof(volume_label_t));
+	if (rc != sizeof(volume_label_t))
 	{
 	        close(f);
 		vtoc_error(unable_to_write, device,
@@ -418,7 +418,7 @@ void vtoc_volume_label_set_volser (volume_label_t *vlabel, char *volser)
 
 
 /*
- * returns the volume serial number right after it is translated 
+ * returns the volume serial number right after it is translated
  * to ASCII
  */
 char * vtoc_volume_label_get_volser (volume_label_t *vlabel, char *volser)
@@ -436,11 +436,11 @@ char * vtoc_volume_label_get_volser (volume_label_t *vlabel, char *volser)
 void vtoc_volume_label_set_key (volume_label_t *vlabel, char *key)
 {
         char s[4];
- 
+
         vtoc_ebcdic_enc(key, s, 4);
         strncpy(vlabel->volkey, s, 4);
         return;
-}                
+}
 
 
 /*
@@ -475,12 +475,12 @@ char * vtoc_volume_label_get_label (volume_label_t *vlabel, char *lbl)
  */
 void vtoc_read_label (char *device, unsigned long position,
 		      format1_label_t *f1, format4_label_t *f4,
-		      format5_label_t *f5, format7_label_t *f7) 
-{        
+		      format5_label_t *f5, format7_label_t *f7)
+{
 	int f,t;
 
         if ((f = open(device, O_RDONLY)) < 0)
-	        vtoc_error(unable_to_open, device, 
+	        vtoc_error(unable_to_open, device,
 			   "Could not read VTOC labels.");
 
         if (lseek(f, position, SEEK_SET) < 0) {
@@ -536,7 +536,7 @@ void vtoc_read_label (char *device, unsigned long position,
 void
 vtoc_write_label (char *device,
 		  unsigned long position,
-		  format1_label_t *f1, 
+		  format1_label_t *f1,
 		  format4_label_t *f4,
 		  format5_label_t *f5,
 		  format7_label_t *f7,
@@ -550,7 +550,7 @@ vtoc_write_label (char *device,
 			   "Could not write VTOC labels.");
 	}
 
-        if (lseek(f, position, SEEK_SET) == -1) 
+        if (lseek(f, position, SEEK_SET) == -1)
 	{
 	        close(f);
 		vtoc_error(unable_to_seek, device,
@@ -560,7 +560,7 @@ vtoc_write_label (char *device,
 	if (f1 != NULL)
 	{
 		t = sizeof(format1_label_t);
-	        if (write(f, f1, t) != t) 
+	        if (write(f, f1, t) != t)
 		{
 		        close(f);
 			vtoc_error(unable_to_write, device,
@@ -571,7 +571,7 @@ vtoc_write_label (char *device,
 	if (f4 != NULL)
 	{
 		t = sizeof(format4_label_t);
-	        if (write(f, f4, t) != t) 
+	        if (write(f, f4, t) != t)
 		{
 		        close(f);
 			vtoc_error(unable_to_write, device,
@@ -582,7 +582,7 @@ vtoc_write_label (char *device,
 	if (f5 != NULL)
 	{
 		t = sizeof(format5_label_t);
-	        if (write(f, f5, t) != t) 
+	        if (write(f, f5, t) != t)
 		{
 		        close(f);
 			vtoc_error(unable_to_write, device,
@@ -593,7 +593,7 @@ vtoc_write_label (char *device,
 	if (f7 != NULL)
 	{
 		t = sizeof(format7_label_t);
-	        if (write(f, f7, t) != t) 
+	        if (write(f, f7, t) != t)
 		{
 		        close(f);
 			vtoc_error(unable_to_write, device,
@@ -619,7 +619,7 @@ vtoc_write_label (char *device,
 /*
  * initializes a format4 label
  */
-void 
+void
 vtoc_init_format4_label (
 	format4_label_t    *f4,
 	unsigned int compat_cylinders,
@@ -627,7 +627,7 @@ vtoc_init_format4_label (
 	unsigned int tracks,
 	unsigned int blocks,
 	unsigned int blksize,
-	uint16_t dev_type) 
+	uint16_t dev_type)
 {
 	int i;
 
@@ -701,7 +701,7 @@ vtoc_init_format4_label (
  * initializes a format5 label
  */
 void
-vtoc_init_format5_label (format5_label_t *f5) 
+vtoc_init_format5_label (format5_label_t *f5)
 {
 	int i;
 
@@ -715,7 +715,7 @@ vtoc_init_format5_label (format5_label_t *f5)
  * initializes a format7 label
  */
 void
-vtoc_init_format7_label (format7_label_t *f7) 
+vtoc_init_format7_label (format7_label_t *f7)
 {
 	int i;
 
@@ -829,11 +829,11 @@ void vtoc_init_format9_label (
 /*
  * do some updates to the VTOC format4 label
  */
-void 
+void
 vtoc_update_format4_label (
 	format4_label_t *f4,
 	cchhb_t *highest_f1,
-	uint16_t unused_update) 
+	uint16_t unused_update)
 {
 	/* update highest address of a format 1 label */
 	memcpy(&f4->DS4HPCHR, highest_f1, sizeof(cchhb_t));
@@ -847,15 +847,15 @@ vtoc_update_format4_label (
  * reorganizes all extents within a FMT5 label
  */
 static void
-vtoc_reorganize_FMT5_extents (format5_label_t *f5) 
+vtoc_reorganize_FMT5_extents (format5_label_t *f5)
 {
 	ds5ext_t *ext, *last, tmp;
 	int i, j;
 
 	for (i=0; i<26; i++)
 	{
-		if (i==0) 
-			last = &f5->DS5AVEXT; 
+		if (i==0)
+			last = &f5->DS5AVEXT;
 		else if ((i > 0) && (i < 8))
 			last = &f5->DS5EXTAV[i-1];
 		else
@@ -863,14 +863,14 @@ vtoc_reorganize_FMT5_extents (format5_label_t *f5)
 
 		for (j=i; j<26; j++)
 		{
-			if (j==0) 
-				ext = &f5->DS5AVEXT; 
+			if (j==0)
+				ext = &f5->DS5AVEXT;
 			else if ((j > 0) && (j < 8))
 				ext = &f5->DS5EXTAV[j-1];
 			else
 				ext = &f5->DS5MAVET[j-8];
 
-			if (((ext->t > 0) && (last->t == 0)) || 
+			if (((ext->t > 0) && (last->t == 0)) ||
 			    ((ext->t > 0) && (ext->t < last->t)))
 			{
 				tmp.t  = last->t;
@@ -891,27 +891,27 @@ vtoc_reorganize_FMT5_extents (format5_label_t *f5)
 /*
  * add a free space extent description to the VTOC FMT5 DSCB
  */
-void 
+void
 vtoc_update_format5_label_add (format5_label_t *f5,
 			       int verbose,
 			       int trk,
-			       uint16_t a, 
-			       uint16_t b, 
-			       uint8_t c) 
+			       uint16_t a,
+			       uint16_t b,
+			       uint8_t c)
 {
 	ds5ext_t *ext = NULL, *tmp = NULL;
-	int i;	
+	int i;
 
 	for (i=0; i<26; i++)
 	{
-		if (i==0) 
-			ext = &f5->DS5AVEXT; 
+		if (i==0)
+			ext = &f5->DS5AVEXT;
 		else if ((i > 0) && (i < 8))
 			ext = &f5->DS5EXTAV[i-1];
 		else
 			ext = &f5->DS5MAVET[i-8];
 
-		if (((a < ext->t) && (a + b*trk + c > ext->t)) || 
+		if (((a < ext->t) && (a + b*trk + c > ext->t)) ||
 		    ((a > ext->t) && (ext->t + ext->fc*trk + ext->ft > a)))
 		{
 			printf("BUG: overlapping free space extents " \
@@ -925,7 +925,7 @@ vtoc_update_format5_label_add (format5_label_t *f5,
 			ext->fc = b;
 			ext->ft = c;
 			tmp = ext;
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 add extent: " \
 				       "add new extent\n");
 			break;
@@ -958,12 +958,12 @@ vtoc_update_format5_label_add (format5_label_t *f5,
 			ext->ft = (tmp->ft + ext->ft) % trk;
 			memset(tmp, 0, sizeof(ds5ext_t));
 			tmp = ext;
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 add extent: " \
 				       "merge with predecessor\n");
 			i = -1;
 			continue;
-		} 
+		}
 
 		if ((tmp->t + tmp->fc*trk + tmp->ft) == ext->t)
 		{
@@ -973,12 +973,12 @@ vtoc_update_format5_label_add (format5_label_t *f5,
 			ext->ft = (tmp->ft + ext->ft) % trk;
 			memset(tmp, 0, sizeof(ds5ext_t));
 			tmp = ext;
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 add extent: " \
 				       "merge with successor\n");
 			i = -1;
 			continue;
-		} 
+		}
 	}
 }
 
@@ -986,21 +986,21 @@ vtoc_update_format5_label_add (format5_label_t *f5,
 /*
  * remove a free space extent description from the VTOC FMT5 DSCB
  */
-void 
+void
 vtoc_update_format5_label_del (format5_label_t *f5,
 			       int verbose,
 			       int trk,
 			       uint16_t a,
 			       uint16_t b,
-			       uint8_t c) 
+			       uint8_t c)
 {
 	ds5ext_t *ext;
 	int i, counter=0;
-	
+
 	for (i=0; i<26; i++)
 	{
-		if (i==0) 
-			ext = &f5->DS5AVEXT; 
+		if (i==0)
+			ext = &f5->DS5AVEXT;
 		else if ((i > 0) && (i < 8))
 			ext = &f5->DS5EXTAV[i-1];
 		else
@@ -1010,7 +1010,7 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 		{
 			/* fills up whole free space gap */
 			memset(ext, 0, sizeof(ds5ext_t));
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 del extent: fills whole gap\n");
 			counter++;
 			break;
@@ -1030,13 +1030,13 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 				ext->fc -= b;
 				ext->ft -= c;
 			}
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 del extent: left bounded\n");
 			counter++;
 			break;
 		}
 
-		if ((ext->t < a) && 
+		if ((ext->t < a) &&
 		    ((ext->t + ext->fc*trk + ext->ft) == (a + b*trk + c)))
 		{
 			/* right-bounded in free space gap */
@@ -1050,7 +1050,7 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 				ext->fc -= b;
 				ext->ft -= c;
 			}
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 del extent: right bounded\n");
 			counter++;
 			break;
@@ -1074,7 +1074,7 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 			vtoc_update_format5_label_add(f5, verbose,
 						      trk, x, y, z);
 
-			if (verbose) 
+			if (verbose)
 				printf("FMT5 del extent: 2 pieces\n");
 			counter++;
 			break;
@@ -1088,8 +1088,8 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 			       "in FMT5 DSCB!\nexiting...\n");
 			exit(1);
 		}
-		
-		if ((a > ext->t) && (a < ext->t + ext->fc*trk + ext->ft) && 
+
+		if ((a > ext->t) && (a < ext->t + ext->fc*trk + ext->ft) &&
 		    (a + b*trk + c > ext->t + ext->fc*trk + ext->ft))
 		{
      			printf("BUG: specified free space extent for " \
@@ -1113,26 +1113,26 @@ vtoc_update_format5_label_del (format5_label_t *f5,
  * reorganizes all extents within a FMT7 label
  */
 static void
-vtoc_reorganize_FMT7_extents (format7_label_t *f7) 
+vtoc_reorganize_FMT7_extents (format7_label_t *f7)
 {
 	ds7ext_t *ext, *last, tmp;
 	int i, j;
 
 	for (i=0; i<16; i++)
 	{
-		if (i<5) 
-			last = &f7->DS7EXTNT[i]; 
-		else 
+		if (i<5)
+			last = &f7->DS7EXTNT[i];
+		else
 			last = &f7->DS7ADEXT[i-5];
 
 		for (j=i; j<16; j++)
 		{
-			if (j<5) 
-				ext = &f7->DS7EXTNT[j]; 
-			else 
+			if (j<5)
+				ext = &f7->DS7EXTNT[j];
+			else
 				ext = &f7->DS7ADEXT[j-5];
 
-			if (((ext->a > 0) && (last->a == 0)) || 
+			if (((ext->a > 0) && (last->a == 0)) ||
 			    ((ext->a > 0) && (ext->a < last->a)))
 			{
 				tmp.a = last->a;
@@ -1150,19 +1150,19 @@ vtoc_reorganize_FMT7_extents (format7_label_t *f7)
 /*
  * add a free space extent description to the VTOC FMT7 DSCB
  */
-void vtoc_update_format7_label_add (format7_label_t *f7, int verbose, 
-				    uint32_t a, uint32_t b) 
+void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
+				    uint32_t a, uint32_t b)
 {
 	ds7ext_t *ext = NULL, *tmp = NULL;
-	int i;	
+	int i;
 
 	for (i=0; i<16; i++) {
-		if (i<5) 
-			ext = &f7->DS7EXTNT[i]; 
-		else 
+		if (i<5)
+			ext = &f7->DS7EXTNT[i];
+		else
 			ext = &f7->DS7ADEXT[i-5];
 
-		if (((a < ext->a) && (b > ext->a) && (b < ext->b)) || 
+		if (((a < ext->a) && (b > ext->a) && (b < ext->b)) ||
 		    ((a > ext->a) && (a < ext->b) && (b > ext->b))) {
 			printf("BUG: overlapping free space extents "
 			       "in FMT7 DSCB!\nexiting...\n");
@@ -1173,7 +1173,7 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 			ext->a = a;
 			ext->b = b;
 			tmp = ext;
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 add extent: add new extent\n");
 			break;
 		}
@@ -1185,9 +1185,9 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 	}
 
 	for (i=0; i<16; i++) {
-		if (i<5) 
-			ext = &f7->DS7EXTNT[i]; 
-		else 
+		if (i<5)
+			ext = &f7->DS7EXTNT[i];
+		else
 			ext = &f7->DS7ADEXT[i-5];
 
 		if ((ext->a + ext->b) == 0x00000000)
@@ -1198,12 +1198,12 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 			ext->b = tmp->b;
 			memset(tmp, 0, sizeof(ds7ext_t));
 			tmp = ext;
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 add extent: " \
 				       "merge with predecessor\n");
 			i = -1;
 			continue;
-		} 
+		}
 
 		if (ext->a == (tmp->b))
 		{
@@ -1211,12 +1211,12 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 			ext->a = tmp->a;
 			memset(tmp, 0, sizeof(ds7ext_t));
 			tmp = ext;
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 add extent: " \
 				       "merge with successor\n");
 			i = -1;
 			continue;
-		} 
+		}
 	}
 }
 
@@ -1224,22 +1224,22 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
 /*
  * remove a free space extent description from the VTOC FMT7 DSCB
  */
-void vtoc_update_format7_label_del (format7_label_t *f7, int verbose, 
-				    uint32_t a, uint32_t b) 
+void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
+				    uint32_t a, uint32_t b)
 {
 	ds7ext_t *ext;
 	int i, counter=0;
 
 	for (i=0; i<16; i++) {
-		if (i<5) 
-			ext = &f7->DS7EXTNT[i]; 
-		else 
+		if (i<5)
+			ext = &f7->DS7EXTNT[i];
+		else
 			ext = &f7->DS7ADEXT[i-5];
 
 		if ((a == ext->a) && (b == ext->b)) {
 			/* fills up whole free space gap */
 			memset(ext, 0, sizeof(ds7ext_t));
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 del extent: fills whole gap\n");
 			counter++;
 			break;
@@ -1248,7 +1248,7 @@ void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
 		if ((a == ext->a) && (b < ext->b)) {
 			/* left-bounded in free space gap */
 			ext->a = b;
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 add extent: left-bounded\n");
 			counter++;
 			break;
@@ -1257,7 +1257,7 @@ void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
 		if ((a > ext->a) && (b == ext->b)) {
 			/* right-bounded in free space gap */
 			ext->b = a;
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 add extent: right-bounded\n");
 			counter++;
 			break;
@@ -1265,16 +1265,16 @@ void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
 
 		if ((a > ext->a) && (b < ext->b)) {
 			/* partition divides free space into 2 pieces */
-			vtoc_update_format7_label_add(f7, verbose, 
+			vtoc_update_format7_label_add(f7, verbose,
 						      b, ext->b);
 			ext->b = a;
-			if (verbose) 
+			if (verbose)
 				printf("FMT7 add extent: 2 pieces\n");
 			counter++;
 			break;
 		}
 
-		if (((a < ext->a) && (b > ext->a)) || 
+		if (((a < ext->a) && (b > ext->a)) ||
 		    ((a < ext->b) && (b > ext->b))) {
 			printf("BUG: specified free space extent for deleting "
 			       "doesn't match free space currently shown in "
