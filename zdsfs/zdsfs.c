@@ -1723,9 +1723,8 @@ int main(int argc, char *argv[])
 	}
 	if (zdsfs_check_codepage_setting(zdsfsinfo.codepage_from,
 					 zdsfsinfo.codepage_to)) {
-		fprintf(stderr, "Ivalid codepage setting from '%s' to '%s'\n",
-			zdsfsinfo.codepage_from,
-			zdsfsinfo.codepage_to);
+		fprintf(stderr, "Invalid codepage setting from '%s' to '%s'\n",
+			zdsfsinfo.codepage_from, zdsfsinfo.codepage_to);
 		rc = -EINVAL;
 		goto cleanup;
 	}
