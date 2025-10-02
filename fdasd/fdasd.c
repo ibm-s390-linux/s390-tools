@@ -406,7 +406,7 @@ static void fdasd_error(fdasd_anchor_t *anc, enum fdasd_failure why, char *str)
  */
 static int read_line(void)
 {
-	bzero(line_buffer, LINE_LENGTH);
+	memset(line_buffer, 0, LINE_LENGTH);
 	line_ptr = line_buffer;
 	if (!fgets(line_buffer, LINE_LENGTH, stdin)) {
 		clearerr(stdin);
@@ -493,7 +493,7 @@ static void fdasd_initialize_anchor(fdasd_anchor_t *anc)
 	volume_label_t *vlabel;
 	int i;
 
-	bzero(anc, sizeof(fdasd_anchor_t));
+	memset(anc, 0, sizeof(fdasd_anchor_t));
 
 	for (i = 0; i < USABLE_PARTITIONS; i++)
 		setpos(anc, i, -1);
@@ -519,17 +519,17 @@ static void fdasd_initialize_anchor(fdasd_anchor_t *anc)
 		fdasd_error(anc, malloc_failed,
 			    "FMT9 DSCB memory allocation failed.");
 
-	bzero(anc->f4, sizeof(format4_label_t));
-	bzero(anc->f5, sizeof(format5_label_t));
-	bzero(anc->f7, sizeof(format7_label_t));
-	bzero(anc->f9, sizeof(format9_label_t));
+	memset(anc->f4, 0, sizeof(format4_label_t));
+	memset(anc->f5, 0, sizeof(format5_label_t));
+	memset(anc->f7, 0, sizeof(format7_label_t));
+	memset(anc->f9, 0, sizeof(format9_label_t));
 	vtoc_init_format9_label(anc->f9);
 
 	vlabel = malloc(sizeof(volume_label_t));
 	if (vlabel == NULL)
 		fdasd_error(anc, malloc_failed,
 			    "Volume label memory allocation failed.");
-	bzero(vlabel, sizeof(volume_label_t));
+	memset(vlabel, 0, sizeof(volume_label_t));
 	anc->vlabel = vlabel;
 
 	for (i = 1; i <= USABLE_PARTITIONS; i++) {
@@ -551,7 +551,7 @@ static void fdasd_initialize_anchor(fdasd_anchor_t *anc)
 		if (part_info->f1 == NULL)
 			fdasd_error(anc, malloc_failed,
 				    "FMT1 DSCB memory allocation failed.");
-		bzero(part_info->f1, sizeof(format1_label_t));
+		memset(part_info->f1, 0, sizeof(format1_label_t));
 
 		if (prev_part_info) {
 			prev_part_info->next = part_info;
@@ -1052,10 +1052,10 @@ static void fdasd_show_mapping(fdasd_anchor_t *anc)
 	int i = 0, j = 0, dev_len;
 
 	printf("\ndevice .........: %s\n", options.device);
-	bzero(str, sizeof(str));
+	memset(str, 0, sizeof(str));
 	vtoc_volume_label_get_label(anc->vlabel, str);
 	printf("volume label ...: %.4s\n", str);
-	bzero(str, sizeof(str));
+	memset(str, 0, sizeof(str));
 	vtoc_volume_label_get_volser(anc->vlabel, str);
 	printf("volume serial ..: %s\n\n", str);
 
@@ -1080,7 +1080,7 @@ static void fdasd_show_mapping(fdasd_anchor_t *anc)
 		if (part_info->used != 0x01)
 			continue;
 
-		bzero(dsname, sizeof(dsname));
+		memset(dsname, 0, sizeof(dsname));
 		strncpy(dsname, part_info->f1->DS1DSNAM, 44);
 		vtoc_ebcdic_dec(dsname, dsname, 44);
 
@@ -1103,7 +1103,7 @@ static void fdasd_print_volser(fdasd_anchor_t *anc)
 {
 	char volser[VOLSER_LENGTH + 1];
 
-	bzero(volser, VOLSER_LENGTH);
+	memset(volser, 0, VOLSER_LENGTH);
 	vtoc_ebcdic_dec(anc->vlabel->volid, volser, VOLSER_LENGTH);
 	printf("%6.6s\n", volser);
 }
@@ -1372,7 +1372,7 @@ static void fdasd_write_vtoc_labels(fdasd_anchor_t *anc)
 	}
 
 	/* write empty labels to the rest of the blocks */
-	bzero(&emptyf1, sizeof(emptyf1));
+	memset(&emptyf1, 0, sizeof(emptyf1));
 	while (blk < maxblk) {
 		vtoc_write_label(options.device, blk, &emptyf1, NULL,
 				 NULL, NULL, NULL);
@@ -1425,7 +1425,7 @@ static void fdasd_recreate_vtoc_unconditional(fdasd_anchor_t *anc)
 			   anc->formatted_cylinders, geo.heads);
 
 	while (part_info != NULL) {
-		bzero(part_info->f1, sizeof(format1_label_t));
+		memset(part_info->f1, 0, sizeof(format1_label_t));
 
 		if (part_info->used == 0x01) {
 			part_info->used       = 0x00;
@@ -1826,7 +1826,7 @@ static void fdasd_process_valid_vtoc(fdasd_anchor_t *anc, unsigned long blk)
 
 	/* go through remaining labels, f4 label already done */
 	for (i = 1; i < geo.sectors; i++) {
-		bzero(&f1_label, f1_size);
+		memset(&f1_label, 0, f1_size);
 		vtoc_read_label(options.device, blk, &f1_label, NULL, NULL,
 				NULL);
 
@@ -2675,7 +2675,7 @@ static void fdasd_dequeue_old_partition(fdasd_anchor_t *anc,
 	part_info->start_trk  = 0x0;
 	part_info->end_trk    = 0x0;
 	part_info->fspace_trk = 0x0;
-	bzero(part_info->f1, sizeof(format1_label_t));
+	memset(part_info->f1, 0, sizeof(format1_label_t));
 }
 
 /*
@@ -2758,7 +2758,7 @@ static void fdasd_remove_partition(fdasd_anchor_t *anc)
 	if (anc->used_partitions != 0)
 		get_addr_of_highest_f1_f8_label(anc, &hf1);
 	else
-		bzero(&hf1, sizeof(struct cchhb));
+		memset(&hf1, 0, sizeof(struct cchhb));
 
 	vtoc_update_format4_label(anc->f4, &hf1, anc->f4->DS4DSREC + 1);
 	vtoc_set_freespace(anc->f4, anc->f5, anc->f7, '+', anc->verbose,
