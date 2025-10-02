@@ -24,8 +24,6 @@
 #include "lib/util_path.h"
 #include "lib/util_sys.h"
 
-/* lstat() doesn't work for sysfs files, a fixed size is therefore inevitable */
-#define READLINK_SIZE	256
 #define PAGE_SIZE	4096
 
 /**
@@ -137,10 +135,10 @@ int util_sys_get_base_dev(dev_t dev, dev_t *base_dev)
  */
 int util_sys_get_dev_addr(const char *dev, char *addr)
 {
-	char device[READLINK_SIZE], *result;
 	unsigned int maj, min;
 	struct stat s;
-	ssize_t len;
+	char *linkdir;
+	char *result;
 	dev_t base;
 	char *path;
 
@@ -160,19 +158,18 @@ int util_sys_get_dev_addr(const char *dev, char *addr)
 	else
 		return -1;
 
-	len = readlink(path, device, READLINK_SIZE - 1);
+	linkdir = util_readlink(path);
 	free(path);
-	if (len != -1)
-		device[len] = '\0';
-	else
+	if (!linkdir)
 		return -1;
 
-	result = strrchr(device, '/');
+	result = strrchr(linkdir, '/');
 	if (result)
 		result++;
 	else
-		result = device;
+		result = linkdir;
 	strcpy(addr, result);
+	free(linkdir);
 
 	return 0;
 }
