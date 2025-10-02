@@ -975,7 +975,7 @@ static void fdasd_verify_device(fdasd_anchor_t *anc, char *name)
  * Note:
  *  - 'version' and 'help' are priority options.
  *	 All other parameters are ignored in that case.
- *  - 'silent' and 'verbose' are allways allowed in any
+ *  - 'silent' and 'verbose' are always allowed in any
  *	 combination.
  *
  */
