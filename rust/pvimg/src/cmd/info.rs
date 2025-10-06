@@ -5,7 +5,7 @@
 use std::io::Write;
 
 use anyhow::Result;
-use log::info;
+use log::{info, warn};
 use pv::{
     misc::{open_file, read_file},
     request::SymKey,
@@ -32,6 +32,7 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
             SymKey::try_from_data(hdr.key_type(), read_file(key_path, "Reading key")?.into())?;
         serde_json::to_writer_pretty(&mut output, &hdr.decrypt(&key)?)?;
     } else {
+        warn!("WARNING: The Secure Execution header integrity and authenticity was not verified. Specify '--hdr-key' to authenticate it. Do not trust the data without verification.");
         serde_json::to_writer_pretty(&mut output, &hdr)?;
     }
     writeln!(output)?;
