@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "attrib.h"
@@ -1077,7 +1078,7 @@ static char *zfcp_lun_st_resolve_devnode(struct subtype *st,
 		return NULL;
 	}
 
-	link = misc_readlink(path);
+	link = util_readlink(path);
 	if (!link)
 		goto out;
 

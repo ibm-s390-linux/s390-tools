@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "attrib.h"
@@ -574,7 +575,7 @@ static bool read_full_id(struct ccwgroup_devid *devid_ptr, const char *drv,
 	for (i = 0; i < CCWGROUP_MAX_DEVIDS; i++) {
 		/* Read cdev<n> link target. */
 		link_path = misc_asprintf("%s/cdev%u", path, i);
-		link = misc_readlink(link_path);
+		link = util_readlink(link_path);
 		free(link_path);
 		if (!link) {
 			result = false;

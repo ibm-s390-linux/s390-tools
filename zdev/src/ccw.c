@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "attrib.h"
@@ -533,7 +534,7 @@ char *ccw_get_driver(struct ccw_devid *devid)
 	id = ccw_devid_to_str(devid);
 	path = path_get_ccw_device(NULL, id);
 	driver_path = misc_asprintf("%s/driver", path);
-	link = misc_readlink(driver_path);
+	link = util_readlink(driver_path);
 	if (link)
 		drv = misc_strdup(basename(link));
 	free(link);
@@ -552,7 +553,7 @@ static char *ccw_get_module(struct ccw_devid *devid)
 	id = ccw_devid_to_str(devid);
 	path = path_get_ccw_device(NULL, id);
 	driver_path = misc_asprintf("%s/driver/module", path);
-	link = misc_readlink(driver_path);
+	link = util_readlink(driver_path);
 	if (link)
 		module = misc_strdup(basename(link));
 	free(link);

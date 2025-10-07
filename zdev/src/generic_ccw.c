@@ -10,6 +10,7 @@
 #include <libgen.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "attrib.h"
@@ -133,7 +134,7 @@ static exit_code_t add_cb(const char *abs_path, const char *rel_path,
 	unsigned int i, major, minor;
 	struct devnode *devnode;
 
-	link = misc_readlink(abs_path);
+	link = util_readlink(abs_path);
 	if (!link)
 		return EXIT_OK;
 

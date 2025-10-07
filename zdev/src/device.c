@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "attrib.h"
@@ -464,7 +465,7 @@ char *device_read_active_attrib(struct device *dev, const char *name)
 	value = misc_read_text_file(path, 1, err_ignore);
 	if (!value) {
 		/* Symbolic links count as read-only attributes. */
-		link = misc_readlink(path);
+		link = util_readlink(path);
 		if (link) {
 			value = misc_strdup(basename(link));
 			free(link);
@@ -560,7 +561,7 @@ void device_read_active_settings(struct device *dev, read_scope_t scope)
 				goto next;
 
 			/* Register symbolic links as readonly attributes. */
-			link = misc_readlink(path);
+			link = util_readlink(path);
 			if (!link)
 				goto next;
 

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "misc.h"
@@ -209,7 +210,7 @@ char *scsi_hctl_to_zfcp_lun_id(const char *hctl)
 	char *buspath, *link = NULL, *zfcp_lun_id = NULL;
 
 	buspath = path_get_sys_bus_dev("scsi", hctl);
-	link = misc_readlink(buspath);
+	link = util_readlink(buspath);
 	if (!link)
 		goto out;
 

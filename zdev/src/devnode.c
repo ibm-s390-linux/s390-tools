@@ -15,6 +15,7 @@
 #include <sys/sysmacros.h>
 #include <unistd.h>
 
+#include "lib/util_libc.h"
 #include "lib/util_path.h"
 
 #include "devnode.h"
@@ -155,7 +156,7 @@ static struct devnode *devnode_from_majmin(devnode_t type, unsigned int major,
 	default:
 		return NULL;
 	}
-	link = misc_readlink(path);
+	link = util_readlink(path);
 	if (!link)
 		goto out;
 
@@ -359,7 +360,7 @@ char *devnode_readlink(struct devnode *devnode)
 	default:
 		return NULL;
 	}
-	link = misc_readlink(path);
+	link = util_readlink(path);
 	free(path);
 
 	return link;
