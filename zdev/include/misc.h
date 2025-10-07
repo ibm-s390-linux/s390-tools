@@ -181,7 +181,6 @@ char *config_read_cmd_output(const char *, int, err_t);
 exit_code_t misc_write_text_file(const char *, const char *, err_t);
 exit_code_t misc_write_text_file_retry(const char *, const char *, err_t);
 exit_code_t misc_mktemp(char **, int *);
-char *misc_readlink(const char *path);
 config_t get_config(int act, int pers, int ac);
 bool is_zvm(void);
 bool is_terminal(void);

@@ -1047,28 +1047,6 @@ exit_code_t misc_write_text_file_retry(const char *path, const char *text,
 	return rc == 0 ? EXIT_OK : EXIT_RUNTIME_ERROR;
 }
 
-#define READLINE_SIZE	4096
-
-/* Return a newly allocated string containing the contents of the symbolic link
- * at the specified path or NULL on error. */
-char *misc_readlink(const char *path)
-{
-	char *name, *name2;
-	ssize_t len;
-
-	debug("Reading link %s\n", path);
-	name = misc_malloc(READLINE_SIZE);
-	len = readlink(path, name, READLINE_SIZE - 1);
-	if (len < 0) {
-		free(name);
-		return NULL;
-	}
-	name[len++] = 0;
-
-	name2 = realloc(name, len);
-	return (name2) ? name2 : name;
-}
-
 /* Determine configuration set. */
 config_t get_config(int active, int persistent, int autoconf)
 {
