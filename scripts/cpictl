@@ -43,7 +43,7 @@ readonly EXIT_FAILURE=1
 readonly EXIT_ARG_TOO_LONG=3
 readonly EXIT_INVALID_CHARS=4
 readonly EXIT_INVALID_ARGS=5
-readonly EXIT_NO_PERMIT_CPI=6
+readonly EXIT_NOTCONFIGURED=6
 
 # Distro-IDs as supported by SE/HMC firmware
 readonly DISTRO_GENERIC=0
@@ -151,7 +151,7 @@ cpi_commit()
 		if [[ "$PV_GUEST" -eq 1 ]]; then
 			if [[ -z "$CPI_PERMIT" ]] || [[ "$CPI_PERMIT" -ne 1 ]]; then
 				echo "Sending CPI data from secure execution Linux guests is disabled. Use --permit-cpi to enable CPI data." >&2
-				exit "$EXIT_NO_PERMIT_CPI"
+				exit "$EXIT_NOTCONFIGURED"
 			fi
 		fi
 	fi
