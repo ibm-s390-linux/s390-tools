@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lib/util_base.h"
 #include "lib/util_path.h"
 
 #include "attrib.h"

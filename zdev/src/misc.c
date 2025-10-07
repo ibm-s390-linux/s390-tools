@@ -28,11 +28,9 @@
 
 #include "lib/util_file.h"
 
-#include "dasd.h"
-#include "device.h"
 #include "devtype.h"
-#include "misc.h"
 #include "path.h"
+#include "zdev.h"
 
 #define DRYRUN_HEADER_BEGIN	((char) 0x01)
 #define DRYRUN_HEADER_END	((char) 0x02)

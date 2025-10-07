@@ -15,7 +15,6 @@
 
 #include "ccw.h"
 #include "ccwgroup.h"
-#include "device.h"
 #include "misc.h"
 #include "path.h"
 #include "qeth.h"

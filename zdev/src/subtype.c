@@ -12,8 +12,6 @@
 #include <string.h>
 #include <strings.h>
 
-#include "lib/util_base.h"
-
 #include "attrib.h"
 #include "device.h"
 #include "devnode.h"

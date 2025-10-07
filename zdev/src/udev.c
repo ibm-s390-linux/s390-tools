@@ -7,8 +7,6 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <ctype.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +21,6 @@
 #include "path.h"
 #include "setting.h"
 #include "udev.h"
-#include "zdev_id.h"
 
 int udev_need_settle = 0;
 int udev_no_settle;

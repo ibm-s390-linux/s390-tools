@@ -7,7 +7,6 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

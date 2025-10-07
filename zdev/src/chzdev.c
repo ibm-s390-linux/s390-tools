@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <ctype.h>
 
 #include "lib/util_path.h"
 #include "lib/zt_common.h"

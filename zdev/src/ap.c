@@ -9,11 +9,9 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
 
 #include "lib/util_libc.h"
@@ -25,7 +23,6 @@
 #include "ccw.h"
 #include "device.h"
 #include "devtype.h"
-#include "internal.h"
 #include "misc.h"
 #include "namespace.h"
 #include "path.h"

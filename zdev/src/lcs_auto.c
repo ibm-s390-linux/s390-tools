@@ -14,7 +14,6 @@
 #include "ccw.h"
 #include "ccwgroup.h"
 #include "ctc.h"
-#include "device.h"
 #include "lcs.h"
 #include "lcs_auto.h"
 #include "module.h"

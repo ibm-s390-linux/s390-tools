@@ -11,8 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lib/util_base.h"
-
 #include "misc.h"
 #include "table.h"
 
