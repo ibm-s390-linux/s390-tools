@@ -16,10 +16,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "lib/util_base.h"
 #include "lib/util_libc.h"
 #include "lib/util_path.h"
-#include "lib/util_prg.h"
 
 /*
  * Verify that directory exists
