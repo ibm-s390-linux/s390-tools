@@ -9,7 +9,7 @@
 #   Copy zdev persistent config from initrd to root-fs.
 #
 
-chzdev --export /run/zdev.initrd.config --all --type --persistent --quiet
+chzdev --export /run/zdev.initrd.config --configured --type --persistent --quiet
 
 # Apart from debugging purposes, this is useful for distro installers,
 # which can import the early config into their own environment early
