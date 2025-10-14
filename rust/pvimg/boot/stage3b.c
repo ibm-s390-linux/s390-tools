@@ -18,7 +18,7 @@
 #include "boot/loaders_layout.h"
 #include "sclp.h"
 
-static volatile struct stage3b_args __section(".loader_parms") loader_parms;
+static volatile struct stage3b_args __section(.loader_parms) loader_parms;
 
 static inline void __noreturn load_psw(struct psw_t psw)
 {

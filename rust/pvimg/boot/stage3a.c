@@ -63,7 +63,7 @@ enum UV_RRC_SSC_HDR_CORRUPT {
 	KEY_SLOT_EMPTY = 0x0040,
 };
 
-static volatile struct stage3a_args __section(".loader_parms") loader_parms;
+static volatile struct stage3a_args __section(.loader_parms) loader_parms;
 
 static void print_error_message(enum UV_RC pv_rc, uint16_t pv_rrc)
 {
