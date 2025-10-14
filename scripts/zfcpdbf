@@ -2,7 +2,7 @@
 #
 # zfcpdbf - Tool to interpret the information from logging/tracing sources
 #
-# Copyright IBM Corp. 2010, 2020
+# Copyright IBM Corp. 2010, 2026
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -102,6 +102,7 @@ use POSIX qw(strftime floor difftime mktime);
 use File::Spec::Functions qw/catfile catdir rel2abs/;
 use File::Basename;
 use Getopt::Long;
+use List::Util qw(min);
 
 use constant TOD_UNIX_EPOCH => 0x7d91048bca000000;
 use constant STD_DEBUG_DIR => "/sys/kernel/debug/s390dbf/";
@@ -595,6 +596,9 @@ sub _print_hba_id1
 	my $rec_received = shift();
 	my $rec_issued;
 	my $pay_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"fsf_res"};
+	my $plogi_length = hex(substr($rec, 112, 8));
+	my $prli_length  = hex(substr($rec, 120, 8));
+	my $els_rec = $PAYLOAD_RECORDS{$fsf_req_id}{"fsf_els"};
 
 	$rec_issued  = stck_to_timeval(substr($rec, 0, 16));
 
@@ -627,6 +631,19 @@ sub _print_hba_id1
 	print "QTCB log length: ", $payload_length, "\n" if ($payload_length);
 	print_payload($payload_length, $pay_rec, "QTCB log info")
 	    if ($payload_length);
+
+	if ($plogi_length) {
+		print "PLOGI length   : ", $plogi_length, "\n";
+		$plogi_length = min($plogi_length, 256);
+	}
+	if ($prli_length) {
+		print "PRLI length    : ", $prli_length, "\n";
+		$prli_length = min($prli_length, 256 - $plogi_length);
+	}
+	if ($plogi_length || $prli_length) {
+		print_payload($plogi_length + $prli_length, $els_rec,
+			      "PLOGI/PRLIinfo");
+	}
 }
 
 sub _print_hba_id2
