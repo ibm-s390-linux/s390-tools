@@ -16,12 +16,11 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-#include "lib/util_base.h"
 #include "lib/util_libc.h"
 #include "lib/util_panic.h"
-#include "lib/util_prg.h"
 
 #include "misc.h"
 
