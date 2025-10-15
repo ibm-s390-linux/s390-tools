@@ -74,7 +74,7 @@ stage3b.elf: head.o $(ZIPL_OBJS)
 
 .SECONDARY: $(FILES:.bin=.lds)
 %.elf: %.lds %.o
-	$(LINK) $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,-T,$< -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
+	$(LINK) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,-T,$< -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 	@chmod a-x $@
 
 %.bin.debug: %.elf

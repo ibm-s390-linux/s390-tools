@@ -93,7 +93,7 @@ stage3.exec: head.o stage3.o kdump3.o libc.o ebcdic.o ebcdic_conv.o sclp.o \
 	     sclp_stage3.o kdump.o entry.o stage3.lds
 
 %.exec:	%.o
-	$(LINK) -Wl,-T,$(filter %.lds,$^) $(NO_PIE_LDFLAGS) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
+	$(LINK) -Wl,-T,$(filter %.lds,$^) $(NO_WARN_RWX_SEGMENTS_LDFLAGS) -Wl,--build-id=none -m64 -static -nostdlib $(filter %.o, $^) -o $@
 	@chmod a-x $@
 
 %.bin.debug: %.exec

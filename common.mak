@@ -341,7 +341,6 @@ export INSTALL CFLAGS CXXFLAGS \
        LDFLAGS CPPFLAGS ALL_CFLAGS ALL_CXXFLAGS ALL_LDFLAGS ALL_CPPFLAGS
 
 NO_PIE_CFLAGS := -fno-pie
-NO_PIE_LDFLAGS := -no-pie
 
 # Overwrite implicit makefile rules for having nice compile output
 %.o: %.c
