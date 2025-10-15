@@ -25,7 +25,7 @@ ifeq ($(HOST_ARCH),s390x)
 INCLUDE_PATHS := $(rootdir)/zipl/include $(rootdir)/include
 INCLUDE_PARMS := $(addprefix -I,$(INCLUDE_PATHS))
 
-ALL_CFLAGS = $(NO_PIE_CFLAGS) -Os -g $(INCLUDE_PARMS) \
+ALL_CFLAGS = -fno-pie -Os -g $(INCLUDE_PARMS) \
 	  -DS390_TOOLS_RELEASE=$(S390_TOOLS_RELEASE) \
 	  -fno-builtin -ffreestanding -fno-asynchronous-unwind-tables \
 	  -fno-delete-null-pointer-checks -fno-stack-protector \
