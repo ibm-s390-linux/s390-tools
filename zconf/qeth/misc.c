@@ -20,7 +20,6 @@
 #include <unistd.h>
 
 #include "lib/util_libc.h"
-#include "lib/util_panic.h"
 
 #include "misc.h"
 
@@ -59,20 +58,14 @@ char *misc_link_target(const char *fmt, ...)
 {
 	char *lnk, *path;
 	va_list ap;
-	ssize_t rc;
 
-	path = util_malloc(PATH_MAX);
 	/* Construct the file name */
 	UTIL_VASPRINTF(&lnk, fmt, ap);
-	rc = readlink(lnk, path, PATH_MAX);
+	path = util_readlink(lnk);
 	free(lnk);
-	if (rc < 0) {
-		free(path);
+	if (!path)
 		return NULL;
-	}
-	util_assert(rc < (PATH_MAX - 1),
-		    "Internal error: Symlink name too long");
-	path[rc] = '\0';
+
 	return path;
 }
 
