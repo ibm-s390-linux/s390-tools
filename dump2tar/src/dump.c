@@ -30,7 +30,6 @@
 #include "dref.h"
 #include "dump.h"
 #include "global.h"
-#include "idcache.h"
 #include "misc.h"
 #include "tar.h"
 
