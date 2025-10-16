@@ -91,13 +91,13 @@ libekmfweb.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libekmfweb
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,libekmfweb.so.$(VERM)
 libekmfweb.so.$(VERSION): ekmfweb.o utilities.o cca.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
-	ln -srf libekmfweb.so.$(VERSION) libekmfweb.so.$(VERM)
-	ln -srf libekmfweb.so.$(VERSION) libekmfweb.so
+	ln -sf libekmfweb.so.$(VERSION) libekmfweb.so.$(VERM)
+	ln -sf libekmfweb.so.$(VERSION) libekmfweb.so
 
 install-libekmfweb.so.$(VERSION): libekmfweb.so.$(VERSION)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERSION)
-	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERM)
-	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so
+	ln -sf libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so.$(VERM)
+	ln -sf libekmfweb.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libekmfweb.so
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(rootdir)include/ekmfweb/ekmfweb.h $(DESTDIR)$(USRINCLUDEDIR)/ekmfweb
 

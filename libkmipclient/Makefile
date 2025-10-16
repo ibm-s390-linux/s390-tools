@@ -113,13 +113,13 @@ libkmipclient.so.$(VERSION): ALL_LDFLAGS += -shared -Wl,--version-script=libkmip
 libkmipclient.so.$(VERSION): kmip.o request.o response.o attribute.o key.o ttlv.o json.o \
 	xml.o https.o tls.o names.o utils.o
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
-	ln -srf libkmipclient.so.$(VERSION) libkmipclient.so.$(VERM)
-	ln -srf libkmipclient.so.$(VERSION) libkmipclient.so
+	ln -sf libkmipclient.so.$(VERSION) libkmipclient.so.$(VERM)
+	ln -sf libkmipclient.so.$(VERSION) libkmipclient.so
 
 install-libkmipclient.so.$(VERSION): libkmipclient.so.$(VERSION)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 -T libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERSION)
-	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERM)
-	ln -srf $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so
+	ln -sf libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so.$(VERM)
+	ln -sf libkmipclient.so.$(VERSION) $(DESTDIR)$(SOINSTALLDIR)/libkmipclient.so
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRINCLUDEDIR)/kmipclient
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $(rootdir)include/kmipclient/kmipclient.h $(DESTDIR)$(USRINCLUDEDIR)/kmipclient
 
