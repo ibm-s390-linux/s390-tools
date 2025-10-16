@@ -655,16 +655,18 @@ static int read_symlink(struct task *task, const char *filename,
 					task->opts->read_chunk_size;
 	int rc = EXIT_OK;
 
+	/* If @relname is NULL, use @filename with AT_FDCWD. */
+	if (!relname) {
+		relname = filename;
+		dirfd = AT_FDCWD;
+	}
+
 	while (!is_aborted(task)) {
 		buffer_make_room(buffer, currlen, false,
 				 task->opts->max_buffer_size);
 
 		cancel_enable();
-		if (relname)
-			actual = readlinkat(dirfd, relname, buffer->addr,
-					    buffer->size);
-		else
-			actual = readlink(filename, buffer->addr, buffer->size);
+		actual = readlinkat(dirfd, relname, buffer->addr, buffer->size);
 		cancel_disable();
 
 		if (actual == -1) {
