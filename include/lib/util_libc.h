@@ -45,7 +45,7 @@ void *__util_zalloc(const char *func, const char *file, int line, size_t size);
 /**
  * Re-allocate memory or exit in case of failure
  *
- * @param[in] ptr  Pointer ot old memory buffer
+ * @param[in] ptr  Pointer to old memory buffer
  * @param[in] size Number of bytes to be allocated
  *
  * @returns   Pointer to memory buffer created with realloc()
