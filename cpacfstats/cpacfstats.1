@@ -79,9 +79,11 @@ the cpacfstats client application.
 
 Example usage scenario:
 .P
-1. Start the cpacfstatsd daemon with root privileges.
+1. Start the cpacfstatsd daemon with root privileges using 'systemctl start
+cpacfstatsd'.
 .P
-2. Check for successful startup by using the ps and syslog commands.
+2. Check for successful startup by using the 'systemctl status cpacfstatsd'
+command.
 .P
 3. Enable the CPACF counters of interest. For example, enable all counters
 by issuing cpacfstats -e.
@@ -95,7 +97,7 @@ cryptographic counters as required. To reset, use, for example, cpacfstats
 6. Disable all the CPACF measurements, for example, by using cpacfstats
 -d.
 .P
-7. Shutdown the cpacfstatsd daemon by using killall cpacfstatsd.
+7. Shutdown the cpacfstatsd daemon by using 'systemctl stop cpacfstatsd'.
 
 .SH OPTIONS
 .TP
