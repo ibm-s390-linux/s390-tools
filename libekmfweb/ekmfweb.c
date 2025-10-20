@@ -5284,6 +5284,85 @@ out:
 }
 
 /**
+ * Validates that a certificate has the same public key as the secure identity
+ * key (field identity_secure_key in config structure) .
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param x509_cert         the X509 certificate object to validate
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ *          -EINVAL: invalid parameter, or certificate is not valid
+ *          -ENOMEM: Failed to allocate memory
+ *          any other errno from file I/O routines
+ */
+int ekmf_validate_cert(const struct ekmf_config *config, const X509 *x509_cert,
+		       const struct ekmf_ext_lib *ext_lib, bool verbose)
+{
+	unsigned char key_blob[MAX_KEY_BLOB_SIZE];
+	size_t key_blob_size = sizeof(key_blob);
+	struct ext_lib_info ext_lib_info;
+	EVP_PKEY *pkey = NULL;
+	int rc;
+
+	if (config == NULL || ext_lib == NULL || x509_cert == NULL)
+		return -EINVAL;
+	if (config->identity_secure_key == NULL)
+		return -EINVAL;
+
+	_ekmf_copy_ext_lib(ext_lib, &ext_lib_info);
+
+	rc = SK_OPENSSL_init(verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to initialize secure key support: "
+			   "%s", strerror(-rc));
+		return rc;
+	}
+
+	rc = read_key_blob(config->identity_secure_key, key_blob,
+			   &key_blob_size);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to read identity key from file "
+			   "'%s': %s", config->identity_secure_key,
+			   strerror(-rc));
+		goto out;
+	}
+
+	rc = SK_OPENSSL_get_secure_key_as_pkey(key_blob, key_blob_size,
+					       false, &pkey,
+					       &ext_lib_info.ext_lib, verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to get the PKEY from the identity "
+			   "key: %s", strerror(-rc));
+		goto out;
+	}
+
+#if !OPENSSL_VERSION_PREREQ(3, 0)
+	if (EVP_PKEY_cmp(pkey, X509_get0_pubkey(x509_cert)) != 1) {
+#else
+	if (EVP_PKEY_eq(pkey, X509_get0_pubkey(x509_cert)) != 1) {
+#endif
+		pr_verbose(verbose, "The certificate does not match with the "
+			   "identity key");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	pr_verbose(verbose, "Certificate successfully validated");
+
+out:
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+
+	SK_OPENSSL_term();
+
+	return rc;
+}
+
+/**
  * Close the connection to the EKMFWeb server by destroying the CURL handle.
  *
  * @param curl_handle       the CURL handle to destroy

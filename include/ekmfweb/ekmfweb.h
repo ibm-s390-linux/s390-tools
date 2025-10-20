@@ -380,6 +380,25 @@ int ekmf_generate_ss_cert(const struct ekmf_config *config,
 			  const struct ekmf_ext_lib *ext_lib, bool verbose);
 
 /**
+ * Validates that a certificate has the same public key as the secure identity
+ * key (field identity_secure_key in config structure) .
+ *
+ * @param config            the configuration structure. Only field
+ *                          identity_secure_key must be specified, all others
+ *                          are optional.
+ * @param x509_cert         the X509 certificate object to validate
+ * @param ext_lib           External secure key crypto library to use
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns a negative errno in case of an error, 0 if success.
+ *          -EINVAL: invalid parameter, or certificate is not valid
+ *          -ENOMEM: Failed to allocate memory
+ *          any other errno from file I/O routines
+ */
+int ekmf_validate_cert(const struct ekmf_config *config, const X509 *x509_cert,
+		       const struct ekmf_ext_lib *ext_lib, bool verbose);
+
+/**
  * Retrieves settings from the EKMFWeb server, such as the template names for
  * generating keys in EKMFWeb.
  *

@@ -1,6 +1,6 @@
 include ../common.mak
 
-VERSION = 1.0
+VERSION = 1.1
 VERM = $(shell echo $(VERSION) | cut -d '.' -f 1)
 
 ifneq (${HAVE_OPENSSL},0)

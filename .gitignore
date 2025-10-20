@@ -63,7 +63,7 @@ libekmfweb/check-dep-libekmfweb
 libekmfweb/detect-openssl-version.dep
 libekmfweb/libekmfweb.so
 libekmfweb/libekmfweb.so.1
-libekmfweb/libekmfweb.so.1.0
+libekmfweb/libekmfweb.so.1.1
 libkmipclient/check-dep-libkmipclient
 libkmipclient/detect-openssl-version.dep
 libkmipclient/libkmipclient.so
