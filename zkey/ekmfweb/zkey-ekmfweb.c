@@ -2819,6 +2819,7 @@ out:
 static int _load_certificate(struct plugin_handle *ph, const char *cert_file,
 			     unsigned char **cert, size_t *cert_size)
 {
+	X509 *x509_cert = NULL;
 	size_t count, size;
 	unsigned char *buf;
 	struct stat sb;
@@ -2850,6 +2851,28 @@ static int _load_certificate(struct plugin_handle *ph, const char *cert_file,
 		goto out;
 	}
 
+	rewind(fp);
+	x509_cert = PEM_read_X509(fp, NULL, NULL, NULL);
+	if (x509_cert == NULL) {
+		rc = -EIO;
+		_set_error(ph,
+			   "Failed to decode certificate from file '%s': %s",
+			   cert_file, strerror(-rc));
+		goto out;
+	}
+
+	rc = _select_cca_adapter(ph);
+	if (rc != 0)
+		goto out;
+
+	rc = ekmf_validate_cert(&ph->ekmf_config, x509_cert,
+				&ph->ext_lib, ph->pd.verbose);
+	if (rc != 0) {
+		_set_error(ph, "The certificate from file '%s' does not match "
+			   "with the identity key", cert_file);
+		goto out;
+	}
+
 	*cert_size = size;
 	*cert = buf;
 
@@ -2858,6 +2881,9 @@ out:
 	if (rc != 0)
 		free(buf);
 	fclose(fp);
+
+	if (x509_cert != NULL)
+		X509_free(x509_cert);
 
 	return rc;
 }
