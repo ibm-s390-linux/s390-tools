@@ -2580,6 +2580,11 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	}
 
 	kms_bound = _keystore_is_kms_bound_key(key_props, NULL);
+	if (kms_bound) {
+		rc = perform_kms_login(keystore->kms_info, keystore->verbose);
+		if (rc != 0)
+			goto out;
+	}
 
 	if (description != NULL) {
 		rc = properties_set(key_props, PROP_NAME_DESCRIPTION,
@@ -2794,6 +2799,7 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	struct properties *key_props = NULL;
 	bool reenc_exists = false;
 	bool pass_exists = false;
+	bool kms_bound;
 	char *msg;
 	int rc;
 
@@ -2816,6 +2822,20 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	rc = _keystore_ensure_keyfiles_not_exist(&new_names, newname);
 	if (rc != 0)
 		goto out;
+
+	key_props = properties_new();
+	rc = properties_load(key_props, file_names.info_filename, 1);
+	if (rc != 0) {
+		warnx("Key '%s' does not exist or is invalid", name);
+		goto out;
+	}
+
+	kms_bound = _keystore_is_kms_bound_key(key_props, NULL);
+	if (kms_bound) {
+		rc = perform_kms_login(keystore->kms_info, keystore->verbose);
+		if (rc != 0)
+			goto out;
+	}
 
 	if (rename(file_names.skey_filename, new_names.skey_filename) != 0) {
 		rc = -errno;
@@ -2850,18 +2870,7 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 		}
 	}
 
-	key_props = properties_new();
-	rc = properties_load(key_props, new_names.info_filename, 1);
-	if (rc != 0) {
-		warnx("Key '%s' does not exist or is invalid", newname);
-		goto out_rename_info;
-	}
-
-	if (_keystore_is_kms_bound_key(key_props, NULL)) {
-		rc = perform_kms_login(keystore->kms_info, keystore->verbose);
-		if (rc != 0)
-			goto out_rename_info;
-
+	if (kms_bound) {
 		rc = set_kms_key_properties(keystore->kms_info, key_props,
 					    newname, NULL, NULL, NULL, NULL,
 					    NULL, keystore->verbose);
