@@ -2139,11 +2139,12 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 		     bool verbose)
 {
 	char *cipher, *iv_mode, *description, *volumes, *vol_type, *sector_size;
+	char key1_label[KMS_KEY_LABEL_SIZE + 14 + 1] = { 0 };
+	char key2_label[KMS_KEY_LABEL_SIZE + 14 + 1] = { 0 };
 	unsigned char key_blob[MAX_SECURE_KEY_SIZE * 2];
-	char key1_label[KMS_KEY_LABEL_SIZE + 1] = { 0 };
-	char key2_label[KMS_KEY_LABEL_SIZE + 1] = { 0 };
 	char key1_id[KMS_KEY_ID_SIZE + 1] = { 0 };
 	char key2_id[KMS_KEY_ID_SIZE + 1] = { 0 };
+	char vp[VERIFICATION_PATTERN_LEN];
 	struct kms_property kms_props[13];
 	int xts_mode_prop = -1, rc = 0;
 	size_t key_size, key_blob_size;
@@ -2151,6 +2152,7 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	size_t num_kms_props = 0;
 	char *sys_volumes = NULL;
 	char *passphrase = NULL;
+	size_t slen;
 
 	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
@@ -2236,7 +2238,8 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 					       kms_options, num_kms_options,
 					       key_blob, &key_blob_size,
 					       key1_id, sizeof(key1_id),
-					       key1_label, sizeof(key1_label));
+					       key1_label,
+					       KMS_KEY_LABEL_SIZE + 1);
 	if (rc != 0) {
 		pr_verbose(verbose, "KMS plugin failed to generate key #1: %s",
 			   strerror(-rc));
@@ -2250,6 +2253,20 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 
 	if (is_ep11_aes_key(key_blob, key_blob_size))
 		key_size = EP11_KEY_SIZE;
+
+	rc = generate_key_verification_pattern(key_blob, key_size,
+					       vp, sizeof(vp), verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to generate key verification "
+			   "pattern for key #1: %s", strerror(-rc));
+		goto out;
+	}
+
+	/* key1_label has space for 14 + 1 more chars than KMS_KEY_LABEL_SIZE */
+	key1_label[KMS_KEY_LABEL_SIZE] = '\0';
+	slen = strlen(key1_label);
+	snprintf(key1_label + slen, sizeof(key1_label) - slen,
+		 " (KCV: %.6s)", vp);
 
 	/* Save ID and label of 1st key */
 	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_ID :
@@ -2289,18 +2306,33 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 					       &key_blob[key_size],
 					       &key_blob_size,
 					       key2_id, sizeof(key2_id),
-					       key2_label, sizeof(key2_label));
+					       key2_label,
+					       KMS_KEY_LABEL_SIZE + 1);
 	if (rc != 0) {
 		pr_verbose(verbose, "KMS plugin failed to generate key #2: %s",
 			   strerror(-rc));
 		goto out;
 	}
 
-	pr_verbose(verbose, "Key2: ID: '%s' Label: '%s'", key1_id, key1_label);
+	pr_verbose(verbose, "Key2: ID: '%s' Label: '%s'", key1_id, key2_label);
 	pr_verbose(verbose, "Keyblob #2: %lu bytes:'", key_blob_size);
 	if (verbose)
 		util_hexdump_grp(stderr, NULL, &key_blob[key_size], 4,
 				 key_blob_size, 0);
+
+	rc = generate_key_verification_pattern(&key_blob[key_size], key_size,
+					       vp, sizeof(vp), verbose);
+	if (rc != 0) {
+		pr_verbose(verbose, "Failed to generate key verification "
+			   "pattern for key #2: %s", strerror(-rc));
+		goto out;
+	}
+
+	/* key2_label has space for 14 + 1 more chars than KMS_KEY_LABEL_SIZE */
+	key2_label[KMS_KEY_LABEL_SIZE] = '\0';
+	slen = strlen(key2_label);
+	snprintf(key2_label + slen, sizeof(key2_label) - slen,
+		 " (KCV: %.6s)", vp);
 
 	/* Save ID and label of 2nd key */
 	rc = properties_set(key_props, PROP_NAME_KMS_XTS_KEY2_ID, key2_id);
