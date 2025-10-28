@@ -13,6 +13,7 @@
 #define LIB_UTIL_SYS_H
 
 #include <stdbool.h>
+#include <sys/types.h>
 
 int util_sys_get_dev_addr(const char *dev, char *addr);
 bool util_sys_dev_is_partition(dev_t dev);

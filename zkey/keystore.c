@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <regex.h>
 #include <stdlib.h>
