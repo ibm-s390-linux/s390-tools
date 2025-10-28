@@ -8,8 +8,6 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#define _LARGEFILE64_SOURCE
-
 #include <ctype.h>
 #include <dlfcn.h>
 #include <err.h>
@@ -547,10 +545,10 @@ static int keyfile_seek(int fd, size_t bytes)
 {
 	size_t next_read;
 	ssize_t bytes_r;
-	off64_t r;
+	off_t r;
 	char *tmp;
 
-	r = lseek64(fd, bytes, SEEK_CUR);
+	r = lseek(fd, bytes, SEEK_CUR);
 	if (r > 0)
 		return 0;
 	if (r < 0 && errno != ESPIPE)

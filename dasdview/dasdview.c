@@ -7,7 +7,6 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#define _LARGEFILE64_SOURCE    /* needed for unistd.h */
 #define _FILE_OFFSET_BITS 64   /* needed for unistd.h */
 
 #include <ctype.h>
@@ -1887,7 +1886,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 
 	/* seek in SEEK_STEP steps */
 	for (i = 1; i <= j; i++) {
-		rc = lseek64(fd, SEEK_STEP, SEEK_CUR);
+		rc = lseek(fd, SEEK_STEP, SEEK_CUR);
 		if (rc == -1) {
 			printf("*** rc: %d (%d) ***\n", rc, errno);
 			printf("*** j: %llu ***\n", j);
