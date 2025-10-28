@@ -25,7 +25,7 @@
 #include <sys/statvfs.h>
 #include <sys/vfs.h>
 #include <syslog.h>
-#include <time.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <utmp.h>
 

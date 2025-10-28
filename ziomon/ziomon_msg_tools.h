@@ -12,6 +12,8 @@
 #ifndef ZIOMON_MSG__TOOLS_H
 #define ZIOMON_MSG__TOOLS_H
 
+#include <time.h>
+
 #include "ziomon_dacc.h"
 
 void conv_blkiomon_v2_to_v3(struct message *msg);
