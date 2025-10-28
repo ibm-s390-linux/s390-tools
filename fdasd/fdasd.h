@@ -10,6 +10,8 @@
 #ifndef FDASD_H
 #define FDASD_H
 
+#include <stdint.h>
+
 /*****************************************************************************
  * SECTION: Definitions needed for DASD-API (see dasd.h)		     *
  *****************************************************************************/
@@ -67,7 +69,7 @@ static struct fdasd_options options = {
 };
 
 typedef struct partition_info {
-	u_int8_t	   used;
+	uint8_t	   used;
 	unsigned long	   start_trk;
 	unsigned long	   end_trk;
 	unsigned long	   len_trk;
@@ -100,7 +102,7 @@ typedef struct fdasd_anchor {
 	int option_reuse;
 	int option_recreate;
 	int partno[USABLE_PARTITIONS];
-	u_int16_t dev_type;
+	uint16_t dev_type;
 	unsigned int used_partitions;
 	unsigned long label_pos;
 	unsigned int  blksize;
@@ -113,8 +115,8 @@ typedef struct fdasd_anchor {
 	partition_info_t *last;
 	volume_label_t	 *vlabel;
 	config_data_t confdata[USABLE_PARTITIONS];
-	u_int32_t hw_cylinders;
-	u_int32_t formatted_cylinders;
+	uint32_t hw_cylinders;
+	uint32_t formatted_cylinders;
 } fdasd_anchor_t;
 
 enum offset {lower, upper};

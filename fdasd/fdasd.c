@@ -8,6 +8,7 @@
  */
 
 #include <getopt.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <sys/sysmacros.h>
 
@@ -211,9 +212,9 @@ static void setpos(fdasd_anchor_t *anc, int dsn, int pos)
 	anc->partno[dsn] = pos;
 }
 
-static u_int32_t get_usable_cylinders(fdasd_anchor_t *anc)
+static uint32_t get_usable_cylinders(fdasd_anchor_t *anc)
 {
-	u_int32_t cyl;
+	uint32_t cyl;
 
 	/* large volume */
 	if (anc->f4->DS4DEVCT.DS4DSCYL == LV_COMPAT_CYL &&
@@ -221,7 +222,7 @@ static u_int32_t get_usable_cylinders(fdasd_anchor_t *anc)
 		return anc->f4->DS4DCYL;
 	/* normal volume */
 	if (anc->f4->DS4DEVCT.DS4DEVFG & ALTERNATE_CYLINDERS_USED)
-		cyl = anc->f4->DS4DEVCT.DS4DSCYL - (u_int16_t)anc->f4->DS4DEVAC;
+		cyl = anc->f4->DS4DEVCT.DS4DSCYL - (uint16_t)anc->f4->DS4DEVAC;
 	else
 		cyl = anc->f4->DS4DEVCT.DS4DSCYL;
 
@@ -230,7 +231,7 @@ static u_int32_t get_usable_cylinders(fdasd_anchor_t *anc)
 
 static void get_addr_of_highest_f1_f8_label(fdasd_anchor_t *anc, cchhb_t *addr)
 {
-	u_int8_t record;
+	uint8_t record;
 	/* We have to count the following labels:
 	 * one format 4
 	 * one format 5
@@ -2470,9 +2471,9 @@ static int fdasd_get_partition_data(fdasd_anchor_t *anc, extent_t *part_extent,
 	unsigned long start, stop, limit;
 	partition_info_t *part_tmp;
 	cchh_t llimit, ulimit;
-	u_int16_t hh, head;
-	u_int32_t cc, cyl;
-	u_int8_t b1, b2;
+	uint16_t hh, head;
+	uint32_t cc, cyl;
+	uint8_t b1, b2;
 	char mesg[48];
 
 	start = FIRST_USABLE_TRK;
@@ -2777,8 +2778,8 @@ static void fdasd_auto_partition(fdasd_anchor_t *anc)
 {
 	partition_info_t *part_info = anc->first;
 	cchh_t llimit, ulimit;
-	u_int16_t head;
-	u_int32_t cyl;
+	uint16_t head;
+	uint32_t cyl;
 	extent_t ext;
 	cchhb_t hf1;
 

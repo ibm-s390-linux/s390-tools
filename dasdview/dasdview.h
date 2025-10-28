@@ -11,6 +11,7 @@
 #define DASDVIEW_H
 
 #include <limits.h>
+#include <stdint.h>
 
 /********************************************************************************
  * SECTION: Definitions needed for DASD-API (see dasd.h)
@@ -68,7 +69,7 @@ typedef struct dasdview_info
 	int dasd_info_version;
 	unsigned int blksize;
 	struct hd_geometry geo;
-	u_int32_t hw_cylinders;
+	uint32_t hw_cylinders;
 
 	unsigned long long begin;
 	unsigned long long size;
