@@ -42,17 +42,17 @@ install:
 else
 
 ifneq ($(shell sh -c 'command -v pkg-config'),)
-LIB_CFLAGS += $(shell pkg-config --silence-errors --cflags libnl-3.0)
-LIB_CFLAGS += $(shell pkg-config --silence-errors --cflags libnl-genl-3.0)
-LIB_CFLAGS += $(shell pkg-config --silence-errors --cflags libnl-route-3.0)
+LIB_CFLAGS += $(shell $(PKG_CONFIG) --silence-errors --cflags libnl-3.0)
+LIB_CFLAGS += $(shell $(PKG_CONFIG) --silence-errors --cflags libnl-genl-3.0)
+LIB_CFLAGS += $(shell $(PKG_CONFIG) --silence-errors --cflags libnl-route-3.0)
 
-LIB_CFLAGS += $(shell pkg-config --silence-errors --cflags libcrypto)
+LIB_CFLAGS += $(shell $(PKG_CONFIG) --silence-errors --cflags libcrypto)
 
-LIB_LFLAGS += $(shell pkg-config --silence-errors --libs libnl-3.0)
-LIB_LFLAGS += $(shell pkg-config --silence-errors --libs libnl-genl-3.0)
-LIB_LFLAGS += $(shell pkg-config --silence-errors --libs libnl-route-3.0)
+LIB_LFLAGS += $(shell $(PKG_CONFIG) --silence-errors --libs libnl-3.0)
+LIB_LFLAGS += $(shell $(PKG_CONFIG) --silence-errors --libs libnl-genl-3.0)
+LIB_LFLAGS += $(shell $(PKG_CONFIG) --silence-errors --libs libnl-route-3.0)
 
-LIB_LFLAGS += $(shell pkg-config --silence-errors --libs libcrypto)
+LIB_LFLAGS += $(shell $(PKG_CONFIG) --silence-errors --libs libcrypto)
 else
 LIB_CFLAGS += -I /usr/include/libnl3/
 LIB_LFLAGS += -lnl-route-3 -lnl-genl-3 -lnl-3
