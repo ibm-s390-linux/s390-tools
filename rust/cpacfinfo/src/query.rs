@@ -233,10 +233,6 @@ pub fn query(ins: &InstructionKind, fc: u8) -> Result<Param, Error> {
 
 fn read_file_to_buf(file: &mut File, buf: &mut [u8]) -> Result<usize, Error> {
     file.read(buf)
-    /* match file.read(buf) {
-        Result::Ok(bytes_read) => Ok(bytes_read),
-        Err(e) => Err(e),
-    } */
 }
 
 #[cfg(test)]
