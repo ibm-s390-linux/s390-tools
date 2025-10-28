@@ -128,7 +128,7 @@ static int envblk_update(struct zipl_envblk *zeb)
 	if (fs_map(zeb->mfd.fd, zeb->offset, &blknr, zeb->size) != 0)
 		goto error_close;
 
-	if (lseek64(dev_fd, blknr * (uint64_t)zeb->size, SEEK_SET) < 0) {
+	if (lseek(dev_fd, blknr * (off_t)zeb->size, SEEK_SET) < 0) {
 		error_reason(strerror(errno));
 		goto error_close;
 	}
