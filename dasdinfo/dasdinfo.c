@@ -33,6 +33,11 @@
 #define RD_BUFFER_SIZE 80
 #define TEMP_DEV_MAX_RETRIES    1000
 
+#ifndef FTW_CONTINUE
+#define FTW_CONTINUE 0
+#define FTW_STOP 1
+#endif
+
 static const struct util_prg prg = {
 	.desc = "Display DASD volume serial number and ID information",
 	.args = "-i BUSID | -b BLOCKDEV | -d DEVNODE",
