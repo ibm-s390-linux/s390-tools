@@ -21,7 +21,7 @@ TOOL_DIRS = zipl zdump fdasd dasdfmt dasdview tunedasd \
 else
 BASELIB_DIRS =
 LIB_DIRS = libpv
-TOOL_DIRS = rust
+TOOL_DIRS = netboot rust
 endif
 
 SUB_DIRS = $(BASELIB_DIRS) $(LIB_DIRS) $(TOOL_DIRS)
