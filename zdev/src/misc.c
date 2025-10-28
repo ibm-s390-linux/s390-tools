@@ -10,7 +10,9 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#ifdef __GLIBC__
 #include <execinfo.h>
+#endif
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -1191,6 +1193,7 @@ void line_free(int argc, char **argv)
 #define BACKTRACE_MAX	32
 
 /* Used for debugging. */
+#ifdef __GLIBC__
 void print_trace(void)
 {
 	void *bt[BACKTRACE_MAX];
@@ -1204,6 +1207,9 @@ void print_trace(void)
 		fprintf(stderr, "DEBUG:  %s\n", bt_sym[i]);
 	free(bt_sym);
 }
+#else
+void print_trace(void) {}
+#endif
 
 /* Return a textual representation of @config. */
 const char *config_to_str(config_t config)
