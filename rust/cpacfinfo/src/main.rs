@@ -108,16 +108,16 @@ fn out_instructions(args: &Cli, instructions: &Vec<Instruction>) {
 }
 
 fn main() -> anyhowRes<()> {
-    /* ---- PARSE COMMAND LINE ARGUMENTS ---- */
+    // ---- PARSE COMMAND LINE ARGUMENTS ----
     let args: Cli = Cli::parse();
 
-    /* ---- PRINT VERSION STRING ---- */
+    // ---- PRINT VERSION STRING ----
     if args.version {
         print_version!("2024");
         return Ok(());
     }
 
-    /* ---- SET CONSTANTS ---- */
+    // ---- SET CONSTANTS ----
     let mut instructions = Vec::new();
     init_instructions(&mut instructions);
 
@@ -133,7 +133,7 @@ fn main() -> anyhowRes<()> {
         update_msa_function_count(&args, &mut levels[idx_of_last_element], &instructions);
     }
 
-    /* ---- GET INFORMATION ---- */
+    // ---- GET INFORMATION ----
     // get stfle bits
     let stfle_bits = Stfle::new()?;
 
@@ -245,7 +245,7 @@ fn main() -> anyhowRes<()> {
         }
     }
 
-    /* ---- OUTPUT ---- */
+    // ---- OUTPUT ----
     match args.msa {
         true => out_msa(&args, &levels, &instructions),
         false => out_instructions(&args, &instructions),

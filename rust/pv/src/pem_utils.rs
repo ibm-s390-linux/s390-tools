@@ -104,11 +104,11 @@ impl<'d> InnerPem<'d> {
 /// println!("PEM {pem}");
 /// ```
 /// ```PEM
-///-----BEGIN <name>-----
-///<header>
+/// -----BEGIN <name>-----
+/// <header>
 ///
-///<Base64 formatted binary data>
-///-----END <name>-----
+/// <Base64 formatted binary data>
+/// -----END <name>-----
 
 #[derive(Debug)]
 pub struct Pem {

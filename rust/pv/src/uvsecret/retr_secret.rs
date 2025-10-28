@@ -18,11 +18,11 @@ use zerocopy::{FromBytes, U16};
 ///
 /// Will convert into PEM as:
 /// ```PEM
-///-----BEGIN IBM PROTECTED KEY-----
-///kind: <name>
+/// -----BEGIN IBM PROTECTED KEY-----
+/// kind: <name>
 ///
-///<protected key in base64>
-///-----END IBM PROTECTED KEY-----
+/// <protected key in base64>
+/// -----END IBM PROTECTED KEY-----
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct IbmProtectedKey {
