@@ -1,4 +1,3 @@
-#include <execinfo.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <fcntl.h>
