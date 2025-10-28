@@ -9,7 +9,6 @@
  * it under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <argz.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
