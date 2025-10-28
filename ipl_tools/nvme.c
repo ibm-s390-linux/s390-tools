@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -99,7 +100,7 @@ static int next_entry(DIR *dir, char *in_path, char *out_path,
 static int nvme_getdev_by_fid(char *fidstr, char *devpath)
 {
 	char temp_path[PATH_MAX + 19], real_path[PATH_MAX];
-	u_int64_t target_fid, curfid;
+	uint64_t target_fid, curfid;
 	char *sys_path;
 	DIR *dir;
 	char *end;
@@ -140,7 +141,7 @@ static int nvme_getdev_by_nsid(char *nsid_str, char *path, char *dev_path)
 {
 	char full_path[NVME_PATH_MAX+1], nsid_path[sizeof(full_path)+5];
 	char *end;
-	u_int64_t nsid, curnsid;
+	uint64_t nsid, curnsid;
 	DIR *dir;
 
 	nsid = strtoul(nsid_str, &end, 10);

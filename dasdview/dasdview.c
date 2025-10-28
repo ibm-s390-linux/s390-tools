@@ -17,6 +17,7 @@
 #include <linux/version.h>
 #include <malloc.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -652,7 +653,7 @@ dasdview_read_vtoc(dasdview_info_t *info)
 	volume_label_t vlabel;
 	format1_label_t tmp;
 	unsigned long maxblk, pos;
-	u_int64_t vtocblk;
+	uint64_t vtocblk;
 	int i;
 
 	pos = info->dasd_info.label_block * info->blksize;
@@ -669,7 +670,7 @@ dasdview_read_vtoc(dasdview_info_t *info)
 		exit(EXIT_FAILURE);
 	}
 
-	vtocblk = (u_int64_t)vtoc_get_cyl_from_cchhb(&vlabel.vtoc) *
+	vtocblk = (uint64_t)vtoc_get_cyl_from_cchhb(&vlabel.vtoc) *
 		info->geo.heads * info->geo.sectors +
 		vtoc_get_head_from_cchhb(&vlabel.vtoc) * info->geo.sectors +
 		vlabel.vtoc.b;
@@ -2087,7 +2088,7 @@ static void dasdview_print_raw_track(char *trackdata,
 {
 	struct eckd_count *ecount;
 	char *data;
-	u_int32_t record;
+	uint32_t record;
 
 	record = 0;
 	data = trackdata;
@@ -2112,8 +2113,8 @@ static void dasdview_print_raw_track(char *trackdata,
 
 static void dasdview_view_raw(dasdview_info_t *info)
 {
-	u_int64_t residual, trckstart, trckend, track, trckbuffsize;
-	u_int64_t tracks_to_read, trckcount, i;
+	uint64_t residual, trckstart, trckend, track, trckbuffsize;
+	uint64_t tracks_to_read, trckcount, i;
 	char *trackdata;
 	char *data;
 	int rc;

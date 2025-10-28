@@ -19,6 +19,7 @@
 #include <limits.h>
 #include <mntent.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,13 +70,13 @@ static void error(const char *format, ...)
 	"is in invalid format\n",prog_name);}
 
 typedef struct bootstrap1 {
-	u_int32_t key;
-	u_int32_t data[6];
+	uint32_t key;
+	uint32_t data[6];
 } __attribute__ ((packed)) bootstrap1_t;
 
 typedef struct bootstrap2 {
-	u_int32_t key;
-	u_int32_t data[36];
+	uint32_t key;
+	uint32_t data[36];
 } __attribute__ ((packed)) bootstrap2_t;
 
 

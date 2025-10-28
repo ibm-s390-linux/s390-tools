@@ -6,6 +6,8 @@
  *
  */
 
+#include <stdint.h>
+
 #include "lib/vtoc.h"
 
 static unsigned char EBCtoASC[256] =
@@ -198,7 +200,7 @@ char * vtoc_ebcdic_dec (char *source, char *target, int l)
 /*
  *
  */
-void vtoc_set_extent (extent_t *ext, u_int8_t typeind, u_int8_t seqno,
+void vtoc_set_extent (extent_t *ext, uint8_t typeind, uint8_t seqno,
 		      cchh_t *lower, cchh_t *upper) 
 { 
         ext->typeind = typeind;
@@ -211,17 +213,17 @@ void vtoc_set_extent (extent_t *ext, u_int8_t typeind, u_int8_t seqno,
 /*
  *
  */
-void vtoc_set_cchh (cchh_t *addr, u_int32_t cc, u_int16_t hh)
+void vtoc_set_cchh (cchh_t *addr, uint32_t cc, uint16_t hh)
 {
-	addr->cc = (u_int16_t) cc;
+	addr->cc = (uint16_t) cc;
 	addr->hh = cc >> 16;
 	addr->hh <<= 4;
 	addr->hh |= hh;
 }
 
-u_int32_t vtoc_get_cyl_from_cchh(cchh_t *addr)
+uint32_t vtoc_get_cyl_from_cchh(cchh_t *addr)
 {
-        u_int32_t cyl;
+        uint32_t cyl;
 
         /*decode cylinder for large volumes */
 	cyl = addr->hh & 0xFFF0;
@@ -230,7 +232,7 @@ u_int32_t vtoc_get_cyl_from_cchh(cchh_t *addr)
 	return cyl;
 }
 
-u_int16_t vtoc_get_head_from_cchh(cchh_t *addr)
+uint16_t vtoc_get_head_from_cchh(cchh_t *addr)
 {
 	/* decode heads for large volumes */
 	return addr->hh & 0x000F;
@@ -239,7 +241,7 @@ u_int16_t vtoc_get_head_from_cchh(cchh_t *addr)
 /*
  *
  */
-static void vtoc_set_ttr (ttr_t *addr, u_int16_t tt, u_int8_t r)
+static void vtoc_set_ttr (ttr_t *addr, uint16_t tt, uint8_t r)
 {
 	addr->tt = tt;
 	addr->r  = r;
@@ -249,18 +251,18 @@ static void vtoc_set_ttr (ttr_t *addr, u_int16_t tt, u_int8_t r)
 /*
  *
  */
-void vtoc_set_cchhb (cchhb_t *addr, u_int32_t cc, u_int16_t hh, u_int8_t b)
+void vtoc_set_cchhb (cchhb_t *addr, uint32_t cc, uint16_t hh, uint8_t b)
 {
-	addr->cc = (u_int16_t) cc;
+	addr->cc = (uint16_t) cc;
 	addr->hh = cc >> 16;
 	addr->hh <<= 4;
 	addr->hh |= hh;
 	addr->b  = b;
 }
 
-u_int32_t vtoc_get_cyl_from_cchhb(cchhb_t *addr)
+uint32_t vtoc_get_cyl_from_cchhb(cchhb_t *addr)
 {
-        u_int32_t cyl;
+        uint32_t cyl;
 
         /* decode cylinder for large volumes */
         cyl = addr->hh & 0xFFF0;
@@ -269,7 +271,7 @@ u_int32_t vtoc_get_cyl_from_cchhb(cchhb_t *addr)
 	return cyl;
 }
 
-u_int16_t vtoc_get_head_from_cchhb(cchhb_t *addr)
+uint16_t vtoc_get_head_from_cchhb(cchhb_t *addr)
 {
 	/* decode heads for large volumes */
 	return addr->hh & 0x000F;
@@ -281,22 +283,22 @@ u_int16_t vtoc_get_head_from_cchhb(cchhb_t *addr)
  * Note: Record zero is special, so first block on a track is
  * in record 1!
  */
-u_int64_t cchhb2blk(cchhb_t *p, struct hd_geometry *geo)
+uint64_t cchhb2blk(cchhb_t *p, struct hd_geometry *geo)
 {
-        return (u_int64_t) vtoc_get_cyl_from_cchhb(p) *
+        return (uint64_t) vtoc_get_cyl_from_cchhb(p) *
 		geo->heads * geo->sectors +
 		vtoc_get_head_from_cchhb(p) * geo->sectors +
 		p->b;
 }
 
-u_int64_t cchh2blk (cchh_t *p, struct hd_geometry *geo) {
+uint64_t cchh2blk (cchh_t *p, struct hd_geometry *geo) {
 
-        return (u_int64_t) vtoc_get_cyl_from_cchh(p) *
+        return (uint64_t) vtoc_get_cyl_from_cchh(p) *
 		geo->heads * geo->sectors +
                 vtoc_get_head_from_cchh(p) * geo->sectors;
 }
 
-u_int32_t cchh2trk (cchh_t *p, struct hd_geometry *geo) {
+uint32_t cchh2trk (cchh_t *p, struct hd_geometry *geo) {
 
 	return  vtoc_get_cyl_from_cchh(p) * geo->heads +
 		vtoc_get_head_from_cchh(p);
@@ -305,7 +307,7 @@ u_int32_t cchh2trk (cchh_t *p, struct hd_geometry *geo) {
 /*
  *
  */
-void vtoc_set_date (labeldate_t * d, u_int8_t year, u_int16_t day) 
+void vtoc_set_date (labeldate_t * d, uint8_t year, uint16_t day) 
 {
         d->year = year;
         d->day  = day;
@@ -625,7 +627,7 @@ vtoc_init_format4_label (
 	unsigned int tracks,
 	unsigned int blocks,
 	unsigned int blksize,
-	u_int16_t dev_type) 
+	uint16_t dev_type) 
 {
 	int i;
 
@@ -748,8 +750,8 @@ static void vtoc_init_format_1_8_label (
 	f1->DS1VOLSQ = 0x0001;
 
 	vtoc_set_date(&f1->DS1CREDT,
-		      (u_int8_t) creatime->tm_year,
-		      (u_int16_t) creatime->tm_yday);
+		      (uint8_t) creatime->tm_year,
+		      (uint16_t) creatime->tm_yday);
 	/* expires never - 99 365 */
 	vtoc_set_date(&f1->DS1EXPDT,
 	              0x63,
@@ -760,8 +762,8 @@ static void vtoc_init_format_1_8_label (
 	vtoc_ebcdic_enc("IBM LINUX    ", str, 13);
 	memcpy((char *)f1->DS1SYSCD, str, 13);
 	vtoc_set_date(&f1->DS1REFD,
-		      (u_int8_t) creatime->tm_year,
-		      (u_int16_t) creatime->tm_yday);
+		      (uint8_t) creatime->tm_year,
+		      (uint16_t) creatime->tm_yday);
 	f1->DS1SMSFG = 0x00;
 	f1->DS1SCXTF = 0x00;
 	f1->DS1SCXTV = 0x0000;
@@ -831,7 +833,7 @@ void
 vtoc_update_format4_label (
 	format4_label_t *f4,
 	cchhb_t *highest_f1,
-	u_int16_t unused_update) 
+	uint16_t unused_update) 
 {
 	/* update highest address of a format 1 label */
 	memcpy(&f4->DS4HPCHR, highest_f1, sizeof(cchhb_t));
@@ -893,9 +895,9 @@ void
 vtoc_update_format5_label_add (format5_label_t *f5,
 			       int verbose,
 			       int trk,
-			       u_int16_t a, 
-			       u_int16_t b, 
-			       u_int8_t c) 
+			       uint16_t a, 
+			       uint16_t b, 
+			       uint8_t c) 
 {
 	ds5ext_t *ext = NULL, *tmp = NULL;
 	int i;	
@@ -988,9 +990,9 @@ void
 vtoc_update_format5_label_del (format5_label_t *f5,
 			       int verbose,
 			       int trk,
-			       u_int16_t a,
-			       u_int16_t b,
-			       u_int8_t c) 
+			       uint16_t a,
+			       uint16_t b,
+			       uint8_t c) 
 {
 	ds5ext_t *ext;
 	int i, counter=0;
@@ -1058,9 +1060,9 @@ vtoc_update_format5_label_del (format5_label_t *f5,
 			((ext->t + ext->fc*trk + ext->ft) > (a + b*trk + c)))
 		{
 			/* partition divides free space into 2 pieces */
-			u_int16_t x = a + b*trk + c;
-			u_int16_t w,y;
-			u_int8_t z;
+			uint16_t x = a + b*trk + c;
+			uint16_t w,y;
+			uint8_t z;
 
 			w = (ext->t + ext->fc*trk + ext->ft) - (a + b*trk + c);
 			y = w / trk;
@@ -1149,7 +1151,7 @@ vtoc_reorganize_FMT7_extents (format7_label_t *f7)
  * add a free space extent description to the VTOC FMT7 DSCB
  */
 void vtoc_update_format7_label_add (format7_label_t *f7, int verbose, 
-				    u_int32_t a, u_int32_t b) 
+				    uint32_t a, uint32_t b) 
 {
 	ds7ext_t *ext = NULL, *tmp = NULL;
 	int i;	
@@ -1223,7 +1225,7 @@ void vtoc_update_format7_label_add (format7_label_t *f7, int verbose,
  * remove a free space extent description from the VTOC FMT7 DSCB
  */
 void vtoc_update_format7_label_del (format7_label_t *f7, int verbose, 
-				    u_int32_t a, u_int32_t b) 
+				    uint32_t a, uint32_t b) 
 {
 	ds7ext_t *ext;
 	int i, counter=0;
@@ -1294,7 +1296,7 @@ void vtoc_update_format7_label_del (format7_label_t *f7, int verbose,
  */
 void vtoc_set_freespace(format4_label_t *f4, format5_label_t *f5,
 		   format7_label_t *f7, char ch, int verbose,
-		   u_int32_t start, u_int32_t stop, u_int32_t cyl, u_int32_t trk)
+		   uint32_t start, uint32_t stop, uint32_t cyl, uint32_t trk)
 {
 	if ((cyl * trk) > BIG_DISK_SIZE) {
 		if (ch == '+') {
@@ -1317,12 +1319,12 @@ void vtoc_set_freespace(format4_label_t *f4, format5_label_t *f5,
 		f4->DS4EFLVL = 0x07;
 		vtoc_set_cchhb(&f4->DS4EFPTR, 0x0000, 0x0001, 0x03);
 	} else {
-		u_int16_t x,y;
-		u_int8_t  z;
+		uint16_t x,y;
+		uint8_t  z;
 
-		x = (u_int16_t) start;
-		y = (u_int16_t) ((stop - start + 1) / trk);
-		z =  (u_int8_t) ((stop - start + 1) % trk);
+		x = (uint16_t) start;
+		y = (uint16_t) ((stop - start + 1) / trk);
+		z =  (uint8_t) ((stop - start + 1) % trk);
 
 		if (ch == '+') {
 			vtoc_update_format5_label_add(f5, verbose, trk,
