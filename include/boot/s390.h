@@ -29,6 +29,7 @@
 #define UNPACK_FACILITY		_AC(161, U)
 
 #ifndef __ASSEMBLER__
+#include <asm/types.h>
 #include <stdint.h>
 
 /*
@@ -379,18 +380,6 @@ static __always_inline int is_zvm(void)
 	get_cpu_id(&cpuid);
 	return cpuid.version == 0xff;
 }
-
-/* To avoid conflicts add a macro guard since __vector128 is also
- * defined in 'linux/asm/types.h'.
- */
-#ifndef _S390_TYPES_H
-/*
- * Vector register definition
- */
-typedef struct {
-	uint32_t u[4];
-} __vector128;
-#endif
 
 /*
  * Save vector registers
