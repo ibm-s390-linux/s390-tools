@@ -8,7 +8,6 @@ use crate::{Error, Result};
 use log::debug;
 use std::{
     convert::TryInto,
-    ffi::c_ulong,
     fs::File,
     os::unix::prelude::{AsRawFd, RawFd},
 };
@@ -46,7 +45,7 @@ pub type UvFlags = crate::misc::Msb0Flags64;
 ///
 /// # Safety:
 /// Raw fd must point to an open file
-fn ioctl_raw(raw_fd: RawFd, cmd: c_ulong, cb: &mut IoctlCb) -> Result<()> {
+fn ioctl_raw(raw_fd: RawFd, cmd: u64, cb: &mut IoctlCb) -> Result<()> {
     debug!("calling unsafe fn wrapper uv::ioctl_raw with {raw_fd:#x?}, {cmd:#x?}, {cb:?}");
 
     let rc;
@@ -56,7 +55,7 @@ fn ioctl_raw(raw_fd: RawFd, cmd: c_ulong, cb: &mut IoctlCb) -> Result<()> {
     // SAFETY: the passed pointer points to a valid memory region that
     // contains the expected C-struct. The struct outlives this function.
     unsafe {
-        rc = ioctl(raw_fd, cmd, cb.as_ptr_mut());
+        rc = ioctl(raw_fd, cmd.try_into().unwrap(), cb.as_ptr_mut());
     }
 
     // NOTE io::Error handles all errnos ioctl uses
