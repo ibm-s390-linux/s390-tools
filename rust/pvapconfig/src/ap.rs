@@ -127,8 +127,7 @@ impl ApqnList {
                 Ok(r) => r,
                 Err(err) => {
                     eprintln!(
-                        "Failure reading AP devices {} ({:?}).",
-                        PATH_SYS_DEVICES_AP, err
+                        "Failure reading AP devices {PATH_SYS_DEVICES_AP} ({err:?})."
                     );
                     return None;
                 }
@@ -139,8 +138,7 @@ impl ApqnList {
                 Ok(r) => r,
                 Err(err) => {
                     eprintln!(
-                        "Failure reading AP queue directories in {} ({:?}).",
-                        path, err
+                        "Failure reading AP queue directories in {path} ({err:?})."
                     );
                     return None;
                 }
@@ -209,7 +207,7 @@ impl ApqnList {
                         continue;
                     }
                     if i1.mkvp == i2.mkvp {
-                        eprintln!("APQN {} and APQN {} have same MPVK", a1, a2);
+                        eprintln!("APQN {a1} and APQN {a2} have same MPVK");
                         return false;
                     }
                 }

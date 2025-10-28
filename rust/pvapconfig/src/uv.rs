@@ -52,7 +52,7 @@ pub fn has_list_secrets_facility() -> Result<(), String> {
 /// The list may be empty if the UV doesn't have any secrets stored.
 pub fn gather_secrets() -> Result<SecretList, String> {
     let uv = match UvDevice::open() {
-        Err(e) => return Err(format!("Failed to open UV device: {:?}.", e)),
+        Err(e) => return Err(format!("Failed to open UV device: {e:?}.")),
         Ok(u) => u,
     };
     let mut cmd = ListCmd::default();

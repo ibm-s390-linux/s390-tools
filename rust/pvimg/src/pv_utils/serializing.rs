@@ -25,7 +25,7 @@ pub fn ser_lower_hex<S: Serializer, B: LowerHex>(
     data: &B,
     ser: S,
 ) -> std::result::Result<S::Ok, S::Error> {
-    format!("{:#018x}", data).serialize(ser)
+    format!("{data:#018x}").serialize(ser)
 }
 
 pub fn ser_hex_confidential<S: Serializer, const COUNT: usize>(

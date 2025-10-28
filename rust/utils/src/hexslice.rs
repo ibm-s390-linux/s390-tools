@@ -48,7 +48,7 @@ impl Display for HexSlice<'_> {
             if f.sign_minus() && f.alternate() {
                 write!(f, "0x")?;
             }
-            write!(f, "{:0>2x}", byte)?;
+            write!(f, "{byte:0>2x}")?;
             if f.sign_minus() {
                 write!(f, " ")?;
             }

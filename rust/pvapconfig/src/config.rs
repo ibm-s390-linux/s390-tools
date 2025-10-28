@@ -143,7 +143,7 @@ impl ApConfigEntry {
                 self.mode = mode;
                 self.validate_accel_entry()?;
             }
-            _ => return Err(format!("Unknown or invalid mode '{}'.", mode)),
+            _ => return Err(format!("Unknown or invalid mode '{mode}'.")),
         }
         Ok(())
     }
@@ -176,16 +176,14 @@ impl ApConfigList {
             Ok(f) => f,
             Err(err) => {
                 return Err(format!(
-                    "Failure to open AP config file {}: {:?}",
-                    fname, err
+                    "Failure to open AP config file {fname}: {err:?}"
                 ))
             }
         };
         match serde_yaml::from_reader(file) {
             Ok(cfg) => Ok(cfg),
             Err(err) => Err(format!(
-                "Failure parsing AP config file {}: {:?}",
-                fname, err
+                "Failure parsing AP config file {fname}: {err:?}"
             )),
         }
     }
@@ -195,10 +193,10 @@ impl ApConfigList {
             let ename = if !entry.name.trim().is_empty() {
                 format!("AP config entry {} '{}'", i, entry.name.trim())
             } else {
-                format!("AP config entry {}", i)
+                format!("AP config entry {i}")
             };
             if let Err(err) = &entry.validate() {
-                return Err(format!("{}: {}", ename, err));
+                return Err(format!("{ename}: {err}"));
             }
         }
         Ok(())

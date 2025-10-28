@@ -145,7 +145,7 @@ impl<T: ControlFlagTrait> ControlFlagsTrait for ControlFlags<T> {
 impl<T: ControlFlagTrait> Display for ControlFlags<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value: u64 = self.flags.into();
-        write!(f, "{:#018x}", value)
+        write!(f, "{value:#018x}")
     }
 }
 
@@ -266,7 +266,7 @@ mod test {
     #[test]
     fn test_display() {
         let flags = PlaintextControlFlagsV1::from_flags([PcfV1::NoComponentEncryption.enabled()]);
-        assert_eq!("0x0000000010000000", format!("{}", flags));
+        assert_eq!("0x0000000010000000", format!("{flags}"));
 
         let flags = PlaintextControlFlagsV1::from_flags([
             PcfV1::AllowDumping.enabled(),
@@ -277,7 +277,7 @@ mod test {
             PcfV1::PckmoEcc.enabled(),
             PcfV1::PckmoHmac.enabled(),
         ]);
-        assert_eq!("0x00000000300000f2", format!("{}", flags));
+        assert_eq!("0x00000000300000f2", format!("{flags}"));
     }
 
     #[test]

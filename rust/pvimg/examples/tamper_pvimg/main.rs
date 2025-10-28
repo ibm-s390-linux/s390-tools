@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::{fs::File, io::Write, path::PathBuf};
+
 use anyhow::Context;
 use clap::{Parser, ValueEnum, ValueHint};
 use log::info;
@@ -14,7 +16,6 @@ use pvimg::{
         UvDataPlainTrait, UvDataTrait,
     },
 };
-use std::{fs::File, io::Write, path::PathBuf};
 use utils::{PvLogger, VerbosityOptions};
 
 #[derive(Parser, Debug)]
@@ -139,7 +140,7 @@ fn main() -> anyhow::Result<()> {
         Ok(_) => (),
         Err(err) => {
             std::fs::remove_file(&opt.outfile)?;
-            panic!("Could not seek SE header: {}", err);
+            panic!("Could not seek SE header: {err}");
         }
     };
 

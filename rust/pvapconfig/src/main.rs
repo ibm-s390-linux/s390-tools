@@ -103,8 +103,7 @@ fn main() -> ExitCode {
         };
         if apconfig.is_empty() {
             println!(
-                "No AP configuration entries in config file '{}': Nothing to do.",
-                configfile
+                "No AP configuration entries in config file '{configfile}': Nothing to do."
             );
             return ExitCode::SUCCESS;
         }
@@ -382,7 +381,7 @@ fn do_ap_config(
                         if let Err(err) = apqn.set_bind_state(pvap::bind_state::Bound) {
                             // bind failed, unbind/reset this apqn, return with failure
                             let _ = apqn.set_bind_state(pvap::bind_state::Unbound);
-                            return Err(format!("Failure binding APQN {}: {}", apqn, err));
+                            return Err(format!("Failure binding APQN {apqn}: {err}"));
                         }
                     }
                     // try to associate
@@ -662,6 +661,6 @@ mod tests {
         let r = do_ap_config(&mut apqnlist, &secretlist, &apcfglist, true);
         assert!(r.is_ok());
         let n = r.unwrap();
-        assert!(n == 3, "n = {} != 3", n);
+        assert!(n == 3, "n = {n} != 3");
     }
 }

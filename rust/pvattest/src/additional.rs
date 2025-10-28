@@ -44,15 +44,15 @@ impl Display for AttestationResult<'_> {
         writeln!(f, "{:#}", self.cuid)?;
         if let Some(data) = &self.add {
             writeln!(f, "Additional-data:")?;
-            writeln!(f, "{:#}", data)?;
+            writeln!(f, "{data:#}")?;
         }
         if let Some(data) = &self.add_fields {
             writeln!(f, "Additional-data content:")?;
-            writeln!(f, "{:#}", data)?;
+            writeln!(f, "{data:#}")?;
         }
         if let Some(data) = &self.user_data {
             writeln!(f, "user-data:")?;
-            writeln!(f, "{:#}", data)?;
+            writeln!(f, "{data:#}")?;
         }
         Ok(())
     }

@@ -162,7 +162,7 @@ impl Display for MsaLevel {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{} ", self.msa_level)?;
         match self.stfle_bit {
-            Some(bit) => write!(f, "STFLE bit [ {:>3} ] : ", bit)?,
+            Some(bit) => write!(f, "STFLE bit [ {bit:>3} ] : ")?,
             None => write!(f, "                  : ")?,
         }
         match self.enabled {

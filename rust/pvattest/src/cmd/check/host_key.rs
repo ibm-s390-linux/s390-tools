@@ -123,8 +123,7 @@ pub fn host_key_check<'a, 'b>(
         }) {
         Some(phkh) => contains_phkh(&hkd_hashes, phkh, kind, check_enforced),
         None if check_enforced => CheckState::Err(format!(
-            "The Attestation result does not contain an {}, but checking was enabled.",
-            kind
+            "The Attestation result does not contain an {kind}, but checking was enabled."
         )),
         None => CheckState::Data(HostKeyCheck::default()),
     };

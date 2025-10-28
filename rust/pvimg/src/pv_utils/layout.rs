@@ -150,7 +150,7 @@ impl Layout {
         }
 
         if let Some(overlapped) = self.overlaps(&interval) {
-            let msg = format!("{} ... {}", overlapped, interval);
+            let msg = format!("{overlapped} ... {interval}");
             return Err(Error::IntervalOverlap(msg));
         }
 
