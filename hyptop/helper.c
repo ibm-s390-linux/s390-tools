@@ -15,7 +15,6 @@
 #include <iconv.h>
 #include <limits.h>
 #include <mntent.h>
-#include <mntent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
