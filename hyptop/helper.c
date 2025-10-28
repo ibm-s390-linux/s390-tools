@@ -24,6 +24,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifndef _PATH_MOUNTED
+#define _PATH_MOUNTED "/etc/mtab"
+#endif
+
 #include "lib/util_fmt.h"
 #include "lib/util_libc.h"
 
