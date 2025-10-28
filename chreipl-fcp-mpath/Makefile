@@ -129,7 +129,7 @@ else # $(ENABLE_DOC) != 1
 # freshness of the man page can be checked, even if `pandoc` is not available,
 # or ENABLE_DOC disabled.
 
-MANPAGE_FRESH	:= $(shell sha256sum --check .chreipl-fcp-mpath.7.cksum >/dev/null && echo 1 || echo 0)
+MANPAGE_FRESH	:= $(shell sha256sum -c .chreipl-fcp-mpath.7.cksum >/dev/null && echo 1 || echo 0)
 ifeq ($(MANPAGE_FRESH),0)
 $(warning chreipl-fcp-mpath.7 is outdated, please regenerate it by calling `make ENABLE_DOC=1`)
 endif
