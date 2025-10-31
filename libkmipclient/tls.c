@@ -233,7 +233,7 @@ out:
 	if (server_cert != NULL)
 		X509_free(server_cert);
 
-	return 0;
+	return rc;
 }
 
 /**
