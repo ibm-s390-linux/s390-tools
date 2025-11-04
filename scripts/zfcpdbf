@@ -738,6 +738,19 @@ sub _print_hba_id5
 	print "FCES new       : 0x", substr($rec, 56, 8), "\n";
 }
 
+sub _print_hba_id6
+{
+	my $fsf_req_id = shift();
+	my $rec = shift();
+	my $payload_length = shift();
+	my $rec_received = shift();
+	my $rec_issued;
+
+	print "WWPN           : 0x", substr($rec, 0, 16), "\n";
+	print "LUN            : 0x", substr($rec, 16, 16), "\n";
+	print "Return Value   : 0x", substr($rec, 32, 8), "\n";
+}
+
 sub print_deferr_common
 {
 	my $rec = shift();
@@ -940,6 +953,7 @@ sub assign_callback_subs
 	$print_hba_id[2] = \&_print_hba_id2;
 	$print_hba_id[3] = \&_print_hba_id3;
 	$print_hba_id[5] = \&_print_hba_id5;
+	$print_hba_id[6] = \&_print_hba_id6;
 
 	$print_rec_id[1] = \&_print_rec_id1;
 	$print_rec_id[2] = \&_print_rec_id2;
