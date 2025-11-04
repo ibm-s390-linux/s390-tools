@@ -316,8 +316,7 @@ PROCFILES="\
   /proc/cmdline\
   /proc/cpuinfo\
   /proc/crypto\
-  /proc/dasd/devices\
-  /proc/dasd/statistics\
+  /proc/dasd\
   /proc/devices\
   /proc/diskstats\
   /proc/interrupts\
@@ -328,11 +327,7 @@ PROCFILES="\
   /proc/misc\
   /proc/modules\
   /proc/mounts\
-  /proc/net/vlan\
-  /proc/net/bonding\
-  /proc/net/sockstat\
-  /proc/net/sockstat6\
-  /proc/net/softnet_stat\
+  /proc/net\
   /proc/partitions\
   /proc/qeth\
   /proc/qeth_perf\
