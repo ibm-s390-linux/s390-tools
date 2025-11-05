@@ -487,6 +487,7 @@ CMDS="uname -a\
   :lsmem\
   :lsmod\
   :lsshut\
+  :lsstp\
   :runlevel\
   :sysctl -a\
   :systemctl --all --no-pager show\
