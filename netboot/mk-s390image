@@ -21,8 +21,9 @@
 # Offsets
 OFFS_INITRD_START_BYTES=66568
 OFFS_INITRD_SIZE_BYTES=66576
+OFFS_COMMANDLINE_MAX_SIZE_BYTES=66608
 OFFS_COMMANDLINE_BYTES=66688
-MAX_PARMFILE_SIZE=896
+LEGACY_MAX_PARMFILE_SIZE=896
 
 # Variables
 cmd=$(basename -- "$0")
@@ -87,6 +88,25 @@ dec2be64()
 	printf '%b' "$b"
 }
 
+max_kernel_cmdline_size()
+{
+	local __kernel=$1 size v
+
+	size_be="$(od -A n -j "${OFFS_COMMANDLINE_MAX_SIZE_BYTES}" -N 8 -t uL -- "$__kernel")"
+	# If little endian then swap bytes
+	if (("$(printf '\1' | od -dAn)" == 1)); then
+		v="$(printf '%016x0' "$size_be")"
+		size="0x${v:14:2}${v:12:2}${v:10:2}${v:8:2}${v:6:2}${v:4:2}${v:2:2}${v:0:2}"
+	else
+		size="$size_be"
+	fi
+	if ((size == 0)); then
+		size="${LEGACY_MAX_PARMFILE_SIZE}"
+	fi
+	# Use arithmetic expression to remove leading and trailing whitespace.
+	printf '%s' "$((size))"
+}
+
 # Do the image build
 dobuild()
 {
@@ -137,16 +157,17 @@ dobuild()
 	# set cmdline
 	if [ "$parmfile" != "" ]
 	then
+		max_parmfile_size=$(max_kernel_cmdline_size "$kernel")
 		parmfile_size=$(du -b -L -- "$parmfile" | cut -f1)
-		if [ "$parmfile_size" -le $MAX_PARMFILE_SIZE ]
+		if (( parmfile_size <= max_parmfile_size ));
 		then
 			# Clear any previous parameters
-			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count=$MAX_PARMFILE_SIZE \
+			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count="$max_parmfile_size" \
                             if=/dev/zero of="$image" conv=notrunc status=none
-			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 if="$parmfile" \
-			    of="$image" conv=notrunc status=none
+			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count="$parmfile_size" \
+			   if="$parmfile" of="$image" conv=notrunc status=none
 		else
-			echo "$cmd: Size $parmfile_size of $parmfile exceeds command line limit of $MAX_PARMFILE_SIZE" >&2
+			echo "$cmd: Size $parmfile_size of $parmfile exceeds command line limit of $max_parmfile_size bytes" >&2
 			return 1
 		fi
 	fi
