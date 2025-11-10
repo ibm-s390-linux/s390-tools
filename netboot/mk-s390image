@@ -25,7 +25,7 @@ OFFS_COMMANDLINE_BYTES=66688
 MAX_PARMFILE_SIZE=896
 
 # Variables
-cmd=$(basename $0)
+cmd=$(basename -- "$0")
 kernel=
 ramdisk=
 parmfile=
@@ -34,15 +34,16 @@ binval=
 success=no
 
 # Cleanup on exit
+# shellcheck disable=SC2317
 cleanup()
 {
 	if [ -n "$binval" ]
 	then
-		rm -f $binval
+		rm -f -- "$binval"
 	fi
-	if [ -n "$image" -a $success = no ]
+	if [ -n "$image" ] && [ "$success" = no ]
 	then
-		rm $image
+		rm -- "$image"
 	fi
 }
 trap cleanup EXIT
@@ -80,10 +81,10 @@ dec2be64()
 	local i
 	for i in $(seq 1 8)
 	do
-		b="\\x$(printf '%x' $(expr $num % 256))$b"
-		num=$(expr $num / 256) || true
+		b="\\x$(printf '%x' "$((num % 256))")$b"
+		num=$((num / 256)) || true
 	done
-	printf $b
+	printf '%b' "$b"
 }
 
 # Do the image build
@@ -97,13 +98,13 @@ dobuild()
 	# check whether all specified files exist
 	for i in $kernel $ramdisk $parmfile
 	do
-	if [ ! -f $i ]
+	if [ ! -f "$i" ]
 	then
 		echo "$cmd: File $i not found" >&2
 		return 1
 	fi
 	done
-	if ! file -b $(readlink -f $kernel) | grep "Linux S390" > /dev/null
+	if ! file -b -- "$(readlink -f -- "$kernel")" | grep "Linux S390" > /dev/null
 	then
 		echo "$cmd: Unrecognized file format for $kernel" >&2
 		return 1
@@ -114,35 +115,36 @@ dobuild()
 	set -e
 
 	# copy over kernel padded with zeroes to page boundary
-	dd if=$kernel of=$image bs=4096 conv=sync status=none
+	dd if="$kernel" of="$image" bs=4096 conv=sync status=none
 
 	# append ramdisk if specified
 	if [ "$ramdisk" != "" ]
 	then
-		ramdisk_size=$(du -b -L $ramdisk | cut -f1)
-		kernel_size=$(du -b -L $kernel | cut -f1)
-		ramdisk_offset=$(du -b -L $image | cut -f1)
-		cat $ramdisk >> $image
+		ramdisk_size=$(du -b -L -- "$ramdisk" | cut -f1)
+		# shellcheck disable=SC2034
+		kernel_size=$(du -b -L -- "$kernel" | cut -f1)
+		ramdisk_offset=$(du -b -L -- "$image" | cut -f1)
+		cat -- "$ramdisk" >> "$image"
 		binval=$(mktemp)
-		dec2be64 $ramdisk_offset > $binval
-		dd seek=$OFFS_INITRD_START_BYTES if=$binval of=$image bs=1 \
+		dec2be64 "$ramdisk_offset" > "$binval"
+		dd seek=$OFFS_INITRD_START_BYTES if="$binval" of="$image" bs=1 \
 			count=8 conv=notrunc status=none
-		dec2be64 $ramdisk_size > $binval
-		dd seek=$OFFS_INITRD_SIZE_BYTES if=$binval of=$image bs=1 \
+		dec2be64 "$ramdisk_size" > "$binval"
+		dd seek=$OFFS_INITRD_SIZE_BYTES if="$binval" of="$image" bs=1 \
 			count=8 conv=notrunc status=none
 	fi
 
 	# set cmdline
 	if [ "$parmfile" != "" ]
 	then
-		parmfile_size=$(du -b -L $parmfile | cut -f1)
-		if [ $parmfile_size -le $MAX_PARMFILE_SIZE ]
+		parmfile_size=$(du -b -L -- "$parmfile" | cut -f1)
+		if [ "$parmfile_size" -le $MAX_PARMFILE_SIZE ]
 		then
 			# Clear any previous parameters
 			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count=$MAX_PARMFILE_SIZE \
-                            if=/dev/zero of=$image conv=notrunc status=none
-			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 if=$parmfile \
-			    of=$image conv=notrunc status=none
+                            if=/dev/zero of="$image" conv=notrunc status=none
+			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 if="$parmfile" \
+			    of="$image" conv=notrunc status=none
 		else
 			echo "$cmd: Size $parmfile_size of $parmfile exceeds command line limit of $MAX_PARMFILE_SIZE" >&2
 			return 1
@@ -154,11 +156,12 @@ dobuild()
 }
 
 # check args and build
-args=$(getopt "r:p:hv" $*)
-if [ $? = 0 ]
+# shellcheck disable=SC2086,SC2048
+if args=$(getopt "r:p:hv" $*)
 then
+	# shellcheck disable=SC2086
 	set -- $args
-	while [ $1 != "" ]
+	while [ "$1" != "" ]
 	do
 		case $1 in
 			-r) ramdisk=$2; shift 2;;
