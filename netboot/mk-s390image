@@ -123,6 +123,11 @@ dobuild()
 		echo "$cmd: File $i not found" >&2
 		return 1
 	fi
+	if [ ! -r "$i" ]
+	then
+		echo "$cmd: File $i cannot be read, no read permission" >&2
+		return 1
+	fi
 	done
 	if ! file -b -- "$(readlink -f -- "$kernel")" | grep "Linux S390" > /dev/null
 	then
