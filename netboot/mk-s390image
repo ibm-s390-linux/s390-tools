@@ -44,7 +44,7 @@ cleanup()
 	fi
 	if [ -n "$image" ] && [ "$success" = no ]
 	then
-		rm -- "$image"
+		rm -f -- "$image"
 	fi
 }
 trap cleanup EXIT
