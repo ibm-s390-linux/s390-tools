@@ -38,12 +38,10 @@ success=no
 # shellcheck disable=SC2317
 cleanup()
 {
-	if [ -n "$binval" ]
-	then
+	if [ -n "$binval" ]; then
 		rm -f -- "$binval"
 	fi
-	if [ -n "$image" ] && [ "$success" = no ]
-	then
+	if [ -n "$image" ] && [ "$success" = no ]; then
 		rm -f -- "$image"
 	fi
 }
@@ -52,25 +50,25 @@ trap cleanup EXIT
 # Usage
 usage()
 {
-cat <<-EOF
-Usage: $cmd KERNEL BOOT_IMAGE [-r RAMDISK] [-p PARMFILE]
+	cat <<- EOF
+		Usage: $cmd KERNEL BOOT_IMAGE [-r RAMDISK] [-p PARMFILE]
 
-Build an s390 image BOOT_IMAGE suitable for CD/tape/network boot or as a
-KVM firmware image using a stripped Linux kernel file KERNEL.
+		Build an s390 image BOOT_IMAGE suitable for CD/tape/network boot or as a
+		KVM firmware image using a stripped Linux kernel file KERNEL.
 
-OPTIONS
--p        Use PARMFILE with kernel parameters in the image
--r        Include RAMDISK in the image
--h        Print this help, then exit
--v        Print version information, then exit
-EOF
+		OPTIONS
+		-p        Use PARMFILE with kernel parameters in the image
+		-r        Include RAMDISK in the image
+		-h        Print this help, then exit
+		-v        Print version information, then exit
+	EOF
 }
 
 printversion()
 {
-	cat <<-EOD
-	$cmd: version %S390_TOOLS_VERSION%
-	Copyright IBM Corp. 2017
+	cat <<- EOD
+		$cmd: version %S390_TOOLS_VERSION%
+		Copyright IBM Corp. 2017
 	EOD
 }
 
@@ -80,8 +78,7 @@ dec2be64()
 	local num=$1
 	local b
 	local i
-	for i in $(seq 1 8)
-	do
+	for i in $(seq 1 8); do
 		b="\\x$(printf '%x' "$((num % 256))")$b"
 		num=$((num / 256)) || true
 	done
@@ -116,21 +113,17 @@ dobuild()
 	local ramdisk_offset
 	local parmfile_size
 	# check whether all specified files exist
-	for i in $kernel $ramdisk $parmfile
-	do
-	if [ ! -f "$i" ]
-	then
-		echo "$cmd: File $i not found" >&2
-		return 1
-	fi
-	if [ ! -r "$i" ]
-	then
-		echo "$cmd: File $i cannot be read, no read permission" >&2
-		return 1
-	fi
+	for i in $kernel $ramdisk $parmfile; do
+		if [ ! -f "$i" ]; then
+			echo "$cmd: File $i not found" >&2
+			return 1
+		fi
+		if [ ! -r "$i" ]; then
+			echo "$cmd: File $i cannot be read, no read permission" >&2
+			return 1
+		fi
 	done
-	if ! file -b -- "$(readlink -f -- "$kernel")" | grep "Linux S390" > /dev/null
-	then
+	if ! file -b -- "$(readlink -f -- "$kernel")" | grep "Linux S390" > /dev/null; then
 		echo "$cmd: Unrecognized file format for $kernel" >&2
 		return 1
 	fi
@@ -143,8 +136,7 @@ dobuild()
 	dd if="$kernel" of="$image" bs=4096 conv=sync status=none
 
 	# append ramdisk if specified
-	if [ "$ramdisk" != "" ]
-	then
+	if [ "$ramdisk" != "" ]; then
 		ramdisk_size=$(du -b -L -- "$ramdisk" | cut -f1)
 		# shellcheck disable=SC2034
 		kernel_size=$(du -b -L -- "$kernel" | cut -f1)
@@ -160,17 +152,15 @@ dobuild()
 	fi
 
 	# set cmdline
-	if [ "$parmfile" != "" ]
-	then
+	if [ "$parmfile" != "" ]; then
 		max_parmfile_size=$(max_kernel_cmdline_size "$kernel")
 		parmfile_size=$(du -b -L -- "$parmfile" | cut -f1)
-		if (( parmfile_size <= max_parmfile_size ));
-		then
+		if ((parmfile_size <= max_parmfile_size)); then
 			# Clear any previous parameters
 			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count="$max_parmfile_size" \
-                            if=/dev/zero of="$image" conv=notrunc status=none
+				if=/dev/zero of="$image" conv=notrunc status=none
 			dd seek=$OFFS_COMMANDLINE_BYTES bs=1 count="$parmfile_size" \
-			   if="$parmfile" of="$image" conv=notrunc status=none
+				if="$parmfile" of="$image" conv=notrunc status=none
 		else
 			echo "$cmd: Size $parmfile_size of $parmfile exceeds command line limit of $max_parmfile_size bytes" >&2
 			return 1
@@ -183,25 +173,40 @@ dobuild()
 
 # check args and build
 # shellcheck disable=SC2086,SC2048
-if args=$(getopt "r:p:hv" $*)
-then
+if args=$(getopt "r:p:hv" $*); then
 	# shellcheck disable=SC2086
 	set -- $args
-	while [ "$1" != "" ]
-	do
+	while [ "$1" != "" ]; do
 		case $1 in
-			-r) ramdisk=$2; shift 2;;
-			-p) parmfile=$2; shift 2;;
-			-h) usage; exit 0;;
-			-v) printversion; exit 0;;
-			--) shift; break;;
-			*) echo "$cmd: Unexpected argument $1, exiting..." >&2; exit 1;;
+			-r)
+				ramdisk=$2
+				shift 2
+				;;
+			-p)
+				parmfile=$2
+				shift 2
+				;;
+			-h)
+				usage
+				exit 0
+				;;
+			-v)
+				printversion
+				exit 0
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				echo "$cmd: Unexpected argument $1, exiting..." >&2
+				exit 1
+				;;
 		esac
 	done
 fi
 
-if [ $# = 2 ]
-then
+if [ $# = 2 ]; then
 	kernel=$1
 	image=$2
 	dobuild
