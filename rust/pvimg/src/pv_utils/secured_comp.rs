@@ -555,7 +555,7 @@ impl SecuredComponentBuilder {
             });
         }
 
-        let mode = if self.encrypt && component.secure_mode() {
+        let mode = if self.encrypt {
             Mode::Encrypt
         } else {
             Mode::Padding
