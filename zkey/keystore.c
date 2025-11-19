@@ -312,7 +312,7 @@ static int _keystore_valid_volume_type(const char *volume_type)
 
 /**
  * Returns the volume type contained in the properties. If no volume type
- * property is contained, then 'plain' is assumed (for backward comatibility).
+ * property is contained, then 'plain' is assumed (for backward compatibility).
  *
  * @returns a string containing the volume type. Must be freed by the caller.
  */
@@ -978,7 +978,7 @@ typedef int (*process_key_t)(struct keystore *keystore,
  * @param[in] name_filter    the name filter. Can contain wild cards.
  *                           NULL means no name filter.
  * @param[in] volume_filter  the volume filter. Can contain wild cards, and
- *                           mutliple volume filters separated by commas.
+ *                           multiple volume filters separated by commas.
  *                           If the filter does not contain the ':dm-name' part,
  *                           then the volumes are matched without the dm-name
  *                           part. If the filter contains the ':dm-name' part,
@@ -987,7 +987,7 @@ typedef int (*process_key_t)(struct keystore *keystore,
  *                           NULL means no volume filter.
  *                           specification is ignored for filter matching.
  * @param[in] apqn_filter    the APQN filter. Can contain wild cards, and
- *                           mutliple APQN filters separated by commas.
+ *                           multiple APQN filters separated by commas.
  *                           NULL means no APQN filter.
  * @param[in] volume_type    If not NULL, specifies the volume type.
  * @param[in] key_type       The key type. NULL means no key type filter.
@@ -3751,7 +3751,7 @@ out:
  * Note: if both fromOld and toNew are FALSE, then the reencipherement mode is
  *       detected automatically. If both are TRUE then the key is reenciphered
  *       from the OLD to the NEW master key.
- * Note: if both inplace and staged are FLASE, then the key is re-enciphered
+ * Note: if both inplace and staged are FALSE, then the key is re-enciphered
  *       inplace when for OLD-to-CURRENT, and is reenciphered staged for
  *       CURRENT-to-NEW.
  * @returns 0 for success or a negative errno in case of an error
@@ -4026,7 +4026,7 @@ out:
  * @param[in] name     the name of the key
  * @param[in] file_names the file names of the key
  *
- * @returnd 0 if the user confirmed the deletion, a negative errno value
+ * @returns 0 if the user confirmed the deletion, a negative errno value
  *          otherwise
  */
 static int _keystore_prompt_for_remove(struct keystore *keystore,
@@ -4220,13 +4220,13 @@ out:
  * @param[in] name_filter    the name filter. Can contain wild cards.
  *                           NULL means no name filter.
  * @param[in] volume_filter  the volume filter. Can contain wild cards, and
- *                           mutliple volume filters separated by commas.
+ *                           multiple volume filters separated by commas.
  *                           The ':dm-name' part of the volume is optional
  *                           for the volume filter. If not specified, the filter
  *                           checks the volume part only.
  *                           NULL means no volume filter.
  * @param[in] apqn_filter    the APQN filter. Can contain wild cards, and
- *                           mutliple APQN filters separated by commas.
+ *                           multiple APQN filters separated by commas.
  *                           NULL means no APQN filter.
  * @param[in] volume_type    The volume type. NULL means no volume type filter.
  * @param[in] key_type       The key type. NULL means no key type filter.
@@ -4686,7 +4686,7 @@ out:
  *
  * @param[in] keystore       the key store
  * @param[in] volume_filter  the volume filter. Can contain wild cards, and
- *                           mutliple volume filters separated by commas.
+ *                           multiple volume filters separated by commas.
  *                           The ':dm-name' part of the volume is optional
  *                           for the volume filter. If not specified, the filter
  *                           checks the volume part only.
@@ -4759,7 +4759,7 @@ int keystore_cryptsetup(struct keystore *keystore, const char *volume_filter,
  *
  * @param[in] keystore       the key store
  * @param[in] volume_filter  the volume filter. Can contain wild cards, and
- *                           mutliple volume filters separated by commas.
+ *                           multiple volume filters separated by commas.
  *                           The ':dm-name' part of the volume is optional
  *                           for the volume filter. If not specified, the filter
  *                           checks the volume part only.
@@ -5112,7 +5112,7 @@ out:
  * @param[in] keystore   the keystore
  * @param[in] key_type   the key type. NULL means no key type filter.
  * @param[in] prop_name  the name of the property to set
- * @param[in] prop_value the value of the property to set or NULL if the proerty
+ * @param[in] prop_value the value of the property to set or NULL if the property
  *                       is to be removed.
  *
  * @returns 0 for success, or a negative errno value in case of an error
@@ -5299,7 +5299,7 @@ static int _keystore_process_kms_msg_for_key(struct keystore *UNUSED(keystore),
  * @param[in] msg        the message to print
  *
  * @returns 0 for success, or a negative errno value in case of an error.
- * -ENOENT if no key macthed
+ * -ENOENT if no key matched
  */
 int keystore_msg_for_kms_key(struct keystore *keystore, const char *key_type,
 			     const char *msg)
@@ -5605,7 +5605,7 @@ out:
  * @param[in] name_filter     the name filter. Can contain wild cards.
  *                            NULL means no name filter.
  * @param[in] volume_filter   the volume filter. Can contain wild cards, and
- *                            mutliple volume filters separated by commas.
+ *                            multiple volume filters separated by commas.
  *                            If the filter does not contain the ':dm-name'
  *                            part, then the volumes are matched without the
  *                            dm-name part. If the filter contains the
@@ -5855,7 +5855,7 @@ out:
  * @param[in] name_filter     the name filter. Can contain wild cards.
  *                            NULL means no name filter.
  * @param[in] volume_filter   the volume filter. Can contain wild cards, and
- *                            mutliple volume filters separated by commas.
+ *                            multiple volume filters separated by commas.
  *                            If the filter does not contain the ':dm-name'
  *                            part, then the volumes are matched without the
  *                            dm-name part. If the filter contains the
