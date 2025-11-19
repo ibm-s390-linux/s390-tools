@@ -303,9 +303,7 @@ pub enum BindState {
 /// Returns a BindState enum as defined above or on failure
 /// an error string. Does NOT print any error messages.
 pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState> {
-    let path = format!(
-        "{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_bind"
-    );
+    let path = format!("{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_bind");
     let state_str = read_file_string(path, "se_bind attribute")?;
     let state = state_str.trim();
     match state {
@@ -330,9 +328,7 @@ pub fn get_apqn_bind_state(card: u32, dom: u32) -> Result<BindState> {
 /// Panics if a desired bind state other than Bound or Unbound is given.
 pub fn set_apqn_bind_state(card: u32, dom: u32, state: BindState) -> Result<()> {
     let ctx = "bind APQN";
-    let path = format!(
-        "{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_bind"
-    );
+    let path = format!("{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_bind");
     match state {
         BindState::Bound => write_file(path, 1.to_string(), ctx),
         BindState::Unbound => write_file(path, 0.to_string(), ctx),
@@ -372,9 +368,7 @@ pub enum AssocState {
 /// Returns an AssocState enum as defined above or on failure
 /// an error string. Does NOT print any error messages.
 pub fn get_apqn_associate_state(card: u32, dom: u32) -> Result<AssocState> {
-    let path = format!(
-        "{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_associate"
-    );
+    let path = format!("{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_associate");
     let state_str = read_file_string(path, "se_associate attribute")?;
     let state = state_str.trim();
     match state.strip_prefix("associated ") {
@@ -389,9 +383,7 @@ pub fn get_apqn_associate_state(card: u32, dom: u32) -> Result<AssocState> {
 }
 
 fn set_apqn_associate_state_associate(card: u32, dom: u32, idx: u16) -> Result<()> {
-    let path = format!(
-        "{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_associate"
-    );
+    let path = format!("{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_associate");
     write_file(path, idx.to_string(), "associate APQN")?;
     let mut ms: u64 = 0;
     loop {
@@ -418,9 +410,7 @@ fn set_apqn_associate_state_associate(card: u32, dom: u32, idx: u16) -> Result<(
 }
 
 fn set_apqn_associate_state_unbind(card: u32, dom: u32) -> Result<()> {
-    let bindpath = format!(
-        "{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_bind"
-    );
+    let bindpath = format!("{PATH_SYS_DEVICES_AP}/card{card:02x}/{card:02x}.{dom:04x}/se_bind");
     write_file(bindpath, 0.to_string(), "unbind APQN")?;
     let mut ms: u64 = 0;
     loop {

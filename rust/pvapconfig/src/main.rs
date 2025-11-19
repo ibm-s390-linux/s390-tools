@@ -102,9 +102,7 @@ fn main() -> ExitCode {
             Err(err) => println_and_exit_failure!("{}", err),
         };
         if apconfig.is_empty() {
-            println!(
-                "No AP configuration entries in config file '{configfile}': Nothing to do."
-            );
+            println!("No AP configuration entries in config file '{configfile}': Nothing to do.");
             return ExitCode::SUCCESS;
         }
         info!("Found {} AP configuration entries.\n", apconfig.len());

@@ -174,17 +174,11 @@ impl ApConfigList {
     fn read_yaml_file(fname: &str) -> Result<Vec<ApConfigEntry>, String> {
         let file = match File::open(fname) {
             Ok(f) => f,
-            Err(err) => {
-                return Err(format!(
-                    "Failure to open AP config file {fname}: {err:?}"
-                ))
-            }
+            Err(err) => return Err(format!("Failure to open AP config file {fname}: {err:?}")),
         };
         match serde_yaml::from_reader(file) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(format!(
-                "Failure parsing AP config file {fname}: {err:?}"
-            )),
+            Err(err) => Err(format!("Failure parsing AP config file {fname}: {err:?}")),
         }
     }
 

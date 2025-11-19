@@ -126,9 +126,7 @@ impl ApqnList {
             match sysfs_get_list_of_subdirs_matching_regex(PATH_SYS_DEVICES_AP, RE_CARD_DIR) {
                 Ok(r) => r,
                 Err(err) => {
-                    eprintln!(
-                        "Failure reading AP devices {PATH_SYS_DEVICES_AP} ({err:?})."
-                    );
+                    eprintln!("Failure reading AP devices {PATH_SYS_DEVICES_AP} ({err:?}).");
                     return None;
                 }
             };
@@ -137,9 +135,7 @@ impl ApqnList {
             let queue_dirs = match sysfs_get_list_of_subdirs_matching_regex(&path, RE_QUEUE_DIR) {
                 Ok(r) => r,
                 Err(err) => {
-                    eprintln!(
-                        "Failure reading AP queue directories in {path} ({err:?})."
-                    );
+                    eprintln!("Failure reading AP queue directories in {path} ({err:?}).");
                     return None;
                 }
             };
