@@ -680,6 +680,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pvverify"
+version = "0.12.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "log",
+ "s390_pv",
+ "utils",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

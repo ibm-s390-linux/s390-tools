@@ -25,7 +25,7 @@ endif #HOSTARCH
 
 ifneq (${HAVE_OPENSSL},0)
 ifneq (${HAVE_LIBCURL},0)
-	PV_TARGETS := pvsecret pvattest pvimg
+	PV_TARGETS := pvsecret pvattest pvimg pvverify
 
 ifeq ($(HOST_ARCH),s390x)
 	PV_TARGETS += pvapconfig pvinfo

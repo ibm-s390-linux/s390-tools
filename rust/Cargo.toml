@@ -8,6 +8,7 @@ members = [
 	"pvimg",
 	"pvinfo",
 	"pvsecret",
+	"pvverify",
 	"utils",
 ]
 resolver = "2"
