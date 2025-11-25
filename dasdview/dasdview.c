@@ -428,7 +428,7 @@ dasdview_read_vlabel(dasdview_info_t *info, volume_label_t *vlabel)
 
 	pos = info->dasd_info.label_block * info->blksize;
 
-	bzero(vlabel, sizeof(volume_label_t));
+	memset(vlabel, 0, sizeof(volume_label_t));
 	if ((strncmp(info->dasd_info.type, "ECKD", 4) == 0) &&
 	    !info->dasd_info.FBA_layout) {
 		/* OS/390 and zOS compatible disk layout */
@@ -466,7 +466,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	printf("\n--- volume label -----------------------------"
 	       "---------------------------------\n");
 
-	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.volkey, 4);
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	strncpy((char *)s4, vlabel.volkey, 4);
 	printf("volume label key        : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
@@ -474,7 +476,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 4; i++)
 		printf("%02x", s4[i]);
 
-	bzero(s4, 5); bzero(s4, 5); strncpy((char *)s4, vlabel.vollbl, 4);
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	strncpy((char *)s4, vlabel.vollbl, 4);
 	printf("\n\nvolume label identifier : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
@@ -482,7 +486,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 4; i++)
 		printf("%02x", s4[i]);
 
-	bzero(s6, 7); bzero(t6, 7); strncpy((char *)s6, vlabel.volid, 6);
+	memset(s6, 0, 7);
+	memset(t6, 0, 7);
+	strncpy((char *)s6, vlabel.volid, 6);
 	printf("\n\nvolume identifier       : ascii  '%6s'\n", s6);
 	vtoc_ebcdic_dec((char *)s6, (char *)t6, 6);
 	printf("                        : ebcdic '%6s'\n", t6);
@@ -503,7 +509,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 		       vtoc_get_cyl_from_cchhb(&vlabel.vtoc),
 		       vtoc_get_head_from_cchhb(&vlabel.vtoc), vlabel.vtoc.b);
 
-	bzero(s5, 6); bzero(t5, 6); strncpy((char *)s5, vlabel.res1, 5);
+	memset(s5, 0, 6);
+	memset(t5, 0, 6);
+	strncpy((char *)s5, vlabel.res1, 5);
 	printf("reserved                : ascii  '%5s'\n", s5);
 	vtoc_ebcdic_dec((char *)s5, (char *)t5, 5);
 	printf("                        : ebcdic '%5s'\n", t5);
@@ -511,7 +519,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 5; i++)
 		printf("%02x", s5[i]);
 
-	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.cisize, 4);
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	strncpy((char *)s4, vlabel.cisize, 4);
 	printf("\n\nCI size for FBA         : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
@@ -519,7 +529,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 4; i++)
 		printf("%02x", s4[i]);
 
-	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.blkperci, 4);
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	strncpy((char *)s4, vlabel.blkperci, 4);
 	printf("\n\nblocks per CI (FBA)     : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
@@ -527,7 +539,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 4; i++)
 		printf("%02x", s4[i]);
 
-	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.labperci, 4);
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	strncpy((char *)s4, vlabel.labperci, 4);
 	printf("\n\nlabels per CI (FBA)     : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
@@ -535,7 +549,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 4; i++)
 		printf("%02x", s4[i]);
 
-	bzero(s4, 5); bzero(t4, 5); strncpy((char *)s4, vlabel.res2, 4);
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	strncpy((char *)s4, vlabel.res2, 4);
 	printf("\n\nreserved                : ascii  '%4s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 4);
 	printf("                        : ebcdic '%4s'\n", t4);
@@ -543,7 +559,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 	for (i = 0; i < 4; i++)
 		printf("%02x", s4[i]);
 
-	bzero(s14, 15); bzero(t14, 15); strncpy(s14, vlabel.lvtoc, 14);
+	memset(s14, 0, 15);
+	memset(t14, 0, 15);
+	strncpy(s14, vlabel.lvtoc, 14);
 	printf("\n\nowner code for VTOC     : ascii  '%14s'\n", s14);
 	vtoc_ebcdic_dec(s14, t14, 14);
 	printf("                          ebcdic '%14s'\n", t14);
@@ -556,9 +574,10 @@ dasdview_print_vlabel(dasdview_info_t *info)
 			printf(" ");
 	}
 
-	bzero(s29, 30); strncpy(s29, vlabel.res3, 28);
+	memset(s29, 0, 30);
+	strncpy(s29, vlabel.res3, 28);
 	printf("\n\nreserved                : ascii  '%28s'\n", s29);
-	bzero(t29, 30);
+	memset(t29, 0, 30);
 	vtoc_ebcdic_dec(s29, t29, 28);
 	printf("                          ebcdic '%28s'\n", t29);
 	printf("                          hex    ");
@@ -573,7 +592,9 @@ dasdview_print_vlabel(dasdview_info_t *info)
 			       "                 ");
 	}
 
-	bzero(s4, 5); bzero(t4, 5); s4[0] = vlabel.ldl_version;
+	memset(s4, 0, 5);
+	memset(t4, 0, 5);
+	s4[0] = vlabel.ldl_version;
 	printf("\n\nldl_version             : ascii  '%1s'\n", s4);
 	vtoc_ebcdic_dec((char *)s4, (char *)t4, 1);
 	printf("                        : ebcdic '%1s'\n", t4);
@@ -609,8 +630,8 @@ dasdview_print_volser(dasdview_info_t *info)
 		dasdview_read_vlabel(info, &vlabel);
 	}
 
-	bzero(vollbl, 5);
-	bzero(volser, 7);
+	memset(vollbl, 0, 5);
+	memset(volser, 0, 7);
 	strncpy(vollbl, vlabel.vollbl, 4);
 	vtoc_ebcdic_dec(vollbl, vollbl, 4);
 
@@ -636,7 +657,7 @@ dasdview_read_vtoc(dasdview_info_t *info)
 
 	pos = info->dasd_info.label_block * info->blksize;
 
-	bzero(&vlabel, sizeof(vlabel));
+	memset(&vlabel, 0, sizeof(vlabel));
 	if ((strncmp(info->dasd_info.type, "ECKD", 4) == 0) &&
 	    !info->dasd_info.FBA_layout) {
 		/* OS/390 and zOS compatible disk layout */
@@ -747,13 +768,13 @@ static void dasdview_print_format1_8_short_info(format1_label_t *f1,
 	char s6[7], s13[14], s44[45];
 	unsigned long track_low, track_up;
 
-	bzero(s44, 45);
+	memset(s44, 0, 45);
 	strncpy(s44, f1->DS1DSNAM, 44);
 	vtoc_ebcdic_dec(s44, s44, 44);
-	bzero(s6, 7);
+	memset(s6, 0, 7);
 	strncpy(s6, (char *)f1->DS1DSSN, 6);
 	vtoc_ebcdic_dec(s6, s6, 6);
-	bzero(s13, 14);
+	memset(s13, 0, 14);
 	strncpy(s13, (char *)f1->DS1SYSCD, 13);
 	vtoc_ebcdic_dec(s13, s13, 13);
 
@@ -837,13 +858,13 @@ static void dasdview_print_format1_8_short_info_raw(format1_label_t *f1,
 	struct dscb *dscb;
 	int rc;
 
-	bzero(s44, 45);
+	memset(s44, 0, 45);
 	strncpy(s44, f1->DS1DSNAM, 44);
 	vtoc_ebcdic_dec(s44, s44, 44);
-	bzero(s6, 7);
+	memset(s6, 0, 7);
 	strncpy(s6, (char *)f1->DS1DSSN, 6);
 	vtoc_ebcdic_dec(s6, s6, 6);
-	bzero(s13, 14);
+	memset(s13, 0, 14);
 	strncpy(s13, (char *)f1->DS1SYSCD, 13);
 	vtoc_ebcdic_dec(s13, s13, 13);
 
@@ -1080,9 +1101,9 @@ static void dasdview_print_format1_8_no_head(format1_label_t *f1)
 	char s6[7], s13[14], s44[45];
 	int i;
 
-	bzero(s6, 7);
-	bzero(s13, 14);
-	bzero(s44, 45);
+	memset(s6, 0, 7);
+	memset(s13, 0, 14);
+	memset(s44, 0, 45);
 
 	strncpy(s44, f1->DS1DSNAM, 44);
 	printf("DS1DSNAM    : ascii  '%44s'\n", s44);
@@ -1918,7 +1939,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 
 	count = info->begin;
 	for (i = 1; i <= j; i++) {
-		bzero(dumpstr, DUMP_STRING_SIZE);
+		memset(dumpstr, 0, DUMP_STRING_SIZE);
 		rc = read(fd, &dumpstr, DUMP_STRING_SIZE);
 		if (rc != DUMP_STRING_SIZE) {
 			close(fd);
@@ -1937,7 +1958,7 @@ static void dasdview_view_standard(dasdview_info_t *info)
 	}
 
 	if (k > 0) {
-		bzero(dumpstr, DUMP_STRING_SIZE);
+		memset(dumpstr, 0, DUMP_STRING_SIZE);
 		rc = read(fd, &dumpstr, k);
 		if (rc != (int)k) {
 			close(fd);
@@ -1976,8 +1997,8 @@ static void dasdview_print_format_raw(unsigned int size, char *dumpstr)
 	while (residual) {
 		/* we handle at most 16 bytes per line */
 		count = MIN(residual, 16u);
-		bzero(asc, 17);
-		bzero(ebc, 17);
+		memset(asc, 0, 17);
+		memset(ebc, 0, 17);
 		printf("|");
 		memcpy(asc, data, count);
 		memcpy(ebc, data, count);
@@ -2187,7 +2208,7 @@ int main(int argc, char *argv[])
 	util_prg_init(&prg);
 	util_opt_init(opt_vec, NULL);
 
-	bzero(&info, sizeof(info));
+	memset(&info, 0, sizeof(info));
 	while (1) {
 		oc = util_opt_getopt_long(argc, argv);
 
