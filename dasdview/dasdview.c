@@ -1071,7 +1071,7 @@ static void dasdview_print_vtoc_info_raw(dasdview_info_t *info)
 
 /*
  * Note: the explicit cylinder/head conversion for large volume
- * adresses should not be necessary for entries that point to
+ * addresses should not be necessary for entries that point to
  * vtoc labels, as those must be located in the first 65K-1 tracks,
  * but we do it anyway to be on the safe side.
  */
