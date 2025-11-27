@@ -87,7 +87,7 @@ static struct util_opt opt_vec[] = {
 /*
  * Exchange content of field value via simple translation map
  *
- * If the attribute is required for translation (attibute name is present in
+ * If the attribute is required for translation (attribute name is present in
  * tr_attr_list[]) then the value of the attribute (if matches the dictionary
  * translation key) is exchanged by the target value of the translation
  * dictionary (sys_to_proc_dict[][2]).
@@ -418,7 +418,7 @@ static bool not_layer2_attr(const char *attr_name)
 }
 
 /*
- * Collect and print attributes for qeth-based device in sepcified format
+ * Collect and print attributes for qeth-based device in specified format
  */
 static void print_device(struct util_rec *rec, const char *device_id)
 {

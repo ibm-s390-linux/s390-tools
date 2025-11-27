@@ -85,7 +85,7 @@ char *misc_link_target(const char *fmt, ...)
  * @param[in]	fmt	Format string for path
  * @param[in]	...	Variable arguments for format string
  *
- * @retval	!0	Number of string elemnts added to argz array
+ * @retval	!0	Number of string elements added to argz array
  * @retval	0	File is empty or cannot be processed
  */
 int misc_argz_add_from_file(char **argz, size_t *argz_len, const char *fmt, ...)
@@ -138,4 +138,3 @@ ssize_t misc_read_buf(int fd, char *buf, size_t count)
 	}
 	return done;
 }
-
