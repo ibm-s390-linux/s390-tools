@@ -165,7 +165,7 @@ ifeq ("${ENABLE_WERROR}", "1")
 endif
 
 DEFAULT_CPPFLAGS = -D_GNU_SOURCE
-DEFAULT_LDFLAGS = -rdynamic
+DEFAULT_LDFLAGS = -rdynamic -Wl,--as-needed
 
 ifeq ("${ASAN}","1")
 	DEFAULT_CFLAGS  += -fsanitize=address -fno-omit-frame-pointer
