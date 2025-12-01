@@ -49,14 +49,20 @@ macro_rules! release_string {
 }
 
 #[macro_export]
+macro_rules! tools_version_fmt {
+    ($year: expr) => {
+        format!(
+            "version {}\nCopyright IBM Corp. {}",
+            $crate::release_string!(),
+            $year
+        )
+    };
+}
+
+#[macro_export]
 macro_rules! __print_version {
     ($year: expr, $verbosity: expr $( ,$feat: expr)?) => {{
-        println!(
-            "{} version {}\nCopyright IBM Corp. {}",
-            env!("CARGO_PKG_NAME"),
-            $crate::release_string!(),
-            $year,
-        );
+        println!("{} {}", env!("CARGO_PKG_NAME"), $crate::tools_version_fmt!($year));
         if $verbosity > $crate::LevelFilter::Warn {
             $($feat.iter().for_each(|f| print!("{f} ")); println!("(compiled)");)?
         }
