@@ -14,9 +14,10 @@ ziomon \- Collect data for performance analysis of fcp adapters.
 .SH DESCRIPTION
 .B ziomon
 starts and controls various utilities to collect data for performance analysis
-for a specified duration. Note that it is possible to specify multipath
-devices also. If multipath devices are specified, the respective
-regular devices used by the multipath devices will be monitored.
+for a specified duration. It is possible to specify multipath devices and persistent
+device symlinks from /dev/disk/... subdirectories (such as by-id, by-path, by-uuid,
+by-label, etc.). If multipath devices or device symlinks are specified, the respective
+underlying regular block devices will be monitored.
 
 .SH OPTIONS
 .TP
@@ -61,13 +62,14 @@ Basename for output files.
 specifies a device to collect respective data for.
 
 .SH EXAMPLES
-Collect data for devices /dev/sda, /dev/sdg, /dev/sdp and the multipath device
-/dev/mapper/36005076303ffc104000000000000212b for 5 minutes.
+Collect data for devices /dev/sda, /dev/sdg, /dev/sdp, the multipath device
+/dev/mapper/36005076303ffc104000000000000212b and the device symlink
+/dev/disk/by-id/scsi-36005076307ffd72c00000000000054f5 for 5 minutes.
 Data should be sampled every 20 seconds.
 The collected data size should not exceed 50 MB.
 The output files should base their names on 'trace_data':
 
-ziomon -i 20 -d 5 -l 50M -o trace_data /dev/mapper/36005076303ffc104000000000000212b /dev/sda /dev/sdg /dev/sdp
+ziomon -i 20 -d 5 -l 50M -o trace_data /dev/sda /dev/sdg /dev/sdp /dev/mapper/36005076303ffc104000000000000212b /dev/disk/by-id/scsi-36005076307ffd72c00000000000054f5
 
 .SH "SEE ALSO"
 .BR ziomon_mgr (8),
