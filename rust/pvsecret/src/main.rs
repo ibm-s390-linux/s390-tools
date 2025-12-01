@@ -43,7 +43,10 @@ fn main() -> ExitCode {
         Command::List(opt) => cmd::list(opt),
         Command::Lock => cmd::lock(),
         Command::Create(opt) => cmd::create(opt),
-        Command::Version => Ok(print_version!("2024", log_level; FEATURES.concat())),
+        Command::Version => {
+            print_version!("2024", log_level; FEATURES.concat());
+            Ok(())
+        }
         Command::Verify(opt) => cmd::verify(opt),
         Command::Retrieve(opt) => cmd::retr(opt),
     };

@@ -140,6 +140,7 @@ pub trait SeHdrPubBuilderTrait {
     fn set_pcf(&mut self, pcf: &PlaintextControlFlagsV1) -> Result<()>;
 }
 
+#[allow(dead_code)]
 #[enum_dispatch(SeHdrData)]
 pub trait SeHdrConfBuilderTrait {
     fn generate_cck(&self) -> Result<SymKey>;

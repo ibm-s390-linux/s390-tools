@@ -167,8 +167,7 @@ impl CertVerifier {
     /// * `cert_paths` - Paths to certificates for the chain of trust
     /// * `crl_paths` - Paths to certificate revocation lists for the chain of trust
     /// * `root_ca_path` - Path to the root of trust
-    /// * `offline` - if set to true the verification process will not try to download CRLs from the
-    ///               internet.
+    /// * `offline` - if set to true the verification process will not try to download CRLs from the internet.
     ///
     /// # Errors
     ///

@@ -18,6 +18,7 @@ trait UvKeyHashTrait: AsRef<[u8]> {}
 #[derive(Debug, PartialEq, Eq)]
 pub struct UvKeyHashV1([u8; 32]);
 
+#[allow(dead_code)]
 #[non_exhaustive]
 #[enum_dispatch]
 #[derive(PartialEq, Eq, Debug)]

@@ -245,6 +245,7 @@ assert_size!(SecretListHdr, 16);
 /// The list should ONLY be created from an UV-Call result using either:
 /// - [`TryInto::try_into`] from [`ListCmd`]
 /// - [`SecretList::decode`]
+///
 /// Any other ways can create invalid lists that do not represent the UV secret store.
 /// The list must not hold more than [`u32::MAX`] elements
 #[derive(Debug, PartialEq, Eq, Serialize, Default)]

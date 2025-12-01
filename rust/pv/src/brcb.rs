@@ -48,7 +48,7 @@ impl TryFrom<Vec<u8>> for BootHdrTags {
 
 /// Struct representing the Secure Execution boot image metadata
 #[allow(unused)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(Debug, Clone, FromBytes, IntoBytes, PartialEq, Eq, Immutable, KnownLayout)]
 pub struct SeImgMetaData {
     /// Magic value
@@ -140,15 +140,14 @@ pub fn seek_se_hdr_start<R>(img: &mut R) -> Result<bool>
 where
     R: Read + Seek,
 {
-    let max_iter: usize;
     const BUF_SIZE: i64 = 8;
     static_assert!(BootHdrMagic::MAGIC.len() == BUF_SIZE as usize);
 
     let old_position = img.stream_position()?;
-    if !SeImgMetaData::seek_start(img)? {
+    let max_iter: usize = if !SeImgMetaData::seek_start(img)? {
         // Search from the previous position.
         img.seek(std::io::SeekFrom::Start(old_position))?;
-        max_iter = 0x15;
+        0x15
     } else {
         let mut img_metadata_bytes = vec![0u8; size_of::<SeImgMetaData>()];
         // read in the header
@@ -161,8 +160,8 @@ where
         }
 
         img.seek(std::io::SeekFrom::Start(img_metadata.hdr_off.into()))?;
-        max_iter = 1;
-    }
+        1
+    };
 
     let mut buf = [0; BUF_SIZE as usize];
     for _ in 0..max_iter {

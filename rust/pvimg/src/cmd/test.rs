@@ -2,7 +2,7 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 use log::{info, warn};
@@ -27,7 +27,7 @@ fn hdr_test_target_hashes(hdr: &SeHdr, key_hashes: &Path) -> Result<bool> {
             ref source,
         } if matches!(ty, FileAccessErrorType::Open)
             && source.kind() == std::io::ErrorKind::NotFound
-            && *path == PathBuf::from(UvKeyHashesV1::SYS_UV_KEYS_ALL) =>
+            && path == Path::new(UvKeyHashesV1::SYS_UV_KEYS_ALL) =>
         {
             Error::UnavailableQueryUvKeyHashesSupport { source: err }
         }

@@ -134,7 +134,6 @@ pub fn host_key_check<'a, 'b>(
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
 
     use super::*;
 
@@ -169,7 +168,7 @@ mod test {
         let res = contains_phkh(&hash, &HexSlice::from(&hash[0].1), HkCheck::Image, true);
         assert!(matches!(
             res,
-            CheckState::Data(s) if s.hash.unwrap() == PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/assets/host.pem.crt"))
+            CheckState::Data(s) if s.hash.unwrap() == Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/assets/host.pem.crt"))
         ))
     }
 }

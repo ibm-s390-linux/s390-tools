@@ -443,17 +443,17 @@ mod test {
         let ibm_wrong_subj = load_gen_cert("ibm_wrong_subject.crt");
         let no_sign_crt = load_gen_cert("inter_ca.crt");
 
-        assert!(super::get_ibm_z_sign_key(&[ibm_crt.clone()]).is_ok());
+        assert!(super::get_ibm_z_sign_key(std::slice::from_ref(&ibm_crt)).is_ok());
         assert!(matches!(
             super::get_ibm_z_sign_key(&[ibm_crt.clone(), ibm_crt.clone()]),
             Err(Error::HkdVerify(ManyIbmSignKeys))
         ));
         assert!(matches!(
-            super::get_ibm_z_sign_key(&[ibm_wrong_subj]),
+            super::get_ibm_z_sign_key(std::slice::from_ref(&ibm_wrong_subj)),
             Err(Error::HkdVerify(NoIbmSignKey))
         ));
         assert!(matches!(
-            super::get_ibm_z_sign_key(&[no_sign_crt.clone()]),
+            super::get_ibm_z_sign_key(std::slice::from_ref(&no_sign_crt)),
             Err(Error::HkdVerify(NoIbmSignKey))
         ));
         assert!(super::get_ibm_z_sign_key(&[ibm_crt, no_sign_crt]).is_ok(),);

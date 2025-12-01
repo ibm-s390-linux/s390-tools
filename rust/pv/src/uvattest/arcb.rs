@@ -142,7 +142,7 @@ impl AttestationRequest {
     }
 
     /// Checks for magic and returns [`BinReqValues`]
-    fn bin_values(arcb: &[u8]) -> Result<BinReqValues> {
+    fn bin_values(arcb: &[u8]) -> Result<BinReqValues<'_>> {
         if !AttestationMagic::starts_with_magic(arcb) {
             return Err(Error::NoArcb);
         }

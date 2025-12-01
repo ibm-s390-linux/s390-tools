@@ -41,11 +41,11 @@ pub fn docstring(attr: &str) -> Option<String> {
     let mut doc = attr
         .strip_prefix("doc = r\"")
         .unwrap()
-        .strip_suffix("\"")
+        .strip_suffix('\"')
         .unwrap()
         .to_string();
-    if doc.starts_with(" ") {
-        doc = doc.strip_prefix(" ").unwrap().to_string();
+    if doc.starts_with(' ') {
+        doc = doc.strip_prefix(' ').unwrap().to_string();
     }
     Some(doc)
 }
