@@ -308,8 +308,8 @@ struct sd_cpu_item {
 #define sd_cpu_item_type(x) ((x)->type)
 #define sd_cpu_item_table_col(item) (&(item)->table_col)
 
-extern int sd_cpu_item_available(struct sd_cpu_item *item);
-extern int sd_cpu_item_cnt(void);
+int sd_cpu_item_available(struct sd_cpu_item *item);
+int sd_cpu_item_cnt(void);
 
 /*
  * Item access functions
@@ -377,8 +377,8 @@ struct sd_sys_item {
 #define sd_sys_item_table_col(item) (&item->table_col)
 #define sd_sys_item_type(item) (item->type)
 
-extern int sd_sys_item_available(struct sd_sys_item *item);
-extern int sd_sys_item_cnt(void);
+int sd_sys_item_available(struct sd_sys_item *item);
+int sd_sys_item_cnt(void);
 
 /*
  * Item access functions
@@ -520,7 +520,7 @@ static inline s64 l_cpu_info_s64(struct sd_cpu_info *info,
  * Misc
  */
 void sd_update(void);
-extern void sd_init(void);
+void sd_init(void);
 
 static inline u64 l_sub_64(u64 x, u64 y)
 {

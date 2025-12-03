@@ -184,10 +184,10 @@ enum hyptop_win_action {
 	WIN_KEEP,
 };
 
-extern enum hyptop_win_action hyptop_process_input_timeout(void);
-extern enum hyptop_win_action hyptop_process_input(void);
-extern enum hyptop_win_action win_switch(struct hyptop_win *w);
-extern enum hyptop_win_action win_back(void);
+enum hyptop_win_action hyptop_process_input_timeout(void);
+enum hyptop_win_action hyptop_process_input(void);
+enum hyptop_win_action win_switch(struct hyptop_win *w);
+enum hyptop_win_action win_back(void);
 
 struct hyptop_win;
 struct hyptop_win {
@@ -206,25 +206,25 @@ struct hyptop_win {
  * Window sys_list
  */
 extern struct hyptop_win win_sys_list;
-extern void win_sys_list_init(void);
+void win_sys_list_init(void);
 
 /*
  * Window sys
  */
 extern struct hyptop_win win_sys;
-extern void win_sys_set(const char *sys_id);
-extern void win_sys_init(void);
+void win_sys_set(const char *sys_id);
+void win_sys_init(void);
 
 /*
  * Window cpu_types
  */
-extern void win_cpu_types_init(void);
+void win_cpu_types_init(void);
 
 /*
  * Misc functions
  */
-extern void hyptop_update_term(void);
-extern void __noreturn hyptop_exit(int rc);
-extern void hyptop_text_mode(void);
+void hyptop_update_term(void);
+void __noreturn hyptop_exit(int rc);
+void hyptop_text_mode(void);
 
 #endif /* HYPTOP_H */

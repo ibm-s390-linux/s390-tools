@@ -23,6 +23,6 @@ struct win_cpu_types {
 	struct hyptop_win	*win_help;
 };
 
-extern struct hyptop_win *win_cpu_types_new(void);
+struct hyptop_win *win_cpu_types_new(void);
 
 #endif /* WIN_CPU_TYPES_H */

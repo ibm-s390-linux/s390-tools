@@ -16,10 +16,10 @@
 
 #define DBFS_WAIT_TIME_US 10000
 
-extern int dg_debugfs_init(int exit_on_err);
-extern int dg_debugfs_vm_init(void);
-extern int dg_debugfs_lpar_init(void);
-extern int dg_debugfs_open(const char *file);
+int dg_debugfs_init(int exit_on_err);
+int dg_debugfs_vm_init(void);
+int dg_debugfs_lpar_init(void);
+int dg_debugfs_open(const char *file);
 
 /*
  * z/VM diag 0C prototypes

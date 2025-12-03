@@ -362,37 +362,37 @@ enum table_scroll_unit {
  */
 extern struct table *table_new(int extra_rows, int sorted, int first_bold,
 			       int with_units);
-extern void table_reset(struct table *t);
-extern void table_rebuild(struct table *t);
-extern void table_finish(struct table *t);
-extern void table_print(struct table *t);
-extern void table_process_input(struct table *t, int c);
+void table_reset(struct table *t);
+void table_rebuild(struct table *t);
+void table_finish(struct table *t);
+void table_print(struct table *t);
+void table_process_input(struct table *t, int c);
 
-extern void table_col_unit_next(struct table *t, char hotkey);
-extern void table_col_unit_prev(struct table *t, char hotkey);
-extern int table_col_unit_set(struct table *t, char hotkey, const char *unit);
-extern void table_col_add(struct table *t, struct table_col *col);
-extern int table_col_select(struct table *t, char hotkey);
-extern void table_col_select_next(struct table *t);
-extern void table_col_select_prev(struct table *t);
-extern void table_col_enable_toggle(struct table *t, char hotkey);
+void table_col_unit_next(struct table *t, char hotkey);
+void table_col_unit_prev(struct table *t, char hotkey);
+int table_col_unit_set(struct table *t, char hotkey, const char *unit);
+void table_col_add(struct table *t, struct table_col *col);
+int table_col_select(struct table *t, char hotkey);
+void table_col_select_next(struct table *t);
+void table_col_select_prev(struct table *t);
+void table_col_enable_toggle(struct table *t, char hotkey);
 
-extern void table_row_del_all(struct table *t);
-extern void table_row_add(struct table *t, struct table_row *row);
-extern void table_row_mark(struct table *t, struct table_row *row);
-extern void table_row_mark_del_all(struct table *t);
-extern void table_row_mark_toggle(struct table *t, struct table_row *row);
-extern void table_row_mark_toggle_by_key(struct table *t, const char *mark_key);
-extern void table_row_select_down(struct table *t, enum table_scroll_unit unit);
-extern void table_row_select_up(struct table *t, enum table_scroll_unit unit);
-extern void table_row_select_key_get(struct table *t, char str[TABLE_STR_MAX]);
-extern struct table_row *table_row_alloc(struct table *t);
+void table_row_del_all(struct table *t);
+void table_row_add(struct table *t, struct table_row *row);
+void table_row_mark(struct table *t, struct table_row *row);
+void table_row_mark_del_all(struct table *t);
+void table_row_mark_toggle(struct table *t, struct table_row *row);
+void table_row_mark_toggle_by_key(struct table *t, const char *mark_key);
+void table_row_select_down(struct table *t, enum table_scroll_unit unit);
+void table_row_select_up(struct table *t, enum table_scroll_unit unit);
+void table_row_select_key_get(struct table *t, char str[TABLE_STR_MAX]);
+struct table_row *table_row_alloc(struct table *t);
 
-extern void table_scroll_down(struct table *t, enum table_scroll_unit unit);
-extern void table_scroll_up(struct table *t, enum table_scroll_unit unit);
+void table_scroll_down(struct table *t, enum table_scroll_unit unit);
+void table_scroll_up(struct table *t, enum table_scroll_unit unit);
 
-extern void table_fmt_start(void);
-extern void table_fmt_end(void);
+void table_fmt_start(void);
+void table_fmt_end(void);
 
 /*
  * Entry add functions

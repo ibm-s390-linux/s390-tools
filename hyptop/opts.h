@@ -14,9 +14,9 @@
 
 #include "hyptop.h"
 
-extern void opts_parse(int argc, char *argv[]);
-extern void opts_iterations_next(void);
-extern int opts_sys_specified(struct hyptop_win *win, const char* sys_name);
-extern void opt_verify_systems(void);
+void opts_parse(int argc, char *argv[]);
+void opts_iterations_next(void);
+int opts_sys_specified(struct hyptop_win *win, const char *sys_name);
+void opt_verify_systems(void);
 
 #endif /* OPTS_H */
