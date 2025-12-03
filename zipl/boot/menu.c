@@ -196,13 +196,9 @@ int menu(void)
 
 	value = menu_read();
 
-	/* sanity - value too big */
-	if (value > BOOT_MENU_ENTRIES)
-		panic(EINTERNAL, "%s", msg_econfig);
-
 boot:
 	/* sanity - config entry not valid */
-	if (__stage2_params.config[value] == 0)
+	if (value > BOOT_MENU_ENTRIES || __stage2_params.config[value] == 0)
 		panic(EINTERNAL, "%s", msg_econfig);
 
 	printf("Booting %s\n",
