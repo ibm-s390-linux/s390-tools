@@ -358,6 +358,6 @@ int dg_debugfs_vm_init(void)
 		close(fh);
 	l_2fc_buf_size = sizeof(struct l_debugfs_d2fc_hdr);
 	l_guest_name_init();
-	sd_dg_register(&dg_debugfs_vm_dg, 0);
+	sd_dg_register(&dg_debugfs_vm_dg, 0, 0);
 	return 0;
 }

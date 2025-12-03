@@ -260,6 +260,10 @@ void table_row_del_all(struct table *t)
 		util_list_remove(&t->row_list, row);
 		table_row_free(row);
 	}
+	if (t->row_physical) {
+		table_row_free(t->row_physical);
+		t->row_physical = NULL;
+	}
 	l_row_last_init(t);
 	t->row_cnt_marked = 0;
 	t->ready = 0;
@@ -418,6 +422,8 @@ static void l_row_last_calc(struct table *t)
  */
 void table_finish(struct table *t)
 {
+	if (t->row_physical)
+		l_row_format(t, t->row_physical);
 	l_row_last_calc(t);
 	t->ready = 1;
 }
@@ -463,6 +469,8 @@ void table_rebuild(struct table *t)
 		l_col_max_width_init(t, col);
 	util_list_iterate(&t->row_list, row)
 		l_row_format(t, row);
+	if (t->row_physical)
+		l_row_format(t, t->row_physical);
 	l_row_format(t, t->row_last);
 }
 
@@ -921,6 +929,10 @@ static void l_table_print_curses(struct table *t)
 	}
 	ht_reverse_on();
 	l_row_print(t, t->row_last);
+	if (t->row_physical) {
+		hyptop_print_nl();
+		l_row_print(t, t->row_physical);
+	}
 	hyptop_print_seek_back(0);
 	ht_reverse_off();
 #ifdef WITH_SCROLL_BAR
@@ -952,6 +964,10 @@ static void l_table_print_all(struct table *t)
 	}
 	l_row_print(t, t->row_last);
 	hyptop_print_nl();
+	if (t->row_physical) {
+		l_row_print(t, t->row_physical);
+		hyptop_print_nl();
+	}
 	hyptop_printf("------------------------------------------------------"
 		      "-------------------------\n");
 }
@@ -991,6 +1007,11 @@ static void l_table_print_all_formatted(struct table *t)
 	util_fmt_pair(FMT_PERSIST, "iteration", "%u", g.o.iterations_act);
 	ht_fmt_time();
 	ht_fmt_cpu_types();
+	if (t->row_physical) {
+		util_fmt_obj_start(FMT_ROW, "physical_information");
+		l_row_print_formatted(t, t->row_physical);
+		util_fmt_obj_end(); /* physical_information{} */
+	}
 	if (strcmp(g.o.cur_win->id, "sys_list") == 0)
 		util_fmt_obj_start(FMT_LIST, "systems");
 	else

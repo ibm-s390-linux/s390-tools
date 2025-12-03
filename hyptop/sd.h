@@ -19,6 +19,7 @@
 
 #define SD_DG_INIT_INTERVAL_SEC	1
 #define SD_SYS_ID_SIZE		9
+#define SD_SYS_DEFAULT_ID	"PHYSICAL"
 
 /*
  * CPU info
@@ -449,7 +450,8 @@ struct sd_dg {
 	struct sd_cpu_item	**cpu_item_enable_vec;
 };
 
-void sd_dg_register(struct sd_dg *, int);
+void sd_dg_register(struct sd_dg *, int, int);
+int sd_dg_has_phys_data(void);
 int sd_dg_has_core_data(void);
 
 /*

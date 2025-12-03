@@ -162,6 +162,22 @@ static void l_sys_item_add(struct table_row *table_row, struct sd_sys *sys,
 	}
 }
 
+static void l_row_add_physical(struct table *t, struct sd_sys *sys)
+{
+	struct sd_sys_item *item;
+	struct table_row *row;
+	unsigned int i;
+
+	row = table_row_alloc(t);
+	table_row_entry_str_add(row, &l_col_sys, sd_sys_id(sys));
+	sd_sys_item_iterate(item, i) {
+		if (!sd_sys_item_set(sys, item))
+			continue;
+		l_sys_item_add(row, sys, item);
+	}
+	t->row_physical = row;
+}
+
 /*
  * Add system to table
  */
@@ -196,6 +212,8 @@ static void l_table_create(void)
 			continue;
 		l_sys_add(guest);
 	}
+	if (sd_dg_has_phys_data())
+		l_row_add_physical(l_t, parent);
 	table_finish(l_t);
 }
 
@@ -337,7 +355,7 @@ void win_sys_list_init(void)
 	int item_cnt;
 
 	/* Alloc table and add columns */
-	l_t = table_new(1, 1, 1, 1);
+	l_t = table_new(2, 1, 1, 1);
 	table_col_add(l_t, &l_col_sys);
 
 	item_cnt = sd_sys_item_cnt() + 1;

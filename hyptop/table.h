@@ -324,6 +324,7 @@ struct table {
 	struct table_col	**col_vec;
 	struct table_col	*col_selected;
 	struct table_row	*row_last;
+	struct table_row	*row_physical;
 	int			row_cnt;
 	int			row_cnt_marked;
 	int			row_cnt_extra;

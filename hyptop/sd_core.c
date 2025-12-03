@@ -26,6 +26,7 @@ static int		l_cpu_type_cnt;
 static int		l_sys_item_cnt;
 static int		l_cpu_item_cnt;
 static int		l_has_core_data;
+static int		l_has_phys_data;
 static struct sd_sys	*l_root_sys;
 
 /*
@@ -148,7 +149,7 @@ void sd_update(void)
 /*
  * Register a data gatherer
  */
-void sd_dg_register(struct sd_dg *dg, int has_core_data)
+void sd_dg_register(struct sd_dg *dg, int has_core_data, int has_phys_data)
 {
 	struct timespec ts = {SD_DG_INIT_INTERVAL_SEC, 0};
 	struct sd_sys_item *sys_item;
@@ -156,6 +157,7 @@ void sd_dg_register(struct sd_dg *dg, int has_core_data)
 	unsigned int i;
 
 	l_has_core_data = has_core_data;
+	l_has_phys_data = has_phys_data;
 	sd.dg = dg;
 	for (i = 0; dg->cpu_type_vec[i]; i++)
 		dg->cpu_type_vec[i]->idx = (1UL << i);
@@ -170,6 +172,14 @@ void sd_dg_register(struct sd_dg *dg, int has_core_data)
 	sd_update();
 
 	l_cpu_types_init();
+}
+
+/*
+ * Does backend has physical CPUs data?
+ */
+int sd_dg_has_phys_data(void)
+{
+	return l_has_phys_data;
 }
 
 /*
@@ -419,7 +429,7 @@ int sd_cpu_item_cnt(void)
  */
 void sd_init(void)
 {
-	l_root_sys = sd_sys_new(NULL, "root");
+	l_root_sys = sd_sys_new(NULL, SD_SYS_DEFAULT_ID);
 }
 
 /*

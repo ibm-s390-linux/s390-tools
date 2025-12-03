@@ -383,6 +383,6 @@ int dg_debugfs_lpar_init(void)
 		return fh;
 	else
 		close(fh);
-	sd_dg_register(&l_sd_dg, 1);
+	sd_dg_register(&l_sd_dg, 1, 1);
 	return 0;
 }
