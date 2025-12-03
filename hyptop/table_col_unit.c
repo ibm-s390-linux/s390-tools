@@ -153,7 +153,7 @@ struct table_col_unit table_col_unit_us = {
  */
 static int l_unit_ms(struct table_col *col, struct table_entry *e)
 {
-	return l_unit_raw_div(col, e, 1000, L_COL_FMT_STR_2);
+	return l_unit_raw_div(col, e, USEC_PER_MSEC, L_COL_FMT_STR_2);
 }
 
 struct table_col_unit table_col_unit_ms = {
@@ -167,7 +167,7 @@ struct table_col_unit table_col_unit_ms = {
  */
 static int l_unit_perc(struct table_col *col, struct table_entry *e)
 {
-	return l_unit_raw_div(col, e, 10000, L_COL_FMT_STR_2);
+	return l_unit_raw_div(col, e, (USEC_PER_SEC / 100), L_COL_FMT_STR_2);
 }
 
 struct table_col_unit table_col_unit_perc = {
@@ -182,7 +182,7 @@ struct table_col_unit table_col_unit_perc = {
  */
 static int l_unit_s(struct table_col *col, struct table_entry *e)
 {
-	return l_unit_raw_div(col, e, 1000000, L_COL_FMT_STR_2);
+	return l_unit_raw_div(col, e, USEC_PER_SEC, L_COL_FMT_STR_2);
 }
 
 struct table_col_unit table_col_unit_s = {
@@ -197,7 +197,7 @@ struct table_col_unit table_col_unit_s = {
  */
 static int l_unit_m(struct table_col *col, struct table_entry *e)
 {
-	return l_unit_raw_div(col, e, 1000000 * 60, L_COL_FMT_STR_0);
+	return l_unit_raw_div(col, e, USEC_PER_SEC * 60, L_COL_FMT_STR_0);
 }
 
 static struct table_col_unit table_col_unit_m = {
@@ -214,7 +214,7 @@ static int l_unit_hm_u64(char *str, u64 v1, int negative)
 {
 	u64 time_tmp, time_h, time_m;
 
-	time_tmp = v1 / (1000000 * 60);
+	time_tmp = v1 / (USEC_PER_SEC * 60);
 	time_h = time_tmp / 60;
 	time_m = time_tmp - time_h * 60;
 
@@ -259,7 +259,7 @@ static int l_unit_dhm_u64(char *str, u64 v1, int negative)
 {
 	u64 time_tmp, time_d, time_h, time_m;
 
-	time_tmp = v1 / (1000000 * 60);
+	time_tmp = v1 / (USEC_PER_SEC * 60);
 	time_d = time_tmp / (60 * 24);
 	time_h = time_tmp / 60 - time_d * 24;
 	time_m = time_tmp - time_h * 60 - time_d * 60 * 24;
@@ -312,10 +312,8 @@ static int l_unit_vis(struct table_col *col, struct table_entry *e)
 	assert(col->type == TABLE_COL_TYPE_U64);
 
 	sprintf(e->str, "|");
-	val1_perc = e->d.u64.v1;
-	val1_perc /= 1000000;
-	val2_perc = e->d.u64.v2;
-	val2_perc /= 1000000;
+	val1_perc = util_usecs_to_secs(e->d.u64.v1);
+	val2_perc = util_usecs_to_secs(e->d.u64.v2);
 	val1_nr = (val1_perc * L_VISUAL_ROW_CNT) + 0.5;
 	val2_nr = (val2_perc * L_VISUAL_ROW_CNT) + 0.5;
 

@@ -48,7 +48,7 @@ static double l_cpu_diff(struct sd_cpu_item *item, struct sd_cpu *cpu, int sign)
 	if (online_time_diff_us == 0)
 		return 0;
 
-	factor = ((double) online_time_diff_us) / 1000000 * cpu->cnt;
+	factor = util_usecs_to_secs(online_time_diff_us) * cpu->cnt;
 	if (sign)
 		diff_us = l_cpu_info_s64(cpu->d_cur, item->offset) -
 			  l_cpu_info_s64(cpu->d_prev, item->offset);

@@ -112,7 +112,7 @@ static enum hyptop_win_action l_sleep(time_t time_s, long time_us)
 	struct timespec ts;
 
 	ts.tv_sec = time_s;
-	ts.tv_nsec = time_us * 1000;
+	ts.tv_nsec = util_usecs_to_nsecs(time_us);
 
 	nanosleep(&ts, NULL);
 	return WIN_KEEP;

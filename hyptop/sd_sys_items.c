@@ -171,7 +171,7 @@ static double l_cpu_info_diff_u64(struct sd_sys_item *item, struct sd_cpu *cpu,
 		diff_us = l_sub_64(l_cpu_info_u64(cpu->d_cur, item->offset),
 				   l_cpu_info_u64(cpu->d_prev, item->offset));
 	}
-	factor = ((double) online_time_diff_us) / 1000000;
+	factor = util_usecs_to_secs(online_time_diff_us);
 	diff_us /= factor;
 	return diff_us;
 }
@@ -237,7 +237,7 @@ static double l_phys_cpu_info_diff_u64(struct sd_sys_item *item,
 		return 0;
 	diff_us = l_sub_64(l_cpu_info_u64(cpu->d_cur, item->offset),
 			   l_cpu_info_u64(cpu->d_prev, item->offset));
-	factor = ((double)time_diff_us) / 1000000;
+	factor = util_usecs_to_secs(time_diff_us);
 	diff_us /= factor;
 	return diff_us;
 }
