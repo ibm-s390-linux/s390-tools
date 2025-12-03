@@ -150,16 +150,17 @@ int menu(void)
 {
 	enum { DEFAULT_MENU_ENTRY = 0 };
 	unsigned long value = DEFAULT_MENU_ENTRY;
+	int sclp_lm_available;
 	char *cmd_line_extra;
 	char endstring[15];
 
 	cmd_line_extra = (char *)COMMAND_LINE_EXTRA;
 	memset(cmd_line_extra, 0, COMMAND_LINE_EXTRA_SIZE);
 
-	if (sclp_setup(SCLP_INIT) != 0) {
-		/* sclp setup failed boot default */
-		goto boot;
-	}
+	/* Try to initialize SCLP line-mode console. But do not fail in case no
+	 * SCLP line-mode console is available.
+	 */
+	sclp_lm_available = sclp_setup(SCLP_INIT) == 0;
 
 	switch (menu_param(&value)) {
 	case NUMBER_FOUND:
@@ -179,6 +180,10 @@ int menu(void)
 		}
 		break;
 	}
+
+	/* SCLP line-mode unavailable; skip menu and input */
+	if (!sclp_lm_available)
+		goto boot;
 
 	/* print banner */
 	printf("%s\n", ((void *)&__stage2_params) + __stage2_params.banner);
