@@ -28,9 +28,9 @@ ifneq (${HAVE_LIBCURL},0)
 	PV_TARGETS := pvsecret pvattest pvimg
 
 ifeq ($(HOST_ARCH),s390x)
-	PV_TARGETS += pvapconfig
+	PV_TARGETS += pvapconfig pvinfo
 else
-	BUILD_TARGETS += skip-pvapconfig
+	BUILD_TARGETS += skip-pvapconfig skip-pvinfo
 endif #HOSTARCH
 
 	PV_BUILD_TARGETS := $(PV_TARGETS)
@@ -74,6 +74,9 @@ skip-build:
 
 skip-pv-build:
 	echo "  SKIP    rust-pv-tools due to unresolved dependencies"
+
+skip-pvinfo:
+	echo "  SKIP    pvinfo due to unsupported architecture (s390x only)"
 
 skip-pvapconfig:
 	echo "  SKIP    pvapconfig due to unsupported architecture (s390x only)"

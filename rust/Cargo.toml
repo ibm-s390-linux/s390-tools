@@ -6,6 +6,7 @@ members = [
 	"pvapconfig",
 	"pvattest",
 	"pvimg",
+	"pvinfo",
 	"pvsecret",
 	"utils",
 ]

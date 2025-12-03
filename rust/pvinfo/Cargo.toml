@@ -1,0 +1,25 @@
+[package]
+name = "pvinfo"
+version = "0.12.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1"
+clap = { version =  "4.5", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_yaml = "0.9.21"
+
+pv_core = { path = "../pv_core", package = "s390_pv_core" }
+utils = { path = "../utils" }
+
+[dev-dependencies]
+tempfile = "3.15.0"
+
+[build-dependencies]
+clap = { version =  "4.5", features = ["derive"] }
+clap_complete = "4.5"

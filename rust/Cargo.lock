@@ -653,6 +653,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pvinfo"
+version = "0.12.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "s390_pv_core",
+ "serde",
+ "serde_yaml",
+ "tempfile",
+ "utils",
+]
+
+[[package]]
 name = "pvsecret"
 version = "0.12.0"
 dependencies = [
