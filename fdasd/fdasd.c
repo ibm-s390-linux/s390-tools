@@ -2696,15 +2696,40 @@ static void fdasd_dequeue_old_partition(fdasd_anchor_t *anc,
 /*
  * adds a new partition to the 'partition table'
  */
+static void fdasd_commit_new_partition(fdasd_anchor_t *anc,
+				       partition_info_t *part_info,
+				       extent_t *ext)
+{
+	unsigned long start, stop;
+	cchhb_t hf1;
+
+	if (anc->formatted_cylinders > LV_COMPAT_CYL)
+		vtoc_init_format8_label(anc->blksize, ext, part_info->f1);
+	else
+		vtoc_init_format1_label(anc->blksize, ext, part_info->f1);
+
+	fdasd_enqueue_new_partition(anc);
+	anc->used_partitions += 1;
+
+	get_addr_of_highest_f1_f8_label(anc, &hf1);
+	vtoc_update_format4_label(anc->f4, &hf1, anc->f4->DS4DSREC - 1);
+
+	start = cchh2trk(&ext->llimit, &geo);
+	stop = cchh2trk(&ext->ulimit, &geo);
+
+	vtoc_set_freespace(anc->f4, anc->f5, anc->f7, '-', anc->verbose,
+			   start, stop, anc->formatted_cylinders, geo.heads);
+
+	anc->vtoc_changed++;
+}
+
 static void fdasd_add_partition(fdasd_anchor_t *anc)
 {
 	partition_info_t *part_info;
-	unsigned long start, stop;
 	extent_t ext;
-	cchhb_t hf1;
 
 	part_info = fdasd_get_empty_f1_label(anc);
-	if (part_info == NULL) {
+	if (!part_info) {
 		printf("No more free partitions left,\n"
 		       "you have to delete one first!");
 		return;
@@ -2713,24 +2738,7 @@ static void fdasd_add_partition(fdasd_anchor_t *anc)
 	if (fdasd_get_partition_data(anc, &ext, part_info) != 0)
 		return;
 
-	if (anc->formatted_cylinders > LV_COMPAT_CYL)
-		vtoc_init_format8_label(anc->blksize, &ext, part_info->f1);
-	else
-		vtoc_init_format1_label(anc->blksize, &ext, part_info->f1);
-
-	fdasd_enqueue_new_partition(anc);
-	anc->used_partitions += 1;
-
-	get_addr_of_highest_f1_f8_label(anc, &hf1);
-	vtoc_update_format4_label(anc->f4, &hf1, anc->f4->DS4DSREC - 1);
-
-	start = cchh2trk(&ext.llimit, &geo);
-	stop = cchh2trk(&ext.ulimit, &geo);
-
-	vtoc_set_freespace(anc->f4, anc->f5, anc->f7, '-', anc->verbose,
-			   start, stop, anc->formatted_cylinders, geo.heads);
-
-	anc->vtoc_changed++;
+	fdasd_commit_new_partition(anc, part_info, &ext);
 }
 
 /*
