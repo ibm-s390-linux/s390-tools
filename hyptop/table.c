@@ -988,8 +988,11 @@ static void l_row_print_formatted(struct table *t, struct table_row *row)
 		unsigned int flags = 0;
 		struct table_entry *e = &row->entries[col_nr];
 
-		if (row == t->row_last && col_nr == 0)
+		if (row == t->row_last && col_nr == 0) {
+			if (g.o.format == FMT_CSV)
+				util_fmt_pair(FMT_QUOTE, col->head, "SUM", e->str);
 			continue;
+		}
 		if (table_col_needs_quotes(col))
 			flags = FMT_QUOTE;
 		if (strcmp(e->str, "-") == 0 || strcmp(e->str, "") == 0)
