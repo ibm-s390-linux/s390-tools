@@ -2744,29 +2744,15 @@ static void fdasd_add_partition(fdasd_anchor_t *anc)
 /*
  * removes a partition from the 'partition table'
  */
-static void fdasd_remove_partition(fdasd_anchor_t *anc)
+static int fdasd_commit_remove_partition(fdasd_anchor_t *anc, unsigned int part_id)
 {
 	partition_info_t *part_info = anc->first;
 	unsigned long start, stop;
-	unsigned int part_id, i;
+	unsigned int i;
 	cchhb_t hf1;
 
-	fdasd_list_partition_table(anc);
-
-	while (!isdigit(part_id = read_char("\ndelete partition with id "
-					    "(use 0 to exit): ")))
-		printf("Invalid partition id '%c' detected.\n", part_id);
-
-	printf("\n");
-	part_id -= 48;
-	if (part_id == 0)
-		return;
-	if (part_id > anc->used_partitions) {
-		printf("'%d' is not a valid partition id!\n", part_id);
-		return;
-	}
-
-	printf("deleting partition number '%d'...\n", part_id);
+	if (part_id < 1 || part_id > anc->used_partitions)
+		return -1;
 
 	setpos(anc, part_id - 1, -1);
 	for (i = 1; i < part_id; i++)
@@ -2788,6 +2774,36 @@ static void fdasd_remove_partition(fdasd_anchor_t *anc)
 			   start, stop, anc->formatted_cylinders, geo.heads);
 
 	anc->vtoc_changed++;
+
+	return 0;
+}
+
+static void fdasd_remove_partition(fdasd_anchor_t *anc)
+{
+	unsigned int part_id;
+	int rc;
+
+	fdasd_list_partition_table(anc);
+
+	while (!isdigit(part_id = read_char("\ndelete partition with id "
+					    "(use 0 to exit): ")))
+		printf("Invalid partition id '%c' detected.\n", part_id);
+
+	printf("\n");
+	part_id -= 48;
+	if (part_id == 0)
+		return;
+
+	if (part_id > anc->used_partitions) {
+		printf("'%d' is not a valid partition id!\n", part_id);
+		return;
+	}
+
+	printf("deleting partition number '%d'...\n", part_id);
+
+	rc = fdasd_commit_remove_partition(anc, part_id);
+	if (rc < 0)
+		printf("Error: Failed to remove partition %d\n", part_id);
 }
 
 /*
