@@ -2336,6 +2336,55 @@ static void fdasd_get_geometry(fdasd_anchor_t *anc)
 	}
 }
 
+/* helper function to parse size value with optional suffix and convert to tracks */
+static int fdasd_parse_relative_size(unsigned long long *result, fdasd_anchor_t *anc)
+{
+	int use_default = 1;
+	unsigned long long trk = 0;
+
+	trk = atoi(line_ptr);
+	while (isdigit(*line_ptr)) {
+		line_ptr++;
+		use_default = 0;
+	}
+
+	switch (*line_ptr) {
+	case 'c':
+	case 'C':
+		trk *= geo.heads;
+		break;
+	case 'k':
+	case 'K':
+		trk *= 1024;
+		trk /= anc->blksize;
+		trk /= geo.sectors;
+		break;
+	case 'm':
+	case 'M':
+		trk *= (1024 * 1024);
+		trk /= anc->blksize;
+		trk /= geo.sectors;
+		break;
+	case 'g':
+	case 'G':
+		trk *= (1024 * 1024 * 1024);
+		trk /= anc->blksize;
+		trk /= geo.sectors;
+		break;
+	case 0x0a:
+		break;
+	default:
+		printf("WARNING: '%c' is not a "
+		       "valid appendix and probably "
+		       "not what you want!\n",
+		       *line_ptr);
+		break;
+	}
+
+	*result = trk;
+	return use_default;
+}
+
 /*
  * asks for partition boundaries
  */
@@ -2366,47 +2415,13 @@ fdasd_read_int(unsigned long low, unsigned long dflt, unsigned long high,
 		if ((*line_ptr == '+' || *line_ptr == '-') && base != lower) {
 			if (*line_ptr == '+')
 				++line_ptr;
-			trk = atoi(line_ptr);
-			while (isdigit(*line_ptr)) {
-				line_ptr++;
+			if (fdasd_parse_relative_size(&trk, anc) != 0) {
+				use_default = 1;
+				break;
+			} else {
 				use_default = 0;
 			}
-
-			switch (*line_ptr) {
-			case 'c':
-			case 'C':
-				trk *= geo.heads;
-				break;
-			case 'k':
-			case 'K':
-				trk *= 1024;
-				trk /= anc->blksize;
-				trk /= geo.sectors;
-				break;
-			case 'm':
-			case 'M':
-				trk *= (1024 * 1024);
-				trk /= anc->blksize;
-				trk /= geo.sectors;
-				break;
-			case 'g':
-			case 'G':
-				trk *= (1024 * 1024 * 1024);
-				trk /= anc->blksize;
-				trk /= geo.sectors;
-				break;
-			case 0x0a:
-				break;
-			default:
-				printf("WARNING: '%c' is not a "
-				       "valid appendix and probably "
-				       "not what you want!\n",
-				       *line_ptr);
-				break;
-			}
-
 			trk += (low - 1);
-
 		} else if (*line_ptr == '\0') {
 			switch (base) {
 			case lower:
