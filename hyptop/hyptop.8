@@ -62,11 +62,11 @@ shown.
 Select sort field for current window. To reverse the sort order, specify the
 option twice. See FIELDS below for definitions.
 .TP
-.BR "\-t <TYPE>,..." " or " "\-\-cpu_types=<TYPE>,..."
+.BR "\-t <TYPE>,..." " or " "\-\-cpu-types=<TYPE>,..."
 Select CPU types that are used for CPU time calculations. See CPU TYPES
 below for definitions.
 .TP
-.BR "\-b" " or " "\-\-batch_mode"
+.BR "\-b" " or " "\-\-batch-mode"
 Use batch mode (no curses). This can be useful for sending output from hyptop
 to another program, a file, or a line mode terminal.
 In this mode no user input is accepted.
@@ -113,13 +113,13 @@ All values are enclosed in double quotation marks and separated by commas. The
 first line of output contains a list of headings. Subsequent lines each
 represent data for one system in one iteration.
 .PP
-This option implies the "\-\-batch_mode" option.
+This option implies the "\-\-batch-mode" option.
 .RE
 .TP
 .BR "\-d <SECONDS>" " or " "\-\-delay=<SECONDS>"
 Specifies the delay between screen updates.
 .TP
-.BR "\-m <FACTOR>" " or " "\-\-smt_factor=<FACTOR>"
+.BR "\-m <FACTOR>" " or " "\-\-smt-factor=<FACTOR>"
 Specifies a workload dependent SMT speedup factor.
 For IBM z15 servers, the default value is 1.3. If the workload benefits
 from SMT, you can specify a higher value. If the workload does not benefit
@@ -239,7 +239,7 @@ The following units are supported:
 
 .SH CPU TYPES
 Depending on the hypervisor different CPU types are supported. These CPU
-types can be selected either interactively or with the "--cpu_types"
+types can be selected either interactively or with the "--cpu-types"
 command line option. The calculation of the CPU data only uses CPUs of
 the specified types.
 

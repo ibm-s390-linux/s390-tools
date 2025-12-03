@@ -39,17 +39,25 @@ static char HELP_TEXT[] =
 "-s, --sys SYSTEM[,..]           Systems for current window\n"
 "-f, --fields LETTER[:UNIT][,..] Fields and units for current window\n"
 "-S, --sort LETTER               Sort field for current window\n"
-"-t, --cpu_types TYPE[,..]       CPU types used for time calculations\n"
-"-b, --batch_mode                Use batch mode (no curses)\n"
+"-t, --cpu-types TYPE[,..]       CPU types used for time calculations\n"
+"-b, --batch-mode                Use batch mode (no curses)\n"
 "    --format FORMAT             Output format (" FMT_TYPE_NAMES "), implies -b\n"
 "-d, --delay SECONDS             Delay time between screen updates\n"
-"-m, --smt_factor FACTOR         Machine generation dependent SMT speedup factor.\n"
+"-m, --smt-factor FACTOR         Machine generation dependent SMT speedup factor.\n"
 "-n, --iterations NUMBER         Number of iterations before ending\n";
 
 /*
  * Options with long-name only
  */
 #define OPT_FORMAT	256 /* --format */
+
+/*
+ * Options with underscore to keep compatibility
+ */
+#define OPT_BATCH_MODE	257 /* --batch_mode */
+#define OPT_SORT_FIELD	258 /* --sort | --sort_field */
+#define OPT_CPU_TYPES	259 /* --cpu_types */
+#define OPT_SMT_FACTOR	260 /* --smt_factor */
 
 /*
  * Initialize default settings
@@ -339,15 +347,19 @@ void opts_parse(int argc, char *argv[])
 	static struct option long_options[] = {
 		{ "version",     no_argument,       NULL, 'v'},
 		{ "help",        no_argument,       NULL, 'h'},
-		{ "batch_mode",  no_argument,       NULL, 'b'},
+		{ "batch-mode",  no_argument,       NULL, 'b'},
+		{ "batch_mode",  no_argument,       NULL, OPT_BATCH_MODE},
 		{ "delay",       required_argument, NULL, 'd'},
-		{ "smt_factor",  required_argument, NULL, 'm'},
+		{ "smt-factor",  required_argument, NULL, 'm'},
+		{ "smt_factor",  required_argument, NULL, OPT_SMT_FACTOR},
 		{ "window",      required_argument, NULL, 'w'},
 		{ "sys",         required_argument, NULL, 's'},
 		{ "iterations",  required_argument, NULL, 'n'},
 		{ "fields",      required_argument, NULL, 'f'},
-		{ "sort_field",  required_argument, NULL, 'S'},
-		{ "cpu_types",   required_argument, NULL, 't'},
+		{ "sort-field",  required_argument, NULL, 'S'},
+		{ "sort_field",  required_argument, NULL, OPT_SORT_FIELD},
+		{ "cpu-types",   required_argument, NULL, 't'},
+		{ "cpu_types",   required_argument, NULL, OPT_CPU_TYPES},
 		{ "format",      required_argument, NULL, OPT_FORMAT },
 		{ NULL,          0,                 NULL, 0  }
 	};
@@ -366,12 +378,14 @@ void opts_parse(int argc, char *argv[])
 		case 'h':
 			l_usage();
 			hyptop_exit(0);
+		case OPT_BATCH_MODE:
 		case 'b':
 			l_batch_mode_set();
 			break;
 		case 'd':
 			l_delay_set(optarg);
 			break;
+		case OPT_SMT_FACTOR:
 		case 'm':
 			l_factor_set(optarg);
 			break;
@@ -384,12 +398,14 @@ void opts_parse(int argc, char *argv[])
 		case 'n':
 			l_iterations_set(optarg);
 			break;
+		case OPT_CPU_TYPES:
 		case 't':
 			l_cpu_types_set(optarg);
 			break;
 		case 'f':
 			l_fields_set(optarg);
 			break;
+		case OPT_SORT_FIELD:
 		case 'S':
 			l_sort_field_set(optarg);
 			break;
