@@ -115,6 +115,13 @@ represent data for one system in one iteration.
 .PP
 This option implies the "\-\-batch-mode" option.
 .RE
+.BR "\-\-all"
+.RS
+Use this option with the "--format" option to include fields without valid
+values in the output. Fields without valid values are omitted from the output
+by default. When you use the "--all" option, the invalid values are included
+and shown as "null".
+.RE
 .TP
 .BR "\-d <SECONDS>" " or " "\-\-delay=<SECONDS>"
 Specifies the delay between screen updates.

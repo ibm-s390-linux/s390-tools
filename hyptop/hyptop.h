@@ -55,6 +55,7 @@ struct hyptop_opts {
 	unsigned int			win_specified;
 	unsigned int			batch_mode_specified;
 	unsigned int			format_specified;
+	unsigned int			format_all;
 	enum util_fmt_t			format;
 	unsigned int			iterations_specified;
 	unsigned int			iterations;

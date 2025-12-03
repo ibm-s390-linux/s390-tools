@@ -42,6 +42,8 @@ static char HELP_TEXT[] =
 "-t, --cpu-types TYPE[,..]       CPU types used for time calculations\n"
 "-b, --batch-mode                Use batch mode (no curses)\n"
 "    --format FORMAT             Output format (" FMT_TYPE_NAMES "), implies -b\n"
+"    --all                       Include omitted fields (with values of null)\n"
+"                                in the output of --format.\n"
 "-d, --delay SECONDS             Delay time between screen updates\n"
 "-m, --smt-factor FACTOR         Machine generation dependent SMT speedup factor.\n"
 "-n, --iterations NUMBER         Number of iterations before ending\n";
@@ -50,6 +52,7 @@ static char HELP_TEXT[] =
  * Options with long-name only
  */
 #define OPT_FORMAT	256 /* --format */
+#define OPT_FORMAT_ALL	261 /* --all*/
 
 /*
  * Options with underscore to keep compatibility
@@ -322,12 +325,23 @@ static void l_format_set(const char *str)
 }
 
 /*
+ * Set the "--all" option to display omitted null values
+ * while using "--format"
+ */
+static void l_format_all_set(void)
+{
+	g.o.format_all = 1;
+}
+
+/*
  * Make option consisteny checks at end of command line parsing
  */
 static void l_parse_finish(void)
 {
 	if (g.o.iterations_specified && g.o.iterations == 0)
 		hyptop_exit(0);
+	if (!g.o.format_specified && g.o.format_all)
+		ERR_EXIT("The --all option requires the -–format option\n");
 	if (g.o.cur_win != &win_sys)
 		return;
 	if (!win_sys.opts.sys.specified)
@@ -349,6 +363,7 @@ void opts_parse(int argc, char *argv[])
 		{ "help",        no_argument,       NULL, 'h'},
 		{ "batch-mode",  no_argument,       NULL, 'b'},
 		{ "batch_mode",  no_argument,       NULL, OPT_BATCH_MODE},
+		{ "all",         no_argument,       NULL, OPT_FORMAT_ALL },
 		{ "delay",       required_argument, NULL, 'd'},
 		{ "smt-factor",  required_argument, NULL, 'm'},
 		{ "smt_factor",  required_argument, NULL, OPT_SMT_FACTOR},
@@ -411,6 +426,9 @@ void opts_parse(int argc, char *argv[])
 			break;
 		case OPT_FORMAT:
 			l_format_set(optarg);
+			break;
+		case OPT_FORMAT_ALL:
+			l_format_all_set();
 			break;
 		default:
 			l_std_usage_exit();
