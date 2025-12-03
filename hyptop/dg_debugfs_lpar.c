@@ -26,6 +26,7 @@
 #define CPU_TYPE_LEN	16
 #define DEBUGFS_FILE	"diag_204"
 
+static struct sd_sys *l_cur_lpar;
 static u64 l_update_time_us;
 static long l_204_buf_size;
 
@@ -36,7 +37,8 @@ static long l_204_buf_size;
 struct l_x_info_blk_hdr {
 	u8	npar;
 	u8	flags;
-	u8	reserved1[6];
+	u8	reserved1[4];
+	u16	this_part;
 	u64	curtod1;
 	u64	curtod2;
 	u8	reserved[40];
@@ -159,6 +161,21 @@ static void *l_sd_sys_fill(struct sd_sys *lpar, struct l_x_sys_hdr *sys_hdr)
 }
 
 /*
+ * Calculate the time delta between samples using current partition's
+ * online time.
+ */
+static u64 l_sd_cur_lpar_delta_time_get(void)
+{
+	struct sd_cpu *cpu;
+
+	cpu = sd_cpu_get(l_cur_lpar, "0");
+	if (!cpu->d_prev || !cpu->d_cur)
+		return 0;
+	return l_sub_64(cpu->d_cur->online_time_us,
+			cpu->d_prev->online_time_us);
+}
+
+/*
  * Fill one physical CPU with data
  */
 static void l_sd_cpu_phys_fill(struct sd_sys *sys,
@@ -241,9 +258,9 @@ static void l_read_debugfs(struct l_debugfs_d204_hdr **hdr,
  */
 static void l_sd_sys_root_fill(struct sd_sys *sys)
 {
+	struct l_x_sys_hdr *sys_hdr, *this_part;
 	struct l_x_info_blk_hdr *time_hdr;
 	struct l_debugfs_d204_hdr *hdr;
-	struct l_x_sys_hdr *sys_hdr;
 	struct sd_sys *lpar;
 	char lpar_id[10];
 	int i;
@@ -262,18 +279,23 @@ static void l_sd_sys_root_fill(struct sd_sys *sys)
 		usleep(DBFS_WAIT_TIME_US);
 	} while (1);
 	sys_hdr = ((void *) time_hdr) + sizeof(struct l_x_info_blk_hdr);
+	this_part = ((void *)time_hdr) + time_hdr->this_part;
 	for (i = 0; i < time_hdr->npar; i++) {
 		l_sys_hdr__sys_name(sys_hdr, lpar_id);
 		lpar = sd_sys_get(sys, lpar_id);
 		if (!lpar)
 			lpar = sd_sys_new(sys, lpar_id);
+		if (sys_hdr == this_part)
+			l_cur_lpar = lpar;
 		lpar->threads_per_core = l_thread_cnt(sys_hdr);
 		sys_hdr = l_sd_sys_fill(lpar, sys_hdr);
 		sd_sys_commit(lpar);
 	}
 
-	if (time_hdr->flags & LPAR_PHYS_FLG)
+	if (time_hdr->flags & LPAR_PHYS_FLG) {
 		l_sd_sys_root_cpu_phys_fill(sys, (void *) sys_hdr);
+		sd_phys_delta_time_us_set(sys, l_sd_cur_lpar_delta_time_get());
+	}
 	ht_free(hdr);
 	sd_sys_commit(sys);
 }
@@ -289,6 +311,16 @@ static void l_sd_update(void)
 	l_sd_sys_root_fill(root);
 	sd_sys_update_end(root, l_update_time_us);
 }
+
+/*
+ * Supported physical information items
+ */
+static struct sd_sys_item *l_phys_item_vec[] = {
+	&sd_sys_item_core_cnt,
+	&sd_sys_item_phys_mgm_diff,
+	&sd_sys_item_mgm,
+	NULL,
+};
 
 /*
  * Supported system items
@@ -364,6 +396,7 @@ static struct sd_cpu_type *l_cpu_type_vec[] = {
 static struct sd_dg l_sd_dg = {
 	.update_sys		= l_sd_update,
 	.cpu_type_vec		= l_cpu_type_vec,
+	.phys_item_vec		= l_phys_item_vec,
 	.sys_item_vec		= l_sys_item_vec,
 	.sys_item_enable_vec	= l_sys_item_enable_vec,
 	.cpu_item_vec		= l_cpu_item_vec,

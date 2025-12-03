@@ -992,6 +992,8 @@ static void l_row_print_formatted(struct table *t, struct table_row *row)
 			continue;
 		if (table_col_needs_quotes(col))
 			flags = FMT_QUOTE;
+		if (strcmp(e->str, "-") == 0 || strcmp(e->str, "") == 0)
+			flags |= FMT_INVAL;
 		util_fmt_pair(flags, col->head, "%s", e->str);
 	}
 }

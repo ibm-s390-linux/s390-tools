@@ -229,8 +229,10 @@ static void l_fmt_init(void)
 
 	if (!g.o.format_specified)
 		return;
-	if (g.o.format == FMT_CSV)
+	if (g.o.format == FMT_CSV) {
 		flags |= FMT_QUOTEALL;
+		flags |= FMT_KEEPINVAL;
+	}
 	if (g.o.format == FMT_JSON || g.o.format == FMT_JSONSEQ)
 		flags |= FMT_HANDLEINT;
 	util_fmt_init(stdout, g.o.format, flags, 1);

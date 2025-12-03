@@ -170,7 +170,7 @@ static void l_row_add_physical(struct table *t, struct sd_sys *sys)
 
 	row = table_row_alloc(t);
 	table_row_entry_str_add(row, &l_col_sys, sd_sys_id(sys));
-	sd_sys_item_iterate(item, i) {
+	sd_phys_item_iterate(item, i) {
 		if (!sd_sys_item_set(sys, item))
 			continue;
 		l_sys_item_add(row, sys, item);
@@ -342,6 +342,11 @@ static void l_run(struct hyptop_win *win)
 	}
 }
 
+static void win_sys_list_set_phys_table_cols(void)
+{
+	sd_sys_item_phys_mgm_diff.table_col = sd_sys_item_mgm_diff.table_col;
+}
+
 /*
  * Initialize window
  */
@@ -369,6 +374,8 @@ void win_sys_list_init(void)
 		col_vec[i] = col;
 		col_desc_vec[i] = item->desc;
 	}
+	if (sd_dg_has_phys_data())
+		win_sys_list_set_phys_table_cols();
 	/* Enable fields */
 	if (win_sys_list.opts.fields.specified)
 		l_fields_enable_cmdline();

@@ -78,6 +78,7 @@ struct sd_sys {
 	struct util_list_node	list;
 	struct sd_info		i;
 	u64			update_time_us;
+	u64			phys_delta_us;
 	u32			child_cnt;
 	u32			child_cnt_active;
 	struct util_list	child_list;
@@ -133,6 +134,11 @@ static inline void sd_sys_mem_max_kib_set(struct sd_sys *sys, u64 value)
 static inline void sd_sys_update_time_us_set(struct sd_sys *sys, u64 value)
 {
 	sys->update_time_us = value;
+}
+
+static inline void sd_phys_delta_time_us_set(struct sd_sys *sys, u64 value)
+{
+	sys->phys_delta_us = value;
 }
 
 /*
@@ -438,12 +444,15 @@ extern struct sd_sys_item sd_sys_item_os_name;
 extern struct sd_sys_item sd_sys_item_samples_total;
 extern struct sd_sys_item sd_sys_item_samples_cpu_using;
 
+extern struct sd_sys_item sd_sys_item_phys_mgm_diff;
+
 /*
  * Data gatherer backend
  */
 struct sd_dg {
 	void 			(*update_sys)(void);
 	struct sd_cpu_type 	**cpu_type_vec;
+	struct sd_sys_item	**phys_item_vec;
 	struct sd_sys_item	**sys_item_vec;
 	struct sd_sys_item	**sys_item_enable_vec;
 	struct sd_cpu_item	**cpu_item_vec;
@@ -462,6 +471,9 @@ int sd_dg_has_core_data(void);
 
 #define sd_cpu_iterate(parent, cpu) \
 	util_list_iterate(&parent->cpu_list, cpu)
+
+#define sd_phys_item_iterate(ptr, i) \
+	for (i = 0; (ptr = sd.dg->phys_item_vec[i]); i++)
 
 #define sd_sys_item_iterate(ptr, i) \
 	for (i = 0; (ptr = sd.dg->sys_item_vec[i]); i++)

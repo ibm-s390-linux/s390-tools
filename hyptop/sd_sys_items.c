@@ -221,8 +221,55 @@ static u64 l_sys_smt_util(struct sd_sys_item *item, struct sd_sys *sys)
 }
 
 /*
+ * value = (value_current - value_prev) / online_time_diff
+ */
+static double l_phys_cpu_info_diff_u64(struct sd_sys_item *item,
+				       struct sd_cpu *cpu,
+				       u64 time_diff_us)
+{
+	double factor, diff_us;
+
+	if (!sd_cpu_type_selected(cpu->type))
+		return 0;
+	if (sd_cpu_state(cpu) == SD_CPU_STATE_STOPPED)
+		return 0;
+	if (time_diff_us == 0)
+		return 0;
+	diff_us = l_sub_64(l_cpu_info_u64(cpu->d_cur, item->offset),
+			   l_cpu_info_u64(cpu->d_prev, item->offset));
+	factor = ((double)time_diff_us) / 1000000;
+	diff_us /= factor;
+	return diff_us;
+}
+
+/*
+ * SUM over all CPUs: value = (value_current - value_prev) / online_time_diff
+ */
+static u64 l_sys_phys_cpu_info_diff_u64(struct sd_sys_item *item, struct sd_sys *sys)
+{
+	struct sd_cpu *cpu;
+	u64 rc = 0;
+
+	sd_cpu_iterate(sys, cpu) {
+		if (!cpu->d_prev || !cpu->d_cur)
+			return 0;
+		rc += l_phys_cpu_info_diff_u64(item, cpu, sys->phys_delta_us);
+	}
+	return rc;
+}
+
+/*
  * System item definitions
  */
+struct sd_sys_item sd_sys_item_phys_mgm_diff = {
+	.table_col = TABLE_COL_TIME_DIFF_SUM(table_col_unit_perc, 'm', "mgm"),
+	.offset = SD_CPU_INFO_OFFSET(mgm_time_us),
+	.type	= SD_TYPE_U64,
+	.desc	= "Management time per second",
+	.fn_set	= l_sys_cpu_info_set,
+	.fn_u64	= l_sys_phys_cpu_info_diff_u64,
+};
+
 struct sd_sys_item sd_sys_item_core_cnt = {
 	.table_col = TABLE_COL_CNT_SUM('#', "#core"),
 	.type	= SD_TYPE_U32,
