@@ -61,7 +61,7 @@ static int menu_read(void)
 				temp_area[i] = ebcdic_tolower(temp_area[i]);
 		value = ebcdic_strtoul(temp_area, &endptr, 10);
 
-		if ((endptr != temp_area) && (value < BOOT_MENU_ENTRIES - 1) &&
+		if ((endptr != temp_area) && (value < BOOT_MENU_ENTRIES) &&
 		    (__stage2_params.config[value] != 0)) {
 			/* valid config found - finish */
 			break;
@@ -198,7 +198,7 @@ int menu(void)
 
 boot:
 	/* sanity - config entry not valid */
-	if (value > BOOT_MENU_ENTRIES || __stage2_params.config[value] == 0)
+	if (value >= BOOT_MENU_ENTRIES || __stage2_params.config[value] == 0)
 		panic(EINTERNAL, "%s", msg_econfig);
 
 	printf("Booting %s\n",
