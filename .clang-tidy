@@ -9,6 +9,7 @@ Checks: >
   -misc-include-cleaner,
   -readability-braces-around-statements,
   -readability-identifier-length,
+  -readability-isolate-declaration,
   -modernize-*,
   -performance-*,
   -portability-*,
