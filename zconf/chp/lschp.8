@@ -11,6 +11,8 @@ lschp \- list information about available channel\-paths.
 .B lschp
 .RB [ \-h|\-\-help ]
 .RB [ \-v|\-\-version ]
+.RB [ \-\-format
+.IR FORMAT ]
 .RB [
 .I CHPID
 ]
@@ -108,6 +110,77 @@ Print a short help text, then exit.
 Print version number, then exit.
 .RE
 
+.br
+.B \-\-format \fIFORMAT\fR
+.RS
+Specify the output format. Supported formats include
+\fIjson\fR, \fIjson-seq\fR, \fIpairs\fR and \fIcsv\fR.
+See section "OUTPUT FORMAT" for more details.
+.RE
+
+
+.SH "OUTPUT FORMAT"
+This section contains additional information for json output format.
+
+.SS json
+
+JSON output consists of a top-level object with the following properties
+(key-value pairs):
+
+.IP \(bu 3
+.BR meta :
+Tool meta-data including API level, version, host name, and time of invocation
+.PP
+.IP \(bu 3
+.BR channel-paths :
+Information about available Channel\-path
+.PP
+
+Example JSON output for channel-path with all properties:
+
+.nf
+{
+  "meta": {
+    "api_level": 1,
+    "version": "2.39.0-build-20260119",
+    "host": "localhost",
+    "time_epoch": 1769092556,
+    "time": "2026-01-22 15:35:56+0100"
+  },
+  "channel_paths": [
+    {
+      "chpid": "0.32",
+      "vary": 1,
+      "cfg": 1,
+      "type": 27,
+      "cmg": 2,
+      "shared": 1,
+      "chid": 576,
+      "chid_external": true
+    },
+    {
+      "chpid": "0.34",
+      "vary": 1,
+      "cfg": 0,
+      "type": 27,
+      "cmg": null,
+      "shared": null,
+      "chid": 608,
+      "chid_external": true
+    },
+    {
+      "chpid": "0.f8",
+      "vary": 1,
+      "cfg": 1,
+      "type": 36,
+      "cmg": 3,
+      "shared": 1,
+      "chid": 2040,
+      "chid_external": false
+    }
+  ]
+}
+.fi
 
 .SH SEE ALSO
 .BR chchp (8)
