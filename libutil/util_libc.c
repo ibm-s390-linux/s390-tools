@@ -89,6 +89,11 @@ void *__util_realloc(const char *func, const char *file, int line,
 {
 	void *buf;
 
+	if (size == 0) {
+		free(ptr);
+		return NULL;
+	}
+
 	buf = realloc(ptr, size);
 
 	if (buf == NULL)

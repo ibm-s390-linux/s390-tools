@@ -545,19 +545,6 @@ int util_file_read_va(const char *path, const char *fmt, ...)
 }
 
 /**
- * Print an error message indicating an out-of-memory situation and exit.
- */
-static void oom(void)
-{
-	fprintf(stderr, "Out of memory\n");
-
-	/* We can't rely on our clean-up routines to work reliably during an
-	 * OOM situation, so just exit here.
-	 */
-	exit(UTIL_EXIT_OUT_OF_MEMORY);
-}
-
-/**
  * Read all data from @fd and return address of resulting buffer in
  * @buffer_ptr. If @size_ptr is non-zero, use it to store the size of the
  * resulting buffer. Return %UTIL_EXIT_OK on success.
@@ -576,9 +563,7 @@ util_exit_code_t util_file_read_fd_buf(FILE *fd, void **buffer_ptr,
 	size_t done = 0;
 
 	while (!feof(fd)) {
-		buffer = realloc(buffer, done + READ_CHUNK_SIZE);
-		if (!buffer)
-			oom();
+		buffer = util_realloc(buffer, done + READ_CHUNK_SIZE);
 		done += fread(&buffer[done], 1, READ_CHUNK_SIZE, fd);
 		if (ferror(fd)) {
 			free(buffer);
@@ -586,9 +571,7 @@ util_exit_code_t util_file_read_fd_buf(FILE *fd, void **buffer_ptr,
 		}
 	}
 
-	buffer = realloc(buffer, done);
-	if (!buffer && done > 0)
-		oom();
+	buffer = util_realloc(buffer, done);
 
 	*buffer_ptr = buffer;
 	if (size_ptr)
@@ -635,9 +618,7 @@ char *util_file_read_fd(FILE *fd, int chomp)
 		done--;
 
 	/* NULL-terminate. */
-	buffer = realloc(buffer, done + 1);
-	if (!buffer)
-		oom();
+	buffer = util_realloc(buffer, done + 1);
 	buffer[done] = 0;
 
 	return buffer;

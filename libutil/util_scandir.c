@@ -68,7 +68,7 @@ static int __scandir(struct dirent ***de_vec, const char *path,
 			continue;
 		de_new = util_malloc(sizeof(*de_new));
 		*de_new = *de;
-		de_vec_new = realloc(de_vec_new, sizeof(void *) * (count + 1));
+		de_vec_new = util_realloc(de_vec_new, sizeof(void *) * (count + 1));
 		de_vec_new[count++] = de_new;
 	}
 	closedir(dirp);
