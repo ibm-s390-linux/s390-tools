@@ -1,15 +1,42 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.40.0 (2025-12-11)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 6.18
 
   Add new tools / libraries:
+  - Add project-wide .clang-tidy configuration
+  - libutil: Introduce util_time for time related functionality
+  - libutil: Introduce zsh/bash autocompletion tooling based on util_opt
+  - pvinfo: Tool to display Secure Execution system information
+  - pvverify: Tool to verify host-key documents
 
   Changes of existing tools:
+  - cpumf: Implement zsh and bash autocompletion
+  - dasdfmt: Implement zsh and bash autocompletion
+  - dbginfo.sh: Add NetworkManager and netplan
+  - dbginfo.sh: Add kvm_stat
+  - dbginfo.sh: Adding stp time information
+  - dbginfo.sh: Simplify procfs collection
+  - hyptop: Add physical information row
+  - hyptop: Calculate sample time delta for physical partition
+  - hyptop: Replace long option names using _ with - for consistency
+            For example: --cpu_types -> --cpu-types
+            (Options with _ are still supported for backward compatibility)
+  - libekmfweb: Add function to validate a certificate against the identity key
+  - netboot: Add longer kernel command lines support
+  - udev/rules.d: Make virtio-blk devices non-rotational
+  - udev/rules.d: Set default io scheduler to 'none' for virtio-blk
+  - ziomon: Add support to sample device symlinks (/dev/disk/...)
+  - ziorep_config: Add fcp-lun details to -M option output
+  - ziorep_config: Add port_id and failed attributes to -A option output
+  - netboot: Install on non-s390 architectures
 
   Bug Fixes:
+  - lib(ekmfweb|kmipclient): Use ln without -r
+  - s390-tools: Fix various compilation issues with musl libc
+  - zipl/boot: Fix unused loadparm when SCLP line-mode console is absent
 
 * __v2.39.0 (2025-10-14)__
 

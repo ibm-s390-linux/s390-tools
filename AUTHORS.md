@@ -1,11 +1,13 @@
 List of all individuals having contributed content to s390-tools
 ----------------------------------------------------------------
 
+- Ajaykumar Rajappa
 - Alexander Egorenkov
 - Alexandra Winter
 - Alexey Ishchuk
 - Andreas Herrmann
 - André Wild
+- Annu Sharma
 - Antoinette Kaschner
 - Arnd Bergmann
 - Axel Wirbser
@@ -28,6 +30,7 @@ List of all individuals having contributed content to s390-tools
 - Eberhard Pasch
 - Eduard Shishkin
 - Einar Lueck
+- Ellen McIntyre
 - Eric Farman
 - Eric Sandeen
 - Erwin Vicari
@@ -49,8 +52,8 @@ List of all individuals having contributed content to s390-tools
 - Graham Inggs
 - Guevenc Guelce
 - Hannes Reinecke
-- Hans-Joachim Picht
 - Hans Wippel
+- Hans-Joachim Picht
 - Harald Freudenberger
 - Heiko Carstens
 - Hendrik Brueckner
@@ -72,12 +75,13 @@ List of all individuals having contributed content to s390-tools
 - Jens Remus
 - Jochen Roehrig
 - Joern Siglen
-- Jörn Siglen
 - Juergen Christ
 - Julian Wiedmann
+- Jörn Siglen
 - Karsten Graul
 - Kittipon Meesompop
 - Klaus-Dieter Wacker
+- L. E. Segovia
 - Lakhvich Dmitriy
 - Marc Hartmayer
 - Mario Held
@@ -133,6 +137,7 @@ List of all individuals having contributed content to s390-tools
 - Sven Schnelle
 - Sven Schuetz
 - Swen Schillig
+- Szabina Korbai
 - Taraka R. Bodireddy
 - Thomas Heidrich
 - Thomas Huth
