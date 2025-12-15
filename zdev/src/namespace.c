@@ -13,7 +13,6 @@
 #include "ccw.h"
 #include "ctc.h"
 #include "devtype.h"
-#include "lcs.h"
 #include "namespace.h"
 #include "qeth.h"
 #include "zfcp_lun.h"
@@ -24,7 +23,6 @@ struct namespace *namespaces[] = {
 	&zfcp_lun_namespace,
 	&qeth_namespace,
 	&ctc_namespace,
-	&lcs_namespace,
 	&ap_namespace,
 	NULL,
 };

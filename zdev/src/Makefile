@@ -36,9 +36,6 @@ chzdev_objects += nic.o qeth.o qeth_auto.o
 # CTC devtype
 chzdev_objects += ctc.o ctc_auto.o
 
-# LCS devtype
-chzdev_objects += lcs.o lcs_auto.o
-
 # AP devtype
 chzdev_objects += ap.o
 
@@ -71,9 +68,6 @@ lszdev_objects += nic.o qeth.o qeth_auto.o
 
 # CTC devtype
 lszdev_objects += ctc.o ctc_auto.o
-
-# LCS devtype
-lszdev_objects += lcs.o lcs_auto.o
 
 # AP devtype
 lszdev_objects += ap.o

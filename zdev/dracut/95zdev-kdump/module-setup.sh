@@ -55,7 +55,7 @@ cmdline() {
 installkernel() {
     # Add modules for all device types supported by chzdev (required for
     # auto-configuration)
-    instmods ctcm lcs qeth qeth_l2 qeth_l3 dasd_mod dasd_eckd_mod dasd_fba_mod \
+    instmods ctcm qeth qeth_l2 qeth_l3 dasd_mod dasd_eckd_mod dasd_fba_mod \
              dasd_diag_mod zfcp
 }
 

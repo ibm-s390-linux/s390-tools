@@ -15,7 +15,6 @@
 #include "ccwgroup.h"
 #include "ctc.h"
 #include "ctc_auto.h"
-#include "lcs.h"
 #include "module.h"
 #include "path.h"
 
@@ -39,9 +38,7 @@ static struct cutype ctc_cutypes[] = {
  * 1. A CTC device can be grouped from 2 CCW devices
  *    a) Read device
  *    b) Write device
- * 2. All CCW devices must be bound to the CTC CCW device driver. Note that
- *    due to an overlap in CU-Types, CCW device could also be bound to
- *    the LCS device driver.
+ * 2. All CCW devices must be bound to the CTC CCW device driver.
  * 3. The subchannel of all CCW devices must be defined with the same CHPID
  * 4. None of the CCW devices is part of an existing CCWGROUP device
  */
@@ -113,7 +110,7 @@ static exit_code_t add_cb(const char *path, const char *filename, void *data)
 }
 
 /* Return a sorted ptrlist of struct ccw_devinfos for all CCW devices
- * bound to the ctc or lcs CCW device driver with matching CUTYPE.
+ * bound to the ctc CCW device driver with matching CUTYPE.
  * The result must be freed using ptrlist_free(,1); */
 static struct util_list *read_sorted_ctc_devinfos(void)
 {
@@ -126,12 +123,6 @@ static struct util_list *read_sorted_ctc_devinfos(void)
 	/* Add CCW devices bound to the CTC CCW device driver. */
 	module_try_load_once(CTC_MOD_NAME, NULL);
 	path = path_get_sys_bus_drv(CCW_BUS_NAME, CTC_CCWDRV_NAME);
-	if (util_path_is_dir(path))
-		path_for_each(path, add_cb, infos);
-	free(path);
-
-	/* Add CCW devices bound to the LCS CCW device driver. */
-	path = path_get_sys_bus_drv(CCW_BUS_NAME, LCS_CCWDRV_NAME);
 	if (util_path_is_dir(path))
 		path_for_each(path, add_cb, infos);
 	free(path);

@@ -18,7 +18,6 @@
 #include "devnode.h"
 #include "devtype.h"
 #include "generic_ccw.h"
-#include "lcs.h"
 #include "misc.h"
 #include "module.h"
 #include "namespace.h"
@@ -36,7 +35,6 @@ struct devtype *devtypes[] = {
 	&zfcp_devtype,
 	&qeth_devtype,
 	&ctc_devtype,
-	&lcs_devtype,
 	&ap_devtype,
 	&virtio_devtype,
 	&generic_ccw_devtype,	/* Generic types should come last. */
