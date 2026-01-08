@@ -8,11 +8,13 @@
  *
  */
 
+#include <limits.h>
+
 #include "ebcdic.h"
 
-
 /*
- * Convert ebcdic string to number with given base
+ * Convert EBCDIC string to number with given base. In case of an overflow,
+ * ULONG_MAX is returned and @endptr is not updated.
  */
 unsigned long ebcdic_strtoul(char *nptr, char **endptr, int base)
 {
@@ -21,7 +23,8 @@ unsigned long ebcdic_strtoul(char *nptr, char **endptr, int base)
 	while (ebcdic_isdigit(*nptr)) {
 		if (val != 0)
 			val *= base;
-		val += *nptr - 0xf0;
+		if (__builtin_uaddl_overflow(val, *nptr - 0xf0, &val))
+			return ULONG_MAX;
 		nptr++;
 	}
 	if (endptr)

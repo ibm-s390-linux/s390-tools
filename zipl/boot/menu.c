@@ -27,12 +27,12 @@ static void menu_prompt(int timeout)
 		printf("Please choose:");
 }
 
-static int menu_read(void)
+static unsigned long menu_read(void)
 {
 	char *temp_area =  (char *)get_zeroed_page();
 	int timeout, rc, i, count = 0;
+	unsigned long value;
 	char *endptr;
-	int value;
 
 	timeout = __stage2_params.timeout;
 
