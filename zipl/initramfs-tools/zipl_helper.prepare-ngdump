@@ -9,7 +9,7 @@
 function create_dumpfs()
 {
 	[ "$dryrun" -eq 1 ] && { echo "/dev/null"; return 0; }
-	mkfs -F "$device" >/dev/null || { echo "Couldn't create filesystem on $1." >&2; return 1; }
+	mkfs.ext4 -F "$device" >/dev/null || { echo "Couldn't create filesystem on $1." >&2; return 1; }
 	local disk_path=/dev/disk/by-uuid/$(blkid -o value -s UUID "$device")
 	for i in $(seq 0 30)
 	do
