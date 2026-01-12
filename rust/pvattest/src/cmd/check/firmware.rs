@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use super::{bail_check, CheckState};
 use crate::{additional::AttestationResult, cli::CheckOpt};
 
-const CHECK_DEFAULT_ENDP: &str = "https://www.ibm.com/support/resourcelink/api";
-const VERIFY_API: &str = "firmware-attestation/verify/v1";
+const CHECK_DEFAULT_ENDP: &str = "https://esupport.ibm.com/eccedge/ent/z";
+const VERIFY_API: &str = "hmrs/firmware/attestation/v1/verify";
 const TIMEOUT_MAX: Duration = Duration::from_secs(3);
 const USER_AGENT: &str = "s390-tools-pvattest";
 const CONTENT_TYPE: &str = "Content-Type: application/json";
