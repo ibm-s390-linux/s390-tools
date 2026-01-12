@@ -503,7 +503,7 @@ static int evt_scan(char *fn, unsigned char *buf, size_t len,
 	__u64 sample_type = pa->sample_type;
 	int allcnt = 0, cnt = 0, rawok = 0;
 	struct perf_event_header *hdr;
-	size_t offset = sizeof(*pa);
+	size_t offset = pa->size;
 	__u64 evtnum = pa->config;
 	struct pai_event_out ev;
 	size_t limit;
@@ -514,6 +514,8 @@ static int evt_scan(char *fn, unsigned char *buf, size_t len,
 		unsigned char valid;
 	} last_csout = { 0, 0, 0 };
 
+	if (verbose && (sizeof(*pa) != pa->size))
+		printf("size perf_event_attr mismatch %zu/%zu\n", sizeof(*pa), offset);
 	while (offset < len) {
 		hdr = (struct perf_event_header *)(buf + offset);
 		memset(&ev, 0, sizeof(ev));
