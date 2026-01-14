@@ -303,11 +303,11 @@ static void conflict_error(const char *uuid, unsigned int a, unsigned int d,
 		}
 	} else {
 		if (persistent) {
-			fprintf(stderr, "AQPN %u.%u is not defined for "
+			fprintf(stderr, "APQN %u.%u is not defined for "
 				"vfio_ap-passthrough use by the persistent "
 				"ap bus mask settings\n", a, d);
 		} else {
-			fprintf(stderr, "AQPN %u.%u is not allowed for "
+			fprintf(stderr, "APQN %u.%u is not allowed for "
 				"vfio_ap-passthrough use by the active ap "
 				"bus mask settings\n", a, d);
 		}
@@ -531,7 +531,7 @@ out:
  * Determine if there are any conflicts between the specified device and
  * the apmask/aqmask settings stored in udev.  This is done by treating
  * the masks as a temporary vfio_ap_device with all of the associated
- * AQPNs owned by the system.
+ * APQNs owned by the system.
  */
 static int check_cfg_mask_conflicts(struct ap_check_anchor *anc)
 {
