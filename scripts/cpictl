@@ -88,7 +88,7 @@ Environment variables used for the --defaults option:
   CPI_SYSTEM_TYPE, CPI_SYSTEM_LEVEL, CPI_SYSTEM_NAME, CPI_SYSPLEX_NAME,
   CPI_PERMIT_ON_PVGUEST (See also the important note.)
 
-Important: Set CPI_PERMIT_ON_PVGUEST=1 or use --permit_cpi option only if you
+Important: Set CPI_PERMIT_ON_PVGUEST=1 or use --permit-cpi option only if you
 trust the host system. Enabling these options allows the host to receive
 potentially sensitive Control-Program Identification (CPI) data from the
 protected virtualization guest, including:
