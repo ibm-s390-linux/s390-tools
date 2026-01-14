@@ -175,9 +175,10 @@ static void print_virtual_counter_answer(int s,
 					 int ctr, int state, uint64_t value)
 {
 	static const char *const states[] = {
-		[DISABLED]    = "disabled",
-		[ENABLED]     = "enabled",
-		[UNSUPPORTED] = "unsupported"
+		[DISABLED]     = "disabled",
+		[ENABLED]      = "enabled",
+		[UNSUPPORTED]  = "unsupported",
+		[UNAUTHORIZED] = "unauthorized"
 	};
 	int paictr = 0, paistate = 0, ec;
 	uint64_t i, paivalue = 0;
@@ -242,6 +243,8 @@ static void print_answer(int s, int ctr, int state, uint64_t value)
 		printf(" %s counter: disabled\n", counter_str[ctr]);
 	else if (state == UNSUPPORTED)
 		printf(" %s counter: unsupported\n", counter_str[ctr]);
+	else if (state == UNAUTHORIZED)
+		printf(" %s counter: unauthorized\n", counter_str[ctr]);
 	else
 		printf(" %s counter: %lu\n", counter_str[ctr], value);
 }

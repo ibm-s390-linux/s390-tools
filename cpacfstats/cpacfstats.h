@@ -74,7 +74,8 @@ enum cmd_e {
 enum state_e {
 	DISABLED = 0,
 	ENABLED,
-	UNSUPPORTED
+	UNSUPPORTED,
+	UNAUTHORIZED
 };
 
 enum counter_type {

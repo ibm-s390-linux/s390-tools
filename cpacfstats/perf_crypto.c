@@ -141,6 +141,10 @@ static int perf_counter_supported(const char *pmu, const char *counter)
 	return !access(buf, R_OK);
 }
 
+/**
+ * Returns 1 if counters are authorized, -1 if counters are unauthorized,
+ * and 0 otherwise which indicates that the counters are unsupported
+ */
 static int cpumf_authorized(void)
 {
 	unsigned vermin, vermax, auth;
@@ -159,10 +163,12 @@ static int cpumf_authorized(void)
 		if (sscanf(line,
 			   "CPU-MF: Counter facility: version=%d.%d authorization=%x",
 			   &vermin, &vermax, &auth) == 3) {
-			if (auth & 0x8)
+			if (auth & 0x8) {
 				res = 1;
-			else
+			} else {
 				eprint("CPU-MF counters not authorized.\n");
+				res = -1;
+			}
 			found = 1;
 			break;
 		}
@@ -233,7 +239,7 @@ static int activatecpu(unsigned int cpu, unsigned int *supported_counters)
 	}
 	/* activate CPU-MF */
 	for (i = 0; i < ALL_COUNTER; ++i) {
-		if (ctr_state[i] == UNSUPPORTED)
+		if (ctr_state[i] == UNSUPPORTED || ctr_state[i] == UNAUTHORIZED)
 			continue;
 		memset(&pfm_event, 0, sizeof(pfm_event));
 		pfm_event.size = sizeof(pfm_event);
@@ -398,7 +404,7 @@ static int perf_load_counter_data(void)
 	int i, res = 0;
 
 	for (i = 0; i < ALL_COUNTER; ++i) {
-		if (ctr_state[i] != UNSUPPORTED)
+		if (ctr_state[i] != UNSUPPORTED && ctr_state[i] != UNAUTHORIZED)
 			res |= perf_event_encode(&pmf_counter_data[i].pmutype,
 						 &pmf_counter_data[i].eventid,
 						 pmf_counter_name[i].pmu,
@@ -474,6 +480,7 @@ int perf_init(unsigned int *supported_counters)
 	};
 	unsigned long maxfd;
 	struct rlimit rlim;
+	int cpumf_state;
 	int i, num;
 	FILE *f;
 
@@ -487,9 +494,14 @@ int perf_init(unsigned int *supported_counters)
 	 * counters for PAI. */
 	num = ALL_COUNTER + 2;
 
-	if (!cpumf_authorized()) {
+	cpumf_state = cpumf_authorized();
+	if (cpumf_state == 0) {
 		for (i = 0; i < ALL_COUNTER; ++i)
 			ctr_state[i] = UNSUPPORTED;
+		num -= ALL_COUNTER;
+	} else if (cpumf_state == -1) {
+		for (i = 0; i < ALL_COUNTER; ++i)
+			ctr_state[i] = UNAUTHORIZED;
 		num -= ALL_COUNTER;
 	} else {
 		for (i = 0; i < ALL_COUNTER; i++) {

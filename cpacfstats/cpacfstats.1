@@ -179,6 +179,12 @@ the errno value.
 ECC counters are only available since z15. cpacfstats will show the
 counters as \fIunsupported\fR if the hardware does not support ECC
 counters.
+
+CPU-MF counters have to be authorized on HMC or SE to be available and are
+otherwise shown as \fIunauthorized\fR. On the HMC or SE, authorize the LPAR
+for each counter set you want to use. Customize the LPAR activation profile
+and modify the Counter Facility Security Options. You need to activate the
+\fICrypto activity counter set authorization control\fR checkbox.
 .
 .SH APPENDIX
 The detailed pai counter names are:

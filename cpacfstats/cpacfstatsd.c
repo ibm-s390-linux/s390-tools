@@ -179,7 +179,7 @@ static int do_enable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 				}
 				state = ENABLED;
 			}
-			if (state != UNSUPPORTED) {
+			if (state != UNSUPPORTED && state != UNAUTHORIZED) {
 				rc = perf_read_ctr(i, &value, supported_counters);
 				if (rc != 0) {
 					send_answer(s, i, rc, 0);
