@@ -21,6 +21,7 @@ use crate::constants::*;
 use crate::handlers::handle_supported_flags;
 use crate::io_utils::check_uv_exists;
 use crate::pvinfo::PvInfo;
+use crate::se_status::SeStatus;
 use std::path::PathBuf;
 
 fn main() -> Result<()> {
@@ -29,11 +30,19 @@ fn main() -> Result<()> {
     cli.post_process();
     let base_dir = PathBuf::from(BASE_DIR);
     let query_dir = base_dir.join(QUERY_DIR);
-    check_uv_exists()?;
     let mut stdout = io::stdout();
     if cli.version {
         utils::print_version!(2025);
         return Ok(());
+    }
+    if let Err(e) = check_uv_exists() {
+        match cli.se_status {
+            true => {
+                writeln!(stdout, "{}", SeStatus::Unsecure)?;
+                return Ok(());
+            }
+            false => return Err(e),
+        }
     }
     match &cli.command {
         // Handle the supported-flags subcommand
