@@ -15,6 +15,10 @@ command line mode:
      \fBfdasd\fR [\-s] [\-r] [\-C] {\-a[\-k|\-l \fIvolser\fR]|\-i|\-p|\-c \fIconf_file\fR}
 [-f \fI[type,blocksize]\fR] \fIdevice\fR
 .br
+script mode:
+.br
+     \fBfdasd\fR \-S [\fIcommands\fR] \fIdevice\fR
+.br
 help:
 .br
      \fBfdasd\fR {\-h|\-v}
@@ -121,6 +125,47 @@ partitions that use the entire disk:
 [1001,2000,swap]
 .br
 [2001,last,lvm]
+.br
+
+.TP
+\fB\-S\fR \fIcommands\fR or \fB\-\-script\fR \fIcommands\fR
+Execute commands in script mode (non-interactive). Commands should be provided
+as a string argument .
+.br
+
+Available commands:
+.sp
+\fBn\fR \fIstart\fR \fIend\fR
+.br
+     Create a partition from track \fIstart\fR to track \fIend\fR.
+     Track numbers can be specified with optional suffixes: k/K (kilobytes),
+     m/M (megabytes), g/G (gigabytes), or c/C (cylinders).
+     Values starting with + are treated as relative to the previous value.
+.sp
+\fBd\fR \fInumber\fR
+.br
+     Remove partition \fInumber\fR.
+.sp
+\fBt\fR \fInumber\fR \fItype\fR
+.br
+     Set partition \fItype\fR on partition \fInumber\fR.
+.sp
+\fBw\fR
+.br
+     Write changes to disk.
+.sp
+\fBq\fR or \fBexit\fR
+.br
+     Exit script mode.
+.sp
+
+Examples:
+.sp
+Create two partitions and writing the changes to the disk:
+.sp
+     \fBfdasd \-\-script "n 2 1000 n 1001 2000 w" /dev/dasda\fR
+.br
+.sp
 .br
 
 .TP

@@ -1,0 +1,188 @@
+#!/bin/bash
+set -e
+
+fail() {
+	[ -n "$1" ] && echo "$1"
+	echo " [FAILED]"
+	exit 2
+}
+
+count_partitions() {
+    $FDASD -p "$DEVICE" 2>/dev/null | grep -c "^[[:space:]]*${DEVICE}" || true
+}
+
+get_partition_type() {
+    $FDASD -p "$DEVICE" 2>/dev/null | grep "${DEVICE}$1" | awk '{for(i=6;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/[[:space:]]*$//'
+}
+
+verify_partition_geometry() {
+    part_info=`$FDASD -p "$DEVICE" 2>/dev/null | grep "${DEVICE}$1"`
+    start=`echo $part_info | awk '{print $2}'`
+    end=`echo $part_info | awk '{print $3}'`
+
+    if [ "$start" = "$2" ] && [ "$end" = "$3" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check if a device is provided
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <device>"
+    echo "Example: $0 /dev/dasda"
+    exit 1
+fi
+
+DEVICE="$1"
+[ -z "$FDASD_PATH" ] && FDASD_PATH=".."
+FDASD=$FDASD_PATH/fdasd
+
+# Verify the given device exists
+if [ ! -b "$DEVICE" ]; then
+    echo -e "Error: Device $DEVICE does not exist or is not a block device$"
+    exit 1
+fi
+
+if ! command -v "$FDASD" &> /dev/null; then
+    echo -e "Error: fdasd binary not found"
+    exit 1
+fi
+
+echo -e "WARNING: This will destroy all data on $DEVICE!"
+read -p "Continue? (yes/no): " confirm
+if [ "$confirm" != "yes" ]; then
+    echo "Aborted."
+    exit 0
+fi
+
+# Initialize the device with a single partition using auto mode
+$FDASD -a "$DEVICE" >/dev/null 2>&1 || true
+
+# Test 1: Remove first partition
+echo -n "Test 1: Removing first partition"
+$FDASD --script "d 1 w" "$DEVICE" >/dev/null 2>&1
+
+PART_COUNT=$(count_partitions)
+if [ "$PART_COUNT" -eq 0 ]; then
+    echo " [OK]"
+else
+    fail " Unexpected number of partitions found. Expected 0, found $PART_COUNT"
+fi
+
+# Test 2: Create a single partition
+echo -n "Test 2: Creating a single partition"
+$FDASD --script "n 2 1000 w" "$DEVICE" >/dev/null 2>&1
+
+if verify_partition_geometry "1" "2" "1000"; then
+    echo " [OK]"
+else
+    fail
+fi
+
+# Test 3: Create a single partition with relative size
+echo -n "Test 3: Create a single partition with relative size"
+$FDASD --script "d 1 w" "$DEVICE" >/dev/null 2>&1
+$FDASD --script "n 2 +100m w" "$DEVICE" >/dev/null 2>&1
+
+if verify_partition_geometry "1" "2" "2134"; then
+    echo " [OK]"
+else
+    fail
+fi
+
+# Test 4: Create multiple partitions
+echo -n "Test 4: Creating multiple partitions"
+$FDASD --script "d 1 w" "$DEVICE" >/dev/null 2>&1
+$FDASD --script "n 2 1000 n 1001 2000 n 2001 3000 w" "$DEVICE" >/dev/null 2>&1
+
+PART_COUNT=$(count_partitions)
+if [ "$PART_COUNT" -eq 3 ] && \
+   verify_partition_geometry "1" "2" "1000" && \
+   verify_partition_geometry "2" "1001" "2000" && \
+   verify_partition_geometry "3" "2001" "3000"; then
+    echo " [OK]"
+else
+    fail
+fi
+
+# Test 5: Remove specific partition
+echo -n "Test 5: Removing partition 2"
+$FDASD --script "d 2 w" "$DEVICE" >/dev/null 2>&1
+
+PART_COUNT=$(count_partitions)
+if [ "$PART_COUNT" -eq 2 ] && \
+   verify_partition_geometry "1" "2" "1000" && \
+   verify_partition_geometry "2" "2001" "3000"; then
+    echo " [OK]"
+else
+    fail
+fi
+
+# Test 6: Change partition type
+echo -n "Test 6: Changing partition type"
+$FDASD --script "t 1 2 w" "$DEVICE" >/dev/null 2>&1
+NEW_TYPE=$(get_partition_type "1")
+
+if [ "$NEW_TYPE" = "Linux swap" ]; then
+    echo " [OK]"
+else
+    fail " Expected partition type 'Linux swap', got $NEW_TYPE"
+fi
+
+# Test 7: Multiple operations in one command
+echo -n "Test 7: Multiple operations in single command"
+$FDASD --script "d 1 d 1 n 2 500 n 501 1000 t 1 2 w" "$DEVICE" >/dev/null 2>&1
+
+PART_COUNT=$(count_partitions)
+TYPE1=$(get_partition_type "1")
+TYPE2=$(get_partition_type "2")
+
+if [ "$PART_COUNT" -eq 2 ] && \
+   [ "$TYPE1" = "Linux swap" ] && \
+   [ "$TYPE2" = "Linux native" ] && \
+   verify_partition_geometry "1" "2" "500" && \
+   verify_partition_geometry "2" "501" "1000"; then
+    echo " [OK]"
+else
+    fail
+fi
+
+# Test 8: Recreate VTOC and create partitions in one command
+echo -n "Test 8: Recreate VTOC and create partitions in one command"
+$FDASD --script "r n 2 800 n 801 1600 w" "$DEVICE" >/dev/null 2>&1
+
+PART_COUNT=$(count_partitions)
+if [ "$PART_COUNT" -eq 2 ] && \
+   verify_partition_geometry "1" "2" "800" && \
+   verify_partition_geometry "2" "801" "1600"; then
+    echo " [OK]"
+else
+    fail
+fi
+
+# Test 9: Quit command
+echo -n "Test 9: Testing quit"
+# Create a partition without writing
+$FDASD --script "d 1 q" "$DEVICE" >/dev/null 2>&1
+
+# Partition should still exist since we didn't write
+PART_COUNT=$(count_partitions)
+if [ "$PART_COUNT" -eq 2 ]; then
+    echo " [OK]"
+else
+    fail " Unexpected number of partitions found. Expected 2, found $PART_COUNT"
+fi
+
+# Test 10: Recreate VTOC
+echo -n "Test 10: Recreating VTOC"
+$FDASD --script "r w" "$DEVICE" >/dev/null 2>&1
+
+PART_COUNT=$(count_partitions)
+if [ "$PART_COUNT" -eq 0 ]; then
+    echo " [OK]"
+else
+    fail " Unexpected number of partitions found. Expected 0, found $PART_COUNT"
+fi
+
+exit 0
