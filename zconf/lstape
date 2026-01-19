@@ -31,7 +31,7 @@ function PrintUsage() {
 	:		-t|--type <list of device types>
 	:			Limit output of CCW tape devices to the given
 	:			devices. The list consists of device types
-	:			separated by ','. (e.g. -t 3480,3490)
+	:			separated by ','.
 	:		--online|--offline
 	:			Show only devices that are either online or
 	:			offline (only one option is allowed). This
@@ -63,7 +63,7 @@ function PrintVersion()
 }
 
 FLSEP=""
-DEVLIST="3480,3490,3590"
+DEVLIST="3490"
 SHORTID=false
 SHOWCCW=true
 VERBOSE=false
@@ -141,8 +141,6 @@ done
 function SysfsCreateListCCW() {
 	(
 		find $1/bus/ccw/drivers/tape_34xx -type l \
-			-printf '%f\n' 2>/dev/null
-		find $1/bus/ccw/drivers/tape_3590 -type l \
 			-printf '%f\n' 2>/dev/null
 	) | awk -v format="$CCWFORMAT" '
 		BEGIN{
