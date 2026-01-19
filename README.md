@@ -79,13 +79,6 @@ Package contents
  * qetharp:
    Read and flush the ARP cache on OSA Express network cards.
 
- * tape390_display:
-   Display information on the message display facility of a s390 tape
-   device.
-
- * tape390_crypt:
-   Control and query crypto settings for 3592 tape devices.
-
  * osasnmpd:
    NET-SNMP subagent implementing MIBs provided by OSA-Express
    features Fast Ethernet, Gigabit Ethernet, 10 Gigabit Ethernet.

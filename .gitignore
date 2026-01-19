@@ -97,8 +97,6 @@ qethqoat/qethqoat
 systemd/cpacfstatsd.service
 systemd/iucvtty-login@.service
 systemd/ttyrun-getty@.service
-tape390/tape390_crypt
-tape390/tape390_display
 tunedasd/src/tunedasd
 vmcp/vmcp
 vmur/vmur
