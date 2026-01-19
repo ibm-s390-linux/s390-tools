@@ -676,7 +676,7 @@ static void read_subdev_rec_verbose(struct util_rec *rec, const char *grp_dev,
 	util_rec_set(rec, "hwtype", buf);
 
 	util_file_read_l(&depth, 10, "%s/depth", grp_dev);
-	util_rec_set(rec, "depth", "%02d", depth + 1);
+	util_rec_set(rec, "depth", "%02d", depth);
 
 	if (util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev))
 		errx(EXIT_FAILURE,
@@ -848,7 +848,7 @@ static void read_rec_verbose(struct util_rec *rec, const char *grp_dev)
 	util_rec_set(rec, "hwtype", buf);
 
 	util_file_read_l(&depth, 10, "%s/depth", grp_dev);
-	util_rec_set(rec, "depth", "%02d", depth + 1);
+	util_rec_set(rec, "depth", "%02d", depth);
 
 	util_file_read_ul(&facility, 16, "%s/ap_functions", grp_dev);
 	for (i = 0; i < MAX_FAC_BITS; i++)
