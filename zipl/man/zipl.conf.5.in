@@ -175,7 +175,7 @@ keyword below)
 When defining a menu section, included configurations are subsequently
 identified by their assigned number.
 
-If the 
+If the
 .B 'prompt'
 setting of the menu section is set to 1, a menu text will be displayed
 during IPL and the boot program will wait for user input:
@@ -186,12 +186,12 @@ zIPL interactive boot menu
 
  0. default (linux)
 .br
- 
+
  1. linux
 .br
  2. test
 .br
- 
+
 Please choose:
 .PP
 
@@ -272,10 +272,10 @@ hardware feature or using the interactive boot menu (DASD devices only - see
 description above).
 
 Only disk IPL sections (see option
-.BR image ) 
+.BR image )
 and file system dump sections (option
 .BR dumpto )
-may be included in menus. 
+may be included in menus.
 
 Note that position number 0 is reserved and will automatically be assigned to
 the default menu entry (see

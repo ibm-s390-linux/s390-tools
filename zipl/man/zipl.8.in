@@ -46,7 +46,7 @@ configuration file is still used to specify parameters or additional boot config
 
 To use a single boot configuration section, provide its name as parameter to
 .BR zipl .
-If 
+If
 .B zipl
 is called without parameters, it searches the configuration file for a
 section specifying the default action.
@@ -129,7 +129,7 @@ If none is supplied, the /boot/loader/entries directory is used.
 
 .TP
 .BR "\-t <TARGET DIRECTORY>" " or " "\-\-target=<TARGET DIRECTORY>"
-Use the specified <TARGET DIRECTORY>. 
+Use the specified <TARGET DIRECTORY>.
 .B zipl
 uses this directory to store the bootmap, i.e. a file containing
 boot data. The actual boot loader is installed onto the device containing
@@ -330,7 +330,7 @@ or configuration section on the command line at the same time.
 Install the multi-boot configuration defined in menu section <MENU> of the
 configuration file.
 
-This option cannot be used together with either 
+This option cannot be used together with either
 .BR \-\-target ,
 .BR \-\-image ,
 .BR \-\-ramdisk ,
