@@ -258,7 +258,7 @@ or configuration section on the command line at the same time.
 Install a system dump record on the device identified by DEVNODE.
 Supported devices are DASD ECKD or FBA disk partitions,
 device mapper multipath partitions of FCP attached SCSI disks,
-partitions of NVMe disks and IBM 3480/3490/3590/3592 tape devices.
+partitions of NVMe disks and IBM 3490 tape devices.
 
 For CCW-type DASD dump, zlib compression is used to compress the
 dump data before writing it to the DASD ECKD partition. Zlib compression
