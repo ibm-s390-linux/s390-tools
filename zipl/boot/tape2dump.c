@@ -26,7 +26,6 @@
 #define SENSE_OVERRUN	0x04	/* Sense */
 #define WRITETAPEMARK	0x1f	/* Write Tape Mark */
 #define READ_DEV_CHAR	0x64	/* Read device characteristics */
-#define LOAD_DISPLAY	0x9f	/* Load tape display */
 #define MODE_SET_DB	0xdb	/* Mode set */
 
 /*
@@ -130,17 +129,6 @@ static void setup_idrc_compression(void)
 }
 
 /*
- * Print message on tape display
- */
-static void ccw_load_display(const char *msg)
-{
-	char _msg[24] = {0x20};
-
-	strcpy(&_msg[1], msg);
-	start_ccw(LOAD_DISPLAY, CCW_FLAG_SLI, 0x11, (void *) _msg);
-}
-
-/*
  * Write sense data to buffer
  */
 static void sense(void *sense_data)
@@ -183,19 +171,6 @@ static void ccw_write_block(unsigned long addr, unsigned long size,
 }
 
 /*
- * Every 16 MB we update the tape display
- */
-static void progress_print_disp(unsigned long addr)
-{
-	char msg[24];
-
-	if (addr % (1024 * 1024 * 16) != 0)
-		return;
-	snprintf(msg, sizeof(msg), "%08u", addr >> 20);
-	ccw_load_display(msg);
-}
-
-/*
  * Dump all memory to tape
  */
 void dt_dump_mem(void)
@@ -212,11 +187,9 @@ void dt_dump_mem(void)
 		ccw_write_block(addr, BLK_SIZE, page);
 		total_dump_size += BLK_SIZE;
 		progress_print(addr + BLK_SIZE);
-		progress_print_disp(addr + BLK_SIZE);
 	}
 	df_s390_em_page_init(page);
 	ccw_write_block(page, sizeof(struct df_s390_em), 0);
 	free_page(page);
 	ccw_write_tapemark();
-	ccw_load_display("DUMP*END");
 }
