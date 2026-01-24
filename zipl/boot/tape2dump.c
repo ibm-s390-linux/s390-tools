@@ -25,7 +25,6 @@
 #define WRITE_CMD	0x01	/* Write block */
 #define SENSE_OVERRUN	0x04	/* Sense */
 #define WRITETAPEMARK	0x1f	/* Write Tape Mark */
-#define READ_DEV_CHAR	0x64	/* Read device characteristics */
 #define MODE_SET_DB	0xdb	/* Mode set */
 
 /*
@@ -105,27 +104,12 @@ static void start_ccw(uint8_t code, uint8_t flags, uint16_t count, void *cda)
 }
 
 /*
- * Read tape device characteristics to find out if IDRC compression can be used
+ * Enable data compaction
  */
 static void setup_idrc_compression(void)
 {
-	uint16_t type;
-
-	start_ccw(READ_DEV_CHAR, 0x0, 0x40, ccw_data);
-
-	memcpy(&type, &ccw_data[3], sizeof(type));
-	switch (type) {
-	case 0x3490:
-	case 0x3590: // XXX 3592
-		ccw_init(&ccw_program.compress, MODE_SET_DB, CCW_FLAG_CC, 0x1,
-			 &mode_set_byte);
-		orb.cpa = __pa32(&ccw_program.compress);
-		break;
-	default:
-	case 0x3480:
-		orb.cpa = __pa32(&ccw_program.write);
-		break;
-	}
+	ccw_init(&ccw_program.compress, MODE_SET_DB, CCW_FLAG_CC, 0x1, &mode_set_byte);
+	orb.cpa = __pa32(&ccw_program.compress);
 }
 
 /*
