@@ -23,6 +23,14 @@
 #include "lib/util_scandir.h"
 #include "lib/zt_common.h"
 
+#define CHP_SHARED  "shared"
+#define CHP_STATE   "vary"
+#define CHP_PCHID   "pchid"
+#define CHP_TYPE    "type"
+#define CHP_CFG     "cfg"
+#define CHP_CMG     "cmg"
+#define CHP_ID      "chpid"
+
 /*
  * Program configuration
  */
@@ -73,42 +81,42 @@ static void print_chpid(const char *chp_dir, unsigned int css_id,
 	path = util_path_sysfs("devices/css%x/%s", css_id, chp_dir);
 
 	/* chpid  */
-	util_rec_set(rec, "chpid", "%x.%02x", css_id, chp_id);
+	util_rec_set(rec, CHP_ID, "%x.%02x", css_id, chp_id);
 
 	/* vary */
 	util_file_read_line(buf, sizeof(buf), "%s/status", path);
 	if (strcmp(buf, "online") == 0)
-		util_rec_set(rec, "vary", "1");
+		util_rec_set(rec, CHP_STATE, "1");
 	else if (strcmp(buf, "offline") == 0)
-		util_rec_set(rec, "vary", "0");
+		util_rec_set(rec, CHP_STATE, "0");
 	else
-		util_rec_set(rec, "vary", "-");
+		util_rec_set(rec, CHP_STATE, "-");
 
 	/* configure */
 	if (util_file_read_line(buf, sizeof(buf), "%s/configure", path))
-		util_rec_set(rec, "cfg", "-");
+		util_rec_set(rec, CHP_CFG, "-");
 	else
-		util_rec_set(rec, "cfg", buf);
+		util_rec_set(rec, CHP_CFG, buf);
 
 	/* type */
 	if (util_file_read_line(buf, sizeof(buf), "%s/type", path))
-		util_rec_set(rec, "type", "%s", "-");
+		util_rec_set(rec, CHP_TYPE, "%s", "-");
 	else
-		util_rec_set(rec, "type", "%02lx", strtoul(buf, NULL, 16));
+		util_rec_set(rec, CHP_TYPE, "%02lx", strtoul(buf, NULL, 16));
 
 	/* cmg */
 	util_file_read_line(buf, sizeof(buf), "%s/cmg", path);
 	if ((strcmp(buf, "unknown") == 0) || (strlen(buf) == 0))
-		util_rec_set(rec, "cmg", "%-3s", "-");
+		util_rec_set(rec, CHP_CMG, "%-3s", "-");
 	else
-		util_rec_set(rec, "cmg", "%-3lx", strtoul(buf, NULL, 0));
+		util_rec_set(rec, CHP_CMG, "%-3lx", strtoul(buf, NULL, 0));
 
 	/* shared */
 	util_file_read_line(buf, sizeof(buf), "%s/shared", path);
 	if ((strcmp(buf, "unknown") == 0) || (strlen(buf) == 0))
-		util_rec_set(rec, "shared", "%s", "-");
+		util_rec_set(rec, CHP_SHARED, "%s", "-");
 	else
-		util_rec_set(rec, "shared", "%-6lx", strtoul(buf, NULL, 0));
+		util_rec_set(rec, CHP_SHARED, "%-6lx", strtoul(buf, NULL, 0));
 
 	/* chid */
 	util_file_read_line(buf, sizeof(buf), "%s/chid_external", path);
@@ -119,13 +127,13 @@ static void print_chpid(const char *chp_dir, unsigned int css_id,
 	util_file_read_line(buf, sizeof(buf), "%s/chid", path);
 	if (strlen(buf) != 0) {
 		if (chid_external)
-			util_rec_set(rec, "pchid", " %4s ", buf);
+			util_rec_set(rec, CHP_PCHID, " %4s ", buf);
 		else
-			util_rec_set(rec, "pchid", "(%4s)", buf);
+			util_rec_set(rec, CHP_PCHID, "(%4s)", buf);
 	} else {
-		util_rec_set(rec, "pchid", "%s", "-");
+		util_rec_set(rec, CHP_PCHID, "%s", "-");
 	}
-	if (!strlen(chp) || strcmp(util_rec_get(rec, "chpid"), chp) == 0)
+	if (!strlen(chp) || strcmp(util_rec_get(rec, CHP_ID), chp) == 0)
 		util_rec_print(rec);
 	free(path);
 }
@@ -189,13 +197,13 @@ static void cmd_lschp(char *chp)
 	char *path;
 
 	rec = util_rec_new_wide("=");
-	util_rec_def(rec, "chpid",  UTIL_REC_ALIGN_LEFT, 6, "CHPID");
-	util_rec_def(rec, "vary",   UTIL_REC_ALIGN_LEFT, 5, "Vary");
-	util_rec_def(rec, "cfg",    UTIL_REC_ALIGN_LEFT, 5, "Cfg.");
-	util_rec_def(rec, "type",   UTIL_REC_ALIGN_LEFT, 5, "Type");
-	util_rec_def(rec, "cmg",    UTIL_REC_ALIGN_LEFT, 4, "Cmg");
-	util_rec_def(rec, "shared", UTIL_REC_ALIGN_LEFT, 6, "Shared");
-	util_rec_def(rec, "pchid",  UTIL_REC_ALIGN_LEFT, 6, " PCHID");
+	util_rec_def(rec, CHP_ID,	UTIL_REC_ALIGN_LEFT, 6, "CHPID");
+	util_rec_def(rec, CHP_STATE,	UTIL_REC_ALIGN_LEFT, 5, "Vary");
+	util_rec_def(rec, CHP_CFG,	UTIL_REC_ALIGN_LEFT, 5, "Cfg.");
+	util_rec_def(rec, CHP_TYPE,	UTIL_REC_ALIGN_LEFT, 5, "Type");
+	util_rec_def(rec, CHP_CMG,	UTIL_REC_ALIGN_LEFT, 4, "Cmg");
+	util_rec_def(rec, CHP_SHARED,	UTIL_REC_ALIGN_LEFT, 6, "Shared");
+	util_rec_def(rec, CHP_PCHID,	UTIL_REC_ALIGN_LEFT, 6, " PCHID");
 
 	util_rec_print_hdr(rec);
 	/*
