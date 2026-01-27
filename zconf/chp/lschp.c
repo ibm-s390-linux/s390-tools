@@ -107,7 +107,7 @@ static void print_chpid(const char *chp_dir, unsigned int css_id,
 	/* cmg */
 	util_file_read_line(buf, sizeof(buf), "%s/cmg", path);
 	if ((strcmp(buf, "unknown") == 0) || (strlen(buf) == 0))
-		util_rec_set(rec, CHP_CMG, "%-3s", "-");
+		util_rec_set(rec, CHP_CMG, "%s", "-");
 	else
 		util_rec_set(rec, CHP_CMG, "%-3lx", strtoul(buf, NULL, 0));
 
