@@ -25,14 +25,33 @@ use crate::pv_utils::{
     Interval,
 };
 
+/// Operation mode for component preparation.
 #[allow(unused)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Mode {
+    /// Encrypt the component data
     Encrypt,
+    /// Decrypt the component data
     Decrypt,
+    /// Add padding but do not encrypt
     Padding,
 }
 
+/// Updates the Address List Digest (ALD) with addresses from the given interval.
+///
+/// # Arguments
+///
+/// * `hasher` - The hasher to update with address data
+/// * `interval` - The memory interval containing addresses to hash
+/// * `chunk_size` - Size of each chunk in bytes
+///
+/// # Returns
+///
+/// The number of chunks processed
+///
+/// # Errors
+///
+/// Returns an error if the hasher update operation fails
 fn update_ald_digest(hasher: &mut Hasher, interval: &Interval, chunk_size: usize) -> Result<usize> {
     let mut num_chunks = 0;
 
@@ -45,15 +64,32 @@ fn update_ald_digest(hasher: &mut Hasher, interval: &Interval, chunk_size: usize
     Ok(num_chunks)
 }
 
+/// Arguments for preparing a secured component.
+///
+/// This struct contains the cryptographic parameters needed to prepare
+/// a component for Secure Execution, including encryption settings and
+/// memory layout information.
 pub struct PrepareSecuredComponentArgs<'a> {
+    /// Starting address of the component in memory
     pub(crate) addr: u64,
+    /// OpenSSL cipher to use for encryption/decryption
     pub(crate) cipher: &'a CipherRef,
+    /// Operation mode (encrypt, decrypt, or padding only)
     pub(crate) mode: Mode,
+    /// Encryption key bytes
     pub(crate) key: &'a [u8],
+    /// Initialization vector for the cipher
     pub(crate) iv: &'a [u8],
+    /// Size of each chunk in bytes
     pub(crate) chunk_size: usize,
 }
 
+/// Metadata collection arguments for component preparation.
+///
+/// This struct holds optional hashers and size information that are
+/// updated during component preparation to generate metadata like
+/// the Payload Digest (PLD), Tweak List Digest (TLD), and Address
+/// List Digest (ALD).
 pub struct MetadataArgs<'a> {
     pub(crate) content_hasher: Option<&'a mut Hasher>,
     pub(crate) tweak_hasher: Option<&'a mut Hasher>,

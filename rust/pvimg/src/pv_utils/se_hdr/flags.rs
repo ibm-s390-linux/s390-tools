@@ -2,24 +2,64 @@
 //
 // Copyright IBM Corp. 2024
 
+//! Control flags for Secure Execution (SE) headers.
+//!
+//! This module provides types and traits for managing control flags used in
+//! IBM Secure Execution headers. It supports two types of flags:
+//! - Plaintext Control Flags (PCF)
+//! - Secret Control Flags (SCF)
+//!
+//! # Examples
+//!
+//! ```
+//! use pvimg::uvdata::{ControlFlagTrait, ControlFlagsTrait, PcfV1, PlaintextControlFlagsV1};
+//!
+//! // Create flags with specific settings
+//! let flags = PlaintextControlFlagsV1::from_flags([
+//!     PcfV1::AllowDumping.enabled(),
+//!     PcfV1::PckmoAes.enabled(),
+//! ]);
+//!
+//! // Check if a flag is set
+//! assert!(flags.is_set(PcfV1::AllowDumping));
+//! ```
+
 use std::{fmt::Display, marker::PhantomData, mem::size_of};
 
 use pv::misc::{Flags, Msb0Flags64};
 
+/// Trait for individual control flag types.
+///
+/// This trait defines the interface for control flag enums, providing methods
+/// to get the flag's bit position and create enabled/disabled flag data.
+/// Implementors must be enum types with `#[repr(u8)]` to ensure proper bit positioning.
 pub trait ControlFlagTrait: std::fmt::Debug + std::hash::Hash + Copy + Eq + Ord {
+    /// Returns the bit position (0-63) for this flag in MSB0 ordering.
+    ///
+    /// # Safety
+    ///
+    /// This method assumes the implementing type is `#[repr(u8)]` and performs
+    /// an unsafe cast to extract the discriminant value.
     fn discriminant(&self) -> u8 {
         assert!(size_of::<Self>() == size_of::<u8>());
         unsafe { *(self as *const Self as *const u8) }
     }
 
+    /// Creates flag data with this flag in the enabled state.
     fn enabled(self) -> FlagData<Self> {
         FlagData::new(self, FlagState::Enabled)
     }
 
+    /// Creates flag data with this flag in the disabled state.
     fn disabled(self) -> FlagData<Self> {
         FlagData::new(self, FlagState::Disabled)
     }
 
+    /// Creates a vector of flag data with all specified flags enabled.
+    ///
+    /// # Arguments
+    ///
+    /// * `flags` - A collection of flags to enable
     fn all_enabled<F: AsRef<[Self]>>(flags: F) -> Vec<FlagData<Self>> {
         flags
             .as_ref()
@@ -28,6 +68,11 @@ pub trait ControlFlagTrait: std::fmt::Debug + std::hash::Hash + Copy + Eq + Ord 
             .collect()
     }
 
+    /// Creates a vector of flag data with all specified flags disabled.
+    ///
+    /// # Arguments
+    ///
+    /// * `flags` - A collection of flags to disable
     fn all_disabled<F: AsRef<[Self]>>(flags: F) -> Vec<FlagData<Self>> {
         flags
             .as_ref()
@@ -37,12 +82,19 @@ pub trait ControlFlagTrait: std::fmt::Debug + std::hash::Hash + Copy + Eq + Ord 
     }
 }
 
+/// Internal state of a control flag (enabled or disabled).
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 enum FlagState {
+    /// Flag is enabled (bit set to 1)
     Enabled,
+    /// Flag is disabled (bit set to 0)
     Disabled,
 }
 
+/// Represents a control flag with its associated state.
+///
+/// This structure pairs a flag with its enabled/disabled state, used when
+/// constructing or modifying `ControlFlags` instances.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct FlagData<T: ControlFlagTrait> {
     value: T,
@@ -55,16 +107,29 @@ impl<T: ControlFlagTrait> FlagData<T> {
     }
 }
 
+/// Trait for managing control flags in Secure Execution headers.
+///
+/// This trait provides methods for parsing, checking, and validating
+/// control flags used in Secure Execution headers.
 pub trait ControlFlagsTrait: Display {
+    /// The underlying control flag type
     type T: ControlFlagTrait;
 
+    /// Creates a new instance from a collection of flag data
     fn from_flags<F: AsRef<[FlagData<Self::T>]>>(flags: F) -> Self;
+
+    /// Parses and applies flag data to this instance
     fn parse_flags<F: AsRef<[FlagData<Self::T>]>>(&mut self, flags: F);
+
+    /// Checks if a specific flag is set
     fn is_set(&self, flag: Self::T) -> bool;
+
+    /// Checks if a specific flag is not set
     fn is_unset(&self, flag: Self::T) -> bool {
         !self.is_set(flag)
     }
 
+    /// Validates that there are no duplicate flags in the collection
     fn no_duplicates<F: AsRef<[FlagData<Self::T>]>>(flags: F) -> bool {
         let mut flags_sorted = flags.as_ref().to_vec();
         flags_sorted.sort_by_key(|data| data.value);
@@ -73,18 +138,54 @@ pub trait ControlFlagsTrait: Display {
         flags_sorted.len() == flags.as_ref().len()
     }
 
+    /// Checks if all specified flags are set.
+    ///
+    /// # Arguments
+    ///
+    /// * `flags` - A collection of flags to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if all flags are set, `false` otherwise
     fn all_set<F: AsRef<[Self::T]>>(&self, flags: F) -> bool {
         flags.as_ref().iter().all(|flag| self.is_set(*flag))
     }
 
+    /// Checks if all specified flags are unset.
+    ///
+    /// # Arguments
+    ///
+    /// * `flags` - A collection of flags to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if all flags are unset, `false` otherwise
     fn all_unset<F: AsRef<[Self::T]>>(&self, flags: F) -> bool {
         flags.as_ref().iter().all(|flag| self.is_unset(*flag))
     }
 }
 
-/// Bitflags as used by the Secure Execution in MSB0 ordering
+/// Bitflags container for Secure Execution control flags.
 ///
-/// Wraps an u64 to set/get individual bits
+/// This structure wraps a 64-bit value with MSB0 (Most Significant Bit first)
+/// ordering, as used by IBM Secure Execution. Each bit position corresponds to
+/// a specific control flag defined by the generic type parameter `T`.
+///
+/// # Type Parameters
+///
+/// * `T` - The control flag enum type (e.g., [`PcfV1`] or [`ScfV1`])
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use flags::{ControlFlagTrait, ControlFlags, PcfV1};
+///
+/// // Create from u64
+/// let flags: ControlFlags<PcfV1> = 0x0000000020000000_u64.into();
+///
+/// // Convert back to u64
+/// let value: u64 = flags.into();
+/// ```
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ControlFlags<T: ControlFlagTrait> {
     flags: Msb0Flags64,
@@ -92,6 +193,7 @@ pub struct ControlFlags<T: ControlFlagTrait> {
 }
 
 impl<T: ControlFlagTrait> ControlFlags<T> {
+    /// Creates a new instance with all flags disabled.
     fn new() -> Self {
         Self {
             flags: 0x0.into(),
@@ -149,31 +251,73 @@ impl<T: ControlFlagTrait> Display for ControlFlags<T> {
     }
 }
 
+/// Plaintext Control Flags for Secure Execution header version 1.
+///
+/// These flags control various aspects of Protected Virtualization (PV) guest
+/// behavior and capabilities. Each variant represents a specific bit position
+/// in the 64-bit control flags field (MSB0 ordering).
+///
+/// # Bit Positions
+///
+/// The numeric values represent bit positions in MSB0 ordering (bit 0 is the
+/// most significant bit). For example, `AllowDumping = 34` means bit 34 from
+/// the left (MSB).
 #[repr(u8)]
 #[non_exhaustive]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PcfV1 {
-    /// PV guest dump support.
+    /// Enables Protected Virtualization guest dump support.
+    ///
+    /// When set, allows dumping of the PV guest for debugging purposes.
     AllowDumping = 34,
-    /// The components are not decrypted during the image unpack.
+
+    /// Disables component encryption during image unpacking.
+    ///
+    /// When set, components are not decrypted during the SE image unpack process.
     NoComponentEncryption = 35,
-    /// DEA/TDEA PCKMO encryption function are allowed.
+
+    /// Enables DEA/TDEA PCKMO encryption functions.
+    ///
+    /// Allows the guest to use Data Encryption Algorithm (DEA) and Triple DEA
+    /// with the Perform Cryptographic Key Management Operation (PCKMO) instruction.
     PckmoDeaTdea = 56,
-    /// AES PCKMO encryption function are allowed.
+
+    /// Enables AES PCKMO encryption functions.
+    ///
+    /// Allows the guest to use Advanced Encryption Standard (AES) with PCKMO.
     PckmoAes = 57,
-    /// ECC PCKMO encryption function are allowed.
+
+    /// Enables ECC PCKMO encryption functions.
+    ///
+    /// Allows the guest to use Elliptic Curve Cryptography (ECC) with PCKMO.
     PckmoEcc = 58,
-    /// HMAC PCKMO encryption function are allowed.
+
+    /// Enables HMAC PCKMO encryption functions.
+    ///
+    /// Allows the guest to use Hash-based Message Authentication Code (HMAC) with PCKMO.
     PckmoHmac = 59,
-    /// Backup target keys can be used.
+
+    /// Enables backup target keys support.
+    ///
+    /// When set, allows the use of backup target keys for key management operations.
     BackupTargetKeys = 62,
 }
+
+/// Type alias for plaintext control flags version 1.
+///
+/// This is the primary type used for managing plaintext control flags in
+/// SE header version 1.
 pub type PlaintextControlFlagsV1 = ControlFlags<PcfV1>;
 impl PlaintextControlFlagsV1 {
+    /// Array of all PCKMO-related flags (excluding HMAC).
+    ///
+    /// This constant provides convenient access to the three main PCKMO flags
+    /// that are typically enabled together.
     pub const PCKMO: [PcfV1; 3] = [PcfV1::PckmoAes, PcfV1::PckmoDeaTdea, PcfV1::PckmoEcc];
 }
 
 impl Default for PlaintextControlFlagsV1 {
+    /// Creates default plaintext control flags with PCKMO support enabled.
     fn default() -> Self {
         Self::from_flags(PcfV1::all_enabled(PlaintextControlFlagsV1::PCKMO))
     }
@@ -199,19 +343,43 @@ impl Display for PcfV1 {
 
 impl ControlFlagTrait for PcfV1 {}
 
+/// Secret Control Flags for Secure Execution header version 1.
+///
+/// These flags control various aspects of Protected Virtualization (PV) guest
+/// behavior and capabilities. Each variant represents a specific bit position
+/// in the 64-bit control flags field (MSB0 ordering).
+///
+/// # Bit Positions
+///
+/// The numeric values represent bit positions in MSB0 ordering (bit 0 is the
+/// most significant bit). For example, `CckExtensionSecretEnforcement = 1` means bit 1 from
+/// the left (MSB).
 #[repr(u8)]
 #[non_exhaustive]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ScfV1 {
-    /// All add-secret requests must provide an extension secret
+    /// Enforces extension secret requirement for add-secret requests.
+    ///
+    /// When set, all add-secret requests must provide an extension secret.
+    /// This adds an additional layer of security to secret management.
     CckExtensionSecretEnforcement = 1,
-    /// Whether CCK can be updated
+
+    /// Allows Customer Communication Key (CCK) updates.
+    ///
+    /// When set, permits updating the CCK after initial configuration.
     CckUpdateAllowed = 2,
 }
+
+/// Type alias for secret control flags version 1.
+///
+/// This is the primary type used for managing secret control flags in
+/// SE header version 1.
 pub type SecretControlFlagsV1 = ControlFlags<ScfV1>;
+
 impl ControlFlagTrait for ScfV1 {}
 
 impl Default for SecretControlFlagsV1 {
+    /// Creates default secret control flags.
     fn default() -> Self {
         Self::from_flags(ScfV1::all_enabled([]))
     }
