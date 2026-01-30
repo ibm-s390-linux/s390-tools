@@ -2,6 +2,7 @@
 //
 // Copyright IBM Corp. 2024
 use std::{
+    fmt::Display,
     io::{Read, Seek, SeekFrom},
     mem::size_of,
 };
@@ -24,6 +25,7 @@ use crate::{
     misc::PAGESIZE,
     pv_utils::{
         error::{Error, Result},
+        misc::display_indented,
         serializing::{serde_hex_array, serialize_to_bytes},
         uvdata::{
             AeadCipherTrait, AeadDataTrait, AeadPlainDataTrait, KeyExchangeTrait, UvDataPlainTrait,
@@ -69,6 +71,18 @@ pub enum SeHdrVersion {
     V1 = 0x100,
 }
 
+impl Display for SeHdrVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                SeHdrVersion::V1 => "1",
+            }
+        )
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 #[serde(rename_all = "snake_case")]
@@ -83,6 +97,37 @@ pub enum SeH {
         #[serde(flatten)]
         se_hdr: SeHdr,
     },
+}
+
+impl Display for SeH {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            SeH::DecryptedSeHdr { verified, se_hdr } => {
+                let verified_s = if *verified {
+                    ", integrity and authenticity verified"
+                } else {
+                    ""
+                };
+                if f.alternate() {
+                    write!(f, "decrypted{verified_s} {se_hdr:#}")
+                } else {
+                    write!(f, "decrypted{verified_s} {se_hdr}")
+                }
+            }
+            SeH::SeHdr { verified, se_hdr } => {
+                let verified_s = if *verified {
+                    "integrity and authenticity verified "
+                } else {
+                    ""
+                };
+                if f.alternate() {
+                    write!(f, "{verified_s}{se_hdr:#}")
+                } else {
+                    write!(f, "{verified_s}{se_hdr}")
+                }
+            }
+        }
+    }
 }
 
 #[repr(C)]
@@ -118,6 +163,12 @@ impl SeHdrCommon {
     }
 }
 
+impl Display for SeHdrCommon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "version: {}", self.version)
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "Endian::Big")]
 /// Secure Execution header structure
@@ -128,6 +179,17 @@ pub struct SeHdr {
     #[serde(flatten)]
     #[deku(ctx = "common.version")]
     pub data: SeHdrVersioned,
+}
+
+impl Display for SeHdr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Secure Execution header")?;
+        // Support verbose mode if the `alternate` (`{:#}`) flag is used.
+        let value = display_indented(f, &self.common, 2);
+        writeln!(f, "{value}")?;
+        let data = display_indented(f, &self.data, 2);
+        writeln!(f, "{data}")
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
@@ -141,6 +203,16 @@ pub struct SeHdrPlain {
     pub data: SeHdrData,
 }
 
+impl Display for SeHdrPlain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Secure Execution header:")?;
+        let value = display_indented(f, &self.common, 2);
+        writeln!(f, "{value}")?;
+        let value = display_indented(f, &self.data, 2);
+        writeln!(f, "{value}")
+    }
+}
+
 #[enum_dispatch(AeadCipherTrait, AeadDataTrait, KeyExchangeTrait)]
 #[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -148,6 +220,20 @@ pub struct SeHdrPlain {
 pub enum SeHdrVersioned {
     #[deku(id = "SeHdrVersion::V1")]
     SeHdrBinV1(SeHdrBinV1),
+}
+
+impl Display for SeHdrVersioned {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SeHdrVersioned::SeHdrBinV1(se_hdr_bin_v1) => {
+                if f.alternate() {
+                    write!(f, "{se_hdr_bin_v1:#}")
+                } else {
+                    write!(f, "{se_hdr_bin_v1}")
+                }
+            }
+        }
+    }
 }
 
 #[enum_dispatch(
@@ -162,6 +248,20 @@ pub enum SeHdrVersioned {
 pub enum SeHdrData {
     #[deku(id = "SeHdrVersion::V1")]
     SeHdrDataV1(SeHdrDataV1),
+}
+
+impl Display for SeHdrData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SeHdrDataV1(data_v1) => {
+                if f.alternate() {
+                    write!(f, "{data_v1:#}")
+                } else {
+                    write!(f, "{data_v1}")
+                }
+            }
+        }
+    }
 }
 
 impl AeadCipherBuilderTrait for SeHdrData {

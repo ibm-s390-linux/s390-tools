@@ -8,8 +8,8 @@ use std::string::ToString;
 use std::{env, ffi::OsStr, path::PathBuf};
 
 use clap::{
-    builder::PossibleValue, Arg, ArgGroup, Args, Command, CommandFactory, Parser, ValueEnum,
-    ValueHint,
+    builder::{PossibleValue, TypedValueParser},
+    Arg, ArgGroup, Args, Command, CommandFactory, Parser, ValueEnum, ValueHint,
 };
 use log::warn;
 use utils::{CertificateOptions, DeprecatedVerbosityOptions};
@@ -214,6 +214,8 @@ pub struct CreateBootImageLegacyFlags {
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum OutputFormatKind {
+    /// Human-readable, unstable text format
+    Text,
     /// JSON format.
     Json,
 }
@@ -221,6 +223,7 @@ pub enum OutputFormatKind {
 impl Display for OutputFormatKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Text => write!(f, "human-readable"),
             Self::Json => write!(f, "JSON"),
         }
     }
@@ -231,6 +234,7 @@ impl FromStr for OutputFormatKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "text" => Ok(Self::Text),
             "json" => Ok(Self::Json),
             _ => Err(format!("Invalid output format: {s}")),
         }
@@ -241,6 +245,8 @@ impl FromStr for OutputFormatKind {
 pub enum OutputFormatVariant {
     /// Default
     Default,
+    /// Full
+    Full,
     /// Minified
     Minify,
     /// Pretty
@@ -256,7 +262,7 @@ pub struct OutputFormatSpec {
 #[derive(Clone, Default)]
 struct OutputFormatSpecParser;
 
-impl clap::builder::TypedValueParser for OutputFormatSpecParser {
+impl TypedValueParser for OutputFormatSpecParser {
     type Value = OutputFormatSpec;
 
     fn parse_ref(
@@ -288,14 +294,15 @@ impl clap::builder::TypedValueParser for OutputFormatSpecParser {
             (_, None) => OutputFormatVariant::Default,
             (_, Some("default")) => OutputFormatVariant::Default,
 
+            (OutputFormatKind::Text, Some("full")) => OutputFormatVariant::Full,
             (OutputFormatKind::Json, Some("pretty")) => OutputFormatVariant::Pretty,
             (OutputFormatKind::Json, Some("minify")) => OutputFormatVariant::Minify,
-            (OutputFormatKind::Json, Some(other)) => {
+            (_, Some(other)) => {
                 let mut err =
                     clap::error::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
                 err.insert(
                     clap::error::ContextKind::InvalidArg,
-                    clap::error::ContextValue::String(arg_name),
+                    clap::error::ContextValue::String(arg_name.clone()),
                 );
                 err.insert(
                     clap::error::ContextKind::InvalidValue,

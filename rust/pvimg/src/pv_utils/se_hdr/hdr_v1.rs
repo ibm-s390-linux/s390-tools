@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
-use std::mem::{size_of, size_of_val};
+use std::{
+    fmt::Display,
+    mem::{size_of, size_of_val},
+};
 
+use base64::prelude::*;
 use deku::{ctx::Endian, prelude::*};
 use openssl::{
     nid::Nid,
@@ -15,6 +19,7 @@ use pv::request::{
     Zeroize, SHA_512_HASH_LEN,
 };
 use serde::{Deserialize, Serialize};
+use utils::HexSlice;
 
 use super::keys::phkh_v1;
 use crate::{
@@ -22,6 +27,7 @@ use crate::{
     misc::PAGESIZE,
     pv_utils::{
         error::Result,
+        misc::display_indented,
         se_hdr::{
             brb::{
                 ComponentMetadata, ComponentMetadataV1, SeHdrCommon, SeHdrConfBuilderTrait,
@@ -79,6 +85,34 @@ pub struct SeHdrAadV1 {
 
 impl SeHdrAadV1 {
     const KEY_TYPE: SymKeyType = SymKeyType::Aes256Gcm;
+}
+
+impl Display for SeHdrAadV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Support verbose mode if the `alternate` (`{:#}`) flag is used.
+        if f.alternate() {
+            writeln!(f, "size: {} bytes", self.sehs)?;
+            writeln!(f, "number of key slots: {}", self.nks)?;
+        }
+        writeln!(f, "key slots:")?;
+        for s in &self.keyslots {
+            writeln!(f, " - {s}")?;
+        }
+        if f.alternate() {
+            let value = display_indented(f, &self.cust_pub_key, 2);
+            writeln!(f, "customer public key:\n{value}",)?;
+            writeln!(f, "number of component pages: {}", self.nep)?;
+            writeln!(f, "components content hash: {:}", HexSlice::from(&self.pld))?;
+            writeln!(f, "components address hash: {:}", HexSlice::from(&self.ald))?;
+            writeln!(f, "components tweak hash: {:}", HexSlice::from(&self.tld))?;
+        }
+        writeln!(
+            f,
+            "plaintext control flags:\n{}",
+            PlaintextControlFlagsV1::from(self.pcf)
+        )?;
+        Ok(())
+    }
 }
 
 impl KeyExchangeTrait for SeHdrAadV1 {
@@ -146,11 +180,36 @@ impl Zeroize for SeHdrConfV1 {
     }
 }
 
+impl Display for SeHdrConfV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "secret control flags:\n{}",
+            SecretControlFlagsV1::from(self.scf)
+        )?;
+
+        // Support verbose mode if the `alternate` (`{:#}`) flag is used.
+        if f.alternate() {
+            writeln!(f, "CCK: {:}", HexSlice::from(self.cck.value()))?;
+            writeln!(f, "XTS key: {:}", HexSlice::from(self.xts.value()))?;
+            let psw = display_indented(f, &self.psw, 2);
+            writeln!(f, "PSW:\n{psw}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Default, PartialEq, Eq, Debug, Clone, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct SeHdrTagV1 {
     #[serde(with = "serde_hex_array", rename = "tag_hex")]
     tag: [u8; SymKeyType::AES_256_GCM_TAG_LEN],
+}
+
+impl Display for SeHdrTagV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:}", HexSlice::from(&self.tag))
+    }
 }
 
 mod ser_confidential_confv1 {
@@ -188,6 +247,21 @@ pub struct SeHdrDataV1 {
     pub data: Confidential<SeHdrConfV1>,
     #[serde(flatten)]
     tag: SeHdrTagV1,
+}
+
+impl Display for SeHdrDataV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Support verbose mode if the `alternate` (`{:#}`) flag is used.
+        if f.alternate() {
+            write!(f, "{:#}", self.aad)?;
+            write!(f, "{:#}", self.data.value())?;
+            writeln!(f, "GCM tag: {}", self.tag)?;
+        } else {
+            write!(f, "{}", self.aad)?;
+            write!(f, "{}", self.data.value())?;
+        }
+        Ok(())
+    }
 }
 
 /// Reads from a `reader` and creates a confidential `SeHdrConfV1`.
@@ -478,6 +552,24 @@ impl SeHdrBinV1 {
     pub(crate) fn try_from_data(data: &[u8]) -> Result<Self> {
         let (_rest, val) = Self::from_bytes((data, 0))?;
         Ok(val)
+    }
+}
+
+impl Display for SeHdrBinV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Support verbose mode if the `alternate` (`{:#}`) flag is used.
+        if f.alternate() {
+            write!(f, "{:#}", self.aad)?;
+            writeln!(
+                f,
+                "encrypted data: {:#}",
+                BASE64_STANDARD.encode(&self.cipher_data)
+            )?;
+            writeln!(f, "GCM tag: {:#}", self.tag)?;
+        } else {
+            write!(f, "{}", self.aad)?;
+        }
+        Ok(())
     }
 }
 

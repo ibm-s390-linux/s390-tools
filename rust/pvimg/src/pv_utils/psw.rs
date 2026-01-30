@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp. 2024
 
+use std::fmt::Display;
+
 use deku::{ctx::Endian, DekuRead, DekuWrite};
 use pv::request::Zeroize;
 use serde::{Deserialize, Serialize};
@@ -21,6 +23,13 @@ pub struct PSW {
     pub mask: u64,
     #[serde(with = "serde_hex_left_padded_u64", rename = "addr_hex")]
     pub addr: u64,
+}
+
+impl Display for PSW {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "address: {:#016x}", self.addr)?;
+        writeln!(f, "mask: {:#016x}", self.mask)
+    }
 }
 
 impl Zeroize for PSW {

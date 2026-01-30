@@ -27,7 +27,7 @@ use crate::pv_utils::{
 
 /// Operation mode for component preparation.
 #[allow(unused)]
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Mode {
     /// Encrypt the component data
     Encrypt,

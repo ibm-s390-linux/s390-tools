@@ -52,6 +52,14 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
 
     match opt.format {
         OutputFormatSpec {
+            kind: OutputFormatKind::Text,
+            variant: OutputFormatVariant::Default,
+        } => write!(output, "{se_hdr}").context("Cannot generate the human readable output")?,
+        OutputFormatSpec {
+            kind: OutputFormatKind::Text,
+            variant: OutputFormatVariant::Full,
+        } => write!(output, "{se_hdr:#}").context("Cannot generate the human readable output")?,
+        OutputFormatSpec {
             kind: OutputFormatKind::Json,
             variant,
         } => {
@@ -63,10 +71,14 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
                 OutputFormatVariant::Default | OutputFormatVariant::Pretty => {
                     serde_json::to_writer_pretty(&mut output, &doc)?;
                 }
+                OutputFormatVariant::Full => {
+                    unreachable!("we already validate the variant in the outer match")
+                }
             }
             // Make sure the output ends with a new line
             writeln!(&mut output)?
         }
+        _ => unreachable!(),
     }
     output.flush()?;
 

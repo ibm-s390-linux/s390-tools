@@ -2,9 +2,29 @@
 //
 // Copyright IBM Corp. 2024
 
+use std::fmt::Display;
+
 use pv::PvCoreError;
 
 use crate::error::{Error, Result};
+
+pub fn display_indented<T: Display>(
+    f: &mut std::fmt::Formatter<'_>,
+    s: &T,
+    width: usize,
+) -> String {
+    let indentation = " ".repeat(width);
+    let value = if f.alternate() {
+        format!("{s:#}")
+    } else {
+        format!("{s}")
+    };
+    value
+        .lines()
+        .map(|l| format!("{indentation}{l}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 
 /// Rounds up the given `value` to a multiple of `multiple`.
 ///

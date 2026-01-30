@@ -2,8 +2,9 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::mem::size_of;
+use std::{fmt::Display, mem::size_of};
 
+use base64::prelude::*;
 use deku::{ctx::Endian, DekuRead, DekuWrite};
 use openssl::{
     hash::{hash, MessageDigest},
@@ -11,6 +12,7 @@ use openssl::{
 };
 use pv::{request::EcPubKeyCoord, static_assert};
 use serde::{Deserialize, Serialize};
+use utils::HexSlice;
 
 use crate::{
     error::{Error, Result},
@@ -33,6 +35,12 @@ pub fn phkh_v1<T: AsRef<PKeyRef<Public>>>(key: T) -> Result<[u8; 32]> {
 pub struct EcPubKeyCoordV1 {
     #[serde(with = "serde_hex_array", rename = "coord_hex")]
     pub coord: [u8; 160],
+}
+
+impl Display for EcPubKeyCoordV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "coordinate: {}", BASE64_STANDARD.encode(self.coord))
+    }
 }
 
 #[allow(clippy::fallible_impl_from)]
@@ -83,6 +91,12 @@ pub struct BinaryKeySlotV1 {
     pub kst: [u8; 16],
 }
 static_assert!(size_of::<BinaryKeySlotV1>() == 80);
+
+impl Display for BinaryKeySlotV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "target key hash: {:}", HexSlice::from(&self.phkh))
+    }
+}
 
 impl TryFrom<Vec<u8>> for BinaryKeySlotV1 {
     type Error = Error;
