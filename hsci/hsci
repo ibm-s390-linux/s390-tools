@@ -365,6 +365,13 @@ function add_hsci {
 		fi
 	fi
 
+	#### Set MTU for the veth pair
+	ndev_mtu="$(cat /sys/class/net/${ndev}/mtu)"
+	hsdev_mtu="$(cat /sys/class/net/${hsdev}/mtu)"
+	hsci_mtu=$(( ndev_mtu < hsdev_mtu ? ndev_mtu : hsdev_mtu ))
+	ip link set dev $hscibp mtu $hsci_mtu
+	ip link set dev $hsci mtu $hsci_mtu
+
 	#### Set veth pair to UP
 	ip link set dev $hscibp up >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
