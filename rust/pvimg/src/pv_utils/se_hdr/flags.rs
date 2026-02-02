@@ -24,16 +24,23 @@
 //! assert!(flags.is_set(PcfV1::AllowDumping));
 //! ```
 
-use std::{fmt::Display, marker::PhantomData, mem::size_of};
+use std::{fmt::Display, fmt::LowerHex, marker::PhantomData, mem::size_of};
 
 use pv::misc::{Flags, Msb0Flags64};
+
+pub trait IntoEnumIterator {
+    /// Returns an iterator over all variants of this enum.
+    fn iter() -> impl Iterator<Item = Self>;
+}
 
 /// Trait for individual control flag types.
 ///
 /// This trait defines the interface for control flag enums, providing methods
 /// to get the flag's bit position and create enabled/disabled flag data.
 /// Implementors must be enum types with `#[repr(u8)]` to ensure proper bit positioning.
-pub trait ControlFlagTrait: std::fmt::Debug + std::hash::Hash + Copy + Eq + Ord {
+pub trait ControlFlagTrait:
+    std::fmt::Debug + std::hash::Hash + Copy + Eq + Ord + Display + IntoEnumIterator
+{
     /// Returns the bit position (0-63) for this flag in MSB0 ordering.
     ///
     /// # Safety
@@ -111,7 +118,7 @@ impl<T: ControlFlagTrait> FlagData<T> {
 ///
 /// This trait provides methods for parsing, checking, and validating
 /// control flags used in Secure Execution headers.
-pub trait ControlFlagsTrait: Display {
+pub trait ControlFlagsTrait {
     /// The underlying control flag type
     type T: ControlFlagTrait;
 
@@ -200,6 +207,17 @@ impl<T: ControlFlagTrait> ControlFlags<T> {
             t: PhantomData {},
         }
     }
+
+    /// Returns a vector of all currently enabled flags.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing all flags that are currently set (enabled)
+    pub fn flags(&self) -> Vec<T> {
+        T::iter()
+            .filter(|flag| self.flags.is_set(flag.discriminant()))
+            .collect()
+    }
 }
 
 impl<T: ControlFlagTrait> From<u64> for ControlFlags<T> {
@@ -244,7 +262,7 @@ impl<T: ControlFlagTrait> ControlFlagsTrait for ControlFlags<T> {
     }
 }
 
-impl<T: ControlFlagTrait> Display for ControlFlags<T> {
+impl<T: ControlFlagTrait> LowerHex for ControlFlags<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value: u64 = self.flags.into();
         write!(f, "{value:#018x}")
@@ -303,6 +321,47 @@ pub enum PcfV1 {
     BackupTargetKeys = 62,
 }
 
+impl IntoEnumIterator for PcfV1 {
+    fn iter() -> impl Iterator<Item = Self> {
+        [
+            Self::AllowDumping,
+            Self::NoComponentEncryption,
+            Self::PckmoDeaTdea,
+            Self::PckmoAes,
+            Self::PckmoEcc,
+            Self::PckmoHmac,
+            Self::BackupTargetKeys,
+        ]
+        .into_iter()
+    }
+}
+
+impl ControlFlagTrait for PcfV1 {}
+
+impl<T: ControlFlagTrait> Display for ControlFlags<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            write!(f, "{:#066b}", <u64>::from(self.flags))
+        } else {
+            let known_flags = self.flags();
+            let mut flags_s = known_flags
+                .iter()
+                .map(|flag| format!(" - {flag}"))
+                .collect::<Vec<_>>();
+            let known_flags_u64: u64 = Self::from_flags(T::all_enabled(known_flags)).into();
+            let unknown_flags = <u64>::from(self.flags) - known_flags_u64;
+            if unknown_flags != 0x0 {
+                flags_s.push(format!(
+                    " - unknown flags {:#}",
+                    <Self>::from(unknown_flags)
+                ));
+            }
+
+            write!(f, "{}", flags_s.join("\n"))
+        }
+    }
+}
+
 /// Type alias for plaintext control flags version 1.
 ///
 /// This is the primary type used for managing plaintext control flags in
@@ -331,17 +390,15 @@ impl Display for PcfV1 {
             match self {
                 Self::AllowDumping => "allow dumping",
                 Self::NoComponentEncryption => "no component encryption",
-                Self::PckmoDeaTdea => "DEA and TDEA PCMKO",
-                Self::PckmoAes => "AES",
-                Self::PckmoEcc => "ECC PCKMO",
-                Self::PckmoHmac => "HMAC PCKMO",
-                Self::BackupTargetKeys => "backup target keys",
+                Self::PckmoDeaTdea => "DEA and TDEA PCKMO support",
+                Self::PckmoAes => "AES PCKMO support",
+                Self::PckmoEcc => "ECC PCKMO support",
+                Self::PckmoHmac => "HMAC PCKMO support",
+                Self::BackupTargetKeys => "backup target keys support",
             }
         )
     }
 }
-
-impl ControlFlagTrait for PcfV1 {}
 
 /// Secret Control Flags for Secure Execution header version 1.
 ///
@@ -370,13 +427,32 @@ pub enum ScfV1 {
     CckUpdateAllowed = 2,
 }
 
+impl IntoEnumIterator for ScfV1 {
+    fn iter() -> impl Iterator<Item = Self> {
+        [Self::CckExtensionSecretEnforcement, Self::CckUpdateAllowed].into_iter()
+    }
+}
+
+impl ControlFlagTrait for ScfV1 {}
+
+impl Display for ScfV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::CckExtensionSecretEnforcement => "CCK extension secret enforced",
+                Self::CckUpdateAllowed => "CCK update allowed",
+            }
+        )
+    }
+}
+
 /// Type alias for secret control flags version 1.
 ///
 /// This is the primary type used for managing secret control flags in
 /// SE header version 1.
 pub type SecretControlFlagsV1 = ControlFlags<ScfV1>;
-
-impl ControlFlagTrait for ScfV1 {}
 
 impl Default for SecretControlFlagsV1 {
     /// Creates default secret control flags.
@@ -388,8 +464,10 @@ impl Default for SecretControlFlagsV1 {
 #[allow(clippy::shadow_unrelated)]
 #[cfg(test)]
 mod test {
-
-    use super::{ControlFlagTrait, ControlFlagsTrait, PcfV1, PlaintextControlFlagsV1};
+    use super::{
+        ControlFlagTrait, ControlFlagsTrait, PcfV1, PlaintextControlFlagsV1, ScfV1,
+        SecretControlFlagsV1,
+    };
 
     #[test]
     fn test_from_flags() {
@@ -434,7 +512,8 @@ mod test {
     #[test]
     fn test_display() {
         let flags = PlaintextControlFlagsV1::from_flags([PcfV1::NoComponentEncryption.enabled()]);
-        assert_eq!("0x0000000010000000", format!("{flags}"));
+        assert_eq!("0x0000000010000000", format!("{flags:#x}"));
+        assert_eq!(format!("{flags}"), " - no component encryption");
 
         let flags = PlaintextControlFlagsV1::from_flags([
             PcfV1::AllowDumping.enabled(),
@@ -445,7 +524,28 @@ mod test {
             PcfV1::PckmoEcc.enabled(),
             PcfV1::PckmoHmac.enabled(),
         ]);
-        assert_eq!("0x00000000300000f2", format!("{flags}"));
+        assert_eq!("0x00000000300000f2", format!("{flags:#x}"));
+        assert_eq!(
+            format!("{flags}"),
+            " - allow dumping
+ - no component encryption
+ - DEA and TDEA PCKMO support
+ - AES PCKMO support
+ - ECC PCKMO support
+ - HMAC PCKMO support
+ - backup target keys support"
+        );
+
+        let flags = SecretControlFlagsV1::from_flags([
+            ScfV1::CckExtensionSecretEnforcement.enabled(),
+            ScfV1::CckUpdateAllowed.enabled(),
+        ]);
+        assert_eq!(format!("{flags:#x}"), "0x6000000000000000");
+        assert_eq!(
+            format!("{flags}"),
+            " - CCK extension secret enforced
+ - CCK update allowed"
+        );
     }
 
     #[test]

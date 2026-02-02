@@ -107,14 +107,14 @@ fn parse_flags(
         None => PlaintextControlFlagsV1::default(),
     };
     pcf.parse_flags(&plaintext_flags);
-    debug!("Using plaintext flags: {pcf}");
+    debug!("Using plaintext flags: {pcf:#x}");
 
     let mut scf: SecretControlFlagsV1 = match &args.experimental_args.x_scf {
         Some(v) => try_parse_u64(v, "x-scf")?.into(),
         None => SecretControlFlagsV1::default(),
     };
     scf.parse_flags(&secret_flags);
-    debug!("Using secret flags:    {scf}");
+    debug!("Using secret flags:    {scf:#x}");
 
     Ok((pcf, scf))
 }
