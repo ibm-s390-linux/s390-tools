@@ -50,7 +50,7 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
         }
     };
 
-    match opt.format {
+    match opt.format.unwrap_or_else(OutputFormatSpec::detect) {
         OutputFormatSpec {
             kind: OutputFormatKind::Text,
             variant: OutputFormatVariant::Default,

@@ -5,7 +5,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
 use std::string::ToString;
-use std::{env, ffi::OsStr, path::PathBuf};
+use std::{env, ffi::OsStr, io::IsTerminal, path::PathBuf};
 
 use clap::{
     builder::{PossibleValue, TypedValueParser},
@@ -259,6 +259,20 @@ pub struct OutputFormatSpec {
     pub variant: OutputFormatVariant,
 }
 
+impl OutputFormatSpec {
+    pub fn detect() -> Self {
+        let kind = if std::io::stdout().is_terminal() {
+            OutputFormatKind::Text
+        } else {
+            OutputFormatKind::Json
+        };
+        Self {
+            kind,
+            variant: OutputFormatVariant::Default,
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 struct OutputFormatSpecParser;
 
@@ -320,7 +334,11 @@ impl TypedValueParser for OutputFormatSpecParser {
         use clap::builder::PossibleValue as PV;
 
         let vals: Vec<PV> = vec![
-            PV::new("json").help("Pretty-printed machine-readable JSON"),
+            PV::new("text")
+                .help("Human-readable, unstable text format (default if a terminal is available)"),
+            PV::new("text:full").help("Human-readable, full detail text format"),
+            PV::new("json")
+                .help("Pretty-printed machine-readable JSON (default if no terminal available)"),
             PV::new("json:pretty").help("Pretty-printed machine-readable JSON"),
             PV::new("json:minify").help("Minified machine-readable JSON"),
         ];
@@ -340,9 +358,12 @@ pub struct InfoArgs {
     #[clap(flatten)]
     pub input: SeImgInputArgs,
 
-    /// Output format
+    /// Output format for the Secure Execution image information.
+    ///
+    /// If not specified, the format is automatically determined based on
+    /// whether stdout is connected to a terminal.
     #[arg(long, value_parser=OutputFormatSpecParser::default())]
-    pub format: OutputFormatSpec,
+    pub format: Option<OutputFormatSpec>,
 
     /// Use the key in FILE to decrypt the Secure Execution header.
     ///
@@ -867,6 +888,11 @@ mod test {
     fn pvimg_info_cli() {
         let args = BTreeMap::new();
         let valid_test_args = [
+            // Format argument is optional
+            flat_map_collect(insert(
+                args.clone(),
+                vec![CliOption::new("image", ["/dev/null"])],
+            )),
             flat_map_collect(insert(
                 args.clone(),
                 vec![
@@ -941,12 +967,6 @@ mod test {
         ];
 
         let invalid_test_args = [
-            // the argument '--key-hashes[=<FILE>]' cannot be used with '--host-key-document
-            // <FILE>'
-            flat_map_collect(insert(
-                args.clone(),
-                vec![CliOption::new("image", ["/dev/null"])],
-            )),
             // No default defined for --format
             flat_map_collect(insert(
                 args,
