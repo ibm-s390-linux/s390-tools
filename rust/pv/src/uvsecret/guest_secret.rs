@@ -53,14 +53,14 @@ pub enum GuestSecret {
     },
     /// Retrievable key
     ///
-    /// Create Retrievables using [`GuestSecret::retrievable`]
+    /// Create Retrievables using [`GuestSecret::Retrievable`]
     /// Secret size is always valid for the type/kind
     Retrievable {
         /// Retrievable secret type
         kind: RetrievableSecret,
         /// Name of the secret
         name: String,
-        /// SHA256 hash of [`GuestSecret::RetrievableKey::name`]
+        /// SHA256 hash of [`GuestSecret::Retrievable::name`]
         id: SecretId,
         /// Confidential actual retrievable secret
         #[serde(skip)]
