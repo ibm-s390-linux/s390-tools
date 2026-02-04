@@ -701,8 +701,10 @@ static void print_subchannels_of_type(enum sch_type type_requested,
 		sch_dir = de_vec[i]->d_name;
 		path = util_path_sysfs("bus/css/devices/%s", sch_dir);
 		if (util_file_read_ul(&type_ul, 10, "%s/type", path) == 0) {
-			if (type_ul != type_requested)
+			if (type_ul != type_requested) {
+				free(path);
 				continue;
+			}
 			if (type_ul == SUBCHANNEL_TYPE_IO)
 				print_sch_io(rec, path, sch_dir);
 			else if (type_ul == SUBCHANNEL_TYPE_CHSC)
