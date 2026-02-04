@@ -59,6 +59,7 @@ typedef enum {
 struct disk_ext_type {
 	disk_type_t type;
 	bool is_nvme;
+	bool is_tape;
 };
 
 /* targetbase definition */
@@ -106,9 +107,8 @@ struct job_target_data;
 
 int device_get_info(const char *device, struct job_target_data *target,
 		    struct device_info **info);
-int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type,
-		      int disk_id);
-int disk_is_tape(const char *device);
+int dump_disk_get_ext_type(const char *device, struct disk_ext_type *ext_type);
+int disk_type_is_tape(struct disk_ext_type *ext_type);
 int disk_type_is_scsi(struct disk_ext_type *ext_type);
 int disk_type_is_eckd_ldl(struct disk_ext_type *ext_type);
 int disk_type_is_nvme(struct disk_ext_type *ext_type);

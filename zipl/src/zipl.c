@@ -174,13 +174,12 @@ main(int argc, char* argv[])
 	/* Do it */
 	switch (job->id) {
 	case job_dump_partition:
-		rc = disk_get_ext_type(job->data.dump.device, &ext_type,
-				       0 /* disk index */);
+		rc = dump_disk_get_ext_type(job->data.dump.device, &ext_type);
 		if (rc)
 			break;
 		job_dump_check_set_ngdump(job, &ext_type);
 		if (!job_dump_is_ngdump(job) &&
-		    (disk_is_tape(job->data.dump.device) ||
+		    (disk_type_is_tape(&ext_type) ||
 		     !disk_type_is_scsi(&ext_type))) {
 			rc = install_dump(job->data.dump.device, &job->target,
 					  job->data.dump.mem, job->data.dump.no_compress);

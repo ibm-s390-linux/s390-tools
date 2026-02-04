@@ -721,8 +721,7 @@ error:
 	return -1;
 }
 
-int
-disk_is_tape(const char* device)
+static int disk_is_tape(const char *device)
 {
 	int fd, rc = 0;
 
@@ -744,22 +743,30 @@ disk_is_tape(const char* device)
  * partition, etc). In case of success the resulted disk type is
  * stored in EXT_TYPE.
  */
-int disk_get_ext_type(const char *device, struct disk_ext_type *ext_type,
-		      int disk_idx)
+int dump_disk_get_ext_type(const char *device, struct disk_ext_type *ext_type)
 {
 	struct job_target_data tmp = {.source = source_unknown};
 	struct device_info *dev_info;
 	struct disk_info *info;
 
+	if (disk_is_tape(device)) {
+		ext_type->is_tape = 1;
+		return 0;
+	}
 	if (device_get_info(device, &tmp, &dev_info))
 		return -1;
-	info = &dev_info->base[disk_idx];
+	info = &dev_info->base[0];
 	ext_type->type = info->type;
 	ext_type->is_nvme = info->is_nvme;
 
 	device_free_info(dev_info);
 	free_target_data(&tmp);
 	return 0;
+}
+
+int disk_type_is_tape(struct disk_ext_type *ext_type)
+{
+	return ext_type->is_tape;
 }
 
 int disk_type_is_scsi(struct disk_ext_type *ext_type)
