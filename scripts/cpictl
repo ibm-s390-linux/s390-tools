@@ -346,12 +346,17 @@ get_distro()
 {
 	local line ID="linux" VERSION_ID="0" VERSION="" update
 
+	# CoreOS variants don’t have a unique ID in /etc/os-release, so use VARIANT_ID instead.
+	# https://github.com/coreos/rhel-coreos-config/blob/main/common.yaml#L85
+	# https://github.com/coreos/fedora-coreos-config/blob/testing-devel/tests/kola/data/commonlib.sh#L43
+	local VARIANT_ID=""
+
 	[[ ! -e "$OS_RELEASE" ]] && return
 
 	# Only import required variables
 	while read -r line ; do
 		if [[ "$line" =~ ^ID= ]] || [[ "$line" =~ ^VERSION_ID= ]] ||
-		   [[ "$line" =~ ^VERSION= ]] ; then
+		   [[ "$line" =~ ^VERSION= ]] || [[ "$line" =~ ^VARIANT_ID= ]] ; then
 			eval "$line"
 		fi
 	done <"$OS_RELEASE"
@@ -362,6 +367,12 @@ get_distro()
 		update="${VERSION/*$VERSION_ID/}"
 		update="${update%% *}"
 		VERSION_ID="$VERSION_ID$update"
+	fi
+
+	if [[ "$ID" == "rhel" ]] && [[ "$VARIANT_ID" == "coreos" ]] ; then
+		# CoreOS detection via VARIANT_ID (RHCOS only for now)
+		# FCOS and SCOS may be added in the future.
+		ID="rhcos"
 	fi
 
 	echo "$ID:$VERSION_ID"
