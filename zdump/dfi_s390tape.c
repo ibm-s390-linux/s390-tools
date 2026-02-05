@@ -86,7 +86,7 @@ static int em_verify(struct df_s390_em *em)
  */
 static void hdr_verify(struct df_s390_hdr *hdr)
 {
-	if (hdr->magic != DF_S390_MAGIC)
+	if (hdr->magic != DF_S390_MAGIC && hdr->magic != DF_S390_MAGIC_EXT)
 		ERR_EXIT("No valid dump found on tape");
 	if (hdr->volnr != 0) {
 		STDERR_PR("Found volume number: %d\n", hdr->volnr);
