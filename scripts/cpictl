@@ -137,7 +137,7 @@ fail_with()
 {
 	echo "$1" >&2
 	echo "Try '$PRG --help' for more information." >&2
-	exit ${2:-$EXIT_FAILURE}
+	exit "${2:-$EXIT_FAILURE}"
 }
 
 cpi_commit()
@@ -435,30 +435,33 @@ if [ $# -le 0 ]; then
 	print_parse_error_and_exit
 fi
 
-opts=$(getopt -o b:ehL:N:S:T:v -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,permit-cpi,show,version -n "$PRG" -- "$@")
-if [ $? -ne 0 ]; then
+if ! opts=$(getopt -o b:ehL:N:S:T:v  \
+			  -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,permit-cpi,show,version \
+			  -n "$PRG" -- "$@") ; then
 	print_parse_error_and_exit
 fi
 
 # This guarantees that only one instance will be running, and will serialize
 # the execution of multiple instances
-[ -e "$CPI_LOCK" -a ! -w "$CPI_LOCK" ] &&
+if [[ -e "$CPI_LOCK" && ! -w "$CPI_LOCK" ]] ; then
 	fail_with "$PRG: Cannot access lock file: $CPI_LOCK"
-[ ! -w "${CPI_LOCK%/*}" ] &&
+fi
+if [[ ! -w "${CPI_LOCK%/*}" ]] ; then
 	fail_with "$PRG: Cannot access lock file: $CPI_LOCK"
+fi
 
 exec 9<> "$CPI_LOCK"
 flock -x 9
 
 # Get current values from sys/firmware
-read LEVEL < "$SYSTEM_LEVEL_PATH"
-read TYPE < "$SYSTEM_TYPE_PATH"
-read NAME < "$SYSTEM_NAME_PATH"
-read SYSPLEX < "$SYSPLEX_NAME_PATH"
+read -r LEVEL < "$SYSTEM_LEVEL_PATH"
+read -r TYPE < "$SYSTEM_TYPE_PATH"
+read -r NAME < "$SYSTEM_NAME_PATH"
+read -r SYSPLEX < "$SYSPLEX_NAME_PATH"
 
 # Parse command line options: Use eval to remove getopt quotes
-eval set -- $opts
-while [ -n $1 ]; do
+eval set -- "$opts"
+while [ -n "$1" ]; do
 	case "$1" in
 	--help|-h)
 		print_help_and_exit
