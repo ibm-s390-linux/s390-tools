@@ -137,7 +137,7 @@ fail_with()
 {
 	echo "$1" >&2
 	echo "Try '$PRG --help' for more information." >&2
-	exit ${2:-$EXIT_FAILURE}
+	exit "${2:-$EXIT_FAILURE}"
 }
 
 cpi_commit()
@@ -346,12 +346,17 @@ get_distro()
 {
 	local line ID="linux" VERSION_ID="0" VERSION="" update
 
+	# CoreOS variants don’t have a unique ID in /etc/os-release, so use VARIANT_ID instead.
+	# https://github.com/coreos/rhel-coreos-config/blob/main/common.yaml#L85
+	# https://github.com/coreos/fedora-coreos-config/blob/testing-devel/tests/kola/data/commonlib.sh#L43
+	local VARIANT_ID=""
+
 	[[ ! -e "$OS_RELEASE" ]] && return
 
 	# Only import required variables
 	while read -r line ; do
 		if [[ "$line" =~ ^ID= ]] || [[ "$line" =~ ^VERSION_ID= ]] ||
-		   [[ "$line" =~ ^VERSION= ]] ; then
+		   [[ "$line" =~ ^VERSION= ]] || [[ "$line" =~ ^VARIANT_ID= ]] ; then
 			eval "$line"
 		fi
 	done <"$OS_RELEASE"
@@ -362,6 +367,12 @@ get_distro()
 		update="${VERSION/*$VERSION_ID/}"
 		update="${update%% *}"
 		VERSION_ID="$VERSION_ID$update"
+	fi
+
+	if [[ "$ID" == "rhel" ]] && [[ "$VARIANT_ID" == "coreos" ]] ; then
+		# CoreOS detection via VARIANT_ID (RHCOS only for now)
+		# FCOS and SCOS may be added in the future.
+		ID="rhcos"
 	fi
 
 	echo "$ID:$VERSION_ID"
@@ -435,30 +446,33 @@ if [ $# -le 0 ]; then
 	print_parse_error_and_exit
 fi
 
-opts=$(getopt -o b:ehL:N:S:T:v -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,permit-cpi,show,version -n "$PRG" -- "$@")
-if [ $? -ne 0 ]; then
+if ! opts=$(getopt -o b:ehL:N:S:T:v  \
+			  -l set-bit:,environment,help,level:,name:,sysplex:,type:,commit,dry-run,permit-cpi,show,version \
+			  -n "$PRG" -- "$@") ; then
 	print_parse_error_and_exit
 fi
 
 # This guarantees that only one instance will be running, and will serialize
 # the execution of multiple instances
-[ -e "$CPI_LOCK" -a ! -w "$CPI_LOCK" ] &&
+if [[ -e "$CPI_LOCK" && ! -w "$CPI_LOCK" ]] ; then
 	fail_with "$PRG: Cannot access lock file: $CPI_LOCK"
-[ ! -w "${CPI_LOCK%/*}" ] &&
+fi
+if [[ ! -w "${CPI_LOCK%/*}" ]] ; then
 	fail_with "$PRG: Cannot access lock file: $CPI_LOCK"
+fi
 
 exec 9<> "$CPI_LOCK"
 flock -x 9
 
 # Get current values from sys/firmware
-read LEVEL < "$SYSTEM_LEVEL_PATH"
-read TYPE < "$SYSTEM_TYPE_PATH"
-read NAME < "$SYSTEM_NAME_PATH"
-read SYSPLEX < "$SYSPLEX_NAME_PATH"
+read -r LEVEL < "$SYSTEM_LEVEL_PATH"
+read -r TYPE < "$SYSTEM_TYPE_PATH"
+read -r NAME < "$SYSTEM_NAME_PATH"
+read -r SYSPLEX < "$SYSPLEX_NAME_PATH"
 
 # Parse command line options: Use eval to remove getopt quotes
-eval set -- $opts
-while [ -n $1 ]; do
+eval set -- "$opts"
+while [ -n "$1" ]; do
 	case "$1" in
 	--help|-h)
 		print_help_and_exit
