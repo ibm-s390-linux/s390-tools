@@ -32,33 +32,6 @@ static const char *msg_sipl_inval = "Secure boot failure: invalid load address";
 static const char *msg_sipl_unverified = "Secure boot failure: unverified load address";
 static const char *msg_sipl_noparm = "Secure boot failure: unable to load ipl parameter";
 
-static inline void __noreturn start_kernel(void)
-{
-	struct psw_t *psw = &S390_lowcore.program_new_psw;
-	unsigned long addr, code;
-
-	/* Setup program check handler */
-	psw->mask = 0x000000180000000ULL;
-	code = 1;
-
-	asm volatile(
-		/* Setup program check handler */
-		"       larl    %[addr],.no_diag308\n"
-		"       stg     %[addr],8(%[psw])\n"
-		"       diag    %[code],%[code],0x308\n"
-		".no_diag308:\n"
-		"       sam31\n"
-		"       sr      %%r1,%%r1\n"
-		"       sr      %%r2,%%r2\n"
-		"       sigp    %%r1,%%r2,%[order]\n"
-		"       lpsw    0\n"
-		: [addr] "=&d" (addr),
-		  [code] "+&d" (code)
-		: [psw] "a" (psw),
-		  [order] "L" (SIGP_SET_ARCHITECTURE));
-	while (1);
-}
-
 unsigned int
 is_verified_address(unsigned long image_addr)
 {
@@ -500,7 +473,7 @@ noextra:
 	handle_environment(strlen(cmdline), max_cmdline_len);
 }
 
-void start(void)
+void __noreturn start(void)
 {
 	unsigned int subchannel_id;
 
@@ -537,7 +510,8 @@ void start(void)
 	kdump_stage3();
 
 	/* start new kernel */
-	start_kernel();
+	diag308(DIAG308_LOAD_NORMAL_RESET, NULL);
+	__builtin_unreachable();
 }
 
 void panic_notify(unsigned long UNUSED(rc))
