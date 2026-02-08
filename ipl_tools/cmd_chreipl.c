@@ -26,7 +26,7 @@
 
 #define BOOTPARMS_NSS_MAX	56
 #define BOOTPARMS_CCW_MAX	64
-#define BOOTPARMS_FCP_MAX	3452
+#define BOOTPARMS_SCPDATA_MAX	3452
 
 #define OPT_BRCHR		0x80
 
@@ -836,9 +836,9 @@ static void chreipl_eckd(void)
 	}
 
 	check_exists("reipl/eckd/device", "\"eckd\" re-IPL target");
-	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_SCPDATA_MAX) {
 		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
-			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+			 strlen(l.bootparms), BOOTPARMS_SCPDATA_MAX);
 	}
 
 	if (l.reipl_clear >= 0) {
@@ -870,9 +870,9 @@ static void chreipl_fcp(void)
 		ERR_EXIT("Could not find FCP device \"%s\"", l.busid);
 	}
 	check_exists("reipl/fcp/device", "\"fcp\" re-IPL target");
-	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_SCPDATA_MAX) {
 		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
-			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+			 strlen(l.bootparms), BOOTPARMS_SCPDATA_MAX);
 	}
 
 	if (l.reipl_clear >= 0) {
@@ -913,9 +913,9 @@ static void chreipl_nvme(void)
 	}
 	check_exists("reipl/nvme/fid", "\"nvme\" re-IPL target");
 
-	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_SCPDATA_MAX) {
 		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
-			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+			 strlen(l.bootparms), BOOTPARMS_SCPDATA_MAX);
 	}
 
 	if (l.reipl_clear >= 0) {
