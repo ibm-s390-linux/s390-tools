@@ -157,6 +157,7 @@ void print_eckd(int show_ipl, const char *name)
 {
 	char *dir = show_ipl ? "ipl" : "reipl/eckd";
 	char *path_loadparm = util_path_sysfs("firmware/%s/loadparm", dir);
+	char *path_reipl_clear = util_path_sysfs("firmware/reipl/eckd/clear");
 	char *path_secure_boot = util_path_sysfs("firmware/ipl/secure");
 	char *loadparm;
 
@@ -172,7 +173,7 @@ void print_eckd(int show_ipl, const char *name)
 		printf("Loadparm:    \"%s\"\n", loadparm);
 		free(loadparm);
 	}
-	if (!show_ipl)
+	if (!show_ipl && access(path_reipl_clear, R_OK) == 0)
 		print_fw_str("clear:       %s\n", dir, "clear");
 	if (access(path_secure_boot, R_OK) == 0)
 		print_fw_str("Secure boot: %s\n", "ipl", "secure");
