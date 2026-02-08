@@ -835,6 +835,12 @@ static void chreipl_eckd(void)
 		ERR_EXIT("Could not find DASD ECKD device \"%s\"", l.busid);
 	}
 
+	check_exists("reipl/eckd/device", "\"eckd\" re-IPL target");
+	if (l.bootparms_set && strlen(l.bootparms) > BOOTPARMS_FCP_MAX) {
+		ERR_EXIT("Maximum boot parameter length exceeded (%zu/%u)",
+			 strlen(l.bootparms), BOOTPARMS_FCP_MAX);
+	}
+
 	if (l.reipl_clear >= 0) {
 		check_exists("reipl/eckd/clear", "ECKD re-IPL clear attribute");
 		write_str(l.reipl_clear ? "1" : "0", "reipl/eckd/clear");
@@ -848,6 +854,8 @@ static void chreipl_eckd(void)
 	write_str(l.bootprog, "reipl/eckd/bootprog");
 	write_str(l.busid, "reipl/eckd/device");
 	write_str_optional(l.loadparm, "reipl/eckd/loadparm", l.loadparm_set, "loadparm");
+	write_str_optional(l.bootparms, "reipl/eckd/scp_data", l.bootparms_set,
+			   "boot parameters");
 	write_str("eckd", "reipl/reipl_type");
 	print_eckd(0, "eckd");
 }
