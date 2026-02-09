@@ -4,14 +4,14 @@
 
 use std::io::Write;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{info, warn};
 use pv::{
     misc::{open_file, read_file},
     request::SymKey,
 };
 use pvimg::{
-    error::OwnExitCode,
+    error::{Error, OwnExitCode},
     uvdata::{KeyExchangeTrait, SeH, SeHdr, UvDataTrait},
 };
 
@@ -28,9 +28,16 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
     SeHdr::seek_sehdr(&mut img, None)?;
     let hdr = SeHdr::try_from_io(&mut img)?;
     let se_hdr = if let Some(key_path) = &opt.hdr_key {
-        let key =
-            SymKey::try_from_data(hdr.key_type(), read_file(key_path, "Reading key")?.into())?;
-        let decrypted_hdr = hdr.decrypt(&key)?;
+        let key = SymKey::try_from_data(
+            hdr.key_type(),
+            read_file(key_path, "Reading header protection key")?.into(),
+        )
+        .map_err(|err| Error::InvalidSeHdrProtectionKey {
+            source: Box::new(Error::Pv(err)),
+        })?;
+        let decrypted_hdr = hdr
+            .decrypt(&key)
+            .context("Failed to authenticate and decrypt the Secure Execution header")?;
         SeH::DecryptedSeHdr {
             se_hdr: decrypted_hdr,
             verified: true,
