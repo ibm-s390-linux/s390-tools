@@ -38,9 +38,16 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
         let decrypted_hdr = hdr
             .decrypt(&key)
             .context("Failed to authenticate and decrypt the Secure Execution header")?;
-        SeH::DecryptedSeHdr {
-            se_hdr: decrypted_hdr,
-            verified: true,
+        if opt.show_secrets {
+            SeH::DecryptedSeHdr {
+                se_hdr: decrypted_hdr,
+                verified: true,
+            }
+        } else {
+            SeH::SeHdr {
+                se_hdr: hdr,
+                verified: true,
+            }
         }
     } else {
         warn!("WARNING: The Secure Execution header integrity and authenticity was not verified. Specify '--hdr-key' to authenticate it. Do not trust the data without verification.");

@@ -365,12 +365,32 @@ pub struct InfoArgs {
     #[arg(long, value_parser=OutputFormatSpecParser::default())]
     pub format: Option<OutputFormatSpec>,
 
-    /// Use the key in FILE to decrypt the Secure Execution header.
+    /// Use the key in FILE to verify the Secure Execution header and optionally
+    /// use '--show-secrets' to decrypt it.
     ///
-    /// It is the key that was specified with the command line option
-    /// '--hdr-key' at the Secure Execution image creation.
-    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, alias = "key")]
+    /// The key must be the same key that was specified with '--hdr-key' when the
+    /// Secure Execution image was created. The key is used to:
+    ///   1. Verify the integrity and authenticity of the header
+    ///   2. Optionally decrypt secrets with '--show-secrets'
+    ///
+    /// Without this option, the information is displayed, but NOT verified, and
+    /// a warning is printed. The displayed data should not be trusted without
+    /// verification.
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, alias = "key", verbatim_doc_comment)]
     pub hdr_key: Option<PathBuf>,
+
+    /// This option reveals sensitive information that is normally encrypted in
+    /// the header, such as:
+    ///   - Customer communication key (CCK)
+    ///   - Image encryption key
+    ///   - Other confidential data
+    ///
+    /// SECURITY WARNING: Only use this option in secure, trusted environments.
+    /// The decrypted secrets should never be exposed in untrusted systems.
+    ///
+    /// This option requires '--hdr-key' to decrypt the header.
+    #[arg(long, requires = "hdr_key", verbatim_doc_comment)]
+    pub show_secrets: bool,
 }
 
 #[derive(Args, Debug)]
