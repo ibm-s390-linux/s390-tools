@@ -14,7 +14,7 @@ use pv::request::{
     random_array, Aes256XtsKey, Confidential, EcPubKeyCoord, Encrypt, Keyslot, SymKey, SymKeyType,
     Zeroize, SHA_512_HASH_LEN,
 };
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use super::keys::phkh_v1;
 use crate::{
@@ -31,7 +31,8 @@ use crate::{
         },
         serializing::{
             bytesize, bytesize_confidential, confidential_read_slice, confidential_write_slice,
-            ser_hex, ser_hex_confidential, ser_lower_hex, serialize_to_bytes,
+            serde_base64, serde_hex_array, serde_hex_confidential_array, serde_hex_left_padded_u64,
+            serialize_to_bytes,
         },
         try_copy_slice_to_array,
         uvdata::{
@@ -49,27 +50,28 @@ struct HdrSizesV1 {
     pub sea: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct SeHdrAadV1 {
     #[deku(assert = "*sehs <= SeHdrDataV1::MAX_SIZE.try_into().unwrap()")]
     pub sehs: u32,
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_hex_array", rename = "iv_hex")]
     pub iv: [u8; SymKeyType::AES_256_GCM_IV_LEN],
+    #[serde(skip)]
     res1: u32,
     #[deku(assert = "*nks <= (*sehs).into()", update = "self.keyslots.len()")]
     pub nks: u64,
     #[deku(assert = "*sea <= (*sehs).into()")]
     pub sea: u64,
     pub nep: u64,
-    #[serde(serialize_with = "ser_lower_hex")]
+    #[serde(with = "serde_hex_left_padded_u64", rename = "pcf_hex")]
     pub pcf: u64,
     pub cust_pub_key: EcPubKeyCoordV1,
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_hex_array", rename = "pld_hex")]
     pub pld: [u8; SHA_512_HASH_LEN],
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_hex_array", rename = "ald_hex")]
     pub ald: [u8; SHA_512_HASH_LEN],
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_hex_array", rename = "tld_hex")]
     pub tld: [u8; SHA_512_HASH_LEN],
     #[deku(count = "nks")]
     pub keyslots: Vec<BinaryKeySlotV1>,
@@ -104,27 +106,30 @@ impl KeyExchangeTrait for SeHdrAadV1 {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, DekuRead, DekuWrite, Serialize)]
+#[derive(PartialEq, Eq, Debug, Clone, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct SeHdrConfV1 {
-    #[serde(serialize_with = "ser_hex_confidential")]
+    #[serde(with = "serde_hex_confidential_array", rename = "cck_hex")]
     #[deku(
         reader = "confidential_read_slice(deku::reader, endian)",
         writer = "confidential_write_slice(cck, deku::writer, endian)"
     )]
     cck: Confidential<[u8; 32]>,
-    #[serde(serialize_with = "ser_hex_confidential")]
+    #[serde(with = "serde_hex_confidential_array", rename = "xts_hex")]
     #[deku(
         reader = "confidential_read_slice(deku::reader, endian)",
         writer = "confidential_write_slice(xts, deku::writer, endian)"
     )]
     xts: Aes256XtsKey,
     psw: PSW,
-    #[serde(serialize_with = "ser_lower_hex")]
+    #[serde(with = "serde_hex_left_padded_u64", rename = "scf_hex")]
     pub scf: u64,
+    #[serde(skip)]
     #[deku(assert_eq = "0")]
     noi: u32,
+    #[serde(skip)]
     res2: u32,
+    #[serde(skip)]
     #[deku(count = "noi")]
     opt_items: Vec<u8>,
 }
@@ -141,27 +146,41 @@ impl Zeroize for SeHdrConfV1 {
     }
 }
 
-#[derive(Default, PartialEq, Eq, Debug, Clone, DekuRead, DekuWrite, Serialize)]
+#[derive(Default, PartialEq, Eq, Debug, Clone, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct SeHdrTagV1 {
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_hex_array", rename = "tag_hex")]
     tag: [u8; SymKeyType::AES_256_GCM_TAG_LEN],
 }
 
-fn ser_confidential_confv1<S: Serializer>(
-    encrypted: &Confidential<SeHdrConfV1>,
-    ser: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    encrypted.value().serialize(ser)
+mod ser_confidential_confv1 {
+    use pv::request::Confidential;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::SeHdrConfV1;
+
+    pub fn serialize<S: Serializer>(
+        encrypted: &Confidential<SeHdrConfV1>,
+        ser: S,
+    ) -> Result<S::Ok, S::Error> {
+        encrypted.value().serialize(ser)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Confidential<SeHdrConfV1>, D::Error> {
+        let conf = SeHdrConfV1::deserialize(deserializer)?;
+        Ok(Confidential::new(conf))
+    }
 }
 
 /// Secure Execution Header definition
-#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "big")]
 pub struct SeHdrDataV1 {
     #[serde(flatten)]
     pub aad: SeHdrAadV1,
-    #[serde(flatten, serialize_with = "ser_confidential_confv1")]
+    #[serde(flatten, with = "ser_confidential_confv1")]
     #[deku(
         reader = "confidential_read_sehdrconf_v1(deku::reader)",
         writer = "confidential_write_sehdrconf_v1(data, deku::writer)"
@@ -439,14 +458,14 @@ impl SeHdrPubBuilderTrait for SeHdrDataV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "big")]
 pub struct SeHdrBinV1 {
     #[serde(flatten)]
     pub aad: SeHdrAadV1,
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_base64", rename = "cipher_data_b64")]
     #[deku(bytes_read = "aad.sea")]
-    pub data: Vec<u8>,
+    pub cipher_data: Vec<u8>,
     #[serde(flatten)]
     pub tag: SeHdrTagV1,
 }
@@ -512,7 +531,7 @@ impl AeadDataTrait for SeHdrBinV1 {
     }
 
     fn data(&self) -> Vec<u8> {
-        self.data.to_owned()
+        self.cipher_data.to_owned()
     }
 
     fn tag(&self) -> Vec<u8> {
@@ -666,5 +685,94 @@ mod tests {
             .with_components(meta)
             .expect("should not fail");
         assert!(matches!(builder.build(), Err(Error::InvalidSeHdr)));
+    }
+
+    #[test]
+    fn roundtrip_se_hdr_tag_v1_json() {
+        let tag = SeHdrTagV1 {
+            tag: [0x42; SymKeyType::AES_256_GCM_TAG_LEN],
+        };
+
+        let json = serde_json::to_string(&tag).expect("should serialize");
+        assert_eq!(json, "{\"tag_hex\":\"42424242424242424242424242424242\"}");
+        let deserialized: SeHdrTagV1 = serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(tag, deserialized);
+    }
+
+    #[test]
+    fn roundtrip_se_hdr_conf_v1_json() {
+        let conf = SeHdrConfV1 {
+            cck: Confidential::new([0x11; 32]),
+            xts: Confidential::new([0x22; SymKeyType::AES_256_XTS_KEY_LEN]),
+            psw: PSW {
+                addr: 0x1000,
+                mask: 0x2000,
+            },
+            scf: 0x42,
+            noi: 0,
+            res2: 0,
+            opt_items: vec![],
+        };
+
+        let json = serde_json::to_string(&conf).expect("should serialize");
+        assert_eq!(json, "{\"cck_hex\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"xts_hex\":\"22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222\",\"psw\":{\"mask_hex\":\"0000000000002000\",\"addr_hex\":\"0000000000001000\"},\"scf_hex\":\"0000000000000042\"}");
+        let deserialized: SeHdrConfV1 = serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(conf, deserialized);
+    }
+
+    #[test]
+    fn roundtrip_se_hdr_aad_v1_json() {
+        let aad = SeHdrAadV1 {
+            sehs: 1024,
+            iv: [0x33; SymKeyType::AES_256_GCM_IV_LEN],
+            res1: 0,
+            nks: 2,
+            sea: 512,
+            nep: 10,
+            pcf: 0x100,
+            cust_pub_key: EcPubKeyCoordV1 { coord: [0x44; 160] },
+            pld: [0x55; SHA_512_HASH_LEN],
+            ald: [0x66; SHA_512_HASH_LEN],
+            tld: [0x77; SHA_512_HASH_LEN],
+            keyslots: vec![],
+        };
+
+        let json = serde_json::to_string(&aad).expect("should serialize");
+        assert_eq!(json, "{\"sehs\":1024,\"iv_hex\":\"333333333333333333333333\",\"nks\":2,\"sea\":512,\"nep\":10,\"pcf_hex\":\"0000000000000100\",\"cust_pub_key\":{\"coord_hex\":\"44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\"},\"pld_hex\":\"55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\",\"ald_hex\":\"66666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666\",\"tld_hex\":\"77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\",\"keyslots\":[]}");
+        let deserialized: SeHdrAadV1 = serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(aad, deserialized);
+    }
+
+    #[test]
+    fn roundtrip_se_hdr_bin_v1_json() {
+        let bin = SeHdrBinV1 {
+            aad: SeHdrAadV1 {
+                sehs: 1024,
+                iv: [0x33; SymKeyType::AES_256_GCM_IV_LEN],
+                res1: 0,
+                nks: 0,
+                sea: 64,
+                nep: 10,
+                pcf: 0x100,
+                cust_pub_key: EcPubKeyCoordV1 { coord: [0x44; 160] },
+                pld: [0x55; SHA_512_HASH_LEN],
+                ald: [0x66; SHA_512_HASH_LEN],
+                tld: [0x77; SHA_512_HASH_LEN],
+                keyslots: vec![],
+            },
+            cipher_data: vec![0x88; 64],
+            tag: SeHdrTagV1 {
+                tag: [0x99; SymKeyType::AES_256_GCM_TAG_LEN],
+            },
+        };
+
+        let json = serde_json::to_string(&bin).expect("should serialize");
+        assert_eq!(json, "{\"sehs\":1024,\"iv_hex\":\"333333333333333333333333\",\"nks\":0,\"sea\":64,\"nep\":10,\"pcf_hex\":\"0000000000000100\",\"cust_pub_key\":{\"coord_hex\":\"44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\"},\"pld_hex\":\"55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555\",\"ald_hex\":\"66666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666\",\"tld_hex\":\"77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777\",\"keyslots\":[],\"cipher_data_b64\":\"iIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiA==\",\"tag_hex\":\"99999999999999999999999999999999\"}");
+        let deserialized: SeHdrBinV1 = serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(bin, deserialized);
     }
 }

@@ -10,6 +10,7 @@ workspace = true
 
 [dependencies]
 anyhow = { version = "1.0.95", features = ["std"] }
+base64 = "0.22.1"
 clap = { version ="4.5", features = ["derive", "wrap_help"]}
 deku = "0.18"
 deku_derive = "0.18"

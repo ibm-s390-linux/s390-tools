@@ -4,9 +4,9 @@
 
 use deku::{ctx::Endian, DekuRead, DekuWrite};
 use pv::request::Zeroize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use super::serializing::ser_lower_hex;
+use super::serializing::serde_hex_left_padded_u64;
 use crate::pv_utils::error::Error;
 
 pub const PSW32_ADDR_MASK: u64 = 0x000000007fffffff;
@@ -14,12 +14,12 @@ pub const PSW_MASK_BA: u64 = 0x0000000080000000;
 pub const PSW_MASK_EA: u64 = 0x0000000100000000;
 pub const PSW_MASK_BIT_12: u64 = 0x08000000000000;
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct PSW {
-    #[serde(serialize_with = "ser_lower_hex")]
+    #[serde(with = "serde_hex_left_padded_u64", rename = "mask_hex")]
     pub mask: u64,
-    #[serde(serialize_with = "ser_lower_hex")]
+    #[serde(with = "serde_hex_left_padded_u64", rename = "addr_hex")]
     pub addr: u64,
 }
 
@@ -30,7 +30,7 @@ impl Zeroize for PSW {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct ShortPsw(u64);
 
@@ -134,5 +134,20 @@ mod tests {
 
         let new_psw: PSW = short_psw.into();
         assert_eq!(new_psw, psw);
+    }
+
+    #[test]
+    fn psw_json_roundtrip() {
+        let psw = PSW {
+            addr: 0x1234567890abcdef,
+            mask: 0xfedcba0987654321,
+        };
+        let json = serde_json::to_string(&psw).expect("should serialize");
+        assert_eq!(
+            json,
+            "{\"mask_hex\":\"fedcba0987654321\",\"addr_hex\":\"1234567890abcdef\"}"
+        );
+        let deserialized: PSW = serde_json::from_str(&json).expect("should deserialize");
+        assert_eq!(psw, deserialized);
     }
 }

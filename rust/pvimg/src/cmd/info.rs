@@ -31,10 +31,16 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
         let key =
             SymKey::try_from_data(hdr.key_type(), read_file(key_path, "Reading key")?.into())?;
         let decrypted_hdr = hdr.decrypt(&key)?;
-        SeH::Decrypted(decrypted_hdr)
+        SeH::DecryptedSeHdr {
+            se_hdr: decrypted_hdr,
+            verified: true,
+        }
     } else {
         warn!("WARNING: The Secure Execution header integrity and authenticity was not verified. Specify '--hdr-key' to authenticate it. Do not trust the data without verification.");
-        SeH::Encrypted(hdr)
+        SeH::SeHdr {
+            se_hdr: hdr,
+            verified: false,
+        }
     };
 
     match opt.format {

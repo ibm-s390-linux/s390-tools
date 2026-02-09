@@ -15,7 +15,7 @@ use pv::{
     },
     static_assert,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub use super::hdr_v1::{SeHdrBinV1, SeHdrDataV1};
 use super::{PlaintextControlFlagsV1, SecretControlFlagsV1};
@@ -23,7 +23,7 @@ use crate::{
     misc::PAGESIZE,
     pv_utils::{
         error::{Error, Result},
-        serializing::{ser_hex, serialize_to_bytes},
+        serializing::{serde_hex_array, serialize_to_bytes},
         uvdata::{
             AeadCipherTrait, AeadDataTrait, AeadPlainDataTrait, KeyExchangeTrait, UvDataPlainTrait,
             UvDataTrait,
@@ -35,7 +35,7 @@ use crate::{
 
 #[repr(u32)]
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(
     endian = "endian",
     id_type = "u32",
@@ -47,26 +47,37 @@ pub enum SeHdrVersion {
     V1 = 0x100,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+#[serde(rename_all = "snake_case")]
 pub enum SeH {
-    Decrypted(SeHdrPlain),
-    Encrypted(SeHdr),
+    DecryptedSeHdr {
+        verified: bool,
+        #[serde(flatten)]
+        se_hdr: SeHdrPlain,
+    },
+    SeHdr {
+        verified: bool,
+        #[serde(flatten)]
+        se_hdr: SeHdr,
+    },
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct SeHdrCommon {
-    #[serde(serialize_with = "ser_hex")]
+    #[serde(with = "serde_hex_array", rename = "magic_hex")]
     pub magic: [u8; 8],
     pub version: SeHdrVersion,
 }
 static_assert!(::std::mem::size_of::<SeHdrCommon>() == 12);
 
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]
 pub struct SeHdrCommonWithSize {
+    #[serde(with = "serde_hex_array", rename = "magic_hex")]
     pub magic: [u8; 8],
     pub version: SeHdrVersion,
     pub sehs: u32,
@@ -85,7 +96,7 @@ impl SeHdrCommon {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "Endian::Big")]
 /// Secure Execution header structure
 pub struct SeHdr {
@@ -97,7 +108,7 @@ pub struct SeHdr {
     pub data: SeHdrVersioned,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[deku(endian = "Endian::Big")]
 /// Plain data Secure Execution header structure
 pub struct SeHdrPlain {
@@ -109,7 +120,7 @@ pub struct SeHdrPlain {
 }
 
 #[enum_dispatch(AeadCipherTrait, AeadDataTrait, KeyExchangeTrait)]
-#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[serde(untagged)]
 #[deku(ctx = "_endian: Endian, version: SeHdrVersion", id = "version")]
 pub enum SeHdrVersioned {
@@ -123,7 +134,7 @@ pub enum SeHdrVersioned {
     KeyExchangeTrait,
     KeyExchangeBuilderTrait
 )]
-#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, DekuRead, DekuWrite, Serialize, Deserialize)]
 #[serde(untagged)]
 #[deku(ctx = "_endian: Endian, version: SeHdrVersion", id = "version")]
 pub enum SeHdrData {
@@ -382,7 +393,7 @@ impl AeadCipherTrait for SeHdrPlain {
 mod tests {
     use std::io::Cursor;
 
-    use super::SeHdr;
+    use super::*;
     use crate::error::Error;
 
     #[test]
