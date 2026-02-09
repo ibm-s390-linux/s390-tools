@@ -47,6 +47,12 @@ pub enum SeHdrVersion {
     V1 = 0x100,
 }
 
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
+pub enum SeH {
+    Decrypted(SeHdrPlain),
+    Encrypted(SeHdr),
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, DekuRead, DekuWrite, Serialize)]
 #[deku(endian = "endian", ctx = "endian: Endian", ctx_default = "Endian::Big")]

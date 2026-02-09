@@ -2,9 +2,15 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{env, fmt::Display, path::PathBuf};
+use std::fmt::Display;
+use std::str::FromStr;
+use std::string::ToString;
+use std::{env, ffi::OsStr, path::PathBuf};
 
-use clap::{ArgGroup, Args, Command, CommandFactory, Parser, ValueEnum, ValueHint};
+use clap::{
+    builder::PossibleValue, Arg, ArgGroup, Args, Command, CommandFactory, Parser, ValueEnum,
+    ValueHint,
+};
 use log::warn;
 use utils::{CertificateOptions, DeprecatedVerbosityOptions};
 
@@ -206,21 +212,112 @@ pub struct CreateBootImageLegacyFlags {
 }
 
 #[non_exhaustive]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-pub enum OutputFormat {
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum OutputFormatKind {
     /// JSON format.
     Json,
 }
 
-impl Display for OutputFormat {
+impl Display for OutputFormatKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Json => "JSON",
+        match self {
+            Self::Json => write!(f, "JSON"),
+        }
+    }
+}
+
+impl FromStr for OutputFormatKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "json" => Ok(Self::Json),
+            _ => Err(format!("Invalid output format: {s}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormatVariant {
+    /// Default
+    Default,
+    /// Minified
+    Minify,
+    /// Pretty
+    Pretty,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutputFormatSpec {
+    pub kind: OutputFormatKind,
+    pub variant: OutputFormatVariant,
+}
+
+#[derive(Clone, Default)]
+struct OutputFormatSpecParser;
+
+impl clap::builder::TypedValueParser for OutputFormatSpecParser {
+    type Value = OutputFormatSpec;
+
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&Arg>,
+        value: &OsStr,
+    ) -> Result<Self::Value, clap::error::Error> {
+        let s = value.to_string_lossy();
+        let mut parts = s.splitn(2, ':');
+        let arg_name = arg.unwrap().get_id().to_string();
+        let kind_s = parts.next().unwrap().to_ascii_lowercase();
+        let variant_s = parts.next().map(|x| x.to_ascii_lowercase());
+        let kind = kind_s.as_str().parse().map_err(|_| {
+            let mut err =
+                clap::error::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+            err.insert(
+                clap::error::ContextKind::InvalidArg,
+                clap::error::ContextValue::String(arg_name.clone()),
+            );
+            err.insert(
+                clap::error::ContextKind::InvalidValue,
+                clap::error::ContextValue::String(kind_s.to_string()),
+            );
+            err
+        })?;
+
+        let variant = match (kind, variant_s.as_deref()) {
+            (_, None) => OutputFormatVariant::Default,
+            (_, Some("default")) => OutputFormatVariant::Default,
+
+            (OutputFormatKind::Json, Some("pretty")) => OutputFormatVariant::Pretty,
+            (OutputFormatKind::Json, Some("minify")) => OutputFormatVariant::Minify,
+            (OutputFormatKind::Json, Some(other)) => {
+                let mut err =
+                    clap::error::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                err.insert(
+                    clap::error::ContextKind::InvalidArg,
+                    clap::error::ContextValue::String(arg_name),
+                );
+                err.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(format!("{kind_s}:{other}")),
+                );
+                Err(err)?
             }
-        )
+        };
+
+        Ok(OutputFormatSpec { kind, variant })
+    }
+
+    // This is used for shell completion suggestions for `--format`
+    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+        use clap::builder::PossibleValue as PV;
+
+        let vals: Vec<PV> = vec![
+            PV::new("json").help("Pretty-printed machine-readable JSON"),
+            PV::new("json:pretty").help("Pretty-printed machine-readable JSON"),
+            PV::new("json:minify").help("Minified machine-readable JSON"),
+        ];
+        Some(Box::new(vals.into_iter()))
     }
 }
 
@@ -236,9 +333,9 @@ pub struct InfoArgs {
     #[clap(flatten)]
     pub input: SeImgInputArgs,
 
-    /// The output format
-    #[arg(long, value_enum)]
-    pub format: OutputFormat,
+    /// Output format
+    #[arg(long, value_parser=OutputFormatSpecParser::default())]
+    pub format: OutputFormatSpec,
 
     /// Use the key in FILE to decrypt the Secure Execution header.
     ///
@@ -790,6 +887,30 @@ mod test {
                 vec![
                     CliOption::new("hdr-key", ["--key", "/dev/null"]),
                     CliOption::new("format", ["--format=json"]),
+                    CliOption::new("image", ["/dev/null"]),
+                ],
+            )),
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("hdr-key", ["--key", "/dev/null"]),
+                    CliOption::new("format", ["--format=json:default"]),
+                    CliOption::new("image", ["/dev/null"]),
+                ],
+            )),
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("hdr-key", ["--key", "/dev/null"]),
+                    CliOption::new("format", ["--format=json:minify"]),
+                    CliOption::new("image", ["/dev/null"]),
+                ],
+            )),
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("hdr-key", ["--key", "/dev/null"]),
+                    CliOption::new("format", ["--format=json:pretty"]),
                     CliOption::new("image", ["/dev/null"]),
                 ],
             )),

@@ -19,7 +19,7 @@ pub use misc::{round_up, try_copy_slice_to_array};
 pub use psw::{ShortPsw, PSW, PSW_MASK_BA, PSW_MASK_EA};
 pub use se_hdr::{
     ComponentMetadataV1, ControlFlagTrait, ControlFlagsTrait, FlagData, PcfV1,
-    PlaintextControlFlagsV1, ScfV1, SeHdr, SeHdrAadV1, SeHdrBinV1, SeHdrBuilder, SeHdrData,
+    PlaintextControlFlagsV1, ScfV1, SeH, SeHdr, SeHdrAadV1, SeHdrBinV1, SeHdrBuilder, SeHdrData,
     SeHdrDataV1, SeHdrPlain, SeHdrVersion, SeHdrVersioned, SecretControlFlagsV1,
 };
 pub use secured_comp::{ComponentTrait, SecuredComponent, SecuredComponentBuilder};

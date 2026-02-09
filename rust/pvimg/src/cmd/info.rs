@@ -12,30 +12,49 @@ use pv::{
 };
 use pvimg::{
     error::OwnExitCode,
-    uvdata::{KeyExchangeTrait, SeHdr, UvDataTrait},
+    uvdata::{KeyExchangeTrait, SeH, SeHdr, UvDataTrait},
 };
 
-use crate::cli::InfoArgs;
+use crate::cli::{InfoArgs, OutputFormatKind, OutputFormatSpec, OutputFormatVariant};
 
 pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
     info!(
         "Reading Secure Execution header {}",
         opt.input.path.display()
     );
-    let mut input = open_file(&opt.input.path)?;
+    let mut img = open_file(&opt.input.path)?;
     let mut output = std::io::stdout();
 
-    SeHdr::seek_sehdr(&mut input, None)?;
-    let hdr = SeHdr::try_from_io(input)?;
-    if let Some(key_path) = &opt.hdr_key {
+    SeHdr::seek_sehdr(&mut img, None)?;
+    let hdr = SeHdr::try_from_io(&mut img)?;
+    let se_hdr = if let Some(key_path) = &opt.hdr_key {
         let key =
             SymKey::try_from_data(hdr.key_type(), read_file(key_path, "Reading key")?.into())?;
-        serde_json::to_writer_pretty(&mut output, &hdr.decrypt(&key)?)?;
+        let decrypted_hdr = hdr.decrypt(&key)?;
+        SeH::Decrypted(decrypted_hdr)
     } else {
         warn!("WARNING: The Secure Execution header integrity and authenticity was not verified. Specify '--hdr-key' to authenticate it. Do not trust the data without verification.");
-        serde_json::to_writer_pretty(&mut output, &hdr)?;
+        SeH::Encrypted(hdr)
+    };
+
+    match opt.format {
+        OutputFormatSpec {
+            kind: OutputFormatKind::Json,
+            variant,
+        } => {
+            match variant {
+                OutputFormatVariant::Minify => {
+                    serde_json::to_writer(&mut output, &se_hdr)?;
+                }
+                OutputFormatVariant::Default | OutputFormatVariant::Pretty => {
+                    serde_json::to_writer_pretty(&mut output, &se_hdr)?
+                }
+            }
+            // Make sure the output ends with a new line
+            writeln!(&mut output)?
+        }
     }
-    writeln!(output)?;
+    output.flush()?;
 
     Ok(OwnExitCode::Success)
 }
