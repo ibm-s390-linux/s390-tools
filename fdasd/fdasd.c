@@ -10,6 +10,7 @@
 #include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <strings.h>
 #include <sys/sysmacros.h>
 
 #include "lib/dasd_base.h"
@@ -157,6 +158,11 @@ static struct util_opt opt_vec[] = {
 		.option = { "label", required_argument, NULL, 'l' },
 		.argument = "VOLSER",
 		.desc = "Set the volume serial to VOLSER",
+	},
+	{
+		.option = { "script", required_argument, NULL, 'S' },
+		.argument = "COMMANDS",
+		.desc = "Execute commands in non-interactive mode",
 	},
 	UTIL_OPT_SECTION("MISC"),
 	{
@@ -637,6 +643,11 @@ static void fdasd_parse_options(fdasd_anchor_t *anc,
 		case 'a':
 			anc->auto_partition++;
 			break;
+		case 'S':
+			anc->script_mode++;
+			anc->silent++;
+			options->script_commands = optarg;
+			break;
 		case 's':
 			anc->silent++;
 			break;
@@ -1040,6 +1051,12 @@ static void fdasd_verify_options(fdasd_anchor_t *anc)
 		fdasd_error(anc, parser_failed,
 			    "Option 'config' cannot be used with"
 			    " 'table'.\n");
+	}
+
+	if (anc->script_mode && (anc->auto_partition || options.conffile)) {
+		fdasd_error(anc, parser_failed,
+			    "Option 'script' cannot be used with"
+			    " 'auto' or 'config'.\n");
 	}
 }
 
@@ -2337,6 +2354,55 @@ static void fdasd_get_geometry(fdasd_anchor_t *anc)
 	}
 }
 
+/* helper function to parse size value with optional suffix and convert to tracks */
+static int fdasd_parse_relative_size(unsigned long long *result, fdasd_anchor_t *anc)
+{
+	int use_default = 1;
+	unsigned long long trk = 0;
+
+	trk = atoi(line_ptr);
+	while (isdigit(*line_ptr)) {
+		line_ptr++;
+		use_default = 0;
+	}
+
+	switch (*line_ptr) {
+	case 'c':
+	case 'C':
+		trk *= geo.heads;
+		break;
+	case 'k':
+	case 'K':
+		trk *= 1024;
+		trk /= anc->blksize;
+		trk /= geo.sectors;
+		break;
+	case 'm':
+	case 'M':
+		trk *= (1024 * 1024);
+		trk /= anc->blksize;
+		trk /= geo.sectors;
+		break;
+	case 'g':
+	case 'G':
+		trk *= (1024 * 1024 * 1024);
+		trk /= anc->blksize;
+		trk /= geo.sectors;
+		break;
+	case 0x0a:
+		break;
+	default:
+		printf("WARNING: '%c' is not a "
+		       "valid appendix and probably "
+		       "not what you want!\n",
+		       *line_ptr);
+		break;
+	}
+
+	*result = trk;
+	return use_default;
+}
+
 /*
  * asks for partition boundaries
  */
@@ -2367,47 +2433,13 @@ fdasd_read_int(unsigned long low, unsigned long dflt, unsigned long high,
 		if ((*line_ptr == '+' || *line_ptr == '-') && base != lower) {
 			if (*line_ptr == '+')
 				++line_ptr;
-			trk = atoi(line_ptr);
-			while (isdigit(*line_ptr)) {
-				line_ptr++;
+			if (fdasd_parse_relative_size(&trk, anc) != 0) {
+				use_default = 1;
+				break;
+			} else {
 				use_default = 0;
 			}
-
-			switch (*line_ptr) {
-			case 'c':
-			case 'C':
-				trk *= geo.heads;
-				break;
-			case 'k':
-			case 'K':
-				trk *= 1024;
-				trk /= anc->blksize;
-				trk /= geo.sectors;
-				break;
-			case 'm':
-			case 'M':
-				trk *= (1024 * 1024);
-				trk /= anc->blksize;
-				trk /= geo.sectors;
-				break;
-			case 'g':
-			case 'G':
-				trk *= (1024 * 1024 * 1024);
-				trk /= anc->blksize;
-				trk /= geo.sectors;
-				break;
-			case 0x0a:
-				break;
-			default:
-				printf("WARNING: '%c' is not a "
-				       "valid appendix and probably "
-				       "not what you want!\n",
-				       *line_ptr);
-				break;
-			}
-
 			trk += (low - 1);
-
 		} else if (*line_ptr == '\0') {
 			switch (base) {
 			case lower:
@@ -2682,15 +2714,40 @@ static void fdasd_dequeue_old_partition(fdasd_anchor_t *anc,
 /*
  * adds a new partition to the 'partition table'
  */
+static void fdasd_commit_new_partition(fdasd_anchor_t *anc,
+				       partition_info_t *part_info,
+				       extent_t *ext)
+{
+	unsigned long start, stop;
+	cchhb_t hf1;
+
+	if (anc->formatted_cylinders > LV_COMPAT_CYL)
+		vtoc_init_format8_label(anc->blksize, ext, part_info->f1);
+	else
+		vtoc_init_format1_label(anc->blksize, ext, part_info->f1);
+
+	fdasd_enqueue_new_partition(anc);
+	anc->used_partitions += 1;
+
+	get_addr_of_highest_f1_f8_label(anc, &hf1);
+	vtoc_update_format4_label(anc->f4, &hf1, anc->f4->DS4DSREC - 1);
+
+	start = cchh2trk(&ext->llimit, &geo);
+	stop = cchh2trk(&ext->ulimit, &geo);
+
+	vtoc_set_freespace(anc->f4, anc->f5, anc->f7, '-', anc->verbose,
+			   start, stop, anc->formatted_cylinders, geo.heads);
+
+	anc->vtoc_changed++;
+}
+
 static void fdasd_add_partition(fdasd_anchor_t *anc)
 {
 	partition_info_t *part_info;
-	unsigned long start, stop;
 	extent_t ext;
-	cchhb_t hf1;
 
 	part_info = fdasd_get_empty_f1_label(anc);
-	if (part_info == NULL) {
+	if (!part_info) {
 		printf("No more free partitions left,\n"
 		       "you have to delete one first!");
 		return;
@@ -2699,52 +2756,21 @@ static void fdasd_add_partition(fdasd_anchor_t *anc)
 	if (fdasd_get_partition_data(anc, &ext, part_info) != 0)
 		return;
 
-	if (anc->formatted_cylinders > LV_COMPAT_CYL)
-		vtoc_init_format8_label(anc->blksize, &ext, part_info->f1);
-	else
-		vtoc_init_format1_label(anc->blksize, &ext, part_info->f1);
-
-	fdasd_enqueue_new_partition(anc);
-	anc->used_partitions += 1;
-
-	get_addr_of_highest_f1_f8_label(anc, &hf1);
-	vtoc_update_format4_label(anc->f4, &hf1, anc->f4->DS4DSREC - 1);
-
-	start = cchh2trk(&ext.llimit, &geo);
-	stop = cchh2trk(&ext.ulimit, &geo);
-
-	vtoc_set_freespace(anc->f4, anc->f5, anc->f7, '-', anc->verbose,
-			   start, stop, anc->formatted_cylinders, geo.heads);
-
-	anc->vtoc_changed++;
+	fdasd_commit_new_partition(anc, part_info, &ext);
 }
 
 /*
  * removes a partition from the 'partition table'
  */
-static void fdasd_remove_partition(fdasd_anchor_t *anc)
+static int fdasd_commit_remove_partition(fdasd_anchor_t *anc, unsigned int part_id)
 {
 	partition_info_t *part_info = anc->first;
 	unsigned long start, stop;
-	unsigned int part_id, i;
+	unsigned int i;
 	cchhb_t hf1;
 
-	fdasd_list_partition_table(anc);
-
-	while (!isdigit(part_id = read_char("\ndelete partition with id "
-					    "(use 0 to exit): ")))
-		printf("Invalid partition id '%c' detected.\n", part_id);
-
-	printf("\n");
-	part_id -= 48;
-	if (part_id == 0)
-		return;
-	if (part_id > anc->used_partitions) {
-		printf("'%d' is not a valid partition id!\n", part_id);
-		return;
-	}
-
-	printf("deleting partition number '%d'...\n", part_id);
+	if (part_id < 1 || part_id > anc->used_partitions)
+		return -1;
 
 	setpos(anc, part_id - 1, -1);
 	for (i = 1; i < part_id; i++)
@@ -2766,6 +2792,36 @@ static void fdasd_remove_partition(fdasd_anchor_t *anc)
 			   start, stop, anc->formatted_cylinders, geo.heads);
 
 	anc->vtoc_changed++;
+
+	return 0;
+}
+
+static void fdasd_remove_partition(fdasd_anchor_t *anc)
+{
+	unsigned int part_id;
+	int rc;
+
+	fdasd_list_partition_table(anc);
+
+	while (!isdigit(part_id = read_char("\ndelete partition with id "
+					    "(use 0 to exit): ")))
+		printf("Invalid partition id '%c' detected.\n", part_id);
+
+	printf("\n");
+	part_id -= 48;
+	if (part_id == 0)
+		return;
+
+	if (part_id > anc->used_partitions) {
+		printf("'%d' is not a valid partition id!\n", part_id);
+		return;
+	}
+
+	printf("deleting partition number '%d'...\n", part_id);
+
+	rc = fdasd_commit_remove_partition(anc, part_id);
+	if (rc < 0)
+		printf("Error: Failed to remove partition %d\n", part_id);
 }
 
 /*
@@ -2940,6 +2996,271 @@ static void fdasd_quit(fdasd_anchor_t *anc)
 	fdasd_exit(anc, 0);
 }
 
+static int fdasd_remove_partition_script(fdasd_anchor_t *anc,
+					 unsigned int part_id)
+{
+	int rc;
+
+	rc = fdasd_commit_remove_partition(anc, part_id);
+	if (rc < 0) {
+		printf("Invalid partition id %d\n", part_id);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int fdasd_get_partition_data_script(fdasd_anchor_t *anc,
+					   extent_t *part_extent,
+					   partition_info_t *part_info,
+					   unsigned long start,
+					   unsigned long stop)
+{
+	partition_info_t *part_tmp;
+	cchh_t llimit, ulimit;
+	u_int16_t hh, head;
+	u_int32_t cc, cyl;
+	u_int8_t b1, b2;
+	unsigned long limit;
+
+	cyl = get_usable_cylinders(anc);
+	head = anc->f4->DS4DEVCT.DS4DSTRK;
+	limit = (head * cyl - 1);
+
+	if (start < FIRST_USABLE_TRK) {
+		printf("Error: Start track %ld is below minimum (%d)\n",
+		       start, FIRST_USABLE_TRK);
+		return -1;
+	}
+
+	if (start > limit) {
+		printf("Error: Start track %ld exceeds disk limit (%ld)\n",
+		       start, limit);
+		return -1;
+	}
+
+	if (stop < start) {
+		printf("Error: Stop track %ld is before start track %ld\n",
+		       stop, start);
+		return -1;
+	}
+
+	if (stop > limit) {
+		printf("Error: Stop track %ld exceeds disk limit (%ld)\n",
+		       stop, limit);
+		return -1;
+	}
+
+	/* check for overlaps with existing partitions */
+	for (part_tmp = anc->first; part_tmp->next; part_tmp = part_tmp->next) {
+		/* Check if start is within an existing partition */
+		if (start >= part_tmp->start_trk && start <= part_tmp->end_trk) {
+			printf("Error: Start track %ld overlaps with partition %ld-%ld\n",
+			       start, part_tmp->start_trk, part_tmp->end_trk);
+			return -1;
+		}
+
+		if (stop >= part_tmp->start_trk && stop <= part_tmp->end_trk) {
+			printf("Error: Stop track %ld overlaps with partition %ld-%ld\n",
+			       stop, part_tmp->start_trk, part_tmp->end_trk);
+			return -1;
+		}
+
+		if (start < part_tmp->start_trk && stop > part_tmp->end_trk) {
+			printf("Error: New partition would encompass existing partition %ld-%ld\n",
+			       part_tmp->start_trk, part_tmp->end_trk);
+			return -1;
+		}
+	}
+
+	/* update partition info */
+	part_info->len_trk   = stop - start + 1;
+	part_info->start_trk = start;
+	part_info->end_trk   = stop;
+
+	cc = start / geo.heads;
+	hh = start - (cc * geo.heads);
+	vtoc_set_cchh(&llimit, cc, hh);
+
+	/* check for cylinder boundary */
+	if (hh == 0)
+		b1 = 0x81;
+	else
+		b1 = 0x01;
+
+	cc = stop / geo.heads;
+	hh = stop - cc * geo.heads;
+	vtoc_set_cchh(&ulimit, cc, hh);
+
+	/* it is always the 1st extent */
+	b2 = 0x00;
+
+	vtoc_set_extent(part_extent, b1, b2, &llimit, &ulimit);
+
+	return 0;
+}
+
+static int fdasd_add_partition_script(fdasd_anchor_t *anc,
+				      unsigned long start_trk,
+				      unsigned long stop_trk)
+{
+	partition_info_t *part_info;
+	extent_t ext;
+	int rc;
+
+	part_info = fdasd_get_empty_f1_label(anc);
+	if (!part_info) {
+		printf("No more free partitions left,\n"
+		       "you have to delete one first!");
+		return -1;
+	}
+
+	rc = fdasd_get_partition_data_script(anc, &ext, part_info,
+					     start_trk, stop_trk);
+	if (rc != 0)
+		return -1;
+
+	fdasd_commit_new_partition(anc, part_info, &ext);
+
+	return 0;
+}
+
+static int fdasd_change_part_type_script(fdasd_anchor_t *anc, unsigned int part_id, unsigned int part_type)
+{
+	partition_info_t *part_info;
+	char *dsname = NULL;
+	char str[20], *ch;
+	unsigned int i = 0;
+
+	if (part_id == 0 || part_id > anc->used_partitions) {
+		printf("'%d' is not a valid partition id!\n", part_id);
+		return -1;
+	}
+
+	part_info = anc->first;
+	for (i = 1; i < part_id; i++)
+		part_info = part_info->next;
+
+	vtoc_ebcdic_dec(part_info->f1->DS1DSNAM, part_info->f1->DS1DSNAM, 44);
+	ch = strstr(part_info->f1->DS1DSNAM, "PART") + 9;
+	if (ch) {
+		strncpy(str, ch, 6);
+		str[6] = '\0';
+	} else {
+		strcpy(str, "error");
+	}
+
+	if (get_part_dsname_by_type(part_type, &dsname)) {
+		printf("part type '%d' is not supported!\n", part_type);
+		return -1;
+	}
+
+	snprintf(str, 7, "%-6s", dsname);
+	ch = strstr(part_info->f1->DS1DSNAM, "PART") + 9;
+	if (ch)
+		memcpy(ch, str, 6);
+	vtoc_ebcdic_enc(part_info->f1->DS1DSNAM, part_info->f1->DS1DSNAM, 44);
+	anc->vtoc_changed++;
+
+	return 0;
+}
+
+static char *_skip_whitespace(char *str)
+{
+	while (*str && isspace(*str))
+		str++;
+	return str;
+}
+
+static void fdasd_process_script_commands(fdasd_anchor_t *anc, char *commands)
+{
+	char *ptr = commands;
+	int rc = 0;
+	char cmd;
+
+	while (*ptr) {
+		ptr = _skip_whitespace(ptr);
+
+		if (*ptr == '\0')
+			break;
+
+		cmd = *ptr++;
+		if (cmd == 'n') {
+			unsigned long long start_trk, stop_trk;
+
+			ptr = _skip_whitespace(ptr);
+
+			/* start track */
+			start_trk = atoi(ptr++);
+			while (isdigit(*ptr))
+				ptr++;
+			if (start_trk == 0) {
+				printf("Invalid start position\n");
+				fdasd_exit(anc, EXIT_FAILURE);
+			}
+
+			ptr = _skip_whitespace(ptr);
+
+			/* stop track (can be relative to start) */
+			if (*ptr == '+') {
+				++ptr;
+				line_ptr = ptr;
+				if (fdasd_parse_relative_size(&stop_trk, anc) != 0) {
+					printf("Invalid stop position\n");
+					fdasd_exit(anc, EXIT_FAILURE);
+				}
+				ptr = ++line_ptr;
+				stop_trk += (start_trk - 1);
+			} else {
+				stop_trk = atoi(ptr++);
+				while (isdigit(*ptr))
+					ptr++;
+			}
+
+			rc = fdasd_add_partition_script(anc, start_trk, stop_trk);
+			if (rc < 0)
+				fdasd_exit(anc, EXIT_FAILURE);
+		} else if (cmd == 'd') {
+			unsigned int part_id;
+
+			part_id = atoi(ptr++);
+			while (isdigit(*ptr))
+				ptr++;
+
+			rc = fdasd_remove_partition_script(anc, part_id);
+			if (rc < 0)
+				fdasd_exit(anc, EXIT_FAILURE);
+		} else if (cmd == 't') {
+			unsigned int part_id, part_type;
+
+			part_id = atoi(ptr++);
+			while (isdigit(*ptr))
+				ptr++;
+			ptr = _skip_whitespace(ptr);
+
+			part_type = atoi(ptr++);
+			while (isdigit(*ptr))
+				ptr++;
+
+			rc = fdasd_change_part_type_script(anc, part_id, part_type);
+			if (rc < 0)
+				fdasd_exit(anc, EXIT_FAILURE);
+		} else if (cmd == 'r') {
+			fdasd_recreate_vtoc_unconditional (anc);
+		} else if (cmd == 'q') {
+			fdasd_exit(anc, EXIT_SUCCESS);
+		} else if (cmd == 'w') {
+			fdasd_write_labels(anc);
+			fdasd_exit(anc, EXIT_SUCCESS);
+		} else {
+			printf("Unknown command '%c'\n", cmd);
+			fdasd_exit(anc, EXIT_FAILURE);
+		}
+	}
+
+	fdasd_exit(anc, EXIT_SUCCESS);
+}
+
 /*
  *
  */
@@ -2984,6 +3305,9 @@ int main(int argc, char *argv[])
 			fdasd_list_partition_table(&anchor);
 		fdasd_quit(&anchor);
 	}
+
+	if (anchor.script_mode)
+		fdasd_process_script_commands(&anchor, options.script_commands);
 
 	fdasd_menu();
 
