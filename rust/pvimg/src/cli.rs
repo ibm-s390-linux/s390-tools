@@ -354,15 +354,16 @@ pub struct SeImgInputArgs {
 }
 
 #[derive(Args, Debug)]
+#[command(group(ArgGroup::new("info-mode").required(true).args(["path", "print_schema"])))]
 pub struct InfoArgs {
     #[clap(flatten)]
-    pub input: SeImgInputArgs,
+    pub input: Option<SeImgInputArgs>,
 
     /// Output format for the Secure Execution image information.
     ///
     /// If not specified, the format is automatically determined based on
     /// whether stdout is connected to a terminal.
-    #[arg(long, value_parser=OutputFormatSpecParser::default())]
+    #[arg(long, value_parser=OutputFormatSpecParser::default(), conflicts_with = "print_schema")]
     pub format: Option<OutputFormatSpec>,
 
     /// Use the key in FILE to verify the Secure Execution header and optionally
@@ -376,7 +377,7 @@ pub struct InfoArgs {
     /// Without this option, the information is displayed, but NOT verified, and
     /// a warning is printed. The displayed data should not be trusted without
     /// verification.
-    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, alias = "key", verbatim_doc_comment)]
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, alias = "key", verbatim_doc_comment, conflicts_with = "print_schema")]
     pub hdr_key: Option<PathBuf>,
 
     /// This option reveals sensitive information that is normally encrypted in
@@ -389,8 +390,22 @@ pub struct InfoArgs {
     /// The decrypted secrets should never be exposed in untrusted systems.
     ///
     /// This option requires '--hdr-key' to decrypt the header.
-    #[arg(long, requires = "hdr_key", verbatim_doc_comment)]
+    #[arg(
+        long,
+        requires = "hdr_key",
+        verbatim_doc_comment,
+        conflicts_with = "print_schema"
+    )]
     pub show_secrets: bool,
+
+    /// Print the schema for the 'info' subcommand and exit.
+    ///
+    /// This outputs the schema that describes the structure of the given output FORMAT
+    /// produced by the 'info' subcommand. The schema can be used for:
+    ///   - Validating output
+    ///   - Building tools that parse the output
+    #[arg(value_name = "FORMAT", long, verbatim_doc_comment)]
+    pub print_schema: Option<OutputFormatKind>,
 }
 
 #[derive(Args, Debug)]
@@ -984,15 +999,55 @@ mod test {
                     CliOption::new("verbose", ["-VVV"]),
                 ],
             )),
+            // --print-schema json works standalone
+            flat_map_collect(insert(
+                args.clone(),
+                vec![CliOption::new(
+                    "print-json-schema",
+                    ["--print-schema", "json"],
+                )],
+            )),
         ];
 
         let invalid_test_args = [
             // No default defined for --format
             flat_map_collect(insert(
-                args,
+                args.clone(),
                 vec![
                     CliOption::new("format", ["--format"]),
                     CliOption::new("image", ["--", "/dev/null"]),
+                ],
+            )),
+            // --print-json-schema conflicts with input
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("print-json-schema", ["--print-schema", "json"]),
+                    CliOption::new("image", ["/dev/null"]),
+                ],
+            )),
+            // --print-json-schema conflicts with --format
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("print-json-schema", ["--print-schema", "json"]),
+                    CliOption::new("format", ["--format=json"]),
+                ],
+            )),
+            // --print-json-schema conflicts with --hdr-key
+            flat_map_collect(insert(
+                args.clone(),
+                vec![
+                    CliOption::new("print-json-schema", ["--print-schema", "json"]),
+                    CliOption::new("hdr-key", ["--hdr-key", "/dev/null"]),
+                ],
+            )),
+            // --print-json-schema conflicts with --show-secrets
+            flat_map_collect(insert(
+                args,
+                vec![
+                    CliOption::new("print-json-schema", ["--print-schema", "json"]),
+                    CliOption::new("show-secrets", ["--show-secrets"]),
                 ],
             )),
         ];

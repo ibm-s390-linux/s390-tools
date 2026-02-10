@@ -17,13 +17,23 @@ use pvimg::{
 
 use crate::cli::{InfoArgs, OutputFormatKind, OutputFormatSpec, OutputFormatVariant};
 
+pub const INFO_V1_JSON_SCHEMA: &str = include_str!("../../schema/info-v1.schema.json");
+
 pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
-    info!(
-        "Reading Secure Execution header {}",
-        opt.input.path.display()
-    );
-    let mut img = open_file(&opt.input.path)?;
     let mut output = std::io::stdout();
+    if let Some(format_kind) = opt.print_schema {
+        match format_kind {
+            OutputFormatKind::Text => {
+                writeln!(output, "No schema for {format_kind} format available!")?
+            }
+            OutputFormatKind::Json => write!(output, "{INFO_V1_JSON_SCHEMA}")?,
+        }
+        return Ok(OwnExitCode::Success);
+    }
+
+    let input_path = opt.input.as_ref().unwrap().path.clone();
+    info!("Reading Secure Execution header {}", input_path.display(),);
+    let mut img = open_file(&input_path)?;
 
     SeHdr::seek_sehdr(&mut img, None)?;
     let hdr = SeHdr::try_from_io(&mut img)?;

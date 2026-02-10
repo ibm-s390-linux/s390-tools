@@ -1,0 +1,321 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "'pvimg info' JSON output schema",
+  "description": "JSON schema for the 'pvimg info' command output. This schema describes the structure of IBM Secure Execution (SE) image header information in three states: decrypted (with secrets), encrypted (verified), and encrypted (not verified).",
+  "type": "object",
+  "required": [
+    "meta",
+    "data"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "description": "Metadata about the s390-tools version and execution environment.",
+      "required": [
+        "api_level",
+        "version",
+        "host",
+        "time_epoch",
+        "time"
+      ],
+      "properties": {
+        "api_level": {
+          "type": "integer",
+          "const": 1,
+          "description": "API level version, currently always 1."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of s390-tools."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname where the command was executed."
+        },
+        "time_epoch": {
+          "type": "integer",
+          "description": "Unix timestamp (seconds since epoch) when the command was executed."
+        },
+        "time": {
+          "type": "string",
+          "description": "Human-readable timestamp in format 'YYYY-MM-DD HH:MM:SS+ZZZZ'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "data": {
+      "type": "object",
+      "description": "Contains the Secure Execution header information.",
+      "required": [
+        "kind",
+        "verified",
+        "magic_hex",
+        "version",
+        "sehs",
+        "iv_hex",
+        "nks",
+        "sea",
+        "nep",
+        "pcf_hex",
+        "cust_pub_key",
+        "pld_hex",
+        "ald_hex",
+        "tld_hex",
+        "keyslots",
+        "tag_hex"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "decrypted_se_hdr",
+            "se_hdr"
+          ],
+          "description": "Type of SE header."
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Indicates whether the SE header authenticity was verified."
+        },
+        "magic_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Magic value identifying the SE header."
+        },
+        "version": {
+          "type": "string",
+          "description": "SE header version string."
+        },
+        "sehs": {
+          "type": "integer",
+          "description": "SE header size in bytes."
+        },
+        "iv_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Initialization vector for SE header encryption."
+        },
+        "nks": {
+          "type": "integer",
+          "description": "Number of key slots."
+        },
+        "sea": {
+          "type": "integer",
+          "description": "Size of encrypted area of the SE header in bytes."
+        },
+        "nep": {
+          "type": "integer",
+          "description": "Number of (encrypted) component pages."
+        },
+        "pcf_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Plaintext control flags."
+        },
+        "cust_pub_key": {
+          "$ref": "#/definitions/custPubKey",
+          "description": "Customer public key."
+        },
+        "pld_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "PLD (Page content List Digest) hash."
+        },
+        "ald_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "ALD (Address List Digest) hash."
+        },
+        "tld_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "TLD (Tweak List Digest) hash."
+        },
+        "keyslots": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Array of key slot entries.",
+          "items": {
+            "$ref": "#/definitions/keyslot"
+          }
+        },
+        "cipher_data_b64": {
+          "$ref": "#/definitions/base64String",
+          "description": "Encrypted SE header data (only for encrypted headers)."
+        },
+        "psw": {
+          "$ref": "#/definitions/psw",
+          "description": "Program Status Word (only for decrypted headers)."
+        },
+        "scf_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Secret control flags (only for decrypted headers)."
+        },
+        "cck_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Customer communication key (CCK) (only for decrypted headers)."
+        },
+        "xts_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Components encryption key (only for decrypted headers)."
+        },
+        "tag_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "SE Header authentication tag."
+        }
+      },
+      "oneOf": [
+        {
+          "title": "Decrypted SE Header",
+          "description": "SE header with decrypted secrets.",
+          "properties": {
+            "kind": {
+              "const": "decrypted_se_hdr"
+            },
+            "verified": {
+              "const": true
+            }
+          },
+          "required": [
+            "kind",
+            "verified",
+            "psw",
+            "scf_hex",
+            "cck_hex",
+            "xts_hex"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "cipher_data_b64"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "title": "Encrypted SE Header (Verified)",
+          "description": "Encrypted SE header integrity and authenticity checked with --hdr-key.",
+          "properties": {
+            "kind": {
+              "const": "se_hdr"
+            },
+            "verified": {
+              "const": true
+            }
+          },
+          "required": [
+            "kind",
+            "verified",
+            "cipher_data_b64"
+          ]
+        },
+        {
+          "title": "Encrypted SE Header (Not Verified)",
+          "description": "Encrypted SE header without integrity and authenticity verification.",
+          "properties": {
+            "kind": {
+              "const": "se_hdr"
+            },
+            "verified": {
+              "const": false
+            }
+          },
+          "required": [
+            "kind",
+            "verified"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "psw"
+                ]
+              },
+              {
+                "required": [
+                  "scf_hex"
+                ]
+              },
+              {
+                "required": [
+                  "cck_hex"
+                ]
+              },
+              {
+                "required": [
+                  "xts_hex"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "hexString": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]+$",
+      "description": "Hexadecimal string without 0x prefix."
+    },
+    "base64String": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+      "description": "Standard Base64-encoded string."
+    },
+    "custPubKey": {
+      "type": "object",
+      "description": "Customer public key.",
+      "required": [
+        "coord_hex"
+      ],
+      "properties": {
+        "coord_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "EC public key coordinates in hex."
+        }
+      },
+      "additionalProperties": false
+    },
+    "keyslot": {
+      "type": "object",
+      "description": "Wrapped SE header protection key for a specific target key.",
+      "required": [
+        "phkh_hex",
+        "wrpk_hex",
+        "kst_hex"
+      ],
+      "properties": {
+        "phkh_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Hash of the public target key."
+        },
+        "wrpk_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Wrapped SE header protection key."
+        },
+        "kst_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Key slot authentication tag."
+        }
+      },
+      "additionalProperties": false
+    },
+    "psw": {
+      "type": "object",
+      "required": [
+        "mask_hex",
+        "addr_hex"
+      ],
+      "description": "Program Status Word (PSW) defining the initial CPU state in the protected mode.",
+      "properties": {
+        "mask_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Initial PSW mask."
+        },
+        "addr_hex": {
+          "$ref": "#/definitions/hexString",
+          "description": "Initial PSW address."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
