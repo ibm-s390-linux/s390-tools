@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVIMG-INFO" "1" "2025-07-25" "s390-tools" "Pvimg Manual"
+.TH "PVIMG-INFO" "1" "2026-02-13" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
 .SH NAME
@@ -11,7 +11,7 @@ pvimg-info \- Print information about the IBM Secure Execution image
 .SH SYNOPSIS
 .nf
 .fam C
-pvimg info [OPTIONS] \-\-format <FORMAT> <INPUT>
+pvimg info [OPTIONS] <INPUT|\-\-print\-schema <FORMAT>>
 .fam C
 .fi
 .SH DESCRIPTION
@@ -27,20 +27,77 @@ Use INPUT as the Secure Execution image.
 .PP
 \-\-format <FORMAT>
 .RS 4
-The output format.
+Output format for the Secure Execution image information. If not specified, the
+format is automatically determined based on whether stdout is connected to a
+terminal.
 
 Possible values:
 .RS 4
-\- \fBjson\fP: JSON format.
+\- \fBtext\fP: Human-readable, unstable text format (default if a terminal is available).
+
+\- \fBtext:full\fP: Human-readable, full detail text format.
+
+\- \fBjson\fP: Pretty-printed machine-readable JSON (default if no terminal available).
+
+\- \fBjson:pretty\fP: Pretty-printed machine-readable JSON.
+
+\- \fBjson:minify\fP: Minified machine-readable JSON.
 
 .RE
 .RE
 .PP
 \-\-hdr\-key <FILE>
 .RS 4
-Use the key in FILE to decrypt the Secure Execution header. It is the key that
-was specified with the command line option \fB\-\-hdr\-key\fR at the Secure
-Execution image creation.
+Use the key in FILE to verify the Secure Execution header and optionally
+use \fB\-\-show\-secrets\fR to decrypt it. The key must be the same key that was
+specified with \fB\-\-hdr\-key\fR when the
+Secure Execution image was created. The key is used to:
+ 1. Verify the integrity and authenticity of the header
+ 2. Optionally decrypt secrets with \fB\-\-show\-secrets\fR
+
+Without this option, the information is displayed, but NOT verified, and
+a warning is printed. The displayed data should not be trusted without
+verification.
+.RE
+.RE
+.PP
+\-\-show\-secrets
+.RS 4
+This option reveals sensitive information that is normally encrypted in
+the header, such as:
+ \- Customer communication key (CCK)
+
+
+ \- Image encryption key
+
+
+ \- Other confidential data
+
+SECURITY WARNING: Only use this option in secure, trusted environments.
+The decrypted secrets should never be exposed in untrusted systems.
+
+This option requires \fB\-\-hdr\-key\fR to decrypt the header.
+.RE
+.RE
+.PP
+\-\-print\-schema <FORMAT>
+.RS 4
+Print the schema for the \fBinfo\fR subcommand and exit. This outputs the schema
+that describes the structure of the given output FORMAT
+produced by the \fBinfo\fR subcommand. The schema can be used for:
+
+
+ \- Validating output
+
+
+ \- Building tools that parse the output
+
+Possible values:
+.RS 4
+\- \fBtext\fP: Human-readable, unstable text format.
+
+\- \fBjson\fP: JSON format.
+
 .RE
 .RE
 .PP
