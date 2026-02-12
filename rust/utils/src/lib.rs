@@ -8,6 +8,7 @@ mod exit_code;
 mod file;
 mod hexslice;
 mod hostname;
+mod json;
 mod log;
 mod tmpfile;
 
@@ -22,6 +23,7 @@ pub use crate::{
     file::{AtomicFile, AtomicFileOperation},
     hexslice::HexSlice,
     hostname::gethostname,
+    json::S390ToolsMetaData,
     log::PvLogger,
     tmpfile::TemporaryDirectory,
 };
