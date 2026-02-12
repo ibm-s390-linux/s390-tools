@@ -587,8 +587,17 @@ pub enum SubCommands {
 
     /// Print information about the IBM Secure Execution image.
     ///
-    /// Note that the API and output format is experimental and subject to
-    /// change.
+    /// The 'info' subcommand extracts and displays information about an
+    /// existing IBM Secure Execution image, including information from the
+    /// Secure Execution header. By default, the header is displayed without
+    /// verifying its integrity and authenticity. Use '--hdr-key' to
+    /// authenticate and verify the header integrity.
+    ///
+    /// Output can be formatted as human-readable text or JSON. Use '--format'
+    /// to control the output format and level of detail.
+    ///
+    /// SECURITY NOTE: Without '--hdr-key', the displayed information is NOT
+    /// verified and should not be trusted.
     Info(InfoArgs),
 
     /// Test different aspects of an existing IBM Secure Execution image.
