@@ -7,6 +7,7 @@ mod cli;
 mod exit_code;
 mod file;
 mod hexslice;
+mod hostname;
 mod log;
 mod tmpfile;
 
@@ -20,6 +21,7 @@ pub use crate::{
     exit_code::{docstring, ExitCodeDoc, ExitCodeTrait, ExitCodeVariantDoc},
     file::{AtomicFile, AtomicFileOperation},
     hexslice::HexSlice,
+    hostname::gethostname,
     log::PvLogger,
     tmpfile::TemporaryDirectory,
 };
