@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-VERIFY" "1" "2025-03-12" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-VERIFY" "1" "2026-02-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -11,7 +11,7 @@ pvattest-verify \- Verify an attestation response
 .SH SYNOPSIS
 .nf
 .fam C
-pvattest verify [OPTIONS] --input <FILE> --hdr <FILE> --arpk <FILE>
+pvattest verify [OPTIONS] \-\-input <FILE> \-\-hdr <FILE> \-\-arpk <FILE>
 .fam C
 .fi
 .SH DESCRIPTION
@@ -83,25 +83,25 @@ Print help (see a summary with \fB\-h\fR).
 
 .SH EXIT STATUS
 .TP 8
-.B 0 - Attestation Verified
+.B 0 \- Attestation Verified
 Attesatation measurement verified successfully. Measured guest is in Secure Execution mode.
 .RE
 
 .TP 8
-.B 1 - Program Error
+.B 1 \- Program Error
 Something went wrong during the local calculation or receiving of the measurement value. Refer to the error message.
 .RE
 
 .TP 8
-.B 2 - Attestation NOT Verified
+.B 2 \- Attestation NOT Verified
 Attesation measurement calculation does not match the received value. Measured guest is very likely not in Secure Execution mode.
 .RE
 .SH EXAMPLES
-To verify a measurement in 'measurement.bin' with the protection key 'arp.kep' and SE-guest header 'se_guest.hdr'.
+To verify a measurement in 'measurement.bin' with the protection key 'arp.kep' and SE\-guest header 'se_guest.hdr'.
 .PP
 .nf
 .fam C
-       $ pvattest verify --input attresp.bin --arpk arp.key --hdr se_guest.hdr
+       $ pvattest verify \-\-input attresp.bin \-\-arpk arp.key \-\-hdr se_guest.hdr
 
 .fam T
 .fi

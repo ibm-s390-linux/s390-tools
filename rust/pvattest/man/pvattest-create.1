@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-CREATE" "1" "2025-03-12" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-CREATE" "1" "2026-02-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -11,7 +11,7 @@ pvattest-create \- Create an attestation measurement request
 .SH SYNOPSIS
 .nf
 .fam C
-pvattest create [OPTIONS] --host-key-document <FILE> --output <FILE> --arpk <FILE> <--no-verify|--cert <FILE>>
+pvattest create [OPTIONS] \-\-host\-key\-document <FILE> \-\-output <FILE> \-\-arpk <FILE> <\-\-no\-verify|\-\-cert <FILE>>
 .fam C
 .fi
 .SH DESCRIPTION
@@ -107,15 +107,15 @@ Print help (see a summary with \fB\-h\fR).
 .RE
 
 .SH EXAMPLES
-Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', and verify the host-key document using the CA-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt'.
+Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', and verify the host\-key document using the CA\-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt'.
 .PP
 .nf
 .fam C
-       $ pvattest create \-k hkd.crt -\-\arpk arp.key \-o attreq.bin \-\-cert DigiCertCA.crt \-\-cert IbmSigningKey.crt
+       $ pvattest create \-k hkd.crt \-\-\arpk arp.key \-o attreq.bin \-\-cert DigiCertCA.crt \-\-cert IbmSigningKey.crt
 
 .fam T
 .fi
-Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', verify the host-key document using the CA-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt', and instead of downloading the certificate revocation list use certificate revocation lists 'DigiCertCA.crl', 'IbmSigningKey.crl', and 'rootCA.crl'.
+Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', verify the host\-key document using the CA\-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt', and instead of downloading the certificate revocation list use certificate revocation lists 'DigiCertCA.crl', 'IbmSigningKey.crl', and 'rootCA.crl'.
 .PP
 .nf
 .fam C

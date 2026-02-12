@@ -111,6 +111,11 @@ Create an association secret
 Create a retrievable secret
 </ul>
 
+- **update-cck**
+<ul>
+Update customer communication key
+</ul>
+
 ### Options
 
 `-k`, `--host-key-document <FILE>`
@@ -367,7 +372,7 @@ secret type.
     Possible values:
         - **plain**: A plaintext secret. Can be any file up to 8190 bytes long.
         - **aes**: An AES key. Must be a plain byte file 128, 192, or 256 bit long.
-        - **aes-xts**: An AES-XTS key. Must be a plain byte file 512, or 1024 bit long.
+        - **aes-xts**: An AES-XTS key. Must be a plain byte file 256, or 512 bit long.
         - **hmac-sha**: A HMAC-SHA key. Must be a plain byte file 512, or 1024 bit long. Special care is required when creating HMAC-SHA keys. For more Information refer to the DESCRIPTION section of the man file.
         - **ec**: An elliptic curve private key. Must be a PEM or DER file.
 </ul>
@@ -379,9 +384,30 @@ Print help (see a summary with '-h').
 </ul>
 
 
+### pvsecret create update-cck
+#### Synopsis
+`pvsecret create update-cck --secret <CCK-FILE>`
+`pvsecret create cck --secret <CCK-FILE>`
+#### Description
+Update customer communication key. Insert a customer communication key into a
+guest.
+#### Options
+
+`--secret <CCK-FILE>`
+<ul>
+Use CCK-FILE as new CCK.
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help (see a summary with '-h').
+</ul>
+
+
 ## pvsecret add
 ### Synopsis
-`pvsecret add <FILE>`
+`pvsecret add [OPTIONS] <FILE>`
 ### Description
 Submit an add-secret request to the Ultravisor (s390x only). Perform an
 add-secret request using a previously generated add-secret request. Only
@@ -393,6 +419,20 @@ available on s390x.
 Specify the request to be sent.
 </ul>
 
+
+### Options
+
+`-f`, `--force`
+<ul>
+Force the addition of add-secret requests. Add an add-secret request even if
+there is already a secret with the same ID in the secret store.
+</ul>
+
+
+`-h`, `--help`
+<ul>
+Print help (see a summary with '-h').
+</ul>
 
 
 ## pvsecret lock

@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST" "1" "2025-03-12" "s390-tools" "Attestation Manual"
+.TH "PVATTEST" "1" "2026-02-12" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -20,28 +20,28 @@ guest systems.
 .SH "PVATTEST COMMANDS"
 .PP
 
-\fBpvattest-create(1)\fR
+\fBpvattest\-create(1)\fR
 .RS 4
 Create an attestation measurement request
 .RE
 
 .PP
 
-\fBpvattest-perform(1)\fR
+\fBpvattest\-perform(1)\fR
 .RS 4
 Send the attestation request to the Ultravisor
 .RE
 
 .PP
 
-\fBpvattest-verify(1)\fR
+\fBpvattest\-verify(1)\fR
 .RS 4
 Verify an attestation response
 .RE
 
 .PP
 
-\fBpvattest-check(1)\fR
+\fBpvattest\-check(1)\fR
 .RS 4
 Check if the attestation result matches defined policies
 .RE
@@ -83,7 +83,7 @@ Create the request on a trusted system.
 
 .fam T
 .fi
-On the SE-guest, \fIperform\fP the attestation.
+On the SE\-guest, \fIperform\fP the attestation.
 .PP
 .nf
 .fam C
@@ -91,7 +91,7 @@ On the SE-guest, \fIperform\fP the attestation.
 
 .fam T
 .fi
-On a trusted system, \fIverify\fP that the response is correct. Here, the protection key from the creation and the SE-guest’s header is used to \fIverify\fP the measurement.
+On a trusted system, \fIverify\fP that the response is correct. Here, the protection key from the creation and the SE\-guest’s header is used to \fIverify\fP the measurement.
 .PP
 .nf
 .fam C
@@ -102,7 +102,7 @@ On a trusted system, \fIverify\fP that the response is correct. Here, the protec
 .fam T
 .fi
 
-If the measurements do not match \fBpvattest\fP exits with code 2 and emits an error message. The SE-guest attestation failed.
+If the measurements do not match \fBpvattest\fP exits with code 2 and emits an error message. The SE\-guest attestation failed.
 .PP
 .nf
 .fam C
@@ -116,4 +116,4 @@ If the measurements do not match \fBpvattest\fP exits with code 2 and emits an e
 .fi
 .SH "SEE ALSO"
 .sp
-\fBpvattest-create\fR(1) \fBpvattest-perform\fR(1) \fBpvattest-verify\fR(1) \fBpvattest-check\fR(1)
+\fBpvattest\-create\fR(1) \fBpvattest\-perform\fR(1) \fBpvattest\-verify\fR(1) \fBpvattest\-check\fR(1)
