@@ -16,6 +16,7 @@ use pv::{
     static_assert,
 };
 use serde::{Deserialize, Serialize};
+use utils::S390ToolsMetaData;
 
 pub use super::hdr_v1::{SeHdrBinV1, SeHdrDataV1};
 use super::{PlaintextControlFlagsV1, SecretControlFlagsV1};
@@ -32,6 +33,27 @@ use crate::{
         PSW,
     },
 };
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct EnvelopeSeHdrV1 {
+    pub meta: S390ToolsMetaData,
+    pub data: SeH,
+}
+
+impl EnvelopeSeHdrV1 {
+    /// Creates a new EnvelopeSeHdrV1 with the given data and default metadata
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The SE header data to wrap
+    pub fn new(data: SeH) -> Self {
+        Self {
+            meta: S390ToolsMetaData::new(1),
+            data,
+        }
+    }
+}
 
 #[repr(u32)]
 #[non_exhaustive]

@@ -12,7 +12,7 @@ use pv::{
 };
 use pvimg::{
     error::{Error, OwnExitCode},
-    uvdata::{KeyExchangeTrait, SeH, SeHdr, UvDataTrait},
+    uvdata::{EnvelopeSeHdrV1, KeyExchangeTrait, SeH, SeHdr, UvDataTrait},
 };
 
 use crate::cli::{InfoArgs, OutputFormatKind, OutputFormatSpec, OutputFormatVariant};
@@ -55,12 +55,13 @@ pub fn info(opt: &InfoArgs) -> Result<OwnExitCode> {
             kind: OutputFormatKind::Json,
             variant,
         } => {
+            let doc = EnvelopeSeHdrV1::new(se_hdr);
             match variant {
                 OutputFormatVariant::Minify => {
-                    serde_json::to_writer(&mut output, &se_hdr)?;
+                    serde_json::to_writer(&mut output, &doc)?;
                 }
                 OutputFormatVariant::Default | OutputFormatVariant::Pretty => {
-                    serde_json::to_writer_pretty(&mut output, &se_hdr)?
+                    serde_json::to_writer_pretty(&mut output, &doc)?;
                 }
             }
             // Make sure the output ends with a new line

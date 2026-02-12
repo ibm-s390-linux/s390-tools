@@ -9,8 +9,8 @@ mod hdr_v1;
 mod keys;
 
 pub use brb::{
-    ComponentMetadata, ComponentMetadataV1, SeH, SeHdr, SeHdrBinV1, SeHdrData, SeHdrDataV1,
-    SeHdrPlain, SeHdrVersion, SeHdrVersioned,
+    ComponentMetadata, ComponentMetadataV1, EnvelopeSeHdrV1, SeH, SeHdr, SeHdrBinV1, SeHdrData,
+    SeHdrDataV1, SeHdrPlain, SeHdrVersion, SeHdrVersioned,
 };
 pub use builder::SeHdrBuilder;
 pub use flags::{
