@@ -1062,7 +1062,7 @@ static int add_segment_program(struct install_set *bis,
 static int add_dump_program(struct install_set *bis,
 			    const struct job_dump_data *dump,
 			    disk_blockptr_t *program, int verbose,
-			    component_header_type type,
+			    component_header_type type, int is_secure,
 			    int program_table_id)
 {
 	struct job_ipl_data ipl;
@@ -1072,7 +1072,7 @@ static int add_dump_program(struct install_set *bis,
 	ipl.common = dump->common;
 
 	return add_ipl_program(bis, false, NULL, &ipl, program,
-			       verbose, 1, type, SECURE_BOOT_DISABLED,
+			       verbose, 1, type, is_secure,
 			       0 /* menu_idx */, 0 /* mirror id */,
 			       program_table_id);
 }
@@ -1146,7 +1146,7 @@ static int build_program_table(struct job_data *job, struct install_set *bis,
 		}
 		rc = add_dump_program(bis, &job->data.dump, &table[0],
 				      verbose || job->command_line,
-				      COMPONENT_HEADER_DUMP,
+				      COMPONENT_HEADER_DUMP, job->is_secure,
 				      program_table_id);
 		break;
 	case job_menu:
