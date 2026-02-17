@@ -58,9 +58,8 @@ static char HELP_TEXT[] =
  * Options with underscore to keep compatibility
  */
 #define OPT_BATCH_MODE	257 /* --batch_mode */
-#define OPT_SORT_FIELD	258 /* --sort | --sort_field */
-#define OPT_CPU_TYPES	259 /* --cpu_types */
-#define OPT_SMT_FACTOR	260 /* --smt_factor */
+#define OPT_CPU_TYPES	258 /* --cpu_types */
+#define OPT_SMT_FACTOR	259 /* --smt_factor */
 
 /*
  * Initialize default settings
@@ -224,7 +223,7 @@ static void l_fields_set(char *str)
 }
 
 /*
- * Set the "--sort_field" option
+ * Set the "--sort" option
  */
 static void l_sort_field_set(char *str)
 {
@@ -371,8 +370,7 @@ void opts_parse(int argc, char *argv[])
 		{ "sys",         required_argument, NULL, 's'},
 		{ "iterations",  required_argument, NULL, 'n'},
 		{ "fields",      required_argument, NULL, 'f'},
-		{ "sort-field",  required_argument, NULL, 'S'},
-		{ "sort_field",  required_argument, NULL, OPT_SORT_FIELD},
+		{ "sort",        required_argument, NULL, 'S'},
 		{ "cpu-types",   required_argument, NULL, 't'},
 		{ "cpu_types",   required_argument, NULL, OPT_CPU_TYPES},
 		{ "format",      required_argument, NULL, OPT_FORMAT },
@@ -420,7 +418,6 @@ void opts_parse(int argc, char *argv[])
 		case 'f':
 			l_fields_set(optarg);
 			break;
-		case OPT_SORT_FIELD:
 		case 'S':
 			l_sort_field_set(optarg);
 			break;
