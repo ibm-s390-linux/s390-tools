@@ -55,13 +55,6 @@ static char HELP_TEXT[] =
 #define OPT_FORMAT_ALL	261 /* --all*/
 
 /*
- * Options with underscore to keep compatibility
- */
-#define OPT_BATCH_MODE	257 /* --batch_mode */
-#define OPT_CPU_TYPES	258 /* --cpu_types */
-#define OPT_SMT_FACTOR	259 /* --smt_factor */
-
-/*
  * Initialize default settings
  */
 static void l_init_defaults(void)
@@ -361,18 +354,18 @@ void opts_parse(int argc, char *argv[])
 		{ "version",     no_argument,       NULL, 'v'},
 		{ "help",        no_argument,       NULL, 'h'},
 		{ "batch-mode",  no_argument,       NULL, 'b'},
-		{ "batch_mode",  no_argument,       NULL, OPT_BATCH_MODE},
+		{ "batch_mode",  no_argument,       NULL, 'b'},
 		{ "all",         no_argument,       NULL, OPT_FORMAT_ALL },
 		{ "delay",       required_argument, NULL, 'd'},
 		{ "smt-factor",  required_argument, NULL, 'm'},
-		{ "smt_factor",  required_argument, NULL, OPT_SMT_FACTOR},
+		{ "smt_factor",  required_argument, NULL, 'm'},
 		{ "window",      required_argument, NULL, 'w'},
 		{ "sys",         required_argument, NULL, 's'},
 		{ "iterations",  required_argument, NULL, 'n'},
 		{ "fields",      required_argument, NULL, 'f'},
 		{ "sort",        required_argument, NULL, 'S'},
 		{ "cpu-types",   required_argument, NULL, 't'},
-		{ "cpu_types",   required_argument, NULL, OPT_CPU_TYPES},
+		{ "cpu_types",   required_argument, NULL, 't'},
 		{ "format",      required_argument, NULL, OPT_FORMAT },
 		{ NULL,          0,                 NULL, 0  }
 	};
@@ -391,14 +384,12 @@ void opts_parse(int argc, char *argv[])
 		case 'h':
 			l_usage();
 			hyptop_exit(0);
-		case OPT_BATCH_MODE:
 		case 'b':
 			l_batch_mode_set();
 			break;
 		case 'd':
 			l_delay_set(optarg);
 			break;
-		case OPT_SMT_FACTOR:
 		case 'm':
 			l_factor_set(optarg);
 			break;
@@ -411,7 +402,6 @@ void opts_parse(int argc, char *argv[])
 		case 'n':
 			l_iterations_set(optarg);
 			break;
-		case OPT_CPU_TYPES:
 		case 't':
 			l_cpu_types_set(optarg);
 			break;
