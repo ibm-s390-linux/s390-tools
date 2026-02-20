@@ -65,12 +65,6 @@ Limit output to either online or offline devices. This filter has no effect
 on the output of SCSI devices.
 
 .TP
-.BR -t | --type " \fI<device-type>\fR"
-Limit output to given device types, for example 3490
-(currently only applies to channel-attached
-tape devices).
-
-.TP
 .I <device-bus-ID>
 Limits the output to information about the specified tape device or
 devices only. For CCW-attached devices only.
@@ -131,9 +125,9 @@ The serial number.
 List all tape devices that are available 
 .RE
 
-\fBlstape --ccw-only -t 3490 --online\fR
+\fBlstape --ccw-only --online\fR
 .RS
-Show all 3490 CCW devices that are online.
+Show all channel-attached tape devices that are online.
 .RE
 
 \fBlstape --scsi-only --verbose\fR

@@ -28,10 +28,6 @@ function PrintUsage() {
 	:			Print this help text.
 	:		--ccw-only|--scsi-only
 	:			Limit output to CCW or SCSI devices only.
-	:		-t|--type <list of device types>
-	:			Limit output of CCW tape devices to the given
-	:			devices. The list consists of device types
-	:			separated by ','.
 	:		--online|--offline
 	:			Show only devices that are either online or
 	:			offline (only one option is allowed). This
@@ -63,7 +59,6 @@ function PrintVersion()
 }
 
 FLSEP=""
-DEVLIST="3490"
 SHORTID=false
 SHOWCCW=true
 VERBOSE=false
@@ -76,14 +71,6 @@ while [ $# -ne 0 ]; do
 		-h|--help)
 			PrintUsage
 			exit 0
-			;;
-		-t|--type)
-			if [ $# -lt 2 ]; then
-				RequireArgument $1 1
-				exit 1
-			fi
-			shift
-			DEVLIST="$1"
 			;;
 		--online)
 			if $FILTEROFFLINE; then
@@ -148,10 +135,6 @@ function SysfsCreateListCCW() {
 			medium_state_str[1] = "LOADED  "
 			medium_state_str[2] = "UNLOADED"
 
-			split("'$DEVLIST'", A, ",")
-			for(i = 1; i in A; i++) {
-				devlist[A[i]] = 1
-			}
 			shortid = "'$SHORTID'"=="true" ? 1 : 0
 			filteronline = "'$FILTERONLINE'"=="true" ? 1 : 0
 			filteroffline = "'$FILTEROFFLINE'"=="true" ? 1 : 0
@@ -168,8 +151,6 @@ function SysfsCreateListCCW() {
 
 			devtype      = Read(devdir "/devtype")
 			split(devtype, A, "/")
-			if (!(A[1] in devlist))
-				next
 
 			online = Read(devdir "/online")
 			if (filteronline && !online)
