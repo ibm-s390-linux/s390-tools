@@ -220,7 +220,7 @@ function SysfsCreateListCCW() {
 				(online==0) ? "N/A" : \
 					medium_state_str[medium_state])
 		}
-	' | sort 
+	' | sort
 }
 
 # handle SCSI device not necessarily zfcp-attached, e.g. virtio-scsi-ccw
