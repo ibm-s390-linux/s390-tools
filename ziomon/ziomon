@@ -302,7 +302,7 @@ function start_trace() {
    blkiomon_command="blkiomon --interval=$WRP_INTERVAL -Q  $WRP_MSG_Q_PATH -q $WRP_MSG_Q_ID -m $WRP_MSG_Q_BLKIOMON_ID $verbose_blk -d -";
    zfcpdd_command="ziomon_zfcpdd -Q  $WRP_MSG_Q_PATH -q $WRP_MSG_Q_ID -m $WRP_MSG_Q_ZIOMON_ZFCPDD_ID -i $WRP_INTERVAL";
    debug "starting blktrace: $blktrace_command | $blkiomon_command | $zfcpdd_command";
-   $blktrace_command 2>$WRP_MSG_Q_PATH/blktrace.err | $blkiomon_command | $zfcpdd_command > $WRP_MSG_Q_PATH/blktrace.log &
+   $blktrace_command 2>$WRP_MSG_Q_PATH/blktrace.err | $blkiomon_command 2>$WRP_MSG_Q_PATH/blkiomon.err | $zfcpdd_command > $WRP_MSG_Q_PATH/blktrace.log &
    i=0;
    # might take a moment to start all processes in the pipe if system under load
    while [ $i -lt 60 ]; do
@@ -351,6 +351,14 @@ function start_trace() {
       sleep 15;
    done
    debug "end data collection at `date`";
+
+   # Ignore benign blkiomon early-read warnings
+   len=`grep -vcE "^bad trace magic 0|^blkiomon: bad trace" $WRP_MSG_Q_PATH/blkiomon.err 2>/dev/null`;
+   if [ $len -ne 0 ]; then
+      cat $WRP_MSG_Q_PATH/blkiomon.err;
+      echo "Error: blkiomon has errors, aborting";
+      return;
+   fi
 
    echo "done";
 }
