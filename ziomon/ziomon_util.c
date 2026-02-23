@@ -897,14 +897,12 @@ static int setup_msg_q(struct options *opts)
 		opts->msg_q = msgget(util_q, S_IRWXU);
 		if (opts->msg_q >= 0) {
 			if (wait)
-				fprintf(stderr, "%s: Message queue is up!\n",
-					toolname);
+				fprintf(stdout, "%s: Message queue is up!\n", toolname);
 			break;
 		}
 		if (!wait) {
 			wait = 1;
-			fprintf(stderr, "%s: Warning: Message queue not"
-				" up yet, waiting...\n", toolname);
+			fprintf(stdout, "%s: Message queue not up yet, waiting...\n", toolname);
 		}
 		usleep(200000);
 	}
