@@ -25,10 +25,6 @@ function error() {
 	exit 1
 }
 
-# currently requires bash version 3.0 or later
-
-. /lib/s390-tools/znetcontrolunits
-
 # The arrays (among other things) should be adapted, if any of those device
 # drivers start supporting different CU types/models.
 

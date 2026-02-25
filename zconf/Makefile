@@ -17,8 +17,6 @@ clean: $(SUB_DIRS)
 install:	install-scripts install-manpages install-usrsbin-scripts $(SUB_DIRS)
 	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 lsznet.raw \
 		$(DESTDIR)$(TOOLS_LIBDIR)
-	$(INSTALL) -g $(GROUP) -o $(OWNER) -m 755 znetcontrolunits \
-		$(DESTDIR)$(TOOLS_LIBDIR)
 
 install-scripts:	$(SCRIPTS)
 	@for i in $^; do \
