@@ -35,7 +35,6 @@ readonly -a CU_CARDTYPE=(
 	"CTC adapter"
 	"escon channel"
 	"ficon channel"
-	"LCS OSA"
 	"OSX"
 	"OSM"
 )
@@ -48,7 +47,6 @@ readonly -a CU_DEVNAME=(
 	ctc
 	eth
 	eth
-	eth
 )
 
 readonly -a CU_DEVDRV=(
@@ -57,7 +55,6 @@ readonly -a CU_DEVDRV=(
 	ctcm
 	ctcm
 	ctcm
-	lcs
 	qeth
 	qeth
 )
@@ -68,13 +65,11 @@ readonly -a CU_GROUPCHANNELS=(
 	2
 	2
 	2
-	2
 	3
 	3
 )
 
 readonly -a CHPIDTYPES=(
-	[0x10]=OSE
 	[0x11]=OSD
 	[0x24]=IQD
 	[0x30]=OSX
@@ -89,7 +84,6 @@ readonly -a CU_TCPIP=(
 	3088/08
 	3088/1f
 	3088/1e
-	3088/60
 	1731/02
 	1731/02
 )
