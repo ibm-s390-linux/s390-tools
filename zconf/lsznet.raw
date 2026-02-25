@@ -55,6 +55,17 @@ readonly -a CU_DEVNAME=(
 	eth
 )
 
+readonly -a CU_DEVDRV=(
+	qeth
+	qeth
+	ctcm
+	ctcm
+	ctcm
+	lcs
+	qeth
+	qeth
+)
+
 readonly -a CU_GROUPCHANNELS=(
 	3
 	3
@@ -93,6 +104,7 @@ readonly SSIDFORMAT=[0-3]
 readonly BUSIDFORMAT=[[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]]
 readonly IDFORMAT=$PREFIXFORMAT.$SSIDFORMAT.$BUSIDFORMAT
 readonly SUBCHANNEL_TYPE_IO=0
+declare CU_IDX
 
 function debug() {
 	level=$1
@@ -100,13 +112,15 @@ function debug() {
 	[ $DEBUG -ge $level ] && echo "$*" 1>&2
 }
 
-# Searches for a match of argument 1 on the array $CU_TCPIP.
+# Searches for a match of argument 1 on the array $CU_TCPIP and sets $CU_IDX to
+# the matched array index on success.
 # Returns 0 on success, 1 on failure.
 function search_cu_tcpip() {
 	local scu=$1
 	local i
 	for ((i = 0; i < ${#CU_TCPIP[@]}; i++)); do
 		if [ "$scu" == "${CU_TCPIP[i]}" ]; then
+			CU_IDX=$i
 			return 0
 		fi
 	done
@@ -220,14 +234,14 @@ function build_list() {
 		if [ -z "$all" ] && ! search_cu_tcpip $cutype; then
 			continue
 		fi
-		if search_cu $cutype; then
-			if [ "${CU_DEVDRV[$cu_idx]}" == "ctcm" ]; then
+		if search_cu_tcpip $cutype; then
+			if [ "${CU_DEVDRV[$CU_IDX]}" == "ctcm" ]; then
 				# assume CTC are mostly virtual and ignore chpid from sysfs
 				chpidtype_symbolic="-"
 			else
 				search_chpt $chptype
 			fi
-			echo $pimchpids $devbusid $cutype $chpidtype_symbolic ${CU_DEVDRV[$cu_idx]} ${CU_DEVNAME[$cu_idx]} ${CU_GROUPCHANNELS[$cu_idx]} ${CU_CARDTYPE[$cu_idx]}
+			echo $pimchpids $devbusid $cutype $chpidtype_symbolic ${CU_DEVDRV[$CU_IDX]} ${CU_DEVNAME[$cu_idx]} ${CU_GROUPCHANNELS[$cu_idx]} ${CU_CARDTYPE[$cu_idx]}
 		else
 			debug 5 " skip non-network device $devbusid CU $cutype"
 		fi
