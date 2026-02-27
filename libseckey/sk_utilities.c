@@ -395,7 +395,7 @@ const struct sk_digest_info *SK_UTIL_get_digest_info(int digest_nid)
 static bool SK_UTILS_is_duplicate_name_entry(const X509_NAME *name,
 					     const X509_NAME_ENTRY *entry)
 {
-	X509_NAME_ENTRY *ne;
+	const X509_NAME_ENTRY *ne;
 	int count, i;
 
 	count = X509_NAME_entry_count(name);
