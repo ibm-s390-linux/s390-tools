@@ -71,3 +71,31 @@ bool ap_bus_has_SB_support(void)
 
 	return sb_support > 0 ? true : false;
 }
+
+/*
+ * Helper function: for a given hex string return the bit value.
+ * Bit count starts on the left with 0.
+ * Returns 0 or 1 or -1 on failure.
+ */
+int check_mask_bit(const char *mask, int bit)
+{
+	int b;
+
+	if (mask && mask[0] == '0' && mask[1] == 'x')
+		mask += 2;
+
+	while (*mask && bit >= 4) {
+		mask++;
+		bit -= 4;
+	}
+	if (*mask >= '0' && *mask <= '9')
+		b = *mask - '0';
+	else if (*mask >= 'a' && *mask <= 'f')
+		b = *mask + 10 - 'a';
+	else if (*mask >= 'A' && *mask <= 'F')
+		b = *mask + 10 - 'A';
+	else
+		return -1;
+
+	return b & (0x08 >> bit) ? 1 : 0;
+}

@@ -21,6 +21,7 @@
 #include "lib/util_rec.h"
 #include "lib/util_scandir.h"
 #include "lib/zt_common.h"
+#include "lib/ap.h"
 
 #include "misc.h"
 
@@ -172,14 +173,18 @@ static void show_bus(void)
 {
 	long domain, max_domain, config_time, value;
 	const char *poll_thread, *ap_interrupts;
+	char features[256], use_dom_mask[80];
 	unsigned long long poll_timeout;
-	char features[256];
 	char *ap;
 
 	/* check if ap driver is available */
 	ap = util_path_sysfs("bus/ap");
 	if (!util_path_is_dir(ap))
 		errx(EXIT_FAILURE, "Crypto device driver not available.");
+
+	/* read usage domain mask */
+	util_file_read_line(use_dom_mask, sizeof(use_dom_mask),
+			    "%s/ap_usage_domain_mask", ap);
 
 	if (util_path_is_readable("%s/features", ap))
 		util_file_read_line(features, sizeof(features), "%s/features", ap);
@@ -201,8 +206,15 @@ static void show_bus(void)
 		ap_interrupts = "disabled";
 	if (features[0])
 		printf("features: %s\n", features);
-	printf("ap_domain=0x%lx\n", domain);
-	printf("ap_max_domain_id=0x%lx\n", max_domain);
+	if (domain < 0) {
+		printf("ap_domain=-1 (not set)\n");
+	} else {
+		if (check_mask_bit(use_dom_mask, domain) > 0)
+			printf("ap_domain=0x%02lx\n", domain);
+		else
+			printf("ap_domain=0x%02lx (unavailable)\n", domain);
+	}
+	printf("ap_max_domain_id=0x%02lx\n", max_domain);
 	if (util_path_is_reg_file("%s/ap_interrupts", ap))
 		printf("ap_interrupts are %s\n", ap_interrupts);
 	printf("config_time=%ld (seconds)\n", config_time);
@@ -250,36 +262,36 @@ static void show_domains_util_rec(char *domain_array[])
  */
 static void show_domains(void)
 {
-	char ctrl_domain_mask[80], usag_domain_mask[80], byte_str[3] = {};
-	int ctrl_chunk, usag_chunk;
+	char ctrl_dom_mask[80], use_dom_mask[80], byte_str[3] = {};
 	char *ap, *domain_array[32 * 8 + 4];
-	int i, x, n;
+	int ctrl_chunk, usag_chunk;
 	uint8_t dom_mask_bit;
+	long domain;
+	int i, x, n;
 
 	/* check if ap driver is available */
 	ap = util_path_sysfs("bus/ap");
 	if (!util_path_is_dir(ap))
 		errx(EXIT_FAILURE, "Crypto device driver not available.");
 
-	util_file_read_line(ctrl_domain_mask, sizeof(ctrl_domain_mask),
+	util_file_read_line(ctrl_dom_mask, sizeof(ctrl_dom_mask),
 			    "%s/ap_control_domain_mask", ap);
-	if (strstr(ctrl_domain_mask, "not"))
+	if (strstr(ctrl_dom_mask, "not"))
 		errx(EXIT_FAILURE, "Control domain mask not available.");
-	util_file_read_line(usag_domain_mask, sizeof(usag_domain_mask),
+	util_file_read_line(use_dom_mask, sizeof(use_dom_mask),
 			    "%s/ap_usage_domain_mask", ap);
-	if (strstr(usag_domain_mask, "not"))
+	if (strstr(use_dom_mask, "not"))
 		errx(EXIT_FAILURE, "Usage domain mask not available.");
 	/* remove leading '0x' from domain mask string */
-	memmove(&ctrl_domain_mask[0], &ctrl_domain_mask[2],
-		sizeof(ctrl_domain_mask) - 2);
-	memmove(&usag_domain_mask[0], &usag_domain_mask[2],
-		sizeof(usag_domain_mask) - 2);
+	memmove(&ctrl_dom_mask[0], &ctrl_dom_mask[2],
+		sizeof(ctrl_dom_mask) - 2);
+	memmove(&use_dom_mask[0], &use_dom_mask[2], sizeof(use_dom_mask) - 2);
 	n = 0;
 	for (i = 0; i < 32; i++) {
 		dom_mask_bit = 0x80;
-		memcpy(byte_str, &ctrl_domain_mask[i * 2], 2);
+		memcpy(byte_str, &ctrl_dom_mask[i * 2], 2);
 		sscanf(byte_str, "%02x", &ctrl_chunk);
-		memcpy(byte_str, &usag_domain_mask[i * 2], 2);
+		memcpy(byte_str, &use_dom_mask[i * 2], 2);
 		sscanf(byte_str, "%02x", &usag_chunk);
 		for (x = 1; x <= 8; x++) {
 			if (ctrl_chunk & dom_mask_bit &&
@@ -299,6 +311,11 @@ static void show_domains(void)
 		domain_array[n++] = "";
 
 	show_domains_util_rec(domain_array);
+
+	/* maybe give a warning, when default domain is unavailable */
+	util_file_read_l(&domain, 10, "%s/ap_domain", ap);
+	if (domain < 0 || check_mask_bit(use_dom_mask, domain) < 1)
+		printf("Warning: Default domain 0x%02lx is not available.\n", domain);
 }
 
 /*
@@ -940,8 +957,10 @@ static void show_devices_all(void)
 {
 	struct util_rec *rec = util_rec_new_wide("-");
 	struct dirent **dev_vec;
-	int i, count;
+	char use_dom_mask[80];
 	char *ap, *path;
+	int i, count;
+	long domain;
 
 	/* check if ap driver is available */
 	ap = util_path_sysfs("bus/ap");
@@ -958,6 +977,14 @@ static void show_devices_all(void)
 	util_rec_print_hdr(rec);
 	for (i = 0; i < count; i++)
 		show_device(rec, dev_vec[i]->d_name);
+
+	/* maybe give a warning, when default domain is unavailable */
+	util_file_read_line(use_dom_mask, sizeof(use_dom_mask),
+			    "%s/ap_usage_domain_mask", ap);
+	util_file_read_l(&domain, 10, "%s/ap_domain", ap);
+	if (domain < 0 || check_mask_bit(use_dom_mask, domain) < 1)
+		printf("Warning: Default domain 0x%02lx is not available.\n", domain);
+
 	free(path);
 }
 

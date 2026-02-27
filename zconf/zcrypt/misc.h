@@ -14,5 +14,6 @@
 
 bool misc_regex_match(const char *str, const char *regex);
 bool ap_bus_has_SB_support(void);
+int check_mask_bit(const char *mask, int bit);
 
 #endif /* MISC_H */

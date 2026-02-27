@@ -231,7 +231,17 @@ static void poll_timeout_set(const char *poll_timeout_str)
 static void default_domain_set(const char *default_domain_str)
 {
 	long max_dom, default_domain, default_domain_read;
-	char *attr, *ap_max_domain_id;
+	char *attr, *ap_max_domain_id, *ap;
+	char use_dom_mask[80];
+
+	/* check if ap driver is available */
+	ap = util_path_sysfs("bus/ap");
+	if (!util_path_is_dir(ap))
+		errx(EXIT_FAILURE, "Crypto device driver not available.");
+
+	/* read usage domain mask */
+	util_file_read_line(use_dom_mask, sizeof(use_dom_mask),
+			    "%s/ap_usage_domain_mask", ap);
 
 	sscanf(default_domain_str, "%li", &default_domain);
 	ap_max_domain_id = util_path_sysfs("bus/ap/ap_max_domain_id");
@@ -247,8 +257,14 @@ static void default_domain_set(const char *default_domain_str)
 	util_file_read_l(&default_domain_read, 10, attr);
 	if (default_domain != default_domain_read)
 		errx(EXIT_FAILURE, "Error - unable to change default domain.");
+
+	/* give a warning, when the fresh set default domain is unavailable */
+	if (default_domain < 0 || check_mask_bit(use_dom_mask, default_domain) < 1)
+		printf("Warning: Default domain 0x%02lx is not available.\n", default_domain);
+
 	free(ap_max_domain_id);
 	free(attr);
+	free(ap);
 }
 
 static void set_online(const char *online, const char *online_text,
