@@ -2172,7 +2172,7 @@ int write_public_key(const char *pem_filename, EVP_PKEY *pkey)
  */
 static bool is_duplicate_name_entry(X509_NAME *name, X509_NAME_ENTRY *entry)
 {
-	X509_NAME_ENTRY *ne;
+	const X509_NAME_ENTRY *ne;
 	int count, i;
 
 	count = X509_NAME_entry_count(name);
