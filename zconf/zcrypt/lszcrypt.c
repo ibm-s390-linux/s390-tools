@@ -955,8 +955,6 @@ static void show_devices_all(void)
 	/* Scan the devices */
 	path = util_path_sysfs("devices/ap/");
 	count = util_scandir(&dev_vec, alphasort, path, "card[0-9a-fA-F]+");
-	if (count < 1)
-		errx(EXIT_FAILURE, "No crypto card devices found.");
 	util_rec_print_hdr(rec);
 	for (i = 0; i < count; i++)
 		show_device(rec, dev_vec[i]->d_name);
