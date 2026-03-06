@@ -21,17 +21,8 @@
 #include "lib/util_rec.h"
 #include "lib/util_scandir.h"
 
+#include "lscss_cli.h"
 #include "misc.h"
-
-/*
- * Numbers for lscss command options that do not have a short form
- */
-#define OPT_AVAIL	256	/* --avail */
-#define OPT_VPM		257	/* --vpm */
-#define OPT_IO		258	/* --io */
-#define OPT_CHSC	259	/* --chsc */
-#define OPT_EADM	260	/* --eadm */
-#define OPT_VFIO	261	/* --vfio */
 
 /* Bus_id format for subchannel or device id */
 #define ID_FORMAT	"^[[:xdigit:]]{1,2}[.][[:xdigit:]][.][[:xdigit:]]{4}$"
@@ -107,70 +98,6 @@ static const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-/*
- * Command line options
- */
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "short", no_argument, NULL, 's'},
-		.desc = "Shorten IDs by removing leading \"0.0.\" "
-			"Note: only IDs beginning with \"0.0.\" "
-			"will be displayed in this case.",
-	},
-	{
-		.option = { "devtype", required_argument, NULL, 't'},
-		.argument = "TYPE,..",
-		.desc = "For IO subchannels, limit output to devices of "
-			"the given TYPE (DEVTYPE[/MODEL])",
-	},
-	{
-		.option = { "devrange", no_argument, NULL, 'd'},
-		.desc = "Indicate that RANGE refers to device identifiers",
-	},
-	{
-		.option = { "avail", no_argument, NULL, OPT_AVAIL},
-		.desc = "Show availability attribute of IO devices",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	{
-		.option = { "vpm", no_argument, NULL, OPT_VPM},
-		.desc = "Show verified path mask",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	{
-		.option = { "uppercase", no_argument, NULL, 'u'},
-		.desc = "Print values using uppercase",
-	},
-	{
-		.option = { "io", no_argument, NULL, OPT_IO},
-		.desc = "Show IO subchannels (default)",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	{
-		.option = { "chsc", no_argument, NULL, OPT_CHSC},
-		.desc = "Show CHSC subchannels",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	{
-		.option = { "eadm", no_argument, NULL, OPT_EADM},
-		.desc = "Show EADM subchannels",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	{
-		.option = { "vfio", no_argument, NULL, OPT_VFIO},
-		.desc = "Show VFIO subchannel information",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	{
-		.option = { "all", no_argument, NULL, 'a'},
-		.desc = "Show subchannels of all types",
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
 };
 
 /*

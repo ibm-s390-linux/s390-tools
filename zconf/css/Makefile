@@ -1,6 +1,11 @@
 # Common definitions
 include ../../common.mak
 
+zsh-completions = _lscss
+bash-completions = lscss.bash
+
+include ../../common_autocomp.mak
+
 libs =	$(rootdir)/libccw/libccw.a \
 	$(rootdir)/libutil/libutil.a
 

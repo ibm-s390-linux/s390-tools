@@ -128,6 +128,8 @@ zconf/chp/chpstat/chpstat
 zconf/chp/chpstat/_chpstat
 zconf/chp/chpstat/chpstat.bash
 zconf/css/lscss
+zconf/css/_lscss
+zconf/css/lscss.bash
 zconf/qeth/lsqeth
 zconf/scm/lsscm
 zconf/zcrypt/chzcrypt
