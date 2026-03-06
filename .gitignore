@@ -167,6 +167,8 @@ zipl/src/chreipl_helper.device-mapper
 zipl/src/chreipl_helper.md
 zipl/src/zipl
 zipl/src/zipl-editenv
+zipl/src/_zipl-editenv
+zipl/src/zipl-editenv.bash
 zipl/src/zipl_helper.device-mapper
 zipl/src/zipl_helper.md
 zkey/check-dep-zkey

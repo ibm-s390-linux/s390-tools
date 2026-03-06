@@ -1,6 +1,11 @@
 # Common definitions
 include ../../common.mak
 
+zsh-completions = _zipl-editenv
+bash-completions = zipl-editenv.bash
+
+include ../../common_autocomp.mak
+
 ALL_CPPFLAGS += -I../include -I../boot \
 	    -DZFCPDUMP_IMAGE="STRINGIFY($(ZFCPDUMP_DIR)/$(ZFCPDUMP_IMAGE))" \
 	    -DZFCPDUMP_INITRD="STRINGIFY($(ZFCPDUMP_DIR)/$(ZFCPDUMP_INITRD))" \
