@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _vmcp
+bash-completions = vmcp.bash
+
+include ../common_autocomp.mak
+
 all: vmcp
 
 libs =	$(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a

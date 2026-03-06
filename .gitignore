@@ -115,6 +115,8 @@ tunedasd/src/tunedasd
 tunedasd/src/_tunedasd
 tunedasd/src/tunedasd.bash
 vmcp/vmcp
+vmcp/_vmcp
+vmcp/vmcp.bash
 vmur/vmur
 zconf/chp/chchp
 zconf/chp/lschp
