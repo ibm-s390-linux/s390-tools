@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _dasdview
+bash-completions = dasdview.bash
+
+include ../common_autocomp.mak
+
 libs =	$(rootdir)/libdasd/libdasd.a \
 	$(rootdir)/libzds/libzds.a \
 	$(rootdir)/libvtoc/libvtoc.a \

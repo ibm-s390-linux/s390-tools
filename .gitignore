@@ -53,6 +53,8 @@ dasdinfo/dasdinfo
 dasdinfo/_dasdinfo
 dasdinfo/dasdinfo.bash
 dasdview/dasdview
+dasdview/_dasdview
+dasdview/dasdview.bash
 dump2tar/src/dump2tar
 fdasd/fdasd
 hmcdrvfs/hmcdrvfs
