@@ -25,7 +25,7 @@ compile_commands.json
 #
 **/.detect-openssl.dep.c
 *.debug
-*/autocompletion_generator_host
+**/autocompletion_generator_host
 ap_tools/ap-check
 cmsfs-fuse/cmsfs-fuse
 cpacfstats/cpacfstats
@@ -56,6 +56,8 @@ dasdview/dasdview
 dasdview/_dasdview
 dasdview/dasdview.bash
 dump2tar/src/dump2tar
+dump2tar/src/_dump2tar
+dump2tar/src/dump2tar.bash
 fdasd/fdasd
 hmcdrvfs/hmcdrvfs
 hsavmcore/check-dep-fuse

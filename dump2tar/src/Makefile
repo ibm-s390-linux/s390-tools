@@ -1,6 +1,11 @@
 # Common definitions
 include ../../common.mak
 
+zsh-completions = _dump2tar
+bash-completions = dump2tar.bash
+
+include ../../common_autocomp.mak
+
 ALL_CPPFLAGS += -I../include -Wno-unused-parameter
 LDLIBS  += -lpthread -lrt
 ifneq ($(HAVE_ZLIB),0)
