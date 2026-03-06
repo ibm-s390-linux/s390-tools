@@ -59,6 +59,8 @@ dump2tar/src/dump2tar
 dump2tar/src/_dump2tar
 dump2tar/src/dump2tar.bash
 fdasd/fdasd
+fdasd/_fdasd
+fdasd/fdasd.bash
 hmcdrvfs/hmcdrvfs
 hsavmcore/check-dep-fuse
 hsavmcore/hsavmcore

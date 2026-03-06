@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _fdasd
+bash-completions = fdasd.bash
+
+include ../common_autocomp.mak
+
 libs =	$(rootdir)/libvtoc/libvtoc.a \
 	$(rootdir)/libzds/libzds.a \
 	$(rootdir)/libdasd/libdasd.a \
