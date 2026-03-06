@@ -134,6 +134,8 @@ zconf/qeth/lsqeth
 zconf/qeth/_lsqeth
 zconf/qeth/lsqeth.bash
 zconf/scm/lsscm
+zconf/scm/_lsscm
+zconf/scm/lsscm.bash
 zconf/zcrypt/chzcrypt
 zconf/zcrypt/lszcrypt
 zconf/zcrypt/zcryptctl

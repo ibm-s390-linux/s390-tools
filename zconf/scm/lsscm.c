@@ -19,6 +19,8 @@
 #include "lib/util_scandir.h"
 #include "lib/zt_common.h"
 
+#include "lsscm_cli.h"
+
 /*
  * Program configuration
  */
@@ -32,15 +34,6 @@ const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-/*
- * Configuration of command line options
- */
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
 };
 
 /**
