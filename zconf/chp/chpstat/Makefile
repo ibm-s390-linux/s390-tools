@@ -1,5 +1,10 @@
 include ../../../common.mak
 
+zsh-completions = _chpstat
+bash-completions = chpstat.bash
+
+include ../../../common_autocomp.mak
+
 all: chpstat
 
 libs =	$(rootdir)/libutil/libutil.a

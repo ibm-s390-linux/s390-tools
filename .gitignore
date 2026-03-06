@@ -125,6 +125,8 @@ zconf/chp/lschp
 zconf/chp/_lschp
 zconf/chp/lschp.bash
 zconf/chp/chpstat/chpstat
+zconf/chp/chpstat/_chpstat
+zconf/chp/chpstat/chpstat.bash
 zconf/css/lscss
 zconf/qeth/lsqeth
 zconf/scm/lsscm
