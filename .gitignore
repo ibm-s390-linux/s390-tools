@@ -112,6 +112,8 @@ systemd/cpacfstatsd.service
 systemd/iucvtty-login@.service
 systemd/ttyrun-getty@.service
 tunedasd/src/tunedasd
+tunedasd/src/_tunedasd
+tunedasd/src/tunedasd.bash
 vmcp/vmcp
 vmur/vmur
 zconf/chp/chchp

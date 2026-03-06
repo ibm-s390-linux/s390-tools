@@ -1,5 +1,10 @@
 include ../../common.mak
 
+zsh-completions = _tunedasd
+bash-completions = tunedasd.bash
+
+include ../../common_autocomp.mak
+
 ALL_CPPFLAGS += -I../include
 
 libs =	$(rootdir)/libdasd/libdasd.a \
