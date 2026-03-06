@@ -39,6 +39,7 @@
 #include "lib/zt_common.h"
 #include "lib/vmcp.h"
 
+#include "lsqeth_cli.h"
 #include "misc.h"
 
 #define ID_FORMAT		"^[[:xdigit:]]{1,2}[.][[:xdigit:]][.][[:xdigit:]]{4}$"
@@ -68,20 +69,6 @@ const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-/*
- * Command line options
- */
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "proc", no_argument, NULL, 'p'},
-		.desc = "List all devices in the former /proc/qeth format"
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
 };
 
 /*

@@ -131,6 +131,8 @@ zconf/css/lscss
 zconf/css/_lscss
 zconf/css/lscss.bash
 zconf/qeth/lsqeth
+zconf/qeth/_lsqeth
+zconf/qeth/lsqeth.bash
 zconf/scm/lsscm
 zconf/zcrypt/chzcrypt
 zconf/zcrypt/lszcrypt

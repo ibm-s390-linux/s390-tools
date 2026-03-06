@@ -1,5 +1,10 @@
 include ../../common.mak
 
+zsh-completions = _lsqeth
+bash-completions = lsqeth.bash
+
+include ../../common_autocomp.mak
+
 all: lsqeth
 
 libs = $(rootdir)/libvmcp/libvmcp.a $(rootdir)/libutil/libutil.a
