@@ -22,6 +22,8 @@
 #include "lib/util_prg.h"
 #include "lib/util_path.h"
 
+#include "lsstp_cli.h"
+
 static const struct util_prg prg = {
 	.desc = "Display STP system information",
 	.args = "",
@@ -32,12 +34,6 @@ static const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
 };
 
 struct stp_parms {

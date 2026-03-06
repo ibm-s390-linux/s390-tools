@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _lsstp
+bash-completions = lsstp.bash
+
+include ../common_autocomp.mak
+
 libs = $(rootdir)/libutil/libutil.a
 all: lsstp
 
