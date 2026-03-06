@@ -167,6 +167,8 @@ zkey/kmip/zkey-kmip.so
 zkey/zkey
 zkey/zkey-cryptsetup
 zmemtopo/zmemtopo
+zmemtopo/_zmemtopo
+zmemtopo/zmemtopo.bash
 zpcictl/zpcictl
 zpcictl/_zpcictl
 zpcictl/zpcictl.bash

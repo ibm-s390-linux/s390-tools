@@ -6,6 +6,11 @@
 #
 include ../common.mak
 
+zsh-completions = _zmemtopo
+bash-completions = zmemtopo.bash
+
+include ../common_autocomp.mak
+
 libs =	$(rootdir)/libutil/libutil.a
 
 all: zmemtopo
