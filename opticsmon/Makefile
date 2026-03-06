@@ -2,6 +2,11 @@ include ../common.mak
 
 TESTS := tests/
 
+zsh-completions = _opticsmon
+bash-completions = opticsmon.bash
+
+include ../common_autocomp.mak
+
 libs =$(rootdir)/libzpci/libzpci.a $(rootdir)/libutil/libutil.a
 
 ifneq (${HAVE_OPENSSL},0)

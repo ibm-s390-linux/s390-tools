@@ -103,6 +103,8 @@ lsstp/lsstp.bash
 mon_tools/mon_fsstatd
 mon_tools/mon_procd
 opticsmon/opticsmon
+opticsmon/_opticsmon
+opticsmon/opticsmon.bash
 osasnmpd/osasnmpd
 qetharp/qetharp
 qethqoat/qethqoat
