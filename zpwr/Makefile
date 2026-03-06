@@ -7,6 +7,11 @@
 
 include ../common.mak
 
+zsh-completions = _zpwr
+bash-completions = zpwr.bash
+
+include ../common_autocomp.mak
+
 all: zpwr
 
 OBJECTS = zpwr.o

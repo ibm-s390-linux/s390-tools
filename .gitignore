@@ -171,3 +171,5 @@ zpcictl/zpcictl
 zpcictl/_zpcictl
 zpcictl/zpcictl.bash
 zpwr/zpwr
+zpwr/_zpwr
+zpwr/zpwr.bash

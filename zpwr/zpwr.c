@@ -29,14 +29,15 @@
 #include "lib/util_fmt.h"
 #include "lib/util_opt.h"
 #include "lib/util_prg.h"
+
 #include "zpwr.h"
+#include "zpwr_cli.h"
 
 #define DIAG		"/dev/diag"
 #define NANO		1000000000ULL
 #define NUMUNIT		5
 #define NAMELEN		8
 #define COMPWIDTH	27
-#define OPT_FORMAT	256
 
 enum part_power {
 	CPU,
@@ -93,33 +94,6 @@ static const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_SECTION("OPTIONS"),
-	{
-		.option = { "format", required_argument, NULL, OPT_FORMAT },
-		.argument = "FORMAT",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-		.desc = "List data in specified FORMAT (" FMT_TYPE_NAMES ")",
-	},
-	{
-		.option = { "delay", required_argument, NULL, 'd' },
-		.argument = "NUMBER",
-		.desc = "Power readings after delay (seconds)",
-	},
-	{
-		.option = { "count", required_argument, NULL, 'c' },
-		.argument = "NUMBER",
-		.desc = "Number of power readings",
-	},
-	{
-		.option = { "stream", no_argument, NULL, 's' },
-		.desc = "Power readings in stream mode",
-	},
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	UTIL_OPT_END
 };
 
 static int get_max_column_width(struct zpwrinfo *pinfo)
