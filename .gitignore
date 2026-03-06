@@ -168,4 +168,6 @@ zkey/zkey
 zkey/zkey-cryptsetup
 zmemtopo/zmemtopo
 zpcictl/zpcictl
+zpcictl/_zpcictl
+zpcictl/zpcictl.bash
 zpwr/zpwr

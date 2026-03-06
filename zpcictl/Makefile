@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _zpcictl
+bash-completions = zpcictl.bash
+
+include ../common_autocomp.mak
+
 all: zpcictl
 
 libs =	$(rootdir)/libzpci/libzpci.a $(rootdir)/libutil/libutil.a
