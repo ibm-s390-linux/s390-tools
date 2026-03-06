@@ -24,6 +24,8 @@
 #include "lib/util_scandir.h"
 #include "lib/zt_common.h"
 
+#include "lschp_cli.h"
+
 #define CHP_SHARED  "shared"
 #define CHP_STATE   "vary"
 #define CHP_PCHID   "pchid"
@@ -34,8 +36,6 @@
 
 static enum util_fmt_t fmt;
 static bool fmt_specified;
-
-#define OPT_FORMAT 262	/* --format */
 
 /*
  * Program configuration
@@ -50,21 +50,6 @@ static const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-/*
- * Configuration of command line options
- */
-static struct util_opt opt_vec[] = {
-	UTIL_OPT_HELP,
-	UTIL_OPT_VERSION,
-	{
-		.option = { "format", required_argument, NULL, OPT_FORMAT},
-		.argument = "FORMAT",
-		.desc = "Output format (" FMT_TYPE_NAMES ")",
-		.flags = UTIL_OPT_FLAG_NOSHORT,
-	},
-	UTIL_OPT_END
 };
 
 /**
@@ -321,7 +306,7 @@ int main(int argc, char *argv[])
 	int c;
 
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
+	util_opt_init(lschp_opt_vec, NULL);
 
 	while (1) {
 		c = util_opt_getopt_long(argc, argv);

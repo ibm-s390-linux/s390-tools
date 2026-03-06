@@ -1,5 +1,10 @@
 include ../../common.mak
 
+zsh-completions := _chchp _lschp
+bash-completions := chchp.bash lschp.bash
+
+include ../../common_autocomp.mak
+
 all: chchp lschp chpstat
 	$(MAKE) -C chpstat all
 

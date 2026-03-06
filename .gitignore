@@ -119,7 +119,11 @@ vmcp/_vmcp
 vmcp/vmcp.bash
 vmur/vmur
 zconf/chp/chchp
+zconf/chp/_chchp
+zconf/chp/chchp.bash
 zconf/chp/lschp
+zconf/chp/_lschp
+zconf/chp/lschp.bash
 zconf/chp/chpstat/chpstat
 zconf/css/lscss
 zconf/qeth/lsqeth

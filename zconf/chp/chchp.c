@@ -25,6 +25,8 @@
 #include "lib/util_prg.h"
 #include "lib/zt_common.h"
 
+#include "chchp_cli.h"
+
 #define CIO_SETTLE "/proc/cio_settle"
 #define MAX_CHPID_CSS 255
 #define MAX_CHPID_ID 255
@@ -61,33 +63,6 @@ const struct util_prg prg = {
 		},
 		UTIL_PRG_COPYRIGHT_END
 	}
-};
-
-/*
- * Configuration of command line options
- */
-static struct util_opt opt_vec[] = {
-	{
-		.option = { "vary", required_argument, NULL, 'v'},
-		.argument = "VALUE",
-		.desc = "Logically vary channel-path to VALUE (1=on, 0=off)",
-	},
-	{
-		.option = { "configure", required_argument, NULL, 'c'},
-		.argument = "VALUE",
-		.desc = "Configure channel-path to VALUE (1=on, 0=standby)",
-	},
-	{
-		.option = { "attribute", required_argument, NULL, 'a'},
-		.argument = "KEY=VALUE",
-		.desc = "Set channel-path attribute KEY to VALUE",
-	},
-	UTIL_OPT_HELP,
-	{
-		.option = { "version", 0, NULL, 'V'},
-		.desc = "Print version information, then exit",
-	},
-	UTIL_OPT_END
 };
 
 /*
@@ -370,7 +345,7 @@ int main(int argc, char *argv[])
 	int c, i;
 
 	util_prg_init(&prg);
-	util_opt_init(opt_vec, NULL);
+	util_opt_init(chchp_opt_vec, NULL);
 	while (1) {
 		c = util_opt_getopt_long(argc, argv);
 		if (c == -1)
