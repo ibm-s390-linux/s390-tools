@@ -64,6 +64,8 @@ fdasd/fdasd.bash
 hmcdrvfs/hmcdrvfs
 hsavmcore/check-dep-fuse
 hsavmcore/hsavmcore
+hsavmcore/_hsavmcore
+hsavmcore/hsavmcore.bash
 hyptop/hyptop
 ip_watcher/xcec-bridge
 ipl_tools/chreipl

@@ -7,6 +7,11 @@
 
 include ../common.mak
 
+zsh-completions = _hsavmcore
+bash-completions = hsavmcore.bash
+
+include ../common_autocomp.mak
+
 ALL_CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 ifeq (${HAVE_FUSE},0)
@@ -41,7 +46,7 @@ endif
 ALL_CFLAGS += $(FUSE_CFLAGS) $(SYSTEMD_CFLAGS)
 LDLIBS += $(FUSE_LDLIBS) $(SYSTEMD_LDLIBS) -lpthread
 
-sources := $(wildcard *.c)
+sources := $(filter-out %_host.c, $(wildcard *.c))
 objects := $(patsubst %.c,%.o,$(sources))
 
 libs = $(rootdir)/libutil/libutil.a
