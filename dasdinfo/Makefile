@@ -1,5 +1,10 @@
 include ../common.mak
 
+zsh-completions = _dasdinfo
+bash-completions = dasdinfo.bash
+
+include ../common_autocomp.mak
+
 libs = $(rootdir)/libutil/libutil.a \
        $(rootdir)/libdasd/libdasd.a
 
