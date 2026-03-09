@@ -1,5 +1,10 @@
 include ../../common.mak
 
+zsh-completions = _chzcrypt _lszcrypt _zcryptstats
+bash-completions = chzcrypt.bash lszcrypt.bash zcryptstats.bash
+
+include ../../common_autocomp.mak
+
 all: chzcrypt lszcrypt zcryptctl zcryptstats
 
 libs = $(rootdir)/libutil/libutil.a

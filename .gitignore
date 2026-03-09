@@ -137,9 +137,15 @@ zconf/scm/lsscm
 zconf/scm/_lsscm
 zconf/scm/lsscm.bash
 zconf/zcrypt/chzcrypt
+zconf/zcrypt/_chzcrypt
+zconf/zcrypt/chzcrypt.bash
 zconf/zcrypt/lszcrypt
+zconf/zcrypt/_lszcrypt
+zconf/zcrypt/lszcrypt.bash
 zconf/zcrypt/zcryptctl
 zconf/zcrypt/zcryptstats
+zconf/zcrypt/_zcryptstats
+zconf/zcrypt/zcryptstats.bash
 zdev/src/chzdev
 zdev/src/chzdev_usage.h
 zdev/src/lszdev
