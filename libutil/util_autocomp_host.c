@@ -28,10 +28,12 @@ static const char *bash_script_part1 = "() {\n\
 \tcurrent_word=\"${COMP_WORDS[COMP_CWORD]}\"\n\
 \toptions_array=\"";
 
-static const char *bash_script_part2 = "\tif [[ ${current_word} == -* || ${COMP_CWORD} -eq 1 ]] ; then\n\
+static const char *bash_script_part2 = "\tif [[ ${current_word} == -* ]] ; then\n\
 \t\tmapfile -t \"COMPREPLY\" < <(compgen -W \"${options_array}\" -- \"$current_word\")\n\
-\t\treturn 0\n\
+\telse\n\
+\t\tcompopt -o bashdefault -o default\n\
 \tfi\n\
+\treturn 0\n\
 }\n\
 complete -F ";
 
@@ -85,7 +87,7 @@ static int start_bash_scriptfile(int fd, char *func_name)
 
 static int start_zsh_scriptfile(int fd, char *func_name, char *tool_name)
 {
-	const char *part3 = " {\n\n\t_arguments -C \\\n";
+	const char *part3 = " {\n\n\t_arguments -C -A \"*\" \\\n";
 	const char *part2 = "\n\nfunction ";
 	const char *part1 = "#compdef ";
 	int len, ret = 0;
@@ -126,6 +128,7 @@ static int write_bash_command_options(struct util_opt *opt_vec, int fd)
 
 static int write_zsh_command_options(struct util_opt *opt_vec, int fd)
 {
+	const char *end = "\t\t\"*:files:_files\"\n}\n";
 	const char *name, *desc;
 	char *str;
 	int len;
@@ -144,8 +147,14 @@ static int write_zsh_command_options(struct util_opt *opt_vec, int fd)
 			free(str);
 		}
 	}
-	if (write(fd, "\n}\n", 3) != 3)
+	len = asprintf(&str, "%s", end);
+	if (len == -1)
 		return -EIO;
+	if (write(fd, str, len) != len) {
+		free(str);
+		return -EIO;
+	}
+	free(str);
 	return 0;
 }
 
