@@ -22,18 +22,17 @@
 #include "lib/util_autocomp.h"
 #include "lib/util_opt.h"
 
-static const char *bash_script_part1 = "() {\n\n\
-\tlocal current_word previous_word options_array\n\n\
+static const char *bash_script_part1 = "() {\n\
+\tlocal current_word options_array\n\
 \tCOMPREPLY=()\n\n\
-\tcurrent_word=\"${COMP_WORDS[COMP_CWORD]}\"\n\n\
-\tprevious_word=\"${COMP_WORDS[COMP_CWORD-1]}\"\n\n\
+\tcurrent_word=\"${COMP_WORDS[COMP_CWORD]}\"\n\
 \toptions_array=\"";
 
-static const char *bash_script_part2 = "\tif [[ ${current_word} == -* || ${COMP_CWORD} -eq 1 ]] ; then\n\n\
-\t\tCOMPREPLY=( $(compgen -W \"${options_array}\" -- ${current_word} ) )\n\n\
-\t\treturn 0\n\n\
-\tfi\n\n\
-}\n\n\
+static const char *bash_script_part2 = "\tif [[ ${current_word} == -* || ${COMP_CWORD} -eq 1 ]] ; then\n\
+\t\tmapfile -t \"COMPREPLY\" < <(compgen -W \"${options_array}\" -- \"$current_word\")\n\
+\t\treturn 0\n\
+\tfi\n\
+}\n\
 complete -F ";
 
 static char *format_name(const char *fmt, char *tool_name)
