@@ -48,15 +48,16 @@ SECTIONS
   .rodata : {*(.rodata .rodata.*) }
   .data : { *(.data .data.*) }
 
+#define SB_TRAILER_SIZE 32
   /* Trailer needed for Secure Boot */
-  . = COMMAND_LINE_EXTRA - SIZEOF(.sb.trailer);
+  . = COMMAND_LINE_EXTRA - SB_TRAILER_SIZE;
   .sb.trailer : {
     QUAD(0x0000c00000000000)
     QUAD(STAGE3_ENTRY + PSW_LOAD)
     QUAD(STAGE3_ENTRY)
     QUAD(0x000000207a49504c)
   }
-  ASSERT(SIZEOF(.sb.trailer) == 32, "Invalid .sb.trailer size")
+  ASSERT(SIZEOF(.sb.trailer) == SB_TRAILER_SIZE, "Invalid .sb.trailer size")
 
   . = COMMAND_LINE_EXTRA;
   .cmdline_extra : {
