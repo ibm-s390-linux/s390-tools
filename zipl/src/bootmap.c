@@ -441,12 +441,14 @@ static int add_component_file(struct install_set *bis, const char *filename,
 
 	if (add_files && comp_reg->offset > 0) {
 		/*
-		 * The file has been already written to the bootmap.
+		 * The file has been already written to the bootmap,
+		 * and that in-bootmap file doesn't contain a trailer.
 		 * Use the respective region in the bootmap file to
 		 * add the component
 		 */
 		filename = bis->filename;
 		add_files = 0;
+		trailer = 0;
 	} else {
 		comp_reg = NULL;
 	}
