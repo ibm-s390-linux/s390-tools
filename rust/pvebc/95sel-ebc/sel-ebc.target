@@ -1,0 +1,27 @@
+[Unit]
+Description=Target unit for IBM Secure Execution for Linux early boot customization
+
+# enable for use in initramfs
+DefaultDependencies=no
+
+# if not met start the target without starting its dependencies
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=rd.sel-ebc
+
+# if not met the target is considered failed
+# AssertVirtualization=kvm
+
+# if target fails abort immediately
+FailureAction=poweroff-immediate
+
+Requires=sel-ebc-pvebc.service
+Requires=sel-ebc-override-crypttab.service
+Requires=sel-ebc-paes-enforce.service
+
+# ordering dependencies
+After=systemd-modules-load.service
+Before=initrd-root-device.target
+
+[Install]
+# most basic hook to start target by default
+WantedBy=initrd.target

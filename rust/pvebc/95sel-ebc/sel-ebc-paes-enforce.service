@@ -1,0 +1,27 @@
+[Unit]
+Description=Enforce PAES encrypted root fs for SEL guests
+
+# Ensure this runs before the handoff to the real root, if that's required:
+After=cryptsetup.target
+After=initrd-root-device.target
+Before=sysroot.mount
+
+# Initramfs requirement
+DefaultDependencies=no
+# Make absolutely sure this only runs in initramfs
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=rd.sel-ebc
+ConditionKernelCommandLine=root
+
+[Service]
+Type=oneshot
+ExecStart=bash -c 'dmsetup table /dev/disk/by-label/root | grep "paes-xts-plain64"'
+FailureAction=poweroff-immediate
+RemainAfterExit=yes
+
+# logs do not leek any sensitive information
+StandardOutput=file:/boot/sics/log
+StandardError=file:/boot/sics/log
+
+[Install]
+RequiredBy=sel-ebc.target

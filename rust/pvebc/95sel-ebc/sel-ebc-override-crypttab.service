@@ -1,0 +1,37 @@
+[Unit]
+Description=Override crypttab
+
+# boot partition contains SICS
+# Loading of kernel modules is required which are needed for protected keys
+Requires=systemd-modules-load.service
+Requires=boot.mount
+
+# Ensure this runs before the handoff to the real root, if that's required:
+After=boot.mount
+After=systemd-modules-load.service
+Before=cryptsetup-pre.target
+Before=cryptsetup.target
+Before=systemd-cryptsetup@.service
+Before=initrd-root-device.target
+After=sel-ebc-pvebc.service
+
+# Initramfs requirement
+DefaultDependencies=no
+# Make absolutely sure this only runs in initramfs
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=rd.sel-ebc
+ConditionKernelCommandLine=root
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /etc/sel-ebc/override-crypttab.sh
+RemainAfterExit=yes
+# If pvebc fails immediately abort boot
+FailureAction=poweroff-immediate
+# boot partition is unencrypted and contains SICS so we can get logs out this way
+# logs do not leek any sensitive information
+StandardOutput=file:/boot/sics/log
+StandardError=file:/boot/sics/log
+
+[Install]
+RequiredBy=sel-ebc.target

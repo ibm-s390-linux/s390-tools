@@ -10,6 +10,8 @@ CARGO_TARGETS :=
 PV_TARGETS :=
 CARGO_TEST_TARGETS :=
 
+SEL_EBC_MODDIR := 95sel-ebc
+
 ifneq (${HAVE_CARGO},0)
 	CARGO_TARGETS := pvebc
 
@@ -29,6 +31,7 @@ ifneq (${HAVE_LIBCURL},0)
 
 ifeq ($(HOST_ARCH),s390x)
 	PV_TARGETS += pvapconfig pvinfo
+	INSTALL_TARGETS += install-ebc-dracut-module
 else
 	BUILD_TARGETS += skip-pvapconfig skip-pvinfo
 endif #HOSTARCH
@@ -103,6 +106,23 @@ endif # CARGO
 	$(RM) -- .check-dep-pvtools .detect-openssl.dep.c .check-cargo
 
 rust-test: $(CARGO_TEST_TARGETS)
+
+install-ebc-dracut-module:
+ifneq ($(HAVE_DRACUT),0)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(SEL_EBC_MODDIR)
+	$(INSTALL) -m 755 pvebc/$(SEL_EBC_MODDIR)/module-setup.sh \
+		pvebc/$(SEL_EBC_MODDIR)/override-crypttab.sh \
+		pvebc/$(SEL_EBC_MODDIR)/pvebc-wrapper.sh \
+		$(DESTDIR)$(DRACUTMODDIR)/$(SEL_EBC_MODDIR)
+	$(INSTALL) -m 644 pvebc/$(SEL_EBC_MODDIR)/boot.mount \
+		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-override-crypttab.service \
+		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-paes-enforce.service \
+		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-pvebc.service \
+		pvebc/$(SEL_EBC_MODDIR)/sel-ebc.crypttab \
+		pvebc/$(SEL_EBC_MODDIR)/sel-ebc.target \
+		$(DESTDIR)$(DRACUTMODDIR)/$(SEL_EBC_MODDIR)
+endif
 
 install-rust-tools: $(BUILD_TARGETS)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(USRBINDIR)

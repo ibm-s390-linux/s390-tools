@@ -1,0 +1,36 @@
+[Unit]
+Description=Run pvebc during early boot to process SICS
+
+# boot partition contains SICS
+# Loading of kernel modules is required which are needed for protected keys
+Requires=systemd-modules-load.service
+Wants=boot.mount
+
+# Ensure this runs before the handoff to the real root, if that's required:
+Before=initrd-root-device.target
+Before=cryptsetup-pre.target
+Before=cryptsetup.target
+After=boot.mount
+After=systemd-modules-load.service
+
+# Initramfs requirement
+DefaultDependencies=no
+# Make absolutely sure this only runs in initramfs
+ConditionPathExists=/etc/initrd-release
+AssertPathIsDirectory=/boot/sics
+ConditionKernelCommandLine=rd.sel-ebc
+
+[Service]
+Type=oneshot
+# execute pvebc
+ExecStart=/bin/bash /etc/sel-ebc/pvebc-wrapper.sh
+RemainAfterExit=yes
+# If pvebc fails immediately abort boot
+FailureAction=poweroff-immediate
+# boot partition is unencrypted and contains SICS so we can get logs out this way
+# logs do not leek any sensitive information
+StandardOutput=file:/boot/sics/log
+StandardError=file:/boot/sics/log
+
+[Install]
+RequiredBy=sel-ebc.target

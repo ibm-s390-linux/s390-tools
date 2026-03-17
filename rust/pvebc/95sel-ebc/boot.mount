@@ -1,0 +1,28 @@
+[Unit]
+Description=Mount /boot early in initramfs
+
+# Initramfs requirement
+DefaultDependencies=no
+# Make absolutely sure this only runs in initramfs (and not post-pivot if the
+# unit ever appears there)
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=root
+
+# we use /dev/disk/by-label because it identifies the boot partition system
+# independently IF set up correctly
+Requires=dev-disk-by\x2dlabel-boot.device
+
+# Ordering dependencies
+After=dev-disk-by\x2dlabel-boot.device
+Before=sel-ebc-pvebc.service
+
+[Mount]
+# system independent identification of boot partition requires that the label
+# boot is set for the boot partition
+What=/dev/disk/by-label/boot
+Where=/boot
+Type=auto
+Options=defaults
+
+[Install]
+WantedBy=sel-ebc-pvebc.service

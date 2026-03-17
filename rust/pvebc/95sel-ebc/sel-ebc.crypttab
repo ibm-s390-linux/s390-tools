@@ -1,0 +1,1 @@
+cryptroot_mapper /dev/disk/by-label/cryptroot /run/sel-ebc/luks-rfs-passphrase
