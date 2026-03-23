@@ -704,9 +704,6 @@ static int add_ipl_program(struct install_set *bis, bool add_envblk,
 	/* initiate values for ramdisk */
 	stats.st_size = 0;
 	if (ipl->common.ramdisk != NULL) {
-		/* Add ramdisk */
-		if (verbose && bis->mirrors[mirror_id].print_details)
-			printf("  initial ramdisk...: %s\n", ipl->common.ramdisk);
 		/* Get ramdisk file size */
 		if (stat(ipl->common.ramdisk, &stats)) {
 			error_reason(strerror(errno));
@@ -834,10 +831,10 @@ static int add_ipl_program(struct install_set *bis, bool add_envblk,
 	offset += sizeof(struct component_entry);
 
 	/* Add kernel image */
-	if (verbose && bis->mirrors[mirror_id].print_details)
-		printf("  kernel image......: %s\n", ipl->common.image);
-
 	signature_size = extract_signature(ipl->common.image, &signature, &sig_head);
+	if (verbose && bis->mirrors[mirror_id].print_details)
+		printf("  kernel image......: %s%s\n",
+		       ipl->common.image, signature_size ? " (signed)" : "");
 	if (signature_size &&
 	    (is_secure == SECURE_BOOT_ENABLED ||
 	     (is_secure == SECURE_BOOT_AUTO && secure_boot_supported))) {
@@ -906,6 +903,10 @@ static int add_ipl_program(struct install_set *bis, bool add_envblk,
 	if (ipl->common.ramdisk != NULL) {
 		signature_size = extract_signature(ipl->common.ramdisk, &signature,
 						   &sig_head);
+		if (verbose && bis->mirrors[mirror_id].print_details)
+			printf("  initial ramdisk...: %s%s\n",
+			       ipl->common.ramdisk,
+			       signature_size ? " (signed)" : "");
 		if (signature_size &&
 		    (is_secure == SECURE_BOOT_ENABLED ||
 		     (is_secure == SECURE_BOOT_AUTO &&
