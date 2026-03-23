@@ -550,8 +550,6 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 
 int main(int argc, char *argv[])
 {
-	struct utsname uname_buf;
-	int version, release;
 	char *uidfile = NULL;
 	char *device = NULL;
 	char *readbuf = NULL;
@@ -616,29 +614,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	uname(&uname_buf);
-	sscanf(uname_buf.release, "%d.%d", &version, &release);
-	if (strcmp(uname_buf.sysname, "Linux") ||
-	    version < 2 || (version == 2 && release < 6)) {
-		warnx("%s %d.%d is not supported", uname_buf.sysname,
-		      version, release);
-		exit(1);
-	}
+	if (!busid && !blockdev && !devnode)
+		errx(EXIT_FAILURE, "Error: please specify a device using either -b, -i or -d");
 
-	if (!busid && !blockdev && !devnode) {
-		warnx("Error: please specify a device using either -b, -i or -d");
-		exit(1);
-	}
+	if ((busid && blockdev) || (busid && devnode) || (blockdev && devnode))
+		errx(EXIT_FAILURE, "Error: please specify device only once,  either -b, -i or -d");
 
-	if ((busid && blockdev) || (busid && devnode) || (blockdev && devnode)) {
-		warnx("Error: please specify device only once,  either -b, -i or -d");
-		exit(1);
-	}
-
-	if (!print_uid && !print_extended_uid && !print_vlabel) {
-		warnx("Error: no action specified (e.g. -u)");
-		exit(1);
-	}
+	if (!print_uid && !print_extended_uid && !print_vlabel)
+		errx(EXIT_FAILURE, "Error: no action specified (e.g. -u)");
 
 	readbuf = dinfo_malloc(RD_BUFFER_SIZE);
 	if (!readbuf)
