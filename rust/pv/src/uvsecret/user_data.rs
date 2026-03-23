@@ -248,7 +248,7 @@ fn check_key_format(kind: UserDataType, key: &PKeyRef<Public>) -> Result<()> {
 ///
 /// # Returns
 ///
-/// Extracrted user-data if available
+/// Extracted user-data if available
 ///
 /// # Errors
 ///
