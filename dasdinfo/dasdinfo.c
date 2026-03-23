@@ -101,9 +101,9 @@ struct volume_label {
 	char volkey[4];
 	char vollbl[4];
 	char volid[6];
-} __attribute__ ((packed));
+} __packed;
 
-static char EBCtoASC[256] = {
+static char ebc_to_asc[256] = {
 /* 0x00  NUL   SOH   STX   ETX  *SEL    HT  *RNL   DEL */
 	0x00, 0x01, 0x02, 0x03, 0x07, 0x09, 0x07, 0x7F,
 /* 0x08  -GE  -SPS  -RPT    VT    FF    CR    SO    SI */
@@ -175,7 +175,7 @@ static char *dinfo_ebcdic_dec(char *source, char *target, int l)
 	int i;
 
 	for (i = 0; i < l; i++)
-		target[i] = EBCtoASC[(unsigned char)(source[i])];
+		target[i] = ebc_to_asc[(unsigned char)(source[i])];
 
 	return target;
 }
@@ -611,8 +611,7 @@ int main(int argc, char *argv[])
 			util_prg_print_version();
 			exit(EXIT_SUCCESS);
 		default:
-			fprintf(stderr, "Try 'dasdinfo --help' for more "
-				"information.\n");
+			fprintf(stderr, "Try 'dasdinfo --help' for more information.\n");
 			exit(1);
 		}
 	}
