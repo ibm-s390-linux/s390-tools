@@ -130,6 +130,30 @@ pub struct CreateSecretOpt {
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub user_data: Option<String>,
 
+    /// Links an Add‑Secret-Request (ASR) to a policy file.
+    ///
+    /// This option embeds a PolicyReference in the ASR user data field. The PolicyReference
+    /// includes the relative file path and the SHA‑512 hash of the policy file, allowing the
+    /// policy’s integrity to be verified.
+    ///
+    /// This option conflicts with --user-data, because both options use the same user data field in
+    /// the ASR structure.
+    #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, conflicts_with("user_data"))]
+    pub policy: Option<String>,
+
+    /// Adds the AES‑GCM authentication tag to a TOC policy file.
+    ///
+    /// This option appends the AES‑GCM authentication tag to the specified TOC policy file. This
+    /// allows the TOC policy to maintain a list of all ASR MAC tags for completeness verification
+    /// during boot. During verification, the TOC checks the MAC tags against this list to ensure
+    /// that all expected ASRs are present and unmodified.
+    #[arg(
+        long = "toc-policy",
+        value_name = "FILE",
+        value_hint = ValueHint::FilePath,
+    )]
+    pub tocpolicy: Option<String>,
+
     /// Use the content of FILE as user signing key.
     ///
     /// Adds a signature calculated from the key in FILE to the add-secret request. The

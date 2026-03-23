@@ -2,24 +2,30 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use std::path::Path;
+use std::{
+    fs::OpenOptions,
+    io::{Read, Write},
+    path::Path,
+};
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
+use pv::request::openssl;
 use pv::{
     misc::{
-        decode_hex, open_file, pv_guest_bit_set, read_exact_file, read_file, try_parse_u128,
-        try_parse_u64, write,
+        decode_hex, encode_hex, open_file, pv_guest_bit_set, read_exact_file, read_file,
+        try_parse_u128, try_parse_u64, write,
     },
     request::{
         openssl::pkey::{PKey, Private},
-        BootHdrTags, ReqEncrCtx, Request, SymKeyType,
+        BootHdrTags, PolicyReference, ReqEncrCtx, Request, SymKeyType,
     },
     secret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret},
     uv::ConfigUid,
 };
 use serde_yaml::Value;
 use utils::get_writer_from_cli_file_arg;
+use zerocopy::IntoBytes;
 
 use crate::cli::{AddSecretType, CreateSecretFlags, CreateSecretOpt, RetrieveableSecretInpKind};
 
@@ -31,6 +37,38 @@ where
     let mut wr = get_writer_from_cli_file_arg(path.as_ref())?;
     write(&mut wr, data, path, ctx)?;
     Ok(())
+}
+
+/// Computes the SHA-256 hash of data from a reader.
+///
+/// Reads data from the provided reader in 4096-byte chunks and computes
+/// the SHA-256 hash of the entire content.
+///
+/// # Parameters
+///
+/// * `r` - A reader providing the data to hash
+///
+/// # Returns
+///
+/// Returns a `Vec<u8>` containing the 32-byte SHA-256 hash, or an error
+/// if reading fails.
+///
+/// # Errors
+///
+/// Returns an error if reading from the reader fails.
+pub fn sha256_hash<R: Read>(mut r: R) -> Result<Vec<u8>, pv::PvCoreError> {
+    let mut hasher = openssl::Sha256::new();
+    let mut buf: [u8; 4096] = [0; 4096];
+
+    loop {
+        let read = r.read(&mut buf)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+
+    Ok(hasher.finish().to_vec())
 }
 
 fn retrievable(name: &str, secret: &str, kind: &RetrieveableSecretInpKind) -> Result<GuestSecret> {
@@ -76,6 +114,14 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     let rq =
         ReqEncrCtx::random(SymKeyType::Aes256Gcm).context("Failed to generate random input")?;
     let ser_asrbc = asrcb.encrypt(&rq)?;
+
+    if let Some(path) = &opt.tocpolicy {
+        let mac_tag = encode_hex(&ser_asrbc[(ser_asrbc.len() - 16)..]);
+        let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+
+        writeln!(file, "{mac_tag}")?;
+    }
+
     warn!("Successfully generated the request");
     write_out(&opt.output, ser_asrbc, "add-secret request")?;
     info!("Successfully wrote the request to '{}'", &opt.output);
@@ -157,6 +203,17 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
         warn!("Added empty user-data file.");
     }
 
+    let supplied_ref = opt
+        .policy
+        .as_ref()
+        .map(|s| -> Result<PolicyReference> {
+            let p = Path::new(s);
+            let reference = PolicyReference::new(p, sha256_hash)?;
+            println!("{}", encode_hex(reference.hash));
+            Ok(reference)
+        })
+        .transpose()?;
+
     let user_key = opt
         .user_sign_key
         .as_ref()
@@ -169,6 +226,8 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
 
     if user_data.is_some() || user_key.is_some() {
         asrcb.set_user_data(user_data.unwrap_or_default(), user_key)?;
+    } else if let Some(ref_val) = supplied_ref {
+        asrcb.set_user_data(ref_val.as_bytes(), None)?;
     }
     Ok(asrcb)
 }

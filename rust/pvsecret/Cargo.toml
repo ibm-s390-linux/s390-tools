@@ -13,6 +13,7 @@ anyhow = { version = "1.0.95", features = ["std"] }
 clap = { version ="4.5", features = ["derive", "wrap_help"]}
 log = { version = "0.4.25", features = ["std", "release_max_level_debug"] }
 serde_yaml = "0.9"
+zerocopy = "0.8"
 
 pv = { path = "../pv" , package = "s390_pv" }
 utils = { path = "../utils"}

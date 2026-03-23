@@ -14,7 +14,7 @@ use utils::{print_cli_error, print_error, print_version, PvLogger};
 
 static LOGGER: PvLogger = PvLogger;
 static EXIT_LOGGER: u8 = 3;
-const FEATURES: &[&[&str]] = &[cmd::CMD_FN, cmd::UV_CMD_FN];
+const FEATURES: &[&[&str]] = &[cmd::CMD_FN, cmd::UV_CMD_FN, &["+ebc"]];
 
 fn main() -> ExitCode {
     let cli: CliOptions = match CliOptions::try_parse() {
