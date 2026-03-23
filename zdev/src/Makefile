@@ -84,20 +84,13 @@ ifneq (${HAVE_JSONC}, 0)
 LDLIBS += -ljson-c
 endif
 
-chzdev_usage.c: chzdev_usage.txt
-	$(SED) $< >$@ -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/g' \
-		      -e 's/$$/\\n"/g'
+CSTR_SED = -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/g' -e 's/$$/\\n"/g'
+
+%_usage.c: %_usage.txt
+	$(SED) $(CSTR_SED) $< >$@
 
 .chzdev.o.d: chzdev_usage.c
-
-lszdev_usage.c: lszdev_usage.txt
-	$(SED) $< >$@ -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/g' \
-		      -e 's/$$/\\n"/g'
-
 .lszdev.o.d: lszdev_usage.c
-
-chzdev.o: chzdev_usage.c
-lszdev.o: lszdev_usage.c
 
 libs =	$(rootdir)/libap/libap.a \
 	$(rootdir)/libutil/libutil.a
