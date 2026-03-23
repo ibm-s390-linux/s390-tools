@@ -261,7 +261,7 @@ static void *dinfo_malloc(size_t size)
 	void *result;
 
 	result = malloc(size);
-	if (result == NULL)
+	if (!result)
 		warnx("Could not allocate %lu bytes of memory", size);
 
 	return result;
@@ -274,7 +274,7 @@ static char *dinfo_make_path(char *dirname, char *filename)
 
 	len = strlen(dirname) + strlen(filename) + 2;
 	result = (char *)dinfo_malloc(len);
-	if (result == NULL)
+	if (!result)
 		return NULL;
 	sprintf(result, "%s/%s", dirname, filename);
 	return result;
@@ -296,12 +296,12 @@ static int dinfo_create_devnode(dev_t dev, char **devno)
 
 	/* Try several locations for the temporary device node. */
 	for (path = 0; path < ARRAY_SIZE(pathname); path++) {
-		if (pathname[path] == NULL)
+		if (!pathname[path])
 			continue;
 		for (retry = 0; retry < TEMP_DEV_MAX_RETRIES; retry++) {
 			snprintf(filename, sizeof(filename), "dasdinfo%04d", retry);
 			result = dinfo_make_path(pathname[path], filename);
-			if (result == NULL)
+			if (!result)
 				return -1;
 			rc = mknod(result, mode, dev);
 			if (rc == 0) {
@@ -342,7 +342,7 @@ static int dinfo_extract_dev(dev_t *dev, char *str)
 	memset(tmp, 0, RD_BUFFER_SIZE);
 	util_strlcpy(tmp, str, RD_BUFFER_SIZE);
 	p = strchr(tmp, ':');
-	if (p == NULL) {
+	if (!p) {
 		warnx("Error: unable to extract major/minor");
 		return -1;
 	}
@@ -401,14 +401,14 @@ dinfo_is_busiddir(const char *fpath, const struct stat *UNUSED(sb),
 		return -1;
 	linkdir = util_readlink(tempdir);
 	free(tempdir);
-	if (strstr(linkdir, "dasd") == NULL) {
+	if (!strstr(linkdir, "dasd")) {
 		free(linkdir);
 		return FTW_CONTINUE;
 	}
 	free(linkdir);
 	free(busiddir);
 	busiddir = strdup(fpath);
-	if (busiddir == NULL)
+	if (!busiddir)
 		return -1;
 	return FTW_STOP;
 }
@@ -421,7 +421,7 @@ dinfo_find_entry(const char *dir, const char *searchstring,
 	struct dirent *dir_entry = NULL;
 
 	directory = opendir(dir);
-	if (directory == NULL)
+	if (!directory)
 		return -1;
 	while ((dir_entry = readdir(directory)) != NULL) {
 		/* compare if the found entry has exactly the same name and type
@@ -431,7 +431,7 @@ dinfo_find_entry(const char *dir, const char *searchstring,
 			     strlen(searchstring)) == 0) &&
 		    (dir_entry->d_type & type)) {
 			*result = strdup(dir_entry->d_name);
-			if (*result == NULL)
+			if (!*result)
 				goto out;
 			closedir(directory);
 			return 0; /* found */
@@ -477,7 +477,7 @@ dinfo_get_blockdev_from_busid(char *busid, char **blkdev)
 		if (rc != 0)
 			goto out2;
 		*blkdev = strdup(strchr(result, ':') + 1);
-		if (*blkdev == NULL)
+		if (!*blkdev)
 			rc = -1;
 	}
 
@@ -510,7 +510,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 
 	path = util_path_sysfs("block/");
 	directory = opendir(path);
-	if (directory == NULL) {
+	if (!directory) {
 		warnx("Error: could not open directory %s", path);
 		free(path);
 		return -1;
