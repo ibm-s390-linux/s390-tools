@@ -1,0 +1,340 @@
+.\" Copyright IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH PVICS 8 "April 2026" "s390-tools"
+
+.SH NAME
+pvics \- Convert qcow2 KVM guest images to EBC-ready SEL images
+
+.SH SYNOPSIS
+.B pvics
+.I ACTION
+.RB [ \-h | \-\-help ]
+.RB [ \-c | \-\-config
+.IR CONFIG_FILE ]
+.RB [ \-i | \-\-image
+.IR BASE_IMAGE ]
+
+.SH DESCRIPTION
+Use the \fBpvics\fR tool to convert existing QEMU Copy/-On/-Write version 2(qcow2) KVM
+guest images into images that are ready for Early Boot Customization (EBC) and Secure Execution for Linux (SEL).
+The tool encrypts the root file system and prepares all resources required for EBC.
+
+The tool operates on a copy of the original base image and performs operations
+in three main phases:
+.IP \(bu 2
+Retrieving information about a given base image
+.IP \(bu 2
+Converting a base image according to a configuration
+.IP \(bu 2
+Encrypting the root file system and preparing EBC resources
+
+All operations preserve the original base image. Logs are written to a
+temporary file, with the filename logged as the first message during runtime.
+Temporary artifacts are automatically cleaned up on completion or failure.
+
+.SH ACTIONS
+.TP
+.B list
+Retrieve information about a given base image. This action displays available
+boot loader entries from \fB/boot/loader/entries\fR, along with kernel and
+initramfs hashes and the kernel command line. This is useful for:
+.RS
+.IP \(bu 2
+Determining valid values for the \fBboot-loader-entry\fR configuration option
+.IP \(bu 2
+Comparing components between base and converted images
+.IP \(bu 2
+Verifying image contents before conversion
+.RE
+
+.TP
+.B convert
+Convert a base image according to the configuration file. This action:
+.RS
+.IP \(bu 2
+Fetches kernel, initramfs, and kernel command line from the specified boot
+loader entry
+.IP \(bu 2
+Builds a SEL image using \fBpvimg\fR(1)
+.IP \(bu 2
+Updates \fB/boot/bootmap\fR to boot into the SEL image
+.RE
+.IP
+The resulting image will be a SEL guest image. It requires encryption to be
+fully EBC-ready (unless \fBno-ebc\fR is enabled in the configuration).
+
+.TP
+.B encrypt
+Encrypt the root file system and prepare EBC resources. This action:
+.RS
+.IP \(bu 2
+Generates secure defaults (CCK, extension secret, LUKS keys) if not provided
+.IP \(bu 2
+Encrypts the root file system using LUKS with PAES
+.IP \(bu 2
+Populates \fB/boot/sics/\fR with add/-secret requests
+.IP \(bu 2
+Creates \fBtoc.pol\fR and \fBtoc.asr\fR for integrity protection
+.RE
+.IP
+This action requires EBC. The guest can boot only by using PAES to open the root file system.
+
+.TP
+.B full
+Perform both \fBconvert\fR and \fBencrypt\fR actions in sequence. This is
+equivalent to running \fBconvert\fR followed by \fBencrypt\fR, but in a single
+invocation.
+
+.SH ARGUMENTS
+.TP
+.I ACTION
+The action to perform: \fBlist\fR, \fBconvert\fR, \fBencrypt\fR, or \fBfull\fR.
+
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display help message and exit.
+
+.TP
+.BR \-c ", " \-\-config " " \fICONFIG_FILE\fR
+Path to the YAML configuration file. See \fBpvics.yaml\fR(5) for the
+configuration file format and options.
+.br
+Required for \fBconvert\fR, \fBencrypt\fR, and \fBfull\fR actions.
+.br
+Not required for the \fBlist\fR action.
+
+.TP
+.BR \-i ", " \-\-image " " \fIBASE_IMAGE\fR
+Path to the base qcow2 image file to process. Required for all actions.
+
+.SH CONVERSION PROCESS
+The conversion process consists of three phases:
+
+.SS Component Fetching
+The tool retrieves the kernel, initramfs, and kernel command line from the
+boot loader entry specified in the configuration file. The components are
+validated to ensure they meet SEL EBC requirements.
+
+The tool prepends \fBrd.sel-ebc\fR to the kernel command line to trigger the
+SEL EBC dracut module (unless \fBno-ebc\fR is enabled) and appends any
+user-provided kernel parameters from the configuration.
+
+.SS SEL Image Build
+The SEL image is built using \fBpvimg\fR(1) with the fetched components.
+Additional options may be specified in the configuration file via
+\fB.convert.pvimg-create-options\fR.
+
+.SS Bootmap Update
+The tool updates the bootmap to boot into the new SEL image:
+.IP \(bu 2
+Existing boot loader entries in \fB/boot/loader/entries/*.conf\fR are renamed
+to \fB*.conf.old\fR
+.IP \(bu 2
+A new entry \fBsel-ebc.conf\fR is created that points to \fB/boot/sel-ebc.img\fR
+.IP \(bu 2
+\fBzipl\fR(8) is run to update the bootmap.
+
+The guest is temporarily started to update the bootmap using libvirt on z/Architecture
+or qemu on non-z/Architecture architectures. Failures are logged to
+\fB/var/log/sel-ebc-zipl.log\fR.
+
+.SH ENCRYPTION PROCESS
+The encryption process consists of three phases:
+
+.SS Secure Default Generation
+If not provided in the configuration, the following are generated from
+\fB/dev/random\fR:
+.IP \(bu 2
+Customer communication key (CCK)
+.IP \(bu 2
+Root file system LUKS encryption key
+.IP \(bu 2
+Extension secret for add/-secret requests
+.IP \(bu 2
+LUKS passphrase
+
+.SS Root File System Encryption
+The root file system is encrypted using the following steps:
+.IP 1. 3
+Resize the qcow2 image to accommodate the LUKS header
+.IP 2. 3
+Resize the root partition (but not the file system) to fit the LUKS header
+.IP 3. 3
+Encrypt the root file system using LUKS
+.IP 4. 3
+Reformat the LUKS header from AES to PAES (Protected AES)
+
+.SS AES to PAES Conversion
+The LUKS header is converted from standard AES encryption to protected AES (PAES).
+With PAES, encryption secrets are stored in the ultravisor secret store rather than directly in the LUKS header.
+
+.SS SICS Population
+The SEL Image Customization Source directory (\fB/boot/sics\fR) is populated
+with the following secrets as add/-secret requests:
+.IP \(bu 2
+Customer communication key (CCK)
+.IP \(bu 2
+LUKS encryption key
+.IP \(bu 2
+LUKS passphrase
+.IP \(bu 2
+Any additional add/-secret requests specified in the configuration
+
+All automatically built add/-secret requests are added to \fBtoc.pol\fR, which verifies the
+completeness of \fB/boot/sics\fR. User-supplied add/-secret requests from the configuration
+are also added. Finally, \fBtoc.asr\fR is built as a meta secret that links
+to \fBtoc.pol\fR for integrity protection.
+
+.SH BUILDING SEL IMAGES WITHOUT EBC
+While the primary purpose of \fBpvics\fR is to create EBC-ready SEL images with
+encrypted root file systems, it can also build SEL images without EBC
+functionality using the \fBno-ebc\fR configuration option.
+
+When \fBno-ebc: true\fR is set in the configuration:
+.IP \(bu 2
+The \fBconvert\fR action builds a SEL image without EBC-specific flags
+.IP \(bu 2
+The \fBencrypt\fR action is completely skipped
+.IP \(bu 2
+The \fBfull\fR action becomes equivalent to \fBconvert\fR only
+.IP \(bu 2
+The \fBrd.sel-ebc\fR kernel parameter is not added
+.IP \(bu 2
+\fB--enable-cck-update\fR and \fB--disable-image-encryption\fR flags are not
+passed to \fBpvimg\fR
+
+This mode is useful for:
+.IP \(bu 2
+Single-party image creation where the same entity performs conversion,
+customization, and encryption
+.IP \(bu 2
+Testing SEL guest functionality without EBC complexity
+.IP \(bu 2
+Development and debugging scenarios
+.IP \(bu 2
+Simplified SEL image generation workflows
+
+.SH OUTPUT FILES
+All output files are written to the directory specified by the \fBout\fR
+configuration option:
+
+.TP
+\fB<out>/image.qcow2\fR
+The converted SEL image (after \fBconvert\fR or \fBfull\fR action)
+
+.TP
+\fB<out>/cck.key\fR
+Customer communication key (generated if not provided)
+
+.TP
+\fB<out>/extension.secret\fR
+Extension secret for add/-secret requests (generated if not provided)
+
+.TP
+\fB<out>/rfs.key\fR
+Root file system LUKS encryption key (generated if not provided)
+
+.TP
+\fB<out>/passphrase\fR
+LUKS passphrase (generated if not provided)
+
+.TP
+\fB<out>/*.asr\fR
+Generated add-secret request files
+
+.SH TEMPORARY FILES
+.TP
+\fB/tmp/tmp.*\fR
+Log file (filename logged at startup)
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error (invalid arguments, missing files, operation failure)
+
+.SH EXAMPLES
+.SS List Boot Loader Entries
+.nf
+pvics list \-\-image /path/to/base-image.qcow2
+.fi
+
+.SS Convert Image Only
+.nf
+pvics convert \-\-config /path/to/config.yaml \-\-image /path/to/base-image.qcow2
+.fi
+
+.SS Encrypt Image Only
+.nf
+pvics encrypt \-\-config /path/to/config.yaml \-\-image /path/to/converted-image.qcow2
+.fi
+
+.SS Full Conversion and Encryption
+.nf
+pvics full \-\-config /path/to/config.yaml \-\-image /path/to/base-image.qcow2
+.fi
+
+.SS Build SEL Image Without EBC
+.nf
+# config.yaml contains: no-ebc: true
+pvics convert \-\-config /path/to/config.yaml \-\-image /path/to/base-image.qcow2
+.fi
+
+.SH FILES
+.TP
+\fB/boot/loader/entries/*.conf\fR
+Boot loader entry files in the base image
+
+.TP
+\fB/boot/sel-ebc.img\fR
+The resulting SEL image file in the guest
+
+.TP
+\fB/boot/sics/\fR
+SEL image-customization source directory that contains EBC resources
+
+.TP
+\fB/boot/sics/toc.pol\fR
+Table-of-contents policy file that lists all add/-secret requests
+
+.TP
+\fB/boot/sics/toc.asr\fR
+Meta secret for integrity protection of toc.pol
+
+.TP
+\fB/var/log/sel-ebc-zipl.log\fR
+Log file for zipl bootmap update operations
+
+.SH NOTES
+.IP \(bu 2
+All operations are performed on a copy of the original base image.
+.IP \(bu 2
+The tool requires root privileges for file-system operations.
+.IP \(bu 2
+The LUKS device is named \fBcryptroot\fR.
+.IP \(bu 2
+The temporary working directory is created at \fB/opt/sel-<UUID>\fR.
+.IP \(bu 2
+The \fBno-verify\fR option should not be used in production environments.
+.IP \(bu 2
+Generated secrets are written to the output directory and should be secured
+appropriately.
+
+.SH SEE ALSO
+.BR pvics.yaml (5),
+.BR pvsecret (1),
+.BR pvimg (1),
+.BR pvebc (8),
+.BR zipl (8),
+.BR cryptsetup (8),
+.BR lsinitrd (1)
+.PP
+Linux on IBM Z and IBM LinuxONE: Secure Execution for Linux documentation
+
+.SH AUTHOR
+IBM Corporation

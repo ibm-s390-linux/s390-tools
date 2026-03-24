@@ -1,0 +1,321 @@
+.\" Copyright IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
+.TH PVICS.YAML 5 "April 2026" "s390-tools"
+
+.SH NAME
+pvics.yaml \- Configuration file for pvics SEL EBC image conversion tool
+
+.SH DESCRIPTION
+The \fBpvics.yaml\fR file is a YAML-formatted configuration file used by the
+\fBpvics\fR tool to control the conversion of existing qcow2 KVM guest images
+to EBC-ready Secure Execution for Linux (SEL) images. The configuration file
+specifies parameters for image conversion, root file system encryption, and
+early boot customization (EBC) resource preparation.
+
+See \fBpvics\fR(8) for detailed information about the tool's actions and the
+conversion process.
+
+.SH FILE FORMAT
+The configuration file uses YAML syntax with the following top-level sections:
+.TP
+\fBGlobal Options\fR
+General settings that apply to all actions
+.TP
+\fBCertificate Chain\fR
+Certificate verification configuration
+.TP
+\fBConversion Options\fR
+Settings specific to the \fBconvert\fR action
+.TP
+\fBEncryption Options\fR
+Settings specific to the \fBencrypt\fR action
+
+.SH GLOBAL OPTIONS
+.TP
+\fBno-verify:\fR \fIboolean\fR
+Disables certificate chain verification for pv commands when set to true.
+Default: \fBfalse\fR.
+.br
+\fBWARNING:\fR Do not disable certificate chain verification in production environments.
+
+.TP
+\fBno-ebc:\fR \fIboolean\fR
+Controls whether EBC functionality is used. When set to
+\fBtrue\fR, a SEL guest image is created without using EBC.
+Default: \fBfalse\fR.
+.br
+When enabled:
+.RS
+.IP \(bu 2
+The \fBencrypt\fR action is skipped
+.IP \(bu 2
+The \fBfull\fR action behaves the same as the \fBconvert\fR action
+.IP \(bu 2
+Default \fBpvimg\fR options are not added; only user-provided options specified in
+\fB.convert.pvimg-create-options\fR are used
+.IP \(bu 2
+The \fBrd.sel-ebc\fR kernel parameter is not added
+.RE
+
+.TP
+\fBout:\fR \fIpath\fR
+\fB(REQUIRED)\fR Local directory path used for output files. All generated
+files (converted images, keys, ASRs) will be written to this directory.
+
+.TP
+\fBhkds:\fR \fIlist\fR
+\fB(REQUIRED)\fR List of paths to host-key-documents (HKDs). Paths may contain
+wildcard patterns, for example  \fBdata/*.hkd\fR.
+.br
+Example:
+.RS
+.nf
+hkds:
+  - data/*.hkd
+  - /path/to/specific.hkd
+.fi
+.RE
+
+.SH CERTIFICATE CHAIN
+The \fBcertificate-chain\fR section contains all relevant files for verification
+of the certificate chain. This section is \fBREQUIRED\fR if \fBno-verify\fR is
+\fBfalse\fR, and \fBUNUSED\fR if \fBno-verify\fR is \fBtrue\fR.
+
+See \fBpvsecret\fR(1) for more detailed information about certificate chain
+verification.
+
+.TP
+\fBcertificate-chain.certs:\fR \fIlist\fR
+List of paths to certificate files. Paths may contain wildcard patterns.
+.br
+Example:
+.RS
+.nf
+certs:
+  - data/*.cert
+.fi
+.RE
+
+.TP
+\fBcertificate-chain.crls:\fR \fIlist\fR
+List of paths to certificate revocation list (CRL) files. Paths may contain
+wildcard patterns.
+.br
+Example:
+.RS
+.nf
+crls:
+  - data/*.crl
+.fi
+.RE
+
+.TP
+\fBcertificate-chain.offline:\fR \fIboolean\fR
+Enables offline mode for the \fBpvsecret create\fR command. When \fBtrue\fR, no
+network access is attempted for certificate verification.
+
+.TP
+\fBcertificate-chain.root-ca:\fR \fIpath\fR
+Path to the root Certificate Authority (CA) file for the certificate chain.
+
+.SH CONVERSION OPTIONS
+The \fBconvert\fR section contains configuration options for the image
+conversion phase. These options are used only when running the \fBconvert\fR or
+\fBfull\fR actions and have no effect on other actions.
+
+.TP
+\fBconvert.boot-loader-entry:\fR \fIstring\fR
+\fB(REQUIRED)\fR Title of an existing boot loader entry from the base image.
+This entry specifies which kernel, initramfs, and kernel command line to use
+for the SEL image.
+.br
+Use the \fBlist\fR action to display available boot loader entries in the
+base image.
+
+.TP
+\fBconvert.sel-kernel-parameter:\fR \fIstring\fR
+\fB(OPTIONAL)\fR Additional kernel parameters to append to the kernel command
+line of the resulting SEL image. The \fBrd.sel-ebc\fR parameter is always
+prepended automatically (unless \fBno-ebc\fR is \fBtrue\fR).
+.br
+Example:
+.RS
+.nf
+sel-kernel-parameter: swiotlb=524288
+.fi
+.RE
+
+.TP
+\fBconvert.pvimg-create-options:\fR \fIstring\fR
+\fB(OPTIONAL)\fR Additional options to pass to the \fBpvimg\fR command during
+SEL image creation.
+.br
+See \fBpvimg\fR(1) for available options.
+
+.SH ENCRYPTION OPTIONS
+The \fBencrypt\fR section contains configuration options specific to the root filesystem
+encryption and EBC resource preparation phase. These options are only used when running
+the \fBencrypt\fR or \fBfull\fR actions and are ignored when \fBno-ebc\fR
+is \fBtrue\fR.
+
+.TP
+\fBencrypt.cck:\fR \fIpath\fR
+\fB(OPTIONAL)\fR Path to the customer communication key (CCK) file. If not
+supplied, a CCK will be generated from \fB/dev/random\fR and written to
+\fB<out>/cck.key\fR.
+
+.TP
+\fBencrypt.extension-secret:\fR \fIpath\fR
+\fB(OPTIONAL)\fR Path to the extension secret file used for \fBpvsecret create\fR
+commands. If not supplied, an extension secret will be generated from
+\fB/dev/random\fR and written to \fB<out>/extension.secret\fR.
+.br
+\fBREQUIRED\fR if \fBencrypt.add-secret-requests\fR is used. In this case, the
+extension secret must match the one used in the supplied add/-secret requests.
+
+.TP
+\fBencrypt.luks-key:\fR \fIpath\fR
+\fB(OPTIONAL)\fR Path to the LUKS encryption key file for the root filesystem.
+If not supplied, a key will be generated from \fB/dev/random\fR and written to
+\fB<out>/rfs.key\fR.
+
+.TP
+\fBencrypt.luks-passphrase:\fR \fIpath\fR
+\fB(OPTIONAL)\fR Path to a file that contains the LUKS passphrase. If not supplied,
+a passphrase will be generated from \fB/dev/random\fR and written to
+\fB<out>/passphrase\fR.
+
+.TP
+\fBencrypt.luks-key-asr-name:\fR \fIstring\fR
+\fB(OPTIONAL)\fR Name of the add-secret request that contains the LUKS
+encryption key. Default: \fBrfs-luks-key\fR.
+
+.TP
+\fBencrypt.luks-key-size:\fR \fIinteger\fR
+\fB(OPTIONAL)\fR Key size in bits for the LUKS encryption key. Valid values:
+\fB256\fR or \fB512\fR. If not specified, the size is determined from the
+supplied key file or a default size is used for generated keys.
+
+.TP
+\fBencrypt.add-secret-requests:\fR \fIlist\fR
+\fB(OPTIONAL)\fR List of paths to additional add/-secret request files to
+be added during boot. Paths may contain wildcard patterns.
+.br
+When using this option:
+.RS
+.IP \(bu 2
+\fBencrypt.extension-secret\fR is \fBREQUIRED\fR
+.IP \(bu 2
+The supplied extension secret must match the extension secret used in all
+supplied add/-secret requests
+.RE
+.br
+Example:
+.RS
+.nf
+add-secret-requests:
+  - data/*.asr
+  - /path/to/custom.asr
+.fi
+.RE
+
+.SH EXAMPLES
+.SS Minimal Configuration for EBC
+.nf
+out: /path/to/output
+hkds:
+  - /path/to/*.hkd
+certificate-chain:
+  certs:
+    - /path/to/*.cert
+  crls:
+    - /path/to/*.crl
+  offline: true
+  root-ca: /path/to/root.ca
+convert:
+  boot-loader-entry: "My Boot Entry"
+.fi
+
+.SS Configuration with Custom Encryption Keys
+.nf
+out: /path/to/output
+hkds:
+  - /path/to/*.hkd
+certificate-chain:
+  certs:
+    - /path/to/*.cert
+  crls:
+    - /path/to/*.crl
+  offline: true
+  root-ca: /path/to/root.ca
+convert:
+  boot-loader-entry: "My Boot Entry"
+  sel-kernel-parameter: swiotlb=524288
+  pvimg-create-options: --enable-pckmo-hmac
+encrypt:
+  cck: /path/to/cck.key
+  luks-key: /path/to/rfs.key
+  luks-passphrase: /path/to/passphrase
+  luks-key-size: 512
+.fi
+
+.SS Configuration with Additional ASRs
+.nf
+out: /path/to/output
+hkds:
+  - /path/to/*.hkd
+certificate-chain:
+  certs:
+    - /path/to/*.cert
+  crls:
+    - /path/to/*.crl
+  offline: true
+  root-ca: /path/to/root.ca
+convert:
+  boot-loader-entry: "My Boot Entry"
+encrypt:
+  extension-secret: /path/to/extension.secret
+  add-secret-requests:
+    - /path/to/*.asr
+.fi
+
+.SS SEL Image Without EBC
+.nf
+no-ebc: true
+out: /path/to/output
+hkds:
+  - /path/to/*.hkd
+convert:
+  boot-loader-entry: "My Boot Entry"
+.fi
+
+.SH FILES
+.TP
+\fB/boot/loader/entries/*.conf\fR
+Boot loader entry files in the base image
+.TP
+\fB/boot/sel-ebc.img\fR
+The resulting SEL image file
+.TP
+\fB/boot/sics/\fR
+SEL Image customization source directory containing EBC resources
+.TP
+\fB/boot/sics/toc.pol\fR
+Table of contents policy file listing all add/-secret requests
+.TP
+\fB/boot/sics/toc.asr\fR
+Meta-secret for integrity protection of toc.pol
+.TP
+\fB/var/log/sel-ebc-zipl.log\fR
+Log file for zipl bootmap update operations
+
+.SH SEE ALSO
+.BR pvics (8),
+.BR pvsecret (1),
+.BR pvimg (1),
+.BR zipl (8),
+.BR cryptsetup (8)
+.PP
+Linux on IBM Z and IBM LinuxONE: Secure Execution for Linux documentation

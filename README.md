@@ -52,6 +52,10 @@ Package contents
    Create an IBM Secure Execution (protected virtualization) image. The
    genprotimg command is a symbolic link to the `pvimg create` command.
 
+ * pvics:
+   Convert a qcow2 image to a qcow2 image ready to boot as IBM Secure Execution
+   for Linux guest.
+
  * udev rules:
    - 59-dasd.rules: rules for unique DASD device nodes created in /dev/disk/.
    - 57-osasnmpd.rules: udev rules for osasnmpd.

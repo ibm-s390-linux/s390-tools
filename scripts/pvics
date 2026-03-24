@@ -1,0 +1,1579 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+#
+# Copyright IBM Corp.
+
+
+#
+# CLEANUP STACK FUNCTIONS
+#
+
+# Initialize the cleanup stack as an array
+declare -a CLEANUP_STACK=()
+
+cleanup_push() {
+	local cmd="$*"
+	if [[ -z "$cmd" ]]; then
+		log_error "pvics: no command provided"
+		return 1
+	fi
+	CLEANUP_STACK+=("$cmd")
+	log_debug "registered cleanup: ${cmd}"
+	return 0
+}
+
+cleanup_pop() {
+	local stack_size=${#CLEANUP_STACK[@]}
+
+	if [[ $stack_size -eq 0 ]]; then
+		log_warn "cleanup_pop: Warning - cleanup stack is empty"
+		return 1
+	fi
+
+	# Get the last command (top of stack)
+	local last_idx=$((stack_size - 1))
+	local cmd="${CLEANUP_STACK[$last_idx]}"
+
+	# Remove it from the stack
+	unset 'CLEANUP_STACK[$last_idx]'
+
+	# Execute the command
+	log_debug "cleanup_pop: Executing: $cmd"
+	execute "${cmd}"
+	local ret=$?
+
+	if [[ $ret -ne 0 ]]; then
+		log_warn "cleanup_pop: Warning - command failed with exit code $ret"
+	fi
+
+	return $ret
+}
+
+cleanup_run() {
+	local stack_size=${#CLEANUP_STACK[@]}
+	local failed=0
+
+	if [[ "${stack_size}" -eq 0 ]]; then
+		log_debug "cleanup_run: No cleanup commands to execute"
+		return 0
+	fi
+
+	log_debug "cleanup_run: Executing ${stack_size} cleanup command(s)"
+
+	# Execute commands in reverse order (LIFO)
+	while [[ ${#CLEANUP_STACK[@]} -gt 0 ]]; do
+		if ! cleanup_pop; then
+		((failed++))
+		fi
+	done
+
+	if [[ "${failed}" -gt 0 ]]; then
+		log_warn "cleanup_run: Warning - ${failed} command(s) failed"
+		return 1
+	fi
+
+	return 0
+}
+
+cleanup_clear() {
+	local stack_size=${#CLEANUP_STACK[@]}
+	CLEANUP_STACK=()
+	log_debug "cleanup_clear: Cleared $stack_size command(s) from stack"
+	return 0
+}
+
+cleanup_show() {
+	local stack_size=${#CLEANUP_STACK[@]}
+
+	if [[ $stack_size -eq 0 ]]; then
+		log_info "Cleanup stack is empty"
+		return 0
+	fi
+
+	log_info "Cleanup stack ($stack_size command(s)):"
+	local idx=0
+	for cmd in "${CLEANUP_STACK[@]}"; do
+		log_info "  [$idx] $cmd"
+		((idx++))
+	done
+
+	return 0
+}
+
+cleanup() {
+	local rc=${1:-1}
+	local stack_size=${#CLEANUP_STACK[@]}
+
+	trap - ERR EXIT PIPE
+
+	if [[ "${stack_size}" -gt 0 ]]; then
+		cleanup_run
+		log_info "Cleanup finished"
+	fi
+
+	if [[ "${rc}" -ne 0 ]]; then
+		exit "${rc}"
+	fi
+
+	return 0
+}
+
+
+#
+# LOGGING FUNCTIONS
+#
+
+# Configuration for logger utility
+LOGGER_TAG="pvics"
+LOGGER_FACILITY="user"
+
+log_init() {
+	logger -t "${LOGGER_TAG}" -p "${LOGGER_FACILITY}.info" "Logging initialized"
+	return 0
+}
+
+log_debug() {
+	local msg="$*"
+	logger -t "${LOGGER_TAG}" -p "${LOGGER_FACILITY}.debug" "${msg}"
+	return 0
+}
+
+log_info() {
+	local msg="$*"
+	echo "[ INFO ] ${msg}"
+	logger -t "${LOGGER_TAG}" -p "${LOGGER_FACILITY}.info" "${msg}"
+	return 0
+}
+
+log_warn() {
+	local msg="$*"
+	echo "[ WARN ] ${msg}"
+	logger -t "${LOGGER_TAG}" -p "${LOGGER_FACILITY}.warning" "${msg}"
+	return 0
+}
+
+log_error() {
+	local msg="$*"
+	echo "[ ERR  ] ${msg}" >&2
+	logger -t "${LOGGER_TAG}" -p "${LOGGER_FACILITY}.err" "${msg}"
+	return 1
+}
+
+log_cleanup() {
+	logger -t "${LOGGER_TAG}" -p "${LOGGER_FACILITY}.info" "Logging cleanup complete"
+	return 0
+}
+
+setup_logger() {
+	log_init
+	cleanup_push log_cleanup
+	return 0
+}
+
+warn_overwrite() {
+	local file
+
+	if [[ $# -lt 1 ]]; then
+		log_error "internal error"
+	fi
+
+	file=$1
+
+	if [[ -e "${file}" ]]; then
+		log_warn "${file} already exists and may be overwritten"
+	fi
+
+	return 0
+}
+
+err_noexist() {
+	local file
+
+	if [[ $# -lt 1 ]]; then
+		return 0
+	fi
+
+	file=$1
+
+	if [[ ! -e "${file}" ]]; then
+		log_error "${file} does not exist"
+	fi
+
+	return 0
+}
+
+
+#
+# PREREQ FUNCTIONS
+#
+
+check_pvsecret_ebc() {
+	local pvsecret_version
+
+	# Run pvsecret with --version --verbose to check for EBC support
+	pvsecret_version=$(pvsecret --version --verbose 2>&1 || true)
+
+	if ! echo "${pvsecret_version}" | grep -q "+ebc"; then
+		log_error "pvsecret does not support EBC feature. Please use a version compiled with EBC support."
+	fi
+
+	log_info "pvsecret supports EBC feature"
+
+	return 0
+}
+
+check_prereqs_convert() {
+	local tools
+
+	tools=(
+		"blkid"
+		"lsblk"
+		"lsinitrd"
+		"modprobe"
+		"mount"
+		"mountpoint"
+		"pvextract-hdr"
+		"pvimg"
+		"printf"
+		"qemu-nbd"
+		"systemctl"
+		"umount"
+	)
+
+	for tool in "${tools[@]}"; do
+		require_command "${tool}"
+	done
+
+	# Check for virtualization tools based on architecture
+	if [[ "${ARCH}" == "s390x" ]]; then
+		require_command "virt-install"
+		require_command "virsh"
+	else
+		require_command "qemu-system-s390x"
+		require_command "pgrep"
+	fi
+
+	return 0
+}
+
+check_prereqs_encrypt() {
+	local tools
+
+	tools=(
+		"blkid"
+		"cryptsetup"
+		"hexdump"
+		"lsblk"
+		"mktemp"
+		"modprobe"
+		"mount"
+		"mountpoint"
+		"pvebc"
+		"pvextract-hdr"
+		"pvsecret"
+		"qemu-img"
+		"qemu-nbd"
+		"sha256sum"
+		"strings"
+		"umount"
+		"xxd"
+		"virt-resize"
+	)
+
+	for tool in "${tools[@]}"; do
+		require_command "${tool}"
+	done
+
+	# Check if pvsecret supports EBC feature
+	check_pvsecret_ebc
+
+	return 0
+}
+
+check_prereqs_list() {
+	local tools
+
+	tools=(
+		"blkid"
+		"lsblk"
+		"lsinitrd"
+		"modprobe"
+		"mountpoint"
+		"mount"
+		"qemu-nbd"
+		"sha256sum"
+		"umount"
+	)
+
+	for tool in "${tools[@]}"; do
+		require_command "${tool}"
+	done
+
+	return 0
+}
+
+check_prereqs() {
+	local tools
+	log_info "checking for required commands"
+
+	# always needed prereqs
+	tools=(
+		"grep"
+		"mkdir"
+		"uname"
+		"uuidgen"
+		"yq"
+	)
+	for tool in "${tools[@]}"; do
+		require_command "${tool}"
+	done
+
+	if [[ "${ACTION}" == "convert" ]]; then
+		check_prereqs_convert
+	elif [[ "${ACTION}" == "encrypt" ]]; then
+		check_prereqs_encrypt
+	elif [[ "${ACTION}" == "full" ]]; then
+		check_prereqs_convert
+		check_prereqs_encrypt
+	elif [[ "${ACTION}" == "list" ]]; then
+		check_prereqs_list
+	else
+		log_error "internal error"
+	fi
+
+	log_info "all required commands found, continuing..."
+
+	return 0
+}
+
+require_command() {
+	local cmd
+
+	cmd="$1"
+
+	command -v "${cmd}" >/dev/null 2>&1 || \
+		log_error "${cmd} required but not installed."
+
+	return 0
+}
+
+
+#
+# HELPER FUNCTIONS
+#
+
+get_free_nbd() {
+	local free
+
+	test -b /dev/nbd0 || modprobe nbd
+
+	free=$(lsblk --output NAME,SIZE \
+		| grep nbd \
+		| grep 0B \
+		| grep -oE "nbd[0-9]+" \
+		| head -n 1)
+
+	if [[ -z "${free}" ]]; then
+		log_error "no free NBD found"
+	fi
+
+	free="/dev/${free}"
+
+	log_info "found free NBD: ${free}"
+
+	NBD="${free}"
+
+	return 0
+}
+
+execute() {
+	log_debug "$@"
+	# shellcheck disable=SC2294
+	eval "$@"
+
+	return $?
+}
+
+get_arch() {
+	ARCH=$(uname -m)
+	if [[ "${ARCH}" == "" ]]; then
+		log_error "Architecture not officially supported"
+		return 1
+	else
+		if [[ "${ARCH}" != "s390x" && "${ARCH}" != "x86_64" ]]; then
+			log_warn "the detected host architecture ${ARCH} is not one of the officially supported architectures (s390x, x86_64)"
+		else
+			log_info "found supported architecture ${ARCH}"
+		fi
+	fi
+
+	return 0
+}
+
+
+# $1 path to image
+# Returns: Sets global NBD variable
+connect_nbd() {
+	local image i nbd_size
+
+	if [[ $# -lt 1 ]]; then
+		log_error "internal error"
+	fi
+
+	image="$1"
+
+	get_free_nbd
+
+	execute qemu-nbd --connect="${NBD}" "${image}"
+
+	log_info "waiting for qemu-nbd:"
+	for i in {1..10}; do
+		test -b "${NBD}p1" && break
+		echo -n "."
+		sleep 0.1
+	done
+	echo ""
+
+	if [[ -b "${NBD}p1" ]]; then
+		# Verify the NBD device is actually connected to our image
+		nbd_size=$(lsblk --bytes --noheadings --output SIZE "${NBD}" 2>/dev/null || echo "0")
+		if [[ "${nbd_size}" == "0" ]]; then
+			log_error "NBD device ${NBD} appears to be claimed by another process"
+		fi
+		cleanup_push disconnect_nbd
+	else
+		log_error "unable to connect ${image} to ${NBD}"
+	fi
+
+	return 0
+}
+
+disconnect_nbd() {
+	test -z "${NBD}" && return 0
+
+	execute "qemu-nbd --disconnect '${NBD}' 2>/dev/null"
+	unset NBD
+
+	return 0
+}
+
+# $1 partition device (e.g., "${NBD}p${BOOT_PARTNUM}")
+# $2 mount point path
+# $3 optional: mount options (e.g., "-r" for read-only)
+mount_partition() {
+	local partition mount_point mount_opts
+
+	if [[ $# -lt 2 ]]; then
+		log_error "internal error"
+	fi
+
+	partition="$1"
+	mount_point="$2"
+	mount_opts="${3:-}"
+
+	execute mount "${mount_opts}" "${partition}" "${mount_point}"
+
+	if mountpoint -q "${mount_point}"; then
+		cleanup_push umount_partition "${mount_point}"
+	fi
+
+	return 0
+}
+
+# $1 mountpoint
+umount_partition() {
+	local mntp="${1:?no mountpoint specified}"
+
+	if mountpoint -q "${mntp}"; then
+		umount "${mntp}"
+	fi
+
+	return 0
+}
+
+
+# $1 path to asr
+# $2 path to toc.pol
+add_asr_to_toc() {
+	local toc asr
+
+	if [[ $# -lt 2 ]]; then
+		log_error "internal error"
+	fi
+
+	asr="$1"
+	toc="$2"
+
+	log_info "adding Add-Secret-Request ${asr} to TOC policy ${toc}"
+
+	xxd -p -s -16 "${asr}" >> "${toc}"
+
+	return 0
+}
+
+# $1 partition label
+# $2 path to image
+get_partnum() {
+	local partition image p partnum
+
+	if [[ $# -lt 2 ]]; then
+		log_error "internal error"
+	fi
+
+	partition="$1"
+	image="$2"
+
+	connect_nbd "${image}"
+
+	# get partitions
+	for p in "${NBD}"p*; do
+
+		if [[ $(blkid | grep -E "^${p}" | grep -oE "LABEL=\"[a-zA-Z]*\"" | cut -d '"' -f 2) == "${partition}" ]]; then
+			partnum="$(blkid | grep -oE "^${p}" | cut -d 'p' -f 2)"
+			log_info "Found partition with label ${partition} at partition ${partnum}"
+
+			cleanup_pop  # Disconnect and remove from stack
+			PARTNUM="${partnum}"
+			return 0
+		fi
+	done
+
+	cleanup_pop  # Disconnect and remove from stack
+	PARTNUM=""
+
+	return 0
+}
+
+# Build pv_cmd array for pvimg/pvsecret commands
+# $1: hkds - space-separated list of HKD paths
+# $2: no_verify - "true" or "false"
+# $3: certs - space-separated list of certificate paths (optional if no_verify=true)
+# $4: crls - space-separated list of CRL paths (optional if no_verify=true)
+# $5: rootca - path to root CA (optional if no_verify=true)
+# $6: offline - "true" or "false" (optional if no_verify=true)
+# Returns: Sets global pv_cmd array
+build_pv_cmd() {
+	local hkds no_verify certs crls rootca offline
+	local h c files f
+
+	if [[ $# -lt 2 ]]; then
+		log_error "internal error: build_pv_cmd requires at least 2 arguments"
+	fi
+
+	hkds="$1"
+	no_verify="$2"
+	certs="${3:-}"
+	crls="${4:-}"
+	rootca="${5:-}"
+	offline="${6:-false}"
+
+	# Initialize pv_cmd array
+	pv_cmd=()
+
+	# Add HKD files
+	for h in ${hkds}; do
+		files=$(ls "${h}")
+		for f in ${files}; do
+			pv_cmd+=("--host-key-document" "${f}")
+		done
+	done
+
+	# If verification is enabled
+	if [[ "${no_verify}" == "false" ]]; then
+		# Add certificates
+		for c in ${certs}; do
+			files=$(ls "${c}")
+			for f in ${files}; do
+				pv_cmd+=("--cert" "${f}")
+			done
+		done
+
+		# Add CRLs
+		for c in ${crls}; do
+			files=$(ls "${c}")
+			for f in ${files}; do
+				pv_cmd+=("--crl" "${f}")
+			done
+		done
+
+		# Add root CA
+		pv_cmd+=("--root-ca" "${rootca}")
+
+		# Add offline flag if requested
+		if [[ "${offline}" == "true" ]]; then
+			pv_cmd+=("--offline")
+		fi
+	else
+		# Verification disabled
+		pv_cmd+=("--no-verify")
+	fi
+
+	return 0
+}
+
+# $1 kernel
+# $2 initramfs
+# $3 kernel parameter
+# $4 output
+# $5 yaml configuration
+#
+# If this function is called by another script that sourced this one the yaml configuration has to
+# be supplied as many variables will not be set otherwise
+build_sel_image() {
+	if [[ $# -lt 4 ]]; then
+		return 1
+	fi
+
+	i="$1"
+	r="$2"
+	p="$3"
+	o="$4"
+	err_noexist "${i}"
+	err_noexist "${r}"
+	err_noexist "${p}"
+
+	if [[ $# -gt 4 ]]; then
+		CONFIG_FILE="$5"
+		err_noexist "${CONFIG_FILE}"
+		parse_yaml_pv
+	fi
+
+	log_info "The following configuration is used to generate the SEL image:"
+	log_info "kernel:		${i}"
+	log_info "initramfs:		${r}"
+	log_info "kernel parameter:	$(cat "${p}")"
+
+	# Build pv_cmd array using helper function
+	build_pv_cmd "${hkds}" "${NO_VERIFY}" "${certs}" "${crls}" "${rootca}" "${offline}"
+
+	# create SEL image
+	pvimg_cmd=("pvimg" "create")
+	pvimg_cmd+=("--kernel" "${i}")
+	pvimg_cmd+=("--ramdisk" "${r}")
+	pvimg_cmd+=("--parmfile" "${p}")
+	pvimg_cmd+=("--output" "${o}")
+	pvimg_cmd+=("${pv_cmd[@]}")
+	if [[ "${NO_EBC:-false}" != "true" ]]; then
+		pvimg_cmd+=("--enable-cck-update" "--quiet" "--disable-image-encryption")
+	fi
+	pvimg_cmd+=("${PVIMG_USER_OPTS}")
+
+	execute "${pvimg_cmd[@]}"
+
+	return 0
+}
+
+
+#
+# USAGE FUNCTIONS
+#
+
+usage() {
+	local action required_options
+
+	action="${ACTION}"
+	required_options="--image <FILE>"
+
+	if [[ "${action}" == "list" ]]; then
+		echo "
+List all available boot loader entries of a s390x guest image and its partitions."
+	elif [[ "${action}" == "convert" ]]; then
+		echo "
+Convert a s390x guest to a Secure Execution for Linux guest."
+	elif [[ "${action}" == "encrypt" ]]; then
+		echo "
+Encrypt the root filesystem of a s390x Secure Execution for Linux guest."
+	elif [[ "${action}" == "" || "${action}" == "full" ]]; then
+		if [[ "${action}" == "" ]]; then
+			action="[ACTION]"
+		fi
+		echo "
+Convert a s390x guest to a Secure Execution for Linux guest with encrypted root
+filesystem."
+	fi
+
+	if [[ "${action}" == "convert" || "${action}" == "encrypt" || "${action}" == "full" ]]; then
+		required_options="${required_options} --config <FILE>"
+	fi
+
+	echo "
+Usage: $0 ${action} [OPTIONS] ${required_options}"
+
+	if [[ "${action}" == "[ACTION]" ]]; then
+		echo "
+Actions:
+	list		List boot entries of a guest
+	convert		Convert the guest to Secure Execution for Linux guest
+	encrypt		Encrypt the root filesystem of the guest
+	full		Convert the guest to SEL guest and encrypt the root fs"
+	fi
+
+	echo "
+Options:
+	-h, --help		Show this help text"
+	if [[ "${action}" == "[ACTION]" ]]; then
+		echo -e "\t-c, --config\t\tConfiguration yaml file"
+	fi
+
+	echo ""
+
+	return 0
+}
+
+
+#
+# CLI FUNCTIONS
+#
+
+cli() {
+	local temp
+
+	if [[ "$#" -lt 1 ]]; then
+		usage
+		return 1
+	fi
+
+	if [[ "$1" == "convert" ]]; then
+		ACTION="convert"
+		shift
+	elif [[ "$1" == "encrypt" ]]; then
+		ACTION="encrypt"
+		shift
+	elif [[ "$1" == "full" ]]; then
+		ACTION="full"
+		shift
+	elif [[ "$1" == "list" ]]; then
+		ACTION="list"
+		shift
+	fi
+
+	temp=$(getopt -o 'hc:i:' --long 'help,config:,image:' -- "$@")
+	if ! eval set -- "$temp"; then
+		usage
+		return 1
+	fi
+
+	eval set -- "$temp"
+	unset temp
+
+	while true; do
+		case "$1" in
+			'-h'|'--help')
+				usage
+				exit 0
+			;;
+			'-c'|'--config')
+				case "$2" in
+				'')
+					usage
+					exit 1
+				;;
+				*)
+					CONFIG_FILE="$2"
+				;;
+				esac
+				shift 2
+				continue
+			;;
+			'-i'|'--image')
+				case "$2" in
+				'')
+					usage
+					exit 1
+				;;
+				*)
+					IMAGE="$2"
+				;;
+				esac
+				shift 2
+				continue
+			;;
+			'--')
+				shift
+				break
+			;;
+			*)
+				usage
+				exit 1
+			;;
+		esac
+	done
+
+	if [[ -z ${IMAGE} ]]; then
+		usage
+		exit 1
+	elif [[ ! -f ${IMAGE} ]]; then
+		log_error "base image ${IMAGE} does not exist"
+
+		return 1
+	fi
+
+	if [[ -z ${CONFIG_FILE} && ${ACTION} != "list" ]]; then
+		usage
+		exit 1
+	elif [[ -n ${CONFIG_FILE} && ! -f ${CONFIG_FILE} ]]; then
+		log_error "config file ${CONFIG_FILE} does not exist"
+
+		return 1
+	fi
+
+	if [[ ${ACTION} != "convert" && ${ACTION} != "encrypt" && ${ACTION} != "full" && ${ACTION} != "list" ]]; then
+		usage
+		exit 1
+	fi
+
+	return 0
+}
+
+
+#
+# YAML FUNCTIONS
+#
+
+parse_yaml_pv() {
+	local files f hkd cert crl
+
+	NO_VERIFY=$(yaml_get_opt ".no-verify")
+	if [[ "${NO_VERIFY}" == "unset" ]]; then
+		NO_VERIFY=false
+	fi
+
+	PVIMG_USER_OPTS="$(yaml_get_opt ".convert.pvimg-create-options")"
+	if [[ "${PVIMG_USER_OPTS}" == "unset" && "${NO_EBC}" != "true" ]]; then
+		PVIMG_USER_OPTS="--enable-pckmo-hmac"
+	elif [[ "${PVIMG_USER_OPTS}" == "unset" ]]; then
+		PVIMG_USER_OPTS=""
+	fi
+
+	HKDs="$(yaml_get_req ".hkds[]")"
+	for hkd in ${HKDs}; do
+		files=$(ls "${hkd}")
+		for f in ${files}; do
+			err_noexist "${f}"
+		done
+	done
+
+	if [[ "${NO_VERIFY}" == "false" ]]; then
+		CC_CERTS="$(yaml_get_req ".certificate-chain.certs[]")"
+		for cert in ${CC_CERTS}; do
+			files=$(ls "${cert}")
+			for f in ${files}; do
+				err_noexist "${f}"
+			done
+		done
+		CC_CRLS="$(yaml_get_req ".certificate-chain.crls[]")"
+		for crl in ${CC_CRLS}; do
+			files=$(ls "${crl}")
+			for f in ${files}; do
+				err_noexist "${f}"
+			done
+		done
+		CC_ROOTCA=$(yaml_get_req ".certificate-chain.root-ca")
+		err_noexist "${CC_ROOTCA}"
+
+		CC_OFFLINE=$(yaml_get_opt ".certificate-chain.offline")
+		if [[ "${CC_OFFLINE}" == "unset" ]]; then
+			CC_OFFLINE="false"
+		fi
+	fi
+
+	return 0
+}
+
+parse_yaml() {
+	# general required configuration settings
+	NO_EBC=$(yaml_get_opt ".no-ebc")
+	if [[ ${NO_EBC} == "unset" ]]; then
+		NO_EBC=false
+	fi
+
+	parse_yaml_pv
+
+	OUT=$(yaml_get_req ".out")
+	err_noexist "${OUT}"
+
+	if [[ ${ACTION} == "convert" || ${ACTION} == "full" ]]; then
+		C_BOOT_LOADER_ENTRY=$(yaml_get_req ".convert.boot-loader-entry")
+		C_SEL_KERNEL_PARAMETER=$(yaml_get_opt ".convert.sel-kernel-parameter")
+	fi
+
+	if [[ ${ACTION} == "encrypt" || ${ACTION} == "full" ]]; then
+		E_CCK=$(yaml_get_opt ".encrypt.cck")
+		if [[ ${E_CCK} != "unset" ]]; then
+			err_noexist "${E_CCK}"
+		fi
+		E_LUKS_RFS_KEY=$(yaml_get_opt ".encrypt.luks-key")
+		if [[ ${E_LUKS_RFS_KEY} != "unset" ]]; then
+			err_noexist "${E_LUKS_RFS_KEY}"
+		fi
+		E_LUKS_PASSPHRASE=$(yaml_get_opt ".encrypt.luks-passphrase")
+		if [[ ${E_LUKS_PASSPHRASE} != "unset" ]]; then
+			err_noexist "${E_LUKS_PASSPHRASE}"
+		fi
+		E_LUKS_RFS_KEY_ASR_NAME=$(yaml_get_opt ".encrypt.luks-key-asr-name")
+		E_LUKS_KEY_SIZE=$(yaml_get_opt ".encrypt.luks-key-size")
+		if [[ "${E_LUKS_KEY_SIZE}" == "unset" ]]; then
+			E_LUKS_KEY_SIZE="512"
+		elif [[ "${E_LUKS_KEY_SIZE}" != "256" && "${E_LUKS_KEY_SIZE}" != "512" ]]; then
+			log_error "invalid .encrypt.luks-key-size of ${E_LUKS_KEY_SIZE} != 256 or 512"
+		fi
+		E_ADD_SECRET_REQUESTS="$(yaml_get_opt ".encrypt.add-secret-requests[]")"
+		if [[ "${E_ADD_SECRET_REQUESTS}" != "unset" ]]; then
+			for asr in ${E_ADD_SECRET_REQUESTS}; do
+				files=$(ls "${asr}")
+				for f in ${files}; do
+					err_noexist "${f}"
+				done
+			done
+
+			# extension secret is now required
+			E_EXTENSION_SECRET=$(yaml_get_req ".encrypt.extension-secret")
+			err_noexist "${E_EXTENSION_SECRET}"
+		else
+			E_EXTENSION_SECRET=$(yaml_get_opt ".encrypt.extension-secret")
+			if [[ ${E_EXTENSION_SECRET} != "unset" ]]; then
+				err_noexist "${E_EXTENSION_SECRET}"
+			fi
+		fi
+	fi
+
+	return 0
+}
+
+yaml_get_req() {
+	yaml_get "$@" true
+
+	return 0
+}
+
+yaml_get_opt() {
+	yaml_get "$@" false
+
+	return 0
+}
+
+yaml_get() {
+	local key required ret
+
+	if [[ $# -lt 2 ]]; then
+		log_error "internal error"
+	fi
+
+	key="$1"
+	required="$2"
+
+	ret="$(yq e -r "${key} // \"unset\"" "${CONFIG_FILE}")"
+
+	if [[ "${required}" == "true" && "${ret}" == "unset" ]]; then
+		log_error "key ${key} not specified in ${CONFIG_FILE} but required"
+	fi
+
+	echo "${ret}"
+
+	return 0
+}
+
+
+#
+# ACTION FUNCTIONS
+#
+
+list() {
+	local image temp_boot ble_dir f title kernel initramfs kernel_params valid
+
+	image="${IMAGE}"
+
+	# mount guest
+	connect_nbd "${image}"
+
+	temp_boot="${TEMP_DIR}/boot"
+	mount_partition "${NBD}p${BOOT_PARTNUM}" "${temp_boot}" "-r"
+
+	ble_dir="${temp_boot}/loader/entries"
+	if [[ ! -d "${ble_dir}" ]]; then
+		log_error "directory ${ble_dir} does not exist, unable to find boot loader entries"
+	fi
+
+	log_info "Found the following boot loader entries:"
+	for f in "${ble_dir}"/*.conf; do
+
+		title="$(grep -E "^title" "${f}" | grep -oE " .*" | grep -oE "[^ ]*")"
+		kernel="$(grep -E "^linux" "${f}" | cut -d ' ' -f 2)"
+		initramfs="$(grep -E "^initrd" "${f}" | cut -d ' ' -f 2)"
+		kernel_params="$(grep -E "^options" "${f}" | cut -d ' ' -f 2-)"
+
+		if echo "${kernel_params}" | grep -q "root=LABEL=root"; then
+			valid="valid"
+		elif echo "${kernel_params}" | grep -q "root=/dev/disk/by-label/root"; then
+			valid="valid"
+		else
+			valid="invalid"
+		fi
+
+		if ! lsinitrd "${TEMP_DIR}${initramfs}" | grep -q "sel-ebc.target"; then
+			valid="invalid"
+		fi
+
+		echo "
+title: \"${title}\" [ ${valid} ]:
+	kernel:		${kernel}
+		SHA256 ($(sha256sum "${TEMP_DIR}${kernel}" | cut -d ' ' -f 1))
+	initramfs:	${initramfs}
+		SHA256 ($(sha256sum "${TEMP_DIR}${initramfs}" | cut -d ' ' -f 1))
+	kernel_params:	${kernel_params}
+"
+	done
+
+	cleanup_pop  # Unmount temp_boot
+	cleanup_pop  # Disconnect NBD
+
+	return 0
+}
+
+# Generate SEL guest from existing guest
+convert() {
+	# setup variables
+	local rootca offline crls certs hkds kernel_parameter
+	local kernel_parameter_file sel_kernel_parameter initramfs kernel dest
+	local image temp_boot temp_root sel_header guest_name
+	local pvimg_cmd pv_cmd ble_array b
+
+	# initialize
+	image=${IMAGE}
+	ble=${C_BOOT_LOADER_ENTRY}
+	kernel_parameter_file="${TEMP_DIR}/kernel_parameter"
+	hkds=${HKDs}
+	# optional
+	sel_kernel_parameter=${C_SEL_KERNEL_PARAMETER}
+	certs="${CC_CERTS}"
+	crls="${CC_CRLS}"
+	rootca="${CC_ROOTCA}"
+	offline="${CC_OFFLINE}"
+
+	# check for files
+	err_noexist "${image}"
+
+	if [[ ${sel_kernel_parameter} == "unset" ]]; then
+		sel_kernel_parameter=""
+	fi
+
+	# create copy for safety
+	log_info "copying image; depending on size this may take some time"
+	execute cp "${image}" "${TEMP_DIR}/image.copy"
+	image="${TEMP_DIR}/image.copy"
+
+	# mount guest
+	connect_nbd "${image}"
+	temp_boot="${TEMP_DIR}/boot"
+	temp_root="${TEMP_DIR}/root"
+	mount_partition "${NBD}p${BOOT_PARTNUM}" "${temp_boot}"
+	mount_partition "${NBD}p${ROOT_PARTNUM}" "${temp_root}"
+
+	# get kernel, initramfs, and kernel parameter from boot loader entry
+	for f in "${temp_boot}"/loader/entries/*.conf; do
+
+		title="$(grep -E "^title" "${f}" | cut -d ' ' -f 3)"
+		if [[ "${title}" != "${ble}" ]]; then
+			continue
+		fi
+
+		kernel="$(grep -E "^linux" "${f}" | cut -d ' ' -f 2)"
+		initramfs="$(grep -E "^initrd" "${f}" | cut -d ' ' -f 2)"
+		if [[ "${NO_EBC}" != "true" ]]; then
+			kernel_parameter="rd.sel-ebc "
+		fi
+		kernel_parameter+="$(grep -E "^options" "${f}" | cut -d ' ' -f 2-) ${sel_kernel_parameter}"
+		break
+	done
+	if [[ "${NO_EBC}" != "true" ]]; then
+		if [[ $(echo "${kernel_parameter}" | grep "root=LABEL=root") == "" \
+			&& $? == "1" \
+			&& $(echo "${kernel_parameter}" | grep "root=/dev/disk/by-label/root") == "" \
+			&& $? == "1" ]]; then
+			log_error "root partition has to be identified using the LABEL root in the kernel parameter line"
+		fi
+		if [[ $(lsinitrd "${TEMP_DIR}${initramfs}" | grep "/usr/lib/systemd/system/sel-ebc.target") == "" \
+			&& $? == "1" ]]; then
+			log_error "initramfs ${initramfs} does not contain IBMs SEL EBC dracut module from s390-tools"
+		fi
+	fi
+
+	# check existence
+	echo "${kernel_parameter}" > "${kernel_parameter_file}"
+
+	build_sel_image "${TEMP_DIR}${kernel}" "${TEMP_DIR}${initramfs}" "${kernel_parameter_file}" "${temp_boot}/sel-ebc.img"
+
+	# extract header from SEL image
+	sel_header="${OUT}/selhdr.bin"
+	execute pvextract-hdr -o "${sel_header}" "${temp_boot}/sel-ebc.img"
+
+	# make old boot loader entries invalid (zipl will only find files ending in .conf)
+	mapfile -t ble_array < <(ls "${temp_boot}/loader/entries/")
+	for b in "${ble_array[@]}"; do
+		execute mv "${temp_boot}/loader/entries/${b}" "${temp_boot}/loader/entries/${b}.old"
+	done
+
+	# create boot entry for SEL
+	printf 'title sel-ebc\nlinux /boot/sel-ebc.img\n' > "${temp_boot}/loader/entries/sel-ebc.conf"
+
+	# inject systemd service to run zipl
+		local service_name="ebczipl.service"
+		local systemd_dir="/usr/lib/systemd/system"
+		local link
+		cat > "${temp_root}${systemd_dir}/${service_name}" << EOF
+[Unit]
+Description=call zipl and shutdown system
+
+[Service]
+Type=oneshot
+ExecStart=zipl
+ExecStartPost=shutdown now
+RemainAfterExit=yes
+StandardOutput=file:/var/log/sel-ebc-zipl.log
+StandardError=file:/var/log/sel-ebc-zipl.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+		systemctl --root="${temp_root}" --no-reload enable "${service_name}"
+
+		# unmount mounted image
+		cleanup_pop  # Unmount temp_root
+		cleanup_pop  # Unmount temp_boot
+		cleanup_pop  # Disconnect NBD
+
+		guest_name="sel-ebc-${UUID}"
+
+		# start guest
+		log_info "starting guest to run zipl"
+		if [[ "${ARCH}" == "s390x" ]]; then
+			execute virt-install \
+				--name "${guest_name}" \
+				--memory 2048 \
+				--vcpus 2 \
+				--disk path="${image}",format=qcow2 \
+				--import \
+				--network network=default,model=virtio \
+				--graphics none \
+				--console pty,target_type=serial \
+				--noautoconsole \
+				--cpu model=host-model,-deflate \
+				--osinfo detect=on,require=off > /dev/null
+		else
+			execute qemu-system-s390x \
+				-name "${guest_name}" \
+				-machine s390-ccw-virtio \
+				-cpu max \
+				-m 2048 \
+				-drive file="${image}",if=virtio,format=qcow2 \
+				-serial none \
+				-display none \
+				-daemonize \
+				-netdev user,id=net0 \
+				-device virtio-net-ccw,netdev=net0
+		fi
+
+		# shutdown and remove guest
+		if [[ "${ARCH}" == "s390x" ]]; then
+			log_info "waiting for ${guest_name} to shut down:"
+			for _ in {1..200}; do
+				execute virsh list --all | grep "${guest_name}" | grep "shut off" > /dev/null && break
+				echo -n "."
+				sleep 0.2
+			done
+			echo ""
+
+			execute virsh undefine "${guest_name}"
+		else
+			log_info "waiting for ${guest_name} to shut down:"
+			for _ in {1..200}; do
+				execute ! pgrep -af "qemu-system-s390x.*${guest_name}" >/dev/null && break
+				echo -n "."
+				sleep 2
+			done
+			echo ""
+		fi
+
+		# mount guest
+		connect_nbd "${image}"
+		temp_root="${TEMP_DIR}/root"
+		mount_partition "${NBD}p${ROOT_PARTNUM}" "${temp_root}"
+
+		# eject systemd service to run zipl
+		if [[ -f "${temp_root}${systemd_dir}/${service_name}" ]]; then
+			rm -f "${temp_root}${systemd_dir}/${service_name}"
+		fi
+		link="${temp_root}${systemd_dir}/multi-user.target.wants/${service_name}"
+		if [[ -h "${link}" ]]; then
+			rm -f "${link}"
+		fi
+
+	# unmount mounted image
+	cleanup_pop  # Unmount temp_root
+	cleanup_pop  # Disconnect NBD
+
+	# copy image to output directory
+	IMAGE="${OUT}/image.qcow2"
+	execute mv "${image}" "${IMAGE}"
+
+	return 0
+}
+
+# Encrypt root partition of SEL guest
+encrypt() {
+	local image dest luks_dev_name passphrase luks_segment_key_size segment_key
+	local asr_name hkds cck asrs certs crls rootca offline extension_secret
+	local pvsecret_cmd_static pvsecret_cmd pv_cmd
+	local retr_sec_type luks_segment_key_bytes blob blob_file
+	local sector_size metadata_size keyslots_size temp_boot sics header
+	local image_resized root_part retr_sec_id dump key_size pv_out pv_in
+	local kcmdline files f asr
+
+	image="${IMAGE}"
+	dest="${OUT}/image.qcow2"
+	luks_dev_name="cryptroot"
+	passphrase="${E_LUKS_PASSPHRASE}"
+	luks_segment_key_size="${E_LUKS_KEY_SIZE}"
+	segment_key="${E_LUKS_RFS_KEY}"
+	asr_name="${E_LUKS_RFS_KEY_ASR_NAME}"
+	hkds="${HKDs}"
+	cck="${E_CCK}"
+	asrs="${E_ADD_SECRET_REQUESTS}"
+	certs="${CC_CERTS}"
+	crls="${CC_CRLS}"
+	rootca="${CC_ROOTCA}"
+	offline="${CC_OFFLINE}"
+	extension_secret="${E_EXTENSION_SECRET}"
+	pvsecret_cmd_static="pvsecret create "
+
+	if [[ "${NO_EBC}" == "true" ]]; then
+		log_info "EBC disabled, skipping encrypt"
+		return 0
+	fi
+
+	# set default LUKS key ASR name
+	if [[ "${asr_name}" == "unset" ]]; then
+		asr_name="rfs-luks-key"
+	fi
+
+	# generate random extension secret if none supplied
+	if [[ "${extension_secret}" == "unset" ]]; then
+		extension_secret="${OUT}/extension.secret"
+		execute dd if=/dev/random of="${extension_secret}" bs=32 count=1
+		log_info "generated new extension secret to ${extension_secret}"
+	fi
+
+	# generate random cck if none supplied
+	if [[ "${cck}" == "unset" ]]; then
+		cck="${OUT}/cck.key"
+		execute dd if=/dev/random of="${cck}" bs=32 count=1
+		log_info "generated new Customer-Communication-Key to ${cck}"
+	fi
+
+	# generate random luks passphrase if none supplied
+	if [[ "${passphrase}" == "unset" ]]; then
+		passphrase="${OUT}/passphrase"
+		execute dd if=/dev/random of="${passphrase}" bs=32 count=1
+		log_info "generated new LUKS passphrase to ${passphrase}"
+	fi
+
+	# check or set default LUKS key size
+	if [[ "${luks_segment_key_size}" == "unset" ]]; then
+		if [[ "${segment_key}" == "unset" ]]; then
+			luks_segment_key_size="512"
+		else
+			key_size="$(wc --bytes < "${segment_key}")"
+			if [[ "${key_size}" -lt "256" ]]; then
+				log_error "${segment_key} has to be at least 32 bytes"
+			elif [[ "${key_size}" -lt "512" ]]; then
+				luks_segment_key_size="256"
+			else
+				luks_segment_key_size="256"
+			fi
+		fi
+	fi
+
+	# set retrievable secret type
+	if [[ "${luks_segment_key_size}" == "256" ]]; then
+		retr_sec_type="7"
+	elif [[ "${luks_segment_key_size}" == "512" ]]; then
+		retr_sec_type="8"
+	else
+		log_error "Cipher aes-xts-plain64 requires a key size of 256 or 512 bit!"
+	fi
+
+	# generate random LUKS key if none supplied
+	if [[ "${segment_key}" == "unset" ]]; then
+		luks_segment_key_bytes=$((luks_segment_key_size / 8))
+
+		segment_key="${OUT}/rfs.key"
+		execute dd if=/dev/random of="${segment_key}" bs="${luks_segment_key_bytes}" count=1
+		log_info "generated new LUKS key for root filesystem to ${segment_key}"
+	fi
+
+	# Increase QCOW2 disk size by 32MiB to allow additional space for LUKS2 header
+	log_info "increase size of qcow2 to fit the LUKS header"
+	execute qemu-img resize "${image}" +32M
+	# Increase partition size by 32MiB as well, but not the file system, as the LUKS2 encryption is around the filesystem
+	image_resized="${TEMP_DIR}/resized.qcow2"
+	execute cp "${image}" "${image_resized}"
+	execute virt-resize --expand "/dev/vda${ROOT_PARTNUM}" --no-expand-content "${image}" "${image_resized}"
+	# Remove smaller image, as we already made a copy
+	execute rm -f "${image}"
+	image="${image_resized}"
+
+	# move image to output and compress
+	# the longopt --compress to the short opt -c is broken
+	execute qemu-img convert --target-format qcow2 -c "${image}" "${dest}" --quiet
+	execute rm -f "${image}"
+	image="${dest}"
+
+	# mount guest image
+	connect_nbd "${image}"
+	root_part="${NBD}p${ROOT_PARTNUM}"
+
+	# mount boot partition
+	temp_boot="${TEMP_DIR}/boot"
+	mount_partition "${NBD}p${BOOT_PARTNUM}" "${temp_boot}"
+
+	# print kernel cmdline
+	if [[ -f "${temp_boot}/sel-ebc.img" ]]; then
+		kcmdline="$(strings "${temp_boot}/sel-ebc.img" | grep -E "^rd.sel-ebc")"
+
+		log_info "found the following kernel cmdline:"
+		log_info "${kcmdline}"
+	else
+		log_error "${temp_boot}/sel-ebc.img does not exist, unable to retrieve kernel cmdline"
+	fi
+
+	# Encrypt the root partition of the mounted guest
+	log_info "encrypting partition"
+	execute cryptsetup reencrypt --encrypt --reduce-device-size 32M \
+			--cipher aes-xts-plain64 --key-size "${luks_segment_key_size}" \
+			--volume-key-file "${segment_key}" --key-file "${passphrase}" "${root_part}" \
+			--batch-mode --label=${luks_dev_name}
+	log_info "done encrypting"
+
+	log_info "reformat LUKS device from aes to paes"
+	retr_sec_id=$(echo -n "${asr_name}" | sha256sum | cut -d " " -f 1)
+
+	blob="00000000 09000000 000${retr_sec_type}0000 ${retr_sec_id}"
+	blob_file="$(mktemp)"
+	echo "${blob}" | xxd -r -p > "${blob_file}"
+	printf "key blob: \n%s\n" "$(hexdump "${blob_file}")"
+	if [[ "$(wc -c "${blob_file}" | cut -d " " -f 1 )" != "44" ]]; then
+		log_error "size of ${blob_file} != 44"
+	fi
+
+	# parse LUKS header
+	dump=$(mktemp)
+	execute cryptsetup luksDump "${root_part}" > "${dump}"
+	sector_size=$(grep "sector:" "${dump}" | awk 'NR==1{print $2}')
+	metadata_size=$(grep "Metadata area:" "${dump}" | awk 'NR==1{print $3}')
+	keyslots_size=$(grep "Keyslots area:" "${dump}" | awk 'NR==1{print $3}')
+
+	# Reformat LUKS header of guest root fs from AES to PAES
+	execute cryptsetup luksFormat "${root_part}" --batch-mode \
+			--key-file "${passphrase}" \
+			--uuid "${UUID}" --cipher paes-xts-plain64 \
+			--sector-size "${sector_size}" \
+			--luks2-metadata-size "${metadata_size}" \
+			--luks2-keyslots-size "${keyslots_size}" \
+			--volume-key-file "${blob_file}" --key-size 352 \
+			--label=${luks_dev_name}
+
+	sics="${temp_boot}/sics"
+	if [[ ! -d "${sics}" ]]; then
+		execute mkdir "${sics}"
+	fi
+
+	# Build pv_cmd array using helper function
+	build_pv_cmd "${hkds}" "${NO_VERIFY}" "${certs}" "${crls}" "${rootca}" "${offline}"
+
+	# prepare pvsecret command
+	pvsecret_cmd_static=("pvsecret" "create")
+	pvsecret_cmd_static+=("${pv_cmd[@]}" "--extension-secret" "${extension_secret}" "--quiet")
+	header="${TEMP_DIR}/selhdr.bin"
+	execute pvextract-hdr -o "${header}" "${temp_boot}/sel-ebc.img"
+	pvsecret_cmd_static+=("--hdr" "${header}")
+
+	# generate ASR for LUKS segment key
+	pv_in="${segment_key}"
+	pv_out="${sics}/${asr_name}.asr"
+	pvsecret_cmd=("${pvsecret_cmd_static[@]}" "--toc-policy" "${sics}/toc.pol" "--output" "${pv_out}" "retrievable" "--secret" "${pv_in}" "--type" "aes-xts" "${asr_name}")
+	execute "${pvsecret_cmd[@]}"
+	log_info "generated Add-Secret-Request ${pv_out} from ${pv_in} containing the LUKS encryption key for the root filesystem"
+
+	# generate ASR for CCK
+	pv_in="${cck}"
+	pv_out="${sics}/cck.asr"
+	pvsecret_cmd=("${pvsecret_cmd_static[@]}" "--toc-policy" "${sics}/toc.pol" "--output" "${pv_out}" "update-cck" "--secret" "${pv_in}")
+	execute "${pvsecret_cmd[@]}"
+	log_info "generated Add-Secret-Request ${pv_out} from ${pv_in} containing the Customer-Communication-Key"
+
+	# generate ASR for LUKS passphrase
+	pv_out="${sics}/luks-rfs-passphrase.asr"
+	pv_in="${passphrase}"
+	pvsecret_cmd=("${pvsecret_cmd_static[@]}" "--toc-policy" "${sics}/toc.pol" "--output" "${pv_out}" "retrievable" "--secret" "${pv_in}" "--type" "plain" "luks-rfs-passphrase")
+	execute "${pvsecret_cmd[@]}"
+	log_info "generated Add-Secret-Request ${pv_out} from ${pv_in} containing the LUKS passphrase for the root filesystem"
+
+	# add additional ASRs to toc.pol
+	if [[ "${asrs}" != "unset" ]]; then
+		for asr in ${asrs}; do
+			files=$(ls "${asr}")
+			for f in ${files}; do
+				add_asr_to_toc "${f}" "${sics}/toc.pol"
+				execute cp "${f}" "${sics}/"
+				log_info "added user provided Add-Secret-Request ${f}"
+			done
+		done
+	fi
+
+	# generate toc.asr
+	pvsecret_cmd=("${pvsecret_cmd_static[@]}" "--output" "${sics}/toc.asr" "--policy" "toc.pol" "meta")
+	execute cp "${sics}/toc.pol" "toc.pol"
+	execute "${pvsecret_cmd[@]}"
+	execute rm -f toc.pol
+
+	# check sanity of SICS
+	pv_cmd=("pvebc" "--dry-run" "--toc" "${sics}/toc.asr")
+	execute "${pv_cmd[@]}"
+	log_info "${sics} is sane"
+
+	# unmount image
+	cleanup_pop  # Unmount temp_boot
+	cleanup_pop  # Disconnect NBD
+
+	return 0
+}
+
+
+#
+# MAIN
+#
+
+main() {
+	# Set strict error handling when running as script
+	local -
+	set -Eu
+
+	# call cleanup on error
+	# PIPE is needed to allow out=$(main list -i <image> | grep -m 1 <filter>)
+	#   bash will close the subshell executing the main function as soon as grep has found a match
+	#   cleanup will not be executed anymore
+	trap 'cleanup 1' ERR EXIT PIPE
+
+	# general
+	ACTION=""
+	NBD=""
+	ARCH=""
+	CONFIG_FILE=""
+	OUT=""
+	UUID=""
+	TEMP_DIR=""
+	NO_VERIFY=""
+	NO_EBC=""
+	BOOT_PARTNUM=""
+	ROOT_PARTNUM=""
+	HKDs=""
+	IMAGE=""
+	PARTNUM=""
+
+	# certificate chain related
+	CC_CERTS=""
+	CC_CRLS=""
+	CC_ROOTCA=""
+	CC_OFFLINE=""
+
+	# conversion related
+	C_BOOT_LOADER_ENTRY=""
+	C_SEL_KERNEL_PARAMETER=""
+
+	# encryption related
+	E_CCK=""
+	E_EXTENSION_SECRET=""
+	E_LUKS_RFS_KEY=""
+	E_LUKS_PASSPHRASE=""
+	E_LUKS_RFS_KEY_ASR_NAME=""
+	E_LUKS_KEY_SIZE=""
+	E_ADD_SECRET_REQUESTS=""
+
+	# parse command line
+	cli "$@"
+
+	# set up logger
+	setup_logger
+
+	# get architecture
+	get_arch
+
+	# check for prereqs
+	check_prereqs
+
+	if [[ "${ACTION}" != "list" ]]; then
+		# parse yaml configuration
+		parse_yaml
+
+		# setup output directory
+		if [[ ! -d ${OUT} ]]; then
+			execute mkdir "${OUT}"
+			if [[ ! -d ${OUT} ]]; then
+				log_error "unable to create ${OUT}"
+			fi
+		fi
+	fi
+
+	# get partitions
+	get_partnum "root" "${IMAGE}"
+	ROOT_PARTNUM="${PARTNUM}"
+	test -z "${ROOT_PARTNUM}" && log_error "unable to find root partition on ${IMAGE}"
+	get_partnum "boot" "${IMAGE}"
+	BOOT_PARTNUM="${PARTNUM}"
+	test -z "${BOOT_PARTNUM}" && log_error "unable to find boot partition on ${IMAGE}"
+
+	# setup temporary directory
+	UUID=$(uuidgen)
+	TEMP_DIR=/opt/sel-ebc-${UUID}
+	execute mkdir "${TEMP_DIR}"
+	if [[ ! -d ${TEMP_DIR} ]]; then
+		log_error "unable to create ${TEMP_DIR}"
+	fi
+	# Register cleanup for TEMP_DIR (will be removed on any exit)
+	if [[ -d "${TEMP_DIR}" ]]; then
+		cleanup_push rm -rf "${TEMP_DIR}"
+	fi
+	execute mkdir "${TEMP_DIR}/boot"
+	execute mkdir "${TEMP_DIR}/root"
+
+	log_info "all temporary resources will be placed in ${TEMP_DIR}"
+
+	if [[ "${ACTION}" == "list" ]]; then
+		list
+	fi
+
+	if [[ "${ACTION}" == "convert" || "${ACTION}" == "full" ]]; then
+		convert
+	fi
+
+	if [[ "${ACTION}" == "encrypt" || "${ACTION}" == "full" ]]; then
+		encrypt
+	fi
+
+	# Done - run cleanup explicitly to support sourcing
+	log_info "done"
+
+	# Run cleanup stack to reset logging and clean up resources
+	# This ensures cleanup happens even when script is sourced
+	cleanup 0
+	return $?
+}
+
+
+#
+# SOURCE WRAPPER
+#
+
+if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
+	main "${@}"
+fi

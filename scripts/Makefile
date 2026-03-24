@@ -1,9 +1,10 @@
 include ../common.mak
 
-SCRIPTS = dbginfo.sh zfcpdbf zipl-switch-to-blscfg sclpdbf
+SCRIPTS = dbginfo.sh zfcpdbf zipl-switch-to-blscfg sclpdbf pvics
 # Helper scripts controlled by corresponding systemd services
 SD_HELPER_SCRIPTS = cpictl dumpconf
-MAN_PAGES = dbginfo.sh.8 zfcpdbf.8 zipl-switch-to-blscfg.8
+MAN_PAGES = dbginfo.sh.8 zfcpdbf.8 zipl-switch-to-blscfg.8 pvics.8
+FILE_MAN_PAGES = pvics.yaml.5
 
 all:
 
@@ -31,6 +32,12 @@ install:
 	do \
 		$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $$i \
 		$(DESTDIR)$(MANDIR)/man8; \
+	done
+
+	@for i in $(FILE_MAN_PAGES); \
+	do \
+		$(INSTALL) -g $(GROUP) -o $(OWNER) -m 644 $$i \
+		$(DESTDIR)$(MANDIR)/man5; \
 	done
 
 clean:

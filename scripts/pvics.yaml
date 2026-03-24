@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: MIT
+#
+# Copyright IBM Corp.
+
+
+# OPTIONAL (default: false)
+no-verify: false
+# This option controls whether the --no-verify flag is used with the pv commands.
+
+# OPTIONAL (default: false)
+no-ebc: false
+# This option controls whether to trigger the SEL EBC related systemd units.
+# It can be used to create a SEL guest image from an existing qcow2 image without utilizing SEL EBC.
+# Setting this to true will prevent the encrypt action from running.
+# In this case, the full action equals the convert action.
+# Setting this to true will prevent the default pvimg options (see below) from being added and instead
+# only add the user provided ones in .convert.pvimg-options.
+
+# REQUIRED
+out: data/output
+# This specifies the local directory used for output.
+
+# REQUIRED
+hkds:
+  - data/*.hkd
+# These are the paths to all relevant Host-Key-Documents.
+# The paths may contain wildcard patterns.
+
+# REQUIRED if .no-verify is false
+# UNUSED if .no-verify is true
+# This section contains all relevant files for verification of the certificate chain.
+# See man pvsecret for more detailed information about any of the keys in this section.
+certificate-chain:
+  # The paths may contain wildcard patterns.
+  certs:
+    - data/*.cert
+
+  # The paths may contain wildcard patterns.
+  crls:
+    - data/*.crl
+
+  # This is the pvsecret create offline option.
+  offline: true
+
+  # This is the root CA of the given certificates.
+  root-ca: data/root.ca
+
+# This section contains relevant information for the first phase: conversion.
+convert:
+  # REQUIRED
+  boot-loader-entry: boot_loader_entry_title
+  # This is the boot loader entry name to be used for kernel, initramfs and kernel parameter.
+  # You can list available boot loader entries with the list action.
+
+  # OPTIONAL
+  sel-kernel-parameter: swiotlb=524288
+  # These are additional kernel parameters for the resulting SEL image.
+  # The parameter rd.sel-ebc will always be added.
+
+  # OPTIONAL (default: --enable-pckmo-hmac)
+  pvimg-create-options: --enable-pckmo-hmac
+  # These are additional pvimg options for the resulting SEL image.
+  # The options --disable-image-encryption and --enable-update-cck are always used except when .no-ebc is true.
+
+# This section contains relevant information for the second phase: encryption.
+encrypt:
+  # OPTIONAL
+  cck: data/cck.key
+  # This is the local path to the CCK.
+  # If none is supplied, one will be generated and written to .out/cck.key.
+
+  # OPTIONAL
+  extension-secret: data/extension.secret
+  # This is the local path to the extension secret for pvsecret create.
+  # This is REQUIRED if .encrypt.add-secret-requests is used.
+  # In this case, the extension secret must be the one from the supplied ASRs.
+  # If none is supplied, one will be generated and written to .out/extension.secret.
+
+  # OPTIONAL
+  luks-key: data/rfs.key
+  # This is the local path to the LUKS encryption key.
+  # If none is supplied, one will be generated and written to .out/rfs.key.
+
+  # OPTIONAL
+  luks-passphrase: data/passphrase
+  # This is the local path to a file containing the LUKS passphrase.
+  # If none is supplied, one will be generated and written to .out/passphrase.
+
+  # OPTIONAL (default: rfs-luks-key)
+  luks-key-asr-name: aes-xts-segment-key
+  # This is the name of the ASR containing the LUKS encryption key.
+
+  # OPTIONAL (default: depending on .encrypt.luks-key)
+  luks-key-size: 512
+  # This is the key size of the LUKS encryption key (256 or 512).
+  # If .encrypt.luks-key is supplied, this will default to a size depending on the key.
+  # Otherwise, this will default to 512 and generate a matching key.
+  # If this is supplied but no key is supplied, a key of the requested size will be generated.
+
+  # OPTIONAL
+  add-secret-requests:
+    - data/*.asr
+  # These are additional secrets to be added during boot.
+  # Using this will make .encrypt.extension-secret a required argument.
+  # The supplied extension secret and the extension secret of supplied ASRs must be the same.
+  # The paths may contain wildcard patterns.
