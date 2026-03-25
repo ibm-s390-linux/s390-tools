@@ -6,12 +6,20 @@ mod apdevice;
 mod confidential;
 mod error;
 mod macros;
+mod policy;
 mod utils;
 mod uvattest;
 mod uvdevice;
 mod uvsecret;
 
 pub use error::{Error, FileAccessErrorType, FileIoErrorType, Result};
+
+/// Early Boot Customization (EBC) utilities.
+///
+/// This module provides types and functions for working with Early Boot
+/// Customization. The integrity and completeness of ASRs are ensured through
+/// cryptographically protected table of contents files.
+pub use policy::PolicyReference;
 
 /// Functionalities for reading attestation requests
 pub mod attest {

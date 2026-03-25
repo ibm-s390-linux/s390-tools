@@ -23,6 +23,7 @@ zerocopy = {version = "0.8", features = ["derive"]}
 serde = { version = "1.0.217", features = ["derive"]}
 byteorder = "1.5"
 regex = "1.10"
+sha2 = "0.10.9"
 
 [dev-dependencies]
 serde_test = "1.0.177"
