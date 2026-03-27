@@ -1,11 +1,7 @@
-/* SPDX-License-Identifier: MIT */
 /*
- * Command line utilities - for lspai
+ * SPDX-License-Identifier: MIT
  *
- * Copyright IBM Corp. 2025
- *
- * s390-tools is free software; you can redistribute it and/or modify
- * it under the terms of the MIT license. See LICENSE for details.
+ * Copyright IBM Corp.
  */
 
 #ifndef LSPAI_CLI_H
