@@ -700,7 +700,7 @@ static int do_it(char *s)
 
 	if (output_format == FMT_CSV)
 		flags |= FMT_NOMETA;
-	if (output_format == FMT_JSON || output_format == FMT_JSONSEQ)
+	if (util_fmt_is_json(output_format))
 		flags |= FMT_HANDLEINT;
 	if (quote_all)
 		flags |= FMT_QUOTEALL;
@@ -708,7 +708,7 @@ static int do_it(char *s)
 	mk_labels();
 	util_fmt_init(stdout, output_format, flags, 1);
 	util_fmt_obj_start(FMT_DEFAULT, "lshwc");
-	if (output_format == FMT_JSON || output_format == FMT_JSONSEQ) {
+	if (util_fmt_is_json(output_format)) {
 		util_fmt_obj_start(FMT_ROW, "cpumcf info");
 		util_fmt_pair(FMT_PERSIST, "counter first", "%d", cfvn);
 		util_fmt_pair(FMT_PERSIST, "counter second", "%d", csvn);
