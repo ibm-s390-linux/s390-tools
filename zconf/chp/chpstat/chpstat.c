@@ -1270,7 +1270,7 @@ static void cmd_list(void)
 	if (opts.groups & KEY_GRP_METRICS)
 		update_util_all(true);
 
-	if (opts.fmt != FMT_JSONSEQ)
+	if (!util_fmt_is_json_stream(opts.fmt))
 		util_fmt_obj_start(FMT_LIST, NULL);
 	for (i = 0; opts.forever || i < opts.iterations; i++) {
 		if (i > 0)
@@ -1286,7 +1286,7 @@ static void cmd_list(void)
 		 * via pipes (e.g. for use with grep). */
 		fflush(stdout);
 	}
-	if (opts.fmt != FMT_JSONSEQ)
+	if (!util_fmt_is_json_stream(opts.fmt))
 		util_fmt_obj_end();
 }
 
@@ -1972,7 +1972,7 @@ static void init_fmt(void)
 		flags |= FMT_FILTER;
 	if (!opts.use_prefix)
 		flags |= FMT_NOPREFIX;
-	if (opts.fmt == FMT_JSON || opts.fmt == FMT_JSONSEQ) {
+	if (util_fmt_is_json(opts.fmt)) {
 		/* Ensure correct JSON even if interrupted. */
 		flags |= FMT_HANDLEINT;
 	}
