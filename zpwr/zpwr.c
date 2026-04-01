@@ -284,7 +284,7 @@ static void fmt_start(enum util_fmt_t fmt, unsigned int fmt_flags,
 	if (!fmt_specified)
 		return;
 	util_fmt_init(stdout, fmt, fmt_flags, 1);
-	if (fmt != FMT_JSONSEQ)
+	if (!util_fmt_is_json_stream(fmt))
 		util_fmt_obj_start(FMT_LIST, "zpwr");
 }
 
@@ -292,7 +292,7 @@ static void fmt_end(enum util_fmt_t fmt, int fmt_specified)
 {
 	if (!fmt_specified)
 		return;
-	if (fmt != FMT_JSONSEQ)
+	if (!util_fmt_is_json_stream(fmt))
 		util_fmt_obj_end(); /* zpwr[] */
 	util_fmt_exit();
 }

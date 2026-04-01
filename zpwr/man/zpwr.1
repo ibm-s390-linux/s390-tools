@@ -30,8 +30,8 @@ CPC readings include total, unassigned resources and infrastructure power
 readings.
 .sp
 Power reading units are automatically presented in a human readable format,
-whereas complex formats like json, csv, json-seq, pairs display the power
-readings in microwatts.
+whereas complex formats like json, csv, json-seq, jsonl, pairs display the
+power readings in microwatts.
 .sp
 CPC power readings can be retrieved only when the required authorization was
 set for the LPAR.  Enable the required authorization by setting "Global
@@ -48,7 +48,7 @@ Retrieve power readings in the following formats: json, csv,
 json-seq or pairs. If no format is specified in the command, the output will
 default to the human readable format.
 .sp
-When the format is json, csv, json-seq or pairs, the power readings are
+When the format is json, csv, json-seq, jsonl or pairs, the power readings are
 displayed in microwatts.
 .RE
 .PP
