@@ -1037,7 +1037,7 @@ void table_fmt_start(void)
 {
 	if (!g.o.format_specified)
 		return;
-	if (g.o.format != FMT_JSONSEQ)
+	if (!util_fmt_is_json_stream(g.o.format))
 		util_fmt_obj_start(FMT_LIST, "hyptop");
 }
 
@@ -1045,7 +1045,7 @@ void table_fmt_end(void)
 {
 	if (!g.o.format_specified)
 		return;
-	if (g.o.format != FMT_JSONSEQ)
+	if (!util_fmt_is_json_stream(g.o.format))
 		util_fmt_obj_end(); /* hyptop[] */
 }
 

@@ -233,7 +233,7 @@ static void l_fmt_init(void)
 		flags |= FMT_QUOTEALL;
 	if (g.o.format == FMT_CSV || g.o.format_all)
 		flags |= FMT_KEEPINVAL;
-	if (g.o.format == FMT_JSON || g.o.format == FMT_JSONSEQ)
+	if (util_fmt_is_json(g.o.format))
 		flags |= FMT_HANDLEINT;
 	util_fmt_init(stdout, g.o.format, flags, 1);
 }

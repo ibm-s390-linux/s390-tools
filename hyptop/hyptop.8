@@ -100,6 +100,17 @@ See section "OUTPUT FORMAT" for more details.
 .BR
 .PP
 .IP \(bu 3
+.B jsonl:
+Line-delimited JSON data structures
+
+Data for each iteration is formatted as a separate JSON data structure
+separated by ASCII Line Feed character (0x0a, LF).
+.BR
+
+See section "OUTPUT FORMAT" for more details.
+.BR
+.PP
+.IP \(bu 3
 .B pairs:
 Textual key=value pairs
 
@@ -457,6 +468,14 @@ section
 Subsequent objects each represent performance data for one iteration
 .br
 .PP
+
+.SS jsonl
+
+The jsonl output format is a data streaming variation of the JSON output format
+described above with the same properties as the json\-seq output with the
+difference that JSON data is separated only by an ASCII Line Feed character
+(0x0a, LF).
+
 
 .SH EXAMPLES
 To start hyptop with the "sys_list" window in interactive mode, enter:
