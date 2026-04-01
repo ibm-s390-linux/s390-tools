@@ -91,6 +91,7 @@ static const struct {
 } formats[] = {
 	{ "json", FMT_JSON },
 	{ "json-seq", FMT_JSONSEQ },
+	{ "jsonl", FMT_JSONL },
 	{ "pairs", FMT_PAIRS },
 	{ "csv",  FMT_CSV },
 };
@@ -111,6 +112,29 @@ bool util_fmt_name_to_type(const char *name, enum util_fmt_t *type)
 	return false;
 }
 
+bool util_fmt_is_json(enum util_fmt_t type)
+{
+	switch (type) {
+	case FMT_JSON:
+	case FMT_JSONSEQ:
+	case FMT_JSONL:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool util_fmt_is_json_stream(enum util_fmt_t type)
+{
+	switch (type) {
+	case FMT_JSONSEQ:
+	case FMT_JSONL:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static void safe_write(const char *str)
 {
 	size_t done, todo;
@@ -129,7 +153,7 @@ static void _indent(unsigned int off, bool safe)
 {
 	unsigned int num, i;
 
-	if (f.type == FMT_JSONSEQ)
+	if (util_fmt_is_json_stream(f.type))
 		return;
 	num = f.ind_base + off;
 	if (f.type == FMT_JSON && f.lvl > 0)
@@ -408,8 +432,8 @@ static void emit_meta_object(void)
 	util_fmt_pair(quoted, "time", "%s", date);
 	_util_fmt_obj_end();
 
-	if (f.type == FMT_JSONSEQ) {
-		/* Tool meta-data is a separate object for JSONSEQ. */
+	if (util_fmt_is_json_stream(f.type)) {
+		/* Tool meta-data is a separate object for JSON streams. */
 		util_fmt_obj_end();
 	}
 }
@@ -478,7 +502,7 @@ void util_fmt_obj_end(void)
 {
 	_util_fmt_obj_end();
 
-	if (f.lvl == 1 && f.meta_done && f.type != FMT_JSONSEQ) {
+	if (f.lvl == 1 && f.meta_done && !util_fmt_is_json_stream(f.type)) {
 		/* Emit closure for top-level meta-container object. */
 		util_fmt_obj_end();
 	}
@@ -737,7 +761,7 @@ void util_fmt_init(FILE *fd, enum util_fmt_t type, unsigned int flags,
 	f.do_warn     = (flags & FMT_WARN);
 	f.handle_int  = (flags & FMT_HANDLEINT);
 	f.api_level   = api_level;
-	if (type == FMT_JSONSEQ)
+	if (util_fmt_is_json_stream(type))
 		f.nl = "";
 	else
 		f.nl = "\n";
@@ -750,6 +774,7 @@ void util_fmt_init(FILE *fd, enum util_fmt_t type, unsigned int flags,
 		break;
 	case FMT_JSON:
 	case FMT_JSONSEQ:
+	case FMT_JSONL:
 		f.obj_start = &json_obj_start;
 		f.obj_end   = &json_obj_end;
 		f.map       = &json_map;

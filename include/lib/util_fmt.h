@@ -45,12 +45,13 @@
 #define FMT_DEFAULT	0
 
 /* Names of supported output format types. */
-#define FMT_TYPE_NAMES	"json json-seq pairs csv"
+#define FMT_TYPE_NAMES	"json json-seq jsonl pairs csv"
 
 /**
  * enum util_fmt_t - Output format types.
  * @FMT_JSON:    JavaScript Object Notation output data structure
  * @FMT_JSONSEQ: Sequence of JSON data structures according to RFC7464
+ * @FMT_JSONL:   Line-delimited JSON
  * @FMT_PAIRS:   Textual key=value pairs
  * @FMT_CSV:     Comma-separated-values output
  *
@@ -59,6 +60,7 @@
 enum util_fmt_t {
 	FMT_JSON,
 	FMT_JSONSEQ,
+	FMT_JSONL,
 	FMT_PAIRS,
 	FMT_CSV,
 };
@@ -231,5 +233,24 @@ void util_fmt_obj_end(void);
  *   parent objects
  */
 void util_fmt_pair(unsigned int mflags, const char *key, const char *fmt, ...);
+
+/**
+ * util_fmt_is_json() - Determine whether format is JSON.
+ * @type: Format type identifier.
+ *
+ * Return: %true if type is JSON, %false otherwise.
+ */
+bool util_fmt_is_json(enum util_fmt_t type);
+
+/**
+ * util_fmt_is_json_stream() - Determine whether format is JSON stream.
+ * @type: Format type identifier.
+ *
+ * Determine whether a given format @type represents a JSON streaming format
+ * such as json-seq (@FMT_JSONSEQ) or jsonl (@FMT_JSONL).
+ *
+ * Return: %true if type is either @FMT_JSONSEQ or @FMT_JSONL, %false otherwise.
+ */
+bool util_fmt_is_json_stream(enum util_fmt_t type);
 
 #endif /* LIB_UTIL_FMT_H */

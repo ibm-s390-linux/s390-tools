@@ -193,6 +193,9 @@ int main(int UNUSED(argc), char *UNUSED(argv[]))
 	announce("JSON formatted as sequence");
 	simple_example(FMT_JSONSEQ, FMT_DEFAULT);
 
+	announce("JSON Lines format");
+	simple_example(FMT_JSONL, FMT_DEFAULT);
+
 	announce("Pairs output");
 	simple_example(FMT_PAIRS, FMT_KEEPINVAL);
 
@@ -231,6 +234,9 @@ int main(int UNUSED(argc), char *UNUSED(argv[]))
 
 	announce("JSON sequence output with meta-data");
 	meta_example(FMT_JSONSEQ);
+
+	announce("JSON Lines output with meta-data");
+	meta_example(FMT_JSONL);
 
 	announce("Pairs output with meta-data");
 	meta_example(FMT_PAIRS);
