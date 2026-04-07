@@ -265,12 +265,10 @@ impl Display for RetrieveableSecretInpKind {
     }
 }
 
-// all members s390x only
 #[derive(Args, Debug)]
 pub struct AddSecretOpt {
     /// Specify the request to be sent.
     #[arg(value_name = "FILE", value_hint = ValueHint::FilePath,)]
-    #[cfg(target_arch = "s390x")]
     pub input: String,
 
     /// Force the addition of add-secret requests.
@@ -282,7 +280,6 @@ pub struct AddSecretOpt {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
-#[cfg(target_arch = "s390x")]
 pub enum ListSecretOutputType {
     /// Human-focused, non-parsable output format
     #[default]
@@ -293,17 +290,14 @@ pub enum ListSecretOutputType {
     Bin,
 }
 
-// all members s390x only
 #[derive(Args, Debug)]
 pub struct ListSecretOpt {
     /// Store the result in FILE
     #[arg(value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath,)]
-    #[cfg(target_arch = "s390x")]
     pub output: String,
 
     /// Define the output format of the list.
     #[arg(long, value_enum, default_value_t)]
-    #[cfg(target_arch = "s390x")]
     pub format: ListSecretOutputType,
 }
 
@@ -331,7 +325,6 @@ pub struct VerifyOpt {
     pub output: String,
 }
 
-// all members s390x only
 #[derive(Args, Debug)]
 pub struct RetrSecretOptions {
     /// Specify the secret ID to be retrieved.
@@ -341,22 +334,18 @@ pub struct RetrSecretOptions {
     /// handle encodes in hexadecimal. Leading zeros are required. If there are multiple secrets in
     /// the store with the same Id there are no guarantees on which specific secret is retrieved.
     /// Use --inform=idx to make sure a specific secret is retrieved.
-    #[cfg(target_arch = "s390x")]
     #[arg(value_name = "ID", value_hint = ValueHint::FilePath)]
     pub input: String,
 
     /// Specify the output path to place the secret value
-    #[cfg(target_arch = "s390x")]
     #[arg(short, long, value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath)]
     pub output: String,
 
     /// Define input type for the Secret ID
-    #[cfg(target_arch = "s390x")]
     #[arg(long, value_enum, default_value_t)]
     pub inform: RetrInpFmt,
 
     /// Define the output format for the retrieved secret
-    #[cfg(target_arch = "s390x")]
     #[arg(long, value_enum, default_value_t)]
     pub outform: RetrOutFmt,
 }
@@ -478,10 +467,7 @@ mod test {
             vec!["pvsecret", "lock"],
             vec!["pvsecret", "version"],
             vec!["pvsecret", "list"],
-            #[cfg(target_arch = "s390x")]
             vec!["pvsecret", "add", "abc"],
-            #[cfg(not(target_arch = "s390x"))]
-            vec!["pvsecret", "add"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "meta"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "association", "name" ],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "update-cck", "--secret", "abc"],
@@ -492,11 +478,8 @@ mod test {
                 "--root-ca", "tttt", "--cck", "cck", "--cuid-hex", "0x11223344556677889900aabbccddeeff", "--pcf", "0x123", "association", "name", "--stdout",
                 "--output-secret", "secret"],
             vec!["pvsecret", "create", "-k", "abc", "--hdr", "abc", "-o", "abc", "--no-verify", "association", "name", "--output-secret", "secret"],
-            #[cfg(target_arch = "s390x")]
             vec!["pvsecret", "list", "--format", "human"],
-            #[cfg(target_arch = "s390x")]
             vec!["pvsecret", "list", "--format", "yaml"],
-            #[cfg(target_arch = "s390x")]
             vec!["pvsecret", "list", "--format", "bin"],
         ];
         // Test for the minimal amount of flags to yield an invalid combination
