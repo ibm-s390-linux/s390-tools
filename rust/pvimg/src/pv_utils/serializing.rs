@@ -98,7 +98,7 @@ pub mod serde_base64 {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        BASE64_STANDARD.decode(&s).map_err(serde::de::Error::custom)
+        BASE64_STANDARD.decode(s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -124,7 +124,7 @@ pub mod serde_base64_array {
     {
         let s = String::deserialize(deserializer)?;
         let decoded = BASE64_STANDARD
-            .decode(&s)
+            .decode(s)
             .map_err(serde::de::Error::custom)?;
         try_copy_slice_to_array(&decoded).map_err(serde::de::Error::custom)
     }
