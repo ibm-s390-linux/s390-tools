@@ -28,7 +28,7 @@ use std::{fmt::Display, fmt::LowerHex, marker::PhantomData, mem::size_of};
 
 use pv::misc::{Flags, Msb0Flags64};
 
-pub trait IntoEnumIterator {
+pub trait IntoEnumIterator: Sized {
     /// Returns an iterator over all variants of this enum.
     fn iter() -> impl Iterator<Item = Self>;
 }
