@@ -11,7 +11,7 @@ PV_TARGETS :=
 CARGO_TEST_TARGETS :=
 
 ifneq (${HAVE_CARGO},0)
-	CARGO_TARGETS :=
+	CARGO_TARGETS := pvebc
 
 	BUILD_TARGETS = $(CARGO_TARGETS)
 	INSTALL_TARGETS := install-rust-tools install-man install-shell-completions

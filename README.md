@@ -30,6 +30,8 @@ Package contents
      Manage secrets for IBM Secure Execution guests
    - pvimg:
      Create and inspect IBM Secure Execution images
+   - pvebc:
+     Verify a secret structure for IBM Secure Execution for Linux.
 
  * dasdfmt:
    Low-level format ECKD DASDs with the classical Linux disk layout or the new
