@@ -35,12 +35,12 @@ pub enum Command {
     /// shred it after verification. Every 'create' will generate a new, random protection key.
     Create(Box<CreateAttOpt>),
 
-    /// Send the attestation request to the Ultravisor.
+    /// Send the attestation request to the Ultravisor (s390x only.)
     ///
     /// Run a measurement of this system through ’/dev/uv’. This device must be accessible and the
     /// attestation Ultravisor facility must be present. The input must be an attestation request
     /// created with ’pvattest create’. Output will contain the original request and the response
-    /// from the Ultravisor.
+    /// from the Ultravisor. Only available on s390x.
     Perform(PerformAttOpt),
 
     /// Verify an attestation response.
@@ -110,27 +110,22 @@ pub enum AttAddFlags {
     FirmwareState,
 }
 
-// all members s390x only
 #[derive(Args, Debug)]
 pub struct PerformAttOpt {
     /// Specify the request to be sent.
-    #[cfg(target_arch = "s390x")]
     #[arg(hide=true, short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub input: Option<String>,
 
     /// Specify the request to be sent.
-    #[cfg(target_arch = "s390x")]
     #[arg(value_name = "IN", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
     pub input_pos: Option<String>,
 
     /// Write the result to FILE.
-    #[cfg(target_arch = "s390x")]
     #[arg(hide=true, short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
     pub output: Option<String>,
 
     /// Write the result to FILE.
     #[arg(value_name = "OUT", value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
-    #[cfg(target_arch = "s390x")]
     pub output_pos: Option<String>,
 
     /// Provide up to 256 bytes of user input

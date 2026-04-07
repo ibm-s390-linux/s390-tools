@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
+#![allow(unused)]
 use anyhow::{anyhow, bail, Error, Result};
 use pv::{assert_size, request::MagicValue, uv::AttestationCmd, uv::ConfigUid};
 use std::{
