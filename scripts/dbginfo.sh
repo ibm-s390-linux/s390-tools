@@ -2,7 +2,7 @@
 #
 # dbginfo.sh - Tool to collect runtime, configuration, and trace information
 #
-# Copyright IBM Corp. 2002, 2025
+# Copyright IBM Corp. 2002, 2026
 #
 # s390-tools is free software; you can redistribute it and/or modify
 # it under the terms of the MIT license. See LICENSE for details.
@@ -14,7 +14,7 @@ export LC_ALL
 
 ########################################
 # Global used variables
-readonly SCRIPTNAME="${0##*/}" # general name of this script
+readonly SCRIPTNAME="${0##*/}" # current name of this script
 readonly FULLPATHSCRIPT="$(readlink -f "${0}")"
 #
 readonly DATETIME="$(date +%Y-%m-%d-%H-%M-%S 2>/dev/null)"
@@ -84,7 +84,7 @@ paramWORKDIR_BASE="/tmp"  # initial default path
 print_version() {
 	cat <<EOF
 ${SCRIPTNAME}: Debug information script version %S390_TOOLS_VERSION%
-Copyright IBM Corp. 2002, 2025
+Copyright IBM Corp. 2002, 2026
 EOF
 }
 
@@ -124,7 +124,7 @@ EOF
 }
 
 ########################################
-# check for oversize logfiles and missing rotation
+# check for oversized logfiles and missing rotation
 logfile_checker() {
 	local counter
 	local logfile
