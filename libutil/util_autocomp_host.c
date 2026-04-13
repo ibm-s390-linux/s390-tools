@@ -177,35 +177,6 @@ static int finish_bash_scriptfile(char *tool_name, int fd, char *func_name)
  * Adds tab completion in bash for a command.
  * Works by generating an autocompletion
  * script file  at '/usr/share/bash-completion/completions'.
- *
- * The full script will be as follows, supposing the tool name is
- * 'example' and it only has the options '--help' and
- * '--version':
- *
- * _example() {
- *
- *      local current_word previous_word options_array
- *
- *      COMPREPLY=()
- *
- *      current_word="${COMP_WORDS[COMP_CWORD]}"
- *
- *      previous_word="${COMP_WORDS[COMP_CWORD-1]}"
- *
- *      options_array="--version --help"
- *
- *      if [[ ${current_word} == -* || ${COMP_CWORD} -eq 1 ]] ; then
- *
- *              COMPREPLY=( $(compgen -W "${options_array}" -- ${current_word} ) )
- *
- *              return 0
- *
- *      fi
- *
- *	}
- *
- *	complete -F _example example
- *
  */
 static void generate_bash_autocomp(struct util_opt *opt_vec, char *tool_name)
 {
@@ -252,22 +223,6 @@ end:
  * Adds tab completion in zsh for a command.
  * Works by generating an autocompletion
  * script file  at '/usr/share/zsh/site-functions'.
- *
- * The full script will be as follows, supposing the tool name is
- * 'example' and it only has the options '--help', -h and
- * '--version' (the descriptions, as well as the flags are
- * taken from a util_opt struct):
- *
- * #compdef example_completion
- *
- * function _example_completion {
- *
- *	_arguments -C \
- *		"-h[Show help information]" \
- *		"--help[Show help but long format]" \
- *		"--version[Show version]"
- * }
- *
  */
 static void generate_zsh_autocomp(struct util_opt *opt_vec, char *tool_name)
 {
