@@ -76,10 +76,8 @@ struct options {
 	unsigned int site_id;
 };
 
-/* Makefile converts lszdev_usage.txt into C file which we include here. */
-static const char *usage_text =
-#include "lszdev_usage.c"
-	;
+/* Makefile converts lszdev_usage.txt into header file which we include here. */
+#include "lszdev_usage.h"
 
 #define OPT_ANONYMOUS_BASE	0x80
 enum {

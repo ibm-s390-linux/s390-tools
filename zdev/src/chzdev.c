@@ -111,10 +111,8 @@ struct options {
 	unsigned int no_module_load:1;
 };
 
-/* Makefile converts chzdev_usage.txt into C file which we include here. */
-static const char *usage_text =
-#include "chzdev_usage.c"
-	;
+/* Makefile converts chzdev_usage.txt into header file which we include here. */
+#include "chzdev_usage.h"
 
 #define OPT_ANONYMOUS_BASE	0x80
 enum {

@@ -86,11 +86,13 @@ endif
 
 CSTR_SED = -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/g' -e 's/$$/\\n"/g'
 
-%_usage.c: %_usage.txt
-	$(SED) $(CSTR_SED) $< >$@
+%_usage.h: %_usage.txt
+	@echo 'static const char *usage_text =' >$@
+	@$(SED) $(CSTR_SED) $< >>$@
+	@echo ';' >>$@
 
-.chzdev.o.d: chzdev_usage.c
-.lszdev.o.d: lszdev_usage.c
+.chzdev.o.d: chzdev_usage.h
+.lszdev.o.d: lszdev_usage.h
 
 libs =	$(rootdir)/libap/libap.a \
 	$(rootdir)/libutil/libutil.a
@@ -113,6 +115,6 @@ ifeq ($(HAVE_DRACUT),1)
 endif
 
 clean:
-	@rm -f *.o chzdev lszdev chzdev_usage.c lszdev_usage.c gmon.out *.gcda *.gcno zdev_id
+	@rm -f *.o chzdev lszdev chzdev_usage.h lszdev_usage.h gmon.out *.gcda *.gcno zdev_id
 
 .PHONY: all install clean
