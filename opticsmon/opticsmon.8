@@ -45,7 +45,7 @@ opticsmon - Monitor optical modules for directly attached PCI based NICs
 Use
 .B opticsmon
 to monitor the health of the optical modules of directly attached PCI based
-NICs. When executed without the \fB--daemon\fR option it will collect optical
+NICs. When executed without the \fB--monitor\fR option it will collect optical
 module data from all available PCI network interface physical functions and
 print a summary in JSON format. Add the \fB--send-report\fR option to report
 this data to the support element.
@@ -55,7 +55,7 @@ this data to the support element.
 .
 .SH OPTIONS
 .SS Operation Options
-.OD daemon "d"
+.OD monitor "m"
 Run continuously and report on link state changes and periodically
 .PP
 .
