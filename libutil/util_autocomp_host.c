@@ -64,7 +64,7 @@ static int init_scriptfile(char *file_path)
 {
 	int fd;
 
-	fd = open(file_path, O_CREAT | O_WRONLY, 0644);
+	fd = open(file_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 	if (fd < 0)
 		return -EIO;
 	return fd;
