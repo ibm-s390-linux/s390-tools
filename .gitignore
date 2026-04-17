@@ -111,9 +111,9 @@ zconf/zcrypt/lszcrypt
 zconf/zcrypt/zcryptctl
 zconf/zcrypt/zcryptstats
 zdev/src/chzdev
-zdev/src/chzdev_usage.c
+zdev/src/chzdev_usage.h
 zdev/src/lszdev
-zdev/src/lszdev_usage.c
+zdev/src/lszdev_usage.h
 zdev/src/zdev_id
 zdsfs/zdsfs
 zdump/.check_dep_fuse
