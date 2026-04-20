@@ -15,7 +15,7 @@ use pv::misc::{create_file, open_file, read_file};
 use serde::Serialize;
 use utils::HexSlice;
 
-use self::firmware::firmware_check;
+use self::firmware::firmware_check_v1;
 use self::host_key::{host_key_check, HostKeyCheck};
 use self::secret_store::{secret_store_check, SecretStoreCheck};
 use crate::additional::AttestationResult;
@@ -120,7 +120,7 @@ pub fn check(opt: &CheckOpt) -> Result<ExitCode> {
     let user_data = user_data_check(opt, &att_res)?.check(&mut issues);
     let secret_store = secret_store_check(opt, &att_res)?.check(&mut issues);
 
-    let firmware_check = firmware_check(opt, &att_res)?;
+    let firmware_check = firmware_check_v1(opt, &att_res)?;
     let valid_firmware = match firmware_check {
         CheckState::None => None,
         CheckState::Data(_) => Some(true),
