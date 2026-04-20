@@ -25,6 +25,8 @@ const CLIENT_ID: &str = "x-client-id: X";
 enum Version {
     #[serde(rename = "1.0")]
     V1,
+    #[serde(rename = "2.0")]
+    V2,
 }
 
 trait Request: Serialize + Debug {
@@ -41,6 +43,23 @@ struct RequestV1_1 {
 
 impl Request for RequestV1_1 {
     type Response = ResponseV1;
+
+    fn new(firmware_hash: &[u8]) -> Self {
+        Self {
+            version: Version::V1,
+            payload: BASE64_STANDARD.encode(firmware_hash),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct RequestV1_2 {
+    version: Version,
+    payload: String,
+}
+
+impl Request for RequestV1_2 {
+    type Response = ResponseV2;
 
     fn new(firmware_hash: &[u8]) -> Self {
         Self {
@@ -75,6 +94,7 @@ trait Response: serde::de::DeserializeOwned + Debug + Display {
     fn verify_api(endp: &str) -> String {
         let ver = match Self::VERSION {
             Version::V1 => "v1",
+            Version::V2 => "v2",
         };
         format!("{endp}/hmrs/firmware/attestation/{ver}/verify",)
     }
@@ -110,6 +130,44 @@ impl Display for ResponseV1 {
         self.reason.as_ref().map_or(Ok(()), |r| {
             write!(f, "\n  Reason: {r}\n  ReferenceId: {}", self.reference_id)
         })
+    }
+}
+
+// allow unused because all fields are provided by the REST API but may be unused by this toolk
+#[allow(unused)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifiedHashV2 {
+    hash: String,
+    signature: String,
+}
+
+#[allow(unused)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResponseV2 {
+    version: Version,
+    valid: bool,
+    reason: String,
+    verified_hashes: Vec<VerifiedHashV2>,
+}
+
+impl Response for ResponseV2 {
+    const VERSION: Version = Version::V2;
+    fn valid(&self) -> bool {
+        self.valid
+    }
+}
+
+impl Display for ResponseV2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "The firmware is {}in a valid state",
+            if self.valid { "" } else { "not " }
+        )?;
+        let json = serde_json::to_string_pretty(self).map_err(|_| std::fmt::Error)?;
+        f.write_str(&json)
     }
 }
 
@@ -209,6 +267,10 @@ pub fn firmware_check_v1(opt: &CheckOpt, att_res: &AttestationResult) -> Result<
     firmware_check::<RequestV1_1>(opt, att_res)
 }
 
+pub fn firmware_check_v2(opt: &CheckOpt, att_res: &AttestationResult) -> Result<CheckState<()>> {
+    firmware_check::<RequestV1_2>(opt, att_res)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -217,6 +279,19 @@ mod test {
     fn serialize_request_v1_1() {
         let payload = BASE64_STANDARD.encode([42u8; 320]);
         let req = RequestV1_1::new(&[42u8; 320]);
+
+        assert!(matches!(req.version, Version::V1));
+        assert_eq!(req.payload, payload);
+
+        let json = serde_json::to_string(&req).unwrap();
+        let expected = format!(r#"{{"version":"1.0","payload":"{payload}"}}"#);
+        assert_eq!(json, expected);
+    }
+
+    #[test]
+    fn serialize_request_v1_2() {
+        let payload = BASE64_STANDARD.encode([42u8; 320]);
+        let req = RequestV1_2::new(&[42u8; 320]);
 
         assert!(matches!(req.version, Version::V1));
         assert_eq!(req.payload, payload);
@@ -262,6 +337,69 @@ mod test {
 
         let display = resp.to_string();
         let expected = "The firmware is in a valid state";
+        assert_eq!(display, expected);
+    }
+
+    #[test]
+    fn parse_response_v2() {
+        let verified_hashes: Vec<_> = (0u8..4)
+            .map(|i| {
+                (
+                    BASE64_STANDARD.encode([42u8 + i; 256]),
+                    BASE64_STANDARD.encode([17u8 + i; 256]),
+                )
+            })
+            .collect();
+
+        let json = format!(
+            r#"{{
+  "version": "2.0",
+  "valid": true,
+  "reason": "string",
+  "verifiedHashes": [
+    {{
+      "hash": "{}",
+      "signature": "{}"
+    }},
+    {{
+      "hash": "{}",
+      "signature": "{}"
+    }},
+    {{
+      "hash": "{}",
+      "signature": "{}"
+    }},
+    {{
+      "hash": "{}",
+      "signature": "{}"
+    }}
+  ]
+}}"#,
+            verified_hashes[0].0,
+            verified_hashes[0].1,
+            verified_hashes[1].0,
+            verified_hashes[1].1,
+            verified_hashes[2].0,
+            verified_hashes[2].1,
+            verified_hashes[3].0,
+            verified_hashes[3].1,
+        );
+
+        let resp: ResponseV2 = serde_json::from_str(&json).unwrap();
+        assert!(resp.valid());
+        assert!(matches!(resp.version, Version::V2));
+        assert_eq!(resp.reason, "string");
+        assert_eq!(resp.verified_hashes.len(), 4);
+
+        for (verified_hash, (hash, signature)) in
+            resp.verified_hashes.iter().zip(verified_hashes.iter())
+        {
+            assert_eq!(&verified_hash.hash, hash);
+            assert_eq!(&verified_hash.signature, signature);
+        }
+
+        let display = resp.to_string();
+        let expected = format!("The firmware is in a valid state\n{json}");
         assert_eq!(display, expected);
     }
 }

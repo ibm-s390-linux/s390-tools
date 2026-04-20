@@ -365,6 +365,16 @@ Check whether the firmware is supported by IBM. Requires internet access.
 </ul>
 
 
+`--firmware-check-version <FIRMWARE_CHECK_VERSION>`
+<ul>
+Specify the firmware verification request version.
+    Default value: '1'
+    Possible values:
+        - **1**: Use firmware verification API request version 1.0.
+        - **2**: Use firmware verification API request version 2.0.
+</ul>
+
+
 `--firmware-verify-url <URL>`
 <ul>
 Specify the endpoint to use for firmware version verification. Use an endpoint

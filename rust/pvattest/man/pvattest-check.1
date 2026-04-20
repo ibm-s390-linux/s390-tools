@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-CHECK" "1" "2026-05-19" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-CHECK" "1" "2026-06-23" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -112,6 +112,20 @@ Required if add\-secret\-requests are specified.
 \-\-firmware
 .RS 4
 Check whether the firmware is supported by IBM. Requires internet access.
+.RE
+.RE
+.PP
+\-\-firmware\-check\-version, \-\-fw\-ver <FIRMWARE_CHECK_VERSION>
+.RS 4
+Specify the firmware verification request version.
+[default: '1']
+
+Possible values:
+.RS 4
+\- \fB1\fP: Use firmware verification API request version 1.0.
+
+\- \fB2\fP: Use firmware verification API request version 2.0.
+
 .RE
 .RE
 .PP

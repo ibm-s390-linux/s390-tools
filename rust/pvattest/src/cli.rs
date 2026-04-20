@@ -216,6 +216,17 @@ pub enum OutputType {
     Yaml,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
+pub enum FirmwareCheckVersion {
+    /// Use firmware check API version 1.0.
+    #[default]
+    #[value(name = "1")]
+    V1,
+    /// Use firmware check API version 2.0.
+    #[value(name = "2")]
+    V2,
+}
+
 #[derive(Args, Debug)]
 pub struct CheckOpt {
     /// Specify the attestation response to check whether the policies are validated.
@@ -302,6 +313,16 @@ pub struct CheckOpt {
     /// Requires internet access.
     #[arg(long)]
     pub firmware: bool,
+
+    /// Specify the firmware verification request version.
+    #[arg(
+        long,
+        visible_alias("fw-ver"),
+        requires("firmware"),
+        value_enum,
+        default_value_t
+    )]
+    pub firmware_check_version: FirmwareCheckVersion,
 
     /// Specify the endpoint to use for firmware version verification.
     ///
