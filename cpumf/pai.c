@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -47,6 +48,8 @@
 #define S390_EVT_PAI_CRYPTO	0x1000
 #define S390_EVT_PAI_NNPA	0x1800
 
+/* SIGINT or SIGTERM signal received */
+static volatile unsigned int sigterm;
 /* Default values for select() timeout: 1 second */
 static unsigned long read_interval = 1000;
 /* Size of mapped perf event ring buffer in 4KB pages.
@@ -350,6 +353,10 @@ static int collect(unsigned long cnt)
 				if (FD_ISSET(i, &r_fds))
 					readmap(i);
 			}
+		} else if (errno == EINTR && sigterm) {
+			/* Interrupt by signal SIGINT/SIGTERM, one more iteration */
+			cnt = 2;
+			rc = 0;
 		}
 	} while (rc != -1 && --cnt > 0);
 	return rc;
@@ -983,6 +990,12 @@ static void setprio(const char *prio)
 		err(EXIT_FAILURE, "Could not set realtime priority");
 }
 
+static void sig_handler(int no)
+{
+	if (no == SIGINT || no == SIGTERM)
+		sigterm = 1;
+}
+
 int main(int argc, char **argv)
 {
 	bool crypto_record = false, report = false;
@@ -1069,6 +1082,10 @@ int main(int argc, char **argv)
 			if (errno || !loop_count || *slash)
 				errx(EXIT_FAILURE, "Invalid argument for runtime");
 		}
+
+		if (signal(SIGTERM, sig_handler) == SIG_ERR ||
+		    signal(SIGINT, sig_handler) == SIG_ERR)
+			errx(EXIT_FAILURE, "Failed to set signal handler");
 
 		ev_install(group);
 		ev_enable();
