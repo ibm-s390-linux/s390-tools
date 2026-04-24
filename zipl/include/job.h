@@ -160,6 +160,8 @@ struct job_data {
 	int command_line;
 	int is_secure;
 	int is_ldipl_dump;
+	int no_compress;
+	int force;
 };
 
 static inline struct target *target_at(struct job_target_data *data,

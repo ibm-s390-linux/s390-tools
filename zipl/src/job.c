@@ -1548,6 +1548,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 		}
 		else
 			job->data.dump.mem = -1LL;
+		job->data.dump.no_compress = job->no_compress;
 		break;
 	case section_mvdump:
 		/* DUMP TO MULTI-VOLUME job */
@@ -1570,6 +1571,7 @@ get_job_from_section_data(char* data[], struct job_data* job, char* section)
 			       		(1024LL * 1024LL));
 		} else
 			job->data.mvdump.mem = -1LL;
+		job->data.mvdump.force = job->force;
 		break;
 	default:
 		/* Should not happen */
@@ -2021,8 +2023,8 @@ job_get(int argc, char* argv[], struct job_data** data)
 	job->noninteractive = cmdline.noninteractive;
 	job->verbose = cmdline.verbose;
 	job->add_files = cmdline.add_files;
-	job->data.dump.no_compress = cmdline.no_compress;
-	job->data.mvdump.force = cmdline.force;
+	job->no_compress = cmdline.no_compress;
+	job->force = cmdline.force;
 	job->dry_run = cmdline.dry_run;
 	job->is_secure =  SECURE_BOOT_UNDEFINED;
 	job->is_ldipl_dump = cmdline.is_ldipl_dump;
