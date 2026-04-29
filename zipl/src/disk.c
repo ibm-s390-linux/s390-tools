@@ -495,7 +495,7 @@ static int run_targetbase_script(struct job_target_data *td,
 
 	misc_asprintf(&ppn_cmd, "%s %d:%d", script_file,
 		      major(stats->st_rdev), minor(stats->st_rdev));
-	printf("Run %s\n", ppn_cmd);
+	pr_debug("Run %s\n", ppn_cmd);
 	fh = popen(ppn_cmd, "r");
 	free(ppn_cmd);
 
