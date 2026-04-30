@@ -17,6 +17,7 @@ List of all individuals having contributed content to s390-tools
 - Bjoern Walk
 - Brian C. Lane
 - Carsten Otte
+- Chinmaya Kajagar
 - Christian Borntraeger
 - Christian Ehrhardt
 - Christof Schmitt

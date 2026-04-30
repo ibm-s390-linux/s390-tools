@@ -1,15 +1,36 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.42.0 (2026-04-30)__
 
-  For Linux kernel version: 6.x
+  For Linux kernel version: 7.0
 
   Add new tools / libraries:
+  - Enable zsh and bash autocompletion for various tools
+  - pvebc: Resolve ASR integrity structure for EBC
+  - pvics: Generate SEL guests from base images
+
+  Remove:
+  - tape390_display and tape390_crypt removed due to long gone hardware support
+  - znetcontrolunits: Remove znetcontrolunits library
 
   Changes of existing tools:
+  - cpumf/pai: Install SIGINT/SIGTERM handler for graceful termination
+  - dbginfo.sh: Add command zmemtopo
+  - libutil/util_fmt: Add support for JSON Lines text format
+  - lstape: Remove 3480 and 3590 tape support
+  - lsznet: Remove support for lcs device type
+  - pvsecret: Add support for ASR integrity structure for EBC
+  - zfcpdbf: Print plogi and prli within open port response as payload
+  - zfcpdbf: Trace all fsf status read buffer fields under HBA
+  - zipl/boot: Add secure boot option to the dump programm
+  - zkey, libekmfweb, libseckey, libkmipclient: Adjust for OpenSSL v4.0.0 API
+                                                changes and deprecations
 
   Bug Fixes:
+  - hyptop/opts: Fix long command line option abbreviations
+  - libutil/util_autocomp: Fix default file completion
+  - zipl/boot: Fix stage3 secure boot trailer placement
 
 * __v2.41.0 (2026-02-16)__
 
