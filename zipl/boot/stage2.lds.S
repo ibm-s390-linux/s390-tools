@@ -82,11 +82,14 @@ SECTIONS
   }
   __stack_end = .;
 
-  /* Sections to be discarded */
-  /DISCARD/ : {
+  .unsupported_input_sections : {
     *(.eh_frame)
     *(.interp)
-    *(.note.GNU-stack)
-    *(.note.package)
+  }
+  ASSERT(SIZEOF(.unsupported_input_sections) == 0, "Unsupported input sections were found.")
+
+  /* Sections to be discarded */
+  /DISCARD/ : {
+    *(.note.*)
   }
 }

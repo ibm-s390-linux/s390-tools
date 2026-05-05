@@ -74,11 +74,14 @@ SECTIONS
 
   	ASSERT(. <= IMAGE_ENTRY, "stage3b size must be smaller than 0x10000 bytes")
 
+	.unsupported_input_sections : {
+	  *(.eh_frame)
+	  *(.interp)
+	}
+	ASSERT(SIZEOF(.unsupported_input_sections) == 0, "Unsupported input sections were found.")
+
 	/* Sections to be discarded */
 	/DISCARD/ : {
-		*(.eh_frame)
-		*(.interp)
-		*(.note.GNU-stack)
-		*(.note.package)
+		*(.note.*)
 	}
 }
