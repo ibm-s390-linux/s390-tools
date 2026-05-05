@@ -27,14 +27,14 @@ static void menu_prompt(int timeout)
 		printf("Please choose:");
 }
 
-static unsigned long menu_read(void)
+static unsigned long menu_read(const volatile struct boot_stage2_params *stage2_params)
 {
 	char *temp_area =  (char *)get_zeroed_page();
 	int timeout, rc, i, count = 0;
 	unsigned long value;
 	char *endptr;
 
-	timeout = stage2_params.timeout;
+	timeout = stage2_params->timeout;
 
 	while (1) {
 		/* print prompt */
@@ -62,7 +62,7 @@ static unsigned long menu_read(void)
 		value = ebcdic_strtoul(temp_area, &endptr, 10);
 
 		if ((endptr != temp_area) && (value < BOOT_MENU_ENTRIES) &&
-		    (stage2_params.config[value] != 0)) {
+		    (stage2_params->config[value] != 0)) {
 			/* valid config found - finish */
 			break;
 		} else {
@@ -81,15 +81,15 @@ out_free_page:
 	return value;
 }
 
-static int menu_list(void)
+static int menu_list(const volatile struct boot_stage2_params *stage2_params)
 {
 	char *name;
 	int i;
 
 	for (i = 0; i < BOOT_MENU_ENTRIES; i++) {
-		if (stage2_params.config[i] == 0)
+		if (stage2_params->config[i] == 0)
 			continue;
-		name = stage2_params.config[i] + ((void *)&stage2_params);
+		name = stage2_params->config[i] + ((void *)stage2_params);
 		printf("%s\n", name);
 		if (i == 0)
 			printf("\n");
@@ -146,7 +146,7 @@ static enum param_result menu_param(unsigned long *value)
 	return NOTHING_FOUND;
 }
 
-int menu(void)
+int menu(const volatile struct boot_stage2_params *stage2_params)
 {
 	enum { DEFAULT_MENU_ENTRY = 0 };
 	unsigned long value = DEFAULT_MENU_ENTRY;
@@ -174,7 +174,7 @@ int menu(void)
 		printf("SCLP_ERROR\n");
 		goto boot;
 	case NOTHING_FOUND:
-		if (stage2_params.flag == 0) {
+		if (stage2_params->flag == 0) {
 			/* menu disabled, boot default */
 			goto boot;
 		}
@@ -186,23 +186,23 @@ int menu(void)
 		goto boot;
 
 	/* print banner */
-	printf("%s\n", ((void *)&stage2_params) + stage2_params.banner);
+	printf("%s\n", (void *)stage2_params + stage2_params->banner);
 
 	/* print config list */
-	menu_list();
+	menu_list(stage2_params);
 
 	if (is_zvm())
 		printf("Note: VM users please use '#cp vi vmsg <input>'\n");
 
-	value = menu_read();
+	value = menu_read(stage2_params);
 
 boot:
 	/* sanity - config entry not valid */
-	if (value >= BOOT_MENU_ENTRIES || stage2_params.config[value] == 0)
+	if (value >= BOOT_MENU_ENTRIES || stage2_params->config[value] == 0)
 		panic(EINTERNAL, "%s", msg_econfig);
 
 	printf("Booting %s\n",
-	       (char *)(stage2_params.config[value] + (void *)&stage2_params + TEXT_OFFSET));
+	       (char *)(stage2_params->config[value] + (void *)stage2_params + TEXT_OFFSET));
 
 	/* append 'BOOT_IMAGE=<num>' to parmline */
 	snprintf(endstring, sizeof(endstring), " BOOT_IMAGE=%u", value);
