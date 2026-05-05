@@ -21,6 +21,7 @@
 static const uint64_t __used __section(.stage2.head) stage2_head;
 
 static const volatile union disk_blockptr __section(.stage2_desc) stage2_desc;
+const volatile struct boot_stage2_params __section(.stage2_params) stage2_params;
 
 static int is_null_descriptor(union disk_blockptr *address)
 {

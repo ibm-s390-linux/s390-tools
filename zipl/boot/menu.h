@@ -26,7 +26,7 @@ struct boot_stage2_params {
 	uint64_t config_kdump;
 } __packed;
 
-extern struct boot_stage2_params __stage2_params;
+extern const volatile struct boot_stage2_params stage2_params;
 
 int menu();
 

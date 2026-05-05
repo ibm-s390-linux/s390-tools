@@ -47,7 +47,8 @@ SECTIONS
   __ex_table_stop = .;
   .rodata : { *(.rodata .rodata.*) }
   .data : { *(.data .data.*) }
-  __stage2_params = .;
+  /* Use NOLOAD because this should not take up any space in the raw binary */
+  .stage2_params (NOLOAD) : { *(.stage2_params) }
 
   . = STAGE2DUMP_TAIL_ADDRESS;
   .stage2dump.tail : { *(.stage2dump.tail) }

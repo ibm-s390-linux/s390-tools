@@ -30,7 +30,7 @@ void kdump_stage2(unsigned long config_nr)
 	unsigned long crash_size;
 	void *crash_base;
 
-	if (!(__stage2_params.config_kdump & (0x1 << config_nr)))
+	if (!(stage2_params.config_kdump & (0x1 << config_nr)))
 		return;
 	kdump_os_info_check(os_info);
 
