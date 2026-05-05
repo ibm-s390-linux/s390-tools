@@ -16,7 +16,7 @@ use crate::additional::AttestationResult;
 use crate::cli::CheckOpt;
 
 const CHECK_DEFAULT_ENDP: &str = "https://esupport.ibm.com/eccedge/ent/z";
-const TIMEOUT_MAX: Duration = Duration::from_secs(3);
+const TIMEOUT_MAX: Duration = Duration::from_secs(120);
 const USER_AGENT: &str = "s390-tools-pvattest";
 const CONTENT_TYPE: &str = "Content-Type: application/json";
 const CLIENT_ID: &str = "x-client-id: X";
