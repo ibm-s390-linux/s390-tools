@@ -116,7 +116,7 @@ void __noreturn start(void)
 	set_device(subchannel_id, ENABLED);
 
 	load_page = (void *)get_zeroed_page();
-	load_address = (union disk_blockptr *) load_page;
+	load_address = load_page;
 
 	/* load blockpointer list to load address */
 	load_direct(&stage2_desc_copy, subchannel_id, load_address);
