@@ -33,6 +33,7 @@ SECTIONS
   .stage2_desc (NOLOAD) : {
     *(.stage2_desc)
   }
+  ASSERT(SIZEOF(.stage2_desc) == 16 || SIZEOF(.stage2_desc) == 0, "Invalid .stage2_desc size")
 
   . = STAGE2_LOAD_ADDRESS;
   __stage2_head = .;
