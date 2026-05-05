@@ -17,7 +17,7 @@ Create an attestation measurement request
 
 - **perform**
 <ul>
-Send the attestation request to the Ultravisor
+Send the attestation request to the Ultravisor (s390x only.)
 </ul>
 
 - **verify**
@@ -150,11 +150,11 @@ Print help (see a summary with '-h').
 ### Synopsis
 `pvattest perform [OPTIONS] [IN] [OUT]`
 ### Description
-Send the attestation request to the Ultravisor. Run a measurement of this system
-through ’/dev/uv’. This device must be accessible and the attestation
-Ultravisor facility must be present. The input must be an attestation request
-created with ’pvattest create’. Output will contain the original request and
-the response from the Ultravisor.
+Send the attestation request to the Ultravisor (s390x only.) Run a measurement
+of this system through ’/dev/uv’. This device must be accessible and the
+attestation Ultravisor facility must be present. The input must be an
+attestation request created with ’pvattest create’. Output will contain the
+original request and the response from the Ultravisor. Only available on s390x.
 ### Arguments
 
 `<IN>`
@@ -170,6 +170,18 @@ Write the result to FILE.
 
 
 ### Options
+
+`-i`, `--input <FILE>`
+<ul>
+Specify the request to be sent.
+</ul>
+
+
+`-o`, `--output <FILE>`
+<ul>
+Write the result to FILE.
+</ul>
+
 
 `-u`, `--user-data <File>`
 <ul>
@@ -256,7 +268,7 @@ Print help (see a summary with '-h').
 
 ## pvattest check
 ### Synopsis
-`pvattest check [OPTIONS] <IN> <OUT>`
+`pvattest check [OPTIONS] [IN] [OUT]`
 ### Description
 Check if the attestation result matches defined policies. After the attestation
 verification, check whether the attestation result complies with user-defined
@@ -276,6 +288,18 @@ Specify the output file for the check result.
 
 
 ### Options
+
+`-i`, `--input <FILE>`
+<ul>
+Specify the attestation response to check whether the policies are validated.
+</ul>
+
+
+`-o`, `--output <FILE>`
+<ul>
+Specify the output file for the check result.
+</ul>
+
 
 `--format <FORMAT>`
 <ul>

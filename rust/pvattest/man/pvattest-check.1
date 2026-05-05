@@ -3,7 +3,7 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-CHECK" "1" "2025-03-12" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-CHECK" "1" "2026-05-19" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
@@ -11,7 +11,7 @@ pvattest-check \- Check if the attestation result matches defined policies
 .SH SYNOPSIS
 .nf
 .fam C
-pvattest check [OPTIONS] <IN> <OUT>
+pvattest check [OPTIONS] [IN] [OUT]
 .fam C
 .fi
 .SH DESCRIPTION
@@ -31,6 +31,18 @@ Specify the output file for the check result.
 .RE
 .RE
 
+.PP
+\-i, \-\-input <FILE>
+.RS 4
+Specify the attestation response to check whether the policies are validated.
+.RE
+.RE
+.PP
+\-o, \-\-output <FILE>
+.RS 4
+Specify the output file for the check result.
+.RE
+.RE
 .PP
 \-\-format <FORMAT>
 .RS 4

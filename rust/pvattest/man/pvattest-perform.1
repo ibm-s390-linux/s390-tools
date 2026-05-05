@@ -3,11 +3,11 @@
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-PERFORM" "1" "2025-03-12" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-PERFORM" "1" "2026-05-19" "s390-tools" "Attestation Manual"
 .nh
 .ad l
 .SH NAME
-pvattest-perform \- Send the attestation request to the Ultravisor
+pvattest-perform \- Send the attestation request to the Ultravisor (s390x only.)
 .SH SYNOPSIS
 .nf
 .fam C
@@ -18,7 +18,8 @@ pvattest perform [OPTIONS] [IN] [OUT]
 Run a measurement of this system through ’/dev/uv’. This device must be
 accessible and the attestation Ultravisor facility must be present. The input
 must be an attestation request created with ’pvattest create’. Output will
-contain the original request and the response from the Ultravisor.
+contain the original request and the response from the Ultravisor. Only
+available on s390x.
 .SH OPTIONS
 .PP
 <IN>
@@ -33,6 +34,18 @@ Write the result to FILE.
 .RE
 .RE
 
+.PP
+\-i, \-\-input <FILE>
+.RS 4
+Specify the request to be sent.
+.RE
+.RE
+.PP
+\-o, \-\-output <FILE>
+.RS 4
+Write the result to FILE.
+.RE
+.RE
 .PP
 \-u, \-\-user\-data <File>
 .RS 4
