@@ -109,7 +109,8 @@ void __noreturn start(void)
 
 	/* print menu and get configuration number */
 	config_nr = menu();
-	kdump_stage2(config_nr);
+	if (stage2_params.config_kdump & (0x1 << config_nr))
+		kdump_stage2();
 
 	io_irq_enable();
 	set_device(subchannel_id, ENABLED);

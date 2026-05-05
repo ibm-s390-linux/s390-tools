@@ -11,27 +11,19 @@
 
 #include "kdump.h"
 #include "libc.h"
-#include "menu.h"
 #include "stage2.h"
-#include "boot/error.h"
 #include "boot/os_info.h"
 
 /*
  * Copy crashkernel memory from [0, crash size] to
- * [crash base, crash base + crash size] if config_nr specifies a
- * kdump boot menu entry.
- *
- * Parameter:
- *   Config number (starts with 1)
+ * [crash base, crash base + crash size].
  */
-void kdump_stage2(unsigned long config_nr)
+void kdump_stage2(void)
 {
 	const struct os_info *os_info = (struct os_info *)S390_lowcore.os_info;
 	unsigned long crash_size;
 	void *crash_base;
 
-	if (!(stage2_params.config_kdump & (0x1 << config_nr)))
-		return;
 	kdump_os_info_check(os_info);
 
 	/* Copy crashkernel memory */

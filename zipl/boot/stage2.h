@@ -30,7 +30,7 @@ void *load_direct(union disk_blockptr *data, struct subchannel_id sid,
 		  void *load_addr);
 int extract_length(void *);
 int is_zero_block(void *);
-void kdump_stage2(unsigned long);
+void kdump_stage2(void);
 
 #endif /* __ASSEMBLER__ */
 
