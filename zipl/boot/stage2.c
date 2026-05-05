@@ -15,10 +15,12 @@
 #include "menu.h"
 #include "boot/error.h"
 #include "boot/s390.h"
-#include "boot/loaders_layout.h"
+#include "boot/boot_defs.h"
 #include "stage2.h"
 
 static const uint64_t __used __section(.stage2.head) stage2_head;
+
+static const volatile union disk_blockptr __section(.stage2_desc) stage2_desc;
 
 static int is_null_descriptor(union disk_blockptr *address)
 {
@@ -87,17 +89,22 @@ static __noreturn void execute(uint64_t psw)
 
 void __noreturn start(void)
 {
-	struct stage2_descr stage2_descr;
+	union disk_blockptr __aligned(8) stage2_desc_copy;
 	struct subchannel_id subchannel_id;
+	union disk_blockptr *blockptr;
 	void *load_address;
 	struct component_entry *entry;
-	union disk_blockptr *blockptr;
 	uint64_t load_psw;
 	void *load_page;
 	int config_nr;
 
+	/* Create a copy of 'stage2_desc' (located at '[0x78, 0x78+16)') before
+	 * invoking `menu(...)`, as the function modifies memory at '[0x86,
+	 * 0x86+2)' by setting 'lowcore.ext_int_code', potentially corrupting
+	 * the original data.
+	 */
+	stage2_desc_copy = stage2_desc;
 	subchannel_id = S390_lowcore.tpi_info.schid;
-	stage2_descr = *(struct stage2_descr*)STAGE2_DESC;
 
 	/* print menu and get configuration number */
 	config_nr = menu();
@@ -110,8 +117,7 @@ void __noreturn start(void)
 	load_address = (union disk_blockptr *) load_page;
 
 	/* load blockpointer list to load address */
-	load_direct((union disk_blockptr *)&stage2_descr, subchannel_id,
-		    load_address);
+	load_direct(&stage2_desc_copy, subchannel_id, load_address);
 
 	blockptr = (union disk_blockptr *)(load_address +
 					   sizeof(union disk_blockptr));

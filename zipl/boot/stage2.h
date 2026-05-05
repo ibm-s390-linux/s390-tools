@@ -26,10 +26,6 @@
 #include "boot/s390.h"
 #include "cio.h"
 
-struct stage2_descr {
-	uint8_t reserved[16];
-} __packed __aligned(8);
-
 void *load_direct(union disk_blockptr *data, struct subchannel_id sid,
 		  void *load_addr);
 int extract_length(void *);

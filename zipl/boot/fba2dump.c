@@ -26,6 +26,8 @@
  */
 static const uint64_t __used __section(.stage2.head) magic = 0x5844464241363401ULL; /* XDFBA64, version 1 */
 
+static const volatile struct fba_dump_param __section(.stage2_desc) stage2_desc;
+
 /*
  * FBA dump device partition specification
  */
@@ -96,10 +98,8 @@ static inline unsigned long b2m(unsigned long blk)
  */
 void dt_device_parm_setup(void)
 {
-	struct fba_dump_param *param = (void *) __stage2_desc;
-
-	device.blk_start = param->blk_start;
-	device.blk_end = param->blk_end;
+	device.blk_start = stage2_desc.blk_start;
+	device.blk_end = stage2_desc.blk_end;
 }
 
 /*

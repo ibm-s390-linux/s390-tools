@@ -27,7 +27,12 @@
 SECTIONS
 {
   . = STAGE2_DESC;
-  __stage2_desc = .;
+  /* Use NOLOAD to ensure this section does not occupy space in the raw binary.
+   * Special care is required here because the section overlaps with the lowcore.
+   */
+  .stage2_desc (NOLOAD) : {
+    *(.stage2_desc)
+  }
 
   . = STAGE2_LOAD_ADDRESS;
   __stage2_head = .;

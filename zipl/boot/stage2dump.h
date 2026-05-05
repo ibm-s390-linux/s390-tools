@@ -26,7 +26,6 @@ extern struct stage2dump_parm_tail __section(.stage2dump.tail) parm_tail;
  * Linker script defined symbols
  */
 extern char __eckd2mvdump_parm_start[];
-extern char __stage2_desc[];
 
 /*
  * Dump common globals

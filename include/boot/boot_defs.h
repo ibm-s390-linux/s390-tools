@@ -201,6 +201,7 @@ union disk_blockptr {
 	struct eckd_blockptr eckd;
 	struct linear_blockptr linear;
 };
+STATIC_ASSERT(sizeof(union disk_blockptr) == 16);
 
 struct boot_info_bp_ipl {
 	union disk_blockptr bm_ptr;

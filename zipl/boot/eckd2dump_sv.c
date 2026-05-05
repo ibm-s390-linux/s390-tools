@@ -23,18 +23,18 @@
  */
 static const uint64_t __used __section(.stage2.head) magic = 0x5845434b44363402ULL; /* "XECKD64", version 2 */
 
+static const volatile struct eckd_dump_param __section(.stage2_desc) stage2_desc;
+
 /*
  * Get device characteristics from zipl parameter block
  */
 void dt_device_parm_setup(void)
 {
-	struct eckd_dump_param *parm = (void *) __stage2_desc;
-
-	device.blk_start = parm->blk_start;
-	device.blk_end = parm->blk_end;
-	device.blk_size = parm->blk_size;
-	device.num_heads = parm->num_heads;
-	device.bpt = parm->bpt;
+	device.blk_start = stage2_desc.blk_start;
+	device.blk_end = stage2_desc.blk_end;
+	device.blk_size = stage2_desc.blk_size;
+	device.num_heads = stage2_desc.num_heads;
+	device.bpt = stage2_desc.bpt;
 	device.sid = IPL_SC;
 }
 
