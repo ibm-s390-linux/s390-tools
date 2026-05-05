@@ -23,11 +23,6 @@
 extern struct stage2dump_parm_tail __section(.stage2dump.tail) parm_tail;
 
 /*
- * Linker script defined symbols
- */
-extern char __eckd2mvdump_parm_start[];
-
-/*
  * Dump common globals
  */
 extern struct df_s390_hdr *dump_hdr;
