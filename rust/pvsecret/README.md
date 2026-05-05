@@ -253,6 +253,28 @@ Optional. No user-data by default.
 </ul>
 
 
+`--policy <FILE>`
+<ul>
+Links an Add‑Secret-Request (ASR) to a policy file. This option embeds a
+PolicyReference in the ASR user data field. The PolicyReference includes the
+relative file path and the SHA‑512 hash of the policy file, allowing the
+policy’s integrity to be verified.
+
+This option conflicts with --user-data, because both options use the same user
+data field in the ASR structure.
+</ul>
+
+
+`--toc-policy <FILE>`
+<ul>
+Adds the AES‑GCM authentication tag to a TOC policy file. This option appends
+the AES‑GCM authentication tag to the specified TOC policy file. This allows
+the TOC policy to maintain a list of all ASR MAC tags for completeness
+verification during boot. During verification, the TOC checks the MAC tags
+against this list to ensure that all expected ASRs are present and unmodified.
+</ul>
+
+
 `--user-sign-key <FILE>`
 <ul>
 Use the content of FILE as user signing key. Adds a signature calculated from
@@ -407,7 +429,7 @@ Print help (see a summary with '-h').
 
 ## pvsecret add
 ### Synopsis
-`pvsecret add [OPTIONS] <FILE>`
+`pvsecret add [OPTIONS] [FILE]`
 ### Description
 Submit an add-secret request to the Ultravisor (s390x only). Perform an
 add-secret request using a previously generated add-secret request. Only
@@ -421,6 +443,12 @@ Specify the request to be sent.
 
 
 ### Options
+
+`-i`, `--input <FILE>`
+<ul>
+Specify the request to be sent.
+</ul>
+
 
 `-f`, `--force`
 <ul>
@@ -461,6 +489,12 @@ Store the result in FILE.
 
 ### Options
 
+`-o`, `--output <FILE>`
+<ul>
+Store the result in FILE.
+</ul>
+
+
 `--format <FORMAT>`
 <ul>
 Define the output format of the list.
@@ -480,7 +514,7 @@ Print help (see a summary with '-h').
 
 ## pvsecret verify
 ### Synopsis
-`pvsecret verify [OPTIONS] <FILE>`
+`pvsecret verify [OPTIONS] [FILE] [FILE]`
 ### Description
 Verifies that the given request is an Add-Secret request by testing for some
 values to be present. If the request contains signed user-data, the signature
@@ -526,7 +560,21 @@ Specify the request to be checked.
 </ul>
 
 
+`<FILE>`
+<ul>
+Store the result in FILE If the request contained abirtary user-data the output
+contains this user-data with padded zeros if available.
+    Default value: '-'
+</ul>
+
+
 ### Options
+
+`-i`, `--input <FILE>`
+<ul>
+Specify the request to be checked.
+</ul>
+
 
 `--user-cert <FILE>`
 <ul>
@@ -544,7 +592,6 @@ curve over a 521 bit prime field (secp521r1).
 <ul>
 Store the result in FILE If the request contained abirtary user-data the output
 contains this user-data with padded zeros if available.
-    Default value: '-'
 </ul>
 
 
@@ -556,8 +603,8 @@ Print help (see a summary with '-h').
 
 ## pvsecret retrieve
 ### Synopsis
-`pvsecret retrieve [OPTIONS] <ID>`
-`pvsecret retr [OPTIONS] <ID>`
+`pvsecret retrieve [OPTIONS] [ID] [FILE]`
+`pvsecret retr [OPTIONS] [ID] [FILE]`
 ### Description
 Retrieve a secret from the UV secret store (s390x only)
 ### Arguments
@@ -574,12 +621,30 @@ retrieved.
 </ul>
 
 
+`<FILE>`
+<ul>
+Specify the output path to place the secret value.
+    Default value: '-'
+</ul>
+
+
 ### Options
+
+`-i`, `--input <FILE>`
+<ul>
+Specify the secret ID to be retrieved. Input type depends on '--inform'. If
+`yaml` (default) is specified, it must be a yaml created by the create
+subcommand of this tool. If `hex` is specified, it must be a 32 byte handle
+encodes in hexadecimal. Leading zeros are required. If there are multiple
+secrets in the store with the same Id there are no guarantees on which specific
+secret is retrieved. Use --inform=idx to make sure a specific secret is
+retrieved.
+</ul>
+
 
 `-o`, `--output <FILE>`
 <ul>
 Specify the output path to place the secret value.
-    Default value: '-'
 </ul>
 
 
