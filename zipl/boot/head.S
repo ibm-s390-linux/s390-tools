@@ -10,6 +10,7 @@
  */
 
 #include "boot/sigp.h"
+#include "boot/s390.h"
 
 .section .text.start
 .globl _start
@@ -26,7 +27,7 @@ _start:
 	basr	%r13,0
 1:	llgf	%r15,.Lstack-1b(%r13)		/* End of stack */
 	brasl	%r14,initialize
-.Lstack: .long  0x10000-160
+.Lstack: .long  __stack_end - STACK_FRAME_OVERHEAD
 .previous
 
 /* The code doesn't require an executable stack */

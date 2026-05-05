@@ -21,7 +21,7 @@
 
 #define LOWCORE_SIZE		_AC(0x2000, UL)
 
-/* Minimum size of a stack frame in bytes */
+/* Minimum size of a stack frame in bytes (= sizeof(struct stack_frame)) */
 #define STACK_FRAME_OVERHEAD	_AC(160, U)
 
 /* Facilities */

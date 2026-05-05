@@ -27,7 +27,7 @@ _start:
 	basr	%r13, 0
 .Lbase:	llgf	%r15, .Lstack - .Lbase(%r13)
 	brasl	%r14, initialize
-.Lstack: .long STACK_ADDRESS + STACK_SIZE - STACK_FRAME_OVERHEAD
+.Lstack: .long __stack_end - STACK_FRAME_OVERHEAD
 .previous
 
 /* The code doesn't require an executable stack */
