@@ -90,11 +90,11 @@ pub enum Error {
     #[error("Input does not contain an attestation request")]
     NoArcb,
 
-    #[error("The attestation request has an unknown version (.0)")]
+    #[error("The attestation request has an unknown version {0}")]
     BinArcbInvVersion(u32),
 
     #[error(
-        "The attestation request encrypted sice is to0 small (.0). Request probably tampered with."
+        "The attestation request encrypted sice is to0 small {0}. Request probably tampered with."
     )]
     BinArcbSeaSmall(u32),
 
