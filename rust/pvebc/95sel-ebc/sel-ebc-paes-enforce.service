@@ -20,8 +20,8 @@ FailureAction=poweroff-immediate
 RemainAfterExit=yes
 
 # logs do not leek any sensitive information
-StandardOutput=file:/boot/sics/log
-StandardError=file:/boot/sics/log
+StandardOutput=console
+StandardError=console
 
 [Install]
 RequiredBy=sel-ebc.target
