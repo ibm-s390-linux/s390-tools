@@ -48,16 +48,23 @@ fi
 pvebc --toc "$EBC_TMPFS/$TOC"
 rc=$?
 if [[ $rc -ne 0 ]]; then
+	echo "pvebc failed with rc=${rc}"
 	exit $rc
 fi
 
 # Retrieve and check for dummy LUKS passphrase
 pvsecret retrieve --inform name -o "$EBC_TMPFS/$ASR_NAME" --outform bin "$ASR_NAME"
+rc=$?
+if [[ $rc -ne 0 ]]; then
+	echo "pvsecret failed with rc=${rc}"
+	exit $rc
+fi
 
 if [[ ! -f "$EBC_TMPFS/$ASR_NAME" ]]; then
 	echo "$EBC_TMPFS/$ASR_NAME does not exist"
+	exit 1
 fi
 
 chmod 400 "$EBC_TMPFS/$ASR_NAME"
 
-exit 0
+exit $?
