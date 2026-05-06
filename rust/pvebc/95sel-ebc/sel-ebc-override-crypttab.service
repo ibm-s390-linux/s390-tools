@@ -4,10 +4,8 @@ Description=Override crypttab
 # boot partition contains SICS
 # Loading of kernel modules is required which are needed for protected keys
 Requires=systemd-modules-load.service
-Requires=boot.mount
 
 # Ensure this runs before the handoff to the real root, if that's required:
-After=boot.mount
 After=systemd-modules-load.service
 Before=cryptsetup-pre.target
 Before=cryptsetup.target

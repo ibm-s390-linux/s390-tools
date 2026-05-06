@@ -43,8 +43,8 @@ install() {
 		"$systemdsystemunitdir/sel-ebc-paes-enforce.service"
 	inst_simple "$moddir/sel-ebc-override-crypttab.service" \
 		"$systemdsystemunitdir/sel-ebc-override-crypttab.service"
-	inst_simple "$moddir/boot.mount" \
-		"$systemdsystemunitdir/boot.mount"
+	inst_simple "$moddir/sel-ebc-boot-mount.service" \
+		"$systemdsystemunitdir/sel-ebc-boot-mount.service"
 
 	# already exisitng unit we depend on for kernel modules
 	inst_simple /usr/lib/systemd/system/systemd-modules-load.service \
@@ -57,6 +57,10 @@ install() {
 	# override crypttab
 	inst_simple "$moddir/override-crypttab.sh" \
 		"/etc/sel-ebc/override-crypttab.sh"
+
+	# mount boot partition to /boot
+	inst_simple "$moddir/boot-mount.sh" \
+		"/etc/sel-ebc/boot-mount.sh"
 
 	# install kernel module dependencies
 	inst_simple "$moddir/sel-ebc-modules.conf" \
@@ -76,5 +80,5 @@ install() {
 	systemctl --root "$initdir" --no-reload --quiet enable sel-ebc-override-crypttab.service
 	systemctl --root "$initdir" --no-reload --quiet enable sel-ebc-paes-enforce.service
 	systemctl --root "$initdir" --no-reload --quiet enable systemd-modules-load.service
-	systemctl --root "$initdir" --no-reload --quiet enable boot.mount
+	systemctl --root "$initdir" --no-reload --quiet enable sel-ebc-boot-mount.service
 }

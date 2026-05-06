@@ -15,6 +15,11 @@ cp "${IBM_RSRC_DIR}/crypttab" "/etc/crypttab"
 
 systemctl daemon-reload
 
-systemctl restart systemd-cryptsetup@cryptroot_mapper.service
+udevadm trigger --subsystem-match=block --settle
+
+if ! systemctl restart systemd-cryptsetup@cryptroot_mapper.service; then
+        systemctl status systemd-cryptsetup@cryptroot_mapper.service
+        exit 1
+fi
 
 exit 0

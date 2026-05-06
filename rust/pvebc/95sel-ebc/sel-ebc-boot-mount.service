@@ -1,0 +1,21 @@
+[Unit]
+Description=Mount a partition identified by label boot to /boot
+
+# Ensure this runs before the handoff to the real root, if that's required:
+Before=sel-ebc-pvebc.service
+
+# Initramfs requirement
+DefaultDependencies=no
+# Make absolutely sure this only runs in initramfs
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=rd.sel-ebc
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /etc/sel-ebc/boot-mount.sh
+RemainAfterExit=yes
+# On failure immediately abort boot
+FailureAction=poweroff-immediate
+
+[Install]
+RequiredBy=sel-ebc-pvebc.service

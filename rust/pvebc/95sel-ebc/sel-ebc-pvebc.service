@@ -4,14 +4,14 @@ Description=Run pvebc during early boot to process SICS
 # boot partition contains SICS
 # Loading of kernel modules is required which are needed for protected keys
 Requires=systemd-modules-load.service
-Wants=boot.mount
+Requires=sel-ebc-boot-mount.service
 
 # Ensure this runs before the handoff to the real root, if that's required:
 Before=initrd-root-device.target
 Before=cryptsetup-pre.target
 Before=cryptsetup.target
-After=boot.mount
 After=systemd-modules-load.service
+After=sel-ebc-boot-mount.service
 
 # Initramfs requirement
 DefaultDependencies=no
