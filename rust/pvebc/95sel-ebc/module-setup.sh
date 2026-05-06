@@ -23,11 +23,11 @@ depends() {
 # Called by dracut
 installkernel() {
 	# kernel modules needed for opening an encrypted rfs
-	instmods -c uvdevice
-	instmods -c paes_s390
-	instmods -c pkey_uv
-	instmods -c pkey_pckmo
-	instmods -c pkey
+	hostonly='' instmods -c uvdevice
+	hostonly='' instmods -c paes_s390
+	hostonly='' instmods -c pkey_uv
+	hostonly='' instmods -c pkey_pckmo
+	hostonly='' instmods -c pkey
 }
 
 # Called by dracut
@@ -57,6 +57,10 @@ install() {
 	# override crypttab
 	inst_simple "$moddir/override-crypttab.sh" \
 		"/etc/sel-ebc/override-crypttab.sh"
+
+	# install kernel module dependencies
+	inst_simple "$moddir/sel-ebc-modules.conf" \
+		"/usr/lib/modules-load.d/sel-ebc-modules.conf"
 
 	# copy main application
 	inst_binary "/usr/bin/pvebc"
