@@ -34,6 +34,21 @@ All operations preserve the original base image. Logs are written to a
 temporary file, with the filename logged as the first message during runtime.
 Temporary artifacts are automatically cleaned up on completion or failure.
 
+.SH Base Image Prerequisites
+The following prerequisites have to be fulfilled by the base image:
+.IP \(bu 2
+label of boot partition set to boot
+.IP \(bu 2
+label of root partition set to root
+.IP \(bu 2
+guest is to be backed by a qcow2 image
+.IP \(bu 2
+an initramfs containing the dracut module 95sel-ebc which is part of s390-tools
+.IP \(bu 2
+a boot loader specifying that initramfs and a kernel parameter line on which root is specified by label
+.IP \(bu 2
+any line starting with default= should be removed from /etc/zipl.conf
+
 .SH ACTIONS
 .TP
 .B list
