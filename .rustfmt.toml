@@ -1,13 +1,12 @@
 edition = "2021"
 newline_style = "Unix"
 
-# Unstable options that help catching some mistakes in formatting and that we may want to enable
-# when they become stable.
-#
-# They are kept here since they are useful to run from time to time.
-#comment_width = 100
-#format_code_in_doc_comments = true
-#group_imports = "StdExternalCrate"
-#normalize_comments = true
+# Unstable options that help catching some mistakes in formatting
+group_imports = "StdExternalCrate"
+imports_granularity = "Module"
+use_field_init_shorthand = true
+comment_width = 100
+format_code_in_doc_comments = true
+normalize_comments = true
+wrap_comments = true
 #reorder_impl_items = true
-#wrap_comments = true
