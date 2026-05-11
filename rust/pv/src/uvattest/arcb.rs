@@ -2,27 +2,20 @@
 //
 // Copyright IBM Corp. 2024
 
-use openssl::pkey::{PKey, Public};
 use std::mem::size_of;
+
+use openssl::pkey::{PKey, Public};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32};
 
-use crate::{
-    assert_size,
-    attest::{AttestationMagic, AttestationMeasAlg},
-    crypto::random_array,
-    misc::Flags,
-    req::{Aad, BinReqValues, Keyslot, ReqEncrCtx},
-    request::{Confidential, MagicValue, Request, RequestVersion, SymKey, Zeroize},
-    static_assert,
-    uv::UvFlags,
-    Error, Result,
-};
-
-use super::{
-    additional::{FW_STATE_SIZE, PHKH_SIZE, SECRET_STORE_HASH_SIZE},
-    AttNonce,
-};
-
+use super::additional::{FW_STATE_SIZE, PHKH_SIZE, SECRET_STORE_HASH_SIZE};
+use super::AttNonce;
+use crate::attest::{AttestationMagic, AttestationMeasAlg};
+use crate::crypto::random_array;
+use crate::misc::Flags;
+use crate::req::{Aad, BinReqValues, Keyslot, ReqEncrCtx};
+use crate::request::{Confidential, MagicValue, Request, RequestVersion, SymKey, Zeroize};
+use crate::uv::UvFlags;
+use crate::{assert_size, static_assert, Error, Result};
 #[cfg(doc)]
 use crate::{
     request::SymKeyType,
@@ -419,8 +412,9 @@ impl Zeroize for ReqConfData {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    use crate::{get_test_asset, request::SymKey, test_utils::get_test_keys};
+    use crate::get_test_asset;
+    use crate::request::SymKey;
+    use crate::test_utils::get_test_keys;
 
     const ARPK: [u8; 32] = [0x17; 32];
     const NONCE: [u8; 16] = [0xab; 16];

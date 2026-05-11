@@ -2,22 +2,22 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::openssl_extensions::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
 use core::slice;
+use std::path::Path;
+
+#[cfg(not(test))]
+use helper::download_first_crl_from_x509;
 use log::{debug, trace};
 use openssl::error::ErrorStack;
 use openssl::stack::Stack;
 use openssl::x509::store::X509Store;
 use openssl::x509::{CrlStatus, X509NameRef, X509Ref, X509StoreContext, X509StoreContextRef, X509};
-use std::path::Path;
-
-#[cfg(not(test))]
-use helper::download_first_crl_from_x509;
 #[cfg(test)]
 use test::download_first_crl_from_x509;
 
 use crate::error::bail_hkd_verify;
 use crate::misc::{read_certs, read_file};
+use crate::openssl_extensions::{StackableX509Crl, X509StoreContextExtension, X509StoreExtension};
 use crate::Result;
 
 mod helper;
@@ -167,7 +167,8 @@ impl CertVerifier {
     /// * `cert_paths` - Paths to certificates for the chain of trust
     /// * `crl_paths` - Paths to certificate revocation lists for the chain of trust
     /// * `root_ca_path` - Path to the root of trust
-    /// * `offline` - if set to true the verification process will not try to download CRLs from the internet.
+    /// * `offline` - if set to true the verification process will not try to download CRLs from the
+    ///   internet.
     ///
     /// # Errors
     ///

@@ -2,22 +2,20 @@
 //
 // Copyright IBM Corp. 2024
 
+use std::process::ExitCode;
+
 use anyhow::Result;
 use log::{debug, warn};
-use pv::{
-    attest::{AttestationItems, AttestationMeasurement, AttestationRequest},
-    misc::{create_file, open_file, read_exact_file, write_file},
-    request::{openssl::pkey::PKey, BootHdrTags, Confidential, SymKey},
-};
-use std::process::ExitCode;
+use pv::attest::{AttestationItems, AttestationMeasurement, AttestationRequest};
+use pv::misc::{create_file, open_file, read_exact_file, write_file};
+use pv::request::openssl::pkey::PKey;
+use pv::request::{BootHdrTags, Confidential, SymKey};
 use utils::HexSlice;
 
-use crate::{
-    additional::AttestationResult,
-    cli::{OutputType, VerifyOpt},
-    exchange::ExchangeFormatResponse,
-    EXIT_CODE_ATTESTATION_FAIL,
-};
+use crate::additional::AttestationResult;
+use crate::cli::{OutputType, VerifyOpt};
+use crate::exchange::ExchangeFormatResponse;
+use crate::EXIT_CODE_ATTESTATION_FAIL;
 
 pub fn verify(opt: &VerifyOpt) -> Result<ExitCode> {
     let mut input = open_file(&opt.input)?;

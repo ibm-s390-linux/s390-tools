@@ -5,14 +5,12 @@
 //! AP support functions
 //
 
-use crate::{
-    utils::{pv_guest_bit_set, read_file_string, write_file},
-    Error, Result,
-};
+use std::{fmt, thread, time};
+
 use regex::Regex;
-use std::fmt;
-use std::thread;
-use std::time;
+
+use crate::utils::{pv_guest_bit_set, read_file_string, write_file};
+use crate::{Error, Result};
 
 const PATH_SYS_DEVICES_AP: &str = "/sys/devices/ap";
 

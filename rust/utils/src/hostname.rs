@@ -2,7 +2,8 @@
 //
 // Copyright IBM Corp. 2026
 
-use std::{ffi::CStr, io};
+use std::ffi::CStr;
+use std::io;
 
 /// Returns the maximum hostname length supported by the system.
 ///
@@ -12,7 +13,8 @@ use std::{ffi::CStr, io};
 fn max_hostname_len() -> usize {
     const _POSIX_HOST_NAME_MAX: usize = 255;
 
-    // SAFETY: sysconf is safe to call with _SC_HOST_NAME_MAX and only reads system configuration without side effects.
+    // SAFETY: sysconf is safe to call with _SC_HOST_NAME_MAX and only reads system configuration
+    // without side effects.
     let n = unsafe { libc::sysconf(libc::_SC_HOST_NAME_MAX) };
     if n < 0 {
         _POSIX_HOST_NAME_MAX

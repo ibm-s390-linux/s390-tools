@@ -6,14 +6,10 @@ use std::io::Write;
 
 use anyhow::{Context, Result};
 use log::{info, warn};
-use pv::{
-    misc::{open_file, read_file},
-    request::SymKey,
-};
-use pvimg::{
-    error::{Error, OwnExitCode},
-    uvdata::{EnvelopeSeHdrV1, KeyExchangeTrait, SeH, SeHdr, UvDataTrait},
-};
+use pv::misc::{open_file, read_file};
+use pv::request::SymKey;
+use pvimg::error::{Error, OwnExitCode};
+use pvimg::uvdata::{EnvelopeSeHdrV1, KeyExchangeTrait, SeH, SeHdr, UvDataTrait};
 
 use crate::cli::{InfoArgs, OutputFormatKind, OutputFormatSpec, OutputFormatVariant};
 

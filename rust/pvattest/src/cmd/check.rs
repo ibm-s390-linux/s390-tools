@@ -6,27 +6,21 @@ mod firmware;
 mod host_key;
 mod secret_store;
 
-use self::{
-    firmware::firmware_check,
-    host_key::{host_key_check, HostKeyCheck},
-    secret_store::secret_store_check,
-    secret_store::SecretStoreCheck,
-};
-use crate::{
-    additional::AttestationResult,
-    cli::{CheckOpt, CheckOptIO},
-    exchange::ExchangeFormatResponse,
-};
+use std::process::ExitCode;
 
 use anyhow::Result;
 use log::{debug, info, warn};
-use pv::{
-    attest::AttestationRequest,
-    misc::{create_file, open_file, read_file},
-};
+use pv::attest::AttestationRequest;
+use pv::misc::{create_file, open_file, read_file};
 use serde::Serialize;
-use std::process::ExitCode;
 use utils::HexSlice;
+
+use self::firmware::firmware_check;
+use self::host_key::{host_key_check, HostKeyCheck};
+use self::secret_store::{secret_store_check, SecretStoreCheck};
+use crate::additional::AttestationResult;
+use crate::cli::{CheckOpt, CheckOptIO};
+use crate::exchange::ExchangeFormatResponse;
 
 #[derive(Default, Debug)]
 enum CheckState<T> {

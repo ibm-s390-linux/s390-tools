@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
+use std::ptr;
+
+use zerocopy::{FromZeros, IntoBytes};
+
 use super::{ffi, AttestationUserData, ConfigUid, UvCmd};
 use crate::{Error, Result};
-use std::ptr;
-use zerocopy::{FromZeros, IntoBytes};
 
 /// _Retrieve Attestation Measurement_ UVC
 ///

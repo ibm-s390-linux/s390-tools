@@ -1,20 +1,18 @@
 #![allow(missing_docs)]
 
-use std::{fs::File, io::Write, path::PathBuf};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::{Parser, ValueEnum, ValueHint};
 use log::info;
-use pv::{
-    misc::{open_file, parse_hex, read_file},
-    request::SymKey,
-};
-use pvimg::{
-    error::Result,
-    uvdata::{
-        KeyExchangeTrait, SeHdr, SeHdrBinV1, SeHdrData, SeHdrDataV1, SeHdrVersioned,
-        UvDataPlainTrait, UvDataTrait,
-    },
+use pv::misc::{open_file, parse_hex, read_file};
+use pv::request::SymKey;
+use pvimg::error::Result;
+use pvimg::uvdata::{
+    KeyExchangeTrait, SeHdr, SeHdrBinV1, SeHdrData, SeHdrDataV1, SeHdrVersioned, UvDataPlainTrait,
+    UvDataTrait,
 };
 use utils::{PvLogger, VerbosityOptions};
 

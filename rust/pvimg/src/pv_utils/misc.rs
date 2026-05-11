@@ -67,10 +67,8 @@ pub fn try_copy_slice_to_array<const COUNT: usize, T: Copy + Default>(
 mod tests {
     use pv::PvCoreError;
 
-    use crate::{
-        error::{Error, Result},
-        pv_utils::try_copy_slice_to_array,
-    };
+    use crate::error::{Error, Result};
+    use crate::pv_utils::try_copy_slice_to_array;
 
     #[test]
     fn test_try_copy_slice_to_array() {

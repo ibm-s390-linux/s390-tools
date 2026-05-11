@@ -14,20 +14,18 @@ mod tmpfile;
 
 pub use ::log::LevelFilter;
 
-pub use crate::{
-    cli::{
-        combined_path_opt, combined_path_req, get_reader_from_cli_file_arg,
-        get_writer_from_cli_file_arg, print_cli_error, print_error, CertificateOptions,
-        DeprecatedVerbosityOptions, VerbosityOptions, STDIN, STDOUT,
-    },
-    exit_code::{docstring, ExitCodeDoc, ExitCodeTrait, ExitCodeVariantDoc},
-    file::{AtomicFile, AtomicFileOperation},
-    hexslice::HexSlice,
-    hostname::gethostname,
-    json::S390ToolsMetaData,
-    log::PvLogger,
-    tmpfile::TemporaryDirectory,
+pub use crate::cli::{
+    combined_path_opt, combined_path_req, get_reader_from_cli_file_arg,
+    get_writer_from_cli_file_arg, print_cli_error, print_error, CertificateOptions,
+    DeprecatedVerbosityOptions, VerbosityOptions, STDIN, STDOUT,
 };
+pub use crate::exit_code::{docstring, ExitCodeDoc, ExitCodeTrait, ExitCodeVariantDoc};
+pub use crate::file::{AtomicFile, AtomicFileOperation};
+pub use crate::hexslice::HexSlice;
+pub use crate::hostname::gethostname;
+pub use crate::json::S390ToolsMetaData;
+pub use crate::log::PvLogger;
+pub use crate::tmpfile::TemporaryDirectory;
 
 /// Get the s390-tools release string
 ///

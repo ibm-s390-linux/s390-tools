@@ -3,10 +3,12 @@
 // Copyright IBM Corp. 2023
 
 #![allow(missing_docs)]
+use std::ffi::c_int;
+
 use s390_pv::request::CertVerifier;
 use s390_pv::test_utils::*;
-use s390_pv::{Error, HkdVerifyErrorType::*};
-use std::ffi::c_int;
+use s390_pv::Error;
+use s390_pv::HkdVerifyErrorType::*;
 
 #[track_caller]
 fn verify_sign_error(exp_raw: c_int, obs: Error) {

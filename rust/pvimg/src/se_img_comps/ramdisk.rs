@@ -6,8 +6,10 @@ use std::io::{Read, Seek};
 
 use pvimg::error::Result;
 
-use super::ComponentKind;
-use super::{CompReader, ComponentCheckCtx, ComponentCheckTrait, ComponentTrait, ReadSeekDebug};
+use super::{
+    CompReader, ComponentCheckCtx, ComponentCheckTrait, ComponentKind, ComponentTrait,
+    ReadSeekDebug,
+};
 
 #[derive(Debug)]
 pub struct Ramdisk(CompReader);

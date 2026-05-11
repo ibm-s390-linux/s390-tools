@@ -2,36 +2,33 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{io::Cursor, path::PathBuf, rc::Rc};
+use std::io::Cursor;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 pub mod ipl;
 mod stage3a_defs;
 mod stage3b_defs;
 use ipl::IPL_PARM_BLOCK_PV_VERSION;
 use log::trace;
-use pvimg::{
-    error::{Error, Result},
-    misc::{serialize_to_bytes, PSW},
-    secured_comp::Interval,
-};
+use pvimg::error::{Error, Result};
+use pvimg::misc::{serialize_to_bytes, PSW};
+use pvimg::secured_comp::Interval;
 
+use self::ipl::{
+    ipl_parameter_block, ipl_pb0_pv, ipl_pb0_pv_comp, ipl_pbt_IPL_PBT_PV, ipl_pl_hdr,
+    IPL_PARM_BLOCK_VERSION,
+};
 pub use self::stage3a_defs::{
     STAGE3A_BSS_ADDRESS, STAGE3A_BSS_SIZE, STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
 };
-use self::{
-    ipl::{
-        ipl_parameter_block, ipl_pb0_pv, ipl_pb0_pv_comp, ipl_pbt_IPL_PBT_PV, ipl_pl_hdr,
-        IPL_PARM_BLOCK_VERSION,
-    },
-    stage3b_defs::{memblob, stage3b_args},
-};
+use self::stage3b_defs::{memblob, stage3b_args};
 use super::CompTweakPrefV1;
-use crate::{
-    se_img::ImgComponent,
-    se_img_comps::{
-        bootloader::stage3a_defs::stage3a_args, stage3a::Stage3a, stage3b::Stage3b, ComponentKind,
-    },
-};
+use crate::se_img::ImgComponent;
+use crate::se_img_comps::bootloader::stage3a_defs::stage3a_args;
+use crate::se_img_comps::stage3a::Stage3a;
+use crate::se_img_comps::stage3b::Stage3b;
+use crate::se_img_comps::ComponentKind;
 
 /// Get the `PVIMG_PKGDATADIR` used for `pvimg`
 ///

@@ -3,27 +3,21 @@
 // Copyright IBM Corp. 2024
 
 #![allow(missing_docs)]
-use std::{
-    fmt::Display,
-    fs::{File, OpenOptions},
-    io::{BufReader, Read, Write},
-    path::PathBuf,
-    str::FromStr,
-};
+use std::fmt::Display;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Read, Write};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error};
 use clap::{Parser, ValueHint};
 use log::{info, warn};
-use pv::{
-    misc::{decode_hex, open_file, read_certs, read_file, try_parse_u64},
-    request::SymKeyType,
-    Error as PvError, Result,
-};
-use pvimg::{
-    misc::PSW,
-    secured_comp::{ComponentTrait, Layout, SecuredComponentBuilder},
-    uvdata::{BuilderTrait, SeHdrBuilder, SeHdrVersion},
-};
+use pv::misc::{decode_hex, open_file, read_certs, read_file, try_parse_u64};
+use pv::request::SymKeyType;
+use pv::{Error as PvError, Result};
+use pvimg::misc::PSW;
+use pvimg::secured_comp::{ComponentTrait, Layout, SecuredComponentBuilder};
+use pvimg::uvdata::{BuilderTrait, SeHdrBuilder, SeHdrVersion};
 use utils::{AtomicFile, AtomicFileOperation, HexSlice, PvLogger, VerbosityOptions};
 
 /// Converts the hexstring into a byte vector.

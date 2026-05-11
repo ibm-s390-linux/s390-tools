@@ -2,31 +2,34 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{
-    fmt::Display,
-    io::{Cursor, Seek, SeekFrom, Write},
-    path::PathBuf,
-    rc::Rc,
-};
+use std::fmt::Display;
+use std::io::{Cursor, Seek, SeekFrom, Write};
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use anyhow::{anyhow, Context, Result};
 use deku::DekuContainerRead;
 use log::debug;
 use openssl::pkey::{PKey, Public};
-use pv::{misc::read_file, request::Confidential};
-use pvimg::{
-    error::Error,
-    misc::{round_up, serialize_to_bytes, ShortPsw, PSW, PSW_MASK_BA, PSW_MASK_EA},
-    secured_comp::{ComponentTrait, Interval, Layout, SecuredComponent, SecuredComponentBuilder},
-    uvdata::{
-        BuilderTrait, PlaintextControlFlagsV1, SeHdrBuilder, SeHdrVersion, SecretControlFlagsV1,
-    },
+use pv::misc::read_file;
+use pv::request::Confidential;
+use pvimg::error::Error;
+use pvimg::misc::{round_up, serialize_to_bytes, ShortPsw, PSW, PSW_MASK_BA, PSW_MASK_EA};
+use pvimg::secured_comp::{
+    ComponentTrait, Interval, Layout, SecuredComponent, SecuredComponentBuilder,
+};
+use pvimg::uvdata::{
+    BuilderTrait, PlaintextControlFlagsV1, SeHdrBuilder, SeHdrVersion, SecretControlFlagsV1,
 };
 
+use crate::se_img_comps::ipib::Ipib;
+use crate::se_img_comps::kernel::S390Kernel;
+use crate::se_img_comps::metadata::ImgMetaData;
+use crate::se_img_comps::sehdr::SeHdrComp;
+use crate::se_img_comps::shortpsw::ShortPSWComp;
 use crate::se_img_comps::{
-    create_ipib, ipib::Ipib, kernel::S390Kernel, metadata::ImgMetaData, render_stage3a,
-    render_stage3b, sehdr::SeHdrComp, shortpsw::ShortPSWComp, stage3a_path, stage3b_path,
-    CompTweakV1, Component, ComponentKind, STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
+    create_ipib, render_stage3a, render_stage3b, stage3a_path, stage3b_path, CompTweakV1,
+    Component, ComponentKind, STAGE3A_ENTRY, STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
 };
 
 pub struct SeHdrArgs<'a> {
@@ -482,7 +485,8 @@ mod tests {
     use std::io::Cursor;
 
     use super::SeImgBuilder;
-    use crate::{se_img::stage3a_path, se_img_comps::stage3b_path};
+    use crate::se_img::stage3a_path;
+    use crate::se_img_comps::stage3b_path;
 
     #[test]
     fn test_comp_ctx_new() {

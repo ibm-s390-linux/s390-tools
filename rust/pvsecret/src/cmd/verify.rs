@@ -2,15 +2,14 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::cli::{VerifyOpt, VerifyOptComb};
 use anyhow::{anyhow, Context, Result};
 use log::warn;
 use pv::misc::{read_certs, read_file};
-use pv::{
-    request::openssl::pkey::{PKey, Public},
-    secret::verify_asrcb_and_get_user_data,
-};
+use pv::request::openssl::pkey::{PKey, Public};
+use pv::secret::verify_asrcb_and_get_user_data;
 use utils::{get_reader_from_cli_file_arg, get_writer_from_cli_file_arg};
+
+use crate::cli::{VerifyOpt, VerifyOptComb};
 
 /// read the content of a DER or PEM x509 and return the public key
 fn read_sgn_key(path: &str) -> Result<PKey<Public>> {

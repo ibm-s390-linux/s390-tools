@@ -2,14 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::assert_size;
-use crate::{
-    request::{MagicValue, RequestMagic},
-    Error, Result,
-};
+use std::fmt::Display;
+use std::mem::size_of;
+
 use byteorder::ByteOrder;
-use std::{fmt::Display, mem::size_of};
 use zerocopy::{BigEndian, Immutable, IntoBytes, U16};
+
+use crate::request::{MagicValue, RequestMagic};
+use crate::{assert_size, Error, Result};
 
 /// The magic value used to identify an `AddSecretRequest`.
 ///
@@ -145,11 +145,9 @@ impl From<UserDataType> for AddSecretMagic {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        request::MagicValue,
-        secret::{AddSecretMagic, UserDataType},
-        Error,
-    };
+    use crate::request::MagicValue;
+    use crate::secret::{AddSecretMagic, UserDataType};
+    use crate::Error;
 
     #[test]
     fn convert_user_data() {

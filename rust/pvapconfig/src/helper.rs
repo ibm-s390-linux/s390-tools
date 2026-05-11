@@ -5,12 +5,13 @@
 //! Collection of helper functions for pvapconfig
 //
 
-use regex::Regex;
 use std::error::Error;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+
+use regex::Regex;
 
 pub const PATH_PVAPCONFIG_LOCK: &str = "/run/lock/pvapconfig.lock";
 
@@ -129,8 +130,9 @@ impl Drop for LockFile {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use utils::TemporaryDirectory;
+
+    use super::*;
 
     // Only very simple tests
 

@@ -4,7 +4,8 @@
 
 use std::fmt::Display;
 
-use deku::{ctx::Endian, DekuRead, DekuWrite};
+use deku::ctx::Endian;
+use deku::{DekuRead, DekuWrite};
 use pv::request::Zeroize;
 use serde::{Deserialize, Serialize};
 
@@ -81,7 +82,8 @@ impl TryFrom<PSW> for ShortPsw {
 #[cfg(test)]
 mod tests {
     use super::{ShortPsw, PSW};
-    use crate::pv_utils::{error::Result, psw::PSW_MASK_BIT_12};
+    use crate::pv_utils::error::Result;
+    use crate::pv_utils::psw::PSW_MASK_BIT_12;
 
     #[test]
     fn test_from_psw_to_short_psw_ok() {

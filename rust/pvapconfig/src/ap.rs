@@ -5,13 +5,14 @@
 //! AP support functions for pvapconfig
 //
 
-use crate::helper::*;
-use pv_core::ap::*;
-use pv_core::misc::read_file_string;
 use std::path::Path;
 use std::slice::Iter;
-use std::thread;
-use std::time;
+use std::{thread, time};
+
+use pv_core::ap::*;
+use pv_core::misc::read_file_string;
+
+use crate::helper::*;
 
 const RE_CARD_DIR: &str = r"^card([[:xdigit:]]{2})$";
 

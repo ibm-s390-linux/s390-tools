@@ -12,6 +12,8 @@ mod config;
 mod helper;
 mod uv;
 
+use std::process::ExitCode;
+
 use ap::ApqnList;
 use cli::ARGS;
 use config::{ApConfigEntry, ApConfigList};
@@ -19,7 +21,6 @@ use helper::{LockFile, PATH_PVAPCONFIG_LOCK};
 use pv_core::ap::{self as pvap, Apqn};
 use pv_core::misc::encode_hex;
 use pv_core::uv::{ListableSecretType, SecretList};
-use std::process::ExitCode;
 use utils::print_version;
 
 /// Simple macro for
@@ -456,8 +457,10 @@ fn config_and_apqn_match(apc: &ApConfigEntry, apqn: &Apqn) -> bool {
 #[cfg(test)]
 mod tests {
 
+    use pv_core::misc::decode_hex;
+    use pv_core::uv::SecretEntry;
+
     use super::*;
-    use pv_core::{misc::decode_hex, uv::SecretEntry};
 
     // This is more or less only a test for the do_ap_config() function
     // However, this is THE main functionality of the whole application.

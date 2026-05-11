@@ -2,18 +2,16 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::{
-    cli::{AttAddFlags, CreateAttOpt},
-    exchange::{ExchangeFormatRequest, ExchangeFormatVersion},
-};
+use std::process::ExitCode;
+
 use anyhow::{bail, Context, Result};
 use log::{debug, warn};
-use pv::{
-    attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion},
-    misc::{create_file, write_file},
-    request::{ReqEncrCtx, Request, SymKey, SymKeyType},
-};
-use std::process::ExitCode;
+use pv::attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion};
+use pv::misc::{create_file, write_file};
+use pv::request::{ReqEncrCtx, Request, SymKey, SymKeyType};
+
+use crate::cli::{AttAddFlags, CreateAttOpt};
+use crate::exchange::{ExchangeFormatRequest, ExchangeFormatVersion};
 
 fn flags(cli_flags: &[AttAddFlags]) -> AttestationFlags {
     let mut att_flags = AttestationFlags::default();

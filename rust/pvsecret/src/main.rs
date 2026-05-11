@@ -6,10 +6,11 @@
 mod cli;
 mod cmd;
 
+use std::process::ExitCode;
+
 use clap::{CommandFactory, Parser};
 use cli::{validate_cli, CliOptions, Command};
 use log::trace;
-use std::process::ExitCode;
 use utils::{print_cli_error, print_error, print_version, PvLogger};
 
 static LOGGER: PvLogger = PvLogger;

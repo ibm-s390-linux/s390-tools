@@ -2,15 +2,15 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::{crypto::SymKeyType, pem::Pem, uvsecret::guest_secret::MAX_SIZE_PLAIN_PAYLOAD, Result};
-
 use log::warn;
-use pv_core::{
-    request::Confidential,
-    uv::{ListableSecretType, RetrievableSecret, RetrieveCmd},
-};
-use zerocopy::BigEndian;
-use zerocopy::{FromBytes, U16};
+use pv_core::request::Confidential;
+use pv_core::uv::{ListableSecretType, RetrievableSecret, RetrieveCmd};
+use zerocopy::{BigEndian, FromBytes, U16};
+
+use crate::crypto::SymKeyType;
+use crate::pem::Pem;
+use crate::uvsecret::guest_secret::MAX_SIZE_PLAIN_PAYLOAD;
+use crate::Result;
 
 /// An IBM Protected Key
 ///
@@ -72,8 +72,8 @@ impl From<RetrieveCmd> for RetrievedSecret {
 
         match kind {
             ListableSecretType::Retrievable(RetrievableSecret::PlainText) => {
-                // Will not run into default, retrieve has a granularity of 16 bytes and 16 bytes is the
-                // minimum size
+                // Will not run into default, retrieve has a granularity of 16 bytes and 16 bytes is
+                // the minimum size
                 let len = U16::<BigEndian>::read_from_prefix(key.value())
                     .unwrap_or_default()
                     .0
@@ -81,8 +81,8 @@ impl From<RetrieveCmd> for RetrievedSecret {
 
                 // Test if the plain text secret has a size:
                 // 1. len <= 8190
-                // 2. first two bytes are max 15 less than buffer-size+2 i.e. smaller than the
-                //    block length
+                // 2. first two bytes are max 15 less than buffer-size+2 i.e. smaller than the block
+                //    length
                 // 3. bytes after len + 2 are zero
                 match len <= MAX_SIZE_PLAIN_PAYLOAD
                     && key.value().len() - (len + 2) < SymKeyType::AES_256_GCM_BLOCK_LEN
@@ -148,8 +148,9 @@ impl RetrievedSecret {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use pv_core::uv::*;
+
+    use super::*;
 
     fn mk_retr(secret: &[u8]) -> RetrievedSecret {
         let entry = SecretEntry::new(

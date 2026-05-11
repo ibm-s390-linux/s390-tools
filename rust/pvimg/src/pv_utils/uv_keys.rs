@@ -119,7 +119,8 @@ mod tests {
 
     use pv::misc::decode_hex;
 
-    use crate::{pv_utils::uv_keys::UvKeyHashV1, uvdata::UvKeyHashesV1};
+    use crate::pv_utils::uv_keys::UvKeyHashV1;
+    use crate::uvdata::UvKeyHashesV1;
 
     #[test]
     fn from_reader() {

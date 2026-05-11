@@ -2,22 +2,22 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{fmt::Display, mem::size_of};
+use std::fmt::Display;
+use std::mem::size_of;
 
 use base64::prelude::*;
-use deku::{ctx::Endian, DekuRead, DekuWrite};
-use openssl::{
-    hash::{hash, MessageDigest},
-    pkey::{PKey, PKeyRef, Public},
-};
-use pv::{request::EcPubKeyCoord, static_assert};
+use deku::ctx::Endian;
+use deku::{DekuRead, DekuWrite};
+use openssl::hash::{hash, MessageDigest};
+use openssl::pkey::{PKey, PKeyRef, Public};
+use pv::request::EcPubKeyCoord;
+use pv::static_assert;
 use serde::{Deserialize, Serialize};
 use utils::HexSlice;
 
-use crate::{
-    error::{Error, Result},
-    pv_utils::{serializing::serde_hex_array, try_copy_slice_to_array},
-};
+use crate::error::{Error, Result};
+use crate::pv_utils::serializing::serde_hex_array;
+use crate::pv_utils::try_copy_slice_to_array;
 
 /// Try to hash the public EC key.
 ///

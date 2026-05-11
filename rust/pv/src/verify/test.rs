@@ -4,12 +4,17 @@
 
 #![cfg(test)]
 
-use super::{helper, helper::*, *};
-use crate::{utils::read_crls, Error, HkdVerifyErrorType::*};
-use openssl::{stack::Stack, x509::X509Crl};
 use std::path::Path;
 
+use openssl::stack::Stack;
+use openssl::x509::X509Crl;
+
+use super::helper::*;
+use super::{helper, *};
 use crate::test_utils::*;
+use crate::utils::read_crls;
+use crate::Error;
+use crate::HkdVerifyErrorType::*;
 
 // Mock function
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<X509Crl>>> {

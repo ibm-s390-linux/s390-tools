@@ -2,10 +2,12 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::cli::Cli;
 use core::fmt::{Display, Formatter, Result};
+
 use serde::{Serialize, Serializer};
 use utils::HexSlice;
+
+use crate::cli::Cli;
 
 /// Number of total function codes (0 to 127)
 pub const NUMBER_FUNC_CODES: usize = 128;

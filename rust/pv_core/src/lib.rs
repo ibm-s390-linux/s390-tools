@@ -13,7 +13,6 @@ mod uvdevice;
 mod uvsecret;
 
 pub use error::{Error, FileAccessErrorType, FileIoErrorType, Result};
-
 /// Early Boot Customization (EBC) utilities.
 ///
 /// This module provides types and functions for working with Early Boot
@@ -28,13 +27,11 @@ pub mod attest {
 
 /// Miscellaneous functions and definitions
 pub mod misc {
-    pub use crate::utils::pv_guest_bit_set;
-    pub use crate::utils::{create_file, open_file};
-    pub use crate::utils::{decode_hex, encode_hex, parse_hex};
-    pub use crate::utils::{read, write};
-    pub use crate::utils::{read_exact_file, read_file, read_file_string, write_file};
-    pub use crate::utils::{to_u16, to_u32, try_parse_u128, try_parse_u64};
-    pub use crate::utils::{Flags, Lsb0Flags64, Msb0Flags64};
+    pub use crate::utils::{
+        create_file, decode_hex, encode_hex, open_file, parse_hex, pv_guest_bit_set, read,
+        read_exact_file, read_file, read_file_string, to_u16, to_u32, try_parse_u128,
+        try_parse_u64, write, write_file, Flags, Lsb0Flags64, Msb0Flags64,
+    };
 }
 
 /// Definitions and functions for interacting with the Ultravisor
@@ -43,8 +40,9 @@ pub mod misc {
 /// [`crate::uv::UvCmd`]
 pub mod uv {
     pub use crate::uvdevice::attest::AttestationCmd;
-    pub use crate::uvdevice::retr_secret::RetrievableSecret;
-    pub use crate::uvdevice::retr_secret::{AesSizes, AesXtsSizes, EcCurves, HmacShaSizes};
+    pub use crate::uvdevice::retr_secret::{
+        AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, RetrievableSecret,
+    };
     pub use crate::uvdevice::secret::{AddCmd, ListCmd, LockCmd, RetrieveCmd};
     pub use crate::uvdevice::secret_list::{ListableSecretType, SecretEntry, SecretId, SecretList};
     pub use crate::uvdevice::{ConfigUid, UvCmd, UvDevice, UvDeviceInfo, UvFlags, UvcSuccess};
@@ -77,15 +75,12 @@ pub mod request {
 
 /// Functionalities for reading add-secret requests
 pub mod secret {
-    pub use crate::uvsecret::AddSecretMagic;
-    pub use crate::uvsecret::UserDataType;
+    pub use crate::uvsecret::{AddSecretMagic, UserDataType};
 }
 
 /// Functionalities for the AP bus
 pub mod ap {
-    pub use crate::apdevice::Apqn;
-    pub use crate::apdevice::RE_QUEUE_DIR;
-    pub use crate::apdevice::{get_apqn_bind_state, set_apqn_bind_state};
+    pub use crate::apdevice::{get_apqn_bind_state, set_apqn_bind_state, Apqn, RE_QUEUE_DIR};
     /// AP modes
     pub mod apqn_mode {
         pub use crate::apdevice::ApqnMode::{self, *};

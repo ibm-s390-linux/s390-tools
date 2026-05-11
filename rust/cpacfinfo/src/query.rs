@@ -3,15 +3,13 @@
 // Copyright IBM Corp. 2024
 
 use std::fs::File;
-use std::io::Error;
-use std::io::Read;
+use std::io::{Error, Read};
 use std::ops::Index;
 use std::result::Result;
 
 use zerocopy::FromBytes;
 
-use crate::msa::InstructionKind;
-use crate::msa::QueryAuthInfo;
+use crate::msa::{InstructionKind, QueryAuthInfo};
 
 /// Path to sysfs in which the query and qai informations are fetched from
 const SYSFS_PATH: &str = "/sys/devices/system/cpu/cpacf/";

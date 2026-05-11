@@ -4,13 +4,12 @@
 
 #![cfg(test)]
 
-use std::{
-    ffi::{c_int, c_ulong},
-    sync::{Mutex, MutexGuard},
-};
+use std::ffi::{c_int, c_ulong};
+use std::sync::{Mutex, MutexGuard};
+
+use lazy_static::lazy_static;
 
 use super::*;
-use lazy_static::lazy_static;
 
 lazy_static! {
     /// needed to serialize all tests as tests operate on static data required by the mock
@@ -129,8 +128,8 @@ impl UvCmd for TestCmd {
 }
 
 impl UvDevice {
-    /// Use this file as backing file for  `uvdevice`. This is OK, as the ioctl is mocked and never touches the
-    /// passed file
+    /// Use this file as backing file for  `uvdevice`. This is OK, as the ioctl is mocked and never
+    /// touches the passed file
     fn test_dev() -> Self {
         Self(File::open(".").unwrap())
     }

@@ -2,28 +2,22 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{
-    fmt::{Debug, Formatter},
-    io::{Read, Write},
-    rc::Rc,
-};
+use std::fmt::{Debug, Formatter};
+use std::io::{Read, Write};
+use std::rc::Rc;
 
 use log::debug;
-use openssl::{
-    bn::BigNum,
-    cipher::{Cipher, CipherRef},
-    cipher_ctx::{CipherCtx, CipherCtxRef},
-    hash::{Hasher, MessageDigest},
-    nid::Nid,
-};
+use openssl::bn::BigNum;
+use openssl::cipher::{Cipher, CipherRef};
+use openssl::cipher_ctx::{CipherCtx, CipherCtxRef};
+use openssl::hash::{Hasher, MessageDigest};
+use openssl::nid::Nid;
 use pv::request::{Confidential, SymKey, SymKeyType};
 
 use super::{try_copy_slice_to_array, Layout};
-use crate::pv_utils::{
-    error::{Error, PvError, Result},
-    se_hdr::{ComponentMetadata, ComponentMetadataV1},
-    Interval,
-};
+use crate::pv_utils::error::{Error, PvError, Result};
+use crate::pv_utils::se_hdr::{ComponentMetadata, ComponentMetadataV1};
+use crate::pv_utils::Interval;
 
 /// Operation mode for component preparation.
 #[allow(unused)]
@@ -651,7 +645,8 @@ impl SecuredComponentBuilder {
 #[allow(clippy::shadow_unrelated)]
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, io::Cursor};
+    use std::fmt::Debug;
+    use std::io::Cursor;
 
     use pv::request::Aes256XtsKey;
 

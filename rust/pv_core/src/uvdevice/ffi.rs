@@ -11,8 +11,9 @@
 
 use std::mem::size_of;
 
-use crate::{assert_size, static_assert};
 use zerocopy::{FromBytes, IntoBytes};
+
+use crate::{assert_size, static_assert};
 
 pub const UVIO_ATT_ARCB_MAX_LEN: usize = 0x100000;
 pub const UVIO_ATT_MEASUREMENT_MAX_LEN: usize = 0x8000;

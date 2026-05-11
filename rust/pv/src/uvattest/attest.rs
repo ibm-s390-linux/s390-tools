@@ -2,20 +2,21 @@
 //
 // Copyright IBM Corp. 2024
 
-use super::AttNonce;
-use crate::{
-    attest::AttestationMeasAlg, brcb::BootHdrTags, crypto::calculate_hmac, request::Confidential,
-    uv::ConfigUid, Result,
-};
-use openssl::{
-    hash::MessageDigest,
-    pkey::{PKeyRef, Private},
-};
 use std::mem::size_of;
+
+use openssl::hash::MessageDigest;
+use openssl::pkey::{PKeyRef, Private};
 use zerocopy::{BigEndian, IntoBytes, U16, U32};
 
+use super::AttNonce;
+use crate::attest::AttestationMeasAlg;
 #[cfg(doc)]
 use crate::attest::AttestationRequest;
+use crate::brcb::BootHdrTags;
+use crate::crypto::calculate_hmac;
+use crate::request::Confidential;
+use crate::uv::ConfigUid;
+use crate::Result;
 
 /// Holds the data to be measured.
 ///
@@ -151,8 +152,9 @@ impl From<Vec<u8>> for AttestationMeasurement {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use openssl::pkey::PKey;
+
+    use super::*;
 
     const M_KEY: [u8; 64] = [0x41; 64];
     const BOOT_HDR_TAGS: BootHdrTags = BootHdrTags::new([1; 64], [2; 64], [3; 64], [4; 16]);

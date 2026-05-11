@@ -2,20 +2,16 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use clap::{ArgAction, ArgGroup, Args, Command, ValueHint};
-use log::{info, warn, LevelFilter};
-use pv::misc::read_file;
-use pv::{
-    misc::{create_file, open_file, read_certs},
-    request::{
-        openssl::pkey::{PKey, Public},
-        HkdVerifier,
-    },
-    Error, Result,
-};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+
+use clap::{ArgAction, ArgGroup, Args, Command, ValueHint};
+use log::{info, warn, LevelFilter};
+use pv::misc::{create_file, open_file, read_certs, read_file};
+use pv::request::openssl::pkey::{PKey, Public};
+use pv::request::HkdVerifier;
+use pv::{Error, Result};
 
 /// CLI Argument collection for handling host-keys, IBM signing keys, and certificates.
 #[derive(Args, Debug, Clone, PartialEq, Eq, Default)]

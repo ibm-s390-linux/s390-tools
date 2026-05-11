@@ -4,7 +4,8 @@
 
 // Based on the output of rust-bindgen 0.69.1
 #![allow(nonstandard_style)]
-use deku::{ctx::Endian, prelude::*};
+use deku::ctx::Endian;
+use deku::prelude::*;
 
 pub const IMAGE_ENTRY: u64 = 0x10000;
 pub const STAGE3A_INIT_ENTRY: u64 = IMAGE_ENTRY;

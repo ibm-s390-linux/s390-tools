@@ -2,21 +2,25 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{
-    fmt::{Debug, Display},
-    io::{Read, Seek, SeekFrom},
-};
+use std::fmt::{Debug, Display};
+use std::io::{Read, Seek, SeekFrom};
 
 use anyhow::Context;
-use deku::{ctx::Endian, DekuRead, DekuWrite};
+use deku::ctx::Endian;
+use deku::{DekuRead, DekuWrite};
 use enum_dispatch::enum_dispatch;
 use pv::request::random_array;
-use pvimg::{error::Result, secured_comp::ComponentTrait};
+use pvimg::error::Result;
+use pvimg::secured_comp::ComponentTrait;
 
-use self::{
-    cmdline::Cmdline, kernel::S390Kernel, metadata::ImgMetaData, ramdisk::Ramdisk,
-    sehdr::SeHdrComp, shortpsw::ShortPSWComp, stage3a::Stage3a, stage3b::Stage3b,
-};
+use self::cmdline::Cmdline;
+use self::kernel::S390Kernel;
+use self::metadata::ImgMetaData;
+use self::ramdisk::Ramdisk;
+use self::sehdr::SeHdrComp;
+use self::shortpsw::ShortPSWComp;
+use self::stage3a::Stage3a;
+use self::stage3b::Stage3b;
 pub use crate::se_img_comps::bootloader::{
     create_ipib, render_stage3a, render_stage3b, stage3a_path, stage3b_path, STAGE3A_ENTRY,
     STAGE3A_INIT_ENTRY, STAGE3A_LOAD_ADDRESS,
@@ -306,13 +310,12 @@ impl CompTweakV1 {
 #[cfg(test)]
 mod tests {
     use deku::{DekuContainerRead, DekuContainerWrite};
-    use proptest::{
-        prelude::{Just, Strategy},
-        prop_assert_eq, prop_oneof, proptest,
-    };
+    use proptest::prelude::{Just, Strategy};
+    use proptest::{prop_assert_eq, prop_oneof, proptest};
 
     use super::{ComponentCheckCtx, ComponentKind};
-    use crate::se_img_comps::{check_components, kernel::S390Kernel, CompTweakPrefV1, CompTweakV1};
+    use crate::se_img_comps::kernel::S390Kernel;
+    use crate::se_img_comps::{check_components, CompTweakPrefV1, CompTweakV1};
 
     fn component_kind_strategy() -> impl Strategy<Value = ComponentKind> {
         prop_oneof![

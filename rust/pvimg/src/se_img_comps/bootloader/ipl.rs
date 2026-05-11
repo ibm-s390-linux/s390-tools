@@ -5,8 +5,10 @@
 // Based on the output of rust-bindgen 0.69.1
 #![allow(nonstandard_style, unused)]
 
-use deku::{ctx::Endian, prelude::*};
-use pvimg::{error::Result, misc::bytesize};
+use deku::ctx::Endian;
+use deku::prelude::*;
+use pvimg::error::Result;
+use pvimg::misc::bytesize;
 
 pub const IPL_FLAG_SECURE: u32 = 64;
 pub const IPL_RB_COMPONENT_FLAG_SIGNED: u32 = 128;

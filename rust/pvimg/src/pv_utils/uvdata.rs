@@ -3,17 +3,14 @@
 // Copyright IBM Corp. 2024
 
 use enum_dispatch::enum_dispatch;
+use pv::request::openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv::request::{
-    decrypt_aead, derive_aes256_gcm_key, encrypt_aead,
-    openssl::pkey::{PKey, PKeyRef, Private, Public},
-    Confidential, SymKey, SymKeyType,
+    decrypt_aead, derive_aes256_gcm_key, encrypt_aead, Confidential, SymKey, SymKeyType,
 };
 
 use super::se_hdr::{SeHdrBinV1, SeHdrData, SeHdrVersioned};
-use crate::pv_utils::{
-    error::{Error, Result},
-    serializing::deserialize_from_bytes,
-};
+use crate::pv_utils::error::{Error, Result};
+use crate::pv_utils::serializing::deserialize_from_bytes;
 
 /// Trait to be used for Authenticated Encryption with Associated Data (AEAD)
 /// data structures.

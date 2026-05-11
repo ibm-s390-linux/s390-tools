@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::Path,
-};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
 
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, U64};
 
-use crate::{
-    macros::{bail_spec, file_error},
-    Error, FileAccessErrorType, Result,
-};
+use crate::macros::{bail_spec, file_error};
+use crate::{Error, FileAccessErrorType, Result};
 
 /// Trait that describes bitflags, represented by `T`.
 pub trait Flags<T>: From<T> + for<'a> From<&'a T> {

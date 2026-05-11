@@ -58,7 +58,8 @@ pub enum Command {
 
     /// Check if the attestation result matches defined policies.
     ///
-    /// After the attestation verification, check whether the attestation result complies with user-defined policies.
+    /// After the attestation verification, check whether the attestation result complies with
+    /// user-defined policies.
     Check(CheckOpt),
 
     /// Print version information and exit.
@@ -103,7 +104,8 @@ pub enum AttAddFlags {
     /// additional-data.
     PhkhAtt,
 
-    /// Request a hash over all successful Add-secret requests and the lock state as additional-data.
+    /// Request a hash over all successful Add-secret requests and the lock state as
+    /// additional-data.
     SecretStoreHash,
 
     /// Request the state of the firmware as additional-data.

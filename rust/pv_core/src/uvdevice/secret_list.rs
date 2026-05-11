@@ -2,24 +2,20 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::{
-    assert_size,
-    uv::{AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, ListCmd, RetrievableSecret},
-    uvdevice::UvCmd,
-    Error, Result,
-};
+use std::cmp::min;
+use std::ffi::CStr;
+use std::fmt::{Debug, Display, LowerHex, UpperHex};
+use std::io::{Cursor, Read, Seek, Write};
+use std::mem::size_of;
+use std::slice::Iter;
+use std::vec::IntoIter;
+
 use serde::{Deserialize, Serialize, Serializer};
-use std::{
-    cmp::min,
-    ffi::CStr,
-    fmt::{Debug, Display, LowerHex, UpperHex},
-    io::{Cursor, Read, Seek, Write},
-    mem::size_of,
-    slice::Iter,
-    vec::IntoIter,
-};
-use zerocopy::{BigEndian, ByteOrder};
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, U16, U32};
+use zerocopy::{BigEndian, ByteOrder, FromBytes, Immutable, IntoBytes, KnownLayout, U16, U32};
+
+use crate::uv::{AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, ListCmd, RetrievableSecret};
+use crate::uvdevice::UvCmd;
+use crate::{assert_size, Error, Result};
 
 /// The 32 byte long ID of an UV secret
 ///

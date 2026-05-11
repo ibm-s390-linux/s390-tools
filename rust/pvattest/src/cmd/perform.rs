@@ -2,16 +2,14 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::{
-    cli::PerformAttOptComb,
-    exchange::{ExchangeFormatRequest, ExchangeFormatResponse, ExchangeFormatVersion},
-};
-use anyhow::Result;
-use pv::{
-    misc::{create_file, open_file, read_file},
-    uv::{AttestationCmd, UvDevice},
-};
 use std::process::ExitCode;
+
+use anyhow::Result;
+use pv::misc::{create_file, open_file, read_file};
+use pv::uv::{AttestationCmd, UvDevice};
+
+use crate::cli::PerformAttOptComb;
+use crate::exchange::{ExchangeFormatRequest, ExchangeFormatResponse, ExchangeFormatVersion};
 
 pub fn perform<'a, P>(opt: P) -> Result<ExitCode>
 where

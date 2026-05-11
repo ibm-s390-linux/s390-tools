@@ -2,27 +2,28 @@
 //
 // Copyright IBM Corp. 2023
 
+use std::cmp::Ordering;
+use std::ffi::c_int;
+use std::path::Path;
+use std::str::from_utf8;
+
+use log::debug;
+use openssl::asn1::{Asn1Time, Asn1TimeRef};
+use openssl::error::ErrorStack;
+use openssl::nid::Nid;
+use openssl::ssl::SslFiletype;
+use openssl::stack::Stack;
+use openssl::x509::store::{File, X509Lookup, X509StoreBuilder, X509StoreRef};
+use openssl::x509::verify::{X509VerifyFlags, X509VerifyParam};
+use openssl::x509::{
+    X509CrlRef, X509Name, X509NameRef, X509PurposeId, X509Ref, X509StoreContext,
+    X509StoreContextRef, X509VerifyResult, X509,
+};
+
 use crate::error::bail_hkd_verify;
 use crate::openssl_extensions::{AkidCheckResult, AkidExtension};
 use crate::HkdVerifyErrorType::*;
 use crate::{Error, Result};
-use log::debug;
-use openssl::{
-    asn1::{Asn1Time, Asn1TimeRef},
-    error::ErrorStack,
-    nid::Nid,
-    ssl::SslFiletype,
-    stack::Stack,
-    x509::{
-        store::{File, X509Lookup, X509StoreBuilder, X509StoreRef},
-        verify::{X509VerifyFlags, X509VerifyParam},
-        X509CrlRef, X509Name, X509NameRef, X509PurposeId, X509Ref, X509StoreContext,
-        X509StoreContextRef, X509VerifyResult, X509,
-    },
-};
-use std::path::Path;
-use std::str::from_utf8;
-use std::{cmp::Ordering, ffi::c_int};
 
 /// Minimum security level for the keys/certificates used to establish a chain of
 /// trust (see <https://www.openssl.org/docs/man1.1.1/man3/X509_VERIFY_PARAM_set_auth_level.html>
@@ -306,9 +307,11 @@ pub fn x509_dist_points(cert: &X509Ref) -> Vec<String> {
 /// CRL not available at all URIs and unexpected format at all URIs are mapped to Ok(None)
 #[cfg(not(test))]
 pub fn download_first_crl_from_x509(cert: &X509Ref) -> Result<Option<Vec<openssl::x509::X509Crl>>> {
-    use crate::utils::read_crls;
-    use curl::easy::{Easy2, Handler, WriteError};
     use std::time::Duration;
+
+    use curl::easy::{Easy2, Handler, WriteError};
+
+    use crate::utils::read_crls;
     const CRL_TIMEOUT_MAX: Duration = Duration::from_secs(3);
     struct Buf(Vec<u8>);
 
@@ -397,9 +400,10 @@ pub fn armonk_locality_fixup(subject: &X509NameRef) -> Option<X509Name> {
 /// tests for some private functions
 mod test {
 
+    use std::time::{Duration, SystemTime};
+
     use super::*;
     use crate::test_utils::*;
-    use std::time::{Duration, SystemTime};
 
     fn sys_to_asn1_time(syst: SystemTime) -> Asn1Time {
         let secs = syst

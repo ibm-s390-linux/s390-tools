@@ -2,18 +2,19 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::Result;
-use crate::{openssl_extensions::BioMem, Error};
+use std::ffi::{c_char, CString};
+use std::fmt::Display;
+
 use openssl::error::ErrorStack;
 use pv_core::request::Confidential;
-use std::{
-    ffi::{c_char, CString},
-    fmt::Display,
-};
+
+use crate::openssl_extensions::BioMem;
+use crate::{Error, Result};
 
 mod ffi {
-    use openssl_sys::BIO;
     use std::ffi::{c_char, c_int, c_long, c_uchar};
+
+    use openssl_sys::BIO;
     extern "C" {
         pub fn PEM_write_bio(
             bio: *mut BIO,
@@ -141,8 +142,8 @@ impl Pem {
 
         let inner_pem = InnerPem::new(name, header, data.as_ref())?;
 
-        // Create the PEM format eagerly so that to_string/display cannot fail because of ASCII or OpenSSL Errors
-        // Both error should be very unlikely
+        // Create the PEM format eagerly so that to_string/display cannot fail because of ASCII or
+        // OpenSSL Errors Both error should be very unlikely
         // OpenSSL should be able to create PEM if there is enough memory and produce a non-null
         // terminated ASCII-string
         // Unwrap succeeds it's all ASCII

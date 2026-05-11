@@ -4,11 +4,12 @@
 
 use std::io::ErrorKind;
 
-use crate::cli::{ListSecretOpt, ListSecretOptComb, ListSecretOutputType};
 use anyhow::{Context, Error, Result};
 use log::{info, warn};
 use pv::uv::{ListCmd, SecretList, UvDevice};
 use utils::{get_writer_from_cli_file_arg, STDOUT};
+
+use crate::cli::{ListSecretOpt, ListSecretOptComb, ListSecretOutputType};
 
 const SECRET_LIST_BUF_SIZE: usize = 4;
 

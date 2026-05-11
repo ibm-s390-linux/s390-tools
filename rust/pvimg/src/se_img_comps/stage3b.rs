@@ -7,8 +7,7 @@ use std::io::{Read, Seek};
 use pvimg::error::Result;
 use pvimg::secured_comp::ComponentTrait;
 
-use super::ComponentKind;
-use super::{CompReader, ComponentCheckCtx, ComponentCheckTrait, ReadSeekDebug};
+use super::{CompReader, ComponentCheckCtx, ComponentCheckTrait, ComponentKind, ReadSeekDebug};
 
 #[derive(Debug)]
 pub struct Stage3b(CompReader);

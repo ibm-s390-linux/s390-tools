@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
+use openssl::error::ErrorStack;
+use openssl::x509::{X509Crl, X509};
+
 use crate::{Error, Result};
-use openssl::{
-    error::ErrorStack,
-    x509::{X509Crl, X509},
-};
 
 /// Read all CRLs from the buffer and parse them into a vector.
 ///

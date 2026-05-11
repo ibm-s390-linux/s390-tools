@@ -2,11 +2,11 @@
 //
 // Copyright IBM Corp. 2023
 
+use std::ffi::c_int;
 use std::fmt;
 
 use foreign_types::{foreign_type, ForeignType, ForeignTypeRef};
 use openssl::x509::{X509CrlRef, X509Ref};
-use std::ffi::c_int;
 
 mod ffi {
     extern "C" {
@@ -99,9 +99,8 @@ impl AkidExtension for X509CrlRef {
 
 #[cfg(test)]
 mod test {
-    use crate::test_utils::load_gen_cert;
-
     use super::*;
+    use crate::test_utils::load_gen_cert;
 
     #[test]
     fn akid() {

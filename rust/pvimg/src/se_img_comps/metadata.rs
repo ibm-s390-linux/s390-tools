@@ -4,13 +4,12 @@
 
 use std::io::{Cursor, Read, Seek};
 
-use pv::{request::SeImgMetaData, static_assert};
+use pv::request::SeImgMetaData;
+use pv::static_assert;
 use pvimg::error::Result;
 
-use super::{
-    bootloader::{STAGE3A_BSS_ADDRESS, STAGE3A_BSS_SIZE},
-    CompReader, ComponentCheckCtx, ComponentCheckTrait, ComponentKind, ComponentTrait,
-};
+use super::bootloader::{STAGE3A_BSS_ADDRESS, STAGE3A_BSS_SIZE};
+use super::{CompReader, ComponentCheckCtx, ComponentCheckTrait, ComponentKind, ComponentTrait};
 
 #[derive(Debug)]
 pub struct ImgMetaData(CompReader);

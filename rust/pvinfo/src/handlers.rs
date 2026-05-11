@@ -4,11 +4,12 @@
 
 //! Handlers for processing CLI flags and subcommands
 
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+
 use crate::constants::*;
 use crate::io_utils::{collect_bit_messages, collect_version_flags, read_hex_from_file};
 use crate::strings::*;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
 
 // Represents metadata for a supported content file.
 struct Content {
@@ -18,7 +19,7 @@ struct Content {
 }
 
 impl Content {
-    //Reads a hex file, then prints either:
+    // Reads a hex file, then prints either:
     // bit messages or version flags
     fn handle_flag(&self, writer: &mut dyn Write, query_dir: &Path) -> io::Result<String> {
         let hex = match read_hex_from_file(query_dir.join(self.file), self.label) {
@@ -132,9 +133,11 @@ pub fn handle_supported_flags(
 // Unit Tests for handlers
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::fs;
+
     use tempfile::tempdir;
+
+    use super::*;
 
     // Verifies that handle_supported_flags correctly processes all
     #[test]

@@ -2,14 +2,14 @@
 //
 // Copyright IBM Corp. 2024
 #![allow(unused)]
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::mem::size_of;
+
 use anyhow::{anyhow, bail, Error, Result};
-use pv::{assert_size, request::MagicValue, uv::AttestationCmd, uv::ConfigUid};
-use std::{
-    io::{ErrorKind, Read, Seek, SeekFrom, Write},
-    mem::size_of,
-};
-use zerocopy::ByteOrder;
-use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32, U64};
+use pv::assert_size;
+use pv::request::MagicValue;
+use pv::uv::{AttestationCmd, ConfigUid};
+use zerocopy::{BigEndian, ByteOrder, FromBytes, Immutable, IntoBytes, KnownLayout, U32, U64};
 
 const INV_EXCHANGE_FMT_ERROR_TEXT: &str = "The input has not the correct format:";
 
@@ -583,8 +583,9 @@ mod test {
 
     use std::io::Cursor;
 
-    use super::*;
     use pv::misc::read_file;
+
+    use super::*;
 
     #[test]
     fn exchange_from_slice() {

@@ -88,7 +88,8 @@ macro_rules! impl_exitcodetrait {
 
 #[cfg(test)]
 mod tests {
-    use crate::{exit_code::ExitCodeDoc, ExitCodeTrait, ExitCodeVariantDoc};
+    use crate::exit_code::ExitCodeDoc;
+    use crate::{ExitCodeTrait, ExitCodeVariantDoc};
 
     #[test]
     fn test_impl_exitcodetrait_with_doc() {

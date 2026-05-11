@@ -5,13 +5,14 @@
 //! Functions around handling the pvapconfig configuration file
 //
 
+use std::fs::File;
+use std::slice::Iter;
+
 use openssl::sha::sha256;
 use pv_core::misc::encode_hex;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
-use std::fs::File;
-use std::slice::Iter;
 
 pub const STR_MODE_EP11: &str = "ep11";
 pub const STR_MODE_ACCEL: &str = "accel";
@@ -209,10 +210,10 @@ impl ApConfigList {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
-    use std::env;
-    use std::fs;
     use std::io::Write;
+    use std::{env, fs};
+
+    use super::*;
 
     const GOOD_CONFIGS: [&str; 8] = [
         "# good test 1

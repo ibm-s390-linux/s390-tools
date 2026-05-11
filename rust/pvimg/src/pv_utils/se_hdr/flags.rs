@@ -24,7 +24,9 @@
 //! assert!(flags.is_set(PcfV1::AllowDumping));
 //! ```
 
-use std::{fmt::Display, fmt::LowerHex, marker::PhantomData, mem::size_of};
+use std::fmt::{Display, LowerHex};
+use std::marker::PhantomData;
+use std::mem::size_of;
 
 use pv::misc::{Flags, Msb0Flags64};
 

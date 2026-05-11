@@ -4,13 +4,14 @@
 
 //! I/O utilities for the PV Info Tool
 
-use crate::constants::*;
-use anyhow::{Context, Result};
-use pv_core::misc::{read_file, read_file_string, try_parse_u64};
-use pv_core::misc::{Flags, Msb0Flags64};
 use std::collections::HashMap;
 use std::path::Path;
 use std::str;
+
+use anyhow::{Context, Result};
+use pv_core::misc::{read_file, read_file_string, try_parse_u64, Flags, Msb0Flags64};
+
+use crate::constants::*;
 
 // Verify that the Ultravisor directory exists
 pub fn check_uv_exists() -> Result<()> {
@@ -143,10 +144,12 @@ pub fn collect_limits(query_dir: &Path) -> HashMap<String, u64> {
 mod test {
     //! Unit Tests for io_utils
 
-    use super::*;
     use std::io::{self, Write};
     use std::path::Path;
+
     use tempfile::{tempdir, NamedTempFile};
+
+    use super::*;
 
     // Tests check_uv_exists() by observing the real BASE_DIR at test runtime
     // if BASE_DIR exists on the machine running the tests, check_uv_exists() must return Ok
@@ -280,7 +283,8 @@ mod test {
         let hex = (1u64 << 63) | (1u64 << 61);
         let messages = collect_bit_messages(hex, desc);
 
-        // Expect "First Feature" and "Third Feature" (and the reserved line should get the " Bit-<index>" if matched)
+        // Expect "First Feature" and "Third Feature" (and the reserved line should get the "
+        // Bit-<index>" if matched)
         assert!(messages.iter().any(|m| m == "First Feature"));
         assert!(messages.iter().any(|m| m == "Third Feature"));
         // reserved wasn't set here; now test reserved specifically below

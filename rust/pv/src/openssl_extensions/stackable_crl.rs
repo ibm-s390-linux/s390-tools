@@ -2,14 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::openssl_extensions::bio::BioMemSlice;
-use foreign_types::{ForeignType, ForeignTypeRef};
-use openssl::{
-    error::ErrorStack,
-    stack::Stackable,
-    x509::{X509Crl, X509CrlRef},
-};
 use std::ptr;
+
+use foreign_types::{ForeignType, ForeignTypeRef};
+use openssl::error::ErrorStack;
+use openssl::stack::Stackable;
+use openssl::x509::{X509Crl, X509CrlRef};
+
+use crate::openssl_extensions::bio::BioMemSlice;
 
 #[derive(Debug)]
 pub struct StackableX509Crl(*mut openssl_sys::X509_CRL);

@@ -4,19 +4,15 @@
 
 // DO NOT USE ANY OF THESE ITEMS IN PRODUCTION CODE
 // USED FOR INTERNAL UNIT AND FVT TESTING ONLY!!!
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use openssl::{
-    bn::BigNum,
-    ec::{EcGroup, EcKey},
-    error::ErrorStack,
-    nid::Nid,
-    pkey::{PKey, Private, Public},
-    x509::{X509Crl, X509},
-};
+use openssl::bn::BigNum;
+use openssl::ec::{EcGroup, EcKey};
+use openssl::error::ErrorStack;
+use openssl::nid::Nid;
+use openssl::pkey::{PKey, Private, Public};
+use openssl::x509::{X509Crl, X509};
 
 /// TEST ONLY! Loads the specified asset into the binary at compile time.
 ///

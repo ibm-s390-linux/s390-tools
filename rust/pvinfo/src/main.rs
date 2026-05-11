@@ -4,9 +4,10 @@
 
 //! Main function for the PV Info Tool
 
+use std::io::{self, Write};
+
 use anyhow::Result;
 use clap::Parser;
-use std::io::{self, Write};
 
 mod cli;
 mod constants;
@@ -16,13 +17,14 @@ mod pvinfo;
 mod se_status;
 mod strings;
 
+use std::path::PathBuf;
+
 use crate::cli::{CliOptions, Commands, OutputFormat};
 use crate::constants::*;
 use crate::handlers::handle_supported_flags;
 use crate::io_utils::check_uv_exists;
 use crate::pvinfo::PvInfo;
 use crate::se_status::SeStatus;
-use std::path::PathBuf;
 
 fn main() -> Result<()> {
     // Parse CLI arguments and apply post-processing

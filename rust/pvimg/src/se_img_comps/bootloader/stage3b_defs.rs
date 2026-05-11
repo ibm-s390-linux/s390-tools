@@ -4,7 +4,8 @@
 
 // Based on the output of rust-bindgen 0.69.1
 #![allow(non_camel_case_types, non_snake_case, nonstandard_style)]
-use deku::{ctx::Endian, prelude::*};
+use deku::ctx::Endian;
+use deku::prelude::*;
 use pvimg::misc::PSW;
 
 #[derive(Debug, Default, Clone, DekuRead, DekuWrite)]

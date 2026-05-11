@@ -6,7 +6,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use log::info;
-use pv::{misc::read_file, request::Confidential};
+use pv::misc::read_file;
+use pv::request::Confidential;
 
 use crate::cli::UserKeys;
 

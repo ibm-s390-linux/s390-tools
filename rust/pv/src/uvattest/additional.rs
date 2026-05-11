@@ -2,14 +2,13 @@
 //
 // Copyright IBM Corp. 2024
 
-use serde::Serialize;
 use std::fmt::Display;
 
-use crate::req::Keyslot;
-use crate::static_assert;
-use crate::{Error, Result};
+use serde::Serialize;
 
 use super::arcb::AttestationFlags;
+use crate::req::Keyslot;
+use crate::{static_assert, Error, Result};
 
 /// Hash for additional-data stuff used for parsing [`AdditionalData`]
 pub(super) const PHKH_SIZE: u32 = 0x20;

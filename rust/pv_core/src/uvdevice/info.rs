@@ -2,14 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::ffi::{self, uvio_uvdev_info};
-use crate::{
-    misc::{Flags, Lsb0Flags64},
-    uv::{UvCmd, UvDevice},
-    Result,
-};
 use std::fmt::Display;
+
 use zerocopy::{FromZeros, IntoBytes};
+
+use super::ffi::{self, uvio_uvdev_info};
+use crate::misc::{Flags, Lsb0Flags64};
+use crate::uv::{UvCmd, UvDevice};
+use crate::Result;
 
 /// Information of supported functions by the uvdevice
 ///

@@ -4,6 +4,12 @@
 
 //! PV Info method implementation for the PV Info Tool
 
+use std::collections::HashMap;
+use std::fmt;
+use std::path::Path;
+
+use serde::Serialize;
+
 use crate::cli::CliOptions;
 use crate::constants::*;
 use crate::io_utils::{
@@ -12,10 +18,6 @@ use crate::io_utils::{
 };
 use crate::se_status::*;
 use crate::strings::*;
-use serde::Serialize;
-use std::collections::HashMap;
-use std::fmt;
-use std::path::Path;
 
 #[derive(Serialize)]
 pub struct PvInfo {
@@ -262,9 +264,10 @@ impl fmt::Display for PvInfo {
 mod test {
     //! Unit Tests for pvinfo_method
 
+    use std::collections::HashMap;
+
     use super::*;
     use crate::se_status::SeStatus;
-    use std::collections::HashMap;
 
     // Test that Display for PvInfo produces a truly empty string
     // when all optional fields are None/

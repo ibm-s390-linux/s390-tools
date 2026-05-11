@@ -2,12 +2,14 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::exchange::ExchangeFormatResponse;
+use std::fmt::Display;
+
 use anyhow::Result;
 use pv::attest::{AdditionalData, AttestationFlags};
 use serde::Serialize;
-use std::fmt::Display;
 use utils::HexSlice;
+
+use crate::exchange::ExchangeFormatResponse;
 
 #[derive(Serialize)]
 pub struct AttestationResult<'a> {

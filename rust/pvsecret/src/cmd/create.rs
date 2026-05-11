@@ -2,27 +2,20 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use std::{
-    fs::OpenOptions,
-    io::{Read, Write},
-    path::Path,
-};
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
+use std::path::Path;
 
 use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
-use pv::request::openssl;
-use pv::{
-    misc::{
-        decode_hex, encode_hex, open_file, pv_guest_bit_set, read_exact_file, read_file,
-        try_parse_u128, try_parse_u64, write,
-    },
-    request::{
-        openssl::pkey::{PKey, Private},
-        BootHdrTags, PolicyReference, ReqEncrCtx, Request, SymKeyType,
-    },
-    secret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret},
-    uv::ConfigUid,
+use pv::misc::{
+    decode_hex, encode_hex, open_file, pv_guest_bit_set, read_exact_file, read_file,
+    try_parse_u128, try_parse_u64, write,
 };
+use pv::request::openssl::pkey::{PKey, Private};
+use pv::request::{openssl, BootHdrTags, PolicyReference, ReqEncrCtx, Request, SymKeyType};
+use pv::secret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret};
+use pv::uv::ConfigUid;
 use serde_yaml::Value;
 use utils::get_writer_from_cli_file_arg;
 use zerocopy::IntoBytes;

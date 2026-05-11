@@ -2,8 +2,7 @@
 //
 // Copyright IBM Corp. 2024
 
-pub use pv::Error as PvError;
-pub use pv::PvCoreError;
+pub use pv::{Error as PvError, PvCoreError};
 use utils::{impl_exitcodetrait, ExitCodeTrait};
 
 /// Result type for this crate

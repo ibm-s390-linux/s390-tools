@@ -2,16 +2,17 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::ffi;
-use crate::{
-    request::{Confidential, MagicValue},
-    uv::{SecretEntry, UvCmd},
-    uvsecret::AddSecretMagic,
-    Error, Result, PAGESIZE,
-};
+use std::io::Read;
+use std::mem::size_of_val;
+
 use log::debug;
-use std::{io::Read, mem::size_of_val};
 use zerocopy::IntoBytes;
+
+use super::ffi;
+use crate::request::{Confidential, MagicValue};
+use crate::uv::{SecretEntry, UvCmd};
+use crate::uvsecret::AddSecretMagic;
+use crate::{Error, Result, PAGESIZE};
 
 /// _List Secrets_ Ultravisor command.
 ///

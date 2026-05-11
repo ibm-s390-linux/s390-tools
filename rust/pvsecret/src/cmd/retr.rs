@@ -2,16 +2,14 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{collections::VecDeque, fmt::Display};
+use std::collections::VecDeque;
+use std::fmt::Display;
 
 use anyhow::{anyhow, bail, Context, Result};
 use log::{debug, info, warn};
-use pv::{
-    misc::open_file,
-    misc::write,
-    secret::{GuestSecret, RetrievedSecret},
-    uv::{RetrieveCmd, SecretEntry, SecretId, SecretList, UvDevice},
-};
+use pv::misc::{open_file, write};
+use pv::secret::{GuestSecret, RetrievedSecret};
+use pv::uv::{RetrieveCmd, SecretEntry, SecretId, SecretList, UvDevice};
 use utils::get_writer_from_cli_file_arg;
 
 use super::list::list_uvc;

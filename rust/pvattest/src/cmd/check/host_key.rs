@@ -2,21 +2,20 @@
 //
 // Copyright IBM Corp. 2024
 
+use std::fmt::Display;
+use std::path::Path;
+
 use anyhow::Result;
 use log::{debug, info};
-use pv::{
-    misc::{read_certs, read_file},
-    request::{openssl::DigestBytes, EcPubKeyCoord},
-};
+use pv::misc::{read_certs, read_file};
+use pv::request::openssl::DigestBytes;
+use pv::request::EcPubKeyCoord;
 use serde::Serialize;
-use std::{fmt::Display, path::Path};
 use utils::HexSlice;
 
 use super::CheckState;
-use crate::{
-    additional::AttestationResult,
-    cli::{CheckOpt, HostKeyCheckPolicy},
-};
+use crate::additional::AttestationResult;
+use crate::cli::{CheckOpt, HostKeyCheckPolicy};
 
 #[derive(Debug, Clone, Copy)]
 pub enum HkCheck {

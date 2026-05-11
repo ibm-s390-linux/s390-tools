@@ -4,8 +4,9 @@
 
 //! se-status definitions for the PV Info Tool
 
-use serde::Serialize; // Trait for serializing data structures (e.g., YAML)
-use std::fmt; // Provides the `Display` trait for pretty-printing
+use std::fmt;
+
+use serde::Serialize; // Trait for serializing data structures (e.g., YAML) // Provides the `Display` trait for pretty-printing
 
 /// Enum representing Secure Execution status
 
@@ -67,8 +68,8 @@ mod test {
     use super::SeStatus;
 
     // Display implementation tests
-    // Verifies that each enum variant of SeStatus is converted into the expected human-readable string
-    // via the Display trait implementation
+    // Verifies that each enum variant of SeStatus is converted into the expected human-readable
+    // string via the Display trait implementation
 
     #[test]
     fn test_display_strings() {

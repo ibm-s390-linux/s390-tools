@@ -3,27 +3,22 @@
 // Copyright IBM Corp. 2023
 use std::mem::size_of;
 
-use openssl::{
-    bn::{BigNum, BigNumContext},
-    ec::{EcGroup, EcGroupRef, EcKey, EcPointRef},
-    error::ErrorStack,
-    hash::{DigestBytes, MessageDigest},
-    nid::Nid,
-    pkey::{PKey, PKeyRef, Private, Public},
-};
+use openssl::bn::{BigNum, BigNumContext};
+use openssl::ec::{EcGroup, EcGroupRef, EcKey, EcPointRef};
+use openssl::error::ErrorStack;
+use openssl::hash::{DigestBytes, MessageDigest};
+use openssl::nid::Nid;
+use openssl::pkey::{PKey, PKeyRef, Private, Public};
 use pv_core::request::{RequestMagic, RequestVersion};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32};
 
-use crate::{
-    assert_size,
-    crypto::{
-        decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, hash, random_array,
-        AeadEncryptionResult, SymKey, SymKeyType,
-    },
-    misc::to_u32,
-    request::Confidential,
-    Error, Result,
+use crate::crypto::{
+    decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, hash, random_array,
+    AeadEncryptionResult, SymKey, SymKeyType,
 };
+use crate::misc::to_u32;
+use crate::request::Confidential;
+use crate::{assert_size, Error, Result};
 /// Encrypt a _secret_ using self and a given private key.
 pub trait Encrypt {
     /// Encrypts `secret` using `self` and `priv_key` the encryption.
@@ -520,7 +515,9 @@ impl<'a> BinReqValues<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{get_test_asset, request::SymKey, test_utils::*};
+    use crate::get_test_asset;
+    use crate::request::SymKey;
+    use crate::test_utils::*;
 
     static TEST_MAGIC: [u8; 8] = 0x12345689abcdef00u64.to_be_bytes();
 

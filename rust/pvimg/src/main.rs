@@ -16,7 +16,8 @@ mod cmd;
 mod se_img;
 mod se_img_comps;
 
-use std::{env, process::ExitCode};
+use std::env;
+use std::process::ExitCode;
 
 use clap::{Command, CommandFactory, Parser};
 use cli::{validate_cli, CliOptions, SubCommands};

@@ -138,8 +138,8 @@ pub struct CreateSecretOpt {
     /// includes the relative file path and the SHA‑512 hash of the policy file, allowing the
     /// policy’s integrity to be verified.
     ///
-    /// This option conflicts with --user-data, because both options use the same user data field in
-    /// the ASR structure.
+    /// This option conflicts with --user-data, because both options use the same user data field
+    /// in the ASR structure.
     #[arg(long, value_name = "FILE", value_hint = ValueHint::FilePath, conflicts_with("user_data"))]
     pub policy: Option<String>,
 

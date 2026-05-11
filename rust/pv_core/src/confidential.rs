@@ -82,7 +82,8 @@ impl<T: Default> Zeroize for Vec<T> {
 
 impl Zeroize for String {
     fn zeroize(&mut self) {
-        // SAFETY: The Vec<u8> zerorize function overwrites memory with the zero byte -> still valid UTF-8
+        // SAFETY: The Vec<u8> zerorize function overwrites memory with the zero byte -> still valid
+        // UTF-8
         unsafe { self.as_mut_vec().zeroize() };
     }
 }

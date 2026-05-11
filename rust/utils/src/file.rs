@@ -2,13 +2,11 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{
-    ffi::OsStr,
-    fs::{rename, File, OpenOptions},
-    io::{self, Seek, SeekFrom, Write},
-    os::unix::fs::OpenOptionsExt,
-    path::Path,
-};
+use std::ffi::OsStr;
+use std::fs::{rename, File, OpenOptions};
+use std::io::{self, Seek, SeekFrom, Write};
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 
 use pv::{Error, FileAccessErrorType, PvCoreError, Result};
 
@@ -80,7 +78,8 @@ impl AtomicFile<File> {
     /// ```
     /// # use utils::AtomicFile;
     ///
-    /// let file = AtomicFile::with_extension("test", ".incomplete", &mut std::fs::OpenOptions::new()).unwrap();
+    /// let file = AtomicFile::with_extension("test", ".incomplete", &mut std::fs::OpenOptions::new())
+    ///     .unwrap();
     /// ```
     pub fn with_extension<P: AsRef<Path>, S: AsRef<OsStr>>(
         output: P,

@@ -2,20 +2,16 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::assert_size;
-use crate::{
-    crypto::{sign_msg, verify_signature},
-    req::BinReqValues,
-    request::{
-        openssl::pkey::{HasParams, HasPublic, Id, PKey, PKeyRef, Private, Public},
-        RequestMagic,
-    },
-    secret::{AddSecretMagic, AddSecretRequest, AddSecretVersion, UserDataType},
-    Error, Result,
-};
 use openssl::hash::MessageDigest;
 use openssl::nid::Nid;
 use zerocopy::{BigEndian, FromBytes, IntoBytes, KnownLayout, U16};
+
+use crate::crypto::{sign_msg, verify_signature};
+use crate::req::BinReqValues;
+use crate::request::openssl::pkey::{HasParams, HasPublic, Id, PKey, PKeyRef, Private, Public};
+use crate::request::RequestMagic;
+use crate::secret::{AddSecretMagic, AddSecretRequest, AddSecretVersion, UserDataType};
+use crate::{assert_size, Error, Result};
 
 /// User data.
 ///
@@ -380,7 +376,8 @@ impl From<VerifiedUserData> for Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{get_test_asset, test_utils::get_test_keys};
+    use crate::get_test_asset;
+    use crate::test_utils::get_test_keys;
 
     #[test]
     fn sign_null() {

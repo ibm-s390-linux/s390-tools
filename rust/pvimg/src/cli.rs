@@ -2,15 +2,16 @@
 //
 // Copyright IBM Corp. 2024
 
+use std::env;
+use std::ffi::OsStr;
 use std::fmt::Display;
+use std::io::IsTerminal;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::ToString;
-use std::{env, ffi::OsStr, io::IsTerminal, path::PathBuf};
 
-use clap::{
-    builder::{PossibleValue, TypedValueParser},
-    Arg, ArgGroup, Args, Command, CommandFactory, Parser, ValueEnum, ValueHint,
-};
+use clap::builder::{PossibleValue, TypedValueParser};
+use clap::{Arg, ArgGroup, Args, Command, CommandFactory, Parser, ValueEnum, ValueHint};
 use log::warn;
 use utils::{CertificateOptions, DeprecatedVerbosityOptions};
 

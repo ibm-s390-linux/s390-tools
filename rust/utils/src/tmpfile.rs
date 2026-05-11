@@ -2,11 +2,9 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{
-    ffi::{CString, OsStr},
-    os::unix::prelude::OsStrExt,
-    path::{Path, PathBuf},
-};
+use std::ffi::{CString, OsStr};
+use std::os::unix::prelude::OsStrExt;
+use std::path::{Path, PathBuf};
 
 /// Rust wrapper for `libc::mkdtemp`
 fn mkdtemp<P: AsRef<Path>>(template: P) -> Result<PathBuf, std::io::Error> {

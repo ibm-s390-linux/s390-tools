@@ -2,29 +2,27 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{fs::OpenOptions, io::BufReader};
+use std::fs::OpenOptions;
+use std::io::BufReader;
 
 use anyhow::{Context, Result};
 use log::{debug, warn};
 use pv::misc::{open_file, try_parse_u64};
-use pvimg::{
-    error::OwnExitCode,
-    secured_comp::ComponentTrait,
-    uvdata::{
-        ControlFlagTrait, ControlFlagsTrait, FlagData, PcfV1, PlaintextControlFlagsV1, ScfV1,
-        SeHdrDataV1, SecretControlFlagsV1,
-    },
+use pvimg::error::OwnExitCode;
+use pvimg::secured_comp::ComponentTrait;
+use pvimg::uvdata::{
+    ControlFlagTrait, ControlFlagsTrait, FlagData, PcfV1, PlaintextControlFlagsV1, ScfV1,
+    SeHdrDataV1, SecretControlFlagsV1,
 };
 use utils::{AtomicFile, AtomicFileOperation};
 
-use crate::{
-    cli::{ComponentPaths, CreateBootImageArgs},
-    cmd::common::read_user_provided_keys,
-    se_img::{SeHdrArgs, SeImgBuilder},
-    se_img_comps::{
-        check_components, cmdline::Cmdline, kernel::S390Kernel, ramdisk::Ramdisk, Component,
-    },
-};
+use crate::cli::{ComponentPaths, CreateBootImageArgs};
+use crate::cmd::common::read_user_provided_keys;
+use crate::se_img::{SeHdrArgs, SeImgBuilder};
+use crate::se_img_comps::cmdline::Cmdline;
+use crate::se_img_comps::kernel::S390Kernel;
+use crate::se_img_comps::ramdisk::Ramdisk;
+use crate::se_img_comps::{check_components, Component};
 
 /// The returned vector is sorted by the occurrence in the memory layout:
 /// First the kernel, then the ramdisk and then the kernel cmdline.

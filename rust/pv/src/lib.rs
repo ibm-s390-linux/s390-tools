@@ -63,13 +63,11 @@ pub mod uv {
 pub mod attest {
     pub use pv_core::attest::*;
 
-    pub use crate::uvattest::{
-        additional::AdditionalData,
-        arcb::{
-            AttestationAuthenticated, AttestationFlags, AttestationRequest, AttestationVersion,
-        },
-        attest::{AttestationItems, AttestationMeasurement},
+    pub use crate::uvattest::additional::AdditionalData;
+    pub use crate::uvattest::arcb::{
+        AttestationAuthenticated, AttestationFlags, AttestationRequest, AttestationVersion,
     };
+    pub use crate::uvattest::attest::{AttestationItems, AttestationMeasurement};
 }
 
 /// Definitions and functions to write objects in PEM format
@@ -91,27 +89,22 @@ pub use crate::error::HkdVerifyErrorType;
 
 /// Functionalities to build UV requests
 pub mod request {
-    pub use crate::{
-        brcb::{seek_se_hdr_start, BootHdrTags, SeImgMetaData},
-        crypto::{
-            decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
-            AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey,
-            SymKeyType, SHA_512_HASH_LEN,
-        },
-        req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request},
-        verify::{CertVerifier, HkdVerifier, NoVerifyHkd},
+    pub use crate::brcb::{seek_se_hdr_start, BootHdrTags, SeImgMetaData};
+    pub use crate::crypto::{
+        decrypt_aead, derive_aes256_gcm_key, encrypt_aead, gen_ec_key, random_array,
+        AeadDecryptionResult, AeadEncryptionResult, Aes256GcmKey, Aes256XtsKey, SymKey, SymKeyType,
+        SHA_512_HASH_LEN,
     };
+    pub use crate::req::{EcPubKeyCoord, Encrypt, Keyslot, ReqEncrCtx, Request};
+    pub use crate::verify::{CertVerifier, HkdVerifier, NoVerifyHkd};
 
     /// Reexports some useful OpenSSL symbols
     pub mod openssl {
-        pub use openssl::{
-            error::ErrorStack,
-            hash::DigestBytes,
-            nid::Nid,
-            pkey,
-            sha::{Sha256, Sha512},
-            x509,
-        };
+        pub use openssl::error::ErrorStack;
+        pub use openssl::hash::DigestBytes;
+        pub use openssl::nid::Nid;
+        pub use openssl::sha::{Sha256, Sha512};
+        pub use openssl::{pkey, x509};
         // rust-OpenSSL does not define these NIDs
         #[allow(missing_docs)]
         pub const NID_ED25519: Nid = Nid::from_raw(openssl_sys::NID_ED25519);
@@ -120,7 +113,6 @@ pub mod request {
     }
 
     pub use pv_core::request::*;
-
     pub use pv_core::PolicyReference;
 }
 
@@ -128,11 +120,9 @@ pub mod request {
 pub mod secret {
     pub use pv_core::secret::*;
 
-    pub use crate::uvsecret::{
-        asrcb::{AddSecretFlags, AddSecretRequest, AddSecretVersion},
-        ext_secret::ExtSecret,
-        guest_secret::GuestSecret,
-        retr_secret::{IbmProtectedKey, RetrievedSecret},
-        user_data::verify_asrcb_and_get_user_data,
-    };
+    pub use crate::uvsecret::asrcb::{AddSecretFlags, AddSecretRequest, AddSecretVersion};
+    pub use crate::uvsecret::ext_secret::ExtSecret;
+    pub use crate::uvsecret::guest_secret::GuestSecret;
+    pub use crate::uvsecret::retr_secret::{IbmProtectedKey, RetrievedSecret};
+    pub use crate::uvsecret::user_data::verify_asrcb_and_get_user_data;
 }

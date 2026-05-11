@@ -6,17 +6,14 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::{info, warn};
-use pv::{
-    misc::{open_file, read_certs, read_file},
-    FileAccessErrorType, PvCoreError,
-};
-use pvimg::{
-    error::{Error, OwnExitCode, PvError},
-    uvdata::{KeyExchangeTrait, SeHdr, UvKeyHashesV1},
-};
+use pv::misc::{open_file, read_certs, read_file};
+use pv::{FileAccessErrorType, PvCoreError};
+use pvimg::error::{Error, OwnExitCode, PvError};
+use pvimg::uvdata::{KeyExchangeTrait, SeHdr, UvKeyHashesV1};
 use utils::HexSlice;
 
-use crate::{cli::TestArgs, log_println};
+use crate::cli::TestArgs;
+use crate::log_println;
 
 /// Returns `Ok(true)` if at least one of the hashes is included.
 fn hdr_test_target_hashes(hdr: &SeHdr, key_hashes: &Path) -> Result<bool> {

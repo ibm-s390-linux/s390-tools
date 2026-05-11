@@ -2,7 +2,8 @@
 //
 // Copyright IBM Corp. 2024
 
-use std::{fmt::Display, time::Duration};
+use std::fmt::Display;
+use std::time::Duration;
 
 use anyhow::{bail, Result};
 use base64::prelude::*;
@@ -11,7 +12,8 @@ use log::{debug, info, log_enabled};
 use serde::{Deserialize, Serialize};
 
 use super::{bail_check, CheckState};
-use crate::{additional::AttestationResult, cli::CheckOpt};
+use crate::additional::AttestationResult;
+use crate::cli::CheckOpt;
 
 const CHECK_DEFAULT_ENDP: &str = "https://esupport.ibm.com/eccedge/ent/z";
 const VERIFY_API: &str = "hmrs/firmware/attestation/v1/verify";

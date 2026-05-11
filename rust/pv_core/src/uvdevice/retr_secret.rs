@@ -2,9 +2,11 @@
 //
 // Copyright IBM Corp. 2024
 
-use crate::uv::{ListableSecretType, RetrieveCmd};
-use serde::{Deserialize, Serialize, Serializer};
 use std::fmt::Display;
+
+use serde::{Deserialize, Serialize, Serializer};
+
+use crate::uv::{ListableSecretType, RetrieveCmd};
 
 /// Allowed sizes for AES keys
 #[non_exhaustive]
@@ -335,8 +337,8 @@ mod test {
         assert_tokens(&retr, &[Token::Str("19 (EC-SECP521R1-PRIVATE-KEY)")]);
     }
 
-    // Ensure that the string representation of the retrievable types stay constant, or PEM will have
-    // different, incompatible types
+    // Ensure that the string representation of the retrievable types stay constant, or PEM will
+    // have different, incompatible types
     #[test]
     fn stable_type_names() {
         assert_eq!("PLAINTEXT", RetrievableSecret::PlainText.to_string());

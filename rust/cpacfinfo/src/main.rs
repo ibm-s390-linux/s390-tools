@@ -7,11 +7,11 @@ mod msa;
 mod query;
 mod stfle;
 
-use anyhow::bail;
-use anyhow::Result as anyhowRes;
-use clap::Parser;
 use std::io::ErrorKind;
 use std::result::Result::Ok;
+
+use anyhow::{bail, Result as anyhowRes};
+use clap::Parser;
 use utils::print_version;
 
 use crate::cli::{Cli, Format};

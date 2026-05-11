@@ -3,19 +3,17 @@
 // Copyright IBM Corp. 2023
 
 #![allow(non_camel_case_types)]
-use crate::FileAccessErrorType;
-use crate::{Error, Result};
-use log::debug;
-use std::{
-    convert::TryInto,
-    fs::File,
-    os::unix::prelude::{AsRawFd, RawFd},
-};
+use std::convert::TryInto;
+use std::fs::File;
+use std::os::unix::prelude::{AsRawFd, RawFd};
 
 #[cfg(not(test))]
 use ::libc::ioctl;
+use log::debug;
 #[cfg(test)]
 use test::mock_libc::ioctl;
+
+use crate::{Error, FileAccessErrorType, Result};
 
 /// Contains the rust representation of asm/uvdevice.h
 /// from kernel version: 6.5 verify

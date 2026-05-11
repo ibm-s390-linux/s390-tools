@@ -2,31 +2,25 @@
 //
 // Copyright IBM Corp. 2023
 
-#[allow(unused_imports)] // used for more convenient docstring
-use super::asrcb::AddSecretRequest;
-use crate::{
-    assert_size,
-    crypto::{hash, random_array, SymKeyType},
-    request::{
-        openssl::{NID_ED25519, NID_ED448},
-        Confidential,
-    },
-    uv::{
-        AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, ListableSecretType, RetrievableSecret,
-        RetrieveCmd, SecretId,
-    },
-    Error, Result,
-};
-use openssl::{
-    hash::MessageDigest,
-    nid::Nid,
-    pkey::{Id, PKey, PKeyRef, Private},
-};
+use std::fmt::Display;
+
+use openssl::hash::MessageDigest;
+use openssl::nid::Nid;
+use openssl::pkey::{Id, PKey, PKeyRef, Private};
 use pv_core::static_assert;
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
-use zerocopy::{BigEndian, KnownLayout};
-use zerocopy::{FromBytes, Immutable, IntoBytes, U16, U32};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16, U32};
+
+#[allow(unused_imports)] // used for more convenient docstring
+use super::asrcb::AddSecretRequest;
+use crate::crypto::{hash, random_array, SymKeyType};
+use crate::request::openssl::{NID_ED25519, NID_ED448};
+use crate::request::Confidential;
+use crate::uv::{
+    AesSizes, AesXtsSizes, EcCurves, HmacShaSizes, ListableSecretType, RetrievableSecret,
+    RetrieveCmd, SecretId,
+};
+use crate::{assert_size, Error, Result};
 
 const ASSOC_SECRET_SIZE: usize = 32;
 const CCK_SIZE: usize = 32;
@@ -476,12 +470,12 @@ impl UpdateCckHdr {
 #[cfg(test)]
 mod test {
 
-    use super::HmacShaSizes as HmacSizes;
-    use super::RetrievableSecret::*;
-    use super::*;
     use openssl::ec::{EcGroup, EcKey};
     use pv_core::uv::AesSizes;
     use serde_test::{assert_tokens, Token};
+
+    use super::RetrievableSecret::*;
+    use super::{HmacShaSizes as HmacSizes, *};
 
     #[test]
     fn association() {

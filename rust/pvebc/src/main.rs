@@ -20,27 +20,23 @@
 mod cli;
 mod ebc_utils;
 
-#[cfg(target_arch = "s390x")]
-use pv_core::uv::{AddCmd, UvDevice};
-#[cfg(target_arch = "s390x")]
-use utils::get_reader_from_cli_file_arg;
+use std::fs::{self, File};
+use std::io::{BufRead, Read};
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use std::str::from_utf8;
 
 use anyhow::{bail, Context, Error, Result};
 use clap::Parser;
-use pv_core::{
-    misc::{decode_hex, encode_hex},
-    PolicyReference,
-};
-use std::{
-    fs::{self, File},
-    io::{BufRead, Read},
-    path::{Path, PathBuf},
-    process::ExitCode,
-    str::from_utf8,
-};
+use pv_core::misc::{decode_hex, encode_hex};
+#[cfg(target_arch = "s390x")]
+use pv_core::uv::{AddCmd, UvDevice};
+use pv_core::PolicyReference;
 // Don't use openssl here because this tool is intended to run in the initramfs
 // phase of the boot and there we don't want to dynamically link against a C lib
 use sha2::{self, Digest};
+#[cfg(target_arch = "s390x")]
+use utils::get_reader_from_cli_file_arg;
 use zerocopy::TryFromBytes;
 
 use crate::cli::Cli;

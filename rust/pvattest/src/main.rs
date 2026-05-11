@@ -8,10 +8,11 @@ mod cli;
 mod cmd;
 mod exchange;
 
+use std::process::ExitCode;
+
 use clap::{CommandFactory, Parser};
 use cli::{CliOptions, Command};
 use log::trace;
-use std::process::ExitCode;
 use utils::{print_cli_error, print_error, print_version, PvLogger};
 
 use crate::cmd::{check, create, perform, verify, CMD_FN, UV_CMD_FN};

@@ -2,10 +2,9 @@
 //
 // Copyright IBM Corp. 2024
 
-use deku::{
-    reader::Reader, writer::Writer, DekuContainerRead, DekuContainerWrite, DekuError, DekuReader,
-    DekuWriter,
-};
+use deku::reader::Reader;
+use deku::writer::Writer;
+use deku::{DekuContainerRead, DekuContainerWrite, DekuError, DekuReader, DekuWriter};
 use pv::request::{Confidential, Zeroize};
 
 use crate::pv_utils::error::Result;
@@ -13,8 +12,7 @@ use crate::pv_utils::error::Result;
 pub mod serde_hex_left_padded_u64 {
     use std::fmt::LowerHex;
 
-    use serde::Deserializer;
-    use serde::{Deserialize, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S: Serializer, B: LowerHex>(
         data: &B,
@@ -219,7 +217,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use deku::{ctx::Endian, DekuContainerWrite, DekuRead, DekuWrite};
+    use deku::ctx::Endian;
+    use deku::{DekuContainerWrite, DekuRead, DekuWrite};
     use pv::request::Confidential;
 
     use crate::pv_utils::serializing::{confidential_read_slice, confidential_write_slice};

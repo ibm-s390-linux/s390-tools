@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
-use std::{collections::BTreeSet, fmt::Display, rc::Rc};
+use std::collections::BTreeSet;
+use std::fmt::Display;
+use std::rc::Rc;
 
-use crate::{
-    misc::round_up,
-    pv_utils::error::{Error, Result},
-};
+use crate::misc::round_up;
+use crate::pv_utils::error::{Error, Result};
 
 /// Represents a range from [start, stop) (inclusive start, exclusive stop)
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
@@ -194,12 +194,11 @@ impl IntoIterator for Layout {
 #[allow(clippy::shadow_unrelated)]
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, rc::Rc};
+    use std::collections::BTreeSet;
+    use std::rc::Rc;
 
-    use proptest::{
-        prelude::{Just, Strategy},
-        prop_assert, prop_assert_eq, proptest,
-    };
+    use proptest::prelude::{Just, Strategy};
+    use proptest::{prop_assert, prop_assert_eq, proptest};
 
     use crate::pv_utils::{Interval, Layout};
 

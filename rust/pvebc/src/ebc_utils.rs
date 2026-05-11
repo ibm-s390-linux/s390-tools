@@ -2,9 +2,11 @@
 //
 // Copyright IBM Corp.
 
+use std::io::Read;
+use std::path::Path;
+
 use anyhow::{bail, Context, Result};
 use pv_core::misc::open_file;
-use std::{io::Read, path::Path};
 
 /// Length of the MAC tag in bytes (last 16 bytes of AddSecretRequest files)
 pub const MAC_TAG_LEN: usize = 16;

@@ -2,10 +2,9 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use std::{
-    io::{Read, Seek, SeekFrom::Current},
-    mem::size_of,
-};
+use std::io::SeekFrom::Current;
+use std::io::{Read, Seek};
+use std::mem::size_of;
 
 use log::{debug, warn};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32, U64};

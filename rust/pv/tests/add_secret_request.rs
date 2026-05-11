@@ -3,25 +3,18 @@
 // Copyright IBM Corp. 2023
 
 #![allow(missing_docs)]
-use openssl::{
-    ec::{EcGroup, EcKey},
-    nid::Nid,
-    pkey::Private,
+use openssl::ec::{EcGroup, EcKey};
+use openssl::nid::Nid;
+use openssl::pkey::Private;
+use s390_pv::request::openssl::pkey::{PKey, Public};
+use s390_pv::request::{BootHdrTags, ReqEncrCtx, Request, SymKey};
+use s390_pv::secret::{
+    verify_asrcb_and_get_user_data, AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret,
+    GuestSecret,
 };
-use s390_pv::{
-    get_test_asset,
-    request::{
-        openssl::pkey::{PKey, Public},
-        BootHdrTags, ReqEncrCtx, Request, SymKey,
-    },
-    secret::{
-        verify_asrcb_and_get_user_data, AddSecretFlags, AddSecretRequest, AddSecretVersion,
-        ExtSecret, GuestSecret,
-    },
-    test_utils::get_test_keys,
-    uv::ConfigUid,
-    Result,
-};
+use s390_pv::test_utils::get_test_keys;
+use s390_pv::uv::ConfigUid;
+use s390_pv::{get_test_asset, Result};
 
 const TAGS: BootHdrTags = BootHdrTags::new([1; 64], [2; 64], [3; 64], [4; 16]);
 const CUID: ConfigUid = [0x42u8; 16];

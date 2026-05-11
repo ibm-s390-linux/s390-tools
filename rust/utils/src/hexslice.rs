@@ -2,8 +2,9 @@
 //
 // Copyright IBM Corp. 2024
 
-use serde::Serialize;
 use std::fmt::{Display, Formatter};
+
+use serde::Serialize;
 
 /// Displays/Serializes an u8-slice into a Hex-string
 ///

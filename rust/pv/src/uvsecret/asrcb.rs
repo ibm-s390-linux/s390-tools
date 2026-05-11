@@ -2,23 +2,22 @@
 //
 // Copyright IBM Corp. 2023
 
-use super::{guest_secret::ListableSecretHdr, user_data::UserData};
-use crate::{
-    assert_size,
-    crypto::{hkdf_rfc_5869, AeadEncryptionResult},
-    misc::Flags,
-    req::{Aad, BinReqValues, Keyslot, ReqEncrCtx},
-    request::{BootHdrTags, Confidential, Request},
-    secret::{ExtSecret, GuestSecret},
-    uv::{ConfigUid, UvFlags},
-    Result,
-};
-use openssl::{
-    md::Md,
-    pkey::{PKey, Private, Public},
-};
-use pv_core::{request::RequestVersion, secret::AddSecretMagic, uv::SecretId};
+use openssl::md::Md;
+use openssl::pkey::{PKey, Private, Public};
+use pv_core::request::RequestVersion;
+use pv_core::secret::AddSecretMagic;
+use pv_core::uv::SecretId;
 use zerocopy::{Immutable, IntoBytes};
+
+use super::guest_secret::ListableSecretHdr;
+use super::user_data::UserData;
+use crate::crypto::{hkdf_rfc_5869, AeadEncryptionResult};
+use crate::misc::Flags;
+use crate::req::{Aad, BinReqValues, Keyslot, ReqEncrCtx};
+use crate::request::{BootHdrTags, Confidential, Request};
+use crate::secret::{ExtSecret, GuestSecret};
+use crate::uv::{ConfigUid, UvFlags};
+use crate::{assert_size, Result};
 
 /// Authenticated data w/o user data
 #[repr(C)]

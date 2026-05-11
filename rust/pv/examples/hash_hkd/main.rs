@@ -1,13 +1,12 @@
 #![allow(missing_docs)]
 
-use pv::request::EcPubKeyCoord;
-use pv_core::misc::encode_hex;
-use s390_pv as pv;
-
 use std::env::args;
 
 use pv::misc::{read_certs, read_file};
+use pv::request::EcPubKeyCoord;
 use pv::{Error, Result};
+use pv_core::misc::encode_hex;
+use s390_pv as pv;
 
 fn main() -> Result<()> {
     let hkd = args().nth(1).expect("Expect one Host-key document");

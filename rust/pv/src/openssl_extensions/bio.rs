@@ -3,10 +3,12 @@
 // Copyright IBM Corp. 2024
 
 use core::slice;
+use std::ffi::c_int;
+use std::marker::PhantomData;
+use std::ptr;
+
 use openssl::error::ErrorStack;
 use openssl_sys::BIO_new_mem_buf;
-use std::ffi::c_int;
-use std::{marker::PhantomData, ptr};
 
 pub struct BioMem(*mut openssl_sys::BIO);
 

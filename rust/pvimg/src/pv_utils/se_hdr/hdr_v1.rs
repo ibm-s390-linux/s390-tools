@@ -1,53 +1,44 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2024
-use std::{
-    fmt::Display,
-    mem::{size_of, size_of_val},
-};
+use std::fmt::Display;
+use std::mem::{size_of, size_of_val};
 
 use base64::prelude::*;
-use deku::{ctx::Endian, prelude::*};
-use openssl::{
-    nid::Nid,
-    pkey::{PKeyRef, Public},
-};
+use deku::ctx::Endian;
+use deku::prelude::*;
+use openssl::nid::Nid;
+use openssl::pkey::{PKeyRef, Public};
+use pv::request::openssl::pkey::{PKey, Private};
 use pv::request::{
-    gen_ec_key,
-    openssl::pkey::{PKey, Private},
-    random_array, Aes256XtsKey, Confidential, EcPubKeyCoord, Encrypt, Keyslot, SymKey, SymKeyType,
-    Zeroize, SHA_512_HASH_LEN,
+    gen_ec_key, random_array, Aes256XtsKey, Confidential, EcPubKeyCoord, Encrypt, Keyslot, SymKey,
+    SymKeyType, Zeroize, SHA_512_HASH_LEN,
 };
 use serde::{Deserialize, Serialize};
 use utils::HexSlice;
 
 use super::keys::phkh_v1;
-use crate::{
-    error::Error,
-    misc::PAGESIZE,
-    pv_utils::{
-        error::Result,
-        misc::display_indented,
-        se_hdr::{
-            brb::{
-                ComponentMetadata, ComponentMetadataV1, SeHdrCommon, SeHdrConfBuilderTrait,
-                SeHdrPlainTrait, SeHdrPubBuilderTrait, SeHdrTrait,
-            },
-            keys::{BinaryKeySlotV1, EcPubKeyCoordV1},
-        },
-        serializing::{
-            bytesize, bytesize_confidential, confidential_read_slice, confidential_write_slice,
-            serde_base64, serde_hex_array, serde_hex_confidential_array, serde_hex_left_padded_u64,
-            serialize_to_bytes,
-        },
-        try_copy_slice_to_array,
-        uvdata::{
-            AeadCipherTrait, AeadDataTrait, AeadPlainDataTrait, KeyExchangeTrait, UvDataPlainTrait,
-            UvDataTrait,
-        },
-        uvdata_builder::{AeadCipherBuilderTrait, KeyExchangeBuilderTrait},
-        PlaintextControlFlagsV1, SecretControlFlagsV1, PSW,
-    },
+use crate::error::Error;
+use crate::misc::PAGESIZE;
+use crate::pv_utils::error::Result;
+use crate::pv_utils::misc::display_indented;
+use crate::pv_utils::se_hdr::brb::{
+    ComponentMetadata, ComponentMetadataV1, SeHdrCommon, SeHdrConfBuilderTrait, SeHdrPlainTrait,
+    SeHdrPubBuilderTrait, SeHdrTrait,
+};
+use crate::pv_utils::se_hdr::keys::{BinaryKeySlotV1, EcPubKeyCoordV1};
+use crate::pv_utils::serializing::{
+    bytesize, bytesize_confidential, confidential_read_slice, confidential_write_slice,
+    serde_base64, serde_hex_array, serde_hex_confidential_array, serde_hex_left_padded_u64,
+    serialize_to_bytes,
+};
+use crate::pv_utils::uvdata::{
+    AeadCipherTrait, AeadDataTrait, AeadPlainDataTrait, KeyExchangeTrait, UvDataPlainTrait,
+    UvDataTrait,
+};
+use crate::pv_utils::uvdata_builder::{AeadCipherBuilderTrait, KeyExchangeBuilderTrait};
+use crate::pv_utils::{
+    try_copy_slice_to_array, PlaintextControlFlagsV1, SecretControlFlagsV1, PSW,
 };
 
 #[derive(Debug)]

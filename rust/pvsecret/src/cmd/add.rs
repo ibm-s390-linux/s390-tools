@@ -2,17 +2,14 @@
 //
 // Copyright IBM Corp. 2023
 
-use crate::{
-    cli::{AddSecretOpt, AddSecretOptComb},
-    cmd::list::list_uvc,
-};
 use anyhow::{bail, Context, Result};
 use log::warn;
-use pv::{
-    secret::AddSecretRequest,
-    uv::{AddCmd, UvCmd, UvDevice},
-};
+use pv::secret::AddSecretRequest;
+use pv::uv::{AddCmd, UvCmd, UvDevice};
 use utils::get_reader_from_cli_file_arg;
+
+use crate::cli::{AddSecretOpt, AddSecretOptComb};
+use crate::cmd::list::list_uvc;
 
 /// Do an Add Secret UVC
 pub fn add(opt: &AddSecretOpt) -> Result<()> {

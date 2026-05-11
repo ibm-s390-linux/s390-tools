@@ -2,17 +2,17 @@
 //
 // Copyright IBM Corp.
 
+use std::fmt::{Display, Formatter, Result as Resfmt};
+use std::fs::File;
+use std::os::unix::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
+use std::str::from_utf8;
+
+use zerocopy::{FromBytes, Immutable, IntoBytes};
+
 use crate::misc::encode_hex;
 use crate::utils::open_file;
 use crate::{Error, Result};
-use std::{
-    fmt::{Display, Formatter, Result as Resfmt},
-    fs::File,
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
-    str::from_utf8,
-};
-use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 const HASH_LEN: usize = 32;
 // UserDataType::Unsigned.max() returns 512

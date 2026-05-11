@@ -2,25 +2,28 @@
 //
 // Copyright IBM Corp. 2023, 2024
 
-use std::{convert::TryInto, fmt::Display, ops::Range};
+use std::convert::TryInto;
+use std::fmt::Display;
+use std::ops::Range;
 
 use enum_dispatch::enum_dispatch;
-use openssl::{
-    derive::Deriver,
-    ec::{EcGroup, EcKey},
-    hash::{DigestBytes, MessageDigest},
-    md::MdRef,
-    nid::Nid,
-    pkey::{HasPublic, Id, PKey, PKeyRef, Private, Public},
-    pkey_ctx::{HkdfMode, PkeyCtx},
-    rand::rand_bytes,
-    rsa::Padding,
-    sign::{Signer, Verifier},
-    symm::{decrypt_aead as openssl_decrypt_aead, encrypt_aead as openssl_encrypt_aead, Cipher},
+use openssl::derive::Deriver;
+use openssl::ec::{EcGroup, EcKey};
+use openssl::hash::{DigestBytes, MessageDigest};
+use openssl::md::MdRef;
+use openssl::nid::Nid;
+use openssl::pkey::{HasPublic, Id, PKey, PKeyRef, Private, Public};
+use openssl::pkey_ctx::{HkdfMode, PkeyCtx};
+use openssl::rand::rand_bytes;
+use openssl::rsa::Padding;
+use openssl::sign::{Signer, Verifier};
+use openssl::symm::{
+    decrypt_aead as openssl_decrypt_aead, encrypt_aead as openssl_encrypt_aead, Cipher,
 };
 use pv_core::request::Confidential;
 
-use crate::{error::Result, Error};
+use crate::error::Result;
+use crate::Error;
 
 /// An AES256-GCM key that will purge itself out of the memory when going out of scope
 pub type Aes256GcmKey = Confidential<[u8; SymKeyType::AES_256_GCM_KEY_LEN]>;
@@ -540,7 +543,8 @@ pub(crate) fn verify_signature<T: HasPublic>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{get_test_asset, test_utils::*, PvCoreError};
+    use crate::test_utils::*;
+    use crate::{get_test_asset, PvCoreError};
 
     #[test]
     fn sign_ec() {

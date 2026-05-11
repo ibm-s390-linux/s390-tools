@@ -6,13 +6,14 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use log::info;
-use openssl::hash::DigestBytes;
-use openssl::hash::{hash, MessageDigest};
-use pv::{misc::read_file, secret::AddSecretRequest};
+use openssl::hash::{hash, DigestBytes, MessageDigest};
+use pv::misc::read_file;
+use pv::secret::AddSecretRequest;
 use serde::Serialize;
 
 use super::{bail_check, CheckState};
-use crate::{additional::AttestationResult, cli::CheckOpt};
+use crate::additional::AttestationResult;
+use crate::cli::CheckOpt;
 
 #[derive(Debug, Serialize)]
 pub struct SecretStoreCheck<'a> {

@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
-pub use crate::openssl_extensions::stackable_crl::*;
 use foreign_types::{ForeignType, ForeignTypeRef};
-use openssl::{
-    error::ErrorStack,
-    stack::{Stack, StackRef},
-    x509::{
-        store::{X509StoreBuilderRef, X509StoreRef},
-        X509CrlRef, X509NameRef, X509Ref, X509StoreContextRef, X509,
-    },
-};
+use openssl::error::ErrorStack;
+use openssl::stack::{Stack, StackRef};
+use openssl::x509::store::{X509StoreBuilderRef, X509StoreRef};
+use openssl::x509::{X509CrlRef, X509NameRef, X509Ref, X509StoreContextRef, X509};
+
+pub use crate::openssl_extensions::stackable_crl::*;
 
 pub fn opt_to_ptr<T: ForeignTypeRef>(o: Option<&T>) -> *mut T::CType {
     match o {
