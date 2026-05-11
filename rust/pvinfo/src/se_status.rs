@@ -6,9 +6,7 @@
 
 use std::fmt;
 
-use serde::Serialize; // Trait for serializing data structures (e.g., YAML) // Provides the `Display` trait for pretty-printing
-
-/// Enum representing Secure Execution status
+use serde::Serialize;
 
 #[derive(Serialize, PartialEq, Debug)] // Automatically implements `serde::Serialize`
 pub enum SeStatus {
