@@ -8,15 +8,15 @@ rust-version.workspace = true
 [dependencies]
 sha2 = "0.10"
 hex = "0.4"
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 pv_core = { path = "../pv_core" , package = "s390_pv_core" }
 utils = { path = "../utils" }
-anyhow = { version = "1.0.95", features = ["std"] }
-zerocopy = { version = "0.8.27", features = ["derive"] }
+anyhow = { version = "1.0.102", features = ["std"] }
+zerocopy = { version = "0.8.48", features = ["derive"] }
 
 [build-dependencies]
-clap = { version ="4.5", features = ["derive"]}
-clap_complete = "4.5"
+clap = { version ="4.6", features = ["derive"]}
+clap_complete = "4.6"
 
 [lints]
 workspace = true
