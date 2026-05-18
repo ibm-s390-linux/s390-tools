@@ -962,19 +962,13 @@ static void record_cpus_nnpa(const char *cp)
 	parse_cpulist(S390_EVT_PAI_NNPA, cp);
 }
 
-/* Mapsize must be power of 2 and larger than 4. Count bits in n and
- * return 0 if input is invalid and has a bit count larger than one.
+/* Mapsize must be power of 2 and larger than 4. Return true in this case.
  */
-static unsigned long check_mapsize(unsigned long n)
+static bool check_mapsize(unsigned long n)
 {
-	int bit, cnt = 0;
-
 	if (n < 4)
 		return 0;
-	for (bit = 0; bit < __BITS_PER_LONG; ++bit)
-		if (n & (1 << bit))
-			++cnt;
-	return cnt == 1 ? n : 0;
+	return (n & (n - 1)) == 0;
 }
 
 static void setprio(const char *prio)
@@ -1040,11 +1034,11 @@ int main(int argc, char **argv)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
 			break;
 		case 'm':
-			errno = 0;
 			mapsize = strtoul(optarg, &slash, 0);
-			mapsize = check_mapsize(mapsize);
-			if (errno || !mapsize || *slash)
+			if (!mapsize || *slash)
 				errx(EXIT_FAILURE, "Invalid argument for -%c", ch);
+			if (!check_mapsize(mapsize))
+				errx(EXIT_FAILURE, "No power of 2 number for -%c", ch);
 			break;
 		case 'n':
 			record_cpus_nnpa(optarg);
