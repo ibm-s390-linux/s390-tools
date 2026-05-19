@@ -113,20 +113,20 @@ pub enum AttAddFlags {
 #[derive(Args, Debug)]
 pub struct PerformAttOpt {
     /// Specify the request to be sent.
-    #[arg(hide=true, short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
-    pub input: Option<String>,
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    input: Option<String>,
 
     /// Specify the request to be sent.
     #[arg(value_name = "IN", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
-    pub input_pos: Option<String>,
+    input_pos: Option<String>,
 
     /// Write the result to FILE.
-    #[arg(hide=true, short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
-    pub output: Option<String>,
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    output: Option<String>,
 
     /// Write the result to FILE.
     #[arg(value_name = "OUT", value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
-    pub output_pos: Option<String>,
+    output_pos: Option<String>,
 
     /// Provide up to 256 bytes of user input
     ///
@@ -134,7 +134,7 @@ pub struct PerformAttOpt {
     /// It is verified during the Attestation measurement verification.
     /// May be any arbitrary data, as long as it is less or equal to 256 bytes
     #[arg(short, long, value_name = "File", value_hint = ValueHint::FilePath,)]
-    pub user_data: Option<String>,
+    user_data: Option<String>,
 }
 
 #[cfg(target_arch = "s390x")]
