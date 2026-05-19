@@ -12,7 +12,12 @@ use self::{
     secret_store::secret_store_check,
     secret_store::SecretStoreCheck,
 };
-use crate::{additional::AttestationResult, cli::CheckOpt, exchange::ExchangeFormatResponse};
+use crate::{
+    additional::AttestationResult,
+    cli::{CheckOpt, CheckOptIO},
+    exchange::ExchangeFormatResponse,
+};
+
 use anyhow::Result;
 use log::{debug, info, warn};
 use pv::{
@@ -104,7 +109,8 @@ pub struct CheckResult<'a> {
 
 /// Perform the policy checks
 pub fn check(opt: &CheckOpt) -> Result<ExitCode> {
-    let mut input = open_file(&opt.input)?;
+    let opt_io = CheckOptIO::from(opt);
+    let mut input = open_file(opt_io.input)?;
     let inp = ExchangeFormatResponse::read(&mut input)?;
     let auth = AttestationRequest::auth_bin(inp.arcb())?;
     let att_res = AttestationResult::from_exchange(&inp, auth.flags())?;
@@ -139,7 +145,7 @@ pub fn check(opt: &CheckOpt) -> Result<ExitCode> {
     };
 
     debug!("res {res:?}");
-    let output = create_file(&opt.output)?;
+    let output = create_file(opt_io.output)?;
     serde_yaml::to_writer(output, &res)?;
 
     match res.successful {

@@ -217,12 +217,20 @@ pub enum OutputType {
 #[derive(Args, Debug)]
 pub struct CheckOpt {
     /// Specify the attestation response to check whether the policies are validated.
-    #[arg(value_name = "IN", value_hint = ValueHint::FilePath,)]
-    pub input: PathBuf,
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    input: Option<PathBuf>,
+
+    /// Specify the attestation response to check whether the policies are validated.
+    #[arg(value_name = "IN", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
+    input_pos: Option<PathBuf>,
 
     /// Specify the output file for the check result.
-    #[arg(value_name = "OUT", value_hint = ValueHint::FilePath,)]
-    pub output: PathBuf,
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    output: Option<PathBuf>,
+
+    /// Specify the output file for the check result.
+    #[arg(value_name = "OUT", value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
+    output_pos: Option<PathBuf>,
 
     /// Define the output format.
     #[arg(long, value_enum, default_value_t)]
@@ -298,6 +306,30 @@ pub struct CheckOpt {
     /// Use an endpoint you trust. Requires the --firmware option.
     #[arg(long, requires("firmware"), value_name = "URL", value_hint = ValueHint::Url)]
     pub firmware_verify_url: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct CheckOptIO<'a> {
+    pub input: &'a PathBuf,
+    pub output: &'a PathBuf,
+}
+
+impl<'a> From<&'a CheckOpt> for CheckOptIO<'a> {
+    fn from(value: &'a CheckOpt) -> Self {
+        let input = match (&value.input, &value.input_pos) {
+            (None, Some(i)) => i,
+            (Some(i), None) => i,
+            (Some(_), Some(_)) => unreachable!(),
+            (None, None) => unreachable!(),
+        };
+        let output = match (&value.output, &value.output_pos) {
+            (None, Some(o)) => o,
+            (Some(o), None) => o,
+            (Some(_), Some(_)) => unreachable!(),
+            (None, None) => unreachable!(),
+        };
+        Self { input, output }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
