@@ -322,7 +322,7 @@ fn write_yaml<P: AsRef<Path>>(
     write_out(&yaml_path, secret_info, "secret information")?;
     warn!(
         "Successfully wrote secret info to '{}'",
-        yaml_path.display().to_string()
+        yaml_path.display()
     );
     Ok(())
 }

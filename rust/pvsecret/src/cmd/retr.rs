@@ -15,7 +15,7 @@ use pv::{
 use utils::get_writer_from_cli_file_arg;
 
 use super::list::list_uvc;
-use crate::cli::{RetrInpFmt, RetrOutFmt, RetrSecretOptions};
+use crate::cli::{RetrInpFmt, RetrOutFmt, RetrSecretOptions, RetrSecretOptionsComb};
 
 enum Value {
     Id(SecretId),
@@ -31,19 +31,19 @@ impl Display for Value {
     }
 }
 
-impl TryFrom<&RetrSecretOptions> for Value {
+impl TryFrom<&RetrSecretOptionsComb<'_>> for Value {
     type Error = anyhow::Error;
 
-    fn try_from(opt: &RetrSecretOptions) -> Result<Self> {
+    fn try_from(opt: &RetrSecretOptionsComb) -> Result<Self> {
         match opt.inform {
-            RetrInpFmt::Yaml => match serde_yaml::from_reader(&mut open_file(&opt.input)?)? {
+            RetrInpFmt::Yaml => match serde_yaml::from_reader(&mut open_file(opt.input)?)? {
                 GuestSecret::Retrievable { id, .. } => Ok(Self::Id(id)),
                 gs => bail!("The file contains a {gs}-secret, which is not retrievable."),
             },
-            RetrInpFmt::Hex => serde_yaml::from_str(&opt.input)
+            RetrInpFmt::Hex => serde_yaml::from_str(opt.input)
                 .context("Cannot parse SecretId information")
                 .map(Self::Id),
-            RetrInpFmt::Name => Ok(Self::Id(SecretId::from_string(&opt.input))),
+            RetrInpFmt::Name => Ok(Self::Id(SecretId::from_string(opt.input))),
             RetrInpFmt::Idx => opt
                 .input
                 .parse()
@@ -104,8 +104,9 @@ fn retrieve(value: Value) -> Result<RetrievedSecret> {
 }
 
 pub fn retr(opt: &RetrSecretOptions) -> Result<()> {
-    let mut output = get_writer_from_cli_file_arg(&opt.output)?;
-    let retr_secret = retrieve(opt.try_into()?)
+    let opt_comb = RetrSecretOptionsComb::from(opt);
+    let mut output = get_writer_from_cli_file_arg(opt_comb.output)?;
+    let retr_secret = retrieve((&opt_comb).try_into()?)
         .context("Could not retrieve the secret from the UV secret store.")?;
 
     let out_data = match opt.outform {
@@ -115,7 +116,7 @@ pub fn retr(opt: &RetrSecretOptions) -> Result<()> {
     write(
         &mut output,
         out_data.value(),
-        &opt.output,
+        opt_comb.output,
         "IBM Protected Key",
     )?;
     Ok(())

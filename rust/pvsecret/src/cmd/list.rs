@@ -4,7 +4,7 @@
 
 use std::io::ErrorKind;
 
-use crate::cli::{ListSecretOpt, ListSecretOutputType};
+use crate::cli::{ListSecretOpt, ListSecretOptComb, ListSecretOutputType};
 use anyhow::{Context, Error, Result};
 use log::{info, warn};
 use pv::uv::{ListCmd, SecretList, UvDevice};
@@ -34,11 +34,12 @@ pub fn list_uvc(uv: &UvDevice) -> Result<SecretList> {
 
 /// Do a List Secrets UVC and output the list in the requested format
 pub fn list(opt: &ListSecretOpt) -> Result<()> {
+    let opt_comb = ListSecretOptComb::from(opt);
     let uv = UvDevice::open()?;
     let secret_list = list_uvc(&uv)?;
-    let mut wr_out = get_writer_from_cli_file_arg(&opt.output)?;
+    let mut wr_out = get_writer_from_cli_file_arg(opt_comb.output)?;
 
-    match &opt.format {
+    match opt_comb.format {
         ListSecretOutputType::Human => {
             write!(wr_out, "{secret_list}").context("Cannot generate output")?
         }
@@ -50,10 +51,10 @@ pub fn list(opt: &ListSecretOpt) -> Result<()> {
     }
     wr_out.flush()?;
 
-    if opt.output != STDOUT {
+    if opt_comb.output != STDOUT {
         warn!(
             "Successfully wrote the list of secrets to '{}'",
-            &opt.output
+            opt_comb.output
         );
     }
     Ok(())
