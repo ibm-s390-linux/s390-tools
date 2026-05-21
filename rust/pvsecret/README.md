@@ -429,14 +429,14 @@ Print help (see a summary with '-h').
 
 ## pvsecret add
 ### Synopsis
-`pvsecret add [OPTIONS] [FILE]`
+`pvsecret add [OPTIONS] [INPUT]`
 ### Description
 Submit an add-secret request to the Ultravisor (s390x only). Perform an
 add-secret request using a previously generated add-secret request. Only
 available on s390x.
 ### Arguments
 
-`<FILE>`
+`<INPUT>`
 <ul>
 Specify the request to be sent.
 </ul>
@@ -473,17 +473,16 @@ fail. Only available on s390x.
 
 ## pvsecret list
 ### Synopsis
-`pvsecret list [OPTIONS] [FILE]`
+`pvsecret list [OPTIONS] [OUTPUT]`
 ### Description
 List all ultravisor secrets (s390x only). Lists the IDs of all non-null secrets
 currently stored in the ultravisor for the currently running IBM Secure
 Execution guest. Only available on s390x.
 ### Arguments
 
-`<FILE>`
+`<OUTPUT>`
 <ul>
 Store the result in FILE.
-    Default value: '-'
 </ul>
 
 
@@ -514,7 +513,7 @@ Print help (see a summary with '-h').
 
 ## pvsecret verify
 ### Synopsis
-`pvsecret verify [OPTIONS] [FILE] [FILE]`
+`pvsecret verify [OPTIONS] [INPUT] [OUTPUT]`
 ### Description
 Verifies that the given request is an Add-Secret request by testing for some
 values to be present. If the request contains signed user-data, the signature
@@ -554,17 +553,16 @@ The verification process works as follows:
 
 ### Arguments
 
-`<FILE>`
+`<INPUT>`
 <ul>
 Specify the request to be checked.
 </ul>
 
 
-`<FILE>`
+`<OUTPUT>`
 <ul>
 Store the result in FILE If the request contained abirtary user-data the output
 contains this user-data with padded zeros if available.
-    Default value: '-'
 </ul>
 
 
@@ -588,7 +586,7 @@ curve over a 521 bit prime field (secp521r1).
 </ul>
 
 
-`-o`, `--output <FILE>`
+`-o`, `--output <OUTPUT>`
 <ul>
 Store the result in FILE If the request contained abirtary user-data the output
 contains this user-data with padded zeros if available.
@@ -603,13 +601,13 @@ Print help (see a summary with '-h').
 
 ## pvsecret retrieve
 ### Synopsis
-`pvsecret retrieve [OPTIONS] [ID] [FILE]`
-`pvsecret retr [OPTIONS] [ID] [FILE]`
+`pvsecret retrieve [OPTIONS] [INPUT] [OUTPUT]`
+`pvsecret retr [OPTIONS] [INPUT] [OUTPUT]`
 ### Description
 Retrieve a secret from the UV secret store (s390x only)
 ### Arguments
 
-`<ID>`
+`<INPUT>`
 <ul>
 Specify the secret ID to be retrieved. Input type depends on '--inform'. If
 `yaml` (default) is specified, it must be a yaml created by the create
@@ -621,16 +619,15 @@ retrieved.
 </ul>
 
 
-`<FILE>`
+`<OUTPUT>`
 <ul>
 Specify the output path to place the secret value.
-    Default value: '-'
 </ul>
 
 
 ### Options
 
-`-i`, `--input <FILE>`
+`-i`, `--input <ID>`
 <ul>
 Specify the secret ID to be retrieved. Input type depends on '--inform'. If
 `yaml` (default) is specified, it must be a yaml created by the create
