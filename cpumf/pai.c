@@ -894,7 +894,7 @@ static int parse_event_attr(char *cp)
 }
 
 /* Parse CPU list and event specifications */
-static void parse_cpulist(int enr, const char *parm)
+static void parse_cpulist(int enr, char *parm)
 {
 	unsigned int evt_attr = 0;
 	cpu_set_t cmdlist, result;
@@ -948,14 +948,14 @@ static const struct util_prg prg = {
 	}
 };
 
-static void record_cpus_crypto(const char *cp)
+static void record_cpus_crypto(char *cp)
 {
 	if (!libcpumf_have_pai_crypto())
 		errx(EXIT_FAILURE, "No support for PAI crypto counters");
 	parse_cpulist(S390_EVT_PAI_CRYPTO, cp);
 }
 
-static void record_cpus_nnpa(const char *cp)
+static void record_cpus_nnpa(char *cp)
 {
 	if (!libcpumf_have_pai_nnpa())
 		errx(EXIT_FAILURE, "No support for PAI nnpa counters");
