@@ -276,6 +276,29 @@ impl DeprecatedVerbosityOptions {
         )
     }
 }
+pub fn combined_path_opt<'a, N: AsRef<str>, P: AsRef<str>>(
+    named: &'a Option<N>,
+    positional: &'a Option<P>,
+    default: &'a str,
+) -> &'a str {
+    match (named, positional) {
+        (None, Some(i)) => i.as_ref(),
+        (Some(i), None) => i.as_ref(),
+        (Some(_), Some(_)) => unreachable!(),
+        (None, None) => default,
+    }
+}
+pub fn combined_path_req<'a, N: AsRef<str>, P: AsRef<str>>(
+    named: &'a Option<N>,
+    positional: &'a Option<P>,
+) -> &'a str {
+    match (named, positional) {
+        (None, Some(i)) => i.as_ref(),
+        (Some(i), None) => i.as_ref(),
+        (Some(_), Some(_)) => unreachable!(),
+        (None, None) => unreachable!(),
+    }
+}
 
 #[cfg(test)]
 mod test {

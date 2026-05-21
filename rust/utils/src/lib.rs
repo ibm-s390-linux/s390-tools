@@ -16,8 +16,9 @@ pub use ::log::LevelFilter;
 
 pub use crate::{
     cli::{
-        get_reader_from_cli_file_arg, get_writer_from_cli_file_arg, print_cli_error, print_error,
-        CertificateOptions, DeprecatedVerbosityOptions, VerbosityOptions, STDIN, STDOUT,
+        combined_path_opt, combined_path_req, get_reader_from_cli_file_arg,
+        get_writer_from_cli_file_arg, print_cli_error, print_error, CertificateOptions,
+        DeprecatedVerbosityOptions, VerbosityOptions, STDIN, STDOUT,
     },
     exit_code::{docstring, ExitCodeDoc, ExitCodeTrait, ExitCodeVariantDoc},
     file::{AtomicFile, AtomicFileOperation},
