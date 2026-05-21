@@ -6,7 +6,9 @@ use std::fmt::Display;
 
 use clap::error::ErrorKind::ValueValidation;
 use clap::{ArgGroup, Args, CommandFactory, Parser, Subcommand, ValueEnum, ValueHint};
-use utils::{CertificateOptions, DeprecatedVerbosityOptions, STDOUT};
+use utils::{
+    combined_path_opt, combined_path_req, CertificateOptions, DeprecatedVerbosityOptions, STDOUT,
+};
 
 /// Manage secrets for IBM Secure Execution guests.
 ///
@@ -296,7 +298,7 @@ pub struct AddSecretOpt {
     input: Option<String>,
 
     /// Specify the request to be sent.
-    #[arg(value_name = "FILE", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
+    #[arg(value_name = "INPUT", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
     input_pos: Option<String>,
 
     /// Force the addition of add-secret requests.
@@ -315,12 +317,7 @@ pub struct AddSecretOptComb<'a> {
 
 impl<'a> From<&'a AddSecretOpt> for AddSecretOptComb<'a> {
     fn from(value: &'a AddSecretOpt) -> Self {
-        let input = match (&value.input, &value.input_pos) {
-            (None, Some(i)) => i.as_str(),
-            (Some(i), None) => i.as_str(),
-            (Some(_), Some(_)) => unreachable!(),
-            (None, None) => unreachable!(),
-        };
+        let input = combined_path_req(&value.input, &value.input_pos);
         Self {
             input,
             force: value.force,
@@ -346,7 +343,7 @@ pub struct ListSecretOpt {
     output: Option<String>,
 
     /// Store the result in FILE
-    #[arg(value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
+    #[arg(value_name = "OUTPUT", value_hint = ValueHint::FilePath, conflicts_with("output"))]
     output_pos: Option<String>,
 
     /// Define the output format of the list.
@@ -362,12 +359,7 @@ pub struct ListSecretOptComb<'a> {
 
 impl<'a> From<&'a ListSecretOpt> for ListSecretOptComb<'a> {
     fn from(value: &'a ListSecretOpt) -> Self {
-        let output = match (&value.output, &value.output_pos) {
-            (None, Some(o)) => o.as_str(),
-            (Some(o), None) => o.as_str(),
-            (Some(_), Some(_)) => unreachable!(),
-            (None, None) => unreachable!(),
-        };
+        let output = combined_path_opt(&value.output, &value.output_pos, STDOUT);
         Self {
             output,
             format: value.format,
@@ -382,7 +374,7 @@ pub struct VerifyOpt {
     input: Option<String>,
 
     /// Specify the request to be checked.
-    #[arg(value_name = "FILE", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
+    #[arg(value_name = "INPUT", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
     input_pos: Option<String>,
 
     /// Certificate containing a public key used to verify the user data signature.
@@ -399,14 +391,14 @@ pub struct VerifyOpt {
     ///
     /// If the request contained abirtary user-data the output contains this user-data with padded
     /// zeros if available.
-    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath,)]
+    #[arg(short, long, value_name = "OUTPUT", value_hint = ValueHint::FilePath,)]
     output: Option<String>,
 
     /// Store the result in FILE
     ///
     /// If the request contained abirtary user-data the output contains this user-data with padded
     /// zeros if available.
-    #[arg(value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
+    #[arg(value_name = "OUTPUT", value_hint = ValueHint::FilePath, conflicts_with("output"))]
     output_pos: Option<String>,
 }
 
@@ -419,18 +411,8 @@ pub struct VerifyOptComb<'a> {
 
 impl<'a> From<&'a VerifyOpt> for VerifyOptComb<'a> {
     fn from(value: &'a VerifyOpt) -> Self {
-        let input = match (&value.input, &value.input_pos) {
-            (None, Some(i)) => i.as_str(),
-            (Some(i), None) => i.as_str(),
-            (Some(_), Some(_)) => unreachable!(),
-            (None, None) => unreachable!(),
-        };
-        let output = match (&value.output, &value.output_pos) {
-            (None, Some(o)) => o.as_str(),
-            (Some(o), None) => o.as_str(),
-            (Some(_), Some(_)) => unreachable!(),
-            (None, None) => unreachable!(),
-        };
+        let input = combined_path_req(&value.input, &value.input_pos);
+        let output = combined_path_opt(&value.output, &value.output_pos, STDOUT);
         Self {
             input,
             user_cert: value.user_cert.as_deref(),
@@ -448,7 +430,7 @@ pub struct RetrSecretOptions {
     /// handle encodes in hexadecimal. Leading zeros are required. If there are multiple secrets in
     /// the store with the same Id there are no guarantees on which specific secret is retrieved.
     /// Use --inform=idx to make sure a specific secret is retrieved.
-    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    #[arg(short, long, value_name = "ID", value_hint = ValueHint::FilePath)]
     input: Option<String>,
 
     /// Specify the secret ID to be retrieved.
@@ -458,7 +440,7 @@ pub struct RetrSecretOptions {
     /// handle encodes in hexadecimal. Leading zeros are required. If there are multiple secrets in
     /// the store with the same Id there are no guarantees on which specific secret is retrieved.
     /// Use --inform=idx to make sure a specific secret is retrieved.
-    #[arg(value_name = "ID", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
+    #[arg(value_name = "INPUT", value_hint = ValueHint::FilePath, required_unless_present("input"), conflicts_with("input"))]
     input_pos: Option<String>,
 
     /// Specify the output path to place the secret value
@@ -466,7 +448,7 @@ pub struct RetrSecretOptions {
     output: Option<String>,
 
     /// Specify the output path to place the secret value
-    #[arg(value_name = "FILE", default_value = STDOUT, value_hint = ValueHint::FilePath, required_unless_present("output"), conflicts_with("output"))]
+    #[arg(value_name = "OUTPUT", value_hint = ValueHint::FilePath, conflicts_with("output"))]
     output_pos: Option<String>,
 
     /// Define input type for the Secret ID
@@ -513,18 +495,8 @@ pub struct RetrSecretOptionsComb<'a> {
 
 impl<'a> From<&'a RetrSecretOptions> for RetrSecretOptionsComb<'a> {
     fn from(value: &'a RetrSecretOptions) -> Self {
-        let input = match (&value.input, &value.input_pos) {
-            (None, Some(i)) => i.as_str(),
-            (Some(i), None) => i.as_str(),
-            (Some(_), Some(_)) => unreachable!(),
-            (None, None) => unreachable!(),
-        };
-        let output = match (&value.output, &value.output_pos) {
-            (None, Some(o)) => o.as_str(),
-            (Some(o), None) => o.as_str(),
-            (Some(_), Some(_)) => unreachable!(),
-            (None, None) => unreachable!(),
-        };
+        let input = combined_path_req(&value.input, &value.input_pos);
+        let output = combined_path_opt(&value.output, &value.output_pos, STDOUT);
         Self {
             input,
             output,
