@@ -1,15 +1,23 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.42.1 (2026-05-22)__
 
-  For Linux kernel version: 7.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 7.0
 
   Changes of existing tools:
+  - cpumf/pai: Improve -m XXX argument verification
+  - pvattest: Add -i -o option variant for check
+  - pvattest: Show perform -i & -o option in help
+  - pvebc: Disable unit logging to /boot
+  - pvsecret: Add -i -o option variants
 
   Bug Fixes:
+  - cpumf/pai: Remove unnecessary const parameter definition
+  - pv: Fix error description
+  - pvebc: Fix dependency for non EBC guests
+  - pvebc: Fix kernel module dependencies
+  - zipl: Don't modify job->data.dump and job->data.mvdump sequentially
 
 * __v2.42.0 (2026-04-30)__
 
