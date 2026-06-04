@@ -710,7 +710,8 @@ Actions:
 
 	echo "
 Options:
-	-h, --help		Show this help text"
+	-h, --help		Show this help text
+	    --version		Show version information"
 	if [[ "${action}" == "[ACTION]" ]]; then
 		echo -e "\t-c, --config\t\tConfiguration yaml file"
 	fi
@@ -718,6 +719,13 @@ Options:
 	echo ""
 
 	return 0
+}
+
+print_version() {
+	cat <<-EOD
+	$0: version %S390_TOOLS_VERSION%
+	Copyright IBM Corp.
+	EOD
 }
 
 
@@ -747,7 +755,7 @@ cli() {
 		shift
 	fi
 
-	temp=$(getopt -o 'hc:i:' --long 'help,config:,image:' -- "$@")
+	temp=$(getopt -o 'hc:i:' --long 'help,version,config:,image:' -- "$@")
 	if ! eval set -- "$temp"; then
 		usage
 		return 1
@@ -760,6 +768,10 @@ cli() {
 		case "$1" in
 			'-h'|'--help')
 				usage
+				exit 0
+			;;
+			'--version')
+				print_version
 				exit 0
 			;;
 			'-c'|'--config')
