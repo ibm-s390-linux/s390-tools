@@ -415,6 +415,7 @@ CONFIGFILES="\
   /etc/docker\
   /etc/dracut.conf.d\
   /etc/exports\
+  /etc/fpc*\
   /etc/fstab\
   /etc/groups\
   /etc/grub.d\
