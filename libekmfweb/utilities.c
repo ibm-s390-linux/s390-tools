@@ -229,8 +229,9 @@ int parse_json_web_token(const char *token, json_object **header_obj,
 			 size_t *signature_len)
 {
 	json_object *hdr = NULL, *pld = NULL, *b64_obj = NULL;
-	char *ch, *header, *payload, *json = NULL;
 	size_t header_len, payload_len, json_len;
+	const char *ch, *header, *payload;
+	char *json = NULL;
 	bool b64 = true;
 	int rc = 0;
 
@@ -254,7 +255,7 @@ int parse_json_web_token(const char *token, json_object **header_obj,
 	 * and the following parts (if any) are used for JWS Signature, or JWE
 	 * Encryption (not considered here).
 	 */
-	header = (char *)token;
+	header = token;
 
 	ch = strchr(token, '.');
 	if (ch == NULL) {
@@ -653,7 +654,7 @@ int verify_json_web_signature(const char *jws, const unsigned char *payload,
 	BIGNUM *bn_s = NULL;
 	const char *alg;
 	size_t sig_len;
-	char *ch;
+	const char *ch;
 
 	if (jws == NULL || pkey == NULL)
 		return -EINVAL;
