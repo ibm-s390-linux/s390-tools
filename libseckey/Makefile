@@ -28,7 +28,7 @@ detect-openssl-version.dep:
 	echo "  #error openssl version 1.1 is required" >> $(TMPFILE)
 	echo "#endif" >> $(TMPFILE)
 	echo "static void __attribute__((unused)) test(void) {" >> $(TMPFILE)
-	echo "    EVP_PKEY_meth_remove(NULL);" >> $(TMPFILE)
+	echo "    EVP_PKEY_id(NULL);" >> $(TMPFILE)
 	echo "}" >> $(TMPFILE)
 	mv $(TMPFILE) $@
 
