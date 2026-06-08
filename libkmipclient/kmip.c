@@ -1370,7 +1370,8 @@ int kmip_connection_get_server_cert(const char *server,
 	struct kmip_conn_config config = { 0 };
 	struct kmip_connection *conn = NULL;
 	int rc, numcerts, i, port_found = 0;
-	char *hostname = NULL, *tok, *tok2;
+	const char *tok, *tok2;
+	char *hostname = NULL;
 	STACK_OF(X509) *chain;
 	bool do_verify = true;
 	FILE *fp = NULL;
