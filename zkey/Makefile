@@ -98,7 +98,7 @@ zkey-cryptsetup-skip-openssl:
 all: $(BUILD_TARGETS) $(SUB_DIRS)
 
 zkey.o: check-dep-zkey zkey.c pkey.h cca.h ep11.h misc.h
-pkey.o: pkey.c pkey.h cca.h ep11.h utils.h
+pkey.o: pkey.c pkey.h cca.h ep11.h utils.h cpacf.h
 cca.o: cca.c cca.h pkey.h ep11.h utils.h
 ep11.o: ep11.c ep11.h pkey.h cca.h utils.h
 utils.o: utils.h pkey.h cca.h ep11.h
@@ -109,14 +109,15 @@ zkey-cryptsetup.o: check-dep-zkey-cryptsetup zkey-cryptsetup.c pkey.h cca.h \
 			ep11.h misc.h utils.h
 kms.o: kms.c kms.h kms-plugin.h utils.h pkey.h
 pvsecrets.o: pvsecrets.h
+cpacf.o: cpacf.c cpacf.h pkey.h
 
 zkey: LDLIBS = -ldl -lcrypto
 zkey: zkey.o pkey.o cca.o ep11.o properties.o keystore.o utils.o kms.o \
-			pvsecrets.o $(libs)
+			pvsecrets.o cpacf.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 zkey-cryptsetup: LDLIBS = -ldl -lcryptsetup -ljson-c -lcrypto
-zkey-cryptsetup: zkey-cryptsetup.o pkey.o cca.o ep11.o utils.o $(libs)
+zkey-cryptsetup: zkey-cryptsetup.o pkey.o cca.o ep11.o utils.o cpacf.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-common:

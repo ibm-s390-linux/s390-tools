@@ -11,15 +11,15 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <linux/if_alg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
+
+#include <openssl/sha.h>
+#include <openssl/crypto.h>
 
 #include "lib/util_base.h"
 #include "lib/util_libc.h"
@@ -28,13 +28,7 @@
 #include "pkey.h"
 #include "pvsecrets.h"
 #include "utils.h"
-
-#ifndef AF_ALG
-#define AF_ALG 38
-#endif
-#ifndef SOL_ALG
-#define SOL_ALG 279
-#endif
+#include "cpacf.h"
 
 #define pr_verbose(verbose, fmt...)	do {				\
 						if (verbose)		\
@@ -47,6 +41,8 @@
 #define MAX_CIPHER_LEN		32
 
 #define INITIAL_APQN_ENTRIES	16
+
+#define MAX_WKVP_RETRY_COUNT	1000
 
 /**
  * Opens the pkey device and returns its file descriptor.
@@ -1576,7 +1572,7 @@ out:
 
 /**
  * Generate a key verification pattern of a secure AES key by encrypting the all
- * zero message with the secure key using the AF_ALG interface
+ * zero message with the secure key
  *
  * @param[in] pkey_fd       the pkey file descriptor
  * @param[in] key           the secure key token
@@ -1595,31 +1591,19 @@ int generate_aes_key_verification_pattern(int pkey_fd,
 					  const char *cipher,
 					  bool verbose)
 {
-	int tfmfd = -1, opfd = -1, rc = 0, retry_count = 0;
-	char null_msg[ENC_ZERO_LEN];
-	char enc_zero[ENC_ZERO_LEN];
-	struct af_alg_iv *alg_iv;
-	struct cmsghdr *header;
-	uint32_t *type;
-	ssize_t len;
+	u8 protkey[MAX(MAX_AES_PROTKEYSIZE * 2, MAX_XTSFULL_PROTKEYSIZE)];
+	size_t protkey_size = sizeof(protkey);
+	u8 null_msg[ENC_ZERO_LEN] = { 0 };
+	u8 enc_zero[ENC_ZERO_LEN];
+	bool securekey, xts;
+	int pkeytype = 0;
+	int count = 0;
 	size_t i;
+	int rc;
 
-	struct sockaddr_alg sa = {
-		.salg_family = AF_ALG,
-		.salg_type = "skcipher",
-	};
-	struct iovec iov = {
-		.iov_base = (void *)null_msg,
-		.iov_len = sizeof(null_msg),
-	};
-	int iv_msg_size = CMSG_SPACE(sizeof(*alg_iv) + PAES_BLOCK_SIZE);
-	char buffer[CMSG_SPACE(sizeof(*type)) + iv_msg_size];
-	struct msghdr msg = {
-		.msg_control = buffer,
-		.msg_controllen = sizeof(buffer),
-		.msg_iov = &iov,
-		.msg_iovlen = 1,
-	};
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(key != NULL, "Internal error: key is NULL");
+	util_assert(vp != NULL, "Internal error: vp is NULL");
 
 	if (vp_len < VERIFICATION_PATTERN_LEN) {
 		rc = -EMSGSIZE;
@@ -1627,102 +1611,68 @@ int generate_aes_key_verification_pattern(int pkey_fd,
 	}
 
 	if (cipher != NULL) {
-		util_strlcpy((char *)sa.salg_name, cipher,
-			     sizeof(sa.salg_name));
-	} else {
-		snprintf((char *)sa.salg_name, sizeof(sa.salg_name), "%s(paes)",
-			 is_xts_key(key, key_size) ? "xts" : "cbc");
-	}
-
-	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
-	if (tfmfd < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to open an AF_ALG socket");
-		goto out;
-	}
-
-	if (bind(tfmfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to bind the AF_ALG socket, "
-			   "salg_name='%s' ", sa.salg_name);
-		goto out;
-	}
-
-retry_setkey:
-	if (setsockopt(tfmfd, SOL_ALG, ALG_SET_KEY, key,
-		       key_size) < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to set the key: %s",
-			   strerror(-rc));
-
-		/*
-		 * After a master key change, it can happen that the setkey
-		 * operation returns EINVAL or EAGAIN, although the key is
-		 * valid. This is a temporary situation and the operation will
-		 * succeed, once the firmware has completed some internal
-		 * processing related with the master key change.
-		 * Delay 1 second and retry up to 10 times.
-		 */
-		if ((rc == -EINVAL || rc == -EAGAIN) && retry_count < 10) {
-			pr_verbose(verbose, "Retrying after 1 second...");
-			retry_count++;
-			sleep(1);
-			goto retry_setkey;
+		if (strcmp(cipher, "cbc(aes)") == 0) {
+			rc = cpacf_aes_cbc_enc(key, key_size,
+					       null_msg, enc_zero,
+					       sizeof(null_msg), 0);
+		} else if (strcmp(cipher, "xts(aes)") == 0) {
+			rc = cpacf_aes_xts_enc(key, key_size,
+					       null_msg, enc_zero,
+					       sizeof(null_msg), 0);
+		} else {
+			pr_verbose(verbose, "Invalid clear key cipher '%s'",
+				   cipher);
+			rc = -EINVAL;
+			goto out;
 		}
-		goto out;
-	}
-	rc = 0;
+	} else {
+		securekey = is_secure_key(key, key_size);
+		xts = securekey ? is_xts_key(key, key_size) : false;
 
-	opfd = accept(tfmfd, NULL, NULL);
-	if (opfd < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to accept on the AF_ALG socket");
-		goto out;
-	}
+		do {
+			rc = pkey_kblob2protk(pkey_fd, (u8 *)key, key_size,
+					      protkey, &protkey_size, &pkeytype,
+					      verbose);
+			if (rc != 0)
+				goto out;
 
-	memset(null_msg, 0, sizeof(null_msg));
-	memset(buffer, 0, sizeof(buffer));
+			switch (pkeytype) {
+			case PKEY_KEYTYPE_AES_128:
+			case PKEY_KEYTYPE_AES_192:
+			case PKEY_KEYTYPE_AES_256:
+				if (xts)
+					rc = cpacf_aes_xts_enc(protkey,
+							       protkey_size,
+							       null_msg,
+							       enc_zero,
+							       sizeof(null_msg),
+							       pkeytype);
+				else
+					rc = cpacf_aes_cbc_enc(protkey,
+							       protkey_size,
+							       null_msg,
+							       enc_zero,
+							       sizeof(null_msg),
+							       pkeytype);
+				break;
+			case PKEY_KEYTYPE_AES_XTS_128:
+			case PKEY_KEYTYPE_AES_XTS_256:
+				rc = cpacf_aes_xts_full_enc(protkey,
+							    protkey_size,
+							    null_msg, enc_zero,
+							    sizeof(null_msg),
+							    pkeytype);
+				break;
+			default:
+				rc = -EINVAL;
+				goto out;
+			}
 
-	header = CMSG_FIRSTHDR(&msg);
-	if (header == NULL) {
-		pr_verbose(verbose, "Failed to obtain control message header");
-		rc = -EINVAL;
-		goto out;
-	}
-
-	header->cmsg_level = SOL_ALG;
-	header->cmsg_type = ALG_SET_OP;
-	header->cmsg_len = CMSG_LEN(sizeof(*type));
-	type = (void *)CMSG_DATA(header);
-	*type = ALG_OP_ENCRYPT;
-
-	header = CMSG_NXTHDR(&msg, header);
-	if (header == NULL) {
-		pr_verbose(verbose, "Failed to obtain control message "
-			   "header");
-		rc = -EINVAL;
-		goto out;
-	}
-	header->cmsg_level = SOL_ALG;
-	header->cmsg_type = ALG_SET_IV;
-	header->cmsg_len = iv_msg_size;
-	alg_iv = (void *)CMSG_DATA(header);
-	alg_iv->ivlen = PAES_BLOCK_SIZE;
-	memcpy(alg_iv->iv, null_msg, PAES_BLOCK_SIZE);
-
-	len = sendmsg(opfd, &msg, 0);
-	if (len != ENC_ZERO_LEN) {
-		pr_verbose(verbose, "Failed to send to the AF_ALG socket");
-		rc = -errno;
-		goto out;
+		} while (rc == -EAGAIN && count++ < MAX_WKVP_RETRY_COUNT);
 	}
 
-	len = read(opfd, enc_zero, sizeof(enc_zero));
-	if (len != ENC_ZERO_LEN) {
-		pr_verbose(verbose, "Failed to receive from the AF_ALG socket");
-		rc = -errno;
+	if (rc != 0)
 		goto out;
-	}
 
 	memset(vp, 0, vp_len);
 	for (i = 0; i < sizeof(enc_zero); i++)
@@ -1731,11 +1681,6 @@ retry_setkey:
 	pr_verbose(verbose, "Key verification pattern:  %s", vp);
 
 out:
-	if (opfd != -1)
-		close(opfd);
-	if (tfmfd != -1)
-		close(tfmfd);
-
 	if (rc != 0)
 		pr_verbose(verbose, "Failed to generate the key verification "
 			   "pattern: %s", strerror(-rc));
@@ -1745,7 +1690,7 @@ out:
 
 /**
  * Generate a key verification pattern of a secure HMAC key by MACing the all
- * zero message with the secure key using the AF_ALG interface
+ * zero message with the secure key
  *
  * @param[in] pkey_fd       the pkey file descriptor
  * @param[in] key           the secure key token
@@ -1763,16 +1708,19 @@ int generate_hmac_key_verification_pattern(int pkey_fd,
 					   const char *cipher,
 					   bool verbose)
 {
-	int tfmfd = -1, opfd = -1, rc = 0, retry_count = 0;
-	char null_msg[MAC_ZERO_LEN];
-	char mac_zero[MAC_ZERO_LEN];
-	size_t i, bitsize;
-	int len;
+	u8 protkey[MAX_HMAC_PROTKEYSIZE];
+	size_t protkey_size = sizeof(protkey);
+	u8 null_msg[MAC_ZERO_LEN] = { 0 };
+	u8 mac_zero[MAC_ZERO_LEN];
+	u8 clear_key[128] = { 0 };
+	size_t i, clear_key_size;
+	int pkeytype = 0;
+	int count = 0;
+	int rc;
 
-	struct sockaddr_alg sa = {
-		.salg_family = AF_ALG,
-		.salg_type = "hash",
-	};
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(key != NULL, "Internal error: key is NULL");
+	util_assert(vp != NULL, "Internal error: vp is NULL");
 
 	if (vp_len < VERIFICATION_PATTERN_LEN) {
 		rc = -EMSGSIZE;
@@ -1780,79 +1728,66 @@ int generate_hmac_key_verification_pattern(int pkey_fd,
 	}
 
 	if (cipher != NULL) {
-		util_strlcpy((char *)sa.salg_name, cipher,
-			     sizeof(sa.salg_name));
-	} else {
-		rc = get_key_bit_size(key, key_size, &bitsize);
-		if (rc != 0) {
-			pr_verbose(verbose, "Failed to get the key size");
+		if (strcmp(cipher, "hmac(sha256)") == 0) {
+			if (key_size > 64) {
+				if (SHA256(key,  key_size, clear_key) == NULL) {
+					pr_verbose(verbose,
+						   "Failed to hash the key");
+					rc = -EIO;
+					goto out;
+				}
+			} else {
+				memcpy(clear_key, key, key_size);
+			}
+			clear_key_size = 64;
+		} else if (strcmp(cipher, "hmac(sha512)") == 0) {
+			if (key_size > 128) {
+				if (SHA512(key,  key_size, clear_key) == NULL) {
+					pr_verbose(verbose,
+						   "Failed to hash the key");
+					rc = -EIO;
+					goto out;
+				}
+			} else {
+				memcpy(clear_key, key, key_size);
+			}
+			clear_key_size = 128;
+		} else {
+			pr_verbose(verbose, "Invalid clear key cipher '%s'",
+				   cipher);
+			rc = -EINVAL;
 			goto out;
 		}
-		snprintf((char *)sa.salg_name, sizeof(sa.salg_name),
-			 "phmac(sha%lu)", bitsize / 2);
+
+		rc = cpacf_hmac_sha(clear_key, clear_key_size,
+				    null_msg, sizeof(null_msg),
+				    mac_zero, sizeof(mac_zero), 0);
+	} else {
+		do {
+			rc = pkey_kblob2protk(pkey_fd, (u8 *)key, key_size,
+					      protkey, &protkey_size, &pkeytype,
+					      verbose);
+			if (rc != 0)
+				goto out;
+
+			switch (pkeytype) {
+			case PKEY_KEYTYPE_HMAC_512:
+			case PKEY_KEYTYPE_HMAC_1024:
+				rc = cpacf_hmac_sha(protkey, protkey_size,
+						    null_msg, sizeof(null_msg),
+						    mac_zero, sizeof(mac_zero),
+						    pkeytype);
+				break;
+			default:
+				rc = -EINVAL;
+				goto out;
+			}
+
+		} while (rc == -EAGAIN && count++ < MAX_WKVP_RETRY_COUNT);
 	}
 
-	tfmfd = socket(AF_ALG, SOCK_SEQPACKET, 0);
-	if (tfmfd < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to open an AF_ALG socket");
+	if (rc != 0)
 		goto out;
-	}
-
-	if (bind(tfmfd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to bind the AF_ALG socket, "
-			   "salg_name='%s' ", sa.salg_name);
-		goto out;
-	}
-
-retry_setkey:
-	if (setsockopt(tfmfd, SOL_ALG, ALG_SET_KEY, key,
-		       key_size) < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to set the key: %s",
-			   strerror(-rc));
-
-		/*
-		 * After a master key change, it can happen that the setkey
-		 * operation returns EINVAL or EAGAIN, although the key is
-		 * valid. This is a temporary situation and the operation will
-		 * succeed, once the firmware has completed some internal
-		 * processing related with the master key change.
-		 * Delay 1 second and retry up to 10 times.
-		 */
-		if ((rc == -EINVAL || rc == -EAGAIN) && retry_count < 10) {
-			pr_verbose(verbose, "Retrying after 1 second...");
-			retry_count++;
-			sleep(1);
-			goto retry_setkey;
-		}
-		goto out;
-	}
-	rc = 0;
-
-	opfd = accept(tfmfd, NULL, NULL);
-	if (opfd < 0) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to accept on the AF_ALG socket");
-		goto out;
-	}
-
-	memset(null_msg, 0, sizeof(null_msg));
-
-	len = send(opfd, &null_msg, sizeof(null_msg), 0);
-	if (len != MAC_ZERO_LEN) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to send to the AF_ALG socket");
-		goto out;
-	}
-
-	len = read(opfd, mac_zero, sizeof(mac_zero));
-	if (len < SHA_256_HASH_SIZE) {
-		rc = -errno;
-		pr_verbose(verbose, "Failed to receive from the AF_ALG socket");
-		goto out;
-	}
 
 	memset(vp, 0, vp_len);
 	for (i = 0; i < SHA_256_HASH_SIZE; i++)
@@ -1861,21 +1796,18 @@ retry_setkey:
 	pr_verbose(verbose, "Key verification pattern:  %s", vp);
 
 out:
-	if (opfd != -1)
-		close(opfd);
-	if (tfmfd != -1)
-		close(tfmfd);
-
 	if (rc != 0)
 		pr_verbose(verbose, "Failed to generate the key verification "
 			   "pattern: %s", strerror(-rc));
 
+	OPENSSL_cleanse(clear_key, sizeof(clear_key));
 	return rc;
+
 }
 
 /**
  * Generate a key verification pattern of a secure key by encrypting the all
- * zero message with the secure key using the AF_ALG interface
+ * zero message with the secure key
  *
  * @param[in] pkey_fd       the pkey file descriptor
  * @param[in] key           the secure key token

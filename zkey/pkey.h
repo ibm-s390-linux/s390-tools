@@ -170,6 +170,10 @@ struct pkey_clrkey {
 #define PKEY_KEYTYPE_AES_128	1
 #define PKEY_KEYTYPE_AES_192	2
 #define PKEY_KEYTYPE_AES_256	3
+#define PKEY_KEYTYPE_AES_XTS_128	10
+#define PKEY_KEYTYPE_AES_XTS_256	11
+#define PKEY_KEYTYPE_HMAC_512		12
+#define PKEY_KEYTYPE_HMAC_1024		13
 
 struct pkey_genseck {
 	u16 cardnr;			/* in: card to use or FFFF for any */
@@ -309,6 +313,10 @@ struct pkey_kblob2pkey3 {
 };
 
 #define PKEY_KBLOB2PROTK3 _IOWR(PKEY_IOCTL_MAGIC, 0x1D, struct pkey_kblob2pkey3)
+
+#define MAX_AES_PROTKEYSIZE		64
+#define MAX_XTSFULL_PROTKEYSIZE		96
+#define MAX_HMAC_PROTKEYSIZE		160
 
 #define KEY_TYPE_CCA_AESDATA        "CCA-AESDATA"
 #define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"

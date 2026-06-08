@@ -18,7 +18,7 @@ plugin-utils.o: ../plugin-utils.c ../plugin-utils.h ../kms-plugin.h
 properties.o: ../properties.c ../properties.h
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -fPIC -c $< -o $@
 
-pkey.o: ../pkey.c ../pkey.h ../cca.h ../ep11.h ../utils.h ../kms-plugin.h
+pkey.o: ../pkey.c ../pkey.h ../cca.h ../ep11.h ../utils.h ../cpacf.h
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -fPIC -c $< -o $@
 
 cca.o: ../cca.c ../cca.h ../pkey.h ../ep11.h ../utils.h ../properties.h ../kms-plugin.h
@@ -30,12 +30,15 @@ ep11.o: ../ep11.c ../ep11.h ../pkey.h ../cca.h ../utils.h ../kms-plugin.h
 utils.o: ../utils.c ../utils.h ../pkey.h ../cca.h ../ep11.h ../kms-plugin.h
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -fPIC -c $< -o $@
 
+cpacf.o: ../cpacf.c ../cpacf.h ../pkey.h
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -fPIC -c $< -o $@
+
 zkey-kmip.so: ALL_CFLAGS += -fPIC
 zkey-kmip.so: LDLIBS = -L$(rootdir)/libkmipclient -lkmipclient -ldl -lcrypto
 zkey-kmip.so: ALL_LDFLAGS += -shared -Wl,--version-script=zkey-kmip.map \
 	-Wl,-z,defs,-Bsymbolic -Wl,-soname,zkey-kmip.so.$(VERM)
 zkey-kmip.so: zkey-kmip.o plugin-utils.o properties.o pkey.o cca.o ep11.o \
-	utils.o profiles.o $(libs)
+	utils.o profiles.o cpacf.o $(libs)
 	$(LINK) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
 install-libkmipclient.dep:
