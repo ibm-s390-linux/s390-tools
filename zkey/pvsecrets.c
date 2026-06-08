@@ -618,6 +618,7 @@ static int pvsecrets_build_key_blob_cb(u16 UNUSED(idx), u16 type, u32 len,
  * @param passphrase_file the file name of a file containing a passphrase
  *                        for LUKS2 (optional, can be NULL)
  * @param verbose         if true, verbose messages are printed
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -626,7 +627,8 @@ int pvsecrets_import(struct keystore *keystore, int uv_fd,
 		     const char *name, const char *description,
 		     const char *volumes, const char *volume_type,
 		     long sector_size, bool gen_passphrase,
-		     const char *passphrase_file, bool verbose)
+		     const char *passphrase_file, bool verbose,
+		     int pkey_fd)
 {
 	struct build_secret_key_blob_data build_blob_data = { 0 };
 	int rc;
@@ -674,7 +676,8 @@ int pvsecrets_import(struct keystore *keystore, int uv_fd,
 	rc = keystore_import(keystore, (unsigned char *)&build_blob_data.token,
 			     sizeof(build_blob_data.token), name, description,
 			     volumes, NULL, false, sector_size, volume_type,
-			     gen_passphrase, passphrase_file, false, NULL);
+			     gen_passphrase, passphrase_file, false, NULL,
+			     pkey_fd);
 
 	return rc;
 }

@@ -1967,7 +1967,7 @@ static int reencipher_prepare(int token)
 	if (rc != 0)
 		goto out;
 
-	rc = generate_key_verification_pattern(key, securekeysize,
+	rc = generate_key_verification_pattern(g.pkey_fd, key, securekeysize,
 					       reenc_tok.verification_pattern,
 					 sizeof(reenc_tok.verification_pattern),
 					       g.verbose);
@@ -1983,7 +1983,7 @@ static int reencipher_prepare(int token)
 	       sizeof(vp_tok.verification_pattern));
 
 	if (is_phmac_integrity) {
-		rc = generate_key_verification_pattern(integrity_key,
+		rc = generate_key_verification_pattern(g.pkey_fd, integrity_key,
 						       integrity_keysize,
 				     reenc_tok.int_verification_pattern,
 				     sizeof(reenc_tok.int_verification_pattern),
@@ -2182,7 +2182,8 @@ static int reencipher_complete(int token)
 
 	}
 
-	rc = generate_key_verification_pattern(key, securekeysize, vp,
+	rc = generate_key_verification_pattern(g.pkey_fd,
+					       key, securekeysize, vp,
 					       sizeof(vp), g.verbose);
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
@@ -2200,7 +2201,8 @@ static int reencipher_complete(int token)
 	}
 
 	if (is_phmac_integrity) {
-		rc = generate_key_verification_pattern(integrity_key,
+		rc = generate_key_verification_pattern(g.pkey_fd,
+						       integrity_key,
 						       integrity_keysize, vp,
 						       sizeof(vp), g.verbose);
 		if (rc != 0) {
@@ -2521,7 +2523,7 @@ static int command_setvp(void)
 						integrity_keysize);
 	seckeysize = keysize - integrity_keysize;
 
-	rc = generate_key_verification_pattern(key, seckeysize,
+	rc = generate_key_verification_pattern(g.pkey_fd, key, seckeysize,
 					       vp_tok.verification_pattern,
 					    sizeof(vp_tok.verification_pattern),
 					       g.verbose);
@@ -2536,7 +2538,7 @@ static int command_setvp(void)
 	if (is_phmac_integrity) {
 		integrity_key = key + seckeysize;
 
-		rc = generate_key_verification_pattern(integrity_key,
+		rc = generate_key_verification_pattern(g.pkey_fd, integrity_key,
 						       integrity_keysize,
 					vp_tok.int_verification_pattern,
 					sizeof(vp_tok.int_verification_pattern),
@@ -2694,7 +2696,7 @@ static int command_setkey(void)
 		goto out;
 	}
 
-	rc = generate_key_verification_pattern(newkey, newekey_size,
+	rc = generate_key_verification_pattern(g.pkey_fd, newkey, newekey_size,
 					       vp, sizeof(vp), g.verbose);
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
@@ -2705,7 +2707,8 @@ static int command_setkey(void)
 	}
 
 	if (is_phmac_integrity) {
-		rc = generate_key_verification_pattern(newkey + newekey_size,
+		rc = generate_key_verification_pattern(g.pkey_fd,
+						       newkey + newekey_size,
 						       integrity_keysize,
 						       int_vp, sizeof(int_vp),
 						       g.verbose);
@@ -2976,7 +2979,7 @@ static int command_convert(void)
 		}
 	}
 
-	rc = generate_key_verification_pattern(newkey, newekey_size,
+	rc = generate_key_verification_pattern(g.pkey_fd, newkey, newekey_size,
 					       new_vp, sizeof(new_vp),
 					       g.verbose);
 	if (rc != 0) {
@@ -2988,7 +2991,8 @@ static int command_convert(void)
 	}
 
 	if (is_phmac_integrity) {
-		rc = generate_key_verification_pattern(newkey + newekey_size,
+		rc = generate_key_verification_pattern(g.pkey_fd,
+						       newkey + newekey_size,
 						       newikey_size,
 						       new_int_vp,
 						       sizeof(new_int_vp),
@@ -3024,7 +3028,7 @@ static int command_convert(void)
 		goto out;
 	}
 
-	rc = generate_aes_key_verification_pattern(key, ekeysize,
+	rc = generate_aes_key_verification_pattern(g.pkey_fd, key, ekeysize,
 						   vp, sizeof(vp),
 						   is_xts ?
 							"xts(aes)" : "cbc(aes)",
@@ -3043,7 +3047,8 @@ static int command_convert(void)
 			 strcmp(ip.integrity, "hmac(sha512)") == 0)
 			hmac_vp_alg = "hmac(sha512)";
 
-		rc = generate_hmac_key_verification_pattern(key + ekeysize,
+		rc = generate_hmac_key_verification_pattern(g.pkey_fd,
+							    key + ekeysize,
 							    integrity_keysize,
 							    int_vp,
 							    sizeof(int_vp),

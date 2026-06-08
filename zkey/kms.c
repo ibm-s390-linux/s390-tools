@@ -2127,6 +2127,7 @@ static char *_get_system_specific_prop_name(const char *prop_name)
  *                            KMS options have been specified
  * @param[in] num_kms_options the number of options in above array
  * @param[in] verbose         if true, verbose messages are printed
+ * @param[in] pkey_fd         the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error.
  * If the KMS plugin does not support the key type, then -ENOTSUP is returned
@@ -2136,7 +2137,7 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 		     bool xts, size_t keybits, const char *filename,
 		     const char *passphrase_file,
 		     struct kms_option *kms_options, size_t num_kms_options,
-		     bool verbose)
+		     bool verbose, int pkey_fd)
 {
 	char *cipher, *iv_mode, *description, *volumes, *vol_type, *sector_size;
 	char key1_label[KMS_KEY_LABEL_SIZE + 14 + 1] = { 0 };
@@ -2159,6 +2160,7 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	util_assert(key_type != NULL, "Internal error: key_type is NULL");
 	util_assert(key_props != NULL, "Internal error: key_props is NULL");
 	util_assert(filename != NULL, "Internal error: filename is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	if (kms_info->plugin_lib == NULL) {
 		warnx("The repository is not bound to a KMS plugin");
@@ -2254,7 +2256,7 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	if (is_ep11_aes_key(key_blob, key_blob_size))
 		key_size = EP11_KEY_SIZE;
 
-	rc = generate_key_verification_pattern(key_blob, key_size,
+	rc = generate_key_verification_pattern(pkey_fd, key_blob, key_size,
 					       vp, sizeof(vp), verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to generate key verification "
@@ -2320,7 +2322,8 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 		util_hexdump_grp(stderr, NULL, &key_blob[key_size], 4,
 				 key_blob_size, 0);
 
-	rc = generate_key_verification_pattern(&key_blob[key_size], key_size,
+	rc = generate_key_verification_pattern(pkey_fd,
+					       &key_blob[key_size], key_size,
 					       vp, sizeof(vp), verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to generate key verification "
@@ -3253,6 +3256,7 @@ out:
  * @param[in] passphrase_file the file name to store the dummy passphras in
  * @param[in] key_type        the key type
  * @param[in] verbose         if true, verbose messages are printed
+ * @param[in] pkey_fd         the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error.
  */
@@ -3260,7 +3264,7 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		    char **description, char **cipher, char **iv_mode,
 		    char **volumes, char **volume_type, ssize_t *sector_size,
 		    const char *filename, const char *passphrase_file,
-		    const char *key_type, bool verbose)
+		    const char *key_type, bool verbose, int pkey_fd)
 {
 	struct kms_property *properties = NULL;
 	u8 key_blob[2 * MAX_SECURE_KEY_SIZE];
@@ -3275,6 +3279,7 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 	int rc = 0;
 
 	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	if (kms_info->plugin_lib == NULL) {
 		warnx("The repository is not bound to a KMS plugin");
@@ -3440,7 +3445,8 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 
 	orig_vp = properties_get(key_props, PROP_NAME_KEY_VP);
 	if (orig_vp != NULL) {
-		rc = generate_key_verification_pattern(key_blob, key_blob_size,
+		rc = generate_key_verification_pattern(pkey_fd,
+						       key_blob, key_blob_size,
 						       vp, sizeof(vp), verbose);
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",

@@ -95,6 +95,7 @@ int pvsecrets_import(struct keystore *keystore, int uv_fd,
 		     const char *name, const char *description,
 		     const char *volumes, const char *volume_type,
 		     long sector_size, bool gen_passphrase,
-		     const char *passphrase_file, bool verbose);
+		     const char *passphrase_file, bool verbose,
+		     int pkey_fd);
 
 #endif

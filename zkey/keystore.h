@@ -68,7 +68,7 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 			      const char *volume_type, const char *key_type,
 			      bool gen_passphrase, const char *passphrase_file,
 			      struct kms_option *kms_options,
-			      size_t num_kms_options);
+			      size_t num_kms_options, int pkey_fd);
 
 int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 		    size_t secure_key_size, const char *name,
@@ -76,21 +76,21 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 		    const char *apqns, bool noapqncheck, size_t sector_size,
 		    const char *volume_type, bool gen_passphrase,
 		    const char *passphrase_file, bool exportable,
-		    struct ext_lib *lib);
+		    struct ext_lib *lib, int pkey_fd);
 
 int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type,
 			bool gen_passphrase, const char *passphrase_file,
-			bool exportable, struct ext_lib *lib);
+			bool exportable, struct ext_lib *lib, int pkey_fd);
 
 int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *description, const char *volumes,
 			const char *apqns, bool noapqncheck,
 			long int sector_size, const char *volume_type,
 			bool gen_passphrase, const char *passphrase_file,
-			bool remove_passphrase, bool quiet);
+			bool remove_passphrase, bool quiet, int pkey_fd);
 
 int keystore_rename_key(struct keystore *keystore, const char *name,
 			const char *newname);
@@ -157,13 +157,15 @@ int keystore_import_kms_keys(struct keystore *keystore,
 			     const char *volume_type,
 			     struct kms_option *kms_options,
 			     size_t num_kms_options,
-			     bool batch_mode, bool novolcheck);
+			     bool batch_mode, bool novolcheck,
+			     int pkey_fd);
 
 int keystore_refresh_kms_keys(struct keystore *keystore,
 			      const char *name_filter,
 			      const char *volume_filter,
 			      const char *volume_type, const char *key_type,
-			      bool refres_properties, bool novolcheck);
+			      bool refres_properties, bool novolcheck,
+			      int pkey_fd);
 
 void keystore_free(struct keystore *keystore);
 

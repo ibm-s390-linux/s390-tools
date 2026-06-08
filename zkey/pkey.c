@@ -1578,6 +1578,7 @@ out:
  * Generate a key verification pattern of a secure AES key by encrypting the all
  * zero message with the secure key using the AF_ALG interface
  *
+ * @param[in] pkey_fd       the pkey file descriptor
  * @param[in] key           the secure key token
  * @param[in] key_size      the size of the secure key
  * @param[in] vp            buffer where the verification pattern is returned
@@ -1588,7 +1589,8 @@ out:
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-int generate_aes_key_verification_pattern(const u8 *key, size_t key_size,
+int generate_aes_key_verification_pattern(int pkey_fd,
+					  const u8 *key, size_t key_size,
 					  char *vp, size_t vp_len,
 					  const char *cipher,
 					  bool verbose)
@@ -1745,6 +1747,7 @@ out:
  * Generate a key verification pattern of a secure HMAC key by MACing the all
  * zero message with the secure key using the AF_ALG interface
  *
+ * @param[in] pkey_fd       the pkey file descriptor
  * @param[in] key           the secure key token
  * @param[in] key_size      the size of the secure key
  * @param[in] vp            buffer where the verification pattern is returned
@@ -1753,7 +1756,8 @@ out:
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-int generate_hmac_key_verification_pattern(const u8 *key,
+int generate_hmac_key_verification_pattern(int pkey_fd,
+					   const u8 *key,
 					   size_t key_size,
 					   char *vp, size_t vp_len,
 					   const char *cipher,
@@ -1873,6 +1877,7 @@ out:
  * Generate a key verification pattern of a secure key by encrypting the all
  * zero message with the secure key using the AF_ALG interface
  *
+ * @param[in] pkey_fd       the pkey file descriptor
  * @param[in] key           the secure key token
  * @param[in] key_size      the size of the secure key
  * @param[in] vp            buffer where the verification pattern is returned
@@ -1881,15 +1886,18 @@ out:
  *
  * @returns 0 on success, a negative errno in case of an error
  */
-int generate_key_verification_pattern(const u8 *key, size_t key_size,
+int generate_key_verification_pattern(int pkey_fd,
+				      const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose)
 {
 	if (is_aes_key(key, key_size))
-		return generate_aes_key_verification_pattern(key, key_size,
+		return generate_aes_key_verification_pattern(pkey_fd,
+							     key, key_size,
 							     vp, vp_len,
 							     NULL, verbose);
 	if (is_hmac_key(key, key_size))
-		return generate_hmac_key_verification_pattern(key, key_size,
+		return generate_hmac_key_verification_pattern(pkey_fd,
+							      key, key_size,
 							      vp, vp_len,
 							      NULL, verbose);
 

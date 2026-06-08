@@ -366,15 +366,18 @@ int validate_secure_key(int pkey_fd,
 			size_t *clear_key_bitsize, int *is_old_mk,
 			const char **apqns, bool verbose);
 
-int generate_key_verification_pattern(const u8 *key, size_t key_size,
+int generate_key_verification_pattern(int pkey_fd,
+				      const u8 *key, size_t key_size,
 				      char *vp, size_t vp_len, bool verbose);
 
-int generate_aes_key_verification_pattern(const u8 *key, size_t key_size,
+int generate_aes_key_verification_pattern(int pkey_fd,
+					  const u8 *key, size_t key_size,
 					  char *vp, size_t vp_len,
 					  const char *cipher,
 					  bool verbose);
 
-int generate_hmac_key_verification_pattern(const u8 *key,
+int generate_hmac_key_verification_pattern(int pkey_fd,
+					   const u8 *key,
 					   size_t key_size,
 					   char *vp, size_t vp_len,
 					   const char *cipher,

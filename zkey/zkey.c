@@ -1636,6 +1636,7 @@ static struct zkey_command zkey_kms_commands[] = {
 		.has_options = 1,
 		.use_kms_plugin = 1,
 		.need_kms_login = 1,
+		.need_pkey_device = 1,
 		.kms_plugin_opts_cmd = KMS_COMMAND_LIST_IMPORT,
 	},
 	{
@@ -1650,6 +1651,7 @@ static struct zkey_command zkey_kms_commands[] = {
 		.has_options = 1,
 		.use_kms_plugin = 1,
 		.need_kms_login = 1,
+		.need_pkey_device = 1,
 	},
 	{ .command = NULL }
 };
@@ -1679,6 +1681,7 @@ static struct zkey_command zkey_pvsecrets_commands[] = {
 		.has_options = 1,
 		.need_keystore = 1,
 		.need_uv_device = 1,
+		.need_pkey_device = 1,
 	},
 	{ .command = NULL }
 };
@@ -1735,6 +1738,7 @@ static struct zkey_command zkey_commands[] = {
 		.command = COMMAND_IMPORT,
 		.abbrev_len = 2,
 		.function = command_import,
+		.need_pkey_device = 1,
 		.short_desc = "Import a secure key",
 		.long_desc = "Import a secure key from a file into the "
 			     "repository",
@@ -1783,6 +1787,7 @@ static struct zkey_command zkey_commands[] = {
 		.has_options = 1,
 		.need_keystore = 1,
 		.use_kms_plugin = 1,
+		.need_pkey_device = 1,
 	},
 	{
 		.command = COMMAND_RENAME,
@@ -2090,7 +2095,8 @@ static int command_generate_repository(void)
 					       g.gen_passphrase,
 					       g.passphrase_file,
 					       g.kms_options,
-					       g.num_kms_options);
+					       g.num_kms_options,
+					       g.pkey_fd);
 		goto out;
 	}
 
@@ -2491,7 +2497,7 @@ static int command_validate_file(void)
 		goto out;
 	}
 
-	rc = generate_key_verification_pattern(secure_key,
+	rc = generate_key_verification_pattern(g.pkey_fd, secure_key,
 					       secure_key_size, vp, sizeof(vp),
 					       g.verbose);
 	if (rc != 0) {
@@ -2624,7 +2630,8 @@ static int command_import(void)
 	rc = keystore_import_key(g.keystore, g.name, g.description, g.volumes,
 				 g.apqns, g.noapqncheck, g.sector_size,
 				 g.pos_arg, g.volume_type, g.gen_passphrase,
-				 g.passphrase_file, g.exportable, &g.lib);
+				 g.passphrase_file, g.exportable, &g.lib,
+				 g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -2742,7 +2749,7 @@ static int command_change(void)
 				 g.apqns, g.noapqncheck, g.sector_size,
 				 g.volume_type, g.gen_passphrase,
 				 g.passphrase_file, g.remove_passphrase,
-				 g.force);
+				 g.force, g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -3283,7 +3290,7 @@ static int command_kms_import(void)
 	rc = keystore_import_kms_keys(g.keystore, g.label, g.name, g.volumes,
 				      g.volume_type, g.kms_options,
 				      g.num_kms_options, g.batch_mode,
-				      g.novolcheck);
+				      g.novolcheck, g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -3305,7 +3312,8 @@ static int command_kms_refresh(void)
 
 	rc = keystore_refresh_kms_keys(g.keystore, g.name, g.volumes,
 				       g.volume_type, g.key_type,
-				       g.refresh_properties, g.novolcheck);
+				       g.refresh_properties, g.novolcheck,
+				       g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
@@ -3372,7 +3380,7 @@ static int command_pvsecrets_import(void)
 			      g.name != NULL ? g.name : g.secret_name,
 			      g.description, g.volumes, g.volume_type,
 			      g.sector_size, g.gen_passphrase,
-			      g.passphrase_file, g.verbose);
+			      g.passphrase_file, g.verbose, g.pkey_fd);
 
 	return rc != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }

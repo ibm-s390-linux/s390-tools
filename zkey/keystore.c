@@ -1612,12 +1612,14 @@ struct keystore *keystore_new(const char *directory,
  * @param[in] vp          buffer filled with the verification pattern
  * @param[in] vp_len      length of the buffer. Must be at
  *                        least VERIFICATION_PATTERN_LEN bytes in size.
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
 static int _keystore_generate_verification_pattern(struct keystore *keystore,
-						  const char *keyfile,
-						  char *vp, size_t vp_len)
+						   const char *keyfile,
+						   char *vp, size_t vp_len,
+						   int pkey_fd)
 {
 	size_t key_size;
 	u8 *key;
@@ -1626,12 +1628,13 @@ static int _keystore_generate_verification_pattern(struct keystore *keystore,
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
 	util_assert(vp != NULL, "Internal error: vp is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	key = read_secure_key(keyfile, &key_size, keystore->verbose);
 	if (key == NULL)
 		return -EIO;
 
-	rc = generate_key_verification_pattern(key, key_size,
+	rc = generate_key_verification_pattern(pkey_fd, key, key_size,
 					       vp, vp_len, keystore->verbose);
 
 	free(key);
@@ -1645,12 +1648,14 @@ static int _keystore_generate_verification_pattern(struct keystore *keystore,
  * @param[in] keystore    the key store
  * @param[in] file_names  the file names of the key
  * @param[in] key_props   the properties of the key
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  *  @returns 0 for success or a negative errno in case of an error
  */
 static int _keystore_ensure_vp_exists(struct keystore *keystore,
 				      const struct key_filenames *file_names,
-				      struct properties *key_props)
+				      struct properties *key_props,
+				      int pkey_fd)
 {
 	char vp[VERIFICATION_PATTERN_LEN];
 	char *temp;
@@ -1664,7 +1669,8 @@ static int _keystore_ensure_vp_exists(struct keystore *keystore,
 
 	rc = _keystore_generate_verification_pattern(keystore,
 						     file_names->skey_filename,
-						     vp, sizeof(vp));
+						     vp, sizeof(vp),
+						     pkey_fd);
 	if (rc != 0)
 		return rc;
 
@@ -2051,6 +2057,7 @@ out:
  * @param[in] passphrase_file the file name of a file containing a passphrase
  *                        for LUKS2 (optional, can be NULL)
  * @param[in] kms         the name of the KMS plugin, or NULL if no KMS is bound
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 on success, or a negative errno value on error
  */
@@ -2065,7 +2072,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 				      const char *key_type,
 				      bool gen_passphrase,
 				      const char *passphrase_file,
-				      const char *kms)
+				      const char *kms,
+				      int pkey_fd)
 {
 	struct properties *key_props = NULL;
 	int rc;
@@ -2088,7 +2096,8 @@ static int _keystore_create_info_file(struct keystore *keystore,
 		}
 	}
 
-	rc = _keystore_ensure_vp_exists(keystore, filenames, key_props);
+	rc = _keystore_ensure_vp_exists(keystore, filenames, key_props,
+					pkey_fd);
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
@@ -2232,7 +2241,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 					description, volumes, apqns,
 					noapqncheck, sector_size, volume_type,
 					key_type, gen_passphrase,
-					passphrase_file, NULL);
+					passphrase_file, NULL, pkey_fd);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2279,6 +2288,7 @@ out_free_key_filenames:
  * @param[in] kms_options an array of KMS options specified, or NULL if no
  *                         KMS options have been specified
  * @param[in] num_kms_options the number of options in above array
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -2288,7 +2298,7 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 			      const char *volume_type, const char *key_type,
 			      bool gen_passphrase, const char *passphrase_file,
 			      struct kms_option *kms_options,
-			      size_t num_kms_options)
+			      size_t num_kms_options, int pkey_fd)
 {
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
@@ -2305,6 +2315,7 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	kms_info = keystore->kms_info;
 	if (kms_info->plugin_lib == NULL) {
@@ -2371,7 +2382,8 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 			      keybits, file_names.skey_filename,
 			      _keystore_passphrase_file_exists(&file_names) ?
 						file_names.pass_filename : NULL,
-			      kms_options, num_kms_options, keystore->verbose);
+			      kms_options, num_kms_options, keystore->verbose,
+			      pkey_fd);
 	if (rc != 0) {
 		warnx("KMS plugin '%s' failed to generate key '%s': %s",
 		      kms_info->plugin_name, name, strerror(-rc));
@@ -2383,7 +2395,8 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_props;
 
-	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props);
+	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props,
+					pkey_fd);
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
@@ -2460,6 +2473,7 @@ out_free_key_filenames:
  *                        for LUKS2 (optional, can be NULL)
  * @param[in] exportable  if true the key shall be exportable
  * @param[in] lib         the external library struct
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -2469,7 +2483,7 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 		    const char *apqns, bool noapqncheck, size_t sector_size,
 		    const char *volume_type, bool gen_passphrase,
 		    const char *passphrase_file, bool exportable,
-		    struct ext_lib *lib)
+		    struct ext_lib *lib, int pkey_fd)
 {
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
@@ -2591,7 +2605,7 @@ write_key:
 					description, volumes, apqns,
 					noapqncheck, sector_size, volume_type,
 					key_type, gen_passphrase,
-					passphrase_file, NULL);
+					passphrase_file, NULL, pkey_fd);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2636,6 +2650,7 @@ out_free_key_filenames:
  *                        for LUKS2 (optional, can be NULL)
  * @param[in] exportable  if true the key shall be exportable
  * @param[in] lib         the external library struct
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -2644,7 +2659,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 			const char *apqns, bool noapqncheck, size_t sector_size,
 			const char *import_file, const char *volume_type,
 			bool gen_passphrase, const char *passphrase_file,
-			bool exportable, struct ext_lib *lib)
+			bool exportable, struct ext_lib *lib, int pkey_fd)
 {
 	size_t secure_key_size;
 	u8 *secure_key;
@@ -2660,7 +2675,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
 	rc = keystore_import(keystore, secure_key, secure_key_size, name,
 			     description, volumes, apqns, noapqncheck,
 			     sector_size, volume_type, gen_passphrase,
-			     passphrase_file, exportable, lib);
+			     passphrase_file, exportable, lib, pkey_fd);
 
 	if (secure_key != NULL)
 		free(secure_key);
@@ -2698,6 +2713,7 @@ int keystore_import_key(struct keystore *keystore, const char *name,
  * @param[in] remove_passphrase if true, remove the (dummy) passphrase
  * @param[in] quiet       if true no confirmation prompt is shown when removing
  *                        a (dummy) passphrase
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  *
@@ -2707,7 +2723,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			const char *apqns, bool noapqncheck,
 			long int sector_size, const char *volume_type,
 			bool gen_passphrase, const char *passphrase_file,
-			bool remove_passphrase, bool quiet)
+			bool remove_passphrase, bool quiet, int pkey_fd)
 {
 	struct volume_check vol_check = { .keystore = keystore, .name = name,
 					  .set = 0, .nocheck = 0 };
@@ -2731,6 +2747,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	rc = _keystore_get_key_filenames(keystore, name, &file_names);
 	if (rc != 0)
@@ -2960,7 +2977,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 		}
 	}
 
-	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props);
+	rc = _keystore_ensure_vp_exists(keystore, &file_names, key_props,
+					pkey_fd);
 	/* ignore return code, vp generation might fail if key is not valid */
 
 	rc = _keystore_set_timestamp_property(key_props, PROP_NAME_CHANGE_TIME);
@@ -3890,7 +3908,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 			goto out;
 
 		rc = _keystore_ensure_vp_exists(keystore, file_names,
-						properties);
+						properties, info->pkey_fd);
 		if (rc != 0) {
 			warnx("Failed to generate the key verification pattern "
 			      "for key '%s': %s", file_names->skey_filename,
@@ -5940,6 +5958,7 @@ struct kms_import {
 	unsigned long num_imported;
 	unsigned long num_skipped;
 	unsigned long num_failed;
+	int pkey_fd;
 };
 
 /**
@@ -6144,7 +6163,8 @@ prompt_alt_name:
 	if (rc != 0)
 		goto out_remove;
 
-	rc = generate_key_verification_pattern(secure_key, secure_key_size,
+	rc = generate_key_verification_pattern(import_data->pkey_fd,
+					       secure_key, secure_key_size,
 					       vp, sizeof(vp),
 					       keystore->verbose);
 	if (rc != 0) {
@@ -6235,6 +6255,7 @@ out:
  *                            with an already existing name is to be imported.
  * @param[in] novolcheck      if true, do not check the associated volumes for
  *                            existence and duplicate use
+ * @param[in] pkey_fd     the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -6245,12 +6266,14 @@ int keystore_import_kms_keys(struct keystore *keystore,
 			     const char *volume_type,
 			     struct kms_option *kms_options,
 			     size_t num_kms_options,
-			     bool batch_mode, bool novolcheck)
+			     bool batch_mode, bool novolcheck,
+			     int pkey_fd)
 {
 	struct kms_import import_data = { 0 };
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	if (keystore->kms_info->plugin_lib == NULL) {
 		warnx("The repository is not bound to a KMS plugin");
@@ -6269,6 +6292,7 @@ int keystore_import_kms_keys(struct keystore *keystore,
 	import_data.num_imported = 0;
 	import_data.num_skipped = 0;
 	import_data.num_failed = 0;
+	import_data.pkey_fd = pkey_fd;
 
 	rc = process_kms_keys(keystore->kms_info, label_filter, name_filter,
 			       volume_filter, volume_type,
@@ -6295,6 +6319,7 @@ struct kms_refresh {
 	bool novolcheck;
 	unsigned long num_refreshed;
 	unsigned long num_failed;
+	int pkey_fd;
 };
 
 /**
@@ -6336,7 +6361,8 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 			     file_names->skey_filename,
 			     file_names->pass_filename,
 			     key_type,
-			     keystore->verbose);
+			     keystore->verbose,
+			     refresh_data->pkey_fd);
 	if (rc != 0) {
 		warnx("KMS plugin '%s' failed to refresh key '%s': %s",
 		      keystore->kms_info->plugin_name, name, strerror(-rc));
@@ -6485,6 +6511,7 @@ out:
  * @param[in] refresh_properties   if true, also refresh the key's properties
  * @param[in] novolcheck      if true, do not check the associated volumes for
  *                            existence and duplicate use
+ * @param[in] pkey_fd         the pkey file descriptor
  *
  * @returns 0 for success or a negative errno in case of an error
  */
@@ -6492,12 +6519,14 @@ int keystore_refresh_kms_keys(struct keystore *keystore,
 			     const char *name_filter,
 			     const char *volume_filter,
 			     const char *volume_type, const char *key_type,
-			     bool refresh_properties, bool novolcheck)
+			     bool refresh_properties, bool novolcheck,
+			     int pkey_fd)
 {
 	struct kms_refresh refresh_data = { 0 };
 	int rc;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
 	if (keystore->kms_info->plugin_lib == NULL) {
 		warnx("The repository is not bound to a KMS plugin");
@@ -6520,6 +6549,7 @@ int keystore_refresh_kms_keys(struct keystore *keystore,
 	refresh_data.novolcheck = novolcheck;
 	refresh_data.num_refreshed = 0;
 	refresh_data.num_failed = 0;
+	refresh_data.pkey_fd = pkey_fd;
 
 	rc = _keystore_process_filtered(keystore, name_filter, volume_filter,
 					NULL, volume_type, key_type, false,
