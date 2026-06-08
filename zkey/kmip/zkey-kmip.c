@@ -4740,7 +4740,8 @@ out:
 static char *_parse_label(struct plugin_handle *ph, const char *label,
 			  enum kms_key_mode key_mode)
 {
-	char *tok, *ret = NULL;
+	char *ret = NULL;
+	const char *tok;
 
 	tok = strchr(label, ':');
 

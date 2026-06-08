@@ -115,11 +115,11 @@ int profile_read(struct plugin_handle *ph, const char *profile_dir,
 
 	prof = util_zalloc(sizeof(struct kmip_profile));
 
-	tok = strrchr(profile_file, '/');
+	tok = (char *)strrchr(profile_file, '/');
 	if (tok == NULL)
 		tok = (char *)profile_file;
 	prof->name = util_strdup(tok);
-	tok = strchr(prof->name, '.');
+	tok = (char *)strchr(prof->name, '.');
 	if (tok != NULL)
 		*tok = 0;
 
