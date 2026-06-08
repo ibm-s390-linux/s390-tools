@@ -1974,8 +1974,6 @@ static int reencipher_prepare(int token)
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module 'paes_s390' is loaded and "
-		      "that the 'paes' cipher is available");
 		goto out;
 	}
 
@@ -1991,9 +1989,6 @@ static int reencipher_prepare(int token)
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",
 			      strerror(-rc));
-			warnx("Make sure that kernel module 'phmac_s390' is "
-			      "loaded and that the 'phmac' cipher is "
-			      "available");
 			goto out;
 		}
 
@@ -2188,8 +2183,6 @@ static int reencipher_complete(int token)
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module 'paes_s390' is loaded and "
-		      "that the 'paes' cipher is available");
 		goto out;
 	}
 
@@ -2208,9 +2201,6 @@ static int reencipher_complete(int token)
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",
 			      strerror(-rc));
-			warnx("Make sure that kernel module 'phmac_s390' is "
-			      "loaded and that the 'phmac' cipher is "
-			      "available");
 			goto out;
 		}
 
@@ -2530,8 +2520,6 @@ static int command_setvp(void)
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module 'paes_s390' is loaded and "
-		      "that the 'paes' cipher is available");
 		goto out;
 	}
 
@@ -2546,8 +2534,6 @@ static int command_setvp(void)
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",
 			      strerror(-rc));
-			warnx("Make sure that kernel module 'phmac_s390' is "
-			      "loaded and that the 'phmac' cipher is available");
 			goto out;
 		}
 	}
@@ -2701,8 +2687,6 @@ static int command_setkey(void)
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module 'paes_s390' is loaded and "
-		      "that the 'paes' cipher is available");
 		goto out;
 	}
 
@@ -2715,9 +2699,6 @@ static int command_setkey(void)
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",
 			      strerror(-rc));
-			warnx("Make sure that kernel module 'phmac_s390' is "
-			      "loaded and that the 'phmac' cipher is "
-			      "available");
 			goto out;
 		}
 	}
@@ -2985,8 +2966,6 @@ static int command_convert(void)
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module 'paes_s390' is loaded and "
-		      "that the 'paes' cipher is available");
 		goto out;
 	}
 
@@ -3000,9 +2979,6 @@ static int command_convert(void)
 		if (rc != 0) {
 			warnx("Failed to generate the verification pattern: %s",
 			      strerror(-rc));
-			warnx("Make sure that kernel module 'phmac_s390' is "
-			      "loaded and that the 'phmac' cipher is "
-			      "available");
 			goto out;
 		}
 	}

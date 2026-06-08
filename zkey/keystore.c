@@ -2101,10 +2101,6 @@ static int _keystore_create_info_file(struct keystore *keystore,
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module '%s' is loaded and "
-		      "that the '%s' cipher is available",
-		      is_aes_key_type(key_type) ? "paes_s390" : "phmac_s390",
-		      is_aes_key_type(key_type) ? "paes" : "phmac");
 		remove(filenames->pass_filename);
 		goto out;
 	}
@@ -2400,10 +2396,6 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module '%s' is loaded and "
-		      "that the '%s' cipher is available",
-		      is_aes_key_type(key_type) ? "paes_s390" : "phmac_s390",
-		      is_aes_key_type(key_type) ? "paes" : "phmac");
 		goto out_free_props;
 	}
 
@@ -3913,12 +3905,6 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 			warnx("Failed to generate the key verification pattern "
 			      "for key '%s': %s", file_names->skey_filename,
 			      strerror(-rc));
-			warnx("Make sure that kernel module '%s' is loaded and "
-			      "that the '%s' cipher is available",
-			      is_aes_key(secure_key, secure_key_size) ?
-						"paes_s390" : "phmac_s390",
-			      is_aes_key(secure_key, secure_key_size) ?
-						"paes" : "phmac");
 			goto out;
 		}
 
@@ -6170,12 +6156,6 @@ prompt_alt_name:
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module '%s' is loaded and "
-		      "that the '%s' cipher is available",
-		      is_aes_key(secure_key, secure_key_size) ?
-					"paes_s390" : "phmac_s390",
-		      is_aes_key(secure_key, secure_key_size) ?
-					"paes" : "phmac");
 		fatal_err = true;
 		goto out_remove;
 	}

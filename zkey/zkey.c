@@ -2503,12 +2503,6 @@ static int command_validate_file(void)
 	if (rc != 0) {
 		warnx("Failed to generate the verification pattern: %s",
 		      strerror(-rc));
-		warnx("Make sure that kernel module '%s' is loaded and "
-		      "that the '%s' cipher is available",
-		      is_aes_key(secure_key, secure_key_size) ?
-					"paes_s390" : "phmac_s390",
-		      is_aes_key(secure_key, secure_key_size) ?
-					"paes" : "phmac");
 		rc = EXIT_FAILURE;
 		goto out;
 	}
