@@ -1423,7 +1423,7 @@ static int _keystore_volume_check(const char *volume, bool remove, bool set,
 	}
 
 	info->volume = util_strdup(volume);
-	ch = strchr(info->volume, ':');
+	ch = (char *)strchr(info->volume, ':');
 	if (ch == NULL || strlen(ch + 1) == 0) {
 		warnx("Volume specification must contain a dm-crypt mapping "
 		      "name separated by a colon");

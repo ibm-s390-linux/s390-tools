@@ -540,11 +540,11 @@ unsigned int str_list_count(const char *str_list)
  *          or NULL if the string was not found
  *
  */
-static char *str_list_find(const char *str_list, const char *str)
+static const char *str_list_find(const char *str_list, const char *str)
 {
-	char *before;
-	char *after;
-	char *ch;
+	const char *before;
+	const char *after;
+	const char *ch;
 
 	ch = strstr(str_list, str);
 	if (ch == NULL)
@@ -608,9 +608,9 @@ char *str_list_add(const char *str_list, const char *str)
  */
 char *str_list_remove(const char *str_list, const char *str)
 {
-	char *after;
+	const char *after;
+	const char *ch;
 	char *ret;
-	char *ch;
 
 	util_assert(str_list != NULL, "Internal error: str_list is NULL");
 	util_assert(str != NULL, "Internal error: str is NULL");
