@@ -298,6 +298,18 @@ struct pkey_apqns4keytype {
 
 #define PKEY_APQNS4KT _IOWR(PKEY_IOCTL_MAGIC, 0x1C, struct pkey_apqns4keytype)
 
+struct pkey_kblob2pkey3 {
+	u8 *key;			/* in: pointer to key blob */
+	u32 keylen;			/* in: key blob size */
+	struct pkey_apqn *apqns;	/* in: ptr to list of apqn targets */
+	u32 apqn_entries;		/* in: # of apqn target list entries */
+	u32 pkeytype;			/* out: prot key type */
+	u32 pkeylen;			/* in/out: size of pkey buffer */
+	u8 *pkey;			/* in: pkey blob buffer space ptr */
+};
+
+#define PKEY_KBLOB2PROTK3 _IOWR(PKEY_IOCTL_MAGIC, 0x1D, struct pkey_kblob2pkey3)
+
 #define KEY_TYPE_CCA_AESDATA        "CCA-AESDATA"
 #define KEY_TYPE_CCA_AESCIPHER      "CCA-AESCIPHER"
 #define KEY_TYPE_EP11_AES           "EP11-AES"

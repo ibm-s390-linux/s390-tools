@@ -1456,6 +1456,124 @@ int validate_secure_key(int pkey_fd,
 	return rc;
 }
 
+/*
+ * Wrapper for the PKEY_KBLOB2PROTK3 IOCTL to transform a key blob of any type
+ * into a protected key. In case the key blob is a 2 part XTS secure key, then
+ * both parts are transformed and the protected key of the second part is
+ * concatenated to the protected key of the first part.
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] key           the key blob
+ * @param[in] key_size      the size of the key blob
+ * @param[in] protkey       the buffer for the returned protected key
+ * @param[in/out] protkey_size  the size of the protected key buffer. On return
+ *                          the actual size of the protected key.
+ * @param[out] pkeytype     the type of the protected key (PKEY_KEYTYPE_nnn)
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+static int pkey_kblob2protk(int pkey_fd, u8 *key, size_t key_size,
+			    u8 *protkey, size_t *protkey_size,
+			    int *pkeytype, bool verbose)
+{
+	u32 list_entries = 0, pkeylen = 0, type;
+	struct pkey_kblob2pkey3 kblob2pkey3;
+	struct pkey_apqn *list = NULL;
+	bool securekey, xts;
+	u32 flags = 0;
+	int rc;
+
+	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
+	util_assert(key != NULL, "Internal error: key is NULL");
+	util_assert(protkey != NULL, "Internal error: protkey is NULL");
+	util_assert(protkey_size != NULL,
+		    "Internal error: protkey_size is NULL");
+	util_assert(pkeytype != NULL, "Internal error: pkeytype is NULL");
+
+	securekey = is_secure_key(key, key_size);
+	xts = securekey ? is_xts_key(key, key_size) : false;
+
+	if (securekey) {
+		flags = PKEY_FLAGS_MATCH_CUR_MKVP;
+		if (is_cca_aes_data_key(key, key_size) ||
+		    is_cca_aes_cipher_key(key, key_size))
+			flags |= PKEY_FLAGS_MATCH_ALT_MKVP;
+
+		rc = build_apqn_list_for_key(pkey_fd, key,
+					     HALF_KEYSIZE_FOR_XTS(
+							key_size, xts),
+					     flags, NULL, &list, &list_entries,
+					     verbose);
+		if (rc != 0) {
+			pr_verbose(verbose, "Failed to build a list of APQNs "
+				   "that can transform this secure key into a "
+				   "protected key: %s", strerror(-rc));
+			goto out;
+		}
+	}
+
+	kblob2pkey3.key = key;
+	kblob2pkey3.keylen = HALF_KEYSIZE_FOR_XTS(key_size, xts);
+	kblob2pkey3.apqns = list;
+	kblob2pkey3.apqn_entries = list_entries;
+	kblob2pkey3.pkeytype = 0;
+	kblob2pkey3.pkeylen = *protkey_size;
+	kblob2pkey3.pkey = protkey;
+
+	rc = ioctl(pkey_fd, PKEY_KBLOB2PROTK3, &kblob2pkey3);
+	if (rc != 0) {
+		rc = -errno;
+		pr_verbose(verbose, "ioctl PKEY_KBLOB2PROTK3 rc: %s",
+			   strerror(-rc));
+		goto out;
+	}
+
+	pkeylen = kblob2pkey3.pkeylen;
+	type = kblob2pkey3.pkeytype;
+
+	if (xts) {
+		if (*protkey_size < 2 * pkeylen) {
+			rc = -EINVAL;
+			pr_verbose(verbose, "Protkey buffer is too small");
+			goto out;
+		}
+
+		kblob2pkey3.key = key + key_size / 2;
+		kblob2pkey3.keylen = key_size / 2;
+		kblob2pkey3.apqns = list;
+		kblob2pkey3.apqn_entries = list_entries;
+		kblob2pkey3.pkeytype = 0;
+		kblob2pkey3.pkeylen = *protkey_size - pkeylen;
+		kblob2pkey3.pkey = protkey + pkeylen;
+
+		rc = ioctl(pkey_fd, PKEY_KBLOB2PROTK3, &kblob2pkey3);
+		if (rc != 0) {
+			rc = -errno;
+			pr_verbose(verbose, "ioctl PKEY_KBLOB2PROTK3 rc: %s",
+				   strerror(-rc));
+			goto out;
+		}
+
+		pkeylen += kblob2pkey3.pkeylen;
+
+		if (kblob2pkey3.pkeytype != type) {
+			rc = -EINVAL;
+			pr_verbose(verbose, "Second part of XTS key is not the "
+				   "same type as the first part");
+			goto out;
+		}
+	}
+
+	*protkey_size = pkeylen;
+	*pkeytype = type;
+
+out:
+	if (list != NULL)
+		free(list);
+	return rc;
+}
+
 /**
  * Generate a key verification pattern of a secure AES key by encrypting the all
  * zero message with the secure key using the AF_ALG interface
