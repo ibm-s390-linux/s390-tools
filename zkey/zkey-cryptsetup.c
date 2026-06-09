@@ -3040,7 +3040,7 @@ static int command_convert(void)
 		    strcmp(ip.integrity, "hmac(sha256") == 0)
 			hmac_vp_alg = "hmac(sha256)";
 		else if (strcmp(ip.integrity, "hmac(sha384)") == 0 ||
-			 strcmp(ip.integrity, "hmac(sha512)") != 0)
+			 strcmp(ip.integrity, "hmac(sha512)") == 0)
 			hmac_vp_alg = "hmac(sha512)";
 
 		rc = generate_hmac_key_verification_pattern(key + ekeysize,
