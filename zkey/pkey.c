@@ -100,7 +100,7 @@ u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 	}
 	size = sb.st_size;
 
-	if (size < MIN_SECURE_KEY_SIZE || size > 2 * MAX_SECURE_KEY_SIZE) {
+	if (size < MIN_SECURE_KEY_SIZE || size > 3 * MAX_SECURE_KEY_SIZE) {
 		warnx("File '%s' has an invalid size: %lu", keyfile, size);
 		return NULL;
 	}
