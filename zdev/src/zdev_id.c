@@ -23,6 +23,7 @@
 #define LOADPARM	"/sys/firmware/ipl/loadparm"
 #define IPL_DEV_ID	"/sys/firmware/ipl/device"
 #define IPL_DEV_TYPE	"/sys/firmware/ipl/ipl_type"
+#define UID_CHECKING	"/sys/firmware/clp/uid_checking"
 
 #define	WHITESPACE	" \t\n"
 
@@ -346,13 +347,33 @@ out:
 		emit("ZDEV_SITE_ID=%d\n", site_id);
 }
 
+/* Export sysfs attr uid_checking to env file */
+static void process_uid_checking(const char *filename)
+{
+	int value;
+	FILE *fd;
+
+	fd = fopen(filename, "r");
+	if (!fd)
+		err(1, "Error in opening uid_checking file: %s", filename);
+
+	if (fscanf(fd, "%d", &value) != 1) {
+		fclose(fd);
+		err(1, "Error in reading uid_checking file: %s", filename);
+	}
+
+	emit("ZDEV_UID_CHECKING=%d\n", value);
+	fclose(fd);
+}
+
 int main(int argc, char *argv[])
 {
-	char *sysinfo, *cmdline, *loadparm;
+	char *sysinfo, *cmdline, *loadparm, *uid_checking;
 
 	sysinfo = argc < 2 ? SYSINFO : argv[1];
 	cmdline = argc < 3 ? CMDLINE : argv[2];
 	loadparm = argc < 4 ? LOADPARM : argv[3];
+	uid_checking = argc < 5 ? UID_CHECKING : argv[4];
 
 	/* Initialize file handle to collect zdev env */
 	zdev_file_init();
@@ -360,6 +381,7 @@ int main(int argc, char *argv[])
 	process_sysinfo(sysinfo);
 	process_cmdline(cmdline);
 	process_loadparm(loadparm);
+	process_uid_checking(uid_checking);
 
 	/* Close file handle to commit zdev env */
 	zdev_file_close();
