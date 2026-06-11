@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #include "sanitize.h"
 #include "zdev.h"
@@ -24,6 +25,10 @@
 #define IPL_DEV_TYPE	"/sys/firmware/ipl/ipl_type"
 
 #define	WHITESPACE	" \t\n"
+
+static int g_cleanup;
+static FILE *g_zdev_file;
+static char g_zdev_tmpfile[] = ZDEV_ID_FILE "-XXXXXX";
 
 static void array_add(char ***array_p, int *num_p, const char *str)
 {
@@ -46,6 +51,91 @@ static void array_free(char **array, int num)
 	for (i = 0; i < num; i++)
 		free(array[i]);
 	free(array);
+}
+
+/* Writes format string to both stdout and zdev_id file */
+static void emit(const char *fmt, ...)
+{
+	char *str = NULL;
+	va_list args;
+	int ret;
+
+	/* Initialize variable arguments */
+	va_start(args, fmt);
+	ret = vasprintf(&str, fmt, args);
+	va_end(args);
+
+	if (ret < 0 || !str)
+		err(1, "Error formatting output string");
+
+	/* Write to temp file */
+	if (fprintf(g_zdev_file, "%s", str) < 0) {
+		free(str);
+		err(1, "Error in writing to temp file: %s", str);
+	}
+
+	/* Write to stdout */
+	if (printf("%s", str) < 0) {
+		free(str);
+		err(1, "Error in writing to stdout: %s", str);
+	}
+
+	free(str);
+}
+
+static void cleanup_temp_file(void)
+{
+	if (g_cleanup)
+		remove(g_zdev_tmpfile);
+}
+
+/*
+ * Initialize the global file pointer for writing zdev env data. Creates a
+ * temporary file that will be renamed after all updates
+ */
+static void zdev_file_init(void)
+{
+	int tmpfd;
+
+	/* Register clean up function to run */
+	atexit(cleanup_temp_file);
+
+	/*
+	 * Create a temporary file. Implementation will replace terminating
+	 * 'X' characters into random characters
+	 */
+	tmpfd = mkstemp(g_zdev_tmpfile);
+	if (tmpfd == -1)
+		err(1, "Could not create temp file");
+
+	/* Indicate clean up routine to remove temp file */
+	g_cleanup = 1;
+
+	/* Open the temp file for writing */
+	g_zdev_file = fdopen(tmpfd, "w");
+	if (!g_zdev_file)
+		err(1, "Could not open temp file");
+
+	/* Write header */
+	emit("%s\n", CHZDEV_HEADER);
+}
+
+/*
+ * Close the global file pointer and rename the temporary file. Should be
+ * called after all updates are complete.
+ */
+static void zdev_file_close(void)
+{
+	/* Close the file */
+	if (fclose(g_zdev_file) != 0)
+		err(1, "Error in closing temp file");
+
+	/* Rename the temporary file to the final name */
+	if (rename(g_zdev_tmpfile, ZDEV_ID_FILE) != 0)
+		err(1, "Error in renaming temp file as: %s", ZDEV_ID_FILE);
+
+	/* Clear flag to prevent atexit() handler from running */
+	g_cleanup = 0;
 }
 
 static void process_sysinfo(const char *filename)
@@ -87,7 +177,7 @@ static void process_sysinfo(const char *filename)
 	 *  2: first level VM
 	 *  3: second level VM
 	 */
-	printf("ZDEV_NEST_LEVEL=%d\n", num_cps);
+	emit("ZDEV_NEST_LEVEL=%d\n", num_cps);
 
 	/*
 	 * ZDEV_HYPERVISOR_<n>=LPAR|z/VM|KVM/Linux
@@ -97,7 +187,7 @@ static void process_sysinfo(const char *filename)
 	for (i = 0; i < num_cps; i++) {
 		/* Sysinfo lists VMs in reverse order .*/
 		level = (i == 0) ? i : (num_cps - i);
-		printf("ZDEV_HYPERVISOR_%d=\"%s\"\n", i, cps[level]);
+		emit("ZDEV_HYPERVISOR_%d=\"%s\"\n", i, cps[level]);
 	}
 	array_free(cps, num_cps);
 
@@ -109,7 +199,7 @@ static void process_sysinfo(const char *filename)
 	 *  0: Classic mode
 	 *  1: DPM mode
 	 */
-	printf("ZDEV_IS_DPM=%d\n", is_dpm);
+	emit("ZDEV_IS_DPM=%d\n", is_dpm);
 }
 
 static void process_cmdline(const char *filename)
@@ -147,7 +237,7 @@ out:
 	 *  0: Perform auto-configuration
 	 *  1: Skip auto-configuration
 	 */
-	printf("ZDEV_NO_AUTO=%d\n", no_auto);
+	emit("ZDEV_NO_AUTO=%d\n", no_auto);
 }
 
 /*
@@ -212,51 +302,6 @@ out:
 	return site_id;
 }
 
-static void write_zdev_site_id(int site_id)
-{
-	FILE *fd;
-	int tmpfd, rc;
-	const char zdev_id_file[] = ZDEV_ID_FILE;
-	char zdev_id_tmpfile[] = ZDEV_ID_FILE "-XXXXXX";
-
-	tmpfd = mkstemp(zdev_id_tmpfile);
-	if (tmpfd == -1)
-		goto err;
-
-	/* Open the temp file to use with fprintf */
-	fd = fdopen(tmpfd, "w");
-	if (!fd)
-		goto err;
-
-	if (fprintf(fd, CHZDEV_HEADER "\n") < 0) {
-		fclose(fd);
-		goto err;
-	}
-
-	if (site_id == SITE_FALLBACK)
-		rc = fprintf(fd, "ZDEV_SITE_ID=\"\"\n");
-	else
-		rc = fprintf(fd, "ZDEV_SITE_ID=%d\n", site_id);
-
-	if (rc < 0) {
-		fclose(fd);
-		goto err;
-	}
-
-	if (fclose(fd))
-		goto err;
-
-	/* Rename the temporary file to ZDEV_SITE_ID_FILE*/
-	if (rename(zdev_id_tmpfile, zdev_id_file) == -1) {
-		remove(zdev_id_tmpfile);
-		goto err;
-	}
-
-	return;
-err:
-	err(1, "Could not write to zdev_site_id file");
-}
-
 /* Read the loadparm and extract the current site_id.
  * loadparm can contains either Sn or "Ss". Sn indicate the site_id, where
  * 'n' is the integer which could be one of the valid site_ids from 0 to 9.
@@ -295,11 +340,10 @@ static void process_loadparm(const char *filename)
 	free(line);
 	fclose(fd);
 out:
-	write_zdev_site_id(site_id);
 	if (site_id == SITE_FALLBACK)
-		printf("ZDEV_SITE_ID=\"\"\n");
+		emit("ZDEV_SITE_ID=\"\"\n");
 	else
-		printf("ZDEV_SITE_ID=%d\n", site_id);
+		emit("ZDEV_SITE_ID=%d\n", site_id);
 }
 
 int main(int argc, char *argv[])
@@ -310,9 +354,15 @@ int main(int argc, char *argv[])
 	cmdline = argc < 3 ? CMDLINE : argv[2];
 	loadparm = argc < 4 ? LOADPARM : argv[3];
 
+	/* Initialize file handle to collect zdev env */
+	zdev_file_init();
+
 	process_sysinfo(sysinfo);
 	process_cmdline(cmdline);
 	process_loadparm(loadparm);
+
+	/* Close file handle to commit zdev env */
+	zdev_file_close();
 
 	return 0;
 }
