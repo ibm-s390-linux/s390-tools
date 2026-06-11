@@ -216,8 +216,8 @@ static void write_zdev_site_id(int site_id)
 {
 	FILE *fd;
 	int tmpfd, rc;
-	const char zdev_id_file[] = ZDEV_SITE_ID_FILE;
-	char zdev_id_tmpfile[] = ZDEV_SITE_ID_FILE "-XXXXXX";
+	const char zdev_id_file[] = ZDEV_ID_FILE;
+	char zdev_id_tmpfile[] = ZDEV_ID_FILE "-XXXXXX";
 
 	tmpfd = mkstemp(zdev_id_tmpfile);
 	if (tmpfd == -1)

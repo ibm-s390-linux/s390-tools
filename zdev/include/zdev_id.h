@@ -10,6 +10,6 @@
 #ifndef ZDEV_ID_H
 #define ZDEV_ID_H
 
-#define ZDEV_SITE_ID_FILE    "/run/zdev_id.env"
+#define ZDEV_ID_FILE    "/run/zdev_id.env"
 
 #endif /* ZDEV_ID_H */

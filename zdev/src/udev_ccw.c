@@ -390,16 +390,16 @@ static exit_code_t udev_ccw_write_device_new(struct device *dev)
 	fprintf(fd, "LABEL=\"%s\"\n", cfg_label);
 
 	/*
-	 * Determine the ZDEV_SITE_ID here. If ZDEV_SITE_ID_FILE available,
+	 * Determine the ZDEV_SITE_ID here. If ZDEV_ID_FILE available,
 	 * simply import the content. If not, execute zdev_id and import the
 	 * output of the same.
 	 */
 	if (site_configured) {
 		fprintf(fd, "# Determine ZDEV_SITE_ID to continue\n");
 		fprintf(fd, "TEST==\"%s\",IMPORT{file}=\"%s\"\n",
-			ZDEV_SITE_ID_FILE, ZDEV_SITE_ID_FILE);
+			ZDEV_ID_FILE, ZDEV_ID_FILE);
 		fprintf(fd, "TEST!=\"%s\",IMPORT{program}=\"%s/zdev_id\"\n\n",
-			ZDEV_SITE_ID_FILE, TOOLS_LIBDIR);
+			ZDEV_ID_FILE, TOOLS_LIBDIR);
 	}
 
 	/* site comparison block */
