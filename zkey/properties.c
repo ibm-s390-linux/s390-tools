@@ -386,6 +386,8 @@ int properties_load(struct properties *properties, const char *filename,
 
 	while (fgets(line, sizeof(line), fp) != NULL) {
 		len = strlen(line);
+		if (len == 0)
+			continue;
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
 		if (line[0] == '#')
