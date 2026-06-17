@@ -310,6 +310,9 @@ pub struct AddSecretOpt {
 }
 
 #[derive(Debug)]
+// Allow dead_code to suppress false positive: struct fields are accessed via From trait
+// implementation and used in cmd/add.rs, but clippy doesn't detect this indirect usage pattern
+#[allow(dead_code)]
 pub struct AddSecretOptComb<'a> {
     pub input: &'a str,
     pub force: bool,
@@ -352,6 +355,9 @@ pub struct ListSecretOpt {
 }
 
 #[derive(Debug)]
+// Allow dead_code to suppress false positive: struct fields are accessed via From trait
+// implementation and used in cmd/list.rs, but clippy doesn't detect this indirect usage pattern
+#[allow(dead_code)]
 pub struct ListSecretOptComb<'a> {
     pub output: &'a str,
     pub format: ListSecretOutputType,
@@ -487,6 +493,9 @@ pub enum RetrOutFmt {
 }
 
 #[derive(Debug)]
+// Allow dead_code to suppress false positive: struct fields are accessed via From trait
+// implementation and used in cmd/retr.rs, but clippy doesn't detect this indirect usage pattern
+#[allow(dead_code)]
 pub struct RetrSecretOptionsComb<'a> {
     pub input: &'a str,
     pub output: &'a str,

@@ -13,6 +13,9 @@ static VERSION: OnceLock<String> = OnceLock::new();
 /// Tool to verify host-keys
 ///
 /// Tool to verify host-keys. Use this tool to verify the chain of trust for IBM Secure
+// Allow manual_non_exhaustive to suppress Clippy false positive as the version
+// field is used by Clap to generate the --version flag.
+#[allow(clippy::manual_non_exhaustive)]
 pub struct CliOptions {
     #[command(flatten)]
     pub certificate_args: CertificateOptions,
