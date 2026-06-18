@@ -28,8 +28,8 @@ RemainAfterExit=yes
 FailureAction=poweroff-immediate
 # boot partition is unencrypted and contains SICS so we can get logs out this way
 # logs do not leek any sensitive information
-StandardOutput=console
-StandardError=console
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 RequiredBy=sel-ebc.target

@@ -20,8 +20,8 @@ FailureAction=poweroff-immediate
 RemainAfterExit=yes
 
 # logs do not leek any sensitive information
-StandardOutput=console
-StandardError=console
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 RequiredBy=sel-ebc.target
