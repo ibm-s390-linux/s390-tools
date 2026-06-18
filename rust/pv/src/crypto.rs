@@ -162,6 +162,12 @@ impl SymKey {
     }
 }
 
+impl Display for SymKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SymKey({:?})", self.key_type())
+    }
+}
+
 /// Performs an hkdf according to RFC 5869.
 /// See [`OpenSSL HKDF`]()
 ///
