@@ -718,6 +718,22 @@ mod test {
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("image-key", ["--image-key", "/dev/null"])])),
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-image-encryption", ["--enable-image-encryption"]),
                                                        CliOption::new("image-key", ["--image-key", "/dev/null"])])),
+
+            // cck-available group tests: valid combinations
+            // --enable-cck-extension-secret with --cck
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-cck-extension-secret", ["--enable-cck-extension-secret"]),
+                                                       CliOption::new("cck", ["--cck", "/dev/null"])])),
+            // --cck with --enable-cck-update (both cck-available options together)
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("cck", ["--cck", "/dev/null"]),
+                                                       CliOption::new("enable-cck-update", ["--enable-cck-update"])])),
+            // --enable-dump with --enable-cck-update (no --cck required as cck-update allows to set a CCK)
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-dump", ["--enable-dump"]),
+                                                       CliOption::new("enable-cck-update", ["--enable-cck-update"])])),
+            // --cck standalone (without any requiring options)
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("cck", ["--cck", "/dev/null"])])),
+            // --comm-key with --enable-cck-update (alias test)
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("comm-key", ["--comm-key", "/dev/null"]),
+                                                       CliOption::new("enable-cck-update", ["--enable-cck-update"])])),
         ];
         let invalid_create_args = [
             flat_map_collect(remove(mvcanv.clone(), "no-verify")),
@@ -759,6 +775,14 @@ mod test {
             // exclusive.
             flat_map_collect(insert(mvca.clone(), vec![CliOption::new("disable-image-encryption", ["--disable-image-encryption"]),
                                                        CliOption::new("image-key", ["--image-key", "/dev/null"])])),
+
+            // cck-available group tests: invalid combinations
+            // --enable-cck-extension-secret without cck-available
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-cck-extension-secret", ["--enable-cck-extension-secret"])])),
+            // --enable-cck-extension-secret with --enable-cck-update and --cck (conflict takes precedence)
+            flat_map_collect(insert(mvca.clone(), vec![CliOption::new("enable-cck-extension-secret", ["--enable-cck-extension-secret"]),
+                                                       CliOption::new("enable-cck-update", ["--enable-cck-update"]),
+                                                       CliOption::new("cck", ["--cck", "/dev/null"])])),
         ];
 
         let mut genprotimg_valid_args = vec![
