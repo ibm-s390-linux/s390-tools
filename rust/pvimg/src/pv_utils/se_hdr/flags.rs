@@ -186,14 +186,18 @@ pub trait ControlFlagsTrait {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
-/// use flags::{ControlFlagTrait, ControlFlags, PcfV1};
+/// ```rust
+/// use pvimg::uvdata::{ControlFlagsTrait, PcfV1, PlaintextControlFlagsV1};
 ///
-/// // Create from u64
-/// let flags: ControlFlags<PcfV1> = 0x0000000020000000_u64.into();
+/// // Create from u64 (bit 57 MSB0 = 0x40)
+/// let flags: PlaintextControlFlagsV1 = 0x0000000000000040_u64.into();
+///
+/// // Check if a flag is set
+/// assert!(flags.is_set(PcfV1::PckmoAes));
 ///
 /// // Convert back to u64
 /// let value: u64 = flags.into();
+/// assert_eq!(value, 0x0000000000000040_u64);
 /// ```
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ControlFlags<T: ControlFlagTrait> {
