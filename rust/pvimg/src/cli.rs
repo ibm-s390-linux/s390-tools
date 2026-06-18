@@ -154,6 +154,9 @@ pub struct CreateBootImageLegacyFlags {
     /// Add-secret requests must provide an extension secret that matches the
     /// CCK-derived extension secret. This option requires the '--cck'
     /// option.
+    // Note: We intentionally require 'cck' (not 'cck-available') because
+    // enable-cck-extension-secret cannot be used together with
+    // --enable-cck-update.
     #[arg(long, action = clap::ArgAction::SetTrue, requires="cck", group="header-flags")]
     pub enable_cck_extension_secret: Option<bool>,
 
