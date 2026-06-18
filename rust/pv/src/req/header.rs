@@ -2,12 +2,13 @@
 //
 // Copyright IBM Corp.
 
+//! Request header structure for UV requests.
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, U32};
 
 use crate::assert_size;
 
 /// Representation of the shared parts of the request header.
-/// Used by [`ReqEncrCtx`]
+/// Used by [`ReqEncrCtx`](super::ReqEncrCtx)
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, Immutable)]
 pub struct RequestHdr {

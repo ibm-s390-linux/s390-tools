@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp.
 
+//! Request encryption context for managing UV request encryption.
+
 use std::mem::size_of;
 
 use openssl::nid::Nid;
@@ -34,7 +36,7 @@ impl ReqEncrCtx {
     /// * `priv_key` - Private key to wrap [`Keyslot`](super::Keyslot)
     /// * `prot_key` - Symmetric key for request encryption. Part of [`Keyslot`](super::Keyslot)
     ///
-    /// If an argument is set to `None` a ranom is generated
+    /// If an argument is set to `None` a random is generated
     ///
     /// # Errors
     ///
@@ -62,8 +64,8 @@ impl ReqEncrCtx {
     /// # Errors
     ///
     /// This function will return an error if OpenSSL could not generate a random value.
-    pub fn random(ket_tp: SymKeyType) -> Result<Self> {
-        match ket_tp {
+    pub fn random(key_tp: SymKeyType) -> Result<Self> {
+        match key_tp {
             SymKeyType::Aes256Gcm => Self::new_aes_256(None, None, None),
             SymKeyType::Aes256Xts => Err(Error::NoAeadKey),
         }

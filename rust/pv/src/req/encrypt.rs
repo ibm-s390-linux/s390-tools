@@ -2,9 +2,11 @@
 //
 // Copyright IBM Corp.
 
+//! Encryption trait and authenticated data types for UV requests.
+
 use openssl::pkey::{PKeyRef, Private};
 
-use super::keyslot::Keyslot;
+use crate::req::Keyslot;
 use crate::Result;
 
 /// Encrypt a _secret_ using self and a given private key.

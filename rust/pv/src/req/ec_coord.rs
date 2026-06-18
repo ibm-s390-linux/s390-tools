@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp.
 
+//! EC public key coordinate utilities and conversions.
+
 use openssl::bn::{BigNum, BigNumContext};
 use openssl::ec::{EcGroup, EcGroupRef, EcKey, EcPointRef};
 use openssl::error::ErrorStack;

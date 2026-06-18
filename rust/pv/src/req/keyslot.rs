@@ -2,6 +2,8 @@
 //
 // Copyright IBM Corp.
 
+//! IBM Z Host key-slot implementations.
+
 use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, PKeyRef, Private, Public};
 
