@@ -22,7 +22,7 @@ pub fn get_reader(filepath: &Path) -> Result<Box<dyn Read>> {
         .with_context(|| format!("unable to get reader from {:?}", filepath))
 }
 
-/// Read all data from a reader into a Vec<u8>
+/// Read all data from a reader into a `Vec<u8>`
 pub fn get_data(rd_in: &mut Box<dyn Read>) -> Result<Vec<u8>> {
     let mut data_in = Vec::new();
     rd_in
