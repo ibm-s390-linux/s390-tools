@@ -12,6 +12,13 @@ use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32, U64
 // (SE) boot request control block aka SE header
 use crate::{assert_size, request::MagicValue, static_assert, Error, Result, PAGESIZE};
 
+/// Version of the Secure Execution header
+#[derive(Debug, PartialEq)]
+pub enum SeHdrVersion {
+    /// Secure Execution header v1
+    One = 0x100,
+}
+
 /// Struct containing all SE-header tags.
 ///
 /// Contains:
@@ -205,7 +212,7 @@ impl BootHdrTags {
     ///
     /// This function will return an error if the header could not be found in
     /// `img` or is invalid.
-    pub fn from_se_image<R>(img: &mut R) -> Result<Self>
+    pub fn from_se_image<R>(img: &mut R) -> Result<(Self, SeHdrVersion)>
     where
         R: Read + Seek,
     {
@@ -232,10 +239,13 @@ impl BootHdrTags {
         };
 
         // Some sanity checks
-        if hdr_head.version.get() != 0x100 {
-            debug!("Unsupported hdr-version: {:0>4x}", hdr_head.version.get());
-            return Err(Error::InvBootHdr);
-        }
+        let hdr_version = match hdr_head.version.get() {
+            0x100 => SeHdrVersion::One,
+            _ => {
+                debug!("Unsupported hdr-version: {:0>4x}", hdr_head.version.get());
+                return Err(Error::InvBootHdr);
+            }
+        };
 
         // go to the Boot header tag
         img.seek(Current(
@@ -248,12 +258,15 @@ impl BootHdrTags {
         let mut tag = [0u8; BootHdrHead::TAG_SIZE];
         img.read_exact(tag.as_mut_slice())?;
 
-        Ok(Self {
-            pld: hdr_head.pld,
-            ald: hdr_head.ald,
-            tld: hdr_head.tld,
-            tag,
-        })
+        Ok((
+            Self {
+                pld: hdr_head.pld,
+                ald: hdr_head.ald,
+                tld: hdr_head.tld,
+                tag,
+            },
+            hdr_version,
+        ))
     }
 }
 
@@ -319,7 +332,7 @@ mod tests {
     fn from_se_image_hdr() {
         let bin_hdr = get_test_asset!("exp/secure_guest.hdr");
         let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(*bin_hdr)).unwrap();
-        assert_eq!(hdr_tags, EXP_HDR);
+        assert_eq!(hdr_tags, (EXP_HDR, SeHdrVersion::One));
     }
 
     #[test]
@@ -355,18 +368,19 @@ mod tests {
         let bin_hdr = get_test_asset!("exp/secure_guest.hdr");
         img[0x12000..0x12280].copy_from_slice(bin_hdr);
         let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(img)).unwrap();
-        assert_eq!(hdr_tags, EXP_HDR);
+        assert_eq!(hdr_tags, (EXP_HDR, SeHdrVersion::One));
     }
 
     #[test]
     fn tags_convert_u8() {
         let bin_hdr = get_test_asset!("exp/secure_guest.hdr");
         let hdr_tags = BootHdrTags::from_se_image(&mut Cursor::new(*bin_hdr)).unwrap();
-        let ser: &[u8] = hdr_tags.as_ref();
+        let ser: &[u8] = hdr_tags.0.as_ref();
         let mut ser = ser.to_vec();
 
         let der: BootHdrTags = ser.clone().try_into().unwrap();
-        assert_eq!(hdr_tags, der);
+        assert_eq!(hdr_tags.0, der);
+        assert_eq!(hdr_tags.1, SeHdrVersion::One);
 
         ser.pop();
         let der: Result<BootHdrTags> = ser.clone().try_into();
@@ -379,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn se_img_metadata() {
+    fn se_img_metadata_v1() {
         let metadata = SeImgMetaData::new_v1(0x14000, 0x16000);
         let data = [
             83, 101, 73, 109, 103, 76, 110, 120, 0, 0, 0, 0, 0, 1, 64, 0, 0, 0, 0, 1, 0, 0, 0, 0,

@@ -24,7 +24,7 @@ pub fn verify(opt: &VerifyOpt) -> Result<ExitCode> {
     let arpk = SymKey::Aes256(
         read_exact_file(&opt.arpk, "Attestation request protection key").map(Confidential::new)?,
     );
-    let tags = BootHdrTags::from_se_image(&mut img)?;
+    let (tags, _) = BootHdrTags::from_se_image(&mut img)?;
     let exchange = ExchangeFormatResponse::read(&mut input)?;
 
     let (auth, conf) = AttestationRequest::decrypt_bin(exchange.arcb(), &arpk)?;

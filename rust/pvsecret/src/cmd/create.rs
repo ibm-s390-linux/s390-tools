@@ -166,13 +166,9 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
     debug!("FLAGS: {flags:x?}");
 
     let mut se_hdr = open_file(&opt.hdr)?;
-    let mut asrcb = AddSecretRequest::new(
-        AddSecretVersion::One,
-        secret,
-        BootHdrTags::from_se_image(&mut se_hdr)
-            .with_context(|| format!("Provided SE-header in '{}' is malformed", &opt.hdr))?,
-        flags,
-    );
+    let (tags, _) = BootHdrTags::from_se_image(&mut se_hdr)
+        .with_context(|| format!("Provided SE-header in '{}' is malformed", &opt.hdr))?;
+    let mut asrcb = AddSecretRequest::new(AddSecretVersion::One, secret, tags, flags);
 
     // Set CUID
     read_cuid(&mut asrcb, opt)?;
