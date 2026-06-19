@@ -406,6 +406,38 @@ static void output_times(struct time_formats date)
 	}
 }
 
+struct ctr_filter_match {
+	bool selected;
+	bool selected_by_id;
+};
+
+static struct ctr_filter_match ctr_match(const char *name, const char *list,
+					 size_t id)
+{
+	struct ctr_filter_match match = { .selected = !list };
+	char *copy, *token;
+	char id_str[32];
+
+	if (!list)
+		return match;
+
+	snprintf(id_str, sizeof(id_str), "%zu", id);
+	copy = util_strdup(list);
+	for (token = strtok(copy, ","); token; token = strtok(NULL, ",")) {
+		if (name && strcmp(token, name) == 0) {
+			match.selected = true;
+			break;
+		}
+		if (strcmp(token, id_str) == 0) {
+			match.selected = true;
+			match.selected_by_id = true;
+			break;
+		}
+	}
+	free(copy);
+	return match;
+}
+
 static void prepare_counter(size_t id, unsigned long value)
 {
 	if (output_format == FMT_CSV) {
@@ -438,9 +470,14 @@ static void output_per_cpu(struct time_formats date)
 			util_fmt_obj_start(FMT_LIST, "counters");
 		}
 		for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
+			struct ctr_filter_match match;
+
 			if (!ctrname[i].hitcnt)
 				continue;
-			if (hideundef && !ctrname[i].name)
+			match = ctr_match(ctrname[i].name, ctrlist, i);
+			if (!match.selected)
+				continue;
+			if (hideundef && !ctrname[i].name && !match.selected_by_id)
 				continue;
 			prepare_counter(i, ctrname[i].ccv[h]);
 		}
@@ -462,9 +499,14 @@ static void output_total(struct time_formats date)
 		util_fmt_obj_start(FMT_LIST, "counters");
 	}
 	for (size_t i = 0; i < ARRAY_SIZE(ctrname); ++i) {
+		struct ctr_filter_match match;
+
 		if (!ctrname[i].hitcnt)
 			continue;
-		if (hideundef && !ctrname[i].name)
+		match = ctr_match(ctrname[i].name, ctrlist, i);
+		if (!match.selected)
+			continue;
+		if (hideundef && !ctrname[i].name && !match.selected_by_id)
 			continue;
 		prepare_counter(i, ctrname[i].total);
 		ctrname[i].total = 0;
