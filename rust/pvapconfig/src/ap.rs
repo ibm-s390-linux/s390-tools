@@ -192,10 +192,12 @@ impl ApqnList {
                     && a1.info.is_some()
                     && a2.info.is_some()
                 {
+                    #[allow(clippy::unnecessary_unwrap)]
                     let i1 = match a1.info.as_ref().unwrap() {
                         apqn_info::Ep11(i) => i,
                         _ => continue,
                     };
+                    #[allow(clippy::unnecessary_unwrap)]
                     let i2 = match a2.info.as_ref().unwrap() {
                         apqn_info::Ep11(i) => i,
                         _ => continue,
