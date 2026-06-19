@@ -92,9 +92,7 @@ use std::iter;
 
 impl ipl_parameter_block {
     pub fn size(num_comp: usize) -> Result<usize> {
-        let comps = iter::repeat(ipl_pb0_pv_comp::default())
-            .take(num_comp)
-            .collect();
+        let comps = std::iter::repeat_n(ipl_pb0_pv_comp::default(), num_comp).collect();
         let ipib = Self {
             pv: ipl_pb0_pv {
                 components: comps,
@@ -110,7 +108,7 @@ impl ipl_parameter_block {
 impl ipl_pb0_pv {
     pub fn size(num_comp: usize) -> Result<usize> {
         let comp = ipl_pb0_pv_comp::default();
-        let comps = iter::repeat(comp).take(num_comp).collect();
+        let comps = std::iter::repeat_n(comp, num_comp).collect();
         let ipl = Self {
             components: comps,
             ..Default::default()

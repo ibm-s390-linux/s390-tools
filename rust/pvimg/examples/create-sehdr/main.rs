@@ -176,7 +176,7 @@ fn main() -> anyhow::Result<()> {
     let mut secure_comp_builer = SecuredComponentBuilder::new_v1(false)?;
 
     // Sort components by address in ascending order
-    args.components.sort_by(|a, b| a.addr.cmp(&b.addr));
+    args.components.sort_by_key(|a| a.addr);
     for component_arg in args.components {
         info!("## Preparing {}", component_arg);
         let mut comp = Comp {

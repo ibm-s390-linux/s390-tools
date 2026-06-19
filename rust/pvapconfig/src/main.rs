@@ -51,8 +51,8 @@ macro_rules! println_and_exit_failure {
 /// returns with exit failure.
 macro_rules! on_error_print_and_exit {
     ($r:expr) => {
-        if $r.is_err() {
-            eprintln!("{}", $r.unwrap_err());
+        if let Err(e) = $r {
+            eprintln!("{}", e);
             return ExitCode::FAILURE;
         }
     };

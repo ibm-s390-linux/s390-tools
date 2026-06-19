@@ -174,7 +174,7 @@ impl ApqnList {
     /// Sort this Apqnlist by card generation:
     /// newest generation first, older generations last.
     pub fn sort_by_gen(&mut self) {
-        self.0.sort_unstable_by(|a, b| b.gen.cmp(&a.gen));
+        self.0.sort_unstable_by_key(|b| std::cmp::Reverse(b.gen));
     }
 
     /// Check MK restriction

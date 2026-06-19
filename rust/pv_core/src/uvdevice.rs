@@ -53,7 +53,7 @@ fn ioctl_raw(raw_fd: RawFd, cmd: u64, cb: &mut IoctlCb) -> Result<()> {
     // SAFETY: the passed pointer points to a valid memory region that
     // contains the expected C-struct. The struct outlives this function.
     unsafe {
-        rc = ioctl(raw_fd, cmd.try_into().unwrap(), cb.as_ptr_mut());
+        rc = ioctl(raw_fd, cmd, cb.as_ptr_mut());
     }
 
     // NOTE io::Error handles all errnos ioctl uses

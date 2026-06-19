@@ -57,7 +57,7 @@ pub fn gethostname() -> io::Result<String> {
         }
     }
 
-    assert!(isize::try_from(buf_len).unwrap() <= isize::MAX);
+    assert!(buf_len <= isize::MAX as usize);
 
     // SAFETY: We made sure that `buf` is:
     // 1. NUL-terminated
