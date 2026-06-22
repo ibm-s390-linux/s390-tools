@@ -1329,7 +1329,7 @@ encrypt() {
 	# Increase partition size by 32MiB as well, but not the file system, as the LUKS2 encryption is around the filesystem
 	image_resized="${TEMP_DIR}/resized.qcow2"
 	execute cp "${image}" "${image_resized}"
-	execute virt-resize --expand "/dev/vda${ROOT_PARTNUM}" --no-expand-content "${image}" "${image_resized}"
+	execute env -S LIBGUESTFS_BACKEND=direct virt-resize --expand "/dev/vda${ROOT_PARTNUM}" --no-expand-content "${image}" "${image_resized}"
 	# Remove smaller image, as we already made a copy
 	execute rm -f "${image}"
 	image="${image_resized}"
