@@ -13,7 +13,9 @@ use pv::misc::{
     try_parse_u128, try_parse_u64, write,
 };
 use pv::request::openssl::pkey::{PKey, Private};
-use pv::request::{openssl, BootHdrTags, PolicyReference, ReqEncrCtx, Request, SymKeyType};
+use pv::request::{
+    openssl, BootHdrTags, HostKey, PolicyReference, ReqEncrCtx, Request, SymKeyType,
+};
 use pv::secret::{AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret, GuestSecret};
 use pv::uv::ConfigUid;
 use serde_yaml::Value;
@@ -99,7 +101,7 @@ pub fn create(opt: &CreateSecretOpt) -> Result<()> {
     opt.certificate_args
         .get_verified_hkds("secret")?
         .into_iter()
-        .for_each(|k| asrcb.add_hostkey(k));
+        .for_each(|k| asrcb.add_hostkey(HostKey::V1(k)));
 
     debug!("Added all host-keys");
 

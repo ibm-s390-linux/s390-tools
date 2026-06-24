@@ -7,7 +7,7 @@ use openssl::ec::{EcGroup, EcKey};
 use openssl::nid::Nid;
 use openssl::pkey::Private;
 use s390_pv::request::openssl::pkey::{PKey, Public};
-use s390_pv::request::{BootHdrTags, ReqEncrCtx, Request, SymKey};
+use s390_pv::request::{BootHdrTags, HostKey, ReqEncrCtx, Request, SymKey};
 use s390_pv::secret::{
     verify_asrcb_and_get_user_data, AddSecretFlags, AddSecretRequest, AddSecretVersion, ExtSecret,
     GuestSecret,
@@ -26,7 +26,7 @@ fn create_asrcb(
     ext_secret: Option<ExtSecret>,
     flags: AddSecretFlags,
     cuid: Option<ConfigUid>,
-    hkd: PKey<Public>,
+    hkd: HostKey,
     ctx: &ReqEncrCtx,
 ) -> Result<Vec<u8>> {
     let mut asrcb = AddSecretRequest::new(AddSecretVersion::One, guest_secret, TAGS, flags);
@@ -67,7 +67,14 @@ where
         true => Some(CUID),
         false => None,
     };
-    create_asrcb(guest_secret, ext_secret.into(), flags, cuid, host_key, &ctx)
+    create_asrcb(
+        guest_secret,
+        ext_secret.into(),
+        flags,
+        cuid,
+        HostKey::V1(host_key),
+        &ctx,
+    )
 }
 
 fn association() -> GuestSecret {
@@ -91,7 +98,7 @@ fn create_signed_asrcb(skey: PKey<Private>, user_data: Vec<u8>) -> Vec<u8> {
     let mut asrcb =
         AddSecretRequest::new(AddSecretVersion::One, GuestSecret::Null, TAGS, no_flag());
 
-    asrcb.add_hostkey(host_key);
+    asrcb.add_hostkey(HostKey::V1(host_key));
     asrcb.set_user_data(user_data, Some(skey)).unwrap();
     asrcb.encrypt(&ctx).unwrap()
 }
@@ -103,7 +110,7 @@ fn null_none_default_ncuid_one_user_unsgn() {
     let mut asrcb =
         AddSecretRequest::new(AddSecretVersion::One, GuestSecret::Null, TAGS, no_flag());
 
-    asrcb.add_hostkey(host_key);
+    asrcb.add_hostkey(HostKey::V1(host_key));
     asrcb.set_user_data(user_data_orig.clone(), None).unwrap();
     let asrcb = asrcb.encrypt(&ctx).unwrap();
 
@@ -236,7 +243,7 @@ fn null_none_default_cuid_seven() {
     let (hkd, ctx) = get_crypto();
     let mut asrcb =
         AddSecretRequest::new(AddSecretVersion::One, GuestSecret::Null, TAGS, no_flag());
-    (0..7).for_each(|_| asrcb.add_hostkey(hkd.clone()));
+    (0..7).for_each(|_| asrcb.add_hostkey(HostKey::V1(hkd.clone())));
     asrcb.set_cuid(CUID);
     let asrcb = asrcb.encrypt(&ctx).unwrap();
 

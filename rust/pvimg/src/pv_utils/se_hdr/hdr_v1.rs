@@ -11,8 +11,8 @@ use openssl::nid::Nid;
 use openssl::pkey::{PKeyRef, Public};
 use pv::request::openssl::pkey::{PKey, Private};
 use pv::request::{
-    gen_ec_key, random_array, Aes256XtsKey, Confidential, EcPubKeyCoord, Encrypt, Keyslot, SymKey,
-    SymKeyType, Zeroize, SHA_512_HASH_LEN,
+    gen_ec_key, random_array, Aes256XtsKey, Confidential, EcPubKeyCoord, Encrypt, HostKey, Keyslot,
+    SymKey, SymKeyType, Zeroize, SHA_512_HASH_LEN,
 };
 use serde::{Deserialize, Serialize};
 use utils::HexSlice;
@@ -419,7 +419,7 @@ impl KeyExchangeBuilderTrait for SeHdrDataV1 {
         aead_key: &SymKey,
         priv_key: &PKeyRef<Private>,
     ) -> Result<()> {
-        let keyslot = Keyslot::new(hostkey.to_owned());
+        let keyslot = Keyslot::new(HostKey::V1(hostkey.to_owned()));
         let keyslot_bin = keyslot.encrypt(aead_key.value(), priv_key)?.try_into()?;
         let keyslot_bin_size = u32::try_from(size_of_val(&keyslot_bin)).unwrap();
         self.aad.keyslots.push(keyslot_bin);

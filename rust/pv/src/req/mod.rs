@@ -11,6 +11,7 @@ mod context;
 mod ec_coord;
 mod encrypt;
 mod header;
+mod hostkey;
 mod keyslot;
 mod request;
 
@@ -18,5 +19,7 @@ mod request;
 pub use context::ReqEncrCtx;
 pub use ec_coord::EcPubKeyCoord;
 pub use encrypt::{Aad, Encrypt};
-pub use keyslot::Keyslot;
+pub use header::RequestHdr;
+pub use hostkey::HostKey;
+pub use keyslot::{Keyslot, KeyslotV1};
 pub use request::{BinReqValues, Request};

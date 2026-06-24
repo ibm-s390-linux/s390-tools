@@ -7,12 +7,12 @@ use std::fmt::Display;
 use serde::Serialize;
 
 use super::arcb::AttestationFlags;
-use crate::req::Keyslot;
+use crate::req::KeyslotV1;
 use crate::{static_assert, Error, Result};
 
 /// Hash for additional-data stuff used for parsing [`AdditionalData`]
 pub(super) const PHKH_SIZE: u32 = 0x20;
-static_assert!(Keyslot::PHKH_SIZE == PHKH_SIZE);
+static_assert!(KeyslotV1::PHKH_SIZE == PHKH_SIZE);
 pub(super) const SECRET_STORE_HASH_SIZE: u32 = 0x40;
 pub(super) const FW_STATE_SIZE: u32 = 0x140;
 

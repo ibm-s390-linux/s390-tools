@@ -3,9 +3,9 @@
 // Copyright IBM Corp.
 use std::mem::size_of;
 
-use openssl::pkey::{PKey, Public};
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
+use super::HostKey;
 use crate::crypto::{decrypt_aead, SymKey, SymKeyType};
 use crate::req::context::ReqEncrCtx;
 use crate::req::header::RequestHdr;
@@ -47,10 +47,11 @@ pub trait Request {
     /// This function will return an error if the encryption fails, the request does not have at
     /// least a hostkey, or other implementation dependent contracts are not met.
     fn encrypt(&self, ctx: &ReqEncrCtx) -> Result<Vec<u8>>;
+
     /// Add a host-key to this request
     ///
     /// Must be called at least once, otherwise {`Request::encrypt`} will fail
-    fn add_hostkey(&mut self, hostkey: PKey<Public>);
+    fn add_hostkey(&mut self, hostkey: HostKey);
 }
 
 /// A struct to represent some parts of a binary/encrypted request.
@@ -149,7 +150,7 @@ mod tests {
     use super::*;
     use crate::get_test_asset;
     use crate::req::header::RequestHdr;
-    use crate::req::{Aad, Keyslot, ReqEncrCtx};
+    use crate::req::{Aad, HostKey, Keyslot, ReqEncrCtx};
     use crate::request::SymKey;
     use crate::test_utils::*;
 
@@ -158,7 +159,7 @@ mod tests {
     #[test]
     fn encr_build_aad() {
         let (cust_key, host_key) = get_test_keys();
-        let ks = Keyslot::new(host_key);
+        let ks = Keyslot::new(HostKey::V1(host_key));
         let ctx = ReqEncrCtx::new_aes_256(
             Some([0x11; 12]),
             Some(cust_key),
@@ -199,6 +200,7 @@ mod tests {
     #[test]
     fn encr_build_aad_nks_many() {
         let (_, host_key) = get_test_keys();
+        let host_key = HostKey::V1(host_key);
         let ctx = ReqEncrCtx::new_aes_256(Some([0x11; 12]), None, None).unwrap();
 
         let ks: Vec<Keyslot> = (0..257).map(|_| Keyslot::new(host_key.clone())).collect();
@@ -211,6 +213,7 @@ mod tests {
     #[test]
     fn encr_build_aad_nks() {
         let (_, host_key) = get_test_keys();
+        let host_key = HostKey::V1(host_key);
         let ctx = ReqEncrCtx::new_aes_256(Some([0x11; 12]), None, None).unwrap();
 
         let ks = [

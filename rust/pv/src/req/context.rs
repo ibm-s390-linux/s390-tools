@@ -11,9 +11,7 @@ use openssl::pkey::{PKey, Private};
 use pv_core::request::{RequestMagic, RequestVersion};
 use zerocopy::IntoBytes;
 
-use super::ec_coord::EcPubKeyCoord;
-use super::encrypt::{Aad, Encrypt};
-use super::header::RequestHdr;
+use super::{Aad, EcPubKeyCoord, Encrypt, RequestHdr};
 use crate::crypto::{
     encrypt_aead, gen_ec_key, random_array, AeadEncryptionResult, SymKey, SymKeyType,
 };
@@ -175,6 +173,7 @@ impl ReqEncrCtx {
 mod tests {
     use super::*;
     use crate::get_test_asset;
+    use crate::req::hostkey::HostKey;
     use crate::req::keyslot::Keyslot;
     use crate::request::SymKey;
     use crate::test_utils::*;
@@ -184,7 +183,7 @@ mod tests {
     #[test]
     fn encr_build_aad() {
         let (cust_key, host_key) = get_test_keys();
-        let ks = Keyslot::new(host_key);
+        let ks = Keyslot::new(HostKey::V1(host_key));
         let ctx = ReqEncrCtx::new_aes_256(
             Some([0x11; 12]),
             Some(cust_key),
@@ -227,7 +226,9 @@ mod tests {
         let (_, host_key) = get_test_keys();
         let ctx = ReqEncrCtx::new_aes_256(Some([0x11; 12]), None, None).unwrap();
 
-        let ks: Vec<Keyslot> = (0..257).map(|_| Keyslot::new(host_key.clone())).collect();
+        let ks: Vec<Keyslot> = (0..257)
+            .map(|_| Keyslot::new(HostKey::V1(host_key.clone())))
+            .collect();
         let mut aad = Vec::<Aad>::new();
         ks.iter().for_each(|ks| aad.push(Aad::Ks(ks)));
 
@@ -238,6 +239,7 @@ mod tests {
     #[test]
     fn encr_build_aad_nks() {
         let (_, host_key) = get_test_keys();
+        let host_key = HostKey::V1(host_key);
         let ctx = ReqEncrCtx::new_aes_256(Some([0x11; 12]), None, None).unwrap();
 
         let ks = [

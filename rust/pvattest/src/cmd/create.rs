@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use log::{debug, warn};
 use pv::attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion};
 use pv::misc::{create_file, write_file};
-use pv::request::{ReqEncrCtx, Request, SymKey, SymKeyType};
+use pv::request::{HostKey, ReqEncrCtx, Request, SymKey, SymKeyType};
 
 use crate::cli::{AttAddFlags, CreateAttOpt};
 use crate::exchange::{ExchangeFormatRequest, ExchangeFormatVersion};
@@ -37,7 +37,7 @@ pub fn create(opt: &CreateAttOpt) -> Result<ExitCode> {
     opt.certificate_args
         .get_verified_hkds("attestation request")?
         .into_iter()
-        .for_each(|k| arcb.add_hostkey(k));
+        .for_each(|k| arcb.add_hostkey(HostKey::V1(k)));
     debug!("Added all host-keys");
 
     let encr_ctx =

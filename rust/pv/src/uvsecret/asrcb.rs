@@ -3,7 +3,7 @@
 // Copyright IBM Corp. 2023
 
 use openssl::md::Md;
-use openssl::pkey::{PKey, Private, Public};
+use openssl::pkey::{PKey, Private};
 use pv_core::request::RequestVersion;
 use pv_core::secret::AddSecretMagic;
 use pv_core::uv::SecretId;
@@ -13,7 +13,7 @@ use super::guest_secret::ListableSecretHdr;
 use super::user_data::UserData;
 use crate::crypto::{hkdf_rfc_5869, AeadEncryptionResult};
 use crate::misc::Flags;
-use crate::req::{Aad, BinReqValues, Keyslot, ReqEncrCtx};
+use crate::req::{Aad, BinReqValues, HostKey, Keyslot, ReqEncrCtx};
 use crate::request::{BootHdrTags, Confidential, Request};
 use crate::secret::{ExtSecret, GuestSecret};
 use crate::uv::{ConfigUid, UvFlags};
@@ -309,7 +309,7 @@ impl Request for AddSecretRequest {
         }
     }
 
-    fn add_hostkey(&mut self, hostkey: PKey<Public>) {
+    fn add_hostkey(&mut self, hostkey: HostKey) {
         self.keyslots.push(Keyslot::new(hostkey))
     }
 }

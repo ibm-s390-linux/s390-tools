@@ -4,7 +4,6 @@
 
 use std::mem::size_of;
 
-use openssl::pkey::{PKey, Public};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U32};
 
 use super::additional::{FW_STATE_SIZE, PHKH_SIZE, SECRET_STORE_HASH_SIZE};
@@ -12,7 +11,7 @@ use super::AttNonce;
 use crate::attest::{AttestationMagic, AttestationMeasAlg};
 use crate::crypto::random_array;
 use crate::misc::Flags;
-use crate::req::{Aad, BinReqValues, Keyslot, ReqEncrCtx};
+use crate::req::{Aad, BinReqValues, HostKey, Keyslot, ReqEncrCtx};
 use crate::request::{Confidential, MagicValue, Request, RequestVersion, SymKey, Zeroize};
 use crate::uv::UvFlags;
 use crate::{assert_size, static_assert, Error, Result};
@@ -52,7 +51,7 @@ use crate::{
 ///
 /// ```rust,no_run
 /// # use s390_pv::attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion};
-/// # use s390_pv::request::{SymKeyType, Request, ReqEncrCtx};
+/// # use s390_pv::request::{SymKeyType, Request, ReqEncrCtx, HostKey};
 /// # fn main() -> s390_pv::Result<()> {
 /// let att_version = AttestationVersion::One;
 /// let meas_alg = AttestationMeasAlg::HmacSha512;
@@ -61,11 +60,11 @@ use crate::{
 /// let hkd = s390_pv::misc::read_certs(&std::fs::read("host-key-document.crt")?)?;
 /// // IBM issued HKD certificates typically have one X509
 /// let hkd = hkd.first().unwrap().public_key()?;
-/// arcb.add_hostkey(hkd);
+/// arcb.add_hostkey(HostKey::V1(hkd));
 /// // you can add multiple hostkeys
 /// // arcb.add_hostkey(another_hkd);
 /// // encrypt it
-/// let ctx = ReqEncrCtx::random(SymKeyType::Aes256)?;
+/// let ctx = ReqEncrCtx::random(SymKeyType::Aes256Gcm)?;
 /// let arcb = arcb.encrypt(&ctx)?;
 /// # Ok(())
 /// # }
@@ -236,7 +235,7 @@ impl Request for AttestationRequest {
         ctx.encrypt_aead(&aad, conf).map(|res| res.into_buf())
     }
 
-    fn add_hostkey(&mut self, hostkey: PKey<Public>) {
+    fn add_hostkey(&mut self, hostkey: HostKey) {
         self.keyslots.push(Keyslot::new(hostkey))
     }
 }
@@ -444,7 +443,7 @@ mod test {
         arcb.conf.value_mut().nonce = NONCE;
         arcb.conf.value_mut().meas_key = MEAS;
 
-        arcb.add_hostkey(host_key);
+        arcb.add_hostkey(HostKey::V1(host_key));
         arcb.encrypt(&ctx).unwrap()
     }
 
