@@ -495,6 +495,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 				fprintf(stderr,
 					"Error: Device name was truncated\n");
 				free(path);
+				free(readbuf);
 				return -1;
 			}
 
@@ -504,6 +505,7 @@ static int dinfo_get_uid_from_devnode(char **uidfile, char *devnode)
 
 	closedir(directory);
 	free(path);
+	free(readbuf);
 	return 0;
 }
 
