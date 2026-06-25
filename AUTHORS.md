@@ -77,7 +77,6 @@ List of all individuals having contributed content to s390-tools
 - Jean-Baptiste Joret
 - Jens Remus
 - Jochen Roehrig
-- Joern Siglen
 - Juergen Christ
 - Julian Wiedmann
 - Jörn Siglen
@@ -135,6 +134,7 @@ List of all individuals having contributed content to s390-tools
 - Steffen Eiden
 - Steffen Maier
 - Steffen Thoss
+- Stephen Gallagher
 - Sumanth Korikkar
 - Susanne Wintenberger
 - Sven Schnelle
@@ -148,6 +148,7 @@ List of all individuals having contributed content to s390-tools
 - Thomas Spatzier
 - Thomas Weber
 - Thorsten Winkler
+- Timo Keller
 - Tobias Huschle
 - Tuan Hoang
 - Ursula Braun

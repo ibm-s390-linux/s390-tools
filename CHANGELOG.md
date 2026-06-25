@@ -1,15 +1,23 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (20xx-xx-xx)__
+* __v2.43.0 (2026-06-25)__
 
-  For Linux kernel version: 7.x
+  For Linux kernel version: 7.1
 
-  Add new tools / libraries:
+  s390-tools: Set Rust MSRV to 1.85.0
 
   Changes of existing tools:
+  - dbginfo.sh: Add IBM appliance specific files
+  - lshwc: Show explicitly selected unnamed counters with --hide
+  - pvattest: Add firmware check version 2
+  - zipl: Introduce verbosity levels of zipl session (--debug)
+  - zkey: Remove the use of AF_ALG for calculating key verification patterns
 
   Bug Fixes:
+  - ebc: implement --version option for pvics
+  - pvebc: Log services to journal+console
+  - pvics: Fix virt-resize permission error
 
 * __v2.42.1 (2026-05-22)__
 
