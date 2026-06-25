@@ -6,7 +6,7 @@ use std::fs::OpenOptions;
 use std::io::BufReader;
 
 use anyhow::{Context, Result};
-use log::{debug, warn};
+use log::{debug, info, warn};
 use pv::misc::{open_file, try_parse_u64};
 use pvimg::error::OwnExitCode;
 use pvimg::secured_comp::ComponentTrait;
@@ -199,7 +199,7 @@ pub fn create(opt: &CreateBootImageArgs) -> Result<OwnExitCode> {
     };
     writer.finish(op)?;
 
-    warn!("Successfully generated the Secure Execution image.");
+    info!("Successfully generated the Secure Execution image.");
     Ok(OwnExitCode::Success)
 }
 

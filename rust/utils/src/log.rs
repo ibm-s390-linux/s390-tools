@@ -27,10 +27,11 @@ impl Log for PvLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            if record.level() > Level::Info {
-                eprintln!("{}: {}", record.level(), record.args());
-            } else {
-                eprintln!("{}", record.args());
+            let lvl = record.level();
+            match lvl {
+                Level::Info => println!("{}", record.args()),
+                Level::Warn => println!("{}: {}", lvl, record.args()),
+                _ => eprintln!("{}: {}", lvl, record.args()),
             }
         }
     }
