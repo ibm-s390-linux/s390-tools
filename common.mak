@@ -104,7 +104,7 @@ define define_toolchain_variables
 	$(call cmd_define_and_export,  STRIP$(1),"  STRIP$(1)       ",$(2)strip)
 	$(call cmd_define_and_export,OBJCOPY$(1),"  OBJCOPY$(1)     ",$(2)objcopy)
 	$(call cmd_define_and_export,OBJDUMP$(1),"  OBJDUMP$(1)     ",$(2)objdump)
-	PKG_CONFIG$(1) = pkg-config
+	PKG_CONFIG$(1) = $(2)pkg-config
 	export PKG_CONFIG$(1)
 endef
 
