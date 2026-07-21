@@ -8,6 +8,9 @@ objects := $(patsubst %.c,%.o,$(sources))
 
 autocomp-object := util_autocomp_host.o
 
+$(autocomp-object): $(autocomp-object:.o=.c)
+	$(CC_FOR_BUILD) $(CFLAGS_FOR_BUILD) -I $(rootdir)/include -c $< -o $@
+
 examples := $(patsubst %.c,%,$(wildcard *_example.c))
 
 all: $(lib) $(autocomp-object)
