@@ -5,22 +5,21 @@
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\" ----------------------------------------------------------------------
-.ds c \fBlspai\fP
 .
-.TH \*c "8" "August 2023" "s390-tools" "CPU-MF management programs"
+.TH lspai "8" "August 2023" "s390-tools" "CPU-MF management programs"
 .
 .SH NAME
-\*c \- list Processor Activity Instrumentation (PAI) counters and values
+lspai \- list Processor Activity Instrumentation (PAI) counters and values
 .
 .SH SYNOPSIS
-\*c
+\fBlspai\fP
 .RB [ \-\-format
 .IR FORMAT ]
 .RB [ \-n ]
 .RB [ \-t
 .IR TYPE ]
 .br
-\*c
+\fBlspai\fP
 .RB [ \-\-format
 .IR FORMAT ]
 .RB [ \-n ]
@@ -35,16 +34,16 @@
 .IR LIST ]
 .RI [ CPULIST ]
 .br
-\*c
+\fBlspai\fP
 .BR \-h | \-\-help
 .br
-\*c
+\fBlspai\fP
 .BR \-v | \-\-version
 .
 .
 .SH DESCRIPTION
 On the first line
-\*c displays the Processor Activity Instrumentation (PAI) counters
+\fBlspai\fP displays the Processor Activity Instrumentation (PAI) counters
 for Linux on IBM Z.
 The output lists the available PAI counter names
 and numbers in various formats.
@@ -60,7 +59,7 @@ is specified or any of the options
 or
 .BR \-i,
 are present on the command line,
-\*c command extracts counter values from the
+\fBlspai\fP command extracts counter values from the
 specified PAI counter sets.
 Counter sets can be specified and extracted for individual CPUs.
 By default the output is a comma-separated list of values.
@@ -160,8 +159,8 @@ Displays counter values as hexadecimal values.
 Displays counter values as hexadecimal values with a leading 0x prefix.
 .
 .SH "EXAMPLE"
-The \*c invocation lists all PAI Neural Network Processing Assist Facility
-(NNPA) counters in numeric order:
+The \fBlspai\fP invocation lists all PAI Neural Network Processing
+Assist Facility (NNPA) counters in numeric order:
 .nf
 # lspai -t nnpa -n
 RAW     NAME			DESCRIPTION
@@ -180,8 +179,8 @@ suitable for
 event specification by name.
 The third gives a short explanation, if available.
 .sp 1
-The \*c invocation displays all PAI Neural Network Processing Assist Facility
-(NNPA) counters values.
+The \fBlspai\fP invocation displays all PAI Neural Network Processing
+Assist Facility (NNPA) counters values.
 Ten iterations with a two second delay in between
 is printed on the screen.
 .nf
@@ -206,9 +205,9 @@ NNPA_2GFRAME(26),NNPA_ACCESSEXCEPT(27)
 #
 .fi
 .sp 1
-This \*c example displays the value of PAI crypto counter number 7.
+This \fBlspai\fP example displays the value of PAI crypto counter number 7.
 It is field number 116 in the output.
-This counter is incremented after \*c is started and
+This counter is incremented after \fBlspai\fP is started and
 the table shows the delta values for PAI crypto counter 7.
 .nf
 # lspai -d -s -i 5 -l3 -t crypto | \
@@ -221,7 +220,7 @@ Date,Time,CPU,C0,C7
 .fi
 .sp 1
 The following table shows the total value for PAI crypto counter 7
-after \*c is started.
+after \fBlspai\fP is started.
 .nf
 # lspai -s -i 5 -l3 -t crypto | \
 awk -F , '{ print $1 ","  $2 "," $3 ","  $4 "," $116; }'
