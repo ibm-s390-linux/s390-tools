@@ -267,7 +267,24 @@ USRBINDIR       = $(INSTALLDIR)/usr/bin
 BINDIR          = $(INSTALLDIR)/sbin
 LIBDIR          = $(INSTALLDIR)/lib
 USRLIBDIR	= $(INSTALLDIR)/usr/lib
+# The directory for 64 bit libraries is distribution specific. It is derived
+# from the target toolchain: gcc reports a multi-os directory of "../lib64"
+# for distributions that install 64 bit libraries into /usr/lib64 (e.g. RHEL
+# or SLES) and "../lib" for distributions that use /usr/lib (e.g. Debian or
+# Ubuntu). CC_SILENT is used instead of CC, because CC expands to the pretty
+# print wrapper, and it honors CROSS_COMPILE, so that the target and not the
+# build host is inspected. If the toolchain cannot be queried, /usr/lib64 is
+# used. The detected value can be overridden, for example with:
+#
+#  $ make USRLIB64DIR=/usr/lib
+#
+ifndef USRLIB64DIR
+ifeq ($(notdir $(shell $(CC_SILENT) -print-multi-os-directory 2>/dev/null)),lib)
+USRLIB64DIR     = $(INSTALLDIR)/usr/lib
+else
 USRLIB64DIR     = $(INSTALLDIR)/usr/lib64
+endif
+endif
 SYSCONFDIR      = $(INSTALLDIR)/etc
 DATADIR         = $(INSTALLDIR)/usr/share
 MANDIR          = $(DATADIR)/man
