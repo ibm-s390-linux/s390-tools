@@ -17,5 +17,7 @@ INITTOP := $(INITRAMFSDIR)/scripts/init-top
 ifeq ($(HAVE_INITRAMFS),1)
 install:
 	$(INSTALL) -m 755 -d $(DESTDIR)$(HOOKDIR) $(DESTDIR)$(INITTOP)
-	$(INSTALL) -m 755 hooks/s390-tools-zkey $(DESTDIR)$(HOOKDIR)
+	sed -e 's@%ZKEYKMSPLUGINDIR%@$(ZKEYKMSPLUGINDIR)@' hooks/s390-tools-zkey.in \
+		> $(DESTDIR)$(HOOKDIR)/s390-tools-zkey
+	chmod 755 $(DESTDIR)$(HOOKDIR)/s390-tools-zkey
 endif

@@ -40,8 +40,8 @@ copy_exec /sbin/chzcrypt
 copy_exec /sbin/lszcrypt
 copy_exec /usr/bin/zkey
 copy_exec /usr/bin/zkey-cryptsetup
-copy_exec /usr/lib64/zkey/zkey-ekmfweb.so
-copy_exec /usr/lib64/zkey/zkey-kmip.so
+copy_exec %ZKEYKMSPLUGINDIR%/zkey-ekmfweb.so
+copy_exec %ZKEYKMSPLUGINDIR%/zkey-kmip.so
 
 mkdir -p "${DESTDIR}/etc"
 cp -a /etc/zkey "${DESTDIR}/etc/"

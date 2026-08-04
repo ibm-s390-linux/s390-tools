@@ -13,5 +13,7 @@ include ../../common.mak
 ifeq ($(HAVE_DRACUT),1)
 install:
 	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTCONFDIR)/
-	$(INSTALL) -m 644 99-pkey.conf $(DESTDIR)$(DRACUTCONFDIR)/
+	sed -e 's@%ZKEYKMSPLUGINDIR%@$(ZKEYKMSPLUGINDIR)@' 99-pkey.conf.in \
+		> $(DESTDIR)$(DRACUTCONFDIR)/99-pkey.conf
+	chmod 644 $(DESTDIR)$(DRACUTCONFDIR)/99-pkey.conf
 endif
