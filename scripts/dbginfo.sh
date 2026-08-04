@@ -573,7 +573,6 @@ CMDS="${CMDS}\
   :icainfo\
   :icastats --all\
   :ivp.e # IBM CCA package install check\
-  :ls -al /usr/lib64/opencryptoki/stdll\
   :lszcrypt -VV\
   :pkcsconf -i\
   :pkcsconf -s\
@@ -582,6 +581,17 @@ CMDS="${CMDS}\
   :pkcsconf -m\
   :systemctl status pkcsslotd\
   "
+
+# The openCryptoki STDLL directory is distribution specific, for example
+# /usr/lib64/opencryptoki/stdll on RHEL or SLES and
+# /usr/lib/<multiarch triplet>/opencryptoki/stdll on Debian or Ubuntu
+for opencryptoki_stdll in /usr/lib64/opencryptoki/stdll \
+			  /usr/lib/*/opencryptoki/stdll \
+			  /usr/lib/opencryptoki/stdll; do
+	if [ -d "${opencryptoki_stdll}" ]; then
+		CMDS="${CMDS}:ls -al ${opencryptoki_stdll}"
+	fi
+done
 
 # product / distro specific commands
 CMDS="${CMDS}\
