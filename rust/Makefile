@@ -115,9 +115,9 @@ ifneq ($(HAVE_DRACUT),0)
 		pvebc/$(SEL_EBC_MODDIR)/override-crypttab.sh \
 		pvebc/$(SEL_EBC_MODDIR)/pvebc-wrapper.sh \
 		pvebc/$(SEL_EBC_MODDIR)/boot-mount.sh \
-		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-modules.conf \
 		$(DESTDIR)$(DRACUTMODDIR)/$(SEL_EBC_MODDIR)
 	$(INSTALL) -m 644 pvebc/$(SEL_EBC_MODDIR)/sel-ebc-boot-mount.service \
+		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-modules.conf \
 		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-override-crypttab.service \
 		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-paes-enforce.service \
 		pvebc/$(SEL_EBC_MODDIR)/sel-ebc-pvebc.service \
