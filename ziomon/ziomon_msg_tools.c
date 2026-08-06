@@ -25,8 +25,24 @@ extern const char *toolname;
 
 
 void conv_blkiomon_v2_to_v3(struct message *msg) {
-	struct blkiomon_stat_v2 stat_v2 = *(struct blkiomon_stat_v2*)msg->data;
-	struct blkiomon_stat    *stat = msg->data;
+	struct blkiomon_stat_v2 stat_v2;
+	struct blkiomon_stat *stat;
+
+	if (!msg || !msg->data) {
+		fprintf(stderr, "%s: Invalid blkiomon message pointer\n",
+			toolname);
+		return;
+	}
+
+	if (msg->length < sizeof(struct blkiomon_stat_v2)) {
+		fprintf(stderr, "%s: Invalid blkiomon v2 message length %u"
+			" (need >= %zu)\n", toolname, msg->length,
+			sizeof(struct blkiomon_stat_v2));
+		return;
+	}
+
+	stat_v2 = *(struct blkiomon_stat_v2 *)msg->data;
+	stat = msg->data;
 
 	stat->device = stat_v2.device;
 	stat->size_r = stat_v2.size_r;
