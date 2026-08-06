@@ -1,76 +1,88 @@
-.\" Copyright IBM Corp. 2025
+.\" Copyright IBM Corp.
+.\" s390-tools is free software; you can redistribute it and/or modify
+.\" it under the terms of the MIT license. See LICENSE for details.
+.\"
 
-.TH "PVVERIFY" "1" "2025-12-09" "s390-tools" "Pvverify Manual"
+.TH "PVVERIFY" "1" "2026-08-11" "s390-tools" "Pvverify Manual"
 .nh
 .ad l
-.SH NAME
-pvverify \- Tool to verify host-keys
-.SH SYNOPSIS
+.SH "NAME"
+pvverify \- Tool to verify host\-keys
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvverify [OPTIONS] --host-key-document <FILE> <--no-verify|--cert <FILE>>
+ \fBpvverify\fR [OPTIONS] \fB\-\-host\-key\-document\fR <FILE> <\-\-no\-verify|\-\-cert <FILE>>
 .fam C
 .fi
-.SH DESCRIPTION
+.SH "DESCRIPTION"
 Tool to verify host\-keys. Use this tool to verify the chain of trust for IBM
 Secure
-.SH OPTIONS
-
-.PP
+.SH "OPTIONS"
 \-k, \-\-host\-key\-document <FILE>
 .RS 4
-Use FILE as a host\-key document. Can be specified multiple times and must be
-specified at least once.
-.RE
+Use FILE as a host\-key document.
+
+Can be specified multiple times and must be specified at least once.
 .RE
 .PP
 \-\-no\-verify
 .RS 4
-Disable the host\-key document verification. Does not require the host\-key
-documents to be valid. Do not use for a production request unless you verified
-the host\-key document beforehand.
-.RE
+Disable the host\-key document verification.
+
+Does not require the host\-key documents to be valid. Do not use for a
+production request unless you verified the host\-key document beforehand.
 .RE
 .PP
 \-C, \-\-cert <FILE>
 .RS 4
-Use FILE as a certificate to verify the host\-key or keys. The certificates are
-used to establish a chain of trust for the verification of the host\-key
-documents. Specify this option twice to specify the IBM Z signing key and the
-intermediate CA certificate (signed by the root CA).
-.RE
+Use FILE as a certificate to verify the host\-key or keys.
+
+The certificates are used to establish a chain of trust for the verification of
+the host\-key documents. Specify this option twice to specify the IBM Z signing
+key and the intermediate CA certificate (signed by the root CA).
 .RE
 .PP
 \-\-crl <FILE>
 .RS 4
-Use FILE as a certificate revocation list (CRL). The list is used to check
-whether a certificate of the chain of trust is revoked. Specify this option
-multiple times to use multiple CRLs.
-.RE
+Use FILE as a certificate revocation list (CRL).
+
+The list is used to check whether a certificate of the chain of trust is
+revoked. Specify this option multiple times to use multiple CRLs.
 .RE
 .PP
 \-\-offline
 .RS 4
 Make no attempt to download CRLs.
 .RE
-.RE
 .PP
 \-\-root\-ca <ROOT_CA>
 .RS 4
-Use FILE as the root\-CA certificate for the verification. If omitted, the
-system wide\-root CAs installed on the system are used. Use this only if you
-trust the specified certificate.
-.RE
+Use FILE as the root\-CA certificate for the verification.
+
+If omitted, the system wide\-root CAs installed on the system are used. Use this
+only if you trust the specified certificate.
 .RE
 .PP
 \-\-version
 .RS 4
 Print version information and exit.
 .RE
+.PP
+\-\-hkd\-version <VERSION>
+.RS 4
+Specify the Host\-key version to use.
+[default: 'auto']
+
+Possible values:
+.RS 4
+\- \fB1\fP: Version 1 \- uses traditional cryptographic keys.
+
+\- \fB2\fP: Version 2 \- uses hybrid (post\-quantum) cryptographic keys.
+
+.RE
 .RE
 .PP
 \-h, \-\-help
 .RS 4
 Print help (see a summary with \fB\-h\fR).
-.RE
 .RE

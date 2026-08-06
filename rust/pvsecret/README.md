@@ -294,6 +294,16 @@ Do not hash the name, use it directly as secret ID. Ignored for meta-secrets.
 </ul>
 
 
+`--secret-version <VERSION>`
+<ul>
+Specify the Add-secret version to use.
+    Default value: '1'
+    Possible values:
+        - **1**: Version 1 - uses traditional cryptographic keys.
+        - **2**: Version 2 - uses hybrid (post-quantum) cryptographic keys.
+</ul>
+
+
 `-h`, `--help`
 <ul>
 Print help (see a summary with '-h').
@@ -307,6 +317,13 @@ Print help (see a summary with '-h').
 Create a meta secret. Use a meta secret to carry flags to the ultravisor without
 having to provide an actual secret value. Meta secrets do not appear in the list
 of secrets.
+#### Options
+
+`-h`, `--help`
+<ul>
+Print help (see a summary with '-h').
+</ul>
+
 
 ### pvsecret create association
 #### Synopsis
@@ -470,6 +487,13 @@ Print help (see a summary with '-h').
 Lock the secret-store (s390x only). Lock the secret store (s390x only). After
 this command executed successfully, all subsequent add-secret requests will
 fail. Only available on s390x.
+### Options
+
+`-h`, `--help`
+<ul>
+Print help (see a summary with '-h').
+</ul>
+
 
 ## pvsecret list
 ### Synopsis

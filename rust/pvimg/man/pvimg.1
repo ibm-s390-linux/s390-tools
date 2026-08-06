@@ -1,86 +1,86 @@
-.\" Copyright 2024, 2025 IBM Corp.
+.\" Copyright IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVIMG" "1" "2025-07-25" "s390-tools" "Pvimg Manual"
+.TH "PVIMG" "1" "2026-08-11" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
-.SH NAME
+.SH "NAME"
 pvimg \- Create and inspect IBM Secure Execution images
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvimg [OPTIONS] <COMMAND>
+ \fBpvimg\fR [OPTIONS] <COMMAND>
 .fam C
 .fi
-.SH DESCRIPTION
+.SH "DESCRIPTION"
 Use \fBpvimg\fP to create an IBM Secure Execution image, which can be loaded
 using zipl or QEMU. \fBpvimg\fP can also be used to inspect existing Secure
 Execution images.
 .SH "PVIMG COMMANDS"
-.PP
-
 \fBpvimg\-create(1)\fR
 .RS 4
-Create an IBM Secure Execution image
+Create an IBM Secure Execution image.
+
+Create a new IBM Secure Execution image. Only create these images in a trusted
+environment, such as your workstation. The \fBpvimg create\fR command creates
+randomly generated keys to protect the image. The generated image can then be
+booted on an IBM Secure Execution system as a KVM guest.
 .RE
-
 .PP
-
 \fBpvimg\-info(1)\fR
 .RS 4
-Print information about the IBM Secure Execution image
+Print information about the IBM Secure Execution image.
+
+The \fBinfo\fR subcommand extracts and displays information about an existing
+IBM Secure Execution image, including information from the Secure Execution
+header. By default, the header is displayed without verifying its integrity and
+authenticity. Use \fB\-\-hdr\-key\fR to authenticate and verify the header
+integrity.
+
+Output can be formatted as human\-readable text or JSON. Use \fB\-\-format\fR to
+control the output format and level of detail.
+
+SECURITY NOTE: Without \fB\-\-hdr\-key\fR, the displayed information is NOT
+verified and should not be trusted.
 .RE
-
 .PP
-
 \fBpvimg\-test(1)\fR
 .RS 4
 Test different aspects of an existing IBM Secure Execution image
 .RE
-
-.SH OPTIONS
-.PP
+.SH "OPTIONS"
 \-v, \-\-verbose
 .RS 4
 Provide more detailed output.
-.RE
 .RE
 .PP
 \-q, \-\-quiet
 .RS 4
 Provide less output.
 .RE
-.RE
 .PP
 \-\-version
 .RS 4
 Print version information and exit.
-.RE
 .RE
 .PP
 \-h, \-\-help
 .RS 4
 Print help (see a summary with \fB\-h\fR).
 .RE
-.RE
-
-.SH EXIT STATUS
+.SH "EXIT STATUS"
 .TP 8
 .B 0 \- Program finished successfully
 The command was executed successfully.
-.RE
 .TP 8
 .B 1 \- Generic error
 Something went wrong during the operation. Refer to the error
 message.
-.RE
 .TP 8
 .B 2 \- Usage error
 The command was used incorrectly, for example: unsupported command
 line flag, or wrong number of arguments.
-.RE
 .SH "SEE ALSO"
-.sp
-\fBpvimg\-create\fR(1) \fBpvimg\-info\fR(1) \fBpvimg\-test\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)
+\fBpvimg\-create\fR(1), \fBpvimg\-info\fR(1), \fBpvimg\-test\fR(1), \fBzipl\fR(8), \fBqemu\fR(1)

@@ -1,102 +1,114 @@
-.\" Copyright 2024, 2025 IBM Corp.
+.\" Copyright IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-CREATE" "1" "2026-05-20" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-CREATE" "1" "2026-08-11" "s390-tools" "Attestation Manual"
 .nh
 .ad l
-.SH NAME
+.SH "NAME"
 pvattest-create \- Create an attestation measurement request
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvattest create [OPTIONS] \-\-host\-key\-document <FILE> \-\-output <FILE> \-\-arpk <FILE> <\-\-no\-verify|\-\-cert <FILE>>
+\fBpvattest\fR \fBcreate\fR [OPTIONS] \fB\-\-host\-key\-document\fR <FILE> \fB\-\-output\fR <FILE> \fB\-\-arpk\fR <FILE> <\-\-no\-verify|\-\-cert <FILE>>
 .fam C
 .fi
-.SH DESCRIPTION
+.SH "DESCRIPTION"
 Create attestation measurement requests to attest an IBM Secure Execution guest.
 Only build attestation requests in a trusted environment such as your
 Workstation. To avoid compromising the attestation do not publish the
 attestation request protection key and shred it after verification. Every
 \fBcreate\fR will generate a new, random protection key.
-.SH OPTIONS
-
-.PP
+.SH "OPTIONS"
 \-k, \-\-host\-key\-document <FILE>
 .RS 4
-Use FILE as a host\-key document. Can be specified multiple times and must be
-specified at least once.
-.RE
+Use FILE as a host\-key document.
+
+Can be specified multiple times and must be specified at least once.
 .RE
 .PP
 \-\-no\-verify
 .RS 4
-Disable the host\-key document verification. Does not require the host\-key
-documents to be valid. Do not use for a production request unless you verified
-the host\-key document beforehand.
-.RE
+Disable the host\-key document verification.
+
+Does not require the host\-key documents to be valid. Do not use for a
+production request unless you verified the host\-key document beforehand.
 .RE
 .PP
 \-C, \-\-cert <FILE>
 .RS 4
-Use FILE as a certificate to verify the host\-key or keys. The certificates are
-used to establish a chain of trust for the verification of the host\-key
-documents. Specify this option twice to specify the IBM Z signing key and the
-intermediate CA certificate (signed by the root CA).
-.RE
+Use FILE as a certificate to verify the host\-key or keys.
+
+The certificates are used to establish a chain of trust for the verification of
+the host\-key documents. Specify this option twice to specify the IBM Z signing
+key and the intermediate CA certificate (signed by the root CA).
 .RE
 .PP
 \-\-crl <FILE>
 .RS 4
-Use FILE as a certificate revocation list (CRL). The list is used to check
-whether a certificate of the chain of trust is revoked. Specify this option
-multiple times to use multiple CRLs.
-.RE
+Use FILE as a certificate revocation list (CRL).
+
+The list is used to check whether a certificate of the chain of trust is
+revoked. Specify this option multiple times to use multiple CRLs.
 .RE
 .PP
 \-\-offline
 .RS 4
 Make no attempt to download CRLs.
 .RE
-.RE
 .PP
 \-\-root\-ca <ROOT_CA>
 .RS 4
-Use FILE as the root\-CA certificate for the verification. If omitted, the
-system wide\-root CAs installed on the system are used. Use this only if you
-trust the specified certificate.
-.RE
+Use FILE as the root\-CA certificate for the verification.
+
+If omitted, the system wide\-root CAs installed on the system are used. Use this
+only if you trust the specified certificate.
 .RE
 .PP
 \-o, \-\-output <FILE>
 .RS 4
 Write the generated request to FILE.
 .RE
-.RE
 .PP
 \-a, \-\-arpk <FILE>
 .RS 4
-Save the protection key as unencrypted GCM\-AES256 key in FILE Do not publish
-this key, otherwise your attestation is compromised.
-.RE
+Save the protection key as unencrypted GCM\-AES256 key in FILE
+
+Do not publish this key, otherwise your attestation is compromised.
 .RE
 .PP
 \-\-add\-data <FLAGS>
 .RS 4
-Specify additional data for the request. Additional data is provided by the
-Ultravisor and returned during the attestation request and is covered by the
-attestation measurement. Can be specified multiple times. Optional.
+Specify additional data for the request.
+
+Additional data is provided by the Ultravisor and returned during the
+attestation request and is covered by the attestation measurement. Can be
+specified multiple times. Optional.
 
 Possible values:
 .RS 4
-\- \fBphkh-img\fP: Request the public host-key-hash of the key that decrypted the SE-image as additional-data.
+\- \fBphkh\-img\fP: Request the public host\-key\-hash of the key that decrypted the SE\-image as additional\-data.
 
-\- \fBphkh-att\fP: Request the public host-key-hash of the key that decrypted the attestation request as additional-data.
+\- \fBphkh\-att\fP: Request the public host\-key\-hash of the key that decrypted the attestation request as additional\-data.
 
-\- \fBsecret-store-hash\fP: Request a hash over all successful Add-secret requests and the lock state as additional-data.
+\- \fBsecret\-store\-hash\fP: Request a hash over all successful Add\-secret requests and the lock state as additional\-data.
 
-\- \fBfirmware-state\fP: Request the state of the firmware as additional-data.
+\- \fBfirmware\-state\fP: Request the state of the firmware as additional\-data.
+
+.RE
+.RE
+.PP
+\-\-att\-version <VERSION>
+.RS 4
+Specify the Attestation Request version to use.
+[default: '1']
+
+Possible values:
+.RS 4
+\- \fB1\fP: Version 1 \- uses traditional cryptographic keys.
+
+\- \fB2\fP: Version 2 \- uses hybrid (post\-quantum) cryptographic keys.
 
 .RE
 .RE
@@ -105,9 +117,7 @@ Possible values:
 .RS 4
 Print help (see a summary with \fB\-h\fR).
 .RE
-.RE
-
-.SH EXAMPLES
+.SH "EXAMPLES"
 Create an attestation request with the protection key 'arp.key', write the request to 'arcb.bin', and verify the host\-key document using the CA\-signed key 'DigiCertCA.crt' and the intermediate key 'IbmSigningKey.crt'.
 .PP
 .nf
@@ -126,5 +136,4 @@ Create an attestation request with the protection key 'arp.key', write the reque
 .fam T
 .fi
 .SH "SEE ALSO"
-.sp
 \fBpvattest\fR(1)

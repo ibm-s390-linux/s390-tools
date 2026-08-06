@@ -1,47 +1,45 @@
-.\" Copyright 2024, 2025 IBM Corp.
+.\" Copyright IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVIMG-INFO" "1" "2026-02-13" "s390-tools" "Pvimg Manual"
+.TH "PVIMG-INFO" "1" "2026-08-11" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
-.SH NAME
+.SH "NAME"
 pvimg-info \- Print information about the IBM Secure Execution image
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvimg info [OPTIONS] <INPUT|\-\-print\-schema <FORMAT>>
+\fBpvimg\fR \fBinfo\fR [OPTIONS] <INPUT|\-\-print\-schema <FORMAT>>
 .fam C
 .fi
-.SH DESCRIPTION
+.SH "DESCRIPTION"
 Note that the API and output format is experimental and subject to change.
-.SH OPTIONS
-.PP
+.SH "OPTIONS"
 <INPUT>
 .RS 4
 Use INPUT as the Secure Execution image.
 .RE
-.RE
-
 .PP
 \-\-format <FORMAT>
 .RS 4
-Output format for the Secure Execution image information. If not specified, the
-format is automatically determined based on whether stdout is connected to a
-terminal.
+Output format for the Secure Execution image information.
+
+If not specified, the format is automatically determined based on whether stdout
+is connected to a terminal.
 
 Possible values:
 .RS 4
-\- \fBtext\fP: Human-readable, unstable text format (default if a terminal is available).
+\- \fBtext\fP: Human\-readable, unstable text format (default if a terminal is available).
 
-\- \fBtext:full\fP: Human-readable, full detail text format.
+\- \fBtext:full\fP: Human\-readable, full detail text format.
 
-\- \fBjson\fP: Pretty-printed machine-readable JSON (default if no terminal available).
+\- \fBjson\fP: Pretty\-printed machine\-readable JSON (default if no terminal available).
 
-\- \fBjson:pretty\fP: Pretty-printed machine-readable JSON.
+\- \fBjson:pretty\fP: Pretty\-printed machine\-readable JSON.
 
-\- \fBjson:minify\fP: Minified machine-readable JSON.
+\- \fBjson:minify\fP: Minified machine\-readable JSON.
 
 .RE
 .RE
@@ -49,8 +47,9 @@ Possible values:
 \-\-hdr\-key <FILE>
 .RS 4
 Use the key in FILE to verify the Secure Execution header and optionally
-use \fB\-\-show\-secrets\fR to decrypt it. The key must be the same key that was
-specified with \fB\-\-hdr\-key\fR when the
+use \fB\-\-show\-secrets\fR to decrypt it.
+
+The key must be the same key that was specified with \fB\-\-hdr\-key\fR when the
 Secure Execution image was created. The key is used to:
  1. Verify the integrity and authenticity of the header
  2. Optionally decrypt secrets with \fB\-\-show\-secrets\fR
@@ -59,18 +58,13 @@ Without this option, the information is displayed, but NOT verified, and
 a warning is printed. The displayed data should not be trusted without
 verification.
 .RE
-.RE
 .PP
 \-\-show\-secrets
 .RS 4
 This option reveals sensitive information that is normally encrypted in
 the header, such as:
  \- Customer communication key (CCK)
-
-
  \- Image encryption key
-
-
  \- Other confidential data
 
 SECURITY WARNING: Only use this option in secure, trusted environments.
@@ -78,23 +72,19 @@ The decrypted secrets should never be exposed in untrusted systems.
 
 This option requires \fB\-\-hdr\-key\fR to decrypt the header.
 .RE
-.RE
 .PP
 \-\-print\-schema <FORMAT>
 .RS 4
-Print the schema for the \fBinfo\fR subcommand and exit. This outputs the schema
-that describes the structure of the given output FORMAT
+Print the schema for the \fBinfo\fR subcommand and exit.
+
+This outputs the schema that describes the structure of the given output FORMAT
 produced by the \fBinfo\fR subcommand. The schema can be used for:
-
-
  \- Validating output
-
-
  \- Building tools that parse the output
 
 Possible values:
 .RS 4
-\- \fBtext\fP: Human-readable, unstable text format.
+\- \fBtext\fP: Human\-readable, unstable text format.
 
 \- \fBjson\fP: JSON format.
 
@@ -105,23 +95,17 @@ Possible values:
 .RS 4
 Print help (see a summary with \fB\-h\fR).
 .RE
-.RE
-
-.SH EXIT STATUS
+.SH "EXIT STATUS"
 .TP 8
 .B 0 \- Program finished successfully
 The command was executed successfully.
-.RE
 .TP 8
 .B 1 \- Generic error
 Something went wrong during the operation. Refer to the error
 message.
-.RE
 .TP 8
 .B 2 \- Usage error
 The command was used incorrectly, for example: unsupported command
 line flag, or wrong number of arguments.
-.RE
 .SH "SEE ALSO"
-.sp
-\fBpvimg\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)
+\fBpvimg\fR(1), \fBzipl\fR(8), \fBqemu\fR(1)

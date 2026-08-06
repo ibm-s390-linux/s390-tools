@@ -1,79 +1,89 @@
-.\" Copyright 2024, 2025 IBM Corp.
+.\" Copyright IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST" "1" "2026-05-19" "s390-tools" "Attestation Manual"
+.TH "PVATTEST" "1" "2026-08-11" "s390-tools" "Attestation Manual"
 .nh
 .ad l
-.SH NAME
+.SH "NAME"
 pvattest \- create, perform, and verify attestation measurements
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvattest [OPTIONS] <COMMAND>
+ \fBpvattest\fR [OPTIONS] <COMMAND>
 .fam C
 .fi
-.SH DESCRIPTION
+.SH "DESCRIPTION"
 Create, perform, and verify attestation measurements for IBM Secure Execution
 guest systems.
 .SH "PVATTEST COMMANDS"
-.PP
-
 \fBpvattest\-create(1)\fR
 .RS 4
-Create an attestation measurement request
+Create an attestation measurement request.
+
+Create attestation measurement requests to attest an IBM Secure Execution guest.
+Only build attestation requests in a trusted environment such as your
+Workstation. To avoid compromising the attestation do not publish the
+attestation request protection key and shred it after verification. Every
+\fBcreate\fR will generate a new, random protection key.
 .RE
-
 .PP
-
 \fBpvattest\-perform(1)\fR
 .RS 4
 Send the attestation request to the Ultravisor (s390x only.)
+
+Run a measurement of this system through \fB/dev/uv\fR. This device must be
+accessible and the attestation Ultravisor facility must be present. The input
+must be an attestation request created with \fBpvattest create\fR. Output will
+contain the original request and the response from the Ultravisor. Only
+available on s390x.
 .RE
-
 .PP
-
 \fBpvattest\-verify(1)\fR
 .RS 4
-Verify an attestation response
+Verify an attestation response.
+
+Verify that a previously generated attestation measurement of an IBM Secure
+Execution guest is as expected. Only verify attestation requests in a trusted
+environment, such as your workstation. Input must contain the response as
+produced by \fBpvattest perform\fR. The protection key must be the one that was
+used to create the request by \fBpvattest create\fR. Shred the protection key
+after the verification. The header must be the IBM Secure Execution header of
+the image that was attested during \fBpvattest perform\fR. The verify command
+solely verifies that the Attestation measurement is correct. It does not check
+for the content of additional data or user data. See `pvattest check` for policy
+checks after you verified the Attestation measurement.
 .RE
-
 .PP
-
 \fBpvattest\-check(1)\fR
 .RS 4
-Check if the attestation result matches defined policies
+Check if the attestation result matches defined policies.
+
+After the attestation verification, check whether the attestation result
+complies with user\-defined policies.
 .RE
-
-.SH OPTIONS
-
-.PP
+.SH "OPTIONS"
 \-v, \-\-verbose
 .RS 4
 Provide more detailed output.
-.RE
 .RE
 .PP
 \-q, \-\-quiet
 .RS 4
 Provide less output.
 .RE
-.RE
 .PP
 \-\-version
 .RS 4
 Print version information and exit.
-.RE
 .RE
 .PP
 \-h, \-\-help
 .RS 4
 Print help (see a summary with \fB\-h\fR).
 .RE
-.RE
-
-.SH EXAMPLES
+.SH "EXAMPLES"
 For details refer to the man page of the command.
 .PP
 Create the request on a trusted system.
@@ -116,5 +126,4 @@ If the measurements do not match \fBpvattest\fP exits with code 2 and emits an e
 .fam T
 .fi
 .SH "SEE ALSO"
-.sp
-\fBpvattest\-create\fR(1) \fBpvattest\-perform\fR(1) \fBpvattest\-verify\fR(1) \fBpvattest\-check\fR(1)
+\fBpvattest\-create\fR(1), \fBpvattest\-perform\fR(1), \fBpvattest\-verify\fR(1), \fBpvattest\-check\fR(1)

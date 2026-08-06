@@ -140,6 +140,16 @@ attestation measurement. Can be specified multiple times. Optional.
 </ul>
 
 
+`--att-version <VERSION>`
+<ul>
+Specify the Attestation Request version to use.
+    Default value: '1'
+    Possible values:
+        - **1**: Version 1 - uses traditional cryptographic keys.
+        - **2**: Version 2 - uses hybrid (post-quantum) cryptographic keys.
+</ul>
+
+
 `-h`, `--help`
 <ul>
 Print help (see a summary with '-h').
@@ -151,9 +161,9 @@ Print help (see a summary with '-h').
 `pvattest perform [OPTIONS] [IN] [OUT]`
 ### Description
 Send the attestation request to the Ultravisor (s390x only.) Run a measurement
-of this system through ’/dev/uv’. This device must be accessible and the
+of this system through '/dev/uv'. This device must be accessible and the
 attestation Ultravisor facility must be present. The input must be an
-attestation request created with ’pvattest create’. Output will contain the
+attestation request created with 'pvattest create'. Output will contain the
 original request and the response from the Ultravisor. Only available on s390x.
 ### Arguments
 
@@ -205,14 +215,13 @@ Print help (see a summary with '-h').
 Verify an attestation response. Verify that a previously generated attestation
 measurement of an IBM Secure Execution guest is as expected. Only verify
 attestation requests in a trusted environment, such as your workstation. Input
-must contain the response as produced by ’pvattest perform’. The protection
-key must be the one that was used to create the request by ’pvattest create’.
-Shred the protection key after the verification. The header must be the IBM
-Secure Execution header of the image that was attested during ’pvattest
-perform’. The verify command solely verifies that the Attestation measurement
-is correct. It does not check for the content of additional data or user data.
-See `pvattest check` for policy checks after you verified the Attestation
-measurement.
+must contain the response as produced by 'pvattest perform'. The protection key
+must be the one that was used to create the request by 'pvattest create'. Shred
+the protection key after the verification. The header must be the IBM Secure
+Execution header of the image that was attested during 'pvattest perform'. The
+verify command solely verifies that the Attestation measurement is correct. It
+does not check for the content of additional data or user data. See `pvattest
+check` for policy checks after you verified the Attestation measurement.
 ### Options
 
 `-i`, `--input <FILE>`
@@ -370,8 +379,8 @@ Check whether the firmware is supported by IBM. Requires internet access.
 Specify the firmware verification request version.
     Default value: '1'
     Possible values:
-        - **1**: Use firmware verification API request version 1.0.
-        - **2**: Use firmware verification API request version 2.0.
+        - **1**: Use firmware check API version 1.0.
+        - **2**: Use firmware check API version 2.0.
 </ul>
 
 

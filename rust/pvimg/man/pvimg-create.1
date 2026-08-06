@@ -1,21 +1,20 @@
-.\" Copyright 2024, 2025 IBM Corp.
+.\" Copyright IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVIMG-CREATE" "1" "2025-07-25" "s390-tools" "Pvimg Manual"
+.TH "PVIMG-CREATE" "1" "2026-08-11" "s390-tools" "Pvimg Manual"
 .nh
 .ad l
-.SH NAME
+.SH "NAME"
 pvimg-create \- Create an IBM Secure Execution image
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvimg create [OPTIONS] \-\-kernel <FILE> \-\-output <FILE> \-\-host\-key\-document <FILE> <\-\-no\-verify|\-\-cert <FILE>>
+\fBpvimg\fR \fBcreate\fR [OPTIONS] \fB\-\-kernel\fR <FILE> \fB\-\-output\fR <FILE> \fB\-\-host\-key\-document\fR <FILE> <\-\-no\-verify|\-\-cert <FILE>>
 .fam C
 .fi
-.SH DESCRIPTION
-.PP
+.SH "DESCRIPTION"
 Use \fBpvimg\fR to generate a single bootable image file with encrypted and
 integrity\-protected parts. The command requires a kernel image, a host\-key
 document, certificates for the host\-key document verification, and an output
@@ -33,115 +32,126 @@ The header contains metadata necessary for running the guest in protected mode.
 Use this image file as a kernel image for zipl or for a direct kernel boot using
 QEMU.
 
-.SH OPTIONS
-.PP
+.SH "OPTIONS"
 \-i, \-\-kernel, \-\-image <FILE>
 .RS 4
-Use the content of FILE as a raw binary Linux kernel. The Linux kernel must be a
-raw binary s390x Linux kernel. The ELF format is not supported.
-.RE
+Use the content of FILE as a raw binary Linux kernel.
+
+The Linux kernel must be a raw binary s390x Linux kernel. The ELF format is not
+supported.
 .RE
 .PP
 \-r, \-\-ramdisk <FILE>
 .RS 4
 Use the content of FILE as the Linux initial RAM disk.
 .RE
-.RE
 .PP
 \-p, \-\-parmfile <FILE>
 .RS 4
-Use the content of FILE as the Linux kernel command line. The Linux kernel
-command line must be shorter than the maximum kernel command line size supported
-by the given Linux kernel.
-.RE
+Use the content of FILE as the Linux kernel command line.
+
+The Linux kernel command line must be shorter than the maximum kernel command
+line size supported by the given Linux kernel.
 .RE
 .PP
 \-o, \-\-output <FILE>
 .RS 4
 Write the generated Secure Execution boot image to FILE.
 .RE
-.RE
 .PP
 \-k, \-\-host\-key\-document <FILE>
 .RS 4
-Use FILE as a host\-key document. Can be specified multiple times and must be
-specified at least once.
-.RE
+Use FILE as a host\-key document.
+
+Can be specified multiple times and must be specified at least once.
 .RE
 .PP
 \-\-no\-verify
 .RS 4
-Disable the host\-key document verification. Does not require the host\-key
-documents to be valid. Do not use for a production request unless you verified
-the host\-key document beforehand.
-.RE
+Disable the host\-key document verification.
+
+Does not require the host\-key documents to be valid. Do not use for a
+production request unless you verified the host\-key document beforehand.
 .RE
 .PP
 \-C, \-\-cert <FILE>
 .RS 4
-Use FILE as a certificate to verify the host\-key or keys. The certificates are
-used to establish a chain of trust for the verification of the host\-key
-documents. Specify this option twice to specify the IBM Z signing key and the
-intermediate CA certificate (signed by the root CA).
-.RE
+Use FILE as a certificate to verify the host\-key or keys.
+
+The certificates are used to establish a chain of trust for the verification of
+the host\-key documents. Specify this option twice to specify the IBM Z signing
+key and the intermediate CA certificate (signed by the root CA).
 .RE
 .PP
 \-\-crl <FILE>
 .RS 4
-Use FILE as a certificate revocation list (CRL). The list is used to check
-whether a certificate of the chain of trust is revoked. Specify this option
-multiple times to use multiple CRLs.
-.RE
+Use FILE as a certificate revocation list (CRL).
+
+The list is used to check whether a certificate of the chain of trust is
+revoked. Specify this option multiple times to use multiple CRLs.
 .RE
 .PP
 \-\-offline
 .RS 4
 Make no attempt to download CRLs.
 .RE
-.RE
 .PP
 \-\-root\-ca <ROOT_CA>
 .RS 4
-Use FILE as the root\-CA certificate for the verification. If omitted, the
-system wide\-root CAs installed on the system are used. Use this only if you
-trust the specified certificate.
-.RE
+Use FILE as the root\-CA certificate for the verification.
+
+If omitted, the system wide\-root CAs installed on the system are used. Use this
+only if you trust the specified certificate.
 .RE
 .PP
 \-\-no\-component\-check
 .RS 4
-Disable all input component checks. For example, for the Linux kernel, it tests
-if the given kernel looks like a raw binary s390x kernel.
-.RE
+Disable all input component checks.
+
+For example, for the Linux kernel, it tests if the given kernel looks like a raw
+binary s390x kernel.
 .RE
 .PP
 \-\-overwrite
 .RS 4
 Overwrite an existing Secure Execution boot image.
 .RE
+.PP
+\-\-hdr\-version <VERSION>
+.RS 4
+Specify the Secure Execution header version to use.
+[default: '1']
+
+Possible values:
+.RS 4
+\- \fB1\fP: Version 1 \- uses traditional cryptographic keys.
+
+\- \fB2\fP: Version 2 \- uses hybrid (post\-quantum) cryptographic keys.
+
+.RE
 .RE
 .PP
 \-\-cck, \-\-comm\-key <FILE>
 .RS 4
-Use the content of FILE as the customer\-communication key (CCK). The file must
-contain exactly 32 bytes of data. In previous versions, this option was called
-\fB\-\-comm\-key\fR.
-.RE
+Use the content of FILE as the customer\-communication key (CCK).
+
+The file must contain exactly 32 bytes of data. In previous versions, this
+option was called \fB\-\-comm\-key\fR.
 .RE
 .PP
 \-\-hdr\-key <FILE>
 .RS 4
-Use the content of FILE as the Secure Execution header protection key. The file
-must contain exactly 32 bytes of data. If the option is not specified, the
-Secure Execution header protection key is a randomly generated key.
-.RE
+Use the content of FILE as the Secure Execution header protection key.
+
+The file must contain exactly 32 bytes of data. If the option is not specified,
+the Secure Execution header protection key is a randomly generated key.
 .RE
 .PP
 \-\-image\-key <FILE>
 .RS 4
-Use the content of FILE as the image encryption key. The file must contain
-exactly 64 bytes of data.
-.RE
+Use the content of FILE as the image encryption key.
+
+The file must contain exactly 64 bytes of data.
 .RE
 .PP
 \-\-enable\-dump
@@ -149,12 +159,10 @@ exactly 64 bytes of data.
 Enable Secure Execution guest dump support. This option requires the
 \fB\-\-cck\fR or \fB\-\-enable\-cck\-update\fR option.
 .RE
-.RE
 .PP
 \-\-disable\-dump
 .RS 4
 Disable Secure Execution guest dump support (default).
-.RE
 .RE
 .PP
 \-\-enable\-cck\-extension\-secret
@@ -162,13 +170,11 @@ Disable Secure Execution guest dump support (default).
 Add\-secret requests must provide an extension secret that matches the
 CCK\-derived extension secret. This option requires the \fB\-\-cck\fR option.
 .RE
-.RE
 .PP
 \-\-disable\-cck\-extension\-secret
 .RS 4
 Add\-secret requests don't have to provide the CCK\-derived extension secret
 (default).
-.RE
 .RE
 .PP
 \-\-enable\-cck\-update
@@ -176,12 +182,10 @@ Add\-secret requests don't have to provide the CCK\-derived extension secret
 Enable CCK update support. Requires z17 or up. This option cannot be used in
 conjunction with the \fB\-\-enable\-cck\-extension\-secret\fR option.
 .RE
-.RE
 .PP
 \-\-disable\-cck\-update
 .RS 4
 Disable CCK update support (default).
-.RE
 .RE
 .PP
 \-\-enable\-pckmo
@@ -189,52 +193,106 @@ Disable CCK update support (default).
 Enable the support for the DEA, TDEA, AES, and ECC PCKMO key encryption
 functions (default).
 .RE
-.RE
 .PP
 \-\-disable\-pckmo
 .RS 4
 Disable the support for the DEA, TDEA, AES, and ECC PCKMO key encryption
 functions.
 .RE
-.RE
 .PP
 \-\-enable\-pckmo\-hmac
 .RS 4
-Enable the support for the HMAC PCKMO key encryption function.
-.RE
+Enable the support for the HMAC PCKMO key encryption function (default for
+header version 2).
 .RE
 .PP
 \-\-disable\-pckmo\-hmac
 .RS 4
-Disable the support for the HMAC PCKMO key encryption function (default).
-.RE
+Disable the support for the HMAC PCKMO key encryption function (default for
+header version 1).
 .RE
 .PP
 \-\-enable\-backup\-keys
 .RS 4
 Enable the support for backup target keys.
 .RE
-.RE
 .PP
 \-\-disable\-backup\-keys
 .RS 4
 Disable the support for backup target keys (default).
 .RE
-.RE
 .PP
 \-\-enable\-image\-encryption
 .RS 4
-Enable encryption of the image components (default). The image components are:
-the kernel, ramdisk, and kernel command line.
-.RE
+Enable encryption of the image components (default).
+
+The image components are: the kernel, ramdisk, and kernel command line.
 .RE
 .PP
 \-\-disable\-image\-encryption
 .RS 4
-Disable encryption of the image components. The image components are: the
-kernel, ramdisk, and kernel command line. Use only if the components used do not
-contain any confidential content (for example, secrets like non\-public
-cryptographic keys).
+Disable encryption of the image components.
+
+The image components are: the kernel, ramdisk, and kernel command line. Use only
+if the components used do not contain any confidential content (for example,
+secrets like non\-public cryptographic keys).
+.RE
+.PP
+\-\-flags <FLAGS>
+.RS 4
+Set control flags using comma\-separated flag names.
+
+Specify flags to enable using their names.
+
+Possible values:
+.RS 4
+\- \fBconfidential\-dump\fP: Confidential guest dump support.
+
+\- \fBpckmo\-dea\-tdea\fP: DEA/TDEA PCKMO key encryption support.
+
+\- \fBpckmo\-aes\fP: AES PCKMO key encryption support.
+
+\- \fBpckmo\-ecc\fP: ECC PCKMO key encryption support.
+
+\- \fBpckmo\-hmac\fP: HMAC PCKMO key encryption support.
+
+\- \fBbackup\-target\-keys\fP: Backup target keys support.
+
+\- \fBcck\-extension\-secret\-enforcement\fP: CCK\-derived extension secret enforcement for add\-secret requests.
+
+\- \fBcck\-update\fP: CCK update support.
+
+\- \fBno\-component\-encryption\fP: Image components without encryption.
+
+.RE
+.RE
+.PP
+\-\-disable\-flags <FLAGS>
+.RS 4
+Set control flags using comma\-separated flag names.
+
+Specify flags to disable using their names.
+
+Possible values:
+.RS 4
+\- \fBconfidential\-dump\fP: Confidential guest dump support.
+
+\- \fBpckmo\-dea\-tdea\fP: DEA/TDEA PCKMO key encryption support.
+
+\- \fBpckmo\-aes\fP: AES PCKMO key encryption support.
+
+\- \fBpckmo\-ecc\fP: ECC PCKMO key encryption support.
+
+\- \fBpckmo\-hmac\fP: HMAC PCKMO key encryption support.
+
+\- \fBbackup\-target\-keys\fP: Backup target keys support.
+
+\- \fBcck\-extension\-secret\-enforcement\fP: CCK\-derived extension secret enforcement for add\-secret requests.
+
+\- \fBcck\-update\fP: CCK update support.
+
+\- \fBno\-component\-encryption\fP: Image components without encryption.
+
 .RE
 .RE
 .PP
@@ -242,24 +300,19 @@ cryptographic keys).
 .RS 4
 Print help (see a summary with \fB\-h\fR).
 .RE
-.RE
-
-.SH EXIT STATUS
+.SH "EXIT STATUS"
 .TP 8
 .B 0 \- Program finished successfully
 The command was executed successfully.
-.RE
 .TP 8
 .B 1 \- Generic error
 Something went wrong during the operation. Refer to the error
 message.
-.RE
 .TP 8
 .B 2 \- Usage error
 The command was used incorrectly, for example: unsupported command
 line flag, or wrong number of arguments.
-.RE
-.SH EXAMPLES
+.SH "EXAMPLES"
 These are examples of how to generate an IBM Secure Execution image in
 \fI\,/boot/secure\-linux\/\fR, using the kernel file \fI\,/boot/vmlinuz\/\fR, the
 initrd in \fI\,/boot/initrd.img\/\fR, the kernel parameters contained in
@@ -277,7 +330,7 @@ Generate an IBM Secure Execution image:
 Generate an IBM Secure Execution image with Secure Execution guest dump support:
 .PP
 .B pvimg create \-i \fI\,/boot/vmlinuz\/\fR \-r \fI\,/boot/initrd.img\/\fR \-p \fI\,parmfile\/\fR \-k \fI\,host_key.crt\/\fR \-C \fI\,ibm\-z\-host\-key\-signing.crt\/\fR \-C \fI\,DigiCertCA.crt\fR \-o \fI\,/boot/secure\-linux\/\fR \-\-enable\-dump \-\-cck \fI\,comm\-key\fR
-.SH NOTES
+.SH "NOTES"
 .IP "1." 4
 The \fBgenprotimg\fR(1) command is a symbolic link to the \fBpvimg\-create\fR(1) command.
 .IP "2." 4
@@ -285,5 +338,4 @@ An ELF file cannot be used as a Linux kernel image.
 .IP "3." 4
 Remember to re\-run \fBzipl\fR after updating an IBM Secure Execution image.
 .SH "SEE ALSO"
-.sp
-\fBpvimg\fR(1) \fBzipl\fR(8) \fBqemu\fR(1)
+\fBpvimg\fR(1), \fBzipl\fR(8), \fBqemu\fR(1)

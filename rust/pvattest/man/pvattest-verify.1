@@ -1,58 +1,55 @@
-.\" Copyright 2024, 2025 IBM Corp.
+.\" Copyright IBM Corp.
 .\" s390-tools is free software; you can redistribute it and/or modify
 .\" it under the terms of the MIT license. See LICENSE for details.
 .\"
 
-.TH "PVATTEST-VERIFY" "1" "2026-05-20" "s390-tools" "Attestation Manual"
+.TH "PVATTEST-VERIFY" "1" "2026-08-11" "s390-tools" "Attestation Manual"
 .nh
 .ad l
-.SH NAME
+.SH "NAME"
 pvattest-verify \- Verify an attestation response
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 .nf
 .fam C
-pvattest verify [OPTIONS] \-\-input <FILE> \-\-hdr <FILE> \-\-arpk <FILE>
+\fBpvattest\fR \fBverify\fR [OPTIONS] \fB\-\-input\fR <FILE> \fB\-\-hdr\fR <FILE> \fB\-\-arpk\fR <FILE>
 .fam C
 .fi
-.SH DESCRIPTION
+.SH "DESCRIPTION"
 Verify that a previously generated attestation measurement of an IBM Secure
 Execution guest is as expected. Only verify attestation requests in a trusted
 environment, such as your workstation. Input must contain the response as
-produced by ’pvattest perform’. The protection key must be the one that was
-used to create the request by ’pvattest create’. Shred the protection key
+produced by \fBpvattest perform\fR. The protection key must be the one that was
+used to create the request by \fBpvattest create\fR. Shred the protection key
 after the verification. The header must be the IBM Secure Execution header of
-the image that was attested during ’pvattest perform’. The verify command
+the image that was attested during \fBpvattest perform\fR. The verify command
 solely verifies that the Attestation measurement is correct. It does not check
 for the content of additional data or user data. See `pvattest check` for policy
 checks after you verified the Attestation measurement.
-.SH OPTIONS
-
-.PP
+.SH "OPTIONS"
 \-i, \-\-input <FILE>
 .RS 4
 Specify the attestation response to be verified.
-.RE
 .RE
 .PP
 \-o, \-\-output <FILE>
 .RS 4
 Specify the output for the verification result.
 .RE
-.RE
 .PP
 \-\-hdr <FILE>
 .RS 4
-Specifies the header of the guest image. Can be an IBM Secure Execution image
-created by genprotimg or an extracted IBM Secure Execution header. The header
-must start at a page boundary.
-.RE
+Specifies the header of the guest image.
+
+Can be an IBM Secure Execution image created by genprotimg or an extracted IBM
+Secure Execution header. The header must start at a page boundary.
 .RE
 .PP
 \-a, \-\-arpk <FILE>
 .RS 4
-Use FILE as the protection key to decrypt the request Do not publish this key,
-otherwise your attestation is compromised. Delete this key after verification.
-.RE
+Use FILE as the protection key to decrypt the request
+
+Do not publish this key, otherwise your attestation is compromised. Delete this
+key after verification.
 .RE
 .PP
 \-\-format <FORMAT>
@@ -69,35 +66,37 @@ Possible values:
 .PP
 \-u, \-\-user\-data <FILE>
 .RS 4
-Write the user data to the FILE if any. Writes the user data, if the response
-contains any, to FILE The user\-data is part of the attestation measurement. If
-the user\-data is written to FILE the user\-data was part of the measurement and
-verified. Emits a warning if the response contains no user\-data.
-.RE
+Write the user data to the FILE if any.
+
+Writes the user data, if the response contains any, to FILE The user\-data is
+part of the attestation measurement. If the user\-data is written to FILE the
+user\-data was part of the measurement and verified. Emits a warning if the
+response contains no user\-data.
 .RE
 .PP
 \-h, \-\-help
 .RS 4
 Print help (see a summary with \fB\-h\fR).
 .RE
-.RE
-
 .SH EXIT STATUS
 .TP 8
 .B 0 \- Attestation Verified
+.RS
 Attesatation measurement verified successfully. Measured guest is in Secure Execution mode.
 .RE
 
 .TP 8
 .B 1 \- Program Error
+.RS
 Something went wrong during the local calculation or receiving of the measurement value. Refer to the error message.
 .RE
 
 .TP 8
 .B 2 \- Attestation NOT Verified
+.RS
 Attesation measurement calculation does not match the received value. Measured guest is very likely not in Secure Execution mode.
 .RE
-.SH EXAMPLES
+.SH "EXAMPLES"
 To verify a measurement in 'measurement.bin' with the protection key 'arp.kep' and SE\-guest header 'se_guest.hdr'.
 .PP
 .nf
@@ -117,5 +116,4 @@ If the verification failed it exists with 2 and prints the following to stderr:
 .fam T
 .fi
 .SH "SEE ALSO"
-.sp
 \fBpvattest\fR(1)

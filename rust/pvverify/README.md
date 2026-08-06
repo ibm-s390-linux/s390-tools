@@ -3,6 +3,10 @@
 ## Synopsis
 `pvverify [OPTIONS] --host-key-document <FILE> <--no-verify|--cert <FILE>>`
 ## Description
+# pvverify
+## Synopsis
+`pvverify [OPTIONS] --host-key-document <FILE> <--no-verify|--cert <FILE>>`
+## Description
 Tool to verify host-keys Tool to verify host-keys. Use this tool to verify the
 chain of trust for IBM Secure
 ## Options
@@ -56,6 +60,16 @@ specified certificate.
 `--version`
 <ul>
 Print version information and exit.
+</ul>
+
+
+`--hkd-version <VERSION>`
+<ul>
+Specify the Host-key version to use.
+    Default value: 'auto'
+    Possible values:
+        - **1**: Version 1 - uses traditional cryptographic keys.
+        - **2**: Version 2 - uses hybrid (post-quantum) cryptographic keys.
 </ul>
 
 
