@@ -506,17 +506,17 @@ static int zfcpdd_do_fifo(void)
 			fprintf(stderr, "%s: could not read trace: %s\n", toolname, strerror(errno));
 			break;
 		}
+		if (bit.pdu_len != sizeof(dd)) {
+			clearerr(ifp);
+			dump_bit(&bit, "invalid trace payload length");
+			break;
+		}
 		if (fread(&dd, bit.pdu_len, 1, ifp) != 1) {
 			clearerr(ifp);
 			fprintf(stderr, "%s: could not read trace payload: %s\n", toolname, strerror(errno));
 			break;
 		}
 		if (bit.action & 0x40000000) {
-			if (bit.pdu_len != sizeof(dd)) {
-				clearerr(ifp);
-				dump_bit(&bit, "not a valid trace");
-				break;
-			}
 			if (zfcpdd_account(&bit, &dd))
 				break;
 		}
