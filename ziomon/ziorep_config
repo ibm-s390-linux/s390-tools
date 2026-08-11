@@ -33,7 +33,7 @@ our $c_src;
 
 sub get_line
 {
-	return "n/a" unless open(FH, (catfile($c_src, @_))[0]);
+	return "n/a" unless open(FH, '<', catfile($c_src, @_));
 	my $line = readline(FH);
 	$line =~ s/\s*\Z// unless !$line;
 	close(FH);
@@ -167,7 +167,7 @@ sub get_mapper_devices
 	my @entries = grep { ! /^\./ } dir_content($c_src);
 
 	foreach my $dev (@entries) {
-		next if ("control" =~ /$dev/);
+		next if ($dev eq "control");
 		if ($base_dir !~ /^\/\Z/) {
 			$mapper_dev{get_line("$dev")} = $dev;
 			next;
