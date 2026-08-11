@@ -86,7 +86,7 @@ void conv_msg_data_from_BE(struct message *msg,
 
 void conv_aggr_data_msg_data_to_BE(struct aggr_data *hdr)
 {
-	__u64 i;
+	__u64 i, skipped;
 
 	if (hdr->util_aggr)
 		conv_overall_result_to_BE(hdr->util_aggr->data);
@@ -94,13 +94,23 @@ void conv_aggr_data_msg_data_to_BE(struct aggr_data *hdr)
 		conv_ioerr_data_to_BE(hdr->ioerr_aggr->data);
 	for (i=0; i<hdr->num_blkiomon; ++i)
 		blkiomon_conv_to_BE(hdr->blkio_aggr[i]->data);
-	for (i=0; i<hdr->num_zfcpdd; ++i)
+	for (i = 0, skipped = 0; i < hdr->num_zfcpdd; ++i) {
+		if (!hdr->zfcpdd_aggr[i] || !hdr->zfcpdd_aggr[i]->data ||
+		    hdr->zfcpdd_aggr[i]->length != sizeof(struct zfcpdd_dstat)) {
+			skipped++;
+			continue;
+		}
 		conv_dstat_to_BE(hdr->zfcpdd_aggr[i]->data);
+	}
+
+	if (skipped)
+		fprintf(stderr, "%s: skipped %llu malformed zfcpdd message(s)\n",
+			toolname, skipped);
 }
 
 void conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr)
 {
-	__u64 i;
+	__u64 i, skipped;
 
 	if (hdr->util_aggr)
 		conv_overall_result_from_BE(hdr->util_aggr->data);
@@ -108,8 +118,18 @@ void conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr)
 		conv_ioerr_data_from_BE(hdr->ioerr_aggr->data);
 	for (i=0; i<hdr->num_blkiomon; ++i)
 		blkiomon_conv_to_BE(hdr->blkio_aggr[i]->data);
-	for (i=0; i<hdr->num_zfcpdd; ++i)
+	for (i = 0, skipped = 0; i < hdr->num_zfcpdd; ++i) {
+		if (!hdr->zfcpdd_aggr[i] || !hdr->zfcpdd_aggr[i]->data ||
+		    hdr->zfcpdd_aggr[i]->length != sizeof(struct zfcpdd_dstat)) {
+			skipped++;
+			continue;
+		}
 		conv_dstat_from_BE(hdr->zfcpdd_aggr[i]->data);
+	}
+
+	if (skipped)
+		fprintf(stderr, "%s: skipped %llu malformed zfcpdd message(s)\n",
+			toolname, skipped);
 }
 
 void copy_msg(struct message *src, struct message **tgt)
