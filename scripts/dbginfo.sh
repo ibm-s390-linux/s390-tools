@@ -174,7 +174,7 @@ container host        Kubernetes: ${KUBERNETES} - docker: ${DOCKER} - podman: ${
 Current user          = $(whoami) (must be root for data collection)
 Date and time         = $(date)
 Uptime                =$(uptime)
-Number of coredumps   = $(corecumpctl 2>/dev/null | wc -l)
+Number of coredumps   = $(expr $(coredumpctl 2>&1 | wc -l) - 1)
 zdevice onl/conf/offl = ${ZDEV_ONL} / ${ZDEV_CONF} / ${ZDEV_OFF}
 Log file check        =$(logfile_checker "/var/log*")
 
