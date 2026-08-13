@@ -41,8 +41,7 @@ readonly MOUNT_POINT_DEBUGFS="/sys/kernel/debug"
 # Network devices
 readonly NETWORK_DEVS=$(cd /sys/class/net; ls -d */ 2>/dev/null |  sed 's/\///g')
 # distro info
-readonly OSPRETTY="$(cat /etc/os* 2>/dev/null | grep -m1 PRETTY_NAME | sed 's/\"//g')"
-readonly OS_NAME="${OSPRETTY##*=}"
+readonly OS_NAME="$(grep -m1 -oP '^PRETTY_NAME="\K[^"]+' /etc/os*)"
 readonly PODMAN=$(if type podman >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 # The processor ID for the first processor
 readonly PROCESSORID="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
