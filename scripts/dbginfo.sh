@@ -1497,24 +1497,34 @@ environment_setup() {
 # create gzip-ped tar file
 create_package() {
 	local rc_tar
+	local TMPARCHIVE="${WORKDIR_BASE}$(uuidgen).tgz"
 	pr_syslog_stdout ${step_num} "Finalizing: Creating archive with collected data"
 	# get a copy of the script used
 	cp -p "${FULLPATHSCRIPT}" "${WORKPATH}"
-	# create the archive
+	# create the archive with random name
 	cd "${WORKDIR_BASE}"
-	touch "${WORKARCHIVE}"
-	chmod 0600 "${WORKARCHIVE}"
-	tar -czf "${WORKARCHIVE}" "${WORKDIR_CURRENT}"
+	tar -czf "${TMPARCHIVE}" "${WORKDIR_CURRENT}"
 	rc_tar=$?
 	if [ $rc_tar -eq 0 ]; then
-		chmod 0600 "${WORKARCHIVE}"
-		pr_stdout " "
-		pr_stdout "Collected data was saved to:"
-		pr_stdout " >>  ${WORKARCHIVE}  <<"
-		pr_stdout " "
-		pr_stdout "Please review all collected data before sending to your" \
-			  "service organization."
-		pr_stdout " "
+		chmod 0600 "${TMPARCHIVE}"
+		# move to final file name
+		if mv -f "${TMPARCHIVE}" "${WORKARCHIVE}"; then
+			pr_stdout " "
+			pr_stdout "Collected data was saved to:"
+			pr_stdout " >>  ${WORKARCHIVE}  <<"
+			pr_stdout " "
+			pr_stdout "Please review all collected data before sending to your" \
+				  "service organization."
+			pr_stdout " "
+		else
+			# handle failed move
+			pr_stdout "${SCRIPTNAME}: Warning: Collection of data has problems!"
+			pr_stdout "Collected data saved (maybe incomplete) to:"
+			pr_stdout " >> ${TMPARCHIVE} <<"
+			pr_stdout " "
+			pr_stdout "Please review all collected data before sending to your" \
+				  "service organization."
+		fi
 	elif [ $rc_tar -eq 127 ]; then
 		pr_stdout " "
 		pr_stdout "${SCRIPTNAME}: Error: tar command is not available!"
@@ -1522,7 +1532,7 @@ create_package() {
 	else
 		pr_stdout " "
 		pr_stdout "${SCRIPTNAME}: Error: Collection of data failed!"
-		pr_stdout "       The creation of \"${WORKARCHIVE}\" was not successful."
+		pr_stdout "       The creation of \"${TMPARCHIVE}\" was not successful."
 		pr_stdout "       Please check the directory \"${WORKDIR_BASE}\""
 		pr_stdout "       to provide enough free available space."
 	fi
