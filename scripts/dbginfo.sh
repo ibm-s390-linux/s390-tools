@@ -204,8 +204,13 @@ while [ ${#} -gt 0 ]; do
 		;;
 	--directory|-d)
 		paramWORKDIR_BASE=${2}
+		cleanWORKDIR_BASE=$(echo ${paramWORKDIR_BASE} | tr -dc '[:alnum:]-_/.')
 		if test -z "${paramWORKDIR_BASE}"; then
 			echo "${SCRIPTNAME}: Error: No directory specified for data collection!"
+			echo
+			exit 1
+		elif test "x${paramWORKDIR_BASE}" != "x${cleanWORKDIR_BASE}"; then
+			echo "${SCRIPTNAME}: Error: The directory contains unsafe shell chars"
 			echo
 			exit 1
 		elif test ! -d "${paramWORKDIR_BASE}"; then
