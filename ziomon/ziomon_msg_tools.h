@@ -47,5 +47,8 @@ time_t get_timestamp_from_msg(const struct message *msg);
 int add_to_agg(struct aggr_data *hdr, struct message *msg,
 	       const struct file_header *f_hdr);
 
+int validate_msg_layout_from_BE(const struct message *msg,
+				const struct file_header *hdr);
+
 #endif
 

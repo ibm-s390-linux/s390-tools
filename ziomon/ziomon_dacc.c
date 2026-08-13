@@ -194,10 +194,29 @@ static int read_message(FILE *fp, struct message *msg, __u32 ver,
 		msg->data = NULL;
 	}
 	else {
+		/*
+		 * The message length should be minimum the size
+		 * of first parameter 'timestamp' inside utilization_data
+		 * or ioerr_data structure which is of type __u64.
+		 */
+		if (msg->length < sizeof(__u64)) {
+			fprintf(stderr, "%s: Invalid message length %u\n",
+				toolname, msg->length);
+			return -1;
+		}
+
 		msg->data = malloc(msg->length);
+		if (!msg->data) {
+			fprintf(stderr, "%s: Failed to allocate message data\n",
+				toolname);
+			return -1;
+		}
+
 		if (fread(msg->data, msg->length, 1, fp) != 1) {
 			fprintf(stderr, "%s: Error reading %u Bytes message"
 				" content\n", toolname, msg->length);
+			free(msg->data);
+			msg->data = NULL;
 			return -1;
 		}
 		if (ver == DATA_MGR_V2 && msgid_blkiomon != IS_NO_BLKIOMON_MSG

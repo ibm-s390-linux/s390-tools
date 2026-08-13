@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "ziomon_msg_tools.h"
 #include "ziomon_util.h"
@@ -67,6 +68,67 @@ void conv_msg_data_to_BE(struct message *msg,
 		conv_dstat_to_BE(msg->data);
 	else
 		fprintf(stderr, "%s: Unknown message encountered\n", toolname);
+}
+
+static __u16 get_max_adapters(void)
+{
+	size_t max;
+
+	max = (UINT32_MAX - sizeof(struct utilization_data)) /
+	      sizeof(struct adapter_utilization);
+
+	return max > UINT16_MAX ? UINT16_MAX : (__u16)max;
+}
+
+static __u64 get_max_luns(void)
+{
+	return (__u64)((UINT32_MAX - sizeof(struct ioerr_data))
+			/ sizeof(struct ioerr_cnt));
+}
+
+int validate_msg_layout_from_BE(const struct message *msg,
+				const struct file_header *hdr)
+{
+	__u64 need;
+
+	if (msg->type == hdr->msgid_utilization) {
+		struct utilization_data *u;
+		__u16 n;
+
+		if (msg->length < sizeof(struct utilization_data))
+			return -1;
+
+		u = msg->data;
+
+		n = be16toh(u->num_adapters);
+		if (n > get_max_adapters())
+			return -1;
+
+		need = sizeof(*u) +
+		       (__u64)n * sizeof(struct adapter_utilization);
+
+		return (__u64)msg->length >= need ? 0 : -1;
+	}
+	if (msg->type == hdr->msgid_ioerr) {
+		struct ioerr_data *d;
+		__u64 n;
+
+		if (msg->length < sizeof(struct ioerr_data))
+			return -1;
+
+		d = msg->data;
+
+		n = be64toh(d->num_luns);
+		if (n > get_max_luns())
+			return -1;
+
+		need = sizeof(*d) +
+		       (__u64)n * sizeof(struct ioerr_cnt);
+
+		return (__u64)msg->length >= need ? 0 : -1;
+	}
+
+	return 0;
 }
 
 void conv_msg_data_from_BE(struct message *msg,
@@ -212,6 +274,12 @@ int add_to_agg(struct aggr_data *agg_data, struct message *msg,
 	       const struct file_header *f_hdr)
 {
 	assert(agg_data->magic == DATA_MGR_MAGIC_AGGR);
+
+	if (validate_msg_layout_from_BE(msg, f_hdr)) {
+		fprintf(stderr, "%s: msg layout corrupted: %u\n",
+			toolname, msg->type);
+		return -1;
+	}
 
 	conv_msg_data_from_BE(msg, f_hdr);
 

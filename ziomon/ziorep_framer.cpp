@@ -255,6 +255,12 @@ int Framer::get_next_frameset(Frameset &frameset, bool replace_missing)
 				" - file corrupt?\n", toolname);
 			return -5;
 		}
+		if (validate_msg_layout_from_BE(&msg, &m_fhdr) != 0) {
+			fprintf(stderr, "%s: Error message layout corrupted"
+				" - file corrupt?\n", toolname);
+			discard_msg(&msg);
+			return -5;
+		}
 		conv_msg_data_from_BE(&msg, &m_fhdr);
 		handle_msg(&msg, frameset);
 		discard_msg(&msg);
