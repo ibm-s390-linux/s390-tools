@@ -954,23 +954,18 @@ int
 check_job_images_ngdump(struct job_dump_data* dump, char *name)
 {
 	const char *helper = TOOLS_LIBDIR "/zipl_helper.prepare-ngdump";
-	char *ppn_cmd = NULL;
+	char *args[] = {(char *)helper, dump->device,
+		dry_run ? "1" : "0", NULL};
+	struct misc_stream stream;
 	char *line = NULL;
-	FILE *fp;
 	int rc;
 
-	misc_asprintf(&ppn_cmd, "%s %s %d", helper, dump->device, dry_run);
-	printf("Run %s\n", ppn_cmd);
-
-	fp = popen(ppn_cmd, "r");
-	if (fp == NULL) {
-		error_reason("Failed to run popen(%s,\"r\",)");
-		free(ppn_cmd);
+	printf("Run '%s %s %s'\n", args[0], args[1], args[2]);
+	misc_stream_init(&stream, (char *)helper, args,
+			 environ /* the child inherits parents environment */);
+	if (misc_stream_open(&stream))
 		return -1;
-	}
-	free(ppn_cmd);
-
-	while (fscanf(fp, "%m[^\n]\n", &line) != EOF) {
+	while (fscanf(stream.fp, "%m[^\n]\n", &line) != EOF) {
 		char *param = NULL;
 		char *value = NULL;
 
@@ -1003,19 +998,8 @@ check_job_images_ngdump(struct job_dump_data* dump, char *name)
 		free(param);
 		free(value);
 	}
-
-	switch (pclose(fp)) {
-	case 0:
-		/* success */
-		break;
-	case -1:
-		error_reason("Failed to run pclose");
+	if (misc_stream_close(&stream))
 		return -1;
-	default:
-		error_reason("Script could not determine dump parameters");
-		return -1;
-	}
-
 	rc = misc_check_readable_file(dump->common.image);
 	if (rc) {
 		error_text("Need external file '%s' for dump",
