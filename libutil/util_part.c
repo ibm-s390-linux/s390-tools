@@ -239,6 +239,34 @@ static int gpt_table_valid(struct gpt *gpt, struct mbr *mbr)
 	return 1;
 }
 
+
+enum part_table_type util_part_get_table_type(const char *device,
+					       size_t blk_size)
+{
+	enum part_table_type rc = PART_TYPE_UNKNOWN;
+	struct gpt gpt = {};
+	struct mbr mbr = {};
+	int fh;
+
+	fh = open(device, O_RDONLY);
+	if (fh == -1)
+		return rc;
+
+	if (lseek(fh, 0, SEEK_SET) != (off_t)-1)
+		read(fh, &mbr, sizeof(mbr));
+
+	if (lseek(fh, blk_size, SEEK_SET) != (off_t)-1)
+		read(fh, &gpt, sizeof(gpt));
+
+	if (gpt_table_valid(&gpt, &mbr))
+		rc = PART_TYPE_GPT;
+	else if (mbr_table_valid(&mbr))
+		rc = PART_TYPE_MBR;
+
+	close(fh);
+	return rc;
+}
+
 /*
  * Search for partition with given start block and count
  *
