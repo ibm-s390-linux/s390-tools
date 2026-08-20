@@ -18,6 +18,7 @@
 #include "misc.h"
 #include "zipl.h"
 #include "lib/vtoc.h"
+#include "lib/util_part.h"
 
 #define FS_MAP_ERROR    "Could not get file mapping"
 
@@ -73,6 +74,7 @@ typedef enum {
 struct disk_info {
 	dev_t disk;
 	disk_type_t type;
+	enum part_table_type part_type;
 	dev_t partition;
 	int devno;
 	int partnum;
@@ -94,6 +96,7 @@ struct device_info {
 			 */
 	int fs_block_size;
 	int align; /* alignment of component location in bootmap */
+	enum part_table_type part_type;
 	struct disk_info base[MAX_TARGETS]; /* array of physical disks for
 					     * bootstrap blocks recording
 					     */

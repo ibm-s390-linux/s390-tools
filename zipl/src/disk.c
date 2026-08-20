@@ -31,6 +31,7 @@
 #include "lib/util_proc.h"
 #include "lib/util_sys.h"
 #include "lib/util_libc.h"
+#include "lib/util_part.h"
 #include "disk.h"
 #include "error.h"
 #include "install.h"
@@ -545,6 +546,7 @@ static int disk_set_info_complete(struct job_target_data *td,
 				  struct disk_info *data,
 				  struct stat *stats, int fd)
 {
+	char *dev_path;
 	long devsize;
 
 	/* Get size of device in sectors (512 byte) */
@@ -572,6 +574,24 @@ static int disk_set_info_complete(struct job_target_data *td,
 			data->geo.start / (data->phy_block_size / 512);
 	if (data->partnum != 0)
 		data->partition = stats->st_rdev;
+	/*
+	 * Detect partition table type for the base disk.
+	 * CDL disks use VTOC, LDL disks have no partition table,
+	 * FBA disk is probed directly.
+	 */
+	if (data->type == disk_type_eckd_cdl) {
+		data->part_type = PART_TYPE_VTOC;
+	} else if (data->type == disk_type_eckd_ldl) {
+		data->part_type = PART_TYPE_UNKNOWN;
+	} else {
+		if (misc_temp_dev(data->disk, 1, &dev_path) == 0) {
+			data->part_type = util_part_get_table_type(dev_path,
+								   data->phy_block_size);
+			misc_free_temp_dev(dev_path);
+		} else {
+			data->part_type = PART_TYPE_UNKNOWN;
+		}
+	}
 	return 0;
 }
 
@@ -592,6 +612,10 @@ static int device_set_info_complete(struct device_info *dev_info,
 				    struct job_target_data *td)
 {
 	struct util_proc_part_entry part_entry;
+	dev_t probe_dev;
+	char *dev_path;
+	int probe_fd;
+	int blksize;
 
 	/* Try to get device name */
 	if (util_proc_part_get_entry(dev_info->device, &part_entry) == 0) {
@@ -603,6 +627,29 @@ static int device_set_info_complete(struct device_info *dev_info,
 	/* Initialize file system block size with invalid value */
 	dev_info->fs_block_size = -1;
 	device_get_alignment(dev_info, td);
+	/*
+	 * Detect partition table type of the logical device itself.
+	 * If there is only one target, the logical device is a partition
+	 * on that disk — skip detection in that case.
+	 * When the logical device is itself a partition (e.g. md0p1),
+	 * the partition table lives on the parent device (e.g. md0), so
+	 * probe the parent rather than the partition.
+	 */
+	if (td->nr_targets == 1)
+		return 0;
+	probe_dev = dev_info->device;
+	if (util_sys_dev_is_partition(dev_info->device))
+		util_sys_get_base_dev(dev_info->device, &probe_dev);
+	if (misc_temp_dev(probe_dev, 1, &dev_path) != 0)
+		return 0;
+	probe_fd = open(dev_path, O_RDONLY);
+	if (probe_fd != -1) {
+		if (ioctl(probe_fd, BLKSSZGET, &blksize) == 0)
+			dev_info->part_type =
+				util_part_get_table_type(dev_path, blksize);
+		close(probe_fd);
+	}
+	misc_free_temp_dev(dev_path);
 	return 0;
 }
 
@@ -1161,6 +1208,20 @@ disk_is_large_volume(struct disk_info *info)
 		info->geo.cylinders == 0xfffe;
 }
 
+static const char *part_type_name(enum part_table_type part_type)
+{
+	switch (part_type) {
+	case PART_TYPE_GPT:
+		return "GPT";
+	case PART_TYPE_MBR:
+		return "MBR";
+	case PART_TYPE_VTOC:
+		return "VTOC";
+	default:
+		return "Unknown";
+	}
+}
+
 static void disk_print_info(struct disk_info *info, int source)
 {
 	const char *prefix = "    ";
@@ -1189,6 +1250,9 @@ static void disk_print_info(struct disk_info *info, int source)
 	       prefix, (info->partnum != 0) ? "partition" : "device");
 	printf("%sDisk layout.....................: %s%s\n",
 	       prefix, disk_get_type_name(info->type), footnote);
+	if (info->part_type)
+		printf("%sPartition table.................: %s\n",
+		       prefix, part_type_name(info->part_type));
 	if (disk_type_is_eckd(info->type)) {
 		printf("%sGeometry - heads................: %d%s\n",
 		       prefix, info->geo.heads, footnote);
@@ -1233,6 +1297,9 @@ void device_print_info(struct device_info *this, struct job_target_data *td)
 	if (this->fs_block_size >= 0)
 		printf("  File system block size............: %d\n",
 		       this->fs_block_size);
+	if (this->part_type)
+		printf("  Partition table...................: %s\n",
+		       part_type_name(this->part_type));
 	for (i = 0; i < td->nr_targets; i++) {
 		printf("  Base %d:\n", i + 1);
 		disk_print_info(&this->base[i], td->source);
