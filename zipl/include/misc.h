@@ -14,6 +14,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#include <spawn.h>
 
 #include "zipl.h"
 
@@ -27,6 +28,15 @@ struct misc_file_buffer {
 struct misc_fd {
 	int fd;
 	unsigned int simulate_write:1;
+};
+
+struct misc_stream {
+	int status;
+	pid_t pid;
+	FILE *fp;
+	char *path;
+	char **argv;
+	char **env;
 };
 
 void* misc_malloc(size_t size);
@@ -60,6 +70,10 @@ void misc_ebcdic_to_ascii(unsigned char *from, unsigned char *to);
 void misc_ascii_to_ebcdic(unsigned char *from, unsigned char *to);
 unsigned int misc_check_secure_boot(void);
 void misc_warn_on_failed_pdge(dev_t device);
+void misc_stream_init(struct misc_stream *stream,
+		      char *path, char *argv[], char **env);
+int misc_stream_open(struct misc_stream *stream);
+int misc_stream_close(struct misc_stream *stream);
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #endif /* not MISC_H */

@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "error.h"
@@ -553,7 +554,96 @@ misc_check_writable_device(const char* devno, int blockdev, int chardev)
 	return 0;
 }
 
+void misc_stream_init(struct misc_stream *stream, char *path,
+		      char *argv[], char **env)
+{
+	memset(stream, 0, sizeof(*stream));
+	stream->path = path;
+	stream->argv = argv;
+	stream->env = env;
+}
 
+/**
+ * Spawn a child process and make it execute a script specified by STREAM->path
+ * with arguments specified by STREAM->argv in the environment specified by
+ * STREAM->env
+ * On success, STREAM->fp points out to the output provided by that script.
+ */
+int misc_stream_open(struct misc_stream *stream)
+{
+	posix_spawn_file_actions_t actions;
+	int pipefd[2];
+
+	if (pipe(pipefd) != 0) {
+		error_reason("Failed to create a pipe");
+		return -1;
+	}
+	posix_spawn_file_actions_init(&actions);
+	/*
+	 * Redirect child's stdout (fd 1) to the write end of the pipe
+	 */
+	posix_spawn_file_actions_adddup2(&actions, pipefd[1],
+					 STDOUT_FILENO);
+	/*
+	 * Close both ends of the pipe in the child context
+	 * (the duplicate is now fd 1)
+	 */
+	posix_spawn_file_actions_addclose(&actions, pipefd[0]);
+	posix_spawn_file_actions_addclose(&actions, pipefd[1]);
+	stream->status = posix_spawn(&stream->pid,
+				     stream->path,
+				     &actions,
+				     NULL,
+				     stream->argv,
+				     stream->env);
+	/* Clean up file actions structure in parent */
+	posix_spawn_file_actions_destroy(&actions);
+
+	/* Parent doesn't need the write end; close it so read() receives EOF */
+	close(pipefd[1]);
+	if (stream->status != 0) {
+		error_reason("posix_spawn failed: %s",
+			     strerror(stream->status));
+		close(pipefd[0]);
+		return -1;
+	}
+	stream->fp = fdopen(pipefd[0], "r");
+	if (!stream->fp) {
+		if (kill(stream->pid, SIGHUP) ||
+		    waitpid(stream->pid, &stream->status, 0) == -1) {
+			fprintf(stderr,
+				"Failed to kill child process for %s (%s)\n",
+				stream->path, strerror(errno));
+		}
+		close(pipefd[0]);
+		error_reason("Failed to open output stream for %s (%s)",
+			     stream->path, strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Release resources captured by misc_stream_open()
+ */
+int misc_stream_close(struct misc_stream *stream)
+{
+	fclose(stream->fp);
+	if (waitpid(stream->pid, &stream->status, 0) < 0) {
+		error_reason("Failed to wait for the child %d executing %s",
+			     stream->pid, stream->path);
+		return -1;
+	}
+	if (!WIFEXITED(stream->status)) {
+		error_reason("Child %d didn't end normally", stream->pid);
+		return -1;
+	}
+	if (WEXITSTATUS(stream->status)) {
+		error_reason("Script %s failed", stream->path);
+		return -1;
+	}
+	return 0;
+}
 
 /* ASCII to EBCDIC conversion table. */
 static unsigned char ascebc[256] =
