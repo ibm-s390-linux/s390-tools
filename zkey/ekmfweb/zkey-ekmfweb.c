@@ -914,7 +914,7 @@ static const struct util_opt configure_options[] = {
 		.desc = "Do not verify the authenticity of the EKMF Web "
 			"server's certificate. For self signed EKMF Web server "
 			"certificates, this is the default. Use option "
-			"'--tls-pin-server-cert' to ensure the self signed "
+			"'--tls-pin-server-pubkey' to ensure the self signed "
 			"certificate's authenticity explicitly. CA signed "
 			"EKMF Web server certificates are verified by default. "
 			"This option disables the verification.",
@@ -1873,8 +1873,8 @@ static int _configure_connection(struct plugin_handle *ph,
 		return -EINVAL;
 	}
 	if (tls_pin_server_pubkey && tls_trust_server_cert) {
-		_set_error(ph, "Option ' --tls-pin-server-pubkey' is not valid "
-			   "together with option '--tls-pin-server-cert");
+		_set_error(ph, "Option '--tls-pin-server-pubkey' is not valid "
+			   "together with option '--tls-trust-server-cert'");
 		return -EINVAL;
 	}
 
