@@ -143,7 +143,7 @@ option is specified.
 Keys generated in EKMF Web are always of type \fBCCA\-AESCIPHER\fP. The
 cryptographic size of the keys depend on the underlying EKMF Web template.
 Use \fBzkey kms info\fP to display the names of the key templates configured.
-If option \fB\-\-key\-bits\fP is specified, it must match the key size in the
+If option \fB\-\-keybits\fP is specified, it must match the key size in the
 template.
 .PP
 You may need to use option \fB\-\-label\-tags\fP to specify the label tags
@@ -284,7 +284,7 @@ EKMF Web server certificates.
 .BR \-\-tls\-dont\-verify\-server\-cert
 Do not verify the authenticity of the EKMF Web server's certificate. For self
 signed EKMF Web server certificates, this is the default. Use option
-\fB\-\-tls\-pin\-server\-cert\fP to ensure the self signed certificate's
+\fB\-\-tls\-pin\-server\-pubkey\fP to ensure the self signed certificate's
 authenticity explicitly. CA signed EKMF Web server certificates are verified by
 default. This option disables the verification.
 .TP
@@ -352,13 +352,20 @@ default is 30 days.
 Specifies the digest algorithm to use when generating a certificate signing
 request or self signed certificate. The default is determined by OpenSSL.
 .TP
+.BR \-P ", " \-\-cert\-rsa\-pss
+Use the RSA-PSS algorithm to sign the certificate signing request or the self
+signed certificate. This option is only honored when the identity key type is
+RSA, it is ignored otherwise.
+This option is only available on systems where the installed version of OpenSSL
+supports RSA-PSS certificate signing.
+.TP
 .BR \-r ", " \-\-register\~\fIcert\-file\fP
 Register the zkey client with EKMF Web by generating an identity key in EKMF
-Web using the certificate from the specified file. Supported  certificate files
+Web using the certificate from the specified file. Supported certificate file
 formats are \fB.pem\fP, \fB.crt\fP, \fB.cert\fP, \fB.cer\fP, and \fB.der\fP
 (i.e. either base64 or DER encoded). If you want to register a self signed
 certificate that you are about to generate using option
-\fB\-\-gen\-self\-signed\-cert\fP, then  specify the same certificate file
+\fB\-\-gen\-self\-signed\-cert\fP, then specify the same certificate file
 name here, and the generated certificate is registered right away.
 .TP
 .BR \-T ", " \-\-label\-tags\~\fIlabel\-tags\fP
@@ -367,6 +374,21 @@ registering the zkey client, in the form
 \fB<tag>=<value>(,<tag>=<value>)*[,]\fP with tags as defined by the key
 template. Use the \fBzkey kms info\fP command to display the key templates used
 by zkey. For registration, the template for identity keys is used.
+.
+.SS "Options for the zkey kms configure command (key transport)"
+.TP
+.BR \-\-session\-rsa\-sign\-digest\~\fIdigest\fP
+Specifies the digest algorithm to use for signing the key transport request,
+when the identity key type is RSA. Ignored otherwise. The default is SHA512.
+This option is only available on systems where the installed version of EKMF Web
+client library supports RSA digest and PSS signature selection.
+.TP
+.BR \-\-session\-rsa\-sign\-algo\~\fIalgorithm\fP
+Specifies the algorithm to use for signing the key transport request, when
+the identity key type is RSA, ignored otherwise. Supported algorithms are
+\fBRSA\fP and \fBRSA\-PSS\fP.
+This option is only available on systems where the installed version of EKMF Web
+client library supports RSA digest and PSS signature selection.
 .
 .SS "Options for the zkey generate command"
 .
@@ -410,7 +432,7 @@ EKMF Web using the identity key of this zkey client are listed.
 .SH EXAMPLES
 .TP
 .B zkey kms plugins
-Lists available key manamgement system plugins.
+Lists available key management system plugins.
 .TP
 .B zkey kms bind EKMFWeb
 Binds the EKMF Web plugin to the current secure key repository.
@@ -423,7 +445,7 @@ Configures the connection to the EKMF Web server on 'my.ekmfweb.server'.
 .TP
 .B zkey kms configure \-\-ekmfweb\-url https://my.ekmfweb.server \-\-tls\-pin\-server\-pubkey \-\-tls\-verify\-hostname
 Configures the connection to the EKMF Web server on 'my.ekmfweb.server' and
-pins the server's public key from the server's TSL certificate as well as
+pins the server's public key from the server's TLS certificate as well as
 enables verification of the host name to match the server's Common Name in the
 certificate.
 .TP
