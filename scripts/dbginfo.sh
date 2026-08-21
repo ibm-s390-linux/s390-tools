@@ -794,12 +794,12 @@ collect_vmcmdsout() {
 	if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
 		pr_collect_output "z/VM"
 
-		if type vmcp >/dev/null; then
+		if type vmcp >/dev/null 2>&1; then
 			cp_command="vmcp"
 			if ! lsmod 2>/dev/null | grep -q vmcp && modinfo vmcp >/dev/null 2>&1; then
 				modprobe vmcp && module_loaded=0 && sleep 2
 			fi
-		elif type hcp >/dev/null; then
+		elif type hcp >/dev/null 2>&1; then
 			cp_command="hcp"
 			if ! lsmod 2>/dev/null | grep -q cpint; then
 				modprobe cpint && module_loaded=0 && sleep 2
@@ -1057,7 +1057,7 @@ collect_osaoat() {
 	local osa_devices
 	local osa_device
 
-	if type qethqoat >/dev/null; then
+	if type qethqoat >/dev/null 2>&1; then
 		osa_devices=$(lsqeth 2>/dev/null | grep "Device name" \
 			     | sed 's/D.*:[[:space:]]*\([^[:space:]]*\)[[:space:]]\+/\1/g' \
 			     | sed 's/[()]//g' )
@@ -1081,7 +1081,7 @@ collect_osaoat() {
 collect_ethtool() {
 	local network_device
 
-	if type ethtool >/dev/null; then
+	if type ethtool >/dev/null 2>&1; then
 		if test -n "${NETWORK_DEVS}"; then
 			pr_collect_output "ethtool"
 			for network_device in ${NETWORK_DEVS}; do
@@ -1122,7 +1122,7 @@ collect_ethtool() {
 collect_tc() {
 	local network_device
 
-	if type tc >/dev/null; then
+	if type tc >/dev/null 2>&1; then
 		if test -n "${NETWORK_DEVS}"; then
 			pr_collect_output "Traffic Control"
 			for network_device in ${NETWORK_DEVS}; do
@@ -1141,7 +1141,7 @@ collect_tc() {
 collect_bridge() {
 	local network_device
 
-	if type bridge >/dev/null; then
+	if type bridge >/dev/null 2>&1; then
 		if test -n "${NETWORK_DEVS}"; then
 			pr_collect_output "bridge"
 			for network_device in ${NETWORK_DEVS}; do
@@ -1173,7 +1173,7 @@ collect_ovs() {
 		:ovs-vsctl -t 5 show\
 		:ovsdb-client dump\
 		"
-	if type ovs-vsctl >/dev/null; then
+	if type ovs-vsctl >/dev/null 2>&1; then
 		pr_collect_output "OpenVSwitch"
 		IFS=:
 		for ovscmd in ${ovscmds}; do
@@ -1252,7 +1252,7 @@ collect_container() {
 collect_nvme() {
 	local device
 
-	if type nvme >/dev/null; then
+	if type nvme >/dev/null 2>&1; then
 		pr_collect_output "NVME storage"
 		call_run_command "nvme list" "${OUTPUT_FILE_NVME}"
 		for device in /dev/nvme[0-9]*; do
@@ -1272,7 +1272,7 @@ collect_nvme() {
 collect_dasd() {
 	local device
 
-	if type dasdview >/dev/null; then
+	if type dasdview >/dev/null 2>&1; then
 		pr_collect_output "DASD storage"
 		call_run_command "lsdasd" "${OUTPUT_FILE_DASD}" # duplicate as file header
 		for device in /dev/dasd*; do
