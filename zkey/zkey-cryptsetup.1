@@ -70,7 +70,7 @@ It checks if the LUKS2 header of the volume contains a valid secure key.
 It also displays the attributes of the secure key, such as key size, whether
 it is a secure key that can be used for the XTS cipher mode, and the master key
 register (CURRENT or OLD) with which the secure key is enciphered. The same
-appplies to a secure integrity key, if present.
+applies to a secure integrity key, if present.
 For further information about master key registers, see the
 \fBreencipher\fP command. Keys of type \fBPVSECRET\-AES\fP and
 \fBPVSECRET\-HMAC\fP do not use a cryptographic adapter, thus no master key
@@ -157,7 +157,6 @@ the master key in the \fBOLD\fP register with the master key in the
 \fBCURRENT\fP register. This option is only available for secure keys of type
 \fBCCA\-AESDATA\fP or \fBCCA\-AESCIPHER\fP.
 .PP
-.PP
 If both the
 .B \-\-from\-old
 and
@@ -165,7 +164,6 @@ and
 options are specified, a secure volume key that is currently enciphered
 with the master key in the \fBOLD\fP register is re-enciphered with the
 master key in the \fBNEW\fP register.
-.RE
 .PP
 If both options are omitted, \fBzkey\-cryptsetup\fP automatically detects
 whether the secure volume key is currently enciphered with the master key in the
@@ -331,7 +329,7 @@ it is used to ensure that the new volume key contains the same effective key.
 If no verification pattern token is available, then you are prompted to confirm
 that the specified secure key is the correct one.
 .B ATTENTION:
-If you set a wrong secure key you will loose all the data on the encrypted
+If you set a wrong secure key you will lose all the data on the encrypted
 volume!
 .PP
 To open a key slot contained in the LUKS2 header of the volume, a passphrase is
@@ -347,7 +345,7 @@ options
 and
 .B \-\-keyfile\-size
 to control which part of the key file is used as passphrase. These options
-behave in the same way the same as with \fBcryptsetup\fP.
+behave in the same way as with \fBcryptsetup\fP.
 .PP
 The
 .B setkey
@@ -423,7 +421,7 @@ options
 and
 .B \-\-keyfile\-size
 to control which part of the key file is used as passphrase. These options
-behave in the same way the same as with \fBcryptsetup\fP.
+behave in the same way as with \fBcryptsetup\fP.
 .PP
 The
 .B convert
@@ -456,6 +454,8 @@ the NEW register.
 Re-enciphers a secure volume key in the LUKS2 header that is currently
 enciphered with the master key in the OLD register with the master key in the
 CURRENT register.
+This option is only available for secure volume keys of type \fBCCA\-AESDATA\fP
+or \fBCCA\-AESCIPHER\fP.
 .TP
 .BR \-i ", " \-\-in\-place
 Forces an in-place re-enciphering of a secure volume key in the LUKS2
@@ -463,6 +463,8 @@ header. This option immediately replaces the secure volume key in the LUKS2
 header of the encrypted volume with the re-enciphered secure volume key.
 Re-enciphering from \fBOLD\fP to \fBCURRENT\fP is performed in-place per
 default.
+This option cannot be specified together with option \fB\-\-staged\fP or
+\fB\-\-complete\fP.
 .TP
 .BR \-s ", " \-\-staged
 Forces that the re-enciphering of a secure volume key in the LUKS2
@@ -473,13 +475,17 @@ secure volume key are still valid at this point. Once the new CCA or EP11 master
 key has been set (made active), you must rerun the reencipher command with
 option \fB\-\-complete\fP to complete the staged re-enciphering. Re-enciphering
 from \fBCURRENT\fP to \fBNEW\fP is performed in staged mode per default.
+This option cannot be specified together with option \fB\-\-in\-place\fP or
+\fB\-\-complete\fP.
 .TP
-.BR \-p ", " \-\-complete
+.BR \-c ", " \-\-complete
 Completes a staged re-enciphering. Use this option after the new CCA or EP11
 master key has been set (made active). When completing the staged
 re-enciphering, the (unbound) key slot containing the re-enciphered secure
 volume key becomes the active key slot and, optionally, all key slots containing
 the old secure volume key are removed.
+This option cannot be specified together with options \fB\-\-to\-new\fP,
+\fB\-\-from\-old\fP, \fB\-\-in\-place\fP, or \fB\-\-staged\fP.
 .TP
 .BR \-q ", " \-\-batch\-mode
 Suppresses all confirmation questions. Use with care!
@@ -525,7 +531,7 @@ Suppresses all confirmation questions. Use with care!
 .TP
 .BR \-d ", " \-\-key\-file\~\fIfile\-name\fP
 Reads the passphrase from the specified file. If this option is omitted,
-or if the file\-zkey\-cryptsetup \fI\-\fP (a dash), then you are prompted to
+or if the file\-name is \fI\-\fP (a dash), then you are prompted to
 enter the passphrase interactively.
 .TP
 .BR \-o ", " \-\-keyfile\-offset\~\fIbytes\fP
