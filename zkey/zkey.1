@@ -291,7 +291,7 @@ are validated.
 .RB [ \-\-from\-old | \-o ]
 .RB [ \-\-in\-place | \-i ]
 .RB [ \-\-staged | \-s ]
-.RB [ \-\-complete | \-c ]
+.RB [ \-\-complete | \-p ]
 .RB [ \-\-verbose | \-V ]
 .PP
 Use the
@@ -1108,7 +1108,7 @@ system plugin and its current configuration.
 .RB [ \-\-from\-old | \-o ]
 .RB [ \-\-in\-place | \-i ]
 .RB [ \-\-staged | \-s ]
-.RB [ \-\-complete | \-c ]
+.RB [ \-\-complete | \-p ]
 .RB [ KMS-plugin\ specific\ options ]
 .RB [ \-\-verbose | \-V ]
 .
@@ -1525,6 +1525,7 @@ volume(s), and can therefore be stored insecurely inside the secure key
 repository. If for a certain usage the passphrase is of relevance for
 security, then do not use this option. This option can only be specified for
 AES-type keys with a volume type of \fBluks2\fP.
+This option cannot be specified together with option \fB\-\-set\-dummy\-passphrase\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
@@ -1535,7 +1536,26 @@ AES key is used to encrypt the volume(s), and can therefore be stored insecurely
 inside the secure key repository. If for a certain usage the passphrase is of
 relevance for security, then do not use this option. This option can only be
 specified for AES-type keys with a volume type of \fBluks2\fP.
+This option cannot be specified together with option \fB\-\-gen\-dummy\-passphrase\fP.
 This option is only used for secure keys contained in the secure key repository.
+.TP
+.BR \-\-exportable
+Generate a secure key that is not export restricted.
+This option is only applicable for keys of type \fBCCA\-AESCIPHER\fP or
+\fBEP11\-AES\fP. Keys of type \fBCCA\-AESDATA\fP are always exportable and
+cannot be export restricted.
+When the secure key repository is bound to a key management system plugin (KMS
+plugin), this option cannot be specified unless option \fB\-\-local\fP is also
+specified.
+.TP
+.BR \-\-wrap\-with\-trusted
+Allow wrapping of the generated key only with a trusted key encryption key
+(KEK).
+This option is only valid for keys of type \fBEP11\-AES\fP and requires that
+option \fB\-\-exportable\fP is also specified.
+When the secure key repository is bound to a key management system plugin (KMS
+plugin), this option cannot be specified unless option \fB\-\-local\fP is also
+specified.
 .TP
 .B KMS-plugin specific options
 A key management system plugin may offer and even require plugin specific
@@ -1607,6 +1627,8 @@ Forces an in-place re-enciphering of a secure AES or HMAC key contained in the
 secure key repository. "In-place" immediately replaces the secure key in the
 repository with the re-enciphered secure key.
 Re-enciphering from OLD to CURRENT is performed in-place per default.
+This option cannot be specified together with option \fB\-\-staged\fP or
+\fB\-\-complete\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-s ", " \-\-staged
@@ -1618,12 +1640,16 @@ new CCA or EP11 master key has been set (made active), you must rerun the
 reencipher command with option \fB\-\-complete\fP to complete the staged
 re-enciphering. Re-enciphering from CURRENT to NEW is performed in staged mode
 per default.
+This option cannot be specified together with option \fB\-\-in\-place\fP or
+\fB\-\-complete\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-p ", " \-\-complete
 Completes a staged re-enciphering. Use this option after the new CCA or EP11
 master key has been set (made active). This option replaces the secure key by
 its re-enciphered version in the secure key repository.
+This option cannot be specified together with options \fB\-\-to\-new\fP,
+\fB\-\-from\-old\fP, \fB\-\-in\-place\fP, or \fB\-\-staged\fP.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -1690,6 +1716,7 @@ volume(s), and can therefore be stored insecurely inside the secure key
 repository. If for a certain usage the passphrase is of relevance for
 security, then do not use this option. This option can only be specified for
 AES-type keys with a volume type of \fBluks2\fP.
+This option cannot be specified together with option \fB\-\-set\-dummy\-passphrase\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
@@ -1700,6 +1727,7 @@ AES key is used to encrypt the volume(s), and can therefore be stored insecurely
 inside the secure key repository. If for a certain usage the passphrase is of
 relevance for security, then do not use this option. This option can only be
 specified for AES-type keys with a volume type of \fBluks2\fP.
+This option cannot be specified together with option \fB\-\-gen\-dummy\-passphrase\fP.
 This option is only used for secure keys contained in the secure key repository.
 .
 .
@@ -1809,7 +1837,7 @@ This option is only used for secure keys contained in the secure key repository.
 Specifies a comma-separated list of volumes (block devices) which are
 associated with the secure AES or HMAC key in the repository. These volumes are
 to be encrypted using \fBdm\-crypt\fP with the secure AES key, or are to be
-integrity protected using \fBdm\-integrit\fP with the secure HMAC key. The
+integrity protected using \fBdm\-integrity\fP with the secure HMAC key. The
 volume association also contains the device-mapper name, separated by a colon,
 used with \fBdm\-crypt\fP or \fBdm\-integrity\fP.
 To add a volume to the associated volumes, prefix the volume with a \fI+\fP.
@@ -1845,7 +1873,7 @@ This option is only used for secure keys contained in the secure key repository.
 .BR \-S ", " \-\-sector\-size\~\fIbytes\fP
 Specifies the sector size in bytes used with \fBdm\-crypt\fP or
 \fBdm\-integrity\fP. It must be a power of two and in the range of 512 to 4096
-ytes. Specify \fI0\fP to set the sector size to the system default.
+bytes. Specify \fI0\fP to set the sector size to the system default.
 You can only set a sector size for an HMAC key of a volume of type
 \fBintegrity\fP. For an HMAC key that is used for combined encryption and
 integrity protection (volume type \fBluks2\fP), set the sector size for the
@@ -1869,6 +1897,7 @@ AES-type keys with a volume type of \fBluks2\fP. When there is already a dummy
 passphrase associated with the key, you must first remove the dummy passphrase
 with option \fB\-\-remove\-dummy\-passphrase\fP before you can associate a new
 dummy passphrase.
+This option cannot be specified together with option \fB\-\-set\-dummy\-passphrase\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-set\-dummy\-passphrase\~\fIpassphrase\-file\fP
@@ -1882,6 +1911,7 @@ specified for AES-type keys with a volume type of \fBluks2\fP. When there is
 already a dummy passphrase associated with the key, you must first remove the
 dummy passphrase with option \fB\-\-remove\-dummy\-passphrase\fP before you can
 associate a new dummy passphrase.
+This option cannot be specified together with option \fB\-\-gen\-dummy\-passphrase\fP.
 This option is only used for secure keys contained in the secure key repository.
 .TP
 .BR \-\-remove\-dummy\-passphrase
@@ -2175,6 +2205,8 @@ Forces an in-place re-enciphering of key management system plugin internal
 secure keys. "in-place" immediately replaces the secure key with the
 re-enciphered secure key. Re-enciphering from OLD to CURRENT is performed
 in-place per default.
+This option cannot be specified together with option \fB\-\-staged\fP or
+\fB\-\-complete\fP.
 .TP
 .BR \-s ", " \-\-staged
 Forces that the re-enciphering of key management system plugin internal secure
@@ -2184,11 +2216,15 @@ at this point. Once the new CCA or EP11 master keys have been set (made active),
 you must rerun the \fBkms reencipher\fP command with option \fB\-\-complete\fP
 to complete the staged re-enciphering.
 Re-enciphering from CURRENT to NEW is performed in staged mode per default.
+This option cannot be specified together with option \fB\-\-in\-place\fP or
+\fB\-\-complete\fP.
 .TP
 .BR \-p ", " \-\-complete
 Completes a staged re-enciphering. Use this option after the new CCA or EP11
 master keys have been set (made active). This option replaces the secure keys by
 their re-enciphered versions.
+This option cannot be specified together with options \fB\-\-to\-new\fP,
+\fB\-\-from\-old\fP, \fB\-\-in\-place\fP, or \fB\-\-staged\fP.
 .TP
 .B KMS-plugin specific options
 A key management system plugin may offer plugin specific options that can be
