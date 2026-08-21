@@ -472,36 +472,31 @@ static void set_driver_name(int fd, struct device_info *info, dev_t device)
 static int run_targetbase_script(struct job_target_data *td,
 				 char *script_file, struct stat *stats)
 {
-	char *ppn_cmd = NULL;
-	FILE *fh;
+	struct misc_stream stream;
+	char *device = NULL;
+	char *args[3];
 
-	misc_asprintf(&ppn_cmd, "%s %d:%d", script_file,
+	misc_asprintf(&device, "%d:%d",
 		      major(stats->st_rdev), minor(stats->st_rdev));
-	pr_debug("Run %s\n", ppn_cmd);
-	fh = popen(ppn_cmd, "r");
-	free(ppn_cmd);
+	args[0] = script_file;
+	args[1] = device;
+	args[2] = NULL;
 
-	if (!fh) {
-		error_reason("Failed to run popen(%s,\"r\",)");
+	pr_debug("Run %s %s\n", script_file, device);
+	misc_stream_init(&stream, script_file, args,
+			 environ /* the child inherits parents environment */);
+	if (misc_stream_open(&stream)) {
+		free(device);
 		return -1;
 	}
 	/* translate the script output to target parameters */
-	if (set_target_parameters(fh, td)) {
-		pclose(fh);
+	if (set_target_parameters(stream.fp, td)) {
+		free(device);
+		misc_stream_close(&stream);
 		return -1;
 	}
-	switch (pclose(fh)) {
-	case 0:
-		/* success */
-		return 0;
-	case -1:
-		error_reason("Failed to run pclose");
-		return -1;
-	default:
-		error_reason("Script could not determine target "
-			     "parameters");
-		return -1;
-	}
+	free(device);
+	return misc_stream_close(&stream);
 }
 
 /**
