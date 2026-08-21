@@ -330,7 +330,7 @@ extension must match the host name (or IP address) of the client system. If no
 extended\-key\-usage extension is specified, then a \fBTLS Web client
 authentication\fP extension ('extendedKeyUsage=clientAuth') is automatically
 added. If no \fBSubject Alternate Name\fP extension is specified, then a
-\fBSubject  Alternate Name\fP extension with the system's host name
+\fBSubject Alternate Name\fP extension with the system's host name
 (subjectAltName=DNS:hostname) is automatically added.
 .TP
 .BR \-N ", " \-\-renew\-cert\~\fIcert\-pem\-file\fP
@@ -398,7 +398,7 @@ self\-signed KMIP server certificates.
 .BR \-\-tls\-dont\-verify\-server\-cert
 Do not verify the authenticity of the certificate of the KMIP server. For
 self\-signed KMIP server certificates, this is the default. Use the
-\fB\-\-tls\-pin\-server\-cert\fP option to ensure the authenticity of the
+\fB\-\-tls\-pin\-server\-pubkey\fP option to ensure the authenticity of the
 self\-signed certificate explicitly. For CA\-signed KMIP server certificates,
 the default is to verify them. This option disables the verification.
 .TP
@@ -467,12 +467,12 @@ A KMIP plugin profile usually belongs to a certain KMIP server product or
 implementation, and contains settings to be used for that specific KMIP server
 implementation.
 .PP
-\fBNote:\fP KMIP plugin profiles must not be confused with the \fP KMIP
+\fBNote:\fP KMIP plugin profiles must not be confused with the \fBKMIP
 profiles\fP as defined by the KMIP standard.
 .PP
 A KMIP plugin profile is selected when configuring the connection to the KMIP
 server. Either, a profile name is explicitly specified using the
-\fB\-\-profile\fP option of the \fBzky kms configure\fP command together with
+\fB\-\-profile\fP option of the \fBzkey kms configure\fP command together with
 the \fB\-\-kmip\-server\fP option, or a profile is automatically selected based
 on the KMIP server information string that the KMIP server returned with the
 KMIP \fBQUERY\fP command response. If none of the available profiles match to
@@ -501,13 +501,13 @@ protocol version like \fBmajor.minor\fP or \fBAUTO\fP. When AUTO is specified,
 the KMIP protocol version supported by the KMIP server is automatically
 discovered using the \fBDISCOVER VERSIONS\fP KMIP request.
 .IP "\(bu" 2
-The \fBtransport method\fP. Possible values are \fBTSL\fP or \fBHTTPS\fP.
+The \fBtransport method\fP. Possible values are \fBTLS\fP or \fBHTTPS\fP.
 A transport method of HTTPS can also be selected by specifying an URL beginning
 with \fBhttps://\fP with the \fB\-\-kmip\-server\fP option with the
 \fBzkey kms configure\fP command, even if the profile used specifies TLS.
 .IP "\(bu" 2
-The \fB encoding method\fP for the KMIP protocol. Possible values are
-\fBTTLV\fP, \fBJSON\fP, or \fBXML\fP. JSON and XML encoding are only posisble
+The \fBencoding method\fP for the KMIP protocol. Possible values are
+\fBTTLV\fP, \fBJSON\fP, or \fBXML\fP. JSON and XML encoding are only possible
 with the HTTPS transport method.
 .IP "\(bu" 2
 The default \fBURI\fP used for the HTTPS transport method, e.g. \fB/kmip\fP.
@@ -572,7 +572,7 @@ retrieved in clear from the KMIP server.
 .SH EXAMPLES
 .TP
 .B zkey kms plugins
-Lists available key manamgement system plugins.
+Lists available key management system plugins.
 .TP
 .B zkey kms bind KMIP
 Binds the KMIP plugin to the current secure key repository.
@@ -584,7 +584,7 @@ Configures the APQN '03.004c' to be associated with the KMIP plugin.
 Generates an RSA identity key with a modulus size of 4096 bits.
 .TP
 .B zkey kms configure \-\-gen\-identity\-key ECC:secp521r1
-Generates an ECC identity key with ellitic curve secp521r1.
+Generates an ECC identity key with elliptic curve secp521r1.
 .TP
 .B zkey kms configure \-\-gen\-csr csr.pem \-\-cert\-subject \(dqCN=my.zkey.client;OU=Example;C=US\(dq
 Generates a certificate signing request with the identity key and the specified
@@ -619,7 +619,7 @@ KMIP plugin profile 'ABC'.
 .TP
 .B zkey kms configure \-\-kmip\-server my.kmip.server \-\-tls\-pin\-server\-pubkey \-\-tls\-verify\-hostname
 Configures the connection to the KMIP server on 'my.kmip.server' and
-pins the server's public key from the server's TSL certificate as well as
+pins the server's public key from the server's TLS certificate as well as
 enables verification of the host name to match the server's Common Name in the
 certificate.
 .TP
