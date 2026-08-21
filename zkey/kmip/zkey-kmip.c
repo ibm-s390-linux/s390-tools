@@ -1390,7 +1390,7 @@ static const struct util_opt configure_options[] = {
 		.desc = "Do not verify the authenticity of the certificate of "
 			"the KMIP server. For self-signed KMIP server "
 			"certificates, this is the default. Use the "
-			"'--tls-pin-server-cert' option to ensure the "
+			"'--tls-pin-server-pubkey' option to ensure the "
 			"authenticity of the self-signed certificate "
 			"explicitly. For CA-signed KMIP server certificates, "
 			"the default is to verify them. This option disables "
@@ -2740,8 +2740,8 @@ static int _configure_connection(struct plugin_handle *ph,
 	int rc;
 
 	if (tls_pin_server_pubkey && tls_trust_server_cert) {
-		_set_error(ph, "Option ' --tls-pin-server-pubkey' is not valid "
-			   "together with option '--tls-pin-server-cert");
+		_set_error(ph, "Option '--tls-pin-server-pubkey' is not valid "
+			   "together with option '--tls-trust-server-cert'");
 		return -EINVAL;
 	}
 
