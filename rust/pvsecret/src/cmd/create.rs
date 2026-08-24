@@ -10,7 +10,7 @@ use anyhow::{anyhow, bail, Context, Error, Result};
 use log::{debug, info, trace, warn};
 use pv::misc::{
     decode_hex, encode_hex, open_file, pv_guest_bit_set, read_exact_file, read_file,
-    try_parse_u128, try_parse_u64, write,
+    try_parse_u128, try_parse_u64, write, write_file_private,
 };
 use pv::request::openssl::pkey::{PKey, Private};
 use pv::request::{
@@ -377,7 +377,7 @@ fn write_secret<P: AsRef<Path>>(
         } => {
             write_yaml(name, guest_secret, stdout, outp_path)?;
             if let Some(path) = output_secret {
-                write_out(path, guest_secret.confidential(), "Association secret")?
+                write_file_private(path, guest_secret.confidential(), "Association secret")?
             }
         }
         AddSecretType::Retrievable { name, stdout, .. } => {
