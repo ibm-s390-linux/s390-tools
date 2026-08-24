@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use anyhow::{bail, Context, Result};
 use log::{debug, warn};
 use pv::attest::{AttestationFlags, AttestationMeasAlg, AttestationRequest, AttestationVersion};
-use pv::misc::{create_file, write_file};
+use pv::misc::{create_file, write_file_private};
 use pv::request::{HostKey, ReqEncrCtx, Request, SymKey, SymKeyType};
 
 use crate::cli::{AttAddFlags, AttVersion, AttVersionSelection, CreateAttOpt};
@@ -96,7 +96,7 @@ pub fn create(opt: &CreateAttOpt) -> Result<ExitCode> {
         SymKey::Aes256(k) => k,
         _ => bail!("Unexpected key type"),
     };
-    write_file(
+    write_file_private(
         &opt.arpk,
         arpk.value(),
         "Attestation request Protection Key",
