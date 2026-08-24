@@ -30,7 +30,7 @@ pub mod misc {
     pub use crate::utils::{
         create_file, decode_hex, encode_hex, open_file, parse_hex, pv_guest_bit_set, read,
         read_exact_file, read_file, read_file_string, to_u16, to_u32, try_parse_u128,
-        try_parse_u64, write, write_file, Flags, Lsb0Flags64, Msb0Flags64,
+        try_parse_u64, write, write_file, write_file_private, Flags, Lsb0Flags64, Msb0Flags64,
     };
 }
 

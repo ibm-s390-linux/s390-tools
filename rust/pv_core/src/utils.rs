@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 //
 // Copyright IBM Corp. 2023
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, U64};
@@ -306,6 +307,27 @@ pub fn read<R: Read, P: AsRef<Path>>(rd: &mut R, path: P, ctx: &str) -> Result<V
 /// Passes through any kind of error `std::fs::write` produces
 pub fn write_file<D: AsRef<[u8]>, P: AsRef<Path>>(path: P, data: D, ctx: &str) -> Result<()> {
     std::fs::write(path.as_ref(), data.as_ref()).map_err(|e| file_error!(Write, ctx, path, e))
+}
+
+/// Write the content to a file in using 0600 permissions
+pub fn write_file_private<D: AsRef<[u8]>, P: AsRef<Path>>(
+    path: P,
+    data: D,
+    ctx: &str,
+) -> Result<()> {
+    let mut f = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path.as_ref())
+        .map_err(|e| Error::FileAccess {
+            ty: FileAccessErrorType::Open,
+            path: path.as_ref().to_path_buf(),
+            source: e,
+        })?;
+    f.write_all(data.as_ref())
+        .map_err(|e| file_error!(Write, ctx, path, e))
 }
 
 /// Write content to a [`std::io::Write`] and add context in case of an error
