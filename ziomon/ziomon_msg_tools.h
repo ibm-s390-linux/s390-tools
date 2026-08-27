@@ -24,7 +24,7 @@ void conv_msg_data_from_BE(struct message *msg, const struct file_header *hdr);
 
 void conv_aggr_data_msg_data_to_BE(struct aggr_data *hdr);
 
-void conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr);
+int conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr);
 
 void copy_msg(struct message *src, struct message **tgt);
 

@@ -209,7 +209,11 @@ static int add_to_aggregated(struct message **msgs, int num_msgs,
 	/* write back to file */
 	conv_aggr_data_msg_data_to_BE(&opts->agg_data);
 	i = write_aggr_file(opts->outfile_agg, &opts->agg_data);
-	conv_aggr_data_msg_data_from_BE(&opts->agg_data);
+	if (conv_aggr_data_msg_data_from_BE(&opts->agg_data)) {
+		fprintf(stderr, "%s: Failed to convert agg data from BE\n",
+			toolname);
+		return -1;
+	}
 
 	return i;
 }

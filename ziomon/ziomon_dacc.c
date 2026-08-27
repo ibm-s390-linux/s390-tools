@@ -940,7 +940,13 @@ int open_data_files(FILE **fp, const char *filename, struct file_header *f_hdr,
 	 */
 
 	if (*agg) {
-		conv_aggr_data_msg_data_from_BE(*agg);
+		if (conv_aggr_data_msg_data_from_BE(*agg)) {
+			fprintf(stderr, "%s: .agg file layout corrupted\n",
+				toolname);
+			free(*agg);
+			*agg = NULL;
+			return -1;
+		}
 
 		/* We use the first message that we have as the basis to
 		   calculate when the final timeframe of the .agg data

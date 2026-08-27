@@ -42,8 +42,14 @@ Framer::Framer(__u64 begin, __u64 end, __u32 interval_length,
 		*rc = -2;
 		return;
 	}
-	if (m_agg_data)
-		conv_aggr_data_msg_data_from_BE(m_agg_data);
+	if (m_agg_data) {
+		if (conv_aggr_data_msg_data_from_BE(m_agg_data) != 0) {
+			fprintf(stderr, "%s: Error .agg data layout corrupted"
+				" - file corrupt?\n", toolname);
+			*rc = -2;
+			return;
+		}
+	}
 
 	if (filter_types) {
 		m_type_filter = new MsgTypeFilter;

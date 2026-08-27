@@ -170,14 +170,66 @@ void conv_aggr_data_msg_data_to_BE(struct aggr_data *hdr)
 			toolname, skipped);
 }
 
-void conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr)
+int conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr)
 {
 	__u64 i, skipped;
 
-	if (hdr->util_aggr)
+	if (hdr->util_aggr) {
+		struct message *msg = hdr->util_aggr;
+		const struct utilization_data *u = msg->data;
+		__u16 n;
+		__u64 need;
+
+		if (msg->length < sizeof(struct utilization_data)) {
+			fprintf(stderr, "%s: util_aggr message too short\n",
+				toolname);
+			return -1;
+		}
+		n = be16toh(u->num_adapters);
+		if (n > get_max_adapters()) {
+			fprintf(stderr,
+				"%s: util_aggr num_adapters exceeds maximum\n",
+				toolname);
+			return -1;
+		}
+		need = sizeof(*u) +
+		       (__u64)n * sizeof(struct adapter_utilization);
+		if ((__u64)msg->length < need) {
+			fprintf(stderr,
+				"%s: util_aggr message length too small for num_adapters\n",
+				toolname);
+			return -1;
+		}
 		conv_overall_result_from_BE(hdr->util_aggr->data);
-	if (hdr->ioerr_aggr)
+	}
+	if (hdr->ioerr_aggr) {
+		struct message *msg = hdr->ioerr_aggr;
+		const struct ioerr_data *d = msg->data;
+		__u64 n;
+		__u64 need;
+
+		if (msg->length < sizeof(struct ioerr_data)) {
+			fprintf(stderr, "%s: ioerr_aggr message too short\n",
+				toolname);
+			return -1;
+		}
+		n = be64toh(d->num_luns);
+		if (n > get_max_luns()) {
+			fprintf(stderr,
+				"%s: ioerr_aggr num_luns exceeds maximum\n",
+				toolname);
+			return -1;
+		}
+		need = sizeof(*d) +
+		       (__u64)n * sizeof(struct ioerr_cnt);
+		if ((__u64)msg->length < need) {
+			fprintf(stderr,
+				"%s: ioerr_aggr message length too small for num_luns\n",
+				toolname);
+			return -1;
+		}
 		conv_ioerr_data_from_BE(hdr->ioerr_aggr->data);
+	}
 	for (i=0; i<hdr->num_blkiomon; ++i)
 		blkiomon_conv_to_BE(hdr->blkio_aggr[i]->data);
 	for (i = 0, skipped = 0; i < hdr->num_zfcpdd; ++i) {
@@ -192,6 +244,8 @@ void conv_aggr_data_msg_data_from_BE(struct aggr_data *hdr)
 	if (skipped)
 		fprintf(stderr, "%s: skipped %llu malformed zfcpdd message(s)\n",
 			toolname, skipped);
+
+	return 0;
 }
 
 void copy_msg(struct message *src, struct message **tgt)
