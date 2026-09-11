@@ -4501,10 +4501,9 @@ static void destroy_file_object(struct file *f)
 
 static void *cmsfs_oper_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 {
-	(void)conn;
-
 	/* force immediate file removal */
 	cfg->hard_remove = 1;
+	fuse_unset_feature_flag(conn, FUSE_CAP_ATOMIC_O_TRUNC);
 	return NULL;
 }
 
