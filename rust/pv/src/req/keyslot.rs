@@ -257,8 +257,11 @@ mod tests {
 
     #[test]
     fn keyslot_v2() {
-        // Install deterministic RNG for reproducible encryption
-        let _guard = DeterministicTestRandGuard::install(&[0x42; 64], &[0x17; 16]).unwrap();
+        // Install deterministic RNG for reproducible encryption.
+        // 4096 bytes is enough to cover both the pairwise consistency checks in
+        // get_test_keys_hybrid() (ossl_ec_key_pairwise_check consumes random bytes for
+        // ladder-blinding) and the subsequent ML-KEM encapsulation in encrypt().
+        let _guard = DeterministicTestRandGuard::install(&[0x42; 4096], &[0x17; 16]).unwrap();
 
         let (cust_key, host_key1, host_key2) = get_test_keys_hybrid();
         let host_key = HostKey::V2(HybridPKey::new(host_key1, host_key2).unwrap());
