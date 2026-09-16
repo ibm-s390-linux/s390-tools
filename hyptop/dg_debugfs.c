@@ -11,7 +11,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <string.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -20,6 +22,7 @@
 #include "hyptop.h"
 
 #define HYPFS_SUBDIR "/s390_hypfs/"
+#define DEBUGFS_MNT_POINT "/sys/kernel/debug"
 
 static char *l_debugfs_dir;
 
@@ -43,6 +46,17 @@ static void l_check_rc_final(int rc, int exit_on_err)
 	ERR_EXIT("Could not initialize data gatherer (%s)\n", strerror(-rc));
 }
 
+static char *l_debugfs_mount(void)
+{
+	if (unshare(CLONE_NEWNS))
+		return NULL;
+	if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL))
+		return NULL;
+	if (mount("none", DEBUGFS_MNT_POINT, "debugfs", 0, NULL))
+		return NULL;
+	return ht_strdup(DEBUGFS_MNT_POINT);
+}
+
 /*
  * Initialize debugfs data gatherer backend
  */
@@ -51,6 +65,8 @@ int dg_debugfs_init(int exit_on_err)
 	int rc;
 
 	l_debugfs_dir = ht_mount_point_get("debugfs");
+	if (!l_debugfs_dir)
+		l_debugfs_dir = l_debugfs_mount();
 	if (!l_debugfs_dir) {
 		if (!exit_on_err)
 			return -ENODEV;
