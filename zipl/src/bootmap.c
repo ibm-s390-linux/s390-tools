@@ -882,6 +882,8 @@ static int add_ipl_program(struct install_set *bis, bool add_envblk,
 	if (ipl->common.parmline != NULL) {
 		if (verbose && bis->mirrors[mirror_id].print_details)
 			printf("  kernel parmline...: '%s'\n", ipl->common.parmline);
+		if (bis->mirrors[mirror_id].print_details)
+			misc_warn_on_ebcdic_parmline(ipl->common.parmline);
 		rc = add_component_buffer(bis, ipl->common.parmline,
 					  strlen(ipl->common.parmline) + 1,
 					  (component_data)ipl->common.parm_addr,

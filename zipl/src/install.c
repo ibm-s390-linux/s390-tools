@@ -741,6 +741,7 @@ install_tapeloader(const char* device, const char* image, const char* parmline,
 			printf("  kernel parmline...: '%s' at 0x%llx\n",
 			       parmline, (unsigned long long) parm_addr);
 		}
+		misc_warn_on_ebcdic_parmline(parmline);
 		/* Write parameter line */
 		rc = DRY_RUN_FUNC(write_tapebuffer(fd, parmline,
 			strlen(parmline), IPL_TAPE_BLOCKSIZE));

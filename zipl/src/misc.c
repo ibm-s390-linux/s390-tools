@@ -763,6 +763,24 @@ void misc_ascii_to_ebcdic(unsigned char *from, unsigned char *to)
 		*from = ascebc[*from];
 }
 
+static inline int has_ebcdic_char(const char *str)
+{
+	int i;
+
+	for (i = 0; str[i]; i++)
+		if (str[i] & 0x80)
+			return 1;
+	return 0;
+}
+
+void misc_warn_on_ebcdic_parmline(const char *parmline)
+{
+	if (!has_ebcdic_char(parmline))
+		return;
+	fprintf(stderr,
+		"Warning: Kernel parmline contains characters in the 0x80-0xff range; the kernel will interpret the whole parmline as EBCDIC\n");
+}
+
 /**
  *  zipl-specific response on failed util_proc_dev_get_entry()
  */
