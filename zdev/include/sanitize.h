@@ -17,7 +17,7 @@
 #define VALID_CPNAME	"/"
 
 /* Valid attribute key special characters */
-#define VALID_ATTRKEY	"/:"
+#define VALID_ATTRKEY	"/:_"
 
 /* Valid attribute value special characters */
 #define VALID_ATTRVAL	"/-+:.,_ "
