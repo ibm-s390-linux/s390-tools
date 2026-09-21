@@ -1,38 +1,29 @@
-#!/usr/bin/perl
+#!/bin/bash
 #
 # FCP adapter trace utility
 #
 # Script to collect all system information required for analysis
 #
 # Copyright IBM Corp. 2008, 2017
+# Copyright Red Hat Inc. 2017
 #
-# s390-tools is free software; you can redistribute it and/or modify
-# it under the terms of the MIT license. See LICENSE for details.
-#
+# s390-tools is free software; you can redistribute it and/or modify it under
+# the terms of the MIT license. See LICENSE for details
 
-use strict;
-use warnings;
-use English;
-use Cwd;
-use File::Temp qw/ tempdir /;
-use File::Spec::Functions;
-use Getopt::Long;
-
-sub version {
-	print "$PROGRAM_NAME: version %S390_TOOLS_VERSION%\n";
-	print "Copyright IBM Corp. 2008, 2017\n";
+function version {
+	echo "$PROGRAM_NAME: version %S390_TOOLS_VERSION%"
+	echo "Copyright IBM Corp. 2008, 2017"
+	echo "Copyright Red Hat Inc. 2017"
 }
 
-sub usage
-{
-	print <<MSG
+function usage {
+	cat <<EOD
 Usage: $PROGRAM_NAME [<options>]
 
 $PROGRAM_NAME collects all system information required for analysis.
 
 Options:
-
-        -h, --help
+	-h, --help
 		print this help text and exit.
 
 	-v, --version
@@ -40,54 +31,67 @@ Options:
 
 	-o, --output
 		specify the name of the output file
-MSG
+EOD
 }
 
-sub dir_content
-{
-        my @temp_dir;
-        opendir(DH, shift()) or return 0;
-        @temp_dir = readdir(DH);
-        closedir(DH);
-        return @temp_dir;
+function store_mapper_devices {
+	dest_dir="$1"
+	src_dir="$2"
+
+	for i in `ls $src_dir`; do
+		mm=$(stat -L -c%t:%T $src_dir/$i)
+		m1=$(echo "$mm" | cut -f1 -d':')
+		m2=$(echo "$mm" | cut -f2 -d':')
+		printf "%d:%d" 0x$m1 0x$m2 > $dest_dir/$src_dir/$i
+	done
 }
 
-sub store_mapper_devices
-{
-	my $dest_dir = shift();
-	my $src_dir = shift();
-	my @entries = grep { ! /^\./ } dir_content($src_dir);
+PROGRAM_NAME="$(basename $0)"
+OUT_FILE="config"
+TMP_DIR=$(mktemp -d tmp.XXXXXX)
 
-	foreach my $map_dev (@entries) {
-		my $tf = catfile($src_dir, "$map_dev");
-		my $mm = `stat -L -c%t:%T $tf`;
-		chomp($mm);
-		$mm = join(":", map { hex($_) } split(":", $mm));
-		system("echo $mm > " .  catfile($dest_dir, $src_dir, $map_dev));
-	}
-
+function cleanup {
+	rm -rf $TMP_DIR
 }
 
-my $out_file="config";
-my $temp_dir = tempdir( CLEANUP => 1);
+trap cleanup EXIT
 
-Getopt::Long::Configure(qw/ bundling /);
-GetOptions('h|help' => sub {usage(); exit 0;},
-	   'v|version' => sub {version(); exit 0;},
-	   'o|output=s' => \$out_file,
-	  ) or do {
-		print "Invalid usage !\n";
-		usage();
-		exit 1;
-	};
+while [[ $# -gt 0 ]]; do
+	key="$1"
 
-system("mkdir -p $temp_dir/sys/block");
-system("mkdir -p $temp_dir/sys/devices/virtual/block");
-system("mkdir -p $temp_dir/sys/class");
-system("mkdir -p $temp_dir/dev/mapper");
-system("rsync -a --inplace /sys/block/dm* /sys/block/sd* $temp_dir/sys/block 2>/dev/null");
-system("rsync -a --inplace --exclude=chpd* /sys/devices/css0 $temp_dir/sys/devices 2>/dev/null");
-system("rsync -a --inplace /sys/devices/virtual/block/dm* $temp_dir/sys/devices/virtual/block 2>/dev/null");
-system("rsync -a --inplace /sys/class/fc_host /sys/class/scsi_device /sys/class/scsi_tape /sys/class/scsi_generic /sys/class/fc_remote_ports $temp_dir/sys/class 2>/dev/null");
-store_mapper_devices($temp_dir,"/dev/mapper");
-system("tar -czf $out_file.cfg -C $temp_dir sys dev 2>/dev/null");
+	case $key in
+		-v|--version)
+			version
+			exit 0
+		;;
+		-h|--help)
+			usage
+			exit 0
+		;;
+		-o|--output)
+			OUT_FILE="$2"
+			shift
+			shift
+		;;
+		*)
+			echo "Invalid usage !"
+			usage
+			exit 1
+		;;
+	esac
+done
+
+mkdir -p $TMP_DIR/sys/block $TMP_DIR/sys/devices/virtual/block \
+	$TMP_DIR/sys/class $TMP_DIR/dev/mapper
+rsync -a --inplace /sys/block/dm* /sys/block/sd* $TMP_DIR/sys/block 2>/dev/null
+rsync -a --inplace --exclude=chpd* /sys/devices/css0 \
+	$TMP_DIR/sys/devices 2>/dev/null
+rsync -a --inplace /sys/devices/virtual/block/dm* \
+	$TMP_DIR/sys/devices/virtual/block 2>/dev/null
+rsync -a --inplace /sys/class/fc_host /sys/class/scsi_device \
+	/sys/class/scsi_tape /sys/class/scsi_generic \
+	/sys/class/fc_remote_ports $TMP_DIR/sys/class 2>/dev/null
+store_mapper_devices $TMP_DIR "/dev/mapper"
+tar -czf $OUT_FILE.cfg -C $TMP_DIR sys dev 2>/dev/null
+
+exit 0
