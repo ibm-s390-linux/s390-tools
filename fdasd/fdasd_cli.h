@@ -29,6 +29,11 @@ static struct util_opt opt_vec[] = {
 		.argument = "VOLSER",
 		.desc = "Set the volume serial to VOLSER",
 	},
+	{
+		.option = { "script", required_argument, NULL, 'S' },
+		.argument = "COMMANDS",
+		.desc = "Execute commands in non-interactive mode",
+	},
 	UTIL_OPT_SECTION("MISC"),
 	{
 		.option = { "check_host_count", no_argument, NULL, 'C' },
