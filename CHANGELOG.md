@@ -1,15 +1,61 @@
 Release history for s390-tools (MIT version)
 --------------------------------------------
 
-* __v2.xx.x (2023-xx-xx)__
+* __v2.44.1 (2026-09-21)__
 
-  For Linux kernel version: 6.x
-
-  Add new tools / libraries:
+  For Linux kernel version: 7.2
 
   Changes of existing tools:
+  - cpumf/lshwc: Add -c as short option for --counters
+  - cpumf/lspai: Handle CPU hotplug gracefully
+  - dbginfo.sh: Change grep for OS name
+  - dbginfo.sh: Change tar generation via temp file
+  - dbginfo.sh: Correct dump counter
+  - dbginfo.sh: Detect the openCryptoki STDLL directory at runtime
+  - dbginfo.sh: Redirect stderr on command existence checks
+  - dbginfo.sh: Replace deprecated backtick command substitution
+  - dbginfo.sh: Secure the directory input variable
+  - zipl: Detect and display partition table type for disk and device
 
   Bug Fixes:
+  - cmsfs-fuse: Fix out-of-bounds access when reading variable-length files
+  - cpumf/lscpumf: Fix exit status and error reporting
+  - cpumf/lshwc: Fix --allcpu to --all in man page
+  - cpumf/lspai: Add input validation for interval parameter
+  - cpumf/lspai: Fix --allcpu to --all in man page
+  - cpumf/lspai: Fix integer overflow in file descriptor calculation
+  - cpumf/lspai: Fix output formatting with minimum indent
+  - dasdview: Fix buffer overflow in dasdview_read_vtoc()
+  - dumpconf: Harden locking during delayed activation to prevent symlink attacks
+  - fdasd: Fix potential buffer overflow in fdasd_change_part_type()
+  - ipl_tools: Fix buffer overflow vulnerabilities in chreipl and is_lpar()
+  - ip_watcher: Use mktemp for cleanup files to avoid collisions
+  - libkmipclient: Fix NULL pointer dereference in kmip_v2_attr_from_v1_attr()
+  - libkmipclient: Fix heap buffer overflow
+  - libutil/util_lockfile: Prevent buffer overflow in lockfile handling
+  - libzds: Add bounds checking and validate used_bytes in PDS directory parsing
+  - pvattest: Write attestation request private key (arpk) with 0600 permissions
+  - pvebc: Fix executable permission on sel-ebc-modules.conf
+  - pvics: Fix incorrect exit values for --version and --help options
+  - pvsecret: Write secret with 0600 permissions
+  - sclpdbf: Harden against invalid trace data
+  - vmur: Fix buffer over-read in get_minor()
+  - zdump/dfi_s390: Add a check for zlib entry size in the dump header
+  - zdump/dfi_s390: Fix out-of-bounds upon dump entry decompression
+  - zdump/dfo_elf: Fix 32-bit truncation in ELF header allocation size
+  - zdump: Reject multi-volume dumps with out-of-range vol_cnt
+  - ziomon/ziomon_zfcpdd: Validate message lengths before processing
+  - ziomon/ziorep_config: Replace unsafe open() and regex match with safer idioms
+  - ziomon: Validate message layout and aggregate message lengths before processing
+  - zipl: Fix memory leak in free_bootloader()
+  - zipl: Replace popen(3) with safer invocation for targetbase scripts and ngdump
+  - zkey-ekmfweb: Fix insecure default: TLS host name verification now enabled by default
+  - zkey-kmip: Fix insecure default: TLS host name verification now enabled by default
+  - zkey: Fix memory leaks when generating keys or reenciphering integrity volumes
+  - zkey: Harden 'zkey kms unbind' command against symlink traversal
+  - zkey: Harden KMS config directory handling against symlink attacks
+  - zkey: Harden KMS plugin file handling against symlink attacks
+  - zkey: Install initrd integration with the configured plugin directory
 
 * __v2.44.0 (2026-07-31)__
 

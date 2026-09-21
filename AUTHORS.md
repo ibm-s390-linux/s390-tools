@@ -60,6 +60,7 @@ List of all individuals having contributed content to s390-tools
 - Harald Freudenberger
 - Heiko Carstens
 - Hendrik Brueckner
+- Hidayath Khan
 - Holger Dengler
 - Holger Smolinski
 - Hongjie Yang
@@ -85,6 +86,7 @@ List of all individuals having contributed content to s390-tools
 - Klaus-Dieter Wacker
 - L. E. Segovia
 - Lakhvich Dmitriy
+- M Nikhil
 - Marc Hartmayer
 - Mario Held
 - Mark Dettinger
@@ -111,6 +113,7 @@ List of all individuals having contributed content to s390-tools
 - Peter Tiedemann
 - Philipp Kern
 - Philipp Rudo
+- Pranav P
 - Prashanth Sundararaman
 - Rafael Fonseca
 - Raimund Schroeder
