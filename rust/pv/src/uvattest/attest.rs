@@ -6,7 +6,6 @@ use std::mem::size_of;
 
 use openssl::hash::MessageDigest;
 use openssl::pkey::{PKeyRef, Private};
-use pv_core::misc::write_file;
 use zerocopy::{BigEndian, IntoBytes, U16, U32};
 
 use super::AttNonce;
@@ -102,7 +101,6 @@ impl AttestationItems {
         }
         items.extend_from_slice(additional);
         assert!(items.len() == size);
-        write_file("additional_data_parsed", &items, "blah").unwrap();
         Self(items.into())
     }
 }
