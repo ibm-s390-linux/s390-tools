@@ -82,7 +82,7 @@ impl AddCmd {
             return Err(Error::AscrbLarge);
         }
 
-        if !AddSecretMagic::starts_with_magic(&data[..6]) {
+        if !AddSecretMagic::starts_with_magic(&data) {
             return Err(Error::NoAsrcb);
         }
         Ok(Self(data))
