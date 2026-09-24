@@ -18,9 +18,11 @@ impl Stfle {
             data: [0; STFLE_LEN],
         };
 
-        // SAFETY: this call is safe because ret can store 64 bits * 3 which equals the required 192
-        // bits.
-        let rc = unsafe { stfle(&mut ret.data[0], STFLE_LEN as u32) };
+        // SAFETY: ret.data has STFLE_LEN elements (3 × 64 bits = 192 bits) as
+        // required by the stfle C function.  as_mut_ptr() carries provenance for
+        // the whole array, allowing the stfle instruction to write all STFLE_LEN
+        // doublewords.
+        let rc = unsafe { stfle(ret.data.as_mut_ptr(), STFLE_LEN as u32) };
         let rc = match rc {
             0 => {
                 println!("Unable to fetch STFLE which is only available on s390x architecture");
