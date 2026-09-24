@@ -3,6 +3,7 @@
 // Copyright IBM Corp. 2023, 2024
 
 use std::fmt::Debug;
+use std::mem::ManuallyDrop;
 
 use crate::Error;
 
@@ -177,12 +178,20 @@ impl<const N: usize> TryFrom<Confidential<Vec<u8>>> for Confidential<[u8; N]> {
     type Error = Error;
 
     fn try_from(value: Confidential<Vec<u8>>) -> Result<Self, Self::Error> {
-        let len = value.0.len();
+        let mut md = ManuallyDrop::new(value);
+        let len = md.0.len();
         if len == N {
-            Ok(Self::new(
-                TryInto::<[u8; N]>::try_into(value.0.clone()).unwrap(),
-            ))
+            // Copy directly into a stack array, then zeroize the Vec before freeing it.
+            // This avoids the extra heap copy that .clone() + TryInto would produce.
+            let mut arr = [0u8; N];
+            arr.copy_from_slice(&md.0);
+            // SAFETY: `md` is never used after this point.
+            unsafe { ManuallyDrop::take(&mut md) }.0.zeroize();
+            Ok(Self::new(arr))
         } else {
+            // Zeroize and free the inner Vec manually since we suppressed Drop.
+            // SAFETY: `md` is never used after this point.
+            unsafe { ManuallyDrop::take(&mut md) }.0.zeroize();
             Err(Error::LengthMismatch {
                 expected: N,
                 actual: len,
