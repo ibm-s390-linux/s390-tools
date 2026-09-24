@@ -147,15 +147,19 @@ impl Pem {
         let inner_pem = InnerPem::new(name, header, data.as_ref())?;
 
         // Create the PEM format eagerly so that to_string/display cannot fail because of ASCII or
-        // OpenSSL Errors Both error should be very unlikely
-        // OpenSSL should be able to create PEM if there is enough memory and produce a non-null
-        // terminated ASCII-string
-        // Unwrap succeeds it's all ASCII
-        // Std lib implements all the conversations without a copy
-        let pem = CString::new(inner_pem.to_pem()?)
+        // OpenSSL errors. Both error cases should be very unlikely.
+        // OpenSSL produces a valid, null-free ASCII string.
+        // We convert directly to String (without CString) to avoid a plaintext copy
+        // that would not be zeroized on drop.
+        let raw = Confidential::new(inner_pem.to_pem()?);
+        if !raw.value().is_ascii() {
+            return Err(Error::NonAscii);
+        }
+        // SAFETY: all bytes are valid ASCII (checked above) -> valid UTF-8
+        let pem = String::from_utf8(raw.into_inner())
+            // Purely defensive handling to satisfy Rust's type system without
+            // using unsafe method
             .map_err(|_| Error::NonAscii)?
-            .into_string()
-            .unwrap()
             .into();
 
         Ok(Self { pem })
