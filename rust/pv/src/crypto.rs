@@ -689,7 +689,7 @@ pub fn decrypt_aead(
     };
     let nid = key.key_type().into();
     let cipher = Cipher::from_nid(nid).ok_or(Error::UnsupportedCipher(nid))?;
-    let decr =
+    let decr = Confidential::new(
         openssl_decrypt_aead(cipher, key.value(), Some(iv), aad, encr, tag).map_err(|ssl_err| {
             // Empty error-stack -> no internal ssl error but decryption failed.
             // Very likely due to a tag mismatch.
@@ -698,24 +698,25 @@ pub fn decrypt_aead(
             } else {
                 Error::Crypto(ssl_err)
             }
-        })?;
-    let mut conf = Confidential::new(vec![0; aad.len() + decr.len() + tag.len()]);
+        })?,
+    );
+    let mut conf = Confidential::new(vec![0; aad.len() + decr.value().len() + tag.len()]);
     let aad_range = Range {
         start: 0,
         end: aad.len(),
     };
     let data_range = Range {
         start: aad.len(),
-        end: aad.len() + decr.len(),
+        end: aad.len() + decr.value().len(),
     };
     let tag_range = Range {
-        start: aad.len() + decr.len(),
-        end: aad.len() + decr.len() + tag.len(),
+        start: aad.len() + decr.value().len(),
+        end: aad.len() + decr.value().len() + tag.len(),
     };
 
     let buf = conf.value_mut();
     buf[aad_range.clone()].copy_from_slice(aad);
-    buf[data_range.clone()].copy_from_slice(&decr);
+    buf[data_range.clone()].copy_from_slice(decr.value());
     buf[tag_range.clone()].copy_from_slice(tag);
     Ok(AeadDecryptionResult {
         buf: conf,
