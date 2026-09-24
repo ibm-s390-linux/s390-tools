@@ -246,9 +246,19 @@ impl ComponentKind {
         self.clone() as u16
     }
 
-    pub fn from_tweak_prefix(value: u16) -> Self {
-        // Safety: `value` must correspond to a discriminant value of `Self`
-        unsafe { std::mem::transmute(value) }
+    pub fn from_tweak_prefix(value: u16) -> Option<Self> {
+        match value {
+            10 => Some(Self::ShortPSW),
+            20 => Some(Self::ImgMetaData),
+            30 => Some(Self::Stage3a),
+            40 => Some(Self::Kernel),
+            50 => Some(Self::Ramdisk),
+            60 => Some(Self::Cmdline),
+            70 => Some(Self::Stage3b),
+            80 => Some(Self::SeHdr),
+            90 => Some(Self::Ipib),
+            _ => None,
+        }
     }
 }
 
@@ -335,7 +345,7 @@ mod tests {
         #[test]
         fn tweak_prefix_back_to_original(kind in component_kind_strategy()) {
             let prefix = kind.tweak_prefix();
-            prop_assert_eq!(kind, ComponentKind::from_tweak_prefix(prefix));
+            prop_assert_eq!(Some(kind), ComponentKind::from_tweak_prefix(prefix));
         }
     }
 
