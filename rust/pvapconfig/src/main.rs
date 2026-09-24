@@ -420,8 +420,8 @@ fn config_and_apqn_match(apc: &ApConfigEntry, apqn: &Apqn) -> bool {
         // config and apqn are accelerators
         // maybe check mingen
         if !apc.mingen.is_empty() {
-            let mingen = &apc.mingen[3..].parse::<u32>().unwrap();
-            if mingen < &apqn.gen {
+            let mingen = apc.mingen[3..].parse::<u32>().unwrap();
+            if apqn.gen < mingen {
                 return false;
             }
         }
@@ -434,8 +434,8 @@ fn config_and_apqn_match(apc: &ApConfigEntry, apqn: &Apqn) -> bool {
         };
         // maybe check mingen
         if !apc.mingen.is_empty() {
-            let mingen = &apc.mingen[3..].parse::<u32>().unwrap();
-            if mingen < &apqn.gen {
+            let mingen = apc.mingen[3..].parse::<u32>().unwrap();
+            if apqn.gen < mingen {
                 return false;
             }
         }
@@ -663,5 +663,106 @@ mod tests {
         assert!(r.is_ok());
         let n = r.unwrap();
         assert!(n == 3, "n = {n} != 3");
+    }
+
+    fn make_accel_apqn(gen: u32) -> Apqn {
+        pvap::Apqn {
+            name: format!("10.000{gen}"),
+            card: 16,
+            domain: 0,
+            gen,
+            mode: pvap::apqn_mode::Accel,
+            info: Some(pvap::apqn_info::Accel(pvap::apqn_info::ApqnInfoAccel {})),
+        }
+    }
+
+    fn make_ep11_apqn(gen: u32) -> Apqn {
+        pvap::Apqn {
+            name: format!("11.000{gen}"),
+            card: 17,
+            domain: 0,
+            gen,
+            mode: pvap::apqn_mode::Ep11,
+            info: Some(pvap::apqn_info::Ep11(pvap::apqn_info::ApqnInfoEp11 {
+                serialnr: String::from("93AADFK719460083"),
+                mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
+            })),
+        }
+    }
+
+    fn make_accel_apc(mingen: &str) -> ApConfigEntry {
+        config::ApConfigEntry {
+            name: String::from("accel_test"),
+            description: String::new(),
+            mode: String::from("accel"),
+            mkvp: String::new(),
+            serialnr: String::new(),
+            mingen: String::from(mingen),
+            secretid: String::new(),
+        }
+    }
+
+    fn make_ep11_apc(mingen: &str) -> ApConfigEntry {
+        config::ApConfigEntry {
+            name: String::from("ep11_test"),
+            description: String::new(),
+            mode: String::from("ep11"),
+            mkvp: String::from("db3c3b3c3f097dd55ec7eb0e7fdbcb93"),
+            serialnr: String::from("93AADFK719460083"),
+            mingen: String::from(mingen),
+            secretid: String::from(
+                "2ad4c9251bdf1bf8c5bfd89d46c2440f26c2570046e7dd3afbdbd45f740857d5",
+            ),
+        }
+    }
+
+    #[test]
+    fn test_mingen_accel_below_rejected() {
+        // CEX5 APQN with mingen=cex6 -> must not match (gen 5 < 6)
+        let apc = make_accel_apc("cex6");
+        let apqn = make_accel_apqn(5);
+        assert!(!config_and_apqn_match(&apc, &apqn));
+    }
+
+    #[test]
+    fn test_mingen_accel_equal_accepted() {
+        // CEX6 APQN with mingen=cex6 -> must match (gen 6 == 6)
+        let apc = make_accel_apc("cex6");
+        let apqn = make_accel_apqn(6);
+        assert!(config_and_apqn_match(&apc, &apqn));
+    }
+
+    #[test]
+    fn test_mingen_accel_above_accepted() {
+        // CEX8 APQN with mingen=cex6 -> must match (gen 8 > 6)
+        // This is the regression case: before the fix this returned false,
+        // skipping the newer card.
+        let apc = make_accel_apc("cex6");
+        let apqn = make_accel_apqn(8);
+        assert!(config_and_apqn_match(&apc, &apqn));
+    }
+
+    #[test]
+    fn test_mingen_ep11_below_rejected() {
+        // CEX7 EP11 APQN with mingen=cex8 -> must not match (gen 7 < 8)
+        let apc = make_ep11_apc("cex8");
+        let apqn = make_ep11_apqn(7);
+        assert!(!config_and_apqn_match(&apc, &apqn));
+    }
+
+    #[test]
+    fn test_mingen_ep11_equal_accepted() {
+        // CEX8 EP11 APQN with mingen=cex8 -> must match (gen 8 == 8)
+        let apc = make_ep11_apc("cex8");
+        let apqn = make_ep11_apqn(8);
+        assert!(config_and_apqn_match(&apc, &apqn));
+    }
+
+    #[test]
+    fn test_mingen_ep11_above_accepted() {
+        // CEX9 EP11 APQN with mingen=cex8 -> must match (gen 9 > 8)
+        let apc = make_ep11_apc("cex8");
+        let apqn = make_ep11_apqn(9);
+        assert!(config_and_apqn_match(&apc, &apqn));
     }
 }
