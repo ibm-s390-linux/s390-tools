@@ -188,7 +188,11 @@ impl CertVerifier {
         let (ibm_z_sign_key, chain) = helper::extract_ibm_sign_key(untr_certs.clone())?;
         let root_ca_verification = match root_ca_path {
             Some(_) => helper::RootCaVerification::SkipPinning,
-            None => helper::RootCaVerification::RootCaOrganizationPinning("DigiCert"),
+            None => helper::RootCaVerification::RootCaOrganizationPinning(&[
+                "DigiCert Inc",
+                "DigiCert, Inc.",
+                "DigiCert",
+            ]),
         };
 
         // Two-round verification:

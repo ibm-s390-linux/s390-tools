@@ -172,8 +172,8 @@ pub fn store_setup<P: AsRef<Path>, Q: AsRef<Path>, R: AsRef<Path>>(
 /// Root CA verification mode
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootCaVerification {
-    /// Enforce specific root CA organization name requirement
-    RootCaOrganizationPinning(&'static str),
+    /// Enforce that the root CA organization name matches one of the allowed values
+    RootCaOrganizationPinning(&'static [&'static str]),
     /// Skip root CA verification (when custom root CA is provided)
     SkipPinning,
 }
@@ -186,17 +186,19 @@ fn x509_subject_orgs(cert: &X509Ref) -> Vec<String> {
         .collect()
 }
 
-/// Checks if the certificate subject matches the expected organization name
+/// Checks if the certificate subject organization matches any of the allowed names
 ///
 /// # Arguments
-/// * `cert` - The certificate chain to verify
-/// * `expected_org` - The expected organization name to match
+/// * `cert` - The certificate to inspect
+/// * `allowed_orgs` - The set of allowed organization names
 ///
 /// # Returns
-/// * `true` if the certificate organization name equals the expected string
+/// * `true` if any O= entry in the subject equals one of the allowed strings
 /// * `false` otherwise
-fn check_x509_org_name(cert: &X509Ref, expected_org: &str) -> bool {
-    x509_subject_orgs(cert).iter().any(|s| s == expected_org)
+fn check_x509_org_name(cert: &X509Ref, allowed_orgs: &[&str]) -> bool {
+    x509_subject_orgs(cert)
+        .iter()
+        .any(|s| allowed_orgs.iter().any(|org| s == org))
 }
 
 /// Verify that the given IBM signing keys can be trusted
@@ -240,7 +242,7 @@ pub fn verify_chain(
             return Ok(false);
         }
 
-        if let RootCaVerification::RootCaOrganizationPinning(expected_org) = root_ca_verification {
+        if let RootCaVerification::RootCaOrganizationPinning(allowed_orgs) = root_ca_verification {
             // The root CA is the last certificate in the chain
             let root_ca = match chain.get(chain.len() - 1) {
                 Some(cert) => cert,
@@ -250,14 +252,14 @@ pub fn verify_chain(
                 }
             };
 
-            if !check_x509_org_name(root_ca, expected_org) {
+            if !check_x509_org_name(root_ca, allowed_orgs) {
                 error!(
                     "error: Root CA pinning failed as organization mismatch
-       expected: {}
-       found:    {}
+       expected one of: {}
+       found:           {}
 
        To trust a different root CA, use '--root-ca <FILE>'.",
-                    expected_org,
+                    allowed_orgs.join(", "),
                     x509_subject_orgs(root_ca).join(", "),
                 );
                 ctx.set_error(X509VerifyResult::APPLICATION_VERIFICATION);
@@ -1547,25 +1549,29 @@ mod tests {
 
             let cert = create_cert_with_orgs(&[min_org, &max_org, special_org, unicode_org]);
 
-            assert!(check_x509_org_name(&cert, min_org));
-            assert!(check_x509_org_name(&cert, &max_org));
-            assert!(check_x509_org_name(&cert, special_org));
-            assert!(check_x509_org_name(&cert, unicode_org));
+            assert!(check_x509_org_name(&cert, &[min_org]));
+            assert!(check_x509_org_name(&cert, &[max_org.as_str()]));
+            assert!(check_x509_org_name(&cert, &[special_org]));
+            assert!(check_x509_org_name(&cert, &[unicode_org]));
 
-            assert!(!check_x509_org_name(&cert, "AB"));
-            assert!(!check_x509_org_name(&cert, &"B".repeat(63)));
-            assert!(!check_x509_org_name(&cert, "Test"));
-            assert!(!check_x509_org_name(&cert, ""));
+            assert!(!check_x509_org_name(&cert, &["AB"]));
+            let b63 = "B".repeat(63);
+            assert!(!check_x509_org_name(&cert, &[b63.as_str()]));
+            assert!(!check_x509_org_name(&cert, &["Test"]));
+            assert!(!check_x509_org_name(&cert, &[""]));
         }
 
         #[test]
         fn multiple_organization_values() {
             let cert = create_cert_with_orgs(&["IBM", "Red Hat"]);
 
-            assert!(check_x509_org_name(&cert, "IBM"));
-            assert!(check_x509_org_name(&cert, "Red Hat"));
+            assert!(check_x509_org_name(&cert, &["IBM"]));
+            assert!(check_x509_org_name(&cert, &["Red Hat"]));
 
-            assert!(!check_x509_org_name(&cert, "Microsoft"));
+            assert!(!check_x509_org_name(&cert, &["Microsoft"]));
+
+            // Multiple allowed orgs: matches if any cert O= matches any allowed org
+            assert!(check_x509_org_name(&cert, &["Microsoft", "IBM"]));
         }
 
         #[test]
@@ -1573,12 +1579,12 @@ mod tests {
             // Test case sensitivity and whitespace handling
             let cert = create_cert_with_orgs(&["IBM Corporation", "IBM  Corp"]);
 
-            assert!(check_x509_org_name(&cert, "IBM Corporation"));
-            assert!(!check_x509_org_name(&cert, "ibm corporation"));
-            assert!(!check_x509_org_name(&cert, "IBM CORPORATION"));
+            assert!(check_x509_org_name(&cert, &["IBM Corporation"]));
+            assert!(!check_x509_org_name(&cert, &["ibm corporation"]));
+            assert!(!check_x509_org_name(&cert, &["IBM CORPORATION"]));
 
-            assert!(check_x509_org_name(&cert, "IBM  Corp"));
-            assert!(!check_x509_org_name(&cert, "IBM Corp"));
+            assert!(check_x509_org_name(&cert, &["IBM  Corp"]));
+            assert!(!check_x509_org_name(&cert, &["IBM Corp"]));
         }
     }
 
@@ -1690,27 +1696,42 @@ mod tests {
             untrusted.push(inter_ca).unwrap();
 
             // With wrong organization pinning, should fail
-            let wrong_org = "Wrong Organization Name";
             let result = verify_chain(
                 &store,
                 &untrusted,
                 &[&ibm_cert.clone()],
-                &RootCaVerification::RootCaOrganizationPinning(wrong_org),
+                &RootCaVerification::RootCaOrganizationPinning(&["Wrong Organization Name"]),
             );
 
             assert!(result.is_err(), "Should fail with wrong organization");
 
-            // With correct organization pinning, should succeed
+            // With a list containing only the correct org, should succeed
+            let result = verify_chain(
+                &store,
+                &untrusted,
+                &[&ibm_cert.clone()],
+                &RootCaVerification::RootCaOrganizationPinning(&[
+                    "International Business Machines Corporation",
+                ]),
+            );
+
+            assert!(result.is_ok(), "Should succeed with correct organization");
+
+            // With a list where only one entry matches, should also succeed
             let result = verify_chain(
                 &store,
                 &untrusted,
                 &[&ibm_cert],
-                &RootCaVerification::RootCaOrganizationPinning(
+                &RootCaVerification::RootCaOrganizationPinning(&[
+                    "Wrong Organization Name",
                     "International Business Machines Corporation",
-                ),
+                ]),
             );
 
-            assert!(result.is_ok(), "Should succeed with correct organization");
+            assert!(
+                result.is_ok(),
+                "Should succeed when one entry in the list matches"
+            );
         }
     }
 }

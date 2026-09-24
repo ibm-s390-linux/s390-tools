@@ -62,25 +62,25 @@ fn verify_chain_offline() {
         &store,
         &sk,
         &[&ibm_crt],
-        &RootCaVerification::RootCaOrganizationPinning(
+        &RootCaVerification::RootCaOrganizationPinning(&[
             "International Business Machines Corporationn"
-        )
+        ])
     )
     .is_err());
     assert!(verify_chain(
         &store,
         &sk,
         &[&ibm_crt],
-        &RootCaVerification::RootCaOrganizationPinning("International")
+        &RootCaVerification::RootCaOrganizationPinning(&["International"])
     )
     .is_err());
     assert!(verify_chain(
         &store,
         &sk,
         &[&ibm_crt],
-        &RootCaVerification::RootCaOrganizationPinning(
+        &RootCaVerification::RootCaOrganizationPinning(&[
             "International Business Machines Corporation"
-        )
+        ])
     )
     .is_ok());
 
