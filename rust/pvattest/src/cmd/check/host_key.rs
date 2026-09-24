@@ -45,7 +45,10 @@ fn load_host_keys<A: AsRef<Path>>(hkds: &[A]) -> Result<Vec<(&Path, Vec<u8>)>> {
             source,
         })?;
 
-        let ec_key = certs.first().unwrap().public_key()?;
+        let ec_key = certs
+            .first()
+            .ok_or_else(|| pv::Error::NoHkdInFile(hkd.display().to_string()))?
+            .public_key()?;
 
         match certs.len() {
             1 => {
