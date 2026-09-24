@@ -244,7 +244,7 @@ fn build_asrcb(opt: &CreateSecretOpt) -> Result<AddSecretRequest> {
         .map(|s| -> Result<PolicyReference> {
             let p = Path::new(s);
             let reference = PolicyReference::new(p, sha256_hash)?;
-            println!("{}", encode_hex(reference.hash));
+            warn!("Policy hash: {}", encode_hex(reference.hash));
             Ok(reference)
         })
         .transpose()?;
