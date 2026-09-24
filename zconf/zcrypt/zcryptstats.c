@@ -1863,6 +1863,7 @@ static int print_measurement_data(unsigned long interval_count,
 
 				pr_verbose("APQN %02x.%04x removed", card,
 					   domain);
+				continue;
 			}
 
 			if (dd->previous_valid) {
