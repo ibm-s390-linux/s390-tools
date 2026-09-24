@@ -273,7 +273,7 @@ fn aes(key: Confidential<Vec<u8>>) -> Result<RetrKeyInfo> {
 /// Get an AES-XTS-key
 fn aes_xts(key: Confidential<Vec<u8>>) -> Result<RetrKeyInfo> {
     let key_len = key.value().len() as u32;
-    let bit_size = bitsize(key_len / 2);
+    let bit_size = bitsize(key_len) / 2;
     match AesXtsSizes::from_bits(bit_size) {
         Some(size) => Ok((RetrievableSecret::AesXts(size), key)),
         None => {
@@ -292,7 +292,7 @@ fn aes_xts(key: Confidential<Vec<u8>>) -> Result<RetrKeyInfo> {
 /// Get an HMAC-SHA-key
 fn hmac_sha(key: Confidential<Vec<u8>>) -> Result<RetrKeyInfo> {
     let key_len = key.value().len() as u32;
-    let size = bitsize(key_len / 2);
+    let size = bitsize(key_len) / 2;
     match HmacShaSizes::from_sha_size(size) {
         Some(size) => Ok((RetrievableSecret::HmacSha(size), key)),
         None => {
@@ -555,6 +555,17 @@ mod test {
     retr_test!(retr_aes_xts_256, aes_xts, 64, AesXts(AesXtsSizes::Bits256));
     retr_test!(retr_aes_hmac_256, hmac_sha, 64, HmacSha(HmacSizes::Sha256));
     retr_test!(retr_aes_hmac_512, hmac_sha, 128, HmacSha(HmacSizes::Sha512));
+
+    #[test]
+    fn retr_odd_key_length_rejected() {
+        let name = "odd_length_secret".to_string();
+        // 33 and 65 bytes would previously be accepted for aes_xts / hmac_sha due to integer
+        // division before bitsize
+        assert!(GuestSecret::aes_xts(&name, vec![0x11; 33].into()).is_err());
+        assert!(GuestSecret::aes_xts(&name, vec![0x11; 65].into()).is_err());
+        assert!(GuestSecret::hmac_sha(&name, vec![0x11; 65].into()).is_err());
+        assert!(GuestSecret::hmac_sha(&name, vec![0x11; 129].into()).is_err());
+    }
 
     #[test]
     fn update_cck() {
