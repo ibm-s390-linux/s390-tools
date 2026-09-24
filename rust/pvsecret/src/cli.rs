@@ -158,7 +158,7 @@ pub struct CreateSecretOpt {
     /// Links an Add‑Secret-Request (ASR) to a policy file.
     ///
     /// This option embeds a PolicyReference in the ASR user data field. The PolicyReference
-    /// includes the relative file path and the SHA‑512 hash of the policy file, allowing the
+    /// includes the relative file path and the SHA‑256 hash of the policy file, allowing the
     /// policy’s integrity to be verified.
     ///
     /// This option conflicts with --user-data, because both options use the same user data field
