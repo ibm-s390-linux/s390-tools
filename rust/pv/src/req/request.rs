@@ -91,7 +91,7 @@ impl<'a> BinReqValues<'a> {
         let aad = &req[..aad_size];
         let req_dep_aad = &req[size_of::<RequestHdr>()..aad_size];
         let encr = &req[aad_size..(aad_size + sea)];
-        let tag = &req[rql - Self::TAG_LEN..];
+        let tag = &req[rql - Self::TAG_LEN..rql];
 
         Ok(Self {
             iv,
@@ -325,6 +325,40 @@ mod tests {
             0, 0, 0, 44, // sea
         ];
         assert_eq!(hdr_bin, &hdr_bin_exp);
+    }
+
+    #[test]
+    fn bin_req_values_tag_bounded_by_rql() {
+        // Build a minimal valid request: header-only AAD, no encrypted data, no
+        // keyslots.  rql = sizeof(RequestHdr) + TAG_LEN = 48 + 16 = 64.
+        const HDR_SIZE: usize = size_of::<RequestHdr>();
+        const TAG_LEN: usize = BinReqValues::TAG_LEN;
+        const RQL: usize = HDR_SIZE + TAG_LEN; // 64
+
+        let hdr = RequestHdr::new(
+            0x200,
+            RQL as u32,
+            [0x11; 12],
+            0, // nks
+            0, // sea
+            Some(TEST_MAGIC),
+        );
+
+        let expected_tag = [0xAA_u8; TAG_LEN];
+        let trailing_garbage = [0xFF_u8; 32];
+
+        let mut buf = Vec::with_capacity(RQL + trailing_garbage.len());
+        buf.extend_from_slice(hdr.as_bytes());
+        buf.extend_from_slice(&expected_tag);
+        buf.extend_from_slice(&trailing_garbage);
+
+        let values = BinReqValues::get(&buf).expect("get must succeed with valid header");
+
+        assert_eq!(
+            values.tag(),
+            &expected_tag,
+            "tag must be bounded by rql, not req.len()"
+        );
     }
 
     #[test]
