@@ -468,17 +468,26 @@ impl KeyExchangeBuilderTrait for SeHdrDataV2 {
         let keyslot = KeyslotV2::new(hostkey.clone());
         let keyslot_bin = keyslot.encrypt(aead_key.value(), priv_key)?.try_into()?;
         let keyslot_bin_size = u32::try_from(size_of_val(&keyslot_bin)).unwrap();
-        self.aad.keyslots.push(keyslot_bin);
-        self.aad.nks = self
+        let sehs: usize = self
+            .aad
+            .sehs
+            .checked_add(keyslot_bin_size)
+            .ok_or(Error::UnexpectedOverflow)?
+            .try_into()?;
+        if sehs > Self::MAX_SIZE {
+            return Err(Error::InvalidSeHdrTooLarge {
+                given: sehs,
+                maximum: Self::MAX_SIZE,
+            });
+        }
+        let nks = self
             .aad
             .nks
             .checked_add(1)
             .ok_or(Error::UnexpectedOverflow)?;
-        self.aad.sehs = self
-            .aad
-            .sehs
-            .checked_add(keyslot_bin_size)
-            .ok_or(Error::UnexpectedOverflow)?;
+        self.aad.sehs = sehs.try_into()?;
+        self.aad.nks = nks;
+        self.aad.keyslots.push(keyslot_bin);
         Ok(())
     }
 }
@@ -816,12 +825,10 @@ mod tests {
         let mut builder = SeHdrBuilder::new(SeHdrVersion::V2, psw.clone(), meta.clone())
             .expect("should not fail");
 
-        builder
-            .add_hostkeys(&too_many_host_keys)
-            .expect("should not fail")
-            .with_components(meta)
-            .expect("should not fail");
-        assert!(matches!(builder.build(), Err(Error::InvalidSeHdr)));
+        assert!(matches!(
+            builder.add_hostkeys(&too_many_host_keys),
+            Err(Error::InvalidSeHdrTooLarge { .. })
+        ));
     }
 
     #[test]
