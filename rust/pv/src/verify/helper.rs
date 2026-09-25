@@ -451,6 +451,9 @@ trait HttpClient {
     fn redirect_url(&self) -> Result<Option<String>>;
     fn get_ref(&self) -> &[u8];
     fn max_filesize(&mut self, size: u64) -> Result<()>;
+    /// Clears the response buffer so stale data from a previous distribution
+    /// point or failed redirect chain does not bleed into the next attempt.
+    fn clear(&mut self);
 }
 
 /// Production HTTP client implementation
@@ -486,6 +489,10 @@ mod prod_client {
     impl HttpClient for CurlHttpClient<Buf> {
         fn get_ref(&self) -> &[u8] {
             &self.handle.get_ref().0
+        }
+
+        fn clear(&mut self) {
+            self.handle.get_mut().0.clear();
         }
 
         fn perform(&mut self) -> Result<()> {
@@ -576,6 +583,10 @@ fn download_first_crl_from_x509_impl<H: HttpClient>(
             continue;
         }
 
+        // Clear any stale data from a previous distribution point or
+        // redirect chain before starting a new attempt.
+        client.clear();
+
         client.url(&dist_point_url)?;
         client.get(true)?;
         // Disable automatic redirects - we handle them manually to validate the
@@ -587,6 +598,11 @@ fn download_first_crl_from_x509_impl<H: HttpClient>(
         client.useragent("s390-tools-pv-crl")?;
 
         for i in 0..=CRL_MAX_REDIRECTIONS {
+            // Clear any stale data by the previous perform() in this redirect
+            // chain before issuing the next request.
+            if i > 0 {
+                client.clear();
+            }
             if let Err(err) = client.perform() {
                 debug!("Failed to download CRL: {}", err);
                 continue 'outer;
@@ -757,6 +773,8 @@ mod tests {
         responses: HashMap<String, MockResponse>,
         perform_count: usize,
         max_filesize: Option<u64>,
+        /// Accumulated response body, mirroring the real CurlHttpClient behaviour.
+        buf: Vec<u8>,
     }
 
     impl MockHttpClient {
@@ -766,6 +784,7 @@ mod tests {
                 responses,
                 perform_count: 0,
                 max_filesize: None,
+                buf: Vec::new(),
             }
         }
     }
@@ -810,6 +829,7 @@ mod tests {
                 if response.should_fail {
                     bail_hkd_verify!(CrlDownloadFailed);
                 }
+                self.buf.extend_from_slice(&response.data);
                 Ok(())
             } else {
                 bail_hkd_verify!(CrlDownloadFailed);
@@ -825,16 +845,16 @@ mod tests {
         }
 
         fn get_ref(&self) -> &[u8] {
-            if let Some(response) = self.responses.get(&self.url) {
-                &response.data
-            } else {
-                &[]
-            }
+            &self.buf
         }
 
         fn max_filesize(&mut self, size: u64) -> Result<()> {
             self.max_filesize = Some(size);
             Ok(())
+        }
+
+        fn clear(&mut self) {
+            self.buf.clear();
         }
     }
 
@@ -847,10 +867,12 @@ mod tests {
         }
     }
 
-    /// Helper to create mock redirect response
-    fn mock_redirect(redirect_to: &str) -> MockResponse {
+    /// Helper to create mock redirect response. `body` is the response body
+    /// sent along with the redirect (e.g. an HTML "Moved Permanently" page);
+    /// pass `&[]` for none.
+    fn mock_redirect(redirect_to: &str, body: &[u8]) -> MockResponse {
         MockResponse {
-            data: vec![],
+            data: body.to_vec(),
             redirect_to: Some(redirect_to.to_string()),
             should_fail: false,
         }
@@ -1171,7 +1193,7 @@ mod tests {
             let mut responses = HashMap::new();
             responses.insert(
                 "http://example.com/test.crl".to_string(),
-                mock_redirect("http://cdn.example.com/test.crl"),
+                mock_redirect("http://cdn.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://cdn.example.com/test.crl".to_string(),
@@ -1181,6 +1203,38 @@ mod tests {
             let result = download_with_mock(&cert, responses);
             assert!(result.is_ok());
             assert!(result.unwrap().is_some());
+        }
+
+        /// A redirect response whose body contains non-CRL bytes must not corrupt
+        /// the buffer: the intermediate body must be cleared before the next
+        /// perform() so that read_crls() only sees the final CRL bytes.
+        #[test]
+        fn redirect_with_body_does_not_corrupt_crl() {
+            let cert = create_cert_with_crl_dps(&["http://example.com/test.crl"]);
+            let crl_data = std::fs::read(get_cert_asset_path("inter_ca.crl")).unwrap();
+
+            // Simulate a 301 response whose body is an HTML page.
+            let html_body = b"<html><body>Moved Permanently</body></html>";
+
+            let mut responses = HashMap::new();
+            responses.insert(
+                "http://example.com/test.crl".to_string(),
+                mock_redirect("http://cdn.example.com/test.crl", html_body),
+            );
+            responses.insert(
+                "http://cdn.example.com/test.crl".to_string(),
+                mock_response(crl_data),
+            );
+
+            let result = download_with_mock(&cert, responses);
+            assert!(
+                result.is_ok(),
+                "CRL download should succeed despite redirect body"
+            );
+            assert!(
+                result.unwrap().is_some(),
+                "CRL should be parsed correctly after redirect with body"
+            );
         }
 
         #[test]
@@ -1194,7 +1248,7 @@ mod tests {
             let mut responses = HashMap::new();
             responses.insert(
                 "http://example.com/test.crl".to_string(),
-                mock_redirect("ftp://example.com/test.crl"),
+                mock_redirect("ftp://example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://backup.example.com/test.crl".to_string(),
@@ -1215,43 +1269,43 @@ mod tests {
             let mut responses = HashMap::new();
             responses.insert(
                 "http://example.com/test.crl".to_string(),
-                mock_redirect("http://redirect1.example.com/test.crl"),
+                mock_redirect("http://redirect1.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect1.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect2.example.com/test.crl"),
+                mock_redirect("http://redirect2.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect2.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect3.example.com/test.crl"),
+                mock_redirect("http://redirect3.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect3.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect4.example.com/test.crl"),
+                mock_redirect("http://redirect4.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect4.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect5.example.com/test.crl"),
+                mock_redirect("http://redirect5.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect5.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect6.example.com/test.crl"),
+                mock_redirect("http://redirect6.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect6.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect7.example.com/test.crl"),
+                mock_redirect("http://redirect7.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect7.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect8.example.com/test.crl"),
+                mock_redirect("http://redirect8.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect8.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect9.example.com/test.crl"),
+                mock_redirect("http://redirect9.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect9.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect10.example.com/test.crl"),
+                mock_redirect("http://redirect10.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect10.example.com/test.crl".to_string(),
@@ -1271,47 +1325,47 @@ mod tests {
             let mut responses = HashMap::new();
             responses.insert(
                 "http://example.com/test.crl".to_string(),
-                mock_redirect("http://redirect1.example.com/test.crl"),
+                mock_redirect("http://redirect1.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect1.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect2.example.com/test.crl"),
+                mock_redirect("http://redirect2.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect2.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect3.example.com/test.crl"),
+                mock_redirect("http://redirect3.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect3.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect4.example.com/test.crl"),
+                mock_redirect("http://redirect4.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect4.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect5.example.com/test.crl"),
+                mock_redirect("http://redirect5.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect5.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect6.example.com/test.crl"),
+                mock_redirect("http://redirect6.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect6.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect7.example.com/test.crl"),
+                mock_redirect("http://redirect7.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect7.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect8.example.com/test.crl"),
+                mock_redirect("http://redirect8.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect8.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect9.example.com/test.crl"),
+                mock_redirect("http://redirect9.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect9.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect10.example.com/test.crl"),
+                mock_redirect("http://redirect10.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect10.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect11.example.com/test.crl"),
+                mock_redirect("http://redirect11.example.com/test.crl", &[]),
             );
 
             let result = download_with_mock(&cert, responses);
@@ -1329,11 +1383,11 @@ mod tests {
             let mut responses = HashMap::new();
             responses.insert(
                 "http://example.com/test.crl".to_string(),
-                mock_redirect("http://redirect1.example.com/test.crl"),
+                mock_redirect("http://redirect1.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect1.example.com/test.crl".to_string(),
-                mock_redirect("http://redirect2.example.com/test.crl"),
+                mock_redirect("http://redirect2.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect2.example.com/test.crl".to_string(),
@@ -1353,11 +1407,11 @@ mod tests {
             // Create a circular redirect: A -> B -> A
             responses.insert(
                 "http://example.com/test.crl".to_string(),
-                mock_redirect("http://redirect.example.com/test.crl"),
+                mock_redirect("http://redirect.example.com/test.crl", &[]),
             );
             responses.insert(
                 "http://redirect.example.com/test.crl".to_string(),
-                mock_redirect("http://example.com/test.crl"),
+                mock_redirect("http://example.com/test.crl", &[]),
             );
 
             let result = download_with_mock(&cert, responses);
