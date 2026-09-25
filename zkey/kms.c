@@ -3442,29 +3442,6 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		if (str != NULL)
 			sscanf(str, "%lu", (long unsigned int *)sector_size);
 	}
-	if (passphrase_file != NULL && volume_type != NULL &&
-	    *volume_type != NULL && strcasecmp(*volume_type, "luks2") == 0) {
-		str = _find_property(properties, num_properties,
-				     KMS_KEY_PROP_PASSPHRASE);
-		if (str != NULL) {
-			rc = store_passphrase_from_base64(str, passphrase_file,
-							  verbose);
-			if (rc != 0) {
-				pr_verbose(verbose,
-					   "Failed to parse passphrase: %s",
-					   strerror(-rc));
-				goto out;
-			}
-		} else {
-			rc = remove(passphrase_file);
-			if (rc != 0 && errno != ENOENT) {
-				pr_verbose(verbose,
-					   "Failed to remove passphrase_file: "
-					   "%s", strerror(errno));
-				goto out;
-			}
-		}
-	}
 
 	key_blob_size = sizeof(key_blob);
 	memset(key_blob, 0, key_blob_size);
@@ -3540,6 +3517,30 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 			      "secure key does not match the current one.");
 			rc = -EIO;
 			goto out;
+		}
+	}
+
+	if (passphrase_file != NULL && volume_type != NULL &&
+	    *volume_type != NULL && strcasecmp(*volume_type, "luks2") == 0) {
+		str = _find_property(properties, num_properties,
+				     KMS_KEY_PROP_PASSPHRASE);
+		if (str != NULL) {
+			rc = store_passphrase_from_base64(str, passphrase_file,
+							  verbose);
+			if (rc != 0) {
+				pr_verbose(verbose,
+					   "Failed to parse passphrase: %s",
+					   strerror(-rc));
+				goto out;
+			}
+		} else {
+			rc = remove(passphrase_file);
+			if (rc != 0 && errno != ENOENT) {
+				pr_verbose(verbose,
+					   "Failed to remove passphrase_file: "
+					   "%s", strerror(errno));
+				goto out;
+			}
 		}
 	}
 
