@@ -4182,18 +4182,18 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 		goto out;
 
 	if (_keystore_passphrase_file_exists(&file_names)) {
-		rc = copy_file(file_names.skey_filename,
+		rc = copy_file(file_names.pass_filename,
 			       new_names.pass_filename, 0);
 		if (rc != 0) {
 			pr_verbose(keystore,
 				   "Passphrase file '%s' could not be copied: "
-				   "%s", new_names.pass_filename,
+				   "%s", file_names.pass_filename,
 				   strerror(-rc));
 			goto out;
 		}
 
 		rc = _keystore_set_file_permission(keystore,
-						   file_names.pass_filename);
+						   new_names.pass_filename);
 		if (rc != 0)
 			goto out;
 	}
