@@ -2078,14 +2078,14 @@ static int add_device_selection(const char *device_id)
 		g.max_card = MAX(g.max_card, card);
 
 		if (domain >= 0) {
-			if (domain > NUM_DOMAINS) {
+			if (domain >= NUM_DOMAINS) {
 				warnx("Invalid domain specified: %s",
 				      device_id);
 				return -EINVAL;
 			}
 			g.domain_mask[MASK_WORD_NO(domain)] |=
 					MASK_BIT(domain);
-			g.min_domain = MIN(g.max_domain, domain);
+			g.min_domain = MIN(g.min_domain, domain);
 			g.max_domain = MAX(g.max_domain, domain);
 		} else {
 			memset(g.domain_mask, 0xff, sizeof(g.domain_mask));
@@ -2105,13 +2105,13 @@ static int add_device_selection(const char *device_id)
 	if (device_id[0] == '.' &&
 	    sscanf(device_id + 1, "%x", &domain) == 1) {
 		pr_verbose("domain: %d", domain);
-		if (domain < 0 || domain > NUM_DOMAINS) {
+		if (domain < 0 || domain >= NUM_DOMAINS) {
 			warnx("Invalid domain specified: %s", device_id);
 			return -EINVAL;
 		}
 
 		g.domain_mask[MASK_WORD_NO(domain)] |= MASK_BIT(domain);
-		g.min_domain = MIN(g.max_domain, domain);
+		g.min_domain = MIN(g.min_domain, domain);
 		g.max_domain = MAX(g.max_domain, domain);
 		memset(g.card_mask, 0xff, sizeof(g.card_mask));
 		g.min_card = 0;
