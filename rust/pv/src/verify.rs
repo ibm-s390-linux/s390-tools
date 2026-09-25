@@ -216,7 +216,10 @@ impl CertVerifier {
             StoreSetupMode::WithCrlCheck,
         )?;
         if !offline {
-            for cert in &untr_certs {
+            // Download CRLs for the IBM signing key and the chain intermediates
+            // only
+            let chain_certs = chain.iter().chain(std::iter::once(ibm_z_sign_key.as_ref()));
+            for cert in chain_certs {
                 if let Some(crls) = download_first_crl_from_x509(cert)? {
                     crls.iter().try_for_each(|c| store_builder.add_crl(c))?;
                 }
