@@ -2674,7 +2674,7 @@ static int command_setkey(void)
 	}
 	if (integrity_keysize > 0 &&
 	    !is_phmac_integrity &&
-	    memcmp(newkey + newekey_size, key + newekey_size,
+	    memcmp(newkey + newekey_size, key + (keysize - integrity_keysize),
 		   integrity_keysize) != 0) {
 		warnx("The secure key in file '%s' contains a different "
 		      "integrity key (i.e. the last %lu bytes of the key) than "
