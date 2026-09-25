@@ -6031,14 +6031,19 @@ int kms_set_key_properties(const kms_handle_t handle, const char *key_id,
  *                          new size of the array
  * @param count             The number of required elements
  */
-static void _reealloc_props_array(struct kms_property **array,
-				  unsigned int *size, unsigned int count)
+static void _realloc_props_array(struct kms_property **array,
+				 unsigned int *size, unsigned int count)
 {
+	unsigned int new_size;
+
 	if (*size >= count)
 		return;
 
-	(*size) += 10;
-	*array = util_realloc(*array, *size * sizeof(struct kms_property));
+	new_size = count + 10;
+	*array = util_realloc(*array, new_size * sizeof(struct kms_property));
+	memset(*array + *size, 0,
+	       (new_size - *size) * sizeof(struct kms_property));
+	*size = new_size;
 }
 
 /**
@@ -6076,7 +6081,7 @@ static int _get_key_attributes(struct plugin_handle *ph, const char *key_id,
 	const char *description, *id, *name, *value;
 	struct kms_property *props = NULL;
 	enum kmip_link_type link_type;
-	unsigned int i, k, count = 0;
+	unsigned int i, k = 0, count = 0;
 	int32_t key_size;
 	int rc;
 
@@ -6128,7 +6133,7 @@ static int _get_key_attributes(struct plugin_handle *ph, const char *key_id,
 			    strcmp(description, " ") == 0)
 				description = "";
 
-			_reealloc_props_array(&props, &count, k + 1);
+			_realloc_props_array(&props, &count, k + 1);
 			props[k].name = util_strdup(KMS_KEY_PROP_DESCRIPTION);
 			props[k].value = util_strdup(description);
 			k++;
@@ -6147,7 +6152,7 @@ static int _get_key_attributes(struct plugin_handle *ph, const char *key_id,
 			    strcmp(description, " ") == 0)
 				description = "";
 
-			_reealloc_props_array(&props, &count, k + 1);
+			_realloc_props_array(&props, &count, k + 1);
 			props[k].name = util_strdup(KMS_KEY_PROP_DESCRIPTION);
 			props[k].value = util_strdup(description);
 			k++;
@@ -6162,15 +6167,20 @@ static int _get_key_attributes(struct plugin_handle *ph, const char *key_id,
 			CHECK_ERROR(rc != 0, rc, rc,
 				    "Failed to get link", ph, out);
 
-			_reealloc_props_array(&props, &count, k + 1);
+			if (link_type != KMIP_LINK_TYPE_NEXT &&
+			    link_type != KMIP_LINK_TYPE_PREVIOUS) {
+				kmip_node_free(linked_id);
+				linked_id = NULL;
+				break;
+			}
+
+			_realloc_props_array(&props, &count, k + 1);
 			if (link_type == KMIP_LINK_TYPE_NEXT)
 				props[k].name =
 					util_strdup(KMS_KEY_PROP_XTS_KEY2_ID);
-			else if (link_type == KMIP_LINK_TYPE_PREVIOUS)
+			else
 				props[k].name =
 					util_strdup(KMS_KEY_PROP_XTS_KEY1_ID);
-			else
-				break;
 
 			rc = kmip_get_linked_object_identifier(linked_id, &id,
 							       NULL, NULL);
@@ -6187,7 +6197,7 @@ static int _get_key_attributes(struct plugin_handle *ph, const char *key_id,
 			if (!_get_custom_attr(ph, attr, &name, &value))
 				break;
 
-			_reealloc_props_array(&props, &count, k + 1);
+			_realloc_props_array(&props, &count, k + 1);
 			props[k].name = util_strdup(name);
 			props[k].value = util_strdup(value);
 			k++;
@@ -6285,7 +6295,7 @@ out:
 	kmip_node_free(linked_id);
 
 	if (rc != 0 && props != NULL) {
-		for (i = 0; i < count; i++) {
+		for (i = 0; i < k; i++) {
 			free((char *)props[i].name);
 			free((char *)props[i].value);
 		}
