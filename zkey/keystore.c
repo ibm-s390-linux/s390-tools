@@ -6191,23 +6191,6 @@ prompt_alt_name:
 	if (rc != 0)
 		goto out;
 
-	if (passphrase != NULL && volume_type != NULL &&
-	    strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
-		rc = store_passphrase_from_base64(passphrase,
-						  file_names.pass_filename,
-						  keystore->verbose);
-		if (rc != 0) {
-			pr_verbose(keystore, "Failed to parse passphrase: %s",
-				   strerror(-rc));
-			goto out;
-		}
-
-		rc = _keystore_set_file_permission(keystore,
-						   file_names.pass_filename);
-		if (rc != 0)
-			goto out_remove;
-	}
-
 	rc = properties_set(key_props, xts ? PROP_NAME_KMS_XTS_KEY1_ID :
 			    PROP_NAME_KMS_KEY_ID, key1_id);
 	if (rc != 0) {
@@ -6251,6 +6234,23 @@ prompt_alt_name:
 	if (rc != 0)
 		goto out_remove;
 
+	if (passphrase != NULL && volume_type != NULL &&
+	    strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
+		rc = store_passphrase_from_base64(passphrase,
+						  file_names.pass_filename,
+						  keystore->verbose);
+		if (rc != 0) {
+			pr_verbose(keystore, "Failed to parse passphrase: %s",
+				   strerror(-rc));
+			goto out_remove;
+		}
+
+		rc = _keystore_set_file_permission(keystore,
+						   file_names.pass_filename);
+		if (rc != 0)
+			goto out_remove;
+	}
+
 	rc = generate_key_verification_pattern(import_data->pkey_fd,
 					       secure_key, secure_key_size,
 					       vp, sizeof(vp),
@@ -6288,6 +6288,7 @@ out_remove:
 	if (rc != 0) {
 		remove(file_names.skey_filename);
 		remove(file_names.info_filename);
+		remove(file_names.pass_filename);
 	}
 
 out:
