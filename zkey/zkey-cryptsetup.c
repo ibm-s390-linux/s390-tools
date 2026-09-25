@@ -2013,7 +2013,7 @@ static int reencipher_prepare(int token)
 	    is_secure_key(integrity_key, integrity_keysize)) {
 		rc = reencipher_key(integrity_key, integrity_keysize,
 				    g.fromold, g.tonew,
-				    is_old_mk, 1);
+				    is_integrity_old_mk, 1);
 		if (rc != 0)
 			goto out;
 	}
