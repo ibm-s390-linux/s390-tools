@@ -2861,18 +2861,21 @@ static int command_convert(void)
 		goto out;
 
 	if (is_phmac_integrity) {
-		if (strcmp(ip.integrity, "hmac(sha224)") != 0 &&
-		    strcmp(ip.integrity, "hmac(sha256)") != 0 &&
-		    strcmp(ip.integrity, "hmac(sha384)") != 0 &&
-		    strcmp(ip.integrity, "hmac(sha512)") != 0) {
+		if (ip.integrity == NULL ||
+		    (strcmp(ip.integrity, "hmac(sha224)") != 0 &&
+		     strcmp(ip.integrity, "hmac(sha256)") != 0 &&
+		     strcmp(ip.integrity, "hmac(sha384)") != 0 &&
+		     strcmp(ip.integrity, "hmac(sha512)") != 0)) {
 			warnx("The volume uses integrity algorithm '%s' and "
 			      "thus can not be converted to use the 'phmac' "
-			      "cipher", ip.integrity);
+			      "cipher", ip.integrity ? ip.integrity : "(none)");
 			rc = -EINVAL;
 			goto out;
 		}
 
 		if (is_pvsecret_hmac_key(newkey + newekey_size, newikey_size)) {
+			get_key_bit_size(newkey + newekey_size, newikey_size,
+					 &hmac_keysize);
 			switch (hmac_keysize) {
 			case 512:
 				if (strcmp(ip.integrity, "hmac(sha224)") != 0 &&
@@ -3019,7 +3022,7 @@ static int command_convert(void)
 
 	if (is_phmac_integrity) {
 		if (strcmp(ip.integrity, "hmac(sha224)") == 0 ||
-		    strcmp(ip.integrity, "hmac(sha256") == 0)
+		    strcmp(ip.integrity, "hmac(sha256)") == 0)
 			hmac_vp_alg = "hmac(sha256)";
 		else if (strcmp(ip.integrity, "hmac(sha384)") == 0 ||
 			 strcmp(ip.integrity, "hmac(sha512)") == 0)
