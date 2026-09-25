@@ -1359,9 +1359,14 @@ int store_passphrase_from_base64(const char *b64_string, const char *filename,
 	int rc = 0;
 
 	len = strlen(b64_string);
+	if (len == 0 || len % 4 != 0) {
+		pr_verbose(verbose, "Invalid base64 string length");
+		return -EINVAL;
+	}
 	rawlen = outlen = (len / 4) * 3;
-	for (i = len - 1; b64_string[i] == '='; i--, rawlen--)
-		;
+	/* Count trailing '=' padding characters; loop is safe: len >= 4 */
+	for (i = len - 1; b64_string[i] == '=' && i >= len - 2; i--)
+		rawlen--;
 
 	buf = malloc(outlen);
 	if (buf == NULL) {
@@ -1380,12 +1385,14 @@ int store_passphrase_from_base64(const char *b64_string, const char *filename,
 	len = EVP_DecodeBlock(buf, (unsigned char *)b64_string, len);
 	if (len != outlen) {
 		pr_verbose(verbose, "EVP_DecodeBlock failed");
+		rc = -EINVAL;
 		goto out;
 	}
 
 	if (fwrite(buf, rawlen, 1, fp) != 1) {
 		pr_verbose(verbose, "Writing file '%s' failed: %s", filename,
 			   strerror(errno));
+		rc = -EIO;
 		goto out;
 	}
 
