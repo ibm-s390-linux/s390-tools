@@ -26,6 +26,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <openssl/crypto.h>
+
 #include "lib/util_base.h"
 #include "lib/util_file.h"
 #include "lib/util_libc.h"
@@ -4531,6 +4533,86 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
 }
 
 /**
+ * Concatenates two key files into a new temporary file created securely
+ * with mkstemp() (mode 0600, no predictable name). The caller is
+ * responsible for removing the file when it is no longer needed.
+ *
+ * @param[in]  file1      path of the first source file
+ * @param[in]  file2      path of the second source file
+ * @param[in]  tmpdir     directory for the temporary file (may be NULL -> /tmp)
+ * @param[out] out_path   on success, a heap-allocated string with the path of
+ *                        the created file; the caller must free() it
+ *
+ * @returns 0 on success, a negative errno value on failure
+ */
+static int _keystore_combine_key_files(const char *file1, const char *file2,
+				       const char *tmpdir, char **out_path)
+{
+	const char *srcs[2] = { file1, file2 };
+	int fd_tmp = -1, fd_src = -1;
+	unsigned char buf[4096];
+	char *tmpl = NULL;
+	ssize_t bytes;
+	int rc = 0;
+	int i;
+
+	util_asprintf(&tmpl, "%s/luks2-integrity-XXXXXX",
+		      tmpdir != NULL ? tmpdir : "/tmp");
+
+	fd_tmp = mkstemp(tmpl);
+	if (fd_tmp < 0) {
+		rc = -errno;
+		warnx("Failed to create temporary key file '%s': %s",
+		      tmpl, strerror(errno));
+		goto out;
+	}
+
+	/* copy file1 then file2 into the temp file */
+	for (i = 0; i < 2; i++) {
+		fd_src = open(srcs[i], O_RDONLY | O_CLOEXEC);
+		if (fd_src < 0) {
+			rc = -errno;
+			warnx("Failed to open key file '%s': %s",
+			      srcs[i], strerror(errno));
+			goto out;
+		}
+
+		while ((bytes = read(fd_src, buf, sizeof(buf))) > 0) {
+			if (write(fd_tmp, buf, bytes) != bytes) {
+				rc = -errno;
+				warnx("Failed to write to temporary key "
+				      "file: %s", strerror(errno));
+				goto out;
+			}
+		}
+		if (bytes < 0) {
+			rc = -errno;
+			warnx("Failed to read key file '%s': %s",
+			      srcs[i], strerror(errno));
+			goto out;
+		}
+
+		close(fd_src);
+		fd_src = -1;
+	}
+
+	*out_path = tmpl;
+	tmpl = NULL;
+
+out:
+	if (fd_src >= 0)
+		close(fd_src);
+	if (fd_tmp >= 0)
+		close(fd_tmp);
+	if (tmpl != NULL) {
+		remove(tmpl);
+		free(tmpl);
+	}
+	OPENSSL_cleanse(buf, sizeof(buf));
+	return rc;
+}
+
+/**
  * Executes a command via system().
  *
  * @param[in] cmd        the command to execute
@@ -4811,35 +4893,28 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 				 * specified by --key-size is however just the
 				 * encryption key size in bits.
 				 */
-
-				tmpdir = secure_getenv("TMPDIR");
-				util_asprintf(&combined_key,
-					      "%s/luks2-integrity-%s.skey",
-					      tmpdir != NULL ? tmpdir : "/tmp",
-					      dmname);
-
-				if (!is_valid_characters_for_command(
-							combined_key)) {
-					rc = -EINVAL;
-					goto out;
-				}
-
-				util_asprintf(&cmd, "cat '%s' '%s' > '%s'",
-					      key_file_name,
-					      find_info.integrity_key_name,
-					      combined_key);
-
 				if (info->execute) {
-					printf("Executing: %s\n", cmd);
-					rc = _keystore_execute_cmd(cmd, "cat");
+					tmpdir = secure_getenv("TMPDIR");
+					rc = _keystore_combine_key_files(
+							key_file_name,
+							find_info.integrity_key_name,
+							tmpdir, &combined_key);
+					if (rc != 0)
+						goto out;
 				} else {
-					printf("%s\n", cmd);
-				}
+					util_asprintf(&combined_key,
+						      "$COMBINED_KEY");
 
-				free(cmd);
-				cmd = NULL;
-				if (rc != 0)
-					goto out;
+					printf("COMBINED_KEY=$(mktemp --tmpdir "
+					       "luks2-integrity-XXXXXX)\n");
+					util_asprintf(&cmd,
+						      "cat '%s' '%s' > \"$COMBINED_KEY\"",
+						      key_file_name,
+						      find_info.integrity_key_name);
+					printf("%s\n", cmd);
+					free(cmd);
+					cmd = NULL;
+				}
 
 				key_file_name = combined_key;
 			}
@@ -4856,7 +4931,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			 */
 			util_asprintf(&cmd,
 				      "cryptsetup luksFormat %s%s--type luks2 "
-				      "--volume-key-file '%s' --key-size %lu "
+				      "--volume-key-file \"%s\" --key-size %lu "
 				      "--cipher %s --pbkdf %s %s%s%s%s",
 				      info->batch_mode ? "-q " : "",
 				      keystore->verbose ? "-v " : "",
@@ -4884,7 +4959,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 				goto out;
 
 			if (combined_key != NULL && !info->execute) {
-				util_asprintf(&cmd, "rm '%s' -f", combined_key);
+				util_asprintf(&cmd, "rm -f \"%s\"", combined_key);
 				printf("%s\n", cmd);
 				free(cmd);
 				cmd = NULL;
