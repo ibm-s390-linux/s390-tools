@@ -586,14 +586,14 @@ fn download_first_crl_from_x509_impl<H: HttpClient>(
         client.max_filesize(CRL_FILE_SIZE_MAX)?;
         client.useragent("s390-tools-pv-crl")?;
 
-        for i in 0..CRL_MAX_REDIRECTIONS {
+        for i in 0..=CRL_MAX_REDIRECTIONS {
             if let Err(err) = client.perform() {
                 debug!("Failed to download CRL: {}", err);
                 continue 'outer;
             }
 
             if let Some(url) = client.redirect_url()? {
-                if i == CRL_MAX_REDIRECTIONS - 1 {
+                if i == CRL_MAX_REDIRECTIONS {
                     bail_hkd_verify!(TooManyRedirectionsCrlDownload);
                 }
                 if validate_crl_url_protocol(&url).is_err() {
@@ -1206,6 +1206,64 @@ mod tests {
             assert!(result.unwrap().is_some());
         }
 
+        /// Exactly CRL_MAX_REDIRECTIONS (10) hops must succeed.
+        #[test]
+        fn redirect_at_limit_succeeds() {
+            let cert = create_cert_with_crl_dps(&["http://example.com/test.crl"]);
+            let crl_data = std::fs::read(get_cert_asset_path("inter_ca.crl")).unwrap();
+
+            let mut responses = HashMap::new();
+            responses.insert(
+                "http://example.com/test.crl".to_string(),
+                mock_redirect("http://redirect1.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect1.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect2.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect2.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect3.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect3.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect4.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect4.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect5.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect5.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect6.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect6.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect7.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect7.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect8.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect8.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect9.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect9.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect10.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect10.example.com/test.crl".to_string(),
+                mock_response(crl_data),
+            );
+
+            let result = download_with_mock(&cert, responses);
+            assert!(result.is_ok());
+            assert!(result.unwrap().is_some());
+        }
+
+        /// CRL_MAX_REDIRECTIONS + 1 (11) hops must fail.
         #[test]
         fn redirect_too_many() {
             let cert = create_cert_with_crl_dps(&["http://example.com/test.crl"]);
@@ -1250,6 +1308,10 @@ mod tests {
             responses.insert(
                 "http://redirect9.example.com/test.crl".to_string(),
                 mock_redirect("http://redirect10.example.com/test.crl"),
+            );
+            responses.insert(
+                "http://redirect10.example.com/test.crl".to_string(),
+                mock_redirect("http://redirect11.example.com/test.crl"),
             );
 
             let result = download_with_mock(&cert, responses);
