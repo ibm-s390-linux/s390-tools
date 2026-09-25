@@ -644,7 +644,7 @@ NETWORK_CMDS="ip -br a\
   :nstat -az\
   :openssl engine # deprecated in OpenSSL 3.n\
   :openssl list --providers 2>/dev/null # redirect help on older systems\
-  :opticsmon --module-info\ # Now called zpcimon but kept for compatibility
+  :opticsmon --module-info # Now called zpcimon but kept for compatibility\
   :route -n\
   "
 
