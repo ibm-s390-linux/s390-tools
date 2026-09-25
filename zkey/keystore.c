@@ -3089,7 +3089,6 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 		goto out_rename_skey;
 	}
 	if (_keystore_reencipher_key_exists(&file_names)) {
-		reenc_exists = true;
 		if (rename(file_names.renc_filename,
 			   new_names.renc_filename) != 0) {
 			rc = -errno;
@@ -3097,9 +3096,9 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 				   file_names.renc_filename, strerror(-rc));
 			goto out_rename_info;
 		}
+		reenc_exists = true;
 	}
 	if (_keystore_passphrase_file_exists(&file_names)) {
-		pass_exists = true;
 		if (rename(file_names.pass_filename,
 			   new_names.pass_filename) != 0) {
 			rc = -errno;
@@ -3107,6 +3106,7 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 				   file_names.pass_filename, strerror(-rc));
 			goto out_rename_info;
 		}
+		pass_exists = true;
 	}
 
 	if (kms_bound) {
@@ -3154,9 +3154,9 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 
 out_rename_info:
 	if (reenc_exists)
-		rename(file_names.renc_filename, new_names.renc_filename);
+		rename(new_names.renc_filename, file_names.renc_filename);
 	if (pass_exists)
-		rename(file_names.pass_filename, new_names.pass_filename);
+		rename(new_names.pass_filename, file_names.pass_filename);
 	rename(new_names.info_filename, file_names.info_filename);
 
 out_rename_skey:
