@@ -2877,8 +2877,12 @@ static int _configure_connection(struct plugin_handle *ph,
 				_set_error(ph, "The certificate could not be "
 					   "verified using the system's "
 					   "CA certificates. Use option "
+					   "'--tls-ca-bundle' to specify a CA "
+					   "bundle, or "
 					   "'--tls-dont-verify-server-cert' to "
-					   "connect to this server anyway.");
+					   "skip certificate verification, or "
+					   "'--tls-dont-verify-hostname' to skip "
+					   "hostname verification.");
 			rc = -EINVAL;
 			goto out;
 		}
