@@ -1513,10 +1513,11 @@ create_package() {
 	cp -p "${FULLPATHSCRIPT}" "${WORKPATH}"
 	# create the archive with random name
 	cd "${WORKDIR_BASE}"
+	touch "${TMPARCHIVE}"
+	chmod 0600 "${TMPARCHIVE}"
 	tar -czf "${TMPARCHIVE}" "${WORKDIR_CURRENT}"
 	rc_tar=$?
 	if [ $rc_tar -eq 0 ]; then
-		chmod 0600 "${TMPARCHIVE}"
 		# move to final file name
 		if mv -f "${TMPARCHIVE}" "${WORKARCHIVE}"; then
 			pr_stdout " "
