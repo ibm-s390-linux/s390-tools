@@ -1887,12 +1887,12 @@ static int count_active_keyslots(struct crypt_device *cd)
 static int reencipher_prepare(int token)
 {
 	int is_old_mk, is_integrity_old_mk;
-	struct reencipher_token reenc_tok;
+	struct reencipher_token reenc_tok = { 0 };
 	size_t integrity_keysize = 0;
 	char *integrity_spec = NULL;
 	u8 *integrity_key = NULL;
 	int is_phmac_integrity;
-	struct vp_token vp_tok;
+	struct vp_token vp_tok = { 0 };
 	char *password = NULL;
 	size_t securekeysize;
 	size_t password_len;
@@ -2488,7 +2488,7 @@ static int command_setvp(void)
 {
 	size_t integrity_keysize = 0, seckeysize;
 	char *integrity_spec = NULL;
-	struct vp_token vp_tok;
+	struct vp_token vp_tok = { 0 };
 	int is_phmac_integrity;
 	size_t keysize = 0;
 	u8 *integrity_key;
