@@ -1419,7 +1419,6 @@ call_run_command() {
 		# command was found and has a type
 		if [ "x${TIMEOUT_OK}" = "xYES" ]; then
 			eval timeout -k ${TOKS} ${TOS} "${cmd}" >> ${logfile} 2>&1
-
 			rc=$?
 		else
 			# fall back - call all existing commands without timeout
@@ -1481,13 +1480,7 @@ EOF
 ########################################
 # Setup the environment
 environment_setup() {
-	if test ! -e "${WORKDIR_BASE}"; then
-		mkdir -p "${WORKDIR_BASE}"
-	elif test ! -d "${WORKDIR_BASE}"; then
-		echo "${SCRIPTNAME}: Error: \"${WORKDIR_BASE}\" exists but this is a file!"
-		echo "       Please make sure \"${WORKDIR_BASE}\" is a directory."
-		exit 1
-	fi
+	# avoid duplicate start of the script
 	if test -e "${LOCKFILE}"; then
 		print_alreadyrunning
 		exit 1
@@ -1495,9 +1488,19 @@ environment_setup() {
 		touch "${LOCKFILE}"
 		echo "${DATETIME}" > "${LOCKFILE}"
 	fi
+	# check/setup work path
+	if test ! -e "${WORKDIR_BASE}"; then
+		mkdir -p "${WORKDIR_BASE}"
+	elif test ! -d "${WORKDIR_BASE}"; then
+		echo "${SCRIPTNAME}: Error: \"${WORKDIR_BASE}\" exists but is a file!"
+		echo "       Please make sure \"${WORKDIR_BASE}\" is a directory."
+		rm ${LOCKFILE}
+		exit 1
+	fi
 	if ! mkdir "${WORKPATH}" 2>/dev/null; then
 		echo "${SCRIPTNAME}: Error: Target directory \"${WORKPATH}\" already exists or"
 		echo "       \"${WORKDIR_BASE}\" does not exist!"
+		rm ${LOCKFILE}
 		exit 1
 	fi
 	chmod 0700 "${WORKPATH}"
