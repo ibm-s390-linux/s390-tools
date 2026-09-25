@@ -1139,8 +1139,10 @@ int json_build_template_info(json_object *obj,
 out:
 	if (rc != 0) {
 		free_tag_def_list(&template->label_tags, copy);
-		if (copy)
+		if (copy) {
 			free_template_info(template);
+			memset(template, 0, sizeof(*template));
+		}
 	}
 
 	return rc;
@@ -1641,8 +1643,10 @@ out:
 		free_tag_list(&key->label_tags, copy);
 		free_tag_list(&key->custom_tags, copy);
 		free_export_control(&key->export_control, copy);
-		if (copy)
+		if (copy) {
 			free_key_info(key);
+			memset(key, 0, sizeof(*key));
+		}
 	}
 
 	return rc;
