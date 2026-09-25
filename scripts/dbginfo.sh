@@ -1510,7 +1510,9 @@ environment_setup() {
 # create gzip-ped tar file
 create_package() {
 	local rc_tar
-	local TMPARCHIVE="${WORKDIR_BASE}$(uuidgen).tgz"
+	# use uuidgen or timestamp for a random filename
+	local uuid=$(uuidgen || date +%s)
+	local TMPARCHIVE="${WORKDIR_BASE}DBG${uuid}.tgz"
 	pr_syslog_stdout ${step_num} "Finalizing: Creating archive with collected data"
 	# get a copy of the script used
 	cp -p "${FULLPATHSCRIPT}" "${WORKPATH}"
