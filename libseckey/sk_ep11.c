@@ -316,9 +316,11 @@ int SK_EP11_generate_ec_key_pair(const struct sk_ext_ep11_lib *ep11_lib,
 		return -rc;
 	}
 
-	hdr = (struct ep11kblob_header *)key_token;
-	hdr->version = PKEY_TYPE_EP11_ECC;
-	hdr->bitlen = curve->prime_bits;
+	if (key_token != NULL) {
+		hdr = (struct ep11kblob_header *)key_token;
+		hdr->version = PKEY_TYPE_EP11_ECC;
+		hdr->bitlen = curve->prime_bits;
+	}
 
 	return 0;
 }
@@ -389,11 +391,13 @@ int SK_EP11_generate_rsa_key_pair(const struct sk_ext_ep11_lib *ep11_lib,
 		return -rc;
 	}
 
-	hdr = (struct ep11kblob_header *)key_token;
-	hdr->version = PKEY_TYPE_EP11_RSA;
-	if (x9_31)
-		hdr->flags |= PKEY_TYPE_EP11_FLAG_X9_31;
-	hdr->bitlen = modulus_bits;
+	if (key_token != NULL) {
+		hdr = (struct ep11kblob_header *)key_token;
+		hdr->version = PKEY_TYPE_EP11_RSA;
+		if (x9_31)
+			hdr->flags |= PKEY_TYPE_EP11_FLAG_X9_31;
+		hdr->bitlen = modulus_bits;
+	}
 
 	return 0;
 }
