@@ -1117,7 +1117,7 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 	struct pkey_clr2seck2 clr2seck2;
 	size_t secure_key_size;
 	size_t clear_key_size;
-	u8 *secure_key;
+	u8 *secure_key = NULL;
 	u8 *clear_key;
 	size_t size;
 	int rc;
@@ -1143,20 +1143,23 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 	clr2seck2.type = key_type_to_pkey_type(key_type);
 	if (clr2seck2.type == 0) {
 		warnx("Key-type not supported: %s", key_type);
-		return -ENOTSUP;
+		rc = -ENOTSUP;
+		goto out;
 	}
 
 retry:
 	clr2seck2.size = keybits_to_keysize(HALF_KEYSIZE_FOR_XTS(
-						clear_key_size * 8, xts));
+					clear_key_size * 8, xts));
 	if (clr2seck2.size == 0) {
 		warnx("Invalid clear key size: '%lu' bytes", clear_key_size);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto out;
 	}
 	if (keybits == 192 && xts) {
 		warnx("Invalid clear key size for XTS: '%lu' bytes",
 		      clear_key_size);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto out;
 	}
 
 	rc = build_apqn_list_for_key_type(pkey_fd, clr2seck2.type, apqns,
@@ -1170,7 +1173,7 @@ retry:
 			warnx("Failed to build a list of APQNs that can "
 			      "generate a secure key of type %s: %s", key_type,
 			      strerror(-rc));
-		return rc;
+		goto out;
 	}
 
 	size = key_size_for_type(clr2seck2.type);
