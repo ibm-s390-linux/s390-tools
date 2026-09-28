@@ -1358,7 +1358,7 @@ static bool _prompt_for_yes(void)
 	if (fgets(str, sizeof(str), stdin) == NULL)
 		return false;
 
-	if (str[strlen(str) - 1] == '\n')
+	if (strlen(str) > 0 && str[strlen(str) - 1] == '\n')
 		str[strlen(str) - 1] = '\0';
 	pr_verbose("Prompt reply: '%s'", str);
 	if (strcasecmp(str, "y") == 0 || strcasecmp(str, "yes") == 0)
