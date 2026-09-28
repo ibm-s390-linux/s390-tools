@@ -708,8 +708,18 @@ static int _get_kmip_config(struct plugin_handle *ph)
 	ph->kmip_config.tls_issuer_cert = NULL;
 	ph->kmip_config.tls_pinned_pubkey = properties_get(ph->pd.properties,
 						KMIP_CONFIG_SERVER_PUBKEY);
+	if (ph->kmip_config.tls_pinned_pubkey != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->kmip_config.tls_pinned_pubkey))
+		return -EINVAL;
+
 	ph->kmip_config.tls_server_cert = properties_get(ph->pd.properties,
 						KMIP_CONFIG_SERVER_CERT);
+	if (ph->kmip_config.tls_server_cert != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->kmip_config.tls_server_cert))
+		return -EINVAL;
+
 	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_VERIFY_SERVER_CERT);
 	ph->kmip_config.tls_verify_peer =
 				(tmp != NULL && strcasecmp(tmp, "yes") == 0);
@@ -803,6 +813,26 @@ kms_handle_t kms_initialize(const char *config_path, bool verbose)
 	    !plugin_path_is_within_config(&ph->pd, ph->identity_secure_key)) {
 		rc = -EINVAL;
 		goto error;
+	}
+
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_WRAPPING_KEY);
+	if (tmp != NULL) {
+		if (!plugin_path_is_within_config(&ph->pd, tmp)) {
+			free(tmp);
+			rc = -EINVAL;
+			goto error;
+		}
+		free(tmp);
+	}
+
+	tmp = properties_get(ph->pd.properties, KMIP_CONFIG_WRAPPING_KEY_REENC);
+	if (tmp != NULL) {
+		if (!plugin_path_is_within_config(&ph->pd, tmp)) {
+			free(tmp);
+			rc = -EINVAL;
+			goto error;
+		}
+		free(tmp);
 	}
 
 	ph->server = properties_get(ph->pd.properties, KMIP_CONFIG_SERVER);
