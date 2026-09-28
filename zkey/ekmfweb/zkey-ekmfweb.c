@@ -1789,8 +1789,10 @@ static int _get_ekmfweb_settings(struct plugin_handle *ph)
 		      "%s/%s", ph->pd.config_path,
 		      EKMFWEB_CONFIG_EKMFWEB_PUBKEY_FILE);
 
-	rc = ekmf_get_public_key(&ph->ekmf_config, &ph->curl_handle,
-				 &error_msg, ph->pd.verbose);
+	rc = ekmf_get_public_key_at(&ph->ekmf_config, ph->pd.config_path_fd,
+				    EKMFWEB_CONFIG_EKMFWEB_PUBKEY_FILE,
+				    &ph->curl_handle,
+				    &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to get the public key of the EKMF Web "
 			   "server at '%s': %s", ph->ekmf_config.base_url,
@@ -1983,11 +1985,14 @@ static int _configure_connection(struct plugin_handle *ph,
 	util_asprintf(&server_pubkey_temp, "%s/%s-tmp", ph->pd.config_path,
 		      EKMFWEB_CONFIG_SERVER_PUBKEY_FILE);
 
-	rc = ekmf_get_server_cert_chain(&ph->ekmf_config,
-					server_cert_temp,
-					server_pubkey_temp,
-					NULL, &verified,
-					&error, ph->pd.verbose);
+	rc = ekmf_get_server_cert_chain_at(&ph->ekmf_config,
+					   ph->pd.config_path_fd,
+					   EKMFWEB_CONFIG_SERVER_CERT_FILE
+									"-tmp",
+					   EKMFWEB_CONFIG_SERVER_PUBKEY_FILE
+									"-tmp",
+					   NULL, &verified,
+					   &error, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to connect to EKMF Web server at '%s': "
 			   "%s", ph->ekmf_config.base_url,
@@ -3594,8 +3599,10 @@ int kms_login(const kms_handle_t handle)
 	util_asprintf((char **)&ph->ekmf_config.login_token, "%s/%s",
 		      ph->pd.config_path, EKMFWEB_CONFIG_LOGIN_TOKEN_FILE);
 
-	rc = ekmf_login(&ph->ekmf_config, &ph->curl_handle, user_id, passcode,
-			&error_msg, ph->pd.verbose);
+	rc = ekmf_login_at(&ph->ekmf_config, ph->pd.config_path_fd,
+			   EKMFWEB_CONFIG_LOGIN_TOKEN_FILE,
+			   &ph->curl_handle, user_id, passcode,
+			   &error_msg, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to login to EKMF Web server at '%s': "
 			   "%s", ph->ekmf_config.base_url,
