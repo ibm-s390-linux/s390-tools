@@ -2388,21 +2388,26 @@ int build_certificate_extensions(X509 *cert, X509_REQ *req,
 
 		rc = -EBADMSG;
 		ex = X509V3_EXT_conf(NULL, NULL, type, value);
-		if (ex != NULL) {
-			if (sk_X509_EXTENSION_find(sk_ext, ex) >= 0) {
-				rc = -EEXIST;
-				free(ext);
-				break;
-			}
-
-			rc = sk_X509_EXTENSION_push(sk_ext, ex);
-			if (rc < 1) {
-				rc = -EIO;
-				free(ext);
-				break;
-			}
-			rc = 0;
+		if (ex == NULL) {
+			free(ext);
+			break;
 		}
+
+		if (sk_X509_EXTENSION_find(sk_ext, ex) >= 0) {
+			rc = -EEXIST;
+			X509_EXTENSION_free(ex);
+			free(ext);
+			break;
+		}
+
+		rc = sk_X509_EXTENSION_push(sk_ext, ex);
+		if (rc < 1) {
+			rc = -EIO;
+			X509_EXTENSION_free(ex);
+			free(ext);
+			break;
+		}
+		rc = 0;
 
 		free(ext);
 	}
