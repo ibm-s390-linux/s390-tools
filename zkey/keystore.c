@@ -2564,7 +2564,6 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 		if (rc != 0) {
 			warnx("No APQN found that is suitable for "
 			      "working with the secure AES key '%s'", name);
-			rc = 0;
 			goto out_free_props;
 		}
 
@@ -4353,8 +4352,9 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 		goto out;
 
 	if (!quiet) {
-		if (_keystore_prompt_for_remove(keystore, name,
-						&file_names) != 0)
+		rc = _keystore_prompt_for_remove(keystore, name,
+						 &file_names);
+		if (rc != 0)
 			goto out;
 	}
 

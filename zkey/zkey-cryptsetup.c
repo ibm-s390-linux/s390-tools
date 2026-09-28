@@ -772,6 +772,7 @@ static int get_password_file(char **pwd, size_t *pwd_size, const char *key_file,
 			if (keyfile_offset > file_read_size) {
 				warnx("Cannot seek to requested key file "
 				      "offset %lu", keyfile_offset);
+				rc = -EINVAL;
 				goto out_err;
 			}
 			file_read_size -= keyfile_offset;
@@ -994,7 +995,7 @@ static int get_token(struct crypt_device *cd, int token, json_object **obj)
 	if (rc < 0) {
 		warnx("Failed to get re-encipher token %d: %s", token,
 		       strerror(-rc));
-		return -rc;
+		return rc;
 	}
 
 	*obj = json_tokener_parse(json);

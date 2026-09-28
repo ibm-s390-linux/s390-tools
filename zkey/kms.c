@@ -2305,6 +2305,7 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 		if (passphrase == NULL) {
 			pr_verbose(verbose, "Failed to read passphrase from "
 				   "file '%s'", passphrase_file);
+			rc = -EIO;
 			goto out;
 		}
 
@@ -2572,6 +2573,7 @@ int set_kms_key_properties(struct kms_info *kms_info,
 			if (passphrase == NULL) {
 				pr_verbose(verbose, "Failed to read passphrase"
 					   " from file '%s'", *passphrase_file);
+				rc = -EIO;
 				goto out;
 			}
 		}

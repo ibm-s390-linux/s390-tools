@@ -1030,6 +1030,7 @@ retry:
 		if (is_ep11_key_session_bound(secure_key, size)) {
 			warnx("The generated key is session bound. Kernel "
 			      "support is required for such keys");
+			rc = -EIO;
 			goto out;
 		}
 	}
@@ -1210,6 +1211,7 @@ retry:
 		if (is_ep11_key_session_bound(secure_key, size)) {
 			warnx("The generated key is session bound. Kernel "
 			      "support is required for such keys");
+			rc = -EIO;
 			goto out;
 		}
 	}
