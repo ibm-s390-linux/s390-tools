@@ -242,8 +242,18 @@ static int _get_ekmf_config(struct plugin_handle *ph)
 	ph->ekmf_config.tls_issuer_cert = NULL;
 	ph->ekmf_config.tls_pinned_pubkey = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_SERVER_PUBKEY);
+	if (ph->ekmf_config.tls_pinned_pubkey != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->ekmf_config.tls_pinned_pubkey))
+		return -EINVAL;
+
 	ph->ekmf_config.tls_server_cert = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_SERVER_CERT);
+	if (ph->ekmf_config.tls_server_cert != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->ekmf_config.tls_server_cert))
+		return -EINVAL;
+
 	tmp = properties_get(ph->pd.properties,
 			     EKMFWEB_CONFIG_VERIFY_SERVER_CERT);
 	ph->ekmf_config.tls_verify_peer =
@@ -259,9 +269,17 @@ static int _get_ekmf_config(struct plugin_handle *ph)
 
 	ph->ekmf_config.login_token = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_LOGIN_TOKEN);
+	if (ph->ekmf_config.login_token != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->ekmf_config.login_token))
+		return -EINVAL;
 
 	ph->ekmf_config.ekmf_server_pubkey = properties_get(ph->pd.properties,
 						EKMFWEB_CONFIG_EKMFWEB_PUBKEY);
+	if (ph->ekmf_config.ekmf_server_pubkey != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->ekmf_config.ekmf_server_pubkey))
+		return -EINVAL;
 
 	return 0;
 }
