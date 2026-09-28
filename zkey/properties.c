@@ -11,6 +11,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -289,18 +290,8 @@ int properties_remove(struct properties *properties, const char *name)
 	return 0;
 }
 
-/**
- * Saves the properties to a file
- *
- * @param[in]  properties    the properties object
- * @param[in]  filename      the file name
- * @param[in]  check_integrity if TRUE, an hash of the key and values is
- *                           stored as part of the file.
- *
- * @returns 0 on success, -EIO the file could not be created
- */
-int properties_save(struct properties *properties, const char *filename,
-		    bool check_integrity)
+static int _properties_save_file(struct properties *properties, FILE *fp,
+				 bool check_integrity)
 {
 	char digest_hex[SHA256_DIGEST_LEN * 2 + 1];
 	unsigned char digest[SHA256_DIGEST_LEN];
@@ -308,14 +299,6 @@ int properties_save(struct properties *properties, const char *filename,
 	struct property *property;
 	EVP_MD_CTX *ctx = NULL;
 	unsigned int i;
-	FILE *fp;
-
-	util_assert(properties != NULL, "Internal error: properties is NULL");
-	util_assert(filename != NULL, "Internal error: filename is NULL");
-
-	fp = fopen_nofollow(filename, "w");
-	if (fp == NULL)
-		return -EIO;
 
 	if (check_integrity)
 		ctx = sha256_init();
@@ -351,18 +334,66 @@ int properties_save(struct properties *properties, const char *filename,
 }
 
 /**
- * Loads the properties from a file
+ * Saves the properties to a file
  *
  * @param[in]  properties    the properties object
  * @param[in]  filename      the file name
  * @param[in]  check_integrity if TRUE, an hash of the key and values is
- *                           compared with the hash stored as part of the file.
+ *                           stored as part of the file.
  *
- * @returns 0 on success, -EIO the file could not be created,
- *          -EPERM in case of a syntax error or an integrity error
+ * @returns 0 on success, -EIO the file could not be created
  */
-int properties_load(struct properties *properties, const char *filename,
+int properties_save(struct properties *properties, const char *filename,
 		    bool check_integrity)
+{
+	FILE *fp;
+
+	util_assert(properties != NULL, "Internal error: properties is NULL");
+	util_assert(filename != NULL, "Internal error: filename is NULL");
+
+	fp = fopen_nofollow(filename, "w");
+	if (fp == NULL)
+		return -EIO;
+
+	return _properties_save_file(properties, fp, check_integrity);
+}
+
+/**
+ * Saves the properties to a file descriptor relative to a directory
+ *
+ * @param[in]  properties    the properties object
+ * @param[in]  dir_fd        the directory file descriptor
+ * @param[in]  filename      the file name inside the directory
+ * @param[in]  check_integrity if TRUE, an hash of the key and values is
+ *                           stored as part of the file.
+ *
+ * @returns 0 on success, negative errno if the file could not be created
+ */
+int properties_save_at(struct properties *properties, int dir_fd,
+		       const char *filename, bool check_integrity)
+{
+	FILE *fp;
+	int fd;
+
+	util_assert(properties != NULL, "Internal error: properties is NULL");
+	util_assert(filename != NULL, "Internal error: filename is NULL");
+
+	fd = openat(dir_fd, filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+		    S_IRUSR | S_IWUSR);
+	if (fd < 0)
+		return -errno;
+
+	fp = fdopen(fd, "w");
+	if (fp == NULL) {
+		close(fd);
+		return -errno;
+	}
+
+	return _properties_save_file(properties, fp, check_integrity);
+}
+
+static int _properties_load_file(struct properties *properties, FILE *fp,
+				 bool check_integrity)
 {
 	char digest_hex[SHA256_DIGEST_LEN * 2 + 1];
 	unsigned char digest[SHA256_DIGEST_LEN];
@@ -373,14 +404,6 @@ int properties_load(struct properties *properties, const char *filename,
 	unsigned int len, i;
 	int rc = 0;
 	char *ch;
-	FILE *fp;
-
-	util_assert(properties != NULL, "Internal error: properties is NULL");
-	util_assert(filename != NULL, "Internal error: filename is NULL");
-
-	fp = fopen(filename, "r");
-	if (fp == NULL)
-		return -EIO;
 
 	if (check_integrity)
 		ctx = sha256_init();
@@ -441,6 +464,66 @@ out:
 		free(digest_read);
 	fclose(fp);
 	return rc;
+}
+
+/**
+ * Loads the properties from a file
+ *
+ * @param[in]  properties    the properties object
+ * @param[in]  filename      the file name
+ * @param[in]  check_integrity if TRUE, an hash of the key and values is
+ *                           compared with the hash stored as part of the file.
+ *
+ * @returns 0 on success, -EIO the file could not be created,
+ *          -EPERM in case of a syntax error or an integrity error
+ */
+int properties_load(struct properties *properties, const char *filename,
+		    bool check_integrity)
+{
+	FILE *fp;
+
+	util_assert(properties != NULL, "Internal error: properties is NULL");
+	util_assert(filename != NULL, "Internal error: filename is NULL");
+
+	fp = fopen(filename, "r");
+	if (fp == NULL)
+		return -EIO;
+
+	return _properties_load_file(properties, fp, check_integrity);
+}
+
+/**
+ * Loads the properties from a file descriptor relative to a directory
+ *
+ * @param[in]  properties    the properties object
+ * @param[in]  dir_fd        the directory file descriptor
+ * @param[in]  filename      the file name inside the directory
+ * @param[in]  check_integrity if TRUE, an hash of the key and values is
+ *                           compared with the hash stored as part of the file.
+ *
+ * @returns 0 on success, -EIO the file could not be opened,
+ *          -EPERM in case of a syntax error or an integrity error
+ */
+int properties_load_at(struct properties *properties, int dir_fd,
+		       const char *filename, bool check_integrity)
+{
+	FILE *fp;
+	int fd;
+
+	util_assert(properties != NULL, "Internal error: properties is NULL");
+	util_assert(filename != NULL, "Internal error: filename is NULL");
+
+	fd = openat(dir_fd, filename, O_RDONLY | O_NOFOLLOW);
+	if (fd < 0)
+		return -errno;
+
+	fp = fdopen(fd, "r");
+	if (fp == NULL) {
+		close(fd);
+		return -errno;
+	}
+
+	return _properties_load_file(properties, fp, check_integrity);
 }
 
 /**

@@ -33,8 +33,14 @@ int properties_remove(struct properties *properties, const char *name);
 int properties_save(struct properties *properties, const char *filename,
 		    bool check_integrity);
 
+int properties_save_at(struct properties *properties, int dir_fd,
+		       const char *filename, bool check_integrity);
+
 int properties_load(struct properties *properties, const char *filename,
 		    bool check_integrity);
+
+int properties_load_at(struct properties *properties, int dir_fd,
+		       const char *filename, bool check_integrity);
 
 char *str_list_combine(const char **strings);
 

@@ -103,7 +103,7 @@ int plugin_init(struct plugin_data *pd, const char *plugin_name,
 
 	pd->properties = properties_new();
 	rc = plugin_load_config(pd);
-	if (rc != 0 && rc != -EIO) {
+	if (rc != 0 && rc != -EIO && rc != -ENOENT) {
 		warnx("Failed to load plugin config file: %s", strerror(-rc));
 		goto error;
 	}
@@ -183,19 +183,19 @@ void plugin_set_error(struct plugin_data *pd, const char *fmt, ...)
  */
 int plugin_load_config(struct plugin_data *pd)
 {
-	char *file_name = NULL;
 	int rc;
 
-	util_asprintf(&file_name, "%s/%s", pd->config_path, pd->config_file);
+	util_assert(pd->config_path_fd >= 0,
+		    "Internal error: config_path_fd is invalid");
 
-	rc = properties_load(pd->properties, file_name, true);
+	rc = properties_load_at(pd->properties, pd->config_path_fd,
+				pd->config_file, true);
 	if (rc != 0)
 		pr_verbose(pd, "Failed to load plugin config file '%s': %s",
-			   file_name, strerror(-rc));
+			   pd->config_file, strerror(-rc));
 	else
-		pr_verbose(pd, "Config file '%s' loaded", file_name);
+		pr_verbose(pd, "Config file '%s' loaded", pd->config_file);
 
-	free(file_name);
 	return rc;
 }
 
@@ -208,26 +208,26 @@ int plugin_load_config(struct plugin_data *pd)
  */
 int plugin_save_config(struct plugin_data *pd)
 {
-	char *file_name = NULL;
 	int rc;
 
-	util_asprintf(&file_name, "%s/%s", pd->config_path, pd->config_file);
+	util_assert(pd->config_path_fd >= 0,
+		    "Internal error: config_path_fd is invalid");
 
-	pr_verbose(pd, "Saving '%s'", file_name);
+	pr_verbose(pd, "Saving '%s'", pd->config_file);
 
-	rc = properties_save(pd->properties, file_name, true);
+	rc = properties_save_at(pd->properties, pd->config_path_fd,
+				pd->config_file, true);
 	if (rc != 0) {
 		plugin_set_error(pd, "Failed to save plugin config file '%s': "
-				 "%s", file_name, strerror(-rc));
+				 "%s", pd->config_file, strerror(-rc));
 		goto out;
 	}
 
-	rc = plugin_set_file_permission(pd, file_name);
+	rc = plugin_set_file_permission(pd, pd->config_file);
 	if (rc != 0)
 		goto out;
 
 out:
-	free(file_name);
 	return rc;
 }
 
