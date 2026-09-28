@@ -480,39 +480,59 @@ out:
 }
 
 /*
- * Returns true if the specified path is within the base path.
- * It canonicalizes both, the base path and the path, and compares that
- * the path starts with the base path followed by a '/'.
+ * Returns true if the specified path is a real (non-symlink) directory
+ * that is a direct child of the keystore directory, anchored on the
+ * pinned dir_fd so that no symlink substitution can occur between the
+ * check and the use.
  */
-static bool is_path_within_base_path(const char *base_path, const char *path)
+static bool is_path_within_base_path(const struct keystore *keystore,
+				     const char *path)
 {
-	char *real_base_path, *real_path;
-	size_t base_len;
+	const char *base_path = keystore->directory;
+	size_t base_len = strlen(base_path);
+	const char *basename;
+	struct stat sb;
 	bool ret = false;
+	int fd;
 
-	real_base_path = canonicalize_file_name(base_path);
-	real_path = canonicalize_file_name(path);
-
-	if (real_base_path == NULL || real_path == NULL) {
-		warnx("Failed to resolve path for safety check: %s",
-		      strerror(errno));
-		goto out;
-	}
-
-	/* Require path to be strictly inside the base path */
-	base_len = strlen(real_base_path);
-	if (strncmp(real_path, real_base_path, base_len) != 0 ||
-	    real_path[base_len] != '/') {
+	/* path must start with "<base_path>/" */
+	if (strncmp(path, base_path, base_len) != 0 ||
+	    path[base_len] != '/') {
 		warnx("'%s' is not inside '%s'", path, base_path);
-		goto out;
+		return false;
 	}
 
-	ret = true;
+	basename = path + base_len + 1;
 
-out:
-	free(real_base_path);
-	free(real_path);
+	/* basename must be a single component: no '/' and not "." or ".." */
+	if (basename[0] == '\0' || strchr(basename, '/') != NULL ||
+	    strcmp(basename, ".") == 0 || strcmp(basename, "..") == 0) {
+		warnx("'%s' is not a valid plugin config directory", path);
+		return false;
+	}
 
+	/*
+	 * Open with O_NOFOLLOW: if the entry is a symlink this fails with
+	 * ELOOP, so the check cannot be bypassed by a symlink substitution.
+	 */
+	fd = openat(keystore->dir_fd, basename,
+		    O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (fd < 0) {
+		warnx("Failed to open plugin config directory '%s': %s",
+		      path, strerror(errno));
+		return false;
+	}
+
+	/*
+	 * Confirm the opened entry is a real directory, not e.g. a bind-mount
+	 * over a symlink target that somehow slipped through.
+	 */
+	if (fstat(fd, &sb) == 0 && S_ISDIR(sb.st_mode))
+		ret = true;
+	else
+		warnx("'%s' is not a directory", path);
+
+	close(fd);
 	return ret;
 }
 

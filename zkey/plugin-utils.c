@@ -74,20 +74,19 @@ int plugin_init(struct plugin_data *pd, const char *plugin_name,
 
 	pr_verbose(pd, "Plugin initializing, config_path: '%s'", config_path);
 
-	if (lstat(config_path, &sb) != 0) {
+	pd->config_path_fd = open(config_path,
+				  O_RDONLY | O_DIRECTORY | O_NOFOLLOW |
+				  O_CLOEXEC);
+	if (pd->config_path_fd < 0) {
+		rc = -errno;
+		warnx("Failed to open directory '%s': %s", config_path,
+		      strerror(-rc));
+		goto error;
+	}
+
+	if (fstat(pd->config_path_fd, &sb) != 0) {
 		rc = -errno;
 		warnx("Can not access '%s': %s", config_path, strerror(-rc));
-		goto error;
-	}
-	if (!S_ISDIR(sb.st_mode)) {
-		warnx("'%s' is not a directory", config_path);
-		rc = -EIO;
-		goto error;
-	}
-	if (!util_path_is_readable(config_path) ||
-	    !util_path_is_writable(config_path)) {
-		warnx("Permission denied for '%s'", config_path);
-		rc = -EACCES;
 		goto error;
 	}
 	if (sb.st_mode & S_IWOTH) {
@@ -101,15 +100,6 @@ int plugin_init(struct plugin_data *pd, const char *plugin_name,
 	pd->config_path_mode = sb.st_mode & (S_IRUSR | S_IWUSR |
 					     S_IRGRP  | S_IWGRP |
 					     S_IROTH);
-
-	pd->config_path_fd = open(config_path,
-				  O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-	if (pd->config_path_fd < 0) {
-		rc = -errno;
-		warnx("Failed to open directory '%s': %s", config_path,
-		      strerror(-rc));
-		goto error;
-	}
 
 	pd->properties = properties_new();
 	rc = plugin_load_config(pd);
@@ -412,45 +402,81 @@ int plugin_remove_config_file(struct plugin_data *pd, const char *filename)
 }
 
 /**
- * Checks whether 'path' resolves to a location strictly inside the plugin's
- * config directory. Both the config directory and 'path' are canonicalized
- * via canonicalize_file_name() so that symlinks and '..' components in
- * 'path' cannot escape the config directory.
+ * Checks whether 'path' names a file that is a direct child of the plugin's
+ * config directory, without following symlinks.
+ *
+ * All validated paths are of the form "<config_path>/<filename>" with a single
+ * filename component - they are written by zkey itself, never by an attacker.
+ * We therefore:
+ *
+ *  1. Verify that 'path' starts with "<config_path>/" using a plain string
+ *     prefix check (no symlink resolution).
+ *  2. Extract the basename and reject traversal components ("", ".", "..") and
+ *     any embedded '/'.
+ *  3. For files that already exist: open with openat(config_path_fd,
+ *     O_NOFOLLOW) and verify via fstat() that it is a regular file.
+ *     O_NOFOLLOW returns ELOOP if the entry is a symlink, so no symlink
+ *     substitution can succeed.
+ *  4. For files that do not yet exist (e.g. staged re-encipherment): steps 1
+ *     and 2 are sufficient - a not-yet-created file cannot be a symlink, and
+ *     the value is always a hardcoded constant filename written by zkey itself.
  *
  * @param pd                the plugin data
  * @param path              the path to validate
  *
- * @returns true if path is inside the config directory, false otherwise.
- *          On failure (path cannot be resolved) false is returned and the
- *          plugin error message is set.
+ * @returns true if path is a valid single-component name inside the config
+ *          directory, false otherwise.
  */
 bool plugin_path_is_within_config(struct plugin_data *pd, const char *path)
 {
-	char *real_config, *real_path;
-	size_t config_len;
+	size_t config_len = strlen(pd->config_path);
+	const char *basename;
+	struct stat sb;
 	bool ok = false;
+	int fd;
 
-	real_config = canonicalize_file_name(pd->config_path);
-	real_path = canonicalize_file_name(path);
+	if (pd == NULL || path == NULL)
+		return false;
 
-	if (real_config == NULL || real_path == NULL) {
-		plugin_set_error(pd, "Failed to resolve path '%s': %s",
-				 path, strerror(errno));
-		goto out;
+	/* Step 1: path must start with "<config_path>/" */
+	if (strncmp(path, pd->config_path, config_len) != 0 ||
+	    path[config_len] != '/') {
+		plugin_set_error(pd, "'%s' is not inside the plugin config "
+				 "directory '%s'", path, pd->config_path);
+		return false;
 	}
 
-	config_len = strlen(real_config);
-	if (strncmp(real_path, real_config, config_len) == 0 &&
-	    real_path[config_len] == '/')
+	/* Step 2: extract basename and reject traversal / multi-component */
+	basename = path + config_len + 1;
+	if (basename[0] == '\0' ||
+	    strcmp(basename, ".") == 0 || strcmp(basename, "..") == 0 ||
+	    strchr(basename, '/') != NULL) {
+		plugin_set_error(pd, "'%s' is not a valid config file path",
+				 path);
+		return false;
+	}
+
+	/* Step 3: if the file exists, open it anchored on config_path_fd */
+	fd = openat(pd->config_path_fd, basename,
+		    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+	if (fd < 0) {
+		if (errno == ENOENT)
+			return true; /* Step 4: not-yet-created file is fine */
+		if (errno == ELOOP)
+			plugin_set_error(pd, "'%s' is a symlink, which is not "
+					 "accepted", path);
+		else
+			plugin_set_error(pd, "Failed to open '%s': %s",
+					 path, strerror(errno));
+		return false;
+	}
+
+	if (fstat(fd, &sb) == 0 && S_ISREG(sb.st_mode))
 		ok = true;
 	else
-		plugin_set_error(pd,
-				 "'%s' is not inside the plugin config "
-				 "directory '%s'", path, pd->config_path);
+		plugin_set_error(pd, "'%s' is not a regular file", path);
 
-out:
-	free(real_config);
-	free(real_path);
+	close(fd);
 	return ok;
 }
 
