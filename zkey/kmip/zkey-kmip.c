@@ -701,6 +701,10 @@ static int _get_kmip_config(struct plugin_handle *ph)
 
 	ph->kmip_config.tls_client_cert = properties_get(ph->pd.properties,
 						KMIP_CONFIG_CLIENT_CERTIFICATE);
+	if (ph->kmip_config.tls_client_cert != NULL &&
+	    !plugin_path_is_within_config(&ph->pd,
+					  ph->kmip_config.tls_client_cert))
+		return -EINVAL;
 
 	ph->kmip_config.tls_ca = properties_get(ph->pd.properties,
 						KMIP_CONFIG_CA_BUNDLE);
@@ -2232,7 +2236,8 @@ static int _generate_csr_sscert(struct plugin_handle *ph,
 		if (rc != 0)
 			goto out;
 
-		rc = SK_UTIL_write_x509_certificate(client_cert, ss_cert);
+		rc = SK_UTIL_write_x509_certificate_at(ph->pd.config_path_fd,
+						       client_cert, ss_cert);
 		if (rc != 0) {
 			_set_error(ph, "Failed to write the self-signed "
 				   "certificate to '%s'", client_cert);
@@ -3325,9 +3330,10 @@ static int _use_client_cert(struct plugin_handle *ph, const char *client_cert)
 	if (rc != 0)
 		goto out;
 
-	rc = SK_UTIL_write_x509_certificate(client_cert_file, cert);
+	rc = SK_UTIL_write_x509_certificate_at(ph->pd.config_path_fd,
+					       client_cert_file, cert);
 	if (rc != 0) {
-		_set_error(ph, "Failed to write the self-signed "
+		_set_error(ph, "Failed to write the client "
 			   "certificate to '%s'", client_cert_file);
 		goto out;
 	}
