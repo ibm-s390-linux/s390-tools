@@ -11,6 +11,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <err.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -202,10 +203,16 @@ static void _ekmf_copy_pss_params(
 
 /**
  * Extract the public key from a certificate in PEM format and store it into a
- * PEM file
+ * PEM file.
+ *
+ * Common implementation: extract the public key from a DER/PEM certificate
+ * string and write it as a PEM public key file.
+ * When dirfd == AT_FDCWD, pubkey_name is treated as a full path (equivalent
+ * to the original fopen_nofollow behaviour). Otherwise pubkey_name is a
+ * plain basename opened relative to dirfd via openat(2).
  */
-static int _ekmf_extract_pubkey(const char *cert, const char *pub_key_pem,
-				bool verbose)
+static int _ekmf_extract_pubkey_impl(const char *cert, int dirfd,
+				     const char *pubkey_name, bool verbose)
 {
 	EVP_PKEY *pkey = NULL;
 	X509 *x509 = NULL;
@@ -233,10 +240,10 @@ static int _ekmf_extract_pubkey(const char *cert, const char *pub_key_pem,
 		goto out;
 	}
 
-	fp = fopen_nofollow(pub_key_pem, "w");
+	fp = fopen_nofollow_at(dirfd, pubkey_name, "w");
 	if (fp == NULL) {
 		rc = -errno;
-		pr_verbose(verbose, "File '%s': %s", pub_key_pem,
+		pr_verbose(verbose, "File '%s': %s", pubkey_name,
 			   strerror(-rc));
 		goto out;
 	}
@@ -257,12 +264,15 @@ out:
 	return rc;
 }
 
-/**
- * Process the attributes of a certificate supplied by curl and writes the
- * PEM-format certificate attribute into the specified file pointer.
+/*
+ * Common implementation: iterate a curl certificate slist, write the PEM
+ * certificate data into fp (if non-NULL), and extract the public key into
+ * a file identified by (dirfd, pubkey_name).
+ * When dirfd == AT_FDCWD, pubkey_name is a full path; otherwise a basename.
  */
-static int _ekmf_process_certificate(FILE *fp, struct curl_slist *slist,
-				     const char *pub_key_pem, bool verbose)
+static int _ekmf_process_certificate_impl(FILE *fp, struct curl_slist *slist,
+					  int dirfd, const char *pubkey_name,
+					  bool verbose)
 {
 	char *cert;
 	int rc;
@@ -283,9 +293,10 @@ static int _ekmf_process_certificate(FILE *fp, struct curl_slist *slist,
 				}
 			}
 
-			if (pub_key_pem != NULL) {
-				rc = _ekmf_extract_pubkey(cert, pub_key_pem,
-							  verbose);
+			if (pubkey_name != NULL) {
+				rc = _ekmf_extract_pubkey_impl(cert, dirfd,
+							       pubkey_name,
+							       verbose);
 				if (rc != 0)
 					return rc;
 			}
@@ -305,35 +316,24 @@ static size_t _ekmf_dummy_write_cb(void *UNUSED(contents), size_t size,
 	return size * nmemb;
 }
 
-/**
- * Connects to the specified server url and obtains the servers certificate
- * and its chain of signing certificates and stores them in the specified
- * PEM files.
+/*
+ * Common implementation for ekmf_get_server_cert_chain() and
+ * ekmf_get_server_cert_chain_at().
  *
- * @param config            the configuration structure. Only the base_url must
- *                          be specified, all others are optional.
- * @param server_cert_pem   Optional: name of a PEM file to store the servers
- *                          certificate
- * @param server_pubkey_pem Optional: name of a PEM file to store the servers
- *                          public key (can be used for public key pinning)
- * @param ca_bundle_pem     Optional: name of a PEM file to store the CA
- *                          certificate chain as a bundle
- * @param verified          On return: If the server 's certificate has been
- *                          verified using the CA specification from the config
- *                          (if ca = NULL: default system CAs, otherwise path
- *                          or file to CAs).
- * @param error_msg         on return: If not NULL, then a textual error message
- *                          is returned in case of a failing request. The caller
- *                          must free the error string when it is not NULL.
- * @param verbose           if true, verbose messages are printed
- *
- * @returns zero for success, a negative errno in case of an error.
+ * When dirfd == AT_FDCWD the three name parameters are full paths and all
+ * opens go through fopen_nofollow_at(AT_FDCWD, path) == open(path, O_NOFOLLOW).
+ * When dirfd is a real directory fd the name parameters are plain basenames
+ * and all opens go through openat(dirfd, basename, O_NOFOLLOW), which
+ * prevents any parent-directory symlink from redirecting the write outside
+ * the trusted directory.
  */
-int ekmf_get_server_cert_chain(const struct ekmf_config *config,
-			       const char *server_cert_pem,
-			       const char *server_pubkey_pem,
-			       const char *ca_bundle_pem,
-			       bool *verified, char **error_msg, bool verbose)
+static int _ekmf_get_server_cert_chain_impl(const struct ekmf_config *config,
+					    int dirfd,
+					    const char *server_cert_name,
+					    const char *server_pubkey_name,
+					    const char *ca_bundle_name,
+					    bool *verified, char **error_msg,
+					    bool verbose)
 {
 	char error_str[CURL_ERROR_SIZE] = { 0 };
 	struct curl_certinfo *ci;
@@ -457,11 +457,11 @@ retry:
 	CURL_ERROR_CHECK(rc, "curl_easy_getinfo CURLINFO_CERTINFO", verbose,
 			 out);
 
-	if (server_cert_pem != NULL) {
-		fp = fopen_nofollow(server_cert_pem, "w");
+	if (server_cert_name != NULL) {
+		fp = fopen_nofollow_at(dirfd, server_cert_name, "w");
 		if (fp == NULL) {
 			rc = -errno;
-			pr_verbose(verbose, "File '%s': %s", server_cert_pem,
+			pr_verbose(verbose, "File '%s': %s", server_cert_name,
 				   strerror(-rc));
 			goto out;
 		}
@@ -477,9 +477,11 @@ retry:
 	for (i = 0; i < ci->num_of_certs; i++) {
 		pr_verbose(verbose, "Certificate %d:", i);
 
-		rc = _ekmf_process_certificate(fp, ci->certinfo[i], i == 0 ?
-						     server_pubkey_pem : NULL,
-					       verbose);
+		rc = _ekmf_process_certificate_impl(fp, ci->certinfo[i],
+						    dirfd,
+						    i == 0 ? server_pubkey_name
+							   : NULL,
+						    verbose);
 		if (rc != 0)
 			break;
 
@@ -493,13 +495,14 @@ retry:
 			 * server certificate wasn't verified by the specified
 			 * or default CA.
 			 */
-			if (ci->num_of_certs > 1 && ca_bundle_pem != NULL &&
+			if (ci->num_of_certs > 1 && ca_bundle_name != NULL &&
 			    do_verify == 0) {
-				fp = fopen_nofollow(ca_bundle_pem, "w");
+				fp = fopen_nofollow_at(dirfd, ca_bundle_name,
+						       "w");
 				if (fp == NULL) {
 					rc = -errno;
 					pr_verbose(verbose, "File '%s': %s",
-						   ca_bundle_pem,
+						   ca_bundle_name,
 						   strerror(-rc));
 					break;
 				}
@@ -525,6 +528,74 @@ out:
 	if (rc > 0)
 		rc = -EIO;
 	return rc;
+}
+
+/**
+ * Connects to the specified server url and obtains the servers certificate
+ * and its chain of signing certificates and stores them in the specified
+ * PEM files.
+ *
+ * @param config            the configuration structure. Only the base_url must
+ *                          be specified, all others are optional.
+ * @param server_cert_pem   Optional: name of a PEM file to store the servers
+ *                          certificate
+ * @param server_pubkey_pem Optional: name of a PEM file to store the servers
+ *                          public key (can be used for public key pinning)
+ * @param ca_bundle_pem     Optional: name of a PEM file to store the CA
+ *                          certificate chain as a bundle
+ * @param verified          On return: If the server's certificate has been
+ *                          verified using the CA specification from the config
+ *                          (if ca = NULL: default system CAs, otherwise path
+ *                          or file to CAs).
+ * @param error_msg         on return: If not NULL, then a textual error message
+ *                          is returned in case of a failing request. The caller
+ *                          must free the error string when it is not NULL.
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ */
+int ekmf_get_server_cert_chain(const struct ekmf_config *config,
+			       const char *server_cert_pem,
+			       const char *server_pubkey_pem,
+			       const char *ca_bundle_pem,
+			       bool *verified, char **error_msg, bool verbose)
+{
+	return _ekmf_get_server_cert_chain_impl(config, AT_FDCWD,
+						server_cert_pem,
+						server_pubkey_pem,
+						ca_bundle_pem,
+						verified, error_msg, verbose);
+}
+
+/**
+ * Like ekmf_get_server_cert_chain() but writes all output files relative to
+ * a trusted directory file descriptor using only basenames, preventing
+ * symlink redirection of writes outside the config directory.
+ *
+ * @param config                  the configuration structure
+ * @param dirfd                   open file descriptor of the output directory
+ * @param server_cert_basename    Optional: basename for the server certificate
+ * @param server_pubkey_basename  Optional: basename for the server public key
+ * @param ca_bundle_basename      Optional: basename for the CA bundle
+ * @param verified          On return: true if server certificate was verified
+ * @param error_msg         on return: textual error message on failure
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ */
+int ekmf_get_server_cert_chain_at(const struct ekmf_config *config,
+				  int dirfd,
+				  const char *server_cert_basename,
+				  const char *server_pubkey_basename,
+				  const char *ca_bundle_basename,
+				  bool *verified, char **error_msg,
+				  bool verbose)
+{
+	return _ekmf_get_server_cert_chain_impl(config, dirfd,
+						server_cert_basename,
+						server_pubkey_basename,
+						ca_bundle_basename,
+						verified, error_msg, verbose);
 }
 
 /**
@@ -1336,10 +1407,16 @@ out:
  *
  * @returns zero for success, a negative errno in case of an error.
  *          -EACCES is returned, if the passcode is no longer valid.
+ *
+ * Common implementation for ekmf_login() and ekmf_login_at().
+ * When dirfd == AT_FDCWD, token_name is a full path; otherwise a basename
+ * opened relative to the trusted directory fd.
  */
-int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
-	       const char *user_id, const char *passcode, char **error_msg,
-	       bool verbose)
+static int _ekmf_login_impl(const struct ekmf_config *config,
+			    int dirfd, const char *token_name,
+			    CURL **curl_handle,
+			    const char *user_id, const char *passcode,
+			    char **error_msg, bool verbose)
 {
 	json_object *response_obj = NULL;
 	json_object *request_obj = NULL;
@@ -1415,11 +1492,11 @@ int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
 	while (*tok == ' ')
 		tok++;
 
-	fp = fopen_nofollow(config->login_token, "w");
+	fp = fopen_nofollow_at(dirfd, token_name, "w");
 	if (fp == NULL) {
 		rc = -errno;
-		pr_verbose(verbose, "Failed to open file %s: '%s'",
-			   config->login_token, strerror(-rc));
+		pr_verbose(verbose, "Failed to open token file '%s': '%s'",
+			   token_name, strerror(-rc));
 		goto out;
 	}
 
@@ -1430,8 +1507,8 @@ int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
 		goto out;
 	}
 
-	pr_verbose(verbose, "Login token successfully updated in file '%s'",
-		   config->login_token);
+	pr_verbose(verbose, "Login token successfully updated in '%s'",
+		   token_name);
 
 out:
 	_ekmf_release_curl_handle(curl_handle, curl);
@@ -1444,7 +1521,43 @@ out:
 		fclose(fp);
 
 	return rc;
+}
 
+int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
+	       const char *user_id, const char *passcode, char **error_msg,
+	       bool verbose)
+{
+	return _ekmf_login_impl(config, AT_FDCWD, config->login_token,
+				curl_handle, user_id, passcode,
+				error_msg, verbose);
+}
+
+/**
+ * Like ekmf_login() but writes the login token into a file opened relative
+ * to a trusted directory file descriptor, preventing symlink redirection of
+ * the write outside the config directory.
+ *
+ * @param config            the configuration structure
+ * @param dirfd             open file descriptor of the directory receiving
+ *                          the login token file
+ * @param token_basename    basename of the login token file within dirfd
+ * @param curl_handle       address of a CURL handle for connection reuse
+ * @param user_id           the user ID to authenticate with
+ * @param passcode          the passcode to authenticate with
+ * @param error_msg         on return: textual error message on failure
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned if the passcode is no longer valid.
+ */
+int ekmf_login_at(const struct ekmf_config *config, int dirfd,
+		  const char *token_basename, CURL **curl_handle,
+		  const char *user_id, const char *passcode,
+		  char **error_msg, bool verbose)
+{
+	return _ekmf_login_impl(config, dirfd, token_basename,
+				curl_handle, user_id, passcode,
+				error_msg, verbose);
 }
 
 /**
@@ -1470,8 +1583,16 @@ out:
  * @returns zero for success, a negative errno in case of an error.
  *          -EACCES is returned, if no or no valid login token is available.
  */
-int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
-			char **error_msg, bool verbose)
+/*
+ * Common implementation for ekmf_get_public_key() and
+ * ekmf_get_public_key_at().
+ * When dirfd == AT_FDCWD, pubkey_name is a full path; otherwise a basename
+ * opened relative to the trusted directory fd.
+ */
+static int _ekmf_get_public_key_impl(const struct ekmf_config *config,
+				     int dirfd, const char *pubkey_name,
+				     CURL **curl_handle,
+				     char **error_msg, bool verbose)
 {
 	json_object *response_obj = NULL;
 	char *login_token = NULL;
@@ -1539,15 +1660,14 @@ int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
 		goto out;
 	}
 
-	rc = write_public_key(config->ekmf_server_pubkey, pkey);
+	rc = write_public_key_at(dirfd, pubkey_name, pkey);
 	if (rc != 0) {
 		pr_verbose(verbose, "Failed to write public key '%s': %s",
-			   config->ekmf_server_pubkey, strerror(-rc));
+			   pubkey_name, strerror(-rc));
 		goto out;
 	}
 
-	pr_verbose(verbose, "EKMFWeb public key written to file '%s'",
-		   config->ekmf_server_pubkey);
+	pr_verbose(verbose, "EKMFWeb public key written to '%s'", pubkey_name);
 
 out:
 	_ekmf_release_curl_handle(curl_handle, curl);
@@ -1561,6 +1681,38 @@ out:
 	SK_OPENSSL_term();
 
 	return rc;
+}
+
+int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
+			char **error_msg, bool verbose)
+{
+	return _ekmf_get_public_key_impl(config, AT_FDCWD,
+					 config->ekmf_server_pubkey,
+					 curl_handle, error_msg, verbose);
+}
+
+/**
+ * Like ekmf_get_public_key() but writes the public key into a file opened
+ * relative to a trusted directory file descriptor, preventing symlink
+ * redirection of the write outside the config directory.
+ *
+ * @param config            the configuration structure
+ * @param dirfd             open file descriptor of the directory receiving
+ *                          the public key file
+ * @param pubkey_basename   basename of the public key PEM file within dirfd
+ * @param curl_handle       address of a CURL handle for connection reuse
+ * @param error_msg         on return: textual error message on failure
+ * @param verbose           if true, verbose messages are printed
+ *
+ * @returns zero for success, a negative errno in case of an error.
+ *          -EACCES is returned if no or no valid login token is available.
+ */
+int ekmf_get_public_key_at(const struct ekmf_config *config, int dirfd,
+			   const char *pubkey_basename, CURL **curl_handle,
+			   char **error_msg, bool verbose)
+{
+	return _ekmf_get_public_key_impl(config, dirfd, pubkey_basename,
+					 curl_handle, error_msg, verbose);
 }
 
 /**

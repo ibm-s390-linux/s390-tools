@@ -2179,6 +2179,39 @@ int write_public_key(const char *pem_filename, EVP_PKEY *pkey)
 }
 
 /**
+ * Write a public key (EVP_PKEY) as PEM into a file opened relative to a
+ * trusted directory file descriptor. Uses O_NOFOLLOW on the basename so
+ * no symlink can redirect the write outside the trusted directory.
+ *
+ * @param dirfd             open file descriptor of the parent directory
+ * @param basename          name of the destination file within that directory
+ * @param pkey              the public key to write
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int write_public_key_at(int dirfd, const char *basename, EVP_PKEY *pkey)
+{
+	FILE *fp;
+	int rc;
+
+	if (basename == NULL || pkey == NULL)
+		return -EINVAL;
+
+	fp = fopen_nofollow_at(dirfd, basename, "w");
+	if (fp == NULL)
+		return -errno;
+
+	rc = PEM_write_PUBKEY(fp, pkey);
+
+	fclose(fp);
+
+	if (rc != 1)
+		return -EIO;
+
+	return 0;
+}
+
+/**
  * Checks if an exact duplicate of the name entry is part of the name already.
  */
 static bool is_duplicate_name_entry(X509_NAME *name, X509_NAME_ENTRY *entry)
@@ -2641,6 +2674,47 @@ FILE *fopen_nofollow(const char *path, const char *mode)
 		return NULL;
 
 	fd = open(path, flags, 0600);
+	if (fd < 0)
+		return NULL;
+
+	fp = fdopen(fd, mode);
+	if (fp == NULL) {
+		close(fd);
+		return NULL;
+	}
+	return fp;
+}
+
+/**
+ * Open a file relative to a trusted directory file descriptor using
+ * O_NOFOLLOW on the basename, so no symlink in any path component
+ * outside the already-verified directory can redirect the operation.
+ *
+ * @param dirfd             open file descriptor of the parent directory
+ * @param basename          name of the file within that directory (no '/')
+ * @param mode              fopen-style mode string ("r", "w", "a", ...)
+ *
+ * @returns FILE pointer on success, NULL on error (errno set)
+ */
+FILE *fopen_nofollow_at(int dirfd, const char *basename, const char *mode)
+{
+	int flags = O_NOFOLLOW;
+	int fd;
+	FILE *fp;
+
+	/* Determine flags based on mode */
+	if (mode[0] == 'r')
+		flags |= (mode[1] == '+') ? O_RDWR : O_RDONLY;
+	else if (mode[0] == 'w')
+		flags |= O_CREAT | O_TRUNC |
+				((mode[1] == '+') ? O_RDWR : O_WRONLY);
+	else if (mode[0] == 'a')
+		flags |= O_CREAT | O_APPEND |
+				((mode[1] == '+') ? O_RDWR : O_WRONLY);
+	else
+		return NULL;
+
+	fd = openat(dirfd, basename, flags, 0600);
 	if (fd < 0)
 		return NULL;
 

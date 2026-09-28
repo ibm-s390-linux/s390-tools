@@ -35,3 +35,11 @@ LIBEKMFWEB_1.1 {
         ekmf_validate_cert;
     local: *;
 };
+
+LIBEKMFWEB_1.2 {
+    global:
+        ekmf_get_server_cert_chain_at;
+        ekmf_login_at;
+        ekmf_get_public_key_at;
+    local: *;
+};

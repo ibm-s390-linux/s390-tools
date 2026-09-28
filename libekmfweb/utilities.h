@@ -98,6 +98,7 @@ int write_x509_request(const char *pem_filename, X509_REQ *req, bool new_hdr);
 int read_public_key(const char *pem_filename, EVP_PKEY **pkey);
 
 int write_public_key(const char *pem_filename, EVP_PKEY *pkey);
+int write_public_key_at(int dirfd, const char *basename, EVP_PKEY *pkey);
 
 int build_subject_name(X509_NAME **name, const char *rdns[], size_t num_rdns,
 		       bool utf8);
@@ -125,5 +126,6 @@ int json_object_object_add_ex(struct json_object *obj, const char *const key,
 #endif
 
 FILE *fopen_nofollow(const char *path, const char *mode);
+FILE *fopen_nofollow_at(int dirfd, const char *basename, const char *mode);
 
 #endif

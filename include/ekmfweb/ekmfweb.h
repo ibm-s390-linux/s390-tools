@@ -103,6 +103,13 @@ int ekmf_get_server_cert_chain(const struct ekmf_config *config,
 			       const char *server_pubkey_pem,
 			       const char *ca_bundle_pem,
 			       bool *verified, char **error_msg, bool verbose);
+int ekmf_get_server_cert_chain_at(const struct ekmf_config *config,
+				  int dirfd,
+				  const char *server_cert_basename,
+				  const char *server_pubkey_basename,
+				  const char *ca_bundle_basename,
+				  bool *verified, char **error_msg,
+				  bool verbose);
 
 /**
  * Print the certificate(s) contained in the specified PEM file.
@@ -165,6 +172,10 @@ int ekmf_check_login_token(const struct ekmf_config *config, bool *valid,
 int ekmf_login(const struct ekmf_config *config, CURL **curl_handle,
 	       const char *user_id, const char *passcode, char **error_msg,
 	       bool verbose);
+int ekmf_login_at(const struct ekmf_config *config, int dirfd,
+		  const char *token_basename, CURL **curl_handle,
+		  const char *user_id, const char *passcode,
+		  char **error_msg, bool verbose);
 
 enum ekmf_key_type {
 	EKMF_KEY_TYPE_ECC = 1,
@@ -489,6 +500,9 @@ int ekmf_check_feature(const struct ekmf_config *config, CURL **curl_handle,
  */
 int ekmf_get_public_key(const struct ekmf_config *config, CURL **curl_handle,
 			char **error_msg, bool verbose);
+int ekmf_get_public_key_at(const struct ekmf_config *config, int dirfd,
+			   const char *pubkey_basename, CURL **curl_handle,
+			   char **error_msg, bool verbose);
 
 /**
  * Requests a key to be retrieved from EKMFweb and imported under the current
