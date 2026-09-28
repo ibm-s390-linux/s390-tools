@@ -587,7 +587,7 @@ int sysfs_get_mkvps(unsigned int card, unsigned int domain,
 
 	if (mk_info->new_mk.mk_state == MK_STATE_UNKNOWN &&
 	    mk_info->cur_mk.mk_state == MK_STATE_UNKNOWN &&
-	    (cardtype == CARD_TYPE_CCA &&
+	    (cardtype != CARD_TYPE_CCA ||
 	     mk_info->old_mk.mk_state == MK_STATE_UNKNOWN))
 		rc = -EIO;
 out:
