@@ -2857,14 +2857,17 @@ static int _configure_connection(struct plugin_handle *ph,
 	util_asprintf(&server_pubkey_temp, "%s/%s-tmp", ph->pd.config_path,
 		      KMIP_CONFIG_SERVER_PUBKEY_FILE);
 
-	rc = kmip_connection_get_server_cert(ph->kmip_config.server,
-					     ph->kmip_config.transport,
-					     ph->kmip_config.tls_ca,
-					     ph->kmip_config.tls_client_key,
-					     ph->kmip_config.tls_client_cert,
-					     server_cert_temp,
-					     server_pubkey_temp,
-					     NULL, &verified, ph->pd.verbose);
+	rc = kmip_connection_get_server_cert_at(ph->kmip_config.server,
+						ph->kmip_config.transport,
+						ph->kmip_config.tls_ca,
+						ph->kmip_config.tls_client_key,
+						ph->kmip_config.tls_client_cert,
+						ph->pd.config_path_fd,
+						KMIP_CONFIG_SERVER_CERT_FILE
+									"-tmp",
+						KMIP_CONFIG_SERVER_PUBKEY_FILE
+									"-tmp",
+						NULL, &verified, ph->pd.verbose);
 	if (rc != 0) {
 		_set_error(ph, "Failed to connect to KMIP server at '%s': "
 			   "%s", ph->kmip_config.server, strerror(-rc));
