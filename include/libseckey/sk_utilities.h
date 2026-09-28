@@ -83,6 +83,8 @@ int SK_UTIL_read_key_blob(const char *filename, unsigned char *key_blob,
 			  size_t *key_blob_len);
 int SK_UTIL_write_key_blob(const char *filename, unsigned char *key_blob,
 			   size_t key_blob_len);
+int SK_UTIL_write_key_blob_at(int dirfd, const char *filename,
+			      unsigned char *key_blob, size_t key_blob_len);
 int SK_UTIL_read_public_key(const char *pem_filename, EVP_PKEY **pkey);
 int SK_UTIL_write_public_key(const char *pem_filename, EVP_PKEY *pkey);
 

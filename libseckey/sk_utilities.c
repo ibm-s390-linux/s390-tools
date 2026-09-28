@@ -1031,6 +1031,55 @@ int SK_UTIL_write_key_blob(const char *filename, unsigned char *key_blob,
 }
 
 /**
+ * Writes a secure key to a file relative to an open directory file descriptor.
+ * Uses openat(dirfd, basename(filename), O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW)
+ * so that neither a symlinked last component nor a swapped parent directory
+ * can redirect the write outside the intended directory.
+ *
+ * @param dirfd              open file descriptor of the containing directory
+ * @param filename           the name of the file to write (only basename used)
+ * @param key_blob           the key blob
+ * @param key_blob_len       the size of the key blob
+ *
+ * @returns zero for success, a negative errno in case of an error
+ */
+int SK_UTIL_write_key_blob_at(int dirfd, const char *filename,
+			      unsigned char *key_blob, size_t key_blob_len)
+{
+	const char *base;
+	size_t count;
+	FILE *fp;
+	int fd;
+
+	if (dirfd < 0 || filename == NULL || key_blob == NULL ||
+	    key_blob_len == 0)
+		return -EINVAL;
+
+	base = strrchr(filename, '/');
+	base = (base != NULL) ? base + 1 : filename;
+
+	fd = openat(dirfd, base,
+		    O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
+	if (fd < 0)
+		return -errno;
+
+	fp = fdopen(fd, "w");
+	if (fp == NULL) {
+		close(fd);
+		return -errno;
+	}
+
+	count = fwrite(key_blob, 1, key_blob_len, fp);
+	if (count != key_blob_len) {
+		fclose(fp);
+		return -EIO;
+	}
+
+	fclose(fp);
+	return 0;
+}
+
+/**
  * Reads a public key from the specified PEM file.
  *
  * @param pem_filename       the name of the PEM file to read
