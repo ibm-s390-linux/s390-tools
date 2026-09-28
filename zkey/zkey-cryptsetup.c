@@ -1815,9 +1815,9 @@ static int reencipher_key(u8 *key, size_t securekeysize,
 								securekeysize))
 					is_integrity_key ?
 						print_msg_for_cca_envvars(
-							"secure volume key") :
+							"secure integrity key") :
 						print_msg_for_cca_envvars(
-							"secure integrity key");
+							"secure volume key");
 				rc = -EINVAL;
 			}
 			return rc;
