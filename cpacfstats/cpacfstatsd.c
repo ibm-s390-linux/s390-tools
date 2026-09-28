@@ -624,12 +624,11 @@ int main(int argc, char *argv[])
 			rc = do_reset(s, ctr, supported_counters);
 		else if (cmd == PRINT)
 			rc = do_print(s, ctr, supported_counters);
-		else {
+		else
 			eprint("Received unknown command %d, ignoring\n",
 			       (int) cmd);
-			close(s);
-			continue;
-		}
+
+		close(s);
 	}
 
 	if (stopsig == SIGTERM)
