@@ -3293,6 +3293,8 @@ out:
 int ekmf_clone_template_info(const struct ekmf_template_info *src,
 			     struct ekmf_template_info **dest)
 {
+	int rc;
+
 	if (src == NULL || dest == NULL)
 		return -EINVAL;
 
@@ -3300,7 +3302,12 @@ int ekmf_clone_template_info(const struct ekmf_template_info *src,
 	if (*dest == NULL)
 		return -ENOMEM;
 
-	return clone_template_info(src, *dest);
+	rc = clone_template_info(src, *dest);
+	if (rc != 0) {
+		free(*dest);
+		*dest = NULL;
+	}
+	return rc;
 }
 
 /**
@@ -4446,6 +4453,8 @@ out:
 int ekmf_clone_key_info(const struct ekmf_key_info *src,
 			struct ekmf_key_info **dest)
 {
+	int rc;
+
 	if (src == NULL || dest == NULL)
 		return -EINVAL;
 
@@ -4453,7 +4462,12 @@ int ekmf_clone_key_info(const struct ekmf_key_info *src,
 	if (*dest == NULL)
 		return -ENOMEM;
 
-	return clone_key_info(src, *dest);
+	rc = clone_key_info(src, *dest);
+	if (rc != 0) {
+		free(*dest);
+		*dest = NULL;
+	}
+	return rc;
 }
 
 /**
