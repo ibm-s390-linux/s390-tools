@@ -1042,7 +1042,7 @@ int sk_openssl_get_pkey_rsa(const unsigned char *secure_key,
 			    const void *private, EVP_PKEY **pkey, bool debug)
 {
 	BIGNUM *bn_modulus = NULL, *bn_pub_exp = NULL;
-	RSA *rsa;
+	RSA *rsa = NULL;
 	int rc;
 
 	if (pkey == NULL || modulus == NULL || pub_exp == NULL)
@@ -1075,6 +1075,9 @@ int sk_openssl_get_pkey_rsa(const unsigned char *secure_key,
 		rc = -EIO;
 		goto out;
 	}
+	/* ownership of bn_modulus and bn_pub_exp transferred to rsa */
+	bn_modulus = NULL;
+	bn_pub_exp = NULL;
 
 	*pkey = EVP_PKEY_new();
 	if (*pkey == NULL) {
@@ -1089,6 +1092,8 @@ int sk_openssl_get_pkey_rsa(const unsigned char *secure_key,
 		rc = -EIO;
 		goto out;
 	}
+	/* ownership of rsa transferred to *pkey */
+	rsa = NULL;
 
 	if (secure_key != NULL) {
 		rc = sk_pkey_meth_setup_pkey(*pkey, secure_key, secure_key_size,
@@ -1104,10 +1109,18 @@ int sk_openssl_get_pkey_rsa(const unsigned char *secure_key,
 	sk_debug(debug, "pkey created: %p", *pkey);
 
 out:
-	if (rc != 0 && bn_modulus != NULL)
-		BN_free(bn_modulus);
-	if (rc != 0 && bn_pub_exp != NULL)
-		BN_free(bn_pub_exp);
+	if (rc != 0) {
+		if (bn_modulus != NULL)
+			BN_free(bn_modulus);
+		if (bn_pub_exp != NULL)
+			BN_free(bn_pub_exp);
+		if (rsa != NULL)
+			RSA_free(rsa);
+		if (*pkey != NULL) {
+			EVP_PKEY_free(*pkey);
+			*pkey = NULL;
+		}
+	}
 	return rc;
 }
 
