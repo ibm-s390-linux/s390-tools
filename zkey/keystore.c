@@ -3905,6 +3905,13 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	if (rc != 0)
 		goto out;
 
+	if (params.inplace != 1) {
+		rc = _keystore_set_file_permission(keystore,
+						   file_names->renc_filename);
+		if (rc != 0)
+			goto out;
+	}
+
 	if (params.complete || params.inplace == 1) {
 		rc = _keystore_set_timestamp_property(properties,
 						      PROP_NAME_REENC_TIME);
