@@ -140,14 +140,22 @@ void plugin_term(struct plugin_data *pd)
 		close(pd->config_path_fd);
 		pd->config_path_fd = -1;
 	}
-	if (pd->plugin_name != NULL)
+	if (pd->plugin_name != NULL) {
 		free((void *)pd->plugin_name);
-	if (pd->config_path != NULL)
+		pd->plugin_name = NULL;
+	}
+	if (pd->config_path != NULL) {
 		free((void *)pd->config_path);
-	if (pd->config_file != NULL)
+		pd->config_path = NULL;
+	}
+	if (pd->config_file != NULL) {
 		free((void *)pd->config_file);
-	if (pd->properties != NULL)
+		pd->config_file = NULL;
+	}
+	if (pd->properties != NULL) {
 		properties_free(pd->properties);
+		pd->properties = NULL;
+	}
 }
 
 /**
