@@ -5291,7 +5291,7 @@ static int _cca_unwrap_key_rsa(struct plugin_handle *ph,
 		    &rule_array_count, rule_array,
 		    (long *)&wrapped_key_len, (unsigned char *)wrapped_key,
 		    (long *)&wrapping_key_len, (unsigned char *)wrapping_key,
-		    (long *)&unwrapped_key_len, unwrapped_key);
+		    (long *)unwrapped_key_len, unwrapped_key);
 
 	if (return_code != 0) {
 		_set_error(ph, "CCA CSNDSYI (SYMMETRIC KEY IMPORT) failed. "
