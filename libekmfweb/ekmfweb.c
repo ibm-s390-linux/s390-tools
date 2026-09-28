@@ -211,7 +211,7 @@ static int _ekmf_extract_pubkey(const char *cert, const char *pub_key_pem,
 	X509 *x509 = NULL;
 	FILE *fp = NULL;
 	BIO *b = NULL;
-	int rc;
+	int rc = 0;
 
 	b = BIO_new_mem_buf(cert, -1);
 	if (b == NULL) {
@@ -254,7 +254,7 @@ out:
 		X509_free(x509);
 	if (b != NULL)
 		BIO_free(b);
-	return 0;
+	return rc;
 }
 
 /**
