@@ -2816,13 +2816,13 @@ static int sk_prov_keymgmt_export_cb(const OSSL_PARAM params[], void *arg)
 
 	np = &new_params[i++];
 	*np = OSSL_PARAM_construct_octet_ptr(SK_PROV_PKEY_PARAM_SK_FUNCS,
-					     (void **)key->funcs,
+					     (void **)&key->funcs,
 					     sizeof(struct sk_funcs));
 	sk_debug_key(key, "param: key: %s", np->key);
 
 	np = &new_params[i++];
 	*np = OSSL_PARAM_construct_octet_ptr(SK_PROV_PKEY_PARAM_SK_PRIVATE,
-					     key->private, 0);
+					     (void **)&key->private, 0);
 	sk_debug_key(key, "param: key: %s", np->key);
 
 	np = &new_params[i++];
