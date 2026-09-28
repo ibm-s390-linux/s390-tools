@@ -1678,8 +1678,7 @@ static EVP_MD *sk_prov_sign_op_get_md(struct sk_prov_op_ctx *ctx)
 	sk_debug_op_ctx(ctx, "ctx: %p", ctx);
 
 	if (!sk_prov_sign_op_get_ctx_params(ctx, ctx_params) ||
-	    !OSSL_PARAM_modified(&ctx_params[0]) ||
-	    !OSSL_PARAM_modified(&ctx_params[1])) {
+	    !OSSL_PARAM_modified(&ctx_params[0])) {
 		sk_debug_op_ctx(ctx, "sk_prov_sign_op_get_ctx_params failed");
 		if (ctx->md != NULL) {
 			sk_debug_op_ctx(ctx, "use digest from context: %s",
@@ -1690,6 +1689,8 @@ static EVP_MD *sk_prov_sign_op_get_md(struct sk_prov_op_ctx *ctx)
 
 		sk_debug_op_ctx(ctx, "use default");
 		strcpy(mdname, SK_PROV_RSA_DEFAULT_MD);
+		strcpy(mdprops, "");
+	} else if (!OSSL_PARAM_modified(&ctx_params[1])) {
 		strcpy(mdprops, "");
 	}
 
@@ -1724,12 +1725,14 @@ static EVP_MD *sk_prov_sign_op_get_mgf_md(struct sk_prov_op_ctx *ctx)
 	sk_debug_op_ctx(ctx, "ctx: %p", ctx);
 
 	if (!sk_prov_sign_op_get_ctx_params(ctx, ctx_params) ||
-	    !OSSL_PARAM_modified(&ctx_params[0]) ||
-	    !OSSL_PARAM_modified(&ctx_params[1])) {
+	    !OSSL_PARAM_modified(&ctx_params[0])) {
 		sk_debug_op_ctx(ctx, "sk_prov_sign_op_get_ctx_params failed, "
 				"using signature digest");
 		return sk_prov_sign_op_get_md(ctx);
 	}
+
+	if (!OSSL_PARAM_modified(&ctx_params[1]))
+		strcpy(mdprops, "");
 
 	md = EVP_MD_fetch((OSSL_LIB_CTX *)ctx->provctx->c_get_libctx(
 							ctx->provctx->handle),
