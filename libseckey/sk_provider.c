@@ -3022,7 +3022,7 @@ static const OSSL_PARAM *sk_prov_keymgmt_import_types(
 
 	default_import_types_fn = (OSSL_FUNC_keymgmt_import_types_fn *)
 			sk_prov_get_default_keymgmt_func(provctx, pkey_type,
-					OSSL_FUNC_KEYMGMT_EXPORT_TYPES);
+					OSSL_FUNC_KEYMGMT_IMPORT_TYPES);
 
 	/* default_import_types_fn is optional */
 	if (default_import_types_fn != NULL)
@@ -3252,7 +3252,7 @@ static void *sk_prov_keymgmt_load(const void *reference, size_t reference_sz)
 	if (reference == NULL)
 		return NULL;
 
-	if (reference_sz == sizeof(struct sk_prov_key)) {
+	if (reference_sz == sizeof(struct sk_prov_key *)) {
 		/* The contents of the reference is the address to our object */
 		key = *(struct sk_prov_key **)reference;
 
