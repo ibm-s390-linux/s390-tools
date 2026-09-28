@@ -912,6 +912,57 @@ int SK_UTIL_write_x509_certificate(const char *pem_filename, X509 *cert)
 }
 
 /**
+ * Writes a X.509 certificate to a file relative to an open directory file
+ * descriptor. Uses openat(dirfd, basename(pem_filename), ...) so that neither
+ * a symlinked last component nor a swapped parent directory can redirect the
+ * write outside the intended directory.
+ *
+ * @param dirfd              open file descriptor of the containing directory
+ * @param pem_filename       the name of the PEM file to write (only basename
+ *                           used)
+ * @param cert               the X.509 certificate object to write
+ *
+ * @returns zero for success, a negative errno in case of an error:
+ *          -EINVAL: invalid parameter
+ *          -EIO: error during writing out the certificate
+ *          any other errno as returned by openat
+ */
+int SK_UTIL_write_x509_certificate_at(int dirfd, const char *pem_filename,
+				      X509 *cert)
+{
+	const char *base;
+	FILE *fp;
+	int fd;
+	int rc;
+
+	if (dirfd < 0 || pem_filename == NULL || cert == NULL)
+		return -EINVAL;
+
+	base = strrchr(pem_filename, '/');
+	base = (base != NULL) ? base + 1 : pem_filename;
+
+	fd = openat(dirfd, base,
+		    O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
+	if (fd < 0)
+		return -errno;
+
+	fp = fdopen(fd, "w");
+	if (fp == NULL) {
+		close(fd);
+		return -errno;
+	}
+
+	rc = PEM_write_X509(fp, cert);
+
+	fclose(fp);
+
+	if (rc != 1)
+		return -EIO;
+
+	return 0;
+}
+
+/**
  * Writes a X.509 certificate signing request to the specified PEM file.
  *
  * @param pem_filename       the name of the PEM file to write to

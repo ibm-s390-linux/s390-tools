@@ -77,6 +77,8 @@ int SK_UTIL_build_ecdsa_signature(const unsigned char *raw_sig,
 /* Functions to read and write keys, certificates, requests, etc. */
 int SK_UTIL_read_x509_certificate(const char *pem_filename, X509 **cert);
 int SK_UTIL_write_x509_certificate(const char *pem_filename, X509 *cert);
+int SK_UTIL_write_x509_certificate_at(int dirfd, const char *pem_filename,
+				      X509 *cert);
 int SK_UTIL_write_x509_request(const char *pem_filename, X509_REQ *req,
 			       bool new_hdr);
 int SK_UTIL_read_key_blob(const char *filename, unsigned char *key_blob,
