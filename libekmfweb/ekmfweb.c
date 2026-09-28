@@ -4022,7 +4022,7 @@ int ekmf_set_key_state(const struct ekmf_config *config, CURL **curl_handle,
 		goto out;
 	}
 
-	if (asprintf(&if_match_hdr, "If-Match : %s", updated_on) < 0) {
+	if (asprintf(&if_match_hdr, "If-Match: %s", updated_on) < 0) {
 		pr_verbose(verbose, "asprintf failed");
 		rc = -ENOMEM;
 		goto out;
@@ -4168,7 +4168,7 @@ static int _ekmf_set_key_tag(const struct ekmf_config *config, CURL *curl,
 		goto out;
 	}
 
-	if (asprintf(&if_match_hdr, "If-Match : %s", updated_on) < 0) {
+	if (asprintf(&if_match_hdr, "If-Match: %s", updated_on) < 0) {
 		pr_verbose(verbose, "asprintf failed");
 		rc = -ENOMEM;
 		goto out;
