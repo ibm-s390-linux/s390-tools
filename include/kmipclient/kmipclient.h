@@ -2062,5 +2062,16 @@ int kmip_connection_get_server_cert(const char *server,
 				    const char *cert_chain_pem,
 				    bool *verified,
 				    bool debug);
+int kmip_connection_get_server_cert_at(const char *server,
+				       enum kmip_transport transport,
+				       const char *ca,
+				       EVP_PKEY *client_key,
+				       const char *client_cert,
+				       int dirfd,
+				       const char *server_cert_basename,
+				       const char *server_pubkey_basename,
+				       const char *cert_chain_basename,
+				       bool *verified,
+				       bool debug);
 
 #endif

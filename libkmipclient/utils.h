@@ -59,5 +59,6 @@ void kmip_node_dump(struct kmip_node *node, bool debug);
 enum kmip_tag kmip_find_v1_attribute_name_tag(struct kmip_node *parent);
 
 FILE *fopen_nofollow(const char *path, const char *mode);
+FILE *fopen_nofollow_at(int dirfd, const char *basename, const char *mode);
 
 #endif

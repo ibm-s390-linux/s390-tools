@@ -11,6 +11,7 @@
 #define _DEFAULT_SOURCE
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <string.h>
 #include <err.h>
@@ -1327,45 +1328,28 @@ void kmip_connection_free(struct kmip_connection *connection)
 	free(connection);
 }
 
-/**
- * Retrieves the serevr's certificate, public key and certificate chain
+/*
+ * Common implementation for kmip_connection_get_server_cert() and
+ * kmip_connection_get_server_cert_at().
  *
- * @param server            the KMIP server.
- *                          For Plain-TLS transport, only the hostname and
- *                          optional port number.
- *                          For HTTPS transport, an URL in the form
- *                          'https://hostname[:port]/uri'
- * @param transport         the transport mode
- * @param ca                Optional: File name of the CA bundle PEM file, or a
- *                          name of a directory the multiple CA certificates.
- *                          If this is NULL, then the default system path for
- *                          CA certificates is used.
- * @param client_key        the client key as an OpenSSL PKEY object.
- * @param client_cert       File name of the client certificate PEM file
- * @param server_cert_pem   File name of a PEM file into which the server
- *                          certificate is written. If NULL then ignored.
- * @param server_pubkey_pem File name of a PEM file into which the server
- *                          public key is written. If NULL then ignored.
- * @param cert_chain_pem    File name of a PEM file into which the certificate
- *                          chain (excluding the server certificate) is written.
- *                          If NULL then ignored.
- * @param verified          On return: If the server 's certificate has been
- *                          verified using the CA specification (if ca = NULL:
- *                          default system CAs, otherwise path or file to CAs).
- * @param debug             if true, debug messages are printed
- *
- * @returns 0 in case of success, or a negative errno value
+ * When dirfd == AT_FDCWD the three name parameters are full paths and all
+ * file opens use fopen_nofollow_at(AT_FDCWD, path) == open(path, O_NOFOLLOW).
+ * When dirfd is a real directory fd the name parameters are plain basenames
+ * and all file opens use openat(dirfd, basename, O_NOFOLLOW), which prevents
+ * any parent-directory symlink from redirecting writes outside the trusted
+ * config directory.
  */
-int kmip_connection_get_server_cert(const char *server,
-				    enum kmip_transport transport,
-				    const char *ca,
-				    EVP_PKEY *client_key,
-				    const char *client_cert,
-				    const char *server_cert_pem,
-				    const char *server_pubkey_pem,
-				    const char *cert_chain_pem,
-				    bool *verified,
-				    bool debug)
+static int _kmip_connection_get_server_cert_impl(const char *server,
+						 enum kmip_transport transport,
+						 const char *ca,
+						 EVP_PKEY *client_key,
+						 const char *client_cert,
+						 int dirfd,
+						 const char *server_cert_name,
+						 const char *server_pubkey_name,
+						 const char *cert_chain_name,
+						 bool *verified,
+						 bool debug)
 {
 	struct kmip_conn_config config = { 0 };
 	struct kmip_connection *conn = NULL;
@@ -1488,40 +1472,42 @@ retry:
 					 X509_FLAG_COMPAT);
 		}
 
-		if (i == 0 && server_cert_pem != NULL) {
-			fp = fopen_nofollow(server_cert_pem, "w");
+		if (i == 0 && server_cert_name != NULL) {
+			fp = fopen_nofollow_at(dirfd, server_cert_name, "w");
 			if (fp == NULL) {
 				rc = -errno;
 				kmip_debug(debug, "Failed to open %s for write",
-					   server_cert_pem, strerror(-rc));
+					   server_cert_name, strerror(-rc));
 				goto out;
 			}
 
 			if (PEM_write_X509(fp, cert) != 1) {
 				kmip_debug(debug, "PEM_write_X509 failed to "
-					   "write to %s", server_cert_pem);
+					   "write to %s", server_cert_name);
 				rc = -EIO;
 				goto out;
 			}
 			fclose(fp);
 			fp = NULL;
 
-			if (server_pubkey_pem != NULL) {
-				fp = fopen_nofollow(server_pubkey_pem, "w");
+			if (server_pubkey_name != NULL) {
+				fp = fopen_nofollow_at(dirfd, server_pubkey_name,
+						       "w");
 				if (fp == NULL) {
 					rc = -errno;
 					kmip_debug(debug, "Failed to open %s "
 						   "for write",
-						   server_pubkey_pem,
+						   server_pubkey_name,
 						   strerror(-rc));
 					goto out;
 				}
 
-				if (PEM_write_PUBKEY(fp, X509_get0_pubkey(cert))
+				if (PEM_write_PUBKEY(fp,
+						     X509_get0_pubkey(cert))
 									!= 1) {
 					kmip_debug(debug, "PEM_write_PUBKEY "
 						   "failed to write to %s",
-						   server_pubkey_pem);
+						   server_pubkey_name);
 					rc = -EIO;
 					goto out;
 				}
@@ -1531,19 +1517,20 @@ retry:
 			continue;
 		}
 
-		if (i > 0 && cert_chain_pem != NULL) {
+		if (i > 0 && cert_chain_name != NULL) {
 			if (fp == NULL)
-				fp = fopen_nofollow(cert_chain_pem, "w");
+				fp = fopen_nofollow_at(dirfd, cert_chain_name,
+						       "w");
 			if (fp == NULL) {
 				rc = -errno;
 				kmip_debug(debug, "Failed to open %s for write",
-					   cert_chain_pem, strerror(-rc));
+					   cert_chain_name, strerror(-rc));
 				goto out;
 			}
 
 			if (PEM_write_X509(fp, cert) != 1) {
 				kmip_debug(debug, "PEM_write_X509 failed to "
-					   "write to %s", cert_chain_pem);
+					   "write to %s", cert_chain_name);
 				rc = -EIO;
 				goto out;
 			}
@@ -1561,6 +1548,95 @@ out:
 		free(hostname);
 
 	return rc;
+}
+
+/**
+ * Retrieves the server's certificate, public key and certificate chain
+ *
+ * @param server            the KMIP server.
+ *                          For Plain-TLS transport, only the hostname and
+ *                          optional port number.
+ *                          For HTTPS transport, an URL in the form
+ *                          'https://hostname[:port]/uri'
+ * @param transport         the transport mode
+ * @param ca                Optional: File name of the CA bundle PEM file, or a
+ *                          name of a directory the multiple CA certificates.
+ *                          If this is NULL, then the default system path for
+ *                          CA certificates is used.
+ * @param client_key        the client key as an OpenSSL PKEY object.
+ * @param client_cert       File name of the client certificate PEM file
+ * @param server_cert_pem   File name of a PEM file into which the server
+ *                          certificate is written. If NULL then ignored.
+ * @param server_pubkey_pem File name of a PEM file into which the server
+ *                          public key is written. If NULL then ignored.
+ * @param cert_chain_pem    File name of a PEM file into which the certificate
+ *                          chain (excluding the server certificate) is written.
+ *                          If NULL then ignored.
+ * @param verified          On return: If the server's certificate has been
+ *                          verified using the CA specification (if ca = NULL:
+ *                          default system CAs, otherwise path or file to CAs).
+ * @param debug             if true, debug messages are printed
+ *
+ * @returns 0 in case of success, or a negative errno value
+ */
+int kmip_connection_get_server_cert(const char *server,
+				    enum kmip_transport transport,
+				    const char *ca,
+				    EVP_PKEY *client_key,
+				    const char *client_cert,
+				    const char *server_cert_pem,
+				    const char *server_pubkey_pem,
+				    const char *cert_chain_pem,
+				    bool *verified,
+				    bool debug)
+{
+	return _kmip_connection_get_server_cert_impl(server, transport, ca,
+						     client_key, client_cert,
+						     AT_FDCWD,
+						     server_cert_pem,
+						     server_pubkey_pem,
+						     cert_chain_pem,
+						     verified, debug);
+}
+
+/**
+ * Like kmip_connection_get_server_cert() but writes all output files relative
+ * to a trusted directory file descriptor using only basenames, preventing
+ * symlink redirection of writes outside the config directory.
+ *
+ * @param server            the KMIP server (same as kmip_connection_get_server_cert)
+ * @param transport         the transport mode
+ * @param ca                Optional: CA bundle path (may be outside config dir)
+ * @param client_key        the client key as an OpenSSL PKEY object
+ * @param client_cert       File name of the client certificate PEM file
+ * @param dirfd             open file descriptor of the output directory
+ * @param server_cert_basename   basename for the server certificate PEM file
+ * @param server_pubkey_basename basename for the server public key PEM file
+ * @param cert_chain_basename    basename for the certificate chain PEM file
+ * @param verified          On return: true if server certificate was verified
+ * @param debug             if true, debug messages are printed
+ *
+ * @returns 0 in case of success, or a negative errno value
+ */
+int kmip_connection_get_server_cert_at(const char *server,
+				       enum kmip_transport transport,
+				       const char *ca,
+				       EVP_PKEY *client_key,
+				       const char *client_cert,
+				       int dirfd,
+				       const char *server_cert_basename,
+				       const char *server_pubkey_basename,
+				       const char *cert_chain_basename,
+				       bool *verified,
+				       bool debug)
+{
+	return _kmip_connection_get_server_cert_impl(server, transport, ca,
+						     client_key, client_cert,
+						     dirfd,
+						     server_cert_basename,
+						     server_pubkey_basename,
+						     cert_chain_basename,
+						     verified, debug);
 }
 
 /**

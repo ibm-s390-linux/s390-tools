@@ -773,3 +773,44 @@ FILE *fopen_nofollow(const char *path, const char *mode)
 	}
 	return fp;
 }
+
+/**
+ * Open a file relative to a trusted directory file descriptor using
+ * O_NOFOLLOW on the basename, so no symlink in any path component
+ * outside the already-verified directory can redirect the operation.
+ *
+ * @param dirfd             open file descriptor of the parent directory
+ * @param basename          name of the file within that directory (no '/')
+ * @param mode              fopen-style mode string ("r", "w", "a", ...)
+ *
+ * @returns FILE pointer on success, NULL on error (errno set)
+ */
+FILE *fopen_nofollow_at(int dirfd, const char *basename, const char *mode)
+{
+	int flags = O_NOFOLLOW;
+	int fd;
+	FILE *fp;
+
+	/* Determine flags based on mode */
+	if (mode[0] == 'r')
+		flags |= (mode[1] == '+') ? O_RDWR : O_RDONLY;
+	else if (mode[0] == 'w')
+		flags |= O_CREAT | O_TRUNC |
+				((mode[1] == '+') ? O_RDWR : O_WRONLY);
+	else if (mode[0] == 'a')
+		flags |= O_CREAT | O_APPEND |
+				((mode[1] == '+') ? O_RDWR : O_WRONLY);
+	else
+		return NULL;
+
+	fd = openat(dirfd, basename, flags, 0600);
+	if (fd < 0)
+		return NULL;
+
+	fp = fdopen(fd, mode);
+	if (fp == NULL) {
+		close(fd);
+		return NULL;
+	}
+	return fp;
+}

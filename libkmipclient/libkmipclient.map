@@ -223,3 +223,9 @@ LIBKMIPCLIENT_1.0 {
         kmip_connection_get_server_cert;
     local: *;
 };
+
+LIBKMIPCLIENT_1.1 {
+    global:
+        kmip_connection_get_server_cert_at;
+    local: *;
+};
