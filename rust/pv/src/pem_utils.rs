@@ -88,9 +88,13 @@ impl<'d> InnerPem<'d> {
             )
         };
 
-        match rc {
-            1 => Err(Error::InternalSsl("Could not write PEM", ErrorStack::get())),
-            _ => Ok(bio.to_vec()),
+        // PEM_write_bio returns the number of bytes written or 0 on error.
+        // For 0 length data, it returns 0 without adding to the OpenSSL error stack.
+        let err = ErrorStack::get();
+        if rc > 0 || (rc == 0 && err.errors().is_empty()) {
+            Ok(bio.to_vec())
+        } else {
+            Err(Error::InternalSsl("Could not write PEM", err))
         }
     }
 }
