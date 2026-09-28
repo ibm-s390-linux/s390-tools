@@ -1834,8 +1834,9 @@ static int _generate_identity_key(struct plugin_handle *ph,
 		goto out;
 	}
 
-	rc = SK_UTIL_write_key_blob(ph->identity_secure_key, identity_key,
-				    identity_key_size);
+	rc = SK_UTIL_write_key_blob_at(ph->pd.config_path_fd,
+				       ph->identity_secure_key,
+				       identity_key, identity_key_size);
 	if (rc != 0) {
 		_set_error(ph, "Failed to write the identity key into file "
 			   "'%s': %s", ph->identity_secure_key, strerror(-rc));
@@ -3978,8 +3979,9 @@ static int _generate_wrapping_key(struct plugin_handle *ph,
 		goto out;
 	}
 
-	rc = SK_UTIL_write_key_blob(wrapping_key_file_tmp, wrapping_key,
-				    wrapping_key_size);
+	rc = SK_UTIL_write_key_blob_at(ph->pd.config_path_fd,
+				       wrapping_key_file_tmp,
+				       wrapping_key, wrapping_key_size);
 	if (rc != 0) {
 		_set_error(ph, "Failed to write the wrapping key into file "
 			   "'%s': %s", wrapping_key_file_tmp, strerror(-rc));
@@ -4499,8 +4501,8 @@ static int _reencipher_key(struct plugin_handle *ph, bool to_new,
 		return rc;
 	}
 
-	rc = SK_UTIL_write_key_blob(reenc_file_name, secure_key,
-				    secure_key_size);
+	rc = SK_UTIL_write_key_blob_at(ph->pd.config_path_fd, reenc_file_name,
+				       secure_key, secure_key_size);
 	if (rc != 0) {
 		_set_error(ph, "Failed to write the secure key into '%s': %s",
 			   reenc_file_name, strerror(-rc));
