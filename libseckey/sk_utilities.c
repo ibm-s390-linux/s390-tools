@@ -34,7 +34,7 @@ void SK_UTIL_warnx(const char *func, const char *fmt, ...)
 	char tmp_fmt[200];
 	va_list ap;
 
-	if (snprintf(tmp_fmt, sizeof(tmp_fmt), "DBG: %s: %s", func, fmt) >
+	if (snprintf(tmp_fmt, sizeof(tmp_fmt), "DBG: %s: %s", func, fmt) >=
 							(int)sizeof(tmp_fmt))
 		return;
 
