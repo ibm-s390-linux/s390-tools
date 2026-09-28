@@ -2892,7 +2892,8 @@ static int _process_kms_keys_cb(const char *key_id, const char *key_label,
 	}
 
 	if (process_data->volume_type != NULL &&
-	    strcasecmp(process_data->volume_type, volume_type) != 0)
+	    (volume_type == NULL ||
+	     strcasecmp(process_data->volume_type, volume_type) != 0))
 		return 0;
 
 	return process_data->callback(key_id, key_label, xts_key2_id,
