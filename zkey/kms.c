@@ -2765,6 +2765,7 @@ static int _match_volumes_filter(const char *volumes, char **volumes_filter)
 			 * Ignore part after ':' of value if filter does
 			 * not also contain a ':' part.
 			 */
+			ch = NULL;
 			if (strchr(volumes_filter[i], ':') == NULL) {
 				ch = strchr(value_list[k], ':');
 				if (ch != NULL)
@@ -2772,9 +2773,14 @@ static int _match_volumes_filter(const char *volumes, char **volumes_filter)
 			}
 
 			if (fnmatch(volumes_filter[i], value_list[k], 0) == 0) {
+				if (ch != NULL)
+					*ch = ':';
 				rc = 1;
 				break;
 			}
+
+			if (ch != NULL)
+				*ch = ':';
 		}
 	}
 
