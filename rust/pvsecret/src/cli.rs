@@ -500,7 +500,8 @@ pub enum RetrInpFmt {
     Yaml,
     /// Use a hex string.
     Hex,
-    /// Use a name-string. Will hash it if no secret with the name found.
+    /// Use a name-string (up to 31 bytes, ASCII). Uses the raw bytes as ID.
+    /// Falls back to the SHA-256 hash of the name if no matching secret is found.
     Name,
     /// Use the secret-index (base 10) instead of the secret-ID
     Idx,

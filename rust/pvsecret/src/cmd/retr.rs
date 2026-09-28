@@ -41,7 +41,16 @@ impl TryFrom<&RetrSecretOptionsComb<'_>> for Value {
             RetrInpFmt::Hex => serde_yaml::from_str(opt.input)
                 .context("Cannot parse SecretId information")
                 .map(Self::Id),
-            RetrInpFmt::Name => Ok(Self::Id(SecretId::from_string(opt.input))),
+            RetrInpFmt::Name => {
+                if opt.input.len() > SecretId::ID_SIZE - 1 {
+                    warn!(
+                        "Name '{}' exceeds {} bytes and will be truncated",
+                        opt.input,
+                        SecretId::ID_SIZE - 1
+                    );
+                }
+                Ok(Self::Id(SecretId::from_string(opt.input)))
+            }
             RetrInpFmt::Idx => opt
                 .input
                 .parse()
@@ -118,4 +127,55 @@ pub fn retr(opt: &RetrSecretOptions) -> Result<()> {
         "IBM Protected Key",
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use pv::uv::SecretId;
+
+    use super::Value;
+    use crate::cli::{RetrInpFmt, RetrSecretOptionsComb};
+
+    fn make_opt(input: &str, inform: RetrInpFmt) -> RetrSecretOptionsComb<'_> {
+        RetrSecretOptionsComb {
+            input,
+            output: "-",
+            inform,
+        }
+    }
+
+    /// --inform name must produce the raw ASCII ID (SecretId::from_string), not a SHA-256 hash.
+    /// The hash fallback happens at retrieval time in retrieve() if the direct lookup fails.
+    #[test]
+    fn name_inform_uses_raw_ascii_id() {
+        let name = "my_secret";
+        let opt = make_opt(name, RetrInpFmt::Name);
+        let value = Value::try_from(&opt).unwrap();
+        let Value::Id(got_id) = value else {
+            panic!("expected Value::Id");
+        };
+        let expected_id = SecretId::from_string(name);
+        assert_eq!(got_id, expected_id);
+    }
+
+    /// from_string truncates names longer than 31 bytes; that is the defined behaviour for
+    /// --inform name (the retrieve() fallback will try the SHA-256 hash at lookup time).
+    #[test]
+    fn name_inform_long_name_is_truncated_to_31_bytes() {
+        // 32-character name: the 32nd character is dropped by from_string
+        let long_name = "a_secret_name_that_is_32bytes_xx";
+        let short_name = &long_name[..31];
+
+        let opt = make_opt(long_name, RetrInpFmt::Name);
+        let value = Value::try_from(&opt).unwrap();
+        let Value::Id(got_id) = value else {
+            panic!("expected Value::Id");
+        };
+
+        let truncated_id = SecretId::from_string(short_name);
+        assert_eq!(
+            got_id, truncated_id,
+            "--inform name must use from_string (truncates at 31 bytes)"
+        );
+    }
 }
