@@ -402,7 +402,7 @@ static int _save_kms_properties(const struct keystore *keystore,
 	if (fd < 0) {
 		rc = -errno;
 		warnx("Failed to open '%s': %s", filename, strerror(-rc));
-		return rc;
+		goto out;
 	}
 
 	if (fchmod(fd, keystore->mode) != 0) {
@@ -2283,8 +2283,10 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	ADD_KMS_PROPS(kms_props, num_kms_props, KMS_KEY_PROP_VOLUMES,
 		      volumes != NULL ? volumes : "");
 	sys_volumes = _get_system_specific_prop_name(KMS_KEY_PROP_VOLUMES);
-	if (sys_volumes == NULL)
-		return -ENOMEM;
+	if (sys_volumes == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
 	ADD_KMS_PROPS(kms_props, num_kms_props, sys_volumes,
 		      volumes != NULL ? volumes : "");
 
@@ -3408,8 +3410,10 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 	}
 
 	sys_volumes = _get_system_specific_prop_name(KMS_KEY_PROP_VOLUMES);
-	if (sys_volumes == NULL)
-		return -ENOMEM;
+	if (sys_volumes == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
 
 	if (description != NULL) {
 		str = _find_property(properties, num_properties,

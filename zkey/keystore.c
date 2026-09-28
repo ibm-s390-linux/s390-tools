@@ -4837,8 +4837,10 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 	free(tries_opt);
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
-		if (info->format)
+		if (info->format) {
+			free(common_passphrase_options);
 			return 0;
+		}
 
 		util_asprintf(&cmd,
 			      "cryptsetup plainOpen %s%s--key-file '%s' "
