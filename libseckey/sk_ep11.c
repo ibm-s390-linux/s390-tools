@@ -416,9 +416,9 @@ static unsigned char sk_ep11_parse_der_tag(const unsigned char *data,
 		num = data[1] & 0x7f;
 		if (num > sizeof(size_t))
 			return 0;
-		*value_len = data[2];
 		if (data_len < 2 + num)
 			return 0;
+		*value_len = data[2];
 		for (i = 1; i < num; i++) {
 			*value_len <<= 8;
 			*value_len |= data[2 + i];
@@ -526,7 +526,8 @@ static bool sk_ep11_valid_ep11_blob(const unsigned char *key_token,
 	if (key_token_length <= sizeof(struct ep11kblob_header))
 		return false;
 
-	if (hdr->len > key_token_length ||
+	if (hdr->len < sizeof(struct ep11kblob_header) ||
+	    hdr->len > key_token_length ||
 	    hdr->type != TOKTYPE_NON_CCA ||
 	    hdr->hver != PKEY_TYPE_EP11_HVER ||
 	    (hdr->version != PKEY_TYPE_EP11_ECC &&

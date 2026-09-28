@@ -561,6 +561,10 @@ static const void *sk_cca_get_pka_section(const unsigned char *key_token,
 	}
 
 	ofs = sizeof(struct cca_token_header);
+	if (ofs + sizeof(struct cca_section_header) > token_hdr->token_length) {
+		sk_debug(debug, "ERROR: section %u not found", section_id);
+		return NULL;
+	}
 	section_hdr = (struct cca_section_header *)&key_token[ofs];
 
 	while (section_hdr->section_identifier != section_id) {
@@ -570,7 +574,8 @@ static const void *sk_cca_get_pka_section(const unsigned char *key_token,
 			return NULL;
 		}
 		ofs += section_hdr->section_length;
-		if (ofs >= token_hdr->token_length) {
+		if (ofs + sizeof(struct cca_section_header) >
+					token_hdr->token_length) {
 			sk_debug(debug, "ERROR: section %u not found",
 				 section_id);
 			return NULL;
@@ -1300,6 +1305,13 @@ static int sk_cca_get_public_from_ec_key(const unsigned char *key_token,
 		return -EINVAL;
 	}
 
+	if (ec_pub_section->section_header.section_length <
+			sizeof(struct cca_ec_pub_key_section) +
+			ec_pub_section->pub_key_length) {
+		sk_debug(debug, "ERROR: EC public key section too small");
+		return -EINVAL;
+	}
+
 	pub_key.ec.x = ec_pub_key + 1;
 
 	/* First byte of public key contains indication of key compression */
@@ -1398,6 +1410,13 @@ static int sk_cca_get_public_from_rsa_key(const unsigned char *key_token,
 		sk_debug(debug, "ERROR: invalid RSA public key section length");
 		return -EINVAL;
 	}
+	if (rsa_pub_section->section_header.section_length <
+			sizeof(struct cca_rsa_pub_key_section) +
+			(size_t)rsa_pub_section->pub_exp_length +
+			(size_t)rsa_pub_section->modulus_length) {
+		sk_debug(debug, "ERROR: RSA public key section too small");
+		return -EINVAL;
+	}
 
 	pub_key.rsa.pub_exp = ((unsigned char *)rsa_pub_section) +
 				sizeof(struct cca_rsa_pub_key_section);
@@ -1426,6 +1445,13 @@ static int sk_cca_get_public_from_rsa_key(const unsigned char *key_token,
 				sizeof(struct cca_rsa_crt_priv_key_section)) {
 			sk_debug(debug, "ERROR: invalid RSA private key "
 				 "section length");
+			return -EINVAL;
+		}
+		if (rsa_priv_section->section_header.section_length <
+				sizeof(struct cca_rsa_crt_priv_key_section) +
+				(size_t)rsa_priv_section->modulus_length) {
+			sk_debug(debug, "ERROR: RSA private key section "
+				 "too small");
 			return -EINVAL;
 		}
 
