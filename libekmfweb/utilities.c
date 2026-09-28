@@ -328,6 +328,10 @@ int parse_json_web_token(const char *token, json_object **header_obj,
 			json[json_len] = '\0';
 		} else {
 			json = strndup(payload, payload_len);
+			if (json == NULL) {
+				rc = -ENOMEM;
+				goto out;
+			}
 		}
 
 		pld = json_tokener_parse(json);
