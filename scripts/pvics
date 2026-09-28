@@ -1008,8 +1008,8 @@ list() {
 
 	log_info "Found the following boot loader entries:"
 	for f in "${ble_dir}"/*.conf; do
-
-		title="$(grep -E "^title" "${f}" | grep -oE " .*" | grep -oE "[^ ]*")"
+		title="$(grep -E "^title" "${f}" | cut -d ' ' -f 2- | grep -oE "[a-zA-Z0-9/_\.\\-\(\)].*")"
+		read -r title <<< "${title}"
 		kernel="$(grep -E "^linux" "${f}" | cut -d ' ' -f 2)"
 		initramfs="$(grep -E "^initrd" "${f}" | cut -d ' ' -f 2)"
 		kernel_params="$(grep -E "^options" "${f}" | cut -d ' ' -f 2-)"
@@ -1084,8 +1084,8 @@ convert() {
 
 	# get kernel, initramfs, and kernel parameter from boot loader entry
 	for f in "${temp_boot}"/loader/entries/*.conf; do
-
-		title="$(grep -E "^title" "${f}" | cut -d ' ' -f 3)"
+		title="$(grep -E "^title" "${f}" | cut -d ' ' -f 2- | grep -oE "[a-zA-Z0-9/_\.\\-\(\)].*")"
+		read -r title <<< "${title}"
 		if [[ "${title}" != "${ble}" ]]; then
 			continue
 		fi
