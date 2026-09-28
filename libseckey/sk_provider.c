@@ -3988,7 +3988,6 @@ static int sk_prov_asym_rsa_decrypt(void *vctx,
 	EVP_MD *oaep_md = NULL, *mgf_md = NULL;
 	struct sk_prov_op_ctx *ctx = vctx;
 	unsigned char *oaep_label = NULL;
-	unsigned char *tmp = NULL;
 	struct sk_prov_key *key;
 	struct sk_funcs *funcs;
 
@@ -4025,14 +4024,8 @@ static int sk_prov_asym_rsa_decrypt(void *vctx,
 	}
 
 	if (out == NULL) {
-		tmp = OPENSSL_zalloc(rsa_size);
-		if (tmp == NULL) {
-			put_error_op_ctx(ctx, SK_PROV_ERR_MALLOC_FAILED,
-					 "OPENSSL_zalloc failed");
-			return 0;
-		}
-		out = tmp;
-		outsize = rsa_size;
+		*outlen = rsa_size;
+		return 1;
 	}
 
 	if (outsize < (size_t)rsa_size) {
@@ -4112,11 +4105,6 @@ static int sk_prov_asym_rsa_decrypt(void *vctx,
 					out, outlen, in, inlen, pad_mode,
 					key->private, ctx->provctx->debug);
 		break;
-	}
-
-	if (tmp != NULL) {
-		OPENSSL_cleanse(tmp, outsize);
-		OPENSSL_free(tmp);
 	}
 
 	if (rc != 0) {
