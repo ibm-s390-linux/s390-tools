@@ -229,7 +229,7 @@ static int do_disable(int s, enum ctr_e ctr, unsigned int *supported_counters)
 static int do_reset(int s, enum ctr_e ctr, unsigned int *supported_counters)
 {
 	int i, rc = 0, state;
-	uint64_t value;
+	uint64_t value = 0;
 
 	for (i = 0; i < NUM_COUNTER; i++) {
 		if (i == ALL_COUNTER)
