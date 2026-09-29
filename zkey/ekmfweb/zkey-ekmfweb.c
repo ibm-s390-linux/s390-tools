@@ -1867,7 +1867,10 @@ static int _configure_connection(struct plugin_handle *ph,
 	char *server_pubkey_file = NULL;
 	char *server_cert_file = NULL;
 	char *server_cert_temp = NULL;
+	char *abspath_cert = NULL;
+	char *abspath_key = NULL;
 	bool self_signed = false;
+	char *abspath_ca = NULL;
 	bool add_https = false;
 	bool verified = false;
 	bool valid = false;
@@ -1938,25 +1941,53 @@ static int _configure_connection(struct plugin_handle *ph,
 		goto out;
 	}
 
+	if (tls_ca_bundle != NULL) {
+		abspath_ca = realpath(tls_ca_bundle, NULL);
+		if (abspath_ca == NULL) {
+			rc = -errno;
+			_set_error(ph, "Failed to resolve path '%s': %s",
+				   tls_ca_bundle, strerror(-rc));
+			goto out;
+		}
+	}
+	if (tls_client_cert != NULL) {
+		abspath_cert = realpath(tls_client_cert, NULL);
+		if (abspath_cert == NULL) {
+			rc = -errno;
+			_set_error(ph, "Failed to resolve path '%s': %s",
+				   tls_client_cert, strerror(-rc));
+			goto out;
+		}
+	}
+	if (tls_client_key != NULL) {
+		abspath_key = realpath(tls_client_key, NULL);
+		if (abspath_key == NULL) {
+			rc = -errno;
+			_set_error(ph, "Failed to resolve path '%s': %s",
+				   tls_client_key, strerror(-rc));
+			goto out;
+		}
+	}
+
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_ca);
-	if (tls_ca_bundle != NULL)
-		ph->ekmf_config.tls_ca = util_strdup(tls_ca_bundle);
+	if (abspath_ca != NULL)
+		ph->ekmf_config.tls_ca = util_strdup(abspath_ca);
 	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_CA_BUNDLE,
-					   tls_ca_bundle);
+					   abspath_ca);
 
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_cert);
-	if (tls_client_cert != NULL)
-		ph->ekmf_config.tls_client_cert = util_strdup(tls_client_cert);
+	if (abspath_cert != NULL)
+		ph->ekmf_config.tls_client_cert = util_strdup(abspath_cert);
 	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_CLIENT_CERT,
-					   tls_client_cert);
+					   abspath_cert);
 	if (rc != 0)
 		goto out;
 
 	FREE_AND_SET_NULL(ph->ekmf_config.tls_client_key);
-	if (tls_client_key != NULL)
-		ph->ekmf_config.tls_client_key = util_strdup(tls_client_key);
+	if (abspath_key != NULL)
+		ph->ekmf_config.tls_client_key = util_strdup(abspath_key);
 	rc = plugin_set_or_remove_property(&ph->pd, EKMFWEB_CONFIG_CLIENT_KEY,
-					   tls_client_key);
+					   abspath_key);
 	if (rc != 0)
 		goto out;
 
@@ -2121,6 +2152,12 @@ static int _configure_connection(struct plugin_handle *ph,
 		goto out;
 
 out:
+	if (abspath_ca != NULL)
+		free(abspath_ca);
+	if (abspath_cert != NULL)
+		free(abspath_cert);
+	if (abspath_key != NULL)
+		free(abspath_key);
 	if (server_cert_temp != NULL) {
 		plugin_remove_config_file(&ph->pd, server_cert_temp);
 		free(server_cert_temp);
