@@ -1299,12 +1299,12 @@ encrypt() {
 			luks_segment_key_size="512"
 		else
 			key_size="$(wc --bytes < "${segment_key}")"
-			if [[ "${key_size}" -lt "256" ]]; then
+			if [[ "${key_size}" -lt "32" ]]; then
 				log_error "${segment_key} has to be at least 32 bytes"
-			elif [[ "${key_size}" -lt "512" ]]; then
+			elif [[ "${key_size}" -lt "64" ]]; then
 				luks_segment_key_size="256"
 			else
-				luks_segment_key_size="256"
+				luks_segment_key_size="512"
 			fi
 		fi
 	fi
