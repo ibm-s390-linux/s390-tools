@@ -2768,6 +2768,7 @@ static int _configure_connection(struct plugin_handle *ph,
 	char *server_cert_file = NULL;
 	char *server_cert_temp = NULL;
 	char *server_info = NULL;
+	char *abspath_ca = NULL;
 	bool self_signed = false;
 	bool verified = false;
 	bool valid = false;
@@ -2840,16 +2841,26 @@ static int _configure_connection(struct plugin_handle *ph,
 	if (rc != 0)
 		return rc;
 
+	if (tls_ca_bundle != NULL) {
+		abspath_ca = realpath(tls_ca_bundle, NULL);
+		if (abspath_ca == NULL) {
+			rc = -errno;
+			_set_error(ph, "Failed to resolve path '%s': %s",
+				   tls_ca_bundle, strerror(-rc));
+			goto out;
+		}
+	}
+
 	rc = plugin_set_or_remove_property(&ph->pd, KMIP_CONFIG_CA_BUNDLE,
-					   tls_ca_bundle);
+					   abspath_ca);
 	if (rc != 0)
-		return rc;
+		goto out;
 
 	/* Establish initial KMIP config */
 	_free_kmip_config(ph);
 	rc = _get_kmip_config(ph);
 	if (rc != 0)
-		return rc;
+		goto out;
 
 	/* Connect to the server the 1st time to get its certificate */
 	util_asprintf(&server_cert_temp, "%s/%s-tmp", ph->pd.config_path,
@@ -3130,6 +3141,8 @@ static int _configure_connection(struct plugin_handle *ph,
 		goto out;
 
 out:
+	if (abspath_ca != NULL)
+		free(abspath_ca);
 	if (server_cert_temp != NULL) {
 		plugin_remove_config_file(&ph->pd, server_cert_temp);
 		free(server_cert_temp);
