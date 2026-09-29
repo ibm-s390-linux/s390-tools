@@ -1448,6 +1448,9 @@ encrypt() {
 
 	# generate toc.asr
 	pvsecret_cmd=("${pvsecret_cmd_static[@]}" "--output" "${sics}/toc.asr" "--policy" "toc.pol" "meta")
+	if [[ -f "toc.pol" ]]; then
+		log_error "toc.pol already exists"
+	fi
 	execute cp "${sics}/toc.pol" "toc.pol"
 	execute "${pvsecret_cmd[@]}"
 	execute rm -f toc.pol
