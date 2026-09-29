@@ -114,64 +114,88 @@ static int _keystore_get_key_filenames(struct keystore *keystore,
 		return -EINVAL;
 	}
 
-	util_asprintf(&names->skey_filename, "%s/%s%s", keystore->directory,
-		      name, SKEY_FILE_EXTENSION);
-	util_asprintf(&names->info_filename, "%s/%s%s", keystore->directory,
-		      name, INFO_FILE_EXTENSION);
-	util_asprintf(&names->renc_filename, "%s/%s%s", keystore->directory,
-			      name, RENC_FILE_EXTENSION);
-	util_asprintf(&names->pass_filename, "%s/%s%s", keystore->directory,
-			      name, PASS_FILE_EXTENSION);
+	util_asprintf(&names->skey_filename, "%s%s", name, SKEY_FILE_EXTENSION);
+	util_asprintf(&names->info_filename, "%s%s", name, INFO_FILE_EXTENSION);
+	util_asprintf(&names->renc_filename, "%s%s", name, RENC_FILE_EXTENSION);
+	util_asprintf(&names->pass_filename, "%s%s", name, PASS_FILE_EXTENSION);
 
-	pr_verbose(keystore, "File names for key '%s': '%s' and '%s'", name,
-		   names->skey_filename, names->info_filename);
+	pr_verbose(keystore, "File names for key '%s': '%s/%s' and '%s/%s'",
+		   name, keystore->directory, names->skey_filename,
+		   keystore->directory, names->info_filename);
 	return 0;
+}
+
+/**
+ * Checks whether a file with the given basename exists as a regular file
+ * inside the repository directory, using fstatat() anchored on the held
+ * directory file descriptor. Symlinks in the final path component are not
+ * followed (AT_SYMLINK_NOFOLLOW), so a symlink is not considered to exist.
+ *
+ * @param[in] keystore   the keystore
+ * @param[in] basename   basename of the file to test (no directory prefix)
+ *
+ * @returns 1 if the file exists as a regular file, 0 otherwise
+ */
+static int _keystore_file_exists_at(const struct keystore *keystore,
+				    const char *basename)
+{
+	struct stat sb;
+
+	if (fstatat(keystore->dir_fd, basename, &sb, AT_SYMLINK_NOFOLLOW) != 0)
+		return 0;
+	return S_ISREG(sb.st_mode) ? 1 : 0;
 }
 
 /**
  * Checks if the .renc file exists.
  *
+ * @param[in] keystore    the keystore
  * @param[in] file_names  names of the files
  *
  * @returns 1 if the file exist, 0 if the file do not exist
  */
-static int _keystore_reencipher_key_exists(struct key_filenames *file_names)
+static int _keystore_reencipher_key_exists(const struct keystore *keystore,
+					   struct key_filenames *file_names)
 {
-	return util_path_is_reg_file("%s", file_names->renc_filename);
+	return _keystore_file_exists_at(keystore, file_names->renc_filename);
 }
 
 /**
  * Checks if the .pass file exists.
  *
+ * @param[in] keystore    the keystore
  * @param[in] file_names  names of the files
  *
  * @returns 1 if the file exist, 0 if the file do not exist
  */
-static int _keystore_passphrase_file_exists(struct key_filenames *file_names)
+static int _keystore_passphrase_file_exists(const struct keystore *keystore,
+					    struct key_filenames *file_names)
 {
-	return util_path_is_reg_file("%s", file_names->pass_filename);
+	return _keystore_file_exists_at(keystore, file_names->pass_filename);
 }
 
 /**
  * Checks if both, the .skey and the .info (and .renc) files exist.
  *
+ * @param[in] keystore    the keystore
  * @param[in] file_names  names of the files
  *
  * @returns 1 if all files exist, 0 if all files do not exist, -1 if one
  *          file exists but other one does not exist (inconsistent state)
  */
-static int _keystore_exists_keyfiles(struct key_filenames *file_names)
+static int _keystore_exists_keyfiles(const struct keystore *keystore,
+				     struct key_filenames *file_names)
 {
 	bool rc_skey, rc_info;
 
-	rc_skey = util_path_is_reg_file("%s", file_names->skey_filename);
-	rc_info = util_path_is_reg_file("%s", file_names->info_filename);
+	rc_skey = _keystore_file_exists_at(keystore, file_names->skey_filename);
+	rc_info = _keystore_file_exists_at(keystore, file_names->info_filename);
 
 	if (rc_skey && rc_info)
 		return 1;
 	if (!rc_skey && !rc_info &&
-	    _keystore_reencipher_key_exists(file_names) == 0 &&
-	    _keystore_passphrase_file_exists(file_names) == 0)
+	    _keystore_reencipher_key_exists(keystore, file_names) == 0 &&
+	    _keystore_passphrase_file_exists(keystore, file_names) == 0)
 		return 0;
 	return -1;
 }
@@ -186,12 +210,13 @@ static int _keystore_exists_keyfiles(struct key_filenames *file_names)
  * @returns 0 if the files exist, -ENOENT if the files do not exist, -EPERM if
  *          one file exists but the other does not exist (inconsistent state)
  */
-static int _keystore_ensure_keyfiles_exist(struct key_filenames *file_names,
+static int _keystore_ensure_keyfiles_exist(const struct keystore *keystore,
+					   struct key_filenames *file_names,
 					   const char *name)
 {
 	int rc;
 
-	rc = _keystore_exists_keyfiles(file_names);
+	rc = _keystore_exists_keyfiles(keystore, file_names);
 	if (rc == 0) {
 		warnx("Key '%s' does not exist", name);
 		return -ENOENT;
@@ -214,12 +239,13 @@ static int _keystore_ensure_keyfiles_exist(struct key_filenames *file_names,
  * @returns 0 if the files exist, -EEXIST if the files exist already, -EPERM if
  *          one file exists but the other does not exist (inconsistent state)
  */
-static int _keystore_ensure_keyfiles_not_exist(struct key_filenames *file_names,
+static int _keystore_ensure_keyfiles_not_exist(const struct keystore *keystore,
+					       struct key_filenames *file_names,
 					       const char *name)
 {
 	int rc;
 
-	rc = _keystore_exists_keyfiles(file_names);
+	rc = _keystore_exists_keyfiles(keystore, file_names);
 	if (rc == 1) {
 		warnx("Key '%s' exists already", name);
 		return -EEXIST;
@@ -250,35 +276,60 @@ static void _keystore_free_key_filenames(struct key_filenames *names)
 }
 
 /**
+ * Removes a file inside the keystore repository directory using unlinkat()
+ * anchored on the held directory file descriptor.
+ *
+ * @param[in] keystore   the key store
+ * @param[in] basename   basename of the file to remove (no directory prefix)
+ *
+ * @returns 0 on success, or a negative errno value on failure
+ */
+static int _keystore_unlinkat(struct keystore *keystore, const char *basename)
+{
+	int rc;
+
+	if (basename == NULL)
+		return 0;
+
+	rc = unlinkat(keystore->dir_fd, basename, 0);
+	if (rc != 0)
+		return -errno;
+	return 0;
+}
+
+/**
  * Sets the file permissions of the file to the permissions and the group
  * of the repository directory
  *
- * @param[in] keystroe     the keystore
- * @param[in] filename     the name of the file to set permissions for
+ * @param[in] keystore   the keystore
+ * @param[in] basename   basename of the file to set permissions for
  *
  * @returns 0 on success, or a negative errno value on failure
  */
 static int _keystore_set_file_permission(struct keystore *keystore,
-					 const char *filename)
+					 const char *basename)
 {
 	int fd, rc = 0;
 
-	fd = open(filename, O_RDONLY | O_NOFOLLOW);
+	fd = openat(keystore->dir_fd, basename, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if (fd < 0) {
 		rc = -errno;
-		warnx("Failed to open '%s': %s", filename, strerror(-rc));
+		warnx("Failed to open '%s/%s': %s", keystore->directory,
+		      basename, strerror(-rc));
 		return rc;
 	}
 
 	if (fchmod(fd, keystore->mode) != 0) {
 		rc = -errno;
-		warnx("chmod failed on file '%s': %s", filename, strerror(-rc));
+		warnx("chmod failed on file '%s/%s': %s", keystore->directory,
+		      basename, strerror(-rc));
 		goto out;
 	}
 
 	if (fchown(fd, geteuid(), keystore->owner) != 0) {
 		rc = -errno;
-		warnx("chown failed on file '%s': %s", filename, strerror(-rc));
+		warnx("chown failed on file '%s/%s': %s", keystore->directory,
+		      basename, strerror(-rc));
 		goto out;
 	}
 
@@ -1089,8 +1140,8 @@ static int _keystore_process_filtered(struct keystore *keystore,
 	if (apqn_filter != NULL)
 		apqn_filter_list = str_list_split(apqn_filter);
 
-	n = scandir(keystore->directory, &namelist, _keystore_info_file_filter,
-		    alphasort);
+	n = scandirat(keystore->dir_fd, ".", &namelist,
+		      _keystore_info_file_filter, alphasort);
 	if (n == -1) {
 		rc = -errno;
 		pr_verbose(keystore, "scandir failed with: %s", strerror(-rc));
@@ -1117,12 +1168,13 @@ static int _keystore_process_filtered(struct keystore *keystore,
 		if (rc != 0)
 			goto free;
 
-		rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+		rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 		if (rc != 0)
 			goto free_names;
 
 		key_props = properties_new();
-		rc = properties_load(key_props, file_names.info_filename, 1);
+		rc = properties_load_at(key_props, keystore->dir_fd,
+					file_names.info_filename, 1);
 		if (rc != 0) {
 			warnx("Key '%s' does not exist or is invalid", name);
 			goto free_prop;
@@ -1486,52 +1538,41 @@ out:
  */
 static int _keystore_lock_repository(struct keystore *keystore)
 {
-	char *lock_file_name;
-	struct stat sb;
 	int rc;
 
-	util_asprintf(&lock_file_name, "%s/%s", keystore->directory,
-		      LOCK_FILE_NAME);
+	keystore->lock_fd = openat(keystore->dir_fd, LOCK_FILE_NAME,
+				   O_CREAT | O_RDONLY | O_NOFOLLOW | O_CLOEXEC,
+				   keystore->mode);
+	if (keystore->lock_fd == -1) {
+		rc = -errno;
+		warnx("Failed to open lock file '%s/%s': %s",
+		      keystore->directory, LOCK_FILE_NAME,
+		      strerror(-rc));
+		return rc;
+	}
 
-	if (lstat(lock_file_name, &sb) == 0) {
-		keystore->lock_fd = open(lock_file_name, O_RDONLY | O_NOFOLLOW);
-		if (keystore->lock_fd == -1) {
-			rc = -errno;
-			warnx("Failed to open lock file '%s': %s",
-			      lock_file_name,
-			      strerror(-rc));
-			goto out;
-		}
-	} else {
-		keystore->lock_fd = open(lock_file_name,
-					 O_CREAT | O_RDONLY | O_NOFOLLOW,
-					 keystore->mode);
-		if (keystore->lock_fd == -1) {
-			rc = -errno;
-			warnx("Failed to create lock file '%s': %s",
-			      lock_file_name,
-			      strerror(-rc));
-			goto out;
-		}
-
-		if (fchown(keystore->lock_fd, geteuid(),
-			   keystore->owner) != 0) {
-			rc = -errno;
-			warnx("chown failed on file '%s': %s", lock_file_name,
-			      strerror(-rc));
-			return rc;
-		}
+	if (fchown(keystore->lock_fd, geteuid(), keystore->owner) != 0 &&
+	    errno != EPERM) {
+		rc = -errno;
+		warnx("chown failed on file '%s/%s': %s",
+		      keystore->directory, LOCK_FILE_NAME,
+		      strerror(-rc));
+		goto err_close;
 	}
 
 	rc = flock(keystore->lock_fd, LOCK_EX);
 	if (rc == -1) {
 		rc = -errno;
-		warnx("Failed to obtain the file lock on '%s': %s",
-		      lock_file_name, strerror((-rc)));
+		warnx("Failed to obtain the file lock on '%s/%s': %s",
+		      keystore->directory, LOCK_FILE_NAME, strerror(-rc));
+		goto err_close;
 	}
 
-out:
-	free(lock_file_name);
+	return 0;
+
+err_close:
+	close(keystore->lock_fd);
+	keystore->lock_fd = -1;
 	return rc;
 }
 
@@ -1579,38 +1620,43 @@ struct keystore *keystore_new(const char *directory,
 
 	util_assert(directory != NULL, "Internal error: directory is NULL");
 
-	if (lstat(directory, &sb) != 0) {
-		warnx("Can not access '%s': %s", directory, strerror(errno));
-		return NULL;
-	}
-	if (!S_ISDIR(sb.st_mode)) {
-		warnx("'%s' is not a directory", directory);
-		return NULL;
-	}
-	if (!util_path_is_readable(directory) ||
-	    !util_path_is_writable(directory)) {
-		warnx("Permission denied for '%s'", directory);
-		return NULL;
-	}
-	if (sb.st_mode & S_IWOTH) {
-		warnx("Directory '%s' is writable for others, this is not "
-		      "accepted", directory);
+	keystore = util_zalloc(sizeof(struct keystore));
+
+	keystore->lock_fd = -1;
+	keystore->dir_fd = -1;
+	keystore->verbose = verbose;
+	keystore->directory = util_strdup(directory);
+	if (keystore->directory[strlen(keystore->directory) - 1] == '/')
+		keystore->directory[strlen(keystore->directory) - 1] = '\0';
+
+	keystore->kms_info = kms_info;
+
+	keystore->dir_fd = open(keystore->directory,
+				O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (keystore->dir_fd < 0) {
+		warnx("Failed to open repository directory '%s': %s",
+		      keystore->directory, strerror(errno));
+		keystore_free(keystore);
 		return NULL;
 	}
 
-	keystore = util_zalloc(sizeof(struct keystore));
+	if (fstat(keystore->dir_fd, &sb) != 0) {
+		warnx("Can not access '%s': %s", directory, strerror(errno));
+		keystore_free(keystore);
+		return NULL;
+	}
+
+	if (sb.st_mode & S_IWOTH) {
+		warnx("Directory '%s' is writable for others, this is not "
+		      "accepted", directory);
+		keystore_free(keystore);
+		return NULL;
+	}
 
 	keystore->owner = sb.st_gid;
 	keystore->mode = sb.st_mode & (S_IRUSR | S_IWUSR |
 				       S_IRGRP  | S_IWGRP |
 				       S_IROTH);
-	keystore->lock_fd = -1;
-	keystore->verbose = verbose;
-	keystore->directory = util_strdup(directory);
-	if (keystore->directory[strlen(keystore->directory)-1] == '/')
-		keystore->directory[strlen(keystore->directory)-1] = '\0';
-
-	keystore->kms_info = kms_info;
 
 	rc = _keystore_lock_repository(keystore);
 	if (rc != 0) {
@@ -1649,7 +1695,8 @@ static int _keystore_generate_verification_pattern(struct keystore *keystore,
 	util_assert(vp != NULL, "Internal error: vp is NULL");
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
 
-	key = read_secure_key(keyfile, &key_size, keystore->verbose);
+	key = read_secure_key_at(keystore->dir_fd, keyfile,
+				 &key_size, keystore->verbose);
 	if (key == NULL)
 		return -EIO;
 
@@ -1802,7 +1849,7 @@ static int _keystore_remove_passphrase(struct keystore *keystore,
 {
 	int rc;
 
-	if (_keystore_passphrase_file_exists((struct key_filenames *)filenames)
+	if (_keystore_passphrase_file_exists(keystore, (struct key_filenames *)filenames)
 	    && prompt) {
 		util_print_indented("ATTENTION: When you remove the LUKS2 "
 				    "dummy passphrase of a key, you might no "
@@ -1820,10 +1867,9 @@ static int _keystore_remove_passphrase(struct keystore *keystore,
 		}
 	}
 
-	rc = remove(filenames->pass_filename);
-	if (rc != 0 && errno != ENOENT) {
-		rc = -errno;
-		warnx("Failed to remove file '%s': %s",
+	rc = _keystore_unlinkat(keystore, filenames->pass_filename);
+	if (rc != 0 && rc != -ENOENT) {
+		warnx("Failed to remove file '%s/%s': %s", keystore->directory,
 		      filenames->pass_filename, strerror(-rc));
 		return rc;
 	}
@@ -1856,7 +1902,7 @@ static int _keystore_set_passphrase(struct keystore *keystore,
 	char *volume_type, *key_type;
 	int rc;
 
-	if (_keystore_passphrase_file_exists((struct key_filenames *)filenames)
+	if (_keystore_passphrase_file_exists(keystore, (struct key_filenames *)filenames)
 	    && prompt) {
 		warnx("There is already a LUKS2 dummy passphrase associated "
 		     "with key '%s'.", name);
@@ -1896,15 +1942,18 @@ static int _keystore_set_passphrase(struct keystore *keystore,
 	free(key_type);
 
 	if (passphrase_file != NULL) {
-		rc = copy_file(passphrase_file, filenames->pass_filename, 0);
+		rc = copy_file_at(AT_FDCWD, passphrase_file,
+				  keystore->dir_fd, filenames->pass_filename,
+				  0);
 		if (rc != 0) {
 			warnx("Failed to copy the passphrase phase '%s': %s",
 			      passphrase_file, strerror(-rc));
 			return rc;
 		}
 	} else {
-		rc = copy_file("/dev/urandom", filenames->pass_filename,
-			       DUMMY_PASSPHRASE_LEN);
+		rc = copy_file_at(AT_FDCWD, "/dev/urandom",
+				  keystore->dir_fd, filenames->pass_filename,
+				  DUMMY_PASSPHRASE_LEN);
 		if (rc != 0) {
 			warnx("Failed to generate the dummy passphrase: %s",
 			      strerror(-rc));
@@ -2120,23 +2169,25 @@ static int _keystore_create_info_file(struct keystore *keystore,
 	if (rc != 0) {
 		warnx("Failed to generate the key verification pattern: %s",
 		      strerror(-rc));
-		remove(filenames->pass_filename);
+		_keystore_unlinkat(keystore, filenames->pass_filename);
 		goto out;
 	}
 
-	rc = properties_save(key_props, filenames->info_filename, 1);
+	rc = properties_save_at(key_props, keystore->dir_fd,
+				filenames->info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   filenames->info_filename, strerror(-rc));
-		remove(filenames->pass_filename);
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, filenames->info_filename,
+			   strerror(-rc));
+		_keystore_unlinkat(keystore, filenames->pass_filename);
 		goto out;
 	}
 
 	rc = _keystore_set_file_permission(keystore, filenames->info_filename);
 	if (rc != 0) {
-		remove(filenames->info_filename);
-		remove(filenames->pass_filename);
+		_keystore_unlinkat(keystore, filenames->info_filename);
+		_keystore_unlinkat(keystore, filenames->pass_filename);
 		goto out;
 	}
 
@@ -2211,7 +2262,7 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
-	rc = _keystore_ensure_keyfiles_not_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_not_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out_free_key_filenames;
 
@@ -2231,20 +2282,22 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 		apqn_list = str_list_split(apqns);
 
 	if (clear_key_file == NULL)
-		rc = generate_secure_key_random(pkey_fd,
-						file_names.skey_filename,
-						keybits, xts, key_type,
-						(const char **)apqn_list,
-						exportable, wrap_with_trusted,
-						keystore->verbose);
+		rc = generate_secure_key_random_at(pkey_fd,
+						   keystore->dir_fd,
+						   file_names.skey_filename,
+						   keybits, xts, key_type,
+						   (const char **)apqn_list,
+						   exportable, wrap_with_trusted,
+						   keystore->verbose);
 	else
-		rc = generate_secure_key_clear(pkey_fd,
-					       file_names.skey_filename,
-					       keybits, xts, clear_key_file,
-					       key_type,
-					       (const char **)apqn_list,
-					       exportable, wrap_with_trusted,
-					       keystore->verbose);
+		rc = generate_secure_key_clear_at(pkey_fd,
+						  keystore->dir_fd,
+						  file_names.skey_filename,
+						  keybits, xts, clear_key_file,
+						  key_type,
+						  (const char **)apqn_list,
+						  exportable, wrap_with_trusted,
+						  keystore->verbose);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2261,8 +2314,9 @@ int keystore_generate_key(struct keystore *keystore, const char *name,
 		goto out_free_props;
 
 	pr_verbose(keystore,
-		   "Successfully generated a secure key in '%s' and key info "
-		   "in '%s'", file_names.skey_filename,
+		   "Successfully generated a secure key in '%s/%s' and key "
+		   "info in '%s/%s'", keystore->directory,
+		   file_names.skey_filename, keystore->directory,
 		   file_names.info_filename);
 
 out_free_props:
@@ -2271,7 +2325,7 @@ out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
 	if (rc != 0)
-		remove(file_names.skey_filename);
+		_keystore_unlinkat(keystore, file_names.skey_filename);
 out_free_key_filenames:
 	_keystore_free_key_filenames(&file_names);
 
@@ -2360,7 +2414,7 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
-	rc = _keystore_ensure_keyfiles_not_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_not_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out_free_key_filenames;
 
@@ -2395,10 +2449,10 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 
 	rc = generate_kms_key(kms_info, name, key_type, key_props, xts,
 			      keybits, file_names.skey_filename,
-			      _keystore_passphrase_file_exists(&file_names) ?
+			      _keystore_passphrase_file_exists(keystore, &file_names) ?
 						file_names.pass_filename : NULL,
 			      kms_options, num_kms_options, keystore->verbose,
-			      pkey_fd);
+			      pkey_fd, keystore);
 	if (rc != 0) {
 		warnx("KMS plugin '%s' failed to generate key '%s': %s",
 		      kms_info->plugin_name, name, strerror(-rc));
@@ -2418,34 +2472,37 @@ int keystore_generate_key_kms(struct keystore *keystore, const char *name,
 		goto out_free_props;
 	}
 
-	rc = properties_save(key_props, file_names.info_filename, 1);
+	rc = properties_save_at(key_props, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   file_names.info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, file_names.info_filename,
+			   strerror(-rc));
 		goto out_del_info_file;
 	}
 
 	rc = _keystore_set_file_permission(keystore, file_names.info_filename);
 	if (rc != 0) {
-		remove(file_names.info_filename);
+		_keystore_unlinkat(keystore, file_names.info_filename);
 		goto out_del_info_file;
 	}
 
 	pr_verbose(keystore,
 		   "Successfully generated a secure key with KMS plugin '%s' "
-		   "in '%s' and key info in '%s'", kms_info->plugin_name,
-		   file_names.skey_filename, file_names.info_filename);
+		   "in '%s/%s' and key info in '%s/%s'", kms_info->plugin_name,
+		   keystore->directory, file_names.skey_filename,
+		   keystore->directory, file_names.info_filename);
 
 out_del_info_file:
 	if (rc != 0)
-		remove(file_names.info_filename);
+		_keystore_unlinkat(keystore, file_names.info_filename);
 out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
 	if (rc != 0) {
-		remove(file_names.skey_filename);
-		remove(file_names.pass_filename);
+		_keystore_unlinkat(keystore, file_names.skey_filename);
+		_keystore_unlinkat(keystore, file_names.pass_filename);
 	}
 out_free_key_filenames:
 	_keystore_free_key_filenames(&file_names);
@@ -2511,7 +2568,7 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 	if (rc != 0)
 		goto out_free_key_filenames;
 
-	rc = _keystore_ensure_keyfiles_not_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_not_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out_free_key_filenames;
 
@@ -2602,8 +2659,8 @@ int keystore_import(struct keystore *keystore, unsigned char *secure_key,
 	}
 
 write_key:
-	rc = write_secure_key(file_names.skey_filename, secure_key,
-			      secure_key_size, keystore->verbose);
+	rc = write_secure_key_at(keystore->dir_fd, file_names.skey_filename,
+				 secure_key, secure_key_size, keystore->verbose);
 	if (rc != 0)
 		goto out_free_props;
 
@@ -2620,14 +2677,15 @@ write_key:
 		goto out_free_props;
 
 	pr_verbose(keystore,
-		   "Successfully imported a secure key in '%s' and key info in '%s'",
-		   file_names.skey_filename, file_names.info_filename);
+		   "Successfully imported a secure key in '%s/%s' and key info in '%s/%s'",
+		   keystore->directory, file_names.skey_filename,
+		   keystore->directory, file_names.info_filename);
 
 out_free_props:
 	if (key_props != NULL)
 		properties_free(key_props);
 	if (rc != 0)
-		remove(file_names.skey_filename);
+		_keystore_unlinkat(keystore, file_names.skey_filename);
 out_free_key_filenames:
 	_keystore_free_key_filenames(&file_names);
 
@@ -2763,12 +2821,13 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out;
 
 	key_props = properties_new();
-	rc = properties_load(key_props, file_names.info_filename, 1);
+	rc = properties_load_at(key_props, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
 		goto out;
@@ -2824,9 +2883,10 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 			goto out;
 		}
 
-		secure_key = read_secure_key(file_names.skey_filename,
-					     &secure_key_size,
-					     keystore->verbose);
+		secure_key = read_secure_key_at(keystore->dir_fd,
+						file_names.skey_filename,
+						&secure_key_size,
+						keystore->verbose);
 		if (secure_key == NULL) {
 			rc = -ENOENT;
 			goto out;
@@ -2923,7 +2983,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 
 		/* Remove dummy passphrase if change to PLAIN volume type */
 		if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) != 0 &&
-		    _keystore_passphrase_file_exists(&file_names)) {
+		    _keystore_passphrase_file_exists(keystore, &file_names)) {
 			rc = _keystore_remove_passphrase(keystore, name,
 							 &file_names, key_props,
 							 false);
@@ -2958,7 +3018,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	}
 
 	if (remove_passphrase) {
-		if (_keystore_passphrase_file_exists(&file_names))
+		if (_keystore_passphrase_file_exists(keystore, &file_names))
 			passphrase_upd = &null_ptr;
 
 		rc = _keystore_remove_passphrase(keystore, name, &file_names,
@@ -2976,7 +3036,8 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 					    description, upd_volumes,
 					    upd_volume_type, sector_size >= 0 ?
 							sect_size : NULL,
-					    passphrase_upd, keystore->verbose);
+					    passphrase_upd, keystore,
+					    keystore->verbose);
 		if (rc != 0) {
 			warnx("KMS plugin '%s' failed to set key properties "
 			      "for key '%s': %s",
@@ -2995,11 +3056,13 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = properties_save(key_props, file_names.info_filename, 1);
+	rc = properties_save_at(key_props, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   file_names.info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, file_names.info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
@@ -3007,7 +3070,7 @@ int keystore_change_key(struct keystore *keystore, const char *name,
 
 out:
 	if (rc != 0 && passphrase_upd != NULL && *passphrase_upd != NULL)
-		remove(*passphrase_upd);
+		_keystore_unlinkat(keystore, *passphrase_upd);
 	_keystore_free_key_filenames(&file_names);
 	if (key_props != NULL)
 		properties_free(key_props);
@@ -3057,7 +3120,7 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out;
 
@@ -3065,12 +3128,13 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_not_exist(&new_names, newname);
+	rc = _keystore_ensure_keyfiles_not_exist(keystore, &new_names, newname);
 	if (rc != 0)
 		goto out;
 
 	key_props = properties_new();
-	rc = properties_load(key_props, file_names.info_filename, 1);
+	rc = properties_load_at(key_props, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
 		goto out;
@@ -3083,33 +3147,39 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 			goto out;
 	}
 
-	if (rename(file_names.skey_filename, new_names.skey_filename) != 0) {
+	if (renameat(keystore->dir_fd, file_names.skey_filename,
+		     keystore->dir_fd, new_names.skey_filename) != 0) {
 		rc = -errno;
-		pr_verbose(keystore, "Failed to rename '%s': %s",
-			   file_names.skey_filename, strerror(-rc));
+		pr_verbose(keystore, "Failed to rename '%s/%s': %s",
+			   keystore->directory, file_names.skey_filename,
+			   strerror(-rc));
 		goto out;
 	}
-	if (rename(file_names.info_filename, new_names.info_filename) != 0) {
+	if (renameat(keystore->dir_fd, file_names.info_filename,
+		     keystore->dir_fd, new_names.info_filename) != 0) {
 		rc = -errno;
-		pr_verbose(keystore, "Failed to rename '%s': %s",
-			   file_names.info_filename, strerror(-rc));
+		pr_verbose(keystore, "Failed to rename '%s/%s': %s",
+			   keystore->directory, file_names.info_filename,
+			   strerror(-rc));
 		goto out_rename_skey;
 	}
-	if (_keystore_reencipher_key_exists(&file_names)) {
-		if (rename(file_names.renc_filename,
-			   new_names.renc_filename) != 0) {
+	if (_keystore_reencipher_key_exists(keystore, &file_names)) {
+		if (renameat(keystore->dir_fd, file_names.renc_filename,
+			     keystore->dir_fd, new_names.renc_filename) != 0) {
 			rc = -errno;
-			pr_verbose(keystore, "Failed to rename '%s': %s",
+			pr_verbose(keystore, "Failed to rename '%s/%s': %s",
+				   keystore->directory,
 				   file_names.renc_filename, strerror(-rc));
 			goto out_rename_info;
 		}
 		reenc_exists = true;
 	}
-	if (_keystore_passphrase_file_exists(&file_names)) {
-		if (rename(file_names.pass_filename,
-			   new_names.pass_filename) != 0) {
+	if (_keystore_passphrase_file_exists(keystore, &file_names)) {
+		if (renameat(keystore->dir_fd, file_names.pass_filename,
+			     keystore->dir_fd, new_names.pass_filename) != 0) {
 			rc = -errno;
-			pr_verbose(keystore, "Failed to rename '%s': %s",
+			pr_verbose(keystore, "Failed to rename '%s/%s': %s",
+				   keystore->directory,
 				   file_names.pass_filename, strerror(-rc));
 			goto out_rename_info;
 		}
@@ -3119,7 +3189,7 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	if (kms_bound) {
 		rc = set_kms_key_properties(keystore->kms_info, key_props,
 					    newname, NULL, NULL, NULL, NULL,
-					    NULL, keystore->verbose);
+					    NULL, keystore, keystore->verbose);
 		if (rc != 0) {
 			warnx("KMS plugin '%s' failed to set key properties "
 			      "for key '%s': %s",
@@ -3144,12 +3214,12 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 	_keystore_msg_for_volumes(msg, key_props, VOLUME_TYPE_INTEGRITY);
 	free(msg);
 
-	if (_keystore_passphrase_file_exists(&new_names)) {
+	if (_keystore_passphrase_file_exists(keystore, &new_names)) {
 		util_asprintf(&msg, "The following volumes are associated with "
 			      "the renamed key '%s'. You should adjust the "
 			      "corresponding crypttab entries to use the new "
-			      "dummy passphrase file name '%s'.", newname,
-			      new_names.pass_filename);
+			      "dummy passphrase file name '%s/%s'.", newname,
+			      keystore->directory, new_names.pass_filename);
 		_keystore_msg_for_volumes(msg, key_props, VOLUME_TYPE_LUKS2);
 		free(msg);
 	}
@@ -3161,13 +3231,17 @@ int keystore_rename_key(struct keystore *keystore, const char *name,
 
 out_rename_info:
 	if (reenc_exists)
-		rename(new_names.renc_filename, file_names.renc_filename);
+		renameat(keystore->dir_fd, new_names.renc_filename,
+			 keystore->dir_fd, file_names.renc_filename);
 	if (pass_exists)
-		rename(new_names.pass_filename, file_names.pass_filename);
-	rename(new_names.info_filename, file_names.info_filename);
+		renameat(keystore->dir_fd, new_names.pass_filename,
+			 keystore->dir_fd, file_names.pass_filename);
+	renameat(keystore->dir_fd, new_names.info_filename,
+		 keystore->dir_fd, file_names.info_filename);
 
 out_rename_skey:
-	rename(new_names.skey_filename, file_names.skey_filename);
+	renameat(keystore->dir_fd, new_names.skey_filename,
+		 keystore->dir_fd, file_names.skey_filename);
 
 out:
 	_keystore_free_key_filenames(&file_names);
@@ -3235,11 +3309,12 @@ static struct util_rec *_keystore_setup_record(bool validation)
 static void _keystore_print_record(struct util_rec *rec,
 				   const char *name,
 				   struct properties *properties,
-				   bool validation, const char *skey_filename,
+				   bool validation, const char *skey_basename,
 				   size_t secure_key_size, bool is_xts,
 				   size_t clear_key_bitsize, bool valid,
 				   bool is_old_mk, bool reenc_pending, u8 *mkvp,
-				   const char *pass_filename)
+				   const char *pass_basename,
+				   const char *directory)
 {
 	char temp_vp[VERIFICATION_PATTERN_LEN + 2];
 	char *kms_xts_key1_label = NULL;
@@ -3361,7 +3436,7 @@ static void _keystore_print_record(struct util_rec *rec,
 				  apqns_argz, apqns_argz_len);
 	else
 		util_rec_set(rec, REC_APQNS, "(none)");
-	util_rec_set(rec, REC_KEY_FILE, skey_filename);
+	util_rec_set(rec, REC_KEY_FILE, "%s/%s", directory, skey_basename);
 	if (sector_size == 0)
 		util_rec_set(rec, REC_SECTOR_SIZE, "(system default)");
 	else
@@ -3383,8 +3458,9 @@ static void _keystore_print_record(struct util_rec *rec,
 				  label_argz_len);
 	else
 		util_rec_set(rec, REC_KMS_KEY_LABEL, "(local)");
-	if (pass_filename != NULL)
-		util_rec_set(rec, REC_PASSPHRASE_FILE, pass_filename);
+	if (pass_basename != NULL)
+		util_rec_set(rec, REC_PASSPHRASE_FILE, "%s/%s",
+			     directory, pass_basename);
 	else
 		util_rec_set(rec, REC_PASSPHRASE_FILE, "(none)");
 	util_rec_set(rec, REC_CREATION_TIME, creation);
@@ -3549,12 +3625,13 @@ static int _keystore_process_validate(struct keystore *keystore,
 	int is_old_mk;
 	int rc, valid;
 
-	rc = _keystore_ensure_keyfiles_exist(file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, file_names, name);
 	if (rc != 0)
 		goto out;
 
-	secure_key = read_secure_key(file_names->skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names->skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
 		rc = -ENOENT;
 		goto out;
@@ -3589,11 +3666,12 @@ static int _keystore_process_validate(struct keystore *keystore,
 			       file_names->skey_filename, secure_key_size,
 			       is_xts_key(secure_key, secure_key_size),
 			       clear_key_bitsize, valid, is_old_mk,
-			       _keystore_reencipher_key_exists(file_names),
+			       _keystore_reencipher_key_exists(keystore, file_names),
 			       is_secure_key(secure_key, secure_key_size) ?
-								mkvp : NULL,
-			       _keystore_passphrase_file_exists(file_names) ?
-					file_names->pass_filename : NULL);
+							     mkvp : NULL,
+			       _keystore_passphrase_file_exists(keystore, file_names) ?
+					file_names->pass_filename : NULL,
+			       keystore->directory);
 
 	if (valid && is_old_mk) {
 		util_print_indented("WARNING: The secure key is currently "
@@ -3824,7 +3902,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	char *temp;
 	int rc;
 
-	rc = _keystore_ensure_keyfiles_exist(file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, file_names, name);
 	if (rc != 0)
 		goto out;
 
@@ -3832,7 +3910,7 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	pr_verbose(keystore, "In-place reencipher: %d", params.inplace);
 
 	if (params.complete) {
-		if (!_keystore_reencipher_key_exists(file_names)) {
+		if (!_keystore_reencipher_key_exists(keystore, file_names)) {
 			warnx("Staged re-enciphering is not pending for key "
 			      "'%s', skipping",
 			      name);
@@ -3846,10 +3924,11 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 		params.inplace = 1;
 	}
 
-	secure_key = read_secure_key(params.complete ?
-						file_names->renc_filename :
-						file_names->skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					params.complete ?
+					file_names->renc_filename :
+					file_names->skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
 		rc = -ENOENT;
 		goto out;
@@ -3906,8 +3985,8 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 
 	out_file = params.inplace == 1 ? file_names->skey_filename :
 					 file_names->renc_filename;
-	rc = write_secure_key(out_file, secure_key,
-			      secure_key_size, keystore->verbose);
+	rc = write_secure_key_at(keystore->dir_fd, out_file,
+				 secure_key, secure_key_size, keystore->verbose);
 	if (rc != 0)
 		goto out;
 
@@ -3928,15 +4007,17 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 						properties, info->pkey_fd);
 		if (rc != 0) {
 			warnx("Failed to generate the key verification pattern "
-			      "for key '%s': %s", file_names->skey_filename,
-			      strerror(-rc));
+			      "for key '%s/%s': %s", keystore->directory,
+			      file_names->skey_filename, strerror(-rc));
 			goto out;
 		}
 
-		rc = properties_save(properties, file_names->info_filename, 1);
+		rc = properties_save_at(properties, keystore->dir_fd,
+					file_names->info_filename, 1);
 		if (rc != 0) {
 			pr_verbose(keystore,
-				   "Failed to write key info file '%s': %s",
+				   "Failed to write key info file '%s/%s': %s",
+				   keystore->directory,
 				   file_names->info_filename, strerror(-rc));
 			goto out;
 		}
@@ -3951,10 +4032,11 @@ static int _keystore_process_reencipher(struct keystore *keystore,
 	}
 
 	if (params.complete ||
-	    (params.inplace && _keystore_reencipher_key_exists(file_names))) {
-		if (remove(file_names->renc_filename) != 0) {
-			rc = -errno;
-			pr_verbose(keystore, "Failed to remove '%s': %s",
+	    (params.inplace && _keystore_reencipher_key_exists(keystore, file_names))) {
+		rc = _keystore_unlinkat(keystore, file_names->renc_filename);
+		if (rc != 0) {
+			pr_verbose(keystore, "Failed to remove '%s/%s': %s",
+				   keystore->directory,
 				   file_names->renc_filename, strerror(-rc));
 			goto out;
 		}
@@ -4096,7 +4178,7 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out;
 
@@ -4104,12 +4186,13 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_not_exist(&new_names, newname);
+	rc = _keystore_ensure_keyfiles_not_exist(keystore, &new_names, newname);
 	if (rc != 0)
 		goto out;
 
 	key_prop = properties_new();
-	rc = properties_load(key_prop, file_names.info_filename, 1);
+	rc = properties_load_at(key_prop, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
 		goto out;
@@ -4126,15 +4209,16 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	key_type = _keystore_get_key_type(key_prop);
 	volume_type = _keystore_get_volume_type(key_prop);
 
-	secure_key = read_secure_key(file_names.skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names.skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
 		rc = -ENOENT;
 		goto out;
 	}
 
-	rc = write_secure_key(new_names.skey_filename, secure_key,
-			      secure_key_size, keystore->verbose);
+	rc = write_secure_key_at(keystore->dir_fd, new_names.skey_filename,
+				 secure_key, secure_key_size, keystore->verbose);
 	free(secure_key);
 	if (rc != 0)
 		goto out;
@@ -4183,11 +4267,13 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 			goto out;
 	}
 
-	rc = properties_save(key_prop, new_names.info_filename, 1);
+	rc = properties_save_at(key_prop, keystore->dir_fd,
+				new_names.info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   new_names.info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, new_names.info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
@@ -4195,14 +4281,15 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	if (_keystore_passphrase_file_exists(&file_names)) {
-		rc = copy_file(file_names.pass_filename,
-			       new_names.pass_filename, 0);
+	if (_keystore_passphrase_file_exists(keystore, &file_names)) {
+		rc = copy_file_at(keystore->dir_fd, file_names.pass_filename,
+				  keystore->dir_fd, new_names.pass_filename,
+				  0);
 		if (rc != 0) {
 			pr_verbose(keystore,
-				   "Passphrase file '%s' could not be copied: "
-				   "%s", file_names.pass_filename,
-				   strerror(-rc));
+				   "Passphrase file '%s/%s' could not be "
+				   "copied: %s", keystore->directory,
+				   file_names.pass_filename, strerror(-rc));
 			goto out;
 		}
 
@@ -4217,9 +4304,9 @@ int keystore_copy_key(struct keystore *keystore, const char *name,
 
 out:
 	if (rc != 0) {
-		remove(new_names.skey_filename);
-		remove(new_names.info_filename);
-		remove(new_names.pass_filename);
+		_keystore_unlinkat(keystore, new_names.skey_filename);
+		_keystore_unlinkat(keystore, new_names.info_filename);
+		_keystore_unlinkat(keystore, new_names.pass_filename);
 	}
 
 	_keystore_free_key_filenames(&file_names);
@@ -4262,12 +4349,13 @@ int keystore_export_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out;
 
-	secure_key = read_secure_key(file_names.skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names.skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
 		rc = -ENOENT;
 		goto out;
@@ -4308,7 +4396,8 @@ static int _keystore_prompt_for_remove(struct keystore *keystore,
 	int rc;
 
 	key_prop = properties_new();
-	rc = properties_load(key_prop, file_names->info_filename, 1);
+	rc = properties_load_at(key_prop, keystore->dir_fd,
+				file_names->info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
 		goto out;
@@ -4351,7 +4440,7 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 {
 	struct key_filenames file_names = { 0 };
 	struct properties *key_props = NULL;
-	int rc;
+	int rc, rc2;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(name != NULL, "Internal error: name is NULL");
@@ -4360,7 +4449,7 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out;
 
@@ -4372,7 +4461,8 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 	}
 
 	key_props = properties_new();
-	rc = properties_load(key_props, file_names.info_filename, 1);
+	rc = properties_load_at(key_props, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
 		goto out;
@@ -4396,28 +4486,35 @@ int keystore_remove_key(struct keystore *keystore, const char *name,
 		}
 	}
 
-	if (remove(file_names.skey_filename) != 0) {
-		rc = -errno;
-		pr_verbose(keystore, "Failed to remove '%s': %s",
+	rc = _keystore_unlinkat(keystore, file_names.skey_filename);
+	if (rc != 0) {
+		pr_verbose(keystore, "Failed to remove '%s/%s': %s",
+			   keystore->directory,
 			   file_names.skey_filename, strerror(-rc));
 		goto out;
 	}
-	if (remove(file_names.info_filename) != 0) {
-		rc = -errno;
-		pr_verbose(keystore, "Failed to remove '%s': %s",
+	rc2 = _keystore_unlinkat(keystore, file_names.info_filename);
+	if (rc2 != 0) {
+		rc = rc2;
+		pr_verbose(keystore, "Failed to remove '%s/%s': %s",
+			   keystore->directory,
 			   file_names.info_filename, strerror(-rc));
 	}
-	if (_keystore_reencipher_key_exists(&file_names)) {
-		if (remove(file_names.renc_filename) != 0) {
-			rc = -errno;
-			pr_verbose(keystore, "Failed to remove '%s': %s",
+	if (_keystore_reencipher_key_exists(keystore, &file_names)) {
+		rc2 = _keystore_unlinkat(keystore, file_names.renc_filename);
+		if (rc2 != 0) {
+			rc = rc2;
+			pr_verbose(keystore, "Failed to remove '%s/%s': %s",
+				   keystore->directory,
 				   file_names.renc_filename, strerror(-rc));
 		}
 	}
-	if (_keystore_passphrase_file_exists(&file_names)) {
-		if (remove(file_names.pass_filename) != 0) {
-			rc = -errno;
-			pr_verbose(keystore, "Failed to remove '%s': %s",
+	if (_keystore_passphrase_file_exists(keystore, &file_names)) {
+		rc2 = _keystore_unlinkat(keystore, file_names.pass_filename);
+		if (rc2 != 0) {
+			rc = rc2;
+			pr_verbose(keystore, "Failed to remove '%s/%s': %s",
+				   keystore->directory,
 				   file_names.pass_filename, strerror(-rc));
 		}
 	}
@@ -4456,8 +4553,9 @@ static int _keystore_display_key(struct keystore *keystore,
 	size_t secure_key_size, clear_key_bitsize = 0;
 	int rc = 0;
 
-	secure_key = read_secure_key(file_names->skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names->skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL)
 		return -EIO;
 
@@ -4475,10 +4573,11 @@ static int _keystore_display_key(struct keystore *keystore,
 			       file_names->skey_filename, secure_key_size,
 			       is_xts_key(secure_key, secure_key_size),
 			       clear_key_bitsize, 0, 0,
-			       _keystore_reencipher_key_exists(file_names),
+			       _keystore_reencipher_key_exists(keystore, file_names),
 			       NULL,
-			       _keystore_passphrase_file_exists(file_names) ?
-					file_names->pass_filename : NULL);
+			       _keystore_passphrase_file_exists(keystore, file_names) ?
+					file_names->pass_filename : NULL,
+			       keystore->directory);
 
 out:
 	free(secure_key);
@@ -4550,6 +4649,7 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
  * with mkstemp() (mode 0600, no predictable name). The caller is
  * responsible for removing the file when it is no longer needed.
  *
+ * @param[in]  keystore   the keystore (used to anchor openat() calls)
  * @param[in]  file1      path of the first source file
  * @param[in]  file2      path of the second source file
  * @param[in]  tmpdir     directory for the temporary file (may be NULL -> /tmp)
@@ -4558,7 +4658,8 @@ int keystore_list_keys(struct keystore *keystore, const char *name_filter,
  *
  * @returns 0 on success, a negative errno value on failure
  */
-static int _keystore_combine_key_files(const char *file1, const char *file2,
+static int _keystore_combine_key_files(const struct keystore *keystore,
+				       const char *file1, const char *file2,
 				       const char *tmpdir, char **out_path)
 {
 	const char *srcs[2] = { file1, file2 };
@@ -4582,11 +4683,12 @@ static int _keystore_combine_key_files(const char *file1, const char *file2,
 
 	/* copy file1 then file2 into the temp file */
 	for (i = 0; i < 2; i++) {
-		fd_src = open(srcs[i], O_RDONLY | O_CLOEXEC);
+		fd_src = openat(keystore->dir_fd, srcs[i],
+				O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 		if (fd_src < 0) {
 			rc = -errno;
-			warnx("Failed to open key file '%s': %s",
-			      srcs[i], strerror(errno));
+			warnx("Failed to open key file '%s/%s': %s",
+			      keystore->directory, srcs[i], strerror(errno));
 			goto out;
 		}
 
@@ -4677,8 +4779,9 @@ static int _keystore_find_integrity_key_cb(struct keystore *keystore,
 	if (find_info->found)
 		return 0;
 
-	secure_key = read_secure_key(file_names->skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names->skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL)
 		return -EIO;
 
@@ -4775,39 +4878,59 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 					const char *volume,
 					const char *dmname,
 					const char *cipher_spec,
-					const char *key_file_name,
+					const char *key_file_basename,
 					size_t key_file_size,
 					size_t sector_size,
 					const char *volume_type,
-					const char *passphrase_file,
+					const char *passphrase_basename,
 					struct crypt_info *info)
 {
 	struct find_integrity_key_info find_info = { 0 };
 	char *keyfile_opt = NULL, *offset_opt = NULL;
 	char *size_opt = NULL, *tries_opt = NULL;
-	char *common_passphrase_options;
+	char *common_passphrase_options = NULL;
+	char *passphrase_file = NULL;
 	char *integrity_opts = NULL;
+	char *key_file_name = NULL;
 	char *combined_key = NULL;
+	const char *key_file_arg;
 	size_t common_len;
 	char *cmd = NULL;
 	char temp[100];
 	char *tmpdir;
 	int rc = 0;
 
-	if (!is_valid_characters_for_command(cipher_spec))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(key_file_name))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(volume))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(dmname))
-		return -EINVAL;
+	util_asprintf(&key_file_name, "%s/%s", keystore->directory,
+		      key_file_basename);
+	key_file_arg = key_file_name;
+	if (passphrase_basename != NULL)
+		util_asprintf(&passphrase_file, "%s/%s", keystore->directory,
+			      passphrase_basename);
+
+	if (!is_valid_characters_for_command(cipher_spec)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(key_file_name)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(volume)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(dmname)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	sprintf(temp, "--sector-size %lu ", sector_size);
 
 	if (info->keyfile) {
-		if (!is_valid_characters_for_command(info->keyfile))
-			return -EINVAL;
+		if (!is_valid_characters_for_command(info->keyfile)) {
+			rc = -EINVAL;
+			goto out;
+		}
 
 		util_asprintf(&keyfile_opt, "--key-file '%s' ", info->keyfile);
 		if (info->keyfile_offset > 0)
@@ -4817,8 +4940,10 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 			util_asprintf(&size_opt, "--keyfile-size %lu ",
 				      info->keyfile_size);
 	} else if (passphrase_file != NULL) {
-		if (!is_valid_characters_for_command(passphrase_file))
-			return -EINVAL;
+		if (!is_valid_characters_for_command(passphrase_file)) {
+			rc = -EINVAL;
+			goto out;
+		}
 
 		util_asprintf(&keyfile_opt, "--key-file '%s' ",
 			      passphrase_file);
@@ -4837,16 +4962,14 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 	free(tries_opt);
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
-		if (info->format) {
-			free(common_passphrase_options);
-			return 0;
-		}
+		if (info->format)
+			goto out;
 
 		util_asprintf(&cmd,
 			      "cryptsetup plainOpen %s%s--key-file '%s' "
 			      "--key-size %lu --cipher %s %s%s %s",
 			      info->batch_mode ? "-q " : "",
-			      keystore->verbose ? "-v " : "", key_file_name,
+			      keystore->verbose ? "-v " : "", key_file_arg,
 			      key_file_size * 8, cipher_spec,
 			      sector_size > 0 ? temp : "", volume, dmname);
 
@@ -4911,7 +5034,8 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 				if (info->execute) {
 					tmpdir = secure_getenv("TMPDIR");
 					rc = _keystore_combine_key_files(
-							key_file_name,
+							keystore,
+							key_file_basename,
 							find_info.integrity_key_name,
 							tmpdir, &combined_key);
 					if (rc != 0)
@@ -4923,15 +5047,16 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 					printf("COMBINED_KEY=$(mktemp --tmpdir "
 					       "luks2-integrity-XXXXXX)\n");
 					util_asprintf(&cmd,
-						      "cat '%s' '%s' > \"$COMBINED_KEY\"",
-						      key_file_name,
+						      "cat '%s' '%s/%s' > \"$COMBINED_KEY\"",
+						      key_file_arg,
+						      keystore->directory,
 						      find_info.integrity_key_name);
 					printf("%s\n", cmd);
 					free(cmd);
 					cmd = NULL;
 				}
 
-				key_file_name = combined_key;
+				key_file_arg = combined_key;
 			}
 
 			/*
@@ -4950,7 +5075,7 @@ static int _keystore_process_cryptsetup(struct keystore *keystore,
 				      "--cipher %s --pbkdf %s %s%s%s%s",
 				      info->batch_mode ? "-q " : "",
 				      keystore->verbose ? "-v " : "",
-				      key_file_name, key_file_size * 8,
+				      key_file_arg, key_file_size * 8,
 				      cipher_spec,
 				      info->fips ? "pbkdf2" :
 						"argon2i --pbkdf-memory 32 "
@@ -5013,6 +5138,8 @@ out:
 
 	free(common_passphrase_options);
 	free(cmd);
+	free(key_file_name);
+	free(passphrase_file);
 	return rc;
 }
 
@@ -5034,27 +5161,44 @@ out:
  * @returns 0 if successful, a negative errno value otherwise
  */
 
-static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
+static int _keystore_process_crypttab(struct keystore *keystore,
 				      const char *volume,
 				      const char *dmname,
 				      const char *cipher_spec,
-				      const char *key_file_name,
+				      const char *key_file_basename,
 				      size_t key_file_size,
 				      size_t sector_size,
 				      const char *volume_type,
-				      const char *passphrase_file,
+				      const char *passphrase_basename,
 				      struct crypt_info *info)
 {
+	char *passphrase_file = NULL;
+	char *key_file_name;
 	char temp[1000];
+	int rc = 0;
 
-	if (!is_valid_characters_for_command(cipher_spec))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(key_file_name))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(volume))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(dmname))
-		return -EINVAL;
+	util_asprintf(&key_file_name, "%s/%s", keystore->directory,
+		      key_file_basename);
+	if (passphrase_basename != NULL)
+		util_asprintf(&passphrase_file, "%s/%s", keystore->directory,
+			      passphrase_basename);
+
+	if (!is_valid_characters_for_command(cipher_spec)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(key_file_name)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(volume)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(dmname)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	if (strcasecmp(volume_type, VOLUME_TYPE_PLAIN) == 0) {
 		sprintf(temp, ",sector-size=%lu", sector_size);
@@ -5063,8 +5207,10 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 		       key_file_size * 8, sector_size > 0 ? temp : "");
 	} else if (strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
 		if (info->keyfile != NULL) {
-			if (!is_valid_characters_for_command(info->keyfile))
-				return -EINVAL;
+			if (!is_valid_characters_for_command(info->keyfile)) {
+				rc = -EINVAL;
+				goto out;
+			}
 
 			printf("%s\t%s\t%s\tluks", dmname, volume,
 			       info->keyfile);
@@ -5074,8 +5220,10 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 			if (info->keyfile_size > 0)
 				printf(",keyfile-size=%lu", info->keyfile_size);
 		} else if (passphrase_file != NULL) {
-			if (!is_valid_characters_for_command(passphrase_file))
-				return -EINVAL;
+			if (!is_valid_characters_for_command(passphrase_file)) {
+				rc = -EINVAL;
+				goto out;
+			}
 
 			printf("%s\t%s\t%s\tluks", dmname, volume,
 			       passphrase_file);
@@ -5086,10 +5234,13 @@ static int _keystore_process_crypttab(struct keystore *UNUSED(keystore),
 			printf(",tries=%lu", info->tries);
 		printf("\n");
 	} else {
-		return -EINVAL;
+		rc = -EINVAL;
 	}
 
-	return 0;
+out:
+	free(key_file_name);
+	free(passphrase_file);
+	return rc;
 }
 
 /**
@@ -5113,13 +5264,14 @@ static int _keystore_process_integritysetup(struct keystore *keystore,
 					    const char *volume,
 					    const char *dmname,
 					    const char *cipher_spec,
-					    const char *key_file_name,
+					    const char *key_file_basename,
 					    size_t key_file_size,
 					    size_t sector_size,
 					    const char *volume_type,
-					    const char *UNUSED(passphrase_file),
+					    const char *UNUSED(passphrase_basename),
 					    struct crypt_info *info)
 {
+	char *key_file_name;
 	char temp[100];
 	int rc = 0;
 	char *cmd;
@@ -5127,16 +5279,27 @@ static int _keystore_process_integritysetup(struct keystore *keystore,
 	if (strcasecmp(volume_type, VOLUME_TYPE_INTEGRITY) != 0)
 		return 0;
 
+	util_asprintf(&key_file_name, "%s/%s", keystore->directory,
+		      key_file_basename);
+
 	sprintf(temp, "--sector-size %lu ", sector_size);
 
-	if (!is_valid_characters_for_command(cipher_spec))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(key_file_name))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(volume))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(dmname))
-		return -EINVAL;
+	if (!is_valid_characters_for_command(cipher_spec)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(key_file_name)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(volume)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(dmname)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	util_asprintf(&cmd,
 		      "integritysetup %s %s%s--integrity %s "
@@ -5158,6 +5321,8 @@ static int _keystore_process_integritysetup(struct keystore *keystore,
 	}
 
 	free(cmd);
+out:
+	free(key_file_name);
 	return rc;
 }
 
@@ -5179,33 +5344,49 @@ static int _keystore_process_integritysetup(struct keystore *keystore,
  * @returns 0 if successful, a negative errno value otherwise
  */
 
-static int _keystore_process_integritytab(struct keystore *UNUSED(keystore),
+static int _keystore_process_integritytab(struct keystore *keystore,
 					  const char *volume,
 					  const char *dmname,
 					  const char *cipher_spec,
-					  const char *key_file_name,
+					  const char *key_file_basename,
 					  size_t UNUSED(key_file_size),
 					  size_t UNUSED(sector_size),
 					  const char *volume_type,
-					  const char *UNUSED(passphrase_file),
+					  const char *UNUSED(passphrase_basename),
 					  struct crypt_info *UNUSED(info))
 {
+	char *key_file_name;
+	int rc = 0;
+
 	if (strcasecmp(volume_type, VOLUME_TYPE_INTEGRITY) != 0)
 		return 0;
 
-	if (!is_valid_characters_for_command(cipher_spec))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(key_file_name))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(volume))
-		return -EINVAL;
-	if (!is_valid_characters_for_command(dmname))
-		return -EINVAL;
+	util_asprintf(&key_file_name, "%s/%s", keystore->directory,
+		      key_file_basename);
+
+	if (!is_valid_characters_for_command(cipher_spec)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(key_file_name)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(volume)) {
+		rc = -EINVAL;
+		goto out;
+	}
+	if (!is_valid_characters_for_command(dmname)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
 	printf("%s\t%s\t%s\tintegrity-algorithm=%s\n", volume, dmname,
 	       key_file_name, cipher_spec);
 
-	return 0;
+out:
+	free(key_file_name);
+	return rc;
 }
 
 /**
@@ -5311,8 +5492,9 @@ static int _keystore_process_crypt(struct keystore *keystore,
 	char *ch;
 	int i;
 
-	secure_key = read_secure_key(file_names->skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names->skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL)
 		return -EIO;
 
@@ -5363,7 +5545,7 @@ static int _keystore_process_crypt(struct keystore *keystore,
 					cipher_spec, file_names->skey_filename,
 					secure_key_size, sector_size,
 					volume_type,
-				_keystore_passphrase_file_exists(file_names) ?
+				_keystore_passphrase_file_exists(keystore, file_names) ?
 					file_names->pass_filename : NULL,
 					info);
 			if (rc != 0)
@@ -5657,12 +5839,13 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 	if (rc != 0)
 		goto out;
 
-	rc = _keystore_ensure_keyfiles_exist(&file_names, name);
+	rc = _keystore_ensure_keyfiles_exist(keystore, &file_names, name);
 	if (rc != 0)
 		goto out;
 
 	properties = properties_new();
-	rc = properties_load(properties, file_names.info_filename, 1);
+	rc = properties_load_at(properties, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		warnx("Key '%s' does not exist or is invalid", name);
 		goto out;
@@ -5689,8 +5872,9 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
-	secure_key = read_secure_key(file_names.skey_filename,
-				     &secure_key_size, keystore->verbose);
+	secure_key = read_secure_key_at(keystore->dir_fd,
+					file_names.skey_filename,
+					&secure_key_size, keystore->verbose);
 	if (secure_key == NULL) {
 		rc = -ENOENT;
 		goto out;
@@ -5790,16 +5974,18 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		goto out;
 	}
 
-	rc = properties_save(properties, file_names.info_filename, 1);
+	rc = properties_save_at(properties, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Failed to write key info file '%s': %s",
-			   file_names.info_filename, strerror(-rc));
+			   "Failed to write key info file '%s/%s': %s",
+			   keystore->directory, file_names.info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
-	rc = write_secure_key(file_names.skey_filename, output_key,
-			      output_key_size, keystore->verbose);
+	rc = write_secure_key_at(keystore->dir_fd, file_names.skey_filename,
+				 output_key, output_key_size, keystore->verbose);
 	if (rc != 0)
 		goto out;
 
@@ -5811,8 +5997,8 @@ int keystore_convert_key(struct keystore *keystore, const char *name,
 		      "the secure AES volume key of type CCA-AESDATA. To "
 		      "change the secure AES volume key in the LUKS2 header, "
 		      "run command 'zkey-cryptsetup setkey <device> "
-		      "--volume-key-file %s':", name,
-		      file_names.skey_filename);
+		      "--volume-key-file %s/%s':", name,
+		      keystore->directory, file_names.skey_filename);
 	_keystore_msg_for_volumes(temp, properties, VOLUME_TYPE_LUKS2);
 	free(temp);
 	util_asprintf(&temp, "The following plain mode volumes are "
@@ -5897,11 +6083,13 @@ static int _keystore_process_kms_key_set_prop(struct keystore *keystore,
 		}
 	}
 
-	rc = properties_save(properties, file_names->info_filename, 1);
+	rc = properties_save_at(properties, keystore->dir_fd,
+				file_names->info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   file_names->info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, file_names->info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
@@ -6015,11 +6203,13 @@ static int _keystore_process_kms_key_unbind(struct keystore *keystore,
 	if (rc != 0)
 		goto out;
 
-	rc = properties_save(properties, file_names->info_filename, 1);
+	rc = properties_save_at(properties, keystore->dir_fd,
+				file_names->info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   file_names->info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, file_names->info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
@@ -6204,7 +6394,7 @@ static int _keystore_process_kms_import(const char *key1_id,
 		goto out;
 
 check_duplicate_key:
-	rc = _keystore_ensure_keyfiles_not_exist(&file_names, key_name);
+	rc = _keystore_ensure_keyfiles_not_exist(keystore, &file_names, key_name);
 	if (rc == -EEXIST) {
 		if (import_data->batch_mode) {
 			rc = 1;
@@ -6315,8 +6505,8 @@ prompt_alt_name:
 		}
 	}
 
-	rc = write_secure_key(file_names.skey_filename, secure_key,
-			      secure_key_size, keystore->verbose);
+	rc = write_secure_key_at(keystore->dir_fd, file_names.skey_filename,
+				 secure_key, secure_key_size, keystore->verbose);
 	if (rc != 0)
 		goto out;
 
@@ -6326,7 +6516,7 @@ prompt_alt_name:
 
 	if (passphrase != NULL && volume_type != NULL &&
 	    strcasecmp(volume_type, VOLUME_TYPE_LUKS2) == 0) {
-		rc = store_passphrase_from_base64(passphrase,
+		rc = store_passphrase_from_base64(passphrase, keystore->dir_fd,
 						  file_names.pass_filename,
 						  keystore->verbose);
 		if (rc != 0) {
@@ -6360,25 +6550,27 @@ prompt_alt_name:
 		goto out_remove;
 	}
 
-	rc = properties_save(key_props, file_names.info_filename, 1);
+	rc = properties_save_at(key_props, keystore->dir_fd,
+				file_names.info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   file_names.info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, file_names.info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
 	rc = _keystore_set_file_permission(keystore, file_names.info_filename);
 	if (rc != 0) {
-		remove(file_names.info_filename);
+		_keystore_unlinkat(keystore, file_names.info_filename);
 		goto out_remove;
 	}
 
 out_remove:
 	if (rc != 0) {
-		remove(file_names.skey_filename);
-		remove(file_names.info_filename);
-		remove(file_names.pass_filename);
+		_keystore_unlinkat(keystore, file_names.skey_filename);
+		_keystore_unlinkat(keystore, file_names.info_filename);
+		_keystore_unlinkat(keystore, file_names.pass_filename);
 	}
 
 out:
@@ -6535,7 +6727,8 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 			     file_names->pass_filename,
 			     key_type,
 			     keystore->verbose,
-			     refresh_data->pkey_fd);
+			     refresh_data->pkey_fd,
+			     keystore);
 	if (rc != 0) {
 		warnx("KMS plugin '%s' failed to refresh key '%s': %s",
 		      keystore->kms_info->plugin_name, name, strerror(-rc));
@@ -6549,7 +6742,7 @@ static int _keystore_refresh_kms_key(struct keystore *keystore,
 	if (rc != 0)
 		goto out;
 
-	if (_keystore_passphrase_file_exists(file_names)) {
+	if (_keystore_passphrase_file_exists(keystore, file_names)) {
 		rc = _keystore_set_file_permission(keystore,
 						   file_names->pass_filename);
 		if (rc != 0)
@@ -6619,11 +6812,13 @@ save_props:
 		goto out;
 	}
 
-	rc = properties_save(properties, file_names->info_filename, 1);
+	rc = properties_save_at(properties, keystore->dir_fd,
+				file_names->info_filename, 1);
 	if (rc != 0) {
 		pr_verbose(keystore,
-			   "Key info file '%s' could not be written: %s",
-			   file_names->info_filename, strerror(-rc));
+			   "Key info file '%s/%s' could not be written: %s",
+			   keystore->directory, file_names->info_filename,
+			   strerror(-rc));
 		goto out;
 	}
 
@@ -6640,8 +6835,8 @@ out:
 			      "encrypted with key '%s'. To update the secure "
 			      "AES volume key in the LUKS2 header, run command "
 			      "'zkey-cryptsetup setkey <device> "
-			      "--volume-key-file %s':", name,
-			      file_names->skey_filename);
+			      "--volume-key-file %s/%s':", name,
+			      keystore->directory, file_names->skey_filename);
 		_keystore_msg_for_volumes(msg, properties, VOLUME_TYPE_LUKS2);
 		free(msg);
 	} else {
@@ -6752,6 +6947,8 @@ void keystore_free(struct keystore *keystore)
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 
 	_keystore_unlock_repository(keystore);
+	if (keystore->dir_fd >= 0)
+		close(keystore->dir_fd);
 	free(keystore->directory);
 	free(keystore);
 }

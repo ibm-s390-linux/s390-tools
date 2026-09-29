@@ -77,13 +77,12 @@ bool prompt_for_yes(bool verbose);
 
 char *printable_mkvp(enum card_type cardtype, u8 *mkvp);
 
-int copy_file(const char *in_file_name, const char *out_file_name,
-	      size_t num_bytes);
+int copy_file_at(int in_dir_fd, const char *in_basename,
+		 int out_dir_fd, const char *out_basename, size_t num_bytes);
 
-char *read_passphrase_as_base64(const char *filename, bool verbose);
-int store_passphrase_from_base64(const char *hex_string, const char *filename,
-				 bool verbose);
-
-FILE *fopen_nofollow(const char *path, const char *mode);
+char *read_passphrase_as_base64_at(int dir_fd, const char *basename,
+				   bool verbose);
+int store_passphrase_from_base64(const char *b64_string, int dir_fd,
+				 const char *basename, bool verbose);
 
 #endif

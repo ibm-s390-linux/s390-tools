@@ -80,30 +80,65 @@ int open_pkey_device(bool verbose)
 u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 		    bool verbose)
 {
+	return read_secure_key_at(AT_FDCWD, keyfile, secure_key_size, verbose);
+}
+
+/**
+ * Read a secure key file using a directory file descriptor and a basename.
+ * The size is obtained with fstat() on the opened fd, avoiding a separate
+ * stat() call on the path.
+ *
+ * When dir_fd is a real pinned directory fd, O_NOFOLLOW is added so the read
+ * is anchored to that inode and cannot be redirected via a symlink.
+ * When dir_fd is AT_FDCWD (arbitrary user-supplied path), O_NOFOLLOW is
+ * omitted so symlinks in the path are followed normally.
+ *
+ * @param[in]  dir_fd           open directory file descriptor, or AT_FDCWD
+ * @param[in]  basename         name of the file within that directory
+ * @param[out] secure_key_size  filled with the size of the returned buffer
+ * @param[in]  verbose          if true, verbose messages are printed
+ *
+ * @return a buffer containing the secure key, or NULL in case of an error.
+ *         The returned buffer must be freed by the caller.
+ */
+u8 *read_secure_key_at(int dir_fd, const char *basename,
+		       size_t *secure_key_size, bool verbose)
+{
 	size_t count, size;
 	struct stat sb;
 	char *msg;
 	FILE *fp;
 	u8 *buf;
+	int fd;
 
-	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(basename != NULL, "Internal error: basename is NULL");
 	util_assert(secure_key_size != NULL,
 		    "Internal error: secure_key_size is NULL");
 
-	if (stat(keyfile, &sb)) {
-		warnx("File '%s': %s", keyfile, strerror(errno));
+	fd = openat(dir_fd, basename,
+		    O_RDONLY | (dir_fd != AT_FDCWD ? O_NOFOLLOW : 0));
+	if (fd < 0) {
+		warnx("File '%s': %s", basename, strerror(errno));
+		return NULL;
+	}
+
+	if (fstat(fd, &sb) != 0) {
+		warnx("File '%s': %s", basename, strerror(errno));
+		close(fd);
 		return NULL;
 	}
 	size = sb.st_size;
 
 	if (size < MIN_SECURE_KEY_SIZE || size > 3 * MAX_SECURE_KEY_SIZE) {
-		warnx("File '%s' has an invalid size: %lu", keyfile, size);
+		warnx("File '%s' has an invalid size: %lu", basename, size);
+		close(fd);
 		return NULL;
 	}
 
-	fp = fopen(keyfile, "r");
+	fp = fdopen(fd, "r");
 	if (fp == NULL) {
-		warnx("File '%s': %s", keyfile, strerror(errno));
+		warnx("File '%s': %s", basename, strerror(errno));
+		close(fd);
 		return NULL;
 	}
 
@@ -111,7 +146,7 @@ u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 	count = fread(buf, 1, size, fp);
 	if (count != size) {
 		msg = ferror(fp) ? strerror(errno) : "File is too small";
-		warnx("File '%s': %s", keyfile, msg);
+		warnx("File '%s': %s", basename, msg);
 		free(buf);
 		buf = NULL;
 		goto out;
@@ -121,7 +156,7 @@ u8 *read_secure_key(const char *keyfile, size_t *secure_key_size,
 
 	if (verbose) {
 		pr_verbose(verbose, "%lu bytes read from file '%s'", size,
-			   keyfile);
+			   basename);
 		util_hexdump_grp(stderr, NULL, buf, 4, size, 0);
 	}
 out:
@@ -142,30 +177,63 @@ out:
 int write_secure_key(const char *keyfile, const u8 *secure_key,
 		     size_t secure_key_size, bool verbose)
 {
+	return write_secure_key_at(AT_FDCWD, keyfile, secure_key, secure_key_size,
+				   verbose);
+}
+
+/**
+ * Write a secure key file using a directory file descriptor and a basename.
+ *
+ * When dir_fd is a real pinned directory fd, O_NOFOLLOW is added so the write
+ * is anchored to that inode and cannot be redirected via a symlink.
+ * When dir_fd is AT_FDCWD (arbitrary user-supplied path), O_NOFOLLOW is
+ * omitted so symlinks in the path are followed normally.
+ *
+ * @param[in] dir_fd          open directory file descriptor, or AT_FDCWD
+ * @param[in] basename        name of the file within that directory
+ * @param[in] secure_key      a buffer containing the secure key
+ * @param[in] secure_key_size the size of the secure key
+ * @param[in] verbose         if true, verbose messages are printed
+ *
+ *  @returns 0 in case of success, -EIO in case of an error
+ */
+int write_secure_key_at(int dir_fd, const char *basename, const u8 *secure_key,
+			size_t secure_key_size, bool verbose)
+{
 	size_t count;
 	FILE *fp;
+	int fd;
 
-	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(basename != NULL, "Internal error: basename is NULL");
 	util_assert(secure_key != NULL, "Internal error: secure_key is NULL");
 	util_assert(secure_key_size > 0,
 		    "Internal error: secure_key_size is zero");
 
-	fp = fopen_nofollow(keyfile, "w");
+	fd = openat(dir_fd, basename,
+		    O_WRONLY | O_CREAT | O_TRUNC |
+		    (dir_fd != AT_FDCWD ? O_NOFOLLOW : 0), 0600);
+	if (fd < 0) {
+		warnx("File '%s': %s", basename, strerror(errno));
+		return -EIO;
+	}
+
+	fp = fdopen(fd, "w");
 	if (fp == NULL) {
-		warnx("File '%s': %s", keyfile, strerror(errno));
+		warnx("File '%s': %s", basename, strerror(errno));
+		close(fd);
 		return -EIO;
 	}
 
 	count = fwrite(secure_key, 1, secure_key_size, fp);
 	if (count != secure_key_size) {
-		warnx("File '%s': %s", keyfile, strerror(errno));
+		warnx("File '%s': %s", basename, strerror(errno));
 		fclose(fp);
 		return -EIO;
 	}
 
 	if (verbose) {
 		pr_verbose(verbose, "%lu bytes written to file '%s'",
-			   secure_key_size, keyfile);
+			   secure_key_size, basename);
 		util_hexdump_grp(stderr, NULL, secure_key, 4,
 				 secure_key_size, 0);
 	}
@@ -194,13 +262,21 @@ static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
 	char *msg;
 	FILE *fp;
 	u8 *buf;
+	int fd;
 
 	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
 	util_assert(clear_key_size != NULL,
 		    "Internal error: clear_key_size is NULL");
 
-	if (stat(keyfile, &sb)) {
+	fd = open(keyfile, O_RDONLY);
+	if (fd < 0) {
 		warnx("File '%s': %s", keyfile, strerror(errno));
+		return NULL;
+	}
+
+	if (fstat(fd, &sb) != 0) {
+		warnx("File '%s': %s", keyfile, strerror(errno));
+		close(fd);
 		return NULL;
 	}
 	size = sb.st_size;
@@ -210,6 +286,7 @@ static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
 		if (size != expected_size) {
 			warnx("File '%s' has an invalid size, "
 			      "%lu bytes expected", keyfile, expected_size);
+			close(fd);
 			return NULL;
 		}
 	} else {
@@ -224,6 +301,7 @@ static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
 			warnx("File '%s' has an invalid size, "
 			      "192 bit keys are not supported with XTS",
 			      keyfile);
+			close(fd);
 			return NULL;
 		}
 		break;
@@ -236,12 +314,14 @@ static u8 *read_clear_key(const char *keyfile, size_t keybits, bool xts,
 		else
 			warnx("File '%s' has an invalid size, 16, 24 "
 			      "or 32 bytes expected", keyfile);
+		close(fd);
 		return NULL;
 	}
 
-	fp = fopen(keyfile, "r");
+	fp = fdopen(fd, "r");
 	if (fp == NULL) {
 		warnx("File '%s': %s", keyfile, strerror(errno));
+		close(fd);
 		return NULL;
 	}
 
@@ -944,13 +1024,47 @@ int generate_secure_key_random(int pkey_fd, const char *keyfile,
 			       const char **apqns, bool exportable,
 			       bool wrap_with_trusted, bool verbose)
 {
+	return generate_secure_key_random_at(pkey_fd, AT_FDCWD, keyfile,
+					     keybits, xts, key_type, apqns,
+					     exportable, wrap_with_trusted,
+					     verbose);
+}
+
+/**
+ * Generate a secure key by random and write it using a directory file
+ * descriptor and a basename.  When dir_fd is a real pinned directory fd,
+ * O_NOFOLLOW is enforced by write_secure_key_at() so the output file cannot
+ * be redirected via a symlink.  When dir_fd is AT_FDCWD the full path in
+ * basename is used unchanged (user-supplied path outside the repository).
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] dir_fd        open directory file descriptor, or AT_FDCWD
+ * @param[in] basename      name of the output file within dir_fd
+ * @param[in] keybits       the cryptographic size of the key in bits
+ * @param[in] xts           if true an XTS key is generated
+ * @param[in] key_type      the type of the key
+ * @param[in] apqns         zero-terminated array of APQN-strings, or NULL
+ * @param[in] exportable    if true the key shall be exportable
+ * @param[in] wrap_with_trusted  if true the key shall be wrapable with a
+ *                          trusted KEK only
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int generate_secure_key_random_at(int pkey_fd, int dir_fd,
+				  const char *basename,
+				  size_t keybits, bool xts,
+				  const char *key_type, const char **apqns,
+				  bool exportable, bool wrap_with_trusted,
+				  bool verbose)
+{
 	struct pkey_genseck2 genseck2;
 	size_t secure_key_size, size;
 	u8 *secure_key = NULL;
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
-	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(basename != NULL, "Internal error: basename is NULL");
 	util_assert(key_type != NULL, "Internal error: key_type is NULL");
 
 	if (keybits == 0)
@@ -1079,7 +1193,8 @@ retry:
 
 	pr_verbose(verbose, "Successfully generated a secure key");
 
-	rc = write_secure_key(keyfile, secure_key, secure_key_size, verbose);
+	rc = write_secure_key_at(dir_fd, basename, secure_key, secure_key_size,
+				 verbose);
 
 out:
 	free(genseck2.apqns);
@@ -1114,6 +1229,42 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 			      const char **apqns, bool exportable,
 			      bool wrap_with_trusted, bool verbose)
 {
+	return generate_secure_key_clear_at(pkey_fd, AT_FDCWD, keyfile,
+					    keybits, xts, clearkeyfile,
+					    key_type, apqns, exportable,
+					    wrap_with_trusted, verbose);
+}
+
+/**
+ * Generate a secure key from a clear key file and write it using a directory
+ * file descriptor and a basename. When dir_fd is a real pinned directory fd,
+ * O_NOFOLLOW is enforced by write_secure_key_at() so the output file cannot
+ * be redirected via a symlink. When dir_fd is AT_FDCWD the full path in
+ * basename is used unchanged (user-supplied path outside the repository).
+ *
+ * @param[in] pkey_fd       the pkey file descriptor
+ * @param[in] dir_fd        open directory file descriptor, or AT_FDCWD
+ * @param[in] basename      name of the output file within dir_fd
+ * @param[in] keybits       the cryptographic size of the key in bits
+ * @param[in] xts           if true an XTS key is generated
+ * @param[in] clearkeyfile  the file name of the clear key to read
+ * @param[in] key_type      the type of the key
+ * @param[in] apqns         zero-terminated array of APQN-strings, or NULL
+ * @param[in] exportable    if true the key shall be exportable
+ * @param[in] wrap_with_trusted  if true the key shall be wrapable with a
+ *                          trusted KEK only
+ * @param[in] verbose       if true, verbose messages are printed
+ *
+ * @returns 0 on success, a negative errno in case of an error
+ */
+int generate_secure_key_clear_at(int pkey_fd, int dir_fd,
+				 const char *basename,
+				 size_t keybits, bool xts,
+				 const char *clearkeyfile,
+				 const char *key_type, const char **apqns,
+				 bool exportable, bool wrap_with_trusted,
+				 bool verbose)
+{
 	struct pkey_clr2seck2 clr2seck2;
 	size_t secure_key_size;
 	size_t clear_key_size;
@@ -1123,7 +1274,7 @@ int generate_secure_key_clear(int pkey_fd, const char *keyfile,
 	int rc;
 
 	util_assert(pkey_fd != -1, "Internal error: pkey_fd is -1");
-	util_assert(keyfile != NULL, "Internal error: keyfile is NULL");
+	util_assert(basename != NULL, "Internal error: basename is NULL");
 	util_assert(clearkeyfile != NULL,
 		    "Internal error: clearkeyfile is NULL");
 	util_assert(key_type != NULL, "Internal error: key_type is NULL");
@@ -1267,7 +1418,8 @@ retry:
 	pr_verbose(verbose,
 		   "Successfully generated a secure key from a clear key");
 
-	rc = write_secure_key(keyfile, secure_key, secure_key_size, verbose);
+	rc = write_secure_key_at(dir_fd, basename, secure_key, secure_key_size,
+				 verbose);
 
 out:
 	memset(clear_key, 0, clear_key_size);

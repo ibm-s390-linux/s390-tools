@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1201,46 +1202,72 @@ char *printable_mkvp(enum card_type cardtype, u8 *mkvp)
 	return mkvp_print_buf;
 }
 
-/*
- * Copy the contents of one file into another file. If num_bytes is zero,
- * then all content until EOF of the input file is copied. Otherwise only up to
- * num_bytes is copied.
+/**
+ * Copies a file identified by (in_dir_fd, in_basename) into a file identified
+ * by (out_dir_fd, out_basename). Each side is opened with openat(2); when the
+ * supplied fd is a real pinned directory fd (i.e. not AT_FDCWD) O_NOFOLLOW is
+ * added so the access is anchored to the directory inode and cannot follow a
+ * symlink in the final path component. When AT_FDCWD is passed the basename
+ * is used as a plain path, which allows callers to supply an absolute or
+ * relative path (e.g. "/dev/urandom" or a user-supplied file outside the
+ * repository).
  *
- * @param[in] in_file_name   the file name of the input file
- * @param[in] out_file_name  the file name of the output file
- * @param[in] num_bytes      the number of  bytes to copy, or 0 to copy until
- *                           EOF of the input file
+ * @param[in] in_dir_fd     open directory fd for the source, or AT_FDCWD
+ * @param[in] in_basename   source file name (or full path when AT_FDCWD)
+ * @param[in] out_dir_fd    open directory fd for the destination, or AT_FDCWD
+ * @param[in] out_basename  destination file name (or full path when AT_FDCWD)
+ * @param[in] num_bytes     number of bytes to copy; 0 means copy until EOF
  *
- * @returns zero for success, or a negative error in case of an error
+ * @returns 0 on success, or a negative errno value on failure
  */
-int copy_file(const char *in_file_name, const char *out_file_name,
-	      size_t num_bytes)
+int copy_file_at(int in_dir_fd, const char *in_basename,
+		 int out_dir_fd, const char *out_basename, size_t num_bytes)
 {
 	FILE *fp_in = NULL, *fp_out = NULL;
 	size_t num = 0, len;
 	char buff[1024];
 	int rc = 0;
+	int fd;
 
-	fp_in = fopen(in_file_name, "r");
-	if (fp_in == NULL) {
+	fd = openat(in_dir_fd, in_basename,
+		    O_RDONLY | (in_dir_fd != AT_FDCWD ? O_NOFOLLOW : 0));
+	if (fd < 0) {
 		rc = -errno;
-		warnx("Failed to open '%s': %s", in_file_name, strerror(-rc));
+		warnx("Failed to open '%s': %s", in_basename, strerror(-rc));
 		goto out;
 	}
 
-	fp_out = fopen_nofollow(out_file_name, "w");
+	fp_in = fdopen(fd, "r");
+	if (fp_in == NULL) {
+		rc = -errno;
+		warnx("Failed to open '%s': %s", in_basename, strerror(-rc));
+		close(fd);
+		goto out;
+	}
+
+	fd = openat(out_dir_fd, out_basename,
+		    O_WRONLY | O_CREAT | O_TRUNC |
+		    (out_dir_fd != AT_FDCWD ? O_NOFOLLOW : 0), 0600);
+	if (fd < 0) {
+		rc = -errno;
+		warnx("Failed to open '%s': %s", out_basename, strerror(-rc));
+		goto out;
+	}
+
+	fp_out = fdopen(fd, "w");
 	if (fp_out == NULL) {
 		rc = -errno;
-		warnx("Failed to open '%s': %s", out_file_name, strerror(-rc));
+		warnx("Failed to open '%s': %s", out_basename, strerror(-rc));
+		close(fd);
 		goto out;
 	}
 
 	while (!feof(fp_in) && (num_bytes == 0 || num < num_bytes)) {
-		len  = fread(buff, 1, num_bytes == 0 ? sizeof(buff) :
-			     MIN(num_bytes - num, sizeof(buff)), fp_in);
+		len = fread(buff, 1, num_bytes == 0 ? sizeof(buff) :
+			    MIN(num_bytes - num, sizeof(buff)), fp_in);
 		if (ferror(fp_in)) {
 			rc = -EIO;
-			warnx("Failed to read from '%s': %s", in_file_name,
+			warnx("Failed to read from '%s': %s", in_basename,
 			      strerror(-rc));
 			break;
 		}
@@ -1250,7 +1277,7 @@ int copy_file(const char *in_file_name, const char *out_file_name,
 
 		if (fwrite(buff, len, 1, fp_out) != 1) {
 			rc = -errno;
-			warnx("Failed to write to '%s': %s", out_file_name,
+			warnx("Failed to write to '%s': %s", out_basename,
 			      strerror(-rc));
 			break;
 		}
@@ -1268,36 +1295,53 @@ out:
 }
 
 /**
- * Reads the passphrase from the specified file and returns the passphrase as
- * an base64 encoded string. The returned string must be freed by the caller.
+ * Reads the passphrase from a file identified by a directory file descriptor
+ * and a basename, and returns it as a base64-encoded string. The file is
+ * opened with openat(2); when dir_fd is a real pinned directory fd O_NOFOLLOW
+ * is added so the read is anchored to the directory inode and cannot follow a
+ * symlink in the final path component. When dir_fd is AT_FDCWD the filename
+ * is used as a plain path (user-supplied file outside the repository).
  *
- * @param[in] filename      the file name of the file containing the passphrase
- * @param[in] verbose       if true, additional error messages are printed.
+ * @param[in] dir_fd    open directory file descriptor, or AT_FDCWD
+ * @param[in] basename  name of the passphrase file within dir_fd
+ * @param[in] verbose   if true, additional error messages are printed.
  *
- * @returns an allocated string
+ * @returns an allocated base64 string, or NULL on error. Caller must free().
  */
-char *read_passphrase_as_base64(const char *filename, bool verbose)
+char *read_passphrase_as_base64_at(int dir_fd, const char *basename,
+				   bool verbose)
 {
 	unsigned char *ret = NULL, *buf = NULL;
-	int outlen, len;
+	int outlen, len, fd;
 	struct stat sb;
 	FILE *fp;
 
-	if (stat(filename, &sb) != 0) {
-		pr_verbose(verbose, "stat on file '%s' failed: %s", filename,
+	fd = openat(dir_fd, basename,
+		    O_RDONLY | (dir_fd != AT_FDCWD ? O_NOFOLLOW : 0));
+	if (fd < 0) {
+		pr_verbose(verbose, "Open of file '%s' failed: %s", basename,
 			   strerror(errno));
+		return NULL;
+	}
+
+	if (fstat(fd, &sb) != 0) {
+		pr_verbose(verbose, "stat on file '%s' failed: %s", basename,
+			   strerror(errno));
+		close(fd);
 		return NULL;
 	}
 
 	if (sb.st_size == 0) {
-		pr_verbose(verbose, "File '%s' is empty", filename);
+		pr_verbose(verbose, "File '%s' is empty", basename);
+		close(fd);
 		return NULL;
 	}
 
-	fp = fopen(filename, "r");
+	fp = fdopen(fd, "r");
 	if (fp == NULL) {
-		pr_verbose(verbose, "Open of file '%s' failed: %s", filename,
+		pr_verbose(verbose, "fdopen of '%s' failed: %s", basename,
 			   strerror(errno));
+		close(fd);
 		return NULL;
 	}
 
@@ -1308,7 +1352,7 @@ char *read_passphrase_as_base64(const char *filename, bool verbose)
 	}
 
 	if (fread(buf, sb.st_size, 1, fp) != 1) {
-		pr_verbose(verbose, "Reading file '%s' failed: %s", filename,
+		pr_verbose(verbose, "Reading file '%s' failed: %s", basename,
 			   strerror(errno));
 		goto out;
 	}
@@ -1342,21 +1386,25 @@ out:
 
 /**
  * Stores the passphrase into the specified file. Decodes the base64 string into
- * bytes.
+ * bytes. The file is created inside the directory identified by @dir_fd using
+ * openat(2) with O_NOFOLLOW, so the write is anchored to the repository
+ * directory file descriptor and cannot follow a symlink in the final path
+ * component.
  *
  * @param[in] b64_string    the passphrase as a base64 string
- * @param[in] filename      the file name of the file containing the passphrase
+ * @param[in] dir_fd        the open file descriptor of the repository directory
+ * @param[in] basename      the basename of the passphrase file within dir_fd
  * @param[in] verbose       if true, additional error messages are printed.
  *
  * @returns 0 for success or a negative errno in case of an error.
  */
-int store_passphrase_from_base64(const char *b64_string, const char *filename,
-				 bool verbose)
+int store_passphrase_from_base64(const char *b64_string, int dir_fd,
+				 const char *basename, bool verbose)
 {
 	size_t len, outlen, rawlen, i;
 	unsigned char *buf;
 	FILE *fp = NULL;
-	int rc = 0;
+	int fd, rc = 0;
 
 	len = strlen(b64_string);
 	if (len == 0 || len % 4 != 0) {
@@ -1374,10 +1422,20 @@ int store_passphrase_from_base64(const char *b64_string, const char *filename,
 		return -ENOMEM;
 	}
 
-	fp = fopen_nofollow(filename, "w");
-	if (fp == NULL) {
-		pr_verbose(verbose, "Open of file '%s' failed: %s", filename,
+	fd = openat(dir_fd, basename,
+		    O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
+	if (fd < 0) {
+		pr_verbose(verbose, "Open of file '%s' failed: %s", basename,
 			   strerror(errno));
+		rc = -EIO;
+		goto out;
+	}
+
+	fp = fdopen(fd, "w");
+	if (fp == NULL) {
+		pr_verbose(verbose, "fdopen of '%s' failed: %s", basename,
+			   strerror(errno));
+		close(fd);
 		rc = -EIO;
 		goto out;
 	}
@@ -1390,7 +1448,7 @@ int store_passphrase_from_base64(const char *b64_string, const char *filename,
 	}
 
 	if (fwrite(buf, rawlen, 1, fp) != 1) {
-		pr_verbose(verbose, "Writing file '%s' failed: %s", filename,
+		pr_verbose(verbose, "Writing file '%s' failed: %s", basename,
 			   strerror(errno));
 		rc = -EIO;
 		goto out;
@@ -1403,32 +1461,3 @@ out:
 	return rc;
 }
 
-FILE *fopen_nofollow(const char *path, const char *mode)
-{
-	int flags = O_NOFOLLOW;
-	int fd;
-	FILE *fp;
-
-	/* Determine flags based on mode */
-	if (mode[0] == 'r')
-		flags |= (mode[1] == '+') ? O_RDWR : O_RDONLY;
-	else if (mode[0] == 'w')
-		flags |= O_CREAT | O_TRUNC |
-				((mode[1] == '+') ? O_RDWR : O_WRONLY);
-	else if (mode[0] == 'a')
-		flags |= O_CREAT | O_APPEND |
-				((mode[1] == '+') ? O_RDWR : O_WRONLY);
-	else
-		return NULL;
-
-	fd = open(path, flags, 0600);
-	if (fd < 0)
-		return NULL;
-
-	fp = fdopen(fd, mode);
-	if (fp == NULL) {
-		close(fd);
-		return NULL;
-	}
-	return fp;
-}

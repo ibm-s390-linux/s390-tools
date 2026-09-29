@@ -20,6 +20,7 @@
 struct keystore {
 	bool verbose;
 	char *directory;
+	int dir_fd;
 	int lock_fd;
 	mode_t mode;
 	gid_t owner;

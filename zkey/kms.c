@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <regex.h>
 #include <stdbool.h>
@@ -323,45 +324,27 @@ out:
 	return rc;
 }
 
-/**
- * Load the kms.conf properties file that is located in the repository
- * directory. The returned properties object must be freed by the caller using
- * properties_free() when no longer needed.
- *
- * @param[in]  repository     the repository directory
- * @param[out] kms_props      On return: a new properties object with the
- *                            properties read from kms.conf.
- * @param[in] verbose         if true, verbose messages are printed
- *
- * @returns 0 for success or a negative errno in case of an error.
- */
-static int load_kms_properties(const char *repository,
-			       struct properties **kms_props, bool verbose)
+static int load_kms_properties_at(int dir_fd, const char *repository,
+				  struct properties **kms_props, bool verbose)
 {
 	struct properties *props = NULL;
-	char *filename = NULL;
 	int rc;
 
-	util_assert(repository != NULL, "Internal error: repository is NULL");
 	util_assert(kms_props != NULL, "Internal error: kms_props is NULL");
 
-	util_asprintf(&filename, "%s/%s", repository, KMS_CONFIG_FILE);
-
-	pr_verbose(verbose, "Trying to load '%s'", filename);
+	pr_verbose(verbose, "Trying to load '%s/%s'", repository, KMS_CONFIG_FILE);
 
 	props = properties_new();
-	rc = properties_load(props, filename, true);
+	rc = properties_load_at(props, dir_fd, KMS_CONFIG_FILE, true);
 	if (rc != 0) {
-		pr_verbose(verbose, "Failed to load '%s': %s", filename,
-			   strerror(-rc));
+		pr_verbose(verbose, "Failed to load '%s/%s': %s", repository,
+			   KMS_CONFIG_FILE, strerror(-rc));
 		goto out;
 	}
 
 	*kms_props = props;
 
 out:
-	if (filename != NULL)
-		free(filename);
 	if (rc != 0)
 		properties_free(props);
 
@@ -381,47 +364,46 @@ out:
 static int _save_kms_properties(const struct keystore *keystore,
 				struct properties *kms_props, bool verbose)
 {
-	char *filename = NULL;
 	int fd = -1, rc = 0;
 
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(kms_props != NULL, "Internal error: kms_props is NULL");
 
-	util_asprintf(&filename, "%s/%s", keystore->directory, KMS_CONFIG_FILE);
+	pr_verbose(verbose, "Saving '%s/%s'", keystore->directory,
+		   KMS_CONFIG_FILE);
 
-	pr_verbose(verbose, "Saving '%s'", filename);
-
-	rc = properties_save(kms_props, filename, true);
+	rc = properties_save_at(kms_props, keystore->dir_fd, KMS_CONFIG_FILE,
+				true);
 	if (rc != 0) {
-		pr_verbose(verbose, "Failed to save '%s': %s", filename,
-			   strerror(-rc));
+		pr_verbose(verbose, "Failed to save '%s/%s': %s",
+			   keystore->directory, KMS_CONFIG_FILE, strerror(-rc));
 		goto out;
 	}
 
-	fd = open(filename, O_RDONLY | O_NOFOLLOW);
+	fd = openat(keystore->dir_fd, KMS_CONFIG_FILE, O_RDONLY | O_NOFOLLOW);
 	if (fd < 0) {
 		rc = -errno;
-		warnx("Failed to open '%s': %s", filename, strerror(-rc));
+		warnx("Failed to open '%s/%s': %s", keystore->directory,
+		      KMS_CONFIG_FILE, strerror(-rc));
 		goto out;
 	}
 
 	if (fchmod(fd, keystore->mode) != 0) {
 		rc = -errno;
-		warnx("chmod failed on file '%s': %s", filename, strerror(-rc));
+		warnx("chmod failed on file '%s/%s': %s", keystore->directory,
+		      KMS_CONFIG_FILE, strerror(-rc));
 		goto out;
 	}
 
 	if (fchown(fd, geteuid(), keystore->owner) != 0) {
 		rc = -errno;
-		warnx("chown failed on file '%s': %s", filename, strerror(-rc));
+		warnx("chown failed on file '%s/%s': %s", keystore->directory,
+		      KMS_CONFIG_FILE, strerror(-rc));
 		goto out;
 	}
 out:
-
 	if (fd >= 0)
 		close(fd);
-	if (filename != NULL)
-		free(filename);
 
 	return rc;
 }
@@ -441,6 +423,7 @@ out:
 int check_for_kms_plugin(struct kms_info *kms_info, bool verbose)
 {
 	char *directory, *plugin = NULL;
+	int dir_fd = -1;
 	int rc;
 
 	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
@@ -451,7 +434,14 @@ int check_for_kms_plugin(struct kms_info *kms_info, bool verbose)
 	if (directory == NULL)
 		directory = DEFAULT_KEYSTORE;
 
-	rc = load_kms_properties(directory, &kms_info->props, verbose);
+	dir_fd = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (dir_fd < 0) {
+		pr_verbose(verbose, "No KMS plugin is configured");
+		rc = 0;
+		goto out;
+	}
+
+	rc = load_kms_properties_at(dir_fd, directory, &kms_info->props, verbose);
 	if (rc != 0) {
 		pr_verbose(verbose, "No KMS plugin is configured");
 		rc = 0;
@@ -471,6 +461,8 @@ int check_for_kms_plugin(struct kms_info *kms_info, bool verbose)
 		goto out;
 
 out:
+	if (dir_fd >= 0)
+		close(dir_fd);
 	if (plugin != NULL)
 		free(plugin);
 	if (rc != 0)
@@ -564,7 +556,7 @@ int init_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 		goto out;
 	}
 
-	if (!is_path_within_base_path(keystore->directory, config_path)) {
+	if (!is_path_within_base_path(keystore, config_path)) {
 		warnx("Invalid KMS config directory: '%s'", config_path);
 		rc = -EIO;
 		goto out;
@@ -678,7 +670,7 @@ void print_last_kms_error(const struct kms_info *kms_info)
 int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 		    bool verbose)
 {
-	char *directory, *config_dir = NULL;
+	char *config_dir = NULL;
 	const struct kms_functions *funcs;
 	struct properties *props = NULL;
 	char *plugin_name = NULL;
@@ -689,7 +681,8 @@ int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
 	util_assert(plugin != NULL, "Internal error: plugin is NULL");
 
-	rc = load_kms_properties(keystore->directory, &props, verbose);
+	rc = load_kms_properties_at(keystore->dir_fd, keystore->directory,
+				    &props, verbose);
 	if (rc == 0) {
 		plugin_name = properties_get(props, KMS_CONFIG_PROP_KMS);
 		if (plugin_name != NULL &&
@@ -709,13 +702,10 @@ int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 	if (rc != 0)
 		goto out;
 
-	directory = secure_getenv(ENVVAR_ZKEY_REPOSITORY);
-	if (directory == NULL)
-		directory = DEFAULT_KEYSTORE;
-	util_asprintf(&config_dir, "%s/%s", directory, plugin_name);
+	util_asprintf(&config_dir, "%s/%s", keystore->directory, plugin_name);
 	pr_verbose(verbose, "Plugin config dir: '%s'", config_dir);
 
-	rc = mkdir(config_dir, keystore->mode);
+	rc = mkdirat(keystore->dir_fd, plugin_name, keystore->mode);
 	if (rc != 0) {
 		rc = -errno;
 		warnx("Failed to create directory '%s': %s", config_dir,
@@ -724,7 +714,8 @@ int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 	}
 	created = true;
 
-	fd = open(config_dir, O_RDONLY | O_NOFOLLOW);
+	fd = openat(keystore->dir_fd, plugin_name,
+		    O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 	if (fd < 0) {
 		rc = -errno;
 		warnx("Failed to open '%s': %s", config_dir, strerror(-rc));
@@ -774,17 +765,17 @@ int bind_kms_plugin(struct keystore *keystore, const char *plugin,
 	}
 
 out:
+	if (config_dir != NULL) {
+		if (rc != 0 && created)
+			unlinkat(keystore->dir_fd, plugin_name, AT_REMOVEDIR);
+		free(config_dir);
+	}
 	if (plugin_name != NULL)
 		free(plugin_name);
 	if (props != NULL)
 		properties_free(props);
 	if (plugin_lib != NULL)
 		dlclose(plugin_lib);
-	if (config_dir != NULL) {
-		if (rc != 0 && created)
-			rmdir(config_dir);
-		free(config_dir);
-	}
 
 	return rc;
 }
@@ -799,7 +790,7 @@ static int remove_directory_recursively(int parent_fd, const char *name)
 	int rc = 0, dirfd;
 	DIR *dirp;
 
-	dirfd = openat(parent_fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+	dirfd = openat(parent_fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 	if (dirfd < 0) {
 		rc = -errno;
 		warnx("Failed to open directory '%s': %s", name, strerror(-rc));
@@ -868,7 +859,7 @@ out:
 int unbind_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 		      bool UNUSED(verbose))
 {
-	int rc, dirfd = -1;
+	int rc;
 
 	util_assert(kms_info != NULL, "Internal error: kms_info is NULL");
 	util_assert(keystore != NULL, "Internal error: keystore is NULL");
@@ -891,16 +882,8 @@ int unbind_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 		}
 	}
 
-	dirfd = open(keystore->directory,
-		     O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-	if (dirfd < 0) {
-		rc = -errno;
-		warnx("Failed to open directory '%s': %s",
-		      keystore->directory, strerror(-rc));
-		goto out;
-	}
-
-	rc = remove_directory_recursively(dirfd, kms_info->plugin_name);
+	rc = remove_directory_recursively(keystore->dir_fd,
+					  kms_info->plugin_name);
 	if (rc != 0) {
 		warnx("Failed to remove the KMS plugin's config "
 		      "directory '%s/%s': %s", keystore->directory,
@@ -908,7 +891,7 @@ int unbind_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 		goto out;
 	}
 
-	if (unlinkat(dirfd, KMS_CONFIG_FILE, 0) != 0) {
+	if (unlinkat(keystore->dir_fd, KMS_CONFIG_FILE, 0) != 0) {
 		rc = -errno;
 		warnx("Failed to remove '%s/%s': %s", keystore->directory,
 		      KMS_CONFIG_FILE, strerror(-rc));
@@ -916,9 +899,6 @@ int unbind_kms_plugin(struct kms_info *kms_info, struct keystore *keystore,
 	}
 
 out:
-	if (dirfd >= 0)
-		close(dirfd);
-
 	return rc;
 }
 
@@ -2238,7 +2218,8 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 		     bool xts, size_t keybits, const char *filename,
 		     const char *passphrase_file,
 		     struct kms_option *kms_options, size_t num_kms_options,
-		     bool verbose, int pkey_fd)
+		     bool verbose, int pkey_fd,
+		     const struct keystore *keystore)
 {
 	char *cipher, *iv_mode, *description, *volumes, *vol_type, *sector_size;
 	char key1_label[KMS_KEY_LABEL_SIZE + 14 + 1] = { 0 };
@@ -2322,11 +2303,13 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	}
 
 	if (passphrase_file != NULL) {
-		passphrase = read_passphrase_as_base64(passphrase_file,
-						       verbose);
+		passphrase = read_passphrase_as_base64_at(keystore->dir_fd,
+							  passphrase_file,
+							  verbose);
 		if (passphrase == NULL) {
 			pr_verbose(verbose, "Failed to read passphrase from "
-				   "file '%s'", passphrase_file);
+				   "file '%s/%s'", keystore->directory,
+				   passphrase_file);
 			rc = -EIO;
 			goto out;
 		}
@@ -2473,8 +2456,9 @@ int generate_kms_key(struct kms_info *kms_info, const char *name,
 	}
 
 save_key:
-	rc = write_secure_key(filename, key_blob, xts ? key_size * 2 : key_size,
-			      verbose);
+	rc = write_secure_key_at(keystore->dir_fd, filename,
+				 key_blob, xts ? key_size * 2 : key_size,
+				 verbose);
 	if (rc != 0)
 		goto out;
 
@@ -2515,6 +2499,7 @@ out:
  *                            or NULL if no passphrase is set. If
  *                            passphrase_file itself is NULL, then no change in
  *                            the passphrase property.
+ * @param[in] keystore        the keystore, used to anchor passphrase reads
  * @param[in] verbose         if true, verbose messages are printed
  *
  * @returns 0 for success or a negative errno in case of an error.
@@ -2525,6 +2510,7 @@ int set_kms_key_properties(struct kms_info *kms_info,
 			   const char *volumes, const char *vol_type,
 			   const char *sector_size,
 			   const char **passphrase_file,
+			   const struct keystore *keystore,
 			   bool verbose)
 {
 	char *key1_id = NULL, *key2_id = NULL;
@@ -2590,11 +2576,14 @@ int set_kms_key_properties(struct kms_info *kms_info,
 		/* *passphrase_file is NULL to remove the property */
 		if (*passphrase_file != NULL) {
 			passphrase =
-				read_passphrase_as_base64(*passphrase_file,
-							  verbose);
+				read_passphrase_as_base64_at(keystore->dir_fd,
+							     *passphrase_file,
+							     verbose);
 			if (passphrase == NULL) {
 				pr_verbose(verbose, "Failed to read passphrase"
-					   " from file '%s'", *passphrase_file);
+					   " from file '%s/%s'",
+					   keystore->directory,
+					   *passphrase_file);
 				rc = -EIO;
 				goto out;
 			}
@@ -3369,6 +3358,7 @@ out:
  * @param[in] key_type        the key type
  * @param[in] verbose         if true, verbose messages are printed
  * @param[in] pkey_fd         the pkey file descriptor
+ * @param[in] keystore        the keystore, used to unlink the passphrase file
  *
  * @returns 0 for success or a negative errno in case of an error.
  */
@@ -3376,7 +3366,8 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		    char **description, char **cipher, char **iv_mode,
 		    char **volumes, char **volume_type, ssize_t *sector_size,
 		    const char *filename, const char *passphrase_file,
-		    const char *key_type, bool verbose, int pkey_fd)
+		    const char *key_type, bool verbose, int pkey_fd,
+		    const struct keystore *keystore)
 {
 	struct kms_property *properties = NULL;
 	u8 key_blob[2 * MAX_SECURE_KEY_SIZE];
@@ -3558,7 +3549,8 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 		str = _find_property(properties, num_properties,
 				     KMS_KEY_PROP_PASSPHRASE);
 		if (str != NULL) {
-			rc = store_passphrase_from_base64(str, passphrase_file,
+			rc = store_passphrase_from_base64(str, keystore->dir_fd,
+							  passphrase_file,
 							  verbose);
 			if (rc != 0) {
 				pr_verbose(verbose,
@@ -3567,17 +3559,19 @@ int refresh_kms_key(struct kms_info *kms_info, struct properties *key_props,
 				goto out;
 			}
 		} else {
-			rc = remove(passphrase_file);
+			rc = unlinkat(keystore->dir_fd, passphrase_file, 0);
 			if (rc != 0 && errno != ENOENT) {
 				pr_verbose(verbose,
-					   "Failed to remove passphrase_file: "
-					   "%s", strerror(errno));
+					   "Failed to remove passphrase file "
+					   "'%s/%s': %s", keystore->directory,
+					   passphrase_file, strerror(errno));
 				goto out;
 			}
 		}
 	}
 
-	rc = write_secure_key(filename, key_blob, key_blob_size, verbose);
+	rc = write_secure_key_at(keystore->dir_fd, filename,
+				 key_blob, key_blob_size, verbose);
 	if (rc != 0)
 		goto out;
 

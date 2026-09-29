@@ -334,31 +334,6 @@ static int _properties_save_file(struct properties *properties, FILE *fp,
 }
 
 /**
- * Saves the properties to a file
- *
- * @param[in]  properties    the properties object
- * @param[in]  filename      the file name
- * @param[in]  check_integrity if TRUE, an hash of the key and values is
- *                           stored as part of the file.
- *
- * @returns 0 on success, -EIO the file could not be created
- */
-int properties_save(struct properties *properties, const char *filename,
-		    bool check_integrity)
-{
-	FILE *fp;
-
-	util_assert(properties != NULL, "Internal error: properties is NULL");
-	util_assert(filename != NULL, "Internal error: filename is NULL");
-
-	fp = fopen_nofollow(filename, "w");
-	if (fp == NULL)
-		return -EIO;
-
-	return _properties_save_file(properties, fp, check_integrity);
-}
-
-/**
  * Saves the properties to a file descriptor relative to a directory
  *
  * @param[in]  properties    the properties object
@@ -378,7 +353,9 @@ int properties_save_at(struct properties *properties, int dir_fd,
 	util_assert(properties != NULL, "Internal error: properties is NULL");
 	util_assert(filename != NULL, "Internal error: filename is NULL");
 
-	fd = openat(dir_fd, filename, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+	fd = openat(dir_fd, filename,
+		    O_WRONLY | O_CREAT | O_TRUNC |
+		    (dir_fd != AT_FDCWD ? O_NOFOLLOW : 0),
 		    S_IRUSR | S_IWUSR);
 	if (fd < 0)
 		return -errno;
@@ -480,16 +457,8 @@ out:
 int properties_load(struct properties *properties, const char *filename,
 		    bool check_integrity)
 {
-	FILE *fp;
-
-	util_assert(properties != NULL, "Internal error: properties is NULL");
-	util_assert(filename != NULL, "Internal error: filename is NULL");
-
-	fp = fopen(filename, "r");
-	if (fp == NULL)
-		return -EIO;
-
-	return _properties_load_file(properties, fp, check_integrity);
+	return properties_load_at(properties, AT_FDCWD, filename,
+				  check_integrity);
 }
 
 /**
@@ -513,7 +482,8 @@ int properties_load_at(struct properties *properties, int dir_fd,
 	util_assert(properties != NULL, "Internal error: properties is NULL");
 	util_assert(filename != NULL, "Internal error: filename is NULL");
 
-	fd = openat(dir_fd, filename, O_RDONLY | O_NOFOLLOW);
+	fd = openat(dir_fd, filename,
+		    O_RDONLY | (dir_fd != AT_FDCWD ? O_NOFOLLOW : 0));
 	if (fd < 0)
 		return -errno;
 
