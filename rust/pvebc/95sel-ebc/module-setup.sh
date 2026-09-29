@@ -6,7 +6,8 @@
 
 # Called by dracut
 check() {
-	# always include
+	require_binaries pvebc pvsecret || return 1
+	require_kernel_modules uvdevice paes_s390 pkey_uv pkey_pckmo pkey || return 1
 	return 0
 }
 
@@ -15,6 +16,7 @@ depends() {
 	# We need systemd in the initramfs
 	echo systemd
 	echo systemd-udevd
+	echo systemd-cryptsetup
 	echo crypt
 	echo dm
 	return 0
