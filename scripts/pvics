@@ -410,6 +410,16 @@ get_arch() {
 	return 0
 }
 
+validate_path() {
+	if [[ $# -lt 1 ]]; then
+		return 1
+	fi
+
+	local path="${1}"
+
+	grep -qE "^[a-zA-Z0-9/_\.-]+$" <<< "${path}"
+}
+
 
 # $1 path to image
 # Returns: Sets global NBD variable
@@ -1092,6 +1102,13 @@ convert() {
 
 		kernel="$(grep -E "^linux" "${f}" | cut -d ' ' -f 2)"
 		initramfs="$(grep -E "^initrd" "${f}" | cut -d ' ' -f 2)"
+
+		if ! validate_path "${kernel}"; then
+			log_error "boot loader entry contains invalid kernel path"
+		fi
+		if ! validate_path "${initramfs}"; then
+			log_error "boot loader entry contains invalid initramfs path"
+		fi
 		if [[ "${NO_EBC}" != "true" ]]; then
 			kernel_parameter="rd.sel-ebc "
 		fi
