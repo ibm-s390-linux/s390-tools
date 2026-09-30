@@ -44,15 +44,16 @@ readonly NETWORK_DEVS=$(cd /sys/class/net; ls -d */ 2>/dev/null |  sed 's/\///g'
 readonly OS_NAME="$(grep -m1 -oP '^PRETTY_NAME="\K[^"]+' /etc/os*)"
 readonly PODMAN=$(if type podman >/dev/null 2>&1; then echo "YES"; else echo "NO"; fi)
 # The processor ID for the first processor
-readonly PROCESSORID="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
-	sed 's/.*identification[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
-readonly PROCESSORVERSION="$(grep -E ".*processor 0:.*" /proc/cpuinfo | \
-	sed 's/.*version[[:space:]]*\=[[:space:]]*\([[:alnum:]]*\).*/\1/g')"
-if test "x${PROCESSORVERSION}" = "xFF" || test "x${PROCESSORVERSION}" = "xff"; then
-	RUNTIME_ENVIRONMENT=$(grep -E "VM00.*Control Program.*" /proc/sysinfo | \
-	sed 's/.*:[[:space:]]*\([[:graph:]]*\).*/\1/g')
-else
+readonly PROCESSORID="$(grep -m1 -oP ".*processor \d+:.*identification = \K[[:alnum:]]+" /proc/cpuinfo)"
+readonly PROCESSORVERSION="$(grep -m1 -oP ".*processor \d+: version = \K[[:alnum:]]+" /proc/cpuinfo | \
+	tr '[:lower:]' '[:upper:]')"
+if test "${PROCESSORVERSION}" = "FF"; then
+	RUNTIME_ENVIRONMENT=$(grep -m1 -oP "VM00.*Control Program: \K[[:graph:]]+" /proc/sysinfo)
+elif test "${PROCESSORVERSION#0}" != "${PROCESSORVERSION}"; then
+	# any value statring with "0" is expected to be a LPAR
 	RUNTIME_ENVIRONMENT="LPAR"
+else
+	RUNTIME_ENVIRONMENT="unclear ${PROCESSORVERSION}"
 fi
 # check for Dynamic Partition Mode
 readonly DPM_UUID=$(grep "LPAR UUID" /proc/sysinfo | \
@@ -109,8 +110,7 @@ The collected information is written to a TAR archive named
 
 where [date] and [time] are the date and time when debug data is collected.
 [hostname] indicates the hostname of the system the data was collected from.
-The [processorid] is taken from the processor 0 and indicates the processor
-identification.
+The [processorid] is the identification of first processor.
 
 Options:
         -d|--directory     specify the directory where the data collection
@@ -801,7 +801,7 @@ collect_vmcmdsout() {
 	local cp_buffer_size
 	local rc_buffer_check
 
-	if echo "${RUNTIME_ENVIRONMENT}" | grep -qi "z/VM" >/dev/null 2>&1; then
+	if test "${RUNTIME_ENVIRONMENT}" = "z/VM"; then
 		pr_collect_output "z/VM"
 
 		if type vmcp >/dev/null 2>&1; then
@@ -864,7 +864,7 @@ collect_hyptop() {
 		"LPAR")
 			param="\#,T,c,e,m,C:s,E:s,M:s,o"  # all LPAR fields
 			;;
-		*)  # KVM guest
+		*)
 			pr_skip "hyptop: not available for ${RUNTIME_ENVIRONMENT}"
 			return 1
 			;;
