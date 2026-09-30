@@ -666,7 +666,7 @@ build_sel_image() {
 	if [[ "${NO_EBC:-false}" != "true" ]]; then
 		pvimg_cmd+=("--enable-cck-update" "--quiet" "--disable-image-encryption")
 	fi
-	pvimg_cmd+=("${PVIMG_USER_OPTS}")
+	pvimg_cmd+=("${PVIMG_USER_OPTS[@]}")
 
 	execute "${pvimg_cmd[@]}"
 
@@ -853,18 +853,20 @@ cli() {
 #
 
 parse_yaml_pv() {
-	local files f hkd cert crl
+	local files f hkd cert crl pvimg_user_opts_raw
 
 	NO_VERIFY=$(yaml_get_opt ".no-verify")
 	if [[ "${NO_VERIFY}" == "unset" ]]; then
 		NO_VERIFY=false
 	fi
 
-	PVIMG_USER_OPTS="$(yaml_get_opt ".convert.pvimg-create-options")"
-	if [[ "${PVIMG_USER_OPTS}" == "unset" && "${NO_EBC}" != "true" ]]; then
-		PVIMG_USER_OPTS="--enable-pckmo-hmac"
-	elif [[ "${PVIMG_USER_OPTS}" == "unset" ]]; then
-		PVIMG_USER_OPTS=""
+	pvimg_user_opts_raw="$(yaml_get_opt ".convert.pvimg-create-options")"
+	if [[ "${pvimg_user_opts_raw}" == "unset" && "${NO_EBC}" != "true" ]]; then
+		PVIMG_USER_OPTS=("--enable-pckmo-hmac")
+	elif [[ "${pvimg_user_opts_raw}" == "unset" ]]; then
+		PVIMG_USER_OPTS=()
+	else
+		read -ra PVIMG_USER_OPTS <<< "${pvimg_user_opts_raw}"
 	fi
 
 	HKDs="$(yaml_get_req ".hkds[]")"
