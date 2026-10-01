@@ -1191,7 +1191,7 @@ collect_ovs() {
 		done
 		IFS="${IFS_ORI}"
 
-		for bridge in ${ovs-vsctl list-br}; do
+		for bridge in $(ovs-vsctl list-br); do
 			ovsbrcmds="ovs-ofctl show ${bridge}\
 				  :ovs-ofctl dump-flows ${bridge}\
 				  :ovs-appctl fdb/show ${bridge}\
