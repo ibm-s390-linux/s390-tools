@@ -4582,8 +4582,9 @@ static int cmsfs_process_args(void *data, const char *arg, int key,
 		fflush(stderr);
 		dup2(STDOUT_FILENO, STDERR_FILENO);
 
-		fuse_opt_add_arg(outargs, "-ho");
-		cmsfs_fuse_main(outargs, &cmsfs_oper);
+		printf("FUSE options:\n");
+		fuse_lib_help(outargs);
+		fuse_opt_free_args(outargs);
 		exit(0);
 	case KEY_VERSION:
 		fprintf(stdout, COMP "FUSE file system for CMS disks "
