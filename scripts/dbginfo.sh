@@ -174,7 +174,7 @@ container host        Kubernetes: ${KUBERNETES} - docker: ${DOCKER} - podman: ${
 Current user          = $(whoami) (must be root for data collection)
 Date and time         = $(date)
 Uptime                =$(uptime)
-Number of coredumps   = $(expr $(coredumpctl 2>&1 | wc -l) - 1)
+Number of coredumps   = $(( $(coredumpctl 2>&1 | wc -l) - 1 ))
 zdevice onl/conf/offl = ${ZDEV_ONL} / ${ZDEV_CONF} / ${ZDEV_OFF}
 Log file check        =$(logfile_checker "/var/log*")
 
@@ -310,7 +310,7 @@ ALL_STEPS="\
   environment_cleanup\
   "
 # The amount of steps running the whole collections, without last cleanup
-readonly COLLECTION_COUNT=$(expr $(echo ${ALL_STEPS} | wc -w) - 1)
+readonly COLLECTION_COUNT=$(( $(echo ${ALL_STEPS} | wc -w) - 1 ))
 
 ########################################
 # Collection of proc fs entries
@@ -855,7 +855,8 @@ collect_hyptop() {
 	local param
 	local delay=1  # seconds
 	local iter=5
-	local sec=$(expr ${delay} \\* ${iter})
+	local sec
+	sec=$(( delay * iter ))
 
 	case ${RUNTIME_ENVIRONMENT} in
 		"z/VM")
@@ -1658,7 +1659,7 @@ for step in ${ALL_STEPS}; do
 	step_num="${current_step} of ${COLLECTION_COUNT}: "
 	# calling step procedure
 	${step}
-	current_step=$(expr ${current_step} + 1)
+	current_step=$(( current_step + 1 ))
 done
 
 logger -t "${SCRIPTNAME}" "Data collection completed"
