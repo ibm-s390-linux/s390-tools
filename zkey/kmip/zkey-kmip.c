@@ -5071,6 +5071,7 @@ out:
 	kmip_node_free(crea_resp);
 	kmip_node_free(act_req);
 	kmip_node_free(act_resp);
+	kmip_node_free(unique_id);
 
 	return rc;
 }
