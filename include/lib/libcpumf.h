@@ -16,6 +16,7 @@
 #define	S390_CPUMF_CFDIAG	"devices/cpum_cf_diag/"
 #define	S390_CPUMF_SF		"devices/cpum_sf/"
 #define S390_CPUS_ONLINE	"devices/system/cpu/online"
+#define S390_CPUS_POSSIBLE	"devices/system/cpu/possible"
 #define S390_CPUMSF_BUFFERSZ	"module/kernel/parameters/cpum_sfb_size"
 #define S390_SYSFS_PAI_CRYPTO	"devices/pai_crypto/"
 #define S390_SYSFS_PAI_EXT	"devices/pai_ext/"

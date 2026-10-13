@@ -309,13 +309,13 @@ static void parse_cpulist(char *parm, struct s390_hwctr_start *start)
 		if (strlen(parm) > 0)		/* Handle CPU list */
 			rc = libcpumf_cpuset(parm, &cpulist);
 		else
-			rc = libcpumf_cpuset_fn(S390_CPUS_ONLINE, &cpulist);
+			rc = libcpumf_cpuset_fn(S390_CPUS_POSSIBLE, &cpulist);
 		if (rc)
 			errx(EXIT_FAILURE, "Cannot use CPU list %s", parm);
 	} else {		/* No CPU list and no counter sets */
-		rc = libcpumf_cpuset_fn(S390_CPUS_ONLINE, &cpulist);
+		rc = libcpumf_cpuset_fn(S390_CPUS_POSSIBLE, &cpulist);
 		if (rc)
-			err(EXIT_FAILURE, "Cannot read file " S390_CPUS_ONLINE);
+			err(EXIT_FAILURE, "Cannot read file " S390_CPUS_POSSIBLE);
 	}
 
 	/* Check with authorized counter sets */
