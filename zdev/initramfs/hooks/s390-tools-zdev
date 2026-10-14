@@ -35,6 +35,9 @@ for x in $zdev_modules ; do
 	manual_add_modules ${x}
 done
 
+mkdir -p "$DESTDIR/lib"
+cp -p /lib/s390-tools/zdev-cmdline-lib.sh "$DESTDIR/lib/"
+
 copy_exec /sbin/chzdev
 copy_exec /sbin/lszdev
 copy_exec /sbin/vmcp
