@@ -11,7 +11,7 @@ use utils::HexSlice;
 
 use crate::exchange::ExchangeFormatResponse;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct AttestationResult<'a> {
     pub cuid: HexSlice<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -175,6 +175,7 @@ impl ExchangeFormatV1Hdr {
 /// # assert!(ExchangeMagic::starts_with_magic(magic));
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct ExchangeMagic;
 impl MagicValue<8> for ExchangeMagic {
     const MAGIC: [u8; 8] = [0x70, 0x76, 0x61, 0x74, 0x74, 0x65, 0x73, 0x74];
