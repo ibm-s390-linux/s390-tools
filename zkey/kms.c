@@ -490,8 +490,8 @@ static bool is_path_within_base_path(const char *base_path, const char *path)
 	size_t base_len;
 	bool ret = false;
 
-	real_base_path = canonicalize_file_name(base_path);
-	real_path = canonicalize_file_name(path);
+	real_base_path = realpath(base_path, NULL);
+	real_path = realpath(path, NULL);
 
 	if (real_base_path == NULL || real_path == NULL) {
 		warnx("Failed to resolve path for safety check: %s",

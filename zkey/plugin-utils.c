@@ -406,7 +406,7 @@ int plugin_remove_config_file(struct plugin_data *pd, const char *filename)
 /**
  * Checks whether 'path' resolves to a location strictly inside the plugin's
  * config directory. Both the config directory and 'path' are canonicalized
- * via canonicalize_file_name() so that symlinks and '..' components in
+ * via realpath() so that symlinks and '..' components in
  * 'path' cannot escape the config directory.
  *
  * @param pd                the plugin data
@@ -422,8 +422,8 @@ bool plugin_path_is_within_config(struct plugin_data *pd, const char *path)
 	size_t config_len;
 	bool ok = false;
 
-	real_config = canonicalize_file_name(pd->config_path);
-	real_path = canonicalize_file_name(path);
+	real_config = realpath(pd->config_path, NULL);
+	real_path = realpath(path, NULL);
 
 	if (real_config == NULL || real_path == NULL) {
 		plugin_set_error(pd, "Failed to resolve path '%s': %s",
