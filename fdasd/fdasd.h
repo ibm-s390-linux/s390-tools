@@ -60,12 +60,14 @@ struct fdasd_options {
 	char *device;
 	char *volser;
 	char *conffile;
+	char *script_commands;
 };
 
 static struct fdasd_options options = {
 	NULL,		/* device   */
 	NULL,		/* volser   */
 	NULL,		/* conffile */
+	NULL,		/* script_commands */
 };
 
 typedef struct partition_info {
@@ -101,6 +103,7 @@ typedef struct fdasd_anchor {
 	int devno;
 	int option_reuse;
 	int option_recreate;
+	int script_mode;
 	int partno[USABLE_PARTITIONS];
 	uint16_t dev_type;
 	unsigned int used_partitions;
