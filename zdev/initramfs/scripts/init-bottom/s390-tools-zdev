@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Copyright IBM Corp. 2026
+#
+# s390-tools is free software; you can redistribute it and/or modify
+# it under the terms of the MIT license. See LICENSE for details.
+#
+# scripts/init-bottom/s390-tools-zdev
+#   Export the device configuration applied by the initial RAM disk so that a
+#   distribution installer can import it and transfer it to the installed
+#   system. Equivalent to the dracut module's retain-zdev.sh.
+#
+#   initramfs-tools runs init-bottom scripts immediately before moving /run to
+#   the root file system, so the exported file survives into the booted
+#   system.
+#
+
+PREREQ=""
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+[ -x /sbin/chzdev ] || exit 0
+
+chzdev --export /run/zdev.initrd.config \
+       --configured --type --persistent --quiet 2>/dev/null || true
+
+exit 0

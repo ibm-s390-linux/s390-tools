@@ -4,6 +4,7 @@ include ../../common.mak
 INITRAMFSDIR := /usr/share/initramfs-tools
 HOOKDIR := $(INITRAMFSDIR)/hooks
 INITTOP := $(INITRAMFSDIR)/scripts/init-top
+INITBOTTOM := $(INITRAMFSDIR)/scripts/init-bottom
 
 # HAVE_INITRAMFS
 #
@@ -12,11 +13,18 @@ INITTOP := $(INITRAMFSDIR)/scripts/init-top
 # performs the following functions when mkinitramfs is run:
 #
 #  - install a boot-time hook to apply firmware-provided configuration data
-#    to the system
+#    and rd.zdev kernel parameters to the system
+#  - install a hook to export the resulting configuration for use by a
+#    distribution installer
 #
 ifeq ($(HAVE_INITRAMFS),1)
 install:
-	$(INSTALL) -m 755 -d $(DESTDIR)/$(HOOKDIR) $(DESTDIR)/$(INITTOP)
+	$(INSTALL) -m 755 -d $(DESTDIR)/$(HOOKDIR) $(DESTDIR)/$(INITTOP) \
+		$(DESTDIR)/$(INITBOTTOM) $(DESTDIR)/$(TOOLS_LIBDIR)
+	$(INSTALL) -m 644 ../cmdline/zdev-cmdline-lib.sh \
+		$(DESTDIR)/$(TOOLS_LIBDIR)
 	$(INSTALL) -m 755 hooks/s390-tools-zdev $(DESTDIR)/$(HOOKDIR)
 	$(INSTALL) -m 755 scripts/init-top/s390-tools-zdev $(DESTDIR)/$(INITTOP)
+	$(INSTALL) -m 755 scripts/init-bottom/s390-tools-zdev \
+		$(DESTDIR)/$(INITBOTTOM)
 endif

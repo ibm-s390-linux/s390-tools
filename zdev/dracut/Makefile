@@ -12,7 +12,7 @@ ZDEVKDUMPDIR := 95zdev-kdump
 #
 #  - copy the persistent root device configuration to the initial ram disk
 #  - install a boot-time hook to apply firmware-provided configuration data
-#    to the system
+#    and rd.zdev kernel parameters to the system
 #
 ifeq ($(HAVE_DRACUT),1)
 install:
@@ -25,6 +25,7 @@ install:
 		$(ZDEVDIR)/retain-zdev.sh \
 		$(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)/
 	$(INSTALL) -m 644 $(ZDEVDIR)/zdev-lib.sh \
+		../cmdline/zdev-cmdline-lib.sh \
 		$(DESTDIR)$(DRACUTMODDIR)/$(ZDEVDIR)/
 	$(INSTALL) -m 755 -d $(DESTDIR)$(DRACUTMODDIR)/$(ZDEVKDUMPDIR)
 	$(INSTALL) -m 755 $(ZDEVKDUMPDIR)/module-setup.sh \

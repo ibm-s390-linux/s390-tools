@@ -74,6 +74,7 @@ install() {
     inst_multiple grep
 
     # Hook to parse zdev kernel parameter
+    inst_simple "$moddir/zdev-cmdline-lib.sh" "/lib/zdev-cmdline-lib.sh"
     inst_hook cmdline 95 "$moddir/parse-zdev.sh"
     # Hook to parse zfcp dracut cmdline parameter
     inst_hook cmdline 95 "$moddir/parse-zfcp.sh"
