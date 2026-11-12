@@ -472,8 +472,9 @@ void VirtAdapterPrinter::print_queue_fill(FILE *fp,
 
 	tmp = 0;
 	if (res && res->valid)
-		tmp = res->stats.queue_util_integral
-			/ (double)res->stats.queue_util_interval;
+		tmp = (res->stats.queue_util_integral
+			/ (double)res->stats.queue_util_interval) * 100
+			/ ZIOREP_PRINTERS_MAX_QUEUE_LEN;
 	print_delimiter(fp);
 	print_abbrev_num(fp, tmp, 5);
 }
